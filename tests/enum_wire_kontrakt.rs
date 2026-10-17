@@ -1491,9 +1491,9 @@ fn pfad_match_ist_token_genau() {
     assert!(!pfad_kommt_vor(text, "lifeline_hub::person::Geschlecht"));
 }
 
-/// LFH-892/LFH-1040: Gerätekopplung. Die Ansichten stehen als CHECK in
-/// `migrations/0159_geraet_kopplung_stellenarten.sql`; das Frontend wählt nach ihnen Hülle und
-/// Startseite, nach der Bindungsart die Stellenauswahl der Kopplungsmaske.
+/// LFH-892/LFH-1040/LLH-1048: Gerätekopplung. Die Ansichten stehen als CHECK in
+/// `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`; das Frontend wählt nach ihnen Hülle
+/// und Startseite, nach der Bindungsart die Stellenauswahl der Kopplungsmaske.
 #[test]
 fn geraet_kopplung_wire() {
     enum_wire!(lifeline_hub::geraet::Funktionsansicht {
@@ -1510,6 +1510,7 @@ fn geraet_kopplung_wire() {
         Betreuungsstelle => "betreuungsstelle",
         Bereitstellungsraum => "bereitstellungsraum",
         Einsatzabschnitt => "einsatzabschnitt",
+        Verpflegungsstelle => "verpflegungsstelle",
     } in lifeline_hub::geraet::Bindungsart::ALLE);
     enum_wire!(lifeline_hub::geraet::repo::KopplungStatus {
         Wartend => "wartend",

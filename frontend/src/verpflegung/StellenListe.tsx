@@ -51,6 +51,9 @@ interface Rueckfragestand {
   fehler: unknown;
 }
 
+/** Kurzgrund am gesperrten „Stornieren“ einer Stelle mit gekoppeltem Gerät (LLH-1048, Server 409). */
+const GERAET_GEKOPPELT = 'Gerät gekoppelt';
+
 /** Hängt an der Stelle eine Ausgabe, auch eine zurückgenommene? Dann kein Storno (Server 422). */
 function hasAusgabe(stelleId: number, zeitfenster: readonly VerpflegungZeitfenster[]): boolean {
   return zeitfenster.some((zf) => zf.ausgaben.some((a) => a.verpflegungsstelle_id === stelleId));
@@ -135,7 +138,7 @@ export default function StellenListe({
   const zeile = (s: Verpflegungsstelle) => {
     const kennung = `Stelle ${s.bezeichnung}`;
     const laufend = laufendeZeitfensterDerStelle(s.id, zeitfenster, jetzt);
-    const aktionen: { key: Aktion; label: string; gefahr?: true }[] = !darfPlanen
+    const aktionen: { key: Aktion; label: string; gefahr?: true; gesperrt?: true }[] = !darfPlanen
       ? []
       : s.status === 'geplant'
         ? [
@@ -144,7 +147,18 @@ export default function StellenListe({
             { key: 'aufloesen', label: 'Auflösen …', gefahr: true },
             ...(hasAusgabe(s.id, zeitfenster)
               ? []
-              : [{ key: 'stornieren' as const, label: 'Stornieren …', gefahr: true as const }]),
+              : s.geraet_gekoppelt
+                ? // LLH-1048: der Server lehnt mit 409 ab; gesperrt mit Grund statt weg, denn
+                  // erst der Widerruf der Kopplung macht es möglich.
+                  [
+                    {
+                      key: 'stornieren' as const,
+                      label: `Stornieren … (${GERAET_GEKOPPELT})`,
+                      gefahr: true as const,
+                      gesperrt: true as const,
+                    },
+                  ]
+                : [{ key: 'stornieren' as const, label: 'Stornieren …', gefahr: true as const }]),
           ]
         : s.status === 'aktiv'
           ? [

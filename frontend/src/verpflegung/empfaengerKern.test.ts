@@ -24,7 +24,9 @@ import {
 } from './empfaengerKern';
 
 /** „Mittag“ 10:00–11:30 UTC mit den gegebenen Ausgaben. */
-const mittag = (ausgaben: ReturnType<typeof ausgabe>[] = []) => zeitfenster({ ausgaben });
+const mittag = (
+  a: ReturnType<typeof ausgabe>[] | Partial<Parameters<typeof zeitfenster>[0]> = [],
+) => zeitfenster(Array.isArray(a) ? { ausgaben: a } : a);
 const namen = (zeilen: readonly { name: string }[]) => zeilen.map((z) => z.name);
 
 describe('verpflegungsstand — „Noch nicht verpflegt“ (LLH-1055)', () => {
@@ -200,6 +202,51 @@ describe('verpflegungsstand — „Noch nicht verpflegt“ (LLH-1055)', () => {
       KEINE_EMPFAENGER,
     );
     expect(namen(stand.verpflegt)).toEqual(['Einheit #99']);
+  });
+});
+
+describe('verpflegungsstand — anderswo verpflegt (LLH-1048 Teil II, LLH-1024 F7)', () => {
+  it('eine anderswo verpflegte Einheit steht unter „verpflegt“ mit „anderswo n EP“, nicht als offen', () => {
+    const stand = verpflegungsstand(
+      mittag({ ausgaben: [], verpflegt_anderswo: [{ einheit_id: GRUPPE_2, menge: 40 }] }),
+      empfaenger(),
+    );
+    expect(namen(stand.offen)).toEqual(['1. Zug', '1. Gruppe']);
+    expect(stand.verpflegt.map((z) => [z.name, z.anderswo, z.ausgaben])).toEqual([
+      ['2. Gruppe', 40, []],
+    ]);
+  });
+
+  it('anderswo an den Zug verpflegt seinen Teilbaum wie eine eigene Ausgabe', () => {
+    const stand = verpflegungsstand(
+      mittag({ ausgaben: [], verpflegt_anderswo: [{ einheit_id: ZUG, menge: 20 }] }),
+      empfaenger(),
+    );
+    expect(stand.offen).toEqual([]);
+    expect(stand.verpflegt.map((z) => [z.name, z.anderswo, z.untereinheiten])).toEqual([
+      ['1. Zug', 20, 2],
+    ]);
+  });
+
+  it('eigene Ausgabe und anderswo an derselben Einheit: eine Zeile mit beidem', () => {
+    const stand = verpflegungsstand(
+      mittag({
+        ausgaben: [ausgabe({ id: 1, menge: 9, einheit_id: GRUPPE_1 })],
+        verpflegt_anderswo: [{ einheit_id: GRUPPE_1, menge: 5 }],
+      }),
+      empfaenger(),
+    );
+    expect(stand.verpflegt.map((z) => [z.name, z.anderswo, z.ausgaben.length])).toEqual([
+      ['1. Gruppe', 5, 1],
+    ]);
+  });
+
+  it('ohne Angabe des Servers (Desktop, einsatzweites Gerät) gibt es kein „anderswo“', () => {
+    const stand = verpflegungsstand(
+      mittag([ausgabe({ id: 1, menge: 9, einheit_id: GRUPPE_1 })]),
+      empfaenger(),
+    );
+    expect(stand.verpflegt.map((z) => z.anderswo)).toEqual([0]);
   });
 });
 

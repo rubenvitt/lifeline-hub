@@ -2,7 +2,8 @@
 //! `funktionsansichten`, „Stellenbindung“).
 //!
 //! Ein stellengebundenes Gerät sieht und schreibt nur an der Stelle seiner Kopplung: eine UHS,
-//! eine Betreuungsstelle, ein Bereitstellungsraum oder ein Einsatzabschnitt. Die Routenschranke in
+//! eine Betreuungsstelle, ein Bereitstellungsraum, ein Einsatzabschnitt oder (wahlweise, LLH-1048)
+//! eine Verpflegungsstelle. Die Routenschranke in
 //! `CurrentUser` lässt die Routen der Ansicht zu; welche Stelle und welche Person dahinter liegt,
 //! prüft der Handler über diese Helfer.
 //!
@@ -14,6 +15,12 @@
 //!
 //! Lesen über eine fremde Stelle oder Person ist 404 (das Gerät erfährt nicht, dass es sie gibt),
 //! Schreiben in eine fremde Stelle bei einer sichtbaren Person 403.
+//!
+//! **Ausnahme Verpflegung** (LLH-1048, LLH-1024 F7): ihre Stelle ist wahlweise
+//! ([`super::Funktionsansicht::stelle_wahlweise`]). Ohne Stelle bleibt das Gerät einsatzweit wie
+//! vor der Bindung. Ihre Handler fragen deshalb [`sicht_wahlweise`] und
+//! [`ziel_stelle_wahlweise`]; die strengen Helfer sehen für ein Verpflegungsgerät ohne Stelle
+//! weiter keine Stelle.
 
 use super::{Bindungsart, GeraetKontext};
 use crate::error::AppError;
@@ -53,6 +60,40 @@ pub fn sicht(geraet: Option<&GeraetKontext>, art: Bindungsart) -> Sicht {
     }
 }
 
+/// Wie [`sicht`], für eine Ansicht mit wahlweiser Stelle (Verpflegung, LLH-1048, LLH-1024 F7):
+/// ein Gerät dieser Ansicht **ohne** Stelle ist einsatzweit und sieht alle Stellen der Art, wie
+/// eine Person (`Alle`); mit Stelle nur diese. Für jede andere Sitzung gilt [`sicht`]. Nur in den
+/// Handlern der Verpflegung zu nehmen; die strenge Regel von [`sicht`] bleibt sonst bestehen.
+pub fn sicht_wahlweise(geraet: Option<&GeraetKontext>, art: Bindungsart) -> Sicht {
+    match geraet {
+        Some(g)
+            if g.stelle.is_none()
+                && g.ansicht.stelle_wahlweise()
+                && g.ansicht.stellenart() == Some(art) =>
+        {
+            Sicht::Alle
+        }
+        _ => sicht(geraet, art),
+    }
+}
+
+/// Die Stelle, an der gebucht wird, bei wahlweiser Bindung ([`sicht_wahlweise`]): ein an eine
+/// Stelle gebundenes Gerät bucht immer an ihr — ohne Angabe setzt der Server sie, eine andere
+/// ist 403 (Buchung in eine fremde Stelle). Eine Person und das einsatzweite Gerät buchen, was
+/// sie angeben. Jedes andere Gerät: 403.
+pub fn ziel_stelle_wahlweise(
+    geraet: Option<&GeraetKontext>,
+    art: Bindungsart,
+    angabe: Option<i64>,
+) -> Result<Option<i64>, AppError> {
+    match (sicht_wahlweise(geraet, art), angabe) {
+        (Sicht::Alle, _) => Ok(angabe),
+        (Sicht::Nur(eigene), None) => Ok(Some(eigene)),
+        (Sicht::Nur(eigene), Some(ziel)) if eigene == ziel => Ok(Some(eigene)),
+        _ => Err(AppError::Forbidden),
+    }
+}
+
 /// Die eigene Stelle der Art `art`, wenn die Sitzung ein daran gebundenes Gerät ist.
 pub fn eigene(geraet: Option<&GeraetKontext>, art: Bindungsart) -> Option<i64> {
     match sicht(geraet, art) {
@@ -61,10 +102,12 @@ pub fn eigene(geraet: Option<&GeraetKontext>, art: Bindungsart) -> Option<i64> {
     }
 }
 
-/// Ob die Sitzung ein Gerät ist, das an irgendeine Stelle gebunden ist. Solche Geräte sehen nur
-/// ihre Stelle und bekommen deshalb keine einsatzweiten Zähler (`routes/modul_zaehler.rs`).
+/// Ob die Sitzung ein Gerät ist, das an irgendeine Stelle gebunden ist: eine Ansicht mit
+/// Pflichtstelle (auch wenn die Stelle weg ist) oder eine wahlweise gebundene mit Stelle. Solche
+/// Geräte sehen nur ihre Stelle und bekommen deshalb keine einsatzweiten Zähler
+/// (`routes/modul_zaehler.rs`).
 pub fn ist_gebunden(geraet: Option<&GeraetKontext>) -> bool {
-    geraet.is_some_and(|g| g.ansicht.ist_stellengebunden())
+    geraet.is_some_and(|g| g.ansicht.ist_stellengebunden() || g.stelle.is_some())
 }
 
 /// Lesen oder Bearbeiten an einer Stelle: eine fremde ist für das Gerät nicht vorhanden (404).
@@ -214,7 +257,8 @@ mod tests {
 
     #[test]
     fn geraet_ohne_stelle_sieht_keine_stelle() {
-        // Lagemonitor und Verpflegung erreichen keine Stellenroute; täten sie es, sähen sie nichts.
+        // Lagemonitor und Verpflegung ohne Stelle erreichen keine Stellenroute; täten sie es, sähen
+        // sie nichts. Einsatzweit ist die Verpflegung nur über `sicht_wahlweise`.
         for a in [Funktionsansicht::Lagemonitor, Funktionsansicht::Verpflegung] {
             let g = geraet(a, None);
             assert_eq!(stelle(Some(&g)), None);
@@ -297,6 +341,66 @@ mod tests {
         );
         assert_eq!(sicht(Some(&g), Bindungsart::Betreuungsstelle), Sicht::Keine);
         assert_eq!(sicht(Some(&g), Bindungsart::Uhs), Sicht::Keine);
+    }
+
+    /// LLH-1048 (LLH-1024 F7): ein Verpflegungsgerät ohne Stelle ist einsatzweit (`Alle`), mit
+    /// Stelle sieht es nur diese; die strenge `sicht` bleibt für es `Keine` bzw. `Nur`.
+    #[test]
+    fn verpflegung_bindet_wahlweise() {
+        let art = Bindungsart::Verpflegungsstelle;
+        let einsatzweit = geraet(Funktionsansicht::Verpflegung, None);
+        assert_eq!(sicht_wahlweise(Some(&einsatzweit), art), Sicht::Alle);
+        assert_eq!(sicht(Some(&einsatzweit), art), Sicht::Keine);
+        assert!(!ist_gebunden(Some(&einsatzweit)));
+        assert_eq!(
+            ziel_stelle_wahlweise(Some(&einsatzweit), art, Some(7)).unwrap(),
+            Some(7)
+        );
+        assert_eq!(
+            ziel_stelle_wahlweise(Some(&einsatzweit), art, None).unwrap(),
+            None
+        );
+
+        let tresen = geraet(Funktionsansicht::Verpflegung, Some((art, 2)));
+        assert_eq!(sicht_wahlweise(Some(&tresen), art), Sicht::Nur(2));
+        assert_eq!(sicht(Some(&tresen), art), Sicht::Nur(2));
+        assert!(ist_gebunden(Some(&tresen)));
+        // Ohne Angabe setzt der Server die eigene Stelle, eine fremde ist 403.
+        assert_eq!(
+            ziel_stelle_wahlweise(Some(&tresen), art, None).unwrap(),
+            Some(2)
+        );
+        assert_eq!(
+            ziel_stelle_wahlweise(Some(&tresen), art, Some(2)).unwrap(),
+            Some(2)
+        );
+        assert!(matches!(
+            ziel_stelle_wahlweise(Some(&tresen), art, Some(3)),
+            Err(AppError::Forbidden)
+        ));
+
+        // Eine Person bucht, was sie angibt.
+        assert_eq!(sicht_wahlweise(None, art), Sicht::Alle);
+        assert_eq!(ziel_stelle_wahlweise(None, art, Some(3)).unwrap(), Some(3));
+
+        // Andere Ansichten werden nicht einsatzweit, nur weil sie keine Stelle haben.
+        for a in [
+            Funktionsansicht::Lagemonitor,
+            Funktionsansicht::Einsatzabschnitt,
+            Funktionsansicht::UhsTablet,
+        ] {
+            let g = geraet(a, None);
+            assert_eq!(sicht_wahlweise(Some(&g), art), Sicht::Keine, "{a:?}");
+            assert!(matches!(
+                ziel_stelle_wahlweise(Some(&g), art, None),
+                Err(AppError::Forbidden)
+            ));
+        }
+        // Eine wahlweise Stelle einer anderen Art macht das Gerät nicht einsatzweit.
+        assert_eq!(
+            sicht_wahlweise(Some(&einsatzweit), Bindungsart::Uhs),
+            Sicht::Keine
+        );
     }
 
     #[sqlx::test]

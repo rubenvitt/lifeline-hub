@@ -12,7 +12,19 @@ Gerät namentlich bestätigen (LFH-1046).
 
 Das System SHALL das Anlegen, Verlängern, Neuausstellen und Widerrufen einer Kopplung nur der
 Einsatzleitung eines aktiven Einsatzes erlauben. Eine Kopplung MUST Einsatz, Funktionsansicht
-und Gerätebezeichnung tragen, bei einer stellengebundenen Ansicht zusätzlich die Stelle.
+und Gerätebezeichnung tragen, bei einer stellengebundenen Ansicht zusätzlich die Stelle. Bei der
+Ansicht Verpflegung ist die Stelle (eine Verpflegungsstelle) wahlweise (LLH-1048); eine
+Bestandskopplung ohne Stelle bleibt einsatzweit.
+
+#### Scenario: Wahlweise Stelle in der Kopplungsmaske
+- **WHEN** die Einsatzleitung in der Kopplungsmaske die Ansicht Verpflegung wählt
+- **THEN** zeigt die Maske das Feld „Verpflegungsstelle“ ohne Pflicht mit der Vorgabe „ohne Stelle (einsatzweit)“ als eigener Option und den geplanten und aktiven Verpflegungsstellen zur Wahl
+- **AND** koppelt sie ohne Wahl einsatzweit, mit Wahl an die gewählte Stelle
+
+#### Scenario: Verpflegungsgerät mit und ohne Stelle
+
+- **WHEN** die Einsatzleitung ein Verpflegungsgerät einmal ohne Stelle und einmal an der Verpflegungsstelle „Feldküche BR Sportplatz“ koppelt
+- **THEN** entstehen beide Kopplungen, die zweite trägt die Stelle und heißt „Feldküche BR Sportplatz · Tresen“
 
 #### Scenario: Führungspersonal darf nicht koppeln
 

@@ -4,8 +4,10 @@ import {
   codeGruppiert,
   endeFehler,
   istBeendet,
+  OHNE_STELLE,
   sperrSatz,
-  stellenartVon,
+  stelleIdAusWahl,
+  stellenFeldVon,
   stellenOptionen,
   verlaengernVorbelegung,
 } from './geraeteKern';
@@ -15,14 +17,35 @@ const JETZT = dayjs('2026-10-04T12:00:00Z');
 describe('geraeteKern (LFH-892)', () => {
   it('nimmt die Stellenart aus der Übersicht des Servers', () => {
     const ansichten = [
-      { ansicht: 'uhs-tablet' as const, stellenart: 'uhs' as const },
-      { ansicht: 'lagemonitor' as const, stellenart: null },
+      { ansicht: 'uhs-tablet' as const, stellenart: 'uhs' as const, stelle_pflicht: true },
+      { ansicht: 'lagemonitor' as const, stellenart: null, stelle_pflicht: false },
+      {
+        ansicht: 'verpflegung' as const,
+        stellenart: 'verpflegungsstelle' as const,
+        stelle_pflicht: false,
+      },
     ];
-    expect(stellenartVon(ansichten, 'uhs-tablet')).toBe('uhs');
-    expect(stellenartVon(ansichten, 'lagemonitor')).toBeNull();
+    expect(stellenFeldVon(ansichten, 'uhs-tablet')).toEqual({ art: 'uhs', pflicht: true });
+    expect(stellenFeldVon(ansichten, 'lagemonitor')).toBeNull();
+    // Wahlweise Stelle (LLH-1048 Teil II): das Feld steht, aber ohne Pflicht.
+    expect(stellenFeldVon(ansichten, 'verpflegung')).toEqual({
+      art: 'verpflegungsstelle',
+      pflicht: false,
+    });
     // Nicht angeboten (noch nicht verfügbar) oder nichts gewählt: keine Stelle.
-    expect(stellenartVon(ansichten, 'betreuungsstelle')).toBeNull();
-    expect(stellenartVon(ansichten, undefined)).toBeNull();
+    expect(stellenFeldVon(ansichten, 'betreuungsstelle')).toBeNull();
+    expect(stellenFeldVon(ansichten, undefined)).toBeNull();
+  });
+
+  it('macht aus der Wahl die `stelle_id` des Servers; „ohne Stelle“ ist `null` (LLH-1048)', () => {
+    const wahlweise = { art: 'verpflegungsstelle' as const, pflicht: false };
+    const pflicht = { art: 'uhs' as const, pflicht: true };
+    expect(stelleIdAusWahl(wahlweise, OHNE_STELLE)).toBeNull();
+    expect(stelleIdAusWahl(wahlweise, 9)).toBe(9);
+    expect(stelleIdAusWahl(wahlweise, undefined)).toBeNull();
+    expect(stelleIdAusWahl(pflicht, 1)).toBe(1);
+    // Ohne Feld (Lagemonitor) geht keine Stelle hinaus, auch keine liegengebliebene.
+    expect(stelleIdAusWahl(null, 1)).toBeNull();
   });
 
   it('bietet je Stellenart nur Stellen an, die der Server annimmt', () => {
@@ -41,6 +64,10 @@ describe('geraeteKern (LFH-892)', () => {
         { id: 7, bezeichnung: 'BR 2', status: 'aufgeloest' },
       ],
       abschnitte: [{ id: 8, name: 'EA Nord' }],
+      verpflegungsstellen: [
+        { id: 9, bezeichnung: 'Feldküche', status: 'geplant' },
+        { id: 10, bezeichnung: 'Alte Küche', status: 'aufgeloest' },
+      ],
     };
     expect(stellenOptionen(quellen, 'uhs')).toEqual([{ value: 1, label: 'UHS Nord' }]);
     expect(stellenOptionen(quellen, 'betreuungsstelle')).toEqual([
@@ -48,6 +75,9 @@ describe('geraeteKern (LFH-892)', () => {
     ]);
     expect(stellenOptionen(quellen, 'bereitstellungsraum')).toEqual([{ value: 6, label: 'BR 1' }]);
     expect(stellenOptionen(quellen, 'einsatzabschnitt')).toEqual([{ value: 8, label: 'EA Nord' }]);
+    expect(stellenOptionen(quellen, 'verpflegungsstelle')).toEqual([
+      { value: 9, label: 'Feldküche' },
+    ]);
     expect(stellenOptionen({}, 'uhs')).toEqual([]);
   });
 

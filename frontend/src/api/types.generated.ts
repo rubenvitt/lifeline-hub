@@ -237,6 +237,11 @@ export interface components {
         /** @description Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle. */
         AnsichtAuswahl: {
             ansicht: components["schemas"]["Funktionsansicht"];
+            /**
+             * @description Ob die Kopplung die Stelle braucht. `false` mit `stellenart`: die Stelle ist wahlweise,
+             *     ohne sie arbeitet das Gerät einsatzweit (Verpflegung, LLH-1048).
+             */
+            stelle_pflicht: boolean;
             stellenart?: components["schemas"]["Bindungsart"] | null;
         };
         /** @description Module einer Ansicht, die in diesem Einsatz einem gekoppelten Gerät gesperrt sind. */
@@ -1052,11 +1057,12 @@ export interface components {
          */
         BezugTyp: "schaden" | "uhs" | "person" | "lagebericht" | "meldung" | "auftrag";
         /**
-         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt
-         *     `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).
+         * @description Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).
+         *     Je Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel
+         *     (`migrations/0213_…`).
          * @enum {string}
          */
-        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt";
+        Bindungsart: "uhs" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegungsstelle";
         /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
         BrAbrufErgebnis: {
             /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
@@ -2931,7 +2937,7 @@ export interface components {
         FunktionsArt: "leitung" | "sachgebiet" | "fuehrungshilfspersonal" | "fachberater";
         /**
          * @description Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in
-         *     `migrations/0159_geraet_kopplung_stellenarten.sql`.
+         *     `migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.
          * @enum {string}
          */
         Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung";
@@ -5683,6 +5689,24 @@ export interface components {
          * @enum {string}
          */
         Verkehrsart: "wechsel" | "gegen";
+        /**
+         * @description Was eine Einheit in einem Zeitfenster anderswo bekommen hat (LLH-1048): nur Kennung und
+         *     Summe, ohne Stelle, Zeitpunkt, Kostform oder Freitext und ohne Personenbezug. Die Feldmenge ist
+         *     in `tests/verpflegung.rs` gepinnt.
+         */
+        VerpflegtAnderswo: {
+            /**
+             * Format: int64
+             * @description Die Empfänger-Einheit; Name und Gliederung stehen in `VerpflegungAnzeige.empfaenger`.
+             */
+            einheit_id: number;
+            /**
+             * Format: int64
+             * @description Portionen aus den nicht zurückgenommenen Ausgaben an diese Einheit, die nicht an der
+             *     Stelle des Geräts gebucht sind (an einer anderen Stelle oder ohne Stelle).
+             */
+            menge: number;
+        };
         /** @description Die eine Lesequelle der Modulseite (`GET …/verpflegung`). */
         VerpflegungAnzeige: {
             /**
@@ -5749,6 +5773,12 @@ export interface components {
             /** @description Zeitpunkt der Auflösung (UTC ohne Zonenkennung), nur bei `aufgeloest`. */
             aufgeloest_at?: string | null;
             bezeichnung: string;
+            /**
+             * @description Ob ein Gerät an der Stelle gekoppelt ist (LLH-1048 Teil II): eine laufende Kopplung, auch
+             *     eine noch nicht eingelöste. Dann ist das Storno 409; die Oberfläche sperrt es mit Grund.
+             *     Nur dieses Ja oder Nein, keine Kopplung, keine Gerätebezeichnung.
+             */
+            geraet_gekoppelt: boolean;
             /** Format: int64 */
             id: number;
             /** Format: double */
@@ -6225,7 +6255,10 @@ export interface components {
         /** @description Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen). */
         ZeitfensterAnzeige: {
             angelegt_at: string;
-            /** @description Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`. */
+            /**
+             * @description Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`. Für ein an eine Stelle
+             *     gebundenes Gerät nur die Ausgaben an dieser Stelle (LLH-1048).
+             */
             ausgaben: components["schemas"]["AusgabeAnzeige"][];
             /** @description Summe der nicht zurückgenommenen Ausgaben. */
             ausgegeben: components["schemas"]["Portionen"];
@@ -6248,6 +6281,14 @@ export interface components {
             je_stelle: components["schemas"]["StelleIst"][];
             /** @description Die zugeordneten Stellen, nach Bezeichnung; leer = einsatzweit (LLH-1040 D5). */
             stelle_ids: number[];
+            /**
+             * @description Nur für ein an eine Verpflegungsstelle gebundenes Gerät (LLH-1048, LLH-1024 F7): je
+             *     Einheit die Ausgaben dieses Zeitfensters, die nicht an seiner Stelle gebucht sind, als
+             *     Summe. Das Gerät sieht diese Ausgaben nicht einzeln (`ausgaben` trägt nur die eigene
+             *     Stelle); ohne die Summe hielte es eine anderswo verpflegte Einheit für „noch nicht
+             *     verpflegt“. Für jede andere Sitzung leer: sie sieht alle Ausgaben.
+             */
+            verpflegt_anderswo: components["schemas"]["VerpflegtAnderswo"][];
             verpflegungsart?: components["schemas"]["Verpflegungsart"] | null;
             /** @description Beginn, UTC ohne Zonenkennung. */
             von_at: string;

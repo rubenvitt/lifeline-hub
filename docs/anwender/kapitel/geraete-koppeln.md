@@ -2,7 +2,7 @@
 titel: Geräte koppeln
 gruppen: [fuehrung, geraete]
 reihenfolge: 700
-quellen: [frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/pages/einstellungen/geraeteKern.ts, src/geraet/mod.rs, src/geraet/repo.rs, src/routes/geraet.rs, src/routes/einsatz.rs, src/routes/einsatzabschnitt.rs]
+quellen: [frontend/src/pages/einstellungen/EinsatzGeraete.tsx, frontend/src/pages/einstellungen/geraeteKern.ts, frontend/src/geraet/stellenName.ts, src/geraet/mod.rs, src/geraet/stelle.rs, src/geraet/repo.rs, src/routes/geraet.rs, src/routes/einsatz.rs, src/routes/einsatzabschnitt.rs]
 ---
 
 ## Überblick
@@ -40,6 +40,19 @@ Für die Einsatzleitung:
 
 Bis das Gerät den Code eingelöst hat, steht es in der Liste als „wartet auf Gerät“, danach als
 „gekoppelt“.
+
+### Verpflegungsgerät an eine Verpflegungsstelle koppeln
+
+Für die Einsatzleitung:
+
+1. „Gerät koppeln“ wählen und unter „Ansicht“ „Verpflegung“ wählen.
+2. Unter „Verpflegungsstelle“ die Stelle wählen, an der das Gerät steht. Vorgabe ist „ohne Stelle
+   (einsatzweit)“; dann sieht das Gerät alle Zeitfenster und Stellen des Einsatzes.
+
+   ![Maske „Gerät koppeln“ mit der Ansicht „Verpflegung“, der Verpflegungsstelle „Feldküche BR Sportplatz“ und der Gerätebezeichnung „Tresen“](../bilder/geraete-koppeln/verpflegungsstelle.png)
+
+3. Die „Gerätebezeichnung“ angeben und „Koppeln“ wählen. Das Gerät heißt danach mit der Stelle,
+   etwa „Feldküche BR Sportplatz · Tresen“.
 
 ### Kopplungen im Blick behalten
 
@@ -113,11 +126,17 @@ Knopf „Gerät koppeln“ und ohne Aktionsmenü. Die Rollen erklärt
 | Betreuungsstelle    | Betreuungsstelle    | Belegung, Betroffene, Meldungen einer Betreuungsstelle |
 | Bereitstellungsraum | Bereitstellungsraum | Kräfte an- und abmelden in einem Bereitstellungsraum   |
 | Einsatzabschnitt    | Einsatzabschnitt    | Kräfte, Aufträge, Meldungen eines Abschnitts           |
-| Verpflegung         | –                   | Portionen je Zeitfenster ausgeben, Fehlmenge melden    |
+| Verpflegung         | Verpflegungsstelle, wahlweise | Portionen je Zeitfenster ausgeben, Fehlmenge melden |
 
 Zur Wahl stehen nur Stellen, die noch arbeiten: keine stornierte oder aufgelöste
 Unfallhilfsstelle, kein aufgelöster Bereitstellungsraum. Eine geschlossene Betreuungsstelle
 bleibt wählbar.
+
+Bei der Verpflegung ist die Stelle wahlweise. Vorgabe ist „ohne Stelle (einsatzweit)“: Das Gerät
+sieht dann alle Zeitfenster und Stellen des Einsatzes. Zur Wahl stehen die geplanten und aktiven
+Verpflegungsstellen; an einer gekoppelt sieht das Gerät nur deren Zeitfenster und die ohne
+Zuordnung, und jede Ausgabe gehört zu dieser Stelle (siehe [Verpflegung](geraet-verpflegung.md)).
+Solange ein Gerät an einer Verpflegungsstelle gekoppelt ist, lässt sie sich nicht stornieren.
 
 Ist ein Modul, das die Ansicht braucht, im Einsatz auf eine Rolle beschränkt, warnt die Maske:
 „… für gekoppelte Geräte gesperrt – fehlt auf dem …“. Das Gerät arbeitet dann ohne dieses Modul.

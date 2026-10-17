@@ -543,7 +543,9 @@ sein, und das System MUST den Zeitpunkt der Auflösung speichern. Ein anderer Ü
 abgelehnt werden. Inbetriebnahme und Auflösung MUST in derselben Transaktion einen System-Eintrag
 im ETB schreiben. Eine Stelle MUST sich nur stornieren lassen, solange sie `geplant` ist und keine
 Ausgabe, auch keine zurückgenommene, auf sie verweist; das Stornieren entfernt ihre Zuordnungen und
-schreibt keinen ETB-Eintrag. Ändern, Statuswechsel und Storno einer stornierten Stelle MUST mit 409
+schreibt keinen ETB-Eintrag. Hängt an der Stelle eine laufende Gerätekopplung (wartend oder aktiv,
+LLH-1048), MUST das Storno mit 409 und dem Grund „Gerät gekoppelt“ abgelehnt werden; die Stelle
+MUST in ihrer Anzeige nennen, ob ein Gerät an ihr gekoppelt ist, ohne Kopplung und Bezeichnung. Ändern, Statuswechsel und Storno einer stornierten Stelle MUST mit 409
 abgelehnt werden. Eine aufgelöste Stelle MUST änderbar bleiben.
 
 #### Scenario: In Betrieb nehmen
@@ -557,6 +559,11 @@ abgelehnt werden. Eine aufgelöste Stelle MUST änderbar bleiben.
 #### Scenario: Aufgelöste Stelle wieder in Betrieb nehmen
 - **WHEN** eine aufgelöste Stelle in Betrieb genommen werden soll
 - **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Stornieren mit gekoppeltem Gerät
+- **WHEN** eine geplante Stelle ohne Ausgabe storniert werden soll, an der ein Verpflegungsgerät gekoppelt ist, auch eines, das seinen Code noch nicht eingelöst hat
+- **THEN** antwortet das System mit 409 „Gerät gekoppelt“ und storniert nichts
+- **AND** nach dem Widerruf der Kopplung storniert es die Stelle
 
 #### Scenario: Stornieren mit Ausgabe
 - **WHEN** eine geplante Stelle storniert werden soll, an der eine Ausgabe gebucht ist
@@ -610,7 +617,13 @@ nicht vor der Auflösung liegt; eine Ausgabe mit früherem Zeitpunkt MUST angeno
 Zeitpunkte MUST als Zeitpunkte verglichen werden, nicht als Text. Eine
 geplante Stelle MUST Ausgaben annehmen. Eine Stelle, der das Zeitfenster nicht zugeordnet ist, MUST
 die Ausgabe ebenfalls annehmen. Die Prüfung der Stelle MUST nach dem Replay über `client_id` und
-nach der Prüfung auf einen aktiven Einsatz laufen.
+nach der Prüfung auf einen aktiven Einsatz laufen. Ein an eine Verpflegungsstelle gebundenes Gerät
+MUST jede Ausgabe an seiner Stelle buchen: ohne Angabe setzt der Server sie, eine andere Stelle
+MUST 403 sein (LLH-1048).
+
+#### Scenario: Gerät an der Feldküche bucht ohne Angabe
+- **WHEN** das an die „Feldküche BR Sportplatz“ gebundene Gerät eine Ausgabe ohne Stelle erfasst
+- **THEN** trägt die Ausgabe die Stelle „Feldküche BR Sportplatz“
 
 #### Scenario: Ausgabe an der Feldküche
 - **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 100 EP an der Stelle „Feldküche BR Sportplatz“ erfasst wird
@@ -648,7 +661,11 @@ auch mit 0, jede weitere Stelle mit Ausgaben und einen Eintrag „ohne Stelle“
 ohne Stelle gibt. Ihre Summe MUST die ausgegebene Menge des Zeitfensters sein. Hat ein Zeitfenster
 keine Zuordnung und keine Ausgabe an einer Stelle, MUST die Aufstellung leer sein. Eine Fehlmenge
 oder Einstufung je Stelle MUST es nicht geben; Fehlmenge und Einstufung bleiben am Zeitfenster.
-Zurückgenommene Ausgaben MUST nicht zählen.
+Zurückgenommene Ausgaben MUST nicht zählen. Ein an eine Verpflegungsstelle gebundenes Gerät MUST
+nur den Eintrag seiner Stelle erhalten, die ausgegebene Menge des Zeitfensters aber unverändert;
+was anderswo an Einheiten ausgegeben wurde, erhält es als Summe je Einheit
+(`verpflegt_anderswo`, Spec `funktionsansichten`, „Verpflegungsgerät an einer
+Verpflegungsstelle“, LLH-1048). Für jede andere Sitzung MUST diese Summe leer sein.
 
 #### Scenario: Zwei Stellen
 - **WHEN** das Zeitfenster „Mittag“ mit Bedarf 200 der Feldküche und der Turnhalle zugeordnet ist und dort 100 und 80 EP ausgegeben sind
@@ -787,6 +804,8 @@ wo zulässig, „Stornieren“ mit Rückfrage anbieten. Ohne Schreibrecht MUST �
 mit Grund stehen und die Zeilenaktionen MUST fehlen (wie unter „Rechte und Modulsichtbarkeit“).
 Der Dialog zum Anlegen MUST mit Bezeichnung, Art und Standort auskommen. Das Verpflegungsgerät
 MUST die Stellen sehen, aber keine dieser Aktionen erhalten, auch kein gesperrtes „Stelle anlegen“.
+Ist an einer geplanten Stelle ohne Ausgabe ein Gerät gekoppelt, MUST „Stornieren“ gesperrt mit dem
+Grund „Gerät gekoppelt“ stehen (LLH-1048).
 
 #### Scenario: Stellen ansehen
 - **WHEN** eine Person die Ansicht „Stellen“ wählt, während die Feldküche aktiv ist und im laufenden Zeitfenster „Mittag“ 100 EP ausgegeben hat
@@ -803,6 +822,10 @@ MUST die Stellen sehen, aber keine dieser Aktionen erhalten, auch kein gesperrte
 #### Scenario: Beobachter sieht die Stellen
 - **WHEN** eine Person ohne Schreibrecht die Ansicht „Stellen“ wählt
 - **THEN** zeigt die Seite die Stellen ohne Zeilenaktionen und „Stelle anlegen“ gesperrt mit Grund
+
+#### Scenario: Stornieren gesperrt bei gekoppeltem Gerät
+- **WHEN** eine Person mit Schreibrecht das Menü der geplanten Stelle „Zuführung Deich“ öffnet, an der ein Gerät gekoppelt ist
+- **THEN** steht dort „Stornieren … (Gerät gekoppelt)“ gesperrt
 
 #### Scenario: Gerät sieht die Stellen
 - **WHEN** das Verpflegungsgerät die Ansicht „Stellen“ öffnet
@@ -836,7 +859,11 @@ nicht wählbare Stelle wird dabei übersprungen. Die Vorwahl gilt beim Öffnen: 
 Zuordnung bei offener Ansicht MUST NOT die Wahl ändern. Die Wahl ändert sich nur durch die Person
 oder, wenn die gewählte Stelle aufgelöst wird, auf „ohne Stelle“. Die Stabsoberfläche MUST die
 Wahl je Einsatz im Browser merken (bei jedem Ende der Anmeldung geräumt); das
-Verpflegungsgerät MUST nichts merken. Ohne Stellen im Einsatz MUST die Stellenwahl fehlen.
+Verpflegungsgerät MUST nichts merken. Ohne Stellen im Einsatz MUST die Stellenwahl fehlen. Ein
+an eine Verpflegungsstelle gebundenes Gerät (LLH-1048) MUST keine Stellenwahl führen, weder in
+der Ausgabeansicht noch im Nachtrag: dort MUST die eigene Stelle fest als Text stehen, mit der an
+ihr ausgegebenen Menge, auch in einem Zeitfenster ohne Zuordnung, und jede Ausgabe MUST sie tragen;
+eine Stelle aus der Adresse MUST es übergehen.
 
 #### Scenario: Ansicht öffnen
 - **WHEN** eine Person mit Schreibrecht am laufenden Zeitfenster „Mittag“ (Bedarf 150, ausgegeben 80) „Ausgabe öffnen“ wählt
@@ -883,6 +910,10 @@ Verpflegungsgerät MUST nichts merken. Ohne Stellen im Einsatz MUST die Stellenw
 #### Scenario: Gerät merkt nichts
 - **WHEN** das Verpflegungsgerät in der Ausgabeansicht von „Mittag“ (zwei zugeordnete Stellen) die Turnhalle wählt und die Ansicht später erneut öffnet
 - **THEN** ist „ohne Stelle“ gewählt
+
+#### Scenario: Gebundenes Gerät wählt keine Stelle
+- **WHEN** das an die Feldküche gebundene Gerät die Ausgabeansicht von „Mittag“ öffnet und 4 EP zählt
+- **THEN** steht dort fest „Stelle Feldküche BR Sportplatz“ ohne Auswahl, und die Ausgabe trägt die Feldküche
 
 #### Scenario: Aufgelöste Stelle nicht wählbar
 - **WHEN** die Feldküche aufgelöst ist und eine Person die Ausgabeansicht von „Mittag“ öffnet, auch mit der Feldküche in der Adresse
@@ -1052,7 +1083,11 @@ jeder Ausgabe zeigen und die Zahl der mitverpflegten Untereinheiten, dazu je Abs
 Zuführungen mit Menge und Zeit. Die Ausgabeansicht MUST beide Listen zeigen; jede noch nicht
 verpflegte Zeile MUST dort „Wählen“ tragen, das die Einheit als Empfänger setzt (gesperrt ohne
 Schreibrecht und im vergangenen Zeitfenster). Am Verpflegungsgerät MUST dasselbe gelten, allein
-aus der Empfängerliste.
+aus der Empfängerliste. Am an eine Verpflegungsstelle gebundenen Gerät (LLH-1048) MUST eine
+Einheit, für die der Server eine Menge anderswo liefert (`verpflegt_anderswo`, an einer anderen
+Stelle oder ohne Stelle), samt ihrem Teilbaum als verpflegt gelten und unter „Verpflegt“ als
+„anderswo verpflegt“ mit dieser Menge stehen, ohne Zeit; mehr als der Server liefert MUST die
+Oberfläche nicht ableiten.
 
 #### Scenario: Eine von drei verpflegt
 - **WHEN** der Einsatz drei eingetroffene Einheiten führt und zum Zeitfenster „Mittag“ eine Ausgabe an eine von ihnen ging
@@ -1081,6 +1116,10 @@ aus der Empfängerliste.
 #### Scenario: Vorgemerkt ohne Netz
 - **WHEN** ohne Netzverbindung 9 EP an die „2. Gruppe“ vorgemerkt sind
 - **THEN** steht die „2. Gruppe“ weiter unter „Noch nicht verpflegt“ mit „ausstehend 9 EP“
+
+#### Scenario: Anderswo verpflegt
+- **WHEN** die „2. Gruppe“ zum Zeitfenster „Abend“ 40 EP an der Turnhalle bekam und das Gerät der Feldküche „Noch nicht verpflegt“ zeigt
+- **THEN** steht die „2. Gruppe“ nicht unter „Noch nicht verpflegt“, sondern unter „Verpflegt“ als „anderswo verpflegt · 40 EP“
 
 #### Scenario: Einheit wählen
 - **WHEN** eine Person in der Ausgabeansicht an der Zeile der „2. Gruppe“ „Wählen“ tippt
