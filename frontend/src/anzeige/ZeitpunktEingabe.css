@@ -12,10 +12,13 @@
    ohne Wert zu schließen (am Handy gibt es kein Escape). Ist der Inhalt höher (`handschuh`), rollt
    der Inhalt in sich. Nachweis: `e2e/dialoge-handy.spec.ts`. */
 
+/* antd setzt das Popover auf `width: max-content`, gekappt über `max-width`; ohne die Kappung maß
+   es mit dem Kalender (Breite 100 %) eine Million Pixel. Die Breite folgt hier den Rändern. */
 .lfh-zeit-blatt.ant-popover {
   position: fixed !important;
   inset: auto 0 0 0 !important;
-  max-width: none;
+  width: auto !important;
+  max-width: 100vw;
   padding: 0;
 }
 

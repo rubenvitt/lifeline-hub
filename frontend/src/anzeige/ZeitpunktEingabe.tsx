@@ -21,8 +21,8 @@
 import { Button, Input, Popover, Space, theme, type InputRef } from 'antd';
 import type { Dayjs } from 'dayjs';
 import {
-  useCallback,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -95,11 +95,23 @@ export function zeitPanelAmFeldAb(token: { controlHeight: number }): AbBreitePun
   return 'md';
 }
 
-function useKalenderLage(): { istBlatt: boolean; istBeruehrung: boolean } {
+/**
+ * Lage des Kalenders: Blatt oder am Feld, dort mit fester Breite. Zehn Steuerhöhen tragen sieben
+ * Tagesspalten samt Rand (kompakt 320 px, komfortabel 500 px; `handschuh` steht nie am Feld).
+ */
+function useKalenderLage(): {
+  istBlatt: boolean;
+  istBeruehrung: boolean;
+  breiteAmFeld: number;
+} {
   const { abBreite, istBeruehrung } = useViewport();
   const { token } = theme.useToken();
   const ab = zeitPanelAmFeldAb(token);
-  return { istBlatt: ab === null || !abBreite(ab), istBeruehrung };
+  return {
+    istBlatt: ab === null || !abBreite(ab),
+    istBeruehrung,
+    breiteAmFeld: token.controlHeight * 10 + 20,
+  };
 }
 
 /** Gleicher Zeitpunkt (am Instant) oder beide leer. */
@@ -182,7 +194,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   } = props;
   const z = useZeitEingabe();
   const { rollen } = useRollen();
-  const { istBlatt, istBeruehrung } = useKalenderLage();
+  const { istBlatt, istBeruehrung, breiteAmFeld } = useKalenderLage();
   // Form.Item reicht `value` immer durch, auch als `undefined` — der Schlüssel entscheidet.
   const gesteuert = Object.prototype.hasOwnProperty.call(props, 'value');
   const [intern, setIntern] = useState<Dayjs | null | undefined>(defaultValue);
@@ -195,22 +207,19 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const offen = open ?? offenIntern;
   const hinweisId = useId();
   const feldRef = useRef<InputRef | null>(null);
-  const weitergegeben = useRef<HTMLInputElement | null | undefined>(undefined);
-  // Die Ref des Aufrufers erfährt nur einen WECHSEL des Felds: antds `Input` erneuert sein Handle
-  // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten), und eine fokussierende Ref wie
-  // die des ETB-Chips (`etb/MetaChip.tsx`, `fokusOhneRollen`) holte sich sonst nach jedem Blur den
-  // Fokus zurück.
-  const setzeRef = useCallback(
-    (el: InputRef | null) => {
-      feldRef.current = el;
-      const knoten = el?.input ?? null;
-      if (knoten === weitergegeben.current) return;
-      weitergegeben.current = knoten;
+  // Die Ref des Aufrufers bekommt das Feld EINMAL je Einhängen: antds `Input` erneuert sein Handle
+  // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten, React ruft die Ref dabei mit
+  // `null` und dem neuen Handle), und eine fokussierende Ref wie die des ETB-Chips
+  // (`etb/MetaChip.tsx`, `fokusOhneRollen`) holte sich sonst nach jedem Blur den Fokus zurück.
+  useLayoutEffect(() => {
+    if (!ref) return;
+    const setze = (el: InputRef | null) => {
       if (typeof ref === 'function') ref(el);
-      else if (ref) (ref as RefObject<InputRef | null>).current = el;
-    },
-    [ref],
-  );
+      else (ref as RefObject<InputRef | null>).current = el;
+    };
+    setze(feldRef.current);
+    return () => setze(null);
+  }, [ref]);
   /**
    * Nach dem Kalender zurück ins Feld, sonst stünde der Fokus auf `<body>`. Nicht bei
    * Fingerbedienung: dort ginge die Bildschirmtastatur auf.
@@ -301,6 +310,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       keineZukunftstage={keineZukunftstage}
       nurTag={nurTag}
       fokusUhrzeit={!istBeruehrung}
+      breite={istBlatt ? undefined : breiteAmFeld}
       onUebernehmen={(neu) => {
         ausWahl(neu);
         oeffne(false);
@@ -317,7 +327,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     <Space.Compact block={style?.width === '100%'} style={style} className={className}>
       <Input
         {...daten}
-        ref={setzeRef}
+        ref={feldRef}
         id={id}
         aria-label={ariaLabel}
         aria-describedby={beschreibung || undefined}

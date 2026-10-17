@@ -36,6 +36,12 @@ export interface ZeitKalenderProps {
    * die Bildschirmtastatur ginge auf und deckte das Blatt.
    */
   fokusUhrzeit?: boolean;
+  /**
+   * Feste Breite am Feld; ohne Angabe füllt der Kalender seinen Behälter (Blatt). antds
+   * Mini-Kalender nimmt 100 % und dehnte ein Popover mit `width: max-content` sonst bis zur
+   * Schirmbreite.
+   */
+  breite?: number;
   onUebernehmen: (zeitpunkt: Dayjs) => void;
   onAbbrechen: () => void;
 }
@@ -49,6 +55,7 @@ export function ZeitKalender({
   keineZukunftstage,
   nurTag,
   fokusUhrzeit = true,
+  breite,
   onUebernehmen,
   onAbbrechen,
 }: ZeitKalenderProps) {
@@ -94,7 +101,7 @@ export function ZeitKalender({
       role="dialog"
       aria-label={nurTag ? 'Tag wählen' : 'Tag und Uhrzeit wählen'}
       onKeyDown={tasten}
-      style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, width: breite }}
     >
       <Calendar
         fullscreen={false}

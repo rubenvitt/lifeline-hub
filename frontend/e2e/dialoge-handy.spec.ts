@@ -465,6 +465,9 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
       Math.abs(p.y + p.height - feld.y),
     );
     expect(abstand, `${wo}: Panel ${JSON.stringify(p)} hängt nicht am Feld`).toBeLessThan(16);
+    // Am Feld hat der Kalender eine feste Breite (kompakt 320 px); antds Mini-Kalender dehnte das
+    // Popover sonst bis zur Schirmbreite.
+    expect(p.width, `${wo}: Kalender ${p.width} px breit`).toBeLessThanOrEqual(340);
     await expect(von).not.toHaveAttribute('readonly', '');
     await page.keyboard.press('Escape');
   }
