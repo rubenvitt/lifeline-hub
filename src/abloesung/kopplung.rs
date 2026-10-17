@@ -7,7 +7,8 @@
 //! - **Eintreffen** der offenen Periode: hat die Einheit keine laufende Schicht, auch keine
 //!   geerbte (Knoten-Modell), und gibt es eine Vorgabe des Abschnitts oder des Einsatzes, beginnt
 //!   die Schicht zum Eintreffen ([`repo::start_schicht_tx`], Rangfolge wie von Hand). Ohne
-//!   Vorgabe entsteht nichts: keine erfundene Zahl.
+//!   Vorgabe entsteht nichts: keine erfundene Zahl. Eine als ablösende geplante Einheit bekommt
+//!   keine: ihre Schicht entsteht mit dem Vollzug als Folgeschicht.
 //! - **Entlassung**, die die letzte Periode schließt: die laufende Schicht der Einheit endet als
 //!   `beendet` mit Grund `entlassung`, ihre Fristen schließen.
 //! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen.
@@ -150,6 +151,23 @@ async fn is_aktiv_tx(
     Ok(r.is_some())
 }
 
+/// Ob eine laufende Schicht des Einsatzes die Einheit als ablösende plant.
+async fn is_geplanter_abloeser_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+) -> Result<bool, AppError> {
+    let r: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM einsatz_abloesung \
+         WHERE einsatz_id = ? AND status = 'laufend' AND abloesende_einheit_id = ? LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(r.is_some())
+}
+
 async fn autostart_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -169,6 +187,12 @@ async fn autostart_tx(
         .await?
         .is_some()
     {
+        return Ok(Vec::new());
+    }
+    // Als ablösende Einheit geplant: ihre Schicht beginnt mit dem Vollzug als Folgeschicht.
+    // Eine Schicht schon beim Eintreffen ließe den Vollzug scheitern („hat schon eine laufende
+    // Schicht“).
+    if is_geplanter_abloeser_tx(conn, einsatz_id, einheit_id).await? {
         return Ok(Vec::new());
     }
     let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;

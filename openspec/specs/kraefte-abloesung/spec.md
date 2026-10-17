@@ -484,7 +484,9 @@ eigene noch eine geerbte laufende Schicht hat, SHALL das System in derselben Tra
 Schicht mit Beginn = Eintreffen anlegen, sofern der Abschnitt der Einheit oder der Einsatz eine
 Vorgabe hat (LLH-1128). Rhythmus und Quelle MUST der Rangfolge des Beginnens von Hand folgen
 (Abschnitt vor Einsatz), samt Fristen, ETB-Eintrag mit der Herkunft („mit dem Eintreffen
-begonnen“) und Live-Ereignis `abloesung`. Ohne Vorgabe MUST keine Schicht entstehen. Das gilt
+begonnen“) und Live-Ereignis `abloesung`. Ohne Vorgabe MUST keine Schicht entstehen, ebenso
+wenig für eine Einheit, die eine laufende Schicht als ablösende plant: ihre Schicht entsteht mit
+dem Vollzug als Folgeschicht. Das gilt
 für jeden Weg des Eintreffens (Statuswechsel, Nachtrag, Bereitstellungsraum). Ein Fehler beim
 Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelingen trotzdem.
 
@@ -499,6 +501,10 @@ Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelinge
 #### Scenario: Zweites Eintreffen
 - **WHEN** eine Einheit mit laufender Schicht ein weiteres Eintreffen bekommt
 - **THEN** entsteht keine zweite Schicht
+
+#### Scenario: Geplanter Ablöser trifft ein
+- **WHEN** „Florian 2“ als ablösende Einheit von „Florian 1“ geplant ist und eintrifft
+- **THEN** bekommt „Florian 2“ keine eigene Schicht, und der spätere Vollzug legt seine Folgeschicht ab dem Vollzug an
 
 #### Scenario: Fehler im Autostart
 - **WHEN** das Anlegen der Schicht scheitert

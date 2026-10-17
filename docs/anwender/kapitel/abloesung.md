@@ -149,7 +149,8 @@ sobald die Einheit eintrifft: über einen Status mit der Marke „Eintreffen“,
 Eintreffen in der Kräfte-Zeitachse oder das Eintreffen am Bereitstellungsraum. „Im Einsatz seit“
 ist dann der Zeitpunkt des Eintreffens, der Rhythmus kommt aus der Vorgabe (die des Abschnitts vor
 der des Einsatzes). Das Einsatztagebuch nennt das mit „mit dem Eintreffen begonnen“. Ohne Vorgabe
-beginnt keine Schicht von selbst; dann bleibt „Schicht beginnen“ von Hand.
+beginnt keine Schicht von selbst; dann bleibt „Schicht beginnen“ von Hand. Ist die Einheit schon
+als ablösende Einheit geplant, beginnt ihre Schicht erst mit dem Vollzug der Ablösung.
 
 Gehört eine Einheit zu einem Verband, dessen Einheit schon eine laufende Schicht hat, bekommt sie
 mit ihrem Eintreffen keine eigene: sie läuft in der Schicht des Verbands mit. Wer für sie trotzdem

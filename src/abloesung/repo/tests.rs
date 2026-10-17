@@ -1777,3 +1777,45 @@ async fn fehler_im_autostart_bricht_das_eintreffen_nicht() {
         .unwrap();
     assert_eq!(n, 0, "der Savepoint nimmt die halbe Schicht zurück");
 }
+
+/// Eine als ablösende geplante Einheit bekommt mit ihrem Eintreffen keine Schicht: sonst
+/// scheiterte der Vollzug an ihrer laufenden Schicht. Ihre Schicht entsteht mit dem Vollzug.
+#[tokio::test]
+async fn geplanter_abloeser_bekommt_beim_eintreffen_keine_schicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f1, Eintreffen, ANKUNFT).await;
+    let a = schichten(&w, w.f1).await[0].id;
+    aendern(
+        &w.pool,
+        w.e,
+        a,
+        w.b,
+        &AenderungEingabe {
+            abloesende_einheit_id: Some(Some(w.f2)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    let b = ereignis(&w, w.f2, Eintreffen, "2030-06-03 13:30:00").await;
+    assert!(b.abloesung.is_empty());
+    assert!(schichten(&w, w.f2).await.is_empty());
+    let (v, _, _) = vollziehen(
+        &w.pool,
+        w.e,
+        a,
+        w.b,
+        "2030-06-03 14:00:00",
+        Some(w.f2),
+        "2030-06-03 14:00:00",
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        v.folgeschicht.unwrap().beginn_at,
+        "2030-06-03 14:00:00",
+        "Folgeschicht ab dem Vollzug"
+    );
+}
