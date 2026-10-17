@@ -45,6 +45,20 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: Option<i64>) {
     sse(state, einsatz_id);
 }
 
+/// Nach einem Schreibweg der Kräfte-Zeitachse, dessen Kopplung die Ablösung geändert hat
+/// (LLH-1128: Schicht mit dem Eintreffen begonnen, mit der Entlassung beendet, nach gestrichener
+/// Entlassung wieder laufend): Kurzruf je ETB-Eintrag und Listen-Refresh, wie beim Beginnen von
+/// Hand. Ohne Einträge nichts.
+pub(crate) fn publish_kopplung(state: &AppState, einsatz_id: i64, etb_ids: &[i64]) {
+    if etb_ids.is_empty() {
+        return;
+    }
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, *etb_id);
+    }
+    sse(state, einsatz_id);
+}
+
 /// Vollzug und Rücknahme ändern die Zeitachse der Einheit und per Fan-out die ihrer Personen;
 /// deren Leser mit nur Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189).
 fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: Zeitachsenwirkung) {
@@ -82,8 +96,8 @@ fn zeit(eingabe: Option<String>, was: &str) -> Result<Option<String>, AppError> 
 
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
-    /// `laufend` | `abgeloest`; fehlt = alle. Als `String`, damit ein unbekannter Wert eine
-    /// benannte 400 liefert.
+    /// `laufend` | `abgeloest` | `beendet`; fehlt = alle. Als `String`, damit ein unbekannter
+    /// Wert eine benannte 400 liefert.
     #[serde(default)]
     status: Option<String>,
 }
@@ -98,7 +112,7 @@ pub async fn liste(
         None | Some("") => None,
         Some(s) => Some(AbloesungStatus::parse(s).ok_or_else(|| {
             AppError::Validation(format!(
-                "Unbekannter Status '{s}' (erlaubt: laufend, abgeloest)"
+                "Unbekannter Status '{s}' (erlaubt: laufend, abgeloest, beendet)"
             ))
         })?),
     };

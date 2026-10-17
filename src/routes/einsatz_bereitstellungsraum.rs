@@ -838,8 +838,9 @@ async fn eintreffen_replay(
     Ok((StatusCode::CREATED, Json(ergebnis)))
 }
 
-/// Live nach dem Commit (D12): ETB, Raum, Einheit und Fahrzeuge, Personen aus dem Fan-out, bei
-/// unangemeldet das Meldungsbündel samt Benachrichtigung und Auto-Frist-Erinnerung.
+/// Live nach dem Commit (D12): ETB, Raum, Einheit und Fahrzeuge, Personen aus dem Fan-out, die
+/// Ablösung bei begonnener Schicht (LLH-1128), bei unangemeldet das Meldungsbündel samt
+/// Benachrichtigung und Auto-Frist-Erinnerung.
 async fn notify_eintreffen(
     state: &AppState,
     einsatz_id: i64,
@@ -860,6 +861,8 @@ async fn notify_eintreffen(
     for ep_id in &g.personen {
         super::einsatz_personal::sse_personal(state, einsatz_id, *ep_id);
     }
+    // Das Eintreffen hat die Schicht der Einheit begonnen (LLH-1128).
+    super::abloesung::publish_kopplung(state, einsatz_id, &g.abloesung);
     if let Some(meldung_id) = g.meldung_id {
         notify_meldung(state, meldung_id).await?;
     }

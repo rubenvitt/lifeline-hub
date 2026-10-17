@@ -1261,15 +1261,15 @@ pub struct Aufgeloest {
     pub kinder: Vec<i64>,
     /// Bereitstellungsraum, aus dem die Einheit ausgetreten ist.
     pub br: Option<i64>,
-    /// Laufende Schicht entfernt oder ein fremder Verweis auf sie geleert.
+    /// Laufende Schicht beendet oder ein fremder Verweis auf sie geleert.
     pub abloesung: bool,
 }
 
 /// Löst eine Einheit auf einer offenen Verbindung auf (atomar mit dem System-ETB, LLH-1079,
 /// design.md D5): Mitglieder freigeben (`einheit_id = NULL` an Personal, Fahrzeug, Material),
 /// Unter-Einheiten an die Über-Einheit hängen (ohne sie werden sie Wurzeln), Sprechgruppen und
-/// Skizzenbezüge lösen, laufende Schicht samt Fristen entfernen, einen Bereitstellungsraum
-/// verlassen. Mit Spur ([`find_spur_tx`]) bleibt die Zeile als aufgelöst stehen und bekommt die
+/// Skizzenbezüge lösen, laufende Schicht beenden (Grund `aufloesung`, LLH-1128), einen
+/// Bereitstellungsraum verlassen. Mit Spur ([`find_spur_tx`]) bleibt die Zeile als aufgelöst stehen und bekommt die
 /// Entlassung in die Zeitachse (der Fan-out erreicht niemanden mehr); ohne Spur wird sie gelöscht.
 /// [`Aufloesung::Stornieren`] lehnt eine Spur mit 422 ab. `NotFound`/`Conflict` wie
 /// [`require_aktiv_tx`].
@@ -1334,7 +1334,8 @@ pub async fn aufloesen_tx(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-    ergebnis.abloesung = crate::abloesung::repo::release_einheit_tx(conn, id).await?;
+    ergebnis.abloesung =
+        crate::abloesung::repo::release_einheit_tx(conn, id, benutzer_id, jetzt).await?;
     ergebnis.br = crate::bereitstellungsraum::belegung_repo::austritt_bei_aufloesung_tx(
         conn,
         einsatz_id,

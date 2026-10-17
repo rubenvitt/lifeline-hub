@@ -1099,7 +1099,7 @@ pub async fn status_setzen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
     let (beruehrt, wieder_verfuegbar) = crate::write_retry!(&state.pool, |conn| {
-        let mut beruehrt = Vec::new();
+        let mut beruehrt = crate::zeitachse::repo::Beruehrt::default();
         let mut wieder_verfuegbar = false;
         if let Some(w) =
             einheit_repo::setze_hand_status_tx(conn, einsatz_id, eid, status_id).await?
@@ -1118,7 +1118,7 @@ pub async fn status_setzen(
                 )
                 .await?
                 {
-                    beruehrt = b.personen;
+                    beruehrt = b;
                 }
             }
             crate::etb::system_audit_tx(
@@ -1140,9 +1140,11 @@ pub async fn status_setzen(
     sse_einheit(&state, einsatz_id, eid);
     // Der Fan-out hat die Zeitachse dieser Personen geschrieben; ihre Leser mit nur
     // Personalrecht erreicht `einheit` nicht (LLH-1185).
-    for ep_id in beruehrt {
-        sse_personal(&state, einsatz_id, ep_id);
+    for ep_id in &beruehrt.personen {
+        sse_personal(&state, einsatz_id, *ep_id);
     }
+    // Eintreffen oder Entlassung der Einheit hat ihre Schicht berührt (LLH-1128).
+    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung);
     // Nur der Handstatus meldet für die Einheit (design.md D11): ihr aus Fahrzeugen abgeleiteter
     // Status meldet nicht noch einmal, das tut schon das Fahrzeug.
     if wieder_verfuegbar {

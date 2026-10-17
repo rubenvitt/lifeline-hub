@@ -976,3 +976,268 @@ async fn einsatzvorgabe_statuscodes_und_rechte() {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+// ── Kopplung an die Kräfte-Zeitachse (LLH-1128) ─────────────────────────────────────────────
+
+async fn status_mit_marke(app: &axum::Router, admin: &str, label: &str, marke: &str) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        "/api/fahrzeug-status",
+        admin,
+        Some(&format!(
+            r#"{{"label":"{label}","kategorie":"gebunden","zeitachse_marke":"{marke}"}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json:?}");
+    json["id"].as_i64().unwrap()
+}
+
+/// Handstatus der Einheit (ohne Fahrzeug): wirkt wie ein Wechsel an der Einheit selbst.
+async fn handstatus(app: &axum::Router, admin: &str, e: i64, einheit: i64, status: i64) {
+    let (s, json) = anfrage(
+        app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/einheiten/{einheit}/status"),
+        admin,
+        Some(&format!(r#"{{"status_id":{status}}}"#)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+}
+
+async fn liste_mit(
+    app: &axum::Router,
+    admin: &str,
+    e: i64,
+    status: &str,
+) -> Vec<serde_json::Value> {
+    let (s, json) = anfrage(
+        app,
+        "GET",
+        &format!("{}?status={status}", pfad(e)),
+        admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+    json.as_array().unwrap().clone()
+}
+
+fn utc(s: &str) -> chrono::DateTime<chrono::Utc> {
+    chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S")
+        .unwrap()
+        .and_utc()
+}
+
+/// Durchstich LLH-1128 über die echten Routen: Einsatzvorgabe 6 h, Statuswechsel mit Marke
+/// `eintreffen` → Schicht ab dem Eintreffen samt Fristen, ETB und Live-Ereignis; ein zweites
+/// Eintreffen legt keine zweite an; die Entlassung beendet sie (kein Hinweis des Schedulers
+/// nach der Fälligkeit); die Streichung der Entlassung öffnet sie wieder.
+#[tokio::test]
+async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &vorgabe_pfad(e),
+        &admin,
+        Some(r#"{"schichtmodell":{"bezeichnung":"Sanitätsdienst","typ":"rhythmus","rhythmus_minuten":360}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let f1 = einheit(&app, &admin, e, "Florian 1", None).await;
+    let am_ort = status_mit_marke(&app, &admin, "am Einsatzort", "eintreffen").await;
+    let am_ort_2 = status_mit_marke(&app, &admin, "an der Stelle", "eintreffen").await;
+    let entlassen = status_mit_marke(&app, &admin, "entlassen", "entlassung").await;
+
+    let mut rx = live.abonniere(e);
+    handstatus(&app, &admin, e, f1, am_ort).await;
+    recv_until_tag(&mut rx, "abloesung", std::time::Duration::from_secs(2)).await;
+
+    let laufend = liste_mit(&app, &admin, e, "laufend").await;
+    assert_eq!(laufend.len(), 1, "{laufend:?}");
+    let schicht = &laufend[0];
+    let id = schicht["id"].as_i64().unwrap();
+    let (_, z) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/einheiten/{f1}/zeitachse"),
+        &admin,
+        None,
+    )
+    .await;
+    let eintreffen_at = z["perioden"][0]["eintreffen_at"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(schicht["beginn_at"], eintreffen_at.as_str());
+    assert_eq!(schicht["rhythmus_quelle"], "einsatz");
+    let faellig = (utc(&eintreffen_at) + chrono::Duration::hours(6))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    assert_eq!(schicht["faellig_at"], faellig.as_str());
+    assert_eq!(schicht["erbende_einheiten"], serde_json::json!([]));
+    assert_eq!(
+        offene_fristen(&pool, id).await.len(),
+        2,
+        "Fälligkeit und Vorwarnung"
+    );
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(
+        treffer(&etb, "system", "«Florian 1» mit dem Eintreffen begonnen").len(),
+        1
+    );
+
+    // Zweites Eintreffen in derselben Periode: ausgelassen, keine zweite Schicht.
+    handstatus(&app, &admin, e, f1, am_ort_2).await;
+    assert_eq!(liste_mit(&app, &admin, e, "laufend").await.len(), 1);
+
+    // Entlassung: beendet mit Spur, keine Fristen, kein Hinweis nach der Fälligkeit.
+    let mut rx = live.abonniere(e);
+    handstatus(&app, &admin, e, f1, entlassen).await;
+    recv_until_tag(&mut rx, "abloesung", std::time::Duration::from_secs(2)).await;
+    assert!(liste_mit(&app, &admin, e, "laufend").await.is_empty());
+    let beendet = liste_mit(&app, &admin, e, "beendet").await;
+    assert_eq!(beendet.len(), 1);
+    assert_eq!(beendet[0]["id"], id);
+    assert_eq!(beendet[0]["status"], "beendet");
+    assert_eq!(beendet[0]["beendet_grund"], "entlassung");
+    assert!(beendet[0].get("einstufung").is_none(), "{:?}", beendet[0]);
+    assert!(liste_mit(&app, &admin, e, "abgeloest").await.is_empty());
+    assert!(offene_fristen(&pool, id).await.is_empty());
+    let mut rx = live.abonniere(e);
+    lifeline_hub::erinnerung::scheduler::tick_einmal(
+        &pool,
+        &live,
+        utc(&faellig) + chrono::Duration::minutes(1),
+    )
+    .await;
+    while let Ok(n) = rx.try_recv() {
+        assert_ne!(n.event.as_str(), "abloesung", "kein Hinweis: {}", n.data);
+    }
+
+    // Streichung der Entlassung: die Schicht läuft wieder, samt Fristen.
+    let (_, z) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/einheiten/{f1}/zeitachse"),
+        &admin,
+        None,
+    )
+    .await;
+    let entlassung = z["ereignisse"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["art"] == "entlassung")
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap();
+    let mut rx = live.abonniere(e);
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/einheiten/{f1}/zeitachse/{entlassung}/streichen"),
+        &admin,
+        Some(r#"{"grund":"falscher Knopf"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json:?}");
+    recv_until_tag(&mut rx, "abloesung", std::time::Duration::from_secs(2)).await;
+    let laufend = liste_mit(&app, &admin, e, "laufend").await;
+    assert_eq!(laufend.len(), 1);
+    assert_eq!(laufend[0]["id"], id);
+    assert!(laufend[0].get("beendet_grund").is_none());
+    assert_eq!(offene_fristen(&pool, id).await.len(), 2);
+}
+
+/// Ohne Vorgabe entsteht keine Schicht; ein erzwungener Fehler im Autostart lässt den
+/// Statuswechsel und das Eintreffen gelingen (Spec „Fehler im Autostart“).
+#[tokio::test]
+async fn ohne_vorgabe_oder_bei_fehler_bleibt_es_beim_statuswechsel() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let f1 = einheit(&app, &admin, e, "Florian 1", None).await;
+    let f2 = einheit(&app, &admin, e, "Florian 2", None).await;
+    let am_ort = status_mit_marke(&app, &admin, "am Einsatzort", "eintreffen").await;
+
+    handstatus(&app, &admin, e, f1, am_ort).await;
+    let (_, alle) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(alle, serde_json::json!([]), "keine erfundene Zahl");
+
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &vorgabe_pfad(e),
+        &admin,
+        Some(r#"{"schichtmodell":{"bezeichnung":"Sanitätsdienst","typ":"rhythmus","rhythmus_minuten":360}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    sqlx::query(
+        "CREATE TRIGGER schicht_scheitert BEFORE INSERT ON einsatz_abloesung \
+         BEGIN SELECT RAISE(ABORT, 'erzwungen'); END",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    handstatus(&app, &admin, e, f2, am_ort).await;
+    let (_, z) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/einheiten/{f2}/zeitachse"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(z["perioden"][0]["anker"], "eintreffen", "{z}");
+    let (_, alle) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(alle, serde_json::json!([]));
+}
+
+/// Knoten-Modell über die Routen: die Untereinheit erbt die Schicht des Verbands und steht im
+/// DTO unter `erbende_einheiten`; ihr eigenes Eintreffen legt keine Schicht an.
+#[tokio::test]
+async fn untereinheit_erbt_die_schicht_des_verbands() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &vorgabe_pfad(e),
+        &admin,
+        Some(r#"{"schichtmodell":{"bezeichnung":"Sanitätsdienst","typ":"rhythmus","rhythmus_minuten":360}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let zug = einheit(&app, &admin, e, "Zug 1", None).await;
+    let (s, gruppe) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/einheiten"),
+        &admin,
+        Some(&format!(
+            r#"{{"name":"Gruppe 1","ueber_einheit_id":{zug}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{gruppe:?}");
+    let gruppe = gruppe["id"].as_i64().unwrap();
+    let am_ort = status_mit_marke(&app, &admin, "am Einsatzort", "eintreffen").await;
+    handstatus(&app, &admin, e, zug, am_ort).await;
+    handstatus(&app, &admin, e, gruppe, am_ort).await;
+
+    let laufend = liste_mit(&app, &admin, e, "laufend").await;
+    assert_eq!(laufend.len(), 1, "nur der Verband: {laufend:?}");
+    assert_eq!(laufend[0]["einheit_id"], zug);
+    assert_eq!(
+        laufend[0]["erbende_einheiten"],
+        serde_json::json!([{"einheit_id": gruppe, "einheit_name": "Gruppe 1"}])
+    );
+}

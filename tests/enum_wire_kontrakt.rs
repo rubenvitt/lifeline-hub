@@ -927,7 +927,21 @@ fn wetter_messgroesse_wire() {
 /// Frontends (`abloesung/einstufung.ts` rechnet dieselben drei Stufen nach).
 #[test]
 fn abloesung_status_wire() {
-    enum_wire_as_str!(lifeline_hub::abloesung::AbloesungStatus { Laufend, Abgeloest });
+    enum_wire_as_str!(lifeline_hub::abloesung::AbloesungStatus {
+        Laufend,
+        Abgeloest,
+        Beendet,
+    });
+}
+
+/// LLH-1128: `beendet_grund` ist TEXT ohne CHECK (`migrations/0212_schichtmodell.sql`); den Wert
+/// setzt nur dieser Enum.
+#[test]
+fn abloesung_beendet_grund_wire() {
+    enum_wire!(lifeline_hub::abloesung::BeendetGrund {
+        Entlassung => "entlassung",
+        Aufloesung => "aufloesung",
+    } in lifeline_hub::abloesung::BeendetGrund::ALLE);
 }
 
 /// `einsatz` seit LLH-1122 (Neubau in `migrations/0212_schichtmodell.sql`).

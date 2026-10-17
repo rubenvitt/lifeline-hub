@@ -748,12 +748,29 @@ async fn aufgeloeste_einheit_hinterlaesst_keine_frist() {
             .is_empty(),
         "der Scheduler löst nichts mehr aus"
     );
-    assert!(liste(&w.pool, w.e, None, T0).await.unwrap().is_empty());
+    assert!(liste(&w.pool, w.e, Some(AbloesungStatus::Laufend), T0)
+        .await
+        .unwrap()
+        .is_empty());
+    // LLH-1128 (Entscheidung 15.10.2026): beendet mit Spur statt gelöscht.
+    let beendet = liste(&w.pool, w.e, Some(AbloesungStatus::Beendet), T0)
+        .await
+        .unwrap();
+    assert_eq!(beendet.len(), 1);
+    assert_eq!(beendet[0].id, a.id);
+    assert_eq!(beendet[0].beendet_grund, Some(BeendetGrund::Aufloesung));
+    assert_eq!(beendet[0].beendet_von_id, Some(w.b));
+    assert!(beendet[0].beendet_at.is_some());
+    assert_eq!(
+        beendet[0].einstufung, None,
+        "keine Einstufung, nie „laufend“"
+    );
 }
 
-/// LLH-1079 (design.md D5): Auflösen entfernt nur die Planung. Die abgelöste Schicht bleibt als
-/// Vollzug stehen, die laufende Folgeschicht der aufgelösten Einheit geht mit ihren Fristen, und
-/// eine fremde Schicht verliert die aufgelöste Einheit als geplante Ablösung.
+/// LLH-1079 (design.md D5), LLH-1128: Auflösen beendet die laufende Schicht mit Spur. Die
+/// abgelöste Schicht bleibt als Vollzug stehen, die laufende Folgeschicht der aufgelösten Einheit
+/// endet mit Grund `aufloesung` und ohne offene Fristen, und eine fremde Schicht verliert die
+/// aufgelöste Einheit als geplante Ablösung.
 #[tokio::test]
 async fn aufloesen_behaelt_abgeloeste_schicht_und_leert_fremde_planung() {
     let w = welt().await;
@@ -806,12 +823,17 @@ async fn aufloesen_behaelt_abgeloeste_schicht_und_leert_fremde_planung() {
         .await
         .unwrap();
     assert!(f2.abloesung && !f2.geloescht, "{f2:?}");
-    let laufend: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung WHERE id = ?")
-        .bind(folge.id)
-        .fetch_one(&w.pool)
-        .await
-        .unwrap();
-    assert_eq!(laufend, 0, "die laufende Schicht ist Planung und geht");
+    let (status, grund): (String, Option<String>) =
+        sqlx::query_as("SELECT status, beendet_grund FROM einsatz_abloesung WHERE id = ?")
+            .bind(folge.id)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        (status.as_str(), grund.as_deref()),
+        ("beendet", Some("aufloesung")),
+        "die laufende Schicht endet mit Spur"
+    );
     assert!(offene_fristen(&w.pool, folge.id).await.is_empty());
 }
 
@@ -995,6 +1017,7 @@ async fn liste_plan_ohne_scan() {
         None,
         Some(AbloesungStatus::Laufend),
         Some(AbloesungStatus::Abgeloest),
+        Some(AbloesungStatus::Beendet),
     ] {
         let plan = plan_zeilen(&w.pool, &liste_sql(status), w.e).await;
         assert!(
@@ -1337,4 +1360,420 @@ async fn ruecknahme_setzt_die_fristen_nach_der_aktuellen_vorgabe() {
             ("abloesung_vorwarnung".into(), "2026-09-22 12:45:00".into()),
         ]
     );
+}
+
+// ── Kopplung an die Kräfte-Zeitachse (LLH-1128) ─────────────────────────────────────────────
+
+/// Weit in der Zukunft, damit beide Fristen vor der Serveruhr liegen, mit der die Kopplung
+/// rechnet.
+const ANKUNFT: &str = "2030-06-03 08:00:00";
+
+/// Schreibt ein Ereignis an der Einheit über den einzigen Schreibpfad (wie ein markierter
+/// Status) und liefert das Ergebnis samt dem, was es berührt hat.
+async fn schreibe(
+    w: &Welt,
+    einheit: i64,
+    art: crate::zeitachse::ZeitachseArt,
+    zeit: &str,
+) -> (
+    crate::zeitachse::repo::Schreibergebnis,
+    crate::zeitachse::repo::Beruehrt,
+) {
+    let mut tx = w.pool.begin().await.unwrap();
+    let r = crate::zeitachse::repo::schreibe_tx(
+        &mut tx,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Einheit(einheit),
+        crate::zeitachse::repo::Neu {
+            art,
+            zeitpunkt_at: zeit,
+            quelle: crate::zeitachse::ZeitachseQuelle::Status,
+            notiz: None,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    r
+}
+
+/// Wie [`schreibe`], das Ereignis muss geschrieben werden.
+async fn ereignis(
+    w: &Welt,
+    einheit: i64,
+    art: crate::zeitachse::ZeitachseArt,
+    zeit: &str,
+) -> crate::zeitachse::repo::Beruehrt {
+    let (r, b) = schreibe(w, einheit, art, zeit).await;
+    assert!(
+        matches!(r, crate::zeitachse::repo::Schreibergebnis::Geschrieben(_)),
+        "{art:?} {zeit}: {r:?}"
+    );
+    b
+}
+
+/// Streicht das jüngste nicht gestrichene Ereignis `art` der Einheit (Route „Streichung“).
+async fn streiche(
+    w: &Welt,
+    einheit: i64,
+    art: crate::zeitachse::ZeitachseArt,
+) -> crate::zeitachse::repo::Beruehrt {
+    let id: i64 = sqlx::query_scalar(
+        "SELECT id FROM einsatz_kraft_zeitachse WHERE einheit_id = ? AND art = ? \
+           AND gestrichen_at IS NULL ORDER BY id DESC LIMIT 1",
+    )
+    .bind(einheit)
+    .bind(art.as_str())
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let mut tx = w.pool.begin().await.unwrap();
+    let g = crate::zeitachse::repo::streiche_tx(
+        &mut tx,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Einheit(einheit),
+        id,
+        "Fehlbuchung",
+        false,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    g.beruehrt
+}
+
+async fn set_einsatz_rhythmus(w: &Welt, minuten: i64) {
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(minuten, 30)),
+        T0,
+    )
+    .await
+    .unwrap();
+}
+
+async fn schichten(w: &Welt, einheit: i64) -> Vec<AbloesungAnzeige> {
+    liste(&w.pool, w.e, None, T0)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|a| a.einheit_id == einheit)
+        .collect()
+}
+
+async fn untereinheit(w: &Welt, name: &str, ueber: i64) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name, ueber_einheit_id) VALUES (?, ?, ?) \
+         RETURNING id",
+    )
+    .bind(w.e)
+    .bind(name)
+    .bind(ueber)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+use crate::zeitachse::ZeitachseArt::{Alarmierung, Eintreffen, Entlassung};
+
+/// Spec „Schicht mit dem Eintreffen“: Einsatzvorgabe 6 h → Beginn = Eintreffen, fällig +6 h,
+/// beide Fristen, ETB mit Herkunft; die Kopplung meldet ihren ETB-Eintrag für die Live-Events.
+#[tokio::test]
+async fn eintreffen_beginnt_die_schicht_nach_der_einsatzvorgabe() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    let b = ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].status, AbloesungStatus::Laufend);
+    assert_eq!(s[0].beginn_at, ANKUNFT);
+    assert_eq!(s[0].faellig_at, "2030-06-03 14:00:00");
+    assert_eq!(s[0].rhythmus_quelle, RhythmusQuelle::Einsatz);
+    assert_eq!(
+        offene_fristen(&w.pool, s[0].id).await,
+        vec![
+            ("abloesung".into(), "2030-06-03 14:00:00".into()),
+            ("abloesung_vorwarnung".into(), "2030-06-03 13:30:00".into()),
+        ]
+    );
+    let etb = etb(&w.pool, w.e).await;
+    let beginn: Vec<_> = etb
+        .iter()
+        .filter(|(_, i, _, _)| i.contains("mit dem Eintreffen begonnen"))
+        .collect();
+    assert_eq!(beginn.len(), 1, "{etb:?}");
+    assert!(
+        beginn[0].1.contains("(Vorgabe Einsatz «Sanitätsdienst»)"),
+        "{}",
+        beginn[0].1
+    );
+    assert_eq!(b.abloesung.len(), 1, "der ETB-Eintrag für Kurzruf und Live");
+}
+
+/// Ohne Vorgabe keine Schicht: keine erfundene Zahl.
+#[tokio::test]
+async fn eintreffen_ohne_vorgabe_beginnt_keine_schicht() {
+    let w = welt().await;
+    let b = ereignis(&w, w.f1, Eintreffen, ANKUNFT).await;
+    assert!(schichten(&w, w.f1).await.is_empty());
+    assert!(b.abloesung.is_empty());
+}
+
+/// Rangfolge wie von Hand: die Vorgabe des Abschnitts vor der des Einsatzes.
+#[tokio::test]
+async fn autostart_nimmt_die_abschnittsvorgabe_vor_der_einsatzvorgabe() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    vorgabe_setzen(&w.pool, w.e, w.abschnitt, w.b, Some(480), T0)
+        .await
+        .unwrap();
+    ereignis(&w, w.f1, Eintreffen, ANKUNFT).await;
+    let s = schichten(&w, w.f1).await;
+    assert_eq!(s[0].rhythmus_quelle, RhythmusQuelle::Abschnitt);
+    assert_eq!(s[0].faellig_at, "2030-06-03 16:00:00");
+}
+
+/// Ein Eintreffen nach einer Alarmierung (Anker) beginnt die Schicht zum Eintreffen; ein
+/// zweites in derselben Periode wird ausgelassen und legt keine zweite an, ebenso wenig ein
+/// Eintreffen bei schon laufender (von Hand begonnener) Schicht. Nach der Entlassung beginnt das
+/// nächste Eintreffen eine neue.
+#[tokio::test]
+async fn autostart_nur_ohne_laufende_schicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 07:30:00").await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let (r, b) = schreibe(&w, w.f2, Eintreffen, "2030-06-03 08:05:00").await;
+    assert!(matches!(
+        r,
+        crate::zeitachse::repo::Schreibergebnis::Ausgelassen(_)
+    ));
+    assert!(b.abloesung.is_empty());
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].beginn_at, ANKUNFT);
+
+    // Von Hand begonnen, dann eingetroffen: keine zweite.
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    beginnen(&w.pool, w.e, w.b, &beginn(f3, Some(120)), T0)
+        .await
+        .unwrap();
+    let b = ereignis(&w, f3, Eintreffen, ANKUNFT).await;
+    assert!(b.abloesung.is_empty());
+    assert_eq!(schichten(&w, f3).await.len(), 1);
+
+    // Entlassen und wieder eingetroffen: eine neue Schicht.
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 12:00:00").await;
+    ereignis(&w, w.f2, Eintreffen, "2030-06-04 08:00:00").await;
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 2, "{s:?}");
+    assert_eq!(s[0].status, AbloesungStatus::Laufend, "laufende zuerst");
+    assert_eq!(s[0].beginn_at, "2030-06-04 08:00:00");
+    assert_eq!(s[1].status, AbloesungStatus::Beendet);
+}
+
+/// Knoten-Modell (LLH-1118 Punkt 1): die Untereinheiten erben die Schicht des Knotens und
+/// bekommen mit ihrem Eintreffen keine eigene. Von Hand begonnen übersteuert eine eigene für
+/// den Teilbaum darunter.
+#[tokio::test]
+async fn untereinheit_erbt_die_schicht_des_knotens() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    let zug = w.f2;
+    let gruppe = untereinheit(&w, "Gruppe 1", zug).await;
+    let trupp = untereinheit(&w, "Trupp 1", gruppe).await;
+    ereignis(&w, zug, Eintreffen, ANKUNFT).await;
+    let b = ereignis(&w, gruppe, Eintreffen, ANKUNFT).await;
+    ereignis(&w, trupp, Eintreffen, ANKUNFT).await;
+    assert!(b.abloesung.is_empty());
+    assert!(schichten(&w, gruppe).await.is_empty(), "erbt, keine eigene");
+    assert!(schichten(&w, trupp).await.is_empty());
+    let knoten = schichten(&w, zug).await;
+    let erben: Vec<(i64, &str)> = knoten[0]
+        .erbende_einheiten
+        .iter()
+        .map(|e| (e.einheit_id, e.einheit_name.as_str()))
+        .collect();
+    assert_eq!(erben, vec![(gruppe, "Gruppe 1"), (trupp, "Trupp 1")]);
+    let mut conn = w.pool.acquire().await.unwrap();
+    assert_eq!(
+        load_wirksamen_traeger_tx(&mut conn, w.e, trupp)
+            .await
+            .unwrap(),
+        Some(zug)
+    );
+    drop(conn);
+
+    // Von Hand an der Gruppe: übersteuert für Gruppe und Trupp.
+    let (eigen, _) = beginnen(&w.pool, w.e, w.b, &beginn(gruppe, Some(240)), T0)
+        .await
+        .unwrap();
+    assert_eq!(
+        eigen.erbende_einheiten,
+        vec![AbloesungErbe {
+            einheit_id: trupp,
+            einheit_name: "Trupp 1".into()
+        }]
+    );
+    assert!(schichten(&w, zug).await[0].erbende_einheiten.is_empty());
+}
+
+/// Spec „Ende mit der Entlassung“: beendet mit Spur, Fristen geschlossen, der Scheduler löst
+/// nach der Fälligkeit nichts mehr aus (kein Fehlalarm „überfällig“), ETB-Eintrag.
+#[tokio::test]
+async fn entlassung_beendet_die_schicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    let b = ereignis(&w, w.f2, Entlassung, "2030-06-03 12:00:00").await;
+    assert_eq!(b.abloesung.len(), 1);
+
+    let s = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(s.status, AbloesungStatus::Beendet);
+    assert_eq!(s.beendet_grund, Some(BeendetGrund::Entlassung));
+    assert_eq!(s.beendet_at.as_deref(), Some("2030-06-03 12:00:00"));
+    assert_eq!(s.beendet_von_id, Some(w.b));
+    assert_eq!(s.einstufung, None);
+    assert!(!s.ruecknehmbar);
+    assert!(offene_fristen(&w.pool, id).await.is_empty());
+    assert!(
+        ausloesbar(&w.pool, id, "2030-06-03 14:01:00")
+            .await
+            .is_empty(),
+        "keine Erinnerung nach der Fälligkeit"
+    );
+    let live = crate::live::LiveHub::new();
+    let mut rx = live.abonniere(w.e);
+    crate::erinnerung::scheduler::tick_einmal(
+        &w.pool,
+        &live,
+        crate::zeit::parse_utc("2030-06-03 14:01:00").unwrap(),
+    )
+    .await;
+    while let Ok(n) = rx.try_recv() {
+        assert_ne!(n.event.as_str(), "abloesung", "kein Hinweis: {}", n.data);
+    }
+    assert!(etb(&w.pool, w.e)
+        .await
+        .iter()
+        .any(|(_, i, _, _)| i == "Ablösung: Schicht von «Florian 2» mit der Entlassung beendet"));
+
+    // Eine beendete Schicht lässt sich weder ändern noch vollziehen.
+    let e = aendern(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &AenderungEingabe {
+            rhythmus_minuten: Some(Some(60)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(status(e), StatusCode::UNPROCESSABLE_ENTITY);
+    let e = vollziehen(&w.pool, w.e, id, w.b, "2030-06-03 13:00:00", None, T0)
+        .await
+        .unwrap_err();
+    assert_eq!(status(e), StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+/// Die Streichung genau dieser Entlassung öffnet die Schicht wieder, samt Fristen.
+#[tokio::test]
+async fn streichung_der_entlassung_oeffnet_die_schicht_wieder() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    ereignis(&w, w.f2, Entlassung, "2030-06-03 12:00:00").await;
+    let b = streiche(&w, w.f2, Entlassung).await;
+    assert_eq!(b.abloesung.len(), 1);
+
+    let s = laden(&w.pool, w.e, id, T0).await.unwrap();
+    assert_eq!(s.status, AbloesungStatus::Laufend);
+    assert_eq!(s.beendet_at, None);
+    assert_eq!(s.beendet_grund, None);
+    assert_eq!(
+        offene_fristen(&w.pool, id).await,
+        vec![
+            ("abloesung".into(), "2030-06-03 14:00:00".into()),
+            ("abloesung_vorwarnung".into(), "2030-06-03 13:30:00".into()),
+        ]
+    );
+    assert!(etb(&w.pool, w.e)
+        .await
+        .iter()
+        .any(|(_, i, _, _)| i.contains("läuft wieder, Entlassung gestrichen")));
+}
+
+/// Eine Entlassung, die eine frühere Periode schließt, während eine spätere offen bleibt
+/// (Alarmierung 07:30, Eintreffen 08:00, Entlassung 07:45 nachgetragen), lässt die laufende
+/// Schicht stehen.
+#[tokio::test]
+async fn entlassung_einer_frueheren_periode_laesst_die_schicht_stehen() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Alarmierung, "2030-06-03 07:30:00").await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let b = ereignis(&w, w.f2, Entlassung, "2030-06-03 07:45:00").await;
+    assert!(b.abloesung.is_empty());
+    let s = schichten(&w, w.f2).await;
+    assert_eq!(s.len(), 1);
+    assert_eq!(s[0].status, AbloesungStatus::Laufend);
+}
+
+/// Auflösen schreibt die Entlassung der Einheit, die Schicht endet aber mit Grund
+/// `aufloesung` (das Auflösen beendet sie vorher).
+#[tokio::test]
+async fn aufloesen_nach_autostart_beendet_mit_grund_aufloesung() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    let id = schichten(&w, w.f2).await[0].id;
+    crate::einheit::repo::aufloesen(&w.pool, w.e, w.f2, w.b)
+        .await
+        .unwrap();
+    let grund: Option<String> =
+        sqlx::query_scalar("SELECT beendet_grund FROM einsatz_abloesung WHERE id = ?")
+            .bind(id)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert_eq!(grund.as_deref(), Some("aufloesung"));
+}
+
+/// Spec „Fehler im Autostart“: scheitert der Autostart mitten im Schreiben (hier an den Fristen,
+/// nach dem Anlegen der Schicht), gelingt das Eintreffen trotzdem, und von der Schicht bleibt
+/// nichts zurück.
+#[tokio::test]
+async fn fehler_im_autostart_bricht_das_eintreffen_nicht() {
+    let w = welt().await;
+    set_einsatz_rhythmus(&w, 360).await;
+    sqlx::query(
+        "CREATE TRIGGER frist_scheitert BEFORE INSERT ON erinnerung \
+         BEGIN SELECT RAISE(ABORT, 'erzwungen'); END",
+    )
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let b = ereignis(&w, w.f2, Eintreffen, ANKUNFT).await;
+    assert!(b.abloesung.is_empty());
+    assert_eq!(
+        perioden(&w, w.f2).await[0].eintreffen_at.as_deref(),
+        Some(ANKUNFT),
+        "das Eintreffen steht"
+    );
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung WHERE einheit_id = ?")
+        .bind(w.f2)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0, "der Savepoint nimmt die halbe Schicht zurück");
 }
