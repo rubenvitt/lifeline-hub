@@ -264,13 +264,18 @@ export function erkenneTypBefehl(text: string): { typ: EtbTyp; rest: string } | 
 export function erkenneZeitBefehl(
   text: string,
   optionen: { zone: string | null | undefined; jetzt: dayjs.Dayjs },
-): { ok: true; zeitpunkt: dayjs.Dayjs; rest: string } | { ok: false; grund: string } | null {
+):
+  | { ok: true; zeitpunkt: dayjs.Dayjs; rest: string; ende: number }
+  | { ok: false; grund: string; ende: number }
+  | null {
   const treffer = /^\/zeit\s+(\S+)\s/.exec(text);
   if (!treffer) return null;
+  // `ende`: wo der Befehl endet — der Aufrufer löst nur aus, wenn genau dort getippt wurde.
+  const ende = treffer[0].length;
   const deutung = deuteZeit(treffer[1], { ...optionen, art: 'ereignis' });
-  if (!deutung.ok) return { ok: false, grund: deutung.grund };
+  if (!deutung.ok) return { ok: false, grund: deutung.grund, ende };
   if (deutung.zeitpunkt == null) return null;
-  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest: text.slice(treffer[0].length) };
+  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest: text.slice(ende), ende };
 }
 
 /**

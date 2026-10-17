@@ -229,15 +229,25 @@ export default function InfotelefonPage() {
       ?.scrollIntoView?.({ block: 'center' });
   }, [hervorgehoben, isHervorgehobenLoaded]);
   const pageCount = pages?.length ?? 0;
+  // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
+  const appendedIds = gefroren
+    ? (pages ?? [])
+        .slice(frozenPageCount)
+        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
+    : [];
+  const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
+  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
   /*
    * Funkprotokoll (LLH-1149): Öffnen am Ende, Mitlaufen am Ende, Anker beim Nachladen oben.
-   * `gefiltert` steht in Serverordnung — der erste Anruf ist der jüngste.
+   * Die Ränder der GEZEIGTEN Anrufe (Serverordnung, der erste ist der jüngste): erst wenn
+   * zurückgehaltene erscheinen (Auftauen, „anzeigen“), läuft die Seite ihnen nach.
    */
   const { amEnde, zumEnde } = useFunkprotokollLauf({
     wurzel: listeRef,
-    bereit: anrufeQuery.isSuccess,
-    juengste: gefiltert[0] != null ? String(gefiltert[0].id) : undefined,
-    aelteste: gefiltert.length > 0 ? String(gefiltert[gefiltert.length - 1].id) : undefined,
+    // Erst mit dem Einsatz steht die Liste statt des Skeletts (Frühausstieg unten).
+    bereit: anrufeQuery.isSuccess && einsatzQuery.data != null,
+    juengste: sichtbar[0] != null ? String(sichtbar[0].id) : undefined,
+    aelteste: sichtbar.length > 0 ? String(sichtbar[sichtbar.length - 1].id) : undefined,
     ohneStartlauf: startMitAnruf,
   });
   // Hochgerollt friert ein wie Fokus in der Liste; zurück am Ende ohne Fokus taut auf.
@@ -337,14 +347,6 @@ export default function InfotelefonPage() {
       : 'daten';
   const gesamt = zaehler?.gesamt ?? 0;
   const offen = zaehler?.offen ?? 0;
-  // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
-  const appendedIds = gefroren
-    ? (pages ?? [])
-        .slice(frozenPageCount)
-        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
-    : [];
-  const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
-  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
   const isListeLoaded = anrufeQuery.isSuccess;
   // Unter `md` trägt die Meta die Kennzahlen; ab `md` stehen sie als Kacheln darunter.
   const anrufeText = gesamt === 1 ? '1 Anruf' : `${gesamt} Anrufe`;
@@ -368,7 +370,11 @@ export default function InfotelefonPage() {
     <Segmentleiste<Sicht>
       beschriftung="Anrufe filtern"
       wert={sicht}
-      onWechsel={setSicht}
+      onWechsel={(neu) => {
+        // Eine Wassermarke der alten Sicht hielte Anrufe der neuen als „neu“ zurück.
+        setGefroren(null);
+        setSicht(neu);
+      }}
       optionen={[
         { wert: 'alle', label: 'alle' },
         { wert: 'offen', label: 'offene Rückrufe' },

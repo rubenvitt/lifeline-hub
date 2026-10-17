@@ -2155,7 +2155,8 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
         HttpResponse.json({
           anzahl_lagebesprechungen: 1,
           letzte_lagebesprechung: {
-            abgehalten_at: '2026-05-23 11:30:00',
+            // Sekundengenau vom Server; Wahl und Grenze laufen auf der vollen Minute.
+            abgehalten_at: '2026-05-23 11:30:42',
             einsatz_id: 7,
             entschluss: '',
             erfasst_at: '2026-05-23 11:35:00',
@@ -2179,7 +2180,8 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
       }),
     ]);
     const band = (await screen.findByText('Gefiltert')).closest('[data-lfh="filterhinweis"]')!;
-    await waitFor(() => expect(band).toHaveTextContent(/\+1 Nachtrag vor \d{4} erfasst/));
+    // Das Datum der Probe ist nicht heute: die Grenze trägt den Tag (`231330`), heute nur `1330`.
+    await waitFor(() => expect(band).toHaveTextContent(/\+1 Nachtrag vor (\d{2})?\d{4} erfasst/));
     expect(band).toHaveTextContent('seit LB');
   });
 });

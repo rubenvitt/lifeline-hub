@@ -505,15 +505,21 @@ export default function Schnellerfassung({
       text = befehl.rest;
     }
     // Danach `/zeit 1420 ` (LLH-1088): setzt die Ereigniszeit, der Rest bleibt Inhalt. Unlesbar
-    // bleibt der Text stehen, und die Hinweiszeile nennt den Grund.
+    // bleibt der Text stehen, und die Hinweiszeile nennt den Grund. Ausgelöst wird nur, wenn das
+    // Leerzeichen hinter der Angabe eben getippt (Cursor genau dort) oder alles eingefügt wurde:
+    // wer in „/zeit 2590 Pumpe“ eine Ziffer löscht, meint nicht 02:59.
+    const caretRoh = textRef.current?.resizableTextArea?.textArea?.selectionStart ?? neu.length;
+    const caretImRest = caretRoh - (neu.length - text.length);
     const zeit = erkenneZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
-    if (zeit?.ok) {
+    const ausloesen =
+      zeit != null && (befehl != null || caretImRest === zeit.ende || !inhalt.startsWith('/zeit'));
+    if (zeit?.ok && ausloesen) {
       setMetadaten((m) => ({ ...m, ereigniszeit: zeit.zeitpunkt }));
       setZukunftsGrund(null);
       text = zeit.rest;
     }
     setZeitBefehlGrund(zeit && !zeit.ok ? zeit.grund : null);
-    if (befehl || zeit?.ok) {
+    if (befehl || (zeit?.ok && ausloesen)) {
       setInhalt(text);
       aktualisiereTrigger(text, text.length);
       return;
@@ -573,6 +579,7 @@ export default function Schnellerfassung({
   function bausteinEinsetzen(felder: BausteinFelder) {
     if (sendet) return;
     setInhalt(felder.inhalt);
+    setZeitBefehlGrund(null);
     setMetadaten((m) => ({
       ...m,
       ...(felder.meldeweg ? { meldeweg: felder.meldeweg } : {}),
@@ -833,8 +840,10 @@ export default function Schnellerfassung({
   const grenzTeil = (
     <>
       {zeitBefehlGrund && (
+        // Höflich, nicht `alert`: der Grund erscheint beim Tippen, nicht beim Absenden, und
+        // unterbräche sonst die Eingabe am Vorleser.
         <span
-          role="alert"
+          role="status"
           data-lfh="etb-zeit-hinweis"
           style={{
             color: rollen.alarmText,

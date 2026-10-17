@@ -9,7 +9,7 @@ import { einsatzFixture } from '../test/fixtures';
 import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
 import { baueZeilen, type EtbZeile } from './etbZeile';
-import EtbZeitachse from './EtbZeitachse';
+import EtbZeitachse, { gezeigteRaender } from './EtbZeitachse';
 
 type ZeitachsenProps = ComponentProps<typeof EtbZeitachse>;
 
@@ -658,6 +658,61 @@ describe('EtbZeitachse – Sammelbanner', () => {
     rerender(bau(zeilenAus([neu, alt]), 1));
     expect(screen.getByText('Neu')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
+  });
+});
+
+describe('EtbZeitachse – gezeigte Ränder für den Bildlauf (LLH-1149)', () => {
+  it('meldet einen zurückgehaltenen Eintrag erst, wenn er erscheint', async () => {
+    const onGezeigt = vi.fn();
+    const alt = eintrag({ id: 1, lfd_nr: 1, erfasser_id: 2 });
+    const neu = eintrag({ id: 2, lfd_nr: 2, erfasser_id: 2, ereigniszeit: '2026-05-23 10:05:00' });
+    const zeilen = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const { neu: rerender } = renderZeitachse({
+      eintraege: [alt],
+      onGezeigt,
+      eigeneBenutzerId: 1,
+      onWiedervorlage: vi.fn(),
+    });
+    expect(onGezeigt).toHaveBeenLastCalledWith({ juengste: '|eintrag-1', aelteste: 'eintrag-1' });
+    // Fokus in der Achse friert ein: der neue fremde Eintrag wird zurückgehalten.
+    act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+    rerender(zeilen([neu, alt]));
+    expect(onGezeigt).toHaveBeenLastCalledWith({ juengste: '|eintrag-1', aelteste: 'eintrag-1' });
+    await userEvent.click(screen.getByRole('button', { name: 'anzeigen' }));
+    expect(onGezeigt).toHaveBeenLastCalledWith({ juengste: '|eintrag-2', aelteste: 'eintrag-1' });
+  });
+
+  it('nennt im unteren Rand die Puffer UND den jüngsten Eintrag: eine stehende Ablehnung hält nichts an', () => {
+    const mit = (e: EtbEintragAnzeige[]) =>
+      gezeigteRaender(baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [abgelehnt()] }));
+    const vorher = mit([eintrag({ id: 1 })]).juengste;
+    const nachher = mit([eintrag({ id: 2 }), eintrag({ id: 1 })]).juengste;
+    expect(nachher).not.toBe(vorher);
+    expect(gezeigteRaender([]).juengste).toBeUndefined();
+  });
+
+  it('taut beim Wechsel der Menge auf (Filter)', async () => {
+    const alt = eintrag({ id: 1, lfd_nr: 1, erfasser_id: 2 });
+    const neu = eintrag({ id: 2, lfd_nr: 2, erfasser_id: 2, ereigniszeit: '2026-05-23 10:05:00' });
+    const z = (e: EtbEintragAnzeige[]) =>
+      baueZeilen({ eintraege: e, ausstehend: [], abgelehnt: [] });
+    const ergebnis = renderMitProviders(
+      <EtbZeitachse einsatzId={1} zeilen={z([alt])} amEnde fensterSchluessel="a" />,
+    );
+    // Hochgerollt: die Achse friert ein.
+    ergebnis.rerender(
+      <EtbZeitachse einsatzId={1} zeilen={z([alt])} amEnde={false} fensterSchluessel="a" />,
+    );
+    ergebnis.rerender(
+      <EtbZeitachse einsatzId={1} zeilen={z([neu, alt])} amEnde={false} fensterSchluessel="a" />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(/1 neue/);
+    ergebnis.rerender(
+      <EtbZeitachse einsatzId={1} zeilen={z([neu, alt])} amEnde={false} fensterSchluessel="b" />,
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getAllByTestId('etb-ereigniszeile')).toHaveLength(2);
   });
 });
 

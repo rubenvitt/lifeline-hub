@@ -38,6 +38,17 @@ const X = (id?: number): AbgelehnterEintrag => ({
 });
 
 describe('baueZeilen (LFH-342 · C7, Befund M82)', () => {
+  it('reiht mehrere Puffer in Serverordnung ein — neueste zuerst (LLH-1149)', () => {
+    // Die Warteschlange liefert aufsteigend; gekehrt steht der jüngste Vorgemerkte unten.
+    const zeilen = baueZeilen({ eintraege: [], ausstehend: [A(1), A(2)], abgelehnt: [X(3), X(4)] });
+    expect(zeilen.map((z) => z.schluessel)).toEqual([
+      'abgelehnt-4',
+      'abgelehnt-3',
+      'ausstehend-2',
+      'ausstehend-1',
+    ]);
+  });
+
   it('stellt abgelehnte vor ausstehende vor die gesendeten Einträge', () => {
     const zeilen = baueZeilen({ eintraege: [E(1), E(2)], ausstehend: [A(9)], abgelehnt: [X(8)] });
     // Die Liste läuft neueste-zuerst; ein noch nicht gesendeter Eintrag ist der jüngste.

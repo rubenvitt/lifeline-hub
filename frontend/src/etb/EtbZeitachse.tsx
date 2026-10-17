@@ -93,6 +93,17 @@ interface Props {
   /** „anzeigen“ am Sammelbanner: die Seite rollt ans Ende, wo die neuen Einträge stehen. */
   onZumEnde?: () => void;
   /**
+   * Meldet die Ränder der GEZEIGTEN Zeilen (`gezeigteRaender`), nach jedem Commit, in dem sie sich
+   * ändern — für `useFunkprotokollLauf`: erst wenn zurückgehaltene Zeilen erscheinen (Auftauen,
+   * „anzeigen“), läuft die Seite ihnen nach.
+   */
+  onGezeigt?: (raender: GezeigteRaender) => void;
+  /**
+   * Kennung der geladenen Menge (Filter). Wechselt sie, taut die Achse auf: eine Wassermarke aus
+   * der alten Menge hielte sonst Treffer der neuen als „neu“ zurück.
+   */
+  fensterSchluessel?: string;
+  /**
    * Lesemarke als Trennlinie (LLH-1149): `knoten` (ein `<li>`) steht direkt unter dem Eintrag mit
    * `nachLfdNr`. Ob sie in der Achse steht oder als Banner darüber, entscheidet die Seite.
    */
@@ -236,6 +247,8 @@ export default function EtbZeitachse({
   eigeneBenutzerId,
   amEnde = true,
   onZumEnde,
+  onGezeigt,
+  fensterSchluessel,
   lesemarke,
   onBerichtigen,
   berichtigenGesperrt,
@@ -277,6 +290,11 @@ export default function EtbZeitachse({
   const [gesehenerSprung, setGesehenerSprung] = useState(sprungMarke);
   if (sprungMarke !== gesehenerSprung) {
     setGesehenerSprung(sprungMarke);
+    setGefroren(null);
+  }
+  const [gesehenesFenster, setGesehenesFenster] = useState(fensterSchluessel);
+  if (fensterSchluessel !== gesehenesFenster) {
+    setGesehenesFenster(fensterSchluessel);
     setGefroren(null);
   }
 
@@ -349,6 +367,15 @@ export default function EtbZeitachse({
       return neu;
     });
   }, []);
+
+  const raender = gezeigteRaender(sichtbar);
+  const meldeGezeigt = useRef(onGezeigt);
+  useLayoutEffect(() => {
+    meldeGezeigt.current = onGezeigt;
+  });
+  useLayoutEffect(() => {
+    meldeGezeigt.current?.({ juengste: raender.juengste, aelteste: raender.aelteste });
+  }, [raender.juengste, raender.aelteste]);
 
   const betreten = useCallback(() => {
     setFokusDrin(true);
@@ -918,3 +945,24 @@ const EtbBuendelzeile = memo(function EtbBuendelzeile({
     </Zeitachseneintrag>
   );
 });
+
+/** Die Ränder der gezeigten Zeilen für den Bildlauf (`useFunkprotokollLauf`). */
+export interface GezeigteRaender {
+  juengste: string | undefined;
+  aelteste: string | undefined;
+}
+
+/**
+ * Ränder der gezeigten Zeilen in Serverordnung (neueste zuerst, gepufferte am Kopf). Der untere
+ * Rand nennt die gepufferten Zeilen UND den jüngsten gesendeten Eintrag: eine stehende abgelehnte
+ * Zeile bliebe sonst die „jüngste“, und neue Einträge darüber liefen nicht mehr mit.
+ */
+export function gezeigteRaender(sichtbar: readonly EtbZeile[]): GezeigteRaender {
+  const puffer = sichtbar.filter((z) => z.art !== 'eintrag').map((z) => z.schluessel);
+  const ersterEintrag = sichtbar.find((z) => z.art === 'eintrag');
+  return {
+    juengste:
+      sichtbar.length === 0 ? undefined : `${puffer.join(',')}|${ersterEintrag?.schluessel ?? ''}`,
+    aelteste: sichtbar[sichtbar.length - 1]?.schluessel,
+  };
+}

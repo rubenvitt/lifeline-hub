@@ -31,7 +31,7 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { Speicherung } from '../components/Erfassung';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import EtbZeitachse from '../etb/EtbZeitachse';
+import EtbZeitachse, { type GezeigteRaender } from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
 import EtbLesemarkeBanner, { useEtbLesemarke } from '../etb/EtbLesemarkeBanner';
 import { lesemarkeImFenster } from '../etb/lesemarkeModell';
@@ -40,9 +40,9 @@ import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
 import EtbZeitraumWahl from '../etb/EtbZeitraumWahl';
 import { filterMerkmale } from '../etb/filterMerkmale';
 import { serverJetzt } from '../offline/serveruhr';
-import { alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { taktisch } from '../anzeige/zeitfenster';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { inZone } from '../anzeige/format';
 import { fetchLagebesprechungStand } from '../api/lagebesprechung';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
@@ -301,7 +301,12 @@ export default function EtbPage() {
   const letzteLbStand = lagebesprechungFrei
     ? (lagebesprechungQuery.data?.letzte_lagebesprechung ?? null)
     : null;
-  const letzteLb = letzteLbStand?.abgehalten_at ?? null;
+  // Auf die Minute abgerundet wie jede Wahl der Schnellwahl (Spec `etb-filterleiste`): „seit LB
+  // 1330“ schließt einen Eintrag um 13:30:10 ein, auch wenn die Besprechung um 13:30:42 endete.
+  const letzteLb = useMemo(() => {
+    const z = alsZeitpunkt(letzteLbStand?.abgehalten_at);
+    return z ? alsBackendZeit(z.utc().startOf('minute')) : null;
+  }, [letzteLbStand?.abgehalten_at]);
 
   /*
    * Nachträge vor der Lagebesprechung (LLH-1071/LLH-1080, Entscheidung Ruben 17.10.2026): „seit
@@ -314,14 +319,14 @@ export default function EtbPage() {
     letzteLbStand != null &&
     filter.von != null &&
     filter.bis == null &&
-    alsZeitpunkt(filter.von)?.isSame(alsZeitpunkt(letzteLbStand.abgehalten_at)) === true;
+    alsZeitpunkt(filter.von)?.isSame(alsZeitpunkt(letzteLb)) === true;
   const filterOhneZeit = useMemo<EtbFilterWerte>(() => {
     const { von: _v, bis: _b, ...rest } = filter;
     void _v;
     void _b;
     return rest;
   }, [filter]);
-  const lbZeit = letzteLbStand?.abgehalten_at;
+  const lbZeit = letzteLb ?? undefined;
   const lbEintrag = letzteLbStand?.etb_eintrag_id;
   const nachtraegeQuery = useQuery({
     queryKey: einsatzKeys.etbListe(einsatzId, { ...filterOhneZeit, nachtraegeVorLb: lbEintrag }),
@@ -607,11 +612,19 @@ export default function EtbPage() {
     [markeInAchse, markeNr, einsatzId],
   );
 
+  // Die Ränder meldet die Zeitachse aus den GEZEIGTEN Zeilen (`onGezeigt`): was sie zurückhält,
+  // steht nicht im Bild, erst sein Erscheinen soll mitlaufen.
+  const [gezeigt, setGezeigt] = useState<GezeigteRaender>({
+    juengste: undefined,
+    aelteste: undefined,
+  });
   const { amEnde, zumEnde } = useFunkprotokollLauf({
     wurzel: zeitachseKopf,
-    bereit: !etbQuery.isLoading,
-    juengste: chronologie[0]?.schluessel,
-    aelteste: chronologie[chronologie.length - 1]?.schluessel,
+    // Erst mit dem Einsatz steht die Seite statt ihres Skeletts (Frühausstieg unten).
+    bereit: !etbQuery.isLoading && einsatzQuery.data != null,
+    juengste: gezeigt.juengste,
+    aelteste: gezeigt.aelteste,
+    kopfImFenster: !etbQuery.hasPreviousPage,
     ohneStartlauf: zielEintragId != null,
     // Unter `xl` steht die Bilanz unter der Spalte: das Ende ist die Spalte über der Erfassung,
     // nicht das Dokumentende — sonst stünde beim Öffnen die Bilanz im Bild statt Nr. 134.
@@ -666,6 +679,9 @@ export default function EtbPage() {
   async function pruefeAusserhalb(angenommen: EtbEintragAnzeige) {
     const schluessel = einsatzKeys.etbListe(einsatzId, filter);
     await qc.refetchQueries({ queryKey: schluessel, exact: true });
+    // Scheitert das Nachladen, liegt nur der alte Stand vor: dort fehlte auch ein passender
+    // Eintrag. Ohne Antwort des Servers wird nichts behauptet.
+    if (qc.getQueryState(schluessel)?.status === 'error') return;
     const daten = qc.getQueryData<InfiniteData<EtbEintragAnzeige[], EtbSeitenParam>>(schluessel);
     const da = daten?.pages[0]?.some((x) => x.id === angenommen.id) ?? false;
     if (!da) setAusserhalb({ id: angenommen.id, lfd_nr: angenommen.lfd_nr, fuer: filterText });
@@ -742,6 +758,9 @@ export default function EtbPage() {
     typWort: (t) => etbTyp[t].label,
     einheitName: (id) => einheitenQuery.data?.find((x) => x.id === id)?.name,
   });
+  // Einmalig (Spec „Eigener Eintrag außerhalb des Filters“): ein anderer Filter räumt den Hinweis,
+  // er kehrt mit dem alten nicht zurück.
+  if (ausserhalb != null && ausserhalb.fuer !== filterText) setAusserhalb(null);
   const ausserhalbHier = ausserhalb != null && ausserhalb.fuer === filterText ? ausserhalb : null;
   const nachtragsGrenze = alsZeitpunkt(lbZeit);
   const band =
@@ -776,7 +795,9 @@ export default function EtbPage() {
                   {nachtraege.length > 99 ? '99+' : nachtraege.length}
                 </span>{' '}
                 {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
-                <span style={monoStil(12)}>{inZone(lbZeit!, konventionen).format('HHmm')}</span>{' '}
+                <span style={monoStil(12)}>
+                  {taktisch(lbZeit!, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
+                </span>{' '}
                 erfasst ·{' '}
                 <Button
                   type="link"
@@ -1071,6 +1092,8 @@ export default function EtbPage() {
               eigeneBenutzerId={benutzer?.id}
               amEnde={amEnde}
               onZumEnde={zumEnde}
+              onGezeigt={setGezeigt}
+              fensterSchluessel={JSON.stringify(filter)}
               lesemarke={lesemarkeLinie}
               ladend={etbQuery.isLoading}
               fehler={etbQuery.isError}

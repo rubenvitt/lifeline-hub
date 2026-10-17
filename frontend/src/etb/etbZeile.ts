@@ -49,13 +49,15 @@ export function baueZeilen(args: {
   ausstehend: readonly AusstehenderEintrag[];
   abgelehnt: readonly AbgelehnterEintrag[];
 }): EtbZeile[] {
+  // Die Puffer kommen aufsteigend aus der Warteschlange (`queueLaden`); hier gilt Serverordnung,
+  // neueste zuerst — gekehrt steht dann der jüngste Vorgemerkte direkt über der Erfassung.
   return [
-    ...args.abgelehnt.map((puffer): EtbZeile => ({
+    ...[...args.abgelehnt].reverse().map((puffer): EtbZeile => ({
       art: 'abgelehnt',
       schluessel: abgelehntSchluessel(puffer),
       puffer,
     })),
-    ...args.ausstehend.map((puffer): EtbZeile => ({
+    ...[...args.ausstehend].reverse().map((puffer): EtbZeile => ({
       art: 'ausstehend',
       schluessel: ausstehendSchluessel(puffer),
       puffer,

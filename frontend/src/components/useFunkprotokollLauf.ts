@@ -49,10 +49,21 @@ interface Optionen {
   wurzel: RefObject<HTMLElement | null>;
   /** Die Liste steht (erste Lieferung oder Puffer) — erst dann rollt das Öffnen ans Ende. */
   bereit: boolean;
-  /** Schlüssel der jüngsten gezeigten Zeile (unten). */
+  /**
+   * Kennung des unteren Rands der GEZEIGTEN Zeilen — ändert sich, sobald unten etwas dazukommt
+   * oder wegfällt. Gezeigt, nicht geladen: was die Liste zurückhält (Sammelbanner), steht nicht im
+   * Bild, und erst sein Erscheinen soll das Mitlaufen auslösen. Bleibt eine gepufferte Zeile
+   * unten stehen, gehört auch der jüngste gesendete Eintrag in die Kennung.
+   */
   juengste: string | undefined;
   /** Schlüssel der ältesten gezeigten Zeile (oben). */
   aelteste: string | undefined;
+  /**
+   * Hält das Fenster den Kopf der Liste (kein „Neuere laden“)? Nur dann läuft die Seite einer
+   * neuen jüngsten Zeile nach; lädt jemand neuere Seiten in ein tiefes Fenster, hält der Anker
+   * die Lesestelle (design.md D2.3). Vorgabe `true`.
+   */
+  kopfImFenster?: boolean;
   /** Beim Öffnen nicht ans Ende rollen, etwa weil ein Sprungziel selbst rollt. */
   ohneStartlauf?: boolean;
   /**
@@ -114,6 +125,7 @@ export function useFunkprotokollLauf({
   juengste,
   aelteste,
   ohneStartlauf = false,
+  kopfImFenster = true,
   ende,
 }: Optionen): { amEnde: boolean; zumEnde: () => void } {
   // Über einen Ref gelesen: die Seite baut das Objekt je Render neu, die Rückrufe bleiben stabil.
@@ -167,12 +179,15 @@ export function useFunkprotokollLauf({
    * Lesestelle: die nächste Änderung braucht den Anker VOR sich, und ein Bildlauf-Ereignis kommt
    * nicht, wenn sich nur der Inhalt ändert.
    */
-  const vorige = useRef({ juengste, aelteste });
+  const vorige = useRef({ juengste, aelteste, kopfImFenster });
   useLayoutEffect(() => {
-    if (!bereit) return;
+    // Erst, wenn die Liste steht UND gezeichnet ist: eine Seite, die noch ihr Skelett zeigt
+    // (Einsatz lädt nach der Liste), verbrauchte sonst den Startlauf an der falschen Höhe.
+    if (!bereit || wurzel.current == null) return;
     const neueJuengste = vorige.current.juengste !== juengste;
     const neueAelteste = vorige.current.aelteste !== aelteste;
-    vorige.current = { juengste, aelteste };
+    const kopfVorher = vorige.current.kopfImFenster;
+    vorige.current = { juengste, aelteste, kopfImFenster };
     let rahmen = 0;
     if (!gestartet.current) {
       // 1. Öffnen am Ende — einmal. Ein zweiter Rahmen fängt Gruppen, deren Höhe der Browser erst
@@ -187,7 +202,7 @@ export function useFunkprotokollLauf({
         amEndeRef.current = istAmEnde(endeRef.current);
         setAmEnde(amEndeRef.current);
       }
-    } else if (amEndeRef.current && (neueJuengste || neueAelteste)) {
+    } else if (amEndeRef.current && kopfVorher && (neueJuengste || neueAelteste)) {
       // 2. Mitlaufen: stand die Seite am Ende, folgt sie der neuen jüngsten Zeile.
       rolleAnsEnde(endeRef.current);
     } else if (neueAelteste && anker.current) {
@@ -201,7 +216,7 @@ export function useFunkprotokollLauf({
     }
     anker.current = obersteSichtbare(wurzel.current);
     return () => cancelAnimationFrame(rahmen);
-  }, [bereit, juengste, aelteste, ohneStartlauf, wurzel, zumEnde]);
+  }, [bereit, juengste, aelteste, kopfImFenster, ohneStartlauf, wurzel, zumEnde]);
 
   return { amEnde, zumEnde };
 }

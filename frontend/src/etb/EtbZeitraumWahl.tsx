@@ -1,5 +1,5 @@
 import { Button, Flex, Popover, theme } from 'antd';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ZEIT_BLATT,
   zeitPanelAmFeldAb,
@@ -11,11 +11,11 @@ import {
   ZEITFENSTER_LABEL,
   zeitfensterArten,
   zeitfensterWahl,
+  taktisch,
   zeitraumBeschriftung,
   type ZeitfensterArt,
 } from '../anzeige/zeitfenster';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatZeitKurz } from '../anzeige/format';
 import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { serverJetzt } from '../offline/serveruhr';
@@ -58,6 +58,8 @@ export default function EtbZeitraumWahl({ von, bis, letzteLb, onWahl }: Props) {
   const bezug = { jetzt: serverJetzt(), zone, letzteLb };
   const beschriftung = zeitraumBeschriftung({ von, bis }, bezug);
   const [eigen, setEigen] = useState<Zeitraum | null>(null);
+  const ausloeser = useRef<HTMLButtonElement>(null);
+  const ersterKnopf = useRef<HTMLButtonElement>(null);
 
   function waehle(grenzen: ZeitraumGrenzen) {
     setOffen(false);
@@ -71,15 +73,35 @@ export default function EtbZeitraumWahl({ von, bis, letzteLb, onWahl }: Props) {
 
   function label(art: ZeitfensterArt): string {
     if (art === 'seitLb' && letzteLb) {
-      return `${ZEITFENSTER_LABEL.seitLb} (${formatZeitKurz(letzteLb, { zeitzone: zone })})`;
+      return `${ZEITFENSTER_LABEL.seitLb} (${taktisch(letzteLb, bezug)})`;
     }
     return ZEITFENSTER_LABEL[art];
   }
 
+  // Ein Dialog, kein Tooltip (antd hängt das Popover ans Ende von `<body>`): der Fokus geht beim
+  // Öffnen hinein (`afterOpenChange`), Escape schließt und gibt ihn dem Auslöser zurück.
   const inhalt = (
-    <Flex vertical gap={token.marginXS} style={{ minWidth: istBlatt ? undefined : 280 }}>
-      {zeitfensterArten({ mitLb: letzteLb != null }).map((art) => (
-        <Button key={art} block onClick={() => schnell(art)} style={{ justifyContent: 'start' }}>
+    <Flex
+      vertical
+      gap={token.marginXS}
+      role="dialog"
+      aria-label="Zeitraum"
+      style={{ minWidth: istBlatt ? undefined : 280 }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        setOffen(false);
+        ausloeser.current?.focus();
+      }}
+    >
+      {zeitfensterArten({ mitLb: letzteLb != null }).map((art, i) => (
+        <Button
+          key={art}
+          ref={i === 0 ? ersterKnopf : undefined}
+          block
+          onClick={() => schnell(art)}
+          style={{ justifyContent: 'start' }}
+        >
           {label(art)}
         </Button>
       ))}
@@ -90,15 +112,17 @@ export default function EtbZeitraumWahl({ von, bis, letzteLb, onWahl }: Props) {
           onChange={(z) => setEigen(z ?? [null, null])}
         />
         <Flex gap={token.marginXS} wrap style={{ marginTop: token.marginXS }}>
+          {/* Nicht gesperrt: ein getipptes Feld schreibt seinen Wert erst beim Verlassen fest, und
+              ein gesperrter Knopf schluckte genau diesen Klick. Ohne Wert schließt er nur. */}
           <Button
             type="primary"
-            disabled={eigen == null || (eigen[0] == null && eigen[1] == null)}
             onClick={() =>
-              eigen &&
-              waehle({
-                von: eigen[0] ? alsBackendZeit(eigen[0]) : undefined,
-                bis: eigen[1] ? alsBackendZeit(eigen[1]) : undefined,
-              })
+              eigen && (eigen[0] != null || eigen[1] != null)
+                ? waehle({
+                    von: eigen[0] ? alsBackendZeit(eigen[0]) : undefined,
+                    bis: eigen[1] ? alsBackendZeit(eigen[1]) : undefined,
+                  })
+                : setOffen(false)
             }
           >
             Zeitraum übernehmen
@@ -126,8 +150,12 @@ export default function EtbZeitraumWahl({ von, bis, letzteLb, onWahl }: Props) {
       destroyOnHidden
       classNames={istBlatt ? { root: ZEIT_BLATT } : undefined}
       content={inhalt}
+      afterOpenChange={(o) => {
+        if (o) ersterKnopf.current?.focus();
+      }}
     >
       <Button
+        ref={ausloeser}
         aria-haspopup="dialog"
         aria-expanded={offen}
         aria-label={von || bis ? `Zeitraum ${beschriftung}` : 'Zeitraum'}

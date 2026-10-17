@@ -42,6 +42,22 @@ describe('EtbZeitraumWahl (LLH-1080)', () => {
     expect(onWahl).toHaveBeenCalledWith({ von: '2026-10-17 11:45:00', bis: undefined });
   });
 
+  it('ist per Tastatur bedienbar: Fokus hinein beim Öffnen, Escape schließt und gibt ihn zurück', async () => {
+    bau();
+    const user = userEvent.setup();
+    const knopf = screen.getByRole('button', { name: 'Zeitraum' });
+    knopf.focus();
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog', { name: 'Zeitraum' });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Letzte Stunde' })).toHaveFocus(),
+    );
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(knopf).toHaveAttribute('aria-expanded', 'false'));
+    expect(knopf).toHaveFocus();
+  });
+
   it('beschriftet einen gesetzten Zeitraum ohne Sekunden', () => {
     bau({ von: '2026-10-17 11:45:00' });
     expect(screen.getByRole('button', { name: /^Zeitraum/ })).toHaveTextContent('seit 1345');

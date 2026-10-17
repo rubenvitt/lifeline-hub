@@ -69,6 +69,9 @@ function Liste(props: {
   ohneStartlauf?: boolean;
   /** Ende an der Spalte statt am Dokument, mit angepinnter Erfassung. */
   mitSpalte?: boolean;
+  kopfImFenster?: boolean;
+  /** Noch keine Liste im DOM (die Seite zeigt ihr Skelett). */
+  ohneWurzel?: boolean;
   onLauf?: (l: ReturnType<typeof useFunkprotokollLauf>) => void;
 }) {
   const wurzel = useRef<HTMLOListElement>(null);
@@ -79,12 +82,13 @@ function Liste(props: {
     juengste: props.zeilen[props.zeilen.length - 1],
     aelteste: props.zeilen[0],
     ohneStartlauf: props.ohneStartlauf,
+    kopfImFenster: props.kopfImFenster,
     ende: props.mitSpalte ? { spalte, fussVariable: '--test-fuss' } : undefined,
   });
   props.onLauf?.(lauf);
   return (
     <div ref={spalte} data-testid="spalte">
-      <ol ref={wurzel}>
+      <ol ref={props.ohneWurzel ? undefined : wurzel}>
         {props.zeilen.map((z) => (
           <li key={z} data-zeile={z}>
             {z}
@@ -182,6 +186,26 @@ describe('useFunkprotokollLauf (LLH-1149)', () => {
     } finally {
       document.documentElement.style.removeProperty('--test-fuss');
     }
+  });
+
+  it('läuft nicht mit, wenn neuere Seiten in ein tiefes Fenster kommen („Neuere laden“)', async () => {
+    const { rerender } = render(<Liste zeilen={['a', 'b']} kopfImFenster={false} />);
+    await naechsterRahmen();
+    const vorher = y;
+    hoehe = 2100;
+    rerender(<Liste zeilen={['a', 'b', 'c', 'd']} kopfImFenster />);
+    expect(y).toBe(vorher);
+    // Hält das Fenster den Kopf, läuft eine neue jüngste Zeile wieder mit.
+    hoehe = 2150;
+    rerender(<Liste zeilen={['a', 'b', 'c', 'd', 'e']} kopfImFenster />);
+    expect(y).toBe(2150);
+  });
+
+  it('verbraucht den Startlauf nicht, solange die Liste nicht im DOM steht', () => {
+    const { rerender } = render(<Liste zeilen={['a']} ohneWurzel />);
+    expect(window.scrollTo).not.toHaveBeenCalled();
+    rerender(<Liste zeilen={['a', 'b']} />);
+    expect(y).toBe(2000);
   });
 
   it('schaltet die Ankerung des Browsers ab und gibt sie beim Aushängen zurück', () => {

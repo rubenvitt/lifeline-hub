@@ -1243,7 +1243,31 @@ describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
     await userEvent.type(feld, '/zeit 2590 Pumpe');
     expect(feld).toHaveValue('/zeit 2590 Pumpe');
     expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
-    expect(screen.getByRole('alert')).toHaveTextContent(/^\/zeit: .+/);
+    expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: .+/);
+  });
+
+  it('greift nicht, wenn mitten in einer stehenden Angabe korrigiert wird', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 2590 Pumpe');
+    // Cursor hinter die „0“, Ziffer löschen: „/zeit 259 Pumpe“ hieße 02:59.
+    await userEvent.type(feld, '{Backspace}', {
+      initialSelectionStart: 10,
+      initialSelectionEnd: 10,
+    });
+    expect(feld).toHaveValue('/zeit 259 Pumpe');
+    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+  });
+
+  it('räumt den Grund, wenn ein Baustein den Text ersetzt', async () => {
+    const baustein = { id: 1, label: 'Lage ruhig', inhalt: 'Lage ruhig' } as EtbBaustein;
+    renderMitProviders(<Schnellerfassung {...props({ bausteine: [baustein] })} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 2590 x');
+    expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: /);
+    await userEvent.type(feld, ' /Lage');
+    await userEvent.click(await screen.findByText('Lage ruhig'));
+    await waitFor(() => expect(screen.queryByText(/^\/zeit: /)).toBeNull());
   });
 
   it('sendet keine Ereigniszeit in der Zukunft: Grund am Chip, Text bleibt', async () => {

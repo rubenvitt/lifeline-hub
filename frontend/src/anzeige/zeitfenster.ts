@@ -59,8 +59,12 @@ export function zeitfensterWahl(
   }
 }
 
-/** „1345“ am selben Tag wie jetzt, sonst „161345“ — taktisch, ohne Sekunden. */
-function taktisch(wire: string, { jetzt, zone }: Zeitbezug): string {
+/**
+ * „1345“ am selben Tag wie jetzt, sonst „161345“ — taktisch, ohne Sekunden. „Heute“ nach der
+ * Serveruhr des Bezugs, nie nach der Geräteuhr: die Beschriftung kippte sonst an einer anderen
+ * Mitternacht als die Wahl.
+ */
+export function taktisch(wire: string, { jetzt, zone }: Pick<Zeitbezug, 'jetzt' | 'zone'>): string {
   const d = inZone(wire, { zeitzone: zone });
   const heute = inZone(alsBackendZeit(jetzt), { zeitzone: zone });
   return d.isSame(heute, 'day') ? d.format('HHmm') : d.format('DDHHmm');
