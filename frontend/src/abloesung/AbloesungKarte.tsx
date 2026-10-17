@@ -314,7 +314,22 @@ export default function AbloesungKarte({
               title={warnungen}
               style={{ ...EINZEILIG, color: rollen.achtungText }}
             >
-              {warnungen}
+              {/* Wortlaut aus `planungWarnungText`; die Uhrzeit in Mono wie jede Zeit der Karte. */}
+              {s.planung_warnungen.map((w, i) => (
+                <span key={`${w.art}-${w.einheit_id}-${w.abloesung_id ?? ''}`}>
+                  {i > 0 && ' · '}
+                  {w.art === 'im_einsatz' && w.seit_at ? (
+                    <>
+                      {w.einheit_name} steht selbst im Einsatz seit{' '}
+                      <span data-lfh="abloesung-warnung-zeit" style={ZAHL}>
+                        <ZeitAnzeige wert={w.seit_at} format="kurz" />
+                      </span>
+                    </>
+                  ) : (
+                    planungWarnungText(w, konventionen)
+                  )}
+                </span>
+              ))}
             </Text>
           )}
           {s.status === 'abgeloest' && s.abschnitt_uebergeben && (

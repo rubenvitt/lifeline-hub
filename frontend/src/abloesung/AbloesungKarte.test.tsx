@@ -247,6 +247,10 @@ describe('AbloesungKarte — Warnungen zur Planung (LLH-1131 Teil II)', () => {
     );
     expect(zeile.title).toBe(zeile.textContent);
     expect(zeile.style.whiteSpace).toBe('nowrap');
+    // Die Uhrzeit in Mono mit festen Ziffern wie jede Zeit der Karte.
+    const zeit = zeile.querySelector<HTMLElement>('[data-lfh="abloesung-warnung-zeit"]');
+    expect(zeit).toHaveTextContent(/^\d{4}$/);
+    expect(zeit!.style.fontVariantNumeric).toBe('tabular-nums');
     expect(zeile.style.color).toBe(wieGesetzt('color', farbenHell.achtungText));
     expect(zeile.style.color).not.toBe(wieGesetzt('color', farbenHell.alarmText));
     // Die Warnung ist keine Einstufung: die Kante bleibt neutral, nichts wird alarmiert.
