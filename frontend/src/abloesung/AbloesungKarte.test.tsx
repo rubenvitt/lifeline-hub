@@ -120,3 +120,29 @@ describe('AbloesungKarte — Ende und Vererbung (LLH-1128)', () => {
     expect(document.querySelector('[data-lfh="abloesung-erben"]')).toBeNull();
   });
 });
+
+describe('AbloesungKarte — Besatzungswechsel (LLH-1150)', () => {
+  it('die abgelöste Schicht nennt „Besatzungswechsel“ und die neue Besatzung, ohne „Abgelöst durch“', () => {
+    zeige(
+      schicht({
+        status: 'abgeloest',
+        vollzogen_at: '2026-10-17 11:40:00',
+        art: 'besatzung',
+        besatzung: [
+          { personal_id: 1, name: 'Anna Alt', rolle: 'alt' },
+          { personal_id: 2, name: 'Cora Neu', rolle: 'neu' },
+          { personal_id: 3, name: 'Dirk Neu', rolle: 'neu' },
+        ],
+      }),
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="abloesung-besatzung"]')!;
+    expect(zeile).toHaveTextContent('Besatzungswechsel · neu: Cora Neu, Dirk Neu');
+    expect(zeile.title).toContain('Bisherige: Anna Alt');
+    expect(document.querySelector('[data-lfh="abloesung-abloeser"]')).toBeNull();
+  });
+
+  it('eine laufende oder als ganze Einheit abgelöste Schicht hat keine solche Zeile', () => {
+    zeige(schicht());
+    expect(document.querySelector('[data-lfh="abloesung-besatzung"]')).toBeNull();
+  });
+});

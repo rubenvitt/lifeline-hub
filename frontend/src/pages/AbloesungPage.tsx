@@ -20,6 +20,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { Abloesung, AbloesungStatus, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
 import { abloeserOptionen, abloeserText } from '../abloesung/abloeser';
+import { besatzungOptionen, besatzungText, bisherigeBesatzung } from '../abloesung/besatzung';
+import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import {
   AbloeserDialog,
@@ -68,7 +70,11 @@ import { useViewport } from '../components/useViewport';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-import { einsatzRechteGrund, MODUL_EINHEITEN_GESPERRT } from '../components/nurAnsicht';
+import {
+  einsatzRechteGrund,
+  MODUL_EINHEITEN_GESPERRT,
+  MODUL_PERSONAL_GESPERRT,
+} from '../components/nurAnsicht';
 import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
 import { einsatzEinstellungenPfad } from '../routing/deeplinks';
 
@@ -216,6 +222,23 @@ export default function AbloesungPage() {
     queryFn: () => listeEinheitenPerioden(einsatzId),
     enabled: einheitenFrei,
   });
+  // Besatzungswechsel (LLH-1150): die neue Besatzung kommt aus dem Personal des Einsatzes (Modul
+  // Personal), geladen erst mit offenem Vollzug-Dialog. Der Wechsel schreibt die Zuordnung, die
+  // sonst das Modul Einheiten schreibt; ohne eine der beiden Freigaben ist er gesperrt mit Grund.
+  const personalFrei = istKeyFreigegeben('personal', freigabenQuery.data);
+  const personalQuery = useQuery({
+    queryKey: einsatzKeys.personal(einsatzId),
+    queryFn: () => listeEinsatzPersonal(einsatzId),
+    enabled: personalFrei && vollzugSchicht != null,
+  });
+  const besatzungGesperrt =
+    freigabenQuery.data == null
+      ? undefined
+      : !einheitenFrei
+        ? MODUL_EINHEITEN_GESPERRT
+        : !personalFrei
+          ? MODUL_PERSONAL_GESPERRT
+          : undefined;
 
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
@@ -331,6 +354,10 @@ export default function AbloesungPage() {
   // `einheit` kommt live, der eigene Tab gleicht sofort ab.
   const invalidiereEinheiten = () =>
     qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+  const invalidiereBesatzung = () => {
+    invalidiereEinheiten();
+    qc.invalidateQueries({ queryKey: einsatzKeys.personal(einsatzId) });
+  };
 
   // Fehler stehen im jeweiligen Dialog (SpeicherFehler); `mutateAsync` lehnt ab, die Hülle lässt
   // die Felder stehen.
@@ -354,7 +381,7 @@ export default function AbloesungPage() {
     // Die zurückgenommene Schicht kehrt in die laufenden zurück — als eigene Handlung.
     merkeEigene(a.id);
     invalidiere();
-    invalidiereEinheiten();
+    invalidiereBesatzung();
     message.success(`Vollzug der Ablösung ${a.einheit_name} zurückgenommen`);
   };
   const zuruecknehmenMut = useMutation({
@@ -391,10 +418,15 @@ export default function AbloesungPage() {
       for (const f of v.folgeschichten) merkeEigene(f.id);
       invalidiere();
       if (v.abgeloest.abschnitt_uebergeben) invalidiereEinheiten();
+      // Der Besatzungswechsel (LLH-1150) hängt Personen um: Einheiten und Personal gleichen ab.
+      const wechsel = v.abgeloest.art === 'besatzung';
+      if (wechsel) invalidiereBesatzung();
       const durch = abloeserText(v.abgeloest);
-      const text = durch
-        ? `Ablösung vollzogen: ${v.abgeloest.einheit_name} durch ${durch}`
-        : `Ablösung vollzogen: ${v.abgeloest.einheit_name}`;
+      const text = wechsel
+        ? `Besatzungswechsel vollzogen: ${v.abgeloest.einheit_name}, neu ${besatzungText(v.abgeloest, 'neu') ?? ''}`
+        : durch
+          ? `Ablösung vollzogen: ${v.abgeloest.einheit_name} durch ${durch}`
+          : `Ablösung vollzogen: ${v.abgeloest.einheit_name}`;
       zeigeRueckgaengig(message, text, () => rueckgaengigMut.mutate(v.abgeloest.id));
     },
   });
@@ -792,6 +824,13 @@ export default function AbloesungPage() {
               : (vollzugSchicht.abschnitt_name ?? null)
           }
           uebergabeGesperrt={einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined}
+          bisherigeBesatzung={bisherigeBesatzung(vollzugSchicht, einheitenQuery.data)}
+          personen={besatzungOptionen(
+            personalQuery.data ?? [],
+            einheitenQuery.data ?? [],
+            vollzugSchicht,
+          )}
+          besatzungGesperrt={besatzungGesperrt}
           laeuft={vollzugMut.isPending}
           fehler={vollzugMut.error}
           onErfassen={(body) => vollzugMut.mutateAsync({ abloesungId: vollzugSchicht.id, body })}

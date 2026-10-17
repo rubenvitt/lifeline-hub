@@ -457,3 +457,102 @@ describe('Ablösung — Vollzug mit Liste und Abschnittsübergabe (LLH-1132)', (
     expect(within(dialog).queryByRole('checkbox')).toBeNull();
   });
 });
+
+/**
+ * LLH-1150: Besatzungswechsel. Die Art wählt zwischen ganzer Einheit und Besatzungswechsel; der
+ * Wechsel zeigt die bisherige Besatzung vorbelegt und nimmt statt der Ablöser die neue Besatzung
+ * (Pflicht). Ohne Freigabe steht er gesperrt mit Grund. Feldbudget: drei Felder.
+ */
+describe('Ablösung — Vollzug als Besatzungswechsel (LLH-1150)', () => {
+  const schicht = {
+    id: 3,
+    einheit_name: 'Florian 1',
+    abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }],
+  } as unknown as Abloesung;
+  const einheiten = [{ value: 12, label: 'Florian 2' }];
+  const personen = [
+    { value: 21, label: 'Cora Neu' },
+    { value: 22, label: 'Fritz · führt Florian 2', disabled: true },
+  ];
+
+  function oeffne(onErfassen = vi.fn().mockResolvedValue(undefined), gesperrt?: string) {
+    renderMitProviders(
+      <VollzugDialog
+        schicht={schicht}
+        einheiten={einheiten}
+        abschnittName="Deichwache Nord"
+        bisherigeBesatzung={['Anna Alt', 'Bernd Alt']}
+        personen={personen}
+        besatzungGesperrt={gesperrt}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    return onErfassen;
+  }
+
+  /** Sichtbare Felder über ihre Label (`frontend/AGENTS.md`, „Feldbudget“). */
+  const felder = (dialog: HTMLElement) =>
+    Array.from(dialog.querySelectorAll('.ant-form-item-label label')).map((l) => l.textContent);
+
+  it('wechselt die Felder: bisherige Besatzung sichtbar, neue Besatzung statt der Ablöser', async () => {
+    const onErfassen = oeffne();
+    const dialog = await screen.findByRole('dialog');
+    expect(felder(dialog)).toEqual(['Art', 'Ablösende Einheiten', 'Zeitpunkt']);
+    // Der Knopf der Radiogruppe trägt den Klick am Label, das Eingabefeld liegt darunter.
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    await waitFor(() => expect(felder(dialog)).toEqual(['Art', 'Neue Besatzung', 'Zeitpunkt']));
+    expect(within(dialog).queryByRole('checkbox')).toBeNull();
+    expect(dialog.querySelector('[data-lfh="vollzug-bisherige-besatzung"]')).toHaveTextContent(
+      'Bisherige Besatzung: Anna Alt, Bernd Alt',
+    );
+
+    // Pflicht: ohne neue Besatzung geht nichts hinaus.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    expect(
+      await within(dialog).findByText('Bitte die neue Besatzung auswählen'),
+    ).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Neue Besatzung' }));
+    const option = await waitFor(() => {
+      const k = document.querySelector<HTMLElement>(
+        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="Cora Neu"]',
+      );
+      expect(k).not.toBeNull();
+      return k!;
+    });
+    expect(
+      document.querySelector(
+        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-disabled[title="Fritz · führt Florian 2"]',
+      ),
+    ).not.toBeNull();
+    await userEvent.click(option);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung_ids: [21],
+      }),
+    );
+  });
+
+  it('ohne Freigabe gesperrt mit Grund; die ganze Einheit bleibt wählbar', async () => {
+    const onErfassen = oeffne(undefined, 'Modul Personal gesperrt');
+    const dialog = await screen.findByRole('dialog');
+    const wechsel = within(dialog).getByRole('radio', { name: 'Besatzungswechsel' });
+    expect(wechsel).toBeDisabled();
+    expect(within(dialog).getByRole('radiogroup')).toHaveAccessibleDescription(
+      'Modul Personal gesperrt',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ abloeser_ids: [12] })),
+    );
+  });
+});
