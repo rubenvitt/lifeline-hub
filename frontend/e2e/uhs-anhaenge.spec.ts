@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fotos, Pläne und Dateien an einer UHS im Browser (LFH-758, Spec `uhs-anhaenge`): Reiter
@@ -123,6 +124,7 @@ test('Reiter „Dateien“: ablegen, herunterladen, Zugriff im Protokoll, entfer
   await expect(anker).toHaveCount(0);
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText('UHS BHP 50: Foto abgelegt')).toBeVisible();
   await expect(page.getByText('UHS BHP 50: Foto entfernt')).toBeVisible();
   await expect(page.getByText(/grundriss_halle/)).toHaveCount(0);

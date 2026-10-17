@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fahrzeug als eigene Einheit führen und Personal der Einheit übernehmen (LLH-1073 Teil II),
@@ -87,6 +88,7 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
   await expect(markiert).toContainText('0/1/1//2');
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText(`Einheit «${funkrufname}» gebildet`, { exact: true })).toBeVisible();
   await expect(
     page.getByText(`Einheit «${funkrufname}»: 2 Kräfte zugeordnet: Berta Brandt, Anna Arndt`),
@@ -140,6 +142,7 @@ test('Personal der Einheit übernehmen: vorgewählt bis zum Soll, danach zeigt d
   await expect(urteil).toContainText('Soll');
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(
     page.getByText(
       `Fahrzeug «${funkrufname}»: 2 Kräfte als Besatzung zugeordnet: Ulla Ufer, Ali Aksoy`,
