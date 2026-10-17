@@ -488,18 +488,21 @@ bleiben. Die Einstufung im Client MUST mit `vorwarnung_minuten` der Schicht rech
 ### Requirement: Hinweis in der AlarmZentrale
 
 Die Oberfläche SHALL zur Vorwarnung und zur Fälligkeit einer Schicht genau einen Toast zeigen,
-mit Einheit, Uhrzeit und einem Sprung zur Seite Ablösung. Er kommt als Benachrichtigung
+mit Einheit, Uhrzeit und einem Sprung zu dieser Schicht auf der Seite Ablösung (`?schicht=<id>`,
+Requirement „Sprung zur Schicht“). Er kommt als Benachrichtigung
 (`abloesung_vorwarnung` als Hinweis, `abloesung_faellig` als Alarm, Spec `benachrichtigungen`)
 an alle mit dem Modul Ablösung; das Live-Ereignis `abloesung` frischt nur die Liste auf. Der
 Toast MUST dem gemeinsamen Budget der Benachrichtigungen unterliegen (höchstens drei sichtbar, der
 Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
 Erinnerung alarmieren. Der Planungshinweis und die Hinweise zur ablösenden Einheit (LLH-1131)
-SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zur Seite
-Ablösung, ohne dass etwas blinkt.
+SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zu ihrer
+Schicht, ohne dass etwas blinkt. Der Sprungpfad jeder Benachrichtigung mit einem Bezug der
+Ablösung MUST `/einsaetze/<id>/abloesung?schicht=<schicht>` sein, auch der Ersatz, wenn der Text
+nicht zu holen war; der Sammeltoast springt zur Seite.
 
 #### Scenario: Fälligkeit erreicht
 - **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
-- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 15:30“ und Sprung zur Seite Ablösung
+- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 15:30“ und Sprung zu ihrer Schicht auf der Seite Ablösung
 
 #### Scenario: Kein Doppelalarm
 - **WHEN** zur selben Fälligkeit auch eine Erinnerung mit Bezug Ablösung fällig wird
@@ -692,7 +695,7 @@ erhalten.
 
 #### Scenario: Eingetroffen
 - **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und per Status eintrifft
-- **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Seite Ablösung, und Mitglieder ohne das Modul erhalten nichts
+- **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Schicht der Rettungsstaffel, und Mitglieder ohne das Modul erhalten nichts
 
 #### Scenario: Am Bereitstellungsraum
 - **WHEN** dieselbe Einheit am Bereitstellungsraum eingebucht und später abgerufen wird
@@ -723,7 +726,10 @@ Schicht trägt `planung_warnungen`, beim Lesen ermittelt, für ihre Einzelplanun
 ihrer Ablöser-Liste. `schon_geplant` MUST erscheinen, wenn dieselbe Einheit auch eine andere
 laufende Schicht plant (mit dieser Schicht und ihrer Einheit), `im_einsatz`, wenn die Einheit
 selbst eine eigene oder geerbte laufende Schicht hat (mit deren Beginn). Die Oberfläche zeigt
-die Warnungen nach dem Speichern der Planung als Meldung.
+die Warnungen nach dem Speichern der Planung als Meldung und, solange sie gelten, an der Karte der
+laufenden Schicht (LLH-1131 Teil II): dezent in einer Zeile im Wortlaut der Meldung, in der Rolle
+Achtung, nie in Rot und ohne Einstufung, Kante oder Fläche der Karte zu ändern; mehrere Warnungen
+stehen mit „ · “ in derselben Zeile, der ganze Text im Titel.
 
 #### Scenario: Schon geplant
 - **WHEN** „Florian 3“ für die Schicht von „Florian 1“ geplant ist und auch für „Florian 2“ geplant wird
@@ -732,6 +738,58 @@ die Warnungen nach dem Speichern der Planung als Meldung.
 #### Scenario: Selbst im Einsatz
 - **WHEN** eine Einheit mit eigener laufender Schicht seit 13:40 als ablösende Einheit geplant wird
 - **THEN** gelingt die Planung, und die Antwort warnt „steht selbst im Einsatz seit 1340“
+
+#### Scenario: Warnung an der Karte
+- **WHEN** „Florian 3“ für die Schichten von „Florian 1“ und „Florian 2“ geplant ist
+- **THEN** zeigt die Karte von „Florian 2“ dezent „Florian 3 schon für Schicht Florian 1 geplant“, und ihre Einstufung bleibt „planmäßig“
+
+### Requirement: Stand der ablösenden Einheit an der Karte
+
+Die Karte einer laufenden Schicht SHALL zu ihren geplanten Ablösern (Ablöser-Liste, ohne Liste
+die Einzelplanung) den Stand aus der Kräfte-Zeitachse zeigen (LLH-1131 Teil II): „Ablösung:
+2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Alarmiert MUST der
+Beginn der offenen Periode des Ablösers sein, wenn sie mit der Alarmierung begann, eingetroffen ihr
+Eintreffen; eine beendete Periode MUST NOT zählen. Der Raum MUST in Klammern stehen, solange der
+Ablöser in einem Bereitstellungsraum steht; ohne Freigabe des Moduls Bereitstellungsräume fehlt
+die Klammer, und die Raumliste wird nicht abgefragt. Ohne Freigabe des Moduls Einheiten fehlt der
+Stand. Trägt kein Ablöser ein Ereignis, bleibt die Zeile „Ablösung geplant durch …“. Die Zeile
+MUST einzeilig bleiben, auch bei mehreren Ablösern (mit „; “ getrennt), der ganze Text im Titel,
+und MUST sich über die bestehenden Live-Ereignisse aktualisieren (`einheit`, `fahrzeug`,
+`abloesung`, `bereitstellungsraum`), ohne eigenen Abruf.
+
+#### Scenario: Alarmiert und eingetroffen
+- **WHEN** „2. Rettungsstaffel“ als Ablöser von „Rettungsstaffel“ geplant ist, um 13:40 alarmiert wurde und um 14:12 am Bereitstellungsraum „BR Sportplatz“ eingetroffen ist
+- **THEN** zeigt die Karte der Rettungsstaffel in einer Zeile „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“
+
+#### Scenario: Noch kein Ereignis
+- **WHEN** der geplante Ablöser weder alarmiert noch eingetroffen ist
+- **THEN** zeigt die Karte „Ablösung geplant durch 2. Rettungsstaffel“
+
+#### Scenario: Live
+- **WHEN** eine andere Person den geplanten Ablöser alarmiert, während die Seite offen ist
+- **THEN** wechselt die Zeile ohne Neuladen auf „Ablösung: 2. Rettungsstaffel · alarmiert …“, und die Karte behält ihre Höhe
+
+### Requirement: Sprung zur Schicht
+
+Die Seite Ablösung SHALL den Deeplink `?schicht=<id>` annehmen (LLH-1131 Teil II, Muster
+Query-Param aus `frontend/AGENTS.md`): Steht die Schicht unter den laufenden, wählt sie „Laufend“,
+gibt zurückgehaltene Schichten frei (wie ein Ansichtswechsel), rollt die Karte ins Bild und hebt
+sie kurz hervor; sonst sucht sie die Schicht unter den abgelösten und beendeten und wählt
+„Vergangen“ mit dem passenden Status. Die Hervorhebung MUST der Form aus der Spec
+`deeplink-hervorhebung` folgen, nach acht Sekunden ohne Übergang enden und MUST NOT blinken. Der
+Parameter MUST danach geräumt sein; eine unbekannte Kennung MUST nichts ändern.
+
+#### Scenario: Toast „Ablösung fällig“
+- **WHEN** jemand im Toast „Ablösung fällig“ zur Schicht von „Florian 1“ springt
+- **THEN** steht „Laufend“, die Karte von „Florian 1“ ist im Bild und hervorgehoben, und die Adresse trägt keinen Parameter mehr
+
+#### Scenario: Zurückgehaltene Schicht
+- **WHEN** die Schicht hinter dem Sammelbanner wartet und jemand zu ihr springt
+- **THEN** reiht die Seite die zurückgehaltenen Schichten ein und hebt die angesprungene hervor
+
+#### Scenario: Schon abgelöst
+- **WHEN** jemand zu einer inzwischen abgelösten Schicht springt
+- **THEN** wechselt die Seite nach „Vergangen“ → „Abgelöst“ und hebt deren Karte hervor
 
 ### Requirement: Abschnitt übergeben beim Vollzug
 
