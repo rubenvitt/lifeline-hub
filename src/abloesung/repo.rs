@@ -322,21 +322,34 @@ impl EinsatzVorgabe {
     }
 }
 
-/// Die wirksame Zone eines Einsatzes: seine Einstellung, sonst die der Organisation, sonst
-/// Europe/Berlin (`einsatz::nummer::zone_oder_vorgabe`, auch für einen unbekannten Namen).
+/// Die wirksame Zone eines Einsatzes: die erste gültige aus seiner Einstellung und der der
+/// Organisation, sonst Europe/Berlin (`einsatz::nummer::ZEITZONE_VORGABE`). Jeder Name wird
+/// für sich gelesen: eine ungültige Einsatzzone („MEZ“) verdrängt keine gültige der
+/// Organisation (Review PR #833).
 async fn zone_tx(conn: &mut SqliteConnection, einsatz_id: i64) -> Result<Tz, AppError> {
-    let name: Option<Option<String>> = sqlx::query_scalar(
-        "SELECT COALESCE(NULLIF(TRIM(ee.zeitzone), ''), NULLIF(TRIM(oe.zeitzone), '')) \
-         FROM einsatz e \
+    let namen: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT ee.zeitzone, oe.zeitzone FROM einsatz e \
          LEFT JOIN einsatz_einstellungen ee ON ee.einsatz_id = e.id \
          LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
     )
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(crate::einsatz::nummer::zone_oder_vorgabe(
-        name.flatten().as_deref(),
-    ))
+    let (einsatz, org) = namen.unwrap_or_default();
+    Ok([einsatz, org]
+        .into_iter()
+        .flatten()
+        .find_map(|name| {
+            let zone = name.trim().parse::<Tz>().ok();
+            if zone.is_none() && !name.trim().is_empty() {
+                tracing::warn!(
+                    zeitzone = name,
+                    "Unbekannte Zeitzone für die Ablösung übergangen"
+                );
+            }
+            zone
+        })
+        .unwrap_or(crate::einsatz::nummer::ZEITZONE_VORGABE))
 }
 
 pub(crate) async fn load_einsatz_vorgabe_tx(
@@ -405,6 +418,34 @@ async fn set_fristen_tx(
         faellig_at,
     )
     .await?;
+    set_vorwarn_frist_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        id,
+        einheit_name,
+        faellig_at,
+        vorwarnung_minuten,
+        jetzt,
+    )
+    .await
+}
+
+/// Setzt nur die Vorwarn-Frist einer laufenden Schicht (Regeln wie [`set_fristen_tx`]). Für eine
+/// reine Änderung der Vorwarnzeit: die Fälligkeitsfrist bleibt unberührt, sonst leerte
+/// `setze_auto_frist_tx` ihr `zuletzt_ausgeloest_at`, und eine überfällige Schicht meldete
+/// „fällig“ ein zweites Mal (Spec „Einmaliges Auslösen“, Review PR #833).
+#[allow(clippy::too_many_arguments)]
+async fn set_vorwarn_frist_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    id: i64,
+    einheit_name: &str,
+    faellig_at: &str,
+    vorwarnung_minuten: i64,
+    jetzt: &str,
+) -> Result<(), AppError> {
     match vorwarnzeit(faellig_at, vorwarnung_minuten) {
         Some(v) if v.as_str() > jetzt => {
             erinnerung_repo::setze_auto_frist_tx(
@@ -427,6 +468,22 @@ async fn set_fristen_tx(
         }
     }
     Ok(())
+}
+
+/// Zeitpunkt der offenen Auto-Frist eines Bezugs, `None` ohne eine.
+async fn open_frist_at_tx(
+    conn: &mut SqliteConnection,
+    bezug_typ: &str,
+    id: i64,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT faellig_at FROM erinnerung \
+         WHERE quelle = 'auto_frist' AND status = 'offen' AND bezug_typ = ? AND bezug_id = ?",
+    )
+    .bind(bezug_typ)
+    .bind(id)
+    .fetch_optional(&mut *conn)
+    .await?)
 }
 
 async fn close_fristen_tx(
@@ -651,7 +708,15 @@ pub async fn aendern(
 
         // Beginn
         let beginn_at = eingabe.beginn_at.clone().unwrap_or(roh.beginn_at.clone());
-        let (faellig_at, rhythmus) = compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?;
+        // Ohne neuen Beginn und ohne Rhythmusangabe bleibt die gespeicherte Fälligkeit: nach einer
+        // entfernten Wechselzeiten-Vorgabe ergäbe Beginn + aufgerundeter Rhythmus sonst eine um
+        // Sekunden verschobene Fälligkeit samt neu gesetzter Fristen (Review PR #833).
+        let (faellig_at, rhythmus) =
+            if eingabe.rhythmus_minuten.is_none() && beginn_at == roh.beginn_at {
+                (roh.faellig_at.clone(), roh.rhythmus_minuten)
+            } else {
+                compute_faellig(&beginn_at, rhythmus, quelle, &vorgabe)?
+            };
         // Bei der Einsatzvorgabe folgt der Rhythmus der Regel; ändert ihn nur der Beginn
         // (Wechselzeiten), ist das keine Rhythmusänderung.
         let rhythmus_geaendert = quelle != roh.rhythmus_quelle
@@ -869,11 +934,11 @@ pub async fn load_einsatz_vorgabe(
 #[derive(Debug, Clone)]
 pub enum EinsatzVorgabeInput {
     /// Kopie eines Schichtmodells der Organisation des Einsatzes (fremd oder unbekannt: 404).
-    AusStammdaten(i64),
+    FromStammdaten(i64),
     /// Eigene Werte, von der Route geprüft.
     Werte(Werte),
     /// Keine Vorgabe mehr.
-    Entfernen,
+    Remove,
 }
 
 /// Setzt oder entfernt die Vorgabe des Einsatzes und zieht die laufenden Schichten nach: wer der
@@ -892,7 +957,7 @@ pub async fn set_einsatz_vorgabe(
     let startwert = etb_startwert(pool, einsatz_id).await?;
     write_retry!(pool, |conn| {
         let neu = match eingabe {
-            EinsatzVorgabeInput::AusStammdaten(id) => {
+            EinsatzVorgabeInput::FromStammdaten(id) => {
                 let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
                     .bind(einsatz_id)
                     .fetch_one(&mut *conn)
@@ -900,7 +965,7 @@ pub async fn set_einsatz_vorgabe(
                 Some(schichtmodell_repo::load_werte_tx(conn, org_id, *id).await?)
             }
             EinsatzVorgabeInput::Werte(w) => Some(w.clone()),
-            EinsatzVorgabeInput::Entfernen => None,
+            EinsatzVorgabeInput::Remove => None,
         };
         let vorher = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
         if vorher.werte == neu {
@@ -931,12 +996,17 @@ pub async fn set_einsatz_vorgabe(
         .fetch_all(&mut *conn)
         .await?;
         for s in laufende {
-            let (faellig_at, rhythmus) = compute_faellig(
-                &s.beginn_at,
-                s.rhythmus_minuten,
-                s.rhythmus_quelle,
-                &vorgabe,
-            )?;
+            // Neu gerechnet wird nur, wer der neuen Vorgabe folgt. Eine entfernte Vorgabe lässt
+            // die gespeicherte Fälligkeit sekundengenau stehen (Review PR #833).
+            let (faellig_at, rhythmus) = match (s.rhythmus_quelle, &vorgabe.werte) {
+                (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+                    &s.beginn_at,
+                    s.rhythmus_minuten,
+                    s.rhythmus_quelle,
+                    &vorgabe,
+                )?,
+                _ => (s.faellig_at.clone(), s.rhythmus_minuten),
+            };
             let faellig_geaendert = faellig_at != s.faellig_at;
             if faellig_geaendert || rhythmus != s.rhythmus_minuten {
                 sqlx::query(
@@ -949,9 +1019,22 @@ pub async fn set_einsatz_vorgabe(
                 .execute(&mut *conn)
                 .await?;
             }
-            if faellig_geaendert || vorwarnung_geaendert {
+            if faellig_geaendert {
                 let (name, _) = einheit_tx(conn, einsatz_id, s.einheit_id).await?;
                 set_fristen_tx(
+                    conn,
+                    einsatz_id,
+                    benutzer_id,
+                    s.id,
+                    &name,
+                    &faellig_at,
+                    vorgabe.vorwarnung(),
+                    jetzt,
+                )
+                .await?;
+            } else if vorwarnung_geaendert {
+                let (name, _) = einheit_tx(conn, einsatz_id, s.einheit_id).await?;
+                set_vorwarn_frist_tx(
                     conn,
                     einsatz_id,
                     benutzer_id,
@@ -1203,13 +1286,61 @@ pub async fn zuruecknehmen(
         .bind(id)
         .execute(&mut *conn)
         .await?;
-        erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
-        // Die Vorwarnung nur wieder öffnen, solange sie noch vor uns liegt.
-        let vorwarnung = load_einsatz_vorgabe_tx(conn, einsatz_id)
-            .await?
-            .vorwarnung();
-        if vorwarnzeit(&roh.faellig_at, vorwarnung).is_some_and(|v| v.as_str() > jetzt) {
-            erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await?;
+        // Fristen nach der aktuellen Vorgabe (Review PR #833). Folgt die Schicht der Vorgabe des
+        // Einsatzes und rechnet deren Regel inzwischen anders, gilt die neue Fälligkeit samt
+        // neuer Fristen. Sonst öffnet die Rücknahme die alte Fälligkeitsfrist, ohne eine schon
+        // erfolgte Auslösung zu wiederholen, und legt die Vorwarnung auf die aktuelle
+        // Vorwarnzeit — nur, solange sie noch vor uns liegt.
+        let vorgabe = load_einsatz_vorgabe_tx(conn, einsatz_id).await?;
+        let vorwarnung = vorgabe.vorwarnung();
+        let (faellig_at, rhythmus) = match (roh.rhythmus_quelle, &vorgabe.werte) {
+            (RhythmusQuelle::Einsatz, Some(_)) => compute_faellig(
+                &roh.beginn_at,
+                roh.rhythmus_minuten,
+                roh.rhythmus_quelle,
+                &vorgabe,
+            )?,
+            _ => (roh.faellig_at.clone(), roh.rhythmus_minuten),
+        };
+        if faellig_at != roh.faellig_at {
+            sqlx::query(
+                "UPDATE einsatz_abloesung SET rhythmus_minuten = ?, faellig_at = ? WHERE id = ?",
+            )
+            .bind(rhythmus)
+            .bind(&faellig_at)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+            set_fristen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                id,
+                &name,
+                &faellig_at,
+                vorwarnung,
+                jetzt,
+            )
+            .await?;
+        } else {
+            erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG, id).await?;
+            if let Some(v) = vorwarnzeit(&faellig_at, vorwarnung).filter(|v| v.as_str() > jetzt) {
+                erinnerung_repo::oeffne_letzte_auto_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id)
+                    .await?;
+                if open_frist_at_tx(conn, OBJEKT_ABLOESUNG_VORWARNUNG, id).await? != Some(v) {
+                    set_vorwarn_frist_tx(
+                        conn,
+                        einsatz_id,
+                        benutzer_id,
+                        id,
+                        &name,
+                        &faellig_at,
+                        vorwarnung,
+                        jetzt,
+                    )
+                    .await?;
+                }
+            }
         }
 
         let etb_id = crate::etb::repo::anlegen_tx(

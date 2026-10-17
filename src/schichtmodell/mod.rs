@@ -152,13 +152,13 @@ pub fn faelligkeit_wechselzeiten(
     // höchstens ein Tag, und jeder Tag hat jede Wechselzeit (bis auf eine Lücke von 1 h).
     (0..4)
         .filter_map(|tage| start.checked_add_signed(Duration::days(tage)))
-        .flat_map(|tag| zeiten.iter().filter_map(move |z| wanduhr(tag, *z, zone)))
+        .flat_map(|tag| zeiten.iter().filter_map(move |z| wall_clock(tag, *z, zone)))
         .filter(|t| *t >= schwelle && *t > beginn)
         .min()
 }
 
 /// Wanduhrzeit `uhrzeit` am Kalendertag `tag` in `zone` als UTC-Zeitpunkt (Regeln oben).
-fn wanduhr(tag: NaiveDate, uhrzeit: Uhrzeit, zone: Tz) -> Option<DateTime<Utc>> {
+fn wall_clock(tag: NaiveDate, uhrzeit: Uhrzeit, zone: Tz) -> Option<DateTime<Utc>> {
     let zeit =
         NaiveTime::from_hms_opt(u32::from(uhrzeit.stunde()), u32::from(uhrzeit.minute()), 0)?;
     let lokal = tag.and_time(zeit);
@@ -430,7 +430,7 @@ pub struct Schichtmodell {
 }
 
 impl Schichtmodell {
-    pub(crate) fn aus(id: i64, werte: Werte, ist_vorgabe: bool, ist_demo: bool) -> Self {
+    pub(crate) fn from_werte(id: i64, werte: Werte, ist_vorgabe: bool, ist_demo: bool) -> Self {
         let f = regel_fields(&werte.regel);
         Schichtmodell {
             id,
@@ -464,7 +464,7 @@ pub struct EinsatzSchichtmodell {
 }
 
 impl EinsatzSchichtmodell {
-    pub(crate) fn aus(werte: Werte, geaendert_at: String) -> Self {
+    pub(crate) fn from_werte(werte: Werte, geaendert_at: String) -> Self {
         let f = regel_fields(&werte.regel);
         EinsatzSchichtmodell {
             bezeichnung: werte.bezeichnung,

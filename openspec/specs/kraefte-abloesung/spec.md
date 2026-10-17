@@ -72,8 +72,8 @@ nennen.
 
 Das System SHALL bei einem Schichtmodell vom Typ `wechselzeiten` die Fälligkeit als den
 ersten Wechsel bestimmen, der mindestens die Mindestdauer nach dem Beginn und echt nach dem
-Beginn liegt. Die Wechselzeiten MUST als Wanduhrzeit in der wirksamen Zone gelten: die des
-Einsatzes, sonst die der Organisation, sonst Europe/Berlin. Über eine Zeitumstellung MUST die
+Beginn liegt. Die Wechselzeiten MUST als Wanduhrzeit in der wirksamen Zone gelten: die erste
+gültige aus der Zone des Einsatzes und der der Organisation, sonst Europe/Berlin. Über eine Zeitumstellung MUST die
 echte Dauer zählen; eine Wechselzeit, die es am Umstellungstag nicht gibt, gilt eine Stunde
 später, eine doppelte beim ersten Mal. Die Fälligkeit MUST gespeichert werden.
 
@@ -128,8 +128,9 @@ damit laufende Fälligkeiten unverändert lassen. Die Vorgabe des Einsatzes MUST
 Abschnittsvorgabe lesbar und änderbar sein: als Kopie eines Modells der eigenen Organisation, mit
 eigenen Werten oder entfernt. Ändert sie sich, MUST das System Rhythmus, Fälligkeit und Fristen
 aller laufenden Schichten mit Quelle `einsatz` neu setzen und die Vorwarn-Fristen aller laufenden
-Schichten auf die neue Vorwarnzeit legen; eine entfernte Vorgabe lässt den zuletzt gültigen
-Rhythmus stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festgehalten werden.
+Schichten auf die neue Vorwarnzeit legen. Eine Fälligkeitsfrist MUST nur neu gesetzt werden,
+wenn sich die Fälligkeit ändert, damit eine überfällige Schicht nicht ein zweites Mal „fällig“
+meldet. Eine entfernte Vorgabe lässt Rhythmus und Fälligkeit stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festgehalten werden.
 
 #### Scenario: Anlage übernimmt die Org-Vorgabe
 - **WHEN** die Organisation die Vorgabe „12-h-Schicht“ führt und ein Einsatz angelegt wird
@@ -143,6 +144,10 @@ Rhythmus stehen. Jede Änderung MUST als ETB-Eintrag vom Typ Entscheidung festge
 - **WHEN** die Vorgabe des Einsatzes von 360 auf 240 min mit 45 min Vorwarnung gesetzt wird und eine laufende Schicht ihr folgt
 - **THEN** ist diese Schicht 120 min früher fällig, ihre Fristen stehen auf der neuen Fälligkeit und 45 min davor
 - **AND** Schichten mit eigenem Rhythmus oder nach der Abschnittsvorgabe behalten ihre Fälligkeit
+
+#### Scenario: Nur die Vorwarnung ändert sich
+- **WHEN** eine Schicht seit 10:30 überfällig ist, „fällig“ schon gemeldet hat und um 10:33 eine Vorgabe mit 45 min Vorwarnung gesetzt wird
+- **THEN** meldet der Scheduler für diese Schicht kein zweites „fällig“
 
 #### Scenario: Weder Modell noch Werte
 - **WHEN** die Vorgabe ohne `schichtmodell_id` und ohne `schichtmodell` gesetzt werden soll
@@ -276,7 +281,9 @@ Das System SHALL einen Vollzug zurücknehmen, solange die daraus entstandene Fol
 unberührt ist, also noch laufend und ohne eigenen Vollzug. Bei der Rücknahme MUST die
 Folgeschicht samt ihrer Fristen entfernt werden, die abgelöste Schicht MUST wieder laufend
 sein, ihre Fristen MUST wieder offen sein, ohne dass eine schon erfolgte Auslösung
-wiederholt wird, und ein ETB-Eintrag vom Typ Berichtigung MUST auf den Vollzugseintrag
+wiederholt wird. Die Vorwarn-Frist MUST dabei der aktuellen Vorwarnzeit folgen; folgt die
+Schicht der Vorgabe des Einsatzes und rechnet deren Regel inzwischen anders, MUST die neue
+Fälligkeit samt neuer Fristen gelten. Ein ETB-Eintrag vom Typ Berichtigung MUST auf den Vollzugseintrag
 verweisen.
 
 #### Scenario: Rücknahme direkt nach Vollzug

@@ -302,7 +302,7 @@ pub struct SetEinsatzVorgabe {
 
 impl SetEinsatzVorgabe {
     /// Genau eine der beiden Angaben: keine → 400 (fehlender Pflichtwert), beide → 422
-    /// (Feld-Kombination). Die Werte prüft `WerteBody::pruefen` (400/422).
+    /// (Feld-Kombination). Die Werte prüft `WerteBody::check` (400/422).
     fn into_input(self) -> Result<EinsatzVorgabeInput, AppError> {
         // Erst die Werte für sich (400), dann der Zusammenhang (422).
         let werte = match self.schichtmodell {
@@ -320,8 +320,8 @@ impl SetEinsatzVorgabe {
                  (schichtmodell), nicht beides"
                     .into(),
             )),
-            (Some(id), None) => Ok(EinsatzVorgabeInput::AusStammdaten(id)),
-            (None, Some(None)) => Ok(EinsatzVorgabeInput::Entfernen),
+            (Some(id), None) => Ok(EinsatzVorgabeInput::FromStammdaten(id)),
+            (None, Some(None)) => Ok(EinsatzVorgabeInput::Remove),
             (None, Some(Some(w))) => Ok(EinsatzVorgabeInput::Werte(w)),
         }
     }

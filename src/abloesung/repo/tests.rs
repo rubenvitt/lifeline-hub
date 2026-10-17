@@ -1089,3 +1089,252 @@ async fn beginnen_folgt_der_einsatzvorgabe_mit_wechselzeiten() {
         Einstufung::Vorwarnung
     );
 }
+
+// ── Review PR #833 (LLH-1122): Regressionstests ─────────────────────────────────────────────
+
+fn rhythmus_werte(minuten: i64, vorwarnung: i64) -> crate::schichtmodell::Werte {
+    crate::schichtmodell::Werte {
+        bezeichnung: "Sanitätsdienst".into(),
+        regel: crate::schichtmodell::Regel::Rhythmus { minuten },
+        vorwarnung_minuten: vorwarnung,
+        planungsvorlauf_minuten: 120,
+    }
+}
+
+/// Fristen der Schicht `id`, die der Scheduler zu `jetzt` auslösen würde.
+async fn ausloesbar(pool: &SqlitePool, id: i64, jetzt: &str) -> Vec<String> {
+    erepo::faellige_zum_ausloesen(pool, jetzt)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|f| f.bezug_id == Some(id))
+        .filter_map(|f| f.bezug_typ)
+        .collect()
+}
+
+/// Eine reine Änderung der Vorwarnung setzt die schon ausgelöste Fälligkeit einer überfälligen
+/// Schicht nicht zurück: „fällig“ kommt genau einmal (Spec „Einmaliges Auslösen“). Ebenso beim
+/// Entfernen einer Vorgabe mit Vorwarnung ≠ 30.
+#[tokio::test]
+async fn reine_vorwarnungsaenderung_loest_die_faelligkeit_nicht_erneut_aus() {
+    let w = welt().await;
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f2, Some(60)), T0)
+        .await
+        .unwrap();
+    assert_eq!(a.faellig_at, "2026-09-22 10:30:00");
+    let tick = "2026-09-22 10:31:00";
+    for f in erepo::faellige_zum_ausloesen(&w.pool, tick).await.unwrap() {
+        erepo::markiere_ausgeloest(&w.pool, f.id, None, tick)
+            .await
+            .unwrap();
+    }
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(360, 45)),
+        "2026-09-22 10:33:00",
+    )
+    .await
+    .unwrap();
+    assert!(
+        ausloesbar(&w.pool, a.id, "2026-09-22 10:34:00")
+            .await
+            .is_empty(),
+        "keine zweite Auslösung nach der Vorwarnungsänderung"
+    );
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Remove,
+        "2026-09-22 10:35:00",
+    )
+    .await
+    .unwrap();
+    assert!(
+        ausloesbar(&w.pool, a.id, "2026-09-22 10:36:00")
+            .await
+            .is_empty(),
+        "keine zweite Auslösung nach dem Entfernen"
+    );
+}
+
+/// Wird eine Einsatzvorgabe mit Wechselzeiten entfernt, bleibt die Fälligkeit sekundengenau
+/// stehen — beim Entfernen und bei einer späteren Änderung ohne neuen Beginn oder Rhythmus.
+#[tokio::test]
+async fn entfernte_wechselzeiten_vorgabe_laesst_die_faelligkeit_stehen() {
+    let w = welt().await;
+    let werte = crate::schichtmodell::Werte {
+        bezeichnung: "12-h-Schicht".into(),
+        regel: crate::schichtmodell::Regel::Wechselzeiten {
+            zeiten: vec![
+                crate::uhrzeit::Uhrzeit::parse("t", "06:00").unwrap(),
+                crate::uhrzeit::Uhrzeit::parse("t", "18:00").unwrap(),
+            ],
+            mindestdauer_minuten: 240,
+        },
+        vorwarnung_minuten: 30,
+        planungsvorlauf_minuten: 120,
+    };
+    set_einsatz_vorgabe(&w.pool, w.e, w.b, &EinsatzVorgabeInput::Werte(werte), T0)
+        .await
+        .unwrap();
+    let (a, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f2,
+            beginn_at: Some("2026-09-22 11:42:17".into()),
+            rhythmus_minuten: None,
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(a.faellig_at, "2026-09-22 16:00:00");
+    set_einsatz_vorgabe(&w.pool, w.e, w.b, &EinsatzVorgabeInput::Remove, T0)
+        .await
+        .unwrap();
+    assert_eq!(
+        laden(&w.pool, w.e, a.id, T0).await.unwrap().faellig_at,
+        "2026-09-22 16:00:00"
+    );
+    let (geaendert, _) = aendern(
+        &w.pool,
+        w.e,
+        a.id,
+        w.b,
+        &AenderungEingabe {
+            abloesende_einheit_id: Some(Some(w.f1)),
+            ..Default::default()
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(geaendert.faellig_at, "2026-09-22 16:00:00");
+    assert_eq!(
+        offene_fristen(&w.pool, a.id).await,
+        vec![
+            ("abloesung".into(), "2026-09-22 16:00:00".into()),
+            ("abloesung_vorwarnung".into(), "2026-09-22 15:30:00".into()),
+        ]
+    );
+}
+
+/// Eine ungültige Zone des Einsatzes verdrängt keine gültige der Organisation; die erste
+/// gültige gilt, sonst Europe/Berlin.
+#[tokio::test]
+async fn ungueltige_einsatzzone_verdraengt_die_org_zone_nicht() {
+    let w = welt().await;
+    let zone = |pool: SqlitePool, e: i64| async move {
+        let mut conn = pool.acquire().await.unwrap();
+        zone_tx(&mut conn, e).await.unwrap()
+    };
+    let setze = |pool: SqlitePool, sql: &'static str, wert: Option<&'static str>, id: i64| async move {
+        sqlx::query(sql)
+            .bind(id)
+            .bind(wert)
+            .execute(&pool)
+            .await
+            .unwrap();
+    };
+    const EINSATZ: &str = "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, ?) \
+         ON CONFLICT (einsatz_id) DO UPDATE SET zeitzone = excluded.zeitzone";
+    const ORG: &str = "INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (?, ?) \
+         ON CONFLICT (org_id) DO UPDATE SET zeitzone = excluded.zeitzone";
+
+    setze(w.pool.clone(), EINSATZ, Some("MEZ"), w.e).await;
+    assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Berlin);
+    setze(w.pool.clone(), ORG, Some("UTC"), 1).await;
+    assert_eq!(
+        zone(w.pool.clone(), w.e).await,
+        chrono_tz::UTC,
+        "ungültige Einsatzzone → gültige Org-Zone"
+    );
+    setze(w.pool.clone(), EINSATZ, Some("Europe/Vienna"), w.e).await;
+    assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Vienna);
+    setze(w.pool.clone(), ORG, Some("Mond/Basis"), 1).await;
+    setze(w.pool.clone(), EINSATZ, None, w.e).await;
+    assert_eq!(zone(w.pool.clone(), w.e).await, chrono_tz::Europe::Berlin);
+}
+
+/// Die Rücknahme setzt die Fristen nach der aktuellen Einsatzvorgabe: eine geänderte Vorwarnung
+/// gilt für die wieder laufende Schicht, und folgt sie der Vorgabe, rechnet deren Regel neu.
+#[tokio::test]
+async fn ruecknahme_setzt_die_fristen_nach_der_aktuellen_vorgabe() {
+    let w = welt().await;
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(360, 30)),
+        T0,
+    )
+    .await
+    .unwrap();
+    // f2 folgt der Einsatzvorgabe, f1 (Abschnitt ohne Vorgabe) hat einen eigenen Rhythmus.
+    let (einsatz, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f2, None), T0)
+        .await
+        .unwrap();
+    assert_eq!(einsatz.rhythmus_quelle, RhythmusQuelle::Einsatz);
+    let (eigen, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    for s in [einsatz.id, eigen.id] {
+        vollziehen(
+            &w.pool,
+            w.e,
+            s,
+            w.b,
+            "2026-09-22 10:00:00",
+            None,
+            "2026-09-22 10:00:00",
+        )
+        .await
+        .unwrap();
+    }
+    set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(rhythmus_werte(240, 45)),
+        "2026-09-22 10:05:00",
+    )
+    .await
+    .unwrap();
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, eigen.id, w.b, "2026-09-22 10:10:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        r.faellig_at, "2026-09-22 15:30:00",
+        "eigener Rhythmus bleibt"
+    );
+    assert_eq!(
+        offene_fristen(&w.pool, eigen.id).await,
+        vec![
+            ("abloesung".into(), "2026-09-22 15:30:00".into()),
+            ("abloesung_vorwarnung".into(), "2026-09-22 14:45:00".into()),
+        ],
+        "Vorwarnung nach der aktuellen Vorgabe"
+    );
+
+    let (r, _, _) = zuruecknehmen(&w.pool, w.e, einsatz.id, w.b, "2026-09-22 10:10:00")
+        .await
+        .unwrap();
+    assert_eq!(
+        r.faellig_at, "2026-09-22 13:30:00",
+        "Regel der Vorgabe neu gerechnet"
+    );
+    assert_eq!(r.rhythmus_minuten, 240);
+    assert_eq!(
+        offene_fristen(&w.pool, einsatz.id).await,
+        vec![
+            ("abloesung".into(), "2026-09-22 13:30:00".into()),
+            ("abloesung_vorwarnung".into(), "2026-09-22 12:45:00".into()),
+        ]
+    );
+}
