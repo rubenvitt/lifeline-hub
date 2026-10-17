@@ -127,6 +127,31 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
   });
 });
 
+describe('useEtbErfassung – Antwort an den Aufrufer (LLH-1071)', () => {
+  it('liefert den angenommenen Eintrag, eingereiht dagegen null', async () => {
+    let versuch = 0;
+    server.use(
+      http.post('/api/einsaetze/9/etb', () => {
+        versuch += 1;
+        return versuch === 1
+          ? HttpResponse.json({ id: 7, lfd_nr: 135, typ: 'anordnung' }, { status: 201 })
+          : HttpResponse.error();
+      }),
+    );
+    const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
+    let angenommen: unknown;
+    await act(async () => {
+      angenommen = await result.current.erfassen(eintrag);
+    });
+    expect(angenommen).toMatchObject({ id: 7, lfd_nr: 135 });
+    let eingereiht: unknown = 'unberuehrt';
+    await act(async () => {
+      eingereiht = await result.current.erfassen(eintrag);
+    });
+    expect(eingereiht).toBeNull();
+  });
+});
+
 describe('useEtbErfassung', () => {
   it('reiht bei Netzwerkfehler ein und sendet beim Flush nach', async () => {
     let versuch = 0;

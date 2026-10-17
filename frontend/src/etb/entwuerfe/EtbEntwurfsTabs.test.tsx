@@ -280,6 +280,39 @@ describe('EtbEntwurfsTabs', () => {
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
+  it('behält mit „Werte behalten“ den Typ für den nächsten Entwurf, ohne Schalter Meldung (LLH-1112)', async () => {
+    const p = props();
+    renderMitProviders(<MitSchalter {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/anordnung Abschnitt Nord räumen{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'anordnung',
+    });
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    expect(
+      await screen.findByRole('button', { name: 'Eintragstyp Anordnung ändern' }),
+    ).toBeInTheDocument();
+    // Ein neuer Reiter über „+“ ist keine Übernahme: er beginnt als Meldung.
+    await userEvent.click(screen.getByRole('button', { name: 'Weiteren Entwurf anlegen' }));
+    expect(
+      await screen.findByRole('button', { name: 'Eintragstyp Meldung ändern' }),
+    ).toBeInTheDocument();
+  });
+
+  it('beginnt ohne „Werte behalten“ nach einer Anordnung wieder als Meldung (LLH-1112)', async () => {
+    const p = props();
+    renderMitProviders(<MitSchalter {...p} />);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
+    await userEvent.type(feld, '/anordnung Abschnitt Nord räumen{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByPlaceholderText(/Inhalt/)).toHaveValue(''));
+    expect(
+      await screen.findByRole('button', { name: 'Eintragstyp Meldung ändern' }),
+    ).toBeInTheDocument();
+  });
+
   it('öffnet über den +-Button einen zweiten Tab', async () => {
     renderMitProviders(<EtbEntwurfsTabs {...props()} />);
     await screen.findByPlaceholderText(/Inhalt/);

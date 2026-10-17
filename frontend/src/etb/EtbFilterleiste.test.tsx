@@ -2,10 +2,6 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { EtbFilterWerte } from '../api/etb';
-import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { mitProzessZone } from '../test/prozessZone';
-import { tippeZeit } from '../test/zeitEingabe';
-import { auswahlZeilen } from './druckAuswahl';
 import EtbFilterleiste from './EtbFilterleiste';
 
 /**
@@ -69,9 +65,9 @@ describe('EtbFilterleiste', () => {
   });
 
   /**
-   * Der Typ ist nicht Teil dieser Leiste — er steht als Segmentleiste im Seitenkopf. „Ein
-   * Nachläufer der Suchfrist überschreibt den gewählten Typ nicht" lebt deshalb an der
-   * Nahtstelle: die Leiste meldet nur IHRE Schlüssel, die Seite führt zusammen
+   * Der Typ gehört nicht dieser Leiste — sie zeigt seine Segmentleiste nur (`vorn`), die Seite
+   * führt ihn aus der URL. „Ein Nachläufer der Suchfrist überschreibt den gewählten Typ nicht"
+   * lebt deshalb an der Nahtstelle: die Leiste meldet nur IHREN Schlüssel, die Seite führt zusammen
    * (`zeitachseModell.test.ts`, `filterZusammenfuehren`; `EtbPage.test.tsx`, „Segment und Suche …").
    */
   it('meldet nur ihre eigenen Schlüssel — nie einen Typ, auch wenn einer in der URL stand', () => {
@@ -109,66 +105,33 @@ describe('EtbFilterleiste', () => {
    * Hydrierung aus der URL: die Leiste bleibt unkontrolliert, nimmt ihren Anfangsstand aber aus
    * `startWerte`.
    */
-  it('zeigt einen aus der URL geladenen Filter an', () => {
+  it('zeigt einen aus der URL geladenen Suchbegriff an', () => {
+    render(<EtbFilterleiste onChange={vi.fn()} startWerte={{ q: 'brand', typ: 'meldung' }} />);
+    expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
+  });
+
+  /*
+   * Eine Leiste, zwei Gruppen (LLH-1065): Typ und System vorn, dann Zeitraum und Einheit, der
+   * Volltext zuletzt.
+   */
+  it('ordnet vorn · mitte · Volltext', () => {
     render(
       <EtbFilterleiste
         onChange={vi.fn()}
-        startWerte={{ q: 'brand', typ: 'meldung', von: '2026-08-21 06:00:00' }}
+        vorn={<button type="button">Typ</button>}
+        mitte={<button type="button">Zeitraum</button>}
       />,
     );
-    expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-    // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen (als DTG); ohne
-    // die Umkehr aus `anzeige/zeitEingabe.ts` stünde er um den Zonenversatz verschoben.
-    expect(screen.getByPlaceholderText('von')).toHaveValue('210800aug26');
-  });
-
-  it('mischt einen Anfangsstand mit einer späteren Änderung, statt ihn zu verwerfen', async () => {
-    const onChange = vi.fn<(w: EtbFilterWerte) => void>();
-    render(<EtbFilterleiste onChange={onChange} startWerte={{ von: '2026-08-21 06:00:00' }} />);
-    await userEvent.type(screen.getByPlaceholderText('Volltextsuche'), 'x');
-    await waitFor(() =>
-      expect(onChange).toHaveBeenLastCalledWith({ von: '2026-08-21 06:00:00', q: 'x' }),
-    );
-  });
-});
-
-/**
- * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. Die Leiste zeigt
- * und liest die Anzeigezone — dieselbe, in der der ETB-Druck den Zeitraum nennt (`druckAuswahl`).
- */
-describe('EtbFilterleiste — Zeitraum in der Anzeigezone (LFH-692)', () => {
-  mitProzessZone('UTC');
-  const BERLIN = { zeitzone: 'Europe/Berlin' };
-
-  function zeige(onChange = vi.fn<(w: EtbFilterWerte) => void>(), startWerte?: EtbFilterWerte) {
-    render(
-      <AnzeigeKonventionenProvider konventionen={BERLIN}>
-        <EtbFilterleiste onChange={onChange} startWerte={startWerte} />
-      </AnzeigeKonventionenProvider>,
-    );
-    return onChange;
-  }
-
-  it('ein Filter aus der URL steht mit der Berliner Uhrzeit im Feld — wie im Druckkopf', () => {
-    const filter = { von: '2026-08-21 06:00:00' };
-    zeige(undefined, filter);
-    expect(screen.getByPlaceholderText('von')).toHaveValue('210800aug26');
-    expect(
-      auswahlZeilen(filter, {
-        konventionen: BERLIN,
-        typWort: String,
-        einheitName: () => undefined,
-      }),
-    ).toEqual(['Zeitraum: ab 21.08.2026 08:00']);
-  });
-
-  it('ein eingegebenes „bis 09:00“ geht als 07:00 UTC in den Filter', async () => {
-    const onChange = zeige();
-    await tippeZeit(userEvent.setup(), screen.getByPlaceholderText('bis'), '2026-08-21 09:00:00');
-    await waitFor(() =>
-      expect(onChange).toHaveBeenLastCalledWith(
-        expect.objectContaining({ bis: '2026-08-21 07:00:00' }),
-      ),
-    );
+    const ziele = [
+      screen.getByRole('button', { name: 'Typ' }),
+      screen.getByRole('button', { name: 'Zeitraum' }),
+      screen.getByPlaceholderText('Volltextsuche'),
+    ];
+    for (let i = 1; i < ziele.length; i += 1) {
+      expect(
+        ziele[i - 1].compareDocumentPosition(ziele[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(ziele[0].closest('[data-lfh="etb-filter-typ"]')).not.toBeNull();
   });
 });

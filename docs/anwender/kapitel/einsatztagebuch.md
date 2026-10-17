@@ -2,14 +2,15 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
+quellen: [frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
 ---
 
 ## Überblick
 
 Das Einsatztagebuch (ETB) ist die fortlaufende Niederschrift des Einsatzes. Jeder Eintrag trägt
 eine laufende Nummer, die Ereigniszeit, einen Typ („Meldung“, „Anordnung“, „Lage“ oder
-„Entscheidung“), „Von“ und „An“ sowie den Inhalt. Die Zeitachse zeigt den neuesten Eintrag oben.
+„Entscheidung“), „Von“ und „An“ sowie den Inhalt. Die Zeitachse liest sich wie ein Funkprotokoll:
+der älteste Eintrag steht oben, der neueste unten direkt über der Erfassungsleiste.
 
 Ein erfasster Eintrag lässt sich weder ändern noch löschen. Ein Fehler wird mit einer
 **Berichtigung** korrigiert: einem neuen Eintrag, der auf den alten verweist. Viele Einträge
@@ -26,12 +27,17 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
 
 1. Im Einsatz das Modul „ETB“ öffnen.
 
-   ![ETB mit Filterleiste, Zeitachse der Einträge, Seitenleiste „Bilanz“ und Erfassungsleiste am Fuß](../bilder/einsatztagebuch/zeitachse.png)
+   ![ETB beim Öffnen: Zeitachse mit den neuesten Einträgen unten über der Erfassungsleiste, Seitenleiste „Bilanz“ rechts](../bilder/einsatztagebuch/zeitachse.png)
 
-2. Die Zeitachse von oben nach unten lesen; „Ältere laden“ am Ende holt frühere Einträge.
-3. Sind seit dem letzten Besuch Einträge hinzugekommen, steht darüber ein Hinweis wie „14 neue
-   Einträge seit Ihrer letzten Sichtung um 13:04“. „alle als gesichtet markieren“ setzt die
-   Lesemarke auf den neuesten Eintrag.
+2. Die Seite öffnet am Ende: der neueste Eintrag steht über der Erfassungsleiste. Nach oben
+   rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge.
+3. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
+   Einträge“ die gesichteten von den neuen. Liegt der zuletzt gesichtete Eintrag nicht im
+   geladenen Teil oder ist ein Filter gesetzt, steht derselbe Hinweis über der Zeitachse, mit „Zur
+   Marke springen“. „alle als gesichtet markieren“ setzt die Lesemarke auf den neuesten Eintrag.
+4. Kommen neue Einträge an, während die Seite am Ende steht, erscheinen sie unten und die Seite
+   läuft mit. Wer hochgerollt hat oder ein Menü in der Zeitachse offen hat, sieht stattdessen
+   unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.
 
 Die Seitenleiste „Bilanz“ zählt die Einträge nach Typ und nennt die jüngsten Berichtigungen; ist
 ein Filter gesetzt, heißt sie „Bilanz im Filter“.
@@ -42,10 +48,11 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Erfassungsleiste am Fuß der Seite den Text in das Feld „Inhalt …“ schreiben.
 
-   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ /meldung, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
+   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ „Meldung“ mit Farbkante, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
 
-2. Den Typ prüfen: Der Knopf links (zum Beispiel „/meldung“) wechselt ihn. Schneller geht es
-   mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
+2. Den Typ prüfen: Der Knopf links zeigt ihn als Wort, zum Beispiel „Meldung“, und die Leiste
+   trägt links seine Farbkante wie die Zeitachse. Ein Klick darauf wechselt den Typ. Schneller
+   geht es mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
 3. „Von“ und „An“ prüfen. Beide sind mit dem persönlichen Standard-Rufnamen vorbelegt. Das Menü
    eines Chips bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“; ein „@“ im
    Text setzt ebenfalls einen Rufnamen ein.
@@ -61,9 +68,17 @@ erscheinen wird.
 1. In der Erfassungsleiste „+ Feld“ wählen oder einen Schrägstrich mitten im Text tippen.
 2. Ein Feld wählen: „Ereigniszeit“ (für einen Nachtrag), „Von“, „An“, „Meldeweg“ (Funk, Telefon,
    Persönlich, Sonstige) oder „Veranlassung“. Darunter stehen die Textbausteine der Organisation.
-3. Den Wert eintragen und den Eintrag wie gewohnt erfassen.
+3. Den Wert eintragen und den Eintrag wie gewohnt erfassen. Schneller geht ein Nachtrag mit
+   „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ setzt die Ereigniszeit auf 14:20, „/zeit -10“
+   auf zehn Minuten vor jetzt; der Rest der Zeile bleibt der Inhalt. Erlaubt sind dieselben
+   Angaben wie im Zeitfeld (etwa „1420“, „14:20“, „101420“). Eine unlesbare Angabe bleibt als
+   Text stehen, und unter dem Feld steht der Grund. Eine Ereigniszeit in der Zukunft nimmt die
+   Erfassung nicht an: der Chip nennt „liegt in der Zukunft“, Text und Felder bleiben stehen.
+   Liegt die Ereigniszeit an einem anderen Tag, zeigt der Chip den Tag mit, etwa „162350“.
 4. Wer mehrere Einträge vom selben Absender hintereinander erfasst, setzt das Häkchen „Werte
-   behalten“: „Von“, „An“ und „Meldeweg“ bleiben dann nach dem Erfassen stehen.
+   behalten“: „Von“, „An“, „Meldeweg“ und der Typ bleiben dann nach dem Erfassen stehen, eine
+   Folge von Anordnungen bleibt also Anordnungen. Ohne Häkchen und in einem neuen Reiter über „+“
+   beginnt der nächste Eintrag als „Meldung“.
 
 Die Chips „Von“ und „An“ bieten eine Buchstabierhilfe mit den Tafeln „Deutsch“ und „NATO“. Bei
 Typ „Lage“ führt der Verweis „Als strukturierten Lagebericht erfassen →“ zu den Lageberichten
@@ -92,18 +107,34 @@ nennt den Grund.
 
 ### Einträge suchen und filtern
 
-1. Oben über der Zeitachse einen Typ wählen: „Alle“, „Meldung“, „Anordnung“, „Entscheidung“,
-   „Lage“ oder „Berichtigung“.
-2. Bei Bedarf in die „Volltextsuche“ tippen, einen Zeitraum mit „von“ und „bis“ setzen oder eine
-   Einheit wählen.
-3. Mit dem Schalter „Systemeinträge zeigen“ die automatischen Systemeinträge aus- und einblenden;
-   die Zahl daneben nennt, wie viele es sind.
-4. Passt nichts, führt „Filter zurücksetzen“ zur vollen Liste zurück.
+Alle Filter stehen in einer Leiste direkt über der Zeitachse.
+
+1. Einen Typ wählen: „Alle“, „Meldung“, „Anordnung“, „Entscheidung“, „Lage“ oder „Berichtigung“.
+2. Mit dem Knopf „System“ die automatischen Systemeinträge aus- und einblenden; die Zahl daneben
+   nennt, wie viele es sind. Ausgeblendet steht dort „… ausgeblendet“ und der Punkt ist
+   gestrichen.
+3. „Zeitraum“ öffnet eine Schnellwahl: „Letzte Stunde“, „Letzte 4 Stunden“, „Seit letzter
+   Lagebesprechung“ (nur, wenn eine abgehalten ist) und „Heute“. Unter „Eigener Zeitraum“ lassen
+   sich „von“ und „bis“ taktisch tippen („1400“, „171400“); „bis“ leer heißt bis jetzt. „Zeitraum
+   übernehmen“ setzt ihn, „Ohne Zeitraum“ nimmt ihn heraus. Der Knopf zeigt danach den Zeitraum,
+   etwa „seit 1345“.
+4. Bei Bedarf eine Einheit wählen oder in die „Volltextsuche“ tippen.
+5. Solange ein Filter gesetzt ist, steht direkt über der Erfassung ein bernsteinfarbenes Band,
+   etwa „Gefiltert · 7 von 134 Einträgen sichtbar · Meldung · seit 1345“. „Filter zurücksetzen“
+   darin führt zur vollen Liste zurück.
+
+Passt ein eben erfasster Eintrag nicht zum Filter, nennt das Band „Nr. … erfasst – außerhalb des
+Filters“; „anzeigen“ hebt den Filter auf und springt zum Eintrag. Unter „Seit letzter
+Lagebesprechung“ nennt das Band außerdem Einträge, die nach der Besprechung erfasst wurden, deren
+Ereigniszeit aber davor liegt („+1 Nachtrag vor 1330 erfasst“); „anzeigen“ erweitert den Zeitraum
+um sie.
 
 Die Volltextsuche findet Wortanfänge in Inhalt, „Von“, „An“ und „Veranlassung“, ohne auf Groß-
 und Kleinschreibung zu achten; bei mehreren Wörtern müssen alle vorkommen. Der Filter steht in der
-Adresse der Seite und lässt sich als Link weitergeben. Auf schmalen Bildschirmen liegen die Filter
-hinter dem Knopf „Filter“, der die Zahl gesetzter Filter trägt.
+Adresse der Seite und lässt sich als Link weitergeben; ein gewählter Zeitraum steht dort mit
+festen Uhrzeiten, ein Link zeigt also beim Empfänger dieselben Einträge. Auf schmalen Bildschirmen
+rollt der Typ einzeilig im Kopf, die übrigen Filter liegen hinter dem Knopf „Filter“, der die Zahl
+gesetzter Filter trägt.
 
 ### Einen Eintrag berichtigen
 
@@ -112,12 +143,16 @@ Für Einsatzleitung und Führungspersonal:
 1. An dem Eintrag das Menü „Aktionen zu Eintrag …“ öffnen und „Berichtigen“ wählen.
 2. Die Erfassungsleiste zeigt „Berichtigung zu Nr. …“. Den richtigen Wortlaut schreiben.
 
-   ![Erfassungsleiste im Modus „Berichtigung zu Nr. 134“ mit dem Typ /berichtigung, dem neuen Text und „Abbrechen“](../bilder/einsatztagebuch/berichtigung.png)
+   ![Erfassungsleiste im Modus „Berichtigung zu Nr. 134“ mit dem Typ „Berichtigung“, dem neuen Text und „Abbrechen“](../bilder/einsatztagebuch/berichtigung.png)
 
 3. „Erfassen“ wählen. „Abbrechen“ verlässt den Modus ohne Eintrag.
 
-Der alte Eintrag zeigt danach „berichtigt durch Nr. …“, die Berichtigung „berichtigt Nr. …“ mit
-dem Verweis „Grundeintrag anzeigen ↗“.
+Der alte Eintrag trägt danach in seiner Kopfzeile die Marke „berichtigt“ und den Sprung „→ Nr. …“
+auf die jüngste Berichtigung; sein Text bleibt unverändert lesbar. Die Marke steht auch, wenn die
+Berichtigung gerade nicht angezeigt ist, etwa unter dem Typfilter „Meldung“. Die Berichtigung
+zeigt „berichtigt Nr. …“ mit dem Verweis „Grundeintrag anzeigen ↗“. Auch eine Berichtigung lässt
+sich wieder berichtigen; die Erfassungsleiste nennt dann die Kette, etwa „Berichtigung zu Nr. 135
+(berichtigt Nr. 134)“.
 
 ### Eine Wiedervorlage anlegen
 
@@ -153,7 +188,8 @@ erteilen (keine Berechtigung)“ da. Wie Aufträge weiterlaufen, beschreibt das 
 
 Das ETB ist ein Beleg. Ein Eintrag bleibt so, wie er erfasst wurde; die Korrektur steht als
 eigener, verknüpfter Eintrag daneben. Weicht die Ereigniszeit um mindestens eine Minute vom
-Eingang ab, zeigt der Eintrag „⧖ nachgetragen um …“.
+Eingang ab, zeigt der Eintrag „⧖ nachgetragen um …“; wurde er an einem anderen Tag erfasst als
+das Ereignis, steht der Tag dabei, etwa „⧖ nachgetragen 110020“.
 
 ### Automatische Einträge
 
@@ -168,6 +204,14 @@ Ob Meldungen und erteilte Aufträge einen Eintrag erzeugen, legt in den Einstell
 Einsatzes unter „Verhalten & Automatik“ das Feld „Automatische ETB-Einträge“ fest; ohne Angabe gilt die Vorgabe
 der Organisation, sonst „An“ ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Ein
 automatischer Eintrag zeigt einen Verweis auf seinen Ursprung, etwa „Auftrag ↗“ oder „Befehl ↗“.
+
+Systemeinträge stehen leiser als Handeinträge: kleinere, gedämpfte Schrift, der Text ungekürzt.
+„System → System“ entfällt, eine bekannte Seite wie „System → ELW 1“ bleibt. Folgen drei oder mehr
+Systemeinträge innerhalb einer Stunde direkt aufeinander, fasst das ETB sie zu einer Zeile
+„3 Systemeinträge · 1301–1312 · anzeigen“ zusammen; „anzeigen“ klappt sie auf, „zuklappen“
+wieder zu. Ein Systemeintrag mit Berichtigung, Nachtrag, Anhang, Dokument oder Verweis steht immer
+einzeln. Unter dem Typfilter „System“, bei einer Volltextsuche und im Druck wird nichts
+zusammengefasst; ein Link auf einen zusammengefassten Eintrag klappt seine Zeile auf.
 
 ### Entwürfe auf dem Gerät
 

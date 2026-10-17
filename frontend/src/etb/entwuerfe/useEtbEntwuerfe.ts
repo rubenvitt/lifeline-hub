@@ -7,6 +7,7 @@ import {
   entwurfEntfernen,
   entwurfSpeichern,
 } from './entwurfStore';
+import type { EtbTyp } from '../../api/types';
 import type { MetadatenWerte } from '../schnellerfassungModell';
 import { neueClientId } from '../../offline/clientId';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
@@ -21,13 +22,14 @@ function leererEntwurf(
   benutzerId: number,
   einsatzId: number,
   metadaten: MetadatenWerte = {},
+  typ: EtbTyp = 'meldung',
 ): EtbEntwurf {
   const jetzt = new Date().toISOString();
   return {
     id: neueClientId(),
     benutzer_id: benutzerId,
     einsatz_id: einsatzId,
-    ...werteZuPatch({ inhalt: '', typ: 'meldung', metadaten }),
+    ...werteZuPatch({ inhalt: '', typ, metadaten }),
     erstellt_at: jetzt,
     geaendert_at: jetzt,
   };
@@ -180,7 +182,11 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
   );
 
   const entwurfSchliessen = useCallback(
-    async (id: string, metadaten: MetadatenWerte = {}) => {
+    /**
+     * `typ`: Typ des Folgeentwurfs, falls ein neuer entsteht — mit „Werte behalten“ der eben
+     * erfasste (LLH-1112), sonst „Meldung“.
+     */
+    async (id: string, metadaten: MetadatenWerte = {}, typ: EtbTyp = 'meldung') => {
       if (benutzerId === null) return;
       setSchliessFehler(null);
       // Scheitert das Entfernen, schließt der Reiter trotzdem (LFH-1139): `entwurfEntfernen` hat
@@ -202,7 +208,7 @@ export function useEtbEntwuerfe(benutzerId: number | null, einsatzId: number) {
       // aktiverId (LFH-214). Beide Setter bleiben FUNKTIONAL (lesen den frisch committeten State)
       // und sind damit immun gegen Änderungen während des vorausgehenden await — ein
       // Closure-Snapshot ließe einen Zombie-Tab zurück.
-      const leer = leererEntwurf(benutzerId, einsatzId, metadaten);
+      const leer = leererEntwurf(benutzerId, einsatzId, metadaten, typ);
       let naechsteListe: EtbEntwurf[] = [];
       setEntwuerfe((prev) => {
         const rest = prev.filter((e) => e.id !== id);

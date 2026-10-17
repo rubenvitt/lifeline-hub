@@ -48,3 +48,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   (LFH-1121): die Anlage stellt jedes Konto unter Änderungszwang, der erste Passwort-Login endete
   sonst in „Neues Passwort festlegen“ statt auf `/einsaetze`. Der Helfer erledigt den Erstwechsel
   in einem eigenen API-Kontext. Konten nur für Listenzeilen brauchen ihn nicht.
+- **Wer den Wortlaut eines Systemeintrags im ETB prüft, klappt die Bündel auf** (LLH-1106):
+  drei und mehr aufeinanderfolgende Systemeinträge stehen als eine Bündelzeile, ihr Text ist
+  nicht im DOM. Nach dem Laden des ETB `systemBuendelAufklappen(page)` aus `e2e/etb-kern.ts`;
+  sonst bestünde auch eine `toHaveCount(0)`-Prüfung nur, weil der Text zugeklappt ist.

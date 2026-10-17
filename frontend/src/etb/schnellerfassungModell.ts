@@ -4,6 +4,7 @@ import type { EtbBaustein, EtbTyp, MeldeWeg } from '../api/types';
 import type { NeuerEintrag } from '../api/etb';
 import { ETB_INHALT_MAX, ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { grenzeText, istZuLang, zeichenZahl } from '../components/zeichenGrenze';
+import { deuteZeit, GRUND } from '../anzeige/zeitParser';
 
 dayjs.extend(utc);
 
@@ -17,6 +18,8 @@ interface MetaFeldDef {
   /** Kleingeschriebene Filter-Stichwörter für das /-Menü. */
   trigger: string[];
   editor: EditorTyp;
+  /** Die Kurzeingabe dafür, im /-Menü neben dem Feld gezeigt (`/zeit 1420`, LLH-1088). */
+  kurz?: string;
 }
 
 /** Anzeige-/Tab-Reihenfolge der Felder im /-Menü und in der Chip-Leiste. */
@@ -26,6 +29,7 @@ export const METADATEN_FELDER: MetaFeldDef[] = [
     label: 'Ereigniszeit',
     trigger: ['zeit', 'ereigniszeit', 'uhrzeit'],
     editor: 'zeit',
+    kurz: '/zeit 1420',
   },
   { feld: 'von', label: 'Von', trigger: ['von', 'absender'], editor: 'text' },
   { feld: 'an', label: 'An', trigger: ['an', 'empfaenger', 'empfänger'], editor: 'text' },
@@ -111,6 +115,8 @@ export interface SlashEintrag {
   key: string;
   label: string;
   gesetzt?: boolean;
+  /** Kurzeingabe des Felds, leise neben dem Wort (`/zeit 1420`). */
+  hinweis?: string;
 }
 
 interface SlashTreffer {
@@ -145,6 +151,7 @@ export function filterSlashEintraege(
     key: def.feld,
     label: def.label,
     gesetzt: gesetzteFelder.includes(def.feld),
+    ...(def.kurz ? { hinweis: def.kurz } : {}),
   }));
 
   const treffer: SlashEintrag[] = bausteine
@@ -214,6 +221,26 @@ export function laengenVerstoss(inhalt: string, metadaten: MetadatenWerte): stri
 }
 
 /**
+ * Wie weit eine Ereigniszeit vor der Serveruhr liegen darf (LLH-1088): dieselbe Toleranz, die der
+ * Server Zeitpunkten aus dem Client lässt (`ZUKUNFT_TOLERANZ_SEKUNDEN`, `src/routes/support.rs`) —
+ * Uhren gehen nie gleich.
+ */
+export const ZUKUNFT_TOLERANZ_S = 60;
+
+/**
+ * Liegt die Ereigniszeit mehr als {@link ZUKUNFT_TOLERANZ_S} nach `jetzt` (Serveruhr)? Dann nennt
+ * die Erfassung den Grund am Zeit-Chip und sendet nicht (Spec `etb-schnellerfassung-tastatur`,
+ * „Keine Ereigniszeit in der Zukunft“), geprüft vor Upload und Warteschlange wie die
+ * Zeichengrenzen. Nur im Client: der Server begrenzt die Ereigniszeit nicht, ein vorgemerkter
+ * Eintrag mit vergangener Zeit kommt also später an.
+ */
+export function zukunftsVerstoss(metadaten: MetadatenWerte, jetzt: dayjs.Dayjs): string | null {
+  const zeit = metadaten.ereigniszeit;
+  if (zeit == null) return null;
+  return zeit.diff(jetzt, 'second') > ZUKUNFT_TOLERANZ_S ? GRUND.zukunft : null;
+}
+
+/**
  * `/anordnung ` am Textanfang, mit folgendem Leerzeichen, setzt den Typ ohne Menü — wer
  * den Befehl auswendig tippt, soll nicht auf die Liste warten müssen. Liefert den Typ und
  * den Text ohne den Befehl, sonst `null`. Nur exakte Typwörter: `/lagebericht` ist kein
@@ -225,6 +252,30 @@ export function erkenneTypBefehl(text: string): { typ: EtbTyp; rest: string } | 
   const typ = treffer[1] as EtbTyp;
   if (!TYP_BEFEHLE.includes(typ)) return null;
   return { typ, rest: text.slice(treffer[0].length) };
+}
+
+/**
+ * `/zeit <Angabe> ` am Textanfang (LLH-1088, Spec `etb-schnellerfassung-tastatur`, „Kurzeingabe der
+ * Ereigniszeit“): die Angabe wird wie im Zeitfeld eines Ereignisses gedeutet (`deuteZeit`, `art:
+ * 'ereignis'`: `1420`, `14:20`, `101420`, `-15` …), der Rest bleibt Inhalt. Wie beim Typbefehl
+ * erst mit dem Leerzeichen dahinter — vorher tippt jemand noch. Unlesbar: `ok: false` mit Grund,
+ * der Text bleibt stehen. Ein vorangestellter Typbefehl ist zuvor schon abgezogen.
+ */
+export function erkenneZeitBefehl(
+  text: string,
+  optionen: { zone: string | null | undefined; jetzt: dayjs.Dayjs },
+):
+  | { ok: true; zeitpunkt: dayjs.Dayjs; rest: string; ende: number }
+  | { ok: false; grund: string; ende: number }
+  | null {
+  const treffer = /^\/zeit\s+(\S+)\s/.exec(text);
+  if (!treffer) return null;
+  // `ende`: wo der Befehl endet — der Aufrufer löst nur aus, wenn genau dort getippt wurde.
+  const ende = treffer[0].length;
+  const deutung = deuteZeit(treffer[1], { ...optionen, art: 'ereignis' });
+  if (!deutung.ok) return { ok: false, grund: deutung.grund, ende };
+  if (deutung.zeitpunkt == null) return null;
+  return { ok: true, zeitpunkt: deutung.zeitpunkt, rest: text.slice(ende), ende };
 }
 
 /**

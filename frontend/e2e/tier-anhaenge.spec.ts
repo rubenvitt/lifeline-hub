@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fotos und Dateien an einem Tier im Browser (LFH-758, Spec `tier-anhaenge`): Ablegen über den
@@ -103,6 +104,7 @@ test('legt am Tier ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und
   expect(download.suggestedFilename()).toBe('Müller_Bello.jpg');
 
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText('Tier T-001: Foto abgelegt')).toBeVisible();
   await expect(page.getByText(/Müller_Bello/)).toHaveCount(0);
 

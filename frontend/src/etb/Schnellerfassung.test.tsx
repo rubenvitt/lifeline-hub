@@ -18,6 +18,8 @@ import { useLocation } from 'react-router';
 import { rufnameZugriff } from '../test/standardRufname';
 import dayjs from 'dayjs';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
+import { theme } from 'antd';
+import { etbTypFarbe } from '../theme/statusFarben';
 
 // Die Schnellerfassung lädt über useFunkrufnamen immer /fahrzeuge + /einheiten.
 // onUnhandledRequest: 'error' im Setup → Default-Handler (leere Listen) bereitstellen,
@@ -599,9 +601,9 @@ describe('Schnellerfassung', () => {
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
     ).not.toBeInTheDocument();
     // Typ auf 'Lage' umstellen — über den Präfix, der den Typ als Befehl zeigt.
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp /meldung ändern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
-    expect(screen.getByRole('button', { name: 'Eintragstyp /lage ändern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
     expect(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
     ).toBeInTheDocument();
@@ -618,7 +620,7 @@ describe('Schnellerfassung', () => {
         <Ort />
       </>,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp /meldung ändern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
     await userEvent.click(
       await screen.findByRole('button', { name: /strukturierten Lagebericht/i }),
@@ -637,9 +639,9 @@ describe('Schnellerfassung', () => {
     await waitFor(() =>
       expect(client.getQueryData(einsatzKeys.modulFreigaben(einsatz.id))).toBeDefined(),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp /meldung ändern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Lage' }));
-    expect(screen.getByRole('button', { name: 'Eintragstyp /lage ändern' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /strukturierten Lagebericht/i }),
     ).not.toBeInTheDocument();
@@ -854,17 +856,29 @@ describe('Schnellerfassung – Entwurf-Anbindung', () => {
 // ---------------------------------------------------------------------------
 
 describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
-  it('zeigt den gewählten Typ als Befehl im Präfix der Zeile', () => {
+  it('zeigt den gewählten Typ als Typwort im Präfix, die Zeile trägt seine Kante (LLH-1112)', () => {
     renderMitProviders(<Schnellerfassung {...props()} />);
     const praefix = document.querySelector('[data-lfh="schnellerfassung-praefix"]')!;
-    expect(praefix).toHaveTextContent('/meldung');
+    expect(praefix).toHaveTextContent(/^Meldung$/);
+    const knopf = screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' });
+    // Der Test rendert ohne Nachttheme: die Hellpalette gilt.
+    expect(knopf).toHaveStyle({ color: etbTypFarbe('meldung', theme.getDesignToken()).wort });
+    const zeile = document.querySelector<HTMLElement>('.lfh-schnellerfassung')!;
+    expect(zeile.style.borderInlineStart).toContain('2px solid');
   });
 
-  it('im Berichtigungsmodus steht /berichtigung fest im Präfix, ohne Typwähler', () => {
+  it('im Berichtigungsmodus steht „Berichtigung“ fest im Präfix, ohne Typwähler', () => {
     renderMitProviders(<Schnellerfassung {...props({ berichtigungZu: original() })} />);
     const praefix = document.querySelector('[data-lfh="schnellerfassung-praefix"]')!;
-    expect(praefix).toHaveTextContent('/berichtigung');
+    expect(praefix).toHaveTextContent(/^Berichtigung$/);
     expect(screen.queryByRole('button', { name: /Eintragstyp/ })).toBeNull();
+  });
+
+  it('das Typmenü trägt je Typ einen Farbpunkt neben dem Wort', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Eintragstyp Meldung ändern' }));
+    const eintrag = await screen.findByRole('menuitem', { name: 'Anordnung' });
+    expect(eintrag.querySelector('[data-lfh="typ-punkt"]')).not.toBeNull();
   });
 
   it('/ am Zeilenanfang bietet die Typen an und setzt den gewählten Typ', async () => {
@@ -878,7 +892,7 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     await waitFor(() => expect(screen.queryByTestId('slash-menu')).toBeNull());
     // Der Befehlstext ist aus dem Feld verschwunden, der Typ steht im Präfix.
     expect(feld).toHaveValue('');
-    expect(screen.getByRole('button', { name: 'Eintragstyp /anordnung ändern' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Eintragstyp Anordnung ändern' })).toBeVisible();
     await userEvent.type(feld, 'Verbau halten{Enter}');
     await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
     expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
@@ -901,7 +915,7 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
     const feld = screen.getByPlaceholderText(/Inhalt/);
     await userEvent.type(feld, '/lage Pegel steigt');
     expect(feld).toHaveValue('Pegel steigt');
-    expect(screen.getByRole('button', { name: 'Eintragstyp /lage ändern' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeVisible();
   });
 
   it('@ füllt bei einer Meldung den Absender aus den Funkrufnamen', async () => {
@@ -1177,6 +1191,116 @@ describe('Ereigniszeit eines vorgehenden Geräts (LFH-895)', () => {
       }),
     );
     expect(eintrag.ereigniszeit).toBe('2026-10-04 09:30:00');
+  });
+});
+
+// LLH-1088: `/zeit` als Kurzeingabe der Ereigniszeit und die Sperre gegen eine Zeit in der Zukunft.
+describe('Nachtrag per /zeit und Zukunftssperre (LLH-1088)', () => {
+  // 14:31 Berlin.
+  const SERVER = Date.parse('2026-10-17T12:31:00Z');
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(SERVER);
+    serveruhrVergessenFuerTests();
+    return () => {
+      vi.useRealTimers();
+      serveruhrVergessenFuerTests();
+    };
+  });
+
+  it('„/zeit 1420 Pumpe läuft“ setzt den Chip und lässt den Rest als Inhalt', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 1420 Pumpe läuft');
+    expect(feld).toHaveValue('Pumpe läuft');
+    expect(screen.getByText('Ereigniszeit: 1420')).toBeInTheDocument();
+    await userEvent.type(feld, '{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      inhalt: 'Pumpe läuft',
+      ereigniszeit: '2026-10-17 12:20:00',
+    });
+  });
+
+  it('„/zeit -10“ zählt von der Serveruhr zurück, auch nach einem Typbefehl', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/lage /zeit -10 Lage ruhig{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect((p.erfassen as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      typ: 'lage',
+      inhalt: 'Lage ruhig',
+      ereigniszeit: '2026-10-17 12:21:00',
+    });
+  });
+
+  it('eine unlesbare Angabe bleibt Text, und die Hinweiszeile nennt den Grund', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 2590 Pumpe');
+    expect(feld).toHaveValue('/zeit 2590 Pumpe');
+    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: .+/);
+  });
+
+  it('greift nicht, wenn mitten in einer stehenden Angabe korrigiert wird', async () => {
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 2590 Pumpe');
+    // Cursor hinter die „0“, Ziffer löschen: „/zeit 259 Pumpe“ hieße 02:59.
+    await userEvent.type(feld, '{Backspace}', {
+      initialSelectionStart: 10,
+      initialSelectionEnd: 10,
+    });
+    expect(feld).toHaveValue('/zeit 259 Pumpe');
+    expect(screen.queryByText(/^Ereigniszeit:/)).toBeNull();
+  });
+
+  it('räumt den Grund, wenn ein Baustein den Text ersetzt', async () => {
+    const baustein = { id: 1, label: 'Lage ruhig', inhalt: 'Lage ruhig' } as EtbBaustein;
+    renderMitProviders(<Schnellerfassung {...props({ bausteine: [baustein] })} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, '/zeit 2590 x');
+    expect(screen.getByRole('status')).toHaveTextContent(/^\/zeit: /);
+    await userEvent.type(feld, ' /Lage');
+    await userEvent.click(await screen.findByText('Lage ruhig'));
+    await waitFor(() => expect(screen.queryByText(/^\/zeit: /)).toBeNull());
+  });
+
+  it('sendet keine Ereigniszeit in der Zukunft: Grund am Chip, Text bleibt', async () => {
+    const p = props({
+      initialWerte: {
+        inhalt: '',
+        typ: 'meldung',
+        // 18:20 statt 14:20.
+        metadaten: { ereigniszeit: dayjs.utc('2026-10-17T16:20:00Z') },
+      },
+    });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    const feld = screen.getByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Pumpe läuft{Enter}');
+    expect(p.erfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('Pumpe läuft');
+    const grund = await screen.findByText(/liegt in der Zukunft/);
+    expect(grund.closest('.ant-tag')).toHaveTextContent('Ereigniszeit: 1820');
+  });
+
+  it('zeigt am Chip den Tag, wenn die Ereigniszeit nicht von heute ist', () => {
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          initialWerte: {
+            inhalt: '',
+            typ: 'meldung',
+            metadaten: { ereigniszeit: dayjs.utc('2026-10-16T21:50:00Z') },
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Ereigniszeit: 162350')).toBeInTheDocument();
   });
 });
 

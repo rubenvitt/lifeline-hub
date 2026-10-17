@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, fehlerText } from '../api/client';
 import { erfasseEtb, type NeuerEintrag } from '../api/etb';
+import type { EtbEintragAnzeige } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import {
@@ -208,7 +209,7 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
   }, [flush]);
 
   const erfassen = useCallback(
-    async (eintrag: NeuerEintrag) => {
+    async (eintrag: NeuerEintrag): Promise<EtbEintragAnzeige | null> => {
       // EINE stabile client_id vor dem Versuch minten, für Online-Senden UND Einreihen — sonst
       // erzeugt ein Timeout-nach-Commit beim Retry ein Duplikat mit neuer lfd_nr.
       const mitId: NeuerEintrag = {
@@ -217,15 +218,20 @@ export function useEtbErfassung(einsatzId: number, benutzerId?: number) {
       };
       if (benutzerId == null) throw new Error('Nicht angemeldet');
       try {
-        await erfasseEtb(einsatzId, mitId, {
+        const angenommen = await erfasseEtb(einsatzId, mitId, {
           offlineQueueBenutzerId: benutzerId,
         });
         qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+        // Die Antwort geht an den Aufrufer: die Seite prüft, ob der Eintrag zum Filter passt
+        // (LLH-1071, „Nr. … erfasst – außerhalb des Filters“).
+        return angenommen;
       } catch (e) {
         if (istOfflineTransient(e)) {
           if (e instanceof ApiError && e.status === 401) meldeSitzungAbgelaufen();
           await queueEinreihen(benutzerId, einsatzId, mitId);
           await ladeAusstehend();
+          // Vorgemerkt, nicht angenommen: es gibt noch keine Nummer.
+          return null;
         } else {
           throw e; // fachliche Ablehnung an den Aufrufer reichen
         }

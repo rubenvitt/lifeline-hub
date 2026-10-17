@@ -2,7 +2,7 @@
 titel: Presse und Infotelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
+quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick
@@ -95,10 +95,13 @@ selbst der Nachweis.
 
 ### Viele Anrufe
 
-Das Anrufprotokoll zeigt zuerst die jüngsten 100 Anrufe. „Ältere laden“ am Ende der Liste holt die
-nächsten. Die Zahlen „Anrufe“ und „offene Rückrufe“ und die Aufgliederung „Nach Anliegen“ zählen
-immer alle Anrufe des Einsatzes, auch die noch nicht geladenen. Ein Link auf einen älteren Anruf
-zeigt ihn hervorgehoben am Ende der Liste.
+Das Anrufprotokoll liest sich wie das Einsatztagebuch: der älteste geladene Anruf steht oben, der
+jüngste unten direkt über der Erfassung, und die Seite öffnet am Ende. Geladen sind zuerst die
+jüngsten 100 Anrufe; „Ältere laden“ über der Liste holt die nächsten. Die Zahlen „Anrufe“ und
+„offene Rückrufe“ und die Aufgliederung „Nach Anliegen“ zählen immer alle Anrufe des Einsatzes,
+auch die noch nicht geladenen. Ein Link auf einen älteren Anruf zeigt ihn hervorgehoben am Anfang
+der Liste. Neue Anrufe anderer Plätze erscheinen am Ende unten; wer hochgerollt hat, sieht dort
+„1 neuer Anruf“ mit „anzeigen“.
 
 ### Medienlage
 

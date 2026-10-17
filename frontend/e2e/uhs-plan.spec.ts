@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { waehleIn } from './auswahl-kern';
 import { FOTO_JPEG, MINI_JPEG } from './bildFixture';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Plan einer UHS als Hintergrund des Platz-Layouts (LFH-999, Spec `uhs-plan`): hochladen und aus
@@ -171,6 +172,7 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
 
   // Das ETB nennt Hinterlegen, keinen Dateinamen und keine Ansicht.
   await page.goto(`/einsaetze/${e}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText('UHS BHP 50: Plan hinterlegt').first()).toBeVisible();
   await expect(page.getByText(/halle\.jpg/)).toHaveCount(0);
 });

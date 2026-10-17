@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeit } from '../anzeige/format';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { etbNummerAbfrage } from '../command-palette/datensatzAbfrage';
 import { VORSCHAU_UNTER_EBENE, VorschauZustand } from '../command-palette/VorschauZustand';
@@ -15,7 +14,7 @@ import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import { MELDEWEG_LABEL } from './EtbZeitachse';
 import { istNachgetragen } from './typFarben';
-import { verweisStil } from './zeitachseModell';
+import { nachtragText, verweisStil } from './zeitachseModell';
 import { etbPfad } from '../routing/deeplinks';
 import { verfasserText } from './verfasser';
 import { useDarfOriginalLaden } from '../einsatz/useDarfOriginalLaden';
@@ -162,8 +161,8 @@ function EintragInhalt({
         {istNachgetragen(e.ereigniszeit, e.received_at) && (
           <Datenfeld label="Erfasst">
             <span style={{ color: rollen.text2 }}>
-              <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
-              {formatUhrzeit(e.received_at, konventionen)}
+              <span aria-hidden="true">⧖ </span>
+              {nachtragText(e.ereigniszeit, e.received_at, konventionen)}
             </span>
           </Datenfeld>
         )}

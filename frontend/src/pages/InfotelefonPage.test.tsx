@@ -169,8 +169,14 @@ describe('InfotelefonPage (LFH-554)', () => {
       expect(within(liste).getAllByRole('listitem')).toHaveLength(ANRUFE_PAGE_SIZE),
     );
     expect(screen.queryByText('ganz alt')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Ältere laden' }));
+    // Funkprotokoll (LLH-1149): der jüngste Anruf steht unten, „Ältere laden“ über der Liste.
+    const zeilen = within(liste).getAllByRole('listitem');
+    expect(zeilen[zeilen.length - 1]).toHaveTextContent('neu 1000');
+    const knopf = screen.getByRole('button', { name: 'Ältere laden' });
+    expect(knopf.compareDocumentPosition(liste) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await userEvent.click(knopf);
     expect(await screen.findByText('ganz alt')).toBeInTheDocument();
+    expect(within(liste).getAllByRole('listitem')[0]).toHaveTextContent('ganz alt');
     expect(loadAnrufe).toHaveBeenLastCalledWith(1, {
       status: undefined,
       vor: { zeit: '2026-09-30 10:00:00', id: 901 },
@@ -189,9 +195,9 @@ describe('InfotelefonPage (LFH-554)', () => {
       return el!;
     });
     expect(ziel).toHaveTextContent('alter Anruf');
-    // Hinten angehängt: er ist älter als alles Geladene.
+    // Ganz oben: er ist älter als alles Geladene (Funkprotokoll, LLH-1149).
     const zeilen = document.querySelectorAll('[data-anruf]');
-    expect(zeilen[zeilen.length - 1]).toBe(ziel);
+    expect(zeilen[0]).toBe(ziel);
   });
 
   it('hebt den per ?anruf= angesprungenen Anruf mit Fläche hervor, nicht nur mit der Klasse (LFH-698)', async () => {

@@ -157,6 +157,21 @@ const SlashMenu = forwardRef<SlashMenuHandle, Props>(function SlashMenu(
             >
               {e.label}
               {e.gesetzt ? ' ✓' : ''}
+              {e.hinweis && ' '}
+              {e.hinweis && (
+                // Die Kurzeingabe als Wink, nicht als Satz (LLH-1088): wer sie liest, tippt sie
+                // beim nächsten Mal aus.
+                <small
+                  style={{
+                    marginInlineStart: token.marginXS,
+                    color: token.colorTextSecondary,
+                    fontFamily: token.fontFamilyCode,
+                    fontSize: 12,
+                  }}
+                >
+                  {e.hinweis}
+                </small>
+              )}
             </div>
           );
         })}

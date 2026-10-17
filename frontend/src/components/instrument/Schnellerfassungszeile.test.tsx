@@ -153,4 +153,23 @@ describe('Schnellerfassungszeile', () => {
       );
     }
   });
+
+  it('kante: eine 2-px-Kante am Zeilenanfang nur auf Wunsch (LLH-1112)', () => {
+    const { unmount } = renderMitProviders(
+      <Schnellerfassungszeile kante="#123456">
+        <Input aria-label="Feld" />
+      </Schnellerfassungszeile>,
+    );
+    const zeile = () => document.querySelector<HTMLElement>('.lfh-schnellerfassung')!;
+    expect(zeile().style.borderInlineStart).toBe('2px solid #123456');
+    expect(zeile()).toHaveAttribute('data-kante', 'true');
+    unmount();
+    renderMitProviders(
+      <Schnellerfassungszeile>
+        <Input aria-label="Feld" />
+      </Schnellerfassungszeile>,
+    );
+    expect(zeile().style.borderInlineStart).toBe('');
+    expect(zeile()).not.toHaveAttribute('data-kante');
+  });
 });

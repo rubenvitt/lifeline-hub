@@ -40,7 +40,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Augenbraue` (`als="h2…h6"`) · `Paneel`/`PaneelZeile` · `Formularpaneel` (Hülle im selben `<Form>`) ·
   `PaneelZustand` · `Kennzahl`/`Kennzahlenband` („Zahl führt") · `Aufgliederung`/`Balken` (nie
   Ersatz der Zahl) · `Zeitachseneintrag` · `StatusZelle`/`StatusChip` (`wort` Pflicht, Übersetzung
-  nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`) · `Sammelbanner` ·
+  nur in `statusFlaeche.ts`) · `Segmentleiste` (statt antds `Segmented`; `SegmentUmschalter` als ein
+  Umschaltknopf daneben, LLH-1065) · `Sammelbanner` · `Filterhinweis` (Band über einer gefilterten
+  Liste, Achtungsrolle, Zahlen nur aus Serverzählungen, LLH-1071) ·
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
   `rollenwerte`/`useRollen`.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
@@ -793,6 +795,9 @@ Spec `bedien-arbeitsplatz`).
   `sendetRef` in `abschicken`.
 - **„Werte behalten"** (`uebernahme`) ist eine Einstellung: eigene Zeile über den Knöpfen,
   **Vorgabe AUS** — in `components/Erfassung.tsx` **und** `pages/EtbPage.tsx` (`useState(false)`).
+  Im ETB übernimmt er Von, An, Meldeweg **und den Eintragstyp** (LLH-1112); aus beginnt der
+  Folgeentwurf als „Meldung“, ein neuer Reiter über „+“ immer. Nie übernommen: Ereigniszeit,
+  Veranlassung, Dateien.
 - **Der Tastaturvertrag steht am Knopf, nie im Text** (LFH-1078): Tastenkappe ↵ an „Erfassen“
   nur bei feinem Zeiger und ab `lg`, Kürzel in `aria-keyshortcuts`; keine Hinweiszeile, kein Kürzel im
   Platzhalter (`etb/Schnellerfassung.tsx`).

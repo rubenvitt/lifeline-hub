@@ -1,7 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import type { EtbTyp } from '../../api/types';
 import { etbTypFarbe } from '../../theme/statusFarben';
-import type { EtbTypFarbe, Farbrollen } from '../../theme/tokens';
+import { schriftskala, type EtbTypFarbe, type Farbrollen } from '../../theme/tokens';
 import { useViewport } from '../useViewport';
 import { monoStil, useRollen } from './rollenwerte';
 
@@ -98,6 +98,11 @@ interface ZeitachseneintragProps extends Hueller {
   aktionen?: ReactNode;
   /** Dreipunkt-Menü der Zeile (LFH-365); in `kompakt` am Ende der Kopfzeile, sonst rechts. */
   menue?: ReactNode;
+  /**
+   * Leiser als ein Handeintrag (LLH-1106, Systemeinträge): Text in `gedaempft` und eine Stufe
+   * kleiner (`schriftskala.textKlein`), ungekürzt — die Zeile ist ein Beleg.
+   */
+  leise?: boolean;
   /** Element der Hülle; Vorgabe `div`, in einer Liste `li`, eigenständig `article`. */
   als?: 'div' | 'li' | 'article';
   style?: CSSProperties;
@@ -118,6 +123,7 @@ export default function Zeitachseneintrag({
   toenung,
   aktionen,
   menue,
+  leise = false,
   als: Element = 'div',
   style,
   ...rest
@@ -145,6 +151,7 @@ export default function Zeitachseneintrag({
       data-lfh-eintrag="zeitachse"
       data-typ={typ}
       data-toenung={toenung}
+      data-leise={leise || undefined}
       style={{
         display: 'flex',
         alignItems: 'stretch',
@@ -241,9 +248,9 @@ export default function Zeitachseneintrag({
         </div>
         <div
           style={{
-            fontSize: 13,
+            fontSize: leise ? schriftskala.textKlein.groesse : 13,
             lineHeight: 1.5,
-            color: rollen.text2,
+            color: leise ? rollen.gedaempft : rollen.text2,
             overflowWrap: 'anywhere',
             // Der Menüknopf ragt aus der Kopfzeile in die erste Textzeile; der Text hält ihm
             // die Breite frei, sonst läge der Knopf über den letzten Zeichen.

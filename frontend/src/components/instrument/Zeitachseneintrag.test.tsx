@@ -64,6 +64,25 @@ describe('Zeitachseneintrag', () => {
     expect(kante(container).style.background).toBe('rgb(1, 2, 3)');
   });
 
+  it('leise: Text gedämpft und eine Stufe kleiner, ohne Tönung (LLH-1106)', () => {
+    const { container } = renderMitProviders(
+      <Zeitachseneintrag zeit="1402" typ="system" typwort="System" leise>
+        Person R-012 erfasst
+      </Zeitachseneintrag>,
+    );
+    const text = screen.getByText('Person R-012 erfasst');
+    expect(text.style.fontSize).toBe('12px');
+    expect(text.style.color).toBe(hexZuRgb(farbenHell.gedaempft));
+    expect(container.querySelector('[data-leise="true"]')).not.toBeNull();
+    // Ohne `leise` der Lauftext in text2 und 13 px.
+    renderMitProviders(
+      <Zeitachseneintrag zeit="1403" typ="meldung" typwort="Meldung">
+        Lage ruhig
+      </Zeitachseneintrag>,
+    );
+    expect(screen.getByText('Lage ruhig').style.fontSize).toBe('13px');
+  });
+
   it('Zeilentönung färbt die ganze Zeile; ohne Tönung transparent', () => {
     expect(zeilenGrund(farbenHell)).toBe('transparent');
     expect(zeilenGrund(farbenHell, 'berichtigung')).toBe(farbenHell.berichtigungZeile);
@@ -239,3 +258,8 @@ describe('Zeitachseneintrag: Aufbau je Dichte (LFH-958)', () => {
     },
   );
 });
+
+function hexZuRgb(hex: string): string {
+  const n = Number.parseInt(hex.replace('#', ''), 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}

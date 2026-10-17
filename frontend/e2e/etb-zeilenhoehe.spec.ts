@@ -104,3 +104,61 @@ test('kompakte Zeile: höchstens 56 px, mindestens 9 Einträge im Bild (Beobacht
   await expect(page.getByRole('button', { name: 'Erfassen', exact: true })).toHaveCount(0);
   await misst(page, einsatzId, 'beobachter');
 });
+
+/**
+ * Systemeinträge (LLH-1106): drei aufeinanderfolgende Systemeinträge stehen als EINE Bündelzeile,
+ * die wie eine Zeile höchstens 56 px misst; aufgeklappt hält auch jede leise Zeile die Höhe.
+ * Gesät über drei Gefahrengebiete (je ein Systemeintrag, wie `leisten-flaeche.spec.ts`).
+ */
+test('Systemeinträge: drei stehen als eine Bündelzeile, aufgeklappt hält jede die Zeilenhöhe', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const einsatzId = await saeen(page);
+  for (const [i, label] of ['Sektor A', 'Sektor B', 'Sektor C'].entries()) {
+    const x = 10 + i / 20;
+    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+      data: {
+        typ: 'gefahrengebiet',
+        geometrie_typ: 'Polygon',
+        geometrie: JSON.stringify({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [x, 50],
+              [x + 0.01, 50],
+              [x + 0.01, 50.01],
+              [x, 50.01],
+              [x, 50],
+            ],
+          ],
+        }),
+        label,
+      },
+    });
+    expect(zone.ok(), await zone.text()).toBeTruthy();
+  }
+  await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'kompakt'));
+  await page.setViewportSize(BREITEN[0]);
+  await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', 'kompakt');
+  const zeitachse = page.getByRole('region', { name: 'Einsatztagebuch' });
+  const buendel = zeitachse.getByTestId('etb-buendelzeile');
+  await expect(buendel).toHaveCount(1);
+  // Zu: die drei Systemeinträge sind nicht als Zeilen da, nur die Meldungen.
+  await expect(zeitachse.getByTestId('etb-ereigniszeile')).toHaveCount(ANZAHL);
+  expect((await buendel.boundingBox())!.height, 'Bündelzeile').toBeLessThanOrEqual(HOECHSTENS);
+
+  const knopf = buendel.getByRole('button', { name: /^3 Systemeinträge / });
+  await expect(knopf).toHaveAttribute('aria-expanded', 'false');
+  await knopf.focus();
+  await page.keyboard.press('Enter');
+  await expect(knopf).toHaveAttribute('aria-expanded', 'true');
+  const leise = zeitachse.locator('[data-testid="etb-ereigniszeile"][data-leise]');
+  await expect(leise).toHaveCount(3);
+  for (const h of await leise.evaluateAll((alle) =>
+    alle.map((z) => z.getBoundingClientRect().height),
+  )) {
+    expect(h, 'leise Zeile').toBeLessThanOrEqual(HOECHSTENS);
+  }
+});

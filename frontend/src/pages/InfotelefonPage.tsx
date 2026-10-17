@@ -44,6 +44,7 @@ import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import AnrufErfassung from '../infotelefon/AnrufErfassung';
+import { funkprotokollFolge, useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
 import {
   einfrieren,
   extendEinfrierstand,
@@ -60,15 +61,19 @@ import { infotelefonStatus } from '../theme/statusFarben';
 
 /**
  * Informationstelefon des Sachgebiets S5 (LFH-554, Spec `stab-infotelefon`): das Protokoll der
- * Anrufe aus der Bevölkerung. Ein Protokoll wird gelesen — Zeitachse wie ETB und Lagemeldungen,
- * jüngste oben (Ordnung vom Server), keine Sortierung, kein Spaltenfilter; nur die Segmentleiste
- * „alle / offene Rückrufe“, die serverseitig filtert.
+ * Anrufe aus der Bevölkerung. Ein Protokoll wird gelesen — Zeitachse wie das ETB in
+ * Funkprotokoll-Ordnung (LLH-1149): ältester Anruf oben, jüngster unten direkt über der
+ * Erfassung, die Seite öffnet am Ende und läuft dort neuen Anrufen nach
+ * (`components/useFunkprotokollLauf.ts`). Keine Sortierung, kein Spaltenfilter; nur die
+ * Segmentleiste „alle / offene Rückrufe“, die serverseitig filtert.
  *
  * **Fenster und Zählung** (LLH-732, Change `w6hgfndx-infotelefon-zaehler`, design.md D6): Die
- * Zeitachse lädt Seiten zu {@link ANRUFE_PAGE_SIZE} Anrufen, „Ältere laden“ hängt die nächste an.
+ * Zeitachse lädt Seiten zu {@link ANRUFE_PAGE_SIZE} Anrufen, „Ältere laden“ (oben) fügt die
+ * nächste darüber ein.
  * Kennzahlen, Meta und Aufgliederung zählen über `…/zaehler` den ganzen Bestand, nie das loaded
  * Fenster. Ohne Zählung steht keine Zahl da (`laden`/`fehler` an der Kennzahl). Ein per
- * `?anruf=` angesteuerter Anruf außerhalb des Fensters wird einzeln geholt und hinten angehängt.
+ * `?anruf=` angesteuerter Anruf außerhalb des Fensters wird einzeln geholt und steht als ältester
+ * oben.
  *
  * **Datenschutz:** Name, Rückrufnummer und Notiz stehen nur hier; die Medienlage und der
  * Lagebericht bekommen sie nie (`stab/medienlage.ts`).
@@ -120,6 +125,8 @@ export default function InfotelefonPage() {
   );
   const [linkedId, setLinkedId] = useState<number | null>(null);
   const listeRef = useRef<HTMLDivElement>(null);
+  // Ein Deeplink rollt selbst zu seinem Anruf; dann nicht beim Öffnen ans Ende.
+  const [startMitAnruf] = useState(() => searchParams.has('anruf'));
   // Die Erfassung hängt angepinnt am Fuß: ihre Höhe hält den Fokus der Zeitachse frei
   // (WCAG 2.4.11, dieselbe Regel wie im ETB, `index.css`).
   const erfassungRef = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_ETB);
@@ -204,7 +211,8 @@ export default function InfotelefonPage() {
     },
   });
 
-  // Der Server filtert; der einzeln geholte Anruf steht hinten, er ist älter als das Fenster.
+  // Der Server filtert; der einzeln geholte Anruf steht hinten (in der Darstellung oben), er ist
+  // älter als das Fenster.
   const gefiltert = useMemo(
     () =>
       linked && sicht === 'alle' && !loaded.some((a) => a.id === linked.id)
@@ -221,8 +229,41 @@ export default function InfotelefonPage() {
       ?.scrollIntoView?.({ block: 'center' });
   }, [hervorgehoben, isHervorgehobenLoaded]);
   const pageCount = pages?.length ?? 0;
+  // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
+  const appendedIds = gefroren
+    ? (pages ?? [])
+        .slice(frozenPageCount)
+        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
+    : [];
+  const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
+  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
+  /*
+   * Funkprotokoll (LLH-1149): Öffnen am Ende, Mitlaufen am Ende, Anker beim Nachladen oben.
+   * Die Ränder der GEZEIGTEN Anrufe (Serverordnung, der erste ist der jüngste): erst wenn
+   * zurückgehaltene erscheinen (Auftauen, „anzeigen“), läuft die Seite ihnen nach.
+   */
+  const { amEnde, zumEnde } = useFunkprotokollLauf({
+    wurzel: listeRef,
+    // Erst mit dem Einsatz steht die Liste statt des Skeletts (Frühausstieg unten).
+    bereit: anrufeQuery.isSuccess && einsatzQuery.data != null,
+    juengste: sichtbar[0] != null ? String(sichtbar[0].id) : undefined,
+    aelteste: sichtbar.length > 0 ? String(sichtbar[sichtbar.length - 1].id) : undefined,
+    ohneStartlauf: startMitAnruf,
+  });
+  // Hochgerollt friert ein wie Fokus in der Liste; zurück am Ende ohne Fokus taut auf.
+  const [fokusDrin, setFokusDrin] = useState(false);
+  const [gesehenAmEnde, setGesehenAmEnde] = useState(amEnde);
+  if (gesehenAmEnde !== amEnde) {
+    setGesehenAmEnde(amEnde);
+    if (!amEnde && gefroren == null) {
+      setFrozenPageCount(pageCount);
+      setAppendedPageIds(new Map());
+      setGefroren(einfrieren(gefiltert));
+    } else if (amEnde && !fokusDrin) setGefroren(null);
+  }
   const betreten = useCallback(
     (e: FocusEvent<HTMLDivElement>) => {
+      setFokusDrin(true);
       if (gefroren == null) {
         setFrozenPageCount(pageCount);
         setAppendedPageIds(new Map());
@@ -242,13 +283,18 @@ export default function InfotelefonPage() {
     },
     [gefiltert, gefroren, pageCount],
   );
-  const verlassen = useCallback((e: FocusEvent<HTMLDivElement>) => {
-    const ziel = e.relatedTarget as Node | null;
-    if (ziel != null && listeRef.current?.contains(ziel)) return;
-    // Ein Menü im Portal (Statuswahl) ist kein Verlassen.
-    if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
-    setGefroren(null);
-  }, []);
+  const verlassen = useCallback(
+    (e: FocusEvent<HTMLDivElement>) => {
+      const ziel = e.relatedTarget as Node | null;
+      if (ziel != null && listeRef.current?.contains(ziel)) return;
+      // Ein Menü im Portal (Statuswahl) ist kein Verlassen.
+      if (ziel instanceof Element && ziel.closest('.ant-dropdown')) return;
+      setFokusDrin(false);
+      // Hochgerollt bleibt sie eingefroren: dort liest jemand.
+      if (amEnde) setGefroren(null);
+    },
+    [amEnde],
+  );
   // Hält die Kennungen jeder nach dem Einfrieren angehängten Seite beim ersten Erscheinen fest.
   useEffect(() => {
     if (gefroren == null || pages == null) return;
@@ -301,14 +347,6 @@ export default function InfotelefonPage() {
       : 'daten';
   const gesamt = zaehler?.gesamt ?? 0;
   const offen = zaehler?.offen ?? 0;
-  // Nachgeladene ältere Seiten gehören zum eingefrorenen Stand; nur die Zeitachse hält Fremdes zurück.
-  const appendedIds = gefroren
-    ? (pages ?? [])
-        .slice(frozenPageCount)
-        .map((page, i) => appendedPageIds.get(frozenPageCount + i) ?? page.map((a) => a.id))
-    : [];
-  const frozenState = gefroren && extendEinfrierstand(gefroren, appendedIds.flat());
-  const { sichtbar, zurueckgehalten } = teileZufluss(gefiltert, frozenState, benutzer?.id);
   const isListeLoaded = anrufeQuery.isSuccess;
   // Unter `md` trägt die Meta die Kennzahlen; ab `md` stehen sie als Kacheln darunter.
   const anrufeText = gesamt === 1 ? '1 Anruf' : `${gesamt} Anrufe`;
@@ -332,7 +370,11 @@ export default function InfotelefonPage() {
     <Segmentleiste<Sicht>
       beschriftung="Anrufe filtern"
       wert={sicht}
-      onWechsel={setSicht}
+      onWechsel={(neu) => {
+        // Eine Wassermarke der alten Sicht hielte Anrufe der neuen als „neu“ zurück.
+        setGefroren(null);
+        setSicht(neu);
+      }}
       optionen={[
         { wert: 'alle', label: 'alle' },
         { wert: 'offen', label: 'offene Rückrufe' },
@@ -389,7 +431,12 @@ export default function InfotelefonPage() {
           // Fokus in der Leiste klappt sie auf (`components/fokusInLeiste.ts`).
           <div ref={erfassungRef} className="etb-erfassung-sticky" {...leistenFokus}>
             <AnrufErfassung
-              onErfassen={(e) => erfassenMutation.mutateAsync(e)}
+              // Der eigene Anruf steht unten über der Leiste: nach dem Erfassen ans Ende.
+              onErfassen={async (e) => {
+                const angelegt = await erfassenMutation.mutateAsync(e);
+                zumEnde();
+                return angelegt;
+              }}
               laeuft={erfassenMutation.isPending}
               fehler={erfassenMutation.error}
               einklappbar={istSchmal && !fokusInLeiste}
@@ -437,38 +484,25 @@ export default function InfotelefonPage() {
             onBlur={verlassen}
             style={{ position: 'relative' }}
           >
-            {/* Überlagerung mit Nullhöhe: das Banner nimmt keinen Platz im Fluss. Es klebt unter dem
-                Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen). */}
-            <div
-              style={{
-                position: 'sticky',
-                top: 'var(--lfh-rahmen-oben, 0px)',
-                height: 0,
-                zIndex: 5,
-              }}
-            >
-              {zurueckgehalten > 0 && (
-                <Sammelbanner
-                  aktion={{
-                    label: 'anzeigen',
-                    onKlick: () => {
-                      setFrozenPageCount(pageCount);
-                      setAppendedPageIds(new Map());
-                      setGefroren(einfrieren(gefiltert));
-                    },
-                  }}
-                  style={{ position: 'absolute', insetInline: 0, top: 0 }}
+            {/* Funkprotokoll (LLH-1149): ältere Anrufe stehen oben, also auch der Weg zu ihnen. Im
+                Listencontainer: der Fokus auf dem Knopf hält die Schleuse geschlossen. */}
+            {anrufeQuery.hasNextPage && (
+              <Flex justify="center" style={{ marginBottom: token.marginSM }}>
+                <Button
+                  onClick={() => void anrufeQuery.fetchNextPage()}
+                  loading={anrufeQuery.isFetchingNextPage}
                 >
-                  {zuflussText(zurueckgehalten)}
-                </Sammelbanner>
-              )}
-            </div>
+                  Ältere laden
+                </Button>
+              </Flex>
+            )}
             <ol aria-label="Anrufprotokoll" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {sichtbar.map((a) => (
+              {funkprotokollFolge(sichtbar).map((a) => (
                 <Zeitachseneintrag
                   key={a.id}
                   als="li"
                   data-anruf={a.id}
+                  data-zeile={String(a.id)}
                   data-lfh="datensicht-karte"
                   className={a.id === hervorgehoben ? HERVORGEHOBEN : undefined}
                   // Die Fläche inline wie im ETB: der Baustein setzt seinen Grund selbst, die
@@ -513,17 +547,35 @@ export default function InfotelefonPage() {
                 </Zeitachseneintrag>
               ))}
             </ol>
-            {/* Im Listencontainer: der Fokus auf dem Knopf hält die Schleuse geschlossen. */}
-            {anrufeQuery.hasNextPage && (
-              <Flex justify="center" style={{ marginTop: token.marginSM }}>
-                <Button
-                  onClick={() => void anrufeQuery.fetchNextPage()}
-                  loading={anrufeQuery.isFetchingNextPage}
+            {/* Überlagerung mit Nullhöhe am UNTEREN Rand: neue Anrufe kommen unten an, das Banner
+                klebt dort über der angepinnten Erfassung (ihre gemessene Höhe). */}
+            <div
+              style={{
+                position: 'sticky',
+                bottom: 'var(--lfh-etb-fokusabstand, 0px)',
+                height: 0,
+                zIndex: 5,
+              }}
+            >
+              {zurueckgehalten > 0 && (
+                <Sammelbanner
+                  aktion={{
+                    label: 'anzeigen',
+                    onKlick: () => {
+                      // Der Knopf geht mit dem Banner, und mit ihm der Fokus — ohne Blur.
+                      setFokusDrin(false);
+                      setFrozenPageCount(pageCount);
+                      setAppendedPageIds(new Map());
+                      setGefroren(amEnde ? null : einfrieren(gefiltert));
+                      zumEnde();
+                    },
+                  }}
+                  style={{ position: 'absolute', insetInline: 0, bottom: 0 }}
                 >
-                  Ältere laden
-                </Button>
-              </Flex>
-            )}
+                  {zuflussText(zurueckgehalten)}
+                </Sammelbanner>
+              )}
+            </div>
           </div>
         )}
       </Flex>

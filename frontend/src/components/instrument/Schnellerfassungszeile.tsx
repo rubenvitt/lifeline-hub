@@ -104,6 +104,11 @@ interface SchnellerfassungszeileProps {
    * eine Feld (ETB, Betroffene) bleibt rahmenlos, dort trägt die Zeile den Rahmen.
    */
   felderUmrandet?: boolean;
+  /**
+   * Farbe einer 2-px-Kante am Zeilenanfang (LLH-1112, Opt-in): die ETB-Erfassung zeigt den Typ
+   * wie die Zeitachse mit Kante und Wort. Zusatzkanal — das Wort im Präfix trägt die Aussage.
+   */
+  kante?: string;
   style?: CSSProperties;
 }
 
@@ -115,6 +120,7 @@ export default function Schnellerfassungszeile({
   gestapelt = false,
   feldFuellt = false,
   felderUmrandet = false,
+  kante,
   style,
 }: SchnellerfassungszeileProps) {
   const { token, rollen } = useRollen();
@@ -139,7 +145,14 @@ export default function Schnellerfassungszeile({
       data-lfh="schnellerfassung"
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, ...style }}
     >
-      <div className="lfh-schnellerfassung" style={schnellerfassungStil(rollen, token, gestapelt)}>
+      <div
+        className="lfh-schnellerfassung"
+        data-kante={kante != null || undefined}
+        style={{
+          ...schnellerfassungStil(rollen, token, gestapelt),
+          ...(kante != null ? { borderInlineStart: `2px solid ${kante}` } : {}),
+        }}
+      >
         {gestapelt && feldZelle}
         {praefix != null && (
           <span data-lfh="schnellerfassung-praefix" style={zellen.praefix}>

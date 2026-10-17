@@ -3,6 +3,7 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, pruefe } from './kontrast-kern';
 import { MINI_JPEG } from './bildFixture';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fotos und Dateien an einem Schaden im Browser: der Download (ob aus `<a href download>` ein
@@ -119,6 +120,7 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
 
   // ── 3 · Pseudonymer ETB-Nachweis ────────────────────────────────────────────────────
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText('Schaden S-001: Foto abgelegt')).toBeVisible();
   await expect(page.getByText(/Hauswand/)).toHaveCount(0);
 

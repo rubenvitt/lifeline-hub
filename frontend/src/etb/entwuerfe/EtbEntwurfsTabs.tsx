@@ -248,7 +248,13 @@ export default function EtbEntwurfsTabs({
             // Der Eintrag steht schon: scheitert nur das Räumen des Entwurfs (Plattenfehler), ist
             // das kein Sendefehler. `entwurfSchliessen` wirft dann nicht, der Grund steht an der
             // Leiste statt als Ablehnung an der Erfassung (LFH-1139).
-            await entwurfSchliessen(e.id, naechsteMetadaten);
+            // Mit „Werte behalten“ beginnt der Folgeentwurf im selben Typ (LLH-1112): eine Serie
+            // von Anordnungen bleibt eine. Ohne Schalter wieder als Meldung.
+            await entwurfSchliessen(
+              e.id,
+              naechsteMetadaten,
+              werteBehalten ? eintrag.typ : 'meldung',
+            );
           }}
           berichtigungZu={null}
           onBerichtigungAbbrechen={() => {}}

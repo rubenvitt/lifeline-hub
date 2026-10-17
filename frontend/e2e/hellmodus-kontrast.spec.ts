@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kontrast, pruefe } from './kontrast-kern';
 
-// Browsermessung des Tagmodus: ETB-Typwörter, Zeilentönungen, die Lückenmarke der Betroffenen
+// Browsermessung des Tagmodus: ETB-Typwörter, Zeilentönungen, der leise Systemeintrag, die Lückenmarke der Betroffenen
 // und die Augenbraue (Tertiärtext `schwach`, LFH-643) auf `grund`, `paneel` und `flaeche`.
 // Böden aus Kriterium 5 als Literale: Tag ≥ 7, Nacht ≥ 5.
 const ZIEL = { light: 7, dark: 5 } as const;
@@ -69,6 +69,16 @@ for (const modus of ['light', 'dark'] as const) {
       berichtigung.getByText('Messung Berichtigung', { exact: true }),
       ZIEL[modus],
       `${modus}/ETB/Berichtigungszeile/Text`,
+    );
+    // Der Systemeintrag steht leise (LLH-1106): Text in `gedaempft`, eine Stufe kleiner — er hält
+    // denselben Boden wie jeder Text.
+    const leise = page.locator('[data-lfh-eintrag="zeitachse"][data-typ="system"][data-leise]');
+    // Die Person erzeugt mehr als einen Systemeintrag; gemessen wird der erste.
+    await expect(leise.first()).toBeVisible();
+    await pruefe(
+      leise.locator('.markdown').first(),
+      ZIEL[modus],
+      `${modus}/ETB/Systemeintrag/Text`,
     );
 
     await page.goto(`/einsaetze/${einsatzId}/personen`);

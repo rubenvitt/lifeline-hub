@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import type { EtbLesemarke } from '../api/types';
-import { inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { formatZeitKurz, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 
 /**
  * Wortlaut des Lesemarken-Banners (LFH-611, Neuentwurf S4) — oder `null`, wenn es nichts
@@ -33,4 +33,34 @@ export function lesemarkeText(marke: EtbLesemarke, konv: AnzeigeKonventionen): s
     ? `um ${d.format('HH:mm')}`
     : `am ${d.format('DD.MM.')} um ${d.format('HH:mm')}`;
   return `${menge} seit Ihrer letzten Sichtung ${wann}`;
+}
+
+/**
+ * Wortlaut der Trennlinie in der Zeitachse (LLH-1149, Spec `etb-zeitachse-darstellung`,
+ * „Lesemarke als Trennlinie“): „Neu seit 1304 · 14 Einträge“ — taktisch, mit Tag, wenn die
+ * Sichtung nicht von heute ist (`formatZeitKurz`, „211304“). `null` wie {@link lesemarkeText},
+ * und auch ohne Marke: ohne gesichteten Eintrag gibt es keinen Ort für die Linie.
+ */
+export function lesemarkeLinie(marke: EtbLesemarke, konv: AnzeigeKonventionen): string | null {
+  if (lesemarkeText(marke, konv) == null || marke.gesichtet_lfd_nr == null) return null;
+  const n = marke.neue_anzahl;
+  const seit = marke.gesichtet_at
+    ? formatZeitKurz(marke.gesichtet_at, konv)
+    : `Nr. ${marke.gesichtet_lfd_nr}`;
+  return `Neu seit ${seit} · ${n === 1 ? '1 Eintrag' : `${n} Einträge`}`;
+}
+
+/**
+ * Steht die Linie in der Achse (statt des Banners)? Nur ohne Filter — unter einem Filter fehlen
+ * die meisten Einträge zwischen Marke und Ende, die Linie stünde an einer falschen Stelle — und
+ * nur, wenn der zuletzt gesichtete Eintrag geladen ist und ein neuerer dahinter.
+ */
+export function lesemarkeImFenster(
+  marke: EtbLesemarke | undefined,
+  geladeneNummern: readonly number[],
+  filterAktiv: boolean,
+): boolean {
+  const nr = marke?.gesichtet_lfd_nr;
+  if (filterAktiv || nr == null || (marke?.neue_anzahl ?? 0) <= 0) return false;
+  return geladeneNummern.includes(nr) && geladeneNummern.some((n) => n > nr);
 }

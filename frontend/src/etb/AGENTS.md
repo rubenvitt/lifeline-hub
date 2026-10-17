@@ -8,6 +8,21 @@ Ableitungen in `etb/zeitachseModell.ts`)
 
 - Keine Sortierung/Spaltenfilter/-auswahl; Ordnung = Zeit (Server). Ebenso Lagemeldungen
   (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`).
+- **Funkprotokoll-Ordnung** (LLH-1149, Entscheidung Ruben 10.10./17.10.2026, Specs
+  `etb-zeitachse-darstellung`, `etb-zeitachse-fenster`, Herleitung
+  `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
+  unten direkt über der Erfassung, Stundengruppen aufsteigend, gepufferte ganz unten (abgelehnte
+  zuletzt), ihre Hinweise unter der Zeitachse. Gekehrt wird nur in der Darstellung
+  (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Bilanz, Druck und Sprung behalten die
+  Serverordnung. Den Bildlauf am Dokument trägt `components/useFunkprotokollLauf.ts`: Öffnen am
+  Ende (außer mit `?eintrag=`), Mitlaufen am Ende an der jüngsten Zeile, Anker beim Nachladen
+  oben (`overflow-anchor: none`, eigene Korrektur). „Ende“ ist die Unterkante der
+  Zeitachsenspalte über der Erfassung (`ende`), nicht das Dokumentende: unter `xl` steht die
+  Bilanz darunter, um die Höhe der Erfassung abgesetzt. Eingefroren wird bei Fokus in der Achse ODER
+  nicht am Ende; das Sammelbanner steht unten über der Erfassung. Nach dem eigenen Eintrag rollt
+  die Seite ans Ende. Die Lesemarke ist eine Trennlinie unter dem zuletzt gesichteten Eintrag,
+  wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
+  springen“. Lagemeldungen bleiben neueste zuerst.
   `KARTEN_EIGENBAU` ist leer (`datensicht.guard.test.ts` pinnt 0).
 - Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`); unter `xl` erst nach der ersten Liste, dann
   stehend (Riegel `bilanzFrei`, nicht `isLoading`).
@@ -30,22 +45,48 @@ Ableitungen in `etb/zeitachseModell.ts`)
     (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
     Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.
   - **Unter `md` zuerst die Zeitachse:** Druck im Menü „Weitere“ (`MenueAusloeser`; der
-    Einsatzabschluss steht auf den Einsatzdaten, LFH-960), Typfilter einzeilig rollend, Volltext, Zeitraum
-    und Einheit hinter „Filter (n)“ (ein Filter von außen klappt sie auf). Die Leiste startet
+    Einsatzabschluss steht auf den Einsatzdaten, LFH-960), Typfilter einzeilig rollend im Kopf,
+    Zeitraum, Einheit, Systemeinträge und Volltext hinter „Filter (n)“ (ein Filter von außen
+    klappt sie auf). Die Leiste startet
     eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): kein Fokus beim
     Mount, ohne Reiterband, Feld- und Hinweiszeile, solange der Fokus nicht in ihr liegt und genau
     ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
     (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
+  - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): der Präfix zeigt das Typwort in
+    der Typfarbe, die Zeile die Typkante (`Schnellerfassungszeile kante`); `/typ ` und danach
+    `/zeit <Angabe> ` setzen Typ und Ereigniszeit (`erkenneTypBefehl`, `erkenneZeitBefehl`,
+    gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`), der Rest bleibt
+    Inhalt; unlesbar bleibt der Text und die Hinweiszeile nennt den Grund. Eine Ereigniszeit über
+    60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und Warteschlange, Grund
+    am Chip); der Server begrenzt sie nicht. Ein Nachtrag über Mitternacht nennt die Erfassung mit
+    Tag (`nachtragText`).
 - **Kopfzahl und Bilanz zählt der Server über DENSELBEN Filter** (LFH-612, `GET …/etb/zaehler`,
   `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
   Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
+- **Eine Filterleiste** (LLH-1065/LLH-1080, Spec `etb-filterleiste`, Herleitung
+  `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
+  `EtbFilterleiste` über der Zeitachse, in zwei Gruppen — Typ-Segmente und Umschaltknopf „System“
+  (`SegmentUmschalter`, `aria-pressed`, fester Name „Systemeinträge zeigen“, Zahl als
+  Beschreibung), dann Zeitraum (`EtbZeitraumWahl`), Einheit, Volltext. Der Seitenkopf trägt ab
+  `md` keinen Filter. Die Leiste führt nur `q` (entprellt); Typ, System, Zeitraum und Einheit
+  sind Sprungwerte der Seite aus der URL. Der Zeitraum schreibt bei jeder Wahl ABSOLUTE,
+  minutengenaue Grenzen (`anzeige/zeitfenster.ts`); „Seit letzter Lagebesprechung“ nur mit
+  Freigabe `lagebesprechung` und abgehaltener Besprechung.
 - **Systemeinträge ausblenden** (LFH-958, Spec `etb-zeitachse-darstellung`): `ohne_system=true`
   ist ein Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste,
   `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),
   nur `true` oder fehlend; neben `typ=system` fällt er weg (sonst 422, `filterZusammenfuehren`).
   Ein `?eintrag=`, der unter dem Ausschluss nicht auftaucht, blendet wieder ein und sagt es.
+- **Systemeinträge leise und gebündelt** (LLH-1106, Spec `etb-zeitachse-darstellung`): ein
+  Systemeintrag steht als `Zeitachseneintrag leise` (Text `gedaempft`, `textKlein`, ungekürzt,
+  ohne Tönung); „System → System“ entfällt (`etb/systemKennung.ts` spiegelt
+  `etb::SYSTEM_RUFNAME`). Ab drei direkt aufeinanderfolgenden schlichten Systemeinträgen einer
+  Stundengruppe steht eine Bündelzeile (`buendleSystemfolgen`, nach `gruppiereNachStunde`);
+  berichtigt, nachgetragen, Anhang, Dokument oder Rückverweis brechen die Folge, ebenso die
+  Lesemarke. Schlüssel ist der älteste Eintrag (offen bleibt offen); ein Sprung klappt im Render
+  auf. Kein Bündel unter `typ=system`, unter `q` und nie im Druck.
 - **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
   Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als
   Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben
@@ -57,10 +98,10 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `openspec/changes/archive/2026-10-06-lfh-947-etb-zeitachse-seitenfenster/design.md`): die Liste
   hält höchstens `ETB_MAX_SEITEN` (5) Seiten (`etb/seitenfenster.ts`); Seitenparameter mit
   Richtung (`{ aelter }` → `before_lfd_nr`, `{ neuer }` → `after_lfd_nr`), nie eine nackte Zahl.
-  Fällt der Kopf heraus, steht „Neuere laden“ über der Zeitachse. Ein `?eintrag=` wählt die
+  „Ältere laden“ steht über der Zeitachse; fällt der Kopf heraus, steht „Neuere laden“ darunter. Ein `?eintrag=` wählt die
   Richtung aus der Kennung (`sprungRichtung`); kein `resetQueries`, das räumte das Lagebild ohne
   Netz. Nach einem eigenen Eintrag aus tiefem Fenster ersetzt die Seite das Fenster durch die
-  neueste Seite (`zumKopf`). Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
+  neueste Seite (`zumKopf`) und rollt ans Ende. Wer die Liste ohne Versand invalidiert, lädt das ganze Fenster neu und bricht ein
   laufendes Nachladen ab (`offline/useEtbErfassung.ts`).
 - **Gemerktes Rendern** (LFH-947): `eintraege`, `chronologie`, Zufluss und Gruppen sind
   `useMemo`, die Zeile (`EtbZeitachsenZeile`) und `components/Markdown` sind `memo`, Handler
