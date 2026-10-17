@@ -984,8 +984,9 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     expect(await screen.findByText('seit 231100')).toBeInTheDocument();
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
     const dialog = await screen.findByRole('dialog');
+    // Das Feld zeigt die volle DTG in der Anzeigezone: 10:00 UTC → 12:00 Berlin.
     await waitFor(() =>
-      expect(within(dialog).getByLabelText('Alarmzeit')).toHaveValue('14.07.2026 12:00'),
+      expect(within(dialog).getByLabelText('Alarmzeit')).toHaveValue('141200jul26'),
     );
     expect(within(dialog).getByText('Europe/Berlin')).toBeInTheDocument();
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Sturm Süd');

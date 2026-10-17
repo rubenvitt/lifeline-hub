@@ -613,7 +613,7 @@ function EinsaetzeInhalt() {
           <Select options={EINSATZART_OPTIONEN} />
         </Form.Item>
         <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
-          <ZeitpunktEingabe format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+          <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item label="Einsatzort" name="einsatzort">
           <Ortsfeld suchen={sucheOrtInOrg} suchSchluessel={globalKeys.orgOrtSuche} />

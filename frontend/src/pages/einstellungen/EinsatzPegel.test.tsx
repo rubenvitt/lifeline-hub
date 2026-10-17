@@ -824,7 +824,7 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
         return v!;
       });
       await userEvent.click(within(vorschlag).getByRole('button', { name: 'Übernehmen' }));
-      expect(screen.getByRole('textbox', { name: 'Zeitpunkt' })).toHaveValue('2099-09-23 06:00');
+      expect(screen.getByRole('textbox', { name: 'Zeitpunkt' })).toHaveValue('230600sep99');
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       await waitFor(() => expect(aufrufe).toHaveLength(1));
       expect(aufrufe[0].body).toEqual({

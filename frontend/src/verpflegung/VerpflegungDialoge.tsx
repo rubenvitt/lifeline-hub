@@ -28,7 +28,7 @@ import { Augenbraue } from '../components/instrument';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { ZeitpunktEingabe, ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitpunktEingabe, ZeitraumEingabe, type Zeitraum } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import {
   empfaengerFelder,
@@ -79,8 +79,6 @@ dayjs.extend(utc);
  * Klappteil (Feldbudget); der Klappkopf nennt es, sobald es gefüllt ist, und geht bei einer zu
  * langen Angabe selbst auf.
  */
-
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 
 type SonderkostWerte = Partial<Record<Kostform, number | null>>;
 
@@ -423,13 +421,18 @@ export function ZeitfensterDialog({
       <Form.Item<ZeitfensterWerte>
         name="zeitraum"
         label="Zeitraum"
-        rules={[{ required: true, message: 'Bitte Beginn und Ende angeben' }]}
+        required
+        rules={[
+          {
+            // Beide Enden: `required` hielte ein halbes Tupel `[Beginn, null]` für gefüllt.
+            validator: (_, wert: Zeitraum | null | undefined) =>
+              wert?.[0] && wert?.[1]
+                ? Promise.resolve()
+                : Promise.reject(new Error('Bitte Beginn und Ende angeben')),
+          },
+        ]}
       >
-        <ZeitraumEingabe
-          format={ZEITFORMAT}
-          placeholder={['Beginn', 'Ende']}
-          style={{ width: '100%' }}
-        />
+        <ZeitraumEingabe placeholder={['Beginn', 'Ende']} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item<ZeitfensterWerte>
         name="bedarf_kraefte"
@@ -667,7 +670,7 @@ export function AusgabeDialog({
         )
       )}
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
-        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
+        <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {eingeklappt(
         ['Weitere Angaben', ...abweichungen].join(' · '),

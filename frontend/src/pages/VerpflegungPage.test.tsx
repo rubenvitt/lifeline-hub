@@ -304,12 +304,14 @@ describe('VerpflegungPage (LFH-634)', () => {
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Zeitfenster anlegen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Nacht');
-    const start = within(dialog).getByPlaceholderText('Beginn');
-    await userEvent.click(start);
-    await userEvent.type(start, '2026-09-25 18:00');
-    await userEvent.keyboard('{Enter}');
-    await userEvent.type(within(dialog).getByPlaceholderText('Ende'), '2026-09-25 19:00');
-    await userEvent.keyboard('{Enter}');
+    // Beide Zeitfelder tippen und verlassen (Verlassen übernimmt; Enter schickte schon ab).
+    await userEvent.type(
+      within(dialog).getByRole('textbox', { name: 'Beginn' }),
+      '2026-09-25 18:00',
+    );
+    await userEvent.tab();
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Ende' }), '2026-09-25 19:00');
+    await userEvent.tab();
     await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '40');
     await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '0');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
@@ -663,12 +665,17 @@ describe('VerpflegungPage (LFH-634)', () => {
       await userEvent.click(within(kopf()).getByRole('button', { name: 'Zeitfenster anlegen' }));
       const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
       await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Imbiss');
-      const start = within(dialog).getByPlaceholderText('Beginn');
-      await userEvent.click(start);
-      await userEvent.type(start, '2026-09-25 18:00');
-      await userEvent.keyboard('{Enter}');
-      await userEvent.type(within(dialog).getByPlaceholderText('Ende'), '2026-09-25 19:00');
-      await userEvent.keyboard('{Enter}');
+      // Beide Zeitfelder tippen und verlassen (Verlassen übernimmt; Enter schickte schon ab).
+      await userEvent.type(
+        within(dialog).getByRole('textbox', { name: 'Beginn' }),
+        '2026-09-25 18:00',
+      );
+      await userEvent.tab();
+      await userEvent.type(
+        within(dialog).getByRole('textbox', { name: 'Ende' }),
+        '2026-09-25 19:00',
+      );
+      await userEvent.tab();
       await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '10');
       await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '0');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));

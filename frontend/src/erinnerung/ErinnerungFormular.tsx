@@ -117,7 +117,7 @@ export default function ErinnerungFormular({
             label="Fällig"
             rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
           >
-            <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+            <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>

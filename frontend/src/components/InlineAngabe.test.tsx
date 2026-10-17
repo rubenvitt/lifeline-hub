@@ -1,8 +1,14 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Input } from 'antd';
+import type { Dayjs } from 'dayjs';
 import { describe, expect, it, vi } from 'vitest';
+import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
+import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
+import { tippeZeit } from '../test/zeitEingabe';
 import { ApiError } from '../api/client';
 import { InlineAngabe, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 
@@ -331,5 +337,86 @@ describe('InlineAngabe · eigener Auslöser', () => {
   it('ohne Schreibrecht kein Auslöser', () => {
     renderMitProviders(<TextAngabe wert="ILS-1" darfSchreiben={false} ausloeser={umbenennen} />);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
+/**
+ * Eine Zeiteingabe als Eingabe (LLH-1070, `anzeige/ZeitpunktEingabe.tsx`): Enter übernimmt den
+ * getippten Zeitpunkt (`onChange`) und sendet im SELBEN Tastendruck das Formular. Läse das Absenden
+ * den Entwurf aus dem Zustand, sähe es den alten Wert und schlösse „unverändert“.
+ */
+describe('InlineAngabe · Zeiteingabe als Eingabe', () => {
+  mitProzessZone('UTC');
+
+  function ZeitAngabe({ onSpeichern }: { onSpeichern: (d: Dayjs | null) => Promise<unknown> }) {
+    return (
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <InlineAngabe<Dayjs | null>
+          etikett="Alarmzeit"
+          wert={alsZeitpunkt('2026-07-14 10:00:00') ?? null}
+          anzeige="141200jul26"
+          leer={(d) => d === null}
+          gleich={(a, b) => (a && b ? a.valueOf() === b.valueOf() : a === b)}
+          pflicht
+          darfSchreiben
+          onSpeichern={onSpeichern}
+          eingabe={({ feld, popup, value, onChange }) => (
+            <ZeitpunktEingabe
+              {...feld}
+              {...popup}
+              value={value}
+              onChange={(d) => onChange(d ?? null)}
+            />
+          )}
+        />
+      </AnzeigeKonventionenProvider>
+    );
+  }
+
+  it('getippt + Enter sendet den NEUEN Zeitpunkt', async () => {
+    const onSpeichern = vi.fn<(d: Dayjs | null) => Promise<unknown>>().mockResolvedValue(undefined);
+    renderMitProviders(<ZeitAngabe onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+    expect(feld).toHaveValue('141200jul26');
+    // 14.07.2026 13:00 Berliner Wanduhr = 11:00 UTC.
+    await tippeZeit(user, feld, '141300jul26');
+    expect(onSpeichern).toHaveBeenCalledTimes(1);
+    expect(alsBackendZeit(onSpeichern.mock.calls[0][0]!)).toBe('2026-07-14 11:00:00');
+  });
+
+  it('sendet den neuen Zeitpunkt auch, wenn das Absenden vor dem Neurendern kommt', async () => {
+    const onSpeichern = vi.fn<(d: Dayjs | null) => Promise<unknown>>().mockResolvedValue(undefined);
+    renderMitProviders(<ZeitAngabe onSpeichern={onSpeichern} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
+    fireEvent.change(feld, { target: { value: '141300jul26' } });
+    // Übernahme (Enter) und Absenden in EINEM Durchlauf: React rendert erst nach beiden, das
+    // Absenden sieht also noch den alten Zustand — nur der Entwurf in der Ref ist schon neu.
+    act(() => {
+      fireEvent.keyDown(feld, { key: 'Enter' });
+      fireEvent.submit(feld.closest('form')!);
+    });
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledTimes(1));
+    expect(alsBackendZeit(onSpeichern.mock.calls[0][0]!)).toBe('2026-07-14 11:00:00');
+  });
+
+  it('Escape bei offenem Kalender schließt erst den Kalender, das zweite verwirft die Zeile', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<ZeitAngabe onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' }));
+    const kalenderKnopf = screen.getByRole('button', { name: /^Kalender und Uhrzeit/ });
+    await user.click(kalenderKnopf);
+    // Der Kalender nimmt beim Öffnen den Fokus (Uhrzeitfeld); dort landet das erste Escape.
+    await screen.findByRole('dialog', { name: 'Tag und Uhrzeit wählen' });
+    await user.keyboard('{Escape}');
+    expect(kalenderKnopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Alarmzeit' }), { key: 'Escape' });
+    expect(screen.queryByRole('textbox', { name: 'Alarmzeit' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' })).toBeInTheDocument();
+    expect(onSpeichern).not.toHaveBeenCalled();
   });
 });

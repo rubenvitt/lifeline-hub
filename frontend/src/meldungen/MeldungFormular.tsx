@@ -389,8 +389,8 @@ export default function MeldungFormular({
                   <Col xs={24} sm={12}>
                     <Form.Item name="ereigniszeit" label="Zeitpunkt des Ereignisses">
                       <ZeitpunktEingabe
+                        art="ereignis"
                         style={{ width: '100%' }}
-                        format="YYYY-MM-DD HH:mm"
                         placeholder="jetzt"
                       />
                     </Form.Item>

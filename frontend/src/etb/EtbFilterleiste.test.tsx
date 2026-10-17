@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EtbFilterWerte } from '../api/etb';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { tippeZeit } from '../test/zeitEingabe';
 import { auswahlZeilen } from './druckAuswahl';
 import EtbFilterleiste from './EtbFilterleiste';
 
@@ -116,9 +117,9 @@ describe('EtbFilterleiste', () => {
       />,
     );
     expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue('brand');
-    // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen; ohne die Umkehr
-    // aus `anzeige/zeitEingabe.ts` stünde er um den Zonenversatz verschoben.
-    expect(screen.getByPlaceholderText('von')).toHaveValue('2026-08-21 08:00:00');
+    // Der Zeitwert kommt als UTC-Wire-String und muss als ORTSZEIT im Feld stehen (als DTG); ohne
+    // die Umkehr aus `anzeige/zeitEingabe.ts` stünde er um den Zonenversatz verschoben.
+    expect(screen.getByPlaceholderText('von')).toHaveValue('210800aug26');
   });
 
   it('mischt einen Anfangsstand mit einer späteren Änderung, statt ihn zu verwerfen', async () => {
@@ -151,7 +152,7 @@ describe('EtbFilterleiste — Zeitraum in der Anzeigezone (LFH-692)', () => {
   it('ein Filter aus der URL steht mit der Berliner Uhrzeit im Feld — wie im Druckkopf', () => {
     const filter = { von: '2026-08-21 06:00:00' };
     zeige(undefined, filter);
-    expect(screen.getByPlaceholderText('von')).toHaveValue('2026-08-21 08:00:00');
+    expect(screen.getByPlaceholderText('von')).toHaveValue('210800aug26');
     expect(
       auswahlZeilen(filter, {
         konventionen: BERLIN,
@@ -163,10 +164,7 @@ describe('EtbFilterleiste — Zeitraum in der Anzeigezone (LFH-692)', () => {
 
   it('ein eingegebenes „bis 09:00“ geht als 07:00 UTC in den Filter', async () => {
     const onChange = zeige();
-    const bis = screen.getByPlaceholderText('bis');
-    await userEvent.click(bis);
-    await userEvent.type(bis, '2026-08-21 09:00:00');
-    fireEvent.keyDown(bis, { key: 'Enter' });
+    await tippeZeit(userEvent.setup(), screen.getByPlaceholderText('bis'), '2026-08-21 09:00:00');
     await waitFor(() =>
       expect(onChange).toHaveBeenLastCalledWith(
         expect.objectContaining({ bis: '2026-08-21 07:00:00' }),

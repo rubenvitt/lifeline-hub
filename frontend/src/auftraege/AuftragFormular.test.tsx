@@ -207,14 +207,13 @@ describe('AuftragFormular — Frist und Erteilung in der Anzeigezone (LFH-692)',
       );
       await openWeitere();
       expect(await screen.findByRole('textbox', { name: 'Erteilt am (optional)' })).toHaveValue(
-        '2026-09-24 10:00',
+        '241000sep26',
       );
       await userEvent.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
       await userEvent.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
       const frist = screen.getByRole('textbox', { name: 'Frist (Quittung/Vollzug)' });
-      await userEvent.click(frist);
+      // Getippt und verlassen: der Klick auf „Auftrag erteilen“ übernimmt die Frist (blur).
       await userEvent.type(frist, '2026-09-24 13:00');
-      await userEvent.keyboard('{Enter}');
       await userEvent.click(screen.getByRole('button', { name: 'Auftrag erteilen' }));
       expect(onAnlegen).toHaveBeenCalledWith(
         expect.objectContaining({

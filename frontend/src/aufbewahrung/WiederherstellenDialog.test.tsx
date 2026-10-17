@@ -2,15 +2,13 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { server } from '../test/server';
+import { tippeZeit } from '../test/zeitEingabe';
 import { renderMitProviders } from '../test/utils';
 import WiederherstellenDialog from './WiederherstellenDialog';
-
-dayjs.extend(customParseFormat);
 
 /** Wiederherstellen-Dialog. */
 
@@ -69,14 +67,9 @@ describe('WiederherstellenDialog', () => {
   it('sendet die gewählte Frist (UTC) per Enter', async () => {
     const { client, dialog } = await zeige();
     const invalidiert = vi.spyOn(client, 'invalidateQueries');
-    const u = userEvent.setup();
-    const eingabe = within(dialog).getByRole('textbox');
-    await u.click(eingabe);
-    await u.type(eingabe, `${ZUKUNFT}{Enter}`);
+    await tippeZeit(userEvent.setup(), within(dialog).getByRole('textbox'), ZUKUNFT);
     await waitFor(() => expect(gesendet).toHaveLength(1));
-    expect(gesendet[0]).toEqual({
-      retention_bis: alsBackendZeit(dayjs(ZUKUNFT, 'YYYY-MM-DD HH:mm')),
-    });
+    expect(gesendet[0]).toEqual({ retention_bis: alsBackendZeit(dayjs(ZUKUNFT)) });
     expect(await screen.findByLabelText('zu')).toBeInTheDocument();
     const keys = invalidiert.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
     for (const k of [['aufbewahrung'], ['einsaetze'], ['einsatz', 7], ['etb', 7]]) {

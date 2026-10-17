@@ -25,9 +25,14 @@ import { alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { setzeViewportBreite } from '../test/viewport';
+import { tippeZeit } from '../test/zeitEingabe';
 import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 dayjs.extend(utc);
+
+const MONATE = ['jan', 'feb', 'mrz', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dez'];
+/** Erwartete Anzeige im Zeitfeld: volle DTG in der Browserzone („141200jul26“). */
+const dtgLokal = (d: dayjs.Dayjs) => `${d.format('DDHHmm')}${MONATE[d.month()]}${d.format('YY')}`;
 
 // MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
 vi.mock('../anzeige/Kartenausschnitt', () => ({
@@ -578,9 +583,8 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     const bodies = patchMitschnitt();
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
-    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
-    fireEvent.click(feld.closest('.ant-picker')!.querySelector<HTMLElement>('.ant-picker-clear')!);
-    await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
+    // Feld leeren und Enter: Enter übernimmt das leere Feld und sendet die Zeile ab.
+    await tippeZeit(user, screen.getByRole('textbox', { name: 'Alarmzeit' }), '');
 
     expect(
       await screen.findByText('Alarmzeit ist eine Pflichtangabe — der bisherige Wert bleibt.'),
@@ -595,7 +599,7 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
     expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toHaveValue(
-      dayjs.utc(basisEinsatz.begonnen_at).local().format('YYYY-MM-DD HH:mm:ss'),
+      dtgLokal(dayjs.utc(basisEinsatz.begonnen_at).local()),
     );
     await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
     expect(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' })).toBeVisible();
@@ -625,7 +629,7 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
       const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
       await user.clear(feld);
       await user.type(feld, dayjs.utc(wire).local().format('YYYY-MM-DD HH:mm:ss'));
-      // Enter übernimmt die Eingabe in den Picker; der Knopf sendet.
+      // Enter übernimmt die Eingabe ins Feld (ohne natives Absenden, `fireEvent`); der Knopf sendet.
       fireEvent.keyDown(feld, { key: 'Enter' });
       await user.click(screen.getByRole('button', { name: 'Alarmzeit speichern' }));
       await waitFor(() => expect(bodies, wire).toEqual([{ begonnen_at: wire }]));
@@ -637,21 +641,15 @@ describe('EinsatzdatenPage · Zeilenbearbeitung (LFH-472)', () => {
     const bodies = patchMitschnitt();
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
-    const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
-    // Ein Klick ins Feld öffnet den Kalender.
-    await user.click(feld);
-    await waitFor(() =>
-      expect(
-        document.querySelector('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'),
-      ).not.toBeNull(),
-    );
-    fireEvent.keyDown(feld, { key: 'Escape' });
-    // Die Zeile steht noch. Ob der Kalender zu ist, zeigt jsdom nicht: es beendet die
-    // Schließ-Animation nie, `-hidden` käme nicht an.
+    const kalenderKnopf = screen.getByRole('button', { name: /^Kalender und Uhrzeit/ });
+    await user.click(kalenderKnopf);
+    // Der Kalender nimmt beim Öffnen den Fokus (Uhrzeitfeld); dort landet das erste Escape.
+    await screen.findByRole('dialog', { name: 'Tag und Uhrzeit wählen' });
+    await user.keyboard('{Escape}');
+    // Die Zeile steht noch, nur der Kalender ist zu. Ob er aus dem DOM ist, zeigt jsdom nicht: es
+    // beendet die Schließ-Animation nie; der Knopf meldet den Zustand.
+    expect(kalenderKnopf).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('textbox', { name: 'Alarmzeit' })).toBeInTheDocument();
-    // rc-picker meldet das Schließen erst im nächsten Frame (`useDelayState`); ein Mensch drückt
-    // das zweite Escape nie schneller.
-    await act(() => new Promise((fertig) => requestAnimationFrame(() => fertig(undefined))));
     fireEvent.keyDown(screen.getByRole('textbox', { name: 'Alarmzeit' }), { key: 'Escape' });
     expect(screen.queryByRole('textbox', { name: 'Alarmzeit' })).toBeNull();
     expect(bodies).toEqual([]);
@@ -914,7 +912,7 @@ describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
     expect(await screen.findByText('141200JUL2026')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
-    expect(feld).toHaveValue('2026-07-14 12:00:00');
+    expect(feld).toHaveValue('141200jul26');
     await user.clear(feld);
     await user.type(feld, '2026-07-14 13:00:00');
     fireEvent.keyDown(feld, { key: 'Enter' });

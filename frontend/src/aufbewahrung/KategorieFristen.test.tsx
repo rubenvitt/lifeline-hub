@@ -1,17 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
+import { tippeZeit } from '../test/zeitEingabe';
 import FristPaneel from './FristPaneel';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige, KategorieAufbewahrung } from '../api/types';
-
-dayjs.extend(customParseFormat);
 
 /**
  * Kategorie-Zeilen im Frist-Paneel (LFH-749, Spec `aufbewahrung-archiv`, „Frist am Einsatz
@@ -64,14 +62,12 @@ function zeige(
   );
 }
 
-const wire = (ortszeit: string) => alsBackendZeit(dayjs(ortszeit, 'YYYY-MM-DD HH:mm'));
+/** Wire-Wert (UTC) einer Ortszeit „YYYY-MM-DD HH:mm". */
+const wire = (ortszeit: string) => alsBackendZeit(dayjs(ortszeit));
 
+/** Tippt die Frist ins erste Zeitfeld des Dialogs; Enter übernimmt und sendet ab. */
 async function fristSetzen(dialog: HTMLElement, ortszeit: string) {
-  const u = userEvent.setup();
-  const eingabe = within(dialog).getAllByRole('textbox')[0];
-  await u.click(eingabe);
-  await u.clear(eingabe);
-  await u.type(eingabe, `${ortszeit}{Enter}`);
+  await tippeZeit(userEvent.setup(), within(dialog).getAllByRole('textbox')[0], ortszeit);
 }
 
 describe('KategorieFristen', () => {

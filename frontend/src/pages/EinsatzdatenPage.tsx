@@ -202,9 +202,9 @@ function ZeitpunktAngabe({
       onSpeichern={(d) => speichern(etikett, zuPatch(d ? alsBackendZeit(d) : null))}
       eingabe={({ feld, popup, value, onChange }) => (
         <ZeitpunktEingabe
+          art="ereignis"
           {...feld}
           {...popup}
-          format="YYYY-MM-DD HH:mm:ss"
           style={{ width: '100%' }}
           value={value}
           onChange={(d) => onChange(d ?? null)}

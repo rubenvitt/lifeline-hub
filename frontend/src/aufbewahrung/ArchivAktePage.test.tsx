@@ -276,8 +276,8 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
     expect(await screen.findByText('012000JUN2026')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Frist ändern' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Neue Aufbewahrungsfrist')).toHaveValue(
-      '2026-06-01 20:00',
+    expect(within(dialog).getByRole('textbox', { name: 'Neue Aufbewahrungsfrist' })).toHaveValue(
+      '012000jun26',
     );
   });
   it('lesbare Einsatz-Zone sticht die der Organisation (Einsatz New York, Org Berlin)', async () => {
@@ -298,8 +298,8 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
     expect(await screen.findByText('011400JUN2026')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Frist ändern' }));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByLabelText('Neue Aufbewahrungsfrist')).toHaveValue(
-      '2026-06-01 14:00',
+    expect(within(dialog).getByRole('textbox', { name: 'Neue Aufbewahrungsfrist' })).toHaveValue(
+      '011400jun26',
     );
   });
 });

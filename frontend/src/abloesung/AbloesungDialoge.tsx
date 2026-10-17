@@ -32,8 +32,6 @@ import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
  * Server dann nimmt, und nur, wenn er bekannt ist.
  */
 
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
-
 export interface EinheitOption {
   value: number;
   label: string;
@@ -156,7 +154,7 @@ export function SchichtBeginnenDialog({
       </Form.Item>
       <Form.Item<BeginnWerte> name="beginn" label="Im Einsatz seit">
         <ZeitpunktEingabe
-          format={ZEITFORMAT}
+          art="ereignis"
           placeholder={beginnPlatzhalter}
           style={{ width: '100%' }}
         />
@@ -342,7 +340,7 @@ export function VollzugDialog({
         </>
       )}
       <Form.Item<VollzugWerte> name="zeitpunkt" label="Zeitpunkt">
-        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
+        <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {art !== 'besatzung' && (
         <>

@@ -2,6 +2,8 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { QueryClient } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
+import { ConfigProvider } from 'antd';
+import deDE from 'antd/locale/de_DE';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
@@ -333,21 +335,25 @@ describe('KraftZeitachse — Nachtrag in der Anzeigezone (LFH-692)', () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
     server.use(http.get(PFAD, () => HttpResponse.json(ZEITACHSE)));
+    // Deutsche Sprache wie in der App: der Kalender titelt seine Tage dann `TT.MM.JJJJ`.
     renderMitProviders(
-      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
-        <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben />
-      </AnzeigeKonventionenProvider>,
+      <ConfigProvider locale={deDE}>
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben />
+        </AnzeigeKonventionenProvider>
+      </ConfigProvider>,
     );
     await waitFor(() => expect(eintraege()).toHaveLength(3));
     await userEvent.click(screen.getAllByRole('button', { name: 'Nachtragen' })[0]);
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByRole('textbox', { name: 'Zeitpunkt' });
-    await waitFor(() => expect(feld).toHaveValue('2026-10-01 01:30'));
-    await userEvent.click(feld);
-    const zelle = (tag: string) => document.querySelector(`td[title="${tag}"]`);
-    await waitFor(() => expect(zelle('2026-10-01')).not.toBeNull());
-    expect(zelle('2026-10-01')).not.toHaveClass('ant-picker-cell-disabled');
-    expect(zelle('2026-10-02')).toHaveClass('ant-picker-cell-disabled');
+    await waitFor(() => expect(feld).toHaveValue('010130okt26'));
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const kalender = await screen.findByRole('dialog', { name: 'Tag und Uhrzeit wählen' });
+    const zelle = (tag: string) => kalender.querySelector(`td[title="${tag}"]`);
+    await waitFor(() => expect(zelle('01.10.2026')).not.toBeNull());
+    expect(zelle('01.10.2026')).not.toHaveClass('ant-picker-cell-disabled');
+    expect(zelle('02.10.2026')).toHaveClass('ant-picker-cell-disabled');
   });
 });
 

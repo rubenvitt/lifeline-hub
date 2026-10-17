@@ -525,7 +525,8 @@ anwendbar), „nicht geprüft" ist keins.
   kommt erst nach dem Sweep.
 - **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,
   `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`): jede Zeiteingabe nimmt
-  `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`;
+  `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`
+  oder `TimePicker`;
   der Formularwert ist ein **Zeitpunkt** (hin `alsZeitpunkt`, zurück `alsBackendZeit`, Kern
   `anzeige/zeitEingabe.ts`), in die Wanduhr der Anzeigezone wandelt nur das Feld. Tagesgrenzen
   über `keineZukunftstage`/`tagInZone`, Uhrzeiten in Texten über `useZeitEingabe().formatiere`;
@@ -537,6 +538,19 @@ anwendbar), „nicht geprüft" ist keins.
   `zeiteingabe`, „Uhrzeit ohne Datum“) liest nur `anzeige/uhrzeit.ts:parseUhrzeit` („0630“, „6:30“)
   und legt nur `uhrzeitAmTag` in der Anzeigezone auf einen Tag (doppelte Stunde: die erste, Lücke:
   nach vorn); die Tagesgrenzen `tagesgrenzen`.
+- **Zeiteingabe ist ein Textfeld** (LLH-1070, Spec `zeiteingabe`, „Eingabe als Text“ ff.,
+  `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`): getippte
+  Zeiten deutet nur `anzeige/zeitParser.ts:deuteZeit` (taktisch `1430`/`101430`/`101430okt26`,
+  deutsch, ISO, relativ `-5`/`+2h`/`j`; Unlesbares wird nie übernommen und nie still korrigiert).
+  Das Feld zeigt die DTG nach `anzeige/format.ts:formatDtg` (Entscheidung E1, FwDV/DV 810); **kein
+  `format` am Aufruf** (Typ und Guard). Die **Feldart** setzt der Aufrufer, wo sie aus dem Feld
+  folgt: `art="ereignis"` (Ereignis-, Alarm-, Eingangszeit, Zeitstand), `art="frist"` (Frist,
+  Termin, Ende einer Gültigkeit), ohne Art bei Filtern und Planungszeiten. Schnellwahlen stehen nur
+  in `anzeige/zeitSchnellwahl.ts`; der Kalender (antds `Calendar`, nur in `anzeige/`) ist der
+  Nebenweg. Tests tippen über `test/zeitEingabe.ts` (`tippeZeit`, `setzeZeit`), nie über
+  Kalenderzellen oder Format-Strings. Falle: antds `Input` baut sein Gerüst um, sobald ein Präfix
+  oder Suffix kommt oder geht, und das Feld verliert mitten im Tippen den Fokus — das Suffix der
+  Deutung steht deshalb immer im DOM.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).

@@ -392,9 +392,8 @@ describe('MeldungFormular — Ereigniszeit eines vorgehenden Geräts (LFH-895)',
     await fuellePflichtfelder('RTW 2', 'MANV');
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     const feld = screen.getByRole('textbox', { name: 'Zeitpunkt des Ereignisses' });
-    await userEvent.click(feld);
+    // Getippt und verlassen: der Klick auf „Meldung erfassen“ übernimmt die Zeit (blur).
     await userEvent.type(feld, '2026-10-04 09:30');
-    await userEvent.keyboard('{Enter}');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(gesendeteEreigniszeit(onAnlegen)).toBe('2026-10-04 09:30:00');

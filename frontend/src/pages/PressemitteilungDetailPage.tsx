@@ -374,11 +374,7 @@ function PressemitteilungDetail() {
               <Input />
             </Form.Item>
             <Form.Item label="Zeitstand" name="zeitstand">
-              <ZeitpunktEingabe
-                allowClear={false}
-                format="DD.MM.YYYY HH:mm"
-                style={{ width: '100%' }}
-              />
+              <ZeitpunktEingabe art="ereignis" allowClear={false} style={{ width: '100%' }} />
             </Form.Item>
             <Checkbox
               className="lagebericht-no-print"

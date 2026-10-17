@@ -12,6 +12,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
+import { tippeZeit } from '../test/zeitEingabe';
 import LagebesprechungModal from './LagebesprechungModal';
 import { zeigeAbschlussToast } from './abschlussToast';
 
@@ -22,7 +23,11 @@ import { zeigeAbschlussToast } from './abschlussToast';
 const JETZT = new Date('2026-09-13T10:00:00Z');
 const wireAb = (minuten: number) =>
   dayjs(JETZT).add(minuten, 'minute').utc().format('YYYY-MM-DD HH:mm:ss');
+/** Getippt wird ein vollständiger Zeitpunkt (ISO), damit die Feldart keinen Tag wählt. */
 const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
+const MONATE = ['jan', 'feb', 'mrz', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dez'];
+/** Erwartete Anzeige im Feld: volle DTG in der Browserzone („131245sep26“). */
+const dtgLokal = (d: dayjs.Dayjs) => `${d.format('DDHHmm')}${MONATE[d.month()]}${d.format('YY')}`;
 const GRUND = 'Die nächste Lagebesprechung muss nach dem Zeitpunkt liegen';
 
 const stand = (over: Partial<LagebesprechungStand> = {}): LagebesprechungStand => ({
@@ -108,7 +113,7 @@ function feldItem(dialog: HTMLElement, label: string): HTMLElement {
   return item;
 }
 
-/** Eingabe eines Feldes über seine Beschriftung — unabhängig vom `for`-Weg des DatePickers. */
+/** Eingabe eines Feldes über seine Beschriftung — unabhängig vom `for`-Weg des Zeitfelds. */
 function feld(dialog: HTMLElement, label: string): HTMLInputElement {
   const eingabe = feldItem(dialog, label).querySelector<HTMLInputElement>('input, textarea');
   if (!eingabe) throw new Error(`Feld „${label}" nicht gefunden`);
@@ -162,7 +167,7 @@ describe('LagebesprechungModal · Erfassungs-Norm', () => {
 describe('LagebesprechungModal · Feldbudget', () => {
   it('zeigt zwei Felder; der Zeitpunkt liegt eingeklappt IM Baum', async () => {
     const dialog = await zeige();
-    // Vorbedingung: die DatePicker-Eingabe wird von der Rollenliste erfasst — sonst wäre die Zahl
+    // Vorbedingung: die Eingabe des Zeitfelds wird von der Rollenliste erfasst — sonst wäre die Zahl
     // unten aus dem falschen Grund richtig.
     expect(within(dialog).getAllByRole('textbox')).toContain(
       feld(dialog, 'Nächste Lagebesprechung'),
@@ -191,7 +196,7 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
   it('belegt einen zukünftigen Termin vor — einen vergangenen nicht', async () => {
     const dialog = await zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe(
-      dayjs(JETZT).add(45, 'minute').format(ZEITFORMAT),
+      dtgLokal(dayjs(JETZT).add(45, 'minute')),
     );
   });
 
@@ -224,7 +229,7 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
 
     rerender(routen(stand({ naechste_lagebesprechung_at: wireAb(90) })));
     expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe(
-      dayjs(JETZT).add(45, 'minute').format(ZEITFORMAT),
+      dtgLokal(dayjs(JETZT).add(45, 'minute')),
     );
     await absenden(dialog);
     // Fremd geändert (Regel 2 in `abschlussBody`): der unberührte Termin geht nicht mit.
@@ -262,9 +267,7 @@ describe('LagebesprechungModal · Vorbelegung und Tri-State', () => {
     // Kein `toBeVisible` als Wartebedingung: jsdom beendet die Aufklapp-Bewegung nicht. Die Aussage
     // trägt der gesendete Body.
     const eingabe = feld(dialog, 'Zeitpunkt der Besprechung');
-    await u.click(eingabe);
-    await u.clear(eingabe);
-    await u.type(eingabe, `${dayjs(JETZT).add(minuten, 'minute').format(ZEITFORMAT)}{Enter}`);
+    await tippeZeit(u, eingabe, dayjs(JETZT).add(minuten, 'minute').format(ZEITFORMAT));
   }
 
   it('Schnellwahl: der Zeitpunkt liegt zurück (eingefroren, die Wanduhr läuft) → ab jetzt', async () => {
@@ -324,9 +327,7 @@ describe('LagebesprechungModal · Termin nach dem Zeitpunkt (Spiegel des 422)', 
   async function setzeTermin(dialog: HTMLElement, minuten: number) {
     const u = userEvent.setup();
     const eingabe = feld(dialog, 'Nächste Lagebesprechung');
-    await u.click(eingabe);
-    await u.clear(eingabe);
-    await u.type(eingabe, `${dayjs(JETZT).add(minuten, 'minute').format(ZEITFORMAT)}{Enter}`);
+    await tippeZeit(u, eingabe, dayjs(JETZT).add(minuten, 'minute').format(ZEITFORMAT));
   }
   const abschliessen = (dialog: HTMLElement) =>
     userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
@@ -431,8 +432,8 @@ describe('LagebesprechungModal · Anzeigezone (LFH-692)', () => {
   it('Termin und Zeitpunkt erscheinen mit der Berliner Uhrzeit; unverändert geht nichts verschoben hinaus', async () => {
     const dialog = await zeigeBerlin(stand({ naechste_lagebesprechung_at: wireAb(45) }));
     // 10:45 UTC → 12:45 Berlin; jetzt 10:00 UTC → 12:00 Berlin.
-    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 12:45');
-    expect(feld(dialog, 'Zeitpunkt der Besprechung').value).toBe('2026-09-13 12:00');
+    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('131245sep26');
+    expect(feld(dialog, 'Zeitpunkt der Besprechung').value).toBe('131200sep26');
     await absenden(dialog);
     expect(gesendet[0]).toEqual({ entschluss: 'Lage unverändert', abgehalten_at: wireAb(0) });
   });
@@ -441,7 +442,7 @@ describe('LagebesprechungModal · Anzeigezone (LFH-692)', () => {
     const dialog = await zeigeBerlin(stand());
     const u = userEvent.setup();
     await u.click(within(dialog).getByRole('button', { name: '+1 h' }));
-    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('2026-09-13 13:00');
+    expect(feld(dialog, 'Nächste Lagebesprechung').value).toBe('131300sep26');
     await absenden(dialog);
     expect(gesendet[0]).toMatchObject({ naechste_at: '2026-09-13 11:00:00' });
   });
@@ -461,8 +462,7 @@ describe('LagebesprechungModal · Gerät mit 5 min Vorlauf (LFH-1031)', () => {
   it('ein Termin 3 min nach der Serverzeit ist zulässig, obwohl die Geräteuhr schon weiter ist', async () => {
     const dialog = await zeige();
     const termin = feld(dialog, 'Nächste Lagebesprechung');
-    await userEvent.click(termin);
-    await userEvent.type(termin, `${dayjs(JETZT).add(3, 'minute').format(ZEITFORMAT)}{Enter}`);
+    await tippeZeit(userEvent.setup(), termin, dayjs(JETZT).add(3, 'minute').format(ZEITFORMAT));
     await absenden(dialog);
     expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(0), naechste_at: wireAb(3) });
   });
@@ -471,9 +471,7 @@ describe('LagebesprechungModal · Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     const dialog = await zeige();
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     const eingabe = feld(dialog, 'Zeitpunkt der Besprechung');
-    await userEvent.click(eingabe);
-    await userEvent.clear(eingabe);
-    await userEvent.type(eingabe, `${dayjs(JETZT).add(-20, 'minute').format(ZEITFORMAT)}{Enter}`);
+    await tippeZeit(userEvent.setup(), eingabe, dayjs(JETZT).add(-20, 'minute').format(ZEITFORMAT));
     await absenden(dialog);
     expect(gesendet[0]).toMatchObject({ abgehalten_at: wireAb(-20) });
   });

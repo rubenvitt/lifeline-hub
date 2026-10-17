@@ -209,13 +209,13 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
 /**
  * ── Entwurfs-Riegel am Zeitstand-Absatz (LFH-499) ──
  *
- * Im Entwurf mit Schreibrecht trägt das Picker-Feld den Zeitstand; ein zweiter Absatz zeigte zwei
- * Uhrzeiten für denselben Wert. Ohne Schreibrecht gibt es kein Picker-Feld, der Absatz muss stehen.
+ * Im Entwurf mit Schreibrecht trägt das Zeitfeld den Zeitstand; ein zweiter Absatz zeigte zwei
+ * Uhrzeiten für denselben Wert. Ohne Schreibrecht gibt es kein Zeitfeld, der Absatz muss stehen.
  * Das Paar pinnt `!(istEntwurf && darfSchreiben)` in beide Richtungen — die Fixtures der übrigen
  * Blöcke sind freigegeben und sähen den Riegel nie.
  */
 describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
-  // Der Picker zeigt die Anzeigezone (Europe/Berlin), nicht die des Geräts (LFH-692). Die
+  // Das Zeitfeld zeigt die Anzeigezone (Europe/Berlin), nicht die des Geräts (LFH-692). Die
   // Prozesszone steht deshalb auf UTC: unter Berlin fielen beide zusammen und die Aussage wäre blind.
   const tzVorher = process.env.TZ;
   afterEach(() => {
@@ -235,7 +235,7 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
     );
   });
 
-  it('mit Schreibrecht: kein Absatz, der Picker trägt den Zeitstand in der Anzeigezone', async () => {
+  it('mit Schreibrecht: kein Absatz, das Zeitfeld trägt den Zeitstand in der Anzeigezone', async () => {
     vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
       id: 1,
       status: 'aktiv',
@@ -244,10 +244,10 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
     } as never);
     renderMitZone('/einsaetze/1/lageberichte/9');
 
-    const picker = await screen.findByLabelText('Zeitstand');
+    const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
     // 12:00 UTC → 14:00 in Berlin (Sommerzeit), obwohl das Gerät auf UTC steht. Der Wert kommt
     // per Effekt nach dem Laden.
-    await waitFor(() => expect(picker).toHaveValue('25.07.2026 14:00'));
+    await waitFor(() => expect(feld).toHaveValue('251400jul26'));
     expect(screen.queryByText(/^Zeitstand: /)).toBeNull();
   });
 
@@ -521,13 +521,14 @@ describe('LageberichtDetailPage — Entwurfsdruck (LFH-731)', () => {
 
   it('trägt einen ungespeicherten Zeitstand im Druckkopf, als taktische DTG in der Anzeigezone', async () => {
     renderMitZone('/einsaetze/1/lageberichte/9');
-    const picker = await screen.findByLabelText('Zeitstand');
-    await waitFor(() => expect(picker).toHaveValue('25.07.2026 14:00'));
+    const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
+    await waitFor(() => expect(feld).toHaveValue('251400jul26'));
     expect(within(kopf()).getByText('251400JUL2026')).toBeInTheDocument();
 
-    await userEvent.click(picker);
-    await userEvent.clear(picker);
-    await userEvent.type(picker, '25.07.2026 16:30{Enter}');
+    // Tippen und Verlassen übernimmt ins Formular; Enter schickte es ab und speicherte.
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '25.07.2026 16:30');
+    await userEvent.tab();
     // 16:30 Ortszeit (Berlin, Sommerzeit) = 14:30 UTC → in der Anzeigezone wieder 16:30.
     await waitFor(() => expect(within(kopf()).getByText('251630JUL2026')).toBeInTheDocument());
     expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();

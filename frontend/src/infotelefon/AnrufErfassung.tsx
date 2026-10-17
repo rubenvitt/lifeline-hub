@@ -221,7 +221,7 @@ export default function AnrufErfassung({
                       style={{ marginBottom: 0, flex: '1 1 200px' }}
                     >
                       <ZeitpunktEingabe
-                        format="DD.MM.YYYY HH:mm"
+                        art="ereignis"
                         placeholder="jetzt"
                         style={{ width: '100%' }}
                       />

@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { renderMitProviders } from '../test/utils';
+import { tippeZeit } from '../test/zeitEingabe';
 import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungModal';
 
 /**
@@ -226,10 +227,9 @@ describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)'
     zeige({ modus: 'vermisst', onErfassen });
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
-    const picker = await screen.findByLabelText('vermisst seit');
-    await nutzer.click(picker);
+    const feld = await screen.findByRole('textbox', { name: 'vermisst seit' });
     // Enter übernimmt den getippten Zeitpunkt UND sendet ab — das Feld liegt im `<form>`.
-    await nutzer.type(picker, '22.09.2026 08:00{Enter}');
+    await tippeZeit(nutzer, feld, '22.09.2026 08:00');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     // Ortszeit 08:00 → UTC; gegen den absoluten Zeitpunkt geprüft, nicht gegen sich selbst.

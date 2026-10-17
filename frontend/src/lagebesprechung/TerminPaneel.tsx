@@ -10,7 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { LagebesprechungStand } from '../api/types';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { Kennzahl, Kennzahlenband, Paneel, type KennzahlZustand } from '../components/instrument';
-import { schnellwahlAuswahl, schnellwahlTermin } from '../components/terminSchnellwahl';
+import { schnellwahlAuswahl, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
 import { serverJetzt } from '../offline/serveruhr';
 import { lagebesprechungZustand, terminZeitpunkt } from './lagebesprechungZustand';
 
@@ -89,7 +89,7 @@ export default function TerminPaneel({
             <Button
               key={s.label}
               disabled={isGesperrt}
-              onClick={() => setTermin(schnellwahlTermin(serverJetzt(), s.minuten))}
+              onClick={() => setTermin(schnellwahlZeit(serverJetzt(), s.minuten))}
             >
               {s.label}
             </Button>
@@ -98,12 +98,12 @@ export default function TerminPaneel({
             kein Termin
           </Button>
           <ZeitpunktEingabe
+            art="frist"
             aria-label="Termin wählen"
             placeholder="Termin wählen"
-            format="YYYY-MM-DD HH:mm"
             disabled={isGesperrt}
             value={terminZeitpunkt(termin)}
-            // Das Löschkreuz des Felds leert den Termin wie „kein Termin“.
+            // Ein geleertes Feld (Enter) leert den Termin wie „kein Termin“.
             onChange={(zeitpunkt) => {
               if (zeitpunkt || termin) setTermin(zeitpunkt);
             }}

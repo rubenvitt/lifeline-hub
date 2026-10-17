@@ -21,7 +21,7 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  * ── ABGRENZUNG ZU `BemerkungZelle` ─────────────────────────────────────────────────────
  *
  * `BemerkungZelle` (LFH-369) trägt optionale Freitexte in Listen und steht auf antds
- * `Typography.Text editable`, das nur Text kann. Hier braucht es DatePicker, Select und
+ * `Typography.Text editable`, das nur Text kann. Hier braucht es Zeiteingabe, Select und
  * InputNumber und eine Pflichtangabe, die leer abgelehnt wird. Gemeinsam sind die Anzeige (Wert
  * als Knopf, `wertKnopfStil`, Platzhalter in `bedienText`) und die Fokusrückgabe
  * (`useFokusRueckgabe`) — beide aus EINER Quelle, nicht kopiert.
@@ -39,7 +39,7 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *
  * ── WAS BEWUSST FEHLT ──────────────────────────────────────────────────────────────────
  *
- * **Kein Speichern beim Verlassen (Blur).** DatePicker und Select öffnen Portale; ein Klick
+ * **Kein Speichern beim Verlassen (Blur).** Kalender der Zeiteingabe und Select öffnen Portale; ein Klick
  * darin verlässt die Eingabe, und ein Blur-Speichern schriebe einen halben Zeitpunkt. Gespeichert
  * wird nur ausdrücklich: Enter, Strg/⌘+Enter im Textfeld, oder „Speichern".
  */
@@ -50,7 +50,7 @@ export interface InlineEingabe<T> {
   value: T;
   onChange: (wert: T) => void;
   /**
-   * Nur für Eingaben mit Popup (DatePicker, Select, AutoComplete) auf das Element spreizen. Damit
+   * Nur für Eingaben mit Popup (Zeiteingabe, Select, AutoComplete) auf das Element spreizen. Damit
    * schließt Escape zuerst das Popup und verwirft erst beim nächsten Mal die Zeile.
    */
   popup: { onOpenChange: (offen: boolean) => void };
@@ -135,14 +135,22 @@ export function InlineAngabe<T>({
   onSpeichern,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
-  const [entwurf, setEntwurf] = useState<T>(wert);
+  const [entwurf, setEntwurfZustand] = useState<T>(wert);
+  // Der Entwurf auch als Ref: die Zeiteingabe übernimmt beim Enter (`onChange`) und das native
+  // Absenden folgt im SELBEN Tastendruck, bevor React neu gerendert hat — `abschicken` läse sonst
+  // den alten Entwurf und schlösse „unverändert“ (LLH-1070, `anzeige/ZeitpunktEingabe.tsx`, D3).
+  const entwurfRef = useRef<T>(wert);
+  function setEntwurf(neu: T) {
+    entwurfRef.current = neu;
+    setEntwurfZustand(neu);
+  }
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<unknown>(null);
   const [pflichtHinweis, setPflichtHinweis] = useState(false);
   // Riegel in der Absende-Funktion, nicht am Knopf: Enter und ein zweiter Klick liefen sonst an
   // `loading` vorbei, bevor React neu gerendert hat.
   const sendetRef = useRef(false);
-  // Offen-Zustand des Eingabe-Popups. Gelesen in der CAPTURE-Phase: rc-picker schließt sein Popup
+  // Offen-Zustand des Eingabe-Popups. Gelesen in der CAPTURE-Phase: ein Popup schließt sich
   // beim Escape im eigenen keydown (vor dem Bubbling ans `<form>`) und meldet `onOpenChange(false)`
   // dabei schon — in der Bubble-Phase stünde hier bereits „zu".
   const popupOffenRef = useRef(false);
@@ -171,6 +179,7 @@ export function InlineAngabe<T>({
 
   async function abschicken() {
     if (sendetRef.current) return;
+    const entwurf = entwurfRef.current;
     if (pflicht && leer(entwurf)) {
       setPflichtHinweis(true);
       schliessen();

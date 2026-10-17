@@ -14,7 +14,7 @@ import type {
 import { serverJetzt } from '../offline/serveruhr';
 import { ErfassungsModal } from '../components/Erfassung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { schnellwahlAuswahl, schnellwahlTermin } from '../components/terminSchnellwahl';
+import { schnellwahlAuswahl, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import {
   abschlussBody,
@@ -27,7 +27,6 @@ import {
 
 /** Teilmenge der geteilten Schnellwahl (+30/+60/+120). */
 const SCHNELLWAHL = schnellwahlAuswahl([30, 60, 120]);
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 const NAECHSTE_ZU_FRUEH =
   'Die nächste Lagebesprechung muss nach dem Zeitpunkt der Besprechung liegen';
 
@@ -136,7 +135,7 @@ export default function LagebesprechungModal({
                     'naechste',
                     // Ab dem SPÄTEREN von Zeitpunkt und jetzt: ein künftiger Zeitpunkt verhindert das 422, ein
                     // zurückliegender lässt „+1 h" nicht in der Vergangenheit landen.
-                    schnellwahlTermin(
+                    schnellwahlZeit(
                       terminBezug(form.getFieldValue('abgehalten'), serverJetzt()),
                       s.minuten,
                     ),
@@ -150,7 +149,7 @@ export default function LagebesprechungModal({
           </Space>
         }
       >
-        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="kein Termin" style={{ width: '100%' }} />
+        <ZeitpunktEingabe art="frist" placeholder="kein Termin" style={{ width: '100%' }} />
       </Form.Item>
       <Collapse
         ghost
@@ -166,11 +165,7 @@ export default function LagebesprechungModal({
                 style={{ marginBottom: 0 }}
               >
                 {/* Leer gilt der Zeitpunkt des Abschließens (`abschlussBody`). */}
-                <ZeitpunktEingabe
-                  format={ZEITFORMAT}
-                  placeholder="jetzt"
-                  style={{ width: '100%' }}
-                />
+                <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
               </Form.Item>
             ),
           },

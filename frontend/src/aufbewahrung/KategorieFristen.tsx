@@ -246,7 +246,7 @@ export default function KategorieFristen({ einsatzId, status, darf }: Props) {
               : 'Danach vorgemerkt, nach 30 Tagen Karenz unwiderruflich geschwärzt.'
           }
         >
-          <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+          <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item
           label="Rechtsgrundlage"

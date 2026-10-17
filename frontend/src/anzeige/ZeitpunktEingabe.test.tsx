@@ -1,13 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfigProvider, Form } from 'antd';
+import deDE from 'antd/locale/de_DE';
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ReactNode } from 'react';
 import { mitProzessZone } from '../test/prozessZone';
+import { setzeZeit, tippeZeit, zeitFeld } from '../test/zeitEingabe';
 import { AnzeigeKonventionenProvider } from './AnzeigeKonventionenContext';
 import {
   ZEIT_BLATT,
@@ -22,301 +24,753 @@ import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 
 dayjs.extend(utc);
 
+const BERLIN = 'Europe/Berlin';
+
 function mitZone(zone: string | null, kind: ReactNode) {
   return (
-    <AnzeigeKonventionenProvider konventionen={{ zeitzone: zone }}>
-      {kind}
-    </AnzeigeKonventionenProvider>
+    <ConfigProvider locale={deDE}>
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: zone }}>
+        {kind}
+      </AnzeigeKonventionenProvider>
+    </ConfigProvider>
   );
 }
 
-describe('ZeitpunktEingabe — Browser UTC, Anzeigezone Europe/Berlin (LFH-692)', () => {
+/** Die Uhr steht (nur `Date`; Timer laufen, damit userEvent weiter wartet). */
+function uhrSteht(iso: string) {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(iso));
+    serveruhrVergessenFuerTests();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    serveruhrVergessenFuerTests();
+  });
+}
+
+const wire = (d: Dayjs | null | undefined) => (d ? alsBackendZeit(d) : d);
+
+/** Der offene Kalender (antd hängt ihn an `document.body`). */
+const kalender = () => screen.findByRole('dialog', { name: /Tag/ });
+
+describe('ZeitpunktEingabe — Anzeige als DTG in der Anzeigezone (Browser UTC)', () => {
   mitProzessZone('UTC');
 
-  it('zeigt einen Zeitpunkt mit der Berliner Wanduhr', () => {
+  it('zeigt einen Zeitpunkt als volle DTG mit der Berliner Wanduhr', () => {
     render(
       mitZone(
-        'Europe/Berlin',
+        BERLIN,
+        <ZeitpunktEingabe aria-label="Beginn" value={alsZeitpunkt('2026-03-16 13:30:00')} />,
+      ),
+    );
+    expect(zeitFeld('Beginn')).toHaveValue('161430mrz26');
+  });
+
+  it('nennt die Anzeigezone, weil sie von der Browserzone abweicht', () => {
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Beginn" />));
+    expect(screen.getByText(BERLIN)).toBeInTheDocument();
+  });
+});
+
+describe('ZeitpunktEingabe — Eingabe als Text (Spec zeiteingabe)', () => {
+  mitProzessZone('UTC');
+  // 2026-10-17 15:00 Berliner Zeit.
+  uhrSteht('2026-10-17T13:00:00Z');
+
+  it('„1430“ + Enter gilt heute 14:30 in der Anzeigezone (Szenario „Tippen und Enter“)', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const onOk = vi.fn<(d: Dayjs | null) => void>();
+    const user = userEvent.setup();
+    render(
+      mitZone(BERLIN, <ZeitpunktEingabe aria-label="Beginn" onChange={onChange} onOk={onOk} />),
+    );
+    await tippeZeit(user, zeitFeld('Beginn'), '1430');
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-17 12:30:00');
+    expect(wire(onOk.mock.lastCall![0])).toBe('2026-10-17 12:30:00');
+    expect(zeitFeld('Beginn')).toHaveValue('171430okt26');
+  });
+
+  it('hängt das Feld beim Tippen nicht neu ein, auch wenn Deutung oder Grund erscheinen', () => {
+    const onChange = vi.fn();
+    render(
+      mitZone(
+        // Ohne Zonenhinweis hat das Feld kein Präfix; erst dann baute ein neues Suffix das Gerüst um.
+        null,
         <ZeitpunktEingabe
           aria-label="Beginn"
-          format="YYYY-MM-DD HH:mm"
-          value={alsZeitpunkt('2026-07-14 10:00:00')}
+          value={alsZeitpunkt('2026-10-16 12:30:00')}
+          onChange={onChange}
         />,
       ),
     );
-    expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
+    const feld = zeitFeld('Beginn');
+    fireEvent.focus(feld);
+    fireEvent.change(feld, { target: { value: '1430' } });
+    // Ein neu eingehängtes Feld bekäme den nächsten Tastendruck nicht mehr (antds Input baut sein
+    // Gerüst um, sobald ein Suffix kommt oder geht).
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    expect(zeitFeld('Beginn')).toBe(feld);
+    expect(onChange).toHaveBeenCalled();
   });
 
-  it('eine eingetippte 13:00 kommt als Zeitpunkt 11:00 UTC heraus', async () => {
-    const onChange = vi.fn<(d: Dayjs | null) => void>();
+  it('zeigt beim Tippen die Deutung daneben, noch ohne zu übernehmen', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Beginn" onChange={onChange} />));
+    await user.type(zeitFeld('Beginn'), '1430');
+    expect(screen.getByText('= 171430okt26')).toBeInTheDocument();
+    expect(zeitFeld('Beginn')).toHaveAccessibleDescription(/= 171430okt26/);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('nennt „gestern“, wenn ein Ereignis sonst in der Zukunft läge', async () => {
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Lage" art="ereignis" />));
+    await user.type(zeitFeld('Lage'), '2350');
+    expect(screen.getByText(/= 162350okt26/)).toHaveTextContent('· gestern');
+  });
+
+  it('im Formular: Verlassen übernimmt, „Speichern“ sendet die getippte Zeit', async () => {
+    const onFinish = vi.fn();
     const user = userEvent.setup();
     render(
       mitZone(
-        'Europe/Berlin',
-        <ZeitpunktEingabe aria-label="Beginn" format="YYYY-MM-DD HH:mm" onChange={onChange} />,
+        BERLIN,
+        <Form onFinish={onFinish} initialValues={{ t: alsZeitpunkt('2026-10-17 06:00:00') }}>
+          <Form.Item name="t" label="Zeit">
+            <ZeitpunktEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
       ),
     );
-    const feld = screen.getByRole('textbox', { name: 'Beginn' });
-    await user.click(feld);
-    await user.type(feld, '2026-07-14 13:00');
-    fireEvent.keyDown(feld, { key: 'Enter' });
-    await waitFor(() => expect(onChange).toHaveBeenCalled());
-    expect(alsBackendZeit(onChange.mock.lastCall![0]!)).toBe('2026-07-14 11:00:00');
+    await user.clear(zeitFeld('Zeit'));
+    await user.type(zeitFeld('Zeit'), '0815');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
+    expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-17 06:15:00');
+  });
+
+  it('im Formular: Enter übernimmt und sendet ab', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Form.Item name="t" label="Zeit">
+            <ZeitpunktEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await tippeZeit(user, zeitFeld('Zeit'), '101430okt26');
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
+    expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-10 12:30:00');
   });
 
   it('im Formular: Speichern ohne Berührung liefert den gelesenen Zeitpunkt unverändert', async () => {
     const onFinish = vi.fn();
+    const onChange = vi.fn();
     render(
       mitZone(
-        'Europe/Berlin',
-        <Form onFinish={onFinish} initialValues={{ t: alsZeitpunkt('2026-10-24 23:30:00') }}>
+        BERLIN,
+        <Form onFinish={onFinish} initialValues={{ t: alsZeitpunkt('2026-10-24 23:30:15') }}>
           <Form.Item name="t" label="Zeit">
-            <ZeitpunktEingabe format="YYYY-MM-DD HH:mm" />
+            <ZeitpunktEingabe onChange={onChange} />
           </Form.Item>
           <button type="submit">ok</button>
         </Form>,
       ),
     );
-    expect(screen.getByRole('textbox', { name: 'Zeit' })).toHaveValue('2026-10-25 01:30');
+    expect(zeitFeld('Zeit')).toHaveValue('250130okt26');
+    fireEvent.focus(zeitFeld('Zeit'));
+    fireEvent.blur(zeitFeld('Zeit'));
     fireEvent.click(screen.getByRole('button', { name: 'ok' }));
     await waitFor(() => expect(onFinish).toHaveBeenCalled());
-    expect(alsBackendZeit(onFinish.mock.lastCall![0].t)).toBe('2026-10-24 23:30:00');
+    // Sekunden bleiben: der Wert wurde nicht neu gebildet.
+    expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-24 23:30:15');
+    expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('„Jetzt“ im Panel setzt den aktuellen Zeitpunkt und zeigt ihn in Berlin', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
-    try {
-      const onChange = vi.fn<(d: Dayjs | null) => void>();
-      const user = userEvent.setup();
-      render(
-        mitZone(
-          'Europe/Berlin',
-          <ZeitpunktEingabe aria-label="Beginn" format="YYYY-MM-DD HH:mm" onChange={onChange} />,
-        ),
-      );
-      await user.click(screen.getByRole('textbox', { name: 'Beginn' }));
-      await user.click(await screen.findByRole('button', { name: 'Jetzt' }));
-      expect(alsBackendZeit(onChange.mock.lastCall![0]!)).toBe('2026-07-14 10:00:00');
-      expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
-    } finally {
-      vi.useRealTimers();
-    }
+  it('Escape verwirft die Eingabe und zeigt den geltenden Wert', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Beginn"
+          value={alsZeitpunkt('2026-10-16 12:30:00')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.clear(zeitFeld('Beginn'));
+    await user.type(zeitFeld('Beginn'), '0900');
+    await user.keyboard('{Escape}');
+    expect(zeitFeld('Beginn')).toHaveValue('161430okt26');
+    expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('„Jetzt“ auf einem 5 min vorgehenden Gerät setzt die Serverzeit (LFH-895)', async () => {
-    const server = Date.parse('2026-07-14T10:00:00Z');
+  it('Unlesbares: Enter sendet nicht, das Feld nennt den Grund', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Form.Item name="t" label="Zeit">
+            <ZeitpunktEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await tippeZeit(user, zeitFeld('Zeit'), '2460');
+    expect(screen.getByText('Uhrzeit gibt es nicht')).toBeInTheDocument();
+    expect(zeitFeld('Zeit')).toHaveAttribute('aria-invalid', 'true');
+    expect(zeitFeld('Zeit')).toHaveValue('2460');
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+
+  it('Unlesbares und Verlassen: geltender Wert zurück, Grund bleibt, gesendet wird der alte Wert', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish} initialValues={{ t: alsZeitpunkt('2026-10-16 12:30:00') }}>
+          <Form.Item name="t" label="Zeit">
+            <ZeitpunktEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await user.clear(zeitFeld('Zeit'));
+    await user.type(zeitFeld('Zeit'), '14:3x');
+    await user.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
+    expect(zeitFeld('Zeit')).toHaveValue('161430okt26');
+    expect(screen.getByText('nicht lesbar')).toBeInTheDocument();
+    expect(wire(onFinish.mock.lastCall![0].t)).toBe('2026-10-16 12:30:00');
+  });
+
+  it('Leeren meldet keinen Zeitpunkt; mit allowClear={false} ist es unlesbar', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    const wert = alsZeitpunkt('2026-10-16 12:30:00');
+    const { unmount } = render(
+      mitZone(BERLIN, <ZeitpunktEingabe aria-label="Beginn" value={wert} onChange={onChange} />),
+    );
+    await tippeZeit(user, zeitFeld('Beginn'), '');
+    expect(onChange).toHaveBeenLastCalledWith(null);
+    unmount();
+
+    onChange.mockClear();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Beginn"
+          value={wert}
+          onChange={onChange}
+          allowClear={false}
+        />,
+      ),
+    );
+    await tippeZeit(user, zeitFeld('Beginn'), '');
+    expect(screen.getByText('Angabe fehlt')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Enter auf dem unveränderten Vorschlag übernimmt ihn ausdrücklich (onOk)', () => {
+    const onOk = vi.fn<(d: Dayjs | null) => void>();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          defaultValue={alsZeitpunkt('2026-10-17 12:00:00')}
+          onOk={onOk}
+        />,
+      ),
+    );
+    fireEvent.keyDown(zeitFeld('Zeit'), { key: 'Enter' });
+    expect(wire(onOk.mock.lastCall![0])).toBe('2026-10-17 12:00:00');
+  });
+
+  it('relativ: „-5“ misst an der Serveruhr, nicht an der vorgehenden Geräteuhr', () => {
+    const server = Date.parse('2026-10-17T13:00:00Z');
+    vi.setSystemTime(server + 5 * 60_000);
+    merkeServerzeit(new Response(null, { headers: { Date: new Date(server).toUTCString() } }));
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} />));
+    setzeZeit(zeitFeld('Zeit'), '-5');
+    const ms = onChange.mock.lastCall![0]!.valueOf();
+    expect(Math.abs(ms - (server - 5 * 60_000))).toBeLessThanOrEqual(1_000);
+  });
+
+  it('die Typprüfung kennt kein `format` mehr', () => {
+    // @ts-expect-error `format` gibt es nicht (Spec: Anzeige im Feld als Datum-Zeit-Gruppe).
+    const element = <ZeitpunktEingabe format="YYYY-MM-DD" />;
+    expect(element).toBeTruthy();
+  });
+});
+
+describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
+  mitProzessZone('UTC');
+  uhrSteht('2026-10-17T13:00:00Z');
+
+  it('die Woche beginnt am Montag', async () => {
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const kopf = within(await kalender()).getAllByRole('columnheader');
+    expect(kopf[0]).toHaveTextContent('Mo');
+  });
+
+  it('anderer Tag, andere Uhrzeit: übernommen und geschlossen', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} onOpenChange={onOpenChange} />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    await user.click(
+      k.querySelector<HTMLElement>('td[title="20.10.2026"] .ant-picker-cell-inner')!,
+    );
+    const uhr = within(k).getByRole('textbox', { name: 'Uhrzeit' });
+    await user.clear(uhr);
+    await user.type(uhr, '0800');
+    await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-20 06:00:00');
+    expect(zeitFeld('Zeit')).toHaveValue('200800okt26');
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('Enter im Uhrzeitfeld übernimmt; eine falsche Uhrzeit nennt den Grund', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} />));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const uhr = within(await kalender()).getByRole('textbox', { name: 'Uhrzeit' });
+    await user.clear(uhr);
+    await user.type(uhr, '2575{Enter}');
+    expect(screen.getByText('Uhrzeit gibt es nicht')).toBeInTheDocument();
+    await user.clear(uhr);
+    await user.type(uhr, '0630{Enter}');
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-17 04:30:00');
+  });
+
+  it('das Uhrzeitfeld nimmt den Fokus nur ohne Fingerbedienung (sonst deckte die Tastatur das Blatt)', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    await waitFor(() => expect(within(k).getByRole('textbox', { name: 'Uhrzeit' })).toHaveFocus());
+    unmount();
+
+    setzeZeigerGrob(true);
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const uhr = within(await kalender()).getByRole('textbox', { name: 'Uhrzeit' });
+    expect(uhr).not.toHaveFocus();
+  });
+
+  it('Escape schließt nur den Kalender', async () => {
+    const onOpenChange = vi.fn();
+    const aussen = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <div onKeyDown={aussen}>
+          <ZeitpunktEingabe aria-label="Zeit" onOpenChange={onOpenChange} />
+        </div>,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    await kalender();
+    await user.keyboard('{Escape}');
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+    expect(aussen).not.toHaveBeenCalled();
+    // Der Fokus geht ins Feld zurück, nicht auf `<body>`.
+    await waitFor(() => expect(zeitFeld('Zeit')).toHaveFocus());
+  });
+
+  it('„jetzt“ im Kalender setzt den Zeitpunkt nach Serveruhr', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" onChange={onChange} />));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    await user.click(within(await kalender()).getByRole('button', { name: 'jetzt' }));
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-17 13:00:00');
+    expect(zeitFeld('Zeit')).toHaveValue('171500okt26');
+  });
+
+  it('keine Zukunftstage: der Kalendertag der Anzeigezone zählt', async () => {
+    vi.setSystemTime(new Date('2026-07-14T23:30:00Z')); // Berlin: 15.07. 01:30
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          keineZukunftstage
+          defaultValue={alsZeitpunkt('2026-07-14 10:00:00')}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    expect(k.querySelector('td[title="15.07.2026"]')).not.toHaveClass('ant-picker-cell-disabled');
+    expect(k.querySelector('td[title="16.07.2026"]')).toHaveClass('ant-picker-cell-disabled');
+  });
+
+  it('zeigt die Zone, wenn sie abweicht', async () => {
+    const user = userEvent.setup();
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    expect(within(await kalender()).getByText(/Zeiten in/)).toHaveTextContent(
+      `Zeiten in ${BERLIN}`,
+    );
+  });
+});
+
+describe('ZeitpunktEingabe — Schnellwahl nach Feldart', () => {
+  mitProzessZone('UTC');
+
+  it('„−5 min“ am Feld misst an der Serveruhr', async () => {
+    const server = Date.parse('2026-10-17T10:00:00Z');
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(server + 5 * 60_000);
     serveruhrVergessenFuerTests();
     merkeServerzeit(new Response(null, { headers: { Date: new Date(server).toUTCString() } }));
     try {
       const onChange = vi.fn<(d: Dayjs | null) => void>();
+      const onOk = vi.fn();
       const user = userEvent.setup();
       render(
         mitZone(
-          'Europe/Berlin',
-          <ZeitpunktEingabe aria-label="Beginn" format="YYYY-MM-DD HH:mm" onChange={onChange} />,
+          BERLIN,
+          <ZeitpunktEingabe
+            aria-label="Zeit"
+            art="ereignis"
+            schnellwahl
+            onChange={onChange}
+            onOk={onOk}
+          />,
         ),
       );
-      await user.click(screen.getByRole('textbox', { name: 'Beginn' }));
-      await user.click(await screen.findByRole('button', { name: 'Jetzt' }));
-      expect(Math.abs(onChange.mock.lastCall![0]!.valueOf() - server)).toBeLessThanOrEqual(1_000);
-      expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
+      await user.click(screen.getByRole('button', { name: '−5 min' }));
+      const ms = onChange.mock.lastCall![0]!.valueOf();
+      expect(Math.abs(ms - (server - 5 * 60_000))).toBeLessThanOrEqual(1_000);
+      expect(onOk).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
       serveruhrVergessenFuerTests();
     }
   });
 
-  it('nennt die Anzeigezone, weil sie von der Browserzone abweicht', () => {
-    render(mitZone('Europe/Berlin', <ZeitpunktEingabe aria-label="Beginn" />));
-    expect(screen.getByText('Europe/Berlin')).toBeInTheDocument();
-  });
-
-  it('keineZukunftstage: der Kalendertag der Anzeigezone zählt, nicht der des Browsers', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-07-14T23:30:00Z')); // Berlin: 15.07. 01:30
-    try {
-      const user = userEvent.setup();
-      render(
-        mitZone(
-          'Europe/Berlin',
-          <ZeitpunktEingabe
-            aria-label="Beginn"
-            keineZukunftstage
-            defaultValue={alsZeitpunkt('2026-07-14 10:00:00')}
-          />,
-        ),
-      );
-      await user.click(screen.getByRole('textbox', { name: 'Beginn' }));
-      const zelle = (tag: string) =>
-        document.querySelector(`td[title="${tag}"]`) as HTMLElement | null;
-      await waitFor(() => expect(zelle('2026-07-15')).not.toBeNull());
-      expect(zelle('2026-07-15')).not.toHaveClass('ant-picker-cell-disabled');
-      expect(zelle('2026-07-16')).toHaveClass('ant-picker-cell-disabled');
-    } finally {
-      vi.useRealTimers();
-    }
+  it('Frist zeigt die Vorwärts-Reihe, ohne `schnellwahl` steht sie nur im Kalender', () => {
+    const { unmount } = render(
+      mitZone(null, <ZeitpunktEingabe aria-label="Frist" art="frist" schnellwahl />),
+    );
+    expect(
+      within(screen.getByRole('group', { name: 'Schnellwahl' }))
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual(['+15 min', '+30 min', '+1 h', '+2 h']);
+    unmount();
+    render(mitZone(null, <ZeitpunktEingabe aria-label="Frist" art="frist" />));
+    expect(screen.queryByRole('group', { name: 'Schnellwahl' })).not.toBeInTheDocument();
   });
 });
 
-describe('ZeitpunktEingabe — gleiche Zone', () => {
+describe('ZeitpunktEingabe — gleiche und ungültige Zone', () => {
   mitProzessZone('Europe/Berlin');
 
-  it('zeigt keinen Zonenhinweis', () => {
-    render(mitZone('Europe/Berlin', <ZeitpunktEingabe aria-label="Beginn" />));
-    expect(screen.queryByText('Europe/Berlin')).not.toBeInTheDocument();
-  });
-
-  it('ohne Anzeigezone (Browserzone) ebenfalls keinen', () => {
+  it('zeigt keinen Zonenhinweis bei gleicher Zone und ohne Anzeigezone', () => {
+    const { unmount } = render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Beginn" />));
+    expect(screen.queryByText(BERLIN)).not.toBeInTheDocument();
+    unmount();
     render(mitZone(null, <ZeitpunktEingabe aria-label="Beginn" />));
     expect(screen.queryByText(/Europe\//)).not.toBeInTheDocument();
   });
-});
 
-describe('ZeitpunktEingabe — ungültige Zone (Spec-Szenario „Ungültige Zone“)', () => {
-  mitProzessZone('Europe/Berlin');
-
-  it('rendert ohne Absturz, zeigt die Browser-Wanduhr und keinen Zonenhinweis', () => {
+  it('ungültige Zone: rendert ohne Absturz, zeigt die Browser-Wanduhr und keinen Hinweis', () => {
     render(
       mitZone(
         'Mars/Olympus',
+        <ZeitpunktEingabe aria-label="Beginn" value={alsZeitpunkt('2026-07-14 10:00:00')} />,
+      ),
+    );
+    expect(zeitFeld('Beginn')).toHaveValue('141200jul26');
+    expect(screen.queryByText('Mars/Olympus')).not.toBeInTheDocument();
+  });
+
+  it('nurTag zeigt und liest einen Kalendertag', () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    render(
+      mitZone(
+        BERLIN,
         <ZeitpunktEingabe
-          aria-label="Beginn"
-          format="YYYY-MM-DD HH:mm"
-          value={alsZeitpunkt('2026-07-14 10:00:00')}
+          aria-label="Tag"
+          nurTag
+          value={alsZeitpunkt('2026-10-23 22:00:00')}
+          onChange={onChange}
         />,
       ),
     );
-    expect(screen.getByRole('textbox', { name: 'Beginn' })).toHaveValue('2026-07-14 12:00');
-    expect(screen.queryByText('Mars/Olympus')).not.toBeInTheDocument();
+    expect(zeitFeld('Tag')).toHaveValue('24.10.2026');
+    setzeZeit(zeitFeld('Tag'), '25.10.');
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-24 22:00:00');
   });
 });
 
-describe('ZeitraumEingabe — Browser UTC, Anzeigezone Europe/Berlin', () => {
+describe('ZeitraumEingabe — zwei Felder (Browser UTC, Anzeigezone Berlin)', () => {
   mitProzessZone('UTC');
+  uhrSteht('2026-10-17T08:00:00Z');
 
-  it('zeigt beide Enden mit der Berliner Wanduhr', () => {
+  it('zeigt beide Enden als DTG und nennt die Zone', () => {
     render(
       mitZone(
-        'Europe/Berlin',
+        BERLIN,
         <ZeitraumEingabe
-          format="YYYY-MM-DD HH:mm"
-          placeholder={['Beginn', 'Ende']}
           value={[alsZeitpunkt('2026-07-14 10:00:00')!, alsZeitpunkt('2026-07-14 11:30:00')!]}
         />,
       ),
     );
-    expect(screen.getByPlaceholderText('Beginn')).toHaveValue('2026-07-14 12:00');
-    expect(screen.getByPlaceholderText('Ende')).toHaveValue('2026-07-14 13:30');
-    expect(screen.getByText('Europe/Berlin')).toBeInTheDocument();
+    expect(zeitFeld('Beginn')).toHaveValue('141200jul26');
+    expect(zeitFeld('Ende')).toHaveValue('141330jul26');
+    expect(screen.getAllByText(BERLIN).length).toBeGreaterThan(0);
+  });
+
+  it('Mittag: „1200“ und „1330“ ergeben einen Zeitraum am selben Tag (Screenshot Verpflegung)', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Form.Item name="zeitraum" label="Zeitraum">
+            <ZeitraumEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await tippeZeit(user, zeitFeld('Beginn'), '1200');
+    await tippeZeit(user, zeitFeld('Ende'), '1330');
+    await waitFor(() => expect(onFinish).toHaveBeenCalled());
+    const [von, bis] = onFinish.mock.lastCall![0].zeitraum as Zeitraum;
+    expect([wire(von), wire(bis)]).toEqual(['2026-10-17 10:00:00', '2026-10-17 11:30:00']);
+  });
+
+  it('über Mitternacht: ein Ende vor dem Beginn liegt am Folgetag', async () => {
+    const onChange = vi.fn<(z: Zeitraum | null) => void>();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitraumEingabe
+          value={[alsZeitpunkt('2026-10-17 20:00:00')!, null]}
+          onChange={onChange}
+        />,
+      ),
+    );
+    setzeZeit(zeitFeld('Ende'), '0600');
+    expect(wire(onChange.mock.lastCall![0]![1])).toBe('2026-10-18 04:00:00');
+    expect(zeitFeld('Ende')).toHaveValue('');
   });
 });
 
-/**
- * Review LFH-692: ein Re-Render bei offenem Panel darf eine noch nicht bestätigte Wahl nicht
- * verwerfen. rc-picker setzt Kalender- und Übernahmewert zurück, sobald `value` die IDENTITÄT
- * wechselt; der Baustein gibt deshalb nur bei einem anderen Zeitpunkt ein neues Objekt weiter.
- * Auslöser in echt: die Verpflegung rendert alle 30 s (`useUhr`).
- */
-describe('ZeitpunktEingabe/ZeitraumEingabe — stabil über Re-Render', () => {
+describe('ZeitpunktEingabe — stabil über Re-Render', () => {
   mitProzessZone('UTC');
-  const BERLIN = 'Europe/Berlin';
 
-  it('Einzel: Tag wählen, Elternteil rendert neu, OK — die Wahl kommt an', async () => {
+  it('getippter Text bleibt, wenn das Elternteil neu rendert', async () => {
     const onChange = vi.fn<(d: Dayjs | null) => void>();
     const wert = alsZeitpunkt('2026-07-14 10:00:00');
     function Huelle({ takt }: { takt: number }) {
       return mitZone(
         BERLIN,
-        <ZeitpunktEingabe
-          aria-label="Beginn"
-          format="YYYY-MM-DD HH:mm"
-          value={wert}
-          onChange={onChange}
-          data-takt={takt}
-        />,
+        <ZeitpunktEingabe aria-label="Beginn" value={wert} onChange={onChange} data-takt={takt} />,
       );
     }
     const user = userEvent.setup();
     const { rerender } = render(<Huelle takt={0} />);
-    await user.click(screen.getByRole('textbox', { name: 'Beginn' }));
-    const zelle = await waitFor(() => {
-      const z = document.querySelector<HTMLElement>('td[title="2026-07-20"]');
-      expect(z).not.toBeNull();
-      return z!;
-    });
-    await user.click(zelle);
+    await user.clear(zeitFeld('Beginn'));
+    await user.type(zeitFeld('Beginn'), '201200jul26');
     rerender(<Huelle takt={1} />);
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-    await waitFor(() => expect(onChange).toHaveBeenCalled());
-    expect(alsBackendZeit(onChange.mock.lastCall![0]!)).toBe('2026-07-20 10:00:00');
-  });
-
-  it('Bereich: Beginn mit OK bestätigt, Elternteil rendert neu, Ende gewählt — beide kommen an', async () => {
-    const onChange = vi.fn<(z: Zeitraum | null) => void>();
-    const wert: Zeitraum = [
-      alsZeitpunkt('2026-07-14 10:00:00')!,
-      alsZeitpunkt('2026-07-14 11:30:00')!,
-    ];
-    function Huelle({ takt }: { takt: number }) {
-      return mitZone(
-        BERLIN,
-        <ZeitraumEingabe
-          format="YYYY-MM-DD HH:mm"
-          placeholder={['Beginn', 'Ende']}
-          value={wert}
-          onChange={onChange}
-          data-takt={takt}
-        />,
-      );
-    }
-    const user = userEvent.setup();
-    const { rerender } = render(<Huelle takt={0} />);
-    await user.click(screen.getByPlaceholderText('Beginn'));
-    const zelle = (tag: string) =>
-      waitFor(() => {
-        const z = document.querySelector<HTMLElement>(`td[title="${tag}"]`);
-        expect(z).not.toBeNull();
-        return z!;
-      });
-    await user.click(await zelle('2026-07-15'));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-    rerender(<Huelle takt={1} />);
-    await user.click(await zelle('2026-07-16'));
-    await user.click(screen.getByRole('button', { name: 'OK' }));
-    await waitFor(() => expect(onChange).toHaveBeenCalled());
-    const [von, bis] = onChange.mock.lastCall![0]!;
-    expect(alsBackendZeit(von!)).toBe('2026-07-15 10:00:00');
-    expect(alsBackendZeit(bis!)).toBe('2026-07-16 11:30:00');
+    await user.keyboard('{Enter}');
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-07-20 10:00:00');
   });
 });
 
-describe('ZeitpunktEingabe/ZeitraumEingabe — Blatt, wo das Panel nicht neben das Feld passt (LFH-953, LFH-1076)', () => {
-  /** Das offene Panel; antd hängt es an `document.body`. */
-  const panel = () =>
+describe('ZeitpunktEingabe — Review LLH-1070', () => {
+  mitProzessZone('UTC');
+  uhrSteht('2026-10-17T13:00:00Z');
+
+  it('meldet einen Prüffehler des Form.Item als aria-invalid', async () => {
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={vi.fn()}>
+          <Form.Item name="t" label="Zeit" rules={[{ required: true, message: 'Zeit fehlt' }]}>
+            <ZeitpunktEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await screen.findByText('Zeit fehlt');
+    expect(zeitFeld('Zeit')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('der Kalender-Knopf nennt sein Feld', () => {
+    render(mitZone(null, <ZeitraumEingabe />));
+    expect(
+      screen.getByRole('button', { name: 'Kalender und Uhrzeit zu Beginn' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Kalender und Uhrzeit zu Ende' }),
+    ).toBeInTheDocument();
+  });
+
+  it('„Übernehmen“ ohne Änderung behält den Wert samt Sekunden', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          value={alsZeitpunkt('2026-10-17 06:00:17')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    await user.click(within(await kalender()).getByRole('button', { name: 'Übernehmen' }));
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Blättern behält den Tag im Monat (31.10. → November → Oktober bleibt der 31.)', async () => {
+    const onChange = vi.fn<(d: Dayjs | null) => void>();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          value={alsZeitpunkt('2026-10-31 07:00:00')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    await user.click(within(k).getByRole('button', { name: 'Folgemonat' }));
+    await user.click(within(k).getByRole('button', { name: 'Vormonat' }));
+    const uhr = within(k).getByRole('textbox', { name: 'Uhrzeit' });
+    await user.clear(uhr);
+    await user.type(uhr, '0900');
+    await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-31 08:00:00');
+  });
+
+  it('keine Zukunftstage: kein Folgemonat, und ein Zukunftstag wird nicht übernommen', async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <ZeitpunktEingabe
+          aria-label="Zeit"
+          keineZukunftstage
+          defaultValue={alsZeitpunkt('2026-10-20 10:00:00')}
+          onChange={onChange}
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /^Kalender und Uhrzeit/ }));
+    const k = await kalender();
+    expect(within(k).getByRole('button', { name: 'Folgemonat' })).toBeDisabled();
+    const uhr = within(k).getByRole('textbox', { name: 'Uhrzeit' });
+    await user.clear(uhr);
+    await user.type(uhr, '0900');
+    await user.click(within(k).getByRole('button', { name: 'Übernehmen' }));
+    expect(within(k).getByText('liegt in der Zukunft')).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('Zeitraum: Enter im Beginn führt ins leere Ende, statt halb abzusenden', async () => {
+    const onFinish = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        BERLIN,
+        <Form onFinish={onFinish}>
+          <Form.Item name="zeitraum" label="Zeitraum">
+            <ZeitraumEingabe />
+          </Form.Item>
+          <button type="submit">Speichern</button>
+        </Form>,
+      ),
+    );
+    await tippeZeit(user, zeitFeld('Beginn'), '1200');
+    expect(zeitFeld('Ende')).toHaveFocus();
+    expect(onFinish).not.toHaveBeenCalled();
+  });
+});
+
+describe('ZeitpunktEingabe — Ref des Aufrufers', () => {
+  it('ruft eine Ref-Funktion nur beim Einhängen, nicht bei jedem Rendern (ETB-Chip fokussiert darüber)', async () => {
+    const ref = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        null,
+        <>
+          <ZeitpunktEingabe aria-label="Zeit" ref={ref} />
+          <input aria-label="Inhalt" />
+        </>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), '14');
+    await user.click(screen.getByRole('textbox', { name: 'Inhalt' }));
+    expect(ref.mock.calls.filter(([el]) => el !== null)).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'Inhalt' })).toHaveFocus();
+  });
+});
+
+describe('ZeitpunktEingabe — Blatt, wo der Kalender nicht neben das Feld passt (LFH-953, LFH-1076)', () => {
+  /** Das offene Popover des Kalenders. */
+  const popup = () =>
     waitFor(() => {
-      const p = document.querySelector<HTMLElement>('.ant-picker-dropdown');
+      const p = document.querySelector<HTMLElement>('.ant-popover');
       expect(p).not.toBeNull();
       return p!;
     });
 
-  it('öffnet den Zeitpunkt unter md als Blatt', async () => {
+  it('öffnet unter md als Blatt', async () => {
     setzeViewportBreite(390);
     render(mitZone(null, <ZeitpunktEingabe aria-label="von" open />));
-    expect(await panel()).toHaveClass(ZEIT_BLATT);
+    expect(await popup()).toHaveClass(ZEIT_BLATT);
   });
 
-  it('öffnet den Zeitraum unter md als Blatt', async () => {
-    setzeViewportBreite(390);
-    render(mitZone(null, <ZeitraumEingabe placeholder={['Beginn', 'Ende']} open />));
-    expect(await panel()).toHaveClass(ZEIT_BLATT);
-  });
-
-  it('lässt das Panel ab md am Feld (antds Ausrichtung)', async () => {
+  it('lässt den Kalender ab md am Feld', async () => {
     render(mitZone(null, <ZeitpunktEingabe aria-label="von" open />));
-    expect(await panel()).not.toHaveClass(ZEIT_BLATT);
+    expect(await popup()).not.toHaveClass(ZEIT_BLATT);
   });
 
   it('die Schwelle wächst mit der Stufe: kompakt ab md, komfortabel ab xxl, Handschuh nie', () => {
@@ -335,65 +789,34 @@ describe('ZeitpunktEingabe/ZeitraumEingabe — Blatt, wo das Panel nicht neben d
       const { unmount } = render(
         inStufe(controlHeight, <ZeitpunktEingabe aria-label="von" open />),
       );
-      expect(await panel()).toHaveClass(ZEIT_BLATT);
+      expect(await popup()).toHaveClass(ZEIT_BLATT);
       unmount();
     }
-    setzeViewportBreite(820);
-    render(inStufe(48, <ZeitraumEingabe placeholder={['Beginn', 'Ende']} open />));
-    expect(await panel()).toHaveClass(ZEIT_BLATT);
   });
 
-  it('lässt das Panel in komfortabel ab xxl am Feld, in Handschuh nie', async () => {
+  it('in Handschuh nie am Feld, in komfortabel ab xxl', async () => {
     setzeViewportBreite(1600);
     const { unmount } = render(inStufe(48, <ZeitpunktEingabe aria-label="von" open />));
-    expect(await panel()).not.toHaveClass(ZEIT_BLATT);
+    expect(await popup()).not.toHaveClass(ZEIT_BLATT);
     unmount();
     setzeViewportBreite(2560);
     render(inStufe(72, <ZeitpunktEingabe aria-label="von" open />));
-    expect(await panel()).toHaveClass(ZEIT_BLATT);
+    expect(await popup()).toHaveClass(ZEIT_BLATT);
   });
 
-  it('sperrt das Tippen auch auf dem Tablet mit Fingerbedienung, sobald das Blatt steht', () => {
-    setzeZeigerGrob(true);
-    const { unmount } = render(inStufe(48, <ZeitpunktEingabe aria-label="von" />));
-    expect(screen.getByRole('textbox', { name: 'von' })).toHaveAttribute('readonly');
-    unmount();
-
-    // Gegenprobe: dasselbe Tablet in kompakt, das Panel steht am Feld.
-    render(inStufe(30, <ZeitpunktEingabe aria-label="von" />));
-    expect(screen.getByRole('textbox', { name: 'von' })).not.toHaveAttribute('readonly');
-  });
-
-  it('sperrt das Tippen nur auf dem Handschirm mit Fingerbedienung (keine Bildschirmtastatur)', () => {
+  it('das Feld bleibt auch mit Fingerbedienung beschreibbar (getippt wird im Feld)', () => {
     setzeViewportBreite(390);
     setzeZeigerGrob(true);
-    const { unmount } = render(
-      mitZone(
-        null,
-        <>
-          <ZeitpunktEingabe aria-label="von" />
-          <ZeitraumEingabe placeholder={['Beginn', 'Ende']} />
-        </>,
-      ),
-    );
-    expect(screen.getByRole('textbox', { name: 'von' })).toHaveAttribute('readonly');
-    expect(screen.getByPlaceholderText('Beginn')).toHaveAttribute('readonly');
-    unmount();
-
-    // Gegenprobe: Handschirm mit Maus — getippt werden darf.
-    setzeZeigerGrob(false);
     render(mitZone(null, <ZeitpunktEingabe aria-label="von" />));
-    expect(screen.getByRole('textbox', { name: 'von' })).not.toHaveAttribute('readonly');
+    expect(zeitFeld('von')).not.toHaveAttribute('readonly');
   });
 
-  it('die Regeln des Blatts stehen fest am unteren Rand, Kalender und Uhrzeit untereinander', () => {
+  it('die Regeln des Blatts stehen fest am unteren Rand', () => {
     // jsdom rechnet kein Layout; den Vertrag belegt `e2e/dialoge-handy.spec.ts` im Browser.
     const css = readFileSync(join(process.cwd(), 'src/anzeige/ZeitpunktEingabe.css'), 'utf8');
     expect(css).toMatch(
-      new RegExp(`\\.${ZEIT_BLATT}\\.ant-picker-dropdown \\{[^}]*position: fixed !important;`),
+      new RegExp(`\\.${ZEIT_BLATT}\\.ant-popover \\{[^}]*position: fixed !important;`),
     );
-    expect(css).toMatch(
-      new RegExp(`\\.${ZEIT_BLATT} \\.ant-picker-datetime-panel \\{[^}]*flex-direction: column;`),
-    );
+    expect(css).toMatch(/max-height: 85dvh;/);
   });
 });

@@ -5,6 +5,7 @@ import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenConte
 import type { Abloesung } from '../api/types';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
+import { tippeZeit } from '../test/zeitEingabe';
 import {
   AbloeserDialog,
   RhythmusDialog,
@@ -19,12 +20,6 @@ import {
 describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
   mitProzessZone('UTC');
   const BERLIN = { zeitzone: 'Europe/Berlin' };
-
-  async function tippeZeit(feld: HTMLElement, text: string) {
-    await userEvent.click(feld);
-    await userEvent.type(feld, text);
-    await userEvent.keyboard('{Enter}');
-  }
 
   it('Vollzug: 13:00 Berliner Zeit geht als 11:00 UTC hinaus', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
@@ -41,7 +36,11 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
       </AnzeigeKonventionenProvider>,
     );
     const dialog = await screen.findByRole('dialog');
-    await tippeZeit(within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }), '2026-09-24 13:00');
+    await tippeZeit(
+      userEvent.setup(),
+      within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }),
+      '2026-09-24 13:00',
+    );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith(
@@ -76,6 +75,7 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
     });
     await userEvent.click(option);
     await tippeZeit(
+      userEvent.setup(),
       within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' }),
       '2026-09-24 06:30',
     );

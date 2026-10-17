@@ -194,7 +194,6 @@ function ZeitAngabe({
         <ZeitpunktEingabe
           {...feld}
           {...popup}
-          format="YYYY-MM-DD HH:mm"
           style={{ width: '100%' }}
           value={value}
           onChange={(d) => onChange(d ?? null)}

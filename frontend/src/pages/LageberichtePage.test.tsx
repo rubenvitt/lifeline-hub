@@ -488,10 +488,11 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
 
   it('macht den Zeitstand im Entwurf editierbar und schickt ihn als UTC-Wirestring (N23)', async () => {
     const { patches } = setupLebend(lagebericht7Abschnitte);
-    const feld = await screen.findByLabelText('Zeitstand');
-    // Der Wert kommt über den Sync-Effekt nach dem ersten Render — deshalb `waitFor`.
+    const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
+    // Der Wert kommt über den Sync-Effekt nach dem ersten Render — deshalb `waitFor`. Das Feld zeigt
+    // die DTG in der Anzeigezone (hier die Gerätezone; der 02.06. bleibt in jeder Zone ein Juni).
     await waitFor(() =>
-      expect(feld).toHaveValue(alsOrtszeit('2026-06-02 10:00:00')!.format('DD.MM.YYYY HH:mm')),
+      expect(feld).toHaveValue(`${alsOrtszeit('2026-06-02 10:00:00')!.format('DDHHmm')}jun26`),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
     await waitFor(() => expect(patches).toHaveLength(1));

@@ -65,8 +65,6 @@ import {
  */
 const RECHTE_TEXT = 'Nur die Einsatzleitung koppelt Geräte';
 
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
-
 interface AnlegenWerte {
   ansicht?: Funktionsansicht;
   stelle_id?: StellenWert;
@@ -424,7 +422,7 @@ export default function EinsatzGeraete() {
             },
           ]}
         >
-          <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
+          <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
         </Form.Item>
         <SpeicherFehler fehler={verlaengern.error} titel="Nicht verlängert" />
       </ErfassungsModal>

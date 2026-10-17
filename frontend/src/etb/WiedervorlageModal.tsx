@@ -9,7 +9,7 @@ import { legeErinnerungAn } from '../api/erinnerungen';
 import { einsatzKeys } from '../api/queryKeys';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { serverJetzt } from '../offline/serveruhr';
-import { SCHNELLWAHL_TERMIN, schnellwahlTermin } from '../components/terminSchnellwahl';
+import { SCHNELLWAHL_TERMIN, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
 import { abstand } from '../theme/tokens';
 import type { EtbEintragAnzeige } from '../api/types';
 
@@ -42,7 +42,7 @@ const VORGABE_MINUTEN = 30;
  * Unten steht zusätzlich der Einsatztermin, sofern er bekannt und zukünftig ist (LFH-463) —
  * ein absoluter Zeitpunkt neben den vier relativen Vorbelegungen.
  */
-// Die Tabelle ist geteilt (`components/terminSchnellwahl.ts`); die Wiedervorlage nimmt alle
+// Die Tabelle ist geteilt (`anzeige/zeitSchnellwahl.ts`); die Wiedervorlage nimmt alle
 // vier Einträge und rechnet ab jetzt.
 const SCHNELLWAHL = SCHNELLWAHL_TERMIN;
 
@@ -153,7 +153,7 @@ export default function WiedervorlageModal({
             <Button
               key={s.label}
               onClick={() =>
-                form.setFieldValue('faellig', schnellwahlTermin(serverJetzt(), s.minuten))
+                form.setFieldValue('faellig', schnellwahlZeit(serverJetzt(), s.minuten))
               }
             >
               {s.label}
@@ -179,7 +179,7 @@ export default function WiedervorlageModal({
           noStyle
           rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
         >
-          <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+          <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
         </Form.Item>
       </Form.Item>
       <Form.Item label="Beschreibung (optional)" name="beschreibung">

@@ -201,7 +201,7 @@ describe('PressemitteilungDetailPage — Zeitstand in der Anzeigezone (LFH-692)'
     );
     const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
     // 12:00 UTC → 14:00 in Berlin (Sommerzeit).
-    await waitFor(() => expect(feld).toHaveValue('30.09.2026 14:00'));
+    await waitFor(() => expect(feld).toHaveValue('301400sep26'));
     await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
     await waitFor(() => expect(aktualisierePressemitteilung).toHaveBeenCalled());
     expect(vi.mocked(aktualisierePressemitteilung).mock.calls[0]).toContainEqual(

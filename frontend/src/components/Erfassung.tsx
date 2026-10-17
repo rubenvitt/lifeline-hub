@@ -69,7 +69,7 @@ import './Erfassung.css';
 
 /**
  * Erstes bedienbares Feld im Formular. Deckt auch antds `Select`, `AutoComplete` und
- * `DatePicker` ab — die rendern alle ein echtes `<input>`.
+ * die Zeiteingabe ab — die rendern alle ein echtes `<input>`.
  */
 const FOKUSSIERBAR = [
   'input:not([type="hidden"]):not([disabled])',
@@ -359,7 +359,10 @@ export function ErfassungsFormular<T extends object>({
   function aufTaste(e: KeyboardEvent<HTMLDivElement>) {
     // Ohne Serienmodus gibt es den Knopf nicht, also darf das Kürzel keine Serien-Marke setzen
     // (s. `onFinishFailed` unten).
+    // Ein Feld, das den Tastendruck selbst verbraucht hat (die Zeiteingabe bei unlesbarem Text),
+    // sperrt auch das Kürzel.
     if (
+      e.defaultPrevented ||
       e.nativeEvent.isComposing ||
       e.repeat ||
       e.shiftKey ||
