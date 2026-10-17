@@ -58,28 +58,28 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 4. Aufrufer umstellen (je Gruppe Props streichen, `art` setzen, Tests auf `tippeZeit`)
 
-- [ ] 4.1 ETB: `etb/MetaChip.tsx` (Ereignis, `schnellwahl`, `onOk`, `ref`), `etb/EtbFilterleiste.tsx`
+- [x] 4.1 ETB: `etb/MetaChip.tsx` (Ereignis, `schnellwahl`, `onOk`, `ref`), `etb/EtbFilterleiste.tsx`
       (ohne Art), `etb/WiedervorlageModal.tsx` (Frist). Tests `MetaChip`, `EtbFilterleiste`,
       `WiedervorlageModal` grün; neu: im Chip „1425“ + Enter übernimmt ohne Maus.
-- [ ] 4.2 Inline-Zeilen: `components/InlineAngabe.tsx` (Vertrag unverändert, Test für Enter
+- [x] 4.2 Inline-Zeilen: `components/InlineAngabe.tsx` (Vertrag unverändert, Test für Enter
       und doppeltes Escape mit offenem Kalender), `pages/EinsatzdatenPage.tsx`,
       `pages/EinsatzleiterAngabe.tsx`, `stab/skizze/Eigenschaftspaneel.tsx`,
       `pages/EinsaetzePage.tsx`. Die Spec-Szenarien von `einsatzdaten-bearbeitung` („Zeitpunkte
       ohne Zonenversatz“) bleiben grün.
-- [ ] 4.3 Meldung, Auftrag, Erinnerung, Lagebesprechung: `meldungen/MeldungFormular.tsx`,
+- [x] 4.3 Meldung, Auftrag, Erinnerung, Lagebesprechung: `meldungen/MeldungFormular.tsx`,
       `auftraege/AuftragFormular.tsx` (erteilt: Ereignis, Frist: Frist),
       `erinnerung/ErinnerungFormular.tsx`, `lagebesprechung/LagebesprechungModal.tsx`,
       `lagebesprechung/TerminPaneel.tsx`; deren Tests grün.
-- [ ] 4.4 Kräfte, Ablösung, Betreuung, Personen, Verpflegung: `kraefte/KraftZeitachse.tsx`,
+- [x] 4.4 Kräfte, Ablösung, Betreuung, Personen, Verpflegung: `kraefte/KraftZeitachse.tsx`,
       `abloesung/AbloesungDialoge.tsx`, `betreuung/BetreuungDialoge.tsx`,
       `personen/LagedatenFelder.tsx`, `verpflegung/VerpflegungDialoge.tsx` (Zeitraum und
       Ausgabe), `verpflegung/TagAusVorlage.tsx` (`nurTag`); Tests inkl.
       `PersonErfassungModal`, `VerpflegungPage` grün; der Verpflegungs-Zeitraum aus dem
       Screenshot (Beginn „1200“, Ende „1330“) als eigener Test.
-- [ ] 4.5 Lagebericht, Presse, Infotelefon: `pages/LageberichtePage.tsx`,
+- [x] 4.5 Lagebericht, Presse, Infotelefon: `pages/LageberichtePage.tsx`,
       `pages/LageberichtDetailPage.tsx`, `pages/PressePage.tsx`,
       `pages/PressemitteilungDetailPage.tsx`, `infotelefon/AnrufErfassung.tsx`; Tests grün.
-- [ ] 4.6 Einstellungen, Aufbewahrung, Zugangsprotokoll:
+- [x] 4.6 Einstellungen, Aufbewahrung, Zugangsprotokoll:
       `pages/einstellungen/PegelPrognoseModal.tsx`, `pages/einstellungen/EinsatzGeraete.tsx`,
       `aufbewahrung/WiederherstellenDialog.tsx`, `aufbewahrung/KategorieFristen.tsx`,
       `aufbewahrung/FristPaneel.tsx`, `zugangsprotokoll/ZugangsprotokollPage.tsx`; Tests grün,
