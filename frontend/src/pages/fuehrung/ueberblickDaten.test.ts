@@ -415,7 +415,12 @@ describe('Nächste Marken', () => {
       }) as unknown as Erinnerung;
     const r = naechsteMarken(
       [],
-      [frist(1, 'abloesung', nach(10)), frist(2, 'abloesung_vorwarnung', vor(20))],
+      [
+        frist(1, 'abloesung', nach(10)),
+        frist(2, 'abloesung_vorwarnung', vor(20)),
+        // Planungshinweis (LLH-1131): auch die dritte Frist steht nur als Ablösungsmarke.
+        frist(3, 'abloesung_planung', nach(5)),
+      ],
       null,
       JETZT,
       [],

@@ -719,6 +719,8 @@ export type AbloesungEinstufung = S['Einstufung'];
 /** Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells, Vorwarnung, folgende Schichten. */
 export type AbloesungEinsatzVorgabe = S['AbloesungEinsatzVorgabeAnzeige'];
 export type RhythmusQuelle = S['RhythmusQuelle'];
+/** Warnung zur geplanten ablösenden Einheit (LLH-1131): schon geplant oder selbst im Einsatz. */
+export type AbloesungPlanungWarnung = S['AbloesungPlanungWarnung'];
 
 // ============================== LLH-1122 Schichtmodelle ==============================
 export type Schichtmodell = S['Schichtmodell'];
