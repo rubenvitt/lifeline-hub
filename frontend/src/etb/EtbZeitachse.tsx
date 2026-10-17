@@ -29,6 +29,7 @@ import {
   useRollen,
   Zeitachseneintrag,
 } from '../components/instrument';
+import { zeitachsenAufbau } from '../components/instrument/Zeitachseneintrag';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeit, inZone } from '../anzeige/format';
 import type { AbgelehnterEintrag } from '../offline/queue';
@@ -39,16 +40,19 @@ import EtbBacklinkBadges from './EtbBacklinkBadges';
 import EtbDokumente, { type EtbDokument } from './EtbDokumente';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
+import { SYSTEM_RUFNAME } from './systemKennung';
 import { istNachgetragen } from './typFarben';
 import { verfasserText } from './verfasser';
 import {
   type Berichtigungsindex,
   berichtigungsindex,
+  buendleSystemfolgen,
   einfrieren,
   type Einfrierstand,
   gruppiereNachStunde,
   teileZufluss,
   hatVerknuepfung,
+  nachtragText,
   verweisStil,
   zuflussText,
 } from './zeitachseModell';
@@ -69,6 +73,11 @@ interface Props {
    */
   fundstellen?: string;
   /**
+   * Folgen von Systemeinträgen bündeln (LLH-1106, `buendleSystemfolgen`)? Vorgabe `true`; die
+   * Seite schaltet es unter `typ=system` ab, die Achse selbst unter einer Volltextsuche.
+   */
+  buendeln?: boolean;
+  /**
    * Zählt je Sprung über `?eintrag=` hoch (auch auf denselben Eintrag). Ein Sprung hebt das
    * Einfrieren auf: das Ziel könnte sonst hinter dem Sammelbanner stehen.
    */
@@ -88,7 +97,10 @@ interface Props {
    * `nachLfdNr`. Ob sie in der Achse steht oder als Banner darüber, entscheidet die Seite.
    */
   lesemarke?: { nachLfdNr: number; knoten: ReactNode };
-  /** Wenn gesetzt, bietet jeder Eintrag „Berichtigen" an (nicht an einer Berichtigung). */
+  /**
+   * Wenn gesetzt, bietet jeder gesendete Eintrag „Berichtigen" an — auch eine Berichtigung
+   * (LLH-1099): eine fehlerhafte Berichtigung bliebe sonst unkorrigierbar stehen.
+   */
   onBerichtigen?: (eintrag: EtbEintragAnzeige) => void;
   /**
    * Grund, aus dem „Berichtigen" gerade gesperrt ist (ein Entwurf sendet noch). Der Punkt
@@ -130,6 +142,8 @@ export const MELDEWEG_LABEL = Object.fromEntries(
 
 function vonAn(von?: string | null, an?: string | null, begriff?: string): ReactNode {
   if (!von && !an) return null;
+  // „System → System“ sagt nichts (LLH-1106); eine bekannte Seite bleibt stehen.
+  if (von === SYSTEM_RUFNAME && an === SYSTEM_RUFNAME) return null;
   return (
     <>
       <Fundstellen text={von || '—'} begriff={begriff} /> →{' '}
@@ -142,6 +156,14 @@ function vonAn(von?: string | null, an?: string | null, begriff?: string): React
 function veranlassungGetroffen(veranlassung: string | null | undefined, begriff?: string): boolean {
   if (!begriff || !veranlassung) return false;
   return fundstellenIn(veranlassung, suchphrasen(begriff)).length > 0;
+}
+
+/**
+ * Die Berichtigungen eines Eintrags aus dem Wire, jüngste zuerst (LLH-1099). Fehlt das Feld (ein
+ * Stand im Gerätespeicher von vor LFH-689), gilt: keine bekannt.
+ */
+function berichtigtDurch(e: EtbEintragAnzeige): EtbEintragAnzeige['berichtigt_durch'] {
+  return [...(e.berichtigt_durch ?? [])].sort((a, b) => b.lfd_nr - a.lfd_nr);
 }
 
 /** „1 Anhang" / „n Anhänge" an einer gepufferten Zeile (LFH-117); ohne Anhang nichts. */
@@ -209,6 +231,7 @@ export default function EtbZeitachse({
   einsatzId,
   highlightId,
   fundstellen,
+  buendeln = true,
   sprungMarke,
   eigeneBenutzerId,
   amEnde = true,
@@ -275,6 +298,57 @@ export default function EtbZeitachse({
       ),
     [sichtbar, konventionen],
   );
+  // Bündel nach dem Gruppieren, je Stundengruppe (LLH-1106, design.md D8): ein Bündel reicht nie
+  // über einen Stundenkopf. Die Lesemarke bricht eine Folge, sonst verschwände die Linie darin.
+  const lesemarkeNr = lesemarke?.nachLfdNr;
+  const gebuendelt = useMemo(
+    () =>
+      gruppen.map((g) => ({
+        ...g,
+        posten: buendleSystemfolgen(g.zeilen, {
+          aus: !buendeln || !!fundstellen,
+          hatDokument: (id) => (dokumente?.get(id)?.length ?? 0) > 0,
+          brichtNach:
+            lesemarkeNr == null
+              ? undefined
+              : (z) => z.art === 'eintrag' && z.eintrag.lfd_nr === lesemarkeNr,
+        }),
+      })),
+    [gruppen, buendeln, fundstellen, dokumente, lesemarkeNr],
+  );
+  /*
+   * Offene Bündel nach Schlüssel (dem ältesten Eintrag): wächst ein offenes Bündel unten, bleibt
+   * es offen. Ein Sprung in ein Bündel klappt es IM RENDER auf (wie der Sprung oben), damit der
+   * Scroll-Effekt der Seite die Zielzeile im selben Commit findet.
+   */
+  const [offen, setOffen] = useState<ReadonlySet<string>>(() => new Set());
+  const zielBuendel = useMemo(() => {
+    if (highlightId == null) return null;
+    for (const g of gebuendelt) {
+      for (const p of g.posten) {
+        if (p.art === 'buendel' && p.zeilen.some((z) => z.eintrag.id === highlightId)) {
+          return p.schluessel;
+        }
+      }
+    }
+    return null;
+  }, [gebuendelt, highlightId]);
+  const [gesehenesZiel, setGesehenesZiel] = useState<string | null>(null);
+  const zielSchluessel =
+    zielBuendel == null ? null : `${zielBuendel}|${highlightId}|${sprungMarke}`;
+  if (zielSchluessel !== gesehenesZiel) {
+    setGesehenesZiel(zielSchluessel);
+    if (zielBuendel != null && !offen.has(zielBuendel)) {
+      setOffen((vorher) => new Set(vorher).add(zielBuendel));
+    }
+  }
+  const umschalten = useCallback((schluessel: string) => {
+    setOffen((vorher) => {
+      const neu = new Set(vorher);
+      if (!neu.delete(schluessel)) neu.add(schluessel);
+      return neu;
+    });
+  }, []);
 
   const betreten = useCallback(() => {
     setFokusDrin(true);
@@ -359,7 +433,16 @@ export default function EtbZeitachse({
     // zweimal vorkommen). NICHT die erste Zeile: ein neuer Eintrag oben hängte sonst die ganze
     // Gruppe neu ein und parste jeden Text darin neu (LFH-947).
     const vorkommen = new Map<string, number>();
-    inhalt = gruppen.map((g, i) => {
+    const mitLesemarke = (z: EtbZeile) =>
+      lesemarke && z.art === 'eintrag' && z.eintrag.lfd_nr === lesemarke.nachLfdNr ? (
+        <Fragment key={z.schluessel}>
+          {zeile(z)}
+          {lesemarke.knoten}
+        </Fragment>
+      ) : (
+        zeile(z)
+      );
+    inhalt = gebuendelt.map((g, i) => {
       const n = vorkommen.get(g.schluessel) ?? 0;
       vorkommen.set(g.schluessel, n + 1);
       return (
@@ -386,16 +469,29 @@ export default function EtbZeitachse({
             </Augenbraue>
           </div>
           <ol style={{ margin: 0, padding: 0 }}>
-            {g.zeilen.map((z) =>
-              lesemarke && z.art === 'eintrag' && z.eintrag.lfd_nr === lesemarke.nachLfdNr ? (
-                <Fragment key={z.schluessel}>
-                  {zeile(z)}
-                  {lesemarke.knoten}
+            {g.posten.map((p) => {
+              if (p.art !== 'buendel') return mitLesemarke(p);
+              const auf = offen.has(p.schluessel);
+              const letzte = p.zeilen[p.zeilen.length - 1];
+              return (
+                <Fragment key={p.schluessel}>
+                  <EtbBuendelzeile
+                    schluessel={p.schluessel}
+                    anzahl={p.zeilen.length}
+                    von={formatUhrzeit(p.zeilen[0].eintrag.ereigniszeit, konventionen)}
+                    bis={formatUhrzeit(letzte.eintrag.ereigniszeit, konventionen)}
+                    offen={auf}
+                    onUmschalten={umschalten}
+                  />
+                  {auf
+                    ? p.zeilen.map(mitLesemarke)
+                    : lesemarke &&
+                      letzte.eintrag.lfd_nr === lesemarke.nachLfdNr && (
+                        <Fragment key="lesemarke">{lesemarke.knoten}</Fragment>
+                      )}
                 </Fragment>
-              ) : (
-                zeile(z)
-              ),
-            )}
+              );
+            })}
           </ol>
         </div>
       );
@@ -516,7 +612,7 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
     if (z.art === 'ausstehend') return null;
     const e = z.eintrag;
     const eintraege: MenueEintrag<'berichtigen' | 'wiedervorlage' | 'auftrag'>[] = [
-      ...(kannBerichtigen && e.typ !== 'berichtigung'
+      ...(kannBerichtigen
         ? [
             {
               key: 'berichtigen' as const,
@@ -558,7 +654,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
 
   function eintragsHinweis(e: EtbEintragAnzeige): ReactNode {
     const grund = index.grundeintrag(e);
-    const durch = index.berichtigtDurch(e);
+    // Die erste (jüngste) Berichtigung steht als Marke in der Kopfzeile (`kopfMeta`), die übrigen
+    // hier.
+    const weitere = berichtigtDurch(e).slice(1);
     const doks = dokumente;
     const stil = verweisStil(token);
     return hinweisZeile(
@@ -572,8 +670,8 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
         ),
         istNachgetragen(e.ereigniszeit, e.received_at) && (
           <span key="nachtrag">
-            <span aria-hidden="true">⧖ </span>nachgetragen um{' '}
-            {formatUhrzeit(e.received_at, konventionen)}
+            <span aria-hidden="true">⧖ </span>
+            {nachtragText(e.ereigniszeit, e.received_at, konventionen)}
           </span>
         ),
         /*
@@ -592,9 +690,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
             </Link>
           </span>
         ),
-        ...durch.map((b) => (
+        ...weitere.map((b) => (
           <Link key={`durch-${b.id}`} to={etbPfad(einsatzId, { eintrag: b.id })} style={stil}>
-            berichtigt durch Nr. {b.lfd_nr}
+            auch berichtigt durch Nr. {b.lfd_nr}
             <span aria-hidden="true"> ↗</span>
           </Link>
         )),
@@ -621,6 +719,36 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
         ),
       ],
       token.marginXS,
+    );
+  }
+
+  /*
+   * Kopfzeile eines gesendeten Eintrags: Von → An, bei einem berichtigten Eintrag davor die Marke
+   * „berichtigt“ und der Sprung auf die jüngste Berichtigung (LLH-1099, Spec
+   * `etb-zeitachse-darstellung`, „Berichtigt unabhängig vom Fenster“). Gelesen wird das Wire-Feld
+   * `berichtigt_durch` — der Server liefert es unabhängig von Seite und Filter (Spec
+   * `etb-berichtigung`); aus dem Fenster gebildet fehlte es genau unter dem Typfilter, unter dem
+   * man die falsche Meldung liest. Der Text bleibt, wie er ist: der Eintrag ist ein Beleg.
+   */
+  function kopfMeta(e: EtbEintragAnzeige): ReactNode {
+    const seiten = vonAn(e.von, e.an, fundstellen);
+    const juengste = berichtigtDurch(e)[0];
+    if (!juengste) return seiten;
+    return (
+      <span
+        style={{
+          display: 'inline-flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: token.marginXS,
+        }}
+      >
+        <StatusChip ton="achtung" wort="berichtigt" />
+        <Link to={etbPfad(einsatzId, { eintrag: juengste.id })} style={verweisStil(token)}>
+          → Nr. {juengste.lfd_nr}
+        </Link>
+        {seiten}
+      </span>
     );
   }
 
@@ -707,8 +835,9 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
         nr={`Nr. ${e.lfd_nr}`}
         typ={e.typ}
         typwort={etbTyp[e.typ].label}
-        meta={vonAn(e.von, e.an, fundstellen)}
+        meta={kopfMeta(e)}
         toenung={e.typ === 'berichtigung' ? 'berichtigung' : undefined}
+        leise={e.typ === 'system'}
         hinweis={eintragsHinweis(e)}
         verfasser={verfasserText(e)}
         weg={e.meldeweg ? MELDEWEG_LABEL[e.meldeweg] : undefined}
@@ -722,4 +851,70 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
   }
 
   return inhalt();
+});
+
+interface BuendelzeileProps {
+  schluessel: string;
+  anzahl: number;
+  /** Ereigniszeit des ältesten und des jüngsten Eintrags, in der Anzeigekonvention. */
+  von: string;
+  bis: string;
+  offen: boolean;
+  onUmschalten: (schluessel: string) => void;
+}
+
+/**
+ * Die Bündelzeile einer Folge von Systemeinträgen (LLH-1106, Spec `etb-zeitachse-darstellung`,
+ * „Folgen von Systemeinträgen gebündelt“): leise wie ihre Einträge, an deren Platz in der Ordnung,
+ * per Tastatur aufklappbar (`aria-expanded`). Aufgeklappt bleibt sie über den Einträgen stehen und
+ * klappt sie wieder zu. `data-zeile` trägt den Bündelschlüssel: der Bildlaufanker der Seite
+ * (`useFunkprotokollLauf`) hält auch an ihr.
+ */
+const EtbBuendelzeile = memo(function EtbBuendelzeile({
+  schluessel,
+  anzahl,
+  von,
+  bis,
+  offen,
+  onUmschalten,
+}: BuendelzeileProps) {
+  const { token } = useRollen();
+  // In `kompakt` ragt der Knopf wie das Zeilenmenü in die Polsterung (`Zeitachseneintrag`): die
+  // Trefffläche bleibt ganz, die Zeile hält aber die Höhe einer Textzeile (≤ 56 px, e2e
+  // `etb-zeilenhoehe`). In den dichteren Stufen wächst sie mit, dort gibt es keine Höhengrenze.
+  const ueberstand =
+    zeitachsenAufbau(token) === 'zeile' ? Math.max(0, (token.controlHeight - 20) / 2) : 0;
+  return (
+    <Zeitachseneintrag
+      als="li"
+      data-lfh="etb-buendel"
+      data-testid="etb-buendelzeile"
+      data-zeile={schluessel}
+      zeit={von}
+      typ="system"
+      typwort={etbTyp.system.label}
+      leise
+    >
+      <button
+        type="button"
+        className="lfh-etb-buendel"
+        aria-expanded={offen}
+        onClick={() => onUmschalten(schluessel)}
+        style={{
+          ...verweisStil(token),
+          marginBlock: -ueberstand,
+          font: 'inherit',
+          color: 'inherit',
+          background: 'none',
+          border: 0,
+          padding: 0,
+          cursor: 'pointer',
+          textAlign: 'start',
+        }}
+      >
+        {anzahl} Systemeinträge <span aria-hidden="true">·</span> {von}–{bis}{' '}
+        <span aria-hidden="true">·</span> {offen ? 'zuklappen' : 'anzeigen'}
+      </button>
+    </Zeitachseneintrag>
+  );
 });

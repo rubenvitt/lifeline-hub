@@ -2,15 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { EtbEintragAnzeige } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
 import { funkprotokollFolge } from '../components/useFunkprotokollLauf';
+import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { baueZeilen } from './etbZeile';
 import {
   berichtigungsindex,
+  berichtigungTitel,
+  buendleSystemfolgen,
   dokumenteJeEintrag,
   einfrieren,
   filterMitTyp,
   filterZusammenfuehren,
   gruppiereNachStunde,
   kopfMeta,
+  nachtragText,
   letzteBerichtigungen,
   pufferZustand,
   stundenEtikett,
@@ -384,5 +388,122 @@ describe('dokumenteJeEintrag (LFH-743)', () => {
   it('liefert ohne Dokument mit ETB-Bezug eine leere Zuordnung', () => {
     expect(dokumenteJeEintrag([dok(1), dok(2)]).size).toBe(0);
     expect(dokumenteJeEintrag([]).size).toBe(0);
+  });
+});
+
+describe('berichtigungTitel (LLH-1099)', () => {
+  it('nennt den Eintrag, an einer Berichtigung auch die Kette', () => {
+    expect(berichtigungTitel(e({ lfd_nr: 134 }), null)).toBe('Berichtigung zu Nr. 134');
+    const b = e({ lfd_nr: 135, typ: 'berichtigung', berichtigt_eintrag_id: 1 });
+    expect(berichtigungTitel(b, 134)).toBe('Berichtigung zu Nr. 135 (berichtigt Nr. 134)');
+    expect(berichtigungTitel(b, null)).toBe(
+      'Berichtigung zu Nr. 135 (berichtigt einen älteren Eintrag)',
+    );
+  });
+});
+
+describe('buendleSystemfolgen (LLH-1106)', () => {
+  const sys = (id: number, over: Partial<EtbEintragAnzeige> = {}) =>
+    e({ id, lfd_nr: id, typ: 'system', von: 'System', an: 'System', ...over });
+  // Funkprotokoll-Ordnung: älteste zuerst, wie die Zeitachse sie nach dem Kehren gruppiert.
+  const zeilenAus = (eintraege: EtbEintragAnzeige[]) =>
+    funkprotokollFolge(
+      baueZeilen({ eintraege: [...eintraege].reverse(), ausstehend: [], abgelehnt: [] }),
+    );
+  const arten = (posten: ReturnType<typeof buendleSystemfolgen>) =>
+    posten.map((p) =>
+      p.art === 'buendel'
+        ? `B${p.zeilen.length}`
+        : p.art === 'eintrag'
+          ? `e${p.eintrag.id}`
+          : p.art,
+    );
+
+  it('lässt zwei Systemeinträge stehen und bündelt ab drei', () => {
+    expect(arten(buendleSystemfolgen(zeilenAus([sys(1), sys(2)]), {}))).toEqual(['e1', 'e2']);
+    const drei = buendleSystemfolgen(zeilenAus([sys(1), sys(2), sys(3)]), {});
+    expect(arten(drei)).toEqual(['B3']);
+  });
+
+  it('schlüsselt das Bündel nach seinem ältesten Eintrag: es wächst unten, der Schlüssel bleibt', () => {
+    const drei = buendleSystemfolgen(zeilenAus([sys(1), sys(2), sys(3)]), {});
+    const vier = buendleSystemfolgen(zeilenAus([sys(1), sys(2), sys(3), sys(4)]), {});
+    expect(drei[0].schluessel).toBe(vier[0].schluessel);
+  });
+
+  it('bricht an einem anderen Typ: zwei Paare um eine Meldung bilden kein Bündel', () => {
+    const posten = buendleSystemfolgen(
+      zeilenAus([sys(1), sys(2), e({ id: 3, lfd_nr: 3 }), sys(4), sys(5)]),
+      {},
+    );
+    expect(arten(posten)).toEqual(['e1', 'e2', 'e3', 'e4', 'e5']);
+  });
+
+  it('bricht an einem berichtigten, nachgetragenen, angehängten oder verknüpften Eintrag', () => {
+    const brecher: Partial<EtbEintragAnzeige>[] = [
+      { berichtigt_durch: [{ id: 9, lfd_nr: 9 }] },
+      { received_at: '2026-05-23 10:30:00' },
+      { anhaenge: [{ id: 1 } as EtbEintragAnzeige['anhaenge'][number]] },
+      { auftrag_id: 7 },
+    ];
+    for (const over of brecher) {
+      const posten = buendleSystemfolgen(
+        zeilenAus([sys(1), sys(2), sys(3, over), sys(4), sys(5)]),
+        {},
+      );
+      expect(arten(posten), JSON.stringify(over)).toEqual(['e1', 'e2', 'e3', 'e4', 'e5']);
+    }
+  });
+
+  it('bricht an einem Eintrag mit Dokument der Ablage', () => {
+    const posten = buendleSystemfolgen(zeilenAus([sys(1), sys(2), sys(3), sys(4)]), {
+      hatDokument: (id) => id === 2,
+    });
+    expect(arten(posten)).toEqual(['e1', 'e2', 'e3', 'e4']);
+  });
+
+  it('bricht nach der Lesemarke, damit die Linie nicht im Bündel verschwindet', () => {
+    const posten = buendleSystemfolgen(
+      zeilenAus([sys(1), sys(2), sys(3), sys(4), sys(5), sys(6)]),
+      {
+        brichtNach: (z) => z.art === 'eintrag' && z.eintrag.id === 3,
+      },
+    );
+    expect(arten(posten)).toEqual(['B3', 'B3']);
+  });
+
+  it('bündelt nicht, wenn es aus ist (Typfilter System, Volltext)', () => {
+    const posten = buendleSystemfolgen(zeilenAus([sys(1), sys(2), sys(3)]), { aus: true });
+    expect(arten(posten)).toEqual(['e1', 'e2', 'e3']);
+  });
+
+  it('nimmt gepufferte Zeilen nie ins Bündel', () => {
+    const zeilen = [
+      ...zeilenAus([sys(1), sys(2)]),
+      ...baueZeilen({ eintraege: [], ausstehend: [puffer], abgelehnt: [] }),
+      ...zeilenAus([sys(3)]),
+    ];
+    expect(arten(buendleSystemfolgen(zeilen, {}))).toEqual(['e1', 'e2', 'ausstehend', 'e3']);
+  });
+});
+
+describe('nachtragText (LLH-1088)', () => {
+  const berlin = { ...DEFAULT_KONVENTIONEN, zeitzone: 'Europe/Berlin' };
+
+  it('nennt am selben Tag die Uhrzeit, über Mitternacht den Tag in taktischer Form', () => {
+    // 10.10. 23:50 und 11.10. 00:20 in Berlin (UTC+2).
+    expect(nachtragText('2026-10-10 21:50:00', '2026-10-10 22:20:00', berlin)).toBe(
+      'nachgetragen 110020',
+    );
+    expect(nachtragText('2026-10-10 10:00:00', '2026-10-10 12:21:00', berlin)).toBe(
+      'nachgetragen um 14:21',
+    );
+  });
+
+  it('bestimmt den Tag in der Anzeigezone, nicht in UTC', () => {
+    // In UTC derselbe Tag (21:50 / 23:10), in Berlin schon der 11.
+    expect(nachtragText('2026-10-10 21:50:00', '2026-10-10 23:10:00', berlin)).toBe(
+      'nachgetragen 110110',
+    );
   });
 });

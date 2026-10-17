@@ -1,5 +1,5 @@
 import { IconAuge, IconBueroklammer, IconKreuz, IconPlus, IconWarndreieck } from '../icons';
-import { Alert, Button, Checkbox, Dropdown, Space, Typography } from 'antd';
+import { Alert, Button, Checkbox, Dropdown, Space, Typography, type GlobalToken } from 'antd';
 import dayjs from 'dayjs';
 import {
   useEffect,
@@ -25,7 +25,7 @@ import type {
   MeldeWeg,
 } from '../api/types';
 import { ERFASSBARE_TYPEN } from './typFarben';
-import { etbTyp } from '../theme/statusFarben';
+import { etbTyp, etbTypFarbe } from '../theme/statusFarben';
 import type { BausteinFelder } from './bausteinEinsetzen';
 import MarkdownEditor, { type TextAreaRef } from '../components/MarkdownEditor';
 import { Zeichenzaehler, zaehlerText, zeichenZahl } from '../components/zeichenGrenze';
@@ -57,16 +57,25 @@ import {
   type MetaFeld,
   type SlashEintrag,
   laengenVerstoss,
+  erkenneZeitBefehl,
+  zukunftsVerstoss,
 } from './schnellerfassungModell';
 import type { EntwurfWerte } from './entwuerfe/entwurfModell';
+import { berichtigungTitel } from './zeitachseModell';
 import { neueClientId } from '../offline/clientId';
 import { serverJetzt } from '../offline/serveruhr';
+import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { lageberichtePfad } from '../routing/deeplinks';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
   berichtigungZu: EtbEintragAnzeige | null;
+  /**
+   * Nummer des Grundeintrags, wenn `berichtigungZu` selbst eine Berichtigung ist und er geladen
+   * ist (LLH-1099, Kette im Titel). Ohne sie nennt der Titel „einen älteren Eintrag“.
+   */
+  berichtigungGrundNr?: number | null;
   onBerichtigungAbbrechen: () => void;
   bausteine: EtbBaustein[];
   einsatz: EinsatzAnzeige;
@@ -194,7 +203,22 @@ function uploadFehlerHinweis(datei: File, e: unknown): string {
   return `${datei.name} konnte nicht hochgeladen werden: ${fehlerGrund(e)}. Der Eintrag ist nicht erfasst.`;
 }
 
-const TYP_MENUE = ERFASSBARE_TYPEN.map((t) => ({ key: t, label: etbTyp[t].label }));
+/** Ein Farbpunkt je Typ wie in der Segmentleiste (LLH-1112): Zusatzkanal, das Wort trägt. */
+function typMenue(token: GlobalToken) {
+  return ERFASSBARE_TYPEN.map((t) => ({
+    key: t,
+    label: (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS }}>
+        <span
+          aria-hidden="true"
+          data-lfh="typ-punkt"
+          style={{ width: 6, height: 6, flex: '0 0 6px', background: etbTypFarbe(t, token).kante }}
+        />
+        {etbTyp[t].label}
+      </span>
+    ),
+  }));
+}
 
 /**
  * Platzhalter: nur, WAS in das Feld gehört (LFH-1078, `frontend/AGENTS.md`, „Texte: zeigen statt
@@ -213,7 +237,8 @@ const KUERZEL_GROB = 'Control+Enter Meta+Enter';
 
 /**
  * Die Wiederholfelder, die ein Absenden überleben, solange „Werte behalten" an ist
- * (Von/An/Meldeweg sind das Gerüst einer Funkmeldung).
+ * (Von/An/Meldeweg sind das Gerüst einer Funkmeldung). Den Eintragstyp behält der Schalter
+ * ebenfalls (LLH-1112); er ist kein Metadatum und geht eigens mit (`entwurfSchliessen`).
  *
  * `veranlassung` und `ereigniszeit` gehören ABSICHTLICH nicht dazu — eine stehengebliebene
  * Ereigniszeit wäre eine falsche Tatsachenbehauptung.
@@ -260,6 +285,7 @@ export function chipZeileStil(schmal: boolean, token: { marginXS: number }): CSS
 export default function Schnellerfassung({
   erfassen,
   berichtigungZu,
+  berichtigungGrundNr,
   onBerichtigungAbbrechen,
   bausteine,
   einsatz,
@@ -334,6 +360,11 @@ export default function Schnellerfassung({
   const anhangGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
+  /** Unlesbare Angabe hinter `/zeit` (LLH-1088): der Grund steht in der Hinweiszeile. */
+  const [zeitBefehlGrund, setZeitBefehlGrund] = useState<string | null>(null);
+  /** Ereigniszeit in der Zukunft beim Absenden (LLH-1088): der Grund steht am Zeit-Chip. */
+  const [zukunftsGrund, setZukunftsGrund] = useState<string | null>(null);
+  const { zone: anzeigeZone } = useZeitEingabe();
   const [editFeld, setEditFeld] = useState<MetaFeld | null>(null);
   // Einzeilige Chip-Zeile unter `md`: den gerade bearbeiteten Chip waagerecht ins Bild holen
   // (die Eingabe fokussiert sich selbst). Ohne Chip in Bearbeitung steht die Zeile am Anfang.
@@ -468,10 +499,23 @@ export default function Schnellerfassung({
   function onInhaltChange(neu: string) {
     // `/anordnung ` am Anfang, ausgetippt statt gewählt, setzt den Typ ohne Menü.
     const befehl = berichtigungZu ? null : erkenneTypBefehl(neu);
+    let text = neu;
     if (befehl) {
       setTyp(befehl.typ);
-      setInhalt(befehl.rest);
-      aktualisiereTrigger(befehl.rest, befehl.rest.length);
+      text = befehl.rest;
+    }
+    // Danach `/zeit 1420 ` (LLH-1088): setzt die Ereigniszeit, der Rest bleibt Inhalt. Unlesbar
+    // bleibt der Text stehen, und die Hinweiszeile nennt den Grund.
+    const zeit = erkenneZeitBefehl(text, { zone: anzeigeZone, jetzt: serverJetzt() });
+    if (zeit?.ok) {
+      setMetadaten((m) => ({ ...m, ereigniszeit: zeit.zeitpunkt }));
+      setZukunftsGrund(null);
+      text = zeit.rest;
+    }
+    setZeitBefehlGrund(zeit && !zeit.ok ? zeit.grund : null);
+    if (befehl || zeit?.ok) {
+      setInhalt(text);
+      aktualisiereTrigger(text, text.length);
       return;
     }
     setInhalt(neu);
@@ -520,6 +564,7 @@ export default function Schnellerfassung({
 
   function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
     if (sendet) return;
+    if (feld === 'ereigniszeit') setZukunftsGrund(null);
     setMetadaten((m) => ({ ...m, [feld]: wert }));
     setEditFeld(null);
     fokusInsFeld();
@@ -632,6 +677,12 @@ export default function Schnellerfassung({
     const zuLang = laengenVerstoss(inhalt, wirksam);
     setLaengenHinweis(zuLang);
     if (zuLang) return;
+    // Ereigniszeit in der Zukunft (LLH-1088, Spec „Keine Ereigniszeit in der Zukunft“): ebenso
+    // VOR Upload und Warteschlange, nach der Serveruhr. Der Grund steht am Zeit-Chip, Text und
+    // Felder bleiben.
+    const zukunft = zukunftsVerstoss(wirksam, serverJetzt());
+    setZukunftsGrund(zukunft);
+    if (zukunft) return;
     // Nur der UPLOAD braucht Netz. Mit Dateien in der Liste wird ohne Verbindung abgewiesen, ohne
     // etwas zu leeren — ein Eintrag ohne die gewählten Dateien wäre eine stille Auslassung.
     // Über der Höchstzahl gar nicht erst hochladen: das Erfassen scheiterte mit 400, und die
@@ -693,6 +744,8 @@ export default function Schnellerfassung({
       // Schalter). Greift für Aufrufer OHNE Remount; `EtbEntwurfsTabs` remountet und setzt
       // dieselben Felder über `initialWerte` wieder ein.
       setMetadaten((m) => (uebernahmeAktiv ? nurUebernahme(m) : {}));
+      // Der Typ bleibt mit „Werte behalten“ stehen (LLH-1112), sonst beginnt es als Meldung.
+      if (!uebernahmeAktiv) setTyp('meldung');
       setEditFeld(null);
       setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
@@ -707,22 +760,26 @@ export default function Schnellerfassung({
   }
 
   /*
-   * DER PRÄFIX IST DER TYPWÄHLER (`/anordnung` in der Befehlszelle): er zeigt den gewählten Typ
-   * und öffnet auf Klick die Typen als Menü — der Weg für Maus und Handschuh; die Tastatur nimmt
-   * `/typ` am Zeilenanfang. Einen zweiten Wähler für denselben Wert gibt es bewusst nicht. Im
-   * Berichtigungsmodus ist der Typ fest und der Präfix Text.
+   * DER PRÄFIX IST DER TYPWÄHLER: er zeigt das Typwort („Anordnung“) in der Wortfarbe des Typs,
+   * die Zeile trägt dessen Kante (LLH-1112, Spec `etb-schnellerfassung-tastatur`, „Typwort statt
+   * Slash-Präfix“), und er öffnet auf Klick die Typen als Menü — der Weg für Maus und Handschuh;
+   * die Tastatur nimmt `/typ` am Zeilenanfang. Einen zweiten Wähler für denselben Wert gibt es
+   * bewusst nicht. Im Berichtigungsmodus ist der Typ fest und der Präfix Text.
    *
-   * Der zugängliche Name enthält den sichtbaren Befehl (WCAG 2.5.3 „Label in Name").
+   * Der zugängliche Name enthält das sichtbare Wort (WCAG 2.5.3 „Label in Name"). Die Kante ist
+   * Zusatzkanal (Entscheidung 17.10.2026): das Wort sagt den Typ, auch ohne Farbe.
    */
+  const praefixTyp: EtbTyp = berichtigungZu ? 'berichtigung' : typ;
+  const typFarbe = etbTypFarbe(praefixTyp, token);
   const praefix = berichtigungZu ? (
-    '/berichtigung'
+    <span style={{ color: typFarbe.wort }}>{etbTyp.berichtigung.label}</span>
   ) : (
     <Dropdown
       trigger={['click']}
       autoFocus
       disabled={sendet}
       menu={{
-        items: TYP_MENUE,
+        items: typMenue(token),
         selectable: true,
         selectedKeys: [typ],
         onClick: ({ key }) => {
@@ -735,10 +792,10 @@ export default function Schnellerfassung({
       <Button
         type="text"
         disabled={sendet}
-        aria-label={`Eintragstyp /${typ} ändern`}
-        style={{ font: 'inherit', color: 'inherit', paddingInline: token.paddingXS }}
+        aria-label={`Eintragstyp ${etbTyp[typ].label} ändern`}
+        style={{ font: 'inherit', color: typFarbe.wort, paddingInline: token.paddingXS }}
       >
-        /{typ}
+        {etbTyp[typ].label}
       </Button>
     </Dropdown>
   );
@@ -770,9 +827,26 @@ export default function Schnellerfassung({
   // Feld — eine weitere Zeile risse das Höhenbudget der angepinnten Leiste. Der Zähler erscheint
   // erst ab 80 % der Grenze; der Hinweis trägt neben der Farbe ein Zeichen und Worte (WCAG 1.4.1).
   const grenzSichtbar =
-    laengenHinweis != null || zaehlerText(zeichenZahl(inhalt), ETB_INHALT_MAX) != null;
+    laengenHinweis != null ||
+    zeitBefehlGrund != null ||
+    zaehlerText(zeichenZahl(inhalt), ETB_INHALT_MAX) != null;
   const grenzTeil = (
     <>
+      {zeitBefehlGrund && (
+        <span
+          role="alert"
+          data-lfh="etb-zeit-hinweis"
+          style={{
+            color: rollen.alarmText,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: token.marginXXS,
+          }}
+        >
+          <IconWarndreieck />
+          <span>/zeit: {zeitBefehlGrund}</span>
+        </span>
+      )}
       {laengenHinweis && (
         <span
           role="alert"
@@ -884,7 +958,7 @@ export default function Schnellerfassung({
           type="warning"
           showIcon
           style={{ marginBottom: token.marginSM }}
-          title={`Berichtigung zu Nr. ${berichtigungZu.lfd_nr}`}
+          title={berichtigungTitel(berichtigungZu, berichtigungGrundNr)}
           action={
             // Gesperrt, solange sie gesendet wird: der Versand liefe sonst trotzdem durch.
             <Button disabled={sendet} onClick={onBerichtigungAbbrechen}>
@@ -919,6 +993,7 @@ export default function Schnellerfassung({
           // (LFH-955, design.md D2).
           feldFuellt
           praefix={praefix}
+          kante={typFarbe.kante}
           hinweis={
             // „Vorschau" neben „Erfassen" statt auf eigener Zeile: eine eigene Knopfzeile kostete im
             // Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste.
@@ -1026,12 +1101,15 @@ export default function Schnellerfassung({
                   fokusInsFeld();
                 }}
                 onRemove={(f) => {
-                  if (!sendet) setMetadaten((m) => ({ ...m, [f]: undefined }));
+                  if (sendet) return;
+                  if (f === 'ereigniszeit') setZukunftsGrund(null);
+                  setMetadaten((m) => ({ ...m, [f]: undefined }));
                 }}
                 onEdit={(f) => {
                   if (!sendet) setEditFeld(f);
                 }}
                 gesperrt={sendet}
+                grund={feld === 'ereigniszeit' ? zukunftsGrund : null}
               />
             ))}
             {editFeld != null && wirksam[editFeld] == null && (

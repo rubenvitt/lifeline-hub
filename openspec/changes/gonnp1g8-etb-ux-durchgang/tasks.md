@@ -14,7 +14,7 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 - [x] 1.6 Lesemarke als Trennlinie in der Achse mit Banner-Rückfall außerhalb des Fensters bzw. unter Filter, Text taktisch; Vitest `EtbLesemarke*.test.tsx`, `lesemarkeModell.test.ts`
 - [x] 1.7 Informationstelefon in derselben Bauform (Kehrung, „Ältere laden“ oben, Sammelbanner unten, Deeplink-Anruf vorn, Hook aus 1.3); Vitest `InfotelefonPage.test.tsx`, `infotelefon/zufluss.test.ts`
 - [x] 1.8 Regeln fortgeschrieben: `frontend/src/etb/AGENTS.md` (Erfassung, Seitenfenster, Zufluss, Lesemarke) und `frontend/src/stab/AGENTS.md` (Infotelefon); Prettier grün
-- [ ] 1.9 e2e nachgezogen: `etb-chronologie`, `etb-zeilenhoehe`, `leisten-flaeche`, `etb-seitenfenster`, `fokus-verdeckung`, `palette-datensaetze` (Leserichtung, Lage von „Neuere/Ältere laden“); `tsc` und `eslint` über `frontend/e2e` grün
+- [x] 1.9 e2e nachgezogen: `etb-chronologie`, `etb-zeilenhoehe`, `leisten-flaeche`, `etb-seitenfenster`, `fokus-verdeckung`, `palette-datensaetze` (Leserichtung, Lage von „Neuere/Ältere laden“); `tsc` und `eslint` über `frontend/e2e` grün. Das Ende ist unter `xl` die Spalte über der Erfassung, nicht das Dokumentende (Bilanz darunter, `useFunkprotokollLauf` `ende`). `fokus-verdeckung` ist in dieser Umgebung auch auf `alpha` (1a3d5e7) in denselben fünf Fällen rot; entschieden wird in der CI des PRs
 - [x] 1.10 Doku: `docs/anwender/kapitel/einsatztagebuch.md` und `presse-infotelefon.md` beschreiben die Leserichtung, Mitlaufen, Sammelbanner unten und die Lesemarke; Wächter der Anwenderdoku grün
 
 ## 2. Eine Filterleiste — LLH-1065 (wbej3nl0)
@@ -45,33 +45,33 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 
 ## 5. Berichtigt-Kennzeichnung — LLH-1099 (rh1l9wpd)
 
-- [ ] 5.1 `berichtigungsindex` nur noch Vorwärtsrichtung, Kommentar nachgezogen; Vitest `zeitachseModell.test.ts`
-- [ ] 5.2 Zeile liest `berichtigt_durch`, Chip „berichtigt“ + „→ Nr. n“ in der Kopfzeile, weitere in der Hinweiszeile; Vitest `EtbZeitachse.test.tsx` (Berichtigung nicht geladen, Typfilter Meldung); Mutationsprobe: Rückkehr zur Fensterbildung macht den Fall rot
-- [ ] 5.3 „Berichtigen“ auch an einer Berichtigung, Leiste nennt die Kette; Vitest `EtbZeitachse.test.tsx`, `Schnellerfassung.test.tsx`
-- [ ] 5.4 Doku `einsatztagebuch.md`, „Einen Eintrag berichtigen“: Chip und Berichtigung einer Berichtigung
+- [x] 5.1 `berichtigungsindex` bleibt für Druck und Bilanz (beide Richtungen, nur Geladenes); die Zeitachse liest ihn nur noch vorwärts (Grundeintrag einer Berichtigung), Kommentar nachgezogen; Vitest `zeitachseModell.test.ts`
+- [x] 5.2 Zeile liest `berichtigt_durch`, Chip „berichtigt“ + „→ Nr. n“ in der Kopfzeile, weitere in der Hinweiszeile; Vitest `EtbZeitachse.test.tsx` (Berichtigung nicht geladen, Typfilter Meldung); Mutationsprobe: Rückkehr zur Fensterbildung macht den Fall rot
+- [x] 5.3 „Berichtigen“ auch an einer Berichtigung, Leiste nennt die Kette (`berichtigungTitel`); Vitest `EtbZeitachse.test.tsx`, `zeitachseModell.test.ts`
+- [x] 5.4 Doku `einsatztagebuch.md`, „Einen Eintrag berichtigen“: Chip und Berichtigung einer Berichtigung
 
 ## 6. Leise und gebündelte Systemeinträge — LLH-1106 (xnc0gxjh)
 
-- [ ] 6.1 `Zeitachseneintrag` Variante `leise` und `vonAn` ohne „System → System“; Vitest im Baustein und in `EtbZeitachse.test.tsx`
-- [ ] 6.2 Reine Funktion `buendleSystemfolgen` mit Vitest (2 vs. 3, Unterbrechung durch anderen Typ, Stundenwechsel, Nachtrag, berichtigt, Anhang, aus unter `typ=system` und `q`)
-- [ ] 6.3 Bündelzeile in der Zeitachse (`aria-expanded`, Name „n Systemeinträge <von> bis <bis> anzeigen“, offen bleibt offen, Sprung klappt im Render auf); Vitest inkl. `EtbZeitachse.render.test.tsx`
-- [ ] 6.4 Regel in `frontend/src/etb/AGENTS.md` (leise, Bündel, nie im Druck); Doku `einsatztagebuch.md`, „Automatische Einträge“
-- [ ] 6.5 e2e `etb-zeilenhoehe` mit Systemeinträgen (Bündelzeile zählt als eine Zeile), Kontrast der leisen Zeile in `hellmodus-kontrast`
+- [x] 6.1 `Zeitachseneintrag` Variante `leise` und `vonAn` ohne „System → System“; Vitest im Baustein und in `EtbZeitachse.test.tsx`
+- [x] 6.2 Reine Funktion `buendleSystemfolgen` mit Vitest (2 vs. 3, Unterbrechung durch anderen Typ, Stundenwechsel, Nachtrag, berichtigt, Anhang, aus unter `typ=system` und `q`)
+- [x] 6.3 Bündelzeile in der Zeitachse (`aria-expanded`, Name „n Systemeinträge <von>–<bis> anzeigen/zuklappen“, offen bleibt offen, Sprung klappt im Render auf); Vitest `EtbZeitachse.test.tsx`, Mutationsprobe Schlüssel am jüngsten Eintrag macht „offen bleibt offen“ rot
+- [x] 6.4 Regel in `frontend/src/etb/AGENTS.md` (leise, Bündel, nie im Druck); Doku `einsatztagebuch.md`, „Automatische Einträge“
+- [x] 6.5 e2e `etb-zeilenhoehe` mit Systemeinträgen (Bündelzeile zählt als eine Zeile), Kontrast der leisen Zeile in `hellmodus-kontrast`
 
 ## 7. Typ in der Erfassung — LLH-1112 (l0ztbp27)
 
-- [ ] 7.1 Präfix mit Typwort und Kante, Name „Eintragstyp <Typ> ändern“, Menü mit Punkten, Berichtigung „Berichtigung“ mit roter Kante; Vitest `Schnellerfassung.test.tsx`; Selektoren in `EtbPage.test.tsx` und `e2e/etb-folgeauftraege.spec.ts` nachgezogen
-- [ ] 7.2 `Schnellerfassungszeile` mit Opt-in `kante`; Vitest im Baustein
-- [ ] 7.3 „Werte behalten“ nimmt den Typ mit (`nurUebernahme`, `useEtbEntwuerfe`), „+“-Reiter startet als Meldung; Vitest `useEtbEntwuerfe.test.tsx`, `EtbEntwurfsTabs.test.tsx`
-- [ ] 7.4 Erfassungs-Norm „Werte behalten“ in `frontend/AGENTS.md` fortgeschrieben; Doku `einsatztagebuch.md` Schritt 2
+- [x] 7.1 Präfix mit Typwort und Kante, Name „Eintragstyp <Typ> ändern“, Menü mit Punkten, Berichtigung „Berichtigung“ mit roter Kante; Vitest `Schnellerfassung.test.tsx`; Selektoren in `EtbPage.test.tsx` und `e2e/etb-folgeauftraege.spec.ts` nachgezogen
+- [x] 7.2 `Schnellerfassungszeile` mit Opt-in `kante`; Vitest im Baustein
+- [x] 7.3 „Werte behalten“ nimmt den Typ mit (`nurUebernahme`, `useEtbEntwuerfe`), „+“-Reiter startet als Meldung; Vitest `useEtbEntwuerfe.test.tsx`, `EtbEntwurfsTabs.test.tsx`
+- [x] 7.4 Erfassungs-Norm „Werte behalten“ in `frontend/AGENTS.md` fortgeschrieben; Doku `einsatztagebuch.md` Schritt 2
 
 ## 8. Nachtrag — LLH-1088 (ovoyr01i)
 
-- [ ] 8.1 `erkenneZeitBefehl` in `schnellerfassungModell.ts` mit Vitest (`1420`, `14:20`, `101420`, `-15`, unlesbar `2590`, nach einem Typbefehl, Tageswechsel in fremder Anzeigezone)
-- [ ] 8.2 Verdrahtung in `Schnellerfassung` (Chip gesetzt, Rest bleibt Inhalt, unlesbar bleibt Text mit Grund) und Vorschlag „zeit 1420“ im `/`-Menü; Vitest `Schnellerfassung.test.tsx`
-- [ ] 8.3 `zukunftsVerstoss` vor Upload und Warteschlange, Grund am Chip; Chip zeigt den Tag, wenn nicht heute; Vitest `Schnellerfassung.test.tsx`, `MetaChip.test.tsx`
-- [ ] 8.4 Nachtrag-Hinweis mit Tag in `EtbZeitachse` und `EtbEintragVorschau`; Vitest über Mitternacht
-- [ ] 8.5 Regel in `frontend/src/etb/AGENTS.md` (Erfassung) und Doku `einsatztagebuch.md`, „Felder, Bausteine und Werte setzen“; e2e Nachtrag-Ablauf (`/zeit -10` + Text + Enter)
+- [x] 8.1 `erkenneZeitBefehl` in `schnellerfassungModell.ts` mit Vitest (`1420`, `14:20`, `101420`, `-15`, unlesbar `2590`, nach einem Typbefehl, Tageswechsel in fremder Anzeigezone)
+- [x] 8.2 Verdrahtung in `Schnellerfassung` (Chip gesetzt, Rest bleibt Inhalt, unlesbar bleibt Text mit Grund) und Vorschlag „zeit 1420“ im `/`-Menü; Vitest `Schnellerfassung.test.tsx`
+- [x] 8.3 `zukunftsVerstoss` vor Upload und Warteschlange, Grund am Chip; Chip zeigt den Tag, wenn nicht heute; Vitest `Schnellerfassung.test.tsx`, `MetaChip.test.tsx`
+- [x] 8.4 Nachtrag-Hinweis mit Tag in `EtbZeitachse` und `EtbEintragVorschau`; Vitest über Mitternacht
+- [x] 8.5 Regel in `frontend/src/etb/AGENTS.md` (Erfassung) und Doku `einsatztagebuch.md`, „Felder, Bausteine und Werte setzen“; e2e Nachtrag-Ablauf (`/zeit -10` + Text + Enter)
 
 ## 9. Integration
 

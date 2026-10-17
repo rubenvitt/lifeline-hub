@@ -50,7 +50,7 @@ Sprung bräuchten eine zweite Lesart). Serverordnung umdrehen (Cursor, Zähler u
 änderten sich, Migration der Clients ohne Gewinn).
 
 ### D2 Bildlauf: Ende halten, Anker bei Nachladen oben, Mitlaufen an der jüngsten id
-Ein Hook `etb/useFunkprotokollLauf.ts` trägt drei Dinge, alle am Dokument:
+Ein Hook `components/useFunkprotokollLauf.ts` trägt drei Dinge, alle am Dokument:
 1. **Öffnen:** nach der ersten Lieferung ohne `?eintrag=` einmal ans Dokumentende rollen
    (`scrollTo({ top: scrollHeight })`, ohne Glättung).
 2. **Am Ende?** Ein passiver `scroll`-Zuhörer hält `amEnde` (Abstand zum Ende ≤ eine Steuerhöhe).
@@ -63,6 +63,14 @@ Ein Hook `etb/useFunkprotokollLauf.ts` trägt drei Dinge, alle am Dokument:
    merkt der Hook die erste sichtbare Zeile samt `getBoundingClientRect().top` und rollt nach dem
    Commit um die Differenz. Die Zeitachse trägt `overflow-anchor: none`, damit Chromes eigenes
    Scroll-Anchoring nicht doppelt korrigiert; Safari kennt es ohnehin nicht.
+
+**Wo das Ende liegt** (nachgetragen bei der Umsetzung): unter `xl` steht die Bilanz unter der
+Zeitachsenspalte, das Dokumentende zeigte also die Bilanz statt Nr. 134 über der Erfassung. Das
+Ende ist deshalb die Unterkante der Spalte direkt über der angepinnten Erfassung (Option `ende`
+mit `--lfh-etb-fokusabstand`); wer weiter in die Bilanz rollt, gilt als am Ende und wird beim
+Mitlaufen nicht zurückgezogen. Die Bilanz steht darunter um die Höhe der Erfassung abgesetzt, sonst
+läge ihre Oberkante hinter der Erfassung im Fenster und rutschte bei jedem Mitlaufen (CLS, e2e
+`leisten-flaeche` „Laden ohne Sprung“). Das Informationstelefon behält das Dokumentende.
 
 Das Sammelbanner rückt vom oberen an den **unteren** Rand: es klebt über der Erfassung
 (`bottom: var(--lfh-etb-fokusabstand)`), Text „N neue Einträge ↓“, „anzeigen“ taut auf und rollt

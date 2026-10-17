@@ -10,6 +10,7 @@ import type { MeldeWeg } from '../api/types';
 import { MELDEWEG_OPTIONEN, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
 import BuchstabierHilfe from './BuchstabierHilfe';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { useRollen } from '../components/instrument';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
 
@@ -59,6 +60,11 @@ interface Props {
   ausStandard?: boolean;
   /** Öffnet die Rufname-Abfrage; nur an Chips aus dem Standard. */
   onStandardAendern?: () => void;
+  /**
+   * Warum der Wert so nicht gesendet wird („liegt in der Zukunft“, LLH-1088). Steht am Chip,
+   * nicht als Satz darunter: dort, wo man ihn ändert (`frontend/AGENTS.md`, LFH-1078).
+   */
+  grund?: string | null;
 }
 
 function feldDef(feld: MetaFeld) {
@@ -69,11 +75,18 @@ function anzeige(
   feld: MetaFeld,
   wert: Wert,
   formatiere: (d: dayjs.Dayjs, format: string) => string,
+  jetzt: dayjs.Dayjs = serverJetzt(),
 ): string {
   if (wert == null) return '';
   // Uhrzeit in der Anzeigezone, nie im Modus des Objekts: ein wiederhergestellter Entwurf trägt
   // einen UTC-Zeitpunkt (`entwurfModell.zuWerte`) und zeigte sonst die UTC-Uhrzeit (LFH-692).
-  if (feldDef(feld).editor === 'zeit') return formatiere(wert as dayjs.Dayjs, 'HHmm');
+  // Liegt sie nicht an diesem Tag, steht der Tag davor (`DDHHmm`, LLH-1088): „2350“ nach
+  // Mitternacht hieße sonst heute Nacht.
+  if (feldDef(feld).editor === 'zeit') {
+    const z = wert as dayjs.Dayjs;
+    const heute = formatiere(z, 'YYYY-MM-DD') === formatiere(jetzt, 'YYYY-MM-DD');
+    return formatiere(z, heute ? 'HHmm' : 'DDHHmm');
+  }
   if (feld === 'meldeweg')
     return MELDEWEG_OPTIONEN.find((o) => o.value === wert)?.label ?? String(wert);
   return String(wert);
@@ -103,8 +116,10 @@ export default function MetaChip({
   gesperrt = false,
   ausStandard = false,
   onStandardAendern,
+  grund,
 }: Props) {
   const d = feldDef(feld);
+  const { rollen } = useRollen();
   const [text, setText] = useState(typeof wert === 'string' ? wert : '');
   const { formatiere } = useZeitEingabe();
 
@@ -209,6 +224,8 @@ export default function MetaChip({
     <Tag
       title={ausStandard ? STANDARD_TITEL : undefined}
       data-standard={ausStandard ? 'ja' : undefined}
+      // Die Kante als zweiter Kanal neben dem Wort (WCAG 1.4.1).
+      style={grund ? { borderColor: rollen.alarm } : undefined}
     >
       {/* Der Maus-Schnellweg hängt am TEXT, nicht am ganzen Chip.
 
@@ -227,6 +244,12 @@ export default function MetaChip({
       >
         {d.label}: {anzeige(feld, wert, formatiere)}
       </span>
+      {grund && (
+        <span role="alert" data-lfh="chip-grund" style={{ color: rollen.alarmText }}>
+          {' '}
+          · {grund}
+        </span>
+      )}
       {/* `danger` am Entfernen, aber ohne Rückfrage: ein entferntes Metadatenfeld ist umkehrbar,
          „Bearbeiten" daneben legt es wieder an (LFH-363). */}
       <MenueAusloeser

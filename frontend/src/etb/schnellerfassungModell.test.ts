@@ -3,6 +3,8 @@ import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
 import type { EtbBaustein } from '../api/types';
 import {
+  erkenneZeitBefehl,
+  zukunftsVerstoss,
   amZeilenanfang,
   atZielFeld,
   baueEintrag,
@@ -230,5 +232,67 @@ describe('@ für Von/An (Neuentwurf S4)', () => {
   it('kehrt den Schlüssel um, auch wenn der Name selbst einen Doppelpunkt trägt', () => {
     expect(einheitAusSchluessel('an:ELW 1')).toEqual({ feld: 'an', wert: 'ELW 1' });
     expect(einheitAusSchluessel('von:Ruf: 4/83-1')).toEqual({ feld: 'von', wert: 'Ruf: 4/83-1' });
+  });
+});
+
+describe('erkenneZeitBefehl (LLH-1088)', () => {
+  // 14:31 in Berlin.
+  const o = { zone: 'Europe/Berlin', jetzt: dayjs.utc('2026-10-17T12:31:00Z') };
+  const zeit = (text: string, opt = o) => {
+    const r = erkenneZeitBefehl(text, opt);
+    return r && r.ok ? { iso: r.zeitpunkt.toISOString(), rest: r.rest } : r;
+  };
+
+  it('liest Uhrzeit, Uhrzeit mit Doppelpunkt, Tag mit Uhrzeit und relativ; der Rest bleibt Inhalt', () => {
+    expect(zeit('/zeit 1420 Pumpe läuft')).toEqual({
+      iso: '2026-10-17T12:20:00.000Z',
+      rest: 'Pumpe läuft',
+    });
+    expect(zeit('/zeit 14:20 Pumpe')).toEqual({ iso: '2026-10-17T12:20:00.000Z', rest: 'Pumpe' });
+    expect(zeit('/zeit 161420 Pumpe')).toEqual({ iso: '2026-10-16T12:20:00.000Z', rest: 'Pumpe' });
+    expect(zeit('/zeit -10 Lage ruhig')).toEqual({
+      iso: '2026-10-17T12:21:00.000Z',
+      rest: 'Lage ruhig',
+    });
+    expect(zeit('/zeit -15 ')).toEqual({ iso: '2026-10-17T12:16:00.000Z', rest: '' });
+  });
+
+  it('nennt bei einer unlesbaren Angabe den Grund und setzt nichts', () => {
+    const r = erkenneZeitBefehl('/zeit 2590 Pumpe', o);
+    expect(r).toMatchObject({ ok: false });
+    expect(r && !r.ok && r.grund).toBeTruthy();
+  });
+
+  it('greift erst nach dem Leerzeichen hinter der Angabe und nur am Textanfang', () => {
+    expect(erkenneZeitBefehl('/zeit', o)).toBeNull();
+    expect(erkenneZeitBefehl('/zeit 1420', o)).toBeNull();
+    expect(erkenneZeitBefehl('Lage /zeit 1420 x', o)).toBeNull();
+    expect(erkenneZeitBefehl('/zeitlich 1420 x', o)).toBeNull();
+  });
+
+  it('liest die Uhrzeit in der Anzeigezone: kurz nach Mitternacht liegt 2350 am Vortag', () => {
+    // 00:30 in Tokio am 18.10.; der Prozess läuft in Berlin.
+    const tokio = { zone: 'Asia/Tokyo', jetzt: dayjs.utc('2026-10-17T15:30:00Z') };
+    expect(zeit('/zeit 2350 Wache', tokio)).toEqual({
+      iso: '2026-10-17T14:50:00.000Z',
+      rest: 'Wache',
+    });
+  });
+});
+
+describe('zukunftsVerstoss (LLH-1088)', () => {
+  const jetzt = dayjs.utc('2026-10-17T12:20:00Z');
+
+  it('lässt 60 s Uhrenspiel zu und weist alles darüber ab', () => {
+    expect(zukunftsVerstoss({}, jetzt)).toBeNull();
+    expect(zukunftsVerstoss({ ereigniszeit: jetzt.subtract(4, 'hour') }, jetzt)).toBeNull();
+    expect(zukunftsVerstoss({ ereigniszeit: jetzt.add(60, 'second') }, jetzt)).toBeNull();
+    expect(zukunftsVerstoss({ ereigniszeit: jetzt.add(61, 'second') }, jetzt)).toBe(
+      'liegt in der Zukunft',
+    );
+    // Tippfehler 1820 statt 1420.
+    expect(zukunftsVerstoss({ ereigniszeit: jetzt.add(4, 'hour') }, jetzt)).toBe(
+      'liegt in der Zukunft',
+    );
   });
 });

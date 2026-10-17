@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
+quellen: [frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
 ---
 
 ## Überblick
@@ -48,10 +48,11 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Erfassungsleiste am Fuß der Seite den Text in das Feld „Inhalt …“ schreiben.
 
-   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ /meldung, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
+   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ „Meldung“ mit Farbkante, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
 
-2. Den Typ prüfen: Der Knopf links (zum Beispiel „/meldung“) wechselt ihn. Schneller geht es
-   mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
+2. Den Typ prüfen: Der Knopf links zeigt ihn als Wort, zum Beispiel „Meldung“, und die Leiste
+   trägt links seine Farbkante wie die Zeitachse. Ein Klick darauf wechselt den Typ. Schneller
+   geht es mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
 3. „Von“ und „An“ prüfen. Beide sind mit dem persönlichen Standard-Rufnamen vorbelegt. Das Menü
    eines Chips bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“; ein „@“ im
    Text setzt ebenfalls einen Rufnamen ein.
@@ -67,9 +68,17 @@ erscheinen wird.
 1. In der Erfassungsleiste „+ Feld“ wählen oder einen Schrägstrich mitten im Text tippen.
 2. Ein Feld wählen: „Ereigniszeit“ (für einen Nachtrag), „Von“, „An“, „Meldeweg“ (Funk, Telefon,
    Persönlich, Sonstige) oder „Veranlassung“. Darunter stehen die Textbausteine der Organisation.
-3. Den Wert eintragen und den Eintrag wie gewohnt erfassen.
+3. Den Wert eintragen und den Eintrag wie gewohnt erfassen. Schneller geht ein Nachtrag mit
+   „/zeit“ am Textanfang: „/zeit 1420 Pumpe läuft“ setzt die Ereigniszeit auf 14:20, „/zeit -10“
+   auf zehn Minuten vor jetzt; der Rest der Zeile bleibt der Inhalt. Erlaubt sind dieselben
+   Angaben wie im Zeitfeld (etwa „1420“, „14:20“, „101420“). Eine unlesbare Angabe bleibt als
+   Text stehen, und unter dem Feld steht der Grund. Eine Ereigniszeit in der Zukunft nimmt die
+   Erfassung nicht an: der Chip nennt „liegt in der Zukunft“, Text und Felder bleiben stehen.
+   Liegt die Ereigniszeit an einem anderen Tag, zeigt der Chip den Tag mit, etwa „162350“.
 4. Wer mehrere Einträge vom selben Absender hintereinander erfasst, setzt das Häkchen „Werte
-   behalten“: „Von“, „An“ und „Meldeweg“ bleiben dann nach dem Erfassen stehen.
+   behalten“: „Von“, „An“, „Meldeweg“ und der Typ bleiben dann nach dem Erfassen stehen, eine
+   Folge von Anordnungen bleibt also Anordnungen. Ohne Häkchen und in einem neuen Reiter über „+“
+   beginnt der nächste Eintrag als „Meldung“.
 
 Die Chips „Von“ und „An“ bieten eine Buchstabierhilfe mit den Tafeln „Deutsch“ und „NATO“. Bei
 Typ „Lage“ führt der Verweis „Als strukturierten Lagebericht erfassen →“ zu den Lageberichten
@@ -134,12 +143,16 @@ Für Einsatzleitung und Führungspersonal:
 1. An dem Eintrag das Menü „Aktionen zu Eintrag …“ öffnen und „Berichtigen“ wählen.
 2. Die Erfassungsleiste zeigt „Berichtigung zu Nr. …“. Den richtigen Wortlaut schreiben.
 
-   ![Erfassungsleiste im Modus „Berichtigung zu Nr. 134“ mit dem Typ /berichtigung, dem neuen Text und „Abbrechen“](../bilder/einsatztagebuch/berichtigung.png)
+   ![Erfassungsleiste im Modus „Berichtigung zu Nr. 134“ mit dem Typ „Berichtigung“, dem neuen Text und „Abbrechen“](../bilder/einsatztagebuch/berichtigung.png)
 
 3. „Erfassen“ wählen. „Abbrechen“ verlässt den Modus ohne Eintrag.
 
-Der alte Eintrag zeigt danach „berichtigt durch Nr. …“, die Berichtigung „berichtigt Nr. …“ mit
-dem Verweis „Grundeintrag anzeigen ↗“.
+Der alte Eintrag trägt danach in seiner Kopfzeile die Marke „berichtigt“ und den Sprung „→ Nr. …“
+auf die jüngste Berichtigung; sein Text bleibt unverändert lesbar. Die Marke steht auch, wenn die
+Berichtigung gerade nicht angezeigt ist, etwa unter dem Typfilter „Meldung“. Die Berichtigung
+zeigt „berichtigt Nr. …“ mit dem Verweis „Grundeintrag anzeigen ↗“. Auch eine Berichtigung lässt
+sich wieder berichtigen; die Erfassungsleiste nennt dann die Kette, etwa „Berichtigung zu Nr. 135
+(berichtigt Nr. 134)“.
 
 ### Eine Wiedervorlage anlegen
 
@@ -175,7 +188,8 @@ erteilen (keine Berechtigung)“ da. Wie Aufträge weiterlaufen, beschreibt das 
 
 Das ETB ist ein Beleg. Ein Eintrag bleibt so, wie er erfasst wurde; die Korrektur steht als
 eigener, verknüpfter Eintrag daneben. Weicht die Ereigniszeit um mindestens eine Minute vom
-Eingang ab, zeigt der Eintrag „⧖ nachgetragen um …“.
+Eingang ab, zeigt der Eintrag „⧖ nachgetragen um …“; wurde er an einem anderen Tag erfasst als
+das Ereignis, steht der Tag dabei, etwa „⧖ nachgetragen 110020“.
 
 ### Automatische Einträge
 
@@ -190,6 +204,14 @@ Ob Meldungen und erteilte Aufträge einen Eintrag erzeugen, legt in den Einstell
 Einsatzes unter „Verhalten & Automatik“ das Feld „Automatische ETB-Einträge“ fest; ohne Angabe gilt die Vorgabe
 der Organisation, sonst „An“ ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Ein
 automatischer Eintrag zeigt einen Verweis auf seinen Ursprung, etwa „Auftrag ↗“ oder „Befehl ↗“.
+
+Systemeinträge stehen leiser als Handeinträge: kleinere, gedämpfte Schrift, der Text ungekürzt.
+„System → System“ entfällt, eine bekannte Seite wie „System → ELW 1“ bleibt. Folgen drei oder mehr
+Systemeinträge innerhalb einer Stunde direkt aufeinander, fasst das ETB sie zu einer Zeile
+„3 Systemeinträge · 1301–1312 · anzeigen“ zusammen; „anzeigen“ klappt sie auf, „zuklappen“
+wieder zu. Ein Systemeintrag mit Berichtigung, Nachtrag, Anhang, Dokument oder Verweis steht immer
+einzeln. Unter dem Typfilter „System“, bei einer Volltextsuche und im Druck wird nichts
+zusammengefasst; ein Link auf einen zusammengefassten Eintrag klappt seine Zeile auf.
 
 ### Entwürfe auf dem Gerät
 

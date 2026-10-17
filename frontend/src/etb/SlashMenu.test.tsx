@@ -41,7 +41,10 @@ describe('SlashMenu', () => {
       key: 'ereigniszeit',
       label: 'Ereigniszeit',
       gesetzt: false,
+      hinweis: '/zeit 1420',
     });
+    // Die Kurzeingabe steht neben dem Feld (LLH-1088).
+    expect(screen.getByText('/zeit 1420')).toBeInTheDocument();
   });
 
   it('filtert und wählt den ersten Treffer per Enter (über externes keydown)', async () => {

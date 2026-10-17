@@ -2,7 +2,9 @@ import type { CSSProperties } from 'react';
 import type { EtbFilterWerte } from '../api/etb';
 import type { EtbEintragAnzeige, EtbTyp, EtbZaehler } from '../api/types';
 import type { AbgelehnterEintrag, AusstehenderEintrag } from '../offline/queue';
+import { formatUhrzeit, inZone, type AnzeigeKonventionen } from '../anzeige/format';
 import type { EtbZeile } from './etbZeile';
+import { istNachgetragen } from './typFarben';
 
 /** Zahl je Typ aus der serverseitigen Zählung (LFH-612). */
 type EtbTypZaehler = EtbZaehler['je_typ'];
@@ -64,6 +66,78 @@ export function gruppiereNachStunde(
   return gruppen;
 }
 
+// ── Folgen von Systemeinträgen (LLH-1106) ─────────────────────────────────────────────
+
+/** Ab so vielen direkt aufeinanderfolgenden schlichten Systemeinträgen steht eine Bündelzeile. */
+export const BUENDEL_SCHWELLE = 3;
+
+/** Eine Bündelzeile: die gesendeten Systemeinträge darin, älteste zuerst. */
+export interface SystemBuendel {
+  art: 'buendel';
+  /** Nach dem ÄLTESTEN Eintrag: die Folge wächst unten, der Schlüssel (und „offen“) bleibt. */
+  schluessel: string;
+  zeilen: Extract<EtbZeile, { art: 'eintrag' }>[];
+}
+
+export type Zeitachsenposten = EtbZeile | SystemBuendel;
+
+/**
+ * Bündelt in einer Stundengruppe (Funkprotokoll-Ordnung, älteste zuerst) jede Folge von
+ * mindestens {@link BUENDEL_SCHWELLE} direkt aufeinanderfolgenden SCHLICHTEN Systemeinträgen
+ * (Spec `etb-zeitachse-darstellung`, „Folgen von Systemeinträgen gebündelt“). Schlicht heißt:
+ * nicht berichtigt, nicht nachgetragen, ohne Anhang, Dokument und Rückverweis — ein solcher
+ * Eintrag hat etwas zu sagen und bricht die Folge. Gepufferte Zeilen bündeln nie.
+ *
+ * `aus` unter `typ=system` und einer Volltextsuche: dort sucht jemand genau diese Einträge.
+ * `brichtNach` beendet eine Folge nach der Zeile (die Lesemarke darf nicht im Bündel stehen).
+ * Ob ein Bündel offen ist, entscheidet die Zeitachse im Render, nicht diese Funktion.
+ */
+export function buendleSystemfolgen(
+  zeilen: readonly EtbZeile[],
+  optionen: {
+    aus?: boolean;
+    hatDokument?: (eintragId: number) => boolean;
+    brichtNach?: (z: EtbZeile) => boolean;
+  },
+): Zeitachsenposten[] {
+  if (optionen.aus) return [...zeilen];
+  const posten: Zeitachsenposten[] = [];
+  let folge: SystemBuendel['zeilen'] = [];
+  const schliessen = () => {
+    if (folge.length >= BUENDEL_SCHWELLE) {
+      posten.push({ art: 'buendel', schluessel: `buendel-${folge[0].schluessel}`, zeilen: folge });
+    } else {
+      posten.push(...folge);
+    }
+    folge = [];
+  };
+  for (const z of zeilen) {
+    if (z.art === 'eintrag' && istSchlichterSystemeintrag(z.eintrag, optionen.hatDokument)) {
+      folge.push(z);
+    } else {
+      schliessen();
+      posten.push(z);
+    }
+    if (optionen.brichtNach?.(z)) schliessen();
+  }
+  schliessen();
+  return posten;
+}
+
+function istSchlichterSystemeintrag(
+  e: EtbEintragAnzeige,
+  hatDokument?: (eintragId: number) => boolean,
+): boolean {
+  return (
+    e.typ === 'system' &&
+    (e.berichtigt_durch ?? []).length === 0 &&
+    !istNachgetragen(e.ereigniszeit, e.received_at) &&
+    e.anhaenge.length === 0 &&
+    !hatVerknuepfung(e) &&
+    !hatDokument?.(e.id)
+  );
+}
+
 // ── Berichtigungsverknüpfung ────────────────────────────────────────────────────────
 
 interface Verweis {
@@ -86,10 +160,10 @@ export interface Berichtigungsindex {
  * (`lfd_nr: null`), und der Aufrufer darf sie nicht erfinden. Die Gegenrichtung kennt nur,
  * was geladen ist.
  *
- * Der Server liefert die Gegenrichtung inzwischen vollständig am Eintrag (`berichtigt_durch`,
- * LFH-689; die Palette-Vorschau liest sie dort). Zeitachse, Druck und Bilanz bilden sie bewusst
- * weiter hier: umgestellt zeigte die gefilterte Zeitachse auch Berichtigungen außerhalb der
- * Liste — eine eigene Entscheidung, kein Beifang.
+ * Der Server liefert die Gegenrichtung vollständig am Eintrag (`berichtigt_durch`, LFH-689). Die
+ * Zeitachse und die Palette-Vorschau lesen sie dort (LLH-1099, Entscheidung 17.10.2026: ein
+ * berichtigter Eintrag ist auch unter Filter als berichtigt zu sehen). Druck und Bilanz bilden sie
+ * weiter hier, über die Einträge, die sie selbst geladen haben.
  */
 export function berichtigungsindex(eintraege: readonly EtbEintragAnzeige[]): Berichtigungsindex {
   const lfdNrVonId = new Map(eintraege.map((e) => [e.id, e.lfd_nr]));
@@ -357,4 +431,38 @@ export function dokumenteJeEintrag<D extends { bezug_etb_eintrag_id?: number | n
     else je.set(bezug, [d]);
   }
   return je;
+}
+
+/**
+ * Titel der Erfassung im Berichtigungsmodus (LLH-1099): „Berichtigung zu Nr. 135“, an einer
+ * Berichtigung mit der Kette „(berichtigt Nr. 134)“. Die Nummer des Grundeintrags kennt nur, wer
+ * ihn geladen hat; sonst wird keine erfunden.
+ */
+export function berichtigungTitel(
+  zu: Pick<EtbEintragAnzeige, 'lfd_nr' | 'typ'>,
+  grundNr: number | null | undefined,
+): string {
+  const titel = `Berichtigung zu Nr. ${zu.lfd_nr}`;
+  if (zu.typ !== 'berichtigung') return titel;
+  return grundNr != null
+    ? `${titel} (berichtigt Nr. ${grundNr})`
+    : `${titel} (berichtigt einen älteren Eintrag)`;
+}
+
+/**
+ * Der Hinweis an einem Nachtrag (LLH-1088, Spec `etb-zeitachse-darstellung`, „Nachtrag mit Tag“):
+ * am selben Kalendertag der Anzeigezone genügt die Uhrzeit („nachgetragen um 14:21“), über
+ * Mitternacht steht die Erfassung mit Tag in taktischer Form („nachgetragen 110020“) — sonst läse
+ * „um 00:20“ sich wie vor der Ereigniszeit. Ob es ein Nachtrag ist, sagt `istNachgetragen`.
+ */
+export function nachtragText(
+  ereigniszeit: string,
+  receivedAt: string,
+  konv: AnzeigeKonventionen,
+): string {
+  const ereignis = inZone(ereigniszeit, konv);
+  const erfasst = inZone(receivedAt, konv);
+  return ereignis.isSame(erfasst, 'day')
+    ? `nachgetragen um ${formatUhrzeit(receivedAt, konv)}`
+    : `nachgetragen ${erfasst.format('DDHHmm')}`;
 }

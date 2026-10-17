@@ -125,6 +125,16 @@ describe('useEtbEntwuerfe', () => {
     expect(result.current.entwuerfe[0].inhalt).toBe('');
   });
 
+  it('entwurfSchliessen beginnt den Folgeentwurf im übergebenen Typ (LLH-1112)', async () => {
+    await entwurfSpeichern(entwurf({ id: 'x', inhalt: 'A' }));
+    const { result } = renderHook(() => useEtbEntwuerfe(ICH, 7));
+    await waitFor(() => expect(result.current.entwuerfe).toHaveLength(1));
+    await act(async () => {
+      await result.current.entwurfSchliessen('x', {}, 'anordnung');
+    });
+    expect(result.current.entwuerfe[0].typ).toBe('anordnung');
+  });
+
   it('LFH-1139: scheitert das Entfernen, schließt der Reiter trotzdem und hält den Grund', async () => {
     await entwurfSpeichern(entwurf({ id: 'A', inhalt: 'A' }));
     await entwurfSpeichern(entwurf({ id: 'B', inhalt: 'B' }));

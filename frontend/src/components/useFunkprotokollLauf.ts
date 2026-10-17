@@ -10,7 +10,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
  * Fokusabstand):
  *
  * 1. **Öffnen am Ende.** Steht die Liste zum ersten Mal (`bereit`), rollt die Seite einmal ans
- *    Dokumentende — der jüngste Eintrag steht ohne Rollen über der Erfassung. Ein Sprungziel
+ *    Ende (Dokumentende oder `ende`) — der jüngste Eintrag steht ohne Rollen über der Erfassung. Ein Sprungziel
  *    (`ohneStartlauf`) rollt selbst.
  * 2. **Mitlaufen an der jüngsten Zeile.** Stand die Seite am Ende, als eine neue jüngste Zeile
  *    kam, rollt sie mit — an der jüngsten Kennung, nicht an der Länge (`frontend/AGENTS.md`,
@@ -55,20 +55,47 @@ interface Optionen {
   aelteste: string | undefined;
   /** Beim Öffnen nicht ans Ende rollen, etwa weil ein Sprungziel selbst rollt. */
   ohneStartlauf?: boolean;
+  /**
+   * Wo das Ende liegt, wenn unter der Liste noch etwas steht (ETB unter `xl`: die Bilanz): die
+   * Unterkante von `spalte` direkt über der angepinnten Erfassung, deren gemessene Höhe in
+   * `fussVariable` am Dokument steht (`components/fokusabstandUnten.ts`). Ohne Angabe ist das
+   * Ende das Dokumentende. Darunter weitergerollt gilt weiter „am Ende“, und Mitlaufen zieht
+   * niemanden zurück.
+   */
+  ende?: { spalte: RefObject<HTMLElement | null>; fussVariable: string };
 }
+
+type Ende = Optionen['ende'];
 
 function scroller(): HTMLElement {
   return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
 }
 
-/** Steht das Fenster am Dokumentende? Ohne Überlauf immer. */
-export function istAmEnde(): boolean {
-  const el = scroller();
-  return el.scrollHeight - (window.scrollY + window.innerHeight) <= AM_ENDE_SCHWELLE_PX;
+/** Wie weit das Ende noch unter dem Sichtbaren liegt (px); ≤ 0 heißt: es steht im Bild. */
+function restBisEnde(ende: Ende): number {
+  const spalte = ende?.spalte.current;
+  if (!ende || !spalte) {
+    return scroller().scrollHeight - (window.scrollY + window.innerHeight);
+  }
+  const fuss =
+    Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue(ende.fussVariable),
+    ) || 0;
+  return spalte.getBoundingClientRect().bottom - (window.innerHeight - fuss);
 }
 
-function rolleAnsEnde() {
-  window.scrollTo?.({ top: scroller().scrollHeight, behavior: 'instant' });
+/** Steht das Fenster am Ende? Ohne Überlauf immer. */
+export function istAmEnde(ende?: Ende): boolean {
+  return restBisEnde(ende) <= AM_ENDE_SCHWELLE_PX;
+}
+
+function rolleAnsEnde(ende?: Ende) {
+  if (!ende) {
+    window.scrollTo?.({ top: scroller().scrollHeight, behavior: 'instant' });
+    return;
+  }
+  const rest = restBisEnde(ende);
+  if (rest > 0) window.scrollBy?.({ top: rest, behavior: 'instant' });
 }
 
 /** Die erste Zeile, deren Unterkante im Fenster liegt — die Lesestelle oben. */
@@ -87,21 +114,27 @@ export function useFunkprotokollLauf({
   juengste,
   aelteste,
   ohneStartlauf = false,
+  ende,
 }: Optionen): { amEnde: boolean; zumEnde: () => void } {
+  // Über einen Ref gelesen: die Seite baut das Objekt je Render neu, die Rückrufe bleiben stabil.
+  const endeRef = useRef(ende);
+  useLayoutEffect(() => {
+    endeRef.current = ende;
+  });
   const [amEnde, setAmEnde] = useState(true);
   const amEndeRef = useRef(true);
   const anker = useRef<Anker | null>(null);
   const gestartet = useRef(false);
 
   const merke = useCallback(() => {
-    const jetzt = istAmEnde();
+    const jetzt = istAmEnde(endeRef.current);
     amEndeRef.current = jetzt;
     setAmEnde(jetzt);
     anker.current = obersteSichtbare(wurzel.current);
   }, [wurzel]);
 
   const zumEnde = useCallback(() => {
-    rolleAnsEnde();
+    rolleAnsEnde(endeRef.current);
     amEndeRef.current = true;
     setAmEnde(true);
   }, []);
@@ -148,15 +181,15 @@ export function useFunkprotokollLauf({
       if (!ohneStartlauf) {
         zumEnde();
         rahmen = requestAnimationFrame(() => {
-          if (amEndeRef.current) rolleAnsEnde();
+          if (amEndeRef.current) rolleAnsEnde(endeRef.current);
         });
       } else {
-        amEndeRef.current = istAmEnde();
+        amEndeRef.current = istAmEnde(endeRef.current);
         setAmEnde(amEndeRef.current);
       }
     } else if (amEndeRef.current && (neueJuengste || neueAelteste)) {
       // 2. Mitlaufen: stand die Seite am Ende, folgt sie der neuen jüngsten Zeile.
-      rolleAnsEnde();
+      rolleAnsEnde(endeRef.current);
     } else if (neueAelteste && anker.current) {
       // 3. Anker: die Lesestelle bleibt am Schirm.
       const a = anker.current;

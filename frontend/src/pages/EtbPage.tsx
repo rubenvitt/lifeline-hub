@@ -396,6 +396,7 @@ export default function EtbPage() {
   const [hervorhebung, setHervorhebung] = useState<{ id: number; marke: number } | null>(null);
   const highlightId = hervorhebung?.id ?? null;
   const zeitachseKopf = useRef<HTMLDivElement>(null);
+  const zeitachsenSpalte = useRef<HTMLDivElement>(null);
   const { abBreite, istSchmal } = useViewport();
   /**
    * Handschirm, zuerst die Zeitachse (LFH-955, design.md D4): unter `md` stehen Volltext,
@@ -612,6 +613,9 @@ export default function EtbPage() {
     juengste: chronologie[0]?.schluessel,
     aelteste: chronologie[chronologie.length - 1]?.schluessel,
     ohneStartlauf: zielEintragId != null,
+    // Unter `xl` steht die Bilanz unter der Spalte: das Ende ist die Spalte über der Erfassung,
+    // nicht das Dokumentende — sonst stünde beim Öffnen die Bilanz im Bild statt Nr. 134.
+    ende: { spalte: zeitachsenSpalte, fussVariable: FOKUSABSTAND_ETB },
   });
 
   /**
@@ -819,6 +823,11 @@ export default function EtbPage() {
                 key="berichtigung"
                 erfassen={erfassenUndZeigen}
                 berichtigungZu={berichtigungZu}
+                // Kette einer Berichtigung (LLH-1099): die Nummer nur mit geladenem Grundeintrag.
+                berichtigungGrundNr={
+                  eintraege.find((x) => x.id === berichtigungZu.berichtigt_eintrag_id)?.lfd_nr ??
+                  null
+                }
                 onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
                 bausteine={bausteineQuery.data ?? []}
                 einsatz={einsatz}
@@ -966,7 +975,7 @@ export default function EtbPage() {
           gap: token.marginLG,
         }}
       >
-        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+        <div ref={zeitachsenSpalte} style={{ flex: '1 1 auto', minWidth: 0 }}>
           {/* Eine Filterleiste über der Zeitachse (LLH-1065): ab `md` Typ, System, Zeitraum,
               Einheit und Volltext; unter `md` hinter „Filter (n)“. Entprellung und die Weiche
               „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. */}
@@ -1056,6 +1065,8 @@ export default function EtbPage() {
               einsatzId={einsatzId}
               highlightId={highlightId}
               fundstellen={filter.q}
+              // Unter „System“ sucht jemand genau diese Einträge: dort kein Bündel (LLH-1106).
+              buendeln={filter.typ !== 'system'}
               sprungMarke={hervorhebung?.marke}
               eigeneBenutzerId={benutzer?.id}
               amEnde={amEnde}
@@ -1154,7 +1165,10 @@ export default function EtbPage() {
                     // Unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
                     top: `calc(var(--lfh-rahmen-oben, 0px) + ${token.margin}px)`,
                   }
-                : undefined
+                : // Darunter um die Höhe der angepinnten Erfassung abgesetzt (LLH-1149): am Ende
+                  // steht die Spalte direkt über der Erfassung, und die Bilanz läge sonst mit
+                  // ihrer Oberkante hinter ihr im Fenster und rutschte bei jedem Mitlaufen.
+                  { marginBlockStart: `var(${FOKUSABSTAND_ETB}, 0px)` }
             }
           >
             <EtbBilanz

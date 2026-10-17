@@ -178,10 +178,62 @@ describe('EtbZeitachse – der Eintrag', () => {
     expect(b).toHaveAttribute('data-toenung', 'berichtigung');
     expect(b.querySelector('[data-lfh="typwort"]')).toHaveTextContent('Berichtigung');
 
-    const o = zeileVon(container, 'eintrag-1');
-    expect(within(o).getByRole('link', { name: 'berichtigt durch Nr. 2' })).toHaveAttribute(
+    // Der Grundeintrag liest „berichtigt durch“ aus dem Wire (LLH-1099), nicht aus dem Fenster.
+    const o = zeileVon(
+      renderZeitachse({
+        eintraege: [korrektur, { ...original, berichtigt_durch: [{ id: 2, lfd_nr: 2 }] }],
+      }).container,
+      'eintrag-1',
+    );
+    expect(within(o).getByRole('link', { name: '→ Nr. 2' })).toHaveAttribute(
       'href',
       '/einsaetze/1/etb?eintrag=2',
+    );
+  });
+
+  /*
+   * LLH-1099: ein berichtigter Eintrag ist IMMER als „berichtigt“ gekennzeichnet — auch unter
+   * Typfilter oder außerhalb des Fensters, wo seine Berichtigung nicht geladen ist.
+   */
+  it('kennzeichnet einen berichtigten Eintrag, auch wenn die Berichtigung nicht geladen ist', () => {
+    const { container } = renderZeitachse({
+      eintraege: [
+        eintrag({
+          id: 1,
+          lfd_nr: 134,
+          inhalt: 'Pumpe Lindenstraße 4',
+          berichtigt_durch: [{ id: 9, lfd_nr: 135 }],
+        }),
+      ],
+    });
+    const z = zeileVon(container, 'eintrag-1');
+    expect(within(z).getByText('berichtigt')).toBeInTheDocument();
+    expect(within(z).getByRole('link', { name: '→ Nr. 135' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/etb?eintrag=9',
+    );
+    // Der Text bleibt vollständig lesbar — der Eintrag ist ein Beleg.
+    expect(z).toHaveTextContent('Pumpe Lindenstraße 4');
+  });
+
+  it('nennt bei mehreren Berichtigungen die jüngste zuerst, die übrigen in der Hinweiszeile', () => {
+    const { container } = renderZeitachse({
+      eintraege: [
+        eintrag({
+          id: 1,
+          lfd_nr: 100,
+          berichtigt_durch: [
+            { id: 5, lfd_nr: 120 },
+            { id: 8, lfd_nr: 140 },
+          ],
+        }),
+      ],
+    });
+    const z = zeileVon(container, 'eintrag-1');
+    expect(within(z).getByRole('link', { name: '→ Nr. 140' })).toBeInTheDocument();
+    expect(within(z).getByRole('link', { name: 'auch berichtigt durch Nr. 120' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/etb?eintrag=5',
     );
   });
 
@@ -353,13 +405,16 @@ describe('EtbZeitachse – Aktionsmenü (LFH-365 · B5e)', () => {
     expect(onAuftragErteilen).toHaveBeenCalledWith(expect.objectContaining({ id: 4 }));
   });
 
-  it('lässt „Berichtigen" an einer Berichtigung weg', async () => {
+  it('bietet „Berichtigen" auch an einer Berichtigung an (LLH-1099)', async () => {
+    const onBerichtigen = vi.fn();
     renderZeitachse({
       eintraege: [eintrag({ id: 2, lfd_nr: 2, typ: 'berichtigung', berichtigt_eintrag_id: 1 })],
       ...alle,
+      onBerichtigen,
     });
     const menue = await oeffneMenue(2);
-    expect(within(menue).queryByRole('menuitem', { name: 'Berichtigen' })).toBeNull();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Berichtigen' }));
+    expect(onBerichtigen).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
   });
 
   it('rendert keinen Auslöser, wenn keine Aktion übrig bleibt (Lesende)', () => {
@@ -620,6 +675,84 @@ describe('EtbZeitachse – Lesemarke als Trennlinie (LLH-1149)', () => {
       (el) => el.getAttribute('data-zeile') ?? 'linie',
     );
     expect(folge).toEqual(['eintrag-1', 'eintrag-2', 'linie', 'eintrag-3']);
+  });
+});
+
+describe('EtbZeitachse – Systemeinträge (LLH-1106)', () => {
+  const sys = (id: number, over: Partial<EtbEintragAnzeige> = {}) =>
+    eintrag({
+      id,
+      lfd_nr: id,
+      typ: 'system',
+      inhalt: `Status ${id}`,
+      von: 'System',
+      an: 'System',
+      meldeweg: null,
+      ereigniszeit: `2026-05-23 10:0${id}:00`,
+      received_at: `2026-05-23 10:0${id}:01`,
+      ...over,
+    });
+  // Serverordnung: jüngste zuerst.
+  const folge = (n: number) => Array.from({ length: n }, (_, i) => sys(n - i));
+
+  it('steht leise und ohne „System → System“, Verfasser bleibt', () => {
+    const { container } = renderZeitachse({ eintraege: [sys(1)] });
+    const z = zeileVon(container, 'eintrag-1');
+    expect(z).toHaveAttribute('data-leise', 'true');
+    expect(z).not.toHaveTextContent('System → System');
+    expect(z).toHaveTextContent('Max');
+  });
+
+  it('zeigt eine bekannte Seite weiter', () => {
+    const { container } = renderZeitachse({ eintraege: [sys(1, { an: 'ELW 1' })] });
+    expect(zeileVon(container, 'eintrag-1')).toHaveTextContent('System → ELW 1');
+  });
+
+  it('lässt einen Handeintrag laut', () => {
+    const { container } = renderZeitachse({ eintraege: [eintrag()] });
+    expect(zeileVon(container, 'eintrag-1')).not.toHaveAttribute('data-leise');
+  });
+
+  it('lässt zwei stehen und bündelt drei zu einer Zeile, zu bis zum Aufklappen', async () => {
+    const zwei = renderZeitachse({ eintraege: folge(2) });
+    expect(screen.queryByTestId('etb-buendelzeile')).toBeNull();
+    zwei.unmount();
+
+    renderZeitachse({ eintraege: folge(3) });
+    const knopf = screen.getByRole('button', { name: /^3 Systemeinträge .+ anzeigen$/ });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Status 2')).toBeNull();
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Status 2')).toBeInTheDocument();
+  });
+
+  it('bleibt aufgeklappt, wenn die Folge unten wächst', async () => {
+    const { neu } = renderZeitachse({ eintraege: folge(3) });
+    await userEvent.click(screen.getByRole('button', { name: /3 Systemeinträge/ }));
+    // Fokus raus: sonst hielte die Zeitachse den neuen Eintrag zurück (Sammelbanner).
+    act(() => (document.activeElement as HTMLElement).blur());
+    neu(baueZeilen({ eintraege: folge(4), ausstehend: [], abgelehnt: [] }));
+    const knopf = screen.getByRole('button', { name: /4 Systemeinträge/ });
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Status 4')).toBeInTheDocument();
+  });
+
+  it('klappt ein Bündel auf, in das ein Sprung zeigt, und hebt den Eintrag hervor', () => {
+    const { container } = renderZeitachse({ eintraege: folge(3), highlightId: 2, sprungMarke: 1 });
+    expect(screen.getByRole('button', { name: /3 Systemeinträge/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(zeileVon(container, 'eintrag-2').className).toContain('zeile-hervorgehoben');
+  });
+
+  it('bündelt nicht unter einer Volltextsuche und nicht, wenn die Seite es abschaltet', () => {
+    const q = renderZeitachse({ eintraege: folge(3), fundstellen: 'Status' });
+    expect(screen.queryByTestId('etb-buendelzeile')).toBeNull();
+    q.unmount();
+    renderZeitachse({ eintraege: folge(3), buendeln: false });
+    expect(screen.queryByTestId('etb-buendelzeile')).toBeNull();
   });
 });
 

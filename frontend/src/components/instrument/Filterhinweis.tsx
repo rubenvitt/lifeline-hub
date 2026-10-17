@@ -15,7 +15,8 @@ import { monoStil, useRollen } from './rollenwerte';
  *
  * ZAHLEN nur von außen, und nur aus einer Serverzählung (`frontend/src/etb/AGENTS.md`, „Kopfzahl
  * und Bilanz“): fehlt eine, steht keine. Merkmale in Mono, wo es Werte sind (der Aufrufer
- * formuliert sie); zu lang endet die Zeile mit „…“, den vollen Text trägt der Titel.
+ * formuliert sie); zu lang endet die Zeile mit „…“, den vollen Text trägt der Titel. Schmal bricht
+ * das Band in Zeilen um, nie seitlich über den Schirm.
  *
  * `role="status"`: höflich angesagt, wenn ein Filter greift. Ohne Merkmal steht nichts da und
  * belegt keinen Platz.
@@ -61,10 +62,20 @@ export default function Filterhinweis({
         gap: token.paddingXXS,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: token.marginXS, minWidth: 0 }}>
+      {/* Bricht um, statt über den Rand zu laufen: auf 390 px im Handschuh ist allein „Filter
+          zurücksetzen“ halb so breit wie der Schirm. Die Merkmale kürzen erst in ihrer Zeile. */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: token.marginXS,
+          minWidth: 0,
+        }}
+      >
         <strong style={{ flex: '0 0 auto' }}>Gefiltert</strong>
         {mitZahl && (
-          <span style={{ flex: '0 0 auto' }}>
+          <span style={{ flex: '0 1 auto', minWidth: 0 }}>
             <span aria-hidden="true">· </span>
             <span style={monoStil(12)}>{treffer}</span> von{' '}
             <span style={monoStil(12)}>{gesamt}</span> {dinge} sichtbar
@@ -74,7 +85,7 @@ export default function Filterhinweis({
           title={merkmalText}
           style={{
             ...monoStil(12),
-            flex: '1 1 auto',
+            flex: '1 1 8em',
             minWidth: 0,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -84,7 +95,7 @@ export default function Filterhinweis({
           <span aria-hidden="true">· </span>
           {merkmalText}
         </span>
-        <Button onClick={onZuruecksetzen} style={{ flex: '0 0 auto' }}>
+        <Button onClick={onZuruecksetzen} style={{ flex: '0 0 auto', marginInlineStart: 'auto' }}>
           Filter zurücksetzen
         </Button>
       </div>

@@ -1023,22 +1023,27 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     expect(
       zeitachse.compareDocumentPosition(leiste) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // Die Hülle der Schnellerfassung trägt den Typ als Befehl im Präfix (nach dem Laden der
-    // Entwürfe).
+    // Die Hülle der Schnellerfassung trägt den Typ als Typwort im Präfix (nach dem Laden der
+    // Entwürfe, LLH-1112).
     await waitFor(() =>
       expect(leiste.querySelector('[data-lfh="schnellerfassung-praefix"]')).toHaveTextContent(
-        '/meldung',
+        'Meldung',
       ),
     );
   });
 
   it('rollt nach einem angenommenen eigenen Eintrag ans Ende — nicht nach einer Ablehnung', async () => {
-    // Funkprotokoll (LLH-1149): der eigene Eintrag steht unten direkt über dem Feld.
-    const vorher = window.scrollTo;
+    // Funkprotokoll (LLH-1149): der eigene Eintrag steht unten direkt über dem Feld. Das Ende ist
+    // die Unterkante der Spalte über der Erfassung; jsdom legt nicht aus, die Spalte endet hier
+    // deshalb gestellt tief unter dem Fenster, und gerollt wird um den Rest (`scrollBy`).
+    const vorher = window.scrollBy;
     const aufrufe: unknown[] = [];
-    window.scrollTo = ((arg?: unknown) => {
+    window.scrollBy = ((arg?: unknown) => {
       aufrufe.push(arg);
-    }) as typeof window.scrollTo;
+    }) as typeof window.scrollBy;
+    const rechteck = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ top: 0, bottom: 5000, left: 0, right: 0, width: 0, height: 0 } as DOMRect);
     let status = 422;
     server.use(
       http.post('/api/einsaetze/7/etb', () =>
@@ -1062,7 +1067,8 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
         expect(aufrufe).toContainEqual(expect.objectContaining({ behavior: 'instant' })),
       );
     } finally {
-      window.scrollTo = vorher;
+      window.scrollBy = vorher;
+      rechteck.mockRestore();
     }
   });
 
@@ -2175,5 +2181,32 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     const band = (await screen.findByText('Gefiltert')).closest('[data-lfh="filterhinweis"]')!;
     await waitFor(() => expect(band).toHaveTextContent(/\+1 Nachtrag vor \d{4} erfasst/));
     expect(band).toHaveTextContent('seit LB');
+  });
+});
+
+describe('EtbPage: Berichtigung einer Berichtigung (LLH-1099)', () => {
+  it('nennt in der Erfassung die Kette', async () => {
+    const grund = { ...eintrag, id: 1, lfd_nr: 134, berichtigt_durch: [{ id: 2, lfd_nr: 135 }] };
+    const b = {
+      ...eintrag,
+      id: 2,
+      lfd_nr: 135,
+      typ: 'berichtigung',
+      inhalt: 'Korrektur',
+      berichtigt_eintrag_id: 1,
+    };
+    setup('/einsaetze/7/etb', [
+      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([b, grund])),
+    ]);
+    await screen.findByText('Korrektur');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Aktionen zu Eintrag 135' }));
+    const menue = document.querySelector<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    )!;
+    await user.click(within(menue).getByRole('menuitem', { name: 'Berichtigen' }));
+    expect(
+      await screen.findByText('Berichtigung zu Nr. 135 (berichtigt Nr. 134)'),
+    ).toBeInTheDocument();
   });
 });

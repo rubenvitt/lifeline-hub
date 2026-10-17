@@ -16,7 +16,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Bilanz, Druck und Sprung behalten die
   Serverordnung. Den Bildlauf am Dokument trägt `components/useFunkprotokollLauf.ts`: Öffnen am
   Ende (außer mit `?eintrag=`), Mitlaufen am Ende an der jüngsten Zeile, Anker beim Nachladen
-  oben (`overflow-anchor: none`, eigene Korrektur). Eingefroren wird bei Fokus in der Achse ODER
+  oben (`overflow-anchor: none`, eigene Korrektur). „Ende“ ist die Unterkante der
+  Zeitachsenspalte über der Erfassung (`ende`), nicht das Dokumentende: unter `xl` steht die
+  Bilanz darunter, um die Höhe der Erfassung abgesetzt. Eingefroren wird bei Fokus in der Achse ODER
   nicht am Ende; das Sammelbanner steht unten über der Erfassung. Nach dem eigenen Eintrag rollt
   die Seite ans Ende. Die Lesemarke ist eine Trennlinie unter dem zuletzt gesichteten Eintrag,
   wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
@@ -51,6 +53,14 @@ Ableitungen in `etb/zeitachseModell.ts`)
     ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
     (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
+  - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): der Präfix zeigt das Typwort in
+    der Typfarbe, die Zeile die Typkante (`Schnellerfassungszeile kante`); `/typ ` und danach
+    `/zeit <Angabe> ` setzen Typ und Ereigniszeit (`erkenneTypBefehl`, `erkenneZeitBefehl`,
+    gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`), der Rest bleibt
+    Inhalt; unlesbar bleibt der Text und die Hinweiszeile nennt den Grund. Eine Ereigniszeit über
+    60 s nach der Serveruhr sendet nicht (`zukunftsVerstoss`, vor Upload und Warteschlange, Grund
+    am Chip); der Server begrenzt sie nicht. Ein Nachtrag über Mitternacht nennt die Erfassung mit
+    Tag (`nachtragText`).
 - **Kopfzahl und Bilanz zählt der Server über DENSELBEN Filter** (LFH-612, `GET …/etb/zaehler`,
   `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
@@ -69,6 +79,14 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),
   nur `true` oder fehlend; neben `typ=system` fällt er weg (sonst 422, `filterZusammenfuehren`).
   Ein `?eintrag=`, der unter dem Ausschluss nicht auftaucht, blendet wieder ein und sagt es.
+- **Systemeinträge leise und gebündelt** (LLH-1106, Spec `etb-zeitachse-darstellung`): ein
+  Systemeintrag steht als `Zeitachseneintrag leise` (Text `gedaempft`, `textKlein`, ungekürzt,
+  ohne Tönung); „System → System“ entfällt (`etb/systemKennung.ts` spiegelt
+  `etb::SYSTEM_RUFNAME`). Ab drei direkt aufeinanderfolgenden schlichten Systemeinträgen einer
+  Stundengruppe steht eine Bündelzeile (`buendleSystemfolgen`, nach `gruppiereNachStunde`);
+  berichtigt, nachgetragen, Anhang, Dokument oder Rückverweis brechen die Folge, ebenso die
+  Lesemarke. Schlüssel ist der älteste Eintrag (offen bleibt offen); ein Sprung klappt im Render
+  auf. Kein Bündel unter `typ=system`, unter `q` und nie im Druck.
 - **Modulzähler** (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`): ETB, Betroffene, Einheiten,
   Abschnitte, Dokumente (LFH-666) als Gesamtmenge; Meldungen, Aufträge, Erinnerungen, Chat als
   Handlungsmenge. Der Server zählt sie per Aggregat ohne Listen zu laden, über dieselben

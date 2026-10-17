@@ -39,8 +39,17 @@ const STEUERHOEHE: Record<Stufe, number> = { kompakt: 30, komfortabel: 48, hands
 const streifen = (g: Groesse) => Math.floor(g.height * 0.15) - 1;
 const STREIFEN = streifen(HANDY);
 
-/** Der offene Kalender einer Zeiteingabe (`anzeige/ZeitKalender.tsx`, ein antd-Popover). */
-const panel = (page: Page) => page.locator('.ant-popover:not(.ant-popover-hidden)');
+/**
+ * Der offene Kalender einer Zeiteingabe (`anzeige/ZeitKalender.tsx`, ein antd-Popover), erkannt
+ * an seinem Fuß: im ETB liegt das Zeitfeld selbst in einem Popover, der Zeitraum-Schnellwahl.
+ */
+const panel = (page: Page) =>
+  page
+    .locator('.ant-popover:not(.ant-popover-hidden)')
+    .filter({ has: page.locator('.lfh-zeit-fuss') });
+
+/** Die Zeitraum-Schnellwahl der ETB-Filterleiste (LLH-1080, `etb/EtbZeitraumWahl.tsx`). */
+const zeitraumWahl = (page: Page) => page.locator('[data-lfh="etb-zeitraum"]');
 
 /** Der Kalender-Knopf neben einem Zeitfeld (`anzeige/ZeitpunktEingabe.tsx`, LLH-1070). */
 const kalenderKnopf = (feld: Locator) =>
@@ -208,8 +217,10 @@ async function pruefeZeitfenster(
 }
 
 /**
- * ETB-Filter „von“: Zeitpunkt mit Uhrzeit im Blatt setzen, der Filter wirkt. Die Rolle ist vorher
- * gewechselt; ohne Schreibrecht fehlt die Erfassungsleiste (Vorbedingung des Rollenzweigs).
+ * ETB-Filter „von“: Zeitpunkt mit Uhrzeit im Blatt setzen, der Filter wirkt. Das Feld steht unter
+ * „Eigener Zeitraum“ der Zeitraum-Schnellwahl (LLH-1080) und wirkt erst mit „Zeitraum übernehmen“.
+ * Die Rolle ist vorher gewechselt; ohne Schreibrecht fehlt die Erfassungsleiste (Vorbedingung des
+ * Rollenzweigs).
  */
 async function pruefeEtbFilter(
   page: Page,
@@ -235,6 +246,7 @@ async function pruefeEtbFilter(
       .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'BODY'))
       .not.toBe('BODY');
   }
+  await zeitraumWahl(page).click();
   const von = page.getByPlaceholder('von', { exact: true });
   await kalenderKnopf(von).click();
   await waehleImPanel(page, 14, `${wer}, ETB „von“`, dichte, g);
@@ -242,6 +254,10 @@ async function pruefeEtbFilter(
   await expect(panel(page)).toBeHidden();
   // Das Feld zeigt die DTG (Spec `zeiteingabe`, „Anzeige im Feld als Datum-Zeit-Gruppe“).
   await expect(von).toHaveValue(/^\d{2}1400[a-z]{3}\d{2}$/);
+  const uebernehmen = page.getByRole('button', { name: 'Zeitraum übernehmen', exact: true });
+  expect(liegtIn(await kasten(uebernehmen), schirm(g)), `${wer}: „Zeitraum übernehmen“`).toBe(true);
+  await uebernehmen.click();
+  await expect(von).toBeHidden();
   await expect(page.getByText(inhalt)).toBeHidden();
   await expect(page.getByText('Kein Eintrag passt zum Filter')).toBeVisible();
   await keinSeitlicherUeberlauf(page, `${wer}, ETB gefiltert`, g);
@@ -393,6 +409,7 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     // Getippt wird im Feld (LLH-1070); der Kalender ist der Nebenweg und steht als Blatt.
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     await page.getByRole('button', { name: /^Filter/ }).tap();
+    await zeitraumWahl(page).tap();
     const von = page.getByPlaceholder('von', { exact: true });
     await expect(von).not.toHaveAttribute('readonly', '');
 
@@ -404,6 +421,10 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     await expect(blatt.getByRole('textbox', { name: 'Uhrzeit', exact: true })).not.toBeFocused();
     await page.touchscreen.tap(HANDY.width / 2, Math.floor(STREIFEN / 2));
     await expect(panel(page)).toBeHidden();
+    // Der Tipp liegt auch außerhalb der Zeitraum-Schnellwahl: sie schließt mit, nichts ist gewählt.
+    await expect(zeitraumWahl(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(zeitraumWahl(page)).toHaveAccessibleName('Zeitraum');
+    await zeitraumWahl(page).tap();
     await expect(von).toHaveValue('');
 
     // Mit Wert: Tag antippen, Uhrzeit eintragen, „Übernehmen“.
@@ -452,6 +473,7 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'BODY'))
       .not.toBe('BODY');
+    await zeitraumWahl(page).click();
     const von = page.getByPlaceholder('von', { exact: true });
     await kalenderKnopf(von).click();
     await expect(panel(page)).toBeVisible();

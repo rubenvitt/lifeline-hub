@@ -12,6 +12,7 @@ const ZEILE = 50;
 let hoehe = 2000;
 let y = 0;
 const fenster = 800;
+let spalteUnten = 1500;
 
 function zeilenOben(el: Element): number {
   const geschwister = [...(el.parentElement?.querySelectorAll('[data-zeile]') ?? [])];
@@ -21,6 +22,7 @@ function zeilenOben(el: Element): number {
 beforeEach(() => {
   hoehe = 2000;
   y = 0;
+  spalteUnten = 1500;
   Object.defineProperty(document.documentElement, 'scrollHeight', {
     configurable: true,
     get: () => hoehe,
@@ -34,6 +36,17 @@ beforeEach(() => {
     y += typeof arg === 'number' ? arg : (arg.top ?? 0);
   }) as typeof window.scrollBy;
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    // Die Spalte endet bei `spalteUnten` im Dokument; darunter stünde noch die Bilanz.
+    if ((this as HTMLElement).dataset?.testid === 'spalte') {
+      return {
+        top: -y,
+        bottom: spalteUnten - y,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 0,
+      } as DOMRect;
+    }
     const oben = zeilenOben(this);
     return {
       top: oben,
@@ -54,25 +67,31 @@ function Liste(props: {
   zeilen: string[];
   bereit?: boolean;
   ohneStartlauf?: boolean;
+  /** Ende an der Spalte statt am Dokument, mit angepinnter Erfassung. */
+  mitSpalte?: boolean;
   onLauf?: (l: ReturnType<typeof useFunkprotokollLauf>) => void;
 }) {
   const wurzel = useRef<HTMLOListElement>(null);
+  const spalte = useRef<HTMLDivElement>(null);
   const lauf = useFunkprotokollLauf({
     wurzel,
     bereit: props.bereit ?? true,
     juengste: props.zeilen[props.zeilen.length - 1],
     aelteste: props.zeilen[0],
     ohneStartlauf: props.ohneStartlauf,
+    ende: props.mitSpalte ? { spalte, fussVariable: '--test-fuss' } : undefined,
   });
   props.onLauf?.(lauf);
   return (
-    <ol ref={wurzel}>
-      {props.zeilen.map((z) => (
-        <li key={z} data-zeile={z}>
-          {z}
-        </li>
-      ))}
-    </ol>
+    <div ref={spalte} data-testid="spalte">
+      <ol ref={wurzel}>
+        {props.zeilen.map((z) => (
+          <li key={z} data-zeile={z}>
+            {z}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -139,6 +158,30 @@ describe('useFunkprotokollLauf (LLH-1149)', () => {
     act(() => lauf!.zumEnde());
     expect(y).toBe(2000);
     expect(lauf!.amEnde).toBe(true);
+  });
+
+  it('rollt mit `ende` nur bis die Spalte über der Erfassung endet, nicht in die Bilanz darunter', async () => {
+    document.documentElement.style.setProperty('--test-fuss', '100px');
+    try {
+      let amEnde = true;
+      const { rerender } = render(
+        <Liste zeilen={['a', 'b']} mitSpalte onLauf={(l) => (amEnde = l.amEnde)} />,
+      );
+      // Spalte endet bei 1500, das Fenster ist 800 hoch, die Erfassung 100: 1500 − 700.
+      expect(y).toBe(800);
+      await naechsterRahmen();
+      expect(y).toBe(800);
+      // Wer weiter in die Bilanz rollt, gilt als am Ende und wird beim Mitlaufen nicht
+      // zurückgezogen; die neue Zeile verlängert die Spalte, ihr Ende bleibt im Bild.
+      bildlauf(1000);
+      await naechsterRahmen();
+      expect(amEnde).toBe(true);
+      spalteUnten = 1550;
+      rerender(<Liste zeilen={['a', 'b', 'c']} mitSpalte onLauf={(l) => (amEnde = l.amEnde)} />);
+      expect(y).toBe(1000);
+    } finally {
+      document.documentElement.style.removeProperty('--test-fuss');
+    }
   });
 
   it('schaltet die Ankerung des Browsers ab und gibt sie beim Aushängen zurück', () => {
