@@ -28,7 +28,11 @@ die Entlassung). Eine Ablösung, auch ihre Fan-out-Kopie, streicht nur die Rück
 Eintreffen der offenen Periode beginnt sie (nur mit Vorgabe, nie bei geerbter), eine Entlassung
 ohne offene Periode danach beendet sie (`beendet`), die Streichung dieser Entlassung öffnet sie;
 in einem Savepoint, ein Fehler bricht nie den Anlass. Ihre ETB-IDs trägt `Beruehrt::abloesung`,
-jeder Aufrufer meldet sie nach dem Commit über `routes::abloesung::publish_kopplung`.
+die Anlässe der Hinweise zur ablösenden Einheit `Beruehrt::hinweise` (LLH-1131,
+`src/abloesung/hinweis.rs`); jeder Aufrufer meldet beides nach dem Commit über
+`routes::abloesung::publish_kopplung`. Ein Weg, der ein Ereignis der ablösenden Einheit ohne
+Zeitachse schreibt (Abruf, Eintreffen am Bereitstellungsraum, Auflösen), bildet seine Anlässe
+in der Transaktion mit `hinweis::anlaesse_tx` und meldet sie ebenso.
 Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl, keine Grenzwerte
 (LFH-860). Anzeige im Meldebild/Personal/Einheit-Detail, **nicht im Stab**. Bewusster Bruch von
 LFH-46 E17 (Feldbefund) auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
@@ -49,4 +53,8 @@ der Organisation wechselt in den zwei Schritten, die der Server verlangt, nur ü
 ohne eigene laufende Schicht erbt die ihres nächsten Vorfahren; der Server ermittelt das beim
 Lesen (`abloesung::vererbung`, DTO `erbende_einheiten` an der tragenden Schicht), der Client
 rechnet keine Vererbung nach. Status `beendet` (mit `beendet_grund`) ist kein `laufend`: jede
-Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`.
+Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`. **Geplant** heißt
+Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste `einsatz_abloesung_abloeser`; jede
+Prüfung darauf liest beide (Planungshinweis, Hinweise, Planungswarnungen, LLH-1131). Die
+Planungswarnungen ermittelt der Server beim Lesen (`planung_warnungen`), der Client zeigt sie
+nur (`abloesung/planungWarnung.ts`). Der Planungshinweis ist eine Frist, keine Einstufung.

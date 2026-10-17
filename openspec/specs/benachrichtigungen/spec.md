@@ -145,6 +145,24 @@ und dem gemeinsamen Budget der Benachrichtigungen unterliegen.
 - **WHEN** eine Schicht fällig wird
 - **THEN** erhalten alle mit dem Modul Ablösung einen Alarm „Ablösung fällig“ wie bisher
 
+### Requirement: Hinweise der Ablösung
+
+Zwei weitere Arten der Ablösung (LLH-1131, Spec `kraefte-abloesung`) SHALL als Hinweis an alle
+mit dem Modul Ablösung gehen: `abloesung_planung` („Keine ablösende Einheit geplant“, vom
+Scheduler) und `abloesung_abloeser` (die geplante ablösende Einheit ist alarmiert, eingetroffen,
+am Bereitstellungsraum eingetroffen oder abgerufen, oder ihre Planung ist entfallen). Bei
+`abloesung_abloeser` MUST der Bezugstyp das Ereignis tragen und der Titel aus ihm folgen; der
+Bezug ist die Schicht, der Sprung führt zur Seite Ablösung. Beide sind je Art abschaltbar und
+MUST NOT eine weitere Stufe oder Einstufung bilden.
+
+#### Scenario: Ablösende Einheit eingetroffen
+- **WHEN** die geplante ablösende Einheit einer Schicht eintrifft und Person A den Status setzt
+- **THEN** erhalten alle anderen mit dem Modul Ablösung einen Hinweis „Ablösende Einheit eingetroffen“, A und Personen ohne das Modul nicht
+
+#### Scenario: Abgeschaltet
+- **WHEN** Person B den Hinweis „Ablösende Einheit“ abgeschaltet hat
+- **THEN** erhält B dafür keine Benachrichtigung, den Alarm „Ablösung fällig“ aber weiter
+
 ### Requirement: Auftrag erteilt
 
 Wird ein Auftrag erteilt, SHALL jeder Nutzer, der zu einem Empfänger des Auftrags gehört

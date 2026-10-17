@@ -10,6 +10,11 @@ LLH-1122 hebt das Non-Goal „Die Vorwarnzeit ist fest auf 30 min gesetzt“ aus
 (`openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/design.md`, Non-Goals) auf:
 die Vorwarnzeit kommt aus dem Schichtmodell des Einsatzes, 30 min sind nur noch die Vorgabe.
 
+LLH-1131 (Entscheidung LLH-1118 Punkte 3 und 5) ergänzt Hinweise an die Führung: zur geplanten
+ablösenden Einheit (alarmiert, eingetroffen, am Bereitstellungsraum eingetroffen, abgerufen,
+Planung entfallen), den Planungshinweis als dritte Frist und Warnungen beim Planen. Es bleibt bei
+drei Einstufungen.
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
@@ -438,7 +443,9 @@ mit Einheit, Uhrzeit und einem Sprung zur Seite Ablösung. Er kommt als Benachri
 an alle mit dem Modul Ablösung; das Live-Ereignis `abloesung` frischt nur die Liste auf. Der
 Toast MUST dem gemeinsamen Budget der Benachrichtigungen unterliegen (höchstens drei sichtbar, der
 Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
-Erinnerung alarmieren.
+Erinnerung alarmieren. Der Planungshinweis und die Hinweise zur ablösenden Einheit (LLH-1131)
+SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zur Seite
+Ablösung, ohne dass etwas blinkt.
 
 #### Scenario: Fälligkeit erreicht
 - **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
@@ -471,7 +478,8 @@ Wird eine Einheit aufgelöst, SHALL das System ihre laufende Schicht als `beende
 `aufloesung`, Zeitpunkt und Person behalten und ihre offenen Fristen schließen, statt sie zu
 löschen (LLH-1128, Entscheidung vom 15.10.2026; ändert die Fassung aus LLH-1079). Abgelöste
 Schichten MUST samt Vollzug bleiben. Verweist eine Schicht einer anderen Einheit auf die
-aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden.
+aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden; an einer laufenden Schicht
+mit Hinweis und ETB-Eintrag (Requirement „Planung entfällt“).
 
 #### Scenario: Historie bleibt
 - **WHEN** eine Einheit mit zwei abgelösten und einer laufenden Schicht aufgelöst wird
@@ -548,3 +556,85 @@ Untereinheit SHALL möglich bleiben und übersteuert die Vererbung für sie und 
 #### Scenario: Eigene Schicht übersteuert
 - **WHEN** an „Gruppe 1“ von Hand eine Schicht begonnen wird
 - **THEN** erbt deren „Trupp 1“ von der Gruppe, und der Zug nennt beide nicht mehr
+
+### Requirement: Planungshinweis
+
+Das System SHALL für jede laufende Schicht ohne geplante ablösende Einheit eine dritte Auto-Frist
+führen, den Planungsvorlauf vor der Fälligkeit (aus dem Schichtmodell des Einsatzes, ohne eines
+2 h; LLH-1118 Punkt 5). Erreicht der Scheduler sie, MUST er genau einmal die Benachrichtigung
+`abloesung_planung` („Keine ablösende Einheit geplant“, Hinweis) an alle Leser des Moduls Ablösung
+melden. Die Frist MUST mit der Fälligkeit und mit dem Planungsvorlauf wandern, beim Planen einer
+ablösenden Einheit (auch über die Ablöser-Liste) schließen und mit einer aufgehobenen oder
+entfallenen Planung wieder entstehen, solange ihr Zeitpunkt noch vor uns liegt; ein Zeitpunkt in
+der Vergangenheit MUST keine Frist ergeben. Der Planungshinweis MUST NOT eine Einstufung sein:
+es bleibt bei `planmaessig`, `vorwarnung` und `ueberfaellig`.
+
+#### Scenario: Zwei Stunden vorher
+- **WHEN** eine Schicht ohne Schichtmodell um 15:30 fällig ist und keine ablösende Einheit geplant ist
+- **THEN** erhalten alle mit dem Modul Ablösung um 13:30 genau einmal den Hinweis „Keine ablösende Einheit geplant“ mit „Florian 1, 15:30“
+
+#### Scenario: Geplant
+- **WHEN** vor 13:30 eine ablösende Einheit geplant wird
+- **THEN** kommt kein Planungshinweis
+
+#### Scenario: Fälligkeit verschoben
+- **WHEN** der Beginn der Schicht um eine Stunde später gesetzt wird
+- **THEN** kommt der Planungshinweis um 14:30
+
+### Requirement: Hinweise zur ablösenden Einheit
+
+Wird die geplante ablösende Einheit einer laufenden Schicht alarmiert, trifft sie ein, trifft sie
+am Bereitstellungsraum ein oder wird sie dort abgerufen, SHALL das System je Ereignis und Schicht
+genau eine Benachrichtigung `abloesung_abloeser` (Hinweis) an alle Leser des Moduls Ablösung
+melden, mit der Schicht als Bezug und dem Ereignis im Bezugstyp (`abloeser_alarmiert`,
+`abloeser_eingetroffen`, `abloeser_br_eingetroffen`, `abloeser_abgerufen`). Geplant heißt: als
+`abloesende_einheit_id` oder in der Ablöser-Liste der Schicht. Alarmierung und Eintreffen MUST nur
+als Beginn der offenen Periode zählen, aus der Kräfte-Zeitachse in derselben Transaktion; das
+Eintreffen am Bereitstellungsraum meldet dessen Buchung, auch wenn die Zeitachse es auslässt, und
+nicht zusätzlich als „eingetroffen“. Bei einem Verband zählt nur die geplante Einheit, nicht ihre
+mitgenommenen Untereinheiten. Gemeldet wird nach dem Commit; ein Fehler dabei MUST den
+Statuswechsel nicht brechen. Andere Leser und die auslösende Person MUST NOT einen Hinweis
+erhalten.
+
+#### Scenario: Eingetroffen
+- **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und per Status eintrifft
+- **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Seite Ablösung, und Mitglieder ohne das Modul erhalten nichts
+
+#### Scenario: Am Bereitstellungsraum
+- **WHEN** dieselbe Einheit am Bereitstellungsraum eingebucht und später abgerufen wird
+- **THEN** gehen je ein Hinweis „im Bereitstellungsraum eingetroffen“ und „abgerufen“ an die Leser
+
+#### Scenario: Nicht geplant
+- **WHEN** eine Einheit ohne Planung alarmiert wird
+- **THEN** entsteht kein Hinweis
+
+### Requirement: Planung entfällt
+
+Wird die geplante ablösende Einheit einer laufenden Schicht aufgelöst oder entlassen (Entlassung
+ohne offene Periode danach), SHALL das System die Planung selbst aufheben, bevor ein
+Fremdschlüssel sie still leeren könnte: Einzelplanung leeren und den Eintrag der Ablöser-Liste
+entfernen, je Schicht ein ETB-Eintrag „Ablösung «…»: Planung der ablösenden Einheit entfallen,
+«…» aufgelöst“ bzw. „… entlassen“ und ein Hinweis `abloesung_abloeser` mit Bezugstyp
+`abloeser_entfallen` an die Leser des Moduls. Ohne verbleibende Planung MUST der Planungshinweis
+wieder anstehen.
+
+#### Scenario: Geplante Einheit aufgelöst
+- **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und aufgelöst wird
+- **THEN** trägt die Schicht keine Planung mehr, das ETB nennt „Planung der ablösenden Einheit entfallen“, und die Leser erhalten den Hinweis „Planung der ablösenden Einheit entfallen“
+
+### Requirement: Plausibilität beim Planen
+
+Das System SHALL beim Planen einer ablösenden Einheit warnen, aber nicht ablehnen: jede laufende
+Schicht trägt `planung_warnungen`, beim Lesen ermittelt, für ihre Einzelplanung und die Einträge
+ihrer Ablöser-Liste. `schon_geplant` MUST erscheinen, wenn dieselbe Einheit auch eine andere
+laufende Schicht plant (mit dieser Schicht und ihrer Einheit), `im_einsatz`, wenn die Einheit
+selbst eine eigene oder geerbte laufende Schicht hat (mit deren Beginn). Die Oberfläche zeigt
+die Warnungen nach dem Speichern der Planung als Meldung.
+
+#### Scenario: Schon geplant
+- **WHEN** „Florian 3“ für die Schicht von „Florian 1“ geplant ist und auch für „Florian 2“ geplant wird
+- **THEN** gelingt die Planung, und die Antwort warnt „Florian 3 schon für Schicht Florian 1 geplant“
+
+#### Scenario: Selbst im Einsatz
+- **WHEN** eine Einheit mit eigener laufender Schicht seit 13:40 als ablösende Einheit geplant wird
+- **THEN** gelingt die Planung, und die Antwort warnt „steht selbst im Einsatz seit 1340“

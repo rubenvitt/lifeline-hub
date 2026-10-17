@@ -215,8 +215,9 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
 - Ein Modell hat entweder einen festen Rhythmus oder feste Wechselzeiten mit Mindestdauer: fällig
   ist dann der erste Wechsel, zu dem die Einheit mindestens die Mindestdauer im Einsatz ist. Dazu
   kommen die Vorwarnung, wie lange vor der Fälligkeit der Hinweis „Ablösung steht an“ erscheint,
-  und der Planungsvorlauf; beide höchstens einen Tag. Der Planungsvorlauf wird mit dem Modell
-  gespeichert und in den Einsatz übernommen.
+  und der Planungsvorlauf, wie lange vorher der Hinweis „Keine ablösende Einheit geplant“
+  erscheint, solange keine geplant ist (Kapitel [Ablösung](abloesung.md)); beide höchstens einen
+  Tag und mit dem Modell in den Einsatz übernommen.
 - Dauern stehen als „8 h“, „7:30 h“ oder „45 min“, Wechselzeiten taktisch wie „0600/1800“.
 - Höchstens ein Modell ist die „Vorgabe der Organisation“. Wer ein anderes als Vorgabe setzt,
   nimmt dem bisherigen die Markierung ab. Jeder neue Einsatz bekommt eine Kopie der Vorgabe; die
