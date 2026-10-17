@@ -14734,7 +14734,8 @@
           "bezeichnung",
           "art",
           "status",
-          "angelegt_at"
+          "angelegt_at",
+          "geraet_gekoppelt"
         ],
         "properties": {
           "abschnitt_id": {
@@ -14759,6 +14760,10 @@
           },
           "bezeichnung": {
             "type": "string"
+          },
+          "geraet_gekoppelt": {
+            "type": "boolean",
+            "description": "Ob ein Gerät an der Stelle gekoppelt ist (LLH-1048 Teil II): eine laufende Kopplung, auch\neine noch nicht eingelöste. Dann ist das Storno 409; die Oberfläche sperrt es mit Grund.\nNur dieses Ja oder Nein, keine Kopplung, keine Gerätebezeichnung."
           },
           "id": {
             "type": "integer",

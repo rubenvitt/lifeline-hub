@@ -70,6 +70,7 @@ export function stelle(over: Partial<Verpflegungsstelle> & { id: number }): Verp
     art: 'feldkueche',
     status: 'aktiv',
     angelegt_at: '2026-09-24 06:00:00',
+    geraet_gekoppelt: false,
     ...over,
   };
 }

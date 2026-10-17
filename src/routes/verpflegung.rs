@@ -20,7 +20,8 @@
 //!   eine Ausgabe, die nicht an seiner Stelle gebucht ist.
 //! - **403** — ein Gerät bucht auf eine Nachforderung (LFH-1044); ein an eine Stelle gebundenes
 //!   Gerät nennt eine andere Verpflegungsstelle (LLH-1048, ohne Angabe setzt der Server seine).
-//! - **409** — stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Bezeichnung einer
+//! - **409** — stornierte Verpflegungsstelle im Pfad (Ändern, Status, Storno), Storno einer
+//!   Stelle mit laufender Gerätekopplung („Gerät gekoppelt“, LLH-1048), Bezeichnung einer
 //!   Stelle schon vergeben, Ausgabe an einer aufgelösten Stelle (LLH-1040 D3) oder an eine
 //!   aufgelöste Einheit (LLH-1055 D2) mit einem Zeitpunkt nicht vor der Auflösung.
 //! - **422** — der Zusammenhang: Ende nicht nach Beginn, Sonderkost über Gesamtbedarf bzw.

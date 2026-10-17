@@ -5773,6 +5773,12 @@ export interface components {
             /** @description Zeitpunkt der Auflösung (UTC ohne Zonenkennung), nur bei `aufgeloest`. */
             aufgeloest_at?: string | null;
             bezeichnung: string;
+            /**
+             * @description Ob ein Gerät an der Stelle gekoppelt ist (LLH-1048 Teil II): eine laufende Kopplung, auch
+             *     eine noch nicht eingelöste. Dann ist das Storno 409; die Oberfläche sperrt es mit Grund.
+             *     Nur dieses Ja oder Nein, keine Kopplung, keine Gerätebezeichnung.
+             */
+            geraet_gekoppelt: boolean;
             /** Format: int64 */
             id: number;
             /** Format: double */

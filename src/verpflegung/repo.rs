@@ -181,7 +181,11 @@ macro_rules! zuordnung_select {
 macro_rules! stelle_select {
     () => {
         "SELECT id, bezeichnung, art, standort, lat, lon, abschnitt_id, status, \
-                aufgeloest_at, storniert_at, angelegt_at \
+                aufgeloest_at, storniert_at, angelegt_at, \
+                EXISTS (SELECT 1 FROM geraet_kopplung k \
+                         WHERE k.verpflegungsstelle_id = verpflegungsstelle.id \
+                           AND k.widerrufen_at IS NULL \
+                           AND k.laeuft_ab_at > datetime('now')) AS geraet_gekoppelt \
          FROM verpflegungsstelle "
     };
 }
@@ -201,6 +205,8 @@ struct StelleZeile {
     aufgeloest_at: Option<String>,
     storniert_at: Option<String>,
     angelegt_at: String,
+    /// Eine laufende Kopplung (wartend oder aktiv) hängt an der Stelle (LLH-1048 Teil II).
+    geraet_gekoppelt: bool,
 }
 
 impl StelleZeile {
@@ -216,6 +222,7 @@ impl StelleZeile {
             status: self.status,
             aufgeloest_at: self.aufgeloest_at,
             angelegt_at: self.angelegt_at,
+            geraet_gekoppelt: self.geraet_gekoppelt,
         }
     }
 }
@@ -1713,8 +1720,11 @@ pub async fn update_stelle_status_tx(
 }
 
 /// Storniert eine Stelle (Fehlanlage, D2): nur `geplant` und nur, solange keine Ausgabe — auch
-/// keine zurückgenommene — auf sie verweist, sonst 422. Entfernt die Zuordnungen in derselben
-/// Transaktion und schreibt kein ETB. So zeigt nie eine Ausgabe auf eine stornierte Stelle, und
+/// keine zurückgenommene — auf sie verweist, sonst 422. Hängt eine laufende Gerätekopplung an ihr
+/// (LLH-1048 Teil II, wartend oder aktiv), ist das Storno 409 „Gerät gekoppelt“: das Gerät sähe
+/// danach nur die einsatzweiten Zeitfenster, und jede Buchung wäre 422. Die Kopplung ist ein
+/// Zustand der Stelle wie die stornierte (409), kein Fehler im Body; erst widerrufen oder ablaufen
+/// lassen. Entfernt die Zuordnungen in derselben Transaktion und schreibt kein ETB. So zeigt nie eine Ausgabe auf eine stornierte Stelle, und
 /// kein „in Betrieb genommen“ bleibt ohne Gegenstück.
 pub async fn stelle_stornieren_tx(
     conn: &mut SqliteConnection,
@@ -1747,6 +1757,11 @@ pub async fn stelle_stornieren_tx(
         return Err(AppError::UnprocessableEntity(format!(
             "An der Stelle hängen Ausgaben ({ausgaben}) — auflösen statt stornieren"
         )));
+    }
+    if roh.geraet_gekoppelt {
+        return Err(AppError::Conflict(
+            "Gerät gekoppelt — erst die Kopplung widerrufen".into(),
+        ));
     }
     sqlx::query("DELETE FROM verpflegung_zeitfenster_stelle WHERE stelle_id = ?")
         .bind(id)

@@ -4644,6 +4644,89 @@ async fn verpflegungsgeraet_an(
     (id, a.cookie.expect("Sitzungscookie"))
 }
 
+/// `geraet_gekoppelt` der Stelle `sid` in `GET …/verpflegung`, gelesen als `cookie`.
+async fn stelle_gekoppelt(app: &axum::Router, cookie: &str, einsatz: i64, sid: i64) -> Value {
+    let (s, v) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/verpflegung"),
+        cookie,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v["stellen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == sid)
+        .unwrap_or_else(|| panic!("Stelle {sid} fehlt: {v}"))["geraet_gekoppelt"]
+        .clone()
+}
+
+/// LLH-1048 Teil II: Eine geplante Verpflegungsstelle, an der ein Gerät hängt, lässt sich nicht
+/// stornieren (409 „Gerät gekoppelt“), auch solange der Code noch nicht eingelöst ist. Sonst
+/// sähe das Gerät danach nur die einsatzweiten Zeitfenster, und jede Buchung wäre 422. Die Stelle
+/// nennt das in `geraet_gekoppelt`, damit die Oberfläche „Stornieren“ mit Grund sperrt. Nach dem
+/// Widerruf geht das Storno.
+#[tokio::test]
+async fn stelle_mit_gekoppeltem_geraet_ist_nicht_stornierbar() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let kueche = verpflegungsstelle(&app, &admin, einsatz, "Feldküche", "geplant").await;
+    let turnhalle = verpflegungsstelle(&app, &admin, einsatz, "Turnhalle", "geplant").await;
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, false);
+
+    // Wartend (Code noch nicht eingelöst) bindet die Stelle schon.
+    let (wartend, _code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "verpflegung", "stelle_id": turnhalle, "bezeichnung": "Tresen 2"}),
+    )
+    .await;
+    let (kid, geraet) = verpflegungsgeraet_an(&app, &admin, einsatz, kueche).await;
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, true);
+    assert_eq!(
+        stelle_gekoppelt(&app, &admin, einsatz, turnhalle).await,
+        true
+    );
+    // Das Gerät liest seine eigene Stelle mit demselben Feld.
+    assert_eq!(stelle_gekoppelt(&app, &geraet, einsatz, kueche).await, true);
+
+    for sid in [kueche, turnhalle] {
+        let (s, v) = anfrage(
+            &app,
+            "DELETE",
+            &format!("/api/einsaetze/{einsatz}/verpflegung/stellen/{sid}"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::CONFLICT, "Stelle {sid}: {v}");
+        assert!(
+            v["error"].as_str().unwrap().contains("Gerät gekoppelt"),
+            "Stelle {sid}: {v}"
+        );
+    }
+    // Die Stellen stehen unverändert.
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, true);
+
+    widerrufen(&app, &admin, einsatz, kid).await;
+    widerrufen(&app, &admin, einsatz, wartend).await;
+    assert_eq!(stelle_gekoppelt(&app, &admin, einsatz, kueche).await, false);
+    let (s, v) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{einsatz}/verpflegung/stellen/{kueche}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+}
+
 /// LLH-1048 (LLH-1024 F7): Die Verpflegung bindet wahlweise. Ohne Stelle koppelt das Gerät
 /// einsatzweit wie bisher; mit Stelle nur an eine geplante oder aktive Verpflegungsstelle des
 /// eigenen Einsatzes, und es trägt deren Namen.
