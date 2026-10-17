@@ -1,5 +1,5 @@
 import type { FachebeneQuelle } from './fachebenen';
-import type { EtbTyp } from './types';
+import type { AbloesungStatus, EtbTyp } from './types';
 import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
 /**
@@ -708,7 +708,7 @@ export const einsatzKeys = {
   // Ablösung: argumentlos = Invalidierungs-Prefix; Liste je Statusfilter und Rhythmus-Vorgaben
   // hängen als Sub-Keys darunter.
   abloesungen: (einsatzId: number) => [EINSATZ_KEYS.abloesungen, einsatzId] as const,
-  abloesungListe: (einsatzId: number, status: 'laufend' | 'abgeloest') =>
+  abloesungListe: (einsatzId: number, status: AbloesungStatus) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'liste', status] as const,
   abloesungVorgaben: (einsatzId: number) =>
     [EINSATZ_KEYS.abloesungen, einsatzId, 'vorgaben'] as const,
