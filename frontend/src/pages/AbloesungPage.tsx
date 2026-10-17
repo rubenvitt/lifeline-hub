@@ -1,7 +1,7 @@
 import { IconStift } from '../icons';
 import { Alert, App, Breadcrumb, Button, Flex, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLinkClickHandler, useParams } from 'react-router';
 import {
   aendereSchicht,
@@ -15,11 +15,13 @@ import {
 } from '../api/abloesungen';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
+import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Abloesung, AbloesungStatus, AbloesungVorgabe } from '../api/types';
 import AbloesungKarte from '../abloesung/AbloesungKarte';
-import { abloeserOptionen, abloeserText } from '../abloesung/abloeser';
+import { abloeserIds, abloeserOptionen, abloeserText } from '../abloesung/abloeser';
+import { buildAbloeserStand, type AbloeserStand } from '../abloesung/abloeserStand';
 import OhneSchichtKarte from '../abloesung/OhneSchichtKarte';
 import {
   AbloeserDialog,
@@ -71,6 +73,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { einsatzRechteGrund, MODUL_EINHEITEN_GESPERRT } from '../components/nurAnsicht';
 import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
 import { einsatzEinstellungenPfad } from '../routing/deeplinks';
+import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 
 const { Text } = Typography;
 
@@ -90,6 +93,13 @@ type Rhythmusziel =
   /** `vorgabe`: was bei leerem Feld gilt, schon als Platzhalter (Abschnitt vor Einsatz). */
   | { art: 'schicht'; schicht: Abloesung; vorgabe: string | undefined }
   | { art: 'abschnitt'; vorgabe: AbloesungVorgabe };
+
+/**
+ * So lange trägt eine per `?schicht=` angesprungene Karte die Hervorhebung (LLH-1131 Teil II):
+ * lang genug, sie nach dem Bildlauf zu finden, danach steht sie wie jede andere. Sie geht ohne
+ * Übergang an und aus, einmal; nichts blinkt.
+ */
+export const SCHICHT_HERVORHEBUNG_MS = 8_000;
 
 /** Leerzustand und Name der Schichtliste je Status. */
 const LEER: Record<AbloesungStatus, string> = {
@@ -128,6 +138,16 @@ const BEREICH: Record<AbloesungStatus, string> = {
  * hat ihre eigene Schleuse nach denselben Regeln; Zähler und Kopf rechnen mit der vollen Menge.
  * Ohne das Modul Einheiten fehlen Einheiten und Zeitachse, das Segment steht dann gesperrt mit
  * Grund. Auf dem Handschirm tragen die Segmente keine Zahl, der Kopf nennt sie.
+ *
+ * Hinweise an die Führung (LLH-1131 Teil II): Die Karte einer laufenden Schicht nennt den Stand
+ * ihrer geplanten Ablöser aus der Kräfte-Zeitachse (`abloesung/abloeserStand.ts`; der Raum aus der
+ * Raumliste, nur mit Freigabe der Bereitstellungsräume) und die Warnungen zur Planung. Live kommt
+ * beides über die bestehenden Ereignisse (`einheit`, `fahrzeug`, `abloesung`,
+ * `bereitstellungsraum`). `?schicht=<id>` (Toasts der AlarmZentrale) wählt die Ansicht mit der
+ * Schicht, gibt Zurückgehaltenes frei, rollt die Karte ins Bild und hebt sie
+ * {@link SCHICHT_HERVORHEBUNG_MS} lang hervor; der Parameter wird geräumt. Steht die Schicht nicht
+ * unter den laufenden, sucht die Seite sie unter den abgelösten und beendeten; eine unbekannte
+ * Kennung ändert nichts.
  */
 export default function AbloesungPage() {
   const { id } = useParams();
@@ -147,6 +167,12 @@ export default function AbloesungPage() {
   const [vollzugSchicht, setVollzugSchicht] = useState<Abloesung | null>(null);
   const [abloeserSchicht, setAbloeserSchicht] = useState<Abloesung | null>(null);
   const [rhythmusZiel, setRhythmusZiel] = useState<Rhythmusziel | null>(null);
+  // Sprung `?schicht=` (LLH-1131 Teil II): die gesuchte vergangene Schicht, die angesprungene
+  // Karte (ein neues Objekt je Sprung, damit ein zweiter Sprung die Frist neu beginnt) und die
+  // Karte, die noch ins Bild gerollt werden muss.
+  const [sucheSchicht, setSucheSchicht] = useState<number | null>(null);
+  const [hervorhebung, setHervorhebung] = useState<{ id: number } | null>(null);
+  const [scrollZiel, setScrollZiel] = useState<number | null>(null);
   // An den Einsatz gebunden: wechselt die Route den Einsatz bei stehender Komponente, wären sonst
   // alle Schichten des neuen Einsatzes „fremde Neuzugänge".
   const [zuflussZustand, setZuflussZustand] = useState<{ einsatzId: number } & Zuflussstand>({
@@ -170,13 +196,13 @@ export default function AbloesungPage() {
   const abgeloestQuery = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'abgeloest'),
     queryFn: () => listeAbloesungen(einsatzId, 'abgeloest'),
-    enabled: ansicht === 'vergangen' && vergangen === 'abgeloest',
+    enabled: (ansicht === 'vergangen' && vergangen === 'abgeloest') || sucheSchicht != null,
   });
   // Beendet ohne Ablösung (LLH-1128): mit der Entlassung oder beim Auflösen der Einheit.
   const beendetQuery = useQuery({
     queryKey: einsatzKeys.abloesungListe(einsatzId, 'beendet'),
     queryFn: () => listeAbloesungen(einsatzId, 'beendet'),
-    enabled: ansicht === 'vergangen' && vergangen === 'beendet',
+    enabled: (ansicht === 'vergangen' && vergangen === 'beendet') || sucheSchicht != null,
   });
   const vorgabenQuery = useQuery({
     queryKey: einsatzKeys.abloesungVorgaben(einsatzId),
@@ -218,6 +244,36 @@ export default function AbloesungPage() {
   });
 
   const laufende = useMemo(() => laufendQuery.data ?? [], [laufendQuery.data]);
+
+  // Stand der geplanten Ablöser (LLH-1131 Teil II): Zeitpunkte aus der Zeitachse, der Raum aus
+  // `aktueller_br_id` der Einheit und dem Namen in der Raumliste. Die Liste der Räume gehört dem
+  // Modul Bereitstellungsräume und wird nur geholt, wenn ein Ablöser gerade in einem Raum steht.
+  const brFrei = istKeyFreigegeben('bereitstellungsraeume', freigabenQuery.data);
+  const abloeserImBr = useMemo(() => {
+    const ids = new Set(laufende.flatMap(abloeserIds));
+    return (einheitenQuery.data ?? []).some((e) => ids.has(e.id) && e.aktueller_br_id != null);
+  }, [laufende, einheitenQuery.data]);
+  const brQuery = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+    enabled: brFrei && abloeserImBr,
+  });
+  const standJeSchicht = useMemo(() => {
+    const m = new Map<number, AbloeserStand[]>();
+    if (!periodenQuery.data) return m;
+    const brNamen = brQuery.data
+      ? new Map(brQuery.data.map((b) => [b.id, b.bezeichnung]))
+      : undefined;
+    for (const s of laufende) {
+      const stand = buildAbloeserStand(s, {
+        perioden: periodenQuery.data,
+        einheiten: einheitenQuery.data,
+        brNamen,
+      });
+      if (stand) m.set(s.id, stand);
+    }
+    return m;
+  }, [laufende, periodenQuery.data, einheitenQuery.data, brQuery.data]);
   const vorgaben = useMemo(() => vorgabenQuery.data ?? [], [vorgabenQuery.data]);
   // Erst mit allen drei Quellen: ohne die laufenden stünde jede Einheit kurz „ohne Schicht“.
   const ohneSchicht = useMemo(
@@ -293,6 +349,69 @@ export default function AbloesungPage() {
         BEGINN_DER_PERIODE,
       ),
     }));
+
+  // ── Sprung `?schicht=<id>` (LLH-1131 Teil II, `frontend/AGENTS.md` „Deeplink-Muster“) ──
+  // Ein Sprung ist wie ein Ansichtswechsel die Bitte, den aktuellen Stand zu sehen: er gibt die
+  // zurückgehaltenen Schichten frei, auch die gesuchte.
+  const springeZu = (id: number) => {
+    setHervorhebung({ id });
+    setScrollZiel(id);
+  };
+  useQueryParamSelektion('schicht', laufendQuery.isSuccess && einsatzQuery.isSuccess, (id) => {
+    if (laufende.some((x) => x.id === id)) {
+      gibFrei();
+      gibOhneFrei();
+      setAnsicht('laufend');
+      springeZu(id);
+    } else {
+      setSucheSchicht(id);
+    }
+  });
+  // Nicht unter den laufenden: die vergangenen beider Status laden, dann entscheiden. Erst wenn
+  // beide frisch stehen, sonst entschiede ein alter Stand.
+  const vergangenBereit = (q: { isFetched: boolean; isFetching: boolean }) =>
+    q.isFetched && !q.isFetching;
+  const abgeloestBereit = vergangenBereit(abgeloestQuery);
+  const beendetBereit = vergangenBereit(beendetQuery);
+  useEffect(() => {
+    if (sucheSchicht == null || !abgeloestBereit || !beendetBereit) return;
+    const status: Vergangen | null = abgeloestQuery.data?.some((x) => x.id === sucheSchicht)
+      ? 'abgeloest'
+      : beendetQuery.data?.some((x) => x.id === sucheSchicht)
+        ? 'beendet'
+        : null;
+    if (status) {
+      setAnsicht('vergangen');
+      setVergangen(status);
+      setHervorhebung({ id: sucheSchicht });
+      setScrollZiel(sucheSchicht);
+    }
+    setSucheSchicht(null);
+  }, [sucheSchicht, abgeloestBereit, beendetBereit, abgeloestQuery.data, beendetQuery.data]);
+  // Einmal ins Bild rollen, sobald die Karte steht (nach dem Ansichtswechsel).
+  useEffect(() => {
+    if (scrollZiel == null) return;
+    const karte = document.querySelector(
+      `[data-lfh="abloesung-karte"][data-schicht-id="${scrollZiel}"]`,
+    );
+    if (!karte) return;
+    karte.scrollIntoView?.({ block: 'center' });
+    setScrollZiel(null);
+    // Die Karte erscheint mit der Ansicht, mit den Daten ihrer Liste oder mit der Freigabe.
+  }, [
+    scrollZiel,
+    ansicht,
+    vergangen,
+    laufendQuery.data,
+    abgeloestQuery.data,
+    beendetQuery.data,
+    zuflussZustand,
+  ]);
+  useEffect(() => {
+    if (!hervorhebung) return;
+    const frist = window.setTimeout(() => setHervorhebung(null), SCHICHT_HERVORHEBUNG_MS);
+    return () => window.clearTimeout(frist);
+  }, [hervorhebung]);
 
   // Einheiten ohne laufende Schicht — nur sie können beginnen oder ablösen.
   const freieEinheiten: EinheitOption[] = useMemo(() => {
@@ -672,6 +791,8 @@ export default function AbloesungPage() {
                   }}
                   onZuruecknehmen={(x) => zuruecknehmenMut.mutate(x.id)}
                   fehlerGrund={kartenFehler.grund(s.id)}
+                  abloeserStand={standJeSchicht.get(s.id) ?? null}
+                  hervorgehoben={hervorhebung?.id === s.id}
                 />
               ))}
             </section>
