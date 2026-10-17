@@ -472,8 +472,11 @@ export default function AbloesungPage() {
   };
   const ohneZahl = ohneSchicht?.length;
   // Auf dem Handschirm tragen die Segmente keine Zahl (Platz neben dem Banner, LLH-1128); der
-  // Kopf nennt sie dort wie überall.
+  // Kopf nennt sie dort wie überall. Im Handschuh-Betrieb bricht „Ohne Schicht“ zudem in zwei
+  // Zeilen: das Segment ist dort 72 px hoch, und einzeilig bliebe neben drei Segmenten kein Platz
+  // für „1 neu“ (gemessen in `e2e/gate1-ueberlauf.spec.ts`).
   const segmentZahl = (n: number | undefined) => (istSchmal || n == null ? '' : ` (${n})`);
+  const ohneWort = istSchmal && token.controlHeight >= 72 ? 'Ohne\nSchicht' : 'Ohne Schicht';
 
   return (
     <EinsatzSeite
@@ -513,7 +516,9 @@ export default function AbloesungPage() {
           (Segmentleiste und Banner tragen beide einen 1-px-Rand). Das Banner ändert ihre Höhe
           nicht, also verschiebt es keine Karte. */}
       <Flex
-        gap={token.marginSM}
+        // Schmal nur `marginXS` (Muster Verpflegung, LLH-1040): die Segmente rücken in ihrer Zelle
+        // um den Zielabstand ein, die Ziele stehen so weiter ≥ 16 px auseinander.
+        gap={istSchmal ? token.marginXS : token.marginSM}
         align="center"
         data-lfh="abloesung-werkzeugzeile"
         style={{ marginBottom: token.margin, minHeight: token.controlHeight + 2 }}
@@ -531,7 +536,7 @@ export default function AbloesungPage() {
             { wert: 'laufend', label: `Laufend${segmentZahl(laufende.length)}` },
             {
               wert: 'ohne',
-              label: `Ohne Schicht${segmentZahl(ohneZahl)}`,
+              label: `${ohneWort}${segmentZahl(ohneZahl)}`,
               gesperrt: einheitenGesperrt ? MODUL_EINHEITEN_GESPERRT : undefined,
             },
             { wert: 'vergangen', label: 'Vergangen' },

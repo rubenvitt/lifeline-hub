@@ -236,6 +236,9 @@
   font-family: var(--lfh-schrift-text);
   font-size: 12px;
   line-height: 1.2;
+  /* Ein Zeilenumbruch im Wortlaut bricht (LLH-1128: „Ohne\nSchicht“ der Ablösung auf 390 px im
+     Handschuh-Betrieb, wo das Segment 72 px hoch ist); sonst bleibt jedes Wort einzeilig. */
+  white-space: pre-line;
   cursor: pointer;
   transition:
     background var(--lfh-uebergang),

@@ -252,7 +252,9 @@ for (const modus of ['light', 'dark'] as const) {
       await page.keyboard.press('Escape');
       await expect(dialog).toBeHidden();
     }
-    await inhalt.getByText('Abgelöst', { exact: true }).click();
+    // „Abgelöst“ ist die Vorgabe unter „Vergangen“ (LLH-1128).
+    await inhalt.getByRole('radio', { name: 'Vergangen', exact: true }).click();
+    await expect(inhalt.getByRole('radio', { name: 'Abgelöst', exact: true })).toBeChecked();
     const abgeloest = page.getByRole('article', { name: `Schicht ${ABGELOEST}`, exact: true });
     await expect(abgeloest).toContainText(`Abgelöst durch ${FOLGE}`);
     const randAbgeloest = await randKontrast(abgeloest, 'left');

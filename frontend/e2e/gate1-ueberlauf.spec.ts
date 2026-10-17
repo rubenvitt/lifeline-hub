@@ -1155,7 +1155,9 @@ test.describe('Gate 1', () => {
    * Segmente; gemessen wird zusätzlich, dass jedes Segment ungekürzt im Fenster steht — auch im
    * Handschuh-Betrieb. Mit „vergangen (3)“ und „Stellen (12)“ wurde dort „1 neu“ gekürzt (5 px
    * Überlauf); schmal heißen beide deshalb ohne Zahl (design.md LLH-1040, Risiken). Gesät werden
-   * trotzdem 12 Stellen: fiele die Kürzung weg, liefe die Zeile wieder über.
+   * trotzdem 12 Stellen: fiele die Kürzung weg, liefe die Zeile wieder über. Die Ablösung trägt
+   * seit LLH-1128 ebenfalls DREI Segmente („Laufend“, „Ohne Schicht“, „Vergangen“), schmal alle
+   * ohne Zahl; vier (abgelöst und beendet getrennt) trügen den Knopf im Handschuh-Betrieb nicht.
    *
    * ROLLEN (LFH-435): nur Admin. Die Werkzeugzeile hat keinen Rollenzweig; der Beobachter sieht
    * dieselbe Segmentleiste und dasselbe Banner, ein zweiter Lauf bewiese nichts Neues.
@@ -1276,7 +1278,14 @@ test.describe('Gate 1', () => {
             'vergangen',
             'Stellen',
           ]);
-        } else expect(mass.segmente, 'Segmente der Ansichtsleiste').toHaveLength(2);
+        } else {
+          // Drei Segmente seit LLH-1128; schmal ohne Zahl, die nennt der Kopf.
+          expect(mass.segmente, 'Segmente der Ansichtsleiste').toEqual([
+            'Laufend',
+            dichte === 'handschuh' ? 'Ohne\nSchicht' : 'Ohne Schicht',
+            'Vergangen',
+          ]);
+        }
         expect(mass.segmentRechts, 'letztes Segment rechts im Fenster').toBeLessThanOrEqual(390);
         expect(mass.segmentGekuerzt, 'kein Segment gekürzt').toEqual([]);
         expect(
