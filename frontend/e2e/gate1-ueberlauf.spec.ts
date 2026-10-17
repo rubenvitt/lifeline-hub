@@ -1125,7 +1125,11 @@ test.describe('Gate 1', () => {
    * Routen oben laufen ohne Banner — es erscheint nur auf ein Live-Ereignis. Ablösung und
    * Verpflegung stellen es in die Werkzeugzeile neben die Segmentleiste; bei 390 px trug das
    * nicht (0 px Text, im Handschuh-Betrieb 59 px Überlauf). Gesät werden 12 gezeigte Einträge,
-   * damit die Segmentleiste ihre zweistellige Zahl trägt.
+   * damit die Segmentleiste ihre zweistellige Zahl trägt. Die Verpflegung trägt seit LLH-1040 DREI
+   * Segmente; gemessen wird zusätzlich, dass jedes Segment ungekürzt im Fenster steht — auch im
+   * Handschuh-Betrieb. Mit „vergangen (3)“ und „Stellen (12)“ wurde dort „1 neu“ gekürzt (5 px
+   * Überlauf); schmal heißen beide deshalb ohne Zahl (design.md LLH-1040, Risiken). Gesät werden
+   * trotzdem 12 Stellen: fiele die Kürzung weg, liefe die Zeile wieder über.
    *
    * ROLLEN (LFH-435): nur Admin. Die Werkzeugzeile hat keinen Rollenzweig; der Beobachter sieht
    * dieselbe Segmentleiste und dasselbe Banner, ein zweiter Lauf bewiese nichts Neues.
@@ -1177,6 +1181,12 @@ test.describe('Gate 1', () => {
         } else {
           for (let i = 1; i <= 12; i += 1) await zeitfenster(`Mittag ${i}`, -60, 180);
           for (let i = 1; i <= 3; i += 1) await zeitfenster(`Frühstück ${i}`, -300, -240);
+          for (let i = 1; i <= 12; i += 1)
+            await post(
+              'verpflegung/stellen',
+              { bezeichnung: `Ausgabe Deich ${i}`, art: 'ausgabestelle' },
+              `Stelle ${i}`,
+            );
         }
 
         await page.goto(`/einsaetze/${einsatzId}/${modul}`);
@@ -1207,10 +1217,20 @@ test.describe('Gate 1', () => {
           const kurz = document.querySelector<HTMLElement>('[data-lfh="sammelbanner-kurz"]')!;
           const knopf = kurz.closest('button')!;
           const k = knopf.getBoundingClientRect();
+          const segmente = [
+            ...document.querySelectorAll<HTMLElement>(
+              '[data-lfh$="-werkzeugzeile"] [data-lfh="segmentleiste"] button',
+            ),
+          ];
           return {
             // Der Text selbst kürzt nicht; zu eng wird es, wenn Icon und Text über die
             // Polsterung des Knopfes hinausragen.
             gekuerzt: kurz.scrollWidth > kurz.clientWidth || knopf.scrollWidth > knopf.clientWidth,
+            segmente: segmente.map((b) => b.textContent),
+            segmentRechts: Math.max(...segmente.map((b) => b.getBoundingClientRect().right)),
+            segmentGekuerzt: segmente
+              .filter((b) => b.scrollWidth > b.clientWidth)
+              .map((b) => b.textContent),
             knopfLinks: k.left,
             knopfRechts: k.right,
             dokument: document.documentElement.scrollWidth,
@@ -1224,6 +1244,15 @@ test.describe('Gate 1', () => {
         expect(mass.knopfLinks, 'Knopf links im Fenster').toBeGreaterThanOrEqual(0);
         expect(mass.knopfRechts, 'Knopf rechts im Fenster').toBeLessThanOrEqual(390);
         expect(mass.dokument, 'kein waagerechter Überlauf').toBeLessThanOrEqual(390);
+        if (modul === 'verpflegung') {
+          expect(mass.segmente, 'Segmente der Ansichtsleiste').toEqual([
+            'aktuell (13)',
+            'vergangen',
+            'Stellen',
+          ]);
+        } else expect(mass.segmente, 'Segmente der Ansichtsleiste').toHaveLength(2);
+        expect(mass.segmentRechts, 'letztes Segment rechts im Fenster').toBeLessThanOrEqual(390);
+        expect(mass.segmentGekuerzt, 'kein Segment gekürzt').toEqual([]);
         expect(
           Math.abs(nachher.zeile - vorher.zeile),
           `Werkzeugzeile ${vorher.zeile} → ${nachher.zeile} px`,
@@ -1238,7 +1267,7 @@ test.describe('Gate 1', () => {
         await expect(banner).toHaveCount(0);
         test.info().annotations.push({
           type: 'messwert',
-          description: `${modul}/${dichte}: Knopf ${mass.knopfLinks.toFixed(1)}–${mass.knopfRechts.toFixed(1)} px, Zeile ${vorher.zeile} → ${nachher.zeile} px`,
+          description: `${modul}/${dichte}: Knopf ${mass.knopfLinks.toFixed(1)}–${mass.knopfRechts.toFixed(1)} px, Segmente bis ${mass.segmentRechts.toFixed(1)} px, Zeile ${vorher.zeile} → ${nachher.zeile} px`,
         });
       });
     }

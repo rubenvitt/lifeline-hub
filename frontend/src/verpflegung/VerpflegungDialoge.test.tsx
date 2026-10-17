@@ -12,7 +12,21 @@ import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { freigabenFixture } from '../test/fixtures';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
-import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
+import { optionenVon, oeffne, waehle } from '../test/auswahlListe';
+import {
+  ABSCHNITT_DEICH,
+  FELDKUECHE,
+  GRUPPE_2,
+  KEINE_SONDERKOST,
+  TURNHALLE,
+  ZUG,
+  ausgabe,
+  empfaenger,
+  empfaengerEinheit,
+  stelle,
+  verpflegungMitStellen,
+  zeitfenster,
+} from '../test/verpflegungDaten';
 import type { Bedarfsvorschlag, BedarfsvorschlagArgs } from './useBedarfsvorschlag';
 import { uhrzeitenText } from './verpflegungText';
 
@@ -453,10 +467,10 @@ describe('AusgabeDialog', () => {
     return { onErfassen, onSchliessen };
   }
 
-  it('„Ausgabe nachtragen“ (LLH-1032 D8): drei Felder sichtbar, der Rest eingeklappt; Knopf im <form>; sendet Menge und Ort', async () => {
+  it('„Ausgabe nachtragen“ (LLH-1032 D8): ohne Stellen und Empfänger zwei Felder sichtbar, der Rest eingeklappt (Ort seit LLH-1055); Knopf im <form>; sendet Menge und Ort', async () => {
     const { onErfassen, onSchliessen } = zeige(NF);
     const dialog = await screen.findByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
-    await budgetUndAufklappen(dialog, 3, /Weitere Angaben/);
+    await budgetUndAufklappen(dialog, 2, /Weitere Angaben/);
     const knopf = pruefeFormStruktur(dialog, 'Nachtragen');
     // Leer heißt jetzt — kein vorbelegter Client-Zeitpunkt.
     expect(within(dialog).getByPlaceholderText('jetzt')).toHaveValue('');
@@ -577,6 +591,11 @@ describe('Zeichengrenzen der Freitexte (LLH-1040, design.md D10)', () => {
     ).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
     expect(ort).toHaveValue('o'.repeat(501));
+    // Der Ort liegt eingeklappt (LLH-1055): der Klappteil geht mit dem Grund auf.
+    expect(within(dialog).getByRole('button', { name: /Weitere Angaben/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     fireEvent.change(ort, { target: { value: 'o'.repeat(500) } });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
     await waitFor(() =>
@@ -845,5 +864,312 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ menge: 120, zeitpunkt_at: '2026-09-24 10:15:00' }),
     );
+  });
+});
+
+describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
+  const STELLEN = [
+    ...verpflegungMitStellen().stellen,
+    stelle({ id: 30, bezeichnung: 'Ausgabe Schule', status: 'aufgeloest' }),
+    stelle({ id: 31, bezeichnung: 'Ausgabe Halle Süd', status: 'aufgeloest' }),
+  ];
+
+  function zeigeZf(modus: 'anlegen' | { zf: ReturnType<typeof zeitfenster> }, stellen = STELLEN) {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <ZeitfensterDialog
+        modus={
+          modus === 'anlegen'
+            ? { art: 'anlegen', onErfassen }
+            : { art: 'bearbeiten', zeitfenster: modus.zf, onErfassen }
+        }
+        einsatzId={1}
+        freigaben={FREIGABEN}
+        jetzt={JETZT}
+        stellen={stellen}
+        laeuft={false}
+        fehler={null}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    return { onErfassen };
+  }
+
+  /** Leert eine Auswahl über ihr Löschkreuz (antd `allowClear`). */
+  async function leere(feld: string) {
+    const auswahl = screen.getByRole('combobox', { name: feld }).closest('.ant-select')!;
+    const kreuz = auswahl.querySelector<HTMLElement>('.ant-select-clear');
+    expect(kreuz).not.toBeNull();
+    await userEvent.click(kreuz!);
+  }
+
+  describe('Zeitfensterdialog', () => {
+    it('ohne Stellen im Einsatz nur „Art“, eingeklappt; die Art geht in den Body', async () => {
+      const { onErfassen } = zeigeZf('anlegen', []);
+      const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+      expect(sichtbareFelder(dialog)).toBe(4);
+      await userEvent.click(within(dialog).getByRole('button', { name: /^Art$/ }));
+      expect(within(dialog).queryByRole('combobox', { name: 'Stellen' })).toBeNull();
+      await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Mittag');
+      await waehleZeitraum(dialog, '2026-09-24 12:00', '2026-09-24 13:30');
+      await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '200');
+      await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '0');
+      await waehle('Art', 'warm');
+      expect(within(dialog).getByRole('button', { name: /^Art · warm$/ })).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith(
+          expect.objectContaining({ bezeichnung: 'Mittag', verpflegungsart: 'warm' }),
+        ),
+      );
+      expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('stelle_ids');
+    });
+
+    it('mit Stellen: Mehrfachwahl der nicht aufgelösten, Kopf nennt die Wahl, Body trägt `stelle_ids`', async () => {
+      const { onErfassen } = zeigeZf('anlegen');
+      const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
+      await userEvent.click(within(dialog).getByRole('button', { name: /^Art und Stellen/ }));
+      await oeffne('Stellen');
+      expect(optionenVon('Stellen')).toEqual([
+        'Ausgabe Turnhalle Nord',
+        'Feldküche BR Sportplatz',
+        'Zuführung Deich',
+      ]);
+      await waehle('Stellen', 'Feldküche BR Sportplatz', 'Ausgabe Turnhalle Nord');
+      expect(
+        within(dialog).getByRole('button', { name: /^Art und Stellen · 2 Stellen$/ }),
+      ).toBeInTheDocument();
+      await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Mittag');
+      await waehleZeitraum(dialog, '2026-09-24 12:00', '2026-09-24 13:30');
+      await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '200');
+      await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '0');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+      expect([...onErfassen.mock.calls[0][0].stelle_ids].sort()).toEqual([FELDKUECHE, TURNHALLE]);
+      expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('verpflegungsart');
+    });
+
+    it('bearbeiten: eine schon zugeordnete aufgelöste Stelle bleibt sichtbar, andere aufgelöste nicht', async () => {
+      zeigeZf({ zf: zeitfenster({ stelle_ids: [TURNHALLE, 30], verpflegungsart: 'kalt' }) });
+      const dialog = await screen.findByRole('dialog', { name: 'Bedarf bearbeiten: Mittag' });
+      expect(
+        within(dialog).getByRole('button', { name: /^Art und Stellen · kalt · 2 Stellen$/ }),
+      ).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: /^Art und Stellen/ }));
+      await oeffne('Stellen');
+      const optionen = optionenVon('Stellen');
+      expect(optionen).toContain('Ausgabe Schule (aufgelöst)');
+      expect(optionen).not.toContain('Ausgabe Halle Süd (aufgelöst)');
+      expect(optionenVon('Stellen', '-selected')).toEqual([
+        'Ausgabe Turnhalle Nord',
+        'Ausgabe Schule (aufgelöst)',
+      ]);
+    });
+
+    it('bearbeiten: Leeren der Art schickt `null`, eine abgewählte Stelle die neue Zuordnung', async () => {
+      const { onErfassen } = zeigeZf({
+        zf: zeitfenster({ stelle_ids: [TURNHALLE, FELDKUECHE], verpflegungsart: 'warm' }),
+      });
+      const dialog = await screen.findByRole('dialog', { name: 'Bedarf bearbeiten: Mittag' });
+      await userEvent.click(within(dialog).getByRole('button', { name: /^Art und Stellen/ }));
+      await leere('Art');
+      await waehle('Stellen', 'Feldküche BR Sportplatz');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({
+          verpflegungsart: null,
+          stelle_ids: [TURNHALLE],
+        }),
+      );
+    });
+
+    it('Patch: gleiche Stellen in anderer Reihenfolge und gleiche Art schicken nichts', () => {
+      const vorher = zeitfenster({ stelle_ids: [TURNHALLE, FELDKUECHE], verpflegungsart: 'warm' });
+      const werte = {
+        bezeichnung: 'Mittag',
+        zeitraum: [dayjs.utc(vorher.von_at), dayjs.utc(vorher.bis_at)] as [
+          dayjs.Dayjs,
+          dayjs.Dayjs,
+        ],
+        bedarf_kraefte: 180,
+        bedarf_betreute: 70,
+        bedarf_weitere: 0,
+        sonderkost: { vegan: 3 },
+        verpflegungsart: 'warm' as const,
+        stelle_ids: [FELDKUECHE, TURNHALLE],
+      };
+      expect(zeitfensterPatch(vorher, werte)).toEqual({});
+      expect(zeitfensterPatch(vorher, { ...werte, stelle_ids: [] })).toEqual({ stelle_ids: [] });
+      expect(zeitfensterPatch(vorher, { ...werte, verpflegungsart: undefined })).toEqual({
+        verpflegungsart: null,
+      });
+    });
+  });
+
+  describe('Nachtrag', () => {
+    function zeigeNachtrag(
+      stellen = STELLEN,
+      zf = verpflegungMitStellen().zeitfenster[0],
+      liste = empfaenger(),
+    ) {
+      const onErfassen = vi.fn().mockResolvedValue(undefined);
+      renderMitProviders(
+        <AusgabeDialog
+          zeitfenster={zf}
+          nachforderungen={null}
+          stellen={stellen}
+          empfaenger={liste}
+          laeuft={false}
+          fehler={null}
+          onErfassen={onErfassen}
+          onSchliessen={vi.fn()}
+        />,
+      );
+      return { onErfassen };
+    }
+
+    it('ohne Stellen im Einsatz: Feld „Ort“, keine Stellenwahl', async () => {
+      zeigeNachtrag([]);
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByLabelText('Ort')).toBeInTheDocument();
+      expect(within(dialog).queryByRole('combobox', { name: 'Stelle' })).toBeNull();
+      expect(within(dialog).queryByLabelText('Zuführungsziel')).toBeNull();
+    });
+
+    it('mit Stellen: „Stelle“ und „Zuführungsziel“ (eingeklappt); die gewählte Stelle nimmt das Zuführungsziel weg', async () => {
+      const { onErfassen } = zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).queryByLabelText('Ort')).toBeNull();
+      expect(within(dialog).getByLabelText('Zuführungsziel')).toBeInTheDocument();
+      // Menge, Empfänger, Stelle, Zeitpunkt (Feldbudget, LLH-1055); das Zuführungsziel liegt eingeklappt.
+      expect(sichtbareFelder(dialog)).toBe(4);
+      await waehle('Stelle', 'Feldküche BR Sportplatz');
+      await waitFor(() => expect(within(dialog).queryByLabelText('Zuführungsziel')).toBeNull());
+      expect(sichtbareFelder(dialog)).toBe(4);
+      await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '100');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({ menge: 100, verpflegungsstelle_id: FELDKUECHE }),
+      );
+    });
+
+    it('Zuführungsziel ohne gewählte Stelle geht als `ort` hinaus; der Klappkopf nennt es', async () => {
+      const { onErfassen } = zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '20');
+      await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+      await userEvent.type(within(dialog).getByLabelText('Zuführungsziel'), 'Deich km 3');
+      expect(
+        within(dialog).getByRole('button', { name: 'Weitere Angaben · Zuführungsziel' }),
+      ).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({ menge: 20, ort: 'Deich km 3' }),
+      );
+    });
+
+    it('Reihenfolge der Wahl: zugeordnete zuerst, aufgelöste als eigene Gruppe', async () => {
+      zeigeNachtrag();
+      await oeffne('Stelle');
+      expect(optionenVon('Stelle')).toEqual([
+        'Ausgabe Turnhalle Nord',
+        'Feldküche BR Sportplatz',
+        'Zuführung Deich',
+        // Innerhalb der Gruppe die Folge der Testdaten (beim Server: nach Bezeichnung).
+        'Ausgabe Schule',
+        'Ausgabe Halle Süd',
+      ]);
+      const gruppen = [...document.querySelectorAll<HTMLElement>('.ant-select-item-group')].map(
+        (g) => g.textContent,
+      );
+      expect(gruppen).toEqual(['zugeordnet', 'weitere', 'aufgelöst']);
+    });
+
+    it('Empfänger: Einheiten mit Stärke, Zuführung an Abschnitt, aufgelöste als eigene Gruppe', async () => {
+      const liste = empfaenger();
+      liste.einheiten.push(
+        empfaengerEinheit({ id: 50, name: 'Alt', aufgeloest_at: '2026-09-24 08:00:00' }),
+      );
+      zeigeNachtrag(STELLEN, verpflegungMitStellen().zeitfenster[0], liste);
+      await oeffne('Empfänger');
+      expect(optionenVon('Empfänger')).toEqual([
+        '1. Zug · Florian 1 · 1/2/17//20',
+        '1. Gruppe · Florian 1-1 · 0/1/8//9',
+        '2. Gruppe · Florian 1-2 · 0/1/8//9',
+        'Wasserrettung',
+        'Zuführung Deich',
+        'Alt',
+      ]);
+      const gruppen = [...document.querySelectorAll<HTMLElement>('.ant-select-item-group')].map(
+        (g) => g.textContent,
+      );
+      expect(gruppen).toContain('aufgelöst');
+    });
+
+    it('eine Einheit belegt die leere Menge mit ihrer Stärke vor; überschreibbar; sendet `einheit_id`', async () => {
+      const { onErfassen } = zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      const menge = within(dialog).getByLabelText('Menge (EP)');
+      await waehle('Empfänger', '1. Zug · Florian 1 · 1/2/17//20');
+      await waitFor(() => expect(menge).toHaveValue('20'));
+      // Ein Wechsel ersetzt nur die eigene Vorgabe.
+      await waehle('Empfänger', '2. Gruppe · Florian 1-2 · 0/1/8//9');
+      await waitFor(() => expect(menge).toHaveValue('9'));
+      await userEvent.clear(menge);
+      await userEvent.type(menge, '8');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({ menge: 8, einheit_id: GRUPPE_2 }),
+      );
+    });
+
+    it('eine eingetippte Menge bleibt beim Wählen der Einheit stehen', async () => {
+      zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      const menge = within(dialog).getByLabelText('Menge (EP)');
+      await userEvent.type(menge, '12');
+      await waehle('Empfänger', '1. Zug · Florian 1 · 1/2/17//20');
+      expect(menge).toHaveValue('12');
+    });
+
+    it('Zuführung an einen Abschnitt: keine Vorgabe, sendet `abschnitt_id`', async () => {
+      const { onErfassen } = zeigeNachtrag();
+      const dialog = await screen.findByRole('dialog');
+      await waehle('Empfänger', 'Zuführung Deich');
+      expect(within(dialog).getByLabelText('Menge (EP)')).toHaveValue('');
+      await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '40');
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(onErfassen).toHaveBeenCalledWith({ menge: 40, abschnitt_id: ABSCHNITT_DEICH }),
+      );
+    });
+
+    it('ohne Einheiten und Abschnitte gibt es kein Feld „Empfänger“', async () => {
+      zeigeNachtrag(STELLEN, verpflegungMitStellen().zeitfenster[0], {
+        einheiten: [],
+        abschnitte: [],
+      });
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).queryByRole('combobox', { name: 'Empfänger' })).toBeNull();
+    });
+
+    it('ausgabeBody: höchstens ein Empfänger', () => {
+      expect(ausgabeBody({ menge: 5, empfaenger: `einheit:${ZUG}` })).toEqual({
+        menge: 5,
+        einheit_id: ZUG,
+      });
+      expect(ausgabeBody({ menge: 5, empfaenger: `abschnitt:${ABSCHNITT_DEICH}` })).toEqual({
+        menge: 5,
+        abschnitt_id: ABSCHNITT_DEICH,
+      });
+      expect(ausgabeBody({ menge: 5, empfaenger: null })).toEqual({ menge: 5 });
+    });
+
+    it('ausgabeBody: mit Stelle kein Ort', () => {
+      expect(ausgabeBody({ menge: 5, ort: 'Deich', verpflegungsstelle_id: FELDKUECHE })).toEqual({
+        menge: 5,
+        verpflegungsstelle_id: FELDKUECHE,
+      });
+    });
   });
 });

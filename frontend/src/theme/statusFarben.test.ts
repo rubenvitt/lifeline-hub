@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle siebenunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle achtunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -82,6 +82,7 @@ describe('Statusfarb-Vertrag', () => {
       'uhsTyp',
       'verfuegbarkeit',
       'verpflegungDeckung',
+      'verpflegungsstelleStatus',
       'warnstufeKarte',
       'warnstufeKennzahl',
     ]);
@@ -222,7 +223,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(37);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(38);
   });
 });
 
@@ -369,6 +370,16 @@ describe('verpflegungDeckung (LFH-634, design.md D3)', () => {
 
   it('führt genau die drei Einstufungen', () => {
     expect(Object.keys(sf.verpflegungDeckung).sort()).toEqual(['gedeckt', 'offen', 'unterdeckung']);
+  });
+});
+
+describe('verpflegungsstelleStatus (LLH-1040, wie brStatus)', () => {
+  it('färbt geplant und aufgelöst neutral, aktiv normal, mit Wort', () => {
+    expect(sf.verpflegungsstelleStatus).toEqual({
+      geplant: { rolle: 'neutral', label: 'geplant' },
+      aktiv: { rolle: 'normal', label: 'aktiv' },
+      aufgeloest: { rolle: 'neutral', label: 'aufgelöst' },
+    });
   });
 });
 

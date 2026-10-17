@@ -2,6 +2,7 @@ import type { GlobalToken } from 'antd';
 import { rollenFarbe } from '../../theme/statusFarben';
 import type {
   Betreuungsstelle,
+  BrListenEintrag,
   Einheit,
   Einsatzabschnitt,
   EinsatzAnzeige,
@@ -25,6 +26,8 @@ import {
 } from './taktischesZeichen';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import { registrierNummer } from '../../anzeige/registrierNummer';
+import { staerkeText, type StaerkeTraeger } from '../../anzeige/staerke';
+import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import {
   freiesZeichen as freiesZeichenBild,
   fuellfarbe,
@@ -51,6 +54,12 @@ export type MarkerTyp =
    * verortet", aber nur bei Lesezugriff auf das Modul Betreuung (`betreuungEbene.ts`).
    */
   | 'betreuungsstelle'
+  /**
+   * Bereitstellungsraum (`buildBrMarker`, LLH-1107): läuft wie die Betreuungsstelle in
+   * `alleVerortet` und „Nicht verortet", nur bei Lesezugriff auf das Modul Bereitstellungsräume
+   * (`brEbene.ts`). Zeichen D.2.1 über `bereitstellungsraumZeichen`, nicht über `tz`.
+   */
+  | 'bereitstellungsraum'
   /**
    * Betroffene, nur aus `personenMarker` — auf der Betroffenen-Seite und als Ebene „Betroffene" der
    * Lagekarte. Dort laufen sie als eigene Liste `personenVerortet` neben `alleVerortet` und
@@ -106,6 +115,16 @@ export interface KarteMarker {
   /** FMS-Status-Ring, nur für Fahrzeuge. */
   statusFarbe?: string | null;
   /**
+   * Zusatz der Kartenplakette hinter dem Namen (Bereitstellungsraum: „0/2/9//11 · 3 Fz" oder
+   * „geplant"). Der Name bleibt `label`: Inspector, Suche und „Nicht verortet" lesen ihn allein.
+   */
+  beschriftungZusatz?: string;
+  /**
+   * Geplant nach DV 102 (Bereitstellungsraum im Status „geplant"): die Karte legt einen
+   * gestrichelten Ring um das Zeichen (`geplantRing.ts`). Nur gesetzt, wenn wahr.
+   */
+  isGeplant?: true;
+  /**
    * Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). `meldungId` = id der
    * Quell-Meldung (Deeplink ?meldung=), `meldungLfdNr` = Anzeigenummer.
    */
@@ -113,7 +132,15 @@ export interface KarteMarker {
 }
 
 export interface NichtVerortet {
-  typ: 'uhs' | 'schaden' | 'einheit' | 'fahrzeug' | 'fuehrung' | 'abschnitt' | 'betreuungsstelle';
+  typ:
+    | 'uhs'
+    | 'schaden'
+    | 'einheit'
+    | 'fahrzeug'
+    | 'fuehrung'
+    | 'abschnitt'
+    | 'betreuungsstelle'
+    | 'bereitstellungsraum';
   id: number;
   label: string;
 }
@@ -251,6 +278,61 @@ export function baueBetreuungMarker(
       });
     } else {
       nichtVerortet.push({ typ: 'betreuungsstelle', id: s.id, label: s.bezeichnung });
+    }
+  }
+  return { verortet, nichtVerortet };
+}
+
+/**
+ * Plakettenzusatz eines Raums: geplant das Wort (der zweite Kanal neben dem gestrichelten Ring),
+ * sonst Stärke und Fahrzeuge der Belegung. Fahrzeuge nur aus `belegung` des Servers, Stärke nur
+ * über `staerkeImRaum` (`frontend/AGENTS.md`, „Eine Heimat je Zahl"); eine unvollständige Stärke
+ * fehlt, statt zu klein dazustehen. Leerer Raum: kein Zusatz.
+ */
+function brZusatz(
+  r: BrListenEintrag,
+  einheiten: readonly StaerkeTraeger[] | undefined,
+): string | undefined {
+  if (r.status === 'geplant') return 'geplant';
+  const teile: string[] = [];
+  const { staerke, unvollstaendig } = staerkeImRaum(r.einheit_ids, einheiten);
+  if (staerke && !unvollstaendig) teile.push(staerkeText(staerke));
+  if (r.belegung.fahrzeuge > 0) teile.push(`${r.belegung.fahrzeuge} Fz`);
+  return teile.length > 0 ? teile.join(' · ') : undefined;
+}
+
+/**
+ * Bereitstellungsräume (LLH-1107): verortete als Marker, unverortete in „Nicht verortet".
+ * Aufgelöste und stornierte fallen heraus, auch aus einem eingefrorenen Stand. Rolle `bedien` wie
+ * UHS und Betreuungsstelle; das Zeichen D.2.1 hängt am Typ (`markerZeichen`), nicht an `tz`.
+ * `einheiten` ist die Einheitenliste des Einsatzes (für die Stärke im Raum), `undefined` ohne
+ * Modul Einheiten.
+ */
+export function buildBrMarker(
+  raeume: readonly BrListenEintrag[],
+  einheiten: readonly StaerkeTraeger[] | undefined,
+  token: GlobalToken,
+): { verortet: KarteMarker[]; nichtVerortet: NichtVerortet[] } {
+  const verortet: KarteMarker[] = [];
+  const nichtVerortet: NichtVerortet[] = [];
+  for (const r of raeume) {
+    if (r.storniert_at || r.status === 'aufgeloest') continue;
+    if (r.lat != null && r.lon != null) {
+      const zusatz = brZusatz(r, einheiten);
+      verortet.push({
+        schluessel: `bereitstellungsraum-${r.id}`,
+        typ: 'bereitstellungsraum',
+        id: r.id,
+        lat: r.lat,
+        lon: r.lon,
+        label: r.bezeichnung,
+        farbe: rollenFarbe(UHS_ROLLE, token),
+        trefferDurchmesser: token.controlHeight,
+        ...(zusatz ? { beschriftungZusatz: zusatz } : {}),
+        ...(r.status === 'geplant' ? { isGeplant: true as const } : {}),
+      });
+    } else {
+      nichtVerortet.push({ typ: 'bereitstellungsraum', id: r.id, label: r.bezeichnung });
     }
   }
   return { verortet, nichtVerortet };

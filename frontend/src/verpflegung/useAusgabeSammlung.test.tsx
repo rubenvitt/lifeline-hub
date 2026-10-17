@@ -309,4 +309,107 @@ describe('useAusgabeSammlung (LLH-1032, design.md D2/D5)', () => {
     act(() => result.current.tippe(1));
     expect(result.current.offen).toBe(false);
   });
+
+  describe('Stelle (LLH-1040, D13 Punkt 7)', () => {
+    it('das Bündel trägt die gewählte Stelle', async () => {
+      erfasse.mockResolvedValue({ zustand: 'gesendet', daten: gebucht(55, 3) });
+      const { result } = aufbau({ stelleId: 21 });
+      tippe(result, 1, 3);
+      await act(async () => result.current.buchen());
+      expect(erfasse).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 3, verpflegungsstelle_id: 21 });
+    });
+
+    it('ohne Stelle kein Schlüssel', async () => {
+      erfasse.mockResolvedValue({ zustand: 'gesendet', daten: gebucht(55, 2) });
+      const { result } = aufbau({ stelleId: null });
+      tippe(result, 1, 2);
+      await act(async () => result.current.buchen());
+      expect(erfasse).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 2 });
+    });
+
+    it('ein Wechsel der Stelle bucht das offene Bündel an der alten Stelle, das nächste geht an die neue', async () => {
+      erfasse.mockResolvedValue({ zustand: 'gesendet', daten: gebucht(55, 4) });
+      const { result, rerender } = aufbau({ stelleId: 21 });
+      tippe(result, 1, 4);
+      rerender({ stelleId: 22 });
+      await act(async () => {});
+      expect(erfasse).toHaveBeenCalledTimes(1);
+      expect(erfasse).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 4, verpflegungsstelle_id: 21 });
+      expect(merkeVor).not.toHaveBeenCalled();
+      tippe(result, 1, 2);
+      await act(async () => result.current.buchen());
+      expect(erfasse).toHaveBeenLastCalledWith(5, 1, MITTAG, {
+        menge: 2,
+        verpflegungsstelle_id: 22,
+      });
+    });
+
+    it('ein Wechsel ohne offene Sammlung sendet nichts', async () => {
+      const { rerender } = aufbau({ stelleId: 21 });
+      rerender({ stelleId: null });
+      await act(async () => vi.advanceTimersByTime(5000));
+      expect(erfasse).not.toHaveBeenCalled();
+    });
+
+    it('beim Verlassen trägt die vorgemerkte Sammlung ihre Stelle', () => {
+      const { result, unmount } = aufbau({ stelleId: 23 });
+      tippe(result, 1, 2);
+      unmount();
+      expect(merkeVor).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 2, verpflegungsstelle_id: 23 });
+    });
+  });
+
+  describe('Empfänger (LLH-1055 Teil II)', () => {
+    const GRUPPE = { art: 'einheit' as const, id: 33 };
+    const DEICH = { art: 'abschnitt' as const, id: 41 };
+
+    it('das Bündel trägt den Empfänger seines ersten Tipps, neben der Stelle', async () => {
+      erfasse.mockResolvedValue({ zustand: 'gesendet', daten: gebucht(55, 9) });
+      const { result } = aufbau({ stelleId: 21, empfaenger: GRUPPE });
+      tippe(result, 9);
+      await act(async () => result.current.buchen());
+      expect(erfasse).toHaveBeenCalledWith(5, 1, MITTAG, {
+        menge: 9,
+        verpflegungsstelle_id: 21,
+        einheit_id: 33,
+      });
+    });
+
+    it('eine Zuführung trägt den Abschnitt', async () => {
+      erfasse.mockResolvedValue({ zustand: 'gesendet', daten: gebucht(55, 40) });
+      const { result } = aufbau({ empfaenger: DEICH });
+      tippe(result, 40);
+      await act(async () => result.current.buchen());
+      expect(erfasse).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 40, abschnitt_id: 41 });
+    });
+
+    it('ein Wechsel des Empfängers bucht das offene Bündel beim alten, das nächste geht an den neuen', async () => {
+      erfasse.mockResolvedValue({ zustand: 'gesendet', daten: gebucht(55, 4) });
+      const { result, rerender } = aufbau({ empfaenger: GRUPPE });
+      tippe(result, 1, 4);
+      rerender({ empfaenger: null });
+      await act(async () => {});
+      expect(erfasse).toHaveBeenCalledTimes(1);
+      expect(erfasse).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 4, einheit_id: 33 });
+      tippe(result, 1, 2);
+      await act(async () => result.current.buchen());
+      expect(erfasse).toHaveBeenLastCalledWith(5, 1, MITTAG, { menge: 2 });
+    });
+
+    it('ein neues Objekt für denselben Empfänger ist kein Wechsel', async () => {
+      const { result, rerender } = aufbau({ empfaenger: GRUPPE });
+      tippe(result, 1, 2);
+      rerender({ empfaenger: { art: 'einheit', id: 33 } });
+      await act(async () => {});
+      expect(erfasse).not.toHaveBeenCalled();
+      expect(result.current.offen).toBe(true);
+    });
+
+    it('beim Verlassen trägt die vorgemerkte Sammlung ihren Empfänger', () => {
+      const { result, unmount } = aufbau({ empfaenger: GRUPPE });
+      tippe(result, 1, 2);
+      unmount();
+      expect(merkeVor).toHaveBeenCalledWith(5, 1, MITTAG, { menge: 2, einheit_id: 33 });
+    });
+  });
 });

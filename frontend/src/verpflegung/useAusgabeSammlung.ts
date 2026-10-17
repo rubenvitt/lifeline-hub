@@ -18,6 +18,11 @@
  * hat (wie der Sync, `offline/useOfflineSync.ts`); sonst sänke die angezeigte Zahl für die Dauer
  * einer Anfrage. Nach einem Wechsel des Zeitfensters zählt es dort nicht mit.
  *
+ * Stelle und Empfänger (LLH-1040, design.md D13 Punkt 7; LLH-1055 Teil II, Entscheidung LLH-1024
+ * F1): Ein Bündel trägt die Stelle und den Empfänger, die beim ersten Tipp gewählt waren, auf jedem
+ * Weg hinaus. Ein Wechsel der Stelle oder des Empfängers bucht das offene Bündel sofort („senden“,
+ * Ansicht steht noch, die Rückmeldung hat ihren Ort); das nächste Bündel zählt beim neuen.
+ *
  * Bewusst keine TanStack-Mutation: es gibt nichts zu pausieren, und jede Sammlung ist ein eigener,
  * unabhängiger Aufruf. Die Regel `networkMode: 'always'` (`offline/AGENTS.md`) greift deshalb nicht.
  */
@@ -30,6 +35,7 @@ import {
   merkeVerpflegungsausgabeVor,
 } from '../offline/schreiben';
 import { AusgabeSammlung, type Buendel } from './ausgabeSammlung';
+import { empfaengerFelder, empfaengerSchluessel, type EmpfaengerWahl } from './empfaengerKern';
 import { KOSTFORMEN } from './verpflegungText';
 
 interface ZeitfensterZiel {
@@ -44,6 +50,10 @@ export interface AusgabeSammlungOptionen {
   zeitfenster: ZeitfensterZiel | null;
   /** Vorbei: eine offene Sammlung wird gebucht, neue Tipps werden nicht angenommen (D7). */
   vergangen: boolean;
+  /** Gewählte Verpflegungsstelle (LLH-1040); `null` oder fehlt: ohne Stelle. */
+  stelleId?: number | null;
+  /** Gewählter Empfänger (LLH-1055); `null` oder fehlt: ohne Empfänger. */
+  empfaenger?: EmpfaengerWahl | null;
   /** Mit Netz gebucht; nur, solange die Ansicht dieses Zeitfensters steht. */
   onGebucht?: (ausgabeId: number, buendel: Buendel) => void;
   /** Ohne Netz an Ort und Stelle vorgemerkt; nur, solange die Ansicht dieses Zeitfensters steht. */
@@ -87,6 +97,8 @@ export function useAusgabeSammlung({
   einsatzId,
   zeitfenster,
   vergangen,
+  stelleId = null,
+  empfaenger = null,
   onGebucht,
   onVorgemerkt,
 }: AusgabeSammlungOptionen): AusgabeSammlungStand {
@@ -100,8 +112,29 @@ export function useAusgabeSammlung({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Die jüngsten Werte für Zeitgeber, Ereignisse und Antworten, die nach dem Render laufen.
-  const aktuell = useRef({ benutzerId, einsatzId, zeitfenster, onGebucht, onVorgemerkt });
-  aktuell.current = { benutzerId, einsatzId, zeitfenster, onGebucht, onVorgemerkt };
+  const aktuell = useRef({
+    benutzerId,
+    einsatzId,
+    zeitfenster,
+    stelleId,
+    empfaenger,
+    onGebucht,
+    onVorgemerkt,
+  });
+  aktuell.current = {
+    benutzerId,
+    einsatzId,
+    zeitfenster,
+    stelleId,
+    empfaenger,
+    onGebucht,
+    onVorgemerkt,
+  };
+  /** Stelle und Empfänger des offenen Bündels: gesetzt beim ersten Tipp, nicht bei einem Wechsel. */
+  const buendelZiel = useRef<{ stelle: number | null; empfaenger: EmpfaengerWahl | null }>({
+    stelle: null,
+    empfaenger: null,
+  });
   const montiert = useRef(true);
 
   const stoppeZeitgeber = useCallback(() => {
@@ -113,8 +146,15 @@ export function useAusgabeSammlung({
   const abschliessen = useCallback(
     (weg: 'senden' | 'vormerken', ziel: ZeitfensterZiel | null) => {
       stoppeZeitgeber();
-      const buendel = sammlung.abschluss();
-      if (!buendel) return;
+      const roh = sammlung.abschluss();
+      if (!roh) return;
+      const { stelle, empfaenger: an } = buendelZiel.current;
+      buendelZiel.current = { stelle: null, empfaenger: null };
+      const buendel: Buendel = {
+        ...roh,
+        ...(stelle != null ? { verpflegungsstelle_id: stelle } : {}),
+        ...empfaengerFelder(an),
+      };
       neuZeichnen();
       const { benutzerId: bid, einsatzId: eid } = aktuell.current;
       if (bid == null || ziel == null) return;
@@ -175,7 +215,14 @@ export function useAusgabeSammlung({
   const tippe = useCallback(
     (n: number, kostform?: Kostform) => {
       if (vergangen || aktuell.current.zeitfenster == null) return;
+      const wasEmpty = sammlung.istLeer;
       if (!sammlung.tippe(n, Date.now(), kostform)) return;
+      if (wasEmpty) {
+        buendelZiel.current = {
+          stelle: aktuell.current.stelleId,
+          empfaenger: aktuell.current.empfaenger,
+        };
+      }
       neuZeichnen();
       planeAbschluss();
     },
@@ -204,6 +251,16 @@ export function useAusgabeSammlung({
       setAblehnung(null);
     };
   }, [zfId, abschliessen]);
+
+  // Ein Wechsel der Stelle (LLH-1040) oder des Empfängers (LLH-1055) schließt das offene Bündel
+  // beim alten Ziel. Verglichen wird der Schlüssel, nicht das Objekt des Empfängers.
+  const zielSchluessel = `${stelleId ?? ''}|${empfaengerSchluessel(empfaenger)}`;
+  const vorigesZiel = useRef(zielSchluessel);
+  useEffect(() => {
+    if (vorigesZiel.current === zielSchluessel) return;
+    vorigesZiel.current = zielSchluessel;
+    abschliessen('senden', aktuell.current.zeitfenster);
+  }, [zielSchluessel, abschliessen]);
 
   // Wird das Zeitfenster während einer Sammlung vergangen, wird sie gebucht (D7).
   useEffect(() => {
