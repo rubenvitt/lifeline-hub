@@ -59,19 +59,27 @@ export const STELLENART_FELD: Record<
     platzhalter: 'Abschnitt wählen',
     leer: 'Kein Abschnitt in diesem Einsatz',
   },
+  verpflegungsstelle: {
+    label: 'Verpflegungsstelle',
+    platzhalter: 'Verpflegungsstelle wählen',
+    leer: 'Keine Verpflegungsstelle in diesem Einsatz',
+  },
 };
 
 /**
- * Art der Stelle, an die die Ansicht gebunden ist, laut der Übersicht des Servers
- * (`GeraeteUebersicht.ansichten`); `null` ohne Stellenbindung oder für eine Ansicht, die der
- * Server nicht anbietet.
+ * Art der Pflichtstelle der Ansicht laut der Übersicht des Servers
+ * (`GeraeteUebersicht.ansichten`); `null` ohne Stellenbindung, für eine wahlweise Stelle
+ * (`stelle_pflicht: false`, Verpflegung, LLH-1048) und für eine Ansicht, die der Server nicht
+ * anbietet. Die Wahl einer wahlweisen Stelle bietet die Maske erst mit LLH-1048 Teil II an; bis
+ * dahin koppelt sie die Verpflegung einsatzweit wie bisher.
  */
 export function stellenartVon(
   ansichten: readonly AnsichtAuswahl[],
   ansicht: Funktionsansicht | undefined,
 ): Bindungsart | null {
   if (!ansicht) return null;
-  return ansichten.find((a) => a.ansicht === ansicht)?.stellenart ?? null;
+  const auswahl = ansichten.find((a) => a.ansicht === ansicht);
+  return auswahl?.stelle_pflicht ? (auswahl.stellenart ?? null) : null;
 }
 
 /** Eine wählbare Stelle der Kopplungsmaske. */
@@ -102,6 +110,7 @@ export function stellenOptionen(
       storniert_at?: string | null;
     }[];
     abschnitte?: readonly { id: number; name: string }[];
+    verpflegungsstellen?: readonly { id: number; bezeichnung: string; status: string }[];
   },
   art: Bindungsart,
 ): StellenOption[] {
@@ -122,6 +131,11 @@ export function stellenOptionen(
         .map((b) => ({ value: b.id, label: b.bezeichnung }));
     case 'einsatzabschnitt':
       return (quellen.abschnitte ?? []).map((a) => ({ value: a.id, label: a.name }));
+    case 'verpflegungsstelle':
+      // `stellen` aus `GET …/verpflegung` kommt ohne stornierte; aufgelöst lehnt der Server ab.
+      return (quellen.verpflegungsstellen ?? [])
+        .filter(benutzbar)
+        .map((s) => ({ value: s.id, label: s.bezeichnung }));
   }
 }
 

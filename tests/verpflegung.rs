@@ -1888,9 +1888,12 @@ async fn bestand_ohne_stelle_unveraendert() {
             "id",
             "je_stelle",
             "stelle_ids",
+            // LLH-1048: nur für ein an eine Stelle gebundenes Gerät gefüllt.
+            "verpflegt_anderswo",
             "von_at",
         ]
     );
+    assert!(z["verpflegt_anderswo"].as_array().unwrap().is_empty());
     assert!(z["je_stelle"].as_array().unwrap().is_empty());
     assert!(z["stelle_ids"].as_array().unwrap().is_empty());
     assert_eq!(z["ausgegeben"]["gesamt"], 120);

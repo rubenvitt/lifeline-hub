@@ -56,6 +56,7 @@ export function zeitfenster(
     fehlmenge: { gesamt: 20, sonderkost: KEINE_SONDERKOST },
     stelle_ids: [],
     je_stelle: [],
+    verpflegt_anderswo: [],
     ausgaben: [ausgabe({ id: 11, menge: 230, sonderkost: { ...KEINE_SONDERKOST, vegan: 3 } })],
     angelegt_at: '2026-09-24 06:00:00',
     ...over,

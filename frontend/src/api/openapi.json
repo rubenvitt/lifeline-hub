@@ -567,17 +567,22 @@
         "type": "object",
         "description": "Eine Ansicht, die die Einsatzleitung koppeln kann, mit der Art ihrer Stelle.",
         "required": [
-          "ansicht"
+          "ansicht",
+          "stelle_pflicht"
         ],
         "properties": {
           "ansicht": {
             "$ref": "#/components/schemas/Funktionsansicht"
           },
+          "stelle_pflicht": {
+            "type": "boolean",
+            "description": "Ob die Kopplung die Stelle braucht. `false` mit `stellenart`: die Stelle ist wahlweise,\nohne sie arbeitet das Gerät einsatzweit (Verpflegung, LLH-1048)."
+          },
           "stellenart": {
             "oneOf": [
               {
                 "$ref": "#/components/schemas/Bindungsart",
-                "description": "Art der Stelle, die die Kopplung braucht (`stelle_id`); fehlt ohne Stellenbindung."
+                "description": "Art der Stelle, an die die Kopplung gebunden wird (`stelle_id`); fehlt ohne\nStellenbindung."
               },
               {
                 "type": "null"
@@ -2722,12 +2727,13 @@
       },
       "Bindungsart": {
         "type": "string",
-        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040). Je Art trägt\n`geraet_kopplung` eine eigene Spalte mit Fremdschlüssel (`migrations/0159_…`).",
+        "description": "Art der Stelle, an die eine Ansicht gebunden ist (LFH-1040, Verpflegungsstelle LLH-1048).\nJe Art trägt `geraet_kopplung` eine eigene Spalte mit Fremdschlüssel\n(`migrations/0213_…`).",
         "enum": [
           "uhs",
           "betreuungsstelle",
           "bereitstellungsraum",
-          "einsatzabschnitt"
+          "einsatzabschnitt",
+          "verpflegungsstelle"
         ]
       },
       "BrAbrufErgebnis": {
@@ -7471,7 +7477,7 @@
       },
       "Funktionsansicht": {
         "type": "string",
-        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0159_geraet_kopplung_stellenarten.sql`.",
+        "description": "Funktionsansicht eines gekoppelten Geräts. Wire-Werte stehen als CHECK in\n`migrations/0213_geraet_kopplung_verpflegungsstelle.sql`.",
         "enum": [
           "uhs-tablet",
           "uhs-laptop",
@@ -14571,6 +14577,26 @@
           "gegen"
         ]
       },
+      "VerpflegtAnderswo": {
+        "type": "object",
+        "description": "Was eine Einheit in einem Zeitfenster anderswo bekommen hat (LLH-1048): nur Kennung und\nSumme, ohne Stelle, Zeitpunkt, Kostform oder Freitext und ohne Personenbezug. Die Feldmenge ist\nin `tests/verpflegung.rs` gepinnt.",
+        "required": [
+          "einheit_id",
+          "menge"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die Empfänger-Einheit; Name und Gliederung stehen in `VerpflegungAnzeige.empfaenger`."
+          },
+          "menge": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Portionen aus den nicht zurückgenommenen Ausgaben an diese Einheit, die nicht an der\nStelle des Geräts gebucht sind (an einer anderen Stelle oder ohne Stelle)."
+          }
+        }
+      },
       "VerpflegungAnzeige": {
         "type": "object",
         "description": "Die eine Lesequelle der Modulseite (`GET …/verpflegung`).",
@@ -15893,6 +15919,7 @@
           "fehlmenge",
           "stelle_ids",
           "je_stelle",
+          "verpflegt_anderswo",
           "ausgaben",
           "angelegt_at"
         ],
@@ -15905,7 +15932,7 @@
             "items": {
               "$ref": "#/components/schemas/AusgabeAnzeige"
             },
-            "description": "Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`."
+            "description": "Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`. Für ein an eine Stelle\ngebundenes Gerät nur die Ausgaben an dieser Stelle (LLH-1048)."
           },
           "ausgegeben": {
             "$ref": "#/components/schemas/Portionen",
@@ -15953,6 +15980,13 @@
               "format": "int64"
             },
             "description": "Die zugeordneten Stellen, nach Bezeichnung; leer = einsatzweit (LLH-1040 D5)."
+          },
+          "verpflegt_anderswo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerpflegtAnderswo"
+            },
+            "description": "Nur für ein an eine Verpflegungsstelle gebundenes Gerät (LLH-1048, LLH-1024 F7): je\nEinheit die Ausgaben dieses Zeitfensters, die nicht an seiner Stelle gebucht sind, als\nSumme. Das Gerät sieht diese Ausgaben nicht einzeln (`ausgaben` trägt nur die eigene\nStelle); ohne die Summe hielte es eine anderswo verpflegte Einheit für „noch nicht\nverpflegt“. Für jede andere Sitzung leer: sie sieht alle Ausgaben."
           },
           "verpflegungsart": {
             "oneOf": [

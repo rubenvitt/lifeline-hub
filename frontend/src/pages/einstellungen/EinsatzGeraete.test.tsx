@@ -45,9 +45,9 @@ interface Aufbau {
 
 /** Die heute koppelbaren Ansichten, wie der Server sie anbietet (LFH-1040). */
 const ANSICHTEN = [
-  { ansicht: 'uhs-tablet', stellenart: 'uhs' },
-  { ansicht: 'uhs-laptop', stellenart: 'uhs' },
-  { ansicht: 'lagemonitor', stellenart: null },
+  { ansicht: 'uhs-tablet', stellenart: 'uhs', stelle_pflicht: true },
+  { ansicht: 'uhs-laptop', stellenart: 'uhs', stelle_pflicht: true },
+  { ansicht: 'lagemonitor', stellenart: null, stelle_pflicht: false },
 ];
 
 function stelleBereit(a: Aufbau = {}) {
@@ -250,7 +250,10 @@ describe('EinsatzGeraete (LFH-892)', () => {
   it('fragt nach der Stelle der Art, die die Ansicht braucht', async () => {
     const { aufrufe } = stelleBereit({
       kopplungen: [],
-      ansichten: [...ANSICHTEN, { ansicht: 'betreuungsstelle', stellenart: 'betreuungsstelle' }],
+      ansichten: [
+        ...ANSICHTEN,
+        { ansicht: 'betreuungsstelle', stellenart: 'betreuungsstelle', stelle_pflicht: true },
+      ],
     });
     rendern();
     await userEvent.click(await screen.findByRole('button', { name: 'Gerät koppeln' }));
