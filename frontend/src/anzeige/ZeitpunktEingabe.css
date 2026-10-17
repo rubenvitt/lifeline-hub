@@ -27,3 +27,18 @@
   overflow-y: auto;
   width: 100%;
 }
+
+/* Der Pfeil zeigt auf den Knopf; das Blatt steht nicht mehr daran. Mit ihm ragte das Blatt über
+   die 85 % hinaus. */
+.lfh-zeit-blatt .ant-popover-arrow {
+  display: none;
+}
+
+/* Schnellwahl und „Übernehmen“ bleiben unten stehen, wenn der Kalender im Blatt rollt
+   (`handschuh`, Handy quer). Gerollt wird im Container, nicht am Popover. */
+.lfh-zeit-blatt .lfh-zeit-fuss {
+  position: sticky;
+  bottom: 0;
+  padding-block: 8px;
+  background: var(--ant-color-bg-elevated);
+}

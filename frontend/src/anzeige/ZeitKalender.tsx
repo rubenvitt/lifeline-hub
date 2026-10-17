@@ -22,6 +22,9 @@ import { heuteInZone, tagInZone, zuWanduhr } from './zeitEingabe';
 
 const TAG = 'YYYY-MM-DD';
 
+/** Klasse der Fußzeile; die Regel steht in `ZeitpunktEingabe.css`. */
+export const ZEIT_FUSS = 'lfh-zeit-fuss';
+
 export interface ZeitKalenderProps {
   /** Geltender Wert des Felds; ohne Wert öffnet der Kalender auf heute und der aktuellen Minute. */
   wert: Dayjs | null | undefined;
@@ -160,17 +163,18 @@ export function ZeitKalender({
           )}
         </Flex>
       )}
-      <Flex gap="small" align="center" justify="space-between" wrap>
-        <ZeitSchnellwahl art={art} onWahl={onUebernehmen} />
-        <Button type="primary" onClick={() => uebernehmen()}>
-          Übernehmen
-        </Button>
-      </Flex>
       {zonenHinweis && (
         <span style={{ color: rollen.gedaempft }}>
           Zeiten in <span style={monoStil(12)}>{zonenHinweis}</span>
         </span>
       )}
+      {/* Die Fußzeile klebt im Blatt unten, wenn der Inhalt rollt (`ZeitpunktEingabe.css`). */}
+      <Flex className={ZEIT_FUSS} gap="small" align="center" justify="space-between" wrap>
+        <ZeitSchnellwahl art={art} onWahl={onUebernehmen} />
+        <Button type="primary" onClick={() => uebernehmen()}>
+          Übernehmen
+        </Button>
+      </Flex>
     </div>
   );
 }
