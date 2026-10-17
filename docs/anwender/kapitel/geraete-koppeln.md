@@ -41,6 +41,19 @@ Für die Einsatzleitung:
 Bis das Gerät den Code eingelöst hat, steht es in der Liste als „wartet auf Gerät“, danach als
 „gekoppelt“.
 
+### Verpflegungsgerät an eine Verpflegungsstelle koppeln
+
+Für die Einsatzleitung:
+
+1. „Gerät koppeln“ wählen und unter „Ansicht“ „Verpflegung“ wählen.
+2. Unter „Verpflegungsstelle“ die Stelle wählen, an der das Gerät steht. Vorgabe ist „ohne Stelle
+   (einsatzweit)“; dann sieht das Gerät alle Zeitfenster und Stellen des Einsatzes.
+
+   ![Maske „Gerät koppeln“ mit der Ansicht „Verpflegung“, der Verpflegungsstelle „Feldküche BR Sportplatz“ und der Gerätebezeichnung „Tresen“](../bilder/geraete-koppeln/verpflegungsstelle.png)
+
+3. Die „Gerätebezeichnung“ angeben und „Koppeln“ wählen. Das Gerät heißt danach mit der Stelle,
+   etwa „Feldküche BR Sportplatz · Tresen“.
+
 ### Kopplungen im Blick behalten
 
 Für die Einsatzleitung:
