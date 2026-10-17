@@ -80,8 +80,6 @@ dayjs.extend(utc);
  * langen Angabe selbst auf.
  */
 
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
-
 type SonderkostWerte = Partial<Record<Kostform, number | null>>;
 
 /** Getrimmter Text oder `null` — ein Feld aus Leerzeichen ist leer. */
@@ -425,11 +423,7 @@ export function ZeitfensterDialog({
         label="Zeitraum"
         rules={[{ required: true, message: 'Bitte Beginn und Ende angeben' }]}
       >
-        <ZeitraumEingabe
-          format={ZEITFORMAT}
-          placeholder={['Beginn', 'Ende']}
-          style={{ width: '100%' }}
-        />
+        <ZeitraumEingabe placeholder={['Beginn', 'Ende']} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item<ZeitfensterWerte>
         name="bedarf_kraefte"
@@ -667,7 +661,7 @@ export function AusgabeDialog({
         )
       )}
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
-        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />
+        <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
       </Form.Item>
       {eingeklappt(
         ['Weitere Angaben', ...abweichungen].join(' · '),

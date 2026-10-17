@@ -572,11 +572,7 @@ function LageberichtDetail() {
               {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
                   würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die
                   DB. */}
-              <ZeitpunktEingabe
-                allowClear={false}
-                format="DD.MM.YYYY HH:mm"
-                style={{ width: '100%' }}
-              />
+              <ZeitpunktEingabe art="ereignis" allowClear={false} style={{ width: '100%' }} />
             </Form.Item>
             {/* An wen der Bericht geht (LLH-1172); auf Papier steht er im Druckkopf. */}
             <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="lagebericht-no-print" />

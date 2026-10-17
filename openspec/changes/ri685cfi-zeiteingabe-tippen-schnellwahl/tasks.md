@@ -34,26 +34,26 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 3. Baustein
 
-- [ ] 3.1 Testhelfer `test/zeitEingabe.ts` (`tippeZeit(feld, text)`: leeren, tippen, Enter;
+- [x] 3.1 Testhelfer `test/zeitEingabe.ts` (`tippeZeit(feld, text)`: leeren, tippen, Enter;
       `zeitFeld(name)`), selbst getestet an einem Minimalformular.
-- [ ] 3.2 `ZeitpunktEingabe` neu nach D1, D3, D4, D8: Mono-`Input`, Anzeige als DTG,
+- [x] 3.2 `ZeitpunktEingabe` neu nach D1, D3, D4, D8: Mono-`Input`, Anzeige als DTG,
       Deutung/Grund als Suffix mit `aria-describedby`, Enter/Verlassen/Escape/Leeren,
       `onChange` nur bei anderem Instant, `onOk` bei ausdrücklicher Übernahme, Zonenhinweis wie
       bisher. `ZeitpunktEingabe.test.tsx` neu: jedes Szenario der Spec-Anforderungen „Eingabe
       als Text“, „Unlesbare Eingabe wird nicht übernommen“, „Anzeige im Feld als
       Datum-Zeit-Gruppe“, dazu die bisherigen Szenarien Anzeigezone, unverändertes Speichern und
       Zonenhinweis unter TZ=UTC. Typprüfung: `format` am Baustein ist ein Fehler.
-- [ ] 3.3 `anzeige/ZeitKalender.tsx` nach D5 mit Popover/Blatt-Weiche (`zeitPanelAmFeldAb`,
+- [x] 3.3 `anzeige/ZeitKalender.tsx` nach D5 mit Popover/Blatt-Weiche (`zeitPanelAmFeldAb`,
       `ZeitpunktEingabe.css` auf den neuen Container umgestellt): Tag wählen, Uhrzeit tippen,
       Enter/„Übernehmen“, Schnellwahl der Feldart, gesperrte Zukunftstage, `onOpenChange`.
       Tests: Szenarien „Wochenbeginn“, „Anderer Tag, andere Uhrzeit“, Blatt unter `md` und in
       `handschuh`, Escape schließt nur den Kalender.
-- [ ] 3.4 Schnellwahl am Feld (Prop `schnellwahl`) nach D6; Test „Minus fünf Minuten“ mit
+- [x] 3.4 Schnellwahl am Feld (Prop `schnellwahl`) nach D6; Test „Minus fünf Minuten“ mit
       vorgehender Geräteuhr (Serveruhr-Versatz gesetzt).
-- [ ] 3.5 `ZeitraumEingabe` aus zwei Feldern nach D7 und `nurTag` nach D8. Tests: Szenarien
+- [x] 3.5 `ZeitraumEingabe` aus zwei Feldern nach D7 und `nurTag` nach D8. Tests: Szenarien
       „Mittag“ und „Über Mitternacht“, Tupel-Wert im Formular, `nurTag` zeigt `TT.MM.JJJJ`.
-- [ ] 3.6 Wächter nach D9: `zeitEingabe.guard.test.ts` und `components/dichte.guard.test.ts`
-      angepasst; beide grün, und ein probeweise eingefügter `DatePicker`-Import außerhalb wie
+- [x] 3.6 Wächter nach D9: `zeitEingabe.guard.test.ts` angepasst, das Kalender-Token in
+      `theme/tokens.ts` mit `auswahlKontrast.test.ts`; beide grün, und ein probeweise eingefügter `DatePicker`-Import außerhalb wie
       innerhalb von `anzeige/` macht den Guard rot.
 
 ## 4. Aufrufer umstellen (je Gruppe Props streichen, `art` setzen, Tests auf `tippeZeit`)
@@ -98,7 +98,7 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 6. Regel und Doku
 
-- [ ] 6.1 `frontend/AGENTS.md` „Zeiteingabe in der Anzeigezone“ fortschreiben (Parser als eine
+- [x] 6.1 `frontend/AGENTS.md` „Zeiteingabe in der Anzeigezone“ fortschreiben (Parser als eine
       Deutung, Feldart, Schnellwahl-Tabelle, kein `format`, Kalender nur in `anzeige/`,
       Testhelfer); Prettier über `frontend/` grün.
 - [ ] 6.2 Anwenderdoku: die Kapitel mit Zeitfeldern (`docs/anwender/kapitel/`: einsatztagebuch,

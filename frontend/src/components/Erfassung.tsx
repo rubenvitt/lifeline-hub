@@ -69,7 +69,7 @@ import './Erfassung.css';
 
 /**
  * Erstes bedienbares Feld im Formular. Deckt auch antds `Select`, `AutoComplete` und
- * `DatePicker` ab — die rendern alle ein echtes `<input>`.
+ * die Zeiteingabe ab — die rendern alle ein echtes `<input>`.
  */
 const FOKUSSIERBAR = [
   'input:not([type="hidden"]):not([disabled])',

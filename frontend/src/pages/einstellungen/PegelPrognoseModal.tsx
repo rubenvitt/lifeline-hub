@@ -17,8 +17,6 @@ import {
   type PrognoseFormWerte,
 } from './pegelPrognoseKern';
 
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
-
 interface PegelPrognoseModalProps {
   einsatzId: number;
   /** Der Pegel, dessen Prognose gepflegt wird — Stand beim Öffnen. */
@@ -130,7 +128,7 @@ export default function PegelPrognoseModal({
         name="zeitpunkt"
         rules={[{ required: true, message: 'Zeitpunkt angeben' }]}
       >
-        <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} />
+        <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
       </Form.Item>
       <SpeicherFehler fehler={speichern.error} titel="Prognose nicht gespeichert" />
     </ErfassungsModal>

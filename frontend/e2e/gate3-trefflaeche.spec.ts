@@ -1427,8 +1427,9 @@ async function lagebesprechungSteht(page: Page) {
     .getByRole('group', { name: 'Termin setzen', exact: true });
   const schnellwahl = gruppe.getByRole('button', { name: /^(\+30 min|\+1 h|\+2 h|kein Termin)$/ });
   await expect(schnellwahl).toHaveCount(TERMIN_KNOEPFE);
+  // Die Zeiteingabe ist Textfeld + Kalender-Knopf in einer Reihe (LLH-1070); gemessen wird die Reihe.
   const terminFeld = gruppe
-    .locator('.ant-picker')
+    .locator('.ant-space-compact')
     .filter({ has: page.getByRole('textbox', { name: 'Termin wählen', exact: true }) });
   return { etbLinks, schnellwahl, terminFeld };
 }
@@ -3417,13 +3418,14 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Aufnahme`);
 
   /**
-   * Die sichtbare Feldhülle: beim `Input` das Element selbst (`ant-input`), beim DatePicker
-   * der Vorfahr `.ant-picker` — nicht das nur 15 px hohe `.ant-picker-input`. Deshalb
-   * Klassen-TOKEN statt Teilstring.
+   * Die sichtbare Feldhülle: beim schlichten `Input` das Element selbst (`ant-input`), bei einem
+   * Feld mit Präfix oder Suffix (die Zeiteingabe, LLH-1070) der Vorfahr
+   * `.ant-input-affix-wrapper` — nicht das innere `<input>`. Die Vereinigung steht in
+   * Dokumentreihenfolge, der Vorfahr also vorn. Klassen-TOKEN statt Teilstring.
    */
   const huelle = (feld: Locator) =>
     feld.locator(
-      'xpath=ancestor-or-self::*[contains(concat(" ", normalize-space(@class), " "), " ant-input ") or contains(concat(" ", normalize-space(@class), " "), " ant-picker ")][1]',
+      'xpath=(ancestor::*[contains(concat(" ", normalize-space(@class), " "), " ant-input-affix-wrapper ")] | self::*)[1]',
     );
 
   const gemessen: string[] = [];

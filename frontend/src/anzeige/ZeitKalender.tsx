@@ -31,6 +31,11 @@ export interface ZeitKalenderProps {
   art?: ZeitArt;
   keineZukunftstage?: boolean;
   nurTag?: boolean;
+  /**
+   * Das Uhrzeitfeld nimmt beim Öffnen den Fokus (Tastatur und Maus). Auf einem Touchgerät nicht:
+   * die Bildschirmtastatur ginge auf und deckte das Blatt.
+   */
+  fokusUhrzeit?: boolean;
   onUebernehmen: (zeitpunkt: Dayjs) => void;
   onAbbrechen: () => void;
 }
@@ -43,6 +48,7 @@ export function ZeitKalender({
   art,
   keineZukunftstage,
   nurTag,
+  fokusUhrzeit = true,
   onUebernehmen,
   onAbbrechen,
 }: ZeitKalenderProps) {
@@ -56,8 +62,8 @@ export function ZeitKalender({
   const grundId = useId();
 
   useEffect(() => {
-    uhrRef.current?.focus({ preventScroll: true, cursor: 'all' });
-  }, []);
+    if (fokusUhrzeit) uhrRef.current?.focus({ preventScroll: true, cursor: 'all' });
+  }, [fokusUhrzeit]);
 
   function uebernehmen(amTag = tag) {
     if (nurTag) {

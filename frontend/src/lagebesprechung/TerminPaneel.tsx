@@ -98,9 +98,9 @@ export default function TerminPaneel({
             kein Termin
           </Button>
           <ZeitpunktEingabe
+            art="frist"
             aria-label="Termin wählen"
             placeholder="Termin wählen"
-            format="YYYY-MM-DD HH:mm"
             disabled={isGesperrt}
             value={terminZeitpunkt(termin)}
             // Das Löschkreuz des Felds leert den Termin wie „kein Termin“.

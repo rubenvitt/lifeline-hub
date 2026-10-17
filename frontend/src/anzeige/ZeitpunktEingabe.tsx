@@ -21,12 +21,15 @@
 import { Button, Input, Popover, Space, theme, type InputRef } from 'antd';
 import type { Dayjs } from 'dayjs';
 import {
+  useCallback,
   useId,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type FocusEvent,
   type KeyboardEvent,
+  type RefObject,
   type Ref,
 } from 'react';
 import { monoStil, useRollen } from '../components/instrument';
@@ -92,11 +95,11 @@ export function zeitPanelAmFeldAb(token: { controlHeight: number }): AbBreitePun
   return 'md';
 }
 
-function useIstBlatt(): boolean {
-  const { abBreite } = useViewport();
+function useKalenderLage(): { istBlatt: boolean; istBeruehrung: boolean } {
+  const { abBreite, istBeruehrung } = useViewport();
   const { token } = theme.useToken();
   const ab = zeitPanelAmFeldAb(token);
-  return ab === null || !abBreite(ab);
+  return { istBlatt: ab === null || !abBreite(ab), istBeruehrung };
 }
 
 /** Gleicher Zeitpunkt (am Instant) oder beide leer. */
@@ -179,7 +182,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   } = props;
   const z = useZeitEingabe();
   const { rollen } = useRollen();
-  const istBlatt = useIstBlatt();
+  const { istBlatt, istBeruehrung } = useKalenderLage();
   // Form.Item reicht `value` immer durch, auch als `undefined` — der Schlüssel entscheidet.
   const gesteuert = Object.prototype.hasOwnProperty.call(props, 'value');
   const [intern, setIntern] = useState<Dayjs | null | undefined>(defaultValue);
@@ -191,6 +194,22 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const [offenIntern, setOffenIntern] = useState(false);
   const offen = open ?? offenIntern;
   const hinweisId = useId();
+  const feldRef = useRef<InputRef | null>(null);
+  const setzeRef = useCallback(
+    (el: InputRef | null) => {
+      feldRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) (ref as RefObject<InputRef | null>).current = el;
+    },
+    [ref],
+  );
+  /**
+   * Nach dem Kalender zurück ins Feld, sonst stünde der Fokus auf `<body>`. Nicht bei
+   * Fingerbedienung: dort ginge die Bildschirmtastatur auf.
+   */
+  function zurueckInsFeld() {
+    if (!istBeruehrung) feldRef.current?.focus({ preventScroll: true });
+  }
 
   const anzeige = wert ? (nurTag ? formatTag(wert, z.zone) : formatDtg(wert, z.zone)) : '';
   const deutung: Deutung | null =
@@ -273,11 +292,16 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
       art={art}
       keineZukunftstage={keineZukunftstage}
       nurTag={nurTag}
+      fokusUhrzeit={!istBeruehrung}
       onUebernehmen={(neu) => {
         ausWahl(neu);
         oeffne(false);
+        zurueckInsFeld();
       }}
-      onAbbrechen={() => oeffne(false)}
+      onAbbrechen={() => {
+        oeffne(false);
+        zurueckInsFeld();
+      }}
     />
   );
 
@@ -285,7 +309,7 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
     <Space.Compact block={style?.width === '100%'} style={style} className={className}>
       <Input
         {...daten}
-        ref={ref}
+        ref={setzeRef}
         id={id}
         aria-label={ariaLabel}
         aria-describedby={beschreibung || undefined}

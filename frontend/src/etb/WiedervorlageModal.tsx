@@ -179,7 +179,7 @@ export default function WiedervorlageModal({
           noStyle
           rules={[{ required: true, message: 'Fälligkeit ist erforderlich' }]}
         >
-          <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+          <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
         </Form.Item>
       </Form.Item>
       <Form.Item label="Beschreibung (optional)" name="beschreibung">

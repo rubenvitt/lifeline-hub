@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
+quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -101,6 +101,17 @@ Touch stehen diese Filter als Knöpfe am unteren Rand der Palette.
 
 Die gewählte Stufe trägt ein Häkchen. Dieselben Einstellungen stehen in der Sprungpalette
 („Darstellung: …“, „Dichte: …“, „Helligkeit: …“).
+
+### Eine Zeit eintragen
+
+1. Ins Zeitfeld klicken. Der bisherige Wert ist markiert, Tippen ersetzt ihn.
+2. Die Zeit tippen, etwa „1430“ für heute 14:30 oder „101430okt26“ für den 10. Oktober 2026,
+   14:30. Neben dem Feld steht, wie die Eingabe gelesen wird („= 171430okt26“).
+3. Mit Enter übernehmen. In einem Formular sendet derselbe Tastendruck das Formular ab.
+
+Wer lieber wählt: „Kalender und Uhrzeit“ neben dem Feld öffnen, einen Tag wählen, unter
+„Uhrzeit“ die Uhrzeit eintragen und „Übernehmen“. Dort stehen auch die Schnellwahlen, etwa
+„jetzt“ und „−5 min“ oder „+30 min“. Escape verwirft eine angefangene Eingabe.
 
 ### Auf eine Benachrichtigung reagieren
 
@@ -276,6 +287,29 @@ nach dem Abmelden stehen und gelten für jede Person, die sich an diesem Gerät 
 - **Helligkeit** dunkelt die ganze Anzeige ab, für den abgedunkelten Führungsraum bei Nacht. Den
   Bildschirm selbst macht sie nicht heller als 100 %.
 
+### Wie Zeitfelder Zeiten lesen
+
+Ein Zeitfeld zeigt seinen Wert als Datum-Zeit-Gruppe: Tag, Stunde und Minute zweistellig, dazu
+Monat und Jahr („171430okt26“). Gelesen werden:
+
+- **Uhrzeit allein** („1430“, „14:30“, „630“): heute.
+- **Tag und Uhrzeit** („171430“): im laufenden Monat.
+- **Datum-Zeit-Gruppe** mit Monat, mit oder ohne Jahr („171430okt26“, „171430OKT2026“), Monat mit
+  oder ohne Umlaut („mrz“, „mär“).
+- **Datum mit Punkten** („17.10.26 1430“, „17.10.2026 14:30“) und ISO („2026-10-17 14:30“).
+- **Relativ zu jetzt**: „j“ oder „jetzt“, „-5“ (vor fünf Minuten), „-1h“, „+30“, „+2h“.
+
+Felder für **Ereignisse** (Eingang, Ereigniszeit, Alarmzeit) legen eine Uhrzeit, die heute noch
+bevorsteht, auf gestern: „2350“ kurz nach Mitternacht ist der Vorabend. Felder für **Fristen**
+(Wiedervorlage, Termin, Frist) legen eine Uhrzeit, die heute vorbei ist, auf morgen. Das Feld
+nennt dann „gestern“ oder „morgen“. Beim Ende eines Zeitraums gilt eine Uhrzeit am Tag des
+Beginns, und liegt sie davor, am Folgetag („2200“ bis „0600“ geht über Mitternacht).
+
+Eine Eingabe, die sich nicht lesen lässt, wird nicht übernommen; das Feld nennt den Grund („Uhrzeit
+gibt es nicht“). Wer das Feld trotzdem verlässt, behält den bisherigen Wert. „Jetzt“ und die
+Schnellwahlen rechnen mit der Uhr des Servers, nicht mit der des Geräts. Zeiten gelten in der
+Zeitzone des Einsatzes; weicht das Gerät davon ab, steht die Zone am Feld.
+
 ### Helligkeit bei einer Warnung
 
 Solange im offenen Einsatz eine Warnung aktiv ist, wirkt die Helligkeit mit **mindestens
@@ -289,3 +323,9 @@ aktiv)“; die dunkleren Stufen sind gesperrt. Als Warnung zählen:
 
 Die eigene Wahl bleibt dabei erhalten: Endet die Warnung oder verlässt man den Einsatz, gilt sie
 wieder.
+
+## Grundlagen und Quellen
+
+- FwDV/DV 810 „Sprech- und Datenfunkverkehr“ (Ausgabe 2018): Zeitangaben als Tag des Monats und
+  Uhrzeitgruppe, bei Bedarf mit Monat und Jahr („271938jan19“). Nach dieser Schreibweise zeigen
+  die Zeitfelder ihren Wert.

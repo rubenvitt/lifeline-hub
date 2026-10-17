@@ -78,6 +78,8 @@ liefert `{ ok: true, zeitpunkt, hinweis?: 'gestern' | 'morgen' }` oder
   ohne `art` gilt als `ereignis`.
 - Ziffernblöcke sind eindeutig nach Länge: 3–4 Ziffern Uhrzeit, 6 Ziffern Tag+Uhrzeit. Fünf
   Ziffern sind unlesbar (kein Raten zwischen `HHMMx` und `THHMM`).
+- Uhren gehen nie gleich: eine Ereigniszeit bis fünf Minuten voraus gilt noch heute (sonst fiele
+  „1430“ um 14:29:30 auf gestern), für Fristen spiegelbildlich.
 - Gründe sind kurze Wörter für das Feld: „Uhrzeit gibt es nicht“, „Tag gibt es nicht“, „Monat
   unbekannt“, „liegt in der Zukunft“, „nicht lesbar“.
 
@@ -125,9 +127,13 @@ Werts, ohne Wert mit heute und der aktuellen Minute. Am Feld als Popover, sonst 
 `zeitPanelAmFeldAb` (Weiche und CSS-Regeln bleiben, die Selektoren wechseln auf den neuen
 Container). Tage nach heute sind bei `keineZukunftstage` gesperrt (`istZukunftstag`).
 
-Wochenbeginn Montag: `import 'dayjs/locale/de'` in `main.tsx` (registriert die Sprache, ändert
-die globale dayjs-Sprache nicht; antd liest sie über `de_DE`). Ein Test prüft „Mo“ in der ersten
-Spalte.
+Wochenbeginn Montag: `import 'dayjs/locale/de'` in `anzeige/dayjsSprache.ts`, das der Kalender
+selbst importiert (registriert die Sprache, ändert die globale dayjs-Sprache nicht; antd liest sie
+über `de_DE`). Ein Test prüft „Mo“ in der ersten Spalte.
+
+Fokus: am Schreibtisch nimmt das Uhrzeitfeld beim Öffnen den Fokus, nach dem Schließen geht er ins
+Feld zurück. Bei Fingerbedienung beides nicht: die Bildschirmtastatur ginge auf und deckte das
+Blatt.
 
 *Alternative:* antds `DatePicker`-Panel mit `showTime={{ format: 'HH:mm', minuteStep: 5 }}` als
 Nebenweg — wieder Scrollspalten, und der Picker brächte seine eigene Texteingabe mit, die mit
@@ -168,8 +174,9 @@ Eingabe `TT.MM.[JJ[JJ]]`, ISO, Kalender ohne Uhrzeitfeld.
 `anzeige/zeitEingabe.guard.test.ts`: kein `DatePicker`/`TimePicker` aus `antd` irgendwo in
 `src/` (auch nicht in `anzeige/`), `Calendar` aus `antd` nur in `anzeige/`, `.local()` weiter
 nur in `anzeige/`. Kein `format=` an `ZeitpunktEingabe`/`ZeitraumEingabe` (Quelltext-Regex als
-zweites Netz zur Typprüfung). `components/dichte.guard.test.ts` führt `Calendar` statt der
-Picker in `INTERAKTIV`.
+zweites Netz zur Typprüfung). `components/dichte.guard.test.ts` bleibt, wie er ist (antds
+`Calendar` hat keine `size`). Die Kontrastkorrektur des gewählten Tags (LFH-1068) zieht vom
+`DatePicker`-Token auf `Calendar` (`theme/tokens.ts`), gemessen in `e2e/zeitraum-kontrast.spec.ts`.
 
 ### D10 Tests ziehen über einen Helfer um
 

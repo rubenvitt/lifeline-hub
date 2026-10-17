@@ -326,8 +326,8 @@ export default function AuftragFormular({
           {/* Leer setzt der Server die Erteilzeit auf jetzt (`auftrag/eingabe.rs`). */}
           <Form.Item name="erteiltAm" label="Erteilt am (optional)">
             <ZeitpunktEingabe
+              art="ereignis"
               style={{ width: '100%' }}
-              format="YYYY-MM-DD HH:mm"
               placeholder="jetzt"
               disabled={!!berichtigen}
             />
@@ -457,7 +457,7 @@ export default function AuftragFormular({
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="frist" label="Frist (Quittung/Vollzug)">
-            <ZeitpunktEingabe style={{ width: '100%' }} format="YYYY-MM-DD HH:mm" />
+            <ZeitpunktEingabe art="frist" style={{ width: '100%' }} />
           </Form.Item>
         </Col>
       </Row>

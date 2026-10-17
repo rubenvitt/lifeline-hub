@@ -314,7 +314,7 @@ for (const modus of ['light', 'dark'] as const) {
     await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
     const seit = dialog.getByLabel('vermisst seit', { exact: true });
     await seit.click();
-    await seit.fill('01.01.2099 10:00');
+    await seit.fill('011000jan99');
     await seit.press('Enter');
     const zukunft = dialog.getByText('Liegt in der Zukunft', { exact: true });
     await expect(zukunft).toBeVisible();

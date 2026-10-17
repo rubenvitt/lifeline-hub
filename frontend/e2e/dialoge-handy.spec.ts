@@ -39,12 +39,18 @@ const STEUERHOEHE: Record<Stufe, number> = { kompakt: 30, komfortabel: 48, hands
 const streifen = (g: Groesse) => Math.floor(g.height * 0.15) - 1;
 const STREIFEN = streifen(HANDY);
 
-/** Das offene Panel einer Zeiteingabe. */
-const panel = (page: Page) => page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)');
+/** Der offene Kalender einer Zeiteingabe (`anzeige/ZeitKalender.tsx`, ein antd-Popover). */
+const panel = (page: Page) => page.locator('.ant-popover:not(.ant-popover-hidden)');
+
+/** Der Kalender-Knopf neben einem Zeitfeld (`anzeige/ZeitpunktEingabe.tsx`, LLH-1070). */
+const kalenderKnopf = (feld: Locator) =>
+  feld
+    .locator('xpath=ancestor::*[contains(concat(" ", @class, " "), " ant-space-compact ")][1]')
+    .getByRole('button', { name: /^Kalender/ });
 
 /**
  * Der Knopf der TanStack-Query-Devtools steht nur im DEV-Build, gegen den die Suite fährt, fest
- * unten rechts — genau über „OK“ im Blatt. Im Betrieb gibt es ihn nicht (wie
+ * unten rechts — genau über „Übernehmen“ im Blatt. Im Betrieb gibt es ihn nicht (wie
  * `fokus-verdeckung.spec.ts`).
  */
 async function ohneDevtoolsKnopf(page: Page) {
@@ -111,8 +117,9 @@ function tagInZweiTagen(): string {
 }
 
 /**
- * Das offene Panel liegt im Schirm; Tag und Stunde werden gewählt und mit „OK“ übernommen.
- * Der Tag liegt in der Zukunft, egal in welcher Zone: Seeds von „jetzt“ fallen danach heraus.
+ * Der offene Kalender liegt im Schirm; Tag und Uhrzeit werden gewählt und mit „Übernehmen“
+ * übernommen. Die Uhrzeit wird getippt, das Feld dafür hält die Steuerhöhe der Stufe. Der Tag
+ * liegt in der Zukunft, egal in welcher Zone: Seeds von „jetzt“ fallen danach heraus.
  */
 async function waehleImPanel(
   page: Page,
@@ -122,19 +129,18 @@ async function waehleImPanel(
   g: Groesse = HANDY,
 ) {
   const p = await pruefeBlatt(page, wo, g);
-  await p.locator(`td[title="${tagInZweiTagen()}"]`).click();
-  const zelle = p.locator(
-    `.ant-picker-time-panel-column[data-type="hour"] li[data-value="${stunde}"]`,
-  );
-  await zelle.scrollIntoViewIfNeeded();
-  const hoehe = (await kasten(zelle.locator('.ant-picker-time-panel-cell-inner'))).height;
+  await p.locator(`td[title="${tagInZweiTagen()}"] .ant-picker-cell-inner`).click();
+  const uhr = p.getByRole('textbox', { name: 'Uhrzeit', exact: true });
+  const hoehe = (await kasten(uhr)).height;
   expect(
     hoehe,
-    `${wo}: Uhrzeitzelle ${hoehe} px, Soll ≥ ${STEUERHOEHE[dichte]} (${dichte})`,
+    `${wo}: Uhrzeitfeld ${hoehe} px, Soll ≥ ${STEUERHOEHE[dichte]} (${dichte})`,
   ).toBeGreaterThanOrEqual(STEUERHOEHE[dichte] - SUBPIXEL);
-  await zelle.click();
-  const ok = p.getByRole('button', { name: 'OK', exact: true });
-  expect(liegtIn(await kasten(ok), schirm(g)), `${wo}: „OK“ liegt nicht im Schirm`).toBe(true);
+  await uhr.fill(`${String(stunde).padStart(2, '0')}00`);
+  const ok = p.getByRole('button', { name: 'Übernehmen', exact: true });
+  expect(liegtIn(await kasten(ok), schirm(g)), `${wo}: „Übernehmen“ liegt nicht im Schirm`).toBe(
+    true,
+  );
   await ok.click();
 }
 
@@ -181,9 +187,10 @@ async function pruefeZeitfenster(
   const bezeichnung = `Mittag ${rolle ?? 'admin'} ${dichte} ${g.width}`;
   await dialog.getByLabel('Bezeichnung', { exact: true }).fill(bezeichnung);
 
-  await dialog.getByPlaceholder('Beginn', { exact: true }).click();
+  await kalenderKnopf(dialog.getByPlaceholder('Beginn', { exact: true })).click();
   await waehleImPanel(page, 12, `${wer}, Beginn`, dichte, g);
-  // antd springt nach „OK“ ins Ende-Feld; das Panel bleibt dafür offen.
+  await expect(panel(page)).toBeHidden();
+  await kalenderKnopf(dialog.getByPlaceholder('Ende', { exact: true })).click();
   await waehleImPanel(page, 13, `${wer}, Ende`, dichte, g);
   await expect(panel(page)).toBeHidden();
 
@@ -229,11 +236,12 @@ async function pruefeEtbFilter(
       .not.toBe('BODY');
   }
   const von = page.getByPlaceholder('von', { exact: true });
-  await von.click();
+  await kalenderKnopf(von).click();
   await waehleImPanel(page, 14, `${wer}, ETB „von“`, dichte, g);
 
   await expect(panel(page)).toBeHidden();
-  await expect(von).toHaveValue(/ 14:00/);
+  // Das Feld zeigt die DTG (Spec `zeiteingabe`, „Anzeige im Feld als Datum-Zeit-Gruppe“).
+  await expect(von).toHaveValue(/^\d{2}1400[a-z]{3}\d{2}$/);
   await expect(page.getByText(inhalt)).toBeHidden();
   await expect(page.getByText('Kein Eintrag passt zum Filter')).toBeVisible();
   await keinSeitlicherUeberlauf(page, `${wer}, ETB gefiltert`, g);
@@ -332,7 +340,7 @@ for (const dichte of STUFEN_BLATT) {
 
 /** Führungs-Tablet hoch und quer in den Stufen, deren Panel nicht neben das Feld passt (LFH-1076). */
 for (const dichte of ['komfortabel', 'handschuh'] as const) {
-  test(`Führungs-Tablet, Stufe ${dichte}: Zeitpanel als Blatt im Schirm, „OK“ übernimmt`, async ({
+  test(`Führungs-Tablet, Stufe ${dichte}: Kalender als Blatt im Schirm, „Übernehmen“ übernimmt`, async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -361,7 +369,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
 test.describe('Touchgerät 390 px (grober Zeiger)', () => {
   test.use({ viewport: HANDY, hasTouch: true, isMobile: true });
 
-  test('kein Tastenkürzel im Serienknopf; Zeitfeld ohne Tastatur, Blatt per Tippen schließen und übernehmen', async ({
+  test('kein Tastenkürzel im Serienknopf; Zeitfeld beschreibbar, Blatt per Tippen schließen und übernehmen', async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -382,28 +390,30 @@ test.describe('Touchgerät 390 px (grober Zeiger)', () => {
     // `innerText` folgt der Darstellung, `textContent` sähe das ausgeblendete Kürzel.
     expect(await serie.innerText()).not.toMatch(/Strg|⌘/);
 
-    // Gewählt wird im Blatt; das Feld nimmt keinen Fokus für die Tastatur an.
+    // Getippt wird im Feld (LLH-1070); der Kalender ist der Nebenweg und steht als Blatt.
     await page.goto(`/einsaetze/${einsatzId}/etb`);
     await page.getByRole('button', { name: /^Filter/ }).tap();
     const von = page.getByPlaceholder('von', { exact: true });
-    await expect(von).toHaveAttribute('readonly', '');
+    await expect(von).not.toHaveAttribute('readonly', '');
 
     // Ohne Wert heraus: Tippen auf den Streifen über dem Blatt schließt es, das Feld bleibt leer.
-    await von.tap();
+    await kalenderKnopf(von).tap();
     const blatt = await pruefeBlatt(page, 'Touch, ETB „von“');
-    await expect(blatt.getByRole('button', { name: 'OK', exact: true })).toBeDisabled();
+    await expect(blatt.getByRole('button', { name: 'Übernehmen', exact: true })).toBeVisible();
+    // Auf dem Touchgerät nimmt das Uhrzeitfeld keinen Fokus an: die Tastatur deckte das Blatt.
+    await expect(blatt.getByRole('textbox', { name: 'Uhrzeit', exact: true })).not.toBeFocused();
     await page.touchscreen.tap(HANDY.width / 2, Math.floor(STREIFEN / 2));
     await expect(panel(page)).toBeHidden();
     await expect(von).toHaveValue('');
 
-    // Mit Wert: Tag und Stunde antippen, „OK“ übernimmt.
-    await von.tap();
+    // Mit Wert: Tag antippen, Uhrzeit eintragen, „Übernehmen“.
+    await kalenderKnopf(von).tap();
     const p = await pruefeBlatt(page, 'Touch, ETB „von“');
-    await p.locator(`td[title="${tagInZweiTagen()}"]`).tap();
-    await p.locator('.ant-picker-time-panel-column[data-type="hour"] li[data-value="9"]').tap();
-    await p.getByRole('button', { name: 'OK', exact: true }).tap();
+    await p.locator(`td[title="${tagInZweiTagen()}"] .ant-picker-cell-inner`).tap();
+    await p.getByRole('textbox', { name: 'Uhrzeit', exact: true }).fill('0900');
+    await p.getByRole('button', { name: 'Übernehmen', exact: true }).tap();
     await expect(panel(page)).toBeHidden();
-    await expect(von).toHaveValue(/ 09:00/);
+    await expect(von).toHaveValue(/^\d{2}0900[a-z]{3}\d{2}$/);
   });
 });
 
@@ -443,7 +453,7 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
       .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'BODY'))
       .not.toBe('BODY');
     const von = page.getByPlaceholder('von', { exact: true });
-    await von.click();
+    await kalenderKnopf(von).click();
     await expect(panel(page)).toBeVisible();
     await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
     await expect(panel(page)).not.toHaveClass(/lfh-zeit-blatt/);

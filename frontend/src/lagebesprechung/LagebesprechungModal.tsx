@@ -27,7 +27,6 @@ import {
 
 /** Teilmenge der geteilten Schnellwahl (+30/+60/+120). */
 const SCHNELLWAHL = schnellwahlAuswahl([30, 60, 120]);
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 const NAECHSTE_ZU_FRUEH =
   'Die nächste Lagebesprechung muss nach dem Zeitpunkt der Besprechung liegen';
 
@@ -150,7 +149,7 @@ export default function LagebesprechungModal({
           </Space>
         }
       >
-        <ZeitpunktEingabe format={ZEITFORMAT} placeholder="kein Termin" style={{ width: '100%' }} />
+        <ZeitpunktEingabe art="frist" placeholder="kein Termin" style={{ width: '100%' }} />
       </Form.Item>
       <Collapse
         ghost
@@ -166,11 +165,7 @@ export default function LagebesprechungModal({
                 style={{ marginBottom: 0 }}
               >
                 {/* Leer gilt der Zeitpunkt des Abschließens (`abschlussBody`). */}
-                <ZeitpunktEingabe
-                  format={ZEITFORMAT}
-                  placeholder="jetzt"
-                  style={{ width: '100%' }}
-                />
+                <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
               </Form.Item>
             ),
           },

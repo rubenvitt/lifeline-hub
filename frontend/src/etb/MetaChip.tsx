@@ -186,6 +186,8 @@ export default function MetaChip({
     // editor === 'zeit'
     return (
       <ZeitpunktEingabe
+        art="ereignis"
+        schnellwahl
         ref={fokusOhneRollen}
         aria-label={d.label}
         disabled={gesperrt}

@@ -177,11 +177,7 @@ export function useFristAenderung(
               : 'Danach für alle gesperrt und zur Löschung vorgemerkt.'
           }
         >
-          <ZeitpunktEingabe
-            format="YYYY-MM-DD HH:mm"
-            disabled={unbegrenzt}
-            style={{ width: '100%' }}
-          />
+          <ZeitpunktEingabe art="frist" disabled={unbegrenzt} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
           <Switch />

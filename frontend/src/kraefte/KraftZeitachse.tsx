@@ -51,8 +51,6 @@ import { serverJetzt } from '../offline/serveruhr';
  * und die Schleuse gilt je Kraft, nicht je Bauteil.
  */
 
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
-
 interface NachtragWerte {
   art: ZeitachseNachtragBody['art'];
   zeitpunkt: Dayjs;
@@ -340,7 +338,7 @@ export default function KraftZeitachse({
           rules={[{ required: true, message: 'Bitte einen Zeitpunkt angeben' }]}
         >
           {/* Zeit und Kalendertag in der Anzeigezone (LFH-692, `keineZukunftstage`). */}
-          <ZeitpunktEingabe format={ZEITFORMAT} style={{ width: '100%' }} keineZukunftstage />
+          <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} keineZukunftstage />
         </Form.Item>
         <Form.Item<NachtragWerte> name="notiz" label="Notiz (optional)">
           <Input placeholder="z. B. per Funk gemeldet" />

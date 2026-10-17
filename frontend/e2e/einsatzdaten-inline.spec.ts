@@ -89,7 +89,8 @@ test('LFH-472: Alarmzeit inline — Enter übernimmt, gespeichert wird der absol
 
   // 03:30 Ortszeit am 29.03.2026 liegt nach der Umstellung (MESZ) = 01:30 UTC.
   const feld = page.getByRole('textbox', { name: 'Alarmzeit', exact: true });
-  await feld.fill('2026-03-29 03:30:00');
+  // Taktisch getippt (LLH-1070); die DTG ist eindeutig, egal wie spät es ist.
+  await feld.fill('290330mrz26');
   await feld.press('Enter');
   await expect(
     page.getByRole('button', { name: 'Alarmzeit bearbeiten', exact: true }),
@@ -103,11 +104,8 @@ test('LFH-472: Alarmzeit geleert wird abgelehnt, der Stand bleibt', async ({ pag
   await page.goto(einsatzdatenPfad(id));
   await page.getByRole('button', { name: 'Alarmzeit bearbeiten', exact: true }).click();
 
-  const picker = page
-    .locator('.ant-picker')
-    .filter({ has: page.getByRole('textbox', { name: 'Alarmzeit', exact: true }) });
-  await picker.hover();
-  await picker.locator('.ant-picker-clear').click();
+  // Geleert wird das Textfeld selbst (LLH-1070, kein Löschkreuz mehr).
+  await page.getByRole('textbox', { name: 'Alarmzeit', exact: true }).fill('');
   await page.getByRole('button', { name: 'Alarmzeit speichern', exact: true }).click();
 
   await expect(

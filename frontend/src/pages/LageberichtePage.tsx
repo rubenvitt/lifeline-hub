@@ -298,11 +298,7 @@ export default function LageberichtePage() {
         </Form.Item>
         {/* Leer setzt der Server jetzt (`routes/vorlagendokument.rs`). */}
         <Form.Item label="Zeitstand" name="zeitstand">
-          <ZeitpunktEingabe
-            format="DD.MM.YYYY HH:mm"
-            placeholder="jetzt"
-            style={{ width: '100%' }}
-          />
+          <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
         </Form.Item>
       </ErfassungsModal>
     </EinsatzSeite>

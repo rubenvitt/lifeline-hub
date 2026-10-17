@@ -95,11 +95,7 @@ export default function WiederherstellenDialog({
         ]}
         dependencies={['unbegrenzt']}
       >
-        <ZeitpunktEingabe
-          format="YYYY-MM-DD HH:mm"
-          disabled={unbegrenzt}
-          style={{ width: '100%' }}
-        />
+        <ZeitpunktEingabe art="frist" disabled={unbegrenzt} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item label="Unbegrenzt aufbewahren" name="unbegrenzt" valuePropName="checked">
         <Switch />

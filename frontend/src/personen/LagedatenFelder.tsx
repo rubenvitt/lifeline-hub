@@ -61,11 +61,7 @@ export function VermisstSeitFeld({ platzhalter }: { platzhalter?: string }) {
         },
       ]}
     >
-      <ZeitpunktEingabe
-        format="DD.MM.YYYY HH:mm"
-        placeholder={platzhalter}
-        style={{ width: '100%' }}
-      />
+      <ZeitpunktEingabe art="ereignis" placeholder={platzhalter} style={{ width: '100%' }} />
     </Form.Item>
   );
 }

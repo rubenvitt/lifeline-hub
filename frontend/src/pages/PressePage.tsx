@@ -565,7 +565,7 @@ export default function PressePage() {
                   {/* Leer setzt der Server jetzt (`routes/presse.rs`, `zeit_oder_jetzt`). */}
                   <Form.Item label="Eingang" name="eingang">
                     <ZeitpunktEingabe
-                      format="DD.MM.YYYY HH:mm"
+                      art="ereignis"
                       placeholder="jetzt"
                       style={{ width: '100%' }}
                     />

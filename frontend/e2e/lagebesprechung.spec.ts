@@ -100,11 +100,11 @@ test.describe('LLH-1111: Modul Lagebesprechung', () => {
     await expect(kennzahl(page, 'Nächste Lagebesprechung')).toContainText('kein Termin');
     await expect(paneel(page, 'Verlauf')).toContainText('Noch keine Lagebesprechung abgeschlossen');
 
-    // Freie Wahl: der Picker übernimmt den getippten Wert mit Enter (Wanduhr Europe/Berlin).
+    // Freie Wahl: das Feld übernimmt die getippte DTG mit Enter (Wanduhr Europe/Berlin, LLH-1070).
     const feld = paneel(page, 'Termin').getByRole('textbox', { name: 'Termin wählen' });
     await expect(feld).toBeEnabled();
     let antwort = terminAntwort(page, id);
-    await feld.fill('2099-09-09 15:17');
+    await feld.fill('091517sep99');
     await feld.press('Enter');
     expect((await antwort).ok()).toBeTruthy();
     expect((await einsatzKopf(page, id)).naechste_lagebesprechung_at).toBe('2099-09-09 13:17:00');

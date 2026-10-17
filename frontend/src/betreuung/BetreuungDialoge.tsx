@@ -55,8 +55,6 @@ import {
  * - Ob eine Leermeldung nötig ist, entscheidet die AKTUELLE Belegung (sonst 422).
  */
 
-const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
-
 interface AbschnittOption {
   value: number;
   label: string;
@@ -285,7 +283,7 @@ function zeitpunktFeld() {
     <Form.Item name="zeitpunkt" label="Zeitpunkt" rules={[zeitRegel]} style={{ marginBottom: 0 }}>
       {/* Uhrzeit und Kalendertag in der Anzeigezone (LFH-692); `zeitRegel` prüft den Zeitpunkt. */}
       <ZeitpunktEingabe
-        format={ZEITFORMAT}
+        art="ereignis"
         placeholder="jetzt"
         keineZukunftstage
         style={{ width: '100%' }}

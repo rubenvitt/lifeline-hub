@@ -197,9 +197,9 @@ export default function EinsatzleiterAngabe({
             </div>
           )}
           <ZeitpunktEingabe
+            art="ereignis"
             aria-label="Einsatzleiter seit"
             placeholder="seit jetzt"
-            format="YYYY-MM-DD HH:mm"
             keineZukunftstage
             style={{ width: '100%' }}
             value={value.seit}

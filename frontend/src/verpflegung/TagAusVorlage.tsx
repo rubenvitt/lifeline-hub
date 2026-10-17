@@ -195,8 +195,7 @@ function TagAusVorlageInhalt({
       <Form.Item label="Tag" htmlFor="verpflegung-tag" style={{ maxWidth: 280 }}>
         <ZeitpunktEingabe
           id="verpflegung-tag"
-          showTime={false}
-          format="DD.MM.YYYY"
+          nurTag
           allowClear={false}
           value={tagWert}
           onChange={(z) => z && onTag(tagInZone(z, zone))}
