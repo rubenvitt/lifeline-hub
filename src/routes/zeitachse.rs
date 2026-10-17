@@ -76,8 +76,15 @@ fn notiz(roh: Option<String>) -> Option<String> {
     roh.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
-/// Nach dem Commit: ETB-Kurzruf, die Kraft selbst und jede per Fan-out berührte Person.
-fn publiziere(state: &AppState, einsatz_id: i64, etb_id: i64, kraft: Kraft, beruehrt: &Beruehrt) {
+/// Nach dem Commit: ETB-Kurzruf, die Kraft selbst und jede per Fan-out berührte Person, dazu die
+/// Kopplung an die Ablösung samt Hinweisen zur ablösenden Einheit.
+async fn publiziere(
+    state: &AppState,
+    einsatz_id: i64,
+    etb_id: i64,
+    kraft: Kraft,
+    beruehrt: &Beruehrt,
+) {
     state.live.publiziere(einsatz_id, etb_id);
     match kraft {
         Kraft::Einheit(id) => {
@@ -92,7 +99,8 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: i64, kraft: Kraft, beru
     for p in &beruehrt.personen {
         super::einsatz_personal::sse_personal(state, einsatz_id, *p);
     }
-    super::abloesung::publish_kopplung(state, einsatz_id, &beruehrt.abloesung);
+    super::abloesung::publish_kopplung(state, einsatz_id, &beruehrt.abloesung, &beruehrt.hinweise)
+        .await;
 }
 
 /// Nachtrag und Streichung sind Schreibwege an der Kraft: an einer entlassenen oder stornierten
@@ -152,7 +160,7 @@ async fn nachtragen(
         .await?;
         Ok((etb_id, beruehrt))
     })?;
-    publiziere(state, einsatz_id, etb_id, kraft, &beruehrt);
+    publiziere(state, einsatz_id, etb_id, kraft, &beruehrt).await;
     repo::laden(&state.pool, einsatz_id, kraft).await
 }
 
@@ -184,7 +192,7 @@ async fn streichen(
         .await?;
         Ok((etb_id, g.beruehrt))
     })?;
-    publiziere(state, einsatz_id, etb_id, kraft, &beruehrt);
+    publiziere(state, einsatz_id, etb_id, kraft, &beruehrt).await;
     repo::laden(&state.pool, einsatz_id, kraft).await
 }
 

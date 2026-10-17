@@ -13,16 +13,24 @@
 //!   `beendet` mit Grund `entlassung`, ihre Fristen schließen.
 //! - **Streichung dieser Entlassung**: die Schicht läuft wieder, samt Fristen.
 //!
+//! Dazu die **Hinweise zur ablösenden Einheit** (LLH-1131, [`super::hinweis`]): ist die Einheit
+//! als ablösende geplant, wird ihre Alarmierung und ihr Eintreffen (beide nur als Beginn der
+//! offenen Periode) je geplanter Schicht ein Anlass; das Eintreffen am Bereitstellungsraum meldet
+//! dessen Buchung selbst. Ihre Entlassung ohne offene Periode danach hebt die Planung auf
+//! (Hinweis und ETB „Planung der ablösenden Einheit entfallen“).
+//!
 //! **Ein Fehler hier bricht nie den Anlass** (gleiche Regel wie ein Perioden-Verstoß beim
 //! Statuswechsel): die Kopplung läuft in einem eigenen `SAVEPOINT`, ein Fehler rollt nur sie
 //! zurück und wird geloggt. Die Einheit erscheint dann ohne Schicht.
 
 use sqlx::SqliteConnection;
 
+use super::hinweis::{self, Wirkung};
 use super::repo::{self, Start};
 use super::BeendetGrund;
+use crate::benachrichtigung::BenachrichtigungBezugTyp;
 use crate::error::AppError;
-use crate::zeitachse::ZeitachseArt;
+use crate::zeitachse::{ZeitachseArt, ZeitachseQuelle};
 
 /// Name des Savepoints; eindeutig genug, weil die Kopplung sich nie selbst ruft.
 const SAVEPOINT: &str = "abloesung_kopplung";
@@ -31,20 +39,27 @@ const SAVEPOINT: &str = "abloesung_kopplung";
 pub const WIE_AUTOSTART: &str = "mit dem Eintreffen begonnen";
 
 /// Nach einem geschriebenen Ereignis an einer Einheit. Liefert die ETB-Einträge, die die
-/// Kopplung geschrieben hat (für Kurzruf und `LiveEvent::Abloesung` nach dem Commit); leer ohne
-/// Wirkung oder nach einem verschluckten Fehler.
+/// Kopplung geschrieben hat (für Kurzruf und `LiveEvent::Abloesung` nach dem Commit), und die
+/// Anlässe der Hinweise zur ablösenden Einheit; leer ohne Wirkung oder nach einem verschluckten
+/// Fehler.
 pub async fn nach_ereignis_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     einheit_id: i64,
     art: ZeitachseArt,
+    quelle: ZeitachseQuelle,
     zeitpunkt_at: &str,
-) -> Result<Vec<i64>, AppError> {
+) -> Result<Wirkung, AppError> {
     let schritt = match art {
-        ZeitachseArt::Eintreffen => Schritt::Autostart,
+        ZeitachseArt::Alarmierung => Schritt::Alarmierung,
+        ZeitachseArt::Eintreffen => Schritt::Autostart {
+            // Das Eintreffen am Bereitstellungsraum meldet dessen Buchung als eigenes Ereignis
+            // (`abloeser_br_eingetroffen`), auch wenn die Zeitachse es auslässt.
+            hinweis: quelle != ZeitachseQuelle::Bereitstellungsraum,
+        },
         ZeitachseArt::Entlassung => Schritt::Ende,
-        _ => return Ok(Vec::new()),
+        ZeitachseArt::Abloesung => return Ok(Wirkung::default()),
     };
     isoliert(
         conn,
@@ -65,9 +80,9 @@ pub async fn nach_streichung_tx(
     einheit_id: i64,
     art: ZeitachseArt,
     zeitpunkt_at: &str,
-) -> Result<Vec<i64>, AppError> {
+) -> Result<Wirkung, AppError> {
     if art != ZeitachseArt::Entlassung {
-        return Ok(Vec::new());
+        return Ok(Wirkung::default());
     }
     isoliert(
         conn,
@@ -83,7 +98,12 @@ pub async fn nach_streichung_tx(
 /// Was die Kopplung an der Schicht tut.
 #[derive(Debug, Clone, Copy)]
 enum Schritt {
-    Autostart,
+    /// Nur der Hinweis „alarmiert“, keine Schicht.
+    Alarmierung,
+    /// `hinweis`: dazu der Hinweis „eingetroffen“.
+    Autostart {
+        hinweis: bool,
+    },
     Ende,
     Wiederaufnahme,
 }
@@ -98,13 +118,24 @@ async fn isoliert(
     einheit_id: i64,
     schritt: Schritt,
     zeitpunkt_at: &str,
-) -> Result<Vec<i64>, AppError> {
+) -> Result<Wirkung, AppError> {
     sqlx::query(sqlx::AssertSqlSafe(format!("SAVEPOINT {SAVEPOINT}")))
         .execute(&mut *conn)
         .await?;
     let r = match schritt {
-        Schritt::Autostart => {
-            autostart_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await
+        Schritt::Alarmierung => {
+            alarmierung_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await
+        }
+        Schritt::Autostart { hinweis } => {
+            eintreffen_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                zeitpunkt_at,
+                hinweis,
+            )
+            .await
         }
         Schritt::Ende => end_tx(conn, einsatz_id, benutzer_id, einheit_id, zeitpunkt_at).await,
         Schritt::Wiederaufnahme => {
@@ -112,11 +143,11 @@ async fn isoliert(
         }
     };
     match r {
-        Ok(etb) => {
+        Ok(wirkung) => {
             sqlx::query(sqlx::AssertSqlSafe(format!("RELEASE {SAVEPOINT}")))
                 .execute(&mut *conn)
                 .await?;
-            Ok(etb)
+            Ok(wirkung)
         }
         Err(e) => {
             sqlx::query(sqlx::AssertSqlSafe(format!("ROLLBACK TO {SAVEPOINT}")))
@@ -130,9 +161,70 @@ async fn isoliert(
                 einheit_id,
                 "Kopplung an die Ablösung ausgelassen: {e}"
             );
-            Ok(Vec::new())
+            Ok(Wirkung::default())
         }
     }
+}
+
+/// Alarmierung als Beginn der offenen Periode: je Schicht, die die Einheit als ablösende plant,
+/// ein Hinweis „alarmiert“. Eine nachgetragene Alarmierung in eine abgeschlossene Periode meldet
+/// nichts.
+async fn alarmierung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    alarmierung_at: &str,
+) -> Result<Wirkung, AppError> {
+    let offen = crate::zeitachse::repo::offene_alarmierung_tx(conn, einheit_id).await?;
+    if offen.as_deref() != Some(alarmierung_at) {
+        return Ok(Wirkung::default());
+    }
+    Ok(Wirkung {
+        etb: Vec::new(),
+        anlaesse: hinweis::anlaesse_tx(
+            conn,
+            einsatz_id,
+            einheit_id,
+            BenachrichtigungBezugTyp::AbloeserAlarmiert,
+            benutzer_id,
+        )
+        .await?,
+    })
+}
+
+/// Eintreffen: Autostart der Schicht, dazu (mit `hinweis`) je Schicht, die die Einheit als
+/// ablösende plant, ein Hinweis „eingetroffen“ — beides nur für das Eintreffen der offenen
+/// Periode. Der Hinweis wird vor dem Autostart gebildet; der Autostart lässt eine geplante
+/// Einheit ohnehin aus.
+async fn eintreffen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    einheit_id: i64,
+    eintreffen_at: &str,
+    hinweis: bool,
+) -> Result<Wirkung, AppError> {
+    let offen = crate::zeitachse::repo::offenes_eintreffen_tx(conn, einheit_id).await?;
+    if offen.as_deref() != Some(eintreffen_at) {
+        return Ok(Wirkung::default());
+    }
+    let anlaesse = if hinweis {
+        hinweis::anlaesse_tx(
+            conn,
+            einsatz_id,
+            einheit_id,
+            BenachrichtigungBezugTyp::AbloeserEingetroffen,
+            benutzer_id,
+        )
+        .await?
+    } else {
+        Vec::new()
+    };
+    Ok(Wirkung {
+        etb: autostart_tx(conn, einsatz_id, benutzer_id, einheit_id, eintreffen_at).await?,
+        anlaesse,
+    })
 }
 
 /// Aktiv (nicht aufgelöst) und im Einsatz.
@@ -175,11 +267,9 @@ async fn autostart_tx(
     einheit_id: i64,
     eintreffen_at: &str,
 ) -> Result<Vec<i64>, AppError> {
-    // Nur das Eintreffen der offenen Periode: ein nachgetragenes in eine abgeschlossene Periode
-    // beginnt keine Schicht.
-    let offen = crate::zeitachse::repo::offenes_eintreffen_tx(conn, einheit_id).await?;
-    if offen.as_deref() != Some(eintreffen_at) || !is_aktiv_tx(conn, einsatz_id, einheit_id).await?
-    {
+    // Nur das Eintreffen der offenen Periode (prüft [`eintreffen_tx`]): ein nachgetragenes in
+    // eine abgeschlossene Periode beginnt keine Schicht.
+    if !is_aktiv_tx(conn, einsatz_id, einheit_id).await? {
         return Ok(Vec::new());
     }
     // Eigene oder geerbte laufende Schicht: nichts anlegen (Knoten-Modell, LLH-1118).
@@ -219,16 +309,26 @@ async fn end_tx(
     benutzer_id: i64,
     einheit_id: i64,
     entlassung_at: &str,
-) -> Result<Vec<i64>, AppError> {
+) -> Result<Wirkung, AppError> {
     // Nur eine Entlassung, nach der keine Periode mehr offen ist: eine in eine frühere Periode
     // nachgetragene lässt die laufende Schicht der späteren stehen.
     if crate::zeitachse::repo::has_offene_periode_tx(conn, einheit_id).await? {
-        return Ok(Vec::new());
+        return Ok(Wirkung::default());
     }
-    let Some((id, name)) = repo::load_laufende_tx(conn, einheit_id).await? else {
-        return Ok(Vec::new());
-    };
     let jetzt = crate::zeit::jetzt();
+    // Eine entlassene Einheit löst niemanden mehr ab (LLH-1131): ihre Planungen entfallen.
+    let mut wirkung = repo::drop_planungen_tx(
+        conn,
+        einsatz_id,
+        benutzer_id,
+        einheit_id,
+        repo::Entfallen::Entlassung,
+        &jetzt,
+    )
+    .await?;
+    let Some((id, name)) = repo::load_laufende_tx(conn, einheit_id).await? else {
+        return Ok(wirkung);
+    };
     repo::end_schicht_tx(
         conn,
         id,
@@ -247,7 +347,8 @@ async fn end_tx(
         &format!("Ablösung: Schicht von «{name}» mit der Entlassung beendet"),
     )
     .await?;
-    Ok(vec![etb_id])
+    wirkung.etb.push(etb_id);
+    Ok(wirkung)
 }
 
 async fn reopen_tx(
@@ -256,7 +357,7 @@ async fn reopen_tx(
     benutzer_id: i64,
     einheit_id: i64,
     entlassung_at: &str,
-) -> Result<Vec<i64>, AppError> {
+) -> Result<Wirkung, AppError> {
     let jetzt = crate::zeit::jetzt();
     let Some((_, name)) = repo::reopen_nach_entlassung_tx(
         conn,
@@ -268,7 +369,7 @@ async fn reopen_tx(
     )
     .await?
     else {
-        return Ok(Vec::new());
+        return Ok(Wirkung::default());
     };
     let startwert = crate::einsatz::einstellungen::etb_startwert(&mut *conn, einsatz_id).await?;
     let etb_id = crate::etb::system_audit_tx(
@@ -279,5 +380,8 @@ async fn reopen_tx(
         &format!("Ablösung: Schicht von «{name}» läuft wieder, Entlassung gestrichen"),
     )
     .await?;
-    Ok(vec![etb_id])
+    Ok(Wirkung {
+        etb: vec![etb_id],
+        anlaesse: Vec::new(),
+    })
 }

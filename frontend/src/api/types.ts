@@ -722,6 +722,8 @@ export type RhythmusQuelle = S['RhythmusQuelle'];
 /** Status einer Schicht (LLH-1128: `beendet` endet ohne Ablösung, mit `beendet_grund`). */
 export type AbloesungStatus = S['AbloesungStatus'];
 export type BeendetGrund = S['BeendetGrund'];
+/** Warnung zur geplanten ablösenden Einheit (LLH-1131): schon geplant oder selbst im Einsatz. */
+export type AbloesungPlanungWarnung = S['AbloesungPlanungWarnung'];
 
 // ============================== LLH-1122 Schichtmodelle ==============================
 export type Schichtmodell = S['Schichtmodell'];

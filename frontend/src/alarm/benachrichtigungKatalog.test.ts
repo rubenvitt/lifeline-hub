@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   ALLE_ARTEN,
   BENACHRICHTIGUNG_ARTEN,
+  sammelGruppeVon,
   sammelTitel,
   sammelZeilen,
   toastSchluessel,
   ZIEL_SPRUENGE,
   zielPfad,
+  zielVon,
 } from './benachrichtigungKatalog';
 
 describe('Katalog der Benachrichtigungsarten', () => {
@@ -38,6 +40,24 @@ describe('Katalog der Benachrichtigungsarten', () => {
 
   it('auch Unwetter steht als Schalter in den Einstellungen', () => {
     expect(BENACHRICHTIGUNG_ARTEN.unwetter).toMatchObject({ stufe: 'hinweis', einstellbar: true });
+  });
+
+  it('Hinweise der Ablösung (LLH-1131): leise, abschaltbar, Sprung in die Ablösung', () => {
+    for (const art of ['abloesung_planung', 'abloesung_abloeser'] as const) {
+      expect(BENACHRICHTIGUNG_ARTEN[art]).toMatchObject({ stufe: 'hinweis', einstellbar: true });
+    }
+    for (const bezug_typ of [
+      'abloeser_alarmiert',
+      'abloeser_eingetroffen',
+      'abloeser_br_eingetroffen',
+      'abloeser_abgerufen',
+      'abloeser_entfallen',
+    ] as const) {
+      expect(zielVon({ art: 'abloesung_abloeser', bezug_typ })).toBe('abloesung');
+    }
+    expect(zielVon({ art: 'abloesung_planung', bezug_typ: 'abloesung' })).toBe('abloesung');
+    expect(sammelGruppeVon('abloesung_planung')).toBe('abloesung');
+    expect(sammelGruppeVon('abloesung_abloeser')).toBe('abloesung_abloeser');
   });
 
   it('jeder Sprung führt in den Einsatz, außerhalb in die Einsatzliste', () => {

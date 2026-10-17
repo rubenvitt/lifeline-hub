@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -13,7 +13,9 @@ laufenden Schichten nach Fälligkeit, warnt vorher (ohne anderes Schichtmodell 3
 meldet, wenn eine Ablösung überfällig ist.
 
 Die Führung sieht hier auch, welche Einheiten im Einsatz noch keine Schicht haben, plant, welche
-Einheit welche ablöst, und hält den Vollzug fest. Schichten beginnen, ändern und vollziehen dürfen
+Einheit welche ablöst, und hält den Vollzug fest. Wer das Modul sieht, erfährt ohne Blick auf die
+Seite, wenn die geplante ablösende Einheit alarmiert ist, eintrifft oder abgerufen wird und wenn
+kurz vor der Fälligkeit noch keine geplant ist. Schichten beginnen, ändern und vollziehen dürfen
 Einsatzleitung und Führungspersonal.
 
 ## Abläufe
@@ -86,7 +88,10 @@ Für Einsatzleitung und Führungspersonal:
 Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte das Menü „Aktionen zu …“ (drei Punkte) öffnen.
-2. „Ablösende Einheit planen“ wählen, die Einheit wählen und „Speichern“ wählen.
+2. „Ablösende Einheit planen“ wählen, die Einheit wählen und „Speichern“ wählen. Ist die Einheit
+   schon für eine andere Schicht geplant oder steht sie selbst im Einsatz, nennt eine Meldung das,
+   etwa „2. Rettungsstaffel schon für Schicht Florian 1 geplant“ oder „… steht selbst im Einsatz
+   seit 1340“. Die Planung gilt trotzdem.
 3. Für einen anderen Rhythmus „Rhythmus ändern“ wählen, den Wert als Dauer eintragen und
    „Speichern“ wählen. Hat der Abschnitt oder der Einsatz eine Vorgabe, lässt ein leeres Feld die
    Schicht wieder ihr folgen.
@@ -127,10 +132,39 @@ Fälligkeit der Alarm „Ablösung fällig“, jeweils mit Einheit und Uhrzeit d
 die Schichten, die bald fällig oder überfällig sind; der Überblick führt die Fälligkeiten als
 Marken.
 
-Beides bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal. Den Hinweis „Ablösung
-steht an“ kann jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“
-nicht (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen
-steht die Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
+Ist zwei Stunden vor der Fälligkeit noch keine ablösende Einheit geplant, kommt der Hinweis
+„Keine ablösende Einheit geplant“, ebenfalls mit Einheit und Uhrzeit der Fälligkeit. Wie lange
+vorher, legt der Planungsvorlauf des Schichtmodells fest. Er kommt einmal; ändert sich die
+Fälligkeit, kommt er zur neuen Zeit. Ist eine Einheit geplant, kommt er nicht; wird die Planung
+aufgehoben oder entfällt sie, steht er wieder an, solange seine Zeit noch nicht vorbei ist. Er
+ändert die Einstufung der Karte nicht.
+
+Alle drei bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal. Die Hinweise kann
+jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“ nicht (Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen steht die
+Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
+
+### Hinweise zur ablösenden Einheit
+
+Ist für eine Schicht eine ablösende Einheit geplant, bekommen alle, die das Modul Ablösung sehen,
+einen Hinweis mit dezentem Ton, wenn diese Einheit
+
+- alarmiert wird („Ablösende Einheit alarmiert“),
+- eintrifft („Ablösende Einheit eingetroffen“),
+- am Bereitstellungsraum eingebucht wird („Ablösende Einheit im Bereitstellungsraum
+  eingetroffen“) oder
+- dort abgerufen wird („Ablösende Einheit abgerufen“).
+
+Die Zeile darunter nennt beide Einheiten, etwa „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“;
+„Öffnen“ führt zur Seite Ablösung. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
+Alarmiert und eingetroffen zählen nur am Anfang ihres Einsatzabschnitts in der
+Kräfte-Zeitachse, ein Nachtrag in einen abgeschlossenen Abschnitt meldet nichts. Bei einem
+Verband zählt nur die geplante Einheit, nicht ihre Untereinheiten.
+
+Wird die geplante Einheit aufgelöst oder entlassen, entfällt die Planung: die Karte zeigt keine
+geplante Ablösung mehr, das Einsatztagebuch hält „Planung der ablösenden Einheit entfallen“ fest,
+und die Leser bekommen den Hinweis „Planung der ablösenden Einheit entfallen“. Danach steht der
+Hinweis „Keine ablösende Einheit geplant“ wieder an.
 
 ### Vorgabe des Einsatzes und Schichtmodelle
 
@@ -216,8 +250,8 @@ Eintreffen einer Einheit ihre Schicht, und ihre Entlassung beendet sie (siehe ob
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält den Beginn einer Schicht (auch mit dem Eintreffen), Änderungen an Rhythmus
-und Planung, jeden Vollzug mit Einheit, ablösender Einheit und Zeitpunkt, jede Rücknahme und das
-Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
+und Planung, eine entfallene Planung, jeden Vollzug mit Einheit, ablösender Einheit und
+Zeitpunkt, jede Rücknahme und das Ende mit der Entlassung fest. Eine Änderung der Vorgabe eines Abschnitts oder des Einsatzes steht
 dort als Entscheidung.
 
 ### Rechte und ohne Netz

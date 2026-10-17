@@ -29,6 +29,7 @@ function schicht(id: number, faellig_at = '2026-09-22 18:00:00'): Abloesung {
     status: 'laufend',
     ruecknehmbar: false,
     erbende_einheiten: [],
+    planung_warnungen: [],
     angelegt_at: '2026-09-22 09:30:00',
   };
 }

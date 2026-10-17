@@ -750,7 +750,7 @@ pub async fn abweisen(
         Ok((ergebnis, etb_id))
     })?;
     state.live.publiziere(einsatz_id, etb_id);
-    notify_aufgeloest(&state, einsatz_id, eid, &ergebnis.aufgeloest);
+    notify_aufgeloest(&state, einsatz_id, eid, &ergebnis.aufgeloest).await;
     let mut fuehrungsstelle = false;
     for (ef_id, _, e) in &ergebnis.entlassen {
         sse_fahrzeug(&state, einsatz_id, *ef_id);
@@ -794,14 +794,14 @@ async fn end_einheit(
         crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(ergebnis)
     })?;
-    notify_aufgeloest(state, einsatz_id, eid, &ergebnis);
+    notify_aufgeloest(state, einsatz_id, eid, &ergebnis).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Nach dem Commit des Auflösens: die Einheit selbst (auch ihre Zeitachse), ihre Unter-Einheiten,
-/// jede gelöste Kraft, die Ablösung und ein verlassener Bereitstellungsraum (LLH-1189-Meldeweg,
-/// design.md „Schnittstellen“).
-fn notify_aufgeloest(
+/// jede gelöste Kraft, die Ablösung samt entfallener Planungen (LLH-1131) und ein verlassener
+/// Bereitstellungsraum (LLH-1189-Meldeweg, design.md „Schnittstellen“).
+async fn notify_aufgeloest(
     state: &AppState,
     einsatz_id: i64,
     eid: i64,
@@ -820,7 +820,8 @@ fn notify_aufgeloest(
     for em_id in &ergebnis.material {
         sse_material(state, einsatz_id, *em_id);
     }
-    if ergebnis.abloesung {
+    // Mit ETB-Einträgen meldet `publish_kopplung` die Ablösung selbst.
+    if ergebnis.abloesung && ergebnis.abloesung_wirkung.etb.is_empty() {
         state
             .live
             .publiziere_einsatz(einsatz_id, LiveEvent::Abloesung);
@@ -828,6 +829,13 @@ fn notify_aufgeloest(
     if let Some(br_id) = ergebnis.br {
         super::einsatz_bereitstellungsraum::sse_br(state, einsatz_id, br_id);
     }
+    super::abloesung::publish_kopplung(
+        state,
+        einsatz_id,
+        &ergebnis.abloesung_wirkung.etb,
+        &ergebnis.abloesung_wirkung.anlaesse,
+    )
+    .await;
 }
 
 /// PUT .../einheiten/{eid}/personal/{ep_id} — Person zuordnen. ETB-Eintrag.
@@ -1143,8 +1151,10 @@ pub async fn status_setzen(
     for ep_id in &beruehrt.personen {
         sse_personal(&state, einsatz_id, *ep_id);
     }
-    // Eintreffen oder Entlassung der Einheit hat ihre Schicht berührt (LLH-1128).
-    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung);
+    // Eintreffen oder Entlassung der Einheit hat ihre Schicht berührt (LLH-1128), Alarmierung
+    // oder Eintreffen einer geplanten ablösenden Einheit ist ein Hinweis (LLH-1131).
+    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung, &beruehrt.hinweise)
+        .await;
     // Nur der Handstatus meldet für die Einheit (design.md D11): ihr aus Fahrzeugen abgeleiteter
     // Status meldet nicht noch einmal, das tut schon das Fahrzeug.
     if wieder_verfuegbar {

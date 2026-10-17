@@ -65,6 +65,18 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
     org: false,
     einstellbar: true,
   },
+  abloesung_planung: {
+    name: 'Keine ablösende Einheit geplant',
+    stufe: 'hinweis',
+    org: false,
+    einstellbar: true,
+  },
+  abloesung_abloeser: {
+    name: 'Ablösende Einheit',
+    stufe: 'hinweis',
+    org: false,
+    einstellbar: true,
+  },
   auftrag_erteilt: { name: 'Neuer Auftrag', stufe: 'hinweis', org: false, einstellbar: true },
   auftrag_quittiert: {
     name: 'Auftrag quittiert',
@@ -210,6 +222,12 @@ const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   lagebericht: 'lageberichte',
   erinnerung: 'erinnerungen',
   abloesung: 'abloesung',
+  // Hinweise zur ablösenden Einheit (LLH-1131): Bezug ist die Schicht.
+  abloeser_alarmiert: 'abloesung',
+  abloeser_eingetroffen: 'abloesung',
+  abloeser_br_eingetroffen: 'abloesung',
+  abloeser_abgerufen: 'abloesung',
+  abloeser_entfallen: 'abloesung',
   lagebesprechung: 'lagebesprechung',
   nachforderung: 'nachforderungen',
   nachforderung_zugesagt: 'nachforderungen',
@@ -239,7 +257,9 @@ export function toastSchluessel(e: Pick<BenachrichtigungEreignis, 'benachrichtig
 
 /**
  * Gruppe für den Titel des Sammeltoasts. Die Gruppen der bestehenden Alarme tragen ihren eigenen
- * Titel („3 weitere Sofortmeldungen“); beide Ablösungsarten fallen in eine Gruppe.
+ * Titel („3 weitere Sofortmeldungen“); die drei Fristen einer Schicht (Planungshinweis,
+ * Vorwarnung, Fälligkeit) fallen in eine Gruppe. Die Hinweise zur ablösenden Einheit bleiben eine
+ * eigene Art.
  */
 export type SammelGruppe =
   'sofort' | 'auftrag-ueberfaellig' | 'erinnerung' | 'abloesung' | 'unwetter' | BenachrichtigungArt;
@@ -248,7 +268,13 @@ export function sammelGruppeVon(art: BenachrichtigungArt): SammelGruppe {
   if (art === 'sofortmeldung') return 'sofort';
   if (art === 'auftrag_ueberfaellig') return 'auftrag-ueberfaellig';
   if (art === 'erinnerung_faellig') return 'erinnerung';
-  if (art === 'abloesung_faellig' || art === 'abloesung_vorwarnung') return 'abloesung';
+  if (
+    art === 'abloesung_faellig' ||
+    art === 'abloesung_vorwarnung' ||
+    art === 'abloesung_planung'
+  ) {
+    return 'abloesung';
+  }
   return art;
 }
 

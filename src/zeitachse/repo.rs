@@ -60,6 +60,9 @@ pub struct Beruehrt {
     /// laufend). Nicht leer → nach dem Commit Kurzruf und `LiveEvent::Abloesung`
     /// (`routes::abloesung::publish_kopplung`).
     pub abloesung: Vec<i64>,
+    /// Anlässe der Hinweise zur ablösenden Einheit (LLH-1131, `abloesung::hinweis`); gemeldet
+    /// nach dem Commit über `routes::abloesung::publish_kopplung`.
+    pub hinweise: Vec<crate::benachrichtigung::Anlass>,
 }
 
 // ── Lesen innerhalb der Transaktion ─────────────────────────────────────────────────────────
@@ -169,15 +172,18 @@ pub async fn schreibe_tx(
                 beruehrt.personen.push(person);
             }
         }
-        beruehrt.abloesung = crate::abloesung::kopplung::nach_ereignis_tx(
+        let wirkung = crate::abloesung::kopplung::nach_ereignis_tx(
             conn,
             einsatz_id,
             benutzer_id,
             einheit_id,
             neu.art,
+            neu.quelle,
             neu.zeitpunkt_at,
         )
         .await?;
+        beruehrt.abloesung = wirkung.etb;
+        beruehrt.hinweise = wirkung.anlaesse;
     }
     Ok((ergebnis, beruehrt))
 }
@@ -315,14 +321,15 @@ pub async fn streiche_tx(
             )
             .await?
         }
-        Kraft::Person(_) => Vec::new(),
+        Kraft::Person(_) => crate::abloesung::hinweis::Wirkung::default(),
     };
     Ok(Gestrichen {
         art,
         zeitpunkt_at,
         beruehrt: Beruehrt {
             personen: kopien.into_iter().map(|(_, p)| p).collect(),
-            abloesung,
+            abloesung: abloesung.etb,
+            hinweise: abloesung.anlaesse,
         },
     })
 }
@@ -470,6 +477,18 @@ pub async fn offenes_eintreffen_tx(
     let bestand = bestand_tx(conn, Kraft::Einheit(einheit_id)).await?;
     let p = perioden::bilde_nachsichtig(&bestand);
     Ok(perioden::offenes_eintreffen(&p).map(str::to_string))
+}
+
+/// Die nicht gestrichene Alarmierung, mit der die offene Periode einer Einheit beginnt (Hinweis
+/// „ablösende Einheit alarmiert“, LLH-1131); `None` ohne offene Periode oder wenn sie mit dem
+/// Eintreffen beginnt.
+pub async fn offene_alarmierung_tx(
+    conn: &mut SqliteConnection,
+    einheit_id: i64,
+) -> Result<Option<String>, AppError> {
+    let bestand = bestand_tx(conn, Kraft::Einheit(einheit_id)).await?;
+    let p = perioden::bilde_nachsichtig(&bestand);
+    Ok(perioden::offene_alarmierung(&p).map(str::to_string))
 }
 
 /// Ob die Einheit eine offene Einsatzperiode hat (Ende der Schicht mit der Entlassung,

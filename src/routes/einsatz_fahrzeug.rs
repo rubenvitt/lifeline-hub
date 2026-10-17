@@ -424,8 +424,10 @@ pub async fn update(
     for ep_id in &beruehrt.personen {
         sse_personal(&state, einsatz_id, *ep_id);
     }
-    // Eintreffen oder Entlassung der Einheit hat ihre Schicht berührt (LLH-1128).
-    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung);
+    // Eintreffen oder Entlassung der Einheit hat ihre Schicht berührt (LLH-1128), Alarmierung
+    // oder Eintreffen einer geplanten ablösenden Einheit ist ein Hinweis (LLH-1131).
+    super::abloesung::publish_kopplung(&state, einsatz_id, &beruehrt.abloesung, &beruehrt.hinweise)
+        .await;
     // Vor- und Nachzustand stammen aus der Transaktion: ein wiederholter Patch mit demselben
     // Status meldet nicht noch einmal.
     if StatusKategorie::wird_wieder_verfuegbar(vorher.status_kategorie, nachher.status_kategorie) {

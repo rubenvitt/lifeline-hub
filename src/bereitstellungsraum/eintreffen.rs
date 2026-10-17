@@ -265,6 +265,9 @@ pub struct Gebucht {
     /// begonnen), für `routes::abloesung::publish_kopplung`. Eigene Einträge des Moduls
     /// Ablösung, nicht der Buchung: die Regel „genau ein ETB-Eintrag“ (D5) gilt für die Buchung.
     pub abloesung: Vec<i64>,
+    /// Hinweise zur ablösenden Einheit (LLH-1131): eine als ablösende geplante Einheit ist am
+    /// Raum eingetroffen. Gemeldet nach dem Commit über `routes::abloesung::publish_kopplung`.
+    pub hinweise: Vec<crate::benachrichtigung::Anlass>,
 }
 
 /// Rahmen einer Buchung: wer, wo, wann.
@@ -406,6 +409,21 @@ async fn bekannt_tx(
             )
         }
     };
+    // Ist die Einheit als ablösende geplant, ist ihr Eintreffen am Raum ein Hinweis (LLH-1131),
+    // auch wenn die Zeitachse es auslässt, weil die Einheit schon eingetroffen war.
+    let mut hinweise = beruehrt.hinweise;
+    if let Some(e) = einheit_id {
+        hinweise.extend(
+            crate::abloesung::hinweis::anlaesse_tx(
+                conn,
+                r.einsatz_id,
+                e,
+                crate::benachrichtigung::BenachrichtigungBezugTyp::AbloeserBrEingetroffen,
+                r.benutzer_id,
+            )
+            .await?,
+        );
+    }
     // 6. Genau ein ETB-Eintrag (D5): „eingetroffen“ nur, wenn die Zeitachse es trägt.
     let text = match zeitachse {
         EintreffenZeitachse::Geschrieben => super::etb_text_eingetroffen(&name, br_bezeichnung),
@@ -430,6 +448,7 @@ async fn bekannt_tx(
         etb_id,
         personen: beruehrt.personen,
         abloesung: beruehrt.abloesung,
+        hinweise,
     })
 }
 
@@ -649,6 +668,7 @@ async fn unangemeldet_tx(
         etb_id,
         personen: beruehrt.personen,
         abloesung: beruehrt.abloesung,
+        hinweise: beruehrt.hinweise,
     })
 }
 

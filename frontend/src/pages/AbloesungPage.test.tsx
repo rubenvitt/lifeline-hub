@@ -72,6 +72,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   status: 'laufend',
   ruecknehmbar: false,
   erbende_einheiten: [],
+  planung_warnungen: [],
   angelegt_at: inMinuten(-300),
   ...over,
 });
@@ -476,6 +477,42 @@ describe('AbloesungPage (LFH-635)', () => {
     const feld = within(dialog).getByRole('textbox', { name: 'Rhythmus' });
     expect(feld).toHaveAttribute('placeholder', '6 h (Vorgabe Abschnitt)');
     expect(within(dialog).queryByText(/Leer/)).toBeNull();
+  });
+
+  it('Planen: eine Warnung des Servers erscheint als Meldung, die Planung gilt (LLH-1131)', async () => {
+    laufendLiefert([schicht({ id: 1 })]);
+    aendereSchicht.mockResolvedValue(
+      schicht({
+        id: 1,
+        abloesende_einheit_id: 12,
+        abloesende_einheit_name: 'Florian 2',
+        planung_warnungen: [
+          {
+            art: 'schon_geplant',
+            einheit_id: 12,
+            einheit_name: 'Florian 2',
+            abloesung_id: 5,
+            abloesung_einheit_name: 'Florian 5',
+          },
+        ],
+      }),
+    );
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Florian 1' }));
+    const menu = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ) as HTMLElement;
+    await userEvent.click(within(menu).getByText('Ablösende Einheit planen'));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Ablösende Einheit' }));
+    await userEvent.click(await screen.findByTitle('Florian 2'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+
+    expect(
+      await screen.findByText('Florian 2 schon für Schicht Florian 5 geplant'),
+    ).toBeInTheDocument();
+    expect(aendereSchicht).toHaveBeenCalledWith(1, 1, { abloesende_einheit_id: 12 });
   });
 
   it('Rhythmus-Vorgabe am Abschnitt: Platzhalter „keine Vorgabe“, kein Erklärsatz', async () => {
