@@ -92,6 +92,7 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_id: i64, kraft: Kraft, beru
     for p in &beruehrt.personen {
         super::einsatz_personal::sse_personal(state, einsatz_id, *p);
     }
+    super::abloesung::publish_kopplung(state, einsatz_id, &beruehrt.abloesung);
 }
 
 /// Nachtrag und Streichung sind Schreibwege an der Kraft: an einer entlassenen oder stornierten

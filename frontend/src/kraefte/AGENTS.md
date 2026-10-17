@@ -24,6 +24,11 @@ Einheit beginnt ihre Periode mit diesem Eintreffen). Das Kennzeichen `uebernahme
 ist kein Zeitpunkt der Zeitachse. Ein Einheit-Ereignis gilt per Fan-out für die
 JETZT zugeordneten Personen; Fahrzeuge wirken nur über ihre Einheit (erstes Fahrzeug bzw. alle für
 die Entlassung). Eine Ablösung, auch ihre Fan-out-Kopie, streicht nur die Rücknahme des Vollzugs.
+`schreibe_tx` koppelt an einer Einheit auch die Schicht (LLH-1128, `src/abloesung/kopplung.rs`):
+Eintreffen der offenen Periode beginnt sie (nur mit Vorgabe, nie bei geerbter), eine Entlassung
+ohne offene Periode danach beendet sie (`beendet`), die Streichung dieser Entlassung öffnet sie;
+in einem Savepoint, ein Fehler bricht nie den Anlass. Ihre ETB-IDs trägt `Beruehrt::abloesung`,
+jeder Aufrufer meldet sie nach dem Commit über `routes::abloesung::publish_kopplung`.
 Dauern rechnet der Client (`kraefte/zeitachse.ts`), ohne Ereignis keine Zahl, keine Grenzwerte
 (LFH-860). Anzeige im Meldebild/Personal/Einheit-Detail, **nicht im Stab**. Bewusster Bruch von
 LFH-46 E17 (Feldbefund) auf Entscheidung vom 30.09.2026 — gilt nur hierfür.
@@ -40,4 +45,8 @@ Schichtmodell des Einsatzes), nie aus einer Konstante im Client (`abloesung/eins
 `abloesung/useUhr.ts`). Dauern stehen nur über `abloesung/dauer.ts` („8 h“, „7:30 h“, nie
 Dezimal), Wechselzeiten taktisch, Regeltexte über `abloesung/schichtmodellText.ts`. Die Vorgabe
 der Organisation wechselt in den zwei Schritten, die der Server verlangt, nur über
-`api/schichtmodelle.ts:setOrgVorgabe`.
+`api/schichtmodelle.ts:setOrgVorgabe`. **Knoten-Modell** (LLH-1118 Punkt 1): eine Untereinheit
+ohne eigene laufende Schicht erbt die ihres nächsten Vorfahren; der Server ermittelt das beim
+Lesen (`abloesung::vererbung`, DTO `erbende_einheiten` an der tragenden Schicht), der Client
+rechnet keine Vererbung nach. Status `beendet` (mit `beendet_grund`) ist kein `laufend`: jede
+Prüfung auf eine laufende Schicht vergleicht streng `status === 'laufend'`.

@@ -12,14 +12,26 @@
 //! Schichtmodell des Einsatzes, ohne eines gilt [`VORWARNUNG_VORGABE_MINUTEN`] (LLH-1122 hebt
 //! das Non-Goal „Vorwarnzeit fest 30 min“ aus LFH-635 auf).
 //!
+//! **Kopplung an die Kräfte-Zeitachse** (LLH-1128, [`kopplung`]): ein Eintreffen beginnt die
+//! Schicht einer Einheit ohne laufende (auch ohne geerbte), sofern Abschnitt oder Einsatz eine
+//! Vorgabe haben; eine Entlassung beendet sie (`beendet`, Grund `entlassung`), ihre Streichung
+//! öffnet sie wieder. Das Auflösen beendet sie mit Grund `aufloesung`.
+//!
+//! **Knoten-Modell** (LLH-1118 Punkt 1): eine Untereinheit ohne eigene laufende Schicht erbt die
+//! ihres nächsten Vorfahren mit laufender Schicht (über `ueber_einheit_id`). Ermittelt wird das
+//! beim Lesen ([`vererbung`]), nie als Kopie gespeichert.
+//!
 //! Spec: `openspec/specs/kraefte-abloesung/spec.md`; Herleitung
 //! `openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/`
+
+use std::collections::{HashMap, HashSet};
 
 use crate::wire_enum::wire_enum;
 use crate::zeit;
 use serde::Serialize;
 use utoipa::ToSchema;
 
+pub mod kopplung;
 pub mod repo;
 
 pub use crate::schichtmodell::VORWARNUNG_VORGABE_MINUTEN;
@@ -35,8 +47,25 @@ wire_enum! {
         Laufend => "laufend",
         /// Die Ablösung ist vollzogen.
         Abgeloest => "abgeloest",
+        /// Ohne Ablösung zu Ende: die Einheit ist entlassen oder aufgelöst (LLH-1128). Keine
+        /// Folgeschicht; der Grund steht in [`BeendetGrund`].
+        Beendet => "beendet",
     }
     try_from = |s| format!("Ungültiger Ablösungsstatus: {s}");
+}
+
+wire_enum! {
+    /// Warum eine Schicht ohne Ablösung endete (`einsatz_abloesung.beendet_grund`, TEXT ohne
+    /// CHECK: den Wert setzt nur dieser Code). Wire == `as_str()`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum BeendetGrund {
+        /// Die Zeitachse hat die Entlassung der Einheit geschrieben; ihre Streichung öffnet
+        /// die Schicht wieder.
+        Entlassung => "entlassung",
+        /// Die Einheit wurde aufgelöst (LLH-1079); die Schicht bleibt als Spur stehen.
+        Aufloesung => "aufloesung",
+    }
+    try_from = |s| format!("Ungültiger Grund für das Ende einer Schicht: {s}");
 }
 
 wire_enum! {
@@ -143,7 +172,55 @@ pub struct AbloesungAnzeige {
     /// Der Vollzug lässt sich zurücknehmen: abgelöst, und eine Folgeschicht ist entweder
     /// nicht vorhanden oder noch unberührt (laufend).
     pub ruecknehmbar: bool,
+    /// Nur bei `beendet`: wann, durch wen und warum die Schicht ohne Ablösung endete.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_von_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beendet_grund: Option<BeendetGrund>,
+    /// Untereinheiten, die diese laufende Schicht erben (Knoten-Modell, LLH-1118): ohne eigene
+    /// laufende Schicht unter dieser Einheit, bis zur nächsten mit eigener. Leer bei
+    /// abgelösten und beendeten Schichten.
+    pub erbende_einheiten: Vec<AbloesungErbe>,
     pub angelegt_at: String,
+}
+
+/// Eine Untereinheit, die die Schicht eines Vorfahren erbt.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct AbloesungErbe {
+    pub einheit_id: i64,
+    pub einheit_name: String,
+}
+
+/// Knoten-Vererbung (LLH-1118 Punkt 1), rein: je Einheit ohne eigene laufende Schicht der
+/// nächste Vorfahr mit einer (`erbende → Träger`). `ueber` ordnet jeder Einheit ihre
+/// übergeordnete zu, `mit_schicht` sind die Einheiten mit eigener laufender Schicht. Eine
+/// Einheit, deren Kette ohne Träger endet, fehlt. Iterativ mit Besucht-Menge (Muster
+/// `einheit::repo::kumuliere`), damit ein korrupter Zyklus terminiert.
+pub fn vererbung(
+    ueber: &HashMap<i64, Option<i64>>,
+    mit_schicht: &HashSet<i64>,
+) -> HashMap<i64, i64> {
+    let mut erbt = HashMap::new();
+    for &einheit in ueber.keys() {
+        if mit_schicht.contains(&einheit) {
+            continue;
+        }
+        let mut besucht = HashSet::from([einheit]);
+        let mut knoten = ueber.get(&einheit).copied().flatten();
+        while let Some(k) = knoten {
+            if !besucht.insert(k) {
+                break;
+            }
+            if mit_schicht.contains(&k) {
+                erbt.insert(einheit, k);
+                break;
+            }
+            knoten = ueber.get(&k).copied().flatten();
+        }
+    }
+    erbt
 }
 
 /// Rhythmus-Vorgabe eines Einsatzabschnitts.
@@ -264,10 +341,46 @@ mod tests {
         assert_eq!(rhythmus_text(45), "45 min");
     }
 
+    /// Knoten-Modell: der nächste Vorfahr mit Schicht trägt, eine eigene Schicht übersteuert
+    /// für den ganzen Teilbaum darunter, ohne Träger erbt niemand, ein Zyklus terminiert.
+    #[test]
+    fn vererbung_folgt_dem_naechsten_vorfahren() {
+        // 1 ─ 2 ─ 3 ─ 4,  2 ─ 5,  6 (Wurzel ohne Schicht) ─ 7,  8 ⇄ 9 (Zyklus)
+        let ueber: HashMap<i64, Option<i64>> = [
+            (1, None),
+            (2, Some(1)),
+            (3, Some(2)),
+            (4, Some(3)),
+            (5, Some(2)),
+            (6, None),
+            (7, Some(6)),
+            (8, Some(9)),
+            (9, Some(8)),
+        ]
+        .into_iter()
+        .collect();
+        let erbt = vererbung(&ueber, &HashSet::from([1, 3]));
+        assert_eq!(erbt.get(&2), Some(&1));
+        assert_eq!(erbt.get(&5), Some(&1), "über die Untereinheit ohne Schicht");
+        assert_eq!(
+            erbt.get(&4),
+            Some(&3),
+            "die eigene Schicht von 3 übersteuert"
+        );
+        assert_eq!(erbt.get(&3), None, "wer eine eigene hat, erbt nicht");
+        assert_eq!(erbt.get(&1), None);
+        assert_eq!(erbt.get(&7), None, "ohne Träger keine Schicht");
+        assert_eq!(erbt.get(&8), None, "Zyklus ohne Träger terminiert");
+        assert_eq!(erbt.len(), 3);
+    }
+
     #[test]
     fn enums_parse_rund() {
-        for s in [AbloesungStatus::Laufend, AbloesungStatus::Abgeloest] {
+        for s in AbloesungStatus::ALLE {
             assert_eq!(AbloesungStatus::parse(s.as_str()), Some(s));
+        }
+        for g in BeendetGrund::ALLE {
+            assert_eq!(BeendetGrund::parse(g.as_str()), Some(g));
         }
         for q in RhythmusQuelle::ALLE {
             assert_eq!(RhythmusQuelle::parse(q.as_str()), Some(q));

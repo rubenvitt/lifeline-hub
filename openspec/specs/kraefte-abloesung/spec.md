@@ -17,7 +17,11 @@ die Vorwarnzeit kommt aus dem Schichtmodell des Einsatzes, 30 min sind nur noch 
 Das System SHALL je Einheit eines Einsatzes Schichten führen. Eine Schicht trägt Beginn
 (Einsatzbeginn der Einheit), Rhythmus in Minuten, die daraus berechnete Fälligkeit
 (Beginn + Rhythmus), optional eine geplante ablösende Einheit und einen Status
-(`laufend` oder `abgeloest`). Je Einheit MUST höchstens eine Schicht `laufend` sein. Fehlt beim
+(`laufend`, `abgeloest` oder `beendet`). `beendet` heißt: ohne Ablösung zu Ende, mit Zeitpunkt,
+Person und Grund (`entlassung` oder `aufloesung`); eine beendete Schicht MUST weder Einstufung
+noch offene Fristen tragen und lässt sich weder ändern noch vollziehen (422). Die Liste MUST
+nach `laufend`, `abgeloest` und `beendet` filtern können. Je Einheit MUST höchstens eine
+Schicht `laufend` sein. Fehlt beim
 Anlegen der Beginn, MUST das System das nicht gestrichene Eintreffen der offenen Einsatzperiode
 der Einheit aus der Kräfte-Zeitachse übernehmen und ohne ein solches den Zeitpunkt der Anlage.
 
@@ -221,7 +225,8 @@ Das System SHALL für jede laufende Schicht eine offene Auto-Frist zur Fälligke
 solange die Vorwarnzeit noch in der Zukunft liegt, eine zweite um die Vorwarnzeit vor
 Fälligkeit.
 Beim Anlegen einer Schicht und bei Änderungen von Beginn oder Rhythmus MUST das System diese
-Fristen anlegen oder verschieben. Bei Vollzug MUST es sie schließen. Erreicht der Scheduler
+Fristen anlegen oder verschieben. Bei Vollzug und beim Ende einer Schicht (`beendet`) MUST es sie
+schließen. Erreicht der Scheduler
 eine dieser Fristen, MUST er genau einmal ein Live-Ereignis an alle Leser des Moduls
 Ablösung senden, das die Schicht und die Art (`vorwarnung` oder `faellig`) nennt.
 
@@ -460,12 +465,86 @@ erscheinen, wenn das Modul für die Person sichtbar ist.
 - **WHEN** eine Schicht überfällig ist, eine in 20 min fällig und eine in 3 h
 - **THEN** zeigt das Modulpanel am Modul Ablösung die Zahl 2
 
-### Requirement: Auflösen behält abgelöste Schichten
+### Requirement: Auflösen beendet die laufende Schicht mit Spur
 
-Wird eine Einheit aufgelöst, SHALL das System ihre laufende Schicht samt offener Fristen
-entfernen und ihre abgelösten Schichten samt Vollzug behalten. Verweist eine Schicht einer
-anderen Einheit auf die aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden.
+Wird eine Einheit aufgelöst, SHALL das System ihre laufende Schicht als `beendet` mit Grund
+`aufloesung`, Zeitpunkt und Person behalten und ihre offenen Fristen schließen, statt sie zu
+löschen (LLH-1128, Entscheidung vom 15.10.2026; ändert die Fassung aus LLH-1079). Abgelöste
+Schichten MUST samt Vollzug bleiben. Verweist eine Schicht einer anderen Einheit auf die
+aufgelöste als ablösende Einheit, MUST dieser Verweis geleert werden.
 
 #### Scenario: Historie bleibt
 - **WHEN** eine Einheit mit zwei abgelösten und einer laufenden Schicht aufgelöst wird
-- **THEN** zeigt die Ablösung die beiden abgelösten Schichten weiter, die laufende nicht mehr
+- **THEN** zeigt die Ablösung die beiden abgelösten Schichten weiter, die laufende ist nicht mehr laufend, sondern `beendet` mit Grund `aufloesung`
+
+### Requirement: Schicht mit dem Eintreffen
+
+Schreibt die Kräfte-Zeitachse das Eintreffen der offenen Periode einer Einheit, die weder eine
+eigene noch eine geerbte laufende Schicht hat, SHALL das System in derselben Transaktion eine
+Schicht mit Beginn = Eintreffen anlegen, sofern der Abschnitt der Einheit oder der Einsatz eine
+Vorgabe hat (LLH-1128). Rhythmus und Quelle MUST der Rangfolge des Beginnens von Hand folgen
+(Abschnitt vor Einsatz), samt Fristen, ETB-Eintrag mit der Herkunft („mit dem Eintreffen
+begonnen“) und Live-Ereignis `abloesung`. Ohne Vorgabe MUST keine Schicht entstehen, ebenso
+wenig für eine Einheit, die eine laufende Schicht als ablösende plant: ihre Schicht entsteht mit
+dem Vollzug als Folgeschicht. Das gilt
+für jeden Weg des Eintreffens (Statuswechsel, Nachtrag, Bereitstellungsraum). Ein Fehler beim
+Anlegen MUST nur das Anlegen zurücknehmen; Statuswechsel und Eintreffen gelingen trotzdem.
+
+#### Scenario: Einsatzvorgabe 6 h
+- **WHEN** der Einsatz die Vorgabe „Sanitätsdienst“ mit 6 h hat und „Florian 1“ um 08:00 per Status eintrifft
+- **THEN** läuft eine Schicht ab 08:00, fällig um 14:00, mit Fristen zu 13:30 und 14:00, und das ETB nennt „mit dem Eintreffen begonnen … (Vorgabe Einsatz «Sanitätsdienst»)“
+
+#### Scenario: Ohne Vorgabe
+- **WHEN** weder Abschnitt noch Einsatz eine Vorgabe haben und eine Einheit eintrifft
+- **THEN** entsteht keine Schicht
+
+#### Scenario: Zweites Eintreffen
+- **WHEN** eine Einheit mit laufender Schicht ein weiteres Eintreffen bekommt
+- **THEN** entsteht keine zweite Schicht
+
+#### Scenario: Geplanter Ablöser trifft ein
+- **WHEN** „Florian 2“ als ablösende Einheit von „Florian 1“ geplant ist und eintrifft
+- **THEN** bekommt „Florian 2“ keine eigene Schicht, und der spätere Vollzug legt seine Folgeschicht ab dem Vollzug an
+
+#### Scenario: Fehler im Autostart
+- **WHEN** das Anlegen der Schicht scheitert
+- **THEN** gelingt der Statuswechsel, das Eintreffen steht, und von der Schicht bleibt nichts zurück
+
+### Requirement: Ende mit der Entlassung
+
+Schreibt die Kräfte-Zeitachse eine Entlassung, nach der die Einheit keine offene Periode mehr
+hat, SHALL das System ihre laufende Schicht in derselben Transaktion als `beendet` mit Grund
+`entlassung`, Zeitpunkt der Entlassung und Person beenden, ihre Fristen schließen und einen
+ETB-Eintrag schreiben. Eine entlassene Einheit MUST danach keinen Hinweis „fällig“ mehr
+auslösen. Wird genau diese Entlassung gestrichen, MUST die Schicht wieder laufen, samt Fristen
+wie bei der Rücknahme eines Vollzugs, sofern die Einheit inzwischen keine neue laufende Schicht
+hat.
+
+#### Scenario: Entlassen vor der Fälligkeit
+- **WHEN** „Florian 1“ mit einer um 14:00 fälligen Schicht um 12:00 entlassen wird
+- **THEN** ist die Schicht `beendet` mit Grund `entlassung` und Ende 12:00, und der Scheduler löst um 14:01 nichts aus
+
+#### Scenario: Entlassung gestrichen
+- **WHEN** diese Entlassung gestrichen wird
+- **THEN** läuft die Schicht wieder, mit Fristen zu 13:30 und 14:00
+
+#### Scenario: Entlassung einer früheren Periode
+- **WHEN** eine Entlassung nachgetragen wird, die eine frühere Periode schließt, während eine spätere offen bleibt
+- **THEN** bleibt die laufende Schicht unberührt
+
+### Requirement: Knoten-Vererbung der Schicht
+
+Eine Untereinheit ohne eigene laufende Schicht SHALL die laufende Schicht ihres nächsten
+Vorfahren mit einer erben (über die übergeordnete Einheit, LLH-1118 Punkt 1). Die Vererbung MUST
+beim Lesen ermittelt und nicht gespeichert werden; die tragende Schicht MUST ihre erbenden
+Untereinheiten nennen (`erbende_einheiten`). Mit ihrem Eintreffen MUST eine erbende
+Untereinheit keine eigene Schicht bekommen. Eine von Hand begonnene Schicht an einer
+Untereinheit SHALL möglich bleiben und übersteuert die Vererbung für sie und ihren Teilbaum.
+
+#### Scenario: Gruppe erbt vom Zug
+- **WHEN** „Zug 1“ eine laufende Schicht hat und seine „Gruppe 1“ eintrifft
+- **THEN** bekommt die Gruppe keine eigene Schicht, und die Schicht des Zugs nennt „Gruppe 1“ als erbend
+
+#### Scenario: Eigene Schicht übersteuert
+- **WHEN** an „Gruppe 1“ von Hand eine Schicht begonnen wird
+- **THEN** erbt deren „Trupp 1“ von der Gruppe, und der Zug nennt beide nicht mehr

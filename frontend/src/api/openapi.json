@@ -89,6 +89,7 @@
           "vorwarnung_minuten",
           "status",
           "ruecknehmbar",
+          "erbende_einheiten",
           "angelegt_at"
         ],
         "properties": {
@@ -121,6 +122,30 @@
           "angelegt_at": {
             "type": "string"
           },
+          "beendet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nur bei `beendet`: wann, durch wen und warum die Schicht ohne Ablösung endete."
+          },
+          "beendet_grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BeendetGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "beendet_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
           "beginn_at": {
             "type": "string"
           },
@@ -145,6 +170,13 @@
                 "type": "null"
               }
             ]
+          },
+          "erbende_einheiten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbloesungErbe"
+            },
+            "description": "Untereinheiten, die diese laufende Schicht erben (Knoten-Modell, LLH-1118): ohne eigene\nlaufende Schicht unter dieser Einheit, bis zur nächsten mit eigener. Leer bei\nabgelösten und beendeten Schichten."
           },
           "faellig_at": {
             "type": "string"
@@ -234,12 +266,30 @@
           }
         }
       },
+      "AbloesungErbe": {
+        "type": "object",
+        "description": "Eine Untereinheit, die die Schicht eines Vorfahren erbt.",
+        "required": [
+          "einheit_id",
+          "einheit_name"
+        ],
+        "properties": {
+          "einheit_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "einheit_name": {
+            "type": "string"
+          }
+        }
+      },
       "AbloesungStatus": {
         "type": "string",
         "description": "Status einer Schicht. Wire == `as_str()`.",
         "enum": [
           "laufend",
-          "abgeloest"
+          "abgeloest",
+          "beendet"
         ]
       },
       "AbloesungVollzugAnzeige": {
@@ -1771,6 +1821,14 @@
         "enum": [
           "entlassen",
           "storniert"
+        ]
+      },
+      "BeendetGrund": {
+        "type": "string",
+        "description": "Warum eine Schicht ohne Ablösung endete (`einsatz_abloesung.beendet_grund`, TEXT ohne\nCHECK: den Wert setzt nur dieser Code). Wire == `as_str()`.",
+        "enum": [
+          "entlassung",
+          "aufloesung"
         ]
       },
       "BefehlAbschnitt": {

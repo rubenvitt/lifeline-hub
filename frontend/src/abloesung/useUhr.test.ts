@@ -24,6 +24,7 @@ const schicht = (
   faellig_at,
   status,
   ruecknehmbar: false,
+  erbende_einheiten: [],
   angelegt_at: '2026-09-22 09:00:00',
 });
 

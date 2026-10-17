@@ -7,7 +7,8 @@
 //! **Alles läuft auf einer offenen Transaktion** (`…_tx`): Statuswechsel, Nachtrag, Vollzug der
 //! Ablösung und Streichung schreiben die Zeitachse im selben Commit wie ihr Anlass. Ein
 //! Ereignis an einer Einheit schreibt den Fan-out auf ihre Personen immer mit
-//! ([`schreibe_tx`]).
+//! ([`schreibe_tx`]), dazu die Kopplung an die Ablösung (LLH-1128, `abloesung::kopplung`):
+//! Eintreffen beginnt, Entlassung beendet die Schicht, ihre Streichung öffnet sie wieder.
 
 use chrono_tz::Tz;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -55,6 +56,10 @@ pub enum Schreibergebnis {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Beruehrt {
     pub personen: Vec<i64>,
+    /// ETB-Einträge der Kopplung an die Ablösung (Schicht begonnen, beendet oder wieder
+    /// laufend). Nicht leer → nach dem Commit Kurzruf und `LiveEvent::Abloesung`
+    /// (`routes::abloesung::publish_kopplung`).
+    pub abloesung: Vec<i64>,
 }
 
 // ── Lesen innerhalb der Transaktion ─────────────────────────────────────────────────────────
@@ -164,6 +169,15 @@ pub async fn schreibe_tx(
                 beruehrt.personen.push(person);
             }
         }
+        beruehrt.abloesung = crate::abloesung::kopplung::nach_ereignis_tx(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            einheit_id,
+            neu.art,
+            neu.zeitpunkt_at,
+        )
+        .await?;
     }
     Ok((ergebnis, beruehrt))
 }
@@ -289,11 +303,26 @@ pub async fn streiche_tx(
         .execute(&mut *conn)
         .await?;
     }
+    let abloesung = match kraft {
+        Kraft::Einheit(einheit_id) => {
+            crate::abloesung::kopplung::nach_streichung_tx(
+                conn,
+                einsatz_id,
+                benutzer_id,
+                einheit_id,
+                art,
+                &zeitpunkt_at,
+            )
+            .await?
+        }
+        Kraft::Person(_) => Vec::new(),
+    };
     Ok(Gestrichen {
         art,
         zeitpunkt_at,
         beruehrt: Beruehrt {
             personen: kopien.into_iter().map(|(_, p)| p).collect(),
+            abloesung,
         },
     })
 }
@@ -441,6 +470,18 @@ pub async fn offenes_eintreffen_tx(
     let bestand = bestand_tx(conn, Kraft::Einheit(einheit_id)).await?;
     let p = perioden::bilde_nachsichtig(&bestand);
     Ok(perioden::offenes_eintreffen(&p).map(str::to_string))
+}
+
+/// Ob die Einheit eine offene Einsatzperiode hat (Ende der Schicht mit der Entlassung,
+/// LLH-1128).
+pub async fn has_offene_periode_tx(
+    conn: &mut SqliteConnection,
+    einheit_id: i64,
+) -> Result<bool, AppError> {
+    let bestand = bestand_tx(conn, Kraft::Einheit(einheit_id)).await?;
+    Ok(perioden::bilde_nachsichtig(&bestand)
+        .last()
+        .is_some_and(|p| p.ende_at.is_none()))
 }
 
 /// Vollzug einer Ablösung: Ereignis `abloesung` an der abgelösten Einheit samt Fan-out. Ohne
