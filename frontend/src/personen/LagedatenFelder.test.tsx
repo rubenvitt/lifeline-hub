@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
+import { tippeZeit } from '../test/zeitEingabe';
 import { VermisstSeitFeld } from './LagedatenFelder';
 
 /**
@@ -28,7 +29,7 @@ describe('VermisstSeitFeld — Anzeigezone (LFH-692)', () => {
 
   it('zeigt die Berliner Uhrzeit, und Speichern ohne Änderung lässt den Wire-String gleich', async () => {
     const onFinish = zeige();
-    expect(screen.getByRole('textbox', { name: 'vermisst seit' })).toHaveValue('24.09.2026 12:00');
+    expect(screen.getByRole('textbox', { name: 'vermisst seit' })).toHaveValue('241200sep26');
     fireEvent.click(screen.getByRole('button', { name: 'ok' }));
     await waitFor(() => expect(onFinish).toHaveBeenCalled());
     expect(onFinish.mock.calls[0][0]).toEqual({ vermisst_seit: '2026-09-24 10:00:00' });
@@ -37,10 +38,7 @@ describe('VermisstSeitFeld — Anzeigezone (LFH-692)', () => {
   it('eine eingegebene 08:30 Berliner Zeit wird 06:30 UTC', async () => {
     const onFinish = zeige();
     const feld = screen.getByRole('textbox', { name: 'vermisst seit' });
-    await userEvent.click(feld);
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '24.09.2026 08:30');
-    await userEvent.keyboard('{Enter}');
+    await tippeZeit(userEvent.setup(), feld, '24.09.2026 08:30');
     fireEvent.click(screen.getByRole('button', { name: 'ok' }));
     await waitFor(() => expect(onFinish).toHaveBeenCalled());
     expect(onFinish.mock.calls[0][0]).toEqual({ vermisst_seit: '2026-09-24 06:30:00' });

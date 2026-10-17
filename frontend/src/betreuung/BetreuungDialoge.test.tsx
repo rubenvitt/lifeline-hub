@@ -870,8 +870,10 @@ describe('Betreuung — „Jetzt“ auf einem nachgehenden Gerät (LFH-895)', ()
     const dialog = await screen.findByRole('dialog');
     await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '89');
-    await userEvent.click(within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Jetzt' }));
+    // „jetzt“ steht in der Schnellwahl des Kalenders neben dem Zeitfeld.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    const kalender = await screen.findByRole('dialog', { name: 'Tag und Uhrzeit wählen' });
+    await userEvent.click(within(kalender).getByRole('button', { name: 'jetzt' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     const gesendet = Date.parse(

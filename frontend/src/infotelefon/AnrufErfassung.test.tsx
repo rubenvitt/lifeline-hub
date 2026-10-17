@@ -5,6 +5,7 @@ import { renderMitProviders } from '../test/utils';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
+import { tippeZeit } from '../test/zeitEingabe';
 import AnrufErfassung, { formularLeer } from './AnrufErfassung';
 
 /** Anliegen wählen: das antd-Select öffnet per Klick, die Option ist ein `option`-Element. */
@@ -101,9 +102,8 @@ describe('AnrufErfassung — Uhrzeit in der Anzeigezone (LFH-692)', () => {
     await waehleAnliegen('Auskunft zur Lage');
     await userEvent.click(screen.getByText('Anrufer und Uhrzeit'));
     const uhrzeit = screen.getByRole('textbox', { name: 'Uhrzeit' });
-    await userEvent.click(uhrzeit);
-    await userEvent.type(uhrzeit, '30.09.2026 13:00');
-    await userEvent.keyboard('{Enter}');
+    // Enter übernimmt die getippte Uhrzeit und sendet ab.
+    await tippeZeit(userEvent.setup(), uhrzeit, '30.09.2026 13:00');
     await waitFor(() =>
       expect(erfassen).toHaveBeenCalledWith(
         expect.objectContaining({ eingang_at: '2026-09-30 11:00:00' }),
