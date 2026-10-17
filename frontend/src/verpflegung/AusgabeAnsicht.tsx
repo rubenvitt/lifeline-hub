@@ -55,7 +55,7 @@ import {
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import { useAusgabeNachtragen } from './useAusgabeNachtragen';
 import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
-import { stellenName, stellenWahl } from './stellenKern';
+import { eigeneStelle, stellenName, stellenWahl } from './stellenKern';
 import { useAusgabeSammlung } from './useAusgabeSammlung';
 import { useNachforderungWahl } from './useNachforderungWahl';
 import {
@@ -123,7 +123,9 @@ function davon(b: Buendel): string {
  * Stelle aus `je_stelle`. Vorgewählt wird in dieser Folge: `?stelle=` aus der Karte, am Desktop die
  * gemerkte Wahl des Einsatzes (`stellenGedaechtnis`), sonst die einzige zugeordnete Stelle. Eine
  * Hand-Wahl gilt bis zum Verlassen und wird am Desktop gemerkt, am Gerät nicht (LLH-1048). Ein
- * Wechsel bucht das offene Bündel an der alten Stelle (`useAusgabeSammlung`).
+ * Wechsel bucht das offene Bündel an der alten Stelle (`useAusgabeSammlung`). Ein an eine
+ * Verpflegungsstelle gebundenes Gerät (LLH-1048 Teil II, `eigeneStelle`) wählt nicht: seine Stelle
+ * steht fest als Text mit ihrem Ist, und jedes Bündel und jeder Nachtrag trägt sie.
  *
  * Empfänger (LLH-1055 Teil II, Entscheidung LLH-1024 F3): Am Platz `ausgabe-empfaenger` steht die
  * Wahl „ohne Empfänger“ (Vorgabe, das Zählen bleibt so schnell wie ohne), eine Einheit (Abholung)
@@ -179,6 +181,8 @@ export default function AusgabeAnsicht() {
   // ── Stellenwahl (LLH-1040) ─────────────────────────────────────────────────────────────
   const stellen = verpflegungQuery.data?.stellen ?? [];
   const amDesktop = geraet == null;
+  // Gebundenes Gerät (LLH-1048): die Stelle steht fest, keine Wahl, keine Vorwahl.
+  const feste = eigeneStelle(geraet, stellen);
   const wahl = stellenWahl(stellen, zf);
   const waehlbar = [...wahl.zugeordnet, ...wahl.weitere];
   const isWaehlbar = (sid: number | null): sid is number =>
@@ -205,8 +209,9 @@ export default function AusgabeAnsicht() {
     setFesteWahl({ schluessel: wahlSchluessel, stelle: vorwahl });
   }
   const festgehalten = festeWahl?.schluessel === wahlSchluessel ? festeWahl.stelle : null;
-  // Eine inzwischen aufgelöste Stelle fällt aus der Wahl.
-  const gewaehlteStelle = isWaehlbar(festgehalten) ? festgehalten : null;
+  // Eine inzwischen aufgelöste Stelle fällt aus der Wahl. Am gebundenen Gerät gilt die eigene,
+  // auch aufgelöst: dann lehnt der Server eine neue Ausgabe ab (409), eine vorher gezählte nicht.
+  const gewaehlteStelle = feste ? feste.id : isWaehlbar(festgehalten) ? festgehalten : null;
   const selectStelle = (sid: number | null) => {
     setFesteWahl({ schluessel: wahlSchluessel, stelle: sid });
     if (amDesktop) saveGemerkteStelle(einsatzId, sid);
@@ -515,9 +520,10 @@ export default function AusgabeAnsicht() {
             </Button>
           </Flex>
           {/* Stellenwahl (LLH-1040); ohne wählbare Stelle bleibt der Platz leer. Die Zeile bricht
-              nicht um: die Wahl nimmt den Rest, das Ist steht fest daneben. */}
+              nicht um: die Wahl nimmt den Rest, das Ist steht fest daneben. Am gebundenen Gerät
+              (LLH-1048) steht statt der Wahl die eigene Stelle als Text. */}
           <div data-lfh="ausgabe-stelle">
-            {waehlbar.length > 0 && (
+            {(feste != null || waehlbar.length > 0) && (
               <Flex
                 align="center"
                 gap={token.marginSM}
@@ -527,17 +533,28 @@ export default function AusgabeAnsicht() {
                   borderBlockStart: `1px solid ${rollen.flaeche2}`,
                 }}
               >
-                <Select<number | 'ohne'>
-                  aria-label="Stelle"
-                  value={gewaehlteStelle ?? 'ohne'}
-                  disabled={tastenGesperrt}
-                  onChange={(v) => selectStelle(v === 'ohne' ? null : v)}
-                  options={[
-                    { value: 'ohne', label: 'ohne Stelle' },
-                    ...waehlbar.map((st) => ({ value: st.id, label: st.bezeichnung })),
-                  ]}
-                  style={{ flex: '1 1 0', minWidth: 0 }}
-                />
+                {feste ? (
+                  <span
+                    data-lfh="ausgabe-stelle-fest"
+                    title={feste.bezeichnung}
+                    style={{ ...einzeilig, flex: '1 1 0', minWidth: 0 }}
+                  >
+                    <span style={{ color: rollen.text2 }}>Stelle </span>
+                    <strong>{feste.bezeichnung}</strong>
+                  </span>
+                ) : (
+                  <Select<number | 'ohne'>
+                    aria-label="Stelle"
+                    value={gewaehlteStelle ?? 'ohne'}
+                    disabled={tastenGesperrt}
+                    onChange={(v) => selectStelle(v === 'ohne' ? null : v)}
+                    options={[
+                      { value: 'ohne', label: 'ohne Stelle' },
+                      ...waehlbar.map((st) => ({ value: st.id, label: st.bezeichnung })),
+                    ]}
+                    style={{ flex: '1 1 0', minWidth: 0 }}
+                  />
+                )}
                 {gewaehlteStelle != null && (
                   <span
                     data-lfh="ausgabe-stelle-ist"
@@ -864,6 +881,7 @@ export default function AusgabeAnsicht() {
           zeitfenster={zf}
           nachforderungen={nachforderung.optionen}
           stellen={stellen}
+          festeStelle={feste}
           empfaenger={empfaengerListe}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}

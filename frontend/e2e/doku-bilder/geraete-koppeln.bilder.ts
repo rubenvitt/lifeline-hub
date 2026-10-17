@@ -13,6 +13,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   kopplungscode.png   frontend/src/pages/einstellungen/EinsatzGeraete.tsx (Dialog „Code für …“)
  *   aktionen.png        frontend/src/pages/einstellungen/EinsatzGeraete.tsx (Aktionsmenü)
  *   verlaengern.png     frontend/src/pages/einstellungen/EinsatzGeraete.tsx (Dialog „Verlängern“)
+ *   verpflegungsstelle.png  frontend/src/pages/einstellungen/EinsatzGeraete.tsx,
+ *                       frontend/src/pages/einstellungen/geraeteKern.ts (wahlweise Stelle, LLH-1048)
  */
 
 const KAPITEL = 'geraete-koppeln';
@@ -143,5 +145,36 @@ test.describe(KAPITEL, () => {
     // Nachgeklickt: die Vorbelegung (24 h ab jetzt) nimmt der Server an.
     await dialog.getByRole('button', { name: 'Verlängern', exact: true }).click();
     await expect(dialog).toHaveCount(0);
+  });
+
+  test('Maske mit wahlweiser Verpflegungsstelle', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const basis = `/api/einsaetze/${demo.id}/verpflegung/stellen`;
+    const { id } = await fuelle<{ id: number }>(page, 'post', basis, {
+      bezeichnung: 'Feldküche BR Sportplatz',
+      art: 'feldkueche',
+    });
+    await fuelle(page, 'post', `${basis}/${id}/status`, { status: 'aktiv' });
+
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/einstellungen/geraete`);
+    await page.getByRole('button', { name: 'Gerät koppeln' }).click();
+    const maske = page.getByRole('dialog', { name: 'Gerät koppeln' });
+    await waehleIn(maske.getByRole('combobox', { name: 'Ansicht' }), 'Verpflegung');
+    const stelle = maske.getByRole('combobox', { name: 'Verpflegungsstelle' });
+    // `has` sucht relativ zum Feld: dort ohne den Dialog davor.
+    const feld = page.getByRole('combobox', { name: 'Verpflegungsstelle' });
+    await expect(maske.locator('.ant-form-item', { has: feld })).toContainText(
+      'ohne Stelle (einsatzweit)',
+    );
+    await waehleIn(stelle, 'Feldküche BR Sportplatz');
+    await maske.getByLabel('Gerätebezeichnung').fill('Tresen');
+    await fotografiere(maske, KAPITEL, 'verpflegungsstelle');
+    // Nachgeklickt: die Kopplung trägt die Stelle im Namen.
+    await maske.getByRole('button', { name: 'Koppeln', exact: true }).click();
+    const code = page.getByRole('dialog', { name: 'Code für Feldküche BR Sportplatz · Tresen' });
+    await expect(code).toBeVisible();
+    await code.getByRole('button', { name: 'Fertig' }).click();
   });
 });

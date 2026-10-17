@@ -15,6 +15,14 @@ import { haeltStufe, stelleDichte } from './trefflaeche-kern';
  *
  * Mutationsprobe: in `geraetSicht.ts` `br-verwalten` für Geräte auf `true` → der Schritt „kein
  * Stornieren“ wird rot.
+ *
+ * Ohne Netz (LLH-1075 Teil III, Spec `bereitstellungsraum-belegung`, „Eintreffen ohne Netz
+ * vormerken“): das Tablet merkt ein Eintreffen vor und sendet es beim Wiederverbinden; eine
+ * abgerissene Antwort (der Server bucht, die Antwort kommt nicht an) endet mit genau einer
+ * Einheit und einer Meldung, und das Nachsenden selbst gelingt (201, nichts abgelehnt).
+ * Mutationsprobe: in `useOfflineSync.ts` beim Nachsenden eine neue `client_id` setzen → der
+ * Server erkennt die Wiederholung nicht und lehnt als Doppelbuchung ab (422), der Schritt
+ * „Nachsenden 201“ wird rot.
  */
 
 async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unknown): Promise<T> {
@@ -238,6 +246,106 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
     'EA Nord',
   );
   await expect(page.getByText('nicht übernommen')).toHaveCount(0);
+});
+
+test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau einmal', async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  await anmeldenAlsAdmin(page);
+  const einsatz = await anlegen(page, '/api/einsaetze', {
+    bezeichnung: `E2E BR offline ${Date.now()}`,
+  });
+  const e = einsatz.id;
+  const raum = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+    bezeichnung: 'BR Sportplatz',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
+    status: 'aktiv',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'LF Nachbarort' });
+  const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
+    page,
+    `/api/einsaetze/${e}/geraete`,
+    { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
+  );
+  const einheitenNamens = async (name: string) =>
+    (
+      (await (await page.request.get(`/api/einsaetze/${e}/einheiten`)).json()) as { name: string }[]
+    ).filter((x) => x.name === name).length;
+
+  const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/br/${raum.id}$`));
+    const dialog = tablet.getByRole('dialog', { name: 'Eintreffen buchen' });
+    const belegung = tablet.getByTestId('br-belegung');
+    const vorgemerkt = tablet.getByTestId('br-vorgemerkt');
+
+    // Ohne Netz: vorgemerkt, beim Wiederverbinden gebucht.
+    await expect(tablet.getByRole('button', { name: 'Eintreffen buchen' })).toBeEnabled();
+    await kontext.setOffline(true);
+    await tablet.getByRole('button', { name: 'Eintreffen buchen' }).click();
+    await dialog.getByRole('button', { name: 'Eintreffen LF Nachbarort' }).click();
+    await expect(tablet.getByText('Offline vorgemerkt: Eintreffen LF Nachbarort')).toBeVisible();
+    await expect(vorgemerkt.getByText('LF Nachbarort')).toBeVisible();
+    await kontext.setOffline(false);
+    await expect(vorgemerkt).toHaveCount(0, { timeout: 30_000 });
+    await expect(belegung.getByText('LF Nachbarort', { exact: true })).toBeVisible();
+
+    // Abgerissene Antwort: der Server bucht, die Antwort erreicht das Tablet nicht.
+    const pfad = `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/eintreffen`;
+    const angekommen: number[] = [];
+    tablet.on('response', (r) => {
+      if (new URL(r.url()).pathname === pfad) angekommen.push(r.status());
+    });
+    let ersterStatus = 0;
+    await tablet.route(
+      `**/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/eintreffen`,
+      async (route) => {
+        ersterStatus = (await route.fetch()).status();
+        await route.abort('connectionreset');
+      },
+      { times: 1 },
+    );
+    await tablet.getByRole('button', { name: 'Eintreffen buchen' }).click();
+    await dialog.getByRole('searchbox', { name: 'Suche' }).fill('Florian Nachbar 7');
+    await dialog.getByRole('button', { name: 'Nicht in der Liste' }).click();
+    await dialog.getByRole('button', { name: 'Unangemeldet buchen' }).click();
+    await expect(
+      tablet.getByText('Offline vorgemerkt: Eintreffen Florian Nachbar 7'),
+    ).toBeVisible();
+    expect(ersterStatus, 'der erste Versuch hat gebucht').toBe(201);
+    // Nachsenden 201: der Server erkennt die Wiederholung an der client_id und liefert die erste
+    // Buchung, statt sie als Doppelbuchung abzulehnen.
+    await expect
+      .poll(() => angekommen, { message: 'Nachsenden 201', timeout: 30_000 })
+      .toEqual([201]);
+    await expect(vorgemerkt).toHaveCount(0, { timeout: 30_000 });
+    await expect(tablet.getByText('abgelehnt – prüfen')).toHaveCount(0);
+    await expect(belegung.getByText('nicht übernommen')).toBeVisible();
+  } finally {
+    await kontext.close();
+  }
+
+  expect(await einheitenNamens('Florian Nachbar 7'), 'genau eine Einheit').toBe(1);
+  const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/meldungen`)).json()) as {
+    inhalt: string;
+  }[];
+  expect(
+    meldungen.filter((m) => m.inhalt.includes('Florian Nachbar 7')),
+    'genau eine Meldung an die Einsatzleitung',
+  ).toHaveLength(1);
+  const detail = (await (
+    await page.request.get(`/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}`)
+  ).json()) as { einheiten: { name: string }[] };
+  expect(detail.einheiten.map((x) => x.name).sort()).toEqual([
+    'Florian Nachbar 7',
+    'LF Nachbarort',
+  ]);
 });
 
 /**

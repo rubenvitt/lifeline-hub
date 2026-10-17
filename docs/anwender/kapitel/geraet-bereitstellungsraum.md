@@ -2,7 +2,7 @@
 titel: Bereitstellungsraum am Gerät
 gruppen: [geraete]
 reihenfolge: 740
-quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/offline/schreiben.ts, frontend/src/offline/useOfflineSync.ts, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
 ---
 
 ## Überblick
@@ -56,6 +56,18 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
 5. Steht „Schon im Einsatz: …“, kennt der Einsatz den Funkrufnamen schon. „Diese buchen“ bucht die
    vorhandene Kraft; „Trotzdem neu anlegen“ nur, wenn es wirklich eine andere Kraft ist. Steht die
    vorhandene Kraft schon in einem Raum, fehlt „Diese buchen“.
+
+### Ohne Netz buchen
+
+1. Wie oben „Eintreffen buchen“ wählen und die Kraft buchen, aus der Suche oder mit „Nicht in der
+   Liste“.
+2. Die Bestätigung lautet „Offline vorgemerkt: Eintreffen …“. Die Kraft steht unter
+   „Vorgemerkt“, unter den bereitgestellten Fahrzeugen, mit „vorgemerkt“ und der Uhrzeit der
+   Erfassung.
+3. Nichts weiter tun: Sobald wieder Netz da ist, geht die Buchung hinaus. Die Kraft steht dann in
+   der Belegung, „Vorgemerkt“ verschwindet.
+4. Meldet die Betriebszeile „abgelehnt – prüfen“, hat der Server die Buchung abgelehnt, etwa weil
+   der Raum inzwischen aufgelöst ist. Prüfen wie im Kapitel [Arbeiten ohne Netz](ohne-netz.md).
 
 ### Kräfte aus der Liste zuweisen
 
@@ -122,6 +134,23 @@ Kraft weiter in den Zahlen des Raums.
 Zeitachse, mit genau einem Eintrag im Einsatztagebuch. Eine unangemeldete Kraft schickt dazu eine
 Meldung an die Einsatzleitung; die Bemerkung steht nicht darin. Einzelheiten stehen im Kapitel
 [Bereitstellungsräume](bereitstellungsraeume.md).
+
+### Ohne Netz
+
+Eine Buchung ohne Netz zählt mit dem Zeitpunkt der Erfassung und kommt genau einmal an, auch
+wenn die Verbindung mitten im Senden abreißt. „Vorgemerkt“ steht nur auf diesem Tablet; die
+Einsatzleitung sieht die Kraft und die Meldung zu einer unangemeldeten Kraft erst nach dem
+Senden.
+
+Eine vorgemerkte Kraft steht in der Suche mit „vorgemerkt …“ und lässt sich nicht noch einmal
+buchen. „Schon vorgemerkt: …“ nennt eine vorgemerkte unangemeldete Kraft mit demselben
+Funkrufnamen; dann gibt es nur „Trotzdem neu anlegen“. Ob ein Funkrufname schon im Einsatz steht,
+prüft das Tablet mit den Kräften, die es zuletzt mit Netz geladen hat; was es nicht kennt, prüft
+der Server beim Senden. Lehnt er ab, steht die Buchung mit dem Grund unter „Offline-Aktionen
+wiederherstellen“.
+
+Das Tablet hält den Raum nicht für die Arbeit ohne Netz vor: Buchen ohne Netz geht auf der Seite,
+die mit Netz geöffnet war. Vorgemerkte Buchungen bleiben auf dem Tablet, bis sie gesendet sind.
 
 ### Verlauf und Wartezeiten
 

@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx]
 ---
 
 ## Überblick
@@ -71,6 +71,8 @@ ist.
 - Meldungen
 - Stand- und Belegungsmeldungen der Betreuung
 - Ausgaben der Verpflegung
+- Eintreffen am Bereitstellungsraum, auf einer mit Netz geöffneten Seite des Raums; die Kraft
+  steht dort bis zum Senden unter „Vorgemerkt“
 - Einträge im Einsatztagebuch
 
 Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
@@ -84,8 +86,8 @@ Uhr des Geräts mit der des Servers ab, solange Netz da ist.
 
 ### Abgelehnte Einträge
 
-Der Server lehnt einen vorgemerkten Eintrag etwa ab, weil der Einsatz inzwischen abgeschlossen ist
-oder ein Pflichtfeld fehlt. Im Einsatztagebuch steht der Grund direkt am Eintrag.
+Der Server lehnt einen vorgemerkten Eintrag etwa ab, weil der Einsatz inzwischen abgeschlossen ist,
+ein Pflichtfeld fehlt oder der Bereitstellungsraum inzwischen aufgelöst ist. Im Einsatztagebuch steht der Grund direkt am Eintrag.
 
 Abgelehnte Einträge löscht die App erst **30 Tage nach der Ablehnung** von selbst: Sie können das
 einzige Zeugnis einer Erfassung sein. Wer sie vorher nicht mehr braucht, verwirft sie. Ausstehende

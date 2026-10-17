@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
 ---
 
 ## Überblick
@@ -96,6 +96,9 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
    „Unangemeldet buchen“ ist gesperrt. „Diese buchen“ bucht die vorhandene Kraft, „Trotzdem neu
    anlegen“ legt die neue trotzdem an. Steht die vorhandene Kraft schon in einem Raum, fehlt
    „Diese buchen“.
+7. Ohne Netz lautet die Bestätigung „Offline vorgemerkt: Eintreffen …“. Die Kraft steht unter
+   „Vorgemerkt“, bis sie beim Server gebucht ist; eine vorgemerkte Kraft bietet die Suche nicht
+   noch einmal an.
 
 ### Kräfte zuweisen und austragen
 
@@ -350,4 +353,7 @@ zusätzlich das Modul Einheiten (die Liste der Abschnitte das Modul Einsatzabsch
 das Modul Aufträge; fehlt eines, steht das Feld gesperrt mit „Modul … gesperrt“, und der Abruf
 geht ohne diese Angabe. Die Bereitstellungsräume
 gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält (Kapitel
-[Ohne Netz](ohne-netz.md)).
+[Ohne Netz](ohne-netz.md)). Auf einer mit Netz geöffneten Seite eines Raums lässt sich ein
+Eintreffen trotzdem buchen: Die App merkt es vor und sendet es genau einmal, sobald wieder Netz da
+ist, mit dem Zeitpunkt der Erfassung. „Vorgemerkt“ steht nur auf dem Gerät, das gebucht hat; in
+den Zahlen des Raums zählt die Kraft erst nach dem Senden.

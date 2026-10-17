@@ -5,6 +5,7 @@ import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import type {
   AusgabeEingabe,
   BelegungsmeldungEingabe,
+  EintreffenEingabe,
   NeueMeldung,
   Person,
   StandmeldungEingabe,
@@ -15,16 +16,25 @@ import type {
 export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
 
 /**
- * Stand- und Belegungsmeldungen und Verpflegungsausgaben tragen zusätzlich die `bezeichnung`
- * (Bezirk, Stelle bzw. Zeitfenster) — nur für die Anzeige, gesendet wird sie nicht. Neue
- * Varianten liegen als Wert im bestehenden Store und brauchen keine DB-Version.
+ * Stand- und Belegungsmeldungen, Verpflegungsausgaben und Eintreffen tragen zusätzlich die
+ * `bezeichnung` (Bezirk, Stelle, Zeitfenster bzw. Bereitstellungsraum) — nur für die Anzeige,
+ * gesendet wird sie nicht. Ein Eintreffen (LLH-1075 Teil III) nennt dazu die Kraft (`name`): die
+ * Zeile „vorgemerkt“ am Raum und die Karte im Wiederherstellungsbereich. Neue Varianten liegen als
+ * Wert im bestehenden Store und brauchen keine DB-Version.
  */
 export type OfflineSchreibaktion =
   | { art: 'person'; daten: PersonAnlegenEingabe }
   | { art: 'meldung'; daten: NeueMeldung }
   | { art: 'stand'; bezirk_id: number; bezeichnung: string; daten: StandmeldungEingabe }
   | { art: 'belegung'; stelle_id: number; bezeichnung: string; daten: BelegungsmeldungEingabe }
-  | { art: 'ausgabe'; zeitfenster_id: number; bezeichnung: string; daten: AusgabeEingabe };
+  | { art: 'ausgabe'; zeitfenster_id: number; bezeichnung: string; daten: AusgabeEingabe }
+  | {
+      art: 'eintreffen';
+      br_id: number;
+      bezeichnung: string;
+      name: string;
+      daten: EintreffenEingabe;
+    };
 
 export interface AusstehendeSchreibaktion {
   id?: number;

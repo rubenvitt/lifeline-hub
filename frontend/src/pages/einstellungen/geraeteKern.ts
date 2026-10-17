@@ -59,19 +59,52 @@ export const STELLENART_FELD: Record<
     platzhalter: 'Abschnitt wählen',
     leer: 'Kein Abschnitt in diesem Einsatz',
   },
+  verpflegungsstelle: {
+    label: 'Verpflegungsstelle',
+    platzhalter: 'Verpflegungsstelle wählen',
+    leer: 'Keine Verpflegungsstelle in diesem Einsatz',
+  },
 };
 
+/** Das Stellenfeld der Kopplungsmaske: die Art der Stelle und ob sie Pflicht ist. */
+export interface StellenFeld {
+  art: Bindungsart;
+  /** `false`: wahlweise (Verpflegung, LLH-1048); ohne Stelle koppelt das Gerät einsatzweit. */
+  pflicht: boolean;
+}
+
 /**
- * Art der Stelle, an die die Ansicht gebunden ist, laut der Übersicht des Servers
- * (`GeraeteUebersicht.ansichten`); `null` ohne Stellenbindung oder für eine Ansicht, die der
- * Server nicht anbietet.
+ * Das Stellenfeld der Ansicht laut der Übersicht des Servers (`GeraeteUebersicht.ansichten`,
+ * `stellenart` und `stelle_pflicht`); `null` ohne Stellenbindung (Lagemonitor) und für eine
+ * Ansicht, die der Server nicht anbietet.
  */
-export function stellenartVon(
+export function stellenFeldVon(
   ansichten: readonly AnsichtAuswahl[],
   ansicht: Funktionsansicht | undefined,
-): Bindungsart | null {
+): StellenFeld | null {
   if (!ansicht) return null;
-  return ansichten.find((a) => a.ansicht === ansicht)?.stellenart ?? null;
+  const auswahl = ansichten.find((a) => a.ansicht === ansicht);
+  if (!auswahl?.stellenart) return null;
+  return { art: auswahl.stellenart, pflicht: auswahl.stelle_pflicht };
+}
+
+/**
+ * Wert der Option „ohne Stelle (einsatzweit)“ einer wahlweisen Stelle. Eine eigene Option statt
+ * eines Löschkreuzes: das Kreuz ist mit Handschuh kein Ziel, und die Vorgabe steht sichtbar.
+ */
+export const OHNE_STELLE = 'einsatzweit';
+export const OHNE_STELLE_LABEL = 'ohne Stelle (einsatzweit)';
+
+/** Wert des Stellenfelds: eine Kennung oder, bei wahlweiser Stelle, {@link OHNE_STELLE}. */
+export type StellenWert = number | typeof OHNE_STELLE;
+
+/** Die `stelle_id` der neuen Kopplung; `null` ohne Stellenfeld und für „ohne Stelle“. */
+export function stelleIdAusWahl(
+  feld: StellenFeld | null,
+  wert: StellenWert | null | undefined,
+): number | null {
+  if (!feld || wert == null || wert === OHNE_STELLE) return null;
+  return wert;
 }
 
 /** Eine wählbare Stelle der Kopplungsmaske. */
@@ -102,6 +135,7 @@ export function stellenOptionen(
       storniert_at?: string | null;
     }[];
     abschnitte?: readonly { id: number; name: string }[];
+    verpflegungsstellen?: readonly { id: number; bezeichnung: string; status: string }[];
   },
   art: Bindungsart,
 ): StellenOption[] {
@@ -122,6 +156,11 @@ export function stellenOptionen(
         .map((b) => ({ value: b.id, label: b.bezeichnung }));
     case 'einsatzabschnitt':
       return (quellen.abschnitte ?? []).map((a) => ({ value: a.id, label: a.name }));
+    case 'verpflegungsstelle':
+      // `stellen` aus `GET …/verpflegung` kommt ohne stornierte; aufgelöst lehnt der Server ab.
+      return (quellen.verpflegungsstellen ?? [])
+        .filter(benutzbar)
+        .map((s) => ({ value: s.id, label: s.bezeichnung }));
   }
 }
 

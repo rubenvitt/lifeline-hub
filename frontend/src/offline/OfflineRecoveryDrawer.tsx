@@ -38,7 +38,8 @@ interface OfflineRecoveryDrawerProps {
 }
 
 /** Kartentitel einer abgelehnten Schreibaktion; exhaustiv über die Art. Stand- und
- *  Belegungsmeldungen nennen ihr Objekt — `bezirk_id: 3` im Inhalt sagt niemandem etwas. */
+ *  Belegungsmeldungen, Ausgaben und Eintreffen nennen ihr Objekt — `bezirk_id: 3` im Inhalt sagt
+ *  niemandem etwas. */
 function aktionsTitel(aktion: OfflineSchreibaktion): string {
   switch (aktion.art) {
     case 'person':
@@ -51,6 +52,10 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
       return `Abgelehnte Belegungsmeldung: ${aktion.bezeichnung}`;
     case 'ausgabe':
       return `Abgelehnte Verpflegungsausgabe: ${aktion.bezeichnung}`;
+    case 'eintreffen':
+      // LLH-1075 Teil III: Kraft und Raum; der Grund (Raum aufgelöst, schon in einem Raum,
+      // schon im Einsatz) steht darunter.
+      return `Abgelehntes Eintreffen: ${aktion.name} · ${aktion.bezeichnung}`;
     default: {
       const nie: never = aktion;
       return `Abgelehnte Offline-Aktion ${JSON.stringify(nie)}`;

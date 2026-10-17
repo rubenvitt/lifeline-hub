@@ -4,10 +4,12 @@ import { ApiError, NetzFehler } from '../api/client';
 import { legePersonAn } from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
+import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { OFFLINE_QUEUE_EVENT, queueLeerenFuerTests, schreibaktionenLaden } from './queue';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from './serveruhr';
 import {
   erfasseBelegungOfflineFaehig,
+  erfasseEintreffenOfflineFaehig,
   erfasseMeldungOfflineFaehig,
   erfassePersonOfflineFaehig,
   erfasseStandOfflineFaehig,
@@ -22,6 +24,7 @@ vi.mock('../api/einsatzPerson', async (importOriginal) => {
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
 vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
+vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
 
 function online(wert: boolean): void {
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: wert });
@@ -424,5 +427,70 @@ describe('Sammlung direkt vormerken (LLH-1032, design.md D5)', () => {
     const zeilen = await schreibaktionenLaden(11, 7);
     const ids = zeilen.map((z) => (z.aktion.daten as { client_id: string }).client_id);
     expect(new Set(ids).size).toBe(2);
+  });
+});
+
+describe('offlinefähiges Eintreffen am Bereitstellungsraum (LLH-1075 Teil III)', () => {
+  const sportplatz = { id: 4, bezeichnung: 'BR Sportplatz' };
+  const unangemeldet = { unangemeldet: { fahrzeuge: [{ funkrufname: 'FL-MUS 1-44-1' }] } };
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-16T12:12:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('merkt offline mit client_id, Erfassungszeitpunkt, Raum und Kraft vor', async () => {
+    online(false);
+    const ergebnis = await erfasseEintreffenOfflineFaehig(11, 7, sportplatz, 'FL-MUS 1-44-1', {
+      ...unangemeldet,
+      client_id: 'e-1',
+    });
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: 'e-1' });
+    expect(bucheEintreffen).not.toHaveBeenCalled();
+    expect(await schreibaktionenLaden(11, 7)).toEqual([
+      expect.objectContaining({
+        aktion: {
+          art: 'eintreffen',
+          br_id: 4,
+          bezeichnung: 'BR Sportplatz',
+          name: 'FL-MUS 1-44-1',
+          daten: { ...unangemeldet, client_id: 'e-1', zeitpunkt_at: '2026-10-16 12:12:00' },
+        },
+      }),
+    ]);
+  });
+
+  it('sendet online mit client_id und Queue-Besitzer, ohne Zeitpunkt', async () => {
+    const antwort = { einheit_id: 30 } as Awaited<ReturnType<typeof bucheEintreffen>>;
+    vi.mocked(bucheEintreffen).mockResolvedValue(antwort);
+    const kraft = { kraft: { objekt_typ: 'einheit' as const, objekt_id: 30 } };
+    const ergebnis = await erfasseEintreffenOfflineFaehig(11, 7, sportplatz, 'HLF 20', kraft);
+    expect(ergebnis).toEqual({ zustand: 'gesendet', daten: antwort });
+    const [einsatz, br, gesendet, optionen] = vi.mocked(bucheEintreffen).mock.calls[0];
+    expect([einsatz, br, optionen]).toEqual([7, 4, { offlineQueueBenutzerId: 11 }]);
+    expect(gesendet).toEqual({ ...kraft, client_id: expect.any(String) });
+    expect(gesendet).not.toHaveProperty('zeitpunkt_at');
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+  });
+
+  it('abgerissene Antwort: merkt mit DERSELBEN client_id vor, damit der Server sie wiedererkennt', async () => {
+    vi.mocked(bucheEintreffen).mockRejectedValueOnce(new NetzFehler());
+    const ergebnis = await erfasseEintreffenOfflineFaehig(11, 7, sportplatz, 'FL', unangemeldet);
+    const gesendet = vi.mocked(bucheEintreffen).mock.calls[0][2];
+    expect(gesendet.client_id).toEqual(expect.any(String));
+    expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion.daten).toEqual({ ...gesendet, zeitpunkt_at: '2026-10-16 12:12:00' });
+  });
+
+  it('eine fachliche Ablehnung (Raum nicht in Betrieb) wirft und merkt nichts vor', async () => {
+    vi.mocked(bucheEintreffen).mockRejectedValueOnce(new ApiError(422, 'BR nicht aktiv'));
+    await expect(
+      erfasseEintreffenOfflineFaehig(11, 7, sportplatz, 'FL', unangemeldet),
+    ).rejects.toMatchObject({ status: 422 });
+    expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
   });
 });

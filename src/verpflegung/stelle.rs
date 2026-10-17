@@ -83,6 +83,10 @@ pub struct VerpflegungsstelleAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aufgeloest_at: Option<String>,
     pub angelegt_at: String,
+    /// Ob ein Gerät an der Stelle gekoppelt ist (LLH-1048 Teil II): eine laufende Kopplung, auch
+    /// eine noch nicht eingelöste. Dann ist das Storno 409; die Oberfläche sperrt es mit Grund.
+    /// Nur dieses Ja oder Nein, keine Kopplung, keine Gerätebezeichnung.
+    pub geraet_gekoppelt: bool,
 }
 
 #[cfg(test)]

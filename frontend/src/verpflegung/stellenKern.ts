@@ -7,10 +7,11 @@
  * - {@link laufendeZeitfensterDerStelle}: die Zeile der Stellenliste („Mittag 12:00–13:30 · 100 EP“).
  * - {@link zeilenJeStelle}: die Aufstellung unter „ausgegeben“ an der Zeitfensterkarte.
  * - {@link stellenWahl}: die Reihenfolge jeder Stellenwahl (zugeordnete zuerst, aufgelöste getrennt).
+ * - {@link eigeneStelle}: die feste Stelle eines gebundenen Verpflegungsgeräts (LLH-1048).
  */
 import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import type { Verpflegungsstelle, VerpflegungZeitfenster } from '../api/types';
+import type { GeraetAnzeige, Verpflegungsstelle, VerpflegungZeitfenster } from '../api/types';
 import { istVergangen } from './deckung';
 
 dayjs.extend(utc);
@@ -128,4 +129,24 @@ export function stellenWahl(
 /** Zahl der Segmentleiste „Stellen (n)“: nicht aufgelöste Stellen. */
 export function offeneStellenCount(stellen: readonly Verpflegungsstelle[]): number {
   return stellen.filter((s) => s.status !== 'aufgeloest').length;
+}
+
+/**
+ * Die Verpflegungsstelle, an die das Gerät gebunden ist (LLH-1048, Entscheidung LLH-1024 F7);
+ * `null` am Desktop, am einsatzweiten Verpflegungsgerät und an jeder anderen Ansicht. An ihr
+ * steht die Stelle fest: keine Stellenwahl, jede Ausgabe trägt sie (der Server setzt sie auch
+ * ohne Angabe und lehnt eine andere mit 403 ab). Der Name kommt aus der live geführten Lesung
+ * (`stellen`, nach einer Umbenennung neu), sonst aus der Sitzung (`geraet.stelle`).
+ */
+export function eigeneStelle(
+  geraet: Pick<GeraetAnzeige, 'ansicht' | 'stelle_id' | 'stelle'> | null | undefined,
+  stellen: readonly Pick<Verpflegungsstelle, 'id' | 'bezeichnung'>[],
+): { id: number; bezeichnung: string } | null {
+  if (geraet?.ansicht !== 'verpflegung' || geraet.stelle_id == null) return null;
+  const id = geraet.stelle_id;
+  return {
+    id,
+    bezeichnung:
+      stellen.find((s) => s.id === id)?.bezeichnung ?? geraet.stelle ?? stellenName(id, stellen),
+  };
 }

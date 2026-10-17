@@ -28,7 +28,8 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Zeitfenster und Bedarf (Org-Zeitzone), dazu Art und Stellen des Zeitfensters und
   Inbetriebnahme/Auflösung einer Stelle; kein Modulzähler.
   **Verpflegungsstellen** (LLH-1040, `src/verpflegung/stelle.rs`): Status wie BR
-  (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe), Zuordnung zum Zeitfenster
+  (`geplant → aktiv → aufgeloest`, Storno nur geplant ohne Ausgabe und ohne laufende
+  Gerätekopplung, sonst 409 „Gerät gekoppelt“ und „Stornieren“ gesperrt mit Grund, LLH-1048), Zuordnung zum Zeitfenster
   n:m (`stelle_ids`), **Soll nur am Zeitfenster**, Ist je Stelle (`je_stelle`) nur vom Server
   (`deckung::rechne`), der Client rechnet nichts nach; keine eigene Leseroute, `stellen[]` kommt
   mit `GET …/verpflegung` (`einsatzKeys.verpflegung`).
@@ -39,7 +40,7 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Zahlen unverändert; der Bestand ohne Stelle bleibt ohne Aufstellung. `ort` geht nur **ohne**
   gewählte Stelle hinaus und heißt, sobald der Einsatz Stellen hat, „Zuführungsziel“. Die
   Stellenwahl der Ausgabeansicht folgt `?stelle=`, dann der gemerkten Wahl, dann der einzigen
-  zugeordneten Stelle; gemerkt wird nur am Desktop (`verpflegung/stellenGedaechtnis.ts`,
+  zugeordneten Stelle (am an eine Stelle gebundenen Gerät keine Wahl: `eigeneStelle`, LLH-1048); gemerkt wird nur am Desktop (`verpflegung/stellenGedaechtnis.ts`,
   Schlüssel `lfh:verpflegung:stelle:<einsatz>`, in `GERAETESPEICHER` und
   `offline/geraetRaeumung.ts`). Ein Stellen- oder Empfängerwechsel schließt das offene Bündel
   beim alten Ziel ab („senden“); das Bündel trägt Stelle und Empfänger seines ersten Tipps.
@@ -58,7 +59,8 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   (Taste „+n“ in der Ausgabeansicht, „Menge …“ und Nachtrag vorbelegt, überschreibbar), ohne
   Stärke keine Vorgabe. „Noch nicht verpflegt“ rechnet nur der Client (`verpflegungsstand`, er
   allein kennt die vorgemerkten): verpflegt ist, wer selbst oder über eine Über-Einheit eine
-  gültige Ausgabe des Zeitfensters hat; ohne Eintreffen steht gesondert (nie raten), nach dem Ende
+  gültige Ausgabe des Zeitfensters hat, am gebundenen Gerät auch über `verpflegt_anderswo` des
+  Servers („anderswo verpflegt · n EP“ unter „Verpflegt“, LLH-1048); ohne Eintreffen steht gesondert (nie raten), nach dem Ende
   eingetroffen fehlt; eine Zuführung an einen Abschnitt verpflegt keine Einheit, „ausstehend“
   nimmt keine aus der Liste. Fläche `verpflegung/EmpfaengerStand.tsx`: in der Ausgabeansicht mit
   „Wählen“, an der Karte eingeklappt ohne Knöpfe. Im Nachtrag liegt „Ort“/„Zuführungsziel“ seither

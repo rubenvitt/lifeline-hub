@@ -37,8 +37,12 @@ pub struct AnsichtSperre {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct AnsichtAuswahl {
     pub ansicht: Funktionsansicht,
-    /// Art der Stelle, die die Kopplung braucht (`stelle_id`); fehlt ohne Stellenbindung.
+    /// Art der Stelle, an die die Kopplung gebunden wird (`stelle_id`); fehlt ohne
+    /// Stellenbindung.
     pub stellenart: Option<Bindungsart>,
+    /// Ob die Kopplung die Stelle braucht. `false` mit `stellenart`: die Stelle ist wahlweise,
+    /// ohne sie arbeitet das Gerät einsatzweit (Verpflegung, LLH-1048).
+    pub stelle_pflicht: bool,
 }
 
 /// Geräteübersicht der Einsatzleitung.
@@ -93,6 +97,7 @@ pub async fn liste(
         .map(|ansicht| AnsichtAuswahl {
             ansicht,
             stellenart: ansicht.stellenart(),
+            stelle_pflicht: ansicht.ist_stellengebunden(),
         })
         .collect();
     Ok(Json(GeraeteUebersicht {
@@ -129,7 +134,8 @@ fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
 /// Prüft die Stelle einer neuen Kopplung und liefert ihre Bezeichnung. Eine Stelle eines anderen
 /// Einsatzes ist 404. Eine UHS oder ein Bereitstellungsraum, storniert oder aufgelöst, ist 422;
 /// eine stornierte Betreuungsstelle 409, eine geschlossene ist zulässig (wie beim Verweis aus dem
-/// Verbleib). Ein Einsatzabschnitt muss nur bestehen.
+/// Verbleib). Ein Einsatzabschnitt muss nur bestehen. Eine Verpflegungsstelle (LLH-1048): storniert
+/// 409 (Lebenszyklus), aufgelöst 422 (Zustand), geplant und aktiv zulässig.
 async fn stelle_pruefen(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -171,6 +177,21 @@ async fn stelle_pruefen(
                 .await?
                 .name)
         }
+        Bindungsart::Verpflegungsstelle => {
+            let stelle =
+                crate::verpflegung::repo::load_stelle_zustand(pool, einsatz_id, id).await?;
+            if stelle.storniert {
+                return Err(AppError::Conflict(
+                    "Die Verpflegungsstelle ist storniert".into(),
+                ));
+            }
+            if stelle.status == crate::verpflegung::stelle::VerpflegungsstelleStatus::Aufgeloest {
+                return Err(AppError::UnprocessableEntity(
+                    "Die Verpflegungsstelle ist aufgelöst".into(),
+                ));
+            }
+            Ok(stelle.bezeichnung)
+        }
     }
 }
 
@@ -197,6 +218,8 @@ pub async fn anlegen(
     }
     let einsatz_id = ctx.einsatz.id;
     let (stelle, stelle_name) = match (ansicht.stellenart(), body.stelle_id) {
+        // Wahlweise Stelle (Verpflegung, LLH-1048): ohne sie einsatzweit.
+        (Some(_), None) if ansicht.stelle_wahlweise() => (None, None),
         (Some(_), None) => {
             return Err(AppError::Validation(format!(
                 "{} braucht eine Stelle (stelle_id)",

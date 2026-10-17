@@ -42,6 +42,7 @@ function zeitfenster(
     fehlmenge: { gesamt: fehlmengeGesamt, sonderkost: { ...KEINE, ...fehlmengeSonderkost } },
     stelle_ids: [],
     je_stelle: [],
+    verpflegt_anderswo: [],
     ausgaben: [],
     angelegt_at: '2026-09-24 08:00:00',
   };

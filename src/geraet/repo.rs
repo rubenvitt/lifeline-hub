@@ -118,7 +118,8 @@ impl KopplungZeile {
 /// höchstens eine gesetzte Spalte.
 macro_rules! stelle_id {
     () => {
-        "COALESCE(k.uhs_id, k.betreuungsstelle_id, k.bereitstellungsraum_id, k.abschnitt_id)"
+        "COALESCE(k.uhs_id, k.betreuungsstelle_id, k.bereitstellungsraum_id, k.abschnitt_id, \
+                  k.verpflegungsstelle_id)"
     };
 }
 
@@ -126,7 +127,8 @@ const ANZEIGE_SELECT: &str = concat!(
     "SELECT k.id, k.ansicht, k.uhs_id, ",
     stelle_id!(),
     " AS stelle_id, \
-        COALESCE(u.bezeichnung, bs.bezeichnung, br.bezeichnung, ea.name) AS stelle, \
+        COALESCE(u.bezeichnung, bs.bezeichnung, br.bezeichnung, ea.name, vs.bezeichnung) \
+            AS stelle, \
         k.bezeichnung, g.anzeigename, k.erstellt_at, e.anzeigename AS erstellt_von_name, \
         k.laeuft_ab_at, k.gekoppelt_at, k.letzter_zugriff_at, k.widerrufen_at, \
         w.anzeigename AS widerrufen_von_name, (k.laeuft_ab_at <= datetime('now')) AS abgelaufen \
@@ -137,7 +139,8 @@ const ANZEIGE_SELECT: &str = concat!(
      LEFT JOIN uhs u ON u.id = k.uhs_id \
      LEFT JOIN betreuungsstelle bs ON bs.id = k.betreuungsstelle_id \
      LEFT JOIN bereitstellungsraum br ON br.id = k.bereitstellungsraum_id \
-     LEFT JOIN einsatzabschnitt ea ON ea.id = k.abschnitt_id"
+     LEFT JOIN einsatzabschnitt ea ON ea.id = k.abschnitt_id \
+     LEFT JOIN verpflegungsstelle vs ON vs.id = k.verpflegungsstelle_id"
 );
 
 /// Alle Kopplungen eines Einsatzes, neueste zuerst.
@@ -206,8 +209,8 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
     let kopplung_id: i64 = sqlx::query_scalar(
         "INSERT INTO geraet_kopplung \
            (einsatz_id, benutzer_id, ansicht, uhs_id, betreuungsstelle_id, bereitstellungsraum_id, \
-            abschnitt_id, bezeichnung, erstellt_von, laeuft_ab_at) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            abschnitt_id, verpflegungsstelle_id, bezeichnung, erstellt_von, laeuft_ab_at) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(neu.einsatz_id)
     .bind(benutzer_id)
@@ -216,6 +219,7 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
     .bind(spalte(Bindungsart::Betreuungsstelle))
     .bind(spalte(Bindungsart::Bereitstellungsraum))
     .bind(spalte(Bindungsart::Einsatzabschnitt))
+    .bind(spalte(Bindungsart::Verpflegungsstelle))
     .bind(neu.bezeichnung)
     .bind(neu.von)
     .bind(neu.laeuft_ab_at)

@@ -37,6 +37,11 @@
 //! ist, leitet der Client ab, weil nur er die vorgemerkten Ausgaben kennt; der Server liefert
 //! keine solche Liste.
 //!
+//! **Gerät an einer Stelle** (LLH-1048, [`stellensicht`]): ein an eine Verpflegungsstelle
+//! gebundenes Gerät sieht die Zeitfenster seiner Stelle und die einsatzweiten, im Einzelnen nur
+//! die Ausgaben seiner Stelle und bucht jede Ausgabe an ihr; Ausgaben anderswo erreichen es nur
+//! als Summe je Einheit (`verpflegt_anderswo`). Ohne Stelle bleibt das Gerät einsatzweit.
+//!
 //! **Verpflegungsplan und Tag aus der Vorlage** (LLH-1058, [`vorlage`]): je Organisation eine
 //! Liste von Mahlzeiten mit Uhrzeit ohne Datum ([`crate::uhrzeit::Uhrzeit`]). Daraus legt
 //! `repo::zeitfenster_aus_vorlage_tx` die Zeitfenster eines Einsatztages in einer Transaktion
@@ -60,6 +65,7 @@ use crate::staerke::Staerke;
 pub mod deckung;
 pub mod repo;
 pub mod stelle;
+pub mod stellensicht;
 pub mod vorlage;
 
 use crate::wire_enum::wire_enum;
@@ -262,6 +268,18 @@ pub struct StelleIst {
     pub ausgegeben: Portionen,
 }
 
+/// Was eine Einheit in einem Zeitfenster anderswo bekommen hat (LLH-1048): nur Kennung und
+/// Summe, ohne Stelle, Zeitpunkt, Kostform oder Freitext und ohne Personenbezug. Die Feldmenge ist
+/// in `tests/verpflegung.rs` gepinnt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+pub struct VerpflegtAnderswo {
+    /// Die Empfänger-Einheit; Name und Gliederung stehen in `VerpflegungAnzeige.empfaenger`.
+    pub einheit_id: i64,
+    /// Portionen aus den nicht zurückgenommenen Ausgaben an diese Einheit, die nicht an der
+    /// Stelle des Geräts gebucht sind (an einer anderen Stelle oder ohne Stelle).
+    pub menge: i64,
+}
+
 /// Ein Zeitfenster mit Deckung und allen Ausgaben (auch zurückgenommenen).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ZeitfensterAnzeige {
@@ -286,7 +304,14 @@ pub struct ZeitfensterAnzeige {
     /// Ausgaben, zuletzt „ohne Stelle“. Leer, wenn es weder Zuordnung noch eine Ausgabe an einer
     /// Stelle gibt — dann zeigt das Zeitfenster nur Gesamtwerte wie bisher.
     pub je_stelle: Vec<StelleIst>,
-    /// Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`.
+    /// Nur für ein an eine Verpflegungsstelle gebundenes Gerät (LLH-1048, LLH-1024 F7): je
+    /// Einheit die Ausgaben dieses Zeitfensters, die nicht an seiner Stelle gebucht sind, als
+    /// Summe. Das Gerät sieht diese Ausgaben nicht einzeln (`ausgaben` trägt nur die eigene
+    /// Stelle); ohne die Summe hielte es eine anderswo verpflegte Einheit für „noch nicht
+    /// verpflegt“. Für jede andere Sitzung leer: sie sieht alle Ausgaben.
+    pub verpflegt_anderswo: Vec<VerpflegtAnderswo>,
+    /// Nach Zeitpunkt, zurückgenommene mit `zurueckgenommen_at`. Für ein an eine Stelle
+    /// gebundenes Gerät nur die Ausgaben an dieser Stelle (LLH-1048).
     pub ausgaben: Vec<AusgabeAnzeige>,
     pub angelegt_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]

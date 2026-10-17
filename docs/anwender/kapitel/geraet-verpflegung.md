@@ -2,7 +2,7 @@
 titel: Verpflegung am Gerät
 gruppen: [geraete]
 reihenfolge: 760
-quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs, src/routes/verpflegung.rs]
+quellen: [frontend/src/pages/VerpflegungPage.tsx, frontend/src/geraet/stellenName.ts, src/verpflegung/stellensicht.rs, src/geraet/stelle.rs, frontend/src/verpflegung/ZeitfensterKarte.tsx, frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/verpflegung/ausgabeSammlung.ts, frontend/src/verpflegung/useAusgabeSammlung.ts, frontend/src/verpflegung/useAusgabeNachtragen.ts, frontend/src/verpflegung/VerpflegungDialoge.tsx, frontend/src/verpflegung/StellenListe.tsx, frontend/src/verpflegung/stellenKern.ts, frontend/src/verpflegung/empfaengerKern.ts, frontend/src/verpflegung/EmpfaengerStand.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/verpflegung/deckung.ts, frontend/src/verpflegung/verpflegungText.ts, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs, src/routes/verpflegung.rs]
 ---
 
 ## Überblick
@@ -12,9 +12,11 @@ ausgegeben sind, bucht sie bei Bedarf auf die Einheit, die abholt, zeigt, welche
 nicht verpflegt ist, und meldet eine Fehlmenge an die Einsatzleitung. Die Zeitfenster mit ihrem
 Bedarf plant die Einsatzleitung; das Tablet arbeitet mit ihnen, plant aber selbst nicht.
 
-Die Verpflegungsansicht ist an keine Stelle gebunden und sieht alle Zeitfenster und alle
-Verpflegungsstellen des Einsatzes (siehe [Geräte koppeln](geraete-koppeln.md)); an welcher Stelle
-ausgegeben wird, wählt das Tablet beim Zählen. Die Navigation unten führt zu „Verpflegung“ und
+Die Einsatzleitung koppelt das Tablet einsatzweit oder an eine Verpflegungsstelle (siehe
+[Geräte koppeln](geraete-koppeln.md)). Einsatzweit sieht es alle Zeitfenster und alle
+Verpflegungsstellen des Einsatzes und wählt beim Zählen, an welcher Stelle ausgegeben wird. An
+einer Stelle gekoppelt nennt die Kopfzeile die Stelle, das Tablet sieht nur ihre Zeitfenster und
+die ohne Zuordnung, und jede Ausgabe gehört zu ihr. Die Navigation unten führt zu „Verpflegung“ und
 „Melden“. Die Bedienung des Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 
 ## Abläufe
@@ -43,7 +45,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
    Stelle.
 2. Unter den Zahlen die eigene Stelle wählen oder „ohne Stelle“. Ist dem Zeitfenster genau eine
    Stelle zugeordnet, ist sie schon gewählt. Daneben steht, wie viel an ihr ausgegeben ist, etwa
-   „an der Stelle 80 EP“.
+   „an der Stelle 80 EP“. An einer Stelle gekoppelt gibt es keine Wahl: Dort steht fest
+   „Stelle …“ mit der eigenen Stelle.
 3. Holt eine Einheit ab, unter „Empfänger“ die Einheit wählen oder weiter unten in der Liste
    „Noch nicht verpflegt“ bei ihr „Wählen“ tippen. Die Taste mit ihrer Stärke, etwa „+9“, zählt so
    viele Portionen auf einmal; „−1“ nimmt einzelne zurück, wenn weniger da sind. Für eine
@@ -63,7 +66,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
    eingetroffenen Einheiten ohne Ausgabe in diesem Zeitfenster, mit Funkrufname, Stärke und
    Abschnitt. Darunter stehen gesondert die Einheiten „ohne Eintreffen“.
 2. Unter „Verpflegt“ stehen die Einheiten mit Menge und Uhrzeit ihrer Ausgabe und die Zuführungen
-   an Abschnitte.
+   an Abschnitte. Am an eine Stelle gekoppelten Tablet steht eine Einheit, die an einer anderen
+   Stelle oder ohne Stelle Portionen bekam, dort als „anderswo verpflegt · … EP“.
 3. Auf der Liste der Zeitfenster zeigt die Klappe „Einheiten“ jeder Karte dieselben Listen.
 
 ### Ausgabe nachtragen
@@ -72,7 +76,8 @@ oder „Unterdeckung“ (Fehlmenge, Zeitfenster hat begonnen).
    „Ausgabe nachtragen: …“ nennt Bedarf, bisher Ausgegebenes und die Fehlmenge.
 2. Unter „Menge (EP)“ die ausgegebenen Portionen eintragen, unter „Empfänger“ bei Bedarf die
    Einheit oder die Zuführung wählen (bei leerer Menge trägt die Einheit ihre Stärke ein) und
-   unter „Stelle“ die Stelle. „Zeitpunkt“ leer heißt jetzt. Der Ort (im Einsatz mit Stellen
+   unter „Stelle“ die Stelle; an einer Stelle gekoppelt steht dort fest die eigene, und ein
+   Zuführungsziel gibt es nicht. „Zeitpunkt“ leer heißt jetzt. Der Ort (im Einsatz mit Stellen
    „Zuführungsziel“), Sonderkost und eine Bemerkung stehen unter „Weitere Angaben“.
 3. „Nachtragen“ wählen. Die Ausgabe steht danach in der Karte, „Ausgegeben“ und „Fehlt“ rechnen
    sie mit.
@@ -103,6 +108,18 @@ Zeitfenster anlegen, den Bedarf ändern und Zeitfenster löschen bleiben der Ein
 ebenso Stellen anlegen, bearbeiten, in Betrieb nehmen, auflösen und stornieren und das Zuordnen
 von Stellen zu Zeitfenstern; am Tablet fehlen diese Knöpfe. Eine Ausgabe auf eine Nachforderung zu buchen, lehnt der Server für
 ein Gerät ab. Statt nachzufordern meldet das Tablet die Fehlmenge an die Einsatzleitung.
+
+### An einer Verpflegungsstelle
+
+Ist das Tablet an eine Verpflegungsstelle gekoppelt, gelten „Soll“, „ausgegeben“ und „fehlt“
+weiter für das ganze Zeitfenster, auch für das, was an anderen Stellen ausgegeben wurde. Einzeln
+sieht das Tablet nur die Ausgaben seiner eigenen Stelle, unter „Stellen“ nur sie selbst und auf der
+Karte nur ihre Zeile. Was anderswo an Einheiten ausgegeben wurde, kennt es nur als Summe je Einheit
+(„anderswo verpflegt“), ohne Zeit und Stelle; so steht eine dort verpflegte Einheit nicht unter
+„Noch nicht verpflegt“. Ein Zeitfenster, das nur anderen Stellen zugeordnet ist, sieht das Tablet
+nicht. Benennt die Einsatzleitung die Stelle um, zeigt die Kopfzeile den neuen Namen ohne neue
+Anmeldung. Löst sie die Stelle auf, bleibt das Tablet gekoppelt und liest weiter; neue Ausgaben
+lehnt der Server dann ab, vorher gezählte nimmt er an.
 
 ### Wie gezählt wird
 
@@ -151,4 +168,5 @@ prüfen“.
 ### Absender der Meldungen
 
 Meldungen tragen „Verpflegung“ und die Gerätebezeichnung als Absender, etwa „Verpflegung ·
-Tablet Ausgabe“.
+Tablet Ausgabe“; an einer Stelle gekoppelt die Stelle und die Gerätebezeichnung, etwa
+„Feldküche BR Sportplatz · Tresen“.

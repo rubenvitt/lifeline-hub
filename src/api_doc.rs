@@ -327,6 +327,7 @@ use utoipa::OpenApi;
         crate::verpflegung::Portionen,
         crate::verpflegung::Sonderkost,
         crate::verpflegung::StelleIst,
+        crate::verpflegung::VerpflegtAnderswo,
         crate::verpflegung::VerpflegungAnzeige,
         crate::verpflegung::VerpflegungEmpfaenger,
         crate::verpflegung::VerpflegungTagErgebnis,
