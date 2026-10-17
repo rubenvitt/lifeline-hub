@@ -95,7 +95,7 @@ describe('Lageentwicklung (LFH-873, Zählbild)', () => {
         '- Meldungen: 2\n' +
         '- Anordnungen: 1\n' +
         '- Entscheidungen: 1\n' +
-        '- Lagemeldungen: 1\n' +
+        '- Lagefeststellungen: 1\n' +
         '- Berichtigungen: 1\n',
     );
     expect(text).not.toContain('Systemeinträge');

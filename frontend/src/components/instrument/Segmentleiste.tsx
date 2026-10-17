@@ -1,6 +1,6 @@
 import { Tooltip } from 'antd';
 import { useId, useRef, type CSSProperties, type KeyboardEvent } from 'react';
-import { useRollen } from './rollenwerte';
+import { monoStil, useRollen } from './rollenwerte';
 import { zielEinzug } from './zielEinzug';
 import '../../theme/sprache.css';
 
@@ -222,6 +222,80 @@ export default function Segmentleiste<W extends string | number>({
           </span>
         );
       })}
+    </div>
+  );
+}
+
+interface SegmentUmschalterProps {
+  /** Gedrückt = an. */
+  an: boolean;
+  onWechsel: (an: boolean) => void;
+  /**
+   * Fester zugänglicher Name („Systemeinträge zeigen“). Er ändert sich mit dem Zustand NICHT —
+   * den sagt `aria-pressed`; ein wechselnder Name würde bei jedem Klick neu angesagt.
+   */
+  zugaenglicherName: string;
+  /** Sichtbares Wort („System“). */
+  label: string;
+  /** Sichtbare Zahl in Mono hinter dem Wort („101“ bzw. „101 ausgeblendet“), optional. */
+  zahl?: string;
+  /** Id einer Beschreibung (die Zahl) für `aria-describedby`. */
+  beschreibungId?: string;
+  /** Aufgelöste Farbe des 6-px-Punkts; aus gestrichen (zweites Zeichen, WCAG 1.4.1). */
+  punkt?: string;
+  style?: CSSProperties;
+}
+
+/**
+ * Ein Umschalter in Segment-Optik (LLH-1065, Spec `etb-zeitachse-darstellung`, „Systemeinträge
+ * zeigen“): EIN Segment, das an- und ausgeht, statt antds `Switch` (iOS-Form, eigene Höhe, eigene
+ * Füllung). Gleiche Zelle, gleiche Klassen, gleiche Geometrie wie {@link Segmentleiste} — er steht
+ * neben ihr und liest sich als ihr Teil. Zustand über `aria-pressed`; gedrückt trägt die
+ * Aktiv-Fläche, aus wird der Punkt gestrichen (Fläche UND Zeichen).
+ */
+export function SegmentUmschalter({
+  an,
+  onWechsel,
+  zugaenglicherName,
+  label,
+  zahl,
+  beschreibungId,
+  punkt,
+  style,
+}: SegmentUmschalterProps) {
+  const { token, rollen } = useRollen();
+  return (
+    <div className="lfh-segmente" data-lfh="segment-umschalter" style={style}>
+      <span role="none" className="lfh-segment-zelle" style={segmentZelleStil(token)}>
+        <button
+          type="button"
+          aria-pressed={an}
+          aria-label={zugaenglicherName}
+          aria-describedby={beschreibungId}
+          className={an ? 'lfh-segment lfh-segment--aktiv' : 'lfh-segment'}
+          onClick={() => onWechsel(!an)}
+          style={segmentStil(token)}
+        >
+          {punkt != null && (
+            <span
+              aria-hidden="true"
+              data-lfh="segment-punkt"
+              data-gestrichen={an ? undefined : 'true'}
+              style={{
+                width: 6,
+                height: 6,
+                flex: '0 0 6px',
+                background: an
+                  ? punkt
+                  : `linear-gradient(to top right, transparent 40%, ${rollen.text} 40%, ${rollen.text} 60%, transparent 60%)`,
+                outline: an ? undefined : `1px solid ${punkt}`,
+              }}
+            />
+          )}
+          {label}
+          {zahl != null && <span style={monoStil(11)}>{zahl}</span>}
+        </button>
+      </span>
     </div>
   );
 }

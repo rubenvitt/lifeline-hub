@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { dichten } from '../../theme/tokens';
 import Segmentleiste, {
+  SegmentUmschalter,
   naechsterIndex,
   segmentStil,
   segmentZelleStil,
@@ -219,5 +220,51 @@ describe('Segmentleiste', () => {
       const b = screen.getByRole('radio', { name: 'B' });
       expect(b.parentElement).toHaveAttribute('data-lfh', 'segment-zelle');
     });
+  });
+});
+
+describe('SegmentUmschalter (LLH-1065)', () => {
+  function Umschalter() {
+    const [an, setAn] = useState(true);
+    return (
+      <>
+        <SegmentUmschalter
+          an={an}
+          onWechsel={setAn}
+          zugaenglicherName="Systemeinträge zeigen"
+          label="System"
+          zahl={an ? '101' : '101 ausgeblendet'}
+          beschreibungId="zahl"
+          punkt="rgb(140, 140, 140)"
+        />
+        <span id="zahl">101</span>
+      </>
+    );
+  }
+
+  it('meldet seinen Zustand über aria-pressed, der Name bleibt fest', async () => {
+    renderMitProviders(<Umschalter />);
+    const knopf = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
+    expect(knopf).toHaveAttribute('aria-pressed', 'true');
+    expect(knopf).toHaveAccessibleDescription('101');
+    expect(knopf).toHaveTextContent('System101');
+    expect(knopf).toHaveClass('lfh-segment--aktiv');
+    await userEvent.click(knopf);
+    expect(knopf).toHaveAttribute('aria-pressed', 'false');
+    expect(knopf).toHaveTextContent('System101 ausgeblendet');
+    expect(knopf).not.toHaveClass('lfh-segment--aktiv');
+  });
+
+  it('streicht den Punkt aus, wenn aus — zweites Zeichen neben der Fläche', async () => {
+    renderMitProviders(<Umschalter />);
+    const knopf = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
+    expect(knopf.querySelector('[data-lfh="segment-punkt"]')).not.toHaveAttribute(
+      'data-gestrichen',
+    );
+    await userEvent.click(knopf);
+    expect(knopf.querySelector('[data-lfh="segment-punkt"]')).toHaveAttribute(
+      'data-gestrichen',
+      'true',
+    );
   });
 });

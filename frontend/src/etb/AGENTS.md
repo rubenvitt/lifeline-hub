@@ -43,8 +43,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
     (`.lfh-schnellerfassung__feld--fuellt`); das ETB setzt es immer, ab `md` ≥ 60 % der Zeile.
     Keine pauschale Regel: eine Zelle mit mehreren Feldern (Infotelefon) bleibt ungestreckt.
   - **Unter `md` zuerst die Zeitachse:** Druck im Menü „Weitere“ (`MenueAusloeser`; der
-    Einsatzabschluss steht auf den Einsatzdaten, LFH-960), Typfilter einzeilig rollend, Volltext, Zeitraum
-    und Einheit hinter „Filter (n)“ (ein Filter von außen klappt sie auf). Die Leiste startet
+    Einsatzabschluss steht auf den Einsatzdaten, LFH-960), Typfilter einzeilig rollend im Kopf,
+    Zeitraum, Einheit, Systemeinträge und Volltext hinter „Filter (n)“ (ein Filter von außen
+    klappt sie auf). Die Leiste startet
     eingeklappt (`EtbEntwurfsTabs einklappbar`, `Schnellerfassung eingeklappt`): kein Fokus beim
     Mount, ohne Reiterband, Feld- und Hinweiszeile, solange der Fokus nicht in ihr liegt und genau
     ein leerer Entwurf ohne Dateien steht. Popups der Leiste zählen als „in der Leiste“
@@ -54,6 +55,15 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `etb/repo.rs:filter_bedingung`, Parameter nur über `routes/etb.rs:filter_merkmale`; Parität
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
   Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
+- **Eine Filterleiste** (LLH-1065/LLH-1080, Spec `etb-filterleiste`, Herleitung
+  `openspec/changes/gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
+  `EtbFilterleiste` über der Zeitachse, in zwei Gruppen — Typ-Segmente und Umschaltknopf „System“
+  (`SegmentUmschalter`, `aria-pressed`, fester Name „Systemeinträge zeigen“, Zahl als
+  Beschreibung), dann Zeitraum (`EtbZeitraumWahl`), Einheit, Volltext. Der Seitenkopf trägt ab
+  `md` keinen Filter. Die Leiste führt nur `q` (entprellt); Typ, System, Zeitraum und Einheit
+  sind Sprungwerte der Seite aus der URL. Der Zeitraum schreibt bei jeder Wahl ABSOLUTE,
+  minutengenaue Grenzen (`anzeige/zeitfenster.ts`); „Seit letzter Lagebesprechung“ nur mit
+  Freigabe `lagebesprechung` und abgehaltener Besprechung.
 - **Systemeinträge ausblenden** (LFH-958, Spec `etb-zeitachse-darstellung`): `ohne_system=true`
   ist ein Filtermerkmal wie die übrigen, nur über `filter_merkmale`/`filter_bedingung`; Liste,
   `zaehler` und `anzahl` erben ihn zusammen. Zustand in der URL (`etbPfad`/`parseEtbFilter`),

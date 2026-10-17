@@ -25,12 +25,14 @@ export { StatusZelle, StatusChip, NUR_VORLESER } from './Status';
 export { tonVonRolle, type StatusTon } from './statusFlaeche';
 export {
   default as Segmentleiste,
+  SegmentUmschalter,
   segmentStil,
   segmentZelleStil,
   naechsterIndex,
   type SegmentOption,
 } from './Segmentleiste';
 export { default as Sammelbanner, sammelbannerKurz } from './Sammelbanner';
+export { default as Filterhinweis } from './Filterhinweis';
 export { default as Schnellerfassungszeile } from './Schnellerfassungszeile';
 export { rollenwerte, useRollen, monoStil } from './rollenwerte';
 export { default as Datenraster, Datenfeld } from './Datenraster';

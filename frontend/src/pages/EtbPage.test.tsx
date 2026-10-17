@@ -728,7 +728,12 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
 
     // Nur der Knopf, kein Satz daneben (LFH-1078).
     expect(screen.queryByText(/Suchbegriff/)).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    // Der Knopf des Leerzustands; das Filterband trägt einen zweiten (LLH-1071).
+    await user.click(
+      within(screen.getByRole('region', { name: 'Einsatztagebuch' })).getByRole('button', {
+        name: 'Filter zurücksetzen',
+      }),
+    );
 
     // Die unterscheidende Zusicherung: ein Reset, der nur den Seitenzustand räumt, ließe die
     // sichtbare Eingabe stehen.
@@ -883,7 +888,11 @@ describe('EtbPage – Datenzustände (LFH-331 · B3)', () => {
         ],
         '/einsaetze/7/etb?q=zzz',
       );
-      await userEvent.click(await screen.findByRole('button', { name: 'Filter zurücksetzen' }));
+      await userEvent.click(
+        within(await screen.findByRole('region', { name: 'Einsatztagebuch' })).getByRole('button', {
+          name: 'Filter zurücksetzen',
+        }),
+      );
       await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
       // Die Leiste wird dabei neu aufgesetzt — ein Remount in derselben Runde schriebe den alten
       // Begriff zurück ins Feld.
@@ -1164,10 +1173,10 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
 
   it('zählt unter einem Filter die Treffer und nennt die Bilanz so', async () => {
     setzeViewportBreite(1366);
-    let zaehlQuery = '';
+    const zaehlQueries: string[] = [];
     setup('/einsaetze/7/etb?q=Deich', [
       http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
-        zaehlQuery = new URL(request.url).search;
+        zaehlQueries.push(new URL(request.url).search);
         return HttpResponse.json({
           gesamt: 7,
           je_typ: {
@@ -1184,8 +1193,9 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     await screen.findByText('Erste Meldung');
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     await waitFor(() => expect(kopf).toHaveTextContent('7 Treffer'));
-    // Dieselben Filtermerkmale wie die Liste gehen an die Zählung.
-    expect(new URLSearchParams(zaehlQuery).get('q')).toBe('Deich');
+    // Dieselben Filtermerkmale wie die Liste gehen an die Zählung (daneben die ungefilterte
+    // Gesamtzahl des Filterbands, LLH-1071).
+    expect(zaehlQueries.some((q) => new URLSearchParams(q).get('q') === 'Deich')).toBe(true);
     const leiste = screen.getByRole('complementary', { name: 'Bilanz des Tagebuchs' });
     expect(within(leiste).getByRole('heading', { name: 'Bilanz im Filter' })).toBeInTheDocument();
   });
@@ -1901,6 +1911,21 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
  * Liste und Zählung über denselben Parameter.
  */
 describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
+  it('steht ab md mit dem Typ in der Filterleiste, nicht im Seitenkopf (LLH-1065)', async () => {
+    setzeViewportBreite(1366);
+    setup('/einsaetze/7/etb', server958());
+    await screen.findByText('Person erfasst');
+    const leiste = document.querySelector('[data-lfh="etb-filterleiste"]')!;
+    const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
+    const typ = screen.getByRole('radiogroup', { name: 'Einträge nach Typ filtern' });
+    expect(leiste.contains(typ)).toBe(true);
+    expect(kopf.contains(typ)).toBe(false);
+    expect(leiste.contains(screen.getByRole('button', { name: 'Systemeinträge zeigen' }))).toBe(
+      true,
+    );
+    expect(screen.getByRole('button', { name: /^Zeitraum/ })).toBeInTheDocument();
+  });
+
   const systemEintrag = {
     ...eintrag,
     id: 2,
@@ -1945,10 +1970,11 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     setzeViewportBreite(1366);
     setup('/einsaetze/7/etb', server958());
     await screen.findByText('Person erfasst');
-    const schalter = screen.getByRole('switch', { name: /Systemeinträge zeigen/ });
-    expect(schalter).toBeChecked();
+    // Ein Umschaltknopf in Segment-Optik, kein Switch (LLH-1065).
+    const schalter = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
+    expect(schalter).toHaveAttribute('aria-pressed', 'true');
     // Angeschaltet nennt er die Zahl der Systemeinträge aus der Serverzählung.
-    await waitFor(() => expect(schalter.closest('label')).toHaveTextContent('98'));
+    await waitFor(() => expect(schalter).toHaveTextContent('System98'));
 
     await userEvent.click(schalter);
     await waitFor(() =>
@@ -1961,9 +1987,9 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     await waitFor(() => expect(kopf).toHaveTextContent('1 Treffer'));
     // Ausgeschaltet nennt er, wie viele er ausblendet (Zählung ohne den Ausschluss).
-    const neu = screen.getByRole('switch', { name: /Systemeinträge zeigen/ });
-    expect(neu).not.toBeChecked();
-    await waitFor(() => expect(neu.closest('label')).toHaveTextContent('98 ausgeblendet'));
+    const neu = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
+    expect(neu).toHaveAttribute('aria-pressed', 'false');
+    await waitFor(() => expect(neu).toHaveTextContent('98 ausgeblendet'));
 
     await userEvent.click(neu);
     await waitFor(() =>
@@ -1976,7 +2002,10 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     setzeViewportBreite(1366);
     setup('/einsaetze/7/etb?ohne_system=true', server958());
     await screen.findByText('Erste Meldung');
-    expect(screen.getByRole('switch', { name: /Systemeinträge zeigen/ })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
     expect(screen.queryByText('Person erfasst')).toBeNull();
     expect(abrufe.every((a) => a.includes('ohne_system=true'))).toBe(true);
   });
@@ -1993,7 +2022,10 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
       ),
     );
     await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
-    expect(screen.getByRole('switch', { name: /Systemeinträge zeigen/ })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Systemeinträge zeigen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   it('unter einem Typfilter blendet ein vergeblicher Sprung nichts ein', async () => {
@@ -2012,7 +2044,7 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     setzeViewportBreite(1366);
     setup('/einsaetze/7/etb', server958());
     await screen.findByText('Person erfasst');
-    const schalter = screen.getByRole('switch', { name: 'Systemeinträge zeigen' });
+    const schalter = screen.getByRole('button', { name: 'Systemeinträge zeigen' });
     await waitFor(() => expect(schalter).toHaveAccessibleDescription('98'));
   });
 
@@ -2031,5 +2063,117 @@ describe('EtbPage: Systemeinträge ausblenden (LFH-958)', () => {
     expect(
       screen.queryByText('Systemeinträge wieder eingeblendet, um den Eintrag zu zeigen'),
     ).toBeNull();
+  });
+});
+
+describe('EtbPage: Filterband (LLH-1071)', () => {
+  /** Zählung je Filter: ungefiltert 134, mit Typ 7. */
+  function zaehlerJeFilter() {
+    return http.get('/api/einsaetze/7/etb/zaehler', ({ request }) => {
+      const gefiltert = new URL(request.url).searchParams.size > 0;
+      const gesamt = gefiltert ? 7 : 134;
+      return HttpResponse.json({
+        gesamt,
+        je_typ: {
+          meldung: gesamt,
+          anordnung: 0,
+          lage: 0,
+          entscheidung: 0,
+          system: 0,
+          berichtigung: 0,
+        },
+      });
+    });
+  }
+
+  it.each([
+    ['?typ=meldung', 'Meldung'],
+    ['?q=Deich', '„Deich“'],
+    ['?ohne_system=true', 'ohne System'],
+    ['?von=2026-05-23%2008%3A00%3A00', 'seit'],
+    ['?einheit_id=3', 'eine Einheit'],
+  ])('zeigt bei %s „Gefiltert · n von m“ über der Erfassung', async (suche, merkmal) => {
+    setup(`/einsaetze/7/etb${suche}`, [zaehlerJeFilter()]);
+    const band = await screen.findByText('Gefiltert');
+    const flaeche = band.closest('[data-lfh="filterhinweis"]')!;
+    await waitFor(() => expect(flaeche).toHaveTextContent('7 von 134 Einträgen sichtbar'));
+    expect(flaeche).toHaveTextContent(merkmal);
+    // Im Fuß, über der Erfassung — dort ist der Blick in der Funkprotokoll-Ordnung.
+    const fuss = document.querySelector('.etb-erfassung-sticky')!;
+    expect(fuss.contains(flaeche)).toBe(true);
+  });
+
+  it('steht ohne Filter nicht da, und „Filter zurücksetzen“ räumt alles', async () => {
+    setup('/einsaetze/7/etb?typ=meldung&q=Deich', [zaehlerJeFilter()]);
+    const knopf = await screen.findByRole('button', { name: 'Filter zurücksetzen' });
+    await userEvent.click(knopf);
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent(''));
+    expect(document.querySelector('[data-lfh="filterhinweis"]')).toBeNull();
+    // Die Leiste ist neu aufgesetzt: das Suchfeld ist leer.
+    await waitFor(() => expect(screen.getByPlaceholderText('Volltextsuche')).toHaveValue(''));
+  });
+
+  it('nennt ohne Zählung keine Zahl', async () => {
+    setup('/einsaetze/7/etb?typ=meldung', [
+      http.get('/api/einsaetze/7/etb/zaehler', () => HttpResponse.json({}, { status: 500 })),
+    ]);
+    const band = (await screen.findByText('Gefiltert')).closest('[data-lfh="filterhinweis"]')!;
+    expect(band).not.toHaveTextContent(/\d+ von \d+/);
+  });
+
+  it('meldet einen eigenen Eintrag außerhalb des Filters und springt auf „anzeigen“ ohne Filter', async () => {
+    server.use(
+      http.post('/api/einsaetze/7/etb', () =>
+        HttpResponse.json(
+          { ...eintrag, id: 2, lfd_nr: 135, typ: 'anordnung', inhalt: 'Räumen' },
+          { status: 201 },
+        ),
+      ),
+    );
+    setup('/einsaetze/7/etb?typ=meldung', [zaehlerJeFilter()]);
+    const feld = await screen.findByPlaceholderText(/Inhalt/);
+    await userEvent.type(feld, 'Räumen{Enter}');
+    const band = () => document.querySelector('[data-lfh="filterhinweis"]') as HTMLElement;
+    await waitFor(() =>
+      expect(band()).toHaveTextContent(/Nr\. 135 erfasst – außerhalb des Filters · anzeigen/),
+    );
+    await userEvent.click(within(band()).getByRole('button', { name: 'anzeigen' }));
+    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('?eintrag=2'));
+  });
+
+  it('nennt Nachträge vor der Lagebesprechung unter „seit LB“', async () => {
+    setup('/einsaetze/7/etb?von=2026-05-23%2011%3A30%3A00', [
+      zaehlerJeFilter(),
+      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/7/lagebesprechung', () =>
+        HttpResponse.json({
+          anzahl_lagebesprechungen: 1,
+          letzte_lagebesprechung: {
+            abgehalten_at: '2026-05-23 11:30:00',
+            einsatz_id: 7,
+            entschluss: '',
+            erfasst_at: '2026-05-23 11:35:00',
+            erfasst_von_id: 1,
+            etb_eintrag_id: 50,
+            id: 1,
+            lfd_nr: 1,
+          },
+        }),
+      ),
+      http.get('/api/einsaetze/7/etb', ({ request }) => {
+        const p = new URL(request.url).searchParams;
+        if (p.get('bis') === '2026-05-23 11:30:00') {
+          return HttpResponse.json([
+            { ...eintrag, id: 52, lfd_nr: 52, ereigniszeit: '2026-05-23 11:20:00' },
+            { ...eintrag, id: 50, lfd_nr: 50, ereigniszeit: '2026-05-23 11:30:00' },
+            { ...eintrag, id: 40, lfd_nr: 40, ereigniszeit: '2026-05-23 11:00:00' },
+          ]);
+        }
+        return HttpResponse.json([eintrag]);
+      }),
+    ]);
+    const band = (await screen.findByText('Gefiltert')).closest('[data-lfh="filterhinweis"]')!;
+    await waitFor(() => expect(band).toHaveTextContent(/\+1 Nachtrag vor \d{4} erfasst/));
+    expect(band).toHaveTextContent('seit LB');
   });
 });

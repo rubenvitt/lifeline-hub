@@ -11,13 +11,13 @@ für vollständig hält.
 ### Requirement: Eine Filterleiste über der Zeitachse
 Ab Breite `md` SHALL die ETB-Seite alle Filter in einer Leiste direkt über der Zeitachse zeigen, in
 dieser Ordnung: Typ-Segmente, Umschaltknopf Systemeinträge, Zeitraum, Einheit, Volltext. Der
-Seitenkopf MUST ab `md` keinen Filter tragen. In der kompakten Dichte bei 1440×900 MUST die Leiste
-einzeilig bleiben; dichtere Stufen dürfen umbrechen. Unter `md` bleibt der Typ im Kopf, der Rest
-hinter „Filter (n)“.
+Seitenkopf MUST ab `md` keinen Filter tragen. Reicht die Breite nicht, MUST die Leiste nur zwischen
+zwei Gruppen umbrechen — Typ und System, dann Zeitraum, Einheit und Volltext — und höchstens zwei
+Zeilen belegen. Unter `md` bleibt der Typ im Kopf, der Rest hinter „Filter (n)“.
 
 #### Scenario: Fükw
 - **WHEN** die ETB-Seite in kompakter Dichte bei 1440×900 steht
-- **THEN** stehen Typ, System, Zeitraum, Einheit und Volltext in einer Zeile über der Zeitachse, und der Kopf trägt nur Titel, Zahl und „Drucken / als PDF“
+- **THEN** stehen Typ, System, Zeitraum, Einheit und Volltext in höchstens zwei Zeilen über der Zeitachse, Typ und System in derselben Zeile, und der Kopf trägt nur Titel, Zahl und „Drucken / als PDF“
 
 #### Scenario: Handschirm
 - **WHEN** die Seite bei 390×844 steht

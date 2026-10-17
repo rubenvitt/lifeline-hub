@@ -19,29 +19,29 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 
 ## 2. Eine Filterleiste — LLH-1065 (wbej3nl0)
 
-- [ ] 2.1 `Segmentleiste` mit Variante `umschalten` (ein Knopf, `aria-pressed`, durchgestrichener Punkt im Aus-Zustand); Vitest im Baustein
-- [ ] 2.2 `EtbFilterleiste` mit Slots `vorn`/`mitte` und neuer Ordnung (Typ · System | Zeitraum · Einheit · Volltext), Dateikopf nachgezogen; Vitest `EtbFilterleiste.test.tsx`
-- [ ] 2.3 `EtbPage`: Segmentleiste ab `md` aus dem Kopf in die Leiste, Switch durch den Umschaltknopf ersetzt (`aria-describedby` der Zahl bleibt), „Filter (n)“ unter `md` unverändert; Vitest `EtbPage.test.tsx` (role `switch` → `button`, `ohne_system` in der URL, Zusammenspiel mit `typ=system`)
-- [ ] 2.4 Mehrzahl `lage` → „Lagefeststellungen“ in `etbTypMehrzahl`; Vitest `statusFarben.test.ts`, `EtbBilanz.test.tsx`, `lageentwicklungUebernahme.test.ts`
-- [ ] 2.5 Spec-Wortlaut „Umschaltknopf“ und Regel „Systemeinträge ausblenden“/„Unter md zuerst die Zeitachse“ in `frontend/src/etb/AGENTS.md`
-- [ ] 2.6 e2e: einzeilige Leiste bei 1440×900 kompakt (Höhe = eine Steuerhöhe + Polsterung) und Kopf ohne Segmentleiste ab `md`, ergänzt in `etb-zeilenhoehe` oder eigener Spec
+- [x] 2.1 `Segmentleiste` mit Variante `umschalten` (ein Knopf, `aria-pressed`, durchgestrichener Punkt im Aus-Zustand); Vitest im Baustein
+- [x] 2.2 `EtbFilterleiste` mit Slots `vorn`/`mitte` und neuer Ordnung (Typ · System | Zeitraum · Einheit · Volltext), Dateikopf nachgezogen; Vitest `EtbFilterleiste.test.tsx`
+- [x] 2.3 `EtbPage`: Segmentleiste ab `md` aus dem Kopf in die Leiste, Switch durch den Umschaltknopf ersetzt (`aria-describedby` der Zahl bleibt), „Filter (n)“ unter `md` unverändert; Vitest `EtbPage.test.tsx` (role `switch` → `button`, `ohne_system` in der URL, Zusammenspiel mit `typ=system`)
+- [x] 2.4 Mehrzahl `lage` → „Lagefeststellungen“ in `etbTypMehrzahl`; Vitest `statusFarben.test.ts`, `EtbBilanz.test.tsx`, `lageentwicklungUebernahme.test.ts`
+- [x] 2.5 Spec-Wortlaut „Umschaltknopf“ und Regel „Systemeinträge ausblenden“/„Unter md zuerst die Zeitachse“ in `frontend/src/etb/AGENTS.md`
+- [ ] 2.6 e2e: Leiste bei 1440×900 kompakt in höchstens zwei Zeilen, Typ und System in einer, Kopf ohne Segmentleiste ab `md`, ergänzt in `etb-zeilenhoehe` oder eigener Spec
 
 ## 3. Zeitraum-Schnellwahl — LLH-1080 (wyylm0tn)
 
-- [ ] 3.1 `anzeige/zeitfenster.ts` (`zeitfensterWahl`, `zeitraumBeschriftung`) mit Vitest: Letzte Stunde/4 Stunden abgerundet, Heute in einer Anzeigezone ≠ Prozesszone (`test/prozessZone.ts`), seit LB nur mit Termin, Beschriftung ohne Sekunden und Wiedererkennung nach Neuladen
-- [ ] 3.2 `etb/EtbZeitraumWahl.tsx` (Knopf mit Aufklapper, am Handy und im Handschuh als Blatt, Ziele in Steuerhöhe, „Eigener Zeitraum“ über `ZeitraumEingabe`); Vitest: eine Wahl setzt `von`/`bis` einmal, „bis“ leer erlaubt, Round-Trip durch `URLSearchParams`
+- [x] 3.1 `anzeige/zeitfenster.ts` (`zeitfensterWahl`, `zeitraumBeschriftung`) mit Vitest: Letzte Stunde/4 Stunden abgerundet, Heute in einer Anzeigezone ≠ Prozesszone (`test/prozessZone.ts`), seit LB nur mit Termin, Beschriftung ohne Sekunden und Wiedererkennung nach Neuladen
+- [x] 3.2 `etb/EtbZeitraumWahl.tsx` (Knopf mit Aufklapper, am Handy und im Handschuh als Blatt, Ziele in Steuerhöhe, „Eigener Zeitraum“ über `ZeitraumEingabe`); Vitest: eine Wahl setzt `von`/`bis` einmal, „bis“ leer erlaubt, Round-Trip durch `URLSearchParams`
 - [ ] 3.3 `EtbFilterleiste`/`EtbPage`: Zeitraum-Bedienziel statt zweier Felder, LB-Stand nur mit Freigabe `lagebesprechung`; Vitest `EtbPage.test.tsx`; e2e `dialoge-handy` auf den neuen Weg umgestellt
-- [ ] 3.4 Doku `einsatztagebuch.md`, Abschnitt „Einträge suchen und filtern“: Leiste, Umschaltknopf und Schnellwahl beschrieben
+- [x] 3.4 Doku `einsatztagebuch.md`, Abschnitt „Einträge suchen und filtern“: Leiste, Umschaltknopf und Schnellwahl beschrieben
 
 ## 4. Filterband — LLH-1071 (nyc0b0fm)
 
-- [ ] 4.1 Baustein `components/instrument/Filterhinweis.tsx` (Export über `index.ts`) mit Vitest: Text mit und ohne Zahlen, Merkmalliste, Kürzung mit Titel, Zusatzzeilen, `onZuruecksetzen`, nichts ohne Merkmal
-- [ ] 4.2 `etb/filterMerkmale.ts` (Kurzform je Merkmal, Zeitraum über `zeitraumBeschriftung`) mit Vitest
-- [ ] 4.3 `EtbPage`: Band im `fuss` über der Erfassung bei jedem Merkmal, `m` aus der Zählung ohne Filter, „Filter zurücksetzen“ räumt Leiste und URL; Vitest je Merkmal und ohne Zählung keine Zahl
-- [ ] 4.4 `useEtbErfassung.erfassen` liefert die Antwort; Zusatz „Nr. n erfasst – außerhalb des Filters · anzeigen“ mit Sprung ohne Filter; Vitest in `EtbPage.test.tsx` und `useEtbErfassung`-Test
-- [ ] 4.5 Hinweis „+n Nachträge vor <Uhrzeit> erfasst · anzeigen“ bei Zeitraum „seit LB“; Vitest mit Mock-Antwort
+- [x] 4.1 Baustein `components/instrument/Filterhinweis.tsx` (Export über `index.ts`) mit Vitest: Text mit und ohne Zahlen, Merkmalliste, Kürzung mit Titel, Zusatzzeilen, `onZuruecksetzen`, nichts ohne Merkmal
+- [x] 4.2 `etb/filterMerkmale.ts` (Kurzform je Merkmal, Zeitraum über `zeitraumBeschriftung`) mit Vitest
+- [x] 4.3 `EtbPage`: Band im `fuss` über der Erfassung bei jedem Merkmal, `m` aus der Zählung ohne Filter, „Filter zurücksetzen“ räumt Leiste und URL; Vitest je Merkmal und ohne Zählung keine Zahl
+- [x] 4.4 `useEtbErfassung.erfassen` liefert die Antwort; Zusatz „Nr. n erfasst – außerhalb des Filters · anzeigen“ mit Sprung ohne Filter; Vitest in `EtbPage.test.tsx` und `useEtbErfassung`-Test
+- [x] 4.5 Hinweis „+n Nachträge vor <Uhrzeit> erfasst · anzeigen“ bei Zeitraum „seit LB“; Vitest mit Mock-Antwort
 - [ ] 4.6 Bausteinliste in `frontend/AGENTS.md` um `Filterhinweis` ergänzt; e2e Kontrast Tag/Nacht des Bands (Muster `hinweis-kontrast.spec.ts`) und `leisten-flaeche` mit Filter auf 390 px
-- [ ] 4.7 Doku `einsatztagebuch.md`: ein Satz zum Band und zum Eintrag außerhalb des Filters
+- [x] 4.7 Doku `einsatztagebuch.md`: ein Satz zum Band und zum Eintrag außerhalb des Filters
 
 ## 5. Berichtigt-Kennzeichnung — LLH-1099 (rh1l9wpd)
 

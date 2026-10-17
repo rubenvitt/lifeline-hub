@@ -89,8 +89,14 @@ Umschaltknopf ist eine Variante der `Segmentleiste` (`umschalten`, ein Element, 
 ausgeschaltet durchgestrichener Punkt als zweites Zeichen). Ab `md` fällt die Segmentleiste aus dem
 Kopf. Unter `md` bleibt sie im Kopf, „Filter (n)“ wie heute. Die Mehrzahl von `lage` heißt
 „Lagefeststellungen“ (nur `etbTypMehrzahl`).
+Eine Zeile bei 1440×900 trägt die Breite nicht: Rail, offenes Modulpanel (ab `xl`) und
+Bilanzspalte lassen rund 800 px, Typ-Segmente und System allein brauchen gut 600. Die Leiste bricht
+deshalb in zwei Gruppen um, nie innerhalb der ersten (nachgemessen in der e2e, Ergebnis im PR).
+Der Umschaltknopf ist ein eigener Export `SegmentUmschalter` neben der `Segmentleiste`, mit
+denselben Klassen und derselben Geometrie.
 *Verworfen:* eigener Instrument-Baustein „Umschaltknopf“ (die Segmentleiste trägt schon Punkt,
-Einzug und Dichte). Zurücksetzen in der Leiste (das trägt nur das Band, Entscheidung).
+Einzug und Dichte). Zurücksetzen in der Leiste (das trägt nur das Band, Entscheidung). Eine Zeile
+erzwingen (Felder würden unbedienbar schmal oder liefen über).
 
 ### D5 Zeitraum: reine Schnellwahl-Funktion, ein Bedienziel mit Aufklapper
 `anzeige/zeitfenster.ts` liefert die Schnellwahl als reine Funktion
