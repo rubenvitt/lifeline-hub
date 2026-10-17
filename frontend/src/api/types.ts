@@ -719,6 +719,9 @@ export type AbloesungEinstufung = S['Einstufung'];
 /** Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells, Vorwarnung, folgende Schichten. */
 export type AbloesungEinsatzVorgabe = S['AbloesungEinsatzVorgabeAnzeige'];
 export type RhythmusQuelle = S['RhythmusQuelle'];
+/** Status einer Schicht (LLH-1128: `beendet` endet ohne Ablösung, mit `beendet_grund`). */
+export type AbloesungStatus = S['AbloesungStatus'];
+export type BeendetGrund = S['BeendetGrund'];
 
 // ============================== LLH-1122 Schichtmodelle ==============================
 export type Schichtmodell = S['Schichtmodell'];
