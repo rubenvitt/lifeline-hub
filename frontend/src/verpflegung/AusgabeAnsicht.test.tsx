@@ -765,6 +765,23 @@ describe('AusgabeAnsicht — Gerät an einer Verpflegungsstelle (LLH-1048 Teil I
     );
   });
 
+  it('auch im einsatzweiten Zeitfenster (ohne Zuordnung) steht und bucht die eigene Stelle', async () => {
+    liefert([mittag()], [kueche()]);
+    zeigeAmGeraet();
+    await geladen();
+    await waitFor(() => expect(platz()).toHaveTextContent('Feldküche BR Sportplatz'));
+    expect(platz().querySelector('[data-lfh="ausgabe-stelle-ist"]')).toHaveTextContent(
+      'an der Stelle 0 EP',
+    );
+    await userEvent.click(taste('+1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        verpflegungsstelle_id: FELDKUECHE,
+      }),
+    );
+  });
+
   it('`?stelle=` einer anderen Stelle ändert die eigene nicht', async () => {
     zeigeAmGeraet(`?stelle=${TURNHALLE}`);
     await geladen();
