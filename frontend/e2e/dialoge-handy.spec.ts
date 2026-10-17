@@ -148,8 +148,8 @@ async function waehleImPanel(
 async function pruefeBlatt(page: Page, wo: string, g: Groesse = HANDY) {
   const p = panel(page);
   await expect(p).toBeVisible();
-  // Erst nach der Einblendung messen: währenddessen ist das Panel skaliert.
-  await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
+  // Erst nach der Einblendung messen: währenddessen ist das Popover skaliert.
+  await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
   const k = await kasten(p);
   expect(liegtIn(k, schirm(g)), `${wo}: Panel ${JSON.stringify(k)} liegt nicht im Schirm`).toBe(
     true,
@@ -455,7 +455,7 @@ test('Tablet hoch und Desktop in kompakt: Fußreihe bleibt einzeilig, Panel blei
     const von = page.getByPlaceholder('von', { exact: true });
     await kalenderKnopf(von).click();
     await expect(panel(page)).toBeVisible();
-    await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
+    await expect(page.locator('.ant-zoom-big-appear, .ant-zoom-big-enter')).toHaveCount(0);
     await expect(panel(page)).not.toHaveClass(/lfh-zeit-blatt/);
     const feld = await kasten(von);
     const p = await kasten(panel(page));

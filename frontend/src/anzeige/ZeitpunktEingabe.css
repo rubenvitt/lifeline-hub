@@ -23,6 +23,7 @@
 }
 
 .lfh-zeit-blatt .ant-popover-container {
+  box-sizing: border-box;
   max-height: 85dvh;
   overflow-y: auto;
   width: 100%;
