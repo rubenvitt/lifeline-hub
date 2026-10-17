@@ -25,6 +25,13 @@ describe('geraetDarf', () => {
   it('eine Person darf alles', () => {
     expect(geraetDarf(null, 'br-eintreffen')).toBe(true);
     expect(geraetDarf(null, 'br-verwalten')).toBe(true);
+    expect(geraetDarf(null, 'br-abrufen')).toBe(true);
+  });
+
+  describe('br-abrufen (LLH-1085): abrufen ist eine Entscheidung der Führung', () => {
+    it.each(ANSICHTEN)('Ansicht %s ruft nicht ab', (ansicht) => {
+      expect(geraetDarf(geraet(ansicht), 'br-abrufen')).toBe(false);
+    });
   });
 
   describe('br-eintreffen (LLH-1075, design.md D14)', () => {

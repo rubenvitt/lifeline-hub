@@ -112,6 +112,12 @@ describe('Art eines Verlaufseintrags als Wort', () => {
     expect(verlaufText(eintrag({ art: 'abruf_aufgehoben' }))).toBe('Abruf zurückgenommen');
   });
 
+  it('der Abruf einer mitgenommenen Untereinheit nennt ihre Einheit (Spec „Verlauf“, D10)', () => {
+    expect(verlaufText(eintrag({ art: 'abruf', ziel: 'EA Deich', mit_einheit: '1. Zug' }))).toBe(
+      'Abruf mit 1. Zug nach EA Deich',
+    );
+  });
+
   it('Wechsel ohne Bezeichnung des anderen Raums bleibt ein Wechsel', () => {
     expect(verlaufText(eintrag({ art: 'wechsel_hinaus' }))).toBe('Wechsel hinaus');
     expect(verlaufText(eintrag({ art: 'wechsel_herein', herkunft: null }))).toBe('Wechsel herein');

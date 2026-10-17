@@ -612,7 +612,10 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     await user.click(await screen.findByRole('button', { name: 'LF Nord zuweisen' }));
     await waitFor(() => expect(belegt).toHaveLength(1));
     expect(belegt[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 30, art: 'eintritt' });
-    await user.click(screen.getByRole('button', { name: 'entfernen' }));
+    // „Austragen“ steht im Aktionsmenü der Zeile; „Abrufen“ gibt es am Gerät nicht (LLH-1085).
+    expect(screen.queryByRole('button', { name: 'RTW 1 abrufen' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Weitere Aktionen zu RTW 1' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Austragen' }));
     await waitFor(() => expect(belegt).toHaveLength(2));
     expect(belegt[1]).toEqual({ objekt_typ: 'einheit', objekt_id: 31, art: 'austritt' });
   });
