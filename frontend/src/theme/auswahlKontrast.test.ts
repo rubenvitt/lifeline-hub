@@ -113,12 +113,11 @@ describe.each([
     expect(kontrast(schrift, farben.auswahlFlaeche)).toBeGreaterThanOrEqual(textboden);
   });
 
-  // Die Zeitraumwahl (LFH-1068): Beginn und die Zelle unter dem Zeiger sind Bereichsenden, Schrift
-  // `colorTextLightSolid` auf `colorPrimary`; antds globales Weiß lag nachts bei 3,22. Die Tage
-  // dazwischen stehen auf `cellActiveWithRangeBg` (= Auswahlfläche), deren Textstufen oben.
+  // Der gewählte Tag im Kalender der Zeiteingabe (LFH-1068, LLH-1070): Schrift
+  // `colorTextLightSolid` auf `colorPrimary`; antds globales Weiß lag nachts bei 3,22.
   // Gemessen in `e2e/zeitraum-kontrast.spec.ts`.
-  it('Schrift eines Bereichsendes in der Datumswahl auf der Bedienfarbe', () => {
-    const schrift = token(antdKomponenten(farben, 'kompakt').DatePicker, 'colorTextLightSolid');
+  it('Schrift des gewählten Tags im Kalender auf der Bedienfarbe', () => {
+    const schrift = token(antdKomponenten(farben, 'kompakt').Calendar, 'colorTextLightSolid');
     expect(kontrast(schrift, aufgeloest().colorPrimary)).toBeGreaterThanOrEqual(textboden);
   });
 });

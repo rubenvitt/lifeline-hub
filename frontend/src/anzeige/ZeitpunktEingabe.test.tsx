@@ -371,6 +371,21 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
     expect(wire(onChange.mock.lastCall![0])).toBe('2026-10-17 04:30:00');
   });
 
+  it('das Uhrzeitfeld nimmt den Fokus nur ohne Fingerbedienung (sonst deckte die Tastatur das Blatt)', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
+    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    const k = await kalender();
+    await waitFor(() => expect(within(k).getByRole('textbox', { name: 'Uhrzeit' })).toHaveFocus());
+    unmount();
+
+    setzeZeigerGrob(true);
+    render(mitZone(BERLIN, <ZeitpunktEingabe aria-label="Zeit" />));
+    await user.click(screen.getByRole('button', { name: 'Kalender und Uhrzeit' }));
+    const uhr = within(await kalender()).getByRole('textbox', { name: 'Uhrzeit' });
+    expect(uhr).not.toHaveFocus();
+  });
+
   it('Escape schließt nur den Kalender', async () => {
     const onOpenChange = vi.fn();
     const aussen = vi.fn();
@@ -388,6 +403,8 @@ describe('ZeitpunktEingabe — Kalender als Nebenweg', () => {
     await user.keyboard('{Escape}');
     expect(onOpenChange).toHaveBeenLastCalledWith(false);
     expect(aussen).not.toHaveBeenCalled();
+    // Der Fokus geht ins Feld zurück, nicht auf `<body>`.
+    await waitFor(() => expect(zeitFeld('Zeit')).toHaveFocus());
   });
 
   it('„jetzt“ im Kalender setzt den Zeitpunkt nach Serveruhr', async () => {
