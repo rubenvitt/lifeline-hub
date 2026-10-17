@@ -17,6 +17,8 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep abloesung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   schichten.png        frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx
+ *   ohne-schicht.png     frontend/src/pages/AbloesungPage.tsx (Ansicht „Ohne Schicht“),
+ *                        frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts
  *   schicht-beginnen.png frontend/src/abloesung/AbloesungDialoge.tsx (`SchichtBeginnenDialog`)
  *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog)
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
@@ -28,6 +30,11 @@ import {
  * Schichten: eine überfällige, eine in der Vorwarnzeit und eine planmäßige mit eigenem Rhythmus.
  * Die Vorgabe des Einsatzes bringen die Demo-Daten mit (LLH-1122: „12-h-Schicht Hochwasser“,
  * `src/demo/szenario.rs`).
+ *
+ * „Ohne Schicht“ (LLH-1128): die Demo-Daten tragen keine Kräfte-Zeitachse. Die Spec lässt den
+ * geplanten Ablöser per Nachtrag eintreffen (mit der Vorgabe des Einsatzes begänne jede andere
+ * Einheit beim Eintreffen ihre Schicht von selbst, er nicht) und die Betreuungsgruppe alarmieren,
+ * noch ohne Eintreffen.
  */
 
 const KAPITEL = 'abloesung';
@@ -98,6 +105,14 @@ test.describe(KAPITEL, () => {
         beginn_at: draht(vor(jetzt, 240)),
         rhythmus_minuten: 480,
       });
+      await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
+        art: 'eintreffen',
+        zeitpunkt_at: draht(vor(jetzt, 25)),
+      });
+      await fuelle(api, 'post', `${basis}/einheiten/${einheit('Betreuungsgruppe')}/zeitachse`, {
+        art: 'alarmierung',
+        zeitpunkt_at: draht(vor(jetzt, 40)),
+      });
     } finally {
       await api.dispose();
     }
@@ -111,6 +126,19 @@ test.describe(KAPITEL, () => {
     const schichten = page.getByRole('region', { name: 'Laufende Schichten' });
     await expect(schichten.locator('[data-lfh="abloesung-karte"]')).toHaveCount(3);
     await fotografiere(schichten, KAPITEL, 'schichten');
+  });
+
+  test('Einheiten ohne Schicht', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/abloesung`);
+    const segment = page.getByRole('radio', { name: /^Ohne Schicht/ });
+    await expect(segment).toHaveText('Ohne Schicht (2)');
+    await segment.click();
+    const liste = page.getByRole('region', { name: 'Einheiten ohne Schicht' });
+    await expect(liste.locator('[data-lfh="abloesung-ohne-schicht"]')).toHaveCount(2);
+    await fotografiere(liste, KAPITEL, 'ohne-schicht');
   });
 
   test('Paneel „Rhythmus je Abschnitt“', async ({ page }) => {
