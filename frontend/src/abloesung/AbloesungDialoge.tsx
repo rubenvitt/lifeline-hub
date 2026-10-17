@@ -1,4 +1,4 @@
-import { Form, InputNumber } from 'antd';
+import { Form, Input } from 'antd';
 import type { Dayjs } from 'dayjs';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../anzeige/format';
@@ -7,15 +7,16 @@ import type { Abloesung } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { abschnittVorgabe } from '../components/vorgabeText';
+import { abschnittVorgabe, einsatzVorgabe } from '../components/vorgabeText';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { rhythmusText } from './einstufung';
+import { ABLOESUNG_RHYTHMUS_MAX_MINUTEN } from '../api/eingabegrenzen';
+import { dauerFeldText, dauerMinuten, dauerRegel, formatDauer } from './dauer';
 
 /**
  * Die Erfassungsmasken der Ablösung, alle auf `ErfassungsModal`; höchstens drei Felder je Dialog.
- * Der Rhythmus wird in STUNDEN erfasst (0,5er-Schritte) und als Minuten gesendet — die Lage
- * spricht in „6-Stunden-Rhythmus", nicht in 360 Minuten. Zeiten stehen in der Anzeigezone
- * (`ZeitpunktEingabe`, LFH-692).
+ * Der Rhythmus wird als DAUER erfasst und angezeigt („8 h“, „7:30 h“, nie „8.0“, LLH-1122,
+ * `abloesung/dauer.ts`) und als Minuten gesendet — die Lage spricht in „6-Stunden-Rhythmus",
+ * nicht in 360 Minuten. Zeiten stehen in der Anzeigezone (`ZeitpunktEingabe`, LFH-692).
  *
  * Kein „Leer: …“ unter den Feldern (LFH-1078, `frontend/AGENTS.md`, „Texte: zeigen statt
  * erklären“): was ein leeres Feld bewirkt, steht als Platzhalter im Feld — der Wert, den der
@@ -29,25 +30,28 @@ export interface EinheitOption {
   label: string;
 }
 
-/** Stunden aus dem Feld → Minuten für das Backend; leer → `undefined`. */
-function stundenAlsMinuten(stunden: number | null | undefined): number | undefined {
-  if (stunden == null || Number.isNaN(stunden)) return undefined;
-  return Math.round(stunden * 60);
-}
+/** Kleinster Rhythmus, den die Masken annehmen: eine halbe Stunde. */
+const RHYTHMUS_MIN_MINUTEN = 30;
 
-const rhythmusFeld = (platzhalter: string | undefined, pflicht: boolean) => (
+/**
+ * Das Rhythmusfeld als Dauer. `required` setzt nur die Pflichtmarke (und `aria-required`); die
+ * Prüfung selbst trägt `dauerRegel`, auch für ein leeres Pflichtfeld.
+ */
+const rhythmusField = (platzhalter: string | undefined, pflicht: boolean) => (
   <Form.Item
-    name="rhythmus_stunden"
-    label="Rhythmus (Stunden)"
-    rules={pflicht ? [{ required: true, message: 'Bitte einen Rhythmus angeben' }] : []}
+    name="rhythmus"
+    label="Rhythmus"
+    required={pflicht}
+    rules={[
+      dauerRegel({
+        pflicht,
+        min: RHYTHMUS_MIN_MINUTEN,
+        max: ABLOESUNG_RHYTHMUS_MAX_MINUTEN,
+        pflichtText: 'Bitte einen Rhythmus angeben',
+      }),
+    ]}
   >
-    <InputNumber
-      min={0.5}
-      max={168}
-      step={0.5}
-      placeholder={platzhalter}
-      style={{ width: '100%' }}
-    />
+    <Input placeholder={platzhalter} autoComplete="off" />
   </Form.Item>
 );
 
@@ -56,7 +60,7 @@ const rhythmusFeld = (platzhalter: string | undefined, pflicht: boolean) => (
 interface BeginnWerte {
   einheit_id: number;
   beginn?: Dayjs | null;
-  rhythmus_stunden?: number | null;
+  rhythmus?: string;
 }
 
 interface SchichtBeginnenProps {
@@ -65,6 +69,11 @@ interface SchichtBeginnenProps {
   einheiten: EinheitOption[];
   /** Einheit → Vorgabe ihres Abschnitts in Minuten (fehlt = keine Vorgabe). */
   vorgabeJeEinheit: Map<number, number>;
+  /**
+   * Die Vorgabe des Einsatzes als Kurztext („12 h“, „Wechsel 0600/1800“, LLH-1122); fehlt, wenn
+   * der Einsatz keine hat. Sie gilt für jede Einheit, deren Abschnitt keine Vorgabe hat.
+   */
+  einsatzVorgabe?: string;
   /**
    * Einheit → Eintreffen ihrer offenen Einsatzperiode (fehlt = keins, der Server nimmt „jetzt“);
    * `null`, solange die Perioden nicht bekannt sind — dann verspricht der Platzhalter nichts.
@@ -84,6 +93,7 @@ export function SchichtBeginnenDialog({
   offen,
   einheiten,
   vorgabeJeEinheit,
+  einsatzVorgabe: einsatzVorgabeText,
   eintreffenJeEinheit = null,
   laeuft,
   fehler,
@@ -114,7 +124,7 @@ export function SchichtBeginnenDialog({
         onErfassen({
           einheit_id: w.einheit_id,
           beginn_at: w.beginn ? alsBackendZeit(w.beginn) : undefined,
-          rhythmus_minuten: stundenAlsMinuten(w.rhythmus_stunden),
+          rhythmus_minuten: dauerMinuten(w.rhythmus) ?? undefined,
         })
       }
       onFertig={onSchliessen}
@@ -139,12 +149,17 @@ export function SchichtBeginnenDialog({
         />
       </Form.Item>
       {/* Vor der Wahl der Einheit gibt es keinen Abschnitt, dessen Vorgabe gälte, und keine
-          Pflicht (LFH-948). Ohne Vorgabe zeigt die Pflichtmarke, dass ein Wert fehlt. */}
+          Pflicht (LFH-948). Rangfolge wie im Server: Abschnitt vor Einsatz (LLH-1122). Ohne
+          beide zeigt die Pflichtmarke, dass ein Wert fehlt. */}
       {einheitId == null
-        ? rhythmusFeld(undefined, false)
-        : rhythmusFeld(
-            vorgabe != null ? abschnittVorgabe(rhythmusText(vorgabe)) : undefined,
-            vorgabe == null,
+        ? rhythmusField(undefined, false)
+        : rhythmusField(
+            vorgabe != null
+              ? abschnittVorgabe(formatDauer(vorgabe))
+              : einsatzVorgabeText != null
+                ? einsatzVorgabe(einsatzVorgabeText)
+                : undefined,
+            vorgabe == null && einsatzVorgabeText == null,
           )}
       <SpeicherFehler fehler={fehler} titel="Schicht konnte nicht begonnen werden" />
     </ErfassungsModal>
@@ -252,7 +267,7 @@ export function AbloeserDialog({
 // ── Rhythmus (Schicht oder Abschnitt) ─────────────────────────────────────────
 
 interface RhythmusWerte {
-  rhythmus_stunden?: number | null;
+  rhythmus?: string;
 }
 
 interface RhythmusProps {
@@ -261,8 +276,8 @@ interface RhythmusProps {
   /** Vorbelegung in Minuten. */
   minuten: number | null;
   /**
-   * Was bei leerem Feld gilt, als Platzhalter: „6 h (Vorgabe Abschnitt)“ bzw. „keine Vorgabe“; fehlt er,
-   * zeigt die Pflichtmarke, dass ein Wert nötig ist.
+   * Was bei leerem Feld gilt, als Platzhalter: „6 h (Vorgabe Abschnitt)“, „12 h (Vorgabe Einsatz)“
+   * bzw. „keine Vorgabe“; fehlt er, zeigt die Pflichtmarke, dass ein Wert nötig ist.
    */
   platzhalter?: string;
   /** Darf das Feld leer bleiben? */
@@ -273,7 +288,7 @@ interface RhythmusProps {
   onSchliessen: () => void;
 }
 
-/** Ein Feld: Rhythmus in Stunden. Für die Schicht („eigener Wert") und die Abschnittsvorgabe. */
+/** Ein Feld: Rhythmus als Dauer. Für die Schicht („eigener Wert") und die Abschnittsvorgabe. */
 export function RhythmusDialog({
   offen,
   titel,
@@ -293,12 +308,12 @@ export function RhythmusDialog({
       form={form}
       erfassenText="Speichern"
       laeuft={laeuft}
-      initialValues={{ rhythmus_stunden: minuten != null ? minuten / 60 : undefined }}
-      onErfassen={(w) => onErfassen(stundenAlsMinuten(w.rhythmus_stunden) ?? null)}
+      initialValues={{ rhythmus: dauerFeldText(minuten) }}
+      onErfassen={(w) => onErfassen(dauerMinuten(w.rhythmus))}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {rhythmusFeld(platzhalter, !leerErlaubt)}
+      {rhythmusField(platzhalter, !leerErlaubt)}
       <SpeicherFehler fehler={fehler} titel="Rhythmus konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );

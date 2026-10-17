@@ -633,6 +633,18 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       umleitungOhneAdmin: true,
     },
     {
+      // LLH-1122: Anker ist der Seitentitel, die Liste der Schichtmodelle kann leer sein.
+      pfad: '/admin/stammdaten/schichtmodelle',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Schichtmodelle', level: 1 }),
+      umleitungOhneAdmin: true,
+    },
+    {
+      // LLH-1122: Vorgabe des Einsatzes; der Beobachter sieht sie mit dem Rechtehinweis.
+      pfad: `/einsaetze/${einsatzId}/einstellungen/abloesung`,
+      anker: (p: Page) => p.getByRole('region', { name: 'Schichtmodell des Einsatzes' }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
+    {
       pfad: `/einsaetze/${einsatzId}/personal`,
       anker: (p: Page) => p.getByText('Kirchgassner-Wohlfahrt, Maximiliane'),
     },
@@ -951,6 +963,20 @@ function gate1VerwaltungRouten(): Gate1Route[] {
           await rechteHinweis(p, NUR_SYSTEM_ADMIN);
           await expect(
             p.getByRole('button', { name: 'Vorlage anlegen' }),
+            'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
+          ).toBeDisabled();
+        },
+      },
+    },
+    {
+      // LLH-1122: Schichtmodelle, gelesen ohne Admin-Recht.
+      pfad: '/admin/stammdaten/schichtmodelle',
+      anker: (p: Page) => p.getByRole('heading', { name: 'Schichtmodelle', level: 1 }),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await rechteHinweis(p, NUR_SYSTEM_ADMIN);
+          await expect(
+            p.getByRole('button', { name: 'Schichtmodell anlegen' }),
             'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
           ).toBeDisabled();
         },

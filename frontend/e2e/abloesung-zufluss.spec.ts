@@ -341,9 +341,10 @@ test.describe('fremde Rhythmusänderung', () => {
 
 /**
  * Die Rhythmuszeile ist die Zeile, die eine fremde Änderung von Wert oder Quelle berührt. Sie
- * bleibt deshalb für jeden zulässigen Rhythmus einzeilig (LFH-708): 167 h 59 min als Vorgabe
- * ist der breiteste Text (224 px bei 15 px Schrift). Gemessen wird dort, wo am wenigsten Platz
- * ist, auf 390 px in `komfortabel` (252 px Inhalt) und `handschuh` (226 px Inhalt).
+ * bleibt deshalb für jeden zulässigen Rhythmus einzeilig (LFH-708): 167:59 h als Vorgabe des
+ * Einsatzes ist der breiteste Text (LLH-1122: Dauer „h:mm“, Quelle „Vorgabe Einsatz“; die
+ * Abschnittsvorgabe heißt nur „Vorgabe“). Gemessen wird dort, wo am wenigsten Platz ist, auf
+ * 390 px in `komfortabel` (252 px Inhalt) und `handschuh` (226 px Inhalt).
  */
 for (const dichte of ['komfortabel', 'handschuh'] as const) {
   test(`Ablösung (mobil, ${dichte}): der längste Rhythmus bleibt einzeilig`, async ({ page }) => {
@@ -365,9 +366,18 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
       return (await antwort.json()) as { id: number };
     };
     const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+    // Der Abschnitt hat keine Vorgabe: die Schicht folgt der Vorgabe des Einsatzes.
     const vorgabe = await page.request.put(
-      `/api/einsaetze/${einsatzId}/abloesungen/vorgaben/${abschnitt.id}`,
-      { data: { rhythmus_minuten: 7 * 24 * 60 - 1 } },
+      `/api/einsaetze/${einsatzId}/abloesungen/schichtmodell`,
+      {
+        data: {
+          schichtmodell: {
+            bezeichnung: 'Längster Rhythmus',
+            typ: 'rhythmus',
+            rhythmus_minuten: 7 * 24 * 60 - 1,
+          },
+        },
+      },
     );
     expect(vorgabe.ok(), `Seeding Vorgabe: ${vorgabe.status()}`).toBeTruthy();
     const einheit = await post(
@@ -380,7 +390,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     await page.goto(`/einsaetze/${einsatzId}/abloesung`);
     await stelleDichte(page, dichte);
     const zeile = page.locator('[data-lfh="abloesung-rhythmus"]');
-    await expect(zeile).toHaveText('Rhythmus 167 h 59 min (Vorgabe)');
+    await expect(zeile).toHaveText('Rhythmus 167:59 h (Vorgabe Einsatz)');
     await schriftenGeladen(page);
 
     const mass = await zeile.evaluate((el) => ({
@@ -391,5 +401,15 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
       mass.hoehe,
       `Rhythmuszeile ${mass.hoehe}px bei Zeilenhöhe ${mass.zeilenhoehe}px`,
     ).toBeLessThanOrEqual(mass.zeilenhoehe + SUBPIXEL);
+    // Gekürzt wird höchstens das Quellenwort, nie der Wert (LLH-1122).
+    const kanten = await zeile.evaluate((el) => {
+      const wert = el.querySelector('[data-lfh="abloesung-rhythmus-wert"]')!;
+      return {
+        wertRechts: wert.getBoundingClientRect().right,
+        zeileRechts: el.getBoundingClientRect().right,
+      };
+    });
+    expect(kanten.wertRechts).toBeLessThanOrEqual(kanten.zeileRechts + SUBPIXEL);
+    await expect(zeile).toHaveAttribute('title', 'Rhythmus 167:59 h (Vorgabe Einsatz)');
   });
 }

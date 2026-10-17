@@ -6,7 +6,7 @@ import { ladeModulZaehler } from '../api/modulZaehler';
 import { wetterAbfrage } from '../api/wetter';
 import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
 import type { Abloesung, Evakuierungsbezirk, ModulFreigaben, ModulZaehler } from '../api/types';
-import { zaehleFaellige } from '../abloesung/einstufung';
+import { countFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
 import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
 import { unwetterLage } from '../wetter/unwetter';
@@ -118,7 +118,7 @@ export function berechneAbloesungZaehler(
   abloesungen: readonly Abloesung[],
   jetzt: Dayjs,
 ): ModulZaehlerWert {
-  const faellig = zaehleFaellige(abloesungen, jetzt);
+  const faellig = countFaellige(abloesungen, jetzt);
   return {
     wert: faellig,
     beschreibung: `${anzahl(faellig, 'Ablösung', 'Ablösungen')} fällig oder in den nächsten 30 min`,
