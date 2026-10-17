@@ -156,4 +156,24 @@ describe('EmpfaengerStand (LLH-1055 Teil II)', () => {
     );
     expect(container.querySelector('[data-lfh="verpflegung-stand"]')).toBeNull();
   });
+  it('anderswo verpflegt (LLH-1048): „anderswo verpflegt · n EP“ statt „noch nicht verpflegt“', () => {
+    renderMitProviders(
+      <EmpfaengerStand
+        zeitfenster={zeitfenster({
+          ausgaben: [ausgabe({ id: 1, menge: 9, einheit_id: GRUPPE_1 })],
+          verpflegt_anderswo: [
+            { einheit_id: GRUPPE_2, menge: 40 },
+            { einheit_id: GRUPPE_1, menge: 5 },
+          ],
+        })}
+        empfaenger={empfaenger()}
+        ueberschrift="h2"
+      />,
+    );
+    expect(zeilen('stand-offen')).toEqual(['1. Zug · Florian 1 · 1/2/17//20 · Deich']);
+    expect(zeilen('stand-verpflegt')).toEqual([
+      '1. Gruppe · Florian 1-1 · 9 EP 11:40 · anderswo verpflegt · 5 EP · Deich',
+      '2. Gruppe · Florian 1-2 · anderswo verpflegt · 40 EP · Deich',
+    ]);
+  });
 });

@@ -11,6 +11,7 @@ import {
   zeitfenster,
 } from '../test/verpflegungDaten';
 import {
+  eigeneStelle,
   laufendeZeitfensterDerStelle,
   offeneStellenCount,
   stellenWahl,
@@ -175,5 +176,34 @@ describe('offeneStellenCount (Zählung der Segmentleiste)', () => {
     expect(offeneStellenCount([stelle({ id: 1, status: 'aufgeloest' }), stelle({ id: 2 })])).toBe(
       1,
     );
+  });
+});
+
+describe('eigeneStelle (Gerät an einer Verpflegungsstelle, LLH-1048 Teil II)', () => {
+  const geraet = (ansicht: 'verpflegung' | 'bereitstellungsraum', stelle_id: number | null) => ({
+    ansicht,
+    stelle_id,
+    stelle: stelle_id == null ? null : 'Feldküche (Sitzung)',
+  });
+  const stellen = [stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche BR Sportplatz' })];
+
+  it('am gebundenen Verpflegungsgerät die Stelle mit dem live geführten Namen', () => {
+    expect(eigeneStelle(geraet('verpflegung', FELDKUECHE), stellen)).toEqual({
+      id: FELDKUECHE,
+      bezeichnung: 'Feldküche BR Sportplatz',
+    });
+  });
+
+  it('fehlt die Stelle in der Lesung, gilt der Name der Sitzung', () => {
+    expect(eigeneStelle(geraet('verpflegung', FELDKUECHE), [])).toEqual({
+      id: FELDKUECHE,
+      bezeichnung: 'Feldküche (Sitzung)',
+    });
+  });
+
+  it('am Desktop, am einsatzweiten Gerät und an einer anderen Ansicht keine', () => {
+    expect(eigeneStelle(null, stellen)).toBeNull();
+    expect(eigeneStelle(geraet('verpflegung', null), stellen)).toBeNull();
+    expect(eigeneStelle(geraet('bereitstellungsraum', FELDKUECHE), stellen)).toBeNull();
   });
 });

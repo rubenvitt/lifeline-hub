@@ -1238,7 +1238,7 @@ fn ids(v: &Value) -> Vec<i64> {
 }
 
 /// Die Felder einer Stelle in der Antwort: keine Benutzerkennung (Spec `funktionsansichten`).
-const STELLEN_FELDER: [&str; 10] = [
+const STELLEN_FELDER: [&str; 11] = [
     "id",
     "bezeichnung",
     "art",
@@ -1249,6 +1249,8 @@ const STELLEN_FELDER: [&str; 10] = [
     "status",
     "aufgeloest_at",
     "angelegt_at",
+    // LLH-1048 Teil II: nur, ob ein Gerät gekoppelt ist, ohne Kopplung und Bezeichnung.
+    "geraet_gekoppelt",
 ];
 
 fn nur_erlaubte_felder(stelle: &Value) {

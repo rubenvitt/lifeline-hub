@@ -3,6 +3,7 @@ import { ladeBetreuung } from '../api/betreuung';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeBr } from '../api/einsatzBereitstellungsraum';
 import { ladeUhs } from '../api/einsatzUhs';
+import { ladeVerpflegung } from '../api/verpflegung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { GeraetAnzeige } from '../api/types';
 
@@ -11,9 +12,10 @@ import type { GeraetAnzeige } from '../api/types';
  * bleibt bis zum Neuladen der Sitzung stehen; benennt die Einsatzleitung die Stelle um, stünde
  * sonst der alte Name im Kopf. Gelesen wird deshalb aus derselben Abfrage, die die Seiten der
  * Ansicht ohnehin halten (gleicher Key, ein Abruf): das Ereignis der Stelle (`uhs`,
- * `bereitstellungsraum`, `abschnitt`, `betreuung`) frischt sie über den Einsatzstrom auf.
- * Solange sie nichts hat (Laden, ohne Netz, Fehler), gilt der Name der Sitzung. Ohne Stelle
- * (Lagemonitor, Verpflegung) `null`.
+ * `bereitstellungsraum`, `abschnitt`, `betreuung`, `verpflegung`) frischt sie über den
+ * Einsatzstrom auf. Solange sie nichts hat (Laden, ohne Netz, Fehler), gilt der Name der Sitzung.
+ * Ohne Stelle (Lagemonitor, Verpflegung einsatzweit) `null`; die Verpflegungsstelle ist
+ * wahlweise (LLH-1048).
  */
 export function useStellenName(geraet: GeraetAnzeige | null): string | null {
   const eid = geraet?.einsatz_id ?? 0;
@@ -44,6 +46,12 @@ export function useStellenName(geraet: GeraetAnzeige | null): string | null {
     enabled: ansicht === 'betreuungsstelle' && id != null,
     select: (d) => d.stellen.find((s) => s.id === id)?.bezeichnung,
   });
+  const verpflegung = useQuery({
+    queryKey: einsatzKeys.verpflegung(eid),
+    queryFn: () => ladeVerpflegung(eid),
+    enabled: ansicht === 'verpflegung' && id != null,
+    select: (d) => d.stellen.find((s) => s.id === id)?.bezeichnung,
+  });
   if (!geraet) return null;
   const live = istUhs
     ? uhs.data
@@ -53,6 +61,8 @@ export function useStellenName(geraet: GeraetAnzeige | null): string | null {
         ? abschnitt.data
         : ansicht === 'betreuungsstelle'
           ? betreuung.data
-          : undefined;
+          : ansicht === 'verpflegung'
+            ? verpflegung.data
+            : undefined;
   return live ?? geraet.stelle ?? null;
 }

@@ -29,6 +29,7 @@ import { listeUhs } from '../../api/einsatzUhs';
 import { ladeBetreuung } from '../../api/betreuung';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
+import { ladeVerpflegung } from '../../api/verpflegung';
 import { einsatzKeys } from '../../api/queryKeys';
 import type {
   Funktionsansicht,
@@ -47,11 +48,15 @@ import {
   codeGruppiert,
   endeFehler,
   istBeendet,
+  OHNE_STELLE,
+  OHNE_STELLE_LABEL,
   sperrSatz,
   STELLENART_FELD,
-  stellenartVon,
+  stelleIdAusWahl,
+  stellenFeldVon,
   stellenOptionen,
   verlaengernVorbelegung,
+  type StellenWert,
 } from './geraeteKern';
 
 /**
@@ -64,7 +69,7 @@ const ZEITFORMAT = 'YYYY-MM-DD HH:mm';
 
 interface AnlegenWerte {
   ansicht?: Funktionsansicht;
-  stelle_id?: number;
+  stelle_id?: StellenWert;
   bezeichnung?: string;
 }
 
@@ -115,7 +120,8 @@ export default function EinsatzGeraete() {
     enabled: leitung,
   });
   // Die Stellen lädt die Maske erst, wenn eine Ansicht ihrer Art gewählt ist (LFH-1040).
-  const stellenart = stellenartVon(geraeteQ.data?.ansichten ?? [], gewaehlteAnsicht);
+  const stellenFeld = stellenFeldVon(geraeteQ.data?.ansichten ?? [], gewaehlteAnsicht);
+  const stellenart = stellenFeld?.art ?? null;
   const uhsQ = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
@@ -135,6 +141,13 @@ export default function EinsatzGeraete() {
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
     enabled: darf && stellenart === 'einsatzabschnitt',
+  });
+  // Verpflegungsstellen (LLH-1048): `stellen` aus der einen Lesequelle der Verpflegung, ohne
+  // stornierte; geplant und aktiv nimmt der Server an.
+  const verpflegungQ = useQuery({
+    queryKey: einsatzKeys.verpflegung(einsatzId),
+    queryFn: () => ladeVerpflegung(einsatzId),
+    enabled: darf && stellenart === 'verpflegungsstelle',
   });
 
   /** Übernimmt eine geänderte Kopplung in die geladene Übersicht. */
@@ -204,12 +217,17 @@ export default function EinsatzGeraete() {
           betreuungsstellen: betreuungQ.data?.stellen,
           bereitstellungsraeume: brQ.data,
           abschnitte: abschnitteQ.data,
+          verpflegungsstellen: verpflegungQ.data?.stellen,
         },
         stellenart,
       )
     : [];
   const stellenLaedt =
-    uhsQ.isLoading || betreuungQ.isLoading || brQ.isLoading || abschnitteQ.isLoading;
+    uhsQ.isLoading ||
+    betreuungQ.isLoading ||
+    brQ.isLoading ||
+    abschnitteQ.isLoading ||
+    verpflegungQ.isLoading;
   const sperre = sperrSatz(sperren, gewaehlteAnsicht, modulName);
 
   return (
@@ -305,7 +323,7 @@ export default function EinsatzGeraete() {
         onErfassen={(w) =>
           anlegen.mutateAsync({
             ansicht: w.ansicht as Funktionsansicht,
-            stelle_id: stellenartVon(ansichten, w.ansicht) ? (w.stelle_id ?? null) : null,
+            stelle_id: stelleIdAusWahl(stellenFeldVon(ansichten, w.ansicht), w.stelle_id),
             bezeichnung: (w.bezeichnung ?? '').trim(),
           })
         }
@@ -329,20 +347,31 @@ export default function EinsatzGeraete() {
             }))}
           />
         </Form.Item>
-        {stellenart && (
+        {stellenFeld && (
           <Form.Item
             // Je Art ein eigenes Feld: ein Wechsel der Ansicht verwirft die gewählte Stelle.
-            key={stellenart}
+            key={stellenFeld.art}
             preserve={false}
-            label={STELLENART_FELD[stellenart].label}
+            label={STELLENART_FELD[stellenFeld.art].label}
             name="stelle_id"
-            rules={[{ required: true, message: STELLENART_FELD[stellenart].platzhalter }]}
+            // Wahlweise (Verpflegung, LLH-1048): Vorgabe „ohne Stelle (einsatzweit)“ als eigene
+            // Option, kein Pflichtfeld und kein Löschkreuz (Handschuh).
+            initialValue={stellenFeld.pflicht ? undefined : OHNE_STELLE}
+            rules={
+              stellenFeld.pflicht
+                ? [{ required: true, message: STELLENART_FELD[stellenFeld.art].platzhalter }]
+                : undefined
+            }
           >
-            <Select<number>
-              placeholder={STELLENART_FELD[stellenart].platzhalter}
+            <Select<StellenWert>
+              placeholder={STELLENART_FELD[stellenFeld.art].platzhalter}
               loading={stellenLaedt}
-              options={stellenAuswahl}
-              notFoundContent={STELLENART_FELD[stellenart].leer}
+              options={
+                stellenFeld.pflicht
+                  ? stellenAuswahl
+                  : [{ value: OHNE_STELLE, label: OHNE_STELLE_LABEL }, ...stellenAuswahl]
+              }
+              notFoundContent={STELLENART_FELD[stellenFeld.art].leer}
             />
           </Form.Item>
         )}

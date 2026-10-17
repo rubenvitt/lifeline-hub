@@ -471,7 +471,12 @@ Wird die Stelle aufgelöst, MUST die Kopplung bestehen bleiben wie bei den übri
 für Ausgaben gilt die Regel der aufgelösten Stelle (`kraefte-verpflegung`, „Ausgabe an einer
 Verpflegungsstelle“). Die Kopplung MUST nur eine geplante oder aktive Stelle des eigenen Einsatzes
 annehmen: eine Stelle eines anderen Einsatzes oder eine unbekannte 404, eine stornierte 409, eine
-aufgelöste 422.
+aufgelöste 422. Solange eine laufende Kopplung an einer geplanten Stelle hängt, MUST deren Storno
+409 sein („Gerät gekoppelt“). In der Oberfläche MUST der Kopf des Geräts die Stelle nennen und
+eine Umbenennung ohne neue Anmeldung zeigen; die Ausgabeansicht und der Nachtrag MUST die Stelle
+fest als Text zeigen statt einer Wahl (`kraefte-verpflegung`, „Ausgabeansicht eines
+Zeitfensters“), und „Noch nicht verpflegt“ MUST die Summe anderswo verrechnen
+(`kraefte-verpflegung`, „Noch nicht verpflegt“).
 
 #### Scenario: Nur die eigenen Zeitfenster
 
@@ -510,6 +515,16 @@ aufgelöste 422.
 - **WHEN** die Einsatzleitung die Feldküche auflöst
 - **THEN** bleibt das Gerät gekoppelt und liest weiter
 - **AND** antwortet der Server auf eine neue Ausgabe mit 409, eine vor der Auflösung gezählte nimmt er an
+
+#### Scenario: Kopf nennt die Stelle
+
+- **WHEN** das Gerät an der Feldküche gekoppelt ist und die Einsatzleitung sie in „Feldküche Festwiese“ umbenennt
+- **THEN** zeigt der Kopf des Geräts erst „Feldküche BR Sportplatz“ und danach ohne neue Anmeldung „Feldküche Festwiese“
+
+#### Scenario: Stelle mit Gerät stornieren
+
+- **WHEN** die Einsatzleitung die geplante Feldküche stornieren will, an der das Gerät gekoppelt ist
+- **THEN** antwortet der Server mit 409 „Gerät gekoppelt“, und die Stelle bleibt
 
 #### Scenario: Stornierte Stelle koppeln
 

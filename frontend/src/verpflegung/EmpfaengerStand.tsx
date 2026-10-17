@@ -13,7 +13,7 @@ import {
 import { uhrzeit } from './verpflegungText';
 
 export interface EmpfaengerStandProps {
-  zeitfenster: Pick<VerpflegungZeitfenster, 'ausgaben' | 'bis_at'>;
+  zeitfenster: Pick<VerpflegungZeitfenster, 'ausgaben' | 'bis_at' | 'verpflegt_anderswo'>;
   empfaenger: VerpflegungEmpfaenger;
   /** Auf diesem Gerät vorgemerkte Ausgaben DIESES Zeitfensters (nur „ausstehend“, nie verpflegt). */
   ausstehend?: readonly Pick<AusgabeEingabe, 'menge' | 'einheit_id'>[];
@@ -63,6 +63,8 @@ function Teile({ teile }: { teile: readonly (ReactNode | null | undefined | fals
  * Funkrufname, Stärke des Teilbaums (`summiereStaerke`/`staerkeText`, wie die Vorgabe der Menge)
  * und Abschnitt; darunter gesondert „ohne Eintreffen“. „Verpflegt“ nennt die direkten Empfänger
  * mit Menge und Zeit und die mitverpflegten Untereinheiten, dann die Zuführungen an Abschnitte.
+ * Am gebundenen Gerät steht eine anderswo verpflegte Einheit dort als „anderswo verpflegt · n EP“
+ * (LLH-1048, `verpflegt_anderswo` des Servers).
  * Mit `onWaehlen` trägt jede noch nicht verpflegte Zeile „Wählen“ (Handschuh: die Zeile ist der
  * schnellere Weg als die Auswahlliste). Ohne Einheiten im Einsatz gibt es die Fläche nicht.
  */
@@ -172,9 +174,18 @@ export default function EmpfaengerStand({
                   teile={[
                     z.name,
                     z.funkrufname && <span style={monoStil(13)}>{z.funkrufname}</span>,
-                    <span key="m" style={monoStil(13, 500)}>
-                      {ausgabenText(z.ausgaben, uhr)}
-                    </span>,
+                    z.ausgaben.length > 0 && (
+                      <span key="m" style={monoStil(13, 500)}>
+                        {ausgabenText(z.ausgaben, uhr)}
+                      </span>
+                    ),
+                    // Am gebundenen Gerät (LLH-1048): nur die Summe des Servers, ohne Zeit.
+                    z.anderswo > 0 && 'anderswo verpflegt',
+                    z.anderswo > 0 && (
+                      <span key="a" data-lfh="stand-anderswo" style={monoStil(13, 500)}>
+                        {z.anderswo} EP
+                      </span>
+                    ),
                     z.untereinheiten > 0 &&
                       `mit ${z.untereinheiten} ${z.untereinheiten === 1 ? 'Untereinheit' : 'Untereinheiten'}`,
                     z.abschnitt,

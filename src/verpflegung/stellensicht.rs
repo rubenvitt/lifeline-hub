@@ -186,6 +186,7 @@ mod tests {
             status: crate::verpflegung::stelle::VerpflegungsstelleStatus::Aktiv,
             aufgeloest_at: None,
             angelegt_at: "2026-10-16 10:00:00".into(),
+            geraet_gekoppelt: false,
         };
         let v = VerpflegungAnzeige {
             zeitfenster: vec![

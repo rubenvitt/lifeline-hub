@@ -19,6 +19,12 @@
  *   Einheit im Einsatz war (`frontend/AGENTS.md`, „Keine erfundenen Daten“).
  * - Eine **Zuführung** an einen Abschnitt verpflegt keine Einheit: sie sagt nicht, wer gegessen
  *   hat. Die Zeilen der Einheiten im Abschnitt (oder darunter) nennen sie.
+ * - **anderswo verpflegt** (LLH-1048, Entscheidung LLH-1024 F7): ein an eine Verpflegungsstelle
+ *   gebundenes Gerät sieht nur die Ausgaben seiner Stelle; was anderswo (an einer anderen Stelle
+ *   oder ohne Stelle) an Einheiten ging, liefert der Server als Summe je Einheit
+ *   (`verpflegt_anderswo`). Sie verpflegt die Einheit und ihren Teilbaum wie eine eigene Ausgabe
+ *   und steht unter „verpflegt“ als Menge ohne Zeit. Nur, was der Server liefert; am Desktop und
+ *   am einsatzweiten Gerät ist die Liste leer.
  * - Eine **vorgemerkte** Ausgabe (ohne Netz, noch nicht bestätigt) steht als „ausstehend“ an
  *   ihrer Einheit und nimmt sie nicht aus der Liste, wie sie nicht in die Deckung zählt.
  *
@@ -198,6 +204,8 @@ export interface VerpflegtZeile {
   aufgeloest: boolean;
   /** Nach Zeitpunkt. */
   ausgaben: AusgabeKurz[];
+  /** EP anderswo (an einer anderen Stelle oder ohne Stelle), nur am gebundenen Gerät; sonst 0. */
+  anderswo: number;
   /** Nicht aufgelöste Untereinheiten, die die Ausgabe mit verpflegt (Teilbaum). */
   untereinheiten: number;
 }
@@ -247,19 +255,24 @@ function vorfahren(id: number, eltern: ReadonlyMap<number, number | null>): numb
  * die auf dem Gerät vorgemerkten Ausgaben DIESES Zeitfensters.
  */
 export function verpflegungsstand(
-  zf: Pick<VerpflegungZeitfenster, 'ausgaben' | 'bis_at'>,
+  zf: Pick<VerpflegungZeitfenster, 'ausgaben' | 'bis_at' | 'verpflegt_anderswo'>,
   e: VerpflegungEmpfaenger,
   ausstehend: readonly Pick<AusgabeEingabe, 'menge' | 'einheit_id'>[] = [],
 ): Verpflegungsstand {
   const gueltig = zf.ausgaben.filter((a) => a.zurueckgenommen_at == null);
   const anEinheit = gruppiere(gueltig, (a) => a.einheit_id);
   const anAbschnitt = gruppiere(gueltig, (a) => a.abschnitt_id);
+  const anderswo = new Map<number, number>();
+  // `?? []`: ein Lagebild von der Platte aus der Zeit vor LLH-1048 trägt das Feld noch nicht.
+  for (const a of zf.verpflegt_anderswo ?? []) {
+    if (a.menge > 0) anderswo.set(a.einheit_id, (anderswo.get(a.einheit_id) ?? 0) + a.menge);
+  }
+  const hatAusgabe = (id: number) => anEinheit.has(id) || anderswo.has(id);
 
   const eltern = new Map(e.einheiten.map((x) => [x.id, x.ueber_einheit_id ?? null]));
   const abschnittEltern = new Map(e.abschnitte.map((a) => [a.id, a.ueber_abschnitt_id ?? null]));
   const abschnittJe = abschnittDerEinheit(e.einheiten);
-  const isErreicht = (id: number) =>
-    anEinheit.has(id) || vorfahren(id, eltern).some((v) => anEinheit.has(v));
+  const isErreicht = (id: number) => hatAusgabe(id) || vorfahren(id, eltern).some(hatAusgabe);
   /** Die Zuführung an den Abschnitt der Einheit oder einen darüber, der nächste gewinnt. */
   const zufuehrungFuer = (id: number): string | null => {
     const ab = abschnittJe.get(id);
@@ -303,8 +316,8 @@ export function verpflegungsstand(
 
   const nachId = new Map(e.einheiten.map((x) => [x.id, x]));
   const verpflegt: VerpflegtZeile[] = [
-    ...e.einheiten.filter((x) => anEinheit.has(x.id)).map((x) => x.id),
-    ...[...anEinheit.keys()].filter((id) => !nachId.has(id)),
+    ...e.einheiten.filter((x) => hatAusgabe(x.id)).map((x) => x.id),
+    ...[...new Set([...anEinheit.keys(), ...anderswo.keys()])].filter((id) => !nachId.has(id)),
   ].map((id) => {
     const einheit = nachId.get(id);
     return {
@@ -314,6 +327,7 @@ export function verpflegungsstand(
       abschnitt: abschnittJe.get(id)?.name ?? null,
       aufgeloest: !!einheit?.aufgeloest_at,
       ausgaben: anEinheit.get(id) ?? [],
+      anderswo: anderswo.get(id) ?? 0,
       untereinheiten: e.einheiten.filter(
         (u) => !u.aufgeloest_at && vorfahren(u.id, eltern).includes(id),
       ).length,

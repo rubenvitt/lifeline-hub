@@ -525,6 +525,11 @@ interface AusgabeDialogProps extends DialogBasis {
   nachforderungen: readonly NachforderungOption[] | null;
   /** Die Verpflegungsstellen des Einsatzes (LLH-1040); ohne gibt es keine Stellenwahl. */
   stellen?: readonly Verpflegungsstelle[];
+  /**
+   * Die feste Stelle eines gebundenen Verpflegungsgeräts (LLH-1048, `eigeneStelle`): statt der
+   * Wahl steht sie als Text, und der Nachtrag trägt sie.
+   */
+  festeStelle?: { id: number; bezeichnung: string } | null;
   /** Die Empfängerliste (LLH-1055); ohne Einheiten und Abschnitte gibt es keine Empfängerwahl. */
   empfaenger?: VerpflegungEmpfaenger;
   onErfassen: (body: AusgabeEingabe) => Promise<unknown>;
@@ -559,6 +564,7 @@ export function AusgabeDialog({
   zeitfenster: zf,
   nachforderungen,
   stellen = [],
+  festeStelle = null,
   empfaenger,
   laeuft,
   fehler,
@@ -573,7 +579,8 @@ export function AusgabeDialog({
   const sonderkost = Form.useWatch('sonderkost', form) as SonderkostWerte | undefined;
   const nachforderungId = Form.useWatch('nachforderung_id', form) as number | null | undefined;
   const bemerkung = Form.useWatch('bemerkung', form) as string | null | undefined;
-  const stelleId = Form.useWatch('verpflegungsstelle_id', form) as number | null | undefined;
+  const gewaehlt = Form.useWatch('verpflegungsstelle_id', form) as number | null | undefined;
+  const stelleId = festeStelle?.id ?? gewaehlt;
   const ort = Form.useWatch('ort', form) as string | null | undefined;
   const hasStellen = stellen.length > 0;
   const ortLabel = hasStellen ? 'Zuführungsziel' : 'Ort';
@@ -605,7 +612,9 @@ export function AusgabeDialog({
       form={form}
       erfassenText="Nachtragen"
       laeuft={laeuft}
-      onErfassen={(w) => onErfassen(ausgabeBody(w))}
+      onErfassen={(w) =>
+        onErfassen(ausgabeBody(festeStelle ? { ...w, verpflegungsstelle_id: festeStelle.id } : w))
+      }
       onPruefungGescheitert={(felder) => {
         if (felder.includes('bemerkung') || felder.includes('ort')) setWeitereOffen(true);
       }}
@@ -642,14 +651,20 @@ export function AusgabeDialog({
           />
         </Form.Item>
       )}
-      {hasStellen && (
-        <Form.Item<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
-          <Select
-            allowClear
-            placeholder="ohne Stelle"
-            options={nachtragStellenOptionen(stellen, zf)}
-          />
+      {festeStelle ? (
+        <Form.Item<AusgabeWerte> label="Stelle">
+          <span data-lfh="nachtrag-stelle-fest">{festeStelle.bezeichnung}</span>
         </Form.Item>
+      ) : (
+        hasStellen && (
+          <Form.Item<AusgabeWerte> name="verpflegungsstelle_id" label="Stelle">
+            <Select
+              allowClear
+              placeholder="ohne Stelle"
+              options={nachtragStellenOptionen(stellen, zf)}
+            />
+          </Form.Item>
+        )
       )}
       <Form.Item<AusgabeWerte> name="zeitpunkt" label="Zeitpunkt">
         <ZeitpunktEingabe format={ZEITFORMAT} placeholder="jetzt" style={{ width: '100%' }} />

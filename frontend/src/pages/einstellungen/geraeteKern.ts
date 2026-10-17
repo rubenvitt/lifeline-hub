@@ -66,20 +66,45 @@ export const STELLENART_FELD: Record<
   },
 };
 
+/** Das Stellenfeld der Kopplungsmaske: die Art der Stelle und ob sie Pflicht ist. */
+export interface StellenFeld {
+  art: Bindungsart;
+  /** `false`: wahlweise (Verpflegung, LLH-1048); ohne Stelle koppelt das Gerät einsatzweit. */
+  pflicht: boolean;
+}
+
 /**
- * Art der Pflichtstelle der Ansicht laut der Übersicht des Servers
- * (`GeraeteUebersicht.ansichten`); `null` ohne Stellenbindung, für eine wahlweise Stelle
- * (`stelle_pflicht: false`, Verpflegung, LLH-1048) und für eine Ansicht, die der Server nicht
- * anbietet. Die Wahl einer wahlweisen Stelle bietet die Maske erst mit LLH-1048 Teil II an; bis
- * dahin koppelt sie die Verpflegung einsatzweit wie bisher.
+ * Das Stellenfeld der Ansicht laut der Übersicht des Servers (`GeraeteUebersicht.ansichten`,
+ * `stellenart` und `stelle_pflicht`); `null` ohne Stellenbindung (Lagemonitor) und für eine
+ * Ansicht, die der Server nicht anbietet.
  */
-export function stellenartVon(
+export function stellenFeldVon(
   ansichten: readonly AnsichtAuswahl[],
   ansicht: Funktionsansicht | undefined,
-): Bindungsart | null {
+): StellenFeld | null {
   if (!ansicht) return null;
   const auswahl = ansichten.find((a) => a.ansicht === ansicht);
-  return auswahl?.stelle_pflicht ? (auswahl.stellenart ?? null) : null;
+  if (!auswahl?.stellenart) return null;
+  return { art: auswahl.stellenart, pflicht: auswahl.stelle_pflicht };
+}
+
+/**
+ * Wert der Option „ohne Stelle (einsatzweit)“ einer wahlweisen Stelle. Eine eigene Option statt
+ * eines Löschkreuzes: das Kreuz ist mit Handschuh kein Ziel, und die Vorgabe steht sichtbar.
+ */
+export const OHNE_STELLE = 'einsatzweit';
+export const OHNE_STELLE_LABEL = 'ohne Stelle (einsatzweit)';
+
+/** Wert des Stellenfelds: eine Kennung oder, bei wahlweiser Stelle, {@link OHNE_STELLE}. */
+export type StellenWert = number | typeof OHNE_STELLE;
+
+/** Die `stelle_id` der neuen Kopplung; `null` ohne Stellenfeld und für „ohne Stelle“. */
+export function stelleIdAusWahl(
+  feld: StellenFeld | null,
+  wert: StellenWert | null | undefined,
+): number | null {
+  if (!feld || wert == null || wert === OHNE_STELLE) return null;
+  return wert;
 }
 
 /** Eine wählbare Stelle der Kopplungsmaske. */

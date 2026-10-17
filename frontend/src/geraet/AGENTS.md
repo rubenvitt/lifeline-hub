@@ -74,7 +74,7 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
   Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live
-  geführten Abfrage der Stelle, `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
+  geführten Abfrage der Stelle (Verpflegungsstelle aus `GET …/verpflegung`), `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
   einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
   `Math.max(56, controlHeight)`. Die Dichte folgt dem Gerät (`theme/dichte.ts`), die
   Handschuh-Stufe wählt das Gerätemenü.
@@ -129,8 +129,15 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   gepinnt in `tests/geraet_kopplung.rs`). Gebucht wird immer an der eigenen Stelle (ohne Angabe
   setzt der Server sie, eine andere 403), ein Zeitfenster nur fremder Stellen und eine fremde
   Ausgabe sind 404; der Replay läuft vor der Zeitfensterprüfung. Absender und Erfasser ist die
-  Stelle über den Anzeigenamen des Gerätekontos und `geraet.stelle`. Bis Teil II bietet die
-  Kopplungsmaske die wahlweise Stelle nicht an (`stellenartVon` nur bei `stelle_pflicht`).
+  Stelle über den Anzeigenamen des Gerätekontos und `geraet.stelle`. Oberfläche (LLH-1048 Teil
+  II): die Kopplungsmaske liest das Feld aus `stellenFeldVon` (`stellenart` und `stelle_pflicht`);
+  eine wahlweise Stelle hat die Vorgabe „ohne Stelle (einsatzweit)“ als eigene Option (kein
+  Löschkreuz, Handschuh), zur Wahl stehen die Stellen aus `GET …/verpflegung`. Am gebundenen Gerät
+  steht die Stelle fest (`verpflegung/stellenKern.ts:eigeneStelle`): keine Stellenwahl in
+  Ausgabeansicht und Nachtrag, jedes Bündel trägt sie; „Noch nicht verpflegt“ verrechnet
+  `verpflegt_anderswo` nur so, wie der Server es liefert. Eine geplante Stelle mit laufender
+  Kopplung (wartend oder aktiv) storniert der Server nicht (409 „Gerät gekoppelt“, Feld
+  `geraet_gekoppelt` der Stelle, Nachweis `tests/geraet_kopplung.rs`).
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
   (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**

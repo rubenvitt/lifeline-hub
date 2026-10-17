@@ -143,6 +143,21 @@ describe('StellenListe (LLH-1040 D13 Punkt 2)', () => {
       ).toEqual(['In Betrieb nehmen', 'Bearbeiten …', 'Auflösen …']);
     });
 
+    it('geplant mit gekoppeltem Gerät: „Stornieren“ gesperrt mit Grund „Gerät gekoppelt“ (LLH-1048)', async () => {
+      const v = verpflegungMitStellen();
+      const props = zeige({
+        stellen: v.stellen.map((s) => (s.id === DEICH ? { ...s, geraet_gekoppelt: true } : s)),
+      });
+      const menue = await oeffneMenue('Zuführung Deich');
+      const eintrag = within(menue).getByRole('menuitem', {
+        name: 'Stornieren … (Gerät gekoppelt)',
+      });
+      expect(eintrag).toHaveAttribute('aria-disabled', 'true');
+      await userEvent.click(eintrag);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(props.onStornieren).not.toHaveBeenCalled();
+    });
+
     it('aktiv: zwei Knöpfe, kein Menü', () => {
       zeige();
       const fk = zeile('Feldküche BR Sportplatz');
