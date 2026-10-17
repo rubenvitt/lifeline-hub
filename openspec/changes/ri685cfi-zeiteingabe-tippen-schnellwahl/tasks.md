@@ -89,9 +89,9 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 5. e2e
 
-- [ ] 5.1 `e2e/einsatzdaten-inline.spec.ts`, `e2e/lagebesprechung.spec.ts`,
+- [x] 5.1 `e2e/einsatzdaten-inline.spec.ts`, `e2e/lagebesprechung.spec.ts`,
       `e2e/betroffene-kontrast.spec.ts` auf `fill('…')` + Enter mit taktischer Eingabe.
-- [ ] 5.2 `e2e/dialoge-handy.spec.ts` und `e2e/zeitraum-kontrast.spec.ts` auf den neuen
+- [x] 5.2 `e2e/dialoge-handy.spec.ts` und `e2e/zeitraum-kontrast.spec.ts` auf den neuen
       Kalender (Blatt im Bildschirm, Tag, Uhrzeit, „Übernehmen“), `e2e/gate3-trefflaeche.spec.ts`
       misst Feld, Kalender-Knopf und Schnellwahl (≥ 72 px in `handschuh`). Lauf in der CI;
       lokal, soweit der Dev-Stack in der Sitzung startet.
