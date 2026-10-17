@@ -7920,4 +7920,223 @@ mod tests {
             .await
             .expect("deaktivierter Name ist wieder frei");
     }
+
+    // ── LLH-1048: Verpflegungsgerät an einer Verpflegungsstelle (0213) ─────────────────────
+
+    /// Der Rebuild von `geraet_kopplung` (Muster 0159) hält Codes, Ereignisse und
+    /// Gerätesitzungen, lässt jede Bestandskopplung ohne Verpflegungsstelle (auch ein
+    /// Verpflegungsgerät bleibt einsatzweit), bindet höchstens eine Stelle über alle fünf Spalten
+    /// und lässt den Einsatz mit Kopplung und Stelle löschen.
+    #[tokio::test]
+    async fn migration_0213_erhaelt_kinder_und_bindet_verpflegungsstelle() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 211).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let konto = |name: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+                     VALUES (1, ?, ?, 'h') RETURNING id",
+                )
+                .bind(name)
+                .bind(name)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'sonstige', 'UHS 1', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let tablet: i64 = sqlx::query_scalar(
+            "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, uhs_id, bezeichnung, \
+                erstellt_von, laeuft_ab_at, gekoppelt_at, letzter_zugriff_at) \
+             VALUES (?, ?, 'uhs-tablet', ?, 'Tablet', ?, '2099-01-01 00:00:00', \
+                '2026-10-16 08:00:00', '2026-10-16 09:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(konto("geraet-1").await)
+        .bind(uhs)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let tresen: i64 = sqlx::query_scalar(
+            "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, bezeichnung, \
+                erstellt_von, laeuft_ab_at) \
+             VALUES (?, ?, 'verpflegung', 'Tresen', ?, '2099-01-01 00:00:00') RETURNING id",
+        )
+        .bind(e)
+        .bind(konto("geraet-2").await)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO geraet_kopplungscode (kopplung_id, code_hash, laeuft_ab_at) \
+             VALUES (?, 'hash', '2099-01-01 00:00:00')",
+        )
+        .bind(tablet)
+        .execute(&pool)
+        .await
+        .unwrap();
+        for k in [tablet, tresen] {
+            sqlx::query(
+                "INSERT INTO geraet_kopplung_ereignis (kopplung_id, ereignis, von) \
+                 VALUES (?, 'angelegt', ?)",
+            )
+            .bind(k)
+            .bind(b)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        sqlx::query(
+            "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id) \
+             SELECT 's' || id, benutzer_id, '2099-01-01 00:00:00', id FROM geraet_kopplung",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let zaehle = |tabelle: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
+                    "SELECT COUNT(*) FROM {tabelle}"
+                )))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        type Zeile = (
+            i64,
+            String,
+            Option<i64>,
+            String,
+            Option<String>,
+            Option<String>,
+        );
+        let bestand = || {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, Zeile>(
+                    "SELECT id, ansicht, uhs_id, laeuft_ab_at, gekoppelt_at, letzter_zugriff_at \
+                     FROM geraet_kopplung ORDER BY id",
+                )
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let vorher = bestand().await;
+
+        migriere_bis(&pool, 213).await;
+
+        for (t, n) in [
+            ("geraet_kopplung", 2),
+            ("geraet_kopplungscode", 1),
+            ("geraet_kopplung_ereignis", 2),
+            ("session", 2),
+        ] {
+            assert_eq!(zaehle(t).await, n, "{t} überlebt den Umbau");
+        }
+        assert_eq!(bestand().await, vorher, "Bestand 1:1, ids unverändert");
+        let gebunden: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM geraet_kopplung WHERE verpflegungsstelle_id IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            gebunden, 0,
+            "Bestandskopplungen bleiben ohne Verpflegungsstelle"
+        );
+        let fk_verletzungen: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'geraet_kopplung_neu'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+        for index in [
+            "idx_geraet_kopplung_einsatz",
+            "idx_geraet_kopplung_abschnitt",
+        ] {
+            let da: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?",
+            )
+            .bind(index)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(da, 1, "{index} steht wieder");
+        }
+
+        // Neue Bindung an eine Verpflegungsstelle, höchstens eine Stelle über alle Arten.
+        let stelle = verpflegungsstelle(&pool, e, b, "Feldküche BR Sportplatz").await;
+        let neu = |name: &'static str, uhs: Option<i64>, vs: Option<i64>| {
+            let pool = pool.clone();
+            let konto = konto(name);
+            async move {
+                let g = konto.await;
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, uhs_id, \
+                        verpflegungsstelle_id, bezeichnung, erstellt_von, laeuft_ab_at) \
+                     VALUES (?, ?, 'verpflegung', ?, ?, 'Tresen', ?, '2099-01-01 00:00:00') \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(g)
+                .bind(uhs)
+                .bind(vs)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        neu("geraet-3", None, Some(stelle))
+            .await
+            .expect("Bindung an eine Verpflegungsstelle");
+        assert!(
+            neu("geraet-4", Some(uhs), Some(stelle)).await.is_err(),
+            "höchstens eine Stelle, auch mit der fünften Spalte"
+        );
+        assert!(
+            neu("geraet-5", None, Some(stelle + 1000)).await.is_err(),
+            "der Fremdschlüssel prüft die Stelle"
+        );
+
+        // Die Kaskade auf die Kinder wirkt weiter.
+        sqlx::query("DELETE FROM geraet_kopplung WHERE id = ?")
+            .bind(tablet)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_eq!(zaehle("geraet_kopplungscode").await, 0);
+        assert_eq!(zaehle("session").await, 1);
+
+        // Der Einsatz geht mit Stelle und gebundener Kopplung in einem Zug.
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("Einsatz mit gebundenem Verpflegungsgerät löschbar");
+        for t in ["geraet_kopplung", "verpflegungsstelle", "session"] {
+            assert_eq!(zaehle(t).await, 0, "{t} geht mit dem Einsatz");
+        }
+    }
 }
