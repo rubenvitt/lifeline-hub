@@ -709,6 +709,97 @@ describe('AusgabeAnsicht — Stellenwahl (LLH-1040, D13 Punkt 7)', () => {
   });
 });
 
+describe('AusgabeAnsicht — Gerät an einer Verpflegungsstelle (LLH-1048 Teil II)', () => {
+  /** Was der Server dem Gerät der Feldküche liefert: nur seine Stelle und deren Ist. */
+  const mittagAnKueche = () =>
+    mittag({
+      stelle_ids: [FELDKUECHE],
+      je_stelle: [
+        { stelle_id: FELDKUECHE, ausgegeben: { gesamt: 100, sonderkost: KEINE_SONDERKOST } },
+      ],
+    });
+  const kueche = () => stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche BR Sportplatz' });
+  const platz = () => document.querySelector<HTMLElement>('[data-lfh="ausgabe-stelle"]')!;
+
+  function zeigeAmGeraet(suche = '') {
+    server.use(
+      meHandler({
+        ...benutzerFixture({ id: BENUTZER_ID, anzeigename: 'Feldküche BR Sportplatz · Tresen' }),
+        geraet: {
+          kopplung_id: 3,
+          einsatz_id: 1,
+          ansicht: 'verpflegung',
+          uhs_id: null,
+          stelle_id: FELDKUECHE,
+          stelle: 'Feldküche BR Sportplatz',
+          bezeichnung: 'Tresen',
+          laeuft_ab_at: '2026-10-04 18:00:00',
+        },
+      }),
+    );
+    return renderMitProviders(ansicht, { route: `/einsaetze/1/verpflegung/1/ausgabe${suche}` });
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    liefert([mittagAnKueche()], [kueche()]);
+  });
+
+  it('keine Stellenwahl: die eigene Stelle steht fest mit ihrem Ist, das Bündel trägt sie', async () => {
+    zeigeAmGeraet();
+    await geladen();
+    await waitFor(() => expect(platz()).toHaveTextContent('Feldküche BR Sportplatz'));
+    expect(screen.queryByRole('combobox', { name: 'Stelle' })).toBeNull();
+    expect(platz().querySelector('[data-lfh="ausgabe-stelle-fest"]')).not.toBeNull();
+    expect(platz().querySelector('[data-lfh="ausgabe-stelle-ist"]')).toHaveTextContent(
+      'an der Stelle 100 EP',
+    );
+    await userEvent.click(taste('+1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toEqual({
+        menge: 1,
+        verpflegungsstelle_id: FELDKUECHE,
+        client_id: expect.any(String),
+      }),
+    );
+  });
+
+  it('`?stelle=` einer anderen Stelle ändert die eigene nicht', async () => {
+    zeigeAmGeraet(`?stelle=${TURNHALLE}`);
+    await geladen();
+    await waitFor(() => expect(platz()).toHaveTextContent('Feldküche BR Sportplatz'));
+    await userEvent.click(taste('+1'));
+    await userEvent.click(taste('Buchen'));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        verpflegungsstelle_id: FELDKUECHE,
+      }),
+    );
+  });
+
+  it('„Ausgabe nachtragen“: die Stelle steht fest, ohne Auswahl und ohne Zuführungsziel', async () => {
+    zeigeAmGeraet();
+    await geladen();
+    await waitFor(() => expect(platz()).toHaveTextContent('Feldküche BR Sportplatz'));
+    await userEvent.click(taste('Ausgabe nachtragen'));
+    const dialog = await screen.findByRole('dialog', { name: 'Ausgabe nachtragen: Mittag' });
+    expect(within(dialog).queryByRole('combobox', { name: 'Stelle' })).toBeNull();
+    expect(dialog.querySelector('[data-lfh="nachtrag-stelle-fest"]')).toHaveTextContent(
+      'Feldküche BR Sportplatz',
+    );
+    expect(within(dialog).queryByLabelText('Zuführungsziel')).toBeNull();
+    await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+    await waitFor(() =>
+      expect(erfasseAusgabe.mock.calls[0][2]).toMatchObject({
+        menge: 12,
+        verpflegungsstelle_id: FELDKUECHE,
+      }),
+    );
+  });
+});
+
 describe('AusgabeAnsicht — Empfänger (LLH-1055 Teil II)', () => {
   const platz = () => document.querySelector<HTMLElement>('[data-lfh="ausgabe-empfaenger"]')!;
   const gewaehlt = () => platz().querySelector('.ant-select-content')?.textContent ?? '';
