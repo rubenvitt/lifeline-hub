@@ -822,7 +822,8 @@ describe('AbloesungPage (LFH-635)', () => {
       laufendLiefert([fremd(), eins(), zwei(), drei()]);
       await client.invalidateQueries();
       await waitFor(() => expect(sammelbanner()).not.toBeNull());
-      await userEvent.click(screen.getByRole('radio', { name: 'Abgelöst' }));
+      // „Abgelöst“ ist die Vorgabe unter „Vergangen“ (LLH-1128).
+      await userEvent.click(screen.getByRole('radio', { name: 'Vergangen' }));
       await screen.findByText('Noch keine Ablösung vollzogen');
       await userEvent.click(screen.getByRole('radio', { name: /^Laufend/ }));
       await waitFor(() => expect(kartenNamen()).toHaveLength(4));
@@ -919,7 +920,8 @@ describe('AbloesungPage — Rücknahme abgelehnt (LFH-1077)', () => {
     async function zeigeAbgeloeste() {
       renderPage();
       await screen.findByText('Keine laufenden Schichten');
-      await userEvent.click(screen.getByRole('radio', { name: 'Abgelöst' }));
+      await userEvent.click(screen.getByRole('radio', { name: 'Vergangen' }));
+      expect(screen.getByRole('radio', { name: 'Abgelöst' })).toBeChecked();
       await screen.findByRole('article', { name: 'Schicht Florian 2' });
     }
     const nimmZurueck = (name: string) =>
@@ -969,6 +971,228 @@ describe('AbloesungPage — Rücknahme abgelehnt (LFH-1077)', () => {
 
       await nimmZurueck('Florian 1');
       await waitFor(() => expect(karte('Florian 1').querySelector('[data-fehler]')).toBeNull());
+    });
+  });
+});
+
+/**
+ * LLH-1128 Teil II: Einheiten im Einsatz ohne Schicht, beendete Schichten, Vererbung.
+ * Einheiten aus dem Mock oben: 11 „Florian 1“, 12 „Florian 2“, 13 „Florian 3“.
+ */
+describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
+  const offen = (einheit_id: number, beginnVor: number, eintreffenVor?: number) => ({
+    einheit_id,
+    perioden: [
+      {
+        anker: 'alarmierung',
+        beginn_at: inMinuten(-beginnVor),
+        eintreffen_at: eintreffenVor != null ? inMinuten(-eintreffenVor) : null,
+      },
+    ],
+  });
+  // Florian 1 trägt die Schicht und vererbt sie an Florian 3; Florian 2 ist ohne Schicht.
+  const traeger = () =>
+    schicht({
+      id: 1,
+      erbende_einheiten: [{ einheit_id: 13, einheit_name: 'Florian 3' }],
+    });
+  const segment = (name: RegExp | string) => screen.getByRole('radio', { name });
+  const ohneKarten = () =>
+    [...document.querySelectorAll('[data-lfh="abloesung-ohne-schicht"]')].map((k) =>
+      k.getAttribute('aria-label'),
+    );
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setzeViewportBreite(1440);
+    freigaben.wert = freigabenFixture();
+    einsatz.wert = {
+      id: 1,
+      bezeichnung: 'Hochwasser',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    };
+    laufendLiefert([traeger()]);
+    listeEinheitenPerioden.mockResolvedValue([offen(11, 300), offen(12, 90, 60), offen(13, 300)]);
+    fetchEinsatzSchichtmodell.mockResolvedValue({ vorwarnung_minuten: 30, laufende_schichten: 0 });
+    listeAbloesungVorgaben.mockResolvedValue([]);
+  });
+
+  it('zählt Einheiten mit offener Periode ohne eigene oder geerbte Schicht', async () => {
+    renderPage();
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('Ohne Schicht (1)'));
+    expect(screen.getByText('1 laufend · 0 fällig · 1 ohne Schicht')).toBeInTheDocument();
+    await userEvent.click(segment(/^Ohne Schicht/));
+    const bereich = await screen.findByRole('region', { name: 'Einheiten ohne Schicht' });
+    // Florian 3 erbt vom Träger und steht deshalb nicht da.
+    expect(ohneKarten()).toEqual(['Florian 2 ohne Schicht']);
+    const karte = within(bereich).getByRole('article', { name: 'Florian 2 ohne Schicht' });
+    expect(within(karte).getByText('eingetroffen')).toBeInTheDocument();
+  });
+
+  it('die tragende Schicht nennt ihre Erben', async () => {
+    renderPage();
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    expect(karte.querySelector('[data-lfh="abloesung-erben"]')).toHaveTextContent(
+      'gilt auch für: Florian 3',
+    );
+  });
+
+  it('„Schicht beginnen“ an der Zeile öffnet den Dialog mit der Einheit vorbelegt', async () => {
+    beginneSchicht.mockResolvedValue(schicht({ id: 2, einheit_id: 12, einheit_name: 'Florian 2' }));
+    renderPage();
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('(1)'));
+    await userEvent.click(segment(/^Ohne Schicht/));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Schicht beginnen für Florian 2' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Schicht beginnen' });
+    expect(within(dialog).getByTitle('Florian 2')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Rhythmus' }), '6');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
+    await waitFor(() =>
+      expect(beginneSchicht).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ einheit_id: 12, rhythmus_minuten: 360 }),
+      ),
+    );
+  });
+
+  it('der Kopfknopf belegt nichts vor, auch nach einer Zeile', async () => {
+    renderPage();
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('(1)'));
+    await userEvent.click(segment(/^Ohne Schicht/));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Schicht beginnen für Florian 2' }),
+    );
+    let dialog = await screen.findByRole('dialog', { name: 'Schicht beginnen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: 'Schicht beginnen' }));
+    dialog = await screen.findByRole('dialog', { name: 'Schicht beginnen' });
+    expect(within(dialog).queryByTitle('Florian 2')).toBeNull();
+  });
+
+  it('ein geplanter Ablöser steht ohne Schicht, aber ohne „Schicht beginnen“', async () => {
+    laufendLiefert([
+      { ...traeger(), abloesende_einheit_id: 12, abloesende_einheit_name: 'Florian 2' },
+    ]);
+    renderPage();
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('(1)'));
+    await userEvent.click(segment(/^Ohne Schicht/));
+    const karte = await screen.findByRole('article', { name: 'Florian 2 ohne Schicht' });
+    expect(within(karte).getByText('als Ablöser geplant für Florian 1')).toBeInTheDocument();
+    expect(within(karte).queryByRole('button')).toBeNull();
+  });
+
+  it('ohne Schreibrecht: die Zeilen tragen keinen Knopf', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    renderPage();
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('(1)'));
+    await userEvent.click(segment(/^Ohne Schicht/));
+    const karte = await screen.findByRole('article', { name: 'Florian 2 ohne Schicht' });
+    expect(within(karte).queryByRole('button')).toBeNull();
+  });
+
+  it('ohne Freigabe des Moduls Einheiten ist das Segment gesperrt und nennt den Grund', async () => {
+    freigaben.wert = freigabenFixture({ einheiten: { zugriff: false } });
+    renderPage();
+    await screen.findAllByRole('article');
+    await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveAttribute('aria-disabled', 'true'));
+    expect(segment(/^Ohne Schicht/)).toHaveAccessibleDescription('Modul Einheiten gesperrt');
+    expect(screen.getByText('1 laufend · 0 fällig')).toBeInTheDocument();
+    await userEvent.click(segment(/^Ohne Schicht/));
+    expect(segment(/^Laufend/)).toBeChecked();
+    expect(listeEinheitenPerioden).not.toHaveBeenCalled();
+  });
+
+  it('scheitert die Zeitachse, steht der Fehler statt eines ewigen Ladens', async () => {
+    listeEinheitenPerioden.mockRejectedValue(new ApiError(500, 'kaputt'));
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(segment(/^Ohne Schicht/));
+    expect(
+      await screen.findByText('Einheiten ohne Schicht konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.ant-spin')).toBeNull();
+  });
+
+  it('auf dem Handschirm stehen die Zahlen im Kopf, nicht in den Segmenten', async () => {
+    setzeViewportBreite(390);
+    renderPage();
+    await screen.findByText('1 laufend · 0 fällig · 1 ohne Schicht');
+    expect(screen.getAllByRole('radio').map((r) => r.textContent)).toEqual([
+      'Laufend',
+      'Ohne Schicht',
+      'Vergangen',
+    ]);
+  });
+
+  it('Vergangen → Beendet lädt den Status „beendet“ und zeigt den Grund', async () => {
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(
+        status === 'laufend'
+          ? [traeger()]
+          : status === 'beendet'
+            ? [
+                schicht({
+                  id: 4,
+                  einheit_name: 'Florian 4',
+                  status: 'beendet',
+                  beendet_grund: 'entlassung',
+                  beendet_at: inMinuten(-30),
+                }),
+              ]
+            : [],
+      ),
+    );
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(segment('Vergangen'));
+    await screen.findByText('Noch keine Ablösung vollzogen');
+    await userEvent.click(segment('Beendet'));
+    const bereich = await screen.findByRole('region', { name: 'Beendete Schichten' });
+    const karte = within(bereich).getByRole('article', { name: 'Schicht Florian 4' });
+    expect(karte.querySelector('[data-lfh="abloesung-ende"]')).toHaveTextContent(
+      /^beendet · entlassen \d{4,6}$/,
+    );
+    expect(listeAbloesungen).toHaveBeenCalledWith(1, 'beendet');
+  });
+
+  describe('Live-Zufluss (Regeln aus abloesung/zufluss.ts)', () => {
+    async function zeigeOhne() {
+      const ergebnis = renderPage();
+      await waitFor(() => expect(segment(/^Ohne Schicht/)).toHaveTextContent('(1)'));
+      await userEvent.click(segment(/^Ohne Schicht/));
+      await screen.findByRole('article', { name: 'Florian 2 ohne Schicht' });
+      return ergebnis;
+    }
+
+    it('eine neue Einheit ohne Schicht wartet hinter dem Banner, der Zähler stimmt sofort', async () => {
+      const { client } = await zeigeOhne();
+      // Der Träger ist entlassen: Florian 1 ist ohne Schicht und länger im Einsatz als
+      // Florian 2, stünde also oben. Florian 3 erbt nicht mehr, hat aber auch keine Periode mehr.
+      laufendLiefert([]);
+      listeEinheitenPerioden.mockResolvedValue([offen(11, 300), offen(12, 90, 60)]);
+      await client.invalidateQueries();
+      await waitFor(() => expect(sammelbanner()).not.toBeNull());
+      expect(sammelbanner()).toHaveTextContent('1 neue Einheit ohne Schicht');
+      expect(segment(/^Ohne Schicht/)).toHaveTextContent('Ohne Schicht (2)');
+      expect(ohneKarten()).toEqual(['Florian 2 ohne Schicht']);
+      await userEvent.click(
+        within(sammelbanner() as HTMLElement).getByRole('button', { name: 'anzeigen' }),
+      );
+      expect(ohneKarten()).toEqual(['Florian 1 ohne Schicht', 'Florian 2 ohne Schicht']);
+      expect(sammelbanner()).toBeNull();
+    });
+
+    it('eine Einheit, die eine Schicht bekommt, fällt sofort weg, ohne Banner', async () => {
+      const { client } = await zeigeOhne();
+      laufendLiefert([traeger(), schicht({ id: 2 })]);
+      await client.invalidateQueries();
+      await screen.findByText('Keine Einheit ohne Schicht');
+      expect(sammelbanner()).toBeNull();
+      expect(segment(/^Ohne Schicht/)).toHaveTextContent('Ohne Schicht (0)');
     });
   });
 });

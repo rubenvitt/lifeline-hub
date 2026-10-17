@@ -331,8 +331,10 @@ mit Einheit, Abschnitt, Beginn, Rhythmus (mit Kennzeichnung Vorgabe oder eigener
 Fälligkeit als Uhrzeit, Einstufung als Wort und Farbe sowie der geplanten ablösenden
 Einheit. Die Einstufung MUST einen zweiten Kanal neben der Farbe tragen (Wort), und nichts
 davon darf blinken. Ohne Schreibrecht MUST die Seite den Grund nennen und die Aktionen
-gesperrt statt entfernt zeigen. Abgelöste Schichten MUST in einer eigenen Ansicht
-nachlesbar sein.
+gesperrt statt entfernt zeigen. Abgelöste und beendete Schichten MUST in der Ansicht
+„Vergangen“ nachlesbar sein, getrennt nach Status („Abgelöst“, „Beendet“, LLH-1128). Eine
+beendete Schicht MUST als „beendet“ mit ihrem Grund erscheinen („beendet · entlassen“ mit
+Uhrzeit, „beendet · aufgelöst“), nie als „abgelöst“; ihre Zeitspalte trägt das Ende.
 
 #### Scenario: Überfällige Schicht in der Liste
 - **WHEN** eine Schicht überfällig ist
@@ -341,6 +343,10 @@ nachlesbar sein.
 #### Scenario: Vollzug mit Rückgängig
 - **WHEN** eine Person eine Ablösung über den Dialog vollzieht
 - **THEN** zeigt die Seite einen Hinweis mit der Aktion „Rückgängig“, die die Rücknahme auslöst
+
+#### Scenario: Mit der Entlassung beendet
+- **WHEN** die Schicht von „Florian 1“ mit seiner Entlassung um 14:12 endete und jemand „Vergangen“ → „Beendet“ wählt
+- **THEN** lädt die Seite die Schichten mit Status `beendet` und zeigt die Karte mit „beendet · entlassen 1412“, ohne Aktion und ohne „abgelöst“
 
 ### Requirement: Kartenhöhe unabhängig von Uhrzeit und fremder Rhythmusänderung
 
@@ -548,3 +554,42 @@ Untereinheit SHALL möglich bleiben und übersteuert die Vererbung für sie und 
 #### Scenario: Eigene Schicht übersteuert
 - **WHEN** an „Gruppe 1“ von Hand eine Schicht begonnen wird
 - **THEN** erbt deren „Trupp 1“ von der Gruppe, und der Zug nennt beide nicht mehr
+
+#### Scenario: Erben auf der Karte
+- **WHEN** die laufende Schicht von „Zug 1“ an „1. Trupp“ und „2. Trupp“ vererbt
+- **THEN** nennt ihre Karte in einer einzeiligen Zeile „gilt auch für: 1. Trupp, 2. Trupp“, den ganzen Text im Titel, und der Client rechnet die Vererbung nicht selbst nach
+
+### Requirement: Einheiten ohne Schicht
+
+Die Seite Ablösung SHALL eine Ansicht „Ohne Schicht“ mit Zahl führen (LLH-1128): die Einheiten
+mit offener Einsatzperiode (letzte Periode ohne Ende, alarmiert oder eingetroffen), die weder
+eine eigene laufende Schicht haben noch über `erbende_einheiten` eine erben, die am längsten im
+Einsatz zuerst. Jede Zeile MUST Eintreffen (ohne es die Alarmierung) und Abschnitt zeigen und
+mit Schreibrecht „Schicht beginnen“ anbieten, das den Dialog mit der Einheit vorbelegt. Ein
+geplanter Ablöser MUST in der Ansicht stehen, mit der Einheit, die er ablösen soll, aber ohne
+„Schicht beginnen“.
+
+#### Scenario: Zug, Trupp und eine einzelne Einheit
+- **WHEN** „Zug Nord“ eine laufende Schicht hat, sein „Trupp Nord“ und „Florian Süd“ eingetroffen sind und keine eigene haben
+- **THEN** zeigt das Segment „Ohne Schicht (1)“ und die Ansicht nur „Florian Süd“
+
+#### Scenario: Schicht aus der Zeile beginnen
+- **WHEN** jemand an der Zeile „Florian Süd“ „Schicht beginnen“ wählt und mit Rhythmus 6 h absendet
+- **THEN** ist „Florian Süd“ im Dialog vorbelegt, „Im Einsatz seit“ nennt das Eintreffen, die Schicht läuft, und die Zeile fällt weg
+
+### Requirement: Zufluss und Sperre der Ansicht „Ohne Schicht“
+
+Neue Einheiten ohne Schicht MUST hinter dem Sammelbanner warten, eine Einheit, die eine Schicht
+bekommt, MUST sofort wegfallen, und Zahl wie Kopf MUST mit der vollen Menge rechnen (Regeln wie
+bei den laufenden Schichten). Ohne Freigabe des Moduls Einheiten MUST das Segment gesperrt mit
+Grund stehen, ohne Zahl und ohne Anfrage an die Kräfte-Zeitachse. Auf 390 px MUST die
+Ansichtsleiste mit dem Banner in jeder Dichte ungekürzt im Fenster stehen; schmal trägt dann der
+Kopf die Zahlen.
+
+#### Scenario: Fremd eingetroffen
+- **WHEN** eine andere Einheit ohne Schicht eintrifft, während die Ansicht gezeigt wird
+- **THEN** zählt das Segment sie sofort mit, die gezeigten Zeilen bleiben, wo sie sind, und das Banner nennt „1 neue Einheit ohne Schicht“
+
+#### Scenario: Modul Einheiten gesperrt
+- **WHEN** der Person die Freigabe des Moduls Einheiten fehlt
+- **THEN** steht „Ohne Schicht“ gesperrt mit dem Grund „Modul Einheiten gesperrt“, und die Seite fragt die Zeitachse nicht ab

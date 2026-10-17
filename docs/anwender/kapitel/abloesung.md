@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -12,8 +12,9 @@ Rhythmus sie abgelöst werden soll und wann die Ablösung damit fällig ist. Die
 laufenden Schichten nach Fälligkeit, warnt vorher (ohne anderes Schichtmodell 30 Minuten) und
 meldet, wenn eine Ablösung überfällig ist.
 
-Die Führung plant hier, welche Einheit welche ablöst, und hält den Vollzug fest. Schichten beginnen,
-ändern und vollziehen dürfen Einsatzleitung und Führungspersonal.
+Die Führung sieht hier auch, welche Einheiten im Einsatz noch keine Schicht haben, plant, welche
+Einheit welche ablöst, und hält den Vollzug fest. Schichten beginnen, ändern und vollziehen dürfen
+Einsatzleitung und Führungspersonal.
 
 ## Abläufe
 
@@ -24,12 +25,29 @@ Die Führung plant hier, welche Einheit welche ablöst, und hält den Vollzug fe
 2. Je Karte links die Uhrzeit der Fälligkeit lesen, rechts die Einstufung: „planmäßig“, „Ablösung
    bald fällig“ (ab der Vorwarnzeit, ohne anderes Schichtmodell 30 Minuten vorher) oder
    „überfällig“. Darunter stehen „in …“ bzw. „seit …“, Abschnitt, „im Einsatz seit“, der Rhythmus
-   als Dauer mit seiner Quelle („Vorgabe“ des Abschnitts, „Vorgabe Einsatz“ oder „eigen“) und eine
-   geplante ablösende Einheit.
+   als Dauer mit seiner Quelle („Vorgabe“ des Abschnitts, „Vorgabe Einsatz“ oder „eigen“), unter
+   „gilt auch für:“ die Untereinheiten, die in dieser Schicht mitlaufen, und eine geplante
+   ablösende Einheit.
 
    ![Drei Schichtkarten: Rettungsstaffel überfällig mit geplanter Ablösung durch die 2. Rettungsstaffel, Sanitätszug „Ablösung bald fällig“ und Sanitätsgruppe UHS planmäßig mit eigenem Rhythmus](../bilder/abloesung/schichten.png)
 
-3. Unter „Abgelöst“ die vollzogenen Ablösungen nachlesen.
+3. Unter „Vergangen“ mit „Abgelöst“ die vollzogenen Ablösungen nachlesen, mit „Beendet“ die
+   Schichten, die ohne Ablösung endeten: „beendet · entlassen“ mit der Uhrzeit der Entlassung oder
+   „beendet · aufgelöst“.
+
+### Einheiten ohne Schicht finden
+
+1. „Ohne Schicht“ wählen. Die Zahl am Segment nennt die Einheiten im Einsatz, die keine Schicht
+   haben; auf dem Handy steht sie im Kopf der Seite („… ohne Schicht“).
+2. Je Zeile links lesen, seit wann die Einheit eingetroffen ist („eingetroffen“) oder, solange sie
+   unterwegs ist, seit wann sie alarmiert ist („alarmiert“); daneben Name und Abschnitt. Eine
+   Einheit, die schon als ablösende Einheit geplant ist, nennt „als Ablöser geplant für …“.
+
+   ![Ansicht „Ohne Schicht“: Betreuungsgruppe alarmiert mit „Schicht beginnen“, 2. Rettungsstaffel eingetroffen und als Ablöser für die Rettungsstaffel geplant](../bilder/abloesung/ohne-schicht.png)
+
+3. Einsatzleitung und Führungspersonal wählen an der Zeile „Schicht beginnen“. Der Dialog öffnet mit
+   der Einheit schon gewählt; weiter wie unter „Eine Schicht beginnen“ ab Schritt 3. Danach
+   verschwindet die Zeile.
 
 ### Eine Schicht beginnen
 
@@ -58,10 +76,10 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Dialog „Ablösung Rettungsstaffel vollziehen“ mit ablösender Einheit „2. Rettungsstaffel“ und Zeitpunkt jetzt](../bilder/abloesung/vollziehen.png)
 
-4. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Abgelöst“; die ablösende Einheit beginnt
-   eine Folgeschicht mit demselben Rhythmus.
-5. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Abgelöst“
-   mit „Vollzug zurücknehmen“, solange die Folgeschicht unberührt ist.
+4. „Vollziehen“ wählen. Die abgelöste Schicht wandert nach „Vergangen“, „Abgelöst“; die ablösende
+   Einheit beginnt eine Folgeschicht mit demselben Rhythmus.
+5. War es die falsche Karte, in der Meldung „Rückgängig“ wählen. Später geht das unter „Vergangen“,
+   „Abgelöst“ mit „Vollzug zurücknehmen“, solange die Folgeschicht unberührt ist.
 
 ### Ablösende Einheit planen und Rhythmus ändern
 
@@ -153,16 +171,40 @@ beginnt keine Schicht von selbst; dann bleibt „Schicht beginnen“ von Hand. I
 als ablösende Einheit geplant, beginnt ihre Schicht erst mit dem Vollzug der Ablösung.
 
 Gehört eine Einheit zu einem Verband, dessen Einheit schon eine laufende Schicht hat, bekommt sie
-mit ihrem Eintreffen keine eigene: sie läuft in der Schicht des Verbands mit. Wer für sie trotzdem
-eine eigene Schicht braucht, beginnt sie von Hand.
+mit ihrem Eintreffen keine eigene: sie läuft in der Schicht des Verbands mit. Die Karte des
+Verbands nennt sie unter „gilt auch für:“, unter „Ohne Schicht“ steht sie nicht. Wer für sie
+trotzdem eine eigene Schicht braucht, beginnt sie von Hand.
+
+Ob eine Schicht von Hand oder mit dem Eintreffen begann, zeigt nur das Einsatztagebuch, nicht die
+Karte.
 
 ### Schicht endet mit der Entlassung
 
 Wird eine Einheit entlassen (Status mit der Marke „Entlassung“ oder nachgetragen), endet ihre
 laufende Schicht ohne Ablösung, und ihre Erinnerungen fallen weg: eine entlassene Einheit meldet
-nie „Ablösung fällig“. Wird diese Entlassung in der Kräfte-Zeitachse wieder gestrichen, läuft die
-Schicht weiter wie zuvor. Wird eine Einheit aufgelöst, endet ihre Schicht ebenso; sie bleibt als
-Nachweis erhalten.
+nie „Ablösung fällig“. Die Schicht steht danach unter „Vergangen“, „Beendet“ mit „beendet ·
+entlassen“ und der Uhrzeit. Wird diese Entlassung in der Kräfte-Zeitachse wieder gestrichen, läuft
+die Schicht weiter wie zuvor. Wird eine Einheit aufgelöst, endet ihre Schicht ebenso („beendet ·
+aufgelöst“); sie bleibt als Nachweis erhalten.
+
+Endet die Schicht eines Verbands mit seiner Entlassung, laufen seine Untereinheiten nicht mehr in
+ihr mit. Sind sie selbst noch im Einsatz, stehen sie danach unter „Ohne Schicht“.
+
+### Wer unter „Ohne Schicht“ steht
+
+Im Einsatz ist eine Einheit, deren letzter Einsatzabschnitt in der Kräfte-Zeitachse offen ist: sie
+ist alarmiert oder eingetroffen und weder entlassen noch abgelöst. Unter „Ohne Schicht“ steht sie,
+solange sie weder eine eigene laufende Schicht hat noch in der Schicht ihres Verbands mitläuft.
+Aufgelöste Einheiten fehlen. Ein geplanter Ablöser steht dort ohne „Schicht beginnen“: seine
+Schicht beginnt mit dem Vollzug der Ablösung, eine eigene ließe den Vollzug scheitern.
+
+Die Ansicht braucht Einheiten und Kräfte-Zeitachse und damit das Modul Einheiten. Fehlt es der
+Person, steht „Ohne Schicht“ gesperrt mit „Modul Einheiten gesperrt“.
+
+Kommt eine Einheit ohne Schicht hinzu, während die Ansicht offen ist, zählt die Zahl sie sofort mit;
+die gezeigten Zeilen bleiben, wo sie sind, und ein Hinweis über der Liste nennt die neue, bis
+„anzeigen“ sie einreiht (auf dem Handy der Knopf „1 neu“). Bekommt eine Einheit eine Schicht, fällt
+ihre Zeile sofort weg. Dasselbe gilt für neue Schichten unter „Laufend“.
 
 ### Zusammenhang mit der Kräfte-Zeitachse
 

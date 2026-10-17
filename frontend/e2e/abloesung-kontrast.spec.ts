@@ -38,6 +38,9 @@ const KARTEN = [
 ] as const;
 const ABGELOEST = 'Florian Kontrast 4';
 const FOLGE = 'Florian Kontrast 5';
+/** LLH-1128: eine Einheit im Einsatz ohne Schicht, eine mit der Entlassung beendete Schicht. */
+const OHNE = 'Florian Kontrast 6';
+const ENTLASSEN = 'Florian Kontrast 7';
 
 async function anmelden(page: Page) {
   await page.goto('/login');
@@ -133,6 +136,24 @@ for (const modus of ['light', 'dark'] as const) {
       data: { abloesende_einheit_id: neu },
     });
     expect(v.ok(), `Vollzug: ${v.status()} ${await v.text()}`).toBeTruthy();
+    // Der Einsatz hat keine Vorgabe: das Eintreffen beginnt keine Schicht von selbst.
+    const draht = (vorMin: number) =>
+      new Date(jetzt - vorMin * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+    const nachtrag = async (einheit: number, art: string, vorMin: number) => {
+      const r = await page.request.post(`${basis}/einheiten/${einheit}/zeitachse`, {
+        data: { art, zeitpunkt_at: draht(vorMin) },
+      });
+      expect(r.ok(), `Nachtrag ${art}: ${r.status()} ${await r.text()}`).toBeTruthy();
+    };
+    await nachtrag(
+      await post(page, `${basis}/einheiten`, { name: OHNE, abschnitt_id }),
+      'eintreffen',
+      50,
+    );
+    const entlassen = await post(page, `${basis}/einheiten`, { name: ENTLASSEN, abschnitt_id });
+    await nachtrag(entlassen, 'eintreffen', 200);
+    await post(page, `${basis}/abloesungen`, { einheit_id: entlassen, rhythmus_minuten: 360 });
+    await nachtrag(entlassen, 'entlassung', 10);
 
     // Die überfällige Schicht meldet der Erinnerungs-Scheduler im nächsten Takt (30 s) als
     // stehende Benachrichtigung oben rechts (AlarmZentrale, `duration: 0`). Ob die Seite dann
@@ -252,12 +273,26 @@ for (const modus of ['light', 'dark'] as const) {
       await page.keyboard.press('Escape');
       await expect(dialog).toBeHidden();
     }
-    await inhalt.getByText('Abgelöst', { exact: true }).click();
+    // „Abgelöst“ ist die Vorgabe unter „Vergangen“ (LLH-1128).
+    await inhalt.getByRole('radio', { name: 'Vergangen', exact: true }).click();
+    await expect(inhalt.getByRole('radio', { name: 'Abgelöst', exact: true })).toBeChecked();
     const abgeloest = page.getByRole('article', { name: `Schicht ${ABGELOEST}`, exact: true });
     await expect(abgeloest).toContainText(`Abgelöst durch ${FOLGE}`);
     const randAbgeloest = await randKontrast(abgeloest, 'left');
     messwerte.push({ modus, karte: 'abgeloest', art: 'kartenrand', ...randAbgeloest });
     await messeTexte(inhalt, 'inhalt', 'abgelöst');
+
+    // LLH-1128: „Beendet“ unter „Vergangen“ und die Ansicht „Ohne Schicht“.
+    await inhalt.getByRole('radio', { name: 'Beendet', exact: true }).click();
+    await expect(
+      page.getByRole('article', { name: `Schicht ${ENTLASSEN}`, exact: true }),
+    ).toContainText('beendet · entlassen');
+    await messeTexte(inhalt, 'inhalt', 'beendet');
+    await inhalt.getByRole('radio', { name: /^Ohne Schicht/ }).click();
+    await expect(
+      page.getByRole('article', { name: `${OHNE} ohne Schicht`, exact: true }),
+    ).toBeVisible();
+    await messeTexte(inhalt, 'inhalt', 'ohne Schicht');
 
     // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf trivial wahr.
     const pruefeGesehen = (pflicht: string | RegExp) => {
@@ -277,7 +312,7 @@ for (const modus of ['light', 'dark'] as const) {
       'Im Einsatz seit',
       'Zeitpunkt',
       'Ablösung',
-      /^4 laufend · 2 fällig$/,
+      /^4 laufend · 2 fällig · 1 ohne Schicht$/,
       // Primärknöpfe: Kopfknopf und Absende-Knöpfe der Dialoge (LFH-661).
       'Schicht beginnen',
       'Vollziehen',
@@ -285,6 +320,10 @@ for (const modus of ['light', 'dark'] as const) {
       'fällig',
       'abgelöst',
       `Abgelöst durch ${FOLGE}`,
+      ENTLASSEN,
+      'beendet',
+      OHNE,
+      'eingetroffen',
     ])
       pruefeGesehen(tragend);
 

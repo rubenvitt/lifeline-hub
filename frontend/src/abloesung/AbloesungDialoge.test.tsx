@@ -338,4 +338,35 @@ describe('Ablösung — Rhythmus als Dauer (LLH-1122)', () => {
     await waitFor(() => expect(feld).toHaveAttribute('placeholder', '12 h (Vorgabe Einsatz)'));
     expect(feld).not.toBeRequired();
   });
+
+  it('Schicht beginnen: vorbelegte Einheit (LLH-1128) — Vorgabe greift, Absenden ohne Wahl', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <SchichtBeginnenDialog
+        offen
+        einheiten={[
+          { value: 5, label: 'Florian 1' },
+          { value: 6, label: 'Florian 2' },
+        ]}
+        vorbelegt={6}
+        vorgabeJeEinheit={new Map([[6, 360]])}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTitle('Florian 2')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox', { name: 'Rhythmus' })).toHaveAttribute(
+        'placeholder',
+        '6 h (Vorgabe Abschnitt)',
+      ),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith(expect.objectContaining({ einheit_id: 6 })),
+    );
+  });
 });

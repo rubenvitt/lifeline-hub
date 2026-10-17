@@ -67,6 +67,8 @@ interface SchichtBeginnenProps {
   offen: boolean;
   /** Einheiten OHNE laufende Schicht. */
   einheiten: EinheitOption[];
+  /** Vorbelegte Einheit — aus einer Zeile „Ohne Schicht“ (LLH-1128); wählbar bleibt jede. */
+  vorbelegt?: number;
   /** Einheit → Vorgabe ihres Abschnitts in Minuten (fehlt = keine Vorgabe). */
   vorgabeJeEinheit: Map<number, number>;
   /**
@@ -92,6 +94,7 @@ interface SchichtBeginnenProps {
 export function SchichtBeginnenDialog({
   offen,
   einheiten,
+  vorbelegt,
   vorgabeJeEinheit,
   einsatzVorgabe: einsatzVorgabeText,
   eintreffenJeEinheit = null,
@@ -118,6 +121,7 @@ export function SchichtBeginnenDialog({
       offen={offen}
       titel="Schicht beginnen"
       form={form}
+      initialValues={vorbelegt != null ? { einheit_id: vorbelegt } : undefined}
       erfassenText="Schicht beginnen"
       laeuft={laeuft}
       onErfassen={(w) =>
