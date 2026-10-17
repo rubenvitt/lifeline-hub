@@ -26,7 +26,7 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 2. Schnellwahl-Tabelle
 
-- [ ] 2.1 `anzeige/zeitSchnellwahl.ts` nach D6 (Ereignis und Frist, `schnellwahlZeit`,
+- [x] 2.1 `anzeige/zeitSchnellwahl.ts` nach D6 (Ereignis und Frist, `schnellwahlZeit`,
       Auswahl wirft bei unbekannter Minutenzahl); `components/terminSchnellwahl.ts` samt Test
       zieht hierher um, die Aufrufer `etb/WiedervorlageModal.tsx`,
       `lagebesprechung/TerminPaneel.tsx`, `lagebesprechung/LagebesprechungModal.tsx` importieren

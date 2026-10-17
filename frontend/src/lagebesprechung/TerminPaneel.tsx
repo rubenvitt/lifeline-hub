@@ -10,7 +10,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { LagebesprechungStand } from '../api/types';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { Kennzahl, Kennzahlenband, Paneel, type KennzahlZustand } from '../components/instrument';
-import { schnellwahlAuswahl, schnellwahlTermin } from '../components/terminSchnellwahl';
+import { schnellwahlAuswahl, schnellwahlZeit } from '../anzeige/zeitSchnellwahl';
 import { serverJetzt } from '../offline/serveruhr';
 import { lagebesprechungZustand, terminZeitpunkt } from './lagebesprechungZustand';
 
@@ -89,7 +89,7 @@ export default function TerminPaneel({
             <Button
               key={s.label}
               disabled={isGesperrt}
-              onClick={() => setTermin(schnellwahlTermin(serverJetzt(), s.minuten))}
+              onClick={() => setTermin(schnellwahlZeit(serverJetzt(), s.minuten))}
             >
               {s.label}
             </Button>

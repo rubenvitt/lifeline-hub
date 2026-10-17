@@ -1,7 +1,12 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { describe, expect, it } from 'vitest';
-import { SCHNELLWAHL_TERMIN, schnellwahlAuswahl, schnellwahlTermin } from './terminSchnellwahl';
+import {
+  SCHNELLWAHL,
+  SCHNELLWAHL_TERMIN,
+  schnellwahlAuswahl,
+  schnellwahlZeit,
+} from './zeitSchnellwahl';
 
 dayjs.extend(utc);
 
@@ -21,6 +26,20 @@ describe('SCHNELLWAHL_TERMIN', () => {
   });
 });
 
+describe('SCHNELLWAHL nach Feldart', () => {
+  it('Ereignis rückwärts: jetzt, −5 min, −15 min', () => {
+    expect(SCHNELLWAHL.ereignis.map((e) => [e.label, e.minuten])).toEqual([
+      ['jetzt', 0],
+      ['−5 min', -5],
+      ['−15 min', -15],
+    ]);
+  });
+
+  it('Frist ist die Bestandsreihe der Termine', () => {
+    expect(SCHNELLWAHL.frist).toBe(SCHNELLWAHL_TERMIN);
+  });
+});
+
 describe('schnellwahlAuswahl', () => {
   it('liefert die Teilmenge in Tabellenreihenfolge, unabhängig von der Aufrufreihenfolge', () => {
     expect(schnellwahlAuswahl([120, 30, 60]).map((e) => e.label)).toEqual([
@@ -35,15 +54,15 @@ describe('schnellwahlAuswahl', () => {
   });
 });
 
-describe('schnellwahlTermin', () => {
+describe('schnellwahlZeit', () => {
   it('rechnet vom übergebenen Bezug, nicht von der Wanduhr', () => {
     const bezug = dayjs('2026-09-13T08:00:00Z');
-    expect(schnellwahlTermin(bezug, 60).valueOf()).toBe(dayjs('2026-09-13T09:00:00Z').valueOf());
+    expect(schnellwahlZeit(bezug, 60).valueOf()).toBe(dayjs('2026-09-13T09:00:00Z').valueOf());
   });
 
   it('rechnet über die Sommerzeitgrenze in echten Minuten', () => {
     // 00:30Z = 01:30 MEZ; zwei echte Stunden später ist 02:30Z = 04:30 MESZ.
     const bezug = dayjs('2026-03-29T00:30:00Z');
-    expect(schnellwahlTermin(bezug, 120).valueOf()).toBe(dayjs('2026-03-29T02:30:00Z').valueOf());
+    expect(schnellwahlZeit(bezug, 120).valueOf()).toBe(dayjs('2026-03-29T02:30:00Z').valueOf());
   });
 });
