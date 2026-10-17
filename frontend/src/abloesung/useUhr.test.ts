@@ -25,6 +25,10 @@ const schicht = (
   status,
   ruecknehmbar: false,
   erbende_einheiten: [],
+  abloeser: [],
+  folgeschichten: [],
+  uebernommen_bei_vollzug: false,
+  abschnitt_uebergeben: false,
   angelegt_at: '2026-09-22 09:00:00',
 });
 

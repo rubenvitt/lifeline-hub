@@ -25,6 +25,10 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   status: 'laufend',
   ruecknehmbar: false,
   erbende_einheiten: [],
+  abloeser: [],
+  folgeschichten: [],
+  uebernommen_bei_vollzug: false,
+  abschnitt_uebergeben: false,
   angelegt_at: '2026-10-17 06:00:00',
   ...over,
 });

@@ -10,6 +10,7 @@ import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
+import { abloeserText } from './abloeser';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
 
@@ -87,6 +88,7 @@ export default function AbloesungKarte({
     s.erbende_einheiten.length > 0
       ? `gilt auch für: ${s.erbende_einheiten.map((e) => e.einheit_name).join(', ')}`
       : null;
+  const durch = abloeserText(s);
   const stufe = laufend ? einstufungOf(s, jetzt) : null;
   const darstellung = stufe ? abloesungEinstufung[stufe] : null;
   const kante =
@@ -202,10 +204,28 @@ export default function AbloesungKarte({
               {erben}
             </Text>
           )}
-          {s.abloesende_einheit_name && s.status !== 'beendet' && (
-            <Text type="secondary">
+          {/* Die Ablöser als Liste (LLH-1132), eine übernommene Schicht mit Vermerk. Einzeilig
+              wie die Erben: eine fremde Planung ändert die Höhe nur, wenn die Zeile erscheint
+              oder verschwindet; der ganze Text steht im Titel. */}
+          {durch && s.status !== 'beendet' && (
+            <Text
+              type="secondary"
+              data-lfh="abloesung-abloeser"
+              title={`${laufend ? 'Ablösung geplant durch' : 'Abgelöst durch'} ${durch}`}
+              style={{
+                display: 'block',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}
-              {s.abloesende_einheit_name}
+              {durch}
+            </Text>
+          )}
+          {s.status === 'abgeloest' && s.abschnitt_uebergeben && (
+            <Text type="secondary" data-lfh="abloesung-abschnitt-uebergeben">
+              Abschnitt {s.uebergebener_abschnitt_name ?? ''} übergeben
             </Text>
           )}
           {/* Ende ohne Ablösung (LLH-1128): kein „abgelöst“, der Grund als Wort. Die Uhrzeit

@@ -31,7 +31,7 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={BERLIN}>
         <VollzugDialog
-          schicht={{ id: 3, einheit_name: 'Florian 1' } as Abloesung}
+          schicht={{ id: 3, einheit_name: 'Florian 1', abloeser: [] } as Abloesung}
           einheiten={[]}
           laeuft={false}
           fehler={null}
@@ -213,7 +213,7 @@ describe('Ablösung — Platzhalter statt Feldhilfe (LFH-1078)', () => {
   it('Vollzug: Zeitpunkt zeigt „jetzt“, kein Erklärsatz', async () => {
     renderMitProviders(
       <VollzugDialog
-        schicht={{ id: 3, einheit_name: 'Florian 1' } as Abloesung}
+        schicht={{ id: 3, einheit_name: 'Florian 1', abloeser: [] } as Abloesung}
         einheiten={[]}
         laeuft={false}
         fehler={null}
@@ -232,7 +232,7 @@ describe('Ablösung — Platzhalter statt Feldhilfe (LFH-1078)', () => {
   it('Ablöser planen: kein Erklärsatz, der Platzhalter sagt „keine geplant“', async () => {
     renderMitProviders(
       <AbloeserDialog
-        schicht={{ id: 3, einheit_name: 'Florian 1' } as Abloesung}
+        schicht={{ id: 3, einheit_name: 'Florian 1', abloeser: [] } as Abloesung}
         einheiten={[]}
         laeuft={false}
         fehler={null}

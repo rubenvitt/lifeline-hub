@@ -21,6 +21,10 @@ function schicht(teil: Partial<Abloesung> & { id: number }): Abloesung {
     status: 'laufend',
     ruecknehmbar: false,
     erbende_einheiten: [],
+    abloeser: [],
+    folgeschichten: [],
+    uebernommen_bei_vollzug: false,
+    abschnitt_uebergeben: false,
     angelegt_at: '2026-09-22 09:30:00',
     ...teil,
   };

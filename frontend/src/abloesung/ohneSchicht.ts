@@ -18,6 +18,7 @@
  * ist zugleich der Sortierschlüssel der Zuflussschleuse (`abloesung/zufluss.ts`).
  */
 import type { Abloesung, EinheitPerioden } from '../api/types';
+import { abloeserIds } from './abloeser';
 
 /** Was die Menge von einer Einheit braucht (Ausschnitt aus `EinheitAnzeige`). */
 export interface EinheitKurz {
@@ -49,7 +50,8 @@ export function findOhneSchicht(
     if (s.status !== 'laufend') continue;
     belegt.add(s.einheit_id);
     for (const e of s.erbende_einheiten) belegt.add(e.einheit_id);
-    if (s.abloesende_einheit_id != null) abloeserFuer.set(s.abloesende_einheit_id, s.einheit_name);
+    // Jeder Eintrag der Liste (LLH-1132), ohne Liste der Spiegel.
+    for (const id of abloeserIds(s)) abloeserFuer.set(id, s.einheit_name);
   }
   const offen = new Map<number, { beginn_at: string; eintreffen_at: string | null }>();
   for (const { einheit_id, perioden: p } of perioden) {
