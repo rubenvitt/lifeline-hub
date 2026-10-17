@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ALLE_ARTEN,
   BENACHRICHTIGUNG_ARTEN,
+  ersatzPfad,
   sammelGruppeVon,
   sammelTitel,
   sammelZeilen,
@@ -58,6 +59,21 @@ describe('Katalog der Benachrichtigungsarten', () => {
     expect(zielVon({ art: 'abloesung_planung', bezug_typ: 'abloesung' })).toBe('abloesung');
     expect(sammelGruppeVon('abloesung_planung')).toBe('abloesung');
     expect(sammelGruppeVon('abloesung_abloeser')).toBe('abloesung_abloeser');
+  });
+
+  it('Ersatz ohne gelesenen Text: eine Benachrichtigung der Ablösung springt zu ihrer Schicht', () => {
+    for (const bezug_typ of ['abloesung', 'abloeser_eingetroffen', 'abloeser_entfallen'] as const) {
+      expect(ersatzPfad({ art: 'abloesung_abloeser', bezug_typ, bezug_id: 9, einsatz_id: 4 })).toBe(
+        '/einsaetze/4/abloesung?schicht=9',
+      );
+    }
+    // Sonst das Modul des Bezugs, Org-Arten der Einsatz.
+    expect(
+      ersatzPfad({ art: 'auftrag_erteilt', bezug_typ: 'auftrag', bezug_id: 3, einsatz_id: 4 }),
+    ).toBe('/einsaetze/4/auftraege');
+    expect(
+      ersatzPfad({ art: 'einsatz_neu', bezug_typ: 'einsatz', bezug_id: 4, einsatz_id: 4 }),
+    ).toBe('/einsaetze/4');
   });
 
   it('jeder Sprung führt in den Einsatz, außerhalb in die Einsatzliste', () => {

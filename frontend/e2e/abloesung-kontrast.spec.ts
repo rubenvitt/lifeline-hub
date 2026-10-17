@@ -9,7 +9,9 @@ import { kontrast, randKontrast } from './kontrast-kern';
  *
  * GESÄT: je Einstufung eine Schicht — überfällig, Vorwarnung, planmäßig — und eine vollzogene
  * mit ablösender Einheit (deren Folgeschicht ist die vierte laufende Karte, sie selbst steht
- * unter „Abgelöst").
+ * unter „Abgelöst"). Die überfällige plant als Ablöser die planmäßige Einheit, die alarmiert ist
+ * und selbst eine Schicht hat: Stand des Ablösers und Warnung in der Rolle Achtung stehen damit
+ * auf der Alarmfläche (LLH-1131 Teil II).
  *
  * SCHRANKEN (Literale): Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 für JEDEN Text im Inhalt, über den
  * Textbaum gefunden (eine Selektorliste übersähe das nächste Textstück). Zustandstragende
@@ -117,14 +119,20 @@ for (const modus of ['light', 'dark'] as const) {
     const jetzt = Date.now();
     // Ein Abschnitt, damit das Vorgaben-Paneel eine Zeile trägt statt des Leerzustands.
     const abschnitt_id = await post(page, `${basis}/abschnitte`, { name: 'Deichwache Kontrast' });
+    const kartenIds: { einheit: number; schicht: number }[] = [];
     for (const k of KARTEN) {
       const einheit = await post(page, `${basis}/einheiten`, { name: k.einheit, abschnitt_id });
-      await post(page, `${basis}/abloesungen`, {
+      const schicht = await post(page, `${basis}/abloesungen`, {
         einheit_id: einheit,
         rhythmus_minuten: 360,
         beginn_at: new Date(jetzt - k.beginnVorMin * 60_000).toISOString(),
       });
+      kartenIds.push({ einheit, schicht });
     }
+    const planung = await page.request.patch(`${basis}/abloesungen/${kartenIds[0].schicht}`, {
+      data: { abloeser_ids: [kartenIds[2].einheit] },
+    });
+    expect(planung.ok(), `Planung: ${planung.status()} ${await planung.text()}`).toBeTruthy();
     const alt = await post(page, `${basis}/einheiten`, { name: ABGELOEST, abschnitt_id });
     const neu = await post(page, `${basis}/einheiten`, { name: FOLGE, abschnitt_id });
     const schicht = await post(page, `${basis}/abloesungen`, {
@@ -150,6 +158,7 @@ for (const modus of ['light', 'dark'] as const) {
       'eintreffen',
       50,
     );
+    await nachtrag(kartenIds[2].einheit, 'alarmierung', 5);
     const entlassen = await post(page, `${basis}/einheiten`, { name: ENTLASSEN, abschnitt_id });
     await nachtrag(entlassen, 'eintreffen', 200);
     await post(page, `${basis}/abloesungen`, { einheit_id: entlassen, rhythmus_minuten: 360 });
@@ -259,11 +268,13 @@ for (const modus of ['light', 'dark'] as const) {
     // (3) Zwei Erfassungsdialoge stellvertretend, beide auf der `ErfassungsModal`-Hülle.
     for (const [ausloeser, titel] of [
       [kopf.getByRole('button', { name: 'Schicht beginnen', exact: true }), 'Schicht beginnen'],
+      // Die Karte ohne Planung: ein vorbelegtes Mehrfachfeld trägt antds unsichtbares Maßstück
+      // (`opacity: 0`), das der Messkern nicht zusammensetzt.
       [
         page
-          .getByRole('article', { name: `Schicht ${KARTEN[0].einheit}`, exact: true })
+          .getByRole('article', { name: `Schicht ${KARTEN[1].einheit}`, exact: true })
           .getByRole('button', { name: 'Ablösung vollziehen', exact: true }),
-        `Ablösung ${KARTEN[0].einheit} vollziehen`,
+        `Ablösung ${KARTEN[1].einheit} vollziehen`,
       ],
     ] as const) {
       await ausloeser.click();
@@ -324,6 +335,9 @@ for (const modus of ['light', 'dark'] as const) {
       'beendet',
       OHNE,
       'eingetroffen',
+      // LLH-1131 Teil II: Stand des Ablösers und Warnung auf der Alarmfläche.
+      `${KARTEN[2].einheit} · alarmiert`,
+      `${KARTEN[2].einheit} steht selbst im Einsatz seit`,
     ])
       pruefeGesehen(tragend);
 

@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/besatzung.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts, frontend/src/abloesung/zufluss.ts, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/abloesung/kopplung.rs, src/zeitachse/repo.rs, src/abloesung/hinweis.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/bereitstellungsraum/eintreffen.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/planungWarnung.ts, frontend/src/abloesung/abloeser.ts, frontend/src/abloesung/abloeserStand.ts, frontend/src/abloesung/besatzung.ts, frontend/src/alarm/benachrichtigungKatalog.ts, frontend/src/routing/deeplinks.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -29,9 +29,13 @@ Einsatzleitung und Führungspersonal.
    „überfällig“. Darunter stehen „in …“ bzw. „seit …“, Abschnitt, „im Einsatz seit“, der Rhythmus
    als Dauer mit seiner Quelle („Vorgabe“ des Abschnitts, „Vorgabe Einsatz“ oder „eigen“), unter
    „gilt auch für:“ die Untereinheiten, die in dieser Schicht mitlaufen, und die geplanten
-   ablösenden Einheiten („Ablösung geplant durch …“).
+   ablösenden Einheiten („Ablösung geplant durch …“). Ist eine von ihnen alarmiert oder
+   eingetroffen, steht dort ihr Stand, etwa „Ablösung: 2. Rettungsstaffel · alarmiert 1340 ·
+   eingetroffen 1412 (BR Sportplatz)“. Ist eine geplante Einheit schon für eine andere Schicht
+   geplant oder steht sie selbst im Einsatz, nennt die Zeile darunter das, etwa „Sanitätsgruppe UHS
+   steht selbst im Einsatz seit 0820“.
 
-   ![Drei Schichtkarten: Rettungsstaffel überfällig mit geplanter Ablösung durch die 2. Rettungsstaffel, Sanitätszug „Ablösung bald fällig“ und Sanitätsgruppe UHS planmäßig mit eigenem Rhythmus](../bilder/abloesung/schichten.png)
+   ![Drei Schichtkarten: Rettungsstaffel überfällig, ihre ablösende 2. Rettungsstaffel eingetroffen im BR Sportplatz; Sanitätszug „Ablösung bald fällig“ mit der Sanitätsgruppe UHS als geplanter Ablösung und der Warnung, dass sie selbst im Einsatz steht; Sanitätsgruppe UHS planmäßig mit eigenem Rhythmus](../bilder/abloesung/schichten.png)
 
 3. Unter „Vergangen“ mit „Abgelöst“ die vollzogenen Ablösungen nachlesen: „Abgelöst durch …“
    nennt alle ablösenden Einheiten, eine übernommene Schicht mit „(Schicht übernommen)“, und
@@ -157,7 +161,7 @@ Fällig ist eine Schicht bei Beginn plus Rhythmus. Der Rhythmus liegt zwischen e
 und 168 Stunden und erscheint als Dauer, etwa „8 h“ oder „7:30 h“. Vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, 30 Minuten vorher,
 wenn das Schichtmodell des Einsatzes nichts anderes vorgibt, bei
 Fälligkeit der Alarm „Ablösung fällig“, jeweils mit Einheit und Uhrzeit der Fälligkeit, etwa
-„Florian 1, 15:30“, und „Öffnen“ zur Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
+„Florian 1, 15:30“, und „Öffnen“ zu dieser Schicht auf der Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
 die Schichten, die bald fällig oder überfällig sind; der Überblick führt die Fälligkeiten als
 Marken.
 
@@ -185,7 +189,7 @@ einen Hinweis mit dezentem Ton, wenn diese Einheit
 - dort abgerufen wird („Ablösende Einheit abgerufen“).
 
 Die Zeile darunter nennt beide Einheiten, etwa „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“;
-„Öffnen“ führt zur Seite Ablösung. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
+„Öffnen“ führt zur Schicht. Wer das Ereignis selbst ausgelöst hat, bekommt keinen Hinweis.
 Alarmiert und eingetroffen zählen nur am Anfang ihres Einsatzabschnitts in der
 Kräfte-Zeitachse, ein Nachtrag in einen abgeschlossenen Abschnitt meldet nichts. Bei einem
 Verband zählt nur die geplante Einheit, nicht ihre Untereinheiten.
@@ -194,6 +198,28 @@ Wird die geplante Einheit aufgelöst oder entlassen, entfällt die Planung: die 
 geplante Ablösung mehr, das Einsatztagebuch hält „Planung der ablösenden Einheit entfallen“ fest,
 und die Leser bekommen den Hinweis „Planung der ablösenden Einheit entfallen“. Danach steht der
 Hinweis „Keine ablösende Einheit geplant“ wieder an.
+
+### Sprung zur Schicht
+
+„Öffnen“ in einem Hinweis der Ablösung (Vorwarnung, Fälligkeit, „Keine ablösende Einheit
+geplant“ und die Hinweise zur ablösenden Einheit) öffnet die Seite Ablösung in der Ansicht, in der
+die Schicht steht: „Laufend“, sonst „Vergangen“ mit „Abgelöst“ oder „Beendet“. Die Karte rückt ins
+Bild und ist acht Sekunden lang hervorgehoben, ohne zu blinken; eine überfällige Karte behält
+dabei ihre rote Fläche. Warten neue Schichten noch hinter dem Hinweis über der Liste, reiht der
+Sprung sie ein. Fasst ein Hinweis mehrere zusammen, führt er nur zur Seite.
+
+### Stand der ablösenden Einheit an der Karte
+
+Der Stand an der Karte kommt aus der Kräfte-Zeitachse der geplanten Einheit, aus ihrem offenen
+Einsatzabschnitt: „alarmiert“ mit der Alarmierung, „eingetroffen“ mit dem Eintreffen, in Klammern
+der Bereitstellungsraum, solange sie dort steht. Mehrere geplante Einheiten stehen in derselben
+Zeile, mit „;“ getrennt; reicht der Platz nicht, endet die Zeile mit „…“, und der ganze Text steht
+im Tooltip. Ändert sich der Stand, während die Seite offen ist, zieht die Zeile nach, ohne dass die
+Karte wächst.
+
+Den Stand sieht nur, wer das Modul Einheiten sieht; den Namen des Bereitstellungsraums nur, wer
+auch das Modul Bereitstellungsräume sieht. Die Warnungen zur Planung stehen in der Farbe für
+Achtung, nicht in Rot; sie ändern die Einstufung der Karte nicht, und die Planung gilt trotzdem.
 
 ### Vorgabe des Einsatzes und Schichtmodelle
 

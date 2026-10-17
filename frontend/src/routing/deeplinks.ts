@@ -269,9 +269,13 @@ export function dokumentePfad(einsatzId: number, opts: { neu?: boolean } = {}): 
   });
 }
 
-/** Ablösungs-Modul: Schichten und fällige Ablösungen je Einheit. */
-export function abloesungPfad(einsatzId: number): string {
-  return einsatzModulPfad(einsatzId, 'abloesung');
+/**
+ * Ablösungs-Modul: Schichten und fällige Ablösungen je Einheit. `?schicht=` springt zu einer
+ * Schicht (LLH-1131 Teil II): die Seite wählt ihre Ansicht, rollt sie ins Bild und hebt sie kurz
+ * hervor. Gebaut wie der Pfad in `src/benachrichtigung/text.rs` (Bezüge der Ablösung).
+ */
+export function abloesungPfad(einsatzId: number, opts: { schicht?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'abloesung'), { schicht: opts.schicht });
 }
 
 /** Verpflegungs-Modul: Zeitfenster mit Bedarf, Ausgaben und Deckung. */

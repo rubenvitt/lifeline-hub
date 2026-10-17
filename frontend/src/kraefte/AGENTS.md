@@ -63,8 +63,15 @@ einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO 
 **Geplant** heißt Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste
 `einsatz_abloesung_abloeser`; jede Prüfung darauf liest beide (Planungshinweis, Hinweise,
 Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
-(`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`). Der
-Planungshinweis ist eine Frist, keine Einstufung.
+(`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`), an der Karte in
+der Rolle Achtung, nie als Einstufung. Der Planungshinweis ist eine Frist, keine Einstufung.
+Den Stand eines geplanten Ablösers an der Karte („Ablösung: … · alarmiert … · eingetroffen …
+(BR …)“, LLH-1131 Teil II) liest nur `abloesung/abloeserStand.ts` aus der offenen Periode der
+Zeitachse; der Raum kommt aus `aktueller_br_id` und der Raumliste, die nur mit Freigabe der
+Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird. Kein eigener Abruf, kein
+DTO-Feld: live über die bestehenden Ereignisse. Jede Benachrichtigung der Ablösung springt zu
+ihrer Schicht (`abloesungPfad(…, { schicht })`, Server `benachrichtigung::text::pfad`, beide
+gleich); die Seite nimmt `?schicht=` nach `useQueryParamSelektion` an.
 
 **Vollzug** (LLH-1132, Spec `kraefte-abloesung`): Die Liste der Ablöser ist die Wahrheit
 (höchstens `ABLOESER_MAX`, Spiegel `ABLOESUNG_ABLOESER_MAX`); `abloesende_einheit_id` ist ihr

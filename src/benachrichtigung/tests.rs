@@ -235,6 +235,22 @@ fn pfade_folgen_den_deeplinks() {
     );
     assert_eq!(p(B::Person, 9), "/einsaetze/7/personen/9");
     assert_eq!(p(B::Fahrzeug, 2), "/einsaetze/7/fahrzeuge?fahrzeug=2");
+    // Jede Benachrichtigung der Ablösung springt zu ihrer Schicht (LLH-1131 Teil II).
+    for typ in [
+        B::Abloesung,
+        B::AbloeserAlarmiert,
+        B::AbloeserEingetroffen,
+        B::AbloeserBrEingetroffen,
+        B::AbloeserAbgerufen,
+        B::AbloeserEntfallen,
+    ] {
+        assert_eq!(
+            p(typ, 3),
+            "/einsaetze/7/abloesung?schicht=3",
+            "{}",
+            typ.as_str()
+        );
+    }
     for typ in BenachrichtigungBezugTyp::ALLE {
         assert!(p(typ, 1).starts_with("/einsaetze/7"), "{}", typ.as_str());
     }
@@ -560,7 +576,10 @@ async fn hinweis_zur_abloesenden_einheit_nennt_titel_aus_dem_bezug_und_beide_ein
         t.detail.as_deref(),
         Some("Ablösung für Rettungsstaffel: 2. Rettungsstaffel")
     );
-    assert_eq!(t.pfad, format!("/einsaetze/{e}/abloesung"));
+    assert_eq!(
+        t.pfad,
+        format!("/einsaetze/{e}/abloesung?schicht={schicht}")
+    );
     for (typ, titel) in [
         (
             BenachrichtigungBezugTyp::AbloeserAlarmiert,

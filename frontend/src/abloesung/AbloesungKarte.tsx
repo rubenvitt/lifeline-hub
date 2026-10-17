@@ -10,10 +10,13 @@ import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abloeserText } from './abloeser';
 import { besatzungText } from './besatzung';
+import { abloeserStandText, type AbloeserStand } from './abloeserStand';
 import { formatDauer } from './dauer';
 import { abloesungZeit, einstufungOf } from './einstufung';
+import { planungWarnungText } from './planungWarnung';
 
 const { Text } = Typography;
 
@@ -27,7 +30,25 @@ interface AbloesungKarteProps {
   onZuruecknehmen?: (schicht: Abloesung) => void;
   /** Grund der zuletzt abgelehnten Rücknahme an dieser Karte, aus `components/useZeilenFehler.ts`. */
   fehlerGrund?: ZeilenGrund | null;
+  /**
+   * Stand der geplanten Ablöser aus der Kräfte-Zeitachse (LLH-1131 Teil II,
+   * `abloesung/abloeserStand.ts`); `null`, solange keiner ein Ereignis trägt.
+   */
+  abloeserStand?: readonly AbloeserStand[] | null;
+  /** Per Deeplink `?schicht=` angesprungen (Spec `deeplink-hervorhebung`). */
+  hervorgehoben?: boolean;
 }
+
+/** Einzeilig mit „…“, der ganze Text im `title` (LFH-708: fremde Änderungen ändern die Höhe nicht). */
+const EINZEILIG = {
+  display: 'block',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+} as const;
+
+/** Zeiten in Mono mit festen Ziffern, in der Größe der Zeile (LFH-771). */
+const ZAHL = { fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums' } as const;
 
 /** „in 23 min" · „seit 12 min überfällig" — das Wort neben der Uhrzeit. */
 function abstandText(faelligAt: string, jetzt: Dayjs): string {
@@ -71,6 +92,14 @@ function zeitspalte(s: Abloesung): { zeit: string | null | undefined; wort: stri
  * Nicht laufend ist eine Schicht abgelöst (Zeitspalte: Vollzug) oder beendet (LLH-1128,
  * Zeitspalte: Ende, dazu „beendet · entlassen …“ bzw. „beendet · aufgelöst“). Eine laufende nennt
  * die Untereinheiten, die sie erben („gilt auch für: …“, Knoten-Modell).
+ *
+ * Hinweise an die Führung (LLH-1131 Teil II): Trägt ein geplanter Ablöser ein Ereignis der
+ * Zeitachse, wird aus „Ablösung geplant durch …“ in derselben Zeile „Ablösung: 2. Rettungsstaffel ·
+ * alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Die Warnungen zur Planung
+ * (`planung_warnungen`) stehen dezent in einer Zeile in der Rolle Achtung, im Wortlaut der Meldung
+ * beim Planen; sie sind keine Einstufung und färben weder Kante noch Fläche. Angesprungen
+ * (`?schicht=`) trägt die Karte die Deeplink-Hervorhebung: Bedienfläche, Linie oben und unten,
+ * Gefahr gewinnt (eine überfällige Karte behält ihre Alarmfläche).
  */
 export default function AbloesungKarte({
   schicht: s,
@@ -81,8 +110,11 @@ export default function AbloesungKarte({
   onRhythmusAendern,
   onZuruecknehmen,
   fehlerGrund,
+  abloeserStand,
+  hervorgehoben = false,
 }: AbloesungKarteProps) {
   const { token, rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
   const laufend = s.status === 'laufend';
   const spalte = zeitspalte(s);
   const erben =
@@ -96,6 +128,16 @@ export default function AbloesungKarte({
     darstellung && darstellung.rolle !== 'neutral'
       ? rollenFarbe(darstellung.rolle, token)
       : rollen.linie;
+  const stand = laufend && abloeserStand && abloeserStand.length > 0 ? abloeserStand : null;
+  const warnungen = laufend
+    ? s.planung_warnungen.map((w) => planungWarnungText(w, konventionen)).join(' · ')
+    : '';
+  const grund =
+    stufe === 'ueberfaellig'
+      ? rollen.alarmFlaeche
+      : hervorgehoben
+        ? rollen.bedienFlaeche
+        : rollen.paneel;
 
   const menue: MenueEintrag<'abloeser' | 'rhythmus'>[] = [
     ...(onAbloeserPlanen ? [{ key: 'abloeser' as const, label: 'Ablösende Einheit planen' }] : []),
@@ -107,15 +149,21 @@ export default function AbloesungKarte({
       data-lfh="abloesung-karte"
       data-einstufung={stufe ?? undefined}
       data-alarm={stufe === 'ueberfaellig' ? 'true' : undefined}
+      data-hervorgehoben={hervorgehoben ? 'true' : undefined}
+      data-schicht-id={s.id}
       aria-label={`Schicht ${s.einheit_name}`}
       style={{
         display: 'flex',
         alignItems: 'stretch',
         minWidth: 0,
         marginBottom: token.marginXS,
-        background: stufe === 'ueberfaellig' ? rollen.alarmFlaeche : rollen.paneel,
+        background: grund,
         border: `1px solid ${rollen.linie}`,
         borderInlineStart: `3px solid ${kante}`,
+        // Wie `kommunikation/KommKarte.tsx` (LFH-896): Linien innen, kein Ring, die Kante bleibt.
+        boxShadow: hervorgehoben
+          ? `inset 0 2px 0 ${rollen.bedien}, inset 0 -2px 0 ${rollen.bedien}`
+          : undefined,
         color: rollen.text,
       }}
     >
@@ -208,20 +256,81 @@ export default function AbloesungKarte({
           {/* Die Ablöser als Liste (LLH-1132), eine übernommene Schicht mit Vermerk. Einzeilig
               wie die Erben: eine fremde Planung ändert die Höhe nur, wenn die Zeile erscheint
               oder verschwindet; der ganze Text steht im Titel. */}
-          {durch && s.status !== 'beendet' && (
+          {stand ? (
             <Text
               type="secondary"
               data-lfh="abloesung-abloeser"
-              title={`${laufend ? 'Ablösung geplant durch' : 'Abgelöst durch'} ${durch}`}
-              style={{
-                display: 'block',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
+              title={abloeserStandText(stand, konventionen)}
+              style={EINZEILIG}
             >
-              {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}
-              {durch}
+              Ablösung:{' '}
+              {stand.map((a, i) => (
+                <span key={a.einheit_id}>
+                  {i > 0 && '; '}
+                  {a.einheit_name}
+                  {a.alarmiert_at && (
+                    <>
+                      {' · alarmiert '}
+                      <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
+                        <ZeitAnzeige wert={a.alarmiert_at} format="kurz" />
+                      </span>
+                    </>
+                  )}
+                  {a.eingetroffen_at && (
+                    <>
+                      {' · eingetroffen '}
+                      <span data-lfh="abloesung-abloeser-zeit" style={ZAHL}>
+                        <ZeitAnzeige wert={a.eingetroffen_at} format="kurz" />
+                      </span>
+                    </>
+                  )}
+                  {a.br_name && ` (${a.br_name})`}
+                </span>
+              ))}
+            </Text>
+          ) : (
+            durch &&
+            s.status !== 'beendet' && (
+              <Text
+                type="secondary"
+                data-lfh="abloesung-abloeser"
+                title={`${laufend ? 'Ablösung geplant durch' : 'Abgelöst durch'} ${durch}`}
+                style={{
+                  display: 'block',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {laufend ? 'Ablösung geplant durch ' : 'Abgelöst durch '}
+                {durch}
+              </Text>
+            )
+          )}
+          {/* Plausibilität beim Planen (LLH-1131): dezent, Rolle Achtung, nie Rot; die Planung
+              gilt trotzdem. Einzeilig wie die Ablöser, der ganze Text im Titel. */}
+          {warnungen && (
+            <Text
+              data-lfh="abloesung-planung-warnung"
+              title={warnungen}
+              style={{ ...EINZEILIG, color: rollen.achtungText }}
+            >
+              {/* Wortlaut aus `planungWarnungText`; die Uhrzeit in Mono wie jede Zeit der Karte. */}
+              {s.planung_warnungen.map((w, i) => (
+                <span key={`${w.art}-${w.einheit_id}-${w.abloesung_id ?? ''}`}>
+                  {i > 0 && ' · '}
+                  {w.art === 'im_einsatz' && w.seit_at ? (
+                    <>
+                      {w.einheit_name} steht selbst im Einsatz seit{' '}
+                      <span data-lfh="abloesung-warnung-zeit" style={ZAHL}>
+                        <ZeitAnzeige wert={w.seit_at} format="kurz" />
+                      </span>
+                    </>
+                  ) : (
+                    planungWarnungText(w, konventionen)
+                  )}
+                </span>
+              ))}
             </Text>
           )}
           {s.status === 'abgeloest' && s.abschnitt_uebergeben && (

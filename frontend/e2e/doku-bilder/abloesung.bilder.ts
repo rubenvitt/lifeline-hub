@@ -16,7 +16,9 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep abloesung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   schichten.png        frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx
+ *   schichten.png        frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx,
+ *                        frontend/src/abloesung/abloeserStand.ts (Stand des Ablösers, LLH-1131),
+ *                        frontend/src/abloesung/planungWarnung.ts (Warnung an der Karte)
  *   ohne-schicht.png     frontend/src/pages/AbloesungPage.tsx (Ansicht „Ohne Schicht“),
  *                        frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts
  *   schicht-beginnen.png frontend/src/abloesung/AbloesungDialoge.tsx (`SchichtBeginnenDialog`)
@@ -41,6 +43,10 @@ import {
  *
  * Besatzungswechsel (LLH-1150): die Spec disponiert zwei Kräfte ohne Einheit („Lena Brandt“,
  * „Tom Weber“), aus denen der Dialog die neue Besatzung wählt.
+ * Hinweise an der Karte (LLH-1131 Teil II): der geplante Ablöser wird vor seinem Eintreffen per
+ * Nachtrag alarmiert und danach am neu angelegten „BR Sportplatz“ eingebucht (die Zeitachse lässt
+ * das zweite Eintreffen aus); der Sanitätszug plant die Sanitätsgruppe UHS, die selbst eine
+ * laufende Schicht hat, und trägt damit die Warnung „… steht selbst im Einsatz seit …“.
  */
 
 const KAPITEL = 'abloesung';
@@ -102,7 +108,7 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'patch', `${basis}/abloesungen/${rettung.id}`, {
         abloesende_einheit_id: abloeser.id,
       });
-      await fuelle(api, 'post', `${basis}/abloesungen`, {
+      const sanitaetszug = await fuelle<Schicht>(api, 'post', `${basis}/abloesungen`, {
         einheit_id: einheit('Sanitätszug Musterstadt'),
         beginn_at: draht(vor(jetzt, 340)),
       });
@@ -111,9 +117,25 @@ test.describe(KAPITEL, () => {
         beginn_at: draht(vor(jetzt, 240)),
         rhythmus_minuten: 480,
       });
+      await fuelle(api, 'patch', `${basis}/abloesungen/${sanitaetszug.id}`, {
+        abloeser_ids: [einheit('Sanitätsgruppe UHS')],
+      });
+      await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
+        art: 'alarmierung',
+        zeitpunkt_at: draht(vor(jetzt, 55)),
+      });
       await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
         art: 'eintreffen',
         zeitpunkt_at: draht(vor(jetzt, 25)),
+      });
+      const raum = await fuelle<{ id: number }>(api, 'post', `${basis}/bereitstellungsraeume`, {
+        bezeichnung: 'BR Sportplatz',
+      });
+      await fuelle(api, 'post', `${basis}/bereitstellungsraeume/${raum.id}/status`, {
+        status: 'aktiv',
+      });
+      await fuelle(api, 'post', `${basis}/bereitstellungsraeume/${raum.id}/eintreffen`, {
+        kraft: { objekt_typ: 'einheit', objekt_id: abloeser.id },
       });
       await fuelle(api, 'post', `${basis}/einheiten/${einheit('Betreuungsgruppe')}/zeitachse`, {
         art: 'alarmierung',
@@ -134,6 +156,18 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/abloesung`);
     const schichten = page.getByRole('region', { name: 'Laufende Schichten' });
     await expect(schichten.locator('[data-lfh="abloesung-karte"]')).toHaveCount(3);
+    await expect(
+      schichten
+        .getByRole('article', { name: 'Schicht Rettungsstaffel' })
+        .locator('[data-lfh="abloesung-abloeser"]'),
+    ).toHaveText(
+      /^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4} · eingetroffen \d{4} \(BR Sportplatz\)$/,
+    );
+    await expect(
+      schichten
+        .getByRole('article', { name: 'Schicht Sanitätszug Musterstadt' })
+        .locator('[data-lfh="abloesung-planung-warnung"]'),
+    ).toHaveText(/^Sanitätsgruppe UHS steht selbst im Einsatz seit \d{4}$/);
     await fotografiere(schichten, KAPITEL, 'schichten');
   });
 

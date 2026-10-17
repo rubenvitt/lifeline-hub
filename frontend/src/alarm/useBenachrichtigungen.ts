@@ -12,14 +12,13 @@ import {
   BENACHRICHTIGUNG_WINDOW_EVENT,
   NACHREICHEN_WINDOW_EVENT,
 } from '../live/benachrichtigungListener';
-import { einsatzPfad } from '../routing/deeplinks';
 import { spieleAlarmTon } from './alarmTon';
 import {
   BENACHRICHTIGUNG_ARTEN,
+  ersatzPfad,
   istOrgArt,
   sammelGruppeVon,
   toastSchluessel,
-  zielPfad,
   zielVon,
 } from './benachrichtigungKatalog';
 import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
@@ -59,7 +58,7 @@ function ersatzAnzeige(e: BenachrichtigungEreignis): BenachrichtigungAnzeige {
     bezug_id: e.bezug_id,
     erstellt_at: '',
     titel: BENACHRICHTIGUNG_ARTEN[e.art]?.name ?? 'Benachrichtigung',
-    pfad: istOrgArt(e.art) ? einsatzPfad(e.einsatz_id) : zielPfad(zielVon(e), e.einsatz_id),
+    pfad: ersatzPfad(e),
   };
 }
 
