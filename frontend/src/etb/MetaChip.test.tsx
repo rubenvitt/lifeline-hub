@@ -7,6 +7,7 @@ import utc from 'dayjs/plugin/utc';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
+import { tippeZeit } from '../test/zeitEingabe';
 import { zuWerte, type EtbEntwurf } from './entwuerfe/entwurfModell';
 import MetaChip from './MetaChip';
 
@@ -343,7 +344,7 @@ describe('MetaChip — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
     expect(screen.queryByText(/1000/)).not.toBeInTheDocument();
   });
 
-  it('der Editor zeigt die Berliner Uhrzeit und übernimmt mit OK den Zeitpunkt', async () => {
+  it('der Editor zeigt die Berliner Uhrzeit und übernimmt mit Enter den Zeitpunkt', async () => {
     const onCommit = vi.fn();
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={BERLIN}>
@@ -359,13 +360,59 @@ describe('MetaChip — Ereigniszeit in der Anzeigezone (LFH-692)', () => {
       </AnzeigeKonventionenProvider>,
     );
     const feld = screen.getByRole('textbox', { name: 'Ereigniszeit' });
-    expect(feld).toHaveValue('2026-07-14 12:00:00');
-    await userEvent.click(feld);
-    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    expect(feld).toHaveValue('141200jul26');
+    // Der Editor hat den Fokus; Enter übernimmt den unberührten Wert.
+    expect(feld).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect((onCommit.mock.calls[0][1] as dayjs.Dayjs).toISOString()).toBe(
       '2026-07-14T10:00:00.000Z',
     );
+  });
+
+  it('eine getippte DTG + Enter übernimmt den Zeitpunkt ohne Maus', async () => {
+    const onCommit = vi.fn();
+    const user = userEvent.setup();
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <MetaChip
+          feld="ereigniszeit"
+          editing
+          wert={dayjs.utc('2026-07-14 10:00:00')}
+          onCommit={onCommit}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    // 14.07.2026 14:25 Berliner Wanduhr = 12:25 UTC.
+    await tippeZeit(user, screen.getByRole('textbox', { name: 'Ereigniszeit' }), '141425jul26');
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit.mock.calls[0][0]).toBe('ereigniszeit');
+    expect((onCommit.mock.calls[0][1] as dayjs.Dayjs).toISOString()).toBe(
+      '2026-07-14T12:25:00.000Z',
+    );
+  });
+
+  it('eine unlesbare Eingabe + Enter übernimmt nichts', async () => {
+    const onCommit = vi.fn();
+    const user = userEvent.setup();
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <MetaChip
+          feld="ereigniszeit"
+          editing
+          wert={dayjs.utc('2026-07-14 10:00:00')}
+          onCommit={onCommit}
+          onCancel={vi.fn()}
+          onRemove={vi.fn()}
+          onEdit={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    await tippeZeit(user, screen.getByRole('textbox', { name: 'Ereigniszeit' }), 'xyz');
+    expect(onCommit).not.toHaveBeenCalled();
   });
 });
 
@@ -385,7 +432,7 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
     };
   });
 
-  it('schlägt die Serverzeit vor, und OK übernimmt sie', async () => {
+  it('schlägt die Serverzeit vor, und Enter übernimmt sie', async () => {
     const onCommit = vi.fn();
     renderMitProviders(
       <MetaChip
@@ -399,12 +446,53 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
       />,
     );
     const feld = screen.getByRole('textbox', { name: 'Ereigniszeit' });
-    expect(feld).toHaveValue('2026-10-04 10:00:00');
-    await userEvent.click(feld);
-    await userEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    // Browser- und Anzeigezone UTC: 10:00 Serverzeit, nicht 10:05 der Geräteuhr.
+    expect(feld).toHaveValue('041000okt26');
+    expect(feld).toHaveFocus();
+    await userEvent.keyboard('{Enter}');
     expect(onCommit).toHaveBeenCalledTimes(1);
     const ms = (onCommit.mock.calls[0][1] as dayjs.Dayjs).valueOf();
     expect(Math.abs(ms - SERVER)).toBeLessThanOrEqual(1_000);
+  });
+
+  it('eine getippte Uhrzeit „0945“ + Enter gilt heute nach der Serveruhr', async () => {
+    const onCommit = vi.fn();
+    const user = userEvent.setup();
+    renderMitProviders(
+      <MetaChip
+        feld="ereigniszeit"
+        editing
+        wert={undefined}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    await tippeZeit(user, screen.getByRole('textbox', { name: 'Ereigniszeit' }), '0945');
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect((onCommit.mock.calls[0][1] as dayjs.Dayjs).toISOString()).toBe(
+      '2026-10-04T09:45:00.000Z',
+    );
+  });
+
+  it('die Schnellwahl „−5 min“ übernimmt ab der Serverzeit, ohne Enter', async () => {
+    const onCommit = vi.fn();
+    renderMitProviders(
+      <MetaChip
+        feld="ereigniszeit"
+        editing
+        wert={undefined}
+        onCommit={onCommit}
+        onCancel={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: '−5 min' }));
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    const ms = (onCommit.mock.calls[0][1] as dayjs.Dayjs).valueOf();
+    expect(Math.abs(ms - (SERVER - 5 * 60_000))).toBeLessThanOrEqual(1_000);
   });
 
   it('LFH-937: Von/An nehmen höchstens 500 Zeichen an — als Freitext und mit Vorschlägen', () => {

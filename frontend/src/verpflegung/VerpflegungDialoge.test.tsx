@@ -96,18 +96,42 @@ function pruefeFormStruktur(dialog: HTMLElement, knopfName: string) {
   return knopf;
 }
 
-/** Zeitraum über die Tastatur — Beginn, Enter, Ende, Enter (in jsdom gemessen tragfähig). */
+const DTG_MONATE = [
+  'jan',
+  'feb',
+  'mrz',
+  'apr',
+  'mai',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'okt',
+  'nov',
+  'dez',
+];
+
+/** Ortszeit „YYYY-MM-DD HH:mm" (Wanduhr der Anzeigezone) → so zeigt sie das Feld („241200sep26"). */
+const dtg = (ortszeit: string) => {
+  const d = dayjs(ortszeit);
+  return `${d.format('DDHHmm')}${DTG_MONATE[d.month()]}${d.format('YY')}`;
+};
+
+/**
+ * Zeitraum über die Tastatur — beide Felder tippen und verlassen (Verlassen übernimmt; Enter
+ * schickte das Formular schon ab, bevor die übrigen Felder gefüllt sind).
+ */
 async function waehleZeitraum(dialog: HTMLElement, von: string, bis: string) {
-  const start = within(dialog).getByPlaceholderText('Beginn');
-  await userEvent.click(start);
+  const start = within(dialog).getByRole('textbox', { name: 'Beginn' });
   await userEvent.clear(start);
   await userEvent.type(start, von);
-  await userEvent.keyboard('{Enter}');
-  const ende = within(dialog).getByPlaceholderText('Ende');
+  await userEvent.tab();
+  const ende = within(dialog).getByRole('textbox', { name: 'Ende' });
   await userEvent.clear(ende);
   await userEvent.type(ende, bis);
-  await userEvent.keyboard('{Enter}');
-  await waitFor(() => expect(start).toHaveValue(von));
+  await userEvent.tab();
+  await waitFor(() => expect(start).toHaveValue(dtg(von)));
+  expect(ende).toHaveValue(dtg(bis));
 }
 
 /** Ortszeit-Eingabe „YYYY-MM-DD HH:mm" → erwarteter Wire-String (UTC, ohne Zone). */
@@ -141,7 +165,7 @@ describe('Wire-Werte (design.md D2/D4)', () => {
       '2026-09-24T10:00:00Z',
       '2026-10-25T01:30:00Z',
     ]) {
-      const ortszeit = dayjs(absolut); // so liefert ihn der Picker
+      const ortszeit = dayjs(absolut); // so liefert ihn die Zeiteingabe
       const body = zeitfensterAnlegenBody({
         bezeichnung: ' Mittag ',
         zeitraum: [ortszeit, ortszeit.add(90, 'minute')],
@@ -791,8 +815,8 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
     zeigeBearbeitenBerlin();
     const dialog = await screen.findByRole('dialog');
     expect(uhrzeitenText(zeitfenster(), BERLIN)).toBe('12:00–13:30');
-    expect(within(dialog).getByPlaceholderText('Beginn')).toHaveValue('2026-09-24 12:00');
-    expect(within(dialog).getByPlaceholderText('Ende')).toHaveValue('2026-09-24 13:30');
+    expect(within(dialog).getByRole('textbox', { name: 'Beginn' })).toHaveValue('241200sep26');
+    expect(within(dialog).getByRole('textbox', { name: 'Ende' })).toHaveValue('241330sep26');
     expect(within(dialog).getAllByText('Europe/Berlin').length).toBeGreaterThan(0);
   });
 
@@ -806,9 +830,9 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ bedarf_betreute: 90 }));
   });
 
-  // Rückweg über das Anlegen: in jsdom übernimmt antds RangePicker eine Tastatur-Korrektur an
-  // einem SCHON belegten Zeitraum nicht ins Formular (auch ohne Baustein gemessen). Die Wandlung
-  // ist dieselbe; die Anzeige beim Bearbeiten pinnt der erste Fall.
+  // Über das Anlegen (früher ein Rückweg um antds RangePicker, der in jsdom eine Korrektur an einem
+  // SCHON belegten Zeitraum nicht übernahm). Die Wandlung ist dieselbe; die Anzeige beim Bearbeiten
+  // pinnt der erste Fall.
   it('ein eingegebenes Fenster 13:00–14:30 Berliner Zeit geht als 11:00–12:30 UTC hinaus', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(

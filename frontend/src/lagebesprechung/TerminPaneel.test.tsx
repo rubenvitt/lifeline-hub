@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -10,6 +10,7 @@ import type { LagebesprechungStand } from '../api/types';
 import { serverJetzt, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
+import { tippeZeit } from '../test/zeitEingabe';
 import TerminPaneel from './TerminPaneel';
 
 dayjs.extend(utc);
@@ -129,13 +130,25 @@ describe('TerminPaneel · Termin setzen', () => {
     expect(gesendet[0]).toEqual({ naechste_at: null });
   });
 
-  it('das Löschkreuz der freien Wahl leert einen gesetzten Termin: naechste_at null', async () => {
+  it('die geleerte freie Wahl (leeren, Enter) leert einen gesetzten Termin: naechste_at null', async () => {
     const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
-    const feld = within(p).getByLabelText('Termin wählen');
-    // jsdom aktiviert den CSS-Hoverzustand des Kreuzes nicht; hier zählt der onClear-Pfad.
-    fireEvent.click(feld.closest('.ant-picker')!.querySelector<HTMLElement>('.ant-picker-clear')!);
+    const feld = within(p).getByRole('textbox', { name: 'Termin wählen' });
+    await tippeZeit(userEvent.setup(), feld, '');
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toEqual({ naechste_at: null });
+  });
+
+  it('die freie Wahl übernimmt einen getippten Termin mit Enter per PUT', async () => {
+    const p = zeige();
+    const feld = within(p).getByRole('textbox', { name: 'Termin wählen' });
+    // Ein vollständiger Zeitpunkt (ISO, Wanduhr der Browserzone): die Feldart wählt keinen Tag.
+    await tippeZeit(
+      userEvent.setup(),
+      feld,
+      dayjs(JETZT).add(90, 'minute').format('YYYY-MM-DD HH:mm'),
+    );
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toEqual({ naechste_at: wireAb(90) });
   });
 
   it('ohne Schreibrecht ist jede Bedienung gesperrt, der Termin bleibt lesbar', () => {

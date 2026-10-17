@@ -46,12 +46,19 @@ function zeige(onClose = vi.fn(), naechsteLagebesprechungAt?: string | null) {
   );
 }
 
-/** Der sichtbare Wert des Fälligkeitsfeldes, unabhängig vom Label-Weg. */
+/** Das Fälligkeitsfeld über die Beschriftung „Fällig am“, unabhängig vom Label-Weg. */
 function faelligFeld(): HTMLInputElement {
-  const feld = document.querySelector<HTMLInputElement>('.ant-picker input');
+  const item = [...document.querySelectorAll<HTMLElement>('.ant-form-item')].find(
+    (i) => i.querySelector('.ant-form-item-label')?.textContent === 'Fällig am',
+  );
+  const feld = item?.querySelector<HTMLInputElement>('input');
   if (!feld) throw new Error('Das Fälligkeitsfeld wurde nicht gefunden');
   return feld;
 }
+
+const MONATE = ['jan', 'feb', 'mrz', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dez'];
+/** Erwartete Anzeige im Feld: volle DTG in der Browserzone („211230aug26“). */
+const dtgLokal = (d: dayjs.Dayjs) => `${d.format('DDHHmm')}${MONATE[d.month()]}${d.format('YY')}`;
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -99,9 +106,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     zeige(vi.fn(), '2026-08-21 13:17:43');
     await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
-    expect(faelligFeld()).toHaveValue(
-      dayjs.utc('2026-08-21 13:17:43').local().format('YYYY-MM-DD HH:mm'),
-    );
+    expect(faelligFeld()).toHaveValue(dtgLokal(dayjs.utc('2026-08-21 13:17:43').local()));
     await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
   });
@@ -121,15 +126,15 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
     zeige();
     // „jetzt" war der einzige nie gemeinte Wert: eine Wiedervorlage auf den aktuellen
     // Zeitpunkt ist im Moment des Anlegens schon fällig.
-    expect(faelligFeld().value).toBe(dayjs(JETZT).add(30, 'minute').format('YYYY-MM-DD HH:mm'));
+    expect(faelligFeld().value).toBe(dtgLokal(dayjs(JETZT).add(30, 'minute')));
   });
 
   it('die Schnellwahl setzt die Fälligkeit, ohne das freie Feld zu ersetzen', async () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     zeige();
     await nutzer.click(screen.getByRole('button', { name: '+2 h' }));
-    expect(faelligFeld().value).toBe(dayjs(JETZT).add(2, 'hour').format('YYYY-MM-DD HH:mm'));
-    // Der DatePicker bleibt für den freien Fall — die Chips sind eine Vorbelegung
+    expect(faelligFeld().value).toBe(dtgLokal(dayjs(JETZT).add(2, 'hour')));
+    // Das Zeitfeld bleibt für den freien Fall — die Chips sind eine Vorbelegung
     // desselben Feldes, kein viertes Feld (LFH-19-Budget).
     expect(faelligFeld()).toBeEnabled();
   });
@@ -321,7 +326,7 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
   it('die Vorbelegung (+30 min) steht mit der Berliner Uhrzeit im Feld', () => {
     zeigeBerlin();
     // 10:00 UTC + 30 min = 12:30 in Berlin (Sommerzeit).
-    expect(faelligFeld().value).toBe('2026-08-21 12:30');
+    expect(faelligFeld().value).toBe('211230aug26');
   });
 
   it('der Lagebesprechungstermin erscheint in Berlin und geht exakt als UTC hinaus', async () => {
@@ -335,7 +340,7 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
     const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     zeigeBerlin('2026-08-21 13:17:43');
     await nutzer.click(screen.getByRole('button', { name: 'Nächste Lagebesprechung' }));
-    expect(faelligFeld()).toHaveValue('2026-08-21 15:17');
+    expect(faelligFeld()).toHaveValue('211517aug26');
     await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
   });

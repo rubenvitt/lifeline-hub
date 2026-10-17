@@ -1,17 +1,15 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import dayjs from 'dayjs';
-import customParseFormat from 'dayjs/plugin/customParseFormat';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { alsBackendZeit, alsOrtszeit } from '../anzeige/zeitEingabe';
+import { tippeZeit } from '../test/zeitEingabe';
 import FristPaneel from './FristPaneel';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import type { BenutzerAnzeige } from '../api/types';
-
-dayjs.extend(customParseFormat);
 
 /**
  * Frist-Paneel: Verlängern ohne Rückfrage, Verkürzen erst nach Rückfrage mit
@@ -54,19 +52,15 @@ function zeige(
 }
 
 /**
- * Setzt den DatePicker auf einen Ortszeit-Wert und sendet mit Enter ab (übernimmt den Wert
- * UND übermittelt); ein zusätzlicher Klick träfe den schon schließenden Dialog.
+ * Tippt einen Ortszeit-Wert ins Zeitfeld und sendet mit Enter ab (übernimmt den Wert UND
+ * übermittelt); ein zusätzlicher Klick träfe den schon schließenden Dialog.
  */
 async function fristSetzen(dialog: HTMLElement, ortszeit: string) {
-  const u = userEvent.setup();
-  const eingabe = within(dialog).getByRole('textbox');
-  await u.click(eingabe);
-  await u.clear(eingabe);
-  await u.type(eingabe, `${ortszeit}{Enter}`);
+  await tippeZeit(userEvent.setup(), within(dialog).getByRole('textbox'), ortszeit);
 }
 
-/** Wire-Wert (UTC) einer Ortszeit — derselbe Weg wie das Paneel. */
-const wire = (ortszeit: string) => alsBackendZeit(dayjs(ortszeit, 'YYYY-MM-DD HH:mm'));
+/** Wire-Wert (UTC) einer Ortszeit „YYYY-MM-DD HH:mm" — derselbe Weg wie das Paneel. */
+const wire = (ortszeit: string) => alsBackendZeit(dayjs(ortszeit));
 
 /**
  * Die Rückfrage über ihren Titeltext: in jsdom tragen beide offenen antd-Dialoge dieselbe
@@ -99,7 +93,7 @@ describe('FristPaneel', () => {
     const dialog = await dialogOeffnen();
     await fristSetzen(dialog, '2030-01-01 12:00');
     await waitFor(() => expect(gesendet).toHaveLength(1));
-    // Der Wert selbst: sonst bliebe der Test grün, wenn der Picker den Wert nie annähme.
+    // Der Wert selbst: sonst bliebe der Test grün, wenn das Feld den Wert nie annähme.
     expect(gesendet[0]).toEqual({ retention_bis: wire('2030-01-01 12:00') });
     expect(rueckfrageOffen()).toBe(false);
     const keys = invalidiert.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
@@ -134,7 +128,8 @@ describe('FristPaneel', () => {
     // am Ende der Zoom-Animation ab, jsdom feuert kein `transitionend` — daher `ant-zoom-leave`.
     await waitFor(() => expect(rueckfrage).toHaveClass('ant-zoom-leave'));
     expect(gesendet).toHaveLength(0);
-    expect(within(dialog).getByRole('textbox')).toHaveValue('2030-01-01 12:00');
+    // Das Feld zeigt die getippte Frist als DTG (Anzeigezone = Gerätezone).
+    expect(within(dialog).getByRole('textbox')).toHaveValue('011200jan30');
   });
 
   it('Aufheben geht ohne Rückfrage mit null hinaus', async () => {
@@ -243,16 +238,17 @@ describe('FristPaneel', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     rerender(<FristPaneel einsatzId={1} einsatz={einsatz('2029-01-01 10:00:00')} />);
     dialog = await dialogOeffnen();
+    // Als DTG in der Gerätezone; der 01.01.2029 10:00 UTC bleibt in jeder üblichen Zone ein Januar.
     await waitFor(() =>
       expect(within(dialog).getByRole('textbox')).toHaveValue(
-        alsOrtszeit('2029-01-01 10:00:00')!.format('YYYY-MM-DD HH:mm'),
+        `${alsOrtszeit('2029-01-01 10:00:00')!.format('DDHHmm')}jan29`,
       ),
     );
   });
 
   it('dieselbe Minute wie die bestehende Frist ist keine Verkürzung (Sekundenrest)', async () => {
     // Beim Abschluss entsteht die Frist aus abgeschlossen_at + Dauer und trägt Sekunden; der
-    // Picker zeigt nur Minuten. Die angezeigte Minute erneut einzugeben ist KEINE Verkürzung.
+    // Feld zeigt nur Minuten. Die angezeigte Minute erneut einzugeben ist KEINE Verkürzung.
     const basis = '2030-10-01 10:00:17';
     zeige(ME_ADMIN, { status: 'abgeschlossen', retention_bis: basis });
     const dialog = await dialogOeffnen();
