@@ -4,8 +4,10 @@ import {
   codeGruppiert,
   endeFehler,
   istBeendet,
+  OHNE_STELLE,
   sperrSatz,
-  stellenartVon,
+  stelleIdAusWahl,
+  stellenFeldVon,
   stellenOptionen,
   verlaengernVorbelegung,
 } from './geraeteKern';
@@ -23,13 +25,27 @@ describe('geraeteKern (LFH-892)', () => {
         stelle_pflicht: false,
       },
     ];
-    expect(stellenartVon(ansichten, 'uhs-tablet')).toBe('uhs');
-    expect(stellenartVon(ansichten, 'lagemonitor')).toBeNull();
-    // Wahlweise Stelle (LLH-1048): die Maske koppelt bis Teil II einsatzweit, ohne Stellenfeld.
-    expect(stellenartVon(ansichten, 'verpflegung')).toBeNull();
+    expect(stellenFeldVon(ansichten, 'uhs-tablet')).toEqual({ art: 'uhs', pflicht: true });
+    expect(stellenFeldVon(ansichten, 'lagemonitor')).toBeNull();
+    // Wahlweise Stelle (LLH-1048 Teil II): das Feld steht, aber ohne Pflicht.
+    expect(stellenFeldVon(ansichten, 'verpflegung')).toEqual({
+      art: 'verpflegungsstelle',
+      pflicht: false,
+    });
     // Nicht angeboten (noch nicht verfügbar) oder nichts gewählt: keine Stelle.
-    expect(stellenartVon(ansichten, 'betreuungsstelle')).toBeNull();
-    expect(stellenartVon(ansichten, undefined)).toBeNull();
+    expect(stellenFeldVon(ansichten, 'betreuungsstelle')).toBeNull();
+    expect(stellenFeldVon(ansichten, undefined)).toBeNull();
+  });
+
+  it('macht aus der Wahl die `stelle_id` des Servers; „ohne Stelle“ ist `null` (LLH-1048)', () => {
+    const wahlweise = { art: 'verpflegungsstelle' as const, pflicht: false };
+    const pflicht = { art: 'uhs' as const, pflicht: true };
+    expect(stelleIdAusWahl(wahlweise, OHNE_STELLE)).toBeNull();
+    expect(stelleIdAusWahl(wahlweise, 9)).toBe(9);
+    expect(stelleIdAusWahl(wahlweise, undefined)).toBeNull();
+    expect(stelleIdAusWahl(pflicht, 1)).toBe(1);
+    // Ohne Feld (Lagemonitor) geht keine Stelle hinaus, auch keine liegengebliebene.
+    expect(stelleIdAusWahl(null, 1)).toBeNull();
   });
 
   it('bietet je Stellenart nur Stellen an, die der Server annimmt', () => {
