@@ -598,7 +598,13 @@ nicht vor der Auflösung liegt; eine Ausgabe mit früherem Zeitpunkt MUST angeno
 Zeitpunkte MUST als Zeitpunkte verglichen werden, nicht als Text. Eine
 geplante Stelle MUST Ausgaben annehmen. Eine Stelle, der das Zeitfenster nicht zugeordnet ist, MUST
 die Ausgabe ebenfalls annehmen. Die Prüfung der Stelle MUST nach dem Replay über `client_id` und
-nach der Prüfung auf einen aktiven Einsatz laufen.
+nach der Prüfung auf einen aktiven Einsatz laufen. Ein an eine Verpflegungsstelle gebundenes Gerät
+MUST jede Ausgabe an seiner Stelle buchen: ohne Angabe setzt der Server sie, eine andere Stelle
+MUST 403 sein (LLH-1048).
+
+#### Scenario: Gerät an der Feldküche bucht ohne Angabe
+- **WHEN** das an die „Feldküche BR Sportplatz“ gebundene Gerät eine Ausgabe ohne Stelle erfasst
+- **THEN** trägt die Ausgabe die Stelle „Feldküche BR Sportplatz“
 
 #### Scenario: Ausgabe an der Feldküche
 - **WHEN** zum Zeitfenster „Mittag“ eine Ausgabe von 100 EP an der Stelle „Feldküche BR Sportplatz“ erfasst wird
@@ -636,7 +642,11 @@ auch mit 0, jede weitere Stelle mit Ausgaben und einen Eintrag „ohne Stelle“
 ohne Stelle gibt. Ihre Summe MUST die ausgegebene Menge des Zeitfensters sein. Hat ein Zeitfenster
 keine Zuordnung und keine Ausgabe an einer Stelle, MUST die Aufstellung leer sein. Eine Fehlmenge
 oder Einstufung je Stelle MUST es nicht geben; Fehlmenge und Einstufung bleiben am Zeitfenster.
-Zurückgenommene Ausgaben MUST nicht zählen.
+Zurückgenommene Ausgaben MUST nicht zählen. Ein an eine Verpflegungsstelle gebundenes Gerät MUST
+nur den Eintrag seiner Stelle erhalten, die ausgegebene Menge des Zeitfensters aber unverändert;
+was anderswo an Einheiten ausgegeben wurde, erhält es als Summe je Einheit
+(`verpflegt_anderswo`, Spec `funktionsansichten`, „Verpflegungsgerät an einer
+Verpflegungsstelle“, LLH-1048). Für jede andere Sitzung MUST diese Summe leer sein.
 
 #### Scenario: Zwei Stellen
 - **WHEN** das Zeitfenster „Mittag“ mit Bedarf 200 der Feldküche und der Turnhalle zugeordnet ist und dort 100 und 80 EP ausgegeben sind

@@ -12,7 +12,14 @@ Gerät namentlich bestätigen (LFH-1046).
 
 Das System SHALL das Anlegen, Verlängern, Neuausstellen und Widerrufen einer Kopplung nur der
 Einsatzleitung eines aktiven Einsatzes erlauben. Eine Kopplung MUST Einsatz, Funktionsansicht
-und Gerätebezeichnung tragen, bei einer stellengebundenen Ansicht zusätzlich die Stelle.
+und Gerätebezeichnung tragen, bei einer stellengebundenen Ansicht zusätzlich die Stelle. Bei der
+Ansicht Verpflegung ist die Stelle (eine Verpflegungsstelle) wahlweise (LLH-1048); eine
+Bestandskopplung ohne Stelle bleibt einsatzweit.
+
+#### Scenario: Verpflegungsgerät mit und ohne Stelle
+
+- **WHEN** die Einsatzleitung ein Verpflegungsgerät einmal ohne Stelle und einmal an der Verpflegungsstelle „Feldküche BR Sportplatz“ koppelt
+- **THEN** entstehen beide Kopplungen, die zweite trägt die Stelle und heißt „Feldküche BR Sportplatz · Tresen“
 
 #### Scenario: Führungspersonal darf nicht koppeln
 
