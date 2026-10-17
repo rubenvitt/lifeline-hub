@@ -66,8 +66,8 @@ Planungshinweis ist eine Frist, keine Einstufung.
 
 **Vollzug** (LLH-1132, Spec `kraefte-abloesung`): Die Liste der Ablöser ist die Wahrheit
 (höchstens `ABLOESER_MAX`, Spiegel `ABLOESUNG_ABLOESER_MAX`); `abloesende_einheit_id` ist ihr
-erster Eintrag und wird nur über `abloesung::repo::set_abloeser_tx` bzw. `sync_spiegel_tx`
-geschrieben, nie direkt. Welcher Ablöser den Knoten bildet (kein Vorfahr in der Liste) und wer
+erster Eintrag: wer die Liste ändert, zieht ihn über `abloesung::repo::set_abloeser_tx` bzw.
+`sync_spiegel_tx` nach (auch `drop_planungen_tx`), nie von Hand. Welcher Ablöser den Knoten bildet (kein Vorfahr in der Liste) und wer
 erbt, entscheidet der Server; der Client zeigt die Liste über `abloesung/abloeser.ts` und rechnet
 nichts nach. Wählbar ist jede andere Einheit ohne laufende Folgeschicht (`abloeserOptionen`);
 eine eigene laufende Schicht ohne Vorgänger übernimmt der Vollzug, die Rücknahme löst sie nur
