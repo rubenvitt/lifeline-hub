@@ -1129,6 +1129,50 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_vollzug_id", G_FK),
             retain("angelegt_von_id", G_FK),
             retain("angelegt_at", G_ZEIT),
+            // LLH-1122 (Neubau 0212): Art (LLH-1150), Spur des Endes (LLH-1128), Abschnitts-
+            // übergabe (LLH-1132). Der Grund ist ein Code-Wert ohne CHECK, kein Freitext.
+            retain("art", G_ENUM),
+            retain("beendet_at", G_ZEIT),
+            retain("beendet_von_id", G_FK),
+            retain("beendet_grund", G_KONFIG),
+            retain("abschnitt_uebergeben", G_KONFIG),
+            retain("abgeloest_abschnitt_vorher_id", G_FK),
+        ],
+    },
+    // Ablöser einer Schicht (LLH-1122, Mig 0212; Vollzug ab LLH-1132): nur Verweise und Zeit.
+    TabellenRegel {
+        tabelle: "einsatz_abloesung_abloeser",
+        scoping: Scoping::UeberParent {
+            fk: "abloesung_id",
+            parent: "einsatz_abloesung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("abloesung_id", G_FK),
+            retain("einheit_id", G_FK),
+            retain("abschnitt_vorher_id", G_FK),
+            retain("angelegt_at", G_ZEIT),
+        ],
+    },
+    // Schichtmodell des Einsatzes (LLH-1122): eine Kopie aus den Stammdaten der Org, Bezeichnung
+    // wie „12-h-Schicht“ und Zahlen. Konfiguration ohne Personenbezug → RETAIN.
+    TabellenRegel {
+        tabelle: "einsatz_schichtmodell",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("bezeichnung", G_KONFIG),
+            retain("typ", G_ENUM),
+            retain("rhythmus_minuten", G_KONFIG),
+            retain("wechselzeiten", G_KONFIG),
+            retain("mindestdauer_minuten", G_KONFIG),
+            retain("vorwarnung_minuten", G_KONFIG),
+            retain("planungsvorlauf_minuten", G_KONFIG),
+            retain("geaendert_von_id", G_FK),
+            retain("geaendert_at", G_ZEIT),
         ],
     },
     // Kräfte-Zeitachse (LFH-552): Ereignisse je Einheit/Person. Art, Quelle, Zeitpunkte und
@@ -3074,6 +3118,9 @@ mod tests {
             // Verpflegungsplan (LLH-1058): Org-Stammdatum; ein angelegtes Zeitfenster kennt seine
             // Vorlage nicht. Ein künftiger Verweis aus dem Einsatz zöge sie sonst in die Hülle.
             "verpflegung_vorlage",
+            // Schichtmodelle (LLH-1122): Org-Stammdatum; der Einsatz hält eine Kopie ohne
+            // Verweis. Ein künftiger Verweis aus dem Einsatz zöge sie sonst in die Hülle.
+            "schichtmodell",
             "qualifikation",
             "karte_registry",
             // Logo der Organisation: hängt an der Org, nicht am Einsatz. Ein späterer FK Richtung

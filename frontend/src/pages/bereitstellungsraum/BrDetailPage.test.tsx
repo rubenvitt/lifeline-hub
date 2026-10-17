@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { App as AntApp } from 'antd';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router';
 import BrDetailPage from './BrDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
 import { setzeViewportBreite } from '../../test/viewport';
@@ -2085,5 +2085,90 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByTestId('br-vorgemerkt')).toBeNull();
+  });
+});
+
+/**
+ * „Auf Karte verorten“ (LLH-1107, Muster Betreuungsstelle LFH-673): der Knopf an den Raumdaten
+ * schickt die Lagekarte in den Platziermodus für diesen Raum. Wer den Raum nicht bearbeiten darf,
+ * bekommt ihn nicht; ohne Freigabe der Lagekarte steht er gesperrt mit Grund.
+ */
+describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
+  function KartenSonde() {
+    const ort = useLocation();
+    return <div data-testid="karte">{`${ort.pathname}${ort.search}`}</div>;
+  }
+
+  function seite(
+    br: BrDetail,
+    {
+      rolle = 'fuehrungspersonal',
+      freigaben,
+    }: {
+      rolle?: EinsatzAnzeige['meine_rolle'];
+      freigaben?: Record<string, { zugriff: boolean }>;
+    } = {},
+  ) {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: rolle }))),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture(freigaben)),
+      ),
+    );
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <AuthProvider>
+            <MemoryRouter initialEntries={['/einsaetze/1/bereitstellungsraeume/1']}>
+              <Routes>
+                <Route
+                  path="/einsaetze/:id/bereitstellungsraeume/:brId"
+                  element={<BrDetailPage />}
+                />
+                <Route path="/einsaetze/:id/lagekarte" element={<KartenSonde />} />
+              </Routes>
+            </MemoryRouter>
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+  }
+
+  it('unverortet: „Auf Karte verorten“ öffnet die Lagekarte im Platziermodus für diesen Raum', async () => {
+    seite(brDetail({ status: 'geplant' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Auf Karte verorten' }));
+    expect(await screen.findByTestId('karte')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?platzieren=bereitstellungsraum%3A1',
+    );
+  });
+
+  it('verortet: derselbe Weg heißt „Auf Karte versetzen“', async () => {
+    seite(brDetail({ lat: 51.93, lon: 8.87 }));
+    expect(await screen.findByRole('button', { name: 'Auf Karte versetzen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Auf Karte verorten' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Freigabe der Lagekarte: gesperrt, der Grund steht im Text', async () => {
+    seite(brDetail(), { freigaben: { lagekarte: { zugriff: false } } });
+    const knopf = await screen.findByRole('button', {
+      name: 'Auf Karte verorten (Keine Berechtigung)',
+    });
+    expect(knopf).toBeDisabled();
+  });
+
+  it('nicht für Beobachter', async () => {
+    seite(brDetail(), { rolle: 'beobachter' });
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
+  });
+
+  it('nicht nach dem Auflösen', async () => {
+    seite(brDetail({ status: 'aufgeloest' }));
+    expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auf Karte/ })).not.toBeInTheDocument();
   });
 });

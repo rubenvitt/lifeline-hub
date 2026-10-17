@@ -34,6 +34,7 @@ use crate::error::AppError;
 use crate::fahrzeug::repo::{self as fahrzeug_repo, FahrzeugDaten};
 use crate::material::repo::{self as material_repo, MaterialDaten};
 use crate::personal::repo::{self as personal_repo, PersonalDaten};
+use crate::schichtmodell::repo as schichtmodell_repo;
 use crate::staerke::Staerke;
 
 /// Ergebnis der Stammdaten-Anlage: die IDs je Szenario-Schlüssel, mit denen das Drehbuch
@@ -48,7 +49,10 @@ pub struct StammdatenErgebnis {
     pub material: BTreeMap<&'static str, i64>,
     /// Vorlagen-ID je Schlüssel aus [`szenario::EINHEITEN_VORLAGEN`].
     pub einheit_vorlagen: BTreeMap<&'static str, i64>,
-    /// Je Art eine Zeile, in Enum-Reihenfolge (Fahrzeug, Personal, Material, Einheiten-Vorlage).
+    /// ID des Schichtmodells [`szenario::SCHICHTMODELL_BEZEICHNUNG`] (LLH-1122).
+    pub schichtmodell: i64,
+    /// Je Art eine Zeile, in Enum-Reihenfolge (Fahrzeug, Personal, Material, Einheiten-Vorlage,
+    /// Schichtmodell).
     /// Gezählt sind
     /// `angelegt` und `mitbenutzt`; `entfernt` und `behalten` stehen auf 0.
     pub je_art: Vec<DemoBerichtZeile>,
@@ -295,6 +299,29 @@ pub async fn stammdaten_importieren_tx(
         einheit_vorlagen.insert(vorlage.schluessel, id);
     }
 
+    // Schichtmodell (LLH-1122): Kennung ist die Bezeichnung ohne Groß-/Kleinschreibung, wie der
+    // 409 der Stammdaten. Ein angelegtes wird nie die Vorgabe der Organisation: das Demo-Modell
+    // soll keinen echten Einsatz prägen; der Demo-Einsatz bekommt es in `importieren_tx`.
+    let modelle: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id, bezeichnung FROM schichtmodell WHERE org_id = ?")
+            .bind(org_id)
+            .fetch_all(&mut *conn)
+            .await?;
+    let gesucht = szenario::SCHICHTMODELL_BEZEICHNUNG.to_lowercase();
+    let (schichtmodell, s_angelegt, s_mitbenutzt) = match modelle
+        .iter()
+        .find(|(_, b)| b.trim().to_lowercase() == gesucht)
+    {
+        Some((id, _)) => (*id, 0, 1),
+        None => {
+            let id =
+                schichtmodell_repo::insert_tx(conn, org_id, &szenario::schichtmodell()?, false)
+                    .await?;
+            markieren(conn, import_id, DemoStammdatenArt::Schichtmodell, id).await?;
+            (id, 1, 0)
+        }
+    };
+
     let zeile = |art, angelegt, mitbenutzt| DemoBerichtZeile {
         art,
         angelegt,
@@ -307,11 +334,13 @@ pub async fn stammdaten_importieren_tx(
         personal,
         material,
         einheit_vorlagen,
+        schichtmodell,
         je_art: vec![
             zeile(DemoStammdatenArt::Fahrzeug, f_angelegt, f_mitbenutzt),
             zeile(DemoStammdatenArt::Personal, p_angelegt, p_mitbenutzt),
             zeile(DemoStammdatenArt::Material, m_angelegt, m_mitbenutzt),
             zeile(DemoStammdatenArt::EinheitVorlage, v_angelegt, v_mitbenutzt),
+            zeile(DemoStammdatenArt::Schichtmodell, s_angelegt, s_mitbenutzt),
         ],
     })
 }

@@ -338,7 +338,8 @@ erhalten. Nachschub stößt sie als Meldung an die Einsatzleitung an, nie als Na
 Verpflegungsstellen des Einsatzes MUST sie alle lesen; beim Buchen einer Ausgabe MUST sie eine
 Verpflegungsstelle wählen können. Stellen planen MUST sie nicht. Die Empfängerliste der
 Verpflegung (Einheiten mit Name, Funkrufname, Gliederung, Abschnitt, Stärke und Eintreffen;
-Abschnitte mit Name) MUST sie lesen und beim Buchen einen Empfänger daraus wählen können.
+Abschnitte mit Name) MUST sie lesen und beim Buchen einen Empfänger daraus wählen können; daraus
+MUST sie auch zeigen, welche Einheit in einem Zeitfenster noch nicht verpflegt ist.
 Einheiten- und Abschnittsnamen gelten dabei nicht als Namen von Einsatzkräften; Namen von
 Einheitsführern und Mitgliedern MUST sie weiterhin nicht erhalten. Die Einheitenliste des
 Einsatzes MUST ihr verschlossen bleiben.
@@ -437,6 +438,11 @@ Lagemonitor).
 
 - **WHEN** das Verpflegungsgerät eine Ausgabe von 9 EP an die Einheit „2. Gruppe“ bucht
 - **THEN** trägt die Ausgabe die Einheit, und die Antwort nennt keinen Namen einer Person
+
+#### Scenario: Noch nicht verpflegt am Gerät
+
+- **WHEN** das Verpflegungsgerät die Ausgabeansicht von „Mittag“ öffnet
+- **THEN** zeigt es, welche Einheiten noch nicht verpflegt sind, mit Name, Stärke und Abschnitt aus der Empfängerliste, und ruft die Einheitenliste nicht ab
 
 #### Scenario: Einheit kommt live dazu
 

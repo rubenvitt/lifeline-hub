@@ -1020,3 +1020,72 @@ async fn plan_zeilen(pool: &SqlitePool, sql: &str, einsatz_id: i64) -> Vec<Strin
         .map(|r| r.get::<String, _>("detail"))
         .collect()
 }
+
+/// LLH-1122: Die Projektion nennt die Vorgabe der Vorwarnung als SQL-Literal; sie muss
+/// [`VORWARNUNG_VORGABE_MINUTEN`] sein, sonst stuften Server und Fristen verschieden ein.
+#[test]
+fn vorwarnung_vorgabe_im_sql() {
+    assert!(ANZEIGE_SELECT.contains(&format!(
+        "COALESCE(m.vorwarnung_minuten, {VORWARNUNG_VORGABE_MINUTEN}) AS vorwarnung_minuten"
+    )));
+}
+
+/// LLH-1122: ohne eigenen Wert und ohne Abschnittsvorgabe folgt die Schicht der Vorgabe des
+/// Einsatzes; Wechselzeiten rechnen in dessen Zone, die Vorwarnung kommt aus dem Modell.
+#[tokio::test]
+async fn beginnen_folgt_der_einsatzvorgabe_mit_wechselzeiten() {
+    let w = welt().await;
+    let werte = crate::schichtmodell::Werte {
+        bezeichnung: "12-h-Schicht".into(),
+        regel: crate::schichtmodell::Regel::Wechselzeiten {
+            zeiten: vec![
+                crate::uhrzeit::Uhrzeit::parse("t", "06:00").unwrap(),
+                crate::uhrzeit::Uhrzeit::parse("t", "18:00").unwrap(),
+            ],
+            mindestdauer_minuten: 240,
+        },
+        vorwarnung_minuten: 45,
+        planungsvorlauf_minuten: 120,
+    };
+    let etb = set_einsatz_vorgabe(
+        &w.pool,
+        w.e,
+        w.b,
+        &EinsatzVorgabeInput::Werte(werte.clone()),
+        T0,
+    )
+    .await
+    .unwrap();
+    assert!(etb.is_some());
+    let (s, _) = beginnen(
+        &w.pool,
+        w.e,
+        w.b,
+        &BeginnEingabe {
+            einheit_id: w.f2,
+            // 13:42 Sommerzeit Berlin
+            beginn_at: Some("2026-09-22 11:42:00".into()),
+            rhythmus_minuten: None,
+        },
+        T0,
+    )
+    .await
+    .unwrap();
+    assert_eq!(s.rhythmus_quelle, RhythmusQuelle::Einsatz);
+    assert_eq!(s.faellig_at, "2026-09-22 16:00:00");
+    assert_eq!(s.rhythmus_minuten, 258);
+    assert_eq!(s.vorwarnung_minuten, 45);
+    let vorwarnung: String = sqlx::query_scalar(
+        "SELECT faellig_at FROM erinnerung WHERE quelle = 'auto_frist' AND status = 'offen' \
+           AND bezug_typ = 'abloesung_vorwarnung' AND bezug_id = ?",
+    )
+    .bind(s.id)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(vorwarnung, "2026-09-22 15:15:00");
+    assert_eq!(
+        einstufung(&s.faellig_at, "2026-09-22 15:15:00", s.vorwarnung_minuten),
+        Einstufung::Vorwarnung
+    );
+}

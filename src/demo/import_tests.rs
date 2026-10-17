@@ -510,6 +510,7 @@ async fn import_legt_den_uebungseinsatz_samt_kopf_und_bericht_an() {
             zeile(DemoStammdatenArt::Personal, 12),
             zeile(DemoStammdatenArt::Material, 4),
             zeile(DemoStammdatenArt::EinheitVorlage, 2),
+            zeile(DemoStammdatenArt::Schichtmodell, 1),
         ],
     };
     assert_eq!(erg.bericht, erwartet);
@@ -1655,4 +1656,48 @@ fn drehbuch_traegt_lage_und_entscheidung() {
         .collect();
     assert!(arten.contains(&EtbArt::Lage));
     assert!(arten.contains(&EtbArt::Entscheidung));
+}
+
+/// LLH-1122: ohne Vorgabe der Organisation bekommt der Demo-Einsatz das Szenario-Modell als
+/// Vorgabe (Kopie); hat die Org eine, bleibt deren Kopie aus der Anlage.
+#[tokio::test]
+async fn demo_einsatz_bekommt_ein_schichtmodell() {
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+    let kopie: (String, String) =
+        sqlx::query_as("SELECT bezeichnung, typ FROM einsatz_schichtmodell WHERE einsatz_id = ?")
+            .bind(erg.einsatz_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        kopie,
+        (
+            szenario::SCHICHTMODELL_BEZEICHNUNG.to_string(),
+            "wechselzeiten".to_string()
+        )
+    );
+
+    let pool = crate::db::test_pool().await;
+    let o = org_mit_admin(&pool, 1).await;
+    sqlx::query(
+        "INSERT INTO schichtmodell (org_id, bezeichnung, typ, rhythmus_minuten, ist_vorgabe) \
+         VALUES (?, 'Sanitätsdienst', 'rhythmus', 360, 1)",
+    )
+    .bind(o.org)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let erg = importieren(&pool, &o, jetzt()).await.expect("importieren");
+    let bezeichnung: String =
+        sqlx::query_scalar("SELECT bezeichnung FROM einsatz_schichtmodell WHERE einsatz_id = ?")
+            .bind(erg.einsatz_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        bezeichnung, "Sanitätsdienst",
+        "die Org-Vorgabe bleibt die des Demo-Einsatzes"
+    );
 }

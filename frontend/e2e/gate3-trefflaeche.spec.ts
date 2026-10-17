@@ -3092,7 +3092,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
       'Vorbedingung: ohne Schreibrecht kein Bedienziel in den Karten (auch kein „Zurücknehmen")',
     ).toHaveCount(0);
 
-    // ── Was bleibt: gesperrte Primäraktion und die zwei Segmente der Ansichtsleiste
+    // ── Was bleibt: gesperrte Primäraktion und die drei Segmente der Ansichtsleiste
     //    (`role="radio"`, deshalb per Struktur gegriffen).
     const kopf = await gesperrtHaeltStufe(
       page
@@ -3104,10 +3104,93 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
     const segmente = page.locator(
       '[data-lfh="verpflegung-werkzeugzeile"] [data-lfh="segmentleiste"] button',
     );
-    await expect(segmente).toHaveCount(2);
-    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 2);
+    await expect(segmente).toHaveCount(3);
+    const segment = await alleHaltenStufe(segmente, soll, `Ansichts-Segment (${dichte})`, 3);
 
     gemessen.push(`${dichte} (Soll ≥ ${soll}): Primär gesperrt ${kopf}, Segment ${segment}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+// ── Verpflegungsstellen (LLH-1040) ────────────────────────────────────────────────────
+//
+// Ansicht „Stellen“: eine GEPLANTE Stelle trägt drei Aktionen hinter einem `MenueAusloeser`, eine
+// AKTIVE zwei Knöpfe („Bearbeiten …“, „Auflösen …“) in `stelle-aktionen` (Lücke `marginSM` =
+// 7 / 11 / 16 px). Die Stellenwahl der Ausgabeansicht ist ein antd-`Select` (`.ant-select` trägt
+// die Steuerhöhe); vorgewählt ist die einzige zugeordnete Stelle.
+
+test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht folgen der Staffel, Abstand ≥ 16 px im Handschuh', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Stellen`);
+  const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
+  const senden = async (pfad: string, data: unknown, methode: 'post' | 'patch' = 'post') => {
+    const antwort = await page.request[methode](`${basis}/${pfad}`, { data });
+    expect(
+      antwort.ok(),
+      `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
+    ).toBeTruthy();
+    return (await antwort.json()) as { id: number };
+  };
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  await senden('stellen', { bezeichnung: 'Zuführung Deich', art: 'zufuehrung' });
+  const feldkueche = await senden('stellen', {
+    bezeichnung: 'Feldküche BR Sportplatz',
+    art: 'feldkueche',
+  });
+  await senden(`stellen/${feldkueche.id}/status`, { status: 'aktiv' });
+  const zf = await senden('zeitfenster', {
+    bezeichnung: 'Mittag Deich',
+    von_at: zeit(-10),
+    bis_at: zeit(110),
+    bedarf_kraefte: 30,
+    bedarf_betreute: 0,
+  });
+  await senden(`zeitfenster/${zf.id}`, { stelle_ids: [feldkueche.id] }, 'patch');
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/verpflegung`);
+    await stelleDichte(page, dichte);
+    await page.getByRole('radio', { name: 'Stellen (2)' }).click();
+    const geplant = page.getByRole('article', { name: 'Stelle Zuführung Deich' });
+    const aktiv = page.getByRole('article', { name: 'Stelle Feldküche BR Sportplatz' });
+    await expect(geplant).toHaveAttribute('data-status', 'geplant');
+    await expect(aktiv).toHaveAttribute('data-status', 'aktiv');
+
+    const menue = await haeltStufe(
+      geplant.getByRole('button', { name: 'Aktionen zu Stelle Zuführung Deich', exact: true }),
+      soll,
+      `Menü der geplanten Stelle (${dichte})`,
+    );
+    const knoepfe = aktiv.locator('[data-lfh="stelle-aktionen"]').getByRole('button');
+    const knopf = await alleHaltenStufe(knoepfe, soll, `Knöpfe der aktiven Stelle (${dichte})`, 2);
+    await expect(knoepfe).toHaveCount(2);
+    const luecke = await abstandZuNachbarn(
+      aktiv.locator('[data-lfh="stelle-aktionen"]'),
+      knoepfe.first(),
+    );
+    if (dichte === 'handschuh') {
+      expect(
+        luecke,
+        `Abstand „Bearbeiten …“ ↔ „Auflösen …“ (handschuh, gemessen ${luecke}px)`,
+      ).toBeGreaterThanOrEqual(16 - SUBPIXEL);
+    }
+
+    await page.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Mittag Deich' })).toBeVisible();
+    const wahl = page.locator('[data-lfh="ausgabe-stelle"] .ant-select');
+    await expect(wahl).toContainText('Feldküche BR Sportplatz');
+    const stellenwahl = await haeltStufe(wahl, soll, `Stellenwahl (${dichte})`);
+
+    gemessen.push(
+      `${dichte} (Soll ≥ ${soll}): Menü ${menue}, Knöpfe ${knopf}, Lücke ${luecke}, ` +
+        `Stellenwahl ${stellenwahl}`,
+    );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

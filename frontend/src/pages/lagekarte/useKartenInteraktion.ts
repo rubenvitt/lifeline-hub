@@ -8,6 +8,7 @@ import { verorteFahrzeug } from '../../api/einsatzFahrzeuge';
 import { verortePerson } from '../../api/einsatzPersonal';
 import { aktualisierePerson } from '../../api/einsatzPerson';
 import { aendereStelle } from '../../api/betreuung';
+import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
@@ -263,6 +264,10 @@ export function useKartenInteraktion({
         // Betreuungsstelle: nur das Koordinatenpaar; der PATCH ist tri-state, ein fehlender
         // Schlüssel bleibt unverändert.
         await aendereStelle(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'bereitstellungsraum') {
+        // Bereitstellungsraum (LLH-1107): nur das Paar, wie bei der Betreuungsstelle. Der Server
+        // schreibt dafür keinen ETB-Eintrag, verteilt aber live.
+        await aktualisiereBr(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
       } else if (platzierungZiel.typ === 'einsatzort') {
         // Einsatzort: nur das Koordinatenpaar. Ein Kopf aus dem Cache überschriebe die
         // gleichzeitige Änderung einer anderen Person (Leitstellen-Nr., Stichwort …).
@@ -287,6 +292,10 @@ export function useKartenInteraktion({
       }
       if (ziel?.typ === 'betreuungsstelle') {
         qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
+      }
+      if (ziel?.typ === 'bereitstellungsraum') {
+        qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, ziel.id) });
       }
       dispatch({ t: 'beenden', arten: ['platzieren'] });
     },
@@ -465,6 +474,13 @@ export function useKartenInteraktion({
         return {
           aufruf: aendereStelle(einsatzId, marker.id, { lat: null, lon: null }),
           faecher: [einsatzKeys.betreuung(einsatzId)],
+        };
+      case 'bereitstellungsraum':
+        // Ebenso: der Raum bleibt, nur sein Kartenpunkt geht (LLH-1107). Umkehrbar über „Auf Karte
+        // verorten" der BR-Detailseite, deshalb ohne Rückfrage.
+        return {
+          aufruf: aktualisiereBr(einsatzId, marker.id, { lat: null, lon: null }),
+          faecher: [einsatzKeys.br(einsatzId), einsatzKeys.brDetail(einsatzId, marker.id)],
         };
       case 'person':
         // Betroffene: nur die zwei Koordinatenfelder wie im Platzier-Zweig; die Person bleibt, nur

@@ -1655,6 +1655,28 @@ describe('LagekartePage', () => {
     expect(platzierModusAn()).toBe(false);
   });
 
+  it('Deeplink ?platzieren=bereitstellungsraum: startet den Platzier-Modus und räumt (LLH-1107)', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=bereitstellungsraum:6');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+  });
+
+  it('Deeplink ?platzieren=bereitstellungsraum: ohne Modul Bereitstellungsräume kein Platziermodus (LLH-1107)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ bereitstellungsraeume: { zugriff: false } })),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=bereitstellungsraum:6');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(platzierModusAn()).toBe(false);
+  });
+
   it('Deeplink ?platzieren=person: startet den Platzier-Modus und räumt (LFH-670)', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');

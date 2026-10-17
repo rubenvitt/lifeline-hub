@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
 import { ladeBetreuung } from '../../api/betreuung';
+import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
@@ -35,6 +36,7 @@ import {
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
   baueBetreuungMarker,
+  buildBrMarker,
   baueAbschnittMarker,
 } from './marker';
 import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
@@ -44,6 +46,7 @@ import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 import { personenZugriffVon } from './personenEbene';
 import { betreuungZugriffVon } from './betreuungEbene';
+import { checkBrZugriff } from './brEbene';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 
 /**
@@ -240,6 +243,22 @@ export function useLagekarteDaten({
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
   const betreuungFehler = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
+  // Ebene „Bereitstellungsräume" (LLH-1107): dieselbe Grenze wie bei den Betreuungsstellen. Das
+  // Fach ist die Liste der Modulseite (`einsatzKeys.br`, mit Belegung), live invalidiert vom
+  // `bereitstellungsraum`-Event, das nur Leser mit Modulrecht bekommen. Im Historien-Modus kommen
+  // die Räume aus dem Dokument.
+  const brVorab = checkBrZugriff({ freigaben, abgelehnt: false });
+  const brQuery = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+    enabled: liveAn && brVorab === 'frei',
+  });
+  const brZugriff = checkBrZugriff({
+    freigaben,
+    abgelehnt: brQuery.error instanceof ApiError && brQuery.error.status === 403,
+  });
+  // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
+  const brFehler = liveAn && brZugriff === 'frei' && brQuery.isError;
   const orgQuery = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
@@ -307,6 +326,15 @@ export function useLagekarteDaten({
         : betreuungQuery.isError
           ? undefined
           : betreuungQuery.data?.bezirke;
+  // Räume hinter derselben Grenze wie die Stellen.
+  const raeumeRoh =
+    brZugriff !== 'frei'
+      ? undefined
+      : istSnapshot
+        ? snap?.bereitstellungsraeume
+        : brQuery.isError
+          ? undefined
+          : brQuery.data;
   // Org-TZ-Default aus dem Dokument, nicht aus der Live-Query — sonst schriebe eine Org-Umbenennung
   // den historischen Stand um.
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
@@ -336,6 +364,12 @@ export function useLagekarteDaten({
     () => baueBetreuungMarker(stellenRoh ?? [], token, orgDefault),
     [stellenRoh, token, orgDefault],
   );
+  // Die Stärke im Raum rechnet über die Einheitenliste; ohne sie (Modul Einheiten gesperrt, noch
+  // nicht geladen) fehlt sie in der Beschriftung, statt zu klein dazustehen.
+  const raeume = useMemo(
+    () => buildBrMarker(raeumeRoh ?? [], einheitenRoh, token),
+    [raeumeRoh, einheitenRoh, token],
+  );
   const fuehrungsstelleMarker = useMemo(
     () => baueFuehrungsstelleMarker(fuehrungsstelleRoh, token),
     [fuehrungsstelleRoh, token],
@@ -345,12 +379,13 @@ export function useLagekarteDaten({
       ...basisVerortet,
       ...(fuehrungsstelleMarker ? [fuehrungsstelleMarker] : []),
       ...stellen.verortet,
+      ...raeume.verortet,
     ],
-    [basisVerortet, fuehrungsstelleMarker, stellen.verortet],
+    [basisVerortet, fuehrungsstelleMarker, stellen.verortet, raeume.verortet],
   );
   const nichtVerortet = useMemo(
-    () => [...basisNichtVerortet, ...stellen.nichtVerortet],
-    [basisNichtVerortet, stellen.nichtVerortet],
+    () => [...basisNichtVerortet, ...stellen.nichtVerortet, ...raeume.nichtVerortet],
+    [basisNichtVerortet, stellen.nichtVerortet, raeume.nichtVerortet],
   );
 
   const taktisch = useMemo(
@@ -478,6 +513,8 @@ export function useLagekarteDaten({
       // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS, ihr Ausfall ist ein
       // Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
       ['Betreuungsstellen', betreuungFehler],
+      // Räume ebenso (LLH-1107); ein 403 ist kein Ausfall (`brFehler`).
+      ['Bereitstellungsräume', brFehler],
       [QUELLE_BETROFFENE, personenFehler],
     ];
     return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
@@ -505,6 +542,7 @@ export function useLagekarteDaten({
     lageMeldungenQuery.isError,
     fkQuery.isError,
     betreuungFehler,
+    brFehler,
     personenFehler,
   ]);
 
@@ -532,6 +570,7 @@ export function useLagekarteDaten({
     // wiederholt.
     if (personenFehler) void personenQuery.refetch();
     if (betreuungFehler) void betreuungQuery.refetch();
+    if (brFehler) void brQuery.refetch();
   };
 
   const lageMeldungMarker = useMemo(
@@ -602,7 +641,8 @@ export function useLagekarteDaten({
         // Vor feststehenden Freigaben weiß niemand, welche Quellen kommen (UHS, Schäden, Stellen
         // speisen den Startausschnitt).
         !freigabenQuery.isFetched ||
-        betreuungQuery.isLoading,
+        betreuungQuery.isLoading ||
+        brQuery.isLoading,
     // Datenstand der Karte (LFH-723): der älteste geladene Teil der Live-Ebenen, wie beim
     // Meldebild. Im Snapshot-Modus keiner — dort nennt der Historien-Banner den Stand, und eine
     // Uhrzeit daneben widerspräche ihm.
@@ -621,6 +661,7 @@ export function useLagekarteDaten({
           freieZeichenQuery.dataUpdatedAt,
           lageMeldungenFrei ? lageMeldungenQuery.dataUpdatedAt : undefined,
           fkQuery.dataUpdatedAt,
+          brZugriff === 'frei' ? brQuery.dataUpdatedAt : undefined,
         ),
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (leer = vollständig). Die Kürzung für die
     // Anzeige ist Darstellung und liegt bei der Seite.
@@ -654,6 +695,7 @@ export function useLagekarteDaten({
       schaeden: schaedenRoh ?? [],
       abschnitte: abschnitteRoh ?? [],
       betreuungsstellen: stellenRoh ?? [],
+      bereitstellungsraeume: raeumeRoh ?? [],
       fuehrungsstelle: fuehrungsstelleRoh ?? null,
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:
@@ -668,6 +710,8 @@ export function useLagekarteDaten({
     // Ebene „Betreuungsstellen": Zugriffszustand für die Zeile; die Marker stehen in
     // `verortet`/`alleVerortet`/`nichtVerortetAlle` wie die UHS.
     betreuungZugriff,
+    // Ebene „Bereitstellungsräume" (LLH-1107): ebenso nur der Zugriffszustand.
+    brZugriff,
     // Ebene „Betroffene": Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,

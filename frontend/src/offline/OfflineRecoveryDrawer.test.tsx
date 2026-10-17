@@ -205,6 +205,26 @@ describe('OfflineRecoveryDrawer: abgelehnte Verpflegungsausgaben (LFH-688)', () 
     expect(screen.getByText(/"client_id": "ausgabe-abgelehnt"/)).toBeInTheDocument();
     expect(screen.getByText(/"menge": 120/)).toBeInTheDocument();
   });
+
+  it('eine Ausgabe an einer Stelle zeigt die Stelle im Inhalt (LLH-1040)', async () => {
+    await schreibaktionEinreihen(11, 7, {
+      art: 'ausgabe',
+      zeitfenster_id: 9,
+      bezeichnung: 'Mittag',
+      daten: { menge: 15, verpflegungsstelle_id: 21, client_id: 'ausgabe-stelle' },
+    });
+    const [ausgabe] = await schreibaktionenLaden(11, 7);
+    await schreibaktionAblehnen(11, ausgabe, 'Die Verpflegungsstelle ist aufgelöst');
+
+    render(
+      <App>
+        <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+      </App>,
+    );
+
+    expect(await screen.findByText('Abgelehnte Verpflegungsausgabe: Mittag')).toBeInTheDocument();
+    expect(screen.getByText(/"verpflegungsstelle_id": 21/)).toBeInTheDocument();
+  });
 });
 
 describe('OfflineRecoveryDrawer: abgelehntes Eintreffen am Bereitstellungsraum (LLH-1075 Teil III)', () => {

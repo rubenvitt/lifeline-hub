@@ -136,6 +136,19 @@ pub async fn importieren_tx(
     // 5. Stammdaten (D8).
     let stamm = stammdaten_importieren_tx(conn, org_id, import_id).await?;
 
+    // 5a. Schichtmodell (LLH-1122): hat der Demo-Einsatz bei der Anlage keine Vorgabe der
+    //     Organisation bekommen, wird das Szenario-Modell seine Vorgabe (eine Kopie wie bei der
+    //     Anlage). Eine vorhandene Org-Vorgabe bleibt die des Demo-Einsatzes.
+    if crate::schichtmodell::repo::load_einsatz_tx(conn, einsatz_id)
+        .await?
+        .is_none()
+    {
+        let werte =
+            crate::schichtmodell::repo::load_werte_tx(conn, org_id, stamm.schichtmodell).await?;
+        crate::schichtmodell::repo::set_einsatz_tx(conn, einsatz_id, Some(&werte), admin_id)
+            .await?;
+    }
+
     // 6. Das Drehbuch in Zeitfolge. Die Einstellungen von Einsatz und Org werden einmal auf
     //    der Verbindung gelesen; über den Pool fielen sie still auf Org 0 zurück (Block 3a).
     let einst = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id).await?;

@@ -7,7 +7,14 @@
  * Anführungszeichen ‚…‘ wie in den ETB-Sätzen (`src/verpflegung/mod.rs`).
  */
 import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
-import type { Kostform, Sonderkost, SonderkostEingabe, VerpflegungZeitfenster } from '../api/types';
+import type {
+  Kostform,
+  Sonderkost,
+  SonderkostEingabe,
+  Verpflegungsart,
+  VerpflegungsstelleArt,
+  VerpflegungZeitfenster,
+} from '../api/types';
 import type { NachforderungVorbelegung } from '../routing/deeplinks';
 
 /** Wortlaut je Kostform — exhaustiv über `Record`: eine sechste Kostform bricht den Typcheck. */
@@ -17,6 +24,20 @@ export const KOSTFORM_LABEL: Record<Kostform, string> = {
   ohne_schwein: 'ohne Schweinefleisch',
   diaet_allergenarm: 'Diät/allergenarm',
   saeugling_kleinkind: 'Säugling/Kleinkind',
+};
+
+/** Art einer Verpflegungsstelle (LLH-1040), exhaustiv über `Record`. */
+export const STELLE_ART_LABEL: Record<VerpflegungsstelleArt, string> = {
+  feldkueche: 'Feldküche',
+  ausgabestelle: 'Ausgabestelle',
+  zufuehrung: 'Zuführung',
+};
+
+/** Verpflegungsart eines Zeitfensters (LLH-1040, nur Anzeige), exhaustiv über `Record`. */
+export const VERPFLEGUNGSART_LABEL: Record<Verpflegungsart, string> = {
+  warm: 'warm',
+  kalt: 'kalt',
+  getraenke: 'Getränke',
 };
 
 /** Feste Reihenfolge der Kostformen (Anzeige und Dialog). */

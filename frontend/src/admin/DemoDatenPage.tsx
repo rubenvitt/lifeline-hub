@@ -103,6 +103,7 @@ const ART_LABEL: Record<DemoStammdatenArt, string> = {
   personal: 'Personal',
   material: 'Material',
   einheit_vorlage: 'Einheiten-Vorlagen',
+  schichtmodell: 'Schichtmodelle',
 };
 
 const VORGANG_LABEL: Record<DemoVorgang, string> = {

@@ -691,6 +691,7 @@ describe('UeberblickPage', () => {
       abschnitt_name: 'Deichwache Nord',
       beginn_at: vor(300),
       rhythmus_minuten: 360,
+      vorwarnung_minuten: 30,
       rhythmus_quelle: 'abschnitt',
       faellig_at: nach(60),
       status: 'laufend',

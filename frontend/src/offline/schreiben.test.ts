@@ -411,6 +411,16 @@ describe('Sammlung direkt vormerken (LLH-1032, design.md D5)', () => {
     }
   });
 
+  it('eine Sammlung an einer Stelle trägt die Stelle in die Queue (LLH-1040, D13 Punkt 8)', async () => {
+    await merkeVerpflegungsausgabeVor(11, 7, mittag, { menge: 4, verpflegungsstelle_id: 21 });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion).toMatchObject({
+      art: 'ausgabe',
+      zeitfenster_id: 9,
+      daten: { menge: 4, verpflegungsstelle_id: 21 },
+    });
+  });
+
   it('zwei Sammlungen tragen zwei verschiedene client_id', async () => {
     await merkeVerpflegungsausgabeVor(11, 7, mittag, { menge: 1 });
     await merkeVerpflegungsausgabeVor(11, 7, mittag, { menge: 2 });

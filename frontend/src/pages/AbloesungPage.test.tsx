@@ -64,6 +64,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   abschnitt_name: 'Deichwache Nord',
   beginn_at: inMinuten(-300),
   rhythmus_minuten: 360,
+  vorwarnung_minuten: 30,
   rhythmus_quelle: 'abschnitt',
   faellig_at: inMinuten(60),
   status: 'laufend',
@@ -163,6 +164,17 @@ describe('AbloesungPage (LFH-635)', () => {
     const herkunft = within(bald).getByText(/^Deichwache Nord · im Einsatz seit$/);
     expect(herkunft).toHaveTextContent(/^Deichwache Nord · im Einsatz seit \d{4,6}$/);
     expect(herkunft).not.toContainElement(rhythmus(bald));
+  });
+
+  it('eine Schicht nach der Vorgabe des Einsatzes heißt „Vorgabe“, nicht „eigen“ (LLH-1122)', async () => {
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [schicht({ id: 1, rhythmus_quelle: 'einsatz' })] : []),
+    );
+    renderPage();
+    const [karte] = await screen.findAllByRole('article');
+    expect(karte.querySelector('[data-lfh="abloesung-rhythmus"]')).toHaveTextContent(
+      /^Rhythmus 6 h \(Vorgabe\)$/,
+    );
   });
 
   it('der Beginn steht in Mono mit festen Ziffern (LFH-771)', async () => {

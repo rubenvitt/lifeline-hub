@@ -250,6 +250,7 @@ pub const STAMMDATEN_PFADE: &[&str] = &[
     "/api/einheit-typen",
     "/api/einheit-vorlagen",
     "/api/verpflegung-vorlagen",
+    "/api/schichtmodelle",
     "/api/sprechgruppen",
     "/api/etb-bausteine",
     "/api/stichwort-vorschlaege",

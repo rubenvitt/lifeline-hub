@@ -189,5 +189,11 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([])),
   http.get('/api/einsaetze/:einsatzId/einheiten', () => HttpResponse.json([])),
+  /**
+   * Bereitstellungsräume — leer als Default, ein echter Serverzustand. Die Lagekarte fragt sie mit
+   * Freigabe `bereitstellungsraeume` ab (Ebene „Bereitstellungsräume", LLH-1107); Tests mit Räumen
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
   http.get('/api/externe-stellen', () => HttpResponse.json([])),
 );

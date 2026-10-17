@@ -283,8 +283,23 @@ export function verpflegungPfad(einsatzId: number): string {
  * Ausgabeansicht eines Zeitfensters (LLH-1032, design.md D1): Portionen zählen mit Soll/Ist.
  * Unterroute des Moduls, `modulAusPfad` gatet sie über das Segment `verpflegung`.
  */
-export function verpflegungAusgabePfad(einsatzId: number, zeitfensterId: number): string {
-  return `${verpflegungPfad(einsatzId)}/${zeitfensterId}/ausgabe`;
+export function verpflegungAusgabePfad(
+  einsatzId: number,
+  zeitfensterId: number,
+  opts: { stelle?: number } = {},
+): string {
+  return mitQuery(`${verpflegungPfad(einsatzId)}/${zeitfensterId}/ausgabe`, {
+    stelle: opts.stelle,
+  });
+}
+
+/**
+ * Gewählte Verpflegungsstelle der Ausgabeansicht (LLH-1040, design.md D13 Punkt 7): `?stelle=<sid>`
+ * aus dem Sprung je Stelle an der Zeitfensterkarte. Vorrang vor der gemerkten Wahl; eine Kennung,
+ * die keine wählbare Stelle trifft, verwirft die Ansicht.
+ */
+export function parseVerpflegungStelle(params: URLSearchParams): number | null {
+  return parseRouteId(params.get('stelle') ?? undefined);
 }
 
 /** Fachmodul „Wetter & Pegel": Pegel mit Verlauf, DWD-Warnungen, Vorhersage. */
@@ -895,7 +910,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * enger als der karteninterne `PlatzierenPunktTyp`. Wer erweitert, prüft
  * `pages/LagekartePage.tsx` mit.
  */
-type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle';
+type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -905,6 +920,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   person: true,
   // Betreuungsstelle („Auf Karte verorten" der Betreuungsseite).
   betreuungsstelle: true,
+  // Bereitstellungsraum („Auf Karte verorten" der BR-Detailseite, LLH-1107).
+  bereitstellungsraum: true,
 };
 
 /**
@@ -1145,8 +1162,14 @@ export function geraetVerpflegungPfad(einsatzId: number): string {
 }
 
 /** Ausgabeansicht eines Zeitfensters am Verpflegungsgerät (LLH-1032); die Startseite bleibt die Liste. */
-export function geraetVerpflegungAusgabePfad(einsatzId: number, zeitfensterId: number): string {
-  return `${geraetVerpflegungPfad(einsatzId)}/${zeitfensterId}/ausgabe`;
+export function geraetVerpflegungAusgabePfad(
+  einsatzId: number,
+  zeitfensterId: number,
+  opts: { stelle?: number } = {},
+): string {
+  return mitQuery(`${geraetVerpflegungPfad(einsatzId)}/${zeitfensterId}/ausgabe`, {
+    stelle: opts.stelle,
+  });
 }
 
 /** Startseite des Abschnittsgeräts (LFH-1043): der eigene Abschnitt mit seinen Einheiten. */
