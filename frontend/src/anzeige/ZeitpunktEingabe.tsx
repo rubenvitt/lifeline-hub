@@ -3,7 +3,7 @@
  * „Zeiteingabe in der Anzeigezone“). Jede Zeiteingabe der Oberfläche läuft über diese Bausteine
  * (Guard `zeitEingabe.guard.test.ts`).
  *
- * Textfeld zuerst (`openspec/changes/ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D1–D8):
+ * Textfeld zuerst (`openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D1–D8):
  * - Getippt wird taktisch („1430“, „101430“, „101430okt26“), deutsch, ISO oder relativ („-5“,
  *   „+2h“, „j“); die eine Deutung ist `zeitParser.ts`. Das Feld zeigt seinen Wert als DTG
  *   („161430okt26“, Entscheidung E1), beim Tippen daneben die Deutung oder den Grund.

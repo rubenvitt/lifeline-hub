@@ -3,7 +3,7 @@ import type { ZeitArt } from './zeitParser';
 
 /**
  * Die EINE Schnellwahl-Tabelle der Zeiteingabe (Spec `zeiteingabe`, „Schnellwahl nach
- * Feldart“; `openspec/changes/ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D6). Der
+ * Feldart“; `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D6). Der
  * Kalender des Bausteins zeigt die Reihe der Feldart, das Feld auf Wunsch ebenso; die
  * ETB-Wiedervorlage (LFH-342 · C7) und die Lagebesprechung (LFH-543) bauen ihre Knöpfe mit
  * eigenem Bezug aus der Frist-Reihe. Gehoben, nicht kopiert: zwei Tabellen mit denselben

@@ -84,7 +84,7 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
       `aufbewahrung/WiederherstellenDialog.tsx`, `aufbewahrung/KategorieFristen.tsx`,
       `aufbewahrung/FristPaneel.tsx`, `zugangsprotokoll/ZugangsprotokollPage.tsx`; Tests grün,
       das nicht mehr nötige `customParseFormat` in den Aufbewahrungs-Tests entfernt.
-- [ ] 4.7 `grep -rn "format=" frontend/src` an Zeitfeldern leer, `mise exec -- pnpm typecheck`
+- [x] 4.7 `grep -rn "format=" frontend/src` an Zeitfeldern leer, `mise exec -- pnpm typecheck`
       und `mise exec -- pnpm lint` grün, `mise exec -- pnpm test` vollständig grün.
 
 ## 5. e2e
@@ -101,7 +101,7 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 - [x] 6.1 `frontend/AGENTS.md` „Zeiteingabe in der Anzeigezone“ fortschreiben (Parser als eine
       Deutung, Feldart, Schnellwahl-Tabelle, kein `format`, Kalender nur in `anzeige/`,
       Testhelfer); Prettier über `frontend/` grün.
-- [ ] 6.2 Anwenderdoku: die Kapitel mit Zeitfeldern (`docs/anwender/kapitel/`: einsatztagebuch,
+- [x] 6.2 Anwenderdoku: die Kapitel mit Zeitfeldern (`docs/anwender/kapitel/`: einsatztagebuch,
       lagebesprechung, erinnerungen, auftraege-befehle, verpflegung u. a.) beschreiben Tippen,
       Kurzformen und Schnellwahl einmal zentral und verweisen darauf; Bilder mit Zeitfeldern nach
       `docs/anwender/AGENTS.md` neu erzeugen oder als offen an LLH-1077 melden. Wächter der Doku
@@ -109,7 +109,7 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` (Bündel `schnell`) grün; Review über Bugs, Zonen,
+- [x] 7.1 `./scripts/check-all.sh` (Bündel `schnell`) grün; Review über Bugs, Zonen,
       Tastaturvertrag und Tests (`superpowers:requesting-code-review`), bestätigte Findings
       behoben.
 

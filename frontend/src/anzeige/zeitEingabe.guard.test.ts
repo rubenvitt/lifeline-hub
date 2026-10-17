@@ -11,7 +11,7 @@
  * Seit LLH-1070 ist die Zeiteingabe ein Textfeld mit eigenem Parser; antds `DatePicker` und
  * `TimePicker` gibt es nirgends mehr (ihre Scrollspalten und das „OK“ je Feld waren der Grund des
  * Umbaus), antds `Calendar` nur als Nebenweg in `anzeige/`. Ein `format` am Baustein gibt es nicht:
- * das Feld zeigt immer die DTG (`openspec/changes/ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`,
+ * das Feld zeigt immer die DTG (`openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`,
  * D8, D9).
  *
  * ── Was dieser Guard NICHT sieht ────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 /**
  * Die EINE Deutung getippter Zeitpunkte (Spec `zeiteingabe`, „Eingabe als Text“ ff.; Herleitung
- * `openspec/changes/ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D2). Rein, ohne React und
+ * `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D2). Rein, ohne React und
  * ohne Uhr: `jetzt` reicht der Aufrufer herein (im Baustein `serverJetzt()`).
  *
  * Gelesen wird als Wanduhr der Anzeigezone; der Zeitpunkt entsteht über

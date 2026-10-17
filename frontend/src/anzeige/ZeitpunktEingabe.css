@@ -1,5 +1,5 @@
 /* Kalender der Zeiteingabe als Blatt am unteren Rand (LFH-953, LFH-1076, `ZeitpunktEingabe.tsx`,
-   `openspec/changes/ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D5).
+   `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D5).
 
    Das Popover richtet sich am Kalender-Knopf aus. Auf 390 px und auf dem Führungs-Tablet in
    `komfortabel`/`handschuh` ragte ein Panel am Feld über den Rand. Darum, wo der Kalender nicht

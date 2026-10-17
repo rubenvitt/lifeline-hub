@@ -1,6 +1,6 @@
 /**
  * Kalender als Nebenweg der Zeiteingabe (Spec `zeiteingabe`, „Kalender als Nebenweg“;
- * `openspec/changes/ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D5): ein Monatsblatt für
+ * `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`, D5): ein Monatsblatt für
  * den Tag, darunter die Uhrzeit als Text und die Schnellwahl. Ein Tag-Klick wählt nur; übernommen
  * wird mit Enter im Uhrzeitfeld oder „Übernehmen“. Keine Scrollspalten, kein „OK“ je Feld.
  *
