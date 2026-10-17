@@ -100,6 +100,7 @@ import { MenueAusloeser, type MenueEintrag } from '../../components/MenueAusloes
 import BrVerlauf from './BrVerlauf';
 import EintreffenDialog from './EintreffenDialog';
 import NichtUebernommenMarke, { UnangemeldetMarke } from '../../kraefte/NichtUebernommenMarke';
+import { useVorgemerkteEintreffen } from '../../offline/useVorgemerkteSchreibaktionen';
 import dayjs from 'dayjs';
 
 const KEINE_EINHEITEN: BrEinheitKurz[] = [];
@@ -165,7 +166,7 @@ const schluesselVon = (b: BelegungMitName) =>
 export default function BrDetailPage() {
   const { id, brId: brIdParam } = useParams();
   const einsatzId = Number(id);
-  const { geraet, laedt: authLaedt } = useAuth();
+  const { geraet, benutzer, laedt: authLaedt } = useAuth();
   // Ein BR-Gerät (LFH-1042) führt nur seinen Raum: kein Umschalter, kein Bearbeiten, kein Auflösen
   // und Stornieren, keine Brotkrumen in fremde Module. In Betrieb nehmen und Belegen bleiben.
   const darf = useGeraetDarf();
@@ -294,6 +295,11 @@ export default function BrDetailPage() {
   // Die Kraft, die der Abruf-Dialog gerade abruft (LLH-1085); `null` = zu.
   const [abrufZiel, setAbrufZiel] = useState<AbrufZiel | null>(null);
   const nichtInBetriebId = useId();
+  // Ohne Netz vorgemerkte Buchungen dieses Geräts (Teil III): die Seite zeigt die des Raums unter
+  // „Vorgemerkt“, der Dialog bietet keine davon erneut an. Alle Räume des Einsatzes, weil eine
+  // vorgemerkte Kraft nirgends ein zweites Mal gebucht werden soll.
+  const vorgemerkt = useVorgemerkteEintreffen(benutzer?.id, einsatzId);
+  const vorgemerkteDaten = useMemo(() => vorgemerkt.map((v) => v.aktion.daten), [vorgemerkt]);
 
   const zeilen = useZeilenFehler<string>();
   // Die zuletzt begonnene Belegung je Zeile: nennt eine Ablehnung, deren Zeile nicht mehr steht.
@@ -399,6 +405,7 @@ export default function BrDetailPage() {
   const materialAmBr = (materialQuery.data ?? []).filter((em) => em.br_id === br.id);
   const eintreffen = darf('br-eintreffen') && darfImEinsatzSchreiben(einsatz);
   const inBetrieb = br.status === 'aktiv';
+  const vorgemerktHier = vorgemerkt.filter((v) => v.aktion.br_id === br.id);
 
   function onZuweisenEinheit(einheit: Einheit) {
     belegungMut.mutate({
@@ -902,6 +909,29 @@ export default function BrDetailPage() {
                 </ListenEintrag>
               )}
             />
+            {/* Ohne Netz vorgemerkt (LLH-1075 Teil III): unter den Listen, damit ihr Kommen und
+                Gehen keine Zeile darüber verschiebt; nicht in den Kennzahlen, die bleiben die des
+                Servers. Beim Nachsenden lädt der Abgleich erst den Raum, dann geht die Zeile. */}
+            {vorgemerktHier.length > 0 && (
+              <div data-testid="br-vorgemerkt" style={{ marginTop: abstand.lg }}>
+                <SektionHeader titel="Vorgemerkt" extra={vorgemerktHier.length} />
+                <Liste
+                  dataSource={vorgemerktHier}
+                  rowKey={(v) => v.aktion.daten.client_id ?? String(v.id)}
+                  renderItem={(v) => (
+                    <ListenEintrag>
+                      <Space wrap>
+                        <span>{v.aktion.name}</span>
+                        {v.aktion.daten.unangemeldet && <UnangemeldetMarke />}
+                        <span style={{ ...monoStil(12), color: rollen.gedaempft }}>
+                          vorgemerkt {formatZeitKurz(v.aktion.daten.zeitpunkt_at ?? v.erstellt_at)}
+                        </span>
+                      </Space>
+                    </ListenEintrag>
+                  )}
+                />
+              </div>
+            )}
           </div>
           {/* Unter der Halte-Fläche: eingeschobenes Material verschiebt keine Belegungszeile unter
               dem Zeiger (D13). Bedienbar auch im Zustand „geplant“, anders als das Belegen. */}
@@ -950,9 +980,11 @@ export default function BrDetailPage() {
       {eintreffen && (
         <EintreffenDialog
           einsatzId={einsatzId}
+          benutzerId={benutzer?.id}
           br={br}
           einheiten={einheitenQuery.data ?? []}
           fahrzeuge={fahrzeugeQuery.data ?? []}
+          vorgemerkt={vorgemerkteDaten}
           offen={eintreffenOffen}
           onClose={() => setEintreffenOffen(false)}
           onGebucht={(ergebnis) => {

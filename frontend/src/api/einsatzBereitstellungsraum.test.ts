@@ -97,6 +97,7 @@ describe('Bereitstellungsraum — Eintreffen', () => {
       '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
       'POST',
       { kraft: { objekt_typ: 'einheit', objekt_id: 12 } },
+      undefined,
     );
   });
 
@@ -112,6 +113,19 @@ describe('Bereitstellungsraum — Eintreffen', () => {
       '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
       'POST',
       { unangemeldet },
+      undefined,
+    );
+  });
+
+  it('nennt beim Nachsenden den Besitzer der Warteschlange (LLH-1075 Teil III)', async () => {
+    const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
+    const daten = { kraft: { objekt_typ: 'einheit' as const, objekt_id: 12 }, client_id: 'e1' };
+    await bucheEintreffen(4, 9, daten, { offlineQueueBenutzerId: 11 });
+    expect(send).toHaveBeenCalledWith(
+      '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
+      'POST',
+      daten,
+      { offlineQueueBenutzerId: 11 },
     );
   });
 });

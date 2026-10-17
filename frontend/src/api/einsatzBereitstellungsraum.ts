@@ -11,7 +11,7 @@ import type {
   ObjektTyp,
   BrBelegungsArt,
 } from './types';
-import { apiGet, apiSend, mitParametern } from './client';
+import { apiGet, apiSend, mitParametern, type ApiSendOptionen } from './client';
 
 // ---------- Bereitstellungsräume ----------
 
@@ -126,11 +126,13 @@ export function bucheEintreffen(
   einsatzId: number,
   brId: number,
   daten: EintreffenEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<EintreffenErgebnis> {
   return apiSend<EintreffenErgebnis>(
     `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/eintreffen`,
     'POST',
     daten,
+    optionen,
   );
 }
 

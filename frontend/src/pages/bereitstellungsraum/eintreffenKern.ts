@@ -2,6 +2,8 @@
  * Reine Logik des Dialogs „Eintreffen buchen“ (LLH-1075 Teil II, design.md
  * D9, D13, D14): Kandidatengruppen „Erwartet“ und „Im Einsatz“, Suche über
  * Name, Typ und Funkrufnamen, Doppelbuchungs-Hinweis und die Request-Körper.
+ * Teil III: ohne Netz vorgemerkte Buchungen (Offline-Queue) kennt der Server
+ * noch nicht; sie gelten weder als frei buchbar noch als Kraft im Einsatz.
  */
 import type {
   Einheit,
@@ -25,6 +27,8 @@ export interface EintreffenTreffer {
   alarmiertAt: string | null;
   /** Eintreffen in der offenen Periode. */
   eingetroffenAt: string | null;
+  /** Erfassungszeitpunkt einer ohne Netz vorgemerkten Buchung dieser Kraft (Teil III). */
+  vorgemerktAt: string | null;
 }
 
 export interface EintreffenGruppen {
@@ -38,7 +42,23 @@ export interface EintreffenGruppenEingabe {
   perioden?: readonly EinheitPerioden[];
   /** Kräfte, die der Detail-Cache schon im Raum kennt. */
   imRaum?: { einheiten: readonly number[]; fahrzeuge: readonly number[] };
+  /** Ohne Netz vorgemerkte Buchungen dieses Geräts, noch nicht beim Server (Teil III). */
+  vorgemerkt?: readonly EintreffenEingabe[];
   suche?: string;
+}
+
+// `objekt_typ` ist am Draht ein `string` (KraftAngabe).
+const kraftSchluessel = (art: string, id: number) => `${art}-${id}`;
+
+/** Vorgemerkte Buchungen bekannter Kräfte: Schlüssel → Erfassungszeitpunkt. */
+function vorgemerkteKraefte(vorgemerkt: readonly EintreffenEingabe[] = []) {
+  const je = new Map<string, string | null>();
+  for (const v of vorgemerkt) {
+    if (v.kraft) {
+      je.set(kraftSchluessel(v.kraft.objekt_typ, v.kraft.objekt_id), v.zeitpunkt_at ?? null);
+    }
+  }
+  return je;
 }
 
 /** Trimmt, vereinheitlicht Leerraum und faltet Groß/Klein (wie der Server). */
@@ -73,6 +93,9 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
   const imRaumF = new Set(e.imRaum?.fahrzeuge ?? []);
   const periodenJe = new Map((e.perioden ?? []).map((p) => [p.einheit_id, p]));
   const abschnittJe = abschnittDerEinheit(einheiten);
+  const vorgemerktJe = vorgemerkteKraefte(e.vorgemerkt);
+  const vorgemerktAt = (art: EintreffenTreffer['art'], id: number) =>
+    vorgemerktJe.get(kraftSchluessel(art, id)) ?? null;
 
   const erwartet: EintreffenTreffer[] = [];
   const imEinsatz: EintreffenTreffer[] = [];
@@ -90,6 +113,7 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
       abschnitt: abschnitt ? (abschnitt.name ?? null) : null,
       alarmiertAt: offen?.anker === 'alarmierung' ? offen.beginn_at : null,
       eingetroffenAt: offen?.eintreffen_at ?? null,
+      vorgemerktAt: vorgemerktAt('einheit', x.id),
     };
     if (!matches(t, [x.funkrufname], suche)) continue;
     (abschnitt == null && t.eingetroffenAt == null ? erwartet : imEinsatz).push(t);
@@ -107,6 +131,7 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
       abschnitt: null,
       alarmiertAt: null,
       eingetroffenAt: null,
+      vorgemerktAt: vorgemerktAt('fahrzeug', f.id),
     };
     if (matches(t, [], suche)) erwartet.push(t);
   }
@@ -115,12 +140,13 @@ export function buildEintreffenGruppen(e: EintreffenGruppenEingabe): EintreffenG
   return { erwartet: erwartet.sort(nachName), imEinsatz: imEinsatz.sort(nachName) };
 }
 
-/** Kurze Hinweise eines Treffers: Alarmierung, Abschnitt, Eintreffen. */
+/** Kurze Hinweise eines Treffers: Vormerkung ohne Netz, Alarmierung, Abschnitt, Eintreffen. */
 export function trefferHinweise(
   t: EintreffenTreffer,
   formatZeit: (wert: string) => string,
 ): string[] {
   const hinweise: string[] = [];
+  if (t.vorgemerktAt) hinweise.push(`vorgemerkt ${formatZeit(t.vorgemerktAt)}`);
   if (t.alarmiertAt) hinweise.push(`alarmiert ${formatZeit(t.alarmiertAt)}`);
   if (t.abschnitt) hinweise.push(t.abschnitt);
   if (t.eingetroffenAt) hinweise.push(`eingetroffen ${formatZeit(t.eingetroffenAt)}`);
@@ -128,16 +154,25 @@ export function trefferHinweise(
 }
 
 export interface Doppelbuchung {
-  /** Name der gleichnamigen Kraft, wie sie im Einsatz heißt. */
+  /** Name der gleichnamigen Kraft, wie sie im Einsatz heißt oder vorgemerkt ist. */
   name: string;
-  /** Der buchbare Treffer dazu; `null`, wenn die Kraft schon in einem Raum steht. */
+  /**
+   * Der buchbare Treffer dazu; `null`, wenn die Kraft schon in einem Raum steht oder ihre Buchung
+   * ohne Netz vorgemerkt ist (dann bucht „Diese buchen“ sie nicht ein zweites Mal).
+   */
   treffer: EintreffenTreffer | null;
+  /** Die Buchung dieser Kraft liegt noch in der Offline-Queue (Teil III). */
+  vorgemerkt: boolean;
 }
 
 /**
  * Sucht eine aktive Kraft mit genau diesem Funkrufnamen (D9): Name oder
  * Funkrufname einer Einheit, Funkrufname eines Fahrzeugs. Ein Fahrzeug einer
- * Einheit verweist auf die Einheit.
+ * Einheit verweist auf die Einheit. Ohne Netz (Teil III) zählen dazu die
+ * vorgemerkten unangemeldeten Kräfte dieses Geräts; sie und vorgemerkte
+ * bekannte Kräfte sind kein buchbarer Treffer. Fehlen die Kräfte des
+ * Einsatzes (nicht geladen), findet die Prüfung nichts: sie erfindet keine
+ * Doppelbuchung, und der Server prüft beim Senden.
  */
 export function findDoppelbuchung(
   funkrufname: string,
@@ -145,28 +180,32 @@ export function findDoppelbuchung(
     einheiten: readonly Einheit[];
     fahrzeuge: readonly EinsatzFahrzeug[];
     kandidaten: EintreffenGruppen;
+    vorgemerkt?: readonly EintreffenEingabe[];
   },
 ): Doppelbuchung | null {
   const ziel = normalizeFunkrufname(funkrufname);
   if (!ziel) return null;
   const alle = [...d.kandidaten.erwartet, ...d.kandidaten.imEinsatz];
-  const trefferVon = (art: EintreffenTreffer['art'], id: number) =>
-    alle.find((t) => t.art === art && t.id === id) ?? null;
   const gleich = (w: string | null | undefined) => w != null && normalizeFunkrufname(w) === ziel;
+  const kraft = (name: string, art: EintreffenTreffer['art'], id: number): Doppelbuchung => {
+    const treffer = alle.find((t) => t.art === art && t.id === id) ?? null;
+    const vorgemerkt = treffer?.vorgemerktAt != null;
+    return { name, treffer: vorgemerkt ? null : treffer, vorgemerkt };
+  };
 
   for (const x of d.einheiten) {
     if (x.aufgeloest_at != null) continue;
-    if (gleich(x.name) || gleich(x.funkrufname)) {
-      return { name: x.name, treffer: trefferVon('einheit', x.id) };
-    }
+    if (gleich(x.name) || gleich(x.funkrufname)) return kraft(x.name, 'einheit', x.id);
   }
   for (const f of d.fahrzeuge) {
     if (f.beendet_at != null || !gleich(f.funkrufname)) continue;
-    return {
-      name: f.funkrufname,
-      treffer:
-        f.einheit_id != null ? trefferVon('einheit', f.einheit_id) : trefferVon('fahrzeug', f.id),
-    };
+    return f.einheit_id != null
+      ? kraft(f.funkrufname, 'einheit', f.einheit_id)
+      : kraft(f.funkrufname, 'fahrzeug', f.id);
+  }
+  for (const v of d.vorgemerkt ?? []) {
+    const name = v.unangemeldet?.fahrzeuge?.find((f) => gleich(f.funkrufname))?.funkrufname;
+    if (name) return { name, treffer: null, vorgemerkt: true };
   }
   return null;
 }
