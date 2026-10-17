@@ -195,9 +195,17 @@ export function ZeitpunktEingabe(props: ZeitpunktEingabeProps) {
   const offen = open ?? offenIntern;
   const hinweisId = useId();
   const feldRef = useRef<InputRef | null>(null);
+  const weitergegeben = useRef<HTMLInputElement | null | undefined>(undefined);
+  // Die Ref des Aufrufers erfährt nur einen WECHSEL des Felds: antds `Input` erneuert sein Handle
+  // bei jedem Rendern (`useImperativeHandle` ohne Abhängigkeiten), und eine fokussierende Ref wie
+  // die des ETB-Chips (`etb/MetaChip.tsx`, `fokusOhneRollen`) holte sich sonst nach jedem Blur den
+  // Fokus zurück.
   const setzeRef = useCallback(
     (el: InputRef | null) => {
       feldRef.current = el;
+      const knoten = el?.input ?? null;
+      if (knoten === weitergegeben.current) return;
+      weitergegeben.current = knoten;
       if (typeof ref === 'function') ref(el);
       else if (ref) (ref as RefObject<InputRef | null>).current = el;
     },

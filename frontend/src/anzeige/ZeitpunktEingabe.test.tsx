@@ -615,6 +615,26 @@ describe('ZeitpunktEingabe — stabil über Re-Render', () => {
   });
 });
 
+describe('ZeitpunktEingabe — Ref des Aufrufers', () => {
+  it('ruft eine Ref-Funktion nur beim Einhängen, nicht bei jedem Rendern (ETB-Chip fokussiert darüber)', async () => {
+    const ref = vi.fn();
+    const user = userEvent.setup();
+    render(
+      mitZone(
+        null,
+        <>
+          <ZeitpunktEingabe aria-label="Zeit" ref={ref} />
+          <input aria-label="Inhalt" />
+        </>,
+      ),
+    );
+    await user.type(zeitFeld('Zeit'), '14');
+    await user.click(screen.getByRole('textbox', { name: 'Inhalt' }));
+    expect(ref.mock.calls.filter(([el]) => el !== null)).toHaveLength(1);
+    expect(screen.getByRole('textbox', { name: 'Inhalt' })).toHaveFocus();
+  });
+});
+
 describe('ZeitpunktEingabe — Blatt, wo der Kalender nicht neben das Feld passt (LFH-953, LFH-1076)', () => {
   /** Das offene Popover des Kalenders. */
   const popup = () =>

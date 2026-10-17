@@ -103,7 +103,7 @@ export default function TerminPaneel({
             placeholder="Termin wählen"
             disabled={isGesperrt}
             value={terminZeitpunkt(termin)}
-            // Das Löschkreuz des Felds leert den Termin wie „kein Termin“.
+            // Ein geleertes Feld (Enter) leert den Termin wie „kein Termin“.
             onChange={(zeitpunkt) => {
               if (zeitpunkt || termin) setTermin(zeitpunkt);
             }}
