@@ -109,6 +109,8 @@
           "folgeschichten",
           "uebernommen_bei_vollzug",
           "abschnitt_uebergeben",
+          "art",
+          "besatzung",
           "ruecknehmbar",
           "erbende_einheiten",
           "planung_warnungen",
@@ -156,6 +158,10 @@
           "angelegt_at": {
             "type": "string"
           },
+          "art": {
+            "$ref": "#/components/schemas/AbloesungArt",
+            "description": "Wie die Schicht vollzogen wurde (LLH-1150); eine laufende trägt `einheit`."
+          },
           "beendet_at": {
             "type": [
               "string",
@@ -182,6 +188,13 @@
           },
           "beginn_at": {
             "type": "string"
+          },
+          "besatzung": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AbloesungBesatzung"
+            },
+            "description": "Beim Besatzungswechsel: wer ging (`alt`) und wer kam (`neu`), je in der Reihenfolge des\nVollzugs. Leer bei jeder anderen Schicht."
           },
           "einheit_id": {
             "type": "integer",
@@ -291,6 +304,36 @@
             "type": "integer",
             "format": "int64",
             "description": "Vorwarnzeit vor der Fälligkeit in Minuten: aus dem Schichtmodell des Einsatzes, ohne\neines [`VORWARNUNG_VORGABE_MINUTEN`]. Die Einstufung rechnet damit."
+          }
+        }
+      },
+      "AbloesungArt": {
+        "type": "string",
+        "description": "Wie eine Schicht vollzogen wurde (`einsatz_abloesung.art`, LLH-1150). Eine laufende Schicht\nträgt die Vorgabe `einheit`. Wire == `as_str()`.",
+        "enum": [
+          "einheit",
+          "besatzung"
+        ]
+      },
+      "AbloesungBesatzung": {
+        "type": "object",
+        "description": "Eine Person der alten oder neuen Besatzung (Eintrag in `einsatz_abloesung_besatzung`).",
+        "required": [
+          "personal_id",
+          "name",
+          "rolle"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "personal_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`einsatz_personal.id`"
+          },
+          "rolle": {
+            "$ref": "#/components/schemas/BesatzungRolle"
           }
         }
       },
@@ -2694,6 +2737,14 @@
             "format": "int64"
           }
         }
+      },
+      "BesatzungRolle": {
+        "type": "string",
+        "description": "Rolle einer Person beim Besatzungswechsel (`einsatz_abloesung_besatzung.rolle`). Wire ==\n`as_str()`.",
+        "enum": [
+          "alt",
+          "neu"
+        ]
       },
       "BesetzungArt": {
         "type": "string",

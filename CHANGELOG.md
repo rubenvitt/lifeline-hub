@@ -1,3 +1,40 @@
+## [1.0.0-alpha.138](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.137...v1.0.0-alpha.138) (2026-10-17)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration:** Das Update legt eine neue Tabelle für Besatzungswechsel an. Die Migration läuft beim ersten Start der neuen Version automatisch. Vorher bitte wie gewohnt eine Sicherung anlegen.
+- **Schnittstelle zum Vollzug einer Ablösung erweitert:** Ein Vollzug gibt jetzt die Art an, also ganze Einheit oder Besatzungswechsel, und beim Besatzungswechsel die neue Besatzung (höchstens 50 Personen). Für einen Besatzungswechsel braucht es die Freigabe des Moduls Einheiten. Fehlt sie, lehnt der Server den Vorgang ab.
+
+### Kräfte und Mittel – Ablösung
+
+- **Neu: Besatzungswechsel.** Eine Ablösung kann jetzt auch nur die Mannschaft tauschen. Einheit, Fahrzeug und Abschnitt bleiben bestehen, und die Folgeschicht gehört zur selben Einheit.
+- **Art im Vollzug-Dialog wählen:** „Ganze Einheit“ oder „Besatzungswechsel“. Beim Besatzungswechsel zeigt der Dialog die bisherige Besatzung, also die Einheit und ihre Untereinheiten. Die neue Besatzung wählt man aus dem Personal des Einsatzes.
+  - Wer schon zur Besatzung gehört, steht nicht in der Auswahl.
+  - Wer eine andere Einheit führt, erscheint gesperrt mit Begründung.
+  - Ohne Freigabe der Module Einheiten und Personal ist der Besatzungswechsel gesperrt, ebenfalls mit Begründung.
+- **Was beim Vollzug passiert:** Die bisherige Besatzung verlässt Einheit, Fahrzeug und Führungsfunktion. Die neue Besatzung kommt in die Einheit. Auf der Zeitachse stehen dazu nur Einträge zu den Personen, die Einheit selbst bekommt keinen Eintrag. Grenzwerte und Ruhezeiten werden dabei nicht berechnet.
+- **Anzeige:** Die Karte der abgelösten Schicht zeigt „Besatzungswechsel · neu: …“. Der Hinweis nach dem Vollzug nennt die neue Besatzung. Die Ansichten Einheiten und Personal aktualisieren sich nach Vollzug und Rücknahme sofort.
+- **Rücknahme:** Wird ein Besatzungswechsel zurückgenommen, entfallen die zugehörigen Einträge auf der Zeitachse. Jede Person kehrt an ihren alten Platz zurück, solange sie seit dem Vollzug nicht anderweitig umgesetzt wurde. Diese Einträge lassen sich nur über die Rücknahme entfernen, nicht einzeln.
+- **Rücknahme bei eigener Folgeschicht:** Eine bereits angelegte eigene Folgeschicht verhindert die Rücknahme nicht mehr.
+- **Datenschutz:** Personenbezüge aus Besatzungswechseln werden beim Schwärzen berücksichtigt.
+
+### Dokumentation
+
+- Das Kapitel „Ablösung“ der Anwenderdokumentation hat einen neuen Ablauf „Die Besatzung wechseln“ und erklärt den Hintergrund des Besatzungswechsels. Die Abschnitte zu Zeitachse und Einsatztagebuch sind angepasst.
+- Der Ablauf „Eine Ablösung vollziehen“ beschreibt das neue Feld „Art“. Die Bildschirmfotos sind aktualisiert.
+
+## [1.0.0-alpha.137](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.136...v1.0.0-alpha.137) (2026-10-17)
+
+### Kräfte und Mittel
+
+- **Stand der ablösenden Einheit auf der Schichtkarte:** Die Karte einer laufenden Schicht zeigt jetzt, wie weit die geplante Ablösung ist, zum Beispiel „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Diese Zeile ersetzt den bisherigen Hinweis „Ablösung geplant durch …“, sobald für die ablösende Einheit ein Ereignis in der Kräfte-Zeitachse erfasst ist. Die Zeile bleibt einzeilig, der volle Text erscheint beim Darüberfahren. Den Bereitstellungsraum sieht nur, wer die Bereitstellungsräume einsehen darf.
+- **Planungswarnungen direkt an der Karte:** Die Warnungen, die beim Planen einer Ablösung erscheinen, stehen jetzt auch dezent auf der Schichtkarte. Ein Beispiel ist „… steht selbst im Einsatz seit 1340“. Der Wortlaut ist derselbe wie beim Planen, die Uhrzeit steht wie alle Zeiten der Karte in fester Ziffernbreite.
+- **Sprung zur Schicht:** Benachrichtigungen zur Ablösung führen jetzt direkt zur betroffenen Schicht statt nur zur Ablösungsübersicht. Das gilt für Vorwarnung, Fälligkeit, Planungshinweise und Hinweise zur ablösenden Einheit. Die Ansicht wechselt dabei zur passenden Liste (laufend, abgelöst oder beendet), rollt die Schichtkarte ins Bild und hebt sie einige Sekunden hervor. Auch ein Link auf eine bestimmte Schicht funktioniert so. Eine unbekannte Schicht ändert die Ansicht nicht.
+
+### Dokumentation
+
+- Das Handbuchkapitel zur Ablösung beschreibt jetzt den Stand der ablösenden Einheit, die Warnungen an der Karte und den Sprung zur Schicht, mit neuen Bildern.
+
 ## [1.0.0-alpha.136](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.135...v1.0.0-alpha.136) (2026-10-17)
 
 ### Wichtige Änderungen

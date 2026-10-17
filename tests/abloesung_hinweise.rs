@@ -414,7 +414,7 @@ async fn eintreffen_der_geplanten_einheit_erreicht_nur_die_leser_des_moduls() {
     );
     assert_eq!(
         v["pfad"],
-        format!("/einsaetze/{}/abloesung", w.einsatz).as_str()
+        format!("/einsaetze/{}/abloesung?schicht={id}", w.einsatz).as_str()
     );
 }
 

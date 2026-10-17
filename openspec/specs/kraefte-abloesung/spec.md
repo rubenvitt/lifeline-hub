@@ -20,6 +20,12 @@ ablösende Einheit nicht in den Abschnitt“ aus LFH-635 auf: der Vollzug nimmt 
 Ablösern, übergibt auf Wunsch den Abschnitt, übernimmt die laufende Schicht eines ungeplant
 eingetroffenen Ablösers und schreibt die Ablösung an jede erbende Untereinheit.
 
+LLH-1150 (Entscheidung LLH-1118 Punkt 4) hebt das Non-Goal „keine Personal-Ebene“ aus LFH-635
+(`openspec/changes/archive/2026-09-29-lfh-635-fachmodul-abloesung/design.md`, Non-Goals) für den
+**Besatzungswechsel** auf, und nur für ihn: die Einheit und ihr Fahrzeug bleiben, nur das
+Personal wechselt; die Schicht hält fest, wer ging und wer kam. Es bleibt dabei, dass die Ablösung
+keine Grenzwerte und keine Ruhezeit je Person rechnet (LFH-860).
+
 ## Requirements
 
 ### Requirement: Schicht einer Einheit
@@ -488,18 +494,21 @@ bleiben. Die Einstufung im Client MUST mit `vorwarnung_minuten` der Schicht rech
 ### Requirement: Hinweis in der AlarmZentrale
 
 Die Oberfläche SHALL zur Vorwarnung und zur Fälligkeit einer Schicht genau einen Toast zeigen,
-mit Einheit, Uhrzeit und einem Sprung zur Seite Ablösung. Er kommt als Benachrichtigung
+mit Einheit, Uhrzeit und einem Sprung zu dieser Schicht auf der Seite Ablösung (`?schicht=<id>`,
+Requirement „Sprung zur Schicht“). Er kommt als Benachrichtigung
 (`abloesung_vorwarnung` als Hinweis, `abloesung_faellig` als Alarm, Spec `benachrichtigungen`)
 an alle mit dem Modul Ablösung; das Live-Ereignis `abloesung` frischt nur die Liste auf. Der
 Toast MUST dem gemeinsamen Budget der Benachrichtigungen unterliegen (höchstens drei sichtbar, der
 Rest gebündelt) und quittierbar sein. Dieselbe Fälligkeit darf nicht zusätzlich als allgemeine
 Erinnerung alarmieren. Der Planungshinweis und die Hinweise zur ablösenden Einheit (LLH-1131)
-SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zur Seite
-Ablösung, ohne dass etwas blinkt.
+SHALL auf demselben Weg ankommen: als Hinweis mit dezentem Ton, Toast und Sprung zu ihrer
+Schicht, ohne dass etwas blinkt. Der Sprungpfad jeder Benachrichtigung mit einem Bezug der
+Ablösung MUST `/einsaetze/<id>/abloesung?schicht=<schicht>` sein, auch der Ersatz, wenn der Text
+nicht zu holen war; der Sammeltoast springt zur Seite.
 
 #### Scenario: Fälligkeit erreicht
 - **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
-- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 15:30“ und Sprung zur Seite Ablösung
+- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 15:30“ und Sprung zu ihrer Schicht auf der Seite Ablösung
 
 #### Scenario: Kein Doppelalarm
 - **WHEN** zur selben Fälligkeit auch eine Erinnerung mit Bezug Ablösung fällig wird
@@ -692,7 +701,7 @@ erhalten.
 
 #### Scenario: Eingetroffen
 - **WHEN** „2. Rettungsstaffel“ als ablösende Einheit von „Rettungsstaffel“ geplant ist und per Status eintrifft
-- **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Seite Ablösung, und Mitglieder ohne das Modul erhalten nichts
+- **THEN** erhält jeder Leser des Moduls Ablösung genau einen Hinweis „Ablösende Einheit eingetroffen“ mit „Ablösung für Rettungsstaffel: 2. Rettungsstaffel“ und Sprung zur Schicht der Rettungsstaffel, und Mitglieder ohne das Modul erhalten nichts
 
 #### Scenario: Am Bereitstellungsraum
 - **WHEN** dieselbe Einheit am Bereitstellungsraum eingebucht und später abgerufen wird
@@ -723,7 +732,10 @@ Schicht trägt `planung_warnungen`, beim Lesen ermittelt, für ihre Einzelplanun
 ihrer Ablöser-Liste. `schon_geplant` MUST erscheinen, wenn dieselbe Einheit auch eine andere
 laufende Schicht plant (mit dieser Schicht und ihrer Einheit), `im_einsatz`, wenn die Einheit
 selbst eine eigene oder geerbte laufende Schicht hat (mit deren Beginn). Die Oberfläche zeigt
-die Warnungen nach dem Speichern der Planung als Meldung.
+die Warnungen nach dem Speichern der Planung als Meldung und, solange sie gelten, an der Karte der
+laufenden Schicht (LLH-1131 Teil II): dezent in einer Zeile im Wortlaut der Meldung, in der Rolle
+Achtung, nie in Rot und ohne Einstufung, Kante oder Fläche der Karte zu ändern; mehrere Warnungen
+stehen mit „ · “ in derselben Zeile, der ganze Text im Titel.
 
 #### Scenario: Schon geplant
 - **WHEN** „Florian 3“ für die Schicht von „Florian 1“ geplant ist und auch für „Florian 2“ geplant wird
@@ -732,6 +744,58 @@ die Warnungen nach dem Speichern der Planung als Meldung.
 #### Scenario: Selbst im Einsatz
 - **WHEN** eine Einheit mit eigener laufender Schicht seit 13:40 als ablösende Einheit geplant wird
 - **THEN** gelingt die Planung, und die Antwort warnt „steht selbst im Einsatz seit 1340“
+
+#### Scenario: Warnung an der Karte
+- **WHEN** „Florian 3“ für die Schichten von „Florian 1“ und „Florian 2“ geplant ist
+- **THEN** zeigt die Karte von „Florian 2“ dezent „Florian 3 schon für Schicht Florian 1 geplant“, und ihre Einstufung bleibt „planmäßig“
+
+### Requirement: Stand der ablösenden Einheit an der Karte
+
+Die Karte einer laufenden Schicht SHALL zu ihren geplanten Ablösern (Ablöser-Liste, ohne Liste
+die Einzelplanung) den Stand aus der Kräfte-Zeitachse zeigen (LLH-1131 Teil II): „Ablösung:
+2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“. Alarmiert MUST der
+Beginn der offenen Periode des Ablösers sein, wenn sie mit der Alarmierung begann, eingetroffen ihr
+Eintreffen; eine beendete Periode MUST NOT zählen. Der Raum MUST in Klammern stehen, solange der
+Ablöser in einem Bereitstellungsraum steht; ohne Freigabe des Moduls Bereitstellungsräume fehlt
+die Klammer, und die Raumliste wird nicht abgefragt. Ohne Freigabe des Moduls Einheiten fehlt der
+Stand. Trägt kein Ablöser ein Ereignis, bleibt die Zeile „Ablösung geplant durch …“. Die Zeile
+MUST einzeilig bleiben, auch bei mehreren Ablösern (mit „; “ getrennt), der ganze Text im Titel,
+und MUST sich über die bestehenden Live-Ereignisse aktualisieren (`einheit`, `fahrzeug`,
+`abloesung`, `bereitstellungsraum`), ohne eigenen Abruf.
+
+#### Scenario: Alarmiert und eingetroffen
+- **WHEN** „2. Rettungsstaffel“ als Ablöser von „Rettungsstaffel“ geplant ist, um 13:40 alarmiert wurde und um 14:12 am Bereitstellungsraum „BR Sportplatz“ eingetroffen ist
+- **THEN** zeigt die Karte der Rettungsstaffel in einer Zeile „Ablösung: 2. Rettungsstaffel · alarmiert 1340 · eingetroffen 1412 (BR Sportplatz)“
+
+#### Scenario: Noch kein Ereignis
+- **WHEN** der geplante Ablöser weder alarmiert noch eingetroffen ist
+- **THEN** zeigt die Karte „Ablösung geplant durch 2. Rettungsstaffel“
+
+#### Scenario: Live
+- **WHEN** eine andere Person den geplanten Ablöser alarmiert, während die Seite offen ist
+- **THEN** wechselt die Zeile ohne Neuladen auf „Ablösung: 2. Rettungsstaffel · alarmiert …“, und die Karte behält ihre Höhe
+
+### Requirement: Sprung zur Schicht
+
+Die Seite Ablösung SHALL den Deeplink `?schicht=<id>` annehmen (LLH-1131 Teil II, Muster
+Query-Param aus `frontend/AGENTS.md`): Steht die Schicht unter den laufenden, wählt sie „Laufend“,
+gibt zurückgehaltene Schichten frei (wie ein Ansichtswechsel), rollt die Karte ins Bild und hebt
+sie kurz hervor; sonst sucht sie die Schicht unter den abgelösten und beendeten und wählt
+„Vergangen“ mit dem passenden Status. Die Hervorhebung MUST der Form aus der Spec
+`deeplink-hervorhebung` folgen, nach acht Sekunden ohne Übergang enden und MUST NOT blinken. Der
+Parameter MUST danach geräumt sein; eine unbekannte Kennung MUST nichts ändern.
+
+#### Scenario: Toast „Ablösung fällig“
+- **WHEN** jemand im Toast „Ablösung fällig“ zur Schicht von „Florian 1“ springt
+- **THEN** steht „Laufend“, die Karte von „Florian 1“ ist im Bild und hervorgehoben, und die Adresse trägt keinen Parameter mehr
+
+#### Scenario: Zurückgehaltene Schicht
+- **WHEN** die Schicht hinter dem Sammelbanner wartet und jemand zu ihr springt
+- **THEN** reiht die Seite die zurückgehaltenen Schichten ein und hebt die angesprungene hervor
+
+#### Scenario: Schon abgelöst
+- **WHEN** jemand zu einer inzwischen abgelösten Schicht springt
+- **THEN** wechselt die Seite nach „Vergangen“ → „Abgelöst“ und hebt deren Karte hervor
 
 ### Requirement: Abschnitt übergeben beim Vollzug
 
@@ -786,3 +850,75 @@ Abschnitt.
 #### Scenario: Vorbelegt aus der Planung
 - **WHEN** an der Schicht von „Florian 1“ (Abschnitt „Deichwache Nord“) „Florian 3“ und „Florian 2“ geplant sind und jemand „Ablösung vollziehen“ wählt
 - **THEN** stehen beide im Feld „Ablösende Einheiten“, und „Abschnitt übergeben (Deichwache Nord)“ ist angehakt
+
+### Requirement: Besatzungswechsel
+
+Das System SHALL eine laufende Schicht als Besatzungswechsel vollziehen (Art `besatzung`,
+gespeichert an der Schicht; ohne Angabe gilt `einheit`): die Einheit, ihr Fahrzeug und ihr
+Abschnitt bleiben, die Folgeschicht MUST an derselben Einheit entstehen (Beginn =
+Vollzugszeitpunkt, Rhythmus und Einsatzstelle der abgelösten Schicht, eigene Fristen). Die alte
+Besatzung MUST die Personalzuordnung der Einheit und jeder Untereinheit sein, die die Schicht erbt
+(Knoten-Vererbung, dieselbe Menge wie der Fan-out der ganzen Einheit); jede ihrer Personen MUST
+ihre Einheit, ein Fahrzeug dieser Einheiten und deren Führung verlassen. Die neue Besatzung
+(Pflicht, höchstens `BESATZUNG_MAX = 50` Personen des Einsatzes) MUST der Einheit zugeordnet
+werden. Die Schicht MUST beide Besatzungen nennen (`besatzung`, Rolle `alt`/`neu`, Tabelle
+`einsatz_abloesung_besatzung`), und ein ETB-Eintrag MUST Einheit, alte und neue Besatzung nennen.
+Abgelehnt werden MUST, ohne etwas zu ändern: eine unbekannte oder fremde Person (404), eine
+entlassene oder stornierte (409), eine aus der alten Besatzung oder die Führung einer anderen
+Einheit (422), ablösende Einheiten oder „Abschnitt übergeben“ beim Besatzungswechsel (422). Leere
+oder zu lange Liste und eine unbekannte Art MUST 400 sein. Der Besatzungswechsel MUST die Freigabe
+des Moduls Einheiten verlangen (403 ohne). Grenzwerte und Ruhezeiten je Person rechnet er nicht
+(LFH-860).
+
+#### Scenario: Mannschaft wechselt, Fahrzeug bleibt
+- **WHEN** die Schicht von „Florian 1“ (mit „Anna Alt“, Führerin auf „Florian 1-44“, und „Gruppe 1“ mit „Bernd Alt“, die die Schicht erbt) um 15:40 als Besatzungswechsel mit „Cora Neu“ und „Dirk Neu“ vollzogen wird
+- **THEN** ist die Schicht abgelöst mit Art `besatzung`, „Florian 1“ hat eine Folgeschicht ab 15:40, „Gruppe 1“ erbt sie
+- **AND** „Anna Alt“ und „Bernd Alt“ gehören keiner Einheit und keinem Fahrzeug mehr an, „Florian 1“ hat keine Führung, „Cora Neu“ und „Dirk Neu“ gehören zu „Florian 1“, das Fahrzeug und der Abschnitt bleiben
+- **AND** das ETB enthält „Ablösung vollzogen: Besatzungswechsel «Florian 1», Einheit und Fahrzeug bleiben. Alte Besatzung: «Anna Alt», «Bernd Alt». Neue Besatzung: «Cora Neu», «Dirk Neu».“
+
+#### Scenario: Person der alten Besatzung als neue
+- **WHEN** „Bernd Alt“ aus der erbenden „Gruppe 1“ als neue Besatzung genannt wird
+- **THEN** antwortet das System mit 422, und die Schicht bleibt laufend
+
+#### Scenario: Ohne neue Besatzung
+- **WHEN** ein Besatzungswechsel ohne `besatzung_ids` abgeschickt wird
+- **THEN** antwortet das System mit 400
+
+### Requirement: Rücknahme eines Besatzungswechsels
+
+Die Rücknahme eines Besatzungswechsels SHALL wie jede Rücknahme gelten (Folgeschicht unberührt,
+Berichtigung im ETB); die eigene Folgeschicht derselben Einheit MUST die Rücknahme dabei nicht
+sperren (`ruecknehmbar`). Sie MUST die Personen-Ereignisse des Vollzugs streichen und jede Person
+zurücklegen, solange sie noch so steht, wie der Vollzug sie hinterlassen hat: die neue Besatzung
+in ihre bisherige Einheit (solange sie noch in der Einheit steht), die alte in ihre Einheit, auf
+ihr Fahrzeug und in ihre Führung (solange sie ohne Einheit, ohne Fahrzeug bzw. die Einheit ohne
+Führung ist). Danach MUST die Schicht wieder Art `einheit` tragen und keine Besatzung nennen.
+Bräche die Streichung die Folge einer Person, MUST die Rücknahme mit 422 scheitern, die Person
+nennen und nichts ändern.
+
+#### Scenario: Zurück wie vorher
+- **WHEN** der Besatzungswechsel von „Florian 1“ zurückgenommen wird
+- **THEN** stehen „Anna Alt“ (wieder Führerin, auf „Florian 1-44“) und „Bernd Alt“ wieder in ihren Einheiten, „Cora Neu“ ohne und „Dirk Neu“ wieder in „Florian 2“, und die Folgeschicht ist entfernt
+
+#### Scenario: Von Hand umgehängt
+- **WHEN** „Cora Neu“ nach dem Wechsel von Hand „Florian 3“ zugeordnet wurde
+- **THEN** lässt die Rücknahme sie dort
+
+### Requirement: Vollzug-Dialog mit Besatzungswechsel
+
+Der Vollzug-Dialog SHALL die Art wählen lassen: „Ganze Einheit“ (Vorgabe) oder
+„Besatzungswechsel“. Beim Besatzungswechsel MUST er statt der ablösenden Einheiten die bisherige
+Besatzung sichtbar vorbelegt zeigen (kein Feld) und die neue Besatzung als Pflichtliste von
+Personen wählen lassen; nicht wählbar ist, wer zur bisherigen gehört, wer eine andere Einheit
+führt, steht gesperrt mit Grund in der Liste. Ohne Freigabe der Module Einheiten oder Personal
+MUST „Besatzungswechsel“ gesperrt sein, mit dem Grund daneben. Mehr als Art, Kräfte und Zeitpunkt
+hat er nicht („Abschnitt übergeben“ gehört als Option zu den Ablösern). Die abgelöste Karte MUST
+„Besatzungswechsel · neu: …“ mit der neuen Besatzung zeigen.
+
+#### Scenario: Wechsel aus dem Dialog
+- **WHEN** jemand an der Schicht von „Florian 1“ „Ablösung vollziehen“ → „Besatzungswechsel“ wählt
+- **THEN** zeigt der Dialog „Bisherige Besatzung: Anna Alt, Bernd Alt“ und das Feld „Neue Besatzung“, ohne „Ablösende Einheiten“ und ohne „Abschnitt übergeben“
+
+#### Scenario: Modul Personal gesperrt
+- **WHEN** der Person die Freigabe des Moduls Personal fehlt
+- **THEN** ist „Besatzungswechsel“ gesperrt, daneben steht „Modul Personal gesperrt“

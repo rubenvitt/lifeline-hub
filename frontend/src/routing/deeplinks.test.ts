@@ -392,6 +392,9 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
   it('abloesungPfad (LFH-635)', () => {
     expect(abloesungPfad(E)).toBe('/einsaetze/5/abloesung');
   });
+  it('abloesungPfad mit ?schicht= wie der Server-Pfad der Benachrichtigung (LLH-1131 Teil II)', () => {
+    expect(abloesungPfad(E, { schicht: 9 })).toBe('/einsaetze/5/abloesung?schicht=9');
+  });
 
   it('verpflegungPfad trifft die Registry-Route (LFH-634)', () => {
     expect(verpflegungPfad(E)).toBe('/einsaetze/5/verpflegung');

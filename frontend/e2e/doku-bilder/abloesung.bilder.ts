@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
-import { waehleIn } from '../auswahl-kern';
+import { waehleIn, waehleStehend, zeigtWahl } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
@@ -16,12 +16,16 @@ import {
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep abloesung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   schichten.png        frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx
+ *   schichten.png        frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx,
+ *                        frontend/src/abloesung/abloeserStand.ts (Stand des Ablösers, LLH-1131),
+ *                        frontend/src/abloesung/planungWarnung.ts (Warnung an der Karte)
  *   ohne-schicht.png     frontend/src/pages/AbloesungPage.tsx (Ansicht „Ohne Schicht“),
  *                        frontend/src/abloesung/OhneSchichtKarte.tsx, frontend/src/abloesung/ohneSchicht.ts
  *   schicht-beginnen.png frontend/src/abloesung/AbloesungDialoge.tsx (`SchichtBeginnenDialog`)
  *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Ablöser-Liste und
  *                        „Abschnitt übergeben“, LLH-1132), frontend/src/abloesung/abloeser.ts
+ *   besatzungswechsel.png frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Art
+ *                        „Besatzungswechsel“, LLH-1150), frontend/src/abloesung/besatzung.ts
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
  *   einsatz-vorgabe.png  frontend/src/pages/AbloesungPage.tsx (Paneel „Vorgabe des Einsatzes“),
  *                        frontend/src/abloesung/schichtmodellText.ts, frontend/src/abloesung/dauer.ts
@@ -36,6 +40,13 @@ import {
  * geplanten Ablöser per Nachtrag eintreffen (mit der Vorgabe des Einsatzes begänne jede andere
  * Einheit beim Eintreffen ihre Schicht von selbst, er nicht) und die Betreuungsgruppe alarmieren,
  * noch ohne Eintreffen.
+ *
+ * Besatzungswechsel (LLH-1150): die Spec disponiert zwei Kräfte ohne Einheit („Lena Brandt“,
+ * „Tom Weber“), aus denen der Dialog die neue Besatzung wählt.
+ * Hinweise an der Karte (LLH-1131 Teil II): der geplante Ablöser wird vor seinem Eintreffen per
+ * Nachtrag alarmiert und danach am neu angelegten „BR Sportplatz“ eingebucht (die Zeitachse lässt
+ * das zweite Eintreffen aus); der Sanitätszug plant die Sanitätsgruppe UHS, die selbst eine
+ * laufende Schicht hat, und trägt damit die Warnung „… steht selbst im Einsatz seit …“.
  */
 
 const KAPITEL = 'abloesung';
@@ -97,7 +108,7 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'patch', `${basis}/abloesungen/${rettung.id}`, {
         abloesende_einheit_id: abloeser.id,
       });
-      await fuelle(api, 'post', `${basis}/abloesungen`, {
+      const sanitaetszug = await fuelle<Schicht>(api, 'post', `${basis}/abloesungen`, {
         einheit_id: einheit('Sanitätszug Musterstadt'),
         beginn_at: draht(vor(jetzt, 340)),
       });
@@ -106,14 +117,33 @@ test.describe(KAPITEL, () => {
         beginn_at: draht(vor(jetzt, 240)),
         rhythmus_minuten: 480,
       });
+      await fuelle(api, 'patch', `${basis}/abloesungen/${sanitaetszug.id}`, {
+        abloeser_ids: [einheit('Sanitätsgruppe UHS')],
+      });
+      await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
+        art: 'alarmierung',
+        zeitpunkt_at: draht(vor(jetzt, 55)),
+      });
       await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
         art: 'eintreffen',
         zeitpunkt_at: draht(vor(jetzt, 25)),
+      });
+      const raum = await fuelle<{ id: number }>(api, 'post', `${basis}/bereitstellungsraeume`, {
+        bezeichnung: 'BR Sportplatz',
+      });
+      await fuelle(api, 'post', `${basis}/bereitstellungsraeume/${raum.id}/status`, {
+        status: 'aktiv',
+      });
+      await fuelle(api, 'post', `${basis}/bereitstellungsraeume/${raum.id}/eintreffen`, {
+        kraft: { objekt_typ: 'einheit', objekt_id: abloeser.id },
       });
       await fuelle(api, 'post', `${basis}/einheiten/${einheit('Betreuungsgruppe')}/zeitachse`, {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 40)),
       });
+      for (const name of ['Lena Brandt', 'Tom Weber']) {
+        await fuelle(api, 'post', `${basis}/personal`, { adhoc: { name } });
+      }
     } finally {
       await api.dispose();
     }
@@ -126,6 +156,18 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/abloesung`);
     const schichten = page.getByRole('region', { name: 'Laufende Schichten' });
     await expect(schichten.locator('[data-lfh="abloesung-karte"]')).toHaveCount(3);
+    await expect(
+      schichten
+        .getByRole('article', { name: 'Schicht Rettungsstaffel' })
+        .locator('[data-lfh="abloesung-abloeser"]'),
+    ).toHaveText(
+      /^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4} · eingetroffen \d{4} \(BR Sportplatz\)$/,
+    );
+    await expect(
+      schichten
+        .getByRole('article', { name: 'Schicht Sanitätszug Musterstadt' })
+        .locator('[data-lfh="abloesung-planung-warnung"]'),
+    ).toHaveText(/^Sanitätsgruppe UHS steht selbst im Einsatz seit \d{4}$/);
     await fotografiere(schichten, KAPITEL, 'schichten');
   });
 
@@ -192,5 +234,31 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'vollziehen');
+  });
+
+  test('Dialog „Ablösung vollziehen“ als Besatzungswechsel', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/abloesung`);
+    const karte = page.getByRole('article', { name: 'Schicht Sanitätszug Musterstadt' });
+    await karte.getByRole('button', { name: 'Ablösung vollziehen' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Ablösung Sanitätszug Musterstadt vollziehen',
+    });
+    await dialog.getByText('Besatzungswechsel', { exact: true }).click();
+    await expect(dialog.locator('[data-lfh="vollzug-bisherige-besatzung"]')).not.toContainText('…');
+    // Die Liste ist virtuell und lang (alle Kräfte des Demo-Einsatzes): erst suchen, dann wählen.
+    const feld = dialog.getByRole('combobox', { name: 'Neue Besatzung' });
+    for (const name of ['Lena Brandt', 'Tom Weber']) {
+      await feld.click();
+      await feld.pressSequentially(name);
+      await waehleStehend(page, name);
+      await zeigtWahl(feld, name);
+    }
+    await feld.blur();
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'besatzungswechsel');
   });
 });

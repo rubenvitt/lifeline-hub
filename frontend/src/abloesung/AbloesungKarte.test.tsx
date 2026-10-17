@@ -4,7 +4,9 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import type { Abloesung } from '../api/types';
 import { renderMitProviders } from '../test/utils';
+import { farbenHell } from '../theme/tokens';
 import AbloesungKarte from './AbloesungKarte';
+import type { AbloeserStand } from './abloeserStand';
 
 dayjs.extend(utc);
 
@@ -28,6 +30,8 @@ const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   abloeser: [],
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
+  art: 'einheit',
+  besatzung: [],
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: '2026-10-17 06:00:00',
@@ -116,5 +120,221 @@ describe('AbloesungKarte — Ende und Vererbung (LLH-1128)', () => {
   it('ohne Erben keine Zeile', () => {
     zeige(schicht());
     expect(document.querySelector('[data-lfh="abloesung-erben"]')).toBeNull();
+  });
+});
+
+describe('AbloesungKarte — Besatzungswechsel (LLH-1150)', () => {
+  it('die abgelöste Schicht nennt „Besatzungswechsel“ und die neue Besatzung, ohne „Abgelöst durch“', () => {
+    zeige(
+      schicht({
+        status: 'abgeloest',
+        vollzogen_at: '2026-10-17 11:40:00',
+        art: 'besatzung',
+        besatzung: [
+          { personal_id: 1, name: 'Anna Alt', rolle: 'alt' },
+          { personal_id: 2, name: 'Cora Neu', rolle: 'neu' },
+          { personal_id: 3, name: 'Dirk Neu', rolle: 'neu' },
+        ],
+      }),
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="abloesung-besatzung"]')!;
+    expect(zeile).toHaveTextContent('Besatzungswechsel · neu: Cora Neu, Dirk Neu');
+    expect(zeile.title).toContain('Bisherige: Anna Alt');
+    expect(document.querySelector('[data-lfh="abloesung-abloeser"]')).toBeNull();
+  });
+
+  it('eine laufende oder als ganze Einheit abgelöste Schicht hat keine solche Zeile', () => {
+    zeige(schicht());
+    expect(document.querySelector('[data-lfh="abloesung-besatzung"]')).toBeNull();
+  });
+});
+
+/** Ein Wert so, wie jsdom ihn im `style` ablegt (Muster `kommunikation/KommKarte.test.tsx`). */
+function wieGesetzt(eigenschaft: 'boxShadow' | 'background' | 'color', wert: string) {
+  const probe = document.createElement('div');
+  probe.style[eigenschaft] = wert;
+  return probe.style[eigenschaft];
+}
+
+const geplant = schicht({ abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }] });
+
+const stand = (over: Partial<AbloeserStand> = {}): AbloeserStand => ({
+  einheit_id: 21,
+  einheit_name: '2. Rettungsstaffel',
+  alarmiert_at: '2026-10-17 11:40:00',
+  eingetroffen_at: '2026-10-17 12:12:00',
+  br_name: 'BR Sportplatz',
+  ...over,
+});
+
+const abloeserZeile = () => document.querySelector<HTMLElement>('[data-lfh="abloesung-abloeser"]')!;
+
+describe('AbloesungKarte — Stand der ablösenden Einheit (LLH-1131 Teil II)', () => {
+  it('ohne Stand bleibt „Ablösung geplant durch …“', () => {
+    renderMitProviders(<AbloesungKarte schicht={geplant} jetzt={jetzt} darfSchreiben={false} />);
+    expect(abloeserZeile()).toHaveTextContent(/^Ablösung geplant durch 2\. Rettungsstaffel$/);
+  });
+
+  it('mit Stand nennt dieselbe Zeile Alarmierung, Eintreffen und Raum, Zeiten in Mono', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={geplant}
+        jetzt={jetzt}
+        darfSchreiben={false}
+        abloeserStand={[stand()]}
+      />,
+    );
+    const zeile = abloeserZeile();
+    expect(zeile).toHaveTextContent(
+      /^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4} · eingetroffen \d{4} \(BR Sportplatz\)$/,
+    );
+    expect(zeile.title).toBe(zeile.textContent);
+    // Einzeilig: ein neues Ereignis ändert die Kartenhöhe nicht (LFH-708).
+    expect(zeile.style.whiteSpace).toBe('nowrap');
+    expect(zeile.style.textOverflow).toBe('ellipsis');
+    const zeiten = zeile.querySelectorAll<HTMLElement>('[data-lfh="abloesung-abloeser-zeit"]');
+    expect(zeiten).toHaveLength(2);
+    for (const z of zeiten) expect(z.style.fontVariantNumeric).toBe('tabular-nums');
+    // Eine Zeile, nicht zwei: „geplant durch“ fällt weg.
+    expect(document.body).not.toHaveTextContent(/geplant durch/);
+  });
+
+  it('mehrere Ablöser bleiben in einer Zeile, der volle Text steht im Titel', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={schicht({
+          abloeser: [
+            { einheit_id: 21, einheit_name: '2. Rettungsstaffel' },
+            { einheit_id: 22, einheit_name: 'Florian 3' },
+          ],
+        })}
+        jetzt={jetzt}
+        darfSchreiben={false}
+        abloeserStand={[
+          stand({ br_name: null, eingetroffen_at: null }),
+          stand({
+            einheit_id: 22,
+            einheit_name: 'Florian 3',
+            alarmiert_at: null,
+            eingetroffen_at: null,
+            br_name: null,
+          }),
+        ]}
+      />,
+    );
+    const zeile = abloeserZeile();
+    expect(zeile).toHaveTextContent(/^Ablösung: 2\. Rettungsstaffel · alarmiert \d{4}; Florian 3$/);
+    expect(zeile.title).toBe(zeile.textContent);
+    expect(zeile.style.whiteSpace).toBe('nowrap');
+  });
+
+  it('eine abgelöste Schicht zeigt keinen Stand, sondern „Abgelöst durch …“', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={schicht({
+          status: 'abgeloest',
+          vollzogen_at: '2026-10-17 11:00:00',
+          abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }],
+        })}
+        jetzt={jetzt}
+        darfSchreiben={false}
+        abloeserStand={[stand()]}
+      />,
+    );
+    expect(abloeserZeile()).toHaveTextContent(/^Abgelöst durch 2\. Rettungsstaffel$/);
+  });
+});
+
+describe('AbloesungKarte — Warnungen zur Planung (LLH-1131 Teil II)', () => {
+  const mitWarnungen = schicht({
+    abloeser: [{ einheit_id: 21, einheit_name: '2. Rettungsstaffel' }],
+    planung_warnungen: [
+      {
+        art: 'schon_geplant',
+        einheit_id: 21,
+        einheit_name: '2. Rettungsstaffel',
+        abloesung_id: 9,
+        abloesung_einheit_name: 'Florian 1',
+      },
+      {
+        art: 'im_einsatz',
+        einheit_id: 21,
+        einheit_name: '2. Rettungsstaffel',
+        seit_at: '2026-10-17 06:40:00',
+      },
+    ],
+  });
+
+  it('stehen im Wortlaut der Meldung in einer Zeile in der Rolle Achtung, nicht in Rot', () => {
+    renderMitProviders(
+      <AbloesungKarte schicht={mitWarnungen} jetzt={jetzt} darfSchreiben={false} />,
+    );
+    const zeile = document.querySelector<HTMLElement>('[data-lfh="abloesung-planung-warnung"]')!;
+    expect(zeile).toHaveTextContent(
+      /^2\. Rettungsstaffel schon für Schicht Florian 1 geplant · 2\. Rettungsstaffel steht selbst im Einsatz seit \d{4}$/,
+    );
+    expect(zeile.title).toBe(zeile.textContent);
+    expect(zeile.style.whiteSpace).toBe('nowrap');
+    // Die Uhrzeit in Mono mit festen Ziffern wie jede Zeit der Karte.
+    const zeit = zeile.querySelector<HTMLElement>('[data-lfh="abloesung-warnung-zeit"]');
+    expect(zeit).toHaveTextContent(/^\d{4}$/);
+    expect(zeit!.style.fontVariantNumeric).toBe('tabular-nums');
+    expect(zeile.style.color).toBe(wieGesetzt('color', farbenHell.achtungText));
+    expect(zeile.style.color).not.toBe(wieGesetzt('color', farbenHell.alarmText));
+    // Die Warnung ist keine Einstufung: die Kante bleibt neutral, nichts wird alarmiert.
+    const karte = screen.getByRole('article', { name: 'Schicht Zug 1' });
+    expect(karte).toHaveAttribute('data-einstufung', 'planmaessig');
+    expect(karte).not.toHaveAttribute('data-alarm');
+  });
+
+  it('ohne Warnung keine Zeile', () => {
+    renderMitProviders(<AbloesungKarte schicht={geplant} jetzt={jetzt} darfSchreiben={false} />);
+    expect(document.querySelector('[data-lfh="abloesung-planung-warnung"]')).toBeNull();
+  });
+
+  it('eine abgelöste Schicht zeigt keine Warnung', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={{ ...mitWarnungen, status: 'abgeloest', vollzogen_at: '2026-10-17 11:00:00' }}
+        jetzt={jetzt}
+        darfSchreiben={false}
+      />,
+    );
+    expect(document.querySelector('[data-lfh="abloesung-planung-warnung"]')).toBeNull();
+  });
+});
+
+describe('AbloesungKarte — Deeplink-Hervorhebung (LLH-1131 Teil II, Spec `deeplink-hervorhebung`)', () => {
+  const LINIEN = `inset 0 2px 0 ${farbenHell.bedien}, inset 0 -2px 0 ${farbenHell.bedien}`;
+  const karte = () => screen.getByRole('article', { name: 'Schicht Zug 1' });
+
+  it('trägt angesprungen Bedienfläche und Ober-/Unterlinie, keinen Ring, und ihre Kennung', () => {
+    renderMitProviders(
+      <AbloesungKarte schicht={schicht()} jetzt={jetzt} darfSchreiben={false} hervorgehoben />,
+    );
+    expect(karte()).toHaveAttribute('data-hervorgehoben', 'true');
+    expect(karte()).toHaveAttribute('data-schicht-id', '1');
+    expect(karte().style.boxShadow).toBe(wieGesetzt('boxShadow', LINIEN));
+    expect(karte().style.background).toBe(wieGesetzt('background', farbenHell.bedienFlaeche));
+  });
+
+  it('eine überfällige Karte behält angesprungen die Alarmfläche (Gefahr gewinnt)', () => {
+    renderMitProviders(
+      <AbloesungKarte
+        schicht={schicht({ faellig_at: '2026-10-17 11:00:00' })}
+        jetzt={jetzt}
+        darfSchreiben={false}
+        hervorgehoben
+      />,
+    );
+    expect(karte()).toHaveAttribute('data-alarm', 'true');
+    expect(karte().style.background).toBe(wieGesetzt('background', farbenHell.alarmFlaeche));
+    expect(karte().style.boxShadow).toBe(wieGesetzt('boxShadow', LINIEN));
+  });
+
+  it('ohne Sprung keine Linie', () => {
+    renderMitProviders(<AbloesungKarte schicht={schicht()} jetzt={jetzt} darfSchreiben={false} />);
+    expect(karte()).not.toHaveAttribute('data-hervorgehoben');
+    expect(karte().style.boxShadow).toBe('');
   });
 });

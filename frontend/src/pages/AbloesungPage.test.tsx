@@ -5,8 +5,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { MemoryRouter, Routes, Route } from 'react-router';
-import AbloesungPage from './AbloesungPage';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
+import AbloesungPage, { SCHICHT_HERVORHEBUNG_MS } from './AbloesungPage';
 import { ApiError } from '../api/client';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
@@ -23,12 +23,29 @@ vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));
+const listeEinsatzPersonal = vi.fn();
+vi.mock('../api/einsatzPersonal', () => ({
+  listeEinsatzPersonal: (...a: unknown[]) => listeEinsatzPersonal(...a),
+}));
+const EINHEITEN = [
+  {
+    id: 11,
+    name: 'Florian 1',
+    abschnitt_id: 7,
+    personal_mitglieder: [{ ep_id: 20, name: 'Anna Alt', ist_fuehrer: false }],
+  },
+  { id: 12, name: 'Florian 2', abschnitt_id: null },
+  { id: 13, name: 'Florian 3', abschnitt_id: 7 },
+];
+const einheiten = vi.hoisted(() => ({ wert: undefined as unknown[] | undefined }));
 vi.mock('../api/einheiten', () => ({
-  listeEinheiten: vi.fn().mockResolvedValue([
-    { id: 11, name: 'Florian 1', abschnitt_id: 7 },
-    { id: 12, name: 'Florian 2', abschnitt_id: null },
-    { id: 13, name: 'Florian 3', abschnitt_id: 7 },
-  ]),
+  listeEinheiten: vi.fn(() => Promise.resolve(einheiten.wert ?? EINHEITEN)),
+}));
+
+// Räume für die Klammer der Kartenzeile zum Ablöser (LLH-1131 Teil II).
+const listeBr = vi.fn();
+vi.mock('../api/einsatzBereitstellungsraum', () => ({
+  listeBr: (...a: unknown[]) => listeBr(...a),
 }));
 
 const listeEinheitenPerioden = vi.fn();
@@ -75,19 +92,37 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   abloeser: [],
   folgeschichten: [],
   uebernommen_bei_vollzug: false,
+  art: 'einheit',
+  besatzung: [],
   abschnitt_uebergeben: false,
   planung_warnungen: [],
   angelegt_at: inMinuten(-300),
   ...over,
 });
 
-function renderPage() {
+/** Springt im laufenden Router, wie ein Klick auf einen Toast der AlarmZentrale. */
+const springe: { zu: (pfad: string) => void } = { zu: () => {} };
+function Springer() {
+  const navigate = useNavigate();
+  springe.zu = (pfad) => void navigate(pfad);
+  return null;
+}
+/** Die Suche der aktuellen Adresse, damit ein Test das Räumen des Parameters sieht. */
+const adresse = { suche: '' };
+function Adresse() {
+  adresse.suche = useLocation().search;
+  return null;
+}
+
+function renderPage(route = '/einsaetze/1/abloesung') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ergebnis = render(
     <QueryClientProvider client={client}>
       <AntApp>
         <AuthProvider>
-          <MemoryRouter initialEntries={['/einsaetze/1/abloesung']}>
+          <MemoryRouter initialEntries={[route]}>
+            <Springer />
+            <Adresse />
             <Routes>
               <Route path="/einsaetze/:id/abloesung" element={<AbloesungPage />} />
             </Routes>
@@ -378,6 +413,70 @@ describe('AbloesungPage (LFH-635)', () => {
     );
     await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
     await waitFor(() => expect(nimmVollzugZurueck).toHaveBeenCalledWith(1, 1));
+  });
+
+  /** LLH-1150: Besatzungswechsel aus dem Dialog, die neue Besatzung aus dem Personal. */
+  it('Besatzungswechsel: bisherige Besatzung vorbelegt, neue gewählt, POST und Hinweis', async () => {
+    const a = schicht({ id: 1, faellig_at: inMinuten(-12) });
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(status === 'laufend' ? [a] : []),
+    );
+    listeEinsatzPersonal.mockResolvedValue([
+      { id: 20, name: 'Anna Alt', einheit_id: 11 },
+      { id: 21, name: 'Cora Neu', einheit_id: null },
+    ]);
+    const folge = schicht({ id: 2, einheit_id: 11, einheit_name: 'Florian 1', vorgaenger_id: 1 });
+    vollzieheAbloesung.mockResolvedValue({
+      abgeloest: {
+        ...a,
+        status: 'abgeloest',
+        ruecknehmbar: true,
+        art: 'besatzung',
+        besatzung: [
+          { personal_id: 20, name: 'Anna Alt', rolle: 'alt' },
+          { personal_id: 21, name: 'Cora Neu', rolle: 'neu' },
+        ],
+      },
+      folgeschicht: folge,
+      folgeschichten: [folge],
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Ablösung vollziehen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(
+      within(dialog).getByRole('radio', { name: 'Besatzungswechsel' }).closest('label')!,
+    );
+    expect(
+      await within(dialog).findByText('Bisherige Besatzung: Anna Alt', { exact: false }),
+    ).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Neue Besatzung' }));
+    await userEvent.click(await screen.findByTitle('Cora Neu'));
+    // Die bisherige Besatzung ist nicht wählbar.
+    expect(document.querySelector('.ant-select-item-option[title="Anna Alt"]')).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
+    await waitFor(() =>
+      expect(vollzieheAbloesung).toHaveBeenCalledWith(1, 1, {
+        vollzogen_at: undefined,
+        art: 'besatzung',
+        besatzung_ids: [21],
+      }),
+    );
+    expect(
+      await screen.findByText('Besatzungswechsel vollzogen: Florian 1, neu Cora Neu'),
+    ).toBeInTheDocument();
+    expect(listeEinsatzPersonal).toHaveBeenCalledWith(1);
+  });
+
+  it('Besatzungswechsel ohne Freigabe des Moduls Personal: gesperrt mit Grund, keine Anfrage', async () => {
+    freigaben.wert = freigabenFixture({ personal: { zugriff: false } });
+    renderPage();
+    const knoepfe = await screen.findAllByRole('button', { name: 'Ablösung vollziehen' });
+    await userEvent.click(knoepfe[0]);
+    const dialog = await screen.findByRole('dialog');
+    const wechsel = within(dialog).getByRole('radio', { name: 'Besatzungswechsel' });
+    await waitFor(() => expect(wechsel).toBeDisabled());
+    expect(within(dialog).getByText('Modul Personal gesperrt')).toBeInTheDocument();
+    expect(listeEinsatzPersonal).not.toHaveBeenCalled();
   });
 
   it('Schicht beginnen: Enter-Struktur und Rhythmus als Dauer → Minuten', async () => {
@@ -1241,5 +1340,221 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
       expect(sammelbanner()).toBeNull();
       expect(segment(/^Ohne Schicht/)).toHaveTextContent('Ohne Schicht (0)');
     });
+  });
+});
+
+describe('AbloesungPage — Hinweise an der Karte und Sprung zur Schicht (LLH-1131 Teil II)', () => {
+  const geplant = () =>
+    schicht({ id: 1, abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }] });
+  const zeile = (k: HTMLElement) => k.querySelector<HTMLElement>('[data-lfh="abloesung-abloeser"]');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setzeViewportBreite(1440);
+    freigaben.wert = freigabenFixture();
+    einsatz.wert = {
+      id: 1,
+      bezeichnung: 'Hochwasser',
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+    };
+    einheiten.wert = undefined;
+    laufendLiefert([geplant(), schicht({ id: 2, faellig_at: inMinuten(120) })]);
+    listeEinheitenPerioden.mockResolvedValue([]);
+    listeBr.mockResolvedValue([{ id: 4, bezeichnung: 'BR Sportplatz' }]);
+    fetchEinsatzSchichtmodell.mockResolvedValue({ vorwarnung_minuten: 30, laufende_schichten: 0 });
+    listeAbloesungVorgaben.mockResolvedValue([]);
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('die Kartenzeile zum Ablöser kommt aus seiner Zeitachse, der Raum aus der Raumliste', async () => {
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: 4 }];
+    listeEinheitenPerioden.mockResolvedValue([
+      {
+        einheit_id: 12,
+        perioden: [
+          { anker: 'alarmierung', beginn_at: inMinuten(-40), eintreffen_at: inMinuten(-10) },
+        ],
+      },
+    ]);
+    renderPage();
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() =>
+      expect(zeile(karte)).toHaveTextContent(
+        /^Ablösung: Florian 2 · alarmiert \d{4,6} · eingetroffen \d{4,6} \(BR Sportplatz\)$/,
+      ),
+    );
+    expect(listeBr).toHaveBeenCalledWith(1);
+  });
+
+  it('live: ein neues Ereignis der Zeitachse ändert die Zeile über die bestehende Invalidierung', async () => {
+    const { client } = renderPage();
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() =>
+      expect(zeile(karte)).toHaveTextContent(/^Ablösung geplant durch Florian 2$/),
+    );
+    // Kein Ablöser in einem Raum: keine Raumabfrage.
+    expect(listeBr).not.toHaveBeenCalled();
+    listeEinheitenPerioden.mockResolvedValue([
+      { einheit_id: 12, perioden: [{ anker: 'alarmierung', beginn_at: inMinuten(-2) }] },
+    ]);
+    // Wie die Ereignisse `fahrzeug` und `einheit` es tun (`api/queryKeys.ts`).
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz-kraefte-zeitachse', 1] }));
+    await waitFor(() =>
+      expect(zeile(karte)).toHaveTextContent(/^Ablösung: Florian 2 · alarmiert \d{4,6}$/),
+    );
+  });
+
+  it('ohne Freigabe der Bereitstellungsräume keine Raumabfrage und keine Klammer', async () => {
+    freigaben.wert = freigabenFixture({ bereitstellungsraeume: { zugriff: false } });
+    einheiten.wert = [EINHEITEN[0], { ...EINHEITEN[1], aktueller_br_id: 4 }];
+    listeEinheitenPerioden.mockResolvedValue([
+      { einheit_id: 12, perioden: [{ anker: 'eintreffen', beginn_at: inMinuten(-10) }] },
+    ]);
+    renderPage();
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() =>
+      expect(zeile(karte)).toHaveTextContent(/^Ablösung: Florian 2 · eingetroffen \d{4,6}$/),
+    );
+    expect(listeBr).not.toHaveBeenCalled();
+  });
+
+  it('die Warnungen zur Planung stehen dezent an der Karte', async () => {
+    laufendLiefert([
+      schicht({
+        id: 1,
+        abloeser: [{ einheit_id: 12, einheit_name: 'Florian 2' }],
+        planung_warnungen: [
+          {
+            art: 'schon_geplant',
+            einheit_id: 12,
+            einheit_name: 'Florian 2',
+            abloesung_id: 5,
+            abloesung_einheit_name: 'Florian 5',
+          },
+        ],
+      }),
+    ]);
+    renderPage();
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    expect(karte.querySelector('[data-lfh="abloesung-planung-warnung"]')).toHaveTextContent(
+      'Florian 2 schon für Schicht Florian 5 geplant',
+    );
+  });
+
+  it('?schicht= hebt die laufende Schicht hervor, rollt sie ins Bild und räumt den Parameter', async () => {
+    renderPage('/einsaetze/1/abloesung?schicht=2');
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 2' });
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    expect(karte.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
+    expect(screen.getByRole('article', { name: 'Schicht Florian 1' })).not.toHaveAttribute(
+      'data-hervorgehoben',
+    );
+    await waitFor(() => expect(adresse.suche).toBe(''));
+  });
+
+  it('die Hervorhebung vergeht nach kurzer Zeit, ohne Animation', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      renderPage('/einsaetze/1/abloesung?schicht=2');
+      const karte = await screen.findByRole('article', { name: 'Schicht Florian 2' });
+      await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+      expect(karte.style.animation).toBe('');
+      expect(karte.style.transition).toBe('');
+      act(() => void vi.advanceTimersByTime(SCHICHT_HERVORHEBUNG_MS - 500));
+      expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+      act(() => void vi.advanceTimersByTime(1000));
+      expect(karte).not.toHaveAttribute('data-hervorgehoben');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('eine abgelöste Schicht: die Seite wechselt nach „Vergangen → Abgelöst“', async () => {
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(
+        status === 'laufend'
+          ? [geplant()]
+          : status === 'abgeloest'
+            ? [schicht({ id: 7, status: 'abgeloest', vollzogen_at: inMinuten(-30) })]
+            : [],
+      ),
+    );
+    renderPage('/einsaetze/1/abloesung?schicht=7');
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 7' });
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    expect(screen.getByRole('radio', { name: 'Vergangen' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Abgelöst' })).toBeChecked();
+  });
+
+  it('eine beendete Schicht: die Seite wechselt nach „Vergangen → Beendet“', async () => {
+    listeAbloesungen.mockImplementation((_e: number, status: string) =>
+      Promise.resolve(
+        status === 'laufend'
+          ? [geplant()]
+          : status === 'beendet'
+            ? [
+                schicht({
+                  id: 8,
+                  status: 'beendet',
+                  beendet_grund: 'aufloesung',
+                  beendet_at: inMinuten(-30),
+                }),
+              ]
+            : [],
+      ),
+    );
+    renderPage('/einsaetze/1/abloesung?schicht=8');
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 8' });
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    expect(screen.getByRole('radio', { name: 'Beendet' })).toBeChecked();
+  });
+
+  it('eine unbekannte Schicht ändert nichts', async () => {
+    renderPage('/einsaetze/1/abloesung?schicht=99');
+    await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() => expect(adresse.suche).toBe(''));
+    await waitFor(() => expect(listeAbloesungen).toHaveBeenCalledWith(1, 'beendet'));
+    await waitFor(() => expect(listeAbloesungen).toHaveBeenCalledWith(1, 'abgeloest'));
+    expect(screen.getByRole('radio', { name: /^Laufend/ })).toBeChecked();
+    expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
+  });
+
+  it('ein Sprung auf der offenen Seite gibt eine zurückgehaltene Schicht frei und hebt sie hervor', async () => {
+    const { client } = renderPage();
+    await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    // Fremd angelegt: wartet hinter dem Banner.
+    laufendLiefert([
+      schicht({ id: 9, faellig_at: inMinuten(-5) }),
+      geplant(),
+      schicht({ id: 2, faellig_at: inMinuten(120) }),
+    ]);
+    await act(() => client.invalidateQueries());
+    await waitFor(() => expect(sammelbanner()).not.toBeNull());
+    expect(screen.queryByRole('article', { name: 'Schicht Florian 9' })).toBeNull();
+    // Der Toast „Ablösung fällig“ springt zu ihr.
+    act(() => springe.zu('/einsaetze/1/abloesung?schicht=9'));
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 9' });
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    expect(sammelbanner()).toBeNull();
+  });
+
+  it('von „Ohne Schicht“ aus wechselt der Sprung zurück auf „Laufend“', async () => {
+    // Florian 2 ist geplanter Ablöser ohne eigene Schicht, steht also unter „Ohne Schicht“.
+    laufendLiefert([geplant()]);
+    listeEinheitenPerioden.mockResolvedValue([
+      { einheit_id: 12, perioden: [{ anker: 'alarmierung', beginn_at: inMinuten(-30) }] },
+    ]);
+    renderPage();
+    await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: /^Ohne Schicht/ })).toHaveTextContent('(1)'),
+    );
+    await userEvent.click(screen.getByRole('radio', { name: /^Ohne Schicht/ }));
+    await screen.findByRole('article', { name: 'Florian 2 ohne Schicht' });
+    act(() => springe.zu('/einsaetze/1/abloesung?schicht=1'));
+    const karte = await screen.findByRole('article', { name: 'Schicht Florian 1' });
+    await waitFor(() => expect(karte).toHaveAttribute('data-hervorgehoben', 'true'));
+    expect(screen.getByRole('radio', { name: /^Laufend/ })).toBeChecked();
   });
 });

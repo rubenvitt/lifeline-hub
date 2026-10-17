@@ -147,8 +147,32 @@ async fn vollzug(
             vollzogen_at: vollzogen_at.into(),
             abloeser: abloeser.to_vec(),
             abschnitt_uebergeben,
+            ..Default::default()
         },
         jetzt,
+    )
+    .await
+}
+
+/// Vollzug als Besatzungswechsel (LLH-1150) mit der neuen Besatzung `neu`.
+async fn besatzungswechsel(
+    w: &Welt,
+    id: i64,
+    vollzogen_at: &str,
+    neu: &[i64],
+) -> Result<(AbloesungVollzugAnzeige, i64, VollzugWirkung), AppError> {
+    super::vollziehen(
+        &w.pool,
+        w.e,
+        id,
+        w.b,
+        &VollzugEingabe {
+            vollzogen_at: vollzogen_at.into(),
+            art: AbloesungArt::Besatzung,
+            besatzung: neu.to_vec(),
+            ..Default::default()
+        },
+        vollzogen_at,
     )
     .await
 }
@@ -2752,4 +2776,420 @@ async fn ausnahme_vom_autostart_gilt_fuer_die_liste_und_den_verband() {
     }
     let b = ereignis(&w, frei, Eintreffen, "2030-06-03 13:30:00").await;
     assert_eq!(b.abloesung.len(), 1, "ungeplant: eigene Schicht");
+}
+
+// ── Besatzungswechsel (LLH-1150) ────────────────────────────────────────────────────────────
+
+/// Eine Person im Einsatz, optional in einer Einheit und auf einem Fahrzeug.
+async fn person(w: &Welt, name: &str, einheit: Option<i64>, fahrzeug: Option<i64>) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO einsatz_personal (einsatz_id, snap_name, einheit_id, fahrzeug_id) \
+         VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(w.e)
+    .bind(name)
+    .bind(einheit)
+    .bind(fahrzeug)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// `(einheit_id, fahrzeug_id)` einer Person.
+async fn zuordnung(w: &Welt, person: i64) -> (Option<i64>, Option<i64>) {
+    sqlx::query_as("SELECT einheit_id, fahrzeug_id FROM einsatz_personal WHERE id = ?")
+        .bind(person)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+async fn fuehrer(w: &Welt, einheit: i64) -> Option<i64> {
+    sqlx::query_scalar("SELECT fuehrer_id FROM einsatz_einheit WHERE id = ?")
+        .bind(einheit)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+/// Nicht gestrichene Ereignisse einer Person: `(art, quelle)` nach Zeit.
+async fn ereignisse_person(w: &Welt, person: i64) -> Vec<(String, String)> {
+    sqlx::query_as(
+        "SELECT art, quelle FROM einsatz_kraft_zeitachse \
+         WHERE personal_id = ? AND gestrichen_at IS NULL ORDER BY zeitpunkt_at, id",
+    )
+    .bind(person)
+    .fetch_all(&w.pool)
+    .await
+    .unwrap()
+}
+
+/// Ein Zug mit Gruppe (erbt die Schicht), Führer auf dem Fahrzeug des Zugs, Gruppenmitglied;
+/// dazu eine Person ohne Einheit und eine aus „Florian 2“. Zug und Gruppe sind eingetroffen.
+struct Lage {
+    gruppe: i64,
+    fahrzeug: i64,
+    fuehrer: i64,
+    mitglied: i64,
+    frei: i64,
+    fremd: i64,
+    schicht: i64,
+}
+
+async fn lage(w: &Welt) -> Lage {
+    let gruppe = untereinheit(w, "Gruppe 1", w.f1).await;
+    let fahrzeug: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, einheit_id) \
+         VALUES (?, 'Florian 1-44', ?) RETURNING id",
+    )
+    .bind(w.e)
+    .bind(w.f1)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    let fuehrer = person(w, "Anna Alt", Some(w.f1), Some(fahrzeug)).await;
+    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+        .bind(fuehrer)
+        .bind(w.f1)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let mitglied = person(w, "Bernd Alt", Some(gruppe), None).await;
+    let frei = person(w, "Cora Neu", None, None).await;
+    let fremd = person(w, "Dirk Neu", Some(w.f2), None).await;
+    for e in [w.f1, gruppe] {
+        eintreffen(w, e, T0).await;
+    }
+    let (a, _) = beginnen(&w.pool, w.e, w.b, &beginn(w.f1, Some(360)), T0)
+        .await
+        .unwrap();
+    Lage {
+        gruppe,
+        fahrzeug,
+        fuehrer,
+        mitglied,
+        frei,
+        fremd,
+        schicht: a.id,
+    }
+}
+
+/// Spec `kraefte-abloesung`, „Besatzungswechsel“: Einheit, Fahrzeug und Abschnitt bleiben, die
+/// Folgeschicht hängt an derselben Einheit; die alte Besatzung (auch die der erbenden Gruppe)
+/// geht aus Einheit, Fahrzeug und Führung und bekommt `abloesung`, die neue kommt in die Einheit
+/// und bekommt `eintreffen`; die Einheiten selbst bekommen kein Ereignis. Das ETB nennt beide
+/// Besatzungen, die Schicht trägt Art und Besatzung, die Rücknahme stellt alles wieder her.
+#[tokio::test]
+async fn besatzungswechsel_tauscht_das_personal_und_die_einheit_bleibt() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let jetzt = "2026-09-22 15:40:00";
+    let (v, _, wirkung) = besatzungswechsel(&w, l.schicht, jetzt, &[l.frei, l.fremd])
+        .await
+        .unwrap();
+
+    let a = &v.abgeloest;
+    assert_eq!(a.status, AbloesungStatus::Abgeloest);
+    assert_eq!(a.art, AbloesungArt::Besatzung);
+    assert!(a.abloeser.is_empty(), "keine ablösende Einheit");
+    let besatzung: Vec<(&str, BesatzungRolle)> = a
+        .besatzung
+        .iter()
+        .map(|b| (b.name.as_str(), b.rolle))
+        .collect();
+    assert_eq!(
+        besatzung,
+        vec![
+            ("Anna Alt", BesatzungRolle::Alt),
+            ("Bernd Alt", BesatzungRolle::Alt),
+            ("Cora Neu", BesatzungRolle::Neu),
+            ("Dirk Neu", BesatzungRolle::Neu),
+        ]
+    );
+    assert!(
+        a.ruecknehmbar,
+        "die eigene Folgeschicht sperrt die Rücknahme nicht"
+    );
+    assert_eq!(v.folgeschichten.len(), 1);
+    let f = &v.folgeschichten[0];
+    assert_eq!(f.einheit_id, w.f1, "dieselbe Einheit");
+    assert_eq!(f.vorgaenger_id, Some(l.schicht));
+    assert_eq!(f.beginn_at, jetzt);
+    assert_eq!(f.faellig_at, "2026-09-22 21:40:00");
+    assert_eq!(
+        f.art,
+        AbloesungArt::Einheit,
+        "eine laufende trägt die Vorgabe"
+    );
+    assert_eq!(
+        f.erbende_einheiten
+            .iter()
+            .map(|e| e.einheit_id)
+            .collect::<Vec<_>>(),
+        vec![l.gruppe],
+        "die Gruppe erbt weiter"
+    );
+    assert_eq!(
+        abschnitt_von(&w, w.f1).await,
+        Some(w.abschnitt),
+        "Abschnitt bleibt"
+    );
+
+    // Zeitachse: nur Personen-Ereignisse, die Perioden der Einheiten laufen weiter.
+    for e in [w.f1, l.gruppe] {
+        assert_eq!(abloesungsereignisse(&w, "einheit_id", e).await, 0, "{e}");
+        assert_eq!(perioden(&w, e).await[0].ende_at, None, "{e}");
+    }
+    for p in [l.fuehrer, l.mitglied] {
+        assert_eq!(
+            ereignisse_person(&w, p).await,
+            vec![
+                ("eintreffen".to_string(), "einheit".to_string()),
+                ("abloesung".to_string(), "abloesung".to_string())
+            ],
+            "{p}"
+        );
+    }
+    for p in [l.frei, l.fremd] {
+        assert_eq!(
+            ereignisse_person(&w, p).await,
+            vec![("eintreffen".to_string(), "abloesung".to_string())],
+            "{p}"
+        );
+    }
+
+    // Zugehörigkeit.
+    assert_eq!(
+        zuordnung(&w, l.fuehrer).await,
+        (None, None),
+        "aus Einheit und Fahrzeug"
+    );
+    assert_eq!(zuordnung(&w, l.mitglied).await, (None, None));
+    assert_eq!(fuehrer(&w, w.f1).await, None, "aus der Führung");
+    assert_eq!(zuordnung(&w, l.frei).await, (Some(w.f1), None));
+    assert_eq!(zuordnung(&w, l.fremd).await, (Some(w.f1), None));
+    let traeger: Option<i64> =
+        sqlx::query_scalar("SELECT einheit_id FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(l.fahrzeug)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert_eq!(traeger, Some(w.f1), "das Fahrzeug bleibt bei der Einheit");
+
+    let inhalt = etb(&w.pool, w.e).await.pop().unwrap().1;
+    assert_eq!(
+        inhalt,
+        "Ablösung vollzogen: Besatzungswechsel «Florian 1», Einheit und Fahrzeug bleiben. \
+         Alte Besatzung: «Anna Alt», «Bernd Alt». Neue Besatzung: «Cora Neu», «Dirk Neu»."
+    );
+    let mut personen = wirkung.personen.clone();
+    personen.sort_unstable();
+    let mut erwartet = vec![l.fuehrer, l.mitglied, l.frei, l.fremd];
+    erwartet.sort_unstable();
+    assert_eq!(personen, erwartet);
+    for e in [w.f1, l.gruppe, w.f2] {
+        assert!(wirkung.einheiten.contains(&e), "{e}");
+    }
+
+    // Rücknahme: alles wie vorher.
+    let (r, _, wirkung) = zuruecknehmen(&w.pool, w.e, l.schicht, w.b, jetzt)
+        .await
+        .unwrap();
+    assert_eq!(r.status, AbloesungStatus::Laufend);
+    assert_eq!(r.art, AbloesungArt::Einheit);
+    assert!(r.besatzung.is_empty());
+    assert!(
+        laden(&w.pool, w.e, f.id, jetzt).await.is_err(),
+        "Folgeschicht entfernt"
+    );
+    assert_eq!(schichten(&w, w.f1).await.len(), 1);
+    assert_eq!(
+        zuordnung(&w, l.fuehrer).await,
+        (Some(w.f1), Some(l.fahrzeug))
+    );
+    assert_eq!(zuordnung(&w, l.mitglied).await, (Some(l.gruppe), None));
+    assert_eq!(fuehrer(&w, w.f1).await, Some(l.fuehrer), "Führung zurück");
+    assert_eq!(zuordnung(&w, l.frei).await, (None, None));
+    assert_eq!(zuordnung(&w, l.fremd).await, (Some(w.f2), None));
+    for p in [l.fuehrer, l.mitglied] {
+        assert_eq!(
+            ereignisse_person(&w, p).await.len(),
+            1,
+            "nur das Eintreffen"
+        );
+    }
+    for p in [l.frei, l.fremd] {
+        assert!(ereignisse_person(&w, p).await.is_empty(), "{p}");
+    }
+    let zeilen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_abloesung_besatzung")
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(zeilen, 0);
+    assert_eq!(wirkung.personen.len(), 4);
+    let (typ, inhalt, bezug, _) = etb(&w.pool, w.e).await.pop().unwrap();
+    assert_eq!(typ, crate::etb::TYP_BERICHTIGUNG);
+    assert!(inhalt.contains("Besatzungswechsel rückgängig"), "{inhalt}");
+    assert!(bezug.is_some());
+}
+
+/// Die Rücknahme legt nur zurück, was noch den Stand des Vollzugs trägt: wer danach von Hand
+/// umgehängt wurde, bleibt dort, und eine Einheit mit neuer Führung behält sie.
+#[tokio::test]
+async fn ruecknahme_des_besatzungswechsels_laesst_handaenderungen_stehen() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let f3 = einheit(&w.pool, w.e, "Florian 3", None).await;
+    let jetzt = "2026-09-22 15:40:00";
+    besatzungswechsel(&w, l.schicht, jetzt, &[l.frei, l.fremd])
+        .await
+        .unwrap();
+    for (p, e) in [(l.frei, f3), (l.fuehrer, f3)] {
+        sqlx::query("UPDATE einsatz_personal SET einheit_id = ? WHERE id = ?")
+            .bind(e)
+            .bind(p)
+            .execute(&w.pool)
+            .await
+            .unwrap();
+    }
+    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+        .bind(l.fremd)
+        .bind(w.f1)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    zuruecknehmen(&w.pool, w.e, l.schicht, w.b, jetzt)
+        .await
+        .unwrap();
+    assert_eq!(
+        zuordnung(&w, l.frei).await.0,
+        Some(f3),
+        "von Hand umgehängt"
+    );
+    assert_eq!(
+        zuordnung(&w, l.fuehrer).await,
+        (Some(f3), None),
+        "bleibt in Florian 3"
+    );
+    assert_eq!(zuordnung(&w, l.mitglied).await.0, Some(l.gruppe));
+    assert_eq!(zuordnung(&w, l.fremd).await.0, Some(w.f2));
+    assert_eq!(
+        fuehrer(&w, w.f1).await,
+        Some(l.fremd),
+        "neue Führung bleibt"
+    );
+}
+
+/// Die neue Besatzung wird vor jedem Schreiben geprüft: unbekannt 404, entlassen 409, schon in
+/// der bisherigen Besatzung (auch der erbenden Gruppe) 422, Führung einer anderen Einheit 422.
+/// Nichts wird halb geschrieben.
+#[tokio::test]
+async fn besatzungswechsel_lehnt_unpassende_personen_ab() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let entlassen = person(&w, "Erik Weg", None, None).await;
+    sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = ?, beendet_als = 'entlassen' WHERE id = ?",
+    )
+    .bind(T0)
+    .bind(entlassen)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let fuehrt = person(&w, "Fritz Führt", Some(w.f2), None).await;
+    sqlx::query("UPDATE einsatz_einheit SET fuehrer_id = ? WHERE id = ?")
+        .bind(fuehrt)
+        .bind(w.f2)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let jetzt = "2026-09-22 15:40:00";
+    for (neu, code) in [
+        (vec![l.frei, 99_999], StatusCode::NOT_FOUND),
+        (vec![l.frei, entlassen], StatusCode::CONFLICT),
+        (vec![l.frei, l.mitglied], StatusCode::UNPROCESSABLE_ENTITY),
+        (vec![fuehrt], StatusCode::UNPROCESSABLE_ENTITY),
+    ] {
+        let err = besatzungswechsel(&w, l.schicht, jetzt, &neu)
+            .await
+            .unwrap_err();
+        assert_eq!(status(err), code, "{neu:?}");
+    }
+    let a = laden(&w.pool, w.e, l.schicht, jetzt).await.unwrap();
+    assert_eq!(a.status, AbloesungStatus::Laufend);
+    assert_eq!(zuordnung(&w, l.frei).await, (None, None));
+    assert_eq!(zuordnung(&w, l.fuehrer).await.0, Some(w.f1));
+    assert!(ereignisse_person(&w, l.frei).await.is_empty());
+}
+
+/// Spec `kraefte-zeitachse`, „Streichung“: das Eintreffen der neuen Besatzung aus dem Vollzug
+/// streicht nur dessen Rücknahme, wie die Ablösung der alten.
+#[tokio::test]
+async fn ereignisse_des_besatzungswechsels_streicht_nur_die_ruecknahme() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let jetzt = "2026-09-22 15:40:00";
+    besatzungswechsel(&w, l.schicht, jetzt, &[l.frei])
+        .await
+        .unwrap();
+    for p in [l.frei, l.fuehrer] {
+        let id: i64 = sqlx::query_scalar(
+            "SELECT id FROM einsatz_kraft_zeitachse \
+             WHERE personal_id = ? AND quelle = 'abloesung'",
+        )
+        .bind(p)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+        let mut tx = w.pool.begin().await.unwrap();
+        let err = crate::zeitachse::repo::streiche_tx(
+            &mut tx,
+            w.e,
+            w.b,
+            crate::zeitachse::repo::Kraft::Person(p),
+            id,
+            "Fehlbuchung",
+            false,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY, "{p}");
+    }
+}
+
+/// Bricht die Streichung die Folge einer Person (nach dem Wechsel neu alarmiert), scheitert die
+/// Rücknahme mit 422, nennt die Person und ändert nichts.
+#[tokio::test]
+async fn ruecknahme_des_besatzungswechsels_bricht_keine_spaetere_folge() {
+    let w = welt().await;
+    let l = lage(&w).await;
+    let jetzt = "2026-09-22 15:40:00";
+    besatzungswechsel(&w, l.schicht, jetzt, &[l.frei])
+        .await
+        .unwrap();
+    let mut tx = w.pool.begin().await.unwrap();
+    crate::zeitachse::repo::schreibe_tx(
+        &mut tx,
+        w.e,
+        w.b,
+        crate::zeitachse::repo::Kraft::Person(l.mitglied),
+        crate::zeitachse::repo::Neu {
+            art: Alarmierung,
+            zeitpunkt_at: "2026-09-22 16:00:00",
+            quelle: crate::zeitachse::ZeitachseQuelle::Status,
+            notiz: None,
+        },
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let err = zuruecknehmen(&w.pool, w.e, l.schicht, w.b, jetzt)
+        .await
+        .unwrap_err();
+    let text = err.to_string();
+    assert_eq!(status(err), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(text.contains("Bernd Alt"), "{text}");
+    let a = laden(&w.pool, w.e, l.schicht, jetzt).await.unwrap();
+    assert_eq!(a.status, AbloesungStatus::Abgeloest);
+    assert_eq!(zuordnung(&w, l.frei).await.0, Some(w.f1));
 }

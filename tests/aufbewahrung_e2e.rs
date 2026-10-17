@@ -305,6 +305,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         gruppe: Gruppe::Einsatzkraft,
         begruendung: "neuer Inhaber über snap_name_von, wenn ad-hoc extern (derselbe Wert wie einsatz_stabsfunktion.snap_name)",
     },
+    Ausnahme {
+        datei: "src/abloesung/repo.rs",
+        funktion: "vollziehen_besatzung_tx",
+        spalte: "einsatz_personal.snap_name",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "alte und neue Besatzung beim Besatzungswechsel der Ablösung (LLH-1150): wer wann in welcher Einheit eingesetzt war",
+    },
     // --- Lagestruktur: Bezeichnungen der Ordnung des Raums und der Betreuung (Zonen, Gebiete,
     // Bezirke, Stellen) und der Streichgrund der Kräfte-Zeitachse. Bewusst behalten, LFH-752. ---
     Ausnahme {

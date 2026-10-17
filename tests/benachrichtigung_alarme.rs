@@ -610,7 +610,7 @@ async fn abloesung_meldet_vorwarnung_und_faelligkeit_an_die_modul_leser() {
     );
     assert_eq!(
         v["pfad"],
-        format!("/einsaetze/{}/abloesung", w.einsatz).as_str()
+        format!("/einsaetze/{}/abloesung?schicht={id}", w.einsatz).as_str()
     );
 }
 

@@ -727,6 +727,10 @@ export type AbloesungAbloeser = S['AbloesungAbloeser'];
 export type AbloesungFolge = S['AbloesungFolge'];
 /** Warnung zur geplanten ablösenden Einheit (LLH-1131): schon geplant oder selbst im Einsatz. */
 export type AbloesungPlanungWarnung = S['AbloesungPlanungWarnung'];
+/** Art des Vollzugs und eine Person beim Besatzungswechsel (LLH-1150). */
+export type AbloesungArt = S['AbloesungArt'];
+export type AbloesungBesatzung = S['AbloesungBesatzung'];
+export type BesatzungRolle = S['BesatzungRolle'];
 
 // ============================== LLH-1122 Schichtmodelle ==============================
 export type Schichtmodell = S['Schichtmodell'];
@@ -790,12 +794,17 @@ export interface SchichtAendernBody {
  * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. `abloeser_ids`
  * (LLH-1132): je Knoten-Ablöser eine Folgeschicht, eine schon laufende ohne Vorgänger wird
  * übernommen. `abschnitt_uebergeben` verlangt die Freigabe des Moduls Einheiten (sonst 403).
+ * `art: 'besatzung'` (LLH-1150) mit `besatzung_ids` (`einsatz_personal.id`, höchstens
+ * `ABLOESUNG_BESATZUNG_MAX`, Pflicht) ist der Besatzungswechsel, ohne Ablöser und ohne
+ * Abschnittsübergabe (sonst 422); er verlangt ebenfalls die Freigabe des Moduls Einheiten.
  */
 export interface VollzugBody {
   vollzogen_at?: string;
   abloesende_einheit_id?: number;
   abloeser_ids?: number[];
   abschnitt_uebergeben?: boolean;
+  art?: AbloesungArt;
+  besatzung_ids?: number[];
 }
 
 // ============================== LFH-639 Betreuung ==============================

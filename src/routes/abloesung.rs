@@ -15,8 +15,9 @@ use crate::abloesung::repo::{
     self, AenderungEingabe, BeginnEingabe, EinsatzVorgabeInput, VollzugEingabe, VollzugWirkung,
 };
 use crate::abloesung::{
-    AbloesungAnzeige, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus, AbloesungVollzugAnzeige,
-    AbloesungVorgabeAnzeige, ABLOESER_MAX, RHYTHMUS_MAX_MINUTEN,
+    AbloesungAnzeige, AbloesungArt, AbloesungEinsatzVorgabeAnzeige, AbloesungStatus,
+    AbloesungVollzugAnzeige, AbloesungVorgabeAnzeige, ABLOESER_MAX, BESATZUNG_MAX,
+    RHYTHMUS_MAX_MINUTEN,
 };
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
@@ -69,21 +70,24 @@ pub(crate) async fn publish_kopplung(
 }
 
 /// Vollzug und Rücknahme ändern die Zeitachse der Einheit, ihrer erbenden Untereinheiten und per
-/// Fan-out die ihrer Personen, mit der Abschnittsübergabe auch Einheiten; deren Leser mit nur
-/// Einheiten- oder Personalrecht erreicht `abloesung` nicht (LLH-1189). Je Einheit ein Ereignis.
+/// Fan-out die ihrer Personen, mit der Abschnittsübergabe auch Einheiten, mit dem
+/// Besatzungswechsel Personen und ihre Einheiten (LLH-1150); deren Leser mit nur Einheiten- oder
+/// Personalrecht erreicht `abloesung` nicht (LLH-1189). Je Einheit und je Person ein Ereignis.
 fn publish_zeitachse(state: &AppState, einsatz_id: i64, wirkung: VollzugWirkung) {
     let mut gemeldet: Vec<i64> = Vec::new();
+    let mut personen = wirkung.personen;
     for (einheit_id, beruehrt) in wirkung.zeitachse {
         super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
         gemeldet.push(einheit_id);
-        for ep_id in beruehrt.personen {
-            super::einsatz_personal::sse_personal(state, einsatz_id, ep_id);
-        }
+        personen.extend(beruehrt.personen);
     }
     for einheit_id in crate::kraefte_disposition::dedupe(&wirkung.einheiten, |id| *id) {
         if !gemeldet.contains(&einheit_id) {
             super::einsatz_einheit::sse_einheit(state, einsatz_id, einheit_id);
         }
+    }
+    for ep_id in crate::kraefte_disposition::dedupe(&personen, |id| *id) {
+        super::einsatz_personal::sse_personal(state, einsatz_id, ep_id);
     }
 }
 
@@ -267,6 +271,70 @@ pub struct Vollziehen {
     /// Freigabe des Moduls Einheiten, das die Unterstellung sonst schreibt.
     #[serde(default)]
     abschnitt_uebergeben: bool,
+    /// `einheit` (Vorgabe) oder `besatzung` (LLH-1150). Als `String`, damit ein unbekannter Wert
+    /// eine benannte 400 liefert.
+    #[serde(default)]
+    art: Option<String>,
+    /// Beim Besatzungswechsel die neue Besatzung (`einsatz_personal.id`, höchstens
+    /// [`BESATZUNG_MAX`]); Pflicht dort, sonst verboten.
+    #[serde(default)]
+    besatzung_ids: Option<Vec<i64>>,
+}
+
+/// Art und neue Besatzung eines Vollzugs (LLH-1150), erst die Felder für sich (400), dann der
+/// Zusammenhang (422): unbekannte Art und mehr als [`BESATZUNG_MAX`] Personen (gezählt vor dem
+/// Entdoppeln) → 400, ein Besatzungswechsel ohne neue Besatzung → 400; beim Besatzungswechsel
+/// ablösende Einheiten oder „Abschnitt übergeben“ → 422, `besatzung_ids` ohne Besatzungswechsel
+/// → 422. Liefert die Art und die neue Besatzung entdoppelt in ihrer Reihenfolge.
+fn vollzug_art(
+    art: Option<&str>,
+    besatzung: Option<&[i64]>,
+    abloeser: &[i64],
+    abschnitt_uebergeben: bool,
+) -> Result<(AbloesungArt, Vec<i64>), AppError> {
+    let art = match art.map(str::trim) {
+        None | Some("") => AbloesungArt::Einheit,
+        Some(s) => AbloesungArt::parse(s).ok_or_else(|| {
+            AppError::Validation(format!(
+                "Unbekannte Art '{s}' (erlaubt: einheit, besatzung)"
+            ))
+        })?,
+    };
+    if besatzung.is_some_and(|b| b.len() > BESATZUNG_MAX) {
+        return Err(AppError::Validation(format!(
+            "besatzung_ids: höchstens {BESATZUNG_MAX} Personen"
+        )));
+    }
+    match art {
+        AbloesungArt::Besatzung => {
+            let ids = crate::kraefte_disposition::dedupe(besatzung.unwrap_or_default(), |id| *id);
+            if ids.is_empty() {
+                return Err(AppError::Validation(
+                    "besatzung_ids fehlt: ein Besatzungswechsel braucht die neue Besatzung".into(),
+                ));
+            }
+            if !abloeser.is_empty() {
+                return Err(AppError::UnprocessableEntity(
+                    "Beim Besatzungswechsel bleibt die Einheit; ablösende Einheiten gibt es nicht"
+                        .into(),
+                ));
+            }
+            if abschnitt_uebergeben {
+                return Err(AppError::UnprocessableEntity(
+                    "Beim Besatzungswechsel bleibt der Abschnitt bei der Einheit".into(),
+                ));
+            }
+            Ok((art, ids))
+        }
+        AbloesungArt::Einheit => {
+            if besatzung.is_some() {
+                return Err(AppError::UnprocessableEntity(
+                    "besatzung_ids gilt nur beim Besatzungswechsel (art: besatzung)".into(),
+                ));
+            }
+            Ok((art, Vec::new()))
+        }
+    }
 }
 
 /// POST /api/einsaetze/{id}/abloesungen/{aid}/vollzug
@@ -281,7 +349,15 @@ pub async fn vollziehen(
     let vollzogen_at = zeit(req.vollzogen_at, "Vollzug")?.unwrap_or_else(|| jetzt.clone());
     let abloeser =
         abloeser_aus(req.abloeser_ids, req.abloesende_einheit_id.map(Some))?.unwrap_or_default();
-    if req.abschnitt_uebergeben {
+    let (art, besatzung) = vollzug_art(
+        req.art.as_deref(),
+        req.besatzung_ids.as_deref(),
+        &abloeser,
+        req.abschnitt_uebergeben,
+    )?;
+    // Abschnittsübergabe und Besatzungswechsel schreiben, was sonst das Modul Einheiten schreibt
+    // (Unterstellung, Personalzuordnung).
+    if req.abschnitt_uebergeben || art == AbloesungArt::Besatzung {
         ctx.fordere_zielmodul::<Einheiten>(&state.pool).await?;
     }
     let (anzeige, etb_id, wirkung) = repo::vollziehen(
@@ -293,6 +369,8 @@ pub async fn vollziehen(
             vollzogen_at,
             abloeser,
             abschnitt_uebergeben: req.abschnitt_uebergeben,
+            art,
+            besatzung,
         },
         &jetzt,
     )
@@ -471,6 +549,65 @@ mod tests {
         assert_eq!(abloeser_aus(None, Some(None)).unwrap(), Some(vec![]));
         assert_eq!(abloeser_aus(None, Some(Some(7))).unwrap(), Some(vec![7]));
         assert_eq!(abloeser_aus(None, None).unwrap(), None);
+    }
+
+    /// LLH-1150: erst das Feld (400), dann der Zusammenhang (422).
+    #[test]
+    fn vollzug_art_prueft_feld_vor_zusammenhang() {
+        let code = |r: Result<(AbloesungArt, Vec<i64>), AppError>| r.unwrap_err().status();
+        assert_eq!(
+            vollzug_art(None, None, &[3], true).unwrap(),
+            (AbloesungArt::Einheit, vec![]),
+            "ohne Art die ganze Einheit"
+        );
+        assert_eq!(
+            code(vollzug_art(Some("fahrzeug"), None, &[], false)),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            code(vollzug_art(Some("besatzung"), Some(&[]), &[], false)),
+            StatusCode::BAD_REQUEST,
+            "leere neue Besatzung"
+        );
+        assert_eq!(
+            code(vollzug_art(Some("besatzung"), None, &[], false)),
+            StatusCode::BAD_REQUEST,
+            "fehlende neue Besatzung"
+        );
+        let viele: Vec<i64> = (1..=BESATZUNG_MAX as i64 + 1).collect();
+        assert_eq!(
+            code(vollzug_art(Some("besatzung"), Some(&viele), &[7], false)),
+            StatusCode::BAD_REQUEST,
+            "Grenze vor dem Zusammenhang"
+        );
+        let genau: Vec<i64> = (1..=BESATZUNG_MAX as i64).collect();
+        assert_eq!(
+            vollzug_art(Some("besatzung"), Some(&genau), &[], false)
+                .unwrap()
+                .1
+                .len(),
+            BESATZUNG_MAX
+        );
+        assert_eq!(
+            code(vollzug_art(Some("besatzung"), Some(&[1]), &[7], false)),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "mit ablösender Einheit"
+        );
+        assert_eq!(
+            code(vollzug_art(Some("besatzung"), Some(&[1]), &[], true)),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "mit Abschnittsübergabe"
+        );
+        assert_eq!(
+            code(vollzug_art(Some("einheit"), Some(&[1]), &[], false)),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "neue Besatzung ohne Besatzungswechsel"
+        );
+        assert_eq!(
+            vollzug_art(Some("besatzung"), Some(&[4, 2, 4]), &[], false).unwrap(),
+            (AbloesungArt::Besatzung, vec![4, 2]),
+            "entdoppelt in der Reihenfolge"
+        );
     }
 
     #[test]

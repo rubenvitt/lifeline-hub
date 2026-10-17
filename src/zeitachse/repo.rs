@@ -234,7 +234,8 @@ pub struct Gestrichen {
 
 /// Streicht ein Ereignis der Kraft samt allen noch nicht gestrichenen Fan-out-Kopien. Prüfung
 /// (Spec „Streichung"): fremdes Ereignis → 404; schon gestrichen → 422; Art `abloesung` (auch die
-/// Fan-out-Kopie an einer Person) ohne `durch_ruecknahme` → 422; ein Rest, der die Perioden-Regeln der Kraft oder einer betroffenen
+/// Fan-out-Kopie an einer Person) oder Quelle `abloesung` (Besatzungswechsel, LLH-1150) ohne
+/// `durch_ruecknahme` → 422; ein Rest, der die Perioden-Regeln der Kraft oder einer betroffenen
 /// Person verletzt → 422 (mit Namen der Person).
 pub async fn streiche_tx(
     conn: &mut SqliteConnection,
@@ -245,9 +246,9 @@ pub async fn streiche_tx(
     grund: &str,
     durch_ruecknahme: bool,
 ) -> Result<Gestrichen, AppError> {
-    let zeile: Option<(String, String, Option<String>)> =
+    let zeile: Option<(String, String, Option<String>, String)> =
         sqlx::query_as(sqlx::AssertSqlSafe(format!(
-            "SELECT art, zeitpunkt_at, gestrichen_at FROM einsatz_kraft_zeitachse \
+            "SELECT art, zeitpunkt_at, gestrichen_at, quelle FROM einsatz_kraft_zeitachse \
              WHERE id = ? AND einsatz_id = ? AND {} = ?",
             kraft.spalte()
         )))
@@ -256,7 +257,7 @@ pub async fn streiche_tx(
         .bind(kraft.id())
         .fetch_optional(&mut *conn)
         .await?;
-    let (art, zeitpunkt_at, gestrichen_at) = zeile.ok_or(AppError::NotFound)?;
+    let (art, zeitpunkt_at, gestrichen_at, quelle) = zeile.ok_or(AppError::NotFound)?;
     let art = ZeitachseArt::parse(&art)
         .ok_or_else(|| AppError::Internal(format!("Unbekannte Zeitachsen-Art '{art}'")))?;
     if gestrichen_at.is_some() {
@@ -264,9 +265,13 @@ pub async fn streiche_tx(
             "Das Ereignis ist bereits gestrichen".into(),
         ));
     }
-    // Nach der ART, nicht der Quelle: die Fan-out-Kopie an einer Person trägt `quelle = einheit`
-    // und dürfte sonst die Periode der Person öffnen, während die Einheit abgelöst bleibt.
-    if art == ZeitachseArt::Abloesung && !durch_ruecknahme {
+    // Nach der ART, nicht nur der Quelle: die Fan-out-Kopie an einer Person trägt
+    // `quelle = einheit` und dürfte sonst die Periode der Person öffnen, während die Einheit
+    // abgelöst bleibt. Dazu nach der QUELLE: das Eintreffen der neuen Besatzung aus einem
+    // Besatzungswechsel (LLH-1150) streicht ebenfalls nur dessen Rücknahme.
+    let aus_vollzug =
+        art == ZeitachseArt::Abloesung || quelle == ZeitachseQuelle::Abloesung.as_str();
+    if aus_vollzug && !durch_ruecknahme {
         return Err(AppError::UnprocessableEntity(
             "Ein Ereignis aus dem Vollzug einer Ablösung lässt sich nur über die Rücknahme des Vollzugs streichen"
                 .into(),

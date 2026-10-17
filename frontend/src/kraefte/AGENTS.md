@@ -23,7 +23,9 @@ zu „neue Einheiten bekommen kein Ereignis“ aus `kraefte-disposition`: die un
 Einheit beginnt ihre Periode mit diesem Eintreffen). Das Kennzeichen `uebernahme_offen_seit`
 ist kein Zeitpunkt der Zeitachse. Ein Einheit-Ereignis gilt per Fan-out für die
 JETZT zugeordneten Personen; Fahrzeuge wirken nur über ihre Einheit (erstes Fahrzeug bzw. alle für
-die Entlassung). Eine Ablösung, auch ihre Fan-out-Kopie und die an einer erbenden Untereinheit (LLH-1132), streicht nur die Rücknahme des Vollzugs.
+die Entlassung). Eine Ablösung, auch ihre Fan-out-Kopie und die an einer erbenden Untereinheit
+(LLH-1132), und jedes Ereignis der Quelle `abloesung` (Besatzungswechsel, LLH-1150) streicht nur
+die Rücknahme des Vollzugs.
 `schreibe_tx` koppelt an einer Einheit auch die Schicht (LLH-1128, `src/abloesung/kopplung.rs`):
 Eintreffen der offenen Periode beginnt sie (nur mit Vorgabe, nie bei geerbter), eine Entlassung
 ohne offene Periode danach beendet sie (`beendet`), die Streichung dieser Entlassung öffnet sie;
@@ -61,8 +63,15 @@ einen geplanten Ablöser. Kein Server-Anteil, solange Perioden und Erben im DTO 
 **Geplant** heißt Einzelplanung `abloesende_einheit_id` oder Ablöser-Liste
 `einsatz_abloesung_abloeser`; jede Prüfung darauf liest beide (Planungshinweis, Hinweise,
 Planungswarnungen, LLH-1131). Die Planungswarnungen ermittelt der Server beim Lesen
-(`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`). Der
-Planungshinweis ist eine Frist, keine Einstufung.
+(`planung_warnungen`), der Client zeigt sie nur (`abloesung/planungWarnung.ts`), an der Karte in
+der Rolle Achtung, nie als Einstufung. Der Planungshinweis ist eine Frist, keine Einstufung.
+Den Stand eines geplanten Ablösers an der Karte („Ablösung: … · alarmiert … · eingetroffen …
+(BR …)“, LLH-1131 Teil II) liest nur `abloesung/abloeserStand.ts` aus der offenen Periode der
+Zeitachse; der Raum kommt aus `aktueller_br_id` und der Raumliste, die nur mit Freigabe der
+Bereitstellungsräume und nur bei einem Ablöser im Raum abgefragt wird. Kein eigener Abruf, kein
+DTO-Feld: live über die bestehenden Ereignisse. Jede Benachrichtigung der Ablösung springt zu
+ihrer Schicht (`abloesungPfad(…, { schicht })`, Server `benachrichtigung::text::pfad`, beide
+gleich); die Seite nimmt `?schicht=` nach `useQueryParamSelektion` an.
 
 **Vollzug** (LLH-1132, Spec `kraefte-abloesung`): Die Liste der Ablöser ist die Wahrheit
 (höchstens `ABLOESER_MAX`, Spiegel `ABLOESUNG_ABLOESER_MAX`); `abloesende_einheit_id` ist ihr
@@ -76,3 +85,18 @@ Untereinheiten eines geplanten Verbands. „Abschnitt übergeben“ ändert `ein
 nur am Knoten und an der abgelösten Einheit, mit Vorher-Werten an Schicht und Liste, und
 verlangt die Freigabe des Moduls Einheiten; die Rücknahme legt nur zurück, was noch den Stand des
 Vollzugs trägt.
+
+**Besatzungswechsel** (LLH-1150, Entscheidung LLH-1118 Punkt 4, Spec `kraefte-abloesung`): Das
+LFH-635-Non-Goal „keine Personal-Ebene“ ist **nur hierfür** aufgehoben. Art `einheit | besatzung`
+an der Schicht (`einsatz_abloesung.art`, eine laufende trägt `einheit`); Einheit, Fahrzeug und
+Abschnitt bleiben, die Folgeschicht hängt an derselben Einheit. Wer ging und wer kam, steht nur in
+`einsatz_abloesung_besatzung` (Rolle `alt`/`neu` samt Vorher-Werten für die Rücknahme), geschrieben
+nur von `abloesung::repo::vollziehen_besatzung_tx`. Die alte Besatzung ist die Zuordnung
+`einsatz_personal.einheit_id` der Einheit und ihrer erbenden Untereinheiten beim Vollzug (dieselbe
+Menge wie der Fan-out der ganzen Einheit); sie verliert Einheit, Fahrzeug dieser Einheiten und
+Führung. Die Zeitachse bekommt nur Personen-Ereignisse (alt `abloesung`, neu `eintreffen`, Quelle
+`abloesung`), keine an der Einheit; **keine Grenzwerte, keine Ruhezeit je Person** (LFH-860 bleibt
+dafür zuständig). Der Wechsel verlangt die Freigabe des Moduls Einheiten (Server) und im Dialog
+dazu die des Moduls Personal (Auswahl); die bisherige Besatzung und die wählbaren Personen bildet
+nur `abloesung/besatzung.ts`. Die Rücknahme legt nur zurück, was noch den Stand des Vollzugs
+trägt.
