@@ -1,5 +1,5 @@
 import { useQuery, type QueryKey } from '@tanstack/react-query';
-import { Button, Input, Space, type InputRef } from 'antd';
+import { Button, Input, Space, type InputProps, type InputRef } from 'antd';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
 import { useRollen } from '../components/instrument';
@@ -32,6 +32,11 @@ export interface OrtsfeldProps {
    * über `popup` herein: dann schließt Escape zuerst die Liste und verwirft erst danach die Zeile.
    */
   onOpenChange?: (offen: boolean) => void;
+  /**
+   * Zeichengrenze des Textes (`zeichenGrenze(max)` aus `components/zeichenGrenze.tsx`); die
+   * passende `zeichenRegel` prüft der Aufrufer am Text des Werts.
+   */
+  count?: InputProps['count'];
 }
 
 /** Eine Suche: der Begriff und ihre laufende Nummer (je Enter oder Knopf eine neue). */
@@ -64,6 +69,7 @@ export function Ortsfeld({
   suchen,
   suchSchluessel,
   onOpenChange,
+  count,
 }: OrtsfeldProps) {
   const { token, rollen } = useRollen();
   const online = useOnline();
@@ -131,6 +137,7 @@ export function Ortsfeld({
           aria-label={ariaLabel}
           autoFocus={autoFocus}
           value={value.text}
+          count={count}
           onChange={(e) => {
             onChange?.({ text: e.target.value, koordinate: null });
             setAnfrage(null);

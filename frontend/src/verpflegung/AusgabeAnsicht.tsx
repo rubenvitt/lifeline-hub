@@ -1,7 +1,7 @@
 import { Alert, Breadcrumb, Button, Flex, Form, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
@@ -35,11 +35,27 @@ import { useGeraetDarf } from '../geraet/geraetSicht';
 import { useOnline } from '../offline/useOnline';
 import { useVorgemerkteAusgaben } from '../offline/useVorgemerkteAusgaben';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
+import { parseVerpflegungStelle } from '../routing/deeplinks';
+import { Select } from '../components/Select';
 import { rollenFarbe, verpflegungDeckung } from '../theme/statusFarben';
 import { AusgabeDialog, RuecknahmeDialog } from './VerpflegungDialoge';
 import type { Buendel } from './ausgabeSammlung';
+import EmpfaengerStand from './EmpfaengerStand';
+import {
+  LEERE_EMPFAENGER,
+  OHNE_EMPFAENGER,
+  empfaengerOptionen,
+  empfaengerSchluessel,
+  empfaengerText,
+  isEmpfaengerWaehlbar,
+  parseEmpfaengerSchluessel,
+  staerkeVorgabe,
+  type EmpfaengerWahl,
+} from './empfaengerKern';
 import { FEHLT_TON, deckungEinstufung, istVergangen } from './deckung';
 import { useAusgabeNachtragen } from './useAusgabeNachtragen';
+import { loadGemerkteStelle, saveGemerkteStelle } from './stellenGedaechtnis';
+import { stellenName, stellenWahl } from './stellenKern';
 import { useAusgabeSammlung } from './useAusgabeSammlung';
 import { useNachforderungWahl } from './useNachforderungWahl';
 import {
@@ -67,6 +83,11 @@ const einzeilig = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
 } as const;
+
+/** „ · an 2. Gruppe“; leer ohne Text. */
+function mitPunkt(text: string): string {
+  return text ? ` · ${text}` : '';
+}
 
 /** „ (davon 2 vegetarisch)“ zu einem Bündel, leer ohne Sonderkost. */
 function davon(b: Buendel): string {
@@ -96,12 +117,29 @@ function davon(b: Buendel): string {
  * im Seitenhinweis.
  *
  * Stab und Gerät teilen die Seite; Pfade über `useEinsatzPfade` (D1).
+ *
+ * Stelle (LLH-1040, design.md D13 Punkt 7): Am Platz `ausgabe-stelle` im Kopf steht die Wahl der
+ * Verpflegungsstelle, die zugeordneten zuerst, ohne aufgelöste, daneben das Ist der gewählten
+ * Stelle aus `je_stelle`. Vorgewählt wird in dieser Folge: `?stelle=` aus der Karte, am Desktop die
+ * gemerkte Wahl des Einsatzes (`stellenGedaechtnis`), sonst die einzige zugeordnete Stelle. Eine
+ * Hand-Wahl gilt bis zum Verlassen und wird am Desktop gemerkt, am Gerät nicht (LLH-1048). Ein
+ * Wechsel bucht das offene Bündel an der alten Stelle (`useAusgabeSammlung`).
+ *
+ * Empfänger (LLH-1055 Teil II, Entscheidung LLH-1024 F3): Am Platz `ausgabe-empfaenger` steht die
+ * Wahl „ohne Empfänger“ (Vorgabe, das Zählen bleibt so schnell wie ohne), eine Einheit (Abholung)
+ * oder ein Abschnitt (Zuführung), alles aus der Projektion `empfaenger` in `GET …/verpflegung`.
+ * Mit einer Einheit steht daneben die Taste „+n“: sie zählt die Ist-Stärke ihres Teilbaums in die
+ * Sammlung, „−1“ und „Menge …“ (vorbelegt mit derselben Zahl) überschreiben. Gemerkt wird die Wahl
+ * nirgends; sie gilt bis zum Wechsel des Zeitfensters. Ein Wechsel bucht das offene Bündel beim
+ * alten Empfänger. Unter den Tasten zeigt `EmpfaengerStand`, wer noch nicht verpflegt ist; „Wählen“
+ * an einer Zeile setzt die Einheit als Empfänger (Handschuh: die Zeile statt der Auswahlliste).
  */
 export default function AusgabeAnsicht() {
   const { id, zeitfensterId } = useParams();
   const einsatzId = Number(id);
   const zfId = Number(zeitfensterId);
-  const { benutzer } = useAuth();
+  const { benutzer, geraet } = useAuth();
+  const [suchParameter] = useSearchParams();
   const darf = useGeraetDarf();
   const pfade = useEinsatzPfade();
   const jetzt = useUhr();
@@ -137,6 +175,62 @@ export default function AusgabeAnsicht() {
   const nachtrag = useAusgabeNachtragen(einsatzId);
 
   const zf = verpflegungQuery.data?.zeitfenster.find((z) => z.id === zfId) ?? null;
+
+  // ── Stellenwahl (LLH-1040) ─────────────────────────────────────────────────────────────
+  const stellen = verpflegungQuery.data?.stellen ?? [];
+  const amDesktop = geraet == null;
+  const wahl = stellenWahl(stellen, zf);
+  const waehlbar = [...wahl.zugeordnet, ...wahl.weitere];
+  const isWaehlbar = (sid: number | null): sid is number =>
+    sid != null && waehlbar.some((s) => s.id === sid);
+  const gemerkt = useMemo(
+    () => (amDesktop ? loadGemerkteStelle(einsatzId) : null),
+    [amDesktop, einsatzId],
+  );
+  const ausKarte = parseVerpflegungStelle(suchParameter);
+  const vorwahl = isWaehlbar(ausKarte)
+    ? ausKarte
+    : isWaehlbar(gemerkt)
+      ? gemerkt
+      : wahl.zugeordnet.length === 1
+        ? wahl.zugeordnet[0].id
+        : null;
+  // Die Vorwahl gilt beim Öffnen (D13 Punkt 7): einmal festgehalten, sobald Zeitfenster und
+  // Anmeldung (Gerät oder Desktop) geladen sind. Danach ändert nur eine Handlung die Wahl, keine
+  // Live-Änderung der Zuordnung; sonst wechselte die Stelle mitten im Zählen und
+  // `useAusgabeSammlung` buchte das Bündel ungefragt.
+  const wahlSchluessel = `${zfId}:${ausKarte ?? ''}`;
+  const [festeWahl, setFesteWahl] = useState<{ schluessel: string; stelle: number | null }>();
+  if (zf != null && benutzer != null && festeWahl?.schluessel !== wahlSchluessel) {
+    setFesteWahl({ schluessel: wahlSchluessel, stelle: vorwahl });
+  }
+  const festgehalten = festeWahl?.schluessel === wahlSchluessel ? festeWahl.stelle : null;
+  // Eine inzwischen aufgelöste Stelle fällt aus der Wahl.
+  const gewaehlteStelle = isWaehlbar(festgehalten) ? festgehalten : null;
+  const selectStelle = (sid: number | null) => {
+    setFesteWahl({ schluessel: wahlSchluessel, stelle: sid });
+    if (amDesktop) saveGemerkteStelle(einsatzId, sid);
+  };
+  // ── Empfänger (LLH-1055 Teil II) ─────────────────────────────────────────────────────────
+  const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
+  const hatEmpfaenger =
+    empfaengerListe.einheiten.some((e) => !e.aufgeloest_at) ||
+    empfaengerListe.abschnitte.length > 0;
+  // Die Wahl gilt je Zeitfenster; eine inzwischen aufgelöste Einheit fällt aus ihr.
+  const [empfaengerWahl, setEmpfaengerWahl] = useState<{
+    zeitfenster: number;
+    wahl: EmpfaengerWahl | null;
+  }>({ zeitfenster: zfId, wahl: null });
+  const roheWahl = empfaengerWahl.zeitfenster === zfId ? empfaengerWahl.wahl : null;
+  const gewaehlterEmpfaenger = isEmpfaengerWaehlbar(roheWahl, empfaengerListe) ? roheWahl : null;
+  const empfaengerEinheit =
+    gewaehlterEmpfaenger?.art === 'einheit'
+      ? empfaengerListe.einheiten.find((e) => e.id === gewaehlterEmpfaenger.id)
+      : undefined;
+  const staerke = empfaengerEinheit ? staerkeVorgabe(empfaengerEinheit) : null;
+  const selectEmpfaenger = (wahl: EmpfaengerWahl | null) =>
+    setEmpfaengerWahl({ zeitfenster: zfId, wahl });
+
   const darfSchreiben = darfImEinsatzSchreiben(einsatzQuery.data);
   const vergangen = zf != null && istVergangen(zf, jetzt);
 
@@ -157,6 +251,8 @@ export default function AusgabeAnsicht() {
     einsatzId,
     zeitfenster: zf ? { id: zf.id, bezeichnung: zf.bezeichnung } : null,
     vergangen,
+    stelleId: gewaehlteStelle,
+    empfaenger: gewaehlterEmpfaenger,
     onGebucht: (ausgabeId, b) =>
       nachtrag.zeigeGebucht(
         `Gebucht: ${b.menge} EP zu ${zitat(zf?.bezeichnung ?? '')}${davon(b)}`,
@@ -418,8 +514,85 @@ export default function AusgabeAnsicht() {
               Buchen
             </Button>
           </Flex>
-          {/* Platz für die Stellenwahl (LLH-1040); rendert heute nichts. */}
-          <div data-lfh="ausgabe-stelle" />
+          {/* Stellenwahl (LLH-1040); ohne wählbare Stelle bleibt der Platz leer. Die Zeile bricht
+              nicht um: die Wahl nimmt den Rest, das Ist steht fest daneben. */}
+          <div data-lfh="ausgabe-stelle">
+            {waehlbar.length > 0 && (
+              <Flex
+                align="center"
+                gap={token.marginSM}
+                style={{
+                  paddingBlock: token.paddingSM,
+                  paddingInline: token.padding,
+                  borderBlockStart: `1px solid ${rollen.flaeche2}`,
+                }}
+              >
+                <Select<number | 'ohne'>
+                  aria-label="Stelle"
+                  value={gewaehlteStelle ?? 'ohne'}
+                  disabled={tastenGesperrt}
+                  onChange={(v) => selectStelle(v === 'ohne' ? null : v)}
+                  options={[
+                    { value: 'ohne', label: 'ohne Stelle' },
+                    ...waehlbar.map((st) => ({ value: st.id, label: st.bezeichnung })),
+                  ]}
+                  style={{ flex: '1 1 0', minWidth: 0 }}
+                />
+                {gewaehlteStelle != null && (
+                  <span
+                    data-lfh="ausgabe-stelle-ist"
+                    style={{ ...einzeilig, flex: 'none', color: rollen.text2 }}
+                  >
+                    an der Stelle{' '}
+                    <span style={{ ...monoStil(13, 500), color: rollen.text }}>
+                      {zf.je_stelle.find((e) => e.stelle_id === gewaehlteStelle)?.ausgegeben
+                        .gesamt ?? 0}{' '}
+                      EP
+                    </span>
+                  </span>
+                )}
+              </Flex>
+            )}
+          </div>
+          {/* Empfänger (LLH-1055); ohne Einheiten und Abschnitte bleibt der Platz leer. Die Wahl
+              nimmt den Rest der Zeile, „+n“ steht fest daneben. */}
+          <div data-lfh="ausgabe-empfaenger">
+            {hatEmpfaenger && (
+              <Flex
+                align="center"
+                gap={token.marginSM}
+                style={{
+                  paddingBlock: token.paddingSM,
+                  paddingInline: token.padding,
+                  borderBlockStart: `1px solid ${rollen.flaeche2}`,
+                }}
+              >
+                <Select<string>
+                  aria-label="Empfänger"
+                  value={empfaengerSchluessel(gewaehlterEmpfaenger)}
+                  disabled={tastenGesperrt}
+                  onChange={(v) => selectEmpfaenger(parseEmpfaengerSchluessel(v))}
+                  options={[
+                    { value: OHNE_EMPFAENGER, label: 'ohne Empfänger' },
+                    ...empfaengerOptionen(empfaengerListe, { aufgeloeste: false }),
+                  ]}
+                  style={{ flex: '1 1 0', minWidth: 0 }}
+                />
+                {empfaengerEinheit && staerke != null && (
+                  <Button
+                    data-lfh="zaehltaste-staerke"
+                    style={{ ...uebrige, flex: 'none' }}
+                    aria-label={`Stärke zählen: ${staerke} EP an ${empfaengerEinheit.name}`}
+                    disabled={tastenGesperrt}
+                    aria-describedby={beschrieben(tastenGesperrt)}
+                    onClick={() => sammlung.tippe(staerke)}
+                  >
+                    +{staerke}
+                  </Button>
+                )}
+              </Flex>
+            )}
+          </div>
         </section>
 
         {/* ── Sonderkost ───────────────────────────────────────────────────────────── */}
@@ -487,6 +660,18 @@ export default function AusgabeAnsicht() {
           )}
         </div>
 
+        {/* ── Noch nicht verpflegt (LLH-1055) ─────────────────────────────────────────── */}
+        <EmpfaengerStand
+          zeitfenster={zf}
+          empfaenger={empfaengerListe}
+          ausstehend={ausstehend.map((v) => v.aktion.daten)}
+          ueberschrift="h2"
+          onWaehlen={selectEmpfaenger}
+          gewaehlt={gewaehlterEmpfaenger}
+          gesperrt={tastenGesperrt}
+          grundId={grundId}
+        />
+
         {/* ── Letzte Buchungen (D6) ───────────────────────────────────────────────── */}
         <section aria-labelledby={`${grundId}-letzte`} style={{ flex: '1 0 auto' }}>
           <Augenbraue als="h2" id={`${grundId}-letzte`}>
@@ -506,6 +691,10 @@ export default function AusgabeAnsicht() {
                 >
                   <span style={{ color: rollen.text2 }}>
                     <span style={monoStil(13, 500)}>{d.menge} EP</span>
+                    {d.verpflegungsstelle_id != null
+                      ? ` · ${stellenName(d.verpflegungsstelle_id, stellen)}`
+                      : ''}
+                    {mitPunkt(empfaengerText(d, empfaengerListe))}
                     {sk ? ` · ${sk}` : ''}
                   </span>
                 </Zeitachseneintrag>
@@ -539,6 +728,10 @@ export default function AusgabeAnsicht() {
                 >
                   <span style={{ textDecoration: zurueck ? 'line-through' : undefined }}>
                     <span style={monoStil(13, 500)}>{a.menge} EP</span>
+                    {a.verpflegungsstelle_id != null
+                      ? ` · ${stellenName(a.verpflegungsstelle_id, stellen)}`
+                      : ''}
+                    {mitPunkt(empfaengerText(a, empfaengerListe))}
                     {sk ? ` · ${sk}` : ''}
                   </span>
                 </Zeitachseneintrag>
@@ -592,7 +785,13 @@ export default function AusgabeAnsicht() {
                 style={uebrige}
                 disabled={tastenGesperrt}
                 aria-describedby={beschrieben(tastenGesperrt)}
-                onClick={() => setDialog({ art: 'menge' })}
+                onClick={() => {
+                  // Vorbelegt mit der Stärke der gewählten Einheit, überschreibbar (LLH-1055).
+                  mengeForm.setFieldsValue({
+                    menge: staerke != null && staerke <= sammlung.platz ? staerke : undefined,
+                  });
+                  setDialog({ art: 'menge' });
+                }}
               >
                 Menge …
               </Button>
@@ -664,6 +863,8 @@ export default function AusgabeAnsicht() {
         <AusgabeDialog
           zeitfenster={zf}
           nachforderungen={nachforderung.optionen}
+          stellen={stellen}
+          empfaenger={empfaengerListe}
           laeuft={nachtrag.laeuft}
           fehler={nachtrag.fehler}
           onErfassen={(body) => nachtrag.nachtragen(zf as VerpflegungZeitfenster, body)}

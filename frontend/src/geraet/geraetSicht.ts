@@ -31,7 +31,9 @@ export type GeraetFaehigkeit =
    * einzige Änderung an Einheiten und Fahrzeugen am Gerät; Übernehmen und Abweisen nie.
    */
   | 'br-eintreffen'
-  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044). */
+  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044); Verpflegungsstellen
+   *  anlegen, bearbeiten, in Betrieb nehmen, auflösen, stornieren und Zeitfenstern zuordnen
+   *  (LLH-1040). Das Gerät liest die Stellen und wählt sie beim Buchen. */
   | 'verpflegung-planen'
   /** Sprünge in Module außerhalb der Ansicht (Lagekarte, Tiere, Schäden, Einsatzübersicht). */
   | 'fremde-module';

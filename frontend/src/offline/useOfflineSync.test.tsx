@@ -24,6 +24,7 @@ import {
   queueLeerenFuerTests,
   queueZaehlerLaden,
   schreibaktionEinreihen,
+  schreibaktionenAbgelehntLaden,
 } from './queue';
 import { useOfflineSync } from './useOfflineSync';
 import { merkeVerpflegungsausgabeVor } from './schreiben';
@@ -625,6 +626,21 @@ describe('Verpflegungsausgaben in der Offline-Queue (LFH-688)', () => {
     await waitFor(async () =>
       expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
     );
+  });
+
+  it('legt eine Ausgabe an einer inzwischen aufgelösten Stelle (409) samt Stelle unter „abgelehnt“ ab (LLH-1040)', async () => {
+    vi.mocked(erfasseAusgabe).mockRejectedValue(
+      new ApiError(409, 'Die Verpflegungsstelle ist aufgelöst'),
+    );
+    const anStelle = { ...ausgabe, daten: { ...ausgabe.daten, verpflegungsstelle_id: 21 } };
+    await schreibaktionEinreihen(BENUTZER_A, 7, anStelle);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+    const [abgelehnt] = await schreibaktionenAbgelehntLaden(BENUTZER_A, 7);
+    expect(abgelehnt.aktion).toMatchObject({ daten: { verpflegungsstelle_id: 21 } });
+    expect(abgelehnt.grund).toContain('aufgelöst');
   });
 
   it('lässt sie bei einem transienten Fehler stehen', async () => {

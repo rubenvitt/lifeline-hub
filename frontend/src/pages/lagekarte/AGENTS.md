@@ -52,11 +52,22 @@ diese Zusage.
   **Datenquelle** (`pages/lagekarte/betreuungEbene.ts`);
   Ort-Vorschau kennt keine Stellen (`src/geocoding/marker.rs`); Verortung ohne ETB, live über
   `Geschrieben::still_geaendert`; Zonentyp `evakuierungsbezirk` (`lage_zone.evakuierungsbezirk_id`).
+- **Bereitstellungsräume auf der Karte** (LLH-1107, Spec `bereitstellungsraum-lagekarte`): Muster
+  der Betreuung (`alleVerortet`, „Nicht verortet“, `?platzieren=bereitstellungsraum:<id>`, Sperre
+  an der Datenquelle `pages/lagekarte/brEbene.ts`, Fach `einsatzKeys.br` der Modulseite). Das
+  Zeichen D.2.1 hängt am Typ (`bereitstellungsraumZeichen` in `zeichen/fachobjektZeichen.ts`),
+  nicht an `tz`. Die Plakette ist `label` plus `beschriftungZusatz`: Fahrzeuge nur aus `belegung`,
+  Stärke nur über `staerkeImRaum`, unvollständig weggelassen. Geplant heißt gestrichelter Ring
+  (`geplantRing.ts`, Bild `ring|geplant` über den Bild-Resolver, Layer `marker-geplant` und
+  `spider-geplant`, Klickziel wie der Statusring) plus das Wort „geplant“, nie eine Farbe.
+  Die Räume fließen über die Marker-Quelle, also ohne eigenen Schlüssel für
+  `wendeKartenDatenAn` (sie gehen mit `marker`).
 - **Kartenquellen eines fremden Moduls laden nur mit Freigabe des Servers** (LFH-669, Spec
   `modul-freigabe`, `openspec/changes/archive/2026-10-01-lfh-669-modulfreigabe-vom-server/design.md` D4):
   `useLagekarteDaten` fragt UHS, Schäden, Einheiten, Fahrzeuge, Abschnitte, Gefahrengebiete,
-  Lagemeldungen und Rückmeldungen nur bei `istKeyFreigegeben(<modul>, freigaben)` ab, ohne bekannte
-  Freigaben gar nicht. Gesperrt ist kein Ausfall (keine Rohdaten, kein Eintrag im
+  Lagemeldungen und Rückmeldungen nur bei `istKeyFreigegeben(<modul>, freigaben)` ab, Betreuung
+  und Bereitstellungsräume über ihren Ebenen-Zugriff (`betreuungEbene.ts`, `brEbene.ts`), ohne
+  bekannte Freigaben gar nicht. Gesperrt ist kein Ausfall (keine Rohdaten, kein Eintrag im
   Ausfallhinweis); fehlen die Freigaben, nennt der Ausfallhinweis „Berechtigungen“. Eine neue
   modulgebundene Quelle bekommt dasselbe Gate; der Modul-Key folgt `PFAD_KEY` in
   `src/einsatz/modul.rs`.
