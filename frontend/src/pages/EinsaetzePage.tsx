@@ -10,6 +10,8 @@ import { sucheOrtInOrg } from '../api/ortSuche';
 import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
+import { fetchSchichtmodelle } from '../api/schichtmodelle';
+import { mitVorgabe } from '../components/vorgabeText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
@@ -236,6 +238,15 @@ function EinsaetzeInhalt() {
     queryFn: listeStichwortVorschlaege,
   });
   const stichwortOptionen = stichwortVorschlaege.map((v) => ({ value: v.text }));
+  // Die Vorgabe der Organisation geht als Kopie in den neuen Einsatz (LLH-1122). Kein Feld
+  // (Feldbudget): eine Zeile sagt, was der Einsatz bekommt; geändert wird in den
+  // Einsatz-Einstellungen. Ohne Org-Vorgabe keine Zeile (keine erfundene Zahl).
+  const { data: schichtmodelle } = useQuery({
+    queryKey: globalKeys.schichtmodelle(),
+    queryFn: fetchSchichtmodelle,
+    enabled: dialogOffen,
+  });
+  const orgSchichtmodell = schichtmodelle?.find((m) => m.ist_vorgabe);
 
   const anlegen = useMutation({
     mutationFn: (werte: AnlegeWerte) =>
@@ -608,6 +619,14 @@ function EinsaetzeInhalt() {
           <Ortsfeld suchen={sucheOrtInOrg} suchSchluessel={globalKeys.orgOrtSuche} />
         </Form.Item>
         <GewaehlterOrt />
+        {orgSchichtmodell && (
+          <p
+            data-lfh="anlage-schichtmodell"
+            style={{ margin: 0, marginBlockEnd: token.margin, color: rollen.gedaempft }}
+          >
+            {`Schichtmodell: ${mitVorgabe(orgSchichtmodell.bezeichnung)}`}
+          </p>
+        )}
         <SpeicherFehler
           fehler={anlegen.error}
           titel="Einsatz nicht angelegt"

@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -14,7 +14,8 @@ Einsatz. Was hier leer bleibt, übernimmt die Vorgabe der Organisation aus der V
 fehlt auch die, die Vorgabe des Systems.
 
 Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
-„Zugriff“ nur von der Einsatzleitung. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
+„Zugriff“ nur von der Einsatzleitung. Der Reiter „Ablösung“ legt das Schichtmodell fest, nach dem
+die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)). Den Reiter „Aufbewahrung“ beschreibt das Kapitel
 [Aufbewahrung](aufbewahrung.md), die Reiter „Pegel“ und „Geräte“ die Kapitel zu Wetter und
 Pegeln und zu gekoppelten Geräten, den Reiter „Zugriff“ (wer im Einsatz mit welcher Rolle
 arbeitet) das Kapitel [Rechte im Einsatz](rechte-im-einsatz.md).
@@ -48,6 +49,26 @@ leert, stellt es auf die Vorgabe zurück.
 
 5. „Speichern“ wählen.
 
+### Das Schichtmodell des Einsatzes festlegen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Reiter „Ablösung“ öffnen. Unter „Schichtmodell des Einsatzes“ steht die Vorgabe des
+   Einsatzes mit Bezeichnung, Regel, Vorwarnung, Planungsvorlauf und laufenden Schichten.
+
+   ![Reiter „Ablösung“ mit dem Schichtmodell „12-h-Schicht Hochwasser“, Wechsel 0600/1800, Mindestdauer 4 h, darunter die Auswahl „Schichtmodell der Organisation“ mit „Übernehmen“](../bilder/einsatz-einstellungen/abloesung.png)
+
+2. Um ein Schichtmodell der Organisation zu übernehmen, unter „Schichtmodell der Organisation“
+   eines wählen und „Übernehmen“ wählen.
+3. Für eigene Werte „Werte ändern“ (ohne Vorgabe „Eigene Werte setzen“) wählen, „Bezeichnung“,
+   „Typ“ und Rhythmus bzw. „Wechselzeiten“ und „Mindestdauer“ eintragen, nach Bedarf unter
+   „Vorwarnung … · Planungsvorlauf …“ beide Werte, und „Speichern“ wählen.
+4. Ohne Vorgabe „Vorgabe entfernen“ wählen. War das ein Versehen, in der Meldung „Rückgängig“
+   wählen.
+
+Jede Änderung gilt sofort, ohne Speichern-Leiste. Die App meldet „Vorgabe des Einsatzes
+gespeichert“.
+
 ### Module ausblenden oder auf eine Rolle beschränken
 
 Für die Einsatzleitung:
@@ -78,6 +99,17 @@ stehen nur fertige Module zur Wahl. Die Fristen nehmen 1 bis 10080 Minuten (sieb
 
 Wer ein Formular mit ungespeicherten Eingaben verlassen will, bekommt die Rückfrage
 „Ungespeicherte Änderungen“.
+
+### Schichtmodell des Einsatzes
+
+Beim Anlegen bekommt ein Einsatz eine Kopie des Schichtmodells, das die Organisation als Vorgabe
+führt; der Dialog „Neuen Einsatz anlegen“ nennt es in der Zeile „Schichtmodell: … (Vorgabe)“.
+Ohne Vorgabe der Organisation hat der Einsatz keine. „Übernehmen“ kopiert ein Modell der
+Organisation; spätere Änderungen in den Stammdaten erreichen den Einsatz nicht. Ändert sich die
+Vorgabe, rechnen die laufenden Schichten neu, die ihr folgen. Entfernen lässt ihren Rhythmus
+stehen, die Vorwarnung fällt auf 30 Minuten. Jede Änderung steht im Einsatztagebuch als
+Entscheidung. Ist das Modul Ablösung im Einsatz nicht freigegeben, zeigt der Reiter nur „Modul
+„Ablösung“ nicht freigegeben“.
 
 ### Nummern
 
@@ -123,6 +155,8 @@ selbst aussperrt.
   mitarbeitet oder zur Organisation des Einsatzes gehört, auch ohne Rolle in der Organisation.
 - „Zugriff“ bedient nur die Einsatzleitung eines laufenden Einsatzes, auch ein System-Admin nur
   mit dieser Rolle.
+- „Ablösung“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
+  die Rhythmus-Vorgabe eines Abschnitts; ein System-Admin ohne Rolle im Einsatz sieht sie nur.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.
 
 Nach dem Abschluss ist der Einsatz eingefroren; nur die Aufbewahrungsfrist lässt sich noch

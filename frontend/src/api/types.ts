@@ -716,6 +716,42 @@ export type Abloesung = S['AbloesungAnzeige'];
 export type AbloesungVollzug = S['AbloesungVollzugAnzeige'];
 export type AbloesungVorgabe = S['AbloesungVorgabeAnzeige'];
 export type AbloesungEinstufung = S['Einstufung'];
+/** Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells, Vorwarnung, folgende Schichten. */
+export type AbloesungEinsatzVorgabe = S['AbloesungEinsatzVorgabeAnzeige'];
+export type RhythmusQuelle = S['RhythmusQuelle'];
+
+// ============================== LLH-1122 Schichtmodelle ==============================
+export type Schichtmodell = S['Schichtmodell'];
+export type SchichtmodellTyp = S['SchichtmodellTyp'];
+export type EinsatzSchichtmodell = S['EinsatzSchichtmodell'];
+
+/**
+ * Kein Backend-Schema: die Werte eines Schichtmodells (`schichtmodell::WerteBody`), beim
+ * Anlegen und Ändern in den Stammdaten und als eigene Werte am Einsatz. Nur die Felder des Typs;
+ * ein Feld des anderen Typs lehnt der Server mit 422 ab. Vorwarnung und Planungsvorlauf fehlen
+ * = Vorgabe (30 bzw. 120 min). Wechselzeiten als `HH:MM`.
+ */
+export interface SchichtmodellWerteBody {
+  bezeichnung: string;
+  typ: SchichtmodellTyp;
+  rhythmus_minuten?: number;
+  wechselzeiten?: string[];
+  mindestdauer_minuten?: number;
+  vorwarnung_minuten?: number;
+  planungsvorlauf_minuten?: number;
+}
+
+/** Kein Backend-Schema: `POST /api/schichtmodelle`, `PUT /api/schichtmodelle/{id}` (ganzer Satz). */
+export interface SchichtmodellBody extends SchichtmodellWerteBody {
+  ist_vorgabe: boolean;
+}
+
+/**
+ * Kein Backend-Schema: `PUT …/abloesungen/schichtmodell`. Genau eine Angabe: ein Modell der
+ * Organisation (Kopie), eigene Werte oder `schichtmodell: null` (entfernen).
+ */
+export type EinsatzSchichtmodellBody =
+  { schichtmodell_id: number } | { schichtmodell: SchichtmodellWerteBody | null };
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen`, FE-lokal. Ohne

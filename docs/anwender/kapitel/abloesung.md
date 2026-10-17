@@ -2,7 +2,7 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, frontend/src/abloesung/dauer.ts, frontend/src/abloesung/schichtmodellText.ts, frontend/src/components/vorgabeText.ts, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
@@ -22,8 +22,9 @@ Die Führung plant hier, welche Einheit welche ablöst, und hält den Vollzug fe
 1. Unter „Kräfte & Mittel“ „Ablösung“ öffnen. Unter „Laufend“ stehen die Schichten, die nächste
    Fälligkeit oben.
 2. Je Karte links die Uhrzeit der Fälligkeit lesen, rechts die Einstufung: „planmäßig“, „Ablösung
-   bald fällig“ (30 Minuten vorher) oder „überfällig“. Darunter stehen „in …“ bzw. „seit …“,
-   Abschnitt, „im Einsatz seit“, der Rhythmus mit seiner Quelle („Vorgabe“ oder „eigen“) und eine
+   bald fällig“ (ab der Vorwarnzeit, ohne anderes Schichtmodell 30 Minuten vorher) oder
+   „überfällig“. Darunter stehen „in …“ bzw. „seit …“, Abschnitt, „im Einsatz seit“, der Rhythmus
+   als Dauer mit seiner Quelle („Vorgabe“ des Abschnitts, „Vorgabe Einsatz“ oder „eigen“) und eine
    geplante ablösende Einheit.
 
    ![Drei Schichtkarten: Rettungsstaffel überfällig mit geplanter Ablösung durch die 2. Rettungsstaffel, Sanitätszug „Ablösung bald fällig“ und Sanitätsgruppe UHS planmäßig mit eigenem Rhythmus](../bilder/abloesung/schichten.png)
@@ -38,10 +39,11 @@ Für Einsatzleitung und Führungspersonal:
 2. Unter „Einheit“ eine Einheit ohne laufende Schicht wählen.
 3. „Im Einsatz seit“ leer lassen oder einen Zeitpunkt wählen. Leer gilt das Eintreffen aus der
    Kräfte-Zeitachse, sonst jetzt; das Feld zeigt, was gilt.
-4. Unter „Rhythmus (Stunden)“ den Rhythmus eintragen. Hat der Abschnitt der Einheit eine Vorgabe,
-   steht sie im Feld und das Feld darf leer bleiben.
+4. Unter „Rhythmus“ den Rhythmus als Dauer eintragen, etwa „8 h“, „7:30“ oder „90 min“. Hat der
+   Abschnitt der Einheit oder der Einsatz eine Vorgabe, steht sie im Feld, etwa „12 h (Vorgabe
+   Einsatz)“, und das Feld darf leer bleiben.
 
-   ![Dialog „Schicht beginnen“ mit Einheit „Betreuungsgruppe“, „Im Einsatz seit“ jetzt und Rhythmus 8 Stunden](../bilder/abloesung/schicht-beginnen.png)
+   ![Dialog „Schicht beginnen“ mit Einheit „Betreuungsgruppe“, „Im Einsatz seit“ jetzt und Rhythmus „8 h“](../bilder/abloesung/schicht-beginnen.png)
 
 5. „Schicht beginnen“ wählen.
 
@@ -67,9 +69,9 @@ Für Einsatzleitung und Führungspersonal:
 
 1. Auf der Karte das Menü „Aktionen zu …“ (drei Punkte) öffnen.
 2. „Ablösende Einheit planen“ wählen, die Einheit wählen und „Speichern“ wählen.
-3. Für einen anderen Rhythmus „Rhythmus ändern“ wählen, den Wert in Stunden eintragen und
-   „Speichern“ wählen. Hat der Abschnitt eine Vorgabe, lässt ein leeres Feld die Schicht wieder ihr
-   folgen.
+3. Für einen anderen Rhythmus „Rhythmus ändern“ wählen, den Wert als Dauer eintragen und
+   „Speichern“ wählen. Hat der Abschnitt oder der Einsatz eine Vorgabe, lässt ein leeres Feld die
+   Schicht wieder ihr folgen.
 
 ### Den Rhythmus je Abschnitt vorgeben
 
@@ -79,16 +81,28 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Paneel „Rhythmus je Abschnitt“ mit Sanitätsdienst „Rhythmus 6 h · 2 laufend“ und drei Abschnitten ohne Vorgabe](../bilder/abloesung/vorgaben.png)
 
-2. Den Rhythmus in Stunden eintragen, leer für keine Vorgabe.
+2. Den Rhythmus als Dauer eintragen, leer für keine Vorgabe.
 3. „Speichern“ wählen. Alle laufenden Schichten des Abschnitts, die der Vorgabe folgen, bekommen den
    neuen Rhythmus und eine neue Fälligkeit; Schichten mit eigenem Rhythmus bleiben.
+
+### Die Vorgabe des Einsatzes nachsehen
+
+1. Unter den Abschnitten steht das Paneel „Vorgabe des Einsatzes“: Bezeichnung des
+   Schichtmodells, Rhythmus oder Wechselzeiten, Vorwarnung und die Zahl der laufenden Schichten,
+   die ihr folgen. Ohne Vorgabe steht dort „keine Vorgabe“.
+
+   ![Paneel „Vorgabe des Einsatzes“ mit „12-h-Schicht Hochwasser“, Wechsel 0600/1800, Mindestdauer 4 h und Vorwarnung 30 min](../bilder/abloesung/einsatz-vorgabe.png)
+
+2. Für Einsatzleitung und Führungspersonal: zum Ändern den Stift wählen. Die Einstellungen des
+   Einsatzes öffnen sich im Reiter „Ablösung“ (Kapitel
+   [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)).
 
 ## Hintergrund
 
 ### Fälligkeit und Hinweise
 
 Fällig ist eine Schicht bei Beginn plus Rhythmus. Der Rhythmus liegt zwischen einer halben Stunde
-und 168 Stunden. Vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, 30 Minuten vorher,
+und 168 Stunden und erscheint als Dauer, etwa „8 h“ oder „7:30 h“. Vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, 30 Minuten vorher,
 wenn das Schichtmodell des Einsatzes nichts anderes vorgibt, bei
 Fälligkeit der Alarm „Ablösung fällig“, jeweils mit Einheit und Uhrzeit der Fälligkeit, etwa
 „Florian 1, 15:30“, und „Öffnen“ zur Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
@@ -113,9 +127,14 @@ die Einheit mindestens die Mindestdauer im Einsatz ist, gerechnet in der Zeitzon
 sonst der Organisation: wer um 13:42 beginnt, ist um 18:00 fällig, wer um 15:00 beginnt, um 06:00
 am Folgetag. Das Schichtmodell legt auch fest, wie lange vorher der Hinweis kommt.
 
+Gesetzt wird die Vorgabe des Einsatzes in den Einstellungen des Einsatzes, Reiter „Ablösung“; die
+Schichtmodelle der Organisation pflegt die Verwaltung (Kapitel [Stammdaten](stammdaten.md)).
 Ändert sich die Vorgabe des Einsatzes, rechnen die Schichten neu, die ihr folgen; Schichten mit
 eigenem Rhythmus oder nach der Vorgabe ihres Abschnitts bleiben. Ändert jemand das Schichtmodell in
 den Stammdaten oder löscht es, bleibt der laufende Einsatz unberührt.
+
+Auf schmalen Bildschirmen im Handschuh-Betrieb kürzt die Karte das Wort „Vorgabe Einsatz“ mit „…“,
+wenn der Platz nicht reicht; der Wert des Rhythmus bleibt ganz stehen.
 
 ### Eine Schicht je Einheit
 

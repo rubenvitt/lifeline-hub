@@ -17,6 +17,7 @@ import EinheitTypenTab from './EinheitTypenTab';
 import EinheitVorlagenTab from './EinheitVorlagenTab';
 import OrganisationTab from './OrganisationTab';
 import SprechgruppenTab from './SprechgruppenTab';
+import SchichtmodelleTab from './SchichtmodelleTab';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 
 /**
@@ -60,6 +61,7 @@ function handler(benutzer: typeof admin) {
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
+    http.get('/api/schichtmodelle', () => HttpResponse.json([])),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Muster', tz_organisation: 'feuerwehr' }),
     ),
@@ -86,12 +88,13 @@ const SEKTIONEN = [
   { name: 'Organisation', Komp: OrganisationTab, aktion: 'Speichern' },
   { name: 'Sprechgruppen', Komp: SprechgruppenTab, aktion: 'Sprechgruppe anlegen' },
   { name: 'Externe Stellen', Komp: ExterneStellenTab, aktion: 'Externe Stelle anlegen' },
+  { name: 'Schichtmodelle', Komp: SchichtmodelleTab, aktion: 'Schichtmodell anlegen' },
 ];
 
 describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
-  it('deckt alle dreizehn Sektionen ab', () => {
+  it('deckt alle vierzehn Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei halber Menge grün.
-    expect(SEKTIONEN).toHaveLength(13);
+    expect(SEKTIONEN).toHaveLength(14);
   });
 
   it.each(SEKTIONEN)('$name nennt ohne Admin-Recht den Grund', async ({ Komp }) => {

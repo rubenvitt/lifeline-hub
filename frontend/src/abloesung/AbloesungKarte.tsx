@@ -1,6 +1,6 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import type { Dayjs } from 'dayjs';
-import type { Abloesung } from '../api/types';
+import type { Abloesung, RhythmusQuelle } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -10,7 +10,8 @@ import { monoStil, useRollen } from '../components/instrument';
 import { dauerText } from '../lagebesprechung/lagebesprechungZustand';
 import { abloesungEinstufung, rollenFarbe } from '../theme/statusFarben';
 import { schrift } from '../theme/tokens';
-import { abloesungZeit, einstufungVon, rhythmusText } from './einstufung';
+import { formatDauer } from './dauer';
+import { abloesungZeit, einstufungOf } from './einstufung';
 
 const { Text } = Typography;
 
@@ -36,6 +37,13 @@ function abstandText(faelligAt: string, jetzt: Dayjs): string {
   return `in ${dauerText(minuten)}`;
 }
 
+/** Herkunft des Rhythmus in der Karte (LLH-1122: Rangfolge eigen → Abschnitt → Einsatz). */
+const QUELLE_WORT: Record<RhythmusQuelle, string> = {
+  einheit: 'eigen',
+  abschnitt: 'Vorgabe',
+  einsatz: 'Vorgabe Einsatz',
+};
+
 /**
  * Eine Schicht. Der linke Rand trägt die Einstufung — EINE Farbe, Gefahr gewinnt: überfällig
  * rot, Vorwarnung gelb, sonst Linienfarbe. Zweiter Kanal ist das Wort im Etikett (WCAG 1.4.1).
@@ -57,7 +65,7 @@ export default function AbloesungKarte({
 }: AbloesungKarteProps) {
   const { token, rollen } = useRollen();
   const laufend = s.status === 'laufend';
-  const stufe = laufend ? einstufungVon(s.faellig_at, jetzt) : null;
+  const stufe = laufend ? einstufungOf(s, jetzt) : null;
   const darstellung = stufe ? abloesungEinstufung[stufe] : null;
   const kante =
     darstellung && darstellung.rolle !== 'neutral'
@@ -134,11 +142,27 @@ export default function AbloesungKarte({
             </span>
           </Text>
           {/* Eigene Zeile: Wert und Quelle ändert eine fremde Rhythmusänderung, und nur diese
-              Zeile darf sie berühren. Die kurzen Quellenwörter halten auch 167 h 59 min als
-              Vorgabe auf 390 px einzeilig (LFH-708); den Abschnitt nennt die Zeile darüber. */}
-          <Text type="secondary" data-lfh="abloesung-rhythmus">
-            Rhythmus {rhythmusText(s.rhythmus_minuten)} (
-            {s.rhythmus_quelle === 'einheit' ? 'eigen' : 'Vorgabe'})
+              Zeile darf sie berühren; sie bleibt deshalb immer einzeilig (LFH-708). Den Abschnitt
+              nennt die Zeile darüber, seine Vorgabe heißt nur „Vorgabe“. „Vorgabe Einsatz“
+              (LLH-1122) passt auf 390 px in `komfortabel` für jeden Wert (167:59 h: 252 von
+              256 px); nur im Handschuh-Betrieb auf 390 px kürzt die Zeile bei Werten mit Minuten
+              oder ab 100 h das Quellenwort mit „…“, nie den Wert, und der ganze Text steht im
+              `title` (gemessen in `e2e/abloesung-zufluss.spec.ts`). */}
+          <Text
+            type="secondary"
+            data-lfh="abloesung-rhythmus"
+            title={`Rhythmus ${formatDauer(s.rhythmus_minuten)} (${QUELLE_WORT[s.rhythmus_quelle]})`}
+            style={{
+              display: 'block',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            <span data-lfh="abloesung-rhythmus-wert">
+              Rhythmus {formatDauer(s.rhythmus_minuten)}
+            </span>{' '}
+            ({QUELLE_WORT[s.rhythmus_quelle]})
           </Text>
           {s.abloesende_einheit_name && (
             <Text type="secondary">

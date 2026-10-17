@@ -6,9 +6,10 @@ use std::collections::BTreeMap;
 
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
-    auftrag, chat, einheit, einheit_vorlage, einsatz, etb, externe_stelle, fahrzeug, fuehrung,
-    infotelefon, kraefte_disposition, lage_zone, lagebesprechung, material, nachforderung,
-    personal, presse, schaden, sprechgruppe, verpflegung, vorlagendokument,
+    abloesung, auftrag, chat, einheit, einheit_vorlage, einsatz, etb, externe_stelle, fahrzeug,
+    fuehrung, infotelefon, kraefte_disposition, lage_zone, lagebesprechung, material,
+    nachforderung, personal, presse, schaden, schichtmodell, sprechgruppe, verpflegung,
+    vorlagendokument,
 };
 
 fn backend() -> BTreeMap<&'static str, usize> {
@@ -120,6 +121,26 @@ fn backend() -> BTreeMap<&'static str, usize> {
         (
             "VERPFLEGUNG_EP_MAX",
             usize::try_from(verpflegung::MAX_EP).unwrap(),
+        ),
+        (
+            "SCHICHTMODELL_BEZEICHNUNG_MAX",
+            schichtmodell::BEZEICHNUNG_MAX,
+        ),
+        (
+            "SCHICHTMODELL_WECHSELZEITEN_MAX",
+            schichtmodell::WECHSELZEITEN_MAX,
+        ),
+        (
+            "SCHICHTMODELL_MINDESTDAUER_MAX_MINUTEN",
+            usize::try_from(schichtmodell::MINDESTDAUER_MAX_MINUTEN).unwrap(),
+        ),
+        (
+            "SCHICHTMODELL_VORLAUF_MAX_MINUTEN",
+            usize::try_from(schichtmodell::VORLAUF_MAX_MINUTEN).unwrap(),
+        ),
+        (
+            "ABLOESUNG_RHYTHMUS_MAX_MINUTEN",
+            usize::try_from(abloesung::RHYTHMUS_MAX_MINUTEN).unwrap(),
         ),
     ])
 }

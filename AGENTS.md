@@ -26,7 +26,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/src/stab/AGENTS.md` | Stab und Fernmeldewesen: eigenes Modul für Funkplan, Skizze und Kommunikationsplan (S6), Stab-Weiche, Checkliste Arbeitsaufnahme, Presse S5 |
 | `frontend/src/lagebesprechung/AGENTS.md` | Lagebesprechung: eigenes Modul, ein Termin mit einem Schreibweg, Vorbereitung, überfälliger Termin, Client und Server |
 | `frontend/src/fuehrung/AGENTS.md` | Führungsfunktionen (Katalog, Codespalte, Besetzung), Client und Server |
-| `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Client und Server |
+| `frontend/src/kraefte/AGENTS.md` | Kräfte-Zeitachse (Ereignisse, Perioden, Einsatzdauer), Ablösung (Rangfolge, Vorwarnung, Schichtmodelle), Client und Server |
 | `frontend/src/geraet/AGENTS.md` | Gekoppelte Geräte: Hülle, Funktionsansichten, Stellenbindung, Lagemonitor, Client und Server |
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |

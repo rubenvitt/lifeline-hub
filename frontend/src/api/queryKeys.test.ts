@@ -430,6 +430,11 @@ describe('einsatzKeys (Factory-Output)', () => {
       'laufend',
     ]);
     expect(einsatzKeys.abloesungVorgaben(1)).toEqual(['einsatz-abloesungen', 1, 'vorgaben']);
+    expect(einsatzKeys.abloesungEinsatzVorgabe(1)).toEqual([
+      'einsatz-abloesungen',
+      1,
+      'schichtmodell',
+    ]);
     // Kräfte-Zeitachse (LFH-552): Listen und Einzelsichten UNTER einem Prefix, damit die vier
     // Ereignisse `einheit`/`personal`/`fahrzeug`/`abloesung` alle treffen.
     expect(einsatzKeys.kraefteZeitachse(1)).toEqual(['einsatz-kraefte-zeitachse', 1]);
@@ -760,6 +765,7 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'stichwort-vorschlaege',
         'externe-stellen',
         'fuehrungsfunktionen',
+        'schichtmodelle',
         'organisation',
         // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
         'einsaetze',

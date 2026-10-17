@@ -20,10 +20,14 @@ import {
  *   schicht-beginnen.png frontend/src/abloesung/AbloesungDialoge.tsx (`SchichtBeginnenDialog`)
  *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog)
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
+ *   einsatz-vorgabe.png  frontend/src/pages/AbloesungPage.tsx (Paneel „Vorgabe des Einsatzes“),
+ *                        frontend/src/abloesung/schichtmodellText.ts, frontend/src/abloesung/dauer.ts
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Schichten. Die Spec setzt am Abschnitt
  * „Sanitätsdienst“ die Vorgabe 6 h, bildet eine „2. Rettungsstaffel“ als Ablöser und beginnt drei
  * Schichten: eine überfällige, eine in der Vorwarnzeit und eine planmäßige mit eigenem Rhythmus.
+ * Die Vorgabe des Einsatzes bringen die Demo-Daten mit (LLH-1122: „12-h-Schicht Hochwasser“,
+ * `src/demo/szenario.rs`).
  */
 
 const KAPITEL = 'abloesung';
@@ -119,6 +123,16 @@ test.describe(KAPITEL, () => {
     await fotografiere(paneel, KAPITEL, 'vorgaben');
   });
 
+  test('Paneel „Vorgabe des Einsatzes“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/abloesung`);
+    const paneel = page.getByRole('region', { name: 'Vorgabe des Einsatzes' });
+    await expect(paneel.getByText('12-h-Schicht Hochwasser')).toBeVisible();
+    await fotografiere(paneel, KAPITEL, 'einsatz-vorgabe');
+  });
+
   test('Dialog „Schicht beginnen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
@@ -127,8 +141,8 @@ test.describe(KAPITEL, () => {
     await page.getByRole('button', { name: 'Schicht beginnen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Schicht beginnen' });
     await waehleIn(dialog.getByRole('combobox', { name: 'Einheit' }), 'Betreuungsgruppe');
-    await dialog.getByRole('spinbutton', { name: 'Rhythmus (Stunden)' }).fill('8');
-    await dialog.getByRole('spinbutton', { name: 'Rhythmus (Stunden)' }).blur();
+    await dialog.getByRole('textbox', { name: 'Rhythmus' }).fill('8 h');
+    await dialog.getByRole('textbox', { name: 'Rhythmus' }).blur();
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'schicht-beginnen');

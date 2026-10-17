@@ -1,7 +1,7 @@
 import dayjs, { type Dayjs } from 'dayjs';
 import { useEffect, useMemo, useState } from 'react';
 import type { Abloesung } from '../api/types';
-import { abloesungZeit, VORWARNUNG_MINUTEN } from './einstufung';
+import { abloesungZeit } from './einstufung';
 
 /**
  * Die Uhr der Ablösungsseite — tickt alle 30 s, damit Einstufung und „in x min" ohne neuen
@@ -16,14 +16,17 @@ export function useUhr(intervallMs = 30_000): Dayjs {
   return jetzt;
 }
 
-/** Der nächste Zeitpunkt, an dem sich die Einstufung einer laufenden Schicht ändert. */
-export function naechsterWechsel(liste: readonly Abloesung[], jetzt: Dayjs): Dayjs | null {
+/**
+ * Der nächste Zeitpunkt, an dem sich die Einstufung einer laufenden Schicht ändert: Beginn ihrer
+ * Vorwarnung (mit ihrer eigenen `vorwarnung_minuten`, LLH-1122) oder ihre Fälligkeit.
+ */
+export function findNextChange(liste: readonly Abloesung[], jetzt: Dayjs): Dayjs | null {
   let naechster: Dayjs | null = null;
   for (const a of liste) {
     if (a.status !== 'laufend') continue;
     const f = abloesungZeit(a.faellig_at);
     if (!f) continue;
-    for (const grenze of [f.subtract(VORWARNUNG_MINUTEN, 'minute'), f]) {
+    for (const grenze of [f.subtract(a.vorwarnung_minuten, 'minute'), f]) {
       if (grenze.isAfter(jetzt) && (!naechster || grenze.isBefore(naechster))) {
         naechster = grenze;
       }
@@ -48,7 +51,7 @@ export function useEinstufungsUhr(liste: readonly Abloesung[] | undefined): Dayj
   const jetzt = useMemo(() => dayjs(), [liste, takt]);
   useEffect(() => {
     if (!liste) return;
-    const wechsel = naechsterWechsel(liste, jetzt);
+    const wechsel = findNextChange(liste, jetzt);
     if (!wechsel) return;
     // +50 ms: der Wechsel soll sicher HINTER der Grenze gerechnet werden (≤ ist überfällig).
     const t = window.setTimeout(

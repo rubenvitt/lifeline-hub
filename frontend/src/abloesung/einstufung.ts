@@ -4,7 +4,12 @@
  * Die Einstufung rechnet das Backend beim Lesen (`src/abloesung/mod.rs::einstufung`); das
  * Frontend rechnet sie NACH, weil die Uhr im Client weitertickt, ohne dass ein neuer Abruf
  * käme. Deshalb dieselbe Regel mit denselben Grenzfällen (genau fällig ⇒ überfällig, genau
- * 30 min ⇒ Vorwarnung), gepinnt wie im Rust-Test `einstufung_grenzfaelle`.
+ * die Vorwarnzeit ⇒ Vorwarnung), gepinnt wie in den Rust-Tests `einstufung_grenzfaelle` und
+ * `einstufung_mit_eigener_vorwarnung`.
+ *
+ * Die Vorwarnzeit kommt je Schicht aus dem DTO (`vorwarnung_minuten`, LLH-1122: aus dem
+ * Schichtmodell des Einsatzes), nie aus einer Konstante im Client (`frontend/src/kraefte/AGENTS.md`,
+ * „Ablösung“).
  *
  * Wire-Strings sind UTC OHNE Zonenkennung: nur über `dayjs.utc` lesen, nie `dayjs(s)`.
  */
@@ -14,9 +19,6 @@ import type { Abloesung, AbloesungEinstufung } from '../api/types';
 
 dayjs.extend(utc);
 
-/** Vorwarnzeit vor der Fälligkeit — Spiegel von `VORWARNUNG_MINUTEN` im Backend. */
-export const VORWARNUNG_MINUTEN = 30;
-
 /** Wire-Zeit (UTC ohne Zone) → Zeitpunkt; `null` bei fehlendem oder unlesbarem Wert. */
 export function abloesungZeit(wire: string | null | undefined): Dayjs | null {
   if (!wire) return null;
@@ -25,22 +27,32 @@ export function abloesungZeit(wire: string | null | undefined): Dayjs | null {
 }
 
 /**
- * Einstufung gegen `jetzt`. Eine unlesbare Fälligkeit gilt wie im Backend als überfällig:
- * sie soll auffallen, nicht verschwinden.
+ * Einstufung gegen `jetzt` mit der Vorwarnzeit der Schicht (`vorwarnung_minuten` aus dem DTO).
+ * Eine unlesbare Fälligkeit gilt wie im Backend als überfällig: sie soll auffallen, nicht
+ * verschwinden.
  */
-export function einstufungVon(faelligAt: string, jetzt: Dayjs): AbloesungEinstufung {
+export function computeEinstufung(
+  faelligAt: string,
+  jetzt: Dayjs,
+  vorwarnungMinuten: number,
+): AbloesungEinstufung {
   const f = abloesungZeit(faelligAt);
   if (!f) return 'ueberfaellig';
   const abstand = f.valueOf() - jetzt.valueOf();
   if (abstand <= 0) return 'ueberfaellig';
-  if (abstand <= VORWARNUNG_MINUTEN * 60_000) return 'vorwarnung';
+  if (abstand <= vorwarnungMinuten * 60_000) return 'vorwarnung';
   return 'planmaessig';
 }
 
+/** Einstufung einer Schicht mit ihrer eigenen Vorwarnzeit. */
+export function einstufungOf(a: Abloesung, jetzt: Dayjs): AbloesungEinstufung {
+  return computeEinstufung(a.faellig_at, jetzt, a.vorwarnung_minuten);
+}
+
 /** Modulzähler: laufende Schichten in der Vorwarnzeit oder überfällig. */
-export function zaehleFaellige(abloesungen: readonly Abloesung[], jetzt: Dayjs): number {
+export function countFaellige(abloesungen: readonly Abloesung[], jetzt: Dayjs): number {
   return abloesungen.filter(
-    (a) => a.status === 'laufend' && einstufungVon(a.faellig_at, jetzt) !== 'planmaessig',
+    (a) => a.status === 'laufend' && einstufungOf(a, jetzt) !== 'planmaessig',
   ).length;
 }
 
@@ -53,15 +65,6 @@ interface AbloesungsMarke {
   text: string;
   /** Anzahl der Einheiten der Gruppe. */
   einheiten: number;
-}
-
-/** Rhythmus als Text: „6 h", „6 h 30 min", „45 min" — wie `rhythmus_text` im Backend. */
-export function rhythmusText(minuten: number): string {
-  const h = Math.floor(minuten / 60);
-  const m = minuten % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} h`;
-  return `${h} h ${m} min`;
 }
 
 /**

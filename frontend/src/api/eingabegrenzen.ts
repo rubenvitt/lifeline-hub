@@ -116,3 +116,13 @@ export const VERPFLEGUNG_VORLAGE_BEZEICHNUNG_MAX = 200;
 export const VERPFLEGUNG_AUS_VORLAGE_MAX = 24;
 /** Menge einer Verpflegungsausgabe in EP (LLH-1032); ebenso jede Kostform darin. */
 export const VERPFLEGUNG_EP_MAX = 100_000;
+/** Bezeichnung eines Schichtmodells (LLH-1122). */
+export const SCHICHTMODELL_BEZEICHNUNG_MAX = 100;
+/** Wechselzeiten je Schichtmodell, gezählt vor dem Entdoppeln. */
+export const SCHICHTMODELL_WECHSELZEITEN_MAX = 24;
+/** Mindestdauer bei Wechselzeiten in Minuten: ein Tag. */
+export const SCHICHTMODELL_MINDESTDAUER_MAX_MINUTEN = 1_440;
+/** Vorwarnung und Planungsvorlauf eines Schichtmodells in Minuten: ein Tag. */
+export const SCHICHTMODELL_VORLAUF_MAX_MINUTEN = 1_440;
+/** Rhythmus einer Schicht und eines Schichtmodells in Minuten: sieben Tage (LFH-635). */
+export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;

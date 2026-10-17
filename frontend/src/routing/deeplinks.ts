@@ -1003,7 +1003,14 @@ export function parseRouteId(param: string | undefined): number | null {
 
 /** Die Sektionen von `/einsaetze/:id/einstellungen`. */
 export type EinstellungenSektion =
-  'allgemein' | 'verhalten' | 'aufbewahrung' | 'module' | 'pegel' | 'geraete' | 'zugriff';
+  | 'allgemein'
+  | 'verhalten'
+  | 'aufbewahrung'
+  | 'module'
+  | 'pegel'
+  | 'abloesung'
+  | 'geraete'
+  | 'zugriff';
 
 /**
  * Sektionen in Bedienreihenfolge — EINE Wahrheit für Tab-Band, Routentabelle und das Ziel des
@@ -1017,6 +1024,9 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'module', label: 'Module' },
   // Hinten angehängt: die erste Sektion ist das Redirect-Ziel.
   { key: 'pegel', label: 'Pegel' },
+  // Vorgabe des Einsatzes für die Ablösung (LLH-1122): Schichtmodell, Rechte wie die
+  // Abschnittsvorgabe.
+  { key: 'abloesung', label: 'Ablösung' },
   // Gerätekopplung (LFH-892): nur die Einsatzleitung koppelt, die Sektion erklärt das selbst.
   { key: 'geraete', label: 'Geräte' },
   // Mitglieder und Rollen (LFH-1170): von den Einsatzdaten hierher, dieselbe Rechtegrenze wie
