@@ -2,19 +2,19 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/offline/schreiben.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
 ---
 
 ## Überblick
 
 Ein **Bereitstellungsraum** (BR) ist der Ort, an dem Einheiten und Fahrzeuge auf ihren Einsatz
 warten. Das Modul zeigt je Raum, wer dort bereitsteht, mit welcher Stärke und seit wann, wer am
-längsten wartet, wer wann kam und ging, welche Kräfte noch keinem Raum zugewiesen sind und welches
-Material dort liegt.
+längsten wartet, wer abgerufen ist und noch ausrücken soll, wer wann kam und ging, welche Kräfte
+noch keinem Raum zugewiesen sind und welches Material dort liegt.
 
 Dieses Kapitel beschreibt die Sicht der Einsatzleitung. Einsatzleitung und Führungspersonal legen
-Räume an, ändern ihre Raumdaten, nehmen sie in Betrieb, weisen Kräfte zu und lösen Räume wieder
-auf. Die Bedienung am gekoppelten Tablet eines Bereitstellungsraums beschreibt
+Räume an, ändern ihre Raumdaten, nehmen sie in Betrieb, weisen Kräfte zu, rufen sie mit Ziel und
+Auftrag ab und lösen Räume wieder auf. Die Bedienung am gekoppelten Tablet eines Bereitstellungsraums beschreibt
 [Bereitstellungsraum am Gerät](geraet-bereitstellungsraum.md).
 
 ## Abläufe
@@ -100,7 +100,7 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
    „Vorgemerkt“, bis sie beim Server gebucht ist; eine vorgemerkte Kraft bietet die Suche nicht
    noch einmal an.
 
-### Kräfte zuweisen und entfernen
+### Kräfte zuweisen und austragen
 
 Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 
@@ -113,9 +113,41 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
    Fahrzeuge im Raum, auch die der bereitgestellten Einheiten. Anders als „Eintreffen buchen“
    trägt „zuweisen“ kein Eintreffen in die Zeitachse ein.
 
-   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit zwei bereitgestellten Einheiten, je mit ihren Fahrzeugen und „seit … · 48 min“, Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und der Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
+   ![Bereitstellungsraum „Parkplatz Stadion Nord“ mit „Auf Karte verorten“ und „Bearbeiten“ an den Raumdaten: oben unter „Abgerufen“ die Betreuungsgruppe mit „abgerufen … → Betreuung · Auftrag Nr. …“, „Ausrücken buchen“ und „Abruf zurücknehmen“, darunter unter „Bereitgestellte Einheiten“ die Rettungsstaffel mit ihren Fahrzeugen, „seit … · 48 min“ und „Abrufen“; Stärke 0/1/5//6, „Fahrzeuge“ 3, „Einheiten“ 2, „Längste Wartezeit“ 48 min und die Seitenleiste „Kräfte ohne BR“ mit aufgeklapptem „Im Einsatz“](../bilder/bereitstellungsraeume/raum.png)
 
-4. Rückt eine Kraft aus, bei ihr „entfernen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
+4. Ist eine Kraft irrtümlich gebucht oder ohne Abruf gegangen, bei ihr das Aktionsmenü öffnen und
+   „Austragen“ wählen. Sie steht wieder unter „Kräfte ohne BR“.
+
+### Eine Kraft abrufen
+
+Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
+
+1. Den Raum öffnen und bei der Einheit oder dem Fahrzeug unter „Bereitgestellte Einheiten“ bzw.
+   „Bereitgestellte Fahrzeuge“ „Abrufen“ wählen.
+2. Bei einer Einheit unter „Ziel-Abschnitt“ den Abschnitt wählen, dem sie unterstellt werden soll.
+   Vorbelegt ist der Abschnitt des Raums; leer bleibt die Unterstellung, wie sie ist. Ein Fahrzeug
+   ohne Einheit hat kein „Ziel-Abschnitt“.
+3. Bei Bedarf unter „Auftrag“ den Auftrag eintragen; leer wird kein Auftrag erteilt. Nimmt die
+   Einheit Untereinheiten mit, nennt der Dialog sie neben dem Knopf („mit …“).
+
+   ![Dialog „Rettungsstaffel abrufen“ mit Ziel-Abschnitt „Sanitätsdienst“ und dem Auftrag „Verletztenablage Nord übernehmen“](../bilder/bereitstellungsraeume/abrufen.png)
+
+4. „Abrufen“ wählen. Die Bestätigung nennt Ziel und Auftragsnummer, etwa „Rettungsstaffel
+   abgerufen → Sanitätsdienst · Auftrag Nr. 7“. Die Kraft steht danach oben unter „Abgerufen“ mit
+   „abgerufen“, der Uhrzeit, dem Ziel und der Auftragsnummer, bis ihr Ausrücken gebucht ist.
+5. Gibt es am Raum keinen Einweiser, der das Ausrücken bucht, stattdessen im Aktionsmenü der Kraft
+   „Abrufen und austragen“ wählen: derselbe Dialog, „Abrufen und austragen“ ruft ab und trägt die
+   Kraft im selben Schritt aus dem Raum aus.
+
+### Ausrücken buchen oder einen Abruf zurücknehmen
+
+1. Den Raum öffnen. Unter „Abgerufen“ stehen die abgerufenen Kräfte, die am längsten abgerufene
+   oben. Eine mitgenommene Untereinheit nennt „mit …“ ihre Einheit.
+2. Rückt die Kraft aus, „Ausrücken buchen“ wählen. Die Bestätigung lautet „… ausgerückt“; die
+   Kraft und die mit ihr abgerufenen Untereinheiten stehen in keinem Raum mehr. Meist bucht das
+   der Einweiser am Tablet des Raums ([Bereitstellungsraum am Gerät](geraet-bereitstellungsraum.md)).
+3. War der Abruf ein Irrtum, „Abruf zurücknehmen“ wählen. Die Kraft steht wieder unter den
+   bereitgestellten, mit ihren Untereinheiten.
 
 ### Sehen, wer am längsten wartet
 
@@ -131,10 +163,12 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist:
 
 1. Den Raum öffnen und ganz unten „Verlauf“ aufklappen.
 2. Die Liste nennt, neueste zuerst, je Ereignis die Uhrzeit, was geschah („Eintritt“, „Austritt“,
-   „Wechsel von …“, „Wechsel nach …“), die Einheit oder das Fahrzeug und, falls erfasst, eine Notiz
-   wie „Einheit aufgelöst“ oder „Fahrzeug entlassen“.
+   „Austritt nach …“, „Abruf nach … (Auftrag Nr. …)“, „Abruf zurückgenommen“, „Wechsel von …“,
+   „Wechsel nach …“), die Einheit oder das Fahrzeug und, falls erfasst, eine Notiz wie „Einheit
+   aufgelöst“ oder „Fahrzeug entlassen“. Der Abruf einer mitgenommenen Untereinheit lautet „Abruf
+   mit … nach …“.
 
-   ![Aufgeklappter Verlauf des Raums „Parkplatz Stadion Nord“ mit dem Austritt des Sanitätszugs und drei Eintritten](../bilder/bereitstellungsraeume/verlauf.png)
+   ![Aufgeklappter Verlauf des Raums „Parkplatz Stadion Nord“ mit dem Abruf der Betreuungsgruppe nach Betreuung, drei Eintritten und dem Austritt des Sanitätszugs](../bilder/bereitstellungsraeume/verlauf.png)
 
 3. Bei offenem Verlauf erscheinen neue Ereignisse ohne Neuladen.
 
@@ -156,8 +190,9 @@ geplanten Raum:
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Einen aktiven Raum erst leeren: alle Kräfte „entfernen“. Solange noch Kräfte dort stehen, ist
-   „Auflösen“ gesperrt, daneben steht „noch … belegt“.
+1. Einen aktiven Raum erst leeren: abgerufene Kräfte ausrücken lassen, die übrigen austragen.
+   Solange noch Kräfte dort stehen, auch abgerufene, ist „Auflösen“ gesperrt, daneben steht
+   „noch … belegt“.
 2. „Auflösen“ wählen und die Rückfrage „BR auflösen?“ mit „BR auflösen“ bestätigen. Der Raum steht
    dann auf „aufgelöst“.
 3. Ein Raum, der nie in Betrieb war, wird stattdessen mit „Stornieren“ verworfen; die Rückfrage „BR
@@ -177,7 +212,7 @@ ist; ein aufgelöster Raum ist nur zu lesen.
 
 „Kräfte ohne BR“ bietet Einheiten an und Fahrzeuge ohne Einheit, sofern sie in keinem Raum stehen.
 Fahrzeuge einer Einheit werden nicht einzeln zugewiesen, sondern über ihre Einheit. Eine Kraft steht
-höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten entfernt. Die Stärke
+höchstens in einem Raum; soll sie in einen anderen, wird sie zuerst im alten ausgetragen. Die Stärke
 rechnet unterstellte Einheiten mit ein und zählt keine doppelt.
 
 „Erwartet“ und „Im Einsatz“ trennen nach dem Abschnitt: eine Einheit ohne eigenen Abschnitt zählt
@@ -207,6 +242,28 @@ Ob ein Funkrufname schon im Einsatz steht, vergleicht die App ohne Groß- und Kl
 ohne doppelte Leerzeichen, mit Namen und Funkrufnamen der Einheiten und den Funkrufnamen der
 Fahrzeuge. Kräfte aus den Stammdaten bietet der Dialog nicht an.
 
+### Was ein Abruf schreibt
+
+Ein Abruf ist eine Entscheidung der Führung: die Kraft verlässt den Raum erst, wenn ihr Ausrücken
+gebucht ist. Bis dahin steht sie unter „Abgerufen“ und zählt weiter in „Bereitgestellt“,
+„Fahrzeuge“, „Einheiten“ und „noch … belegt“; ihr „seit“ und damit die Wartezeit laufen weiter.
+Am Tablet des Raums erscheint der Abruf ohne Neuladen, ohne Ton und ohne Benachrichtigung.
+
+In einem Schritt unterstellt der Abruf eine Einheit dem gewählten Abschnitt und erteilt den
+Auftrag. Der Auftrag steht danach unter [Aufträge und Befehle](auftraege-befehle.md) mit der Kraft als Empfänger und
+dem Abschnitt als Ort und benachrichtigt wie jeder andere Auftrag. Eine Einheit nimmt ihre
+Untereinheiten über alle Ebenen mit, die im selben Raum stehen und nicht schon eigens abgerufen
+sind; Unterstellung und Auftrag bekommt nur die Einheit selbst. Die Fahrzeuge einer Einheit gehen
+mit ihr; einzeln abrufen lässt sich nur ein Fahrzeug ohne Einheit, und es hat keine
+Unterstellung.
+
+„Ausrücken buchen“ trägt die Kraft und die mit ihr abgerufenen Untereinheiten aus dem Raum aus.
+„Abruf zurücknehmen“ hebt den Abruf auf, auch für die mitgenommenen Untereinheiten; Unterstellung
+und Auftrag bleiben, ein Auftrag wird bei Bedarf unter Aufträge aufgehoben. „Abrufen und
+austragen“ ruft ab und trägt aus, ohne dass jemand das Ausrücken bestätigt.
+
+Mehrere Kräfte auf einmal abzurufen gibt es nicht; ein Verband geht mit seiner Einheit.
+
 ### Was die Zahlen zählen
 
 „Fahrzeuge“ zählt jedes aktive Fahrzeug im Raum genau einmal: die einzeln bereitgestellten und
@@ -227,9 +284,10 @@ diese nach, erscheint die Wartezeit kürzer, nie negativ. Die Fahrzeuge einer Ei
 eigenes „seit“, sie stehen mit ihrer Einheit. „Längste Wartezeit“ ist die Wartezeit der Kraft, die
 am längsten im Raum steht. Eine Farbe oder Warnung für lange Wartezeiten gibt es nicht.
 
-Die Listen ordnen fest nach Wartezeit, bei gleicher Zeit nach Namen. Steht der Mauszeiger über
-der Belegung oder liegt der Fokus dort, warten Zugänge anderer Arbeitsplätze hinter dem Hinweis
-„… neu“, damit keine Zeile unter dem Zeiger springt; eigene Zuweisungen erscheinen sofort.
+Die Listen ordnen fest nach Wartezeit, bei gleicher Zeit nach Namen; „Abgerufen“ ordnet nach der
+Zeit des Abrufs. Steht der Mauszeiger über der Belegung oder liegt der Fokus dort, warten Zugänge
+anderer Arbeitsplätze hinter dem Hinweis „… neu“ bzw. „… neu abgerufen“, damit keine Zeile unter
+dem Zeiger springt; eigene Zuweisungen und Abrufe erscheinen sofort.
 
 ### Verlauf
 
@@ -274,17 +332,26 @@ Ist die Lagekarte gesperrt, steht „Auf Karte verorten (Keine Berechtigung)“ 
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält fest, wenn ein Raum in Betrieb genommen oder aufgelöst wird und wenn eine
-Kraft in einen Raum eintritt, dort eintrifft oder ihn verlässt, jeweils mit Namen. Das Anlegen, das Ändern der
+Kraft in einen Raum eintritt, dort eintrifft oder ihn verlässt, jeweils mit Namen. Ein Abruf
+schreibt genau einen Eintrag mit Ziel und Auftragsnummer, etwa „Rettungsstaffel aus
+Bereitstellungsraum Parkplatz Stadion Nord abgerufen nach Sanitätsdienst (Auftrag Nr. 7)“, mit
+mitgenommenen Untereinheiten „… mit …“, bei „Abrufen und austragen“ mit „… und ausgerückt“; den
+Auftragstext wiederholt er nicht. Das Ausrücken lautet „… rückt aus Bereitstellungsraum … aus nach
+…“, die Rücknahme „Abruf von … aus Bereitstellungsraum … zurückgenommen“. Das Anlegen, das Ändern der
 Raumdaten, das Verorten und das Stornieren eines Raums stehen nicht darin. Wird ein Raum umbenannt, behalten
 frühere Einträge den alten Namen.
 
 ### Rechte und ohne Netz
 
 Lesen darf, wer das Modul Bereitstellungsräume sieht. Anlegen, ändern, in Betrieb nehmen,
-Eintreffen buchen, zuweisen, entfernen, auflösen und stornieren dürfen Einsatzleitung und
-Führungspersonal, solange der Einsatz läuft (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
+Eintreffen buchen, zuweisen, abrufen, Ausrücken buchen, Abrufe zurücknehmen, austragen, auflösen
+und stornieren dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft (Kapitel
+[Rechte im Einsatz](rechte-im-einsatz.md)).
 Eine unangemeldete Kraft verlangt zusätzlich das Recht auf Einheiten und auf Fahrzeuge; fehlt es,
-steht der Grund im Dialog und nichts wird gebucht. Die Bereitstellungsräume
+steht der Grund im Dialog und nichts wird gebucht. Beim Abruf verlangt der Ziel-Abschnitt
+zusätzlich das Modul Einheiten (die Liste der Abschnitte das Modul Einsatzabschnitte), der Auftrag
+das Modul Aufträge; fehlt eines, steht das Feld gesperrt mit „Modul … gesperrt“, und der Abruf
+geht ohne diese Angabe. Die Bereitstellungsräume
 gehören nicht zu dem, was die App für die Arbeit ohne Netz vorhält (Kapitel
 [Ohne Netz](ohne-netz.md)). Auf einer mit Netz geöffneten Seite eines Raums lässt sich ein
 Eintreffen trotzdem buchen: Die App merkt es vor und sendet es genau einmal, sobald wieder Netz da

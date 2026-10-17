@@ -180,6 +180,29 @@ function kennzahl(titel: string): HTMLElement {
   return zelle;
 }
 
+/**
+ * Das zuletzt geöffnete antd-Menü (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“):
+ * jedes Portal kommt beim ersten Öffnen ans Ende von `body`.
+ */
+async function openMenue(name: string, bereich: HTMLElement = document.body) {
+  await userEvent.click(
+    within(bereich).getByRole('button', { name: new RegExp(`^Weitere Aktionen zu ${name}`) }),
+  );
+  return waitFor(() => {
+    const offen = document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    );
+    expect(offen.length).toBeGreaterThan(0);
+    return offen[offen.length - 1];
+  });
+}
+
+/** „Austragen“ steht im Aktionsmenü der Zeile, nicht als roter Knopf (LLH-1085). */
+async function austragen(name: string, bereich: HTMLElement = document.body) {
+  const menue = await openMenue(name, bereich);
+  await userEvent.click(within(menue).getByRole('menuitem', { name: 'Austragen' }));
+}
+
 function renderBrBei(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(
@@ -209,7 +232,7 @@ describe('BrDetailPage — Deeplink-Robustheit (LFH-25)', () => {
 });
 
 describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () => {
-  it('zeigt bereitgestellte Einheiten und entfernt per Austritt', async () => {
+  it('zeigt bereitgestellte Einheiten und trägt per Austritt aus', async () => {
     const br = brDetail({ einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
 
     server.use(
@@ -241,14 +264,13 @@ describe('BrDetailPage – bereitgestellte Einheiten + Austritt (LFH-14)', () =>
 
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
 
-    const btn = screen.getByRole('button', { name: 'entfernen' });
-    await userEvent.click(btn);
+    await austragen('Einheit Alpha');
 
     await waitFor(() => expect(capturedBody).not.toBeNull());
     expect(capturedBody).toMatchObject({ art: 'austritt', objekt_typ: 'einheit', objekt_id: 10 });
     // Die Quittung nennt Handlung und Objekt (LFH-948); die Bezeichnung geht nicht zum Server.
     expect(
-      await screen.findByText('Einheit „Einheit Alpha“ aus dem BR entfernt'),
+      await screen.findByText('Einheit „Einheit Alpha“ aus dem BR ausgetragen'),
     ).toBeInTheDocument();
     expect(capturedBody).not.toHaveProperty('bezeichnung');
   });
@@ -347,7 +369,7 @@ describe('BrDetailPage — Sidebar-Suche (LFH-347 · M58b)', () => {
 });
 
 describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
-  it('zeigt bei BR-Status geplant keine entfernen-/zuweisen-Buttons', async () => {
+  it('zeigt bei BR-Status geplant keine Abrufen-/Austragen-/zuweisen-Buttons', async () => {
     // geplant → schreibgeschützt; bereitgestellte Einheit + freie Kraft in Sidebar.
     const br = brDetail({ status: 'geplant', einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
     const frei = einheit({ id: 30, name: 'Einheit Frei', aktueller_br_id: null });
@@ -364,12 +386,13 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
     // Kräfte sind sichtbar …
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
     expect(screen.getByText('Einheit Frei')).toBeInTheDocument();
-    // … aber keine Schreibaktionen (entfernen/zuweisen).
-    expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
+    // … aber keine Schreibaktionen (abrufen, austragen, zuweisen).
+    expect(screen.queryByRole('button', { name: /abrufen$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Weitere Aktionen/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /zuweisen$/ })).not.toBeInTheDocument();
   });
 
-  it('zeigt für Beobachter keine entfernen-/zuweisen-Buttons (BR aktiv)', async () => {
+  it('zeigt für Beobachter keine Abrufen-/Austragen-/zuweisen-Buttons (BR aktiv)', async () => {
     const br = brDetail({ status: 'aktiv', einheiten: [{ id: 10, name: 'Einheit Alpha' }] });
     const frei = einheit({ id: 30, name: 'Einheit Frei', aktueller_br_id: null });
 
@@ -383,7 +406,8 @@ describe('BrDetailPage – Schreibschutz (LFH-14)', () => {
     renderBrDetail();
 
     expect(await screen.findByText('Einheit Alpha')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'entfernen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /abrufen$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Weitere Aktionen/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /zuweisen$/ })).not.toBeInTheDocument();
   });
 });
@@ -684,9 +708,9 @@ describe('BrDetailPage — Belegung springt nicht unter dem Zeiger (LFH-1113)', 
     const stand = { br: brDetail({ einheiten: [alpha] }) };
     stelleBereit(stand);
     const qc = renderBrDetail();
-    const entfernen = await screen.findByRole('button', { name: 'entfernen' });
+    const abrufen = await screen.findByRole('button', { name: 'Einheit Alpha abrufen' });
 
-    act(() => entfernen.focus());
+    act(() => abrufen.focus());
     stand.br = brDetail({ einheiten: [alpha, aachen] });
     await liveInvalidierung(qc);
     const banner = await screen.findByRole('button', { name: '1 neu anzeigen' });
@@ -834,12 +858,10 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
   const hinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
   const abgelehnt = (text: string) => () => HttpResponse.json({ error: text }, { status: 409 });
 
-  it('Entfernen: der Grund steht an genau dieser Zeile, kein Toast', async () => {
+  it('Austragen: der Grund steht an genau dieser Zeile, kein Toast', async () => {
     seite(brDetail({ einheiten: [alpha, bravo] }), abgelehnt('Einheit ist im Einsatz gebunden'));
     await screen.findByText('Einheit Alpha');
-    await userEvent.click(
-      within(zeile('Einheit Alpha')).getByRole('button', { name: 'entfernen' }),
-    );
+    await austragen('Einheit Alpha', zeile('Einheit Alpha'));
 
     expect(await within(zeile('Einheit Alpha')).findByRole('alert')).toHaveTextContent(
       'Einheit ist im Einsatz gebunden',
@@ -848,7 +870,7 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  it('Entfernen: das nächste Entfernen an der Zeile räumt den Grund', async () => {
+  it('Austragen: das nächste Austragen an der Zeile räumt den Grund', async () => {
     let erster = true;
     seite(brDetail({ einheiten: [alpha] }), async () => {
       if (erster) {
@@ -859,15 +881,15 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
       return HttpResponse.json({});
     });
     await screen.findByText('Einheit Alpha');
-    await userEvent.click(screen.getByRole('button', { name: 'entfernen' }));
+    await austragen('Einheit Alpha');
     await within(zeile('Einheit Alpha')).findByRole('alert');
 
-    // Regex: das Ladesymbol des ersten Laufs klingt in jsdom nicht ab und bleibt im Namen.
-    await userEvent.click(screen.getByRole('button', { name: /entfernen/ }));
+    // `openMenue` sucht per Regex: das Ladesymbol des ersten Laufs klingt in jsdom nicht ab.
+    await austragen('Einheit Alpha');
     await waitFor(() => expect(within(zeile('Einheit Alpha')).queryByRole('alert')).toBeNull());
   });
 
-  it('Entfernen: zwei Zeilen nebenläufig, die späte Ablehnung der ersten steht an ihr', async () => {
+  it('Austragen: zwei Zeilen nebenläufig, die späte Ablehnung der ersten steht an ihr', async () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     seite(brDetail({ einheiten: [alpha, bravo] }), async ({ request }) => {
@@ -880,12 +902,8 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
       return HttpResponse.json({});
     });
     await screen.findByText('Einheit Alpha');
-    await userEvent.click(
-      within(zeile('Einheit Alpha')).getByRole('button', { name: 'entfernen' }),
-    );
-    await userEvent.click(
-      within(zeile('Einheit Bravo')).getByRole('button', { name: 'entfernen' }),
-    );
+    await austragen('Einheit Alpha', zeile('Einheit Alpha'));
+    await austragen('Einheit Bravo', zeile('Einheit Bravo'));
     await act(async () => lehneAb());
 
     expect(await within(zeile('Einheit Alpha')).findByRole('alert')).toHaveTextContent(
@@ -895,23 +913,21 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
-  it('Entfernen: nur die laufende Zeile dreht', async () => {
+  it('Austragen: nur die laufende Zeile dreht', async () => {
     seite(brDetail({ einheiten: [alpha, bravo] }), async () => {
       await delay('infinite');
       return HttpResponse.json({});
     });
     await screen.findByText('Einheit Alpha');
-    await userEvent.click(
-      within(zeile('Einheit Alpha')).getByRole('button', { name: 'entfernen' }),
-    );
+    await austragen('Einheit Alpha', zeile('Einheit Alpha'));
 
     await waitFor(() =>
-      expect(within(zeile('Einheit Alpha')).getByRole('button', { name: /entfernen/ })).toHaveClass(
-        'ant-btn-loading',
-      ),
+      expect(
+        within(zeile('Einheit Alpha')).getByRole('button', { name: /^Weitere Aktionen/ }),
+      ).toHaveClass('ant-btn-loading'),
     );
     expect(
-      within(zeile('Einheit Bravo')).getByRole('button', { name: /entfernen/ }),
+      within(zeile('Einheit Bravo')).getByRole('button', { name: /^Weitere Aktionen/ }),
     ).not.toHaveClass('ant-btn-loading');
   });
 
@@ -1011,7 +1027,8 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
         </AntApp>
       </QueryClientProvider>,
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'entfernen' }));
+    await screen.findByText('Einheit Alpha');
+    await austragen('Einheit Alpha');
     await within(zeile('Einheit Alpha')).findByRole('alert');
 
     await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Raum' }));
@@ -2085,6 +2102,388 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByTestId('br-vorgemerkt')).toBeNull();
+  });
+});
+
+describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberfläche“)', () => {
+  const GERAET_ME = {
+    id: 9,
+    anzeigename: 'BR Alpha · Tablet',
+    benutzername: 'geraet-4',
+    system_rolle: 'keiner',
+    org_rolle: 'keine',
+    aktiv: true,
+    erstellt_at: '2026-10-04',
+    totp_aktiviert: false,
+    passwort_gesetzt: false,
+    geraet: {
+      kopplung_id: 4,
+      einsatz_id: 1,
+      ansicht: 'bereitstellungsraum',
+      stelle_id: 1,
+      stelle: 'BR Alpha',
+      bezeichnung: 'Tablet',
+      laeuft_ab_at: '2026-10-05 12:00:00',
+    },
+  };
+  const DEICH = { id: 5, name: 'EA Deich' };
+  const ABRUF = {
+    seit_at: '2026-10-15 12:32:00',
+    ziel_abschnitt_id: 5,
+    ziel_anzeige: 'EA Deich',
+    auftrag_id: 70,
+    auftrag_nr: 7,
+  };
+  const ABRUF_ERGEBNIS = {
+    abruf: {
+      id: 9,
+      einsatz_id: 1,
+      br_id: 1,
+      objekt_typ: 'einheit',
+      objekt_id: 10,
+      art: 'abruf',
+      zeitpunkt_at: '2026-10-15 12:32:00',
+      erfasst_von: 1,
+      ziel_abschnitt_id: 5,
+      ziel_anzeige: 'EA Deich',
+      auftrag_id: 70,
+    },
+    mitgenommen: [],
+    auftrag_id: 70,
+    auftrag_nr: 7,
+  };
+
+  interface Aufrufe {
+    abruf: unknown[];
+    aufheben: unknown[];
+    belegung: unknown[];
+    qc: QueryClient;
+  }
+
+  /** Der Raum liefert, was `stand.br` gerade trägt; eine Live-Invalidierung holt den neuen Stand. */
+  function seite(
+    stand: { br: BrDetail },
+    {
+      einheiten = [] as Einheit[],
+      freigaben = freigabenFixture(),
+      abruf = () => HttpResponse.json(ABRUF_ERGEBNIS, { status: 201 }),
+    }: {
+      einheiten?: Einheit[];
+      freigaben?: ReturnType<typeof freigabenFixture>;
+      abruf?: () => Response;
+    } = {},
+  ): Aufrufe {
+    const aufrufe = { abruf: [], aufheben: [], belegung: [] } as Omit<Aufrufe, 'qc'>;
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())),
+      http.get('/api/einsaetze/1/bereitstellungsraeume/1', () => HttpResponse.json(stand.br)),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([DEICH])),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf', async ({ request }) => {
+        aufrufe.abruf.push(await request.json());
+        return abruf();
+      }),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf/aufheben', async ({ request }) => {
+        aufrufe.aufheben.push(await request.json());
+        return HttpResponse.json({});
+      }),
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/belegung', async ({ request }) => {
+        aufrufe.belegung.push(await request.json());
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    return { ...aufrufe, qc: renderBrDetail() };
+  }
+
+  const abgerufen = () => screen.getByTestId('br-abgerufen');
+  const dialog = () => screen.getByRole('dialog');
+
+  it('eine abgerufene Kraft steht oben unter „Abgerufen“ mit Zeit, Ziel und Auftrag, nicht unter den bereitgestellten', async () => {
+    seite({
+      br: brDetail({
+        einheiten: [
+          { id: 10, name: 'HLF 20', abruf: ABRUF, seit_at: '2026-10-15 11:42:00' },
+          { id: 11, name: 'Zug Nord', seit_at: '2026-10-15 11:40:00' },
+        ],
+      }),
+    });
+    expect(
+      await within(await screen.findByTestId('br-abgerufen')).findByText('HLF 20'),
+    ).toBeInTheDocument();
+    const zeile = within(abgerufen()).getByText('HLF 20').closest<HTMLElement>('.listen-eintrag')!;
+    const angabe = zeile.querySelector<HTMLElement>('[data-lfh="br-abruf"]')!;
+    expect(within(angabe).getByText('abgerufen')).toBeInTheDocument();
+    expect(angabe).toHaveTextContent(/abgerufen\s*\d{4,6} → EA Deich · Auftrag Nr\. 7/);
+    // Getrennt, aber weiter im Raum: die Kennzahl zählt beide Einheiten (Server).
+    expect(within(abgerufen()).queryByText('Zug Nord')).toBeNull();
+    expect(screen.getAllByText('HLF 20')).toHaveLength(1);
+    expect(kennzahl('Einheiten')).toHaveTextContent('2');
+    // „Abgerufen“ steht über den bereitgestellten Einheiten.
+    expect(
+      abgerufen().compareDocumentPosition(screen.getByText('Bereitgestellte Einheiten')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('eine mitgenommene Untereinheit nennt ihre Einheit', async () => {
+    seite({
+      br: brDetail({
+        einheiten: [
+          { id: 10, name: '1. Zug', abruf: ABRUF },
+          {
+            id: 12,
+            name: 'Gruppe 1',
+            abruf: { seit_at: ABRUF.seit_at, ziel_anzeige: 'EA Deich', mit_objekt_id: 10 },
+          },
+        ],
+      }),
+    });
+    const zeile = (
+      await within(await screen.findByTestId('br-abgerufen')).findByText('Gruppe 1')
+    ).closest<HTMLElement>('.listen-eintrag')!;
+    expect(zeile.querySelector('[data-lfh="br-abruf"]')).toHaveTextContent(
+      /→ EA Deich · mit 1\. Zug/,
+    );
+  });
+
+  it('bereitgestellt: „Abrufen“ als Hauptaktion, Nebenwege im Menü, kein roter Knopf in der Belegung', async () => {
+    seite({ br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) });
+    const knopf = await screen.findByRole('button', { name: 'HLF 20 abrufen' });
+    expect(knopf).toHaveTextContent('Abrufen');
+    expect(screen.getByTestId('br-belegung').querySelectorAll('.ant-btn-dangerous')).toHaveLength(
+      0,
+    );
+    const menue = await openMenue('HLF 20');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Abrufen und austragen', 'Austragen']);
+  });
+
+  it('Abrufen: Ziel-Abschnitt mit dem Abschnitt des Raums vorbelegt, mit Auftrag', async () => {
+    const aufrufe = seite({
+      br: brDetail({ abschnitt_id: 5, einheiten: [{ id: 10, name: 'HLF 20' }] }),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'HLF 20 abrufen' }));
+    expect(await within(dialog()).findByText('HLF 20 abrufen')).toBeInTheDocument();
+    expect(await within(dialog()).findByTitle('EA Deich')).toBeInTheDocument();
+    await userEvent.type(within(dialog()).getByLabelText('Auftrag'), 'Sandsackverbau');
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen/ }));
+
+    await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
+    expect(aufrufe.abruf[0]).toEqual({
+      objekt_typ: 'einheit',
+      objekt_id: 10,
+      abschnitt_id: 5,
+      auftrag_text: 'Sandsackverbau',
+    });
+    expect(
+      await screen.findByText('HLF 20 abgerufen → EA Deich · Auftrag Nr. 7'),
+    ).toBeInTheDocument();
+  });
+
+  it('Abrufen ohne Angaben: weder Abschnitt noch Auftrag gehen hinaus', async () => {
+    const aufrufe = seite({ br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) });
+    await userEvent.click(await screen.findByRole('button', { name: 'HLF 20 abrufen' }));
+    await userEvent.click(await within(dialog()).findByRole('button', { name: /^Abrufen/ }));
+    await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
+    expect(aufrufe.abruf[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 10 });
+  });
+
+  it('eine Einheit nimmt ihren Verband mit: der Dialog nennt ihn am Knopf', async () => {
+    seite(
+      {
+        br: brDetail({
+          einheiten: [
+            { id: 10, name: '1. Zug' },
+            { id: 12, name: 'Gruppe 1' },
+            { id: 13, name: 'Gruppe 2', abruf: ABRUF },
+          ],
+        }),
+      },
+      {
+        einheiten: [
+          einheit({ id: 10, name: '1. Zug' }),
+          einheit({ id: 12, name: 'Gruppe 1', ueber_einheit_id: 10 }),
+          einheit({ id: 13, name: 'Gruppe 2', ueber_einheit_id: 10 }),
+        ],
+      },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: '1. Zug abrufen' }));
+    expect(await within(dialog()).findByText('mit Gruppe 1')).toBeInTheDocument();
+  });
+
+  it('„Abrufen und austragen“: ein Schritt mit `ausgerueckt`', async () => {
+    const aufrufe = seite({ br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) });
+    await screen.findByText('HLF 20');
+    const menue = await openMenue('HLF 20');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Abrufen und austragen' }));
+    expect(await within(dialog()).findByText('HLF 20 abrufen und austragen')).toBeInTheDocument();
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen und austragen/ }));
+    await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
+    expect(aufrufe.abruf[0]).toMatchObject({ objekt_id: 10, ausgerueckt: true });
+    expect(
+      await screen.findByText('HLF 20 abgerufen und ausgetragen → EA Deich · Auftrag Nr. 7'),
+    ).toBeInTheDocument();
+  });
+
+  it('ein Fahrzeug ohne Einheit hat keine Unterstellung: kein Ziel-Abschnitt', async () => {
+    const aufrufe = seite({
+      br: brDetail({ abschnitt_id: 5, fahrzeuge: [{ id: 20, funkrufname: 'Florian 1' }] }),
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Florian 1 abrufen' }));
+    await within(dialog()).findByText('Florian 1 abrufen');
+    expect(within(dialog()).queryByText('Ziel-Abschnitt')).toBeNull();
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen/ }));
+    await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
+    expect(aufrufe.abruf[0]).toEqual({ objekt_typ: 'fahrzeug', objekt_id: 20 });
+  });
+
+  it('ohne Freigabe Aufträge: Auftrag gesperrt mit Grund, der Text geht nicht hinaus', async () => {
+    const aufrufe = seite(
+      { br: brDetail({ abschnitt_id: 5, einheiten: [{ id: 10, name: 'HLF 20' }] }) },
+      { freigaben: freigabenFixture({ auftraege: { zugriff: false } }) },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'HLF 20 abrufen' }));
+    expect(await within(dialog()).findByText('Modul Aufträge gesperrt')).toBeInTheDocument();
+    expect(within(dialog()).getByLabelText('Auftrag')).toBeDisabled();
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen/ }));
+    await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
+    expect(aufrufe.abruf[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 10, abschnitt_id: 5 });
+  });
+
+  it('ohne Freigabe Einheiten: Ziel-Abschnitt gesperrt mit Grund, kein Abschnitt geht hinaus', async () => {
+    const aufrufe = seite(
+      { br: brDetail({ abschnitt_id: 5, einheiten: [{ id: 10, name: 'HLF 20' }] }) },
+      { freigaben: freigabenFixture({ einheiten: { zugriff: false } }) },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'HLF 20 abrufen' }));
+    expect(await within(dialog()).findByText('Modul Einheiten gesperrt')).toBeInTheDocument();
+    // Das gesperrte Feld zeigt keinen vorbelegten Abschnitt, der doch nicht hinausginge.
+    expect(within(dialog()).queryByTitle('EA Deich')).toBeNull();
+    await userEvent.click(within(dialog()).getByRole('button', { name: /^Abrufen/ }));
+    await waitFor(() => expect(aufrufe.abruf).toHaveLength(1));
+    expect(aufrufe.abruf[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 10 });
+  });
+
+  it('eine Ablehnung des Servers steht im Dialog, der bleibt offen, kein Toast', async () => {
+    seite(
+      { br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) },
+      { abruf: () => HttpResponse.json({ error: 'Kraft ist schon abgerufen' }, { status: 422 }) },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'HLF 20 abrufen' }));
+    await userEvent.click(await within(dialog()).findByRole('button', { name: /^Abrufen/ }));
+    expect(await within(dialog()).findByText('Nicht abgerufen')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Kraft ist schon abgerufen')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+  });
+
+  it('abgerufen: „Ausrücken buchen“ bucht den Austritt, „Abruf zurücknehmen“ hebt ihn auf', async () => {
+    const aufrufe = seite({
+      br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20', abruf: ABRUF }] }),
+    });
+    const ausruecken = await screen.findByRole('button', { name: 'Ausrücken buchen für HLF 20' });
+    expect(ausruecken).toHaveTextContent('Ausrücken buchen');
+    await userEvent.click(ausruecken);
+    await waitFor(() => expect(aufrufe.belegung).toHaveLength(1));
+    expect(aufrufe.belegung[0]).toMatchObject({
+      objekt_typ: 'einheit',
+      objekt_id: 10,
+      art: 'austritt',
+    });
+    expect(await screen.findByText('Einheit „HLF 20“ ausgerückt')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Abruf zurücknehmen für HLF 20' }));
+    await waitFor(() => expect(aufrufe.aufheben).toHaveLength(1));
+    expect(aufrufe.aufheben[0]).toEqual({ objekt_typ: 'einheit', objekt_id: 10 });
+    expect(await screen.findByText('Abruf von HLF 20 zurückgenommen')).toBeInTheDocument();
+  });
+
+  it('am BR-Gerät: Ausrücken ja, Abrufen und Zurücknehmen nie, Austragen im Menü', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(GERAET_ME)));
+    seite({
+      br: brDetail({
+        einheiten: [
+          { id: 10, name: 'HLF 20', abruf: ABRUF },
+          { id: 11, name: 'Zug Nord' },
+        ],
+      }),
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Ausrücken buchen für HLF 20' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Abruf zurücknehmen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /abrufen$/ })).toBeNull();
+    const menue = await openMenue('Zug Nord');
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Austragen']);
+  });
+
+  it('aktiver Raum ohne Abgerufene: „Abgerufen“ steht leer; im geplanten Raum fehlt es', async () => {
+    seite({ br: brDetail({ einheiten: [{ id: 11, name: 'Zug Nord' }] }) });
+    expect(
+      await within(await screen.findByTestId('br-abgerufen')).findByText('Keine Kraft abgerufen'),
+    ).toBeInTheDocument();
+  });
+
+  it('geplanter Raum: kein Abschnitt „Abgerufen“', async () => {
+    seite({ br: brDetail({ status: 'geplant', einheiten: [{ id: 11, name: 'Zug Nord' }] }) });
+    expect(await screen.findByText('Zug Nord')).toBeInTheDocument();
+    expect(screen.queryByTestId('br-abgerufen')).toBeNull();
+  });
+
+  it('fremder Abruf bei gehaltenem Zeiger: die Zeile wartet hinter dem Banner, die Einheit verlässt die Bereitgestellten', async () => {
+    // Steht schon eine Kraft unter „Abgerufen“, hält die Schleuse wie in den übrigen Listen; die
+    // erste Zeile einer leeren Liste erscheint wie dort sofort (`teileZuflussNach`).
+    const stand = {
+      br: brDetail({
+        einheiten: [
+          { id: 11, name: 'Zug Nord' },
+          { id: 12, name: 'Zug Süd', abruf: { ...ABRUF, seit_at: '2026-10-15 12:00:00' } },
+        ],
+      }),
+    };
+    const { qc } = seite(stand);
+    await screen.findByText('Zug Nord');
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'mouse' });
+    stand.br = brDetail({
+      einheiten: [
+        { id: 11, name: 'Zug Nord', abruf: ABRUF },
+        { id: 12, name: 'Zug Süd', abruf: { ...ABRUF, seit_at: '2026-10-15 12:00:00' } },
+      ],
+    });
+    await act(() => qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(1, 1) }));
+
+    const banner = await screen.findByRole('button', { name: '1 neu anzeigen' });
+    expect(screen.getByText('1 neu abgerufen')).toBeInTheDocument();
+    expect(screen.queryByText('Zug Nord')).toBeNull();
+    await userEvent.click(banner);
+    expect(await within(abgerufen()).findByText('Zug Nord')).toBeInTheDocument();
+  });
+
+  it('eigener Abruf erscheint sofort unter „Abgerufen“, auch bei gehaltenem Zeiger', async () => {
+    const stand = { br: brDetail({ einheiten: [{ id: 10, name: 'HLF 20' }] }) };
+    const aufrufe = seite(stand);
+    server.use(
+      http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf', async ({ request }) => {
+        aufrufe.abruf.push(await request.json());
+        stand.br = brDetail({ einheiten: [{ id: 10, name: 'HLF 20', abruf: ABRUF }] });
+        return HttpResponse.json(ABRUF_ERGEBNIS, { status: 201 });
+      }),
+    );
+    await screen.findByText('HLF 20');
+    fireEvent.pointerMove(screen.getByTestId('br-belegung'), { pointerType: 'mouse' });
+    fireEvent.click(screen.getByRole('button', { name: 'HLF 20 abrufen' }));
+    fireEvent.click(await within(dialog()).findByRole('button', { name: /^Abrufen/ }));
+
+    expect(await within(abgerufen()).findByText('HLF 20')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /neu anzeigen/ })).toBeNull();
   });
 });
 

@@ -28,6 +28,8 @@ import {
  *                 frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx (zugeklappt),
  *                 frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx,
  *                 frontend/src/kraefte/NichtUebernommenMarke.tsx
+ *   abgerufen.png frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx (Abschnitt
+ *                 „Abgerufen“, Gerätezweig), frontend/src/pages/bereitstellungsraum/abrufKern.ts
  *   unangemeldet.png frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx (Schritt 2,
  *                 Gerät vollflächig), frontend/src/kraefte/AdhocFahrzeugFelder.tsx,
  *                 frontend/src/components/Erfassung.tsx
@@ -73,12 +75,12 @@ async function raumTablet(page: Page, browser: Browser) {
   await expect(geraet).toHaveURL(new RegExp(`/geraet/${demo.id}/br/${br}$`));
   const nav = geraet.getByRole('navigation', { name: 'Gerätenavigation' });
   await expect(nav.getByRole('link')).toHaveText(['Raum', 'Melden']);
-  return { kontext, geraet, nav };
+  return { kontext, geraet, nav, einsatzId: demo.id, brId: br };
 }
 
 test.describe(KAPITEL, () => {
   test('Raum in Betrieb nehmen und Kräfte anmelden', async ({ page, browser }) => {
-    const { kontext, geraet } = await raumTablet(page, browser);
+    const { kontext, geraet, einsatzId, brId } = await raumTablet(page, browser);
     try {
       await expect(geraet.getByRole('heading', { level: 1, name: RAUM })).toBeVisible();
       const inBetrieb = geraet.getByRole('button', { name: 'In Betrieb nehmen' });
@@ -125,15 +127,51 @@ test.describe(KAPITEL, () => {
       await expect(belegung.getByText('nicht übernommen')).toBeVisible();
 
       await geraet.reload();
-      await expect(belegung.getByRole('button', { name: 'entfernen' })).toHaveCount(3);
+      const weitere = belegung.getByRole('button', { name: /^Weitere Aktionen zu / });
+      await expect(weitere).toHaveCount(3);
       await geraet.mouse.move(0, 0);
       await fotografiere(geraet, KAPITEL, 'raum');
 
-      // Nachgeklickt: „entfernen“ meldet eine Kraft wieder ab.
-      const entfernen = belegung.getByRole('button', { name: 'entfernen' });
-      const vorher = await entfernen.count();
-      await entfernen.first().click();
-      await expect(entfernen).toHaveCount(vorher - 1);
+      // Die Einsatzleitung ruft eine der Kräfte ab (LLH-1085); das Tablet zeigt sie unter
+      // „Abgerufen“ mit „Ausrücken buchen“.
+      const raum = (await (
+        await page.request.get(`/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}`)
+      ).json()) as { einheiten: { id: number; name: string }[] };
+      const kraft = raum.einheiten.find((x) => x.name !== UNANGEMELDET);
+      expect(kraft, 'eine eingebuchte Einheit').toBeDefined();
+      const abschnitte = (await (
+        await page.request.get(`/api/einsaetze/${einsatzId}/abschnitte`)
+      ).json()) as { id: number; name: string }[];
+      const ziel = abschnitte.find((a) => a.name === 'Sanitätsdienst');
+      expect(ziel, 'Abschnitt „Sanitätsdienst“').toBeDefined();
+      await fuelle(
+        page,
+        'post',
+        `/api/einsaetze/${einsatzId}/bereitstellungsraeume/${brId}/abruf`,
+        {
+          objekt_typ: 'einheit',
+          objekt_id: kraft!.id,
+          abschnitt_id: ziel!.id,
+          auftrag_text: 'Verletztenablage Nord übernehmen',
+        },
+      );
+      const abgerufen = geraet.getByTestId('br-abgerufen');
+      const ausruecken = abgerufen.getByRole('button', {
+        name: `Ausrücken buchen für ${kraft!.name}`,
+      });
+      await expect(ausruecken).toBeVisible();
+      await expect(weitere).toHaveCount(2);
+      await geraet.mouse.move(0, 0);
+      await fotografiere(abgerufen, KAPITEL, 'abgerufen');
+
+      // Nachgeklickt: „Ausrücken buchen“ trägt die abgerufene Kraft aus, „Austragen“ im
+      // Aktionsmenü eine andere.
+      await ausruecken.click();
+      await expect(abgerufen.getByText('Keine Kraft abgerufen')).toBeVisible();
+      await expect(weitere).toHaveCount(2);
+      await weitere.first().click();
+      await geraet.getByRole('menuitem', { name: 'Austragen' }).click();
+      await expect(weitere).toHaveCount(1);
     } finally {
       await kontext.close();
     }

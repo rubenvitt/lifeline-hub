@@ -282,6 +282,13 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
   zurücknehmen will
 - **THEN** antwortet der Server mit 403, und nichts ist geschrieben
 
+#### Scenario: Abruf am Tablet
+
+- **WHEN** die Einsatzleitung eine Einheit aus dem BR Sportplatz abruft, während das Tablet des
+  Raums die Seite zeigt
+- **THEN** steht die Einheit am Tablet ohne Neuladen unter „Abgerufen“ mit „Ausrücken buchen“
+- **AND** bietet das Tablet weder „Abrufen“ noch „Abruf zurücknehmen“ an und spielt keinen Ton
+
 #### Scenario: Unangemeldete Kraft am Gerät
 
 - **WHEN** das Gerät des BR Sportplatz am BR Sportplatz eine unangemeldete Kraft bucht

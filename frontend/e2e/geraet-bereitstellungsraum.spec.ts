@@ -70,10 +70,13 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     // Anmelden aus „Kräfte ohne BR“, abmelden aus der Belegung. Angemeldet nennt die Zeile, seit
     // wann die Einheit wartet (LLH-1095).
     await tablet.getByRole('button', { name: 'LF Nord zuweisen' }).click();
-    const belegung = tablet.getByRole('button', { name: 'entfernen' });
-    await expect(belegung).toHaveCount(1);
+    // „Austragen“ steht im Aktionsmenü der Zeile, „Abrufen“ gibt es am Gerät nicht (LLH-1085).
+    const weitere = tablet.getByRole('button', { name: 'Weitere Aktionen zu LF Nord' });
+    await expect(weitere).toHaveCount(1);
+    await expect(tablet.getByRole('button', { name: 'LF Nord abrufen' })).toHaveCount(0);
     await expect(tablet.getByTestId('br-belegung')).toContainText(/seit \d{4,6} · \d+ min/);
-    await belegung.click();
+    await weitere.click();
+    await tablet.getByRole('menuitem', { name: 'Austragen' }).click();
     await expect(tablet.getByText('Keine Einheiten bereitgestellt')).toBeVisible();
 
     // Verlauf des eigenen Raums: zugeklappt geladen erst beim Aufklappen, neueste zuerst.
@@ -343,4 +346,107 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     'Florian Nachbar 7',
     'LF Nachbarort',
   ]);
+});
+
+/**
+ * LLH-1085 Teil II (Spec `bereitstellungsraum-belegung`, „Abruf in der Oberfläche“; Spec
+ * `funktionsansichten`, „Ansicht Bereitstellungsraum“): die Führung am Desktop (`kompakt`) ruft eine
+ * bereitgestellte Einheit mit Ziel-Abschnitt und Auftrag ab; das Tablet des Raums (`handschuh`)
+ * sieht sie live unter „Abgerufen“, ohne „Abruf zurücknehmen“, und bucht „Ausrücken buchen“. Danach
+ * ist die Einheit dem Abschnitt unterstellt, steht in keinem Raum mehr, und der Verlauf nennt Abruf
+ * und Austritt mit Ziel.
+ *
+ * Mutationsprobe: in `BrDetailPage.tsx` „Ausrücken buchen“ hinter `abrufen` legen → der Knopf
+ * fehlt am Tablet, der Schritt „Ausrücken buchen“ wird rot.
+ */
+test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ page, browser }) => {
+  test.setTimeout(180_000);
+  await anmeldenAlsAdmin(page);
+  const einsatz = await anlegen(page, '/api/einsaetze', {
+    bezeichnung: `E2E BR Abruf ${Date.now()}`,
+  });
+  const e = einsatz.id;
+  const raum = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+    bezeichnung: 'BR Sportplatz',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
+    status: 'aktiv',
+  });
+  const deich = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Deich' });
+  const hlf = await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'HLF Deich' });
+  await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/belegung`, {
+    objekt_typ: 'einheit',
+    objekt_id: hlf.id,
+    art: 'eintritt',
+  });
+  const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
+    page,
+    `/api/einsaetze/${e}/geraete`,
+    { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
+  );
+
+  const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/br/${raum.id}$`));
+    await stelleDichte(tablet, 'handschuh');
+    const tabletAbgerufen = tablet.getByTestId('br-abgerufen');
+    await expect(tabletAbgerufen.getByText('Keine Kraft abgerufen')).toBeVisible();
+    await expect(tablet.getByRole('button', { name: 'HLF Deich abrufen' })).toHaveCount(0);
+
+    // Die Führung ruft ab.
+    await page.goto(`/einsaetze/${e}/bereitstellungsraeume/${raum.id}`);
+    await stelleDichte(page, 'kompakt');
+    await page.getByRole('button', { name: 'HLF Deich abrufen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'HLF Deich abrufen' });
+    await dialog.getByRole('combobox', { name: 'Ziel-Abschnitt' }).click();
+    await page.locator('.ant-select-item-option[title="EA Deich"]').click();
+    await dialog.getByRole('textbox', { name: 'Auftrag' }).fill('Sandsackverbau');
+    await dialog.getByRole('button', { name: 'Abrufen' }).click();
+    await expect(
+      page.getByText(/^HLF Deich abgerufen → EA Deich · Auftrag Nr\. \d+$/),
+    ).toBeVisible();
+    await expect(page.getByTestId('br-abgerufen').getByText('HLF Deich')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Abruf zurücknehmen für HLF Deich' }),
+    ).toBeVisible();
+
+    // Das Tablet sieht den Abruf live, ohne Ton, und bucht das Ausrücken.
+    await expect(tabletAbgerufen.getByText('HLF Deich')).toBeVisible();
+    await expect(tabletAbgerufen.locator('[data-lfh="br-abruf"]')).toContainText(
+      /abgerufen\s*\d{4,6} → EA Deich · Auftrag Nr\. \d+/,
+    );
+    await expect(
+      tablet.getByRole('button', { name: 'Abruf zurücknehmen für HLF Deich' }),
+    ).toHaveCount(0);
+    const ausruecken = tablet.getByRole('button', { name: 'Ausrücken buchen für HLF Deich' });
+    await expect(tablet.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+    await haeltStufe(ausruecken, 72, 'Knopf „Ausrücken buchen“ (handschuh)');
+    await ausruecken.click();
+    await expect(tablet.getByText('Einheit „HLF Deich“ ausgerückt')).toBeVisible();
+    await expect(tabletAbgerufen.getByText('Keine Kraft abgerufen')).toBeVisible();
+    await expect(tablet.getByText('Keine Einheiten bereitgestellt')).toBeVisible();
+
+    // Der Verlauf nennt Abruf und Austritt mit Ziel.
+    await tablet
+      .getByRole('button', { name: 'Verlauf des Bereitstellungsraums BR Sportplatz' })
+      .click();
+    const eintraege = tablet.getByRole('list', { name: 'Verlauf' }).getByRole('listitem');
+    await expect(eintraege.nth(0)).toContainText('Austritt nach EA Deich');
+    await expect(eintraege.nth(1)).toContainText(/Abruf nach EA Deich \(Auftrag Nr\. \d+\)/);
+  } finally {
+    await kontext.close();
+  }
+
+  // Unterstellt und in keinem Raum mehr.
+  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/einheiten`)).json()) as {
+    id: number;
+    abschnitt_id: number | null;
+    aktueller_br_id: number | null;
+  }[];
+  const nachher = einheiten.find((x) => x.id === hlf.id);
+  expect(nachher?.abschnitt_id).toBe(deich.id);
+  expect(nachher?.aktueller_br_id ?? null).toBeNull();
 });
