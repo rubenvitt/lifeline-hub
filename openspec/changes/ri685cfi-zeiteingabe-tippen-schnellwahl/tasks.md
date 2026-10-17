@@ -7,14 +7,15 @@ Code vorübergehend umdrehen, der Test muss rot werden. Node und pnpm über `mis
 
 ## 1. Kern: Sprache, Schreibweise, Parser (`anzeige/`)
 
-- [ ] 1.1 `import 'dayjs/locale/de'` in `main.tsx` und `test/setup.ts`; ein Test rendert antds
+- [x] 1.1 `import 'dayjs/locale/de'` in `anzeige/dayjsSprache.ts`, das der Kalender selbst
+      importiert (gilt so auch ohne `main.tsx`, in Tests und Druckfenstern); ein Test rendert antds
       `Calendar` unter `ConfigProvider locale={deDE}` und findet „Mo“ als erste Wochentagsspalte.
       Erledigt, wenn der Test grün ist und ohne den Import rot wird.
-- [ ] 1.2 DTG nach E1 in `anzeige/format.ts` (Tag, Stunde, Minute, Monat klein ohne Umlaut, Jahr
+- [x] 1.2 DTG nach E1 in `anzeige/format.ts` (Tag, Stunde, Minute, Monat klein ohne Umlaut, Jahr
       zweistellig), Fundstelle DV 810.3 im Kommentar (weicht sie ab: Kommentar an LLH-1045, E1
       bleibt). `format.test.ts`: `161430mrz26` für 2026-03-16 13:30 UTC in Europe/Berlin, alle
       zwölf Monatskürzel, Jahreswechsel. Bestehende Formatierer unverändert grün.
-- [ ] 1.3 `anzeige/zeitParser.ts` mit `deuteZeit` nach D2. `zeitParser.test.ts` deckt jede
+- [x] 1.3 `anzeige/zeitParser.ts` mit `deuteZeit` nach D2. `zeitParser.test.ts` deckt jede
       Schreibweise der Spec ab (Uhrzeit, `TTHHMM`, DTG mit 0/2/4 Jahresziffern, Groß/klein,
       `mrz`/`mär`, `TT.MM.[JJ|JJJJ] HHMM`, ISO mit Sekunden, `j`, `jetzt`, `-5`, `-5m`, `-1h`,
       `+90`), die Richtungsregeln (Ereignis kurz nach Mitternacht, Frist am Abend, Monatswechsel

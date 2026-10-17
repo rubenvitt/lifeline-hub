@@ -2,7 +2,7 @@
  * Reine Formatlogik für Anzeige-Konventionen: Zeit (Zeitzone + 24h/12h), Koordinaten
  * (WGS84/MGRS/UTM/GK) und Einheiten (metrisch/imperial). Provider/Hook delegieren hierher.
  */
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../api/types';
@@ -91,6 +91,38 @@ export function taktischeDtgVoll(
   if (!utcStr) return '';
   const d = inZone(utcStr, konv);
   return `${d.format('DDHHmm')}${MONATE_DE[d.month()]}${d.format('YYYY')}`;
+}
+
+/**
+ * Monatskürzel der Datum-Zeit-Gruppe nach FwDV/DV 810 (Ausgabe 2018, Sprech- und
+ * Datenfunkverkehr: „Tag des Monats – Uhrzeitgruppe (hhmm), soweit erforderlich können Monat und
+ * Jahr angefügt werden“, Beispiel „271938jan19“): klein, drei Buchstaben, ohne Umlaut.
+ * Entscheidung E1 vom 17.10.2026 (LLH-1045). Der Zeit-Parser liest dieselbe Tabelle.
+ */
+export const MONATE_DTG = [
+  'jan',
+  'feb',
+  'mrz',
+  'apr',
+  'mai',
+  'jun',
+  'jul',
+  'aug',
+  'sep',
+  'okt',
+  'nov',
+  'dez',
+] as const;
+
+/**
+ * Volle DTG nach E1 „161430okt26“ (Tag, Uhrzeit, Monat klein, Jahr zweistellig) eines
+ * Zeitpunkts in der Anzeigezone; ohne gültige Zone in der Browserzone. Das Zeitfeld zeigt seinen
+ * Wert so (Spec `zeiteingabe`, „Anzeige im Feld als Datum-Zeit-Gruppe“). Die übrigen Anzeigen
+ * stellt LLH-1053 von {@link taktischeDtgVoll} hierher um.
+ */
+export function formatDtg(zeitpunkt: Dayjs, zone: string | null | undefined): string {
+  const d = inZone(zeitpunkt.utc().format('YYYY-MM-DD HH:mm:ss'), { zeitzone: zone });
+  return `${d.format('DDHHmm')}${MONATE_DTG[d.month()]}${d.format('YY')}`;
 }
 
 /** Volle Zeitangabe → taktische DTG „161430JUL2026". */

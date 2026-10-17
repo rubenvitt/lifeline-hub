@@ -3,6 +3,8 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import {
+  formatDtg,
+  MONATE_DTG,
   formatZeit,
   formatZeitKurz,
   formatUhrzeit,
@@ -168,5 +170,37 @@ describe('formatDistanz', () => {
   it('imperial: ft bzw. mi', () => {
     expect(formatDistanz(100, { einheiten: 'imperial' })).toBe('328 ft');
     expect(formatDistanz(5000, { einheiten: 'imperial' })).toBe('3.11 mi');
+  });
+});
+
+describe('formatDtg (DTG nach FwDV/DV 810, Entscheidung E1)', () => {
+  it('schreibt Tag, Uhrzeit, Monat klein ohne Umlaut und zweistelliges Jahr in der Zone', () => {
+    expect(formatDtg(dayjs.utc('2026-03-16 13:30:00'), 'Europe/Berlin')).toBe('161430mrz26');
+    expect(formatDtg(dayjs.utc('2026-10-17 12:30:00'), 'Europe/Berlin')).toBe('171430okt26');
+  });
+
+  it('kennt alle zwölf Monatskürzel', () => {
+    const kuerzel = Array.from({ length: 12 }, (_, i) =>
+      formatDtg(dayjs.utc(`2026-${String(i + 1).padStart(2, '0')}-10 12:00:00`), 'UTC').slice(6, 9),
+    );
+    expect(kuerzel).toEqual(MONATE_DTG);
+    expect(MONATE_DTG).toEqual([
+      'jan',
+      'feb',
+      'mrz',
+      'apr',
+      'mai',
+      'jun',
+      'jul',
+      'aug',
+      'sep',
+      'okt',
+      'nov',
+      'dez',
+    ]);
+  });
+
+  it('nimmt beim Jahreswechsel Tag, Monat und Jahr der Anzeigezone', () => {
+    expect(formatDtg(dayjs.utc('2026-12-31 23:30:00'), 'Europe/Berlin')).toBe('010030jan27');
   });
 });
