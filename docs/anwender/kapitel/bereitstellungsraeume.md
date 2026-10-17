@@ -2,7 +2,7 @@
 titel: Bereitstellungsräume
 gruppen: [fuehrung]
 reihenfolge: 350
-quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BereitstellungsraeumeDefault.tsx, frontend/src/pages/bereitstellungsraum/BereitstellungsraeumePage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/BrAnlegenDrawer.tsx, frontend/src/pages/bereitstellungsraum/BrBearbeitenModal.tsx, frontend/src/pages/bereitstellungsraum/BrSwitcher.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/brAuswahl.ts, frontend/src/pages/bereitstellungsraum/brBelegungKern.ts, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/pages/bereitstellungsraum/belegungZufluss.ts, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_bereitstellungsraum.rs, src/bereitstellungsraum/mod.rs, src/bereitstellungsraum/belegung_repo.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/pages/bereitstellungsraum/freieKraefte.ts, frontend/src/pages/bereitstellungsraum/AufKarteVerorten.tsx, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/bereitstellungsraum/AbrufDialog.tsx, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
 ---
 
 ## Überblick
@@ -58,6 +58,19 @@ Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv i
 
 3. „Speichern“ wählen. Die neue Bezeichnung steht im Seitenkopf, im Umschalter und in der
    Übersicht, Standort und Notiz stehen unter „Raumdaten“; die Übersicht zeigt auch den Standort.
+
+### Einen Bereitstellungsraum auf der Lagekarte verorten
+
+Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv ist:
+
+1. Den Raum öffnen und bei „Raumdaten“ „Auf Karte verorten“ wählen. Steht der Raum schon auf der
+   Karte, heißt der Knopf „Auf Karte versetzen“.
+2. Die Lagekarte öffnet sich zum Platzieren dieses Raums. Auf die Stelle der Karte tippen, an der
+   der Raum liegt. Die App meldet „Objekt verortet“.
+3. Der Raum steht danach mit dem Zeichen „Bereitstellungsraum“ auf der Karte, beschriftet mit
+   Bezeichnung, Stärke und Zahl der Fahrzeuge, etwa „Parkplatz Stadion Nord · 0/1/5//6 · 3 Fz“.
+4. Ein Tipp auf das Zeichen zeigt unter „Ausgewählt“ Status, Stärke, Fahrzeuge, Einheiten, „Wartet
+   seit“ und Abschnitt. „Im Fachmodul öffnen“ führt zurück zum Raum.
 
 ### Eintreffen buchen
 
@@ -296,6 +309,23 @@ Material in einem Bereitstellungsraum steht nicht im [Meldebild](meldebild.md). 
 und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; ohne die
 Freigabe fehlt die Sektion „Material“. Am gekoppelten Tablet eines Raums fehlt sie ebenso.
 
+### Auf der Lagekarte
+
+Auf der [Lagekarte](lagekarte.md) stehen die verorteten Räume in der Ebene
+„Bereitstellungsräume“. Ein geplanter Raum trägt einen gestrichelten Ring um sein Zeichen und in
+der Beschriftung „geplant“; Stärke und Fahrzeuge zeigt erst ein aktiver Raum. Ein aufgelöster oder
+stornierter Raum verschwindet von der Karte. Ein Raum ohne Ort steht in der Leiste unter „Nicht
+verortet“ und lässt sich auch dort platzieren; „Verortung löschen“ am gewählten Zeichen nimmt ihm
+den Ort wieder. Die Koordinate ist unabhängig vom Freitext „Standort“: der eine ändert den
+anderen nicht.
+
+Fahrzeuge und Einheiten zählt die Karte wie der Raum selbst. Die Stärke rechnet sie aus der
+Einheitenliste; fehlt das Recht auf das Modul Einheiten, steht sie nicht in der Beschriftung, und
+unter „Ausgewählt“ steht „—“. Eine Änderung an Ort, Status oder Belegung erreicht jede offene
+Karte ohne Neuladen. Ein gesicherter Lagestand zeigt die Räume so, wie sie beim Sichern waren.
+Verorten kann nur, wer den Raum ändern darf; am gekoppelten Tablet eines Raums fehlt der Knopf.
+Ist die Lagekarte gesperrt, steht „Auf Karte verorten (Keine Berechtigung)“ gesperrt da.
+
 ### Einsatztagebuch
 
 Das Einsatztagebuch hält fest, wenn ein Raum in Betrieb genommen oder aufgelöst wird und wenn eine
@@ -305,7 +335,7 @@ Bereitstellungsraum Parkplatz Stadion Nord abgerufen nach Sanitätsdienst (Auftr
 mitgenommenen Untereinheiten „… mit …“, bei „Abrufen und austragen“ mit „… und ausgerückt“; den
 Auftragstext wiederholt er nicht. Das Ausrücken lautet „… rückt aus Bereitstellungsraum … aus nach
 …“, die Rücknahme „Abruf von … aus Bereitstellungsraum … zurückgenommen“. Das Anlegen, das Ändern der
-Raumdaten und das Stornieren eines Raums stehen nicht darin. Wird ein Raum umbenannt, behalten
+Raumdaten, das Verorten und das Stornieren eines Raums stehen nicht darin. Wird ein Raum umbenannt, behalten
 frühere Einträge den alten Namen.
 
 ### Rechte und ohne Netz

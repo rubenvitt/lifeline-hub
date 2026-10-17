@@ -239,6 +239,7 @@ export default function LagekartePage() {
     personenFehler,
     personenNichtGeladen,
     betreuungZugriff,
+    brZugriff,
     datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
@@ -277,8 +278,9 @@ export default function LagekartePage() {
         personenZugriff,
         personenEbeneAn: layer.person,
         betreuungZugriff,
+        brZugriff,
       }),
-    [alleVerortet, personenVerortet, personenZugriff, layer.person, betreuungZugriff],
+    [alleVerortet, personenVerortet, personenZugriff, layer.person, betreuungZugriff, brZugriff],
   );
 
   const {
@@ -807,15 +809,17 @@ export default function LagekartePage() {
     const auftrag = parsePlatzierenAuftrag(searchParams.get('platzieren'));
     if (!auftrag) return;
     if (ladt) return;
-    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf, eine Person nur mit dem Modul
-    // Personen (LFH-670) — sonst endete der Klick in einem 403. Bis die Rechte feststehen, bleibt
-    // der Auftrag stehen.
+    // Eine Stelle platziert nur, wer das Modul Betreuung lesen darf, ein Raum nur mit dem Modul
+    // Bereitstellungsräume (LLH-1107), eine Person nur mit dem Modul Personen (LFH-670) — sonst
+    // endete der Klick in einem 403. Bis die Rechte feststehen, bleibt der Auftrag stehen.
     const modulZugriff =
       auftrag.typ === 'betreuungsstelle'
         ? betreuungZugriff
-        : auftrag.typ === 'person'
-          ? personenZugriff
-          : null;
+        : auftrag.typ === 'bereitstellungsraum'
+          ? brZugriff
+          : auftrag.typ === 'person'
+            ? personenZugriff
+            : null;
     if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
@@ -833,6 +837,7 @@ export default function LagekartePage() {
     onPlatzierenStart,
     rechteBekannt,
     betreuungZugriff,
+    brZugriff,
     personenZugriff,
   ]);
 
@@ -1399,6 +1404,7 @@ export default function LagekartePage() {
           nichtGeladen: personenNichtGeladen,
         }}
         betreuung={{ zugriff: betreuungZugriff }}
+        br={{ zugriff: brZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={onMarkerWaehlen}

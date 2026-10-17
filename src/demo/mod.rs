@@ -98,6 +98,8 @@ wire_enum! {
         Personal => "personal",
         Material => "material",
         EinheitVorlage => "einheit_vorlage",
+        /// Schichtmodell der Ablösung (LLH-1122).
+        Schichtmodell => "schichtmodell",
     }
 }
 

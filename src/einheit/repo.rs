@@ -1169,6 +1169,12 @@ const SPUREN_EINHEIT: &[(&str, &str)] = &[
                        WHERE einheit_id = ?1 OR abloesende_einheit_id = ?1)",
         "Die Einheit steht in der Ablösung",
     ),
+    // LLH-1122 (Mig 0212): die Liste der Ablöser (befüllt ab LLH-1132) zählt wie die
+    // Einzelplanung `abloesende_einheit_id` oben.
+    (
+        "SELECT EXISTS(SELECT 1 FROM einsatz_abloesung_abloeser WHERE einheit_id = ?)",
+        "Die Einheit ist als Ablösung geplant",
+    ),
     (
         "SELECT EXISTS(SELECT 1 FROM etb_eintrag_einheit WHERE einheit_id = ?)",
         "Einträge im Einsatztagebuch nennen die Einheit",

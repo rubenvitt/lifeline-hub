@@ -86,6 +86,7 @@
           "rhythmus_minuten",
           "rhythmus_quelle",
           "faellig_at",
+          "vorwarnung_minuten",
           "status",
           "ruecknehmbar",
           "angelegt_at"
@@ -194,6 +195,42 @@
             ],
             "format": "int64",
             "description": "Die abgelöste Schicht, aus deren Vollzug diese hervorging."
+          },
+          "vorwarnung_minuten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Vorwarnzeit vor der Fälligkeit in Minuten: aus dem Schichtmodell des Einsatzes, ohne\neines [`VORWARNUNG_VORGABE_MINUTEN`]. Die Einstufung rechnet damit."
+          }
+        }
+      },
+      "AbloesungEinsatzVorgabeAnzeige": {
+        "type": "object",
+        "description": "Vorgabe des Einsatzes (LLH-1122): die Kopie eines Schichtmodells, die beim Anlegen aus der\nVorgabe der Organisation kam oder in den Einsatz-Einstellungen gesetzt wurde.",
+        "required": [
+          "vorwarnung_minuten",
+          "laufende_schichten"
+        ],
+        "properties": {
+          "laufende_schichten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Laufende Schichten, die der Vorgabe des Einsatzes folgen."
+          },
+          "schichtmodell": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/EinsatzSchichtmodell",
+                "description": "Fehlt = der Einsatz hat keine Vorgabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "vorwarnung_minuten": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Wirksame Vorwarnzeit aller Schichten des Einsatzes."
           }
         }
       },
@@ -3831,7 +3868,8 @@
           "fahrzeug",
           "personal",
           "material",
-          "einheit_vorlage"
+          "einheit_vorlage",
+          "schichtmodell"
         ]
       },
       "DemoVorgang": {
@@ -5442,6 +5480,59 @@
           "fuehrungspersonal",
           "beobachter"
         ]
+      },
+      "EinsatzSchichtmodell": {
+        "type": "object",
+        "description": "Die Kopie eines Schichtmodells am Einsatz.",
+        "required": [
+          "bezeichnung",
+          "typ",
+          "vorwarnung_minuten",
+          "planungsvorlauf_minuten",
+          "geaendert_at"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "geaendert_at": {
+            "type": "string"
+          },
+          "mindestdauer_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "planungsvorlauf_minuten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rhythmus_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "typ": {
+            "$ref": "#/components/schemas/SchichtmodellTyp"
+          },
+          "vorwarnung_minuten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wechselzeiten": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "EinsatzStatus": {
         "type": "string",
@@ -12260,7 +12351,8 @@
         "description": "Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.",
         "enum": [
           "abschnitt",
-          "einheit"
+          "einheit",
+          "einsatz"
         ]
       },
       "Richtung": {
@@ -12660,6 +12752,81 @@
           "umweltschaden",
           "tierkadaver",
           "sonstige"
+        ]
+      },
+      "Schichtmodell": {
+        "type": "object",
+        "description": "Ein Schichtmodell der Organisation.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "typ",
+          "vorwarnung_minuten",
+          "planungsvorlauf_minuten",
+          "ist_vorgabe",
+          "ist_demo"
+        ],
+        "properties": {
+          "bezeichnung": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ist_demo": {
+            "type": "boolean",
+            "description": "Vom Demo-Import angelegt (Marke in `demo_herkunft`, live gelesen)."
+          },
+          "ist_vorgabe": {
+            "type": "boolean",
+            "description": "Die Vorgabe der Organisation; neue Einsätze kopieren sie."
+          },
+          "mindestdauer_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur bei Typ `wechselzeiten`."
+          },
+          "planungsvorlauf_minuten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rhythmus_minuten": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Nur bei Typ `rhythmus`."
+          },
+          "typ": {
+            "$ref": "#/components/schemas/SchichtmodellTyp"
+          },
+          "vorwarnung_minuten": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wechselzeiten": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "Nur bei Typ `wechselzeiten`: Wanduhrzeiten `HH:MM`, sortiert."
+          }
+        }
+      },
+      "SchichtmodellTyp": {
+        "type": "string",
+        "description": "Typ eines Schichtmodells. Wire == `as_str()`.",
+        "enum": [
+          "rhythmus",
+          "wechselzeiten"
         ]
       },
       "Schriftfeld": {

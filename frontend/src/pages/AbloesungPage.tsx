@@ -554,9 +554,9 @@ export default function AbloesungPage() {
           // Folgt die Schicht der Vorgabe, bleibt das Feld leer — sonst machte ein unverändertes
           // Speichern aus der Vorgabe still einen eigenen Wert.
           minuten={
-            rhythmusZiel.schicht.rhythmus_quelle === 'abschnitt'
-              ? null
-              : rhythmusZiel.schicht.rhythmus_minuten
+            rhythmusZiel.schicht.rhythmus_quelle === 'einheit'
+              ? rhythmusZiel.schicht.rhythmus_minuten
+              : null
           }
           leerErlaubt={rhythmusZiel.vorgabe != null}
           platzhalter={

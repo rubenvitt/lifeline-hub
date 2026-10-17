@@ -6,7 +6,21 @@ import { describe, expect, it, vi } from 'vitest';
 import type { VerpflegungZeitfenster } from '../api/types';
 import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import { renderMitProviders } from '../test/utils';
-import { KEINE_SONDERKOST, ausgabe, zeitfenster } from '../test/verpflegungDaten';
+import { setzeViewportBreite } from '../test/viewport';
+import {
+  ABSCHNITT_DEICH,
+  DEICH,
+  FELDKUECHE,
+  GRUPPE_1,
+  GRUPPE_2,
+  KEINE_SONDERKOST,
+  TURNHALLE,
+  ausgabe,
+  empfaenger,
+  stelle,
+  verpflegungMitStellen,
+  zeitfenster,
+} from '../test/verpflegungDaten';
 import ZeitfensterKarte, { type ZeitfensterKarteProps } from './ZeitfensterKarte';
 import { zeitfensterKennung } from './verpflegungText';
 
@@ -399,5 +413,194 @@ describe('ZeitfensterKarte — Aktionen (LFH-365)', () => {
       },
     );
     expect(screen.queryByRole('button', { name: /Fehlmenge melden/ })).toBeNull();
+  });
+});
+
+describe('ZeitfensterKarte — Stellen (LLH-1040, D13 Punkt 4)', () => {
+  const v = verpflegungMitStellen();
+  const mittagMitStellen = v.zeitfenster[0];
+  const jeStelle = (karte: HTMLElement) =>
+    karte.querySelector<HTMLElement>('[data-lfh="verpflegung-je-stelle"]');
+  const zeilen = (karte: HTMLElement) =>
+    [...(jeStelle(karte)?.querySelectorAll<HTMLElement>('li') ?? [])].map((li) =>
+      li.querySelector('[data-lfh="je-stelle-text"]')!.textContent!.trim(),
+    );
+
+  it('Fixture 200/100/80: Ist je Stelle unter „ausgegeben“, Marke der Art', () => {
+    const { karte } = zeige(mittagMitStellen, { stellen: v.stellen });
+    expect(zeilen(karte)).toEqual([
+      'Ausgabe Turnhalle Nord · 80 EP',
+      'Feldküche BR Sportplatz · 100 EP',
+    ]);
+    expect(within(karte).getByText('warm')).toHaveAttribute('data-lfh', 'verpflegungsart');
+    // Kein Soll je Stelle: das Gesamt-„fehlt“ bleibt die einzige Fehlmenge.
+    expect(within(fehltWert(karte)).getByText('20')).toBeInTheDocument();
+  });
+
+  it('Bestand ohne Stelle rendert wie vorher: keine Aufstellung, keine Marke', () => {
+    const { karte } = zeige(zeitfenster(), { stellen: v.stellen });
+    expect(jeStelle(karte)).toBeNull();
+    expect(karte.querySelector('[data-lfh="verpflegungsart"]')).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen an/ })).toBeNull();
+  });
+
+  it('kennzeichnet aufgelöste und nicht zugeordnete Stellen, „ohne Stelle“ zuletzt', () => {
+    const stellen = [
+      stelle({ id: FELDKUECHE, bezeichnung: 'Feldküche', status: 'aufgeloest' }),
+      stelle({ id: DEICH, bezeichnung: 'Zuführung Deich', art: 'zufuehrung' }),
+    ];
+    const zf = zeitfenster({
+      stelle_ids: [FELDKUECHE],
+      je_stelle: [
+        { stelle_id: null, ausgegeben: { gesamt: 30, sonderkost: KEINE_SONDERKOST } },
+        { stelle_id: FELDKUECHE, ausgegeben: { gesamt: 100, sonderkost: KEINE_SONDERKOST } },
+        { stelle_id: DEICH, ausgegeben: { gesamt: 20, sonderkost: KEINE_SONDERKOST } },
+      ],
+    });
+    const { karte } = zeige(zf, { stellen });
+    expect(zeilen(karte)).toEqual([
+      'Feldküche · aufgelöst · 100 EP',
+      'Zuführung Deich · nicht zugeordnet · 20 EP',
+      'ohne Stelle · 30 EP',
+    ]);
+    // Sprung nur zu einer Stelle, an der noch gebucht werden kann.
+    expect(screen.getAllByRole('link', { name: /^Ausgabe öffnen an/ })).toHaveLength(1);
+    expect(
+      screen.getByRole('link', { name: `Ausgabe öffnen an Zuführung Deich zu ${kennung}` }),
+    ).toHaveAttribute('href', `/einsaetze/1/verpflegung/1/ausgabe?stelle=${DEICH}`);
+  });
+
+  it('Sprung je Stelle mit `?stelle=`, am Gerät auf dem Gerätepfad', () => {
+    zeige(mittagMitStellen, { stellen: v.stellen }, true);
+    expect(
+      screen.getByRole('link', {
+        name: `Ausgabe öffnen an Feldküche BR Sportplatz zu ${zeitfensterKennung(mittagMitStellen)}`,
+      }),
+    ).toHaveAttribute('href', `/geraet/1/verpflegung/1/ausgabe?stelle=${FELDKUECHE}`);
+  });
+
+  it('kein Sprung je Stelle ohne Schreibrecht, nach dem Ende und bei 390 px; die Zeilen bleiben', () => {
+    const { karte } = zeige(mittagMitStellen, { stellen: v.stellen, darfSchreiben: false });
+    expect(zeilen(karte)).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen an/ })).toBeNull();
+  });
+
+  it('nach dem Ende kein Sprung je Stelle', () => {
+    zeige(mittagMitStellen, { stellen: v.stellen, jetzt: VORBEI });
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen an/ })).toBeNull();
+  });
+
+  it('bei 390 px nur die Zeilen', () => {
+    setzeViewportBreite(390);
+    const { karte } = zeige(mittagMitStellen, { stellen: v.stellen });
+    expect(zeilen(karte)).toHaveLength(2);
+    expect(screen.queryByRole('link', { name: /^Ausgabe öffnen an/ })).toBeNull();
+  });
+
+  it('eine Ausgabe an einer Stelle nennt die Stelle statt des Orts', () => {
+    const zf = zeitfenster({
+      ausgaben: [
+        ausgabe({ id: 11, menge: 100, verpflegungsstelle_id: TURNHALLE, ort: null }),
+        ausgabe({ id: 12, menge: 30, ort: 'Deich km 3' }),
+      ],
+    });
+    const { karte } = zeige(zf, { stellen: v.stellen });
+    const eintraege = karte.querySelectorAll<HTMLElement>('[data-lfh="verpflegung-ausgabe"]');
+    expect(eintraege[0].textContent).toContain('100 EP · Ausgabe Turnhalle Nord');
+    expect(eintraege[1].textContent).toContain('30 EP · Deich km 3');
+  });
+
+  it('eine ausstehende Ausgabe nennt ihre Stelle', () => {
+    const { karte } = zeige(zeitfenster(), {
+      stellen: v.stellen,
+      ausstehend: [
+        {
+          id: 2,
+          benutzer_id: 11,
+          einsatz_id: 1,
+          erstellt_at: '2026-09-24T09:40:00.000Z',
+          aktion: {
+            art: 'ausgabe',
+            zeitfenster_id: 1,
+            bezeichnung: 'Mittag',
+            daten: { menge: 15, verpflegungsstelle_id: FELDKUECHE, client_id: 'a-3' },
+          },
+        },
+      ],
+    });
+    const zeile = karte.querySelector<HTMLElement>('[data-lfh="verpflegung-ausgabe-ausstehend"]')!;
+    expect(zeile.textContent).toContain('15 EP · Feldküche BR Sportplatz');
+  });
+});
+
+describe('ZeitfensterKarte — Empfänger (LLH-1055 Teil II)', () => {
+  const mitEmpfaengern = () =>
+    zeitfenster({
+      ausgaben: [
+        ausgabe({ id: 11, menge: 9, ort: null, einheit_id: GRUPPE_1 }),
+        ausgabe({ id: 12, menge: 40, ort: null, abschnitt_id: ABSCHNITT_DEICH }),
+      ],
+    });
+
+  it('jede Ausgabe nennt ihren Empfänger', () => {
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: empfaenger() });
+    const zeilen = [...karte.querySelectorAll<HTMLElement>('[data-lfh="verpflegung-ausgabe"]')].map(
+      (z) => z.textContent,
+    );
+    expect(zeilen[0]).toContain('9 EP · an 1. Gruppe');
+    expect(zeilen[1]).toContain('40 EP · Zuführung Deich');
+  });
+
+  it('eine vorgemerkte Ausgabe nennt ihren Empfänger', () => {
+    const { karte } = zeige(zeitfenster({ ausgaben: [] }), {
+      empfaenger: empfaenger(),
+      ausstehend: [
+        {
+          id: 1,
+          benutzer_id: 11,
+          einsatz_id: 1,
+          erstellt_at: '2026-09-24T09:40:00.000Z',
+          aktion: {
+            art: 'ausgabe',
+            zeitfenster_id: 1,
+            bezeichnung: 'Mittag',
+            daten: {
+              menge: 9,
+              einheit_id: GRUPPE_2,
+              client_id: 'a',
+              zeitpunkt_at: '2026-09-24 09:40:00',
+            },
+          },
+        },
+      ],
+    });
+    expect(karte.querySelector('[data-lfh="verpflegung-ausgabe-ausstehend"]')).toHaveTextContent(
+      '9 EP · an 2. Gruppe',
+    );
+  });
+
+  it('Klappe „Einheiten“ nennt die Zahlen; aufgeklappt „Noch nicht verpflegt“ und „Verpflegt“', async () => {
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: empfaenger() });
+    const klappe = within(karte).getByRole('button', {
+      name: 'Einheiten · 2 noch nicht verpflegt · 1 ohne Eintreffen · 1 verpflegt',
+    });
+    expect(karte.querySelector('[data-lfh="verpflegung-stand"]')).toBeNull();
+    await userEvent.click(klappe);
+    const stand = await waitFor(() => {
+      const el = karte.querySelector<HTMLElement>('[data-lfh="verpflegung-stand"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    // Sichtbarkeit misst jsdom in der Klappanimation nicht; die Rolle genügt.
+    expect(
+      within(stand).getByRole('heading', { name: 'Noch nicht verpflegt · 2', hidden: true }),
+    ).toBeInTheDocument();
+    // An der Karte wählt niemand einen Empfänger: keine Knöpfe.
+    expect(within(stand).queryAllByRole('button')).toEqual([]);
+  });
+
+  it('ohne Einheiten im Einsatz keine Klappe', () => {
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: { einheiten: [], abschnitte: [] } });
+    expect(within(karte).queryByRole('button', { name: /^Einheiten/ })).toBeNull();
   });
 });

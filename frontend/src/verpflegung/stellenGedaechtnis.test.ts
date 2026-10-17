@@ -1,0 +1,57 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  gemerkteStellenRaeumen,
+  loadGemerkteStelle,
+  saveGemerkteStelle,
+} from './stellenGedaechtnis';
+
+/**
+ * Die gemerkte Stellenwahl der Ausgabeansicht (LLH-1040, design.md D13 Punkt 7): nur eine Kennung
+ * je Einsatz, über `lib/sichererSpeicher`, bei jedem Ausgang geräumt.
+ */
+
+beforeEach(() => localStorage.clear());
+afterEach(() => vi.restoreAllMocks());
+
+describe('stellenGedaechtnis', () => {
+  it('merkt die Wahl je Einsatz und liest sie zurück', () => {
+    saveGemerkteStelle(7, 21);
+    saveGemerkteStelle(8, 22);
+    expect(loadGemerkteStelle(7)).toBe(21);
+    expect(loadGemerkteStelle(8)).toBe(22);
+    expect(loadGemerkteStelle(9)).toBeNull();
+  });
+
+  it('„ohne Stelle“ entfernt den Eintrag', () => {
+    saveGemerkteStelle(7, 21);
+    saveGemerkteStelle(7, null);
+    expect(loadGemerkteStelle(7)).toBeNull();
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('ein fremder Wert gilt als nichts gemerkt', () => {
+    localStorage.setItem('lfh:verpflegung:stelle:7', 'Feldküche');
+    expect(loadGemerkteStelle(7)).toBeNull();
+  });
+
+  it('ein gesperrter Speicher wirft nicht: lesen ergibt nichts, schreiben geht ins Leere', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('gesperrt', 'SecurityError');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('gesperrt', 'SecurityError');
+    });
+    expect(() => saveGemerkteStelle(7, 21)).not.toThrow();
+    expect(loadGemerkteStelle(7)).toBeNull();
+  });
+
+  it('Räumen nimmt alle gemerkten Stellen, fremde Schlüssel bleiben', () => {
+    saveGemerkteStelle(7, 21);
+    saveGemerkteStelle(8, 22);
+    localStorage.setItem('lifeline-hub.theme', 'dunkel');
+    gemerkteStellenRaeumen();
+    expect(loadGemerkteStelle(7)).toBeNull();
+    expect(loadGemerkteStelle(8)).toBeNull();
+    expect(localStorage.getItem('lifeline-hub.theme')).toBe('dunkel');
+  });
+});

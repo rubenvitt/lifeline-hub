@@ -66,6 +66,7 @@ pub mod personal_status;
 pub mod presse;
 pub mod qualifikation;
 pub mod schaden_anhang;
+pub mod schichtmodell;
 pub mod sitzung;
 pub mod sprechgruppe;
 pub mod stab;

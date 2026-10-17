@@ -22,7 +22,7 @@ import type {
 } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { freigabenFixture } from '../test/fixtures';
-import { zeitfenster } from '../test/verpflegungDaten';
+import { stelle, zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
@@ -724,7 +724,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
   const wire = (minuten: number) =>
     new Date(Date.now() + minuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
 
-  function verpflegungBereit() {
+  function verpflegungBereit(stellen: ReturnType<typeof stelle>[] = []) {
     stelleBereit(vGeraet);
     const nachforderungen = vi.fn();
     server.use(
@@ -740,7 +740,7 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
       http.get('/api/einsaetze/7/verpflegung', () =>
         HttpResponse.json({
           zeitfenster: [zeitfenster({ id: 1, einsatz_id: 7, von_at: wire(-30), bis_at: wire(60) })],
-          stellen: [],
+          stellen,
         }),
       ),
       http.get('/api/einsaetze/7/nachforderungen', () => {
@@ -773,6 +773,21 @@ describe('Verpflegung — Portionen buchen und Fehlmenge melden (LFH-1044)', () 
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
     expect(nachforderungen).not.toHaveBeenCalled();
+  });
+
+  it('sieht die Stellen ohne Aktionen und ohne „Stelle anlegen“ (LLH-1040)', async () => {
+    vi.useRealTimers();
+    verpflegungBereit([
+      stelle({ id: 21, bezeichnung: 'Feldküche BR Sportplatz' }),
+      stelle({ id: 23, bezeichnung: 'Zuführung Deich', art: 'zufuehrung', status: 'geplant' }),
+    ]);
+    renderApp('/geraet/7/verpflegung');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('radio', { name: 'Stellen (2)' }));
+    expect(await screen.findByRole('article', { name: 'Stelle Zuführung Deich' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Stelle anlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu Stelle/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /zu Stelle/ })).toBeNull();
   });
 
   it('„Fehlmenge melden“ füllt die Meldung an die Einsatzleitung vor, Absender ist das Gerät', async () => {

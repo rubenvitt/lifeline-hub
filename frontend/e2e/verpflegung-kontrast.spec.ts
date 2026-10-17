@@ -27,6 +27,10 @@ import { kontrast, pruefe, randKontrast } from './kontrast-kern';
  * Nacht, mit denselben Schranken; die gesperrte Taste „−1“ (ohne Sammlung) hält den
  * Gesperrt-Boden ≥ 4,5 : 1 (Spec `textstufen-kontrast`, `gesperrt-kontrast.spec.ts`), Text in
  * gesperrten Knöpfen zählt nur dort.
+ * STELLEN (LLH-1040): „Mittag Kontrast" ist zwei Stellen zugeordnet und an beiden ausgegeben, eine
+ * davon danach aufgelöst — die Zeilen je Stelle stehen benannt und einzeln gemessen, das
+ * Kennzeichen „aufgelöst" in Zweittext eingeschlossen. Die Ansicht „Stellen" trägt alle drei
+ * Statuswörter (geplant, aktiv, aufgelöst im aufgeklappten Klappteil); jeder Text dort zählt.
  * Der Rand der OFFENEN Karte trägt keinen Zustand (Linienfarbe) — gemessen und angehängt, und
  * zugesichert, dass er sich von den Zustandsrändern unterscheidet. Sichtbarer Text unter
  * `aria-hidden` (Legende der Bedarfs-Aufgliederung) überspringt der Textbaum; er wird eigens
@@ -127,7 +131,16 @@ for (const modus of ['light', 'dark'] as const) {
       { menge: 25, zeitpunkt_at: zeit(-30), ort: 'Deichweg' },
     );
     await post(page, `${basis}/ausgaben/${falsch.ausgabe_id}/zuruecknehmen`);
-    // Gedeckt: 40 EP Bedarf, 40 ausgegeben.
+    // Stellen: zwei aktive (eine danach aufgelöst), eine geplante.
+    const stelle = async (bezeichnung: string, art: string, status?: string) => {
+      const { id } = await post(page, `${basis}/stellen`, { bezeichnung, art });
+      if (status) await post(page, `${basis}/stellen/${id}/status`, { status });
+      return id;
+    };
+    const feldkueche = await stelle('Feldküche Kontrast', 'feldkueche', 'aktiv');
+    const turnhalle = await stelle('Turnhalle Kontrast', 'ausgabestelle', 'aktiv');
+    await stelle('Deich Kontrast', 'zufuehrung');
+    // Gedeckt: 40 EP Bedarf, 25 an der Feldküche und 15 an der Turnhalle ausgegeben.
     const mittag = await post(page, `${basis}/zeitfenster`, {
       bezeichnung: 'Mittag Kontrast',
       von_at: zeit(-10),
@@ -135,11 +148,21 @@ for (const modus of ['light', 'dark'] as const) {
       bedarf_kraefte: 30,
       bedarf_betreute: 10,
     });
-    await post(page, `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
-      menge: 40,
-      zeitpunkt_at: zeit(-5),
-      ort: 'Feldküche Süd',
+    const r = await page.request.patch(`${basis}/zeitfenster/${mittag.id}`, {
+      data: { stelle_ids: [feldkueche, turnhalle], verpflegungsart: 'warm' },
     });
+    expect(r.ok(), `Zuordnung: ${r.status()} ${await r.text()}`).toBeTruthy();
+    for (const [menge, stelleId] of [
+      [25, feldkueche],
+      [15, turnhalle],
+    ] as const) {
+      await post(page, `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
+        menge,
+        zeitpunkt_at: zeit(-5),
+        verpflegungsstelle_id: stelleId,
+      });
+    }
+    await post(page, `${basis}/stellen/${turnhalle}/status`, { status: 'aufgeloest' });
     // Offen: Beginn in drei Stunden, keine Ausgabe, Sonderkost-Fehlmenge ohne Alarm.
     await post(page, `${basis}/zeitfenster`, {
       bezeichnung: 'Abendessen Kontrast',
@@ -187,7 +210,8 @@ for (const modus of ['light', 'dark'] as const) {
           .toBeGreaterThanOrEqual(ZUSTAND);
       }
 
-      const etikett = karte.locator('.ant-tag');
+      // Das Etikett der Einstufung; die Verpflegungsart (Mittag, „warm“) ist ein eigenes Tag.
+      const etikett = karte.locator('.ant-tag:not([data-lfh="verpflegungsart"])');
       await expect(etikett).toHaveCount(1);
       await expect(etikett).toHaveText(k.wort);
       const tagRand = await randKontrast(etikett, 'top');
@@ -226,7 +250,7 @@ for (const modus of ['light', 'dark'] as const) {
     const skFehlt = unter.locator('li[data-kostform="vegan"] [data-lfh="sonderkost-fehlt"]');
     await expect(skFehlt).toHaveText('fehlt 8 vegan');
     for (const [was, ziel] of [
-      ['Etikett', unter.locator('.ant-tag')],
+      ['Etikett', unter.locator('.ant-tag:not([data-lfh="verpflegungsart"])')],
       ['Fehlmenge', fehlmenge],
       ['Sonderkost-Fehlmenge', skFehlt],
     ] as const) {
@@ -238,6 +262,30 @@ for (const modus of ['light', 'dark'] as const) {
           `${modus}, Unterdeckung: ${was}: ${m.verhaeltnis.toFixed(2)} : 1 (Soll ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`,
         )
         .toBeGreaterThanOrEqual(TEXT[modus]);
+    }
+
+    // (2b) Zeilen je Stelle am Mittag, benannt: Name, Kennzeichen (Zweittext) und Menge.
+    const jeStelle = karteZu(page, 'Mittag Kontrast').locator('[data-lfh="je-stelle-text"]');
+    await expect(jeStelle).toHaveText([
+      'Feldküche Kontrast · 25 EP',
+      'Turnhalle Kontrast · aufgelöst · 15 EP',
+    ]);
+    for (const [i, name] of ['Feldküche', 'Turnhalle'].entries()) {
+      const zeile = jeStelle.nth(i);
+      for (const [was, ziel] of [
+        ['Name', zeile],
+        ['Menge', zeile.locator('span').last()],
+        ...(i === 1 ? ([['Kennzeichen', zeile.locator('span').first()]] as const) : []),
+      ] as const) {
+        const m = await kontrast(ziel);
+        messwerte.push({ modus, karte: 'gedeckt', art: `je Stelle: ${name} ${was}`, ...m });
+        expect
+          .soft(
+            m.verhaeltnis,
+            `${modus}, je Stelle ${name}, ${was}: ${m.verhaeltnis.toFixed(2)} : 1 (Soll ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`,
+          )
+          .toBeGreaterThanOrEqual(TEXT[modus]);
+      }
     }
 
     // (3) Jeder Text — Seitenkopf, Seiteninhalt und die beiden Hauptdialoge.
@@ -285,12 +333,35 @@ for (const modus of ['light', 'dark'] as const) {
       await dialog.getByRole('button', { name: bereich }).click();
       await expect(dialog.getByLabel(bereichsFeld, { exact: true })).toBeVisible();
       // Das Aufklappen animiert Höhe UND Opacity; erst messen, wenn die Bewegung vorbei ist.
-      await expect(dialog.locator('.ant-collapse-panel')).toHaveCount(1);
-      await expect(dialog.locator('.ant-collapse-panel')).not.toHaveClass(/ant-motion-collapse/);
+      // Gezählt wird das OFFENE Paneel: der Zeitfensterdialog trägt zwei Klappteile (LLH-1040).
+      const offen = dialog.locator('.ant-collapse-item-active .ant-collapse-panel');
+      await expect(offen).toHaveCount(1);
+      await expect(offen).not.toHaveClass(/ant-motion-collapse/);
       await messeTexte(dialog, titel);
       await page.keyboard.press('Escape');
       await expect(dialog).toBeHidden();
     }
+
+    // (4) Ansicht „Stellen": die drei Statuswörter, „aufgelöst" im aufgeklappten Klappteil.
+    await page.getByRole('radio', { name: 'Stellen (2)' }).click();
+    const stellen = page.locator('[data-lfh="verpflegung-stellen"]');
+    await stellen.getByRole('button', { name: 'aufgelöst (1)' }).click();
+    const aufgeloest = stellen.locator('[data-lfh="verpflegungsstelle"][data-status="aufgeloest"]');
+    await expect(aufgeloest).toBeVisible();
+    await expect(stellen.locator('.ant-collapse-item-active .ant-collapse-panel')).not.toHaveClass(
+      /ant-motion-collapse/,
+    );
+    for (const [status, wort] of [
+      ['geplant', 'geplant'],
+      ['aktiv', 'aktiv'],
+      ['aufgeloest', 'aufgelöst'],
+    ] as const) {
+      const etikett = stellen.locator(
+        `[data-lfh="verpflegungsstelle"][data-status="${status}"] .ant-tag`,
+      );
+      await expect(etikett).toHaveText(wort);
+    }
+    await messeTexte(inhalt, 'stellen');
 
     // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf trivial wahr.
     const pruefeGesehen = (pflicht: string | RegExp) => {
@@ -327,7 +398,8 @@ for (const modus of ['light', 'dark'] as const) {
       'Weitere Personen (EP)',
       'Säugling/Kleinkind',
       'Menge (EP)',
-      'Ort',
+      // „Ort“ heißt seit LLH-1040 „Zuführungsziel“, sobald der Einsatz Stellen hat.
+      'Zuführungsziel',
       'Zeitpunkt',
       'Weitere Angaben',
       'Nachforderung',
@@ -342,6 +414,18 @@ for (const modus of ['light', 'dark'] as const) {
       'EP',
       'Rest folgt mit der zweiten Tour',
       'davon Sonderkost (EP)',
+      // Stellen (LLH-1040): Klappteil des Zeitfensterdialogs, Ansicht „Stellen" samt Statuswörtern.
+      /^Art und Stellen/,
+      /^Stellen \(2\)$/,
+      'Stelle',
+      'geplant',
+      'aktiv',
+      'aufgelöst',
+      'Feldküche',
+      'Zuführung',
+      'warm',
+      'kein laufendes Zeitfenster',
+      '25 EP ausgegeben',
     ])
       pruefeGesehen(tragend);
 
@@ -409,6 +493,16 @@ for (const modus of ['light', 'dark'] as const) {
         sonderkost: { vegan: 6 },
       })
     ).id;
+    // Empfänger (LLH-1055): eine eingetroffene Gruppe und eine Einheit ohne Eintreffen, damit
+    // Empfängerwahl und „Noch nicht verpflegt“ samt „Wählen“ gemessen werden.
+    const { id: gruppe } = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, {
+      name: 'Gruppe Kontrast',
+    });
+    await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name: 'Wasserrettung Kontrast' });
+    await post(page, `/api/einsaetze/${einsatzId}/einheiten/${gruppe}/zeitachse`, {
+      art: 'eintreffen',
+      zeitpunkt_at: zeit(-60),
+    });
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     const messwerte: Record<string, unknown>[] = [];
@@ -442,7 +536,15 @@ for (const modus of ['light', 'dark'] as const) {
         .toBeGreaterThanOrEqual(TEXT[modus]);
 
       // Jeder Text außerhalb gesperrter Knöpfe.
-      for (const bereich of ['ausgabe-kopf', 'ausgabe-sonderkost', 'zaehltasten'] as const) {
+      // Die gewählte Zeile trägt die Auswahlfläche; ihr Text wird darauf gemessen.
+      await page.getByRole('button', { name: 'Empfänger wählen: Gruppe Kontrast' }).click();
+      await page.mouse.move(0, 0);
+      for (const bereich of [
+        'ausgabe-kopf',
+        'ausgabe-sonderkost',
+        'zaehltasten',
+        'verpflegung-stand',
+      ] as const) {
         const knoten = await textknoten(page.locator(`[data-lfh="${bereich}"]`));
         for (const { ziel, text } of knoten) {
           if (await ziel.evaluate((el) => el.closest('button[disabled]') != null)) continue;
@@ -464,7 +566,18 @@ for (const modus of ['light', 'dark'] as const) {
       await pruefe(minus, GESPERRT_BODEN, `${modus}/${k.stufe}/−1 gesperrt`);
       await expect(minus).toHaveCSS('border-top-style', 'dashed');
     }
-    for (const tragend of ['Sammlung', '+1', '+5', '+10', 'Menge …', 'Soll', 'fehlt']) {
+    for (const tragend of [
+      'Sammlung',
+      '+1',
+      '+5',
+      '+10',
+      'Menge …',
+      'Soll',
+      'fehlt',
+      'Gruppe Kontrast',
+      'Wasserrettung Kontrast',
+      'Wählen',
+    ]) {
       expect(
         gemessen.filter((t) => t === tragend).length,
         `Text „${tragend}“ gemessen`,

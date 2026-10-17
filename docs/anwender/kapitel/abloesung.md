@@ -2,15 +2,15 @@
 titel: Ablösung
 gruppen: [fuehrung]
 reihenfolge: 360
-quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, openspec/specs/kraefte-abloesung/spec.md]
+quellen: [frontend/src/pages/AbloesungPage.tsx, frontend/src/abloesung/AbloesungKarte.tsx, frontend/src/abloesung/AbloesungDialoge.tsx, frontend/src/abloesung/einstufung.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/abloesung.rs, src/abloesung/repo.rs, src/zeitachse/repo.rs, src/erinnerung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/schichtmodell/mod.rs, openspec/specs/kraefte-abloesung/spec.md]
 ---
 
 ## Überblick
 
 Das Modul **Ablösung** führt je Einheit eine **Schicht**: seit wann sie im Einsatz ist, in welchem
 Rhythmus sie abgelöst werden soll und wann die Ablösung damit fällig ist. Die Seite zeigt die
-laufenden Schichten nach Fälligkeit, warnt 30 Minuten vorher und meldet, wenn eine Ablösung
-überfällig ist.
+laufenden Schichten nach Fälligkeit, warnt vorher (ohne anderes Schichtmodell 30 Minuten) und
+meldet, wenn eine Ablösung überfällig ist.
 
 Die Führung plant hier, welche Einheit welche ablöst, und hält den Vollzug fest. Schichten beginnen,
 ändern und vollziehen dürfen Einsatzleitung und Führungspersonal.
@@ -88,7 +88,8 @@ Für Einsatzleitung und Führungspersonal:
 ### Fälligkeit und Hinweise
 
 Fällig ist eine Schicht bei Beginn plus Rhythmus. Der Rhythmus liegt zwischen einer halben Stunde
-und 168 Stunden. 30 Minuten vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, bei
+und 168 Stunden. Vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, 30 Minuten vorher,
+wenn das Schichtmodell des Einsatzes nichts anderes vorgibt, bei
 Fälligkeit der Alarm „Ablösung fällig“, jeweils mit Einheit und Uhrzeit der Fälligkeit, etwa
 „Florian 1, 15:30“, und „Öffnen“ zur Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
 die Schichten, die bald fällig oder überfällig sind; der Überblick führt die Fälligkeiten als
@@ -98,6 +99,23 @@ Beides bekommen alle, die das Modul Ablösung sehen, je Fälligkeit einmal. Den 
 steht an“ kann jede Person unter „Benachrichtigungen“ abschalten, den Alarm „Ablösung fällig“
 nicht (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). In den Erinnerungen
 steht die Ablösung zwar, meldet sich aber nicht noch einmal als „Erinnerung fällig“.
+
+### Vorgabe des Einsatzes und Schichtmodelle
+
+Woher der Rhythmus einer Schicht kommt, folgt einer festen Reihenfolge: ein eigener Wert der
+Schicht, sonst die Vorgabe des Abschnitts, sonst die Vorgabe des Einsatzes. Die Vorgabe des
+Einsatzes ist die Kopie eines Schichtmodells. Ein neuer Einsatz bekommt das Schichtmodell, das die
+Organisation als Vorgabe führt; hat sie keines, hat auch der Einsatz keine Vorgabe.
+
+Ein Schichtmodell gibt einen festen Rhythmus vor oder feste Wechselzeiten, etwa 06:00 und 18:00
+mit vier Stunden Mindestdauer. Bei Wechselzeiten ist die Schicht zum ersten Wechsel fällig, zu dem
+die Einheit mindestens die Mindestdauer im Einsatz ist, gerechnet in der Zeitzone des Einsatzes,
+sonst der Organisation: wer um 13:42 beginnt, ist um 18:00 fällig, wer um 15:00 beginnt, um 06:00
+am Folgetag. Das Schichtmodell legt auch fest, wie lange vorher der Hinweis kommt.
+
+Ändert sich die Vorgabe des Einsatzes, rechnen die Schichten neu, die ihr folgen; Schichten mit
+eigenem Rhythmus oder nach der Vorgabe ihres Abschnitts bleiben. Ändert jemand das Schichtmodell in
+den Stammdaten oder löscht es, bleibt der laufende Einsatz unberührt.
 
 ### Eine Schicht je Einheit
 
@@ -115,7 +133,7 @@ von Hand streichen (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 
 Das Einsatztagebuch hält den Beginn einer Schicht, Änderungen an Rhythmus und Planung, jeden Vollzug
 mit Einheit, ablösender Einheit und Zeitpunkt und jede Rücknahme fest. Eine Änderung der Vorgabe
-eines Abschnitts steht dort als Entscheidung.
+eines Abschnitts oder des Einsatzes steht dort als Entscheidung.
 
 ### Rechte und ohne Netz
 

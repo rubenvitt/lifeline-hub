@@ -36,7 +36,9 @@ export type GeraetFaehigkeit =
    * Führung, kein Gerät (Routenliste ohne `…/abruf`). Das Ausrücken bucht das Gerät als Austritt.
    */
   | 'br-abrufen'
-  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044). */
+  /** Verpflegungszeitfenster anlegen, Bedarf ändern, löschen (LFH-1044); Verpflegungsstellen
+   *  anlegen, bearbeiten, in Betrieb nehmen, auflösen, stornieren und Zeitfenstern zuordnen
+   *  (LLH-1040). Das Gerät liest die Stellen und wählt sie beim Buchen. */
   | 'verpflegung-planen'
   /** Sprünge in Module außerhalb der Ansicht (Lagekarte, Tiere, Schäden, Einsatzübersicht). */
   | 'fremde-module';

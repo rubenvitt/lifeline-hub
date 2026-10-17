@@ -597,6 +597,64 @@ describe('Inspector für Betroffene (LFH-648)', () => {
   });
 });
 
+describe('Inspector für Bereitstellungsräume (LLH-1107)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  const raumMarker = {
+    schluessel: 'bereitstellungsraum-6',
+    typ: 'bereitstellungsraum',
+    id: 6,
+    lat: 50.05,
+    lon: 8.55,
+    label: 'BR Sportplatz',
+    farbe: '#1677ff',
+    beschriftungZusatz: '3 Fz',
+  } as KarteMarker;
+
+  it('Name, Objektart, Raumzeichen in der Kachel und der Sprung zur Detailseite', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={raumMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    // Der Titel ist der Name allein, der Zusatz gehört der Kartenplakette.
+    expect(screen.getByText('BR Sportplatz')).toBeInTheDocument();
+    expect(screen.getByText('Bereitstellungsraum')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Im Fachmodul öffnen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/bereitstellungsraeume/6',
+    );
+    expect(
+      document.querySelector('[data-lfh="auswahl-kachel"] img')?.getAttribute('src'),
+    ).toContain(encodeURIComponent('<svg'));
+  });
+
+  it('mit Schreibrecht: „Verortung löschen" ohne Rückfrage (umkehrbar)', () => {
+    const geloescht: KarteMarker[] = [];
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={raumMarker}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={(m) => geloescht.push(m)}
+      />,
+    );
+    screen.getByRole('button', { name: /Verortung löschen/ }).click();
+    expect(geloescht.map((m) => m.schluessel)).toEqual(['bereitstellungsraum-6']);
+  });
+});
+
 /**
  * „Verortung löschen" ist nicht überall gleich destruktiv: ein Abschnitt steht nur mit Fläche auf
  * der Karte, sein Löschen schickt `flaeche_geojson: null` — unumkehrbar, also Rückfrage. Ein Punkt

@@ -33,6 +33,7 @@ const LAYER_KEYS: (keyof LayerSichtbar)[] = [
   'freies_zeichen',
   'person',
   'betreuungsstelle',
+  'bereitstellungsraum',
 ];
 /**
  * Layer-Default ohne gespeicherten Wert: alle Ebenen an, außer „Betroffene" (LFH-648). Weil
@@ -55,6 +56,8 @@ const LAYER_DEFAULT: LayerSichtbar = {
   person: false,
   // An wie die UHS: wenige Lageobjekte; die Modulsperre greift an der Quelle (LFH-673).
   betreuungsstelle: true,
+  // An wie die Betreuungsstellen; die Modulsperre greift an der Quelle (LLH-1107).
+  bereitstellungsraum: true,
 };
 
 /** Kanonischer Konfigurations-Stand einer Kartenansicht (View-Config, ohne Kamera). */

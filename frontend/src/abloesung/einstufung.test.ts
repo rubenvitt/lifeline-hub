@@ -15,6 +15,7 @@ function schicht(teil: Partial<Abloesung> & { id: number }): Abloesung {
     einheit_name: `Florian ${teil.id}`,
     beginn_at: '2026-09-22 09:30:00',
     rhythmus_minuten: 360,
+    vorwarnung_minuten: 30,
     rhythmus_quelle: 'einheit',
     faellig_at: '2026-09-22 15:30:00',
     status: 'laufend',

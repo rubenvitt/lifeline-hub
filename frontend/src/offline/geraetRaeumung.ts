@@ -12,6 +12,7 @@
 import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfStore';
+import { gemerkteStellenRaeumen } from '../verpflegung/stellenGedaechtnis';
 import { personErfassungsQuittungenAufraeumen, personErfassungsQuittungenRaeumen } from './queue';
 
 /**
@@ -82,6 +83,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'jeder-ausgang',
     grund:
       'Letzter Antreff- bzw. Schadensort; ein zweiter Benutzer im selben Tab bekäme ihn sonst vorbelegt. Zusätzlich an benutzer_id gebunden, ein Benutzerwechsel ohne Abmelden räumt ihn (LFH-785).',
+  },
+  {
+    ort: 'localStorage lfh:verpflegung:stelle:<einsatz>',
+    datei: 'verpflegung/stellenGedaechtnis.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Nur die Kennung der Verpflegungsstelle, an der am Desktop gezählt wird (LLH-1040); der Server liefert die Stellen wieder, eine nächste Person soll nicht an fremder Stelle buchen.',
   },
   {
     ort: 'localStorage lfh:offline-quittung-signal',
@@ -212,6 +220,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     personErfassungsQuittungen: personErfassungsQuittungenRaeumen,
     ortCache: ortCacheRaeumen,
     erfassungsSitzung: erfassungsSitzungRaeumen,
+    verpflegungsstelle: gemerkteStellenRaeumen,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),
   });
 }

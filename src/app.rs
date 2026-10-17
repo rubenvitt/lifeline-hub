@@ -554,6 +554,12 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abloesungen/vorgaben/{abschnitt_id}",
             put(routes::abloesung::vorgabe_setzen),
         )
+        // Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells.
+        .route(
+            "/api/einsaetze/{id}/abloesungen/schichtmodell",
+            get(routes::abloesung::read_einsatz_vorgabe)
+                .put(routes::abloesung::set_einsatz_vorgabe),
+        )
         .route(
             "/api/einsaetze/{id}/abloesungen/{aid}",
             patch(routes::abloesung::aendern),
@@ -1780,6 +1786,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/verpflegung-vorlagen/{vid}",
             patch(routes::verpflegung_vorlage::update),
+        )
+        // Schichtmodelle (LLH-1122): Lesen für alle der Org, Schreiben Admin.
+        .route(
+            "/api/schichtmodelle",
+            get(routes::schichtmodell::list).post(routes::schichtmodell::create),
+        )
+        .route(
+            "/api/schichtmodelle/{sid}",
+            put(routes::schichtmodell::update).delete(routes::schichtmodell::delete),
         )
         .route("/api/einheit-typen", get(routes::einheit_typ::liste))
         .route("/api/einheit-typen", post(routes::einheit_typ::anlegen))

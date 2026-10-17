@@ -12,6 +12,7 @@ import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 import { ordneEigenpositionEin } from './eigenpositionLayer';
+import { GEPLANT_RING_BILD } from './geplantRing';
 
 // Felder, die eine Layer-Expression, ein Filter, der Klick-Handler oder die Cluster-Aggregation
 // liest: schluessel (Klick → Inspector), typ (Donut-Segmente), farbe (marker-kreis), icon
@@ -38,6 +39,8 @@ export interface MarkerProps {
   sk?: string;
   /** Eigene Cluster-Quelle (`KarteMarker.clusterQuelle`) — liest `teileNachQuelle`. */
   quelle?: 'personen';
+  /** Geplanter Raum (`KarteMarker.isGeplant`): gestrichelter Ring (`marker-geplant`). */
+  isGeplant?: true;
 }
 
 export type MarkerFeature = {
@@ -62,8 +65,9 @@ const PLAKETTEN_RANG: Partial<Record<MarkerTyp, number>> = {
   abschnitt: 3,
   uhs: 4,
   betreuungsstelle: 5,
-  schaden: 6,
-  freies_zeichen: 7,
+  bereitstellungsraum: 6,
+  schaden: 7,
+  freies_zeichen: 8,
 };
 
 /** Der Name auf der Plakette — oder keiner, wo das label keiner ist. */
@@ -71,7 +75,9 @@ function beschriftungVon(mk: KarteMarker): string | undefined {
   if (mk.typ === 'lagemeldung') return undefined; // „Meldung #412": Nummer, kein Name
   if (mk.typ === 'freies_zeichen' && mk.label === FREIES_ZEICHEN_ERSATZLABEL) return undefined;
   const text = mk.label.trim();
-  return text === '' ? undefined : text;
+  if (text === '') return undefined;
+  // Raum: „BR Sportplatz · 0/2/9//11 · 3 Fz" (LLH-1107); der Name bleibt vorn.
+  return mk.beschriftungZusatz ? `${text} · ${mk.beschriftungZusatz}` : text;
 }
 
 function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
@@ -83,6 +89,7 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   if (mk.trefferDurchmesser) properties.treffer = mk.trefferDurchmesser;
   if (mk.sichtung) properties.sk = mk.sichtung;
   if (mk.clusterQuelle) properties.quelle = mk.clusterQuelle;
+  if (mk.isGeplant) properties.isGeplant = true;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -170,6 +177,7 @@ export const MARKER_KLICK_LAYER = [
   'marker-kreis',
   'marker-kurz',
   'marker-status-ring',
+  'marker-geplant',
   'marker-einsatzort-symbol',
   'marker-label',
   'marker-einsatzort-label',
@@ -181,6 +189,7 @@ export const SPIDER_KLICK_LAYER = [
   'spider-kreis',
   'spider-kurz',
   'spider-status-ring',
+  'spider-geplant',
   'spider-label',
 ] as const;
 
@@ -202,6 +211,7 @@ const MARKER_LAYER_REIHENFOLGE = [
   'marker-treffer',
   'marker-einsatzort-treffer',
   'marker-status-ring',
+  'marker-geplant',
   'marker-kante',
   'marker-kreis',
   'marker-kurz',
@@ -212,6 +222,7 @@ const MARKER_LAYER_REIHENFOLGE = [
   'spider-legs-line',
   'spider-treffer',
   'spider-status-ring',
+  'spider-geplant',
   'spider-kante',
   'spider-kreis',
   'spider-kurz',
@@ -277,6 +288,15 @@ const KURZ_PAINT: SymbolLayerSpecification['paint'] = {
   'text-color': '#000',
   'text-halo-color': '#fff',
   'text-halo-width': 1.5,
+};
+/**
+ * Gestrichelter Ring eines geplanten Raums (`geplantRing.ts`): ein festes Bild unter dem Zeichen,
+ * wie der Statusring nie verdrängt.
+ */
+const GEPLANT_LAYOUT: SymbolLayerSpecification['layout'] = {
+  'icon-image': GEPLANT_RING_BILD,
+  'icon-allow-overlap': true,
+  'icon-ignore-placement': true,
 };
 const SYMBOL_LAYOUT: SymbolLayerSpecification['layout'] = {
   'icon-image': ['get', 'icon'],
@@ -398,6 +418,15 @@ export function sorgeFuerMarkerLayer(
       source: MARKER_CLUSTER_QUELLE,
       filter: ['all', ['!', ['has', 'point_count']], ['has', 'statusFarbe']],
       paint: { ...STATUS_RING_PAINT },
+    });
+  }
+  if (!map.getLayer('marker-geplant')) {
+    map.addLayer({
+      id: 'marker-geplant',
+      type: 'symbol',
+      source: MARKER_CLUSTER_QUELLE,
+      filter: ['all', ['!', ['has', 'point_count']], ['has', 'isGeplant']],
+      layout: { ...GEPLANT_LAYOUT },
     });
   }
   if (!map.getLayer('marker-treffer')) {
@@ -645,6 +674,15 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'statusFarbe'],
       paint: { ...STATUS_RING_PAINT },
+    });
+  }
+  if (!map.getLayer('spider-geplant')) {
+    map.addLayer({
+      id: 'spider-geplant',
+      type: 'symbol',
+      source: SPIDER_LEAVES_QUELLE,
+      filter: ['has', 'isGeplant'],
+      layout: { ...GEPLANT_LAYOUT },
     });
   }
   if (!map.getLayer('spider-kante')) {

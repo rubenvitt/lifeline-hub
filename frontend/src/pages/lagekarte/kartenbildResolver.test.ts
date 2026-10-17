@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { kartenbildResolver, type KartenbildZiel } from './kartenbildResolver';
 import type { Drawing } from '@einsatzzeichen/schema';
 import { plakettenBildId } from './plakette';
+import { GEPLANT_RING_BILD, geplantRingBild } from './geplantRing';
 
 /** Kleinste Karte: hält Bilder und merkt sich, wer was angelegt hat. */
 function fakeKarte(): KartenbildZiel & {
@@ -30,6 +31,23 @@ function aufbau(zeichen: Map<string, Drawing> = new Map()) {
   const resolver = kartenbildResolver(karte, { zeichen: () => zeichen, zeichneEz });
   return { karte, zeichneEz, resolver };
 }
+
+describe('kartenbildResolver — gestrichelter Ring (LLH-1107)', () => {
+  it('legt den Ring eines geplanten Raums synchron an, in doppelter Dichte', () => {
+    const { karte, resolver, zeichneEz } = aufbau();
+    resolver(GEPLANT_RING_BILD);
+    expect(karte.hasImage(GEPLANT_RING_BILD)).toBe(true);
+    const b = geplantRingBild();
+    expect(karte.bilder.get(GEPLANT_RING_BILD)).toMatchObject({
+      width: b.width,
+      height: b.height,
+    });
+    expect(karte.optionen.get(GEPLANT_RING_BILD)).toEqual({ pixelRatio: 2 });
+    expect(zeichneEz).not.toHaveBeenCalled();
+    // Nach einem Stilwechsel fragt die Karte erneut — ein schon vorhandenes Bild bleibt.
+    expect(() => resolver(GEPLANT_RING_BILD)).not.toThrow();
+  });
+});
 
 // LFH-841: MapLibre 6 baut die Bildantwort einer Kachel, BEVOR es `styleimagemissing` feuert; nur
 // was der Resolver anlegt (bzw. dessen Promise), steht im laufenden Layout.

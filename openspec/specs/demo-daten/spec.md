@@ -86,11 +86,14 @@ MUST der Kopf als Historie mit Entfernzeitpunkt stehen bleiben.
 ### Requirement: Stammdaten mit Konfliktregel
 
 Der Import SHALL die Stammdaten anlegen, die das Szenario braucht: Fahrzeuge, Personal,
-Material und Einheiten-Vorlagen der Organisation. Ein vorhandener Datensatz derselben
-Organisation mit Dienststatus `in_dienst` (bei Einheiten-Vorlagen: aktiv) und derselben
-fachlichen Kennung MUST mitbenutzt statt angelegt werden. Die Kennung ist beim Fahrzeug der
-Funkrufname, beim Personal die Personalnummer, beim Material die Bestandsnummer und bei der
-Einheiten-Vorlage der Name. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
+Material, Einheiten-Vorlagen und ein Schichtmodell (LLH-1122) der Organisation. Ein vorhandener
+Datensatz derselben Organisation mit Dienststatus `in_dienst` (bei Einheiten-Vorlagen: aktiv)
+und derselben fachlichen Kennung MUST mitbenutzt statt angelegt werden. Die Kennung ist beim
+Fahrzeug der Funkrufname, beim Personal die Personalnummer, beim Material die Bestandsnummer,
+bei der Einheiten-Vorlage der Name und beim Schichtmodell die Bezeichnung ohne Unterschied von
+Groß- und Kleinschreibung. Ein angelegtes Schichtmodell MUST NOT die Vorgabe der Organisation
+werden; hat der Demo-Einsatz bei seiner Anlage keine Vorgabe bekommen, MUST er das
+Szenario-Modell als Kopie zur Vorgabe bekommen. Ein Name ist beim Personal nie die Kennung. Ein mitbenutzter
 Datensatz MUST unverändert bleiben. Kataloge (Fahrzeug- und Personalstatus, Einheitstypen,
 Qualifikationen) MUST nur mitbenutzt werden, und zwar nur aktive
 Einträge. Fehlt ein benötigter Katalogeintrag, MUST der Import mit 422 abbrechen, den
@@ -112,6 +115,11 @@ und MUST NOT eine Zuordnung zwischen Personal und Benutzerkonto setzen.
 #### Scenario: Kein Benutzerkonto
 - **WHEN** ein Import durchläuft
 - **THEN** ist die Zahl der Benutzerkonten vorher und nachher gleich
+
+#### Scenario: Demo-Schichtmodell
+- **WHEN** der Admin in eine Organisation ohne Schichtmodelle importiert
+- **THEN** steht danach das Schichtmodell „12-h-Schicht Hochwasser“ mit Demo-Marke, nicht als Vorgabe der Organisation
+- **AND** der Demo-Einsatz hat es als Vorgabe der Ablösung
 
 #### Scenario: Demo-Vorlage mit Untereinheit
 - **WHEN** der Admin in eine Organisation ohne Vorlagen importiert
@@ -297,8 +305,8 @@ verschwinden.
 
 ### Requirement: Demo-Marke in den Stammdaten-Antworten
 
-Jede Antwort, die einen Fahrzeug-, Personal-, Material- oder Einheiten-Vorlagen-Stammdatensatz
-liefert, SHALL das Feld `ist_demo` tragen. Das gilt für Listen und für die Antworten auf Ändern
+Jede Antwort, die einen Fahrzeug-, Personal-, Material-, Einheiten-Vorlagen- oder
+Schichtmodell-Stammdatensatz liefert, SHALL das Feld `ist_demo` tragen. Das gilt für Listen und für die Antworten auf Ändern
 sowie auf Außer- und In-Dienst-Stellen. Das Feld MUST genau dann wahr sein, wenn die Zeile im
 Moment der Abfrage eine Demo-Marke trägt. Mitbenutzte Datensätze und Zeilen, die beim Entfernen
 ihre Marke verloren haben, MUST `false` melden. Das Feld MUST immer vorhanden sein.

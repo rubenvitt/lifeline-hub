@@ -9,6 +9,8 @@ import {
 } from '../routing/deeplinks';
 import { KEINE_SONDERKOST, zeitfenster } from '../test/verpflegungDaten';
 import {
+  STELLE_ART_LABEL,
+  VERPFLEGUNGSART_LABEL,
   belegteKostformen,
   meldungVorbelegung,
   nachforderungVorbelegung,
@@ -161,5 +163,19 @@ describe('meldungVorbelegung (Verpflegungsgerät, LFH-1044)', () => {
     const inhalt = meldungVorbelegung(zeitfenster(), BERLIN)!;
     const pfad = geraetMeldungenPfad(1, { inhalt });
     expect(new URLSearchParams(pfad.slice(pfad.indexOf('?'))).get('inhalt')).toBe(inhalt);
+  });
+});
+
+describe('Wörter der Verpflegungsstelle und der Verpflegungsart (LLH-1040)', () => {
+  it('nennt jede Art der Stelle', () => {
+    expect(STELLE_ART_LABEL).toEqual({
+      feldkueche: 'Feldküche',
+      ausgabestelle: 'Ausgabestelle',
+      zufuehrung: 'Zuführung',
+    });
+  });
+
+  it('nennt jede Verpflegungsart', () => {
+    expect(VERPFLEGUNGSART_LABEL).toEqual({ warm: 'warm', kalt: 'kalt', getraenke: 'Getränke' });
   });
 });
