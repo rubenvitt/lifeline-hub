@@ -582,7 +582,7 @@ geplanter Ablöser MUST in der Ansicht stehen, mit der Einheit, die er ablösen 
 Neue Einheiten ohne Schicht MUST hinter dem Sammelbanner warten, eine Einheit, die eine Schicht
 bekommt, MUST sofort wegfallen, und Zahl wie Kopf MUST mit der vollen Menge rechnen (Regeln wie
 bei den laufenden Schichten). Ohne Freigabe des Moduls Einheiten MUST das Segment gesperrt mit
-Grund stehen, ohne Zahl und ohne Anfrage an Einheiten oder Zeitachse. Auf 390 px MUST die
+Grund stehen, ohne Zahl und ohne Anfrage an die Kräfte-Zeitachse. Auf 390 px MUST die
 Ansichtsleiste mit dem Banner in jeder Dichte ungekürzt im Fenster stehen; schmal trägt dann der
 Kopf die Zahlen.
 

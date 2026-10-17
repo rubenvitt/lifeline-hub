@@ -1106,6 +1106,17 @@ describe('AbloesungPage — Ohne Schicht und beendet (LLH-1128)', () => {
     expect(listeEinheitenPerioden).not.toHaveBeenCalled();
   });
 
+  it('scheitert die Zeitachse, steht der Fehler statt eines ewigen Ladens', async () => {
+    listeEinheitenPerioden.mockRejectedValue(new ApiError(500, 'kaputt'));
+    renderPage();
+    await screen.findAllByRole('article');
+    await userEvent.click(segment(/^Ohne Schicht/));
+    expect(
+      await screen.findByText('Einheiten ohne Schicht konnten nicht geladen werden'),
+    ).toBeInTheDocument();
+    expect(document.querySelector('.ant-spin')).toBeNull();
+  });
+
   it('auf dem Handschirm stehen die Zahlen im Kopf, nicht in den Segmenten', async () => {
     setzeViewportBreite(390);
     renderPage();
