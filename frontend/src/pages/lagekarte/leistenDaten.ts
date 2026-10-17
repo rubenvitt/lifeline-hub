@@ -1,5 +1,6 @@
 import type {
   Betreuungsstelle,
+  BrListenEintrag,
   Fuehrungsstelle,
   Einheit,
   Einsatzabschnitt,
@@ -14,6 +15,7 @@ import type { Farbrollen } from '../../theme/tokens';
 import {
   auslastung,
   betreuungsstelleStatus,
+  brStatus,
   schadenAusmass,
   schadenStatus,
   statusKategorie,
@@ -28,6 +30,8 @@ import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
 import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
 import { BETREUUNG_SPERRGRUND, type BetreuungZugriff } from './betreuungEbene';
+import { BR_SPERRGRUND, type BrZugriff } from './brEbene';
+import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
 import { staerkeText } from '../../anzeige/staerke';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
@@ -54,6 +58,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'zone', name: 'Zonen' },
   { key: 'uhs', name: 'UHS' },
   { key: 'betreuungsstelle', name: 'Betreuungsstellen' },
+  { key: 'bereitstellungsraum', name: 'Bereitstellungsräume' },
   { key: 'schaden', name: 'Schäden' },
   { key: 'lagemeldung', name: 'Lagemeldungen' },
   { key: 'freies_zeichen', name: 'Taktische Zeichen' },
@@ -120,6 +125,11 @@ export interface BetreuungEbenenAngabe {
   zugriff: BetreuungZugriff;
 }
 
+/** Zugriffsangabe der Ebene „Bereitstellungsräume" (LLH-1107), wie bei den Betreuungsstellen. */
+export interface BrEbenenAngabe {
+  zugriff: BrZugriff;
+}
+
 /**
  * Die Zeilen des Paneels „Ebenen".
  *
@@ -136,6 +146,7 @@ export function ebenenZeilen(
   quellenFehler: boolean,
   personen: PersonenEbenenAngabe = { zugriff: 'ausgeblendet', anzahl: 0 },
   betreuung: BetreuungEbenenAngabe = { zugriff: 'ausgeblendet' },
+  br: BrEbenenAngabe = { zugriff: 'ausgeblendet' },
 ): EbenenZeile[] {
   const zaehlung = new Map<MarkerTyp, number>();
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
@@ -147,6 +158,13 @@ export function ebenenZeilen(
       if (betreuung.zugriff === 'ausgeblendet') return [];
       if (betreuung.zugriff === 'gesperrt') {
         return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: BETREUUNG_SPERRGRUND }];
+      }
+    }
+    // Bereitstellungsräume ebenso (LLH-1107).
+    if (key === 'bereitstellungsraum') {
+      if (br.zugriff === 'ausgeblendet') return [];
+      if (br.zugriff === 'gesperrt') {
+        return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: BR_SPERRGRUND }];
       }
     }
     const n = key === 'zone' ? zonenAnzahl : (zaehlung.get(key) ?? 0);
@@ -197,6 +215,8 @@ export interface AuswahlRoh {
   abschnitte: readonly Einsatzabschnitt[];
   /** Betreuungsstellen — leer ohne Modulrecht. */
   betreuungsstellen: readonly Betreuungsstelle[];
+  /** Bereitstellungsräume (LLH-1107) — leer ohne Modulrecht. */
+  bereitstellungsraeume: readonly BrListenEintrag[];
   /** Eigene Führungsstelle (LFH-1181); fehlt sie, zeigt der Inspector nur den Sprung. */
   fuehrungsstelle?: Fuehrungsstelle | null;
   /**
@@ -215,6 +235,7 @@ export const LEERE_ROHDATEN: AuswahlRoh = {
   schaeden: [],
   abschnitte: [],
   betreuungsstellen: [],
+  bereitstellungsraeume: [],
 };
 
 /** Ein Feld des Datenrasters: Augenbraue + Wert, optional mit Statusrolle (getönter Chip). */
@@ -240,6 +261,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   // Objektart-Wort für Personen-Marker.
   person: 'Person',
   betreuungsstelle: 'Betreuungsstelle',
+  bereitstellungsraum: 'Bereitstellungsraum',
 };
 
 export { staerkeText };
@@ -376,6 +398,25 @@ export function auswahlRaster(
         { label: 'Status', wert: st?.label ?? s.status, rolle: st?.rolle, mono: false },
         { label: 'Belegung', wert: belegung, rolle: auslastung(belegt, kap)?.rolle },
         { label: 'Abschnitt', wert: abschnittName(s.abschnitt_id), mono: false },
+      ];
+    }
+    // Bereitstellungsraum (LLH-1107): Zahlen nur aus `belegung` des Servers, Stärke nur über
+    // `staerkeImRaum` („Eine Heimat je Zahl"); unvollständig „—" statt einer zu kleinen Summe.
+    case 'bereitstellungsraum': {
+      const r = roh.bereitstellungsraeume.find((x) => x.id === marker.id);
+      if (!r) return [];
+      const st = brStatus[r.status];
+      const { staerke, unvollstaendig } = staerkeImRaum(r.einheit_ids, roh.einheiten);
+      return [
+        { label: 'Status', wert: st?.label ?? r.status, rolle: st?.rolle, mono: false },
+        { label: 'Stärke', wert: unvollstaendig ? '—' : staerkeText(staerke) },
+        { label: 'Fahrzeuge', wert: String(r.belegung.fahrzeuge) },
+        { label: 'Einheiten', wert: String(r.belegung.einheiten) },
+        {
+          label: 'Wartet seit',
+          wert: r.belegung.laengste_seit_at ? zeit(r.belegung.laengste_seit_at) : '—',
+        },
+        { label: 'Abschnitt', wert: text(r.abschnitt_name), mono: false },
       ];
     }
     case 'schaden': {

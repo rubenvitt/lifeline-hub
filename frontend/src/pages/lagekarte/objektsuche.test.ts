@@ -15,15 +15,17 @@ const m = (typ: MarkerTyp, id: number, label: string): KarteMarker => ({
 
 const UHS = m('uhs', 1, 'UHS Süd');
 const STELLE = m('betreuungsstelle', 2, 'Turnhalle Mitte');
+const RAUM = m('bereitstellungsraum', 4, 'BR Sportplatz');
 const PERSON = m('person', 3, 'Müller, Anna');
 
 describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
   const basis = {
-    verortet: [UHS, STELLE],
+    verortet: [UHS, STELLE, RAUM],
     personen: [PERSON],
     personenZugriff: 'frei' as const,
     personenEbeneAn: true,
     betreuungZugriff: 'frei' as const,
+    brZugriff: 'frei' as const,
   };
   const namen = (a: typeof basis | Parameters<typeof suchbareMarker>[0]) =>
     suchbareMarker(a).map((x) => x.label);
@@ -39,6 +41,19 @@ describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
       expect(liste).not.toContain('Turnhalle Mitte');
       // Gegenaussage: gesperrt ist nur das Modul, nicht die Suche.
       expect(liste).toContain('UHS Süd');
+    },
+  );
+
+  it('mit Recht auf Bereitstellungsräume: der Raum ist suchbar (LLH-1107)', () => {
+    expect(namen(basis)).toContain('BR Sportplatz');
+  });
+
+  it.each(['gesperrt', 'ausgeblendet'] as const)(
+    'ohne Recht auf Bereitstellungsräume (%s): kein Name eines Raums (LLH-1107)',
+    (zugriff) => {
+      const liste = namen({ ...basis, brZugriff: zugriff });
+      expect(liste).not.toContain('BR Sportplatz');
+      expect(liste).toContain('Turnhalle Mitte');
     },
   );
 

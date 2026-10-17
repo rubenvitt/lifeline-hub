@@ -1,5 +1,6 @@
 import type { Drawing } from '@einsatzzeichen/schema';
 import { PLAKETTE_PRAEFIX, plakettenBild } from './plakette';
+import { GEPLANT_RING_BILD, geplantRingBild } from './geplantRing';
 
 /** Der Ausschnitt der Karte, den der Resolver braucht (jsdom hat keine echte). */
 export interface KartenbildZiel {
@@ -25,8 +26,9 @@ export interface KartenbildQuellen {
  * erschiene erst beim nächsten Neu-Layout, nach einem Stilwechsel ohne neue Daten nie. Den Resolver
  * (samt Promise) wartet MapLibre ab, und er überlebt `setStyle`.
  *
- * - `plakette|` (Beschriftung, 9-Slice) und `ez|` (Fachobjekte und freie Zeichen, seit LFH-836
- *   design.md D8 ein Weg) synchron. Den asynchronen `tz|`-Weg des Altpakets gibt es nicht mehr.
+ * - `plakette|` (Beschriftung, 9-Slice), `ez|` (Fachobjekte und freie Zeichen, seit LFH-836
+ *   design.md D8 ein Weg) und der gestrichelte Ring geplanter Räume (`ring|geplant`, LLH-1107)
+ *   synchron. Den asynchronen `tz|`-Weg des Altpakets gibt es nicht mehr.
  *
  * Nichts wirft: ein fehlendes Bild ist besser als ein Fehler im MapLibre-Callback (der Marker
  * bleibt klickbar, die Beschriftung steht ohne Plakette).
@@ -43,6 +45,13 @@ export function kartenbildResolver(
       if (!bild) return;
       const { width, height, data, ...dehnung } = bild;
       karte.addImage(id, { width, height, data }, dehnung);
+      return;
+    }
+
+    // Gestrichelter Ring eines geplanten Raums (LLH-1107), ein festes Bild.
+    if (id === GEPLANT_RING_BILD) {
+      const { width, height, data, pixelRatio } = geplantRingBild();
+      karte.addImage(id, { width, height, data }, { pixelRatio });
       return;
     }
 

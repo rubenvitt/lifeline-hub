@@ -23,7 +23,9 @@
 import {
   CompositionError,
   NotMeasuredError,
+  drawAnySpec,
   drawSymbol,
+  serializeAnySpec,
   serializeSpec,
 } from '@einsatzzeichen/core';
 import {
@@ -33,6 +35,7 @@ import {
   type Drawing,
   type FunctionRoleId,
   type OrganizationId,
+  type PictogramSpec,
   type SymbolSpec,
   type TechnicalBodyMarkId,
 } from '@einsatzzeichen/schema';
@@ -343,4 +346,46 @@ export function funktionsZeichen(e: FunktionsZeichenEingabe): FachobjektZeichen 
   const ergebnis = waehle([spec]) ?? waehle([person]);
   FUNKTION_CACHE.set(key, ergebnis);
   return ergebnis;
+}
+
+/**
+ * Das Zeichen eines Bereitstellungsraums (LLH-1107): das Führungszeichen D.2.1
+ * „Bereitstellungsraum“ aus Anhang D, freistehend als Piktogramm — gelbe Ortsfläche mit dem
+ * Bereitstellungsrahmen. Ohne Organisation: der Raum gehört keiner, und der Katalog führt das
+ * Zeichen nur in dieser Fassung. Den Meldekopf (D.2.2) zeichnet der Hub nicht, er führt ihn nicht
+ * als Angabe.
+ */
+const BEREITSTELLUNGSRAUM_SPEC: PictogramSpec = {
+  kind: 'pictogram',
+  pictogram: 'leadership.staging-area',
+};
+
+interface BereitstellungsraumZeichen {
+  spec: PictogramSpec;
+  drawing: Drawing;
+  /** Karten-Bildschlüssel wie bei `fachobjektZeichen`: `ez|` + kanonische Serialisierung. */
+  schluessel: string;
+}
+
+let brZeichenCache: BereitstellungsraumZeichen | null | undefined;
+
+/**
+ * Wie `fachobjektZeichen`: gecacht, wirft nie; `null`, wenn die Bibliothek das Zeichen nicht
+ * zeichnet (dann bleibt der Marker ein Kreis).
+ */
+export function bereitstellungsraumZeichen(): BereitstellungsraumZeichen | null {
+  if (brZeichenCache !== undefined) return brZeichenCache;
+  try {
+    brZeichenCache = {
+      spec: BEREITSTELLUNGSRAUM_SPEC,
+      drawing: drawAnySpec(BEREITSTELLUNGSRAUM_SPEC),
+      schluessel: `ez|${serializeAnySpec(BEREITSTELLUNGSRAUM_SPEC)}`,
+    };
+  } catch (e) {
+    if (import.meta.env.DEV) {
+      console.warn('[fachobjektZeichen] Bereitstellungsraum nicht gezeichnet', e);
+    }
+    brZeichenCache = null;
+  }
+  return brZeichenCache;
 }

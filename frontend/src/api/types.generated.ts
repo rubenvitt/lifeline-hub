@@ -71,6 +71,29 @@ export interface components {
              * @description Die abgelöste Schicht, aus deren Vollzug diese hervorging.
              */
             vorgaenger_id?: number | null;
+            /**
+             * Format: int64
+             * @description Vorwarnzeit vor der Fälligkeit in Minuten: aus dem Schichtmodell des Einsatzes, ohne
+             *     eines [`VORWARNUNG_VORGABE_MINUTEN`]. Die Einstufung rechnet damit.
+             */
+            vorwarnung_minuten: number;
+        };
+        /**
+         * @description Vorgabe des Einsatzes (LLH-1122): die Kopie eines Schichtmodells, die beim Anlegen aus der
+         *     Vorgabe der Organisation kam oder in den Einsatz-Einstellungen gesetzt wurde.
+         */
+        AbloesungEinsatzVorgabeAnzeige: {
+            /**
+             * Format: int64
+             * @description Laufende Schichten, die der Vorgabe des Einsatzes folgen.
+             */
+            laufende_schichten: number;
+            schichtmodell?: components["schemas"]["EinsatzSchichtmodell"] | null;
+            /**
+             * Format: int64
+             * @description Wirksame Vorwarnzeit aller Schichten des Einsatzes.
+             */
+            vorwarnung_minuten: number;
         };
         /**
          * @description Status einer Schicht. Wire == `as_str()`.
@@ -1502,7 +1525,7 @@ export interface components {
          * @description Stammdatenart im Bericht. Wire == `as_str()`.
          * @enum {string}
          */
-        DemoStammdatenArt: "fahrzeug" | "personal" | "material" | "einheit_vorlage";
+        DemoStammdatenArt: "fahrzeug" | "personal" | "material" | "einheit_vorlage" | "schichtmodell";
         /**
          * @description Vorgang, den ein Bericht beschreibt. Wire == `as_str()`.
          * @enum {string}
@@ -2121,6 +2144,21 @@ export interface components {
          * @enum {string}
          */
         EinsatzRolle: "einsatzleitung" | "fuehrungspersonal" | "beobachter";
+        /** @description Die Kopie eines Schichtmodells am Einsatz. */
+        EinsatzSchichtmodell: {
+            bezeichnung: string;
+            geaendert_at: string;
+            /** Format: int64 */
+            mindestdauer_minuten?: number | null;
+            /** Format: int64 */
+            planungsvorlauf_minuten: number;
+            /** Format: int64 */
+            rhythmus_minuten?: number | null;
+            typ: components["schemas"]["SchichtmodellTyp"];
+            /** Format: int64 */
+            vorwarnung_minuten: number;
+            wechselzeiten?: string[] | null;
+        };
         /**
          * @description Einsatz-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
          * @enum {string}
@@ -4787,7 +4825,7 @@ export interface components {
          * @description Herkunft des Rhythmus einer Schicht. Wire == `as_str()`.
          * @enum {string}
          */
-        RhythmusQuelle: "abschnitt" | "einheit";
+        RhythmusQuelle: "abschnitt" | "einheit" | "einsatz";
         /**
          * @description Geteilte Richtung für Auftrag/Meldung (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `richtung`.
@@ -4929,6 +4967,38 @@ export interface components {
         SchadenStatus: "offen" | "uebergeben" | "abgeschlossen";
         /** @enum {string} */
         SchadenTyp: "sachschaden" | "verkehrshindernis" | "infrastruktur" | "umweltschaden" | "tierkadaver" | "sonstige";
+        /** @description Ein Schichtmodell der Organisation. */
+        Schichtmodell: {
+            bezeichnung: string;
+            /** Format: int64 */
+            id: number;
+            /** @description Vom Demo-Import angelegt (Marke in `demo_herkunft`, live gelesen). */
+            ist_demo: boolean;
+            /** @description Die Vorgabe der Organisation; neue Einsätze kopieren sie. */
+            ist_vorgabe: boolean;
+            /**
+             * Format: int64
+             * @description Nur bei Typ `wechselzeiten`.
+             */
+            mindestdauer_minuten?: number | null;
+            /** Format: int64 */
+            planungsvorlauf_minuten: number;
+            /**
+             * Format: int64
+             * @description Nur bei Typ `rhythmus`.
+             */
+            rhythmus_minuten?: number | null;
+            typ: components["schemas"]["SchichtmodellTyp"];
+            /** Format: int64 */
+            vorwarnung_minuten: number;
+            /** @description Nur bei Typ `wechselzeiten`: Wanduhrzeiten `HH:MM`, sortiert. */
+            wechselzeiten?: string[] | null;
+        };
+        /**
+         * @description Typ eines Schichtmodells. Wire == `as_str()`.
+         * @enum {string}
+         */
+        SchichtmodellTyp: "rhythmus" | "wechselzeiten";
         /**
          * @description Schriftfeld der Skizze (J.5). Jedes Feld trägt den gespeicherten Wert, `null` = leer. Die
          *     Vorgabe des Herausgebers (Einsatzbezeichnung) setzt erst die Darstellung ein, damit

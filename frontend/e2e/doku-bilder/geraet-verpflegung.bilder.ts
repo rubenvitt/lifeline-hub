@@ -16,13 +16,15 @@ import {
  * Der Demo-Einsatz hat keine Zeitfenster; zwei legt die Spec als Einsatzleitung über die API an,
  * dazu zwei aktive Verpflegungsstellen (LLH-1040; „Ausgabe Gesamtschule“ dem Mittagessen
  * zugeordnet, „Ausgabe Turnhalle Nord“ nicht) und eine erste Ausgabe an der Gesamtschule (D3).
+ * Den Einheiten des Demo-Einsatzes ohne Eintreffen trägt sie eines nach (LLH-1055).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep geraet-verpflegung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   zeitfenster.png        frontend/src/pages/VerpflegungPage.tsx, frontend/src/verpflegung/ZeitfensterKarte.tsx
  *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx, frontend/src/geraet/GeraeteLayout.tsx
- *                          (Tablet, Stellenwahl mit der zugeordneten Stelle, offene Sammlung, ein
- *                          ausstehender Eintrag ohne Netz)
+ *                          (Tablet, Stellenwahl mit der zugeordneten Stelle, Empfänger
+ *                          „Rettungsstaffel“, offene Sammlung, ein ausstehender Eintrag ohne Netz),
+ *                          frontend/src/verpflegung/EmpfaengerStand.tsx (LLH-1055)
  *   fehlmenge.png          frontend/src/geraet/GeraetMeldungenPage.tsx (vorbefüllt aus der Verpflegung)
  */
 
@@ -30,16 +32,26 @@ const KAPITEL = 'geraet-verpflegung';
 const MITTAG = 'Mittagessen';
 const ABEND = 'Abendessen';
 const STELLE = 'Ausgabe Gesamtschule';
+/** Untereinheit des Demo-Einsatzes (`src/demo/szenario.rs`, `EINHEITEN_VORLAGEN`). */
+const STAFFEL = 'Rettungsstaffel';
 
 /** Zwei Zeitfenster (eines läuft, eines steht an) und eine Ausgabe, einmal je Lauf. */
 async function zeitfensterAnlegen(page: Page, einsatz: number) {
   const basis = `/api/einsaetze/${einsatz}/verpflegung`;
   const stand = (await (await page.request.get(basis)).json()) as {
     zeitfenster: { bezeichnung: string }[];
+    empfaenger: { einheiten: { id: number; eintreffen_at?: string | null }[] };
   };
   if (stand.zeitfenster.some((z) => z.bezeichnung === MITTAG)) return;
   const stunde = 3_600_000;
   const jetzt = Date.now();
+  // Eintreffen der Demo-Einheiten (LLH-1055), nur wo es fehlt.
+  for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
+    await fuelle(page, 'post', `/api/einsaetze/${einsatz}/einheiten/${e.id}/zeitachse`, {
+      art: 'eintreffen',
+      zeitpunkt_at: new Date(jetzt - 2 * stunde).toISOString(),
+    });
+  }
   const stelle = async (bezeichnung: string, standort: string) => {
     const { id } = await fuelle<{ id: number }>(page, 'post', `${basis}/stellen`, {
       bezeichnung,
@@ -166,7 +178,9 @@ test.describe(KAPITEL, () => {
       for (let i = 0; i < 3; i++) await plus1.click();
       await geraet.getByRole('button', { name: 'Buchen', exact: true }).click();
       await expect(geraet.locator('[data-lfh="ausgabe-ausstehend"]')).toHaveText('+ 3 ausstehend');
-      // Danach eine offene Sammlung samt Sonderkost.
+      // Danach eine offene Sammlung an die Rettungsstaffel samt Sonderkost (LLH-1055).
+      await geraet.getByRole('button', { name: `Empfänger wählen: ${STAFFEL}` }).click();
+      await expect(geraet.locator('[data-lfh="ausgabe-empfaenger"]')).toContainText(STAFFEL);
       await geraet.getByRole('button', { name: /^vegetarisch/ }).click();
       await plus1.click();
       await expect(geraet.locator('[data-lfh="sammlung-menge"]')).toHaveText('2');

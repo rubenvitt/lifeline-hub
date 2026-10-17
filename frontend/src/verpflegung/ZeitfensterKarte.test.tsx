@@ -8,11 +8,15 @@ import { EinsatzPfadeProvider, GERAET_PFADE } from '../routing/EinsatzPfade';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
 import {
+  ABSCHNITT_DEICH,
   DEICH,
   FELDKUECHE,
+  GRUPPE_1,
+  GRUPPE_2,
   KEINE_SONDERKOST,
   TURNHALLE,
   ausgabe,
+  empfaenger,
   stelle,
   verpflegungMitStellen,
   zeitfenster,
@@ -526,5 +530,77 @@ describe('ZeitfensterKarte — Stellen (LLH-1040, D13 Punkt 4)', () => {
     });
     const zeile = karte.querySelector<HTMLElement>('[data-lfh="verpflegung-ausgabe-ausstehend"]')!;
     expect(zeile.textContent).toContain('15 EP · Feldküche BR Sportplatz');
+  });
+});
+
+describe('ZeitfensterKarte — Empfänger (LLH-1055 Teil II)', () => {
+  const mitEmpfaengern = () =>
+    zeitfenster({
+      ausgaben: [
+        ausgabe({ id: 11, menge: 9, ort: null, einheit_id: GRUPPE_1 }),
+        ausgabe({ id: 12, menge: 40, ort: null, abschnitt_id: ABSCHNITT_DEICH }),
+      ],
+    });
+
+  it('jede Ausgabe nennt ihren Empfänger', () => {
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: empfaenger() });
+    const zeilen = [...karte.querySelectorAll<HTMLElement>('[data-lfh="verpflegung-ausgabe"]')].map(
+      (z) => z.textContent,
+    );
+    expect(zeilen[0]).toContain('9 EP · an 1. Gruppe');
+    expect(zeilen[1]).toContain('40 EP · Zuführung Deich');
+  });
+
+  it('eine vorgemerkte Ausgabe nennt ihren Empfänger', () => {
+    const { karte } = zeige(zeitfenster({ ausgaben: [] }), {
+      empfaenger: empfaenger(),
+      ausstehend: [
+        {
+          id: 1,
+          benutzer_id: 11,
+          einsatz_id: 1,
+          erstellt_at: '2026-09-24T09:40:00.000Z',
+          aktion: {
+            art: 'ausgabe',
+            zeitfenster_id: 1,
+            bezeichnung: 'Mittag',
+            daten: {
+              menge: 9,
+              einheit_id: GRUPPE_2,
+              client_id: 'a',
+              zeitpunkt_at: '2026-09-24 09:40:00',
+            },
+          },
+        },
+      ],
+    });
+    expect(karte.querySelector('[data-lfh="verpflegung-ausgabe-ausstehend"]')).toHaveTextContent(
+      '9 EP · an 2. Gruppe',
+    );
+  });
+
+  it('Klappe „Einheiten“ nennt die Zahlen; aufgeklappt „Noch nicht verpflegt“ und „Verpflegt“', async () => {
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: empfaenger() });
+    const klappe = within(karte).getByRole('button', {
+      name: 'Einheiten · 2 noch nicht verpflegt · 1 ohne Eintreffen · 1 verpflegt',
+    });
+    expect(karte.querySelector('[data-lfh="verpflegung-stand"]')).toBeNull();
+    await userEvent.click(klappe);
+    const stand = await waitFor(() => {
+      const el = karte.querySelector<HTMLElement>('[data-lfh="verpflegung-stand"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+    // Sichtbarkeit misst jsdom in der Klappanimation nicht; die Rolle genügt.
+    expect(
+      within(stand).getByRole('heading', { name: 'Noch nicht verpflegt · 2', hidden: true }),
+    ).toBeInTheDocument();
+    // An der Karte wählt niemand einen Empfänger: keine Knöpfe.
+    expect(within(stand).queryAllByRole('button')).toEqual([]);
+  });
+
+  it('ohne Einheiten im Einsatz keine Klappe', () => {
+    const { karte } = zeige(mitEmpfaengern(), { empfaenger: { einheiten: [], abschnitte: [] } });
+    expect(within(karte).queryByRole('button', { name: /^Einheiten/ })).toBeNull();
   });
 });

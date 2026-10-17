@@ -138,7 +138,7 @@ export default function AbloesungKarte({
               Vorgabe auf 390 px einzeilig (LFH-708); den Abschnitt nennt die Zeile darüber. */}
           <Text type="secondary" data-lfh="abloesung-rhythmus">
             Rhythmus {rhythmusText(s.rhythmus_minuten)} (
-            {s.rhythmus_quelle === 'abschnitt' ? 'Vorgabe' : 'eigen'})
+            {s.rhythmus_quelle === 'einheit' ? 'eigen' : 'Vorgabe'})
           </Text>
           {s.abloesende_einheit_name && (
             <Text type="secondary">

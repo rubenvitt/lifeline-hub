@@ -6,6 +6,7 @@ import {
   baueFuehrungsstelleMarker,
   baueMarker,
   baueBetreuungMarker,
+  buildBrMarker,
   baueTaktischeMarker,
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
@@ -17,6 +18,7 @@ import { rollenFarbe } from '../../theme/statusFarben';
 import { antdToken, farbenDunkel, type Dichte } from '../../theme/tokens';
 import type {
   Betreuungsstelle,
+  BrListenEintrag,
   EinsatzAnzeige,
   FreiesZeichen,
   Fuehrungsstelle,
@@ -608,5 +610,101 @@ describe('baueFuehrungsstelleMarker (LFH-1181)', () => {
   it('fehlt ohne Koordinate, auch mit Adresse', () => {
     expect(baueFuehrungsstelleMarker(fs({ standort_adresse: 'Rathaus' }), token)).toBeNull();
     expect(baueFuehrungsstelleMarker(undefined, token)).toBeNull();
+  });
+});
+
+function raum(partial: Partial<BrListenEintrag>): BrListenEintrag {
+  return {
+    id: 7,
+    einsatz_id: 1,
+    bezeichnung: 'BR Sportplatz',
+    status: 'aktiv',
+    erfasst_at: '2026-10-16 08:00:00',
+    erfasst_von: 1,
+    geaendert_at: '2026-10-16 08:00:00',
+    geaendert_von: 1,
+    belegung: { einheiten: 0, fahrzeuge: 0 },
+    einheit_ids: [],
+    ...partial,
+  };
+}
+
+const zug = {
+  id: 10,
+  ueber_einheit_id: null,
+  ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
+};
+
+describe('buildBrMarker (LLH-1107)', () => {
+  it('verorteter Raum wird Marker mit Bedienrolle und Trefferzone', () => {
+    const { verortet, nichtVerortet } = buildBrMarker([raum({ lat: 51.93, lon: 8.87 })], [], token);
+    expect(nichtVerortet).toEqual([]);
+    expect(verortet).toEqual([
+      {
+        schluessel: 'bereitstellungsraum-7',
+        typ: 'bereitstellungsraum',
+        id: 7,
+        lat: 51.93,
+        lon: 8.87,
+        label: 'BR Sportplatz',
+        farbe: rollenFarbe('bedien', token),
+        trefferDurchmesser: token.controlHeight,
+      },
+    ]);
+  });
+
+  it('beschriftet mit Stärke und Fahrzeugen aus der Belegung („Eine Heimat je Zahl")', () => {
+    const { verortet } = buildBrMarker(
+      [
+        raum({
+          lat: 51.93,
+          lon: 8.87,
+          einheit_ids: [10],
+          belegung: { einheiten: 1, fahrzeuge: 3 },
+        }),
+      ],
+      [zug],
+      token,
+    );
+    expect(verortet[0].beschriftungZusatz).toBe('0/2/9//11 · 3 Fz');
+  });
+
+  it('lässt eine unvollständige Stärke weg statt einer zu kleinen Zahl, die Fahrzeuge bleiben', () => {
+    const { verortet } = buildBrMarker(
+      [raum({ lat: 1, lon: 2, einheit_ids: [10, 99], belegung: { einheiten: 2, fahrzeuge: 1 } })],
+      [zug],
+      token,
+    );
+    expect(verortet[0].beschriftungZusatz).toBe('1 Fz');
+    // Ohne Einheitenliste (Modul gesperrt) ebenso.
+    const ohneListe = buildBrMarker(
+      [raum({ lat: 1, lon: 2, einheit_ids: [10], belegung: { einheiten: 1, fahrzeuge: 0 } })],
+      undefined,
+      token,
+    );
+    expect(ohneListe.verortet[0].beschriftungZusatz).toBeUndefined();
+  });
+
+  it('geplanter Raum ist gestrichelt und sagt es als Wort', () => {
+    const { verortet } = buildBrMarker([raum({ lat: 1, lon: 2, status: 'geplant' })], [], token);
+    expect(verortet[0].isGeplant).toBe(true);
+    expect(verortet[0].beschriftungZusatz).toBe('geplant');
+    const aktiv = buildBrMarker([raum({ lat: 1, lon: 2 })], [], token);
+    expect(aktiv.verortet[0].isGeplant).toBeUndefined();
+  });
+
+  it('unverorteter Raum steht in „Nicht verortet", aufgelöste und stornierte nirgends', () => {
+    const { verortet, nichtVerortet } = buildBrMarker(
+      [
+        raum({ id: 8, bezeichnung: 'BR Nord', status: 'geplant' }),
+        raum({ id: 9, lat: 1, lon: 2, status: 'aufgeloest' }),
+        raum({ id: 11, status: 'aufgeloest' }),
+        raum({ id: 12, lat: 1, lon: 2, status: 'geplant', storniert_at: '2026-10-16 09:00:00' }),
+      ],
+      [],
+      token,
+    );
+    expect(verortet).toEqual([]);
+    expect(nichtVerortet).toEqual([{ typ: 'bereitstellungsraum', id: 8, label: 'BR Nord' }]);
   });
 });

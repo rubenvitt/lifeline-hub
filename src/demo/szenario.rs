@@ -13,6 +13,7 @@
 
 use crate::betreuung::{BetreuungsstelleArt, Erhebung};
 use crate::einsatzabschnitt::AbschnittLagezustand;
+use crate::error::AppError;
 use crate::gefahr::Warnstufe;
 use crate::katalog::StatusKategorie;
 use crate::material::MaterialStatus;
@@ -285,6 +286,27 @@ const fn vp(
         fahrzeug,
         position,
     }
+}
+
+/// Schichtmodell des Szenarios (LLH-1122): zwölf Stunden mit Wechsel um 06:00 und 18:00 und
+/// 4 h Mindestdauer, wie bei Hochwasserlagen üblich. Kennung ist die Bezeichnung.
+pub const SCHICHTMODELL_BEZEICHNUNG: &str = "12-h-Schicht Hochwasser";
+
+/// Die Werte des Szenario-Modells; ein Fehler hier ist ein Tippfehler im Drehbuch (`Internal`).
+pub fn schichtmodell() -> Result<crate::schichtmodell::Werte, AppError> {
+    let zeit = |s: &str| {
+        crate::uhrzeit::Uhrzeit::parse("wechselzeiten", s)
+            .map_err(|_| AppError::Internal(format!("Demo-Szenario: Uhrzeit {s:?}")))
+    };
+    Ok(crate::schichtmodell::Werte {
+        bezeichnung: SCHICHTMODELL_BEZEICHNUNG.into(),
+        regel: crate::schichtmodell::Regel::Wechselzeiten {
+            zeiten: vec![zeit("06:00")?, zeit("18:00")?],
+            mindestdauer_minuten: 240,
+        },
+        vorwarnung_minuten: crate::schichtmodell::VORWARNUNG_VORGABE_MINUTEN,
+        planungsvorlauf_minuten: crate::schichtmodell::PLANUNGSVORLAUF_VORGABE_MINUTEN,
+    })
 }
 
 /// Der Sanitätszug mit seiner Rettungsstaffel, so wie das Drehbuch sie im Einsatz bildet

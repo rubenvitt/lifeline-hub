@@ -41,8 +41,8 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   Stellenwahl der Ausgabeansicht folgt `?stelle=`, dann der gemerkten Wahl, dann der einzigen
   zugeordneten Stelle; gemerkt wird nur am Desktop (`verpflegung/stellenGedaechtnis.ts`,
   Schlüssel `lfh:verpflegung:stelle:<einsatz>`, in `GERAETESPEICHER` und
-  `offline/geraetRaeumung.ts`). Ein Stellenwechsel schließt das offene Bündel an der alten Stelle
-  ab („senden“); das Bündel trägt die Stelle seines ersten Tipps.
+  `offline/geraetRaeumung.ts`). Ein Stellen- oder Empfängerwechsel schließt das offene Bündel
+  beim alten Ziel ab („senden“); das Bündel trägt Stelle und Empfänger seines ersten Tipps.
   **Empfänger** (LLH-1055 D1–D4, `src/verpflegung/repo.rs`): Einheit (Abholung) oder Abschnitt
   (Zuführung), **höchstens einer** (beide 422), **nie Personen**; fremd oder unbekannt 404. Die
   Empfängerliste (`empfaenger`) kommt nur als Projektion mit `GET …/verpflegung` (bewusste
@@ -52,9 +52,18 @@ Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
   `einheit` und `abschnitt` erreichen Leser der Verpflegung über die Gate-Menge
   (`LiveEvent::modul_keys`), `personal` nicht; der Client lädt dann `einsatzKeys.verpflegung` neu.
   Eine Ausgabe an eine Einheit ist eine Spur (`SPUREN_EINHEIT`): auflösen behält sie, stornieren 422.
-  Die Sammelbuchung der Ausgabeansicht und „Ausgabe nachtragen“ (LLH-1032) setzen noch keinen
-  Empfänger; `einheit_id`/`abschnitt_id` an `AusgabeEingabe` sind optional, eine Ausgabe ohne
-  Empfänger bleibt gültig. Ein Bündel trägt höchstens einen Empfänger für alle seine Portionen.
+  Oberfläche (LLH-1055 Teil II, Kern `verpflegung/empfaengerKern.ts`): Empfänger nur aus
+  `empfaenger`, Vorgabe „ohne Empfänger“ (Zählen bleibt so schnell wie ohne), die Wahl wird nie
+  gemerkt. Mengenvorgabe einer Einheit = Ist-Stärke ihres Teilbaums über `summiereStaerke`
+  (Taste „+n“ in der Ausgabeansicht, „Menge …“ und Nachtrag vorbelegt, überschreibbar), ohne
+  Stärke keine Vorgabe. „Noch nicht verpflegt“ rechnet nur der Client (`verpflegungsstand`, er
+  allein kennt die vorgemerkten): verpflegt ist, wer selbst oder über eine Über-Einheit eine
+  gültige Ausgabe des Zeitfensters hat; ohne Eintreffen steht gesondert (nie raten), nach dem Ende
+  eingetroffen fehlt; eine Zuführung an einen Abschnitt verpflegt keine Einheit, „ausstehend“
+  nimmt keine aus der Liste. Fläche `verpflegung/EmpfaengerStand.tsx`: in der Ausgabeansicht mit
+  „Wählen“, an der Karte eingeklappt ohne Knöpfe. Im Nachtrag liegt „Ort“/„Zuführungsziel“ seither
+  eingeklappt (Feldbudget: Menge, Empfänger, Stelle, Zeitpunkt). Ein Bündel trägt höchstens einen
+  Empfänger für alle seine Portionen.
   **Ausgabe zählen** (LLH-1032, Spec `kraefte-verpflegung`, „Ausgabe zählen“): erfasst wird in
   der Ausgabeansicht je Zeitfenster (`verpflegung/AusgabeAnsicht.tsx`, Route
   `verpflegung/:zeitfensterId/ausgabe` an Stab und Gerät, Pfade über `EinsatzPfade`). Gezählt

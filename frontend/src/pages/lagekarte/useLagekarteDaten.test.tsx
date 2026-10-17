@@ -815,6 +815,194 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 });
 
 /**
+ * Ebene „Bereitstellungsräume" (LLH-1107): Grenze an der Datenquelle wie bei den
+ * Betreuungsstellen. Die Tests zählen die Requests an `…/bereitstellungsraeume` mit.
+ */
+describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
+  const RAUM = {
+    id: 31,
+    einsatz_id: 5,
+    bezeichnung: 'BR Sportplatz',
+    status: 'aktiv',
+    lat: 50.03,
+    lon: 8.52,
+    erfasst_at: '2026-10-16 08:00:00',
+    erfasst_von: 1,
+    geaendert_at: '2026-10-16 08:00:00',
+    geaendert_von: 1,
+    belegung: { einheiten: 1, fahrzeuge: 3 },
+    einheit_ids: [41],
+  };
+  const UNVERORTET = {
+    ...RAUM,
+    id: 32,
+    bezeichnung: 'BR Nord',
+    status: 'geplant',
+    lat: undefined,
+    lon: undefined,
+    belegung: { einheiten: 0, fahrzeuge: 0 },
+    einheit_ids: [],
+  };
+  const EINHEIT = {
+    id: 41,
+    name: 'Zug 1',
+    typ_label: 'Zug',
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 2, mannschaft: 9 },
+  };
+
+  /** Alle Live-Quellen gesund; Freigaben und Räume je Fall. Liefert den Abrufzähler. */
+  function handler(freigaben: Record<string, Partial<ModulFreigabe>>, raeume: () => Response) {
+    const zaehler = { raeume: 0 };
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/einheiten', () => HttpResponse.json([EINHEIT])),
+      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
+        HttpResponse.json(RUECKMELDUNGEN),
+      ),
+      http.get('/api/einsaetze/5/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture(freigaben)),
+      ),
+      http.get('/api/einsaetze/5/bereitstellungsraeume', () => {
+        zaehler.raeume += 1;
+        return raeume();
+      }),
+    );
+    return zaehler;
+  }
+
+  function render() {
+    return renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+  }
+
+  it('frei: verorteter Raum mit Belegung in `alleVerortet`, unverorteter in „Nicht verortet"', async () => {
+    handler({}, () => HttpResponse.json([RAUM, UNVERORTET]));
+    const { result } = render();
+    await waitFor(() =>
+      expect(
+        result.current.alleVerortet.find((m) => m.typ === 'bereitstellungsraum')
+          ?.beschriftungZusatz,
+      ).toBe('0/2/9//11 · 3 Fz'),
+    );
+    expect(result.current.brZugriff).toBe('frei');
+    expect(result.current.alleVerortet.find((m) => m.typ === 'bereitstellungsraum')).toMatchObject({
+      schluessel: 'bereitstellungsraum-31',
+      label: 'BR Sportplatz',
+    });
+    expect(result.current.nichtVerortetAlle).toContainEqual({
+      typ: 'bereitstellungsraum',
+      id: 32,
+      label: 'BR Nord',
+    });
+    expect(result.current.rohdaten.bereitstellungsraeume).toHaveLength(2);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('Server verweigert das Modul: „gesperrt", KEIN Request und KEIN Ausfallhinweis', async () => {
+    const z = handler({ bereitstellungsraeume: { zugriff: false } }, () =>
+      HttpResponse.json([RAUM]),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.brZugriff).toBe('gesperrt'));
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'bereitstellungsraum')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+    expect(z.raeume).toBe(0);
+  });
+
+  it('Modul im Einsatz ausgeblendet: „ausgeblendet" und KEIN Request', async () => {
+    const z = handler({ bereitstellungsraeume: { sichtbar: false, zugriff: false } }, () =>
+      HttpResponse.json([RAUM]),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    expect(result.current.brZugriff).toBe('ausgeblendet');
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+    expect(z.raeume).toBe(0);
+  });
+
+  it('Server lehnt mit 403 ab: „gesperrt", keine Marker, KEIN Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 403 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.brZugriff).toBe('gesperrt'));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'bereitstellungsraum')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('echter Ausfall (500) bei freiem Modul: „Bereitstellungsräume" steht im Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 500 }));
+    const { result } = render();
+    await waitFor(() =>
+      expect(result.current.fehlerhafteQuellen).toEqual(['Bereitstellungsräume']),
+    );
+    expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'bereitstellungsraum')).toBe(
+      false,
+    );
+  });
+
+  it('Historien-Modus: Räume kommen aus dem Dokument, kein Live-Request', async () => {
+    const z = handler({}, () => HttpResponse.json([]));
+    const doc = dokument('keine');
+    ladeLageSnapshot.mockResolvedValue({
+      ...doc,
+      daten: { ...doc.daten, bereitstellungsraeume: [{ ...RAUM, status: 'geplant' }] },
+    });
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() =>
+      expect(
+        result.current.alleVerortet.find((m) => m.schluessel === 'bereitstellungsraum-31'),
+      ).toMatchObject({ isGeplant: true, beschriftungZusatz: 'geplant' }),
+    );
+    expect(z.raeume).toBe(0);
+  });
+
+  it('Historien-Modus mit altem Dokument ohne Feld: keine Räume, kein Fehler', async () => {
+    handler({}, () => HttpResponse.json([]));
+    ladeLageSnapshot.mockResolvedValue(dokument('keine'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    await waitFor(() => expect(result.current.brZugriff).toBe('frei'));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'bereitstellungsraum')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+});
+
+/**
  * Modulgrenze der Kartenquellen (LFH-669, Spec `modul-freigabe`): eine Quelle eines fremden Moduls
  * wird nur bei Freigabe des Servers angefragt. Gesperrt ist kein Ausfall. Die Tests zählen die
  * Requests mit — „nichts gezeichnet" allein belegte nicht, dass nichts geladen wurde.

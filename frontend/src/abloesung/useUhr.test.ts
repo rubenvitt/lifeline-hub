@@ -18,6 +18,7 @@ const schicht = (
   einheit_name: `F${id}`,
   beginn_at: '2026-09-22 09:00:00',
   rhythmus_minuten: 360,
+  vorwarnung_minuten: 30,
   rhythmus_quelle: 'einheit',
   faellig_at,
   status,

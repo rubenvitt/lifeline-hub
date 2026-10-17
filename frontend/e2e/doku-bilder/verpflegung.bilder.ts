@@ -15,15 +15,18 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep verpflegung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   zeitfenster.png        frontend/src/pages/VerpflegungPage.tsx,
- *                          frontend/src/verpflegung/ZeitfensterKarte.tsx (samt Ist je Stelle)
+ *                          frontend/src/verpflegung/ZeitfensterKarte.tsx (samt Ist je Stelle und
+ *                          Klappe „Einheiten“, LLH-1055)
  *   zeitfenster-anlegen.png frontend/src/verpflegung/VerpflegungDialoge.tsx (`ZeitfensterDialog`)
- *   ausgabe-nachtragen.png frontend/src/verpflegung/VerpflegungDialoge.tsx (`AusgabeDialog`, Feld
- *                          „Stelle“), frontend/src/verpflegung/ZeitfensterKarte.tsx (Menü der Karte)
+ *   ausgabe-nachtragen.png frontend/src/verpflegung/VerpflegungDialoge.tsx (`AusgabeDialog`, Felder
+ *                          „Empfänger“ und „Stelle“), frontend/src/verpflegung/ZeitfensterKarte.tsx
+ *                          (Menü der Karte)
  *   stellen.png            frontend/src/verpflegung/StellenListe.tsx (Ansicht „Stellen“),
  *                          frontend/src/verpflegung/stellenKern.ts
  *   tag-aus-vorlage.png    frontend/src/verpflegung/TagAusVorlage.tsx,
  *                          frontend/src/verpflegung/tagAusVorlageKern.ts (übermorgen, vier Mahlzeiten)
- *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx (Stellenwahl),
+ *   ausgabe-zaehlen.png    frontend/src/verpflegung/AusgabeAnsicht.tsx (Stellen- und
+ *                          Empfängerwahl), frontend/src/verpflegung/EmpfaengerStand.tsx,
  *                          frontend/src/verpflegung/zaehltasteStil.ts (Fükw, offene Sammlung)
  *
  * Demo-Lücke (D3): die Demo-Daten tragen keine Verpflegung. Die Spec legt drei Stellen an
@@ -31,9 +34,12 @@ import {
  * geplant) und drei Zeitfenster — „Getränke“ laufend und gedeckt, einsatzweit; „Mittag“ laufend
  * mit Unterdeckung samt Sonderkost, den beiden aktiven Stellen zugeordnet und an ihnen mit 100 und
  * 80 EP ausgegeben, dazu eine zurückgenommene Ausgabe; „Abendessen“ anstehend und offen. Den
- * Verpflegungsplan (LLH-1058) bringen die Demo-Daten auch nicht mit: die Spec legt vier Mahlzeiten
- * an; das Bild zeigt übermorgen, damit kein Zeitfenster von heute als „schon angelegt“ hineinragt,
- * gleich zu welcher Stunde der Lauf fährt. Das Zählbild steht zuletzt: seine Sammlung bucht sich nach der Ruhe womöglich und änderte sonst die
+ * Einheiten des Demo-Einsatzes ohne Eintreffen trägt sie eines nach (LLH-1055), damit sie unter
+ * „Noch nicht verpflegt“ stehen statt unter „ohne Eintreffen“. Den Verpflegungsplan (LLH-1058)
+ * bringen die Demo-Daten auch nicht mit: die Spec legt vier Mahlzeiten an; das Bild zeigt
+ * übermorgen, damit kein Zeitfenster von heute als „schon angelegt“ hineinragt, gleich zu welcher
+ * Stunde der Lauf fährt. Das
+ * Zählbild steht zuletzt: seine Sammlung bucht sich nach der Ruhe womöglich und änderte sonst die
  * Zahlen der übrigen Bilder.
  */
 
@@ -50,6 +56,8 @@ interface Stelle {
 }
 
 const FELDKUECHE = 'Feldküche BR Sportplatz';
+/** Untereinheit des Demo-Einsatzes (`src/demo/szenario.rs`, `EINHEITEN_VORLAGEN`). */
+const STAFFEL = 'Rettungsstaffel';
 const TURNHALLE = 'Ausgabe Turnhalle Nord';
 
 /** Drahtformat des Servers: UTC ohne Zonenkennung. */
@@ -83,6 +91,17 @@ test.describe(KAPITEL, () => {
         if (aktiv) await fuelle(api, 'post', `${basis}/stellen/${id}/status`, { status: 'aktiv' });
         return id;
       };
+      // Eintreffen der Demo-Einheiten (LLH-1055), nur wo es fehlt.
+      const stand = (await (await api.get(basis)).json()) as {
+        empfaenger: { einheiten: { id: number; eintreffen_at?: string | null }[] };
+      };
+      for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
+        await fuelle(api, 'post', `/api/einsaetze/${demo.id}/einheiten/${e.id}/zeitachse`, {
+          art: 'eintreffen',
+          zeitpunkt_at: new Date(jetzt.getTime() - 120 * 60_000).toISOString(),
+        });
+      }
+
       const feldkueche = await stelle(FELDKUECHE, 'feldkueche', 'Sportplatz am Deich', true);
       const turnhalle = await stelle(TURNHALLE, 'ausgabestelle', 'Turnhalle Nord', true);
       await stelle('Zuführung Deich', 'zufuehrung', 'Deichweg, Höhe Schöpfwerk', false);
@@ -206,6 +225,13 @@ test.describe(KAPITEL, () => {
       .locator(`.ant-select-item-option[title="${TURNHALLE}"]`)
       .click();
     await expect(dialog.getByLabel('Zuführungsziel')).toHaveCount(0);
+    // Empfänger (LLH-1055): die eingetragene Menge bleibt, die Stärke belegt nur eine leere vor.
+    await dialog.getByRole('combobox', { name: 'Empfänger' }).click();
+    await page
+      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .locator(`.ant-select-item-option[title^="${STAFFEL}"]`)
+      .click();
+    await expect(dialog.getByLabel('Menge (EP)')).toHaveValue('10');
     await dialog.getByLabel('Menge (EP)').focus();
     await dialog.getByLabel('Menge (EP)').blur();
     await page.mouse.move(0, 0);
@@ -260,14 +286,13 @@ test.describe(KAPITEL, () => {
     await expect(page.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText(
       'an der Stelle 100 EP',
     );
+    // Die Rettungsstaffel holt ab: „Wählen“ an ihrer Zeile, ihre Stärke mit einem Tipp.
+    await page.getByRole('button', { name: `Empfänger wählen: ${STAFFEL}` }).click();
+    await page
+      .getByRole('button', { name: new RegExp(`^Stärke zählen: \\d+ EP an ${STAFFEL}$`) })
+      .click();
     await page.getByRole('button', { name: /^vegetarisch/ }).click();
-    const plus1 = page.locator('[data-lfh="zaehltasten"]').getByRole('button', {
-      name: '+1',
-      exact: true,
-    });
-    await plus1.click();
-    await plus1.click();
-    await expect(page.locator('[data-lfh="sammlung-menge"]')).toHaveText('3');
+    await expect(page.locator('[data-lfh="sammlung-menge"]')).not.toHaveText('0');
     // Die ganze Seite: Kopf oben, Zähltasten am unteren Rand; das Element allein ist ein Fenster
     // hoch und läge zum Teil unter der Kopfleiste.
     await page.evaluate(() => window.scrollTo(0, 0));

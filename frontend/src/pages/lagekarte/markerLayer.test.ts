@@ -20,6 +20,7 @@ import {
 } from './markerLayer';
 import { FREIES_ZEICHEN_ERSATZLABEL, type KarteMarker } from './marker';
 import { plakettenBildId, zonenPlakette } from './plakette';
+import { GEPLANT_RING_BILD } from './geplantRing';
 import { offlineStyle } from './basemapStil';
 import { farbenDunkel, farbenHell } from '../../theme/tokens';
 
@@ -176,6 +177,22 @@ describe('Marker-Beschriftung', () => {
     expect(fc.features[0].properties.plakette).toBeUndefined();
   });
 
+  it('hängt den Zusatz eines Raums an den Namen, der Name selbst bleibt das label (LLH-1107)', () => {
+    const fc = baueMarkerFc([
+      mk({
+        schluessel: 'bereitstellungsraum-7',
+        typ: 'bereitstellungsraum',
+        label: 'BR Sportplatz',
+        beschriftungZusatz: '0/2/9//11 · 3 Fz',
+      }),
+      mk({ schluessel: 'bereitstellungsraum-8', typ: 'bereitstellungsraum', label: 'BR Nord' }),
+    ]);
+    expect(fc.features.map((f) => f.properties.beschriftung)).toEqual([
+      'BR Sportplatz · 0/2/9//11 · 3 Fz',
+      'BR Nord',
+    ]);
+  });
+
   it('beschriftet auch den Einsatzort', () => {
     const fc = baueEinsatzortFc([
       mk({ schluessel: 'einsatzort', typ: 'einsatzort', label: 'Deich km 4,2' }),
@@ -279,6 +296,8 @@ describe('sorgeFuerMarkerLayer', () => {
       // Der Einsatzort hat eine eigene, ungeclusterte Quelle und damit eine eigene Zone.
       'marker-einsatzort-treffer',
       'marker-status-ring',
+      // Der gestrichelte Ring eines geplanten Raums liegt wie der Statusring unter dem Zeichen.
+      'marker-geplant',
       'marker-kante',
       'marker-kreis',
       'marker-kurz',
@@ -289,6 +308,7 @@ describe('sorgeFuerMarkerLayer', () => {
       'spider-legs-line',
       'spider-treffer',
       'spider-status-ring',
+      'spider-geplant',
       'spider-kante',
       'spider-kreis',
       'spider-kurz',
@@ -342,6 +362,48 @@ describe('sorgeFuerMarkerLayer', () => {
     // Eine Layer-ID-Umbenennung ohne Nachziehen der Konstante bände den Klick-Handler an einen
     // nicht existierenden Layer — hier rot statt unbemerkt.
     for (const id of MARKER_KLICK_LAYER) expect(layers.has(id)).toBe(true);
+  });
+});
+
+describe('Gestrichelter Ring eines geplanten Raums (LLH-1107)', () => {
+  it('trägt `isGeplant` nur am geplanten Marker', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'bereitstellungsraum-1', typ: 'bereitstellungsraum', isGeplant: true }),
+      mk({ schluessel: 'bereitstellungsraum-2', typ: 'bereitstellungsraum' }),
+    ]);
+    expect(fc.features[0].properties.isGeplant).toBe(true);
+    expect(fc.features[1].properties).not.toHaveProperty('isGeplant');
+  });
+
+  it('zeichnet den Ring als Bild unter dem Zeichen, nur an Einzelmarkern mit `isGeplant`, ohne Kollision', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    for (const [id, quelle] of [
+      ['marker-geplant', MARKER_CLUSTER_QUELLE],
+      ['spider-geplant', SPIDER_LEAVES_QUELLE],
+    ] as const) {
+      const l = layers.get(id) as {
+        type: string;
+        source: string;
+        filter: unknown;
+        layout: Record<string, unknown>;
+      };
+      expect(l.type).toBe('symbol');
+      expect(l.source).toBe(quelle);
+      expect(JSON.stringify(l.filter)).toContain('"isGeplant"');
+      expect(l.layout['icon-image']).toBe(GEPLANT_RING_BILD);
+      expect(l.layout['icon-allow-overlap']).toBe(true);
+      expect(l.layout['icon-ignore-placement']).toBe(true);
+    }
+    // Cluster tragen keinen Ring.
+    expect(JSON.stringify((layers.get('marker-geplant') as { filter: unknown }).filter)).toContain(
+      'point_count',
+    );
+  });
+
+  it('der Ring ist Klickziel wie der Statusring', () => {
+    expect(MARKER_KLICK_LAYER).toContain('marker-geplant');
+    expect(SPIDER_KLICK_LAYER).toContain('spider-geplant');
   });
 });
 

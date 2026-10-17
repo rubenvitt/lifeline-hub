@@ -8,13 +8,20 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
-import type { ModulFreigaben, Verpflegungsstelle, VerpflegungZeitfenster } from '../api/types';
+import type {
+  ModulFreigaben,
+  VerpflegungEmpfaenger,
+  Verpflegungsstelle,
+  VerpflegungZeitfenster,
+} from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
 import {
   DEICH,
   FELDKUECHE,
+  GRUPPE_2,
   KEINE_SONDERKOST,
   ausgabe,
+  empfaenger,
   stelle,
   verpflegungMitStellen,
   zeitfenster,
@@ -26,6 +33,7 @@ import { meHandler, server } from '../test/server';
 import { benutzerFixture } from '../test/fixtures';
 import { setzeOnline } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import { waehle } from '../test/auswahlListe';
 
 dayjs.extend(utc);
 
@@ -107,8 +115,18 @@ const abend = () =>
 const fruehstueck = () =>
   zeitfenster({ id: 3, bezeichnung: 'Frühstück', von_at: um(-240), bis_at: um(-180) });
 
-function liefert(zf: VerpflegungZeitfenster[], stellen: Verpflegungsstelle[] = []) {
-  ladeVerpflegung.mockImplementation(() => Promise.resolve({ zeitfenster: zf, stellen }));
+function liefert(
+  zf: VerpflegungZeitfenster[],
+  stellen: Verpflegungsstelle[] = [],
+  empfaengerListe?: VerpflegungEmpfaenger,
+) {
+  ladeVerpflegung.mockImplementation(() =>
+    Promise.resolve({
+      zeitfenster: zf,
+      stellen,
+      ...(empfaengerListe ? { empfaenger: empfaengerListe } : {}),
+    }),
+  );
 }
 
 function Ort() {
@@ -801,6 +819,38 @@ describe('VerpflegungPage (LFH-634)', () => {
       expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Aktionen zu Stelle/ })).toBeNull();
       expect(screen.queryByRole('button', { name: /zu Stelle/ })).toBeNull();
+    });
+  });
+  describe('Empfänger (LLH-1055 Teil II)', () => {
+    it('die Karte nennt Empfänger und Einheiten; der Nachtrag bietet „Empfänger“ und sendet ihn', async () => {
+      erfasseAusgabe.mockResolvedValue({ ausgabe_id: 55, zeitfenster: mittag() });
+      liefert(
+        [{ ...mittag(), ausgaben: [ausgabe({ id: 11, menge: 230, einheit_id: GRUPPE_2 })] }],
+        [],
+        empfaenger(),
+      );
+      renderPage();
+      const k = await karte(mittag());
+      expect(k.querySelector('[data-lfh="verpflegung-ausgabe"]')).toHaveTextContent(
+        '230 EP · an 2. Gruppe',
+      );
+      expect(
+        within(k).getByRole('button', {
+          name: 'Einheiten · 2 noch nicht verpflegt · 1 ohne Eintreffen · 1 verpflegt',
+        }),
+      ).toBeInTheDocument();
+      const dialog = await nachtragenDialog();
+      await waehle('Empfänger', '2. Gruppe · Florian 1-2 · 0/1/8//9');
+      await waitFor(() => expect(within(dialog).getByLabelText('Menge (EP)')).toHaveValue('9'));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+      await waitFor(() =>
+        expect(erfasseAusgabe).toHaveBeenCalledWith(
+          1,
+          1,
+          expect.objectContaining({ menge: 9, einheit_id: GRUPPE_2 }),
+          expect.anything(),
+        ),
+      );
     });
   });
 });

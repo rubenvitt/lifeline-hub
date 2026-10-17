@@ -185,6 +185,9 @@ pub(crate) async fn anlegen_tx(
     .bind(EINSATZ_ROLLE_LEITUNG)
     .execute(&mut *conn)
     .await?;
+    // LLH-1122: die Vorgabe der Organisation wird als Kopie die Vorgabe des Einsatzes, damit die
+    // Ablösung vom ersten Eintreffen an rechnen kann; ohne Org-Vorgabe keine.
+    crate::schichtmodell::repo::copy_org_vorgabe_tx(conn, einsatz_id, org_id, ersteller_id).await?;
     Ok(einsatz_id)
 }
 
