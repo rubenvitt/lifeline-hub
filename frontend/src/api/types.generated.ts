@@ -39,6 +39,11 @@ export interface components {
             abschnitt_id?: number | null;
             abschnitt_name?: string | null;
             angelegt_at: string;
+            /** @description Nur bei `beendet`: wann, durch wen und warum die Schicht ohne Ablösung endete. */
+            beendet_at?: string | null;
+            beendet_grund?: components["schemas"]["BeendetGrund"] | null;
+            /** Format: int64 */
+            beendet_von_id?: number | null;
             beginn_at: string;
             /** Format: int64 */
             einheit_id: number;
@@ -46,6 +51,12 @@ export interface components {
             /** Format: int64 */
             einsatz_id: number;
             einstufung?: components["schemas"]["Einstufung"] | null;
+            /**
+             * @description Untereinheiten, die diese laufende Schicht erben (Knoten-Modell, LLH-1118): ohne eigene
+             *     laufende Schicht unter dieser Einheit, bis zur nächsten mit eigener. Leer bei
+             *     abgelösten und beendeten Schichten.
+             */
+            erbende_einheiten: components["schemas"]["AbloesungErbe"][];
             faellig_at: string;
             /**
              * Format: int64
@@ -95,11 +106,17 @@ export interface components {
              */
             vorwarnung_minuten: number;
         };
+        /** @description Eine Untereinheit, die die Schicht eines Vorfahren erbt. */
+        AbloesungErbe: {
+            /** Format: int64 */
+            einheit_id: number;
+            einheit_name: string;
+        };
         /**
          * @description Status einer Schicht. Wire == `as_str()`.
          * @enum {string}
          */
-        AbloesungStatus: "laufend" | "abgeloest";
+        AbloesungStatus: "laufend" | "abgeloest" | "beendet";
         /**
          * @description Antwort auf einen Vollzug: die abgelöste Schicht und — mit ablösender Einheit — die
          *     Folgeschicht.
@@ -656,6 +673,12 @@ export interface components {
          * @enum {string}
          */
         BeendetAls: "entlassen" | "storniert";
+        /**
+         * @description Warum eine Schicht ohne Ablösung endete (`einsatz_abloesung.beendet_grund`, TEXT ohne
+         *     CHECK: den Wert setzt nur dieser Code). Wire == `as_str()`.
+         * @enum {string}
+         */
+        BeendetGrund: "entlassung" | "aufloesung";
         /** @description Ein gefüllter Abschnitt (so persistiert als JSON-Array-Element). */
         BefehlAbschnitt: {
             schluessel: string;

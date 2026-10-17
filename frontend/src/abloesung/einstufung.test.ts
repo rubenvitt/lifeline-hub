@@ -20,6 +20,7 @@ function schicht(teil: Partial<Abloesung> & { id: number }): Abloesung {
     faellig_at: '2026-09-22 15:30:00',
     status: 'laufend',
     ruecknehmbar: false,
+    erbende_einheiten: [],
     angelegt_at: '2026-09-22 09:30:00',
     ...teil,
   };

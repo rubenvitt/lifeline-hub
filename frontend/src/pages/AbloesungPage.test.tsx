@@ -71,6 +71,7 @@ const schicht = (over: Partial<Abloesung> & { id: number }): Abloesung => ({
   faellig_at: inMinuten(60),
   status: 'laufend',
   ruecknehmbar: false,
+  erbende_einheiten: [],
   angelegt_at: inMinuten(-300),
   ...over,
 });
