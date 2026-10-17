@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 
 /**
  * Bildlauf einer Liste in Funkprotokoll-Ordnung am DOKUMENT (LLH-1149, Spec
- * `etb-zeitachse-darstellung`, `openspec/changes/gonnp1g8-etb-ux-durchgang/design.md` D2): älteste
+ * `etb-zeitachse-darstellung`, `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D2): älteste
  * Zeile oben, neueste unten direkt über einer angepinnten Erfassung. Genutzt von ETB und
  * Informationstelefon, damit es nur eine Leserichtung gibt.
  *

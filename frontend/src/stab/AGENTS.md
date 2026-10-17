@@ -181,7 +181,7 @@ einzeln (`…/infotelefon/{aid}`) und stellt ihn als ältesten oben dazu. Die Zu
 (`infotelefon/zufluss.ts`) nimmt Seiten, die nach dem Einfrieren nachgeladen wurden, über
 `extendEinfrierstand` auf, damit ein Nachtrag aus einer älteren Seite nicht als „neuer Anruf“ gilt.
 **Informationstelefon in Funkprotokoll-Ordnung** (LLH-1149, Spec `stab-infotelefon`, Herleitung
-`openspec/changes/gonnp1g8-etb-ux-durchgang/design.md` D10): dieselbe Leserichtung wie das ETB
+`openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D10): dieselbe Leserichtung wie das ETB
 (`etb/AGENTS.md`, „Funkprotokoll-Ordnung“) — ältester Anruf oben, jüngster unten über der
 Erfassung, „Ältere laden“ über der Liste, das Sammelbanner unten; Öffnen am Ende, Mitlaufen und
 Anker über `components/useFunkprotokollLauf.ts`, gekehrt wird erst in der Darstellung

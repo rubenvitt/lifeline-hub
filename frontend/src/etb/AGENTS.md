@@ -10,7 +10,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
   (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`).
 - **Funkprotokoll-Ordnung** (LLH-1149, Entscheidung Ruben 10.10./17.10.2026, Specs
   `etb-zeitachse-darstellung`, `etb-zeitachse-fenster`, Herleitung
-  `openspec/changes/gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
+  `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
   unten direkt über der Erfassung, Stundengruppen aufsteigend, gepufferte ganz unten (abgelehnte
   zuletzt), ihre Hinweise unter der Zeitachse. Gekehrt wird nur in der Darstellung
   (`funkprotokollFolge`, nach dem Zufluss); Server, Cursor, Bilanz, Druck und Sprung behalten die
@@ -66,7 +66,7 @@ Ableitungen in `etb/zeitachseModell.ts`)
   `tests/etb_zaehler.rs`). „412 Einträge"/„Bilanz" bzw. „7 Treffer"/„Bilanz im Filter"; keine
   Tagesgrenze. Ohne Zählung steht **keine** Zahl da, nie die des geladenen Fensters.
 - **Eine Filterleiste** (LLH-1065/LLH-1080, Spec `etb-filterleiste`, Herleitung
-  `openspec/changes/gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
+  `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D4–D5): ab `md` stehen alle Filter in
   `EtbFilterleiste` über der Zeitachse, in zwei Gruppen — Typ-Segmente und Umschaltknopf „System“
   (`SegmentUmschalter`, `aria-pressed`, fester Name „Systemeinträge zeigen“, Zahl als
   Beschreibung), dann Zeitraum (`EtbZeitraumWahl`), Einheit, Volltext. Der Seitenkopf trägt ab

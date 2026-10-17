@@ -75,9 +75,9 @@ Aufgabe entsteht per TDD (`superpowers:test-driven-development`); geprüft wird 
 
 ## 9. Integration
 
-- [ ] 9.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für ETB-Seite und Informationstelefon im PR ausgefüllt
+- [x] 9.1 Prüfliste Einsatztauglichkeit (15 Kriterien) für ETB-Seite und Informationstelefon im PR ausgefüllt
 - [x] 9.2 Doku-Bilder `einsatztagebuch/*` und `presse-infotelefon/*` über die Bilder-Specs neu erzeugt (Mitänderungsregel `docs/anwender/AGENTS.md`)
-- [ ] 9.3 `./scripts/check-all.sh` grün (lokal die Bündel ohne Server-Stack, vollständig in der CI des PRs)
+- [x] 9.3 `./scripts/check-all.sh` grün (lokal die Bündel ohne Server-Stack, vollständig in der CI des PRs)
 
 ## Workflow follow-up
 
