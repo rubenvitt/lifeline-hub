@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waehleIn } from './auswahl-kern';
 import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
@@ -237,6 +238,130 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
       [feldkueche, 0],
       [turnhalle, 5],
     ]);
+  } finally {
+    await kontext.close();
+  }
+});
+
+/**
+ * Gerät an einer Verpflegungsstelle (LLH-1048, Entscheidung LLH-1024 F7; Spec
+ * `funktionsansichten`, „Verpflegungsgerät an einer Verpflegungsstelle“): die Einsatzleitung
+ * koppelt über die Maske an die Feldküche. Das Gerät sieht die Zeitfenster der Feldküche und das
+ * einsatzweite, nicht das der Turnhalle; der Kopf nennt die Stelle, die Ausgabeansicht hat keine
+ * Stellenwahl, und die gezählte Ausgabe trägt die Feldküche. Die Feldküche meldet danach
+ * `geraet_gekoppelt` (die Storno-Sperre selbst belegt `tests/geraet_kopplung.rs`).
+ *
+ * Mutationsproben: in `AusgabeAnsicht.tsx` die feste Stelle ignoriert (`gewaehlteStelle` nur aus
+ * der Wahl) → „Stelle fest“ und die Stelle an der Ausgabe werden rot; in
+ * `verpflegung::stellensicht` den Zeitfensterfilter aus → „Abend Turnhalle“ ist sichtbar.
+ */
+test('LLH-1048: Gerät an der Feldküche sieht die Turnhalle nicht und bucht an der Feldküche', async ({
+  page,
+  browser,
+}) => {
+  // Zwei Kontexte und die Kopplungsmaske: lokal knapp unter dem Vorgabe-Budget von 30 s.
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await anmeldenAlsAdmin(page);
+  const { id: e } = await anlegen(page, '/api/einsaetze', {
+    bezeichnung: `E2E Verpflegung an Stelle ${Date.now()}`,
+  });
+  const basis = `/api/einsaetze/${e}/verpflegung`;
+  const jetzt = Date.now();
+  const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
+  const stelle = async (bezeichnung: string, art: string) => {
+    const { id } = await anlegen(page, `${basis}/stellen`, { bezeichnung, art });
+    await anlegen(page, `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    return id;
+  };
+  const feldkueche = await stelle('Feldküche BR Sportplatz', 'feldkueche');
+  const turnhalle = await stelle('Ausgabe Turnhalle Nord', 'ausgabestelle');
+  const zeitfenster = (bezeichnung: string, stelle_ids: number[]) =>
+    anlegen(page, `${basis}/zeitfenster`, {
+      bezeichnung,
+      von_at: zeit(-30),
+      bis_at: zeit(90),
+      bedarf_kraefte: 60,
+      bedarf_betreute: 0,
+      stelle_ids,
+    });
+  await zeitfenster('Mittag Feldküche', [feldkueche]);
+  await zeitfenster('Abend Turnhalle', [turnhalle]);
+  await zeitfenster('Getränke einsatzweit', []);
+
+  // Einsatzleitung: über die Maske an die Feldküche koppeln.
+  await page.goto(`/einsaetze/${e}/einstellungen/geraete`);
+  await page.getByRole('button', { name: 'Gerät koppeln' }).click();
+  await waehleIn(page.getByRole('combobox', { name: 'Ansicht' }), 'Verpflegung');
+  const stellenFeld = page.getByRole('combobox', { name: 'Verpflegungsstelle' });
+  await expect(page.locator('.ant-form-item', { has: stellenFeld })).toContainText(
+    'ohne Stelle (einsatzweit)',
+  );
+  await waehleIn(stellenFeld, 'Feldküche BR Sportplatz');
+  await page.getByLabel('Gerätebezeichnung').fill('Tresen');
+  await page.getByRole('button', { name: 'Koppeln', exact: true }).click();
+  const codeText = page.locator('[data-lfh="kopplungscode-text"]');
+  await expect(codeText).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+  const code = (await codeText.textContent())!.replace('-', '');
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await expect(page.locator('[data-lfh="geraet-titel"]')).toHaveText(
+    'Feldküche BR Sportplatz · Tresen',
+  );
+
+  const kontext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/verpflegung$`));
+    await expect(
+      tablet.getByRole('banner').getByText('Feldküche BR Sportplatz', { exact: true }),
+    ).toBeVisible();
+
+    // Nur die eigenen und die einsatzweiten Zeitfenster.
+    const karten = tablet.locator('[data-lfh="verpflegung-karte"]');
+    await expect(
+      tablet.getByRole('article', { name: /^Zeitfenster Mittag Feldküche/ }),
+    ).toBeVisible();
+    await expect(
+      tablet.getByRole('article', { name: /^Zeitfenster Getränke einsatzweit/ }),
+    ).toBeVisible();
+    await expect(karten).toHaveCount(2);
+    await expect(tablet.getByText('Abend Turnhalle')).toHaveCount(0);
+
+    // Ausgabeansicht: die Stelle steht fest, keine Wahl; gezählt wird an der Feldküche.
+    await tablet
+      .getByRole('article', { name: /^Zeitfenster Mittag Feldküche/ })
+      .getByRole('link', { name: /^Ausgabe öffnen zu/ })
+      .first()
+      .click();
+    await expect(tablet.getByRole('heading', { level: 1, name: 'Mittag Feldküche' })).toBeVisible();
+    const platz = tablet.locator('[data-lfh="ausgabe-stelle"]');
+    await expect(platz.locator('[data-lfh="ausgabe-stelle-fest"]')).toHaveText(
+      'Stelle Feldküche BR Sportplatz',
+    );
+    await expect(platz.getByRole('combobox')).toHaveCount(0);
+    const plus1 = tablet.getByRole('button', { name: '+1', exact: true });
+    for (let i = 0; i < 4; i++) await plus1.click();
+    await expect(tablet.getByText('Gebucht: 4 EP zu ‚Mittag Feldküche‘')).toBeVisible();
+    await expect(platz.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText('an der Stelle 4 EP');
+
+    const antwort = await page.request.get(basis);
+    const stand = (await antwort.json()) as {
+      zeitfenster: {
+        bezeichnung: string;
+        ausgaben: { menge: number; verpflegungsstelle_id: number | null }[];
+      }[];
+      stellen: { id: number; geraet_gekoppelt: boolean }[];
+    };
+    const mittag = stand.zeitfenster.find((z) => z.bezeichnung === 'Mittag Feldküche')!;
+    expect(mittag.ausgaben.map((a) => [a.menge, a.verpflegungsstelle_id])).toEqual([
+      [4, feldkueche],
+    ]);
+
+    // Die Feldküche trägt das Gerät, die Turnhalle nicht.
+    expect(stand.stellen.find((s) => s.id === feldkueche)?.geraet_gekoppelt).toBe(true);
+    expect(stand.stellen.find((s) => s.id === turnhalle)?.geraet_gekoppelt).toBe(false);
   } finally {
     await kontext.close();
   }
