@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
-import { waehleIn } from '../auswahl-kern';
+import { waehleIn, waehleStehend, zeigtWahl } from '../auswahl-kern';
 import {
   anmelden,
   apiAlsAdmin,
@@ -22,6 +22,8 @@ import {
  *   schicht-beginnen.png frontend/src/abloesung/AbloesungDialoge.tsx (`SchichtBeginnenDialog`)
  *   vollziehen.png       frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Ablöser-Liste und
  *                        „Abschnitt übergeben“, LLH-1132), frontend/src/abloesung/abloeser.ts
+ *   besatzungswechsel.png frontend/src/abloesung/AbloesungDialoge.tsx (Vollzugsdialog mit Art
+ *                        „Besatzungswechsel“, LLH-1150), frontend/src/abloesung/besatzung.ts
  *   vorgaben.png         frontend/src/pages/AbloesungPage.tsx (Paneel „Rhythmus je Abschnitt“)
  *   einsatz-vorgabe.png  frontend/src/pages/AbloesungPage.tsx (Paneel „Vorgabe des Einsatzes“),
  *                        frontend/src/abloesung/schichtmodellText.ts, frontend/src/abloesung/dauer.ts
@@ -36,6 +38,9 @@ import {
  * geplanten Ablöser per Nachtrag eintreffen (mit der Vorgabe des Einsatzes begänne jede andere
  * Einheit beim Eintreffen ihre Schicht von selbst, er nicht) und die Betreuungsgruppe alarmieren,
  * noch ohne Eintreffen.
+ *
+ * Besatzungswechsel (LLH-1150): die Spec disponiert zwei Kräfte ohne Einheit („Lena Brandt“,
+ * „Tom Weber“), aus denen der Dialog die neue Besatzung wählt.
  */
 
 const KAPITEL = 'abloesung';
@@ -114,6 +119,9 @@ test.describe(KAPITEL, () => {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 40)),
       });
+      for (const name of ['Lena Brandt', 'Tom Weber']) {
+        await fuelle(api, 'post', `${basis}/personal`, { adhoc: { name } });
+      }
     } finally {
       await api.dispose();
     }
@@ -192,5 +200,31 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'vollziehen');
+  });
+
+  test('Dialog „Ablösung vollziehen“ als Besatzungswechsel', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/abloesung`);
+    const karte = page.getByRole('article', { name: 'Schicht Sanitätszug Musterstadt' });
+    await karte.getByRole('button', { name: 'Ablösung vollziehen' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Ablösung Sanitätszug Musterstadt vollziehen',
+    });
+    await dialog.getByText('Besatzungswechsel', { exact: true }).click();
+    await expect(dialog.locator('[data-lfh="vollzug-bisherige-besatzung"]')).not.toContainText('…');
+    // Die Liste ist virtuell und lang (alle Kräfte des Demo-Einsatzes): erst suchen, dann wählen.
+    const feld = dialog.getByRole('combobox', { name: 'Neue Besatzung' });
+    for (const name of ['Lena Brandt', 'Tom Weber']) {
+      await feld.click();
+      await feld.pressSequentially(name);
+      await waehleStehend(page, name);
+      await zeigtWahl(feld, name);
+    }
+    await feld.blur();
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'besatzungswechsel');
   });
 });
