@@ -679,6 +679,24 @@ function einstellungenFlaechen(einsatzId: string): Flaeche[] {
       ],
     },
     {
+      // LLH-1122: Vorgabe des Einsatzes — Auswahl aus den Stammdaten, Übernehmen, eigene Werte.
+      pfad: `${R}/einstellungen/abloesung`,
+      anker: knopf('Übernehmen'),
+      ziele: [
+        {
+          sorte: 'Ablösung Schichtmodell',
+          ziele: (page) => inMain(page).locator('.ant-select'),
+          mindestens: 1,
+        },
+        { sorte: 'Ablösung Übernehmen', ziele: knopf('Übernehmen'), mindestens: 1 },
+        {
+          sorte: 'Ablösung eigene Werte',
+          ziele: knopf(/Eigene Werte setzen|Werte ändern/),
+          mindestens: 1,
+        },
+      ],
+    },
+    {
       // LFH-1170: Mitglieder, Rollen und Führungsstelle je Person, von den Einsatzdaten umgezogen.
       pfad: `${R}/einstellungen/zugriff`,
       anker: knopf('Hinzufügen'),
