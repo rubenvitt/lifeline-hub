@@ -1,11 +1,11 @@
 import { IconPersonPlus } from '../../icons';
-import { useSprungSperre } from '../../einsatz/useSprungSperre';
-import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
+import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
+import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
 import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin } from 'antd';
-import { Link, Navigate, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId } from 'react';
 import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
@@ -13,7 +13,10 @@ import {
   einsaetzePfad,
   einsatzPfad,
   parseRouteId,
+  parseUhsBereich,
+  uhsBereichSuche,
   unfallhilfsstellenListePfad,
+  type UhsBereich,
 } from '../../routing/deeplinks';
 import { useEinsatzPfade } from '../../routing/EinsatzPfade';
 import { useGeraetDarf } from '../../geraet/geraetSicht';
@@ -34,16 +37,23 @@ import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
 import { staerkeText } from '../../anzeige/staerke';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
+import { KennungsLink } from '../../components/kennungsLink';
+import { materialKopfzahl } from '../../kraefte/materialVerdichtungKern';
 
-const REITER_NAME = {
+/**
+ * Die Bereiche der Seite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
+ * Bereiche“): eine Leiste unter dem Kopf, der gewählte Bereich füllt die Arbeitsfläche bis zur
+ * Fensterhöhe. Die Belegung (der Grundriss) ist die Vorgabe; die Wahl steht in der Adresse.
+ */
+const BEREICH_NAME: Record<UhsBereich, string> = {
+  belegung: 'Belegung',
   material: 'Material',
   kraefte: 'Kräfte',
   bewegungen: 'Bewegungen',
   dateien: 'Dateien',
-} as const;
-type Reiter = keyof typeof REITER_NAME;
+};
 
-/** „Material, Bewegungen und Dateien“: der Name der Reiterleiste nennt, was sie führt. */
+/** „Belegung, Material und Bewegungen“: der Name der Bereichsleiste nennt, was sie führt. */
 function aufzaehlung(namen: string[]): string {
   return namen.length < 2
     ? (namen[0] ?? '')
@@ -60,20 +70,43 @@ export default function UhsDetailPage() {
   // Person ist alles frei. Die Wege führen in die Oberfläche, aus der man kommt.
   const darf = useGeraetDarf();
   const pfade = useEinsatzPfade();
-  // Am Gerät stehen Material und Dateien im Bereich „UHS“ des Laptops (`geraet/GeraetStellePage`),
-  // nicht unter dem Grundriss; hier bleibt dort nur der Verlauf.
+  // Am Gerät stehen Material, Kräfte und Dateien im Bereich „UHS“ des Laptops
+  // (`geraet/GeraetStellePage`), die Wege führt die Gerätenavigation: dort ist diese Seite nur die
+  // Belegung, und der Verlauf folgt darunter im Seitenfluss, ohne Bereichsleiste.
   const { geraet } = useAuth();
-  const reiterListe: Reiter[] = [
-    ...(!geraet && darf('uhs-material') ? (['material'] as const) : []),
-    // LFH-1045: die Kräfte der UHS; der Laptop führt sie im Bereich „UHS“.
-    ...(!geraet ? (['kraefte'] as const) : []),
-    'bewegungen',
-    // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
-    ...(!geraet && darf('uhs-anhaenge') ? (['dateien'] as const) : []),
-  ];
-  // Material/Bewegungen als Segmentleiste; nur das aktive Feld ist gebaut.
-  const [reiter, setReiter] = useState<Reiter>(reiterListe[0]);
-  const reiterFeld = useId();
+  const bereichListe: UhsBereich[] = geraet
+    ? ['belegung']
+    : [
+        'belegung',
+        ...(darf('uhs-material') ? (['material'] as const) : []),
+        // LFH-1045: die Kräfte der UHS.
+        'kraefte',
+        'bewegungen',
+        // LFH-758: Fotos, Unterlagen und der Plan (Grundriss als Datei) der UHS.
+        ...(darf('uhs-anhaenge') ? (['dateien'] as const) : []),
+      ];
+  // Der Bereich steht in der Adresse (`?bereich=`); einer, den diese Sicht nicht führt (Gerät),
+  // fällt wie ein unbekannter auf die Belegung zurück. Nur der gewählte Bereich ist gebaut.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const gewuenscht = parseUhsBereich(searchParams);
+  const bereich: UhsBereich = bereichListe.includes(gewuenscht) ? gewuenscht : 'belegung';
+  // Ersetzen statt Anhängen: das Zurück des Browsers verlässt die Seite, statt durch die Bereiche
+  // zu blättern. Andere Parameter bleiben stehen.
+  const waehleBereich = (neu: UhsBereich) =>
+    setSearchParams(
+      (alt) => {
+        const naechste = new URLSearchParams(alt);
+        naechste.delete('bereich');
+        for (const [k, v] of new URLSearchParams(uhsBereichSuche(neu))) naechste.set(k, v);
+        return naechste;
+      },
+      { replace: true },
+    );
+  const bereichFeld = useId();
+  // Die Materialzahl im Kopf nur mit Freigabe Material (LLH-1133 D2). Anders als bei einem Sprung
+  // heißt unbekannt hier zu: eine Zahl, die beim Eintreffen der Freigaben verschwände, stünde
+  // kurz falsch da.
+  const materialFrei = istKeyFreigegeben('material', useModulFreigaben(einsatzId));
   const uhsId = Number(uhsIdParam);
   const idGueltig = parseRouteId(uhsIdParam) != null;
   const listenPfad = unfallhilfsstellenListePfad(einsatzId);
@@ -180,11 +213,26 @@ export default function UhsDetailPage() {
   // Typ und Standort sind Kopf-Meta; der Typ ist eine Kategorie (im Vertrag `neutral`), es zählt
   // nur seine Beschriftung aus `uhsTyp`. Die Notiz ist Freitext und bleibt Beschreibungszeile.
   // Die Stärke steht im Kopf jeder Ansicht (LFH-1045), die Kräfte dazu im Reiter.
-  const meta = [
+  const metaText = [
     uhsTyp[uhs.typ].label,
     uhs.standort ?? 'ohne Standort',
     `Stärke ${staerkeText(uhs.staerke)}`,
   ].join(' · ');
+  // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
+  // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät) oder ohne
+  // Freigabe Material steht keine Zahl.
+  const zeigeMaterialzahl = bereichListe.includes('material') && materialFrei;
+  const meta = zeigeMaterialzahl ? (
+    <>
+      {metaText} ·{' '}
+      <KennungsLink to={{ search: uhsBereichSuche('material') }}>
+        {materialKopfzahl(uhs.material)}
+      </KennungsLink>
+    </>
+  ) : (
+    metaText
+  );
+  const mehrereBereiche = bereichListe.length > 1;
 
   return (
     <EinsatzSeite
@@ -284,72 +332,85 @@ export default function UhsDetailPage() {
           )}
         </Space>
       }
-      fensterInhalt={{
-        // Mindest-Arbeitsfläche: unter einem langen Kopf scrollt die Seite, statt Grundriss und
-        // Reiter zu überlagern. 380 px beschreiben die Fläche, keine Kopfhöhe.
-        mindestHoehe: 380,
-        // `key` an der UHS, auch an den Reitern: die Route hat keinen `key`, der Umschalter behält
-        // die Seite. Gründe abgelehnter Aktionen der vorigen UHS gehören nicht an die nächste.
-        inhalt: (
-          <Grundriss
-            key={uhs.id}
-            einsatzId={einsatzId}
-            uhs={uhs}
-            schreibgeschuetzt={schreibgeschuetzt}
-            platzBearbeitbar={darf('grundriss-bearbeiten')}
+      // Die Leiste gehört zum Kopf, den der Fensterrahmen misst: so steht sie bei 1440 × 900 ohne
+      // Bildlauf über dem Grundriss, und jeder Bereich behält die Mindesthöhe. Ein einzelner
+      // Bereich ist keine Wahl: dann steht nur die Belegung.
+      bereiche={
+        mehrereBereiche && (
+          <Segmentleiste
+            rolle="tablist"
+            beschriftung={aufzaehlung(bereichListe.map((b) => BEREICH_NAME[b]))}
+            wert={bereich}
+            onWechsel={waehleBereich}
+            optionen={bereichListe.map((b) => ({
+              wert: b,
+              label: BEREICH_NAME[b],
+              steuert: bereichFeld,
+            }))}
           />
+        )
+      }
+      fensterInhalt={{
+        // Mindest-Arbeitsfläche: unter einem langen Kopf scrollt die Seite, statt den Bereich zu
+        // überlagern. 380 px beschreiben die Fläche, keine Kopfhöhe.
+        mindestHoehe: 380,
+        // `key` an der UHS, auch an den Bereichen: die Route hat keinen `key`, der Umschalter
+        // behält die Seite. Gründe abgelehnter Aktionen der vorigen UHS gehören nicht an die
+        // nächste. Der Grundriss teilt seine Fläche selbst (Unterreiter unter `xl`); die übrigen
+        // Bereiche rollen in ihrer Fläche.
+        inhalt: (
+          <div
+            {...(mehrereBereiche
+              ? { role: 'tabpanel', id: bereichFeld, 'aria-label': BEREICH_NAME[bereich] }
+              : {})}
+            style={{
+              height: '100%',
+              minHeight: 0,
+              ...(bereich === 'belegung' ? {} : { overflowY: 'auto' }),
+            }}
+          >
+            {bereich === 'belegung' ? (
+              <Grundriss
+                key={uhs.id}
+                einsatzId={einsatzId}
+                uhs={uhs}
+                schreibgeschuetzt={schreibgeschuetzt}
+                platzBearbeitbar={darf('grundriss-bearbeiten')}
+              />
+            ) : bereich === 'kraefte' ? (
+              <UhsKraefte
+                key={uhs.id}
+                einsatzId={einsatzId}
+                uhs={uhs}
+                schreibgeschuetzt={schreibgeschuetzt}
+                einheitZuordnen
+              />
+            ) : bereich === 'material' ? (
+              <MaterialTab
+                key={uhs.id}
+                einsatzId={einsatzId}
+                uhs={uhs}
+                schreibgeschuetzt={schreibgeschuetzt}
+              />
+            ) : bereich === 'bewegungen' ? (
+              <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
+            ) : (
+              <UhsAnhaenge
+                einsatzId={einsatzId}
+                uhs={uhs}
+                darfSchreiben={!schreibgeschuetzt}
+                zeigeZugriffe={istEinsatzLeitung(einsatz)}
+              />
+            )}
+          </div>
         ),
       }}
     >
-      {/* Der Seitenkopf teilt die Resthöhe mit dem Grundriss; Material/Bewegungen/Dateien folgen
-          im Seitenfluss. */}
-      {/* Ein einzelner Reiter ist keine Wahl: dann steht nur das Feld (UHS-Tablet). */}
-      {reiterListe.length > 1 && (
-        <Segmentleiste
-          rolle="tablist"
-          beschriftung={aufzaehlung(reiterListe.map((r) => REITER_NAME[r]))}
-          wert={reiter}
-          onWechsel={setReiter}
-          optionen={reiterListe.map((r) => ({
-            wert: r,
-            label: REITER_NAME[r],
-            steuert: reiterFeld,
-          }))}
-          style={{ marginTop: 16, marginBottom: 12 }}
-        />
-      )}
-      {/* Ohne Leiste kein Reiterfeld: dann benennt sich die Liste darin selbst. */}
-      <div
-        {...(reiterListe.length > 1
-          ? { role: 'tabpanel', id: reiterFeld, 'aria-label': REITER_NAME[reiter] }
-          : { style: { marginTop: 16 } })}
-      >
-        {reiter === 'kraefte' ? (
-          <UhsKraefte
-            key={uhs.id}
-            einsatzId={einsatzId}
-            uhs={uhs}
-            schreibgeschuetzt={schreibgeschuetzt}
-            einheitZuordnen
-          />
-        ) : reiter === 'material' ? (
-          <MaterialTab
-            key={uhs.id}
-            einsatzId={einsatzId}
-            uhs={uhs}
-            schreibgeschuetzt={schreibgeschuetzt}
-          />
-        ) : reiter === 'bewegungen' ? (
+      {geraet && (
+        <div style={{ marginTop: 16 }}>
           <BewegungenTab uhs={uhs} dataUpdatedAt={detailQuery.dataUpdatedAt} />
-        ) : (
-          <UhsAnhaenge
-            einsatzId={einsatzId}
-            uhs={uhs}
-            darfSchreiben={!schreibgeschuetzt}
-            zeigeZugriffe={istEinsatzLeitung(einsatz)}
-          />
-        )}
-      </div>
+        </div>
+      )}
     </EinsatzSeite>
   );
 }

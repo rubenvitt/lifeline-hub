@@ -5,9 +5,9 @@ Subtask LLH-1133 (`i0x7xjk3`) von LLH-1018. Jede Aufgabe entsteht per TDD. Gepr�
 
 ## 1. Bereiche der UHS-Seite
 
-- [ ] 1.1 `bereich`-Param in `routing/deeplinks.ts` (Parser mit Rückfall auf Belegung). Vitest.
-- [ ] 1.2 `UhsDetailPage`: Bereichsleiste unter dem Kopf, gewählter Bereich in `fensterInhalt` mit voller Höhe, Unterreiter des Grundrisses unverändert. Vitest `UhsDetailPage.test.tsx` (Vorgabe Belegung, `?bereich=material`, Wechsel schreibt die URL).
-- [ ] 1.3 Kopfzahl `materialKopfzahl` als Sprung in der Meta-Zeile, ohne Freigabe Material keine Zahl. Vitest.
+- [x] 1.1 `bereich`-Param in `routing/deeplinks.ts` (Parser mit Rückfall auf Belegung). Vitest.
+- [x] 1.2 `UhsDetailPage`: Bereichsleiste unter dem Kopf, gewählter Bereich in `fensterInhalt` mit voller Höhe, Unterreiter des Grundrisses unverändert. Vitest `UhsDetailPage.test.tsx` (Vorgabe Belegung, `?bereich=material`, Wechsel schreibt die URL).
+- [x] 1.3 Kopfzahl `materialKopfzahl` als Sprung in der Meta-Zeile, ohne Freigabe Material keine Zahl. Vitest.
 
 ## 2. Material am Ort
 
