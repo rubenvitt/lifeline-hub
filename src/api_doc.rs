@@ -262,6 +262,8 @@ use utoipa::OpenApi;
         crate::person::audit_repo::ZugriffAnzeige,
         crate::person::audit_repo::ZugriffArt,
         crate::person::anhang::PersonAnhangAnzeige,
+        crate::person::massnahme_repo::MassnahmeAnzeige,
+        crate::person::massnahme_repo::MassnahmeArt,
         crate::person::sichtung_repo::SichtungAnzeige,
         crate::person::transport_repo::Fachrichtung,
         crate::person::transport_repo::TransportAnzeige,

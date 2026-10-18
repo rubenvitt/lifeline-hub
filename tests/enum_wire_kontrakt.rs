@@ -188,6 +188,18 @@ fn serde_wire_gleich_as_str() {
         Psychiatrie => "psychiatrie",
         Sonstige => "sonstige",
     });
+    // Maßnahmen (LLH-1324, Spec `personen-massnahmen`)
+    enum_wire!(lifeline_hub::person::massnahme_repo::MassnahmeArt {
+        Blutstillung => "blutstillung",
+        Zugang => "zugang",
+        Infusion => "infusion",
+        Sauerstoff => "sauerstoff",
+        Atemweg => "atemweg",
+        Analgesie => "analgesie",
+        Immobilisation => "immobilisation",
+        Waermeerhalt => "waermeerhalt",
+        Dekontamination => "dekontamination",
+    });
 
     // schaden
     enum_wire_as_str!(lifeline_hub::schaden::SchadenStatus {

@@ -9188,4 +9188,84 @@ mod tests {
         assert!(cache("normal", "fliegend", "kinder").await.is_err());
         assert!(cache("normal", "sitzend", "zahn").await.is_err());
     }
+
+    // --- LLH-1324: Maßnahmen am Patienten (0220) ---
+
+    /// `person_massnahme`: nur Katalogwerte, Durchführung und Ankunft Pflicht, Aufheben als
+    /// Spalten an der Zeile (leer = gilt), `client_id` je Einsatz eindeutig.
+    #[tokio::test]
+    async fn migration_0220_person_massnahme() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 220).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let massnahme = |art: &'static str, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, \
+                        erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, '2026-10-18 14:05:00', '2026-10-18 14:06:00', ?, ?) \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(art)
+                .bind(b)
+                .bind(client_id)
+                .fetch_one(&pool)
+                .await
+                .map(|r| sqlx::Row::get::<i64, _>(&r, 0))
+            }
+        };
+        for art in [
+            "blutstillung",
+            "zugang",
+            "infusion",
+            "sauerstoff",
+            "atemweg",
+            "analgesie",
+            "immobilisation",
+            "waermeerhalt",
+            "dekontamination",
+        ] {
+            massnahme(art, None)
+                .await
+                .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        assert!(
+            massnahme("tourniquet", None).await.is_err(),
+            "nur der Katalog"
+        );
+        let m = massnahme("infusion", Some("m1")).await.unwrap();
+        assert!(
+            massnahme("infusion", Some("m1")).await.is_err(),
+            "derselbe Schlüssel im selben Einsatz"
+        );
+        let (at, von): (Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT aufgehoben_at, aufgehoben_von_id FROM person_massnahme WHERE id = ?",
+        )
+        .bind(m)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((at, von), (None, None), "eine neue Maßnahme gilt");
+        sqlx::query(
+            "UPDATE person_massnahme SET aufgehoben_at = '2026-10-18 14:10:00', \
+                aufgehoben_von_id = ? WHERE id = ?",
+        )
+        .bind(b)
+        .bind(m)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
 }

@@ -3858,6 +3858,33 @@ export interface components {
          * @enum {string}
          */
         LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
+        /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
+        MassnahmeAnzeige: {
+            art: components["schemas"]["MassnahmeArt"];
+            aufgehoben_at?: string | null;
+            /** Format: int64 */
+            aufgehoben_von_id?: number | null;
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046). */
+            bestaetigt_name?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann die Maßnahme beim Server ankam (Erfassungszeit im Sinne der Spec). */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            person_id: number;
+            /** @description Durchführung; ohne Angabe die Erfassung, ohne Netz die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
+         *     `migrations/0220_person_massnahme.sql`. Katalogwert (Retain), nie im ETB oder Live-Kanal.
+         * @enum {string}
+         */
+        MassnahmeArt: "blutstillung" | "zugang" | "infusion" | "sauerstoff" | "atemweg" | "analgesie" | "immobilisation" | "waermeerhalt" | "dekontamination";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;

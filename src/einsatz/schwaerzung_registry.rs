@@ -339,6 +339,28 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        tabelle: "person_massnahme",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1324 (design.md D4): die Maßnahme ist ein Katalogwert wie die Sichtung.
+            retain("art", G_TRIAGE),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            // Aufheben genau einmal (D1), ohne Grund.
+            retain("aufgehoben_at", G_ZEIT),
+            retain("aufgehoben_von_id", G_FK),
+            retain("client_id", G_IDEMPOTENZ),
+        ],
+    },
+    TabellenRegel {
         tabelle: "person_verlaufsnotiz",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -2835,6 +2857,8 @@ pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
     "person_uhs_belegung",
     // LLH-1325: ein Transportstand, auch ein aufgehobener (design.md D4).
     "person_transport",
+    // LLH-1324: eine Maßnahme, auch eine aufgehobene.
+    "person_massnahme",
 ];
 
 /// `SELECT` der Personen-IDs mit Behandlungsbezug (ohne Einsatz-Eingrenzung; der Aufrufer grenzt

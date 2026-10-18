@@ -9803,6 +9803,83 @@
           "lagged"
         ]
       },
+      "MassnahmeAnzeige": {
+        "type": "object",
+        "description": "Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "art",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MassnahmeArt"
+          },
+          "aufgehoben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aufgehoben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Maßnahme beim Server ankam (Erfassungszeit im Sinne der Spec)."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Durchführung; ohne Angabe die Erfassung, ohne Netz die Zeit am Gerät, gekappt."
+          }
+        }
+      },
+      "MassnahmeArt": {
+        "type": "string",
+        "description": "Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in\n`migrations/0220_person_massnahme.sql`. Katalogwert (Retain), nie im ETB oder Live-Kanal.",
+        "enum": [
+          "blutstillung",
+          "zugang",
+          "infusion",
+          "sauerstoff",
+          "atemweg",
+          "analgesie",
+          "immobilisation",
+          "waermeerhalt",
+          "dekontamination"
+        ]
+      },
       "MaterialAnzeige": {
         "type": "object",
         "description": "Öffentliche Material-Darstellung (ohne `org_id`).",
