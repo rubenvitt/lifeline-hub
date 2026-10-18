@@ -2430,6 +2430,8 @@ mod tests {
     const NAME_KLARTEXT: &str = "LFH725-Gepflanzter-Name";
     const ANHANG_KLARTEXT: &[u8] = b"LFH725-GEPFLANZTER-ANHANG";
     const BILD_KLARTEXT: &[u8] = b"LFH997-GEPFLANZTES-LUFTBILD";
+    /// Notiz einer Verletzung am Körperschema (LLH-1113), Scrub mit der Behandlung.
+    const VERLETZUNG_KLARTEXT: &str = "LLH1113-Gepflanzte-Verletzungsnotiz";
     /// Bytes eines UHS-Plans (LFH-999), der mit der Schwärzung ganz verschwinden muss.
     const PLAN_KLARTEXT: &[u8] = b"LFH999-GEPFLANZTER-PLAN";
 
@@ -2551,7 +2553,7 @@ mod tests {
     }
 
     /// Vorgemerkter Einsatz, Karenz zum Zeitpunkt `2026-03-01` abgelaufen, mit dem Klartext in
-    /// einer Scrub-Spalte (Personenname), in einem Anhang und in einem Bild der Lagekarte, die
+    /// einer Scrub-Spalte (Personenname, Notiz einer Verletzung), in einem Anhang und in einem Bild der Lagekarte, die
     /// über mehrere Seiten reichen (Overflow-Seiten — genau die lässt `secure_delete = FAST`
     /// stehen).
     async fn faelliger_einsatz_mit_klartext(pool: &SqlitePool) -> i64 {
@@ -2589,6 +2591,21 @@ mod tests {
         .await
         .unwrap();
         bild_mit_bytes(pool, e, &BILD_KLARTEXT.repeat(1000)).await;
+        // LLH-1113: Notiz und Lage einer Verletzung fallen mit der Behandlung (Scrub).
+        sqlx::query(
+            "INSERT INTO person_verletzung (einsatz_id, person_id, ansicht, region, art, x, y, \
+                notiz, zeitpunkt_at, erfasst_at, erfasst_von) \
+             SELECT ?, id, 'vorn', 'thorax', 'wunde_blutung', 0.4, 0.3, ?, \
+                '2025-12-31 10:00:00', '2025-12-31 10:00:00', ? \
+             FROM einsatz_person WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .bind(VERLETZUNG_KLARTEXT)
+        .bind(b)
+        .bind(e)
+        .execute(pool)
+        .await
+        .unwrap();
         e
     }
 
@@ -2683,6 +2700,10 @@ mod tests {
             enthaelt_klartext(&pfad) && crate::db::datei_oder_wal_enthaelt(&pfad, PLAN_KLARTEXT),
             "Vorbedingung: Klartext liegt in der Datei"
         );
+        assert!(
+            crate::db::datei_oder_wal_enthaelt(&pfad, VERLETZUNG_KLARTEXT.as_bytes()),
+            "Vorbedingung: die Notiz der Verletzung liegt in der Datei"
+        );
 
         assert_eq!(
             tick_einmal(&pool, &LiveHub::new(), t("2026-03-01 12:00:00")).await,
@@ -2711,6 +2732,10 @@ mod tests {
         assert!(
             !crate::db::datei_oder_wal_enthaelt(&pfad, PLAN_KLARTEXT),
             "Bytes des UHS-Plans stehen noch in DB-Datei oder WAL"
+        );
+        assert!(
+            !crate::db::datei_oder_wal_enthaelt(&pfad, VERLETZUNG_KLARTEXT.as_bytes()),
+            "Notiz der Verletzung steht noch in DB-Datei oder WAL"
         );
     }
 

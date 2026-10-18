@@ -3,8 +3,10 @@
 //! Aufheben genau einmal, kein ETB, das Live-Ereignis nennt nur Einsatz und Person; am UHS-Gerät
 //! nur an Personen der eigenen UHS.
 
-use axum::http::StatusCode;
+use axum::body::{to_bytes, Body};
+use axum::http::{header, Request, StatusCode};
 use serde_json::{json, Value};
+use tower::ServiceExt;
 
 mod common;
 use common::{
@@ -385,4 +387,172 @@ async fn replay_derselben_client_id_legt_eine_verletzung_an() {
     neu["client_id"] = json!("v-2");
     let (s, _) = post(&app, &admin, &pfad(e, p), neu).await;
     assert_eq!(s, StatusCode::CONFLICT);
+}
+
+// ---------- Am UHS-Gerät ----------
+
+/// Koppelt ein Gerät mit `body` und liefert sein Sitzungscookie.
+async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String {
+    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/geraete"), body).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let code = v["code"]["code"].as_str().unwrap().to_string();
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/geraete/koppeln")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(json!({ "code": code }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let cookie = resp.headers()[header::SET_COOKIE]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let _ = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    cookie
+}
+
+async fn aktive_stelle(app: &axum::Router, admin: &str, e: i64, art: &str, body: Value) -> i64 {
+    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/{art}"), body).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+/// Spec `personen-verletzungen`, „Verletzungen am UHS-Gerät“: das Tablet markiert und hebt auf
+/// an einer Person seiner UHS, mit „Bestätigt von“; eine fremde UHS ist 404, Betreuungsstelle und
+/// Lagemonitor bekommen 403.
+#[tokio::test]
+async fn verletzung_am_uhs_geraet() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mut uhs = Vec::new();
+    for bez in ["UHS Nord", "UHS Süd"] {
+        let id = aktive_stelle(
+            &app,
+            &admin,
+            e,
+            "uhs",
+            json!({"typ": "behandlungsplatz", "bezeichnung": bez}),
+        )
+        .await;
+        let (s, _) = post(
+            &app,
+            &admin,
+            &format!("/api/einsaetze/{e}/uhs/{id}/status"),
+            json!({"status": "aktiv"}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK);
+        uhs.push(id);
+    }
+    let tablet = geraet(
+        &app,
+        &admin,
+        e,
+        json!({"ansicht": "uhs-tablet", "uhs_id": uhs[0], "bezeichnung": "Tablet 1"}),
+    )
+    .await;
+    let (s, kraft) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personal"),
+        json!({"adhoc": {"name": "Dr. A. Muster", "funktion": "Notärztin"}}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{kraft}");
+    let (s, eigene) = post(
+        &app,
+        &tablet,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{eigene}");
+    let eigene = eigene["id"].as_i64().unwrap();
+    let (s, fremde) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({"uhs_id": uhs[1]}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fremde}");
+    let fremde = fremde["id"].as_i64().unwrap();
+
+    let mut body = unterarm();
+    body["bestaetigt_personal_id"] = kraft["id"].clone();
+    let (s, v) = post(&app, &tablet, &pfad(e, eigene), body).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+    let (s, a) = post(&app, &tablet, &aufheben_pfad(e, eigene, &v), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{a}");
+
+    let (s, x) = post(&app, &tablet, &pfad(e, fremde), unterarm()).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS: {x}");
+    let (_, an_fremder) = post(&app, &admin, &pfad(e, fremde), unterarm()).await;
+    let (s, x) = post(
+        &app,
+        &tablet,
+        &aufheben_pfad(e, fremde, &an_fremder),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS: {x}");
+
+    let stelle = aktive_stelle(
+        &app,
+        &admin,
+        e,
+        "betreuung/stellen",
+        json!({"bezeichnung": "NU Turnhalle", "art": "notunterkunft", "kapazitaet_personen": 80}),
+    )
+    .await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/betreuung/stellen/{stelle}"),
+        &admin,
+        Some(&json!({"status": "in_betrieb"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let betreuung = geraet(
+        &app,
+        &admin,
+        e,
+        json!({"ansicht": "betreuungsstelle", "stelle_id": stelle, "bezeichnung": "Tablet NU"}),
+    )
+    .await;
+    let (s, in_stelle) = post(
+        &app,
+        &betreuung,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{in_stelle}");
+    let in_stelle = in_stelle["id"].as_i64().unwrap();
+    let monitor = geraet(
+        &app,
+        &admin,
+        e,
+        json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor Stab"}),
+    )
+    .await;
+    for (cookie, p, name) in [
+        (&betreuung, in_stelle, "Betreuungsstelle"),
+        (&monitor, eigene, "Lagemonitor"),
+    ] {
+        let (s, x) = post(&app, cookie, &pfad(e, p), unterarm()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{name}: {x}");
+    }
 }

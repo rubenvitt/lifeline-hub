@@ -87,8 +87,8 @@ wire_enum! {
     /// `einsatz_aufbewahrung_kategorie`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
     pub enum Datenkategorie {
-        /// Zustand, PAT-Nummer, benötigte Fachrichtung und Notizen zu Sichtung, Verlauf und
-        /// UHS-Belegung.
+        /// Zustand, PAT-Nummer, benötigte Fachrichtung, Lage und Notiz der Verletzungen und
+        /// Notizen zu Sichtung, Verlauf und UHS-Belegung.
         Behandlung => "behandlung",
         /// Herkunftsadresse und Melderkontakt.
         Personenauskunft => "personenauskunft",

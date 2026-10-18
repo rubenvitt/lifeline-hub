@@ -36,8 +36,8 @@ impl Datenkategorie {
     const fn entfernt(&self) -> &'static str {
         match self {
             Datenkategorie::Behandlung => {
-                "Zustand, PAT-Nummer und benötigte Fachrichtung der Personen sowie die Notizen \
-                 zu Sichtung, Verlauf und UHS-Belegung"
+                "Zustand, PAT-Nummer und benötigte Fachrichtung der Personen, Lage und Notiz \
+                 ihrer Verletzungen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung"
             }
             Datenkategorie::Personenauskunft => "Herkunftsadresse und Melderkontakt der Personen",
             Datenkategorie::Anhaenge => {
@@ -2041,6 +2041,85 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(art, "analgesie", "die Maßnahme bleibt");
+        assert_eq!(
+            person_felder(&pool, mit).await.0,
+            None,
+            "beide Zwecke abgelaufen"
+        );
+    }
+
+    /// LLH-1113 (Spec `aufbewahrung-kategorien`, „Schwärzung der Behandlung leert die
+    /// PAT-Kern-Freitexte“): eine Verletzung, auch eine aufgehobene, gibt Behandlungsbezug. Die
+    /// Schwärzung der Behandlung leert ihre Lage und Notiz; Ansicht, Region, Art und Schwere
+    /// bleiben.
+    #[tokio::test]
+    async fn verletzung_haelt_den_stamm_und_die_behandlung_leert_lage_und_notiz() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let mit = volle_person(&pool, einsatz, 1, leit).await;
+        let ohne = volle_person(&pool, einsatz, 2, leit).await;
+        sqlx::query(
+            "INSERT INTO person_verletzung (einsatz_id, person_id, ansicht, region, art, schwere, \
+                x, y, notiz, zeitpunkt_at, erfasst_at, erfasst_von, aufgehoben_at, \
+                aufgehoben_von_id) \
+             VALUES (?, ?, 'vorn', 'unterarm_l', 'fraktur_verdacht', 'mittel', 0.3, 0.4, \
+                'offene Fehlstellung', '2026-05-27 10:00:00', '2026-05-27 10:00:00', ?, \
+                '2026-05-27 10:05:00', ?)",
+        )
+        .bind(einsatz)
+        .bind(mit)
+        .bind(leit)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        schliessen(&pool, einsatz, leit).await;
+        erst_auskunft_dann_behandlung(&pool, einsatz).await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            person_felder(&pool, mit).await.0.as_deref(),
+            Some("Mustermann"),
+            "auch eine aufgehobene Verletzung ist ein Behandlungsbezug"
+        );
+        assert_eq!(person_felder(&pool, ohne).await.0, None);
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Behandlung, t(JETZT))
+                .await
+                .unwrap()
+        );
+        type Zeile = (
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<f64>,
+            Option<f64>,
+            Option<String>,
+        );
+        let zeile: Zeile = sqlx::query_as(
+            "SELECT ansicht, region, art, schwere, x, y, notiz FROM person_verletzung \
+             WHERE person_id = ?",
+        )
+        .bind(mit)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            zeile,
+            (
+                "vorn".into(),
+                "unterarm_l".into(),
+                "fraktur_verdacht".into(),
+                Some("mittel".into()),
+                None,
+                None,
+                None
+            )
+        );
         assert_eq!(
             person_felder(&pool, mit).await.0,
             None,
