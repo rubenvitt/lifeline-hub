@@ -36,8 +36,8 @@ impl Datenkategorie {
     const fn entfernt(&self) -> &'static str {
         match self {
             Datenkategorie::Behandlung => {
-                "Zustand und PAT-Nummer der Personen sowie die Notizen zu Sichtung, Verlauf und \
-                 UHS-Belegung"
+                "Zustand, PAT-Nummer und benötigte Fachrichtung der Personen sowie die Notizen \
+                 zu Sichtung, Verlauf und UHS-Belegung"
             }
             Datenkategorie::Personenauskunft => "Herkunftsadresse und Melderkontakt der Personen",
             Datenkategorie::Anhaenge => {
@@ -1887,6 +1887,112 @@ mod tests {
             "Kontamination bleibt"
         );
         assert_eq!(name(nur_pat).await, None, "beide Zwecke abgelaufen");
+    }
+
+    /// Schwärzt erst `personenauskunft`, dann `behandlung` eines abgeschlossenen Einsatzes; dazwischen
+    /// läuft `zwischen`. Für die Behandlungsbezüge der PAT-Kern-Tabellen (Change `y18v58dt-pat-kern`).
+    async fn erst_auskunft_dann_behandlung(pool: &SqlitePool, einsatz: i64) {
+        let vor_31 = "2026-05-30 12:00:00";
+        for k in [Datenkategorie::Personenauskunft, Datenkategorie::Behandlung] {
+            kategorie_stand(pool, einsatz, k, "2026-05-01 00:00:00", Some(vor_31)).await;
+        }
+    }
+
+    /// LLH-1325 (Spec `aufbewahrung-kategorien`, design.md D4): ein Transportstand gibt
+    /// Behandlungsbezug, auch ein aufgehobener. Die Schwärzung der Behandlung leert die
+    /// Fachrichtung in Verlauf und Cache; Priorität und Art bleiben als Statuskategorie.
+    #[tokio::test]
+    async fn transportstand_haelt_den_stamm_und_die_behandlung_leert_die_fachrichtung() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let mit_transport = volle_person(&pool, einsatz, 1, leit).await;
+        let aufgehoben = volle_person(&pool, einsatz, 2, leit).await;
+        let ohne = volle_person(&pool, einsatz, 3, leit).await;
+        for (p, prio, art, fach) in [
+            (
+                mit_transport,
+                Some("dringlich"),
+                Some("liegend"),
+                Some("psychiatrie"),
+            ),
+            (aufgehoben, None, None, None),
+        ] {
+            sqlx::query(
+                "INSERT INTO person_transport (einsatz_id, person_id, prioritaet, art, \
+                    fachrichtung, zeitpunkt_at, erfasst_at, erfasst_von) \
+                 VALUES (?, ?, ?, ?, ?, '2026-05-27 10:00:00', '2026-05-27 10:00:00', ?)",
+            )
+            .bind(einsatz)
+            .bind(p)
+            .bind(prio)
+            .bind(art)
+            .bind(fach)
+            .bind(leit)
+            .execute(&pool)
+            .await
+            .unwrap();
+            sqlx::query(
+                "UPDATE einsatz_person SET transport_prioritaet = ?, transport_art = ?, \
+                    transport_fachrichtung = ? WHERE id = ?",
+            )
+            .bind(prio)
+            .bind(art)
+            .bind(fach)
+            .bind(p)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        schliessen(&pool, einsatz, leit).await;
+        erst_auskunft_dann_behandlung(&pool, einsatz).await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let name = |p: i64| {
+            let pool = pool.clone();
+            async move { person_felder(&pool, p).await.0 }
+        };
+        assert_eq!(name(mit_transport).await.as_deref(), Some("Mustermann"));
+        assert_eq!(
+            name(aufgehoben).await.as_deref(),
+            Some("Mustermann"),
+            "auch ein aufgehobener Transport ist ein Behandlungsbezug"
+        );
+        assert_eq!(name(ohne).await, None, "ohne Bezug nur Personenauskunft");
+
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Behandlung, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let verlauf: (Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT prioritaet, art, fachrichtung FROM person_transport WHERE person_id = ?",
+        )
+        .bind(mit_transport)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            verlauf,
+            (Some("dringlich".into()), Some("liegend".into()), None),
+            "Verlauf"
+        );
+        let cache: (Option<String>, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT transport_prioritaet, transport_art, transport_fachrichtung \
+             FROM einsatz_person WHERE id = ?",
+        )
+        .bind(mit_transport)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            cache,
+            (Some("dringlich".into()), Some("liegend".into()), None),
+            "Cache"
+        );
+        assert_eq!(name(mit_transport).await, None, "beide Zwecke abgelaufen");
     }
 
     #[tokio::test]

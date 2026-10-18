@@ -240,7 +240,7 @@ impl Funktionsansicht {
 
 /// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
 /// Platzverfügbarkeit, Personen der eigenen UHS mit Aufnahme, Stammdaten, Sichtung, Verbleib und
-/// Notizen, dazu die Auswahl „Bestätigt von“ (LFH-1046). Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
+/// Notizen sowie Transport (PAT-Kern), dazu die Auswahl „Bestätigt von“ (LFH-1046). Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
 /// Material, Status, Storno, Export, Druck, Abgleich und Anhänge fehlen bewusst.
 const UHS_TABLET: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/uhs"),
@@ -260,6 +260,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
+    // PAT-Kern (Change y18v58dt-pat-kern, Spec `funktionsansichten`).
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/transport"),
 ];
 /// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten,
 /// Kräfte und Anhänge der eigenen UHS, Meldungen anlegen und die eigenen lesen. Material liest der Laptop
@@ -302,6 +304,7 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
+    ("POST", "/api/einsaetze/{id}/personen/{pid}/transport"),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
 ];

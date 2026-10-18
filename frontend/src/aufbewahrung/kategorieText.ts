@@ -22,7 +22,7 @@ export const KATEGORIE_TEXT: Record<Datenkategorie, KategorieText> = {
   behandlung: {
     bezeichnung: 'Behandlung',
     daten:
-      'Zustand und PAT-Nummer der Personen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung',
+      'Zustand, PAT-Nummer und benötigte Fachrichtung der Personen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung',
     vorschlag: {
       tage: 3650,
       quelle:

@@ -6209,3 +6209,105 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Abschnittsgerät");
 }
+
+// ---------- PAT-Kern am UHS-Gerät (Change y18v58dt-pat-kern) ----------
+
+/// Was ein PAT-Kern-Schreibweg am Gerät ergibt: der Einsatz, die Person der eigenen UHS und die
+/// Antwort des Tablets.
+struct PatKernAmGeraet {
+    app: axum::Router,
+    admin: String,
+    einsatz: i64,
+    person: i64,
+    antwort: Value,
+}
+
+/// Ein Schreibweg unter `…/personen/{pid}/{weg}` am Gerät (Specs `funktionsansichten`,
+/// `geraete-kopplung`): Tablet und Laptop der UHS Nord schreiben an einer Person ihrer UHS, das
+/// Tablet mit „Bestätigt von“; eine Person der UHS Süd ist 404, Betreuungsstelle und Lagemonitor
+/// bekommen 403, auch an einer Person, die sie sonst sehen.
+async fn pat_kern_am_geraet(weg: &str, body: Value) -> PatKernAmGeraet {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let laptop = laptop(&app, &admin, einsatz, nord).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let eigene = person_in(&app, &tablet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let fremde = person_in(&app, &admin, einsatz, Some(sued)).await["id"]
+        .as_i64()
+        .unwrap();
+    let pfad = |p: i64| format!("/api/einsaetze/{einsatz}/personen/{p}/{weg}");
+
+    let mut bestaetigt = body.clone();
+    bestaetigt["bestaetigt_personal_id"] = json!(aerztin);
+    let (s, antwort) = anfrage_json(&app, "POST", &pfad(eigene), &tablet, Some(&bestaetigt)).await;
+    assert_eq!(s, StatusCode::CREATED, "Tablet: {antwort}");
+    assert_eq!(antwort["bestaetigt_name"], "Dr. A. Muster", "{antwort}");
+    let (s, v) = anfrage_json(&app, "POST", &pfad(eigene), &laptop, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "Laptop: {v}");
+    let (s, v) = anfrage_json(&app, "POST", &pfad(fremde), &tablet, Some(&body)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS: {v}");
+
+    let stelle = betreuungsstelle_anlegen(&app, &admin, einsatz, "NU Turnhalle").await;
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "betreuungsstelle", "stelle_id": stelle, "bezeichnung": "Tablet NU"}),
+    )
+    .await;
+    let betreuung = koppeln(&app, &code, None)
+        .await
+        .cookie
+        .expect("Sitzungscookie");
+    let in_stelle = person_in_stelle(&app, &admin, einsatz, stelle).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    for (geraet, p, name) in [
+        (&betreuung, in_stelle, "Betreuungsstelle"),
+        (&monitor, eigene, "Lagemonitor"),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &pfad(p), geraet, Some(&body)).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{name}: {v}");
+    }
+    PatKernAmGeraet {
+        app,
+        admin,
+        einsatz,
+        person: eigene,
+        antwort,
+    }
+}
+
+/// LLH-1325 (Spec `personen-transport`, „Transport am UHS-Gerät“): das Tablet legt den Transport
+/// fest; der ETB-Eintrag nennt das Gerät als Erfasser und die bestätigende Person.
+#[tokio::test]
+async fn transport_am_uhs_geraet() {
+    let lage = pat_kern_am_geraet("transport", json!({"prioritaet": "sofort"})).await;
+    let etb = system_etb(&lage.app, &lage.admin, lage.einsatz).await;
+    let eintraege: Vec<_> = etb
+        .iter()
+        .filter(|(t, _)| t.contains("Transportpriorität"))
+        .collect();
+    assert_eq!(
+        eintraege.len(),
+        1,
+        "der Laptop wiederholt dieselbe Priorität: {etb:?}"
+    );
+    assert_eq!(
+        eintraege[0].0,
+        "Person R-001: Transportpriorität sofort, bestätigt: Dr. A. Muster"
+    );
+    assert_eq!(eintraege[0].1, "UHS Nord · Tablet 1");
+    let (_, d) = anfrage(
+        &lage.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personen/{}", lage.einsatz, lage.person),
+        &lage.admin,
+        None,
+    )
+    .await;
+    assert_eq!(d["transporte"][1]["id"], lage.antwort["id"]);
+    assert_eq!(d["transporte"][1]["bestaetigt_name"], "Dr. A. Muster");
+}
