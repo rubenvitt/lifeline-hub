@@ -22,7 +22,9 @@ Ableitungen in `etb/zeitachseModell.ts`)
   nicht am Ende; das Sammelbanner steht unten über der Erfassung. Nach dem eigenen Eintrag rollt
   die Seite ans Ende. Die Lesemarke ist eine Trennlinie unter dem zuletzt gesichteten Eintrag,
   wenn er im ungefilterten Fenster steht (`lesemarkeImFenster`), sonst ein Banner mit „Zur Marke
-  springen“. Lagemeldungen bleiben neueste zuerst.
+  springen“. „Nach oben“ (`etb/nachOben.ts`) steht erst ab mehr als einer Fensterhöhe Abstand
+  zum Anfang, rechts in der Überlagerung der Zeitachse über dem Sammelbanner (gestapelt, nie
+  darüber gelegt). Lagemeldungen bleiben neueste zuerst.
   `KARTEN_EIGENBAU` ist leer (`datensicht.guard.test.ts` pinnt 0).
 - Seitenleiste „Bilanz" (`etb/EtbBilanz.tsx`); unter `xl` erst nach der ersten Liste, dann
   stehend (Riegel `bilanzFrei`, nicht `isLoading`).
@@ -54,7 +56,8 @@ Ableitungen in `etb/zeitachseModell.ts`)
     (`LEISTEN_SCHWEBE`, `components/fokusInLeiste.ts`, auch für das Informationstelefon). Nachweis: zwei Einträge ganz im Bild auf
     390 × 844, auch ohne Abschließen-Recht (`e2e/leisten-flaeche.spec.ts`).
   - **Typ und Ereigniszeit am Textanfang** (LLH-1112/LLH-1088): der Präfix zeigt das Typwort in
-    der Typfarbe, die Zeile die Typkante (`Schnellerfassungszeile kante`); `/typ ` und danach
+    der Typfarbe, die Zeile ihren Rahmen samt Fokusring in der Typfarbe, vorn als 2-px-Kante
+    (`Schnellerfassungszeile rahmenFarbe`); `/typ ` und danach
     `/zeit <Angabe> ` setzen Typ und Ereigniszeit (`erkenneTypBefehl`, `erkenneZeitBefehl`,
     gedeutet nur über `deuteZeit` mit `art: 'ereignis'` und `serverJetzt()`), der Rest bleibt
     Inhalt; unlesbar bleibt der Text und die Hinweiszeile nennt den Grund. Eine Ereigniszeit über

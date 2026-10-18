@@ -1002,7 +1002,7 @@ export default function Schnellerfassung({
           // (LFH-955, design.md D2).
           feldFuellt
           praefix={praefix}
-          kante={typFarbe.kante}
+          rahmenFarbe={typFarbe.kante}
           hinweis={
             // „Vorschau" neben „Erfassen" statt auf eigener Zeile: eine eigene Knopfzeile kostete im
             // Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste.
