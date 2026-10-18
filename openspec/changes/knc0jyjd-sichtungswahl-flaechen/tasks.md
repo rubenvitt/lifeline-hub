@@ -29,4 +29,4 @@ Subtask LLH-1083 (`knc0jyjd`) von LLH-1018. Jede Aufgabe entsteht per TDD
 ## 5. Regeln und Doku
 
 - [x] 5.1 `frontend/AGENTS.md`, „Farbachsen → Sichtung“: Wahl als Vollfläche über `SichtungsWahl` (Flächenpalette, Kante in `text`), Anzeige als umrandetes Farbfeld. `frontend/src/personen/AGENTS.md` (Erfassung und Nachsichtung). Prettier grün.
-- [ ] 5.2 Kapitel `docs/anwender/kapitel/betroffene.md` und `geraet-uhs.md` beschreiben die Wahl. Bilder `betroffene/erfassen.png`, `geraet-uhs/aufnahme.png` und `geraet-uhs/sichtung.png` sind neu erzeugt (Mitänderungsregel `docs/anwender/AGENTS.md`), der Wächter der Anwenderdoku ist grün.
+- [x] 5.2 Kapitel `docs/anwender/kapitel/betroffene.md` und `geraet-uhs.md` beschreiben die Wahl. Bilder `betroffene/erfassen.png`, `geraet-uhs/aufnahme.png` und `geraet-uhs/sichtung.png` sind neu erzeugt (Mitänderungsregel `docs/anwender/AGENTS.md`), der Wächter der Anwenderdoku ist grün.

@@ -38,5 +38,5 @@ Gemeinsame Change für LLH-1094 (`bti508xb`) und LLH-1129 (`mtcm6ied`) von LLH-1
 
 - [x] 6.1 e2e `personen-detail.spec.ts` (Kopf bei 1280 × 800 und 1440 × 900 ohne Bildlauf, Nachsichten ohne Dialog, Bezug hinzufügen), `betroffene-handy.spec.ts` (390 × 844: SK, Zustand und Aufenthalt in der ersten Höhe), `geraet-uhs-tablet.spec.ts`. `tsc` und `eslint` über `frontend/e2e` grün.
 - [x] 6.2 `frontend/src/personen/AGENTS.md`: „Personen-Detail“ (Kopf statt zweier Spalten) und neuer Abschnitt „Bezüge“. Prettier grün.
-- [ ] 6.3 Kapitel `betroffene.md`, `geraet-uhs.md`, `tiere.md` und `schaeden.md` mit neu erzeugten Bildern, Wächter der Anwenderdoku grün.
+- [x] 6.3 Kapitel `betroffene.md`, `geraet-uhs.md`, `tiere.md` und `schaeden.md` mit neu erzeugten Bildern, Wächter der Anwenderdoku grün.
 - [x] 6.4 Folgetask auf dem Board: die drei lokalen „vor n min“-Kopien auf `anzeige/abstand.ts` umstellen. (LLH-1327)
