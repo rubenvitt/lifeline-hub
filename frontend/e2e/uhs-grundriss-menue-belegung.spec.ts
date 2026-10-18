@@ -110,7 +110,7 @@ test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung'
 
   await belegungDurch;
   await nachladenDurch;
-  await expect(page.getByText('belegt')).toBeVisible();
+  await expect(page.getByText('belegt', { exact: true })).toBeVisible();
 
   const { tief, proben } = await page.evaluate(() => ({
     tief: (window as unknown as { __tief: number }).__tief,

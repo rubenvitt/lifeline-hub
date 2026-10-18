@@ -74,7 +74,7 @@ async function setupBelegterPlatz(page: Page): Promise<string> {
 
   // Person aus „Noch nicht aufgenommen" auf „Bett 1" ziehen → belegt.
   await ziehe(page, page.getByText(personName).first(), page.getByText('Bett 1'));
-  await expect(page.getByText('belegt')).toBeVisible();
+  await expect(page.getByText('belegt', { exact: true })).toBeVisible();
   await warteBisBelegungDurch(page, personName);
   return personName;
 }
@@ -125,7 +125,7 @@ test('UHS Grundriss: belegte Person in den Wartebereich ziehen räumt den Platz'
   // Person auf den Platz zurück.
   await warteBisBelegungDurch(page, personName);
   await expect(wartebereich.getByText(personName)).toBeVisible();
-  await expect(page.getByText('belegt')).toBeHidden();
+  await expect(page.getByText('belegt', { exact: true })).toBeHidden();
 });
 
 // Platz-Karten bleiben unabhängig von Belegung, Titellänge und Tag-Anzahl EXAKT gleich groß,
@@ -178,7 +178,7 @@ test('UHS Grundriss: alle Platz-Karten sind gleich groß (Belegung/Titel-Umbruch
 
   // Behandlungsplatz 1 belegen (2-zeiliger Titel + belegt + Person + Aktionen).
   await ziehe(page, page.getByText(personName).first(), page.getByText('Behandlungsplatz 1'));
-  await expect(page.getByText('belegt')).toBeVisible();
+  await expect(page.getByText('belegt', { exact: true })).toBeVisible();
   // Erst nach dem Nachladen ins Menü: ein später Refetch räumte ein offenes Platzmenü ab.
   await warteBisBelegungDurch(page, personName);
   // Behandlungsplatz 2 zusätzlich auf „aufbereitung" — die Tag-Zeile als dritte Varianzquelle.
@@ -343,7 +343,7 @@ test('UHS Grundriss: belegte Platz-Karte bleibt unter dem Raster-Zeilenabstand (
   await page.mouse.up();
 
   // Belegung bestätigt (Karte zeigt „belegt").
-  await expect(page.getByText('belegt')).toBeVisible();
+  await expect(page.getByText('belegt', { exact: true })).toBeVisible();
 
   // Reale Layout-Höhe der absolut positionierten Karte: ≤ 120 px, sonst ragt sie in Bett 6.
   const kartenHoehe = await bett1Text.evaluate((el) => {
