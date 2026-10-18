@@ -51,9 +51,23 @@ function trifftFilter(p: Pick<Person, 'status'>, filter: PersonenFilter): boolea
   return filter === 'alle' || p.status === filter;
 }
 
-/** Zeilenmenge einer Sicht. Das Raster filtert NICHT nach Sichtung, es GRUPPIERT danach. */
-export function filterPersonen(alle: readonly Person[], sicht: PersonenSicht): readonly Person[] {
-  return alle.filter((p) => trifftFilter(p, sicht.filter) && (!sicht.nurLuecken || hatLuecke(p)));
+/**
+ * Zeilenmenge einer Sicht. Das Raster filtert NICHT nach Sichtung, es GRUPPIERT danach.
+ *
+ * `behalten`: Personen, deren Lücke gerade aus der Zeile geschlossen wurde (LLH-1130). Unter „Nur
+ * Lücken zeigen“ bleiben sie stehen und zeigen den neuen Wert, statt unter dem Finger zu
+ * verschwinden; die Seite räumt die Menge, sobald sich die Sicht ändert.
+ */
+export function filterPersonen(
+  alle: readonly Person[],
+  sicht: PersonenSicht,
+  behalten?: ReadonlySet<number>,
+): readonly Person[] {
+  return alle.filter(
+    (p) =>
+      trifftFilter(p, sicht.filter) &&
+      (!sicht.nurLuecken || hatLuecke(p) || (behalten?.has(p.id) ?? false)),
+  );
 }
 
 /**

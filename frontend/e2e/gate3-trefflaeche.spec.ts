@@ -3293,8 +3293,8 @@ test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abst
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(`/einsaetze/${einsatzId}/personen`);
     await stelleDichte(page, dichte);
-    const leer = page.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
-    const voll = page.getByRole('button', { name: 'Zustand zu R-002 bearbeiten' });
+    const leer = page.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' });
+    const voll = page.getByRole('button', { name: 'Zustand / Verdacht zu R-002 bearbeiten' });
     const hLeer = await haeltStufe(leer, soll, `Zustand-Knopf leer (${dichte})`);
     const hVoll = await haeltStufe(voll, soll, `Zustand-Knopf gefüllt (${dichte})`);
     for (const [ziel, name] of [
@@ -3312,8 +3312,21 @@ test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abst
         16 - SUBPIXEL,
       );
     }
+    // Zeilenaktionen (LLH-1130): Sichtungsauslöser, „Verbleib erfassen“ in der Lücke und der
+    // Menüauslöser der Aktionsspalte sind antd-Knöpfe und folgen der Staffel.
+    const zeilenZiele = [
+      [page.getByRole('button', { name: 'R-001 sichten' }), 'Sichtungsauslöser'],
+      [page.getByRole('button', { name: 'Verbleib erfassen für R-001' }), 'Verbleib erfassen'],
+      [page.getByRole('button', { name: 'Aktionen zu R-001' }), 'Zeilenmenü'],
+    ] as const;
+    const hZiele: string[] = [];
+    for (const [ziel, name] of zeilenZiele) {
+      hZiele.push(`${name} ${await haeltStufe(ziel, soll, `${name} (${dichte})`)}`);
+      const breite = (await ziel.boundingBox())!.width;
+      expect(breite, `${name} (${dichte}) breit ${breite}px`).toBeGreaterThanOrEqual(24 - SUBPIXEL);
+    }
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): leer ${hLeer}, gefüllt ${hVoll}, Abstand ${abstand}`,
+      `${dichte} (Soll ≥ ${soll}): leer ${hLeer}, gefüllt ${hVoll}, Abstand ${abstand}, ${hZiele.join(', ')}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
@@ -3323,9 +3336,9 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
   page,
 }) => {
   // LFH-435: der Nur-Lese-Zweig der Betroffenen NIMMT WEG — Zustand steht als Text statt als
-  // `BemerkungZelle`, Erfassungsband und die zwei Kopfknöpfe fehlen. Einen Rechtehinweis gibt es
-  // im aktiven Einsatz nicht (nur „abgeschlossen — nur Ansicht"). Dem Beobachter bleibt im Kopf
-  // die Ansichtsleiste; sie wird gemessen.
+  // `BemerkungZelle`, Erfassungsband, die zwei Kopfknöpfe und die Zeilenaktionen (Sichtung,
+  // „Verbleib erfassen“, Zeilenmenü, LLH-1130) fehlen; über der Liste steht „Nur Ansicht · Grund“.
+  // Dem Beobachter bleibt im Kopf die Ansichtsleiste; sie wird gemessen.
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
@@ -3344,10 +3357,20 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
     await expect(
-      page.getByRole('button', { name: /^Zustand zu R-\d+ (hinzufügen|bearbeiten)$/ }),
+      page.getByRole('button', { name: /^Zustand \/ Verdacht zu R-\d+ (hinzufügen|bearbeiten)$/ }),
       'Vorbedingung: ohne Schreibrecht keine Zustand-Knöpfe',
     ).toHaveCount(0);
     await expect(page.locator('[data-lfh="zustand-zelle"]')).toHaveCount(0);
+    await expect(
+      page.locator('[data-lfh="rechte-hinweis"]'),
+      'Vorbedingung: „Nur Ansicht“ mit Grund über der Liste',
+    ).toContainText('Nur Ansicht');
+    await expect(
+      page.getByRole('button', {
+        name: /^(Sichtung R-\d+ ändern|R-\d+ sichten|Aktionen zu R-|Verbleib erfassen für R-)/,
+      }),
+      'Vorbedingung: ohne Schreibrecht keine Zeilenaktionen',
+    ).toHaveCount(0);
     await expect(
       page.locator('[data-lfh="erfassungsband"]'),
       'Vorbedingung: ohne Schreibrecht kein Erfassungsband',
@@ -3435,7 +3458,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
     await stelleDichte(page, dichte);
     await page.getByRole('button', { name: /Weitere Angaben/ }).click();
     const zustand = await haeltStufe(
-      huelle(page.getByLabel('Zustand', { exact: true })),
+      huelle(page.getByLabel('Zustand / Verdacht', { exact: true })),
       soll,
       `Route Zustand (${dichte})`,
     );
@@ -3452,7 +3475,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
     await schnell.getByRole('button', { name: /Weitere Angaben/ }).click();
     await modalRuht(page);
     const modalZustand = await haeltStufe(
-      huelle(schnell.getByLabel('Zustand', { exact: true })),
+      huelle(schnell.getByLabel('Zustand / Verdacht', { exact: true })),
       soll,
       `Modal Zustand (${dichte})`,
     );

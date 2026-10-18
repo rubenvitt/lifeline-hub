@@ -3,11 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import AufnahmeFelder, {
-  aufnahmeZuEingabe,
-  skFlaechenStil,
-  type AufnahmeModus,
-} from './AufnahmeFelder';
+import AufnahmeFelder, { aufnahmeZuEingabe, type AufnahmeModus } from './AufnahmeFelder';
 
 /**
  * Die Feldgruppe der Personen-Aufnahme — geprüft wird, was in beiden Mounts gilt; die Wege durch
@@ -30,10 +26,17 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
     const flaechen = within(gruppe).getAllByRole('radio');
     expect(flaechen).toHaveLength(6);
     // Die Reihenfolge ist die Dringlichkeit, nicht die Aufzählung des Enums.
-    expect(gruppe.textContent).toBe('SK ISK IISK IIISK IVtotunverletzt');
+    expect(flaechen.map((f) => f.getAttribute('data-sichtung'))).toEqual([
+      'sk1',
+      'sk2',
+      'sk3',
+      'sk4',
+      'tot',
+      'unverletzt',
+    ]);
   });
 
-  it('steht ganz oben — vor Geschlecht, Alter und Antreffort', () => {
+  it('steht ganz oben — vor Geschlecht, Alter und Fundort', () => {
     const { container } = zeige();
     const beschriftungen = [...container.querySelectorAll('.ant-form-item label')].map(
       (l) => l.textContent,
@@ -53,12 +56,20 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
   });
 
-  it('trägt die Farbe im Etikett, nicht als Fläche', () => {
+  it('nutzt die Sichtungswahl mit Flächen statt Radio-Knöpfen mit Farbfeld (LLH-1083)', () => {
     zeige();
-    // Die Farbe steht an einem `Tag` INNERHALB der Fläche; ein eingefärbter Radio-Button wäre
-    // Text in einer Farbe mit unzugesichertem Kontrast.
-    const gruppe = screen.getByRole('radiogroup');
-    expect(gruppe.querySelectorAll('.ant-tag')).toHaveLength(6);
+    const gruppe = screen.getByRole('radiogroup', { name: 'Sichtungskategorie' });
+    expect(gruppe).toHaveAttribute('data-lfh', 'sichtungswahl');
+    expect(gruppe.querySelectorAll('.ant-tag, .ant-radio-button-wrapper')).toHaveLength(0);
+  });
+
+  it('nimmt eine Wahl beim zweiten Tipp zurück — eine Erfassung ohne Sichtung bleibt erlaubt', async () => {
+    zeige();
+    const sk3 = screen.getByRole('radio', { name: /^SK III,/ });
+    await userEvent.click(sk3);
+    expect(sk3).toBeChecked();
+    await userEvent.click(sk3);
+    expect(sk3).not.toBeChecked();
   });
 });
 
@@ -90,7 +101,7 @@ describe('AufnahmeFelder — Feldbudget', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschlecht')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Antreffort')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fundort')).toBeInTheDocument();
     // Der Name hat der Sichtung im sichtbaren Budget Platz gemacht.
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
@@ -107,7 +118,7 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
     async (modus, sichtbar) => {
       const { container } = zeige(modus);
       expect(feldZahl(container)).toBe(sichtbar);
-      for (const label of ['Zustand', 'Koordinate', 'vermisst seit']) {
+      for (const label of ['Zustand / Verdacht', 'Koordinate', 'vermisst seit']) {
         expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
       }
       await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
@@ -116,11 +127,11 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
       if (modus === 'vermisst') {
         // Eine vermisste Person ist nicht angetroffen: kein Zustand, kein Fundort.
         expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
-        expect(screen.queryByLabelText('Zustand')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Zustand / Verdacht')).not.toBeInTheDocument();
         expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
       } else {
         // Ohne Status `vermisst` wäre „vermisst seit" ein 422.
-        expect(screen.getByLabelText('Zustand')).toBeInTheDocument();
+        expect(screen.getByLabelText('Zustand / Verdacht')).toBeInTheDocument();
         expect(screen.getByLabelText('Koordinate')).toBeInTheDocument();
         expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
       }
@@ -156,27 +167,13 @@ describe('aufnahmeZuEingabe', () => {
     expect(aufnahmeZuEingabe({ bestaetigt_personal_id: 5 })).toEqual({});
   });
 
+  it('macht aus einer zurückgenommenen Wahl eine Erfassung ohne Sichtung (LLH-1083)', () => {
+    expect(aufnahmeZuEingabe({ sichtung: null, bestaetigt_personal_id: 5 })).toEqual({});
+  });
+
   it('reicht „vermisst seit" als Wire-String durch', () => {
     expect(aufnahmeZuEingabe({ vermisst_seit: '2026-09-22 06:00:00' })).toEqual({
       vermisst_seit: '2026-09-22 06:00:00',
     });
-  });
-});
-
-describe('skFlaechenStil()', () => {
-  /**
-   * Rein gerufen (jsdom rechnet kein Layout). Die Böden stehen als LITERALE da, sonst prüften sie
-   * den Token gegen sich selbst.
-   */
-  it('hält 64 px als Boden und folgt darüber der Dichtestufe', () => {
-    expect(skFlaechenStil({ controlHeight: 30 }).minHeight).toBe(64); // kompakt
-    expect(skFlaechenStil({ controlHeight: 48 }).minHeight).toBe(64); // komfortabel
-    expect(skFlaechenStil({ controlHeight: 72 }).minHeight).toBe(72); // Handschuh
-  });
-
-  it('wächst über zwei Dichtestufen — ein Festwert fiele hier durch', () => {
-    expect(skFlaechenStil({ controlHeight: 72 }).minHeight).toBeGreaterThan(
-      Number(skFlaechenStil({ controlHeight: 30 }).minHeight),
-    );
   });
 });

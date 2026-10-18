@@ -57,6 +57,18 @@ const detail = {
   abgleiche: [],
 } as PersonDetail;
 
+/** Aufenthalt im Wartebereich einer UHS, wie der Server ihn im Detail mitliefert (LLH-1129). */
+const imWartebereich = (uhs: string, uhsId = 5): PersonDetail['aufenthalt'] => ({
+  uhs_id: uhsId,
+  uhs_bezeichnung: uhs,
+  platz_id: null,
+  platz_bezeichnung: null,
+  seit: '2026-05-27 09:30:00',
+});
+
+/** Der Patientenkopf (LLH-1094): das erste Paneel der Seite. */
+const kopf = () => screen.getByRole('region', { name: 'Patientenkopf' });
+
 function render(
   einsatzObj: typeof einsatzAktiv,
   person: PersonDetail,
@@ -111,7 +123,7 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
   });
 
-  it('verlinkt „Als Geschädigte" auf die Schaden-Detailseite (LFH-148)', async () => {
+  it('verlinkt den Schadenbezug auf die Schaden-Detailseite (LFH-148)', async () => {
     const schaden = {
       id: 99,
       einsatz_id: 1,
@@ -123,26 +135,38 @@ describe('PersonenDetailPage — Deeplink-Robustheit (LFH-25)', () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([schaden])),
     ]);
-    await klappeZuordnungenAuf();
+    await klappeBezuegeAuf();
     const link = await screen.findByRole('link', { name: /sachschaden/ });
     expect(link).toHaveAttribute('href', '/einsaetze/1/schaeden/99');
   });
 });
 
 /**
- * Ladehoheit: beim Öffnen laufen nur Einsatz und Detail; Tiere, Schäden, UHS-Liste und
- * Zugriffs-Audit speisen Blöcke, die erst nach dem Aufklappen etwas anzeigen.
+ * Ladehoheit: beim Öffnen laufen nur Einsatz und Detail (Aufenthalt mit UHS- und Platzname
+ * kommt mit dem Detail, LLH-1129); Tiere und Schäden laden mit dem Abschnitt „Bezüge“, die
+ * Kandidaten und die UHS-Liste erst mit ihrem Dialog, das Zugriffs-Audit mit seinem Abschnitt.
  */
 describe('PersonenDetailPage — Ladehoheit', () => {
-  /** Pfade der abgesetzten Einsatz-Abfragen, in Reihenfolge. `/auth/me` zählt nicht mit. */
-  function zaehleAbfragen(): { pfade: string[]; loesen: () => void } {
+  /**
+   * Pfade der abgesetzten Einsatz-Abfragen, in Reihenfolge, und dieselben mit Suchteil (die
+   * Bezüge und die Kandidaten treffen denselben Pfad). `/auth/me` zählt nicht mit.
+   */
+  function zaehleAbfragen(): { pfade: string[]; adressen: string[]; loesen: () => void } {
     const pfade: string[] = [];
+    const adressen: string[] = [];
     const horcher = ({ request }: { request: Request }) => {
-      const pfad = new URL(request.url).pathname;
-      if (pfad.startsWith('/api/einsaetze/')) pfade.push(pfad);
+      const url = new URL(request.url);
+      if (url.pathname.startsWith('/api/einsaetze/')) {
+        pfade.push(url.pathname);
+        adressen.push(url.pathname + url.search);
+      }
     };
     server.events.on('request:start', horcher);
-    return { pfade, loesen: () => server.events.removeListener('request:start', horcher) };
+    return {
+      pfade,
+      adressen,
+      loesen: () => server.events.removeListener('request:start', horcher),
+    };
   }
 
   it('setzt beim Öffnen höchstens zwei Abfragen ab', async () => {
@@ -162,22 +186,68 @@ describe('PersonenDetailPage — Ladehoheit', () => {
   });
 
   /**
-   * Die zweite Hälfte: „höchstens zwei" wäre auch grün, wenn die Zuordnungen gar nicht mehr lüden.
+   * Spec `personen-detail`, „Ein Abruf beim Öffnen“: der Kopf zeigt UHS, Wartebereich und „seit“
+   * aus dem Detail, ohne die UHS-Liste zu laden.
    */
-  it('lädt die Zuordnungen erst beim Aufklappen', async () => {
+  it('zeigt den Aufenthalt im Kopf ohne weiteren Abruf für UHS- und Platznamen', async () => {
+    const { pfade, loesen } = zaehleAbfragen();
+    try {
+      render(einsatzAktiv, {
+        ...detail,
+        aktuelle_uhs_id: 5,
+        aufenthalt: imWartebereich('Turnhalle'),
+      } as PersonDetail);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      expect(within(kopf()).getByText(/^Turnhalle · Wartebereich · seit/)).toBeInTheDocument();
+      expect(pfade.filter((p) => !p.endsWith('/modul-freigaben'))).toEqual([
+        '/api/einsaetze/1',
+        '/api/einsaetze/1/personen/10',
+      ]);
+    } finally {
+      loesen();
+    }
+  });
+
+  /**
+   * Die zweite Hälfte: „höchstens zwei" wäre auch grün, wenn die Bezüge gar nicht mehr lüden.
+   * Die freien Kandidaten (Tierliste ohne Filter, Schadenauswahl) und die UHS-Liste laden auch
+   * dann noch nicht: sie gehören zu ihren Dialogen.
+   */
+  it('lädt die Bezüge erst beim Aufklappen, die Kandidaten erst mit dem Dialog', async () => {
+    const { pfade, adressen, loesen } = zaehleAbfragen();
+    try {
+      render(einsatzAktiv, detail);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      expect(screen.queryByText(/^Bezüge \d/)).not.toBeInTheDocument();
+
+      await klappeBezuegeAuf();
+      expect(await screen.findByText('Bezüge 0')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(adressen).toContain('/api/einsaetze/1/tiere?halter_person_id=10');
+        expect(adressen.some((a) => a.startsWith('/api/einsaetze/1/schaeden?'))).toBe(true);
+      });
+      expect(adressen).not.toContain('/api/einsaetze/1/tiere');
+      expect(pfade).not.toContain('/api/einsaetze/1/schaeden/auswahl');
+      expect(pfade).not.toContain('/api/einsaetze/1/uhs');
+
+      await userEvent.click(screen.getByRole('button', { name: 'Bezug hinzufügen' }));
+      await waitFor(() => {
+        expect(adressen).toContain('/api/einsaetze/1/tiere');
+        expect(pfade).toContain('/api/einsaetze/1/schaeden/auswahl');
+      });
+    } finally {
+      loesen();
+    }
+  });
+
+  it('lädt die UHS-Liste erst mit dem Dialog „In UHS aufnehmen“', async () => {
     const { pfade, loesen } = zaehleAbfragen();
     try {
       render(einsatzAktiv, detail);
       await screen.findByRole('heading', { name: /Person R-001/ });
-      expect(screen.queryByText('Zugeordnete Tiere')).not.toBeInTheDocument();
-
-      await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
-      expect(await screen.findByText('Zugeordnete Tiere')).toBeInTheDocument();
-      await waitFor(() => {
-        expect(pfade).toContain('/api/einsaetze/1/tiere');
-        expect(pfade).toContain('/api/einsaetze/1/schaeden');
-        expect(pfade).toContain('/api/einsaetze/1/uhs');
-      });
+      expect(pfade).not.toContain('/api/einsaetze/1/uhs');
+      await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
+      await waitFor(() => expect(pfade).toContain('/api/einsaetze/1/uhs'));
     } finally {
       loesen();
     }
@@ -218,18 +288,23 @@ async function ausMenue(name: RegExp) {
 }
 
 /**
- * Den Zuordnungs-Abschnitt aufklappen: Tiere, Schäden und UHS-Verortung liegen eingeklappt und
- * laden erst dann. Ohne `forceRender` sind sie vorher nicht im Baum.
+ * Den Abschnitt „Bezüge“ aufklappen: Tier- und Schadenbezüge liegen eingeklappt und laden erst
+ * dann. Ohne `forceRender` sind sie vorher nicht im Baum.
  */
-async function klappeZuordnungenAuf() {
+async function klappeBezuegeAuf() {
   await screen.findByRole('heading', { name: /Person R-001/ });
-  await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
+  await userEvent.click(screen.getByRole('button', { name: /Bezüge/ }));
+}
+
+/** Das Bearbeiten-Formular der Personendaten öffnen (Primäraktion des Seitenkopfs). */
+async function starteBearbeiten() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
 }
 
 describe('PersonenDetailPage — Kopfleiste', () => {
   /**
-   * Die Primärknöpfe im Kopf — über die Marke des Primitivs eingegrenzt, nicht global: der Verlauf
-   * trägt ein Notiz-Formular, dessen Absende-Knopf zu Recht primär ist.
+   * Die Primärknöpfe im Kopf — über die Marke des Primitivs eingegrenzt, nicht global: der
+   * Patientenkopf trägt eine Notizzeile, deren Absende-Knopf zu Recht primär ist.
    */
   function kopfPrimaeraktionen(): HTMLElement[] {
     const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]');
@@ -239,21 +314,31 @@ describe('PersonenDetailPage — Kopfleiste', () => {
     );
   }
 
-  it('trägt genau eine Primäraktion, und sie hängt am Zustand: ungesichtet → „Sichten"', async () => {
-    render(einsatzAktiv, detail);
+  /**
+   * LLH-1094: Sichten und Verbleib erfassen stehen im Patientenkopf; die Primäraktion hängt nicht
+   * mehr an der Sichtung, sie ist „Bearbeiten“.
+   */
+  it.each([
+    { fall: 'ungesichtet', person: detail },
+    {
+      fall: 'gesichtet',
+      person: { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk2' } as PersonDetail,
+    },
+  ])('trägt genau eine Primäraktion „Bearbeiten“ ($fall)', async ({ person }) => {
+    render(einsatzAktiv, person);
     await screen.findByRole('heading', { name: /Person R-001/ });
     const primaer = kopfPrimaeraktionen();
     expect(primaer).toHaveLength(1);
-    expect(primaer[0]).toHaveAccessibleName('Sichten');
+    expect(primaer[0]).toHaveAccessibleName('Bearbeiten');
   });
 
-  it('… und bei einer gesichteten Person ist es „Verbleib erfassen"', async () => {
+  it('das Menü trägt weder Sichten noch Verbleib noch Bearbeiten — die stehen im Kopf', async () => {
     const patient = { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk2' } as PersonDetail;
     render(einsatzAktiv, patient);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    const primaer = kopfPrimaeraktionen();
-    expect(primaer).toHaveLength(1);
-    expect(primaer[0]).toHaveAccessibleName('Verbleib erfassen');
+    const menue = await oeffneKopfmenue();
+    expect(within(menue).queryByText(/Sichten|Verbleib|Bearbeiten/)).not.toBeInTheDocument();
+    expect(within(menue).getByRole('menuitem', { name: /Stornieren/ })).toBeInTheDocument();
   });
 
   it('bündelt die Statuswechsel im Menü und lässt „Zurück zur Liste" weg', async () => {
@@ -337,33 +422,159 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   });
 });
 
-describe('PersonenDetailPage — med. Verlauf', () => {
-  it('Re-Sichten ruft erfasseSichtung mit SK II', async () => {
+describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (LLH-1094)', () => {
+  const sichtungAntwort = (kategorie: Sichtungskategorie) =>
+    HttpResponse.json(
+      {
+        id: 1,
+        einsatz_id: 1,
+        person_id: 10,
+        kategorie,
+        notiz: null,
+        gesichtet_at: '2026-05-27 10:00:00',
+        gesichtet_von: 1,
+      },
+      { status: 201 },
+    );
+
+  it('Sichten: ein Tipp auf die Sichtung klappt die Wahl im Kopf auf, kein Dialog', async () => {
     let gerufen: { kategorie?: string } = {};
     render(einsatzAktiv, detail, [
       http.post('/api/einsaetze/1/personen/10/sichtung', async ({ request }) => {
         gerufen = (await request.json()) as { kategorie?: string };
+        return sichtungAntwort('sk2');
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    // Bei einer ungesichteten Person heißt der Auslöser „Sichten“ — „Nachsichten“ wäre für die
+    // erste Sichtung falsch.
+    const ausloeser = within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' });
+    expect(ausloeser).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(ausloeser);
+    expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
+    const paneel = within(kopf()).getByRole('region', { name: 'Sichtung erfassen' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(within(paneel).getByRole('radio', { name: /^SK II,/ }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
+    // Nach dem Erfolg klappt das Paneel zu.
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull(),
+    );
+  });
+
+  it('Nachsichten: danach zeigt der Kopf die neue Sichtung mit neuer Zeit', async () => {
+    let stand = {
+      ...detail,
+      status: 'betroffen',
+      aktuelle_sichtung: 'sk2',
+      aktuelle_sichtung_at: '2026-05-27 09:00:00',
+    } as PersonDetail;
+    render(einsatzAktiv, stand, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.post('/api/einsaetze/1/personen/10/sichtung', () => {
+        stand = { ...stand, aktuelle_sichtung: 'sk1', aktuelle_sichtung_at: '2026-05-27 10:00:00' };
+        return sichtungAntwort('sk1');
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const vorher = within(kopf()).getByText(/^gesichtet /).textContent;
+    await userEvent.click(
+      within(kopf()).getByRole('button', { name: 'Nachsichten, aktuell SK II · schwer' }),
+    );
+    const paneel = within(kopf()).getByRole('region', { name: 'Sichtung erfassen' });
+    await userEvent.click(within(paneel).getByRole('radio', { name: /^SK I,/ }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Übernehmen' }));
+    expect(
+      await within(kopf()).findByRole('button', { name: 'Nachsichten, aktuell SK I · akut' }),
+    ).toBeInTheDocument();
+    expect(within(kopf()).getByText(/^gesichtet /).textContent).not.toBe(vorher);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Verbleib erfassen klappt ein Paneel in der Ansicht auf und schickt den Verbleib', async () => {
+    let gesendet: Record<string, unknown> | undefined;
+    render(einsatzAktiv, { ...detail, status: 'betroffen' } as PersonDetail, [
+      http.post('/api/einsaetze/1/personen/10/verbleib', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 }, { status: 201 });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Verbleib erfassen' }));
+    const paneel = within(kopf()).getByRole('region', { name: 'Verbleib erfassen' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(within(paneel).getByRole('combobox', { name: 'Art' }));
+    await userEvent.click(await screen.findByTitle('Transport'));
+    await userEvent.type(within(paneel).getByRole('textbox', { name: 'Ziel' }), 'KH Mitte');
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await waitFor(() => expect(gesendet).toMatchObject({ art: 'transport', ziel: 'KH Mitte' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Verbleib erfassen' })).toBeNull(),
+    );
+  });
+
+  it('Notiz: die Eingabezeile im Kopf legt eine Verlaufsnotiz an', async () => {
+    let gesendet: { text?: string } = {};
+    render(einsatzAktiv, detail, [
+      http.post('/api/einsaetze/1/personen/10/notizen', async ({ request }) => {
+        gesendet = (await request.json()) as { text?: string };
         return HttpResponse.json(
           {
-            id: 1,
+            id: 9,
             einsatz_id: 1,
             person_id: 10,
-            kategorie: 'sk2',
-            notiz: null,
-            gesichtet_at: '2026-05-27 10:00:00',
-            gesichtet_von: 1,
+            text: gesendet.text,
+            erfasst_at: '2026-05-27 10:00:00',
+            erfasst_von: 1,
           },
           { status: 201 },
         );
       }),
     ]);
-    // Die Primäraktion des Kopfes heißt bei einer ungesichteten Person „Sichten" — „Re-Sichten"
-    // wäre für die erste Sichtung falsch.
-    await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
-    await userEvent.click(await screen.findByText('SK II'));
-    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
-    await waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const feld = within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' });
+    // Die Folge steht als Beschreibung an der Zeile, nicht als Überschrift (LFH-1078).
+    expect(feld).toHaveAccessibleDescription('nicht änderbar · nicht im ETB');
+    await userEvent.type(feld, 'trinkt Wasser');
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Notiz anlegen' }));
+    await waitFor(() => expect(gesendet.text).toBe('trinkt Wasser'));
+    // Nach dem Erfolg ist die Zeile leer. Neu gesucht: antd ersetzt das Eingabeelement beim
+    // Sperren während des Speicherns.
+    await waitFor(() =>
+      expect(within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' })).toHaveValue(''),
+    );
+  });
+
+  /** Spec `personen-detail`, „Ohne Schreibrecht“: der Kopf zeigt alles, bedient nichts. */
+  it('ohne Schreibrecht zeigt der Kopf Sichtung, Zustand, Aufenthalt und Notiz nur lesend', async () => {
+    render(einsatzBeobachter, {
+      ...detail,
+      status: 'betroffen',
+      aktuelle_sichtung: 'sk2',
+      aktuelle_sichtung_at: '2026-05-27 09:00:00',
+      zustand: 'Verdacht auf Hüftfraktur',
+      aktuelle_uhs_id: 5,
+      aufenthalt: imWartebereich('Turnhalle'),
+      notizen: [
+        {
+          id: 7,
+          einsatz_id: 1,
+          person_id: 10,
+          text: 'trinkt Wasser',
+          erfasst_at: '2026-05-27 09:30:00',
+          erfasst_von: 1,
+        },
+      ],
+    } as PersonDetail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const k = kopf();
+    expect(k).toHaveTextContent('SK II · schwer');
+    expect(k).toHaveTextContent('Verdacht auf Hüftfraktur');
+    expect(k).toHaveTextContent(/Turnhalle · Wartebereich · seit/);
+    expect(k).toHaveTextContent('trinkt Wasser');
+    expect(within(k).queryAllByRole('button')).toHaveLength(0);
+    expect(within(k).queryByRole('textbox')).toBeNull();
   });
 
   it('zeigt bei Sichtung=tot den Hinweis mit dem Personenstatus und „Auf „verstorben“ setzen"', async () => {
@@ -393,9 +604,8 @@ describe('PersonenDetailPage — med. Verlauf', () => {
       screen.getByText(`Sichtung „tot“, Status noch „${STATUS_META[totDetail.status].label}“`),
     ).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/Admin-Status|append-only|SK: /);
-    expect(
-      screen.getByLabelText('Verlaufsnotiz (nicht änderbar, erscheint nicht im ETB)'),
-    ).toBeInTheDocument();
+    // Die Notiz bleibt daneben schreibbar, jetzt als Zeile im Patientenkopf.
+    expect(within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' })).toBeInTheDocument();
   });
 
   it('zeigt die Chronologie-Zeiten taktisch formatiert (LFH-141), nicht als Rohstring', async () => {
@@ -623,7 +833,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(gesendet).toBe(true));
   });
@@ -641,7 +851,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
       client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry,
     ).toBe(false);
 
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     const name = screen.getByDisplayValue('Mustermann');
     await userEvent.clear(name);
     await userEvent.type(name, 'Lokaler Name');
@@ -673,7 +883,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     // Konfliktdialog erscheint statt eines stillen Overwrites.
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
@@ -698,7 +908,7 @@ describe('PersonenDetailPage — Stammdaten', () => {
         );
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
     await waitFor(() => expect(koerper).toHaveLength(2));
@@ -716,27 +926,43 @@ describe('PersonenDetailPage — Stammdaten', () => {
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
   });
 
-  it('zeigt Stammdaten UND med. Verlauf gleichzeitig (zwei Spalten, ohne Tabs)', async () => {
+  /**
+   * Spec `einsatztauglichkeit-layout`, „Das Personen-Detail beginnt mit dem Patientenkopf“: eine
+   * Spalte, zuerst der Kopf, dann Verlauf und Personendaten, ohne Reiter. Die Lage in der Breite
+   * misst `e2e/betroffene-handy.spec.ts`; hier steht die Folge im Baum.
+   */
+  it('beginnt mit dem Patientenkopf, darunter Verlauf und Personendaten, ohne Reiter', async () => {
     render(einsatzAktiv, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    expect(screen.getByText('Stammdaten')).toBeInTheDocument();
-    expect(screen.getByText('Medizinischer Verlauf', { exact: true })).toBeInTheDocument();
-    // Keine Tab-Leiste mehr:
-    expect(screen.queryByRole('tab', { name: 'Medizinischer Verlauf' })).not.toBeInTheDocument();
+    const folge = [
+      kopf(),
+      screen.getByText('Verlauf', { exact: true }),
+      screen.getByText('Personendaten', { exact: true }),
+      stammdatenRaster(),
+    ];
+    for (let i = 1; i < folge.length; i += 1) {
+      expect(folge[i - 1].compareDocumentPosition(folge[i])).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    // Die medizinische Spalte gibt es nicht mehr; ihr Inhalt steht im Kopf und im Verlauf.
+    expect(screen.queryByText('Medizinischer Verlauf')).not.toBeInTheDocument();
   });
 });
 
+/** Der Stammdaten-Raster der Personendaten; der Kopf trägt einen eigenen („Patientenangaben“). */
+function stammdatenRaster(): HTMLElement {
+  const r = document.querySelector<HTMLElement>('dl[aria-label="Stammdaten"]');
+  expect(r).not.toBeNull();
+  return r!;
+}
+
 /**
  * Stammdaten im Datenraster (LFH-963, design.md D8): kein `Descriptions` mehr, nur gesetzte
- * Angaben als Feld, die leeren in EINER Zeile „Ohne Angabe: …". Die Reihenfolge der Spalten
- * (medizinisch zuerst unter `lg`) ist CSS und steht im e2e-Gate `e2e/betroffene-handy.spec.ts`.
+ * Angaben als Feld, die leeren in EINER Zeile „Ohne Angabe: …". Dass der Patientenkopf in jeder
+ * Breite über den Personendaten liegt, misst das e2e-Gate `e2e/betroffene-handy.spec.ts`.
  */
 describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
-  function raster(): HTMLElement {
-    const r = document.querySelector<HTMLElement>('[data-lfh="datenraster"]');
-    expect(r).not.toBeNull();
-    return r!;
-  }
+  const raster = stammdatenRaster;
   function begriffe(): string[] {
     return [...raster().querySelectorAll('dt')].map((dt) => dt.textContent ?? '');
   }
@@ -749,20 +975,39 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
     expect(name.tagName).toBe('DT');
     expect(name.nextElementSibling).toHaveTextContent('Mustermann');
     expect(begriffe()).toEqual(
-      expect.arrayContaining(['Name', 'Vorname', 'Geschlecht', 'Alter (geschätzt)', 'Antreffort']),
+      expect.arrayContaining(['Name', 'Vorname', 'Geschlecht', 'Alter (geschätzt)', 'Fundort']),
     );
   });
 
   it('sammelt leere Angaben in einer Zeile „Ohne Angabe", statt Striche zu zeigen', async () => {
     render(einsatzBeobachter, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });
+    // „Zustand / Verdacht“ steht im Patientenkopf (LLH-1094), nicht ein zweites Mal hier.
     expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
-      'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, Zustand, Koordinate, Melder / Kontakt, Notiz',
+      'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, Koordinate, Melder / Kontakt, Notiz',
     );
-    for (const leer of ['Geburtsdatum', 'Herkunft / Adresse', 'Zustand', 'Koordinate', 'Notiz']) {
+    for (const leer of ['Geburtsdatum', 'Herkunft / Adresse', 'Koordinate', 'Notiz']) {
       expect(begriffe()).not.toContain(leer);
     }
     expect(within(raster()).queryByText('—')).toBeNull();
+  });
+
+  it('führt „Zustand / Verdacht“ im Kopf, nicht in den Stammdaten', async () => {
+    render(einsatzAktiv, { ...detail, zustand: 'Verdacht auf Hüftfraktur' } as PersonDetail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(begriffe().some((b) => b.startsWith('Zustand'))).toBe(false);
+    expect(within(kopf()).getByText('Zustand / Verdacht')).toBeInTheDocument();
+    expect(
+      within(kopf()).getByRole('button', { name: 'Zustand / Verdacht zu R-001 bearbeiten' }),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne Zustand bietet der Kopf „Zustand / Verdacht … hinzufügen“ an', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(
+      within(kopf()).getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    ).toBeInTheDocument();
   });
 
   it('zeigt die Koordinate als Feld, sobald „Auf Lagekarte verorten" angeboten wird', async () => {
@@ -797,6 +1042,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByText(/^Ohne Angabe:/)).toBeNull();
     expect(begriffe()).toContain('Notiz');
+    expect(begriffe().some((b) => b.startsWith('Zustand'))).toBe(false);
   });
 });
 
@@ -830,7 +1076,7 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
     await waitFor(() => expect(entscheidung).toBe('bestaetigt'));
   });
 
-  it('zeigt den „Zugeordnete Tiere"-Block und verlinkt auf die Tier-Detailseite', async () => {
+  it('zeigt den Tierbezug als Zeile in Einsatzsprache und verlinkt auf die Tier-Detailseite', async () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
         const url = new URL(request.url);
@@ -868,16 +1114,15 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
         return HttpResponse.json([]);
       }),
     ]);
-    await klappeZuordnungenAuf();
-    expect(await screen.findByText(/Zugeordnete Tiere/i)).toBeInTheDocument();
-    expect(await screen.findByText(/T-007/)).toBeInTheDocument();
-    expect(screen.getByText(/Rex/)).toBeInTheDocument();
-    // Klick auf den Tier-Tag deeplinkt auf die Tier-Detail-Vollseite, nicht auf die Liste.
-    await userEvent.click(screen.getByText(/Rex/));
+    await klappeBezuegeAuf();
+    const zeile = await screen.findByRole('link', { name: 'Halter von T-007 · Hund „Rex“' });
+    expect(screen.getByText('Bezüge 1')).toBeInTheDocument();
+    // Die Zeile deeplinkt auf die Tier-Detail-Vollseite, nicht auf die Liste.
+    await userEvent.click(zeile);
     expect(await screen.findByText('TIERE-DETAIL')).toBeInTheDocument();
   });
 
-  it('zeigt den „Als Geschädigte bei Schäden"-Block im Personen-Drawer', async () => {
+  it('zeigt den Schadenbezug in derselben Liste wie den Tierbezug', async () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden', ({ request }) => {
         const url = new URL(request.url);
@@ -912,9 +1157,34 @@ describe('PersonenDetailPage — Abgleich / Tiere / Schäden', () => {
         return HttpResponse.json([]);
       }),
     ]);
-    await klappeZuordnungenAuf();
-    expect(await screen.findByText(/Als Geschädigte bei Schäden/i)).toBeInTheDocument();
-    expect(await screen.findByText((t) => t.includes('S-003'))).toBeInTheDocument();
+    await klappeBezuegeAuf();
+    const zeile = await screen.findByRole('link', {
+      name: 'Geschädigt bei S-003 · umweltschaden (mittel)',
+    });
+    expect(zeile).toHaveAttribute('href', '/einsaetze/1/schaeden/7');
+    expect(zeile.closest('[data-lfh="bezuege"]')).not.toBeNull();
+    expect(screen.getByText('Bezüge 1')).toBeInTheDocument();
+    // Die getrennten Blöcke der alten Zuordnungen gibt es nicht mehr.
+    expect(screen.queryByText(/Als Geschädigte bei Schäden|Zugeordnete Tiere/)).toBeNull();
+  });
+
+  /** Spec `personen-detail`, „Keine Bezüge“. */
+  it('ohne Bezüge zeigt der Abschnitt „Bezüge 0“ und mit Schreibrecht „Bezug hinzufügen“', async () => {
+    render(einsatzAktiv, detail);
+    await klappeBezuegeAuf();
+    expect(await screen.findByText('Bezüge 0')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bezug hinzufügen' })).toBeInTheDocument();
+    expect(document.querySelector('[data-lfh="bezug"]')).toBeNull();
+  });
+
+  it('ohne Schreibrecht stehen die Bezüge ohne „Bezug hinzufügen“ und „Bezug lösen“', async () => {
+    render(einsatzBeobachter, detail, [
+      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([zugeordnetesTier])),
+    ]);
+    await klappeBezuegeAuf();
+    expect(await screen.findByRole('link', { name: /^Halter von T-007/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Bezug hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Bezug zu .* lösen/ })).toBeNull();
   });
 });
 
@@ -928,34 +1198,105 @@ describe('PersonenDetailPage — Robustheit', () => {
     expect(await screen.findByText('Person konnte nicht geladen werden')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
+});
 
-  it('zeigt das Patient-Tag bei gesichteter Person (SK I)', async () => {
-    const patient = {
-      ...detail,
-      status: 'betroffen',
-      aktuelle_sichtung: 'sk1',
-      aktuelle_sichtung_at: '2026-05-27 10:00:00',
-    } as PersonDetail;
-    render(einsatzAktiv, patient);
-    expect((await screen.findAllByText('Patient')).length).toBeGreaterThan(0);
+/**
+ * Spec `personen-detail`, „Patientenkopf beantwortet die Patientenfragen“: Sichtung mit DTG,
+ * „vor n min“ (im Minutentakt) und dem Namen dessen, der bestätigt hat; Aufenthalt oder Verbleib.
+ */
+describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
+  const gesichtet = {
+    ...detail,
+    status: 'betroffen',
+    aktuelle_sichtung: 'sk1',
+    aktuelle_sichtung_at: '2026-05-27 10:00:00',
+    sichtungen: [
+      {
+        id: 1,
+        einsatz_id: 1,
+        person_id: 10,
+        kategorie: 'sk1' as Sichtungskategorie,
+        notiz: null,
+        gesichtet_at: '2026-05-27 10:00:00',
+        gesichtet_von: 1,
+        bestaetigt_name: 'Dr. Weiß',
+      },
+    ],
+  } as PersonDetail;
+
+  afterEach(() => vi.useRealTimers());
+
+  it('zeigt die Sichtung mit DTG, „vor n min“ und dem Bestätigenden; der Abstand läuft nach', async () => {
+    // Nur die Uhr und die Takt-Zeitgeber laufen künstlich, mit der echten Zeit mit: Netz und
+    // `findBy*` warten weiter echt.
+    vi.useFakeTimers({
+      shouldAdvanceTime: true,
+      toFake: ['Date', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    });
+    vi.setSystemTime(new Date('2026-05-27T10:05:30Z'));
+    render(einsatzAktiv, gesichtet);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const zeit = within(kopf()).getByText(/^gesichtet /);
+    expect(zeit).toHaveTextContent(/^gesichtet \d{6} · vor 5 min · bestätigt: Dr\. Weiß$/);
+    expect(within(kopf()).getByText('SK I · akut')).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(zeit).toHaveTextContent('vor 6 min');
   });
 
-  it('zeigt KEIN Patient-Tag bei unverletzter Person', async () => {
-    const unverletzt = {
+  it('zeigt ungesichtet ohne Zeit und ohne erfundene Angaben', async () => {
+    render(einsatzBeobachter, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(within(kopf()).getByText('ungesichtet')).toBeInTheDocument();
+    expect(within(kopf()).queryByText(/^gesichtet /)).toBeNull();
+    expect(within(kopf()).getByText('ohne Aufenthalt')).toBeInTheDocument();
+  });
+
+  it('nennt den Platz, wenn die Person auf einem liegt', async () => {
+    render(einsatzAktiv, {
+      ...detail,
+      aktuelle_uhs_id: 5,
+      aktueller_platz_id: 3,
+      aufenthalt: { ...imWartebereich('Turnhalle'), platz_id: 3, platz_bezeichnung: 'Liege 3' },
+    } as PersonDetail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(within(kopf()).getByText(/^Turnhalle · Liege 3 · seit/)).toBeInTheDocument();
+  });
+
+  /** Spec-Szenario „Patient nach dem Abtransport“. */
+  it('zeigt nach dem Abtransport statt des Aufenthalts den Verbleib mit Transportmittel und Zeit', async () => {
+    render(einsatzAktiv, {
       ...detail,
       status: 'betroffen',
-      aktuelle_sichtung: 'unverletzt',
-      aktuelle_sichtung_at: '2026-05-27 10:00:00',
-    } as PersonDetail;
-    render(einsatzAktiv, unverletzt);
+      aktueller_verbleib: 'transport',
+      verbleib: [
+        {
+          id: 3,
+          einsatz_id: 1,
+          person_id: 10,
+          art: 'transport',
+          ziel: 'KH Mitte',
+          transportmittel: 'RTW 1',
+          notiz: null,
+          zeitpunkt_at: '2026-05-27 11:00:00',
+          erfasst_von: 1,
+        },
+      ],
+    } as unknown as PersonDetail);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    expect(screen.queryByText('Patient')).not.toBeInTheDocument();
+    expect(within(kopf()).getByText('Verbleib')).toBeInTheDocument();
+    expect(within(kopf()).queryByText('Aufenthalt')).toBeNull();
+    expect(within(kopf()).getByText(/^Transport → KH Mitte \(RTW 1\) ·/)).toHaveTextContent(
+      /· \d{6}$/,
+    );
+    // Mit Verbleib gibt es kein „In UHS aufnehmen“ (Grundriss-Konsistenz).
+    expect(within(kopf()).queryByRole('button', { name: 'In UHS aufnehmen' })).toBeNull();
   });
 });
 
-// Gegenrichtung zum UHS-Grundriss: Person von ihrer Detailseite aus einer UHS/einem Platz zuweisen
-// (eintritt/wechsel) und austragen (austritt); art spiegelt die belegMut-Logik des Grundrisses
-// (aktuelle_uhs_id ? 'wechsel' : 'eintritt').
+// Gegenrichtung zum UHS-Grundriss: die UHS des Einsatzes für den Dialog im Patientenkopf.
 const uhsListe = [
   {
     id: 5,
@@ -979,112 +1320,107 @@ const uhsListe = [
   },
 ];
 
-describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
-  it('zeigt die aktuelle UHS-Verortung im Klartext', async () => {
-    const belegt = { ...detail, aktuelle_uhs_id: 5 } as PersonDetail;
-    render(einsatzAktiv, belegt, [
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
-    ]);
-    await klappeZuordnungenAuf();
-    expect(await screen.findByText('BHP 50')).toBeInTheDocument();
-  });
+/**
+ * Aufenthalt im Patientenkopf (LLH-1129, Option A): „In UHS aufnehmen“ ohne UHS, sonst
+ * „Verlegen“ und „Austragen“, ohne Aufklappen. Der Dialog teilt die Belegungslogik des
+ * Grundrisses (aktuelle_uhs_id ? 'wechsel' : 'eintritt').
+ */
+describe('PersonenDetailPage — Aufenthalt im Kopf (LFH-152, LLH-1129)', () => {
+  const belegungsAntwort = (art: string, uhsId: number) =>
+    HttpResponse.json(
+      {
+        id: 1,
+        einsatz_id: 1,
+        person_id: 10,
+        uhs_id: uhsId,
+        platz_id: null,
+        art,
+        notiz: null,
+        zeitpunkt_at: '2026-05-27 10:00:00',
+        erfasst_von: 1,
+      },
+      { status: 201 },
+    );
+  const belegt = {
+    ...detail,
+    aktuelle_uhs_id: 5,
+    aufenthalt: imWartebereich('BHP 50'),
+  } as PersonDetail;
 
-  it('weist eine noch nicht verortete Person einer UHS zu (art=eintritt)', async () => {
+  it('nimmt eine noch nicht verortete Person in eine UHS auf (art=eintritt)', async () => {
     let gesendet: { art?: string; uhs_id?: number } = {};
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
         gesendet = (await request.json()) as { art?: string; uhs_id?: number };
-        return HttpResponse.json(
-          {
-            id: 1,
-            einsatz_id: 1,
-            person_id: 10,
-            uhs_id: 5,
-            platz_id: null,
-            art: 'eintritt',
-            notiz: null,
-            zeitpunkt_at: '2026-05-27 10:00:00',
-            erfasst_von: 1,
-          },
-          { status: 201 },
-        );
+        return belegungsAntwort('eintritt', 5);
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(within(kopf()).queryByRole('button', { name: 'Verlegen' })).toBeNull();
+    expect(within(kopf()).queryByRole('button', { name: 'Austragen' })).toBeNull();
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('In UHS aufnehmen')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('combobox', { name: /Unfallhilfsstelle/ }));
     await userEvent.click(await screen.findByText('BHP 50'));
-    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufnehmen' }));
     await waitFor(() => expect(gesendet).toMatchObject({ art: 'eintritt', uhs_id: 5 }));
   });
 
-  it('wechselt die UHS einer bereits verorteten Person (art=wechsel)', async () => {
+  /** Spec-Szenario „Verlegen aus dem Kopf“. */
+  it('verlegt eine verortete Person (art=wechsel), der Kopf zeigt danach die neue UHS', async () => {
     let gesendet: { art?: string; uhs_id?: number } = {};
-    const belegt = { ...detail, aktuelle_uhs_id: 5 } as PersonDetail;
+    let stand = belegt;
     render(einsatzAktiv, belegt, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
         gesendet = (await request.json()) as { art?: string; uhs_id?: number };
-        return HttpResponse.json(
-          {
-            id: 2,
-            einsatz_id: 1,
-            person_id: 10,
-            uhs_id: 6,
-            platz_id: null,
-            art: 'wechsel',
-            notiz: null,
-            zeitpunkt_at: '2026-05-27 10:00:00',
-            erfasst_von: 1,
-          },
-          { status: 201 },
-        );
+        stand = { ...belegt, aktuelle_uhs_id: 6, aufenthalt: imWartebereich('PA 1', 6) };
+        return belegungsAntwort('wechsel', 6);
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'UHS ändern' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(within(kopf()).getByText(/^BHP 50 · Wartebereich · seit/)).toBeInTheDocument();
+    expect(within(kopf()).queryByRole('button', { name: 'In UHS aufnehmen' })).toBeNull();
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Verlegen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('combobox', { name: /Unfallhilfsstelle/ }));
     await userEvent.click(await screen.findByText('PA 1'));
-    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verlegen' }));
     await waitFor(() => expect(gesendet).toMatchObject({ art: 'wechsel', uhs_id: 6 }));
+    expect(await within(kopf()).findByText(/^PA 1 · Wartebereich · seit/)).toBeInTheDocument();
   });
 
-  it('trägt eine verortete Person aus der UHS aus (art=austritt)', async () => {
+  it('trägt eine verortete Person aus der UHS aus (art=austritt), ohne Aufklappen', async () => {
     let gesendet: { art?: string } = {};
-    const belegt = { ...detail, aktuelle_uhs_id: 5 } as PersonDetail;
     render(einsatzAktiv, belegt, [
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
         gesendet = (await request.json()) as { art?: string };
-        return HttpResponse.json(
-          {
-            id: 3,
-            einsatz_id: 1,
-            person_id: 10,
-            uhs_id: 5,
-            platz_id: null,
-            art: 'austritt',
-            notiz: null,
-            zeitpunkt_at: '2026-05-27 10:00:00',
-            erfasst_von: 1,
-          },
-          { status: 201 },
-        );
+        return belegungsAntwort('austritt', 5);
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     await waitFor(() => expect(gesendet).toMatchObject({ art: 'austritt' }));
   });
 
-  it('bietet bei gesetztem Verbleib kein Zuweisen an (Grundriss-Konsistenz)', async () => {
+  it('bietet bei gesetztem Verbleib kein Aufnehmen an (Grundriss-Konsistenz)', async () => {
     const transportiert = { ...detail, aktueller_verbleib: 'transport' } as PersonDetail;
     render(einsatzAktiv, transportiert, [
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
     ]);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    expect(screen.queryByRole('button', { name: 'UHS zuweisen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'In UHS aufnehmen' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht steht der Aufenthalt ohne „Verlegen“ und „Austragen“', async () => {
+    render(einsatzBeobachter, belegt);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(within(kopf()).getByText(/^BHP 50 · Wartebereich · seit/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verlegen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Austragen' })).toBeNull();
   });
 
   it('bietet im UHS-Picker nur aktive UHS an (geplante ausgeschlossen)', async () => {
@@ -1105,17 +1441,17 @@ describe('PersonenDetailPage — UHS-Zuweisung (LFH-152)', () => {
         ]),
       ),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
     await userEvent.click(await screen.findByRole('combobox', { name: /Unfallhilfsstelle/ }));
     expect(await screen.findByText('BHP 50')).toBeInTheDocument();
     expect(screen.queryByText('BHP geplant')).not.toBeInTheDocument();
   });
 });
 
-// Von der Personen-Seite aus Tiere (Halter) / Schäden (Geschädigte) zuweisen und lösen. Der Picker
-// bietet nur freie Ziele; Zuweisen setzt die FK und leert die konkurrierenden XOR-Slots im selben
-// PATCH.
+// Von der Personen-Seite aus Tiere (Halter) / Schäden (Geschädigte) als Bezug hinzufügen und lösen.
+// Die Suche bietet nur freie Ziele; Hinzufügen setzt die FK und leert die konkurrierenden XOR-Slots
+// im selben PATCH.
 const freiesTier = {
   id: 40,
   einsatz_id: 1,
@@ -1185,32 +1521,51 @@ const zugeordneterSchaden = {
   geschaedigt_person_id: 10,
 };
 
-describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
-  it('weist der Person ein freies Tier als Halter zu (XOR-Leerung)', async () => {
+describe('PersonenDetailPage — Bezüge hinzufügen und lösen (LFH-151, LLH-1129)', () => {
+  /** „Bezug hinzufügen“ öffnen und die gemeinsame Auswahl über Tiere und Schäden aufklappen. */
+  async function oeffneSuche(): Promise<HTMLElement> {
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Bezug hinzufügen')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Tier oder Schaden' }));
+    return dialog;
+  }
+
+  /** Spec-Szenario „Tier als Bezug hinzufügen“: ein Knopf, eine Suche, eine Wahl. */
+  it('fügt ein freies Tier als Bezug hinzu (XOR-Leerung), die Zeile steht danach in den Bezügen', async () => {
     let patch: Record<string, unknown> | null = null;
+    let halterVon: object[] = [];
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
         const url = new URL(request.url);
-        // Anzeige-Query (Halter dieser Person) leer; Picker-Query (ohne Param) = freie Kandidaten.
-        if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json([]);
+        // Bezüge (Halter dieser Person) und Kandidaten (ohne Filter) treffen denselben Pfad.
+        if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json(halterVon);
         return HttpResponse.json([freiesTier]);
       }),
       http.patch('/api/einsaetze/1/tiere/40', async ({ request }) => {
         patch = (await request.json()) as Record<string, unknown>;
+        halterVon = [{ ...freiesTier, halter_person_id: 10 }];
         return HttpResponse.json({ ...freiesTier, halter_person_id: 10 });
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
-    await userEvent.click(await screen.findByText(/Minka/));
-    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    const dialog = await oeffneSuche();
+    await userEvent.type(
+      within(dialog).getByRole('combobox', { name: 'Tier oder Schaden' }),
+      'Minka',
+    );
+    await userEvent.click(await screen.findByTitle(/Minka/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
     await waitFor(() =>
       expect(patch).toMatchObject({ halter_person_id: 10, halter_kontakt: null }),
     );
+    expect(
+      await screen.findByRole('link', { name: 'Halter von T-008 · Katze „Minka“' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Bezüge 1')).toBeInTheDocument();
   });
 
-  it('löst die Halter-Zuordnung eines zugeordneten Tiers (halter_person_id=null)', async () => {
+  it('löst den Halter-Bezug eines Tiers (halter_person_id=null)', async () => {
     let patch: Record<string, unknown> | null = null;
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
@@ -1224,13 +1579,12 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...zugeordnetesTier, halter_person_id: null });
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await screen.findByText(/T-007/);
-    await userEvent.click(await screen.findByRole('button', { name: 'lösen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug zu T-007 lösen' }));
     await waitFor(() => expect(patch).toMatchObject({ halter_person_id: null }));
   });
 
-  it('weist der Person einen freien Schaden als Geschädigte zu (XOR-Leerung)', async () => {
+  it('fügt einen freien Schaden als Bezug hinzu (XOR-Leerung)', async () => {
     let patch: Record<string, unknown> | null = null;
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden/auswahl', () =>
@@ -1246,11 +1600,9 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...freierSchaden, geschaedigt_person_id: 10 });
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
-    await userEvent.click(await screen.findByText(/S-009/));
-    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+    const dialog = await oeffneSuche();
+    await userEvent.click(await screen.findByTitle(/S-009/));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
     await waitFor(() =>
       expect(patch).toMatchObject({
         geschaedigt_person_id: 10,
@@ -1261,7 +1613,7 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
     );
   });
 
-  it('löst die Geschädigt-Zuordnung eines Schadens (geschaedigt_person_id=null)', async () => {
+  it('löst den Geschädigt-Bezug eines Schadens (geschaedigt_person_id=null)', async () => {
     let patch: Record<string, unknown> | null = null;
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/schaeden', ({ request }) => {
@@ -1275,35 +1627,50 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         return HttpResponse.json({ ...zugeordneterSchaden, geschaedigt_person_id: null });
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await screen.findByText((t) => t.includes('S-003'));
-    await userEvent.click(await screen.findByRole('button', { name: 'lösen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug zu S-003 lösen' }));
     await waitFor(() => expect(patch).toMatchObject({ geschaedigt_person_id: null }));
   });
 
-  it('bietet im Picker nur freie Tiere an (bereits belegte werden ausgeschlossen)', async () => {
+  it('gruppiert die Kandidaten nach „Tiere (als Halter)“ und „Schäden (als Geschädigte)“', async () => {
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/tiere', ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has('halter_person_id') ? [] : [freiesTier],
+        ),
+      ),
+      http.get('/api/einsaetze/1/schaeden/auswahl', () =>
+        HttpResponse.json(auswahlAus([freierSchaden])),
+      ),
+    ]);
+    await oeffneSuche();
+    expect(await screen.findByText('Tiere (als Halter)')).toBeInTheDocument();
+    expect(screen.getByText('Schäden (als Geschädigte)')).toBeInTheDocument();
+    expect(screen.getByTitle(/Minka/)).toBeInTheDocument();
+    expect(screen.getByTitle(/S-009/)).toBeInTheDocument();
+  });
+
+  it('bietet in der Suche nur freie Tiere an (bereits belegte werden ausgeschlossen)', async () => {
     render(einsatzAktiv, detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) => {
         const url = new URL(request.url);
         if (url.searchParams.get('halter_person_id') === '10') return HttpResponse.json([]);
-        // Picker-Rohliste enthält ein freies UND ein bereits belegtes Tier.
+        // Die Kandidaten-Rohliste enthält ein freies UND ein bereits belegtes Tier.
         return HttpResponse.json([freiesTier, { ...zugeordnetesTier, halter_person_id: 99 }]);
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Tier' }));
-    expect(await screen.findByText(/Minka/)).toBeInTheDocument();
+    await oeffneSuche();
+    expect(await screen.findByTitle(/Minka/)).toBeInTheDocument();
     expect(screen.queryByText(/Rex/)).not.toBeInTheDocument();
   });
 
-  it('bietet im Schaden-Picker nur freie, nicht-abgeschlossene Schäden an', async () => {
+  it('bietet in der Suche nur freie, nicht-abgeschlossene Schäden an', async () => {
     render(einsatzAktiv, detail, [
-      // Der Picker liest die Schadenauswahl (LFH-1075).
+      // Die Suche liest die Schadenauswahl (LFH-1075).
       http.get('/api/einsaetze/1/schaeden/auswahl', () => {
         return HttpResponse.json(
           auswahlAus([
-            freierSchaden, // S-009, frei + offen → im Picker
+            freierSchaden, // S-009, frei + offen → in der Suche
             {
               ...freierSchaden,
               id: 51,
@@ -1322,10 +1689,8 @@ describe('PersonenDetailPage — Tiere/Schäden-Zuweisung (LFH-151)', () => {
         );
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Schaden' }));
-    expect(await screen.findByText(/S-009/)).toBeInTheDocument();
+    await oeffneSuche();
+    expect(await screen.findByTitle(/S-009/)).toBeInTheDocument();
     expect(screen.queryByText(/brandschaden/)).not.toBeInTheDocument();
     expect(screen.queryByText(/wasserschaden/)).not.toBeInTheDocument();
   });
@@ -1349,6 +1714,8 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     const ziel = new URL(link.getAttribute('href')!, 'http://x');
     expect(ziel.pathname).toBe('/einsaetze/1/lagekarte');
     expect(ziel.searchParams.get('platzieren')).toBe('person:10');
+    // Mit Herkunft: die Karte bietet danach „Zurück zu R-001“ an (LLH-1125).
+    expect(ziel.searchParams.get('zurueck')).toBe('1');
     // Nicht vermisst → keine Zeile „vermisst seit".
     expect(screen.queryByText('vermisst seit')).not.toBeInTheDocument();
   });
@@ -1381,8 +1748,8 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
-    await userEvent.type(screen.getByLabelText('Zustand'), 'Beinfraktur');
+    await starteBearbeiten();
+    await userEvent.type(screen.getByLabelText('Zustand / Verdacht'), 'Beinfraktur');
     await userEvent.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
     // Ohne Status vermisst gibt es das Feld nicht (sonst 422).
     expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
@@ -1405,7 +1772,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
         return HttpResponse.json({ ...mitKoordinate });
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     expect(screen.getByLabelText('Koordinate')).toHaveValue('52.2691/9.1343');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(koerper).toBeDefined());
@@ -1422,7 +1789,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
         return HttpResponse.json({ ...detail });
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.clear(screen.getByLabelText('Koordinate'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(koerper).toBeDefined());
@@ -1437,7 +1804,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
         return HttpResponse.json(detail);
       }),
     ]);
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.type(screen.getByLabelText('Koordinate'), '52.1');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText(/Breite und Länge mit/)).toBeInTheDocument();
@@ -1449,10 +1816,10 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     render(einsatzAktiv, vermisst);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     // Gegenaussage im selben Formular: „vermisst seit" ist da, die zwei Fundort-Felder nicht.
     expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Zustand')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Zustand / Verdacht')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
   });
 
@@ -1472,7 +1839,7 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.getByText('vermisst seit')).toBeInTheDocument();
 
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(koerper).toHaveLength(1));
@@ -1602,9 +1969,10 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
   });
 });
 
-// Erfassungs-Norm (frontend/AGENTS.md, LFH-796): die vier Dialoge der Seite liegen auf der
-// Erfassungshülle. Alle sind Select-Masken — Enter schluckt der `Select`, belegt wird die Struktur.
-describe('PersonenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', () => {
+// Erfassungs-Norm (frontend/AGENTS.md, LFH-796): die zwei Dialoge der Seite und die zwei Paneele
+// des Patientenkopfs liegen auf der Erfassungshülle. Die Dialoge sind Select-Masken — Enter
+// schluckt der `Select`, belegt wird die Struktur.
+describe('PersonenDetailPage — Dialoge und Paneele auf der Erfassungshülle (LFH-796)', () => {
   const leereListen: Parameters<typeof server.use> = [
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
@@ -1612,31 +1980,45 @@ describe('PersonenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
   ];
 
   it.each([
-    { dialog: 'Sichtung erfassen', ausloeser: 'Sichten', knopf: 'Übernehmen', zuordnung: false },
-    { dialog: 'UHS zuweisen', ausloeser: 'UHS zuweisen', knopf: 'Zuweisen', zuordnung: true },
     {
-      dialog: 'Tier als Halter zuweisen',
-      ausloeser: 'Tier zuweisen',
-      knopf: 'Zuweisen',
-      zuordnung: true,
+      dialog: 'In UHS aufnehmen',
+      ausloeser: 'In UHS aufnehmen',
+      knopf: 'Aufnehmen',
+      bezuege: false,
     },
     {
-      dialog: 'Schaden zuweisen (Geschädigte)',
-      ausloeser: 'Schaden zuweisen',
-      knopf: 'Zuweisen',
-      zuordnung: true,
+      dialog: 'Bezug hinzufügen',
+      ausloeser: 'Bezug hinzufügen',
+      knopf: 'Hinzufügen',
+      bezuege: true,
     },
   ])(
     '$dialog: Knopf im Formular, keine Fußzeile',
-    async ({ dialog, ausloeser, knopf, zuordnung }) => {
+    async ({ dialog, ausloeser, knopf, bezuege }) => {
       render(einsatzAktiv, detail, leereListen);
-      if (zuordnung) await klappeZuordnungenAuf();
+      if (bezuege) await klappeBezuegeAuf();
       await userEvent.click(await screen.findByRole('button', { name: ausloeser }));
       const fenster = await screen.findByRole('dialog');
       expect(within(fenster).getByText(dialog)).toBeInTheDocument();
       const absenden = within(fenster).getByRole('button', { name: knopf });
       expect(absenden.closest('form')).not.toBeNull();
       expect(document.querySelector('.ant-modal-footer')).toBeNull();
+    },
+  );
+
+  it.each([
+    { paneel: 'Sichtung erfassen', ausloeser: 'Sichten, bisher ungesichtet', knopf: 'Übernehmen' },
+    { paneel: 'Verbleib erfassen', ausloeser: 'Verbleib erfassen', knopf: 'Verbleib erfassen' },
+  ])(
+    '$paneel: Paneel im Kopf, Knopf im Formular, kein Dialog',
+    async ({ paneel, ausloeser, knopf }) => {
+      render(einsatzAktiv, detail, leereListen);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      await userEvent.click(within(kopf()).getByRole('button', { name: ausloeser }));
+      const bereich = within(kopf()).getByRole('region', { name: paneel });
+      const absenden = within(bereich).getByRole('button', { name: knopf });
+      expect(absenden.closest('form')).not.toBeNull();
+      expect(screen.queryByRole('dialog')).toBeNull();
     },
   );
 });

@@ -82,7 +82,9 @@ describe('Bestätigt von (LFH-1046)', () => {
     const user = userEvent.setup();
     zeige();
     await screen.findByLabelText('Bestätigt von');
-    await waehle(user, 'Kategorie', 'SK II');
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('radio', { name: /^SK II,/ }),
+    );
     await waehle(user, 'Bestätigt von', 'Dr. A. Muster · Notärztin');
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
@@ -96,7 +98,9 @@ describe('Bestätigt von (LFH-1046)', () => {
     const user = userEvent.setup();
     zeige();
     await screen.findByLabelText('Bestätigt von');
-    await waehle(user, 'Kategorie', 'SK II');
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('radio', { name: /^SK II,/ }),
+    );
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).not.toHaveProperty('bestaetigt_personal_id');
@@ -105,7 +109,7 @@ describe('Bestätigt von (LFH-1046)', () => {
   it('für eine Person: kein Feld, keine Liste', async () => {
     server.use(meHandler(benutzerFixture({ anzeigename: 'EL' })));
     zeige();
-    await screen.findByLabelText('Kategorie');
+    await screen.findByRole('radiogroup', { name: 'Sichtungskategorie' });
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByLabelText('Bestätigt von')).toBeNull();
     expect(listenAbrufe).toBe(0);

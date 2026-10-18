@@ -14,7 +14,7 @@ import { FakeEventSource } from '../test/eventSource';
  * LFH-627: „Instance created by `useForm` is not connected to any Form element". Wie im
  * Schadendialog fassten zwei Wege die Formularinstanz an, ohne dass ein `<Form>` hing:
  *  - `?neu=1` öffnet den Dialog über den echten Scheduler; der Öffnen-Effekt setzte den gemerkten
- *    Antreffort, bevor antds `Modal` sein `<Form>` eingehängt hatte;
+ *    Fundort, bevor antds `Modal` sein `<Form>` eingehängt hatte;
  *  - der Einsatzwechsel rief `resetFields()`, auch wenn der Dialog nie offen war.
  *
  * **Eigene Datei, und das ist Absicht:** `@rc-component/util` gibt dieselbe Warnung je
@@ -71,14 +71,14 @@ function render(route: string) {
 }
 
 describe('TierePage · Formularbindung (LFH-627)', () => {
-  it('?neu=1 setzt den gemerkten Antreffort erst, wenn das Formular eingehängt ist', async () => {
+  it('?neu=1 setzt den gemerkten Fundort erst, wenn das Formular eingehängt ist', async () => {
     // Gemerkt vom angemeldeten Benutzer: ungebundene Werte verwirft die Anmeldung (LFH-785).
     erfassungsSitzungBinden(nutzer.id);
     sessionStorage.setItem('lfh:erfassung:1:tier:antreff_ort', 'Tierlager A');
     const spy = vi.spyOn(console, 'error');
     render('/einsaetze/1/tiere?neu=1');
 
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager A'));
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tierlager A'));
     await act(naechsterMakrotask);
     expect(unverbundenWarnungen(spy)).toEqual([]);
   });

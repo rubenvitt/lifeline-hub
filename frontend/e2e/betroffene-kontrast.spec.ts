@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { kontrast, pruefe } from './kontrast-kern';
+import { kontrast, pruefe, randKontrast } from './kontrast-kern';
 import { kartenpunktAufSeite, messeKante } from './karten-pixel-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 
@@ -32,27 +32,30 @@ for (const modus of ['light', 'dark'] as const) {
     for (const ort of ['route', 'modal']) {
       await page.goto(`${basis}/personen${ort === 'route' ? '/aufnahme' : ''}`);
       if (ort === 'modal') await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
-      const gruppe = page.locator('#sichtung');
-      await expect(gruppe.locator('.ant-tag')).toHaveText([
-        'SK I',
-        'SK II',
-        'SK III',
-        'SK IV',
-        'tot',
-        'unverletzt',
-      ]);
+      // Die Sichtungswahl (LLH-1083, Spec `farbrollen-kontrast`, „Sichtungsfläche hält den
+      // Textboden“): Text auf jeder Fläche, Kante gegen den Grund ≥ 3 : 1, gefüllt und in der
+      // Randform, in Ruhe und unter dem Zeiger.
+      const gruppe = page.getByRole('radiogroup', { name: 'Sichtungskategorie' });
+      const flaechen = gruppe.getByRole('radio');
+      await expect(flaechen).toHaveCount(6);
       for (const label of ['SK I', 'SK II', 'SK III', 'SK IV', 'tot', 'unverletzt']) {
-        const tag = gruppe.locator('.ant-tag').filter({ hasText: new RegExp(`^${label}$`) });
+        const flaeche = gruppe.getByRole('radio', { name: new RegExp(`^${label},`) });
         await page.mouse.move(0, 0);
-        await pruefe(tag, minimum, `${modus}/${ort}/${label}/ungewählt`);
-        await tag.hover();
-        await pruefe(tag, minimum, `${modus}/${ort}/${label}/hover`);
-        await tag.click();
+        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/ungewählt`);
+        const kante = await randKontrast(flaeche, 'top');
+        expect(kante.gegenAussen, `${modus}/${ort}/${label}/Kante`).toBeGreaterThanOrEqual(3);
+        await flaeche.hover();
+        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/hover`);
+        await flaeche.click();
         await expect(gruppe.getByRole('radio', { checked: true })).toHaveCount(1);
-        await expect(gruppe.getByRole('radio', { name: label, exact: true })).toBeChecked();
-        await pruefe(tag, minimum, `${modus}/${ort}/${label}/gewählt+hover`);
+        await expect(flaeche).toBeChecked();
+        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/gewählt+hover`);
         await page.mouse.move(0, 0);
-        await pruefe(tag, minimum, `${modus}/${ort}/${label}/gewählt`);
+        await pruefe(flaeche, minimum, `${modus}/${ort}/${label}/gewählt`);
+        // Die übrigen stehen jetzt in der Randform und halten den Boden ebenso.
+        for (const andere of await gruppe.getByRole('radio', { checked: false }).all()) {
+          await pruefe(andere, minimum, `${modus}/${ort}/${label}/Randform`);
+        }
       }
     }
   });
@@ -217,8 +220,8 @@ for (const modus of ['light', 'dark'] as const) {
 
     // ── Liste ──
     await page.goto(`${basis}/personen`);
-    const leer = page.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
-    const voll = page.getByRole('button', { name: 'Zustand zu R-002 bearbeiten' });
+    const leer = page.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' });
+    const voll = page.getByRole('button', { name: 'Zustand / Verdacht zu R-002 bearbeiten' });
     for (const [ziel, name] of [
       [leer, 'Zustand-Knopf leer'],
       [voll, 'Zustandswert'],

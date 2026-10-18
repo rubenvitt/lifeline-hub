@@ -101,6 +101,18 @@ export function updateDisposition(
 }
 
 /**
+ * Statuswechsel eines Postens (LLH-1133, Spec `material-am-ort`, „Status am Ort setzen“): der EINE
+ * Weg für die Materialliste und jeden Ort, der sein Material mit `kraefte/MaterialAmOrt` zeigt.
+ */
+export function setzeMaterialStatus(
+  einsatzId: number,
+  emId: number,
+  status: MaterialStatus,
+): Promise<EinsatzMaterial> {
+  return updateDisposition(einsatzId, emId, { status });
+}
+
+/**
  * Einen Posten aufteilen (LLH-1093, design.md D8): `menge` geht als neue Zeile mit denselben
  * Angaben, demselben Ort und Status ab, die Ausgangszeile behält den Rest. Antwort `[Ausgang, neu]`.
  */

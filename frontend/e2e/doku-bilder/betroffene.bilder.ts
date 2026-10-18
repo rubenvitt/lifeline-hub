@@ -7,10 +7,11 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep betroffene`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   liste.png        frontend/src/pages/PersonenPage.tsx, frontend/src/personen/BetroffenenSeitenleiste.tsx
+ *   liste.png        frontend/src/pages/PersonenPage.tsx, frontend/src/personen/BetroffenenSeitenleiste.tsx,
+ *                    frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx
  *   erfassen.png     frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx
  *   kurzeingabe.png  frontend/src/personen/BetroffeneZeile.tsx
- *   verbleib.png     frontend/src/personen/VerbleibErfassung.tsx
+ *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx
  *
  * Daten: die Betroffenen des Demo-Einsatzes reichen, es wird nichts gefüllt.
  */
@@ -47,15 +48,12 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/personen`);
     await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
-    await dialog
-      .locator('#sichtung .ant-tag')
-      .filter({ hasText: /^SK II$/ })
-      .click();
-    await expect(dialog.getByRole('radio', { name: 'SK II', exact: true })).toBeChecked();
+    await dialog.getByRole('radio', { name: /^SK II,/ }).click();
+    await expect(dialog.getByRole('radio', { name: /^SK II,/ })).toBeChecked();
     await waehleIn(dialog.getByRole('combobox', { name: 'Geschlecht' }), 'männlich');
     await dialog.getByLabel('Geschätztes Alter (Jahre)').fill('45');
-    await dialog.getByLabel('Antreffort').fill('Mühlbachweg 12, Keller');
-    await dialog.getByLabel('Antreffort').blur();
+    await dialog.getByLabel('Fundort').fill('Mühlbachweg 12, Keller');
+    await dialog.getByLabel('Fundort').blur();
     await fotografiere(dialog, KAPITEL, 'erfassen');
   });
 
@@ -72,18 +70,19 @@ test.describe(KAPITEL, () => {
     await fotografiere(band, KAPITEL, 'kurzeingabe');
   });
 
-  test('Dialog „Verbleib erfassen“', async ({ page }) => {
+  test('Patientenkopf mit Paneel „Verbleib erfassen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const id = await personId(page, demo.id, 'Vorlage');
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/personen/${id}`);
-    await page.getByRole('button', { name: 'Verbleib erfassen' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Verbleib erfassen' });
-    await waehleIn(dialog.getByRole('combobox', { name: 'Art' }), 'Transport');
-    await dialog.getByLabel('Ziel').fill('Klinikum Musterstadt');
-    await dialog.getByLabel('Transportmittel (RTW/KTW …)').fill('KTW 1');
-    await dialog.getByLabel('Transportmittel (RTW/KTW …)').blur();
-    await fotografiere(dialog, KAPITEL, 'verbleib');
+    const kopf = page.getByRole('region', { name: 'Patientenkopf' });
+    await kopf.getByRole('button', { name: 'Verbleib erfassen' }).click();
+    const paneel = page.getByRole('region', { name: 'Verbleib erfassen' });
+    await waehleIn(paneel.getByRole('combobox', { name: 'Art' }), 'Transport');
+    await paneel.getByLabel('Ziel').fill('Klinikum Musterstadt');
+    await paneel.getByLabel('Transportmittel (RTW/KTW …)').fill('KTW 1');
+    await paneel.getByLabel('Transportmittel (RTW/KTW …)').blur();
+    await fotografiere(kopf, KAPITEL, 'verbleib');
   });
 });

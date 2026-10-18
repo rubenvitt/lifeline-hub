@@ -32,8 +32,16 @@ import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
 import { merkeZuletztVerwendet } from './zuletztVerwendet';
 import type { BeginneKartenHandlung } from './useKartenFehler';
+import type { PlatzierenZielTyp } from '../../routing/deeplinks';
 
 export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
+type PlatzierZiel = { typ: PlatzierenPunktTyp | 'einsatzort'; id: number };
+/**
+ * Was gerade verortet wurde (LLH-1125, Spec `lagekarte-verortungsauftrag`): Stoff der Rückmeldung
+ * „<Kennung> verortet“. `zurueck` = der Auftrag kam von der Seite des Datensatzes, die Rückmeldung
+ * trägt dann „Zurück zu …“.
+ */
+export type VerortetZiel = PlatzierZiel & { zurueck: boolean };
 type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
 
 /**
@@ -45,7 +53,18 @@ type ZoneBestaetigung = ZoneEntwurf & { geometrie: GeoJsonGeometry };
  */
 type KartenModus =
   | { art: 'idle' }
-  | { art: 'platzieren'; ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } }
+  /**
+   * `auftrag`: gesetzt, wenn der Modus aus einem Verortungsauftrag von außen kommt
+   * (`?platzieren=…`, LLH-1125); `null` beim Start in der Karte selbst („Nicht verortet“,
+   * Einsatzort). Nur ein Auftrag endet in der Rückmeldung „verortet“.
+   */
+  | { art: 'platzieren'; ziel: PlatzierZiel; auftrag: { zurueck: boolean } | null }
+  /**
+   * Nach erfolgreichem Verorten eines Auftrags (LLH-1125): die Rückmeldung steht, bis jemand „Auf der Karte
+   * bleiben“ wählt oder einen anderen Modus beginnt. Kein exklusiver Modus — die Karte ist wieder
+   * frei bedienbar.
+   */
+  | { art: 'verortet'; ziel: VerortetZiel }
   | { art: 'abschnitt'; id: number }
   | { art: 'zone'; entwurf: ZoneEntwurf; bestaetigung: ZoneBestaetigung | null; speichern: boolean }
   | { art: 'bild'; id: number }
@@ -57,7 +76,12 @@ type KartenModus =
   | { art: 'messen'; form: MessForm };
 
 type ModusAktion =
-  | { t: 'platzieren'; ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number } }
+  | { t: 'platzieren'; ziel: PlatzierZiel; auftrag?: { zurueck: boolean } }
+  /**
+   * Erfolg des Verortens: aus einem Auftrag die Rückmeldung, sonst Modusende wie bisher (LFH-765);
+   * läuft kein Platzier-Modus mehr, No-op.
+   */
+  | { t: 'verortet'; ziel: PlatzierZiel }
   | { t: 'abschnitt'; id: number }
   | { t: 'zone'; entwurf: ZoneEntwurf }
   | { t: 'bild'; id: number }
@@ -88,7 +112,14 @@ type KartenSelektion =
 function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
   switch (a.t) {
     case 'platzieren':
-      return { art: 'platzieren', ziel: a.ziel };
+      return { art: 'platzieren', ziel: a.ziel, auftrag: a.auftrag ?? null };
+    case 'verortet':
+      // Die Herkunft kommt aus dem Modus, der verortet hat; ein inzwischen begonnener anderer Modus
+      // bleibt stehen (wie `beenden` mit `arten`).
+      if (state.art !== 'platzieren') return state;
+      return state.auftrag
+        ? { art: 'verortet', ziel: { ...a.ziel, zurueck: state.auftrag.zurueck } }
+        : { art: 'idle' };
     case 'abschnitt':
       return { art: 'abschnitt', id: a.id };
     case 'bild':
@@ -115,10 +146,11 @@ interface KartenInteraktionArgs {
   einsatzId: number;
   darfSchreiben: boolean;
   /**
-   * Alle anwählbaren Marker: `alleVerortet` plus, bei sichtbarer Ebene, die Betroffenen, die
-   * bewusst nicht in `alleVerortet` stehen.
+   * Alle anwählbaren Marker: `alleVerortet` plus, bei gezeichneter Ebene, die Betroffenen, die
+   * bewusst nicht in `alleVerortet` stehen. Als Ref, gelesen erst beim Wählen: welche Betroffenen
+   * gezeichnet werden, hängt am Vorrang `verortungsTyp` dieses Hooks (LLH-1125).
    */
-  waehlbar: KarteMarker[];
+  waehlbarRef: { readonly current: readonly KarteMarker[] };
   /** Aktive Ansicht: neu angelegte Objekte werden auf ihr gestempelt. */
   aktiveAnsichtId?: number;
   /**
@@ -148,7 +180,7 @@ interface KartenInteraktionArgs {
 export function useKartenInteraktion({
   einsatzId,
   darfSchreiben,
-  waehlbar,
+  waehlbarRef,
   aktiveAnsichtId,
   beginneHandlung,
   verwirfHandlung,
@@ -158,6 +190,12 @@ export function useKartenInteraktion({
   const qc = useQueryClient();
 
   const [modus, dispatch] = useReducer(modusReducer, { art: 'idle' } as KartenModus);
+  /**
+   * Ebenen-Vorrang des Verortungsauftrags von außen (LLH-1125, design.md D1): gesetzt beim Start
+   * des Auftrags, steht bis zum Verlassen der Seite (Unmount). Die Seite zeichnet die Ebene dieses
+   * Typs, ohne den Schalter umzustellen; gespeichert wird er nie.
+   */
+  const [verortungsTyp, setVerortungsTyp] = useState<PlatzierenZielTyp | null>(null);
 
   // Steigt bei jedem Zonen-Zeichnen-Start und erzwingt ein Re-Fire des Zonen-Effekts in
   // Kartenflaeche auch bei gleichem Modus (z. B. Polygon → Polygon), damit starten() einen offenen,
@@ -226,6 +264,7 @@ export function useKartenInteraktion({
   // Aus dem Modus abgeleitet — die Werte können konstruktionsbedingt nicht gleichzeitig gesetzt
   // sein.
   const platzierungZiel = modus.art === 'platzieren' ? modus.ziel : null;
+  const verortetZiel = modus.art === 'verortet' ? modus.ziel : null;
   const zeichneAbschnittId = modus.art === 'abschnitt' ? modus.id : null;
   const zoneEntwurf = modus.art === 'zone' ? modus.entwurf : null;
   const zoneBestaetigung = modus.art === 'zone' ? modus.bestaetigung : null;
@@ -236,8 +275,8 @@ export function useKartenInteraktion({
   const messStart = messForm ? messStartWert : null;
 
   // Während eines exklusiven Modus darf ein Karten-Klick auf ein Objekt kein Auswahl-Panel öffnen
-  // (sonst Doppel-Panel neben der ZeichnenSteuerung).
-  const exklusiverModusAktiv = modus.art !== 'idle';
+  // (sonst Doppel-Panel neben der ZeichnenSteuerung). Die Rückmeldung „verortet“ ist keiner.
+  const exklusiverModusAktiv = modus.art !== 'idle' && modus.art !== 'verortet';
 
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Teil-PATCH des Kopfs, dann invalidieren).
   const verortenMutation = useMutation({
@@ -275,10 +314,10 @@ export function useKartenInteraktion({
       }
       // Das Ziel reist als Ergebnis zu `onSuccess`: dort steht fest, wem der PATCH galt, unabhängig
       // vom inzwischen laufenden Modus.
-      return platzierungZiel;
+      return { ziel: platzierungZiel, punkt: p };
     },
-    onSuccess: (ziel) => {
-      erfolg('Objekt verortet');
+    onSuccess: (ergebnis) => {
+      const ziel = ergebnis?.ziel;
       qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
@@ -290,6 +329,10 @@ export function useKartenInteraktion({
         qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
         qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, ziel.id) });
       }
+      if (ziel?.typ === 'schaden') {
+        // Das Detail, auf das „Zurück zu S-…“ führt (LLH-1125), zeigt sonst die alte Koordinate.
+        qc.invalidateQueries({ queryKey: einsatzKeys.schaden(einsatzId, ziel.id) });
+      }
       if (ziel?.typ === 'betreuungsstelle') {
         qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
       }
@@ -297,7 +340,22 @@ export function useKartenInteraktion({
         qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
         qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, ziel.id) });
       }
-      dispatch({ t: 'beenden', arten: ['platzieren'] });
+      // Ein Auftrag von außen meldet am Ort statt per Toast (LLH-1125, design.md D2): der Modus wird
+      // zu „verortet“, der neue Marker ist gewählt und angeflogen — eine Fehlplatzierung fällt so
+      // auf. Ein Start in der Karte selbst endet wie bisher (LFH-765: danach gilt der Zustand davor).
+      const lauf = modusRef.current;
+      const isAusAuftrag = lauf.art === 'platzieren' && lauf.auftrag != null;
+      if (!isAusAuftrag) erfolg('Objekt verortet');
+      if (!ziel) return;
+      dispatch({ t: 'verortet', ziel });
+      if (isAusAuftrag) {
+        setSelektion({
+          art: 'objekt',
+          schluessel: ziel.typ === 'einsatzort' ? 'einsatzort' : `${ziel.typ}-${ziel.id}`,
+        });
+        const { lat, lon } = ergebnis.punkt;
+        if (lat != null && lon != null) setFlyToZiel({ lng: lon, lat });
+      }
     },
     onMutate: () => ({
       melde: beginneHandlung('verorten', 'Nicht verortet', 'Verorten fehlgeschlagen'),
@@ -406,7 +464,7 @@ export function useKartenInteraktion({
 
   function onMarkerWaehlen(schluessel: string) {
     setSelektion({ art: 'objekt', schluessel });
-    const m = waehlbar.find((x) => x.schluessel === schluessel);
+    const m = waehlbarRef.current.find((x) => x.schluessel === schluessel);
     if (m) setFlyToZiel({ lng: m.lon, lat: m.lat });
   }
 
@@ -634,6 +692,27 @@ export function useKartenInteraktion({
     },
     [setAuswahl],
   );
+  /**
+   * Verortungsauftrag von außen (`?platzieren=…[&zurueck=1]`, LLH-1125): wie `onPlatzierenStart`,
+   * dazu Herkunft und Ebenen-Vorrang. Stabil aus demselben Grund (Deps des Auftrags-Effekts).
+   */
+  const onVerortungsauftragStart = useCallback(
+    (auftrag: { typ: PlatzierenZielTyp; id: number; zurueck: boolean }) => {
+      dispatch({
+        t: 'platzieren',
+        ziel: { typ: auftrag.typ, id: auftrag.id },
+        auftrag: { zurueck: auftrag.zurueck },
+      });
+      setVerortungsTyp(auftrag.typ);
+      setAuswahl(null);
+    },
+    [setAuswahl],
+  );
+  /** „Auf der Karte bleiben“: schließt nur die Rückmeldung; Auswahl und Ebenen-Vorrang bleiben. */
+  const onVerortetSchliessen = useCallback(
+    () => dispatch({ t: 'beenden', arten: ['verortet'] }),
+    [],
+  );
   const onPlatzierenAbbrechen = () => {
     if (modusRef.current.art === 'platzieren') verwirfHandlung('verorten');
     dispatch({ t: 'beenden', arten: ['platzieren'] });
@@ -825,6 +904,8 @@ export function useKartenInteraktion({
   return {
     // FSM-State (Display/Wiring).
     platzierungZiel,
+    verortetZiel,
+    verortungsTyp,
     zeichneAbschnittId,
     zoneEntwurf,
     zoneBestaetigung,
@@ -869,6 +950,8 @@ export function useKartenInteraktion({
     onBestaetigungZurueck,
     bestaetigungVerwerfen,
     onPlatzierenStart,
+    onVerortungsauftragStart,
+    onVerortetSchliessen,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
     onZoneZeichnenStart,

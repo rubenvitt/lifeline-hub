@@ -1095,6 +1095,42 @@ for (const viewport of [
       else await leisteZu(page);
     });
 
+    // LLH-1125: nach dem Tipp meldet das Band „S-… verortet“; jede Handlung hat genau einen Knopf
+    // (die Leiste zeigt unter `lg` keinen zweiten), „Zurück zu …“ führt ins Detail.
+    test('Verortungsauftrag mit Herkunft: Rückmeldung im Band, ein Knopf je Handlung, Rückweg', async ({
+      page,
+    }) => {
+      await oeffneKarte(page, `?platzieren=schaden:${saat.schadenId}&zurueck=1`);
+      await expect(band(page)).toContainText('Platzieren · Schaden');
+      await tippeFrei(page, 'Verorten');
+
+      await expect(band(page)).toContainText(/S-\d{3} verortet/);
+      const zurueck = page.getByRole('button', { name: /^Zurück zu S-\d{3}$/ });
+      const bleiben = page.getByRole('button', { name: 'Auf der Karte bleiben', exact: true });
+      await expect(zurueck).toHaveCount(1);
+      await expect(bleiben).toHaveCount(1);
+      await expect(band(page).getByRole('button')).toHaveCount(2);
+
+      // „Auf der Karte bleiben“ schließt nur die Rückmeldung.
+      await bleiben.tap();
+      await expect(band(page)).toHaveCount(0);
+
+      // Neu verorten läuft genauso, und der Rückweg führt ins Detail des Schadens.
+      // Die Zeitachse steht vom ersten Öffnen her schon offen.
+      await page.goto(
+        `/einsaetze/${saat.einsatzId}/lagekarte?platzieren=schaden:${saat.schadenId}&zurueck=1`,
+      );
+      await ruhe(page);
+      await springe(page, MITTE, ZOOM);
+      await expect(band(page)).toContainText('Platzieren · Schaden');
+      await tippeFrei(page, 'Neu verorten');
+      await expect(zurueck).toHaveCount(1);
+      await zurueck.tap();
+      await expect(page).toHaveURL(
+        new RegExp(`/einsaetze/${saat.einsatzId}/schaeden/${saat.schadenId}$`),
+      );
+    });
+
     test('Taktisches Zeichen: Tipp setzt, „Fertig" im Band beendet', async ({ page }) => {
       await oeffneKarte(page);
       await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).tap();

@@ -28,7 +28,7 @@ import { ladeGefahrengebiete } from '../../api/gefahren';
 import { holeRueckmeldungen, listeLageMeldungen } from '../../api/meldungen';
 import { ladeOrganisation } from '../../api/organisation';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
-import type { Warnstufe } from '../../api/types';
+import type { Person, Warnstufe } from '../../api/types';
 import {
   baueFuehrungsstelleMarker,
   baueMarker,
@@ -59,6 +59,8 @@ export const QUELLE_BETROFFENE = 'Betroffene';
 const PERSONEN_MODUL = modulRegistry.find((m) => m.key === 'personen');
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Ebene „Betreuungsstellen". */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
+/** Leere Personenliste mit fester Identität: ohne Modul oder vor dem Abruf. */
+const LEER_PERSONEN: readonly Person[] = [];
 
 interface LagekarteDatenArgs {
   einsatzId: number;
@@ -715,6 +717,8 @@ export function useLagekarteDaten({
     // Ebene „Betroffene": Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,
+    // Rohliste nur bei freiem Modul, für die Kennung der Rückmeldung „R-… verortet“ (LLH-1125).
+    personen: personenDaten ?? LEER_PERSONEN,
     personenNichtGeladen,
     /**
      * Die Personenliste scheiterte bei freiem Modul (kein 403). Steht zugleich als

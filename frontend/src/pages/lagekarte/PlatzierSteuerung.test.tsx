@@ -96,3 +96,40 @@ describe('PlatzierSteuerung (LFH-765)', () => {
     expect(container.querySelector('[data-lfh="platzier-steuerung"]')).not.toBeNull();
   });
 });
+
+describe('PlatzierSteuerung — Rückmeldung „verortet“ (LLH-1125)', () => {
+  it('mit Herkunft: Kennung im Titel, „Zurück zu …“ primär, „Auf der Karte bleiben“ daneben', async () => {
+    const onZurueck = vi.fn();
+    const onBleiben = vi.fn();
+    zeige({ art: 'verortet', meldung: { kennung: 'R-005', onZurueck, onBleiben } });
+    expect(screen.getByText('R-005 verortet')).toBeInTheDocument();
+    const zurueck = screen.getByRole('button', { name: 'Zurück zu R-005' });
+    expect(zurueck).toHaveClass('ant-btn-primary');
+    // Genau zwei Knöpfe, je Handlung einer.
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+    await userEvent.click(zurueck);
+    expect(onZurueck).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Auf der Karte bleiben' }));
+    expect(onBleiben).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Herkunft kein Rückweg, ohne Kennung „Objekt verortet“ und „Zurück“', () => {
+    const { rerender } = zeige({
+      art: 'verortet',
+      meldung: { kennung: 'R-005', onZurueck: null, onBleiben: vi.fn() },
+    });
+    expect(screen.queryByRole('button', { name: /^Zurück/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auf der Karte bleiben' })).toBeInTheDocument();
+
+    rerender(
+      <PlatzierSteuerung
+        modus={{
+          art: 'verortet',
+          meldung: { kennung: null, onZurueck: vi.fn(), onBleiben: vi.fn() },
+        }}
+      />,
+    );
+    expect(screen.getByText('Objekt verortet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zurück' })).toBeInTheDocument();
+  });
+});

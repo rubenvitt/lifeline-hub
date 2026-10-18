@@ -1368,6 +1368,42 @@
           "endgueltig_geloescht"
         ]
       },
+      "AufenthaltAnzeige": {
+        "type": "object",
+        "description": "Wo eine Person gerade in einer UHS steht (LLH-1129): für den Patientenkopf im Personen-Detail,\ndamit er UHS- und Platznamen ohne zweiten Abruf nennt. UHS- und Platzbezeichnung sind\nLagestruktur, keine Scrub-Werte der Person. `seit` ist der Zeitpunkt der jüngsten Belegung\n(Eintritt oder Wechsel) in dieser UHS.",
+        "required": [
+          "uhs_id",
+          "uhs_bezeichnung"
+        ],
+        "properties": {
+          "platz_bezeichnung": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "platz_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "seit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uhs_bezeichnung": {
+            "type": "string"
+          },
+          "uhs_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AuftragAnzeige": {
         "type": "object",
         "description": "Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus\ndem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate\n(`empfaenger_anzahl`, `quittiert_anzahl`) stammen aus `auftrag_empfaenger`.",
@@ -11985,6 +12021,17 @@
                 "items": {
                   "$ref": "#/components/schemas/AbgleichAnzeige"
                 }
+              },
+              "aufenthalt": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AufenthaltAnzeige",
+                    "description": "UHS, Platz und seit wann; `null` außerhalb jeder UHS (LLH-1129, Patientenkopf)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "notizen": {
                 "type": "array",

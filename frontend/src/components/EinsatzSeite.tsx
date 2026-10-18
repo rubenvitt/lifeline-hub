@@ -335,6 +335,12 @@ interface EinsatzSeiteProps {
   /** Arbeitsfläche bis zum Fensterende; children folgen darunter im Dokumentfluss. */
   fensterInhalt?: { inhalt: ReactNode; mindestHoehe?: number };
   /**
+   * Bereichsleiste unter Kopf und Hinweis (LLH-1133, UHS-Seite): eine `Segmentleiste`, deren
+   * Bereich die Arbeitsfläche (`fensterInhalt`) füllt. Sie gehört zum Kopf, den `FensterRahmen`
+   * misst; so behält jeder Bereich die Mindesthöhe, und die Leiste steht ohne Bildlauf im Bild.
+   */
+  bereiche?: ReactNode;
+  /**
    * Angepinnter Seitenfuß (LFH-373). Steht als LETZTES Kind der Seitenwurzel, nicht im Inhalt:
    * ein `position: sticky; bottom: 0` steigt nie über die Oberkante seines Elternblocks, im
    * Inhalt hinge er unter einem hohen Kopf fest und ragte unter das Fenster. Die Polsterung trägt
@@ -390,6 +396,7 @@ export default function EinsatzSeite({
   dataUpdatedAt,
   breite = 'voll',
   fensterInhalt,
+  bereiche,
   fuss,
   children,
 }: EinsatzSeiteProps) {
@@ -531,6 +538,11 @@ export default function EinsatzSeite({
           {hinweis && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
         </div>
       )}
+      {bereiche && (
+        <div data-lfh="seiten-bereiche" style={{ ...koerperStil, marginBottom: token.marginSM }}>
+          {bereiche}
+        </div>
+      )}
     </>
   );
 
@@ -545,9 +557,14 @@ export default function EinsatzSeite({
       ) : (
         kopf
       )}
-      <div data-lfh="seiten-inhalt" style={koerperStil}>
-        {children}
-      </div>
+      {/* Unter einer Arbeitsfläche ohne Inhalt keine leere Hülle: endet die Seite mit ihr
+          (UHS-Bereiche, LLH-1133), fielen Ränder durch den leeren Block, und ein Dichtewechsel
+          lief in die ResizeObserver-Schleife des Fensterrahmens (`e2e/uhs-hoehe.spec.ts`). */}
+      {(fensterInhalt == null || (children != null && children !== false)) && (
+        <div data-lfh="seiten-inhalt" style={koerperStil}>
+          {children}
+        </div>
+      )}
       {fuss}
     </div>
   );

@@ -61,10 +61,11 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
     await laptop.getByRole('button', { name: 'Anlegen', exact: true }).click();
     await expect(laptop.getByText('Platz angelegt')).toBeVisible();
 
-    // Bereich „UHS“: Plätze in Zahlen, Material nur lesend, Meldung an die Einsatzleitung.
+    // Bereich „UHS“: Lage der Stelle in Zahlen (LLH-1136), Material nur lesend, Meldung an die
+    // Einsatzleitung.
     await nav.getByRole('link', { name: 'UHS' }).click();
     await expect(laptop).toHaveURL(new RegExp(`/geraet/${e}/stelle$`));
-    await expect(laptop.getByRole('group', { name: 'Plätze in Zahlen' })).toBeVisible();
+    await expect(laptop.getByRole('group', { name: 'Lage der Stelle' })).toBeVisible();
     await laptop.getByRole('tab', { name: 'Material' }).click();
     await expect(laptop.getByText('Kein Material', { exact: true })).toBeVisible();
     await expect(laptop.getByRole('button', { name: 'Material zuordnen' })).toHaveCount(0);

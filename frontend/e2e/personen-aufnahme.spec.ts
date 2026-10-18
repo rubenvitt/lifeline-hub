@@ -32,9 +32,9 @@ function sichtung(page: Page) {
   return page.locator('#sichtung');
 }
 
-/** Eine Sichtungs-Auswahlfläche über ihre Beschriftung treffen. */
+/** Eine Sichtungsfläche über ihren Namen „<Kürzel>, <Wort>“ treffen (`SichtungsWahl`, LLH-1083). */
 function skFlaeche(page: Page, label: string) {
-  return sichtung(page).getByText(label, { exact: true });
+  return sichtung(page).getByRole('radio', { name: new RegExp(`^${label},`) });
 }
 
 test('AK 2: eine gesichtete Person in ≤ 4 Interaktionen und ohne Seitenwechsel', async ({

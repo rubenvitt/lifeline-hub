@@ -10,7 +10,7 @@
  * Neue Kopien verhindert `menueAusloeser.guard.test.ts`.
  */
 import { Button, Dropdown, type MenuProps } from 'antd';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IconPunkteSenkrecht } from '../icons';
 
 /** Ein Eintrag des gebündelten Menüs. */
@@ -58,6 +58,12 @@ export interface MenueAusloeserProps<K extends string = string> {
   gesperrt?: boolean;
   /** Eine ausgelöste Aktion läuft noch; zeigt sich am Auslöser. */
   laeuft?: boolean;
+  /**
+   * Das Menü geht auf oder zu. Für eine Liste, die solange Menge und Folge hält (Schleuse der
+   * `Datensicht`, LLH-1130). Hängt der Auslöser mit offenem Menü aus oder verliert das offene Menü
+   * alle Einträge, meldet er „zu“.
+   */
+  onOffenAenderung?: (offen: boolean) => void;
 }
 
 export function MenueAusloeser<K extends string = string>({
@@ -66,8 +72,25 @@ export function MenueAusloeser<K extends string = string>({
   onWahl,
   gesperrt,
   laeuft,
+  onOffenAenderung,
 }: MenueAusloeserProps<K>) {
-  if (eintraege.length === 0) return null;
+  const [offen, setOffen] = useState(false);
+  const isLeer = eintraege.length === 0;
+  // Verliert ein offenes Menü live alle Einträge, hängt der Auslöser aus (`return null` unten).
+  // Ohne Zurücksetzen bliebe `offen` stehen, das „zu“ käme nie, und die Liste hielte, bis die
+  // Zeile aushängt. Zurückgesetzt wird im Render (abgeleiteter Zustand), nicht in einem Effekt.
+  if (isLeer && offen) setOffen(false);
+  // Ref: ein neuer Rückruf je Render meldete sonst bei jedem Render „zu“ und wieder „auf“.
+  const meldeRef = useRef(onOffenAenderung);
+  useEffect(() => {
+    meldeRef.current = onOffenAenderung;
+  });
+  useEffect(() => {
+    if (!offen) return;
+    meldeRef.current?.(true);
+    return () => meldeRef.current?.(false);
+  }, [offen]);
+  if (isLeer) return null;
   return (
     /*
      * RIEGEL GEGEN PORTAL-AUFSTEIGEN (LFH-367/B5g, gemessen in `docs/leitlinien/
@@ -95,6 +118,7 @@ export function MenueAusloeser<K extends string = string>({
         // „LFH-683: Menüauslöser per Tastatur“).
         autoFocus
         disabled={gesperrt}
+        onOpenChange={setOffen}
         menu={{
           items: menueEintraege(eintraege),
           // Zuordnung am Menü, nicht je Eintrag: die Einträge bleiben reine Beschreibung.

@@ -84,10 +84,11 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/unfallhilfsstellen/${uhs.id}`);
     await page.getByText('Behandlungsplatz 3', { exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Patient zuweisen — Behandlungsplatz 3' });
-    await waehleIn(
-      dialog.getByRole('combobox', { name: 'Patient' }),
-      `R-${String(wartend.registrier_nr).padStart(3, '0')} · Musterfrau`,
-    );
+    await dialog
+      .getByRole('radio', {
+        name: new RegExp(`R-${String(wartend.registrier_nr).padStart(3, '0')} · Musterfrau`),
+      })
+      .check();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'patient-zuweisen');
   });

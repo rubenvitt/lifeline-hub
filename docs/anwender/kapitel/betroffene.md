@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs]
 ---
 
 ## Überblick
@@ -21,7 +21,7 @@ Vermissten.
 ### Die Lage der Betroffenen ablesen
 
 1. Im Modulpanel „Betroffene“ öffnen. Die Liste zeigt je Person Registriernummer, Name, Sichtung,
-   Zustand, Status, Fundort, Verbleib und Zeit.
+   Zustand, Status, Fundort, Verbleib und Zeit. Ein Klick auf die Zeile öffnet die Person.
 
    ![Liste der Betroffenen mit Statusfilter, Suche und der Seitenleiste mit Sichtungsbild, Verbleib und offenen Feldern](../bilder/betroffene/liste.png)
 
@@ -36,16 +36,17 @@ Vermissten.
 ### Eine Person mit der Maske erfassen
 
 1. „Betroffene erfassen“ wählen.
-2. Unter „Sichtungskategorie“ die Kategorie antippen, dazu „Geschlecht“, „Geschätztes Alter
-   (Jahre)“ und „Antreffort“, soweit bekannt.
+2. Unter „Sichtungskategorie“ die Fläche der Kategorie antippen, dazu „Geschlecht“, „Geschätztes
+   Alter (Jahre)“ und „Fundort“, soweit bekannt. Ein zweiter Tipp auf die gewählte Fläche nimmt
+   die Wahl zurück; die Person wird dann ohne Sichtung erfasst.
 
-   ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Antreffort](../bilder/betroffene/erfassen.png)
+   ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Fundort](../bilder/betroffene/erfassen.png)
 
 3. Name, Vorname, Zustand, Koordinate und Notiz stehen unter „Weitere Angaben“.
 4. „Erfassen“ wählen. Die Quittung nennt die neue Registriernummer („Erfasst als R-…“).
 
 Kommen mehrere Personen nacheinander, speichert „Speichern und nächste“ (Strg + Enter) und hält
-die Maske offen. Mit „Werte behalten“ bleibt der Antreffort für die nächste Person stehen; die
+die Maske offen. Mit „Werte behalten“ bleibt der Fundort für die nächste Person stehen; die
 Sichtung wird nie übernommen.
 
 ### Eine Person mit der Kurzeingabe erfassen
@@ -64,23 +65,60 @@ Die Kürzel: „Nachname, Vorname“; „m“, „w“ oder „d“ mit dem Alte
 bis „sk4“, „skt“ für tot und „sku“ für unverletzt; „#Breite/Länge“ für die Koordinate des
 Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen wird.
 
+### In der Liste nachsichten und Lücken schließen
+
+1. In der Liste auf die Sichtung der Person tippen; bei einer ungesichteten Person steht dort
+   „Sichten“. Die Sichtungswahl öffnet sich über der Zeile.
+2. Die Fläche der Kategorie antippen und „Übernehmen“ wählen. Die Zeile zeigt die neue Kategorie,
+   die Liste bleibt offen. „Abbrechen“ schließt die Wahl, ohne zu speichern.
+3. Fehlt einer Person der Verbleib, steht in ihrer Spalte „Verbleib“ der Knopf „Verbleib
+   erfassen“. Ihn wählen, „Art“ und „Ziel“ angeben und „Erfassen“ wählen.
+4. Das Menü am Ende der Zeile (am Handy in der Karte der Person) bietet „Sichten“, „Verbleib
+   erfassen“ und „Auf Lagekarte verorten“.
+
+Mit „Nur Lücken zeigen“ lässt sich die Liste so Zeile für Zeile abarbeiten: eine Zeile, deren
+Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansicht, der Filter oder
+„Nur Lücken zeigen“ wechselt; die Zahl unter „Offene Felder“ sinkt sofort.
+
 ### Sichten und den Verbleib erfassen
 
-1. In der Liste die Person öffnen. Die Seite „Person R-…“ zeigt Status, Sichtung und den
-   medizinischen Verlauf.
-2. Ohne Sichtung „Sichten“ wählen, sonst im Aktionsmenü der Seite „Re-Sichten“. Im Dialog
-   „Sichtung erfassen“ die „Kategorie“ wählen, bei Bedarf eine „Kurzbegründung (optional)“, und
-   „Übernehmen“ wählen.
-3. Verlässt die Person die Einsatzstelle, „Verbleib erfassen“ wählen und die „Art“ wählen:
-   „Transport“, „Notunterkunft“, „Entlassung vor Ort“, „verbleibt vor Ort“ oder „Verbleib des
-   Leichnams“. Dazu das „Ziel“ und beim Transport das „Transportmittel (RTW/KTW …)“.
+1. In der Liste die Person öffnen. Oben auf der Seite „Person R-…“ steht der Patientenkopf:
+   Sichtung mit Zeit („gesichtet … · vor 42 min“), „Zustand / Verdacht“, Aufenthalt oder
+   Verbleib und die letzte Notiz.
+2. Auf die Sichtung tippen. Darunter klappt die Sichtungswahl auf: die Fläche der Kategorie
+   antippen, bei Bedarf eine „Kurzbegründung (optional)“, und „Übernehmen“ wählen.
+3. Verlässt die Person die Einsatzstelle, im Kopf „Verbleib erfassen“ wählen und die „Art“
+   wählen: „Transport“, „Notunterkunft“, „Entlassung vor Ort“, „verbleibt vor Ort“ oder
+   „Verbleib des Leichnams“. Dazu das „Ziel“ und beim Transport das „Transportmittel (RTW/KTW …)“.
 
-   ![Dialog „Verbleib erfassen“ mit Art Transport, Ziel und Transportmittel](../bilder/betroffene/verbleib.png)
+   ![Patientenkopf mit aufgeklapptem Paneel „Verbleib erfassen“: Art Transport, Ziel und Transportmittel](../bilder/betroffene/verbleib.png)
 
-4. „Erfassen“ wählen.
+4. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib.
 
-Bei „Notunterkunft“ bietet der Dialog die Betreuungsstellen des Einsatzes an; die gewählte Stelle
-wird zum Ziel.
+Bei „Notunterkunft“ bietet das Paneel die Betreuungsstellen des Einsatzes an; die gewählte Stelle
+wird zum Ziel. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anlegen“.
+
+### Aufenthalt und Bezüge pflegen
+
+1. Steht die Person in keiner Unfallhilfsstelle, im Kopf „In UHS aufnehmen“ wählen und die UHS
+   wählen. Steht sie schon in einer, verlegen „Verlegen“ und „Austragen“ sie.
+2. Gehört der Person ein Tier oder ist sie bei einem Schaden geschädigt, „Bezüge“ aufklappen und
+   „Bezug hinzufügen“ wählen.
+3. Im Feld „Tier oder Schaden“ nach Kennung, Art, Name oder Ort suchen, den Treffer wählen und
+   „Hinzufügen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
+4. „Bezug lösen“ an der Zeile hebt einen Bezug wieder auf.
+
+### Den Fundort auf der Lagekarte verorten
+
+1. Die Person öffnen und bei „Koordinate“ „Auf Lagekarte verorten“ wählen, oder in der Liste im
+   Menü der Zeile „Auf Lagekarte verorten“. Die Lagekarte öffnet sich zum Platzieren dieser Person.
+2. Auf die Stelle der Karte tippen, an der die Person gefunden wurde. Der Marker erscheint, auch
+   wenn die Ebene „Betroffene“ ausgeschaltet ist, und die Karte meldet „R-… verortet“.
+3. „Zurück zu R-…“ wählen. Die Seite der Person zeigt die neue Koordinate. „Auf der Karte
+   bleiben“ lässt die Karte offen.
+
+Ein erneutes Verorten setzt den Fundort neu und läuft genauso
+([Lagekarte, Zeichnen und Messen](lagekarte.md)).
 
 ### Eine vermisste Person melden und abgleichen
 
@@ -112,7 +150,11 @@ hin und bietet „Auf „verstorben“ setzen“ an. Vermisste und abgemeldete P
 sichten.
 
 Die Sichtungskategorien und ihre Farben: SK I akut (rot), SK II schwer (gelb), SK III leicht
-(grün), SK IV abwartend (blau), tot (schwarz), unverletzt (ohne Farbe).
+(grün), SK IV abwartend (blau), tot (schwarz), unverletzt (ohne Farbe). Bei der Wahl ist jede
+Kategorie eine eigene Farbfläche mit Kürzel und Bedeutungswort. Die gewählte trägt ein Häkchen und
+einen kräftigen Rahmen, die übrigen treten zurück und zeigen ihre Farbe nur noch als Streifen am
+Rand. So ist die Wahl auch ohne Farbe zu erkennen. Jede Fläche ist mindestens 72 px hoch, auch in
+der kompakten Darstellung.
 
 Wird eine Person mit SK I erfasst oder auf SK I hochgestuft, auch bei ihrer ersten Sichtung,
 bekommen alle im Einsatz, die das Modul „Betroffene“ lesen, den Hinweis „Sichtung I“ mit der
@@ -125,8 +167,16 @@ Herabstufung und das Bearbeiten der Angaben bleiben still.
 ### Offene Felder
 
 Als Lücke zählt nur, wer angetroffen wurde (erfasst, betroffen, verstorben). Ohne Verbleib heißt:
-weder ein Verbleib noch eine Unfallhilfsstelle. Ohne Fundort heißt: weder Antreffort noch
-Koordinate. Solche Zeilen sind in der Liste markiert.
+weder ein Verbleib noch eine Unfallhilfsstelle. Ohne Fundort heißt: weder eine Ortsangabe noch
+eine Koordinate. Solche Zeilen sind in der Liste markiert.
+
+### Arbeiten in der Liste
+
+Solange die Sichtungswahl, das Menü einer Zeile oder ein Dialog aus der Zeile offen ist, rücken
+neu eintreffende Personen nicht in die Liste, und die Reihenfolge bleibt; ein Band über der Liste
+nennt sie („1 neuer Eintrag — anzeigen“). So springt keine Zeile unter dem Finger weg. Wird eine
+Sichtung aus der Liste abgelehnt, steht der Grund an der Zeile; ist die Zeile gerade nicht zu
+sehen, über der Liste.
 
 ### Unfallhilfsstelle und Verbleib
 
@@ -136,14 +186,15 @@ Wartebereich ([Unfallhilfsstellen](unfallhilfsstellen.md)). Ein Verbleib „Tran
 der Status „verstorben“ oder „abgemeldet“ und das Stornieren.
 
 Eine Person mit Verbleib „Notunterkunft“ in einer Betreuungsstelle zählt dort unter „davon
-namentlich“ ([Betreuung und Evakuierung](betreuung.md)). Tiere und Schäden lassen sich einer
-Person auf ihrer Seite zuordnen („Tier zuweisen“, „Schaden zuweisen“).
+namentlich“ ([Betreuung und Evakuierung](betreuung.md)). Zur Wahl unter „Bezug hinzufügen“ stehen
+nur freie Tiere (ohne Halter) und Schäden ohne Geschädigte, die nicht abgeschlossen sind; ein
+fremder Bezug wird nie still überschrieben.
 
 ### Einsatztagebuch und Zugriffsprotokoll
 
 Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „Person R-… erfasst“,
-„Person R-…: Sichtung SK …“, Statuswechsel und Stornierungen. Die „Verlaufsnotiz“ auf der Seite
-der Person ist nicht änderbar und erscheint nicht im Einsatztagebuch.
+„Person R-…: Sichtung SK …“, Statuswechsel und Stornierungen. Die Notiz im Patientenkopf ist
+nicht änderbar und erscheint nicht im Einsatztagebuch.
 
 Jedes Öffnen der Seite einer Person wird protokolliert, ebenso der CSV-Export und der Druck der
 Liste. Die Einsatzleitung sieht das Protokoll unter „Listenzugriffe“ im Kopf der Liste und unter
@@ -153,7 +204,10 @@ Liste. Die Einsatzleitung sieht das Protokoll unter „Listenzugriffe“ im Kopf
 
 Erfassen und ändern dürfen Einsatzleitung und Führungspersonal eines laufenden Einsatzes
 ([Rechte im Einsatz](rechte-im-einsatz.md)). Einen Vermisstenabgleich bestätigen oder verwerfen
-darf nur die Einsatzleitung.
+darf nur die Einsatzleitung. Wer nicht schreiben darf, sieht über der Liste „Nur Ansicht“ mit dem
+Grund („nur Einsatzleitung und Führungspersonal“ bzw. „Einsatz abgeschlossen“); Sichtungswahl,
+„Verbleib erfassen“ und das Menü der Zeilen fehlen dann. Am UHS-Gerät lässt sich aus der Liste
+sichten, aber nicht verorten ([UHS-Tablet und UHS-Laptop](geraet-uhs.md)).
 
 ### Ohne Netz
 

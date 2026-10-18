@@ -568,7 +568,7 @@ pub async fn schwaerzen(
     if let Some((_, wessen)) = stamm {
         inhalt.push_str(&format!(
             "; dazu der Personenstamm {wessen} (Name, Vorname, Geschlecht, Geburtsdatum, \
-             geschätztes Alter, Antreffort, Personennotiz, Verbleib)"
+             geschätztes Alter, Fundort, Personennotiz, Verbleib)"
         ));
     }
     inhalt.push_str(

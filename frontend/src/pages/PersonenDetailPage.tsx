@@ -1,8 +1,7 @@
 import { useRollen } from '../components/instrument/rollenwerte';
-import { Datenfeld, Datenraster } from '../components/instrument';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
-import { abgleichStatus, bezugsDarstellung } from '../theme/statusFarben';
+import { abgleichStatus } from '../theme/statusFarben';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import {
@@ -10,14 +9,12 @@ import {
   App,
   Breadcrumb,
   Button,
-  Col,
   Collapse,
   Flex,
   Form,
   Input,
   InputNumber,
   Modal,
-  Row,
   Space,
   Spin,
   Tag,
@@ -27,7 +24,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -41,22 +38,15 @@ import {
   entscheideAbgleich,
   ladePerson,
   ladePersonAudit,
-  legeNotizAn,
   registrierAnzeige,
   setzePersonStatus,
   stornierePerson,
   type PersonEingabe,
 } from '../api/einsatzPerson';
-import { listeTiere, tierRegistrierAnzeige, aktualisiereTier } from '../api/einsatzTier';
-import {
-  listeSchaeden,
-  schadenRegistrierAnzeige,
-  aktualisiereSchaden,
-} from '../api/einsatzSchaden';
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META, istPatient } from '../personen/personMeta';
+import { STATUS_META } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
@@ -64,29 +54,13 @@ import { ZUGRIFF_SPALTEN } from '../personen/zugriffSpalten';
 import { ANHAENGE_TITEL } from '../components/erfassungsAnhaenge/ErfassungsAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
-import VerbleibErfassung from '../personen/VerbleibErfassung';
-import SichtungDialog from '../personen/SichtungDialog';
-import {
-  SchadenZuweisenDialog,
-  TierZuweisenDialog,
-  UhsZuweisenDialog,
-} from '../personen/ZuweisungsDialoge';
-import { SPEZIES_META } from './tiere/tierHelfer';
+import Patientenkopf from '../personen/Patientenkopf';
+import PersonBezuege from '../personen/PersonBezuege';
+import StammdatenRaster, { type StammdatenAngabe } from '../personen/StammdatenRaster';
+import { UhsZuweisenDialog } from '../personen/ZuweisungsDialoge';
 import KatalogTabelle from '../components/KatalogTabelle';
-import type {
-  Person,
-  PersonDetail,
-  PersonStatus,
-  PersonZugriff,
-  Schaden,
-  Tier,
-} from '../api/types';
-import {
-  lagekartePfad,
-  parseRouteId,
-  schadenDetailPfad,
-  tiereDetailPfad,
-} from '../routing/deeplinks';
+import type { Person, PersonDetail, PersonStatus, PersonZugriff } from '../api/types';
+import { lagekartePfad, parseRouteId } from '../routing/deeplinks';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { koordinatenText } from '../personen/koordinate';
@@ -105,7 +79,6 @@ import {
   type ZeilenGrund,
 } from '../components/useZeilenFehler';
 import { registrierNummer } from '../anzeige/registrierNummer';
-import { KennungsLink } from '../components/kennungsLink';
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: PersonStatus): PersonStatus[] {
@@ -137,7 +110,7 @@ const IRREVERSIBEL: PersonStatus[] = ['verstorben'];
  */
 type Kopfaktion =
   | {
-      art: 'sichten' | 'verbleib' | 'bearbeiten' | 'stornieren';
+      art: 'bearbeiten' | 'stornieren';
       key: string;
       label: string;
       /** Rot und hinter dem einen Trenner des Menüs (`components/MenueAusloeser.tsx`). */
@@ -150,50 +123,6 @@ type Kopfaktion =
       status: PersonStatus;
       gefahr?: true;
     };
-
-interface StammdatenAngabe {
-  label: string;
-  /** `null`/leer = ohne Angabe; landet in der Zeile „Ohne Angabe", nicht als Strich im Raster. */
-  wert: ReactNode;
-  mono?: boolean;
-  breit?: boolean;
-}
-
-function leer(wert: ReactNode): boolean {
-  return wert == null || wert === false || (typeof wert === 'string' && wert.trim() === '');
-}
-
-/**
- * Stammdaten als `Datenraster` (LFH-963, design.md D8): nur gesetzte Angaben als Feld, die leeren
- * in EINER Zeile darunter. Eine Spalte voller Striche läse sich am Handy als Inhalt und schöbe die
- * gesetzten Angaben aus dem Bild.
- */
-function StammdatenRaster({ angaben }: { angaben: readonly StammdatenAngabe[] }) {
-  const gesetzt = angaben.filter((a) => !leer(a.wert));
-  const ohne = angaben.filter((a) => leer(a.wert)).map((a) => a.label);
-  return (
-    <div>
-      {gesetzt.length > 0 && (
-        <Datenraster spalten={2} beschriftung="Stammdaten">
-          {gesetzt.map((a) => (
-            <Datenfeld key={a.label} label={a.label} mono={a.mono} breit={a.breit}>
-              {a.wert}
-            </Datenfeld>
-          ))}
-        </Datenraster>
-      )}
-      {ohne.length > 0 && (
-        <Typography.Paragraph
-          type="secondary"
-          data-lfh="ohne-angabe"
-          style={{ marginTop: 8, marginBottom: 0 }}
-        >
-          Ohne Angabe: {ohne.join(', ')}
-        </Typography.Paragraph>
-      )}
-    </div>
-  );
-}
 
 export default function PersonenDetailPage() {
   const { token, rollen } = useRollen();
@@ -222,9 +151,6 @@ export default function PersonenDetailPage() {
    */
   const statusFehler = useZeilenFehler<string>();
   const statusSchluessel = (eid: number, pid: number) => `${eid}:${pid}`;
-  // Schlüssel ist die Kennung (T-007, S-009): sie nennt die Zeile auch, wenn sie fort ist.
-  const tierFehler = useZeilenFehler<string>();
-  const schadenFehler = useZeilenFehler<string>();
   const abgleichFehler = useZeilenFehler<number>();
   /*
    * Eine Zeilenaktion gehört der Person, an der sie begann (`person` in den Variablen): die Route
@@ -262,36 +188,21 @@ export default function PersonenDetailPage() {
     retry: false,
   });
   /**
-   * Ladehoheit: die vier Abfragen unten hängen am aufgeklappten Abschnitt, nicht am Öffnen der
-   * Seite. Beim Öffnen laufen nur Einsatz und Detail; der medizinische Verlauf ist Teil des
-   * Detail-Abrufs.
+   * Ladehoheit: Bezüge, Fotos und Dateien und das Audit hängen am aufgeklappten Abschnitt, nicht am
+   * Öffnen der Seite. Beim Öffnen laufen nur Einsatz und Detail; Verlauf und Aufenthalt (UHS- und
+   * Platzname, LLH-1129) sind Teil des Detail-Abrufs.
    */
-  const [zuordnungenOffen, setZuordnungenOffen] = useState(false);
+  const [bezuegeOffen, setBezuegeOffen] = useState(false);
   const [auditOffen, setAuditOffen] = useState(false);
-  /** LFH-757: die Anhangliste lädt erst mit ihrem Abschnitt (Ladehoheit wie Zuordnungen). */
+  /** LFH-757: die Anhangliste lädt erst mit ihrem Abschnitt (Ladehoheit wie die Bezüge). */
   const [anhaengeOffen, setAnhaengeOffen] = useState(false);
   const [uhsModalOffen, setUhsModalOffen] = useState(false);
 
-  const tiereDerPersonQuery = useQuery({
-    queryKey: einsatzKeys.tiereHalter(einsatzId, personId),
-    queryFn: () => listeTiere(einsatzId, { halterPersonId: personId }),
-    enabled: idGueltig && zuordnungenOffen,
-  });
-  const schaedenDerPersonQuery = useQuery({
-    queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId),
-    queryFn: () =>
-      listeSchaeden(einsatzId, { geschaedigtPersonId: personId, inklStorniert: false }),
-    enabled: idGueltig && zuordnungenOffen,
-  });
-  /**
-   * UHS-Liste für die Klartext-Anzeige der Verortung und den Zuweisungs-Picker. Hängt allein am
-   * aufgeklappten Abschnitt: beide Auslöser des Dialogs stehen innerhalb des Abschnitts, er kann
-   * also nur offen sein, während der Abschnitt es ist.
-   */
+  /** UHS-Liste nur für den Dialog „In UHS aufnehmen“/„Verlegen“ — die Namen liefert das Detail. */
   const uhsListeQuery = useQuery({
     queryKey: einsatzKeys.uhs(einsatzId),
     queryFn: () => listeUhs(einsatzId),
-    enabled: idGueltig && zuordnungenOffen,
+    enabled: idGueltig && uhsModalOffen,
   });
   const auditQuery = useQuery({
     queryKey: einsatzKeys.personAudit(einsatzId, personId),
@@ -425,22 +336,6 @@ export default function PersonenDetailPage() {
   const [statusDialog, setStatusDialog] = useState<PersonStatus | null>(null);
   const [stornoOffen, setStornoOffen] = useState(false);
 
-  // Sichtung (Dialog in `personen/SichtungDialog.tsx`)
-  const [reSichtenOffen, setReSichtenOffen] = useState(false);
-
-  // Verlaufsnotiz
-  const [notizForm] = Form.useForm<{ text: string }>();
-  const notizMutation = useMutation({
-    mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, v.text),
-    onSuccess: () => {
-      invalidateDetail();
-      notizForm.resetFields();
-    },
-  });
-
-  // Verbleib (Dialog in `personen/VerbleibErfassung.tsx`)
-  const [verbleibOffen, setVerbleibOffen] = useState(false);
-
   // UHS-Zuweisung (Dialog in `personen/ZuweisungsDialoge.tsx`). Austragen = austritt.
   function invalidateUhs() {
     invalidateDetail();
@@ -449,36 +344,6 @@ export default function PersonenDetailPage() {
   const austrittMutation = useMutation({
     mutationFn: () => aenderePersonBelegung(einsatzId, personId, { art: 'austritt' }),
     onSuccess: invalidateUhs,
-  });
-
-  // Tiere (Halter) / Schäden (Geschädigte) von der Personen-Seite zuweisen und lösen. Die
-  // Zuweisungsdialoge (Picker-Listen, XOR-Leerung) stehen in `personen/ZuweisungsDialoge.tsx`.
-  const [tierModalOffen, setTierModalOffen] = useState(false);
-  const [schadenModalOffen, setSchadenModalOffen] = useState(false);
-  function invalidateZuordnung() {
-    invalidateDetail();
-    qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.schaeden(einsatzId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.tiereHalter(einsatzId, personId) });
-    qc.invalidateQueries({ queryKey: einsatzKeys.schaedenGeschaedigt(einsatzId, personId) });
-  }
-  const tierLoesenMut = useMutation({
-    mutationFn: (v: { id: number; kennung: string; person: string }) =>
-      aktualisiereTier(einsatzId, v.id, { halter_person_id: null }),
-    onMutate: (v) => tierFehler.beginne(v.kennung),
-    onSuccess: invalidateZuordnung,
-    onError: (e, v) => {
-      if (nochDa(v.person)) tierFehler.melde(v.kennung, e, 'Lösen fehlgeschlagen');
-    },
-  });
-  const schadenLoesenMut = useMutation({
-    mutationFn: (v: { id: number; kennung: string; person: string }) =>
-      aktualisiereSchaden(einsatzId, v.id, { geschaedigt_person_id: null }),
-    onMutate: (v) => schadenFehler.beginne(v.kennung),
-    onSuccess: invalidateZuordnung,
-    onError: (e, v) => {
-      if (nochDa(v.person)) schadenFehler.melde(v.kennung, e, 'Lösen fehlgeschlagen');
-    },
   });
 
   const abgleichEntscheidenMutation = useMutation({
@@ -500,41 +365,23 @@ export default function PersonenDetailPage() {
    * Route, kein `key`) räumt sie. Erst beim Wechsel, nicht beim Einhängen: das Notizformular hängt
    * dann noch nicht, und `resetFields` warnte über eine unverbundene Form.
    */
-  const { leere: leereTiere } = tierFehler;
-  const { leere: leereSchaeden } = schadenFehler;
   const { leere: leereAbgleiche } = abgleichFehler;
   const { reset: editReset } = editMutation;
   const { reset: stornoReset } = stornoMutation;
-  const { reset: notizReset } = notizMutation;
   const { reset: austrittReset } = austrittMutation;
   const { beende: beendeEdit } = editSitzung;
   const vorigePerson = useRef(personSchluessel);
   useEffect(() => {
     if (vorigePerson.current === personSchluessel) return;
     vorigePerson.current = personSchluessel;
-    leereTiere();
-    leereSchaeden();
     leereAbgleiche();
     editReset();
     stornoReset();
-    notizReset();
     austrittReset();
     beendeEdit();
-    notizForm.resetFields();
-  }, [
-    personSchluessel,
-    leereTiere,
-    leereSchaeden,
-    leereAbgleiche,
-    editReset,
-    stornoReset,
-    notizReset,
-    austrittReset,
-    beendeEdit,
-    notizForm,
-  ]);
+  }, [personSchluessel, leereAbgleiche, editReset, stornoReset, austrittReset, beendeEdit]);
 
-  // Die Blöcke „Zugeordnete Tiere/Schäden" hält der Einsatz-Live-Stream im EinsatzLayout aktuell:
+  // Die Bezüge (`personen/PersonBezuege.tsx`) hält der Einsatz-Live-Stream im EinsatzLayout aktuell:
   // `tier`→'einsatz-tiere', `schaden`→'einsatz-schaeden'. Der Prefix-Match deckt die Keys
   // ['einsatz-tiere', …, 'halter', personId] bzw. ['einsatz-schaeden', …, 'geschaedigt', personId]
   // mit ab.
@@ -575,21 +422,13 @@ export default function PersonenDetailPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const darfZuordnen = darfSchreiben && !p.storniert_at;
 
-  function medSpalte(person: PersonDetail) {
+  /**
+   * Unter dem Patientenkopf: der Hinweis auf eine Sichtung „tot“ ohne passenden Status, der Verlauf
+   * und der Vermisstenabgleich. Sichten, Verbleib und Notiz stehen im Kopf (LLH-1094).
+   */
+  function verlaufBlock(person: PersonDetail) {
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
-        <Space wrap>
-          {istPatient(person) && <Tag>Patient</Tag>}
-          {person.aktuelle_sichtung ? (
-            <SichtungsTag kategorie={person.aktuelle_sichtung} />
-          ) : (
-            <Tag>ungesichtet</Tag>
-          )}
-          {person.aktueller_verbleib && <Tag>{person.aktueller_verbleib}</Tag>}
-        </Space>
-        {/* „Re-Sichten" und „Verbleib erfassen" stehen in der Kopfleiste (eine als
-            Primäraktion, die andere im Menü); zwei Wege zu derselben Aktion wären ein
-            Unterschied ohne Bedeutung. */}
         {darfSchreiben && person.aktuelle_sichtung === 'tot' && person.status !== 'verstorben' && (
           <Alert
             type="warning"
@@ -621,31 +460,12 @@ export default function PersonenDetailPage() {
             }
           />
         )}
-        {darfSchreiben && !person.storniert_at && (
-          <Form form={notizForm} layout="vertical" onFinish={notizMutation.mutate}>
-            <Form.Item
-              label="Verlaufsnotiz (nicht änderbar, erscheint nicht im ETB)"
-              name="text"
-              rules={[{ required: true, message: 'Bitte Text eingeben' }]}
-            >
-              <Input.TextArea rows={2} />
-            </Form.Item>
-            {notizMutation.error != null && (
-              <div style={{ marginBottom: token.marginSM }}>
-                <SpeicherFehler fehler={notizMutation.error} titel="Notiz nicht angelegt" />
-              </div>
-            )}
-            <Button type="primary" htmlType="submit" loading={notizMutation.isPending}>
-              Notiz anlegen
-            </Button>
-          </Form>
-        )}
         <div>
           <Typography.Text
             type="secondary"
             style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
           >
-            Medizinischer Verlauf
+            Verlauf
           </Typography.Text>
           <PersonVerlauf person={person} />
         </div>
@@ -730,8 +550,8 @@ export default function PersonenDetailPage() {
       { label: 'Geburtsdatum', wert: person.geburtsdatum, mono: true },
       { label: 'Alter (geschätzt)', wert: person.alter_geschaetzt, mono: true },
       { label: 'Herkunft / Adresse', wert: person.herkunft_adresse, breit: true },
-      ...(angetroffen || person.zustand ? [{ label: 'Zustand', wert: person.zustand }] : []),
-      { label: 'Antreffort', wert: person.antreff_ort },
+      // „Zustand / Verdacht“ steht im Patientenkopf (LLH-1094), nicht doppelt hier.
+      { label: 'Fundort', wert: person.antreff_ort },
       ...(angetroffen || koordinate
         ? [
             {
@@ -757,7 +577,8 @@ export default function PersonenDetailPage() {
                       // handgebauten Bedienziels trägt `verortenLinkStil`.
                       <Link
                         to={lagekartePfad(einsatzId, {
-                          platzieren: { typ: 'person', id: person.id },
+                          // Mit Herkunft: „Zurück zu R-…“ führt danach hierher (LLH-1125).
+                          platzieren: { typ: 'person', id: person.id, zurueck: true },
                         })}
                         style={verortenLinkStil(token, rollen.bedienText)}
                       >
@@ -838,11 +659,11 @@ export default function PersonenDetailPage() {
             {/* Zustand und Koordinate beschreiben eine angetroffene Person — wie in
                 `AufnahmeFelder` bekommt eine vermisste sie nicht angeboten. */}
             {angetroffen && (
-              <Form.Item label="Zustand" name="zustand">
+              <Form.Item label="Zustand / Verdacht" name="zustand">
                 <Input placeholder="z. B. gehfähig, unterkühlt" />
               </Form.Item>
             )}
-            <Form.Item label="Antreffort" name="antreff_ort">
+            <Form.Item label="Fundort" name="antreff_ort">
               <Input />
             </Form.Item>
             {angetroffen && <KoordinateFeld />}
@@ -878,182 +699,36 @@ export default function PersonenDetailPage() {
           <StammdatenRaster angaben={stammdatenAngaben(person, angetroffen)} />
         )}
 
-        {/* Zuordnungen, Fotos und Dateien und Audit laden erst beim Aufklappen; Kopf und
-            medizinischer Verlauf kommen aus demselben Detail-Abruf und stehen sofort.
+        {/* Bezüge, Fotos und Dateien und Audit laden erst beim Aufklappen; Patientenkopf und
+            Verlauf kommen aus demselben Detail-Abruf und stehen sofort.
 
             Kein `forceRender`: mit ihm stünden die Panels im Baum, und „erst beim Aufklappen"
-            wäre nicht von „immer da" zu unterscheiden.
-
-            Die UHS-Verortung steht mit im Panel, obwohl `aktuelle_uhs_id` aus dem Detail kommt:
-            nur der Klartext-Name braucht die UHS-Liste, und dafür gibt es den Rückfallwert `UHS
-            #id`. */}
+            wäre nicht von „immer da" zu unterscheiden. */}
         <Collapse
           ghost
           activeKey={[
-            ...(zuordnungenOffen ? ['zuordnungen'] : []),
+            ...(bezuegeOffen ? ['bezuege'] : []),
             ...(anhaengeOffen ? ['anhaenge'] : []),
             ...(auditOffen ? ['audit'] : []),
           ]}
           onChange={(offen: string | string[]) => {
             const schluessel = Array.isArray(offen) ? offen : [offen];
-            setZuordnungenOffen(schluessel.includes('zuordnungen'));
+            setBezuegeOffen(schluessel.includes('bezuege'));
             setAnhaengeOffen(schluessel.includes('anhaenge'));
             setAuditOffen(schluessel.includes('audit'));
           }}
           items={[
             {
-              key: 'zuordnungen',
-              label: 'Zuordnungen (Tiere, Schäden, UHS)',
+              key: 'bezuege',
+              label: 'Bezüge',
               children: (
-                <Space orientation="vertical" style={{ width: '100%' }} size="large">
-                  <div>
-                    <Space wrap>
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
-                      >
-                        Zugeordnete Tiere
-                      </Typography.Text>
-                      {darfZuordnen && (
-                        <Button onClick={() => setTierModalOffen(true)}>Tier zuweisen</Button>
-                      )}
-                    </Space>
-                    {(tiereDerPersonQuery.data?.length ?? 0) === 0 ? (
-                      <div>
-                        <Typography.Text type="secondary">keine</Typography.Text>
-                      </div>
-                    ) : (
-                      <Space wrap style={{ marginTop: 4 }}>
-                        {(tiereDerPersonQuery.data ?? []).map((t: Tier) => (
-                          <Space key={t.id} size={4} data-lfh="zuordnung">
-                            <Tag
-                              style={{ cursor: 'pointer' }}
-                              onClick={() => navigate(tiereDetailPfad(einsatzId, t.id))}
-                            >
-                              {tierRegistrierAnzeige(t.registrier_nr)}{' '}
-                              {SPEZIES_META[t.spezies] ?? t.spezies}
-                              {t.rufname ? ` „${t.rufname}"` : ''}
-                            </Tag>
-                            {darfZuordnen && (
-                              <Button
-                                type="text"
-                                onClick={() =>
-                                  tierLoesenMut.mutate({
-                                    id: t.id,
-                                    kennung: tierRegistrierAnzeige(t.registrier_nr),
-                                    person: personSchluessel,
-                                  })
-                                }
-                              >
-                                lösen
-                              </Button>
-                            )}
-                            {zeilenGrund(tierFehler.grund(tierRegistrierAnzeige(t.registrier_nr)))}
-                          </Space>
-                        ))}
-                      </Space>
-                    )}
-                  </div>
-
-                  <div>
-                    <Space wrap>
-                      <Typography.Text
-                        type="secondary"
-                        style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
-                      >
-                        Als Geschädigte bei Schäden
-                      </Typography.Text>
-                      {darfZuordnen && (
-                        <Button onClick={() => setSchadenModalOffen(true)}>Schaden zuweisen</Button>
-                      )}
-                    </Space>
-                    {(schaedenDerPersonQuery.data?.length ?? 0) === 0 ? (
-                      <div>
-                        <Typography.Text type="secondary">keine</Typography.Text>
-                      </div>
-                    ) : (
-                      <Space wrap style={{ marginTop: 4 }}>
-                        {(schaedenDerPersonQuery.data ?? []).map((sch: Schaden) => (
-                          <Space key={sch.id} size={4} data-lfh="zuordnung">
-                            <KennungsLink to={schadenDetailPfad(einsatzId, sch.id)}>
-                              <Tag style={{ cursor: 'pointer' }}>
-                                {schadenRegistrierAnzeige(sch.registrier_nr)} {sch.typ} (
-                                {sch.ausmass}) — {sch.status}
-                              </Tag>
-                            </KennungsLink>
-                            {darfZuordnen && (
-                              <Button
-                                type="text"
-                                onClick={() =>
-                                  schadenLoesenMut.mutate({
-                                    id: sch.id,
-                                    kennung: schadenRegistrierAnzeige(sch.registrier_nr),
-                                    person: personSchluessel,
-                                  })
-                                }
-                              >
-                                lösen
-                              </Button>
-                            )}
-                            {zeilenGrund(
-                              schadenFehler.grund(schadenRegistrierAnzeige(sch.registrier_nr)),
-                            )}
-                          </Space>
-                        ))}
-                      </Space>
-                    )}
-                  </div>
-
-                  <div data-lfh="uhs-verortung">
-                    <Typography.Text
-                      type="secondary"
-                      style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
-                    >
-                      UHS-Verortung
-                    </Typography.Text>
-                    <div style={{ marginTop: 4 }}>
-                      {person.aktuelle_uhs_id != null ? (
-                        // `size="middle"`: eine Aktionsreihe mit einem `danger`-Knopf und weiterer
-                        // Aktion trägt mindestens `token.marginSM` Abstand — antds Vorgabe liegt
-                        // darunter.
-                        <Space wrap size="middle">
-                          <StatusTag
-                            darstellung={bezugsDarstellung(
-                              uhsListeQuery.data?.find((u) => u.id === person.aktuelle_uhs_id)
-                                ?.bezeichnung ?? `UHS #${person.aktuelle_uhs_id}`,
-                            )}
-                          />
-                          {darfSchreiben && !person.storniert_at && (
-                            <>
-                              <Button onClick={() => setUhsModalOffen(true)}>UHS ändern</Button>
-                              <Button danger onClick={() => austrittMutation.mutate()}>
-                                Austragen
-                              </Button>
-                            </>
-                          )}
-                        </Space>
-                      ) : (
-                        <Space wrap>
-                          <Typography.Text type="secondary">keiner UHS zugewiesen</Typography.Text>
-                          {darfSchreiben && !person.storniert_at && !person.aktueller_verbleib && (
-                            <Button onClick={() => setUhsModalOffen(true)}>UHS zuweisen</Button>
-                          )}
-                        </Space>
-                      )}
-                    </div>
-                    {/* Unter beiden Zweigen: hat ein anderer schon ausgetragen, wechselt der
-                        Zweig. */}
-                    {austrittMutation.error != null && (
-                      <div style={{ marginTop: token.marginXS }}>
-                        <SpeicherFehler
-                          fehler={austrittMutation.error}
-                          titel="Nicht ausgetragen"
-                          fallback="Austragen fehlgeschlagen"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </Space>
+                // Am Personenwechsel neu: Gründe und offene Suche gehören zur Person.
+                <PersonBezuege
+                  key={personSchluessel}
+                  einsatzId={einsatzId}
+                  personId={person.id}
+                  darfZuordnen={darfZuordnen}
+                />
               ),
             },
             {
@@ -1091,7 +766,7 @@ export default function PersonenDetailPage() {
               : []),
           ].filter(
             (abschnitt) =>
-              (abschnitt.key !== 'zuordnungen' || darf('person-zuordnungen')) &&
+              (abschnitt.key !== 'bezuege' || darf('person-zuordnungen')) &&
               (abschnitt.key !== 'anhaenge' || darf('person-anhaenge')),
           )}
         />
@@ -1107,14 +782,6 @@ export default function PersonenDetailPage() {
   }
 
   function fuehreKopfaktionAus(aktion: Kopfaktion) {
-    if (aktion.art === 'sichten') {
-      setReSichtenOffen(true);
-      return;
-    }
-    if (aktion.art === 'verbleib') {
-      setVerbleibOffen(true);
-      return;
-    }
     if (aktion.art === 'bearbeiten') {
       starteBearbeiten();
       return;
@@ -1140,22 +807,12 @@ export default function PersonenDetailPage() {
    * Bearbeitung wird weder Primäraktion noch Menü-Auslöser gerendert — ein deaktivierter Auslöser
    * wäre ein Bedienziel, das nichts tut.
    *
-   * Die Primäraktion hängt an einer Frage: ist gesichtet worden? Nein → „Sichten". Ja → „Verbleib
-   * erfassen".
-   *
-   * 1. `aktuelle_sichtung: 'unverletzt'` ist nach `PATIENT_SK` kein Patient, bekommt aber „Verbleib
-   *    erfassen": Unverletzte werden entlassen oder verbleiben vor Ort, beides ist ein Verbleib.
-   * 2. Ein bereits erfasster Verbleib schaltet nicht weiter; „Bearbeiten" steht in beiden Fällen im
-   *    Menü.
+   * Sichten und Verbleib erfassen stehen im Patientenkopf (LLH-1094): zwei Wege zu derselben
+   * Handlung wären ein Unterschied ohne Bedeutung. Der Kopf trägt „Bearbeiten“ (bis LLH-1103 die
+   * Felder einzeln schreibt), das Menü Statuswechsel und Stornieren.
    */
   const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
     if (!darfSchreiben || p.storniert_at || editSitzung.sitzung) return null;
-    const sichten: Kopfaktion = {
-      art: 'sichten',
-      key: 'sichten',
-      label: p.aktuelle_sichtung ? 'Re-Sichten' : 'Sichten',
-    };
-    const verbleib: Kopfaktion = { art: 'verbleib', key: 'verbleib', label: 'Verbleib erfassen' };
     const bearbeiten: Kopfaktion = { art: 'bearbeiten', key: 'bearbeiten', label: 'Bearbeiten' };
     // Status und Storno bleiben am Gerät aus; der Server lehnt sie dort ab (LFH-892).
     const statusFrei = darf('person-status');
@@ -1172,17 +829,10 @@ export default function PersonenDetailPage() {
       label: 'Stornieren',
       gefahr: true,
     };
-
-    // An der Betreuungsstelle wird nicht gesichtet (LFH-1041); dort führt der Verbleib.
-    const sichtungFrei = darf('person-sichtung');
-    const primaer = sichtungFrei && p.aktuelle_sichtung == null ? sichten : verbleib;
-    const uebrig = [
-      ...(sichtungFrei ? [primaer === sichten ? verbleib : sichten] : []),
-      bearbeiten,
-      ...statuswechsel,
-      ...(statusFrei ? [stornieren] : []),
-    ];
-    return { primaer, weitere: uebrig };
+    return {
+      primaer: bearbeiten,
+      weitere: [...statuswechsel, ...(statusFrei ? [stornieren] : [])],
+    };
   })();
 
   const laeuftStatus =
@@ -1195,12 +845,6 @@ export default function PersonenDetailPage() {
    * von Zeilen, die nicht mehr dastehen (etwa live von anderer Seite gelöst).
    */
   const statusGrund = statusFehler.grund(statusSchluessel(einsatzId, p.id));
-  const tierKennungen = new Set(
-    (tiereDerPersonQuery.data ?? []).map((t) => tierRegistrierAnzeige(t.registrier_nr)),
-  );
-  const schadenKennungen = new Set(
-    (schaedenDerPersonQuery.data ?? []).map((sch) => schadenRegistrierAnzeige(sch.registrier_nr)),
-  );
   const fort = <K,>(
     art: string,
     speicher: ZeilenFehlerSpeicher<K>,
@@ -1216,24 +860,48 @@ export default function PersonenDetailPage() {
       ? [{ schluessel: 'status', titel: 'Status nicht geändert', ...statusGrund }]
       : []),
     ...fort(
-      'tier',
-      tierFehler,
-      (k) => tierKennungen.has(k),
-      (k) => `Tier ${k} nicht gelöst`,
-    ),
-    ...fort(
-      'schaden',
-      schadenFehler,
-      (k) => schadenKennungen.has(k),
-      (k) => `Schaden ${k} nicht gelöst`,
-    ),
-    ...fort(
       'abgleich',
       abgleichFehler,
       (id) => p.abgleiche.some((a) => a.id === id),
       () => 'Abgleich nicht entschieden',
     ),
   ];
+
+  /**
+   * Handlungen am Aufenthalt im Patientenkopf (LLH-1129, Option A): „In UHS aufnehmen“ ohne UHS,
+   * sonst „Verlegen“ und „Austragen“. Nicht am Gerät (`person-zuordnungen`); der Aufenthalt bleibt
+   * dort lesbar. Der Grund eines gescheiterten Austragens steht darunter.
+   */
+  const aufenthaltBedienbar = darf('person-zuordnungen') && darfSchreiben && !p.storniert_at;
+  const aufenthaltAktionen = aufenthaltBedienbar && (
+    <>
+      {p.aktuelle_uhs_id != null ? (
+        // `size="middle"`: eine Aktionsreihe mit einem `danger`-Knopf und weiterer Aktion trägt
+        // mindestens `token.marginSM` Abstand.
+        <Space wrap size="middle">
+          <Button onClick={() => setUhsModalOffen(true)}>Verlegen</Button>
+          <Button
+            danger
+            loading={austrittMutation.isPending}
+            onClick={() => austrittMutation.mutate()}
+          >
+            Austragen
+          </Button>
+        </Space>
+      ) : (
+        !p.aktueller_verbleib && (
+          <Button onClick={() => setUhsModalOffen(true)}>In UHS aufnehmen</Button>
+        )
+      )}
+      {austrittMutation.error != null && (
+        <SpeicherFehler
+          fehler={austrittMutation.error}
+          titel="Nicht ausgetragen"
+          fallback="Austragen fehlgeschlagen"
+        />
+      )}
+    </>
+  );
 
   return (
     <EinsatzSeite
@@ -1252,13 +920,7 @@ export default function PersonenDetailPage() {
           </Flex>
         )
       }
-      dataUpdatedAt={gemeinsamerDatenstand(
-        detailQuery.dataUpdatedAt,
-        tiereDerPersonQuery.dataUpdatedAt,
-        schaedenDerPersonQuery.dataUpdatedAt,
-        uhsListeQuery.dataUpdatedAt,
-        auditQuery.dataUpdatedAt,
-      )}
+      dataUpdatedAt={gemeinsamerDatenstand(detailQuery.dataUpdatedAt, auditQuery.dataUpdatedAt)}
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
@@ -1287,44 +949,52 @@ export default function PersonenDetailPage() {
          */
         aktionenPlan && (
           <Space>
-            {/* Kein `loading`: die Primäraktion öffnet in jeder Gestalt nur einen Dialog. Der
-                laufende Statuswechsel sitzt im Menü und zeigt sich am Auslöser. */}
+            {/* Kein `loading`: die Primäraktion öffnet nur das Formular. Der laufende
+                Statuswechsel sitzt im Menü und zeigt sich am Auslöser. */}
             <Button type="primary" onClick={() => fuehreKopfaktionAus(aktionenPlan.primaer)}>
               {aktionenPlan.primaer.label}
             </Button>
-            <MenueAusloeser
-              eintraege={aktionenPlan.weitere}
-              laeuft={laeuftStatus}
-              // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
-              // gleichnamige Knöpfe kein Ziel.
-              zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
-              onWahl={(key) => {
-                const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
-                if (eintrag) fuehreKopfaktionAus(eintrag);
-              }}
-            />
+            {aktionenPlan.weitere.length > 0 && (
+              <MenueAusloeser
+                eintraege={aktionenPlan.weitere}
+                laeuft={laeuftStatus}
+                // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
+                // gleichnamige Knöpfe kein Ziel.
+                zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
+                onWahl={(key) => {
+                  const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+                  if (eintrag) fuehreKopfaktionAus(eintrag);
+                }}
+              />
+            )}
           </Space>
         )
       }
     >
-      {/* Unter `lg` steht die medizinische Spalte zuerst (LFH-963, design.md D8): am Handy und
-          am Tablet hoch ist Sichtung und Verlauf die erste Frage, die Stammdaten folgen. Ab
-          `lg` nebeneinander, Stammdaten links. `order` statt zweier Bäume: ein Formular im
-          Bearbeiten-Zweig darf nicht doppelt hängen. */}
-      <Row gutter={24}>
-        <Col xs={{ span: 24, order: 2 }} lg={{ span: 12, order: 1 }}>
+      {/* Eine Spalte (LLH-1094, Spec `personen-detail`): zuerst der Patientenkopf mit den
+          Patientenfragen, dann Verlauf, Personendaten und die eingeklappten Abschnitte. Ein Baum:
+          ein Formular im Bearbeiten-Zweig darf nicht doppelt hängen. */}
+      <Flex vertical gap={token.marginLG}>
+        <Patientenkopf
+          key={personSchluessel}
+          einsatzId={einsatzId}
+          person={p}
+          darfSchreiben={darfSchreiben}
+          darfSichten={darf('person-sichtung')}
+          aufenthaltAktionen={aufenthaltAktionen}
+          onGeschrieben={invalidateDetail}
+        />
+        {verlaufBlock(p)}
+        <div>
           <Typography.Text
             type="secondary"
             style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
           >
-            Stammdaten
+            Personendaten
           </Typography.Text>
           {stammdatenSpalte(p)}
-        </Col>
-        <Col xs={{ span: 24, order: 1 }} lg={{ span: 12, order: 2 }}>
-          {medSpalte(p)}
-        </Col>
-      </Row>
+        </div>
+      </Flex>
 
       {/* Beide Rückfragen warten auf die Antwort (design.md D3): sie schließen erst beim Erfolg,
           bis dahin sind ihre Auswege gesperrt, und eine Ablehnung steht in ihnen. */}
@@ -1394,23 +1064,6 @@ export default function PersonenDetailPage() {
         )}
       </Modal>
 
-      <SichtungDialog
-        einsatzId={einsatzId}
-        personId={personId}
-        offen={reSichtenOffen}
-        onErfasst={invalidateDetail}
-        onSchliessen={() => setReSichtenOffen(false)}
-      />
-
-      {verbleibOffen && (
-        <VerbleibErfassung
-          einsatzId={einsatzId}
-          personId={personId}
-          onErfasst={invalidateDetail}
-          onSchliessen={() => setVerbleibOffen(false)}
-        />
-      )}
-
       <UhsZuweisenDialog
         einsatzId={einsatzId}
         personId={personId}
@@ -1423,22 +1076,6 @@ export default function PersonenDetailPage() {
           invalidateUhs();
         }}
         onSchliessen={() => setUhsModalOffen(false)}
-      />
-
-      <TierZuweisenDialog
-        einsatzId={einsatzId}
-        personId={personId}
-        offen={tierModalOffen}
-        onZugewiesen={invalidateZuordnung}
-        onSchliessen={() => setTierModalOffen(false)}
-      />
-
-      <SchadenZuweisenDialog
-        einsatzId={einsatzId}
-        personId={personId}
-        offen={schadenModalOffen}
-        onZugewiesen={invalidateZuordnung}
-        onSchliessen={() => setSchadenModalOffen(false)}
       />
     </EinsatzSeite>
   );

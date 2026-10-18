@@ -35,7 +35,7 @@ Kategorie angehören.
 
 ### Requirement: Personenstamm folgt den Zwecken der Person
 
-Name, Vorname, Geschlecht, Geburtsdatum, geschätztes Alter, Antreffort samt Koordinate,
+Name, Vorname, Geschlecht, Geburtsdatum, geschätztes Alter, Fundort samt Koordinate,
 Personennotiz und Verbleib (Ziel, Transportmittel, Notiz; die Art bleibt als Statuskategorie)
 einer Person SHALL das System
 erst schwärzen, wenn alle Zwecke dieser Person geschwärzt sind. Eine Person mit

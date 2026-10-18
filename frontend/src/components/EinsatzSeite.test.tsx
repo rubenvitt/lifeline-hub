@@ -450,6 +450,37 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
    * Ein `position: sticky; bottom: 0` steigt nie über die Oberkante seines Elternblocks; als Kind
    * der Wurzel beginnt dieser mit dem Seitenkopf.
    */
+  it('stellt die Bereichsleiste in den Kopf über die Arbeitsfläche (LLH-1133)', () => {
+    const { container } = renderMitProviders(
+      <EinsatzSeite
+        titel="UHS Nord"
+        hinweis={<div data-testid="hinweis">Grund</div>}
+        bereiche={<div data-testid="bereiche">Belegung · Material</div>}
+        fensterInhalt={{ inhalt: <div data-testid="flaeche">Grundriss</div> }}
+      >
+        {null}
+      </EinsatzSeite>,
+    );
+    const bereiche = screen.getByTestId('bereiche');
+    const kopf = container.querySelector('[data-lfh="seitenkopf"]')!;
+    // Nach Kopf und Hinweis, vor der Arbeitsfläche: Teil dessen, was `FensterRahmen` als Kopf misst.
+    expect(kopf.compareDocumentPosition(bereiche) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      screen.getByTestId('hinweis').compareDocumentPosition(bereiche) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      bereiche.compareDocumentPosition(screen.getByTestId('flaeche')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Kopf und Leiste stehen im selben ersten Kind des Rahmens: der Rahmen misst beide.
+    const kopfteil = kopf.parentElement!;
+    expect(kopfteil.contains(bereiche)).toBe(true);
+    expect(kopfteil.contains(screen.getByTestId('flaeche'))).toBe(false);
+    // Endet die Seite mit der Arbeitsfläche, steht darunter keine leere Hülle.
+    expect(container.querySelector('[data-lfh="seiten-inhalt"]')).toBeNull();
+  });
+
   it('stellt einen Fuß als letztes Kind der Wurzel hinter den Inhalt', () => {
     const { container } = renderMitProviders(
       <EinsatzSeite titel="ETB" fuss={<div data-testid="fuss">Erfassung</div>}>

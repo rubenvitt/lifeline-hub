@@ -33,6 +33,17 @@ export function kurzVerbleib(v: Verbleib): string {
 // Kompatible Exportnamen; die Farbachsen liegen im Theme.
 export { sichtung as SK_META, personStatus as STATUS_META } from '../theme/statusFarben';
 
+/** Reihenfolge der Sichtungskategorien — Dringlichkeit zuerst, wie an der Aufnahme gesprochen.
+ *  Eine Quelle für Erfassung, Nachsichtung (`SichtungsWahl`) und Sortierungen (LLH-1083). */
+export const SK_REIHE: readonly Sichtungskategorie[] = [
+  'sk1',
+  'sk2',
+  'sk3',
+  'sk4',
+  'tot',
+  'unverletzt',
+];
+
 /**
  * Das Bedeutungswort je Sichtungskategorie für Legenden (BBK-Einteilung). Das Kürzel selbst
  * bleibt `SK_META[k].label` — dies ist der Beisatz.

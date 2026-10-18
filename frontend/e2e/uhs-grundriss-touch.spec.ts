@@ -1,5 +1,4 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { stehendeAuswahl } from './auswahl-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 /**
@@ -414,14 +413,12 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toContainText('Patient zuweisen');
-    await dialog.getByRole('combobox').tap();
-    const liste = await stehendeAuswahl(page);
-    await liste.locator('.ant-select-item-option').filter({ hasText: personName }).tap();
+    // Die Kandidaten stehen als Optionsknöpfe (LLH-1135); der Tipp wählt die Person.
+    const kandidat = dialog.getByRole('radio', { name: new RegExp(personName) });
+    await kandidat.tap();
     // Vorbedingung: ein verlorener Tipp wird hier rot, nicht erst an der leeren Karte.
-    await expect(dialog.locator('.ant-select-content')).toContainText(personName);
-    // „Erfassen" ist der Vorgabetext der Erfassungshülle. Auf den Dialog eingegrenzt, weil
-    // dieselbe Beschriftung auch an der Schnellerfassung hängt.
-    await dialog.getByRole('button', { name: 'Erfassen', exact: true }).tap();
+    await expect(kandidat).toBeChecked();
+    await dialog.getByRole('button', { name: 'Zuweisen', exact: true }).tap();
 
     await expect(bett1(page), 'der Klickweg hat zugewiesen').toContainText(personName);
 

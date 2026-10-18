@@ -1,18 +1,24 @@
 import StatusTag from '../components/StatusTag';
-import SichtungsTag from '../components/SichtungsTag';
-import { Descriptions, Space, Spin, Tag, Typography, theme } from 'antd';
+import { Space, Spin, Tag, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { ladePerson } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META, istPatient } from './personMeta';
+import { STATUS_META } from './personMeta';
+import Patientenkopf from './Patientenkopf';
 import PersonVerlauf from './PersonVerlauf';
+import StammdatenRaster from './StammdatenRaster';
 import { SeitenFehler } from '../components/SeitenZustand';
 
 /**
- * NUR-LESEN-Inhalt einer Person: Identität, Status, Sichtung und medizinischer Verlauf — ein
- * Bauteil für `PersonDetailDrawer` und die Vorschau der Sprungpalette. Der Rahmen bleibt beim
- * Aufrufer, das Bearbeiten bei der Personen-Seite.
- * Derselbe Query-Key wie Liste und Drawer-Titel (`einsatzKeys.person`): ein Cache-Fach.
+ * NUR-LESEN-Inhalt einer Person — ein Bauteil für `PersonDetailDrawer` (Personenmarke im
+ * UHS-Grundriss) und die Vorschau der Sprungpalette. Der Rahmen bleibt beim Aufrufer, das
+ * Bearbeiten bei der Personen-Seite.
+ *
+ * Oben die Patientenfragen aus dem Patientenkopf in der Lesefassung (LLH-1137, kein Nachbau):
+ * Sichtung mit Zeit, „Zustand / Verdacht“, Aufenthalt bzw. Verbleib, letzte Notiz. Darunter die
+ * Personendaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“ — kein
+ * `Descriptions` (`frontend/src/personen/AGENTS.md`, „Personen-Detail“). Derselbe Query-Key wie
+ * Liste und Drawer-Titel (`einsatzKeys.person`): ein Cache-Fach, ein Detail-GET je Öffnung.
  */
 export default function PersonVorschau({
   einsatzId,
@@ -42,40 +48,31 @@ export default function PersonVorschau({
         <Space orientation="vertical" style={{ width: '100%' }} size="large">
           <Space wrap>
             <StatusTag darstellung={STATUS_META[p.status]} />
-            {istPatient(p) && <Tag>Patient</Tag>}
-            {p.aktuelle_sichtung ? (
-              <SichtungsTag kategorie={p.aktuelle_sichtung} />
-            ) : (
-              <Tag>ungesichtet</Tag>
-            )}
-            {p.aktueller_verbleib && <Tag>{p.aktueller_verbleib}</Tag>}
             {p.storniert_at && <Tag color="default">storniert</Tag>}
           </Space>
 
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="Name">{p.name ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Vorname">{p.vorname ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Geschlecht">{p.geschlecht ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Geburtsdatum">{p.geburtsdatum ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Alter (geschätzt)">
-              {p.alter_geschaetzt ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Herkunft / Adresse">
-              {p.herkunft_adresse ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Antreffort">{p.antreff_ort ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="Melder / Kontakt">
-              {p.melder_kontakt ?? '—'}
-            </Descriptions.Item>
-            <Descriptions.Item label="Notiz">{p.notiz ?? '—'}</Descriptions.Item>
-          </Descriptions>
+          <Patientenkopf einsatzId={einsatzId} person={p} modus="lesen" />
+
+          <StammdatenRaster
+            angaben={[
+              { label: 'Name', wert: p.name },
+              { label: 'Vorname', wert: p.vorname },
+              { label: 'Geschlecht', wert: p.geschlecht },
+              { label: 'Geburtsdatum', wert: p.geburtsdatum, mono: true },
+              { label: 'Alter (geschätzt)', wert: p.alter_geschaetzt, mono: true },
+              { label: 'Herkunft / Adresse', wert: p.herkunft_adresse, breit: true },
+              { label: 'Fundort', wert: p.antreff_ort },
+              { label: 'Melder / Kontakt', wert: p.melder_kontakt, breit: true },
+              { label: 'Notiz', wert: p.notiz, breit: true },
+            ]}
+          />
 
           <div>
             <Typography.Text
               type="secondary"
               style={{ fontSize: token.fontSizeSM, textTransform: 'uppercase' }}
             >
-              Medizinischer Verlauf (neueste zuerst)
+              Verlauf (neueste zuerst)
             </Typography.Text>
             <div style={{ marginTop: token.marginXXS }}>
               <PersonVerlauf person={p} />

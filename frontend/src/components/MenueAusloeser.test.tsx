@@ -143,6 +143,47 @@ describe('MenueAusloeser', () => {
     expect(onWahl).toHaveBeenCalledWith('verschieben');
   });
 
+  describe('meldet offen und zu (Schleuse der Datensicht, LLH-1130)', () => {
+    it('meldet „auf“ beim Öffnen und „zu“, wenn das offene Menü live alle Einträge verliert', async () => {
+      const onOffenAenderung = vi.fn();
+      const { rerender } = renderMitProviders(
+        <MenueAusloeser
+          eintraege={DREI}
+          zugaenglicherName="Zeile 1"
+          onWahl={vi.fn()}
+          onOffenAenderung={onOffenAenderung}
+        />,
+      );
+      await oeffne('Zeile 1');
+      await waitFor(() => expect(onOffenAenderung).toHaveBeenLastCalledWith(true));
+
+      rerender(
+        <MenueAusloeser
+          eintraege={[]}
+          zugaenglicherName="Zeile 1"
+          onWahl={vi.fn()}
+          onOffenAenderung={onOffenAenderung}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Zeile 1' })).toBeNull();
+      await waitFor(() => expect(onOffenAenderung).toHaveBeenLastCalledWith(false));
+
+      // Kommen die Einträge wieder, steht das Menü zu und hält nichts.
+      onOffenAenderung.mockClear();
+      rerender(
+        <MenueAusloeser
+          eintraege={DREI}
+          zugaenglicherName="Zeile 1"
+          onWahl={vi.fn()}
+          onOffenAenderung={onOffenAenderung}
+        />,
+      );
+      expect(screen.getByRole('button', { name: 'Zeile 1' })).toBeEnabled();
+      expect(offenesMenue()).toBeNull();
+      expect(onOffenAenderung).not.toHaveBeenCalled();
+    });
+  });
+
   /**
    * PORTAL-AUFSTEIGEN (LFH-367/B5g). Das Menü liegt im DOM unter `document.body`, ein Synthetic
    * Event steigt aber durch den KOMPONENTENbaum auf: ein Klick ins Menü erreicht jeden Vorfahren

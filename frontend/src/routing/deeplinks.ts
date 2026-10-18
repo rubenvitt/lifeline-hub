@@ -58,8 +58,44 @@ function mitQuery(pfad: string, params: Record<string, string | number | undefin
 
 // ── Item-Routes (Vollseiten-Detail) ──────────────────────────────────────────
 
-export function uhsDetailPfad(einsatzId: number, uhsId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'unfallhilfsstellen')}/${uhsId}`;
+/**
+ * Bereiche der UHS-Detailseite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
+ * Bereiche“). Wie der Reiter bei {@link auftraegePfad} ist der Bereich ZUSTAND, kein Auftrag: er
+ * bleibt in der Adresse stehen, damit ein Link ihn direkt öffnet. Die Vorgabe „Belegung“ (der
+ * Grundriss) steht ohne Parameter.
+ */
+export type UhsBereich = 'belegung' | 'material' | 'kraefte' | 'bewegungen' | 'dateien';
+
+/** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
+const UHS_BEREICH_ERLAUBT: Record<UhsBereich, true> = {
+  belegung: true,
+  material: true,
+  kraefte: true,
+  bewegungen: true,
+  dateien: true,
+};
+
+/** Der Query-Teil eines Bereichs (`?bereich=material`), für die Vorgabe leer. */
+export function uhsBereichSuche(bereich: UhsBereich): string {
+  return mitQuery('', { bereich: bereich === 'belegung' ? undefined : bereich });
+}
+
+export function uhsDetailPfad(
+  einsatzId: number,
+  uhsId: number,
+  opts: { bereich?: UhsBereich } = {},
+): string {
+  return `${einsatzModulPfad(einsatzId, 'unfallhilfsstellen')}/${uhsId}${uhsBereichSuche(opts.bereich ?? 'belegung')}`;
+}
+
+/** Umkehr von {@link uhsBereichSuche}: ein unbekannter oder fehlender Wert ergibt die Belegung. */
+export function parseUhsBereich(params: URLSearchParams): UhsBereich {
+  const bereich = params.get('bereich');
+  return bereich &&
+    bereich !== 'belegung' &&
+    Object.prototype.hasOwnProperty.call(UHS_BEREICH_ERLAUBT, bereich)
+    ? (bereich as UhsBereich)
+    : 'belegung';
 }
 
 export function bereitstellungsraumDetailPfad(einsatzId: number, brId: number): string {
@@ -757,13 +793,14 @@ export function chatPfad(einsatzId: number, opts: { kanal?: number } = {}): stri
 
 /**
  * Vorbelegung der Nachforderungs-Erfassung (z. B. „Nachfordern" aus der Verpflegung). Keine
- * Personenangaben: nur Bezeichnungen und Zahlen.
+ * Personenangaben: nur Bezeichnungen und Zahlen. Bezeichnung und Anzahl dürfen fehlen
+ * („Fehlmenge melden“ an der UHS, LLH-1133): dann trägt die Person sie selbst ein.
  */
 export interface NachforderungVorbelegung {
   art: string;
-  bezeichnung: string;
+  bezeichnung?: string;
   /** Positive Ganzzahl. */
-  anzahl: number;
+  anzahl?: number;
   begruendung?: string;
 }
 
@@ -799,9 +836,11 @@ export const NACHFORDERUNG_VORBELEGUNG_PARAMS = [
 /**
  * Liest die Vorbelegung aus `?art=…&bezeichnung=…&anzahl=…&begruendung=…` zurück.
  *
- * Unbrauchbares wird GANZ verworfen: eine vorbelegte Erfassung ohne Fehlmenge forderte das
- * Falsche nach. `anzahl` muss eine positive Ganzzahl in Dezimalschreibweise sein (`Number()`
- * nähme auch `1e2`), `art` und `bezeichnung` nicht leer; `begruendung` ist optional.
+ * Unbrauchbares wird GANZ verworfen: eine falsch vorbelegte Fehlmenge forderte das Falsche nach.
+ * `art` ist Pflicht und nicht leer; eine gesetzte `anzahl` muss eine positive Ganzzahl in
+ * Dezimalschreibweise sein (`Number()` nähme auch `1e2`), eine gesetzte `bezeichnung` nicht leer.
+ * Fehlen beide, ist es eine Teil-Vorbelegung (LLH-1133): die Felder bleiben leer, und die Person
+ * füllt sie. `begruendung` ist optional.
  *
  * `neu` liest dieser Parser bewusst NICHT: ein `get('neu')`-Leser in dieser Datei wäre für
  * `schnellaktionen.guard.test.ts` keinem Modul zuordenbar.
@@ -810,13 +849,23 @@ export function parseNachforderungVorbelegung(
   params: URLSearchParams,
 ): NachforderungVorbelegung | null {
   const art = params.get('art')?.trim();
-  const bezeichnung = params.get('bezeichnung')?.trim();
+  if (!art) return null;
+  const vorbelegung: NachforderungVorbelegung = { art };
+  if (params.has('bezeichnung')) {
+    const bezeichnung = params.get('bezeichnung')?.trim();
+    if (!bezeichnung) return null;
+    vorbelegung.bezeichnung = bezeichnung;
+  }
   const roheAnzahl = params.get('anzahl');
-  if (!art || !bezeichnung || roheAnzahl == null || !/^[1-9]\d*$/.test(roheAnzahl)) return null;
-  const anzahl = Number(roheAnzahl);
-  if (!Number.isSafeInteger(anzahl)) return null;
+  if (roheAnzahl != null) {
+    if (!/^[1-9]\d*$/.test(roheAnzahl)) return null;
+    const anzahl = Number(roheAnzahl);
+    if (!Number.isSafeInteger(anzahl)) return null;
+    vorbelegung.anzahl = anzahl;
+  }
   const begruendung = params.get('begruendung')?.trim();
-  return begruendung ? { art, bezeichnung, anzahl, begruendung } : { art, bezeichnung, anzahl };
+  if (begruendung) vorbelegung.begruendung = begruendung;
+  return vorbelegung;
 }
 
 /**
@@ -873,7 +922,11 @@ export function lagekartePfad(
     gefahrengebiet?: number;
     ansicht?: number;
     snapshot?: number;
-    platzieren?: { typ: PlatzierenZielTyp; id: number };
+    /**
+     * `zurueck`: der Auftrag kommt von der Seite des Datensatzes, die Karte bietet danach „Zurück
+     * zu …“ an (LLH-1125). Das Ziel leitet `rueckwegPfad` aus Typ und Kennung ab.
+     */
+    platzieren?: { typ: PlatzierenZielTyp; id: number; zurueck?: boolean };
     zeichnen?: ZeichnenAuftrag;
     zentrum?: Kartenzentrum;
     /** Adresssuche (LFH-638): die Karte übernimmt den Text ins Suchfeld und sucht ihn. */
@@ -890,6 +943,8 @@ export function lagekartePfad(
     snapshot: opts.snapshot,
     // Platzier-Auftrag: der nächste Klick auf die Karte setzt die Koordinate dieses Objekts.
     platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
+    // Herkunft des Auftrags (LLH-1125): nur ein Merker, nie ein Pfad — kein offener Weiterleiter.
+    zurueck: opts.platzieren?.zurueck ? 1 : undefined,
     // Zeichnen-Auftrag (LFH-825): die Karte betritt den Zonen-Zeichenmodus dieses Typs und räumt.
     zeichnen: opts.zeichnen
       ? opts.zeichnen.form
@@ -935,7 +990,8 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * enger als der karteninterne `PlatzierenPunktTyp`. Wer erweitert, prüft
  * `pages/LagekartePage.tsx` mit.
  */
-type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
+export type PlatzierenZielTyp =
+  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -962,6 +1018,36 @@ export function parsePlatzierenAuftrag(
   if (!typ || !Object.prototype.hasOwnProperty.call(PLATZIEREN_ZIEL_ERLAUBT, typ)) return null;
   const id = parseRouteId(roheId);
   return id == null ? null : { typ: typ as PlatzierenZielTyp, id };
+}
+
+/**
+ * Liest den Merker `?zurueck=1` eines Verortungsauftrags (LLH-1125). Nur genau `1` zählt: der Wert
+ * ist nie ein Pfad oder eine Adresse, sonst wäre die Karte ein offener Weiterleiter.
+ */
+export function parseZurueck(wert: string | null | undefined): boolean {
+  return wert === '1';
+}
+
+/**
+ * Rückweg nach dem Verorten: die Seite, von der der Auftrag kam, allein aus Typ und Kennung
+ * (LLH-1125, Spec `lagekarte-verortungsauftrag`). Exhaustiv: ein neuer Zieltyp (etwa `tier`,
+ * LFH-1263) bricht den Typcheck, bis er hier sein Ziel bekommt.
+ */
+const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => string) | null> = {
+  person: personDetailPfad,
+  schaden: schadenDetailPfad,
+  // Keine Detailroute: die Betreuungsseite hebt die Stelle hervor (`?stelle=`).
+  betreuungsstelle: (einsatzId, id) => betreuungPfad(einsatzId, { stelle: id }),
+  bereitstellungsraum: bereitstellungsraumDetailPfad,
+  // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
+  // verortet, es gibt keine Seite, zu der man zurückwollte.
+  uhs: null,
+};
+
+export function rueckwegPfad(einsatzId: number, typ: PlatzierenZielTyp, id: number): string | null {
+  if (!Object.prototype.hasOwnProperty.call(RUECKWEG, typ)) return null;
+  const ziel = RUECKWEG[typ];
+  return ziel ? ziel(einsatzId, id) : null;
 }
 
 /**

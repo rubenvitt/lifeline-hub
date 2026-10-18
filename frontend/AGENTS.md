@@ -124,7 +124,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `bereitstellungsraum-belegung`): Fahrzeuge, Einheiten und längste Wartezeit nur aus `belegung`
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
   (`bereitstellungsraum/brZahlen.ts`); „noch n belegt“ vor dem Auflösen zählt wie
-  `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
+  `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Lage einer UHS (In der Stelle,
+  Plätze frei, Wartend, Abtransportiert; LLH-1136) nur über `pages/uhs/uhsLage.ts`, aus denselben
+  Mengen wie der Grundriss. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
 - **Eine Baumlogik der Kräfte: `kraefte/kraeftebaumKern.ts`** (LLH-1025, Spec `kraeftebaum`).
@@ -189,7 +191,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   (nicht Touch) in der Sicht hält Menge und Folge der Zeilen, im Baum auf jeder Ebene über
   `organigramm/baumSchleuse.ts` (keine zweite Baumlogik); Inhalt fließt, Entfallenes fällt sofort
   weg, der Sammelbanner nennt Neues, Umgehängtes und Umsortiertes. `zufluss="sofort"` nur für
-  Flächen ohne Bedienziel in den Zeilen.
+  Flächen ohne Bedienziel in den Zeilen. Ein offenes Popover, Menü oder Dialog einer Zeile hält
+  wie Fokus, auch ohne ihn (Touch): die Seite meldet es über `halten`
+  (`components/useHalteQuellen.ts`), `MenueAusloeser` über `onOffenAenderung`; Menüs des
+  Kartenfußs hält die Sicht selbst (LLH-1130).
 - **Eine geblätterte Liste nimmt den Servermodus der `Datensicht`** (LFH-1075, Prop
   `serverseitig`): Suche (entprellt) und Spaltenfilter gehen an den Server, die Sortierung
   kontrolliert; die Sicht filtert und sortiert nicht noch einmal. `stand` ist die Abfrage der
@@ -222,9 +227,13 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Fortschritt hat keine Oberfläche (LFH-1208): die Spalte trägt nur Altdaten, die Lage trägt der
   Lagezustand, den Arbeitsstand die offenen Aufträge.
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
-  `SichtungsTag`/`sichtungsfarben`, umrandetes Farbfeld, SK I rot, II gelb, III grün, IV blau,
-  Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
-  dunklem Grund sichtbar. **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
+  SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
+  als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem
+  und Schwarz auf dunklem Grund sichtbar. **Gewählt** wird als Vollfläche über
+  `personen/SichtungsWahl.tsx` aus der Flächenpalette `sichtungsflaechen` (bis zum Textboden
+  abgedunkelt, in beiden Modi gleich) mit Kante in `text` (`sichtungsKante`), gewählt mit ✓ und
+  3-px-Rahmen, die übrigen in Randform; 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung
+  (LLH-1083, Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
   Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
   den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die
@@ -567,7 +576,13 @@ anwendbar), „nicht geprüft" ist keins.
   (`wirksameDarstellungsart`). Gemessen in `kraefte-kontrast.spec.ts`.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
   `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort) lesen beide von dort — zwei
-  Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss.
+  Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss. Am Ort (LLH-1133,
+  Spec `material-am-ort`) ist die Statusanzeige ebenso `StatusWahl`, mit denselben Einträgen
+  (`kraefte/materialPosten.ts:materialStatusWahl`) und demselben Schreibweg
+  (`api/einsatzMaterial.ts:setzeMaterialStatus`), Ablehnung an der Zeile; Ad-hoc-Material nimmt an
+  beiden Stellen nur `kraefte/MaterialAdhocDialog.tsx` (am Ort mit festem `ort`, ein Request).
+  Rechte wie beim Zuordnen (Schreibrecht und Freigabe Material); ein beendeter Ort sperrt Zuordnen,
+  Erfassen und Ausgeben, nicht Status und Lösen. Nachweis `kraefte/materialSchreibweg.test.tsx`.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in

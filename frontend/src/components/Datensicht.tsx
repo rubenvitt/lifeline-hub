@@ -511,6 +511,12 @@ interface DatensichtProps<T extends object, K extends string> {
    * gemerkte Zeilen zeichnen neu, wenn es sich ändert, und nur dann. Schließt `baum` aus.
    */
   zeilenFehler?: (zeile: T) => ZeilenGrund | null;
+  /**
+   * Ein Popover, Menü oder Dialog einer Zeile ist offen (LLH-1130, Spec `betroffene-lagedaten`):
+   * die Schleuse hält Menge und Folge wie bei Fokus, auch ohne Fokus und Zeiger in der Sicht
+   * (Touch, Portal). Die Menüs des Kartenfußs (`weitere`) melden sich selbst.
+   */
+  halten?: boolean;
 }
 
 // ── Konstanten ───────────────────────────────────────────────────────────────────────
@@ -1011,6 +1017,7 @@ export default function Datensicht<T extends object, const K extends string>(
     werkzeuge,
     aufklappen,
     zeilenFehler,
+    halten = false,
   } = props;
 
   const { token } = theme.useToken();
@@ -1303,6 +1310,21 @@ export default function Datensicht<T extends object, const K extends string>(
     nachBenutzeraktion();
   }, [serverStand, nachBenutzeraktion]);
 
+  /**
+   * Offene Menüs des Kartenfußs (`weitere`) halten die Sicht wie `halten` der Seite. Ein Schlüssel
+   * je Karte; der Auslöser meldet „zu“, auch wenn er mit offenem Menü aushängt.
+   */
+  const [kartenMenueOffen, setKartenMenueOffen] = useState<ReadonlySet<Key>>(() => new Set());
+  const reportKartenMenue = useCallback((k: Key, offen: boolean) => {
+    setKartenMenueOffen((alt) => {
+      if (alt.has(k) === offen) return alt;
+      const neu = new Set(alt);
+      if (offen) neu.add(k);
+      else neu.delete(k);
+      return neu;
+    });
+  }, []);
+
   // Einfrieren, Fokus- und Zeigerbedingung: `useZuflussSchleuse` (Spec `datensicht-zufluss`).
   const zuflussBereich = useZuflussSchleuse(zuflussSteuerung, {
     zeilen,
@@ -1311,6 +1333,7 @@ export default function Datensicht<T extends object, const K extends string>(
     gruppeVon: gruppen?.schluessel,
     mitGerippe: baumKinder != null,
     wurzel,
+    halten: halten || kartenMenueOffen.size > 0,
   });
 
   // ── DEV-Diagnose ──────────────────────────────────────────────────────────────────
@@ -2065,6 +2088,7 @@ export default function Datensicht<T extends object, const K extends string>(
           gesperrt={weitereLaeuft}
           laeuft={weitereLaeuft}
           onWahl={(key) => weitere.onWahl(key, zeile)}
+          onOffenAenderung={(offen) => reportKartenMenue(schluessel(zeile), offen)}
         />
       ) : null;
     const aktionen = [knopf, menueKnopf].filter((k) => k != null);

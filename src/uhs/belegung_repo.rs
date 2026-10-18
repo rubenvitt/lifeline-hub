@@ -1,4 +1,4 @@
-use super::BelegungAnzeige;
+use super::{AufenthaltAnzeige, BelegungAnzeige};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -243,6 +243,31 @@ pub async fn liste_je_person(
         .fetch_all(pool)
         .await?,
     )
+}
+
+/// Der aktuelle Aufenthalt einer Person aus dem Cache an `einsatz_person` (LLH-1129); `None`
+/// außerhalb jeder UHS. Ein Read, für das Personen-Detail.
+pub async fn aufenthalt(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<Option<AufenthaltAnzeige>, AppError> {
+    Ok(sqlx::query_as::<_, AufenthaltAnzeige>(
+        "SELECT u.id AS uhs_id, u.bezeichnung AS uhs_bezeichnung, \
+                pl.id AS platz_id, pl.bezeichnung AS platz_bezeichnung, \
+                (SELECT b.zeitpunkt_at FROM person_uhs_belegung b \
+                  WHERE b.person_id = ep.id AND b.uhs_id = ep.aktuelle_uhs_id \
+                    AND b.art <> 'austritt' \
+                  ORDER BY b.zeitpunkt_at DESC, b.id DESC LIMIT 1) AS seit \
+         FROM einsatz_person ep \
+         JOIN uhs u ON u.id = ep.aktuelle_uhs_id \
+         LEFT JOIN uhs_platz pl ON pl.id = ep.aktueller_platz_id \
+         WHERE ep.einsatz_id = ? AND ep.id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .fetch_optional(pool)
+    .await?)
 }
 
 /// Lädt ein einzelnes Event; `NotFound` außerhalb des Einsatzes.

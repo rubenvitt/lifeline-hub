@@ -367,7 +367,7 @@ Löschprotokoll der Organisation.
 
 System-Einträge im ETB, die Personen, Tiere oder Schäden betreffen, SHALL diese über ihre
 Registriernummer bezeichnen (`R-042`, `T-007`, `S-003`). Die Identitäts- und Kontaktangaben
-der Personenzeile (Name, Vorname, Geburtsdatum, Herkunftsadresse, Antreffort, Melderkontakt,
+der Personenzeile (Name, Vorname, Geburtsdatum, Herkunftsadresse, Fundort, Melderkontakt,
 Zustand, Notiz), die Kontakte von Haltern und Geschädigten sowie die Tier-Kennzeichnung MUST
 in keinem System-Eintrag stehen. Übernimmt ein System-Eintrag einen anderen Wert, den die
 Klassifikation als Scrub führt, in seinen Wortlaut, MUST diese Stelle in einer

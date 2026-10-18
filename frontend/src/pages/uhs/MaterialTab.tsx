@@ -4,8 +4,11 @@ import { listEinsatzMaterial } from '../../api/einsatzMaterial';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsDetail } from '../../api/types';
 import { useAuthOptional } from '../../auth/AuthContext';
-import { istSprungGesperrt } from '../../einsatz/modulRegistry';
+import { istKeyFreigegeben, istSprungGesperrt } from '../../einsatz/modulRegistry';
+import { SprungKnopf } from '../../components/Sprung';
+import { useRollen } from '../../components/instrument';
 import MaterialAmOrt from '../../kraefte/MaterialAmOrt';
+import { nachforderungenPfad } from '../../routing/deeplinks';
 
 interface Props {
   einsatzId: number;
@@ -26,9 +29,25 @@ interface Props {
  *
  * Eine aufgelöste oder stornierte UHS nimmt kein Material mehr an (LLH-1093 D14, Server 422): der
  * Grund steht an der Auswahl, Ausgeben fehlt; Lösen bleibt (LLH-1224 D13).
+ *
+ * „Fehlmenge melden“ (LLH-1133 D5) steht nur hier, an der UHS: ein Sprung in die Erfassung einer
+ * Nachforderung, vorbelegt mit der Art Material und der UHS in der Begründung. Bezeichnung und
+ * Anzahl trägt die Person ein. Ohne Schreibrecht oder Freigabe Nachforderungen fehlt er (nicht
+ * gesperrt: die Erfassung dort ließe sich ohnehin nicht öffnen).
  */
+/**
+ * Begründung der Fehlmenge (LLH-1133 D5): „Fehlmenge UHS «Turnhalle»“. Trägt die Bezeichnung das
+ * „UHS“ schon („UHS Nord“), steht es nicht doppelt: „Fehlmenge «UHS Nord»“.
+ */
+export function fehlmengeBegruendung(bezeichnung: string): string {
+  return /^UHS\b/i.test(bezeichnung)
+    ? `Fehlmenge «${bezeichnung}»`
+    : `Fehlmenge UHS «${bezeichnung}»`;
+}
+
 export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props) {
   const auth = useAuthOptional();
+  const { token } = useRollen();
   const nurLesen = auth != null && (auth.laedt || auth.geraet != null);
   const darfSchreiben = !schreibgeschuetzt && !nurLesen;
 
@@ -47,18 +66,35 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
     enabled: darfSchreiben && freigabenFest && materialFrei,
   });
 
+  // Bekannt freigegeben, nicht „unbekannt heißt offen“: der Sprung erschiene sonst und fiele weg.
+  const fehlmengeMelden =
+    darfSchreiben && istKeyFreigegeben('nachforderungen', freigabenQuery.data);
+
   return (
-    <MaterialAmOrt
-      einsatzId={einsatzId}
-      ort={{ art: 'uhs', id: uhs.id }}
-      posten={uhs.material}
-      angebot={darfSchreiben && materialFrei ? materialQuery : undefined}
-      darfSchreiben={darfSchreiben}
-      materialFrei={materialFrei}
-      loesenText="Lösen"
-      sperrgrund={
-        uhs.storniert_at ? 'UHS storniert' : uhs.status === 'aufgeloest' ? 'UHS aufgelöst' : null
-      }
-    />
+    <>
+      <MaterialAmOrt
+        einsatzId={einsatzId}
+        ort={{ art: 'uhs', id: uhs.id }}
+        posten={uhs.material}
+        angebot={darfSchreiben && materialFrei ? materialQuery : undefined}
+        darfSchreiben={darfSchreiben}
+        materialFrei={materialFrei}
+        loesenText="Lösen"
+        sperrgrund={
+          uhs.storniert_at ? 'UHS storniert' : uhs.status === 'aufgeloest' ? 'UHS aufgelöst' : null
+        }
+      />
+      {fehlmengeMelden && (
+        <div style={{ marginTop: token.marginSM }}>
+          <SprungKnopf
+            to={nachforderungenPfad(einsatzId, {
+              vorbelegung: { art: 'Material', begruendung: fehlmengeBegruendung(uhs.bezeichnung) },
+            })}
+          >
+            Fehlmenge melden
+          </SprungKnopf>
+        </div>
+      )}
+    </>
   );
 }

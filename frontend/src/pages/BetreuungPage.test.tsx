@@ -655,7 +655,8 @@ describe('BetreuungPage (LFH-639)', () => {
       }),
     );
     expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
-      '/einsaetze/1/lagekarte?platzieren=betreuungsstelle%3A8',
+      // Mit Herkunft: die Karte bietet danach „Zurück zu …“ an (LLH-1125).
+      '/einsaetze/1/lagekarte?platzieren=betreuungsstelle%3A8&zurueck=1',
     );
   });
 

@@ -352,10 +352,13 @@ export default function BetreuungPage() {
   );
   const stelleAktion = useCallback(
     (aktion: StelleAktion, stelle: Betreuungsstelle) => {
-      // Sprung in den Platziermodus der Lagekarte; dort räumt die Karte den Auftrag.
+      // Sprung in den Platziermodus der Lagekarte; dort räumt die Karte den Auftrag. Mit Herkunft
+      // führt „Zurück zu …“ danach hierher (LLH-1125).
       if (aktion === 'verorten') {
         navigate(
-          lagekartePfad(einsatzId, { platzieren: { typ: 'betreuungsstelle', id: stelle.id } }),
+          lagekartePfad(einsatzId, {
+            platzieren: { typ: 'betreuungsstelle', id: stelle.id, zurueck: true },
+          }),
         );
         return;
       }

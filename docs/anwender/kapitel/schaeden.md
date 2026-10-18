@@ -68,6 +68,8 @@ behalten“ bleibt der Ort stehen.
 1. Die Seite des Schadens öffnen. Unter „Verortung“ steht „nicht verortet“.
 2. „Auf Karte verorten“ wählen. Die Lagekarte öffnet sich und nimmt die Stelle des Schadens auf
    ([Lagekarte, Zeichnen und Messen](lagekarte.md)).
+3. Nach dem Tipp auf die Karte meldet sie „S-… verortet“. „Zurück zu S-…“ führt auf die Seite
+   des Schadens zurück.
 
 Wer die Koordinate schon beim Erfassen kennt, trägt sie unter „Weitere Angaben“ ein.
 
@@ -80,8 +82,8 @@ nach „abgeschlossen“. „Bearbeiten“ auf der Seite des Schadens ändert Ty
 Beschreibung und Geschädigt. „Stornieren“ nimmt eine Fehlerfassung aus der Liste. Fotos und
 Dateien zum Schaden liegen auf seiner Seite.
 
-Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Schaden
-zuweisen“, [Betroffene und Sichtung](betroffene.md)).
+Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Bezug
+hinzufügen“ unter „Bezüge“, [Betroffene und Sichtung](betroffene.md)).
 
 ### Einsatztagebuch
 

@@ -27,7 +27,10 @@ export default function AufKarteVerorten({
     <Button
       onClick={() =>
         navigate(
-          lagekartePfad(einsatzId, { platzieren: { typ: 'bereitstellungsraum', id: br.id } }),
+          // Mit Herkunft: „Zurück zu …“ führt danach auf diese Seite (LLH-1125).
+          lagekartePfad(einsatzId, {
+            platzieren: { typ: 'bereitstellungsraum', id: br.id, zurueck: true },
+          }),
         )
       }
     >

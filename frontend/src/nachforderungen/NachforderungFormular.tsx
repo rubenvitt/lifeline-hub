@@ -101,8 +101,9 @@ export default function NachforderungFormular({
     if (!vorbelegung) return;
     form.setFieldsValue({
       art: vorbelegung.art,
-      bezeichnung: vorbelegung.bezeichnung,
-      anzahl: vorbelegung.anzahl,
+      // Eine Teil-Vorbelegung (LLH-1133) lässt beide leer: die Person trägt sie ein.
+      bezeichnung: vorbelegung.bezeichnung ?? '',
+      anzahl: vorbelegung.anzahl ?? null,
       begruendung: vorbelegung.begruendung ?? '',
     });
   }, [form, vorbelegung]);

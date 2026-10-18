@@ -107,7 +107,7 @@ function render(
 /** Erste Auswahlfläche der Sichtung anklicken (Wrapper, nicht das ausgeblendete `input`). */
 async function waehleSk(index: number) {
   const flaeche = within(screen.getByRole('radiogroup')).getAllByRole('radio')[index];
-  await userEvent.click(flaeche.closest('label')!);
+  await userEvent.click(flaeche);
 }
 
 describe('AufnahmePage', () => {
@@ -152,7 +152,7 @@ describe('AufnahmePage', () => {
     ]);
     await screen.findByRole('radiogroup');
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
-    await userEvent.type(await screen.findByLabelText('Zustand'), 'Beinfraktur');
+    await userEvent.type(await screen.findByLabelText('Zustand / Verdacht'), 'Beinfraktur');
     await userEvent.type(screen.getByLabelText('Koordinate'), '#52.2691/9.1342');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
@@ -198,17 +198,17 @@ describe('AufnahmePage', () => {
   });
 
   /**
-   * Der sitzungsweite Antreffort gilt auch hier, nicht nur im Modal (`uebernahme` deckt nur einen
+   * Der sitzungsweite Fundort gilt auch hier, nicht nur im Modal (`uebernahme` deckt nur einen
    * Lauf ab). Beide Richtungen, weil Schreiben ohne Lesen unsichtbar und Lesen ohne Schreiben leer
    * bliebe.
    */
-  it('merkt den Antreffort für die Sitzung und setzt ihn beim Wiederkommen ein', async () => {
+  it('merkt den Fundort für die Sitzung und setzt ihn beim Wiederkommen ein', async () => {
     render(einsatzAktiv, [
       http.post('/api/einsaetze/1/personen', () => HttpResponse.json(angelegt, { status: 201 })),
     ]);
     await screen.findByRole('radiogroup', { name: 'Sichtungskategorie' });
 
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await screen.findByText(/Erfasst als R-047/);
     expect(sessionStorage.getItem('lfh:erfassung:1:person:antreff_ort')).toBe('Sammelstelle Süd');
@@ -216,9 +216,7 @@ describe('AufnahmePage', () => {
     // Die Seite frisch betreten — wie nach einem Abstecher in die Liste.
     cleanup();
     render(einsatzAktiv);
-    await waitFor(() =>
-      expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'),
-    );
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd'));
   });
 
   it('zeigt Beobachtern „Nur Ansicht · Grund“ statt der Maske (LFH-1078)', async () => {
@@ -391,14 +389,14 @@ describe('AufnahmePage — Ablehnung am Formular (LFH-1077)', () => {
   it('nennt den Grund am Formular, behält die Eingabe und zeigt keinen Toast', async () => {
     render(einsatzAktiv, [http.post('/api/einsaetze/1/personen', abgelehnt)]);
     await screen.findByRole('radiogroup');
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     const grund = await screen.findByRole('alert');
     expect(grund).toHaveTextContent('Person nicht erfasst');
     expect(grund).toHaveTextContent('Sichtung passt nicht zum Status');
     expect(grund.closest('form')).not.toBeNull();
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
@@ -522,7 +520,7 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
 
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
     await waitFor(() => expect(client.getQueryData(einsatzKeys.einsatz(2))).toBeDefined());
-    await userEvent.type(await screen.findByLabelText('Antreffort'), 'Turnhalle B');
+    await userEvent.type(await screen.findByLabelText('Fundort'), 'Turnhalle B');
 
     await act(async () => antwortFreigeben());
     await waitFor(() => expect(client.isMutating()).toBe(0));
@@ -536,13 +534,13 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
 
   it('die Serie aus Einsatz A leert die Felder von B nicht', async () => {
     await spaeterErfolgNachWechsel('Speichern und nächste');
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Turnhalle B');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Turnhalle B');
   });
 
   it('der Rückweg aus Einsatz A führt nicht aus B heraus', async () => {
     await spaeterErfolgNachWechsel('Erfassen');
     expect(aktuellerPfad()).toBe('/einsaetze/2/personen/aufnahme');
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Turnhalle B');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Turnhalle B');
   });
 
   /**

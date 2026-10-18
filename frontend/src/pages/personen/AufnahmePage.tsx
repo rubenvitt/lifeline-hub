@@ -67,7 +67,7 @@ export default function AufnahmePage() {
   const uhsAuftrag = parseRouteId(searchParams.get('uhs') ?? undefined);
 
   /**
-   * Der sitzungsweite Antreffort gilt wie im Modal auch hier; `uebernahme={['antreff_ort']}` deckt
+   * Der sitzungsweite Fundort gilt wie im Modal auch hier; `uebernahme={['antreff_ort']}` deckt
    * nur einen Lauf ab. Gesetzt als Formularwert, NICHT als `initialValues` — sonst füllte jeder
    * Serien-Reset den Ort auch bei ausgeschaltetem „Werte behalten" wieder auf. Der Merker
    * verhindert, dass ein späterer Render einen getippten Ort überschreibt.

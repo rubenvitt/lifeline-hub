@@ -3,8 +3,44 @@ import { monoStil, Segmentleiste } from '../../components/instrument';
 import type { GriffModus } from './bildGriffe';
 import { bandStil } from './KartenFuss';
 
+/**
+ * Rückmeldung nach dem Verorten (LLH-1125, Spec `lagekarte-verortungsauftrag`): „<Kennung>
+ * verortet“, primär „Zurück zu <Kennung>“ (nur mit Herkunft), daneben „Auf der Karte bleiben“.
+ */
+export interface VerortetMeldung {
+  /** z. B. „R-005“; `null`, wenn das Objekt nicht geladen ist — dann „Objekt verortet“. */
+  kennung: string | null;
+  /** Rückweg zur Seite des Datensatzes; `null` ohne Herkunft (kein `?zurueck=1`). */
+  onZurueck: (() => void) | null;
+  onBleiben: () => void;
+}
+
+/**
+ * Titel und Knöpfe der Rückmeldung — ein Baustein für das Fuß-Band (unter `lg`) und die Leiste
+ * (ab `lg`), damit beide denselben Wortlaut tragen. Gerendert wird er je Breite nur an einer Stelle.
+ */
+export function VerortetInhalt({ meldung }: { meldung: VerortetMeldung }) {
+  const { kennung, onZurueck, onBleiben } = meldung;
+  return (
+    <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+      <Typography.Text strong>
+        {kennung ? `${kennung} verortet` : 'Objekt verortet'}
+      </Typography.Text>
+      <Space wrap>
+        {onZurueck && (
+          <Button type="primary" onClick={onZurueck}>
+            {kennung ? `Zurück zu ${kennung}` : 'Zurück'}
+          </Button>
+        )}
+        <Button onClick={onBleiben}>Auf der Karte bleiben</Button>
+      </Space>
+    </Space>
+  );
+}
+
 /** Laufender Leistenmodus, wie ihn das Band bedient. `null` = keiner, dann rendert es nichts. */
 export type PlatzierModus =
+  | { art: 'verortet'; meldung: VerortetMeldung }
   | {
       art: 'platzieren';
       /** z. B. „Einheit: Pumpe Ost" oder „Einsatzort". */
@@ -41,6 +77,22 @@ export type PlatzierModus =
 export default function PlatzierSteuerung({ modus }: { modus: PlatzierModus | null }) {
   const { token } = theme.useToken();
   if (!modus) return null;
+  if (modus.art === 'verortet') {
+    return (
+      <Card
+        size="small"
+        data-lfh="platzier-steuerung"
+        data-testid="verortet-rueckmeldung"
+        style={{
+          ...bandStil('mitte'),
+          boxShadow: token.boxShadowSecondary,
+          minWidth: 'min(320px, 100%)',
+        }}
+      >
+        <VerortetInhalt meldung={modus.meldung} />
+      </Card>
+    );
+  }
   const titel =
     modus.art === 'platzieren'
       ? `Platzieren · ${modus.objekt}`

@@ -26,7 +26,6 @@ import { stelle, zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
-import { platzZahlen } from './GeraetStellePage';
 
 /**
  * Die Gerätehülle im echten Routenbaum (LFH-892, Spec `feldgeraet-bedienung`): Startseite,
@@ -208,6 +207,94 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     expect(screen.queryByRole('button', { name: /Benutzermenü/ })).toBeNull();
   });
 
+  it('Patientenliste: Zustand und Platz, nach Dringlichkeit sortiert (LLH-1135)', async () => {
+    stelleBereit();
+    const sk3 = person({
+      id: 12,
+      registrier_nr: 3,
+      name: 'Dritte',
+      aktuelle_sichtung: 'sk3',
+      zustand: 'gehfähig, unterkühlt',
+    });
+    const sk1 = person({ id: 13, registrier_nr: 4, name: 'Vierte', aktuelle_sichtung: 'sk1' });
+    const ohne = person({ id: 14, registrier_nr: 5, name: 'Fünfte', aktuelle_sichtung: null });
+    const sk1Frueh = person({
+      id: 15,
+      registrier_nr: 6,
+      name: 'Sechste',
+      aktuelle_sichtung: 'sk1',
+    });
+    const eintritt = (person_id: number, zeitpunkt_at: string) => ({
+      id: person_id,
+      einsatz_id: 7,
+      uhs_id: 2,
+      person_id,
+      platz_id: null,
+      art: 'eintritt' as const,
+      notiz: null,
+      erfasst_von: 1,
+      zeitpunkt_at,
+    });
+    server.use(
+      http.get('/api/einsaetze/7/personen', () =>
+        HttpResponse.json([ausgetreten, sk3, sk1, ohne, sk1Frueh]),
+      ),
+      http.get('/api/einsaetze/7/uhs/2', () =>
+        HttpResponse.json({
+          ...uhs,
+          belegungen: [
+            eintritt(12, '2026-10-04 08:00:00'),
+            eintritt(13, '2026-10-04 09:30:00'),
+            eintritt(14, '2026-10-04 09:40:00'),
+            eintritt(15, '2026-10-04 09:10:00'),
+          ],
+        }),
+      ),
+    );
+    renderApp('/geraet');
+    expect(await screen.findByText('Dritte, Max')).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /Zustand/ })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /Platz/ })).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: /^Ort/ })).toBeNull();
+    // Ungesichtet, dann SK I (längere Wartezeit zuerst), SK III; die Ausgetretenen dahinter.
+    const reihen = screen
+      .getAllByRole('row')
+      .map((r) => /R-\d+/.exec(r.textContent ?? '')?.[0])
+      .filter(Boolean);
+    expect(reihen).toEqual(['R-005', 'R-006', 'R-004', 'R-003', 'R-002']);
+    // Der Zustand steht in einer Zeile, Längeres endet mit „…“.
+    const zustand = screen.getByText('gehfähig, unterkühlt');
+    expect(zustand.closest('.ant-typography-ellipsis-single-line')).not.toBeNull();
+  });
+
+  it('UHS-Tablet: Nachsichtung aus der Zeile, kein Zeilenmenü und kein Verorten (LLH-1130)', async () => {
+    vi.useRealTimers();
+    stelleBereit();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personen/10/sichtung', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json(
+          { id: 1, person_id: 10, kategorie: 'sk1', notiz: null, erfasst_at: '', erfasst_von: 1 },
+          { status: 201 },
+        );
+      }),
+    );
+    const router = renderApp('/geraet');
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Sichtung R-001 ändern, aktuell SK II' }),
+    );
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-001' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null }]));
+    // Kein Zeilenklick: die Liste bleibt.
+    expect(pfad(router)).toBe('/geraet/7/patienten');
+    expect(screen.queryByRole('button', { name: /^Aktionen zu R-/ })).toBeNull();
+    expect(screen.queryByText('Auf Lagekarte verorten')).toBeNull();
+  });
+
   it('Fremde Adresse: die Lagekarte führt auf die Startseite', async () => {
     stelleBereit();
     const router = renderApp('/einsaetze/7/lagekarte');
@@ -299,25 +386,45 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
   it('Patientenansicht: kein Sprung in Lagekarte oder andere Module, kein Status und Storno', async () => {
     vi.useRealTimers();
     stelleBereit();
+    server.use(
+      http.get('/api/einsaetze/7/personen/10', () =>
+        HttpResponse.json({
+          ...wartend,
+          aufenthalt: {
+            uhs_id: 2,
+            uhs_bezeichnung: 'UHS Nord',
+            platz_id: null,
+            platz_bezeichnung: null,
+            seit: '2026-10-04 09:05:00',
+          },
+          sichtungen: [],
+          notizen: [],
+          verbleib: [],
+          abgleiche: [],
+        } as PersonDetail),
+      ),
+    );
     renderApp('/geraet/7/patienten/10');
     expect(await screen.findByRole('heading', { level: 1, name: /Person R-001/ })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
-    expect(screen.queryByText(/Zuordnungen/)).toBeNull();
+    expect(screen.queryByText(/Bezüge/)).toBeNull();
     expect(screen.queryByText(/Fotos und Dateien/)).toBeNull();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Weitere Aktionen zu Person/ }));
-    await waitFor(() =>
-      expect(
-        document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
-      ).not.toBeNull(),
-    );
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    expect(within(menue).getByText('Bearbeiten')).toBeInTheDocument();
-    expect(within(menue).queryByText('Stornieren')).toBeNull();
-    expect(within(menue).queryByText(/^→/)).toBeNull();
+    // Spec `personen-detail`, „Am UHS-Tablet nur lesen“: der Aufenthalt steht im Kopf, ohne
+    // „Verlegen“ und „Austragen“. Nachsichten geht am UHS-Tablet weiter.
+    const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+    expect(within(kopf).getByText(/^UHS Nord · Wartebereich · seit/)).toBeVisible();
+    expect(
+      within(kopf).queryByRole('button', { name: /In UHS aufnehmen|Verlegen|Austragen/ }),
+    ).toBeNull();
+    expect(
+      within(kopf).getByRole('button', { name: 'Nachsichten, aktuell SK II · schwer' }),
+    ).toBeVisible();
+    // Primäraktion „Bearbeiten“; ohne Status und Storno bleibt kein Menüeintrag, also kein Menü.
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Weitere Aktionen zu Person/ })).toBeNull();
+    expect(screen.queryByText('Stornieren')).toBeNull();
+    expect(screen.queryByText(/^Auf „.*“ setzen$/)).toBeNull();
   });
 
   it('Grundriss: ohne Platzbearbeitung, Status, Umschalter, Material und Dateien', async () => {
@@ -429,13 +536,22 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     expect(screen.queryByRole('tablist', { name: /Material|Bewegungen|Dateien/ })).toBeNull();
   });
 
-  it('Plätze in Zahlen, Material der UHS nur lesend und ohne die Einsatzliste', async () => {
+  it('Lage der Stelle in Zahlen, Material der UHS nur lesend und ohne die Einsatzliste', async () => {
     vi.useRealTimers();
     const { materialListe } = laptopBereit();
     renderApp('/geraet/7/stelle');
     expect(await screen.findByRole('heading', { level: 1, name: 'UHS' })).toBeVisible();
-    const zahlen = await screen.findByRole('group', { name: 'Plätze in Zahlen' });
-    expect(within(zahlen).getByText('Frei')).toBeVisible();
+    // Dieselbe Zahlzeile wie am Fükw (LLH-1136); jede Zahl springt in den Grundriss bzw. die
+    // Patientenliste des Geräts.
+    const zahlen = await screen.findByRole('group', { name: 'Lage der Stelle' });
+    expect(within(zahlen).getByRole('link', { name: /Plätze frei/ })).toHaveAttribute(
+      'href',
+      '/geraet/7/uhs/2',
+    );
+    expect(within(zahlen).getByRole('link', { name: /In der Stelle/ })).toHaveAttribute(
+      'href',
+      '/geraet/7/patienten',
+    );
     expect(screen.getByRole('button', { name: 'Grundriss bearbeiten' })).toBeVisible();
 
     const user = userEvent.setup();
@@ -923,26 +1039,5 @@ describe('Bausteine', () => {
     expect(ortInDerUhs(wartend, uhs)).toBe('Wartebereich');
     expect(ortInDerUhs({ ...wartend, aktueller_platz_id: 30 }, uhs)).toBe('Liege 1');
     expect(ortInDerUhs(ausgetreten, uhs)).toBe('KH Mitte');
-  });
-
-  it('platzZahlen: belegt vor Verfügbarkeit, Wartebereich und stornierte zählen nicht', () => {
-    const p = uhs.plaetze[0];
-    const mit: UhsDetail = {
-      ...uhs,
-      plaetze: [
-        p,
-        { ...p, id: 31, verfuegbarkeit: 'defekt' },
-        { ...p, id: 32, verfuegbarkeit: 'aufbereitung' },
-        { ...p, id: 33 },
-        { ...p, id: 34, typ: 'wartebereich' },
-        { ...p, id: 35, storniert_at: '2026-10-04 09:00:00' },
-      ],
-    };
-    expect(platzZahlen(mit, new Set([30, 32]))).toEqual({
-      gesamt: 4,
-      belegt: 2,
-      frei: 1,
-      nichtVerfuegbar: 1,
-    });
   });
 });

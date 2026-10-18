@@ -18,6 +18,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Radio,
   Space,
   Tabs,
   Tooltip,
@@ -39,7 +40,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   aenderePersonBelegung,
   aktualisierePlatz,
@@ -62,6 +63,15 @@ import UhsPlanPaneel from './UhsPlanPaneel';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
+import SichtungsTag from '../../components/SichtungsTag';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
+import {
+  useZuflussSchleuse,
+  useZuflussSteuerung,
+  type ZuflussSteuerung,
+} from '../../components/useZuflussSchleuse';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import { taktischeDtg } from '../../anzeige/format';
 import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
 import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
 import { SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
@@ -74,6 +84,14 @@ import {
   markenZielStil,
   seitlicherUeberlauf,
 } from './grundrissLayout';
+import {
+  gehalteneFolge,
+  nachDringlichkeit,
+  wartetSeit,
+  wartezeitMinuten,
+  wartezeitText,
+} from './dringlichkeit';
+import { personenInUhs as personenInUhsVon, transportiertAus } from './uhsLage';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -264,13 +282,15 @@ function personLabel(person: Person): string {
 interface PersonenkartenProps {
   person: Person | undefined;
   kompakt?: boolean;
+  /** Beginn der Wartezeit (Wire, UTC); gesetzt nur im Wartebereich (LLH-1135). */
+  wartetSeit?: string | null;
   /**
    * Test-Marke an der gerenderten Personenmarke, nur vom DragOverlay gesetzt: ohne sie ist „der
    * Drag läuft wirklich" in Playwright nicht behauptbar.
    */
   testId?: string;
 }
-function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
+function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenProps) {
   const { token, rollen } = useRollen();
   if (!person) return null;
   /*
@@ -278,10 +298,16 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
    * Die Höhe ist dichteunabhängig (wie antds Tag: `fontSizeSM` × `lineHeightSM` + 2 px Rahmen),
    * weil die belegte Platzkarte diesen Streifen mit 24 px einplant. Kein Bedienziel: Klick und Zug
    * trägt `PersonenkarteDrag`. `data-lfh="personenkarte"` ist die Marke der e2e-Specs.
+   *
+   * Vorn steht die Sichtung (LLH-1135, BBK: umrandetes Farbfeld plus Wort, `SichtungsTag` in der
+   * kompakten Form, nicht höher als die Schriftzeile); sie kürzt nie, der Name endet mit „…“. Im
+   * Wartebereich steht dahinter die Wartezeit.
    */
   const nr = registrierAnzeige(person.registrier_nr);
   const style: React.CSSProperties = {
-    display: 'inline-block',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: token.paddingXS,
     maxWidth: kompakt ? 124 : '100%',
     // In Listen polstert die Hülle (`markenZielStil`); nur auf der Platzkarte trägt die Marke ihren
     // Abstand selbst.
@@ -297,7 +323,6 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
     // `kompakt` (auf der Platzkarte): einzeilig mit Ellipsis, damit die absolut positionierte Karte
     // unabhängig von der Namenslänge ihre Höhe hält.
     overflow: 'hidden',
-    textOverflow: 'ellipsis',
     verticalAlign: 'top',
   };
   return (
@@ -307,9 +332,40 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
       style={style}
       title={kompakt ? personLabel(person) : undefined}
     >
-      <span style={monoStil(token.fontSizeSM)}>{nr}</span>
-      {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
-      {` · ${person.name || 'unbekannt'}`}
+      <SichtungsTag kategorie={person.aktuelle_sichtung ?? null} form="kompakt" />
+      {/* Leerzeichen für den zugänglichen Namen; im Flex-Behälter zeichnet es nicht. */}{' '}
+      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={monoStil(token.fontSizeSM)}>{nr}</span>
+        {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
+        {` · ${person.name || 'unbekannt'}`}
+      </span>
+      {wartetSeit && (
+        <>
+          {' '}
+          <Wartezeit seit={wartetSeit} />
+        </>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Wartezeit „12 min“ im Takt der vollen Minute (`useMinutenTakt`), Mono; der Beginn steht als
+ * taktische Zeit im Titel (LLH-1135). Eigene Komponente, damit nur sie im Minutentakt zeichnet.
+ */
+function Wartezeit({ seit }: { seit: string }) {
+  const jetzt = useMinutenTakt();
+  const { token } = theme.useToken();
+  const { konventionen } = useAnzeigeKonventionen();
+  const minuten = wartezeitMinuten(seit, jetzt);
+  if (minuten == null) return null;
+  return (
+    <span
+      data-lfh="wartezeit"
+      title={`seit ${taktischeDtg(seit, konventionen)}`}
+      style={{ ...monoStil(token.fontSizeSM), flex: 'none' }}
+    >
+      {wartezeitText(minuten)}
     </span>
   );
 }
@@ -320,10 +376,12 @@ function PersonenkarteDrag({
   kompakt,
   onOeffnen,
   keinZiel,
+  wartetSeit,
 }: {
   person: Person;
   disabled: boolean;
   kompakt?: boolean;
+  wartetSeit?: string | null;
   onOeffnen?: (personId: number) => void;
   /**
    * Die Marke liegt in einem Auslöser, der selbst das Ziel ist (Kartenform). `useDraggable` setzt
@@ -383,7 +441,7 @@ function PersonenkarteDrag({
       style={style}
       onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
     >
-      <Personenkarte person={person} kompakt={kompakt} />
+      <Personenkarte person={person} kompakt={kompakt} wartetSeit={wartetSeit} />
     </div>
   );
 }
@@ -735,6 +793,9 @@ function PlatzKarte({
   );
 }
 
+/** Schlüssel der Schleuse: stabil, damit `useZuflussSchleuse` nicht je Render neu friert. */
+const personSchluessel = (p: Person) => p.id;
+
 /** Schmale Personen-Liste als Spalten-Karte (links: Eingang/Wartebereich). */
 function PersonenSpalte({
   titel,
@@ -746,6 +807,8 @@ function PersonenSpalte({
   onOeffnen,
   onVerbleib,
   fehler,
+  wartetSeitVon,
+  schleuse = false,
 }: {
   titel: string;
   personen: Person[];
@@ -767,6 +830,15 @@ function PersonenSpalte({
   onVerbleib?: (person: Person) => void;
   /** Grund einer abgelehnten Ablage in dieser Spalte (Ziehen in den Wartebereich). */
   fehler?: ZeilenGrund | null;
+  /** Beginn der Wartezeit je Person; gesetzt, zeigt die Marke die Wartezeit (LLH-1135). */
+  wartetSeitVon?: (person: Person) => string | null;
+  /**
+   * Die Liste ist nach Dringlichkeit sortiert und hält ihre Folge, solange Zeiger oder Fokus darin
+   * sind (`frontend/AGENTS.md`, „Live-Updates springen nicht unter dem Cursor“; Bedingungen aus
+   * `components/useZuflussSchleuse.ts`, dieselben wie in der `Datensicht`). Danach sortiert sie neu.
+   * Neue stehen solange hinten (`gehalteneFolge`), Entfallene gehen sofort.
+   */
+  schleuse?: boolean;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({
@@ -775,6 +847,27 @@ function PersonenSpalte({
     disabled: !droppableId,
   });
   const { token } = theme.useToken();
+  const wurzel = useRef<HTMLDivElement | null>(null);
+  const zufluss: ZuflussSteuerung<Person> = useZuflussSteuerung<Person>();
+  const bereich = useZuflussSchleuse(zufluss, {
+    zeilen: personen,
+    schluessel: personSchluessel,
+    aktiv: schleuse,
+    mitGerippe: false,
+    wurzel,
+  });
+  const gezeigt =
+    zufluss.stand.art === 'gefroren'
+      ? gehalteneFolge(zufluss.stand.folge, personen, personSchluessel)
+      : personen;
+  const { setNodeRef: setDropRef } = drop;
+  const listeRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wurzel.current = el;
+      if (droppableId) setDropRef(el);
+    },
+    [droppableId, setDropRef],
+  );
   return (
     <Paneel
       titel={titel}
@@ -786,10 +879,11 @@ function PersonenSpalte({
       {/* Zeilen- und Knopfabstand aus der Dichte-Staffel (`marginXS`), nicht fest 4 px: neben einem
           72-px-Handschuhknopf wäre das kein Abstand. */}
       <div
-        ref={droppableId ? drop.setNodeRef : undefined}
+        ref={listeRef}
+        {...(schleuse ? bereich : {})}
         style={{ minHeight: 48, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        {personen.map((p) => (
+        {gezeigt.map((p) => (
           <div
             key={p.id}
             data-testid="personen-zeile"
@@ -799,6 +893,7 @@ function PersonenSpalte({
               person={p}
               disabled={schreibgeschuetzt || belegungLaeuft}
               onOeffnen={onOeffnen}
+              wartetSeit={wartetSeitVon?.(p)}
             />
             {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in keinem
                 klickbaren Vorfahren und braucht keinen `stopPropagation`-/`onPointerDown`-Riegel.
@@ -873,6 +968,8 @@ function TransportSpalte({
               style={{ ...monoStil(12), paddingInline: 0 }}
               onClick={() => onOeffnen(p.id)}
             >
+              {/* Die Sichtung auch hier (LLH-1135): jede Personenmarke im Grundriss trägt sie. */}
+              <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
               {personLabel(p)}
             </Button>
             {p.aktueller_verbleib && (
@@ -1105,14 +1202,25 @@ export default function Grundriss({
   // Zielplatz des Klick-Zuweisungswegs (null = geschlossen).
   const [zuweisenPlatz, setZuweisenPlatz] = useState<UhsPlatz | null>(null);
   const [zuweisenForm] = Form.useForm<ZuweisenWerte>();
+  // Folge der Kandidaten beim Öffnen: solange der Dialog offen ist, rückt keiner unter dem Finger
+  // (`gehalteneFolge`, LLH-1135).
+  const [zuweisenFolge, setZuweisenFolge] = useState<readonly number[] | null>(null);
 
   const personenQuery = useQuery({
     queryKey: einsatzKeys.personen(einsatzId),
     queryFn: () => listePersonen(einsatzId),
   });
   const personen = personenQuery.data ?? [];
-  const personenInUhs = personen.filter((p) => p.aktuelle_uhs_id === uhs.id);
-  const wartebereichPersonen = personenInUhs.filter((p) => p.aktueller_platz_id == null);
+  const personenInUhs = personenInUhsVon(uhs, personen);
+  // Beginn der Wartezeit je Person aus der Belegungsreihe (LLH-1135), einmal je Render.
+  const beginnJe = new Map(personenInUhs.map((p) => [p.id, wartetSeit(p.id, uhs.belegungen)]));
+  const wartetSeitVon = (p: Person) => beginnJe.get(p.id) ?? null;
+  // Wartebereich nach Dringlichkeit (`dringlichkeit.ts`): ungesichtet, SK I … IV, tot,
+  // unverletzt; je Kategorie die längste Wartezeit zuerst.
+  const wartebereichPersonen = nachDringlichkeit(
+    personenInUhs.filter((p) => p.aktueller_platz_id == null),
+    (p) => ({ sichtung: p.aktuelle_sichtung, seit: wartetSeitVon(p) }),
+  );
   // „Noch nicht aufgenommen": in keiner UHS, nicht storniert, noch nicht final disponiert.
   // Transport/Entlassung/Verstorben leeren `aktuelle_uhs_id` (Auto-Austritt) — ohne den Filter
   // stünden sie hier und zugleich in der Transport-Spalte.
@@ -1123,17 +1231,21 @@ export default function Grundriss({
     return personenInUhs.find((p) => p.aktueller_platz_id === platzId);
   }
   // Kandidaten des Zuweisungsdialogs — dieselbe Menge, die der Drag-Weg erreicht. Der Wartebereich
-  // steht vorn, weil er im Betrieb der häufigere Fall ist.
-  const zuweisbarePersonen = [...wartebereichPersonen, ...nichtAufgenommen];
+  // steht vorn, weil er im Betrieb der häufigere Fall ist; „Noch nicht aufgenommen“ dahinter, in
+  // sich nach derselben Reihe (ohne Wartezeit in der UHS zählt die Erfassung).
+  const zuweisbarePersonen = [
+    ...wartebereichPersonen,
+    ...nachDringlichkeit(nichtAufgenommen, (p) => ({
+      sichtung: p.aktuelle_sichtung,
+      seit: p.erfasst_at,
+    })),
+  ];
+  const zuweisenKandidaten = gehalteneFolge(zuweisenFolge, zuweisbarePersonen, personSchluessel);
 
   // Rechte Spalte: Personen, die aus dieser UHS auf Transport gingen — Austritts-Historie
   // (`uhs.belegungen`) ∩ aktueller Verbleib „Transport".
-  const ausgetretenIds = new Set(
-    uhs.belegungen.filter((b) => b.art === 'austritt').map((b) => b.person_id),
-  );
-  const transportiert = personen
-    .filter((p) => ausgetretenIds.has(p.id) && p.aktueller_verbleib?.startsWith('Transport'))
-    .sort((a, b) => a.registrier_nr - b.registrier_nr);
+  // Dieselbe Menge zählt die Lage der Stelle (`uhsLage.ts`, LLH-1136).
+  const transportiert = transportiertAus(uhs, personen);
 
   // Innenfläche so groß, dass alle Plätze hineinpassen — sie scrollt innerhalb der Mittelspalte.
   const maxX = Math.max(0, ...uhs.plaetze.map((p) => p.pos_x ?? 0));
@@ -1439,6 +1551,8 @@ export default function Grundriss({
       <PersonenSpalte
         titel="Wartebereich (Eingang)"
         personen={wartebereichPersonen}
+        wartetSeitVon={wartetSeitVon}
+        schleuse
         schreibgeschuetzt={schreibgeschuetzt}
         belegungLaeuft={belegungLaeuft}
         droppableId="drop-inbox"
@@ -1561,6 +1675,7 @@ export default function Grundriss({
                       message.info('Niemand wartet');
                       return;
                     }
+                    setZuweisenFolge(zuweisbarePersonen.map(personSchluessel));
                     setZuweisenPlatz(p);
                   }}
                   niemandWartet={zuweisbarePersonen.length === 0}
@@ -1736,29 +1851,50 @@ export default function Grundriss({
       </ErfassungsModal>
 
       {/* Klick-Zuweisungsweg, der Ersatz für das Ziehen auf den Platz. Ein Feld, der Platz steht
-          im Titel. Kein Serienmodus: der Zielplatz ist je Vorgang ein anderer. */}
+          im Titel. Kein Serienmodus: der Zielplatz ist je Vorgang ein anderer.
+
+          Die Kandidaten stehen als Liste (LLH-1135): Sichtung, Wartezeit, Zustand, nach
+          Dringlichkeit; der erste ist vorgewählt, ein Tipp auf „Zuweisen“ genügt. Optionsknöpfe
+          statt `Select`: ein `Select` schluckt Enter, aus dem gewählten Optionsknopf sendet Enter
+          das Formular nativ ab (Erfassungs-Norm, `frontend/AGENTS.md`). */}
       <ErfassungsModal<ZuweisenWerte>
         offen={zuweisenPlatz != null}
         titel={
           zuweisenPlatz ? `Patient zuweisen — ${zuweisenPlatz.bezeichnung}` : 'Patient zuweisen'
         }
         form={zuweisenForm}
+        erfassenText="Zuweisen"
         laeuft={zuweisenMut.isPending}
         speicherung={zuweisenMut}
         speicherFehlerTitel="Nicht zugewiesen"
         speicherFehlerFallback="Zuweisen fehlgeschlagen"
         onErfassen={async (werte) => {
+          // Die Vorwahl steht im Feld (`KandidatenWahl`); hier gilt nur, was der Prüfer durchließ.
+          const personId = werte.personId;
           // `mutateAsync`: ein abgelehnter Serverruf lässt die Auswahl stehen.
-          if (!zuweisenPlatz || werte.personId == null) return;
-          await zuweisenMut.mutateAsync({ personId: werte.personId, platzId: zuweisenPlatz.id });
+          if (!zuweisenPlatz || personId == null) return;
+          await zuweisenMut.mutateAsync({ personId, platzId: zuweisenPlatz.id });
         }}
         onFertig={() => setZuweisenPlatz(null)}
         onAbbrechen={() => setZuweisenPlatz(null)}
       >
-        <Form.Item label="Patient" name="personId" rules={[{ required: true }]}>
-          <Select<number>
-            placeholder="Patient auswählen…"
-            options={zuweisbarePersonen.map((p) => ({ value: p.id, label: personLabel(p) }))}
+        <Form.Item
+          label="Patient"
+          name="personId"
+          rules={[
+            {
+              // Live: wer inzwischen nicht mehr zuweisbar ist, wird nicht still verlegt.
+              validator: (_, wert: number | undefined) =>
+                wert == null || zuweisenKandidaten.some((p) => p.id === wert)
+                  ? Promise.resolve()
+                  : Promise.reject(new Error('Nicht mehr zuweisbar')),
+            },
+          ]}
+        >
+          <KandidatenWahl
+            kandidaten={zuweisenKandidaten}
+            isWartend={(p) => p.aktuelle_uhs_id === uhs.id}
+            wartetSeitVon={wartetSeitVon}
           />
         </Form.Item>
       </ErfassungsModal>
@@ -1769,6 +1905,107 @@ export default function Grundriss({
         onClose={() => setDetailPersonId(null)}
       />
     </DndContext>
+  );
+}
+
+/**
+ * Auswahl im Dialog „Patient zuweisen“ (LLH-1135): je Kandidat ein Optionsknopf mit Sichtung,
+ * Kennung, Wartezeit und Zustand; erst der Wartebereich, dann „Noch nicht aufgenommen“, beide in
+ * der Folge, die der Aufrufer übergibt. Ohne Wahl zeigt sie den ersten gewählt; der Aufrufer
+ * schickt dann ihn. Der Fokus der Hülle fällt auf den ersten Optionsknopf, also auf ihn.
+ */
+function KandidatenWahl({
+  id,
+  value,
+  onChange,
+  kandidaten,
+  isWartend,
+  wartetSeitVon,
+}: {
+  id?: string;
+  value?: number;
+  onChange?: (personId: number) => void;
+  kandidaten: readonly Person[];
+  isWartend: (p: Person) => boolean;
+  wartetSeitVon: (p: Person) => string | null;
+}) {
+  const { token } = theme.useToken();
+  const { rollen } = useRollen();
+  // Die Vorwahl steht im Formular, nicht nur in der Anzeige: fällt der Vorgewählte live weg,
+  // meldet der Prüfer „Nicht mehr zuweisbar“, statt dass „Zuweisen“ still den Nächsten verlegt.
+  // Der Dialog hängt beim Schließen aus (`destroyOnHidden`); jedes Öffnen wählt neu vor.
+  const erster = kandidaten[0]?.id;
+  useEffect(() => {
+    if (value == null && erster != null) onChange?.(erster);
+  }, [value, erster, onChange]);
+  const gruppe = (titel: string, personen: readonly Person[]): ReactNode =>
+    personen.length > 0 && (
+      <>
+        <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
+          {titel}
+        </Typography.Text>
+        {personen.map((p) => {
+          const seit = isWartend(p) ? wartetSeitVon(p) : null;
+          return (
+            <Radio key={p.id} value={p.id} style={{ width: '100%' }}>
+              <span
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: token.paddingXS,
+                  minWidth: 0,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
+                <span style={{ flex: 'none' }}>
+                  <span style={monoStil(token.fontSizeSM)}>
+                    {registrierAnzeige(p.registrier_nr)}
+                  </span>
+                  {` · ${p.name || 'unbekannt'}`}
+                </span>
+                {seit && (
+                  <>
+                    {' '}
+                    <Wartezeit seit={seit} />
+                  </>
+                )}
+                {p.zustand && (
+                  <>
+                    {' '}
+                    <span
+                      title={p.zustand}
+                      style={{
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        color: rollen.text2,
+                      }}
+                    >
+                      {p.zustand}
+                    </span>
+                  </>
+                )}
+              </span>
+            </Radio>
+          );
+        })}
+      </>
+    );
+  return (
+    <Radio.Group
+      id={id}
+      aria-label="Patient"
+      value={value}
+      onChange={(e) => onChange?.(e.target.value as number)}
+      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
+    >
+      {gruppe('Wartebereich', kandidaten.filter(isWartend))}
+      {gruppe(
+        'Noch nicht aufgenommen',
+        kandidaten.filter((p) => !isWartend(p)),
+      )}
+    </Radio.Group>
   );
 }
 

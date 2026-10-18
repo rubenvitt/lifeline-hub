@@ -171,7 +171,7 @@ interface ErfassungsFormularProps<T> {
   serie?: boolean;
   /**
    * Wiederholfelder, die ein Serien-Speichern überleben (Trägerorganisation,
-   * Meldeweg, Antreffort …). Nicht leer → die Hülle zeigt „Werte behalten".
+   * Meldeweg, Fundort …). Nicht leer → die Hülle zeigt „Werte behalten".
    */
   uebernahme?: (keyof T & string)[];
   /** Startwerte. Werden bei jedem Zurücksetzen wieder wirksam. */

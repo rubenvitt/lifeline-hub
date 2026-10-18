@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -20,20 +20,25 @@ und zeigen nur deren Patienten. Die Navigation unten führt zu „Patienten“, 
 
 ### Patienten im Blick behalten
 
-1. „Patienten“ öffnen. Die Liste zeigt je Person Registriernummer, Name, Sichtungskategorie, Zeit
-   und Ort in der UHS (Wartebereich oder Platz).
+1. „Patienten“ öffnen. Die Liste zeigt je Person Registriernummer, Name, Sichtungskategorie,
+   Zustand, Zeit und Platz in der UHS (Wartebereich oder Platz). Sie steht nach Dringlichkeit:
+   ungesichtet zuerst, dann SK I bis SK IV, tot und unverletzt, je Kategorie wer am längsten
+   wartet.
 
    ![Patientenliste eines UHS-Tablets mit der Gruppe „In der UHS“ und dem Knopf „Patient aufnehmen“](../bilder/geraet-uhs/patienten.png)
 
 2. Eine Zeile antippen, um die Person zu öffnen.
+3. Zum Nachsichten ohne Öffnen die Sichtung in der Zeile antippen, die Fläche der Kategorie wählen
+   und „Übernehmen“ wählen.
 
-Wer die UHS verlassen hat, steht in der Gruppe „Ausgetreten“ mit seinem Verbleib.
+Wer die UHS verlassen hat, steht in der Gruppe „Ausgetreten“ mit seinem Verbleib. Eine Sichtung
+mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unten).
 
 ### Patient aufnehmen
 
 1. „Patient aufnehmen“ oder unten „Aufnahme“ wählen.
-2. Die Sichtungskategorie wählen und, soweit bekannt, Geschlecht, geschätztes Alter und
-   Antreffort angeben. Name und weitere Angaben stehen unter „Weitere Angaben“.
+2. Die Fläche der Sichtungskategorie antippen und, soweit bekannt, Geschlecht, geschätztes Alter und
+   Fundort angeben. Name und weitere Angaben stehen unter „Weitere Angaben“.
 
    ![Aufnahme am UHS-Tablet mit gewählter Sichtungskategorie SK II](../bilder/geraet-uhs/aufnahme.png)
 
@@ -49,20 +54,23 @@ R-013 · SK II · im Wartebereich“. Die Aufnahme geht immer in die eigene UHS.
    ![Grundriss der UHS Turnhalle Musterstadt mit Wartebereich, Behandlungsplätzen, Trage und Transportbereitstellung](../bilder/geraet-uhs/grundriss.png)
 
 2. Einen freien Platz antippen. Der Dialog „Patient zuweisen — …“ öffnet sich.
-3. Unter „Patient“ die Person wählen und „Erfassen“ wählen.
+3. Unter „Patient“ ist der dringlichste Patient vorgewählt; bei Bedarf einen anderen antippen.
+   „Zuweisen“ wählen.
 
-Alternativ lässt sich die Karte einer wartenden Person auf den Platz ziehen. Über das Menü eines
+Jede Patientenmarke im Grundriss trägt vorn die Sichtung, im Wartebereich dazu die Wartezeit.
+Die Reihenfolge erklärt [Unfallhilfsstellen](unfallhilfsstellen.md). Alternativ lässt sich die
+Karte einer wartenden Person auf den Platz ziehen. Über das Menü eines
 Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren.
 
 ### Sichten mit „Bestätigt von“
 
-1. Die Person öffnen und „Sichten“ wählen; bei einer schon gesichteten Person steht
-   „Re-Sichten“ im Menü „Weitere Aktionen“.
-2. Im Dialog „Sichtung erfassen“ die „Kategorie“ wählen und, wenn nötig, eine
+1. Die Person öffnen und oben im Patientenkopf auf die Sichtung tippen („ungesichtet“ oder die
+   bisherige Kategorie).
+2. In der aufgeklappten Sichtungswahl die Fläche der Kategorie antippen und, wenn nötig, eine
    „Kurzbegründung (optional)“ angeben.
 3. Unter „Bestätigt von“ die Person wählen, die die Sichtung verantwortet, etwa die Notärztin.
 
-   ![Dialog „Sichtung erfassen“ mit Kategorie SK II und „Bestätigt von“ Anna Probe · Notarzt](../bilder/geraet-uhs/sichtung.png)
+   ![Patientenkopf mit aufgeklappter Sichtungswahl, Kategorie SK II und „Bestätigt von“ Anna Probe · Notarzt](../bilder/geraet-uhs/sichtung.png)
 
 4. „Übernehmen“ wählen. Die Sichtung trägt danach „bestätigt: …“ mit dem Namen.
 
@@ -72,8 +80,11 @@ Für den UHS-Laptop:
 
 1. Unten „UHS“ wählen. Die Leiste oben wechselt zwischen „Plätze“, „Kräfte“, „Material“,
    „Meldungen“ und „Dateien“.
-2. „Plätze“ zählt Plätze, belegte, freie und nicht verfügbare; „Grundriss bearbeiten“ führt in
-   den Grundriss, wo „Plätze bearbeiten“ Plätze anlegt und ändert.
+2. „Plätze“ zeigt die Lage der Stelle in Zahlen wie am Fükw: „In der Stelle“ mit der Sichtung,
+   „Plätze frei“, „Wartend“ mit der längsten Wartezeit und „Abtransportiert“
+   ([Unfallhilfsstellen](unfallhilfsstellen.md)). Ein Tipp auf „In der Stelle“ öffnet die
+   Patienten, auf die übrigen Zahlen den Grundriss. „Grundriss bearbeiten“ führt in den
+   Grundriss, wo „Plätze bearbeiten“ Plätze anlegt und ändert.
 3. „Kräfte“ zeigt die Stärke der UHS und ihre Kräfte. „Kraft zuordnen“ holt eine Person des
    Einsatzes an die UHS, „Kraft erfassen“ legt eine neue an, „Abziehen“ nimmt sie wieder heraus.
 

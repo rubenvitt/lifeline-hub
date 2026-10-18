@@ -1294,7 +1294,7 @@ function materialAmOrtFlaechen(
       ziele: ziele('Fahrzeug', /^(Decken|Trage) Fahrzeug vom Fahrzeug lösen$/),
     },
     {
-      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}`,
+      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}?bereich=material`,
       anker: knopf('Decken UHS ausgeben'),
       ziele: ziele('UHS', /^(Decken|Trage) UHS lösen$/),
     },
@@ -1323,16 +1323,47 @@ test('C15 · Material am Ort (Beobachter): Bedienung fehlt, die Posten stehen', 
   // fehlen); gemessen wird, was auf der Fläche bleibt: die Reiter der UHS.
   await messeImRollenzweig(page, 'beobachter', [
     {
-      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}`,
+      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}?bereich=material`,
       anker: (page) => inMain(page).locator('[data-lfh="material-am-ort-zeile"]').first(),
       fehlt: (page) => inMain(page).getByRole('button', { name: / (lösen|ausgeben)$/ }),
       ziele: [
         {
           sorte: 'UHS Reiter (Beobachter)',
-          ziele: segment(/^(Material|Kräfte|Bewegungen|Dateien)$/, 'tab'),
+          ziele: segment(/^(Belegung|Material|Kräfte|Bewegungen|Dateien)$/, 'tab'),
           mindestens: 2,
         },
       ],
     },
   ]);
+});
+
+// ── Sichtungswahl (LLH-1083, Spec `sichtungswahl`, „Trefferfläche jeder Kategorie“) ─────
+// Wie die Zähltaste (LLH-1032) eine Ausnahme NACH OBEN: 72 × 96 in JEDER Stufe, also keine
+// Gegenprobe „kompakt bleibt kleiner“. Gemessen werden Maße und Lücke je Stufe.
+
+test('Sichtungswahl: sechs Flächen halten 72 × 96 in kompakt und Handschuh, Lücke 8 bzw. 16 px', async ({
+  page,
+}) => {
+  const einsatzId = await einsatzAnlegen(page, `Sichtungswahl ${Date.now()}`);
+  for (const [dichte, luecke] of [
+    ['kompakt', 8],
+    ['handschuh', 16],
+  ] as const) {
+    await page.goto(`/einsaetze/${einsatzId}/personen/aufnahme`);
+    await stelleDichte(page, dichte);
+    const flaechen = page
+      .getByRole('radiogroup', { name: 'Sichtungskategorie' })
+      .getByRole('radio');
+    await expect(flaechen).toHaveCount(6);
+    const kaesten = await Promise.all((await flaechen.all()).map((f) => f.boundingBox()));
+    for (const [i, k] of kaesten.entries()) {
+      expect(k, `${dichte}/Fläche ${i}`).not.toBeNull();
+      expect(k!.height + SUBPIXEL, `${dichte}/Fläche ${i}/Höhe`).toBeGreaterThanOrEqual(72);
+      expect(k!.width + SUBPIXEL, `${dichte}/Fläche ${i}/Breite`).toBeGreaterThanOrEqual(96);
+    }
+    // Waagerechte Lücke zwischen zwei Nachbarn derselben Reihe.
+    const [a, b] = [kaesten[0]!, kaesten[1]!];
+    expect(Math.abs(a.y - b.y), `${dichte}: erste zwei in einer Reihe`).toBeLessThan(1);
+    expect(b.x - (a.x + a.width) + SUBPIXEL, `${dichte}/Lücke`).toBeGreaterThanOrEqual(luecke);
+  }
 });

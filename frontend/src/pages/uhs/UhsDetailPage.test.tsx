@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
@@ -90,7 +90,7 @@ describe('UhsDetailPage — Deeplink-Robustheit (LFH-25)', () => {
   });
 });
 
-describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () => {
+describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
   const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
   const uhs = {
     id: 9,
@@ -100,23 +100,155 @@ describe('UhsDetailPage — Material/Bewegungen als Inline-Tabs (LFH-149)', () =
     status: 'aktiv',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
-
-  it('zeigt Material/Bewegungen als Tabs (kein Drawer) und schaltet zwischen ihnen', async () => {
+  const geladen = () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+  };
+  const leiste = () =>
+    screen.findByRole('tablist', { name: 'Belegung, Material, Kräfte, Bewegungen und Dateien' });
+
+  it('Vorgabe ist die Belegung: der Grundriss steht im Bereich, die anderen nicht', async () => {
+    geladen();
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
-    // Grundriss bleibt Hauptinhalt; Material/Bewegungen sind Tabs (role=tab), keine Drawer-Buttons.
-    expect(await screen.findByText('GRUNDRISS')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Material' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Bewegungen' })).toBeInTheDocument();
-    // Default-Tab (Material) inline sichtbar — kein Drawer (sonst kein Tab-Panel).
-    expect(screen.getByText('MATERIAL-TAB')).toBeInTheDocument();
+    await leiste();
+    expect(screen.getByRole('tab', { name: 'Belegung' })).toHaveAttribute('aria-selected', 'true');
+    const feld = screen.getByRole('tabpanel', { name: 'Belegung' });
+    expect(within(feld).getByText('GRUNDRISS')).toBeInTheDocument();
+    expect(screen.queryByText('MATERIAL-TAB')).not.toBeInTheDocument();
     expect(screen.queryByText('BEWEGUNGEN-TAB')).not.toBeInTheDocument();
-    // Tab-Wechsel zeigt die Bewegungen inline.
+  });
+
+  it('die Leiste steht über dem Grundriss, nicht im Seitenfluss darunter', async () => {
+    geladen();
+    const { container } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    const tabs = await leiste();
+    expect(
+      tabs.compareDocumentPosition(screen.getByText('GRUNDRISS')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // Unter der Arbeitsfläche hängt nichts mehr.
+    expect(container.querySelector('[data-lfh="seiten-inhalt"]')).toBeNull();
+  });
+
+  it('die Lage der Stelle steht in Zahlen in der Belegung über dem Grundriss (LLH-1136)', async () => {
+    geladen();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await leiste();
+    const feld = screen.getByRole('tabpanel', { name: 'Belegung' });
+    const zahlen = within(feld).getByRole('group', { name: 'Lage der Stelle' });
+    expect(
+      zahlen.compareDocumentPosition(within(feld).getByText('GRUNDRISS')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Abtransportiert']) {
+      expect(within(zahlen).getByText(titel)).toBeInTheDocument();
+    }
+    // Über dem Grundriss ist eine Zahl kein Sprung: die Fläche darunter zeigt dasselbe.
+    expect(within(zahlen).queryAllByRole('link')).toHaveLength(0);
+  });
+
+  it('?bereich=material öffnet den Bereich Material an Stelle des Grundrisses', async () => {
+    geladen();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9?bereich=material');
+
+    await leiste();
+    expect(screen.getByRole('tab', { name: 'Material' })).toHaveAttribute('aria-selected', 'true');
+    expect(
+      within(screen.getByRole('tabpanel', { name: 'Material' })).getByText('MATERIAL-TAB'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('GRUNDRISS')).not.toBeInTheDocument();
+  });
+
+  it('ein unbekannter Bereich fällt auf die Belegung zurück', async () => {
+    geladen();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9?bereich=lager');
+
+    await leiste();
+    expect(screen.getByRole('tab', { name: 'Belegung' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('GRUNDRISS')).toBeInTheDocument();
+  });
+
+  it('der Wechsel schreibt den Bereich in die Adresse, die Belegung räumt ihn', async () => {
+    geladen();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await leiste();
     await userEvent.click(screen.getByRole('tab', { name: 'Bewegungen' }));
     expect(await screen.findByText('BEWEGUNGEN-TAB')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=bewegungen');
+    expect(screen.queryByText('GRUNDRISS')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Belegung' }));
+    expect(await screen.findByText('GRUNDRISS')).toBeInTheDocument();
+    expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9');
+  });
+});
+
+describe('UhsDetailPage — Materialzahl im Kopf (LLH-1133)', () => {
+  const einsatz = { id: 1, bezeichnung: 'Lage', status: 'aktiv', meine_rolle: 'einsatzleitung' };
+  const posten = (id: number, status: string) => ({
+    id,
+    bezeichnung: `Posten ${id}`,
+    art: 'geraet',
+    menge: 1,
+    ausgegeben: 0,
+    status,
+    uhs_id: 9,
+  });
+  const uhs = {
+    id: 9,
+    einsatz_id: 1,
+    bezeichnung: 'UHS Nord',
+    typ: 'patientenablage',
+    status: 'aktiv',
+    standort: 'Halle 1',
+    notiz: null,
+    material: [posten(1, 'einsatzbereit'), posten(2, 'defekt'), posten(3, 'im_einsatz')],
+    plaetze: [],
+    belegungen: [],
+  };
+  const kopf = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
+
+  it('nennt „3 Posten · 1 Ausfall“ im Kopf, ein Tippen wählt den Bereich Material', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await screen.findByText('GRUNDRISS');
+    const link = await within(kopf()).findByRole('link', { name: '3 Posten · 1 Ausfall' });
+    await userEvent.click(link);
+    await waitFor(() =>
+      expect(aktuellerPfad()).toBe('/einsaetze/1/unfallhilfsstellen/9?bereich=material'),
+    );
+    expect(screen.getByRole('tab', { name: 'Material' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('MATERIAL-TAB')).toBeInTheDocument();
+    vi.mocked(ladeModulFreigaben).mockReset();
+  });
+
+  it('ohne Freigabe Material steht keine Zahl im Kopf', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ material: { zugriff: false } }),
+    );
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    // Positiver Anker zuerst: die Meta steht, nur die Zahl fehlt.
+    await screen.findByText('GRUNDRISS');
+    await within(kopf()).findByText(/Patientenablage · Halle 1/);
+    await waitFor(() => expect(vi.mocked(ladeModulFreigaben)).toHaveBeenCalled());
+    // Die Freigaben sind da (Gegenprobe am Kopf: „Patient aufnehmen“ ist frei), die Zahl fehlt.
+    expect(await screen.findByRole('button', { name: 'Patient aufnehmen' })).toBeEnabled();
+    expect(within(kopf()).queryByText(/Posten/)).not.toBeInTheDocument();
+    vi.mocked(ladeModulFreigaben).mockReset();
   });
 });
 
@@ -129,6 +261,9 @@ describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
     status: 'aktiv',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it.each([
@@ -142,11 +277,11 @@ describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
       status: 'aktiv',
       meine_rolle: rolle,
     } as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     const leiste = await screen.findByRole('tablist', {
-      name: 'Material, Kräfte, Bewegungen und Dateien',
+      name: 'Belegung, Material, Kräfte, Bewegungen und Dateien',
     });
     expect(leiste).toBeInTheDocument();
     expect(screen.queryByText(/DATEIEN-TAB/)).not.toBeInTheDocument();
@@ -166,6 +301,9 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
     bezeichnung: 'UHS Nord',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it('zeigt den UHS-Typ als Beschriftung, nicht als Wire-Wert', async () => {
@@ -174,7 +312,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
       ...uhsBasis,
       typ: 'patientenablage',
       status: 'aktiv',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     expect(await screen.findByText(/Patientenablage/)).toBeInTheDocument();
@@ -187,7 +325,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
       ...uhsBasis,
       typ: 'patientenablage',
       status: 'aktiv',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     const { container } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
     await screen.findByText('GRUNDRISS');
 
@@ -201,7 +339,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
       ...uhsBasis,
       typ: 'patientenablage',
       status: 'aktiv',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Auflösen' }));
@@ -221,7 +359,7 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
         ...uhsBasis,
         typ: 'patientenablage',
         status,
-      } as Awaited<ReturnType<typeof ladeUhs>>);
+      } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
       const { container, unmount } = renderBei('/einsaetze/1/unfallhilfsstellen/9');
       await screen.findByText('GRUNDRISS');
 
@@ -243,6 +381,9 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     bezeichnung: 'UHS Nord',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it('bietet „Patient aufnehmen" und schickt in die Aufnahme mit UHS-Auftrag', async () => {
@@ -252,7 +393,7 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
       id: 7,
       typ: 'patientenablage',
       status: 'aktiv',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
     await userEvent.click(await screen.findByRole('button', { name: 'Patient aufnehmen' }));
@@ -271,7 +412,7 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
       id: 7,
       typ: 'patientenablage',
       status: 'aktiv',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
     // Der Grund steht sichtbar im Knopf, nicht nur im `title` (der auf Touch nie erscheint).
@@ -292,7 +433,7 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
       id: 8,
       typ: 'patientenablage',
       status: 'geplant',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/8'); // Status geplant
 
     expect(await screen.findByRole('button', { name: 'In Betrieb nehmen' })).toBeInTheDocument();
@@ -309,7 +450,7 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
       id: 7,
       typ: 'patientenablage',
       status: 'aktiv',
-    } as Awaited<ReturnType<typeof ladeUhs>>);
+    } as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/7');
 
     // Seite ist da — Grundriss ist in dieser Datei gemockt (kein „Bett" im DOM).
@@ -328,12 +469,18 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     status: 'aktiv',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
+  afterEach(() => vi.mocked(listePersonen).mockResolvedValue([]));
 
   it('nennt die Zahl der Belegten sichtbar im gesperrten Knopf', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
-    vi.mocked(listePersonen).mockResolvedValueOnce([
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
+    // Dauerhaft, nicht einmal: die Zahlzeile im Kopf (LLH-1136) liest denselben Cache und fragt
+    // im Testclient ohne `staleTime` beim Einhängen nach.
+    vi.mocked(listePersonen).mockResolvedValue([
       { id: 1, aktuelle_uhs_id: 9, storniert_at: null },
       { id: 2, aktuelle_uhs_id: 9, storniert_at: null },
       // Andere UHS und stornierte Personen zählen nicht.
@@ -349,7 +496,7 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
 
   it('ohne Belegte ist „Auflösen“ bedienbar', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue(uhs as Awaited<ReturnType<typeof ladeUhs>>);
+    vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
     renderBei('/einsaetze/1/unfallhilfsstellen/9');
 
     expect(await screen.findByRole('button', { name: 'Auflösen' })).toBeEnabled();
@@ -365,11 +512,14 @@ describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     typ: 'patientenablage',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it('aktiv: „Unfallhilfsstelle auflösen“ bestätigt rot und löst erst dann auf', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'aktiv' } as Awaited<
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'aktiv' } as unknown as Awaited<
       ReturnType<typeof ladeUhs>
     >);
     vi.mocked(setzeUhsStatus).mockClear();
@@ -386,7 +536,7 @@ describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
 
   it('geplant: „Unfallhilfsstelle stornieren“ bestätigt rot und storniert erst dann', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'geplant' } as Awaited<
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'geplant' } as unknown as Awaited<
       ReturnType<typeof ladeUhs>
     >);
     vi.mocked(storniereUhs).mockClear();
@@ -412,13 +562,16 @@ describe('UhsDetailPage — Ablehnung im Seitenhinweis (LFH-1077)', () => {
     typ: 'patientenablage',
     standort: 'Halle 1',
     notiz: null,
+    material: [],
+    plaetze: [],
+    belegungen: [],
   };
   /** Der Hinweis-Slot des Seitenkopfs. */
   const hinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
 
   function geplant() {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
-    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'geplant' } as Awaited<
+    vi.mocked(ladeUhs).mockResolvedValue({ ...uhsBasis, status: 'geplant' } as unknown as Awaited<
       ReturnType<typeof ladeUhs>
     >);
   }
@@ -493,7 +646,7 @@ describe('UhsDetailPage — Ablehnung im Seitenhinweis (LFH-1077)', () => {
     geplant();
     vi.mocked(ladeUhs).mockImplementation(
       async (_einsatz, id) =>
-        ({ ...uhsBasis, id, status: 'geplant' }) as Awaited<ReturnType<typeof ladeUhs>>,
+        ({ ...uhsBasis, id, status: 'geplant' }) as unknown as Awaited<ReturnType<typeof ladeUhs>>,
     );
     vi.mocked(setzeUhsStatus).mockReset();
     vi.mocked(setzeUhsStatus).mockRejectedValueOnce(new ApiError(409, 'Keine Plätze angelegt'));

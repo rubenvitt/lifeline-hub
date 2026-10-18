@@ -24,7 +24,7 @@ async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unkn
 
 /** Die Sichtungs-Auswahlfläche über ihre Beschriftung (wie `personen-aufnahme.spec.ts`). */
 function skFlaeche(page: Page, label: string) {
-  return page.locator('#sichtung').getByText(label, { exact: true });
+  return page.locator('#sichtung').getByRole('radio', { name: new RegExp(`^${label},`) });
 }
 
 test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerruf', async ({
@@ -155,16 +155,20 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
     await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/patienten$`));
 
     await tablet.goto(`/geraet/${e}/patienten/${person.id}`);
-    await tablet.getByRole('button', { name: 'Sichten', exact: true }).click();
-    const dialog = tablet.getByRole('dialog', { name: 'Sichtung erfassen' });
-    await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'SK II');
+    // Nachsichten im Patientenkopf, ohne Dialog (LLH-1094).
+    const kopf = tablet.getByRole('region', { name: 'Patientenkopf' });
+    await kopf.getByRole('button', { name: /^Sichten, bisher ungesichtet|^Nachsichten/ }).click();
+    const paneel = tablet.getByRole('region', { name: 'Sichtung erfassen' });
+    await paneel.getByRole('radio', { name: /^SK II,/ }).click();
     await waehleIn(
-      dialog.getByRole('combobox', { name: 'Bestätigt von' }),
+      paneel.getByRole('combobox', { name: 'Bestätigt von' }),
       'Dr. A. Muster · Notärztin',
     );
-    await dialog.getByRole('button', { name: 'Übernehmen' }).click();
-    await expect(dialog).toHaveCount(0);
-    await expect(tablet.getByText('bestätigt: Dr. A. Muster')).toBeVisible();
+    await paneel.getByRole('button', { name: 'Übernehmen' }).click();
+    await expect(paneel).toHaveCount(0);
+    await expect(kopf.locator('[data-lfh="sichtung-zeit"]')).toContainText(
+      'bestätigt: Dr. A. Muster',
+    );
   } finally {
     await kontext.close();
   }

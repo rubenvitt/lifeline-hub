@@ -231,6 +231,51 @@ describe('StatusWahl · „Status setzen“ in der Palette (LFH-507)', () => {
     await waitFor(() => expect(offeneMenues()).toHaveLength(0));
   });
 
+  /**
+   * Material am Ort in der Fahrzeugkarte (LLH-1133): die Posten tragen je eine eigene Zeilenwurzel
+   * (`kraefte/MaterialAmOrt.tsx`, `data-row-key`). Ohne sie wäre die Karte die Zeile aller
+   * Statuswahlen, und der zuletzt angemeldete Posten gewänne gegen das Fahrzeug.
+   */
+  it('trifft in einer Karte mit Materialposten das Fahrzeug, nicht den letzten Posten', async () => {
+    const u = userEvent.setup();
+    const fahrzeug = vi.fn();
+    const posten = vi.fn();
+    renderMitProviders(
+      <CommandPaletteProvider>
+        <div data-lfh="datensicht-karte">
+          <a href="/fahrzeuge/1">Florian 1</a>
+          <StatusWahl
+            darstellung={FREI}
+            optionen={OPTIONEN}
+            kennung="Florian 1"
+            onWaehlen={fahrzeug}
+            darfSchreiben
+          />
+          <div data-row-key="material-7" data-lfh="material-am-ort-zeile">
+            <StatusWahl
+              darstellung={FREI}
+              optionen={OPTIONEN}
+              kennung="Trage"
+              onWaehlen={posten}
+              darfSchreiben
+            />
+          </div>
+        </div>
+      </CommandPaletteProvider>,
+    );
+
+    await paletteAusZeile(u, 'Florian 1');
+    await u.click(option('status-setzen')!);
+    const menue = await waitFor(() => {
+      const offen = offeneMenues();
+      expect(offen).toHaveLength(1);
+      return offen[0];
+    });
+    await u.click(within(menue).getByRole('menuitem', { name: '4 – Am Einsatzort' }));
+    expect(fahrzeug).toHaveBeenCalledWith(4);
+    expect(posten).not.toHaveBeenCalled();
+  });
+
   it('öffnet im Tabellenzweig das Menü der Fokuszeile (Zeile per data-row-key)', async () => {
     const u = userEvent.setup();
     const gewaehlt = vi.fn();

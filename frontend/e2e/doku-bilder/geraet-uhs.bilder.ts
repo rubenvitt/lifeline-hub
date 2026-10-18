@@ -1,5 +1,5 @@
 import type { Browser, Page } from '@playwright/test';
-import { waehleIn, waehleStehend } from '../auswahl-kern';
+import { waehleIn } from '../auswahl-kern';
 import {
   KONTEXTE,
   anmelden,
@@ -22,7 +22,7 @@ import {
  *   patienten.png   frontend/src/geraet/GeraetPatientenPage.tsx
  *   aufnahme.png    frontend/src/pages/personen/AufnahmePage.tsx (Gerätezweig)
  *   grundriss.png   frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx
- *   sichtung.png    frontend/src/personen/SichtungDialog.tsx, frontend/src/geraet/BestaetigtVonFeld.tsx
+ *   sichtung.png    frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/geraet/BestaetigtVonFeld.tsx
  *   laptop-uhs.png  frontend/src/geraet/GeraetStellePage.tsx, frontend/src/pages/uhs/UhsKraefte.tsx
  */
 
@@ -105,7 +105,10 @@ test.describe(KAPITEL, () => {
     try {
       await nav.getByRole('link', { name: 'Aufnahme' }).click();
       await expect(geraet).toHaveURL(/\/aufnahme\?uhs=\d+$/);
-      await geraet.locator('#sichtung').getByText('SK II', { exact: true }).click();
+      await geraet
+        .locator('#sichtung')
+        .getByRole('radio', { name: /^SK II,/ })
+        .click();
       await fotografiere(geraet.locator('main'), KAPITEL, 'aufnahme');
       await geraet.getByRole('button', { name: 'Speichern und nächste' }).click();
       await expect(geraet.getByText(/Erfasst als R-\d{3} · SK II · im Wartebereich/)).toBeVisible();
@@ -132,9 +135,8 @@ test.describe(KAPITEL, () => {
       // Nachgeklickt: Tippen auf den freien Platz öffnet „Patient zuweisen“.
       await platz.click();
       const dialog = geraet.getByRole('dialog', { name: /^Patient zuweisen — Behandlungsplatz 1/ });
-      await dialog.getByRole('combobox', { name: 'Patient' }).click();
-      await waehleStehend(geraet, 'R-001 · Mustermann', { exact: false });
-      await dialog.getByRole('button', { name: 'Erfassen' }).click();
+      await dialog.getByRole('radio', { name: /R-001 · Mustermann/ }).check();
+      await dialog.getByRole('button', { name: 'Zuweisen' }).click();
       await expect(dialog).toHaveCount(0);
       await expect(platz).toContainText('Mustermann');
     } finally {
@@ -169,15 +171,18 @@ test.describe(KAPITEL, () => {
       const label = mit.funktion ? `${mit.name} · ${mit.funktion}` : mit.name;
 
       await geraet.goto(`/geraet/${einsatz}/patienten/${person.id}`);
-      await geraet.getByRole('button', { name: 'Sichten', exact: true }).click();
-      const dialog = geraet.getByRole('dialog', { name: 'Sichtung erfassen' });
-      await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'SK II');
-      await waehleIn(dialog.getByRole('combobox', { name: 'Bestätigt von' }), label);
-      await dialog.getByRole('combobox', { name: 'Bestätigt von' }).blur();
-      await fotografiere(dialog, KAPITEL, 'sichtung');
-      await dialog.getByRole('button', { name: 'Übernehmen' }).click();
-      await expect(dialog).toHaveCount(0);
-      await expect(geraet.getByText(`bestätigt: ${mit.name}`)).toBeVisible();
+      const kopf = geraet.getByRole('region', { name: 'Patientenkopf' });
+      await kopf.getByRole('button', { name: /^Sichten, bisher ungesichtet|^Nachsichten/ }).click();
+      const paneel = geraet.getByRole('region', { name: 'Sichtung erfassen' });
+      await paneel.getByRole('radio', { name: /^SK II,/ }).click();
+      await waehleIn(paneel.getByRole('combobox', { name: 'Bestätigt von' }), label);
+      await paneel.getByRole('combobox', { name: 'Bestätigt von' }).blur();
+      await fotografiere(kopf, KAPITEL, 'sichtung');
+      await paneel.getByRole('button', { name: 'Übernehmen' }).click();
+      await expect(paneel).toHaveCount(0);
+      await expect(kopf.locator('[data-lfh="sichtung-zeit"]')).toContainText(
+        `bestätigt: ${mit.name}`,
+      );
     } finally {
       await kontext.close();
     }

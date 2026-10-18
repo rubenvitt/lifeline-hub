@@ -18,7 +18,7 @@ Halter zuordnen.
 ### Die Tiere im Einsatz ablesen
 
 1. Im Modulpanel „Tiere“ öffnen. Die Liste zeigt je Tier Registriernummer, Status, Spezies,
-   Rufname, Rasse, Halter, seit wann es geführt wird und den Antreffort.
+   Rufname, Rasse, Halter, seit wann es geführt wird und den Fundort.
 
    ![Liste der Tiere in der Sicht „Alle“ mit aktiven, vermissten und abgeschlossenen Tieren](../bilder/tiere/liste.png)
 
@@ -31,15 +31,15 @@ Halter zuordnen.
 
 1. „Tier erfassen“ wählen.
 2. Die „Spezies“ wählen („Hund“, „Katze“, „Großtier“, „Nutzgeflügel“, „Kleintier“, „Wildtier“,
-   „Sonstige“), dazu „Rufname“ und „Antreffort“, soweit bekannt.
+   „Sonstige“), dazu „Rufname“ und „Fundort“, soweit bekannt.
 3. Unter „Weitere Angaben“ bei Bedarf „Rasse / Beschreibung“ und „Notiz“ ergänzen.
 
-   ![Dialog „Tier erfassen“ mit Spezies Katze, Rufname, Antreffort, Rasse und Notiz](../bilder/tiere/erfassen.png)
+   ![Dialog „Tier erfassen“ mit Spezies Katze, Rufname, Fundort, Rasse und Notiz](../bilder/tiere/erfassen.png)
 
 4. „Erfassen“ wählen. Das Tier steht als „aktiv“ in der Liste.
 
 An einer Sammelstelle kommen Tiere oft nacheinander: „Speichern und nächste“ hält den Dialog
-offen, mit „Werte behalten“ bleiben Spezies und Antreffort stehen.
+offen, mit „Werte behalten“ bleiben Spezies und Fundort stehen.
 
 ### Ein vermisstes Tier melden und als aufgefunden markieren
 
@@ -59,8 +59,9 @@ Ein aktives Tier, das entlaufen ist, setzt „Als vermisst markieren“ auf „v
    externen Kontakt: „…““ wählen.
 3. „Speichern“ wählen.
 
-Umgekehrt ordnet „Tier zuweisen“ auf der Seite einer betroffenen Person ein Tier zu, das noch
-keinen Halter hat. Die Liste der Tiere zeigt den Halter dann mit seiner Registriernummer.
+Umgekehrt ordnet „Bezug hinzufügen“ unter „Bezüge“ auf der Seite einer betroffenen Person ein
+Tier zu, das noch keinen Halter hat ([Betroffene und Sichtung](betroffene.md)). Die Liste der
+Tiere zeigt den Halter dann mit seiner Registriernummer.
 
 ### Ein Tier abschließen
 

@@ -76,6 +76,32 @@ describe('ebenenZeilen', () => {
     expect(anzahl.fahrzeug).toBe(0);
   });
 
+  it('markiert die Ebene, die nur der Verortungsauftrag zeichnet, als „eingeblendet“ (LLH-1125)', () => {
+    const aus = { ...ALLE_AN, person: false, schaden: false };
+    const frei = { zugriff: 'frei', anzahl: 1 } as const;
+    const zeilen = ebenenZeilen([], 0, aus, false, frei, undefined, undefined, 'person');
+    const person = zeilen.find((z) => z.key === 'person')!;
+    // Der Schalter bleibt die Wahl: aus, aber eingeblendet.
+    expect(person).toMatchObject({ sichtbar: false, eingeblendet: true });
+    expect(zeilen.find((z) => z.key === 'schaden')!.eingeblendet).toBeFalsy();
+    // Ohne Modulfreigabe gibt es nichts einzublenden.
+    const gesperrt = ebenenZeilen(
+      [],
+      0,
+      aus,
+      false,
+      { zugriff: 'gesperrt', anzahl: 0 },
+      undefined,
+      undefined,
+      'person',
+    );
+    expect(gesperrt.find((z) => z.key === 'person')!.eingeblendet).toBeFalsy();
+    // Ein Vorrang auf eine andere Ebene greift nur dort.
+    const schaden = ebenenZeilen([], 0, aus, false, frei, undefined, undefined, 'schaden');
+    expect(schaden.find((z) => z.key === 'schaden')!.eingeblendet).toBe(true);
+    expect(schaden.find((z) => z.key === 'person')!.eingeblendet).toBeFalsy();
+  });
+
   it('zählt Zonen aus der ungegatterten Liste — auch bei abgeschalteter Ebene', () => {
     // `zonenFeatures` wäre bei `layer.zone = false` leer, die Zeile zeigte „0" für vorhandene Zonen
     // — deshalb kommt die Zahl von außen.

@@ -179,7 +179,8 @@ function ortPfad(einsatzId: number, ort: MaterialOrtRef): string {
     case 'fahrzeug':
       return fahrzeugePfad(einsatzId, { fahrzeug: ort.id });
     case 'uhs':
-      return uhsDetailPfad(einsatzId, ort.id);
+      // Material steht dort im eigenen Bereich (LLH-1133), nicht unter der Belegung.
+      return uhsDetailPfad(einsatzId, ort.id, { bereich: 'material' });
     case 'bereitstellungsraum':
       return bereitstellungsraumDetailPfad(einsatzId, ort.id);
   }

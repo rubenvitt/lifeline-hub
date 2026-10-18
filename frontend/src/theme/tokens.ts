@@ -13,6 +13,32 @@ export const sichtungsfarben = {
   schwarz: '#000000',
 } as const;
 
+/** Sichtungskategorien mit eigener Farbe (alle außer „unverletzt“). */
+export type SichtungsFarbe = keyof typeof sichtungsfarben;
+
+/**
+ * Flächenpalette der Sichtungs-WAHL (LLH-1083, Option B; `personen/SichtungsWahl.tsx`): eine
+ * gefüllte Fläche je Kategorie mit Kürzel und Wort darin. Die Punktfarben oben taugen dafür nicht
+ * (Weiß auf `#f5222d` 4,08 : 1); diese Töne sind bis zum Textboden abgedunkelt und in BEIDEN
+ * Modi gleich, damit der BBK-Farbton nachts derselbe bleibt. Die Anzeige (`SichtungsTag`, Karte,
+ * Druck) bleibt bei `sichtungsfarben`. Gerechnet in `sichtungKontrast.test.ts`.
+ */
+export const sichtungsflaechen: Record<SichtungsFarbe, { flaeche: string; schrift: string }> = {
+  rot: { flaeche: '#a8071a', schrift: '#ffffff' },
+  gelb: { flaeche: '#fadb14', schrift: '#000000' },
+  gruen: { flaeche: '#135200', schrift: '#ffffff' },
+  blau: { flaeche: '#003eb3', schrift: '#ffffff' },
+  schwarz: { flaeche: '#000000', schrift: '#ffffff' },
+};
+
+/**
+ * Die Kante jeder Sichtungsfläche: die Textfarbe des Modus. Ohne sie verschwänden Gelb auf hellem
+ * und Rot, Blau, Grün, Schwarz auf dunklem Grund (Fläche gegen Grund 1,05–2,6 : 1).
+ */
+export function sichtungsKante(rollen: Pick<Farbrollen, 'text'>): string {
+  return rollen.text;
+}
+
 /**
  * Gestaltungssprache (LFH-352) in der Fassung des Neuentwurfs „Instrumententafel“.
  * Grundlage: `docs/superpowers/specs/2026-07-25-gestaltungssprache.md` und

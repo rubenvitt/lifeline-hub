@@ -1,5 +1,6 @@
-import { Alert, Button } from 'antd';
+import { Alert, Button, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { IconPersonPlus } from '../icons';
 import { useAuth } from '../auth/AuthContext';
@@ -10,11 +11,37 @@ import type { Person, UhsDetail } from '../api/types';
 import Datensicht, { spaltenFuer } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { personenKarte, personenSpalten, verbleibText } from '../personen/personenSpalten';
+import { useRollen } from '../components/instrument';
+import {
+  personenKarte,
+  personenSpalten,
+  seitWert,
+  verbleibText,
+} from '../personen/personenSpalten';
 import { geraetAufnahmePfad, geraetPersonPfad } from '../routing/deeplinks';
+import { dringlichkeitsWert, wartetSeit } from '../pages/uhs/dringlichkeit';
+import { useZeilenFehler } from '../components/useZeilenFehler';
+import { useHalteQuellen } from '../components/useHalteQuellen';
+import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
+import { useGeraetDarf } from './geraetSicht';
 
-/** Spalten des Registers, die das Tablet zeigt; Zustand, Fundort und Vermerk stehen im Detail. */
-const GERAET_SPALTEN = new Set(['reg', 'person', 'sk', 'seit']);
+/**
+ * Spalten des Registers, die das Tablet zeigt; Fundort und Vermerk stehen im Detail. Der Zustand
+ * steht dabei (LLH-1135): wer als Nächstes auf einen Platz kommt, entscheidet sich an Sichtung und
+ * Zustand.
+ */
+const GERAET_SPALTEN = new Set(['reg', 'person', 'sk', 'zustand', 'seit']);
+
+/** Zustand in Kurzform: eine Zeile, Längeres endet mit „…“ und steht ganz im Tooltip. */
+function ZustandKurz({ zustand }: { zustand: string | null | undefined }) {
+  const { rollen } = useRollen();
+  if (!zustand) return <span style={{ color: rollen.schwach }}>—</span>;
+  return (
+    <Typography.Text ellipsis={{ tooltip: zustand }} style={{ fontSize: 12, color: rollen.text2 }}>
+      {zustand}
+    </Typography.Text>
+  );
+}
 
 const IN_DER_UHS = 'hier';
 const AUSGETRETEN = 'weg';
@@ -55,11 +82,53 @@ export default function GeraetPatientenPage() {
   });
   const uhs = uhsQuery.data;
 
-  const register = personenSpalten((id) => (id === uhs?.id ? uhs.bezeichnung : undefined));
+  /*
+   * Nachsichten aus der Zeile (LLH-1130, Spec `betroffene-lagedaten`): das UHS-Gerät darf sichten
+   * (`person-sichtung`), verortet aber nicht (`fremde-module`) — deshalb kein Zeilenmenü; Zustand
+   * und Verbleib bleiben hier Anzeige. Der Grund einer Ablehnung steht an der Zeile, das offene
+   * Popover hält die Liste.
+   */
+  const darf = useGeraetDarf();
+  const sichtungZeilen = useZeilenFehler<number>();
+  const { beginne, melde } = sichtungZeilen;
+  const { isHolding, hold } = useHalteQuellen();
+  const rueckmeldung = useMemo<ZeilenRueckmeldung>(
+    () => ({
+      beginne,
+      melde: (personId, fehler) => melde(personId, fehler, 'Sichtung nicht gespeichert'),
+      hold,
+    }),
+    [beginne, melde, hold],
+  );
+  const register = personenSpalten((id) => (id === uhs?.id ? uhs.bezeichnung : undefined), {
+    einsatzId,
+    darfSchreiben: false,
+    darfSichten: darf('person-sichtung'),
+    rueckmeldung,
+  });
+  /*
+   * Vorgabe-Sortierung nach Dringlichkeit (LLH-1135, `pages/uhs/dringlichkeit.ts`, dieselbe Reihe
+   * wie Wartebereich und Zuweisung): die Sichtungsspalte sortiert nach Reihe und Wartezeit seit
+   * dem Eintritt (bzw. der Rückkehr in den Wartebereich); ohne Belegung zählt die Sichtung oder
+   * Erfassung. Den Zufluss hält die Schleuse der `Datensicht`.
+   */
+  const dringlichkeit = (p: Person) =>
+    dringlichkeitsWert({
+      sichtung: p.aktuelle_sichtung,
+      seit: (uhs ? wartetSeit(p.id, uhs.belegungen) : null) ?? seitWert(p),
+    });
   const spalten = spaltenFuer<Person>()([
-    ...register.filter((s) => GERAET_SPALTEN.has(s.key)),
+    ...register
+      .filter((s) => GERAET_SPALTEN.has(s.key))
+      .map((s): (typeof register)[number] =>
+        s.key === 'sk'
+          ? { ...s, sortWert: dringlichkeit }
+          : s.key === 'zustand'
+            ? { ...s, render: (_: unknown, p: Person) => <ZustandKurz zustand={p.zustand} /> }
+            : s,
+      ),
     {
-      title: 'Ort',
+      title: 'Platz',
       key: 'ort',
       width: 160,
       immerSichtbar: true,
@@ -94,7 +163,7 @@ export default function GeraetPatientenPage() {
           ladend={personenQuery.isLoading}
           leerText="Noch keine Patienten in dieser Unfallhilfsstelle"
           suche={{ platzhalter: 'R-Nr., Name' }}
-          standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
+          standardSortierung={{ spalte: 'sk', richtung: 'auf' }}
           gruppen={{
             schluessel: (p) => (uhs && p.aktuelle_uhs_id === uhs.id ? IN_DER_UHS : AUSGETRETEN),
             etikett: (g) => (g === IN_DER_UHS ? 'In der UHS' : 'Ausgetreten'),
@@ -102,9 +171,12 @@ export default function GeraetPatientenPage() {
             unterEbene: 1,
           }}
           onZeileKlick={(p) => navigate(geraetPersonPfad(einsatzId, p.id))}
+          zeilenFehler={(p) => sichtungZeilen.grund(p.id)}
+          halten={isHolding}
           karte={{
             ...personenKarte(einsatzId),
             titel: { spalte: 'reg', ziel: (p) => geraetPersonPfad(einsatzId, p.id) },
+            // Höchstens drei Felder: der Zustand steht in der Kartenform nicht (Tablet zeigt die Tabelle).
             sekundaer: ['person', 'sk', 'ort'],
           }}
         />

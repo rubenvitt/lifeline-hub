@@ -270,8 +270,8 @@ describe('Zustand-Spalte (LFH-613)', () => {
     renderMitProviders(<div onClick={zeilenKlick}>{zelle(mitSchreibrecht, basis)}</div>);
 
     // Die Zeilenkennung trägt den Namen — n Zeilen, n unterscheidbare Knöpfe.
-    const knopf = screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
-    expect(knopf).toHaveTextContent('Zustand hinzufügen');
+    const knopf = screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' });
+    expect(knopf).toHaveTextContent('Zustand / Verdacht hinzufügen');
     await userEvent.click(knopf);
     // Der Klick bleibt in der Zelle — die Zeile navigiert nicht auf die Detailseite.
     expect(zeilenKlick).not.toHaveBeenCalled();
@@ -285,7 +285,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   it('zeigt während des Speicherns den GETIPPTEN Wert mit Ladeanzeige, nicht wieder den Platzhalter (LFH-650)', async () => {
     /**
-     * Bis zur Serverantwort darf bei vorher leerem Feld nicht wieder „Zustand hinzufügen" stehen;
+     * Bis zur Serverantwort darf bei vorher leerem Feld nicht wieder „Zustand / Verdacht hinzufügen" stehen;
      * die Antwort wird festgehalten, damit der Zwischenzustand beobachtbar ist.
      */
     let freigeben!: () => void;
@@ -297,12 +297,16 @@ describe('Zustand-Spalte (LFH-613)', () => {
       }),
     );
     renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     const feld = screen.getByRole('textbox');
     await userEvent.type(feld, 'gehfähig');
     fireEvent.blur(feld);
 
-    const knopf = await screen.findByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
+    const knopf = await screen.findByRole('button', {
+      name: 'Zustand / Verdacht zu R-001 bearbeiten',
+    });
     expect(knopf).toHaveTextContent('gehfähig');
     // Warten auf die Bedingung, nicht auf den Takt (LFH-531): antds Button führt `loading` über
     // einen eigenen Zustand (`useDelayState`, gesetzt im Layout-Effekt) und trägt die Klasse erst
@@ -311,7 +315,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
     // festgehalten, die Ladeanzeige muss also stehen und bleiben.
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
     expect(knopf).toHaveTextContent('gehfähig');
-    expect(screen.queryByRole('button', { name: 'Zustand zu R-001 hinzufügen' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    ).toBeNull();
     freigeben();
   });
 
@@ -333,21 +339,23 @@ describe('Zustand-Spalte (LFH-613)', () => {
     const gehalten = new Promise<void>((r) => (freigeben = r));
     vi.spyOn(client, 'invalidateQueries').mockImplementation(() => gehalten);
     renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>, { client });
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
 
     await waitFor(() => expect(koerper).toHaveLength(1));
     await waitFor(() => expect(client.invalidateQueries).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 30));
-    const knopf = screen.getByRole('button', { name: 'Zustand zu R-001 bearbeiten' });
+    const knopf = screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 bearbeiten' });
     expect(knopf).toHaveTextContent('gehfähig');
     expect(knopf).toHaveClass('ant-btn-loading');
     freigeben();
     // Gegenhälfte: steht der Refetch, endet der Laufzustand (ohne neue Daten kehrt der
     // Platzhalter zurück).
     expect(
-      await screen.findByRole('button', { name: 'Zustand zu R-001 hinzufügen' }),
+      await screen.findByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
     ).toBeInTheDocument();
   });
 
@@ -365,7 +373,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
       ),
     );
     const { container } = renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
 
@@ -380,7 +390,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
     );
 
     scheitern = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
     await waitFor(() => expect(zellHuelle).not.toHaveAttribute('data-fehler'));
@@ -389,7 +401,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   it('bietet einer VERMISSTEN Person keinen Zustand an — auch mit Schreibrecht', () => {
     renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, status: 'vermisst' })}</>);
-    expect(screen.queryByRole('button', { name: /Zustand zu R-001/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Zustand \/ Verdacht zu R-001/ })).toBeNull();
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
@@ -402,7 +414,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
       }),
     );
     renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     fireEvent.blur(screen.getByRole('textbox'));
     await new Promise((r) => setTimeout(r, 20));
     expect(patch).not.toHaveBeenCalled();
