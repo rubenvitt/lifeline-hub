@@ -38,6 +38,7 @@ import {
 } from './leistenDaten';
 import Sichtungslegende from './Sichtungslegende';
 import Klassenlegende from './Klassenlegende';
+import { VerortetInhalt, type VerortetMeldung } from './PlatzierSteuerung';
 import './lagekarte.css';
 import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
@@ -273,6 +274,17 @@ export interface SidebarProps {
   onEinsatzortPlatzieren: () => void;
   layer: LayerSichtbar;
   onLayerToggle: (key: keyof LayerSichtbar, an: boolean) => void;
+  /**
+   * Die Ebene, die nur ein Verortungsauftrag zeichnet (LLH-1125): ihre Zeile trägt „eingeblendet“,
+   * der Schalter zeigt weiter `layer`.
+   */
+  eingeblendet?: keyof LayerSichtbar | null;
+  /**
+   * Rückmeldung nach dem Verorten (LLH-1125). Ab `lg` steht sie hier oben; unter `lg`
+   * (`modusBedienungImFuss`) trägt sie das Fuß-Band, und die Leiste zeigt sie nicht — je Breite
+   * genau ein Knopf je Handlung.
+   */
+  verortetMeldung?: VerortetMeldung | null;
   /** Zahl der Zonen der aktiven Ansicht — UNGEGATTERT (siehe `ebenenZeilen`). */
   zonenAnzahl: number;
   /**
@@ -415,6 +427,7 @@ function EbenenZeilenKnopf({
   onUmschalten: (an: boolean) => void;
 }) {
   const { token, rollen } = useRollen();
+  const eingeblendetId = useId();
   const farbe = ebenenFarbe(zeile.key, rollen);
   if (zeile.sperrgrund) return <GesperrteEbenenZeile zeile={zeile} grund={zeile.sperrgrund} />;
   return (
@@ -423,6 +436,7 @@ function EbenenZeilenKnopf({
       role="switch"
       aria-checked={zeile.sichtbar}
       aria-label={zeile.name}
+      aria-describedby={zeile.eingeblendet ? eingeblendetId : undefined}
       data-ebene={zeile.key}
       className="lfh-ebenenzeile"
       onClick={() => onUmschalten(!zeile.sichtbar)}
@@ -450,7 +464,16 @@ function EbenenZeilenKnopf({
             : 'transparent',
         }}
       />
-      <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{zeile.name}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 12 }}>
+        {zeile.name}
+        {/* Aus, aber für den Verortungsauftrag gezeichnet (LLH-1125): der Zusatz sagt, warum Marker
+            trotz ausgeschalteter Ebene stehen. Der zugängliche Name bleibt der Ebenenname. */}
+        {zeile.eingeblendet && (
+          <span id={eingeblendetId} style={{ color: rollen.text2 }}>
+            {' · eingeblendet'}
+          </span>
+        )}
+      </span>
       {/* `text2` aus demselben Grund; `gedaempft` hielte am Tag auf `flaeche3` nur 6,6 : 1. */}
       <span style={{ ...monoStil(11), color: rollen.text2 }}>{zeile.anzahl}</span>
     </button>
@@ -669,8 +692,10 @@ export default function Sidebar(props: SidebarProps) {
     props.personen,
     props.betreuung,
     props.br,
+    props.eingeblendet ?? null,
   );
-  const zeigeSichtungslegende = props.layer.person && props.personen?.zugriff === 'frei';
+  const zeigeSichtungslegende =
+    (props.layer.person || props.eingeblendet === 'person') && props.personen?.zugriff === 'frei';
   const grundlagePaneelInhalt =
     props.grundlageWahl != null ||
     !props.onlineVerfuegbar ||
@@ -711,6 +736,19 @@ export default function Sidebar(props: SidebarProps) {
         color: rollen.text,
       }}
     >
+      {props.verortetMeldung && !props.modusBedienungImFuss && (
+        <div
+          data-lfh="verortet-hinweis"
+          style={{
+            padding: token.padding,
+            borderBlockEnd: `1px solid ${rollen.linie}`,
+            borderInlineStart: `2px solid ${rollen.bedien}`,
+            background: rollen.flaeche2,
+          }}
+        >
+          <VerortetInhalt meldung={props.verortetMeldung} />
+        </div>
+      )}
       {platzierungZiel && darfSchreiben && (
         <div
           data-lfh="platzieren-hinweis"

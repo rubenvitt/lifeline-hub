@@ -97,7 +97,7 @@ function rendere(fehler: (e: unknown) => void = vi.fn(), erfolg: (text: string) 
       useKartenInteraktion({
         einsatzId: 1,
         darfSchreiben: true,
-        waehlbar: [],
+        waehlbarRef: { current: [] },
         // Jede Handlung meldet an dieselbe Sonde; Schlüssel prüft der Test mit `useKartenFehler`.
         beginneHandlung: () => fehler,
         verwirfHandlung: vi.fn(),
@@ -309,6 +309,8 @@ describe('useKartenInteraktion — Einsatzort verorten (LFH-1006)', () => {
       einsatzort_lon: 8.6,
     });
     await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    // Ein Start aus der Leiste ist kein Auftrag von außen: keine Rückmeldung am Ort (LLH-1125).
+    expect(result.current.verortetZiel).toBeNull();
     expect(result.current.platzierungZiel).toBeNull();
   });
 });
@@ -324,7 +326,7 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg,
@@ -354,6 +356,117 @@ describe('useKartenInteraktion — Betroffene verorten (LFH-613)', () => {
   });
 });
 
+describe('useKartenInteraktion — Verortungsauftrag von außen (LLH-1125)', () => {
+  it('ein Start aus der Leiste bleibt beim Toast und beendet den Modus wie bisher (LFH-765)', async () => {
+    const erfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
+    act(() => result.current.onPlatzierenStart({ typ: 'schaden', id: 3 }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    expect(result.current.verortetZiel).toBeNull();
+    expect(result.current.platzierungZiel).toBeNull();
+    expect(result.current.auswahl).toBeNull();
+    expect(result.current.flyToZiel).toBeNull();
+  });
+
+  it('der Start eines äußeren Auftrags setzt den Typ der Ebene, ein Start aus der Leiste nicht', () => {
+    const { result } = rendere();
+    act(() => result.current.onPlatzierenStart({ typ: 'schaden', id: 3 }));
+    expect(result.current.verortungsTyp).toBeNull();
+    act(() => result.current.onVerortungsauftragStart({ typ: 'person', id: 10, zurueck: true }));
+    expect(result.current.verortungsTyp).toBe('person');
+    expect(result.current.platzierungZiel).toEqual({ typ: 'person', id: 10 });
+    expect(result.current.exklusiverModusAktiv).toBe(true);
+  });
+
+  it('Erfolg setzt „verortet“ mit Herkunft, wählt den Marker und fliegt hin — kein Toast', async () => {
+    einsatzPersonApi.aktualisierePerson.mockClear();
+    const erfolg = vi.fn();
+    const { result } = rendere(vi.fn(), erfolg);
+    act(() => result.current.onVerortungsauftragStart({ typ: 'person', id: 10, zurueck: true }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+
+    await waitFor(() =>
+      expect(result.current.verortetZiel).toEqual({ typ: 'person', id: 10, zurueck: true }),
+    );
+    expect(erfolg).not.toHaveBeenCalled();
+    expect(result.current.platzierungZiel).toBeNull();
+    // Hervorgehoben über die vorhandene Auswahl; die Karte bleibt bedienbar.
+    expect(result.current.auswahl).toBe('person-10');
+    expect(result.current.flyToZiel).toEqual({ lng: 8.6, lat: 50.1 });
+    expect(result.current.exklusiverModusAktiv).toBe(false);
+    // Der Vorrang der Ebene bleibt nach dem Verorten stehen.
+    expect(result.current.verortungsTyp).toBe('person');
+  });
+
+  it('Schaden: das Detail ist danach frisch, damit „Zurück zu S-…“ die Koordinate zeigt', async () => {
+    einsatzSchadenApi.aktualisiereSchaden.mockClear();
+    const client = neuerQueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbarRef: { current: [] },
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
+          erfolg: vi.fn(),
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    act(() => result.current.onVerortungsauftragStart({ typ: 'schaden', id: 3, zurueck: true }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(result.current.verortetZiel?.typ).toBe('schaden'));
+    const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+    expect(keys).toContainEqual(['einsatz-schaden', 1, 3]);
+  });
+
+  it('ohne Herkunft trägt die Rückmeldung keinen Rückweg', async () => {
+    const { result } = rendere();
+    act(() => result.current.onVerortungsauftragStart({ typ: 'person', id: 10, zurueck: false }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() =>
+      expect(result.current.verortetZiel).toEqual({ typ: 'person', id: 10, zurueck: false }),
+    );
+  });
+
+  it('„Auf der Karte bleiben“ räumt nur die Rückmeldung, der Vorrang der Ebene bleibt', async () => {
+    const { result } = rendere();
+    act(() => result.current.onVerortungsauftragStart({ typ: 'person', id: 10, zurueck: true }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(result.current.verortetZiel).not.toBeNull());
+
+    act(() => result.current.onVerortetSchliessen());
+    expect(result.current.verortetZiel).toBeNull();
+    expect(result.current.verortungsTyp).toBe('person');
+    expect(result.current.auswahl).toBe('person-10');
+  });
+
+  it('neu verorten läuft wie beim ersten Mal, ein anderer Modus verdrängt die Rückmeldung', async () => {
+    const { result } = rendere();
+    act(() => result.current.onVerortungsauftragStart({ typ: 'person', id: 10, zurueck: true }));
+    act(() => result.current.onKarteKlick({ lng: 8.6, lat: 50.1 }));
+    await waitFor(() => expect(result.current.verortetZiel).not.toBeNull());
+
+    act(() => result.current.onVerortungsauftragStart({ typ: 'person', id: 10, zurueck: true }));
+    expect(result.current.verortetZiel).toBeNull();
+    expect(result.current.platzierungZiel).toEqual({ typ: 'person', id: 10 });
+    act(() => result.current.onKarteKlick({ lng: 8.7, lat: 50.2 }));
+    await waitFor(() =>
+      expect(result.current.verortetZiel).toEqual({ typ: 'person', id: 10, zurueck: true }),
+    );
+    expect(result.current.flyToZiel).toEqual({ lng: 8.7, lat: 50.2 });
+
+    act(() => result.current.onMessenStart('strecke'));
+    expect(result.current.verortetZiel).toBeNull();
+  });
+});
+
 describe('useKartenInteraktion — Betroffene: Verortung löschen (LFH-648)', () => {
   it('leert NUR die Fundort-Koordinate und invalidiert Liste und Person', async () => {
     einsatzPersonApi.aktualisierePerson.mockClear();
@@ -364,7 +477,7 @@ describe('useKartenInteraktion — Betroffene: Verortung löschen (LFH-648)', ()
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
@@ -751,7 +864,7 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
@@ -902,7 +1015,7 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg,
@@ -1202,7 +1315,7 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
@@ -1226,7 +1339,7 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
@@ -1330,7 +1443,7 @@ describe('useKartenInteraktion — Kontextmenü (LFH-776)', () => {
         useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: false,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
@@ -1361,7 +1474,7 @@ describe('useKartenInteraktion · Gründe je Objekt (LFH-1077)', () => {
         const karte = useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: fehler.beginne,
           verwirfHandlung: fehler.verwirf,
           erfolg: vi.fn(),
@@ -1405,7 +1518,7 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ nach Einsatzwechsel 
         useKartenInteraktion({
           einsatzId: id,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),
           erfolg: vi.fn(),
@@ -1437,7 +1550,7 @@ describe('useKartenInteraktion · Beenden räumt den Grund des Modus (LFH-1077)'
         const karte = useKartenInteraktion({
           einsatzId: 1,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           beginneHandlung: fehler.beginne,
           verwirfHandlung: fehler.verwirf,
           erfolg: vi.fn(),
@@ -1526,7 +1639,7 @@ describe('useKartenInteraktion · „Zeichen hier setzen“ hält Einsatz und An
         useKartenInteraktion({
           einsatzId: id,
           darfSchreiben: true,
-          waehlbar: [],
+          waehlbarRef: { current: [] },
           aktiveAnsichtId: ansicht,
           beginneHandlung: () => vi.fn(),
           verwirfHandlung: vi.fn(),

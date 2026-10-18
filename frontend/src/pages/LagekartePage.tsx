@@ -24,6 +24,7 @@ import {
   parsePlatzierenAuftrag,
   parseZeichnenAuftrag,
   parseRouteId,
+  parseZurueck,
 } from '../routing/deeplinks';
 import { parsePolygon, polygonZentroid, stuetzpunkte } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
@@ -64,7 +65,17 @@ import MessSteuerung from './lagekarte/MessSteuerung';
 import SuchnadelBand from './lagekarte/SuchnadelBand';
 import type { GefundenerOrt } from '../anzeige/ortssuche';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import PlatzierSteuerung, { type PlatzierModus } from './lagekarte/PlatzierSteuerung';
+import PlatzierSteuerung, {
+  type PlatzierModus,
+  type VerortetMeldung,
+} from './lagekarte/PlatzierSteuerung';
+import {
+  ebeneMitVorrang,
+  layerMitVorrang,
+  rueckwegZiel,
+  verortetKennung,
+} from './lagekarte/verortungsauftrag';
+import type { KarteMarker } from './lagekarte/marker';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
@@ -236,6 +247,7 @@ export default function LagekartePage() {
     rohdaten,
     personenZugriff,
     personenVerortet,
+    personen,
     personenFehler,
     personenNichtGeladen,
     betreuungZugriff,
@@ -243,18 +255,6 @@ export default function LagekartePage() {
     datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
-  // Ebene „Betroffene": gezeichnet nur bei eingeschaltetem Schalter und freiem Modul. Personen sind
-  // nur wählbar, solange sie gezeichnet werden; für die übrigen Ebenen bleibt `alleVerortet` der
-  // Lookup. Startausschnitt und Kopfzahl bleiben ohne Personen. `clusterQuelle`: auf dieser Karte
-  // clustern Personen getrennt und liegen unter den Kräften (`PERSONEN_CLUSTER_QUELLE`); die
-  // Betroffenen-Karte setzt es nicht.
-  const personenAufKarte = useMemo(
-    () =>
-      layer.person && personenZugriff === 'frei'
-        ? personenVerortet.map((m) => ({ ...m, clusterQuelle: 'personen' as const }))
-        : [],
-    [layer.person, personenZugriff, personenVerortet],
-  );
   // Abschnittsflächen für die Karte mit stabiler Identität: die Karte setzt sie bei neuer Liste
   // per `setData` neu, und die Seite rendert bei jedem Eigenpositions-Fix (LFH-945, D5).
   const kartenFlaechen = useMemo(
@@ -264,24 +264,10 @@ export default function LagekartePage() {
         : LEER_FLAECHEN,
     [layer.abschnitt, flaechen],
   );
-  const waehlbar = useMemo(
-    () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
-    [alleVerortet, personenAufKarte],
-  );
-  // Objektsuche der Leiste: dieselbe Menge wie `waehlbar`, aber mit eigener Modulprüfung je Typ —
-  // „kein Name ohne Recht" hängt so nicht an der Datenquelle.
-  const suchbar = useMemo(
-    () =>
-      suchbareMarker({
-        verortet: alleVerortet,
-        personen: personenVerortet,
-        personenZugriff,
-        personenEbeneAn: layer.person,
-        betreuungZugriff,
-        brZugriff,
-      }),
-    [alleVerortet, personenVerortet, personenZugriff, layer.person, betreuungZugriff, brZugriff],
-  );
+  // Anwählbare Marker für `useKartenInteraktion` (Wählen und Anfliegen): als Ref, weil die
+  // gezeichneten Betroffenen am Ebenen-Vorrang des Hooks hängen (LLH-1125); gesetzt im Render
+  // weiter unten, gelesen erst beim Wählen.
+  const waehlbarRef = useRef<readonly KarteMarker[]>([]);
 
   const {
     onFachebeneToggle,
@@ -456,6 +442,8 @@ export default function LagekartePage() {
 
   const {
     platzierungZiel,
+    verortetZiel,
+    verortungsTyp,
     zeichneAbschnittId,
     zoneEntwurf,
     zoneBestaetigung,
@@ -488,6 +476,8 @@ export default function LagekartePage() {
     bestaetigungVerwerfen,
     onBestaetigungZurueck,
     onPlatzierenStart,
+    onVerortungsauftragStart,
+    onVerortetSchliessen,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
     onZoneZeichnenStart,
@@ -520,13 +510,60 @@ export default function LagekartePage() {
   } = useKartenInteraktion({
     einsatzId,
     darfSchreiben,
-    waehlbar,
+    waehlbarRef,
     aktiveAnsichtId,
     beginneHandlung: kartenFehler.beginne,
     verwirfHandlung: kartenFehler.verwirf,
     erfolg,
     warnung: (text) => message.warning(text),
   });
+
+  // Ebenen-Vorrang des Verortungsauftrags (LLH-1125, design.md D1): gezeichnet wird `layerEffektiv`,
+  // Schalter, Schmutzig-Erkennung und Speichern lesen weiter `layer`. Abgeleitet, nie gespeichert.
+  const layerEffektiv = useMemo(
+    () => layerMitVorrang(layer, verortungsTyp),
+    [layer, verortungsTyp],
+  );
+  const eingeblendet = ebeneMitVorrang(layer, verortungsTyp);
+
+  // Ebene „Betroffene": gezeichnet nur bei gezeichneter Ebene und freiem Modul. Personen sind nur
+  // wählbar, solange sie gezeichnet werden; für die übrigen Ebenen bleibt `alleVerortet` der
+  // Lookup. Startausschnitt und Kopfzahl bleiben ohne Personen. `clusterQuelle`: auf dieser Karte
+  // clustern Personen getrennt und liegen unter den Kräften (`PERSONEN_CLUSTER_QUELLE`); die
+  // Betroffenen-Karte setzt es nicht.
+  const personenAufKarte = useMemo(
+    () =>
+      layerEffektiv.person && personenZugriff === 'frei'
+        ? personenVerortet.map((m) => ({ ...m, clusterQuelle: 'personen' as const }))
+        : [],
+    [layerEffektiv.person, personenZugriff, personenVerortet],
+  );
+  const waehlbar = useMemo(
+    () => (personenAufKarte.length ? [...alleVerortet, ...personenAufKarte] : alleVerortet),
+    [alleVerortet, personenAufKarte],
+  );
+  waehlbarRef.current = waehlbar;
+  // Objektsuche der Leiste: dieselbe Menge wie `waehlbar`, aber mit eigener Modulprüfung je Typ —
+  // „kein Name ohne Recht" hängt so nicht an der Datenquelle.
+  const suchbar = useMemo(
+    () =>
+      suchbareMarker({
+        verortet: alleVerortet,
+        personen: personenVerortet,
+        personenZugriff,
+        personenEbeneAn: layerEffektiv.person,
+        betreuungZugriff,
+        brZugriff,
+      }),
+    [
+      alleVerortet,
+      personenVerortet,
+      personenZugriff,
+      layerEffektiv.person,
+      betreuungZugriff,
+      brZugriff,
+    ],
+  );
 
   // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
   // sich ausblenden, die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und Vorrang in
@@ -614,8 +651,8 @@ export default function LagekartePage() {
   // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
   // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).
   const sichtbareMarker = useMemo(
-    () => [...alleVerortet.filter((m) => layer[m.typ]), ...personenAufKarte],
-    [alleVerortet, layer, personenAufKarte],
+    () => [...alleVerortet.filter((m) => layerEffektiv[m.typ]), ...personenAufKarte],
+    [alleVerortet, layerEffektiv, personenAufKarte],
   );
   // Startausschnitt aus den Daten (Ansichtszentrum → Einsatzort → Objekte); die Karte wendet ihn
   // genau einmal an. Über alle verorteten Objekte: eine ausgeblendete Ebene ändert nicht, wo der
@@ -823,18 +860,21 @@ export default function LagekartePage() {
     if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
+    // Mit Herkunft (`&zurueck=1`, LLH-1125) bietet die Rückmeldung danach „Zurück zu …“ an; das Ziel
+    // folgt aus Typ und Kennung, nie aus der URL.
     if (darfSchreiben && (modulZugriff === null || modulZugriff === 'frei')) {
-      onPlatzierenStart(auftrag);
+      onVerortungsauftragStart({ ...auftrag, zurueck: parseZurueck(searchParams.get('zurueck')) });
     }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('platzieren');
+    naechste.delete('zurueck');
     setSearchParams(naechste, { replace: true });
   }, [
     searchParams,
     setSearchParams,
     ladt,
     darfSchreiben,
-    onPlatzierenStart,
+    onVerortungsauftragStart,
     rechteBekannt,
     betreuungZugriff,
     brZugriff,
@@ -1108,6 +1148,19 @@ export default function LagekartePage() {
 
   const platzierBild =
     bildPlatzierenId != null ? bilder.find((b) => b.id === bildPlatzierenId) : undefined;
+  // Rückmeldung nach dem Verorten (LLH-1125): unter `lg` im Fuß-Band, ab `lg` oben in der Leiste.
+  const verortetRueckweg = verortetZiel ? rueckwegZiel(einsatzId, verortetZiel) : null;
+  const verortetMeldung: VerortetMeldung | null = verortetZiel
+    ? {
+        kennung: verortetKennung(verortetZiel, {
+          personen,
+          marker: alleVerortet,
+          nichtVerortet: nichtVerortetAlle,
+        }),
+        onZurueck: verortetRueckweg ? () => navigate(verortetRueckweg) : null,
+        onBleiben: onVerortetSchliessen,
+      }
+    : null;
   const platzierModus: PlatzierModus | null = platzierungZiel
     ? {
         art: 'platzieren',
@@ -1131,7 +1184,9 @@ export default function LagekartePage() {
             onGriffModus: setGriffModus,
             onFertig: onBildPlatzierenFertig,
           }
-        : null;
+        : verortetMeldung
+          ? { art: 'verortet', meldung: verortetMeldung }
+          : null;
 
   const karte = (
     <div
@@ -1375,7 +1430,7 @@ export default function LagekartePage() {
         suchbar={suchbar}
         // Betroffene zählen nicht zum Lagebild-Fehler, gehören aber bei eingeschalteter Ebene zur
         // Suche — ihr Ausfall macht sie unvollständig.
-        suchbarUnvollstaendig={lagebildFehler || (personenFehler && layer.person)}
+        suchbarUnvollstaendig={lagebildFehler || (personenFehler && layerEffektiv.person)}
         ortssuche={ortssuche}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
@@ -1396,6 +1451,8 @@ export default function LagekartePage() {
         onEinsatzortPlatzieren={onEinsatzortPlatzieren}
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
+        eingeblendet={eingeblendet}
+        verortetMeldung={verortetMeldung}
         zonenAnzahl={zonen.length}
         personen={{
           zugriff: personenZugriff,

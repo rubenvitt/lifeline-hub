@@ -2383,6 +2383,140 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
 });
 
 /**
+ * Verortungsauftrag von außen (LLH-1125, Spec `lagekarte-verortungsauftrag`): die Ebene des Auftrags
+ * ist eingeblendet, ohne den Schalter oder die Ansicht zu ändern; nach dem Tipp steht „<Kennung>
+ * verortet“ mit Rückweg. Die Person hat noch keinen Fundort, wie im echten Ablauf.
+ */
+describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
+  const PERSON_OHNE_ORT = { ...PERSON_VERORTET, antreff_lat: null, antreff_lon: null };
+
+  function auftragsHandler(extra: ReturnType<typeof http.get>[] = []) {
+    // Die Liste liefert nach dem PATCH den neuen Fundort, wie der Server nach der Invalidierung.
+    let verortet = false;
+    basisHandler([
+      ...extra,
+      http.get('/api/einsaetze/1/personen', () =>
+        HttpResponse.json([verortet ? PERSON_VERORTET : PERSON_OHNE_ORT]),
+      ),
+      http.patch('/api/einsaetze/1/personen/11', () => {
+        verortet = true;
+        return HttpResponse.json(PERSON_VERORTET);
+      }),
+    ]);
+  }
+
+  function renderMitDetail(route: string) {
+    return renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+          <Route path="/einsaetze/:id/personen/:personId" element={<div>Detail der Person</div>} />
+        </Routes>
+        <LocationSonde />
+      </>,
+      { route },
+    );
+  }
+
+  it('zeichnet die Betroffenen bei ausgeschalteter Ebene, ohne Schalter und Ansicht zu ändern', async () => {
+    auftragsHandler();
+    const user = userEvent.setup();
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent(/platzieren|zurueck/),
+    );
+    await user.click(screen.getByText('karte-klick'));
+
+    expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
+    // Der Schalter steht weiter auf aus und sagt, dass die Ebene nur eingeblendet ist.
+    const schalter = screen.getByRole('switch', { name: 'Betroffene' });
+    expect(schalter).toHaveAttribute('aria-checked', 'false');
+    expect(schalter).toHaveTextContent('eingeblendet');
+    // Die Ansicht gilt nicht als geändert: nichts zu speichern.
+    expect(
+      screen.queryByRole('button', { name: /In dieser Ansicht speichern/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ab lg: die Leiste meldet „R-042 verortet“ und führt mit „Zurück zu R-042“ ins Detail', async () => {
+    auftragsHandler();
+    const user = userEvent.setup();
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await user.click(screen.getByText('karte-klick'));
+
+    const leiste = screen.getByRole('complementary', { name: 'Kartenleiste' });
+    expect(await within(leiste).findByText('R-042 verortet')).toBeInTheDocument();
+    // Kein Toast mehr: die Rückmeldung steht am Ort.
+    expect(screen.queryByText('Objekt verortet')).not.toBeInTheDocument();
+    // Hervorgehoben über die vorhandene Auswahl, angeflogen.
+    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    expect(await within(paneel).findByText('R-042 · SK II')).toBeInTheDocument();
+    expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":8.6,"lat":50.1}');
+    // Je Breite genau ein Knopf je Handlung: ab `lg` steht kein Fuß-Band.
+    expect(screen.getAllByRole('button', { name: 'Zurück zu R-042' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Auf der Karte bleiben' })).toHaveLength(1);
+
+    await user.click(screen.getByRole('button', { name: 'Zurück zu R-042' }));
+    expect(await screen.findByText('Detail der Person')).toBeInTheDocument();
+  });
+
+  it('„Auf der Karte bleiben“ schließt die Rückmeldung, die Ebene bleibt gezeichnet', async () => {
+    auftragsHandler();
+    const user = userEvent.setup();
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await user.click(screen.getByText('karte-klick'));
+    await user.click(await screen.findByRole('button', { name: 'Auf der Karte bleiben' }));
+
+    expect(screen.queryByText('R-042 verortet')).not.toBeInTheDocument();
+    expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
+  });
+
+  it('ohne Herkunft (kein ?zurueck=1) steht die Rückmeldung ohne „Zurück zu …“', async () => {
+    auftragsHandler();
+    const user = userEvent.setup();
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await user.click(screen.getByText('karte-klick'));
+    expect(await screen.findByText('R-042 verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Zurück/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Auf der Karte bleiben' })).toBeInTheDocument();
+  });
+
+  it('bei 390 px trägt das Fuß-Band die Handlungen, die Leiste nur den Zustand', async () => {
+    setzeViewportBreite(390);
+    auftragsHandler();
+    const user = userEvent.setup();
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await user.click(screen.getByText('karte-klick'));
+
+    const band = await screen.findByTestId('verortet-rueckmeldung');
+    expect(band.closest('[data-lfh="karten-fuss"]')).not.toBeNull();
+    expect(within(band).getByText('R-042 verortet')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Zurück zu R-042' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Auf der Karte bleiben' })).toHaveLength(1);
+  });
+
+  it('ohne Modul „Personen“ kein Modus und kein Personenmarker', async () => {
+    auftragsHandler([
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ personen: { sichtbar: true, zugriff: false } })),
+      ),
+    ]);
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
+    expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(platzierModusAn()).toBe(false);
+    expect(screen.queryByText(/^marker-person-/)).not.toBeInTheDocument();
+  });
+});
+
+/**
  * Korrigierbares Zeichnen (LFH-712). Der Stub meldet den Zeichenstand wie die echte Karte; „Letzten
  * Punkt zurück" und die erste Esc-Stufe laufen über den Karten-Handle.
  */
