@@ -61,6 +61,7 @@ const uhsMit = (material: EinsatzMaterial[], status = 'aktiv', storniertAt: stri
   ({
     id: 3,
     einsatz_id: 1,
+    bezeichnung: 'Turnhalle',
     status,
     storniert_at: storniertAt,
     plaetze: [],
@@ -247,7 +248,7 @@ describe('MaterialTab · Sperrgrund „Material zuordnen …“ (LFH-970)', () =
     render({ liste: [verortet] });
     await waitFor(() => expect(auswahl()).toBeDisabled());
     expect(auswahl()).toHaveAccessibleDescription(/Kein Material ohne Ort/);
-    expect(screen.getByRole('link', { name: /im Modul Material erfassen/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Material/ })).toHaveAttribute(
       'href',
       '/einsaetze/1/material',
     );
@@ -351,6 +352,37 @@ describe('MaterialTab · stornierte UHS', () => {
     expect(auswahl()).toHaveAccessibleDescription('UHS storniert');
     expect(screen.queryByRole('button', { name: 'Wolldecke ausgeben' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
+  });
+});
+
+/** „Fehlmenge melden“ (LLH-1133 D5, Spec `material-am-ort`, „Fehlmenge vom Ort melden“). */
+describe('MaterialTab · Fehlmenge melden', () => {
+  it('springt in die Erfassung einer Nachforderung, vorbelegt mit Art Material und der UHS', async () => {
+    render();
+    const sprung = await screen.findByRole('link', { name: /Fehlmenge melden/ });
+    const href = new URL(sprung.getAttribute('href')!, 'http://x');
+    expect(href.pathname).toBe('/einsaetze/1/nachforderungen');
+    expect(href.searchParams.get('neu')).toBe('1');
+    expect(href.searchParams.get('art')).toBe('Material');
+    expect(href.searchParams.get('begruendung')).toBe('Fehlmenge UHS «Turnhalle»');
+    // Bezeichnung und Anzahl kennt nur die Person: keine erfundene Fehlmenge.
+    expect(href.searchParams.has('anzahl')).toBe(false);
+    expect(href.searchParams.has('bezeichnung')).toBe(false);
+  });
+
+  it('fehlt ohne Freigabe des Moduls Nachforderungen', async () => {
+    render({ freigaben: freigabenFixture({ nachforderungen: { zugriff: false } }) });
+    // Positiver Anker: der Reiter bedient (Freigaben stehen fest), nur der Sprung fehlt.
+    await bereit();
+    await waitFor(() => expect(auswahl()).toBeEnabled());
+    expect(screen.queryByRole('link', { name: /Fehlmenge melden/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Fehlmenge melden/ })).toBeNull();
+  });
+
+  it('fehlt ohne Schreibrecht', async () => {
+    render({ schreibgeschuetzt: true });
+    await waitFor(() => expect(zeile('Trage')).toBeInTheDocument());
+    expect(screen.queryByRole('link', { name: /Fehlmenge melden/ })).toBeNull();
   });
 });
 

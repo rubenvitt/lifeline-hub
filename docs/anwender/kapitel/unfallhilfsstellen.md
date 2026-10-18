@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
 ---
 
 ## Überblick
@@ -40,7 +40,7 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
 1. Im Modulpanel „Unfallhilfsstellen“ öffnen. Es öffnet sich die zuletzt besuchte oder eine
    aktive Stelle; andere wählt der Umschalter im Titel.
 
-   ![Grundriss der Unfallhilfsstelle mit zwei belegten und mehreren freien Plätzen und den Reitern Fläche, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
+   ![Unfallhilfsstelle mit der Leiste „Belegung“, „Material“, „Kräfte“, „Bewegungen“ und „Dateien“ über dem Grundriss, darin zwei belegte und mehrere freie Plätze, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
 
 2. Die Fläche zeigt jeden Platz mit seiner Verfügbarkeit („frei“, „belegt“, „in Aufbereitung“,
    „defekt“, „gesperrt“) und dem Patienten darauf. Jede Patientenmarke trägt vorn die Sichtung
@@ -50,8 +50,10 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
    aufgenommen“). Der Wartebereich steht nach Dringlichkeit: wer oben steht, kommt als Nächstes
    auf einen Platz. „Transport“ zeigt, wer die Stelle auf Transport verlassen hat („Auf Transport
    gebracht“).
-4. Unter dem Grundriss führen „Material“, „Kräfte“, „Bewegungen“ und „Dateien“ zu den Angaben
-   der Stelle; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
+4. Die Leiste über dem Grundriss wechselt zwischen „Belegung“ (dem Grundriss), „Material“,
+   „Kräfte“, „Bewegungen“ und „Dateien“. Jeder Bereich füllt dieselbe Fläche bis zum unteren
+   Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
+   Der gewählte Bereich steht in der Adresse, ein Lesezeichen öffnet ihn direkt.
 
 Auf einem breiten Bildschirm stehen Wartebereich, Fläche und Transport nebeneinander; dann lassen
 sich Patienten auch mit der Maus auf einen Platz ziehen.
@@ -60,14 +62,22 @@ sich Patienten auch mit der Maus auf einen Platz ziehen.
 
 Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
 
-1. Die Stelle öffnen und unter dem Grundriss „Material“ wählen. Der Reiter zeigt jeden Posten mit
-   Menge und Status, im Kopf die Zahl der Posten und, falls vorhanden, den Ausfall.
+1. Die Stelle öffnen und in der Leiste „Material“ wählen, oder im Kopf der Stelle die Zahl der
+   Posten antippen, etwa „3 Posten · 1 Ausfall“. Der Bereich zeigt jeden Posten mit Menge und
+   Status, darüber dieselbe Zahl.
 2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
    anderem Ort“ Posten, die schon an einem anderen Ort liegen, etwa bei einer Einheit, mit diesem
    Ort im Eintrag. Der Posten liegt danach an der Stelle.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „30 von 50 übrig“.
-4. Mit „Lösen“ einen Posten von der Stelle lösen. Er bleibt ohne Ort im Einsatz.
+4. Den Status eines Postens an seiner Statusanzeige wählen, etwa „defekt“. Die Zeile zeigt den
+   neuen Status, die Zahl im Kopf zählt den Ausfall mit.
+5. Mit „Material erfassen“ Material ohne Stammeintrag anlegen, etwa eine Spende: „Bezeichnung“
+   und „Menge“ eintragen und „Disponieren“ wählen. Der Posten liegt danach an der Stelle.
+6. Fehlt Material, „Fehlmenge melden“ wählen. Die Erfassung einer Nachforderung öffnet mit der
+   Art „Material“ und der Stelle in der Begründung; Bezeichnung und Anzahl dort eintragen und die
+   Nachforderung absetzen.
+7. Mit „Lösen“ einen Posten von der Stelle lösen. Er bleibt ohne Ort im Einsatz.
 
 ### Einen Patienten aufnehmen und einem Platz zuweisen
 
@@ -146,17 +156,25 @@ zugeordnet oder von ihr abgezogen werden, stehen ebenfalls dort.
 
 ### Kräfte und Material
 
-Der Kopf der Stelle nennt ihre Stärke. Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
+Der Kopf der Stelle nennt ihre Stärke und, mit Freigabe des Moduls Material, die Zahl ihrer
+Posten samt Ausfall; Ausfall fasst defekt, verbraucht, Desinfektion nötig und aufgebraucht
+zusammen (Kapitel [Material](material.md)). Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
 Unter „Material“ holt „Material zuordnen …“ Material des Einsatzes an die Stelle: Posten ohne Ort
 und Posten an einem anderen Ort, die ohne Rückfrage umgehängt werden; das Einsatztagebuch nennt den
-alten und den neuen Ort. Erfasst wird Material im Modul [Material](material.md). Zugeordnet wird an
-eine geplante oder aktive Stelle; an einer aufgelösten steht „Material zuordnen …“ gesperrt mit
-„UHS aufgelöst“, Material, das schon dort liegt, lässt sich weiter lösen. Material an einer
-Unfallhilfsstelle steht nicht im [Meldebild](meldebild.md). Zuordnen, Lösen und Ausgeben verlangen
-Schreibrecht im Einsatz und die Freigabe des Moduls Material; ohne die Freigabe stehen die Posten
-lesbar da, und „Material zuordnen …“ steht gesperrt mit „Modul Material gesperrt“. Ein UHS-Laptop
-zeigt das Material seiner Stelle nur lesend.
+alten und den neuen Ort. „Material erfassen“ legt Ad-hoc-Material in einem Schritt an der Stelle
+an, im selben Dialog wie im Modul [Material](material.md), nur ohne das Feld „Ort“; Material aus
+dem Materialstamm disponiert das Modul Material. Ein Statuswechsel an der Stelle ist derselbe wie
+in der Materialliste und steht ebenso im Einsatztagebuch. Zugeordnet und erfasst wird an einer
+geplanten oder aktiven Stelle; an einer aufgelösten stehen „Material zuordnen …“ und „Material
+erfassen“ gesperrt mit „UHS aufgelöst“, Material, das schon dort liegt, lässt sich weiter lösen
+und im Status ändern. Material an einer Unfallhilfsstelle steht nicht im
+[Meldebild](meldebild.md). Zuordnen, Erfassen, Status, Lösen und Ausgeben verlangen Schreibrecht im
+Einsatz und die Freigabe des Moduls Material; ohne die Freigabe stehen die Posten lesbar da, der
+Status ist keine Bedienung, und „Material zuordnen …“ und „Material erfassen“ stehen gesperrt mit
+„Modul Material gesperrt“. „Fehlmenge melden“ steht nur mit Schreibrecht und der Freigabe des
+Moduls Nachforderungen da (Kapitel [Nachforderungen](nachforderung.md)). Ein UHS-Laptop zeigt das
+Material seiner Stelle nur lesend.
 
 ### Rechte
 

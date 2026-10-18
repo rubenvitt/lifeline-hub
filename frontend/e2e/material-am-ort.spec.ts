@@ -84,7 +84,8 @@ test('UHS-Reiter: Posten der Einheit zuordnen und Decken ausgeben; Einheit und E
   page,
 }) => {
   const s = await seed(page);
-  await page.goto(`/einsaetze/${s.einsatzId}/unfallhilfsstellen/${s.uhsId}`);
+  // Der Bereich „Material“ der UHS (LLH-1133): Vorgabe ist die Belegung.
+  await page.goto(`/einsaetze/${s.einsatzId}/unfallhilfsstellen/${s.uhsId}?bereich=material`);
   await expect(zeile(page, 'Wolldecke')).toContainText('20');
   const main = page.locator('main');
 

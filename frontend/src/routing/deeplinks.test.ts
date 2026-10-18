@@ -70,6 +70,8 @@ import {
   parseNachforderungVorbelegung,
   auftraegePfad,
   parseAuftraegeReiter,
+  parseUhsBereich,
+  uhsBereichSuche,
   gefahrenPfad,
   lagekartePfad,
   einsatzdatenPfad,
@@ -959,23 +961,36 @@ describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
     },
   );
 
-  it('fehlende Anzahl verwirft die ganze Vorbelegung', () => {
+  // Eine Teil-Vorbelegung (LLH-1133, „Fehlmenge melden“ an der UHS) lässt Anzahl und Bezeichnung
+  // offen: die Person trägt sie selbst ein. Verworfen wird nur, was gesetzt und unbrauchbar ist.
+  it('fehlende Anzahl lässt das Feld leer, die übrigen Angaben bleiben', () => {
     const p = params(nachforderungenPfad(E, { vorbelegung }));
     p.delete('anzahl');
-    expect(parseNachforderungVorbelegung(p)).toBeNull();
+    expect(parseNachforderungVorbelegung(p)).toEqual({
+      art: vorbelegung.art,
+      bezeichnung: vorbelegung.bezeichnung,
+      begruendung: vorbelegung.begruendung,
+    });
   });
 
-  it.each(['art', 'bezeichnung'])(
-    'leere oder fehlende %s verwirft die ganze Vorbelegung',
-    (feld) => {
-      const leer = params(nachforderungenPfad(E, { vorbelegung }));
-      leer.set(feld, '   ');
-      expect(parseNachforderungVorbelegung(leer)).toBeNull();
-      const fehlt = params(nachforderungenPfad(E, { vorbelegung }));
-      fehlt.delete(feld);
-      expect(parseNachforderungVorbelegung(fehlt)).toBeNull();
-    },
-  );
+  it.each(['art', 'bezeichnung'])('leere %s verwirft die ganze Vorbelegung', (feld) => {
+    const leer = params(nachforderungenPfad(E, { vorbelegung }));
+    leer.set(feld, '   ');
+    expect(parseNachforderungVorbelegung(leer)).toBeNull();
+  });
+
+  it('fehlende Art verwirft die ganze Vorbelegung, fehlende Bezeichnung nicht', () => {
+    const ohneArt = params(nachforderungenPfad(E, { vorbelegung }));
+    ohneArt.delete('art');
+    expect(parseNachforderungVorbelegung(ohneArt)).toBeNull();
+    const ohneBezeichnung = params(nachforderungenPfad(E, { vorbelegung }));
+    ohneBezeichnung.delete('bezeichnung');
+    expect(parseNachforderungVorbelegung(ohneBezeichnung)).toEqual({
+      art: vorbelegung.art,
+      anzahl: vorbelegung.anzahl,
+      begruendung: vorbelegung.begruendung,
+    });
+  });
 
   it('eine leere Begründung fällt weg, statt als leerer Text vorzubelegen', () => {
     const p = params(nachforderungenPfad(E, { vorbelegung }));
@@ -1025,5 +1040,52 @@ describe('hilfePfad / parseHilfeGruppe (LFH-1096)', () => {
     expect(parseHilfeGruppe(rund)).toBe('geraete');
     expect(parseHilfeGruppe(new URLSearchParams('gruppe=leitstelle'))).toBe('alle');
     expect(parseHilfeGruppe(new URLSearchParams(''))).toBe('alle');
+  });
+});
+
+describe('deeplinks — Bereiche der UHS-Seite (LLH-1133)', () => {
+  const params = (pfad: string) => new URLSearchParams(pfad.split('?')[1] ?? '');
+
+  it('die Belegung ist die Vorgabe und steht ohne Parameter', () => {
+    expect(uhsDetailPfad(E, 9, { bereich: 'belegung' })).toBe('/einsaetze/5/unfallhilfsstellen/9');
+    expect(uhsBereichSuche('belegung')).toBe('');
+  });
+
+  it.each(['material', 'kraefte', 'bewegungen', 'dateien'] as const)(
+    '%s steht in der Adresse und übersteht den Round-Trip',
+    (bereich) => {
+      const pfad = uhsDetailPfad(E, 9, { bereich });
+      expect(pfad).toBe(`/einsaetze/5/unfallhilfsstellen/9?bereich=${bereich}`);
+      expect(parseUhsBereich(params(pfad))).toBe(bereich);
+      expect(uhsBereichSuche(bereich)).toBe(`?bereich=${bereich}`);
+    },
+  );
+
+  it.each(['', 'belegung', 'Material', 'grundriss', 'toString'])(
+    'ein unbekannter oder leerer Wert %j fällt auf die Belegung zurück',
+    (wert) => {
+      expect(parseUhsBereich(new URLSearchParams({ bereich: wert }))).toBe('belegung');
+    },
+  );
+
+  it('ohne Parameter gilt die Belegung', () => {
+    expect(parseUhsBereich(new URLSearchParams())).toBe('belegung');
+  });
+});
+
+describe('deeplinks — Teil-Vorbelegung einer Nachforderung (LLH-1133, „Fehlmenge melden“)', () => {
+  const params = (pfad: string) => new URLSearchParams(pfad.split('?')[1] ?? '');
+
+  it('Art und Begründung ohne Bezeichnung und Anzahl übersteht den Round-Trip', () => {
+    const teil = { art: 'Material', begruendung: 'Fehlmenge UHS «Turnhalle»' };
+    const pfad = nachforderungenPfad(E, { vorbelegung: teil });
+    expect(params(pfad).get('neu')).toBe('1');
+    expect(parseNachforderungVorbelegung(params(pfad))).toEqual(teil);
+  });
+
+  it('eine gesetzte, aber unbrauchbare Anzahl verwirft auch die Teil-Vorbelegung', () => {
+    const p = params(nachforderungenPfad(E, { vorbelegung: { art: 'Material' } }));
+    p.set('anzahl', '0');
+    expect(parseNachforderungVorbelegung(p)).toBeNull();
   });
 });

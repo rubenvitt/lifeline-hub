@@ -566,7 +566,13 @@ anwendbar), „nicht geprüft" ist keins.
   (`wirksameDarstellungsart`). Gemessen in `kraefte-kontrast.spec.ts`.
 - **Material** (LFH-341, `materialStatus`): `im_einsatz` `bedien`, `defekt`/`verbraucht` `alarm`;
   `pages/MaterialPage.tsx` und `kraefte/MaterialAmOrt.tsx` (Material am Ort) lesen beide von dort — zwei
-  Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss.
+  Farbbehandlungen desselben Enums wären der Fehlerfall, nicht der Kompromiss. Am Ort (LLH-1133,
+  Spec `material-am-ort`) ist die Statusanzeige ebenso `StatusWahl`, mit denselben Einträgen
+  (`kraefte/materialPosten.ts:materialStatusWahl`) und demselben Schreibweg
+  (`api/einsatzMaterial.ts:setzeMaterialStatus`), Ablehnung an der Zeile; Ad-hoc-Material nimmt an
+  beiden Stellen nur `kraefte/MaterialAdhocDialog.tsx` (am Ort mit festem `ort`, ein Request).
+  Rechte wie beim Zuordnen (Schreibrecht und Freigabe Material); ein beendeter Ort sperrt Zuordnen,
+  Erfassen und Ausgeben, nicht Status und Lösen. Nachweis `kraefte/materialSchreibweg.test.tsx`.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in

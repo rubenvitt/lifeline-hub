@@ -1294,7 +1294,7 @@ function materialAmOrtFlaechen(
       ziele: ziele('Fahrzeug', /^(Decken|Trage) Fahrzeug vom Fahrzeug lösen$/),
     },
     {
-      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}`,
+      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}?bereich=material`,
       anker: knopf('Decken UHS ausgeben'),
       ziele: ziele('UHS', /^(Decken|Trage) UHS lösen$/),
     },
@@ -1323,13 +1323,13 @@ test('C15 · Material am Ort (Beobachter): Bedienung fehlt, die Posten stehen', 
   // fehlen); gemessen wird, was auf der Fläche bleibt: die Reiter der UHS.
   await messeImRollenzweig(page, 'beobachter', [
     {
-      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}`,
+      pfad: `${R}/unfallhilfsstellen/${ids.uhsId}?bereich=material`,
       anker: (page) => inMain(page).locator('[data-lfh="material-am-ort-zeile"]').first(),
       fehlt: (page) => inMain(page).getByRole('button', { name: / (lösen|ausgeben)$/ }),
       ziele: [
         {
           sorte: 'UHS Reiter (Beobachter)',
-          ziele: segment(/^(Material|Kräfte|Bewegungen|Dateien)$/, 'tab'),
+          ziele: segment(/^(Belegung|Material|Kräfte|Bewegungen|Dateien)$/, 'tab'),
           mindestens: 2,
         },
       ],

@@ -1,4 +1,5 @@
 import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
+import type { StatusOption } from '../components/StatusWahl';
 import { materialStatus, type StatusDarstellung } from '../theme/statusFarben';
 
 /**
@@ -61,6 +62,18 @@ const NUR_GERAET: ReadonlySet<MaterialStatus> = new Set(['verbraucht', 'desinfek
 /** Die Status, die eine Zeile dieser Art annehmen darf, in der Folge des Vertrags. */
 export function materialStatusOptionen(art: MaterialArt): MaterialStatus[] {
   return ALLE_STATUS.filter((s) => art === 'geraet' || !NUR_GERAET.has(s));
+}
+
+/**
+ * Die Einträge der Statuswahl einer Zeile mit `darstellung` — der Farbpunkt im Menü kommt aus dem
+ * Vertrag. Materialliste und Material am Ort (LLH-1133) bieten dieselben an.
+ */
+export function materialStatusWahl(art: MaterialArt): StatusOption<MaterialStatus>[] {
+  return materialStatusOptionen(art).map((s) => ({
+    wert: s,
+    label: materialStatus[s].label,
+    darstellung: materialStatus[s],
+  }));
 }
 
 /** Der Rest eines Verbrauchsguts als Text: „30 von 50 übrig“, auch „50 von 50 übrig“. */

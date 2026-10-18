@@ -58,8 +58,44 @@ function mitQuery(pfad: string, params: Record<string, string | number | undefin
 
 // ── Item-Routes (Vollseiten-Detail) ──────────────────────────────────────────
 
-export function uhsDetailPfad(einsatzId: number, uhsId: number): string {
-  return `${einsatzModulPfad(einsatzId, 'unfallhilfsstellen')}/${uhsId}`;
+/**
+ * Bereiche der UHS-Detailseite (LLH-1133, Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in
+ * Bereiche“). Wie der Reiter bei {@link auftraegePfad} ist der Bereich ZUSTAND, kein Auftrag: er
+ * bleibt in der Adresse stehen, damit ein Link ihn direkt öffnet. Die Vorgabe „Belegung“ (der
+ * Grundriss) steht ohne Parameter.
+ */
+export type UhsBereich = 'belegung' | 'material' | 'kraefte' | 'bewegungen' | 'dateien';
+
+/** Exhaustiver Record aus demselben Grund wie {@link ETB_TYP_ERLAUBT}. */
+const UHS_BEREICH_ERLAUBT: Record<UhsBereich, true> = {
+  belegung: true,
+  material: true,
+  kraefte: true,
+  bewegungen: true,
+  dateien: true,
+};
+
+/** Der Query-Teil eines Bereichs (`?bereich=material`), für die Vorgabe leer. */
+export function uhsBereichSuche(bereich: UhsBereich): string {
+  return mitQuery('', { bereich: bereich === 'belegung' ? undefined : bereich });
+}
+
+export function uhsDetailPfad(
+  einsatzId: number,
+  uhsId: number,
+  opts: { bereich?: UhsBereich } = {},
+): string {
+  return `${einsatzModulPfad(einsatzId, 'unfallhilfsstellen')}/${uhsId}${uhsBereichSuche(opts.bereich ?? 'belegung')}`;
+}
+
+/** Umkehr von {@link uhsBereichSuche}: ein unbekannter oder fehlender Wert ergibt die Belegung. */
+export function parseUhsBereich(params: URLSearchParams): UhsBereich {
+  const bereich = params.get('bereich');
+  return bereich &&
+    bereich !== 'belegung' &&
+    Object.prototype.hasOwnProperty.call(UHS_BEREICH_ERLAUBT, bereich)
+    ? (bereich as UhsBereich)
+    : 'belegung';
 }
 
 export function bereitstellungsraumDetailPfad(einsatzId: number, brId: number): string {
@@ -757,13 +793,14 @@ export function chatPfad(einsatzId: number, opts: { kanal?: number } = {}): stri
 
 /**
  * Vorbelegung der Nachforderungs-Erfassung (z. B. „Nachfordern" aus der Verpflegung). Keine
- * Personenangaben: nur Bezeichnungen und Zahlen.
+ * Personenangaben: nur Bezeichnungen und Zahlen. Bezeichnung und Anzahl dürfen fehlen
+ * („Fehlmenge melden“ an der UHS, LLH-1133): dann trägt die Person sie selbst ein.
  */
 export interface NachforderungVorbelegung {
   art: string;
-  bezeichnung: string;
+  bezeichnung?: string;
   /** Positive Ganzzahl. */
-  anzahl: number;
+  anzahl?: number;
   begruendung?: string;
 }
 
@@ -799,9 +836,11 @@ export const NACHFORDERUNG_VORBELEGUNG_PARAMS = [
 /**
  * Liest die Vorbelegung aus `?art=…&bezeichnung=…&anzahl=…&begruendung=…` zurück.
  *
- * Unbrauchbares wird GANZ verworfen: eine vorbelegte Erfassung ohne Fehlmenge forderte das
- * Falsche nach. `anzahl` muss eine positive Ganzzahl in Dezimalschreibweise sein (`Number()`
- * nähme auch `1e2`), `art` und `bezeichnung` nicht leer; `begruendung` ist optional.
+ * Unbrauchbares wird GANZ verworfen: eine falsch vorbelegte Fehlmenge forderte das Falsche nach.
+ * `art` ist Pflicht und nicht leer; eine gesetzte `anzahl` muss eine positive Ganzzahl in
+ * Dezimalschreibweise sein (`Number()` nähme auch `1e2`), eine gesetzte `bezeichnung` nicht leer.
+ * Fehlen beide, ist es eine Teil-Vorbelegung (LLH-1133): die Felder bleiben leer, und die Person
+ * füllt sie. `begruendung` ist optional.
  *
  * `neu` liest dieser Parser bewusst NICHT: ein `get('neu')`-Leser in dieser Datei wäre für
  * `schnellaktionen.guard.test.ts` keinem Modul zuordenbar.
@@ -810,13 +849,23 @@ export function parseNachforderungVorbelegung(
   params: URLSearchParams,
 ): NachforderungVorbelegung | null {
   const art = params.get('art')?.trim();
-  const bezeichnung = params.get('bezeichnung')?.trim();
+  if (!art) return null;
+  const vorbelegung: NachforderungVorbelegung = { art };
+  if (params.has('bezeichnung')) {
+    const bezeichnung = params.get('bezeichnung')?.trim();
+    if (!bezeichnung) return null;
+    vorbelegung.bezeichnung = bezeichnung;
+  }
   const roheAnzahl = params.get('anzahl');
-  if (!art || !bezeichnung || roheAnzahl == null || !/^[1-9]\d*$/.test(roheAnzahl)) return null;
-  const anzahl = Number(roheAnzahl);
-  if (!Number.isSafeInteger(anzahl)) return null;
+  if (roheAnzahl != null) {
+    if (!/^[1-9]\d*$/.test(roheAnzahl)) return null;
+    const anzahl = Number(roheAnzahl);
+    if (!Number.isSafeInteger(anzahl)) return null;
+    vorbelegung.anzahl = anzahl;
+  }
   const begruendung = params.get('begruendung')?.trim();
-  return begruendung ? { art, bezeichnung, anzahl, begruendung } : { art, bezeichnung, anzahl };
+  if (begruendung) vorbelegung.begruendung = begruendung;
+  return vorbelegung;
 }
 
 /**

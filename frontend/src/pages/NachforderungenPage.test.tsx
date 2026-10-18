@@ -283,6 +283,20 @@ describe('NachforderungenPage', () => {
       );
     });
 
+    it('eine Teil-Vorbelegung (Fehlmenge an der UHS) setzt Art und Begründung, Bezeichnung und Anzahl bleiben leer', async () => {
+      renderPage(
+        nachforderungenPfad(1, {
+          vorbelegung: { art: 'Material', begruendung: 'Fehlmenge UHS «Turnhalle»' },
+        }),
+      );
+      await erwarteMaske({
+        art: 'Material',
+        bezeichnung: '',
+        anzahl: '',
+        begruendung: 'Fehlmenge UHS «Turnhalle»',
+      });
+    });
+
     it('nach dem Absetzen füllt sich die Erfassung NICHT erneut mit der Vorbelegung', async () => {
       legeNachforderungAn.mockResolvedValue(nf());
       renderPage(deeplink);

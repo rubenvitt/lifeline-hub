@@ -1,16 +1,4 @@
-import {
-  Alert,
-  App,
-  Breadcrumb,
-  Button,
-  Collapse,
-  Form,
-  Input,
-  Modal,
-  Space,
-  Tag,
-  Typography,
-} from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Modal, Space, Tag, Typography } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { Select } from '../components/Select';
 import { BemerkungZelle } from '../components/BemerkungZelle';
@@ -33,19 +21,18 @@ import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeMaterial } from '../api/material';
 import {
   updateDisposition,
-  disponiereAdhoc,
   disponiereMaterial,
   listEinsatzMaterial,
   listEntlassenesMaterial,
   nimmAusDemEinsatz,
   reaktiviereDisposition,
+  setzeMaterialStatus,
   storniereDisposition,
   teileAuf,
-  type MaterialAdhocEingabe,
   type MaterialOrtPatch,
   type MaterialPatch,
 } from '../api/einsatzMaterial';
-import { MATERIAL_ADHOC_TEXT_MAX, MATERIAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
+import { MATERIAL_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, MaterialArt, MaterialStatus } from '../api/types';
 import { kraefteuebersichtPfad, nachforderungenPfad } from '../routing/deeplinks';
@@ -57,11 +44,11 @@ import MaterialOrtAngabe, {
 import { buildOrtGruppierung, buildOrtOptions, ortFilter } from '../kraefte/materialOrtWahl';
 import { useMaterialOrt } from '../kraefte/useMaterialOrt';
 import {
-  ART_OPTIONEN,
   AUFGEBRAUCHT,
   isAufgebraucht,
   materialDarstellung,
   materialStatusOptionen,
+  materialStatusWahl,
   mengeText,
   OHNE_ORT_WERT,
   ortPostFields,
@@ -71,6 +58,7 @@ import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
 import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
 import MaterialAusgabeModal, { type AusgabeModus } from '../kraefte/MaterialAusgabeModal';
 import MaterialMengeModal from '../kraefte/MaterialMengeModal';
+import MaterialAdhocDialog from '../kraefte/MaterialAdhocDialog';
 import { Segmentleiste } from '../components/instrument';
 import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
@@ -94,16 +82,12 @@ import { useNewGesture } from './einsatzabschnitte/useNewGesture';
 const STATUS_REIHENFOLGE = Object.keys(materialStatus) as MaterialStatus[];
 
 /**
- * Menüwerte mit `darstellung` — der Farbpunkt im Statusmenü kommt aus dem Vertrag. Je Art nur die
+ * Menüwerte mit `darstellung` (`materialStatusWahl`, geteilt mit Material am Ort). Je Art nur die
  * erlaubten Status (LLH-1224 D3): ein Verbrauchsgut kennt „verbraucht“ und „Desinfektion nötig“
  * nicht, es wird ausgegeben.
  */
 function statusOptionen(em: EinsatzMaterial): StatusOption<MaterialStatus>[] {
-  return materialStatusOptionen(em.art).map((s) => ({
-    wert: s,
-    label: materialStatus[s].label,
-    darstellung: materialStatus[s],
-  }));
+  return materialStatusWahl(em.art);
 }
 
 /** Gruppe und Filterwert eines Postens: aufgebraucht vor dem Status (LLH-1224 D15). */
@@ -182,14 +166,6 @@ interface StammDisposition {
   menge: number;
 }
 
-/** Werte des Ad-hoc-Dialogs: `art` bleibt leer, bis die Person wählt (LLH-1225 D6). */
-type AdhocWerte = MaterialAdhocEingabe & { menge: number; art?: MaterialArt; ort?: string };
-
-/** Vorgabe der Art wie am Server (LLH-1224 D1): Menge über 1 → Verbrauchsgut, sonst Gerät. */
-function artVorgabe(menge: number | null | undefined): MaterialArt {
-  return (menge ?? 1) > 1 ? 'verbrauchsgut' : 'geraet';
-}
-
 /** Gruppierung der Liste (LLH-1225 D4): Vorgabe Ort, die Frage des Tickets ist „was ist wo“. */
 type Gruppierung = 'ort' | 'status';
 const GRUPPIERUNG_OPTIONEN = [
@@ -197,33 +173,12 @@ const GRUPPIERUNG_OPTIONEN = [
   { wert: 'status', label: 'Nach Status' },
 ] as const satisfies readonly { wert: Gruppierung; label: string }[];
 
-/** Die Segmente „Art“ im Ad-hoc-Dialog; ohne eigene Wahl zeigen sie die Vorgabe der Menge. */
-function ArtFeld({
-  value,
-  onChange,
-  vorgabe,
-}: {
-  value?: MaterialArt;
-  onChange?: (art: MaterialArt) => void;
-  vorgabe: MaterialArt;
-}) {
-  return (
-    <Segmentleiste<MaterialArt>
-      beschriftung="Art"
-      wert={value ?? vorgabe}
-      onWechsel={(art) => onChange?.(art)}
-      optionen={ART_OPTIONEN}
-    />
-  );
-}
-
 export default function MaterialPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
-  const [form] = Form.useForm<AdhocWerte>();
   const [disponierenOffen, setDisponierenOffen] = useState(false);
   const [stammForm] = Form.useForm<StammDisposition>();
   /**
@@ -330,13 +285,6 @@ export default function MaterialPage() {
   useEffect(() => {
     if (isGeraetGewaehlt) stammForm.setFieldValue('menge', 1);
   }, [isGeraetGewaehlt, stammForm]);
-  // Ad-hoc (D6): ohne eigene Wahl folgt die Art der Menge; „Gerät“ setzt die Menge auf 1 und sperrt.
-  const adhocMenge = Form.useWatch('menge', form);
-  const adhocArtGewaehlt = Form.useWatch('art', form);
-  const isAdhocGeraet = adhocArtGewaehlt === 'geraet';
-  useEffect(() => {
-    if (isAdhocGeraet) form.setFieldValue('menge', 1);
-  }, [isAdhocGeraet, form]);
 
   /**
    * Liefert die Zusage des Listenabgleichs: eine `InlineAngabe` schließt erst, wenn der neue Wert im
@@ -367,29 +315,6 @@ export default function MaterialPage() {
     onSuccess: () => {
       message.success('Material disponiert');
       invalidate();
-    },
-  });
-  const adhocMutation = useMutation({
-    mutationFn: (w: AdhocWerte) => {
-      // Gesendet wird die angezeigte Art, auch die Vorgabe (D6); ein Gerät steht je Stück.
-      const art = w.art ?? artVorgabe(w.menge);
-      return disponiereAdhoc(
-        einsatzId,
-        {
-          bezeichnung: w.bezeichnung,
-          kategorie: w.kategorie,
-          bestandsnummer: w.bestandsnummer,
-          traegerorganisation: w.traegerorganisation,
-        },
-        art === 'geraet' ? 1 : (w.menge ?? 1),
-        { art, ort: ortPostFields(w.ort) },
-      );
-    },
-    // Nur invalidieren und melden: geschlossen wird über `onFertig`, geleert von der
-    // Erfassungshülle auf allen Wegen, auch beim Abbrechen.
-    onSuccess: () => {
-      invalidate();
-      message.success('Ad-hoc-Material disponiert');
     },
   });
   // Menge und Ausgabe in ihren Dialogen (D5); die Einheit zeigt Menge und Rest ihres Materials mit.
@@ -455,7 +380,7 @@ export default function MaterialPage() {
     { emId: number; status: MaterialStatus }
   >({
     queryKey: einsatzKeys.material(einsatzId),
-    mutationFn: (v) => updateDisposition(einsatzId, v.emId, { status: v.status }),
+    mutationFn: (v) => setzeMaterialStatus(einsatzId, v.emId, v.status),
     zeilenId: (v) => v.emId,
     anwenden: (em, v) => ({ ...em, status: v.status }),
     nochOptimistisch: (em, v) => em.status === v.status,
@@ -1164,86 +1089,13 @@ export default function MaterialPage() {
         </Form.Item>
       </ErfassungsModal>
 
-      {/* Ad-hoc-Erfassung auf der Schnellerfassungs-Hülle.
-
-          Serienmodus, weil Ad-hoc-Material stückweise nachkommt. Wertübernahme auf Kategorie
-          und Trägerorganisation — sie bleiben über eine Anlieferung gleich und stehen deshalb
-          hinten: was sich je Position ändert (Bezeichnung, Menge), kommt zuerst.
-
-          Feldbudget: höchstens vier sichtbare Felder. Die Bestandsnummer ist das fünfte; bei
-          Spenden und Fremdmaterial gibt es sie meist nicht. Sie liegt unter „Weitere Angaben".
-
-          `forceRender` registriert das Feld ab dem ersten Bild im Formular statt erst beim
-          Aufklappen. Den eingetippten Wert rettet es nicht — der überlebt das Zuklappen ohnehin
-          (antd baut den Bereich nicht ab, `Form.Item` bewahrt per Vorgabe). */}
-      <ErfassungsModal<AdhocWerte>
+      {/* Ad-hoc-Erfassung im geteilten Dialog (LLH-1133 D4); hier mit dem Feld „Ort“. */}
+      <MaterialAdhocDialog
+        einsatzId={einsatzId}
         offen={adhocOffen}
-        titel="Ad-hoc-Material ohne Stammeintrag"
-        form={form}
-        erfassenText="Disponieren"
-        serie
-        uebernahme={['kategorie', 'traegerorganisation']}
-        initialValues={{ menge: 1, ort: OHNE_ORT_WERT }}
-        laeuft={adhocMutation.isPending}
-        speicherung={adhocMutation}
-        speicherFehlerTitel="Nicht disponiert"
-        speicherFehlerFallback="Disponieren fehlgeschlagen"
-        // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage lässt die Hülle die Werte
-        // stehen. Den Grund zeigt die Hülle über `speicherung`.
-        onErfassen={async (w) => {
-          await adhocMutation.mutateAsync(w);
-        }}
-        onFertig={() => setAdhocOffen(false)}
-        onAbbrechen={() => setAdhocOffen(false)}
-      >
-        <Form.Item
-          label="Bezeichnung"
-          name="bezeichnung"
-          rules={[{ required: true, whitespace: true }]}
-        >
-          <Input placeholder="z. B. Spende-Decken" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-        </Form.Item>
-        <Form.Item
-          label="Menge"
-          name="menge"
-          rules={[{ required: true }]}
-          extra={isAdhocGeraet ? 'Ein Gerät steht je Stück im Einsatz' : undefined}
-        >
-          <MengenFeld beschriftung="Menge" style={{ width: 120 }} disabled={isAdhocGeraet} />
-        </Form.Item>
-        {/* Art (LLH-1225 D6): ohne eigene Wahl zeigt sie die Vorgabe der Menge, gesendet wird,
-            was steht. */}
-        <Form.Item label="Art" name="art">
-          <ArtFeld vorgabe={artVorgabe(adhocMenge)} />
-        </Form.Item>
-        <Form.Item label="Kategorie" name="kategorie">
-          <Input maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-        </Form.Item>
-        <Collapse
-          ghost
-          items={[
-            {
-              key: 'weitere',
-              label: 'Weitere Angaben',
-              forceRender: true,
-              children: (
-                <>
-                  <Form.Item label="Trägerorganisation" name="traegerorganisation">
-                    <Input placeholder="z. B. THW" maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-                  </Form.Item>
-                  <Form.Item label="Bestandsnummer" name="bestandsnummer">
-                    <Input maxLength={MATERIAL_ADHOC_TEXT_MAX} />
-                  </Form.Item>
-                  {/* Ort (D7) unter „Weitere Angaben“ (Feldbudget, 1093 D12). */}
-                  <Form.Item label="Ort" name="ort" style={{ marginBottom: 0 }}>
-                    <Select<string> options={buildOrtOptions(ortKontext.quellen)} />
-                  </Form.Item>
-                </>
-              ),
-            },
-          ]}
-        />
-      </ErfassungsModal>
+        onSchliessen={() => setAdhocOffen(false)}
+        ortOptionen={buildOrtOptions(ortKontext.quellen)}
+      />
     </EinsatzSeite>
   );
 }

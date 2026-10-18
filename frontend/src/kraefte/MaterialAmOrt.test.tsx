@@ -158,6 +158,57 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     );
   });
 
+  /** Öffnet das Statusmenü einer Zeile; antd lässt geschlossene Portale stehen (Muster `MaterialPage.test`). */
+  async function statusMenue(bezeichnung: string): Promise<HTMLElement> {
+    await userEvent.click(
+      within(zeile(bezeichnung)).getByRole('button', { name: `Status von ${bezeichnung} ändern` }),
+    );
+    const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+      (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+    );
+    expect(offen).toHaveLength(1);
+    return offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+  }
+
+  it('Status am Ort (LLH-1133): die Anzeige ist der Auslöser, die Wahl schickt den Status', async () => {
+    const gesendet = patchMitschnitt();
+    zeige();
+    const menue = await statusMenue('Trage');
+    // Je Art nur die erlaubten Status (LLH-1224 D3), wie in der Materialliste.
+    expect(within(menue).getByRole('menuitem', { name: /Desinfektion nötig/ })).toBeInTheDocument();
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        { url: '/api/einsaetze/1/material/2', body: { status: 'einsatzbereit' } },
+      ]),
+    );
+  });
+
+  it('ein Verbrauchsgut bietet „verbraucht“ und „Desinfektion nötig“ nicht an', async () => {
+    zeige();
+    const menue = await statusMenue('Wolldecke');
+    expect(within(menue).queryByRole('menuitem', { name: /Desinfektion nötig/ })).toBeNull();
+    expect(within(menue).queryByRole('menuitem', { name: /^verbraucht$/ })).toBeNull();
+  });
+
+  it('eine Ablehnung des Statuswechsels steht an der Zeile', async () => {
+    patchMitschnitt(() => HttpResponse.json({ error: 'Material ist beendet' }, { status: 409 }));
+    zeige();
+    const menue = await statusMenue('Trage');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
+    expect(await within(zeile('Trage')).findByText('Material ist beendet')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(zeile('Trage')).toHaveTextContent('defekt');
+  });
+
+  it('am beendeten Ort bleibt der Status bedienbar wie das Lösen', () => {
+    zeige({ sperrgrund: 'UHS aufgelöst' });
+    expect(
+      within(zeile('Trage')).getByRole('button', { name: 'Status von Trage ändern' }),
+    ).toBeEnabled();
+  });
+
   it('der Lösen-Wortlaut folgt dem Ort', () => {
     zeige({
       ort: { art: 'fahrzeug', id: 4 },
@@ -199,10 +250,75 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     const feld = screen.getByRole('combobox', { name: 'Material zuordnen' });
     await waitFor(() => expect(feld).toBeDisabled());
     expect(feld).toHaveAccessibleDescription(/Kein Material ohne Ort/);
-    expect(screen.getByRole('link', { name: /im Modul Material erfassen/ })).toHaveAttribute(
+    // Erfasst wird am Ort (LLH-1133): der Sprung führt nur noch ins Modul, nicht zum Erfassen.
+    expect(screen.getByRole('link', { name: /Material/ })).toHaveAttribute(
       'href',
       '/einsaetze/1/material',
     );
+    expect(screen.queryByText(/im Modul Material erfassen/)).toBeNull();
+  });
+
+  it('„Material erfassen“ legt Ad-hoc-Material in EINEM Request an diesem Ort an (LLH-1133)', async () => {
+    const posts: unknown[] = [];
+    const patches = patchMitschnitt();
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(em({ id: 99, bezeichnung: 'Sauerstoff 2 l', uhs_id: 7 }));
+      }),
+    );
+    zeige();
+    await userEvent.click(screen.getByRole('button', { name: 'Material erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    // Der Ort steht fest: kein Feld „Ort“.
+    expect(within(dialog).queryByLabelText('Ort')).toBeNull();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Sauerstoff 2 l');
+    const menge = within(dialog).getByRole('spinbutton', { name: 'Menge' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '4');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({
+      adhoc: { bezeichnung: 'Sauerstoff 2 l' },
+      menge: 4,
+      art: 'verbrauchsgut',
+      uhs_id: 7,
+    });
+    // Kein zweiter Schritt: kein Ortswechsel hinterher.
+    expect(patches).toEqual([]);
+    expect(await screen.findByText('Ad-hoc-Material disponiert')).toBeInTheDocument();
+  });
+
+  it('am Fahrzeug geht der Posten mit dem Fahrzeug als Ort', async () => {
+    const posts: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material', async ({ request }) => {
+        posts.push(await request.json());
+        return HttpResponse.json(em({ id: 99 }));
+      }),
+    );
+    zeige({ ort: { art: 'fahrzeug', id: 4 }, posten: [], loesenText: 'Vom Fahrzeug lösen' });
+    await userEvent.click(screen.getByRole('button', { name: 'Material erfassen' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Stromerzeuger');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disponieren' }));
+    await waitFor(() => expect(posts).toHaveLength(1));
+    expect(posts[0]).toMatchObject({ menge: 1, art: 'geraet', einsatz_fahrzeug_id: 4 });
+    expect(posts[0]).not.toHaveProperty('uhs_id');
+  });
+
+  it('am beendeten Ort ist „Material erfassen“ gesperrt und nennt den Grund', () => {
+    zeige({ sperrgrund: 'UHS aufgelöst' });
+    const knopf = screen.getByRole('button', { name: 'Material erfassen' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('UHS aufgelöst');
+  });
+
+  it('ohne Freigabe Material ist „Material erfassen“ gesperrt mit „Modul Material gesperrt“', () => {
+    zeige({ materialFrei: false, angebot: undefined });
+    const knopf = screen.getByRole('button', { name: 'Material erfassen' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('Modul Material gesperrt');
   });
 
   it('beendeter Ort: Zuordnen gesperrt mit Grund, Lösen geht, kein Ausgeben', () => {
@@ -220,7 +336,9 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     expect(feld).toBeDisabled();
     expect(feld).toHaveAccessibleDescription('Modul Material gesperrt');
     expect(zeile('Trage')).toHaveTextContent('defekt');
-    expect(screen.queryByRole('button', { name: /lösen|ausgeben/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /lösen|ausgeben|ändern$/ })).toBeNull();
+    // Die Statusanzeige ist keine Bedienung (Spec `material-am-ort`, „Status am Ort setzen“).
+    expect(screen.queryByRole('button', { name: /^Status von/ })).toBeNull();
   });
 
   it('nur lesend (Gerät, kein Schreibrecht): keine Bedienelemente', () => {

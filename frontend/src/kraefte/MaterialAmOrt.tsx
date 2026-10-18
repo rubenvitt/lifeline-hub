@@ -1,23 +1,31 @@
 import { useId, useMemo, useState, type ReactNode } from 'react';
 import { App, Button, Space, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateDisposition } from '../api/einsatzMaterial';
+import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
 import { einsatzKeys } from '../api/queryKeys';
-import type { EinsatzMaterial } from '../api/types';
+import type { EinsatzMaterial, MaterialStatus } from '../api/types';
 import { monoStil, useRollen } from '../components/instrument';
 import { KennungsLink } from '../components/kennungsLink';
 import { MODUL_MATERIAL_GESPERRT } from '../components/nurAnsicht';
 import { Select } from '../components/Select';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import { sprungGesperrtText } from '../components/Sprung';
-import StatusTag from '../components/StatusTag';
+import StatusWahl from '../components/StatusWahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
+import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { materialPfad } from '../routing/deeplinks';
+import MaterialAdhocDialog from './MaterialAdhocDialog';
 import MaterialAusgabeModal from './MaterialAusgabeModal';
 import { useMaterialOrtKontext } from './MaterialOrtAngabe';
 import { buildZuordnenOptions, type OrtPosten, type ZuordnenPosten } from './materialOrtWahl';
-import { materialDarstellung, mengeText, ORT_FELD, type MaterialOrtRef } from './materialPosten';
+import {
+  materialDarstellung,
+  materialStatusWahl,
+  mengeText,
+  ORT_FELD,
+  type MaterialOrtRef,
+} from './materialPosten';
 import { materialKopfzahl } from './materialVerdichtungKern';
 import { useMaterialOrt } from './useMaterialOrt';
 
@@ -27,15 +35,19 @@ import { useMaterialOrt } from './useMaterialOrt';
  * Aufrufers (Einheit-DTO, UHS-Detail, Materialliste), normiert auf {@link MaterialAmOrtPosten}.
  *
  * - Zeile: Bezeichnung, Kategorie gedämpft, Menge („30 von 50 übrig“, `mengeText`), Status über
- *   `materialDarstellung`; bei Verbrauchsgut mit Rest „Ausgeben“ (derselbe Dialog wie die
- *   Materialliste), rechts das Lösen in Rot mit Abstand und ohne Rückfrage (LFH-363: die gelöste
- *   Zuordnung ist umkehrbar, über die Auswahl darunter).
+ *   `materialDarstellung`. Die Statusanzeige ist der Auslöser der Statuswahl (LLH-1133,
+ *   `StatusWahl`, derselbe Schreibweg `setzeMaterialStatus` und dieselben Einträge wie die
+ *   Materialliste); eine Ablehnung steht an der Zeile. Bei Verbrauchsgut mit Rest „Ausgeben“
+ *   (derselbe Dialog wie die Materialliste), rechts das Lösen in Rot mit Abstand und ohne
+ *   Rückfrage (LFH-363: die gelöste Zuordnung ist umkehrbar, über die Auswahl darunter).
  * - Kopfzahl „n Posten · k Ausfall“ aus der einen Material-Zählung.
  * - „Material zuordnen …“: wählen schreibt, Gruppen „Ohne Ort“ und „An anderem Ort“
  *   ({@link buildZuordnenOptions}). Zuordnen und Lösen laufen über den EINEN Schreibweg
  *   ({@link useMaterialOrt}, Recht Material, nie die Route eines Zielmoduls).
- * - Ein beendeter Ort sperrt nur das Zuordnen (und Ausgeben), mit Kurzgrund daneben; Lösen
- *   bleibt (LLH-1224 D13).
+ * - „Material erfassen“ (LLH-1133 D4): Ad-hoc-Material ohne Stamm mit diesem Ort in EINEM
+ *   Request, im geteilten Dialog der Materialliste ({@link MaterialAdhocDialog}).
+ * - Ein beendeter Ort sperrt nur das Zuordnen, Erfassen und Ausgeben, mit Kurzgrund daneben;
+ *   Lösen und Status bleiben (LLH-1224 D13): sie ändern den Posten, nicht den Ort.
  * - Rechte (D9): bedienen nur mit Schreibrecht UND Freigabe Material. Ohne Freigabe zeigt der
  *   Baustein die Posten und die Auswahl gesperrt mit „Modul Material gesperrt“; ohne Schreibrecht
  *   (auch am Gerät) nur die Posten.
@@ -145,6 +157,34 @@ export default function MaterialAmOrt({
     onError: (e) => zuordnenFehler.melde('zuordnen', e, 'Zuordnen fehlgeschlagen'),
   });
 
+  /**
+   * Gleicht nach einer Änderung am Posten ab: die Einheit trägt ihr Material im DTO, UHS und
+   * Bereitstellungsraum im Detail, das Fahrzeug liest die Materialliste. Erfüllt, wenn alle neu im
+   * Cache stehen — bis dahin zeigt die Zeile den gewählten Stand.
+   */
+  const gleicheOrtAb = () => {
+    void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    return Promise.all([
+      qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+      ort.art === 'uhs'
+        ? qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, ort.id) })
+        : ort.art === 'bereitstellungsraum'
+          ? qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, ort.id) })
+          : undefined,
+      qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) }),
+    ]);
+  };
+
+  // Status am Ort (LLH-1133): derselbe Weg wie die Materialliste, die Ablehnung an der Zeile.
+  const statusWechsel = useMutation({
+    mutationFn: async (v: { p: MaterialAmOrtPosten; status: MaterialStatus }) => {
+      await setzeMaterialStatus(einsatzId, v.p.id, v.status);
+      await gleicheOrtAb();
+    },
+    onMutate: (v) => zeilen.beginne(v.p.id),
+    onError: (e, v) => zeilen.melde(v.p.id, e, 'Status nicht geändert'),
+  });
+
   // „Ausgeben“ (D5): derselbe Dialog wie die Materialliste, mit dem Stand beim Öffnen.
   const [ausgabeFuer, setAusgabeFuer] = useState<number | null>(null);
   const ausgabePosten =
@@ -154,20 +194,23 @@ export default function MaterialAmOrt({
       updateDisposition(einsatzId, v.p.id, { ausgegeben: v.ausgegeben }),
     onSuccess: (_d, v) => {
       message.success(`${v.p.bezeichnung}: ${v.menge} ausgegeben`);
-      // Die Einheit trägt ihr Material im DTO, UHS und Bereitstellungsraum im Detail.
-      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
-      if (ort.art === 'uhs') {
-        void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, ort.id) });
-      } else if (ort.art === 'bereitstellungsraum') {
-        void qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, ort.id) });
-      }
-      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
-      return qc.invalidateQueries({ queryKey: einsatzKeys.material(einsatzId) });
+      return gleicheOrtAb();
     },
   });
 
   const zuordnenGrund = zuordnenFehler.grund('zuordnen');
   const sperre = !materialFrei ? MODUL_MATERIAL_GESPERRT : sperrgrund;
+  const [erfassenOffen, setErfassenOffen] = useState(false);
+  // Neben der Auswahl; gesperrt nennt die Auswahl daneben den Grund, der Knopf verweist darauf.
+  const erfassenKnopf = (
+    <Button
+      disabled={sperre != null}
+      aria-describedby={sperre != null ? grundId : undefined}
+      onClick={() => setErfassenOffen(true)}
+    >
+      Material erfassen
+    </Button>
+  );
 
   return (
     <div data-lfh="material-am-ort">
@@ -191,6 +234,9 @@ export default function MaterialAmOrt({
       )}
       {posten.map((p) => {
         const grund = zeilen.grund(p.id);
+        // Bis der Abgleich steht, zeigt die Zeile den gewählten Status.
+        const statusLaeuft = statusWechsel.isPending && statusWechsel.variables?.p.id === p.id;
+        const statusStand = statusLaeuft ? { ...p, status: statusWechsel.variables.status } : p;
         const isAusgebbar =
           isBedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
         return (
@@ -222,7 +268,20 @@ export default function MaterialAmOrt({
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
               {/* Eine Zahl bricht nicht um. */}
               <span style={{ ...monoStil(13), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
-              <StatusTag darstellung={materialDarstellung(p)} />
+              <StatusWahl
+                darstellung={materialDarstellung(statusStand)}
+                aktuell={statusStand.status}
+                optionen={materialStatusWahl(p.art)}
+                kennung={p.bezeichnung}
+                darfSchreiben={isBedienbar}
+                laeuft={statusLaeuft}
+                gesperrt={statusWechsel.isPending}
+                onWaehlen={(status) => {
+                  if (!statusWechsel.isPending && status !== p.status) {
+                    statusWechsel.mutate({ p, status });
+                  }
+                }}
+              />
             </span>
             {isBedienbar && (
               <Space size="middle" wrap>
@@ -267,6 +326,7 @@ export default function MaterialAmOrt({
                 disabled
                 aria-describedby={sperre ? grundId : undefined}
               />
+              {erfassenKnopf}
               {sperre && (
                 <Typography.Text type="secondary" id={grundId}>
                   {sperre}
@@ -280,6 +340,7 @@ export default function MaterialAmOrt({
               angebot={angebot}
               laeuft={zuordnen.isPending}
               onWaehlen={(p) => zuordnen.mutate(p)}
+              erfassen={erfassenKnopf}
             />
           )}
         </div>
@@ -292,6 +353,14 @@ export default function MaterialAmOrt({
             fallback={zuordnenGrund.fallback}
           />
         </div>
+      )}
+      {isBedienbar && !sperrgrund && (
+        <MaterialAdhocDialog
+          einsatzId={einsatzId}
+          ort={ort}
+          offen={erfassenOffen}
+          onSchliessen={() => setErfassenOffen(false)}
+        />
       )}
       {/* Außerhalb der Zeilen-`map`: ein Dialog für alle Posten (`frontend/AGENTS.md`, „Aktionen“). */}
       {isBedienbar && (
@@ -318,13 +387,22 @@ interface ZuordnenAuswahlProps {
   angebot: NonNullable<MaterialAmOrtProps['angebot']>;
   laeuft: boolean;
   onWaehlen: (p: ZuordnenPosten) => void;
+  /** „Material erfassen“ neben der Auswahl. */
+  erfassen: ReactNode;
 }
 
 /**
  * Die bedienbare Auswahl. Eigene Komponente, damit die Namen der anderen Orte (Listen der Module,
  * nur mit Leserecht) erst geladen werden, wenn die Person zuordnen darf.
  */
-function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: ZuordnenAuswahlProps) {
+function ZuordnenAuswahl({
+  einsatzId,
+  ort,
+  angebot,
+  laeuft,
+  onWaehlen,
+  erfassen,
+}: ZuordnenAuswahlProps) {
   const grundId = useId();
   const { token } = useRollen();
   const { kontext } = useMaterialOrtKontext(einsatzId, false, angebot.data);
@@ -354,20 +432,22 @@ function ZuordnenAuswahl({ einsatzId, ort, angebot, laeuft, onWaehlen }: Zuordne
           if (p) onWaehlen(p);
         }}
       />
+      {erfassen}
       {fehler && (
         <Typography.Text type="danger" id={grundId}>
           Material konnte nicht geladen werden
         </Typography.Text>
       )}
       {leer && (
-        // Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗“, kein Knopf.
+        // Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗“, kein Knopf. Erfasst wird
+        // daneben am Ort (LLH-1133); der Sprung führt nur noch in die Materialliste.
         <Typography.Text type="secondary" id={grundId}>
           Kein Material ohne Ort –{' '}
           {materialGesperrt ? (
-            sprungGesperrtText('im Modul Material erfassen')
+            sprungGesperrtText(modulName('material'))
           ) : (
             <KennungsLink to={materialPfad(einsatzId)}>
-              im Modul Material erfassen <span aria-hidden="true">↗</span>
+              {modulName('material')} <span aria-hidden="true">↗</span>
             </KennungsLink>
           )}
         </Typography.Text>

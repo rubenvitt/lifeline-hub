@@ -2,7 +2,7 @@
 titel: Nachforderung
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -127,11 +127,13 @@ markiert, steht sie bei „Adressat“ „Leitstelle“ schon in der „Adressat
 dem Absetzen. Ein selbst eingetragener Wert wird dabei nie überschrieben. Gespeichert wird nur
 der Text.
 
-### Aus der Verpflegung nachfordern
+### Aus der Verpflegung und von einer Unfallhilfsstelle nachfordern
 
 Fehlt in einem Zeitfenster der Verpflegung etwas, öffnet „Nachfordern“ an dessen Karte dieses
-Formular mit vorbelegten Feldern ([Verpflegung](verpflegung.md)). Die Felder bleiben vor dem Absetzen
-änderbar.
+Formular mit vorbelegten Feldern ([Verpflegung](verpflegung.md)). An einer Unfallhilfsstelle öffnet
+„Fehlmenge melden“ im Bereich „Material“ das Formular mit der Art „Material“ und der Stelle in der
+Begründung ([Unfallhilfsstellen](unfallhilfsstellen.md)); Bezeichnung und Anzahl bleiben dort leer.
+Die Felder bleiben vor dem Absetzen änderbar.
 
 ### Ablauf der Stufen
 
