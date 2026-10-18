@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -11,6 +11,16 @@ import type { AbloeserStand } from './abloeserStand';
 dayjs.extend(utc);
 
 const jetzt = dayjs.utc('2026-10-17 12:00:00');
+
+// `ZeitAnzeige` misst „heute“ an der Systemuhr: ohne sie stünde ab dem 18.10. `DDHHmm` statt `HHmm`
+// (LLH-1323). Nur `Date` fälschen, `findBy*` hängt an echten Timern.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(jetzt.toDate());
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const schicht = (over: Partial<Abloesung> = {}): Abloesung => ({
   id: 1,
