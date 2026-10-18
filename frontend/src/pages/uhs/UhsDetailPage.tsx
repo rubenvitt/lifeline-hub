@@ -222,13 +222,15 @@ export default function UhsDetailPage() {
   // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät) oder ohne
   // Freigabe Material steht keine Zahl.
   const zeigeMaterialzahl = bereichListe.includes('material') && materialFrei;
+  // Die Meta bricht im Kopf nicht um (`seitenMetaStil`); vor der Zahl darf sie es, sonst liefe
+  // der Kopf bei 390 px über den Rand. Die Teile selbst bleiben ganz.
   const meta = zeigeMaterialzahl ? (
-    <>
-      {metaText} ·{' '}
+    <span style={{ whiteSpace: 'normal' }}>
+      <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span>{' '}
       <KennungsLink to={{ search: uhsBereichSuche('material') }}>
         {materialKopfzahl(uhs.material)}
       </KennungsLink>
-    </>
+    </span>
   ) : (
     metaText
   );
