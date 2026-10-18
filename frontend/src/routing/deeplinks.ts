@@ -873,7 +873,11 @@ export function lagekartePfad(
     gefahrengebiet?: number;
     ansicht?: number;
     snapshot?: number;
-    platzieren?: { typ: PlatzierenZielTyp; id: number };
+    /**
+     * `zurueck`: der Auftrag kommt von der Seite des Datensatzes, die Karte bietet danach „Zurück
+     * zu …“ an (LLH-1125). Das Ziel leitet `rueckwegPfad` aus Typ und Kennung ab.
+     */
+    platzieren?: { typ: PlatzierenZielTyp; id: number; zurueck?: boolean };
     zeichnen?: ZeichnenAuftrag;
     zentrum?: Kartenzentrum;
     /** Adresssuche (LFH-638): die Karte übernimmt den Text ins Suchfeld und sucht ihn. */
@@ -890,6 +894,8 @@ export function lagekartePfad(
     snapshot: opts.snapshot,
     // Platzier-Auftrag: der nächste Klick auf die Karte setzt die Koordinate dieses Objekts.
     platzieren: opts.platzieren ? `${opts.platzieren.typ}:${opts.platzieren.id}` : undefined,
+    // Herkunft des Auftrags (LLH-1125): nur ein Merker, nie ein Pfad — kein offener Weiterleiter.
+    zurueck: opts.platzieren?.zurueck ? 1 : undefined,
     // Zeichnen-Auftrag (LFH-825): die Karte betritt den Zonen-Zeichenmodus dieses Typs und räumt.
     zeichnen: opts.zeichnen
       ? opts.zeichnen.form
@@ -935,7 +941,8 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * enger als der karteninterne `PlatzierenPunktTyp`. Wer erweitert, prüft
  * `pages/LagekartePage.tsx` mit.
  */
-type PlatzierenZielTyp = 'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
+export type PlatzierenZielTyp =
+  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -962,6 +969,36 @@ export function parsePlatzierenAuftrag(
   if (!typ || !Object.prototype.hasOwnProperty.call(PLATZIEREN_ZIEL_ERLAUBT, typ)) return null;
   const id = parseRouteId(roheId);
   return id == null ? null : { typ: typ as PlatzierenZielTyp, id };
+}
+
+/**
+ * Liest den Merker `?zurueck=1` eines Verortungsauftrags (LLH-1125). Nur genau `1` zählt: der Wert
+ * ist nie ein Pfad oder eine Adresse, sonst wäre die Karte ein offener Weiterleiter.
+ */
+export function parseZurueck(wert: string | null | undefined): boolean {
+  return wert === '1';
+}
+
+/**
+ * Rückweg nach dem Verorten: die Seite, von der der Auftrag kam, allein aus Typ und Kennung
+ * (LLH-1125, Spec `lagekarte-verortungsauftrag`). Exhaustiv: ein neuer Zieltyp (etwa `tier`,
+ * LFH-1263) bricht den Typcheck, bis er hier sein Ziel bekommt.
+ */
+const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => string) | null> = {
+  person: personDetailPfad,
+  schaden: schadenDetailPfad,
+  // Keine Detailroute: die Betreuungsseite hebt die Stelle hervor (`?stelle=`).
+  betreuungsstelle: (einsatzId, id) => betreuungPfad(einsatzId, { stelle: id }),
+  bereitstellungsraum: bereitstellungsraumDetailPfad,
+  // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
+  // verortet, es gibt keine Seite, zu der man zurückwollte.
+  uhs: null,
+};
+
+export function rueckwegPfad(einsatzId: number, typ: PlatzierenZielTyp, id: number): string | null {
+  if (!Object.prototype.hasOwnProperty.call(RUECKWEG, typ)) return null;
+  const ziel = RUECKWEG[typ];
+  return ziel ? ziel(einsatzId, id) : null;
 }
 
 /**

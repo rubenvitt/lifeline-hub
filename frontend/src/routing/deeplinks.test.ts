@@ -24,6 +24,8 @@ import {
   tierePfad,
   parseKartenzentrum,
   parsePlatzierenAuftrag,
+  parseZurueck,
+  rueckwegPfad,
   parseZeichnenAuftrag,
   personenAufnahmePfad,
   personenPfad,
@@ -356,6 +358,40 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(wert).toBe('bereitstellungsraum:9');
     expect(parsePlatzierenAuftrag(wert)).toEqual({ typ: 'bereitstellungsraum', id: 9 });
     expect(parsePlatzierenAuftrag('bereitstellungsraum:abc')).toBeNull();
+  });
+  describe('Rückweg nach dem Verorten (LLH-1125)', () => {
+    it('lagekartePfad trägt ?zurueck=1 nur mit Herkunft', () => {
+      const pfad = lagekartePfad(E, { platzieren: { typ: 'person', id: 42, zurueck: true } });
+      const params = new URL(pfad, 'http://x').searchParams;
+      expect(params.get('platzieren')).toBe('person:42');
+      expect(params.get('zurueck')).toBe('1');
+      expect(parseZurueck(params.get('zurueck'))).toBe(true);
+      expect(lagekartePfad(E, { platzieren: { typ: 'person', id: 42 } })).not.toContain('zurueck');
+      expect(
+        lagekartePfad(E, { platzieren: { typ: 'person', id: 42, zurueck: false } }),
+      ).not.toContain('zurueck');
+    });
+    it('parseZurueck zählt nur genau „1“ — ein Pfad oder eine Adresse ist kein Rückweg', () => {
+      expect(parseZurueck('1')).toBe(true);
+      expect(parseZurueck(null)).toBe(false);
+      expect(parseZurueck('')).toBe(false);
+      expect(parseZurueck('0')).toBe(false);
+      expect(parseZurueck('true')).toBe(false);
+      expect(parseZurueck('/einsaetze/5/personen/42')).toBe(false);
+      expect(parseZurueck('https://example.org')).toBe(false);
+    });
+    it('rueckwegPfad leitet das Ziel allein aus Typ und Kennung ab', () => {
+      expect(rueckwegPfad(E, 'person', 42)).toBe(personDetailPfad(E, 42));
+      expect(rueckwegPfad(E, 'schaden', 7)).toBe(schadenDetailPfad(E, 7));
+      expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungPfad(E, { stelle: 3 }));
+      expect(rueckwegPfad(E, 'bereitstellungsraum', 9)).toBe(bereitstellungsraumDetailPfad(E, 9));
+    });
+    it('rueckwegPfad: die UHS hat keinen äußeren Einstieg, ein unbekannter Typ kein Ziel', () => {
+      expect(rueckwegPfad(E, 'uhs', 2)).toBeNull();
+      // Ein Typ von außerhalb der Union (etwa aus einer manipulierten URL) findet kein Ziel.
+      expect(rueckwegPfad(E, 'tier' as never, 2)).toBeNull();
+      expect(rueckwegPfad(E, 'toString' as never, 2)).toBeNull();
+    });
   });
   it('lagekartePfad trägt ?evakuierungsbezirk= (LFH-673)', () => {
     const pfad = lagekartePfad(E, { evakuierungsbezirk: 5 });
