@@ -66,7 +66,11 @@ describe('MaterialOrtAngabe (LLH-1225 D3)', () => {
     const faelle: [MaterialOrtRef, string, string][] = [
       [{ art: 'einheit', id: 3 }, 'Rettungsstaffel', '/einsaetze/1/einheiten/3'],
       [{ art: 'fahrzeug', id: 4 }, 'Florian 1/83-1', '/einsaetze/1/fahrzeuge?fahrzeug=4'],
-      [{ art: 'uhs', id: 7 }, 'UHS Turnhalle', '/einsaetze/1/unfallhilfsstellen/7'],
+      [
+        { art: 'uhs', id: 7 },
+        'UHS Turnhalle',
+        '/einsaetze/1/unfallhilfsstellen/7?bereich=material',
+      ],
       [{ art: 'bereitstellungsraum', id: 6 }, 'BR Nord', '/einsaetze/1/bereitstellungsraeume/6'],
     ];
     for (const [ort, name, href] of faelle) {

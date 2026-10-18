@@ -122,6 +122,17 @@ describe('uhsLage (LLH-1136)', () => {
     expect(nachher.laengsteWarteMin).toBe(14);
   });
 
+  it('wer auf einem Platz vom Typ Wartebereich steht, zählt als wartend', () => {
+    const lage = uhsLage(
+      uhs([schritt({ id: 1, person_id: 6, zeitpunkt_at: '2026-10-18 09:04:00' })]),
+      [person({ id: 6, aktueller_platz_id: 15 })],
+      JETZT,
+    );
+    expect(lage).toMatchObject({ inDerStelle: 1, wartend: 1, laengsteWarteMin: 30 });
+    // Der Wartebereich-Platz ist kein Behandlungsplatz: die Plätze bleiben unberührt.
+    expect(lage.plaetze).toMatchObject({ gesamt: 4, belegt: 0 });
+  });
+
   it('ohne Wartende gibt es keine längste Wartezeit', () => {
     const lage = uhsLage(uhs([]), [], JETZT);
     expect(lage).toMatchObject({ inDerStelle: 0, wartend: 0, laengsteWarteMin: null });

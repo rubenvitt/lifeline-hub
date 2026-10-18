@@ -35,6 +35,16 @@ interface Props {
  * Anzahl trägt die Person ein. Ohne Schreibrecht oder Freigabe Nachforderungen fehlt er (nicht
  * gesperrt: die Erfassung dort ließe sich ohnehin nicht öffnen).
  */
+/**
+ * Begründung der Fehlmenge (LLH-1133 D5): „Fehlmenge UHS «Turnhalle»“. Trägt die Bezeichnung das
+ * „UHS“ schon („UHS Nord“), steht es nicht doppelt: „Fehlmenge «UHS Nord»“.
+ */
+export function fehlmengeBegruendung(bezeichnung: string): string {
+  return /^UHS\b/i.test(bezeichnung)
+    ? `Fehlmenge «${bezeichnung}»`
+    : `Fehlmenge UHS «${bezeichnung}»`;
+}
+
 export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props) {
   const auth = useAuthOptional();
   const { token } = useRollen();
@@ -78,7 +88,7 @@ export default function MaterialTab({ einsatzId, uhs, schreibgeschuetzt }: Props
         <div style={{ marginTop: token.marginSM }}>
           <SprungKnopf
             to={nachforderungenPfad(einsatzId, {
-              vorbelegung: { art: 'Material', begruendung: `Fehlmenge UHS «${uhs.bezeichnung}»` },
+              vorbelegung: { art: 'Material', begruendung: fehlmengeBegruendung(uhs.bezeichnung) },
             })}
           >
             Fehlmenge melden

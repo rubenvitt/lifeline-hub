@@ -1869,8 +1869,8 @@ export default function Grundriss({
         speicherFehlerTitel="Nicht zugewiesen"
         speicherFehlerFallback="Zuweisen fehlgeschlagen"
         onErfassen={async (werte) => {
-          // Ohne Wahl gilt der vorgewählte erste Kandidat (das Feld zeigt ihn gewählt).
-          const personId = werte.personId ?? zuweisenKandidaten[0]?.id;
+          // Die Vorwahl steht im Feld (`KandidatenWahl`); hier gilt nur, was der Prüfer durchließ.
+          const personId = werte.personId;
           // `mutateAsync`: ein abgelehnter Serverruf lässt die Auswahl stehen.
           if (!zuweisenPlatz || personId == null) return;
           await zuweisenMut.mutateAsync({ personId, platzId: zuweisenPlatz.id });
@@ -1931,6 +1931,13 @@ function KandidatenWahl({
 }) {
   const { token } = theme.useToken();
   const { rollen } = useRollen();
+  // Die Vorwahl steht im Formular, nicht nur in der Anzeige: fällt der Vorgewählte live weg,
+  // meldet der Prüfer „Nicht mehr zuweisbar“, statt dass „Zuweisen“ still den Nächsten verlegt.
+  // Der Dialog hängt beim Schließen aus (`destroyOnHidden`); jedes Öffnen wählt neu vor.
+  const erster = kandidaten[0]?.id;
+  useEffect(() => {
+    if (value == null && erster != null) onChange?.(erster);
+  }, [value, erster, onChange]);
   const gruppe = (titel: string, personen: readonly Person[]): ReactNode =>
     personen.length > 0 && (
       <>
@@ -1989,7 +1996,7 @@ function KandidatenWahl({
     <Radio.Group
       id={id}
       aria-label="Patient"
-      value={value ?? kandidaten[0]?.id}
+      value={value}
       onChange={(e) => onChange?.(e.target.value as number)}
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
     >

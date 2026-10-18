@@ -6,7 +6,7 @@ import { server } from '../../test/server';
 import { freigabenFixture } from '../../test/fixtures';
 import { renderMitProviders } from '../../test/utils';
 import type { EinsatzMaterial, MaterialStatus, ModulFreigaben, UhsDetail } from '../../api/types';
-import MaterialTab from './MaterialTab';
+import MaterialTab, { fehlmengeBegruendung } from './MaterialTab';
 
 /**
  * Der Materialreiter der UHS als Hülle um den Baustein für Material am Ort (LLH-1225, design.md
@@ -411,5 +411,12 @@ describe('MaterialTab · Gerät (UHS-Laptop)', () => {
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(abgefragt).toEqual([]);
+  });
+});
+
+describe('fehlmengeBegruendung', () => {
+  it('nennt die UHS einmal, auch wenn die Bezeichnung mit „UHS“ beginnt', () => {
+    expect(fehlmengeBegruendung('Turnhalle')).toBe('Fehlmenge UHS «Turnhalle»');
+    expect(fehlmengeBegruendung('UHS Nord')).toBe('Fehlmenge «UHS Nord»');
   });
 });

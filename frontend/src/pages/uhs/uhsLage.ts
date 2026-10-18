@@ -72,7 +72,14 @@ export interface UhsLage {
 
 export function uhsLage(uhs: UhsDetail, personen: readonly Person[], jetztMs: number): UhsLage {
   const drin = personenInUhs(uhs, personen);
-  const wartende = drin.filter((p) => p.aktueller_platz_id == null);
+  // Wartend ist, wer keinen Platz hat oder auf einem Platz vom Typ „Wartebereich“ steht: der Server
+  // lässt solche Plätze belegen, und dort zählt die Person weder bei den Plätzen noch sonst wo.
+  const wartebereichPlaetze = new Set(
+    uhs.plaetze.filter((p) => p.typ === 'wartebereich').map((p) => p.id),
+  );
+  const wartende = drin.filter(
+    (p) => p.aktueller_platz_id == null || wartebereichPlaetze.has(p.aktueller_platz_id),
+  );
   const minuten = wartende
     .map((p) => {
       const seit = wartetSeit(p.id, uhs.belegungen);

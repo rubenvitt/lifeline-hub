@@ -67,6 +67,12 @@ describe('UhsLagezeile (LLH-1136)', () => {
     expect(zeile.textContent).toMatch(/Abtransportiert\s*1/);
     expect(within(zeile).queryAllByRole('link')).toHaveLength(0);
     expect(zeile.textContent).not.toMatch(/Mustermann|Beispiel|Fort/);
+    // Eine Zeile, die live nicht umbricht; der volle Wortlaut steht im Titel.
+    expect(zeile.style.whiteSpace).toBe('nowrap');
+    expect(zeile).toHaveAttribute(
+      'title',
+      'In der Stelle 2 SK I 1 · SK II 1 · Plätze frei 1 / 3 1 in Aufbereitung · Wartend 1 längste 34 min · Abtransportiert 1',
+    );
   });
 
   it('nennt In der Stelle, Plätze frei, Wartend mit längster Zeit und Abtransportiert', async () => {

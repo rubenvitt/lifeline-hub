@@ -104,6 +104,9 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     expect(zeile('Wolldecke')).toHaveTextContent('einsatzbereit');
     expect(zeile('Trage')).toHaveTextContent('defekt');
     expect(zeile('Zeltbahn')).toHaveTextContent('aufgebraucht');
+    // Jeder Posten ist eine eigene Zeile für „Status setzen“ in der Palette (LLH-1133): in der
+    // Fahrzeugkarte träfe die Statuswahl sonst den letzten Posten statt des Fahrzeugs.
+    expect(zeile('Trage')).toHaveAttribute('data-row-key', expect.stringMatching(/^material-\d+$/));
   });
 
   it('„Ausgeben“ nur am Verbrauchsgut mit Rest; der Dialog schickt die neue Ausgabe', async () => {

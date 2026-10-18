@@ -85,16 +85,14 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
         wert: lage.inDerStelle,
         zusatz:
           besetzt.length > 0 ? (
-            <span style={{ display: 'inline-flex', gap: token.marginXS, flexWrap: 'wrap' }}>
+            <span>
               {SICHTUNGSBILD_REIHE.filter((k) => k !== 'ohne' && lage.sichtung[k] > 0).map((k) => (
                 <span key={k} style={{ whiteSpace: 'nowrap' }}>
                   <SichtungsTag form="kompakt" kategorie={k as Sichtungskategorie} />{' '}
                   {lage.sichtung[k]}
                 </span>
               ))}
-              {lage.sichtung.ohne > 0 && (
-                <span style={{ whiteSpace: 'nowrap' }}>ohne Sichtung {lage.sichtung.ohne}</span>
-              )}
+              {lage.sichtung.ohne > 0 && <span>ohne Sichtung {lage.sichtung.ohne}</span>}
             </span>
           ) : (
             'ohne Patienten'
@@ -108,29 +106,38 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
       { titel: 'Wartend', wert: lage.wartend, zusatz: warteZusatz },
       { titel: 'Abtransportiert', wert: lage.abtransportiert },
     ];
+    const volltext = posten
+      .map((p) =>
+        [p.titel, p.wert, p.titel === 'In der Stelle' ? besetzt.join(' · ') : p.zusatz]
+          .filter((t) => t != null && t !== '')
+          .join(' '),
+      )
+      .join(' · ');
     return (
       <div
         role="group"
         aria-label="Lage der Stelle"
         data-lfh="uhs-lagezeile"
+        // EINE Zeile, auch wenn live eine SK-Stufe dazukommt oder „59 min“ zu „1 h 00 min“ wird:
+        // ein Umbruch ließe den Grundriss darunter springen. Was nicht passt, schneidet der Rand ab,
+        // der volle Wortlaut steht im Titel.
+        title={zustand === 'daten' ? volltext : undefined}
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'baseline',
-          columnGap: token.marginLG,
-          rowGap: token.marginXXS,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
           color: rollen.text,
         }}
       >
         {posten.map((p) => (
-          <span
-            key={p.titel}
-            style={{ display: 'inline-flex', gap: token.marginXS, alignItems: 'baseline' }}
-          >
-            <span style={{ color: rollen.schwach }}>{p.titel}</span>
+          <span key={p.titel} style={{ marginInlineEnd: token.marginLG }}>
+            <span style={{ color: rollen.schwach }}>{p.titel}</span>{' '}
             <b style={{ ...monoStil(16, 500) }}>{zahl(p.wert)}</b>
             {zustand === 'daten' && p.zusatz != null && (
-              <span style={{ color: rollen.gedaempft }}>{p.zusatz}</span>
+              <>
+                {' '}
+                <span style={{ color: rollen.gedaempft }}>{p.zusatz}</span>
+              </>
             )}
           </span>
         ))}

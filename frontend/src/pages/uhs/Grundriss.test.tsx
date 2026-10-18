@@ -2249,7 +2249,40 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
       expect(screen.getByRole('radio', { name: /ungesichtet R-004/ })).toBeInTheDocument();
     });
 
-    it('„Zuweisen“ belegt den vorgewählten Kandidaten; Enter sendet über den Knopf im Formular', async () => {
+    it('verlegt nicht still den Nächsten, wenn der Vorgewählte inzwischen woanders liegt', async () => {
+      const uhs = uhsDetail({
+        status: 'aktiv',
+        plaetze: [
+          platz({ id: 10, bezeichnung: 'Bett 1' }),
+          platz({ id: 11, bezeichnung: 'Bett 2' }),
+        ],
+        belegungen: [eintritt(1, '2026-10-18 08:00:00'), eintritt(2, '2026-10-18 08:20:00')],
+      });
+      const gesendet: number[] = [];
+      server.use(
+        http.post('/api/einsaetze/1/personen/:pid/uhs-belegung', ({ params }) => {
+          gesendet.push(Number(params.pid));
+          return HttpResponse.json({ ...eintritt(Number(params.pid), 'x'), platz_id: 10 });
+        }),
+      );
+      const { client } = renderGrundriss(uhs, [wartend(1, 'sk3'), wartend(2, 'sk1')]);
+
+      await userEvent.click((await screen.findAllByTestId('platz-karte'))[0]);
+      await screen.findByRole('radiogroup', { name: 'Patient' });
+      expect(kandidaten()[0]).toBeChecked();
+      // Ein anderer Arbeitsplatz legt den Vorgewählten (R-002) auf Bett 2.
+      act(() => {
+        client.setQueryData<Person[]>(einsatzKeys.personen(1), (alt) =>
+          (alt ?? []).map((p) => (p.id === 2 ? { ...p, aktueller_platz_id: 11 } : p)),
+        );
+      });
+      await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
+
+      expect(await screen.findByText('Nicht mehr zuweisbar')).toBeInTheDocument();
+      expect(gesendet).toEqual([]);
+    });
+
+    it('„Zuweisen“ belegt den vorgewählten Kandidaten; der Absende-Knopf liegt im Formular', async () => {
       const uhs = uhsDetail({
         status: 'aktiv',
         plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],

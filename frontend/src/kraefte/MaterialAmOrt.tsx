@@ -242,6 +242,10 @@ export default function MaterialAmOrt({
         return (
           <div
             key={p.id}
+            // Eigene Zeilenwurzel für den Palettenweg „Status setzen“ (`components/StatusWahl.tsx`):
+            // sonst wäre in der Fahrzeugkarte die Karte die Zeile, und der letzte Posten gewänne
+            // gegen die Statuswahl des Fahrzeugs.
+            data-row-key={`material-${p.id}`}
             data-lfh="material-am-ort-zeile"
             style={{
               display: 'flex',
