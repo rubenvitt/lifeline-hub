@@ -1,5 +1,5 @@
 import type { Browser, Page } from '@playwright/test';
-import { waehleIn, waehleStehend } from '../auswahl-kern';
+import { waehleIn } from '../auswahl-kern';
 import {
   KONTEXTE,
   anmelden,
@@ -132,9 +132,8 @@ test.describe(KAPITEL, () => {
       // Nachgeklickt: Tippen auf den freien Platz öffnet „Patient zuweisen“.
       await platz.click();
       const dialog = geraet.getByRole('dialog', { name: /^Patient zuweisen — Behandlungsplatz 1/ });
-      await dialog.getByRole('combobox', { name: 'Patient' }).click();
-      await waehleStehend(geraet, 'R-001 · Mustermann', { exact: false });
-      await dialog.getByRole('button', { name: 'Erfassen' }).click();
+      await dialog.getByRole('radio', { name: /R-001 · Mustermann/ }).check();
+      await dialog.getByRole('button', { name: 'Zuweisen' }).click();
       await expect(dialog).toHaveCount(0);
       await expect(platz).toContainText('Mustermann');
     } finally {
