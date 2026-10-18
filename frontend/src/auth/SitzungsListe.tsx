@@ -19,7 +19,14 @@ function alsMs(utc: string): number {
   return Date.parse(`${utc.trim().replace(' ', 'T')}Z`);
 }
 
-/** „gerade eben“, „vor 12 min“, „vor 3 h“; ab einem Tag `null` (dann steht der Zeitpunkt). */
+/**
+ * „gerade eben“, „vor 12 min“, „vor 3 h“; ab einem Tag `null` (dann steht der Zeitpunkt).
+ *
+ * Bewusst nicht `anzeige/abstand.ts:formatVor` (LLH-1327): unter 5 min „gerade eben“ nach dem
+ * Server-Takt, „vor n h“ ohne Minuten (der Takt macht sie ungenau) und ab einem Tag kein Text.
+ * Die 5-min-Schwelle beschreibt die Anwenderhilfe (`docs/anwender/kapitel/benutzer.md`,
+ * `profil-sicherheit.md`).
+ */
 export function zuletztText(utc: string, jetztMs: number): string | null {
   const alter = jetztMs - alsMs(utc);
   if (alter < GERADE_EBEN_MS) return 'gerade eben';

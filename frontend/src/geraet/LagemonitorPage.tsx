@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
+import { formatVor } from '../anzeige/abstand';
 import { useAuth } from '../auth/AuthContext';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeLagemonitor } from '../api/lagemonitor';
@@ -44,12 +45,6 @@ export const GROSS = { kennzahl: 96, kennzahlKlein: 72, text: 28, titel: 32 } as
 
 export function istVeraltet(standMs: number, jetztMs: number): boolean {
   return standMs > 0 && jetztMs - standMs > VERALTET_AB_MS;
-}
-
-/** „vor 3 min“, unter einer Minute „gerade eben“. */
-export function alterText(standMs: number, jetztMs: number): string {
-  const minuten = Math.floor((jetztMs - standMs) / 60_000);
-  return minuten < 1 ? 'gerade eben' : `vor ${minuten} min`;
 }
 
 type WachZustand = 'aus' | 'an' | 'nicht-unterstuetzt';
@@ -550,7 +545,7 @@ function Statusleiste({
         }}
       >
         {standMs > 0
-          ? `${veraltet ? 'Veraltet · ' : ''}Stand ${dayjs(standMs).format('HH:mm')} · ${alterText(standMs, jetzt)}`
+          ? `${veraltet ? 'Veraltet · ' : ''}Stand ${dayjs(standMs).format('HH:mm')} · ${formatVor(standMs, jetzt)}`
           : 'Kein Stand'}
       </span>
       <span style={{ fontFamily: schrift.zahl }}>{dayjs(jetzt).format('HH:mm')}</span>

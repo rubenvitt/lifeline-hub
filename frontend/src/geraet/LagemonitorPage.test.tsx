@@ -13,7 +13,6 @@ import type { GeraetAnzeige, LagemonitorAnzeige } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import {
   ABRUF_TAKT_MS,
-  alterText,
   HERVORHEBUNG_MS,
   istVeraltet,
   LANG_DRUECKEN_MS,
@@ -230,6 +229,21 @@ describe('Lagemonitor — Aktualität und Gerätemenü', () => {
     expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 min/);
   });
 
+  it('nennt einen Stand über einer Stunde in Stunden und Minuten (anzeige/abstand.ts)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    const stand = () => document.querySelector<HTMLElement>('[data-lfh="monitor-datenstand"]')!;
+    lagebildAntwort = () => HttpResponse.json({ fehler: 'weg' }, { status: 503 });
+    // Die Uhr springt, ohne dass die Abrufe dazwischen laufen; der Stand bleibt der erste.
+    vi.setSystemTime(JETZT + 184 * 60_000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(stand().textContent).toMatch(/Veraltet · Stand .* · vor 3 h 4 min$/);
+  });
+
   it('kurzes Tippen öffnet kein Menü, 3 s Drücken schon, nach 30 s ohne Eingabe zu', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
     bereit();
@@ -399,12 +413,10 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
 });
 
 describe('Bausteine', () => {
-  it('istVeraltet und alterText', () => {
+  it('istVeraltet', () => {
     expect(istVeraltet(JETZT, JETZT + 2 * 60_000)).toBe(false);
     expect(istVeraltet(JETZT, JETZT + 2 * 60_000 + 1)).toBe(true);
     expect(istVeraltet(0, JETZT)).toBe(false);
-    expect(alterText(JETZT, JETZT + 30_000)).toBe('gerade eben');
-    expect(alterText(JETZT, JETZT + 3 * 60_000)).toBe('vor 3 min');
   });
 
   it('monitorAusschnitt: ein Punkt mit Zoom, mehrere als Rahmen, keiner ohne Karte', () => {
