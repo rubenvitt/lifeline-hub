@@ -799,7 +799,11 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
   }
   const zweite = { ...detail, id: 11, registrier_nr: 11, aktuelle_uhs_id: 5 } as PersonDetail;
 
-  function renderMitWechsel(person: PersonDetail, extra: Parameters<typeof server.use> = []) {
+  function renderMitWechsel(
+    person: PersonDetail,
+    extra: Parameters<typeof server.use> = [],
+    client?: ReturnType<typeof erzeugeQueryClient>,
+  ) {
     server.use(
       meHandler(benutzerFixture()),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
@@ -818,7 +822,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
           <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
         </Routes>
       </>,
-      { route: '/einsaetze/1/personen/10' },
+      { route: '/einsaetze/1/personen/10', client },
     );
   }
   const zurZweiten = async () => {
@@ -850,6 +854,25 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     // Die Bearbeitung gehört zur ersten Person; ihr Speichern träfe sonst die zweite.
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(screen.getByRole('textbox', { name: /Verlaufsnotiz/ })).toHaveValue('');
+  });
+
+  it('hängt den Patientenkopf neu ein, auch wenn die zweite Person schon im Cache liegt', async () => {
+    // Liegt die zweite Person im Cache, gibt es keinen Ladezustand dazwischen: ohne `key` blieben
+    // getippte Notiz und offenes Paneel stehen, und „Notiz anlegen“ träfe die zweite Person.
+    const client = erzeugeQueryClient({
+      queries: { retry: false, gcTime: 60_000, staleTime: 60_000 },
+      mutations: { retry: false },
+    });
+    client.setQueryData(einsatzKeys.person(1, 11), zweite);
+    renderMitWechsel(detail, [], client);
+    await kopfueberschrift();
+    await userEvent.type(screen.getByRole('textbox', { name: /Verlaufsnotiz/ }), 'fuer R-001');
+    await userEvent.click(within(kopf()).getByRole('button', { name: /^Sichten/ }));
+    expect(screen.getByRole('region', { name: 'Sichtung erfassen' })).toBeInTheDocument();
+
+    await zurZweiten();
+    expect(screen.getByRole('textbox', { name: /Verlaufsnotiz/ })).toHaveValue('');
+    expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull();
   });
 
   it('eine erst nach dem Wechsel scheiternde Zeilenaktion meldet nicht bei der neuen Person', async () => {

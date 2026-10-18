@@ -976,6 +976,7 @@ export default function PersonenDetailPage() {
           ein Formular im Bearbeiten-Zweig darf nicht doppelt hängen. */}
       <Flex vertical gap={token.marginLG}>
         <Patientenkopf
+          key={personSchluessel}
           einsatzId={einsatzId}
           person={p}
           darfSchreiben={darfSchreiben}
