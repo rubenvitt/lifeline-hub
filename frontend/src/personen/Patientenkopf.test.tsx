@@ -2,8 +2,9 @@ import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PersonDetail } from '../api/types';
+import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
 import { server } from '../test/server';
+import { setzeViewportBreite } from '../test/viewport';
 import { renderMitProviders } from '../test/utils';
 import Patientenkopf from './Patientenkopf';
 
@@ -333,5 +334,161 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     const { kopf } = zeige({}, { darfSichten: false });
     expect(within(kopf).queryByRole('button', { name: /Sichten/ })).toBeNull();
     expect(within(kopf).getByText(/SK II · schwer/)).toBeInTheDocument();
+  });
+});
+
+/** Eine Maßnahme der Fixture; `aufgehoben` setzt `aufgehoben_at`. */
+function massnahme(id: number, art: Massnahme['art'], um: string, aufgehoben = false): Massnahme {
+  return {
+    id,
+    einsatz_id: 1,
+    person_id: 10,
+    art,
+    zeitpunkt_at: `2026-10-18 ${um}:00`,
+    erfasst_at: `2026-10-18 ${um}:00`,
+    erfasst_von: 1,
+    aufgehoben_at: aufgehoben ? '2026-10-18 11:00:00' : null,
+  };
+}
+
+function verletzung(
+  id: number,
+  region: Verletzung['region'],
+  art: Verletzung['art'],
+  aufgehoben = false,
+  ansicht: Verletzung['ansicht'] = 'vorn',
+): Verletzung {
+  return {
+    id,
+    einsatz_id: 1,
+    person_id: 10,
+    ansicht,
+    region,
+    art,
+    zeitpunkt_at: '2026-10-18 09:40:00',
+    erfasst_at: '2026-10-18 09:40:00',
+    erfasst_von: 1,
+    aufgehoben_at: aufgehoben ? '2026-10-18 10:00:00' : null,
+  };
+}
+
+/** Der volle PAT-Kern aus dem Szenario der Spec (`personen-detail`, „Voller PAT-Kern“). */
+const vollerKern: Partial<PersonDetail> = {
+  pat_nummer: 'A-4711',
+  kontamination: true,
+  transport_prioritaet: 'dringlich',
+  transport_art: 'liegend',
+  transport_fachrichtung: 'unfallchirurgie',
+  transport_at: '2026-10-18 09:50:00',
+  // Jüngste Durchführung zuerst, wie der Server liefert; die aufgehobene zählt nicht.
+  massnahmen: [
+    massnahme(6, 'sauerstoff', '10:20'),
+    massnahme(5, 'infusion', '10:10', true),
+    massnahme(4, 'zugang', '10:00'),
+    massnahme(3, 'analgesie', '09:55'),
+    massnahme(2, 'immobilisation', '09:45'),
+    massnahme(1, 'blutstillung', '09:30'),
+  ],
+  // Erfassungsfolge; Nummer 2 ist aufgehoben und lässt eine Lücke.
+  verletzungen: [
+    verletzung(1, 'unterarm_l', 'fraktur_verdacht'),
+    verletzung(2, 'kopf', 'wunde_blutung', true),
+    verletzung(3, 'thorax', 'prellung_schwellung'),
+    verletzung(4, 'ruecken', 'schmerz', false, 'hinten'),
+    verletzung(5, 'fuss_r', 'verbrennung'),
+  ],
+};
+
+describe('Patientenkopf — voller PAT-Kern (LLH-1324/1325/1326/1113, design.md D14)', () => {
+  it('nennt PAT-Nummer und „kontaminiert“ in der Kopfzeile', () => {
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    const zeile = kopf.querySelector<HTMLElement>('[data-lfh="patientenkopf-zeile"]');
+    expect(zeile).not.toBeNull();
+    expect(within(zeile!).getByText('PAT A-4711')).toBeInTheDocument();
+    expect(within(zeile!).getByText('kontaminiert')).toBeInTheDocument();
+  });
+
+  it('teilt das Raster ab lg in zwei Spalten: links Lage, rechts Behandlung', () => {
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    const spalten = kopf.querySelectorAll<HTMLElement>('dl[data-lfh="datenraster"]');
+    expect(spalten).toHaveLength(2);
+    const begriffe = [...spalten].map((dl) =>
+      [...dl.querySelectorAll('dt')].map((dt) => dt.textContent),
+    );
+    expect(begriffe).toEqual([
+      ['Sichtung', 'Zustand / Verdacht', 'Aufenthalt', 'Transport'],
+      ['Maßnahmen', 'Verletzungen', 'Letzte Notiz'],
+    ]);
+    const huelle = spalten[0].parentElement!;
+    expect(huelle.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+  });
+
+  it('stapelt die Spalten unter lg, die Lage zuerst', () => {
+    setzeViewportBreite(800);
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    const spalten = kopf.querySelectorAll<HTMLElement>('dl[data-lfh="datenraster"]');
+    expect(spalten[0].parentElement!.style.gridTemplateColumns).toBe('minmax(0, 1fr)');
+    expect(spalten[0].querySelector('dt')?.textContent).toBe('Sichtung');
+  });
+
+  it('zeigt den Transportstand mit Priorität, Art und Fachrichtung', () => {
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    expect(kopf.querySelector('[data-lfh="transport"]')?.textContent).toMatch(
+      /^dringlich · liegend · Unfallchirurgie/,
+    );
+  });
+
+  it('kürzt die Maßnahmen auf drei gültige und nennt die übrigen', () => {
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    const liste = within(kopf).getByRole('list', { name: 'Maßnahmen' });
+    const zeilen = within(liste)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    expect(zeilen).toHaveLength(3);
+    expect(zeilen[0]).toMatch(/^Sauerstoff · /);
+    expect(zeilen[1]).toMatch(/^Zugang · /);
+    expect(zeilen[2]).toMatch(/^Analgesie · /);
+    // Fünf gültige, drei stehen: die aufgehobene Infusion zählt nicht mit.
+    expect(within(kopf).getByText('+ 2 weitere')).toBeInTheDocument();
+    expect(liste.textContent).not.toContain('Infusion');
+  });
+
+  it('nummeriert die Verletzungen fest nach Erfassung, Aufgehobene lassen eine Lücke', () => {
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    const liste = within(kopf).getByRole('list', { name: 'Verletzungen' });
+    const zeilen = within(liste)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    expect(zeilen).toEqual([
+      '1 Unterarm links, vorn · Fraktur-Verdacht',
+      '3 Thorax, vorn · Prellung/Schwellung',
+      '4 Rücken, hinten · Schmerz',
+    ]);
+    expect(within(kopf).getByText('+ 1 weitere')).toBeInTheDocument();
+  });
+
+  it('nennt leere Angaben, ohne Kopfzeile', () => {
+    const { kopf } = zeige({}, { darfSchreiben: false });
+    expect(kopf.querySelector('[data-lfh="patientenkopf-zeile"]')).toBeNull();
+    expect(kopf.querySelector('[data-lfh="transport"]')?.textContent).toBe('kein Transport');
+    expect(kopf.querySelector('[data-lfh="massnahmen"]')?.textContent).toBe('keine');
+    expect(kopf.querySelector('[data-lfh="verletzungen"]')?.textContent).toBe('keine');
+    expect(within(kopf).queryByText(/weitere/)).toBeNull();
+  });
+
+  it('zeigt „nicht kontaminiert“ nicht als Marke', () => {
+    const { kopf } = zeige({ kontamination: false }, { darfSchreiben: false });
+    expect(within(kopf).queryByText('kontaminiert')).toBeNull();
+  });
+
+  it.each([
+    ['ohne Schreibrecht', { darfSchreiben: false }],
+    ['in der Lesefassung', { modus: 'lesen' }],
+  ])('zeigt %s den vollen Kern ohne jede Bedienung', (_fall, props) => {
+    const { kopf } = zeige(vollerKern, props);
+    expect(within(kopf).queryAllByRole('button')).toHaveLength(0);
+    expect(within(kopf).queryByRole('textbox')).toBeNull();
+    expect(within(kopf).getByText('PAT A-4711')).toBeInTheDocument();
+    expect(within(kopf).getByRole('list', { name: 'Verletzungen' })).toBeInTheDocument();
   });
 });

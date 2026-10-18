@@ -10,13 +10,25 @@ import {
   Datenfeld,
   Datenraster,
   Schnellerfassungszeile,
+  monoStil,
   useRollen,
 } from '../components/instrument';
+import StatusTag from '../components/StatusTag';
+import { useViewport } from '../components/useViewport';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
-import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
+import { sichtung as SK_DARSTELLUNG, kontamination } from '../theme/statusFarben';
 import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
-import { SK_WORT, kurzVerbleib } from './personMeta';
+import {
+  MASSNAHME_WORT,
+  SK_WORT,
+  VERLETZUNG_ART_WORT,
+  VERLETZUNG_SCHWERE_WORT,
+  gueltig,
+  kurzVerbleib,
+  transportText,
+} from './personMeta';
+import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
 import { istAngetroffen } from './personenBilanz';
 import { ZustandSchreiben } from './personenSpalten';
 import { SichtungFelder, saveSichtung, type SichtungWerte } from './SichtungDialog';
@@ -41,8 +53,11 @@ export interface PatientenkopfProps {
 /**
  * Der Patientenkopf (LLH-1094, Spec `personen-detail`, „Patientenkopf beantwortet die
  * Patientenfragen“): Sichtung mit DTG und „vor n min“, Zustand / Verdacht, Aufenthalt bzw.
- * Verbleib, letzte Notiz — alles aus dem einen Detail-GET (`aufenthalt` liefert der Server mit,
- * LLH-1129). Sichten, Verbleib und Notiz gehen hier ohne Dialog: jede Handlung klappt ihr
+ * Verbleib, Transport, Maßnahmen, Verletzungen und letzte Notiz, dazu in der Kopfzeile PAT-Nummer
+ * und „kontaminiert“ (voller PAT-Kern, Change `y18v58dt-pat-kern` D14) — alles aus dem einen
+ * Detail-GET (`aufenthalt` liefert der Server mit, LLH-1129). Ab `lg` zwei Spalten, Maßnahmen und
+ * Verletzungen gekürzt auf drei mit „+ n weitere“, damit der Kopf bei 1280 × 800 ohne Bildlauf
+ * steht. Sichten, Verbleib und Notiz gehen hier ohne Dialog: jede Handlung klappt ihr
  * eigenes Paneel auf, eine Ablehnung bleibt in ihm stehen. Solange Sichtung oder Verbleib
  * speichert, sperrt der Kopf den Wechsel (beide Auslöser `disabled`): hinge das Paneel mitten im
  * Speichern aus, hätte eine Ablehnung keinen Ort, und ein später Erfolg schlösse das neue Paneel.
@@ -58,7 +73,7 @@ export default function Patientenkopf({
   aufenthaltAktionen,
   onGeschrieben,
 }: PatientenkopfProps) {
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
   const jetzt = useMinutenTakt();
   const bedienbar = modus === 'bedienen' && darfSchreiben && !person.storniert_at;
   const angetroffen = istAngetroffen(person);
@@ -79,6 +94,14 @@ export default function Patientenkopf({
   const letzteSichtung = person.sichtungen?.[0];
   const letzteNotiz = person.notizen?.[0];
   const letzterVerbleib = person.verbleib?.[0];
+  const letzterTransport = person.transporte?.[0];
+  const transport = transportText(person);
+  const massnahmen = gueltig(person.massnahmen ?? []);
+  const verletzungen = nummeriere(person.verletzungen ?? []).filter(
+    (n) => n.verletzung.aufgehoben_at == null,
+  );
+  const kopfzeile = !!person.pat_nummer || person.kontamination === true;
+  const zweiSpalten = useViewport().abBreite('lg');
 
   return (
     <section
@@ -86,88 +109,168 @@ export default function Patientenkopf({
       aria-label="Patientenkopf"
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
     >
-      <Datenraster spalten={2} beschriftung="Patientenangaben">
-        <Datenfeld label="Sichtung">
-          <Flex vertical gap={token.marginXXS}>
-            <SichtungsAnzeige
-              person={person}
-              bedienbar={bedienbar && darfSichten && angetroffen}
-              offen={offen === 'sichtung'}
-              gesperrt={isSpeichernd}
-              onUmschalten={() => toggle('sichtung')}
-            />
-            {person.aktuelle_sichtung_at && (
-              <Typography.Text type="secondary" data-lfh="sichtung-zeit">
-                gesichtet <ZeitAnzeige wert={person.aktuelle_sichtung_at} format="dtg" /> ·{' '}
-                {formatVor(person.aktuelle_sichtung_at, jetzt)}
-                {letzteSichtung?.bestaetigt_name &&
-                  ` · bestätigt: ${letzteSichtung.bestaetigt_name}`}
-              </Typography.Text>
-            )}
-          </Flex>
-        </Datenfeld>
-
-        <Datenfeld label="Zustand / Verdacht">
-          {bedienbar && angetroffen ? (
-            <ZustandSchreiben p={person} einsatzId={einsatzId} />
-          ) : (
-            <span data-lfh="zustand">{person.zustand || '—'}</span>
+      {kopfzeile && (
+        <div
+          data-lfh="patientenkopf-zeile"
+          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginSM }}
+        >
+          {person.pat_nummer && (
+            <span data-lfh="pat-nummer" style={{ ...monoStil(13), color: rollen.text }}>
+              {`PAT ${person.pat_nummer}`}
+            </span>
           )}
-        </Datenfeld>
+          {person.kontamination === true && <StatusTag darstellung={kontamination} />}
+        </div>
+      )}
 
-        <Datenfeld label={person.aufenthalt || !letzterVerbleib ? 'Aufenthalt' : 'Verbleib'}>
-          <Flex vertical gap={token.marginXS}>
-            <span data-lfh="aufenthalt">
-              {person.aufenthalt ? (
+      {/* Zwei Spalten ab lg (design.md D14): links die Lage des Patienten, rechts was an ihm
+          getan und gefunden ist. Darunter gestapelt, die Lage zuerst (Spec, 390 × 844). */}
+      <div
+        data-lfh="patientenkopf-raster"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: zweiSpalten ? 'repeat(2, minmax(0, 1fr))' : 'minmax(0, 1fr)',
+          gap: token.marginSM,
+        }}
+      >
+        <Datenraster spalten={1} beschriftung="Patientenangaben">
+          <Datenfeld label="Sichtung">
+            <Flex vertical gap={token.marginXXS}>
+              <SichtungsAnzeige
+                person={person}
+                bedienbar={bedienbar && darfSichten && angetroffen}
+                offen={offen === 'sichtung'}
+                gesperrt={isSpeichernd}
+                onUmschalten={() => toggle('sichtung')}
+              />
+              {person.aktuelle_sichtung_at && (
+                <Typography.Text type="secondary" data-lfh="sichtung-zeit">
+                  gesichtet <ZeitAnzeige wert={person.aktuelle_sichtung_at} format="dtg" /> ·{' '}
+                  {formatVor(person.aktuelle_sichtung_at, jetzt)}
+                  {letzteSichtung?.bestaetigt_name &&
+                    ` · bestätigt: ${letzteSichtung.bestaetigt_name}`}
+                </Typography.Text>
+              )}
+            </Flex>
+          </Datenfeld>
+
+          <Datenfeld label="Zustand / Verdacht">
+            {bedienbar && angetroffen ? (
+              <ZustandSchreiben p={person} einsatzId={einsatzId} />
+            ) : (
+              <span data-lfh="zustand">{person.zustand || '—'}</span>
+            )}
+          </Datenfeld>
+
+          <Datenfeld label={person.aufenthalt || !letzterVerbleib ? 'Aufenthalt' : 'Verbleib'}>
+            <Flex vertical gap={token.marginXS}>
+              <span data-lfh="aufenthalt">
+                {person.aufenthalt ? (
+                  <>
+                    {person.aufenthalt.uhs_bezeichnung} ·{' '}
+                    {person.aufenthalt.platz_bezeichnung ?? 'Wartebereich'}
+                    {person.aufenthalt.seit && (
+                      <>
+                        {' '}
+                        · seit <ZeitAnzeige wert={person.aufenthalt.seit} format="dtg" />
+                      </>
+                    )}
+                  </>
+                ) : letzterVerbleib ? (
+                  <>
+                    {kurzVerbleib(letzterVerbleib)} ·{' '}
+                    <ZeitAnzeige wert={letzterVerbleib.zeitpunkt_at} format="dtg" />
+                  </>
+                ) : (
+                  <Typography.Text type="secondary">ohne Aufenthalt</Typography.Text>
+                )}
+              </span>
+              {modus === 'bedienen' && (
+                <Flex gap={token.marginSM} wrap>
+                  {aufenthaltAktionen}
+                  {bedienbar && angetroffen && (
+                    <Button
+                      aria-expanded={offen === 'verbleib'}
+                      disabled={isSpeichernd}
+                      onClick={() => toggle('verbleib')}
+                    >
+                      Verbleib erfassen
+                    </Button>
+                  )}
+                </Flex>
+              )}
+            </Flex>
+          </Datenfeld>
+
+          <Datenfeld label="Transport">
+            <span data-lfh="transport">
+              {transport ? (
                 <>
-                  {person.aufenthalt.uhs_bezeichnung} ·{' '}
-                  {person.aufenthalt.platz_bezeichnung ?? 'Wartebereich'}
-                  {person.aufenthalt.seit && (
-                    <>
+                  {transport}
+                  {person.transport_at && (
+                    <Typography.Text type="secondary">
                       {' '}
-                      · seit <ZeitAnzeige wert={person.aufenthalt.seit} format="dtg" />
-                    </>
+                      · <ZeitAnzeige wert={person.transport_at} format="dtg" />
+                      {letzterTransport?.bestaetigt_name &&
+                        ` · bestätigt: ${letzterTransport.bestaetigt_name}`}
+                    </Typography.Text>
                   )}
                 </>
-              ) : letzterVerbleib ? (
-                <>
-                  {kurzVerbleib(letzterVerbleib)} ·{' '}
-                  <ZeitAnzeige wert={letzterVerbleib.zeitpunkt_at} format="dtg" />
-                </>
               ) : (
-                <Typography.Text type="secondary">ohne Aufenthalt</Typography.Text>
+                <Typography.Text type="secondary">kein Transport</Typography.Text>
               )}
             </span>
-            {modus === 'bedienen' && (
-              <Flex gap={token.marginSM} wrap>
-                {aufenthaltAktionen}
-                {bedienbar && angetroffen && (
-                  <Button
-                    aria-expanded={offen === 'verbleib'}
-                    disabled={isSpeichernd}
-                    onClick={() => toggle('verbleib')}
-                  >
-                    Verbleib erfassen
-                  </Button>
-                )}
-              </Flex>
-            )}
-          </Flex>
-        </Datenfeld>
+          </Datenfeld>
+        </Datenraster>
 
-        <Datenfeld label="Letzte Notiz">
-          {letzteNotiz ? (
-            <span data-lfh="letzte-notiz">
-              {letzteNotiz.text}{' '}
-              <Typography.Text type="secondary">
-                · <ZeitAnzeige wert={letzteNotiz.erfasst_at} format="dtg" />
-              </Typography.Text>
-            </span>
-          ) : (
-            <Typography.Text type="secondary">keine</Typography.Text>
-          )}
-        </Datenfeld>
-      </Datenraster>
+        <Datenraster spalten={1} beschriftung="Behandlung">
+          <Datenfeld label="Maßnahmen">
+            <div data-lfh="massnahmen">
+              <GekuerzteListe
+                beschriftung="Maßnahmen"
+                eintraege={massnahmen.map((m) => ({
+                  key: m.id,
+                  inhalt: (
+                    <>
+                      {MASSNAHME_WORT[m.art]} ·{' '}
+                      <ZeitAnzeige wert={m.zeitpunkt_at} format="uhrzeit" />
+                    </>
+                  ),
+                }))}
+              />
+            </div>
+          </Datenfeld>
+          <Datenfeld label="Verletzungen">
+            <div data-lfh="verletzungen">
+              <GekuerzteListe
+                beschriftung="Verletzungen"
+                eintraege={verletzungen.map(({ nummer, verletzung: v }) => ({
+                  key: v.id,
+                  inhalt: (
+                    <>
+                      <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)} ·{' '}
+                      {VERLETZUNG_ART_WORT[v.art]}
+                      {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`}
+                    </>
+                  ),
+                }))}
+              />
+            </div>
+          </Datenfeld>
+          <Datenfeld label="Letzte Notiz">
+            {letzteNotiz ? (
+              <span data-lfh="letzte-notiz">
+                {letzteNotiz.text}{' '}
+                <Typography.Text type="secondary">
+                  · <ZeitAnzeige wert={letzteNotiz.erfasst_at} format="dtg" />
+                </Typography.Text>
+              </span>
+            ) : (
+              <Typography.Text type="secondary">keine</Typography.Text>
+            )}
+          </Datenfeld>
+        </Datenraster>
+      </div>
 
       {offen === 'sichtung' && (
         <SichtungPaneel
@@ -251,6 +354,45 @@ function SichtungsAnzeige({
     >
       {text}
     </button>
+  );
+}
+
+/** Wie viele Einträge einer Liste der Kopf zeigt, bevor er kürzt (design.md D14). */
+export const KOPF_LISTE_MAX = 3;
+
+/**
+ * Eine Liste im Kopf, gekürzt auf {@link KOPF_LISTE_MAX} Einträge; die übrigen nennt eine Zahl
+ * („+ 2 weitere“), damit der Kopf bei 1280 × 800 ohne Bildlauf steht. Leer steht „keine“.
+ */
+function GekuerzteListe({
+  beschriftung,
+  eintraege,
+}: {
+  beschriftung: string;
+  eintraege: { key: number; inhalt: ReactNode }[];
+}) {
+  const { token } = useRollen();
+  if (eintraege.length === 0) return <Typography.Text type="secondary">keine</Typography.Text>;
+  const rest = eintraege.length - KOPF_LISTE_MAX;
+  return (
+    <>
+      <ul
+        aria-label={beschriftung}
+        style={{
+          listStyle: 'none',
+          margin: 0,
+          padding: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: token.marginXXS,
+        }}
+      >
+        {eintraege.slice(0, KOPF_LISTE_MAX).map((e) => (
+          <li key={e.key}>{e.inhalt}</li>
+        ))}
+      </ul>
+      {rest > 0 && <Typography.Text type="secondary">{`+ ${rest} weitere`}</Typography.Text>}
+    </>
   );
 }
 

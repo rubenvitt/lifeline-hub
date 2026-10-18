@@ -1,4 +1,14 @@
-import type { Sichtungskategorie, TransportArt, TransportPrioritaet, Verbleib } from '../api/types';
+import type {
+  Fachrichtung,
+  MassnahmeArt,
+  Person,
+  Sichtungskategorie,
+  TransportArt,
+  TransportPrioritaet,
+  Verbleib,
+  VerletzungArt,
+  VerletzungSchwere,
+} from '../api/types';
 
 /**
  * Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt) — die eine Quelle
@@ -81,3 +91,72 @@ export const TRANSPORT_ART_WORT: Record<TransportArt, string> = {
   sitzend: 'sitzend',
   mit_notarzt: 'mit Notarzt',
 };
+
+/** Das Wort der benötigten Fachrichtung (LLH-1325). */
+export const FACHRICHTUNG_WORT: Record<Fachrichtung, string> = {
+  unfallchirurgie: 'Unfallchirurgie',
+  verbrennung: 'Verbrennung',
+  kinder: 'Kinder',
+  neuro: 'Neuro',
+  innere: 'Innere',
+  geburtshilfe: 'Geburtshilfe',
+  psychiatrie: 'Psychiatrie',
+  sonstige: 'Sonstige',
+};
+
+/**
+ * Der aktuelle Transportstand in einer Zeile („dringlich · liegend · Unfallchirurgie“), aus dem
+ * Cache an der Person; ohne Stand `null`. Die Priorität steht als Wort, keine Farbe (D10).
+ */
+export function transportText(
+  p: Pick<Person, 'transport_prioritaet' | 'transport_art' | 'transport_fachrichtung'>,
+): string | null {
+  const teile = [
+    p.transport_prioritaet ?? null,
+    p.transport_art ? TRANSPORT_ART_WORT[p.transport_art] : null,
+    p.transport_fachrichtung ? FACHRICHTUNG_WORT[p.transport_fachrichtung] : null,
+  ].filter((t): t is string => t != null);
+  return teile.length > 0 ? teile.join(' · ') : null;
+}
+
+/** Das Wort je Maßnahme aus dem festen Katalog (LLH-1324), wie die Wahl im Paneel es zeigt. */
+export const MASSNAHME_WORT: Record<MassnahmeArt, string> = {
+  blutstillung: 'Blutstillung',
+  zugang: 'Zugang',
+  infusion: 'Infusion',
+  sauerstoff: 'Sauerstoff',
+  atemweg: 'Atemweg',
+  analgesie: 'Analgesie',
+  immobilisation: 'Immobilisation',
+  waermeerhalt: 'Wärmeerhalt',
+  dekontamination: 'Dekontamination',
+};
+
+/** Feste Folge der Maßnahmen in der Wahl: die Katalogfolge der Spec. */
+export const MASSNAHME_REIHE = Object.keys(MASSNAHME_WORT) as readonly MassnahmeArt[];
+
+/** Das Wort je Art der Verletzung (LLH-1113). */
+export const VERLETZUNG_ART_WORT: Record<VerletzungArt, string> = {
+  wunde_blutung: 'Wunde/Blutung',
+  fraktur_verdacht: 'Fraktur-Verdacht',
+  verbrennung: 'Verbrennung',
+  prellung_schwellung: 'Prellung/Schwellung',
+  amputation: 'Amputation',
+  schmerz: 'Schmerz',
+  sonstige: 'Sonstige',
+};
+
+/** Feste Folge der Arten in der Wahl am Körperschema. */
+export const VERLETZUNG_ART_REIHE = Object.keys(VERLETZUNG_ART_WORT) as readonly VerletzungArt[];
+
+/** Das Wort je Schwere; die Schwere ist optional. */
+export const VERLETZUNG_SCHWERE_WORT: Record<VerletzungSchwere, string> = {
+  leicht: 'leicht',
+  mittel: 'mittel',
+  schwer: 'schwer',
+};
+
+/** Aus einer Liste nur, was gilt: Aufgehobenes steht im Verlauf, nicht im Kopf. */
+export function gueltig<T extends { aufgehoben_at?: string | null }>(liste: readonly T[]): T[] {
+  return liste.filter((e) => e.aufgehoben_at == null);
+}
