@@ -6,8 +6,8 @@ Gemeinsame Change für LLH-1094 (`bti508xb`) und LLH-1129 (`mtcm6ied`) von LLH-1
 
 ## 1. Server: Aufenthalt im Detail — LLH-1129 (mtcm6ied)
 
-- [ ] 1.1 `AufenthaltAnzeige` (`uhs_id`, `uhs_bezeichnung`, `platz_id`, `platz_bezeichnung`, `seit`) und `PersonDetail.aufenthalt` mit Abfrage über `uhs`/`uhs_platz`/`person_uhs_belegung`. Servertest: ohne UHS `null`, im Wartebereich ohne Platz, auf Platz mit Name, nach Wechsel `seit` vom Wechsel, nach Austritt `null`.
-- [ ] 1.2 `api_doc.rs` und Typ-Codegen (`scripts/check-typ-codegen.sh` grün, beide generierten Dateien mitcommittet).
+- [x] 1.1 `AufenthaltAnzeige` (`uhs_id`, `uhs_bezeichnung`, `platz_id`, `platz_bezeichnung`, `seit`) und `PersonDetail.aufenthalt` mit Abfrage über `uhs`/`uhs_platz`/`person_uhs_belegung`. Servertest: ohne UHS `null`, im Wartebereich ohne Platz, auf Platz mit Name, nach Wechsel `seit` vom Wechsel, nach Austritt `null`.
+- [x] 1.2 `api_doc.rs` und Typ-Codegen (`scripts/check-typ-codegen.sh` grün, beide generierten Dateien mitcommittet).
 
 ## 2. Geteilte Helfer — LLH-1094 (bti508xb)
 

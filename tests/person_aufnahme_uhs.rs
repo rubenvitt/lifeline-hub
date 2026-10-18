@@ -256,3 +256,87 @@ async fn aufnahme_braucht_uhs_modulzugriff_auch_beim_replay() {
         StatusCode::CREATED
     );
 }
+
+/// LLH-1129: Das Detail nennt den Aufenthalt (UHS, Platz, seit), damit der Patientenkopf ohne
+/// zweiten Abruf auskommt. Ohne UHS `null`, nach dem Austritt wieder `null`.
+#[tokio::test]
+async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
+    let (app, pool, _live, admin, e, u) = setup().await;
+    let detail = |p: i64| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let (s, d) = anfrage(
+                &app,
+                "GET",
+                &format!("/api/einsaetze/{e}/personen/{p}"),
+                &admin,
+                None,
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK);
+            d
+        }
+    };
+
+    // Ohne UHS kein Aufenthalt.
+    let (s, ohne) = aufnehmen(&app, &admin, e, json!({ "sichtung": "sk3" })).await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(detail(ohne["id"].as_i64().unwrap()).await["aufenthalt"].is_null());
+
+    // Im Wartebereich: UHS mit Name, kein Platz.
+    let (s, person) = aufnehmen(&app, &admin, e, json!({ "uhs_id": u, "sichtung": "sk2" })).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let p = person["id"].as_i64().unwrap();
+    let a = &detail(p).await["aufenthalt"];
+    assert_eq!(a["uhs_id"], u);
+    assert_eq!(a["uhs_bezeichnung"], "BHP Mitte");
+    assert!(a["platz_id"].is_null());
+    assert!(a["platz_bezeichnung"].is_null());
+    assert!(a["seit"].is_string());
+
+    // Auf einen Platz gewechselt: Platzname, `seit` vom Wechsel.
+    let (s, platz) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/uhs/{u}/plaetze"),
+        &admin,
+        Some(r#"{"typ":"behandlungsplatz","bezeichnung":"Platz 2"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{platz}");
+    let platz_id = platz["id"].as_i64().unwrap();
+    // Den Eintritt in die Vergangenheit legen, damit der Wechsel sichtbar jünger ist.
+    sqlx::query(
+        "UPDATE person_uhs_belegung SET zeitpunkt_at = '2026-01-01 08:00:00' WHERE person_id = ?",
+    )
+    .bind(p)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{p}/uhs-belegung"),
+        &admin,
+        Some(&json!({ "art": "wechsel", "uhs_id": u, "platz_id": platz_id }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let a = &detail(p).await["aufenthalt"];
+    assert_eq!(a["platz_id"], platz_id);
+    assert_eq!(a["platz_bezeichnung"], "Platz 2");
+    assert_ne!(a["seit"].as_str().unwrap(), "2026-01-01 08:00:00");
+
+    // Nach dem Austritt kein Aufenthalt.
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{p}/uhs-belegung"),
+        &admin,
+        Some(r#"{"art":"austritt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    assert!(detail(p).await["aufenthalt"].is_null());
+}

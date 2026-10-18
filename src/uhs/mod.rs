@@ -188,6 +188,19 @@ pub struct BelegungAnzeige {
     pub erfasst_von: i64,
 }
 
+/// Wo eine Person gerade in einer UHS steht (LLH-1129): für den Patientenkopf im Personen-Detail,
+/// damit er UHS- und Platznamen ohne zweiten Abruf nennt. UHS- und Platzbezeichnung sind
+/// Lagestruktur, keine Scrub-Werte der Person. `seit` ist der Zeitpunkt der jüngsten Belegung
+/// (Eintritt oder Wechsel) in dieser UHS.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct AufenthaltAnzeige {
+    pub uhs_id: i64,
+    pub uhs_bezeichnung: String,
+    pub platz_id: Option<i64>,
+    pub platz_bezeichnung: Option<String>,
+    pub seit: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

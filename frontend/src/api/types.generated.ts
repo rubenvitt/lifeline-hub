@@ -526,6 +526,21 @@ export interface components {
          */
         AufbewahrungZustand: "ohne_frist" | "frist_laeuft" | "faellig" | "vorgemerkt" | "schwaerzung_ausstehend" | "geschwaerzt" | "schwaerzung_beantragt" | "loeschung_ausstehend" | "endgueltig_geloescht";
         /**
+         * @description Wo eine Person gerade in einer UHS steht (LLH-1129): für den Patientenkopf im Personen-Detail,
+         *     damit er UHS- und Platznamen ohne zweiten Abruf nennt. UHS- und Platzbezeichnung sind
+         *     Lagestruktur, keine Scrub-Werte der Person. `seit` ist der Zeitpunkt der jüngsten Belegung
+         *     (Eintritt oder Wechsel) in dieser UHS.
+         */
+        AufenthaltAnzeige: {
+            platz_bezeichnung?: string | null;
+            /** Format: int64 */
+            platz_id?: number | null;
+            seit?: string | null;
+            uhs_bezeichnung: string;
+            /** Format: int64 */
+            uhs_id: number;
+        };
+        /**
          * @description Anzeige eines Auftrags inkl. abgeleiteter Felder und der Vollzugs-Achse aus
          *     dem geteilten `kommunikation_status` (per LEFT JOIN). Quittungs-Aggregate
          *     (`empfaenger_anzahl`, `quittiert_anzahl`) stammen aus `auftrag_empfaenger`.
@@ -4739,6 +4754,7 @@ export interface components {
          */
         PersonDetail: components["schemas"]["PersonAnzeige"] & {
             abgleiche: components["schemas"]["AbgleichAnzeige"][];
+            aufenthalt?: components["schemas"]["AufenthaltAnzeige"] | null;
             notizen: components["schemas"]["NotizAnzeige"][];
             sichtungen: components["schemas"]["SichtungAnzeige"][];
             verbleib: components["schemas"]["VerbleibAnzeige"][];

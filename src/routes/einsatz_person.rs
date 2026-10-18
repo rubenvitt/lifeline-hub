@@ -27,6 +27,7 @@ use crate::routes::support::{
     deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pruefe_koordinate, trimme,
     trimme_tri,
 };
+use crate::uhs::{belegung_repo, AufenthaltAnzeige};
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -45,6 +46,8 @@ pub struct PersonDetail {
     pub notizen: Vec<NotizAnzeige>,
     pub verbleib: Vec<VerbleibAnzeige>,
     pub abgleiche: Vec<AbgleichAnzeige>,
+    /// UHS, Platz und seit wann; `null` außerhalb jeder UHS (LLH-1129, Patientenkopf).
+    pub aufenthalt: Option<AufenthaltAnzeige>,
 }
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
@@ -564,6 +567,7 @@ pub async fn detail(
     let sichtungen = sichtung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let notizen = verlaufsnotiz_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let aufenthalt = belegung_repo::aufenthalt(&state.pool, einsatz_id, person_id).await?;
     // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
     // Personen des Einsatzes.
     let abgleiche = if ctx.geraet.is_some() {
@@ -578,6 +582,7 @@ pub async fn detail(
         notizen,
         verbleib,
         abgleiche,
+        aufenthalt,
     }))
 }
 
