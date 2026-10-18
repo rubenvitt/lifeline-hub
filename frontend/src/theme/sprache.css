@@ -153,6 +153,16 @@
   outline-offset: -2px;
 }
 
+/* Bündelzeile der Systemeinträge (LLH-1106, `etb/EtbZeitachse.tsx`): handgebautes Bedienziel,
+   Fokusring in `bedien` wie oben, Hover als Unterstrich — die Zeile bleibt leise. */
+.lfh-etb-buendel:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 2px;
+}
+.lfh-etb-buendel:hover {
+  text-decoration: underline;
+}
+
 /* Sprunglink von der gewählten Karte ins Detail (`components/ListeDetail.tsx`, ab `lg`): ohne
    Fokus aus dem Bild genommen, aber in der Tab-Folge; mit Fokus steht er mit seiner Inline-
    Geometrie (Boden `controlHeight`) unter der Karte. */

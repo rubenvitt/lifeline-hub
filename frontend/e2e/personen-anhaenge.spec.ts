@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { MINI_JPEG } from './bildFixture';
 import { wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Fotos und Dateien an einer Person (LFH-757) im Browser: der Abschnitt der Detailseite lädt
@@ -123,6 +124,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
 
   // ── 4 · Pseudonymer ETB-Nachweis ────────────────────────────────────────────────────
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText('Person R-001: Foto abgelegt')).toBeVisible();
   await expect(page.getByText(/Mueller|Erika/)).toHaveCount(0);
 

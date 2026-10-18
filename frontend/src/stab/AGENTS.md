@@ -177,9 +177,15 @@ Keys fehlen in `LAGEBILD_OFFLINE` (LFH-767). **Informationstelefon: Fenster und 
 immer seitenweise (`ANRUFE_PAGE_SIZE`, Cursor Eingang + Kennung, „Ältere laden“), „offene Rückrufe“
 filtert am Server; Kennzahlen, Meta und „Nach Anliegen“ lesen nur `…/infotelefon/zaehler`, nie
 das geladene Fenster, ebenso die Medienlage. Ein Deeplink außerhalb des Fensters holt den Anruf
-einzeln (`…/infotelefon/{aid}`) und hängt ihn hinten an. Die Zufluss-Schleuse
+einzeln (`…/infotelefon/{aid}`) und stellt ihn als ältesten oben dazu. Die Zufluss-Schleuse
 (`infotelefon/zufluss.ts`) nimmt Seiten, die nach dem Einfrieren nachgeladen wurden, über
 `extendEinfrierstand` auf, damit ein Nachtrag aus einer älteren Seite nicht als „neuer Anruf“ gilt.
+**Informationstelefon in Funkprotokoll-Ordnung** (LLH-1149, Spec `stab-infotelefon`, Herleitung
+`openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D10): dieselbe Leserichtung wie das ETB
+(`etb/AGENTS.md`, „Funkprotokoll-Ordnung“) — ältester Anruf oben, jüngster unten über der
+Erfassung, „Ältere laden“ über der Liste, das Sammelbanner unten; Öffnen am Ende, Mitlaufen und
+Anker über `components/useFunkprotokollLauf.ts`, gekehrt wird erst in der Darstellung
+(`funkprotokollFolge`). Hochgerollt friert die Schleuse ein wie bei Fokus in der Liste.
 **Informationstelefon unter `md`** (LFH-1067): zuerst die Anrufe, nach dem Muster der ETB-Erfassung
 (`etb/AGENTS.md`). Die Leiste startet eingeklappt (`AnrufErfassung einklappbar`: nur Anliegen und
 „Erfassen“, solange der Fokus nicht in ihr liegt und das Formular leer ist), die Kennzahlen stehen

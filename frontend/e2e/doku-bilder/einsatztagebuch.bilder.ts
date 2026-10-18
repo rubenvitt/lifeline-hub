@@ -7,7 +7,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep einsatztagebuch`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   zeitachse.png       frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx,
- *                       frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbBilanz.tsx
+ *                       frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/EtbBilanz.tsx
  *   erfassung.png       frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx,
  *                       frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx
  *   berichtigung.png    frontend/src/etb/Schnellerfassung.tsx (Berichtigung)
@@ -35,7 +35,7 @@ async function fokusWeg(page: Page) {
 }
 
 test.describe(KAPITEL, () => {
-  test('Zeitachse mit Filter, Bilanz und Erfassungsleiste', async ({ page }) => {
+  test('Zeitachse beim Öffnen am Ende, Bilanz und Erfassungsleiste', async ({ page }) => {
     await etbOeffnen(page);
     await expect(page.getByRole('complementary', { name: 'Bilanz des Tagebuchs' })).toBeVisible();
     await fokusWeg(page);

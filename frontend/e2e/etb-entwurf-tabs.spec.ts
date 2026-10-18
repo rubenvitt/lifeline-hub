@@ -83,6 +83,53 @@ test('ETB-Entwurf-Tab: Eintrag erfassen landet in der Zeitachse, Entwurf-Tab wir
   await expect(zeitachse.getByText(inhalt, { exact: true })).toBeVisible();
 });
 
+/**
+ * Nachtrag per Kurzeingabe (LLH-1088): `/zeit -10` am Textanfang setzt die Ereigniszeit zehn
+ * Minuten vor jetzt, der Rest wird der Inhalt, und die Zeitachse kennzeichnet den Nachtrag.
+ * Getippt, nicht eingefügt: der Befehl greift mit dem Leerzeichen hinter der Angabe.
+ */
+test('ETB: „/zeit -10 Lage ruhig“ + Enter erfasst einen Nachtrag mit dem Rest als Inhalt', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await einsatzAnlegenUndOeffnen(page, `E2E Nachtrag ${Date.now()}`);
+  const feld = page.getByPlaceholder('Inhalt …');
+  await expect(feld).toBeVisible();
+  const inhalt = `Lage ruhig ${Date.now()}`;
+  await feld.pressSequentially(`/zeit -10 ${inhalt}`);
+  await expect(feld).toHaveValue(inhalt);
+  // Kurz nach Mitternacht liegt „-10“ am Vortag, dann steht der Tag davor (`DDHHmm`).
+  await expect(page.getByText(/^Ereigniszeit: (\d{2})?\d{4}$/)).toBeVisible();
+  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
+
+  const zeile = page
+    .getByRole('region', { name: 'Einsatztagebuch' })
+    .getByTestId('etb-ereigniszeile')
+    .filter({ hasText: inhalt });
+  await expect(zeile).toHaveCount(1);
+  await expect(zeile).toContainText('nachgetragen');
+});
+
+/**
+ * Typwort und Typ-Übernahme (LLH-1112): der Präfix nennt den Typ als Wort, und mit „Werte
+ * behalten“ beginnt der nächste Entwurf im selben Typ.
+ */
+test('ETB: mit „Werte behalten“ bleibt eine Folge von Anordnungen Anordnungen', async ({
+  page,
+}) => {
+  await anmelden(page);
+  await einsatzAnlegenUndOeffnen(page, `E2E Typ behalten ${Date.now()}`);
+  const feld = page.getByPlaceholder('Inhalt …');
+  await expect(feld).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Werte behalten' }).check();
+  await feld.pressSequentially('/anordnung Abschnitt Nord räumen');
+  await expect(page.getByRole('button', { name: 'Eintragstyp Anordnung ändern' })).toBeVisible();
+  await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
+  await expect(page.getByPlaceholder('Inhalt …')).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Eintragstyp Anordnung ändern' })).toBeVisible();
+});
+
 test('ETB-Entwurf-Autosave: getippter Entwurf überlebt einen Reload', async ({ page }) => {
   await anmelden(page);
   const name = `E2E Autosave ${Date.now()}`;

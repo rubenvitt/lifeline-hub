@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEtbLesemarke, setzeEtbLesemarke } from '../api/etb';
+import { Button } from 'antd';
+import { useNavigate } from 'react-router';
+import { ladeEtbLesemarke, listeEtb, setzeEtbLesemarke } from '../api/etb';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Sammelbanner, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { lesemarkeText } from './lesemarkeModell';
+import { etbPfad } from '../routing/deeplinks';
+import { lesemarkeLinie, lesemarkeText } from './lesemarkeModell';
 
 /**
  * „14 neue Einträge seit Ihrer letzten Sichtung um 13:04 · alle als gesichtet markieren"
@@ -32,20 +35,40 @@ import { lesemarkeText } from './lesemarkeModell';
  *
  * Je Einsatz neu montiert: die Seite bleibt beim Einsatzwechsel stehen, ein alter Grund oder eine
  * spät scheiternde Markierung des vorigen Einsatzes gehört nicht an dieses Banner.
+ *
+ * ── ZWEI FORMEN (LLH-1149, Funkprotokoll-Ordnung) ─────────────────────────────────────
+ *
+ * `linie`: eine Trennzeile IN der Zeitachse direkt unter dem zuletzt gesichteten Eintrag, „Neu
+ * seit 1304 · 14 Einträge“ — die Zeitachse setzt sie dorthin, die Seite entscheidet, ob sie im
+ * Fenster steht (`lesemarkeImFenster`). `banner` (Vorgabe): der Rückfall, wenn die Marke
+ * außerhalb des Fensters oder unter einem Filter liegt; dann führt „Zur Marke springen“ hin.
+ * Die Seite öffnet in beiden Fällen am Ende (Entscheidung Ruben, 17.10.2026).
  */
-export default function EtbLesemarkeBanner({ einsatzId }: { einsatzId: number }) {
-  return <LesemarkeBanner key={einsatzId} einsatzId={einsatzId} />;
+export default function EtbLesemarkeBanner({
+  einsatzId,
+  form = 'banner',
+}: {
+  einsatzId: number;
+  form?: 'banner' | 'linie';
+}) {
+  return <LesemarkeBanner key={einsatzId} einsatzId={einsatzId} form={form} />;
 }
 
-function LesemarkeBanner({ einsatzId }: { einsatzId: number }) {
-  const { konventionen } = useAnzeigeKonventionen();
-  const { token, rollen } = useRollen();
-  const qc = useQueryClient();
-
-  const query = useQuery({
+/** Derselbe Abruf wie im Banner — die Seite fragt ihn ab, um Linie oder Banner zu wählen. */
+export function useEtbLesemarke(einsatzId: number) {
+  return useQuery({
     queryKey: einsatzKeys.etbLesemarke(einsatzId),
     queryFn: () => ladeEtbLesemarke(einsatzId),
   });
+}
+
+function LesemarkeBanner({ einsatzId, form }: { einsatzId: number; form: 'banner' | 'linie' }) {
+  const { konventionen } = useAnzeigeKonventionen();
+  const { token, rollen } = useRollen();
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+
+  const query = useEtbLesemarke(einsatzId);
   const markieren = useMutation({
     mutationFn: (bisLfdNr: number) => setzeEtbLesemarke(einsatzId, bisLfdNr),
     /*
@@ -61,36 +84,75 @@ function LesemarkeBanner({ einsatzId }: { einsatzId: number }) {
 
   const marke = query.data;
   if (marke == null) return null;
-  const text = lesemarkeText(marke, konventionen);
+  const text =
+    form === 'linie' ? lesemarkeLinie(marke, konventionen) : lesemarkeText(marke, konventionen);
   const bis = marke.hoechste_lfd_nr;
   if (text == null || bis == null) return null;
+  const markeNr = marke.gesichtet_lfd_nr;
 
+  /*
+   * Der Sprung braucht die Kennung, die Marke kennt nur die Nummer: ein Abruf der einen Seite
+   * direkt darunter, ohne Filter — unter dem Filter, der das Banner auslöste, stünde die Marke
+   * meist nicht. Scheitert er, bleibt die Seite, wie sie ist.
+   */
+  async function zurMarke(nr: number) {
+    try {
+      const [ziel] = await listeEtb(einsatzId, { before_lfd_nr: nr + 1, limit: 1 });
+      if (ziel) navigate(etbPfad(einsatzId, { eintrag: ziel.id }));
+    } catch {
+      // kein Ziel, kein Sprung
+    }
+  }
+
+  const fehler = markieren.error != null && (
+    <div style={{ padding: token.paddingXS, borderBlockEnd: `1px solid ${rollen.bannerLinie}` }}>
+      <SpeicherFehler
+        fehler={markieren.error}
+        titel="Nicht als gesichtet markiert"
+        fallback="Markieren fehlgeschlagen"
+      />
+    </div>
+  );
+  const banner = (
+    <Sammelbanner
+      aktion={{
+        label: 'alle als gesichtet markieren',
+        // Riegel gegen den Doppelklick: der Knopf des Banners kennt kein `loading`.
+        onKlick: () => {
+          if (!markieren.isPending) markieren.mutate(bis);
+        },
+      }}
+      // Im Rahmen der Zeitachse: nur Trennlinien, der Rahmen trägt den Rest.
+      style={{
+        border: 'none',
+        borderBlockEnd: `1px solid ${rollen.bannerLinie}`,
+        ...(form === 'linie' ? { borderBlockStart: `1px solid ${rollen.bannerLinie}` } : {}),
+      }}
+    >
+      {text}
+      {form === 'banner' && markeNr != null && (
+        <>
+          {' · '}
+          <Button type="link" onClick={() => void zurMarke(markeNr)} style={{ paddingInline: 0 }}>
+            Zur Marke springen
+          </Button>
+        </>
+      )}
+    </Sammelbanner>
+  );
+
+  if (form === 'linie') {
+    return (
+      <li data-lfh="etb-lesemarke" style={{ listStyle: 'none' }}>
+        {banner}
+        {fehler}
+      </li>
+    );
+  }
   return (
     <>
-      <Sammelbanner
-        aktion={{
-          label: 'alle als gesichtet markieren',
-          // Riegel gegen den Doppelklick: der Knopf des Banners kennt kein `loading`.
-          onKlick: () => {
-            if (!markieren.isPending) markieren.mutate(bis);
-          },
-        }}
-        // Im Rahmen der Zeitachse: nur die Trennlinie nach unten, der Rahmen trägt den Rest.
-        style={{ border: 'none', borderBlockEnd: `1px solid ${rollen.bannerLinie}` }}
-      >
-        {text}
-      </Sammelbanner>
-      {markieren.error != null && (
-        <div
-          style={{ padding: token.paddingXS, borderBlockEnd: `1px solid ${rollen.bannerLinie}` }}
-        >
-          <SpeicherFehler
-            fehler={markieren.error}
-            titel="Nicht als gesichtet markiert"
-            fallback="Markieren fehlgeschlagen"
-          />
-        </div>
-      )}
+      {banner}
+      {fehler}
     </>
   );
 }

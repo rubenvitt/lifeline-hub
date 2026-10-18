@@ -222,10 +222,11 @@ describe('EtbPage — Seitenfenster (LFH-947)', () => {
       ).catch(() => undefined);
     }
     await waitFor(() => expect(zeile(container, 700)).not.toBeNull());
-    // Lückenlos: die gerenderten Nummern sind eine geschlossene, absteigende Folge.
+    // Lückenlos: die gerenderten Nummern sind eine geschlossene Folge, aufsteigend bis zum
+    // neuesten Eintrag ganz unten (Funkprotokoll, LLH-1149).
     const nrn = nummernImDom(container);
-    expect(nrn[0]).toBe(700);
-    nrn.forEach((n, i) => expect(n).toBe(700 - i));
+    expect(nrn[nrn.length - 1]).toBe(700);
+    nrn.forEach((n, i) => expect(n).toBe(700 - (nrn.length - 1 - i)));
     // Die neuere Seite kam über den Cursor nach oben, nicht über einen Neustart am Kopf.
     expect(abrufe.some((a) => a.includes('after_lfd_nr='))).toBe(true);
   }, 120000);

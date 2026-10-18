@@ -53,10 +53,11 @@ geleert. Die Vorgabe von „Werte behalten“ ist aus.
   eingeklappte Teil zu ist
 
 ### Requirement: Protokoll, offene Rückrufe und Kennzahlen
-Die Protokollseite SHALL die Anrufe als zeitlich geordnete Liste zeigen, die jüngsten oben.
-Sortierung und Spaltenfilter gibt es nicht. Eine Segmentleiste MUST zwischen „alle“ und „offene
-Rückrufe“ umschalten; „offene Rückrufe“ lädt die Liste mit dem Filter `status=offen`. Über dem
-Protokoll steht:
+Die Protokollseite SHALL die Anrufe als zeitlich geordnete Liste in Funkprotokoll-Ordnung zeigen:
+ältester geladener Anruf oben, jüngster unten direkt über der Erfassung; beim Öffnen steht die
+Seite am Ende. Sortierung und Spaltenfilter gibt es nicht. Eine Segmentleiste MUST zwischen „alle“
+und „offene Rückrufe“ umschalten; „offene Rückrufe“ lädt die Liste mit dem Filter `status=offen`.
+Über dem Protokoll steht:
 - die Zahl der Anrufe gesamt als Kennzahl
 - die Zahl offener Rückrufe als Kennzahl
 - eine Aufgliederung nach Anliegen
@@ -85,6 +86,10 @@ ansteuerbar sein.
 - **WHEN** die Liste geladen ist, die Zählung aber scheitert
 - **THEN** zeigen die Kennzahlen keinen Wert, sondern den Fehlerzustand, und die Aufgliederung
   fehlt
+
+#### Scenario: Eigener Anruf erscheint über der Erfassung
+- **WHEN** am Seitenende ein Anruf erfasst wird
+- **THEN** steht er ohne eigenes Rollen als unterste Zeile direkt über der Erfassung
 
 ### Requirement: Zählung der Anrufe
 Das System SHALL unter `GET /api/einsaetze/{id}/stab/infotelefon/zaehler` die Anrufe des
@@ -135,7 +140,8 @@ abgelehnt werden.
 zuerst, bei gleichem Eingang die höhere Kennung zuerst. `limit` begrenzt die Seite (Vorgabe 100,
 größere Werte werden auf die Obergrenze geklemmt). `vor_zeit` und `vor_id` (Eingang und Kennung
 des letzten gelesenen Anrufs) liefern die Seite dahinter. Nur einer der beiden Cursorwerte MUST
-mit 422 abgelehnt werden.
+mit 422 abgelehnt werden. Die Protokollseite SHALL die Seiten in ihrer Leserichtung zeigen, also
+gespiegelt.
 
 #### Scenario: Blättern ohne Lücke
 - **WHEN** 250 Anrufe mit teils gleichem Eingang seitenweise mit `limit=100` geladen werden
@@ -147,8 +153,8 @@ mit 422 abgelehnt werden.
 
 #### Scenario: Ältere laden
 - **WHEN** die Protokollseite mehr Anrufe hat als eine Seite
-- **THEN** zeigt sie die jüngsten Anrufe und am Ende „Ältere laden“, das die nächste Seite
-  anhängt
+- **THEN** zeigt sie die jüngsten Anrufe unten und über ihnen „Ältere laden“, das die nächste
+  Seite darüber einfügt, ohne dass die gelesene Zeile springt
 
 ### Requirement: Einzelner Anruf
 Das System SHALL unter `GET /api/einsaetze/{id}/stab/infotelefon/{aid}` einen Anruf einzeln

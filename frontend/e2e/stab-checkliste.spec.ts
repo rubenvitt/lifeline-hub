@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzAnlegen } from './einsatz-kern';
+import { systemBuendelAufklappen } from './etb-kern';
 
 /**
  * Checkliste Arbeitsaufnahme (LFH-551): der Klickweg im echten Browser.
@@ -79,6 +80,7 @@ test('Arbeitsaufnahme: Tipp auf den Zeilentext hakt ab, übersteht das Neuladen,
 
   // Der Beleg steht in der ETB-Zeitachse.
   await page.goto(`/einsaetze/${einsatzId}/etb`);
+  await systemBuendelAufklappen(page);
   await expect(page.getByText(GEMELDET)).toHaveCount(1);
 });
 

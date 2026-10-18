@@ -1,4 +1,4 @@
-import { Alert, App, Breadcrumb, Button, Switch } from 'antd';
+import { Alert, App, Breadcrumb, Button } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   useInfiniteQuery,
@@ -31,11 +31,19 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import type { Speicherung } from '../components/Erfassung';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import EtbZeitachse from '../etb/EtbZeitachse';
+import EtbZeitachse, { type GezeigteRaender } from '../etb/EtbZeitachse';
 import EtbBilanz from '../etb/EtbBilanz';
-import EtbLesemarkeBanner from '../etb/EtbLesemarkeBanner';
+import EtbLesemarkeBanner, { useEtbLesemarke } from '../etb/EtbLesemarkeBanner';
+import { lesemarkeImFenster } from '../etb/lesemarkeModell';
 import { Select } from '../components/Select';
 import EtbFilterleiste, { type LeistenFilter } from '../etb/EtbFilterleiste';
+import EtbZeitraumWahl from '../etb/EtbZeitraumWahl';
+import { filterMerkmale } from '../etb/filterMerkmale';
+import { serverJetzt } from '../offline/serveruhr';
+import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
+import { taktisch } from '../anzeige/zeitfenster';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { fetchLagebesprechungStand } from '../api/lagebesprechung';
 import WiedervorlageModal from '../etb/WiedervorlageModal';
 import AuftragAusEtbModal from '../etb/AuftragAusEtbModal';
 import Schnellerfassung from '../etb/Schnellerfassung';
@@ -56,8 +64,16 @@ import { scrolleZurZeile } from '../components/Datensicht';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { useTastaturEbene } from '../command-palette/CommandPaletteProvider';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Segmentleiste, monoStil, useRollen, type SegmentOption } from '../components/instrument';
+import {
+  Filterhinweis,
+  monoStil,
+  Segmentleiste,
+  SegmentUmschalter,
+  useRollen,
+  type SegmentOption,
+} from '../components/instrument';
 import { FOKUSABSTAND_ETB, useFokusabstandUnten } from '../components/fokusabstandUnten';
+import { useFunkprotokollLauf } from '../components/useFunkprotokollLauf';
 import { useViewport } from '../components/useViewport';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import { useFokusInLeiste } from '../components/fokusInLeiste';
@@ -247,6 +263,17 @@ export default function EtbPage() {
     queryFn: () => ladeEtbZaehler(einsatzId, filterMitSystem),
     enabled: filter.ohne_system === true,
   });
+  /*
+   * Die Gesamtzahl für das Filterband (LLH-1071, „n von m“): dieselbe Zählung ohne Filter, unter
+   * demselben Präfix und in derselben Bauart wie Kopf und Bilanz — der Modulzähler liefe über ein
+   * anderes Sammelfenster und stünde kurz neben einer unpassenden Trefferzahl. Ohne Filter ist es
+   * derselbe Key wie `zaehlerQuery`.
+   */
+  const gesamtQuery = useQuery({
+    queryKey: einsatzKeys.etbZaehler(einsatzId, {}),
+    queryFn: () => ladeEtbZaehler(einsatzId, {}),
+    enabled: filterAktiv,
+  });
   const systemZahlId = useId();
   const systemAnzahl = (filter.ohne_system ? systemZaehlerQuery.data : zaehlerQuery.data)?.je_typ
     .system;
@@ -260,6 +287,59 @@ export default function EtbPage() {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const dokumenteFrei = istKeyFreigegeben('dokumente', modulFreigabenQuery.data);
+  /*
+   * Die letzte Lagebesprechung für die Schnellwahl „Seit letzter Lagebesprechung“ (LLH-1080):
+   * Gate ist die Freigabe `lagebesprechung` (LLH-1111), nicht der Stab. Ohne sie und ohne
+   * abgehaltene Besprechung wird die Wahl nicht angeboten. Derselbe Key wie die Modulseite.
+   */
+  const lagebesprechungFrei = istKeyFreigegeben('lagebesprechung', modulFreigabenQuery.data);
+  const lagebesprechungQuery = useQuery({
+    queryKey: einsatzKeys.lagebesprechung(einsatzId),
+    queryFn: () => fetchLagebesprechungStand(einsatzId),
+    enabled: lagebesprechungFrei,
+  });
+  const letzteLbStand = lagebesprechungFrei
+    ? (lagebesprechungQuery.data?.letzte_lagebesprechung ?? null)
+    : null;
+  // Auf die Minute abgerundet wie jede Wahl der Schnellwahl (Spec `etb-filterleiste`): „seit LB
+  // 1330“ schließt einen Eintrag um 13:30:10 ein, auch wenn die Besprechung um 13:30:42 endete.
+  const letzteLb = useMemo(() => {
+    const z = alsZeitpunkt(letzteLbStand?.abgehalten_at);
+    return z ? alsBackendZeit(z.utc().startOf('minute')) : null;
+  }, [letzteLbStand?.abgehalten_at]);
+
+  /*
+   * Nachträge vor der Lagebesprechung (LLH-1071/LLH-1080, Entscheidung Ruben 17.10.2026): „seit
+   * LB“ grenzt nach Ereigniszeit ab. Wer nach der Besprechung einen früheren Funkspruch nachträgt,
+   * fiele still heraus. Eine Seite mit denselben Filtern bis zur Besprechung, absteigend nach
+   * Nummer: was eine höhere Kennung als der Besprechungseintrag trägt (die Kennung wächst mit der
+   * Nummer, `etb/seitenfenster.ts`), wurde danach erfasst. Mehr als eine Seite zählt „99+“.
+   */
+  const seitLb =
+    letzteLbStand != null &&
+    filter.von != null &&
+    filter.bis == null &&
+    alsZeitpunkt(filter.von)?.isSame(alsZeitpunkt(letzteLb)) === true;
+  const filterOhneZeit = useMemo<EtbFilterWerte>(() => {
+    const { von: _v, bis: _b, ...rest } = filter;
+    void _v;
+    void _b;
+    return rest;
+  }, [filter]);
+  const lbZeit = letzteLb ?? undefined;
+  const lbEintrag = letzteLbStand?.etb_eintrag_id;
+  const nachtraegeQuery = useQuery({
+    queryKey: einsatzKeys.etbListe(einsatzId, { ...filterOhneZeit, nachtraegeVorLb: lbEintrag }),
+    queryFn: () => listeEtb(einsatzId, { ...filterOhneZeit, bis: lbZeit }),
+    enabled: seitLb && lbZeit != null && lbEintrag != null,
+  });
+  const nachtraege = useMemo(() => {
+    const lb = alsZeitpunkt(lbZeit);
+    if (!seitLb || lb == null || lbEintrag == null) return [];
+    return (nachtraegeQuery.data ?? []).filter(
+      (e) => e.id > lbEintrag && (alsZeitpunkt(e.ereigniszeit)?.isBefore(lb) ?? false),
+    );
+  }, [nachtraegeQuery.data, seitLb, lbZeit, lbEintrag]);
   // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
   const auftragGesperrt = istSprungGesperrt('auftraege', modulFreigabenQuery.data);
   const dokumenteQuery = useQuery({
@@ -310,6 +390,10 @@ export default function EtbPage() {
     termin?: string | null;
   } | null>(null);
   const [auftragZu, setAuftragZu] = useState<EtbEintragAnzeige | null>(null);
+  /** Eigener Eintrag außerhalb des Filters, einmalig gemeldet — nur unter dem Filter von damals. */
+  const [ausserhalb, setAusserhalb] = useState<{ id: number; lfd_nr: number; fuer: string } | null>(
+    null,
+  );
   /**
    * Die Hervorhebung trägt eine Zählmarke neben der id: ein zweiter Sprung auf denselben Eintrag
    * änderte die id nicht, der Scroll-Effekt liefe nicht wieder.
@@ -317,6 +401,7 @@ export default function EtbPage() {
   const [hervorhebung, setHervorhebung] = useState<{ id: number; marke: number } | null>(null);
   const highlightId = hervorhebung?.id ?? null;
   const zeitachseKopf = useRef<HTMLDivElement>(null);
+  const zeitachsenSpalte = useRef<HTMLDivElement>(null);
   const { abBreite, istSchmal } = useViewport();
   /**
    * Handschirm, zuerst die Zeitachse (LFH-955, design.md D4): unter `md` stehen Volltext,
@@ -341,6 +426,7 @@ export default function EtbPage() {
   // Entwürfe, montiert sie damit aufgeklappt und fokussiert ihr Feld selbst (`startFokus`).
   if (searchParams.get('neu') === '1' && !fokusInLeiste) setFokusInLeiste(true);
   const { token, rollen } = useRollen();
+  const { konventionen } = useAnzeigeKonventionen();
   // Fokusabstand zur angepinnten Erfassungsleiste (WCAG 2.4.11): sonst rollte der Browser jeden per
   // Tab angesteuerten Zeilenauslöser hinter die Leiste. Verbraucht als `scroll-margin` an der
   // Zeitachse (`index.css`), nicht am Dokument.
@@ -501,6 +587,50 @@ export default function EtbPage() {
     [eintraege, ausstehend, abgelehnt],
   );
 
+  /*
+   * Funkprotokoll-Ordnung (LLH-1149, design.md D2): die Seite öffnet am Ende, läuft dort neuen
+   * Einträgen nach und hält beim Nachladen oben die Lesestelle. Die Chronologie steht in
+   * Serverordnung — ihre erste Zeile ist die jüngste, ihre letzte die älteste. Ein Sprungziel
+   * rollt selbst (`scrolleZurZeile`), dann nicht ans Ende.
+   */
+  /*
+   * Lesemarke (LLH-1149, D3): steht der zuletzt gesichtete Eintrag im ungefilterten Fenster, ist
+   * sie eine Linie in der Achse, sonst ein Banner darüber. Derselbe Abruf wie im Banner.
+   */
+  const lesemarkeQuery = useEtbLesemarke(einsatzId);
+  const geladeneNummern = useMemo(() => eintraege.map((e) => e.lfd_nr), [eintraege]);
+  const markeInAchse = lesemarkeImFenster(lesemarkeQuery.data, geladeneNummern, filterAktiv);
+  const markeNr = lesemarkeQuery.data?.gesichtet_lfd_nr;
+  const lesemarkeLinie = useMemo(
+    () =>
+      markeInAchse && markeNr != null
+        ? {
+            nachLfdNr: markeNr,
+            knoten: <EtbLesemarkeBanner key="lesemarke" einsatzId={einsatzId} form="linie" />,
+          }
+        : undefined,
+    [markeInAchse, markeNr, einsatzId],
+  );
+
+  // Die Ränder meldet die Zeitachse aus den GEZEIGTEN Zeilen (`onGezeigt`): was sie zurückhält,
+  // steht nicht im Bild, erst sein Erscheinen soll mitlaufen.
+  const [gezeigt, setGezeigt] = useState<GezeigteRaender>({
+    juengste: undefined,
+    aelteste: undefined,
+  });
+  const { amEnde, zumEnde } = useFunkprotokollLauf({
+    wurzel: zeitachseKopf,
+    // Erst mit dem Einsatz steht die Seite statt ihres Skeletts (Frühausstieg unten).
+    bereit: !etbQuery.isLoading && einsatzQuery.data != null,
+    juengste: gezeigt.juengste,
+    aelteste: gezeigt.aelteste,
+    kopfImFenster: !etbQuery.hasPreviousPage,
+    ohneStartlauf: zielEintragId != null,
+    // Unter `xl` steht die Bilanz unter der Spalte: das Ende ist die Spalte über der Erfassung,
+    // nicht das Dokumentende — sonst stünde beim Öffnen die Bilanz im Bild statt Nr. 134.
+    ende: { spalte: zeitachsenSpalte, fussVariable: FOKUSABSTAND_ETB },
+  });
+
   /**
    * Steht das Fenster tief im Tagebuch, läge der eigene neue Eintrag außerhalb (LFH-947): das
    * Neuladen nach dem Senden beginnt bei der ersten gehaltenen Seite. Die Seite holt deshalb den
@@ -523,20 +653,38 @@ export default function EtbPage() {
   }
 
   /**
-   * Eingabe unten, neueste oben — und was nach dem eigenen Eintrag passiert.
+   * Eingabe unten, neueste unten — und was nach dem eigenen Eintrag passiert (LLH-1149).
    *
-   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, die Zeitachse läuft neueste
-   * zuerst. Wer weiter unten liest und erfasst, sähe seinen Eintrag nicht ankommen. Nach einem
-   * angenommenen Eintrag (gesendet oder gepuffert) rollt die Seite deshalb den Kopf der Zeitachse
-   * ins Bild — `block: 'nearest'`, also gar nicht, wenn er sichtbar ist. Das ist die Antwort auf
-   * eine eigene Handlung, kein Sprung unter dem Cursor (WCAG 3.2.5 zielt auf ungefragte
-   * Änderungen). Der Fokus bleibt im Feld. Bei einer Ablehnung rollt nichts: der Wortlaut steht
-   * noch im Feld, der Grund an der Erfassung (`Schnellerfassung`, LFH-1077), kein Toast.
+   * Die Erfassung steht wie in einem Funkprotokoll am Fuß der Seite, und die Zeitachse endet
+   * direkt darüber mit dem jüngsten Eintrag. Nach einem angenommenen Eintrag (gesendet oder
+   * gepuffert) rollt die Seite ans Ende, auch wenn man vorher hochgerollt hatte: der eigene
+   * Eintrag steht dann direkt über dem Feld. Das ist die Antwort auf eine eigene Handlung, kein
+   * Sprung unter dem Cursor (WCAG 3.2.5 zielt auf ungefragte Änderungen). Der Fokus bleibt im
+   * Feld. Bei einer Ablehnung rollt nichts: der Wortlaut steht noch im Feld, der Grund an der
+   * Erfassung (`Schnellerfassung`, LFH-1077), kein Toast.
    */
   async function erfassenUndZeigen(e: NeuerEintrag) {
-    await erfassen(e);
+    const angenommen = await erfassen(e);
     if (etbQuery.hasPreviousPage) await zumKopf();
-    zeitachseKopf.current?.scrollIntoView?.({ block: 'nearest' });
+    zumEnde();
+    if (angenommen && filterAktiv) await pruefeAusserhalb(angenommen);
+  }
+
+  /*
+   * Eigener Eintrag außerhalb des Filters (LLH-1071, Spec `etb-filterleiste`): passt er nicht,
+   * steht er nach dem Neuladen nirgends — wer das nicht sieht, erfasst ihn womöglich doppelt. Ob er
+   * passt, entscheidet allein der Server: die Liste ordnet nach Nummer absteigend, ein passender
+   * neuer Eintrag stünde also in der ersten Seite.
+   */
+  async function pruefeAusserhalb(angenommen: EtbEintragAnzeige) {
+    const schluessel = einsatzKeys.etbListe(einsatzId, filter);
+    await qc.refetchQueries({ queryKey: schluessel, exact: true });
+    // Scheitert das Nachladen, liegt nur der alte Stand vor: dort fehlte auch ein passender
+    // Eintrag. Ohne Antwort des Servers wird nichts behauptet.
+    if (qc.getQueryState(schluessel)?.status === 'error') return;
+    const daten = qc.getQueryData<InfiniteData<EtbEintragAnzeige[], EtbSeitenParam>>(schluessel);
+    const da = daten?.pages[0]?.some((x) => x.id === angenommen.id) ?? false;
+    if (!da) setAusserhalb({ id: angenommen.id, lfd_nr: angenommen.lfd_nr, fuer: filterText });
   }
 
   // Seitenzustand: ohne den Einsatz gibt es weder Breadcrumb noch Schreibrecht — deshalb
@@ -600,48 +748,131 @@ export default function EtbPage() {
     punkt: t === 'alle' ? rollen.schwach : etbTypFarbe(t, token).kante,
   }));
 
+  /*
+   * Das Filterband (LLH-1071, Spec `etb-filterleiste`, „Filterband über der Erfassung“): bei jedem
+   * Filtermerkmal direkt über der Erfassung, auf jeder Breite — in der Funkprotokoll-Ordnung ist
+   * dort der Blick, und es klebt mit der Leiste. Zahlen nur aus den Serverzählungen.
+   */
+  const merkmale = filterMerkmale(filter, {
+    bezug: { jetzt: serverJetzt(), zone: konventionen.zeitzone, letzteLb },
+    typWort: (t) => etbTyp[t].label,
+    einheitName: (id) => einheitenQuery.data?.find((x) => x.id === id)?.name,
+  });
+  // Einmalig (Spec „Eigener Eintrag außerhalb des Filters“): ein anderer Filter räumt den Hinweis,
+  // er kehrt mit dem alten nicht zurück.
+  if (ausserhalb != null && ausserhalb.fuer !== filterText) setAusserhalb(null);
+  const ausserhalbHier = ausserhalb != null && ausserhalb.fuer === filterText ? ausserhalb : null;
+  const nachtragsGrenze = alsZeitpunkt(lbZeit);
+  const band =
+    merkmale.length > 0 ? (
+      <div style={{ marginBottom: token.marginXS }}>
+        <Filterhinweis
+          treffer={zaehlerQuery.data?.gesamt}
+          gesamt={gesamtQuery.data?.gesamt}
+          merkmale={merkmale}
+          onZuruecksetzen={filterZuruecksetzen}
+          zusaetze={[
+            ausserhalbHier && (
+              <span key="ausserhalb">
+                Nr. <span style={monoStil(12)}>{ausserhalbHier.lfd_nr}</span> erfasst – außerhalb
+                des Filters ·{' '}
+                <Button
+                  type="link"
+                  style={{ paddingInline: 0 }}
+                  onClick={() => {
+                    setAusserhalb(null);
+                    navigate(etbPfad(einsatzId, { eintrag: ausserhalbHier.id }));
+                  }}
+                >
+                  anzeigen
+                </Button>
+              </span>
+            ),
+            nachtraege.length > 0 && nachtragsGrenze && (
+              <span key="nachtraege">
+                +
+                <span style={monoStil(12)}>
+                  {nachtraege.length > 99 ? '99+' : nachtraege.length}
+                </span>{' '}
+                {nachtraege.length === 1 ? 'Nachtrag' : 'Nachträge'} vor{' '}
+                <span style={monoStil(12)}>
+                  {taktisch(lbZeit!, { jetzt: serverJetzt(), zone: konventionen.zeitzone })}
+                </span>{' '}
+                erfasst ·{' '}
+                <Button
+                  type="link"
+                  style={{ paddingInline: 0 }}
+                  onClick={() =>
+                    filterAendern({
+                      von: nachtraege.reduce(
+                        (frueh, e) => (e.ereigniszeit < frueh ? e.ereigniszeit : frueh),
+                        nachtraege[0].ereigniszeit,
+                      ),
+                    })
+                  }
+                >
+                  anzeigen
+                </Button>
+              </span>
+            ),
+          ].filter(Boolean)}
+        />
+      </div>
+    ) : null;
+
   // Die Erfassung hängt auf jeder Breite als `fuss` an der Seitenwurzel: in der Zeitachsenspalte
   // stiege sie nie über deren Oberkante, und an zwei Orten je nach Breite hängte ein Wechsel über
   // `xl` sie neu ein — der Text einer laufenden Berichtigung wäre weg. Ab `xl` endet sie über den
-  // Außenrand vor der Bilanzspalte.
-  const erfassung = darfSchreiben ? (
-    <div
-      ref={erfassungRef}
-      className={
-        breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
-      }
-      style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
-      // Fokus in der Leiste klappt sie auf (D4, `components/fokusInLeiste.ts`).
-      {...leistenFokus}
-    >
-      {berichtigungZu ? (
-        <Schnellerfassung
-          key="berichtigung"
-          erfassen={erfassenUndZeigen}
-          berichtigungZu={berichtigungZu}
-          onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
-          bausteine={bausteineQuery.data ?? []}
-          einsatz={einsatz}
-          rufname={rufname}
-        />
-      ) : (
-        <EtbEntwurfsTabs
-          key={einsatzId}
-          einsatzId={einsatzId}
-          erfassen={erfassenUndZeigen}
-          bausteine={bausteineQuery.data ?? []}
-          einsatz={einsatz}
-          rufname={rufname}
-          werteBehalten={werteBehalten}
-          onWerteBehaltenChange={setWerteBehalten}
-          onSendetChange={setEntwurfSendet}
-          dateien={entwurfsDateien}
-          versand={entwurfsVersand}
-          einklappbar={istSchmal && !fokusInLeiste}
-        />
-      )}
-    </div>
-  ) : null;
+  // Außenrand vor der Bilanzspalte. Das Filterband steht im selben Fuß, darüber; ohne
+  // Schreibrecht steht es dort allein.
+  const erfassung =
+    darfSchreiben || band ? (
+      <div
+        ref={erfassungRef}
+        className={
+          breit ? 'etb-erfassung-sticky etb-erfassung-sticky--neben-leiste' : 'etb-erfassung-sticky'
+        }
+        style={breit ? { marginInlineEnd: LEISTE_BREITE + token.marginLG } : undefined}
+      >
+        {band}
+        {/* Fokus in der Leiste klappt sie auf (D4, `components/fokusInLeiste.ts`); das Band
+            gehört nicht dazu, ein Zurücksetzen klappt die Erfassung nicht auf. */}
+        <div {...leistenFokus}>
+          {darfSchreiben &&
+            (berichtigungZu ? (
+              <Schnellerfassung
+                key="berichtigung"
+                erfassen={erfassenUndZeigen}
+                berichtigungZu={berichtigungZu}
+                // Kette einer Berichtigung (LLH-1099): die Nummer nur mit geladenem Grundeintrag.
+                berichtigungGrundNr={
+                  eintraege.find((x) => x.id === berichtigungZu.berichtigt_eintrag_id)?.lfd_nr ??
+                  null
+                }
+                onBerichtigungAbbrechen={() => setBerichtigungZu(null)}
+                bausteine={bausteineQuery.data ?? []}
+                einsatz={einsatz}
+                rufname={rufname}
+              />
+            ) : (
+              <EtbEntwurfsTabs
+                key={einsatzId}
+                einsatzId={einsatzId}
+                erfassen={erfassenUndZeigen}
+                bausteine={bausteineQuery.data ?? []}
+                einsatz={einsatz}
+                rufname={rufname}
+                werteBehalten={werteBehalten}
+                onWerteBehaltenChange={setWerteBehalten}
+                onSendetChange={setEntwurfSendet}
+                dateien={entwurfsDateien}
+                versand={entwurfsVersand}
+                einklappbar={istSchmal && !fokusInLeiste}
+              />
+            ))}
+        </div>
+      </div>
+    ) : null;
 
   // Der Typfilter als Segmentleiste. Er schreibt in denselben URL-Filter wie die Leiste darunter
   // (`etbPfad`/`parseEtbFilter`); das gewählte Segment wird aus der URL gelesen, Zurück/Vor
@@ -665,6 +896,8 @@ export default function EtbPage() {
   // für den ganzen Einsatz gehört nicht in den Kopf einer Arbeitsseite.
   const weitereEintraege: MenueEintrag<'druck'>[] = [{ key: 'druck', label: 'Drucken / als PDF' }];
 
+  // Ab `md` steht der Typ in der Filterleiste über der Zeitachse (LLH-1065): der Kopf trägt, was
+  // ÖFFNET, nicht was filtert. Unter `md` rollt er einzeilig im Kopf (LFH-955 D3).
   const kopfAktionen = istSchmal ? (
     <>
       {typleiste}
@@ -699,7 +932,37 @@ export default function EtbPage() {
       >
         Drucken / als PDF
       </Button>
-      {typleiste}
+    </>
+  );
+
+  /*
+   * Ausschluss der Systemeinträge (LFH-958, LLH-1065): ein Typfilter wie die Segmente, deshalb in
+   * ihrer Optik und neben ihnen — ein Umschaltknopf statt antds Switch. Der Name bleibt fest, die
+   * Zahl ist Beschreibung: sonst sagte ein Bildschirmleser bei jeder neuen Zählung den Knopf neu
+   * an. Aus streicht er den Punkt (zweites Zeichen neben der Fläche).
+   */
+  const systemKnopf = (
+    <>
+      <SegmentUmschalter
+        an={!filter.ohne_system}
+        onWechsel={(an) => filterAendern({ ohne_system: an ? undefined : true })}
+        zugaenglicherName="Systemeinträge zeigen"
+        label="System"
+        zahl={
+          systemAnzahl == null
+            ? undefined
+            : filter.ohne_system
+              ? `${systemAnzahl} ausgeblendet`
+              : String(systemAnzahl)
+        }
+        beschreibungId={systemAnzahl != null ? systemZahlId : undefined}
+        punkt={etbTypFarbe('system', token).kante}
+      />
+      {systemAnzahl != null && (
+        <span id={systemZahlId} hidden>
+          {filter.ohne_system ? `${systemAnzahl} ausgeblendet` : systemAnzahl}
+        </span>
+      )}
     </>
   );
 
@@ -733,56 +996,46 @@ export default function EtbPage() {
           gap: token.marginLG,
         }}
       >
-        <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-          {/* Volltext und Zeitraum: die schmale Filterzeile unter dem Kopf. Entprellung und die
-              Weiche „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. */}
+        <div ref={zeitachsenSpalte} style={{ flex: '1 1 auto', minWidth: 0 }}>
+          {/* Eine Filterleiste über der Zeitachse (LLH-1065): ab `md` Typ, System, Zeitraum,
+              Einheit und Volltext; unter `md` hinter „Filter (n)“. Entprellung und die Weiche
+              „eigene gegen fremde Änderung" in `EtbFilterleiste` und im Effekt oben. */}
           <div ref={filterWurzel} id="etb-filterleiste" hidden={!filterleisteSichtbar}>
             {filterleisteSichtbar && (
               <EtbFilterleiste
                 key={filterMarke}
                 startWerte={filter}
                 onChange={leisteGeaendert}
-                zusatz={
+                vorn={
+                  istSchmal ? undefined : (
+                    <>
+                      {typleiste}
+                      {systemKnopf}
+                    </>
+                  )
+                }
+                mitte={
                   <>
+                    {/* Ein Bedienziel statt zweier Felder (LLH-1080): schreibt absolute Grenzen
+                        einmal, kein Entprellen — ein Sprungwert wie Typ und Einheit. */}
+                    <EtbZeitraumWahl
+                      von={filter.von}
+                      bis={filter.bis}
+                      letzteLb={letzteLb}
+                      onWahl={(g) => filterAendern(g)}
+                    />
                     {/* Kontrolliert aus der URL wie die Typleiste — Ziel des Knopfs „ETB ↗" an
                         der Einheit auf der Lagekarte. Kein Entprellen: ein Sprungwert. */}
                     <Select<number>
                       aria-label="Nach Einheit filtern"
                       placeholder="Einheit"
                       allowClear
-                      style={{ minWidth: 180 }}
+                      style={{ minWidth: 160 }}
                       value={filter.einheit_id}
                       options={einheitOptionen}
                       onChange={(id) => filterAendern({ einheit_id: id ?? undefined })}
                     />
-                    {/* Ausschluss der Systemeinträge (LFH-958): ein Filter wie die übrigen, in der
-                        URL, mit der Zahl, die er zeigt bzw. verbirgt. */}
-                    <label
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: token.marginXS,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {/* Der Name bleibt fest, die Zahl ist Beschreibung: sonst sagte ein
-                          Bildschirmleser bei jeder neuen Zählung den Schalter neu an. */}
-                      <Switch
-                        aria-label="Systemeinträge zeigen"
-                        aria-describedby={systemAnzahl != null ? systemZahlId : undefined}
-                        checked={!filter.ohne_system}
-                        onChange={(an) => filterAendern({ ohne_system: an ? undefined : true })}
-                      />
-                      Systemeinträge zeigen
-                      {systemAnzahl != null && (
-                        <span
-                          id={systemZahlId}
-                          style={{ ...monoStil(11), color: rollen.gedaempft }}
-                        >
-                          {filter.ohne_system ? `${systemAnzahl} ausgeblendet` : systemAnzahl}
-                        </span>
-                      )}
-                    </label>
+                    {istSchmal && systemKnopf}
                   </>
                 }
               />
@@ -801,11 +1054,106 @@ export default function EtbPage() {
             </div>
           )}
 
+          <div
+            ref={zeitachseKopf}
+            data-lfh="etb-zeitachse-rahmen"
+            style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
+          >
+            {/* „neu seit Ihrer letzten Sichtung" — als Linie in der Achse, wenn die Marke im
+                Fenster steht, sonst hier als Banner im Fluss; das Sammelbanner des
+                Live-Zuflusses liegt dagegen auf der Zeitachse. */}
+            {!markeInAchse && <EtbLesemarkeBanner einsatzId={einsatzId} />}
+            {/* Funkprotokoll (LLH-1149): ältere Einträge stehen oben, also auch der Weg zu ihnen.
+                Die Lesestelle hält `useFunkprotokollLauf` beim Einfügen darüber. */}
+            {etbQuery.hasNextPage && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: token.paddingXS,
+                  borderBlockEnd: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Button
+                  onClick={() => etbQuery.fetchNextPage()}
+                  loading={etbQuery.isFetchingNextPage}
+                >
+                  Ältere laden
+                </Button>
+              </div>
+            )}
+            <EtbZeitachse
+              zeilen={chronologie}
+              einsatzId={einsatzId}
+              highlightId={highlightId}
+              fundstellen={filter.q}
+              // Unter „System“ sucht jemand genau diese Einträge: dort kein Bündel (LLH-1106).
+              buendeln={filter.typ !== 'system'}
+              sprungMarke={hervorhebung?.marke}
+              eigeneBenutzerId={benutzer?.id}
+              amEnde={amEnde}
+              onZumEnde={zumEnde}
+              onGezeigt={setGezeigt}
+              fensterSchluessel={JSON.stringify(filter)}
+              lesemarke={lesemarkeLinie}
+              ladend={etbQuery.isLoading}
+              fehler={etbQuery.isError}
+              leerText={leerInhalt}
+              dokumente={dokumenteZuEintrag}
+              onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
+              berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
+              onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
+              onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
+              auftragGesperrt={auftragGesperrt}
+              onErneutSenden={(p) => void abgelehntErneutSenden(p)}
+              zeilenFehler={(s) => erneutFehler.grund(`${einsatzId}:${s}`)}
+              onVerwerfen={(p) => {
+                if (p.id != null) void abgelehntVerwerfen(p.id);
+              }}
+            />
+
+            {/* Das Fenster steht nicht am neuesten Eintrag (LFH-947): der Rückweg ans Ende,
+                lückenlos über den Cursor. Keine Zahl — die zählt der Server im Kopf. */}
+            {etbQuery.hasPreviousPage && (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: token.paddingXS,
+                  borderBlockStart: `1px solid ${rollen.linie}`,
+                }}
+              >
+                <Button
+                  onClick={() => etbQuery.fetchPreviousPage()}
+                  loading={etbQuery.isFetchingPreviousPage}
+                >
+                  Neuere laden
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Gepufferte Einträge stehen als Zeilen ganz unten; die Zusammenfassung direkt
+              darunter, über der Erfassung, wo der Blick nach dem Erfassen ist (LLH-1149).
+              Abgelehnt zuletzt, wie in der Zeitachse: es verlangt eine Handlung. */}
+          {ausstehend.length > 0 && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginTop: token.marginSM }}
+              title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
+              description={
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {ausstehend.map((a) => (
+                    <li key={a.id}>{a.eintrag.inhalt}</li>
+                  ))}
+                </ul>
+              }
+            />
+          )}
           {abgelehnt.length > 0 && (
             <Alert
               type="error"
               showIcon
-              style={{ marginBottom: token.marginSM }}
+              style={{ marginTop: token.marginSM }}
               title={`${abgelehnt.length === 1 ? '1 gepufferter Eintrag' : `${abgelehnt.length} gepufferte Einträge`} abgelehnt und NICHT gespeichert`}
               description={
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
@@ -822,82 +1170,6 @@ export default function EtbPage() {
                 </ul>
               }
             />
-          )}
-          {ausstehend.length > 0 && (
-            <Alert
-              type="info"
-              showIcon
-              style={{ marginBottom: token.marginSM }}
-              title={`${ausstehend.length === 1 ? '1 Eintrag' : `${ausstehend.length} Einträge`} offline vorgemerkt`}
-              description={
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {ausstehend.map((a) => (
-                    <li key={a.id}>{a.eintrag.inhalt}</li>
-                  ))}
-                </ul>
-              }
-            />
-          )}
-
-          <div
-            ref={zeitachseKopf}
-            data-lfh="etb-zeitachse-rahmen"
-            style={{ border: `1px solid ${rollen.linie}`, background: rollen.grund }}
-          >
-            {/* „neu seit Ihrer letzten Sichtung" — im Fluss über der Zeitachse; das
-                Sammelbanner des Live-Zuflusses liegt dagegen auf ihr. */}
-            <EtbLesemarkeBanner einsatzId={einsatzId} />
-            {/* Das Fenster steht nicht am neuesten Eintrag (LFH-947): der Rückweg nach oben,
-                lückenlos über den Cursor nach oben. Keine Zahl — die zählt der Server im Kopf. */}
-            {etbQuery.hasPreviousPage && (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: token.paddingXS,
-                  borderBlockEnd: `1px solid ${rollen.linie}`,
-                }}
-              >
-                <Button
-                  onClick={() => etbQuery.fetchPreviousPage()}
-                  loading={etbQuery.isFetchingPreviousPage}
-                >
-                  Neuere laden
-                </Button>
-              </div>
-            )}
-            <EtbZeitachse
-              zeilen={chronologie}
-              einsatzId={einsatzId}
-              highlightId={highlightId}
-              fundstellen={filter.q}
-              sprungMarke={hervorhebung?.marke}
-              eigeneBenutzerId={benutzer?.id}
-              ladend={etbQuery.isLoading}
-              fehler={etbQuery.isError}
-              leerText={leerInhalt}
-              dokumente={dokumenteZuEintrag}
-              onBerichtigen={darfSchreiben ? (e) => setBerichtigungZu(e) : undefined}
-              berichtigenGesperrt={entwurfSendet ? 'erst nach dem Senden' : undefined}
-              onWiedervorlage={darfSchreiben ? oeffneWiedervorlage : undefined}
-              onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
-              auftragGesperrt={auftragGesperrt}
-              onErneutSenden={(p) => void abgelehntErneutSenden(p)}
-              zeilenFehler={(s) => erneutFehler.grund(`${einsatzId}:${s}`)}
-              onVerwerfen={(p) => {
-                if (p.id != null) void abgelehntVerwerfen(p.id);
-              }}
-            />
-          </div>
-
-          {etbQuery.hasNextPage && (
-            <div style={{ textAlign: 'center', marginTop: token.marginSM }}>
-              <Button
-                onClick={() => etbQuery.fetchNextPage()}
-                loading={etbQuery.isFetchingNextPage}
-              >
-                Ältere laden
-              </Button>
-            </div>
           )}
         </div>
 
@@ -916,7 +1188,10 @@ export default function EtbPage() {
                     // Unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
                     top: `calc(var(--lfh-rahmen-oben, 0px) + ${token.margin}px)`,
                   }
-                : undefined
+                : // Darunter um die Höhe der angepinnten Erfassung abgesetzt (LLH-1149): am Ende
+                  // steht die Spalte direkt über der Erfassung, und die Bilanz läge sonst mit
+                  // ihrer Oberkante hinter ihr im Fenster und rutschte bei jedem Mitlaufen.
+                  { marginBlockStart: `var(${FOKUSABSTAND_ETB}, 0px)` }
             }
           >
             <EtbBilanz

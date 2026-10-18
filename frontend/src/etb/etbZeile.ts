@@ -39,20 +39,25 @@ export function abgelehntSchluessel(p: AbgelehnterEintrag): string {
  * Reihenfolge: abgelehnt, dann ausstehend, dann die Serverliste. Beide gepufferten
  * Sorten stehen am KOPF, weil die Liste neueste-zuerst läuft und ein noch nicht
  * gesendeter Eintrag der jüngste ist — und weil ein abgelehnter Eintrag eine Handlung
- * verlangt, ein ausstehender nur Geduld. Die Serverordnung selbst bleibt unangetastet.
+ * verlangt, ein ausstehender nur Geduld. Die Serverordnung selbst bleibt unangetastet; die
+ * Zeitachse kehrt die ganze Folge erst beim Darstellen um (`funkprotokollFolge` in
+ * `components/useFunkprotokollLauf.ts`, LLH-1149), dann stehen die gepufferten ganz unten über
+ * der Erfassung, abgelehnte zuletzt.
  */
 export function baueZeilen(args: {
   eintraege: readonly EtbEintragAnzeige[];
   ausstehend: readonly AusstehenderEintrag[];
   abgelehnt: readonly AbgelehnterEintrag[];
 }): EtbZeile[] {
+  // Die Puffer kommen aufsteigend aus der Warteschlange (`queueLaden`); hier gilt Serverordnung,
+  // neueste zuerst — gekehrt steht dann der jüngste Vorgemerkte direkt über der Erfassung.
   return [
-    ...args.abgelehnt.map((puffer): EtbZeile => ({
+    ...[...args.abgelehnt].reverse().map((puffer): EtbZeile => ({
       art: 'abgelehnt',
       schluessel: abgelehntSchluessel(puffer),
       puffer,
     })),
-    ...args.ausstehend.map((puffer): EtbZeile => ({
+    ...[...args.ausstehend].reverse().map((puffer): EtbZeile => ({
       art: 'ausstehend',
       schluessel: ausstehendSchluessel(puffer),
       puffer,
