@@ -1,3 +1,45 @@
+## [1.0.0-alpha.140](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.139...v1.0.0-alpha.140) (2026-10-18)
+
+### Einsatztagebuch
+
+**Neue Reihenfolge wie im Funkprotokoll**
+- Die Zeitachse steht jetzt chronologisch: der älteste Eintrag oben, der neueste unten direkt über der Erfassung. Die Seite öffnet am Ende und rückt bei neuen Einträgen automatisch mit.
+- Wer nach oben scrollt, hält die Zeitachse an, wie beim Schreiben in der Erfassung. Neue Einträge werden dann gesammelt und unten mit einem Hinweis angezeigt. Beim Nachladen bleibt die Lesestelle erhalten.
+- „Ältere laden“ steht oben, „Neuere laden“ unten.
+- Die Lesemarke ist eine Trennlinie unter dem zuletzt gelesenen Eintrag. Ist dieser Eintrag nicht zu sehen, erscheint ein Hinweis mit „Zur Marke springen“.
+- Der Druck behält seine bisherige Reihenfolge.
+
+**Eine Filterleiste über der Zeitachse**
+- Ab mittlerer Bildschirmbreite stehen alle Filter in einer Leiste über der Zeitachse: Eintragstyp, Umschalter „System“, Zeitraum, Einheit und Volltextsuche. Im Seitenkopf gibt es keine Filter mehr.
+- Für den Zeitraum gibt es eine Schnellwahl: letzte Stunde, letzte 4 Stunden, seit der letzten Lagebesprechung, heute oder ein eigener Zeitraum. Jede Wahl wird mit festen, minutengenauen Grenzen in die Adresse geschrieben. Ein geteilter Link zeigt deshalb genau denselben Ausschnitt. Die Beschriftungen richten sich nach der Serveruhr, nicht nach der Uhr des Geräts.
+
+**Filterhinweis**
+- Solange ein Filter aktiv ist, steht über der Erfassung „Gefiltert · n von m Einträgen sichtbar“. Der Hinweis nennt die gesetzten Filter und bietet „Filter zurücksetzen“ an.
+- Der Hinweis meldet auch, wenn der eigene neue Eintrag außerhalb des Filters liegt und deshalb nicht angezeigt wird. Ebenso meldet er Nachträge, die zeitlich vor der Lagebesprechung liegen.
+- Auf dem Handy bricht der Hinweis um, statt über den Rand zu laufen.
+
+**Berichtigte Einträge**
+- Ein berichtigter Eintrag trägt die Marke „berichtigt“. Ein Klick darauf springt zur jüngsten Berichtigung, auch wenn diese noch nicht geladen ist oder durch einen Filter ausgeblendet wird.
+- „Berichtigen“ steht an jedem gesendeten Eintrag. Beim Berichtigen wird die bisherige Folge von Berichtigungen angezeigt.
+
+**Ruhigere Systemeinträge**
+- Systemeinträge sind optisch zurückgenommen, die Angabe „System → System“ entfällt.
+- Drei oder mehr aufeinanderfolgende einfache Systemeinträge innerhalb einer Stunde werden zu einer aufklappbaren Zeile zusammengefasst. Das gilt nicht beim Filter auf Systemeinträge, bei der Volltextsuche und im Druck.
+
+**Erfassung**
+- Vor dem Eingabefeld steht der gewählte Eintragstyp als Wort in seiner Typfarbe. Die Eingabezeile ist am Rand in derselben Farbe markiert.
+- „Werte behalten“ übernimmt jetzt auch den Eintragstyp.
+- Neue Kurzeingabe für Nachträge: `/zeit 1420 …` setzt eine feste Ereigniszeit, `/zeit -10 …` eine Zeit vor 10 Minuten. Die Angabe greift, sobald ein Leerzeichen dahinter getippt wird oder der ganze Text eingefügt wird. Eine Zeit in der Zukunft wird schon vor dem Absenden abgewiesen, auch ohne Netz. Reicht ein Nachtrag über Mitternacht zurück, wird der Tag mitgenannt.
+- Die Mehrzahl von „Lage“ heißt jetzt durchgängig „Lagefeststellungen“.
+
+### Kommunikation
+
+- Das Informationstelefon nutzt dieselbe Reihenfolge wie das Einsatztagebuch: neueste Einträge unten, die Seite öffnet am Ende und rückt bei neuen Einträgen mit.
+
+### Dokumentation
+
+- Die Bilder zum Einsatztagebuch und zum Informationstelefon in der Anwenderdokumentation zeigen jetzt die neue Reihenfolge, die Filterleiste und den Eintragstyp in der Erfassung.
+
 ## [1.0.0-alpha.139](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.138...v1.0.0-alpha.139) (2026-10-17)
 
 ### Wichtige Änderungen
