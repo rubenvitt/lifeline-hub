@@ -43,6 +43,7 @@ const detail = {
   verbleib: [],
   abgleiche: [],
   transporte: [],
+  massnahmen: [],
 } as unknown as PersonDetail;
 
 /**

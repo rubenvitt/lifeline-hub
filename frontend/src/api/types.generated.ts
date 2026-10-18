@@ -4811,6 +4811,8 @@ export interface components {
         PersonDetail: components["schemas"]["PersonAnzeige"] & {
             abgleiche: components["schemas"]["AbgleichAnzeige"][];
             aufenthalt?: components["schemas"]["AufenthaltAnzeige"] | null;
+            /** @description Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`. */
+            massnahmen: components["schemas"]["MassnahmeAnzeige"][];
             notizen: components["schemas"]["NotizAnzeige"][];
             sichtungen: components["schemas"]["SichtungAnzeige"][];
             /** @description Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf. */

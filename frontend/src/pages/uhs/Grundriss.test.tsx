@@ -839,7 +839,15 @@ describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
 
 describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   function detail(p: Person): PersonDetail {
-    return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [], transporte: [] };
+    return {
+      ...p,
+      sichtungen: [],
+      notizen: [],
+      verbleib: [],
+      abgleiche: [],
+      transporte: [],
+      massnahmen: [],
+    };
   }
 
   it('öffnet beim Klick auf eine Wartebereichs-Karte den Detail-Drawer', async () => {
@@ -967,6 +975,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
           verbleib: [],
           abgleiche: [],
           transporte: [],
+          massnahmen: [],
         }),
       ),
     );
@@ -1134,6 +1143,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
           verbleib: [],
           abgleiche: [],
           transporte: [],
+          massnahmen: [],
         }),
       ),
     );

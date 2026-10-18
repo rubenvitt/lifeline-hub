@@ -12172,7 +12172,8 @@
               "notizen",
               "verbleib",
               "abgleiche",
-              "transporte"
+              "transporte",
+              "massnahmen"
             ],
             "properties": {
               "abgleiche": {
@@ -12191,6 +12192,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "massnahmen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MassnahmeAnzeige"
+                },
+                "description": "Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`."
               },
               "notizen": {
                 "type": "array",

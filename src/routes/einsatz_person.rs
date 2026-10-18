@@ -15,6 +15,7 @@ use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
+use crate::person::massnahme_repo::{self, MassnahmeAnzeige};
 use crate::person::sichtung_repo::SichtungAnzeige;
 use crate::person::transport_repo::{self, TransportAnzeige};
 use crate::person::verbleib_repo::VerbleibAnzeige;
@@ -51,6 +52,8 @@ pub struct PersonDetail {
     pub aufenthalt: Option<AufenthaltAnzeige>,
     /// Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf.
     pub transporte: Vec<TransportAnzeige>,
+    /// Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`.
+    pub massnahmen: Vec<MassnahmeAnzeige>,
 }
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
@@ -571,6 +574,7 @@ pub async fn detail(
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let aufenthalt = belegung_repo::aufenthalt(&state.pool, einsatz_id, person_id).await?;
     let transporte = transport_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let massnahmen = massnahme_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
     // Personen des Einsatzes.
     let abgleiche = if ctx.geraet.is_some() {
@@ -587,6 +591,7 @@ pub async fn detail(
         abgleiche,
         aufenthalt,
         transporte,
+        massnahmen,
     }))
 }
 

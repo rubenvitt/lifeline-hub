@@ -1081,6 +1081,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::person_transport::festlegen),
         )
         .route(
+            "/api/einsaetze/{id}/personen/{pid}/massnahmen",
+            post(routes::person_massnahme::erfassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/massnahmen/{mid}/aufheben",
+            post(routes::person_massnahme::aufheben),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/{pid}/abgleich",
             post(routes::einsatz_person::abgleich_anlegen),
         )
