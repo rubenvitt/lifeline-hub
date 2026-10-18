@@ -1995,6 +1995,59 @@ mod tests {
         assert_eq!(name(mit_transport).await, None, "beide Zwecke abgelaufen");
     }
 
+    /// LLH-1324 (Spec `aufbewahrung-kategorien`, design.md D4): eine Maßnahme gibt
+    /// Behandlungsbezug, auch eine aufgehobene; sie selbst bleibt als Katalogwert erhalten.
+    #[tokio::test]
+    async fn massnahme_haelt_den_stamm_und_bleibt_als_katalogwert() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let mit = volle_person(&pool, einsatz, 1, leit).await;
+        let ohne = volle_person(&pool, einsatz, 2, leit).await;
+        sqlx::query(
+            "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, erfasst_at, \
+                erfasst_von, aufgehoben_at, aufgehoben_von_id) \
+             VALUES (?, ?, 'analgesie', '2026-05-27 10:00:00', '2026-05-27 10:00:00', ?, \
+                '2026-05-27 10:05:00', ?)",
+        )
+        .bind(einsatz)
+        .bind(mit)
+        .bind(leit)
+        .bind(leit)
+        .execute(&pool)
+        .await
+        .unwrap();
+        schliessen(&pool, einsatz, leit).await;
+        erst_auskunft_dann_behandlung(&pool, einsatz).await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            person_felder(&pool, mit).await.0.as_deref(),
+            Some("Mustermann"),
+            "auch eine aufgehobene Maßnahme ist ein Behandlungsbezug"
+        );
+        assert_eq!(person_felder(&pool, ohne).await.0, None);
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Behandlung, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let art: String =
+            sqlx::query_scalar("SELECT art FROM person_massnahme WHERE person_id = ?")
+                .bind(mit)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(art, "analgesie", "die Maßnahme bleibt");
+        assert_eq!(
+            person_felder(&pool, mit).await.0,
+            None,
+            "beide Zwecke abgelaufen"
+        );
+    }
+
     #[tokio::test]
     async fn anhaenge_schwaerzung_laesst_anderes_stehen_und_ist_idempotent() {
         let pool = crate::db::test_pool().await;

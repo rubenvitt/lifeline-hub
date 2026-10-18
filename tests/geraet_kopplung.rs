@@ -6219,6 +6219,10 @@ struct PatKernAmGeraet {
     admin: String,
     einsatz: i64,
     person: i64,
+    /// Eine Person der UHS Süd.
+    fremde: i64,
+    /// Sitzung des Tablets der UHS Nord.
+    tablet: String,
     antwort: Value,
 }
 
@@ -6276,6 +6280,8 @@ async fn pat_kern_am_geraet(weg: &str, body: Value) -> PatKernAmGeraet {
         admin,
         einsatz,
         person: eigene,
+        fremde,
+        tablet,
         antwort,
     }
 }
@@ -6310,4 +6316,70 @@ async fn transport_am_uhs_geraet() {
     .await;
     assert_eq!(d["transporte"][1]["id"], lage.antwort["id"]);
     assert_eq!(d["transporte"][1]["bestaetigt_name"], "Dr. A. Muster");
+}
+
+/// LLH-1324 (Spec `personen-massnahmen`, „Maßnahmen am UHS-Gerät“): das Tablet erfasst eine
+/// bestätigte Maßnahme und hebt sie auf; eine Maßnahme einer fremden UHS bleibt 404.
+#[tokio::test]
+async fn massnahme_am_uhs_geraet() {
+    let lage = pat_kern_am_geraet("massnahmen", json!({"art": "sauerstoff"})).await;
+    let (_, d) = anfrage(
+        &lage.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personen/{}", lage.einsatz, lage.person),
+        &lage.admin,
+        None,
+    )
+    .await;
+    let bestaetigt = d["massnahmen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == lage.antwort["id"])
+        .unwrap_or_else(|| panic!("{d}"));
+    assert_eq!(bestaetigt["bestaetigt_name"], "Dr. A. Muster");
+    let etb = system_etb(&lage.app, &lage.admin, lage.einsatz).await;
+    assert!(
+        etb.iter().all(|(t, _)| !t.contains("sauerstoff")),
+        "kein ETB: {etb:?}"
+    );
+
+    let aufheben = |p: i64, m: &Value| {
+        format!(
+            "/api/einsaetze/{}/personen/{p}/massnahmen/{m}/aufheben",
+            lage.einsatz
+        )
+    };
+    // Eine Maßnahme an der Person der UHS Süd hebt das Tablet nicht auf.
+    let (s, fremd) = anfrage_json(
+        &lage.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{}/personen/{}/massnahmen",
+            lage.einsatz, lage.fremde
+        ),
+        &lage.admin,
+        Some(&json!({"art": "zugang"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fremd}");
+    let (s, v) = anfrage(
+        &lage.app,
+        "POST",
+        &aufheben(lage.fremde, &fremd["id"]),
+        &lage.tablet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS: {v}");
+    let (s, v) = anfrage(
+        &lage.app,
+        "POST",
+        &aufheben(lage.person, &lage.antwort["id"]),
+        &lage.tablet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["aufgehoben_at"].is_string(), "{v}");
 }

@@ -41,7 +41,7 @@ Für jede Aufgabe gilt:
 
 - [x] 4.1 Migration `0220`: Tabelle `person_massnahme` (Art, `zeitpunkt_at` als Durchführung, `erfasst_at`, Erfasser, Bestätigung, `aufgehoben_*`, `client_id`). Wire-Enum mit Wire-Kontrakt.
 - [x] 4.2 `POST …/massnahmen` und `POST …/massnahmen/{mid}/aufheben` (D1, rennsicheres 409). `PersonDetail.massnahmen`. Servertests: Rechte, Org-Isolation, unbekannte Maßnahme 400, storniert 409, vermisst 422, zweimal aufheben 409 auch gleichzeitig, Leak-Test, Replay.
-- [ ] 4.3 Aufbewahrung und Gerät wie 3.3. Tests grün.
+- [x] 4.3 Aufbewahrung und Gerät wie 3.3. Tests grün.
 
 ## 5. Verletzungen — LLH-1113 (jhos00j7)
 
