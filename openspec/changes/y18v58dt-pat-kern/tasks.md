@@ -15,7 +15,7 @@ Für jede Aufgabe gilt:
 ## 1. Grundlage Erfassungszeit und Idempotenz — LLH-1138 (ewjfqaek), Backend
 
 - [x] 1.1 Migration `0217`: `client_id` und `eingegangen_at` (nullable) an `person_sichtung`, `person_verbleib` und `person_verlaufsnotiz`, dazu partielle Unique-Indizes je Einsatz. Prüfung: Migrationstest grün und `check-migrationen.sh` grün.
-- [ ] 1.2 Zeit-Helfer für medizinische Einträge: `support::meldezeitpunkt` plus Untergrenze `einsatz_person.erfasst_at` (design.md D5). Unit-Tests für mehr als 60 s Zukunft (400), höchstens 60 s Zukunft (jetzt), vor dem Anlegen (gekappt) und ohne Angabe (jetzt).
+- [x] 1.2 Zeit-Helfer für medizinische Einträge: `support::meldezeitpunkt` plus Untergrenze `einsatz_person.erfasst_at` (design.md D5). Unit-Tests für mehr als 60 s Zukunft (400), höchstens 60 s Zukunft (jetzt), vor dem Anlegen (gekappt) und ohne Angabe (jetzt).
 - [ ] 1.3 Sichtung: POST nimmt `client_id` und `zeitpunkt_at` an, Replay vor `fordere_aktiv`, Cache nach jüngstem Zeitpunkt (D6), Hinweis „Sichtung I“ nur, wenn der Eintrag gewinnt, ETB mit `ereigniszeit` und „nachgetragen“, ETB-Live-Ereignis. Servertests: doppelte `client_id` ergibt einen Eintrag und einen ETB-Eintrag, ältere Sichtung ändert den Cache nicht und benachrichtigt nicht, Zukunft 400.
 - [ ] 1.4 Verbleib: dasselbe wie 1.3 in einem `write_retry!` samt Auto-Austritt, der nur läuft, wenn der Eintrag gewinnt. Die Kurzform wird aus der gewinnenden Zeile berechnet. Servertests: älterer Verbleib ohne Austritt, Replay idempotent.
 - [ ] 1.5 Notiz: `client_id` und `zeitpunkt_at`, ohne ETB. Servertest Replay.
