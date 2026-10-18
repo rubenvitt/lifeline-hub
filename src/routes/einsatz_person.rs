@@ -20,6 +20,7 @@ use crate::person::sichtung_repo::SichtungAnzeige;
 use crate::person::transport_repo::{self, TransportAnzeige};
 use crate::person::verbleib_repo::VerbleibAnzeige;
 use crate::person::verlaufsnotiz_repo::NotizAnzeige;
+use crate::person::verletzung_repo::{self, VerletzungAnzeige};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
@@ -54,6 +55,8 @@ pub struct PersonDetail {
     pub transporte: Vec<TransportAnzeige>,
     /// Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`.
     pub massnahmen: Vec<MassnahmeAnzeige>,
+    /// Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`.
+    pub verletzungen: Vec<VerletzungAnzeige>,
 }
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
@@ -575,6 +578,7 @@ pub async fn detail(
     let aufenthalt = belegung_repo::aufenthalt(&state.pool, einsatz_id, person_id).await?;
     let transporte = transport_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let massnahmen = massnahme_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let verletzungen = verletzung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
     // Personen des Einsatzes.
     let abgleiche = if ctx.geraet.is_some() {
@@ -592,6 +596,7 @@ pub async fn detail(
         aufenthalt,
         transporte,
         massnahmen,
+        verletzungen,
     }))
 }
 

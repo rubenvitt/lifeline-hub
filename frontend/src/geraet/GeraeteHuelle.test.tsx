@@ -131,6 +131,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
         abgleiche: [],
         transporte: [],
         massnahmen: [],
+        verletzungen: [],
       } as PersonDetail),
     ),
   );
@@ -467,6 +468,7 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
           abgleiche: [],
           transporte: [],
           massnahmen: [],
+          verletzungen: [],
         } as PersonDetail),
       ),
     );

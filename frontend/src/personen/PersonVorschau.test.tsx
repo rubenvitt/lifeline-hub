@@ -44,6 +44,7 @@ const detail = {
   abgleiche: [],
   transporte: [],
   massnahmen: [],
+  verletzungen: [],
 } as unknown as PersonDetail;
 
 /**

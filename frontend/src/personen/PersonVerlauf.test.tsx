@@ -37,6 +37,7 @@ const basis = {
   abgleiche: [],
   transporte: [],
   massnahmen: [],
+  verletzungen: [],
 } as PersonDetail;
 
 const person: PersonDetail = {

@@ -847,6 +847,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
       abgleiche: [],
       transporte: [],
       massnahmen: [],
+      verletzungen: [],
     };
   }
 
@@ -976,6 +977,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
           abgleiche: [],
           transporte: [],
           massnahmen: [],
+          verletzungen: [],
         }),
       ),
     );
@@ -1144,6 +1146,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
           abgleiche: [],
           transporte: [],
           massnahmen: [],
+          verletzungen: [],
         }),
       ),
     );

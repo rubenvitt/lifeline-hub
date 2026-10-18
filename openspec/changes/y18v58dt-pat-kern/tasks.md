@@ -46,7 +46,7 @@ Für jede Aufgabe gilt:
 ## 5. Verletzungen — LLH-1113 (jhos00j7)
 
 - [x] 5.1 Migration `0221`: Tabelle `person_verletzung` (Ansicht, Region, Art, Schwere, `x`, `y`, `notiz`, Zeiten, Erfasser, Bestätigung, `aufgehoben_*`, `client_id`). Wire-Enums mit Wire-Kontrakt, `VERLETZUNG_NOTIZ_MAX` mit Spiegel.
-- [ ] 5.2 `POST …/verletzungen` und `…/verletzungen/{vid}/aufheben` mit Prüfung der Paare aus Ansicht und Region (422) und Lage 0..1 (400). `PersonDetail.verletzungen`. Servertests in `tests/person_verletzung.rs`: Rechte, Org-Isolation, Gerät, Katalog 400, Paare 422, zweimal aufheben 409, Leak-Test (Region, Art und Notiz weder in ETB noch in SSE), Replay.
+- [x] 5.2 `POST …/verletzungen` und `…/verletzungen/{vid}/aufheben` mit Prüfung der Paare aus Ansicht und Region (422) und Lage 0..1 (400). `PersonDetail.verletzungen`. Servertests in `tests/person_verletzung.rs`: Rechte, Org-Isolation, Gerät, Katalog 400, Paare 422, zweimal aufheben 409, Leak-Test (Region, Art und Notiz weder in ETB noch in SSE), Replay.
 - [ ] 5.3 Aufbewahrung: `x`/`y`/`notiz` Scrub `Z_BEHANDLUNG` gepinnt, Fixture in `purge_scheduler.rs` für `schwaerzung_hinterlaesst_keine_altbytes`. Gerät wie 3.3. Tests grün.
 
 ## 6. Patientenkopf und Verlauf — LLH-1324, LLH-1325, LLH-1326, LLH-1113

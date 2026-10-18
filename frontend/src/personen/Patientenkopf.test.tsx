@@ -62,6 +62,7 @@ const basis = {
   abgleiche: [],
   transporte: [],
   massnahmen: [],
+  verletzungen: [],
   aufenthalt: {
     uhs_id: 3,
     uhs_bezeichnung: 'Turnhalle',

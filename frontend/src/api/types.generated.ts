@@ -4824,6 +4824,8 @@ export interface components {
             /** @description Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf. */
             transporte: components["schemas"]["TransportAnzeige"][];
             verbleib: components["schemas"]["VerbleibAnzeige"][];
+            /** @description Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`. */
+            verletzungen: components["schemas"]["VerletzungAnzeige"][];
         };
         /**
          * @description Perioden einer Person — Zeile der Liste für die Personal-Seite. Nur Personen mit

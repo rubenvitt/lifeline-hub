@@ -63,6 +63,7 @@ pub mod pegel;
 pub mod person_anhang;
 pub mod person_massnahme;
 pub mod person_transport;
+pub mod person_verletzung;
 pub mod personal;
 pub mod personal_status;
 pub mod presse;

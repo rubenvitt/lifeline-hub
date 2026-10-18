@@ -12200,7 +12200,8 @@
               "verbleib",
               "abgleiche",
               "transporte",
-              "massnahmen"
+              "massnahmen",
+              "verletzungen"
             ],
             "properties": {
               "abgleiche": {
@@ -12251,6 +12252,13 @@
                 "items": {
                   "$ref": "#/components/schemas/VerbleibAnzeige"
                 }
+              },
+              "verletzungen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VerletzungAnzeige"
+                },
+                "description": "Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`."
               }
             }
           }

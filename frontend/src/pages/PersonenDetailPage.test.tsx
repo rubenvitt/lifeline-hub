@@ -57,6 +57,7 @@ const detail = {
   abgleiche: [],
   transporte: [],
   massnahmen: [],
+  verletzungen: [],
 } as PersonDetail;
 
 /** Aufenthalt im Wartebereich einer UHS, wie der Server ihn im Detail mitliefert (LLH-1129). */

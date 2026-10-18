@@ -64,6 +64,7 @@ describe('Vorschau (LFH-645/664)', () => {
           abgleiche: [],
           transporte: [],
           massnahmen: [],
+          verletzungen: [],
         }),
       ),
     );
