@@ -436,10 +436,12 @@ pub async fn anlegen(
                         conn,
                         einsatz_id,
                         id,
-                        k.as_str(),
-                        None,
+                        &sichtung_repo::NeueSichtung {
+                            kategorie: k.as_str(),
+                            bestaetigung: bestaetigung.as_ref(),
+                            ..Default::default()
+                        },
                         ctx.benutzer.id,
-                        bestaetigung.as_ref(),
                         // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
                         // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
                         matches!(status_enum, PersonStatus::Erfasst),
@@ -820,23 +822,53 @@ pub struct SichtungBody {
     pub notiz: Option<String>,
     /// Namentliche Bestätigung am Gerät (LFH-1046): Kennung in `einsatz_personal`.
     pub bestaetigt_personal_id: Option<i64>,
+    /// Erfassungszeit, offline vorgemerkt (LLH-1138); fehlt = jetzt. Gekappt über
+    /// [`crate::routes::support::erfassungszeitpunkt`].
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/sichtung — Sichtung erfassen.
 /// Schreibberechtigt + aktiv. Hebt `erfasst→betroffen` (Annahme 5); bei
 /// `vermisst`/`abgemeldet` → 422; bei storniert → 409. Sichtung=`tot` ändert
 /// den Admin-Status NICHT (Annahme 4). Pseudonyme ETB-Spur + SSE.
+///
+/// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): ein Replay derselben `client_id`
+/// kommt vor dem Aktiv-Gate zurück (Muster `anlegen`), ohne zweiten ETB-Eintrag und ohne
+/// Hinweis. Der Cache folgt der jüngsten Erfassungszeit; eine nachgereichte ältere Sichtung
+/// steht im Verlauf und im ETB („nachgetragen“, zu ihrer Erfassungszeit), meldet aber kein
+/// „Sichtung I“.
 pub async fn sichten(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Personen>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
+    headers: HeaderMap,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<SichtungBody>,
 ) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = crate::routes::support::parse_client_id(body.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = sichtung_repo::nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |s| s.person_id)?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let kategorie = Sichtungskategorie::parse(&body.kategorie)
         .ok_or_else(|| AppError::Validation("Unbekannte Sichtungskategorie".into()))?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let gesichtet_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        chrono::Utc::now(),
+        &person.erfasst_at,
+    )?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierte Person kann nicht gesichtet werden".into(),
@@ -863,36 +895,108 @@ pub async fn sichten(
     .await?;
 
     // F06/LFH-244 Tier-A: Sichtungs-Erfassung (optionaler Status-Hub + INSERT + Cache-Update)
-    // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
-    // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
-    let text = crate::person::etb_text_bestaetigt(
-        crate::person::etb_text_sichtung(person.registrier_nr, kategorie),
-        bestaetigung.as_ref(),
-    );
+    // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Welcher ETB-Text gilt,
+    // entscheidet erst der Cache nach dem INSERT (gewinnt der Eintrag?). SSE nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (sichtung, vorher) = crate::write_retry!(&state.pool, |conn| {
+    let neu = sichtung_repo::NeueSichtung {
+        kategorie: kategorie.as_str(),
+        notiz: notiz.as_deref(),
+        gesichtet_at: Some(&gesichtet_at),
+        client_id: client_id.as_deref(),
+        bestaetigung: bestaetigung.as_ref(),
+    };
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        // Zwei gleichzeitige Übertragungen desselben Schlüssels: unter `BEGIN IMMEDIATE` sieht
+        // die zweite die erste und liefert sie zurück, statt am Unique-Index zu scheitern.
+        if let Some(cid) = client_id.as_deref() {
+            if let Some(replay) = sichtung_repo::nach_client_id(&mut *conn, einsatz_id, cid).await?
+            {
+                return Ok(Sichtet::Replay(replay));
+            }
+        }
         // Vorzustand in DERSELBEN Transaktion: eine parallele Sichtung kann den vor der Tx
         // geladenen `person.aktuelle_sichtung` schon überholt haben.
         let vorher = sichtung_repo::aktuelle_kategorie_tx(conn, einsatz_id, person_id).await?;
-        let sichtung = sichtung_repo::erfassen_tx(
+        let erfasst = sichtung_repo::erfassen_tx(
             conn,
             einsatz_id,
             person_id,
-            kategorie.as_str(),
-            notiz.as_deref(),
+            &neu,
             ctx.benutzer.id,
-            bestaetigung.as_ref(),
             hebe_auf_betroffen,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok((sichtung, vorher))
+        let text = if erfasst.gewinnt {
+            crate::person::etb_text_sichtung(person.registrier_nr, kategorie)
+        } else {
+            let aktuell = sichtung_repo::aktuelle_kategorie_tx(conn, einsatz_id, person_id)
+                .await?
+                .ok_or_else(|| AppError::Internal("Sichtung ohne aktuelle Kategorie".into()))?;
+            crate::person::etb_text_sichtung_nachgetragen(person.registrier_nr, kategorie, aktuell)
+        };
+        let text = crate::person::etb_text_bestaetigt(text, bestaetigung.as_ref());
+        let etb_id = crate::etb::system_audit_zu_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &text,
+            &erfasst.sichtung.gesichtet_at,
+        )
+        .await?;
+        Ok(Sichtet::Neu {
+            erfasst,
+            vorher,
+            etb_id,
+        })
     })?;
+    let (erfasst, vorher, etb_id) = match ergebnis {
+        Sichtet::Replay(replay) => {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |s| s.person_id)?),
+            ))
+        }
+        Sichtet::Neu {
+            erfasst,
+            vorher,
+            etb_id,
+        } => (erfasst, vorher, etb_id),
+    };
+    state.live.publiziere(einsatz_id, etb_id);
     sse_person(&state, einsatz_id, person_id);
-    if wird_sk1(vorher, kategorie) {
+    // Der Hinweis hängt am aktuellen Stand (D6): nur wenn dieser Eintrag ihn bestimmt.
+    if erfasst.gewinnt && wird_sk1(vorher, kategorie) {
         melde_sichtung_eins(&state, einsatz_id, person_id, ctx.benutzer.id).await;
     }
-    Ok((StatusCode::CREATED, Json(sichtung)))
+    Ok((StatusCode::CREATED, Json(erfasst.sichtung)))
+}
+
+/// Ausgang der Sichtungs-Transaktion.
+enum Sichtet {
+    /// Schon gespeichert (gleichzeitiger Replay derselben `client_id`).
+    Replay(SichtungAnzeige),
+    Neu {
+        erfasst: sichtung_repo::ErfassteSichtung,
+        vorher: Option<Sichtungskategorie>,
+        etb_id: i64,
+    },
+}
+
+/// Ein Replay gilt nur an der Person, an der der Eintrag gespeichert ist; eine `client_id`, die
+/// an einer anderen Person vergeben ist, ist 422 (Muster `betreuung::repo::replay_am_objekt`).
+fn replay_an_person<T>(
+    replay: T,
+    person_id: i64,
+    person: impl Fn(&T) -> i64,
+) -> Result<T, AppError> {
+    if person(&replay) == person_id {
+        Ok(replay)
+    } else {
+        Err(AppError::UnprocessableEntity(
+            "client_id gehört zu einem Eintrag an einer anderen Person".into(),
+        ))
+    }
 }
 
 /// GET /api/einsaetze/{id}/personen/bestaetiger — Auswahl „Bestätigt von“ am Gerät (LFH-1046,

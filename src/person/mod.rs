@@ -473,6 +473,21 @@ pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> S
     )
 }
 
+/// System-ETB einer nachgereichten älteren Sichtung (LLH-1138, Spec `personen-verlauf`): sie
+/// steht im Verlauf, die aktuelle bleibt. «Person R-001: Sichtung SK I, nachgetragen, aktuelle
+/// Sichtung bleibt SK II». Beide Kategorien sind Statuskategorien (Retain), kein Befund.
+pub fn etb_text_sichtung_nachgetragen(
+    registrier_nr: i64,
+    kategorie: Sichtungskategorie,
+    aktuell: Sichtungskategorie,
+) -> String {
+    format!(
+        "{}, nachgetragen, aktuelle Sichtung bleibt {}",
+        etb_text_sichtung(registrier_nr, kategorie),
+        aktuell.etb_label()
+    )
+}
+
 /// Hängt eine namentliche Bestätigung am Gerät an einen System-ETB-Text (LFH-1046):
 /// «Person R-001: Sichtung SK II, bestätigt: Dr. A. Muster». Der Name ist eine Einsatzkraft
 /// (`einsatz_personal.snap_name`), kein Wert von Betroffenen (LFH-752, Gruppe Einsatzkraft).

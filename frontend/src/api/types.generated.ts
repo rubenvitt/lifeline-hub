@@ -5196,6 +5196,11 @@ export interface components {
         SichtungAnzeige: {
             /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
             bestaetigt_name?: string | null;
+            /**
+             * @description Wann der Eintrag beim Server ankam (LLH-1138); `gesichtet_at` ist die Erfassungszeit.
+             *     Fehlt bei Einträgen von vor der Migration 0217.
+             */
+            eingegangen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             gesichtet_at: string;

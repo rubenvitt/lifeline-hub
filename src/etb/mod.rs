@@ -72,6 +72,30 @@ pub async fn system_audit_tx(
     .await
 }
 
+/// Wie [`system_audit_tx`], mit der Ereigniszeit des auslösenden Eintrags statt der Ankunft:
+/// ein ohne Netz vorgemerkter medizinischer Eintrag (LLH-1138, Spec `personen-verlauf`) steht
+/// zu seiner Erfassungszeit im ETB. `ereigniszeit` ist bereits gekappt (Drahtform, UTC).
+pub async fn system_audit_zu_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    startwert: i64,
+    inhalt: &str,
+    ereigniszeit: &str,
+) -> Result<i64, AppError> {
+    repo::anlegen_tx(
+        conn,
+        einsatz_id,
+        erfasser_id,
+        startwert,
+        repo::EintragDaten {
+            ereigniszeit: Some(ereigniszeit),
+            ..system_daten(inhalt)
+        },
+    )
+    .await
+}
+
 /// Legt einen System-ETB-Eintrag auf einer frischen Pool-Connection an und liefert die
 /// Anzeige (für den SSE-Broadcast). Konvenienz für den nicht-atomaren Degradations-Pfad
 /// (F06/LFH-244, Tier-B) — entspricht `repo::anlegen` spezialisiert auf `TYP_SYSTEM`.

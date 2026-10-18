@@ -956,10 +956,11 @@ impl Ablauf<'_> {
                         conn,
                         self.einsatz_id,
                         person_id,
-                        kategorie.as_str(),
-                        None,
+                        &crate::person::sichtung_repo::NeueSichtung {
+                            kategorie: kategorie.as_str(),
+                            ..Default::default()
+                        },
                         self.admin_id,
-                        None,
                         true,
                     )
                     .await?;

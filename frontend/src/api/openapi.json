@@ -13293,6 +13293,13 @@
             ],
             "description": "Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person."
           },
+          "eingegangen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Eintrag beim Server ankam (LLH-1138); `gesichtet_at` ist die Erfassungszeit.\nFehlt bei Einträgen von vor der Migration 0217."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"

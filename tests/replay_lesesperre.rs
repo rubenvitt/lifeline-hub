@@ -192,6 +192,30 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Fenster",
     });
 
+    // LLH-1138: die medizinischen Einträge einer Person nehmen ihren Replay ebenso vor dem
+    // Aktiv-Gate und hinter der Lese-Policy.
+    let p = angelegt(
+        app,
+        cookie,
+        &format!("{basis}/personen"),
+        r#"{"name":"Gesichtet"}"#,
+        "Person",
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    let url = format!("{basis}/personen/{p}/sichtung");
+    let body =
+        json!({"kategorie":"sk2","notiz":"Geheim-Sichtung Atemnot","client_id":"r-sichtung"});
+    angelegt(app, cookie, &url, &body.to_string(), "Sichtung").await;
+    faelle.push(Fall {
+        route: "personen/sichtung",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"kategorie":"sk2","client_id":"r-sichtung-neu"}).to_string(),
+        geheim: "Geheim-Sichtung",
+    });
+
     faelle
 }
 
