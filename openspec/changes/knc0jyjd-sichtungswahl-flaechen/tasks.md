@@ -23,8 +23,8 @@ Subtask LLH-1083 (`knc0jyjd`) von LLH-1018. Jede Aufgabe entsteht per TDD
 
 ## 4. Nachweise im Browser
 
-- [ ] 4.1 `e2e/betroffene-kontrast.spec.ts` misst die Flächen (Text und Kante) in Tag und Nacht.
-- [ ] 4.2 `e2e/trefflaeche-pruefflaechen.spec.ts` misst die Flächen (≥ 72 × 96, Abstand) in `kompakt` und `handschuh`.
+- [x] 4.1 `e2e/betroffene-kontrast.spec.ts` misst die Flächen (Text und Kante) in Tag und Nacht.
+- [x] 4.2 `e2e/trefflaeche-pruefflaechen.spec.ts` misst die Flächen (≥ 72 × 96, Abstand) in `kompakt` und `handschuh`.
 
 ## 5. Regeln und Doku
 
