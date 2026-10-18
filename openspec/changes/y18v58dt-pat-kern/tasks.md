@@ -28,7 +28,7 @@ Für jede Aufgabe gilt:
 - [x] 2.2 `PAT_NUMMER_MAX` mit Spiegel in `frontend/src/api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`. Servertest: über der Grenze 400.
 - [x] 2.3 Aufbewahrung: `pat_nummer` Scrub `Z_BEHANDLUNG` (gepinnt, `PERSONENBEZUEGE` `Mit`), `kontamination` Retain, `behandlungsbezug_sql` erweitert. Tests: Guard grün, nur-PAT-Person hat Behandlungsbezug, Schwärzung leert die PAT-Nummer.
 - [x] 2.4 Frontend: Statusvertrag `kontamination` (Rolle `achtung`, Wort), Suchtext der Spalte `reg`, Platzhalter der Suche, `PERSON_AUF_DER_PLATTE` (D9), `lagebildKuerzen` für `personenAuswahl`. Vitest: Suche findet „4711“, Kürzung lässt die PAT-Nummer aus.
-- [ ] 2.5 Sprungpalette: `pat_nummer` im Label „PAT …“, Ziffernzweig mit exaktem PAT-Treffer (D12). Vitest: „4711“ trifft R-4711 und R-012 mit „PAT 4711“.
+- [x] 2.5 Sprungpalette: `pat_nummer` im Label „PAT …“, Ziffernzweig mit exaktem PAT-Treffer (D12). Vitest: „4711“ trifft R-4711 und R-012 mit „PAT 4711“.
 
 ## 3. Transport — LLH-1325 (uz0emwv9)
 

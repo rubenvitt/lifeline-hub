@@ -189,6 +189,60 @@ describe('baueDatensatzTreffer — die drei Akzeptanzkriterien', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe('baueDatensatzTreffer — PAT-Nummer (LLH-1326, design.md D12)', () => {
+  const quellen = {
+    personen: [
+      person({ id: 12, registrier_nr: 12, name: 'Muster', pat_nummer: '4711' }),
+      person({ id: 4711, registrier_nr: 4711, name: 'Weber' }),
+      person({ id: 30, registrier_nr: 30, name: 'Kurz', pat_nummer: 'A-4711' }),
+    ],
+  };
+
+  /** Spec `sprungpalette`, „Ziffern treffen Registrier- und PAT-Nummer“. */
+  it('trifft bei Ziffern die Registriernummer und die genau passende PAT-Nummer, beide als Nummerntreffer', () => {
+    const t = baueDatensatzTreffer(kontext({ suche: '4711', quellen }));
+    expect(labels(t).slice(0, 2)).toEqual([
+      'Betroffene · R-4711 · Weber',
+      'Betroffene · R-012 · Muster · PAT 4711',
+    ]);
+    expect(t.slice(0, 2).map((x) => x.stufe)).toEqual([0, 0]);
+    // „A-4711“ ist keine genau passende PAT-Nummer: höchstens ein Texttreffer dahinter.
+    expect(t.find((x) => x.befehl.id === 'datensatz:personen:30')?.stufe).not.toBe(0);
+  });
+
+  it('liest führende Nullen wie bei der Registriernummer', () => {
+    const t = baueDatensatzTreffer(kontext({ suche: '04711', quellen }));
+    expect(ids(t).slice(0, 2)).toEqual(['datensatz:personen:4711', 'datensatz:personen:12']);
+  });
+
+  it('bindet R- an die Registriernummer, nicht an die PAT-Nummer', () => {
+    const t = baueDatensatzTreffer(kontext({ suche: 'R-4711', quellen }));
+    expect(ids(t)).toEqual(['datensatz:personen:4711']);
+  });
+
+  it('nennt die PAT-Nummer im Label mit Vorsatz, auch ohne Namen', () => {
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: 'pat 0815',
+        quellen: { personen: [person({ id: 5, registrier_nr: 5, pat_nummer: '0815' })] },
+      }),
+    );
+    expect(labels(t)).toEqual(['Betroffene · R-005 · PAT 0815']);
+  });
+
+  /** Spec `sprungpalette`, „Ohne Netz“: die gekürzte Auswahl trägt keine PAT-Nummer. */
+  it('findet ohne PAT-Nummer in der Auswahl niemanden über sie', () => {
+    const t = baueDatensatzTreffer(
+      kontext({
+        suche: '4711',
+        quellen: { personen: [person({ id: 12, registrier_nr: 12, name: 'Muster' })] },
+      }),
+    );
+    expect(t).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 describe('baueDatensatzTreffer — Rangfolge', () => {
   /**
    * `praefixStufe` rechnet die Stufe aus dem LABEL: „Betroffene · R-042 · Müller“ läge bei '42' auf
