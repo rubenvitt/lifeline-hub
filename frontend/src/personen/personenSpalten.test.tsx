@@ -389,7 +389,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
 
   it('bietet einer VERMISSTEN Person keinen Zustand an — auch mit Schreibrecht', () => {
     renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, status: 'vermisst' })}</>);
-    expect(screen.queryByRole('button', { name: /Zustand / Verdacht zu R-001/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Zustand \/ Verdacht zu R-001/ })).toBeNull();
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
