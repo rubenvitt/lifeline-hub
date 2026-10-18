@@ -326,6 +326,14 @@ export const uebernahmeOffen: StatusDarstellung = { rolle: 'achtung', label: 'ni
  */
 export const brAbgerufen: StatusDarstellung = { rolle: 'achtung', label: 'abgerufen' };
 
+/**
+ * Kontamination „ja“ an einer Person (LLH-1326, Change `y18v58dt-pat-kern`, design.md D11): eine
+ * Gefahr für die Kräfte (Dekon, Eigenschutz), darum `achtung` mit Wort; `alarm` kollidierte mit
+ * dem Rot von SK I. Eine einzelne Darstellung, keine Karte über einem Enum: „nein“ und „keine
+ * Angabe“ tragen keine Marke. Steht in Patientenkopf, Betroffenenliste und Patientenliste am Gerät.
+ */
+export const kontamination: StatusDarstellung = { rolle: 'achtung', label: 'kontaminiert' };
+
 /** Bewegungsart einer UHS-Belegung. */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {
   eintritt: { rolle: 'normal', label: 'Eintritt' },

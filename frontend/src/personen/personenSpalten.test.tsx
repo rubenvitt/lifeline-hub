@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { koordinatenText } from './koordinate';
-import { pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
+import { effektiveDaten, pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
 import type { Person } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { lagebildKuerzen } from '../offline/lagebildKuerzung';
@@ -145,6 +145,28 @@ describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
     expect(reg.immerSichtbar).toBe(true);
     expect(reg.zahl).toBe(true);
     expect(spalte('seit')[0].zahl).toBe(true);
+  });
+
+  it('findet eine Person über ihre PAT-Nummer in der Spalte Nr. (LLH-1326, D12)', () => {
+    const reg = personenSpalten.find((s) => s.key === 'reg')!;
+    expect(reg.suchText!({ ...basis, registrier_nr: 12, pat_nummer: 'A-4711' })).toBe(
+      'R-012 A-4711',
+    );
+    expect(reg.suchText!(basis)).toBe('R-001');
+    const zeilen = [
+      { ...basis, id: 1, registrier_nr: 12, pat_nummer: 'A-4711' },
+      { ...basis, id: 2, registrier_nr: 13, pat_nummer: 'B-12' },
+      { ...basis, id: 3, registrier_nr: 14 },
+    ];
+    const treffer = effektiveDaten({
+      daten: zeilen,
+      spalten: personenSpalten,
+      sortierung: null,
+      suchbegriff: '4711',
+      filterWerte: {},
+      baum: false,
+    });
+    expect(treffer.map((p) => p.registrier_nr)).toEqual([12]);
   });
 
   it('bricht die Nr. nie um, auch nicht in der Handschuh-Dichte (LFH-1151)', () => {

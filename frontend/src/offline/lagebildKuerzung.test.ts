@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Person } from '../api/types';
+import type { Person, PersonAuswahl } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { lagebildKuerzen, nichtGeladen, PERSON_AUF_DER_PLATTE } from './lagebildKuerzung';
 
@@ -155,6 +155,37 @@ describe('lagebildKuerzen', () => {
     expect(lagebildKuerzen(etb)).toBe(etb);
     const leer = eintrag(einsatzKeys.personen(7), undefined);
     expect(lagebildKuerzen(leer)).toBe(leer);
+  });
+});
+
+describe('lagebildKuerzen — Personenauswahl (LLH-1326, D9)', () => {
+  const AUSWAHL: PersonAuswahl[] = [
+    {
+      id: 1,
+      registrier_nr: 12,
+      status: 'betroffen',
+      name: 'Muster',
+      vorname: 'Erika',
+      pat_nummer: '4711',
+    },
+    { id: 2, registrier_nr: 13, status: 'erfasst', name: null, vorname: null },
+  ];
+
+  it('lässt die PAT-Nummer aus und behält Nummer, Name und Status', () => {
+    const gekuerzt = lagebildKuerzen(eintrag(einsatzKeys.personenAuswahl(7), AUSWAHL)).state
+      .data as Record<string, unknown>[];
+    expect(gekuerzt).toEqual([
+      { id: 1, registrier_nr: 12, status: 'betroffen', name: 'Muster', vorname: 'Erika' },
+      { id: 2, registrier_nr: 13, status: 'erfasst', name: null, vorname: null },
+    ]);
+    expect(JSON.stringify(gekuerzt)).not.toContain('4711');
+  });
+
+  it('ist idempotent und lässt den Eingang stehen', () => {
+    const e = eintrag(einsatzKeys.personenAuswahl(7), AUSWAHL);
+    const einmal = lagebildKuerzen(e);
+    expect(lagebildKuerzen(einmal)).toEqual(einmal);
+    expect(AUSWAHL[0].pat_nummer).toBe('4711');
   });
 });
 

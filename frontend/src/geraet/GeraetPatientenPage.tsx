@@ -162,7 +162,7 @@ export default function GeraetPatientenPage() {
           zeilenSchluessel="id"
           ladend={personenQuery.isLoading}
           leerText="Noch keine Patienten in dieser Unfallhilfsstelle"
-          suche={{ platzhalter: 'R-Nr., Name' }}
+          suche={{ platzhalter: 'R-Nr., PAT-Nr., Name' }}
           standardSortierung={{ spalte: 'sk', richtung: 'auf' }}
           gruppen={{
             schluessel: (p) => (uhs && p.aktuelle_uhs_id === uhs.id ? IN_DER_UHS : AUSGETRETEN),

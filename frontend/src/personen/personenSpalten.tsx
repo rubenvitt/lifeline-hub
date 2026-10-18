@@ -370,7 +370,9 @@ export function personenSpalten(
       zahl: true,
       // Sortiert wird über die ZAHL — über den Anzeigetext läge „R-10" vor „R-9".
       sortWert: (p) => p.registrier_nr,
-      suchText: (p) => registrierAnzeige(p.registrier_nr),
+      // Die PAT-Nummer gehört zur Kennung der Person (LLH-1326, design.md D12): „4711“ findet
+      // „A-4711“. Ohne Netz fehlt sie im gekürzten Datensatz, dann trifft nur die Nr.
+      suchText: (p) => [registrierAnzeige(p.registrier_nr), p.pat_nummer].filter(Boolean).join(' '),
       // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`. Ohne Umbruch: in
       // der Handschuh-Dichte brach „R-001“ sonst in „R-“ / „001“ (LFH-1151).
       render: (_, p) => (

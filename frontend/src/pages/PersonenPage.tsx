@@ -1137,7 +1137,7 @@ export default function PersonenPage() {
                 zeilenSchluessel="id"
                 ladend={personenQuery.isLoading}
                 leerText={leerText}
-                suche={{ platzhalter: 'R-Nr., Name, Fundort' }}
+                suche={{ platzhalter: 'R-Nr., PAT-Nr., Name, Fundort' }}
                 standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
