@@ -8988,4 +8988,82 @@ mod tests {
             assert_eq!(zaehle(t).await, 0, "{t} geht mit dem Einsatz");
         }
     }
+
+    // --- LLH-1138: Erfassungszeit und Idempotenz der Personen-Einträge (0217) ---
+
+    /// `client_id` und `eingegangen_at` an Sichtung, Verbleib und Verlaufsnotiz: nullable, ohne
+    /// Vorgabewert (der INSERT setzt die Ankunft), und je Einsatz eindeutig, nur wenn gesetzt.
+    #[tokio::test]
+    async fn migration_0217_person_verlauf_client_id_und_ankunft() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 217).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let e2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage 2') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut personen = Vec::new();
+        for einsatz in [e, e2] {
+            personen.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, \
+                        geaendert_von) VALUES (?, 1, ?, ?) RETURNING id",
+                )
+                .bind(einsatz)
+                .bind(b)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let einfuegen = [
+            "INSERT INTO person_sichtung (einsatz_id, person_id, kategorie, gesichtet_von, \
+                client_id) VALUES (?, ?, 'sk2', ?, ?)",
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von, client_id) \
+             VALUES (?, ?, 'vor_ort', ?, ?)",
+            "INSERT INTO person_verlaufsnotiz (einsatz_id, person_id, text, erfasst_von, \
+                client_id) VALUES (?, ?, 'stabil', ?, ?)",
+        ];
+        for (tabelle, sql) in ["person_sichtung", "person_verbleib", "person_verlaufsnotiz"]
+            .into_iter()
+            .zip(einfuegen)
+        {
+            let schreibe = |einsatz: i64, person: i64, client_id: Option<&'static str>| {
+                let pool = pool.clone();
+                async move {
+                    sqlx::query(sql)
+                        .bind(einsatz)
+                        .bind(person)
+                        .bind(b)
+                        .bind(client_id)
+                        .execute(&pool)
+                        .await
+                }
+            };
+            schreibe(e, personen[0], Some("k1")).await.unwrap();
+            assert!(
+                schreibe(e, personen[0], Some("k1")).await.is_err(),
+                "{tabelle}: derselbe Schlüssel im selben Einsatz"
+            );
+            schreibe(e2, personen[1], Some("k1"))
+                .await
+                .unwrap_or_else(|f| panic!("{tabelle}: anderer Einsatz: {f}"));
+            schreibe(e, personen[0], None).await.unwrap();
+            schreibe(e, personen[0], None)
+                .await
+                .unwrap_or_else(|f| panic!("{tabelle}: ohne Schlüssel beliebig oft: {f}"));
+            let ankunft: Vec<Option<String>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT eingegangen_at FROM {tabelle}"
+            )))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert!(
+                ankunft.iter().all(Option::is_none),
+                "{tabelle}: ohne Vorgabewert bleibt die Ankunft leer, der INSERT setzt sie"
+            );
+        }
+    }
 }

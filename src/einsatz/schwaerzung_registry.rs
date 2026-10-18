@@ -297,6 +297,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
             retain("bestaetigt_personal_id", G_FK),
             scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            // Ohne Netz vorgemerkt (LLH-1138): Schlüssel der Offline-Queue und Ankunft beim
+            // Server; `gesichtet_at` bleibt die Erfassungszeit.
+            retain("client_id", G_IDEMPOTENZ),
+            retain("eingegangen_at", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -312,6 +316,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("text", Strategie::Platzhalter, Z_BEHANDLUNG),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
+            // Ohne Netz vorgemerkt (LLH-1138): `erfasst_at` ist die Erfassungszeit.
+            retain("client_id", G_IDEMPOTENZ),
+            retain("eingegangen_at", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -338,6 +345,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
             retain("bestaetigt_personal_id", G_FK),
             scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            // Ohne Netz vorgemerkt (LLH-1138): `zeitpunkt_at` ist die Erfassungszeit.
+            retain("client_id", G_IDEMPOTENZ),
+            retain("eingegangen_at", G_ZEIT),
         ],
     },
     TabellenRegel {
