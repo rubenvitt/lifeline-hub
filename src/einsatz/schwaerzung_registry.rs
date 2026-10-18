@@ -2795,7 +2795,8 @@ pub(super) fn set_zuweisungen(scrubs: &[(&'static str, Strategie)]) -> (Vec<Stri
 }
 
 /// Tabellen, deren Zeilen einer Person einen Behandlungsbezug geben (design.md D3), jeweils
-/// über `person_id`. Dazu kommt `einsatz_person.zustand` selbst. Ohne `storniert_at`-Filter: auch
+/// über `person_id`. Dazu kommen an `einsatz_person` selbst der Zustand, die PAT-Nummer und eine
+/// Kontamination „ja“ (LLH-1326, Change `y18v58dt-pat-kern`, design.md D4). Ohne `storniert_at`-Filter: auch
 /// eine stornierte Sichtung war eine medizinische Einschätzung. Gepinnt in
 /// `tests::behandlungsbezug_kennt_jede_personentabelle`.
 pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
@@ -2807,7 +2808,11 @@ pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
 /// `SELECT` der Personen-IDs mit Behandlungsbezug (ohne Einsatz-Eingrenzung; der Aufrufer grenzt
 /// über die Tabellenregel ein).
 fn behandlungsbezug_sql() -> String {
-    let mut teile = vec!["p.zustand IS NOT NULL".to_string()];
+    let mut teile = vec![
+        "p.zustand IS NOT NULL".to_string(),
+        "p.pat_nummer IS NOT NULL".to_string(),
+        "p.kontamination = 1".to_string(),
+    ];
     for t in BEHANDLUNGSBEZUG_TABELLEN {
         teile.push(format!(
             "EXISTS (SELECT 1 FROM {t} x WHERE x.person_id = p.id)"

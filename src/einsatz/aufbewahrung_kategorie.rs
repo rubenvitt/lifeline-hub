@@ -36,7 +36,8 @@ impl Datenkategorie {
     const fn entfernt(&self) -> &'static str {
         match self {
             Datenkategorie::Behandlung => {
-                "Zustand der Personen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung"
+                "Zustand und PAT-Nummer der Personen sowie die Notizen zu Sichtung, Verlauf und \
+                 UHS-Belegung"
             }
             Datenkategorie::Personenauskunft => "Herkunftsadresse und Melderkontakt der Personen",
             Datenkategorie::Anhaenge => {
@@ -1789,6 +1790,103 @@ mod tests {
             );
             assert_eq!(adresse, None, "Person {p}: Adresse weg");
         }
+    }
+
+    /// LLH-1326 (Spec `aufbewahrung-kategorien`, „Nur eine PAT-Nummer“ und „Schwärzung der
+    /// Behandlung leert die PAT-Kern-Freitexte“): eine PAT-Nummer und eine Kontamination „ja“
+    /// geben Behandlungsbezug, „nein“ nicht. Die Behandlung leert die PAT-Nummer, die
+    /// Kontamination bleibt als Statuskategorie.
+    #[tokio::test]
+    async fn pat_nummer_und_kontamination_halten_den_stamm_bis_zur_behandlung() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, leit) = abgeschlossen(&pool).await;
+        let nur_pat = volle_person(&pool, einsatz, 1, leit).await;
+        let kontaminiert = volle_person(&pool, einsatz, 2, leit).await;
+        let nicht_kontaminiert = volle_person(&pool, einsatz, 3, leit).await;
+        for (p, pat, kont) in [
+            (nur_pat, Some("A-4711"), None),
+            (kontaminiert, None, Some(1_i64)),
+            (nicht_kontaminiert, None, Some(0)),
+        ] {
+            sqlx::query("UPDATE einsatz_person SET pat_nummer = ?, kontamination = ? WHERE id = ?")
+                .bind(pat)
+                .bind(kont)
+                .bind(p)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        schliessen(&pool, einsatz, leit).await;
+        let vor_31 = "2026-05-30 12:00:00";
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Personenauskunft,
+            "2026-05-01 00:00:00",
+            Some(vor_31),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Personenauskunft, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let name = |p: i64| {
+            let pool = pool.clone();
+            async move { person_felder(&pool, p).await.0 }
+        };
+        assert_eq!(
+            name(nur_pat).await.as_deref(),
+            Some("Mustermann"),
+            "nur PAT-Nummer"
+        );
+        assert_eq!(
+            name(kontaminiert).await.as_deref(),
+            Some("Mustermann"),
+            "kontaminiert"
+        );
+        assert_eq!(
+            name(nicht_kontaminiert).await,
+            None,
+            "„nein“ ist kein Behandlungsbezug"
+        );
+
+        kategorie_stand(
+            &pool,
+            einsatz,
+            Datenkategorie::Behandlung,
+            "2026-05-01 00:00:00",
+            Some(vor_31),
+        )
+        .await;
+        assert!(
+            schwaerzen(&pool, einsatz, Datenkategorie::Behandlung, t(JETZT))
+                .await
+                .unwrap()
+        );
+        let pat_kern = |p: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (Option<String>, Option<i64>)>(
+                    "SELECT pat_nummer, kontamination FROM einsatz_person WHERE id = ?",
+                )
+                .bind(p)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        assert_eq!(
+            pat_kern(nur_pat).await,
+            (None, None),
+            "die PAT-Nummer ist weg"
+        );
+        assert_eq!(
+            pat_kern(kontaminiert).await,
+            (None, Some(1)),
+            "Kontamination bleibt"
+        );
+        assert_eq!(name(nur_pat).await, None, "beide Zwecke abgelaufen");
     }
 
     #[tokio::test]
