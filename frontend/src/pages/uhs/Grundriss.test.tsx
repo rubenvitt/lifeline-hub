@@ -847,7 +847,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     server.use(http.get('/api/einsaetze/1/personen/7', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhsDetail({}), [p]);
     await userEvent.click(await screen.findByText(/R-007/));
-    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Vollständig öffnen' })).toBeInTheDocument();
   });
 
@@ -857,7 +857,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     server.use(http.get('/api/einsaetze/1/personen/8', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhs, [p]);
     await userEvent.click(await screen.findByText(/R-008/));
-    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
   });
 
   it('öffnet den Detail-Drawer auch im schreibgeschützten Modus (nur ansehen)', async () => {
@@ -865,7 +865,7 @@ describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
     server.use(http.get('/api/einsaetze/1/personen/9', () => HttpResponse.json(detail(p))));
     renderGrundriss(uhsDetail({}), [p], true);
     await userEvent.click(await screen.findByText(/R-009/));
-    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
   });
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert (kein leerer Drawer)', async () => {
@@ -966,7 +966,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     renderGrundriss(unbelegt(), [p], false, 'komfortabel');
     await userEvent.click(await screen.findByRole('button', { name: 'Aktionen zu Bett 1' }));
     await userEvent.click(within(offenesMenue()).getByText('Person öffnen'));
-    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
   });
 
   it('öffnet über „Verbleib / Entlassung erfassen" den Verbleib-Dialog', async () => {
@@ -1127,7 +1127,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     const karte = await screen.findByRole('button', { name: 'Bett 1: Person öffnen' });
     expect(karte).not.toHaveAttribute('aria-haspopup');
     await userEvent.click(karte);
-    expect(await screen.findByText('Medizinischer Verlauf (neueste zuerst)')).toBeInTheDocument();
+    expect(await screen.findByText('Verlauf (neueste zuerst)')).toBeInTheDocument();
     expect(keinOffenesMenue()).toBe(true);
   });
 

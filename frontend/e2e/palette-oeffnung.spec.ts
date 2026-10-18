@@ -153,7 +153,7 @@ test('→ zeigt die Personenvorschau in der Palette, Esc führt zurück, ein zwe
   await page.keyboard.press('ArrowRight');
   const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
   await expect(vorschau).toBeVisible();
-  await expect(vorschau.getByText(/Medizinischer Verlauf/)).toBeVisible();
+  await expect(vorschau.getByRole('region', { name: 'Patientenkopf' })).toBeVisible();
   await expect(page.getByRole('listbox')).toHaveCount(0);
 
   // Esc geht EINE Ebene zurück — der globale Dispatcher darf die Palette nicht mitschliessen.
@@ -264,7 +264,7 @@ test.describe('Tablet', () => {
     await vorschauZiel(zeile).tap();
     const vorschau = page.getByRole('region', { name: /^Vorschau:/ });
     await expect(vorschau).toBeVisible();
-    await expect(vorschau.getByText(/Medizinischer Verlauf/)).toBeVisible();
+    await expect(vorschau.getByRole('region', { name: 'Patientenkopf' })).toBeVisible();
     expect(page.url()).toBe(vorher);
     // Der Fokus bleibt im Suchfeld: Esc führt von dort eine Ebene zurück.
     await expect(paletteInput(page)).toBeFocused();
