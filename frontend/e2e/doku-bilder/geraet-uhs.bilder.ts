@@ -180,7 +180,9 @@ test.describe(KAPITEL, () => {
       await fotografiere(kopf, KAPITEL, 'sichtung');
       await paneel.getByRole('button', { name: 'Übernehmen' }).click();
       await expect(paneel).toHaveCount(0);
-      await expect(geraet.getByText(`bestätigt: ${mit.name}`)).toBeVisible();
+      await expect(kopf.locator('[data-lfh="sichtung-zeit"]')).toContainText(
+        `bestätigt: ${mit.name}`,
+      );
     } finally {
       await kontext.close();
     }
