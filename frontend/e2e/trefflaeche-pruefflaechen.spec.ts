@@ -1367,3 +1367,62 @@ test('Sichtungswahl: sechs Flächen halten 72 × 96 in kompakt und Handschuh, L�
     expect(b.x - (a.x + a.width) + SUBPIXEL, `${dichte}/Lücke`).toBeGreaterThanOrEqual(luecke);
   }
 });
+
+// ── Körperschema (LLH-1120, Spec `koerperschema`, „Jede Region ist erreichbar“) ──────────
+// Jede Region hält mindestens die Steuerhöhe der Stufe, in der Handschuh-Stufe 72 px, Hand,
+// Fuß und Hals sogar 72 × 72 (design.md D13: ihre Zonen reichen über die Silhouette hinaus).
+// Gegenprobe: die Hand ist in `kompakt` kleiner, die Figur folgt der Stufe (`figurMassstab`).
+
+test('Körperschema: jede Region hält die Stufe, Hand, Fuß und Hals 72 × 72 im Handschuh', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const einsatzId = await einsatzAnlegen(page, `Körperschema ${Date.now()}`);
+  const r = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    data: { name: 'Treffer', status: 'betroffen', sichtung: 'sk3' },
+  });
+  expect(r.ok(), `Person: ${r.status()}`).toBe(true);
+  const pid = ((await r.json()) as { id: number }).id;
+
+  const hand: Record<string, { width: number; height: number }> = {};
+  for (const [dichte, boden] of [
+    ['kompakt', 30],
+    ['handschuh', 72],
+  ] as const) {
+    await page.goto(`/einsaetze/${einsatzId}/personen/${pid}`);
+    await stelleDichte(page, dichte);
+    await page
+      .getByRole('region', { name: 'Patientenkopf' })
+      .getByRole('button', { name: 'Verletzung markieren' })
+      .click();
+    const paneel = page.getByRole('region', { name: 'Verletzung markieren' });
+    for (const ansicht of ['vorn', 'hinten'] as const) {
+      const figur = paneel.locator(`[data-lfh="koerperfigur"][data-ansicht="${ansicht}"]`);
+      const zonen = figur.locator('[data-lfh="koerperzone"]');
+      await expect(zonen).toHaveCount(ansicht === 'vorn' ? 18 : 17);
+      for (const zone of await zonen.all()) {
+        const name = await zone.getAttribute('aria-label');
+        const k = await zone.boundingBox();
+        expect(k, `${dichte}/${name}`).not.toBeNull();
+        expect(k!.height + SUBPIXEL, `${dichte}/${name}/Höhe`).toBeGreaterThanOrEqual(boden);
+        expect(k!.width + SUBPIXEL, `${dichte}/${name}/Breite`).toBeGreaterThanOrEqual(boden);
+      }
+      for (const region of ['hand_l', 'hand_r', 'fuss_l', 'fuss_r', 'hals']) {
+        const k = (await figur.locator(`[data-region="${region}"]`).boundingBox())!;
+        if (dichte === 'handschuh') {
+          expect(k.width + SUBPIXEL, `${ansicht}/${region}/Breite`).toBeGreaterThanOrEqual(72);
+          expect(k.height + SUBPIXEL, `${ansicht}/${region}/Höhe`).toBeGreaterThanOrEqual(72);
+        }
+      }
+    }
+    // Die Hand links, vorn (Szenario der Spec) wird getroffen: der Tipp öffnet ihre Wahl.
+    const handLinks = paneel.getByRole('button', { name: 'Hand links, vorn' });
+    hand[dichte] = (await handLinks.boundingBox())!;
+    await handLinks.click();
+    await expect(
+      paneel.getByRole('group', { name: 'Verletzung an Hand links, vorn' }),
+    ).toBeVisible();
+  }
+  expect(hand.kompakt.height, 'Gegenprobe: in kompakt kleiner').toBeLessThan(hand.handschuh.height);
+});

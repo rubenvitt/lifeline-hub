@@ -63,7 +63,7 @@ Für jede Aufgabe gilt:
 - [x] 7.3 `personen/Koerperschema.tsx`: Lesen und Markieren, Wahl der Art als Flächen, Speichern mit dem zweiten Tipp, Aufheben am Sternchen, Ablehnung am Schema, Tastatur in fester Folge, vorn und hinten ab `md` bzw. umschaltbar. Vitest für Lesen, Markieren, Aufheben, gesperrt, Ablehnung und Tastatur.
 - [x] 7.4 Einbau: Datenfeld „Verletzungen“ mit Mini-Figur im Kopf, Paneel „Verletzung markieren“, Schnellansicht lesend. Vitest.
 - [x] 7.5 Druckseite `/einsaetze/:id/personen/:pid/druck`: Route, einmal laden, „Neu laden“, Audit `druck` mit `person_id`, unbekannte Person, nicht am Gerät. Server- und Seitentest. Eintrag in `playwright.config.ts` `DRUCK_SPECS` und e2e `koerperschema-druck.spec.ts` schwarz-weiß.
-- [ ] 7.6 Kontrast: `theme/koerperschemaKontrast.test.ts` (Silhouette und Sternchen in Tag und Nacht) und `e2e/betroffene-kontrast.spec.ts` erweitert. Trefferflächen in `e2e/trefflaeche-pruefflaechen.spec.ts` (72 × 72 in der Handschuh-Stufe, auch für die Hand).
+- [x] 7.6 Kontrast: `theme/koerperschemaKontrast.test.ts` (Silhouette und Sternchen in Tag und Nacht) und `e2e/betroffene-kontrast.spec.ts` erweitert. Trefferflächen in `e2e/trefflaeche-pruefflaechen.spec.ts` (72 × 72 in der Handschuh-Stufe, auch für die Hand).
 
 ## 8. Ohne Netz im Frontend — LLH-1138 (ewjfqaek)
 
