@@ -389,6 +389,11 @@ export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
+/** Transport einer Person (LLH-1325): Verlaufseintrag und seine Kataloge. */
+export type Transport = S['TransportAnzeige'];
+export type TransportPrioritaet = S['TransportPrioritaet'];
+export type TransportArt = S['TransportArt'];
+export type Fachrichtung = S['Fachrichtung'];
 
 // ============================== E‑3 Unfallhilfsstellen ==============================
 export type UhsTyp = S['UhsTyp'];

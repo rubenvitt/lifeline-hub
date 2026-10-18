@@ -208,6 +208,68 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     expect(screen.queryByRole('button', { name: /Benutzermenü/ })).toBeNull();
   });
 
+  it('Patientenliste: Priorität innerhalb der Kategorie, Marke „kontaminiert“ (LLH-1325, D11)', async () => {
+    stelleBereit();
+    const normal = person({
+      id: 12,
+      registrier_nr: 3,
+      name: 'Dritte',
+      aktuelle_sichtung: 'sk1',
+      transport_prioritaet: 'normal',
+    });
+    const sofort = person({
+      id: 13,
+      registrier_nr: 5,
+      name: 'Fünfte',
+      aktuelle_sichtung: 'sk1',
+      transport_prioritaet: 'sofort',
+      kontamination: true,
+    });
+    const sk2Sofort = person({
+      id: 14,
+      registrier_nr: 4,
+      name: 'Vierte',
+      aktuelle_sichtung: 'sk2',
+      transport_prioritaet: 'sofort',
+      kontamination: false,
+    });
+    const eintritt = (person_id: number, zeitpunkt_at: string) => ({
+      id: person_id,
+      einsatz_id: 7,
+      uhs_id: 2,
+      person_id,
+      platz_id: null,
+      art: 'eintritt' as const,
+      notiz: null,
+      erfasst_von: 1,
+      zeitpunkt_at,
+    });
+    server.use(
+      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([normal, sofort, sk2Sofort])),
+      http.get('/api/einsaetze/7/uhs/2', () =>
+        HttpResponse.json({
+          ...uhs,
+          belegungen: [
+            eintritt(12, '2026-10-04 09:00:00'),
+            eintritt(13, '2026-10-04 09:45:00'),
+            eintritt(14, '2026-10-04 08:00:00'),
+          ],
+        }),
+      ),
+    );
+    renderApp('/geraet');
+    expect(await screen.findByText('Dritte, Max')).toBeVisible();
+    const reihen = screen
+      .getAllByRole('row')
+      .map((r) => /R-\d+/.exec(r.textContent ?? '')?.[0])
+      .filter(Boolean);
+    expect(reihen).toEqual(['R-005', 'R-003', 'R-004']);
+    // Nur „ja“ trägt die Marke; „nein“ und „keine Angabe“ nicht.
+    const marken = screen.getAllByText('kontaminiert');
+    expect(marken).toHaveLength(1);
+    expect(marken[0].closest('tr')).toHaveTextContent('R-005');
+  });
+
   it('Patientenliste: Zustand und Platz, nach Dringlichkeit sortiert (LLH-1135)', async () => {
     stelleBereit();
     const sk3 = person({

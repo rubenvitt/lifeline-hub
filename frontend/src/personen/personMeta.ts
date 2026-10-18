@@ -1,4 +1,4 @@
-import type { Sichtungskategorie, Verbleib } from '../api/types';
+import type { Sichtungskategorie, TransportArt, TransportPrioritaet, Verbleib } from '../api/types';
 
 /**
  * Triage-Reihenfolge der Patienten-Abschnitte (SK I zuerst, tot zuletzt) — die eine Quelle
@@ -56,4 +56,28 @@ export const SK_WORT: Record<Sichtungskategorie | 'ohne', string> = {
   tot: 'verstorben',
   unverletzt: 'ohne Verletzung',
   ohne: 'ohne Sichtung',
+};
+
+/**
+ * Reihe der Transportpriorität (LLH-1325, design.md D10): ordnet innerhalb einer
+ * Sichtungskategorie, nie über ihr. Ohne Priorität steht eine Person hinter „normal“.
+ */
+export const TRANSPORT_PRIORITAET_REIHE: readonly TransportPrioritaet[] = [
+  'sofort',
+  'dringlich',
+  'normal',
+];
+
+/** Platz der Transportpriorität in ihrer Reihe, 0 = sofort; ohne Priorität hinter „normal“. */
+export function transportRang(prioritaet: TransportPrioritaet | null | undefined): number {
+  return prioritaet == null
+    ? TRANSPORT_PRIORITAET_REIHE.length
+    : TRANSPORT_PRIORITAET_REIHE.indexOf(prioritaet);
+}
+
+/** Das Wort der Transportart, wie es an der Trage gesprochen wird. */
+export const TRANSPORT_ART_WORT: Record<TransportArt, string> = {
+  liegend: 'liegend',
+  sitzend: 'sitzend',
+  mit_notarzt: 'mit Notarzt',
 };

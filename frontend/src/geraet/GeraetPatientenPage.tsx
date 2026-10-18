@@ -108,13 +108,14 @@ export default function GeraetPatientenPage() {
   });
   /*
    * Vorgabe-Sortierung nach Dringlichkeit (LLH-1135, `pages/uhs/dringlichkeit.ts`, dieselbe Reihe
-   * wie Wartebereich und Zuweisung): die Sichtungsspalte sortiert nach Reihe und Wartezeit seit
-   * dem Eintritt (bzw. der Rückkehr in den Wartebereich); ohne Belegung zählt die Sichtung oder
-   * Erfassung. Den Zufluss hält die Schleuse der `Datensicht`.
+   * wie Wartebereich und Zuweisung): die Sichtungsspalte sortiert nach Reihe, Transportpriorität
+   * (LLH-1325) und Wartezeit seit dem Eintritt (bzw. der Rückkehr in den Wartebereich); ohne
+   * Belegung zählt die Sichtung oder Erfassung. Den Zufluss hält die Schleuse der `Datensicht`.
    */
   const dringlichkeit = (p: Person) =>
     dringlichkeitsWert({
       sichtung: p.aktuelle_sichtung,
+      prioritaet: p.transport_prioritaet,
       seit: (uhs ? wartetSeit(p.id, uhs.belegungen) : null) ?? seitWert(p),
     });
   const spalten = spaltenFuer<Person>()([

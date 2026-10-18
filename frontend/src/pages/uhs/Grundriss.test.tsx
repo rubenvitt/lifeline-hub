@@ -2177,6 +2177,87 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
     expect(folgeIn(wartebereich())).toEqual(['R-003', 'R-004', 'R-002', 'R-001', 'R-005']);
   });
 
+  it('ordnet innerhalb der Kategorie nach Transportpriorität, auch bei der Zuweisung (LLH-1325)', async () => {
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+      belegungen: [
+        eintritt(3, '2026-10-18 08:00:00'),
+        eintritt(5, '2026-10-18 08:15:00'),
+        eintritt(4, '2026-10-18 07:00:00'),
+        eintritt(6, '2026-10-18 08:19:00'),
+      ],
+    });
+    renderGrundriss(uhs, [
+      wartend(3, 'sk1', { transport_prioritaet: 'normal' }),
+      wartend(5, 'sk1', { transport_prioritaet: 'sofort' }),
+      wartend(4, 'sk2', { transport_prioritaet: 'sofort' }),
+      wartend(6, 'sk1'),
+      person({ id: 7, registrier_nr: 7, aktuelle_sichtung: 'sk3' }),
+      person({
+        id: 8,
+        registrier_nr: 8,
+        aktuelle_sichtung: 'sk3',
+        transport_prioritaet: 'dringlich',
+      }),
+    ]);
+    await screen.findByText(/R-006/);
+    // R-005 (SK I, sofort, 5 min) vor R-003 (SK I, normal, 20 min); R-006 (SK I, ohne) vor
+    // R-004 (SK II, sofort): die Priorität sticht keine Sichtung.
+    expect(folgeIn(wartebereich())).toEqual(['R-005', 'R-003', 'R-006', 'R-004']);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+    const radios = within(await screen.findByRole('radiogroup', { name: 'Patient' })).getAllByRole(
+      'radio',
+    );
+    expect(radios.map((r) => /R-\d+/.exec(r.closest('label')!.textContent!)?.[0])).toEqual([
+      'R-005',
+      'R-003',
+      'R-006',
+      'R-004',
+      'R-008',
+      'R-007',
+    ]);
+  });
+
+  it('die Transportspalte trägt die Priorität als neutrale Marke mit Wort (LLH-1325)', async () => {
+    const austritt = (personId: number): UhsBelegung => ({
+      ...eintritt(personId, '2026-10-18 08:00:00'),
+      art: 'austritt',
+    });
+    renderGrundriss(uhsDetail({ belegungen: [austritt(3), austritt(4)] }), [
+      person({
+        id: 3,
+        registrier_nr: 3,
+        aktuelle_sichtung: 'sk2',
+        aktueller_verbleib: 'Transport',
+        transport_prioritaet: 'dringlich',
+      }),
+      person({
+        id: 4,
+        registrier_nr: 4,
+        aktuelle_sichtung: 'sk3',
+        aktueller_verbleib: 'Transport',
+      }),
+    ]);
+    const spalte = (await screen.findByText('Auf Transport gebracht')).closest<HTMLElement>(
+      '[data-lfh="paneel"]',
+    )!;
+    const marke = await within(spalte).findByText('dringlich');
+    expect(marke.closest('.ant-tag')).not.toBeNull();
+    expect(marke.closest('[data-lfh="transport-prioritaet"]')).toHaveAttribute(
+      'title',
+      'Transportpriorität dringlich',
+    );
+    // Ohne Priorität keine Marke, und die Folge bleibt die der Spalte (kein neues Sortieren).
+    expect(within(spalte).getAllByText(/Transportpriorität|dringlich/)).toHaveLength(1);
+    expect(
+      within(spalte)
+        .getAllByRole('button')
+        .map((b) => /R-\d+/.exec(b.textContent!)?.[0]),
+    ).toEqual(['R-003', 'R-004']);
+  });
+
   it('zeigt die Wartezeit im Wartebereich, den Beginn als taktische Zeit im Titel', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(Date.parse('2026-10-18T08:12:30Z'));

@@ -63,6 +63,7 @@ import UhsPlanPaneel from './UhsPlanPaneel';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
+import PrioritaetMarke from '../../personen/PrioritaetMarke';
 import SichtungsTag from '../../components/SichtungsTag';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import {
@@ -971,7 +972,10 @@ function TransportSpalte({
               {/* Die Sichtung auch hier (LLH-1135): jede Personenmarke im Grundriss trägt sie. */}
               <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
               {personLabel(p)}
-            </Button>
+            </Button>{' '}
+            {/* Die Priorität als neutrale Marke neben dem Knopf (LLH-1325, design.md D10); die
+                Spalte sortiert deshalb nicht neu. */}
+            <PrioritaetMarke prioritaet={p.transport_prioritaet} />
             {p.aktueller_verbleib && (
               <div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -1216,10 +1220,14 @@ export default function Grundriss({
   const beginnJe = new Map(personenInUhs.map((p) => [p.id, wartetSeit(p.id, uhs.belegungen)]));
   const wartetSeitVon = (p: Person) => beginnJe.get(p.id) ?? null;
   // Wartebereich nach Dringlichkeit (`dringlichkeit.ts`): ungesichtet, SK I … IV, tot,
-  // unverletzt; je Kategorie die längste Wartezeit zuerst.
+  // unverletzt; je Kategorie die Transportpriorität, dann die längste Wartezeit zuerst.
   const wartebereichPersonen = nachDringlichkeit(
     personenInUhs.filter((p) => p.aktueller_platz_id == null),
-    (p) => ({ sichtung: p.aktuelle_sichtung, seit: wartetSeitVon(p) }),
+    (p) => ({
+      sichtung: p.aktuelle_sichtung,
+      prioritaet: p.transport_prioritaet,
+      seit: wartetSeitVon(p),
+    }),
   );
   // „Noch nicht aufgenommen": in keiner UHS, nicht storniert, noch nicht final disponiert.
   // Transport/Entlassung/Verstorben leeren `aktuelle_uhs_id` (Auto-Austritt) — ohne den Filter
@@ -1237,6 +1245,7 @@ export default function Grundriss({
     ...wartebereichPersonen,
     ...nachDringlichkeit(nichtAufgenommen, (p) => ({
       sichtung: p.aktuelle_sichtung,
+      prioritaet: p.transport_prioritaet,
       seit: p.erfasst_at,
     })),
   ];

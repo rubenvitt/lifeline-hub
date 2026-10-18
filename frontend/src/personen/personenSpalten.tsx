@@ -15,7 +15,9 @@ import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
-import { STATUS_META } from './personMeta';
+import { STATUS_META, TRANSPORT_ART_WORT, transportRang } from './personMeta';
+import PrioritaetMarke from './PrioritaetMarke';
+import { kontamination } from '../theme/statusFarben';
 import { GESCHLECHT_KURZ } from './personBefehl';
 import { koordinatenText } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
@@ -32,8 +34,8 @@ import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
  * Das EINE Spaltenregister der Betroffenen-Listen; speist Zeilen- und Rasteransicht und über den
  * Kartenplan beide Darstellungsformen, auch am Gerät.
  *
- * Spalten: Nr. · Person (Name + Geschlecht/Alter) · Sichtung · Zustand · Status · Fundort ·
- * Verbleib · Vermerk · Zeit.
+ * Spalten: Nr. · Person (Name + Geschlecht/Alter, Marke „kontaminiert“) · Sichtung · Zustand ·
+ * Status · Fundort · Verbleib · Transport · Vermerk · Zeit.
  *
  * Ohne `bedienung` ist alles Anzeige. Mit ihr bedient die Zeile (LLH-1130, Spec
  * `betroffene-lagedaten`, „Sichtung und Verbleib aus der Betroffenenliste“):
@@ -107,6 +109,10 @@ function PersonZelle({ p }: { p: Person }) {
           {nameText(p) ?? 'unbekannt'}
         </span>
         {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
+        {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
+            `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
+            in Liste, Karte und Patientenliste am Gerät. */}
+        {p.kontamination === true && <StatusTag darstellung={kontamination} />}
       </span>
       {offen && (
         <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
@@ -147,6 +153,31 @@ function FundortZelle({ p }: { p: Person }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Transportpriorität als neutrale Marke, die Art dahinter; ohne Stand „—“ (LLH-1325). */
+function TransportZelle({ p }: { p: Person }) {
+  const { token, rollen } = useRollen();
+  if (p.transport_prioritaet == null && p.transport_art == null) {
+    return <span style={{ color: rollen.schwach }}>—</span>;
+  }
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        flexWrap: 'wrap',
+        alignItems: 'baseline',
+        columnGap: token.marginXS,
+      }}
+    >
+      <PrioritaetMarke prioritaet={p.transport_prioritaet} />{' '}
+      {p.transport_art && (
+        <span style={{ fontSize: 12, color: rollen.text2 }}>
+          {TRANSPORT_ART_WORT[p.transport_art]}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -429,6 +460,22 @@ export function personenSpalten(
       key: 'verbleib',
       suchText: (p) => verbleibText(p, uhsName),
       render: (_, p) => <VerbleibZelle p={p} uhsName={uhsName} bedienung={bedienung} />,
+    },
+    {
+      title: 'Transport',
+      key: 'transport',
+      // Feste Breite (LFH-523): neben Person und Vermerk fließt keine weitere Spalte. Ab `lg`,
+      // wie der Fundort; darunter trägt die Sichtung die Folge.
+      width: 112,
+      abBreite: 'lg',
+      // Der Rang der Priorität (LLH-1325, design.md D10); ohne Priorität leer, also hinten.
+      sortWert: (p) =>
+        p.transport_prioritaet == null ? null : transportRang(p.transport_prioritaet),
+      suchText: (p) =>
+        [p.transport_prioritaet, p.transport_art && TRANSPORT_ART_WORT[p.transport_art]]
+          .filter(Boolean)
+          .join(' ') || null,
+      render: (_, p) => <TransportZelle p={p} />,
     },
     {
       title: 'Vermerk',

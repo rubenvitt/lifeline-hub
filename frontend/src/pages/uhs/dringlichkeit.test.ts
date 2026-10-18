@@ -7,6 +7,8 @@ import {
   gehalteneFolge,
   nachDringlichkeit,
   compareDringlichkeit,
+  transportRang,
+  type DringlichkeitsMerkmale,
   wartetSeit,
   wartezeitMinuten,
   wartezeitText,
@@ -55,7 +57,7 @@ describe('Dringlichkeitsreihe (LLH-1135)', () => {
       { id: 'sk2', sichtung: 'sk2', seit: '2026-10-18 08:00:00' },
       { id: 'sk4', sichtung: 'sk4', seit: '2026-10-18 08:00:00' },
     ] as const;
-    expect(nachDringlichkeit(personen, (p) => p).map((p) => p.id)).toEqual([
+    expect(nachDringlichkeit(personen, ohnePrioritaet).map((p) => p.id)).toEqual([
       'ungesichtet',
       'sk1-alt',
       'sk1-jung',
@@ -73,8 +75,8 @@ describe('Dringlichkeitsreihe (LLH-1135)', () => {
       { id: 'b', sichtung: 'sk2' as const, seit: '2026-10-18 09:00:00' },
       { id: 'c', sichtung: 'sk2' as const, seit: null },
     ];
-    expect(nachDringlichkeit(personen, (p) => p).map((p) => p.id)).toEqual(['b', 'a', 'c']);
-    expect(compareDringlichkeit(personen[0], personen[2])).toBe(0);
+    expect(nachDringlichkeit(personen, ohnePrioritaet).map((p) => p.id)).toEqual(['b', 'a', 'c']);
+    expect(compareDringlichkeit(ohnePrioritaet(personen[0]), ohnePrioritaet(personen[2]))).toBe(0);
   });
 
   it('lässt die Eingabe unverändert', () => {
@@ -82,7 +84,7 @@ describe('Dringlichkeitsreihe (LLH-1135)', () => {
       { sichtung: 'sk3' as const, seit: null },
       { sichtung: 'sk1' as const, seit: null },
     ];
-    nachDringlichkeit(personen, (p) => p);
+    nachDringlichkeit(personen, ohnePrioritaet);
     expect(personen.map((p) => p.sichtung)).toEqual(['sk3', 'sk1']);
   });
 
@@ -95,9 +97,74 @@ describe('Dringlichkeitsreihe (LLH-1135)', () => {
       { sichtung: 'sk3' as const, seit: '2020-01-01 00:00:00' },
       { sichtung: 'unverletzt' as const, seit: null },
     ];
+    const werte = reihe.map((m) => dringlichkeitsWert(ohnePrioritaet(m)));
+    expect([...werte].sort((a, b) => a - b)).toEqual(werte);
+    expect(new Set(werte).size).toBe(werte.length);
+  });
+});
+
+/** Die Merkmale eines Eintrags ohne Transportpriorität. */
+function ohnePrioritaet<T extends Omit<DringlichkeitsMerkmale, 'prioritaet'>>(
+  m: T,
+): T & DringlichkeitsMerkmale {
+  return { ...m, prioritaet: null };
+}
+
+describe('Transportpriorität innerhalb der Sichtungskategorie (LLH-1325, design.md D10)', () => {
+  const wartet = (min: number) =>
+    new Date(Date.parse('2026-10-18T09:00:00Z') - min * 60_000)
+      .toISOString()
+      .replace('T', ' ')
+      .slice(0, 19);
+
+  it('zwei SK I im Wartebereich: „sofort“ vor „normal“, auch bei kürzerer Wartezeit', () => {
+    const personen = [
+      { id: 'R-003', sichtung: 'sk1', prioritaet: 'normal', seit: wartet(20) },
+      { id: 'R-005', sichtung: 'sk1', prioritaet: 'sofort', seit: wartet(5) },
+    ] as const;
+    expect(nachDringlichkeit(personen, (p) => p).map((p) => p.id)).toEqual(['R-005', 'R-003']);
+  });
+
+  it('die Priorität sticht keine Sichtung', () => {
+    const personen = [
+      { id: 'R-004', sichtung: 'sk2', prioritaet: 'sofort', seit: wartet(30) },
+      { id: 'R-006', sichtung: 'sk1', prioritaet: null, seit: wartet(1) },
+    ] as const;
+    expect(nachDringlichkeit(personen, (p) => p).map((p) => p.id)).toEqual(['R-006', 'R-004']);
+  });
+
+  it('sofort, dringlich, normal, ohne; je Stufe die längste Wartezeit zuerst', () => {
+    const personen = [
+      { id: 'ohne', sichtung: 'sk2', prioritaet: undefined, seit: wartet(60) },
+      { id: 'normal', sichtung: 'sk2', prioritaet: 'normal', seit: wartet(50) },
+      { id: 'dringlich-jung', sichtung: 'sk2', prioritaet: 'dringlich', seit: wartet(5) },
+      { id: 'sofort', sichtung: 'sk2', prioritaet: 'sofort', seit: wartet(1) },
+      { id: 'dringlich-alt', sichtung: 'sk2', prioritaet: 'dringlich', seit: wartet(40) },
+    ] as const;
+    const folge = ['sofort', 'dringlich-alt', 'dringlich-jung', 'normal', 'ohne'];
+    expect(nachDringlichkeit(personen, (p) => p).map((p) => p.id)).toEqual(folge);
+    expect(transportRang('sofort')).toBe(0);
+    expect(transportRang(null)).toBe(3);
+  });
+
+  it('der Sortierwert hat den Zwischenschritt und ordnet wie der Vergleich', () => {
+    const reihe: DringlichkeitsMerkmale[] = [
+      { sichtung: null, prioritaet: null, seit: wartet(1) },
+      { sichtung: 'sk1', prioritaet: 'sofort', seit: wartet(1) },
+      { sichtung: 'sk1', prioritaet: 'sofort', seit: null },
+      { sichtung: 'sk1', prioritaet: 'dringlich', seit: wartet(500_000) },
+      { sichtung: 'sk1', prioritaet: 'normal', seit: wartet(60) },
+      { sichtung: 'sk1', prioritaet: null, seit: wartet(90) },
+      { sichtung: 'sk1', prioritaet: null, seit: null },
+      { sichtung: 'sk2', prioritaet: 'sofort', seit: '2020-01-01 00:00:00' },
+      { sichtung: 'unverletzt', prioritaet: null, seit: null },
+    ];
     const werte = reihe.map(dringlichkeitsWert);
     expect([...werte].sort((a, b) => a - b)).toEqual(werte);
     expect(new Set(werte).size).toBe(werte.length);
+    for (let i = 1; i < reihe.length; i++) {
+      expect(compareDringlichkeit(reihe[i - 1], reihe[i])).toBeLessThan(0);
+    }
   });
 });
 
