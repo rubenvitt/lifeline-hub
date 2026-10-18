@@ -425,6 +425,17 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   });
 });
 
+describe('PersonenDetailPage — Druckansicht (LLH-1120)', () => {
+  it('führt auch ohne Schreibrecht als Nebenweg auf die Druckansicht der Person', async () => {
+    render(einsatzBeobachter, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(screen.getByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/personen/10/druck',
+    );
+  });
+});
+
 describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (LLH-1094)', () => {
   const sichtungAntwort = (kategorie: Sichtungskategorie) =>
     HttpResponse.json(

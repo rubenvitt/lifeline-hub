@@ -1053,6 +1053,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::listenzugriffe),
         )
         .route(
+            "/api/einsaetze/{id}/personen/{pid}/druck",
+            get(routes::einsatz_person::detail_druck),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/{pid}",
             get(routes::einsatz_person::detail),
         )

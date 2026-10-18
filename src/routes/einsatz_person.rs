@@ -560,6 +560,31 @@ pub async fn detail(
     ctx: EinsatzLesezugriff<Personen>,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<PersonDetail>, AppError> {
+    detail_mit_audit(&state, &ctx, person_id, "detail").await
+}
+
+/// GET /api/einsaetze/{id}/personen/{pid}/druck — die Druckansicht einer Person (LLH-1120, Spec
+/// `druck-dokumente`, „Druckansicht einer Person“): dasselbe Detail, aber im Zugriffsprotokoll
+/// als `druck` mit `person_id` (die CHECK-Liste aus 0141 erlaubt die Art). Muster wie
+/// `…/personen/druck` neben der Liste: ein eigener Pfad statt eines Query-Parameters, damit
+/// die Art des Zugriffs an der Route hängt und kein Aufrufer das Detail-Audit umgehen kann. Die
+/// Route steht in keiner Routenliste der Geräte: am Gerät 403 (`tests/geraet_kopplung.rs`).
+pub async fn detail_druck(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<PersonDetail>, AppError> {
+    detail_mit_audit(&state, &ctx, person_id, "druck").await
+}
+
+/// Lädt das Detail einer Person und schreibt VOR der Anreicherung genau einen Audit-Eintrag der
+/// Art `art` (`detail` oder `druck`). Eine unbekannte Person ist 404 ohne Eintrag.
+async fn detail_mit_audit(
+    state: &AppState,
+    ctx: &EinsatzLesezugriff<Personen>,
+    person_id: i64,
+    art: &str,
+) -> Result<Json<PersonDetail>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
@@ -568,7 +593,7 @@ pub async fn detail(
         einsatz_id,
         Some(person_id),
         ctx.benutzer.id,
-        "detail",
+        art,
     )
     .await?;
 

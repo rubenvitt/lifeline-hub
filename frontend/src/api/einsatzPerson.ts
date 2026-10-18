@@ -125,6 +125,15 @@ export function ladePerson(einsatzId: number, personId: number): Promise<PersonD
   return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
 }
 
+/**
+ * Druckansicht einer Person (LLH-1120, Spec `druck-dokumente`): dasselbe Detail, aber
+ * serverseitig als `druck`-Eintrag mit Person im Zugriffsprotokoll. Nie still wiederholen und nie
+ * aus dem Cache des Details ersetzen (`frontend/src/druck/AGENTS.md`, Personendruck).
+ */
+export function loadPersonDruck(einsatzId: number, personId: number): Promise<PersonDetail> {
+  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}/druck`);
+}
+
 export function legePersonAn(
   einsatzId: number,
   daten: PersonAnlegenEingabe,

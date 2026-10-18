@@ -60,7 +60,7 @@ import StammdatenRaster, { type StammdatenAngabe } from '../personen/StammdatenR
 import { UhsZuweisenDialog } from '../personen/ZuweisungsDialoge';
 import KatalogTabelle from '../components/KatalogTabelle';
 import type { Person, PersonDetail, PersonStatus, PersonZugriff } from '../api/types';
-import { lagekartePfad, parseRouteId } from '../routing/deeplinks';
+import { lagekartePfad, parseRouteId, personDruckPfad } from '../routing/deeplinks';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { koordinatenText } from '../personen/koordinate';
@@ -921,6 +921,22 @@ export default function PersonenDetailPage() {
         )
       }
       dataUpdatedAt={gemeinsamerDatenstand(detailQuery.dataUpdatedAt, auditQuery.dataUpdatedAt)}
+      // Druckansicht der Person (LLH-1120): Nebenweg auch ohne Schreibrecht, nicht am Gerät.
+      weitere={
+        darf('person-druck')
+          ? {
+              name: `Weitere Wege zu Person ${registrierAnzeige(p.registrier_nr)}`,
+              eintraege: [
+                {
+                  key: 'druck',
+                  label: 'Druckansicht',
+                  ziel: personDruckPfad(einsatzId, p.id),
+                  onWahl: () => navigate(personDruckPfad(einsatzId, p.id)),
+                },
+              ],
+            }
+          : undefined
+      }
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}

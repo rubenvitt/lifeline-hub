@@ -2144,6 +2144,30 @@ async fn aufnahme_scheitert_ganz_wenn_der_eintritt_scheitert() {
     assert_eq!(nachher, vorher, "keine Person ohne Eintritt");
 }
 
+/// Die Druckansicht einer Person gibt es am Gerät nicht (LLH-1120, Spec `druck-dokumente`): die
+/// Route steht in keiner Routenliste, das Tablet erhält 403 und schreibt keinen Druck-Eintrag.
+#[tokio::test]
+async fn tablet_oeffnet_keine_druckansicht_der_person() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let eigen = person_in(&app, &admin, einsatz, Some(nord)).await;
+    let pid = eigen["id"].as_i64().unwrap();
+    let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+    let (s, v) = anfrage_json(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: das Detail liest es: {v}");
+    let (s, v) = anfrage_json(&app, "GET", &format!("{basis}/druck"), &geraet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    let druck: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'druck'",
+    )
+    .bind(einsatz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(druck, 0);
+}
+
 #[tokio::test]
 async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

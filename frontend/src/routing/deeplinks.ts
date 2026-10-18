@@ -122,6 +122,14 @@ export function personDetailPfad(einsatzId: number, personId: number): string {
   return `${einsatzModulPfad(einsatzId, 'personen')}/${personId}`;
 }
 
+/**
+ * Druckansicht einer Person (LLH-1120): eigene Seite neben dem Detail, unter `personen/` mit
+ * Sperre und Sichtbarkeit des Moduls; nicht am Gerät.
+ */
+export function personDruckPfad(einsatzId: number, personId: number): string {
+  return `${personDetailPfad(einsatzId, personId)}/druck`;
+}
+
 export function tiereDetailPfad(einsatzId: number, tierId: number): string {
   return `${einsatzModulPfad(einsatzId, 'tiere')}/${tierId}`;
 }

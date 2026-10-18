@@ -26,6 +26,8 @@ export type GeraetFaehigkeit =
    * `UHS_LAPTOP`; Betreuungsstelle und Lagemonitor 403, `tests/geraet_kopplung.rs`).
    */
   | 'person-behandlung'
+  /** Druckansicht einer Person (LLH-1120): nur am Arbeitsplatz, die Route steht in keiner Liste. */
+  | 'person-druck'
   /** Tiere und Schäden einer Person. */
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
@@ -69,6 +71,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'person-status':
     case 'person-zuordnungen':
     case 'person-anhaenge':
+    case 'person-druck':
     case 'fremde-module':
       return false;
   }

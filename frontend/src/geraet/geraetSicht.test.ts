@@ -55,4 +55,10 @@ describe('geraetDarf', () => {
       expect(geraetDarf(null, 'person-behandlung')).toBe(true);
     });
   });
+
+  describe('person-druck (LLH-1120): die Druckansicht einer Person gibt es am Gerät nicht', () => {
+    it.each(ANSICHTEN)('Ansicht %s druckt nicht', (ansicht) => {
+      expect(geraetDarf(geraet(ansicht), 'person-druck')).toBe(false);
+    });
+  });
 });

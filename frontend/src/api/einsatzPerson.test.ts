@@ -7,6 +7,7 @@ import {
   revokeMassnahme,
   revokeVerletzung,
   saveTransport,
+  loadPersonDruck,
   legePersonAnhangAb,
   listePersonAnhaenge,
   personAnhangDownloadPfad,
@@ -164,5 +165,19 @@ describe('PAT-Kern-Schreibwege', () => {
     await revokeVerletzung(7, 3, 9);
     expect(aufruf(f).pfad).toBe('/api/einsaetze/7/personen/3/verletzungen/9/aufheben');
     expect(aufruf(f).methode).toBe('POST');
+  });
+});
+// Die Druckansicht einer Person (LLH-1120) lädt über den protokollierenden Druck-Endpunkt der
+// Person, nie über das Detail: das Öffnen steht als `druck` im Zugriffsprotokoll.
+describe('loadPersonDruck', () => {
+  it('ruft genau GET /api/einsaetze/{id}/personen/{pid}/druck', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"id":3}', { status: 200 }));
+    await expect(loadPersonDruck(7, 3)).resolves.toEqual({ id: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [pfad, init] = fetchMock.mock.calls[0];
+    expect(pfad).toBe('/api/einsaetze/7/personen/3/druck');
+    expect(init?.method ?? 'GET').toBe('GET');
   });
 });

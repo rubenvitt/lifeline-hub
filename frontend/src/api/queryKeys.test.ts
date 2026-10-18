@@ -640,6 +640,24 @@ describe('einsatzKeys.auftragDruck (LLH-1171)', () => {
   });
 });
 
+/**
+ * Druckansicht einer Person (LLH-1120): ein Schnappschuss mit eigenem Prefix außerhalb von
+ * `person`, nicht live und nicht auf der Platte; jeder Abruf schreibt einen `druck`-Eintrag.
+ */
+describe('einsatzKeys.personDruck (LLH-1120)', () => {
+  it('baut den Key als [prefix, einsatzId, personId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.personDruck(5, 10)).toEqual(['einsatz-person-druck', 5, 10]);
+  });
+
+  it('ist nicht live und liegt nicht unter dem Prefix des Details', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-person-druck');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-person-druck');
+    }
+    expect(einsatzKeys.personDruck(5, 10)[0]).not.toBe(EINSATZ_KEYS.person);
+  });
+});
+
 describe('istRueckmeldungenKey (LFH-610)', () => {
   it('trifft die Rückmeldungen jedes Einsatzes, aber keine Meldungsliste', () => {
     expect(istRueckmeldungenKey(['einsatz-meldungen', 7, 'rueckmeldungen'])).toBe(true);
