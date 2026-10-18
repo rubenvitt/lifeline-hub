@@ -62,7 +62,7 @@ export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffe
  * (`PersonErfassungModal` und `pages/personen/AufnahmePage`): eine Maske, ein Feldbudget.
  *
  * ── FELDBUDGET: VIER SICHTBARE FELDER ──────────────────────────────
- * Sichtung, Geschlecht, Geschätztes Alter, Antreffort. Der Name liegt unter „Weitere Angaben":
+ * Sichtung, Geschlecht, Geschätztes Alter, Fundort. Der Name liegt unter „Weitere Angaben":
  * an der Aufnahme wird zuerst die Kategorie vergeben, der Name ist meist unbekannt.
  * Pflichtfelder gibt es keine.
  *
@@ -152,9 +152,9 @@ export default function AufnahmeFelder({
       <Form.Item label="Geschätztes Alter (Jahre)" name="alter_geschaetzt">
         <InputNumber min={0} max={120} style={{ width: 140 }} />
       </Form.Item>
-      {/* „Antreffort" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab, und der Ort
+      {/* „Fundort" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab, und der Ort
          steht am Ende eines Aufnahmegesprächs. */}
-      <Form.Item label="Antreffort" name="antreff_ort">
+      <Form.Item label="Fundort" name="antreff_ort">
         <Input placeholder="z. B. Brücke, Sammelstelle" />
       </Form.Item>
       <Collapse

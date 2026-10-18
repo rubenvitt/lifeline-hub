@@ -117,7 +117,7 @@ describe('PersonenPage — Maske „Betroffene erfassen“ (LFH-1077)', () => {
   async function erfasseImDialog() {
     await userEvent.click(await screen.findByRole('button', { name: 'Betroffene erfassen' }));
     const dialog = await offenerDialog();
-    await userEvent.type(within(dialog).getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await userEvent.type(within(dialog).getByLabelText('Fundort'), 'Sammelstelle Süd');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     return dialog;
   }
@@ -130,7 +130,7 @@ describe('PersonenPage — Maske „Betroffene erfassen“ (LFH-1077)', () => {
     const grund = await within(dialog).findByRole('alert');
     expect(grund).toHaveTextContent('Person nicht erfasst');
     expect(grund).toHaveTextContent('Sichtung unbekannt');
-    expect(within(dialog).getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
+    expect(within(dialog).getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd');
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
     // Die Erfassungszeile darunter bleibt still: der Grund gehört der Maske.

@@ -130,7 +130,7 @@ const tierSpalten = spaltenFuer<Tier>()([
     render: (_, t) => <ZeitAnzeige wert={t.erfasst_at} />,
   },
   {
-    title: 'Antreffort',
+    title: 'Fundort',
     dataIndex: 'antreff_ort',
     key: 'antreff_ort',
     abBreite: 'xl',
@@ -447,11 +447,11 @@ export default function TierePage() {
       {/* Serienmodus: an einer Sammelstelle kommen die Tiere in Serie an.
 
           `uebernahme` trägt die zwei Felder, die sich an einer Sammelstelle nicht ändern: der
-          Antreffort ist die Sammelstelle selbst, und die Spezies müsste sonst je Tier neu
+          Fundort ist die Sammelstelle selbst, und die Spezies müsste sonst je Tier neu
           gewählt werden (das Zurücksetzen fiele auf `initialValues` = 'hund'). Die übrigen
           Felder beschreiben das einzelne Tier.
 
-          Der sitzungsweite Antreffort ist ein eigener Vertrag: nach erfolgreicher Mutation
+          Der sitzungsweite Fundort ist ein eigener Vertrag: nach erfolgreicher Mutation
           einsatz- und maskenbezogen gemerkt und beim Öffnen einmal eingesetzt. Er gehört nicht
           zu `initialValues`, damit ein Serien-Reset bei ausgeschaltetem Schalter leer bleibt.
 
@@ -499,7 +499,7 @@ export default function TierePage() {
         <Form.Item label="Rufname" name="rufname">
           <Input />
         </Form.Item>
-        <Form.Item label="Antreffort" name="antreff_ort">
+        <Form.Item label="Fundort" name="antreff_ort">
           <Input placeholder="z. B. Weide, Sammelstelle" />
         </Form.Item>
         {/* FELDBUDGET (LFH-963, `frontend/AGENTS.md`, Feldbudget): drei sichtbare Felder in

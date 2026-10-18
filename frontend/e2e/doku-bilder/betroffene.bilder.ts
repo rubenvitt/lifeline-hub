@@ -51,8 +51,8 @@ test.describe(KAPITEL, () => {
     await expect(dialog.getByRole('radio', { name: /^SK II,/ })).toBeChecked();
     await waehleIn(dialog.getByRole('combobox', { name: 'Geschlecht' }), 'männlich');
     await dialog.getByLabel('Geschätztes Alter (Jahre)').fill('45');
-    await dialog.getByLabel('Antreffort').fill('Mühlbachweg 12, Keller');
-    await dialog.getByLabel('Antreffort').blur();
+    await dialog.getByLabel('Fundort').fill('Mühlbachweg 12, Keller');
+    await dialog.getByLabel('Fundort').blur();
     await fotografiere(dialog, KAPITEL, 'erfassen');
   });
 

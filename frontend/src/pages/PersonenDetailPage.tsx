@@ -551,7 +551,7 @@ export default function PersonenDetailPage() {
       { label: 'Alter (geschätzt)', wert: person.alter_geschaetzt, mono: true },
       { label: 'Herkunft / Adresse', wert: person.herkunft_adresse, breit: true },
       // „Zustand / Verdacht“ steht im Patientenkopf (LLH-1094), nicht doppelt hier.
-      { label: 'Antreffort', wert: person.antreff_ort },
+      { label: 'Fundort', wert: person.antreff_ort },
       ...(angetroffen || koordinate
         ? [
             {
@@ -663,7 +663,7 @@ export default function PersonenDetailPage() {
                 <Input placeholder="z. B. gehfähig, unterkühlt" />
               </Form.Item>
             )}
-            <Form.Item label="Antreffort" name="antreff_ort">
+            <Form.Item label="Fundort" name="antreff_ort">
               <Input />
             </Form.Item>
             {angetroffen && <KoordinateFeld />}

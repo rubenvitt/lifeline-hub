@@ -975,7 +975,7 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
     expect(name.tagName).toBe('DT');
     expect(name.nextElementSibling).toHaveTextContent('Mustermann');
     expect(begriffe()).toEqual(
-      expect.arrayContaining(['Name', 'Vorname', 'Geschlecht', 'Alter (geschätzt)', 'Antreffort']),
+      expect.arrayContaining(['Name', 'Vorname', 'Geschlecht', 'Alter (geschätzt)', 'Fundort']),
     );
   });
 

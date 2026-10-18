@@ -36,7 +36,7 @@ describe('AufnahmeFelder — Sichtungskategorie', () => {
     ]);
   });
 
-  it('steht ganz oben — vor Geschlecht, Alter und Antreffort', () => {
+  it('steht ganz oben — vor Geschlecht, Alter und Fundort', () => {
     const { container } = zeige();
     const beschriftungen = [...container.querySelectorAll('.ant-form-item label')].map(
       (l) => l.textContent,
@@ -101,7 +101,7 @@ describe('AufnahmeFelder — Feldbudget', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschlecht')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Antreffort')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fundort')).toBeInTheDocument();
     // Der Name hat der Sichtung im sichtbaren Budget Platz gemacht.
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });

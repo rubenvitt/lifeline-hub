@@ -91,7 +91,7 @@ test.describe(KAPITEL, () => {
     const dialog = page.getByRole('dialog', { name: 'Tier erfassen' });
     await waehleIn(dialog.getByRole('combobox', { name: 'Spezies' }), 'Katze');
     await dialog.getByLabel('Rufname').fill('Felix');
-    await dialog.getByLabel('Antreffort').fill('Mühlbachweg 14, Dachboden');
+    await dialog.getByLabel('Fundort').fill('Mühlbachweg 14, Dachboden');
     await dialog.getByRole('button', { name: 'Weitere Angaben' }).click();
     await dialog.getByLabel('Rasse / Beschreibung').fill('Hauskatze');
     await dialog.getByLabel('Notiz').fill('verängstigt, Transportbox nötig');

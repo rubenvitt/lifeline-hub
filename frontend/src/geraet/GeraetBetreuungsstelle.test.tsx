@@ -183,7 +183,7 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Aufnahme/ })).toBeVisible();
     expect(screen.queryByRole('radiogroup', { name: 'Sichtungskategorie' })).toBeNull();
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Antreffort'), 'Sammelstelle{Enter}');
+    await user.type(screen.getByLabelText('Fundort'), 'Sammelstelle{Enter}');
     await waitFor(() => expect(aufnahmeBody).not.toBeNull());
     expect(aufnahmeBody).not.toHaveProperty('uhs_id');
     expect(aufnahmeBody).not.toHaveProperty('sichtung');

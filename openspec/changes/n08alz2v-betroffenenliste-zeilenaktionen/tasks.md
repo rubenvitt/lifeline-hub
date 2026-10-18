@@ -6,7 +6,7 @@ Subtask LLH-1130 (`n08alz2v`) von LLH-1018. Setzt `knc0jyjd-sichtungswahl-flaech
 
 ## 1. Ein Wort „Fundort“
 
-- [ ] 1.1 UI-Texte zu `antreff_ort` bei Personen (`AufnahmeFelder`, `PersonVorschau`, `PersonenDetailPage`, `aufbewahrung/kategorieText.ts`) und Tieren (`TierePage`, `TiereDetailPage`, `TiereDruckTabelle`) auf „Fundort“ umstellen. Wort-Test für Maske, Detail, Liste, Druck und Vorschau; Seitentests der Tiere grün.
+- [x] 1.1 UI-Texte zu `antreff_ort` bei Personen (`AufnahmeFelder`, `PersonVorschau`, `PersonenDetailPage`, `aufbewahrung/kategorieText.ts`) und Tieren (`TierePage`, `TiereDetailPage`, `TiereDruckTabelle`) auf „Fundort“ umstellen. Wort-Test für Maske, Detail, Liste, Druck und Vorschau; Seitentests der Tiere grün.
 
 ## 2. Zeilenaktionen
 

@@ -279,9 +279,7 @@ export default function TiereDetailPage() {
       <Datenfeld label="Größe / Gewicht">
         {zelle('groesse_gewicht', <Input />, t.groesse_gewicht ?? '—')}
       </Datenfeld>
-      <Datenfeld label="Antreffort">
-        {zelle('antreff_ort', <Input />, t.antreff_ort ?? '—')}
-      </Datenfeld>
+      <Datenfeld label="Fundort">{zelle('antreff_ort', <Input />, t.antreff_ort ?? '—')}</Datenfeld>
       <Datenfeld label="Halter">
         {zelle(
           'halter',

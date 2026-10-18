@@ -595,7 +595,7 @@ describe('TierePage', () => {
     await warteBisDialogWeg();
   });
 
-  it('„Speichern und nächste" hält den Dialog offen und nimmt Spezies und Antreffort mit', async () => {
+  it('„Speichern und nächste" hält den Dialog offen und nimmt Spezies und Fundort mit', async () => {
     type Wortlaut = {
       spezies?: string;
       status?: string;
@@ -623,7 +623,7 @@ describe('TierePage', () => {
     );
     expect(katze).toBeTruthy();
     await userEvent.click(katze!);
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Nord');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Sammelstelle Nord');
     await userEvent.type(screen.getByLabelText('Rufname'), 'Rex');
 
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
@@ -647,7 +647,7 @@ describe('TierePage', () => {
     expect(await screen.findByText('Erfasst: 1')).toBeInTheDocument();
     // Einzelfeld geleert, Wiederholfelder stehen.
     await waitFor(() => expect(screen.getByLabelText('Rufname')).toHaveValue(''));
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Nord');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Nord');
 
     // Zweiter Satz: die Übernahme steht auch im Wortlaut, nicht bloß im Feld.
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
@@ -659,7 +659,7 @@ describe('TierePage', () => {
     expect(wortlaute[1].rufname ?? '').toBe('');
   });
 
-  it('merkt einen erfolgreichen Antreffort für das Wiederöffnen dieser Tiermaske', async () => {
+  it('merkt einen erfolgreichen Fundort für das Wiederöffnen dieser Tiermaske', async () => {
     let versuche = 0;
     server.use(
       http.post('/api/einsaetze/1/tiere', () => {
@@ -669,19 +669,17 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Tier-Sammelstelle');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Tier-Sammelstelle');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
 
     await userEvent.click(screen.getByRole('button', { name: 'Tier erfassen' }));
-    await waitFor(() =>
-      expect(screen.getByLabelText('Antreffort')).toHaveValue('Tier-Sammelstelle'),
-    );
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tier-Sammelstelle'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
-  it('speichert den Antreffort bei einem fehlgeschlagenen Tier nicht', async () => {
+  it('speichert den Fundort bei einem fehlgeschlagenen Tier nicht', async () => {
     let versuche = 0;
     server.use(
       http.post('/api/einsaetze/1/tiere', () => {
@@ -691,18 +689,18 @@ describe('TierePage', () => {
     );
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Fehlerort Tier');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Fehlerort Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(versuche).toBe(1));
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Fehlerort Tier');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Fehlerort Tier');
     expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_ort')).toBeNull();
   });
 
   /**
    * Der Dialog wartet auf die Antwort (LFH-1077, design.md D3): solange erfasst wird, sind Kreuz
    * und Abbrechen gesperrt, sonst hätte eine Ablehnung keinen Ort mehr. Erst der Erfolg schließt
-   * und merkt den Antreffort.
+   * und merkt den Fundort.
    */
   it('sperrt das Schließen, solange erfasst wird; erst der Erfolg schließt und merkt den Ort', async () => {
     let postGestartet!: () => void;
@@ -726,7 +724,7 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Wartort Tier');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Wartort Tier');
     await userEvent.type(screen.getByLabelText('Rufname'), 'Warte-Tier');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
@@ -759,11 +757,11 @@ describe('TierePage', () => {
     render(einsatzAktiv, []);
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
 
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager Nord'));
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tierlager Nord'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(versuche).toBe(1));
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('');
   });
 
   it('setzt beim Einsatzwechsel alle Tierwerte zurück und lädt nur den B-Sitzungsort', async () => {
@@ -795,7 +793,7 @@ describe('TierePage', () => {
     );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue('Tierlager A'));
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Tierlager A'));
     const dialogA = screen.getByRole('dialog');
     await userEvent.click(within(dialogA).getByRole('combobox'));
     const katze = (await screen.findAllByText('Katze')).find((el) =>
@@ -811,7 +809,7 @@ describe('TierePage', () => {
 
     const dialogB = await screen.findByRole('dialog');
     await waitFor(() =>
-      expect(within(dialogB).getByLabelText('Antreffort')).toHaveValue('Tierlager B'),
+      expect(within(dialogB).getByLabelText('Fundort')).toHaveValue('Tierlager B'),
     );
     expect(within(dialogB).getByTitle('Hund')).toBeInTheDocument();
     expect(within(dialogB).getByLabelText('Rufname')).toHaveValue('');
@@ -977,7 +975,7 @@ describe('TierePage', () => {
 
 /**
  * Feldbudget der Tiere-Erfassung (LFH-963, design.md D7; `frontend/AGENTS.md`, Feldbudget): in
- * beiden Modi GENAU drei sichtbare Felder (Spezies, Rufname, Antreffort) — eine Obergrenze deckte
+ * beiden Modi GENAU drei sichtbare Felder (Spezies, Rufname, Fundort) — eine Obergrenze deckte
  * eine Zählung, die ein Feld verliert. Der Rest liegt mit `forceRender` eingeklappt IM Baum, die
  * Gegenprobe „Aufklappen → Zahl steigt" belegt, dass die Zählung Verstecktes nicht mitnimmt.
  */
@@ -1003,7 +1001,7 @@ describe('TierePage — Feldbudget der Erfassung (LFH-963)', () => {
   }
 
   it.each(['Tier erfassen', 'Vermisst melden'] as const)(
-    '„%s" zeigt Spezies, Rufname und Antreffort — sonst nichts',
+    '„%s" zeigt Spezies, Rufname und Fundort — sonst nichts',
     async (knopf) => {
       const dialog = await oeffne(knopf);
       expect(sichtbareFelder(dialog)).toBe(3);
@@ -1013,7 +1011,7 @@ describe('TierePage — Feldbudget der Erfassung (LFH-963)', () => {
       for (const feld of [
         spezies,
         within(dialog).getByLabelText('Rufname'),
-        within(dialog).getByLabelText('Antreffort'),
+        within(dialog).getByLabelText('Fundort'),
       ]) {
         expect(feld.closest('.ant-collapse')).toBeNull();
       }

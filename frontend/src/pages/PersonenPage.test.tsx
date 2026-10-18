@@ -360,9 +360,9 @@ describe('PersonenPage', () => {
     // Hervorhebung an einer unsichtbaren Zeile.
     await userEvent.click(await screen.findByRole('tab', { name: 'Erfasst' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    // Der Name liegt unter „Weitere Angaben" — hier genügt der Antreffort, die Maske hat keine
+    // Der Name liegt unter „Weitere Angaben" — hier genügt der Fundort, die Maske hat keine
     // Pflichtfelder.
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Brücke');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Brücke');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Erfasst als R-047')).toBeInTheDocument();
@@ -475,7 +475,7 @@ describe('PersonenPage', () => {
 
     await ersterStart;
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Neu');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await zweiterStart;
 
@@ -538,7 +538,7 @@ describe('PersonenPage', () => {
     const { container } = renderMitEinsatzNavigation();
 
     await userEvent.click(await screen.findByRole('button', { name: 'Vermisst melden' }));
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Person A');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Person A');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await postStart;
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
@@ -570,7 +570,7 @@ describe('PersonenPage', () => {
     // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline Neu');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Offline Neu');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
 
@@ -618,7 +618,7 @@ describe('PersonenPage', () => {
     // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Nach Reload');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Nach Reload');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     ersteSeite.unmount();
@@ -829,7 +829,7 @@ describe('PersonenPage', () => {
     // Online geladen, dann fällt das Netz weg: so liegt es im Einsatz.
     setzeOnline(false);
     await userEvent.click(vermisstMelden);
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Offline A');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Offline A');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText(/Offline vorgemerkt/)).toBeInTheDocument();
     const [vorgemerkt] = await schreibaktionenLaden(1, 1);

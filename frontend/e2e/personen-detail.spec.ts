@@ -53,7 +53,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   const dialog = page.getByRole('dialog');
   await expect(dialog).toBeVisible();
   // Name und Vorname liegen unter „Weitere Angaben" (Feldbudget: sichtbar sind Sichtung,
-  // Geschlecht, Alter, Antreffort). Teiltreffer, weil ältere antd-Fassungen das Pfeil-Icon im
+  // Geschlecht, Alter, Fundort). Teiltreffer, weil ältere antd-Fassungen das Pfeil-Icon im
   // Zugangsnamen trugen.
   await dialog.getByRole('button', { name: /Weitere Angaben/ }).click();
   await dialog.getByLabel('Name', { exact: true }).fill('Mustermann');
