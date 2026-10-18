@@ -72,7 +72,7 @@ Der Kopf der Seite zählt Bezirke und Betreuungsstellen und nennt volle Stellen.
 5. „Melden“ wählen.
 
 Eine Stelle ohne Koordinate lässt sich über „Auf Karte verorten“ im Menü auf der Lagekarte
-setzen.
+setzen; „Zurück zu …“ führt danach auf die Betreuungsseite zurück.
 
 ### Eine Meldung zurücknehmen
 

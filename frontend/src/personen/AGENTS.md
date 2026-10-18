@@ -22,7 +22,10 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
 - **Verortungsauftrag** per `lagekartePfad(…, { platzieren })` → `?platzieren=<typ>:<id>`;
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt
   den Modus nur mit Schreibrecht, bei `person` zusätzlich nur mit freigegebenem Modul „Personen“
-  (`personenZugriff === 'frei'`, LFH-670). Koordinaten in der Schadens-Erfassung: LFH-453.
+  (`personenZugriff === 'frei'`, LFH-670). Einstiege von einer Datensatzseite setzen `zurueck: true`;
+  danach zeichnet die Karte die Ebene „Betroffene“, ohne den Schalter umzustellen, und bietet
+  „Zurück zu R-…“ an (LLH-1125, `frontend/src/pages/lagekarte/AGENTS.md`, „Verortungsauftrag von
+  außen“). Koordinaten in der Schadens-Erfassung: LFH-453.
 - **Die Kartenansicht hat eine Schleuse** (LFH-668,
   `openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`): solange Maus/Stift über der
   Ansicht, der Fokus darin oder ein Bündel aufgefächert ist, halten die Marker Menge, Folge und Lage
