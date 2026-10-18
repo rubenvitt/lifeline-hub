@@ -7,7 +7,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep betroffene`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   liste.png        frontend/src/pages/PersonenPage.tsx, frontend/src/personen/BetroffenenSeitenleiste.tsx
+ *   liste.png        frontend/src/pages/PersonenPage.tsx, frontend/src/personen/BetroffenenSeitenleiste.tsx,
+ *                    frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx
  *   erfassen.png     frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx
  *   kurzeingabe.png  frontend/src/personen/BetroffeneZeile.tsx
  *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx
@@ -51,8 +52,8 @@ test.describe(KAPITEL, () => {
     await expect(dialog.getByRole('radio', { name: /^SK II,/ })).toBeChecked();
     await waehleIn(dialog.getByRole('combobox', { name: 'Geschlecht' }), 'männlich');
     await dialog.getByLabel('Geschätztes Alter (Jahre)').fill('45');
-    await dialog.getByLabel('Antreffort').fill('Mühlbachweg 12, Keller');
-    await dialog.getByLabel('Antreffort').blur();
+    await dialog.getByLabel('Fundort').fill('Mühlbachweg 12, Keller');
+    await dialog.getByLabel('Fundort').blur();
     await fotografiere(dialog, KAPITEL, 'erfassen');
   });
 

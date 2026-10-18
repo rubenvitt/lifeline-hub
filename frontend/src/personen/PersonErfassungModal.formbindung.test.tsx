@@ -6,7 +6,7 @@ import PersonErfassungModal, { type ErfassungsModus } from './PersonErfassungMod
 
 /**
  * LFH-627: „Instance created by `useForm` is not connected to any Form element". Der Dialog
- * setzte den gemerkten Antreffort im Öffnen-Effekt, bevor antds `Modal` sein `<Form>` eingehängt
+ * setzte den gemerkten Fundort im Öffnen-Effekt, bevor antds `Modal` sein `<Form>` eingehängt
  * hatte. Innerhalb von `act` fällt das nicht auf, weil `act` alles in einem Zug abarbeitet; über
  * den echten Scheduler (Deeplink `?neu=1`, Netzantwort) prüft rc-field-form einen Makrotask
  * später und findet kein `<Form>`.
@@ -56,14 +56,14 @@ afterEach(() => {
 });
 
 describe('PersonErfassungModal · Formularbindung (LFH-627)', () => {
-  it('setzt den gemerkten Antreffort erst, wenn das Formular eingehängt ist', async () => {
+  it('setzt den gemerkten Fundort erst, wenn das Formular eingehängt ist', async () => {
     sessionStorage.setItem('lfh:erfassung:1:person:antreff_ort', 'Turnhalle');
     const spy = vi.spyOn(console, 'error');
     renderMitProviders(<Huelle />);
 
     await oeffneUeberDenScheduler();
 
-    await waitFor(() => expect(screen.getByLabelText(/Antreffort/)).toHaveValue('Turnhalle'));
+    await waitFor(() => expect(screen.getByLabelText(/Fundort/)).toHaveValue('Turnhalle'));
     expect(unverbundenWarnungen(spy)).toEqual([]);
   });
 });

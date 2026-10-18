@@ -54,8 +54,8 @@ describe('PersonErfassungModal — Tastaturweg', () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    // Letztes SICHTBARES Eingabefeld ist der Antreffort.
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
+    // Letztes SICHTBARES Eingabefeld ist der Fundort.
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onErfassen.mock.calls[0][0]).toMatchObject({ antreff_ort: 'Sammelstelle Süd' });
@@ -80,32 +80,32 @@ describe('PersonErfassungModal — Serienmodus', () => {
     const { onErfassen, onFertig } = zeige();
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     // Offen heißt: der Aufrufer wurde NICHT zum Schließen aufgefordert und der Dialog steht.
     expect(onFertig).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByLabelText('Antreffort')).toHaveValue(''));
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue(''));
     const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
     await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
   });
 
-  it('der Antreffort überlebt das Serien-Speichern (Kontext-Default)', async () => {
+  it('der Fundort überlebt das Serien-Speichern (Kontext-Default)', async () => {
     // `uebernahme={['antreff_ort']}`: an einer Sammelstelle kommen viele Personen vom selben Ort.
     // „Werte behalten" steht per Vorgabe aus und wird hier eingeschaltet.
     zeige();
     const nutzer = userEvent.setup();
 
     await nutzer.click(screen.getByRole('checkbox', { name: 'Werte behalten' }));
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await nutzer.type(screen.getByLabelText('Geschätztes Alter (Jahre)'), '40');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     // Das Nebeneinander ist der Beleg: das Einzelfeld ist leer, der Wiederholwert steht.
     await waitFor(() => expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toHaveValue(''));
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd');
     expect(sessionStorage.getItem('lfh:erfassung:1:person:antreff_ort')).toBe('Sammelstelle Süd');
   });
 
@@ -113,7 +113,7 @@ describe('PersonErfassungModal — Serienmodus', () => {
     const { onFertig } = zeige();
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
@@ -130,7 +130,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
     expect(screen.getByRole('radiogroup')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschlecht')).toBeInTheDocument();
     expect(screen.getByLabelText('Geschätztes Alter (Jahre)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Antreffort')).toBeInTheDocument();
+    expect(screen.getByLabelText('Fundort')).toBeInTheDocument();
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Vorname')).not.toBeInTheDocument();
 
@@ -182,7 +182,7 @@ describe('PersonErfassungModal — Feldbudget', () => {
     // Bereich offen und „der Wert geht mit" wäre trivial.
     await waitFor(() => expect(kopf).toHaveAttribute('aria-expanded', 'false'));
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onErfassen.mock.calls[0][0]).toMatchObject({ name: 'Mustermann', vorname: 'Max' });
@@ -196,7 +196,7 @@ describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)'
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await nutzer.type(await screen.findByLabelText('Zustand / Verdacht'), 'gehfähig, unterkühlt');
     await nutzer.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Deich{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Deich{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     const daten = onErfassen.mock.calls[0][0];
@@ -215,7 +215,7 @@ describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)'
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await nutzer.type(await screen.findByLabelText('Koordinate'), '95/9');
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Deich{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Deich{Enter}');
 
     expect(await screen.findByText('Breite außerhalb ±90')).toBeInTheDocument();
     expect(onErfassen).not.toHaveBeenCalled();
@@ -243,28 +243,26 @@ describe('PersonErfassungModal — Ablehnung', () => {
     const { onFertig } = zeige({ onErfassen });
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd{Enter}');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd{Enter}');
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onFertig).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd');
   });
 });
 
-describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
+describe('PersonErfassungModal — sitzungsweiter Fundort', () => {
   it('merkt den Ort erst nach Erfolg und setzt ihn beim Wiederöffnen ein', async () => {
     const ersteAnsicht = zeige();
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ersteAnsicht.onErfassen).toHaveBeenCalledTimes(1));
     ersteAnsicht.unmount();
 
     zeige();
-    await waitFor(() =>
-      expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'),
-    );
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 
@@ -274,13 +272,13 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     });
     const nutzer = userEvent.setup();
 
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Fehlerort');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Fehlerort');
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ersteAnsicht.onErfassen).toHaveBeenCalledTimes(1));
     ersteAnsicht.unmount();
 
     zeige();
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('');
   });
 
   it('merkt einen Ort nach Abbruch während des Speicherns nicht', async () => {
@@ -290,7 +288,7 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     });
     const ansicht = zeige({ onErfassen: vi.fn(() => antwort) });
 
-    await userEvent.type(screen.getByLabelText('Antreffort'), 'Abbruchort Person');
+    await userEvent.type(screen.getByLabelText('Fundort'), 'Abbruchort Person');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(ansicht.onErfassen).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole('button', { name: /Close|Schliessen|Schließen/i }));
@@ -309,15 +307,13 @@ describe('PersonErfassungModal — sitzungsweiter Antreffort', () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    await waitFor(() =>
-      expect(screen.getByLabelText('Antreffort')).toHaveValue('Sammelstelle Süd'),
-    );
+    await waitFor(() => expect(screen.getByLabelText('Fundort')).toHaveValue('Sammelstelle Süd'));
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
-    await nutzer.type(screen.getByLabelText('Antreffort'), 'Sammelstelle Süd');
+    await nutzer.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await nutzer.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-    expect(screen.getByLabelText('Antreffort')).toHaveValue('');
+    expect(screen.getByLabelText('Fundort')).toHaveValue('');
     expect(screen.getByRole('checkbox', { name: 'Werte behalten' })).not.toBeChecked();
   });
 });

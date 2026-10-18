@@ -100,6 +100,21 @@ async function pruefeListeAmHandy(page: Page, einsatzId: string, mitSchreibrecht
   await expect(zeile.locator('[data-sichtung-summe]')).toHaveText(/2\s*gesamt/);
   await expect(zeile, 'Sichtungszeile ohne Scrollen ganz im Bild').toBeInViewport({ ratio: 1 });
 
+  // Zeilenaktionen (LLH-1130): mit Schreibrecht trägt die Karte den Sichtungsauslöser und im Fuß
+  // das Zeilenmenü; ohne steht „Nur Ansicht“ mit Grund über der Liste, und beides fehlt.
+  if (mitSchreibrecht) {
+    await expect(
+      ersteZeile.getByRole('button', { name: 'Sichtung R-002 ändern, aktuell SK I' }),
+    ).toBeVisible();
+    await expect(ersteZeile.getByRole('button', { name: 'Aktionen zu R-002' })).toBeVisible();
+  } else {
+    await expect(page.locator('[data-lfh="rechte-hinweis"]')).toContainText(
+      'nur Einsatzleitung und Führungspersonal',
+    );
+    await expect(page.getByRole('button', { name: /^Aktionen zu R-/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^Sichtung R-|sichten$/ })).toHaveCount(0);
+  }
+
   // Kopf: höchstens eine Primäraktion, Nebenwege nicht als Knopf.
   await expect(kopf(page).locator('.ant-btn-primary')).toHaveCount(mitSchreibrecht ? 1 : 0);
   if (mitSchreibrecht) {
@@ -195,6 +210,48 @@ test('Beobachter bei 390 px: Personenzeile und Sichtungszeile im ersten Bild, De
   await wechsleZuRolle(page, 'beobachter', einsatzId);
   await pruefeListeAmHandy(page, einsatzId, false);
   await pruefeDetail(page, einsatzId, personId);
+});
+
+/**
+ * Kartenform unter `md` (LLH-1130, Spec `betroffene-lagedaten`): die Nachsichtung geht auch in
+ * der Karte in drei Tipps (Sichtungsfeld, Fläche, „Übernehmen“), das Zeilenmenü steht in der
+ * Karte (rechts neben dem Inhalt, damit die erste Karte im ersten Bild bleibt) und führt den
+ * Verortungsauftrag mit Rückweg auf die Lagekarte.
+ */
+test('Admin bei 390 px: Nachsichtung in der Karte, Zeilenmenü in der Karte', async ({ page }) => {
+  test.slow();
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Betroffene Karte ${Date.now()}`);
+  await seedeLage(page, einsatzId);
+  await page.setViewportSize(HANDSCHIRM);
+  await page.goto(`/einsaetze/${einsatzId}/personen`);
+  await stelleKomfortabel(page);
+
+  const karten = page.locator('[data-lfh="datensicht-karte"]');
+  await expect(karten).toHaveCount(2);
+  const karte = karten.filter({ hasText: 'R-002' });
+
+  await karte.getByRole('button', { name: 'Sichtung R-002 ändern, aktuell SK I' }).tap();
+  const flaeche = page.getByRole('region', { name: 'Sichtung R-002' });
+  await flaeche.getByRole('radio', { name: /^SK II,/ }).tap();
+  await flaeche.getByRole('button', { name: 'Übernehmen' }).tap();
+  await expect(
+    karte.getByRole('button', { name: 'Sichtung R-002 ändern, aktuell SK II' }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+
+  // Das Menü steht in der Karte, ganz im Bild (klicken statt nur sehen, LFH-355).
+  const ausloeser = karte.getByRole('button', { name: 'Aktionen zu R-002' });
+  await expect(ausloeser).toBeInViewport({ ratio: 1 });
+  await ausloeser.tap();
+  const menue = page.getByRole('menu');
+  await expect(menue.getByRole('menuitem')).toHaveText([
+    'Sichten',
+    'Verbleib erfassen',
+    'Auf Lagekarte verorten',
+  ]);
+  await menue.getByRole('menuitem', { name: 'Auf Lagekarte verorten' }).tap();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte\\?platzieren=person`));
 });
 
 /**

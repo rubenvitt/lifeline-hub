@@ -10,7 +10,7 @@
  * Neue Kopien verhindert `menueAusloeser.guard.test.ts`.
  */
 import { Button, Dropdown, type MenuProps } from 'antd';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { IconPunkteSenkrecht } from '../icons';
 
 /** Ein Eintrag des gebündelten Menüs. */
@@ -58,6 +58,11 @@ export interface MenueAusloeserProps<K extends string = string> {
   gesperrt?: boolean;
   /** Eine ausgelöste Aktion läuft noch; zeigt sich am Auslöser. */
   laeuft?: boolean;
+  /**
+   * Das Menü geht auf oder zu. Für eine Liste, die solange Menge und Folge hält (Schleuse der
+   * `Datensicht`, LLH-1130). Hängt der Auslöser mit offenem Menü aus, meldet er „zu“.
+   */
+  onOffenAenderung?: (offen: boolean) => void;
 }
 
 export function MenueAusloeser<K extends string = string>({
@@ -66,7 +71,19 @@ export function MenueAusloeser<K extends string = string>({
   onWahl,
   gesperrt,
   laeuft,
+  onOffenAenderung,
 }: MenueAusloeserProps<K>) {
+  const [offen, setOffen] = useState(false);
+  // Ref: ein neuer Rückruf je Render meldete sonst bei jedem Render „zu“ und wieder „auf“.
+  const meldeRef = useRef(onOffenAenderung);
+  useEffect(() => {
+    meldeRef.current = onOffenAenderung;
+  });
+  useEffect(() => {
+    if (!offen) return;
+    meldeRef.current?.(true);
+    return () => meldeRef.current?.(false);
+  }, [offen]);
   if (eintraege.length === 0) return null;
   return (
     /*
@@ -95,6 +112,7 @@ export function MenueAusloeser<K extends string = string>({
         // „LFH-683: Menüauslöser per Tastatur“).
         autoFocus
         disabled={gesperrt}
+        onOpenChange={setOffen}
         menu={{
           items: menueEintraege(eintraege),
           // Zuordnung am Menü, nicht je Eintrag: die Einträge bleiben reine Beschreibung.

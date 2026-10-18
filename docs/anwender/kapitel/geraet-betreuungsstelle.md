@@ -31,7 +31,7 @@ Wer die Stelle verlassen hat, steht in der Gruppe „Weitergezogen“ mit seinem
 ### Betroffene aufnehmen
 
 1. „Aufnehmen“ oder unten „Aufnahme“ wählen.
-2. Soweit bekannt Geschlecht, geschätztes Alter und Antreffort angeben; Name, Vorname und weitere
+2. Soweit bekannt Geschlecht, geschätztes Alter und Fundort angeben; Name, Vorname und weitere
    Angaben stehen unter „Weitere Angaben“.
 
    ![Aufnahme am Tablet der Betreuungsstelle ohne Sichtungskategorie, mit den Knöpfen „Speichern und nächste“ und „Erfassen“](../bilder/geraet-betreuungsstelle/aufnahme.png)

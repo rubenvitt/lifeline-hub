@@ -117,7 +117,7 @@ Vormerkung, Schwärzung und jede Änderung einer Frist stehen im Einsatztagebuch
 
 Ohne eigene Frist „folgt der Frist des Einsatzes“. Eine Kategorie-Frist wirkt nur, wenn sie
 früher abläuft als die des Einsatzes. Danach wird die Kategorie vorgemerkt und nach 30 Tagen
-Karenz geschwärzt; der Einsatz selbst bleibt lesbar. Name, Geburtsdatum, Antreffort und Verbleib
+Karenz geschwärzt; der Einsatz selbst bleibt lesbar. Name, Geburtsdatum, Fundort und Verbleib
 einer Person bleiben, bis alle Zwecke der Person abgelaufen sind.
 
 Während der Karenz bleiben die Daten der Kategorie lesbar, auch in Druck und Export. Wer eine

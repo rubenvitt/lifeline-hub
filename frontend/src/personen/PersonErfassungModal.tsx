@@ -24,7 +24,7 @@ export const ERFASSUNG_TITEL: Record<ErfassungsModus, string> = {
 };
 
 interface Props {
-  /** Einsatzgrenze des sitzungsweiten Antrefforts. */
+  /** Einsatzgrenze des sitzungsweiten Fundorts. */
   einsatzId: number;
   /** Aktueller Modus (steuert Titel, Sichtungsfeld und Melder-Feld); `null` schließt das Modal. */
   modus: ErfassungsModus | null;
@@ -51,7 +51,7 @@ interface Props {
  * Der Aufrufer hält `modus` und die Anlege-Mutation, das Modal nur das Formular; zurückgesetzt
  * wird von der Hülle. Die Felder kommen aus `AufnahmeFelder` (dort begründet).
  *
- * `uebernahme={['antreff_ort']}`: bei „Werte behalten" überlebt der Antreffort den
+ * `uebernahme={['antreff_ort']}`: bei „Werte behalten" überlebt der Fundort den
  * Serien-Reset. Davon getrennt merkt `erfassungsSitzung` den Ort bis Tab-Ende und setzt ihn beim
  * nächsten Öffnen einmal ein — bewusst nicht als `initialValues`, sonst füllte jeder Reset ihn
  * auch bei ausgeschaltetem Schalter wieder auf.

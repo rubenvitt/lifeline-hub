@@ -29,7 +29,7 @@ export default function TiereDruckTabelle({ tiere, konventionen }: Props) {
     { titel: 'Rufname', wert: (t) => t.rufname ?? '—' },
     { titel: 'Rasse', wert: (t) => t.rasse_beschreibung ?? '—' },
     { titel: 'Halter', wert: halterText },
-    { titel: 'Antreffort', wert: (t) => t.antreff_ort ?? '—' },
+    { titel: 'Fundort', wert: (t) => t.antreff_ort ?? '—' },
     { titel: 'erfasst', mono: true, wert: (t) => druckZeit(t.erfasst_at, konventionen) },
   ];
   return (

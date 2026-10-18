@@ -168,6 +168,15 @@ describe('Betreuungsstelle — Startseite und Navigation', () => {
     ).toEqual(['Betroffene', 'Aufnahme', 'Stelle']);
   });
 
+  it('die Liste bietet weder Sichtung noch Zeilenmenü (LLH-1130)', async () => {
+    bereit();
+    renderApp('/geraet/7/betroffene');
+    expect(await screen.findByText('Muster, Max')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Sichtung R-|sichten$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu R-/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Verbleib erfassen für/ })).toBeNull();
+  });
+
   it('die Seiten der UHS führen auf die Startseite', async () => {
     bereit();
     const router = renderApp('/geraet/7/patienten');
@@ -183,7 +192,7 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Aufnahme/ })).toBeVisible();
     expect(screen.queryByRole('radiogroup', { name: 'Sichtungskategorie' })).toBeNull();
     const user = userEvent.setup();
-    await user.type(screen.getByLabelText('Antreffort'), 'Sammelstelle{Enter}');
+    await user.type(screen.getByLabelText('Fundort'), 'Sammelstelle{Enter}');
     await waitFor(() => expect(aufnahmeBody).not.toBeNull());
     expect(aufnahmeBody).not.toHaveProperty('uhs_id');
     expect(aufnahmeBody).not.toHaveProperty('sichtung');

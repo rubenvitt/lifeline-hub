@@ -267,6 +267,34 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     expect(zustand.closest('.ant-typography-ellipsis-single-line')).not.toBeNull();
   });
 
+  it('UHS-Tablet: Nachsichtung aus der Zeile, kein Zeilenmenü und kein Verorten (LLH-1130)', async () => {
+    vi.useRealTimers();
+    stelleBereit();
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personen/10/sichtung', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json(
+          { id: 1, person_id: 10, kategorie: 'sk1', notiz: null, erfasst_at: '', erfasst_von: 1 },
+          { status: 201 },
+        );
+      }),
+    );
+    const router = renderApp('/geraet');
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Sichtung R-001 ändern, aktuell SK II' }),
+    );
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-001' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null }]));
+    // Kein Zeilenklick: die Liste bleibt.
+    expect(pfad(router)).toBe('/geraet/7/patienten');
+    expect(screen.queryByRole('button', { name: /^Aktionen zu R-/ })).toBeNull();
+    expect(screen.queryByText('Auf Lagekarte verorten')).toBeNull();
+  });
+
   it('Fremde Adresse: die Lagekarte führt auf die Startseite', async () => {
     stelleBereit();
     const router = renderApp('/einsaetze/7/lagekarte');

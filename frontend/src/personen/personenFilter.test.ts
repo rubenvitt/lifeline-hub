@@ -84,6 +84,24 @@ describe('filterPersonen', () => {
     expect(nummern(filterPersonen(menge, { ...SICHT, nurLuecken: true }))).toEqual([20]);
     expect(filterPersonen(menge, { ...SICHT, filter: 'erfasst', nurLuecken: true })).toEqual([]);
   });
+
+  it('„Nur Lücken" behält eine gerade geschlossene Lücke, der Statusfilter gilt weiter (LLH-1130)', () => {
+    const geschlossen = {
+      ...betroffen,
+      aktueller_verbleib: 'KH Mitte',
+      aktuelle_verbleib_art: 'transport' as const,
+    };
+    const offen = { ...betroffen, id: 20, registrier_nr: 20, aktueller_verbleib: null };
+    const menge = [geschlossen, offen];
+    const behalten = new Set([geschlossen.id]);
+    expect(nummern(filterPersonen(menge, { ...SICHT, nurLuecken: true }))).toEqual([20]);
+    expect(nummern(filterPersonen(menge, { ...SICHT, nurLuecken: true }, behalten))).toEqual([
+      3, 20,
+    ]);
+    expect(
+      filterPersonen(menge, { ...SICHT, filter: 'erfasst', nurLuecken: true }, behalten),
+    ).toEqual([]);
+  });
 });
 
 describe('sichtFuerNeuePerson', () => {

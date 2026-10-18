@@ -191,7 +191,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   (nicht Touch) in der Sicht hält Menge und Folge der Zeilen, im Baum auf jeder Ebene über
   `organigramm/baumSchleuse.ts` (keine zweite Baumlogik); Inhalt fließt, Entfallenes fällt sofort
   weg, der Sammelbanner nennt Neues, Umgehängtes und Umsortiertes. `zufluss="sofort"` nur für
-  Flächen ohne Bedienziel in den Zeilen.
+  Flächen ohne Bedienziel in den Zeilen. Ein offenes Popover, Menü oder Dialog einer Zeile hält
+  wie Fokus, auch ohne ihn (Touch): die Seite meldet es über `halten`
+  (`components/useHalteQuellen.ts`), `MenueAusloeser` über `onOffenAenderung`; Menüs des
+  Kartenfußs hält die Sicht selbst (LLH-1130).
 - **Eine geblätterte Liste nimmt den Servermodus der `Datensicht`** (LFH-1075, Prop
   `serverseitig`): Suche (entprellt) und Spaltenfilter gehen an den Server, die Sortierung
   kontrolliert; die Sicht filtert und sortiert nicht noch einmal. `stand` ist die Abfrage der

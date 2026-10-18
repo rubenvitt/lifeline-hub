@@ -32,6 +32,13 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Schäden (`BezugHinzufuegenDialog`, XOR-Leerung im selben PATCH), „Bezug lösen“ mit Grund an der
   Zeile; lädt erst aufgeklappt. Der Aufenthalt in einer UHS ist kein Bezug, er steht im Kopf
   („In UHS aufnehmen“, „Verlegen“, „Austragen“; nicht am Gerät).
+- **Zeilenaktionen der Betroffenenliste** (LLH-1130, Spec `betroffene-lagedaten`): die
+  Sichtungszelle ist der Auslöser (`personen/ZeilenSichtung.tsx`, Popover mit `SichtungsWahl` und
+  „Übernehmen“, Grund an der Zeile), die leere Verbleib-Zelle bietet „Verbleib erfassen“, das
+  Zeilenmenü „Sichten“, „Verbleib erfassen“, „Auf Lagekarte verorten“ (mit `zurueck`). Alles über
+  `bedienung` von `personenSpalten`; das Gerät gibt nur `darfSichten`, kein Menü. Unter „Nur
+  Lücken zeigen“ bleibt eine aus der Zeile geschlossene Lücke stehen, bis sich die Sicht ändert.
+  Ein Wort „Fundort“ für `antreff_ort` (Wächter `personen/fundortWort.guard.test.ts`).
 - **`SK_META`** führt Schlüssel von `sichtungsfarben` oder `null`, keine CSS-Werte.
 - **Verortungsauftrag** per `lagekartePfad(…, { platzieren })` → `?platzieren=<typ>:<id>`;
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt

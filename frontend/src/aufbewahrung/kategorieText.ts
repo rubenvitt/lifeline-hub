@@ -50,7 +50,7 @@ export const KATEGORIEN: readonly Datenkategorie[] = ['behandlung', 'personenaus
  * läse „Personenauskunft 0 Tage“ sich so, als verschwänden die Namen mit dem Abschluss.
  */
 export const PERSONENSTAMM_TEXT =
-  'Name, Geburtsdatum, Antreffort und Verbleib bleiben, bis alle Zwecke der Person abgelaufen sind.';
+  'Name, Geburtsdatum, Fundort und Verbleib bleiben, bis alle Zwecke der Person abgelaufen sind.';
 
 /** Der Satz zur Vorgabe einer Kategorie an einem aktiven Einsatz bzw. ohne eigene Dauer. */
 export function vorgabeSatz(dauerTage: number | null | undefined): string {

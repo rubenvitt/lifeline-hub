@@ -53,7 +53,7 @@ describe('TiereDruckTabelle', () => {
       Array.from(document.querySelectorAll('[data-lfh="tiere-druck-tabelle"] thead th')).map(
         (th) => th.textContent,
       ),
-    ).toEqual(['Nr.', 'Status', 'Spezies', 'Rufname', 'Rasse', 'Halter', 'Antreffort', 'erfasst']);
+    ).toEqual(['Nr.', 'Status', 'Spezies', 'Rufname', 'Rasse', 'Halter', 'Fundort', 'erfasst']);
     expect(zellen(0).slice(0, 7)).toEqual([
       'T-001',
       'aktiv',

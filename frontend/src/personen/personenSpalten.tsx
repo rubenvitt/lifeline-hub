@@ -1,8 +1,11 @@
-import { Typography } from 'antd';
+import { Button, Typography } from 'antd';
+import type { CSSProperties } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import { BemerkungZelle } from '../components/BemerkungZelle';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { sprungGesperrtText } from '../components/Sprung';
 import { Select } from '../components/Select';
 import { spaltenFuer, type Kartenplan } from '../components/Datensicht';
 import { monoStil, useRollen } from '../components/instrument';
@@ -23,17 +26,22 @@ import {
   verbleibKlasse,
   verbleibLabel,
 } from './personenBilanz';
+import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
 
 /**
- * Das EINE Spaltenregister der Betroffenen-Listen — reine Anzeige, ohne Aktionen; speist
- * Zeilen- und Rasteransicht und über den Kartenplan beide Darstellungsformen.
+ * Das EINE Spaltenregister der Betroffenen-Listen; speist Zeilen- und Rasteransicht und über den
+ * Kartenplan beide Darstellungsformen, auch am Gerät.
  *
  * Spalten: Nr. · Person (Name + Geschlecht/Alter) · Sichtung · Zustand · Status · Fundort ·
  * Verbleib · Vermerk · Zeit.
  *
- * „Zustand" ist inline bearbeitbar über `BemerkungZelle` (Zeilenkennung `R-042` im
- * zugänglichen Namen, PATCH nur mit dem einen Feld). Die Zelle fängt ihren Klick ab, sonst
- * navigierte die Zeile per `onZeileKlick` auf die Detailseite.
+ * Ohne `bedienung` ist alles Anzeige. Mit ihr bedient die Zeile (LLH-1130, Spec
+ * `betroffene-lagedaten`, „Sichtung und Verbleib aus der Betroffenenliste“):
+ * - „Sichtung“ ist der Auslöser der Nachsichtung (`ZeilenSichtung`, Popover mit Flächenwahl).
+ * - „Zustand" ist inline bearbeitbar über `BemerkungZelle` (Zeilenkennung `R-042` im
+ *   zugänglichen Namen, PATCH nur mit dem einen Feld).
+ * Jede bedienbare Zelle fängt ihren Klick ab, sonst navigierte die Zeile per `onZeileKlick` auf
+ * die Detailseite.
  * „Fundort" zeigt Freitext UND darunter die Koordinate in Mono; eine der beiden schließt die
  * Fundort-Lücke.
  *
@@ -142,10 +150,86 @@ function FundortZelle({ p }: { p: Person }) {
   );
 }
 
-/** Bedienung der Zustand-Spalte; ohne sie bleibt die Spalte reine Anzeige. */
-interface ZustandBedienung {
+/** Bedienung der Zeilen; ohne sie bleibt das Register reine Anzeige. */
+export interface PersonenBedienung {
   einsatzId: number;
+  /** Schreibrecht im Einsatz: Zustand, Verbleib und Zeilenmenü. */
   darfSchreiben: boolean;
+  /**
+   * Sichten aus der Zeile. Vorgabe wie `darfSchreiben`; am Gerät `person-sichtung` (UHS ja,
+   * Betreuungsstelle nein, LFH-1041).
+   */
+  darfSichten?: boolean;
+  /** Zeilenfehler und Schleuse der Seite; ohne sie bleibt die Sichtung Anzeige. */
+  rueckmeldung?: ZeilenRueckmeldung;
+  /** Öffnet „Verbleib erfassen“ (Dialog der Seite); ohne den Weg bleibt der Verbleib Anzeige. */
+  onVerbleib?: (p: Person) => void;
+  /** Das Zeilenmenü (design.md D3); fehlt es, gibt es keine Aktionsspalte (Gerät). */
+  menue?: PersonenZeilenMenue;
+}
+
+/** Die Handlungen des Zeilenmenüs. */
+export type PersonZeilenAktion = 'sichten' | 'verbleib' | 'verorten';
+
+export interface PersonenZeilenMenue {
+  /** Breite der Aktionsspalte: Steuerhöhe der Dichte plus Zellpolster beidseits. */
+  breite: number;
+  /** Lagekarte für den Verortungsauftrag: frei, oder gesperrt mit Grund (LFH-888). */
+  lagekarte: 'frei' | 'gesperrt';
+  onWahl: (aktion: PersonZeilenAktion, p: Person) => void;
+}
+
+/** Wortlaut des Verortungsauftrags, wie auf der Detailseite. */
+const VERORTEN = 'Auf Lagekarte verorten';
+
+/**
+ * Die Einträge des Zeilenmenüs einer Person (LLH-1130, design.md D3): „Sichten“, „Verbleib
+ * erfassen“, „Auf Lagekarte verorten“. Nur für eine angetroffene, nicht stornierte Person und nur
+ * mit Schreibrecht; eine gesperrte Lagekarte steht gesperrt mit Grund da (M16). Gebündelt wird ab
+ * drei Einträgen (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“); darunter gibt es
+ * kein Menü, Sichtung und Verbleib bleiben in ihren Zellen.
+ */
+export function zeilenMenueEintraege(
+  p: Person,
+  bedienung: PersonenBedienung | undefined,
+): MenueEintrag<PersonZeilenAktion>[] {
+  const menue = bedienung?.menue;
+  if (!menue || !bedienung.darfSchreiben || !istAngetroffen(p) || p.storniert_at) return [];
+  const eintraege: MenueEintrag<PersonZeilenAktion>[] = [
+    ...((bedienung.darfSichten ?? bedienung.darfSchreiben)
+      ? [{ key: 'sichten' as const, label: 'Sichten' }]
+      : []),
+    ...(bedienung.onVerbleib ? [{ key: 'verbleib' as const, label: 'Verbleib erfassen' }] : []),
+    menue.lagekarte === 'gesperrt'
+      ? { key: 'verorten', label: sprungGesperrtText(VERORTEN), gesperrt: true }
+      : { key: 'verorten', label: VERORTEN },
+  ];
+  return eintraege.length >= 3 ? eintraege : [];
+}
+
+/** Zugänglicher Name des Menüauslösers, mit Kennung (mehrere Menüs auf einer Seite). */
+export function zeilenMenueName(p: Pick<Person, 'registrier_nr'>): string {
+  return `Aktionen zu ${registrierAnzeige(p.registrier_nr)}`;
+}
+
+/** Spaltenkopf ohne Beschriftung, aber mit Namen für die Hilfstechnik. */
+const NUR_VORGELESEN: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
+};
+
+/** Ist die Sichtung dieser Zeile bedienbar? Nur eine angetroffene, nicht stornierte Person. */
+function sichtungBedienbar(p: Person, b: PersonenBedienung | undefined): boolean {
+  return (
+    b?.rueckmeldung != null &&
+    (b.darfSichten ?? b.darfSchreiben) &&
+    istAngetroffen(p) &&
+    !p.storniert_at
+  );
 }
 
 /**
@@ -202,7 +286,7 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
   );
 }
 
-function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: ZustandBedienung }) {
+function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienung }) {
   const { rollen } = useRollen();
   // Nicht bearbeitbar: eine pausierte Änderung überschriebe nach der Rückkehr des Netzes einen
   // Wert, den niemand gesehen hat (LFH-1095).
@@ -237,16 +321,45 @@ export function verbleibText(
   return p.aktueller_verbleib || verbleibLabel(k);
 }
 
-function VerbleibZelle({ p, uhsName }: { p: Person; uhsName: (id: number) => string | undefined }) {
+/**
+ * Verbleib-Zelle. Bei offenem Verbleib einer angetroffenen Person steht dort „Verbleib erfassen“
+ * (LLH-1130, design.md D2): die Lücke schließt in der Zelle, in der sie steht, auch unter „Nur
+ * Lücken zeigen“. Der Knopf öffnet den Dialog der Seite (`VerbleibErfassung`, Fehler im Dialog).
+ */
+function VerbleibZelle({
+  p,
+  uhsName,
+  bedienung,
+}: {
+  p: Person;
+  uhsName: (id: number) => string | undefined;
+  bedienung?: PersonenBedienung;
+}) {
   const { rollen } = useRollen();
   const text = verbleibText(p, uhsName);
-  if (text == null) return <Leerzelle offen={lueckenVon(p).verbleib} />;
-  return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
+  if (text != null) return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
+  const offen = lueckenVon(p).verbleib;
+  const onVerbleib = bedienung?.darfSchreiben && !p.storniert_at ? bedienung.onVerbleib : undefined;
+  if (!offen || !onVerbleib) return <Leerzelle offen={offen} />;
+  return (
+    <Button
+      type="link"
+      aria-label={`Verbleib erfassen für ${registrierAnzeige(p.registrier_nr)}`}
+      // Der Klick gehört der Zelle, sonst öffnete die Zeile die Detailseite.
+      onClick={(e) => {
+        e.stopPropagation();
+        onVerbleib(p);
+      }}
+      style={{ paddingInline: 0 }}
+    >
+      Verbleib erfassen
+    </Button>
+  );
 }
 
 export function personenSpalten(
   uhsName: (id: number) => string | undefined,
-  zustand?: ZustandBedienung,
+  bedienung?: PersonenBedienung,
 ) {
   return spaltenFuer<Person>()([
     {
@@ -272,7 +385,21 @@ export function personenSpalten(
       suchText: nameText,
       render: (_, p) => <PersonZelle p={p} />,
     },
-    { title: 'Sichtung', key: 'sk', width: 104, render: (_, p) => <SkTag p={p} /> },
+    {
+      title: 'Sichtung',
+      key: 'sk',
+      width: 104,
+      render: (_, p) =>
+        bedienung?.rueckmeldung && sichtungBedienbar(p, bedienung) ? (
+          <ZeilenSichtung
+            p={p}
+            einsatzId={bedienung.einsatzId}
+            rueckmeldung={bedienung.rueckmeldung}
+          />
+        ) : (
+          <SkTag p={p} />
+        ),
+    },
     {
       title: 'Zustand / Verdacht',
       key: 'zustand',
@@ -280,7 +407,7 @@ export function personenSpalten(
       // und Vermerk.
       width: 140,
       suchText: (p) => p.zustand,
-      render: (_, p) => <ZustandZelle p={p} bedienung={zustand} />,
+      render: (_, p) => <ZustandZelle p={p} bedienung={bedienung} />,
     },
     {
       title: 'Status',
@@ -299,7 +426,7 @@ export function personenSpalten(
       title: 'Verbleib',
       key: 'verbleib',
       suchText: (p) => verbleibText(p, uhsName),
-      render: (_, p) => <VerbleibZelle p={p} uhsName={uhsName} />,
+      render: (_, p) => <VerbleibZelle p={p} uhsName={uhsName} bedienung={bedienung} />,
     },
     {
       title: 'Vermerk',
@@ -333,7 +460,50 @@ export function personenSpalten(
       sortWert: seitWert,
       render: (_, p) => <ZeitAnzeige wert={seitWert(p)} format="dtg" />,
     },
+    /*
+     * Die Aktionsspalte (design.md D3): schmal, feste Breite, ohne Beschriftung, nicht abwählbar.
+     * Öffnen bleibt der Zeilenklick; der Auslöser fängt seinen Klick ab. Unter `md` trägt der
+     * Kartenfuß dasselbe Menü (`weitere` des Kartenplans).
+     */
+    ...(bedienung?.menue
+      ? [
+          {
+            title: <span style={NUR_VORGELESEN}>Aktionen</span>,
+            etikett: 'Aktionen',
+            key: 'aktionen' as const,
+            width: bedienung.menue.breite,
+            immerSichtbar: true,
+            render: (_: unknown, p: Person) => (
+              <ZeilenMenue p={p} bedienung={bedienung} menue={bedienung.menue!} />
+            ),
+          },
+        ]
+      : []),
   ]);
+}
+
+function ZeilenMenue({
+  p,
+  bedienung,
+  menue,
+}: {
+  p: Person;
+  bedienung: PersonenBedienung;
+  menue: PersonenZeilenMenue;
+}) {
+  const halte = bedienung.rueckmeldung?.halte;
+  return (
+    // Der Auslöser reicht seinen Klick weiter (`MenueAusloeser`); hier endet er, sonst öffnete die
+    // Zeile die Detailseite.
+    <div onClick={(e) => e.stopPropagation()}>
+      <MenueAusloeser<PersonZeilenAktion>
+        eintraege={zeilenMenueEintraege(p, bedienung)}
+        zugaenglicherName={zeilenMenueName(p)}
+        onWahl={(aktion) => menue.onWahl(aktion, p)}
+        onOffenAenderung={halte ? (offen) => halte(`menue:${p.id}`, offen) : undefined}
+      />
+    </div>
+  );
 }
 
 /** Die Schlüsselmenge des Registers — Grundlage jedes typgeprüften Kartenplan-Slots. */

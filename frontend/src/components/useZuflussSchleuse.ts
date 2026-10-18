@@ -106,10 +106,16 @@ export function useZuflussSchleuse<T>(
     /** Im Baum hält der Stand auch die Zeilen samt Kindern (`gerippe`). */
     mitGerippe: boolean;
     wurzel: RefObject<HTMLElement | null>;
+    /**
+     * Dritte Bedingung neben Fokus und Zeiger (LLH-1130): ein Popover, Menü oder Dialog einer
+     * Zeile ist offen. Es liegt im Portal und hält auch dort, wo weder Fokus noch Zeiger zählen
+     * (Touch). Vorgabe `false`.
+     */
+    halten?: boolean;
   },
 ): ZuflussBereich {
   const { stand: schleuse, setStand: setSchleuse } = steuerung;
-  const { zeilen, schluessel, aktiv, gruppeVon, mitGerippe, wurzel } = args;
+  const { zeilen, schluessel, aktiv, gruppeVon, mitGerippe, wurzel, halten = false } = args;
 
   /**
    * Der eingefrorene Stand, Folge UND Gruppenzugehörigkeit. Beide Einfrierstellen (`'neu'`-Auftrag
@@ -167,10 +173,25 @@ export function useZuflussSchleuse<T>(
    * ODER ein Maus- bzw. Stiftzeiger über der Sicht schließt; offen erst, wenn keine mehr gilt. Wer
    * mit der Maus auf eine Zeile zielt, hat oft noch nicht geklickt.
    */
-  const bedingung = useRef({ zeiger: false, fokus: false });
+  const bedingung = useRef({ zeiger: false, fokus: false, halten });
   const checkOffen = useCallback(() => {
-    if (!bedingung.current.zeiger && !bedingung.current.fokus) setSchleuse({ art: 'offen' });
+    const b = bedingung.current;
+    if (!b.zeiger && !b.fokus && !b.halten) setSchleuse({ art: 'offen' });
   }, [setSchleuse]);
+
+  /**
+   * `halten` schließt wie ein Fokuseintritt und öffnet erst, wenn auch Fokus und Zeiger fehlen.
+   * Nur der WECHSEL wirkt: `schliessen` ist je Datenstand neu, ein Lauf bei jedem Zufluss fröre
+   * sonst den neuen Stand ein.
+   */
+  const haltenVorher = useRef(halten);
+  useLayoutEffect(() => {
+    bedingung.current.halten = halten;
+    if (haltenVorher.current === halten) return;
+    haltenVorher.current = halten;
+    if (halten) schliessen();
+    else checkOffen();
+  }, [halten, schliessen, checkOffen]);
 
   const betreten = useCallback(() => {
     bedingung.current.fokus = true;
