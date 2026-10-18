@@ -539,7 +539,11 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
     await userEvent.type(feld, 'trinkt Wasser');
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Notiz anlegen' }));
     await waitFor(() => expect(gesendet.text).toBe('trinkt Wasser'));
-    await waitFor(() => expect(feld).toHaveValue(''));
+    // Nach dem Erfolg ist die Zeile leer. Neu gesucht: antd ersetzt das Eingabeelement beim
+    // Sperren während des Speicherns.
+    await waitFor(() =>
+      expect(within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' })).toHaveValue(''),
+    );
   });
 
   /** Spec `personen-detail`, „Ohne Schreibrecht“: der Kopf zeigt alles, bedient nichts. */
@@ -1233,9 +1237,7 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
     render(einsatzAktiv, gesichtet);
     await screen.findByRole('heading', { name: /Person R-001/ });
     const zeit = within(kopf()).getByText(/^gesichtet /);
-    expect(zeit).toHaveTextContent(
-      /^gesichtet \d{6}\p{Lu}{3}\d{2} · vor 5 min · bestätigt: Dr\. Weiß$/u,
-    );
+    expect(zeit).toHaveTextContent(/^gesichtet \d{6} · vor 5 min · bestätigt: Dr\. Weiß$/);
     expect(within(kopf()).getByText('SK I · akut')).toBeInTheDocument();
 
     await act(async () => {
@@ -1287,7 +1289,7 @@ describe('PersonenDetailPage — Patientenkopf (LLH-1094)', () => {
     expect(within(kopf()).getByText('Verbleib')).toBeInTheDocument();
     expect(within(kopf()).queryByText('Aufenthalt')).toBeNull();
     expect(within(kopf()).getByText(/^Transport → KH Mitte \(RTW 1\) ·/)).toHaveTextContent(
-      /\d{6}\p{Lu}{3}\d{2}$/u,
+      /· \d{6}$/,
     );
     // Mit Verbleib gibt es kein „In UHS aufnehmen“ (Grundriss-Konsistenz).
     expect(within(kopf()).queryByRole('button', { name: 'In UHS aufnehmen' })).toBeNull();

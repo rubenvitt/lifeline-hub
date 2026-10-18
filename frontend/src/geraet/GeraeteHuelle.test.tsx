@@ -299,25 +299,45 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
   it('Patientenansicht: kein Sprung in Lagekarte oder andere Module, kein Status und Storno', async () => {
     vi.useRealTimers();
     stelleBereit();
+    server.use(
+      http.get('/api/einsaetze/7/personen/10', () =>
+        HttpResponse.json({
+          ...wartend,
+          aufenthalt: {
+            uhs_id: 2,
+            uhs_bezeichnung: 'UHS Nord',
+            platz_id: null,
+            platz_bezeichnung: null,
+            seit: '2026-10-04 09:05:00',
+          },
+          sichtungen: [],
+          notizen: [],
+          verbleib: [],
+          abgleiche: [],
+        } as PersonDetail),
+      ),
+    );
     renderApp('/geraet/7/patienten/10');
     expect(await screen.findByRole('heading', { level: 1, name: /Person R-001/ })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
-    expect(screen.queryByText(/Zuordnungen/)).toBeNull();
+    expect(screen.queryByText(/Bezüge/)).toBeNull();
     expect(screen.queryByText(/Fotos und Dateien/)).toBeNull();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Weitere Aktionen zu Person/ }));
-    await waitFor(() =>
-      expect(
-        document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
-      ).not.toBeNull(),
-    );
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    expect(within(menue).getByText('Bearbeiten')).toBeInTheDocument();
-    expect(within(menue).queryByText('Stornieren')).toBeNull();
-    expect(within(menue).queryByText(/^→/)).toBeNull();
+    // Spec `personen-detail`, „Am UHS-Tablet nur lesen“: der Aufenthalt steht im Kopf, ohne
+    // „Verlegen“ und „Austragen“. Nachsichten geht am UHS-Tablet weiter.
+    const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+    expect(within(kopf).getByText(/^UHS Nord · Wartebereich · seit/)).toBeVisible();
+    expect(
+      within(kopf).queryByRole('button', { name: /In UHS aufnehmen|Verlegen|Austragen/ }),
+    ).toBeNull();
+    expect(
+      within(kopf).getByRole('button', { name: 'Nachsichten, aktuell SK II · schwer' }),
+    ).toBeVisible();
+    // Primäraktion „Bearbeiten“; ohne Status und Storno bleibt kein Menüeintrag, also kein Menü.
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Weitere Aktionen zu Person/ })).toBeNull();
+    expect(screen.queryByText('Stornieren')).toBeNull();
+    expect(screen.queryByText(/^Auf „.*“ setzen$/)).toBeNull();
   });
 
   it('Grundriss: ohne Platzbearbeitung, Status, Umschalter, Material und Dateien', async () => {

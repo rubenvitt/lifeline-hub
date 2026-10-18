@@ -190,24 +190,24 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     expect(await screen.findByText(/Erfasst als R-003 · untergebracht/)).toBeVisible();
   });
 
-  it('Person: „Verbleib erfassen“ statt „Sichten“, kein Sichten im Menü', async () => {
+  it('Person: „Verbleib erfassen“ im Kopf, die Sichtung nur lesend, kein Menü ohne Einträge', async () => {
     bereit();
     renderApp('/geraet/7/betroffene/10');
     expect(await screen.findByRole('heading', { level: 1, name: /Person R-001/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Verbleib erfassen' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Sichten' })).toBeNull();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /Weitere Aktionen zu Person/ }));
-    await waitFor(() =>
-      expect(
-        document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]'),
-      ).not.toBeNull(),
-    );
-    const menue = document.querySelector<HTMLElement>(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    )!;
-    expect(within(menue).getByText('Bearbeiten')).toBeInTheDocument();
-    expect(within(menue).queryByText(/Sichten/)).toBeNull();
+    // Sichten, Verbleib und Notiz stehen im Patientenkopf (LLH-1094); gesichtet wird an der
+    // Betreuungsstelle nicht (LFH-1041), die Sichtung steht dort nur als Anzeige.
+    const kopf = screen.getByRole('region', { name: 'Patientenkopf' });
+    expect(within(kopf).getByRole('button', { name: 'Verbleib erfassen' })).toBeVisible();
+    expect(within(kopf).getByText('ungesichtet')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Sichten/ })).toBeNull();
+    // Kein Aufnehmen, Verlegen oder Austragen am Gerät (`person-zuordnungen`).
+    expect(
+      within(kopf).queryByRole('button', { name: /In UHS aufnehmen|Verlegen|Austragen/ }),
+    ).toBeNull();
+    // Die Primäraktion ist „Bearbeiten“; Status und Storno gibt es am Gerät nicht, also auch
+    // keinen Auslöser für ein leeres Menü.
+    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Weitere Aktionen zu Person/ })).toBeNull();
   });
 });
 

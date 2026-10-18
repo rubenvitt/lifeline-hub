@@ -4,7 +4,8 @@ import { kontoAnlegen } from './konto-anlegen';
 
 // Verbleib „Notunterkunft" an eine Betreuungsstelle knüpfen — Durchstich gegen das echte
 // Backend. Die Einzelheiten prüfen Vitest und `tests/verbleib_betreuungsstelle.rs`; hier geht
-// es um das Zusammenspiel: Dialog → POST → Personenseite, und eine ZWEITE geöffnete
+// es um das Zusammenspiel: Paneel „Verbleib erfassen" im Patientenkopf (LLH-1094, kein Dialog)
+// → POST → Personenseite, und eine ZWEITE geöffnete
 // Betreuungsseite, die „davon namentlich 1" ohne Neuladen bekommt (Live-Fan-out
 // `person → betreuung`). Dazu der Gegenfall ohne Modul Betreuung.
 
@@ -30,9 +31,24 @@ async function senden(
   return (await antwort.json()) as { id: number };
 }
 
-/** Wählt in einem antd-Select des Dialogs einen Eintrag (der echte Optionsknoten, nicht der a11y-Spiegel). */
+/** Das Paneel „Verbleib erfassen", das der Knopf im Patientenkopf aufklappt. */
+function verbleibPaneel(page: Page) {
+  return page.getByRole('region', { name: 'Verbleib erfassen' });
+}
+
+/** Klappt das Paneel über den Knopf am Aufenthalt bzw. Verbleib des Patientenkopfs auf. */
+async function verbleibPaneelOeffnen(page: Page) {
+  const kopf = page.getByRole('region', { name: 'Patientenkopf' });
+  await kopf.getByRole('button', { name: 'Verbleib erfassen', expanded: false }).click();
+  await expect(verbleibPaneel(page)).toBeVisible();
+  // Kein Dialog mehr: das Paneel steht in der Ansicht.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  return verbleibPaneel(page);
+}
+
+/** Wählt in einem antd-Select des Paneels einen Eintrag (der echte Optionsknoten, nicht der a11y-Spiegel). */
 async function waehle(page: Page, feld: string, eintrag: string) {
-  await waehleIn(page.getByRole('dialog').getByRole('combobox', { name: feld }), eintrag);
+  await waehleIn(verbleibPaneel(page).getByRole('combobox', { name: feld }), eintrag);
 }
 
 async function zweiteSitzung(browser: Browser, benutzer: string, pw: string): Promise<Page> {
@@ -63,7 +79,7 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
   await senden(page, 'patch', `${basis}/betreuung/stellen/${sid}`, { status: 'in_betrieb' });
   await senden(page, 'post', `${basis}/betreuung/stellen/${sid}/belegungen`, { belegt: 40 });
   const { id: p } = await senden(page, 'post', `${basis}/personen`, {});
-  // Gesichtet → die Primäraktion der Seite ist „Verbleib erfassen".
+  // Gesichtet → der Patientenkopf bietet „Verbleib erfassen" an.
   await senden(page, 'post', `${basis}/personen/${p}/sichtung`, { kategorie: 'sk3' });
 
   // Zweite Sitzung auf der Betreuungsseite — vorher ohne namentliche Zahl.
@@ -74,17 +90,18 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
   await expect(zeile).not.toContainText('namentlich');
 
   await page.goto(`/einsaetze/${e}/personen/${p}`);
-  await page.getByRole('button', { name: 'Verbleib erfassen' }).first().click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
+  const paneel = await verbleibPaneelOeffnen(page);
   await waehle(page, 'Art', 'Notunterkunft');
   await waehle(page, 'Betreuungsstelle (optional)', 'NU Turnhalle Nord');
-  await expect(dialog.getByLabel('Ziel')).toHaveValue('NU Turnhalle Nord');
+  await expect(paneel.getByLabel('Ziel')).toHaveValue('NU Turnhalle Nord');
   await page.screenshot({ path: info.outputPath('dialog-stelle-gewaehlt.png') });
 
-  await dialog.getByRole('button', { name: 'Erfassen' }).click();
-  await expect(dialog).toBeHidden();
-  await expect(page.getByText('Notunterkunft → NU Turnhalle Nord').first()).toBeVisible();
+  await paneel.getByRole('button', { name: 'Verbleib erfassen' }).click();
+  // Nach dem Erfolg klappt das Paneel zu; der Kopf zeigt den Verbleib.
+  await expect(paneel).toHaveCount(0);
+  await expect(
+    page.getByRole('region', { name: 'Patientenkopf' }).locator('[data-lfh="aufenthalt"]'),
+  ).toContainText('Notunterkunft → NU Turnhalle Nord');
 
   // Die zweite Seite bekommt die Zahl über das Personen-Ereignis, ohne Neuladen.
   await expect(zeile).toContainText('davon namentlich 1', { timeout: 30_000 });
@@ -124,11 +141,10 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
 
   const seite = await zweiteSitzung(browser, name, `${name}pw1`);
   await seite.goto(`/einsaetze/${e}/personen/${p}`);
-  await seite.getByRole('button', { name: 'Verbleib erfassen' }).first().click();
+  const paneel = await verbleibPaneelOeffnen(seite);
   await waehle(seite, 'Art', 'Notunterkunft');
-  const dialog = seite.getByRole('dialog');
-  await expect(dialog.getByLabel('Ziel')).toBeVisible();
-  await expect(dialog.getByRole('combobox', { name: 'Betreuungsstelle (optional)' })).toHaveCount(
+  await expect(paneel.getByLabel('Ziel')).toBeVisible();
+  await expect(paneel.getByRole('combobox', { name: 'Betreuungsstelle (optional)' })).toHaveCount(
     0,
   );
   await seite.screenshot({ path: info.outputPath('dialog-ohne-betreuung.png') });

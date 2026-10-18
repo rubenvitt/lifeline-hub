@@ -15,8 +15,8 @@ import { FakeEventSource } from '../test/eventSource';
 
 /**
  * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Dialoge nennen
- * den Grund und warten auf die Antwort, Formulare und Blöcke tragen ihn selbst, Zeilen an sich,
- * Kopfaktionen im Seitenhinweis. Kein Fehler-Toast.
+ * den Grund und warten auf die Antwort, Paneele des Patientenkopfs, Formulare und Blöcke tragen ihn
+ * selbst, Zeilen an sich, Kopfaktionen im Seitenhinweis. Kein Fehler-Toast.
  */
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
@@ -169,9 +169,18 @@ async function ausMenue(name: RegExp) {
   await userEvent.click(within(menue as HTMLElement).getByRole('menuitem', { name }));
 }
 
-async function klappeZuordnungenAuf() {
+async function klappeBezuegeAuf() {
   await kopfueberschrift();
-  await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
+  await userEvent.click(screen.getByRole('button', { name: /Bezüge/ }));
+}
+
+/** Der Patientenkopf (LLH-1094) und ein aufgeklapptes Paneel darin. */
+const kopf = () => screen.getByRole('region', { name: 'Patientenkopf' });
+const paneel = (name: string) => within(kopf()).getByRole('region', { name });
+
+/** Das Bearbeiten-Formular der Personendaten öffnen (Primäraktion des Seitenkopfs). */
+async function starteBearbeiten() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
 }
 
 /**
@@ -193,25 +202,31 @@ async function waehle(dialog: HTMLElement, feld: string | RegExp, eintrag: RegEx
   await userEvent.click(await screen.findByTitle(eintrag));
 }
 
-describe('PersonenDetailPage — Sichtung im Dialog (LFH-1077)', () => {
+describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)', () => {
   async function sichte() {
-    await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
-    const dialog = await offenerDialog();
-    await userEvent.click(within(dialog).getByRole('radio', { name: /^SK II,/ }));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
-    return dialog;
+    await kopfueberschrift();
+    await userEvent.click(
+      within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' }),
+    );
+    const bereich = paneel('Sichtung erfassen');
+    await userEvent.click(within(bereich).getByRole('radio', { name: /^SK II,/ }));
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Übernehmen' }));
+    return bereich;
   }
 
-  it('nennt den Grund im Dialog, der Dialog bleibt offen, kein Toast', async () => {
+  it('nennt den Grund im Paneel, das Paneel bleibt offen, kein Dialog, kein Toast', async () => {
     render(detail, [
       http.post('/api/einsaetze/1/personen/10/sichtung', () => abgelehnt('Person storniert')),
     ]);
-    const dialog = await sichte();
+    const bereich = await sichte();
 
-    const grund = await within(dialog).findByRole('alert');
+    const grund = await within(bereich).findByRole('alert');
     expect(grund).toHaveTextContent('Sichtung nicht gespeichert');
     expect(grund).toHaveTextContent('Person storniert');
-    expect(dialog.closest('.ant-zoom-leave')).toBeNull();
+    expect(bereich).toBeInTheDocument();
+    // Die Wahl bleibt stehen, bis erneut abgeschickt wird.
+    expect(within(bereich).getByRole('radio', { name: /^SK II,/ })).toBeChecked();
+    expect(screen.queryByRole('dialog')).toBeNull();
     keinToast();
   });
 
@@ -224,38 +239,94 @@ describe('PersonenDetailPage — Sichtung im Dialog (LFH-1077)', () => {
         return abgelehnt('Person storniert');
       }),
     ]);
-    const dialog = await sichte();
-    await within(dialog).findByRole('alert');
+    const bereich = await sichte();
+    await within(bereich).findByRole('alert');
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
-    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
-    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(within(bereich).queryByRole('alert')).toBeNull());
+    expect(within(bereich).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    // Ein laufendes Speichern sperrt nur das eigene Paneel: die Notizzeile bleibt bedienbar.
+    expect(within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' })).toBeEnabled();
+    expect(within(kopf()).getByRole('button', { name: 'Notiz anlegen' })).toBeEnabled();
   });
 
   it('Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     render(detail, [
       http.post('/api/einsaetze/1/personen/10/sichtung', () => abgelehnt('Person storniert')),
     ]);
-    const dialog = await sichte();
-    await within(dialog).findByRole('alert');
+    const bereich = await sichte();
+    await within(bereich).findByRole('alert');
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Sichten' }));
-    const wieder = await offenerDialog();
-    expect(within(wieder).queryByRole('alert')).toBeNull();
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Abbrechen' }));
+    expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull();
+    await userEvent.click(
+      within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' }),
+    );
+    expect(within(paneel('Sichtung erfassen')).queryByRole('alert')).toBeNull();
   });
 });
 
-describe('PersonenDetailPage — Zuweisungen im Dialog (LFH-1077)', () => {
-  it('UHS zuweisen: Grund im Dialog; Abbrechen und Wiederöffnen räumen ihn', async () => {
+/** Spec `personen-detail`, Szenario „Ablehnung am Ort“. */
+describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)', () => {
+  const angetroffen = { ...detail, status: 'betroffen' } as PersonDetail;
+
+  async function erfasseVerbleib() {
+    await kopfueberschrift();
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Verbleib erfassen' }));
+    const bereich = paneel('Verbleib erfassen');
+    await userEvent.click(within(bereich).getByRole('combobox', { name: 'Art' }));
+    await userEvent.click(await screen.findByTitle('Transport'));
+    await userEvent.type(within(bereich).getByRole('textbox', { name: 'Ziel' }), 'KH Mitte');
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Verbleib erfassen' }));
+    return bereich;
+  }
+
+  it('nennt den Grund im Paneel, die Eingaben bleiben, die übrigen Paneele bleiben bedienbar', async () => {
+    render(angetroffen, [
+      http.post('/api/einsaetze/1/personen/10/verbleib', () => abgelehnt('Person storniert')),
+    ]);
+    const bereich = await erfasseVerbleib();
+
+    const grund = await within(bereich).findByRole('alert');
+    expect(grund).toHaveTextContent('Verbleib nicht erfasst');
+    expect(grund).toHaveTextContent('Person storniert');
+    expect(within(bereich).getByRole('textbox', { name: 'Ziel' })).toHaveValue('KH Mitte');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(within(kopf()).getByRole('textbox', { name: 'Verlaufsnotiz' })).toBeEnabled();
+    expect(
+      within(kopf()).getByRole('button', { name: 'Sichten, bisher ungesichtet' }),
+    ).toBeEnabled();
+    keinToast();
+  });
+
+  it('das nächste Absenden räumt den Grund, Abbrechen ist bis zur Antwort gesperrt', async () => {
+    let zweiter = false;
+    render(angetroffen, [
+      http.post('/api/einsaetze/1/personen/10/verbleib', async () => {
+        if (zweiter) return nie();
+        zweiter = true;
+        return abgelehnt('Person storniert');
+      }),
+    ]);
+    const bereich = await erfasseVerbleib();
+    await within(bereich).findByRole('alert');
+
+    await userEvent.click(within(bereich).getByRole('button', { name: 'Verbleib erfassen' }));
+    await waitFor(() => expect(within(bereich).queryByRole('alert')).toBeNull());
+    expect(within(bereich).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+});
+
+describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', () => {
+  it('In UHS aufnehmen: Grund im Dialog; Abbrechen und Wiederöffnen räumen ihn', async () => {
     render(detail, [
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => abgelehnt('UHS ist voll')),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'UHS zuweisen' }));
+    await kopfueberschrift();
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
     const dialog = await offenerDialog();
     await waehle(dialog, 'Unfallhilfsstelle', /^BHP 50$/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuweisen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufnehmen' }));
 
     const grund = await within(dialog).findByRole('alert');
     expect(grund).toHaveTextContent('Nicht zugewiesen');
@@ -263,11 +334,11 @@ describe('PersonenDetailPage — Zuweisungen im Dialog (LFH-1077)', () => {
     keinToast();
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
-    await userEvent.click(screen.getByRole('button', { name: 'UHS zuweisen' }));
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
     expect(within(await offenerDialog()).queryByRole('alert')).toBeNull();
   });
 
-  it('Tier zuweisen: Grund im Dialog, kein Toast', async () => {
+  it('Bezug zu einem Tier: Grund im Dialog, kein Toast', async () => {
     render(detail, [
       http.get('/api/einsaetze/1/tiere', ({ request }) =>
         HttpResponse.json(
@@ -276,20 +347,20 @@ describe('PersonenDetailPage — Zuweisungen im Dialog (LFH-1077)', () => {
       ),
       http.patch('/api/einsaetze/1/tiere/40', () => abgelehnt('Tier hat schon einen Halter')),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Tier zuweisen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
     const dialog = await offenerDialog();
-    await waehle(dialog, 'Tier', /Minka/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuweisen' }));
+    await waehle(dialog, 'Tier oder Schaden', /Minka/);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Tier hat schon einen Halter',
-    );
+    const grund = await within(dialog).findByRole('alert');
+    expect(grund).toHaveTextContent('Bezug nicht hinzugefügt');
+    expect(grund).toHaveTextContent('Tier hat schon einen Halter');
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();
     keinToast();
   });
 
-  it('Schaden zuweisen: Grund im Dialog, kein Toast', async () => {
+  it('Bezug zu einem Schaden: Grund im Dialog, kein Toast', async () => {
     render(detail, [
       http.get('/api/einsaetze/1/schaeden/auswahl', () =>
         HttpResponse.json(
@@ -300,11 +371,11 @@ describe('PersonenDetailPage — Zuweisungen im Dialog (LFH-1077)', () => {
       ),
       http.patch('/api/einsaetze/1/schaeden/51', () => abgelehnt('Schaden abgeschlossen')),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Schaden zuweisen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
     const dialog = await offenerDialog();
-    await waehle(dialog, 'Schaden', /S-011/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuweisen' }));
+    await waehle(dialog, 'Tier oder Schaden', /S-011/);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hinzufügen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Schaden abgeschlossen');
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();
@@ -493,7 +564,7 @@ describe('PersonenDetailPage — Bearbeiten und Notiz (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Geburtsdatum ungültig')),
     ]);
     await kopfueberschrift();
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     const grund = await screen.findByRole('alert');
@@ -512,7 +583,7 @@ describe('PersonenDetailPage — Bearbeiten und Notiz (LFH-1077)', () => {
       }),
     ]);
     await kopfueberschrift();
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Geburtsdatum ungültig');
 
@@ -526,12 +597,12 @@ describe('PersonenDetailPage — Bearbeiten und Notiz (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Geburtsdatum ungültig')),
     ]);
     await kopfueberschrift();
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Geburtsdatum ungültig');
 
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await screen.findByRole('button', { name: 'Speichern' });
     expect(screen.queryByText('Geburtsdatum ungültig')).toBeNull();
   });
@@ -541,7 +612,7 @@ describe('PersonenDetailPage — Bearbeiten und Notiz (LFH-1077)', () => {
       http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Zwischenzeitlich geändert', 409)),
     ]);
     await kopfueberschrift();
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
 
     expect(await screen.findByRole('button', { name: 'Überschreiben' })).toBeInTheDocument();
@@ -573,18 +644,22 @@ describe('PersonenDetailPage — Bearbeiten und Notiz (LFH-1077)', () => {
   });
 });
 
-describe('PersonenDetailPage — Zuordnungen und Abgleich (LFH-1077)', () => {
-  it('Austragen: der Grund steht an der UHS-Verortung, kein Toast', async () => {
+describe('PersonenDetailPage — Aufenthalt, Bezüge und Abgleich (LFH-1077)', () => {
+  it('Austragen: der Grund steht im Kopf am Aufenthalt, kein Toast', async () => {
     render({ ...detail, aktuelle_uhs_id: 5 } as PersonDetail, [
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => abgelehnt('Bereits entlassen')),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
+    await kopfueberschrift();
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
 
     const grund = await screen.findByRole('alert');
     expect(grund).toHaveTextContent('Nicht ausgetragen');
     expect(grund).toHaveTextContent('Bereits entlassen');
-    expect(grund.closest('[data-lfh="uhs-verortung"]')).not.toBeNull();
+    // Im Feld „Aufenthalt“ des Kopfs, unter den Knöpfen — nicht im Seitenhinweis.
+    const feld = grund.closest<HTMLElement>('[data-lfh="datenfeld"]');
+    expect(feld?.querySelector('dt')).toHaveTextContent('Aufenthalt');
+    expect(within(feld!).getByRole('button', { name: 'Austragen' })).toBeInTheDocument();
+    expect(seitenHinweis()).toBeNull();
     keinToast();
   });
 
@@ -607,11 +682,15 @@ describe('PersonenDetailPage — Zuordnungen und Abgleich (LFH-1077)', () => {
         HttpResponse.json({ ...zweitesTier, halter_person_id: null }),
       ),
     ]);
-    await klappeZuordnungenAuf();
+    await klappeBezuegeAuf();
     const zeile = async (nr: string) =>
-      (await screen.findByText(new RegExp(nr))).closest('[data-lfh="zuordnung"]') as HTMLElement;
-    await userEvent.click(within(await zeile('T-007')).getByRole('button', { name: 'lösen' }));
-    await userEvent.click(within(await zeile('T-008')).getByRole('button', { name: 'lösen' }));
+      (await screen.findByText(new RegExp(nr))).closest('[data-lfh="bezug"]') as HTMLElement;
+    await userEvent.click(
+      within(await zeile('T-007')).getByRole('button', { name: 'Bezug zu T-007 lösen' }),
+    );
+    await userEvent.click(
+      within(await zeile('T-008')).getByRole('button', { name: 'Bezug zu T-008 lösen' }),
+    );
     await act(async () => lehneAb());
 
     expect(await within(await zeile('T-007')).findByText('Tier storniert')).toHaveAttribute(
@@ -621,7 +700,11 @@ describe('PersonenDetailPage — Zuordnungen und Abgleich (LFH-1077)', () => {
     keinToast();
   });
 
-  it('Tier lösen: ist die Zeile fort, steht der Grund im Seitenhinweis', async () => {
+  /**
+   * Ist die Zeile fort (live von anderer Seite gelöst), steht der Grund oben in den Bezügen —
+   * dem Ort der Handlung, der noch sichtbar ist — und nicht im Seitenhinweis.
+   */
+  it('Tier lösen: ist die Zeile fort, steht der Grund oben in den Bezügen', async () => {
     const { client } = render(
       detail,
       [
@@ -634,19 +717,17 @@ describe('PersonenDetailPage — Zuordnungen und Abgleich (LFH-1077)', () => {
       ],
       true,
     );
-    await klappeZuordnungenAuf();
-    await screen.findByText(/T-007/);
-    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug zu T-007 lösen' }));
     await screen.findByText('Tier storniert');
 
     act(() => client.setQueryData(einsatzKeys.tiereHalter(1, 10), []));
-    const grund = await waitFor(() => {
-      const g = seitenHinweis()?.querySelector<HTMLElement>('[role="alert"]');
-      expect(g).toBeTruthy();
-      return g as HTMLElement;
-    });
-    expect(grund).toHaveTextContent('Tier T-007 nicht gelöst');
+    await waitFor(() => expect(document.querySelector('[data-lfh="bezug"]')).toBeNull());
+    const bezuege = document.querySelector<HTMLElement>('[data-lfh="bezuege"]')!;
+    const grund = await within(bezuege).findByRole('alert');
+    expect(grund).toHaveTextContent('Bezug T-007 nicht gelöst');
     expect(grund).toHaveTextContent('Tier storniert');
+    expect(seitenHinweis()?.querySelector('[role="alert"]') ?? null).toBeNull();
   });
 
   it('Schaden lösen: der Grund steht an der Zeile, das nächste Lösen räumt ihn', async () => {
@@ -663,13 +744,14 @@ describe('PersonenDetailPage — Zuordnungen und Abgleich (LFH-1077)', () => {
         return abgelehnt('Schaden abgeschlossen');
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await screen.findByText(/S-009/);
-    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug zu S-009 lösen' }));
 
-    expect(await screen.findByText('Schaden abgeschlossen')).toHaveAttribute('data-fehler');
+    const grund = await screen.findByText('Schaden abgeschlossen');
+    expect(grund).toHaveAttribute('data-fehler');
+    expect(grund.closest('[data-lfh="bezug"]')).toHaveTextContent('S-009');
     keinToast();
-    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bezug zu S-009 lösen' }));
     await waitFor(() => expect(screen.queryByText('Schaden abgeschlossen')).toBeNull());
   });
 
@@ -754,10 +836,9 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     await userEvent.type(screen.getByRole('textbox', { name: /Verlaufsnotiz/ }), 'trinkt Wasser');
     await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
     await screen.findByText('Person storniert');
-    await userEvent.click(screen.getByRole('button', { name: /Zuordnungen/ }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     await screen.findByText('Bereits entlassen');
-    await ausMenue(/Bearbeiten/);
+    await starteBearbeiten();
     await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
     await screen.findByText('Geburtsdatum ungültig');
 
@@ -784,9 +865,8 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
         return abgelehnt('Tier storniert');
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await screen.findByText(/T-007/);
-    await userEvent.click(screen.getByRole('button', { name: 'lösen' }));
+    await klappeBezuegeAuf();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bezug zu T-007 lösen' }));
 
     await zurZweiten();
     await act(async () => {
@@ -799,7 +879,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
 });
 
 describe('PersonenDetailPage — Austragen und neue Verortung (LFH-1077)', () => {
-  it('eine gelungene UHS-Zuweisung räumt den Grund eines gescheiterten Austragens', async () => {
+  it('ein gelungenes Verlegen räumt den Grund eines gescheiterten Austragens', async () => {
     render({ ...detail, aktuelle_uhs_id: 5 } as PersonDetail, [
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
         const body = (await request.json()) as { art: string };
@@ -808,14 +888,14 @@ describe('PersonenDetailPage — Austragen und neue Verortung (LFH-1077)', () =>
           : HttpResponse.json({ ...detail, aktuelle_uhs_id: 5 });
       }),
     ]);
-    await klappeZuordnungenAuf();
-    await userEvent.click(await screen.findByRole('button', { name: 'Austragen' }));
+    await kopfueberschrift();
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     await screen.findByText('Bereits entlassen');
 
-    await userEvent.click(screen.getByRole('button', { name: 'UHS ändern' }));
+    await userEvent.click(within(kopf()).getByRole('button', { name: 'Verlegen' }));
     const dialog = await offenerDialog();
     await waehle(dialog, 'Unfallhilfsstelle', /^BHP 50$/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Zuweisen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Verlegen' }));
     await schliesst(dialog);
     await waitFor(() => expect(screen.queryByText('Bereits entlassen')).toBeNull());
   });
