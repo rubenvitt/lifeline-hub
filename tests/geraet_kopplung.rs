@@ -3216,6 +3216,77 @@ async fn vorgemerkte_bestaetigung_gilt_zur_erfassungszeit() {
     assert_eq!(s, StatusCode::CONFLICT, "nach der Entlassung erfasst: {v}");
 }
 
+/// LLH-1138 (tasks.md 1.7): die Warteschlange des UHS-Tablets überträgt Sichtung, Verbleib und
+/// Notiz nach einem Netzabbruch ein zweites Mal mit derselben `client_id`. Jeder Eintrag steht
+/// genau einmal im Verlauf, Sichtung und Verbleib je einmal im ETB, mit dem Gerät als Erfasser.
+#[tokio::test]
+async fn replay_am_geraet_legt_jeden_eintrag_einmal_an() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let pid = person_in(&app, &geraet, einsatz, Some(nord)).await["id"]
+        .as_i64()
+        .unwrap();
+    sqlx::query("UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?")
+        .bind(zeit(-1800))
+        .bind(pid)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+    let schritte = [
+        (
+            "sichtung",
+            json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin,
+                   "zeitpunkt_at": zeit(-900), "client_id": "tab-s"}),
+        ),
+        (
+            "notizen",
+            json!({"text": "stabil", "zeitpunkt_at": zeit(-800), "client_id": "tab-n"}),
+        ),
+        (
+            "verbleib",
+            json!({"art": "transport", "bestaetigt_personal_id": aerztin,
+                   "zeitpunkt_at": zeit(-700), "client_id": "tab-v"}),
+        ),
+    ];
+    for (pfad, body) in &schritte {
+        let mut ids = Vec::new();
+        for _ in 0..2 {
+            let (s, v) = anfrage_json(
+                &app,
+                "POST",
+                &format!("{basis}/{pfad}"),
+                &geraet,
+                Some(body),
+            )
+            .await;
+            assert_eq!(s, StatusCode::CREATED, "{pfad}: {v}");
+            ids.push(v["id"].clone());
+        }
+        assert_eq!(
+            ids[0], ids[1],
+            "{pfad}: der Replay liefert den gespeicherten Eintrag"
+        );
+    }
+    let (_, d) = anfrage(&app, "GET", &basis, &admin, None).await;
+    for feld in ["sichtungen", "notizen", "verbleib"] {
+        assert_eq!(d[feld].as_array().unwrap().len(), 1, "{feld}: {d}");
+    }
+    assert_eq!(d["sichtungen"][0]["bestaetigt_name"], "Dr. A. Muster");
+    assert!(
+        d["aufenthalt"].is_null(),
+        "der Transport nimmt die Person aus der UHS: {d}"
+    );
+    let etb = system_etb(&app, &admin, einsatz).await;
+    for wort in ["Sichtung SK II", "abtransportiert", "verlässt"] {
+        let treffer: Vec<_> = etb.iter().filter(|(t, _)| t.contains(wort)).collect();
+        assert_eq!(treffer.len(), 1, "{wort}: {etb:?}");
+        assert_eq!(treffer[0].1, "UHS Nord · Tablet 1");
+    }
+}
+
 /// Laut Zeitachse war die Kraft zur Erfassungszeit schon entlassen: 409 wie bisher.
 #[tokio::test]
 async fn bestaetigung_nach_dem_einsatzende_der_kraft_ist_409() {
