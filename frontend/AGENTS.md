@@ -399,6 +399,11 @@ anwendbar), „nicht geprüft" ist keins.
   (Höhe und Breite) und steht am unteren Rand (LLH-1032, `verpflegung/zaehltasteStil.ts`). Das ist
   eine Ausnahme nach oben, keine Stufenwahl: die übrigen Tasten folgen der Staffel. Nachweis
   `e2e/gate3-trefflaeche.spec.ts` („Ausgabeansicht“).
+- **Kein Zoom wie in einer App** (LLH-1328): der Viewport in `index.html` sperrt den Zoom
+  (`maximum-scale=1.0, user-scalable=no`), `html` in `index.css` den Doppeltipp
+  (`touch-action: manipulation`). Sonst zoomt iOS beim Fokus in jedes Feld unter 16 px Schrift,
+  und die Stufen liegen darunter. Größe trägt die Dichte, kein Feld wird dafür auf 16 px gehoben.
+  Wächter `theme/keinZoom.guard.test.ts`.
 - **Die Stufe folgt dem Gerät, nie der Person** (LFH-724, Spec `bedien-dichte`): beim Start
   gespeicherte Wahl → Zeigerart (grob → `komfortabel`) → `kompakt`, nur in
   `theme/dichte.ts:startDichte`; `handschuh` nur auf Wahl, kein Zuhörer auf die Zeigerart, kein

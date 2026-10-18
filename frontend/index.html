@@ -5,7 +5,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#0c0e11" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Kein Zoom wie in einer App (LLH-1328, `frontend/AGENTS.md`, Bedien-Leitlinie): iOS zoomt
+         sonst beim Fokus in jedes Feld unter 16 px Schrift, und die Dichte-Stufen liegen darunter.
+         Größe trägt die Dichte, nicht der Browser-Zoom. Wächter `theme/keinZoom.guard.test.ts`. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>lifeline-hub</title>
     <!-- Theme synchron vor dem React-Mount setzen, sonst blitzt beim Laden das
          falsche Farbschema auf (FOUC). Logik gespiegelt aus ThemeModeProvider:
