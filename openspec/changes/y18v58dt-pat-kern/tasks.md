@@ -58,7 +58,7 @@ Für jede Aufgabe gilt:
 
 ## 7. Körperschema — LLH-1120 (ixr64ox8)
 
-- [ ] 7.1 `personen/koerperschema/geometrie.ts`: Regionen im normierten Rahmen, drei Umrisse, Trefferzonen für Hand, Fuß und Hals über die Silhouette hinaus. Vitest: jeder Regionsmittelpunkt liegt in jedem Umriss, jede Region hat ihre Ansicht nach den Paaren der Spec.
+- [x] 7.1 `personen/koerperschema/geometrie.ts`: Regionen im normierten Rahmen, drei Umrisse, Trefferzonen für Hand, Fuß und Hals über die Silhouette hinaus. Vitest: jeder Regionsmittelpunkt liegt in jedem Umriss, jede Region hat ihre Ansicht nach den Paaren der Spec.
 - [ ] 7.2 `personen/koerperschema/koerperschemaKern.ts`: Figur aus Geschlecht, Name „Unterarm links, vorn“, feste Nummerierung mit Lücken. Vitest.
 - [ ] 7.3 `personen/Koerperschema.tsx`: Lesen und Markieren, Wahl der Art als Flächen, Speichern mit dem zweiten Tipp, Aufheben am Sternchen, Ablehnung am Schema, Tastatur in fester Folge, vorn und hinten ab `md` bzw. umschaltbar. Vitest für Lesen, Markieren, Aufheben, gesperrt, Ablehnung und Tastatur.
 - [ ] 7.4 Einbau: Datenfeld „Verletzungen“ mit Mini-Figur im Kopf, Paneel „Verletzung markieren“, Schnellansicht lesend. Vitest.
