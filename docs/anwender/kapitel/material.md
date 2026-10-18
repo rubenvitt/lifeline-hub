@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
 ---
 
 ## Überblick
@@ -70,7 +70,9 @@ Für Einsatzleitung und Führungspersonal, wenn ein Posten nicht im Materialstam
 4. „Disponieren“ wählen. Mit „Speichern und nächste“ und „Werte behalten“ bleiben Kategorie und
    Trägerorganisation für den nächsten Posten stehen.
 
-Ad-hoc-Posten tragen in der Liste die Marke „ad-hoc“.
+Ad-hoc-Posten tragen in der Liste die Marke „ad-hoc“. Derselbe Dialog steht an jedem Ort als
+„Material erfassen“, dort ohne das Feld „Ort“ (siehe „Material an Einheit, Fahrzeug, UHS und
+Bereitstellungsraum“ unten).
 
 ### Den Ort ändern
 
@@ -215,14 +217,17 @@ auf demselben Weg gespeichert.
 ### Material an Einheit, Fahrzeug, UHS und Bereitstellungsraum
 
 Jeder Ort zeigt sein Material selbst, mit Menge, Status und der Zahl der Posten: die Seite einer
-Einheit im Paneel „Material“, die Fahrzeugliste im Aufklapper unter „Beladung“, eine UHS im Reiter
-„Material“ und ein Bereitstellungsraum in der Sektion „Material“ (Kapitel [Einheiten](einheiten.md),
+Einheit im Paneel „Material“, die Fahrzeugliste im Aufklapper unter „Beladung“, eine UHS im Bereich
+„Material“ (die Zahl steht auch im Kopf der UHS) und ein Bereitstellungsraum in der Sektion „Material“ (Kapitel [Einheiten](einheiten.md),
 [Fahrzeuge und FMS](fahrzeuge.md), [Unfallhilfsstellen](unfallhilfsstellen.md),
 [Bereitstellungsräume](bereitstellungsraeume.md)). Dort holt „Material zuordnen …“ Posten ohne
 Ort und Posten von einem anderen Ort her, der Knopf zum Lösen („Aus Einheit lösen“, „Vom Fahrzeug
 lösen“, „Lösen“) setzt den Posten auf „ohne Ort“, und „Ausgeben“ öffnet denselben Dialog wie in der
-Liste. Jeder dieser Wege speichert den Ort genauso wie die Angabe „Ort“ in der Liste. Zuordnen,
-Lösen und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; das
+Liste. Die Statusanzeige eines Postens setzt den Status wie die Spalte „Status“ der Liste, mit
+denselben Status je Art. „Material erfassen“ legt Ad-hoc-Material an und ordnet es in einem
+Schritt diesem Ort zu. Jeder dieser Wege speichert genauso wie die Liste. An einer UHS meldet
+„Fehlmenge melden“ fehlendes Material als Nachforderung (Kapitel
+[Nachforderungen](nachforderung.md)). Zuordnen, Erfassen, Status, Lösen und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; das
 Recht auf das Modul des Orts, etwa Einheiten, genügt dafür nicht. Einheit und UHS zeigen ihr
 Material auch ohne diese Freigabe, Fahrzeugliste und Bereitstellungsraum nicht.
 
@@ -233,8 +238,8 @@ Endet ein Ort, bleibt der Posten im Einsatz:
   stornieren.
 - Wird eine Einheit aufgelöst, steht ihr Material ohne Ort.
 - Eine aufgelöste UHS oder ein aufgelöster Bereitstellungsraum nimmt kein Material mehr an;
-  Material, das schon dort liegt, bleibt dort und lässt sich lösen. „Material zuordnen …“ ist dort
-  gesperrt, mit dem Grund „UHS aufgelöst“ bzw. „BR aufgelöst“.
+  Material, das schon dort liegt, bleibt dort und lässt sich lösen. „Material zuordnen …“ und
+  „Material erfassen“ sind dort gesperrt, mit dem Grund „UHS aufgelöst“ bzw. „BR aufgelöst“.
 
 ### Umstellung des Bestands
 
