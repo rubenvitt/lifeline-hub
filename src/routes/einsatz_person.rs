@@ -619,6 +619,12 @@ pub struct PatchBody {
     /// Leeren nähme der Dashboard-Zählung die Grundlage (design.md D4).
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub vermisst_seit: Option<Option<String>>,
+    /// LLH-1326: PAT-Nummer (Tri-State; `null`/`""` leert).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub pat_nummer: Option<Option<String>>,
+    /// LLH-1326: Kontamination (Tri-State; `null` heißt „keine Angabe“, nicht „nein“).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kontamination: Option<Option<bool>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -657,6 +663,7 @@ pub async fn aktualisieren(
     let melder = trimme_tri(body.melder_kontakt);
     let notiz = trimme_tri(body.notiz);
     let zustand = trimme_tri(body.zustand);
+    let pat_nummer = trimme_tri(body.pat_nummer);
 
     // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
     // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).
@@ -705,6 +712,8 @@ pub async fn aktualisieren(
             antreff_lat: body.antreff_lat,
             antreff_lon: body.antreff_lon,
             vermisst_seit: vermisst_seit.as_deref().map(Some),
+            pat_nummer: pat_nummer.as_ref().map(|o| o.as_deref()),
+            kontamination: body.kontamination,
         },
     )
     .await?;

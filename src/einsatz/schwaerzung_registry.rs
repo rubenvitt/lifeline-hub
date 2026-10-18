@@ -279,6 +279,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktueller_verbleib_status", G_TRIAGE),
             // Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der Stelle).
             retain("aktuelle_verbleib_betreuungsstelle_id", G_FK),
+            // LLH-1326 (Change y18v58dt-pat-kern, design.md D4): die PAT-Nummer verknüpft die
+            // Person mit ihrer Papier-Patientenanhängetasche und fällt mit der Behandlung; die
+            // Kontamination ist eine Statuskategorie wie die Sichtung.
+            scrub("pat_nummer", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("kontamination", G_TRIAGE),
         ],
     },
     TabellenRegel {
@@ -3542,6 +3547,7 @@ mod tests {
             (
                 "behandlung".to_string(),
                 menge(&[
+                    "einsatz_person.pat_nummer",
                     "einsatz_person.zustand",
                     "person_sichtung.notiz",
                     "person_uhs_belegung.notiz",

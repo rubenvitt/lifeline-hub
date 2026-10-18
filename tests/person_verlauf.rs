@@ -562,3 +562,95 @@ async fn notiz_weit_in_der_zukunft_ist_400() {
         .unwrap()
         .is_empty());
 }
+
+// ---------- PAT-Nummer und Kontamination (tasks.md 2.1) ----------
+
+#[tokio::test]
+async fn pat_nummer_und_kontamination_einzeln_setzen_und_leeren() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"name":"Muster","zustand":"unterkühlt"}"#,
+    )
+    .await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}");
+    let patch = |body: Value| {
+        let app = app.clone();
+        let admin = admin.clone();
+        let pfad = pfad.clone();
+        async move { anfrage(&app, "PATCH", &pfad, &admin, Some(&body.to_string())).await }
+    };
+
+    let (s, v) = patch(json!({ "pat_nummer": "  A-4711 " })).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["pat_nummer"], "A-4711", "getrimmt");
+    assert_eq!(v["name"], "Muster");
+    assert_eq!(
+        v["zustand"], "unterkühlt",
+        "ein einzelnes Feld leert keine anderen"
+    );
+    assert!(
+        !v.as_object().unwrap().contains_key("kontamination"),
+        "keine Angabe: {v}"
+    );
+
+    let (s, v) = patch(json!({ "kontamination": false })).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["kontamination"], false, "„nein“ ist eine Angabe");
+    assert_eq!(v["pat_nummer"], "A-4711");
+
+    let (s, v) = patch(json!({ "kontamination": true })).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["kontamination"], true);
+
+    let (s, v) = patch(json!({ "pat_nummer": null })).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(!v.as_object().unwrap().contains_key("pat_nummer"), "{v}");
+    assert_eq!(v["kontamination"], true, "die Kontamination bleibt");
+
+    let (s, v) = patch(json!({ "kontamination": null })).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        !v.as_object().unwrap().contains_key("kontamination"),
+        "geleert: {v}"
+    );
+    assert_eq!(v["zustand"], "unterkühlt");
+
+    let (s, _) = patch(json!({ "kontamination": "ja" })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "nur true, false oder null");
+}
+
+#[tokio::test]
+async fn auswahl_traegt_die_pat_nummer() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    let q = person_anlegen(&app, &admin, e, "{}").await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &admin,
+        Some(r#"{"pat_nummer":"4711"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/auswahl"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zeilen = v.as_array().unwrap();
+    let zeile = |id: i64| zeilen.iter().find(|z| z["id"] == id).unwrap();
+    assert_eq!(zeile(p)["pat_nummer"], "4711");
+    assert!(!zeile(q).as_object().unwrap().contains_key("pat_nummer"));
+}

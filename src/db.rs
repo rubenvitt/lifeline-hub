@@ -9066,4 +9066,37 @@ mod tests {
             );
         }
     }
+
+    // --- LLH-1326: PAT-Nummer und Kontamination an der Person (0218) ---
+
+    /// `pat_nummer` und `kontamination` sind nullable (NULL = keine Angabe, nicht „nein“), die
+    /// PAT-Nummer ist nicht eindeutig, die Kontamination nur 0 oder 1.
+    #[tokio::test]
+    async fn migration_0218_pat_nummer_und_kontamination() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 218).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let person = |nr: i64, pat: Option<&'static str>, kont: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, \
+                        geaendert_von, pat_nummer, kontamination) VALUES (?, ?, ?, ?, ?, ?)",
+                )
+                .bind(e)
+                .bind(nr)
+                .bind(b)
+                .bind(b)
+                .bind(pat)
+                .bind(kont)
+                .execute(&pool)
+                .await
+            }
+        };
+        person(1, None, None).await.expect("ohne Angabe");
+        person(2, Some("A-4711"), Some(1)).await.unwrap();
+        person(3, Some("A-4711"), Some(0))
+            .await
+            .expect("dieselbe PAT-Nummer zweimal (Tippfehler im Feld)");
+        assert!(person(4, None, Some(2)).await.is_err(), "nur 0 oder 1");
+    }
 }

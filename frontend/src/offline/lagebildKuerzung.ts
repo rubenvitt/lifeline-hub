@@ -49,6 +49,11 @@ export const PERSON_AUF_DER_PLATTE = {
   aktuelles_verbleib_ziel: 'behalten',
   aktueller_verbleib_status: 'behalten',
   aktuelle_verbleib_betreuungsstelle_id: 'behalten',
+  // LLH-1326 (Change y18v58dt-pat-kern, design.md D9): die Kontamination ist eine
+  // Statuskategorie wie die Sichtung und warnt die Kräfte auch ohne Netz; die PAT-Nummer
+  // verknüpft die Person mit der Papiertasche und bleibt vom Gerät fern.
+  pat_nummer: 'auslassen',
+  kontamination: 'behalten',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 type PersonFeld = keyof typeof PERSON_AUF_DER_PLATTE;

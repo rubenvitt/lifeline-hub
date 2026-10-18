@@ -30,6 +30,7 @@ const ERWARTET_BEHALTEN = [
   'aktuelle_uhs_id',
   'aktueller_platz_id',
   'vermisst_seit',
+  'kontamination',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -39,6 +40,7 @@ const ERWARTET_AUSGELASSEN = [
   'antreff_ort',
   'antreff_lat',
   'antreff_lon',
+  'pat_nummer',
 ].sort();
 
 /** Eine Person mit JEDEM Feld gesetzt — ein ausgelassenes Feld fiele sonst nicht auf. */
@@ -74,6 +76,8 @@ const VOLL: Person = {
   aktuelles_verbleib_ziel: 'Klinikum',
   aktueller_verbleib_status: 'angemeldet',
   aktuelle_verbleib_betreuungsstelle_id: 2,
+  pat_nummer: 'A-4711',
+  kontamination: true,
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {
@@ -114,7 +118,15 @@ describe('lagebildKuerzen', () => {
     expect(p.nicht_geladen).toEqual(ERWARTET_AUSGELASSEN);
     // Kein Freitext in irgendeiner Form, auch nicht als Wert eines anderen Felds.
     const text = JSON.stringify(p);
-    for (const wert of ['Hauptstraße', 'Keller', '0170', 'Diabetikerin', 'unterkühlt', '53.07']) {
+    for (const wert of [
+      'Hauptstraße',
+      'Keller',
+      '0170',
+      'Diabetikerin',
+      'unterkühlt',
+      '53.07',
+      'A-4711',
+    ]) {
       expect(text).not.toContain(wert);
     }
   });

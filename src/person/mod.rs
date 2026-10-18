@@ -273,6 +273,10 @@ pub struct PersonAuswahl {
     pub status: PersonStatus,
     pub name: Option<String>,
     pub vorname: Option<String>,
+    /// PAT-Nummer (LLH-1326, design.md D12): die Sprungpalette findet die Person auch darüber.
+    /// Ohne Netz kürzt `lagebildKuerzen` sie weg (D9).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pat_nummer: Option<String>,
 }
 
 /// Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
@@ -331,6 +335,13 @@ pub struct PersonAnzeige {
     /// Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aktuelle_verbleib_betreuungsstelle_id: Option<i64>,
+    /// Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pat_nummer: Option<String>,
+    /// Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,
+    /// ausdrücklich nicht „nein“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kontamination: Option<bool>,
 }
 
 #[cfg(test)]

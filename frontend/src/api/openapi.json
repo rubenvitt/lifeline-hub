@@ -11923,6 +11923,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "kontamination": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,\nausdrücklich nicht „nein“."
+          },
           "melder_kontakt": {
             "type": [
               "string",
@@ -11940,6 +11947,13 @@
               "string",
               "null"
             ]
+          },
+          "pat_nummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig."
           },
           "registrier_nr": {
             "type": "integer",
@@ -11994,6 +12008,13 @@
               "string",
               "null"
             ]
+          },
+          "pat_nummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PAT-Nummer (LLH-1326, design.md D12): die Sprungpalette findet die Person auch darüber.\nOhne Netz kürzt `lagebildKuerzen` sie weg (D9)."
           },
           "registrier_nr": {
             "type": "integer",

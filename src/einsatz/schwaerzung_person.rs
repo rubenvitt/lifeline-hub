@@ -145,6 +145,7 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("antreff_lat", Mit),
             ("antreff_lon", Mit),
             ("aktuelles_verbleib_ziel", Mit),
+            ("pat_nummer", Mit),
         ],
     },
     PersonenBezug {

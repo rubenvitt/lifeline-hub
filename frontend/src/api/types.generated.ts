@@ -4724,9 +4724,16 @@ export interface components {
             herkunft_adresse?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,
+             *     ausdrücklich nicht „nein“.
+             */
+            kontamination?: boolean | null;
             melder_kontakt?: string | null;
             name?: string | null;
             notiz?: string | null;
+            /** @description Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig. */
+            pat_nummer?: string | null;
             /** Format: int64 */
             registrier_nr: number;
             status: components["schemas"]["PersonStatus"];
@@ -4749,6 +4756,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             name?: string | null;
+            /**
+             * @description PAT-Nummer (LLH-1326, design.md D12): die Sprungpalette findet die Person auch darüber.
+             *     Ohne Netz kürzt `lagebildKuerzen` sie weg (D9).
+             */
+            pat_nummer?: string | null;
             /** Format: int64 */
             registrier_nr: number;
             status: components["schemas"]["PersonStatus"];
