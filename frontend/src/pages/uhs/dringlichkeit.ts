@@ -1,5 +1,6 @@
 import type { Sichtungskategorie, UhsBelegung } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
+import { SK_REIHE } from '../../personen/personMeta';
 
 /**
  * Dringlichkeit in der Unfallhilfsstelle (LLH-1135): wer als Nächstes auf einen freien Platz
@@ -8,19 +9,12 @@ import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
  *
  * Reihe: ungesichtet (muss gesichtet werden), SK I bis SK IV, tot, unverletzt; innerhalb einer
  * Kategorie die längste Wartezeit zuerst. Ungesichtete stehen vorn, weil sie am Ende untergingen.
- * Weicht die Entscheidung ab, ändert sich nur {@link DRINGLICHKEITS_REIHE}.
+ * Die Kategorien folgen `SK_REIHE` (eine Quelle mit der Sichtungswahl, LLH-1083); hier kommt
+ * nur „ungesichtet“ davor.
  */
 export type Dringlichkeitsstufe = 'ungesichtet' | Sichtungskategorie;
 
-export const DRINGLICHKEITS_REIHE = [
-  'ungesichtet',
-  'sk1',
-  'sk2',
-  'sk3',
-  'sk4',
-  'tot',
-  'unverletzt',
-] as const satisfies readonly Dringlichkeitsstufe[];
+export const DRINGLICHKEITS_REIHE: readonly Dringlichkeitsstufe[] = ['ungesichtet', ...SK_REIHE];
 
 /** Was die Folge braucht: die aktuelle Sichtung und seit wann die Person wartet (Wire, UTC). */
 export interface DringlichkeitsMerkmale {
