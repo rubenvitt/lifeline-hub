@@ -118,7 +118,8 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     // gepinnt.
     expect(screen.getByRole('link', { name: 'Auf Karte verorten' })).toHaveAttribute(
       'href',
-      '/einsaetze/1/lagekarte?platzieren=schaden%3A10',
+      // Mit Herkunft: die Karte bietet danach „Zurück zu S-001“ an (LLH-1125).
+      '/einsaetze/1/lagekarte?platzieren=schaden%3A10&zurueck=1',
     );
   });
 

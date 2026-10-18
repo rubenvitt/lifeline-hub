@@ -72,7 +72,12 @@ export default function SchadenDaten({
                   Auf Karte verorten
                 </Button>
               ) : (
-                <Link to={lagekartePfad(einsatzId, { platzieren: { typ: 'schaden', id: s.id } })}>
+                // Mit Herkunft: „Zurück zu S-…“ führt danach hierher (LLH-1125).
+                <Link
+                  to={lagekartePfad(einsatzId, {
+                    platzieren: { typ: 'schaden', id: s.id, zurueck: true },
+                  })}
+                >
                   Auf Karte verorten
                 </Link>
               ))}

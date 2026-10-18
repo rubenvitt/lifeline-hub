@@ -2541,7 +2541,8 @@ describe('BrDetailPage — Auf Karte verorten (LLH-1107)', () => {
     seite(brDetail({ status: 'geplant' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Auf Karte verorten' }));
     expect(await screen.findByTestId('karte')).toHaveTextContent(
-      '/einsaetze/1/lagekarte?platzieren=bereitstellungsraum%3A1',
+      // Mit Herkunft: die Karte bietet danach „Zurück zu …“ an (LLH-1125).
+      '/einsaetze/1/lagekarte?platzieren=bereitstellungsraum%3A1&zurueck=1',
     );
   });
 
