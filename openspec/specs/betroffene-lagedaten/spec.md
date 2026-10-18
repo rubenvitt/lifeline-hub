@@ -9,11 +9,13 @@ vermisst wird. Diese Angaben tragen die Betroffenen-Erfassung und das Lage-Dashb
 
 ### Requirement: Zustand einer Person
 Das System SHALL an jeder Person einen optionalen Freitext „Zustand“ führen, der den aktuellen
-Zustand in Kurzform beschreibt (z. B. „gehfähig, unterkühlt“). Der Zustand MUST beim Anlegen
-(`POST …/personen`) und beim Bearbeiten (`PATCH …/personen/{pid}`) setzbar sein. Beim
-Bearbeiten MUST er mit `null` oder einem leeren Text wieder leerbar sein. Führende und
-folgende Leerzeichen MUST entfernt werden, ein danach leerer Text MUST als „kein Zustand“
-gespeichert werden.
+Zustand oder eine Verdachtsdiagnose in Kurzform beschreibt (z. B. „gehfähig, unterkühlt“ oder
+„Verdacht auf Hüftfraktur“). Die Oberfläche MUST das Feld überall „Zustand / Verdacht“ nennen
+(Erfassung, Liste, Detail, Schnellansicht, Druck); der Feldname der Schnittstelle bleibt
+`zustand`. Der Zustand MUST beim Anlegen (`POST …/personen`) und beim Bearbeiten
+(`PATCH …/personen/{pid}`) setzbar sein. Beim Bearbeiten MUST er mit `null` oder einem leeren
+Text wieder leerbar sein. Führende und folgende Leerzeichen MUST entfernt werden, ein danach
+leerer Text MUST als „kein Zustand“ gespeichert werden.
 
 #### Scenario: Zustand beim Anlegen
 - **WHEN** eine Person mit `zustand: "  Beinfraktur "` angelegt wird
@@ -25,7 +27,11 @@ gespeichert werden.
 
 #### Scenario: Zustand in der Liste bearbeiten
 - **WHEN** eine schreibberechtigte Person in der Betroffenenliste den leeren Zustand einer Zeile anklickt, einen Text eingibt und das Feld verlässt
-- **THEN** wird der Zustand gespeichert und in der Spalte „Zustand“ angezeigt
+- **THEN** wird der Zustand gespeichert und in der Spalte „Zustand / Verdacht“ angezeigt
+
+#### Scenario: Ein Wort für das Feld
+- **WHEN** die Erfassungsmaske, die Betroffenenliste, das Detail und die Schnellansicht einer Person angezeigt werden
+- **THEN** heißt das Feld an allen vier Stellen „Zustand / Verdacht“
 
 ### Requirement: Fundort als Koordinate
 Das System SHALL an jeder Person ein optionales Koordinatenpaar für den Fundort führen
@@ -247,3 +253,37 @@ Koordinate, MUST sie stattdessen sagen, dass keine Person ohne Koordinate ist.
 #### Scenario: Letzte Lücke schließt sich bei geschlossener Schleuse
 - **WHEN** bei geschlossener Schleuse die letzte Person ohne Koordinate live verortet wird
 - **THEN** sagt die Hinweiszeile „Keine Person ohne Koordinate“, und der Sammelbanner nennt eine neue Person
+
+### Requirement: Sichtung und Verbleib aus der Betroffenenliste
+
+Die Betroffenenliste SHALL Nachsichten, Verbleib erfassen und einen Verortungsauftrag direkt aus
+der Zeile anbieten, ohne Umweg über die Detailseite.
+- Die Sichtungszelle MUST der Auslöser der Nachsichtung sein: Zelle, Fläche, „Übernehmen“,
+  höchstens drei Tipps. Ihr zugänglicher Name nennt die Kennung der Person.
+- Bei offenem Verbleib MUST die Verbleib-Zelle „Verbleib erfassen“ anbieten.
+- Ein Zeilenmenü MUST „Sichten“, „Verbleib erfassen“ und „Auf Lagekarte verorten“ tragen.
+- Der Zeilenklick MUST weiter die Detailseite öffnen. Eine Bedienung in Zelle, Popover oder Menü
+  MUST NOT den Zeilenklick auslösen.
+- Ein abgelehnter Schreibversuch MUST an seiner Zeile stehen.
+- Solange ein Popover oder Menü einer Zeile offen ist, MUST die Liste Menge und Folge halten.
+- Ohne Schreibrecht MUST über der Liste „Nur Ansicht“ mit Grund stehen, und die Bedienelemente
+  MUST fehlen.
+
+#### Scenario: Nachsichtung aus der Liste
+- **WHEN** jemand mit Schreibrecht in der Zeile von R-007 auf die Sichtung tippt, „SK I“ wählt und
+  „Übernehmen“ drückt
+- **THEN** zeigt die Zeile „SK I“, die Detailseite wurde nicht geöffnet, und es waren drei Tipps
+
+#### Scenario: Verbleib-Lücke schließen
+- **WHEN** „Nur Lücken zeigen“ aktiv ist und jemand in der leeren Verbleib-Zelle „Verbleib
+  erfassen“ wählt und einen Transport speichert
+- **THEN** trägt die Zeile den Verbleib, und die Lückenzahl sinkt um eins
+
+#### Scenario: Liste springt nicht unter dem Popover
+- **WHEN** das Sichtungs-Popover einer Zeile offen ist und live eine neue Person hinzukommt
+- **THEN** bleiben Menge und Folge der Liste, bis das Popover geschlossen ist
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** ein Beobachter die Betroffenenliste öffnet
+- **THEN** steht über der Liste „Nur Ansicht“ mit Grund, und die Zeilen tragen weder
+  Sichtungsauslöser noch „Verbleib erfassen“ noch Zeilenmenü

@@ -9,7 +9,7 @@ import { farbenDunkel, farbenHell, sichtungsKante, sichtungsflaechen } from './t
  * gefüllten Fläche hält Tag ≥ 7 : 1 und Nacht ≥ 5 : 1 — die Flächentöne sind in beiden Modi
  * gleich (BBK-Farbton), also gilt der strengere Tagboden. Die Kante jeder Fläche liegt in der
  * Textfarbe des Modus und hält gegen Grund und Fläche ≥ 3 : 1 (WCAG 1.4.11). Herleitung:
- * `openspec/changes/knc0jyjd-sichtungswahl-flaechen/design.md`. Böden als Literale; der
+ * `openspec/changes/archive/2026-10-18-knc0jyjd-sichtungswahl-flaechen/design.md`. Böden als Literale; der
  * Browser-Nachweis steht in `e2e/betroffene-kontrast.spec.ts`.
  */
 const TEXTBODEN_TAG = 7;

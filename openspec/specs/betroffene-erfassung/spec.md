@@ -47,7 +47,7 @@ Ein Pflichtfeld MUST nie hinter dem aufklappbaren Bereich stehen.
 
 #### Scenario: Erfassen
 - **WHEN** die Tiere-Erfassung geöffnet ist
-- **THEN** sind höchstens vier Eingabefelder sichtbar, darunter Spezies und Antreffort, und nach dem Aufklappen von „Weitere Angaben“ sind es mehr
+- **THEN** sind höchstens vier Eingabefelder sichtbar, darunter Spezies und Fundort, und nach dem Aufklappen von „Weitere Angaben“ sind es mehr
 
 #### Scenario: Vermisst melden
 - **WHEN** „Vermisst melden“ auf der Tiere-Liste geöffnet ist

@@ -409,17 +409,17 @@ Seitenleiste darf darunter folgen.
 - **WHEN** dieselbe Liste als Beobachter geöffnet wird
 - **THEN** liegen die erste Personenzeile und die Sichtungszusammenfassung vollständig im Fenster, und der Kopf trägt keinen Erfassungsknopf
 
-### Requirement: Das Personen-Detail stellt die medizinische Spalte vor die Stammdaten
+### Requirement: Das Personen-Detail beginnt mit dem Patientenkopf
 
-Unterhalb von `lg` (schmaler als 992 px) MUST das Personen-Detail die medizinische Spalte
-(Sichtung, Verlaufsnotiz, Verlauf) vor den Stammdaten zeigen; ab `lg` stehen beide Spalten
-nebeneinander, die Stammdaten links. Die Stammdaten MUST jedes Etikett über seinem Wert zeigen,
-und leere Angaben MUST in einer Zeile „Ohne Angabe: …“ zusammengefasst stehen statt als eigene
-Zeilen mit Strich.
+Das Personen-Detail MUST in jeder Breite mit dem Patientenkopf beginnen (Sichtung, Zustand /
+Verdacht, Aufenthalt bzw. Verbleib, letzte Notiz). Darunter folgen der Verlauf und die
+Personendaten. Die zwei gleichrangigen Spalten aus medizinischen Angaben und Stammdaten entfallen.
+Die Personendaten MUST jedes Etikett über seinem Wert zeigen, und leere Angaben MUST in einer
+Zeile „Ohne Angabe: …“ zusammengefasst stehen statt als eigene Zeilen mit Strich.
 
 #### Scenario: Handschirm und Tablet hoch
 - **WHEN** das Detail einer Person bei 390 × 844 und bei 820 × 1180 geöffnet wird, als Admin und als Beobachter
-- **THEN** liegt die Oberkante der medizinischen Spalte über der Oberkante der Stammdaten
+- **THEN** liegt die Oberkante des Patientenkopfs über der Oberkante der Personendaten
 
 #### Scenario: Leere Angaben
 - **WHEN** eine Person ohne Geburtsdatum, Herkunft und Melder angezeigt wird

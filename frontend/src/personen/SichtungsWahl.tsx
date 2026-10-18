@@ -7,7 +7,7 @@ import { SK_REIHE, SK_WORT } from './personMeta';
 
 /**
  * Die Wahl einer Sichtungskategorie nach BBK (LLH-1083, Spec `sichtungswahl`; Herleitung
- * `openspec/changes/knc0jyjd-sichtungswahl-flaechen/design.md`). Ein Baustein für Erfassung,
+ * `openspec/changes/archive/2026-10-18-knc0jyjd-sichtungswahl-flaechen/design.md`). Ein Baustein für Erfassung,
  * Nachsichtung, Patientenkopf und Zeilen-Popover; die ANZEIGE bleibt `SichtungsTag`.
  *
  * ── FLÄCHE STATT FARBFELD ──────────────────────────────────────────────────────────────

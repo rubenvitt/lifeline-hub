@@ -47,7 +47,7 @@ export interface PatientenkopfProps {
  * speichert, sperrt der Kopf den Wechsel (beide Auslöser `disabled`): hinge das Paneel mitten im
  * Speichern aus, hätte eine Ablehnung keinen Ort, und ein später Erfolg schlösse das neue Paneel.
  * Deshalb liegen beide Mutationen hier, und jedes Paneel schließt nur sich selbst.
- * Herleitung: `openspec/changes/y18v58dt-patientenkopf-bezuege/design.md`.
+ * Herleitung: `openspec/changes/archive/2026-10-18-y18v58dt-patientenkopf-bezuege/design.md`.
  */
 export default function Patientenkopf({
   einsatzId,

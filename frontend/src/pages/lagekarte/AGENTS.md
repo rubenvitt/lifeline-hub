@@ -131,7 +131,7 @@ diese Zusage.
   (`modusBedienungImFuss`: „wird platziert“, Koordinate, Mittelpunkt) — je Breite genau ein Knopf
   je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
 - **Verortungsauftrag von außen** (LLH-1125, Spec `lagekarte-verortungsauftrag`,
-  `openspec/changes/pao1s6uw-verorten-rueckweg/design.md`): `?platzieren=<typ>:<id>[&zurueck=1]`
+  `openspec/changes/archive/2026-10-18-pao1s6uw-verorten-rueckweg/design.md`): `?platzieren=<typ>:<id>[&zurueck=1]`
   startet über `onVerortungsauftragStart`. Der **Ebenen-Vorrang** ist abgeleitet, nie gespeichert:
   `verortungsTyp` im Hook (bis zum Unmount), gezeichnet wird `layerMitVorrang`
   (`lagekarte/verortungsauftrag.ts`), Schalter, Schmutzig-Erkennung und Speichern lesen weiter

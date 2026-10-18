@@ -146,7 +146,7 @@ bleiben. Ein bereits entfernter Anhang MUST beim erneuten Entfernen mit 404 antw
 Das System MUST beim Ablegen und beim Entfernen je einen System-Eintrag im Einsatztagebuch
 schreiben, im Wortlaut „Tier T-007: Foto abgelegt“ bzw. „Tier T-007: PDF entfernt“. Der
 Eintrag MUST das Tier über seine Registriernummer benennen und MUST NOT den Dateinamen, die
-Kennzeichnung, den Halter, den Antreffort oder einen anderen Freitext enthalten. Eine
+Kennzeichnung, den Halter, den Fundort oder einen anderen Freitext enthalten. Eine
 abgewiesene Ablage MUST keinen Eintrag erzeugen.
 
 #### Scenario: Wortlaut beim Ablegen
