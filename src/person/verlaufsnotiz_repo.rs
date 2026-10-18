@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use serde::Serialize;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
 
 /// Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`).
@@ -10,37 +10,93 @@ pub struct NotizAnzeige {
     pub einsatz_id: i64,
     pub person_id: i64,
     pub text: String,
+    /// Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät (LLH-1138), gekappt.
     pub erfasst_at: String,
     pub erfasst_von: i64,
+    /// Wann der Eintrag beim Server ankam (LLH-1138). Fehlt bei Einträgen von vor der
+    /// Migration 0217.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eingegangen_at: Option<String>,
 }
 
 const SELECT_NOTIZ: &str = "\
-    SELECT id, einsatz_id, person_id, text, erfasst_at, erfasst_von \
+    SELECT id, einsatz_id, person_id, text, erfasst_at, erfasst_von, eingegangen_at \
     FROM person_verlaufsnotiz";
 
-/// Legt eine append-only Befundnotiz an. `text` ist bereits getrimmt (Handler).
+/// Eine neue Notiz; `text` bereits getrimmt (Handler).
+#[derive(Debug, Default)]
+pub struct NeueNotiz<'a> {
+    pub text: &'a str,
+    /// Erfassungszeit, bereits über `support::erfassungszeitpunkt` gekappt; `None` = jetzt.
+    pub erfasst_at: Option<&'a str>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    pub client_id: Option<&'a str>,
+}
+
+/// Legt eine append-only Befundnotiz an. Kommt dieselbe `client_id` im Einsatz ein zweites Mal,
+/// liefert sie die gespeicherte Notiz (unter `BEGIN IMMEDIATE` auch bei zwei gleichzeitigen
+/// Übertragungen genau eine Zeile).
 pub async fn anlegen(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: i64,
-    text: &str,
+    neu: &NeueNotiz<'_>,
+    erfasst_von: i64,
+) -> Result<NotizAnzeige, AppError> {
+    crate::write_retry!(pool, |conn| {
+        if let Some(cid) = neu.client_id {
+            if let Some(replay) = nach_client_id(&mut *conn, einsatz_id, cid).await? {
+                return Ok(replay);
+            }
+        }
+        anlegen_tx(conn, einsatz_id, person_id, neu, erfasst_von).await
+    })
+}
+
+/// [`anlegen`] ohne Replay-Prüfung in einer laufenden Transaktion.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    neu: &NeueNotiz<'_>,
     erfasst_von: i64,
 ) -> Result<NotizAnzeige, AppError> {
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO person_verlaufsnotiz (einsatz_id, person_id, text, erfasst_von) \
-         VALUES (?, ?, ?, ?) RETURNING id",
+        "INSERT INTO person_verlaufsnotiz \
+            (einsatz_id, person_id, text, erfasst_von, erfasst_at, eingegangen_at, client_id) \
+         VALUES (?, ?, ?, ?, COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now')), \
+                 strftime('%Y-%m-%d %H:%M:%S','now'), ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
-    .bind(text)
+    .bind(neu.text)
     .bind(erfasst_von)
-    .fetch_one(pool)
+    .bind(neu.erfasst_at)
+    .bind(neu.client_id)
+    .fetch_one(&mut *conn)
     .await?;
     sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!("{SELECT_NOTIZ} WHERE id = ?")))
         .bind(id)
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await
         .map_err(Into::into)
+}
+
+/// Die schon gespeicherte Notiz zu einer `client_id` im Einsatz (Replay der Offline-Queue).
+pub async fn nach_client_id(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<NotizAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, NotizAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_NOTIZ} WHERE einsatz_id = ? AND client_id = ?"
+        )))
+        .bind(einsatz_id)
+        .bind(client_id)
+        .fetch_optional(executor)
+        .await?,
+    )
 }
 
 /// Notizen einer Person (neueste zuerst).
@@ -97,8 +153,14 @@ mod tests {
     async fn anlegen_ist_append_only_und_liste_neueste_zuerst() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        anlegen(&pool, e, p, "Platzwunde Stirn", b).await.unwrap();
-        anlegen(&pool, e, p, "stabil, ansprechbar", b)
+        let notiz = |text| NeueNotiz {
+            text,
+            ..NeueNotiz::default()
+        };
+        anlegen(&pool, e, p, &notiz("Platzwunde Stirn"), b)
+            .await
+            .unwrap();
+        anlegen(&pool, e, p, &notiz("stabil, ansprechbar"), b)
             .await
             .unwrap();
         let notizen = liste_je_person(&pool, e, p).await.unwrap();

@@ -1331,28 +1331,68 @@ enum Verbleibt {
 #[derive(Debug, Deserialize)]
 pub struct NotizBody {
     pub text: String,
+    /// Erfassungszeit, offline vorgemerkt (LLH-1138); fehlt = jetzt.
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/notizen — append-only Befundnotiz.
 /// Schreibberechtigt + aktiv. **KEIN ETB-Eintrag** (besondere Kategorie). SSE.
+///
+/// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): Replay derselben `client_id` vor
+/// dem Aktiv-Gate, Erfassungszeit gekappt.
 pub async fn notiz(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Personen>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
+    headers: HeaderMap,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<NotizBody>,
 ) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = crate::routes::support::parse_client_id(body.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) =
+            verlaufsnotiz_repo::nach_client_id(&state.pool, einsatz_id, cid).await?
+        {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |n| n.person_id)?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let text = pflicht(&body.text, "Notiztext")?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let erfasst_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        chrono::Utc::now(),
+        &person.erfasst_at,
+    )?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierte Person kann keine Notiz erhalten".into(),
         ));
     }
-    let notiz =
-        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, &text, ctx.benutzer.id)
-            .await?;
+    let notiz = verlaufsnotiz_repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        &verlaufsnotiz_repo::NeueNotiz {
+            text: &text,
+            erfasst_at: Some(&erfasst_at),
+            client_id: client_id.as_deref(),
+        },
+        ctx.benutzer.id,
+    )
+    .await?;
+    // Ein gleichzeitiger Replay kam in der Transaktion zurück; er gehört zu dieser Person nur,
+    // wenn die Kennung passt.
+    let notiz = replay_an_person(notiz, person_id, |n| n.person_id)?;
     // BEWUSST kein super::etb_system_degradiert(): besondere Kategorie gehört NICHT in den ETB.
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(notiz)))

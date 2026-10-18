@@ -4211,8 +4211,14 @@ export interface components {
         NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt";
         /** @description Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`). */
         NotizAnzeige: {
+            /**
+             * @description Wann der Eintrag beim Server ankam (LLH-1138). Fehlt bei Einträgen von vor der
+             *     Migration 0217.
+             */
+            eingegangen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät (LLH-1138), gekappt. */
             erfasst_at: string;
             /** Format: int64 */
             erfasst_von: number;

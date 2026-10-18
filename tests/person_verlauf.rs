@@ -503,3 +503,62 @@ async fn verbleib_weit_in_der_zukunft_ist_400() {
         .unwrap()
         .is_empty());
 }
+
+// ---------- Notiz (tasks.md 1.5) ----------
+
+#[tokio::test]
+async fn notiz_replay_steht_genau_einmal_im_verlauf() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    angelegt_vor(&pool, p, 30).await;
+    let etb_vorher = system_etb(&app, &admin, e).await.len();
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/notizen");
+    let vorgemerkt = zeit(-300);
+    let body =
+        json!({ "text": "stabil, ansprechbar", "zeitpunkt_at": vorgemerkt, "client_id": "n-1" });
+    let (s1, v1) = post(&app, &admin, &pfad, body.clone()).await;
+    assert_eq!(s1, StatusCode::CREATED, "{v1}");
+    assert_eq!(
+        v1["erfasst_at"],
+        vorgemerkt.as_str(),
+        "die Erfassungszeit gilt"
+    );
+    assert!(v1["eingegangen_at"].is_string(), "{v1}");
+    let (s2, v2) = post(&app, &admin, &pfad, body).await;
+    assert_eq!(s2, StatusCode::CREATED, "{v2}");
+    assert_eq!(v1["id"], v2["id"]);
+    assert_eq!(
+        detail(&app, &admin, e, p).await["notizen"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        system_etb(&app, &admin, e).await.len(),
+        etb_vorher,
+        "eine Notiz schreibt kein ETB"
+    );
+}
+
+#[tokio::test]
+async fn notiz_weit_in_der_zukunft_ist_400() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen/{p}/notizen"),
+        json!({ "text": "x", "zeitpunkt_at": zeit(600) }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert!(detail(&app, &admin, e, p).await["notizen"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}

@@ -10727,12 +10727,20 @@
           "erfasst_von"
         ],
         "properties": {
+          "eingegangen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Eintrag beim Server ankam (LLH-1138). Fehlt bei Einträgen von vor der\nMigration 0217."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
           },
           "erfasst_at": {
-            "type": "string"
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät (LLH-1138), gekappt."
           },
           "erfasst_von": {
             "type": "integer",
