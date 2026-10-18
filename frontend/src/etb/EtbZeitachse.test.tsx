@@ -987,7 +987,7 @@ describe('Nach oben', () => {
         vi.advanceTimersToNextFrame();
       });
       fireEvent.click(screen.getByRole('button', { name: 'Nach oben' }));
-      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'instant' });
 
       rolle(0);
       act(() => {

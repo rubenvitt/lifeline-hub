@@ -34,8 +34,11 @@ export function useWeitGerollt(): boolean {
   return weit;
 }
 
-/** Rollt an den Seitenanfang; ohne Bewegung, wenn das System reduzierte Bewegung wünscht. */
+/**
+ * Springt an den Seitenanfang, ohne Bewegung wie `rolleAnsEnde` in
+ * `components/useFunkprotokollLauf.ts`: ein weicher Lauf über ein langes Tagebuch dauert, und
+ * die Medienabfrage für reduzierte Bewegung gehört `useViewport` (`useViewport.guard.test.ts`).
+ */
 export function scrollNachOben() {
-  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  window.scrollTo?.({ top: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
+  window.scrollTo?.({ top: 0, behavior: 'instant' });
 }
