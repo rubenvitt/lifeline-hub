@@ -1,5 +1,6 @@
 import { Alert, Button, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { IconPersonPlus } from '../icons';
 import { useAuth } from '../auth/AuthContext';
@@ -19,6 +20,10 @@ import {
 } from '../personen/personenSpalten';
 import { geraetAufnahmePfad, geraetPersonPfad } from '../routing/deeplinks';
 import { dringlichkeitsWert, wartetSeit } from '../pages/uhs/dringlichkeit';
+import { useZeilenFehler } from '../components/useZeilenFehler';
+import { useHalteQuellen } from '../components/useHalteQuellen';
+import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
+import { useGeraetDarf } from './geraetSicht';
 
 /**
  * Spalten des Registers, die das Tablet zeigt; Fundort und Vermerk stehen im Detail. Der Zustand
@@ -77,7 +82,30 @@ export default function GeraetPatientenPage() {
   });
   const uhs = uhsQuery.data;
 
-  const register = personenSpalten((id) => (id === uhs?.id ? uhs.bezeichnung : undefined));
+  /*
+   * Nachsichten aus der Zeile (LLH-1130, Spec `betroffene-lagedaten`): das UHS-Gerät darf sichten
+   * (`person-sichtung`), verortet aber nicht (`fremde-module`) — deshalb kein Zeilenmenü; Zustand
+   * und Verbleib bleiben hier Anzeige. Der Grund einer Ablehnung steht an der Zeile, das offene
+   * Popover hält die Liste.
+   */
+  const darf = useGeraetDarf();
+  const sichtungZeilen = useZeilenFehler<number>();
+  const { beginne, melde } = sichtungZeilen;
+  const { haelt, halte } = useHalteQuellen();
+  const rueckmeldung = useMemo<ZeilenRueckmeldung>(
+    () => ({
+      beginne,
+      melde: (personId, fehler) => melde(personId, fehler, 'Sichtung nicht gespeichert'),
+      halte,
+    }),
+    [beginne, melde, halte],
+  );
+  const register = personenSpalten((id) => (id === uhs?.id ? uhs.bezeichnung : undefined), {
+    einsatzId,
+    darfSchreiben: false,
+    darfSichten: darf('person-sichtung'),
+    rueckmeldung,
+  });
   /*
    * Vorgabe-Sortierung nach Dringlichkeit (LLH-1135, `pages/uhs/dringlichkeit.ts`, dieselbe Reihe
    * wie Wartebereich und Zuweisung): die Sichtungsspalte sortiert nach Reihe und Wartezeit seit
@@ -143,6 +171,8 @@ export default function GeraetPatientenPage() {
             unterEbene: 1,
           }}
           onZeileKlick={(p) => navigate(geraetPersonPfad(einsatzId, p.id))}
+          zeilenFehler={(p) => sichtungZeilen.grund(p.id)}
+          halten={haelt}
           karte={{
             ...personenKarte(einsatzId),
             titel: { spalte: 'reg', ziel: (p) => geraetPersonPfad(einsatzId, p.id) },

@@ -168,6 +168,15 @@ describe('Betreuungsstelle — Startseite und Navigation', () => {
     ).toEqual(['Betroffene', 'Aufnahme', 'Stelle']);
   });
 
+  it('die Liste bietet weder Sichtung noch Zeilenmenü (LLH-1130)', async () => {
+    bereit();
+    renderApp('/geraet/7/betroffene');
+    expect(await screen.findByText('Muster, Max')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Sichtung R-|sichten$/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Aktionen zu R-/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Verbleib erfassen für/ })).toBeNull();
+  });
+
   it('die Seiten der UHS führen auf die Startseite', async () => {
     bereit();
     const router = renderApp('/geraet/7/patienten');

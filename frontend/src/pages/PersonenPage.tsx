@@ -3,7 +3,12 @@ import { Alert, App, Breadcrumb, Button, Flex, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { parsePersonenSicht, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
+import {
+  lagekartePfad,
+  parsePersonenSicht,
+  personDetailPfad,
+  personenDruckPfad,
+} from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
@@ -28,6 +33,9 @@ import {
   nameText,
   personenKarte,
   personenSpalten,
+  zeilenMenueEintraege,
+  zeilenMenueName,
+  type PersonZeilenAktion,
 } from '../personen/personenSpalten';
 import {
   FILTER_OPTIONEN,
@@ -49,6 +57,12 @@ import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
+import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
+import VerbleibErfassung from '../personen/VerbleibErfassung';
+import SichtungDialog from '../personen/SichtungDialog';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { useDichte } from '../theme/ThemeModeProvider';
+import { dichten } from '../theme/tokens';
 import '../personen/betroffene.css';
 import { erfassePersonOfflineFaehig } from '../offline/schreiben';
 import {
@@ -64,7 +78,8 @@ import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
-import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
+import { useHalteQuellen } from '../components/useHalteQuellen';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 
 /**
@@ -84,6 +99,10 @@ import { modulName } from '../einsatz/modulRegistry';
  *   Seitenleiste steht dort unter allen Zeilen, die Lagezahl gehört in den ersten Bildschirm.
  * - Statusfilter als zweite Leiste (Erfasst/Vermisst/Betroffen/Verstorben/Alle; „Patienten" ist im
  *   Sichtungsraster aufgegangen) und die Tabelle über `Datensicht`.
+ * - Zeilenaktionen (LLH-1130, Spec `betroffene-lagedaten`): die Sichtungszelle öffnet die
+ *   Nachsichtung im Popover, die leere Verbleib-Zelle „Verbleib erfassen“, das Zeilenmenü (unter
+ *   `md` im Kartenfuß) „Sichten“, „Verbleib erfassen“ und „Auf Lagekarte verorten“. Offenes
+ *   Popover, Menü oder Dialog hält die Liste (`halten`); ohne Schreibrecht „Nur Ansicht · Grund“.
  * - Seitenleiste 268 px ab `xl` (Sichtungsbild, Verbleib, Offene Felder), darunter gestapelt unter
  *   der Liste.
  *
@@ -244,6 +263,53 @@ export default function PersonenPage() {
     null,
   );
   const abgleichZeilen = useZeilenFehler<number>();
+  /*
+   * Zeilenaktionen (LLH-1130, design.md D4/D5): die Nachsichtung aus der Zelle meldet ihren Grund an
+   * die Zeile; Popover und Menü einer Zeile halten die Liste (`halten` der `Datensicht`).
+   */
+  const sichtungZeilen = useZeilenFehler<number>();
+  const { haelt: zeileHaelt, halte } = useHalteQuellen();
+  /** „Verbleib erfassen“ aus der Zeile: der Dialog gehört zum Einsatz, in dem er aufging. */
+  const [verbleibFuer, setVerbleibFuer] = useState<{ einsatzId: number; person: Person } | null>(
+    null,
+  );
+  const oeffneVerbleib = useCallback(
+    (p: Person) => setVerbleibFuer({ einsatzId, person: p }),
+    [einsatzId],
+  );
+  /** „Sichten“ aus dem Zeilenmenü: die Nachsichtung im Dialog (Fläche + „Übernehmen“). */
+  const [sichtungFuer, setSichtungFuer] = useState<{ einsatzId: number; person: Person } | null>(
+    null,
+  );
+  // Verortungsauftrag nur in eine freie Lagekarte (LFH-888), wie auf der Detailseite.
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
+  /**
+   * Breite der Aktionsspalte: die quadratische Steuerhöhe der Dichte plus Zellpolster beidseits
+   * (Muster der Fahrzeugseite); ohne Beschriftung, Fließspalten-Regel LFH-523.
+   */
+  const { dichte } = useDichte();
+  const aktionsBreite = dichten[dichte].zeilenhoehe + 2 * dichten[dichte].abstand.md;
+  const waehleZeilenAktion = useCallback(
+    (aktion: PersonZeilenAktion, p: Person) => {
+      if (aktion === 'sichten') setSichtungFuer({ einsatzId, person: p });
+      else if (aktion === 'verbleib') setVerbleibFuer({ einsatzId, person: p });
+      else
+        navigate(
+          // Mit Herkunft: „Zurück zu R-…“ führt danach auf die Person (LLH-1125).
+          lagekartePfad(einsatzId, { platzieren: { typ: 'person', id: p.id, zurueck: true } }),
+        );
+    },
+    [einsatzId, navigate],
+  );
+  /*
+   * Unter „Nur Lücken zeigen“ bleibt eine Zeile stehen, deren Lücke gerade aus ihr geschlossen
+   * wurde: sie zeigt den neuen Wert, statt unter dem Finger zu verschwinden (Spec
+   * `betroffene-lagedaten`, „Verbleib-Lücke schließen“). Jede Änderung der Sicht räumt die Menge.
+   */
+  const [lueckeGeschlossen, setLueckeGeschlossen] = useState<ReadonlySet<number>>(() => new Set());
+  useEffect(() => {
+    setLueckeGeschlossen((alt) => (alt.size === 0 ? alt : new Set()));
+  }, [einsatzId, sicht.filter, sicht.nurLuecken, sicht.ansicht]);
   const abgleichDialogFehler = abgleichFuer ? abgleichDialog?.fehler : null;
   const setzeAbgleichDialogFehler = (zielEinsatzId: number, fehler: unknown) =>
     setAbgleichDialog((alt) =>
@@ -573,6 +639,26 @@ export default function PersonenPage() {
   useEffect(() => {
     leereAbgleichZeilen();
   }, [einsatzId, leereAbgleichZeilen]);
+  const {
+    beginne: beginneSichtung,
+    melde: meldeSichtung,
+    leere: leereSichtungZeilen,
+  } = sichtungZeilen;
+  useEffect(() => {
+    leereSichtungZeilen();
+  }, [einsatzId, leereSichtungZeilen]);
+  const rueckmeldung = useMemo<ZeilenRueckmeldung>(
+    () => ({
+      beginne: beginneSichtung,
+      melde: (personId, fehler, zielEinsatzId) => {
+        // Eine Ablehnung aus dem alten Einsatz meldet sich nicht im neuen (LFH-1138).
+        if (zielEinsatzId !== quittungKontextRef.current.einsatzId) return;
+        meldeSichtung(personId, fehler, 'Sichtung nicht gespeichert');
+      },
+      halte,
+    }),
+    [beginneSichtung, meldeSichtung, halte],
+  );
   /** Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung im Dialog. */
   const oeffneAbgleich = useCallback(
     (p: Person | null) => setAbgleichDialog(p ? { einsatzId, person: p, fehler: null } : null),
@@ -592,13 +678,32 @@ export default function PersonenPage() {
     ? gefundenePersonen(frischErfasst.alle)
     : KEINE_GEFUNDENEN;
   const uhsDaten = uhsQuery.data;
-  const register = useMemo(() => {
-    const namen = new Map((uhsDaten ?? []).map((u) => [u.id, u.bezeichnung]));
-    return personenSpalten((id) => namen.get(id), {
+  const bedienung = useMemo(
+    () => ({
       einsatzId,
       darfSchreiben: darfSchreibenListe,
-    });
-  }, [uhsDaten, einsatzId, darfSchreibenListe]);
+      rueckmeldung,
+      onVerbleib: oeffneVerbleib,
+      menue: {
+        breite: aktionsBreite,
+        lagekarte: karteGesperrt ? ('gesperrt' as const) : ('frei' as const),
+        onWahl: waehleZeilenAktion,
+      },
+    }),
+    [
+      einsatzId,
+      darfSchreibenListe,
+      rueckmeldung,
+      oeffneVerbleib,
+      aktionsBreite,
+      karteGesperrt,
+      waehleZeilenAktion,
+    ],
+  );
+  const register = useMemo(() => {
+    const namen = new Map((uhsDaten ?? []).map((u) => [u.id, u.bezeichnung]));
+    return personenSpalten((id) => namen.get(id), bedienung);
+  }, [uhsDaten, bedienung]);
   /**
    * Die Spaltenliste der Zeilen-Ansicht: Register plus Abgleichspalte. Durch
    * `spaltenFuer<Person>()` geführt, nicht annotiert — eine Annotation weitete die
@@ -616,7 +721,26 @@ export default function PersonenPage() {
       ]),
     [register, darfAbgleichenListe, gefundeneListe, abgleichVorschlagen, einsatzId],
   );
-  const rasterKarte = useMemo(() => personenKarte(einsatzId), [einsatzId]);
+  /**
+   * Das Zeilenmenü steht unter `md` im Kartenfuß (design.md D3): dieselben Einträge über `weitere`,
+   * gestapelt unter dem Inhalt. Ohne Einträge (Rechte, vermisst) gibt es keinen Auslöser.
+   */
+  const kartenMenue = useMemo(
+    () => ({
+      eintraege: (p: Person) => zeilenMenueEintraege(p, bedienung),
+      zugaenglicherName: zeilenMenueName,
+      onWahl: (key: string, p: Person) => waehleZeilenAktion(key as PersonZeilenAktion, p),
+    }),
+    [bedienung, waehleZeilenAktion],
+  );
+  const rasterKarte = useMemo(
+    () => ({
+      ...personenKarte(einsatzId),
+      weitere: darfSchreibenListe ? kartenMenue : undefined,
+      gestapelt: true as const,
+    }),
+    [einsatzId, darfSchreibenListe, kartenMenue],
+  );
   const listenKarte = useMemo(
     () => ({
       ...personenKarte(einsatzId),
@@ -625,8 +749,10 @@ export default function PersonenPage() {
       aktion: darfAbgleichenListe
         ? { etikett: 'Abgleich vorschlagen …', onKlick: (p: Person) => oeffneAbgleich(p) }
         : undefined,
+      weitere: darfSchreibenListe ? kartenMenue : undefined,
+      gestapelt: true as const,
     }),
-    [einsatzId, darfAbgleichenListe, oeffneAbgleich],
+    [einsatzId, darfAbgleichenListe, oeffneAbgleich, darfSchreibenListe, kartenMenue],
   );
 
   /**
@@ -647,7 +773,12 @@ export default function PersonenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
+  /*
+   * Ohne Schreibrecht steht „Nur Ansicht · Grund“ über der Liste (M16; LLH-1130, Spec
+   * `betroffene-lagedaten`): beim Beobachter die Rollen, die schreiben, beim abgeschlossenen Einsatz
+   * der Abschluss. Die Zeilen fallen auf die Anzeige zurück (`personenSpalten` ohne Schreibrecht).
+   */
+  const nurAnsicht = !darfSchreiben;
 
   const alle = frischErfasst.alle;
   const gefundene = gefundenePersonen(alle);
@@ -661,7 +792,7 @@ export default function PersonenPage() {
    */
   const listeGescheitert = personenQuery.isError && alle.length === 0;
   const standVeraltet = personenQuery.isError && alle.length > 0;
-  const zeilen = filterPersonen(alle, sicht);
+  const zeilen = filterPersonen(alle, sicht, lueckeGeschlossen);
   /*
    * Der Grund eines abgelehnten Vorschlags steht an der Zeile, solange sie mit der Abgleichspalte
    * dasteht; ist sie weggefiltert oder die Ansicht gewechselt, im Seitenhinweis.
@@ -681,6 +812,33 @@ export default function PersonenPage() {
         ...abgleichZeilen.grund(id),
       };
     });
+  /*
+   * Der Grund einer abgelehnten Nachsichtung steht an der Zeile; zeigt die Seite sie nicht (Karte,
+   * Statusfilter), im Seitenhinweis. Suche und Spaltenfilter fängt die `Datensicht` selbst.
+   */
+  const sichtungFort = sichtungZeilen
+    .gemeldet()
+    .filter((id) => sicht.ansicht === 'karte' || !zeilen.some((p) => p.id === id))
+    .map((id) => {
+      const nr = alle.find((p) => p.id === id)?.registrier_nr;
+      return {
+        id,
+        titel:
+          nr != null
+            ? `Sichtung für ${registrierAnzeige(nr)} nicht gespeichert`
+            : 'Sichtung nicht gespeichert',
+        ...sichtungZeilen.grund(id),
+      };
+    });
+  /**
+   * Die Liste hält Menge und Folge, solange ein Popover, Menü oder Dialog einer Zeile offen ist
+   * (Spec `betroffene-lagedaten`, „Liste springt nicht unter dem Popover“).
+   */
+  const halten =
+    zeileHaelt || verbleibFuer?.einsatzId === einsatzId || sichtungFuer?.einsatzId === einsatzId;
+  /** Ein Grund je Zeile: die jüngste Aktion der Zeile räumt ihren, die Abgleichspalte ihren. */
+  const zeilenGrund = (p: Person) =>
+    sichtungZeilen.grund(p.id) ?? (abgleichSpalteDa ? abgleichZeilen.grund(p.id) : null);
   const uhsNamen = new Map(uhsListe.map((u) => [u.id, u.bezeichnung]));
   const uhsName = (id: number) => uhsNamen.get(id);
 
@@ -785,10 +943,13 @@ export default function PersonenPage() {
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        (nurAnsicht || csvExport.fehler != null || abgleichFort.length > 0) && (
+        (nurAnsicht ||
+          csvExport.fehler != null ||
+          abgleichFort.length > 0 ||
+          sichtungFort.length > 0) && (
           <Flex vertical gap={token.marginSM}>
             <SeitenHinweise
-              rechteText={EINSATZ_ABGESCHLOSSEN}
+              rechteText={einsatzRechteGrund(einsatz.status)}
               rechteFehlt={nurAnsicht}
               fehler={csvExport.fehler}
               fehlerTitel="Export fehlgeschlagen"
@@ -796,6 +957,14 @@ export default function PersonenPage() {
             />
             {abgleichFort.map((g) => (
               <SpeicherFehler key={g.id} fehler={g.fehler} titel={g.titel} fallback={g.fallback} />
+            ))}
+            {sichtungFort.map((g) => (
+              <SpeicherFehler
+                key={`sichtung-${g.id}`}
+                fehler={g.fehler}
+                titel={g.titel}
+                fallback={g.fallback}
+              />
             ))}
           </Flex>
         )
@@ -940,6 +1109,8 @@ export default function PersonenPage() {
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
                 karte={rasterKarte}
+                zeilenFehler={zeilenGrund}
+                halten={halten}
               />
             ) : (
               <Datensicht
@@ -964,7 +1135,8 @@ export default function PersonenPage() {
                 onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
                 zeilenKlasse={zeilenKlasse}
                 karte={listenKarte}
-                zeilenFehler={abgleichSpalteDa ? (p) => abgleichZeilen.grund(p.id) : undefined}
+                zeilenFehler={zeilenGrund}
+                halten={halten}
               />
             )}
           </div>
@@ -1007,6 +1179,37 @@ export default function PersonenPage() {
           })
         }
       />
+
+      {sichtungFuer?.einsatzId === einsatzId && (
+        <SichtungDialog
+          key={sichtungFuer.person.id}
+          einsatzId={einsatzId}
+          personId={sichtungFuer.person.id}
+          offen
+          onErfasst={() => {
+            const personId = sichtungFuer.person.id;
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, personId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          }}
+          onSchliessen={() => setSichtungFuer(null)}
+        />
+      )}
+      {verbleibFuer?.einsatzId === einsatzId && (
+        <VerbleibErfassung
+          key={verbleibFuer.person.id}
+          einsatzId={einsatzId}
+          personId={verbleibFuer.person.id}
+          onErfasst={() => {
+            const personId = verbleibFuer.person.id;
+            setLueckeGeschlossen((alt) => new Set(alt).add(personId));
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, personId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          }}
+          onSchliessen={() => setVerbleibFuer(null)}
+        />
+      )}
 
       <PersonErfassungModal
         key={einsatzId}
