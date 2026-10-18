@@ -65,7 +65,7 @@ export function verortetKennung(
   return (quellen.marker.find(gleich) ?? quellen.nichtVerortet.find(gleich))?.label ?? null;
 }
 
-function istAuftragsTyp(typ: string): typ is PlatzierenZielTyp {
+function isAuftragsTyp(typ: string): typ is PlatzierenZielTyp {
   return Object.prototype.hasOwnProperty.call(EBENE_DES_AUFTRAGS, typ);
 }
 
@@ -77,6 +77,6 @@ export function rueckwegZiel(
   einsatzId: number,
   ziel: VerortetObjekt & { zurueck: boolean },
 ): string | null {
-  if (!ziel.zurueck || !istAuftragsTyp(ziel.typ)) return null;
+  if (!ziel.zurueck || !isAuftragsTyp(ziel.typ)) return null;
   return rueckwegPfad(einsatzId, ziel.typ, ziel.id);
 }

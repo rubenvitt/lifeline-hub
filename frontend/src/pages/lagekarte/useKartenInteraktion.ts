@@ -344,11 +344,11 @@ export function useKartenInteraktion({
       // zu „verortet“, der neue Marker ist gewählt und angeflogen — eine Fehlplatzierung fällt so
       // auf. Ein Start in der Karte selbst endet wie bisher (LFH-765: danach gilt der Zustand davor).
       const lauf = modusRef.current;
-      const ausAuftrag = lauf.art === 'platzieren' && lauf.auftrag != null;
-      if (!ausAuftrag) erfolg('Objekt verortet');
+      const isAusAuftrag = lauf.art === 'platzieren' && lauf.auftrag != null;
+      if (!isAusAuftrag) erfolg('Objekt verortet');
       if (!ziel) return;
       dispatch({ t: 'verortet', ziel });
-      if (ausAuftrag) {
+      if (isAusAuftrag) {
         setSelektion({
           art: 'objekt',
           schluessel: ziel.typ === 'einsatzort' ? 'einsatzort' : `${ziel.typ}-${ziel.id}`,
