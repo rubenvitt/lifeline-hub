@@ -1037,8 +1037,14 @@ export default function LagekartePage() {
   // Bedienung in der Leiste. Unter `lg` steht sie im Fuß-Band `PlatzierSteuerung`, und der laufende
   // Modus gibt die Karte frei (LFH-765, Vorrang in `leisteSichtbar`). Abgeleitet, nicht per Effekt:
   // endet der Modus, gilt wieder, was vorher galt.
+  // Die Rückmeldung „… verortet“ (LLH-1125) steht ab `lg` nur in der Leiste: sie hält die Leiste
+  // offen wie ein Leistenmodus, sonst hinge sie an der Auswahl, und die fehlt, solange die Liste
+  // nach dem Speichern nachlädt (oder dabei scheitert).
   const leistenModusAktiv =
-    platzierungZiel != null || bildPlatzierenId != null || zeichenPlatzieren != null;
+    platzierungZiel != null ||
+    bildPlatzierenId != null ||
+    zeichenPlatzieren != null ||
+    verortetZiel != null;
   const leisteErzwungen = auswahlInhalt != null || (breit && leistenModusAktiv);
   const leisteIstSichtbar = leisteSichtbar({
     gemerkt: leistenWahl.wahl,
@@ -1157,7 +1163,9 @@ export default function LagekartePage() {
           marker: alleVerortet,
           nichtVerortet: nichtVerortetAlle,
         }),
-        onZurueck: verortetRueckweg ? () => navigate(verortetRueckweg) : null,
+        // Ersetzen statt Anhängen: „Zurück“ im Detail führt danach auf die Liste, nicht noch
+        // einmal auf die Karte ohne Auftrag.
+        onZurueck: verortetRueckweg ? () => navigate(verortetRueckweg, { replace: true }) : null,
         onBleiben: onVerortetSchliessen,
       }
     : null;

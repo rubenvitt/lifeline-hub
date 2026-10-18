@@ -2462,6 +2462,37 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     expect(await screen.findByText('Detail der Person')).toBeInTheDocument();
   });
 
+  it('ab lg bei eingeklappter Leiste: die Rückmeldung hält die Leiste offen, auch wenn das Nachladen scheitert', async () => {
+    // Die gemerkte Wahl „Leiste zu“ (Fükw) und eine Personenliste, die nach dem PATCH nicht mehr
+    // lädt: ohne Auswahl hinge die Leiste sonst an nichts, und „Zurück zu …“ stünde nirgends.
+    localStorage.setItem('lfh:lagekarte:leiste-offen:ab-lg', '0');
+    let verortet = false;
+    basisHandler([
+      http.get('/api/einsaetze/1/personen', () =>
+        verortet
+          ? HttpResponse.json({ error: 'Netz weg' }, { status: 503 })
+          : HttpResponse.json([PERSON_OHNE_ORT]),
+      ),
+      http.patch('/api/einsaetze/1/personen/11', () => {
+        verortet = true;
+        return HttpResponse.json(PERSON_VERORTET);
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await user.click(screen.getByText('karte-klick'));
+
+    // Ohne nachgeladene Liste fehlt die Kennung: die Meldung sagt dann „Objekt verortet“, der
+    // Rückweg steht trotzdem (er hängt an Typ und Kennung des Auftrags, nicht an der Liste).
+    const leiste = await screen.findByRole('complementary', { name: 'Kartenleiste' });
+    expect(await within(leiste).findByText(/^(R-042|Objekt) verortet$/)).toBeInTheDocument();
+    expect(within(leiste).getByRole('button', { name: /^Zurück/ })).toBeVisible();
+    await user.click(within(leiste).getByRole('button', { name: /^Zurück/ }));
+    expect(await screen.findByText('Detail der Person')).toBeInTheDocument();
+    localStorage.removeItem('lfh:lagekarte:leiste-offen:ab-lg');
+  });
+
   it('„Auf der Karte bleiben“ schließt die Rückmeldung, die Ebene bleibt gezeichnet', async () => {
     auftragsHandler();
     const user = userEvent.setup();
