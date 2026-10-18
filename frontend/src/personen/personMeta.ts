@@ -160,3 +160,23 @@ export const VERLETZUNG_SCHWERE_WORT: Record<VerletzungSchwere, string> = {
 export function gueltig<T extends { aufgehoben_at?: string | null }>(liste: readonly T[]): T[] {
   return liste.filter((e) => e.aufgehoben_at == null);
 }
+
+/** Spielraum, ab dem ein Eintrag als nachgetragen gilt: wie die Zukunftstoleranz des Servers. */
+export const NACHTRAG_SPIELRAUM_MS = 60_000;
+
+function alsMs(wire: string): number {
+  return Date.parse(`${wire.replace(' ', 'T')}Z`);
+}
+
+/**
+ * Ob ein Eintrag nachgetragen ist (Spec `personen-verlauf`, „Nachsichtung von vor 20 Minuten“):
+ * er kam mehr als {@link NACHTRAG_SPIELRAUM_MS} nach seiner Erfassungszeit beim Server an
+ * (`eingegangen_at` bzw. `erfasst_at`). Ein sofort erfasster Eintrag trägt beide Zeiten aus
+ * derselben Sekunde; Einträge von vor der Migration 0217 haben keinen Eingang.
+ */
+export function istNachgetragen(erfassung: string, eingang: string | null | undefined): boolean {
+  if (!eingang) return false;
+  const a = alsMs(erfassung);
+  const b = alsMs(eingang);
+  return Number.isFinite(a) && Number.isFinite(b) && b - a > NACHTRAG_SPIELRAUM_MS;
+}
