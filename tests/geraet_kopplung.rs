@@ -3105,6 +3105,204 @@ async fn entlassene_kraft_fehlt_in_der_auswahl_der_bestaetigenden() {
     assert_eq!(namen, ["Zander"]);
 }
 
+/// Wire-Zeitstempel `versatz_sek` von jetzt (UTC, `YYYY-MM-DD HH:MM:SS`).
+fn zeit(versatz_sek: i64) -> String {
+    (chrono::Utc::now() + chrono::Duration::seconds(versatz_sek))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
+/// Verlegt die Alarmierung, die das Disponieren in die Kräfte-Zeitachse schreibt (Status
+/// „alarmiert“ des Standardkatalogs), auf `at`.
+async fn alarmiert_um(pool: &sqlx::SqlitePool, personal: i64, at: &str) {
+    let r = sqlx::query(
+        "UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? \
+         WHERE personal_id = ? AND art = 'alarmierung'",
+    )
+    .bind(at)
+    .bind(personal)
+    .execute(pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        r.rows_affected(),
+        1,
+        "das Disponieren schreibt eine Alarmierung"
+    );
+}
+
+/// Ein Ereignis der Kräfte-Zeitachse einer Person, von Hand nachgetragen.
+async fn zeitachse(pool: &sqlx::SqlitePool, einsatz: i64, personal: i64, art: &str, at: &str) {
+    sqlx::query(
+        "INSERT INTO einsatz_kraft_zeitachse \
+            (einsatz_id, personal_id, art, zeitpunkt_at, quelle, erfasst_von) \
+         VALUES (?, ?, ?, ?, 'nachtrag', (SELECT id FROM benutzer WHERE benutzername = 'admin'))",
+    )
+    .bind(einsatz)
+    .bind(personal)
+    .bind(art)
+    .bind(at)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// Person, die vor 30 Minuten angelegt wurde: eine vorgemerkte Sichtung von vor 10 Minuten wird
+/// nicht auf das Anlegen gekappt.
+async fn person_seit_30_min(
+    app: &axum::Router,
+    pool: &sqlx::SqlitePool,
+    geraet: &str,
+    einsatz: i64,
+) -> i64 {
+    let pid = person_in(app, geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    sqlx::query("UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?")
+        .bind(zeit(-1800))
+        .bind(pid)
+        .execute(pool)
+        .await
+        .unwrap();
+    pid
+}
+
+/// LLH-1138, design.md D7: „Bestätigt von“ gilt zur Erfassungszeit. Eine Kraft, die laut
+/// Kräfte-Zeitachse damals eingesetzt war und vor der Übertragung entlassen wurde, bestätigt die
+/// vorgemerkte Sichtung weiter.
+#[tokio::test]
+async fn vorgemerkte_bestaetigung_gilt_zur_erfassungszeit() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    alarmiert_um(&pool, aerztin, &zeit(-1500)).await;
+    let pid = person_seit_30_min(&app, &pool, &geraet, einsatz).await;
+    let vorgemerkt = zeit(-600);
+    // Schichtwechsel vor der Übertragung.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{aerztin}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({
+            "kategorie": "sk2", "bestaetigt_personal_id": aerztin,
+            "zeitpunkt_at": vorgemerkt, "client_id": "offline-best-1"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+
+    // Derselbe Verbleib, nach der Entlassung erfasst, bestätigt sie nicht mehr.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &geraet,
+        Some(&json!({"art": "vor_ort", "bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "nach der Entlassung erfasst: {v}");
+}
+
+/// Laut Zeitachse war die Kraft zur Erfassungszeit schon entlassen: 409 wie bisher.
+#[tokio::test]
+async fn bestaetigung_nach_dem_einsatzende_der_kraft_ist_409() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    alarmiert_um(&pool, aerztin, &zeit(-1500)).await;
+    zeitachse(&pool, einsatz, aerztin, "entlassung", &zeit(-1200)).await;
+    sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = ?, beendet_als = 'entlassen' WHERE id = ?",
+    )
+    .bind(zeit(-1200))
+    .bind(aerztin)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let pid = person_seit_30_min(&app, &pool, &geraet, einsatz).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({
+            "kategorie": "sk2", "bestaetigt_personal_id": aerztin, "zeitpunkt_at": zeit(-600)
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}
+
+/// Rückfall „aktiv jetzt“ (design.md, Risiken): ohne Kräfte-Zeitachse lässt sich die Einsatzzeit
+/// nicht bestimmen. Eine aktive Kraft bestätigt, eine entlassene nicht, auch wenn die Sichtung vor
+/// der Entlassung erfasst wurde.
+#[tokio::test]
+async fn ohne_zeitachse_gilt_aktiv_jetzt() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aktiv = kraft(&app, &admin, einsatz, "Zander").await;
+    let weg = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    // Ohne Zeitachse: ein Katalog ohne Zeitachsen-Marken schreibt beim Disponieren nichts.
+    sqlx::query("DELETE FROM einsatz_kraft_zeitachse WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pid = person_seit_30_min(&app, &pool, &geraet, einsatz).await;
+    let vorgemerkt = zeit(-600);
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{weg}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let pfad = format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &geraet,
+        Some(
+            &json!({"kategorie": "sk2", "bestaetigt_personal_id": weg, "zeitpunkt_at": vorgemerkt}),
+        ),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "entlassen, Einsatzzeit unbekannt: {v}"
+    );
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &geraet,
+        Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": aktiv, "zeitpunkt_at": vorgemerkt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "aktiv: {v}");
+    assert_eq!(v["bestaetigt_name"], "Zander");
+}
+
 #[tokio::test]
 async fn auswahl_der_bestaetigenden_nur_fuer_uhs_geraete() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

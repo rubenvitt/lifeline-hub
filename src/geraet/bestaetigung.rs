@@ -35,11 +35,18 @@ pub struct Bestaetiger {
 /// Prüft eine angegebene Bestätigung und löst den Namen auf. Ohne Angabe `None`. Eine Angabe
 /// ohne Gerätesitzung oder mit einer Kennung außerhalb des Einsatzes ist 422 (Zusammenhang,
 /// `src/AGENTS.md`, Statuscode-Konvention).
+///
+/// `erfasst_at` ist die Erfassungszeit des Schritts (LLH-1138, design.md D7): eine inzwischen
+/// entlassene Kraft bestätigt weiter, wenn sie laut Kräfte-Zeitachse zu dieser Zeit eingesetzt
+/// war ([`eingesetzt_zur`]). Lässt sich das nicht bestimmen (keine Einsatzperiode in der
+/// Zeitachse) oder fehlt die Zeit, gilt der Rückfall „aktiv jetzt“. Eine stornierte Kraft war
+/// nie eingesetzt und bestätigt nie.
 pub async fn aufloesen(
     pool: &SqlitePool,
     geraet: Option<&GeraetKontext>,
     einsatz_id: i64,
     personal_id: Option<i64>,
+    erfasst_at: Option<&str>,
 ) -> Result<Option<Bestaetigung>, AppError> {
     let Some(personal_id) = personal_id else {
         return Ok(None);
@@ -59,11 +66,56 @@ pub async fn aufloesen(
     let (name, ende) = zeile.ok_or_else(|| {
         AppError::UnprocessableEntity("Die bestätigende Person gehört nicht zum Einsatz".into())
     })?;
-    // Eine entlassene oder stornierte Kraft bestätigt nichts mehr (409, LLH-1079).
+    // Eine entlassene oder stornierte Kraft bestätigt nichts mehr (409, LLH-1079) — außer die
+    // entlassene war zur Erfassungszeit eingesetzt (D7).
     if let Some(als) = ende {
-        return Err(crate::personal::disposition_repo::beendet_conflict(&als));
+        let damals = match erfasst_at {
+            Some(t) if als == crate::entlassung::BeendetAls::Entlassen.as_str() => {
+                let zeitachse = crate::zeitachse::repo::laden(
+                    pool,
+                    einsatz_id,
+                    crate::zeitachse::repo::Kraft::Person(personal_id),
+                )
+                .await?;
+                eingesetzt_zur(&zeitachse.perioden, t)
+            }
+            _ => None,
+        };
+        // Rückfall „aktiv jetzt“: nicht bestimmbar heißt wie bisher abgelehnt.
+        if damals != Some(true) {
+            return Err(crate::personal::disposition_repo::beendet_conflict(&als));
+        }
     }
     Ok(Some(Bestaetigung { personal_id, name }))
+}
+
+/// Ob eine Kraft zur Zeit `t` eingesetzt war: eine ihrer Einsatzperioden umfasst `t` (ab dem
+/// Beginn, bis vor das Ende: mit der Entlassung ist sie nicht mehr eingesetzt; eine offene Periode
+/// reicht bis jetzt). `None`, wenn die Zeitachse keine
+/// Periode kennt oder `t` unlesbar ist: dann lässt sich die Einsatzzeit nicht bestimmen.
+pub fn eingesetzt_zur(perioden: &[crate::zeitachse::Einsatzperiode], t: &str) -> Option<bool> {
+    let t = crate::zeit::parse(t)?;
+    if perioden.is_empty() {
+        return None;
+    }
+    let mut bestimmt = false;
+    for p in perioden {
+        let Some(beginn) = crate::zeit::parse(&p.beginn_at) else {
+            continue;
+        };
+        let ende = match p.ende_at.as_deref() {
+            None => None,
+            Some(e) => match crate::zeit::parse(e) {
+                Some(e) => Some(e),
+                None => continue,
+            },
+        };
+        bestimmt = true;
+        if beginn <= t && ende.is_none_or(|e| t < e) {
+            return Some(true);
+        }
+    }
+    bestimmt.then_some(false)
 }
 
 /// Das Personal des Einsatzes für die Auswahl, nach Name sortiert.
@@ -76,4 +128,58 @@ pub async fn auswahl(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Bestaetig
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::zeitachse::{Einsatzperiode, ZeitachseArt};
+
+    fn periode(beginn: &str, ende: Option<&str>) -> Einsatzperiode {
+        Einsatzperiode {
+            beginn_at: beginn.into(),
+            anker: ZeitachseArt::Eintreffen,
+            eintreffen_at: Some(beginn.into()),
+            ende_at: ende.map(Into::into),
+            ende_art: ende.map(|_| ZeitachseArt::Entlassung),
+        }
+    }
+
+    #[test]
+    fn eingesetzt_zur_prueft_jede_periode_mit_grenzen() {
+        let p = [
+            periode("2026-10-18 08:00:00", Some("2026-10-18 10:00:00")),
+            periode("2026-10-18 12:00:00", None),
+        ];
+        assert_eq!(eingesetzt_zur(&p, "2026-10-18 09:00:00"), Some(true));
+        assert_eq!(eingesetzt_zur(&p, "2026-10-18 09:59:59"), Some(true));
+        assert_eq!(
+            eingesetzt_zur(&p, "2026-10-18 10:00:00"),
+            Some(false),
+            "mit der Entlassung nicht mehr"
+        );
+        assert_eq!(
+            eingesetzt_zur(&p, "2026-10-18 08:00:00"),
+            Some(true),
+            "Beginn zählt"
+        );
+        assert_eq!(
+            eingesetzt_zur(&p, "2026-10-18 11:00:00"),
+            Some(false),
+            "Pause"
+        );
+        assert_eq!(eingesetzt_zur(&p, "2026-10-18 07:59:59"), Some(false));
+        assert_eq!(
+            eingesetzt_zur(&p, "2026-10-18 13:00:00"),
+            Some(true),
+            "offen"
+        );
+    }
+
+    #[test]
+    fn eingesetzt_zur_ohne_periode_ist_unbestimmt() {
+        assert_eq!(eingesetzt_zur(&[], "2026-10-18 09:00:00"), None);
+        let p = [periode("2026-10-18 08:00:00", None)];
+        assert_eq!(eingesetzt_zur(&p, "gestern"), None, "unlesbare Zeit");
+    }
 }

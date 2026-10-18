@@ -333,11 +333,13 @@ pub async fn anlegen(
             "Eine Bestätigung gibt es nur zu einer Erst-Sichtung".into(),
         ));
     }
+    // Die Erst-Sichtung trägt die Serverzeit, also gilt „aktiv jetzt“.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
+        None,
     )
     .await?;
 
@@ -881,11 +883,13 @@ pub async fn sichten(
         }
     };
     let notiz = trimme(body.notiz);
+    // Zur Erfassungszeit (D7): eine vor der Übertragung entlassene Kraft bestätigt weiter.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
+        Some(&gesichtet_at),
     )
     .await?;
 
@@ -1211,11 +1215,13 @@ pub async fn verbleib(
     let transportmittel = trimme(body.transportmittel);
     let ziel = trimme(body.ziel);
     let notiz = trimme(body.notiz);
+    // Zur Erfassungszeit (D7), wie bei der Sichtung.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
+        Some(&zeitpunkt_at),
     )
     .await?;
 

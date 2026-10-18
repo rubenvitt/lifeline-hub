@@ -19,7 +19,7 @@ Für jede Aufgabe gilt:
 - [x] 1.3 Sichtung: POST nimmt `client_id` und `zeitpunkt_at` an, Replay vor `fordere_aktiv`, Cache nach jüngstem Zeitpunkt (D6), Hinweis „Sichtung I“ nur, wenn der Eintrag gewinnt, ETB mit `ereigniszeit` und „nachgetragen“, ETB-Live-Ereignis. Servertests: doppelte `client_id` ergibt einen Eintrag und einen ETB-Eintrag, ältere Sichtung ändert den Cache nicht und benachrichtigt nicht, Zukunft 400.
 - [x] 1.4 Verbleib: dasselbe wie 1.3 in einem `write_retry!` samt Auto-Austritt, der nur läuft, wenn der Eintrag gewinnt. Die Kurzform wird aus der gewinnenden Zeile berechnet. Servertests: älterer Verbleib ohne Austritt, Replay idempotent.
 - [x] 1.5 Notiz: `client_id` und `zeitpunkt_at`, ohne ETB. Servertest Replay.
-- [ ] 1.6 Bestätigung zur Erfassungszeit (D7) in `geraet::bestaetigung`. Servertest: Kraft nach der Erfassung entlassen, das Replay gelingt; Rückfall „aktiv jetzt“, wenn die Einsatzzeit fehlt.
+- [x] 1.6 Bestätigung zur Erfassungszeit (D7) in `geraet::bestaetigung`. Servertest: Kraft nach der Erfassung entlassen, das Replay gelingt; Rückfall „aktiv jetzt“, wenn die Einsatzzeit fehlt.
 - [ ] 1.7 Typ-Codegen und Wire-Kontrakt nachgezogen, `tests/geraet_kopplung.rs` mit Replay am Gerät grün.
 
 ## 2. PAT-Nummer und Kontamination — LLH-1326 (kxv9m07u)
