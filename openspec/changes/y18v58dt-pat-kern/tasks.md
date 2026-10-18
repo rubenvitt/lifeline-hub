@@ -51,7 +51,7 @@ Für jede Aufgabe gilt:
 
 ## 6. Patientenkopf und Verlauf — LLH-1324, LLH-1325, LLH-1326, LLH-1113
 
-- [ ] 6.1 API-Funktionen in `api/einsatzPerson.ts` für Transport, Maßnahme, Verletzung (erfassen und aufheben). Test-Fixtures bekommen die neuen Pflichtfelder (`PersonVerlauf.test.tsx`, `Grundriss.test.tsx` u. a.). `tsc -b` grün.
+- [x] 6.1 API-Funktionen in `api/einsatzPerson.ts` für Transport, Maßnahme, Verletzung (erfassen und aufheben). Test-Fixtures bekommen die neuen Pflichtfelder (`PersonVerlauf.test.tsx`, `Grundriss.test.tsx` u. a.). `tsc -b` grün.
 - [ ] 6.2 `Patientenkopf.tsx`: Kopfzeile mit PAT-Nummer und „kontaminiert“, Raster in zwei Spalten ab `lg` mit Transport, Maßnahmen und Verletzungen und Kürzung „+ n weitere“ (D14). Vitest für Lesen, voll, leer und ohne Schreibrecht.
 - [ ] 6.3 Paneele „Transport festlegen“ und „Maßnahme erfassen“ mit „Bestätigt von“ am Gerät, Ablehnung am Ort, ein Paneel zugleich, Wechsel beim Speichern gesperrt. PAT-Nummer und Kontamination inline über den PATCH, ohne Netz gesperrt. Vitest mit verzögerter Antwort und Ablehnung.
 - [ ] 6.4 `PersonVerlauf.tsx`: Transport, Maßnahme (auch aufgehoben) und Verletzung (auch aufgehoben) als Einträge, nachgetragene Einträge erkennbar. Vitest.

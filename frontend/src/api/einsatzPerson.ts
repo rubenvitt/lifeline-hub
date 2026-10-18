@@ -1,5 +1,9 @@
 import type {
   Bestaetiger,
+  Fachrichtung,
+  KoerperRegion,
+  Massnahme,
+  MassnahmeArt,
   Person,
   PersonAnhang,
   PersonAuswahl,
@@ -8,10 +12,17 @@ import type {
   PersonZugriff,
   Sichtung,
   Sichtungskategorie,
+  Transport,
+  TransportArt,
+  TransportPrioritaet,
   Verbleib,
   VerbleibArt,
   VerbleibStatus,
   Verlaufsnotiz,
+  Verletzung,
+  VerletzungAnsicht,
+  VerletzungArt,
+  VerletzungSchwere,
   Abgleich,
 } from './types';
 import {
@@ -224,6 +235,103 @@ export function legeNotizAn(
     `/api/einsaetze/${einsatzId}/personen/${personId}/notizen`,
     'POST',
     { text },
+  );
+}
+
+// ---------- PAT-Kern: Transport, Maßnahmen, Verletzungen (Change `y18v58dt-pat-kern`) ----------
+//
+// Je Schreibweg GENAU EINE Funktion, und jede Oberfläche ruft sie nur über ihre eine Mutation im
+// Patientenkopf: die Offline-Vormerkung (Abschnitt 8, design.md D8) tauscht hier den Aufruf gegen
+// den vorgemerkten Weg aus. `client_id` und `zeitpunkt_at` kennt der Server schon (LLH-1138).
+
+/** Ein voller Transportstand (Spec `personen-transport`): jedes Feld einzeln leer, alle drei leer
+ * heben den Transport auf. Am Gerät optional „Bestätigt von“ (LFH-1046). */
+export interface TransportEingabe {
+  prioritaet: TransportPrioritaet | null;
+  art: TransportArt | null;
+  fachrichtung: Fachrichtung | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+/** Transport festlegen: ein neuer Eintrag im Verlauf; ETB nur beim Wechsel der Priorität. */
+export function saveTransport(
+  einsatzId: number,
+  personId: number,
+  eingabe: TransportEingabe,
+): Promise<Transport> {
+  return apiSend<Transport>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/transport`,
+    'POST',
+    eingabe,
+  );
+}
+
+/** Eine Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`); ohne `zeitpunkt_at` gilt die
+ * Erfassung als Durchführung. Kein ETB. */
+export interface MassnahmeEingabe {
+  art: MassnahmeArt;
+  zeitpunkt_at?: string | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+export function createMassnahme(
+  einsatzId: number,
+  personId: number,
+  eingabe: MassnahmeEingabe,
+): Promise<Massnahme> {
+  return apiSend<Massnahme>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen`,
+    'POST',
+    eingabe,
+  );
+}
+
+/** Hebt eine Maßnahme genau einmal auf (zweites Aufheben 409). */
+export function revokeMassnahme(
+  einsatzId: number,
+  personId: number,
+  massnahmeId: number,
+): Promise<Massnahme> {
+  return apiSend<Massnahme>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen/${massnahmeId}/aufheben`,
+    'POST',
+  );
+}
+
+/** Eine Verletzung am Körperschema (Spec `personen-verletzungen`): Region muss in der Ansicht
+ * liegen (sonst 422), die Lage `x`/`y` nur als Paar, je 0..1. Kein ETB. */
+export interface VerletzungEingabe {
+  ansicht: VerletzungAnsicht;
+  region: KoerperRegion;
+  art: VerletzungArt;
+  schwere?: VerletzungSchwere | null;
+  x?: number;
+  y?: number;
+  notiz?: string | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+export function createVerletzung(
+  einsatzId: number,
+  personId: number,
+  eingabe: VerletzungEingabe,
+): Promise<Verletzung> {
+  return apiSend<Verletzung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen`,
+    'POST',
+    eingabe,
+  );
+}
+
+/** Hebt eine Verletzung genau einmal auf; die Nummer am Schema bleibt frei (Lücke). */
+export function revokeVerletzung(
+  einsatzId: number,
+  personId: number,
+  verletzungId: number,
+): Promise<Verletzung> {
+  return apiSend<Verletzung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen/${verletzungId}/aufheben`,
+    'POST',
   );
 }
 
