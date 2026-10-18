@@ -1,4 +1,5 @@
-import type { KoerperRegion, Verletzung, VerletzungAnsicht } from '../../api/types';
+import type { KoerperRegion, Person, Verletzung, VerletzungAnsicht } from '../../api/types';
+import type { Figur } from './geometrie';
 
 /**
  * Reiner Kern des Körperschemas (LLH-1120, Spec `koerperschema`, design.md D13): Namen der
@@ -59,4 +60,12 @@ export function nummeriere(verletzungen: readonly Verletzung[]): NummerierteVerl
   return [...verletzungen]
     .sort((a, b) => a.id - b.id)
     .map((verletzung, i) => ({ nummer: i + 1, verletzung }));
+}
+
+/**
+ * Die Figur aus dem Geschlecht der Person (Spec, „Figur nach Geschlecht, Lage unabhängig davon“):
+ * männlich und weiblich je eigene, sonst (divers, unbekannt, ohne Angabe) die neutrale.
+ */
+export function figurVon(geschlecht: Person['geschlecht'] | undefined): Figur {
+  return geschlecht === 'maennlich' || geschlecht === 'weiblich' ? geschlecht : 'neutral';
 }
