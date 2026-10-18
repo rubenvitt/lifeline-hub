@@ -1,3 +1,10 @@
+## [1.0.0-alpha.141](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.140...v1.0.0-alpha.141) (2026-10-18)
+
+### Bedienung auf Mobilgeräten
+
+- **Kein ungewolltes Zoomen mehr beim Tippen:** Auf iPhone und iPad vergrößerte sich die Ansicht bisher jedes Mal, wenn man in ein Eingabefeld tippte. Das ist behoben. Die App verhält sich jetzt wie eine native App und zoomt gar nicht mehr, auch nicht per Doppeltipp oder beim Drehen des Geräts. Wie groß die Schrift ist, bestimmt weiterhin die eingestellte Darstellungsdichte.
+- Die Lagekarte und die Ziehgriffe reagieren weiter wie gewohnt auf Wischen und Zoomen.
+
 ## [1.0.0-alpha.140](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.139...v1.0.0-alpha.140) (2026-10-18)
 
 ### Einsatztagebuch
