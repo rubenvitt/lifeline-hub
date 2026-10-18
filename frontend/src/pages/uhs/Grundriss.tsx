@@ -91,6 +91,7 @@ import {
   wartezeitMinuten,
   wartezeitText,
 } from './dringlichkeit';
+import { personenInUhs as personenInUhsVon, transportiertAus } from './uhsLage';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -1210,7 +1211,7 @@ export default function Grundriss({
     queryFn: () => listePersonen(einsatzId),
   });
   const personen = personenQuery.data ?? [];
-  const personenInUhs = personen.filter((p) => p.aktuelle_uhs_id === uhs.id);
+  const personenInUhs = personenInUhsVon(uhs, personen);
   // Beginn der Wartezeit je Person aus der Belegungsreihe (LLH-1135), einmal je Render.
   const beginnJe = new Map(personenInUhs.map((p) => [p.id, wartetSeit(p.id, uhs.belegungen)]));
   const wartetSeitVon = (p: Person) => beginnJe.get(p.id) ?? null;
@@ -1243,12 +1244,8 @@ export default function Grundriss({
 
   // Rechte Spalte: Personen, die aus dieser UHS auf Transport gingen — Austritts-Historie
   // (`uhs.belegungen`) ∩ aktueller Verbleib „Transport".
-  const ausgetretenIds = new Set(
-    uhs.belegungen.filter((b) => b.art === 'austritt').map((b) => b.person_id),
-  );
-  const transportiert = personen
-    .filter((p) => ausgetretenIds.has(p.id) && p.aktueller_verbleib?.startsWith('Transport'))
-    .sort((a, b) => a.registrier_nr - b.registrier_nr);
+  // Dieselbe Menge zählt die Lage der Stelle (`uhsLage.ts`, LLH-1136).
+  const transportiert = transportiertAus(uhs, personen);
 
   // Innenfläche so groß, dass alle Plätze hineinpassen — sie scrollt innerhalb der Mittelspalte.
   const maxX = Math.max(0, ...uhs.plaetze.map((p) => p.pos_x ?? 0));

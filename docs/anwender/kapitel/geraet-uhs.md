@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -77,8 +77,11 @@ Für den UHS-Laptop:
 
 1. Unten „UHS“ wählen. Die Leiste oben wechselt zwischen „Plätze“, „Kräfte“, „Material“,
    „Meldungen“ und „Dateien“.
-2. „Plätze“ zählt Plätze, belegte, freie und nicht verfügbare; „Grundriss bearbeiten“ führt in
-   den Grundriss, wo „Plätze bearbeiten“ Plätze anlegt und ändert.
+2. „Plätze“ zeigt die Lage der Stelle in Zahlen wie am Fükw: „In der Stelle“ mit der Sichtung,
+   „Plätze frei“, „Wartend“ mit der längsten Wartezeit und „Abtransportiert“
+   ([Unfallhilfsstellen](unfallhilfsstellen.md)). Ein Tipp auf „In der Stelle“ öffnet die
+   Patienten, auf die übrigen Zahlen den Grundriss. „Grundriss bearbeiten“ führt in den
+   Grundriss, wo „Plätze bearbeiten“ Plätze anlegt und ändert.
 3. „Kräfte“ zeigt die Stärke der UHS und ihre Kräfte. „Kraft zuordnen“ holt eine Person des
    Einsatzes an die UHS, „Kraft erfassen“ legt eine neue an, „Abziehen“ nimmt sie wieder heraus.
 

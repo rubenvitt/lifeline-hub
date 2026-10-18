@@ -59,8 +59,10 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche unter der Bereich
   await page.goto(pfad);
   await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
   const grundriss = page.getByTestId('grundriss-rahmen');
-  // Die Mindest-Arbeitsfläche des Grundrisses ist 380 px; sie ist kein Kopf-Abzug.
-  expect((await grundriss.boundingBox())!.height).toBeGreaterThanOrEqual(380);
+  // Die Mindest-Arbeitsfläche ist 380 px; sie ist kein Kopf-Abzug. Sie gilt dem Bereich, in dem
+  // über dem Grundriss die Lage der Stelle als eine Zeile steht (LLH-1136).
+  const bereich = page.getByRole('tabpanel', { name: 'Belegung', exact: true });
+  expect((await bereich.boundingBox())!.height).toBeGreaterThanOrEqual(380);
   // Die Bereichsleiste steht über dem Grundriss (LLH-1133), nicht im Seitenfluss darunter.
   const reihenfolge = await grundriss.evaluate((el) => {
     const material = [...document.querySelectorAll('[role="tab"]')].find(
@@ -73,8 +75,12 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche unter der Bereich
   await expect(page.getByRole('spinbutton', { name: 'Menge' })).toBeVisible();
 });
 
+/**
+ * Gemessen wird der Bereich „Belegung“: er ist die Arbeitsfläche mit den 380 px. Über dem Grundriss
+ * steht darin ab `md` die Lage der Stelle als eine Schriftzeile (LLH-1136).
+ */
 async function grundrissMessen(page: Page) {
-  return page.getByTestId('grundriss-rahmen').evaluate((el) => {
+  return page.getByRole('tabpanel', { name: 'Belegung', exact: true }).evaluate((el) => {
     const r = el.getBoundingClientRect();
     const content = el.closest('main')!;
     return {
@@ -245,6 +251,7 @@ for (const breite of [1024, 390]) {
  * LLH-1133 (Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in Bereiche“): am Fükw (1440 × 900)
  * und am Führungs-Tablet (1280 × 800) steht die Bereichsleiste ohne Bildlauf über dem Grundriss,
  * „Material“ ist ohne Bildlauf wählbar, und jeder Bereich füllt dieselbe Fläche bis zum Fenster.
+ * Darüber steht die Lage der Stelle in Zahlen ganz im Fenster (LLH-1136).
  */
 async function bereichMessen(page: Page, name: string) {
   return page.getByRole('tabpanel', { name, exact: true }).evaluate((el) => {
@@ -280,6 +287,12 @@ for (const [breite, hoehe] of [
     // Ohne Bildlauf: die Seite steht oben, und der Reiter liegt im Fenster über dem Grundriss.
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
     await expect(material).toBeInViewport();
+    // Die Lage der Stelle in Zahlen (LLH-1136) steht ganz im Fenster über der Leiste.
+    const zahlen = page.getByRole('group', { name: 'Lage der Stelle' });
+    await expect(zahlen).toBeInViewport({ ratio: 1 });
+    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Abtransportiert']) {
+      await expect(zahlen.getByText(titel, { exact: true })).toBeVisible();
+    }
     const abstand = await page
       .getByTestId('grundriss-rahmen')
       .evaluate(

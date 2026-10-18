@@ -297,12 +297,16 @@ describe('Zustand-Spalte (LFH-613)', () => {
       }),
     );
     renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     const feld = screen.getByRole('textbox');
     await userEvent.type(feld, 'gehfähig');
     fireEvent.blur(feld);
 
-    const knopf = await screen.findByRole('button', { name: 'Zustand / Verdacht zu R-001 bearbeiten' });
+    const knopf = await screen.findByRole('button', {
+      name: 'Zustand / Verdacht zu R-001 bearbeiten',
+    });
     expect(knopf).toHaveTextContent('gehfähig');
     // Warten auf die Bedingung, nicht auf den Takt (LFH-531): antds Button führt `loading` über
     // einen eigenen Zustand (`useDelayState`, gesetzt im Layout-Effekt) und trägt die Klasse erst
@@ -311,7 +315,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
     // festgehalten, die Ladeanzeige muss also stehen und bleiben.
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
     expect(knopf).toHaveTextContent('gehfähig');
-    expect(screen.queryByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    ).toBeNull();
     freigeben();
   });
 
@@ -333,7 +339,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
     const gehalten = new Promise<void>((r) => (freigeben = r));
     vi.spyOn(client, 'invalidateQueries').mockImplementation(() => gehalten);
     renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>, { client });
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
 
@@ -365,7 +373,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
       ),
     );
     const { container } = renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
 
@@ -380,7 +390,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
     );
 
     scheitern = false;
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
     fireEvent.blur(screen.getByRole('textbox'));
     await waitFor(() => expect(zellHuelle).not.toHaveAttribute('data-fehler'));
@@ -402,7 +414,9 @@ describe('Zustand-Spalte (LFH-613)', () => {
       }),
     );
     renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
-    await userEvent.click(screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
     fireEvent.blur(screen.getByRole('textbox'));
     await new Promise((r) => setTimeout(r, 20));
     expect(patch).not.toHaveBeenCalled();

@@ -105,7 +105,10 @@ test.describe(KAPITEL, () => {
     try {
       await nav.getByRole('link', { name: 'Aufnahme' }).click();
       await expect(geraet).toHaveURL(/\/aufnahme\?uhs=\d+$/);
-      await geraet.locator('#sichtung').getByRole('radio', { name: /^SK II,/ }).click();
+      await geraet
+        .locator('#sichtung')
+        .getByRole('radio', { name: /^SK II,/ })
+        .click();
       await fotografiere(geraet.locator('main'), KAPITEL, 'aufnahme');
       await geraet.getByRole('button', { name: 'Speichern und nächste' }).click();
       await expect(geraet.getByText(/Erfasst als R-\d{3} · SK II · im Wartebereich/)).toBeVisible();

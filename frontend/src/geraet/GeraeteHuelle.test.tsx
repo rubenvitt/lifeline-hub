@@ -26,7 +26,6 @@ import { stelle, zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
-import { platzZahlen } from './GeraetStellePage';
 
 /**
  * Die Gerätehülle im echten Routenbaum (LFH-892, Spec `feldgeraet-bedienung`): Startseite,
@@ -509,13 +508,22 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     expect(screen.queryByRole('tablist', { name: /Material|Bewegungen|Dateien/ })).toBeNull();
   });
 
-  it('Plätze in Zahlen, Material der UHS nur lesend und ohne die Einsatzliste', async () => {
+  it('Lage der Stelle in Zahlen, Material der UHS nur lesend und ohne die Einsatzliste', async () => {
     vi.useRealTimers();
     const { materialListe } = laptopBereit();
     renderApp('/geraet/7/stelle');
     expect(await screen.findByRole('heading', { level: 1, name: 'UHS' })).toBeVisible();
-    const zahlen = await screen.findByRole('group', { name: 'Plätze in Zahlen' });
-    expect(within(zahlen).getByText('Frei')).toBeVisible();
+    // Dieselbe Zahlzeile wie am Fükw (LLH-1136); jede Zahl springt in den Grundriss bzw. die
+    // Patientenliste des Geräts.
+    const zahlen = await screen.findByRole('group', { name: 'Lage der Stelle' });
+    expect(within(zahlen).getByRole('link', { name: /Plätze frei/ })).toHaveAttribute(
+      'href',
+      '/geraet/7/uhs/2',
+    );
+    expect(within(zahlen).getByRole('link', { name: /In der Stelle/ })).toHaveAttribute(
+      'href',
+      '/geraet/7/patienten',
+    );
     expect(screen.getByRole('button', { name: 'Grundriss bearbeiten' })).toBeVisible();
 
     const user = userEvent.setup();
@@ -1003,26 +1011,5 @@ describe('Bausteine', () => {
     expect(ortInDerUhs(wartend, uhs)).toBe('Wartebereich');
     expect(ortInDerUhs({ ...wartend, aktueller_platz_id: 30 }, uhs)).toBe('Liege 1');
     expect(ortInDerUhs(ausgetreten, uhs)).toBe('KH Mitte');
-  });
-
-  it('platzZahlen: belegt vor Verfügbarkeit, Wartebereich und stornierte zählen nicht', () => {
-    const p = uhs.plaetze[0];
-    const mit: UhsDetail = {
-      ...uhs,
-      plaetze: [
-        p,
-        { ...p, id: 31, verfuegbarkeit: 'defekt' },
-        { ...p, id: 32, verfuegbarkeit: 'aufbereitung' },
-        { ...p, id: 33 },
-        { ...p, id: 34, typ: 'wartebereich' },
-        { ...p, id: 35, storniert_at: '2026-10-04 09:00:00' },
-      ],
-    };
-    expect(platzZahlen(mit, new Set([30, 32]))).toEqual({
-      gesamt: 4,
-      belegt: 2,
-      frei: 1,
-      nichtVerfuegbar: 1,
-    });
   });
 });

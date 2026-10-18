@@ -61,7 +61,13 @@ beforeEach(() => {
       const halter = new URL(request.url).searchParams.get('halter_person_id');
       if (halter === '10') return HttpResponse.json(tiereDerPerson);
       return HttpResponse.json([
-        tier({ id: 41, registrier_nr: 9, rufname: 'Minka', spezies: 'katze', halter_person_id: null }),
+        tier({
+          id: 41,
+          registrier_nr: 9,
+          rufname: 'Minka',
+          spezies: 'katze',
+          halter_person_id: null,
+        }),
         // Belegt: steht nicht zur Wahl.
         tier({ id: 42, registrier_nr: 10, rufname: 'Fremd', halter_person_id: 99 }),
       ]);
@@ -92,14 +98,19 @@ beforeEach(() => {
       return tierPatchAntwort();
     }),
     http.patch('/api/einsaetze/1/schaeden/:id', async ({ request, params }) => {
-      patches.push({ pfad: `schaeden/${String(params.id)}`, body: (await request.json()) as never });
+      patches.push({
+        pfad: `schaeden/${String(params.id)}`,
+        body: (await request.json()) as never,
+      });
       return HttpResponse.json(schaden({ geschaedigt_person_id: null }));
     }),
   );
 });
 
 function zeige(darfZuordnen = true) {
-  return renderMitProviders(<PersonBezuege einsatzId={1} personId={10} darfZuordnen={darfZuordnen} />);
+  return renderMitProviders(
+    <PersonBezuege einsatzId={1} personId={10} darfZuordnen={darfZuordnen} />,
+  );
 }
 
 describe('PersonBezuege (LLH-1129)', () => {

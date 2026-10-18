@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
@@ -101,6 +101,8 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
   const geladen = () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
@@ -132,6 +134,24 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
     ).toBeTruthy();
     // Unter der Arbeitsfläche hängt nichts mehr.
     expect(container.querySelector('[data-lfh="seiten-inhalt"]')).toBeNull();
+  });
+
+  it('die Lage der Stelle steht in Zahlen in der Belegung über dem Grundriss (LLH-1136)', async () => {
+    geladen();
+    renderBei('/einsaetze/1/unfallhilfsstellen/9');
+
+    await leiste();
+    const feld = screen.getByRole('tabpanel', { name: 'Belegung' });
+    const zahlen = within(feld).getByRole('group', { name: 'Lage der Stelle' });
+    expect(
+      zahlen.compareDocumentPosition(within(feld).getByText('GRUNDRISS')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    for (const titel of ['In der Stelle', 'Plätze frei', 'Wartend', 'Abtransportiert']) {
+      expect(within(zahlen).getByText(titel)).toBeInTheDocument();
+    }
+    // Über dem Grundriss ist eine Zahl kein Sprung: die Fläche darunter zeigt dasselbe.
+    expect(within(zahlen).queryAllByRole('link')).toHaveLength(0);
   });
 
   it('?bereich=material öffnet den Bereich Material an Stelle des Grundrisses', async () => {
@@ -191,6 +211,8 @@ describe('UhsDetailPage — Materialzahl im Kopf (LLH-1133)', () => {
     standort: 'Halle 1',
     notiz: null,
     material: [posten(1, 'einsatzbereit'), posten(2, 'defekt'), posten(3, 'im_einsatz')],
+    plaetze: [],
+    belegungen: [],
   };
   const kopf = () => document.querySelector<HTMLElement>('[data-lfh="seitenkopf"]')!;
 
@@ -240,6 +262,8 @@ describe('UhsDetailPage — Reiter „Dateien“ (LFH-758)', () => {
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it.each([
@@ -278,6 +302,8 @@ describe('UhsDetailPage — gemeinsamer Modul-Seitenkopf (LFH-341 · C6)', () =>
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it('zeigt den UHS-Typ als Beschriftung, nicht als Wire-Wert', async () => {
@@ -356,6 +382,8 @@ describe('UhsDetailPage — Patientenaufnahme ohne Modulwechsel (LFH-341 · H38)
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it('bietet „Patient aufnehmen" und schickt in die Aufnahme mit UHS-Auftrag', async () => {
@@ -442,12 +470,17 @@ describe('UhsDetailPage — „Auflösen“ gesperrt, solange belegt (LFH-1078)'
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
+  afterEach(() => vi.mocked(listePersonen).mockResolvedValue([]));
 
   it('nennt die Zahl der Belegten sichtbar im gesperrten Knopf', async () => {
     vi.mocked(ladeEinsatz).mockResolvedValue(einsatz as Awaited<ReturnType<typeof ladeEinsatz>>);
     vi.mocked(ladeUhs).mockResolvedValue(uhs as unknown as Awaited<ReturnType<typeof ladeUhs>>);
-    vi.mocked(listePersonen).mockResolvedValueOnce([
+    // Dauerhaft, nicht einmal: die Zahlzeile im Kopf (LLH-1136) liest denselben Cache und fragt
+    // im Testclient ohne `staleTime` beim Einhängen nach.
+    vi.mocked(listePersonen).mockResolvedValue([
       { id: 1, aktuelle_uhs_id: 9, storniert_at: null },
       { id: 2, aktuelle_uhs_id: 9, storniert_at: null },
       // Andere UHS und stornierte Personen zählen nicht.
@@ -480,6 +513,8 @@ describe('UhsDetailPage — Rückfragen nennen die Handlung (LFH-960)', () => {
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
 
   it('aktiv: „Unfallhilfsstelle auflösen“ bestätigt rot und löst erst dann auf', async () => {
@@ -528,6 +563,8 @@ describe('UhsDetailPage — Ablehnung im Seitenhinweis (LFH-1077)', () => {
     standort: 'Halle 1',
     notiz: null,
     material: [],
+    plaetze: [],
+    belegungen: [],
   };
   /** Der Hinweis-Slot des Seitenkopfs. */
   const hinweis = () => document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');

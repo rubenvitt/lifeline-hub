@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
 ---
 
 ## Überblick
@@ -57,6 +57,20 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
 
 Auf einem breiten Bildschirm stehen Wartebereich, Fläche und Transport nebeneinander; dann lassen
 sich Patienten auch mit der Maus auf einen Platz ziehen.
+
+### Die Lage der Stelle melden
+
+1. Die Stelle öffnen. Über der Leiste steht die Lage der Stelle in vier Zahlen, ohne Namen.
+2. „In der Stelle“ ablesen: wer in der Stelle steht, auf einem Platz oder im Wartebereich,
+   darunter je Sichtung als Farbbalken und in Worten, etwa „SK I 1 · SK II 3“.
+3. „Plätze frei“ ablesen: freie von allen Plätzen, etwa „2 / 6“, dazu wie viele in Aufbereitung
+   sind.
+4. „Wartend“ und „Abtransportiert“ ablesen: wer im Wartebereich auf einen Platz wartet, mit der
+   längsten Wartezeit, und wer die Stelle auf Transport verlassen hat.
+
+Die Zahlen laufen live mit und stimmen mit dem Grundriss überein; für die Lagemeldung an die
+Einsatzleitung muss niemand abzählen. Am UHS-Laptop steht dieselbe Zeile im Bereich „UHS“
+([UHS-Tablet und UHS-Laptop](geraet-uhs.md)).
 
 ### Material an der Stelle führen
 

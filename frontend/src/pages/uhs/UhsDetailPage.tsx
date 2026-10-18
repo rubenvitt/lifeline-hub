@@ -2,7 +2,7 @@ import { IconPersonPlus } from '../../icons';
 import { useModulFreigaben, useSprungSperre } from '../../einsatz/useSprungSperre';
 import { istKeyFreigegeben, KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
-import { Alert, App, Breadcrumb, Button, Popconfirm, Space, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Popconfirm, Space, Spin } from 'antd';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId } from 'react';
@@ -25,6 +25,8 @@ import { listePersonen } from '../../api/einsatzPerson';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsStatus } from '../../api/types';
 import EinsatzSeite from '../../components/EinsatzSeite';
+import { useRollen } from '../../components/instrument/rollenwerte';
+import { useViewport } from '../../components/useViewport';
 import StatusTag from '../../components/StatusTag';
 import { Segmentleiste } from '../../components/instrument';
 import { uhsStatus, uhsTyp } from '../../theme/statusFarben';
@@ -32,6 +34,7 @@ import UhsSwitcher from './UhsSwitcher';
 import { merkeLetzteUhs } from './uhsAuswahl';
 import Grundriss from './Grundriss';
 import MaterialTab from './MaterialTab';
+import UhsLagezeile from './UhsLagezeile';
 import BewegungenTab from './BewegungenTab';
 import UhsAnhaenge from './UhsAnhaenge';
 import UhsKraefte from './UhsKraefte';
@@ -74,6 +77,8 @@ export default function UhsDetailPage() {
   // (`geraet/GeraetStellePage`), die Wege führt die Gerätenavigation: dort ist diese Seite nur die
   // Belegung, und der Verlauf folgt darunter im Seitenfluss, ohne Bereichsleiste.
   const { geraet } = useAuth();
+  const { token } = useRollen();
+  const { abBreite } = useViewport();
   const bereichListe: UhsBereich[] = geraet
     ? ['belegung']
     : [
@@ -235,6 +240,7 @@ export default function UhsDetailPage() {
     metaText
   );
   const mehrereBereiche = bereichListe.length > 1;
+  const zeigeLagezeile = !geraet && abBreite('md');
 
   return (
     <EinsatzSeite
@@ -354,7 +360,9 @@ export default function UhsDetailPage() {
       }
       fensterInhalt={{
         // Mindest-Arbeitsfläche: unter einem langen Kopf scrollt die Seite, statt den Bereich zu
-        // überlagern. 380 px beschreiben die Fläche, keine Kopfhöhe.
+        // überlagern. 380 px beschreiben die Fläche des Bereichs, keine Kopfhöhe. Die Zahlzeile
+        // der Belegung (eine Schriftzeile, LLH-1136) steht IN dieser Fläche: eine Reserve, die mit
+        // der Dichte wüchse, kippte den Rahmen beim Dichtewechsel in die ResizeObserver-Schleife.
         mindestHoehe: 380,
         // `key` an der UHS, auch an den Bereichen: die Route hat keinen `key`, der Umschalter
         // behält die Seite. Gründe abgelehnter Aktionen der vorigen UHS gehören nicht an die
@@ -372,13 +380,23 @@ export default function UhsDetailPage() {
             }}
           >
             {bereich === 'belegung' ? (
-              <Grundriss
-                key={uhs.id}
-                einsatzId={einsatzId}
-                uhs={uhs}
-                schreibgeschuetzt={schreibgeschuetzt}
-                platzBearbeitbar={darf('grundriss-bearbeiten')}
-              />
+              // Die Lage der Stelle in Zahlen (LLH-1136) steht IN der Belegung über dem Grundriss,
+              // nicht im gemessenen Kopf des Fensterrahmens: dort kippte ihre breitenabhängige Höhe
+              // mit der Bildlaufleiste in eine ResizeObserver-Schleife (`e2e/uhs-hoehe.spec.ts`).
+              // Am Gerät und unter `md` gehört die Fläche dem Grundriss; der UHS-Laptop trägt die
+              // Zahlen im Bereich „UHS“ (`geraet/GeraetStellePage`).
+              <Flex vertical gap={token.marginSM} style={{ height: '100%', minHeight: 0 }}>
+                {zeigeLagezeile && <UhsLagezeile einsatzId={einsatzId} uhs={uhs} />}
+                <div style={{ flex: '1 1 0', minHeight: 0 }}>
+                  <Grundriss
+                    key={uhs.id}
+                    einsatzId={einsatzId}
+                    uhs={uhs}
+                    schreibgeschuetzt={schreibgeschuetzt}
+                    platzBearbeitbar={darf('grundriss-bearbeiten')}
+                  />
+                </div>
+              </Flex>
             ) : bereich === 'kraefte' ? (
               <UhsKraefte
                 key={uhs.id}
