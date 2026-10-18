@@ -82,8 +82,8 @@ nach „abgeschlossen“. „Bearbeiten“ auf der Seite des Schadens ändert Ty
 Beschreibung und Geschädigt. „Stornieren“ nimmt eine Fehlerfassung aus der Liste. Fotos und
 Dateien zum Schaden liegen auf seiner Seite.
 
-Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Schaden
-zuweisen“, [Betroffene und Sichtung](betroffene.md)).
+Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Bezug
+hinzufügen“ unter „Bezüge“, [Betroffene und Sichtung](betroffene.md)).
 
 ### Einsatztagebuch
 

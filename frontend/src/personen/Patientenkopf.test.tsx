@@ -146,6 +146,41 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
     expect(kopf.querySelector('[data-lfh="sichtung-zeit"]')).toBeNull();
   });
 
+  it('zeigt eine verstorbene Person mit Sichtung und Verbleib des Leichnams', () => {
+    const { kopf } = zeige({
+      status: 'verstorben',
+      aktuelle_sichtung: 'tot',
+      aufenthalt: null,
+      aktuelle_uhs_id: null,
+      verbleib: [
+        {
+          id: 3,
+          einsatz_id: 1,
+          person_id: 10,
+          art: 'verstorben',
+          ziel: null,
+          transportmittel: null,
+          zeitpunkt_at: '2026-10-18 11:00:00',
+          erfasst_von: 1,
+        },
+      ],
+    } as Partial<PersonDetail>);
+    expect(
+      within(kopf).getByRole('button', { name: /^Nachsichten, aktuell .*verstorben/ }),
+    ).toBeVisible();
+    expect(kopf.querySelector('[data-lfh="aufenthalt"]')?.textContent).toMatch(
+      /^Verbleib des Leichnams · /,
+    );
+  });
+
+  it('bietet an einer stornierten Person keine Bedienung an, zeigt aber den Inhalt', () => {
+    const { kopf } = zeige({ storniert_at: '2026-10-18 12:00:00' });
+    expect(within(kopf).queryAllByRole('button')).toHaveLength(0);
+    expect(within(kopf).queryByRole('textbox')).toBeNull();
+    expect(within(kopf).getByText(/SK II · schwer/)).toBeInTheDocument();
+    expect(within(kopf).getByText(/Schmerzmittel verweigert/)).toBeInTheDocument();
+  });
+
   it.each([
     ['ohne Schreibrecht', { darfSchreiben: false }],
     ['in der Lesefassung', { modus: 'lesen' }],
@@ -160,7 +195,9 @@ describe('Patientenkopf — lesen (LLH-1094)', () => {
 describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
   it('sichtet nach: Sichtung tippen, Fläche, Übernehmen — kein Dialog', async () => {
     const { kopf, onGeschrieben } = zeige();
-    await userEvent.click(within(kopf).getByRole('button', { name: /^Nachsichten, aktuell SK II/ }));
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: /^Nachsichten, aktuell SK II/ }),
+    );
     const paneel = screen.getByRole('region', { name: 'Sichtung erfassen' });
     expect(screen.queryByRole('dialog')).toBeNull();
     await userEvent.click(within(paneel).getByRole('radio', { name: /^SK I,/ }));

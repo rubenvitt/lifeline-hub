@@ -59,8 +59,9 @@ Ein aktives Tier, das entlaufen ist, setzt „Als vermisst markieren“ auf „v
    externen Kontakt: „…““ wählen.
 3. „Speichern“ wählen.
 
-Umgekehrt ordnet „Tier zuweisen“ auf der Seite einer betroffenen Person ein Tier zu, das noch
-keinen Halter hat. Die Liste der Tiere zeigt den Halter dann mit seiner Registriernummer.
+Umgekehrt ordnet „Bezug hinzufügen“ unter „Bezüge“ auf der Seite einer betroffenen Person ein
+Tier zu, das noch keinen Halter hat ([Betroffene und Sichtung](betroffene.md)). Die Liste der
+Tiere zeigt den Halter dann mit seiner Registriernummer.
 
 ### Ein Tier abschließen
 
