@@ -1,3 +1,11 @@
+## [1.0.0-alpha.142](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.141...v1.0.0-alpha.142) (2026-10-18)
+
+### Einsatztagebuch
+
+- **Neuer Knopf „Nach oben“:** Wer im Einsatztagebuch weit zurückgescrollt hat, sieht rechts über der Erfassung einen Knopf „Nach oben“. Er erscheint, sobald mehr als eine Bildschirmhöhe über der aktuellen Lesestelle liegt. Ein Klick springt ohne Animation an den Anfang zurück, wo Filterleiste und „Ältere laden“ stehen. Ist zugleich der Sammelhinweis eingeblendet, steht der Knopf darüber und verdeckt ihn nicht.
+- **Erfassungszeile zeigt den Eintragstyp deutlicher:** Der ganze Rahmen der Erfassungszeile hat jetzt die Farbe des gewählten Eintragstyps, bei einer Anordnung zum Beispiel Orange. Auch die Fokusmarkierung übernimmt diese Farbe. So sieht man schon vor dem Absenden, welcher Typ eingestellt ist.
+- **Anwenderhandbuch:** Das Kapitel „Einsatztagebuch“ beschreibt beide Neuerungen. Die Bilder zur Erfassungsleiste, zur Berichtigung und zur Zeitachse wurden neu erstellt.
+
 ## [1.0.0-alpha.141](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.140...v1.0.0-alpha.141) (2026-10-18)
 
 ### Bedienung auf Mobilgeräten
