@@ -722,8 +722,11 @@ export default function PersonenPage() {
     [register, darfAbgleichenListe, gefundeneListe, abgleichVorschlagen, einsatzId],
   );
   /**
-   * Das Zeilenmenü steht unter `md` im Kartenfuß (design.md D3): dieselben Einträge über `weitere`,
-   * gestapelt unter dem Inhalt. Ohne Einträge (Rechte, vermisst) gibt es keinen Auslöser.
+   * Das Zeilenmenü unter `md` (design.md D3): dieselben Einträge über `weitere` der Karte. Es steht
+   * rechts neben dem Inhalt, NICHT gestapelt darunter: die gestapelte Aktionszeile schob die erste
+   * Karte am Handy aus dem ersten Bild (gemessen 0,79 bei 390 × 844, komfortabel; Spec
+   * `einsatztauglichkeit-layout`, `e2e/betroffene-handy.spec.ts`). Ohne Einträge (Rechte, vermisst)
+   * gibt es keinen Auslöser.
    */
   const kartenMenue = useMemo(
     () => ({
@@ -737,7 +740,6 @@ export default function PersonenPage() {
     () => ({
       ...personenKarte(einsatzId),
       weitere: darfSchreibenListe ? kartenMenue : undefined,
-      gestapelt: true as const,
     }),
     [einsatzId, darfSchreibenListe, kartenMenue],
   );
@@ -750,7 +752,6 @@ export default function PersonenPage() {
         ? { etikett: 'Abgleich vorschlagen …', onKlick: (p: Person) => oeffneAbgleich(p) }
         : undefined,
       weitere: darfSchreibenListe ? kartenMenue : undefined,
-      gestapelt: true as const,
     }),
     [einsatzId, darfAbgleichenListe, oeffneAbgleich, darfSchreibenListe, kartenMenue],
   );

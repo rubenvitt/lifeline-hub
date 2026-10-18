@@ -146,10 +146,10 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     await expect(folge, `Folgezeile unter der gemessenen Zeile (${dichte})`).toHaveCount(1);
     const folgeVorher = await kasten(folge);
     const reg = (await zeile(erste).locator('td').first().innerText()).trim();
-    await page.getByRole('button', { name: `Zustand zu ${reg} hinzufügen` }).click();
+    await page.getByRole('button', { name: `Zustand / Verdacht zu ${reg} hinzufügen` }).click();
     await page.keyboard.type('gehfähig');
     await page.keyboard.press('Tab');
-    const knopf = page.getByRole('button', { name: `Zustand zu ${reg} bearbeiten` });
+    const knopf = page.getByRole('button', { name: `Zustand / Verdacht zu ${reg} bearbeiten` });
     await expect(knopf).toHaveText(/gehfähig/);
     await expect(knopf).not.toHaveClass(/ant-btn-loading/);
     const nachher = await kasten(zeile(erste));
@@ -190,6 +190,47 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     );
   }
   test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+});
+
+/**
+ * Nachsichtung aus der Zeile (LLH-1130, Spec `betroffene-lagedaten`, „Nachsichtung aus der
+ * Liste“): Zelle, Fläche, „Übernehmen“ — drei Tipps, die Seite bleibt, die Zeile zeigt die neue
+ * Kategorie. Geometrie wie oben: das Popover liegt im Portal, die Zeilenhöhe bleibt.
+ */
+test('Liste: Nachsichtung aus der Zeile in drei Tipps, die Zeile zeigt SK I, die Seite bleibt (LLH-1130)', async ({
+  page,
+}) => {
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Nachsichtung ${Date.now()}`,
+  });
+  const id = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+    name: 'Nachsicht',
+    sichtung: 'sk2',
+  });
+  await page.goto(`/einsaetze/${einsatzId}/personen`);
+  const zeile = page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
+  const ausloeser = zeile.getByRole('button', { name: /^Sichtung R-\d+ ändern, aktuell SK II$/ });
+  await expect(ausloeser).toBeVisible();
+  const vorher = await kasten(zeile);
+
+  // Drei Tipps: Zelle, Fläche, „Übernehmen“.
+  await ausloeser.click();
+  const flaeche = page.getByRole('region', { name: /^Sichtung R-\d+$/ });
+  await flaeche.getByRole('radio', { name: /^SK I,/ }).click();
+  await flaeche.getByRole('button', { name: 'Übernehmen' }).click();
+
+  await expect(
+    zeile.getByRole('button', { name: /^Sichtung R-\d+ ändern, aktuell SK I$/ }),
+  ).toBeVisible();
+  await expect(flaeche).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen$`));
+  const nachher = await kasten(zeile);
+  expect(
+    Math.abs(nachher.height - vorher.height),
+    `Zeilenhöhe nach der Nachsichtung: ${vorher.height} → ${nachher.height}`,
+  ).toBeLessThanOrEqual(1);
 });
 
 test('Schnellerfassung bei 390 px: die Hinweiszeile beim Tippen von „Name sk2 @UHS #lat/lon"', async ({

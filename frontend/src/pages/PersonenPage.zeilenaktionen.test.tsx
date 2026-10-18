@@ -354,7 +354,7 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
     expect(screen.queryByRole('button', { name: 'Aktionen zu R-009' })).toBeNull();
   });
 
-  it('unter md steht das Menü im Kartenfuß', async () => {
+  it('unter md steht das Menü in der Karte', async () => {
     setzeViewportBreite(390);
     const user = userEvent.setup();
     render(() => [r007]);
@@ -422,7 +422,7 @@ describe('Schleuse: Popover und Menü halten die Liste (LLH-1130, 2.4)', () => {
     expect(await screen.findByText('R-002')).toBeInTheDocument();
   });
 
-  it('Menü im Kartenfuß (unter md) hält ebenso', async () => {
+  it('Menü in der Karte (unter md) hält ebenso', async () => {
     setzeViewportBreite(390);
     const user = userEvent.setup();
     let stand: Person[] = [r007];

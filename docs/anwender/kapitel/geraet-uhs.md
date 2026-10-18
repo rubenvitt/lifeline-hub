@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -28,14 +28,17 @@ und zeigen nur deren Patienten. Die Navigation unten führt zu „Patienten“, 
    ![Patientenliste eines UHS-Tablets mit der Gruppe „In der UHS“ und dem Knopf „Patient aufnehmen“](../bilder/geraet-uhs/patienten.png)
 
 2. Eine Zeile antippen, um die Person zu öffnen.
+3. Zum Nachsichten ohne Öffnen die Sichtung in der Zeile antippen, die Fläche der Kategorie wählen
+   und „Übernehmen“ wählen.
 
-Wer die UHS verlassen hat, steht in der Gruppe „Ausgetreten“ mit seinem Verbleib.
+Wer die UHS verlassen hat, steht in der Gruppe „Ausgetreten“ mit seinem Verbleib. Eine Sichtung
+mit „Bestätigt von“ oder Kurzbegründung geht über den Patientenkopf (unten).
 
 ### Patient aufnehmen
 
 1. „Patient aufnehmen“ oder unten „Aufnahme“ wählen.
 2. Die Fläche der Sichtungskategorie antippen und, soweit bekannt, Geschlecht, geschätztes Alter und
-   Antreffort angeben. Name und weitere Angaben stehen unter „Weitere Angaben“.
+   Fundort angeben. Name und weitere Angaben stehen unter „Weitere Angaben“.
 
    ![Aufnahme am UHS-Tablet mit gewählter Sichtungskategorie SK II](../bilder/geraet-uhs/aufnahme.png)
 

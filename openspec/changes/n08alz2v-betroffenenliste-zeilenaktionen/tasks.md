@@ -18,5 +18,5 @@ Subtask LLH-1130 (`n08alz2v`) von LLH-1018. Setzt `knc0jyjd-sichtungswahl-flaech
 
 ## 3. Nachweise und Doku
 
-- [ ] 3.1 e2e `betroffene-layout.spec.ts`/`betroffene-handy.spec.ts`: Nachsichtung aus der Zeile, Kartenform unter `md`; Trefferflächen der neuen Zellen (Gate 3) grün.
-- [ ] 3.2 Kapitel `betroffene.md` und `tiere.md` nachgezogen, Bild `betroffene/liste.png` neu, Wächter der Anwenderdoku grün.
+- [x] 3.1 e2e `betroffene-layout.spec.ts`/`betroffene-handy.spec.ts`: Nachsichtung aus der Zeile, Kartenform unter `md`; Trefferflächen der neuen Zellen (Gate 3) grün. (Unter `md` steht das Menü rechts in der Karte statt gestapelt im Fuß: gestapelt fiel die erste Karte bei 390 × 844 aus dem ersten Bild, gemessen 0,79; Spec `einsatztauglichkeit-layout`. Mitgezogen: der veraltete Knopfname „Zustand zu …“ im Layout-Test, Vorbedingungen des Beobachter-Gates.)
+- [x] 3.2 Kapitel `betroffene.md` und `tiere.md` nachgezogen, Bild `betroffene/liste.png` neu, Wächter der Anwenderdoku grün. (Dazu „Fundort“ in `aufbewahrung.md`, `geraet-uhs.md`, `geraet-betreuungsstelle.md`; neu erzeugt auch `betroffene/erfassen`, `tiere/erfassen`, `tiere/liste`, `geraet-uhs/patienten`, `geraet-uhs/aufnahme`.)
