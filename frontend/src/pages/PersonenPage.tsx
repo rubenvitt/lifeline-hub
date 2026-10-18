@@ -684,11 +684,15 @@ export default function PersonenPage() {
       darfSchreiben: darfSchreibenListe,
       rueckmeldung,
       onVerbleib: oeffneVerbleib,
-      menue: {
-        breite: aktionsBreite,
-        lagekarte: karteGesperrt ? ('gesperrt' as const) : ('frei' as const),
-        onWahl: waehleZeilenAktion,
-      },
+      // Ohne Schreibrecht entfällt die Zeilenaktionsspalte ganz (`frontend/AGENTS.md`, M45), wie
+      // das Menü der Karte (`weitere` unten).
+      menue: darfSchreibenListe
+        ? {
+            breite: aktionsBreite,
+            lagekarte: karteGesperrt ? ('gesperrt' as const) : ('frei' as const),
+            onWahl: waehleZeilenAktion,
+          }
+        : undefined,
     }),
     [
       einsatzId,
