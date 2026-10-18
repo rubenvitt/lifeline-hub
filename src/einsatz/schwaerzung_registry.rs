@@ -284,6 +284,36 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Kontamination ist eine Statuskategorie wie die Sichtung.
             scrub("pat_nummer", Strategie::NullSetzen, Z_BEHANDLUNG),
             retain("kontamination", G_TRIAGE),
+            // LLH-1325 (design.md D4): Cache des Transportstands. Priorität und Art sind
+            // Statuskategorien wie die Sichtung (der ETB-Text der Priorität braucht das, die
+            // Ausnahmeliste ist für `einsatz_person.*` gesperrt); die Fachrichtung ist
+            // diagnosenah (Psychiatrie, Geburtshilfe) und fällt mit der Behandlung.
+            retain("transport_prioritaet", G_TRIAGE),
+            retain("transport_art", G_TRIAGE),
+            scrub("transport_fachrichtung", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("transport_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "person_transport",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1325 (design.md D4): wie der Cache an der Person.
+            retain("prioritaet", G_TRIAGE),
+            retain("art", G_TRIAGE),
+            scrub("fachrichtung", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            // Namentliche Bestätigung am Gerät (LFH-1046) wie bei der Sichtung.
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     TabellenRegel {
@@ -2803,6 +2833,8 @@ pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
     "person_sichtung",
     "person_verlaufsnotiz",
     "person_uhs_belegung",
+    // LLH-1325: ein Transportstand, auch ein aufgehobener (design.md D4).
+    "person_transport",
 ];
 
 /// `SELECT` der Personen-IDs mit Behandlungsbezug (ohne Einsatz-Eingrenzung; der Aufrufer grenzt
@@ -3553,8 +3585,10 @@ mod tests {
                 "behandlung".to_string(),
                 menge(&[
                     "einsatz_person.pat_nummer",
+                    "einsatz_person.transport_fachrichtung",
                     "einsatz_person.zustand",
                     "person_sichtung.notiz",
+                    "person_transport.fachrichtung",
                     "person_uhs_belegung.notiz",
                     "person_verlaufsnotiz.text",
                 ]),

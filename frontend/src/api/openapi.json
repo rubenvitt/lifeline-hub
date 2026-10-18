@@ -7223,6 +7223,20 @@
           "offline"
         ]
       },
+      "Fachrichtung": {
+        "type": "string",
+        "description": "Benötigte Fachrichtung des Zielkrankenhauses. Diagnosenah (Psychiatrie, Geburtshilfe):\nScrub mit der Kategorie Behandlung (design.md D4), nie im ETB oder Live-Kanal.",
+        "enum": [
+          "unfallchirurgie",
+          "verbrennung",
+          "kinder",
+          "neuro",
+          "innere",
+          "geburtshilfe",
+          "psychiatrie",
+          "sonstige"
+        ]
+      },
       "FahrzeugAnzeige": {
         "type": "object",
         "description": "Öffentliche Fahrzeug-Darstellung (ohne `org_id`).",
@@ -14364,6 +14378,99 @@
             "type": "string"
           }
         }
+      },
+      "TransportAnzeige": {
+        "type": "object",
+        "description": "Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportArt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann der Stand beim Server ankam."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fachrichtung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fachrichtung"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "prioritaet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportPrioritaet"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt."
+          }
+        }
+      },
+      "TransportArt": {
+        "type": "string",
+        "description": "Transportart. Statuskategorie (Retain), erscheint aber nie im ETB oder Live-Kanal.",
+        "enum": [
+          "liegend",
+          "sitzend",
+          "mit_notarzt"
+        ]
+      },
+      "TransportPrioritaet": {
+        "type": "string",
+        "description": "Transportpriorität (Spec `personen-transport`). String = CHECK in\n`migrations/0219_person_transport.sql`. Ordnet innerhalb der Sichtungskategorie, nie über\nihr (design.md D10). Statuskategorie (Retain), deshalb darf sie ins ETB.",
+        "enum": [
+          "sofort",
+          "dringlich",
+          "normal"
+        ]
       },
       "UebernahmeBody": {
         "type": "object",

@@ -167,6 +167,27 @@ fn serde_wire_gleich_as_str() {
         Bestaetigt,
         Verworfen,
     });
+    // Transport (LLH-1325, Spec `personen-transport`)
+    enum_wire!(lifeline_hub::person::transport_repo::TransportPrioritaet {
+        Sofort => "sofort",
+        Dringlich => "dringlich",
+        Normal => "normal",
+    });
+    enum_wire!(lifeline_hub::person::transport_repo::TransportArt {
+        Liegend => "liegend",
+        Sitzend => "sitzend",
+        MitNotarzt => "mit_notarzt",
+    });
+    enum_wire!(lifeline_hub::person::transport_repo::Fachrichtung {
+        Unfallchirurgie => "unfallchirurgie",
+        Verbrennung => "verbrennung",
+        Kinder => "kinder",
+        Neuro => "neuro",
+        Innere => "innere",
+        Geburtshilfe => "geburtshilfe",
+        Psychiatrie => "psychiatrie",
+        Sonstige => "sonstige",
+    });
 
     // schaden
     enum_wire_as_str!(lifeline_hub::schaden::SchadenStatus {

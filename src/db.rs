@@ -9099,4 +9099,93 @@ mod tests {
             .expect("dieselbe PAT-Nummer zweimal (Tippfehler im Feld)");
         assert!(person(4, None, Some(2)).await.is_err(), "nur 0 oder 1");
     }
+
+    // --- LLH-1325: Transport als Verlauf mit Cache an der Person (0219) ---
+
+    /// `person_transport` nimmt einen vollen Stand je Zeile (jedes Feld einzeln leer, drei leere
+    /// heben auf), nur Katalogwerte, und ist je Einsatz über `client_id` eindeutig. Der Cache an
+    /// `einsatz_person` trägt dieselben Kataloge.
+    #[tokio::test]
+    async fn migration_0219_person_transport() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 219).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let stand = |prio: Option<&'static str>,
+                     art: Option<&'static str>,
+                     fach: Option<&'static str>,
+                     client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_transport (einsatz_id, person_id, prioritaet, art, \
+                        fachrichtung, zeitpunkt_at, erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, ?, ?, '2026-10-18 10:00:00', '2026-10-18 10:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(prio)
+                .bind(art)
+                .bind(fach)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        stand(
+            Some("dringlich"),
+            Some("liegend"),
+            Some("unfallchirurgie"),
+            Some("t1"),
+        )
+        .await
+        .unwrap();
+        stand(None, None, None, None)
+            .await
+            .expect("drei leere heben auf");
+        stand(Some("sofort"), None, Some("psychiatrie"), None)
+            .await
+            .expect("jedes Feld einzeln leer");
+        assert!(
+            stand(Some("dringlich"), None, None, Some("t1"))
+                .await
+                .is_err(),
+            "derselbe Schlüssel im selben Einsatz"
+        );
+        assert!(stand(Some("eilig"), None, None, None).await.is_err());
+        assert!(stand(None, Some("fliegend"), None, None).await.is_err());
+        assert!(stand(None, None, Some("zahn"), None).await.is_err());
+
+        let cache = |prio: &'static str, art: &'static str, fach: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "UPDATE einsatz_person SET transport_prioritaet = ?, transport_art = ?, \
+                        transport_fachrichtung = ?, transport_at = '2026-10-18 10:00:00' \
+                     WHERE id = ?",
+                )
+                .bind(prio)
+                .bind(art)
+                .bind(fach)
+                .bind(p)
+                .execute(&pool)
+                .await
+            }
+        };
+        cache("normal", "mit_notarzt", "geburtshilfe")
+            .await
+            .unwrap();
+        assert!(cache("eilig", "sitzend", "kinder").await.is_err());
+        assert!(cache("normal", "fliegend", "kinder").await.is_err());
+        assert!(cache("normal", "sitzend", "zahn").await.is_err());
+    }
 }

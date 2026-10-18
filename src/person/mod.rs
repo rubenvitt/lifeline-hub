@@ -3,6 +3,7 @@ pub mod anhang;
 pub mod audit_repo;
 pub mod repo;
 pub mod sichtung_repo;
+pub mod transport_repo;
 pub mod verbleib_repo;
 pub mod verlaufsnotiz_repo;
 

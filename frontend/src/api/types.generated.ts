@@ -2860,6 +2860,12 @@ export interface components {
          * @enum {string}
          */
         FachebeneStatus: "ok" | "leer" | "offline";
+        /**
+         * @description Benötigte Fachrichtung des Zielkrankenhauses. Diagnosenah (Psychiatrie, Geburtshilfe):
+         *     Scrub mit der Kategorie Behandlung (design.md D4), nie im ETB oder Live-Kanal.
+         * @enum {string}
+         */
+        Fachrichtung: "unfallchirurgie" | "verbrennung" | "kinder" | "neuro" | "innere" | "geburtshilfe" | "psychiatrie" | "sonstige";
         /** @description Öffentliche Fahrzeug-Darstellung (ohne `org_id`). */
         FahrzeugAnzeige: {
             angelegt_at: string;
@@ -5634,6 +5640,38 @@ export interface components {
             otpauth_url: string;
             secret_base32: string;
         };
+        /** @description Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“. */
+        TransportAnzeige: {
+            art?: components["schemas"]["TransportArt"] | null;
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046). */
+            bestaetigt_name?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann der Stand beim Server ankam. */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            fachrichtung?: components["schemas"]["Fachrichtung"] | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            person_id: number;
+            prioritaet?: components["schemas"]["TransportPrioritaet"] | null;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Transportart. Statuskategorie (Retain), erscheint aber nie im ETB oder Live-Kanal.
+         * @enum {string}
+         */
+        TransportArt: "liegend" | "sitzend" | "mit_notarzt";
+        /**
+         * @description Transportpriorität (Spec `personen-transport`). String = CHECK in
+         *     `migrations/0219_person_transport.sql`. Ordnet innerhalb der Sichtungskategorie, nie über
+         *     ihr (design.md D10). Statuskategorie (Retain), deshalb darf sie ins ETB.
+         * @enum {string}
+         */
+        TransportPrioritaet: "sofort" | "dringlich" | "normal";
         /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
         UebernahmeBody: {
             /** Format: int64 */
