@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
 ---
 
 ## Überblick
@@ -43,10 +43,13 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
    ![Grundriss der Unfallhilfsstelle mit zwei belegten und mehreren freien Plätzen und den Reitern Fläche, Wartebereich und Transport](../bilder/unfallhilfsstellen/grundriss.png)
 
 2. Die Fläche zeigt jeden Platz mit seiner Verfügbarkeit („frei“, „belegt“, „in Aufbereitung“,
-   „defekt“, „gesperrt“) und dem Patienten darauf.
-3. „Wartebereich“ zeigt, wer in der Stelle auf einen Platz wartet („Wartebereich (Eingang)“) und
-   wer noch keiner Stelle zugeordnet ist („Noch nicht aufgenommen“). „Transport“ zeigt, wer die
-   Stelle auf Transport verlassen hat („Auf Transport gebracht“).
+   „defekt“, „gesperrt“) und dem Patienten darauf. Jede Patientenmarke trägt vorn die Sichtung
+   als Farbfeld mit Kategorie, etwa „SK I“; „—“ heißt ungesichtet.
+3. „Wartebereich“ zeigt, wer in der Stelle auf einen Platz wartet („Wartebereich (Eingang)“), mit
+   der Wartezeit in Minuten, und wer noch keiner Stelle zugeordnet ist („Noch nicht
+   aufgenommen“). Der Wartebereich steht nach Dringlichkeit: wer oben steht, kommt als Nächstes
+   auf einen Platz. „Transport“ zeigt, wer die Stelle auf Transport verlassen hat („Auf Transport
+   gebracht“).
 4. Unter dem Grundriss führen „Material“, „Kräfte“, „Bewegungen“ und „Dateien“ zu den Angaben
    der Stelle; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
 
@@ -74,11 +77,13 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    Stelle; die Quittung nennt seine Registriernummer und „im Wartebereich“.
 3. Auf der Fläche einen freien Platz anklicken oder in seinem Menü „Patient zuweisen“ wählen. Der
    Dialog „Patient zuweisen — …“ nennt den Platz.
-4. Unter „Patient“ die Person wählen.
+4. Unter „Patient“ stehen die Kandidaten mit Sichtung, Wartezeit und Zustand, erst der
+   Wartebereich, dann „Noch nicht aufgenommen“, je nach Dringlichkeit. Der erste ist vorgewählt;
+   bei Bedarf einen anderen wählen.
 
-   ![Dialog „Patient zuweisen — Behandlungsplatz 3“ mit gewählter Person](../bilder/unfallhilfsstellen/patient-zuweisen.png)
+   ![Dialog „Patient zuweisen — Behandlungsplatz 3“ mit der Liste der wartenden Patienten](../bilder/unfallhilfsstellen/patient-zuweisen.png)
 
-5. „Erfassen“ wählen. Der Platz steht auf „belegt“.
+5. „Zuweisen“ wählen. Der Platz steht auf „belegt“.
 
 Zurück in den Wartebereich führt das Platzmenü („…“) mit „Zurück in den Wartebereich“.
 
@@ -116,6 +121,21 @@ markieren“).
 Ein Verbleib „Transport“, „Notunterkunft“ oder „Entlassung vor Ort“ beendet den Aufenthalt in der
 Stelle, ebenso der Status „verstorben“ oder „abgemeldet“ einer Person und ihr Stornieren, auch
 wenn das im Modul „Betroffene“ geschieht.
+
+### Reihenfolge nach Dringlichkeit
+
+Wartebereich, Dialog „Patient zuweisen“ und die Patientenliste am
+[UHS-Tablet](geraet-uhs.md) ordnen nach derselben Reihe: ungesichtet zuerst (diese Patienten
+müssen gesichtet werden), dann SK I, SK II, SK III, SK IV, tot und unverletzt. Innerhalb einer
+Kategorie steht vorn, wer am längsten wartet. Die Wartezeit zählt ab der Aufnahme in die Stelle;
+kommt ein Patient von einem Platz in den Wartebereich zurück, zählt sie ab dieser Rückkehr. Wer
+noch nicht aufgenommen ist, steht im Dialog hinter dem Wartebereich, in sich nach derselben
+Reihe.
+
+Ändert sich eine Sichtung, während der Mauszeiger über dem Wartebereich steht oder der Fokus
+darin liegt, bleibt die Reihenfolge stehen; neu Wartende stehen so lange unten an. Danach ordnet
+der Wartebereich neu. Ebenso bleibt die Liste im Dialog „Patient zuweisen“ stehen, solange er
+offen ist.
 
 ### Einsatztagebuch
 

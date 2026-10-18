@@ -208,6 +208,66 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     expect(screen.queryByRole('button', { name: /Benutzermenü/ })).toBeNull();
   });
 
+  it('Patientenliste: Zustand und Platz, nach Dringlichkeit sortiert (LLH-1135)', async () => {
+    stelleBereit();
+    const sk3 = person({
+      id: 12,
+      registrier_nr: 3,
+      name: 'Dritte',
+      aktuelle_sichtung: 'sk3',
+      zustand: 'gehfähig, unterkühlt',
+    });
+    const sk1 = person({ id: 13, registrier_nr: 4, name: 'Vierte', aktuelle_sichtung: 'sk1' });
+    const ohne = person({ id: 14, registrier_nr: 5, name: 'Fünfte', aktuelle_sichtung: null });
+    const sk1Frueh = person({
+      id: 15,
+      registrier_nr: 6,
+      name: 'Sechste',
+      aktuelle_sichtung: 'sk1',
+    });
+    const eintritt = (person_id: number, zeitpunkt_at: string) => ({
+      id: person_id,
+      einsatz_id: 7,
+      uhs_id: 2,
+      person_id,
+      platz_id: null,
+      art: 'eintritt' as const,
+      notiz: null,
+      erfasst_von: 1,
+      zeitpunkt_at,
+    });
+    server.use(
+      http.get('/api/einsaetze/7/personen', () =>
+        HttpResponse.json([ausgetreten, sk3, sk1, ohne, sk1Frueh]),
+      ),
+      http.get('/api/einsaetze/7/uhs/2', () =>
+        HttpResponse.json({
+          ...uhs,
+          belegungen: [
+            eintritt(12, '2026-10-04 08:00:00'),
+            eintritt(13, '2026-10-04 09:30:00'),
+            eintritt(14, '2026-10-04 09:40:00'),
+            eintritt(15, '2026-10-04 09:10:00'),
+          ],
+        }),
+      ),
+    );
+    renderApp('/geraet');
+    expect(await screen.findByText('Dritte, Max')).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /Zustand/ })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: /Platz/ })).toBeVisible();
+    expect(screen.queryByRole('columnheader', { name: /^Ort/ })).toBeNull();
+    // Ungesichtet, dann SK I (längere Wartezeit zuerst), SK III; die Ausgetretenen dahinter.
+    const reihen = screen
+      .getAllByRole('row')
+      .map((r) => /R-\d+/.exec(r.textContent ?? '')?.[0])
+      .filter(Boolean);
+    expect(reihen).toEqual(['R-005', 'R-006', 'R-004', 'R-003', 'R-002']);
+    // Der Zustand steht in einer Zeile, Längeres endet mit „…“.
+    const zustand = screen.getByText('gehfähig, unterkühlt');
+    expect(zustand.closest('.ant-typography-ellipsis-single-line')).not.toBeNull();
+  });
+
   it('Fremde Adresse: die Lagekarte führt auf die Startseite', async () => {
     stelleBereit();
     const router = renderApp('/einsaetze/7/lagekarte');

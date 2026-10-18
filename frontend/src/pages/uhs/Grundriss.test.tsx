@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { act, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
@@ -22,6 +22,7 @@ import {
 import type { Person, PersonDetail, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeMasse } from '../../test/elementMasse';
+import { DEFAULT_KONVENTIONEN, taktischeDtg } from '../../anzeige/format';
 import type { DragEndEvent } from '@dnd-kit/core';
 
 /**
@@ -540,17 +541,12 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
   }
 
   /**
-   * Wählt im geöffneten Patienten-Auswahlfeld den Eintrag mit dieser Kennung — über das sichtbare
-   * Dropdown, weil dieselbe Person auch in der linken Spalte steht.
+   * Wählt in der Kandidatenliste des Dialogs den Eintrag mit dieser Kennung — über die
+   * Optionsgruppe, weil dieselbe Person auch in der linken Spalte steht (LLH-1135).
    */
   async function waehlePatient(kennung: RegExp) {
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Patient' }));
-    const liste = await waitFor(() => {
-      const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
-      if (!el) throw new Error('kein offenes Auswahlfeld');
-      return el as HTMLElement;
-    });
-    await userEvent.click(within(liste).getByText(kennung));
+    const gruppe = await screen.findByRole('radiogroup', { name: 'Patient' });
+    await userEvent.click(within(gruppe).getByRole('radio', { name: kennung }));
   }
 
   function belegungRoute(personId: number, senke: { body: unknown }) {
@@ -581,7 +577,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
     await waehlePatient(/R-005/);
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
 
     await waitFor(() => expect(senke.body).not.toBeNull());
     expect(senke.body).toEqual({ art: 'eintritt', uhs_id: 1, platz_id: 10 });
@@ -605,7 +601,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
     await waehlePatient(/R-005/);
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
 
     await waitFor(() => {
       const optimistisch = client.getQueryData<Person[]>(einsatzKeys.personen(1));
@@ -660,7 +656,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
     await waehlePatient(/R-007/);
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
 
     await waitFor(() => expect(senke.body).not.toBeNull());
     expect(senke.body).toEqual({ art: 'wechsel', uhs_id: 1, platz_id: 10 });
@@ -678,7 +674,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Platzaktionen zu Bett 1/ }));
     await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
 
-    expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
+    expect(await screen.findByRole('radiogroup', { name: 'Patient' })).toBeInTheDocument();
   });
 
   it('löst beim Klick auf einen Menüeintrag NICHT zusätzlich die Platzzuweisung aus', async () => {
@@ -752,7 +748,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
 
-    expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
+    expect(await screen.findByRole('radiogroup', { name: 'Patient' })).toBeInTheDocument();
   });
 
   it('bietet keinen Zuweisungsweg im schreibgeschützten Modus', async () => {
@@ -762,7 +758,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
 
     await userEvent.click(await screen.findByTestId('platz-karte'));
 
-    expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Patient' })).not.toBeInTheDocument();
   });
 
   it('bietet keinen Zuweisungsweg im Bearbeiten-Modus (dort verschiebt der Klick Layout)', async () => {
@@ -775,7 +771,7 @@ describe('Grundriss – Platzzuweisung ohne Drag (LFH-367/B5g)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Plätze bearbeiten' }));
     await userEvent.click(await screen.findByTestId('platz-karte'));
 
-    expect(screen.queryByRole('combobox', { name: 'Patient' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radiogroup', { name: 'Patient' })).not.toBeInTheDocument();
   });
 
   it('meldet statt eines Dialogs, wenn niemand zuweisbar ist', async () => {
@@ -942,7 +938,7 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
 
     // Zweiter Tipp: „Patient zuweisen" öffnet den Dialog, das Menü geht zu.
     await userEvent.click(within(offenesMenue()).getByText('Patient zuweisen'));
-    expect(await screen.findByRole('combobox', { name: 'Patient' })).toBeInTheDocument();
+    expect(await screen.findByRole('radiogroup', { name: 'Patient' })).toBeInTheDocument();
     menueZu();
   });
 
@@ -1537,14 +1533,9 @@ describe('Grundriss – Platzmenü während laufender Belegung (LFH-457)', () =>
 
     // Zuweisen über den Klickweg an Bett 1 — die Person sitzt danach optimistisch dort.
     await userEvent.click((await screen.findAllByTestId('platz-karte'))[0]);
-    await userEvent.click(await screen.findByRole('combobox', { name: 'Patient' }));
-    const liste = await waitFor(() => {
-      const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
-      if (!el) throw new Error('kein offenes Auswahlfeld');
-      return el as HTMLElement;
-    });
-    await userEvent.click(within(liste).getByText(/R-005/));
-    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    const gruppe = await screen.findByRole('radiogroup', { name: 'Patient' });
+    await userEvent.click(within(gruppe).getByRole('radio', { name: /R-005/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Zuweisen' }));
 
     expect(await screen.findByRole('button', { name: 'zurückweisen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Verbleib / Entlassung erfassen' })).toBeDisabled();
@@ -2004,14 +1995,8 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
     );
     await userEvent.click(await screen.findByTestId('platz-karte'));
     const d = await dialog();
-    await userEvent.click(within(d).getByRole('combobox', { name: 'Patient' }));
-    const liste = await waitFor(() => {
-      const el = document.querySelector('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
-      if (!el) throw new Error('kein offenes Auswahlfeld');
-      return el as HTMLElement;
-    });
-    await userEvent.click(within(liste).getByText(/R-005/));
-    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(d).getByRole('radio', { name: /R-005/ }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Zuweisen' }));
 
     const grund = await within(d).findByRole('alert');
     expect(grund).toHaveTextContent('Nicht zugewiesen');
@@ -2019,7 +2004,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
     expect(flaechenGrund('Bett 1')).toBeNull();
     expect(toasts()).toBe(0);
 
-    await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Zuweisen' }));
     await waitFor(() => expect(within(d).queryByRole('alert')).toBeNull());
     expect(within(d).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
     await act(async () => zweiter.frei());
@@ -2094,5 +2079,201 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Plätze anlegen' }));
     expect(screen.getByRole('button', { name: /Anlegen/ })).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
+  const eintritt = (personId: number, zeitpunkt_at: string, id = personId): UhsBelegung => ({
+    id,
+    einsatz_id: 1,
+    uhs_id: 1,
+    person_id: personId,
+    platz_id: null,
+    art: 'eintritt',
+    notiz: null,
+    erfasst_von: 1,
+    zeitpunkt_at,
+  });
+  const wartend = (id: number, sichtung: Person['aktuelle_sichtung'], over: Partial<Person> = {}) =>
+    person({
+      id,
+      registrier_nr: id,
+      name: `Person ${id}`,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: null,
+      aktuelle_sichtung: sichtung,
+      ...over,
+    });
+  const wartebereich = () =>
+    screen.getByText('Wartebereich (Eingang)').closest<HTMLElement>('[data-lfh="paneel"]')!;
+  const folgeIn = (bereich: HTMLElement) =>
+    within(bereich)
+      .getAllByTestId('personen-zeile')
+      .map((z) => /R-\d+/.exec(z.textContent ?? '')?.[0]);
+
+  it('jede Personenmarke trägt die Sichtung mit Wort und Farbe: Platz, Wartebereich, Transport', async () => {
+    const aufPlatz = person({
+      id: 1,
+      registrier_nr: 1,
+      aktuelle_uhs_id: 1,
+      aktueller_platz_id: 10,
+      aktuelle_sichtung: 'sk1',
+    });
+    const ungesichtet = wartend(2, null);
+    const transportiert = person({
+      id: 3,
+      registrier_nr: 3,
+      aktuelle_sichtung: 'sk3',
+      aktueller_verbleib: 'Transport KH Mitte',
+    });
+    const uhs = uhsDetail({
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+      belegungen: [{ ...eintritt(3, '2026-10-18 08:00:00'), art: 'austritt' }],
+    });
+    renderGrundriss(uhs, [aufPlatz, ungesichtet, transportiert]);
+
+    const karte = await screen.findByTestId('platz-karte');
+    await waitFor(() => expect(within(karte).getByText('SK I')).toBeInTheDocument());
+    expect(within(karte).getByText('SK I')).toHaveAttribute('data-sichtung', 'sk1');
+    // Ungesichtet: „—“ sichtbar, das Wort im zugänglichen Namen der Marke.
+    expect(
+      within(wartebereich()).getByRole('button', { name: /^ungesichtet R-002 · Person 2/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^SK III R-003 · unbekannt$/ })).toBeInTheDocument();
+  });
+
+  it('der Wartebereich steht nach Dringlichkeit, je Kategorie die längste Wartezeit zuerst', async () => {
+    const uhs = uhsDetail({
+      belegungen: [
+        eintritt(1, '2026-10-18 08:00:00'),
+        eintritt(2, '2026-10-18 08:20:00'),
+        eintritt(3, '2026-10-18 08:30:00'),
+        eintritt(4, '2026-10-18 08:10:00'),
+        eintritt(5, '2026-10-18 07:00:00'),
+      ],
+    });
+    renderGrundriss(uhs, [
+      wartend(1, 'sk3'),
+      wartend(2, 'sk1'),
+      wartend(3, null),
+      wartend(4, 'sk1'),
+      wartend(5, 'unverletzt'),
+    ]);
+    await screen.findByText(/R-005/);
+    expect(folgeIn(wartebereich())).toEqual(['R-003', 'R-004', 'R-002', 'R-001', 'R-005']);
+  });
+
+  it('zeigt die Wartezeit im Wartebereich, den Beginn als taktische Zeit im Titel', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.parse('2026-10-18T08:12:30Z'));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const uhs = uhsDetail({
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+      belegungen: [eintritt(1, '2026-10-18 08:00:00'), eintritt(2, '2026-10-18 07:00:00')],
+    });
+    renderGrundriss(uhs, [wartend(1, 'sk2'), wartend(2, 'sk2', { aktueller_platz_id: 10 })]);
+    await screen.findByText(/R-001/);
+    const zeit = within(wartebereich()).getByText('12 min');
+    expect(zeit).toHaveAttribute(
+      'title',
+      `seit ${taktischeDtg('2026-10-18 08:00:00', DEFAULT_KONVENTIONEN)}`,
+    );
+    // Auf dem Platz wartet niemand: die Marke dort trägt keine Wartezeit.
+    expect(within(screen.getByTestId('platz-karte')).queryByText(/min$/)).toBeNull();
+  });
+
+  it('hält die Folge, solange der Zeiger im Wartebereich ist, und sortiert danach neu', async () => {
+    const uhs = uhsDetail({
+      belegungen: [eintritt(1, '2026-10-18 08:00:00'), eintritt(2, '2026-10-18 08:00:00')],
+    });
+    const { client } = renderGrundriss(uhs, [wartend(1, 'sk2'), wartend(2, 'sk3')]);
+    await screen.findByText(/R-002/);
+    expect(folgeIn(wartebereich())).toEqual(['R-001', 'R-002']);
+
+    const zeile = within(wartebereich()).getAllByTestId('personen-zeile')[0];
+    fireEvent.pointerMove(zeile, { pointerType: 'mouse' });
+    act(() => {
+      client.setQueryData<Person[]>(einsatzKeys.personen(1), (alt) => [
+        ...(alt ?? []).map((p) => (p.id === 2 ? { ...p, aktuelle_sichtung: 'sk1' as const } : p)),
+        wartend(3, null),
+      ]);
+    });
+    // Der Inhalt fließt (R-002 trägt SK I), die Folge steht; Neues steht hinten an.
+    await waitFor(() => expect(within(wartebereich()).getByText('SK I')).toBeInTheDocument());
+    expect(folgeIn(wartebereich())).toEqual(['R-001', 'R-002', 'R-003']);
+
+    fireEvent.pointerLeave(zeile, { pointerType: 'mouse' });
+    await waitFor(() => expect(folgeIn(wartebereich())).toEqual(['R-003', 'R-002', 'R-001']));
+  });
+
+  describe('Patient zuweisen', () => {
+    function kandidaten() {
+      return within(screen.getByRole('radiogroup', { name: 'Patient' })).getAllByRole('radio');
+    }
+
+    it('listet die Kandidaten mit Sichtung, Wartezeit und Zustand nach Dringlichkeit, der erste ist vorgewählt', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(Date.parse('2026-10-18T08:30:00Z'));
+      onTestFinished(() => {
+        vi.useRealTimers();
+      });
+      const uhs = uhsDetail({
+        status: 'aktiv',
+        plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+        belegungen: [eintritt(1, '2026-10-18 08:00:00'), eintritt(2, '2026-10-18 08:25:00')],
+      });
+      renderGrundriss(uhs, [
+        wartend(1, 'sk3', { zustand: 'gehfähig, unterkühlt' }),
+        wartend(2, 'sk1', { zustand: 'Atemnot' }),
+        person({ id: 3, registrier_nr: 3, aktuelle_sichtung: 'sk2' }),
+        person({ id: 4, registrier_nr: 4, aktuelle_sichtung: null }),
+      ]);
+
+      await userEvent.click(await screen.findByTestId('platz-karte'));
+      await screen.findByRole('radiogroup', { name: 'Patient' });
+      // Erst der Wartebereich nach Dringlichkeit, dahinter „Noch nicht aufgenommen“ in derselben
+      // Reihe.
+      expect(kandidaten().map((r) => /R-\d+/.exec(r.closest('label')!.textContent!)?.[0])).toEqual([
+        'R-002',
+        'R-001',
+        'R-004',
+        'R-003',
+      ]);
+      expect(kandidaten()[0]).toBeChecked();
+      const erster = kandidaten()[0].closest('label')!;
+      expect(erster).toHaveTextContent('SK I');
+      expect(erster).toHaveTextContent('5 min');
+      expect(erster).toHaveTextContent('Atemnot');
+      expect(screen.getByRole('radio', { name: /ungesichtet R-004/ })).toBeInTheDocument();
+    });
+
+    it('„Zuweisen“ belegt den vorgewählten Kandidaten; Enter sendet über den Knopf im Formular', async () => {
+      const uhs = uhsDetail({
+        status: 'aktiv',
+        plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+        belegungen: [eintritt(1, '2026-10-18 08:00:00'), eintritt(2, '2026-10-18 08:20:00')],
+      });
+      const senke: { body: unknown } = { body: null };
+      server.use(
+        http.post('/api/einsaetze/1/personen/2/uhs-belegung', async ({ request }) => {
+          senke.body = await request.json();
+          return HttpResponse.json({ ...eintritt(2, 'x'), platz_id: 10, art: 'wechsel' });
+        }),
+      );
+      renderGrundriss(uhs, [wartend(1, 'sk3'), wartend(2, 'sk1')]);
+
+      await userEvent.click(await screen.findByTestId('platz-karte'));
+      const knopf = await screen.findByRole('button', { name: 'Zuweisen' });
+      // Erfassungs-Norm: der Absende-Knopf liegt im Formular, kein Modal-Fuß (Enter sendet nativ).
+      expect(knopf.closest('form')).not.toBeNull();
+      expect(document.querySelector('.ant-modal-footer')).toBeNull();
+      // Der Fokus steht auf dem vorgewählten Kandidaten.
+      await waitFor(() => expect(document.activeElement).toBe(kandidaten()[0]));
+      await userEvent.click(knopf);
+
+      await waitFor(() => expect(senke.body).toEqual({ art: 'wechsel', uhs_id: 1, platz_id: 10 }));
+    });
   });
 });

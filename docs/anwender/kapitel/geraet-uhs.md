@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -20,8 +20,10 @@ und zeigen nur deren Patienten. Die Navigation unten führt zu „Patienten“, 
 
 ### Patienten im Blick behalten
 
-1. „Patienten“ öffnen. Die Liste zeigt je Person Registriernummer, Name, Sichtungskategorie, Zeit
-   und Ort in der UHS (Wartebereich oder Platz).
+1. „Patienten“ öffnen. Die Liste zeigt je Person Registriernummer, Name, Sichtungskategorie,
+   Zustand, Zeit und Platz in der UHS (Wartebereich oder Platz). Sie steht nach Dringlichkeit:
+   ungesichtet zuerst, dann SK I bis SK IV, tot und unverletzt, je Kategorie wer am längsten
+   wartet.
 
    ![Patientenliste eines UHS-Tablets mit der Gruppe „In der UHS“ und dem Knopf „Patient aufnehmen“](../bilder/geraet-uhs/patienten.png)
 
@@ -49,9 +51,12 @@ R-013 · SK II · im Wartebereich“. Die Aufnahme geht immer in die eigene UHS.
    ![Grundriss der UHS Turnhalle Musterstadt mit Wartebereich, Behandlungsplätzen, Trage und Transportbereitstellung](../bilder/geraet-uhs/grundriss.png)
 
 2. Einen freien Platz antippen. Der Dialog „Patient zuweisen — …“ öffnet sich.
-3. Unter „Patient“ die Person wählen und „Erfassen“ wählen.
+3. Unter „Patient“ ist der dringlichste Patient vorgewählt; bei Bedarf einen anderen antippen.
+   „Zuweisen“ wählen.
 
-Alternativ lässt sich die Karte einer wartenden Person auf den Platz ziehen. Über das Menü eines
+Jede Patientenmarke im Grundriss trägt vorn die Sichtung, im Wartebereich dazu die Wartezeit.
+Die Reihenfolge erklärt [Unfallhilfsstellen](unfallhilfsstellen.md). Alternativ lässt sich die
+Karte einer wartenden Person auf den Platz ziehen. Über das Menü eines
 Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren.
 
 ### Sichten mit „Bestätigt von“
