@@ -166,7 +166,9 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
     );
     await paneel.getByRole('button', { name: 'Übernehmen' }).click();
     await expect(paneel).toHaveCount(0);
-    await expect(tablet.getByText('bestätigt: Dr. A. Muster')).toBeVisible();
+    await expect(kopf.locator('[data-lfh="sichtung-zeit"]')).toContainText(
+      'bestätigt: Dr. A. Muster',
+    );
   } finally {
     await kontext.close();
   }
