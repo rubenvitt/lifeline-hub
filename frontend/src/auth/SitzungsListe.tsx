@@ -1,8 +1,8 @@
 import { Button, Flex, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
 import { PaneelZustand, StatusChip, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { globalKeys } from '../api/queryKeys';
 import type { SitzungAnzeige } from '../api/types';
@@ -35,16 +35,6 @@ export function zuletztText(utc: string, jetztMs: number): string | null {
   return null;
 }
 
-/** Die Minute, damit „vor 12 min“ nicht stehen bleibt, solange die Liste offen ist. */
-function useJetzt(): number {
-  const [jetzt, setJetzt] = useState(() => Date.now());
-  useEffect(() => {
-    const t = window.setInterval(() => setJetzt(Date.now()), 60_000);
-    return () => window.clearInterval(t);
-  }, []);
-  return jetzt;
-}
-
 interface SitzungsListeProps {
   /** Benennt den Ladezustand für Vorlesende. */
   titel: string;
@@ -75,7 +65,8 @@ export default function SitzungsListe({
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
   const { formatZeit } = useAnzeigeKonventionen();
-  const jetzt = useJetzt();
+  // Die Minute, damit „vor 12 min“ nicht stehen bleibt, solange die Liste offen ist.
+  const jetzt = useMinutenTakt();
   const abfrage = useQuery({ queryKey, queryFn: laden });
 
   // Beide Fächer (eigene und fremde) unter einem Prefix: ein Admin am eigenen Konto sieht dieselbe
