@@ -36,7 +36,7 @@ function zeitMs(seit: string | null | undefined): number | null {
  * Vergleich zweier Personen: Kategorie, dann der frühere Beginn (längere Wartezeit) zuerst; ohne
  * Beginn hinten in der Kategorie. Gleiche liefern 0, die stabile Sortierung hält ihre Folge.
  */
-export function vergleicheDringlichkeit(a: DringlichkeitsMerkmale, b: DringlichkeitsMerkmale) {
+export function compareDringlichkeit(a: DringlichkeitsMerkmale, b: DringlichkeitsMerkmale) {
   const abstand = dringlichkeitsRang(a.sichtung) - dringlichkeitsRang(b.sichtung);
   if (abstand !== 0) return abstand;
   const za = zeitMs(a.seit);
@@ -50,7 +50,7 @@ export function nachDringlichkeit<T>(
   liste: readonly T[],
   merkmale: (eintrag: T) => DringlichkeitsMerkmale,
 ): T[] {
-  return [...liste].sort((a, b) => vergleicheDringlichkeit(merkmale(a), merkmale(b)));
+  return [...liste].sort((a, b) => compareDringlichkeit(merkmale(a), merkmale(b)));
 }
 
 /** Abstand je Rang: größer als jeder Zeitpunkt in Millisekunden (Jahr 2286 ≈ 1e13). */

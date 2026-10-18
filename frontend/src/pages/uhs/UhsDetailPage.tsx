@@ -226,10 +226,10 @@ export default function UhsDetailPage() {
   // Die Materialzahl im Wortlaut des Bausteins („3 Posten · 1 Ausfall“, eine Heimat je Zahl,
   // LLH-1133 D2) als Sprung in den Bereich Material. Ohne diesen Bereich (Gerät) oder ohne
   // Freigabe Material steht keine Zahl.
-  const zeigeMaterialzahl = bereichListe.includes('material') && materialFrei;
+  const showMaterialzahl = bereichListe.includes('material') && materialFrei;
   // Die Meta bricht im Kopf nicht um (`seitenMetaStil`); vor der Zahl darf sie es, sonst liefe
   // der Kopf bei 390 px über den Rand. Die Teile selbst bleiben ganz.
-  const meta = zeigeMaterialzahl ? (
+  const meta = showMaterialzahl ? (
     <span style={{ whiteSpace: 'normal' }}>
       <span style={{ whiteSpace: 'nowrap' }}>{metaText} ·</span> // Ersetzen wie die Bereichsleiste:
       „Zurück“ verlässt die Seite, statt den Bereich zurückzunehmen.
@@ -240,8 +240,8 @@ export default function UhsDetailPage() {
   ) : (
     metaText
   );
-  const mehrereBereiche = bereichListe.length > 1;
-  const zeigeLagezeile = !geraet && abBreite('md');
+  const hasMehrereBereiche = bereichListe.length > 1;
+  const showLagezeile = !geraet && abBreite('md');
 
   return (
     <EinsatzSeite
@@ -345,7 +345,7 @@ export default function UhsDetailPage() {
       // Bildlauf über dem Grundriss, und jeder Bereich behält die Mindesthöhe. Ein einzelner
       // Bereich ist keine Wahl: dann steht nur die Belegung.
       bereiche={
-        mehrereBereiche && (
+        hasMehrereBereiche && (
           <Segmentleiste
             rolle="tablist"
             beschriftung={aufzaehlung(bereichListe.map((b) => BEREICH_NAME[b]))}
@@ -371,7 +371,7 @@ export default function UhsDetailPage() {
         // Bereiche rollen in ihrer Fläche.
         inhalt: (
           <div
-            {...(mehrereBereiche
+            {...(hasMehrereBereiche
               ? { role: 'tabpanel', id: bereichFeld, 'aria-label': BEREICH_NAME[bereich] }
               : {})}
             style={{
@@ -387,7 +387,7 @@ export default function UhsDetailPage() {
               // Am Gerät und unter `md` gehört die Fläche dem Grundriss; der UHS-Laptop trägt die
               // Zahlen im Bereich „UHS“ (`geraet/GeraetStellePage`).
               <Flex vertical gap={token.marginSM} style={{ height: '100%', minHeight: 0 }}>
-                {zeigeLagezeile && <UhsLagezeile einsatzId={einsatzId} uhs={uhs} />}
+                {showLagezeile && <UhsLagezeile einsatzId={einsatzId} uhs={uhs} />}
                 <div style={{ flex: '1 1 0', minHeight: 0 }}>
                   <Grundriss
                     key={uhs.id}

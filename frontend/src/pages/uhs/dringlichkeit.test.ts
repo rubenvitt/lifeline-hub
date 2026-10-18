@@ -6,7 +6,7 @@ import {
   dringlichkeitsWert,
   gehalteneFolge,
   nachDringlichkeit,
-  vergleicheDringlichkeit,
+  compareDringlichkeit,
   wartetSeit,
   wartezeitMinuten,
   wartezeitText,
@@ -74,7 +74,7 @@ describe('Dringlichkeitsreihe (LLH-1135)', () => {
       { id: 'c', sichtung: 'sk2' as const, seit: null },
     ];
     expect(nachDringlichkeit(personen, (p) => p).map((p) => p.id)).toEqual(['b', 'a', 'c']);
-    expect(vergleicheDringlichkeit(personen[0], personen[2])).toBe(0);
+    expect(compareDringlichkeit(personen[0], personen[2])).toBe(0);
   });
 
   it('lässt die Eingabe unverändert', () => {

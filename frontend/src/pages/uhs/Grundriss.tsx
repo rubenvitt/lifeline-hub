@@ -1893,7 +1893,7 @@ export default function Grundriss({
         >
           <KandidatenWahl
             kandidaten={zuweisenKandidaten}
-            istWartend={(p) => p.aktuelle_uhs_id === uhs.id}
+            isWartend={(p) => p.aktuelle_uhs_id === uhs.id}
             wartetSeitVon={wartetSeitVon}
           />
         </Form.Item>
@@ -1919,14 +1919,14 @@ function KandidatenWahl({
   value,
   onChange,
   kandidaten,
-  istWartend,
+  isWartend,
   wartetSeitVon,
 }: {
   id?: string;
   value?: number;
   onChange?: (personId: number) => void;
   kandidaten: readonly Person[];
-  istWartend: (p: Person) => boolean;
+  isWartend: (p: Person) => boolean;
   wartetSeitVon: (p: Person) => string | null;
 }) {
   const { token } = theme.useToken();
@@ -1945,7 +1945,7 @@ function KandidatenWahl({
           {titel}
         </Typography.Text>
         {personen.map((p) => {
-          const seit = istWartend(p) ? wartetSeitVon(p) : null;
+          const seit = isWartend(p) ? wartetSeitVon(p) : null;
           return (
             <Radio key={p.id} value={p.id} style={{ width: '100%' }}>
               <span
@@ -2000,10 +2000,10 @@ function KandidatenWahl({
       onChange={(e) => onChange?.(e.target.value as number)}
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
     >
-      {gruppe('Wartebereich', kandidaten.filter(istWartend))}
+      {gruppe('Wartebereich', kandidaten.filter(isWartend))}
       {gruppe(
         'Noch nicht aufgenommen',
-        kandidaten.filter((p) => !istWartend(p)),
+        kandidaten.filter((p) => !isWartend(p)),
       )}
     </Radio.Group>
   );

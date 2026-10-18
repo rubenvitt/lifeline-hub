@@ -162,7 +162,7 @@ export default function MaterialAmOrt({
    * Bereitstellungsraum im Detail, das Fahrzeug liest die Materialliste. Erfüllt, wenn alle neu im
    * Cache stehen — bis dahin zeigt die Zeile den gewählten Stand.
    */
-  const gleicheOrtAb = () => {
+  const syncOrt = () => {
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
     return Promise.all([
       qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
@@ -179,7 +179,7 @@ export default function MaterialAmOrt({
   const statusWechsel = useMutation({
     mutationFn: async (v: { p: MaterialAmOrtPosten; status: MaterialStatus }) => {
       await setzeMaterialStatus(einsatzId, v.p.id, v.status);
-      await gleicheOrtAb();
+      await syncOrt();
     },
     onMutate: (v) => zeilen.beginne(v.p.id),
     onError: (e, v) => zeilen.melde(v.p.id, e, 'Status nicht geändert'),
@@ -194,7 +194,7 @@ export default function MaterialAmOrt({
       updateDisposition(einsatzId, v.p.id, { ausgegeben: v.ausgegeben }),
     onSuccess: (_d, v) => {
       message.success(`${v.p.bezeichnung}: ${v.menge} ausgegeben`);
-      return gleicheOrtAb();
+      return syncOrt();
     },
   });
 
@@ -235,8 +235,8 @@ export default function MaterialAmOrt({
       {posten.map((p) => {
         const grund = zeilen.grund(p.id);
         // Bis der Abgleich steht, zeigt die Zeile den gewählten Status.
-        const statusLaeuft = statusWechsel.isPending && statusWechsel.variables?.p.id === p.id;
-        const statusStand = statusLaeuft ? { ...p, status: statusWechsel.variables.status } : p;
+        const isStatusPending = statusWechsel.isPending && statusWechsel.variables?.p.id === p.id;
+        const statusStand = isStatusPending ? { ...p, status: statusWechsel.variables.status } : p;
         const isAusgebbar =
           isBedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
         return (
@@ -278,7 +278,7 @@ export default function MaterialAmOrt({
                 optionen={materialStatusWahl(p.art)}
                 kennung={p.bezeichnung}
                 darfSchreiben={isBedienbar}
-                laeuft={statusLaeuft}
+                laeuft={isStatusPending}
                 gesperrt={statusWechsel.isPending}
                 onWaehlen={(status) => {
                   if (!statusWechsel.isPending && status !== p.status) {
