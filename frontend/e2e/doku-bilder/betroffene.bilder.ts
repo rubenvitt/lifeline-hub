@@ -47,11 +47,8 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/personen`);
     await page.getByRole('button', { name: 'Betroffene erfassen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Betroffene erfassen' });
-    await dialog
-      .locator('#sichtung .ant-tag')
-      .filter({ hasText: /^SK II$/ })
-      .click();
-    await expect(dialog.getByRole('radio', { name: 'SK II', exact: true })).toBeChecked();
+    await dialog.getByRole('radio', { name: /^SK II,/ }).click();
+    await expect(dialog.getByRole('radio', { name: /^SK II,/ })).toBeChecked();
     await waehleIn(dialog.getByRole('combobox', { name: 'Geschlecht' }), 'männlich');
     await dialog.getByLabel('Geschätztes Alter (Jahre)').fill('45');
     await dialog.getByLabel('Antreffort').fill('Mühlbachweg 12, Keller');

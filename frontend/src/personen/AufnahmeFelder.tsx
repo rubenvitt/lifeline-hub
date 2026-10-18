@@ -1,12 +1,11 @@
-import SichtungsTag from '../components/SichtungsTag';
-import { Collapse, Form, Input, InputNumber, Radio, Typography, theme } from 'antd';
-import type { CSSProperties } from 'react';
+import { Collapse, Form, Input, InputNumber, Typography } from 'antd';
 import { Select } from '../components/Select';
 import type { PersonEingabe } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
 import { parseKoordinate } from './koordinate';
 import { KoordinateFeld, VermisstSeitFeld } from './LagedatenFelder';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
+import SichtungsWahl from './SichtungsWahl';
 
 /**
  * Werte der Personen-Aufnahme: `PersonEingabe` plus Erst-Sichtung — `status` leitet der
@@ -24,8 +23,9 @@ export type AufnahmeEingabe = PersonEingabe & {
  * (`52.2691/9.1342`) steht und erst in {@link aufnahmeZuEingabe} zerlegt wird. „vermisst seit"
  * liegt schon als Wire-String (UTC) im Formular.
  */
-export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon'> & {
+export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon' | 'sichtung'> & {
   koordinate?: string;
+  sichtung?: Sichtungskategorie | null;
 };
 
 /**
@@ -34,12 +34,14 @@ export type AufnahmeWerte = Omit<AufnahmeEingabe, 'antreff_lat' | 'antreff_lon'>
  * Koordinatentext erreicht diese Funktion nicht — die Feldprüfung hält vorher an.
  */
 export function aufnahmeZuEingabe(werte: AufnahmeWerte): AufnahmeEingabe {
-  const { koordinate, vermisst_seit, bestaetigt_personal_id, ...rest } = werte;
+  const { koordinate, vermisst_seit, bestaetigt_personal_id, sichtung, ...rest } = werte;
   const k = koordinate && koordinate.trim() !== '' ? parseKoordinate(koordinate) : null;
   return {
     ...rest,
+    // Eine zurückgenommene Wahl (`SichtungsWahl abwaehlbar` meldet `null`) heißt: ohne Sichtung.
+    ...(sichtung ? { sichtung } : {}),
     // Ohne Erst-Sichtung gibt es nichts zu bestätigen (sonst 422).
-    ...(rest.sichtung && bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
+    ...(sichtung && bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
     ...(k?.ok ? { antreff_lat: k.lat, antreff_lon: k.lon } : {}),
     ...(vermisst_seit ? { vermisst_seit } : {}),
   };
@@ -54,23 +56,6 @@ export type AufnahmeModus = 'erfassen' | 'vermisst';
 
 /** Der Folgestatus der allgemeinen Maske, sichtbar im Dialog (LFH-963, Entscheidung 9). */
 export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffen';
-
-/** Reihenfolge der Auswahlflächen — Dringlichkeit zuerst, wie an der Aufnahme gesprochen. */
-const SK_REIHE: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt'];
-
-/**
- * Boden der Sichtungs-Auswahlflächen: 64 px oder die Dichtestufe, je nachdem, was größer ist
- * (im Handschuh-Betrieb gewinnt 72). Rein und exportiert, damit über zwei Dichtestufen prüfbar.
- */
-export function skFlaechenStil(token: { controlHeight: number }): CSSProperties {
-  return {
-    minHeight: Math.max(64, token.controlHeight),
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 96,
-  };
-}
 
 /**
  * Die Feldgruppe der Personen-Aufnahme — **ohne eigenes `<Form>`**, für zwei Mounts
@@ -104,9 +89,6 @@ export default function AufnahmeFelder({
   /** Ohne Sichtung und ohne ihren Folgestatus, etwa am Gerät einer Betreuungsstelle (LFH-1041). */
   ohneSichtung?: boolean;
 }) {
-  const { token } = theme.useToken();
-  const flaeche = skFlaechenStil(token);
-
   const weitereAngaben = (
     <>
       <Form.Item label="Name" name="name">
@@ -149,23 +131,10 @@ export default function AufnahmeFelder({
       )}
       {modus !== 'vermisst' && !ohneSichtung && (
         <Form.Item label="Sichtungskategorie" name="sichtung">
-          {/* Dieselbe fachliche Kennzeichnung wie in Liste und Verlauf; die Beschriftung trägt den
-             Textkontrast unabhängig von SK-Farbe und Radio-Zustand. */}
-          {/* `aria-label` zusätzlich zum `Form.Item`-Label: `label[for]` benennt nur labelable elements,
-             und eine `Radio.Group` (`div[role="radiogroup"]`) gehört nicht dazu — sonst stünden sechs
-             Flächen in einer namenlosen Gruppe. */}
-          <Radio.Group
-            name="sichtung"
-            aria-label="Sichtungskategorie"
-            optionType="button"
-            buttonStyle="outline"
-          >
-            {SK_REIHE.map((k) => (
-              <Radio.Button key={k} value={k} style={flaeche}>
-                <SichtungsTag kategorie={k} style={{ marginInlineEnd: 0 }} />
-              </Radio.Button>
-            ))}
-          </Radio.Group>
+          {/* Dieselbe Wahl wie bei der Nachsichtung (LLH-1083); abwählbar, denn eine Person darf
+             ohne Sichtung entstehen (`FOLGESTATUS_HINWEIS`). Die Gruppe trägt ihren Namen selbst:
+             `label[for]` benennt keine `radiogroup`. */}
+          <SichtungsWahl abwaehlbar aria-label="Sichtungskategorie" />
         </Form.Item>
       )}
       <Form.Item label="Geschlecht" name="geschlecht">

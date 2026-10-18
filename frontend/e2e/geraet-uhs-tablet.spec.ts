@@ -24,7 +24,7 @@ async function anlegen<T = { id: number }>(page: Page, pfad: string, data?: unkn
 
 /** Die Sichtungs-Auswahlfläche über ihre Beschriftung (wie `personen-aufnahme.spec.ts`). */
 function skFlaeche(page: Page, label: string) {
-  return page.locator('#sichtung').getByText(label, { exact: true });
+  return page.locator('#sichtung').getByRole('radio', { name: new RegExp(`^${label},`) });
 }
 
 test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerruf', async ({
@@ -157,7 +157,7 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
     await tablet.goto(`/geraet/${e}/patienten/${person.id}`);
     await tablet.getByRole('button', { name: 'Sichten', exact: true }).click();
     const dialog = tablet.getByRole('dialog', { name: 'Sichtung erfassen' });
-    await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'SK II');
+    await dialog.getByRole('radio', { name: /^SK II,/ }).click();
     await waehleIn(
       dialog.getByRole('combobox', { name: 'Bestätigt von' }),
       'Dr. A. Muster · Notärztin',

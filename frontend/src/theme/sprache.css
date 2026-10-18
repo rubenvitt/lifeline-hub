@@ -276,6 +276,13 @@
   outline-offset: -2px;
 }
 
+/* Sichtungswahl (LLH-1083): der Ring liegt AUSSEN auf dem Grund, damit er auf der blauen
+   SK-IV-Fläche nicht verschwindet; die Lücke zwischen zwei Flächen (≥ 8 px) trägt ihn. */
+.lfh-sichtungswahl__flaeche:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 2px;
+}
+
 /* Schnellerfassungszeile: die ZEILE trägt Rahmen und Grund, das Feld darin nicht.
    Drei Klassen tief, damit antds `:where()`-gekapselte Feldregeln (bis 0,2,0 samt
    `:focus`) unterliegen, ohne `!important`.

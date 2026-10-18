@@ -105,7 +105,7 @@ test.describe(KAPITEL, () => {
     try {
       await nav.getByRole('link', { name: 'Aufnahme' }).click();
       await expect(geraet).toHaveURL(/\/aufnahme\?uhs=\d+$/);
-      await geraet.locator('#sichtung').getByText('SK II', { exact: true }).click();
+      await geraet.locator('#sichtung').getByRole('radio', { name: /^SK II,/ }).click();
       await fotografiere(geraet.locator('main'), KAPITEL, 'aufnahme');
       await geraet.getByRole('button', { name: 'Speichern und nächste' }).click();
       await expect(geraet.getByText(/Erfasst als R-\d{3} · SK II · im Wartebereich/)).toBeVisible();
@@ -171,7 +171,7 @@ test.describe(KAPITEL, () => {
       await geraet.goto(`/geraet/${einsatz}/patienten/${person.id}`);
       await geraet.getByRole('button', { name: 'Sichten', exact: true }).click();
       const dialog = geraet.getByRole('dialog', { name: 'Sichtung erfassen' });
-      await waehleIn(dialog.getByRole('combobox', { name: 'Kategorie' }), 'SK II');
+      await dialog.getByRole('radio', { name: /^SK II,/ }).click();
       await waehleIn(dialog.getByRole('combobox', { name: 'Bestätigt von' }), label);
       await dialog.getByRole('combobox', { name: 'Bestätigt von' }).blur();
       await fotografiere(dialog, KAPITEL, 'sichtung');

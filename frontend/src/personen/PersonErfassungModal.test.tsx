@@ -43,8 +43,8 @@ describe('PersonErfassungModal — Tastaturweg', () => {
   it('setzt den Fokus beim Öffnen auf das erste Feld', async () => {
     zeige();
     /**
-     * Das erste Feld ist die Sichtung, der Fokus landet auf ihrer ERSTEN Fläche: die Hülle greift
-     * das erste `input`, und `Radio.Button` rendert je Fläche ein echtes `<input type="radio">`.
+     * Das erste Feld ist die Sichtung, der Fokus landet auf ihrer ERSTEN Fläche: sie trägt das
+     * ausdrückliche Fokusziel der Hülle (`data-erfassung-fokus`, `SichtungsWahl`).
      */
     const flaechen = within(screen.getByRole('radiogroup')).getAllByRole('radio');
     await waitFor(() => expect(document.activeElement).toBe(flaechen[0]));
@@ -65,9 +65,8 @@ describe('PersonErfassungModal — Tastaturweg', () => {
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
 
-    // Geklickt wird der WRAPPER: antd blendet die Radio-Eingabe mit `pointer-events: none` aus.
     const skZwei = within(screen.getByRole('radiogroup')).getAllByRole('radio')[1];
-    await nutzer.click(skZwei.closest('label')!);
+    await nutzer.click(skZwei);
     await nutzer.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));

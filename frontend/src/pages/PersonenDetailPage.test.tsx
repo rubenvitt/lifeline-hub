@@ -360,8 +360,7 @@ describe('PersonenDetailPage — med. Verlauf', () => {
     // Die Primäraktion des Kopfes heißt bei einer ungesichteten Person „Sichten" — „Re-Sichten"
     // wäre für die erste Sichtung falsch.
     await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
-    await userEvent.click(await screen.findByRole('combobox', { name: /Kategorie/ }));
-    await userEvent.click(await screen.findByText('SK II'));
+    await userEvent.click(await screen.findByRole('radio', { name: /^SK II,/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(gerufen.kategorie).toBe('sk2'));
   });

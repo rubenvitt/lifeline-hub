@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs]
 ---
 
 ## Überblick
@@ -36,8 +36,9 @@ Vermissten.
 ### Eine Person mit der Maske erfassen
 
 1. „Betroffene erfassen“ wählen.
-2. Unter „Sichtungskategorie“ die Kategorie antippen, dazu „Geschlecht“, „Geschätztes Alter
-   (Jahre)“ und „Antreffort“, soweit bekannt.
+2. Unter „Sichtungskategorie“ die Fläche der Kategorie antippen, dazu „Geschlecht“, „Geschätztes
+   Alter (Jahre)“ und „Antreffort“, soweit bekannt. Ein zweiter Tipp auf die gewählte Fläche nimmt
+   die Wahl zurück; die Person wird dann ohne Sichtung erfasst.
 
    ![Maske „Betroffene erfassen“ mit gewählter Sichtungskategorie SK II, Geschlecht, Alter und Antreffort](../bilder/betroffene/erfassen.png)
 
@@ -69,8 +70,8 @@ Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen 
 1. In der Liste die Person öffnen. Die Seite „Person R-…“ zeigt Status, Sichtung und den
    medizinischen Verlauf.
 2. Ohne Sichtung „Sichten“ wählen, sonst im Aktionsmenü der Seite „Re-Sichten“. Im Dialog
-   „Sichtung erfassen“ die „Kategorie“ wählen, bei Bedarf eine „Kurzbegründung (optional)“, und
-   „Übernehmen“ wählen.
+   „Sichtung erfassen“ die Fläche der Kategorie antippen, bei Bedarf eine „Kurzbegründung
+   (optional)“, und „Übernehmen“ wählen.
 3. Verlässt die Person die Einsatzstelle, „Verbleib erfassen“ wählen und die „Art“ wählen:
    „Transport“, „Notunterkunft“, „Entlassung vor Ort“, „verbleibt vor Ort“ oder „Verbleib des
    Leichnams“. Dazu das „Ziel“ und beim Transport das „Transportmittel (RTW/KTW …)“.
@@ -112,7 +113,11 @@ hin und bietet „Auf „verstorben“ setzen“ an. Vermisste und abgemeldete P
 sichten.
 
 Die Sichtungskategorien und ihre Farben: SK I akut (rot), SK II schwer (gelb), SK III leicht
-(grün), SK IV abwartend (blau), tot (schwarz), unverletzt (ohne Farbe).
+(grün), SK IV abwartend (blau), tot (schwarz), unverletzt (ohne Farbe). Bei der Wahl ist jede
+Kategorie eine eigene Farbfläche mit Kürzel und Bedeutungswort. Die gewählte trägt ein Häkchen und
+einen kräftigen Rahmen, die übrigen treten zurück und zeigen ihre Farbe nur noch als Streifen am
+Rand. So ist die Wahl auch ohne Farbe zu erkennen. Jede Fläche ist mindestens 72 px hoch, auch in
+der kompakten Darstellung.
 
 Wird eine Person mit SK I erfasst oder auf SK I hochgestuft, auch bei ihrer ersten Sichtung,
 bekommen alle im Einsatz, die das Modul „Betroffene“ lesen, den Hinweis „Sichtung I“ mit der

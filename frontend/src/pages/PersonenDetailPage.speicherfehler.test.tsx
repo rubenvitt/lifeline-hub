@@ -197,7 +197,7 @@ describe('PersonenDetailPage — Sichtung im Dialog (LFH-1077)', () => {
   async function sichte() {
     await userEvent.click(await screen.findByRole('button', { name: 'Sichten' }));
     const dialog = await offenerDialog();
-    await waehle(dialog, /Kategorie/, /^SK II$/);
+    await userEvent.click(within(dialog).getByRole('radio', { name: /^SK II,/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
     return dialog;
   }

@@ -107,7 +107,7 @@ function render(
 /** Erste Auswahlfläche der Sichtung anklicken (Wrapper, nicht das ausgeblendete `input`). */
 async function waehleSk(index: number) {
   const flaeche = within(screen.getByRole('radiogroup')).getAllByRole('radio')[index];
-  await userEvent.click(flaeche.closest('label')!);
+  await userEvent.click(flaeche);
 }
 
 describe('AufnahmePage', () => {

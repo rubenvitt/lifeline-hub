@@ -6,6 +6,10 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
 - **Sichtung geht mit dem Anlegen mit** (`POST …/personen` mit `sichtung`, eine Transaktion,
   unter `war_neu`) — kein nachgeschobener Request (Offline-Idempotenz). Mit `vermisst` 422,
   unbekannte Kategorie 400.
+- **Eine Sichtungswahl für jeden Ort** (LLH-1083, Spec `sichtungswahl`): `personen/SichtungsWahl.tsx`
+  in der Erfassung (`abwaehlbar`, eine zurückgenommene Wahl heißt „ohne Sichtung“), in der
+  Nachsichtung (`SichtungFelder` in `SichtungDialog.tsx`, Fläche + „Übernehmen“) und überall, wo
+  später gewählt wird. Reihenfolge `SK_REIHE` (`personMeta.ts`), kein `Select` für die Sichtung.
 - **Eine Erfassungsmaske ist ein Bauteil, kein Ort:** `personen/AufnahmeFelder.tsx` (ohne
   `<Form>`) für Modal und `/einsaetze/:id/personen/aufnahme`; Budget verschieben, nicht dehnen.
 - **Eine Maske „Betroffene erfassen“, ein Wort „erfasst“** (LFH-963, Spec `betroffene-erfassung`,

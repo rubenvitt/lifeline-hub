@@ -3,15 +3,48 @@ import { useMutation } from '@tanstack/react-query';
 import { erfasseSichtung } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
-import { Select } from '../components/Select';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
-import { SK_META } from './personMeta';
+import SichtungsWahl from './SichtungsWahl';
 
-interface SichtungWerte {
+export interface SichtungWerte {
   kategorie: Sichtungskategorie;
   notiz?: string;
   /** Nur am UHS-Gerät (LFH-1046). */
   bestaetigt_personal_id?: number;
+}
+
+/**
+ * Die Felder einer Nachsichtung — ohne eigenes `<Form>`, für zwei Hüllen: diesen Dialog
+ * (Grundriss, Gerät) und die Fassung in der Ansicht (Patientenkopf, LLH-1094). Für die Wahl der
+ * Kategorie gibt es kein Dropdown (LLH-1083, Spec `sichtungswahl`): eine Fläche, dann „Übernehmen“.
+ */
+export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
+  return (
+    <>
+      <Form.Item
+        label="Kategorie"
+        name="kategorie"
+        rules={[{ required: true, message: 'Bitte eine Sichtungskategorie wählen' }]}
+      >
+        <SichtungsWahl aria-label="Sichtungskategorie" />
+      </Form.Item>
+      <Form.Item label="Kurzbegründung (optional)" name="notiz">
+        <Input />
+      </Form.Item>
+      <BestaetigtVonFeld einsatzId={einsatzId} />
+    </>
+  );
+}
+
+/** Der Aufruf hinter beiden Hüllen; die Hülle reicht nur ihre Werte durch. */
+export function sendeSichtung(einsatzId: number, personId: number, v: SichtungWerte) {
+  return erfasseSichtung(
+    einsatzId,
+    personId,
+    v.kategorie,
+    v.notiz ?? null,
+    v.bestaetigt_personal_id,
+  );
 }
 
 interface SichtungDialogProps {
@@ -37,8 +70,7 @@ export default function SichtungDialog({
 }: SichtungDialogProps) {
   const [form] = Form.useForm<SichtungWerte>();
   const sichtungMutation = useMutation({
-    mutationFn: (v: SichtungWerte) =>
-      erfasseSichtung(einsatzId, personId, v.kategorie, v.notiz ?? null, v.bestaetigt_personal_id),
+    mutationFn: (v: SichtungWerte) => sendeSichtung(einsatzId, personId, v),
     onSuccess: onErfasst,
   });
 
@@ -56,18 +88,7 @@ export default function SichtungDialog({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item label="Kategorie" name="kategorie" rules={[{ required: true }]}>
-        <Select
-          options={(Object.keys(SK_META) as Sichtungskategorie[]).map((k) => ({
-            value: k,
-            label: SK_META[k].label,
-          }))}
-        />
-      </Form.Item>
-      <Form.Item label="Kurzbegründung (optional)" name="notiz">
-        <Input />
-      </Form.Item>
-      <BestaetigtVonFeld einsatzId={einsatzId} />
+      <SichtungFelder einsatzId={einsatzId} />
     </ErfassungsModal>
   );
 }

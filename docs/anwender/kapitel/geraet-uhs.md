@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -32,7 +32,7 @@ Wer die UHS verlassen hat, steht in der Gruppe „Ausgetreten“ mit seinem Verb
 ### Patient aufnehmen
 
 1. „Patient aufnehmen“ oder unten „Aufnahme“ wählen.
-2. Die Sichtungskategorie wählen und, soweit bekannt, Geschlecht, geschätztes Alter und
+2. Die Fläche der Sichtungskategorie antippen und, soweit bekannt, Geschlecht, geschätztes Alter und
    Antreffort angeben. Name und weitere Angaben stehen unter „Weitere Angaben“.
 
    ![Aufnahme am UHS-Tablet mit gewählter Sichtungskategorie SK II](../bilder/geraet-uhs/aufnahme.png)
@@ -58,7 +58,7 @@ Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren
 
 1. Die Person öffnen und „Sichten“ wählen; bei einer schon gesichteten Person steht
    „Re-Sichten“ im Menü „Weitere Aktionen“.
-2. Im Dialog „Sichtung erfassen“ die „Kategorie“ wählen und, wenn nötig, eine
+2. Im Dialog „Sichtung erfassen“ die Fläche der Kategorie antippen und, wenn nötig, eine
    „Kurzbegründung (optional)“ angeben.
 3. Unter „Bestätigt von“ die Person wählen, die die Sichtung verantwortet, etwa die Notärztin.
 

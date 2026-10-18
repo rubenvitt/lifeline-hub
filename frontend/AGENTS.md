@@ -222,9 +222,13 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Fortschritt hat keine Oberfläche (LFH-1208): die Spalte trägt nur Altdaten, die Lage trägt der
   Lagezustand, den Arbeitsstand die offenen Aufträge.
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
-  `SichtungsTag`/`sichtungsfarben`, umrandetes Farbfeld, SK I rot, II gelb, III grün, IV blau,
-  Tote schwarz, „unverletzt" ohne Farbe; die Umrandung macht Gelb auf hellem und Schwarz auf
-  dunklem Grund sichtbar. **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
+  SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
+  als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem
+  und Schwarz auf dunklem Grund sichtbar. **Gewählt** wird als Vollfläche über
+  `personen/SichtungsWahl.tsx` aus der Flächenpalette `sichtungsflaechen` (bis zum Textboden
+  abgedunkelt, in beiden Modi gleich) mit Kante in `text` (`sichtungsKante`), gewählt mit ✓ und
+  3-px-Rahmen, die übrigen in Randform; 72 × 96 px in jeder Stufe, kein Dropdown für die Sichtung
+  (LLH-1083, Spec `sichtungswahl`, `theme/sichtungKontrast.test.ts`). **Kein `color` an antds `Tag`** außer `"default"` (LFH-891/LFH-1022,
   Spec `farbrollen-kontrast`, Guard 3 in `theme/statusVertrag.guard.test.ts`): kein Preset hält
   den Textboden. Ein Status steht in `StatusTag` mit einer Rolle aus dem Vertrag; eine
   Kennzeichnung ohne Status (ad-hoc, Rolle, Kennung, Kategorie, Bezug) ist neutral wie die

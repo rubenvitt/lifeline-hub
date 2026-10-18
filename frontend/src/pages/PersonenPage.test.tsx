@@ -396,7 +396,7 @@ describe('PersonenPage', () => {
     const skZwei = within(
       screen.getByRole('radiogroup', { name: 'Sichtungskategorie' }),
     ).getAllByRole('radio')[1];
-    await userEvent.click(skZwei.closest('label')!);
+    await userEvent.click(skZwei);
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
 
     expect(await screen.findByText('Erfasst als R-048 · SK II')).toBeInTheDocument();
