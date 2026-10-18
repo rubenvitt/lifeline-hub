@@ -79,7 +79,7 @@ export default function SichtungsWahl({
   // Roving-Tabindex: die gewählte Fläche, sonst die erste, ist der eine Tab-Stopp der Gruppe.
   const fokusIndex = Math.max(0, value ? SK_REIHE.indexOf(value) : 0);
 
-  function waehle(k: Sichtungskategorie) {
+  function select(k: Sichtungskategorie) {
     if (disabled) return;
     if (k === value) {
       if (abwaehlbar) onChange?.(null);
@@ -88,7 +88,7 @@ export default function SichtungsWahl({
     onChange?.(k);
   }
 
-  function beiTaste(e: KeyboardEvent<HTMLButtonElement>, index: number) {
+  function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>, index: number) {
     const schritt =
       e.key === 'ArrowRight' || e.key === 'ArrowDown'
         ? 1
@@ -162,8 +162,8 @@ export default function SichtungsWahl({
             // In einer Erfassungshülle ist die Wahl das erste Feld; die Hülle greift sonst nur
             // echte `<input>` (`components/Erfassung.tsx`, `fokussiereErstesFeld`).
             data-erfassung-fokus={index === fokusIndex ? '' : undefined}
-            onClick={() => waehle(k)}
-            onKeyDown={(e) => beiTaste(e, index)}
+            onClick={() => select(k)}
+            onKeyDown={(e) => handleKeyDown(e, index)}
             style={stil}
           >
             <span style={{ fontSize: token.fontSizeLG, fontWeight: 700, lineHeight: 1.1 }}>

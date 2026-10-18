@@ -1315,7 +1315,7 @@ export default function Datensicht<T extends object, const K extends string>(
    * je Karte; der Auslöser meldet „zu“, auch wenn er mit offenem Menü aushängt.
    */
   const [kartenMenueOffen, setKartenMenueOffen] = useState<ReadonlySet<Key>>(() => new Set());
-  const meldeKartenMenue = useCallback((k: Key, offen: boolean) => {
+  const reportKartenMenue = useCallback((k: Key, offen: boolean) => {
     setKartenMenueOffen((alt) => {
       if (alt.has(k) === offen) return alt;
       const neu = new Set(alt);
@@ -2088,7 +2088,7 @@ export default function Datensicht<T extends object, const K extends string>(
           gesperrt={weitereLaeuft}
           laeuft={weitereLaeuft}
           onWahl={(key) => weitere.onWahl(key, zeile)}
-          onOffenAenderung={(offen) => meldeKartenMenue(schluessel(zeile), offen)}
+          onOffenAenderung={(offen) => reportKartenMenue(schluessel(zeile), offen)}
         />
       ) : null;
     const aktionen = [knopf, menueKnopf].filter((k) => k != null);

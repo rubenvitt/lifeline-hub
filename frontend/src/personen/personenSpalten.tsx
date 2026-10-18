@@ -223,7 +223,7 @@ const NUR_VORGELESEN: CSSProperties = {
 };
 
 /** Ist die Sichtung dieser Zeile bedienbar? Nur eine angetroffene, nicht stornierte Person. */
-function sichtungBedienbar(p: Person, b: PersonenBedienung | undefined): boolean {
+function isSichtungBedienbar(p: Person, b: PersonenBedienung | undefined): boolean {
   return (
     b?.rueckmeldung != null &&
     (b.darfSichten ?? b.darfSchreiben) &&
@@ -390,7 +390,7 @@ export function personenSpalten(
       key: 'sk',
       width: 104,
       render: (_, p) =>
-        bedienung?.rueckmeldung && sichtungBedienbar(p, bedienung) ? (
+        bedienung?.rueckmeldung && isSichtungBedienbar(p, bedienung) ? (
           <ZeilenSichtung
             p={p}
             einsatzId={bedienung.einsatzId}
@@ -491,7 +491,7 @@ function ZeilenMenue({
   bedienung: PersonenBedienung;
   menue: PersonenZeilenMenue;
 }) {
-  const halte = bedienung.rueckmeldung?.halte;
+  const hold = bedienung.rueckmeldung?.hold;
   return (
     // Der Auslöser reicht seinen Klick weiter (`MenueAusloeser`); hier endet er, sonst öffnete die
     // Zeile die Detailseite.
@@ -500,7 +500,7 @@ function ZeilenMenue({
         eintraege={zeilenMenueEintraege(p, bedienung)}
         zugaenglicherName={zeilenMenueName(p)}
         onWahl={(aktion) => menue.onWahl(aktion, p)}
-        onOffenAenderung={halte ? (offen) => halte(`menue:${p.id}`, offen) : undefined}
+        onOffenAenderung={hold ? (offen) => hold(`menue:${p.id}`, offen) : undefined}
       />
     </div>
   );

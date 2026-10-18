@@ -268,12 +268,12 @@ export default function PersonenPage() {
    * die Zeile; Popover und Menü einer Zeile halten die Liste (`halten` der `Datensicht`).
    */
   const sichtungZeilen = useZeilenFehler<number>();
-  const { haelt: zeileHaelt, halte } = useHalteQuellen();
+  const { isHolding: isZeileHolding, hold } = useHalteQuellen();
   /** „Verbleib erfassen“ aus der Zeile: der Dialog gehört zum Einsatz, in dem er aufging. */
   const [verbleibFuer, setVerbleibFuer] = useState<{ einsatzId: number; person: Person } | null>(
     null,
   );
-  const oeffneVerbleib = useCallback(
+  const openVerbleib = useCallback(
     (p: Person) => setVerbleibFuer({ einsatzId, person: p }),
     [einsatzId],
   );
@@ -289,7 +289,7 @@ export default function PersonenPage() {
    */
   const { dichte } = useDichte();
   const aktionsBreite = dichten[dichte].zeilenhoehe + 2 * dichten[dichte].abstand.md;
-  const waehleZeilenAktion = useCallback(
+  const selectZeilenAktion = useCallback(
     (aktion: PersonZeilenAktion, p: Person) => {
       if (aktion === 'sichten') setSichtungFuer({ einsatzId, person: p });
       else if (aktion === 'verbleib') setVerbleibFuer({ einsatzId, person: p });
@@ -655,9 +655,9 @@ export default function PersonenPage() {
         if (zielEinsatzId !== quittungKontextRef.current.einsatzId) return;
         meldeSichtung(personId, fehler, 'Sichtung nicht gespeichert');
       },
-      halte,
+      hold,
     }),
-    [beginneSichtung, meldeSichtung, halte],
+    [beginneSichtung, meldeSichtung, hold],
   );
   /** Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung im Dialog. */
   const oeffneAbgleich = useCallback(
@@ -683,21 +683,25 @@ export default function PersonenPage() {
       einsatzId,
       darfSchreiben: darfSchreibenListe,
       rueckmeldung,
-      onVerbleib: oeffneVerbleib,
-      menue: {
-        breite: aktionsBreite,
-        lagekarte: karteGesperrt ? ('gesperrt' as const) : ('frei' as const),
-        onWahl: waehleZeilenAktion,
-      },
+      onVerbleib: openVerbleib,
+      // Ohne Schreibrecht entfällt die Zeilenaktionsspalte ganz (`frontend/AGENTS.md`, M45), wie
+      // das Menü der Karte (`weitere` unten).
+      menue: darfSchreibenListe
+        ? {
+            breite: aktionsBreite,
+            lagekarte: karteGesperrt ? ('gesperrt' as const) : ('frei' as const),
+            onWahl: selectZeilenAktion,
+          }
+        : undefined,
     }),
     [
       einsatzId,
       darfSchreibenListe,
       rueckmeldung,
-      oeffneVerbleib,
+      openVerbleib,
       aktionsBreite,
       karteGesperrt,
-      waehleZeilenAktion,
+      selectZeilenAktion,
     ],
   );
   const register = useMemo(() => {
@@ -732,9 +736,9 @@ export default function PersonenPage() {
     () => ({
       eintraege: (p: Person) => zeilenMenueEintraege(p, bedienung),
       zugaenglicherName: zeilenMenueName,
-      onWahl: (key: string, p: Person) => waehleZeilenAktion(key as PersonZeilenAktion, p),
+      onWahl: (key: string, p: Person) => selectZeilenAktion(key as PersonZeilenAktion, p),
     }),
-    [bedienung, waehleZeilenAktion],
+    [bedienung, selectZeilenAktion],
   );
   const rasterKarte = useMemo(
     () => ({
@@ -836,7 +840,9 @@ export default function PersonenPage() {
    * (Spec `betroffene-lagedaten`, „Liste springt nicht unter dem Popover“).
    */
   const halten =
-    zeileHaelt || verbleibFuer?.einsatzId === einsatzId || sichtungFuer?.einsatzId === einsatzId;
+    isZeileHolding ||
+    verbleibFuer?.einsatzId === einsatzId ||
+    sichtungFuer?.einsatzId === einsatzId;
   /** Ein Grund je Zeile: die jüngste Aktion der Zeile räumt ihren, die Abgleichspalte ihren. */
   const zeilenGrund = (p: Person) =>
     sichtungZeilen.grund(p.id) ?? (abgleichSpalteDa ? abgleichZeilen.grund(p.id) : null);

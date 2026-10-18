@@ -60,7 +60,8 @@ export interface MenueAusloeserProps<K extends string = string> {
   laeuft?: boolean;
   /**
    * Das Menü geht auf oder zu. Für eine Liste, die solange Menge und Folge hält (Schleuse der
-   * `Datensicht`, LLH-1130). Hängt der Auslöser mit offenem Menü aus, meldet er „zu“.
+   * `Datensicht`, LLH-1130). Hängt der Auslöser mit offenem Menü aus oder verliert das offene Menü
+   * alle Einträge, meldet er „zu“.
    */
   onOffenAenderung?: (offen: boolean) => void;
 }
@@ -74,6 +75,11 @@ export function MenueAusloeser<K extends string = string>({
   onOffenAenderung,
 }: MenueAusloeserProps<K>) {
   const [offen, setOffen] = useState(false);
+  const isLeer = eintraege.length === 0;
+  // Verliert ein offenes Menü live alle Einträge, hängt der Auslöser aus (`return null` unten).
+  // Ohne Zurücksetzen bliebe `offen` stehen, das „zu“ käme nie, und die Liste hielte, bis die
+  // Zeile aushängt. Zurückgesetzt wird im Render (abgeleiteter Zustand), nicht in einem Effekt.
+  if (isLeer && offen) setOffen(false);
   // Ref: ein neuer Rückruf je Render meldete sonst bei jedem Render „zu“ und wieder „auf“.
   const meldeRef = useRef(onOffenAenderung);
   useEffect(() => {
@@ -84,7 +90,7 @@ export function MenueAusloeser<K extends string = string>({
     meldeRef.current?.(true);
     return () => meldeRef.current?.(false);
   }, [offen]);
-  if (eintraege.length === 0) return null;
+  if (isLeer) return null;
   return (
     /*
      * RIEGEL GEGEN PORTAL-AUFSTEIGEN (LFH-367/B5g, gemessen in `docs/leitlinien/

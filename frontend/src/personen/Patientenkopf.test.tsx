@@ -254,6 +254,73 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     );
   });
 
+  /** Hält die Antwort auf die Sichtung zurück, bis der Test sie freigibt. */
+  function verzoegereSichtung(antwort: () => Response) {
+    let freigeben!: () => void;
+    const freigabe = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/sichtung', async () => {
+        await freigabe;
+        return antwort();
+      }),
+    );
+    return () => freigeben();
+  }
+
+  async function sichteBisSpeichern(kopf: HTMLElement, kategorie: RegExp) {
+    await userEvent.click(within(kopf).getByRole('button', { name: /^Nachsichten/ }));
+    const paneel = screen.getByRole('region', { name: 'Sichtung erfassen' });
+    await userEvent.click(within(paneel).getByRole('radio', { name: kategorie }));
+    const uebernehmen = within(paneel).getByRole('button', { name: 'Übernehmen' });
+    await userEvent.click(uebernehmen);
+    await waitFor(() => expect(uebernehmen).toHaveClass('ant-btn-loading'));
+    return paneel;
+  }
+
+  it('sperrt den Wechsel, solange die Sichtung speichert, und zeigt eine Ablehnung danach im Paneel', async () => {
+    const freigeben = verzoegereSichtung(() =>
+      HttpResponse.json({ error: 'Person ist storniert' }, { status: 409 }),
+    );
+    const { kopf, onGeschrieben } = zeige();
+    const paneel = await sichteBisSpeichern(kopf, /^SK III,/);
+    const ausloeser = within(kopf).getByRole('button', { name: /^Nachsichten/ });
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verbleib erfassen' }));
+    await userEvent.click(ausloeser);
+    expect(screen.queryByRole('region', { name: 'Verbleib erfassen' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Sichtung erfassen' })).toBe(paneel);
+    expect(ausloeser).toBeDisabled();
+    expect(within(kopf).getByRole('button', { name: 'Verbleib erfassen' })).toBeDisabled();
+
+    freigeben();
+    expect(await within(paneel).findByText(/Person ist storniert/)).toBeInTheDocument();
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    expect(within(kopf).getByRole('button', { name: 'Verbleib erfassen' })).toBeEnabled();
+    expect(ausloeser).toBeEnabled();
+  });
+
+  it('schließt nach gespeicherter Sichtung nur das eigene Paneel', async () => {
+    const freigeben = verzoegereSichtung(() => HttpResponse.json({ id: 99 }, { status: 201 }));
+    const { kopf, onGeschrieben } = zeige();
+    await sichteBisSpeichern(kopf, /^SK I,/);
+    // Ginge der Verbleib jetzt auf, schlösse ihn der späte Erfolg samt Eingabe.
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verbleib erfassen' }));
+    expect(screen.queryByRole('region', { name: 'Verbleib erfassen' })).toBeNull();
+
+    freigeben();
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull(),
+    );
+    // Danach geht der Verbleib wieder auf, und nichts Spätes schließt ihn.
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verbleib erfassen' }));
+    const verbleib = screen.getByRole('region', { name: 'Verbleib erfassen' });
+    await userEvent.type(within(verbleib).getByLabelText('Ziel'), 'KH Mitte');
+    expect(screen.getByRole('region', { name: 'Verbleib erfassen' })).toBe(verbleib);
+    expect(within(verbleib).getByLabelText('Ziel')).toHaveValue('KH Mitte');
+  });
+
   it('nimmt die Aufenthalts-Handlungen der Seite auf', () => {
     const { kopf } = zeige({}, { aufenthaltAktionen: <button type="button">Verlegen</button> });
     expect(within(kopf).getByRole('button', { name: 'Verlegen' })).toBeVisible();

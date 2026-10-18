@@ -287,6 +287,8 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
     render(() => [r007]);
 
     await user.click(await screen.findByRole('button', { name: 'Aktionen zu R-007' }));
+    // Gegenprobe zu „Ohne Schreibrecht“: mit Schreibrecht steht die Spalte.
+    expect(screen.getByRole('columnheader', { name: 'Aktionen' })).toBeInTheDocument();
     const menue = await offenesMenue();
     expect(eintraege(menue)).toEqual(['Sichten', 'Verbleib erfassen', 'Auf Lagekarte verorten']);
     // Das Öffnen des Menüs ist kein Zeilenklick.
@@ -468,6 +470,8 @@ describe('Ohne Schreibrecht (LLH-1130, 2.5)', () => {
     expect(screen.queryByRole('button', { name: /R-007 sichten/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Verbleib erfassen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Aktionen zu R-007' })).toBeNull();
+    // Die Zeilenaktionsspalte entfällt ganz (M45), keine leere Spalte „Aktionen“.
+    expect(screen.queryByRole('columnheader', { name: 'Aktionen' })).toBeNull();
   };
 
   it('Beobachter: „Nur Ansicht“ mit Grund über der Liste, keine Bedienelemente in den Zeilen', async () => {

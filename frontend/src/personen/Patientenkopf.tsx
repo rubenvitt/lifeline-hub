@@ -1,5 +1,5 @@
 import { Button, Flex, Form, Input, Typography } from 'antd';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { erfasseVerbleib, legeNotizAn, type VerbleibEingabe } from '../api/einsatzPerson';
 import type { PersonDetail } from '../api/types';
@@ -19,7 +19,7 @@ import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
 import { SK_WORT, kurzVerbleib } from './personMeta';
 import { istAngetroffen } from './personenBilanz';
 import { ZustandSchreiben } from './personenSpalten';
-import { SichtungFelder, sendeSichtung, type SichtungWerte } from './SichtungDialog';
+import { SichtungFelder, saveSichtung, type SichtungWerte } from './SichtungDialog';
 import { useVerbleibFelder } from './VerbleibErfassung';
 import type { VerbleibFormWerte } from './verbleibErfassungKern';
 
@@ -43,7 +43,10 @@ export interface PatientenkopfProps {
  * Patientenfragen“): Sichtung mit DTG und „vor n min“, Zustand / Verdacht, Aufenthalt bzw.
  * Verbleib, letzte Notiz — alles aus dem einen Detail-GET (`aufenthalt` liefert der Server mit,
  * LLH-1129). Sichten, Verbleib und Notiz gehen hier ohne Dialog: jede Handlung klappt ihr
- * eigenes Paneel auf, eine Ablehnung bleibt in ihm stehen, ein laufendes Speichern sperrt nur es.
+ * eigenes Paneel auf, eine Ablehnung bleibt in ihm stehen. Solange Sichtung oder Verbleib
+ * speichert, sperrt der Kopf den Wechsel (beide Auslöser `disabled`): hinge das Paneel mitten im
+ * Speichern aus, hätte eine Ablehnung keinen Ort, und ein später Erfolg schlösse das neue Paneel.
+ * Deshalb liegen beide Mutationen hier, und jedes Paneel schließt nur sich selbst.
  * Herleitung: `openspec/changes/y18v58dt-patientenkopf-bezuege/design.md`.
  */
 export default function Patientenkopf({
@@ -59,8 +62,19 @@ export default function Patientenkopf({
   const jetzt = useMinutenTakt();
   const bedienbar = modus === 'bedienen' && darfSchreiben && !person.storniert_at;
   const angetroffen = istAngetroffen(person);
-  const [offen, setOffen] = useState<'sichtung' | 'verbleib' | null>(null);
-  const schliessen = () => setOffen(null);
+  const [offen, setOffen] = useState<Paneel | null>(null);
+  const toggle = (paneel: Paneel) => setOffen((o) => (o === paneel ? null : paneel));
+  const close = (paneel: Paneel) => () => setOffen((o) => (o === paneel ? null : o));
+
+  const sichtungMutation = useMutation({
+    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person.id, v),
+    onSuccess: () => onGeschrieben?.(),
+  });
+  const verbleibMutation = useMutation({
+    mutationFn: (eingabe: VerbleibEingabe) => erfasseVerbleib(einsatzId, person.id, eingabe),
+    onSuccess: () => onGeschrieben?.(),
+  });
+  const isSpeichernd = sichtungMutation.isPending || verbleibMutation.isPending;
 
   const letzteSichtung = person.sichtungen?.[0];
   const letzteNotiz = person.notizen?.[0];
@@ -79,7 +93,8 @@ export default function Patientenkopf({
               person={person}
               bedienbar={bedienbar && darfSichten && angetroffen}
               offen={offen === 'sichtung'}
-              onUmschalten={() => setOffen(offen === 'sichtung' ? null : 'sichtung')}
+              gesperrt={isSpeichernd}
+              onUmschalten={() => toggle('sichtung')}
             />
             {person.aktuelle_sichtung_at && (
               <Typography.Text type="secondary" data-lfh="sichtung-zeit">
@@ -129,7 +144,8 @@ export default function Patientenkopf({
                 {bedienbar && angetroffen && (
                   <Button
                     aria-expanded={offen === 'verbleib'}
-                    onClick={() => setOffen(offen === 'verbleib' ? null : 'verbleib')}
+                    disabled={isSpeichernd}
+                    onClick={() => toggle('verbleib')}
                   >
                     Verbleib erfassen
                   </Button>
@@ -156,17 +172,15 @@ export default function Patientenkopf({
       {offen === 'sichtung' && (
         <SichtungPaneel
           einsatzId={einsatzId}
-          personId={person.id}
-          onGeschrieben={onGeschrieben}
-          onSchliessen={schliessen}
+          mutation={sichtungMutation}
+          onSchliessen={close('sichtung')}
         />
       )}
       {offen === 'verbleib' && (
         <VerbleibPaneel
           einsatzId={einsatzId}
-          personId={person.id}
-          onGeschrieben={onGeschrieben}
-          onSchliessen={schliessen}
+          mutation={verbleibMutation}
+          onSchliessen={close('verbleib')}
         />
       )}
       {bedienbar && (
@@ -184,11 +198,14 @@ function SichtungsAnzeige({
   person,
   bedienbar,
   offen,
+  gesperrt,
   onUmschalten,
 }: {
   person: PersonDetail;
   bedienbar: boolean;
   offen: boolean;
+  /** Ein Paneel des Kopfs speichert gerade: kein Wechsel. */
+  gesperrt: boolean;
   onUmschalten: () => void;
 }) {
   const { token, rollen } = useRollen();
@@ -223,31 +240,33 @@ function SichtungsAnzeige({
       data-sichtung={k ?? 'ohne'}
       aria-expanded={offen}
       aria-label={k ? `Nachsichten, aktuell ${text}` : 'Sichten, bisher ungesichtet'}
+      disabled={gesperrt}
       onClick={onUmschalten}
-      style={{ ...stil, cursor: 'pointer', font: 'inherit', fontWeight: 700 }}
+      style={{
+        ...stil,
+        cursor: gesperrt ? 'not-allowed' : 'pointer',
+        font: 'inherit',
+        fontWeight: 700,
+      }}
     >
       {text}
     </button>
   );
 }
 
-/** Nachsichtung in der Ansicht: dieselben Felder wie der Dialog, eigene Mutation. */
+type Paneel = 'sichtung' | 'verbleib';
+
+/** Nachsichtung in der Ansicht: dieselben Felder wie der Dialog; die Mutation hält der Kopf. */
 function SichtungPaneel({
   einsatzId,
-  personId,
-  onGeschrieben,
+  mutation,
   onSchliessen,
 }: {
   einsatzId: number;
-  personId: number;
-  onGeschrieben?: () => void;
+  mutation: UseMutationResult<unknown, Error, SichtungWerte>;
   onSchliessen: () => void;
 }) {
   const [form] = Form.useForm<SichtungWerte>();
-  const mutation = useMutation({
-    mutationFn: (v: SichtungWerte) => sendeSichtung(einsatzId, personId, v),
-    onSuccess: () => onGeschrieben?.(),
-  });
   return (
     <section aria-label="Sichtung erfassen" data-lfh="sichtung-paneel">
       <ErfassungsFormular<SichtungWerte>
@@ -269,21 +288,15 @@ function SichtungPaneel({
 /** Verbleib in der Ansicht: dieselben Felder wie der Dialog (`useVerbleibFelder`). */
 function VerbleibPaneel({
   einsatzId,
-  personId,
-  onGeschrieben,
+  mutation,
   onSchliessen,
 }: {
   einsatzId: number;
-  personId: number;
-  onGeschrieben?: () => void;
+  mutation: UseMutationResult<unknown, Error, VerbleibEingabe>;
   onSchliessen: () => void;
 }) {
   const [form] = Form.useForm<VerbleibFormWerte>();
   const { elemente, body } = useVerbleibFelder(einsatzId, form);
-  const mutation = useMutation({
-    mutationFn: (eingabe: VerbleibEingabe) => erfasseVerbleib(einsatzId, personId, eingabe),
-    onSuccess: () => onGeschrieben?.(),
-  });
   return (
     <section aria-label="Verbleib erfassen" data-lfh="verbleib-paneel">
       <ErfassungsFormular<VerbleibFormWerte>
