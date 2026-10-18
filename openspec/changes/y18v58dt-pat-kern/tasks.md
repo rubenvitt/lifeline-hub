@@ -61,7 +61,7 @@ Für jede Aufgabe gilt:
 - [x] 7.1 `personen/koerperschema/geometrie.ts`: Regionen im normierten Rahmen, drei Umrisse, Trefferzonen für Hand, Fuß und Hals über die Silhouette hinaus. Vitest: jeder Regionsmittelpunkt liegt in jedem Umriss, jede Region hat ihre Ansicht nach den Paaren der Spec.
 - [x] 7.2 `personen/koerperschema/koerperschemaKern.ts`: Figur aus Geschlecht, Name „Unterarm links, vorn“, feste Nummerierung mit Lücken. Vitest.
 - [x] 7.3 `personen/Koerperschema.tsx`: Lesen und Markieren, Wahl der Art als Flächen, Speichern mit dem zweiten Tipp, Aufheben am Sternchen, Ablehnung am Schema, Tastatur in fester Folge, vorn und hinten ab `md` bzw. umschaltbar. Vitest für Lesen, Markieren, Aufheben, gesperrt, Ablehnung und Tastatur.
-- [ ] 7.4 Einbau: Datenfeld „Verletzungen“ mit Mini-Figur im Kopf, Paneel „Verletzung markieren“, Schnellansicht lesend. Vitest.
+- [x] 7.4 Einbau: Datenfeld „Verletzungen“ mit Mini-Figur im Kopf, Paneel „Verletzung markieren“, Schnellansicht lesend. Vitest.
 - [ ] 7.5 Druckseite `/einsaetze/:id/personen/:pid/druck`: Route, einmal laden, „Neu laden“, Audit `druck` mit `person_id`, unbekannte Person, nicht am Gerät. Server- und Seitentest. Eintrag in `playwright.config.ts` `DRUCK_SPECS` und e2e `koerperschema-druck.spec.ts` schwarz-weiß.
 - [ ] 7.6 Kontrast: `theme/koerperschemaKontrast.test.ts` (Silhouette und Sternchen in Tag und Nacht) und `e2e/betroffene-kontrast.spec.ts` erweitert. Trefferflächen in `e2e/trefflaeche-pruefflaechen.spec.ts` (72 × 72 in der Handschuh-Stufe, auch für die Hand).
 

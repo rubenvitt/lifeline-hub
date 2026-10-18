@@ -728,3 +728,91 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     }
   });
 });
+
+describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D13)', () => {
+  it('zeigt ab md die kleine Figur neben der Liste, darunter nur die Liste', () => {
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    const feld = kopf.querySelector<HTMLElement>('[data-lfh="verletzungen"]')!;
+    expect(feld.querySelectorAll('[data-lfh="koerperfigur"]')).toHaveLength(2);
+    // Vier gültige Verletzungen, je ein Sternchen mit seiner festen Nummer.
+    expect(
+      [...feld.querySelectorAll('[data-lfh="stern"]')].map((s) => s.getAttribute('data-nummer')),
+    ).toEqual(['1', '3', '5', '4']);
+  });
+
+  it('lässt die Figur unter md weg', () => {
+    setzeViewportBreite(600);
+    const { kopf } = zeige(vollerKern, { darfSchreiben: false });
+    expect(kopf.querySelector('[data-lfh="koerperfigur"]')).toBeNull();
+    expect(within(kopf).getByRole('list', { name: 'Verletzungen' })).toBeInTheDocument();
+  });
+
+  it('öffnet „Verletzung markieren“ als Paneel mit dem vollen Schema und speichert mit zwei Tipps', async () => {
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
+    const paneel = screen.getByRole('region', { name: 'Verletzung markieren' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Unterarm links, vorn' }));
+    await userEvent.click(within(paneel).getByRole('radio', { name: 'Fraktur-Verdacht' }));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet).toHaveLength(1);
+    expect(gesendet[0]).toMatchObject({
+      pfad: 'verletzungen',
+      body: { ansicht: 'vorn', region: 'unterarm_l', art: 'fraktur_verdacht' },
+    });
+    // Mehrere Verletzungen nacheinander: das Paneel bleibt offen.
+    expect(screen.getByRole('region', { name: 'Verletzung markieren' })).toBe(paneel);
+  });
+
+  it('lässt eine Ablehnung am Schema stehen, die übrigen Paneele bleiben bedienbar', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/verletzungen', () =>
+        HttpResponse.json({ error: 'Person ist vermisst' }, { status: 422 }),
+      ),
+    );
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
+    const paneel = screen.getByRole('region', { name: 'Verletzung markieren' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Kopf, vorn' }));
+    await userEvent.click(within(paneel).getByRole('radio', { name: 'Wunde/Blutung' }));
+    expect(await within(paneel).findByText(/Person ist vermisst/)).toBeInTheDocument();
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    expect(within(kopf).getByRole('button', { name: 'Transport festlegen' })).toBeEnabled();
+  });
+
+  it('hebt eine Verletzung am Sternchen auf', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/verletzungen/:vid/aufheben', ({ params }) => {
+        gesendet.push({ pfad: `verletzungen/${String(params.vid)}/aufheben`, body: null });
+        return HttpResponse.json({ id: Number(params.vid) });
+      }),
+    );
+    const { kopf, onGeschrieben } = zeige(vollerKern);
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
+    const paneel = screen.getByRole('region', { name: 'Verletzung markieren' });
+    await userEvent.click(
+      within(paneel).getByRole('button', { name: /^Verletzung 3, Thorax, vorn/ }),
+    );
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Aufheben' }));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet).toEqual([{ pfad: 'verletzungen/3/aufheben', body: null }]);
+  });
+
+  it('sperrt das Markieren ohne Netz mit Grund', async () => {
+    const { kopf } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
+    setzeOnline(false);
+    try {
+      const paneel = await screen.findByRole('region', { name: 'Verletzung markieren' });
+      expect(await within(paneel).findByText('Markieren ohne Netz nicht möglich')).toBeVisible();
+      expect(within(paneel).queryByRole('button', { name: 'Kopf, vorn' })).toBeNull();
+    } finally {
+      setzeOnline(true);
+    }
+  });
+
+  it('bietet ohne Behandlungsrecht kein Markieren an', () => {
+    const { kopf } = zeige(vollerKern, { darfBehandeln: false });
+    expect(within(kopf).queryByRole('button', { name: 'Verletzung markieren' })).toBeNull();
+  });
+});

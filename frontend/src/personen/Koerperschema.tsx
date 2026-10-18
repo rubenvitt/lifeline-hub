@@ -296,3 +296,36 @@ export function VerletzungsListe({ eintraege }: { eintraege: readonly Nummeriert
     </ol>
   );
 }
+
+/** Pixel je Einheit der kleinen Figur im Patientenkopf (90 × 132 px je Ansicht). */
+export const MINI_MASSSTAB = 0.3;
+
+/**
+ * Die kleine Figur im Patientenkopf (design.md D13, „Einbau“): vorn und hinten, Sternchen mit
+ * Nummer, ohne Bedienung. Den Text trägt die Liste daneben; die Figur ist Lesehilfe.
+ */
+export function KoerperschemaMini({
+  verletzungen,
+  geschlecht,
+}: {
+  verletzungen: readonly Verletzung[];
+  geschlecht: Person['geschlecht'] | undefined;
+}) {
+  const { token } = useRollen();
+  const figur = figurVon(geschlecht);
+  const gueltige = nummeriere(verletzungen).filter((n) => n.verletzung.aufgehoben_at == null);
+  return (
+    <Flex gap={token.marginXS} data-lfh="koerperschema-mini" style={{ flex: '0 0 auto' }}>
+      {ANSICHTEN.map((ansicht) => (
+        <KoerperFigur
+          key={ansicht}
+          ansicht={ansicht}
+          figur={figur}
+          massstab={MINI_MASSSTAB}
+          modus="mini"
+          sterne={gueltige.filter((n) => n.verletzung.ansicht === ansicht)}
+        />
+      ))}
+    </Flex>
+  );
+}

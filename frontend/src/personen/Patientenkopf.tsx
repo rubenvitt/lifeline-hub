@@ -5,11 +5,14 @@ import {
   createMassnahme,
   erfasseVerbleib,
   legeNotizAn,
+  createVerletzung,
   revokeMassnahme,
+  revokeVerletzung,
   saveTransport,
   type MassnahmeEingabe,
   type TransportEingabe,
   type VerbleibEingabe,
+  type VerletzungEingabe,
 } from '../api/einsatzPerson';
 import type { PersonDetail } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
@@ -23,6 +26,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
+import { useOnline } from '../offline/useOnline';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
@@ -37,6 +41,7 @@ import {
   transportText,
 } from './personMeta';
 import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
+import Koerperschema, { KoerperschemaMini } from './Koerperschema';
 import PatKennzeichen from './PatKennzeichen';
 import { MassnahmePaneel, TransportPaneel } from './PatientenkopfPaneele';
 import { istAngetroffen } from './personenBilanz';
@@ -119,12 +124,22 @@ export default function Patientenkopf({
     mutationFn: (massnahmeId: number) => revokeMassnahme(einsatzId, person.id, massnahmeId),
     onSuccess: () => onGeschrieben?.(),
   });
+  const verletzungMutation = useMutation({
+    mutationFn: (eingabe: VerletzungEingabe) => createVerletzung(einsatzId, person.id, eingabe),
+    onSuccess: () => onGeschrieben?.(),
+  });
+  const verletzungAufhebenMutation = useMutation({
+    mutationFn: (verletzungId: number) => revokeVerletzung(einsatzId, person.id, verletzungId),
+    onSuccess: () => onGeschrieben?.(),
+  });
   const isSpeichernd =
     sichtungMutation.isPending ||
     verbleibMutation.isPending ||
     transportMutation.isPending ||
     massnahmeMutation.isPending ||
-    massnahmeAufhebenMutation.isPending;
+    massnahmeAufhebenMutation.isPending ||
+    verletzungMutation.isPending ||
+    verletzungAufhebenMutation.isPending;
   const behandelbar = bedienbar && darfBehandeln && angetroffen;
 
   const letzteSichtung = person.sichtungen?.[0];
@@ -136,7 +151,10 @@ export default function Patientenkopf({
   const verletzungen = nummeriere(person.verletzungen ?? []).filter(
     (n) => n.verletzung.aufgehoben_at == null,
   );
-  const zweiSpalten = useViewport().abBreite('lg');
+  const viewport = useViewport();
+  const zweiSpalten = viewport.abBreite('lg');
+  const mitFigur = viewport.abBreite('md') && verletzungen.length > 0;
+  const online = useOnline();
 
   return (
     <section
@@ -287,21 +305,42 @@ export default function Patientenkopf({
             )}
           </Datenfeld>
           <Datenfeld label="Verletzungen">
-            <div data-lfh="verletzungen">
-              <GekuerzteListe
-                beschriftung="Verletzungen"
-                eintraege={verletzungen.map(({ nummer, verletzung: v }) => ({
-                  key: v.id,
-                  inhalt: (
-                    <>
-                      <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)} ·{' '}
-                      {VERLETZUNG_ART_WORT[v.art]}
-                      {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`}
-                    </>
-                  ),
-                }))}
-              />
+            <div
+              data-lfh="verletzungen"
+              style={{ display: 'flex', gap: token.marginSM, alignItems: 'flex-start' }}
+            >
+              {/* Ab md die kleine Figur (design.md D13); den Text trägt die Liste daneben. */}
+              {mitFigur && (
+                <KoerperschemaMini
+                  verletzungen={person.verletzungen ?? []}
+                  geschlecht={person.geschlecht}
+                />
+              )}
+              <div style={{ minWidth: 0 }}>
+                <GekuerzteListe
+                  beschriftung="Verletzungen"
+                  eintraege={verletzungen.map(({ nummer, verletzung: v }) => ({
+                    key: v.id,
+                    inhalt: (
+                      <>
+                        <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)}{' '}
+                        · {VERLETZUNG_ART_WORT[v.art]}
+                        {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`}
+                      </>
+                    ),
+                  }))}
+                />
+              </div>
             </div>
+            {behandelbar && (
+              <PaneelKnopf
+                offen={offen === 'verletzung'}
+                gesperrt={isSpeichernd}
+                onClick={() => toggle('verletzung')}
+              >
+                Verletzung markieren
+              </PaneelKnopf>
+            )}
           </Datenfeld>
           <Datenfeld label="Letzte Notiz">
             {letzteNotiz ? (
@@ -339,6 +378,27 @@ export default function Patientenkopf({
           mutation={transportMutation}
           onSchliessen={close('transport')}
         />
+      )}
+      {offen === 'verletzung' && (
+        <section aria-label="Verletzung markieren" data-lfh="verletzung-paneel">
+          <Flex vertical gap={token.marginSM}>
+            <Koerperschema
+              einsatzId={einsatzId}
+              verletzungen={person.verletzungen ?? []}
+              geschlecht={person.geschlecht}
+              modus="markieren"
+              // Bis die Vormerkung ohne Netz steht (Abschnitt 8), bleibt das Markieren online.
+              gesperrt={online ? undefined : 'Markieren ohne Netz nicht möglich'}
+              markierung={verletzungMutation}
+              aufhebung={verletzungAufhebenMutation}
+            />
+            <div>
+              <Button disabled={isSpeichernd} onClick={close('verletzung')}>
+                Schließen
+              </Button>
+            </div>
+          </Flex>
+        </section>
       )}
       {offen === 'massnahme' && (
         <MassnahmePaneel
@@ -459,7 +519,7 @@ function GekuerzteListe({
   );
 }
 
-type Paneel = 'sichtung' | 'verbleib' | 'transport' | 'massnahme';
+type Paneel = 'sichtung' | 'verbleib' | 'transport' | 'massnahme' | 'verletzung';
 
 /** Auslöser eines Paneels im Datenfeld; solange ein Paneel speichert, wechselt keiner. */
 function PaneelKnopf({
