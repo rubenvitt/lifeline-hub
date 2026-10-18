@@ -8,7 +8,7 @@ import SichtungsTag from '../components/SichtungsTag';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { useRollen } from '../components/instrument';
 import { SK_META } from './personMeta';
-import { sendeSichtung } from './SichtungDialog';
+import { saveSichtung } from './SichtungDialog';
 import SichtungsWahl, { SICHTUNGSFLAECHE_BREITE, sichtungsLuecke } from './SichtungsWahl';
 
 /**
@@ -22,7 +22,7 @@ export interface ZeilenRueckmeldung {
   /** `onError`: der Grund steht an der Zeile; die Seite verwirft ihn nach einem Einsatzwechsel. */
   melde: (personId: number, fehler: unknown, einsatzId: number) => void;
   /** Ein Popover oder Menü der Zeile geht auf oder zu: die Liste hält Menge und Folge. */
-  halte: (quelle: string, offen: boolean) => void;
+  hold: (quelle: string, offen: boolean) => void;
 }
 
 interface ZeilenSichtungProps {
@@ -46,7 +46,7 @@ interface SichtungEingabe {
  * - „Übernehmen“ schließt sofort; bis der neue Stand in der Liste steht, zeigt die Zelle die
  *   gewählte Kategorie mit Ladeanzeige. Eine Ablehnung steht an der Zeile (`ZeilenFehler` der
  *   `Datensicht`, design.md D5), nicht im Popover: das ist dann schon zu.
- * - Solange das Popover offen ist, hält die Liste Menge und Folge (`halte`, design.md D4). Der
+ * - Solange das Popover offen ist, hält die Liste Menge und Folge (`hold`, design.md D4). Der
  *   Halt hängt an einem Effekt: verschwindet die Zeile mit offenem Popover, gibt er ihn frei.
  * - Kein Notizfeld und kein „Bestätigt von“: beides bleibt der Nachsichtung im Patientenkopf und im
  *   Dialog. Die Wahl beginnt leer, auch eine bestätigte gleiche Kategorie ist eine Nachsichtung.
@@ -59,11 +59,11 @@ export default function ZeilenSichtung({ p, einsatzId, rueckmeldung }: ZeilenSic
   const ausloeser = useRef<HTMLButtonElement>(null);
   const warOffen = useRef(false);
   const kennung = registrierAnzeige(p.registrier_nr);
-  const { beginne, melde, halte } = rueckmeldung;
+  const { beginne, melde, hold } = rueckmeldung;
 
   const mutation = useMutation({
     mutationFn: (v: { einsatzId: number; kategorie: Sichtungskategorie }) =>
-      sendeSichtung(v.einsatzId, p.id, { kategorie: v.kategorie }),
+      saveSichtung(v.einsatzId, p.id, { kategorie: v.kategorie }),
     onMutate: () => beginne(p.id),
     onError: (fehler, v) => melde(p.id, fehler, v.einsatzId),
     // Zurückgegeben: die Zelle bleibt `isPending`, bis der neue Stand in der Liste steht.
@@ -78,9 +78,9 @@ export default function ZeilenSichtung({ p, einsatzId, rueckmeldung }: ZeilenSic
   const quelle = `sichtung:${p.id}`;
   useEffect(() => {
     if (!offen) return;
-    halte(quelle, true);
-    return () => halte(quelle, false);
-  }, [offen, quelle, halte]);
+    hold(quelle, true);
+    return () => hold(quelle, false);
+  }, [offen, quelle, hold]);
 
   // Nach dem Schließen zurück auf den Auslöser: wer per Tastatur nachsichtet, steht wieder in der
   // Zeile (und die Liste behält den Fokus, wie vor dem Öffnen).

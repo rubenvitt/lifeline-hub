@@ -37,7 +37,7 @@ export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
 }
 
 /** Der Aufruf hinter beiden Hüllen; die Hülle reicht nur ihre Werte durch. */
-export function sendeSichtung(einsatzId: number, personId: number, v: SichtungWerte) {
+export function saveSichtung(einsatzId: number, personId: number, v: SichtungWerte) {
   return erfasseSichtung(
     einsatzId,
     personId,
@@ -70,7 +70,7 @@ export default function SichtungDialog({
 }: SichtungDialogProps) {
   const [form] = Form.useForm<SichtungWerte>();
   const sichtungMutation = useMutation({
-    mutationFn: (v: SichtungWerte) => sendeSichtung(einsatzId, personId, v),
+    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, personId, v),
     onSuccess: onErfasst,
   });
 

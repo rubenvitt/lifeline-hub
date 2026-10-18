@@ -91,14 +91,14 @@ export default function GeraetPatientenPage() {
   const darf = useGeraetDarf();
   const sichtungZeilen = useZeilenFehler<number>();
   const { beginne, melde } = sichtungZeilen;
-  const { haelt, halte } = useHalteQuellen();
+  const { isHolding, hold } = useHalteQuellen();
   const rueckmeldung = useMemo<ZeilenRueckmeldung>(
     () => ({
       beginne,
       melde: (personId, fehler) => melde(personId, fehler, 'Sichtung nicht gespeichert'),
-      halte,
+      hold,
     }),
-    [beginne, melde, halte],
+    [beginne, melde, hold],
   );
   const register = personenSpalten((id) => (id === uhs?.id ? uhs.bezeichnung : undefined), {
     einsatzId,
@@ -172,7 +172,7 @@ export default function GeraetPatientenPage() {
           }}
           onZeileKlick={(p) => navigate(geraetPersonPfad(einsatzId, p.id))}
           zeilenFehler={(p) => sichtungZeilen.grund(p.id)}
-          halten={haelt}
+          halten={isHolding}
           karte={{
             ...personenKarte(einsatzId),
             titel: { spalte: 'reg', ziel: (p) => geraetPersonPfad(einsatzId, p.id) },

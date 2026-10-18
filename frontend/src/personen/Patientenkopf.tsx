@@ -19,7 +19,7 @@ import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
 import { SK_WORT, kurzVerbleib } from './personMeta';
 import { istAngetroffen } from './personenBilanz';
 import { ZustandSchreiben } from './personenSpalten';
-import { SichtungFelder, sendeSichtung, type SichtungWerte } from './SichtungDialog';
+import { SichtungFelder, saveSichtung, type SichtungWerte } from './SichtungDialog';
 import { useVerbleibFelder } from './VerbleibErfassung';
 import type { VerbleibFormWerte } from './verbleibErfassungKern';
 
@@ -67,7 +67,7 @@ export default function Patientenkopf({
   const close = (paneel: Paneel) => () => setOffen((o) => (o === paneel ? null : o));
 
   const sichtungMutation = useMutation({
-    mutationFn: (v: SichtungWerte) => sendeSichtung(einsatzId, person.id, v),
+    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person.id, v),
     onSuccess: () => onGeschrieben?.(),
   });
   const verbleibMutation = useMutation({
