@@ -8608,6 +8608,33 @@
           }
         }
       },
+      "KoerperRegion": {
+        "type": "string",
+        "description": "Körperregion aus dem festen Katalog, Seiten aus Sicht des Patienten. String = CHECK in\n`migrations/0221_person_verletzung.sql`.",
+        "enum": [
+          "kopf",
+          "gesicht",
+          "hals",
+          "thorax",
+          "abdomen",
+          "becken",
+          "ruecken",
+          "wirbelsaeule",
+          "gesaess",
+          "oberarm_l",
+          "oberarm_r",
+          "unterarm_l",
+          "unterarm_r",
+          "hand_l",
+          "hand_r",
+          "oberschenkel_l",
+          "oberschenkel_r",
+          "unterschenkel_l",
+          "unterschenkel_r",
+          "fuss_l",
+          "fuss_r"
+        ]
+      },
       "KommunikationsStelle": {
         "type": "object",
         "description": "Eine gepflegte Stelle samt ihren Verbindungen.\n\n`funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit\ndie Seite den Katalog nicht braucht — auch nicht ohne Netz (design.md D3, D9).",
@@ -15170,6 +15197,137 @@
         "enum": [
           "wechsel",
           "gegen"
+        ]
+      },
+      "VerletzungAnsicht": {
+        "type": "string",
+        "description": "Ansicht des Körperschemas.",
+        "enum": [
+          "vorn",
+          "hinten"
+        ]
+      },
+      "VerletzungAnzeige": {
+        "type": "object",
+        "description": "Eine Verletzung (1:1 zu `person_verletzung`); eine aufgehobene trägt `aufgehoben_at`.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "ansicht",
+          "region",
+          "art",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/VerletzungAnsicht"
+          },
+          "art": {
+            "$ref": "#/components/schemas/VerletzungArt"
+          },
+          "aufgehoben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aufgehoben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Verletzung beim Server ankam."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "region": {
+            "$ref": "#/components/schemas/KoerperRegion"
+          },
+          "schwere": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VerletzungSchwere"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "x": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Lage, je 0 bis 1 normiert auf die Ansicht; nur als Paar."
+          },
+          "y": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt."
+          }
+        }
+      },
+      "VerletzungArt": {
+        "type": "string",
+        "description": "Art der Verletzung aus dem festen Katalog.",
+        "enum": [
+          "wunde_blutung",
+          "fraktur_verdacht",
+          "verbrennung",
+          "prellung_schwellung",
+          "amputation",
+          "schmerz",
+          "sonstige"
+        ]
+      },
+      "VerletzungSchwere": {
+        "type": "string",
+        "description": "Schwere einer Verletzung, optional.",
+        "enum": [
+          "leicht",
+          "mittel",
+          "schwer"
         ]
       },
       "VerpflegtAnderswo": {

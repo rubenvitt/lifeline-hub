@@ -3397,6 +3397,12 @@ export interface components {
             rechtsgrundlage: string;
         };
         /**
+         * @description Körperregion aus dem festen Katalog, Seiten aus Sicht des Patienten. String = CHECK in
+         *     `migrations/0221_person_verletzung.sql`.
+         * @enum {string}
+         */
+        KoerperRegion: "kopf" | "gesicht" | "hals" | "thorax" | "abdomen" | "becken" | "ruecken" | "wirbelsaeule" | "gesaess" | "oberarm_l" | "oberarm_r" | "unterarm_l" | "unterarm_r" | "hand_l" | "hand_r" | "oberschenkel_l" | "oberschenkel_r" | "unterschenkel_l" | "unterschenkel_r" | "fuss_l" | "fuss_r";
+        /**
          * @description Eine gepflegte Stelle samt ihren Verbindungen.
          *
          *     `funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit
@@ -5936,6 +5942,53 @@ export interface components {
          * @enum {string}
          */
         Verkehrsart: "wechsel" | "gegen";
+        /**
+         * @description Ansicht des Körperschemas.
+         * @enum {string}
+         */
+        VerletzungAnsicht: "vorn" | "hinten";
+        /** @description Eine Verletzung (1:1 zu `person_verletzung`); eine aufgehobene trägt `aufgehoben_at`. */
+        VerletzungAnzeige: {
+            ansicht: components["schemas"]["VerletzungAnsicht"];
+            art: components["schemas"]["VerletzungArt"];
+            aufgehoben_at?: string | null;
+            /** Format: int64 */
+            aufgehoben_von_id?: number | null;
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046). */
+            bestaetigt_name?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann die Verletzung beim Server ankam. */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            /** Format: int64 */
+            person_id: number;
+            region: components["schemas"]["KoerperRegion"];
+            schwere?: components["schemas"]["VerletzungSchwere"] | null;
+            /**
+             * Format: double
+             * @description Lage, je 0 bis 1 normiert auf die Ansicht; nur als Paar.
+             */
+            x?: number | null;
+            /** Format: double */
+            y?: number | null;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Art der Verletzung aus dem festen Katalog.
+         * @enum {string}
+         */
+        VerletzungArt: "wunde_blutung" | "fraktur_verdacht" | "verbrennung" | "prellung_schwellung" | "amputation" | "schmerz" | "sonstige";
+        /**
+         * @description Schwere einer Verletzung, optional.
+         * @enum {string}
+         */
+        VerletzungSchwere: "leicht" | "mittel" | "schwer";
         /**
          * @description Was eine Einheit in einem Zeitfenster anderswo bekommen hat (LLH-1048): nur Kennung und
          *     Summe, ohne Stelle, Zeitpunkt, Kostform oder Freitext und ohne Personenbezug. Die Feldmenge ist

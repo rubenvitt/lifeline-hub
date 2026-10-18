@@ -7,6 +7,7 @@ pub mod sichtung_repo;
 pub mod transport_repo;
 pub mod verbleib_repo;
 pub mod verlaufsnotiz_repo;
+pub mod verletzung_repo;
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -504,6 +505,11 @@ pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> S
 /// Papier-Patientenanhängetasche, ein kurzer Freitext zum Abgleich. Spiegel:
 /// `frontend/src/api/eingabegrenzen.ts`.
 pub const PAT_NUMMER_MAX: usize = 32;
+
+/// Höchstlänge der Notiz einer Verletzung (LLH-1113, Spec `personen-verletzungen`): ein kurzer
+/// Zusatz zur Markierung am Körperschema, kein Befundtext. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const VERLETZUNG_NOTIZ_MAX: usize = 200;
 
 /// System-ETB einer nachgereichten älteren Sichtung (LLH-1138, Spec `personen-verlauf`): sie
 /// steht im Verlauf, die aktuelle bleibt. «Person R-001: Sichtung SK I, nachgetragen, aktuelle

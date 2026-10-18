@@ -200,6 +200,48 @@ fn serde_wire_gleich_as_str() {
         Waermeerhalt => "waermeerhalt",
         Dekontamination => "dekontamination",
     });
+    // Verletzungen (LLH-1113, Spec `personen-verletzungen`)
+    enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungAnsicht {
+        Vorn => "vorn",
+        Hinten => "hinten",
+    });
+    enum_wire!(lifeline_hub::person::verletzung_repo::KoerperRegion {
+        Kopf => "kopf",
+        Gesicht => "gesicht",
+        Hals => "hals",
+        Thorax => "thorax",
+        Abdomen => "abdomen",
+        Becken => "becken",
+        Ruecken => "ruecken",
+        Wirbelsaeule => "wirbelsaeule",
+        Gesaess => "gesaess",
+        OberarmL => "oberarm_l",
+        OberarmR => "oberarm_r",
+        UnterarmL => "unterarm_l",
+        UnterarmR => "unterarm_r",
+        HandL => "hand_l",
+        HandR => "hand_r",
+        OberschenkelL => "oberschenkel_l",
+        OberschenkelR => "oberschenkel_r",
+        UnterschenkelL => "unterschenkel_l",
+        UnterschenkelR => "unterschenkel_r",
+        FussL => "fuss_l",
+        FussR => "fuss_r",
+    });
+    enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungArt {
+        WundeBlutung => "wunde_blutung",
+        FrakturVerdacht => "fraktur_verdacht",
+        Verbrennung => "verbrennung",
+        PrellungSchwellung => "prellung_schwellung",
+        Amputation => "amputation",
+        Schmerz => "schmerz",
+        Sonstige => "sonstige",
+    });
+    enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungSchwere {
+        Leicht => "leicht",
+        Mittel => "mittel",
+        Schwer => "schwer",
+    });
 
     // schaden
     enum_wire_as_str!(lifeline_hub::schaden::SchadenStatus {

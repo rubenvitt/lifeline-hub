@@ -361,6 +361,34 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        tabelle: "person_verletzung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1113 (design.md D4): wo und was als Katalogwert bleibt auswertbar; die genaue
+            // Lage und die Notiz fallen mit der Behandlung.
+            retain("ansicht", G_TRIAGE),
+            retain("region", G_TRIAGE),
+            retain("art", G_TRIAGE),
+            retain("schwere", G_TRIAGE),
+            scrub("x", Strategie::NullSetzen, Z_BEHANDLUNG),
+            scrub("y", Strategie::NullSetzen, Z_BEHANDLUNG),
+            scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            retain("aufgehoben_at", G_ZEIT),
+            retain("aufgehoben_von_id", G_FK),
+            retain("client_id", G_IDEMPOTENZ),
+        ],
+    },
+    TabellenRegel {
         tabelle: "person_verlaufsnotiz",
         scoping: Scoping::EinsatzId,
         zeilenfilter: None,
@@ -2859,6 +2887,8 @@ pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
     "person_transport",
     // LLH-1324: eine Maßnahme, auch eine aufgehobene.
     "person_massnahme",
+    // LLH-1113: eine Verletzung, auch eine aufgehobene.
+    "person_verletzung",
 ];
 
 /// `SELECT` der Personen-IDs mit Behandlungsbezug (ohne Einsatz-Eingrenzung; der Aufrufer grenzt
@@ -3615,6 +3645,9 @@ mod tests {
                     "person_transport.fachrichtung",
                     "person_uhs_belegung.notiz",
                     "person_verlaufsnotiz.text",
+                    "person_verletzung.notiz",
+                    "person_verletzung.x",
+                    "person_verletzung.y",
                 ]),
             ),
             (

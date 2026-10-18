@@ -9268,4 +9268,176 @@ mod tests {
         .await
         .unwrap();
     }
+
+    // --- LLH-1113: Verletzungen am Körperschema (0221) ---
+
+    /// `person_verletzung`: Ansicht, Region, Art und Schwere nur aus dem Katalog, Lage je 0..1 und
+    /// nur als Paar, Aufheben als Spalten an der Zeile, `client_id` je Einsatz eindeutig.
+    #[tokio::test]
+    async fn migration_0221_person_verletzung() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 221).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        #[allow(clippy::type_complexity)]
+        let verletzung = |ansicht: &'static str,
+                          region: &'static str,
+                          art: &'static str,
+                          schwere: Option<&'static str>,
+                          lage: (Option<f64>, Option<f64>),
+                          client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_verletzung (einsatz_id, person_id, ansicht, region, art, \
+                        schwere, x, y, notiz, zeitpunkt_at, erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'offen', '2026-10-18 10:00:00', \
+                        '2026-10-18 10:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(ansicht)
+                .bind(region)
+                .bind(art)
+                .bind(schwere)
+                .bind(lage.0)
+                .bind(lage.1)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        let ohne = (None, None);
+        for region in [
+            "kopf",
+            "gesicht",
+            "hals",
+            "thorax",
+            "abdomen",
+            "becken",
+            "ruecken",
+            "wirbelsaeule",
+            "gesaess",
+            "oberarm_l",
+            "oberarm_r",
+            "unterarm_l",
+            "unterarm_r",
+            "hand_l",
+            "hand_r",
+            "oberschenkel_l",
+            "oberschenkel_r",
+            "unterschenkel_l",
+            "unterschenkel_r",
+            "fuss_l",
+            "fuss_r",
+        ] {
+            let ansicht = if ["ruecken", "wirbelsaeule", "gesaess"].contains(&region) {
+                "hinten"
+            } else {
+                "vorn"
+            };
+            verletzung(ansicht, region, "schmerz", None, ohne, None)
+                .await
+                .unwrap_or_else(|f| panic!("{region}: {f}"));
+        }
+        for art in [
+            "wunde_blutung",
+            "fraktur_verdacht",
+            "verbrennung",
+            "prellung_schwellung",
+            "amputation",
+            "schmerz",
+            "sonstige",
+        ] {
+            verletzung(
+                "hinten",
+                "kopf",
+                art,
+                Some("schwer"),
+                (Some(0.0), Some(1.0)),
+                None,
+            )
+            .await
+            .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        verletzung(
+            "vorn",
+            "kopf",
+            "schmerz",
+            Some("leicht"),
+            (Some(0.5), Some(0.2)),
+            Some("v1"),
+        )
+        .await
+        .unwrap();
+        for (fall, ergebnis) in [
+            (
+                "Schlüssel doppelt",
+                verletzung("vorn", "kopf", "schmerz", None, ohne, Some("v1")).await,
+            ),
+            (
+                "Rücken vorn",
+                verletzung("vorn", "ruecken", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Thorax hinten",
+                verletzung("hinten", "thorax", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Ansicht",
+                verletzung("seite", "kopf", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Region",
+                verletzung("vorn", "schulter_l", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Art",
+                verletzung("vorn", "kopf", "biss", None, ohne, None).await,
+            ),
+            (
+                "Schwere",
+                verletzung("vorn", "kopf", "schmerz", Some("kritisch"), ohne, None).await,
+            ),
+            (
+                "x > 1",
+                verletzung(
+                    "vorn",
+                    "kopf",
+                    "schmerz",
+                    None,
+                    (Some(1.1), Some(0.5)),
+                    None,
+                )
+                .await,
+            ),
+            (
+                "y < 0",
+                verletzung(
+                    "vorn",
+                    "kopf",
+                    "schmerz",
+                    None,
+                    (Some(0.1), Some(-0.1)),
+                    None,
+                )
+                .await,
+            ),
+            (
+                "nur x",
+                verletzung("vorn", "kopf", "schmerz", None, (Some(0.1), None), None).await,
+            ),
+        ] {
+            assert!(ergebnis.is_err(), "{fall}");
+        }
+    }
 }

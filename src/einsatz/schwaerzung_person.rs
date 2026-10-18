@@ -172,6 +172,17 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
     },
     PersonenBezug {
         art: PersonenArt::Betroffene,
+        tabelle: "person_verletzung",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[
+            ("x", Mit),
+            ("y", Mit),
+            ("notiz", Mit),
+            ("bestaetigt_name", Ohne(O_BESTAETIGT)),
+        ],
+    },
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
         tabelle: "person_verlaufsnotiz",
         bezug: Bezug::Spalte("person_id"),
         spalten: &[("text", Mit)],
@@ -306,6 +317,17 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         tabelle: "person_massnahme",
         bezug: Bezug::Spalte("bestaetigt_personal_id"),
         spalten: &[("bestaetigt_name", Mit)],
+    },
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "person_verletzung",
+        bezug: Bezug::Spalte("bestaetigt_personal_id"),
+        spalten: &[
+            ("bestaetigt_name", Mit),
+            ("x", Ohne(O_BEHANDELT)),
+            ("y", Ohne(O_BEHANDELT)),
+            ("notiz", Ohne(O_BEHANDELT)),
+        ],
     },
     PersonenBezug {
         art: PersonenArt::ExterneKraft,
