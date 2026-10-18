@@ -11,9 +11,9 @@ Subtask LLH-1133 (`i0x7xjk3`) von LLH-1018. Jede Aufgabe entsteht per TDD. Gepr�
 
 ## 2. Material am Ort
 
-- [ ] 2.1 `MaterialAmOrt`: Statusanzeige als `StatusWahl` mit den Rechten des Zuordnens, Fehler an der Zeile, Geräte lesend. Vitest `MaterialAmOrt.test.tsx`, `materialSchreibweg.test.tsx` (gleicher Schreibweg wie `MaterialPage`).
-- [ ] 2.2 `kraefte/MaterialAdhocDialog.tsx` aus `MaterialPage` herauslösen, „Material erfassen“ in `MaterialAmOrt` mit Ort in einem Request, gesperrt am beendeten Ort. Vitest; `MaterialPage`-Test bleibt grün.
-- [ ] 2.3 „Fehlmenge melden“ an der UHS (Vorbelegung Nachforderung, nur mit Freigabe). Vitest.
+- [x] 2.1 `MaterialAmOrt`: Statusanzeige als `StatusWahl` mit den Rechten des Zuordnens, Fehler an der Zeile, Geräte lesend. Vitest `MaterialAmOrt.test.tsx`, `materialSchreibweg.test.tsx` (gleicher Schreibweg wie `MaterialPage`).
+- [x] 2.2 `kraefte/MaterialAdhocDialog.tsx` aus `MaterialPage` herauslösen, „Material erfassen“ in `MaterialAmOrt` mit Ort in einem Request, gesperrt am beendeten Ort. Vitest; `MaterialPage`-Test bleibt grün.
+- [x] 2.3 „Fehlmenge melden“ an der UHS (Vorbelegung Nachforderung, nur mit Freigabe). Vitest.
 
 ## 3. Nachweise und Doku
 

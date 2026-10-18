@@ -1,15 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { ReactElement } from 'react';
-import { server } from '../test/server';
+import { Route, Routes } from 'react-router';
+import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
-import { freigabenFixture } from '../test/fixtures';
+import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { waehle } from '../test/auswahlListe';
 import type { Einheit, EinsatzMaterial, UhsDetail } from '../api/types';
 import EinheitMaterial from '../pages/einheit/EinheitMaterial';
 import { buildEinheitRechte } from '../pages/einheit/einheitAnsichtKern';
+import MaterialPage from '../pages/MaterialPage';
 import MaterialTab from '../pages/uhs/MaterialTab';
 import MaterialAmOrt from './MaterialAmOrt';
 import MaterialOrtAngabe, { useMaterialOrtKontext } from './MaterialOrtAngabe';
@@ -236,6 +238,63 @@ describe('Ein Schreibweg für den Ort (LLH-1225 D2, 6.5)', () => {
 
       expect(amOrtSelbst.gesendet).toEqual(liste.gesendet);
       expect(liste.gesendet[0].url).toBe('/api/einsaetze/1/material/40');
+      expect([...liste.einheitenRouten, ...amOrtSelbst.einheitenRouten]).toEqual([]);
+    });
+  });
+});
+
+/** Öffnet das Statusmenü des Postens und wählt „defekt“ (Portal-Filter wie `MaterialPage.test`). */
+async function statusDefekt(bezeichnung: string) {
+  await userEvent.click(
+    await screen.findByRole('button', { name: `Status von ${bezeichnung} ändern` }),
+  );
+  const offen = [...document.querySelectorAll<HTMLElement>('.ant-dropdown')].filter(
+    (d) => !d.classList.contains('ant-dropdown-hidden') && d.style.pointerEvents !== 'none',
+  );
+  expect(offen).toHaveLength(1);
+  const menue = offen[0].querySelector<HTMLElement>('[role="menu"]')!;
+  await userEvent.click(within(menue).getByRole('menuitem', { name: /defekt/ }));
+}
+
+/** Statuswechsel in der Materialliste selbst (`MaterialPage`), am selben Posten. */
+async function statusInDerMaterialliste(hier: EinsatzMaterial) {
+  const { gesendet, einheitenRouten } = mitschnitt(hier);
+  server.use(
+    meHandler(adminFixture()),
+    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
+    // Aktives und herausgenommenes Material teilen den Pfad (`?entlassene=1`).
+    http.get('/api/einsaetze/1/material', ({ request }) =>
+      HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : [FREI, hier]),
+    ),
+    http.get('/api/material', () => HttpResponse.json([])),
+  );
+  renderMitProviders(
+    <Routes>
+      <Route path="/einsaetze/:id/material" element={<MaterialPage />} />
+    </Routes>,
+    { route: '/einsaetze/1/material' },
+  );
+  await statusDefekt('Trage');
+  await waitFor(() => expect(gesendet).toHaveLength(1));
+  cleanup();
+  return { gesendet, einheitenRouten };
+}
+
+describe('Ein Schreibweg für den Status (LLH-1133, „Status am Ort setzen“)', () => {
+  describe.each(ORTE)('$name', (ort) => {
+    it('Status am Ort sendet denselben Körper wie die Materialliste', async () => {
+      const hier = amOrt(ort.ref);
+      const liste = await statusInDerMaterialliste(hier);
+
+      const amOrtSelbst = mitschnitt(hier);
+      renderMitProviders(ort.host(hier));
+      await statusDefekt('Trage');
+      await waitFor(() => expect(amOrtSelbst.gesendet).toHaveLength(1));
+
+      expect(amOrtSelbst.gesendet).toEqual(liste.gesendet);
+      expect(liste.gesendet).toEqual([
+        { url: '/api/einsaetze/1/material/40', body: { status: 'defekt' } },
+      ]);
       expect([...liste.einheitenRouten, ...amOrtSelbst.einheitenRouten]).toEqual([]);
     });
   });
