@@ -43,4 +43,16 @@ describe('geraetDarf', () => {
       expect(geraetDarf(geraet('bereitstellungsraum'), 'br-verwalten')).toBe(false);
     });
   });
+
+  describe('person-behandlung (Change y18v58dt-pat-kern): Transport, Maßnahme, Verletzung', () => {
+    it.each(ANSICHTEN)('Ansicht %s', (ansicht) => {
+      expect(geraetDarf(geraet(ansicht), 'person-behandlung')).toBe(
+        ansicht === 'uhs-tablet' || ansicht === 'uhs-laptop',
+      );
+    });
+
+    it('eine Person behandelt', () => {
+      expect(geraetDarf(null, 'person-behandlung')).toBe(true);
+    });
+  });
 });

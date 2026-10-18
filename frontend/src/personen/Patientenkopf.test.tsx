@@ -3,9 +3,10 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
-import { server } from '../test/server';
+import { benutzerFixture } from '../test/fixtures';
+import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import Patientenkopf from './Patientenkopf';
 
 /**
@@ -490,5 +491,240 @@ describe('Patientenkopf — voller PAT-Kern (LLH-1324/1325/1326/1113, design.md 
     expect(within(kopf).queryByRole('textbox')).toBeNull();
     expect(within(kopf).getByText('PAT A-4711')).toBeInTheDocument();
     expect(within(kopf).getByRole('list', { name: 'Verletzungen' })).toBeInTheDocument();
+  });
+});
+
+describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', () => {
+  let gepatcht: unknown[];
+  beforeEach(() => {
+    gepatcht = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        gepatcht.push(await request.json());
+        return HttpResponse.json({ ...basis });
+      }),
+      http.post('/api/einsaetze/1/personen/10/massnahmen/:mid/aufheben', ({ params }) => {
+        gesendet.push({ pfad: `massnahmen/${String(params.mid)}/aufheben`, body: null });
+        return HttpResponse.json({ id: Number(params.mid) });
+      }),
+    );
+  });
+
+  it('legt den Transport im Paneel fest, ohne Dialog', async () => {
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Transport festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Transport festlegen' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await userEvent.click(
+      within(within(paneel).getByRole('radiogroup', { name: 'Priorität' })).getByRole('radio', {
+        name: 'sofort',
+      }),
+    );
+    await userEvent.click(
+      within(within(paneel).getByRole('radiogroup', { name: 'Art' })).getByRole('radio', {
+        name: 'liegend',
+      }),
+    );
+    await userEvent.click(within(paneel).getByRole('combobox', { name: 'Fachrichtung' }));
+    await userEvent.click(await screen.findByTitle('Unfallchirurgie'));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Transport festlegen' }));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet).toEqual([
+      {
+        pfad: 'transport',
+        body: { prioritaet: 'sofort', art: 'liegend', fachrichtung: 'unfallchirurgie' },
+      },
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Transport festlegen' })).toBeNull(),
+    );
+  });
+
+  it('belegt das Paneel mit dem aktuellen Stand vor; „ohne“ leert ein Feld', async () => {
+    const { kopf } = zeige(vollerKern);
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Transport festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Transport festlegen' });
+    const prio = within(paneel).getByRole('radiogroup', { name: 'Priorität' });
+    expect(within(prio).getByRole('radio', { name: 'dringlich' })).toBeChecked();
+    await userEvent.click(within(prio).getByRole('radio', { name: 'ohne' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Transport festlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0].body).toEqual({
+      prioritaet: null,
+      art: 'liegend',
+      fachrichtung: 'unfallchirurgie',
+    });
+  });
+
+  it('lässt eine Ablehnung des Transports im Paneel stehen, die übrigen bleiben bedienbar', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/transport', () =>
+        HttpResponse.json({ error: 'Person ist vermisst' }, { status: 422 }),
+      ),
+    );
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Transport festlegen' }));
+    const paneel = screen.getByRole('region', { name: 'Transport festlegen' });
+    await userEvent.click(within(paneel).getByRole('radio', { name: 'normal' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Transport festlegen' }));
+    expect(await within(paneel).findByText(/Person ist vermisst/)).toBeInTheDocument();
+    expect(within(paneel).getByRole('radio', { name: 'normal' })).toBeChecked();
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    expect(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' })).toBeEnabled();
+  });
+
+  it('erfasst eine Maßnahme über die Flächen, ohne Uhrzeit gilt die Erfassung', async () => {
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await userEvent.click(within(paneel).getByRole('radio', { name: 'Blutstillung' }));
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet).toEqual([{ pfad: 'massnahmen', body: { art: 'blutstillung' } }]);
+  });
+
+  it('verlangt eine Maßnahme, bevor es sendet', async () => {
+    const { kopf } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    expect(await within(paneel).findByText('Bitte eine Maßnahme wählen')).toBeInTheDocument();
+    expect(gesendet).toEqual([]);
+  });
+
+  it('hebt eine Maßnahme im Paneel auf', async () => {
+    const { kopf, onGeschrieben } = zeige(vollerKern);
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await userEvent.click(
+      within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
+    );
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet).toEqual([{ pfad: 'massnahmen/1/aufheben', body: null }]);
+  });
+
+  it('hält immer nur ein Paneel offen', async () => {
+    const { kopf } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Transport festlegen' }));
+    expect(screen.getByRole('region', { name: 'Transport festlegen' })).toBeInTheDocument();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    expect(screen.queryByRole('region', { name: 'Transport festlegen' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Maßnahme erfassen' })).toBeInTheDocument();
+    // Der Auslöser schließt sein eigenes Paneel wieder.
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Maßnahme erfassen', expanded: true }),
+    );
+    expect(screen.queryByRole('region', { name: 'Maßnahme erfassen' })).toBeNull();
+  });
+
+  it('sperrt den Wechsel, solange die Maßnahme speichert, und zeigt die Ablehnung im Paneel', async () => {
+    let freigeben!: () => void;
+    const freigabe = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/massnahmen', async () => {
+        await freigabe;
+        return HttpResponse.json({ error: 'Person ist storniert' }, { status: 409 });
+      }),
+    );
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await userEvent.click(within(paneel).getByRole('radio', { name: 'Sauerstoff' }));
+    const senden = within(paneel).getByRole('button', { name: 'Maßnahme erfassen' });
+    await userEvent.click(senden);
+    await waitFor(() => expect(senden).toHaveClass('ant-btn-loading'));
+    const transport = within(kopf).getByRole('button', { name: 'Transport festlegen' });
+    expect(transport).toBeDisabled();
+    expect(within(kopf).getByRole('button', { name: /^Nachsichten/ })).toBeDisabled();
+    expect(within(kopf).getByRole('button', { name: 'Verbleib erfassen' })).toBeDisabled();
+    await userEvent.click(transport);
+    expect(screen.getByRole('region', { name: 'Maßnahme erfassen' })).toBe(paneel);
+
+    freigeben();
+    expect(await within(paneel).findByText(/Person ist storniert/)).toBeInTheDocument();
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    expect(transport).toBeEnabled();
+  });
+
+  it('nennt am UHS-Tablet „Bestätigt von“ und schickt die Kennung mit', async () => {
+    server.use(
+      meHandler({
+        ...benutzerFixture({ anzeigename: 'UHS Nord · Tablet 1' }),
+        geraet: {
+          kopplung_id: 3,
+          einsatz_id: 1,
+          ansicht: 'uhs-tablet',
+          uhs_id: 3,
+          stelle: 'UHS Nord',
+          bezeichnung: 'Tablet 1',
+          laeuft_ab_at: '2026-10-08 12:00:00',
+        },
+      }),
+      http.get('/api/einsaetze/1/personen/bestaetiger', () =>
+        HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]),
+      ),
+    );
+    const user = userEvent.setup();
+    const { kopf } = zeige();
+    await user.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
+    await user.click(await within(paneel).findByRole('combobox', { name: 'Bestätigt von' }));
+    await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
+    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0].body).toEqual({ art: 'zugang', bestaetigt_personal_id: 5 });
+  });
+
+  it('bietet ohne Behandlungsrecht (Betreuungsstelle) weder Transport noch Maßnahme an', () => {
+    const { kopf } = zeige(vollerKern, { darfBehandeln: false });
+    expect(within(kopf).queryByRole('button', { name: 'Transport festlegen' })).toBeNull();
+    expect(within(kopf).queryByRole('button', { name: 'Maßnahme erfassen' })).toBeNull();
+    expect(kopf.querySelector('[data-lfh="transport"]')?.textContent).toMatch(/^dringlich/);
+  });
+
+  it('schreibt die PAT-Nummer inline über den PATCH, nur dieses Feld', async () => {
+    const { kopf, onGeschrieben } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'PAT-Nummer eintragen' }));
+    const feld = within(kopf).getByRole('textbox', { name: 'PAT-Nummer' });
+    await userEvent.type(feld, 'A-4711{Enter}');
+    await waitFor(() => expect(gepatcht).toEqual([{ pat_nummer: 'A-4711' }]));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+  });
+
+  it('zählt die PAT-Nummer gegen die Servergrenze und sendet Überlänge nicht', async () => {
+    const { kopf } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'PAT-Nummer eintragen' }));
+    const feld = within(kopf).getByRole('textbox', { name: 'PAT-Nummer' });
+    await userEvent.type(feld, `${'9'.repeat(33)}{Enter}`);
+    expect(within(kopf).getByText(/zu lang/)).toBeInTheDocument();
+    expect(gepatcht).toEqual([]);
+  });
+
+  it('setzt die Kontamination inline über den PATCH', async () => {
+    const { kopf } = zeige();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Kontamination eintragen' }));
+    await userEvent.click(within(kopf).getByRole('combobox', { name: 'Kontamination' }));
+    await userEvent.click(await screen.findByTitle('kontaminiert'));
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Kontamination speichern' }));
+    await waitFor(() => expect(gepatcht).toEqual([{ kontamination: true }]));
+  });
+
+  it('sperrt PAT-Nummer und Kontamination ohne Netz mit Grund', () => {
+    setzeOnline(false);
+    try {
+      const { kopf } = zeige(vollerKern);
+      expect(within(kopf).queryByRole('button', { name: /PAT-Nummer/ })).toBeNull();
+      expect(within(kopf).queryByRole('button', { name: /Kontamination/ })).toBeNull();
+      expect(within(kopf).getByText('PAT A-4711')).toBeInTheDocument();
+      expect(within(kopf).getByText('kontaminiert')).toBeInTheDocument();
+      expect(within(kopf).getByRole('status')).toHaveTextContent(
+        'PAT-Nummer und Kontamination ohne Netz nicht änderbar',
+      );
+    } finally {
+      setzeOnline(true);
+    }
   });
 });

@@ -981,6 +981,7 @@ export default function PersonenDetailPage() {
           person={p}
           darfSchreiben={darfSchreiben}
           darfSichten={darf('person-sichtung')}
+          darfBehandeln={darf('person-behandlung')}
           aufenthaltAktionen={aufenthaltAktionen}
           onGeschrieben={invalidateDetail}
         />

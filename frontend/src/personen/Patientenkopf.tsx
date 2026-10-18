@@ -1,7 +1,16 @@
 import { Button, Flex, Form, Input, Typography } from 'antd';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { erfasseVerbleib, legeNotizAn, type VerbleibEingabe } from '../api/einsatzPerson';
+import {
+  createMassnahme,
+  erfasseVerbleib,
+  legeNotizAn,
+  revokeMassnahme,
+  saveTransport,
+  type MassnahmeEingabe,
+  type TransportEingabe,
+  type VerbleibEingabe,
+} from '../api/einsatzPerson';
 import type { PersonDetail } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { formatVor } from '../anzeige/abstand';
@@ -13,11 +22,10 @@ import {
   monoStil,
   useRollen,
 } from '../components/instrument';
-import StatusTag from '../components/StatusTag';
 import { useViewport } from '../components/useViewport';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
-import { sichtung as SK_DARSTELLUNG, kontamination } from '../theme/statusFarben';
+import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
 import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
 import {
   MASSNAHME_WORT,
@@ -29,6 +37,8 @@ import {
   transportText,
 } from './personMeta';
 import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
+import PatKennzeichen from './PatKennzeichen';
+import { MassnahmePaneel, TransportPaneel } from './PatientenkopfPaneele';
 import { istAngetroffen } from './personenBilanz';
 import { ZustandSchreiben } from './personenSpalten';
 import { SichtungFelder, saveSichtung, type SichtungWerte } from './SichtungDialog';
@@ -44,6 +54,11 @@ export interface PatientenkopfProps {
   darfSchreiben?: boolean;
   /** Darf hier gesichtet werden? An der Betreuungsstelle nicht (LFH-1041). */
   darfSichten?: boolean;
+  /**
+   * Transport, Maßnahme und Verletzung (Change `y18v58dt-pat-kern`): am Gerät nur die UHS
+   * (`geraetDarf('person-behandlung')`), an der Betreuungsstelle nicht.
+   */
+  darfBehandeln?: boolean;
   /** Handlungen am Aufenthalt (In UHS aufnehmen, Verlegen, Austragen) — die Seite besitzt sie. */
   aufenthaltAktionen?: ReactNode;
   /** Nach jedem erfolgreichen Schreiben (die Seite invalidiert Person, Liste und ETB). */
@@ -70,10 +85,11 @@ export default function Patientenkopf({
   modus = 'bedienen',
   darfSchreiben = false,
   darfSichten = true,
+  darfBehandeln = true,
   aufenthaltAktionen,
   onGeschrieben,
 }: PatientenkopfProps) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const jetzt = useMinutenTakt();
   const bedienbar = modus === 'bedienen' && darfSchreiben && !person.storniert_at;
   const angetroffen = istAngetroffen(person);
@@ -89,7 +105,27 @@ export default function Patientenkopf({
     mutationFn: (eingabe: VerbleibEingabe) => erfasseVerbleib(einsatzId, person.id, eingabe),
     onSuccess: () => onGeschrieben?.(),
   });
-  const isSpeichernd = sichtungMutation.isPending || verbleibMutation.isPending;
+  // Je Schreibweg EINE Mutation, hier im Kopf (Wechselsperre). Die Offline-Vormerkung
+  // (Abschnitt 8, design.md D8) tauscht nur die `mutationFn` aus.
+  const transportMutation = useMutation({
+    mutationFn: (eingabe: TransportEingabe) => saveTransport(einsatzId, person.id, eingabe),
+    onSuccess: () => onGeschrieben?.(),
+  });
+  const massnahmeMutation = useMutation({
+    mutationFn: (eingabe: MassnahmeEingabe) => createMassnahme(einsatzId, person.id, eingabe),
+    onSuccess: () => onGeschrieben?.(),
+  });
+  const massnahmeAufhebenMutation = useMutation({
+    mutationFn: (massnahmeId: number) => revokeMassnahme(einsatzId, person.id, massnahmeId),
+    onSuccess: () => onGeschrieben?.(),
+  });
+  const isSpeichernd =
+    sichtungMutation.isPending ||
+    verbleibMutation.isPending ||
+    transportMutation.isPending ||
+    massnahmeMutation.isPending ||
+    massnahmeAufhebenMutation.isPending;
+  const behandelbar = bedienbar && darfBehandeln && angetroffen;
 
   const letzteSichtung = person.sichtungen?.[0];
   const letzteNotiz = person.notizen?.[0];
@@ -100,7 +136,6 @@ export default function Patientenkopf({
   const verletzungen = nummeriere(person.verletzungen ?? []).filter(
     (n) => n.verletzung.aufgehoben_at == null,
   );
-  const kopfzeile = !!person.pat_nummer || person.kontamination === true;
   const zweiSpalten = useViewport().abBreite('lg');
 
   return (
@@ -109,19 +144,12 @@ export default function Patientenkopf({
       aria-label="Patientenkopf"
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
     >
-      {kopfzeile && (
-        <div
-          data-lfh="patientenkopf-zeile"
-          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginSM }}
-        >
-          {person.pat_nummer && (
-            <span data-lfh="pat-nummer" style={{ ...monoStil(13), color: rollen.text }}>
-              {`PAT ${person.pat_nummer}`}
-            </span>
-          )}
-          {person.kontamination === true && <StatusTag darstellung={kontamination} />}
-        </div>
-      )}
+      <PatKennzeichen
+        einsatzId={einsatzId}
+        person={person}
+        bedienbar={bedienbar}
+        onGeschrieben={onGeschrieben}
+      />
 
       {/* Zwei Spalten ab lg (design.md D14): links die Lage des Patienten, rechts was an ihm
           getan und gefunden ist. Darunter gestapelt, die Lage zuerst (Spec, 390 × 844). */}
@@ -220,6 +248,15 @@ export default function Patientenkopf({
                 <Typography.Text type="secondary">kein Transport</Typography.Text>
               )}
             </span>
+            {behandelbar && (
+              <PaneelKnopf
+                offen={offen === 'transport'}
+                gesperrt={isSpeichernd}
+                onClick={() => toggle('transport')}
+              >
+                Transport festlegen
+              </PaneelKnopf>
+            )}
           </Datenfeld>
         </Datenraster>
 
@@ -239,6 +276,15 @@ export default function Patientenkopf({
                 }))}
               />
             </div>
+            {behandelbar && (
+              <PaneelKnopf
+                offen={offen === 'massnahme'}
+                gesperrt={isSpeichernd}
+                onClick={() => toggle('massnahme')}
+              >
+                Maßnahme erfassen
+              </PaneelKnopf>
+            )}
           </Datenfeld>
           <Datenfeld label="Verletzungen">
             <div data-lfh="verletzungen">
@@ -284,6 +330,23 @@ export default function Patientenkopf({
           einsatzId={einsatzId}
           mutation={verbleibMutation}
           onSchliessen={close('verbleib')}
+        />
+      )}
+      {offen === 'transport' && (
+        <TransportPaneel
+          einsatzId={einsatzId}
+          person={person}
+          mutation={transportMutation}
+          onSchliessen={close('transport')}
+        />
+      )}
+      {offen === 'massnahme' && (
+        <MassnahmePaneel
+          einsatzId={einsatzId}
+          person={person}
+          mutation={massnahmeMutation}
+          aufheben={massnahmeAufhebenMutation}
+          onSchliessen={close('massnahme')}
         />
       )}
       {bedienbar && (
@@ -396,7 +459,28 @@ function GekuerzteListe({
   );
 }
 
-type Paneel = 'sichtung' | 'verbleib';
+type Paneel = 'sichtung' | 'verbleib' | 'transport' | 'massnahme';
+
+/** Auslöser eines Paneels im Datenfeld; solange ein Paneel speichert, wechselt keiner. */
+function PaneelKnopf({
+  offen,
+  gesperrt,
+  onClick,
+  children,
+}: {
+  offen: boolean;
+  gesperrt: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <Button aria-expanded={offen} disabled={gesperrt} onClick={onClick}>
+        {children}
+      </Button>
+    </div>
+  );
+}
 
 /** Nachsichtung in der Ansicht: dieselben Felder wie der Dialog; die Mutation hält der Kopf. */
 function SichtungPaneel({

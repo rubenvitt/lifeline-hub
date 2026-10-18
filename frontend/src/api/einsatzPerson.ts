@@ -64,6 +64,10 @@ export interface PersonEingabe {
    * (`undefined` → `null`) mitlaufen, wenn es nicht gesetzt werden soll.
    */
   vermisst_seit?: string | null;
+  /** PAT-Nummer (LLH-1326), höchstens `PAT_NUMMER_MAX` Zeichen; `null` leert. Nur im PATCH. */
+  pat_nummer?: string | null;
+  /** Kontamination: `true`/`false`, `null` = keine Angabe (nicht „nein“). Nur im PATCH. */
+  kontamination?: boolean | null;
 }
 
 /** Offline-/Fastpath-fähige Anlage. `client_id` macht einen Replay nach
