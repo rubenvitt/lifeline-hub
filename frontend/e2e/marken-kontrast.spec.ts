@@ -10,7 +10,7 @@ import { pruefe } from './kontrast-kern';
  * LFH-1022 zog die übrigen Presets nach: kein Preset hielt beide Böden (Browser, 08.10.2026,
  * alle 14 Presets; etwa „Admin“ `gold` Tag 2,76, „Patient“ `geekblue` Nacht 4,16, `purple` Nacht
  * 3,39, `green` Tag 3,37). Der zweite Test misst je eine Fundstelle jeder neuen Bauform:
- * Kennzeichnungen neutral („Patient“, „Admin“), Status über `StatusTag` (Abgleich „Verdacht“,
+ * Kennzeichnungen neutral („Notiz“ im Personen-Verlauf, „Admin“), Status über `StatusTag` (Abgleich „Verdacht“,
  * Online-Quelle „inaktiv“).
  *
  * Böden als Literale, keine Farbwerte aus dem Produkt: eine schlechte Palette muss rot werden.
@@ -80,13 +80,16 @@ for (const modus of ['light', 'dark'] as const) {
     const gefunden = await post(page, basis, { name: 'Gefunden, Greta', sichtung: 'sk1' });
     const vermisst = await post(page, basis, { name: 'Vermisst, Volker', status: 'vermisst' });
     await post(page, `${basis}/${vermisst.id}/abgleich`, { gefunden_person_id: gefunden.id });
+    await post(page, `${basis}/${gefunden.id}/notizen`, { text: 'Wärmeerhalt' });
 
-    // Kennzeichnung ohne Status: „Patient“ war `geekblue` (Nacht 4,16).
+    // Kennzeichnung ohne Status: „Patient“ war `geekblue` (Nacht 4,16). Die Marke selbst entfiel
+    // mit dem Patientenkopf (LLH-1094, die Sichtungsfläche trägt die Frage); gemessen wird
+    // dieselbe Bauform (`Tag` ohne `color`) im Verlauf derselben Seite.
     await page.goto(`/einsaetze/${einsatzId}/personen/${gefunden.id}`);
-    const patient = page.locator('.ant-tag').filter({ hasText: /^Patient$/ });
-    await expect(patient).toHaveCount(1);
+    const notiz = page.locator('.ant-tag').filter({ hasText: /^Notiz$/ });
+    await expect(notiz).toHaveCount(1);
     await page.mouse.move(1, 1);
-    await pruefe(patient, TEXT[modus], `${modus}: Patient in der Personen-Detailseite`);
+    await pruefe(notiz, TEXT[modus], `${modus}: Notiz im Verlauf der Personen-Detailseite`);
 
     // Status: der offene Abgleich war `gold` (Tag 2,76) und ist jetzt `achtung` aus dem Vertrag.
     await page.goto(`/einsaetze/${einsatzId}/personen/${vermisst.id}`);
