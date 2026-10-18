@@ -131,7 +131,7 @@ describe('UhsDetailPage — Bereiche über dem Grundriss (LLH-1133)', () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     // Unter der Arbeitsfläche hängt nichts mehr.
-    expect(container.querySelector('[data-lfh="seiten-inhalt"]')).toBeEmptyDOMElement();
+    expect(container.querySelector('[data-lfh="seiten-inhalt"]')).toBeNull();
   });
 
   it('?bereich=material öffnet den Bereich Material an Stelle des Grundrisses', async () => {

@@ -557,9 +557,14 @@ export default function EinsatzSeite({
       ) : (
         kopf
       )}
-      <div data-lfh="seiten-inhalt" style={koerperStil}>
-        {children}
-      </div>
+      {/* Unter einer Arbeitsfläche ohne Inhalt keine leere Hülle: endet die Seite mit ihr
+          (UHS-Bereiche, LLH-1133), fielen Ränder durch den leeren Block, und ein Dichtewechsel
+          lief in die ResizeObserver-Schleife des Fensterrahmens (`e2e/uhs-hoehe.spec.ts`). */}
+      {(fensterInhalt == null || (children != null && children !== false)) && (
+        <div data-lfh="seiten-inhalt" style={koerperStil}>
+          {children}
+        </div>
+      )}
       {fuss}
     </div>
   );

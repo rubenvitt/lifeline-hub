@@ -17,5 +17,5 @@ Subtask LLH-1133 (`i0x7xjk3`) von LLH-1018. Jede Aufgabe entsteht per TDD. Gepr�
 
 ## 3. Nachweise und Doku
 
-- [ ] 3.1 e2e `uhs-hoehe.spec.ts` auf Bereiche umgestellt (1440 × 900 und 1280 × 800: Material ohne Bildlauf wählbar, jeder Bereich volle Höhe).
+- [x] 3.1 e2e `uhs-hoehe.spec.ts` auf Bereiche umgestellt (1440 × 900 und 1280 × 800: Material ohne Bildlauf wählbar, jeder Bereich volle Höhe).
 - [ ] 3.2 `frontend/AGENTS.md`, Abschnitt Material (LFH-341): Status und Ad-hoc am Ort. Kapitel `unfallhilfsstellen.md` (Bild `grundriss.png` neu) und `material.md`; Prettier und Wächter der Anwenderdoku grün.

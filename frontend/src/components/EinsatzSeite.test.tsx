@@ -477,6 +477,8 @@ describe('EinsatzSeite · Seitenebene der Kommandopalette', () => {
     const kopfteil = kopf.parentElement!;
     expect(kopfteil.contains(bereiche)).toBe(true);
     expect(kopfteil.contains(screen.getByTestId('flaeche'))).toBe(false);
+    // Endet die Seite mit der Arbeitsfläche, steht darunter keine leere Hülle.
+    expect(container.querySelector('[data-lfh="seiten-inhalt"]')).toBeNull();
   });
 
   it('stellt einen Fuß als letztes Kind der Wurzel hinter den Inhalt', () => {

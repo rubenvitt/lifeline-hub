@@ -37,17 +37,17 @@ import { useMaterialOrt } from './useMaterialOrt';
  * - Zeile: Bezeichnung, Kategorie gedämpft, Menge („30 von 50 übrig“, `mengeText`), Status über
  *   `materialDarstellung`. Die Statusanzeige ist der Auslöser der Statuswahl (LLH-1133,
  *   `StatusWahl`, derselbe Schreibweg `setzeMaterialStatus` und dieselben Einträge wie die
- *   Materialliste); eine Ablehnung steht an der Zeile. Bei Verbrauchsgut mit Rest „Ausgeben“ (derselbe Dialog wie die
- *   Materialliste), rechts das Lösen in Rot mit Abstand und ohne Rückfrage (LFH-363: die gelöste
- *   Zuordnung ist umkehrbar, über die Auswahl darunter).
+ *   Materialliste); eine Ablehnung steht an der Zeile. Bei Verbrauchsgut mit Rest „Ausgeben“
+ *   (derselbe Dialog wie die Materialliste), rechts das Lösen in Rot mit Abstand und ohne
+ *   Rückfrage (LFH-363: die gelöste Zuordnung ist umkehrbar, über die Auswahl darunter).
  * - Kopfzahl „n Posten · k Ausfall“ aus der einen Material-Zählung.
  * - „Material zuordnen …“: wählen schreibt, Gruppen „Ohne Ort“ und „An anderem Ort“
  *   ({@link buildZuordnenOptions}). Zuordnen und Lösen laufen über den EINEN Schreibweg
  *   ({@link useMaterialOrt}, Recht Material, nie die Route eines Zielmoduls).
  * - „Material erfassen“ (LLH-1133 D4): Ad-hoc-Material ohne Stamm mit diesem Ort in EINEM
  *   Request, im geteilten Dialog der Materialliste ({@link MaterialAdhocDialog}).
- * - Ein beendeter Ort sperrt nur das Zuordnen, Erfassen und Ausgeben, mit Kurzgrund daneben; Lösen und
- *   Status bleiben (LLH-1224 D13): sie ändern den Posten, nicht den Ort.
+ * - Ein beendeter Ort sperrt nur das Zuordnen, Erfassen und Ausgeben, mit Kurzgrund daneben;
+ *   Lösen und Status bleiben (LLH-1224 D13): sie ändern den Posten, nicht den Ort.
  * - Rechte (D9): bedienen nur mit Schreibrecht UND Freigabe Material. Ohne Freigabe zeigt der
  *   Baustein die Posten und die Auswahl gesperrt mit „Modul Material gesperrt“; ohne Schreibrecht
  *   (auch am Gerät) nur die Posten.

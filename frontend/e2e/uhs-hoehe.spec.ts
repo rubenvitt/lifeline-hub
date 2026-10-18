@@ -35,7 +35,7 @@ async function aufbauenMitEinsatz(page: Page) {
   };
 }
 
-test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolgenden Reitern', async ({
+test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche unter der Bereichsleiste', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -61,11 +61,12 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche vor den nachfolge
   const grundriss = page.getByTestId('grundriss-rahmen');
   // Die Mindest-Arbeitsfläche des Grundrisses ist 380 px; sie ist kein Kopf-Abzug.
   expect((await grundriss.boundingBox())!.height).toBeGreaterThanOrEqual(380);
+  // Die Bereichsleiste steht über dem Grundriss (LLH-1133), nicht im Seitenfluss darunter.
   const reihenfolge = await grundriss.evaluate((el) => {
     const material = [...document.querySelectorAll('[role="tab"]')].find(
       (tab) => tab.textContent === 'Material',
     )!;
-    return material.getBoundingClientRect().top - el.getBoundingClientRect().bottom;
+    return el.getBoundingClientRect().top - material.getBoundingClientRect().bottom;
   });
   expect(reihenfolge).toBeGreaterThanOrEqual(0);
   await page.getByRole('button', { name: 'Plätze anlegen', exact: true }).click();
@@ -141,7 +142,7 @@ for (const breite of [1366, 1024, 390]) {
       expect(innen!.y + innen!.height).toBeLessThanOrEqual(rahmen!.y + rahmen!.height + 1);
     }
     await page.screenshot({ path: testInfo.outputPath(`handschuh-${breite}.png`) });
-    // Die nachfolgenden Reiter bleiben im Dokumentfluss erreichbar.
+    // Die übrigen Bereiche stehen über die Bereichsleiste in derselben Fläche (LLH-1133).
     await page.getByRole('tab', { name: 'Bewegungen', exact: true }).click();
     await expect(page.getByRole('tab', { name: 'Bewegungen', exact: true })).toHaveAttribute(
       'aria-selected',
@@ -150,7 +151,15 @@ for (const breite of [1366, 1024, 390]) {
     const bewegungen = page.getByText('Keine Bewegungen erfasst', { exact: true });
     await bewegungen.scrollIntoViewIfNeeded();
     await expect(bewegungen).toBeInViewport();
-    expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    await page.getByRole('tab', { name: 'Belegung', exact: true }).click();
+    await expect(page.getByTestId('grundriss-rahmen')).toBeVisible();
+    // Rollen, wo es etwas zu rollen gibt: bei 390 px im Handschuh trägt der Boden die Seite über
+    // das Fenster hinaus. Breiter endet die Seite mit dem Bereich (LLH-1133), dort gibt es nichts
+    // darunter, und die Messung unten gilt der Höhe ohne Bildlauf.
+    if (breite === 390) {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    }
     // Resize NACH Scroll: viewport-relatives top allein würde die Höhe aufblasen. Bei 390 px
     // erzwingt eine Fensterhöhe von 600 px den BODEN-Zweig (Resthöhe < 380 px); bei 844 px
     // bliebe mehr, und die Aussage unten wäre leer.
@@ -229,5 +238,82 @@ for (const breite of [1024, 390]) {
       expect(verkleinert.fenster - verkleinert.polster - verkleinert.oben).toBeLessThan(380);
       expect(verkleinert.hoehe).toBeCloseTo(380, 0);
     }
+  });
+}
+
+/**
+ * LLH-1133 (Spec `uhs-grundriss`, „Die UHS-Seite gliedert sich in Bereiche“): am Fükw (1440 × 900)
+ * und am Führungs-Tablet (1280 × 800) steht die Bereichsleiste ohne Bildlauf über dem Grundriss,
+ * „Material“ ist ohne Bildlauf wählbar, und jeder Bereich füllt dieselbe Fläche bis zum Fenster.
+ */
+async function bereichMessen(page: Page, name: string) {
+  return page.getByRole('tabpanel', { name, exact: true }).evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const content = el.closest('main')!;
+    return {
+      oben: r.top + window.scrollY,
+      unten: r.bottom + window.scrollY,
+      hoehe: r.height,
+      fenster: window.innerHeight,
+      polster: parseFloat(getComputedStyle(content).paddingBottom),
+    };
+  });
+}
+
+for (const [breite, hoehe] of [
+  [1440, 900],
+  [1280, 800],
+] as const) {
+  test(`UHS-Bereiche bei ${breite} × ${hoehe}: Material ohne Bildlauf, jeder Bereich volle Höhe`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: breite, height: hoehe });
+    const pfad = await aufbauen(page);
+    await page.goto(pfad);
+    await expect(page.getByText('Bett 2', { exact: true })).toBeVisible();
+
+    const leiste = page.getByRole('tablist', {
+      name: 'Belegung, Material, Kräfte, Bewegungen und Dateien',
+    });
+    const material = leiste.getByRole('tab', { name: 'Material', exact: true });
+    // Ohne Bildlauf: die Seite steht oben, und der Reiter liegt im Fenster über dem Grundriss.
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await expect(material).toBeInViewport();
+    const abstand = await page
+      .getByTestId('grundriss-rahmen')
+      .evaluate(
+        (el, tab) => el.getBoundingClientRect().top - tab!.getBoundingClientRect().bottom,
+        await material.elementHandle(),
+      );
+    expect(abstand).toBeGreaterThanOrEqual(0);
+
+    const flaechen: Record<string, number> = {};
+    for (const name of ['Belegung', 'Material', 'Kräfte', 'Bewegungen', 'Dateien']) {
+      await leiste.getByRole('tab', { name, exact: true }).click();
+      await expect(leiste.getByRole('tab', { name, exact: true })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      await expect
+        .poll(
+          async () => {
+            const m = await bereichMessen(page, name);
+            return Math.abs(m.unten - Math.max(m.fenster - m.polster, m.oben + 380));
+          },
+          { message: `${name}: der Bereich füllt die Resthöhe bis zum Fenster` },
+        )
+        .toBeLessThanOrEqual(1);
+      flaechen[name] = (await bereichMessen(page, name)).hoehe;
+      expect(flaechen[name]).toBeGreaterThanOrEqual(380);
+    }
+    // Dieselbe Fläche für jeden Bereich, keiner hängt unter einem anderen.
+    expect(new Set(Object.values(flaechen).map(Math.round)).size).toBe(1);
+    // Die Wahl steht in der Adresse und öffnet direkt.
+    await leiste.getByRole('tab', { name: 'Material', exact: true }).click();
+    await expect(page).toHaveURL(/\?bereich=material$/);
+    await page.reload();
+    await expect(material).toHaveAttribute('aria-selected', 'true');
   });
 }
