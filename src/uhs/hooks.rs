@@ -5,7 +5,7 @@ use crate::etb::{self, repo as etb_repo};
 use crate::person::{registrier_anzeige, repo as person_repo};
 use crate::uhs::belegung_repo::{self, AustrittInfo};
 use crate::uhs::repo as uhs_repo;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Ergebnis eines erfolgten Auto-Austritts: was der Route-Handler per SSE emittieren muss (den
 /// neuen ETB-Eintrag sowie `uhs_id`/`person_id` für die Board-Events).
@@ -62,5 +62,46 @@ pub async fn auto_austritt(
         uhs_id: info.uhs_id,
         person_id,
         etb_eintrag,
+    }))
+}
+
+/// Was ein Auto-Austritt in einer laufenden Transaktion hinterlässt: der ETB-Eintrag und die
+/// Kennungen für die Board-Events nach dem Commit.
+#[derive(Debug)]
+pub struct AutoAustrittTx {
+    pub uhs_id: i64,
+    pub person_id: i64,
+    pub etb_id: i64,
+}
+
+/// [`auto_austritt`] in der Transaktion des auslösenden Schritts (Verbleib, LLH-1138): Austritt,
+/// Reservierungs-Cleanup und der pseudonyme System-ETB-Eintrag fallen mit ihm oder gar nicht.
+/// `startwert` reicht der pool-besitzende Aufrufer durch (LFH-133).
+pub async fn auto_austritt_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    anlass: &str,
+    benutzer_id: i64,
+    startwert: i64,
+) -> Result<Option<AutoAustrittTx>, AppError> {
+    let Some(info) =
+        belegung_repo::austritt_intern_tx(conn, einsatz_id, person_id, Some(anlass), benutzer_id)
+            .await?
+    else {
+        return Ok(None);
+    };
+    let person = person_repo::laden_tx(conn, einsatz_id, person_id).await?;
+    let uhs = uhs_repo::laden_tx(conn, einsatz_id, info.uhs_id).await?;
+    let text = format!(
+        "Person {}: verlässt {} ({anlass})",
+        registrier_anzeige(person.registrier_nr),
+        uhs.bezeichnung
+    );
+    let etb_id = etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &text).await?;
+    Ok(Some(AutoAustrittTx {
+        uhs_id: info.uhs_id,
+        person_id,
+        etb_id,
     }))
 }

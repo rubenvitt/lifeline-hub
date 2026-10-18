@@ -351,3 +351,155 @@ async fn sichtung_sendet_das_etb_live_ereignis() {
     assert_eq!(s, StatusCode::CREATED);
     recv_until_tag(&mut rx, "etb", Duration::from_secs(1)).await;
 }
+
+// ---------- Verbleib (tasks.md 1.4) ----------
+
+/// Einsatz mit aktiver UHS und einer Person darin (vor 30 Minuten angelegt). Liefert
+/// (Einsatz, UHS, Person).
+async fn person_in_uhs(
+    app: &axum::Router,
+    pool: &sqlx::SqlitePool,
+    cookie: &str,
+) -> (i64, i64, i64) {
+    let e = einsatz_anlegen(app, cookie).await;
+    let (s, uhs) = post(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{e}/uhs"),
+        json!({ "typ": "behandlungsplatz", "bezeichnung": "BHP Mitte" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{uhs}");
+    let u = uhs["id"].as_i64().unwrap();
+    let (s, v) = post(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{e}/uhs/{u}/status"),
+        json!({ "status": "aktiv" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, person) = post(
+        app,
+        cookie,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({ "uhs_id": u }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let p = person["id"].as_i64().unwrap();
+    angelegt_vor(pool, p, 30).await;
+    (e, u, p)
+}
+
+#[tokio::test]
+async fn aelterer_verbleib_laesst_den_aktuellen_stehen_und_tritt_nicht_aus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, _u, p) = person_in_uhs(&app, &pool, &admin).await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/verbleib");
+
+    let (s, _) = post(&app, &admin, &pfad, json!({ "art": "vor_ort" })).await;
+    assert_eq!(s, StatusCode::CREATED);
+    let vorgemerkt = zeit(-600);
+    let (s, alt) = post(
+        &app,
+        &admin,
+        &pfad,
+        json!({ "art": "transport", "ziel": "KH Mitte", "zeitpunkt_at": vorgemerkt, "client_id": "v-1" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{alt}");
+    assert_eq!(alt["zeitpunkt_at"], vorgemerkt.as_str());
+    assert!(alt["eingegangen_at"].is_string(), "{alt}");
+
+    let d = detail(&app, &admin, e, p).await;
+    assert_eq!(
+        d["aktueller_verbleib"], "vor Ort",
+        "die Kurzform kommt aus der gewinnenden Zeile"
+    );
+    assert_eq!(d["aktuelle_verbleib_art"], "vor_ort");
+    assert!(
+        d["aufenthalt"].is_object(),
+        "die Person tritt nicht aus der UHS aus: {d}"
+    );
+    assert_eq!(d["verbleib"].as_array().unwrap().len(), 2);
+
+    let etb = system_etb(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .all(|z| !z["inhalt"].as_str().unwrap().contains("verlässt")),
+        "kein Austritt: {etb:?}"
+    );
+    let nachtrag = etb
+        .iter()
+        .find(|z| z["inhalt"] == "Person R-001: abtransportiert, nachgetragen")
+        .unwrap_or_else(|| panic!("{etb:?}"));
+    assert_eq!(nachtrag["ereigniszeit"], vorgemerkt.as_str());
+
+    // Gegenprobe: ein jüngerer Transport gewinnt und nimmt die Person aus der UHS.
+    let (s, _) = post(
+        &app,
+        &admin,
+        &pfad,
+        json!({ "art": "transport", "ziel": "KH Süd" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let d = detail(&app, &admin, e, p).await;
+    assert_eq!(d["aktueller_verbleib"], "Transport → KH Süd");
+    assert!(d["aufenthalt"].is_null(), "{d}");
+}
+
+#[tokio::test]
+async fn verbleib_replay_ist_idempotent_samt_austritt() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, _u, p) = person_in_uhs(&app, &pool, &admin).await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/verbleib");
+    let body = json!({ "art": "transport", "zeitpunkt_at": zeit(-120), "client_id": "v-2" });
+    let mut rx = live.abonniere(e);
+    let (s1, v1) = post(&app, &admin, &pfad, body.clone()).await;
+    assert_eq!(s1, StatusCode::CREATED, "{v1}");
+    recv_until_tag(&mut rx, "etb", Duration::from_secs(1)).await;
+    let (s2, v2) = post(&app, &admin, &pfad, body).await;
+    assert_eq!(s2, StatusCode::CREATED, "{v2}");
+    assert_eq!(v1["id"], v2["id"]);
+    let d = detail(&app, &admin, e, p).await;
+    assert_eq!(d["verbleib"].as_array().unwrap().len(), 1);
+    assert!(d["aufenthalt"].is_null());
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert_eq!(
+        inhalte
+            .iter()
+            .filter(|i| i.contains("abtransportiert"))
+            .count(),
+        1,
+        "{inhalte:?}"
+    );
+    assert_eq!(
+        inhalte.iter().filter(|i| i.contains("verlässt")).count(),
+        1,
+        "{inhalte:?}"
+    );
+}
+
+#[tokio::test]
+async fn verbleib_weit_in_der_zukunft_ist_400() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen/{p}/verbleib"),
+        json!({ "art": "entlassung", "zeitpunkt_at": zeit(600) }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert!(detail(&app, &admin, e, p).await["verbleib"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+}

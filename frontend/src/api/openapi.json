@@ -14811,6 +14811,13 @@
             "format": "int64",
             "description": "Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen\nliest, wer das Modul Betreuung sehen darf, aus dessen Übersicht."
           },
+          "eingegangen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Eintrag beim Server ankam (LLH-1138); `zeitpunkt_at` ist die Erfassungszeit.\nFehlt bei Einträgen von vor der Migration 0217."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"

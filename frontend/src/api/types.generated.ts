@@ -5800,6 +5800,11 @@ export interface components {
              *     liest, wer das Modul Betreuung sehen darf, aus dessen Übersicht.
              */
             betreuungsstelle_id?: number | null;
+            /**
+             * @description Wann der Eintrag beim Server ankam (LLH-1138); `zeitpunkt_at` ist die Erfassungszeit.
+             *     Fehlt bei Einträgen von vor der Migration 0217.
+             */
+            eingegangen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */

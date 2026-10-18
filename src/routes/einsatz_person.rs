@@ -492,15 +492,10 @@ pub async fn anlegen(
                         id,
                         verbleib_repo::VerbleibDaten {
                             art: art.as_str(),
-                            transportmittel: None,
-                            ziel: None,
-                            status: None,
-                            notiz: None,
                             betreuungsstelle_id: Some(stelle_id),
                             // Eine Bestätigung gibt es nur zu einer Erst-Sichtung (oben).
-                            bestaetigung: None,
+                            ..Default::default()
                         },
-                        &art.kurzform(None),
                         ctx.benutzer.id,
                     )
                     .await?;
@@ -1120,6 +1115,12 @@ pub struct VerbleibBody {
     pub betreuungsstelle_id: Option<i64>,
     /// Namentliche Bestätigung am Gerät (LFH-1046): Kennung in `einsatz_personal`.
     pub bestaetigt_personal_id: Option<i64>,
+    /// Erfassungszeit, offline vorgemerkt (LLH-1138); fehlt = jetzt.
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
@@ -1131,14 +1132,30 @@ pub struct VerbleibBody {
 /// fremder/unbekannter Stelle, 409 bei stornierter. Eine geschlossene Stelle ist erlaubt
 /// (Entscheidung 24.09.2026: ein Verbleib wird oft nachgetragen). Der Server setzt keinen
 /// Stellennamen in Ziel, Kurzform oder ETB.
+///
+/// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): Replay vor dem Aktiv-Gate,
+/// Erfassungszeit gekappt, Cache und Kurzform aus dem jüngsten Ereignis. Verbleib, Auto-Austritt
+/// und ETB stehen in EINER Transaktion; der Austritt läuft nur, wenn der neue Verbleib gewinnt.
 pub async fn verbleib(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Personen>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
+    headers: HeaderMap,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<VerbleibBody>,
 ) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = crate::routes::support::parse_client_id(body.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = verbleib_repo::nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |v| v.person_id)?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
     parse_enum_opt(
@@ -1146,6 +1163,9 @@ pub async fn verbleib(
         body.status.as_deref(),
         "Unbekannter Verbleib-Status",
     )?;
+    // Das Feld für sich (400) vor jedem Zusammenhang (422); die Untergrenze kommt mit der Person.
+    let jetzt = chrono::Utc::now();
+    crate::routes::support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), jetzt)?;
     // Stellenbindung (LFH-1041): ein Gerät der Betreuungsstelle bringt in keine andere
     // Notunterkunft, auch nicht ohne Stelle; die übrigen Verbleib-Arten bleiben frei.
     if art == VerbleibArt::Notunterkunft
@@ -1178,6 +1198,11 @@ pub async fn verbleib(
         }
     }
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let zeitpunkt_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        jetzt,
+        &person.erfasst_at,
+    )?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierte Person kann keinen Verbleib erhalten".into(),
@@ -1186,7 +1211,6 @@ pub async fn verbleib(
     let transportmittel = trimme(body.transportmittel);
     let ziel = trimme(body.ziel);
     let notiz = trimme(body.notiz);
-    let kurzform = art.kurzform(ziel.as_deref());
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
@@ -1195,55 +1219,113 @@ pub async fn verbleib(
     )
     .await?;
 
-    let verbleib = verbleib_repo::erfassen(
-        &state.pool,
-        einsatz_id,
-        person_id,
-        verbleib_repo::VerbleibDaten {
-            art: art.as_str(),
-            transportmittel: transportmittel.as_deref(),
-            ziel: ziel.as_deref(),
-            status: body.status.as_deref(),
-            notiz: notiz.as_deref(),
-            betreuungsstelle_id: body.betreuungsstelle_id,
-            bestaetigung: bestaetigung.as_ref(),
-        },
-        &kurzform,
-        ctx.benutzer.id,
-    )
-    .await?;
-
-    // E‑3: bei transport/entlassung/notunterkunft → UHS-Auto-Austritt (eigene ETB-Spur).
-    // Notunterkunft (LFH-613) verlässt die Unfallhilfsstelle ebenso wie ein Transport.
-    if matches!(
-        art,
-        VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
-    ) {
-        let anlass = format!("durch Verbleib {}", art.as_str());
-        if let Some(effekt) =
-            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, ctx.benutzer.id)
-                .await?
-        {
-            sse_auto_austritt(&state, einsatz_id, &effekt);
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let daten = verbleib_repo::VerbleibDaten {
+        art: art.as_str(),
+        transportmittel: transportmittel.as_deref(),
+        ziel: ziel.as_deref(),
+        status: body.status.as_deref(),
+        notiz: notiz.as_deref(),
+        betreuungsstelle_id: body.betreuungsstelle_id,
+        bestaetigung: bestaetigung.as_ref(),
+        zeitpunkt_at: Some(&zeitpunkt_at),
+        client_id: client_id.as_deref(),
+    };
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        if let Some(cid) = client_id.as_deref() {
+            if let Some(replay) = verbleib_repo::nach_client_id(&mut *conn, einsatz_id, cid).await?
+            {
+                return Ok(Verbleibt::Replay(replay));
+            }
         }
+        let erfasst = verbleib_repo::erfassen_tx(
+            conn,
+            einsatz_id,
+            person_id,
+            verbleib_repo::VerbleibDaten { ..daten },
+            ctx.benutzer.id,
+        )
+        .await?;
+        // E‑3: bei transport/entlassung/notunterkunft → UHS-Auto-Austritt (eigene ETB-Spur).
+        // Notunterkunft (LFH-613) verlässt die Unfallhilfsstelle ebenso wie ein Transport. Nur,
+        // wenn dieser Verbleib der aktuelle ist (D6): ein älterer nachgereichter Transport holt
+        // die zurückgekehrte Person nicht aus der UHS.
+        let austritt = if erfasst.gewinnt
+            && matches!(
+                art,
+                VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
+            ) {
+            crate::uhs::auto_austritt_tx(
+                conn,
+                einsatz_id,
+                person_id,
+                &format!("durch Verbleib {}", art.as_str()),
+                ctx.benutzer.id,
+                startwert,
+            )
+            .await?
+        } else {
+            None
+        };
+        let verbleib = verbleib_repo::laden_tx(conn, einsatz_id, erfasst.id).await?;
+        let text = format!(
+            "Person {}: {}",
+            registrier_anzeige(person.registrier_nr),
+            art.etb_sachverhalt()
+        );
+        let text = if erfasst.gewinnt {
+            text
+        } else {
+            format!("{text}, nachgetragen")
+        };
+        let etb_id = crate::etb::system_audit_zu_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::person::etb_text_bestaetigt(text, bestaetigung.as_ref()),
+            &verbleib.zeitpunkt_at,
+        )
+        .await?;
+        Ok(Verbleibt::Neu {
+            verbleib,
+            austritt,
+            etb_id,
+        })
+    })?;
+    let (verbleib, austritt, etb_id) = match ergebnis {
+        Verbleibt::Replay(replay) => {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |v| v.person_id)?),
+            ))
+        }
+        Verbleibt::Neu {
+            verbleib,
+            austritt,
+            etb_id,
+        } => (verbleib, austritt, etb_id),
+    };
+    if let Some(a) = austritt {
+        state.live.publiziere(einsatz_id, a.etb_id);
+        state
+            .live
+            .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", a.uhs_id);
     }
-
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        ctx.benutzer.id,
-        &crate::person::etb_text_bestaetigt(
-            format!(
-                "Person {}: {}",
-                registrier_anzeige(person.registrier_nr),
-                art.etb_sachverhalt()
-            ),
-            bestaetigung.as_ref(),
-        ),
-    )
-    .await;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
+}
+
+/// Ausgang der Verbleib-Transaktion.
+enum Verbleibt {
+    /// Schon gespeichert (gleichzeitiger Replay derselben `client_id`).
+    Replay(VerbleibAnzeige),
+    Neu {
+        verbleib: VerbleibAnzeige,
+        austritt: Option<crate::uhs::AutoAustrittTx>,
+        etb_id: i64,
+    },
 }
 
 #[derive(Debug, Deserialize)]

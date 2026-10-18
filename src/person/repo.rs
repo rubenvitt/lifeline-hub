@@ -896,19 +896,13 @@ mod tests {
         let _leer = stelle("Leer").await;
         let nu = |id| VerbleibDaten {
             art: "notunterkunft",
-            transportmittel: None,
-            ziel: None,
-            status: None,
-            notiz: None,
             betreuungsstelle_id: Some(id),
-            bestaetigung: None,
+            ..VerbleibDaten::default()
         };
         let mut personen = Vec::new();
         for _ in 0..4 {
             let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
-            erfassen(&pool, e, p.id, nu(nord), "Notunterkunft", b)
-                .await
-                .unwrap();
+            erfassen(&pool, e, p.id, nu(nord), b).await.unwrap();
             personen.push(p.id);
         }
         storniere(&pool, e, personen[2], b).await.unwrap();
@@ -922,7 +916,6 @@ mod tests {
                 bestaetigung: None,
                 ..nu(nord)
             },
-            "entlassen",
             b,
         )
         .await

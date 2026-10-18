@@ -216,6 +216,17 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Sichtung",
     });
 
+    let url = format!("{basis}/personen/{p}/verbleib");
+    let body = json!({"art":"transport","ziel":"Geheim-Klinik Nord","client_id":"r-verbleib"});
+    angelegt(app, cookie, &url, &body.to_string(), "Verbleib").await;
+    faelle.push(Fall {
+        route: "personen/verbleib",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"art":"vor_ort","client_id":"r-verbleib-neu"}).to_string(),
+        geheim: "Geheim-Klinik",
+    });
+
     faelle
 }
 
