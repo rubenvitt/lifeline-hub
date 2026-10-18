@@ -68,6 +68,8 @@ behalten“ bleibt der Ort stehen.
 1. Die Seite des Schadens öffnen. Unter „Verortung“ steht „nicht verortet“.
 2. „Auf Karte verorten“ wählen. Die Lagekarte öffnet sich und nimmt die Stelle des Schadens auf
    ([Lagekarte, Zeichnen und Messen](lagekarte.md)).
+3. Nach dem Tipp auf die Karte meldet sie „S-… verortet“. „Zurück zu S-…“ führt auf die Seite
+   des Schadens zurück.
 
 Wer die Koordinate schon beim Erfassen kennt, trägt sie unter „Weitere Angaben“ ein.
 

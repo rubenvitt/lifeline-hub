@@ -130,6 +130,19 @@ diese Zusage.
   `PlatzierSteuerung`, die Sidebar zeigt dann nur Zustand und Zusatzangaben
   (`modusBedienungImFuss`: „wird platziert“, Koordinate, Mittelpunkt) — je Breite genau ein Knopf
   je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
+- **Verortungsauftrag von außen** (LLH-1125, Spec `lagekarte-verortungsauftrag`,
+  `openspec/changes/pao1s6uw-verorten-rueckweg/design.md`): `?platzieren=<typ>:<id>[&zurueck=1]`
+  startet über `onVerortungsauftragStart`. Der **Ebenen-Vorrang** ist abgeleitet, nie gespeichert:
+  `verortungsTyp` im Hook (bis zum Unmount), gezeichnet wird `layerMitVorrang`
+  (`lagekarte/verortungsauftrag.ts`), Schalter, Schmutzig-Erkennung und Speichern lesen weiter
+  `layer`; die Schalterzeile trägt „eingeblendet“, die Modulsperre bleibt an der Datenquelle.
+  Nach Erfolg wird der Modus zu `verortet` (kein exklusiver Modus, kein Toast): Marker gewählt und
+  angeflogen, Rückmeldung „<Kennung> verortet“ mit „Zurück zu …“ (nur mit `zurueck`) und „Auf der
+  Karte bleiben“, unter `lg` im Fuß-Band, ab `lg` oben in der Leiste — je Breite genau ein Knopf
+  je Handlung. Der **Rückweg** folgt allein aus Typ und Kennung (`rueckwegPfad`, exhaustiver
+  `Record`; UHS ohne äußeren Einstieg `null`), nie aus der URL (kein offener Weiterleiter). Ein
+  Start in der Karte selbst („Nicht verortet“, Einsatzort) endet wie bisher mit Toast und
+  Modusende (LFH-765). Nachweis `e2e/lagekarte-betroffene.spec.ts`, `e2e/lagekarte-touch.spec.ts`.
 - **Kartengrundlage** (LFH-558, Spec `lagekarte-kartengrundlage`, Herleitung D6 in
   `openspec/changes/archive/2026-09-30-lfh-558-lagekarte-kartenpfade-fixture-basemap/design.md`):
   die Karte entsteht mit dem Blindstil, der Style der Ansicht kommt per `setStyle`. Jeder

@@ -102,6 +102,11 @@ export interface EbenenZeile {
   sichtbar: boolean;
   /** Gesetzt = die Zeile ist nicht schaltbar und sagt, warum (nur „Betroffene"). */
   sperrgrund?: string;
+  /**
+   * Die Ebene ist aus, wird aber für einen Verortungsauftrag gezeichnet (LLH-1125): die Zeile trägt
+   * den Zusatz „eingeblendet“, der Schalter bleibt die Wahl.
+   */
+  eingeblendet?: boolean;
 }
 
 /**
@@ -147,10 +152,12 @@ export function ebenenZeilen(
   personen: PersonenEbenenAngabe = { zugriff: 'ausgeblendet', anzahl: 0 },
   betreuung: BetreuungEbenenAngabe = { zugriff: 'ausgeblendet' },
   br: BrEbenenAngabe = { zugriff: 'ausgeblendet' },
+  /** Die Ebene, die nur der Verortungsauftrag zeichnet (`ebeneMitVorrang`, LLH-1125). */
+  eingeblendet: keyof LayerSichtbar | null = null,
 ): EbenenZeile[] {
   const zaehlung = new Map<MarkerTyp, number>();
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
-  return EBENEN.flatMap(({ key, name }): EbenenZeile[] => {
+  const zeilen = EBENEN.flatMap(({ key, name }): EbenenZeile[] => {
     if (key === 'person') return personenZeile(name, layer.person, quellenFehler, personen);
     // Wie „Betroffene": ausgeblendet → keine Zeile, gesperrt → Grund statt Zahl, nie „an". Die Zahl
     // kommt aus `alleVerortet`.
@@ -170,6 +177,10 @@ export function ebenenZeilen(
     const n = key === 'zone' ? zonenAnzahl : (zaehlung.get(key) ?? 0);
     return [{ key, name, anzahl: quellenFehler ? '—' : n, sichtbar: layer[key] }];
   });
+  // Eine gesperrte Zeile blendet nichts ein: ohne Zugriff zeichnet die Karte die Ebene nicht.
+  return zeilen.map((z) =>
+    z.key === eingeblendet && !z.sichtbar && !z.sperrgrund ? { ...z, eingeblendet: true } : z,
+  );
 }
 
 /**

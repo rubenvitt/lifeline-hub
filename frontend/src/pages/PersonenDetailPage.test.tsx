@@ -1714,6 +1714,8 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     const ziel = new URL(link.getAttribute('href')!, 'http://x');
     expect(ziel.pathname).toBe('/einsaetze/1/lagekarte');
     expect(ziel.searchParams.get('platzieren')).toBe('person:10');
+    // Mit Herkunft: die Karte bietet danach „Zurück zu R-001“ an (LLH-1125).
+    expect(ziel.searchParams.get('zurueck')).toBe('1');
     // Nicht vermisst → keine Zeile „vermisst seit".
     expect(screen.queryByText('vermisst seit')).not.toBeInTheDocument();
   });

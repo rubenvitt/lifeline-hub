@@ -578,7 +578,8 @@ export default function PersonenDetailPage() {
                       // handgebauten Bedienziels trägt `verortenLinkStil`.
                       <Link
                         to={lagekartePfad(einsatzId, {
-                          platzieren: { typ: 'person', id: person.id },
+                          // Mit Herkunft: „Zurück zu R-…“ führt danach hierher (LLH-1125).
+                          platzieren: { typ: 'person', id: person.id, zurueck: true },
                         })}
                         style={verortenLinkStil(token, rollen.bedienText)}
                       >

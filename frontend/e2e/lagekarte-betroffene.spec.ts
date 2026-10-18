@@ -370,6 +370,69 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
   await expect(page.locator('[data-lfh="auswahl"]').getByText('Zug Rand')).toHaveCount(0);
 });
 
+// LLH-1125 (Spec `lagekarte-verortungsauftrag`): wer eine Person aus ihrem Detail verortet, sieht
+// den neuen Marker, obwohl die Ebene „Betroffene“ aus ist — und der Schalter, die Ansicht bleiben
+// unberührt. „Zurück zu R-…“ führt ins Detail, das die neue Koordinate zeigt.
+test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker und führt zurück', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await anmeldenAls(page, ADMIN, PW);
+  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+    bezeichnung: `E2E Rueckweg ${Date.now()}`,
+  });
+  const basis = `/api/einsaetze/${einsatzId}`;
+  // Ohne Fundort: genau der Fall, für den „Auf Lagekarte verorten“ da ist.
+  const person = (await senden(page, 'post', `${basis}/personen`, { name: 'Rückweg' })) as {
+    id: number;
+    registrier_nr: number;
+  };
+  const kennung = `R-${String(person.registrier_nr).padStart(3, '0')}`;
+
+  // Jeder schreibende Zugriff auf eine Kartenansicht wäre ein gespeicherter Vorrang.
+  const ansichtGeschrieben: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/karten-ansichten') && r.method() !== 'GET') {
+      ansichtGeschrieben.push(`${r.method()} ${r.url()}`);
+    }
+  });
+
+  await page.goto(`/einsaetze/${einsatzId}/personen/${person.id}`);
+  await page.getByRole('link', { name: 'Auf Lagekarte verorten', exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte`));
+  await karteBereit(page);
+  // Vorbedingung: der Modus läuft, die Ebene ist laut Schalter aus.
+  await expect(page.locator('[data-lfh="platzieren-hinweis"]')).toBeVisible();
+  const schalter = page.getByRole('switch', { name: 'Betroffene' });
+  await expect(schalter).toHaveAttribute('aria-checked', 'false');
+
+  await springe(page, MITTE, 13);
+  await klickeAuf(page, MITTE);
+
+  // Rückmeldung am Ort, Marker in der Personenquelle, gewählt im Paneel „Ausgewählt“.
+  const leiste = page.locator('[data-lfh="kartenleiste"]');
+  await expect(leiste.getByText(`${kennung} verortet`)).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await features(page, 'marker-personen')).some(
+          (p) => p.schluessel === `person-${person.id}` || Number(p.c_person ?? 0) > 0,
+        ),
+      { timeout: 30_000 },
+    )
+    .toBe(true);
+  await expect(page.locator('[data-paneel="ausgewaehlt"]').getByText(kennung)).toBeVisible();
+  // Der Schalter steht weiter auf aus und sagt, dass die Ebene nur eingeblendet ist.
+  await expect(schalter).toHaveAttribute('aria-checked', 'false');
+  await expect(schalter).toContainText('eingeblendet');
+  await expect(page.getByRole('button', { name: /In dieser Ansicht speichern/ })).toHaveCount(0);
+  expect(ansichtGeschrieben, 'die Ansicht wurde nicht geschrieben').toEqual([]);
+
+  await page.getByRole('button', { name: `Zurück zu ${kennung}`, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/personen/${person.id}$`));
+  await expect(page.locator('[data-lfh="koordinate"]')).toBeVisible();
+});
+
 // LFH-668, D5 (`openspec/changes/archive/2026-10-01-lfh-668-betroffenen-karte-schleuse/design.md`): auf der Lagekarte
 // gibt es keine Schleuse, der Spider-Schutz der Kartenfläche gilt aber auch hier. Eine reine
 // Inhaltsänderung (Sichtung) lässt ein aufgefächertes Bündel offen, ein Zugang klappt es zu.

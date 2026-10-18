@@ -66,7 +66,8 @@ Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv i
 1. Den Raum öffnen und bei „Raumdaten“ „Auf Karte verorten“ wählen. Steht der Raum schon auf der
    Karte, heißt der Knopf „Auf Karte versetzen“.
 2. Die Lagekarte öffnet sich zum Platzieren dieses Raums. Auf die Stelle der Karte tippen, an der
-   der Raum liegt. Die App meldet „Objekt verortet“.
+   der Raum liegt. Die Karte meldet die Bezeichnung mit „verortet“, etwa „Parkplatz Stadion Nord
+   verortet“; „Zurück zu …“ führt auf die Seite des Raums zurück.
 3. Der Raum steht danach mit dem Zeichen „Bereitstellungsraum“ auf der Karte, beschriftet mit
    Bezeichnung, Stärke und Zahl der Fahrzeuge, etwa „Parkplatz Stadion Nord · 0/1/5//6 · 3 Fz“.
 4. Ein Tipp auf das Zeichen zeigt unter „Ausgewählt“ Status, Stärke, Fahrzeuge, Einheiten, „Wartet
