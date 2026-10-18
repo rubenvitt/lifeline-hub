@@ -964,3 +964,62 @@ describe('EtbZeitachse — Fundstellen der Volltextsuche', () => {
     expect(container.querySelector('mark')).toBeNull();
   });
 });
+
+describe('Nach oben', () => {
+  function rolle(scrollY: number) {
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: scrollY });
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+  }
+
+  it('steht erst, wenn mehr als eine Fensterhöhe darüber liegt, und rollt an den Anfang', async () => {
+    vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+    const scrollTo = vi.fn();
+    vi.stubGlobal('scrollTo', scrollTo);
+    try {
+      rolle(0);
+      renderZeitachse({ eintraege: [eintrag()] });
+      expect(screen.queryByRole('button', { name: 'Nach oben' })).toBeNull();
+
+      rolle(window.innerHeight + 1);
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Nach oben' }));
+      expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 0 }));
+
+      rolle(0);
+      act(() => {
+        vi.advanceTimersToNextFrame();
+      });
+      expect(screen.queryByRole('button', { name: 'Nach oben' })).toBeNull();
+    } finally {
+      rolle(0);
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
+  });
+
+  it('steht über dem Sammelbanner, nicht darauf', () => {
+    rolle(window.innerHeight + 1);
+    try {
+      const { neu } = renderZeitachse({ eintraege: [eintrag()], onWiedervorlage: vi.fn() });
+      // Fokus in der Achse friert ein: der neue Eintrag steht im Banner.
+      act(() => screen.getByRole('button', { name: 'Aktionen zu Eintrag 1' }).focus());
+      neu(
+        baueZeilen({
+          eintraege: [eintrag({ id: 2, lfd_nr: 2 }), eintrag()],
+          ausstehend: [],
+          abgelehnt: [],
+        }),
+      );
+      const knopf = screen.getByRole('button', { name: 'Nach oben' });
+      const banner = document.querySelector('[data-lfh="sammelbanner"]')!;
+      expect(knopf.parentElement).toBe(banner.parentElement);
+      expect(knopf.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      rolle(0);
+    }
+  });
+});

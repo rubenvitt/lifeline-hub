@@ -321,6 +321,12 @@
   outline-offset: 0;
 }
 
+/* Mit Typfarbe (ETB) folgt der Fokusring dem Rahmen: ein blauer Ring um den orangen Rahmen
+   läse sich als zweiter Zustand. Der Fokus bleibt sichtbar, der Rahmen wird doppelt so stark. */
+.lfh-schnellerfassung[data-rahmen-farbe]:focus-within {
+  outline-color: var(--lfh-schnellerfassung-rahmen);
+}
+
 /* Katalogtabelle / Datensicht (`components/KatalogTabelle.tsx`). Farben, Trenner und
    Zellpolster kommen als antd-Komponententokens (`tabellenTokens`); hier steht nur die
    Kopfzeilen-TYPOGRAFIE und die Mono-Spalte. `.ant-table-wrapper.lfh-katalog` hebt die

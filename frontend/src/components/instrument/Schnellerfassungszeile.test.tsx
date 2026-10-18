@@ -154,15 +154,18 @@ describe('Schnellerfassungszeile', () => {
     }
   });
 
-  it('kante: eine 2-px-Kante am Zeilenanfang nur auf Wunsch (LLH-1112)', () => {
+  it('rahmenFarbe: der ganze Rahmen in der Typfarbe, vorn 2 px, nur auf Wunsch (LLH-1112)', () => {
     const { unmount } = renderMitProviders(
-      <Schnellerfassungszeile kante="#123456">
+      <Schnellerfassungszeile rahmenFarbe="#d46b08">
         <Input aria-label="Feld" />
       </Schnellerfassungszeile>,
     );
     const zeile = () => document.querySelector<HTMLElement>('.lfh-schnellerfassung')!;
-    expect(zeile().style.borderInlineStart).toBe('2px solid #123456');
-    expect(zeile()).toHaveAttribute('data-kante', 'true');
+    expect(zeile().style.borderTop).toBe('1px solid rgb(212, 107, 8)');
+    expect(zeile().style.borderBottom).toBe('1px solid rgb(212, 107, 8)');
+    expect(zeile().style.borderInlineStart).toBe('2px solid #d46b08');
+    expect(zeile().style.getPropertyValue('--lfh-schnellerfassung-rahmen')).toBe('#d46b08');
+    expect(zeile()).toHaveAttribute('data-rahmen-farbe', 'true');
     unmount();
     renderMitProviders(
       <Schnellerfassungszeile>
@@ -170,6 +173,14 @@ describe('Schnellerfassungszeile', () => {
       </Schnellerfassungszeile>,
     );
     expect(zeile().style.borderInlineStart).toBe('');
-    expect(zeile()).not.toHaveAttribute('data-kante');
+    expect(zeile().style.getPropertyValue('--lfh-schnellerfassung-rahmen')).toBe('');
+    expect(zeile()).not.toHaveAttribute('data-rahmen-farbe');
+  });
+
+  it('rahmenFarbe: der Fokusring folgt der Typfarbe (sprache.css)', () => {
+    const css = readFileSync(join(process.cwd(), 'src/theme/sprache.css'), 'utf8');
+    expect(css).toMatch(
+      /\.lfh-schnellerfassung\[data-rahmen-farbe\]:focus-within\s*\{\s*outline-color:\s*var\(--lfh-schnellerfassung-rahmen\);/,
+    );
   });
 });

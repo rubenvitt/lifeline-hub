@@ -105,10 +105,12 @@ interface SchnellerfassungszeileProps {
    */
   felderUmrandet?: boolean;
   /**
-   * Farbe einer 2-px-Kante am Zeilenanfang (LLH-1112, Opt-in): die ETB-Erfassung zeigt den Typ
-   * wie die Zeitachse mit Kante und Wort. Zusatzkanal — das Wort im Präfix trägt die Aussage.
+   * Typfarbe der Zeile (LLH-1112, Opt-in): der ganze Rahmen trägt sie, am Zeilenanfang als
+   * 2-px-Kante wie in der Zeitachse, und der Fokusring folgt ihr (`theme/sprache.css`). Die
+   * ETB-Erfassung zeigt so den Typ, den sie gerade schreibt. Zusatzkanal — das Wort im Präfix
+   * trägt die Aussage.
    */
-  kante?: string;
+  rahmenFarbe?: string;
   style?: CSSProperties;
 }
 
@@ -120,7 +122,7 @@ export default function Schnellerfassungszeile({
   gestapelt = false,
   feldFuellt = false,
   felderUmrandet = false,
-  kante,
+  rahmenFarbe,
   style,
 }: SchnellerfassungszeileProps) {
   const { token, rollen } = useRollen();
@@ -147,10 +149,16 @@ export default function Schnellerfassungszeile({
     >
       <div
         className="lfh-schnellerfassung"
-        data-kante={kante != null || undefined}
+        data-rahmen-farbe={rahmenFarbe != null || undefined}
         style={{
           ...schnellerfassungStil(rollen, token, gestapelt),
-          ...(kante != null ? { borderInlineStart: `2px solid ${kante}` } : {}),
+          ...(rahmenFarbe != null
+            ? {
+                border: `1px solid ${rahmenFarbe}`,
+                borderInlineStart: `2px solid ${rahmenFarbe}`,
+                ['--lfh-schnellerfassung-rahmen' as string]: rahmenFarbe,
+              }
+            : {}),
         }}
       >
         {gestapelt && feldZelle}

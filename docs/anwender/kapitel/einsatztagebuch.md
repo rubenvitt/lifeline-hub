@@ -30,7 +30,9 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
    ![ETB beim Öffnen: Zeitachse mit den neuesten Einträgen unten über der Erfassungsleiste, Seitenleiste „Bilanz“ rechts](../bilder/einsatztagebuch/zeitachse.png)
 
 2. Die Seite öffnet am Ende: der neueste Eintrag steht über der Erfassungsleiste. Nach oben
-   rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge.
+   rollen liest zurück; „Ältere laden“ über der Zeitachse holt frühere Einträge. Wer weiter als
+   eine Bildschirmhöhe zurückgerollt ist, kommt rechts über der Erfassungsleiste mit „Nach oben“
+   in einem Zug zum Anfang mit Filterleiste und „Ältere laden“.
 3. Sind seit dem letzten Besuch Einträge hinzugekommen, trennt eine Linie wie „Neu seit 1304 · 14
    Einträge“ die gesichteten von den neuen. Liegt der zuletzt gesichtete Eintrag nicht im
    geladenen Teil oder ist ein Filter gesetzt, steht derselbe Hinweis über der Zeitachse, mit „Zur
@@ -48,10 +50,10 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Erfassungsleiste am Fuß der Seite den Text in das Feld „Inhalt …“ schreiben.
 
-   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ „Meldung“ mit Farbkante, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
+   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ „Meldung“ mit Rahmen in der Typfarbe, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
 
 2. Den Typ prüfen: Der Knopf links zeigt ihn als Wort, zum Beispiel „Meldung“, und die Leiste
-   trägt links seine Farbkante wie die Zeitachse. Ein Klick darauf wechselt den Typ. Schneller
+   trägt seine Farbe als Rahmen, links als Kante wie die Zeitachse (eine Anordnung etwa orange). Ein Klick darauf wechselt den Typ. Schneller
    geht es mit einem Schrägstrich am Zeilenanfang, etwa „/anordnung“ oder „/lage“.
 3. „Von“ und „An“ prüfen. Beide sind mit dem persönlichen Standard-Rufnamen vorbelegt. Das Menü
    eines Chips bietet „Nur für diesen Eintrag ändern“ und „Standard-Rufname ändern“; ein „@“ im

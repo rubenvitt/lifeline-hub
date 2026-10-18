@@ -35,9 +35,11 @@ import { formatUhrzeit, inZone } from '../anzeige/format';
 import type { AbgelehnterEintrag } from '../offline/queue';
 import { etbPfad } from '../routing/deeplinks';
 import { etbTyp } from '../theme/statusFarben';
+import { IconPfeilHoch } from '../icons';
 import EtbAnhaenge from './EtbAnhaenge';
 import EtbBacklinkBadges from './EtbBacklinkBadges';
 import EtbDokumente, { type EtbDokument } from './EtbDokumente';
+import { scrollNachOben, useWeitGerollt } from './nachOben';
 import type { EtbZeile } from './etbZeile';
 import { MELDEWEG_OPTIONEN } from './schnellerfassungModell';
 import { SYSTEM_RUFNAME } from './systemKennung';
@@ -271,6 +273,7 @@ export default function EtbZeitachse({
   const [gefroren, setGefroren] = useState<Einfrierstand | null>(null);
   /** Liegt der Fokus in der Zeitachse? Zweiter Grund zum Einfrieren neben „nicht am Ende“. */
   const [fokusDrin, setFokusDrin] = useState(false);
+  const weitGerollt = useWeitGerollt();
   /*
    * Hochgerollt friert ein, zurück am Ende taut auf — sofern kein Fokus darin liegt (LLH-1149,
    * design.md D2). Im Render angeglichen wie der Sprung unten: ein Effekt käme einen Commit zu
@@ -539,7 +542,9 @@ export default function EtbZeitachse({
       {inhalt}
       {/* Überlagerung mit Nullhöhe am UNTEREN Rand (LLH-1149): neue Einträge kommen unten an,
           das Banner klebt dort über der angepinnten Erfassung (`--lfh-etb-fokusabstand`, ihre
-          gemessene Höhe) und nimmt keinen Platz im Fluss. */}
+          gemessene Höhe) und nimmt keinen Platz im Fluss. „Nach oben“ steht rechts darüber,
+          gestapelt statt überlagert, damit es das Banner nie verdeckt. Die Schale lässt Zeiger
+          durch. */}
       <div
         style={{
           position: 'sticky',
@@ -548,23 +553,56 @@ export default function EtbZeitachse({
           zIndex: 5,
         }}
       >
-        {zurueckgehalten > 0 && (
-          <Sammelbanner
-            aktion={{
-              label: 'anzeigen',
-              onKlick: () => {
-                // Der Knopf verschwindet mit dem Banner, und mit ihm der Fokus — ohne Blur-Ereignis.
-                // Stünde `fokusDrin` weiter, bliebe die Achse am Ende eingefroren.
+        <div
+          style={{
+            position: 'absolute',
+            insetInline: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-end',
+            gap: token.marginXS,
+            pointerEvents: 'none',
+          }}
+        >
+          {weitGerollt && (
+            <Button
+              data-lfh="etb-nach-oben"
+              icon={<IconPfeilHoch />}
+              style={{
+                pointerEvents: 'auto',
+                marginInlineEnd: token.marginSM,
+                // Ohne Banner steht der Knopf mit Luft über der Erfassung, sonst trennt `gap`.
+                marginBlockEnd: zurueckgehalten > 0 ? 0 : token.marginSM,
+              }}
+              onClick={() => {
+                // Der Knopf verschwindet oben, und mit ihm der Fokus — ohne Blur-Ereignis (wie
+                // beim Banner): stünde `fokusDrin` weiter, bliebe die Achse eingefroren.
                 setFokusDrin(false);
-                setGefroren(amEnde ? null : einfrieren(zeilen));
-                onZumEnde?.();
-              },
-            }}
-            style={{ position: 'absolute', insetInline: 0, bottom: 0 }}
-          >
-            {zuflussText(zurueckgehalten)}
-          </Sammelbanner>
-        )}
+                scrollNachOben();
+              }}
+            >
+              Nach oben
+            </Button>
+          )}
+          {zurueckgehalten > 0 && (
+            <Sammelbanner
+              aktion={{
+                label: 'anzeigen',
+                onKlick: () => {
+                  // Der Knopf verschwindet mit dem Banner, und mit ihm der Fokus — ohne Blur-Ereignis.
+                  // Stünde `fokusDrin` weiter, bliebe die Achse am Ende eingefroren.
+                  setFokusDrin(false);
+                  setGefroren(amEnde ? null : einfrieren(zeilen));
+                  onZumEnde?.();
+                },
+              }}
+              style={{ alignSelf: 'stretch', pointerEvents: 'auto' }}
+            >
+              {zuflussText(zurueckgehalten)}
+            </Sammelbanner>
+          )}
+        </div>
       </div>
     </div>
   );
