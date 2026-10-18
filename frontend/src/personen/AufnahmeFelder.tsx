@@ -108,7 +108,7 @@ export default function AufnahmeFelder({
       {modus !== 'vermisst' && (
         <>
           {einsatzId != null && <BestaetigtVonFeld einsatzId={einsatzId} />}
-          <Form.Item label="Zustand" name="zustand">
+          <Form.Item label="Zustand / Verdacht" name="zustand">
             <Input placeholder="z. B. gehfähig, unterkühlt" />
           </Form.Item>
           <KoordinateFeld />

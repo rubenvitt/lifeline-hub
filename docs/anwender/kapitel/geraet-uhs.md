@@ -2,7 +2,7 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
 ---
 
 ## Überblick
@@ -56,13 +56,13 @@ Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren
 
 ### Sichten mit „Bestätigt von“
 
-1. Die Person öffnen und „Sichten“ wählen; bei einer schon gesichteten Person steht
-   „Re-Sichten“ im Menü „Weitere Aktionen“.
-2. Im Dialog „Sichtung erfassen“ die Fläche der Kategorie antippen und, wenn nötig, eine
+1. Die Person öffnen und oben im Patientenkopf auf die Sichtung tippen („ungesichtet“ oder die
+   bisherige Kategorie).
+2. In der aufgeklappten Sichtungswahl die Fläche der Kategorie antippen und, wenn nötig, eine
    „Kurzbegründung (optional)“ angeben.
 3. Unter „Bestätigt von“ die Person wählen, die die Sichtung verantwortet, etwa die Notärztin.
 
-   ![Dialog „Sichtung erfassen“ mit Kategorie SK II und „Bestätigt von“ Anna Probe · Notarzt](../bilder/geraet-uhs/sichtung.png)
+   ![Patientenkopf mit aufgeklappter Sichtungswahl, Kategorie SK II und „Bestätigt von“ Anna Probe · Notarzt](../bilder/geraet-uhs/sichtung.png)
 
 4. „Übernehmen“ wählen. Die Sichtung trägt danach „bestätigt: …“ mit dem Namen.
 

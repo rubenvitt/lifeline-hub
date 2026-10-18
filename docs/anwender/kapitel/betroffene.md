@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs]
 ---
 
 ## Überblick
@@ -67,21 +67,31 @@ Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen 
 
 ### Sichten und den Verbleib erfassen
 
-1. In der Liste die Person öffnen. Die Seite „Person R-…“ zeigt Status, Sichtung und den
-   medizinischen Verlauf.
-2. Ohne Sichtung „Sichten“ wählen, sonst im Aktionsmenü der Seite „Re-Sichten“. Im Dialog
-   „Sichtung erfassen“ die Fläche der Kategorie antippen, bei Bedarf eine „Kurzbegründung
-   (optional)“, und „Übernehmen“ wählen.
-3. Verlässt die Person die Einsatzstelle, „Verbleib erfassen“ wählen und die „Art“ wählen:
-   „Transport“, „Notunterkunft“, „Entlassung vor Ort“, „verbleibt vor Ort“ oder „Verbleib des
-   Leichnams“. Dazu das „Ziel“ und beim Transport das „Transportmittel (RTW/KTW …)“.
+1. In der Liste die Person öffnen. Oben auf der Seite „Person R-…“ steht der Patientenkopf:
+   Sichtung mit Zeit („gesichtet … · vor 42 min“), „Zustand / Verdacht“, Aufenthalt oder
+   Verbleib und die letzte Notiz.
+2. Auf die Sichtung tippen. Darunter klappt die Sichtungswahl auf: die Fläche der Kategorie
+   antippen, bei Bedarf eine „Kurzbegründung (optional)“, und „Übernehmen“ wählen.
+3. Verlässt die Person die Einsatzstelle, im Kopf „Verbleib erfassen“ wählen und die „Art“
+   wählen: „Transport“, „Notunterkunft“, „Entlassung vor Ort“, „verbleibt vor Ort“ oder
+   „Verbleib des Leichnams“. Dazu das „Ziel“ und beim Transport das „Transportmittel (RTW/KTW …)“.
 
-   ![Dialog „Verbleib erfassen“ mit Art Transport, Ziel und Transportmittel](../bilder/betroffene/verbleib.png)
+   ![Patientenkopf mit aufgeklapptem Paneel „Verbleib erfassen“: Art Transport, Ziel und Transportmittel](../bilder/betroffene/verbleib.png)
 
-4. „Erfassen“ wählen.
+4. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib.
 
-Bei „Notunterkunft“ bietet der Dialog die Betreuungsstellen des Einsatzes an; die gewählte Stelle
-wird zum Ziel.
+Bei „Notunterkunft“ bietet das Paneel die Betreuungsstellen des Einsatzes an; die gewählte Stelle
+wird zum Ziel. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anlegen“.
+
+### Aufenthalt und Bezüge pflegen
+
+1. Steht die Person in keiner Unfallhilfsstelle, im Kopf „In UHS aufnehmen“ wählen und die UHS
+   wählen. Steht sie schon in einer, verlegen „Verlegen“ und „Austragen“ sie.
+2. Gehört der Person ein Tier oder ist sie bei einem Schaden geschädigt, „Bezüge“ aufklappen und
+   „Bezug hinzufügen“ wählen.
+3. Im Feld „Tier oder Schaden“ nach Kennung, Art, Name oder Ort suchen, den Treffer wählen und
+   „Hinzufügen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
+4. „Bezug lösen“ an der Zeile hebt einen Bezug wieder auf.
 
 ### Eine vermisste Person melden und abgleichen
 
@@ -141,14 +151,15 @@ Wartebereich ([Unfallhilfsstellen](unfallhilfsstellen.md)). Ein Verbleib „Tran
 der Status „verstorben“ oder „abgemeldet“ und das Stornieren.
 
 Eine Person mit Verbleib „Notunterkunft“ in einer Betreuungsstelle zählt dort unter „davon
-namentlich“ ([Betreuung und Evakuierung](betreuung.md)). Tiere und Schäden lassen sich einer
-Person auf ihrer Seite zuordnen („Tier zuweisen“, „Schaden zuweisen“).
+namentlich“ ([Betreuung und Evakuierung](betreuung.md)). Zur Wahl unter „Bezug hinzufügen“ stehen
+nur freie Tiere (ohne Halter) und Schäden ohne Geschädigte, die nicht abgeschlossen sind; ein
+fremder Bezug wird nie still überschrieben.
 
 ### Einsatztagebuch und Zugriffsprotokoll
 
 Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „Person R-… erfasst“,
-„Person R-…: Sichtung SK …“, Statuswechsel und Stornierungen. Die „Verlaufsnotiz“ auf der Seite
-der Person ist nicht änderbar und erscheint nicht im Einsatztagebuch.
+„Person R-…: Sichtung SK …“, Statuswechsel und Stornierungen. Die Notiz im Patientenkopf ist
+nicht änderbar und erscheint nicht im Einsatztagebuch.
 
 Jedes Öffnen der Seite einer Person wird protokolliert, ebenso der CSV-Export und der Druck der
 Liste. Die Einsatzleitung sieht das Protokoll unter „Listenzugriffe“ im Kopf der Liste und unter

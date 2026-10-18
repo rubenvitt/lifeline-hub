@@ -152,7 +152,7 @@ describe('AufnahmePage', () => {
     ]);
     await screen.findByRole('radiogroup');
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
-    await userEvent.type(await screen.findByLabelText('Zustand'), 'Beinfraktur');
+    await userEvent.type(await screen.findByLabelText('Zustand / Verdacht'), 'Beinfraktur');
     await userEvent.type(screen.getByLabelText('Koordinate'), '#52.2691/9.1342');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
 

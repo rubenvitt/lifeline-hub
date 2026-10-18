@@ -1,4 +1,4 @@
-import { Collapse, Form, Input } from 'antd';
+import { Collapse, Form, Input, type FormInstance } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { ladeModulFreigaben } from '../api/einsaetze';
@@ -36,27 +36,11 @@ interface VerbleibErfassungProps {
 }
 
 /**
- * „Verbleib erfassen" auf `ErfassungsModal`.
- *
- * Montiert = offen, jede Öffnung hat eine frische Mutation. Fehler stehen IM Dialog; die
- * Mutation hat kein `onError`, `mutateAsync` lehnt ab, die Hülle lässt die Felder stehen.
- *
- * Felder je Art halten das Budget (≤ 3): Transportmittel nur beim Transport, die
- * Betreuungsstelle nur bei der Notunterkunft UND mit Lesezugriff auf das Modul Betreuung — die
- * Grenze sitzt an der Datenquelle (ohne Zugriff kein Abruf, ein 403 heißt „keine Auswahl").
- * Die Notiz liegt unter „Weitere Angaben", OHNE `forceRender` (sie hat keine Vorbelegung, und
- * nur so bleibt „≤ 3 sichtbar" widerlegbar); am UHS-Gerät dort auch „Bestätigt von“ (LFH-1046).
- *
- * Die Stellenwahl belegt „Ziel" sichtbar und änderbar mit dem Namen vor; gespeichert wird, was
- * dort steht.
+ * Felder und Body-Bau einer Verbleib-Erfassung, ohne Hülle: für den Dialog unten und das Paneel
+ * im Patientenkopf (LLH-1094). Der Aufrufer hält das `<Form>`; `body` baut aus den Werten den
+ * Request (die Stellen-Frage kennt nur dieser Hook).
  */
-export default function VerbleibErfassung({
-  einsatzId,
-  personId,
-  onErfasst,
-  onSchliessen,
-}: VerbleibErfassungProps) {
-  const [form] = Form.useForm<VerbleibFormWerte>();
+export function useVerbleibFelder(einsatzId: number, form: FormInstance<VerbleibFormWerte>) {
   const art = Form.useWatch('art', form);
   // Das Gerät einer Betreuungsstelle bringt nur in die eigene Stelle (LFH-1041); ohne Stelle
   // lehnt der Server die Notunterkunft ab.
@@ -89,24 +73,12 @@ export default function VerbleibErfassung({
   // trägt oder eigener Text ist.
   const gewaehlt = useRef<Betreuungsstelle | undefined>(undefined);
 
-  const mutation = useMutation({
-    mutationFn: (body: VerbleibEingabe) => erfasseVerbleib(einsatzId, personId, body),
-    onSuccess: onErfasst,
-  });
+  // `art` ist Pflicht (Regel am Feld) — ohne sie läuft `onFinish` nicht.
+  const body = (werte: VerbleibFormWerte): VerbleibEingabe =>
+    verbleibBody({ ...werte, art: werte.art! }, felder.stelle);
 
-  return (
-    <ErfassungsModal<VerbleibFormWerte>
-      offen
-      titel="Verbleib erfassen"
-      form={form}
-      laeuft={mutation.isPending}
-      onErfassen={async (werte) => {
-        // `art` ist Pflicht (Regel am Feld) — ohne sie läuft `onFinish` nicht.
-        await mutation.mutateAsync(verbleibBody({ ...werte, art: werte.art! }, felder.stelle));
-      }}
-      onFertig={onSchliessen}
-      onAbbrechen={onSchliessen}
-    >
+  const elemente = (
+    <>
       <Form.Item label="Art" name="art" rules={[{ required: true, message: 'Art wählen' }]}>
         <Select
           options={VERBLEIB_ART_OPTIONEN}
@@ -183,6 +155,50 @@ export default function VerbleibErfassung({
           },
         ]}
       />
+    </>
+  );
+  return { elemente, body };
+}
+
+/**
+ * „Verbleib erfassen" auf `ErfassungsModal`.
+ *
+ * Montiert = offen, jede Öffnung hat eine frische Mutation. Fehler stehen IM Dialog; die
+ * Mutation hat kein `onError`, `mutateAsync` lehnt ab, die Hülle lässt die Felder stehen.
+ *
+ * Felder je Art halten das Budget (≤ 3): Transportmittel nur beim Transport, die
+ * Betreuungsstelle nur bei der Notunterkunft UND mit Lesezugriff auf das Modul Betreuung — die
+ * Grenze sitzt an der Datenquelle (ohne Zugriff kein Abruf, ein 403 heißt „keine Auswahl").
+ * Die Notiz liegt unter „Weitere Angaben", OHNE `forceRender` (sie hat keine Vorbelegung, und
+ * nur so bleibt „≤ 3 sichtbar" widerlegbar); am UHS-Gerät dort auch „Bestätigt von“ (LFH-1046).
+ *
+ * Die Stellenwahl belegt „Ziel" sichtbar und änderbar mit dem Namen vor; gespeichert wird, was
+ * dort steht.
+ */
+export default function VerbleibErfassung({
+  einsatzId,
+  personId,
+  onErfasst,
+  onSchliessen,
+}: VerbleibErfassungProps) {
+  const [form] = Form.useForm<VerbleibFormWerte>();
+  const { elemente, body } = useVerbleibFelder(einsatzId, form);
+  const mutation = useMutation({
+    mutationFn: (eingabe: VerbleibEingabe) => erfasseVerbleib(einsatzId, personId, eingabe),
+    onSuccess: onErfasst,
+  });
+
+  return (
+    <ErfassungsModal<VerbleibFormWerte>
+      offen
+      titel="Verbleib erfassen"
+      form={form}
+      laeuft={mutation.isPending}
+      onErfassen={(werte) => mutation.mutateAsync(body(werte))}
+      onFertig={onSchliessen}
+      onAbbrechen={onSchliessen}
+    >
+      {elemente}
       <SpeicherFehler fehler={mutation.error} titel="Verbleib nicht erfasst" />
     </ErfassungsModal>
   );

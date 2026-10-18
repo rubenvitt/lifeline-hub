@@ -220,8 +220,8 @@ for (const modus of ['light', 'dark'] as const) {
 
     // ── Liste ──
     await page.goto(`${basis}/personen`);
-    const leer = page.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
-    const voll = page.getByRole('button', { name: 'Zustand zu R-002 bearbeiten' });
+    const leer = page.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' });
+    const voll = page.getByRole('button', { name: 'Zustand / Verdacht zu R-002 bearbeiten' });
     for (const [ziel, name] of [
       [leer, 'Zustand-Knopf leer'],
       [voll, 'Zustandswert'],

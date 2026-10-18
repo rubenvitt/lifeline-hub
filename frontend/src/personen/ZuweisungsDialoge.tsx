@@ -14,7 +14,7 @@ import { Select } from '../components/Select';
 import { SPEZIES_META } from '../pages/tiere/tierHelfer';
 
 /**
- * Zuweisungsdialoge der Personen-Detailseite (UHS, Tier als Halter, Schaden als Geschädigte), auf
+ * Zuweisungsdialoge der Personen-Detailseite (Aufenthalt in einer UHS, Bezug zu Tier oder Schaden), auf
  * der Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm; LFH-796). Alle drei sind reine
  * Auswahlmasken: Enter schluckt der `Select`, die Struktur belegt der Seitentest.
  *
@@ -70,9 +70,9 @@ export function UhsZuweisenDialog({
   return (
     <ErfassungsModal<UhsWerte>
       offen={offen}
-      titel="UHS zuweisen"
+      titel={belegt ? 'Verlegen' : 'In UHS aufnehmen'}
       form={form}
-      erfassenText="Zuweisen"
+      erfassenText={belegt ? 'Verlegen' : 'Aufnehmen'}
       laeuft={belegungMutation.isPending}
       speicherung={belegungMutation}
       speicherFehlerTitel="Nicht zugewiesen"
@@ -99,125 +99,105 @@ export function UhsZuweisenDialog({
   );
 }
 
+/** Wert einer Wahl in der Bezugssuche: Art und Kennung in einem String (`tier:5`, `schaden:7`). */
+type BezugWahl = `tier:${number}` | `schaden:${number}`;
+
 /**
- * Tier der Person als Halter zuweisen. Die Kandidaten laden erst mit dem offenen Dialog und sind
- * nur FREIE Tiere (kein Halter, kein Kontakt, nicht storniert): kein stilles Überschreiben fremder
- * Zuordnungen. Zuweisen leert den konkurrierenden XOR-Slot im selben PATCH (sonst 500 durch den
- * Mehrspalten-CHECK).
+ * „Bezug hinzufügen“ (LLH-1129, Spec `personen-detail`, „Bezüge zu Tier und Schaden in einer
+ * Liste“): EINE Suche über freie Tiere und freie Schäden, gruppiert. Ersetzt die beiden Dialoge
+ * „Tier zuweisen“ und „Schaden zuweisen“. Die Kandidaten laden erst mit dem offenen Dialog und
+ * sind nur FREIE (kein stilles Überschreiben fremder Zuordnungen). Zuweisen leert den
+ * konkurrierenden XOR-Slot im selben PATCH (sonst 500 durch den Mehrspalten-CHECK): am Tier den
+ * Halter-Kontakt, am Schaden Personal, Organisation und Kontakt.
  */
-export function TierZuweisenDialog({
+export function BezugHinzufuegenDialog({
   einsatzId,
   personId,
   offen,
   onZugewiesen,
   onSchliessen,
 }: ZuweisungsDialogProps) {
-  const [form] = Form.useForm<{ tier_id: number }>();
+  const [form] = Form.useForm<{ bezug: BezugWahl }>();
   const tiereQuery = useQuery({
     queryKey: einsatzKeys.tiere(einsatzId),
     queryFn: () => listeTiere(einsatzId),
     enabled: offen,
   });
-  const freieTiere = (tiereQuery.data ?? []).filter(
-    (t) => t.halter_person_id == null && t.halter_kontakt == null && t.storniert_at == null,
-  );
-  const zuweisenMutation = useMutation({
-    mutationFn: (tierId: number) =>
-      aktualisiereTier(einsatzId, tierId, { halter_person_id: personId, halter_kontakt: null }),
-    onSuccess: onZugewiesen,
-  });
-
-  return (
-    <ErfassungsModal<{ tier_id: number }>
-      offen={offen}
-      titel="Tier als Halter zuweisen"
-      form={form}
-      erfassenText="Zuweisen"
-      laeuft={zuweisenMutation.isPending}
-      speicherung={zuweisenMutation}
-      speicherFehlerTitel="Nicht zugewiesen"
-      onErfassen={(v) => zuweisenMutation.mutateAsync(v.tier_id)}
-      onFertig={onSchliessen}
-      onAbbrechen={onSchliessen}
-    >
-      <Form.Item
-        label="Tier"
-        name="tier_id"
-        rules={[{ required: true, message: 'Bitte Tier wählen' }]}
-      >
-        <Select
-          placeholder="freies Tier wählen"
-          loading={tiereQuery.isLoading}
-          notFoundContent={tiereQuery.isLoading ? '…' : 'keine freien Tiere'}
-          options={freieTiere.map((t) => ({
-            value: t.id,
-            label: `${tierRegistrierAnzeige(t.registrier_nr)} ${SPEZIES_META[t.spezies] ?? t.spezies}${t.rufname ? ` „${t.rufname}"` : ''}`,
-          }))}
-        />
-      </Form.Item>
-    </ErfassungsModal>
-  );
-}
-
-/**
- * Schaden der Person als Geschädigte zuweisen. Kandidaten wie beim Tier: erst mit dem offenen
- * Dialog, nur freie (kein Geschädigter, nicht storniert, nicht abgeschlossen). Zuweisen leert die
- * drei konkurrierenden XOR-Slots im selben PATCH.
- */
-export function SchadenZuweisenDialog({
-  einsatzId,
-  personId,
-  offen,
-  onZugewiesen,
-  onSchliessen,
-}: ZuweisungsDialogProps) {
-  const [form] = Form.useForm<{ schaden_id: number }>();
   // Die Auswahl kennt alle nicht stornierten Schäden, auch bei großem Bestand (LFH-1075).
   const schaedenQuery = useQuery({
     queryKey: einsatzKeys.schaedenAuswahl(einsatzId),
     queryFn: () => listeSchadenAuswahl(einsatzId),
     enabled: offen,
   });
+  const freieTiere = (tiereQuery.data ?? []).filter(
+    (t) => t.halter_person_id == null && t.halter_kontakt == null && t.storniert_at == null,
+  );
   const freieSchaeden = (schaedenQuery.data ?? []).filter(
-    (s) => s.frei && s.status !== 'abgeschlossen',
+    (sch) => sch.frei && sch.status !== 'abgeschlossen',
   );
   const zuweisenMutation = useMutation({
-    mutationFn: (schadenId: number) =>
-      aktualisiereSchaden(einsatzId, schadenId, {
-        geschaedigt_person_id: personId,
-        geschaedigt_personal_id: null,
-        geschaedigt_organisation_id: null,
-        geschaedigt_kontakt: null,
-      }),
+    mutationFn: (wahl: BezugWahl): Promise<unknown> => {
+      const [art, roh] = wahl.split(':');
+      const id = Number(roh);
+      return art === 'tier'
+        ? aktualisiereTier(einsatzId, id, { halter_person_id: personId, halter_kontakt: null })
+        : aktualisiereSchaden(einsatzId, id, {
+            geschaedigt_person_id: personId,
+            geschaedigt_personal_id: null,
+            geschaedigt_organisation_id: null,
+            geschaedigt_kontakt: null,
+          });
+    },
     onSuccess: onZugewiesen,
   });
+  const laedt = tiereQuery.isLoading || schaedenQuery.isLoading;
 
   return (
-    <ErfassungsModal<{ schaden_id: number }>
+    <ErfassungsModal<{ bezug: BezugWahl }>
       offen={offen}
-      titel="Schaden zuweisen (Geschädigte)"
+      titel="Bezug hinzufügen"
       form={form}
-      erfassenText="Zuweisen"
+      erfassenText="Hinzufügen"
       laeuft={zuweisenMutation.isPending}
       speicherung={zuweisenMutation}
-      speicherFehlerTitel="Nicht zugewiesen"
-      onErfassen={(v) => zuweisenMutation.mutateAsync(v.schaden_id)}
+      speicherFehlerTitel="Bezug nicht hinzugefügt"
+      onErfassen={(v) => zuweisenMutation.mutateAsync(v.bezug)}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
       <Form.Item
-        label="Schaden"
-        name="schaden_id"
-        rules={[{ required: true, message: 'Bitte Schaden wählen' }]}
+        label="Tier oder Schaden"
+        name="bezug"
+        rules={[{ required: true, message: 'Bitte Tier oder Schaden wählen' }]}
       >
         <Select
-          placeholder="freien Schaden wählen"
-          loading={schaedenQuery.isLoading}
-          notFoundContent={schaedenQuery.isLoading ? '…' : 'keine freien Schäden'}
-          options={freieSchaeden.map((s) => ({
-            value: s.id,
-            label: `${schadenRegistrierAnzeige(s.registrier_nr)} ${s.typ} (${s.ausmass})`,
-          }))}
+          showSearch={{ optionFilterProp: 'label' }}
+          placeholder="Kennung, Art, Name oder Ort suchen"
+          loading={laedt}
+          notFoundContent={laedt ? '…' : 'keine freien Tiere oder Schäden'}
+          options={[
+            {
+              label: 'Tiere (als Halter)',
+              options: freieTiere.map((t) => ({
+                value: `tier:${t.id}`,
+                label: [
+                  tierRegistrierAnzeige(t.registrier_nr),
+                  SPEZIES_META[t.spezies] ?? t.spezies,
+                  t.rufname ? `„${t.rufname}“` : null,
+                  t.antreff_ort,
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              })),
+            },
+            {
+              label: 'Schäden (als Geschädigte)',
+              options: freieSchaeden.map((sch) => ({
+                value: `schaden:${sch.id}`,
+                label: `${schadenRegistrierAnzeige(sch.registrier_nr)} · ${sch.typ} (${sch.ausmass})`,
+              })),
+            },
+          ].filter((g) => g.options.length > 0)}
         />
       </Form.Item>
     </ErfassungsModal>

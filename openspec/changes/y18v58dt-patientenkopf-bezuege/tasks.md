@@ -11,8 +11,8 @@ Gemeinsame Change für LLH-1094 (`bti508xb`) und LLH-1129 (`mtcm6ied`) von LLH-1
 
 ## 2. Geteilte Helfer — LLH-1094 (bti508xb)
 
-- [ ] 2.1 `anzeige/abstand.ts` `formatVor` („gerade eben“, „vor 1 min“, „vor 42 min“, „vor 3 h 5 min“) mit Vitest.
-- [ ] 2.2 `SichtungFelder` aus `SichtungDialog` herauslösen (Wahl, Kurzbegründung, „Bestätigt von“). Der Dialog nutzt sie weiter; `SichtungDialog`-Test grün.
+- [x] 2.1 `anzeige/abstand.ts` `formatVor` („gerade eben“, „vor 1 min“, „vor 42 min“, „vor 3 h 5 min“) mit Vitest.
+- [x] 2.2 `SichtungFelder` aus `SichtungDialog` herauslösen (Wahl, Kurzbegründung, „Bestätigt von“). Der Dialog nutzt sie weiter; `SichtungDialog`-Test grün.
 
 ## 3. Patientenkopf — LLH-1094 (bti508xb)
 

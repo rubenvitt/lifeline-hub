@@ -10,7 +10,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, test, uhrAnhalten } from '
  *   liste.png        frontend/src/pages/PersonenPage.tsx, frontend/src/personen/BetroffenenSeitenleiste.tsx
  *   erfassen.png     frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx
  *   kurzeingabe.png  frontend/src/personen/BetroffeneZeile.tsx
- *   verbleib.png     frontend/src/personen/VerbleibErfassung.tsx
+ *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx
  *
  * Daten: die Betroffenen des Demo-Einsatzes reichen, es wird nichts gefüllt.
  */
@@ -69,18 +69,19 @@ test.describe(KAPITEL, () => {
     await fotografiere(band, KAPITEL, 'kurzeingabe');
   });
 
-  test('Dialog „Verbleib erfassen“', async ({ page }) => {
+  test('Patientenkopf mit Paneel „Verbleib erfassen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const id = await personId(page, demo.id, 'Vorlage');
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/personen/${id}`);
-    await page.getByRole('button', { name: 'Verbleib erfassen' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Verbleib erfassen' });
-    await waehleIn(dialog.getByRole('combobox', { name: 'Art' }), 'Transport');
-    await dialog.getByLabel('Ziel').fill('Klinikum Musterstadt');
-    await dialog.getByLabel('Transportmittel (RTW/KTW …)').fill('KTW 1');
-    await dialog.getByLabel('Transportmittel (RTW/KTW …)').blur();
-    await fotografiere(dialog, KAPITEL, 'verbleib');
+    const kopf = page.getByRole('region', { name: 'Patientenkopf' });
+    await kopf.getByRole('button', { name: 'Verbleib erfassen' }).click();
+    const paneel = page.getByRole('region', { name: 'Verbleib erfassen' });
+    await waehleIn(paneel.getByRole('combobox', { name: 'Art' }), 'Transport');
+    await paneel.getByLabel('Ziel').fill('Klinikum Musterstadt');
+    await paneel.getByLabel('Transportmittel (RTW/KTW …)').fill('KTW 1');
+    await paneel.getByLabel('Transportmittel (RTW/KTW …)').blur();
+    await fotografiere(kopf, KAPITEL, 'verbleib');
   });
 });

@@ -19,9 +19,19 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Filter, Tabelle und Dialog nennen den Status gleich („Erfasst“, nie „Neu“). Summen heißen
   „gesamt“, weil „erfasst“ ein Status ist. Unter `xl` steht die `Sichtungszeile` über dem
   Statusfilter (die Seitenleiste rutscht unter die Liste).
-- **Personen-Detail:** Stammdaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“,
-  kein `Descriptions`; unter `lg` die medizinische Spalte zuerst (`Col` mit `order`, ein Baum).
-  Nachweis: `e2e/betroffene-handy.spec.ts`.
+- **Personen-Detail** (LLH-1094, Spec `personen-detail`): eine Spalte in fester Folge —
+  Patientenkopf (`personen/Patientenkopf.tsx`: Sichtung mit DTG und „vor n min“, „Zustand /
+  Verdacht“, Aufenthalt bzw. Verbleib, letzte Notiz), Verlauf, Personendaten, eingeklappt Bezüge,
+  Fotos und Dateien, Zugriffsprotokoll; ein Baum. Sichten, Verbleib und Notiz gehen im Kopf ohne
+  Dialog (eigenes Paneel je Handlung, Grund am Ort); der Kopf hat eine Lesefassung (`modus="lesen"`)
+  für Schnellansichten. Den Aufenthalt (UHS- und Platzname, seit) liefert der Detail-GET
+  (`aufenthalt`), kein zweiter Abruf beim Öffnen. Personendaten im `Datenraster`, leere Angaben
+  in EINER Zeile „Ohne Angabe: …“, kein `Descriptions`. Nachweis: `e2e/betroffene-handy.spec.ts`.
+- **Bezüge** (LLH-1129): Tier und Schaden als EINE Liste in Einsatzsprache
+  (`personen/PersonBezuege.tsx`), „Bezug hinzufügen“ über eine gemeinsame Suche freier Tiere und
+  Schäden (`BezugHinzufuegenDialog`, XOR-Leerung im selben PATCH), „Bezug lösen“ mit Grund an der
+  Zeile; lädt erst aufgeklappt. Der Aufenthalt in einer UHS ist kein Bezug, er steht im Kopf
+  („In UHS aufnehmen“, „Verlegen“, „Austragen“; nicht am Gerät).
 - **`SK_META`** führt Schlüssel von `sichtungsfarben` oder `null`, keine CSS-Werte.
 - **Verortungsauftrag** per `lagekartePfad(…, { platzieren })` → `?platzieren=<typ>:<id>`;
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt

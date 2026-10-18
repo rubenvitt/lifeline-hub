@@ -194,7 +194,7 @@ describe('PersonErfassungModal — Zustand, Koordinate, vermisst seit (LFH-613)'
     const { onErfassen } = zeige();
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
-    await nutzer.type(await screen.findByLabelText('Zustand'), 'gehfähig, unterkühlt');
+    await nutzer.type(await screen.findByLabelText('Zustand / Verdacht'), 'gehfähig, unterkühlt');
     await nutzer.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
     await nutzer.type(screen.getByLabelText('Antreffort'), 'Deich{Enter}');
 

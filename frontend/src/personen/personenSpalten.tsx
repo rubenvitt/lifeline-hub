@@ -158,7 +158,7 @@ interface ZustandBedienung {
  * - Ein Fehler steht AN DER ZELLE (`data-fehler`, Rand aus `colorError`, Satz in `alarmText`),
  *   kein Toast. Er geht beim nächsten Versuch von selbst.
  */
-function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
+export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
   const mutation = useMutation({
@@ -189,7 +189,7 @@ function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
         wert={laeuft ? mutation.variables : p.zustand}
         laeuft={laeuft}
         darfSchreiben
-        bezeichnung="Zustand"
+        bezeichnung="Zustand / Verdacht"
         kennung={registrierAnzeige(p.registrier_nr)}
         onSpeichern={(wert) => mutation.mutate(wert)}
       />
@@ -274,7 +274,7 @@ export function personenSpalten(
     },
     { title: 'Sichtung', key: 'sk', width: 104, render: (_, p) => <SkTag p={p} /> },
     {
-      title: 'Zustand',
+      title: 'Zustand / Verdacht',
       key: 'zustand',
       // Feste Breite mit Platz für den Platzhalter-Knopf — KEINE weitere Fließspalte neben Person
       // und Vermerk.

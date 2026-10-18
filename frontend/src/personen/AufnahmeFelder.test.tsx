@@ -118,7 +118,7 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
     async (modus, sichtbar) => {
       const { container } = zeige(modus);
       expect(feldZahl(container)).toBe(sichtbar);
-      for (const label of ['Zustand', 'Koordinate', 'vermisst seit']) {
+      for (const label of ['Zustand / Verdacht', 'Koordinate', 'vermisst seit']) {
         expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
       }
       await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
@@ -127,11 +127,11 @@ describe('AufnahmeFelder — Zustand, Koordinate, vermisst seit (LFH-613)', () =
       if (modus === 'vermisst') {
         // Eine vermisste Person ist nicht angetroffen: kein Zustand, kein Fundort.
         expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
-        expect(screen.queryByLabelText('Zustand')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Zustand / Verdacht')).not.toBeInTheDocument();
         expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
       } else {
         // Ohne Status `vermisst` wäre „vermisst seit" ein 422.
-        expect(screen.getByLabelText('Zustand')).toBeInTheDocument();
+        expect(screen.getByLabelText('Zustand / Verdacht')).toBeInTheDocument();
         expect(screen.getByLabelText('Koordinate')).toBeInTheDocument();
         expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
       }

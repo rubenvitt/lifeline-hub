@@ -3293,8 +3293,8 @@ test('Betroffene Liste: Zustand-Knopf leer und gefüllt folgen der Staffel, Abst
   for (const { dichte, soll } of STAFFEL) {
     await page.goto(`/einsaetze/${einsatzId}/personen`);
     await stelleDichte(page, dichte);
-    const leer = page.getByRole('button', { name: 'Zustand zu R-001 hinzufügen' });
-    const voll = page.getByRole('button', { name: 'Zustand zu R-002 bearbeiten' });
+    const leer = page.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' });
+    const voll = page.getByRole('button', { name: 'Zustand / Verdacht zu R-002 bearbeiten' });
     const hLeer = await haeltStufe(leer, soll, `Zustand-Knopf leer (${dichte})`);
     const hVoll = await haeltStufe(voll, soll, `Zustand-Knopf gefüllt (${dichte})`);
     for (const [ziel, name] of [
@@ -3344,7 +3344,7 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
 
     // ── VORBEDINGUNGEN: die Schreibziele fehlen.
     await expect(
-      page.getByRole('button', { name: /^Zustand zu R-\d+ (hinzufügen|bearbeiten)$/ }),
+      page.getByRole('button', { name: /^Zustand \/ Verdacht zu R-\d+ (hinzufügen|bearbeiten)$/ }),
       'Vorbedingung: ohne Schreibrecht keine Zustand-Knöpfe',
     ).toHaveCount(0);
     await expect(page.locator('[data-lfh="zustand-zelle"]')).toHaveCount(0);
@@ -3435,7 +3435,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
     await stelleDichte(page, dichte);
     await page.getByRole('button', { name: /Weitere Angaben/ }).click();
     const zustand = await haeltStufe(
-      huelle(page.getByLabel('Zustand', { exact: true })),
+      huelle(page.getByLabel('Zustand / Verdacht', { exact: true })),
       soll,
       `Route Zustand (${dichte})`,
     );
@@ -3452,7 +3452,7 @@ test('Betroffene Aufnahme: Zustand, Koordinate und „vermisst seit" folgen der 
     await schnell.getByRole('button', { name: /Weitere Angaben/ }).click();
     await modalRuht(page);
     const modalZustand = await haeltStufe(
-      huelle(schnell.getByLabel('Zustand', { exact: true })),
+      huelle(schnell.getByLabel('Zustand / Verdacht', { exact: true })),
       soll,
       `Modal Zustand (${dichte})`,
     );
