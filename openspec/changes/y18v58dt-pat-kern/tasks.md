@@ -25,7 +25,7 @@ Für jede Aufgabe gilt:
 ## 2. PAT-Nummer und Kontamination — LLH-1326 (kxv9m07u)
 
 - [x] 2.1 Migration `0218`: `pat_nummer`, `kontamination` (CHECK 0/1, nullable). `PersonAnzeige`, `PersonAuswahl`, `PatchBody`/`PatchDaten` und die Bind-Kette in `repo::aktualisiere` neu nummerieren. Repo-Test `aktualisiere_setzt_jede_spalte_an_ihren_platz` erweitert. Servertest: ein einzelnes Feld leert keine anderen.
-- [ ] 2.2 `PAT_NUMMER_MAX` mit Spiegel in `frontend/src/api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`. Servertest: über der Grenze 400.
+- [x] 2.2 `PAT_NUMMER_MAX` mit Spiegel in `frontend/src/api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`. Servertest: über der Grenze 400.
 - [ ] 2.3 Aufbewahrung: `pat_nummer` Scrub `Z_BEHANDLUNG` (gepinnt, `PERSONENBEZUEGE` `Mit`), `kontamination` Retain, `behandlungsbezug_sql` erweitert. Tests: Guard grün, nur-PAT-Person hat Behandlungsbezug, Schwärzung leert die PAT-Nummer.
 - [ ] 2.4 Frontend: Statusvertrag `kontamination` (Rolle `achtung`, Wort), Suchtext der Spalte `reg`, Platzhalter der Suche, `PERSON_AUF_DER_PLATTE` (D9), `lagebildKuerzen` für `personenAuswahl`. Vitest: Suche findet „4711“, Kürzung lässt die PAT-Nummer aus.
 - [ ] 2.5 Sprungpalette: `pat_nummer` im Label „PAT …“, Ziffernzweig mit exaktem PAT-Treffer (D12). Vitest: „4711“ trifft R-4711 und R-012 mit „PAT 4711“.

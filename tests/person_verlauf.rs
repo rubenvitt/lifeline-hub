@@ -654,3 +654,40 @@ async fn auswahl_traegt_die_pat_nummer() {
     assert_eq!(zeile(p)["pat_nummer"], "4711");
     assert!(!zeile(q).as_object().unwrap().contains_key("pat_nummer"));
 }
+
+#[tokio::test]
+async fn pat_nummer_ueber_der_grenze_ist_400() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}");
+    let max = lifeline_hub::person::PAT_NUMMER_MAX;
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "pat_nummer": "9".repeat(max + 1) }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert_eq!(
+        v["error"],
+        format!("PAT-Nummer darf höchstens {max} Zeichen lang sein")
+    );
+    assert!(!detail(&app, &admin, e, p)
+        .await
+        .as_object()
+        .unwrap()
+        .contains_key("pat_nummer"));
+    let (s, v) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "pat_nummer": format!("  {}  ", "9".repeat(max)) }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "genau die Grenze, nach dem Trimmen: {v}");
+}

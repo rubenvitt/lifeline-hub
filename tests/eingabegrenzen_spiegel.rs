@@ -8,7 +8,7 @@ use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
     abloesung, auftrag, chat, einheit, einheit_vorlage, einsatz, etb, externe_stelle, fahrzeug,
     fuehrung, infotelefon, kraefte_disposition, lage_zone, lagebesprechung, material,
-    nachforderung, personal, presse, schaden, schichtmodell, sprechgruppe, verpflegung,
+    nachforderung, person, personal, presse, schaden, schichtmodell, sprechgruppe, verpflegung,
     vorlagendokument,
 };
 
@@ -34,6 +34,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
             vorlagendokument::verteiler::VERTEILER_BEZEICHNUNG_MAX,
         ),
         ("FUNKTION_TEXT_MAX", fuehrung::TEXT_MAX),
+        ("PAT_NUMMER_MAX", person::PAT_NUMMER_MAX),
         ("PERSONAL_ADHOC_TEXT_MAX", personal::ADHOC_TEXT_MAX),
         (
             "PERSONAL_EINSATZFUNKTION_MAX",

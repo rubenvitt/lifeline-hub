@@ -663,7 +663,11 @@ pub async fn aktualisieren(
     let melder = trimme_tri(body.melder_kontakt);
     let notiz = trimme_tri(body.notiz);
     let zustand = trimme_tri(body.zustand);
-    let pat_nummer = trimme_tri(body.pat_nummer);
+    let pat_nummer = crate::routes::support::optional_max_tri(
+        body.pat_nummer,
+        "PAT-Nummer",
+        crate::person::PAT_NUMMER_MAX,
+    )?;
 
     // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
     // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).

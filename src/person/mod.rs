@@ -484,6 +484,11 @@ pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> S
     )
 }
 
+/// Höchstlänge der PAT-Nummer (LLH-1326, Spec `betroffene-lagedaten`): die Nummer einer
+/// Papier-Patientenanhängetasche, ein kurzer Freitext zum Abgleich. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const PAT_NUMMER_MAX: usize = 32;
+
 /// System-ETB einer nachgereichten älteren Sichtung (LLH-1138, Spec `personen-verlauf`): sie
 /// steht im Verlauf, die aktuelle bleibt. «Person R-001: Sichtung SK I, nachgetragen, aktuelle
 /// Sichtung bleibt SK II». Beide Kategorien sind Statuskategorien (Retain), kein Befund.

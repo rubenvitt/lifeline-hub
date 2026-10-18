@@ -30,6 +30,8 @@ export const VERTEILER_MAX = 50;
 export const VERTEILER_BEZEICHNUNG_MAX = 200;
 /** Freier Empfänger-Tag eines Auftrags (`funktion_text`). */
 export const FUNKTION_TEXT_MAX = 200;
+/** PAT-Nummer einer Person, die Nummer der Papier-Patientenanhängetasche (LLH-1326). */
+export const PAT_NUMMER_MAX = 32;
 /** Name, Qualifikation und Träger einer Ad-hoc-Kraft (UHS LFH-1045, Personal LLH-1067). */
 export const PERSONAL_ADHOC_TEXT_MAX = 200;
 /** Einsatzfunktion einer Kraft (LLH-1067). */
