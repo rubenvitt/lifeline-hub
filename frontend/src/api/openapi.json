@@ -11982,6 +11982,44 @@
               "null"
             ]
           },
+          "transport_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportArt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transport_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erfassungszeit des aktuellen Transportstands."
+          },
+          "transport_fachrichtung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fachrichtung"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transport_prioritaet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportPrioritaet",
+                "description": "Aktueller Transportstand (LLH-1325, Cache des jüngsten Eintrags in `person_transport`);\nalle vier fehlen ohne Stand oder nach dem Aufheben."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "vermisst_seit": {
             "type": [
               "string",
@@ -12056,7 +12094,8 @@
               "sichtungen",
               "notizen",
               "verbleib",
-              "abgleiche"
+              "abgleiche",
+              "transporte"
             ],
             "properties": {
               "abgleiche": {
@@ -12087,6 +12126,13 @@
                 "items": {
                   "$ref": "#/components/schemas/SichtungAnzeige"
                 }
+              },
+              "transporte": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TransportAnzeige"
+                },
+                "description": "Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf."
               },
               "verbleib": {
                 "type": "array",

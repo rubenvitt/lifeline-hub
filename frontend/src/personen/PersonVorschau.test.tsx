@@ -42,6 +42,7 @@ const detail = {
   notizen: [],
   verbleib: [],
   abgleiche: [],
+  transporte: [],
 } as unknown as PersonDetail;
 
 /**

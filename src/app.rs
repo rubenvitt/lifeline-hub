@@ -1077,6 +1077,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_person::notiz),
         )
         .route(
+            "/api/einsaetze/{id}/personen/{pid}/transport",
+            post(routes::person_transport::festlegen),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/{pid}/abgleich",
             post(routes::einsatz_person::abgleich_anlegen),
         )

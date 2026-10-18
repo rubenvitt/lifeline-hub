@@ -113,6 +113,7 @@ function bereit() {
         notizen: [],
         verbleib: [],
         abgleiche: [],
+        transporte: [],
       } as PersonDetail),
     ),
     http.post('/api/einsaetze/7/personen', async ({ request }) => {

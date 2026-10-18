@@ -4744,6 +4744,11 @@ export interface components {
             registrier_nr: number;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
+            transport_art?: components["schemas"]["TransportArt"] | null;
+            /** @description Erfassungszeit des aktuellen Transportstands. */
+            transport_at?: string | null;
+            transport_fachrichtung?: components["schemas"]["Fachrichtung"] | null;
+            transport_prioritaet?: components["schemas"]["TransportPrioritaet"] | null;
             /**
              * @description Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status
              *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
@@ -4781,6 +4786,8 @@ export interface components {
             aufenthalt?: components["schemas"]["AufenthaltAnzeige"] | null;
             notizen: components["schemas"]["NotizAnzeige"][];
             sichtungen: components["schemas"]["SichtungAnzeige"][];
+            /** @description Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf. */
+            transporte: components["schemas"]["TransportAnzeige"][];
             verbleib: components["schemas"]["VerbleibAnzeige"][];
         };
         /**

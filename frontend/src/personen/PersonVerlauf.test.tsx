@@ -35,6 +35,7 @@ const basis = {
   notizen: [],
   verbleib: [],
   abgleiche: [],
+  transporte: [],
 } as PersonDetail;
 
 const person: PersonDetail = {

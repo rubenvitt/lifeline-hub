@@ -31,6 +31,8 @@ const ERWARTET_BEHALTEN = [
   'aktueller_platz_id',
   'vermisst_seit',
   'kontamination',
+  'transport_prioritaet',
+  'transport_art',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -41,6 +43,8 @@ const ERWARTET_AUSGELASSEN = [
   'antreff_lat',
   'antreff_lon',
   'pat_nummer',
+  'transport_fachrichtung',
+  'transport_at',
 ].sort();
 
 /** Eine Person mit JEDEM Feld gesetzt — ein ausgelassenes Feld fiele sonst nicht auf. */
@@ -78,6 +82,10 @@ const VOLL: Person = {
   aktuelle_verbleib_betreuungsstelle_id: 2,
   pat_nummer: 'A-4711',
   kontamination: true,
+  transport_prioritaet: 'dringlich',
+  transport_art: 'liegend',
+  transport_fachrichtung: 'psychiatrie',
+  transport_at: '2026-10-18 09:00:00',
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {
@@ -126,6 +134,7 @@ describe('lagebildKuerzen', () => {
       'unterkühlt',
       '53.07',
       'A-4711',
+      'psychiatrie',
     ]) {
       expect(text).not.toContain(wert);
     }

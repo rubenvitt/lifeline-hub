@@ -54,6 +54,12 @@ export const PERSON_AUF_DER_PLATTE = {
   // verknüpft die Person mit der Papiertasche und bleibt vom Gerät fern.
   pat_nummer: 'auslassen',
   kontamination: 'behalten',
+  // LLH-1325 (design.md D9): Priorität und Art ordnen den Abtransport auch ohne Netz; die
+  // Fachrichtung ist diagnosenah, die Zeit des Stands braucht ohne Netz niemand.
+  transport_prioritaet: 'behalten',
+  transport_art: 'behalten',
+  transport_fachrichtung: 'auslassen',
+  transport_at: 'auslassen',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 /**

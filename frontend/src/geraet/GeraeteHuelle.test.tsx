@@ -129,6 +129,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
         notizen: [],
         verbleib: [],
         abgleiche: [],
+        transporte: [],
       } as PersonDetail),
     ),
   );
@@ -401,6 +402,7 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
           notizen: [],
           verbleib: [],
           abgleiche: [],
+          transporte: [],
         } as PersonDetail),
       ),
     );

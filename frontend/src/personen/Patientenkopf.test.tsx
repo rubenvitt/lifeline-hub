@@ -60,6 +60,7 @@ const basis = {
   ],
   verbleib: [],
   abgleiche: [],
+  transporte: [],
   aufenthalt: {
     uhs_id: 3,
     uhs_bezeichnung: 'Turnhalle',

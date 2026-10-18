@@ -33,7 +33,7 @@ Für jede Aufgabe gilt:
 ## 3. Transport — LLH-1325 (uz0emwv9)
 
 - [x] 3.1 Migration `0219`: Tabelle `person_transport` (Stand, `zeitpunkt_at`, `erfasst_at`, Erfasser, Bestätigung, `client_id`) und Cache-Spalten an `einsatz_person`. Wire-Enums für Priorität, Art und Fachrichtung mit Wire-Kontrakt.
-- [ ] 3.2 `POST …/personen/{pid}/transport` mit Bestätigung, Erfassungszeit, Cache nach jüngstem Zeitpunkt und ETB nur bei Prioritätswechsel („Person R-012: Transportpriorität dringlich“, „… aufgehoben“, „, bestätigt: Name“). `PersonDetail.transporte`. Servertests: Rechte, Org-Isolation, 400/409/422, kein ETB bei reinem Art- oder Fachrichtungswechsel, Leak-Test (Art und Fachrichtung weder in ETB noch in SSE), Replay.
+- [x] 3.2 `POST …/personen/{pid}/transport` mit Bestätigung, Erfassungszeit, Cache nach jüngstem Zeitpunkt und ETB nur bei Prioritätswechsel („Person R-012: Transportpriorität dringlich“, „… aufgehoben“, „, bestätigt: Name“). `PersonDetail.transporte`. Servertests: Rechte, Org-Isolation, 400/409/422, kein ETB bei reinem Art- oder Fachrichtungswechsel, Leak-Test (Art und Fachrichtung weder in ETB noch in SSE), Replay.
 - [ ] 3.3 Aufbewahrung (D4) und Gerät: `UHS_TABLET`/`UHS_LAPTOP`, Betreuungsstelle 403, fremde UHS 404. Tests: Schwärzungs-Guards, `tests/geraet_kopplung.rs`.
 - [ ] 3.4 Sortierung: `dringlichkeit.ts` mit Priorität als zweitem Schlüssel und `dringlichkeitsWert` mit Zwischenschritt. Vitest mit den beiden Szenarien der Spec `personen-transport`. Spalte „Transport“ in `personenSpalten.tsx` (sortierbar, Budget), Marke in der Transportspalte des Grundrisses. Vitest.
 

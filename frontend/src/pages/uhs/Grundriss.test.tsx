@@ -839,7 +839,7 @@ describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
 
 describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   function detail(p: Person): PersonDetail {
-    return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] };
+    return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [], transporte: [] };
   }
 
   it('öffnet beim Klick auf eine Wartebereichs-Karte den Detail-Drawer', async () => {
@@ -960,7 +960,14 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     const p = belegtePerson();
     server.use(
       http.get('/api/einsaetze/1/personen/7', () =>
-        HttpResponse.json({ ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] }),
+        HttpResponse.json({
+          ...p,
+          sichtungen: [],
+          notizen: [],
+          verbleib: [],
+          abgleiche: [],
+          transporte: [],
+        }),
       ),
     );
     renderGrundriss(unbelegt(), [p], false, 'komfortabel');
@@ -1120,7 +1127,14 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     const p = belegtePerson();
     server.use(
       http.get('/api/einsaetze/1/personen/7', () =>
-        HttpResponse.json({ ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] }),
+        HttpResponse.json({
+          ...p,
+          sichtungen: [],
+          notizen: [],
+          verbleib: [],
+          abgleiche: [],
+          transporte: [],
+        }),
       ),
     );
     renderGrundriss(unbelegt(), [p], true, 'komfortabel');

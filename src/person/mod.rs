@@ -343,6 +343,20 @@ pub struct PersonAnzeige {
     /// ausdrücklich nicht „nein“.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kontamination: Option<bool>,
+    /// Aktueller Transportstand (LLH-1325, Cache des jüngsten Eintrags in `person_transport`);
+    /// alle vier fehlen ohne Stand oder nach dem Aufheben.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<transport_repo::TransportPrioritaet>)]
+    pub transport_prioritaet: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<transport_repo::TransportArt>)]
+    pub transport_art: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<transport_repo::Fachrichtung>)]
+    pub transport_fachrichtung: Option<String>,
+    /// Erfassungszeit des aktuellen Transportstands.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport_at: Option<String>,
 }
 
 #[cfg(test)]

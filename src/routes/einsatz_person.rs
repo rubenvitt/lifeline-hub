@@ -16,6 +16,7 @@ use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
 use crate::person::sichtung_repo::SichtungAnzeige;
+use crate::person::transport_repo::{self, TransportAnzeige};
 use crate::person::verbleib_repo::VerbleibAnzeige;
 use crate::person::verlaufsnotiz_repo::NotizAnzeige;
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
@@ -48,6 +49,8 @@ pub struct PersonDetail {
     pub abgleiche: Vec<AbgleichAnzeige>,
     /// UHS, Platz und seit wann; `null` außerhalb jeder UHS (LLH-1129, Patientenkopf).
     pub aufenthalt: Option<AufenthaltAnzeige>,
+    /// Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf.
+    pub transporte: Vec<TransportAnzeige>,
 }
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
@@ -567,6 +570,7 @@ pub async fn detail(
     let notizen = verlaufsnotiz_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let aufenthalt = belegung_repo::aufenthalt(&state.pool, einsatz_id, person_id).await?;
+    let transporte = transport_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
     // Personen des Einsatzes.
     let abgleiche = if ctx.geraet.is_some() {
@@ -582,6 +586,7 @@ pub async fn detail(
         verbleib,
         abgleiche,
         aufenthalt,
+        transporte,
     }))
 }
 
@@ -984,6 +989,27 @@ pub async fn sichten(
     Ok((StatusCode::CREATED, Json(erfasst.sichtung)))
 }
 
+/// Ein neuer medizinischer Eintrag (Transport, Maßnahme, Verletzung; Change `y18v58dt-pat-kern`)
+/// gilt nur an einer angetroffenen Person: storniert ist Lebenszyklus (409), vermisst oder
+/// abgemeldet ein Zusammenhang (422, `src/AGENTS.md`, Statuscode-Konvention). `was` nennt den
+/// Eintrag im Wortlaut („keinen Transport“).
+pub(crate) fn fordere_angetroffen(person: &PersonAnzeige, was: &str) -> Result<(), AppError> {
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict(format!(
+            "Stornierte Person kann {was} erhalten"
+        )));
+    }
+    match person.status {
+        PersonStatus::Vermisst | PersonStatus::Abgemeldet => {
+            Err(AppError::UnprocessableEntity(format!(
+                "Person ist nicht anwesend (Status {})",
+                person.status.as_str()
+            )))
+        }
+        PersonStatus::Erfasst | PersonStatus::Betroffen | PersonStatus::Verstorben => Ok(()),
+    }
+}
+
 /// Ausgang der Sichtungs-Transaktion.
 enum Sichtet {
     /// Schon gespeichert (gleichzeitiger Replay derselben `client_id`).
@@ -997,7 +1023,7 @@ enum Sichtet {
 
 /// Ein Replay gilt nur an der Person, an der der Eintrag gespeichert ist; eine `client_id`, die
 /// an einer anderen Person vergeben ist, ist 422 (Muster `betreuung::repo::replay_am_objekt`).
-fn replay_an_person<T>(
+pub(crate) fn replay_an_person<T>(
     replay: T,
     person_id: i64,
     person: impl Fn(&T) -> i64,
