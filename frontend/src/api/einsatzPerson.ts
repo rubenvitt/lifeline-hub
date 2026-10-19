@@ -70,6 +70,15 @@ export interface PersonEingabe {
   kontamination?: boolean | null;
 }
 
+/**
+ * Feld-CAS im PATCH (LLH-1103, design.md D1 der Change `f8218h1i-personendaten-feldweise`): je
+ * geändertem Feld der Wert beim Öffnen, unter demselben Namen wie die Änderung. `null` heißt
+ * „leer erwartet“, die Koordinate steht nur als Paar (`antreff_lat` und `antreff_lon`). Weicht
+ * der gespeicherte Wert ab, antwortet der Server mit 409 und schreibt nichts; ein Feld hier, das
+ * die Änderung nicht nennt, ist 400. Ohne `erwartet` schreibt der PATCH ohne Vergleich.
+ */
+export type PersonErwartet = PersonEingabe;
+
 /** Offline-/Fastpath-fähige Anlage. `client_id` macht einen Replay nach
  * verloren gegangener Antwort idempotent; `status` vermeidet den unsicheren
  * zweiten Request bei „Vermisst“/„Betroffen“. */

@@ -1,15 +1,15 @@
 ## 1. Grenzen für Personen-Freitexte — LLH-1329 (jr8h0lyy), Backend
 
-- [ ] 1.1 Konstanten `PERSON_NAME_MAX`, `PERSON_ANGABE_MAX`, `PERSON_ZUSTAND_MAX`, `PERSON_NOTIZ_MAX`, `VERLAUFSNOTIZ_MAX` in `src/person/mod.rs` (D7), gespiegelt in `frontend/src/api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`.
-- [ ] 1.2 Prüfung im Anlegen (`AnlegenBody`), im PATCH (nur genannte Felder) und im Notiz-POST mit der Meldung „{Feld} darf höchstens {max} Zeichen lang sein“. Servertests je Feld: an der Grenze angenommen, ein Zeichen mehr 400, Person unverändert; PATCH eines anderen Felds bei Altbestand über der Grenze geht durch.
+- [x] 1.1 Konstanten `PERSON_NAME_MAX`, `PERSON_ANGABE_MAX`, `PERSON_ZUSTAND_MAX`, `PERSON_NOTIZ_MAX`, `VERLAUFSNOTIZ_MAX` in `src/person/mod.rs` (D7), gespiegelt in `frontend/src/api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`.
+- [x] 1.2 Prüfung im Anlegen (`AnlegenBody`), im PATCH (nur genannte Felder) und im Notiz-POST mit der Meldung „{Feld} darf höchstens {max} Zeichen lang sein“. Servertests je Feld: an der Grenze angenommen, ein Zeichen mehr 400, Person unverändert; PATCH eines anderen Felds bei Altbestand über der Grenze geht durch.
 - [ ] 1.3 Zähler (`zeichenGrenze`) an Aufnahme (`personen/AufnahmeFelder.tsx`), Schnellerfassung, Notizzeile im Kopf und „Zustand / Verdacht“; nie kürzen. Vitest je Maske.
 
 ## 2. Feld-CAS und Geburtsdatum am Server — LLH-1103 (f8218h1i), Backend
 
-- [ ] 2.1 `PatchBody.erwartet` (optional, gleiche Feldnamen, Tri-State-Werte), `repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an (Koordinate als Paar); 409 bei vorhandener Person, 404 sonst; `erwartet`-Feld ohne Änderung desselben Felds 400. `basis_geaendert_at` bleibt unverändert nutzbar.
-- [ ] 2.2 Tests (`tests/einsatz_person.rs`): gleicher Altwert schreibt; fremd geänderter Wert 409 und nichts geschrieben; Sichtung, Status, PAT-Nummer und ein anderes Feld zwischendurch lösen keinen 409 aus; leerer Altwert (`null`) gegen gesetzten Wert 409; Koordinate als Paar; ohne `erwartet` wie bisher; Bind-Reihenfolge-Test erweitert.
-- [ ] 2.3 Geburtsdatum im PATCH: `YYYY-MM-DD`, gültiger Kalendertag, nicht in der Zukunft (D6), sonst 400; Leeren erlaubt. Tests.
-- [ ] 2.4 Typ-Codegen (`scripts/check-typ-codegen.sh`), falls der Request-Typ im OpenAPI erscheint; `src/AGENTS.md` (CAS-Baseline: Personen nutzen Feld-CAS, `useEditSitzung` nur noch Tier und Schaden).
+- [x] 2.1 `PatchBody.erwartet` (optional, gleiche Feldnamen, Tri-State-Werte), `repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an (Koordinate als Paar); 409 bei vorhandener Person, 404 sonst; `erwartet`-Feld ohne Änderung desselben Felds 400. `basis_geaendert_at` bleibt unverändert nutzbar.
+- [x] 2.2 Tests (`tests/einsatz_person.rs`): gleicher Altwert schreibt; fremd geänderter Wert 409 und nichts geschrieben; Sichtung, Status, PAT-Nummer und ein anderes Feld zwischendurch lösen keinen 409 aus; leerer Altwert (`null`) gegen gesetzten Wert 409; Koordinate als Paar; ohne `erwartet` wie bisher; Bind-Reihenfolge-Test erweitert.
+- [x] 2.3 Geburtsdatum im PATCH: `YYYY-MM-DD`, gültiger Kalendertag, nicht in der Zukunft (D6), sonst 400; Leeren erlaubt. Tests.
+- [x] 2.4 Typ-Codegen (`scripts/check-typ-codegen.sh`), falls der Request-Typ im OpenAPI erscheint; `src/AGENTS.md` (CAS-Baseline: Personen nutzen Feld-CAS, `useEditSitzung` nur noch Tier und Schaden).
 
 ## 3. Bausteine — LLH-1103 (f8218h1i), Frontend
 
