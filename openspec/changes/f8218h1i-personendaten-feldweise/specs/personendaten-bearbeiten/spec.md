@@ -74,7 +74,7 @@ Geburtsdatum, ein geschätztes Alter über 120 oder unter 0, eine ungültige Koo
 gekürzt, gekappt oder korrigiert werden.
 
 #### Scenario: Alter über 120
-- **WHEN** jemand im Feld „Geschätztes Alter“ 130 eingibt und speichert
+- **WHEN** jemand im Feld „Alter (geschätzt)“ 130 eingibt und speichert
 - **THEN** steht am Feld „höchstens 120“, und es geht kein Request hinaus
 
 ### Requirement: Eine offene Bearbeitung zur Zeit
@@ -82,7 +82,9 @@ gekürzt, gekappt oder korrigiert werden.
 Hat ein offenes Feld einen geänderten, ungespeicherten Entwurf, SHALL jeder Wechsel auf einen
 anderen Pfad die Rückfrage „Bleiben“/„Verwerfen“ zeigen, und das Schließen oder Neuladen des
 Browsers MUST warnen. Solange dieser Entwurf besteht, MUST jedes andere Feld der Personendaten
-mit Grund gesperrt sein. Ein offenes Feld ohne Änderung MUST keine Rückfrage auslösen.
+mit Grund gesperrt sein. Ein offenes Feld ohne Änderung MUST keine Rückfrage auslösen. Ein offenes
+Feld MUST an seinem Ort und mit seinem Entwurf stehen bleiben, auch wenn ein neu geladener Stand
+den Wert des Felds ändert, bis es gespeichert oder abgebrochen ist.
 
 #### Scenario: Wegnavigieren mit offenem Namen
 - **WHEN** jemand im Feld Name „Mül“ eintippt und ohne Speichern in die Betroffenenliste wechselt
@@ -91,8 +93,9 @@ mit Grund gesperrt sein. Ein offenes Feld ohne Änderung MUST keine Rückfrage a
 ### Requirement: Ohne Netz gesperrt
 
 Ohne Verbindung zum Server SHALL jede Angabe der Personendaten und „Zustand / Verdacht“ im
-Patientenkopf gesperrt sein, mit einem sichtbaren Grund am Feld. Eine Änderung der Personendaten
-MUST NOT vorgemerkt werden.
+Patientenkopf und in der Betroffenenliste gesperrt sein, mit einem sichtbaren Grund: für die
+Personendaten einmal am Kopf des Abschnitts, für „Zustand / Verdacht“ am Feld. Ein schon getippter
+Entwurf MUST stehen bleiben. Eine Änderung der Personendaten MUST NOT vorgemerkt werden.
 
 #### Scenario: Tablet ohne Netz
 - **WHEN** am UHS-Tablet ohne Netz das Detail einer Person offen ist
@@ -104,8 +107,9 @@ Das Geburtsdatum SHALL als Kalenderdatum ohne Uhrzeit und Zone eingegeben und al
 angezeigt werden; gespeichert wird `YYYY-MM-DD`. Die Eingabe MUST „TT.MM.JJJJ“, „T.M.JJJJ“,
 „TT.MM.JJ“ und `YYYY-MM-DD` lesen; ein zweistelliges Jahr MUST als das jüngste Jahr gelesen werden,
 das nicht in der Zukunft liegt. Ein Datum in der Zukunft oder ein ungültiges Datum MUST am Feld
-abgelehnt werden. Der Server MUST ein Geburtsdatum, das nicht `YYYY-MM-DD` ist oder in der Zukunft
-liegt, mit 400 abweisen. Ein schon gespeicherter Wert in anderer Form MUST unverändert angezeigt
+abgelehnt werden. Der Server MUST ein Geburtsdatum, das nicht `YYYY-MM-DD` ist oder nach dem
+morgigen Tag (UTC) liegt, beim Anlegen und beim Ändern mit 400 abweisen; der eine Tag Spielraum
+fängt die Zeitzonen der Anzeige ab. Ein schon gespeicherter Wert in anderer Form MUST unverändert angezeigt
 werden.
 
 #### Scenario: Zweistelliges Jahr

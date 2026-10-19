@@ -50,7 +50,8 @@ je genanntem Feld eine Bedingung `AND <spalte> IS ?` an das UPDATE (SQLite `IS` 
 NULL); die Koordinate trägt Breite und Länge. Bei 0 Zeilen und vorhandener Person: 409 mit der
 Meldung „Zwischenzeitlich geändert“. `basis_geaendert_at` bleibt als Wire-Feld bestehen
 (Grenzwert-Regel), das Frontend sendet es für Personen nicht mehr. Ein Feld in `erwartet`, das
-nicht auch geändert wird, ist 400. Verworfen: CAS über `geaendert_at` (Fehlalarme durch Sichtung,
+nicht auch geändert wird, und eine Koordinate nur halb in `erwartet` sind 422 (Feldkombination,
+Statuscode-Konvention in `src/AGENTS.md`). Ein leerer Altwert trifft auch eine leere Zeichenkette. Verworfen: CAS über `geaendert_at` (Fehlalarme durch Sichtung,
 Status, PAT; Detail ist nicht live) und blind je Feld (verletzt das Akzeptanzkriterium).
 
 **D2 — Rückfrage bei 409.** Dieselbe Rückfrage wie bisher („Zwischenzeitlich geändert“,
@@ -72,7 +73,7 @@ Bestehende Nutzer bleiben unverändert (alle neuen Props optional).
 **D4 — Merker „offene Bearbeitung“.** Ein kleiner Seitenkontext (`components/offeneBearbeitung`)
 hält höchstens eine offene, geänderte Bearbeitung je Seite (Etikett). Er speist
 `useFormularVerlassenSchutz` und `VerlassenRueckfrage` und liefert den anderen Feldern den
-Sperrgrund „Erst „Name“ speichern oder verwerfen“. Ein offenes Feld ohne Änderung meldet sich
+Sperrgrund „Erst „Name“ speichern oder abbrechen“ (passend zum Knopf), einmal am Kopf des Abschnitts. Ein offenes Feld ohne Änderung meldet sich
 nicht an. LLH-1139 kann denselben Kontext später für Paneele nutzen.
 
 **D5 — Leere Angaben.** `StammdatenRaster` bekommt einen Schreibzweig: gesetzte Angaben als
@@ -87,7 +88,7 @@ liest „TT.MM.JJJJ“, „T.M.JJJJ“, „TT.MM.JJ“ und `YYYY-MM-DD`; zweiste
 das nicht in der Zukunft liegt; prüft Kalendergültigkeit und „nicht nach heute“ (heute = Tag der
 Anzeigezone). `formatKalenderdatum(iso)` zeigt „TT.MM.JJJJ“, ein Wert, der kein ISO-Datum ist,
 erscheint roh. Anzeige in Personendaten, `personenSpalten`, `PersonVorschau`, `PersonDruckBlatt`.
-Der Server prüft im PATCH `YYYY-MM-DD` und „nicht nach heute (UTC + 1 Tag Spielraum)“, sonst 400.
+Der Server prüft beim Anlegen und im PATCH `YYYY-MM-DD` und „nicht nach heute (UTC + 1 Tag Spielraum)“, sonst 400.
 Verworfen: `ZeitpunktEingabe` mit `nurTag` (Zeitpunkt in der Anzeigezone, Jahr 2000+, Schnellwahl).
 
 **D7 — Grenzen (LLH-1329).**
@@ -110,7 +111,8 @@ Aufnahme (`AufnahmeFelder`), Schnellerfassung, Notizzeile, Zustand im Kopf, jewe
 
 **D8 — Ohne Netz.** `useOhneVerbindung` (nie `navigator.onLine`). Ein Grund für den ganzen
 Abschnitt Personendaten („Ohne Verbindung nicht änderbar“), am Feld als `gesperrt`. „Zustand /
-Verdacht“ im Kopf bekommt dieselbe Sperre (heute pausiert die Mutation still).
+Verdacht“ im Kopf und in der Betroffenenliste bekommt dieselbe Sperre (heute pausiert die Mutation
+still); ein getippter Entwurf bleibt dabei stehen.
 
 **D9 — Kopf und Gerät.** Die Primäraktion „Bearbeiten“ entfällt. Der Seitenkopf trägt dann keine
 Primäraktion; das Menü behält Statuswechsel und Stornieren. Am Gerät (UHS, Betreuungsstelle) sind
