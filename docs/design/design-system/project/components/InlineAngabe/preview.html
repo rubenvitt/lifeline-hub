@@ -1,0 +1,629 @@
+<!-- @dsCard group="Bedienung" height=600 -->
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>InlineAngabe (geschlossen, leer, offen)</title>
+<style>
+.data-ant-cssinjs-cache-path{content:"";}
+</style>
+<style>
+:root {
+  --lfh-grund: #e9ebee;
+  --lfh-flaeche: #ffffff;
+  --lfh-flaeche-2: #f5f6f8;
+  --lfh-linie: #d4d8dd;
+  --lfh-linie-stark: #b9bfc6;
+  --lfh-raster-linie: rgba(26, 95, 160, 0.07);
+  --lfh-text: #111418;
+  --lfh-gedaempft: #363d45;
+  --lfh-schwach: #424a53;
+  --lfh-bedien: #154e84;
+  --lfh-alarm: #b02318;
+  --lfh-achtung: #7a5200;
+  --lfh-normal: #1c6640;
+  --lfh-marke: #a8071a;
+  --lfh-marke-glut: 0 0 10px 0 rgba(168, 7, 26, 0.3);
+  --lfh-alarm-fuellung: rgba(176, 35, 24, 0.07);
+  --lfh-alarm-fuellung-stark: rgba(176, 35, 24, 0.2);
+  --lfh-achtung-fuellung: rgba(122, 82, 0, 0.08);
+  --lfh-achtung-fuellung-stark: rgba(122, 82, 0, 0.2);
+  --lfh-normal-fuellung: rgba(28, 102, 64, 0.07);
+  --lfh-kopf: #eef0f2;
+  --lfh-paneel: #f4f5f7;
+  --lfh-flaeche-3: #e1e4e8;
+  --lfh-text-2: #2b3138;
+  --lfh-steuer-rahmen: #79818a;
+  --lfh-bedien-hover: #185895;
+  --lfh-bedien-text: #144779;
+  --lfh-auf-bedien: #ffffff;
+  --lfh-normal-text: #155234;
+  --lfh-achtung-text: #604200;
+  --lfh-alarm-text: #8f1c12;
+  --lfh-alarm-hover: #7d1810;
+  --lfh-normal-flaeche: #e3f1e8;
+  --lfh-achtung-flaeche: #f7efd5;
+  --lfh-alarm-flaeche: #f9e3e3;
+  --lfh-bedien-flaeche: #e4edf7;
+  --lfh-auswahl-flaeche: #dbe7f5;
+  --lfh-gesperrt: #565e67;
+  --lfh-banner-grund: #e6eef8;
+  --lfh-banner-linie: #9dbbe0;
+  --lfh-berichtigung-zeile: #fbeaea;
+  --lfh-luecke-zeile: #faf3da;
+  --lfh-problem-zeile: #f8eded;
+  --lfh-zeichen-platte: transparent;
+  --lfh-etb-meldung-kante: #1677ff;
+  --lfh-etb-meldung-wort: #0a47a6;
+  --lfh-etb-anordnung-kante: #b35600;
+  --lfh-etb-anordnung-wort: #7a3700;
+  --lfh-etb-entscheidung-kante: #722ed1;
+  --lfh-etb-entscheidung-wort: #5b1fae;
+  --lfh-etb-lage-kante: #0e8c90;
+  --lfh-etb-lage-wort: #005357;
+  --lfh-etb-berichtigung-kante: #cf1322;
+  --lfh-etb-berichtigung-wort: #8f1c12;
+  --lfh-etb-system-kante: #424a53;
+  --lfh-etb-system-wort: #363d45;
+  --lfh-warnstufe-niedrig: #9e7f00;
+  --lfh-warnstufe-mittel: #b35600;
+  --lfh-warnstufe-hoch: #cf1322;
+  --lfh-warnstufe-akut: #a8071a;
+  --lfh-radius-flaeche: 0;
+  --lfh-radius-steuer: 0;
+  --lfh-radius-marke: 0;
+  --lfh-luft-1: 3px;
+  --lfh-luft-2: 7px;
+  --lfh-luft-3: 11px;
+  --lfh-luft-4: 18px;
+  --lfh-zeilenhoehe: 30px;
+  --lfh-schriftgroesse: 13.5px;
+  --lfh-seiten-polsterung: 12px;
+  --lfh-kopf-polsterung: 12px;
+  --lfh-kopf-vordergrund: #e8ebee;
+  --lfh-rahmen-grund: #0c0e11;
+  --lfh-rahmen-aktiv: #16191d;
+  --lfh-rahmen-feld: #14171b;
+  --lfh-rahmen-linie: #22262b;
+  --lfh-rahmen-text: #e8ebee;
+  --lfh-rahmen-gedaempft: #a0a8b1;
+  --lfh-rahmen-gesperrt: #838b94;
+  --lfh-rahmen-alarm: #ff7070;
+  --lfh-rahmen-marke: #a8071a;
+  --lfh-versal-sperrung: 2.2px;
+  --lfh-uebergang: 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --lfh-schrift-text: 'LFH Archivo', system-ui, -apple-system, sans-serif;
+  --lfh-schrift-display: 'LFH Archivo Narrow', 'LFH Archivo', system-ui, sans-serif;
+  --lfh-schrift-zahl: 'LFH JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --lfh-typo-ueberschrift-groesse: 30px;
+  --lfh-typo-ueberschrift-gewicht: 600;
+  --lfh-typo-ueberschrift-sperrung: -0.02em;
+  --lfh-typo-seitentitel-groesse: 14px;
+  --lfh-typo-seitentitel-gewicht: 600;
+  --lfh-typo-text-groesse: 14px;
+  --lfh-typo-text-gewicht: 400;
+  --lfh-typo-text-klein-groesse: 12px;
+  --lfh-typo-text-klein-gewicht: 400;
+  --lfh-typo-augenbraue-groesse: 10px;
+  --lfh-typo-augenbraue-gewicht: 600;
+  --lfh-typo-augenbraue-sperrung: 0.14em;
+  --lfh-typo-rail-etikett-groesse: 9px;
+  --lfh-typo-rail-etikett-gewicht: 500;
+  --lfh-typo-rail-etikett-sperrung: 0.06em;
+  --lfh-typo-meta-groesse: 11px;
+  --lfh-typo-meta-gewicht: 400;
+  --lfh-typo-datenwert-klein-groesse: 22px;
+  --lfh-typo-datenwert-klein-gewicht: 500;
+  --lfh-typo-datenwert-klein-sperrung: -0.02em;
+  --lfh-typo-datenwert-groesse: 32px;
+  --lfh-typo-datenwert-gewicht: 500;
+  --lfh-typo-datenwert-sperrung: -0.02em;
+  --lfh-typo-datenwert-gross-groesse: 40px;
+  --lfh-typo-datenwert-gross-gewicht: 500;
+  --lfh-typo-datenwert-gross-sperrung: -0.02em;
+}
+[data-theme='dark'] {
+  --lfh-grund: #08090b;
+  --lfh-flaeche: #0f1215;
+  --lfh-flaeche-2: #14171b;
+  --lfh-linie: #22262b;
+  --lfh-linie-stark: #2e343a;
+  --lfh-raster-linie: rgba(77, 148, 214, 0.055);
+  --lfh-text: #e8ebee;
+  --lfh-gedaempft: #9aa2ab;
+  --lfh-schwach: #838b94;
+  --lfh-bedien: #4d94d6;
+  --lfh-alarm: #ff6b6b;
+  --lfh-achtung: #e8cc3a;
+  --lfh-normal: #52c41a;
+  --lfh-marke: #a8071a;
+  --lfh-marke-glut: 0 0 12px 0 rgba(168, 7, 26, 0.55);
+  --lfh-alarm-fuellung: rgba(255, 107, 107, 0.1);
+  --lfh-alarm-fuellung-stark: rgba(255, 107, 107, 0.24);
+  --lfh-achtung-fuellung: rgba(232, 204, 58, 0.1);
+  --lfh-achtung-fuellung-stark: rgba(232, 204, 58, 0.24);
+  --lfh-normal-fuellung: rgba(82, 196, 26, 0.1);
+  --lfh-kopf: #0c0e11;
+  --lfh-paneel: #0a0c0e;
+  --lfh-flaeche-3: #16191d;
+  --lfh-text-2: #c6ccd2;
+  --lfh-steuer-rahmen: #626a73;
+  --lfh-bedien-hover: #7db3e8;
+  --lfh-bedien-text: #8ec2f0;
+  --lfh-auf-bedien: #08090b;
+  --lfh-normal-text: #7ddc4a;
+  --lfh-achtung-text: #e8cc3a;
+  --lfh-alarm-text: #ff6b6b;
+  --lfh-alarm-hover: #e88a87;
+  --lfh-normal-flaeche: #0d1a0a;
+  --lfh-achtung-flaeche: #1c1705;
+  --lfh-alarm-flaeche: #1c0a0d;
+  --lfh-bedien-flaeche: #0d1620;
+  --lfh-auswahl-flaeche: #08172b;
+  --lfh-gesperrt: #8f97a0;
+  --lfh-banner-grund: #0d1520;
+  --lfh-banner-linie: #1d3a5c;
+  --lfh-berichtigung-zeile: #160d0f;
+  --lfh-luecke-zeile: #161305;
+  --lfh-problem-zeile: #130f0f;
+  --lfh-zeichen-platte: #c9ced4;
+  --lfh-etb-meldung-kante: #1677ff;
+  --lfh-etb-meldung-wort: #5c9dff;
+  --lfh-etb-anordnung-kante: #d46b08;
+  --lfh-etb-anordnung-wort: #e8852a;
+  --lfh-etb-entscheidung-kante: #722ed1;
+  --lfh-etb-entscheidung-wort: #a57ff0;
+  --lfh-etb-lage-kante: #13c2c2;
+  --lfh-etb-lage-wort: #13c2c2;
+  --lfh-etb-berichtigung-kante: #cf1322;
+  --lfh-etb-berichtigung-wort: #ff6b6b;
+  --lfh-etb-system-kante: #838b94;
+  --lfh-etb-system-wort: #9aa2ab;
+  --lfh-warnstufe-niedrig: #d4b106;
+  --lfh-warnstufe-mittel: #d46b08;
+  --lfh-warnstufe-hoch: #cf1322;
+  --lfh-warnstufe-akut: #a8071a;
+}
+[data-dichte='komfortabel'] {
+  --lfh-luft-1: 5px;
+  --lfh-luft-2: 11px;
+  --lfh-luft-3: 18px;
+  --lfh-luft-4: 28px;
+  --lfh-zeilenhoehe: 48px;
+  --lfh-schriftgroesse: 15px;
+}
+[data-dichte='handschuh'] {
+  --lfh-luft-1: 7px;
+  --lfh-luft-2: 16px;
+  --lfh-luft-3: 26px;
+  --lfh-luft-4: 44px;
+  --lfh-zeilenhoehe: 72px;
+  --lfh-schriftgroesse: 15px;
+}
+@media screen {
+  html[data-helligkeit]:not([data-helligkeit='100'])::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: #000;
+    opacity: var(--lfh-abdunkelung, 0);
+    pointer-events: none;
+    z-index: 2147483647;
+  }
+}
+@media (min-width: 768px) {
+  :root {
+    --lfh-seiten-polsterung: 24px;
+  }
+}
+@media (min-width: 992px) {
+  :root {
+    --lfh-kopf-polsterung: 24px;
+  }
+}
+.lfh-zahl {
+  font-family: var(--lfh-schrift-zahl);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0;
+}
+.lfh-zahl--mittel {
+  font-size: 17px;
+  font-weight: 500;
+}
+.lfh-etikett {
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  letter-spacing: var(--lfh-typo-augenbraue-sperrung);
+  text-transform: uppercase;
+  color: var(--lfh-schwach);
+  white-space: nowrap;
+}
+.lfh-felder {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--lfh-linie);
+  border: 1px solid var(--lfh-linie);
+}
+.lfh-feld {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--lfh-luft-2);
+  background: var(--lfh-flaeche);
+}
+.lfh-feld--alarm .lfh-zahl {
+  color: var(--lfh-alarm-text);
+}
+.lfh-feld--achtung .lfh-zahl {
+  color: var(--lfh-achtung-text);
+}
+.lfh-skelett {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lfh-luft-2);
+  padding: var(--lfh-luft-1) 0;
+}
+.lfh-skelett__balken {
+  height: 12px;
+  width: 100%;
+  background: var(--lfh-flaeche-3);
+  animation: lfh-puls 1.4s ease-in-out infinite;
+}
+.lfh-skelett__balken--gross {
+  height: 26px;
+  width: 55%;
+}
+.lfh-skelett__balken--kurz {
+  width: 35%;
+}
+@keyframes lfh-puls {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.lfh-fehler {
+  display: flex;
+  gap: var(--lfh-luft-3);
+  padding: var(--lfh-luft-3);
+  border: 1px solid var(--lfh-alarm);
+  background: var(--lfh-alarm-flaeche);
+}
+[data-fugenraster] > * {
+  outline: 1px solid var(--lfh-linie);
+}
+.lfh-kennzahl {
+  background: var(--lfh-flaeche);
+}
+.lfh-kennzahl__ziel {
+  cursor: pointer;
+  transition: background var(--lfh-uebergang);
+}
+.lfh-kennzahl__ziel:hover {
+  background: var(--lfh-flaeche-3);
+}
+.lfh-kennzahl__ziel:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+.lfh-etb-buendel:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 2px;
+}
+.lfh-etb-buendel:hover {
+  text-decoration: underline;
+}
+.lfh-sprung-detail:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.lfh-anhang-vorschau:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+@media (max-width: 767.98px) {
+  .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
+    min-height: calc(var(--lfh-kennzahl-notizzeilen) * 1.4em);
+  }
+  [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen .lfh-kennzahl__titel {
+    min-height: 2.6em;
+  }
+  [data-dichte='handschuh'] .lfh-kennzahlenband--notizzeilen [data-lfh='kennzahl-notiz'] {
+    min-height: calc((var(--lfh-kennzahl-notizzeilen) + 1) * 1.4em);
+  }
+}
+@media (min-width: 768px) {
+  .lfh-kennzahlenband--notizfest [data-lfh='kennzahl-notiz'] {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--lfh-kennzahl-notizzeilen-fest);
+    line-clamp: var(--lfh-kennzahl-notizzeilen-fest);
+    overflow: hidden;
+    min-height: calc(var(--lfh-kennzahl-notizzeilen-fest) * 1.4em);
+  }
+}
+.lfh-segmente {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: var(--lfh-linie-stark);
+  border: 1px solid var(--lfh-linie-stark);
+}
+.lfh-segment-zelle {
+  background: var(--lfh-flaeche);
+}
+.lfh-segment {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--lfh-flaeche);
+  color: var(--lfh-gedaempft);
+  font-family: var(--lfh-schrift-text);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: pre-line;
+  cursor: pointer;
+  transition:
+    background var(--lfh-uebergang),
+    color var(--lfh-uebergang);
+}
+.lfh-segment:hover {
+  color: var(--lfh-text);
+}
+.lfh-segment--aktiv {
+  background: var(--lfh-flaeche-3);
+  color: var(--lfh-text);
+}
+.lfh-segment[aria-disabled='true'],
+.lfh-segment[aria-disabled='true']:hover {
+  color: var(--lfh-schwach);
+  cursor: not-allowed;
+}
+.lfh-segment:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+.lfh-sichtungswahl__flaeche:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: 2px;
+}
+.lfh-schnellerfassung
+  .lfh-schnellerfassung__feld:not(.lfh-schnellerfassung__feld--umrandet)
+  .ant-input,
+.lfh-schnellerfassung
+  .lfh-schnellerfassung__feld:not(.lfh-schnellerfassung__feld--umrandet)
+  .ant-input-affix-wrapper,
+.lfh-schnellerfassung
+  .lfh-schnellerfassung__feld:not(.lfh-schnellerfassung__feld--umrandet)
+  .ant-input:focus,
+.lfh-schnellerfassung
+  .lfh-schnellerfassung__feld:not(.lfh-schnellerfassung__feld--umrandet)
+  .ant-input-affix-wrapper:focus-within {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--lfh-text);
+  font-size: 14px;
+  line-height: var(--ant-font-height);
+}
+.lfh-schnellerfassung__feld--gestapelt > *,
+.lfh-schnellerfassung__feld--fuellt > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.lfh-schnellerfassung:focus-within {
+  outline: 1px solid var(--lfh-bedien);
+  outline-offset: 0;
+}
+.lfh-schnellerfassung[data-rahmen-farbe]:focus-within {
+  outline-color: var(--lfh-schnellerfassung-rahmen);
+}
+.ant-table-wrapper.lfh-katalog .ant-table-thead > tr > th {
+  font-family: var(--lfh-schrift-text);
+  font-size: var(--lfh-typo-augenbraue-groesse);
+  font-weight: var(--lfh-typo-augenbraue-gewicht);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-bottom-color: var(--lfh-linie);
+}
+.ant-table-wrapper.lfh-katalog .ant-table-thead .ant-table-filter-trigger {
+  box-sizing: border-box;
+  justify-content: center;
+  min-width: var(--lfh-filter-ziel, 24px);
+  min-height: var(--lfh-filter-ziel, 24px);
+  margin-block: calc(-1 * var(--lfh-filter-einzug, 0px));
+  margin-inline-end: 0;
+}
+.ant-table-wrapper.lfh-katalog .ant-table-thead .ant-table-filter-trigger:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+[data-lfh='datensicht-baum-ziel']:hover > .ant-table-row-expand-icon {
+  border-color: currentcolor;
+}
+[data-lfh='datensicht-baum-ziel']:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
+.ant-table-wrapper.lfh-katalog td.lfh-zahl-spalte {
+  font-family: var(--lfh-schrift-zahl);
+  font-variant-numeric: tabular-nums;
+}
+.ant-table-wrapper.lfh-katalog .ant-table-tbody * {
+  scroll-margin-top: var(--lfh-tabellenkopf-hoehe, 0px);
+}
+.ant-table-wrapper.lfh-katalog .ant-table-header,
+.ant-table-wrapper.lfh-katalog .ant-table-body,
+.ant-table-wrapper.lfh-katalog .ant-table-content {
+  scroll-padding-inline-start: var(--lfh-tabellen-kennung-breite, 0px);
+}
+.ant-table-wrapper.lfh-katalog .ant-table-cell-fix-start-shadow-show::after,
+.ant-table-wrapper.lfh-katalog .ant-table-fix-start-shadow-show .ant-table-container::before {
+  box-shadow:
+    inset 2px 0 0 0 var(--lfh-steuer-rahmen),
+    inset 10px 0 8px -8px var(--lfh-steuer-rahmen);
+}
+.ant-table-wrapper.lfh-katalog .ant-table-cell-fix-end-shadow-show::after,
+.ant-table-wrapper.lfh-katalog .ant-table-fix-end-shadow-show .ant-table-container::after {
+  box-shadow:
+    inset -2px 0 0 0 var(--lfh-steuer-rahmen),
+    inset -10px 0 8px -8px var(--lfh-steuer-rahmen);
+}
+.lfh-ampel {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--lfh-luft-1);
+}
+.lfh-ampel .lfh-feld {
+  align-items: center;
+  gap: 0;
+  padding: 0 var(--lfh-luft-1);
+  background: none;
+}
+.lfh-ampel .lfh-zahl {
+  line-height: 1.15;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.ant-notification {
+  --notification-top: var(--lfh-alarm-oben);
+}
+.ant-table-wrapper .ant-table-tbody > tr.zeile-hervorgehoben > td,
+[data-lfh='datensicht-karte'].zeile-hervorgehoben {
+  background-color: var(--lfh-bedien-flaeche);
+  box-shadow:
+    inset 0 2px 0 var(--lfh-bedien),
+    inset 0 -2px 0 var(--lfh-bedien);
+  transition: background-color 0.4s ease;
+}
+mark.lfh-fundstelle {
+  color: inherit;
+  background-color: var(--lfh-achtung-flaeche);
+  box-shadow: inset 0 -2px 0 var(--lfh-achtung);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.etb-stundengruppe {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+.etb-erfassung-sticky {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin: 0 calc(-1 * var(--lfh-seiten-polsterung)) calc(-1 * var(--lfh-seiten-polsterung));
+  padding: 12px var(--lfh-seiten-polsterung) 14px;
+  background: var(--lfh-kopf);
+  border-top: 1px solid var(--lfh-linie-stark);
+}
+.etb-erfassung-sticky--neben-leiste {
+  padding-inline-end: 0;
+}
+.etb-erfassung-sticky .ant-tabs-nav {
+  margin-bottom: 8px;
+}
+.etb-erfassung-sticky .markdown-editor__vorschau {
+  max-height: 28vh;
+}
+.ant-radio-group-outline .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled),
+.ant-radio-group-outline .ant-radio-button-wrapper:not(.ant-radio-button-wrapper-disabled):hover {
+  color: var(--lfh-bedien-text);
+}
+.ant-input-out-of-range.ant-input-out-of-range,
+.ant-input-out-of-range.ant-input-out-of-range input,
+.ant-input-out-of-range.ant-input-out-of-range textarea,
+.ant-input-out-of-range.ant-input-out-of-range .ant-input-show-count-suffix,
+.ant-input-out-of-range.ant-input-out-of-range .ant-input-data-count {
+  color: var(--lfh-alarm-text);
+}
+:root .ant-modal .ant-modal-footer > .ant-btn + .ant-btn,
+:root .ant-modal-confirm .ant-modal-confirm-btns .ant-btn + .ant-btn,
+:root .ant-popconfirm .ant-popconfirm-buttons .ant-btn + .ant-btn {
+  margin-inline-start: var(--ant-padding);
+}
+:root .ant-btn.ant-btn:disabled,
+:root .ant-btn.ant-btn.ant-btn-disabled,
+:root .ant-input.ant-input-disabled,
+:root .ant-input.ant-input[disabled],
+:root .ant-input-affix-wrapper.ant-input-affix-wrapper-disabled,
+:root .ant-input-number.ant-input-number-disabled,
+:root .ant-picker.ant-picker-disabled,
+:root .ant-select.ant-select-disabled,
+:root .ant-radio-button-wrapper.ant-radio-button-wrapper-disabled,
+:root .ant-checkbox-disabled .ant-checkbox-inner.ant-checkbox-inner {
+  border-style: dashed;
+  border-color: var(--lfh-steuer-rahmen);
+}
+:root .ant-input-affix-wrapper-disabled .ant-input.ant-input,
+:root .ant-input-number-disabled .ant-input-number-input.ant-input-number-input {
+  border-style: none;
+}
+:root .ant-menu-item.ant-menu-item-disabled,
+:root .ant-menu-submenu.ant-menu-submenu-disabled > .ant-menu-submenu-title,
+:root .ant-dropdown-menu-item.ant-dropdown-menu-item-disabled,
+:root .ant-select-item-option.ant-select-item-option-disabled,
+:root .ant-segmented-item.ant-segmented-item-disabled {
+  outline: 1px dashed var(--lfh-steuer-rahmen);
+  outline-offset: -1px;
+}
+[data-lfh='seitenkopf'] *,
+[data-lfh='seiten-inhalt'] * {
+  scroll-margin-block-end: var(--lfh-etb-fokusabstand, 0px);
+}
+:root:has([data-lfh='speicherleiste']) {
+  scroll-padding-block-end: var(--lfh-speicherleiste-fokusabstand, 0px);
+}
+:root:has([data-lfh='zaehltasten']),
+main:has([data-lfh='zaehltasten']) {
+  scroll-padding-block-end: var(--lfh-zaehltasten-fokusabstand, 0px);
+}
+:root:has([data-lfh='modul-panel'] :focus) {
+  scroll-padding-block-end: var(--lfh-modulpanel-fokusabstand, 0px);
+}
+:root {
+  scroll-padding-block-start: var(--lfh-rahmen-oben, 0px);
+}
+:root:has([data-lfh='rahmen-kopf'] :focus, [data-lfh='betriebszeile'] :focus) {
+  scroll-padding-block-start: 0px;
+}
+</style>
+<style>
+html,body{margin:0;padding:0}
+body{background:var(--lfh-grund);color:var(--lfh-text);font-family:var(--lfh-schrift-text)}
+.ds-themen{display:flex;flex-direction:column}
+.ds-thema{background:var(--lfh-grund);color:var(--lfh-text);padding:16px;display:flex;flex-direction:column;gap:12px}
+.ds-thema h2{margin:0}
+.ds-inhalt{max-width:720px}
+.ds-stapel{display:flex;flex-direction:column;gap:12px}
+.ds-reihe{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ds-reihe>.ant-input{flex:1 1 200px;width:auto}
+.ds-fugenraster{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--lfh-linie);border:1px solid var(--lfh-linie)}
+.ds-feld{display:flex;flex-direction:column;gap:4px;margin-top:12px;max-width:320px;font-size:13px}
+</style>
+</head>
+<body>
+<main class="ds-themen" aria-label="InlineAngabe (geschlossen, leer, offen)"><section class="ds-thema" data-theme="dark"><h2 class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(131, 139, 148); margin: 0px;">Nacht</h2><div class="ds-inhalt"><dl aria-label="Angaben" data-lfh="datenraster" data-fugenraster="" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(max(min(180px, 100%), calc((100% - 0px) / 1)), 1fr)); margin: 0px; gap: 1px; background: rgb(15, 18, 21); border: 1px solid rgb(34, 38, 43); clip-path: inset(0);"><div data-lfh="datenfeld" style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; padding-block: 7px; padding-inline: 11px; background: rgb(15, 18, 21);"><dt class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(131, 139, 148); margin: 0px;">Leitstellen-Nr.</dt><dd style="margin: 0px; min-width: 0px; overflow-wrap: anywhere; color: rgb(232, 235, 238); font-family: &quot;LFH JetBrains Mono&quot;, ui-monospace, &quot;SF Mono&quot;, Menlo, monospace; font-size: 13px; font-weight: 400; font-variant-numeric: tabular-nums;"><button aria-label="Leitstellen-Nr. bearbeiten" aria-describedby="_r_1_" type="button" class="ant-btn css-var-_r_0_ ant-btn-text ant-btn-color-default ant-btn-variant-text" style="min-width: 24px; height: auto; min-height: 30px; padding-block: 3px; padding-inline: 7px; max-width: 100%; white-space: normal; text-align: start; justify-content: flex-start; overflow-wrap: anywhere; color: inherit; font: inherit; margin-inline: -7px;"><span id="_r_1_">LST-26-08812</span><span aria-hidden="true" style="color: rgb(154, 162, 171);"><span aria-hidden="true" data-lfh-icon="stift" class="anticon lfh-icon" style="display: inline-flex; align-items: center; color: inherit; font-style: normal; line-height: 0; text-align: center; text-transform: none; vertical-align: -0.125em;"><svg viewBox="0 0 50 50" width="1em" height="1em" fill="currentColor" focusable="false"><path d="M 43.125 2 C 41.878906 2 40.636719 2.488281 39.6875 3.4375 L 38.875 4.25 L 45.75 11.125 C 45.746094 11.128906 46.5625 10.3125 46.5625 10.3125 C 48.464844 8.410156 48.460938 5.335938 46.5625 3.4375 C 45.609375 2.488281 44.371094 2 43.125 2 Z M 37.34375 6.03125 C 37.117188 6.0625 36.90625 6.175781 36.75 6.34375 L 4.3125 38.8125 C 4.183594 38.929688 4.085938 39.082031 4.03125 39.25 L 2.03125 46.75 C 1.941406 47.09375 2.042969 47.457031 2.292969 47.707031 C 2.542969 47.957031 2.90625 48.058594 3.25 47.96875 L 10.75 45.96875 C 10.917969 45.914063 11.070313 45.816406 11.1875 45.6875 L 43.65625 13.25 C 44.054688 12.863281 44.058594 12.226563 43.671875 11.828125 C 43.285156 11.429688 42.648438 11.425781 42.25 11.8125 L 9.96875 44.09375 L 5.90625 40.03125 L 38.1875 7.75 C 38.488281 7.460938 38.578125 7.011719 38.410156 6.628906 C 38.242188 6.246094 37.855469 6.007813 37.4375 6.03125 C 37.40625 6.03125 37.375 6.03125 37.34375 6.03125 Z"></path></svg></span></span></button></dd></div><div data-lfh="datenfeld" style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; padding-block: 7px; padding-inline: 11px; background: rgb(15, 18, 21);"><dt class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(131, 139, 148); margin: 0px;">Bemerkung</dt><dd style="margin: 0px; min-width: 0px; overflow-wrap: anywhere; color: rgb(232, 235, 238); font-size: 13px;"><button type="button" class="ant-btn css-var-_r_0_ ant-btn-link ant-btn-color-link ant-btn-variant-link" style="min-width: 24px; color: rgb(142, 194, 240); padding-inline: 0px; padding-block: 3px; height: auto; min-height: 30px; max-width: 100%; white-space: normal; text-align: start; justify-content: flex-start; overflow-wrap: anywhere;"><span>Bemerkung eintragen</span></button></dd></div><div data-lfh="datenfeld" style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; padding-block: 7px; padding-inline: 11px; background: rgb(15, 18, 21);"><dt class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(131, 139, 148); margin: 0px;">Einsatzstichwort</dt><dd style="margin: 0px; min-width: 0px; overflow-wrap: anywhere; color: rgb(232, 235, 238); font-size: 13px;"><form style="display: flex; flex-direction: column; gap: 3px; min-width: 0px;"><input id="_r_a_" aria-label="Einsatzstichwort" class="ant-input ant-input-outlined css-var-_r_0_ ant-input-css-var" type="text" value="THL 2"><div class="ant-space ant-space-horizontal ant-space-align-center ant-space-gap-row-middle ant-space-gap-col-middle css-var-_r_0_" style="flex-wrap: wrap;"><div class="ant-space-item"><button aria-label="Einsatzstichwort speichern" type="submit" class="ant-btn css-var-_r_0_ ant-btn-primary ant-btn-color-primary ant-btn-variant-solid" style="min-width: 24px;"><span>Speichern</span></button></div><div class="ant-space-item"><button aria-label="Bearbeitung von Einsatzstichwort abbrechen" type="button" class="ant-btn css-var-_r_0_ ant-btn-default ant-btn-color-default ant-btn-variant-outlined" style="min-width: 24px;"><span>Abbrechen</span></button></div></div></form></dd></div></dl></div></section><section class="ds-thema" data-theme="light"><h2 class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(66, 74, 83); margin: 0px;">Tag</h2><div class="ds-inhalt"><dl aria-label="Angaben" data-lfh="datenraster" data-fugenraster="" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(max(min(180px, 100%), calc((100% - 0px) / 1)), 1fr)); margin: 0px; gap: 1px; background: rgb(255, 255, 255); border: 1px solid rgb(212, 216, 221); clip-path: inset(0);"><div data-lfh="datenfeld" style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; padding-block: 7px; padding-inline: 11px; background: rgb(255, 255, 255);"><dt class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(66, 74, 83); margin: 0px;">Leitstellen-Nr.</dt><dd style="margin: 0px; min-width: 0px; overflow-wrap: anywhere; color: rgb(17, 20, 24); font-family: &quot;LFH JetBrains Mono&quot;, ui-monospace, &quot;SF Mono&quot;, Menlo, monospace; font-size: 13px; font-weight: 400; font-variant-numeric: tabular-nums;"><button aria-label="Leitstellen-Nr. bearbeiten" aria-describedby="_r_e_" type="button" class="ant-btn css-var-_r_d_ ant-btn-text ant-btn-color-default ant-btn-variant-text" style="min-width: 24px; height: auto; min-height: 30px; padding-block: 3px; padding-inline: 7px; max-width: 100%; white-space: normal; text-align: start; justify-content: flex-start; overflow-wrap: anywhere; color: inherit; font: inherit; margin-inline: -7px;"><span id="_r_e_">LST-26-08812</span><span aria-hidden="true" style="color: rgb(54, 61, 69);"><span aria-hidden="true" data-lfh-icon="stift" class="anticon lfh-icon" style="display: inline-flex; align-items: center; color: inherit; font-style: normal; line-height: 0; text-align: center; text-transform: none; vertical-align: -0.125em;"><svg viewBox="0 0 50 50" width="1em" height="1em" fill="currentColor" focusable="false"><path d="M 43.125 2 C 41.878906 2 40.636719 2.488281 39.6875 3.4375 L 38.875 4.25 L 45.75 11.125 C 45.746094 11.128906 46.5625 10.3125 46.5625 10.3125 C 48.464844 8.410156 48.460938 5.335938 46.5625 3.4375 C 45.609375 2.488281 44.371094 2 43.125 2 Z M 37.34375 6.03125 C 37.117188 6.0625 36.90625 6.175781 36.75 6.34375 L 4.3125 38.8125 C 4.183594 38.929688 4.085938 39.082031 4.03125 39.25 L 2.03125 46.75 C 1.941406 47.09375 2.042969 47.457031 2.292969 47.707031 C 2.542969 47.957031 2.90625 48.058594 3.25 47.96875 L 10.75 45.96875 C 10.917969 45.914063 11.070313 45.816406 11.1875 45.6875 L 43.65625 13.25 C 44.054688 12.863281 44.058594 12.226563 43.671875 11.828125 C 43.285156 11.429688 42.648438 11.425781 42.25 11.8125 L 9.96875 44.09375 L 5.90625 40.03125 L 38.1875 7.75 C 38.488281 7.460938 38.578125 7.011719 38.410156 6.628906 C 38.242188 6.246094 37.855469 6.007813 37.4375 6.03125 C 37.40625 6.03125 37.375 6.03125 37.34375 6.03125 Z"></path></svg></span></span></button></dd></div><div data-lfh="datenfeld" style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; padding-block: 7px; padding-inline: 11px; background: rgb(255, 255, 255);"><dt class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(66, 74, 83); margin: 0px;">Bemerkung</dt><dd style="margin: 0px; min-width: 0px; overflow-wrap: anywhere; color: rgb(17, 20, 24); font-size: 13px;"><button type="button" class="ant-btn css-var-_r_d_ ant-btn-link ant-btn-color-link ant-btn-variant-link" style="min-width: 24px; color: rgb(20, 71, 121); padding-inline: 0px; padding-block: 3px; height: auto; min-height: 30px; max-width: 100%; white-space: normal; text-align: start; justify-content: flex-start; overflow-wrap: anywhere;"><span>Bemerkung eintragen</span></button></dd></div><div data-lfh="datenfeld" style="display: flex; flex-direction: column; gap: 4px; min-width: 0px; padding-block: 7px; padding-inline: 11px; background: rgb(255, 255, 255);"><dt class="lfh-augenbraue" style="font-family: &quot;LFH Archivo&quot;, system-ui, -apple-system, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; color: rgb(66, 74, 83); margin: 0px;">Einsatzstichwort</dt><dd style="margin: 0px; min-width: 0px; overflow-wrap: anywhere; color: rgb(17, 20, 24); font-size: 13px;"><form style="display: flex; flex-direction: column; gap: 3px; min-width: 0px;"><input id="_r_n_" aria-label="Einsatzstichwort" class="ant-input ant-input-outlined css-var-_r_d_ ant-input-css-var" type="text" value="THL 2"><div class="ant-space ant-space-horizontal ant-space-align-center ant-space-gap-row-middle ant-space-gap-col-middle css-var-_r_d_" style="flex-wrap: wrap;"><div class="ant-space-item"><button aria-label="Einsatzstichwort speichern" type="submit" class="ant-btn css-var-_r_d_ ant-btn-primary ant-btn-color-primary ant-btn-variant-solid" style="min-width: 24px;"><span>Speichern</span></button></div><div class="ant-space-item"><button aria-label="Bearbeitung von Einsatzstichwort abbrechen" type="button" class="ant-btn css-var-_r_d_ ant-btn-default ant-btn-color-default ant-btn-variant-outlined" style="min-width: 24px;"><span>Abbrechen</span></button></div></div></form></dd></div></dl></div></section></main>
+</body>
+</html>
