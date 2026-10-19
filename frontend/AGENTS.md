@@ -23,13 +23,18 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
     Generator `frontend/scripts/design-system/`, Wächter `designSystem.guard.test.ts`, Change
     `uzfj5f43-design-system-aus-code`); von Hand gepflegt wird es nicht, Änderungen auf der Seite
     überschreibt die nächste Veröffentlichung. Ändert ein PR das Theme (`theme/tokens.ts`,
-    `theme/schriften.ts`, `theme/rollen.css`, `theme/sprache.css`, `index.css`), einen
-    vorgestellten Baustein oder einen Regelabschnitt, den die README trägt, läuft
-    `mise exec -- pnpm -C frontend design-system`, und das Erzeugte kommt mit in den PR.
+    `theme/schriften.ts`, `theme/statusFarben.ts`, `theme/rollen.css`, `theme/sprache.css`,
+    `index.css`), `components/instrument/statusFlaeche.ts`, einen vorgestellten Baustein, einen
+    Regelabschnitt, den die README trägt, oder `theme/gesperrtZeichen.guard.test.ts` (README
+    „Gesperrt“), oder hebt er antd oder eine Schrift, läuft
+    `mise exec -- pnpm -C frontend design-system`, und das Erzeugte kommt mit in den PR. Ein roter
+    Wächter heißt dasselbe.
   - **Nach dem Merge veröffentlicht der Agent, der den PR abschließt, neu**: aus dem Stand von
-    `alpha` auf die Adresse in `ARTIFACT.md`, nur geänderte Dateien, den Index
-    `design-system.json` zuletzt, `lastChange.via` „Claude Code aus lifeline-hub <Commit>“. Ohne
-    claude.ai-Anmeldung vermerkt er das als Kommentar an der Aufgabe.
+    `alpha` auf die Adresse in `ARTIFACT.md`, nur die geänderten Dateien unter `project/`. Den
+    Index `design-system.json` gibt es nur im Artifact: zuletzt und einzeln senden, unmittelbar
+    vorher lesen, alle Schlüssel und `createdOnFiles` behalten, nur `lastChange` setzen (`via`
+    „Claude Code aus lifeline-hub <Commit>“). Ohne claude.ai-Anmeldung vermerkt er das als
+    Kommentar an der Aufgabe.
 
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
