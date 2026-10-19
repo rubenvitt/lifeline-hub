@@ -10,9 +10,11 @@ import { datenfeldStil, datenrasterStil } from './datenrasterStil';
  * SEMANTIK: ein `<dl>`; jedes Feld ist ein `<div>` mit `<dt>` (Augenbraue) und `<dd>` — die
  * zulässige Gruppierung nach HTML, Vorleser hören Begriff und Wert als Paar.
  *
- * BEARBEITEN AN ORT UND STELLE: der Wert ist ein beliebiger Knoten. Eine Detailseite, die im
- * Edit-Modus ein `Form.Item noStyle` in die Zelle legt, behält dasselbe Raster. `mono` setzt die
- * Schrift am `<dd>`; ein antd-Eingabefeld darin bringt seine eigene mit.
+ * BEARBEITEN AN ORT UND STELLE: im Edit-Modus einer Detailseite steht statt `Datenfeld` eine
+ * `DatenfeldEingabe` (`./DatenfeldEingabe.tsx`, LLH-1101) im selben Raster — mit einem Etikett, das
+ * die Eingabe benennt, und einem `Form.Item` OHNE `noStyle`, damit ein Prüffehler sichtbar unter
+ * der Eingabe steht. Ein `Form.Item noStyle` im `Datenfeld` ist der alte Weg: die Eingabe bliebe
+ * ohne Namen, und eine Regel verhinderte das Speichern still. `mono` setzt die Schrift am `<dd>`.
  */
 interface DatenrasterProps {
   children: ReactNode;
