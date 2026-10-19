@@ -12,15 +12,18 @@ import { monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { aktualisierePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
+import { PERSON_ZUSTAND_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
+import { formatKalenderdatum } from '../anzeige/kalenderdatum';
 import { STATUS_META, TRANSPORT_ART_WORT, transportRang } from './personMeta';
 import PrioritaetMarke from './PrioritaetMarke';
 import { kontamination } from '../theme/statusFarben';
 import { GESCHLECHT_KURZ } from './personBefehl';
 import { koordinatenText } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
 import type { PersonEintragArt } from '../offline/personEintrag';
 import {
   istAngetroffen,
@@ -58,7 +61,7 @@ import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
 
 /** Alter-Anzeige: Geburtsdatum > geschätztes Alter (mit Tilde — das Feld IST geschätzt). */
 function alterAnzeige(p: Pick<Person, 'geburtsdatum' | 'alter_geschaetzt'>): string | null {
-  if (p.geburtsdatum) return p.geburtsdatum;
+  if (p.geburtsdatum) return formatKalenderdatum(p.geburtsdatum);
   if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt}`;
   return null;
 }
@@ -298,6 +301,10 @@ function isSichtungBedienbar(p: Person, b: PersonenBedienung | undefined): boole
 export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: number }) {
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
+  // Ohne Verbindung gesperrt mit Grund, im Kopf wie in der Liste (LLH-1103, design.md D8): die
+  // Mutation pausierte sonst und überschriebe nach der Rückkehr still einen ungesehenen Wert.
+  // `useOhneVerbindung`, nie `navigator.onLine` allein (WLAN ohne Server).
+  const ohneVerbindung = useOhneVerbindung();
   const mutation = useMutation({
     mutationFn: (zustand: string) =>
       aktualisierePerson(einsatzId, p.id, { zustand: zustand.trim() === '' ? null : zustand }),
@@ -328,6 +335,8 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
         darfSchreiben
         bezeichnung="Zustand / Verdacht"
         kennung={registrierAnzeige(p.registrier_nr)}
+        max={PERSON_ZUSTAND_MAX}
+        gesperrt={ohneVerbindung ? OHNE_VERBINDUNG_NICHT_AENDERBAR : undefined}
         onSpeichern={(wert) => mutation.mutate(wert)}
       />
       {fehler && (

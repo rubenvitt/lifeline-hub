@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import type { Uhs } from '../api/types';
 import {
   SICHTUNG_BUCHSTABEN,
@@ -318,5 +319,32 @@ describe('loeseBefehl', () => {
       eingabe: { sichtung: 'sk1' },
       uhs: null,
     });
+  });
+});
+
+/**
+ * Grenze von Name und Vorname (LLH-1329): die Schnellerfassung prüft die Länge VOR dem Senden und
+ * vor der Warteschlange, mit dem Wortlaut des Servers; gekürzt wird nie. Als Paar mit der Grenze
+ * selbst, sonst wäre auch ein Parser grün, der jeden Namen ablehnt. Mutationsprobe: die Prüfung
+ * in `parsePersonBefehl` entfernt → das Problem fehlt, und die Zeile sendet.
+ */
+describe('Name und Vorname an der Grenze (LLH-1329)', () => {
+  const lang = (n: number) => 'x'.repeat(n);
+
+  it('nimmt genau die Grenze an', () => {
+    const b = parsePersonBefehl(`${lang(PERSON_NAME_MAX)}, ${lang(PERSON_NAME_MAX)}`);
+    expect(b.probleme).toEqual([]);
+    expect(b.eingabe.name).toHaveLength(PERSON_NAME_MAX);
+  });
+
+  it('meldet ein Zeichen mehr je Feld und kürzt nicht', () => {
+    const name = parsePersonBefehl(lang(PERSON_NAME_MAX + 1));
+    expect(name.probleme).toEqual([`Name darf höchstens ${PERSON_NAME_MAX} Zeichen lang sein`]);
+    expect(name.eingabe.name).toHaveLength(PERSON_NAME_MAX + 1);
+    const vorname = parsePersonBefehl(`Kowalski, ${lang(PERSON_NAME_MAX + 1)} w 34`);
+    expect(vorname.probleme).toEqual([
+      `Vorname darf höchstens ${PERSON_NAME_MAX} Zeichen lang sein`,
+    ]);
+    expect(loeseBefehl(vorname, []).ok).toBe(false);
   });
 });

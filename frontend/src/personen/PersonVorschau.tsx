@@ -3,7 +3,8 @@ import { Space, Spin, Tag, Typography, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { ladePerson } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META } from './personMeta';
+import { GESCHLECHT_WORT, STATUS_META } from './personMeta';
+import { formatKalenderdatum } from '../anzeige/kalenderdatum';
 import Patientenkopf from './Patientenkopf';
 import PersonVerlauf from './PersonVerlauf';
 import StammdatenRaster from './StammdatenRaster';
@@ -57,8 +58,15 @@ export default function PersonVorschau({
             angaben={[
               { label: 'Name', wert: p.name },
               { label: 'Vorname', wert: p.vorname },
-              { label: 'Geschlecht', wert: p.geschlecht },
-              { label: 'Geburtsdatum', wert: p.geburtsdatum, mono: true },
+              {
+                label: 'Geschlecht',
+                wert: p.geschlecht ? GESCHLECHT_WORT[p.geschlecht] : null,
+              },
+              {
+                label: 'Geburtsdatum',
+                wert: p.geburtsdatum ? formatKalenderdatum(p.geburtsdatum) : null,
+                mono: true,
+              },
               { label: 'Alter (geschätzt)', wert: p.alter_geschaetzt, mono: true },
               { label: 'Herkunft / Adresse', wert: p.herkunft_adresse, breit: true },
               { label: 'Fundort', wert: p.antreff_ort },

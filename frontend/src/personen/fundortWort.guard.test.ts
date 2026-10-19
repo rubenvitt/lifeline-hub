@@ -49,7 +49,8 @@ export function antreffortBefunde(dateien: Record<string, string>): string[] {
  */
 const FUNDORT_ORTE = [
   'personen/AufnahmeFelder.tsx',
-  'pages/PersonenDetailPage.tsx',
+  // Die Personendaten des Details stehen seit LLH-1103 in einem eigenen Abschnitt.
+  'personen/Personendaten.tsx',
   'personen/personenSpalten.tsx',
   'personen/PersonenDruckTabelle.tsx',
   'personen/PersonVorschau.tsx',

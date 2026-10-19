@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { meHandler, server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
 import PersonenDetailPage from './PersonenDetailPage';
 import type { Person, PersonDetail, Sichtungskategorie } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
@@ -101,7 +101,7 @@ function render(
       <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
       <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
     </Routes>,
-    { route: '/einsaetze/1/personen/10', client },
+    { route: '/einsaetze/1/personen/10', client, datenRouter: true },
   );
 }
 
@@ -116,7 +116,7 @@ function renderBei(route: string) {
       <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
       <Route path="/einsaetze/:id/tiere/:tierId" element={<div>TIERE-DETAIL</div>} />
     </Routes>,
-    { route },
+    { route, datenRouter: true },
   );
 }
 
@@ -299,11 +299,6 @@ async function klappeBezuegeAuf() {
   await userEvent.click(screen.getByRole('button', { name: /Bezüge/ }));
 }
 
-/** Das Bearbeiten-Formular der Personendaten öffnen (Primäraktion des Seitenkopfs). */
-async function starteBearbeiten() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-}
-
 describe('PersonenDetailPage — Kopfleiste', () => {
   /**
    * Die Primärknöpfe im Kopf — über die Marke des Primitivs eingegrenzt, nicht global: der
@@ -318,8 +313,9 @@ describe('PersonenDetailPage — Kopfleiste', () => {
   }
 
   /**
-   * LLH-1094: Sichten und Verbleib erfassen stehen im Patientenkopf; die Primäraktion hängt nicht
-   * mehr an der Sichtung, sie ist „Bearbeiten“.
+   * LLH-1094: Sichten und Verbleib erfassen stehen im Patientenkopf. LLH-1103: die Personendaten
+   * werden feldweise geschrieben; „Bearbeiten“ gibt es nicht mehr, der Kopf trägt keine
+   * Primäraktion, nur das Menü.
    */
   it.each([
     { fall: 'ungesichtet', person: detail },
@@ -327,12 +323,14 @@ describe('PersonenDetailPage — Kopfleiste', () => {
       fall: 'gesichtet',
       person: { ...detail, status: 'betroffen', aktuelle_sichtung: 'sk2' } as PersonDetail,
     },
-  ])('trägt genau eine Primäraktion „Bearbeiten“ ($fall)', async ({ person }) => {
+  ])('trägt keine Primäraktion und kein „Bearbeiten“ ($fall)', async ({ person }) => {
     render(einsatzAktiv, person);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    const primaer = kopfPrimaeraktionen();
-    expect(primaer).toHaveLength(1);
-    expect(primaer[0]).toHaveAccessibleName('Bearbeiten');
+    expect(kopfPrimaeraktionen()).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Weitere Aktionen zu Person R-001' }),
+    ).toBeInTheDocument();
   });
 
   it('das Menü trägt weder Sichten noch Verbleib noch Bearbeiten — die stehen im Kopf', async () => {
@@ -837,107 +835,12 @@ describe('PersonenDetailPage — Stammdaten', () => {
     expect(screen.getByText('Brücke')).toBeInTheDocument();
   });
 
-  it('Einsatzleitung kann bearbeiten und speichern', async () => {
-    // Kein getByLabelText (antd Form bindet label/htmlFor nicht zuverlässig): Edit-Modus öffnen,
-    // das mit initialValues={p} vorbefüllte Formular direkt speichern und den PATCH prüfen.
-    let gesendet = false;
-    render(einsatzAktiv, detail, [
-      http.patch('/api/einsaetze/1/personen/10', async () => {
-        gesendet = true;
-        return HttpResponse.json({ ...detail });
-      }),
-    ]);
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(gesendet).toBe(true));
-  });
-
-  it('friert Formularwerte und CAS-Basis gemeinsam ein, auch wenn der Detailstand refetcht', async () => {
-    let koerper: Record<string, unknown> | undefined;
-    const { client } = render(einsatzAktiv, detail, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...detail, name: 'Lokaler Name' });
-      }),
-    ]);
-    await screen.findByRole('heading', { name: /Person R-001/ });
-    expect(
-      client.getQueryCache().find({ queryKey: einsatzKeys.person(1, 10) })?.options.retry,
-    ).toBe(false);
-
-    await starteBearbeiten();
-    const name = screen.getByDisplayValue('Mustermann');
-    await userEvent.clear(name);
-    await userEvent.type(name, 'Lokaler Name');
-
-    act(() => {
-      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
-        ...detail,
-        name: 'Externer Name',
-        geaendert_at: '2026-05-27 09:15:00',
-      });
-    });
-    expect(name).toHaveValue('Lokaler Name');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(koerper).toBeDefined());
-    expect(koerper?.name).toBe('Lokaler Name');
-    expect(koerper?.basis_geaendert_at).toBe('2026-05-27 09:00:00');
-  });
-
-  it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-241/F10)', async () => {
-    const koerper: Array<Record<string, unknown>> = [];
-    render(einsatzAktiv, detail, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper.push((await request.json()) as Record<string, unknown>);
-        // Erster Save (mit Baseline) → 409; der Overwrite (ohne Baseline) → Erfolg.
-        if (koerper.length === 1) {
-          return HttpResponse.json({ error: 'Zwischenzeitlich geändert' }, { status: 409 });
-        }
-        return HttpResponse.json({ ...detail });
-      }),
-    ]);
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    // Konfliktdialog erscheint statt eines stillen Overwrites.
-    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await waitFor(() => expect(koerper).toHaveLength(2));
-    // Der erste Request trug den beim Öffnen gelesenen Stand; der Overwrite bewusst nicht.
-    expect(koerper[0].basis_geaendert_at).toBe('2026-05-27 09:00:00');
-    expect(koerper[1].basis_geaendert_at).toBeUndefined();
-  });
-
-  it('ein zweiter 409 auf den Overwrite zeigt die Servermeldung statt erneut den Dialog (LFH-351)', async () => {
-    // Die Personen-Route kennt einen zweiten 409, der kein CAS-Konflikt ist: `fordere_aktiv`
-    // („Einsatz ist abgeschlossen und schreibgeschützt") greift vor der CAS-Prüfung und lässt sich
-    // per `overwrite` nicht umgehen. Ohne den `!v.overwrite`-Zweig öffnete jeder Overwrite
-    // denselben Dialog erneut.
-    const koerper: Array<Record<string, unknown>> = [];
-    render(einsatzAktiv, detail, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(
-          { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
-          { status: 409 },
-        );
-      }),
-    ]);
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Überschreiben' }));
-    await waitFor(() => expect(koerper).toHaveLength(2));
-    // Die Servermeldung belegt den else-Zweig (`fehler`); ein zweiter Dialog wäre eine Schleife,
-    // deren einziger Ausweg „Verwerfen und neu laden" ist.
-    expect(
-      await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
-    ).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Überschreiben' })).toHaveLength(1);
-  });
-
-  it('Beobachter sieht keinen Bearbeiten-Button', async () => {
+  it('Beobachter sieht weder „Bearbeiten“ noch einen schreibbaren Wert', async () => {
     render(einsatzBeobachter, detail);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Name bearbeiten$/ })).not.toBeInTheDocument();
+    expect(within(stammdatenRaster()).getByText('Mustermann')).toBeInTheDocument();
   });
 
   /**
@@ -963,9 +866,12 @@ describe('PersonenDetailPage — Stammdaten', () => {
   });
 });
 
-/** Der Stammdaten-Raster der Personendaten; der Kopf trägt einen eigenen („Patientenangaben“). */
+/**
+ * Das Datenraster der Personendaten; der Kopf trägt ein eigenes („Patientenangaben“). Es heißt wie
+ * sein Abschnitt („Personendaten“), nicht mehr „Stammdaten“.
+ */
 function stammdatenRaster(): HTMLElement {
-  const r = document.querySelector<HTMLElement>('dl[aria-label="Stammdaten"]');
+  const r = document.querySelector<HTMLElement>('dl[aria-label="Personendaten"]');
   expect(r).not.toBeNull();
   return r!;
 }
@@ -1039,7 +945,11 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
   });
 
   it('nennt bei einer vermissten Person weder Zustand noch Koordinate', async () => {
-    render(einsatzAktiv, { ...detail, status: 'vermisst', vermisst_seit: null } as PersonDetail);
+    render(einsatzBeobachter, {
+      ...detail,
+      status: 'vermisst',
+      vermisst_seit: null,
+    } as PersonDetail);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.getByText(/^Ohne Angabe:/)).toHaveTextContent(
       'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, vermisst seit, Melder / Kontakt, Notiz',
@@ -1758,111 +1668,554 @@ describe('PersonenDetailPage — Zustand, Koordinate, vermisst seit (LFH-613)', 
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
   });
 
-  it('bearbeitet Zustand und Koordinate: PATCH mit zerlegtem Paar, ohne „vermisst seit"', async () => {
-    let koerper: Record<string, unknown> | undefined;
-    render(einsatzAktiv, detail, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...detail });
-      }),
-    ]);
-    await starteBearbeiten();
-    await userEvent.type(screen.getByLabelText('Zustand / Verdacht'), 'Beinfraktur');
-    await userEvent.type(screen.getByLabelText('Koordinate'), '52,2691/9,1342');
-    // Ohne Status vermisst gibt es das Feld nicht (sonst 422).
-    expect(screen.queryByLabelText('vermisst seit')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(koerper).toBeDefined());
-    expect(koerper).toMatchObject({
-      zustand: 'Beinfraktur',
-      antreff_lat: 52.2691,
-      antreff_lon: 9.1342,
-    });
-    expect(koerper).not.toHaveProperty('koordinate');
-    expect(koerper).not.toHaveProperty('vermisst_seit');
-  });
-
-  it('lässt eine unveränderte Koordinate weg — keine stille Rundung auf vier Stellen', async () => {
-    let koerper: Record<string, unknown> | undefined;
-    render(einsatzAktiv, mitKoordinate, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...mitKoordinate });
-      }),
-    ]);
-    await starteBearbeiten();
-    expect(screen.getByLabelText('Koordinate')).toHaveValue('52.2691/9.1343');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(koerper).toBeDefined());
-    expect(koerper).not.toHaveProperty('antreff_lat');
-    expect(koerper).not.toHaveProperty('antreff_lon');
-    expect(koerper).toMatchObject({ zustand: 'gehfähig' });
-  });
-
-  it('leert die Koordinate als Paar', async () => {
-    let koerper: Record<string, unknown> | undefined;
-    render(einsatzAktiv, mitKoordinate, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper = (await request.json()) as Record<string, unknown>;
-        return HttpResponse.json({ ...detail });
-      }),
-    ]);
-    await starteBearbeiten();
-    await userEvent.clear(screen.getByLabelText('Koordinate'));
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(koerper).toBeDefined());
-    expect(koerper).toMatchObject({ antreff_lat: null, antreff_lon: null });
-  });
-
-  it('hält eine unbrauchbare Koordinate an, statt zu senden', async () => {
-    const patch = vi.fn();
-    render(einsatzAktiv, detail, [
-      http.patch('/api/einsaetze/1/personen/10', () => {
-        patch();
-        return HttpResponse.json(detail);
-      }),
-    ]);
-    await starteBearbeiten();
-    await userEvent.type(screen.getByLabelText('Koordinate'), '52.1');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText(/Breite und Länge mit/)).toBeInTheDocument();
-    expect(patch).not.toHaveBeenCalled();
-  });
-
-  it('vermisst: kein Zustand, keine Koordinate, kein Verorten — ein Fundort gibt es nicht', async () => {
+  it('vermisst: keine Koordinate, kein Verorten — ein Fundort gibt es nicht', async () => {
     const vermisst = { ...detail, status: 'vermisst' } as PersonDetail;
     render(einsatzAktiv, vermisst);
     await screen.findByRole('heading', { name: /Person R-001/ });
     expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
-    await starteBearbeiten();
-    // Gegenaussage im selben Formular: „vermisst seit" ist da, die zwei Fundort-Felder nicht.
-    expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Zustand / Verdacht')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Koordinate')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Koordinate / })).toBeNull();
+    // Gegenaussage: „vermisst seit“ ist schreibbar.
+    expect(screen.getByRole('button', { name: 'vermisst seit eintragen' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Personendaten feldweise in der Ansicht (LLH-1103, Spec `personendaten-bearbeiten`; Change
+ * `f8218h1i-personendaten-feldweise`, design.md D1–D10). Ein PATCH je Feld mit nur diesem Feld und
+ * seinem Wert beim Öffnen (`erwartet`), Rückfrage bei 409, Prüfung am Feld, Rückfrage beim
+ * Verlassen, Sperre ohne Netz.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - `onOeffnen` hält den Altwert nicht fest (Altwert aus dem jeweils aktuellen Stand): rot in
+ *   „der Altwert ist der Stand beim Öffnen“.
+ * - Rückfrage ohne Vergleich mit dem Stand beim Öffnen (jeder 409 fragt): rot in „ein 409 ohne
+ *   Feldänderung steht am Feld“.
+ * - `pruefe` am Alter entfernt: rot in „Alter über 120“.
+ * - Sperre ohne Netz entfernt: rot in „ohne Netz alles gesperrt“.
+ * - Provider des Merkers entfernt: rot in „Rückfrage beim Verlassen“.
+ */
+describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
+  /**
+   * Ein PATCH-Mitschnitt mit Serverstand: der PATCH antwortet mit dem Stand nach der Änderung
+   * (ohne `erwartet`), der Detail-GET danach ebenso.
+   */
+  function patchMitschnitt(person: PersonDetail = detail) {
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = person;
+    const handler = [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        const k = (await request.json()) as Record<string, unknown>;
+        koerper.push(k);
+        const aenderung = { ...k };
+        delete aenderung.erwartet;
+        stand = { ...stand, ...aenderung } as PersonDetail;
+        return HttpResponse.json(stand);
+      }),
+    ];
+    return { koerper, handler };
+  }
+  const ohneAngabe = () => document.querySelector<HTMLElement>('[data-lfh="ohne-angabe"]')!;
+
+  it('Name ergänzen: „+ Name“, ein PATCH mit nur `name`, Meldung „Name gespeichert“', async () => {
+    const ohneName = { ...detail, name: null } as PersonDetail;
+    const { koerper, handler } = patchMitschnitt(ohneName);
+    render(einsatzAktiv, ohneName, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+
+    const plus = within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' });
+    expect(plus).toHaveTextContent('+ Name');
+    await user.click(plus);
+    const feld = within(ohneAngabe()).getByRole('textbox', { name: 'Name' });
+    expect(feld).toHaveFocus();
+    await user.type(feld, 'Müller');
+    await user.click(screen.getByRole('button', { name: 'Name speichern' }));
+
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toEqual({ name: 'Müller', erwartet: { name: null } });
+    expect(await screen.findByText('Name gespeichert')).toBeInTheDocument();
+    expect(within(stammdatenRaster()).getByText('Müller')).toBeInTheDocument();
+    // Der Fokus folgt der Angabe ins Raster, statt auf <body> zu fallen.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toHaveFocus(),
+    );
   });
 
-  it('vermisst: zeigt „vermisst seit" und sendet es nur, wenn es geändert wurde', async () => {
+  it('Vorname ändern: nur `vorname` mit Altwert, die übrigen Felder bleiben unberührt', async () => {
+    const { koerper, handler } = patchMitschnitt();
+    render(einsatzAktiv, detail, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Vorname bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Vorname' });
+    await user.clear(feld);
+    await user.type(feld, 'Moritz{Enter}');
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toEqual({ vorname: 'Moritz', erwartet: { vorname: 'Max' } });
+    expect(await screen.findByText('Vorname gespeichert')).toBeInTheDocument();
+  });
+
+  it('der Altwert ist der Stand beim Öffnen, auch wenn das Detail inzwischen neu kam', async () => {
+    const { koerper, handler } = patchMitschnitt();
+    const { client } = render(einsatzAktiv, detail, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Name' });
+    await user.clear(feld);
+    await user.type(feld, 'Lokal');
+    act(() => {
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
+        ...detail,
+        name: 'Extern',
+        vorname: 'Moritz',
+      });
+    });
+    // Erst wenn der neue Stand angekommen ist, belegt der Fall etwas (der Query-Cache meldet
+    // asynchron). Mutationsprobe: `ausgang` je Render aus `person` statt beim Öffnen — rot.
+    expect(await screen.findByText('Moritz')).toBeInTheDocument();
+    expect(feld).toHaveValue('Lokal');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toEqual({ name: 'Lokal', erwartet: { name: 'Mustermann' } });
+  });
+
+  it('409: Rückfrage mit dem aktuellen Wert; „Überschreiben“ sendet ohne Altwert', async () => {
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = detail;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        if (koerper.length === 1) {
+          // B hat inzwischen „Meier“ gespeichert.
+          stand = { ...detail, name: 'Meier' };
+          return HttpResponse.json(
+            { error: 'Das Feld wurde zwischenzeitlich geändert. Bitte neu laden.' },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json({ ...detail, name: 'Müller' });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Müller{Enter}');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Zwischenzeitlich geändert');
+    expect(dialog).toHaveTextContent('„Meier“');
+    await user.click(within(dialog).getByRole('button', { name: 'Überschreiben' }));
+    await waitFor(() => expect(koerper).toHaveLength(2));
+    expect(koerper[0]).toEqual({ name: 'Müller', erwartet: { name: 'Mustermann' } });
+    expect(koerper[1]).toEqual({ name: 'Müller' });
+    expect(await screen.findByText('Name gespeichert')).toBeInTheDocument();
+  });
+
+  /**
+   * B schreibt dazwischen (Spec `personendaten-bearbeiten`, „Eine offene Bearbeitung zur Zeit“):
+   * ein offenes Feld bleibt an seinem Ort und mit seinem Entwurf, bis es gespeichert oder
+   * abgebrochen ist, auch wenn der neue Stand es zwischen Zeile „Ohne Angabe“ und Raster
+   * verschöbe. Mutationsprobe: Einordnung nach dem neuen Stand statt dem beim Öffnen — das Feld
+   * hängt aus, der Entwurf ist still weg und der Merker meldet ab, rot.
+   */
+  it('ein offenes „+ Name“ bleibt mit Entwurf stehen, wenn ein neuer Stand einen Namen bringt', async () => {
+    const ohneName = { ...detail, name: null } as PersonDetail;
+    const { client } = render(einsatzAktiv, ohneName);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
+    await user.type(within(ohneAngabe()).getByRole('textbox', { name: 'Name' }), 'Mül');
+    act(() => {
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
+        ...ohneName,
+        name: 'Meier',
+        vorname: 'Moritz',
+      });
+    });
+    // Der neue Stand ist angekommen (der Query-Cache meldet asynchron).
+    expect(await within(stammdatenRaster()).findByText('Moritz')).toBeInTheDocument();
+    const feld = within(ohneAngabe()).getByRole('textbox', { name: 'Name' });
+    expect(feld).toHaveValue('Mül');
+    expect(feld).toHaveFocus();
+    // Der Merker hält weiter: die übrigen Felder bleiben gesperrt.
+    expect(screen.getByText('Erst „Name“ speichern oder abbrechen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+
+    // Abgebrochen steht die Angabe dort, wo der neue Stand sie hinstellt.
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
+    expect(within(stammdatenRaster()).getByText('Meier')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeEnabled();
+  });
+
+  it('ein offener gesetzter Name bleibt mit Entwurf im Raster, wenn ein neuer Stand ihn leert', async () => {
+    const { client } = render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x');
+    act(() => {
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
+        ...detail,
+        name: null,
+        vorname: 'Moritz',
+      });
+    });
+    expect(await within(stammdatenRaster()).findByText('Moritz')).toBeInTheDocument();
+    const feld = within(stammdatenRaster()).getByRole('textbox', { name: 'Name' });
+    expect(feld).toHaveValue('Mustermannx');
+    expect(feld).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
+    expect(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' })).toBeEnabled();
+  });
+
+  /**
+   * D2 mit Verschiebung: der 409 lädt den neuen Stand, in dem „Name“ nicht mehr leer ist. Während
+   * der Rückfrage bleibt das Feld eingehängt (und die übrigen gesperrt); scheitert
+   * „Überschreiben“, steht der Grund am Feld. Mutationsprobe: Einordnung nach dem neuen Stand —
+   * das Feld hängt beim Neuladen aus, der zweite Fehler steht nirgends, rot.
+   */
+  it('409 mit Verschiebung: das Feld bleibt während der Rückfrage, ein gescheitertes Überschreiben steht am Feld', async () => {
+    const ohneName = { ...detail, name: null } as PersonDetail;
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = ohneName;
+    render(einsatzAktiv, ohneName, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        if (koerper.length === 1) {
+          // B hat inzwischen „Meier“ gespeichert.
+          stand = { ...ohneName, name: 'Meier' };
+          return HttpResponse.json(
+            { error: 'Das Feld wurde zwischenzeitlich geändert. Bitte neu laden.' },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json(
+          { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
+          { status: 409 },
+        );
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
+    await user.type(within(ohneAngabe()).getByRole('textbox', { name: 'Name' }), 'Müller{Enter}');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('„Meier“');
+    expect(within(ohneAngabe()).getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Überschreiben' }));
+    expect(
+      await within(ohneAngabe()).findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
+    ).toBeInTheDocument();
+    expect(within(ohneAngabe()).getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
+    expect(koerper).toEqual([{ name: 'Müller', erwartet: { name: null } }, { name: 'Müller' }]);
+    expect(screen.queryByText('Name gespeichert')).toBeNull();
+  });
+
+  /**
+   * Escape (oder Schließen) der Rückfrage entscheidet nichts: weder überschreiben noch verwerfen,
+   * das Feld bleibt mit dem Entwurf offen. Mutationsprobe: Escape wieder als „Verwerfen“ — das
+   * Feld schließt und der Entwurf ist weg, rot.
+   */
+  it('409: Escape schließt die Rückfrage, das Feld bleibt mit dem Entwurf offen', async () => {
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = detail;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        stand = { ...detail, name: 'Meier' };
+        return HttpResponse.json({ error: 'geändert' }, { status: 409 });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Müller{Enter}');
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Name speichern' })).not.toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+    expect(koerper).toHaveLength(1);
+    expect(screen.queryByText('Name gespeichert')).toBeNull();
+  });
+
+  it('409: „Verwerfen und neu laden“ schließt das Feld und zeigt den neuen Stand', async () => {
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = detail;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        stand = { ...detail, name: 'Meier' };
+        return HttpResponse.json({ error: 'geändert' }, { status: 409 });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x{Enter}');
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Verwerfen und neu laden' }));
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull());
+    expect(koerper).toHaveLength(1);
+    expect(within(stammdatenRaster()).getByText('Meier')).toBeInTheDocument();
+  });
+
+  it('ein 409 ohne Feldänderung (Einsatz abgeschlossen) steht am Feld, ohne Rückfrage', async () => {
+    render(einsatzAktiv, detail, [
+      http.patch('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json(
+          { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
+          { status: 409 },
+        ),
+      ),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x{Enter}');
+    expect(
+      await screen.findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Mustermannx');
+  });
+
+  it('Alter über 120: „höchstens 120“ am Feld, kein Request', async () => {
+    const { koerper, handler } = patchMitschnitt();
+    render(einsatzAktiv, detail, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alter (geschätzt) bearbeiten' }));
+    const feld = screen.getByRole('spinbutton', { name: 'Alter (geschätzt)' });
+    await user.clear(feld);
+    await user.type(feld, '130');
+    await user.click(screen.getByRole('button', { name: 'Alter (geschätzt) speichern' }));
+    expect(await screen.findByText('höchstens 120')).toBeInTheDocument();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(koerper).toEqual([]);
+  });
+
+  it('Geburtsdatum: „01.02.80“ wird 1980-02-01 und erscheint als 01.02.1980; Unsinn am Feld', async () => {
+    const { koerper, handler } = patchMitschnitt();
+    render(einsatzAktiv, detail, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(within(ohneAngabe()).getByRole('button', { name: 'Geburtsdatum eintragen' }));
+    const feld = screen.getByRole('textbox', { name: 'Geburtsdatum' });
+    expect(feld).toHaveFocus();
+    await user.type(feld, '31.02.1980{Enter}');
+    expect(await screen.findByText('Tag gibt es nicht')).toBeInTheDocument();
+    expect(koerper).toEqual([]);
+
+    await user.clear(feld);
+    await user.type(feld, '01.02.80{Enter}');
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toEqual({ geburtsdatum: '1980-02-01', erwartet: { geburtsdatum: null } });
+    expect(await within(stammdatenRaster()).findByText('01.02.1980')).toBeInTheDocument();
+  });
+
+  it('Geburtsdatum aus der Freitext-Zeit erscheint roh und geht unverändert nicht hinaus', async () => {
+    const alt = { ...detail, geburtsdatum: 'ca. 1980' } as PersonDetail;
+    const { koerper, handler } = patchMitschnitt(alt);
+    render(einsatzAktiv, alt, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    expect(within(stammdatenRaster()).getByText('ca. 1980')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Geburtsdatum bearbeiten' }));
+    await userEvent.keyboard('{Enter}');
+    expect(screen.queryByText('nicht lesbar')).toBeNull();
+    expect(koerper).toEqual([]);
+  });
+
+  /**
+   * Überlänge als Prüfung am Feld (Spec `personendaten-bearbeiten`, „Prüfungen am Feld“): der Grund
+   * steht als `FeldFehler` unter der Eingabe, die Eingabe ist `aria-invalid` und beschrieben, kein
+   * Request, nie gekürzt. Mutationsprobe: zurück auf `isValid` — kein Grund, keine Beschreibung,
+   * rot.
+   */
+  it('Name über der Grenze: Grund am Feld, kein Request, nie gekürzt', async () => {
+    const { koerper, handler } = patchMitschnitt();
+    render(einsatzAktiv, detail, handler);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Name' });
+    // Eingefügt statt getippt: 201 Zeichen.
+    await userEvent.clear(feld);
+    await userEvent.paste('x'.repeat(201));
+    await userEvent.keyboard('{Enter}');
+    const grund = 'Name darf höchstens 200 Zeichen lang sein';
+    expect(await screen.findByText(grund)).toBeInTheDocument();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveAccessibleDescription(grund);
+    // Erst warten, dann „kein Request“ (wie Tier und Schaden): ein Request liefe asynchron.
+    await waitFor(() => expect(feld).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(koerper).toEqual([]);
+    expect(feld).toHaveValue('x'.repeat(201));
+  });
+
+  describe('Koordinate (D10)', () => {
+    const mitKoordinate = {
+      ...detail,
+      // Mehr Stellen als das Textfeld zeigt — so wie ein Kartenklick sie setzt.
+      antreff_lat: 52.269149,
+      antreff_lon: 9.134251,
+    } as PersonDetail;
+
+    it('eine neue Koordinate geht als Paar, der Altwert als Paar mit allen Stellen', async () => {
+      const { koerper, handler } = patchMitschnitt(mitKoordinate);
+      render(einsatzAktiv, mitKoordinate, handler);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Koordinate bearbeiten' }));
+      const feld = screen.getByRole('textbox', { name: 'Koordinate' });
+      expect(feld).toHaveValue('52.2691/9.1343');
+      await user.clear(feld);
+      await user.type(feld, '52,2691/9,1342{Enter}');
+      await waitFor(() => expect(koerper).toHaveLength(1));
+      expect(koerper[0]).toEqual({
+        antreff_lat: 52.2691,
+        antreff_lon: 9.1342,
+        erwartet: { antreff_lat: 52.269149, antreff_lon: 9.134251 },
+      });
+    });
+
+    it('unverändert geht nichts hinaus — keine stille Rundung auf vier Stellen', async () => {
+      const { koerper, handler } = patchMitschnitt(mitKoordinate);
+      render(einsatzAktiv, mitKoordinate, handler);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      await userEvent.click(screen.getByRole('button', { name: 'Koordinate bearbeiten' }));
+      await userEvent.keyboard('{Enter}');
+      expect(koerper).toEqual([]);
+    });
+
+    it('Leeren nimmt das Paar', async () => {
+      const { koerper, handler } = patchMitschnitt(mitKoordinate);
+      render(einsatzAktiv, mitKoordinate, handler);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      await userEvent.click(screen.getByRole('button', { name: 'Koordinate bearbeiten' }));
+      await userEvent.clear(screen.getByRole('textbox', { name: 'Koordinate' }));
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => expect(koerper).toHaveLength(1));
+      expect(koerper[0]).toMatchObject({ antreff_lat: null, antreff_lon: null });
+    });
+
+    it('eine unbrauchbare Koordinate steht am Feld, kein Request', async () => {
+      const { koerper, handler } = patchMitschnitt();
+      render(einsatzAktiv, detail, handler);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      // Ohne Koordinate, aber mit Verorten-Weg steht sie als Feld im Raster.
+      await userEvent.click(
+        within(stammdatenRaster()).getByRole('button', { name: 'Koordinate eintragen' }),
+      );
+      await userEvent.type(screen.getByRole('textbox', { name: 'Koordinate' }), '52.1{Enter}');
+      expect(await screen.findByText(/Breite und Länge mit/)).toBeInTheDocument();
+      expect(koerper).toEqual([]);
+    });
+  });
+
+  it('vermisst: „vermisst seit“ schreibbar, ohne Koordinate', async () => {
     const vermisst = {
       ...detail,
       status: 'vermisst',
       vermisst_seit: '2026-05-27 06:00:00',
     } as PersonDetail;
-    const koerper: Record<string, unknown>[] = [];
-    render(einsatzAktiv, vermisst, [
-      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
-        koerper.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json({ ...vermisst });
-      }),
-    ]);
+    render(einsatzAktiv, vermisst);
     await screen.findByRole('heading', { name: /Person R-001/ });
-    expect(screen.getByText('vermisst seit')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'vermisst seit bearbeiten' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Koordinate / })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Auf Lagekarte verorten' })).toBeNull();
+  });
 
-    await starteBearbeiten();
-    expect(screen.getByLabelText('vermisst seit')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(koerper).toHaveLength(1));
-    // Unverändert: kein Key — auch kein `null`, das wäre ein 400.
-    expect(koerper[0]).not.toHaveProperty('vermisst_seit');
+  it('leere Angaben mit Schreibrecht als Knöpfe „+ …“, ohne Schreibrecht als Satz', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    for (const etikett of ['Geburtsdatum', 'Herkunft / Adresse', 'Melder / Kontakt', 'Notiz']) {
+      expect(
+        within(ohneAngabe()).getByRole('button', { name: `${etikett} eintragen` }),
+      ).toHaveTextContent(`+ ${etikett}`);
+    }
+  });
+
+  it('eine offene Bearbeitung zur Zeit: die übrigen Felder gesperrt, der Grund steht einmal oben', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x');
+    const grund = 'Erst „Name“ speichern oder abbrechen';
+    expect(screen.getAllByText(grund)).toHaveLength(1);
+    const vorname = screen.getByRole('button', { name: 'Vorname bearbeiten' });
+    expect(vorname).toBeDisabled();
+    expect(vorname).toHaveAccessibleDescription(`Max ${grund}`);
+    expect(
+      within(ohneAngabe()).getByRole('button', { name: 'Geburtsdatum eintragen' }),
+    ).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeEnabled();
+    expect(screen.queryByText(grund)).toBeNull();
+  });
+
+  it('Rückfrage beim Verlassen: „Bleiben“ behält „Mül“, „Verwerfen“ wechselt in die Liste', async () => {
+    render(einsatzAktiv, { ...detail, name: null } as PersonDetail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Mül');
+    await user.click(screen.getByRole('link', { name: 'Betroffene' }));
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await user.click(screen.getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Mül');
+    expect(screen.queryByText('LISTE')).toBeNull();
+
+    await user.click(screen.getByRole('link', { name: 'Betroffene' }));
+    await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+
+  it('ohne Änderung keine Rückfrage beim Verlassen', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await userEvent.click(screen.getByRole('link', { name: 'Betroffene' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+
+  it('ohne Netz alles gesperrt, mit einem Grund am Abschnitt', async () => {
+    render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    setzeOnline(false);
+    try {
+      const daten = document.querySelector<HTMLElement>('[data-lfh="personendaten"]')!;
+      const grund = await within(daten).findByText('Ohne Verbindung nicht änderbar');
+      expect(within(daten).getAllByText('Ohne Verbindung nicht änderbar')).toHaveLength(1);
+      expect(grund).toBeVisible();
+      const name = screen.getByRole('button', { name: 'Name bearbeiten' });
+      expect(name).toBeDisabled();
+      expect(name).toHaveAccessibleDescription('Mustermann Ohne Verbindung nicht änderbar');
+      const plus = within(ohneAngabe()).getByRole('button', { name: 'Geburtsdatum eintragen' });
+      expect(plus).toBeDisabled();
+      expect(plus).toHaveAccessibleDescription('Ohne Verbindung nicht änderbar');
+    } finally {
+      setzeOnline(true);
+    }
   });
 });
 

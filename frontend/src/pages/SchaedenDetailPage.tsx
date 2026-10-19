@@ -39,6 +39,9 @@ import {
 } from './schaeden/schadenHelfer';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
+import { useSpeicherLeiste } from '../components/speicherLeiste';
+import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 
 const TYP_OPTIONS = (Object.keys(TYP_LABEL) as SchadenTyp[]).map((t) => ({
   value: t,
@@ -69,6 +72,14 @@ export default function SchaedenDetailPage() {
   // still ein Schreiben ohne Lock.
   const sitzung = editSitzung.sitzung;
   const bearbeiten = sitzung != null;
+  const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
+  // Verlassen-Schutz (LLH-1101, `frontend/AGENTS.md` „Formularseiten“): aktiv, solange die
+  // Bearbeiten-Sitzung offen ist. Der `schluessel` hängt an der Sitzung, nicht nur an der ID: eine
+  // abgebrochene Eingabe zählt beim nächsten „Bearbeiten“ nicht als offene Änderung.
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: bearbeiten,
+    schluessel: bearbeiten ? schadenId : null,
+  });
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
@@ -152,13 +163,15 @@ export default function SchaedenDetailPage() {
   const editFehler = sperrkonflikt ? null : editMutation.error;
 
   // Die Route hat keinen `key`: der Wechsel zu einem anderen Schaden behält die Seite, nicht die
-  // Gründe.
+  // Gründe und nicht die Bearbeiten-Sitzung (ihre Werte und ihr Lock-Stand gehören dem vorigen).
   const { reset: editReset } = editMutation;
   const { reset: stornoReset } = stornoMutation;
+  const { beende: beendeSitzung } = editSitzung;
   useEffect(() => {
     editReset();
     stornoReset();
-  }, [schadenId, editReset, stornoReset]);
+    beendeSitzung();
+  }, [schadenId, editReset, stornoReset, beendeSitzung]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
@@ -194,50 +207,42 @@ export default function SchaedenDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
-  // Eine Eingabe-Zelle: im Edit-Modus ein noStyle-Form.Item an der Stelle der Anzeige — dasselbe
-  // Datenraster bleibt stehen. Die Regeln bleiben am Formular der Seite.
-  const feld = (name: string, input: React.ReactNode, rules?: object[]) => (
-    <Form.Item name={name} noStyle rules={rules}>
-      {input}
-    </Form.Item>
-  );
-
   const detailAnsicht = (
     <SchadenDaten
       schaden={s}
       einsatzId={einsatzId}
       verortenLink={darfSchreiben}
       karteGesperrt={karteGesperrt}
+      // Im Bearbeiten-Modus wird jede Zelle eine `DatenfeldEingabe` (LLH-1101): benannt, und eine
+      // Regel meldet sich sichtbar am Feld statt das Speichern still zu verhindern.
       eingabe={
         bearbeiten
           ? {
-              typ: feld('typ', <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} />),
-              ausmass: feld(
-                'ausmass',
-                <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} />,
-              ),
-              ort: feld(
-                'ort',
-                <Input
-                  placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5"
-                  maxLength={SCHADEN_ORT_MAX}
-                />,
-                [{ required: true, message: 'Ort ist Pflicht' }],
-              ),
+              typ: { feld: <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} /> },
+              ausmass: { feld: <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} /> },
+              ort: {
+                feld: (
+                  <Input
+                    placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5"
+                    maxLength={SCHADEN_ORT_MAX}
+                  />
+                ),
+                rules: [{ required: true, message: 'Ort ist Pflicht' }],
+              },
               // Eine ältere, längere Beschreibung bleibt stehen: der Zähler nennt die Überlänge,
               // Speichern scheitert an der Regel, bis gekürzt ist (LFH-937, design.md Risiken).
-              beschreibung: feld(
-                'beschreibung',
-                <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />,
-                [zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')],
-              ),
-              geschaedigt: feld(
-                'geschaedigt',
-                <GeschaedigtPicker
-                  einsatzId={einsatzId}
-                  orgName={einsatz.org_name ?? 'Eigene Organisation'}
-                />,
-              ),
+              beschreibung: {
+                feld: <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />,
+                rules: [zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')],
+              },
+              geschaedigt: {
+                feld: (
+                  <GeschaedigtPicker
+                    einsatzId={einsatzId}
+                    orgName={einsatz.org_name ?? 'Eigene Organisation'}
+                  />
+                ),
+              },
             }
           : undefined
       }
@@ -318,9 +323,13 @@ export default function SchaedenDetailPage() {
         )
       }
     >
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       {sitzung ? (
         <Form
           form={editForm}
+          onValuesChange={schutz.geaendert}
+          // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
+          scrollToFirstError={{ focus: true }}
           onFinish={(daten) => {
             const patch: SchadenPatch = {
               typ: daten.typ,
@@ -330,7 +339,11 @@ export default function SchaedenDetailPage() {
               // Geschädigt XOR: immer alle vier Felder explizit senden (das nicht gewählte ist null).
               ...geschaedigtFelder(daten.geschaedigt ?? null, orgId),
             };
-            editMutation.mutate({ daten: patch, basis: sitzung.basis });
+            const fassung = schutz.fassung();
+            editMutation.mutate(
+              { daten: patch, basis: sitzung.basis },
+              { onSuccess: () => schutz.gespeichert(fassung) },
+            );
           }}
         >
           {detailAnsicht}
@@ -339,7 +352,9 @@ export default function SchaedenDetailPage() {
               <SpeicherFehler fehler={editFehler} />
             </div>
           )}
-          <Space style={{ marginTop: 16 }}>
+          {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei langer
+              Beschreibung scrollten die Knöpfe sonst aus dem Bild. */}
+          <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
             <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
               Speichern
             </Button>
@@ -347,7 +362,7 @@ export default function SchaedenDetailPage() {
             <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
               Abbrechen
             </Button>
-          </Space>
+          </div>
         </Form>
       ) : (
         detailAnsicht

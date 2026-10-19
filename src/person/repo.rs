@@ -72,6 +72,42 @@ pub struct PatchDaten<'a> {
     pub kontamination: Option<Option<bool>>,
 }
 
+/// Ein erwarteter Spaltenwert des Feld-CAS, getypt für den Bind (`None` = leer erwartet).
+#[derive(Debug, Clone, Copy)]
+enum ExpectedValue<'a> {
+    Text(Option<&'a str>),
+    Integer(Option<i64>),
+    Real(Option<f64>),
+    Bool(Option<bool>),
+}
+
+impl<'a> ExpectedValue<'a> {
+    /// Die genannten Altwerte in fester Spaltenfolge, je mit ihrem Spaltennamen.
+    fn aus(erwartet: &PatchDaten<'a>) -> Vec<(&'static str, ExpectedValue<'a>)> {
+        use ExpectedValue::{Bool, Integer, Real, Text};
+        [
+            ("name", erwartet.name.map(Text)),
+            ("vorname", erwartet.vorname.map(Text)),
+            ("geschlecht", erwartet.geschlecht.map(Text)),
+            ("geburtsdatum", erwartet.geburtsdatum.map(Text)),
+            ("alter_geschaetzt", erwartet.alter_geschaetzt.map(Integer)),
+            ("herkunft_adresse", erwartet.herkunft_adresse.map(Text)),
+            ("antreff_ort", erwartet.antreff_ort.map(Text)),
+            ("melder_kontakt", erwartet.melder_kontakt.map(Text)),
+            ("notiz", erwartet.notiz.map(Text)),
+            ("zustand", erwartet.zustand.map(Text)),
+            ("antreff_lat", erwartet.antreff_lat.map(Real)),
+            ("antreff_lon", erwartet.antreff_lon.map(Real)),
+            ("vermisst_seit", erwartet.vermisst_seit.map(Text)),
+            ("pat_nummer", erwartet.pat_nummer.map(Text)),
+            ("kontamination", erwartet.kontamination.map(Bool)),
+        ]
+        .into_iter()
+        .filter_map(|(spalte, wert)| wert.map(|w| (spalte, w)))
+        .collect()
+    }
+}
+
 /// Personen eines Einsatzes (ohne stornierte), optional nach Status gefiltert.
 /// Sortierung: registrier_nr aufsteigend.
 pub async fn liste(
@@ -259,12 +295,21 @@ pub async fn anlegen(
 /// sonst `Conflict` (409) statt eines stillen Last-write-wins-Overwrites. `None` = bewusstes
 /// Overwrite (Escape-Hatch des Konfliktdialogs). Bei 0 betroffenen Zeilen wird 404 (Zeile fehlt)
 /// von 409 (Zeile existiert, Stand veraltet) unterschieden.
+///
+/// Feld-CAS (LLH-1103, design.md D1 der Change `f8218h1i-personendaten-feldweise`): `erwartet`
+/// trägt je Spalte den Wert beim Öffnen, dreiwertig wie [`PatchDaten`] (`None` = kein Vergleich,
+/// `Some(None)` = leer erwartet). Je genannter Spalte hängt das UPDATE `AND <spalte> IS ?` an;
+/// `IS` vergleicht auch NULL, ein leerer Text-Altwert trifft dazu eine leere oder nur aus
+/// Leerraum bestehende Zeichenkette. Sichtung, Status, PAT oder ein anderes Feld ändern so zwar
+/// `geaendert_at`, aber keinen Konflikt. Paarregel der Koordinate und „nur mit Änderung
+/// desselben Felds“ prüft der Handler.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: i64,
     geaendert_von: i64,
     erwartet_geaendert_at: Option<&str>,
+    erwartet: &PatchDaten<'_>,
     daten: PatchDaten<'_>,
 ) -> Result<PersonAnzeige, AppError> {
     // Flag/Wert-Paare statt COALESCE (LFH-266/F12): erst so lässt sich eine Spalte über die
@@ -298,8 +343,27 @@ pub async fn aktualisiere(
             geaendert_von = ?31 \
          WHERE id = ?32 AND einsatz_id = ?33",
     );
+    let mut nummer = 34;
     if erwartet_geaendert_at.is_some() {
         sql.push_str(" AND geaendert_at = ?34");
+        nummer += 1;
+    }
+    // Spaltennamen nur aus der festen Liste in `ExpectedValue::aus`, nie aus der Anfrage: das
+    // Suffix bleibt SQL-sicher, nur seine Länge ist dynamisch.
+    let altwerte = ExpectedValue::aus(erwartet);
+    for (spalte, wert) in &altwerte {
+        // Ein leerer Text-Altwert trifft auch eine gespeicherte leere oder nur aus Leerraum
+        // bestehende Zeichenkette (design.md D1): die Oberfläche zeigt beides als „ohne Angabe“
+        // und schickt `null`; sonst bliebe ein solcher Bestand dauerhaft im 409.
+        if matches!(wert, ExpectedValue::Text(_)) {
+            sql.push_str(&format!(
+                " AND ({spalte} IS ?{nummer} OR (?{nummer} IS NULL AND \
+                 TRIM({spalte}, ' ' || char(9) || char(10) || char(13)) = ''))"
+            ));
+        } else {
+            sql.push_str(&format!(" AND {spalte} IS ?{nummer}"));
+        }
+        nummer += 1;
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.name.map(|_| 1_i64))
@@ -338,10 +402,18 @@ pub async fn aktualisiere(
     if let Some(stand) = erwartet_geaendert_at {
         q = q.bind(stand);
     }
+    for (_, wert) in altwerte.iter().copied() {
+        q = match wert {
+            ExpectedValue::Text(v) => q.bind(v),
+            ExpectedValue::Integer(v) => q.bind(v),
+            ExpectedValue::Real(v) => q.bind(v),
+            ExpectedValue::Bool(v) => q.bind(v),
+        };
+    }
     let betroffen = q.execute(pool).await?.rows_affected();
     if betroffen == 0 {
         // Mit Guard: existiert die Zeile → veralteter Stand (409), sonst fehlt sie (404).
-        if erwartet_geaendert_at.is_some() {
+        if erwartet_geaendert_at.is_some() || !altwerte.is_empty() {
             let existiert: Option<i64> =
                 sqlx::query_scalar("SELECT 1 FROM einsatz_person WHERE id = ? AND einsatz_id = ?")
                     .bind(person_id)
@@ -349,9 +421,12 @@ pub async fn aktualisiere(
                     .fetch_optional(pool)
                     .await?;
             if existiert.is_some() {
-                return Err(AppError::Conflict(
-                    "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden.".into(),
-                ));
+                let meldung = if erwartet_geaendert_at.is_some() {
+                    "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
+                } else {
+                    "Das Feld wurde zwischenzeitlich geändert. Bitte neu laden."
+                };
+                return Err(AppError::Conflict(meldung.into()));
             }
         }
         return Err(AppError::NotFound);
@@ -614,6 +689,7 @@ mod tests {
             p.id,
             b,
             None,
+            &PatchDaten::default(),
             PatchDaten {
                 notiz: Some(Some("blutet")),
                 ..PatchDaten::default()
@@ -627,6 +703,253 @@ mod tests {
             Some("Mustermann"),
             "ungesetzte Felder bleiben"
         );
+    }
+
+    /// Je Spalte ein eigener Wert: lat ≠ lon, Texte mit dem Spaltennamen, damit ein Tausch
+    /// gleichtypiger Nachbarn auffällt.
+    fn jede_spalte_distinkt() -> PatchDaten<'static> {
+        PatchDaten {
+            name: Some(Some("W-name")),
+            vorname: Some(Some("W-vorname")),
+            geschlecht: Some(Some("weiblich")),
+            geburtsdatum: Some(Some("1990-01-01")),
+            alter_geschaetzt: Some(Some(42)),
+            herkunft_adresse: Some(Some("W-herkunft")),
+            antreff_ort: Some(Some("W-antreff")),
+            melder_kontakt: Some(Some("W-melder")),
+            notiz: Some(Some("W-notiz")),
+            zustand: Some(Some("W-zustand")),
+            antreff_lat: Some(Some(52.25)),
+            antreff_lon: Some(Some(9.125)),
+            vermisst_seit: Some(Some("2026-09-22 06:00:00")),
+            pat_nummer: Some(Some("W-pat")),
+            kontamination: Some(Some(true)),
+        }
+    }
+
+    /// Feld-CAS (LLH-1103, design.md D1): jede erwartete Spalte wird mit IHREM Wert verglichen.
+    /// Erst alle fünfzehn Altwerte zusammen mit dem Zeilen-CAS (`geaendert_at` als `?34`, die
+    /// Altwerte dahinter): das schreibt nur, wenn jede Bedingung ihren eigenen Bind bekommt.
+    /// Dann je Spalte allein der Wert des Nachbarn: das muss 409 sein, sonst fehlt die Bedingung
+    /// dieser Spalte oder sie liest einen fremden Bind. Mutationsprobe: im Suffix zwei
+    /// Spaltennamen tauschen (etwa `melder_kontakt`/`notiz`) → der erste Schritt wird 409 und rot;
+    /// eine Spalte aus dem Suffix streichen → ihr Fall im zweiten Schritt schreibt und wird rot.
+    #[tokio::test]
+    async fn aktualisiere_vergleicht_jede_erwartete_spalte_an_ihrem_platz() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+        let p = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            &PatchDaten::default(),
+            jede_spalte_distinkt(),
+        )
+        .await
+        .unwrap();
+
+        aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            Some(&p.geaendert_at),
+            &jede_spalte_distinkt(),
+            PatchDaten {
+                notiz: Some(Some("W-notiz")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("alle Altwerte stimmen");
+
+        let falsch: [(&str, PatchDaten<'static>); 15] = [
+            (
+                "name",
+                PatchDaten {
+                    name: Some(Some("W-vorname")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "vorname",
+                PatchDaten {
+                    vorname: Some(Some("W-name")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "geschlecht",
+                PatchDaten {
+                    geschlecht: Some(Some("maennlich")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "geburtsdatum",
+                PatchDaten {
+                    geburtsdatum: Some(Some("weiblich")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "alter_geschaetzt",
+                PatchDaten {
+                    alter_geschaetzt: Some(Some(43)),
+                    ..Default::default()
+                },
+            ),
+            (
+                "herkunft_adresse",
+                PatchDaten {
+                    herkunft_adresse: Some(Some("W-antreff")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "antreff_ort",
+                PatchDaten {
+                    antreff_ort: Some(Some("W-herkunft")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "melder_kontakt",
+                PatchDaten {
+                    melder_kontakt: Some(Some("W-notiz")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "notiz",
+                PatchDaten {
+                    notiz: Some(Some("W-melder")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "zustand",
+                PatchDaten {
+                    zustand: Some(Some("W-notiz")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "antreff_lat",
+                PatchDaten {
+                    antreff_lat: Some(Some(9.125)),
+                    ..Default::default()
+                },
+            ),
+            (
+                "antreff_lon",
+                PatchDaten {
+                    antreff_lon: Some(Some(52.25)),
+                    ..Default::default()
+                },
+            ),
+            (
+                "vermisst_seit",
+                PatchDaten {
+                    vermisst_seit: Some(Some("W-pat")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "pat_nummer",
+                PatchDaten {
+                    pat_nummer: Some(Some("2026-09-22 06:00:00")),
+                    ..Default::default()
+                },
+            ),
+            (
+                "kontamination",
+                PatchDaten {
+                    kontamination: Some(Some(false)),
+                    ..Default::default()
+                },
+            ),
+        ];
+        for (spalte, erwartet) in &falsch {
+            let err = aktualisiere(
+                &pool,
+                e,
+                p.id,
+                b,
+                None,
+                erwartet,
+                PatchDaten {
+                    notiz: Some(Some("X")),
+                    ..PatchDaten::default()
+                },
+            )
+            .await
+            .unwrap_err();
+            assert!(
+                matches!(err, AppError::Conflict(_)),
+                "{spalte}: falscher Altwert muss 409 sein, war: {err:?}"
+            );
+        }
+        assert_eq!(
+            laden(&pool, e, p.id).await.unwrap().notiz.as_deref(),
+            Some("W-notiz"),
+            "kein Konflikt hat geschrieben"
+        );
+
+        // Leer erwartet trifft nur NULL (`IS`, nicht `=`).
+        let err = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            &PatchDaten {
+                name: Some(None),
+                ..PatchDaten::default()
+            },
+            PatchDaten::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        let q = anlegen(&pool, e, b, leere_daten()).await.unwrap();
+        aktualisiere(
+            &pool,
+            e,
+            q.id,
+            b,
+            None,
+            &PatchDaten {
+                name: Some(None),
+                ..PatchDaten::default()
+            },
+            PatchDaten {
+                name: Some(Some("Neu")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .expect("leer erwartet, leer vorgefunden");
+
+        // Unbekannte Person mit Feld-CAS bleibt 404.
+        let err = aktualisiere(
+            &pool,
+            e,
+            999_999,
+            b,
+            None,
+            &PatchDaten {
+                name: Some(None),
+                ..PatchDaten::default()
+            },
+            PatchDaten::default(),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::NotFound), "{err:?}");
     }
 
     /// Jede Spalte landet an ihrem Platz — der einzige Schutz gegen ein STILLES Vertauschen
@@ -650,23 +973,8 @@ mod tests {
             p.id,
             b,
             None,
-            PatchDaten {
-                name: Some(Some("W-name")),
-                vorname: Some(Some("W-vorname")),
-                geschlecht: Some(Some("weiblich")),
-                geburtsdatum: Some(Some("1990-01-01")),
-                alter_geschaetzt: Some(Some(42)),
-                herkunft_adresse: Some(Some("W-herkunft")),
-                antreff_ort: Some(Some("W-antreff")),
-                melder_kontakt: Some(Some("W-melder")),
-                notiz: Some(Some("W-notiz")),
-                zustand: Some(Some("W-zustand")),
-                antreff_lat: Some(Some(52.25)),
-                antreff_lon: Some(Some(9.125)),
-                vermisst_seit: Some(Some("2026-09-22 06:00:00")),
-                pat_nummer: Some(Some("W-pat")),
-                kontamination: Some(Some(true)),
-            },
+            &PatchDaten::default(),
+            jede_spalte_distinkt(),
         )
         .await
         .unwrap();
@@ -719,6 +1027,7 @@ mod tests {
             p.id,
             b,
             None,
+            &PatchDaten::default(),
             PatchDaten {
                 melder_kontakt: Some(None),
                 notiz: Some(None),
@@ -736,9 +1045,17 @@ mod tests {
         );
 
         // Gegenprobe: ein leerer Patch darf NICHTS leeren.
-        let b2 = aktualisiere(&pool, e, p.id, b, None, PatchDaten::default())
-            .await
-            .unwrap();
+        let b2 = aktualisiere(
+            &pool,
+            e,
+            p.id,
+            b,
+            None,
+            &PatchDaten::default(),
+            PatchDaten::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(
             b2.name.as_deref(),
             Some("Mustermann"),
@@ -772,6 +1089,7 @@ mod tests {
             p.id,
             b,
             None,
+            &PatchDaten::default(),
             PatchDaten {
                 geschlecht: Some(None),
                 ..PatchDaten::default()
@@ -804,6 +1122,7 @@ mod tests {
             p.id,
             b,
             Some(stand),
+            &PatchDaten::default(),
             PatchDaten {
                 notiz: Some(Some("A")),
                 ..PatchDaten::default()
@@ -819,6 +1138,7 @@ mod tests {
             p.id,
             b,
             Some(stand),
+            &PatchDaten::default(),
             PatchDaten {
                 notiz: Some(Some("B")),
                 ..PatchDaten::default()
@@ -844,6 +1164,7 @@ mod tests {
             p.id,
             b,
             None,
+            &PatchDaten::default(),
             PatchDaten {
                 notiz: Some(Some("C")),
                 ..PatchDaten::default()
@@ -853,9 +1174,17 @@ mod tests {
         .expect("None-Stand = Overwrite muss durchgehen");
 
         // Falsche id trotz Stand → NotFound (nicht Conflict).
-        let err = aktualisiere(&pool, e, 999_999, b, Some(stand), PatchDaten::default())
-            .await
-            .unwrap_err();
+        let err = aktualisiere(
+            &pool,
+            e,
+            999_999,
+            b,
+            Some(stand),
+            &PatchDaten::default(),
+            PatchDaten::default(),
+        )
+        .await
+        .unwrap_err();
         assert!(
             matches!(err, AppError::NotFound),
             "unbekannte id muss 404 bleiben, war: {err:?}"

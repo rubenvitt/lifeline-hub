@@ -5,7 +5,8 @@ import { QueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
-import { renderMitProviders } from '../test/utils';
+import { renderMitProviders, setzeOnline } from '../test/utils';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR } from '../offline/verbindung';
 import { koordinatenText } from './koordinate';
 import { effektiveDaten, pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
 import type { Person } from '../api/types';
@@ -214,7 +215,9 @@ describe('geschlechtAlter / verbleibText', () => {
   it('schreibt Geschlecht und Alter in der Kurzform der Zeile', () => {
     expect(geschlechtAlter(basis)).toBe('m ~40');
     expect(geschlechtAlter({ ...basis, geschlecht: null, alter_geschaetzt: null })).toBeNull();
-    expect(geschlechtAlter({ ...basis, geburtsdatum: '1990-01-02' })).toBe('m 1990-01-02');
+    // Kalenderdatum als TT.MM.JJJJ (LLH-1103, D6), Altbestand roh.
+    expect(geschlechtAlter({ ...basis, geburtsdatum: '1990-01-02' })).toBe('m 02.01.1990');
+    expect(geschlechtAlter({ ...basis, geburtsdatum: 'ca. 1990' })).toBe('m ca. 1990');
   });
 
   it('nennt die Kurzform der Art, sonst die UHS beim Namen, sonst nichts', () => {
@@ -443,6 +446,56 @@ describe('Zustand-Spalte (LFH-613)', () => {
     fireEvent.blur(screen.getByRole('textbox'));
     await new Promise((r) => setTimeout(r, 20));
     expect(patch).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Ohne Netz gesperrt mit Grund an der Zelle (LLH-1103, design.md D8, Spec
+   * `personendaten-bearbeiten`, „Ohne Netz gesperrt“): die Mutation liefe mit `networkMode:
+   * 'online'` in die Pause und überschriebe nach der Rückkehr still einen Wert, den niemand
+   * gesehen hat. Ein getippter Entwurf bleibt stehen.
+   */
+  it('ohne Netz gesperrt mit Grund an der Zelle', async () => {
+    renderMitProviders(<>{zelle(mitSchreibrecht, { ...basis, zustand: 'gehfähig' })}</>);
+    setzeOnline(false);
+    try {
+      // Mutationsprobe: Sperre in `ZustandSchreiben` entfernt — der Knopf bleibt bedienbar, rot.
+      const knopf = screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 bearbeiten' });
+      await waitFor(() => expect(knopf).toBeDisabled());
+      expect(screen.getByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+      expect(knopf).toHaveAccessibleDescription(`gehfähig ${OHNE_VERBINDUNG_NICHT_AENDERBAR}`);
+    } finally {
+      setzeOnline(true);
+    }
+  });
+
+  it('ohne Netz bleibt ein getippter Entwurf stehen und geht nicht nachträglich hinaus', async () => {
+    const koerper: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
+      }),
+    );
+    renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Zustand / Verdacht zu R-001 hinzufügen' }),
+    );
+    await userEvent.type(screen.getByRole('textbox'), 'gehfähig');
+    setzeOnline(false);
+    try {
+      expect(await screen.findByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+      fireEvent.blur(screen.getByRole('textbox'));
+      await new Promise((r) => setTimeout(r, 30));
+      expect(screen.getByRole('textbox')).toHaveValue('gehfähig');
+    } finally {
+      setzeOnline(true);
+    }
+    // Mutationsprobe: das Senden ohne Netz nicht sperren — die pausierte Mutation holt nach der
+    // Rückkehr still nach, rot.
+    await new Promise((r) => setTimeout(r, 30));
+    expect(koerper).toEqual([]);
+    fireEvent.blur(screen.getByRole('textbox'));
+    await waitFor(() => expect(koerper).toEqual([{ zustand: 'gehfähig' }]));
   });
 
   it('bleibt ohne Schreibrecht reine Anzeige — Wert oder „—", kein Knopf', () => {

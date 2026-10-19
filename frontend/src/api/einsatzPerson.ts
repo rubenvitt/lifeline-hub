@@ -70,6 +70,15 @@ export interface PersonEingabe {
   kontamination?: boolean | null;
 }
 
+/**
+ * Feld-CAS im PATCH (LLH-1103, design.md D1 der Change `f8218h1i-personendaten-feldweise`): je
+ * geändertem Feld der Wert beim Öffnen, unter demselben Namen wie die Änderung. `null` heißt
+ * „leer erwartet“, die Koordinate steht nur als Paar (`antreff_lat` und `antreff_lon`). Weicht
+ * der gespeicherte Wert ab, antwortet der Server mit 409 und schreibt nichts; ein Feld hier, das
+ * die Änderung nicht nennt, ist 400. Ohne `erwartet` schreibt der PATCH ohne Vergleich.
+ */
+export type PersonErwartet = PersonEingabe;
+
 /** Offline-/Fastpath-fähige Anlage. `client_id` macht einen Replay nach
  * verloren gegangener Antwort idempotent; `status` vermeidet den unsicheren
  * zweiten Request bei „Vermisst“/„Betroffen“. */
@@ -156,6 +165,53 @@ export function aktualisierePerson(
   basisGeaendertAt?: string,
 ): Promise<Person> {
   const body = patchBody(daten, basisGeaendertAt);
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
+}
+
+/**
+ * Die einzeln schreibbaren Personendaten (LLH-1103, Spec `personendaten-bearbeiten`) mit ihrem
+ * Wire-Wert; `null` leert. Die Koordinate ist EIN Feld und geht als Paar `antreff_lat`/`antreff_lon`.
+ * „vermisst seit“ lässt sich nicht leeren (`null` ist am Server 400).
+ */
+export interface PersonFeldEingabe {
+  name: string | null;
+  vorname: string | null;
+  geschlecht: string | null;
+  geburtsdatum: string | null;
+  alter_geschaetzt: number | null;
+  herkunft_adresse: string | null;
+  antreff_ort: string | null;
+  melder_kontakt: string | null;
+  notiz: string | null;
+  koordinate: { lat: number; lon: number } | null;
+  vermisst_seit: string;
+}
+export type PersonFeld = keyof PersonFeldEingabe;
+
+function feldAufWire<K extends PersonFeld>(feld: K, wert: PersonFeldEingabe[K]): PersonEingabe {
+  if (feld === 'koordinate') {
+    const k = wert as PersonFeldEingabe['koordinate'];
+    return { antreff_lat: k?.lat ?? null, antreff_lon: k?.lon ?? null };
+  }
+  return { [feld]: wert } as PersonEingabe;
+}
+
+/**
+ * Ein Feld der Personendaten schreiben, mit Feld-CAS (design.md D1): `erwartet` ist der Wert beim
+ * Öffnen (`null` = leer); weicht der gespeicherte ab, antwortet der Server mit 409 und schreibt
+ * nichts. `erwartet` `undefined` schreibt ohne Vergleich („Überschreiben“ nach der Rückfrage).
+ * Der Body nennt nur dieses Feld, kein anderes wird geleert; `aktualisierePerson` bleibt für den
+ * Kopf (Zustand, PAT) und andere Aufrufer.
+ */
+export function savePersonFeld<K extends PersonFeld>(
+  einsatzId: number,
+  personId: number,
+  feld: K,
+  wert: PersonFeldEingabe[K],
+  erwartet: PersonFeldEingabe[K] | undefined,
+): Promise<Person> {
+  const body: PersonEingabe & { erwartet?: PersonErwartet } = feldAufWire(feld, wert);
+  if (erwartet !== undefined) body.erwartet = feldAufWire(feld, erwartet);
   return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
 }
 

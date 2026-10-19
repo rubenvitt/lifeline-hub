@@ -1,6 +1,7 @@
 import { theme } from 'antd';
 import type { PersonDetail } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { formatKalenderdatum } from '../anzeige/kalenderdatum';
 import { ZeilenListe, type Titel, type Zeile } from '../druck/ZeilenListe';
 import { kontamination as KONTAMINATION, sichtung as SK } from '../theme/statusFarben';
 import Koerperschema from './koerperschema/Koerperschema';
@@ -45,7 +46,7 @@ export default function PersonDruckBlatt({
     { etikett: 'Name', wert: p.name },
     { etikett: 'Vorname', wert: p.vorname },
     { etikett: 'Geschlecht', wert: p.geschlecht ? GESCHLECHT_WORT[p.geschlecht] : null },
-    { etikett: 'Geburtsdatum', wert: p.geburtsdatum },
+    { etikett: 'Geburtsdatum', wert: p.geburtsdatum ? formatKalenderdatum(p.geburtsdatum) : null },
     {
       etikett: 'Alter (geschätzt)',
       wert: p.alter_geschaetzt != null ? String(p.alter_geschaetzt) : null,

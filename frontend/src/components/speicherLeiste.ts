@@ -3,7 +3,7 @@ import { theme } from 'antd';
 import { FOKUSABSTAND_SPEICHERLEISTE, useFokusabstandUnten } from './fokusabstandUnten';
 
 // Baustein aller Formularseiten (Einstellungen, `stammdaten/`: Organisation, Fahrzeug- und
-// Personal-Detail).
+// Personal-Detail) und des Bearbeiten-Modus von Schaden- und Tier-Detail (LLH-1101).
 
 /**
  * Speicher-Leiste am unteren Rand einer Sektion — sticky, mit Trennlinie und eigenem Grund.
@@ -14,13 +14,22 @@ import { FOKUSABSTAND_SPEICHERLEISTE, useFokusabstandUnten } from './fokusabstan
  * B4/LFH-332). Sticky, weil er sonst bei vielen Feldern aus dem Bild scrollt, während man das
  * letzte ausfüllt.
  *
- * Kein `<Space>`: hier steht genau EIN Knopf, kein `danger`-Nachbar.
+ * Kein `<Space>`: auf den Formularseiten steht genau EIN Knopf, kein `danger`-Nachbar. Eine
+ * Sitzung, die man abbrechen kann (Bearbeiten-Modus einer Detailseite, LLH-1101), trägt
+ * „Speichern“ und „Abbrechen“: mit `hasAbbrechen` wird die Leiste eine umbrechende Reihe mit dem
+ * Abstand `padding` (11/18/26 px), derselben Stufe wie der Fuß der Erfassungs-Hülle — die
+ * Leitlinie verlangt ≥ 8 px mit Maus, ≥ 16 px mit Touch (`frontend/AGENTS.md`, „Farbe und
+ * Zeichen“). Ohne die Option bleibt die Leiste, wie sie war.
  */
-export function speicherLeisteStil(token: {
-  colorBgContainer: string;
-  paddingSM: number;
-  colorBorderSecondary: string;
-}): CSSProperties {
+export function speicherLeisteStil(
+  token: {
+    colorBgContainer: string;
+    paddingSM: number;
+    padding: number;
+    colorBorderSecondary: string;
+  },
+  { hasAbbrechen = false }: { hasAbbrechen?: boolean } = {},
+): CSSProperties {
   return {
     position: 'sticky',
     bottom: 0,
@@ -28,6 +37,7 @@ export function speicherLeisteStil(token: {
     background: token.colorBgContainer,
     paddingBlock: token.paddingSM,
     borderTop: `1px solid ${token.colorBorderSecondary}`,
+    ...(hasAbbrechen ? { display: 'flex', flexWrap: 'wrap', gap: token.padding } : {}),
   };
 }
 
@@ -42,8 +52,12 @@ export function speicherLeisteStil(token: {
  * steht (`index.css`; `scroll-margin` an den Feldern blieb gemessen wirkungslos). Nachweis:
  * `e2e/fokus-verdeckung.spec.ts`.
  */
-export function useSpeicherLeiste() {
+export function useSpeicherLeiste(optionen: { hasAbbrechen?: boolean } = {}) {
   const { token } = theme.useToken();
   const ref = useFokusabstandUnten(token.marginSM, FOKUSABSTAND_SPEICHERLEISTE);
-  return { ref, 'data-lfh': 'speicherleiste', style: speicherLeisteStil(token) } as const;
+  return {
+    ref,
+    'data-lfh': 'speicherleiste',
+    style: speicherLeisteStil(token, optionen),
+  } as const;
 }

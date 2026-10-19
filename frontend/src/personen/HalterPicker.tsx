@@ -37,6 +37,8 @@ function personLabel(
 
 interface Props {
   einsatzId: number;
+  /** Kennung der Eingabe: ein Etikett (`htmlFor`) benennt die Auswahl (LLH-1101). */
+  id?: string;
   /** Von Form.Item injiziert. */
   value?: HalterWert;
   onChange?: (v: HalterWert) => void;
@@ -46,7 +48,7 @@ interface Props {
  * Gemischtes Select für den Tier-Halter: eine betroffene Person des Einsatzes
  * (→ `halter_person_id`) oder ein externer Kontakt als Freitext (→ `halter_kontakt`).
  */
-export default function HalterPicker({ einsatzId, value = null, onChange }: Props) {
+export default function HalterPicker({ einsatzId, id, value = null, onChange }: Props) {
   const [suche, setSuche] = useState('');
 
   // Auswahl ohne Freitexte (LFH-940): nur Nummer, Name, Status.
@@ -111,6 +113,7 @@ export default function HalterPicker({ einsatzId, value = null, onChange }: Prop
 
   return (
     <Select
+      id={id}
       allowClear
       placeholder="Betroffene Person (R-Nr.) oder externer Kontakt …"
       style={{ width: '100%' }}

@@ -463,7 +463,8 @@ test('Kopf (LFH-952): Tab durch den klebenden Kopf rollt die Seite nicht', async
 });
 
 /**
- * LFH-475 (Nachzug N2 aus LFH-346 · C11): die zwei sticky Speicherleisten, die C11 gebaut hat.
+ * LFH-475 (Nachzug N2 aus LFH-346 · C11): die zwei sticky Speicherleisten, die C11 gebaut hat;
+ * dazu die Leisten im Bearbeiten-Modus von Schaden- und Tier-Detail (LLH-1101).
  * Dieselbe Stilfunktion wie oben (`speicherLeisteStil`) belegt nur die GEOMETRIE der Leiste,
  * nicht die Tabulaturordnung über DIESEN Formularen — deshalb je Route ein eigener Lauf.
  *
@@ -523,7 +524,31 @@ async function speicherleisteFokusBereit(page: Page, ersteFeld: string) {
   return { ziele, reserve };
 }
 
-for (const { name, feld, seite } of [
+/**
+ * Eine Route mit Speicherleiste: `seite` sät und liefert den Pfad, `vorbereiten` öffnet nach dem
+ * Laden den Zustand mit Leiste (Bearbeiten-Modus der Detailseiten, LLH-1101).
+ */
+interface LeistenRoute {
+  name: string;
+  feld: string;
+  seite: (page: Page) => Promise<string>;
+  vorbereiten?: (page: Page) => Promise<void>;
+}
+
+/** Ein frischer Einsatz über die API (die Oberfläche prüft hier niemand, `e2e/AGENTS.md`). */
+async function einsatzPerApi(page: Page): Promise<number> {
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `E2E-FOKUS Einsatz ${Date.now()}` },
+  });
+  expect(antwort.ok(), `Seeding Einsatz: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
+  return ((await antwort.json()) as { id: number }).id;
+}
+
+async function bearbeitenOeffnen(page: Page) {
+  await page.getByRole('button', { name: 'Bearbeiten', exact: true }).click();
+}
+
+const LEISTEN_ROUTEN: LeistenRoute[] = [
   {
     name: 'Fahrzeug-Detailseite',
     feld: 'Funkrufname',
@@ -564,7 +589,46 @@ for (const { name, feld, seite } of [
     feld: 'Aufbewahrungs-Dauer (Tage)',
     seite: async () => '/admin/einstellungen/einsatz',
   },
-]) {
+  {
+    // LLH-1101: der Bearbeiten-Modus trägt „Speichern“ und „Abbrechen“ in der Leiste. Ohne
+    // Koordinate, damit „Auf Karte verorten“ im Formular steht: mit den fünf Feldern und beiden
+    // Knöpfen sind das genau die acht Stopps der Vorbedingung.
+    name: 'Schaden-Detailseite',
+    feld: 'Typ',
+    seite: async (page: Page) => {
+      const einsatzId = await einsatzPerApi(page);
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+        data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Fokusprobe Keller' },
+      });
+      expect(
+        antwort.ok(),
+        `Seeding Schaden: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      const { id } = (await antwort.json()) as { id: number };
+      return `/einsaetze/${einsatzId}/schaeden/${id}`;
+    },
+    vorbereiten: bearbeitenOeffnen,
+  },
+  {
+    name: 'Tier-Detailseite',
+    feld: 'Rufname',
+    seite: async (page: Page) => {
+      const einsatzId = await einsatzPerApi(page);
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/tiere`, {
+        data: { spezies: 'hund', rufname: 'Rex' },
+      });
+      expect(
+        antwort.ok(),
+        `Seeding Tier: ${antwort.status()} ${await antwort.text()}`,
+      ).toBeTruthy();
+      const { id } = (await antwort.json()) as { id: number };
+      return `/einsaetze/${einsatzId}/tiere/${id}`;
+    },
+    vorbereiten: bearbeitenOeffnen,
+  },
+];
+
+for (const { name, feld, seite, vorbereiten } of LEISTEN_ROUTEN) {
   for (const viewport of [
     { width: 390, height: 420 },
     { width: 1366, height: 520 },
@@ -576,6 +640,7 @@ for (const { name, feld, seite } of [
       const pfad = await seite(page);
       await page.setViewportSize(viewport);
       await page.goto(pfad);
+      await vorbereiten?.(page);
       await expect(page.getByLabel(feld, { exact: true })).toBeVisible();
 
       const { ziele, reserve } = await speicherleisteFokusBereit(page, feld);

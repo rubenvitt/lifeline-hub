@@ -24,11 +24,12 @@ use crate::person::verletzung_repo::{self, VerletzungAnzeige};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
-    PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
+    PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus, PAT_NUMMER_MAX,
+    PERSON_ANGABE_MAX, PERSON_NAME_MAX, PERSON_NOTIZ_MAX, PERSON_ZUSTAND_MAX, VERLAUFSNOTIZ_MAX,
 };
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pruefe_koordinate, trimme,
-    trimme_tri,
+    deserialize_optional_field, optional_max, optional_max_tri, parse_enum, parse_enum_opt,
+    pflicht_max, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::uhs::{belegung_repo, AufenthaltAnzeige};
 use axum::extract::{Query, State};
@@ -270,6 +271,23 @@ pub async fn anlegen(
         body.geschlecht.as_deref(),
         "Unbekanntes Geschlecht",
     )?;
+    // LLH-1329: die Freitexte für sich (400), vor jedem 422 des Zusammenhangs.
+    let name = optional_max(body.name, "Name", PERSON_NAME_MAX)?;
+    let vorname = optional_max(body.vorname, "Vorname", PERSON_NAME_MAX)?;
+    let herkunft = optional_max(
+        body.herkunft_adresse,
+        "Herkunft / Adresse",
+        PERSON_ANGABE_MAX,
+    )?;
+    let antreff = optional_max(body.antreff_ort, "Fundort", PERSON_ANGABE_MAX)?;
+    let melder = optional_max(body.melder_kontakt, "Melder / Kontakt", PERSON_ANGABE_MAX)?;
+    let zustand = optional_max(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
+    let notiz = optional_max(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
+    // LLH-1103 (design.md D6): dieselbe Prüfung wie im PATCH, das Feld für sich (400).
+    let geburtsdatum = match trimme(body.geburtsdatum) {
+        Some(roh) => Some(pruefe_geburtsdatum(&roh, chrono::Utc::now().date_naive())?),
+        None => None,
+    };
 
     let status = body
         .status
@@ -378,15 +396,6 @@ pub async fn anlegen(
         "antreff_lat",
         "antreff_lon",
     )?;
-    let zustand = trimme(body.zustand);
-
-    let name = trimme(body.name);
-    let vorname = trimme(body.vorname);
-    let geburtsdatum = trimme(body.geburtsdatum);
-    let herkunft = trimme(body.herkunft_adresse);
-    let antreff = trimme(body.antreff_ort);
-    let melder = trimme(body.melder_kontakt);
-    let notiz = trimme(body.notiz);
 
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
@@ -669,6 +678,173 @@ pub struct PatchBody {
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
     pub basis_geaendert_at: Option<String>,
+    /// Feld-CAS (LLH-1103, design.md D1 der Change `f8218h1i-personendaten-feldweise`): je Feld
+    /// der Wert beim Öffnen. Der Server schreibt nur, solange jede genannte Spalte noch diesen
+    /// Wert hat, sonst 409. Fehlt es, wird ohne Feldvergleich geschrieben (Überschreiben).
+    #[serde(default)]
+    pub erwartet: Option<ErwartetBody>,
+}
+
+/// Altwerte des Feld-CAS: dieselben Feldnamen wie die Änderung, dreiwertig (fehlt = kein
+/// Vergleich, `null` oder `""` = leer erwartet; leer trifft auch eine gespeicherte leere oder nur
+/// aus Leerraum bestehende Zeichenkette). Ein Feld hier, das der PATCH nicht ändert, ist 422; die
+/// Koordinate steht nur als Paar (`antreff_lat` und `antreff_lon`), sonst 422. Ein unbekannter
+/// Feldname ist 400 statt eines stillen Schreibens ohne Vergleich.
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ErwartetBody {
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub name: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub vorname: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub geschlecht: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub geburtsdatum: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub alter_geschaetzt: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub herkunft_adresse: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub antreff_ort: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub melder_kontakt: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub notiz: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub zustand: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub antreff_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub antreff_lon: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub vermisst_seit: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub pat_nummer: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kontamination: Option<Option<bool>>,
+}
+
+/// Ein Text-Altwert: `""` (auch nur Leerraum) heißt leer wie `null`. Sonst bleibt der Wert, wie
+/// der Client ihn gelesen hat — kein Trimmen, damit ein alter ungetrimmter Bestand vergleichbar
+/// bleibt.
+fn leer_als_null(wert: Option<Option<String>>) -> Option<Option<String>> {
+    wert.map(|w| w.filter(|t| !t.trim().is_empty()))
+}
+
+/// Prüft `erwartet` gegen die Änderung: die Koordinate nur als Paar, und jedes Feld mit Altwert
+/// muss im selben PATCH geändert werden. Beides ist eine Feldkombination, also 422
+/// (`src/AGENTS.md`, Statuscode-Konvention; design.md D1).
+fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppError> {
+    if erwartet.antreff_lat.is_some() != erwartet.antreff_lon.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "erwartet trägt die Koordinate nur als Paar (antreff_lat und antreff_lon)".into(),
+        ));
+    }
+    let felder = [
+        ("name", erwartet.name.is_some(), body.name.is_some()),
+        (
+            "vorname",
+            erwartet.vorname.is_some(),
+            body.vorname.is_some(),
+        ),
+        (
+            "geschlecht",
+            erwartet.geschlecht.is_some(),
+            body.geschlecht.is_some(),
+        ),
+        (
+            "geburtsdatum",
+            erwartet.geburtsdatum.is_some(),
+            body.geburtsdatum.is_some(),
+        ),
+        (
+            "alter_geschaetzt",
+            erwartet.alter_geschaetzt.is_some(),
+            body.alter_geschaetzt.is_some(),
+        ),
+        (
+            "herkunft_adresse",
+            erwartet.herkunft_adresse.is_some(),
+            body.herkunft_adresse.is_some(),
+        ),
+        (
+            "antreff_ort",
+            erwartet.antreff_ort.is_some(),
+            body.antreff_ort.is_some(),
+        ),
+        (
+            "melder_kontakt",
+            erwartet.melder_kontakt.is_some(),
+            body.melder_kontakt.is_some(),
+        ),
+        ("notiz", erwartet.notiz.is_some(), body.notiz.is_some()),
+        (
+            "zustand",
+            erwartet.zustand.is_some(),
+            body.zustand.is_some(),
+        ),
+        (
+            "antreff_lat",
+            erwartet.antreff_lat.is_some(),
+            body.antreff_lat.is_some(),
+        ),
+        (
+            "antreff_lon",
+            erwartet.antreff_lon.is_some(),
+            body.antreff_lon.is_some(),
+        ),
+        (
+            "vermisst_seit",
+            erwartet.vermisst_seit.is_some(),
+            body.vermisst_seit.is_some(),
+        ),
+        (
+            "pat_nummer",
+            erwartet.pat_nummer.is_some(),
+            body.pat_nummer.is_some(),
+        ),
+        (
+            "kontamination",
+            erwartet.kontamination.is_some(),
+            body.kontamination.is_some(),
+        ),
+    ];
+    if let Some((feld, _, _)) = felder.iter().find(|(_, alt, neu)| *alt && !*neu) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "erwartet nennt {feld}, der PATCH ändert {feld} aber nicht"
+        )));
+    }
+    Ok(())
+}
+
+/// Spielraum für ein Geburtsdatum am Tagesrand (design.md D6): die Oberfläche prüft „nicht nach
+/// heute“ im Tag der Anzeigezone, der UTC um bis zu einen Tag voraus sein kann.
+const GEBURTSDATUM_SPIELRAUM: chrono::Duration = chrono::Duration::days(1);
+
+/// Prüft ein zu SETZENDES Geburtsdatum (LLH-1103, design.md D6), beim Anlegen und im PATCH: genau
+/// `YYYY-MM-DD`, ein gültiger Kalendertag und nicht nach `heute` (UTC) plus Spielraum, sonst 400.
+/// Ein schon gespeicherter Wert in anderer Form wird nicht geprüft, nur ein geschriebener.
+fn pruefe_geburtsdatum(roh: &str, heute: chrono::NaiveDate) -> Result<String, AppError> {
+    let zeichen = roh.as_bytes();
+    let form = zeichen.len() == 10
+        && zeichen.iter().enumerate().all(|(i, z)| match i {
+            4 | 7 => *z == b'-',
+            _ => z.is_ascii_digit(),
+        });
+    if !form {
+        return Err(AppError::Validation(
+            "Geburtsdatum muss die Form JJJJ-MM-TT haben".into(),
+        ));
+    }
+    let tag = chrono::NaiveDate::parse_from_str(roh, "%Y-%m-%d")
+        .map_err(|_| AppError::Validation("Geburtsdatum ist kein gültiger Kalendertag".into()))?;
+    if tag > heute + GEBURTSDATUM_SPIELRAUM {
+        return Err(AppError::Validation(
+            "Geburtsdatum darf nicht in der Zukunft liegen".into(),
+        ));
+    }
+    Ok(roh.to_owned())
 }
 
 /// PATCH /api/einsaetze/{id}/personen/{pid} — Identitäts-/Kontextfelder bearbeiten.
@@ -693,21 +869,32 @@ pub async fn aktualisieren(
             .and_then(|opt| opt.as_deref().map(str::trim).filter(|s| !s.is_empty())),
         "Unbekanntes Geschlecht",
     )?;
+    if let Some(erwartet) = &body.erwartet {
+        pruefe_erwartet(erwartet, &body)?;
+    }
 
-    let name = trimme_tri(body.name);
-    let vorname = trimme_tri(body.vorname);
+    // LLH-1329: nur die genannten Felder; ein Altbestand über der Grenze in einem anderen Feld
+    // hält die Änderung nicht auf.
+    let name = optional_max_tri(body.name, "Name", PERSON_NAME_MAX)?;
+    let vorname = optional_max_tri(body.vorname, "Vorname", PERSON_NAME_MAX)?;
     let geschlecht = trimme_tri(body.geschlecht);
-    let geburtsdatum = trimme_tri(body.geburtsdatum);
-    let herkunft = trimme_tri(body.herkunft_adresse);
-    let antreff = trimme_tri(body.antreff_ort);
-    let melder = trimme_tri(body.melder_kontakt);
-    let notiz = trimme_tri(body.notiz);
-    let zustand = trimme_tri(body.zustand);
-    let pat_nummer = crate::routes::support::optional_max_tri(
-        body.pat_nummer,
-        "PAT-Nummer",
-        crate::person::PAT_NUMMER_MAX,
+    let geburtsdatum = match trimme_tri(body.geburtsdatum) {
+        Some(Some(roh)) => Some(Some(pruefe_geburtsdatum(
+            &roh,
+            chrono::Utc::now().date_naive(),
+        )?)),
+        andere => andere,
+    };
+    let herkunft = optional_max_tri(
+        body.herkunft_adresse,
+        "Herkunft / Adresse",
+        PERSON_ANGABE_MAX,
     )?;
+    let antreff = optional_max_tri(body.antreff_ort, "Fundort", PERSON_ANGABE_MAX)?;
+    let melder = optional_max_tri(body.melder_kontakt, "Melder / Kontakt", PERSON_ANGABE_MAX)?;
+    let notiz = optional_max_tri(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
+    let zustand = optional_max_tri(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
+    let pat_nummer = optional_max_tri(body.pat_nummer, "PAT-Nummer", PAT_NUMMER_MAX)?;
 
     // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
     // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).
@@ -723,7 +910,8 @@ pub async fn aktualisieren(
 
     // Paarregel und „nur bei vermisst" brauchen den Bestand. Wie in `einsatz_uhs.rs` gilt: der
     // Effektivzustand wird vor dem UPDATE gelesen; ein konkurrierender Schreiber dazwischen
-    // fängt das optimistische Lock (`basis_geaendert_at`), wo der Client es mitschickt.
+    // fängt das optimistische Lock (`basis_geaendert_at` bzw. der Feld-CAS über `erwartet`),
+    // wo der Client es mitschickt.
     if body.antreff_lat.is_some() || body.antreff_lon.is_some() || vermisst_seit.is_some() {
         let vorher = repo::laden(&state.pool, einsatz_id, person_id).await?;
         let eff_lat = body.antreff_lat.unwrap_or(vorher.antreff_lat);
@@ -736,12 +924,42 @@ pub async fn aktualisieren(
         }
     }
 
+    let erwartet = body.erwartet.unwrap_or_default();
+    let alt_name = leer_als_null(erwartet.name);
+    let alt_vorname = leer_als_null(erwartet.vorname);
+    let alt_geschlecht = leer_als_null(erwartet.geschlecht);
+    let alt_geburtsdatum = leer_als_null(erwartet.geburtsdatum);
+    let alt_herkunft = leer_als_null(erwartet.herkunft_adresse);
+    let alt_antreff = leer_als_null(erwartet.antreff_ort);
+    let alt_melder = leer_als_null(erwartet.melder_kontakt);
+    let alt_notiz = leer_als_null(erwartet.notiz);
+    let alt_zustand = leer_als_null(erwartet.zustand);
+    let alt_vermisst_seit = leer_als_null(erwartet.vermisst_seit);
+    let alt_pat_nummer = leer_als_null(erwartet.pat_nummer);
+
     let person = repo::aktualisiere(
         &state.pool,
         einsatz_id,
         person_id,
         ctx.benutzer.id,
         body.basis_geaendert_at.as_deref(),
+        &repo::PatchDaten {
+            name: alt_name.as_ref().map(|o| o.as_deref()),
+            vorname: alt_vorname.as_ref().map(|o| o.as_deref()),
+            geschlecht: alt_geschlecht.as_ref().map(|o| o.as_deref()),
+            geburtsdatum: alt_geburtsdatum.as_ref().map(|o| o.as_deref()),
+            alter_geschaetzt: erwartet.alter_geschaetzt,
+            herkunft_adresse: alt_herkunft.as_ref().map(|o| o.as_deref()),
+            antreff_ort: alt_antreff.as_ref().map(|o| o.as_deref()),
+            melder_kontakt: alt_melder.as_ref().map(|o| o.as_deref()),
+            notiz: alt_notiz.as_ref().map(|o| o.as_deref()),
+            zustand: alt_zustand.as_ref().map(|o| o.as_deref()),
+            antreff_lat: erwartet.antreff_lat,
+            antreff_lon: erwartet.antreff_lon,
+            vermisst_seit: alt_vermisst_seit.as_ref().map(|o| o.as_deref()),
+            pat_nummer: alt_pat_nummer.as_ref().map(|o| o.as_deref()),
+            kontamination: erwartet.kontamination,
+        },
         repo::PatchDaten {
             name: name.as_ref().map(|o| o.as_deref()),
             vorname: vorname.as_ref().map(|o| o.as_deref()),
@@ -1455,7 +1673,7 @@ pub async fn notiz(
         }
     }
     ctx.fordere_aktiv()?;
-    let text = pflicht(&body.text, "Notiztext")?;
+    let text = pflicht_max(&body.text, "Notiztext", VERLAUFSNOTIZ_MAX)?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     let erfasst_at = crate::routes::support::erfassungszeitpunkt(
         body.zeitpunkt_at.as_deref(),
@@ -1597,4 +1815,69 @@ pub async fn abgleich_entscheiden(
     sse_person(&state, einsatz_id, abgleich.vermisst_person_id);
     sse_person(&state, einsatz_id, abgleich.gefunden_person_id);
     Ok(Json(entschieden))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tag(s: &str) -> chrono::NaiveDate {
+        chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    fn meldung(r: Result<String, AppError>) -> String {
+        match r {
+            Err(AppError::Validation(m)) => m,
+            andere => panic!("400 erwartet, war {andere:?}"),
+        }
+    }
+
+    #[test]
+    fn geburtsdatum_nimmt_gueltige_tage_bis_morgen() {
+        let heute = tag("2026-10-19");
+        for gut in ["1980-02-01", "2024-02-29", "2026-10-19", "2026-10-20"] {
+            assert_eq!(pruefe_geburtsdatum(gut, heute).unwrap(), gut);
+        }
+    }
+
+    #[test]
+    fn geburtsdatum_lehnt_form_kalender_und_zukunft_ab() {
+        let heute = tag("2026-10-19");
+        for form in [
+            "1980-2-1",
+            "01.02.1980",
+            "+1980-02-01",
+            "19800201",
+            "1980-02-01 ",
+        ] {
+            assert_eq!(
+                meldung(pruefe_geburtsdatum(form, heute)),
+                "Geburtsdatum muss die Form JJJJ-MM-TT haben",
+                "{form}"
+            );
+        }
+        for kalender in ["2023-02-29", "1980-02-31", "1980-13-01", "1980-00-10"] {
+            assert_eq!(
+                meldung(pruefe_geburtsdatum(kalender, heute)),
+                "Geburtsdatum ist kein gültiger Kalendertag",
+                "{kalender}"
+            );
+        }
+        assert_eq!(
+            meldung(pruefe_geburtsdatum("2026-10-21", heute)),
+            "Geburtsdatum darf nicht in der Zukunft liegen"
+        );
+    }
+
+    #[test]
+    fn leerer_text_altwert_heisst_leer() {
+        assert_eq!(leer_als_null(None), None);
+        assert_eq!(leer_als_null(Some(None)), Some(None));
+        assert_eq!(leer_als_null(Some(Some("  ".into()))), Some(None));
+        assert_eq!(
+            leer_als_null(Some(Some(" Alt ".into()))),
+            Some(Some(" Alt ".into())),
+            "kein Trimmen"
+        );
+    }
 }

@@ -28,6 +28,8 @@ import {
 import { useViewport } from '../components/useViewport';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { VERLAUFSNOTIZ_MAX } from '../api/eingabegrenzen';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
 import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
@@ -178,7 +180,8 @@ export default function Patientenkopf({
   const mitFigur = viewport.abBreite('md') && verletzungen.length > 0;
   // Ohne Verbindung heißt: Browser offline ODER der Server antwortet nicht (WLAN ohne Server,
   // `frontend/src/offline/AGENTS.md`); `navigator.onLine` allein böte das Aufheben dort an.
-  const aufhebenGesperrt = useOhneVerbindung() ? AUFHEBEN_OHNE_NETZ : undefined;
+  const ohneVerbindung = useOhneVerbindung();
+  const aufhebenGesperrt = ohneVerbindung ? AUFHEBEN_OHNE_NETZ : undefined;
   // Vorgemerkt an dieser Person, getrennt vom Serverstand (`frontend/src/offline/AGENTS.md`, „Was
   // vorgemerkt ist, kennt der Server noch nicht“); die Notizen quittiert die Notizzeile.
   const benutzerId = useAuthOptional()?.benutzer?.id;
@@ -232,6 +235,8 @@ export default function Patientenkopf({
           </Datenfeld>
 
           <Datenfeld label="Zustand / Verdacht">
+            {/* Ohne Netz sperrt `ZustandSchreiben` selbst, mit Grund am Feld (LLH-1103, D8); ein
+                getippter Entwurf bleibt stehen, statt gegen den Lesetext getauscht zu werden. */}
             {bedienbar && angetroffen ? (
               <ZustandSchreiben p={person} einsatzId={einsatzId} />
             ) : (
@@ -727,13 +732,19 @@ function NotizZeile({
           <Form.Item
             name="text"
             noStyle
-            rules={[{ required: true, whitespace: true, message: 'Bitte Text eingeben' }]}
+            rules={[
+              { required: true, whitespace: true, message: 'Bitte Text eingeben' },
+              // Grenze des Servers (LLH-1329): ein zu langer Text geht weder hinaus noch in die
+              // Warteschlange; der Zähler sagt „zu lang“, gekürzt wird nie.
+              zeichenRegel(VERLAUFSNOTIZ_MAX, 'Notiztext'),
+            ]}
           >
             <Input
               aria-label="Verlaufsnotiz"
               aria-describedby={`notiz-folge-${personId}`}
               placeholder="Verlaufsnotiz"
               disabled={mutation.isPending}
+              count={zeichenGrenze(VERLAUFSNOTIZ_MAX)}
             />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={mutation.isPending}>

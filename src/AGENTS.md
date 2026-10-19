@@ -18,13 +18,23 @@ Handler (`JsonBody`, LFH-1074).
   (`abschliessen_ohne_grund_ist_400` gegen `abschluss_ohne_grund_ist_422_und_mit_grund_ok`).
   Reine 400er-Referenz: `tests/freies_zeichen.rs` (`ohne_zeichenform_ist_400`,
   `leere_zeichenform_ist_400`, `altes_format_ist_400`; seit LLH-1160 gibt es dort keinen 422 mehr).
-- **409 hat zwei Quellen:** CAS (`basis_geaendert_at` in `schaden/repo.rs`, `tier/repo.rs`;
-  Überschreiben-Dialog) und Lebenszyklus (kein Dialog). Das Frontend trennt nur heuristisch
-  (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
+- **409 hat zwei Quellen:** CAS (Zeilen-CAS `basis_geaendert_at` in `schaden/repo.rs`,
+  `tier/repo.rs`; Feld-CAS `erwartet` in `person/repo.rs`; Rückfrage „Zwischenzeitlich
+  geändert“ mit Überschreiben) und Lebenszyklus (kein Dialog). Das Frontend trennt nur
+  heuristisch (`istKonflikt` in `frontend/src/api/client.ts`, `!v.overwrite`-Zweig in
   `SchaedenDetailPage.tsx`/`TiereDetailPage.tsx`) — ein neuer 409 in einer
   CAS-Route zieht den Zweig mit.
-- **CAS-Baseline beim Öffnen einfrieren** (`components/useEditSitzung.ts`, gebrandete
-  `CasBasis`; `starte` nimmt den Datensatz). Test braucht ein gemountetes `<Form form={form}>`.
+- **CAS-Baseline beim Öffnen einfrieren**: das Sammelbearbeiten von Tier und Schaden über
+  `components/useEditSitzung.ts` (gebrandete `CasBasis`; `starte` nimmt den Datensatz); Test
+  braucht ein gemountetes `<Form form={form}>`.
+- **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change
+  `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
+  geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und
+  `person::repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an. Sichtung, Status, PAT oder
+  ein anderes Feld lösen so keinen 409 aus; ein Altwert ohne Änderung desselben Felds und eine
+  halbe Koordinate sind 422, ein leerer Altwert trifft auch eine leere Zeichenkette,
+  ohne `erwartet` wird ohne Vergleich geschrieben. `basis_geaendert_at` bleibt als Wire-Feld für
+  ältere Clients.
 - Legitimes 422 bei Sweeps nicht mitkippen (`lage_zone.rs`, `gefahr.rs`, `einsatzabschnitt.rs`,
   `sprechgruppe/repo.rs:pruefe_zuordenbar`, `auth.rs` „Code ungültig", `einsatz_uhs.rs`).
 - Handler-Prechecks vor der DB bleiben (`einsatz_schaden.rs`/PATCH, `einsatz_tier.rs`/Status) —

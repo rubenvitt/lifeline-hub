@@ -2,7 +2,7 @@
 titel: Arbeiten ohne Netz
 gruppen: [alle, fuehrung]
 reihenfolge: 20
-quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx]
+quellen: [frontend/src/api/queryKeys.ts, frontend/src/offline/, frontend/src/live/LiveStatusBanner.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/components/Datenstand.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/personen/Personendaten.tsx]
 ---
 
 ## Überblick
@@ -79,8 +79,11 @@ ist.
 - Einträge im Einsatztagebuch
 
 Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
-Bei Personen brauchen das Aufheben einer Maßnahme oder Verletzung und das Eintragen von PAT-Nummer
-und Kontamination Netz; ohne Netz stehen sie gesperrt mit Grund.
+Bei Personen brauchen das Aufheben einer Maßnahme oder Verletzung, das Eintragen von PAT-Nummer
+und Kontamination, „Zustand / Verdacht“ im Kopf und in der Liste und die Personendaten (Name,
+Geburtsdatum, Fundort …) Netz; ohne Netz stehen sie gesperrt mit Grund („Ohne Verbindung nicht
+änderbar“), bei den Personendaten einmal über dem Abschnitt. Eine Änderung daran wird nicht
+vorgemerkt; ein schon getippter Zustand bleibt im Feld stehen.
 
 Ein vorgemerkter Eintrag liegt auf dem Gerät und geht hinaus, sobald wieder Netz da ist, ohne
 weiteres Zutun und in der Reihenfolge der Erfassung. Eine erfasste Person trägt bis dahin „R-…“

@@ -6,14 +6,10 @@ import StatusTag from '../components/StatusTag';
 import SichtungsTag from '../components/SichtungsTag';
 import {
   Alert,
-  App,
   Breadcrumb,
   Button,
   Collapse,
   Flex,
-  Form,
-  Input,
-  InputNumber,
   Modal,
   Space,
   Spin,
@@ -21,9 +17,7 @@ import {
   Typography,
 } from 'antd';
 import { MenueAusloeser } from '../components/MenueAusloeser';
-import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
-import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -34,44 +28,33 @@ import {
   istEinsatzLeitung,
 } from '../einsatz/schreibrecht';
 import {
-  aktualisierePerson,
   entscheideAbgleich,
   ladePerson,
   ladePersonAudit,
   registrierAnzeige,
   setzePersonStatus,
   stornierePerson,
-  type PersonEingabe,
 } from '../api/einsatzPerson';
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
-import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { GESCHLECHT_WORT, STATUS_META } from '../personen/personMeta';
+import { STATUS_META } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
 import { ZUGRIFF_SPALTEN } from '../personen/zugriffSpalten';
 import { ANHAENGE_TITEL } from '../components/erfassungsAnhaenge/ErfassungsAnhaenge';
-import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import PersonVerlauf from '../personen/PersonVerlauf';
 import Patientenkopf from '../personen/Patientenkopf';
 import PersonBezuege from '../personen/PersonBezuege';
-import StammdatenRaster, { type StammdatenAngabe } from '../personen/StammdatenRaster';
+import Personendaten from '../personen/Personendaten';
 import { UhsZuweisenDialog } from '../personen/ZuweisungsDialoge';
 import KatalogTabelle from '../components/KatalogTabelle';
 import type { Person, PersonDetail, PersonStatus, PersonZugriff } from '../api/types';
 import { lagekartePfad, parseRouteId, personDruckPfad } from '../routing/deeplinks';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { useGeraetDarf } from '../geraet/geraetSicht';
-import { koordinatenText } from '../personen/koordinate';
 import { istAngetroffen } from '../personen/personenBilanz';
-import { KoordinateFeld, VermisstSeitFeld } from '../personen/LagedatenFelder';
-import {
-  bearbeitenWerteAus,
-  bearbeitenZuPatch,
-  verortenLinkStil,
-  type PersonBearbeitenWerte,
-} from '../personen/personBearbeiten';
+import { verortenLinkStil } from '../personen/personBearbeiten';
 import { SpeicherFehler, ZeilenFehler } from '../components/SpeicherHinweis';
 import {
   useZeilenFehler,
@@ -110,7 +93,7 @@ const IRREVERSIBEL: PersonStatus[] = ['verstorben'];
  */
 type Kopfaktion =
   | {
-      art: 'bearbeiten' | 'stornieren';
+      art: 'stornieren';
       key: string;
       label: string;
       /** Rot und hinter dem einen Trenner des Menüs (`components/MenueAusloeser.tsx`). */
@@ -139,9 +122,6 @@ export default function PersonenDetailPage() {
   const pfade = useEinsatzPfade();
 
   const qc = useQueryClient();
-  const { modal } = App.useApp();
-  const [editForm] = Form.useForm<PersonBearbeitenWerte>();
-  const editSitzung = useEditSitzung<PersonBearbeitenWerte>(editForm);
 
   /*
    * Jede Ablehnung steht an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
@@ -274,46 +254,6 @@ export default function PersonenDetailPage() {
       });
     },
   });
-  // Optimistisches Lock: `basis` trägt den beim Öffnen der Maske eingefrorenen geaendert_at-Stand
-  // (aus den Live-Query-Daten gelesen hebelte ein Hintergrund-Refetch das Lock aus); ein 409 öffnet
-  // den Konfliktdialog, statt still zu überschreiben.
-  const editMutation = useMutation({
-    // `basis` ist eine `CasBasis` und nur aus `useEditSitzung` zu bekommen: ein blanker
-    // `p.geaendert_at` bricht hier den Typcheck.
-    mutationFn: (v: { daten: PersonEingabe; basis?: CasBasis; overwrite?: boolean }) =>
-      aktualisierePerson(einsatzId, personId, v.daten, v.overwrite ? undefined : v.basis),
-    onSuccess: () => {
-      invalidateDetail();
-      editSitzung.beende();
-    },
-    onError: (e, v) => {
-      // Nur der erste 409 (Save mit Baseline) ist der Sperrkonflikt. Der zweite 409 der Route,
-      // `fordere_aktiv` („Einsatz ist abgeschlossen und schreibgeschützt"), greift vor der
-      // CAS-Prüfung und ist per `overwrite` nicht zu umgehen. Ein 409 auf den Overwrite zeigt
-      // deshalb die Servermeldung, statt denselben Dialog erneut zu öffnen (dieselbe Weiche wie in
-      // SchaedenDetailPage/TiereDetailPage). Jeder andere Fehler steht am Formular (`editFehler`).
-      if (istKonflikt(e) && !v.overwrite) {
-        modal.confirm({
-          title: 'Zwischenzeitlich geändert',
-          content: 'Seit dem Öffnen von jemand anderem gespeichert.',
-          okText: 'Überschreiben',
-          okButtonProps: { danger: true },
-          cancelText: 'Verwerfen und neu laden',
-          onOk: () => editMutation.mutate({ daten: v.daten, overwrite: true }),
-          onCancel: () => {
-            detailQuery.refetch();
-            editSitzung.beende();
-          },
-        });
-      }
-    },
-  });
-  // Der Sperrkonflikt fragt nach (oben); am Formular steht nur, was keine Rückfrage auslöst.
-  const editFehler =
-    editMutation.error != null &&
-    !(istKonflikt(editMutation.error) && !editMutation.variables?.overwrite)
-      ? editMutation.error
-      : null;
   /** Abbrechen räumt den Grund; eine laufende Mutation bleibt unberührt. */
   function raeume(m: { isPending: boolean; error: unknown; reset: () => void }) {
     if (!m.isPending && m.error != null) m.reset();
@@ -361,25 +301,21 @@ export default function PersonenDetailPage() {
   });
 
   /*
-   * Gründe, Bearbeitung und Notiztext gehören zur Person: ein Wechsel auf eine andere (gleiche
+   * Gründe und Notiztext gehören zur Person: ein Wechsel auf eine andere (gleiche
    * Route, kein `key`) räumt sie. Erst beim Wechsel, nicht beim Einhängen: das Notizformular hängt
    * dann noch nicht, und `resetFields` warnte über eine unverbundene Form.
    */
   const { leere: leereAbgleiche } = abgleichFehler;
-  const { reset: editReset } = editMutation;
   const { reset: stornoReset } = stornoMutation;
   const { reset: austrittReset } = austrittMutation;
-  const { beende: beendeEdit } = editSitzung;
   const vorigePerson = useRef(personSchluessel);
   useEffect(() => {
     if (vorigePerson.current === personSchluessel) return;
     vorigePerson.current = personSchluessel;
     leereAbgleiche();
-    editReset();
     stornoReset();
     austrittReset();
-    beendeEdit();
-  }, [personSchluessel, leereAbgleiche, editReset, stornoReset, austrittReset, beendeEdit]);
+  }, [personSchluessel, leereAbgleiche, stornoReset, austrittReset]);
 
   // Die Bezüge (`personen/PersonBezuege.tsx`) hält der Einsatz-Live-Stream im EinsatzLayout aktuell:
   // `tier`→'einsatz-tiere', `schaden`→'einsatz-schaeden'. Der Prefix-Match deckt die Keys
@@ -536,168 +472,49 @@ export default function PersonenDetailPage() {
   }
 
   /**
-   * Lesezweig der Stammdaten (LFH-963, design.md D8): `null` = ohne Angabe. Zustand und Koordinate
-   * beschreiben eine angetroffene Person und fehlen bei einer vermissten ganz, wie im
-   * Bearbeiten-Zweig; „vermisst seit" nur bei einer vermissten.
+   * „Auf Lagekarte verorten“ neben der Koordinate (LFH-613): nur an einer angetroffenen, nicht
+   * stornierten Person, mit Schreibrecht und nicht am Gerät.
    */
-  function stammdatenAngaben(person: PersonDetail, angetroffen: boolean): StammdatenAngabe[] {
-    const koordinate = koordinatenText(person);
-    const verorten = darfSchreiben && !person.storniert_at && angetroffen && darf('fremde-module');
-    return [
-      { label: 'Name', wert: person.name },
-      { label: 'Vorname', wert: person.vorname },
-      { label: 'Geschlecht', wert: person.geschlecht ? GESCHLECHT_WORT[person.geschlecht] : null },
-      { label: 'Geburtsdatum', wert: person.geburtsdatum, mono: true },
-      { label: 'Alter (geschätzt)', wert: person.alter_geschaetzt, mono: true },
-      { label: 'Herkunft / Adresse', wert: person.herkunft_adresse, breit: true },
-      // „Zustand / Verdacht“ steht im Patientenkopf (LLH-1094), nicht doppelt hier.
-      { label: 'Fundort', wert: person.antreff_ort },
-      ...(angetroffen || koordinate
-        ? [
-            {
-              label: 'Koordinate',
-              // Als Feld, sobald etwas dasteht: der Wert oder der Weg, ihn zu setzen.
-              wert:
-                koordinate || verorten ? (
-                  <Space wrap size="middle">
-                    {koordinate && (
-                      <span data-lfh="koordinate" style={{ fontFamily: token.fontFamilyCode }}>
-                        {koordinate}
-                      </span>
-                    )}
-                    {verorten && karteGesperrt && (
-                      // Gesperrte Lagekarte (LFH-888): der Auftrag steht gesperrt mit Grund (M16).
-                      <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
-                        Auf Lagekarte verorten
-                      </Button>
-                    )}
-                    {verorten && !karteGesperrt && (
-                      // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die
-                      // Lagekarte), in einem neuen Tab öffenbar. Die zwei Angaben des
-                      // handgebauten Bedienziels trägt `verortenLinkStil`.
-                      <Link
-                        to={lagekartePfad(einsatzId, {
-                          // Mit Herkunft: „Zurück zu R-…“ führt danach hierher (LLH-1125).
-                          platzieren: { typ: 'person', id: person.id, zurueck: true },
-                        })}
-                        style={verortenLinkStil(token, rollen.bedienText)}
-                      >
-                        Auf Lagekarte verorten
-                      </Link>
-                    )}
-                  </Space>
-                ) : null,
-              breit: true,
-            },
-          ]
-        : []),
-      ...(person.status === 'vermisst'
-        ? [
-            {
-              label: 'vermisst seit',
-              wert: person.vermisst_seit ? (
-                <ZeitAnzeige wert={person.vermisst_seit} format="dtgVoll" />
-              ) : null,
-              mono: true,
-            },
-          ]
-        : []),
-      { label: 'Melder / Kontakt', wert: person.melder_kontakt, breit: true },
-      { label: 'Notiz', wert: person.notiz, breit: true },
-    ];
+  function verortenWeg(person: PersonDetail) {
+    if (!(darfSchreiben && !person.storniert_at && istAngetroffen(person) && darf('fremde-module')))
+      return undefined;
+    if (karteGesperrt) {
+      // Gesperrte Lagekarte (LFH-888): der Auftrag steht gesperrt mit Grund (M16).
+      return (
+        <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
+          Auf Lagekarte verorten
+        </Button>
+      );
+    }
+    // Ein Link, kein Knopf: das Ziel ist eine Adresse (Platzier-Auftrag an die Lagekarte), in
+    // einem neuen Tab öffenbar. Die zwei Angaben des handgebauten Bedienziels trägt
+    // `verortenLinkStil`.
+    return (
+      <Link
+        to={lagekartePfad(einsatzId, {
+          // Mit Herkunft: „Zurück zu R-…“ führt danach hierher (LLH-1125).
+          platzieren: { typ: 'person', id: person.id, zurueck: true },
+        })}
+        style={verortenLinkStil(token, rollen.bedienText)}
+      >
+        Auf Lagekarte verorten
+      </Link>
+    );
   }
 
   function stammdatenSpalte(person: PersonDetail) {
-    const angetroffen = istAngetroffen(person);
-    // Als `const` herausgezogen, damit TypeScript im Formularzweig auf „Sitzung offen" verengt:
-    // `basis` ist dort nicht optional. Mit `editSitzung.sitzung?.basis` wäre der unmögliche Fall
-    // still ein Schreiben ohne Lock.
-    const sitzung = editSitzung.sitzung;
     return (
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
-        {sitzung ? (
-          <Form
-            form={editForm}
-            layout="vertical"
-            initialValues={sitzung.werte}
-            // Koordinate und „vermisst seit" werden gegen die Werte beim Öffnen gemessen:
-            // unverändert gehen sie nicht mit (Rundung, 400 auf `null`) —
-            // `personen/personBearbeiten.ts`.
-            onFinish={(werte) =>
-              editMutation.mutate({
-                daten: bearbeitenZuPatch(werte, sitzung.werte, person.status === 'vermisst'),
-                basis: sitzung.basis,
-              })
-            }
-          >
-            <Form.Item label="Name" name="name">
-              <Input />
-            </Form.Item>
-            <Form.Item label="Vorname" name="vorname">
-              <Input />
-            </Form.Item>
-            <Form.Item label="Geschlecht" name="geschlecht">
-              <Select
-                allowClear
-                options={[
-                  { value: 'maennlich', label: 'männlich' },
-                  { value: 'weiblich', label: 'weiblich' },
-                  { value: 'divers', label: 'divers' },
-                  { value: 'unbekannt', label: 'unbekannt' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item label="Geburtsdatum (YYYY-MM-DD)" name="geburtsdatum">
-              <Input />
-            </Form.Item>
-            <Form.Item label="Geschätztes Alter" name="alter_geschaetzt">
-              <InputNumber min={0} max={120} />
-            </Form.Item>
-            <Form.Item label="Herkunft / Adresse" name="herkunft_adresse">
-              <Input />
-            </Form.Item>
-            {/* Zustand und Koordinate beschreiben eine angetroffene Person — wie in
-                `AufnahmeFelder` bekommt eine vermisste sie nicht angeboten. */}
-            {angetroffen && (
-              <Form.Item label="Zustand / Verdacht" name="zustand">
-                <Input placeholder="z. B. gehfähig, unterkühlt" />
-              </Form.Item>
-            )}
-            <Form.Item label="Fundort" name="antreff_ort">
-              <Input />
-            </Form.Item>
-            {angetroffen && <KoordinateFeld />}
-            {person.status === 'vermisst' && <VermisstSeitFeld />}
-            <Form.Item label="Melder / Kontakt" name="melder_kontakt">
-              <Input />
-            </Form.Item>
-            <Form.Item label="Notiz" name="notiz">
-              <Input.TextArea rows={2} />
-            </Form.Item>
-            {editFehler != null && (
-              <div style={{ marginBottom: token.marginSM }}>
-                <SpeicherFehler fehler={editFehler} />
-              </div>
-            )}
-            <Space>
-              <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
-                Speichern
-              </Button>
-              {/* Bis zur Antwort gesperrt: ihre Ablehnung braucht das Formular als Ort. */}
-              <Button
-                disabled={editMutation.isPending}
-                onClick={() => {
-                  raeume(editMutation);
-                  editSitzung.beende();
-                }}
-              >
-                Abbrechen
-              </Button>
-            </Space>
-          </Form>
-        ) : (
-          <StammdatenRaster angaben={stammdatenAngaben(person, angetroffen)} />
-        )}
+        {/* Feldweise in der Ansicht (LLH-1103); am Personenwechsel neu, damit kein Entwurf
+            mitwandert. */}
+        <Personendaten
+          key={personSchluessel}
+          einsatzId={einsatzId}
+          person={person}
+          darfSchreiben={darfSchreiben && !person.storniert_at}
+          verorten={verortenWeg(person)}
+          onGeschrieben={invalidateDetail}
+        />
 
         {/* Bezüge, Fotos und Dateien und Audit laden erst beim Aufklappen; Patientenkopf und
             Verlauf kommen aus demselben Detail-Abruf und stehen sofort.
@@ -774,18 +591,7 @@ export default function PersonenDetailPage() {
     );
   }
 
-  /** Die Bearbeiten-Sitzung öffnen — Formularwerte und CAS-Basis aus demselben Snapshot. */
-  function starteBearbeiten() {
-    const werte = bearbeitenWerteAus(p);
-    // Spätere Live-/Refetch-Stände dürfen nur den Lesemodus aktualisieren.
-    editSitzung.starte(p, werte);
-  }
-
   function fuehreKopfaktionAus(aktion: Kopfaktion) {
-    if (aktion.art === 'bearbeiten') {
-      starteBearbeiten();
-      return;
-    }
     if (aktion.art !== 'status') {
       setStornoOffen(true);
       return;
@@ -803,17 +609,16 @@ export default function PersonenDetailPage() {
   /**
    * Was der Kopf anbietet, und in welcher Rangfolge — abgeleitet, nicht im JSX verzweigt.
    *
-   * `null` heißt gar keine Aktion: ohne Schreibrecht, an einer stornierten Person und während einer
-   * Bearbeitung wird weder Primäraktion noch Menü-Auslöser gerendert — ein deaktivierter Auslöser
-   * wäre ein Bedienziel, das nichts tut.
+   * `null` heißt gar keine Aktion: ohne Schreibrecht, an einer stornierten Person und ohne
+   * Menüeintrag (am Gerät) wird kein Menü-Auslöser gerendert — ein Auslöser ohne Einträge wäre ein
+   * Bedienziel, das nichts tut.
    *
-   * Sichten und Verbleib erfassen stehen im Patientenkopf (LLH-1094): zwei Wege zu derselben
-   * Handlung wären ein Unterschied ohne Bedeutung. Der Kopf trägt „Bearbeiten“ (bis LLH-1103 die
-   * Felder einzeln schreibt), das Menü Statuswechsel und Stornieren.
+   * Sichten und Verbleib erfassen stehen im Patientenkopf (LLH-1094), die Personendaten werden
+   * feldweise in der Ansicht geschrieben (LLH-1103): der Kopf trägt keine Primäraktion, nur das
+   * Menü mit Statuswechsel und Stornieren.
    */
-  const aktionenPlan = ((): { primaer: Kopfaktion; weitere: Kopfaktion[] } | null => {
-    if (!darfSchreiben || p.storniert_at || editSitzung.sitzung) return null;
-    const bearbeiten: Kopfaktion = { art: 'bearbeiten', key: 'bearbeiten', label: 'Bearbeiten' };
+  const aktionenPlan = ((): { weitere: Kopfaktion[] } | null => {
+    if (!darfSchreiben || p.storniert_at) return null;
     // Status und Storno bleiben am Gerät aus; der Server lehnt sie dort ab (LFH-892).
     const statusFrei = darf('person-status');
     const statuswechsel: Kopfaktion[] = (statusFrei ? naechsteStatus(p.status) : []).map((s) => ({
@@ -829,10 +634,8 @@ export default function PersonenDetailPage() {
       label: 'Stornieren',
       gefahr: true,
     };
-    return {
-      primaer: bearbeiten,
-      weitere: [...statuswechsel, ...(statusFrei ? [stornieren] : [])],
-    };
+    const weitere = [...statuswechsel, ...(statusFrei ? [stornieren] : [])];
+    return weitere.length > 0 ? { weitere } : null;
   })();
 
   const laeuftStatus =
@@ -959,37 +762,27 @@ export default function PersonenDetailPage() {
       }
       aktionen={
         /**
-         * Eine Primäraktion, alles Weitere im Menü. Einen „Zurück zur Liste"-Knopf gibt es nicht:
-         * der Breadcrumb trägt denselben Weg, und `zurueck` bleibt der Rücksprung nach dem
-         * Stornieren.
+         * Keine Primäraktion (LLH-1103), alles im Menü. Einen „Zurück zur Liste"-Knopf gibt es
+         * nicht: der Breadcrumb trägt denselben Weg, und `zurueck` bleibt der Rücksprung nach dem
+         * Stornieren. Der laufende Statuswechsel zeigt sich am Auslöser.
          */
         aktionenPlan && (
-          <Space>
-            {/* Kein `loading`: die Primäraktion öffnet nur das Formular. Der laufende
-                Statuswechsel sitzt im Menü und zeigt sich am Auslöser. */}
-            <Button type="primary" onClick={() => fuehreKopfaktionAus(aktionenPlan.primaer)}>
-              {aktionenPlan.primaer.label}
-            </Button>
-            {aktionenPlan.weitere.length > 0 && (
-              <MenueAusloeser
-                eintraege={aktionenPlan.weitere}
-                laeuft={laeuftStatus}
-                // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
-                // gleichnamige Knöpfe kein Ziel.
-                zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
-                onWahl={(key) => {
-                  const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
-                  if (eintrag) fuehreKopfaktionAus(eintrag);
-                }}
-              />
-            )}
-          </Space>
+          <MenueAusloeser
+            eintraege={aktionenPlan.weitere}
+            laeuft={laeuftStatus}
+            // Die Zeilenkennung im Namen: auf einer Seite mit mehreren Menüs lieferten n
+            // gleichnamige Knöpfe kein Ziel.
+            zugaenglicherName={`Weitere Aktionen zu Person ${registrierAnzeige(p.registrier_nr)}`}
+            onWahl={(key) => {
+              const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+              if (eintrag) fuehreKopfaktionAus(eintrag);
+            }}
+          />
         )
       }
     >
       {/* Eine Spalte (LLH-1094, Spec `personen-detail`): zuerst der Patientenkopf mit den
-          Patientenfragen, dann Verlauf, Personendaten und die eingeklappten Abschnitte. Ein Baum:
-          ein Formular im Bearbeiten-Zweig darf nicht doppelt hängen. */}
+          Patientenfragen, dann Verlauf, Personendaten und die eingeklappten Abschnitte. */}
       <Flex vertical gap={token.marginLG}>
         <Patientenkopf
           key={personSchluessel}

@@ -34,6 +34,16 @@ export const FUNKTION_TEXT_MAX = 200;
 export const PAT_NUMMER_MAX = 32;
 /** Kurze Notiz einer Verletzung am Körperschema (LLH-1113). */
 export const VERLETZUNG_NOTIZ_MAX = 200;
+/** Name und Vorname einer Person (LLH-1329). */
+export const PERSON_NAME_MAX = 200;
+/** Herkunft / Adresse, Fundort und Melder / Kontakt einer Person (LLH-1329). */
+export const PERSON_ANGABE_MAX = 500;
+/** „Zustand / Verdacht“ einer Person (LLH-1329). */
+export const PERSON_ZUSTAND_MAX = 500;
+/** Notiz in den Personendaten (LLH-1329). */
+export const PERSON_NOTIZ_MAX = 2_000;
+/** Verlaufsnotiz einer Person (`POST …/notizen`, LLH-1329). */
+export const VERLAUFSNOTIZ_MAX = 2_000;
 /** Name, Qualifikation und Träger einer Ad-hoc-Kraft (UHS LFH-1045, Personal LLH-1067). */
 export const PERSONAL_ADHOC_TEXT_MAX = 200;
 /** Einsatzfunktion einer Kraft (LLH-1067). */

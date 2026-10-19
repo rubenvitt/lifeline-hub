@@ -76,6 +76,18 @@ describe('PersonVorschau', () => {
     expect(screen.queryByText('—')).toBeNull();
   });
 
+  it('zeigt Geburtsdatum als TT.MM.JJJJ und das Geschlecht als Wort (LLH-1103)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json({ ...detail, geburtsdatum: '1980-07-14' }),
+      ),
+    );
+    renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />);
+    expect(await screen.findByText('14.07.1980')).toBeInTheDocument();
+    expect(screen.getByText('männlich')).toBeInTheDocument();
+    expect(screen.queryByText('maennlich')).toBeNull();
+  });
+
   it('zeigt das Körperschema nur lesend: Figur und Liste, kein Markieren (LLH-1120)', async () => {
     server.use(
       http.get('/api/einsaetze/1/personen/10', () =>

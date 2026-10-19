@@ -92,7 +92,9 @@ function render(
       <Route path="/einsaetze/:id/schaeden/:schadenId" element={<SchaedenDetailPage />} />
       <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
     </Routes>,
-    { route },
+    // Data Router: der Verlassen-Schutz hält Pfadwechsel über `useBlocker` an, und der wirft ohne
+    // ihn (`frontend/AGENTS.md`, „Formularseiten“).
+    { route, datenRouter: true },
   );
 }
 
@@ -696,7 +698,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
           <Route path="/einsaetze/:id/schaeden/:schadenId" element={<SchaedenDetailPage />} />
         </Routes>
       </>,
-      { route: '/einsaetze/1/schaeden/10' },
+      { route: '/einsaetze/1/schaeden/10', datenRouter: true },
     );
     await storniere();
     await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Schaden ist verknüpft'));
@@ -704,5 +706,136 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Schaden' }));
     await screen.findByRole('heading', { name: /Schaden S-002/ });
     expect(screen.queryByText('Schaden ist verknüpft')).toBeNull();
+  });
+});
+
+/**
+ * Prüfung am Feld (LLH-1101): die Zellen des Bearbeiten-Modus stehen auf `DatenfeldEingabe`, ein
+ * Prüffehler steht sichtbar unter seiner Eingabe. Vorher lag `Form.Item noStyle` in der Zelle:
+ * „Ort ist Pflicht“ verhinderte das Speichern, ohne dass irgendwo stand, warum.
+ */
+describe('SchaedenDetailPage — Prüfung am Feld (LLH-1101)', () => {
+  function mitPatch() {
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, basisSchaden(), [
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(basisSchaden());
+      }),
+    ]);
+    return koerper;
+  }
+
+  it('leerer Ort: „Ort ist Pflicht“ steht am Feld, der Fokus darin, kein PATCH', async () => {
+    const koerper = mitPatch();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const ort = await screen.findByLabelText('Ort');
+    await userEvent.clear(ort);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Mutationsprobe: `noStyle` zurück an das `Form.Item` der Zelle — keine Meldung, rot.
+    const meldung = await screen.findByText('Ort ist Pflicht');
+    expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(ort.closest('[data-lfh="datenfeld"]'));
+    expect(ort).toHaveAccessibleDescription('Ort ist Pflicht');
+    // Mutationsprobe: ohne `scrollToFirstError` am Formular bleibt der Fokus am Knopf, rot.
+    await waitFor(() => expect(ort).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(koerper).toHaveLength(0);
+  });
+
+  it('Gegenprobe: mit Ort speichert die Seite', async () => {
+    const koerper = mitPatch();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const ort = await screen.findByLabelText('Ort');
+    await userEvent.clear(ort);
+    await userEvent.type(ort, 'Bahnhofstr. 3');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0].ort).toBe('Bahnhofstr. 3');
+    expect(screen.queryByText('Ort ist Pflicht')).toBeNull();
+  });
+
+  it('eine zu lange Beschreibung nennt die Grenze am Feld', async () => {
+    render(einsatzAktiv, basisSchaden({ beschreibung: 'b'.repeat(8_001) }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    const meldung = await screen.findByText('Beschreibung darf höchstens 8.000 Zeichen lang sein');
+    expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(
+      screen.getByLabelText('Beschreibung').closest('[data-lfh="datenfeld"]'),
+    );
+  });
+
+  it('jede Eingabe ist über ihr Etikett erreichbar', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByRole('combobox', { name: 'Typ' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Ausmaß' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Ort' })).toHaveValue('Hauptstr. 17');
+    expect(screen.getByRole('textbox', { name: 'Beschreibung' })).toHaveValue('Umgestürzter Baum');
+    // Mutationsprobe: ohne `id`-Weitergabe im `GeschaedigtPicker` hat die Auswahl keinen Namen.
+    expect(screen.getByRole('combobox', { name: 'Geschädigt' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Verlassen-Schutz (LLH-1101, Spec `formularseiten`, „Rückfrage vor dem Verlassen“): mit offener
+ * Änderung hält ein Pfadwechsel an, ohne fragt niemand.
+ */
+describe('SchaedenDetailPage — Verlassen-Schutz (LLH-1101)', () => {
+  const rueckfrage = () => screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+
+  it('offene Änderung: „Bleiben“ hält die Eingabe, „Verwerfen“ führt zur Liste', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const ort = await screen.findByLabelText('Ort');
+    await userEvent.type(ort, ' Hinterhof');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByLabelText('Ort')).toHaveValue('Hauptstr. 17 Hinterhof');
+    expect(screen.queryByText('LISTE')).toBeNull();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
+    const wieder = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await userEvent.click(within(wieder).getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+
+  it('ohne Änderung: der Wechsel geht ohne Rückfrage', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByLabelText('Ort');
+    await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    expect(rueckfrage()).toBeNull();
+  });
+
+  it('eine abgebrochene Änderung zählt beim nächsten Bearbeiten nicht', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(await screen.findByLabelText('Ort'), ' alt');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByLabelText('Ort');
+
+    // Mutationsprobe: `schluessel` fest auf die Schaden-ID statt auf die offene Sitzung — der
+    // Merker trüge die verworfene Eingabe weiter, die Rückfrage käme, rot.
+    await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    expect(rueckfrage()).toBeNull();
+  });
+});
+
+describe('SchaedenDetailPage — stehende Leiste (LLH-1101)', () => {
+  it('Speichern und Abbrechen stehen in der Speicherleiste im Formular', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const speichern = await screen.findByRole('button', { name: 'Speichern' });
+    // Mutationsprobe: die Knöpfe zurück in ein `<Space>` ohne Leiste — `closest` findet nichts.
+    const leiste = speichern.closest('[data-lfh="speicherleiste"]');
+    expect(leiste).not.toBeNull();
+    expect(leiste!.closest('form')).not.toBeNull();
+    expect(within(leiste as HTMLElement).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
   });
 });
