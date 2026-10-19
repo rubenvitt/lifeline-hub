@@ -3,7 +3,7 @@ import type { PersonDetail } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeilenListe, type Titel, type Zeile } from '../druck/ZeilenListe';
 import { kontamination as KONTAMINATION, sichtung as SK } from '../theme/statusFarben';
-import Koerperschema from './Koerperschema';
+import Koerperschema from './koerperschema/Koerperschema';
 import { MASSNAHME_WORT, SK_WORT, STATUS_META, gueltig, transportText } from './personMeta';
 
 /**

@@ -64,7 +64,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Die Suche der Liste hängt die PAT-Nummer an die Spalte `reg`, die Palette trifft sie exakt
   (`command-palette/datensaetze.ts`).
 - **Körperschema** (LLH-1120, Spec `koerperschema`, D13): ein Baustein
-  `personen/Koerperschema.tsx` für Lesen, Markieren und Druck; Geometrie nur in
+  `personen/koerperschema/Koerperschema.tsx` für Lesen, Markieren und Druck; Geometrie nur in
   `personen/koerperschema/geometrie.ts` (normiert 0..1 je Ansicht, drei Umrisse, eine
   Regionskarte; Guard `geometrie.test.ts`: jeder Mittelpunkt in jedem Umriss), Figur nach
   Geschlecht, Name und Nummer in `koerperschemaKern.ts`. Markieren in zwei Tipps (Region, dann

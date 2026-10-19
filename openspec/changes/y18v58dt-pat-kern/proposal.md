@@ -88,7 +88,7 @@ Aufbewahrung, Gerät, Erfassungszeit und Patientenkopf. Deshalb kommen sie in ei
   - Aufbewahrungsregister (`schwaerzung_registry.rs`, `schwaerzung_person.rs`)
   - Routenlisten der UHS-Geräte
 - **Frontend:**
-  - neuer Baustein `personen/Koerperschema.tsx`
+  - neuer Baustein `personen/koerperschema/Koerperschema.tsx`
   - Patientenkopf, Verlauf, Betroffenenliste, UHS-Grundriss und Gerätelisten
   - Offline-Schicht (`offline/schreiben.ts`, `queue.ts`, `useOfflineSync.ts`)
   - Sprungpalette und Lagebild-Kürzung

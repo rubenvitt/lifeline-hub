@@ -4,7 +4,7 @@ import type { Figur } from './geometrie';
 /**
  * Reiner Kern des Körperschemas (LLH-1120, Spec `koerperschema`, design.md D13): Namen der
  * Regionen, feste Nummerierung und die Wahl der Figur. Die Zeichnung (`geometrie.ts`) und der
- * Baustein (`personen/Koerperschema.tsx`) lesen nur von hier; Patientenkopf, Druck und Liste
+ * Baustein (`personen/koerperschema/Koerperschema.tsx`) lesen nur von hier; Patientenkopf, Druck und Liste
  * nennen eine Verletzung mit demselben Namen.
  */
 

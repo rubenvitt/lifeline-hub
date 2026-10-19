@@ -41,7 +41,7 @@ import {
   transportText,
 } from './personMeta';
 import { nummeriere, regionName } from './koerperschema/koerperschemaKern';
-import Koerperschema, { KoerperschemaMini } from './Koerperschema';
+import Koerperschema, { KoerperschemaMini } from './koerperschema/Koerperschema';
 import PatKennzeichen from './PatKennzeichen';
 import { MassnahmePaneel, TransportPaneel } from './PatientenkopfPaneele';
 import { istAngetroffen } from './personenBilanz';

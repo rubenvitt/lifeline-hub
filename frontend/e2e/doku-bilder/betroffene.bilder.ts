@@ -13,7 +13,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   kurzeingabe.png  frontend/src/personen/BetroffeneZeile.tsx
  *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx
  *   koerperschema.png frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatKennzeichen.tsx,
- *                    frontend/src/personen/Koerperschema.tsx, frontend/src/personen/koerperschema/KoerperFigur.tsx
+ *                    frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/koerperschema/KoerperFigur.tsx
  *
  * Daten: die Betroffenen des Demo-Einsatzes reichen; nur für den vollen PAT-Kern füllt die Spec
  * eine eigene Person (Transport, PAT-Nummer, Kontamination, Maßnahmen, Verletzungen) über die API.

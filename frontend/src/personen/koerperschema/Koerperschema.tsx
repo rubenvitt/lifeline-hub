@@ -1,29 +1,24 @@
 import { Button, Flex, Form, Typography } from 'antd';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { useState } from 'react';
-import type { VerletzungEingabe } from '../api/einsatzPerson';
+import type { VerletzungEingabe } from '../../api/einsatzPerson';
 import type {
   Person,
   Verletzung,
   VerletzungAnsicht,
   VerletzungArt,
   VerletzungSchwere,
-} from '../api/types';
-import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { Segmentleiste, monoStil, useRollen } from '../components/instrument';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { useViewport } from '../components/useViewport';
-import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../geraet/BestaetigtVonFeld';
-import FlaechenWahl from './FlaechenWahl';
-import KoerperFigur, { type KoerperZiel } from './koerperschema/KoerperFigur';
-import { figurMassstab, normiere, sternLage } from './koerperschema/geometrie';
-import {
-  figurVon,
-  nummeriere,
-  regionName,
-  type NummerierteVerletzung,
-} from './koerperschema/koerperschemaKern';
-import { VERLETZUNG_ART_REIHE, VERLETZUNG_ART_WORT, VERLETZUNG_SCHWERE_WORT } from './personMeta';
+} from '../../api/types';
+import ZeitAnzeige from '../../anzeige/ZeitAnzeige';
+import { Segmentleiste, monoStil, useRollen } from '../../components/instrument';
+import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { useViewport } from '../../components/useViewport';
+import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../../geraet/BestaetigtVonFeld';
+import FlaechenWahl from '../FlaechenWahl';
+import KoerperFigur, { type KoerperZiel } from './KoerperFigur';
+import { figurMassstab, normiere, sternLage } from './geometrie';
+import { figurVon, nummeriere, regionName, type NummerierteVerletzung } from './koerperschemaKern';
+import { VERLETZUNG_ART_REIHE, VERLETZUNG_ART_WORT, VERLETZUNG_SCHWERE_WORT } from '../personMeta';
 
 /**
  * Der Baustein „Körperschema“ (LLH-1120, Spec `koerperschema`, design.md D13): Verletzungen einer

@@ -2,11 +2,11 @@ import { useMutation } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { VerletzungEingabe } from '../api/einsatzPerson';
-import type { Verletzung } from '../api/types';
-import { ApiError } from '../api/client';
-import { renderMitProviders } from '../test/utils';
-import { setzeViewportBreite } from '../test/viewport';
+import type { VerletzungEingabe } from '../../api/einsatzPerson';
+import type { Verletzung } from '../../api/types';
+import { ApiError } from '../../api/client';
+import { renderMitProviders } from '../../test/utils';
+import { setzeViewportBreite } from '../../test/viewport';
 import Koerperschema, { type KoerperschemaProps } from './Koerperschema';
 
 /**
