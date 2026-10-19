@@ -77,14 +77,16 @@ Für Einsatzleitung und Führungspersonal:
 
 3. Den neuen Wert eingeben oder wählen und mit „Speichern“ oder Enter übernehmen. „Abbrechen“
    oder Escape lässt den alten Wert stehen. In „Bemerkung“ bricht Enter die Zeile um; übernommen
-   wird mit Strg+Enter oder „Speichern“.
+   wird mit Strg+Enter oder „Speichern“. Name und Funkrufname dürfen höchstens 200 Zeichen lang
+   sein, die Bemerkung höchstens 2 000; eine längere Bemerkung nennt das Feld „zu lang“ und
+   speichert sie nicht.
 4. Unter „Soll-Stärke (F/UF/M)“ Führer, Unterführer und Mannschaft zusammen eintragen. Unter „Ist
    (F/UF/M//Σ)“ steht die Ist-Stärke, mit unterstellten Einheiten auch die kumulierte, und
    daneben „unterbesetzt“ oder „Soll erfüllt“.
 5. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
    zurück.
 6. Im Paneel „Funk und Kommunikation“ ebenso „Sprechgruppen“, „Kommunikationsmittel“ und
-   „Erreichbarkeit / Nummer“ ändern.
+   „Erreichbarkeit / Nummer“ ändern. Die Erreichbarkeit darf höchstens 200 Zeichen lang sein.
 
 ### Das taktische Zeichen setzen
 
