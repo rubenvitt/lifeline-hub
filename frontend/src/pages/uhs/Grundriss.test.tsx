@@ -463,7 +463,9 @@ describe('Grundriss – vorgemerkter Verbleib am Ort (LLH-1138, `frontend/src/of
     renderGrundriss(uhsDetail({ plaetze: [] }), [p], false, 'kompakt', false, true, true);
     await screen.findByTestId('angemeldet');
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen — R-008 · unbekannt' }),
+      await screen.findByRole('button', {
+        name: 'Verbleib / Entlassung erfassen — R-008 · unbekannt',
+      }),
     );
     setzeOnline(false);
     onTestFinished(() => setzeOnline(true));

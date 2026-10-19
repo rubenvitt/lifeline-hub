@@ -874,7 +874,7 @@ describe('Einträge einer Person in der Offline-Queue (LLH-1138, design.md D8)',
           useOfflineSync(BENUTZER_A);
           useQuery({
             queryKey: einsatzKeys.personen(7),
-            queryFn: async () => [{ id: 10, aktuelle_uhs_id: null, stand } as Person],
+            queryFn: async () => [{ id: 10, aktuelle_uhs_id: null, stand } as unknown as Person],
             staleTime: Infinity,
           });
           useQuery({
