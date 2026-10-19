@@ -865,6 +865,50 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     // beendet das Ausblenden nie, „offen“ heißt hier: ohne `ant-zoom-leave`.
     expect(document.querySelectorAll('.ant-modal:not(.ant-zoom-leave)')).toHaveLength(0);
   });
+
+  it('der Wechsel zu einem anderen Schaden schließt „Schaden übergeben“ und öffnet ihn nicht wieder', async () => {
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button type="button" onClick={() => void navigate('/einsaetze/1/schaeden/11')}>
+            Zum zweiten Schaden
+          </button>
+          <button type="button" onClick={() => void navigate('/einsaetze/1/schaeden/10')}>
+            Zurück zum ersten Schaden
+          </button>
+        </>
+      );
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
+      http.get('/api/einsaetze/1/schaeden/11', () =>
+        HttpResponse.json(basisSchaden({ id: 11, registrier_nr: 2 })),
+      ),
+      http.get('/api/einsaetze/1/schaeden/:sid/anhaenge', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/schaeden/:schadenId" element={<SchaedenDetailPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/schaeden/10', datenRouter: true },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden übergeben' }));
+    await screen.findByRole('dialog', { name: 'Schaden übergeben' });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Schaden' }));
+    await screen.findByRole('heading', { name: /Schaden S-002/ });
+    expect(document.querySelectorAll('.ant-modal:not(.ant-zoom-leave)')).toHaveLength(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zurück zum ersten Schaden' }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(document.querySelectorAll('.ant-modal:not(.ant-zoom-leave)')).toHaveLength(0);
+  });
 });
 
 /**

@@ -104,4 +104,14 @@ describe('halterVorbelegung', () => {
     );
     expect(halterVorbelegung(basis)).toBeNull();
   });
+
+  it('nimmt keine stornierte Halterperson, dann den Kontakt', () => {
+    expect(
+      halterVorbelegung({
+        ...basis,
+        halter_registrier_nr: 7,
+        halter_storniert_at: '2026-05-29 10:00:00',
+      }),
+    ).toBeNull();
+  });
 });

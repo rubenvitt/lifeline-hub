@@ -395,6 +395,17 @@ describe('TiereDetailPage — Status/Verbleib', () => {
     expect(within(dialog).getByLabelText('Übergeben an / Ort')).toHaveValue('R-007');
   });
 
+  it('nimmt die Vorbelegung zurück, wenn ein anderer Verbleib gewählt wird', async () => {
+    render(einsatzAktiv, { ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7 });
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    await userEvent.click(await screen.findByText('an Halter übergeben'));
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    await userEvent.click(await screen.findByText('an Tierarzt übergeben'));
+    expect(within(dialog).getByLabelText('Übergeben an / Ort')).toHaveValue('');
+  });
+
   it('überschreibt kein schon eingetragenes Ziel mit dem Halter', async () => {
     render(einsatzAktiv, { ...tierBasis, halter_kontakt: 'Fam. Becker' });
     await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
@@ -427,7 +438,9 @@ describe('TiereDetailPage — Kopfaktionen', () => {
     const eintraege = within(await oeffneKopfmenue()).getAllByRole('menuitem');
     expect(eintraege.map((e) => e.textContent)).toEqual(menue);
     // Gefahr rot (antd `danger`) und als Letztes, hinter dem einen Trenner.
-    expect(eintraege[eintraege.length - 1].className).toMatch(/item-danger/);
+    const letzter = eintraege[eintraege.length - 1];
+    expect(letzter.className).toMatch(/item-danger/);
+    expect(letzter.previousElementSibling?.className).toMatch(/divider/);
   });
 
   it('trägt weder „Zurück zur Liste“ noch einen Pfeil-Knopf', async () => {
@@ -715,7 +728,8 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     await ausMenue('Stornieren');
-    await waitFor(() => expect(screen.queryByText('Tier ist einer UHS zugeordnet')).toBeNull());
+    const wieder = await stornoDialog();
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 
   it('Verbleib: der Grund steht im Dialog, der Dialog bleibt offen, kein Toast', async () => {
@@ -755,6 +769,50 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(oeffnen);
     const wieder = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
     await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
+  });
+
+  it('der Wechsel zu einem anderen Tier schließt den Verbleib-Dialog und leert ihn', async () => {
+    function Wechsel() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => void navigate('/einsaetze/1/tiere/11')}>
+          Zum zweiten Tier
+        </button>
+      );
+    }
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/einsaetze/1/tiere/10', () =>
+        HttpResponse.json({ ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7 }),
+      ),
+      http.get('/api/einsaetze/1/tiere/11', () =>
+        HttpResponse.json({ ...tierBasis, id: 11, registrier_nr: 2 }),
+      ),
+      http.get('/api/einsaetze/1/tiere/:tid/anhaenge', () => HttpResponse.json([])),
+    );
+    renderMitProviders(
+      <>
+        <Wechsel />
+        <Routes>
+          <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
+        </Routes>
+      </>,
+      { route: '/einsaetze/1/tiere/10', datenRouter: true },
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
+    await userEvent.click(within(dialog).getByRole('combobox'));
+    await userEvent.click(await screen.findByText('an Halter übergeben'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Tier' }));
+    await screen.findByRole('heading', { name: /Tier T-002/ });
+    // Offen gelassen, schriebe „Verbleib speichern“ den Verbleib von T-001 an T-002. jsdom beendet
+    // das Ausblenden nie, „offen“ heißt hier: ohne `ant-zoom-leave`.
+    expect(document.querySelectorAll('.ant-modal:not(.ant-zoom-leave)')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: 'Verbleib erfassen' }));
+    const neu = await screen.findByRole('dialog', { name: 'Verbleib von T-002' });
+    expect(within(neu).getByLabelText('Übergeben an / Ort')).toHaveValue('');
   });
 
   it('der Wechsel zu einem anderen Tier räumt die Gründe', async () => {

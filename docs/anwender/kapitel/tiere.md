@@ -17,8 +17,8 @@ Halter zuordnen.
 
 ### Die Tiere im Einsatz ablesen
 
-1. Im Modulpanel „Tiere“ öffnen. Die Liste zeigt je Tier Registriernummer, Status, Spezies,
-   Rufname, Rasse, Halter, seit wann es geführt wird und den Fundort.
+1. Im Modulpanel „Tiere“ öffnen. Die Liste zeigt je Tier Registriernummer, Status, Verbleib,
+   Spezies, Rufname, Rasse, Halter, seit wann es geführt wird und den Fundort.
 
    ![Liste der Tiere in der Sicht „Alle“ mit aktiven, vermissten und abgeschlossenen Tieren](../bilder/tiere/liste.png)
 

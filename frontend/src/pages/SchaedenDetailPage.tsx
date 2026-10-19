@@ -223,6 +223,11 @@ export default function SchaedenDetailPage() {
     editReset();
     stornoReset();
     beendeSitzung();
+    // Dialoge gehören dem Schaden, für den sie geöffnet wurden; auch die Rückfrage, sonst stünde
+    // sie beim Rückweg auf den vorigen ungefragt wieder da.
+    setUebergebenOffen(false);
+    setAbschlussOffen(false);
+    setStornoFuer(null);
   }, [schadenId, editReset, stornoReset, beendeSitzung]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.

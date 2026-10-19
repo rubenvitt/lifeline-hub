@@ -275,8 +275,12 @@ export default function TiereDetailPage() {
     statusReset();
     stornoReset();
     beendeSitzung();
+    // Dialoge gehören dem Tier, für das sie geöffnet wurden: offen gelassen, schriebe „Verbleib
+    // speichern“ den Verbleib des vorigen (samt dessen Halter) an das neue.
     setStornoOffen(false);
-  }, [tierId, editReset, statusReset, stornoReset, beendeSitzung]);
+    setAbschlussOffen(false);
+    abschlussForm.resetFields();
+  }, [tierId, editReset, statusReset, stornoReset, beendeSitzung, abschlussForm]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
@@ -461,8 +465,8 @@ export default function TiereDetailPage() {
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       aktionen={
         /**
-         * Genau eine Primäraktion je Zustand, „Bearbeiten“ sichtbar daneben (Rubens Vorbild der
-         * Bearbeitung in der Ansicht), alles Weitere im Menü (LLH-1105). Einen „Zurück zur
+         * Genau eine Primäraktion je Zustand, „Bearbeiten“ sichtbar daneben (Vorbild der Bearbeitung
+         * in der Ansicht, LLH-1101), alles Weitere im Menü (LLH-1105). Einen „Zurück zur
          * Liste“-Knopf gibt es nicht: die Brotkrume trägt denselben Weg.
          */
         plan && (
@@ -594,15 +598,16 @@ export default function TiereDetailPage() {
               value: k,
               label: TIER_VERBLEIB[k],
             }))}
-            // Den bekannten Halter vorbelegen, nie ein schon eingetragenes Ziel überschreiben.
+            // Den bekannten Halter vorbelegen, nie ein schon eingetragenes Ziel überschreiben; beim
+            // Wechsel auf einen anderen Verbleib die unveränderte Vorbelegung wieder herausnehmen.
             onChange={(grund: AbschlussGrund) => {
               const halter = halterVorbelegung(t);
-              if (
-                grund === 'uebergabe_halter' &&
-                halter &&
-                !abschlussForm.getFieldValue('abschluss_ziel')
-              )
+              const ziel: unknown = abschlussForm.getFieldValue('abschluss_ziel');
+              if (halter == null) return;
+              if (grund === 'uebergabe_halter' && !ziel)
                 abschlussForm.setFieldValue('abschluss_ziel', halter);
+              else if (grund !== 'uebergabe_halter' && ziel === halter)
+                abschlussForm.setFieldValue('abschluss_ziel', undefined);
             }}
           />
         </Form.Item>

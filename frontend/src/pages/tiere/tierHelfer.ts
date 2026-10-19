@@ -74,11 +74,15 @@ export function halterNummer(t: Pick<Tier, 'halter_registrier_nr'>): string | nu
   return t.halter_registrier_nr != null ? registrierNummer('R', t.halter_registrier_nr) : null;
 }
 
-/** Vorbelegung von „Übergeben an / Ort“ bei „an Halter übergeben“: der bekannte Halter, sonst nichts. */
+/**
+ * Vorbelegung von „Übergeben an / Ort“ bei „an Halter übergeben“: der bekannte Halter, sonst
+ * nichts. Eine stornierte Halterperson ist kein Übergabeziel.
+ */
 export function halterVorbelegung(
-  t: Pick<Tier, 'halter_registrier_nr' | 'halter_kontakt'>,
+  t: Pick<Tier, 'halter_registrier_nr' | 'halter_kontakt' | 'halter_storniert_at'>,
 ): string | null {
-  return halterNummer(t) ?? (t.halter_kontakt || null);
+  if (t.halter_registrier_nr != null) return t.halter_storniert_at ? null : halterNummer(t);
+  return t.halter_kontakt || null;
 }
 
 /** Zeilenmenge aus Statussicht UND Spezies — Schnittmenge, keine Vereinigung. */

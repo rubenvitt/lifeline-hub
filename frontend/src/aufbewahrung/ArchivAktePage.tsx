@@ -156,7 +156,10 @@ const tierSpalten: KatalogSpalte<ArchivTier>[] = [
     // Dasselbe Wort wie auf der Seite des Tiers (LLH-1092).
     title: 'Verbleib',
     width: 200,
-    render: (_, t) => (t.abschluss_grund ? TIER_VERBLEIB[t.abschluss_grund] : leer),
+    // Nur am abgeschlossenen Tier: beim Wiederaufnehmen bleibt der Grund gespeichert, gilt aber
+    // nicht mehr (wie `verbleibText` in Liste und Druck).
+    render: (_, t) =>
+      t.status === 'abgeschlossen' && t.abschluss_grund ? TIER_VERBLEIB[t.abschluss_grund] : leer,
   },
   {
     key: 'erfasst',
