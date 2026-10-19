@@ -11,7 +11,10 @@ nichts ab.
 Wer im Einsatz Schreibrecht auf das Modul Personen hat, SHALL an einer angetroffenen Person eine
 Maßnahme aus dem festen Katalog erfassen können: `blutstillung`, `zugang`, `infusion`,
 `sauerstoff`, `atemweg`, `analgesie`, `immobilisation`, `waermeerhalt`, `dekontamination`. Die
-Uhrzeit der Durchführung MUST optional sein. Ohne Angabe gilt der Zeitpunkt der Erfassung. Ein
+Uhrzeit der Durchführung MUST optional sein. Ohne Angabe gilt der Zeitpunkt der Erfassung. Die
+Uhrzeit MAY vor dem Anlegen der Person liegen und MUST dann unverändert gelten. Liegt sie vor dem
+Beginn des Einsatzes (oder, falls das Anlegen früher liegt, vor dem Anlegen), MUST der Server mit
+400 ablehnen und nichts speichern. Nach oben gilt die Kappung der Spec `personen-verlauf`. Ein
 unbekannter Katalogwert MUST 400 ergeben. Eine stornierte Person MUST 409 ergeben, eine vermisste
 oder abgemeldete 422.
 
@@ -21,6 +24,15 @@ Warnung.
 #### Scenario: Tourniquet um 14:05
 - **WHEN** jemand an R-012 „Blutstillung“ mit Uhrzeit 14:05 erfasst
 - **THEN** liefert das Detail von R-012 die Maßnahme mit 14:05, Erfasser und Erfassungszeit
+
+#### Scenario: Tourniquet am Fundort vor der Registrierung
+- **WHEN** um 13:50 am Fundort ein Tourniquet angelegt, die Person um 14:00 registriert und danach
+  „Blutstillung“ mit Uhrzeit 13:50 erfasst wird
+- **THEN** trägt die Maßnahme 13:50
+
+#### Scenario: Uhrzeit vor dem Einsatzbeginn
+- **WHEN** eine Maßnahme mit einer Uhrzeit vor dem Beginn des Einsatzes erfasst wird
+- **THEN** antwortet der Server mit 400 und speichert nichts
 
 #### Scenario: Ohne Uhrzeit
 - **WHEN** eine Maßnahme ohne Uhrzeit erfasst wird

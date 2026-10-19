@@ -61,7 +61,8 @@ const SELECT_MASSNAHME: &str = "\
 #[derive(Debug)]
 pub struct NeueMassnahme<'a> {
     pub art: MassnahmeArt,
-    /// Durchführung, bereits über `support::erfassungszeitpunkt` gekappt.
+    /// Durchführung, bereits über `support::durchfuehrungszeitpunkt` geprüft (darf vor der
+    /// Registrierung liegen; der Kommentar in `0220` nennt noch `erfassungszeitpunkt`).
     pub zeitpunkt_at: &'a str,
     pub client_id: Option<&'a str>,
     /// Bereits über [`crate::geraet::bestaetigung::aufloesen`] geprüft.

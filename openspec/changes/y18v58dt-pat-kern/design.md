@@ -322,3 +322,8 @@ Branches vor dem Release, weil Migrationen nie geändert werden.
 - Transport-ETB (D6): Ein nachgereichter älterer Stand, der die Priorität ändert, nennt wie die
   Sichtung die weiter geltende („…, nachgetragen, aktuelle Priorität bleibt normal“). Sonst las
   das ETB einen eingeschobenen Stand als letzten (Review).
+- Durchführungszeit der Maßnahme (D5, Entscheidung zu Review D2): Sie wird nicht auf
+  `einsatz_person.erfasst_at` gekappt, denn ein Tourniquet am Fundort liegt vor der
+  Registrierung. Untergrenze ist `einsatz.begonnen_at` (liegt die Registrierung früher, sie);
+  davor 400 (`support::durchfuehrungszeitpunkt`). Die obere Grenze bleibt. Sichtung, Verbleib,
+  Notiz, Transport und Verletzung kappen weiter über `support::erfassungszeitpunkt`.

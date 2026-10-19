@@ -13,7 +13,9 @@ Jeder medizinische Eintrag einer Person SHALL einen Erfassungszeitpunkt tragen. 
 einen `zeitpunkt_at` mit, MUST der Server ihn übernehmen, gekappt:
 - liegt er mehr als 60 Sekunden nach der Serveruhr, MUST der Server mit 400 ablehnen;
 - liegt er in der Zukunft, aber höchstens 60 Sekunden, MUST der Server ihn auf jetzt setzen;
-- liegt er vor dem Anlegen der Person, MUST der Server ihn auf das Anlegen setzen.
+- liegt er vor dem Anlegen der Person, MUST der Server ihn auf das Anlegen setzen. Ausgenommen
+  ist die Durchführungszeit einer Maßnahme: Sie MAY vor dem Anlegen liegen; ihre Untergrenze
+  regelt die Spec `personen-massnahmen`.
 
 Ohne Angabe MUST der Eintrag die Serverzeit tragen. Der Server MUST zusätzlich festhalten, wann der
 Eintrag angekommen ist.

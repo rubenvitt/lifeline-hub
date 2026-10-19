@@ -352,3 +352,69 @@ async fn replay_derselben_client_id_legt_eine_massnahme_an() {
     let (s, _) = post(&app, &admin, &aufheben_pfad(e, p, &v1), json!({})).await;
     assert_eq!(s, StatusCode::CONFLICT, "abgeschlossen: kein Aufheben");
 }
+
+/// Entscheidung zu Review D2 (Spec `personen-massnahmen`, „Maßnahme erfassen“): die Uhrzeit der
+/// Durchführung darf vor der Registrierung liegen (Tourniquet am Fundort, dann registriert).
+/// Untergrenze ist der Beginn des Einsatzes; davor ist 400 und nichts wird gespeichert.
+#[tokio::test]
+async fn durchfuehrung_vor_der_registrierung_bleibt_vor_dem_einsatzbeginn_400() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    sqlx::query("UPDATE einsatz SET begonnen_at = ? WHERE id = ?")
+        .bind(zeit(-3600))
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+
+    let am_fundort = zeit(-600);
+    let (s, tq) = post(
+        &app,
+        &admin,
+        &pfad(e, p),
+        json!({"art": "blutstillung", "zeitpunkt_at": am_fundort}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{tq}");
+    assert_eq!(
+        tq["zeitpunkt_at"],
+        am_fundort.as_str(),
+        "vor der Registrierung, nicht auf sie gekappt"
+    );
+
+    let (s, v) = post(
+        &app,
+        &admin,
+        &pfad(e, p),
+        json!({"art": "zugang", "zeitpunkt_at": zeit(-7200)}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains("Beginn des Einsatzes"),
+        "{v}"
+    );
+    assert_eq!(
+        detail(&app, &admin, e, p).await["massnahmen"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // Die anderen Einträge bleiben bei der Kappung auf die Registrierung.
+    let (s, sichtung) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        json!({"kategorie": "sk2", "zeitpunkt_at": am_fundort}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{sichtung}");
+    assert_ne!(sichtung["gesichtet_at"], am_fundort.as_str(), "{sichtung}");
+}

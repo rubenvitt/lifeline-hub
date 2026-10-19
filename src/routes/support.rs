@@ -113,6 +113,31 @@ pub fn erfassungszeitpunkt(
     }
 }
 
+/// Durchführungszeit einer Maßnahme (Spec `personen-massnahmen`, Entscheidung zu Review D2): wie
+/// [`meldezeitpunkt`] nach oben, aber ohne Kappung auf die Registrierung — ein Tourniquet am
+/// Fundort liegt vor ihr. Untergrenze ist der Beginn des Einsatzes; davor ist die Zeit für sich
+/// unbrauchbar → 400 (`src/AGENTS.md`, Statuscode-Konvention). Liegt die Registrierung (wider
+/// Erwarten) vor dem Beginn, gilt sie als Grenze: eine Zeit ab der Registrierung ist nie falsch.
+/// Gilt nur für die Maßnahme; die anderen Einträge kappen über [`erfassungszeitpunkt`].
+pub fn durchfuehrungszeitpunkt(
+    eingabe: Option<&str>,
+    jetzt: chrono::DateTime<chrono::Utc>,
+    einsatzbeginn: &str,
+    registrierung: &str,
+) -> Result<String, AppError> {
+    let gekappt = meldezeitpunkt(eingabe, jetzt)?;
+    let grenze = [einsatzbeginn, registrierung]
+        .into_iter()
+        .filter_map(crate::zeit::parse)
+        .min();
+    match (crate::zeit::parse(&gekappt), grenze) {
+        (Some(t), Some(grenze)) if t < grenze => Err(AppError::Validation(format!(
+            "Durchgeführt: Zeitpunkt {gekappt} liegt vor dem Beginn des Einsatzes"
+        ))),
+        _ => Ok(gekappt),
+    }
+}
+
 /// Höchstlänge einer `client_id` — wie bei Meldung und Person (`routes/meldung.rs`).
 pub const CLIENT_ID_MAX: usize = 64;
 
@@ -1158,6 +1183,58 @@ mod tests {
         assert_eq!(
             erfassungszeitpunkt(Some(" "), jetzt, angelegt).unwrap(),
             "2026-10-18 14:20:00"
+        );
+    }
+
+    #[test]
+    fn durchfuehrungszeitpunkt_darf_vor_die_registrierung_nicht_vor_den_einsatzbeginn() {
+        let jetzt = t("2026-10-18 14:20:00");
+        let beginn = "2026-10-18 13:30:00";
+        let registriert = "2026-10-18 14:00:00";
+        // Tourniquet am Fundort, vor der Registrierung: übernommen.
+        assert_eq!(
+            durchfuehrungszeitpunkt(Some("2026-10-18 13:50:00"), jetzt, beginn, registriert)
+                .unwrap(),
+            "2026-10-18 13:50:00"
+        );
+        // Genau der Einsatzbeginn: übernommen; davor 400.
+        assert_eq!(
+            durchfuehrungszeitpunkt(Some("2026-10-18 13:30:00"), jetzt, beginn, registriert)
+                .unwrap(),
+            "2026-10-18 13:30:00"
+        );
+        assert_eq!(
+            durchfuehrungszeitpunkt(Some("2026-10-18 13:29:59"), jetzt, beginn, registriert)
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        // Obere Grenze wie überall: mehr als 60 s Zukunft 400, sonst jetzt.
+        assert_eq!(
+            durchfuehrungszeitpunkt(Some("2026-10-18 14:21:01"), jetzt, beginn, registriert)
+                .unwrap_err()
+                .status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            durchfuehrungszeitpunkt(Some("2026-10-18 14:21:00"), jetzt, beginn, registriert)
+                .unwrap(),
+            "2026-10-18 14:20:00"
+        );
+        assert_eq!(
+            durchfuehrungszeitpunkt(None, jetzt, beginn, registriert).unwrap(),
+            "2026-10-18 14:20:00"
+        );
+        // Registrierung vor dem (nachträglich verlegten) Beginn: sie ist die Grenze.
+        assert_eq!(
+            durchfuehrungszeitpunkt(
+                Some("2026-10-18 13:20:00"),
+                jetzt,
+                beginn,
+                "2026-10-18 13:10:00"
+            )
+            .unwrap(),
+            "2026-10-18 13:20:00"
         );
     }
 

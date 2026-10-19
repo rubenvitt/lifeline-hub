@@ -59,9 +59,11 @@ pub async fn erfassen(
     ctx.fordere_aktiv()?;
     let art = parse_enum(MassnahmeArt::parse, &body.art, "Unbekannte Maßnahme")?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
-    let zeitpunkt_at = crate::routes::support::erfassungszeitpunkt(
+    // Darf vor der Registrierung liegen (Tourniquet am Fundort), nicht vor dem Einsatzbeginn.
+    let zeitpunkt_at = crate::routes::support::durchfuehrungszeitpunkt(
         body.zeitpunkt_at.as_deref(),
         chrono::Utc::now(),
+        &ctx.einsatz.begonnen_at,
         &person.erfasst_at,
     )?;
     fordere_angetroffen(&person, "keine Maßnahme")?;

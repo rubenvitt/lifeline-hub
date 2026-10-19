@@ -118,8 +118,8 @@ der Transport aufgehoben.
 
 1. Im Patientenkopf bei „Maßnahmen“ „Maßnahme erfassen“ wählen.
 2. Unter „Maßnahme“ die Fläche wählen, etwa „Zugang“, „Sauerstoff“ oder „Immobilisation“.
-3. Liegt die Durchführung zurück, unter „Durchgeführt (optional)“ die Uhrzeit eintragen; ohne
-   Angabe gilt der Zeitpunkt der Erfassung.
+3. Liegt die Durchführung zurück, unter „Durchgeführt (optional)“ die Uhrzeit eintragen, auch
+   eine vor dem Erfassen der Person; ohne Angabe gilt der Zeitpunkt der Erfassung.
 4. „Maßnahme erfassen“ im Paneel wählen. Der Kopf nennt die Maßnahme mit Uhrzeit.
 
 Eine versehentlich erfasste Maßnahme hebt „Aufheben“ unter „Erfasst“ im selben Paneel auf; sie
@@ -244,7 +244,9 @@ Was im Kopf gilt, entscheidet der jüngste Zeitpunkt, nicht die Ankunft: Kommt e
 vor 20 Minuten an, nachdem schon eine neuere gespeichert ist, steht sie im Verlauf, die aktuelle
 Sichtung bleibt. Dasselbe gilt für Verbleib und Transport. Ein Zeitpunkt mehr als eine Minute in
 der Zukunft wird abgelehnt; einer vor dem Erfassen der Person zählt als Zeitpunkt der Erfassung
-der Person.
+der Person. Ausgenommen ist die Uhrzeit, zu der eine Maßnahme durchgeführt wurde: Sie darf vor dem
+Erfassen der Person liegen, etwa bei einem Tourniquet am Fundort, aber nicht vor dem Beginn des
+Einsatzes; eine frühere Uhrzeit lehnt der Server ab.
 
 ### Transport, Maßnahmen und Verletzungen
 
