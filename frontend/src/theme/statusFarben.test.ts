@@ -43,7 +43,7 @@ const ALLE_MAPS = Object.fromEntries(
 ) as Record<string, Record<string, sf.StatusDarstellung>>;
 
 describe('Statusfarb-Vertrag', () => {
-  it('deckt alle achtunddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
+  it('deckt alle neununddreißig Vertragskarten ab — eine weitere Map rutscht nicht still durch', () => {
     // „Karten“, nicht „Enums“: `dringlichkeit` ist über eine Statusrolle geschlüsselt und
     // beschriftet die Stufe selbst.
     expect(Object.keys(ALLE_MAPS).sort()).toEqual([
@@ -78,6 +78,7 @@ describe('Statusfarb-Vertrag', () => {
       'schadenStatus',
       'schwaerzungsantragStand',
       'statusKategorie',
+      'transportDurch',
       'uhsStatus',
       'uhsTyp',
       'verfuegbarkeit',
@@ -86,6 +87,12 @@ describe('Statusfarb-Vertrag', () => {
       'warnstufeKarte',
       'warnstufeKennzahl',
     ]);
+  });
+
+  it('nennt, wer transportiert: Eigentransport als Achtung, fremd neutral (LLH-1332, D5)', () => {
+    expect(sf.transportDurch.eigen).toEqual({ rolle: 'achtung', label: 'Eigentransport' });
+    expect(sf.transportDurch.fremd).toEqual({ rolle: 'neutral', label: 'fremdes Rettungsmittel' });
+    expect(sf.uebergabeOffen).toEqual({ rolle: 'achtung', label: 'Übergabe offen' });
   });
 
   it('warnt bei einer Kontamination mit Wort, als Achtung, nicht als Alarm (LLH-1326, D11)', () => {
@@ -228,7 +235,7 @@ describe('Warnstufe als Fläche (LFH-368 · B5h)', () => {
     expect(Object.keys(ALLE_MAPS)).not.toContain('sichtung');
     // Ebenso die Ebenenfarbe der Fachebenen (LFH-593): eine Identität, keine Statusrolle.
     expect(Object.keys(ALLE_MAPS)).not.toContain('fachebeneFarbe');
-    expect(Object.keys(ALLE_MAPS)).toHaveLength(38);
+    expect(Object.keys(ALLE_MAPS)).toHaveLength(39);
   });
 });
 

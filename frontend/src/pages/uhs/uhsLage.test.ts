@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Person, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
-import { platzZahlen, unterwegsAus, uhsLage } from './uhsLage';
+import { ausgetretenSeit, platzZahlen, unterwegsAus, uhsLage } from './uhsLage';
 
 /**
  * Lage der Stelle in Zahlen (LLH-1136): abgeleitet aus Personen und UHS-Detail, dieselben Mengen
@@ -157,6 +157,17 @@ describe('uhsLage (LLH-1136)', () => {
       schritt({ id: 3, person_id: 10, art: 'austritt' }),
     ]);
     expect(unterwegsAus(u, p).map((x) => x.id)).toEqual([7]);
+  });
+
+  it('ausgetretenSeit: der jüngste Austritt der Person, sonst null', () => {
+    const reihe = [
+      schritt({ id: 1, person_id: 7, art: 'austritt', zeitpunkt_at: '2026-10-18 09:00:00' }),
+      schritt({ id: 2, person_id: 7, art: 'eintritt', zeitpunkt_at: '2026-10-18 09:10:00' }),
+      schritt({ id: 3, person_id: 7, art: 'austritt', zeitpunkt_at: '2026-10-18 09:20:00' }),
+      schritt({ id: 4, person_id: 8, art: 'austritt', zeitpunkt_at: '2026-10-18 09:30:00' }),
+    ];
+    expect(ausgetretenSeit(7, reihe)).toBe('2026-10-18 09:20:00');
+    expect(ausgetretenSeit(9, reihe)).toBeNull();
   });
 
   it('platzZahlen: belegt vor Verfügbarkeit, Wartebereich und stornierte zählen nicht', () => {

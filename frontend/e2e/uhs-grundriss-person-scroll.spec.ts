@@ -106,7 +106,7 @@ test('UHS Grundriss: belegte Person in den Transport-Bereich ziehen öffnet den 
   page,
 }) => {
   const personName = await setupBelegterPlatz(page);
-  await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Auf Transport gebracht'));
+  await ziehe(page, page.getByText(personName).first(), dropZone(page, 'Unterwegs'));
   // Der Abschluss-Screen ist der „Verbleib erfassen"-Dialog.
   await expect(page.getByRole('dialog')).toContainText('Verbleib erfassen');
 });

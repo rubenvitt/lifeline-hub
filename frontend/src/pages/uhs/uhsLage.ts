@@ -31,6 +31,25 @@ export function unterwegsAus(
     .sort((a, b) => a.registrier_nr - b.registrier_nr);
 }
 
+/**
+ * Wann eine Person diese Stelle zuletzt verlassen hat (jüngster Austritt ihrer Belegungsreihe), als
+ * Beginn von „unterwegs“ (LLH-1332); `null` ohne Austritt.
+ */
+export function ausgetretenSeit(
+  personId: number,
+  belegungen: UhsDetail['belegungen'],
+): string | null {
+  let seit: string | null = null;
+  for (const b of belegungen) {
+    if (b.person_id !== personId || b.art !== 'austritt') continue;
+    if (seit == null || b.zeitpunkt_at > seit) seit = b.zeitpunkt_at;
+  }
+  return seit;
+}
+
+/** Ab so vielen Minuten unterwegs trägt die Zeile „Übergabe offen“ (Spec `uhs-grundriss`). */
+export const UEBERGABE_OFFEN_AB_MIN = 60;
+
 /** Belegte Plätze wie im Grundriss: der aktuelle Platz jeder Person in dieser UHS. */
 export function belegtePlaetze(
   uhs: Pick<UhsDetail, 'id'>,

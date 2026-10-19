@@ -30,9 +30,9 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
 ## 4. UHS-Grundriss
 
-- [ ] 4.1 Test zuerst, dann umsetzen: Grundriss nimmt `useVerbleibFelder` statt der eigenen Maske (Vorbelegung Art Transport). Prüfung: `Grundriss.test.tsx` Verbleib-Fälle grün, Betreuungsstelle und „Bestätigt von“ dort erreichbar.
+- [x] 4.1 Test zuerst, dann umsetzen: Grundriss nimmt `useVerbleibFelder` statt der eigenen Maske (Vorbelegung Art Transport). Prüfung: `Grundriss.test.tsx` Verbleib-Fälle grün, Betreuungsstelle und „Bestätigt von“ dort erreichbar.
 - [ ] 4.2 Test zuerst, dann umsetzen: Zeile der Listen „Noch nicht aufgenommen“ und „Wartebereich“ zweizeilig nach D8 (`PersonenSpalte`, `grundrissLayout.ts`), „Verbleib“ sichtbar als Textknopf in der zweiten Zeile. Prüfung: `grundrissLayout.test.ts`, `Grundriss.test.tsx`, `GrundrissTabs.test.tsx` grün; e2e `trefflaeche-pruefflaechen.spec.ts` in allen drei Stufen grün; Bild bei 240 px Spaltenbreite zeigt den vollen Namen.
-- [ ] 4.3 Test zuerst, dann umsetzen: Spalte „Unterwegs“ (`TransportSpalte`) mit Fahrzeug, Ziel, Dauer, Priorität, „Übergabe quittieren“ und Marke „Übergabe offen“ ab 60 min (`useMinutenTakt`); Abgeschlossene fehlen. Prüfung: Tests „Übergabe aus der Spalte“, „Fremdes Rettungsmittel“, „Lange unterwegs“ grün; `UhsLagezeile.test.tsx` grün.
+- [x] 4.3 Test zuerst, dann umsetzen: Spalte „Unterwegs“ (`TransportSpalte`) mit Fahrzeug, Ziel, Dauer, Priorität, „Übergabe quittieren“ und Marke „Übergabe offen“ ab 60 min (`useMinutenTakt`); Abgeschlossene fehlen. Prüfung: Tests „Übergabe aus der Spalte“, „Fremdes Rettungsmittel“, „Lange unterwegs“ grün; `UhsLagezeile.test.tsx` grün.
 
 ## 5. Sichtungsboard
 

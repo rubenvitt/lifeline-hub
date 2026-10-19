@@ -1,4 +1,4 @@
-import { AutoComplete, Form, type FormInstance } from 'antd';
+import { AutoComplete, Form, Input, type FormInstance } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { ladeTransportmittel } from '../api/einsatzPerson';
@@ -26,9 +26,15 @@ import {
 export default function RettungsmittelFeld({
   einsatzId,
   form,
+  fokus = false,
 }: {
   einsatzId: number;
   form: FormInstance<VerbleibFormWerte>;
+  /**
+   * Das Feld ist das Fokusziel der Erfassungshülle (`[data-erfassung-fokus]`): wenn die Art schon
+   * vorbelegt ist, etwa im Grundriss, beginnt die Eingabe hier statt an der Art.
+   */
+  fokus?: boolean;
 }) {
   const auswahl = useQuery({
     queryKey: einsatzKeys.personenTransportmittel(einsatzId),
@@ -54,6 +60,7 @@ export default function RettungsmittelFeld({
           optionen={rettungsmittelOptionen(auswahl.data)}
           navigiert={navigiert}
           suche={suche}
+          fokus={fokus}
           onWahl={(option) =>
             form.setFieldValue('einsatz_fahrzeug_id', option?.einsatzFahrzeugId ?? null)
           }
@@ -74,9 +81,11 @@ function RettungsmittelEingabe({
   optionen,
   navigiert,
   suche,
+  fokus,
   onWahl,
 }: {
   id?: string;
+  fokus: boolean;
   value?: string;
   onChange?: (v: string) => void;
   optionen: ReturnType<typeof rettungsmittelOptionen>;
@@ -96,7 +105,6 @@ function RettungsmittelEingabe({
         value={value}
         // Gruppen tragen `options`; antds Typ kennt nur flache Optionen (Muster `rufnameOptions`).
         options={optionen as unknown as RettungsmittelOption[]}
-        placeholder="z. B. 1/83-1 oder RTW 3/83-2"
         filterOption={(eingabe, option) =>
           option != null &&
           'value' in option &&
@@ -114,7 +122,13 @@ function RettungsmittelEingabe({
           onWahl(option);
         }}
         style={{ width: '100%' }}
-      />
+      >
+        {/* Eigenes Eingabefeld, damit die Fokusmarke am `<input>` sitzt, nicht am Rahmen. */}
+        <Input
+          placeholder="z. B. 1/83-1 oder RTW 3/83-2"
+          data-erfassung-fokus={fokus || undefined}
+        />
+      </AutoComplete>
     </div>
   );
 }
