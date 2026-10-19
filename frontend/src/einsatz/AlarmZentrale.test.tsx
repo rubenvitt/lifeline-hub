@@ -358,8 +358,10 @@ describe('AlarmZentrale', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Einsatz wechseln' }));
 
     // Selbst während antd die alte Notice ausblendet, darf ihre Aktion nicht zur Route des
-    // vorherigen Einsatzes springen.
-    await userEvent.click(alteSammelAktion);
+    // vorherigen Einsatzes springen. Seit antd 6.6.6 trägt die ausblendende Notice
+    // `pointer-events: none`; erreichbar bleibt ihr Knopf über die Tastatur.
+    alteSammelAktion.focus();
+    await userEvent.keyboard('{Enter}');
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/2/start');
     await warteBisNotificationWeg('Sofortmeldung eingegangen');
     await warteBisNotificationWeg('3 weitere Sofortmeldungen');
