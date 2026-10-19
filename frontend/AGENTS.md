@@ -601,8 +601,8 @@ anwendbar), „nicht geprüft" ist keins.
   Rechte wie beim Zuordnen (Schreibrecht und Freigabe Material); ein beendeter Ort sperrt Zuordnen,
   Erfassen und Ausgeben, nicht Status und Lösen. Nachweis `kraefte/materialSchreibweg.test.tsx`.
   Eine selbst gelöste Zeile hält ihre Stelle als träge Marke „Gelöst“, bis Zeiger und Fokus den
-  Baustein verlassen haben (LLH-1254, `useGeloestHalten` in `kraefte/MaterialAmOrt.tsx`); Rückgängig
-  über `kommunikation/rueckgaengig.tsx`.
+  Baustein verlassen haben (LLH-1254, `useHoldGeloest` in `kraefte/MaterialAmOrt.tsx`); Rückgängig
+  über `kommunikation/rueckgaengig.tsx`, nicht am beendeten Ort, Ablehnung über dem Block.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in

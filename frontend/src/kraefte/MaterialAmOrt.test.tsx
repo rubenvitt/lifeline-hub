@@ -361,7 +361,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
 /**
  * Kein Sprung unter dem Zeiger nach dem Lösen (LLH-1254, Change
  * `k2gckqtq-material-loesen-ohne-sprung`): Die gelöste Zeile bleibt als „Gelöst“ an ihrer Stelle,
- * bis Zeiger und Fokus den Baustein verlassen haben und `HALTEN_MS` vergangen ist.
+ * bis Zeiger und Fokus den Baustein verlassen haben und `HOLD_MS` vergangen ist.
  */
 describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
   afterEach(() => {
@@ -560,21 +560,54 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     ).toBeEnabled();
   });
 
-  it('eine Ablehnung des Rückgängig steht an der Zeile, kein Fehler-Toast', async () => {
-    const user = userEvent.setup();
+  it('eine Ablehnung des Rückgängig steht über dem Block und bleibt, wenn die Zeile fällt', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     let n = 0;
     patchMitschnitt(() =>
       ++n === 1
         ? HttpResponse.json({})
-        : HttpResponse.json({ error: 'UHS ist aufgelöst' }, { status: 422 }),
+        : HttpResponse.json({ error: 'Material ist verliehen' }, { status: 409 }),
     );
     zeige();
     await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
     const hinweis = (await screen.findByText('Trage gelöst')).closest('.ant-message-notice')!;
     await user.click(within(hinweis as HTMLElement).getByRole('button', { name: 'Rückgängig' }));
-    expect(await within(zeile('Trage')).findByText('UHS ist aufgelöst')).toHaveAttribute(
-      'data-fehler',
-    );
+    expect(await screen.findByText('Material ist verliehen')).toBeInTheDocument();
+    expect(screen.getByText('Trage nicht zurückgenommen')).toBeInTheDocument();
     expect(document.querySelector('.ant-message-error')).toBeNull();
+    // Zeiger und Fokus sind im Hinweis, die Haltezeit läuft ab: die Zeile fällt, der Grund bleibt.
+    act(() => vi.advanceTimersByTime(10_000));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull());
+    expect(screen.getByText('Material ist verliehen')).toBeInTheDocument();
+  });
+
+  it('am beendeten Ort gibt es kein Rückgängig, weil der Server das Zuordnen ablehnt', async () => {
+    const user = userEvent.setup();
+    patchMitschnitt();
+    zeige({ sperrgrund: 'UHS aufgelöst' });
+    await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
+    const hinweis = (await screen.findByText('Trage gelöst')).closest('.ant-message-notice')!;
+    expect(within(hinweis as HTMLElement).queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+    expect(marke('Trage')).toBeInTheDocument();
+  });
+
+  it('der letzte Posten gelöst: kein Leertext über dem Platzhalter', async () => {
+    const user = userEvent.setup();
+    const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    neu({ posten: [] });
+    expect(screen.queryByText('Kein Material')).toBeNull();
+    expect(reihenfolge()).toEqual(['Trage']);
+  });
+
+  it('am Platzhalter stehen Status und „Ausgeben“ unsichtbar weiter: die Höhe bleibt', async () => {
+    const user = userEvent.setup();
+    await loeseUndGleicheAb(user, 'Wolldecke', 1);
+    const z = zeile('Wolldecke');
+    const ausgeben = z.querySelector<HTMLElement>('[aria-label="Wolldecke ausgeben"]');
+    expect(ausgeben).not.toBeNull();
+    expect(within(z).queryByRole('button', { name: 'Wolldecke ausgeben' })).toBeNull();
+    expect(z.querySelector('[aria-label="Status von Wolldecke ändern"]')).not.toBeNull();
+    expect(within(z).queryByRole('button', { name: /Status von/ })).toBeNull();
   });
 });

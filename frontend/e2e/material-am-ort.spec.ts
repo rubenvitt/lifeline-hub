@@ -171,19 +171,28 @@ test('Einheit: zwei Klicks auf dieselbe Stelle lösen nur einen Posten (LLH-1254
   // Gelöst wird die obere Zeile; ohne Halten rückte die untere mit ihrem Knopf an diese Stelle.
   const oben = (await zeilen.first().textContent())?.includes('Trage') ? 'Trage' : 'Spineboard';
   const unten = oben === 'Trage' ? 'Spineboard' : 'Trage';
-  const box = await zeile(page, oben)
-    .getByRole('button', { name: `${oben} aus Einheit lösen` })
-    .boundingBox();
+  const knopf = zeile(page, oben).getByRole('button', { name: `${oben} aus Einheit lösen` });
+  // `mouse.click` nimmt Koordinaten im Bild: der Knopf muss darin liegen.
+  await knopf.scrollIntoViewIfNeeded();
+  const box = await knopf.boundingBox();
   expect(box).not.toBeNull();
   const x = box!.x + box!.width / 2;
   const y = box!.y + box!.height / 2;
 
   // Erst wenn die Einheit neu geladen ist, stünde ohne Halten der fremde Knopf unter dem Zeiger.
-  const abgleich = page.waitForResponse(
-    (r) => r.request().method() === 'GET' && /\/einheiten$/.test(new URL(r.url()).pathname),
-  );
+  const abgleich = page.waitForResponse(async (r) => {
+    if (r.request().method() !== 'GET' || !/\/einheiten$/.test(new URL(r.url()).pathname)) {
+      return false;
+    }
+    const einheiten = (await r.json()) as {
+      id: number;
+      material_mitglieder: { bezeichnung: string }[];
+    }[];
+    const einheit = einheiten.find((e) => e.id === s.einheitId);
+    return einheit != null && !einheit.material_mitglieder.some((m) => m.bezeichnung === oben);
+  });
   await page.mouse.click(x, y);
-  await expect(paneel.getByRole('button', { name: `${oben} gelöst` })).toBeVisible();
+  await expect(page.getByText(`${oben} gelöst`)).toBeVisible();
   await abgleich;
   await page.mouse.click(x, y);
   await page.mouse.dblclick(x, y);

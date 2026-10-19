@@ -35,8 +35,11 @@ vier Orten über den einen Baustein. Ein Fehlgriff lässt sich zurücknehmen.
 
 1. **Gelöste Zeile bleibt als Platzhalter (Weg A).** Nach dem Erfolg merkt sich der Baustein den
    Posten mit seinem Stand und seiner Stelle in der Liste. Er zeichnet dort eine gedämpfte Zeile in
-   gleicher Höhe: Bezeichnung und Menge bleiben, Status und „Ausgeben“ entfallen. Rechts steht statt
-   des Knopfs die Marke „Gelöst“.
+   gleicher Höhe: Bezeichnung und Menge bleiben, Status und „Ausgeben“ stehen unsichtbar und träge
+   weiter (`visibility: hidden`, die Statuswahl gesperrt, damit sie ihre Palettenebene abmeldet).
+   Fielen sie weg, passte eine schmal umgebrochene Zeile wieder in eine, und alles darunter rückte
+   hoch. Rechts steht statt des Knopfs die Marke „Gelöst“. Der Leertext richtet sich nach den
+   gezeichneten Zeilen, nicht nach der Quelle.
    - **Verworfen B, Zuflussschleuse:** Sie hält per Spec nur Zuwachs. Hielte sie auch Entfallenes,
      würde sie die Regel aller `Datensicht`-Listen ändern, und das gehört nicht in diesen Task.
    - **Verworfen C, Zeitsperre aller Lösen-Knöpfe nach dem Wegfall:** Sie verhindert den
@@ -55,21 +58,27 @@ vier Orten über den einen Baustein. Ein Fehlgriff lässt sich zurücknehmen.
    gelten: Kein Maus- oder Stiftzeiger steht über dem Baustein (`pointerenter`/`pointerleave`,
    Touch-Zeiger zählen nicht, denn sie verlassen das Element nach jedem Tipp), kein Fokus liegt im
    Baustein (`focusin`/`focusout`, Portal-Menüs wie bei `checkVerlassen`), und seit dem letzten
-   `pointerdown` im Baustein sind `HALTEN_MS` = 4000 ms vergangen. Auf dem Touchgerät hält also die
+   `pointerdown` im Baustein sind `HOLD_MS` = 4000 ms vergangen. Auf dem Touchgerät hält also die
    Zeit, an der Maus der Zeiger, an der Tastatur der Fokus. Einzeln wegfallende Platzhalter würden
    wieder springen.
-4. **Daten gegen Platzhalter.** Je Posten gibt es zwei Phasen. `wartet`: Die Quelle zeigt den Posten
-   noch (Einheit-DTO noch nicht abgeglichen), und trotzdem steht der Platzhalter. So wird der Knopf
-   nicht noch einmal bedienbar. `weg`: Die Quelle zeigt ihn nicht mehr. Taucht der Posten in der
-   Phase `weg` wieder auf (Rückgängig oder jemand anderes ordnet ihn zu), gewinnt die echte Zeile,
+4. **Daten gegen Platzhalter.** Je Posten gibt es zwei Phasen. `pending`: Die Quelle zeigt den
+   Posten noch (Einheit-DTO noch nicht abgeglichen), und trotzdem steht der Platzhalter. So wird der
+   Knopf nicht noch einmal bedienbar. `gone`: Die Quelle zeigt ihn nicht mehr. Taucht der Posten in
+   der Phase `gone` wieder auf (Rückgängig oder jemand anderes ordnet ihn zu), gewinnt die echte Zeile,
    und der Platzhalter entfällt. Die Stelle merkt sich der Baustein als Index in der zuletzt
    gezeichneten Folge. Eingefügt wird aufsteigend, sodass mehrere Platzhalter ihre Plätze behalten.
 5. **Rückgängig über den Hinweis des Hauses.** `onSuccess` ruft `zeigeRueckgaengig(message,
    "Trage gelöst", …)` statt `message.success`. „Rückgängig“ ruft `setOrt(posten, ort)` und
-   gleicht ab. Scheitert das, steht der Grund an der Zeile, solange der Platzhalter steht, sonst am
-   Zuordnen-Fehler des Bausteins. Der Hinweis liegt oben im Bild, weit weg vom Zeiger.
+   gleicht ab; danach gewinnt die echte Zeile, sobald die Quelle den Posten zeigt. Scheitert das,
+   steht der Grund als `SpeicherFehler` über dem Block („Trage nicht zurückgenommen“), bis zur
+   nächsten Rücknahme. An der Zeile stünde er nicht dauerhaft, denn der Platzhalter fällt mit der
+   Zeit weg. Der Baustein ist der Ort der Handlung an vier Seiten; ein eigener Slot je Seite
+   (`SeitenHinweise`) bräuchte dafür vier Aufrufer, ohne den Grund näher an die Handlung zu bringen.
+   An einem beendeten Ort (`sperrgrund`) steht nur „Trage gelöst“ ohne „Rückgängig“: Der Server
+   lehnt das Zuordnen dort sicher ab, und ein Rückweg, der 409 liefert, ist schlechter als keiner
+   (`kommunikation/rueckgaengig.tsx`). Der Hinweis liegt oben im Bild, weit weg vom Zeiger.
 6. **Kein neuer Baustein, kein Hook nach außen.** Die Logik bleibt in `MaterialAmOrt.tsx`, als
-   kleiner lokaler Hook in derselben Datei (`useGeloestHalten`). Eine zweite Verwendung gibt es noch
+   kleiner lokaler Hook in derselben Datei (`useHoldGeloest`). Eine zweite Verwendung gibt es noch
    nicht (Non-Goal 3).
 
 ## Risks / Trade-offs
