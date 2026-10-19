@@ -3,15 +3,11 @@ import type { ReactNode } from 'react';
 import { ConfigProvider } from 'antd';
 import deDE from 'antd/locale/de_DE';
 import {
-  antdAlgorithmus,
   antdKaestchen,
   antdKlappkopf,
   antdKnopf,
-  antdKomponenten,
   antdOptionsknopf,
-  antdToken,
-  farbenDunkel,
-  farbenHell,
+  antdThema,
   type Dichte,
 } from './tokens';
 import { zeigerIstGrob } from '../components/useViewport';
@@ -213,16 +209,12 @@ export function ThemeModeProvider({ children }: { children: ReactNode }) {
         checkbox={kaestchen}
         // Boden des beschrifteten Optionsknopfs (LFH-1048): gebaut wie das Kästchen-Label.
         radio={optionsknopf}
-        theme={{
-          // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
-          // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine
-          // Steuerhöhe mit, sonst rechnete antd sie unter den Boden aus A1 Gate 3.
-          token: antdToken(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
-          // Nachts hält `antdAlgorithmus` die Signalfarben auf ihrem Rollenwert.
-          algorithm: antdAlgorithmus(effektiv === 'dark'),
-          // antds Switch rechnet seine Maße aus der Schrift statt aus `controlHeight` (LFH-380).
-          components: antdKomponenten(effektiv === 'dark' ? farbenDunkel : farbenHell, dichte),
-        }}
+        // Farbrollen je Modus aus derselben Quelle wie `rollen.css`; die Dichte hängt hier und nicht
+        // an einer Größen-Prop je Element (die endet bei 40 px). `antdToken` setzt die kleine
+        // Steuerhöhe mit, sonst rechnete antd sie unter den Boden aus A1 Gate 3. Nachts hält
+        // `antdAlgorithmus` die Signalfarben auf ihrem Rollenwert; antds Switch rechnet seine Maße
+        // aus der Schrift statt aus `controlHeight` (LFH-380, `antdKomponenten`).
+        theme={antdThema(effektiv === 'dark', dichte)}
       >
         {children}
       </ConfigProvider>
