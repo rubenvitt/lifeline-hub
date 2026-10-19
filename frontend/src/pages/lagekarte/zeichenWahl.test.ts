@@ -31,7 +31,7 @@ const kinds = Object.keys(GRUNDZEICHEN_NAMEN) as SymbolKind[];
 describe('grundzeichenOptionen', () => {
   it('bietet die Grundzeichenarten des Vokabulars an, jede mit deutschem Namen', () => {
     const optionen = grundzeichenOptionen();
-    expect(optionen.length).toBe(27);
+    expect(optionen.length).toBe(29);
     for (const o of optionen) {
       expect(o.label.length, o.id).toBeGreaterThan(0);
       expect(o.label).toBe(GRUNDZEICHEN_NAMEN[o.id as SymbolKind]);
