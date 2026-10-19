@@ -283,6 +283,11 @@ pub async fn anlegen(
     let melder = optional_max(body.melder_kontakt, "Melder / Kontakt", PERSON_ANGABE_MAX)?;
     let zustand = optional_max(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
     let notiz = optional_max(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
+    // LLH-1103 (design.md D6): dieselbe Prüfung wie im PATCH, das Feld für sich (400).
+    let geburtsdatum = match trimme(body.geburtsdatum) {
+        Some(roh) => Some(pruefe_geburtsdatum(&roh, chrono::Utc::now().date_naive())?),
+        None => None,
+    };
 
     let status = body
         .status
@@ -391,7 +396,6 @@ pub async fn anlegen(
         "antreff_lat",
         "antreff_lon",
     )?;
-    let geburtsdatum = trimme(body.geburtsdatum);
 
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
@@ -682,9 +686,10 @@ pub struct PatchBody {
 }
 
 /// Altwerte des Feld-CAS: dieselben Feldnamen wie die Änderung, dreiwertig (fehlt = kein
-/// Vergleich, `null` oder `""` = leer erwartet). Ein Feld hier, das der PATCH nicht ändert, ist
-/// 400; die Koordinate steht nur als Paar (`antreff_lat` und `antreff_lon`), sonst 400. Ein
-/// unbekannter Feldname ist 400 statt eines stillen Schreibens ohne Vergleich.
+/// Vergleich, `null` oder `""` = leer erwartet; leer trifft auch eine gespeicherte leere oder nur
+/// aus Leerraum bestehende Zeichenkette). Ein Feld hier, das der PATCH nicht ändert, ist 422; die
+/// Koordinate steht nur als Paar (`antreff_lat` und `antreff_lon`), sonst 422. Ein unbekannter
+/// Feldname ist 400 statt eines stillen Schreibens ohne Vergleich.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ErwartetBody {
@@ -727,11 +732,12 @@ fn leer_als_null(wert: Option<Option<String>>) -> Option<Option<String>> {
     wert.map(|w| w.filter(|t| !t.trim().is_empty()))
 }
 
-/// Prüft `erwartet` gegen die Änderung (400, das Feld für sich): die Koordinate nur als Paar,
-/// und jedes Feld mit Altwert muss im selben PATCH geändert werden.
+/// Prüft `erwartet` gegen die Änderung: die Koordinate nur als Paar, und jedes Feld mit Altwert
+/// muss im selben PATCH geändert werden. Beides ist eine Feldkombination, also 422
+/// (`src/AGENTS.md`, Statuscode-Konvention; design.md D1).
 fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppError> {
     if erwartet.antreff_lat.is_some() != erwartet.antreff_lon.is_some() {
-        return Err(AppError::Validation(
+        return Err(AppError::UnprocessableEntity(
             "erwartet trägt die Koordinate nur als Paar (antreff_lat und antreff_lon)".into(),
         ));
     }
@@ -805,7 +811,7 @@ fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppE
         ),
     ];
     if let Some((feld, _, _)) = felder.iter().find(|(_, alt, neu)| *alt && !*neu) {
-        return Err(AppError::Validation(format!(
+        return Err(AppError::UnprocessableEntity(format!(
             "erwartet nennt {feld}, der PATCH ändert {feld} aber nicht"
         )));
     }
@@ -816,9 +822,9 @@ fn pruefe_erwartet(erwartet: &ErwartetBody, body: &PatchBody) -> Result<(), AppE
 /// heute“ im Tag der Anzeigezone, der UTC um bis zu einen Tag voraus sein kann.
 const GEBURTSDATUM_SPIELRAUM: chrono::Duration = chrono::Duration::days(1);
 
-/// Prüft ein zu SETZENDES Geburtsdatum (LLH-1103, design.md D6): genau `YYYY-MM-DD`, ein
-/// gültiger Kalendertag und nicht nach `heute` (UTC) plus Spielraum, sonst 400. Ein schon
-/// gespeicherter Wert in anderer Form wird nicht geprüft, nur ein geschriebener.
+/// Prüft ein zu SETZENDES Geburtsdatum (LLH-1103, design.md D6), beim Anlegen und im PATCH: genau
+/// `YYYY-MM-DD`, ein gültiger Kalendertag und nicht nach `heute` (UTC) plus Spielraum, sonst 400.
+/// Ein schon gespeicherter Wert in anderer Form wird nicht geprüft, nur ein geschriebener.
 fn pruefe_geburtsdatum(roh: &str, heute: chrono::NaiveDate) -> Result<String, AppError> {
     let zeichen = roh.as_bytes();
     let form = zeichen.len() == 10

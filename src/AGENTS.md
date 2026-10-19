@@ -31,7 +31,8 @@ Handler (`JsonBody`, LFH-1074).
   `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
   geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und
   `person::repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an. Sichtung, Status, PAT oder
-  ein anderes Feld lösen so keinen 409 aus; ein Altwert ohne Änderung desselben Felds ist 400,
+  ein anderes Feld lösen so keinen 409 aus; ein Altwert ohne Änderung desselben Felds und eine
+  halbe Koordinate sind 422, ein leerer Altwert trifft auch eine leere Zeichenkette,
   ohne `erwartet` wird ohne Vergleich geschrieben. `basis_geaendert_at` bleibt als Wire-Feld für
   ältere Clients.
 - Legitimes 422 bei Sweeps nicht mitkippen (`lage_zone.rs`, `gefahr.rs`, `einsatzabschnitt.rs`,

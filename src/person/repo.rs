@@ -299,7 +299,8 @@ pub async fn anlegen(
 /// Feld-CAS (LLH-1103, design.md D1 der Change `f8218h1i-personendaten-feldweise`): `erwartet`
 /// trägt je Spalte den Wert beim Öffnen, dreiwertig wie [`PatchDaten`] (`None` = kein Vergleich,
 /// `Some(None)` = leer erwartet). Je genannter Spalte hängt das UPDATE `AND <spalte> IS ?` an;
-/// `IS` vergleicht auch NULL. Sichtung, Status, PAT oder ein anderes Feld ändern so zwar
+/// `IS` vergleicht auch NULL, ein leerer Text-Altwert trifft dazu eine leere oder nur aus
+/// Leerraum bestehende Zeichenkette. Sichtung, Status, PAT oder ein anderes Feld ändern so zwar
 /// `geaendert_at`, aber keinen Konflikt. Paarregel der Koordinate und „nur mit Änderung
 /// desselben Felds“ prüft der Handler.
 pub async fn aktualisiere(
@@ -350,8 +351,18 @@ pub async fn aktualisiere(
     // Spaltennamen nur aus der festen Liste in `ExpectedValue::aus`, nie aus der Anfrage: das
     // Suffix bleibt SQL-sicher, nur seine Länge ist dynamisch.
     let altwerte = ExpectedValue::aus(erwartet);
-    for (spalte, _) in &altwerte {
-        sql.push_str(&format!(" AND {spalte} IS ?{nummer}"));
+    for (spalte, wert) in &altwerte {
+        // Ein leerer Text-Altwert trifft auch eine gespeicherte leere oder nur aus Leerraum
+        // bestehende Zeichenkette (design.md D1): die Oberfläche zeigt beides als „ohne Angabe“
+        // und schickt `null`; sonst bliebe ein solcher Bestand dauerhaft im 409.
+        if matches!(wert, ExpectedValue::Text(_)) {
+            sql.push_str(&format!(
+                " AND ({spalte} IS ?{nummer} OR (?{nummer} IS NULL AND \
+                 TRIM({spalte}, ' ' || char(9) || char(10) || char(13)) = ''))"
+            ));
+        } else {
+            sql.push_str(&format!(" AND {spalte} IS ?{nummer}"));
+        }
         nummer += 1;
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))

@@ -2929,7 +2929,7 @@ async fn ohne_erwartet_schreibt_der_patch_wie_bisher() {
 }
 
 /// Die Koordinate ist ein Feld aus zwei Spalten: `erwartet` trägt Breite und Länge zusammen, sonst
-/// 400; weicht eine der beiden ab, ist es 409. Mutationsprobe: die Länge nicht ins Suffix nehmen
+/// 422; weicht eine der beiden ab, ist es 409. Mutationsprobe: die Länge nicht ins Suffix nehmen
 /// → der PATCH mit veralteter Länge schreibt und wird rot.
 #[tokio::test]
 async fn feld_cas_koordinate_als_paar() {
@@ -2944,7 +2944,8 @@ async fn feld_cas_koordinate_als_paar() {
     )
     .await;
 
-    // Nur eine Hälfte als Altwert → 400, nichts geschrieben.
+    // Nur eine Hälfte als Altwert → 422 (Feldkombination, `src/AGENTS.md`,
+    // Statuscode-Konvention), nichts geschrieben.
     let (s, json) = person_patch(
         &app,
         &admin,
@@ -2953,7 +2954,11 @@ async fn feld_cas_koordinate_als_paar() {
         r#"{"antreff_lat":53.0,"antreff_lon":10.0,"erwartet":{"antreff_lat":52.2691}}"#,
     )
     .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        person_detail(&app, &admin, e, p).await["antreff_lat"],
+        52.2691
+    );
 
     // Breite stimmt, Länge ist veraltet → 409.
     let (s, json) = person_patch(
@@ -2995,10 +3000,12 @@ async fn feld_cas_koordinate_als_paar() {
     assert!(!json.as_object().unwrap().contains_key("antreff_lat"));
 }
 
-/// Ein Altwert für ein Feld, das der PATCH nicht ändert, ist 400 (design.md D1), und nichts wird
-/// geschrieben. Mutationsprobe: die Prüfung entfernen → der PATCH schreibt den Vornamen (200).
+/// Ein Altwert für ein Feld, das der PATCH nicht ändert, ist 422 (design.md D1: eine
+/// Feldkombination, `src/AGENTS.md`, Statuscode-Konvention), und nichts wird geschrieben.
+/// Mutationsprobe: die Prüfung entfernen → der PATCH schreibt den Vornamen (200); sie als 400
+/// melden → rot.
 #[tokio::test]
-async fn erwartet_ohne_aenderung_desselben_felds_ist_400() {
+async fn erwartet_ohne_aenderung_desselben_felds_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -3011,8 +3018,43 @@ async fn erwartet_ohne_aenderung_desselben_felds_ist_400() {
         r#"{"vorname":"Neu","erwartet":{"name":"Alt"}}"#,
     )
     .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(person_detail(&app, &admin, e, p).await["vorname"], "Vor");
+}
+
+/// Ein leerer Altwert (`null` oder `""`) trifft bei einer Textspalte auch eine gespeicherte leere
+/// oder nur aus Leerraum bestehende Zeichenkette (design.md D1): die Oberfläche zeigt beides als
+/// „ohne Angabe“ und schickt `null`. Ein gesetzter Wert bleibt ein Konflikt. Mutationsprobe: im
+/// Suffix nur `IS ?` → „“ und „  “ ergeben dauerhaft 409 und werden rot.
+#[tokio::test]
+async fn leerer_altwert_trifft_auch_leere_zeichenkette() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for (gespeichert, erwartet) in [("", "null"), ("  ", "null"), ("\t", r#""""#)] {
+        let p = person_anlegen(&app, &admin, e, "{}").await;
+        sqlx::query("UPDATE einsatz_person SET melder_kontakt = ? WHERE id = ?")
+            .bind(gespeichert)
+            .bind(p)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let body =
+            format!(r#"{{"melder_kontakt":"Neu","erwartet":{{"melder_kontakt":{erwartet}}}}}"#);
+        let (s, json) = person_patch(&app, &admin, e, p, &body).await;
+        assert_eq!(s, StatusCode::OK, "{gespeichert:?}: {json}");
+        assert_eq!(json["melder_kontakt"], "Neu");
+    }
+    let p = person_anlegen(&app, &admin, e, r#"{"melder_kontakt":"Alt"}"#).await;
+    let (s, json) = person_patch(
+        &app,
+        &admin,
+        e,
+        p,
+        r#"{"melder_kontakt":"Neu","erwartet":{"melder_kontakt":null}}"#,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "gesetzt bleibt Konflikt: {json}");
 }
 
 /// Zahl, Wahrheitswert, Auswahl und Zeitpunkt vergleichen ebenso; eine unbekannte Person bleibt
@@ -3125,14 +3167,66 @@ async fn geburtsdatum_im_patch_wird_geprueft() {
     }
 }
 
-/// Ein schon gespeicherter Wert in anderer Form bleibt stehen und hält die Änderung eines
-/// anderen Felds nicht auf; geprüft wird nur ein geschriebenes Geburtsdatum.
+/// Beim Anlegen gilt dieselbe Prüfung wie im PATCH (design.md D6, Spec
+/// `personendaten-bearbeiten`, „Geburtsdatum als Kalenderdatum“): `YYYY-MM-DD`, gültiger
+/// Kalendertag, nicht nach morgen (UTC), sonst 400 und keine Person; leer heißt ohne Angabe.
+/// Mutationsprobe: die Prüfung im Anlegen entfernen → „ca. 1980“, „31.02.“ und „übermorgen“
+/// legen an (201) und werden rot.
 #[tokio::test]
-async fn altes_geburtsdatum_in_freier_form_haelt_andere_felder_nicht_auf() {
+async fn geburtsdatum_beim_anlegen_wird_geprueft() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let p = person_anlegen(&app, &admin, e, r#"{"geburtsdatum":"ca. 1980"}"#).await;
+
+    let heute = chrono::Utc::now().date_naive();
+    let morgen = (heute + chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    let uebermorgen = (heute + chrono::Duration::days(2))
+        .format("%Y-%m-%d")
+        .to_string();
+
+    for schlecht in [
+        "ca. 1980",
+        "01.02.1980",
+        "1980-02-31",
+        "1980-2-1",
+        uebermorgen.as_str(),
+    ] {
+        let body = serde_json::json!({ "geburtsdatum": schlecht }).to_string();
+        let (s, json) = personen_post(&app, &admin, e, &body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{schlecht}: {json}");
+    }
+    assert_eq!(personen_anzahl(&app, &admin, e).await, 0, "nichts angelegt");
+
+    for gut in ["1980-02-01", morgen.as_str()] {
+        let body = serde_json::json!({ "geburtsdatum": gut }).to_string();
+        let (s, json) = personen_post(&app, &admin, e, &body).await;
+        assert_eq!(s, StatusCode::CREATED, "{gut}: {json}");
+        assert_eq!(json["geburtsdatum"], gut);
+    }
+    let (s, json) = personen_post(&app, &admin, e, r#"{"geburtsdatum":" 1980-02-01 "}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "getrimmt: {json}");
+    assert_eq!(json["geburtsdatum"], "1980-02-01");
+    let (s, json) = personen_post(&app, &admin, e, r#"{"geburtsdatum":"  "}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "leer: {json}");
+    assert!(json["geburtsdatum"].is_null());
+}
+
+/// Ein schon gespeicherter Wert in anderer Form bleibt stehen und hält die Änderung eines
+/// anderen Felds nicht auf; geprüft wird nur ein geschriebenes Geburtsdatum. Der Altbestand
+/// kommt direkt in die Tabelle: weder Anlegen noch PATCH nehmen ihn heute noch an.
+#[tokio::test]
+async fn altes_geburtsdatum_in_freier_form_haelt_andere_felder_nicht_auf() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    sqlx::query("UPDATE einsatz_person SET geburtsdatum = 'ca. 1980' WHERE id = ?")
+        .bind(p)
+        .execute(&pool)
+        .await
+        .unwrap();
     let (s, json) = person_patch(&app, &admin, e, p, r#"{"name":"Meier"}"#).await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["geburtsdatum"], "ca. 1980");
