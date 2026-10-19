@@ -243,6 +243,8 @@ export function personenPfad(
      */
     filter?: PersonenFilter;
     ansicht?: PersonenAnsicht;
+    /** „Abgeschlossene zeigen“ (LLH-1332). */
+    abgeschlossen?: boolean;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'personen'), {
@@ -250,6 +252,7 @@ export function personenPfad(
     neu: opts.neu ? 1 : undefined,
     filter: opts.filter,
     ansicht: opts.ansicht,
+    abgeschlossen: opts.abgeschlossen ? 1 : undefined,
   });
 }
 
@@ -277,8 +280,9 @@ const PERSONEN_ANSICHT_ERLAUBT: Record<PersonenAnsicht, true> = {
 export function parsePersonenSicht(params: URLSearchParams): {
   filter?: PersonenFilter;
   ansicht?: PersonenAnsicht;
+  abgeschlossen?: boolean;
 } {
-  const werte: { filter?: PersonenFilter; ansicht?: PersonenAnsicht } = {};
+  const werte: { filter?: PersonenFilter; ansicht?: PersonenAnsicht; abgeschlossen?: boolean } = {};
   const filter = params.get('filter');
   if (filter && Object.prototype.hasOwnProperty.call(PERSONEN_FILTER_ERLAUBT, filter)) {
     werte.filter = filter as PersonenFilter;
@@ -287,6 +291,7 @@ export function parsePersonenSicht(params: URLSearchParams): {
   if (ansicht && Object.prototype.hasOwnProperty.call(PERSONEN_ANSICHT_ERLAUBT, ansicht)) {
     werte.ansicht = ansicht as PersonenAnsicht;
   }
+  if (params.get('abgeschlossen') === '1') werte.abgeschlossen = true;
   return werte;
 }
 

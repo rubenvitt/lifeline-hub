@@ -4,7 +4,7 @@ import { wartetSeit, wartezeitMinuten } from './dringlichkeit';
 
 /**
  * Lage einer Unfallhilfsstelle in Zahlen (LLH-1136): wie viele Patienten nach Sichtung, wie viele
- * Plätze frei, wer wartet und wie lange, wer auf Transport ging. Rein und aus denselben Mengen wie
+ * Plätze frei, wer wartet und wie lange, wer im Eigentransport unterwegs ist. Rein und aus denselben Mengen wie
  * der Grundriss (`Grundriss.tsx`), damit Zahl und Bild nie auseinanderlaufen. Die Sichtung zählt
  * über `sichtungsbild` (eine Heimat je Zahl, `frontend/AGENTS.md`, LFH-550).
  */
@@ -15,10 +15,11 @@ export function personenInUhs(uhs: Pick<UhsDetail, 'id'>, personen: readonly Per
 }
 
 /**
- * Wer diese Stelle auf Transport verlassen hat: Austritt in ihrer Belegungsreihe und aktueller
- * Verbleib „Transport“. Nach R-Nr. sortiert, wie die Transport-Spalte des Grundrisses.
+ * Wer diese Stelle im Eigentransport verlassen hat und noch nicht übergeben ist (LLH-1332, Spec
+ * `uhs-grundriss`, Spalte „Unterwegs“): Austritt in ihrer Belegungsreihe und Versorgungszustand
+ * `unterwegs`. Nach R-Nr. sortiert, wie die Spalte des Grundrisses.
  */
-export function transportiertAus(
+export function unterwegsAus(
   uhs: Pick<UhsDetail, 'belegungen'>,
   personen: readonly Person[],
 ): Person[] {
@@ -26,7 +27,7 @@ export function transportiertAus(
     uhs.belegungen.filter((b) => b.art === 'austritt').map((b) => b.person_id),
   );
   return personen
-    .filter((p) => ausgetreten.has(p.id) && p.aktueller_verbleib?.startsWith('Transport'))
+    .filter((p) => ausgetreten.has(p.id) && p.versorgung === 'unterwegs')
     .sort((a, b) => a.registrier_nr - b.registrier_nr);
 }
 
@@ -67,7 +68,8 @@ export interface UhsLage {
   wartend: number;
   /** Längste laufende Wartezeit in Minuten; `null` ohne Wartende oder ohne lesbaren Beginn. */
   laengsteWarteMin: number | null;
-  abtransportiert: number;
+  /** Aus dieser Stelle im Eigentransport, Übergabe offen ({@link unterwegsAus}). */
+  unterwegs: number;
 }
 
 export function uhsLage(uhs: UhsDetail, personen: readonly Person[], jetztMs: number): UhsLage {
@@ -92,6 +94,6 @@ export function uhsLage(uhs: UhsDetail, personen: readonly Person[], jetztMs: nu
     plaetze: platzZahlen(uhs, belegtePlaetze(uhs, personen)),
     wartend: wartende.length,
     laengsteWarteMin: minuten.length > 0 ? Math.max(...minuten) : null,
-    abtransportiert: transportiertAus(uhs, personen).length,
+    unterwegs: unterwegsAus(uhs, personen).length,
   };
 }

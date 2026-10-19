@@ -32,7 +32,8 @@ const personen = [
     registrier_nr: 3,
     name: 'Fort',
     aktuelle_uhs_id: null,
-    aktueller_verbleib: 'Transport → KH',
+    aktueller_verbleib: 'Eigentransport 1/83-1 → KH',
+    versorgung: 'unterwegs',
   },
 ].map((p) => ({ einsatz_id: 1, status: 'betroffen', storniert_at: null, ...p })) as Person[];
 
@@ -64,18 +65,18 @@ describe('UhsLagezeile (LLH-1136)', () => {
     expect(zeile.querySelectorAll('[data-sichtung]')).toHaveLength(2);
     expect(within(zeile).getByText('1 in Aufbereitung')).toBeInTheDocument();
     expect(within(zeile).getByText('längste 34 min')).toBeInTheDocument();
-    expect(zeile.textContent).toMatch(/Abtransportiert\s*1/);
+    expect(zeile.textContent).toMatch(/Unterwegs\s*1/);
     expect(within(zeile).queryAllByRole('link')).toHaveLength(0);
     expect(zeile.textContent).not.toMatch(/Mustermann|Beispiel|Fort/);
     // Eine Zeile, die live nicht umbricht; der volle Wortlaut steht im Titel.
     expect(zeile.style.whiteSpace).toBe('nowrap');
     expect(zeile).toHaveAttribute(
       'title',
-      'In der Stelle 2 SK I 1 · SK II 1 · Plätze frei 1 / 3 1 in Aufbereitung · Wartend 1 längste 34 min · Abtransportiert 1',
+      'In der Stelle 2 SK I 1 · SK II 1 · Plätze frei 1 / 3 1 in Aufbereitung · Wartend 1 längste 34 min · Unterwegs 1',
     );
   });
 
-  it('nennt In der Stelle, Plätze frei, Wartend mit längster Zeit und Abtransportiert', async () => {
+  it('nennt In der Stelle, Plätze frei, Wartend mit längster Zeit und Unterwegs', async () => {
     renderMitProviders(<UhsLagezeile einsatzId={1} uhs={uhs} form="band" />);
     const zeile = screen.getByRole('group', { name: 'Lage der Stelle' });
     expect(await within(zeile).findByText('In der Stelle')).toBeInTheDocument();
@@ -88,7 +89,7 @@ describe('UhsLagezeile (LLH-1136)', () => {
     expect(within(zeile).getByText('1 / 3')).toBeInTheDocument();
     expect(within(zeile).getByText('1 in Aufbereitung')).toBeInTheDocument();
     expect(within(zeile).getByText('längste 34 min')).toBeInTheDocument();
-    expect(within(zeile).getByText('Abtransportiert')).toBeInTheDocument();
+    expect(within(zeile).getByText('Unterwegs')).toBeInTheDocument();
     // Keine Personennamen in der Zahlzeile.
     expect(zeile.textContent).not.toMatch(/Mustermann|Beispiel|Fort/);
   });
@@ -115,7 +116,7 @@ describe('UhsLagezeile (LLH-1136)', () => {
       'href',
       '/geraet/1/uhs/3',
     );
-    expect(within(zeile).getByRole('link', { name: /Abtransportiert/ })).toHaveAttribute(
+    expect(within(zeile).getByRole('link', { name: /Unterwegs/ })).toHaveAttribute(
       'href',
       '/geraet/1/uhs/3',
     );

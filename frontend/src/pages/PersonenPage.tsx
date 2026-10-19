@@ -1,5 +1,5 @@
 import { IconKreuz } from '../icons';
-import { Alert, App, Breadcrumb, Button, Flex, type InputRef } from 'antd';
+import { Alert, App, Breadcrumb, Button, Checkbox, Flex, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,7 +50,7 @@ import {
   type PersonenFilter,
   type PersonenSicht,
 } from '../personen/personenFilter';
-import { hatLuecke, SICHTUNGSBILD_REIHE } from '../personen/personenBilanz';
+import { hatLuecke, istAbgeschlossen, SICHTUNGSBILD_REIHE } from '../personen/personenBilanz';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
 import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
@@ -567,7 +567,12 @@ export default function PersonenPage() {
   // Keine Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: `sicht` ist kontrollierter
   // Zustand, nichts wird neu aufgesetzt.
   useEffect(() => {
-    if (!searchParams.has('filter') && !searchParams.has('ansicht')) return;
+    if (
+      !searchParams.has('filter') &&
+      !searchParams.has('ansicht') &&
+      !searchParams.has('abgeschlossen')
+    )
+      return;
     const vorgabe = parsePersonenSicht(searchParams);
     setSichtNachEinsatz((alt) => {
       const bisher = alt[einsatzId] ?? SICHT_VORGABE;
@@ -577,6 +582,7 @@ export default function PersonenPage() {
     const rest = new URLSearchParams(searchParams);
     rest.delete('filter');
     rest.delete('ansicht');
+    rest.delete('abgeschlossen');
     setSearchParams(rest, { replace: true });
   }, [searchParams, setSearchParams, einsatzId]);
 
@@ -808,6 +814,12 @@ export default function PersonenPage() {
   const listeGescheitert = personenQuery.isError && alle.length === 0;
   const standVeraltet = personenQuery.isError && alle.length > 0;
   const zeilen = filterPersonen(alle, sicht, lueckeGeschlossen);
+  /** Abgeschlossene der Statusmenge — die Zahl am Schalter „Abgeschlossene zeigen“ (LLH-1332). */
+  const abgeschlosseneZahl = filterPersonen(alle, {
+    ...sicht,
+    nurLuecken: false,
+    abgeschlossen: true,
+  }).filter(istAbgeschlossen).length;
   /*
    * Der Grund eines abgelehnten Vorschlags steht an der Zeile, solange sie mit der Abgleichspalte
    * dasteht; ist sie weggefiltert oder die Ansicht gewechselt, im Seitenhinweis.
@@ -1069,14 +1081,28 @@ export default function PersonenPage() {
             {/* Unter `xl` steht die Seitenleiste unter allen Zeilen; die Lagezahl bleibt hier im
                 ersten Bildschirm (LFH-963). Ab `xl` steht die Seitenleiste daneben. */}
             {!mitSeitenleiste && !personenQuery.isLoading && <Sichtungszeile alle={alle} />}
-            <Segmentleiste<PersonenFilter>
-              rolle="tablist"
-              beschriftung="Personen nach Status filtern"
-              optionen={FILTER_OPTIONEN}
-              wert={sicht.filter}
-              onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
-              style={{ marginBottom: token.marginSM }}
-            />
+            <Flex wrap align="center" gap={token.marginSM} style={{ marginBottom: token.marginSM }}>
+              <Segmentleiste<PersonenFilter>
+                rolle="tablist"
+                beschriftung="Personen nach Status filtern"
+                optionen={FILTER_OPTIONEN}
+                wert={sicht.filter}
+                onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
+              />
+              {/* Abgeschlossene stehen nicht in den Standardansichten (LLH-1332, Spec
+                  `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. */}
+              <Checkbox
+                checked={sicht.abgeschlossen}
+                onChange={(e) =>
+                  aendereSichtFuer(einsatzId, (alt) => ({
+                    ...alt,
+                    abgeschlossen: e.target.checked,
+                  }))
+                }
+              >
+                Abgeschlossene zeigen ({abgeschlosseneZahl})
+              </Checkbox>
+            </Flex>
             {sicht.ansicht === 'karte' ? (
               // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe Menge wie
               // die Zeilen, nur verortet.

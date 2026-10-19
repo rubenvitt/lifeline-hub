@@ -82,6 +82,20 @@ describe('verdichtePersonen', () => {
     expect(v.gesamt).toBe(6);
   });
 
+  it('lässt Abgeschlossene aus Patienten und SK-Verteilung, zählt sie gesondert (LLH-1332)', () => {
+    const v = verdichtePersonen([
+      person({ aktuelle_sichtung: 'sk2' }),
+      person({ aktuelle_sichtung: 'sk2', versorgung: 'unterwegs' }),
+      person({ aktuelle_sichtung: 'sk2', versorgung: 'abgeschlossen' }),
+      person({ aktuelle_sichtung: 'tot', versorgung: 'abgeschlossen' }),
+    ]);
+    expect(v.sk.sk2).toBe(2);
+    expect(v.sk.tot).toBe(0);
+    expect(v.patienten).toBe(2);
+    expect(v.abgeschlossen).toBe(2);
+    expect(v.gesamt).toBe(4);
+  });
+
   it('dieselbe SK-Verteilung wie die Seitenleiste der Betroffenen (LFH-550)', () => {
     const liste = [
       person({ aktuelle_sichtung: 'sk2' }),

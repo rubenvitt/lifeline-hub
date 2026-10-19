@@ -95,7 +95,7 @@ import {
   wartezeitMinuten,
   wartezeitText,
 } from './dringlichkeit';
-import { personenInUhs as personenInUhsVon, transportiertAus } from './uhsLage';
+import { personenInUhs as personenInUhsVon, unterwegsAus } from './uhsLage';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -1287,7 +1287,7 @@ export default function Grundriss({
   // Rechte Spalte: Personen, die aus dieser UHS auf Transport gingen — Austritts-Historie
   // (`uhs.belegungen`) ∩ aktueller Verbleib „Transport".
   // Dieselbe Menge zählt die Lage der Stelle (`uhsLage.ts`, LLH-1136).
-  const transportiert = transportiertAus(uhs, personen);
+  const transportiert = unterwegsAus(uhs, personen);
 
   // Innenfläche so groß, dass alle Plätze hineinpassen — sie scrollt innerhalb der Mittelspalte.
   const maxX = Math.max(0, ...uhs.plaetze.map((p) => p.pos_x ?? 0));

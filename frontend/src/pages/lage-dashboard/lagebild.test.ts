@@ -224,7 +224,7 @@ describe('baueLagebild', () => {
     expect(bild.kennzahlen[0].etikett).toBe('Pegel');
   });
 
-  it('Verbleib offen: Angetroffene ohne Verbleib, Notiz transportiert, Achtung bei > 0', () => {
+  it('Verbleib offen: Angetroffene ohne Verbleib, Notiz unterwegs, Achtung bei > 0', () => {
     const p = (extra: Partial<Person>) =>
       ({
         status: 'betroffen',
@@ -237,7 +237,8 @@ describe('baueLagebild', () => {
         personen: [
           p({}),
           p({}),
-          p({ aktuelle_verbleib_art: 'transport', aktueller_verbleib_status: 'abtransportiert' }),
+          p({ aktuelle_verbleib_art: 'transport', versorgung: 'unterwegs' }),
+          p({ aktuelle_verbleib_art: 'transport', versorgung: 'abgeschlossen' }),
           p({ status: 'vermisst' }),
         ],
       }),
@@ -247,7 +248,7 @@ describe('baueLagebild', () => {
     expect(bild.kennzahlen[0]).toMatchObject({
       etikett: 'Verbleib offen',
       wert: '2',
-      notiz: '1 transportiert',
+      notiz: '1 unterwegs',
       ton: 'achtung',
       route: 'personen',
     });

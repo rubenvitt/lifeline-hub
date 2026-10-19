@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Person, UhsBelegung, UhsDetail, UhsPlatz } from '../../api/types';
-import { platzZahlen, transportiertAus, uhsLage } from './uhsLage';
+import { platzZahlen, unterwegsAus, uhsLage } from './uhsLage';
 
 /**
  * Lage der Stelle in Zahlen (LLH-1136): abgeleitet aus Personen und UHS-Detail, dieselben Mengen
@@ -97,10 +97,10 @@ describe('uhsLage (LLH-1136)', () => {
     });
     expect(lage.wartend).toBe(3);
     expect(lage.laengsteWarteMin).toBe(34);
-    expect(lage.abtransportiert).toBe(0);
+    expect(lage.unterwegs).toBe(0);
   });
 
-  it('Gegenprobe: wer auf Transport geht, verlässt die Stelle und zählt als Abtransport', () => {
+  it('Gegenprobe: wer in den Eigentransport geht, verlässt die Stelle und zählt als unterwegs', () => {
     const vorher = uhsLage(uhs(belegungen), personen, JETZT);
     const nachher = uhsLage(
       uhs([
@@ -109,7 +109,12 @@ describe('uhsLage (LLH-1136)', () => {
       ]),
       personen.map((p) =>
         p.id === 2
-          ? { ...p, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH Mitte' }
+          ? {
+              ...p,
+              aktuelle_uhs_id: null,
+              aktueller_verbleib: 'Eigentransport 1/83-1 → KH Mitte',
+              versorgung: 'unterwegs' as const,
+            }
           : p,
       ),
       JETZT,
@@ -117,7 +122,7 @@ describe('uhsLage (LLH-1136)', () => {
     expect(nachher.inDerStelle).toBe(vorher.inDerStelle - 1);
     expect(nachher.wartend).toBe(vorher.wartend - 1);
     expect(nachher.sichtung.sk2).toBe(1);
-    expect(nachher.abtransportiert).toBe(vorher.abtransportiert + 1);
+    expect(nachher.unterwegs).toBe(vorher.unterwegs + 1);
     // Die längste Wartende war Person 2 (seit 09:00); jetzt wartet Person 3 am längsten.
     expect(nachher.laengsteWarteMin).toBe(14);
   });
@@ -138,17 +143,20 @@ describe('uhsLage (LLH-1136)', () => {
     expect(lage).toMatchObject({ inDerStelle: 0, wartend: 0, laengsteWarteMin: null });
   });
 
-  it('Abtransporte: nur wer aus DIESER Stelle austrat und auf Transport ist', () => {
+  it('Unterwegs: nur wer aus DIESER Stelle austrat und im Eigentransport ist', () => {
     const p = [
-      person({ id: 7, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH' }),
-      person({ id: 8, aktuelle_uhs_id: null, aktueller_verbleib: 'entlassen' }),
-      person({ id: 9, aktuelle_uhs_id: null, aktueller_verbleib: 'Transport → KH' }),
+      person({ id: 7, aktuelle_uhs_id: null, versorgung: 'unterwegs' }),
+      person({ id: 8, aktuelle_uhs_id: null, versorgung: 'abgeschlossen' }),
+      person({ id: 9, aktuelle_uhs_id: null, versorgung: 'unterwegs' }),
+      person({ id: 10, aktuelle_uhs_id: null, versorgung: 'abgeschlossen' }),
     ];
     const u = uhs([
       schritt({ id: 1, person_id: 7, art: 'austritt' }),
       schritt({ id: 2, person_id: 8, art: 'austritt' }),
+      // An ein fremdes Rettungsmittel übergeben: abgeschlossen, nicht unterwegs.
+      schritt({ id: 3, person_id: 10, art: 'austritt' }),
     ]);
-    expect(transportiertAus(u, p).map((x) => x.id)).toEqual([7]);
+    expect(unterwegsAus(u, p).map((x) => x.id)).toEqual([7]);
   });
 
   it('platzZahlen: belegt vor Verfügbarkeit, Wartebereich und stornierte zählen nicht', () => {

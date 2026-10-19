@@ -363,7 +363,10 @@ function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienu
 
 /** Verbleib-Anzeige: Kurzform (sonst Wort) der Art, sonst die aktuelle UHS, sonst „—". */
 export function verbleibText(
-  p: Pick<Person, 'aktuelle_verbleib_art' | 'aktueller_verbleib' | 'aktuelle_uhs_id'>,
+  p: Pick<
+    Person,
+    'aktuelle_verbleib_art' | 'aktueller_verbleib' | 'aktuelle_uhs_id' | 'versorgung'
+  >,
   uhsName: (id: number) => string | undefined,
 ): string | null {
   const k = verbleibKlasse(p);
