@@ -12,7 +12,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
-  `einsatzbericht-deckel-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `einsatzbericht-deckel-druck`, `koerperschema-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
@@ -99,6 +99,17 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `person_zugriff_audit`, ohne Eintrag keine Daten. Nie über `listePersonen` oder deren Cache;
   Optionen aus `druck/abfrageOptionen.ts` (`retry: false`, `refetchOnMount: 'always'`,
   `networkMode: 'always'` — offline scheitern statt den alten Stand druckbar zeigen), `gcTime: 0`. Tiere und Schäden drucken über ihre Liste, ohne Protokoll.
+- **Druckansicht einer Person** (LLH-1120, Spec `druck-dokumente`, „Druckansicht einer Person“,
+  Muster Auftragsdruck): `/einsaetze/:id/personen/:pid/druck` (`pages/PersonDruckPage.tsx`, Pfad
+  `personDruckPfad`), Einstieg als Nebenweg „Druckansicht“ des Personendetails, auch ohne
+  Schreibrecht, nie am Gerät (`geraetDarf('person-druck')` ist überall falsch, die Route steht in
+  keiner Routenliste). Geladen nur über `GET …/personen/{pid}/druck`, das jeden Abruf als `druck`
+  mit `person_id` ins Zugriffsprotokoll schreibt; Optionen wie beim Listendruck
+  (`DRUCK_ABFRAGE`, `gcTime: 0`), eigener nicht-live Key `personDruck`, „Neu laden“ holt neu.
+  Eine unbekannte Person steht als solche da, ohne Druckknopf. Das Blatt
+  (`personen/PersonDruckBlatt.tsx`) zeichnet das Körperschema mit `modus="druck"` ohne Fläche in
+  `currentColor`: Sternchen und Liste unterscheiden sich durch Nummer und Form, nie durch Farbe
+  (Nachweis `e2e/koerperschema-druck.spec.ts`, schwarz-weiß).
 - **Einsatzbericht** (LFH-726, `pages/EinsatzberichtDruckPage.tsx`, `druck/einsatzbericht/`,
   `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
   nie gesperrten Einsatzdaten), Einstieg sekundär auf der Einsatzdaten-Seite und in der Palette.

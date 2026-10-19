@@ -650,8 +650,9 @@ anwendbar), „nicht geprüft" ist keins.
   mit PNG, SVG erst nach Freigabe abrufen (Kontingent des Abos). Lücke: Ersatz aus demselben Stil,
   sonst eigene Zeichnung im 50er-Raster mit Vermerk; **nie ein zweiter Katalog**. Jedes Icon ist
   `aria-hidden`, `1em`, `currentColor`, Hülle `anticon` (antds Ausrichtung); antds eigene
-  Bauteil-Icons (Auswahlpfeil, Schließkreuz, `loading`) bleiben. Taktische Zeichen und die
-  Bildmarke sind keine Icons.
+  Bauteil-Icons (Auswahlpfeil, Schließkreuz, `loading`) bleiben. Taktische Zeichen, die
+  Bildmarke und die Figur des Körperschemas samt Sternchen (`personen/koerperschema/`) sind
+  Zeichnungen, keine Icons; Knöpfe neben ihnen tragen Icons des Satzes.
 - **Ein Emoji ist kein Icon:** Guard `icons/icons.guard.test.ts` (kein Import aus
   `@ant-design/icons`/`react-icons`, Stempel, kein unbenutztes Icon, kein Emoji im Code); in
   Text-/Druckausgaben ein Kurzwort (`Pers.`/`Fzg.`/`Mtl.`). Erlaubt als Textzeichen: ⧖ und ↗

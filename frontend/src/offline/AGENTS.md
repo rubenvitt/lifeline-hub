@@ -2,7 +2,8 @@
 
 Gilt für `frontend/src/offline/`, `api/queryKeys.ts`, `api/queryClient.ts` und den
 `AuthProvider`, ergänzt `frontend/AGENTS.md`. Der Abschnitt „Schreiben ohne Netz“ gilt
-außerdem für jede Mutation, die eine `erfasse…OfflineFaehig`-Funktion ruft, für
+außerdem für jede Mutation, die eine `erfasse…OfflineFaehig`- oder `save…OfflineCapable`-Funktion
+ruft, für
 `api/client.ts`, für `setzeOnline` in `test/utils.tsx` und für jede Stelle, die beim Erfassen
 „jetzt“ nimmt (ETB-Erfassung, Meldungsformular, `anzeige/ZeitpunktEingabe.tsx`). Pfade relativ
 zu `frontend/src/`.
@@ -22,13 +23,17 @@ draußen gelassen werden.
 
 - **Die Personenauswahl liegt neben der Vollliste auf der Platte** (`personenAuswahl`, LFH-940,
   Entscheidung Ruben 06.10.2026): nur Nummer, Name und Status, keine neue Datenart. Sie hält
-  Sprungpalette und Auswahlfelder ohne Netz am Leben. Die Meldungsseite (offen, Seiten der
+  Sprungpalette und Auswahlfelder ohne Netz am Leben. `lagebildKuerzen` kürzt auch sie, auf die
+  Positivliste `PERSONENAUSWAHL_AUF_DER_PLATTE`; die PAT-Nummer bleibt draußen, ohne Netz findet
+  die Palette eine Person darüber nicht (Change `y18v58dt-pat-kern`, D9). Die Meldungsseite (offen, Seiten der
   abgeschlossenen, Kennzahlen, Einzelabruf) bleibt draußen wie die Vollliste.
 - **Die Betroffenen liegen ohne Freitexte auf der Platte** (LFH-1095, Entscheidung Ruben
   09.10.2026): `lagebildKuerzen` (`offline/lagebildKuerzung.ts`) kürzt jede Person beim Speichern
   (Live und Vorrat) und vor dem `hydrate` (Bestand von davor) auf die Positivliste
-  `PERSON_AUF_DER_PLATTE`. Weg sind Adresse, Melderkontakt, Notiz, Zustand und Fundort samt
-  Koordinate; Sichtung, Verbleib und UHS/Platz bleiben. Ein neues Feld der Personenantwort bricht
+  `PERSON_AUF_DER_PLATTE`. Weg sind Adresse, Melderkontakt, Notiz, Zustand, Fundort samt
+  Koordinate, PAT-Nummer, Fachrichtung und Zeit des Transports; Sichtung, Verbleib, UHS/Platz,
+  Kontamination sowie Priorität und Art des Transports bleiben. Verletzungen und Maßnahmen stehen
+  nur im Detail und kommen nie auf die Platte. Ein neues Feld der Personenantwort bricht
   den Typcheck, bis es dort eingeordnet ist. Der Live-Cache bleibt voll. Der gekürzte Datensatz
   trägt `nicht_geladen`; jede Anzeige dieser Felder fragt `nichtGeladen(p, feld)` und zeigt
   „nicht geladen“, nie leer, offen oder bearbeitbar (Liste, Lücken, Karten). Wer ein weiteres
@@ -163,6 +168,17 @@ draußen gelassen werden.
   vormerkt. TanStacks Vorgabe `'online'` hielte die Mutation ohne Netz an: Dann erschiene
   nie „Offline vorgemerkt“, und nach der Rückkehr des Netzes ginge die Erfassung online
   hinaus. Bis LFH-705 galt das für alle fünf solchen Mutationen.
+- **Die medizinischen Einträge einer Person gehen über EINE Aktionsart je POST**
+  (LLH-1138, Change `y18v58dt-pat-kern`, D8): Sichtung, Verbleib, Notiz, Transport, Maßnahme und
+  Verletzung als `PersonEintragAktion` (`offline/personEintrag.ts`, `sendPersonEintrag` exhaustiv,
+  auch im Abgleich), vorgemerkt über `savePersonEintragOfflineCapable` und damit über
+  `mitErfassungszeitOfflineFaehig`: Erfassungszeit nach der Serveruhr, `client_id` für das
+  Replay, „Bestätigt von“ reist mit. Die Aktion trägt `person_id` und die Registriernummer als
+  `bezeichnung` (Quittung, Wiederherstellungsbereich: „Abgelehnte Sichtung: R-012“). Was sich ohne
+  Netz vormerken lässt, ist genau diese Liste (`PERSON_EINTRAG_ARTEN`): Aufheben einer Maßnahme
+  oder Verletzung bleibt online und ist ohne Netz mit Grund gesperrt, weil seine Route weder
+  `client_id` noch Erfassungszeit trägt (ein Replay endete in 409); PAT-Nummer und Kontamination
+  (PATCH) ebenso. Vorgemerktes einer Person zeigt `useVorgemerktePersonEintraege` am Ort.
 - **Ein gesammelter Schreibvorgang setzt die `client_id` beim Abschluss, nicht beim ersten
   Tipp** (LLH-1032, Sammelbuchung der Verpflegung, `verpflegung/useAusgabeSammlung.ts`). Ein
   Abschluss ohne Ort für Erfolg oder Ablehnung (Unmount, Routenwechsel, `pagehide`,
