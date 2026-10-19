@@ -12,16 +12,24 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 `_ds/…/tokens/*.css` ist alt). Bei Konflikten gewinnt das Design — **außer bei der Sichtung**
 (BBK). Umgekehrte Altregeln tragen „Neuentwurf 22.09.2026".
 
-- **Größere UI-Entwürfe über Claude Design** (Ruben, 08.10.2026, geändert 12.10.2026): Bei etwas
-  wirklich Größerem (neue Seite, neues Modul, Umbau des Rahmens, neuer Baustein; nicht bei einem
-  Feld oder Knopf) entwirft der Agent selbst in Claude Design, **wenn er Zugriff hat**
-  (`DesignSync`). Dort liegt das Design System **„Lifeline Hub“**; es baut auf den Entwurf, nicht
-  auf antd. Das Ergebnis landet wie der Neuentwurf unter `docs/design/<datum>-<thema>/`
-  (Inline-Styles maßgeblich). Ohne Zugriff (etwa in einer Cloud-Sitzung, `DesignSync` braucht
-  `/design-login` aus einer interaktiven Sitzung) baut er direkt nach dieser Gestaltungssprache:
-  kein Angebot, kein Prompt für Ruben, kein Entwurfsabschnitt im Ticket. Ändert ein PR Rollen,
-  `schriftskala`, Dichten, Bausteine oder Textregeln, sagt der Agent, dass das Design System
-  nachgezogen werden muss.
+- **Größere UI-Entwürfe über das Design System** (Ruben, 08.10.2026, geändert 19.10.2026,
+  LLH-1333): Bei etwas wirklich Größerem (neue Seite, neues Modul, Umbau des Rahmens, neuer
+  Baustein; nicht bei einem Feld oder Knopf) entwirft der Agent selbst mit `/design` bzw. dem
+  Artifact-Typ „Design“ auf Grundlage des Design Systems **„Lifeline Hub“** (Adresse in
+  `docs/design/design-system/ARTIFACT.md`), auch in einer Cloud-Sitzung: kein Angebot, kein
+  Prompt für Ruben, kein Entwurfsabschnitt im Ticket. Das Ergebnis landet wie der Neuentwurf unter
+  `docs/design/<datum>-<thema>/` (Inline-Styles maßgeblich).
+  - **Das Design System ist aus dem Code erzeugt** (`docs/design/design-system/project/`,
+    Generator `frontend/scripts/design-system/`, Wächter `designSystem.guard.test.ts`, Change
+    `uzfj5f43-design-system-aus-code`); von Hand gepflegt wird es nicht, Änderungen auf der Seite
+    überschreibt die nächste Veröffentlichung. Ändert ein PR das Theme (`theme/tokens.ts`,
+    `theme/schriften.ts`, `theme/rollen.css`, `theme/sprache.css`, `index.css`), einen
+    vorgestellten Baustein oder einen Regelabschnitt, den die README trägt, läuft
+    `mise exec -- pnpm -C frontend design-system`, und das Erzeugte kommt mit in den PR.
+  - **Nach dem Merge veröffentlicht der Agent, der den PR abschließt, neu**: aus dem Stand von
+    `alpha` auf die Adresse in `ARTIFACT.md`, nur geänderte Dateien, den Index
+    `design-system.json` zuletzt, `lastChange.via` „Claude Code aus lifeline-hub <Commit>“. Ohne
+    claude.ai-Anmeldung vermerkt er das als Kommentar an der Aufgabe.
 
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
