@@ -115,16 +115,20 @@ export function setzeMaterialStatus(
 /**
  * Einen Posten aufteilen (LLH-1093, design.md D8): `menge` geht als neue Zeile mit denselben
  * Angaben, demselben Ort und Status ab, die Ausgangszeile behält den Rest. Antwort `[Ausgang, neu]`.
+ * `ort` setzt den Ort der neuen Zeile im selben Request (t1hvaqzu, design.md D1): die Felder wie im
+ * PATCH, bezogen auf den Ort der Ausgangszeile (`ortPatch(ziel, ortVon(posten))`); ohne sie bleibt
+ * der Ort der Ausgangszeile.
  */
 export function teileAuf(
   einsatzId: number,
   emId: number,
   menge: number,
+  ort?: MaterialOrtPatch | null,
 ): Promise<[EinsatzMaterial, EinsatzMaterial]> {
   return apiSend<[EinsatzMaterial, EinsatzMaterial]>(
     `/api/einsaetze/${einsatzId}/material/${emId}/aufteilen`,
     'POST',
-    { menge },
+    { menge, ...ort },
   );
 }
 

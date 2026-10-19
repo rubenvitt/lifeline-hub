@@ -497,14 +497,22 @@ pub async fn update(
 /// sie kam mit derselben Lieferung (LLH-1226, design.md D9). Die neue Zeile ist aktiv.
 /// `NotFound`/`Conflict` wie
 /// [`require_aktiv_tx`], `UnprocessableEntity` an einem Gerät, wenn `menge` nicht kleiner als die
-/// Menge ist und wenn sie den Rest übersteigt. `menge` ≥ 1 prüft die Route (400). Liefert die ID
-/// der neuen Zeile.
+/// Menge ist und wenn sie den Rest übersteigt. `menge` ≥ 1 prüft die Route (400).
+///
+/// `ort_patch` setzt den Ort der neuen Zeile in derselben Anfrage (t1hvaqzu, design.md D1/D2): dieselben
+/// Tri-State-Felder wie im PATCH, bezogen auf den Ort der Ausgangszeile, den die neue Zeile erbt;
+/// leer = gleicher Ort. Zwei Orte mit Wert prüft die Route (422). Ein anderes Ziel wird nach Menge
+/// und Art und vor dem ersten Schreiben geprüft ([`ort::require_ziel_tx`], 404/409/422), so
+/// schreibt jede Ablehnung nichts, auch ohne umgebende Transaktion; gesetzt wird es über
+/// [`ort::set_ort_tx`]. Liefert die ID der neuen Zeile und ihren Ortswechsel gegenüber der
+/// Ausgangszeile.
 pub async fn teile_auf_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     em_id: i64,
     menge: i64,
-) -> Result<i64, AppError> {
+    ort_patch: OrtPatch,
+) -> Result<(i64, ort::OrtWechsel), AppError> {
     require_aktiv_tx(conn, einsatz_id, em_id).await?;
     let (ausgang, ausgegeben, art): (i64, i64, String) = sqlx::query_as(
         "SELECT menge, ausgegeben, art FROM einsatz_material WHERE id = ? AND einsatz_id = ?",
@@ -525,6 +533,14 @@ pub async fn teile_auf_tx(
         return Err(AppError::UnprocessableEntity(
             "Abzuteilende Menge größer als der Rest".into(),
         ));
+    }
+    let vorher = ort::load_ort_tx(conn, einsatz_id, em_id).await?;
+    let wechsel = ort::OrtWechsel {
+        vorher,
+        nachher: ort_patch.ziel(vorher).unwrap_or(vorher),
+    };
+    if let (true, Some(ziel)) = (wechsel.is_changed(), wechsel.nachher) {
+        ort::require_ziel_tx(conn, einsatz_id, ziel).await?;
     }
     let neu: i64 = sqlx::query_scalar(
         "INSERT INTO einsatz_material \
@@ -550,7 +566,10 @@ pub async fn teile_auf_tx(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    Ok(neu)
+    if wechsel.is_changed() {
+        ort::set_ort_tx(conn, einsatz_id, neu, wechsel.nachher).await?;
+    }
+    Ok((neu, wechsel))
 }
 
 /// Aktives Material einer UHS (aufgelöst), nach Dispo-Zeit; gefiltert nach `einsatz_id`
@@ -1428,9 +1447,21 @@ mod tests {
 
     async fn teile(pool: &SqlitePool, einsatz: i64, em: i64, menge: i64) -> Result<i64, AppError> {
         let mut tx = pool.begin().await.unwrap();
-        let neu = teile_auf_tx(&mut tx, einsatz, em, menge).await?;
+        let (neu, _) = teile_auf_tx(&mut tx, einsatz, em, menge, OrtPatch::default()).await?;
         tx.commit().await.unwrap();
         Ok(neu)
+    }
+
+    /// Aufteilen mit Ort-Feldern OHNE umgebende Transaktion: eine Ablehnung darf dann nichts
+    /// geschrieben haben, auch ohne Rollback (t1hvaqzu, design.md D2).
+    async fn teile_nach(
+        pool: &SqlitePool,
+        einsatz: i64,
+        em: i64,
+        menge: i64,
+        ort: OrtPatch,
+    ) -> Result<(i64, ort::OrtWechsel), AppError> {
+        teile_auf_tx(&mut pool.acquire().await.unwrap(), einsatz, em, menge, ort).await
     }
 
     /// LLH-1224 D2/D3/D4: Art, Menge, Ausgabe und Status passen zueinander, beim Disponieren
@@ -1809,6 +1840,196 @@ mod tests {
         assert_eq!(
             load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
             3
+        );
+    }
+
+    /// Einheit „Staffel A“, UHS „Turnhalle“, Fahrzeug „Florian 1/83-1“ und 50 Wolldecken an der
+    /// Einheit; liefert (einsatz, einheit, uhs, fahrzeug, em).
+    async fn decken_an_der_einheit(pool: &SqlitePool) -> (i64, i64, i64, i64, i64) {
+        let (benutzer, einsatz) = setup(pool).await;
+        let einheit: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Staffel A') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let uhs: i64 = sqlx::query_scalar(
+            "INSERT INTO uhs (einsatz_id, typ, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'patientenablage', 'Turnhalle', ?, ?) RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(benutzer)
+        .bind(benutzer)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let fahrzeug: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname) \
+             VALUES (?, 'Florian 1/83-1') RETURNING id",
+        )
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let m = mat_repo::anlegen(pool, 1, mat_daten("Wolldecke"))
+            .await
+            .unwrap();
+        let em = disponiere_stamm(pool, einsatz, 1, m.id, 50, benutzer)
+            .await
+            .unwrap();
+        ort::set_ort_tx(
+            &mut pool.acquire().await.unwrap(),
+            einsatz,
+            em,
+            Some(MaterialOrt::Einheit(einheit)),
+        )
+        .await
+        .unwrap();
+        (einsatz, einheit, uhs, fahrzeug, em)
+    }
+
+    async fn zeilen(pool: &SqlitePool) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_material")
+            .fetch_one(pool)
+            .await
+            .unwrap()
+    }
+
+    /// t1hvaqzu (LLH-1251), design.md D1/D2: 20 von 50 Wolldecken der Einheit an die UHS in EINEM
+    /// Aufteilen; genau eine neue Zeile, und zwar an der UHS, der Rest bleibt an der Einheit.
+    #[tokio::test]
+    async fn aufteilen_mit_zielort_legt_genau_eine_zeile_am_ziel_an() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit, uhs, _, em) = decken_an_der_einheit(&pool).await;
+        let ziel = OrtPatch {
+            uhs_id: Some(Some(uhs)),
+            ..OrtPatch::default()
+        };
+        let (neu, wechsel) = teile_nach(&pool, einsatz, em, 20, ziel).await.unwrap();
+        assert_eq!(
+            wechsel,
+            ort::OrtWechsel {
+                vorher: Some(MaterialOrt::Einheit(einheit)),
+                nachher: Some(MaterialOrt::Uhs(uhs)),
+            }
+        );
+        let a = load_anzeige(&pool, einsatz, em, true).await.unwrap();
+        let b = load_anzeige(&pool, einsatz, neu, true).await.unwrap();
+        assert_eq!(
+            (a.menge, a.ort()),
+            (30, Some(MaterialOrt::Einheit(einheit)))
+        );
+        assert_eq!((b.menge, b.ort()), (20, Some(MaterialOrt::Uhs(uhs))));
+        assert_eq!(zeilen(&pool).await, 2, "genau eine neue Zeile");
+        let an_der_uhs = list_je_uhs(&pool, einsatz, uhs, true).await.unwrap();
+        assert_eq!(
+            an_der_uhs.iter().map(|e| e.id).collect::<Vec<_>>(),
+            vec![neu]
+        );
+    }
+
+    /// t1hvaqzu, design.md D1/D2: die Ort-Felder bedeuten dasselbe wie im PATCH (bezogen auf den
+    /// Ort der Ausgangszeile); ein Ziel wird wie jeder Ortswechsel geprüft, NACH Menge und Art und
+    /// VOR dem ersten Schreiben.
+    #[tokio::test]
+    async fn aufteilen_mit_ziel_grenzen() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, einheit, uhs, fahrzeug, em) = decken_an_der_einheit(&pool).await;
+        let code = |r: Result<(i64, ort::OrtWechsel), AppError>| match r {
+            Ok(_) => 200,
+            Err(AppError::NotFound) => 404,
+            Err(AppError::Conflict(_)) => 409,
+            Err(AppError::UnprocessableEntity(_)) => 422,
+            Err(other) => panic!("unerwartet: {other:?}"),
+        };
+
+        // `null` am aktuellen Ort: der abgeteilte Teil steht ohne Ort.
+        let loesen = OrtPatch {
+            einheit_id: Some(None),
+            ..OrtPatch::default()
+        };
+        let (ohne, w) = teile_nach(&pool, einsatz, em, 5, loesen).await.unwrap();
+        assert!(w.is_changed());
+        assert_eq!(
+            load_anzeige(&pool, einsatz, ohne, true)
+                .await
+                .unwrap()
+                .ort(),
+            None
+        );
+        // Derselbe Ort: kein Wechsel, die Teilzeile bleibt an der Einheit.
+        let gleich = OrtPatch {
+            einheit_id: Some(Some(einheit)),
+            ..OrtPatch::default()
+        };
+        let (dort, w) = teile_nach(&pool, einsatz, em, 5, gleich).await.unwrap();
+        assert!(!w.is_changed());
+        assert_eq!(
+            load_anzeige(&pool, einsatz, dort, true)
+                .await
+                .unwrap()
+                .ort(),
+            Some(MaterialOrt::Einheit(einheit))
+        );
+        assert_eq!(
+            load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
+            40
+        );
+        let vorher = zeilen(&pool).await;
+
+        // Erst Menge, dann Ziel: zu viel an ein unbekanntes Ziel ist der Mengen-422, kein 404.
+        let unbekannt = OrtPatch {
+            einheit_id: Some(Some(9999)),
+            ..OrtPatch::default()
+        };
+        assert_eq!(
+            grund(
+                teile_nach(&pool, einsatz, em, 40, unbekannt)
+                    .await
+                    .unwrap_err()
+            ),
+            "Abzuteilende Menge muss kleiner als die Menge sein"
+        );
+        assert_eq!(
+            code(teile_nach(&pool, einsatz, em, 5, unbekannt).await),
+            404
+        );
+        sqlx::query("UPDATE uhs SET status = 'aufgeloest' WHERE id = ?")
+            .bind(uhs)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let an_uhs = OrtPatch {
+            uhs_id: Some(Some(uhs)),
+            ..OrtPatch::default()
+        };
+        assert_eq!(code(teile_nach(&pool, einsatz, em, 5, an_uhs).await), 422);
+        sqlx::query(
+            "UPDATE einsatz_fahrzeug SET beendet_at = '2026-10-14 10:00:00', \
+                 beendet_als = 'entlassen' WHERE id = ?",
+        )
+        .bind(fahrzeug)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let an_fahrzeug = OrtPatch {
+            einsatz_fahrzeug_id: Some(Some(fahrzeug)),
+            ..OrtPatch::default()
+        };
+        assert_eq!(
+            code(teile_nach(&pool, einsatz, em, 5, an_fahrzeug).await),
+            409
+        );
+        assert_eq!(
+            zeilen(&pool).await,
+            vorher,
+            "keine Ablehnung legt eine Zeile an"
+        );
+        assert_eq!(
+            load_anzeige(&pool, einsatz, em, true).await.unwrap().menge,
+            40,
+            "keine Ablehnung mindert die Ausgangszeile"
         );
     }
 

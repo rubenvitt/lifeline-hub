@@ -492,14 +492,27 @@ pub struct AufteilenBody {
     /// Die abzuteilende Menge: mindestens 1 (sonst 400) und kleiner als die Menge des Postens
     /// (sonst 422).
     pub menge: i64,
+    /// Der Ort des abgeteilten Teils (t1hvaqzu, design.md D1), dieselben Tri-State-Felder wie im
+    /// PATCH, bezogen auf den Ort der Ausgangszeile: fehlen alle = gleicher Ort, Wert = dorthin,
+    /// `null` am aktuellen Ort = ohne Ort. Mehr als ein Wert → 422.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einheit_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub einsatz_fahrzeug_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub uhs_id: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub br_id: Option<Option<i64>>,
 }
 
 /// POST /api/einsaetze/{id}/material/{em_id}/aufteilen — einen Posten auf zwei Zeilen aufteilen
 /// (LLH-1093, design.md D8): die Ausgangszeile wird um `menge` gemindert, eine neue Zeile mit
 /// `menge` übernimmt Angaben, Art, Status, Bemerkung, Ort und Dispositionszeitpunkt und beginnt
-/// ohne Ausgabe (LLH-1224 D14). Ein ETB-Eintrag in derselben Transaktion. 400 bei `menge` < 1, 404
-/// bei fremder Zeile, 409 bei beendetem Material, 422 an einem Gerät, bei `menge` ab der Menge des
-/// Postens und über dem Rest. Liefert 201 mit `[Ausgang, neu]`.
+/// ohne Ausgabe (LLH-1224 D14). Nennt der Body einen Ort, steht die neue Zeile dort (t1hvaqzu,
+/// design.md D1/D2). Ein ETB-Eintrag in derselben Transaktion, bei einem Ortswechsel mit altem und
+/// neuem Ort (D3). Reihenfolge: 400 (`menge` < 1) → 422 (zwei Orte) → 404 (Zeile) → 409
+/// (beendet) → 422 (Gerät, `menge` ab der Menge, über dem Rest) → 404/409/422 (Ziel); jede
+/// Ablehnung schreibt nichts. Liefert 201 mit `[Ausgang, neu]`.
 pub async fn aufteilen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Material>,
@@ -512,31 +525,58 @@ pub async fn aufteilen(
             "Abzuteilende Menge muss mindestens 1 sein".into(),
         ));
     }
+    let ort_patch = OrtPatch {
+        einheit_id: body.einheit_id,
+        einsatz_fahrzeug_id: body.einsatz_fahrzeug_id,
+        uhs_id: body.uhs_id,
+        br_id: body.br_id,
+    };
+    ort_patch.validate()?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    // F06/LFH-244 Tier-A: Mindern, Anlegen und System-ETB atomar in EINER Tx; SSE erst nach dem
-    // Commit.
-    let (ausgang, neu) = crate::write_retry!(&state.pool, |conn| {
+    // F06/LFH-244 Tier-A: Mindern, Anlegen, Ort und System-ETB atomar in EINER Tx; SSE erst nach
+    // dem Commit.
+    let (ausgang, neu, wechsel) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
-        let neu_id = disposition_repo::teile_auf_tx(conn, einsatz_id, em_id, body.menge).await?;
+        let (neu_id, wechsel) =
+            disposition_repo::teile_auf_tx(conn, einsatz_id, em_id, body.menge, ort_patch).await?;
+        let ortswechsel = if wechsel.is_changed() {
+            Some((
+                ort::ort_text_tx(conn, einsatz_id, wechsel.vorher).await?,
+                ort::ort_text_tx(conn, einsatz_id, wechsel.nachher).await?,
+            ))
+        } else {
+            None
+        };
         crate::etb::system_audit_tx(
             conn,
             einsatz_id,
             ctx.benutzer.id,
             startwert,
-            &crate::material::etb_text_aufgeteilt(&vorher.bezeichnung, vorher.menge, body.menge),
+            &crate::material::etb_text_aufgeteilt(
+                &vorher.bezeichnung,
+                vorher.menge,
+                body.menge,
+                ortswechsel
+                    .as_ref()
+                    .map(|(alt, neu)| (alt.as_str(), neu.as_str())),
+            ),
         )
         .await?;
         let ausgang = disposition_repo::load_anzeige_tx(conn, einsatz_id, em_id, true).await?;
         let neu = disposition_repo::load_anzeige_tx(conn, einsatz_id, neu_id, true).await?;
-        Ok((ausgang, neu))
+        Ok((ausgang, neu, wechsel))
     })?;
     sse_material(&state, einsatz_id, ausgang.id);
     sse_material(&state, einsatz_id, neu.id);
     notify_nachforderung(&state, &ausgang);
     // Der Ort zeigt sein Material als Liste und bekommt eine Zeile dazu (`material` erreicht
-    // seine Leser ohne Materialrecht nicht, LLH-1182).
+    // seine Leser ohne Materialrecht nicht, LLH-1182); wandert der abgeteilte Teil, auch das Ziel
+    // (Spec `material-modell`, „Ortswechsel live“).
     if let Some(o) = ausgang.ort() {
         sse_ort(&state, einsatz_id, o);
+    }
+    if let (true, Some(ziel)) = (wechsel.is_changed(), wechsel.nachher) {
+        sse_ort(&state, einsatz_id, ziel);
     }
     Ok((StatusCode::CREATED, Json(vec![ausgang, neu])))
 }
