@@ -26,6 +26,7 @@ import { stelle, zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
+import { queueLeerenFuerTests } from '../offline/queue';
 
 /**
  * Die Gerätehülle im echten Routenbaum (LFH-892, Spec `feldgeraet-bedienung`): Startseite,
@@ -353,11 +354,53 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     const flaeche = await screen.findByRole('region', { name: 'Sichtung R-001' });
     await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
     await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
-    await waitFor(() => expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null }]));
+    await waitFor(() =>
+      expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null, client_id: expect.any(String) }]),
+    );
     // Kein Zeilenklick: die Liste bleibt.
     expect(pfad(router)).toBe('/geraet/7/patienten');
     expect(screen.queryByRole('button', { name: /^Aktionen zu R-/ })).toBeNull();
     expect(screen.queryByText('Auf Lagekarte verorten')).toBeNull();
+  });
+
+  it('UHS-Tablet ohne Netz: die Zeilen-Sichtung zeigt „Offline vorgemerkt“ und geht danach einmal hinaus (LLH-1138)', async () => {
+    vi.useRealTimers();
+    await queueLeerenFuerTests();
+    stelleBereit();
+    const gesendet: { zeitpunkt_at?: string; client_id?: string }[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personen/10/sichtung', async ({ request }) => {
+        gesendet.push((await request.json()) as (typeof gesendet)[number]);
+        return HttpResponse.json(
+          { id: 1, person_id: 10, kategorie: 'sk1', notiz: null, erfasst_at: '', erfasst_von: 1 },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp('/geraet');
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Sichtung R-001 ändern, aktuell SK II' }),
+    );
+    act(() => setzeOnline(false));
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-001' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+
+    const zeile = () => screen.getByText('R-001').closest('tr') as HTMLElement;
+    expect(await within(zeile()).findByText('Offline vorgemerkt')).toBeVisible();
+    expect(gesendet).toEqual([]);
+
+    // Das Netz kehrt zurück: die Warteschlange der Hülle sendet genau einmal, mit Erfassungszeit.
+    act(() => setzeOnline(true));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      kategorie: 'sk1',
+      client_id: expect.any(String),
+      zeitpunkt_at: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/),
+    });
+    await waitFor(() => expect(within(zeile()).queryByText('Offline vorgemerkt')).toBeNull());
+    expect(gesendet).toHaveLength(1);
   });
 
   it('Fremde Adresse: die Lagekarte führt auf die Startseite', async () => {

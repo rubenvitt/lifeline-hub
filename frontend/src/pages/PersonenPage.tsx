@@ -33,6 +33,7 @@ import {
   nameText,
   personenKarte,
   personenSpalten,
+  vorgemerktJePerson,
   zeilenMenueEintraege,
   zeilenMenueName,
   type PersonZeilenAktion,
@@ -65,6 +66,7 @@ import { useDichte } from '../theme/ThemeModeProvider';
 import { dichten } from '../theme/tokens';
 import '../personen/betroffene.css';
 import { erfassePersonOfflineFaehig } from '../offline/schreiben';
+import { useVorgemerktePersonEintraege } from '../offline/useVorgemerkteSchreibaktionen';
 import {
   beobachteOfflinePersonQuittungen,
   OFFLINE_SCHREIBAKTION_GESENDET_EVENT,
@@ -678,12 +680,19 @@ export default function PersonenPage() {
     ? gefundenePersonen(frischErfasst.alle)
     : KEINE_GEFUNDENEN;
   const uhsDaten = uhsQuery.data;
+  // Ohne Netz Vorgemerktes je Zeile (LLH-1138, design.md D8): einmal für alle Zeilen gelesen.
+  const vorgemerkteEintraege = useVorgemerktePersonEintraege(benutzer?.id, einsatzId);
+  const vorgemerkt = useMemo(
+    () => vorgemerktJePerson(vorgemerkteEintraege),
+    [vorgemerkteEintraege],
+  );
   const bedienung = useMemo(
     () => ({
       einsatzId,
       darfSchreiben: darfSchreibenListe,
       rueckmeldung,
       onVerbleib: openVerbleib,
+      vorgemerkt,
       // Ohne Schreibrecht entfällt die Zeilenaktionsspalte ganz (`frontend/AGENTS.md`, M45), wie
       // das Menü der Karte (`weitere` unten).
       menue: darfSchreibenListe
@@ -699,6 +708,7 @@ export default function PersonenPage() {
       darfSchreibenListe,
       rueckmeldung,
       openVerbleib,
+      vorgemerkt,
       aktionsBreite,
       karteGesperrt,
       selectZeilenAktion,
@@ -1191,7 +1201,7 @@ export default function PersonenPage() {
         <SichtungDialog
           key={sichtungFuer.person.id}
           einsatzId={einsatzId}
-          personId={sichtungFuer.person.id}
+          person={sichtungFuer.person}
           offen
           onErfasst={() => {
             const personId = sichtungFuer.person.id;
@@ -1206,7 +1216,7 @@ export default function PersonenPage() {
         <VerbleibErfassung
           key={verbleibFuer.person.id}
           einsatzId={einsatzId}
-          personId={verbleibFuer.person.id}
+          person={verbleibFuer.person}
           onErfasst={() => {
             const personId = verbleibFuer.person.id;
             setLueckeGeschlossen((alt) => new Set(alt).add(personId));

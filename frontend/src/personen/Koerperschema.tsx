@@ -49,8 +49,13 @@ export interface KoerperschemaProps {
   verletzungen: readonly Verletzung[];
   geschlecht: Person['geschlecht'] | undefined;
   modus: 'lesen' | 'markieren' | 'druck';
-  /** Grund, warum das Markieren gesperrt ist (ohne Netz); das Schema bleibt lesbar. */
+  /** Grund, warum das Markieren gesperrt ist; das Schema bleibt lesbar. */
   gesperrt?: string;
+  /**
+   * Grund, warum nur das Aufheben gesperrt ist (ohne Netz, LLH-1138): Markieren merkt vor, das
+   * Aufheben hat keine `client_id` und bleibt online.
+   */
+  aufhebenGesperrt?: string;
   markierung?: UseMutationResult<unknown, Error, VerletzungEingabe>;
   aufhebung?: UseMutationResult<unknown, Error, number>;
 }
@@ -84,6 +89,7 @@ export default function Koerperschema({
   geschlecht,
   modus,
   gesperrt,
+  aufhebenGesperrt,
   markierung,
   aufhebung,
 }: KoerperschemaProps) {
@@ -135,7 +141,7 @@ export default function Koerperschema({
   }
 
   function aufheben(id: number) {
-    if (!aufhebung || laeuft) return;
+    if (!aufhebung || laeuft || aufhebenGesperrt) return;
     aufhebung.mutateAsync(id).then(
       () => setAuswahl(null),
       () => {},
@@ -239,9 +245,15 @@ export default function Koerperschema({
               <Typography.Text strong>
                 <span style={monoStil(13)}>{stern.nummer}</span> {verletzungText(stern.verletzung)}
               </Typography.Text>
+              {aufhebenGesperrt && (
+                <div role="status" style={{ color: rollen.text2 }}>
+                  {aufhebenGesperrt}
+                </div>
+              )}
               <Flex gap="middle" wrap>
                 <Button
                   danger
+                  disabled={!!aufhebenGesperrt}
                   loading={aufhebung?.isPending}
                   onClick={() => aufheben(stern.verletzung.id)}
                 >

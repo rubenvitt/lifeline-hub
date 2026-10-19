@@ -23,7 +23,7 @@ export function istPatient(p: { aktuelle_sichtung?: Sichtungskategorie | null })
 }
 
 /** Einzeilige Kurzfassung eines Verbleib-Eintrags für den Personen-Verlauf. */
-export function kurzVerbleib(v: Verbleib): string {
+export function kurzVerbleib(v: Pick<Verbleib, 'art' | 'ziel' | 'transportmittel'>): string {
   const ziel = v.ziel ? ` → ${v.ziel}` : '';
   const tm = v.transportmittel ? ` (${v.transportmittel})` : '';
   switch (v.art) {

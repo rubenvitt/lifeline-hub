@@ -2,18 +2,18 @@ import { Button, Flex, Form, Input, Typography } from 'antd';
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import {
-  createMassnahme,
-  erfasseVerbleib,
-  legeNotizAn,
-  createVerletzung,
   revokeMassnahme,
   revokeVerletzung,
-  saveTransport,
   type MassnahmeEingabe,
   type TransportEingabe,
   type VerbleibEingabe,
   type VerletzungEingabe,
 } from '../api/einsatzPerson';
+import { useAuthOptional } from '../auth/AuthContext';
+import {
+  useVorgemerktePersonEintraege,
+  type VorgemerkterPersonEintrag,
+} from '../offline/useVorgemerkteSchreibaktionen';
 import type { PersonDetail } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { formatVor } from '../anzeige/abstand';
@@ -46,7 +46,8 @@ import PatKennzeichen from './PatKennzeichen';
 import { MassnahmePaneel, TransportPaneel } from './PatientenkopfPaneele';
 import { istAngetroffen } from './personenBilanz';
 import { ZustandSchreiben } from './personenSpalten';
-import { SichtungFelder, saveSichtung, type SichtungWerte } from './SichtungDialog';
+import { SichtungFelder, useSaveSichtung, type SichtungWerte } from './SichtungDialog';
+import { useSavePersonEintrag, vormerkungText } from './personEintragSpeichern';
 import { useVerbleibFelder } from './VerbleibErfassung';
 import type { VerbleibFormWerte } from './verbleibErfassungKern';
 
@@ -102,31 +103,45 @@ export default function Patientenkopf({
   const toggle = (paneel: Paneel) => setOffen((o) => (o === paneel ? null : paneel));
   const close = (paneel: Paneel) => () => setOffen((o) => (o === paneel ? null : o));
 
+  // Je Schreibweg EINE Mutation, hier im Kopf (Wechselsperre). Ohne Netz merkt der Schreibweg vor
+  // (LLH-1138, design.md D8): deshalb `networkMode: 'always'`, sonst hielte TanStack die Mutation
+  // an (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“). Vorgemerkt gibt es keinen neuen
+  // Serverstand; die Quittung steht unten im Kopf.
+  const saveSichtung = useSaveSichtung();
+  const save = useSavePersonEintrag();
+  const nachSpeichern = (ergebnis: { zustand: 'gesendet' | 'vorgemerkt' }) => {
+    if (ergebnis.zustand === 'gesendet') onGeschrieben?.();
+  };
   const sichtungMutation = useMutation({
-    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person.id, v),
-    onSuccess: () => onGeschrieben?.(),
+    networkMode: 'always',
+    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person, v),
+    onSuccess: nachSpeichern,
   });
   const verbleibMutation = useMutation({
-    mutationFn: (eingabe: VerbleibEingabe) => erfasseVerbleib(einsatzId, person.id, eingabe),
-    onSuccess: () => onGeschrieben?.(),
+    networkMode: 'always',
+    mutationFn: (eingabe: VerbleibEingabe) => save(einsatzId, person, 'verbleib', eingabe),
+    onSuccess: nachSpeichern,
   });
-  // Je Schreibweg EINE Mutation, hier im Kopf (Wechselsperre). Die Offline-Vormerkung
-  // (Abschnitt 8, design.md D8) tauscht nur die `mutationFn` aus.
   const transportMutation = useMutation({
-    mutationFn: (eingabe: TransportEingabe) => saveTransport(einsatzId, person.id, eingabe),
-    onSuccess: () => onGeschrieben?.(),
+    networkMode: 'always',
+    mutationFn: (eingabe: TransportEingabe) => save(einsatzId, person, 'transport', eingabe),
+    onSuccess: nachSpeichern,
   });
   const massnahmeMutation = useMutation({
-    mutationFn: (eingabe: MassnahmeEingabe) => createMassnahme(einsatzId, person.id, eingabe),
-    onSuccess: () => onGeschrieben?.(),
+    networkMode: 'always',
+    mutationFn: (eingabe: MassnahmeEingabe) => save(einsatzId, person, 'massnahme', eingabe),
+    onSuccess: nachSpeichern,
   });
+  // Aufheben bleibt online: die Route kennt weder `client_id` noch Erfassungszeit, ein Replay
+  // endete in 409, und das Aufheben stünde zur Zeit der Übertragung im Verlauf.
   const massnahmeAufhebenMutation = useMutation({
     mutationFn: (massnahmeId: number) => revokeMassnahme(einsatzId, person.id, massnahmeId),
     onSuccess: () => onGeschrieben?.(),
   });
   const verletzungMutation = useMutation({
-    mutationFn: (eingabe: VerletzungEingabe) => createVerletzung(einsatzId, person.id, eingabe),
-    onSuccess: () => onGeschrieben?.(),
+    networkMode: 'always',
+    mutationFn: (eingabe: VerletzungEingabe) => save(einsatzId, person, 'verletzung', eingabe),
+    onSuccess: nachSpeichern,
   });
   const verletzungAufhebenMutation = useMutation({
     mutationFn: (verletzungId: number) => revokeVerletzung(einsatzId, person.id, verletzungId),
@@ -155,6 +170,14 @@ export default function Patientenkopf({
   const zweiSpalten = viewport.abBreite('lg');
   const mitFigur = viewport.abBreite('md') && verletzungen.length > 0;
   const online = useOnline();
+  const aufhebenGesperrt = online ? undefined : AUFHEBEN_OHNE_NETZ;
+  // Vorgemerkt an dieser Person, getrennt vom Serverstand (`frontend/src/offline/AGENTS.md`, „Was
+  // vorgemerkt ist, kennt der Server noch nicht“); die Notizen quittiert die Notizzeile.
+  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const vorgemerkt = useVorgemerktePersonEintraege(benutzerId, einsatzId).filter(
+    (v) => v.aktion.person_id === person.id,
+  );
+  const vorgemerkteNotizen = vorgemerkt.filter((v) => v.aktion.art === 'notiz');
 
   return (
     <section
@@ -357,6 +380,9 @@ export default function Patientenkopf({
         </Datenraster>
       </div>
 
+      {modus === 'bedienen' && (
+        <VorgemerktBlock eintraege={vorgemerkt.filter((v) => v.aktion.art !== 'notiz')} />
+      )}
       {offen === 'sichtung' && (
         <SichtungPaneel
           einsatzId={einsatzId}
@@ -387,8 +413,8 @@ export default function Patientenkopf({
               verletzungen={person.verletzungen ?? []}
               geschlecht={person.geschlecht}
               modus="markieren"
-              // Bis die Vormerkung ohne Netz steht (Abschnitt 8), bleibt das Markieren online.
-              gesperrt={online ? undefined : 'Markieren ohne Netz nicht möglich'}
+              // Markieren merkt ohne Netz vor (D8); Aufheben bleibt online.
+              aufhebenGesperrt={aufhebenGesperrt}
               markierung={verletzungMutation}
               aufhebung={verletzungAufhebenMutation}
             />
@@ -406,11 +432,17 @@ export default function Patientenkopf({
           person={person}
           mutation={massnahmeMutation}
           aufheben={massnahmeAufhebenMutation}
+          aufhebenGesperrt={aufhebenGesperrt}
           onSchliessen={close('massnahme')}
         />
       )}
       {bedienbar && (
-        <NotizZeile einsatzId={einsatzId} personId={person.id} onGeschrieben={onGeschrieben} />
+        <NotizZeile
+          einsatzId={einsatzId}
+          person={person}
+          vorgemerkt={vorgemerkteNotizen}
+          onGeschrieben={onGeschrieben}
+        />
       )}
     </section>
   );
@@ -477,6 +509,52 @@ function SichtungsAnzeige({
     >
       {text}
     </button>
+  );
+}
+
+/** Grund, warum ohne Netz nicht aufgehoben wird (LFH-966: wenige Wörter). */
+export const AUFHEBEN_OHNE_NETZ = 'Aufheben ohne Netz nicht möglich';
+
+/**
+ * Quittung „Offline vorgemerkt“ im Kopf (LLH-1138, Spec `personen-detail`, „Nachsichtung am
+ * Tablet ohne Netz“): was an dieser Person in der Warteschlange liegt, mit Erfassungszeit. Es
+ * verschwindet, sobald der Abgleich den Eintrag gesendet und das Detail neu geladen hat; eine
+ * Ablehnung steht dann im Wiederherstellungsbereich.
+ */
+function VorgemerktBlock({ eintraege }: { eintraege: readonly VorgemerkterPersonEintrag[] }) {
+  const { token, rollen } = useRollen();
+  if (eintraege.length === 0) return null;
+  return (
+    <section
+      aria-label="Offline vorgemerkt"
+      data-lfh="vorgemerkt"
+      style={{
+        borderInlineStart: `3px solid ${token.colorWarning}`,
+        paddingInlineStart: token.paddingSM,
+        color: rollen.text2,
+      }}
+    >
+      <Typography.Text strong>Offline vorgemerkt</Typography.Text>
+      <VorgemerktListe eintraege={eintraege} />
+    </section>
+  );
+}
+
+function VorgemerktListe({ eintraege }: { eintraege: readonly VorgemerkterPersonEintrag[] }) {
+  return (
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {eintraege.map((v) => (
+        <li key={v.id ?? v.aktion.daten.client_id}>
+          {vormerkungText(v.aktion)}
+          {v.aktion.daten.zeitpunkt_at && (
+            <>
+              {' · '}
+              <ZeitAnzeige wert={v.aktion.daten.zeitpunkt_at} format="uhrzeit" />
+            </>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -607,20 +685,27 @@ function VerbleibPaneel({
  */
 function NotizZeile({
   einsatzId,
-  personId,
+  person,
+  vorgemerkt,
   onGeschrieben,
 }: {
   einsatzId: number;
-  personId: number;
+  person: PersonDetail;
+  /** Ohne Netz vorgemerkte Notizen dieser Person (LLH-1138): die Zeile quittiert sie. */
+  vorgemerkt: readonly VorgemerkterPersonEintrag[];
   onGeschrieben?: () => void;
 }) {
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
   const [form] = Form.useForm<{ text: string }>();
+  const save = useSavePersonEintrag();
+  const personId = person.id;
   const mutation = useMutation({
-    mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, { text: v.text }),
-    onSuccess: () => {
+    // Merkt ohne Netz vor (design.md D8); der Text liegt dann in der Warteschlange.
+    networkMode: 'always',
+    mutationFn: (v: { text: string }) => save(einsatzId, person, 'notiz', { text: v.text }),
+    onSuccess: (ergebnis) => {
       form.resetFields();
-      onGeschrieben?.();
+      if (ergebnis.zustand === 'gesendet') onGeschrieben?.();
     },
   });
   return (
@@ -647,6 +732,12 @@ function NotizZeile({
           </Button>
         </Flex>
       </Schnellerfassungszeile>
+      {vorgemerkt.length > 0 && (
+        <div data-lfh="notiz-vorgemerkt" style={{ marginTop: token.marginXS, color: rollen.text2 }}>
+          <Typography.Text strong>Offline vorgemerkt</Typography.Text>
+          <VorgemerktListe eintraege={vorgemerkt} />
+        </div>
+      )}
       {mutation.error != null && (
         <div style={{ marginTop: token.marginXS }}>
           <SpeicherFehler fehler={mutation.error} titel="Notiz nicht angelegt" />

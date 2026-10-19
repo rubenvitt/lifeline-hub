@@ -180,15 +180,18 @@ export function MassnahmePaneel({
   person,
   mutation,
   aufheben,
+  aufhebenGesperrt,
   onSchliessen,
 }: {
   einsatzId: number;
   person: PersonDetail;
   mutation: UseMutationResult<unknown, Error, MassnahmeEingabe>;
   aufheben: UseMutationResult<unknown, Error, number>;
+  /** Grund, warum ohne Netz nicht aufgehoben wird (LLH-1138); Erfassen merkt vor. */
+  aufhebenGesperrt?: string;
   onSchliessen: () => void;
 }) {
-  const { token } = useRollen();
+  const { token, rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const [form] = Form.useForm<MassnahmeWerte>();
   const erfasst = gueltig(person.massnahmen ?? []);
@@ -221,6 +224,11 @@ export function MassnahmePaneel({
       {erfasst.length > 0 && (
         <Flex vertical gap={token.marginXS} style={{ marginTop: token.marginSM }}>
           <Typography.Text type="secondary">Erfasst</Typography.Text>
+          {aufhebenGesperrt && (
+            <div role="status" style={{ color: rollen.text2 }}>
+              {aufhebenGesperrt}
+            </div>
+          )}
           <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
             {erfasst.map((m) => (
               <li key={m.id}>
@@ -236,7 +244,7 @@ export function MassnahmePaneel({
                   <Button
                     danger
                     aria-label={name(m)}
-                    disabled={aufheben.isPending || mutation.isPending}
+                    disabled={!!aufhebenGesperrt || aufheben.isPending || mutation.isPending}
                     loading={aufheben.isPending && aufheben.variables === m.id}
                     onClick={() => aufheben.mutate(m.id)}
                   >

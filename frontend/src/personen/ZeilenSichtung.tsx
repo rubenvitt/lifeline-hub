@@ -8,7 +8,7 @@ import SichtungsTag from '../components/SichtungsTag';
 import { ErfassungsFormular } from '../components/Erfassung';
 import { useRollen } from '../components/instrument';
 import { SK_META } from './personMeta';
-import { saveSichtung } from './SichtungDialog';
+import { useSaveSichtung } from './SichtungDialog';
 import SichtungsWahl, { SICHTUNGSFLAECHE_BREITE, sichtungsLuecke } from './SichtungsWahl';
 
 /**
@@ -29,6 +29,8 @@ interface ZeilenSichtungProps {
   p: Person;
   einsatzId: number;
   rueckmeldung: ZeilenRueckmeldung;
+  /** Eine Nachsichtung dieser Person liegt ohne Netz in der Warteschlange (LLH-1138). */
+  vorgemerkt?: boolean;
 }
 
 interface SichtungEingabe {
@@ -50,9 +52,16 @@ interface SichtungEingabe {
  *   Halt hängt an einem Effekt: verschwindet die Zeile mit offenem Popover, gibt er ihn frei.
  * - Kein Notizfeld und kein „Bestätigt von“: beides bleibt der Nachsichtung im Patientenkopf und im
  *   Dialog. Die Wahl beginnt leer, auch eine bestätigte gleiche Kategorie ist eine Nachsichtung.
+ * - Ohne Netz merkt die Zelle vor (LLH-1138, Spec `betroffene-lagedaten`): sie zeigt weiter den
+ *   Serverstand, darunter „Offline vorgemerkt“, bis der Abgleich die Sichtung gesendet hat.
  */
-export default function ZeilenSichtung({ p, einsatzId, rueckmeldung }: ZeilenSichtungProps) {
-  const { token } = useRollen();
+export default function ZeilenSichtung({
+  p,
+  einsatzId,
+  rueckmeldung,
+  vorgemerkt = false,
+}: ZeilenSichtungProps) {
+  const { token, rollen } = useRollen();
   const qc = useQueryClient();
   const [form] = Form.useForm<SichtungEingabe>();
   const [offen, setOffen] = useState(false);
@@ -60,14 +69,19 @@ export default function ZeilenSichtung({ p, einsatzId, rueckmeldung }: ZeilenSic
   const warOffen = useRef(false);
   const kennung = registrierAnzeige(p.registrier_nr);
   const { beginne, melde, hold } = rueckmeldung;
+  const saveSichtung = useSaveSichtung();
 
   const mutation = useMutation({
+    // Merkt ohne Netz selbst vor (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
+    networkMode: 'always',
     mutationFn: (v: { einsatzId: number; kategorie: Sichtungskategorie }) =>
-      saveSichtung(v.einsatzId, p.id, { kategorie: v.kategorie }),
+      saveSichtung(v.einsatzId, p, { kategorie: v.kategorie }),
     onMutate: () => beginne(p.id),
     onError: (fehler, v) => melde(p.id, fehler, v.einsatzId),
     // Zurückgegeben: die Zelle bleibt `isPending`, bis der neue Stand in der Liste steht.
-    onSuccess: (_s, v) =>
+    // Vorgemerkt gibt es keinen neuen Stand; die Quittung liest die Seite aus der Warteschlange.
+    onSuccess: (ergebnis, v) =>
+      ergebnis.zustand === 'vorgemerkt' ||
       Promise.all([
         qc.invalidateQueries({ queryKey: einsatzKeys.personen(v.einsatzId) }),
         qc.invalidateQueries({ queryKey: einsatzKeys.person(v.einsatzId, p.id) }),
@@ -152,6 +166,11 @@ export default function ZeilenSichtung({ p, einsatzId, rueckmeldung }: ZeilenSic
           {gezeigt ? <SichtungsTag kategorie={gezeigt} /> : 'Sichten'}
         </Button>
       </Popover>
+      {vorgemerkt && (
+        <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
+          Offline vorgemerkt
+        </div>
+      )}
     </div>
   );
 }

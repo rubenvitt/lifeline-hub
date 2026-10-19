@@ -66,7 +66,7 @@ function zeige() {
   const r = renderMitProviders(
     <VerbleibErfassung
       einsatzId={1}
-      personId={2}
+      person={{ id: 2, registrier_nr: 2 }}
       onErfasst={onErfasst}
       onSchliessen={onSchliessen}
     />,

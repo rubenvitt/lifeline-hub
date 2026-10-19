@@ -31,7 +31,7 @@ import {
   type PersonEintragDaten,
 } from './personEintrag';
 
-type OfflineSchreibErgebnis<T> =
+export type OfflineSchreibErgebnis<T> =
   { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
 
 function clientId(vorgegeben?: string | null): string {

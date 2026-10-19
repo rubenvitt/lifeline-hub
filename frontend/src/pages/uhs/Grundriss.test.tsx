@@ -4,7 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
+import { AuthProvider, useAuthOptional } from '../../auth/AuthContext';
+import { benutzerFixture } from '../../test/fixtures';
+import { setzeOnline } from '../../test/utils';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import { App as AntApp, ConfigProvider } from 'antd';
 import Grundriss, {
   PLATZ_KARTE_BREITE,
@@ -118,6 +122,11 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
   };
 }
 
+/** Zeigt, dass die Sitzung geladen ist (Besitzer der Offline-Warteschlange). */
+function AuthSonde() {
+  return useAuthOptional()?.benutzer ? <span data-testid="angemeldet" /> : null;
+}
+
 /**
  * Rendert mit dem App-Theme der gewählten Dichtestufe: die Platzkarte liest ihre Bedienform aus den
  * Tokens (`platzBedienform`), antds Vorgaben ohne Theme ergäben einen Zustand, den die App in
@@ -131,8 +140,11 @@ function renderGrundriss(
   /** Nachtbetrieb mit antds dunklem Algorithmus; ohne ihn liest `useRollen` das Thema als hell. */
   nacht = false,
   platzBearbeitbar = true,
+  /** Mit angemeldetem Benutzer: Besitzer der Offline-Warteschlange (LLH-1138). */
+  angemeldet = false,
 ) {
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
+  if (angemeldet) server.use(meHandler(benutzerFixture()));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const baum = (u: UhsDetail) => (
     // MemoryRouter: der Detail-Drawer nutzt useNavigate.
@@ -145,12 +157,24 @@ function renderGrundriss(
           }}
         >
           <AntApp>
-            <Grundriss
-              einsatzId={1}
-              uhs={u}
-              schreibgeschuetzt={schreibgeschuetzt}
-              platzBearbeitbar={platzBearbeitbar}
-            />
+            {angemeldet ? (
+              <AuthProvider>
+                <AuthSonde />
+                <Grundriss
+                  einsatzId={1}
+                  uhs={u}
+                  schreibgeschuetzt={schreibgeschuetzt}
+                  platzBearbeitbar={platzBearbeitbar}
+                />
+              </AuthProvider>
+            ) : (
+              <Grundriss
+                einsatzId={1}
+                uhs={u}
+                schreibgeschuetzt={schreibgeschuetzt}
+                platzBearbeitbar={platzBearbeitbar}
+              />
+            )}
           </AntApp>
         </ConfigProvider>
       </QueryClientProvider>
@@ -366,6 +390,49 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByTitle('Transport')).toBeInTheDocument();
     expect(within(dialog).queryByTitle('Entlassung vor Ort')).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Verbleib ohne Netz (LLH-1138, design.md D8)', () => {
+  it('merkt den Transport vor, quittiert „Offline vorgemerkt“ und schließt den Dialog', async () => {
+    await queueLeerenFuerTests();
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderGrundriss(uhs, [p], false, 'kompakt', false, true, true);
+    await screen.findByTestId('angemeldet');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
+    setzeOnline(false);
+    onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
+
+    expect(await screen.findByText('Offline vorgemerkt: Verbleib R-007')).toBeInTheDocument();
+    // Geschlossen: jsdom beendet antds Ausblendung nicht, der Dialog steht im Ausgang.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')?.className ?? 'weg').toMatch(/zoom-leave|weg/),
+    );
+    expect(gesendet).toEqual([]);
+    expect((await schreibaktionenLaden(benutzerFixture().id, 1)).map((z) => z.aktion)).toEqual([
+      expect.objectContaining({
+        art: 'verbleib',
+        person_id: 7,
+        bezeichnung: 'R-007',
+        daten: expect.objectContaining({
+          art: 'transport',
+          ziel: 'KH Mitte',
+          status: 'abtransportiert',
+          zeitpunkt_at: expect.any(String),
+        }),
+      }),
+    ]);
   });
 });
 

@@ -21,6 +21,7 @@ import { kontamination } from '../theme/statusFarben';
 import { GESCHLECHT_KURZ } from './personBefehl';
 import { koordinatenText } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
+import type { PersonEintragArt } from '../offline/personEintrag';
 import {
   istAngetroffen,
   lueckenText,
@@ -197,6 +198,27 @@ export interface PersonenBedienung {
   onVerbleib?: (p: Person) => void;
   /** Das Zeilenmenü (design.md D3); fehlt es, gibt es keine Aktionsspalte (Gerät). */
   menue?: PersonenZeilenMenue;
+  /**
+   * Ohne Netz vorgemerkte Einträge je Person (LLH-1138, `vorgemerktJePerson`): Sichtungs- und
+   * Verbleib-Zelle zeigen „Offline vorgemerkt“, getrennt vom Serverstand.
+   */
+  vorgemerkt?: VorgemerktJePerson;
+}
+
+/** Arten vorgemerkter Einträge je Person. */
+export type VorgemerktJePerson = ReadonlyMap<number, ReadonlySet<PersonEintragArt>>;
+
+/** Die vorgemerkten Einträge eines Einsatzes nach Person; eine Liste liest sie einmal. */
+export function vorgemerktJePerson(
+  eintraege: readonly { aktion: { art: PersonEintragArt; person_id: number } }[],
+): VorgemerktJePerson {
+  const je = new Map<number, Set<PersonEintragArt>>();
+  for (const { aktion } of eintraege) {
+    const arten = je.get(aktion.person_id) ?? new Set<PersonEintragArt>();
+    arten.add(aktion.art);
+    je.set(aktion.person_id, arten);
+  }
+  return je;
 }
 
 /** Die Handlungen des Zeilenmenüs. */
@@ -368,6 +390,20 @@ function VerbleibZelle({
 }) {
   const { rollen } = useRollen();
   const text = verbleibText(p, uhsName);
+  // Ein vorgemerkter Verbleib (LLH-1138) steht neben dem Serverstand, nicht an seiner Stelle.
+  const vorgemerkt = bedienung?.vorgemerkt?.get(p.id)?.has('verbleib') && (
+    <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
+      Offline vorgemerkt
+    </div>
+  );
+  if (vorgemerkt) {
+    return (
+      <>
+        {text != null && <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>}
+        {vorgemerkt}
+      </>
+    );
+  }
   if (text != null) return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
   const offen = lueckenVon(p).verbleib;
   const onVerbleib = bedienung?.darfSchreiben && !p.storniert_at ? bedienung.onVerbleib : undefined;
@@ -428,6 +464,7 @@ export function personenSpalten(
             p={p}
             einsatzId={bedienung.einsatzId}
             rueckmeldung={bedienung.rueckmeldung}
+            vorgemerkt={bedienung.vorgemerkt?.get(p.id)?.has('sichtung')}
           />
         ) : (
           <SkTag p={p} />

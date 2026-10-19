@@ -7,7 +7,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import type { EinsatzAnzeige, Person } from '../api/types';
 import PersonenPage from './PersonenPage';
-import { queueLeerenFuerTests } from '../offline/queue';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { offlineQuittungsKanalZuruecksetzenFuerTests } from '../offline/ereignisse';
 import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
@@ -125,7 +125,9 @@ describe('Sichtung aus der Zeile (LLH-1130, 2.1)', () => {
     // Tipp 3: „Übernehmen“.
     await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
 
-    await waitFor(() => expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null }]));
+    await waitFor(() =>
+      expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null, client_id: expect.any(String) }]),
+    );
     expect(
       await screen.findByRole('button', { name: 'Sichtung R-007 ändern, aktuell SK I' }),
     ).toBeInTheDocument();
@@ -276,6 +278,68 @@ async function offenesMenue() {
   ) as HTMLElement;
 }
 
+describe('Ohne Netz aus der Zeile (LLH-1138, design.md D8)', () => {
+  const benutzerId = benutzerFixture().id;
+
+  it('Nachsichtung: die Zeile zeigt „Offline vorgemerkt“, gesendet wird nichts', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/70/sichtung', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json(sichtungAntwort('sk1'), { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(() => [r007]);
+
+    await user.click(await screen.findByRole('button', { name: /^Sichtung R-007 ändern/ }));
+    setzeOnline(false);
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-007' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+
+    expect(await within(zeile('R-007')).findByText('Offline vorgemerkt')).toBeInTheDocument();
+    // Die Zelle zeigt weiter den Serverstand.
+    expect(
+      within(zeile('R-007')).getByRole('button', { name: 'Sichtung R-007 ändern, aktuell SK II' }),
+    ).toBeInTheDocument();
+    expect(gesendet).toEqual([]);
+    expect((await schreibaktionenLaden(benutzerId, 1)).map((z) => z.aktion)).toEqual([
+      expect.objectContaining({
+        art: 'sichtung',
+        person_id: 70,
+        bezeichnung: 'R-007',
+        daten: expect.objectContaining({ kategorie: 'sk1', zeitpunkt_at: expect.any(String) }),
+      }),
+    ]);
+  });
+
+  it('Verbleib aus der Lücke: der Dialog schließt, die Zeile zeigt „Offline vorgemerkt“', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/70/verbleib', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json(verbleibAntwort, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(() => [r007]);
+
+    await user.click(await screen.findByRole('button', { name: 'Verbleib erfassen für R-007' }));
+    setzeOnline(false);
+    await erfasseTransport(user, 'KH Mitte');
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Verbleib erfassen' })).toBeNull(),
+    );
+    expect(await within(zeile('R-007')).findByText('Offline vorgemerkt')).toBeInTheDocument();
+    expect(gesendet).toEqual([]);
+    expect((await schreibaktionenLaden(benutzerId, 1)).map((z) => z.aktion.art)).toEqual([
+      'verbleib',
+    ]);
+  });
+});
+
 describe('Zeilenmenü (LLH-1130, 2.3)', () => {
   const eintraege = (menue: HTMLElement) =>
     within(menue)
@@ -317,7 +381,9 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Sichtung erfassen' });
     await user.click(within(dialog).getByRole('radio', { name: /^SK III,/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
-    await waitFor(() => expect(gesendet).toEqual([{ kategorie: 'sk3', notiz: null }]));
+    await waitFor(() =>
+      expect(gesendet).toEqual([{ kategorie: 'sk3', notiz: null, client_id: expect.any(String) }]),
+    );
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Sichtung erfassen' })).toBeNull(),
     );

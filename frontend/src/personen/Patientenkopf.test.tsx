@@ -1,11 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
 import { benutzerFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import Patientenkopf from './Patientenkopf';
 
@@ -208,7 +209,11 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     await userEvent.click(within(paneel).getByRole('radio', { name: /^SK I,/ }));
     await userEvent.click(within(paneel).getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
-    expect(gesendet).toEqual([{ pfad: 'sichtung', body: { kategorie: 'sk1', notiz: null } }]);
+    expect(gesendet).toEqual([
+      { pfad: 'sichtung', body: { kategorie: 'sk1', notiz: null, client_id: expect.any(String) } },
+    ]);
+    // Online ohne Erfassungszeit: der Server nimmt seine Uhr (LLH-1138).
+    expect(gesendet[0].body).not.toHaveProperty('zeitpunkt_at');
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull(),
     );
@@ -253,7 +258,9 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     await userEvent.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
     await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
-    expect(gesendet).toEqual([{ pfad: 'notizen', body: { text: 'Infusion läuft' } }]);
+    expect(gesendet).toEqual([
+      { pfad: 'notizen', body: { text: 'Infusion läuft', client_id: expect.any(String) } },
+    ]);
     await waitFor(() =>
       expect(screen.getByRole('textbox', { name: 'Verlaufsnotiz' })).toHaveValue(''),
     );
@@ -532,7 +539,12 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     expect(gesendet).toEqual([
       {
         pfad: 'transport',
-        body: { prioritaet: 'sofort', art: 'liegend', fachrichtung: 'unfallchirurgie' },
+        body: {
+          prioritaet: 'sofort',
+          art: 'liegend',
+          fachrichtung: 'unfallchirurgie',
+          client_id: expect.any(String),
+        },
       },
     ]);
     await waitFor(() =>
@@ -553,6 +565,7 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
       prioritaet: null,
       art: 'liegend',
       fachrichtung: 'unfallchirurgie',
+      client_id: expect.any(String),
     });
   });
 
@@ -580,7 +593,9 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await userEvent.click(within(paneel).getByRole('radio', { name: 'Blutstillung' }));
     await userEvent.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
-    expect(gesendet).toEqual([{ pfad: 'massnahmen', body: { art: 'blutstillung' } }]);
+    expect(gesendet).toEqual([
+      { pfad: 'massnahmen', body: { art: 'blutstillung', client_id: expect.any(String) } },
+    ]);
   });
 
   it('verlangt eine Maßnahme, bevor es sendet', async () => {
@@ -675,7 +690,11 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
     await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));
-    expect(gesendet[0].body).toEqual({ art: 'zugang', bestaetigt_personal_id: 5 });
+    expect(gesendet[0].body).toEqual({
+      art: 'zugang',
+      bestaetigt_personal_id: 5,
+      client_id: expect.any(String),
+    });
   });
 
   it('bietet ohne Behandlungsrecht (Betreuungsstelle) weder Transport noch Maßnahme an', () => {
@@ -798,14 +817,18 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
     expect(gesendet).toEqual([{ pfad: 'verletzungen/3/aufheben', body: null }]);
   });
 
-  it('sperrt das Markieren ohne Netz mit Grund', async () => {
-    const { kopf } = zeige();
+  it('hebt ohne Netz nicht auf: das Sternchen nennt den Grund', async () => {
+    const { kopf } = zeige(vollerKern);
     await userEvent.click(within(kopf).getByRole('button', { name: 'Verletzung markieren' }));
     setzeOnline(false);
     try {
       const paneel = await screen.findByRole('region', { name: 'Verletzung markieren' });
-      expect(await within(paneel).findByText('Markieren ohne Netz nicht möglich')).toBeVisible();
-      expect(within(paneel).queryByRole('button', { name: 'Kopf, vorn' })).toBeNull();
+      await userEvent.click(
+        within(paneel).getByRole('button', { name: /^Verletzung 3, Thorax, vorn/ }),
+      );
+      expect(within(paneel).getByRole('button', { name: 'Aufheben' })).toBeDisabled();
+      expect(within(paneel).getByText('Aufheben ohne Netz nicht möglich')).toBeVisible();
+      expect(gesendet).toEqual([]);
     } finally {
       setzeOnline(true);
     }
@@ -814,5 +837,178 @@ describe('Patientenkopf — Verletzungen am Körperschema (LLH-1120, design.md D
   it('bietet ohne Behandlungsrecht kein Markieren an', () => {
     const { kopf } = zeige(vollerKern, { darfBehandeln: false });
     expect(within(kopf).queryByRole('button', { name: 'Verletzung markieren' })).toBeNull();
+  });
+});
+
+/**
+ * Ohne Netz am UHS-Tablet (LLH-1138, design.md D8, Spec `personen-detail`, „Nachsichtung am
+ * Tablet ohne Netz“): jeder Eintrag geht in die Warteschlange statt zu scheitern, am Ort steht
+ * „Offline vorgemerkt“. Geladen wird online, dann fällt das Netz weg (`setzeOnline`).
+ */
+describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
+  const TABLET = 41;
+  beforeEach(async () => {
+    await queueLeerenFuerTests();
+    server.use(
+      meHandler({
+        ...benutzerFixture({ id: TABLET, anzeigename: 'UHS Nord · Tablet 1' }),
+        geraet: {
+          kopplung_id: 3,
+          einsatz_id: 1,
+          ansicht: 'uhs-tablet',
+          uhs_id: 3,
+          stelle: 'UHS Nord',
+          bezeichnung: 'Tablet 1',
+          laeuft_ab_at: '2026-10-08 12:00:00',
+        },
+      }),
+      http.get('/api/einsaetze/1/personen/bestaetiger', () =>
+        HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]),
+      ),
+    );
+  });
+  afterEach(() => setzeOnline(true));
+
+  /** Wartet auf die Gerätesitzung: „Bestätigt von“ erscheint im Sichtungspaneel erst mit ihr. */
+  async function sitzungAbwarten(kopf: HTMLElement) {
+    await userEvent.click(within(kopf).getByRole('button', { name: /^Nachsichten/ }));
+    const paneel = screen.getByRole('region', { name: 'Sichtung erfassen' });
+    await within(paneel).findByRole('combobox', { name: 'Bestätigt von' });
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Abbrechen' }));
+  }
+
+  /** Öffnet ein Paneel bei stehender Gerätesitzung und nimmt dann das Netz weg. */
+  async function paneelOhneNetz(kopf: HTMLElement, knopf: RegExp | string, region: string) {
+    await sitzungAbwarten(kopf);
+    await userEvent.click(within(kopf).getByRole('button', { name: knopf }));
+    const paneel = screen.getByRole('region', { name: region });
+    setzeOnline(false);
+    return paneel;
+  }
+
+  async function vorgemerkt() {
+    return (await schreibaktionenLaden(TABLET, 1)).map((z) => z.aktion);
+  }
+
+  it('Nachsichtung: steht im Kopf „Offline vorgemerkt“, mit „Bestätigt von“ in der Warteschlange', async () => {
+    const user = userEvent.setup();
+    const { kopf, onGeschrieben } = zeige();
+    const paneel = await paneelOhneNetz(kopf, /^Nachsichten/, 'Sichtung erfassen');
+    await user.click(within(paneel).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(paneel).getByRole('combobox', { name: 'Bestätigt von' }));
+    await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
+    await user.click(within(paneel).getByRole('button', { name: 'Übernehmen' }));
+
+    const quittung = await within(kopf).findByRole('region', { name: 'Offline vorgemerkt' });
+    expect(quittung).toHaveTextContent('Sichtung SK I');
+    expect(gesendet).toEqual([]);
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    // Der Kopf zeigt weiter den Serverstand, das Vorgemerkte steht daneben.
+    expect(within(kopf).getByRole('button', { name: /^Nachsichten, aktuell SK II/ })).toBeVisible();
+    expect(await vorgemerkt()).toEqual([
+      {
+        art: 'sichtung',
+        person_id: 10,
+        bezeichnung: 'R-012',
+        daten: {
+          kategorie: 'sk1',
+          notiz: null,
+          bestaetigt_personal_id: 5,
+          client_id: expect.any(String),
+          zeitpunkt_at: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/),
+        },
+      },
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Sichtung erfassen' })).toBeNull(),
+    );
+  });
+
+  it('Verbleib, Transport und Maßnahme: je vorgemerkt und im Kopf quittiert', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige();
+
+    let paneel = await paneelOhneNetz(kopf, 'Verbleib erfassen', 'Verbleib erfassen');
+    await user.click(within(paneel).getByRole('combobox', { name: 'Art' }));
+    await user.click(await screen.findByTitle('Transport'));
+    await user.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
+    await user.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Verbleib erfassen' })).toBeNull(),
+    );
+
+    setzeOnline(true);
+    paneel = await paneelOhneNetz(kopf, 'Transport festlegen', 'Transport festlegen');
+    await user.click(within(paneel).getByRole('radio', { name: 'dringlich' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Transport festlegen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Transport festlegen' })).toBeNull(),
+    );
+
+    setzeOnline(true);
+    paneel = await paneelOhneNetz(kopf, 'Maßnahme erfassen', 'Maßnahme erfassen');
+    await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
+    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Maßnahme erfassen' })).toBeNull(),
+    );
+
+    const quittung = within(kopf).getByRole('region', { name: 'Offline vorgemerkt' });
+    await waitFor(() => expect(within(quittung).getAllByRole('listitem')).toHaveLength(3));
+    expect(quittung).toHaveTextContent('Verbleib Transport → KH Mitte');
+    expect(quittung).toHaveTextContent('Transport dringlich');
+    expect(quittung).toHaveTextContent('Maßnahme Zugang');
+    expect(gesendet).toEqual([]);
+    expect((await vorgemerkt()).map((a) => a.art)).toEqual(['verbleib', 'transport', 'massnahme']);
+  });
+
+  it('Maßnahme aufheben bleibt ohne Netz mit Grund gesperrt', async () => {
+    const { kopf } = zeige(vollerKern);
+    const paneel = await paneelOhneNetz(kopf, 'Maßnahme erfassen', 'Maßnahme erfassen');
+    expect(await within(paneel).findByText('Aufheben ohne Netz nicht möglich')).toBeVisible();
+    expect(
+      within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
+    ).toBeDisabled();
+  });
+
+  it('Verletzung: markiert ohne Netz mit zwei Tipps und merkt vor', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige();
+    const paneel = await paneelOhneNetz(kopf, 'Verletzung markieren', 'Verletzung markieren');
+    await user.click(within(paneel).getByRole('button', { name: 'Kopf, vorn' }));
+    await user.click(within(paneel).getByRole('radio', { name: 'Wunde/Blutung' }));
+
+    const quittung = await within(kopf).findByRole('region', { name: 'Offline vorgemerkt' });
+    expect(quittung).toHaveTextContent('Verletzung Kopf, vorn · Wunde/Blutung');
+    expect(gesendet).toEqual([]);
+    expect(await vorgemerkt()).toEqual([
+      expect.objectContaining({
+        art: 'verletzung',
+        daten: expect.objectContaining({ ansicht: 'vorn', region: 'kopf', art: 'wunde_blutung' }),
+      }),
+    ]);
+  });
+
+  it('Notiz: die Zeile quittiert „Offline vorgemerkt“ mit dem Text und leert sich', async () => {
+    const user = userEvent.setup();
+    const { kopf } = zeige();
+    await sitzungAbwarten(kopf);
+    setzeOnline(false);
+    await user.type(screen.getByRole('textbox', { name: 'Verlaufsnotiz' }), 'Infusion läuft');
+    await user.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+
+    const zeile = kopf.querySelector<HTMLElement>('[data-lfh="notiz-zeile"]')!;
+    expect(await within(zeile).findByText(/Offline vorgemerkt/)).toBeVisible();
+    expect(zeile).toHaveTextContent('Infusion läuft');
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Verlaufsnotiz' })).toHaveValue(''),
+    );
+    expect(gesendet).toEqual([]);
+    expect(await vorgemerkt()).toEqual([
+      expect.objectContaining({
+        art: 'notiz',
+        daten: expect.objectContaining({ text: 'Infusion läuft' }),
+      }),
+    ]);
   });
 });

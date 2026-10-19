@@ -48,7 +48,8 @@ import {
   setzePlatzVerfuegbarkeit,
   stornierePlatz,
 } from '../../api/einsatzUhs';
-import { erfasseVerbleib, listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { useSavePersonEintrag } from '../../personen/personEintragSpeichern';
 import type {
   Person,
   PlatzTyp,
@@ -1433,15 +1434,19 @@ export default function Grundriss({
   // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben). Der Server trägt die Person
   // aus der UHS aus (Auto-Austritt); bei Transport wandert sie nach rechts.
   // `status=abtransportiert` nur bei Transport, sonst null — wie in der PersonenPage.
+  // Ohne Netz merkt der Schreibweg vor (LLH-1138, design.md D8; `networkMode: 'always'`, Regel in
+  // `frontend/src/offline/AGENTS.md`): die Person bleibt dann, wo sie steht, bis der Abgleich sendet.
+  const saveVerbleib = useSavePersonEintrag();
   const transportMut = useMutation({
+    networkMode: 'always',
     mutationFn: ({
-      personId,
+      person,
       art,
       ziel,
       transportmittel,
       notiz,
-    }: VerbleibWerte & { personId: number }) =>
-      erfasseVerbleib(einsatzId, personId, {
+    }: VerbleibWerte & { person: Person }) =>
+      saveVerbleib(einsatzId, person, 'verbleib', {
         art,
         ziel: ziel ?? null,
         transportmittel: transportmittel ?? null,
@@ -1449,7 +1454,11 @@ export default function Grundriss({
         notiz: notiz ?? null,
       }),
     // Schließen und Leeren macht die Erfassungshülle, sie zeigt auch die Ablehnung.
-    onSuccess: () => {
+    onSuccess: (ergebnis, { person }) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning(`Offline vorgemerkt: Verbleib ${registrierAnzeige(person.registrier_nr)}`);
+        return;
+      }
       message.success('Verbleib erfasst');
       invalidate();
     },
@@ -1831,7 +1840,7 @@ export default function Grundriss({
         onErfassen={async (werte) => {
           // Der Dialog ist nur offen, solange eine Zielperson steht; die Prüfung engt den Typ ein.
           if (!transportPerson) return;
-          await transportMut.mutateAsync({ personId: transportPerson.id, ...werte });
+          await transportMut.mutateAsync({ person: transportPerson, ...werte });
         }}
         onFertig={() => setTransportPerson(null)}
         onAbbrechen={() => setTransportPerson(null)}
