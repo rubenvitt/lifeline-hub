@@ -149,6 +149,14 @@ export const VERLETZUNG_ART_WORT: Record<VerletzungArt, string> = {
 /** Feste Folge der Arten in der Wahl am Körperschema. */
 export const VERLETZUNG_ART_REIHE = Object.keys(VERLETZUNG_ART_WORT) as readonly VerletzungArt[];
 
+/** Das Wort je Geschlecht, wie die Erfassung es nennt; der Wire-Wert steht nie im Text. */
+export const GESCHLECHT_WORT: Record<NonNullable<Person['geschlecht']>, string> = {
+  maennlich: 'männlich',
+  weiblich: 'weiblich',
+  divers: 'divers',
+  unbekannt: 'unbekannt',
+};
+
 /** Das Wort je Schwere; die Schwere ist optional. */
 export const VERLETZUNG_SCHWERE_WORT: Record<VerletzungSchwere, string> = {
   leicht: 'leicht',

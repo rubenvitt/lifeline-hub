@@ -12,11 +12,12 @@ Er MUST enthalten:
 - den Transportstand (Priorität, Art, benötigte Fachrichtung), falls es einen gibt;
 - die PAT-Nummer und die Marke „kontaminiert“, falls angegeben;
 - die gültigen Maßnahmen mit Uhrzeit;
-- die gültigen Verletzungen als nummerierte Liste, ab `md` mit kleiner Figur;
+- die gültigen Verletzungen als nummerierte Liste mit Uhrzeit, ab `md` mit kleiner Figur;
 - die letzte Verlaufsnotiz.
 
 Bei 1280 × 800 und 1440 × 900 MUST all das ohne Bildlauf sichtbar sein. Lange Listen von Maßnahmen
-oder Verletzungen MUST der Kopf kürzen und die Zahl der übrigen nennen. Bei 390 × 844 MUST
+oder Verletzungen MUST der Kopf kürzen, die jüngsten zuerst zeigen und die Zahl der übrigen
+nennen. Bei 390 × 844 MUST
 mindestens Sichtung, Zustand / Verdacht und Aufenthalt in der ersten Bildschirmhöhe stehen. Der
 Abstand zu jetzt MUST im Minutentakt nachlaufen. Das Öffnen der Seite MUST weiterhin genau einen
 Abruf des Details auslösen.

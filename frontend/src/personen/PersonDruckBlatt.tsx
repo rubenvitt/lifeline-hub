@@ -4,7 +4,14 @@ import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeilenListe, type Titel, type Zeile } from '../druck/ZeilenListe';
 import { kontamination as KONTAMINATION, sichtung as SK } from '../theme/statusFarben';
 import Koerperschema from './koerperschema/Koerperschema';
-import { MASSNAHME_WORT, SK_WORT, STATUS_META, gueltig, transportText } from './personMeta';
+import {
+  GESCHLECHT_WORT,
+  MASSNAHME_WORT,
+  SK_WORT,
+  STATUS_META,
+  gueltig,
+  transportText,
+} from './personMeta';
 
 /**
  * Das Blatt einer Person (LLH-1120, Spec `druck-dokumente`, „Druckansicht einer Person“):
@@ -37,7 +44,7 @@ export default function PersonDruckBlatt({
     { etikett: 'Status', wert: STATUS_META[p.status].label },
     { etikett: 'Name', wert: p.name },
     { etikett: 'Vorname', wert: p.vorname },
-    { etikett: 'Geschlecht', wert: p.geschlecht },
+    { etikett: 'Geschlecht', wert: p.geschlecht ? GESCHLECHT_WORT[p.geschlecht] : null },
     { etikett: 'Geburtsdatum', wert: p.geburtsdatum },
     {
       etikett: 'Alter (geschätzt)',

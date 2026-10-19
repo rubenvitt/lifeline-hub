@@ -470,3 +470,113 @@ test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „
     person.id,
   );
 });
+
+/** Dichte setzen und neu laden (Schlüssel aus `theme/ThemeModeProvider.tsx`, literal als Vertrag). */
+async function stelleDichte(page: Page, dichte: 'kompakt' | 'komfortabel' | 'handschuh') {
+  await page.evaluate((w) => window.localStorage.setItem('lifeline-hub.dichte', w), dichte);
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+}
+
+/**
+ * Spec `koerperschema`, „Markieren mit höchstens zwei Tipps“: in jeder Dichte steht die Wahl der
+ * Art nach dem Tipp auf eine Region ohne Bildlauf im Bild, auch in der Handschuh-Stufe am
+ * Führungs-Tablet (1280 × 800 mit Rail und Modulpanel, 1024 × 768). Reicht die Breite nicht für
+ * vorn, hinten und die Wahl nebeneinander, schaltet eine Segmentleiste die Ansicht um.
+ *
+ * Mutationsprobe: in `Koerperschema.tsx` beide Ansichten immer nebeneinander (`sichtbar =
+ * ANSICHTEN`) → bei 1280 × 800 im Handschuh ist die Wahl nach dem Tipp nicht zu sehen (rot,
+ * gemessen).
+ */
+test('Körperschema: Wahl der Art nach dem Tipp im Bild, auch im Handschuh am Tablet', async ({
+  page,
+}) => {
+  test.slow();
+  await anmelden(page);
+  const e = await einsatzPerApi(page, `E2E Körperschema Wahl ${Date.now()}`);
+  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+    name: 'Wahltest',
+    geschlecht: 'maennlich',
+    sichtung: 'sk2',
+  });
+  // Am Handy (390 × 844) nur die Handschuh-Stufe: die Figur (480 px) ist breiter als der Schirm
+  // und rollt, statt zu schrumpfen; die Wahl steht darunter und rückt nach dem Tipp ins Bild.
+  const faelle = [
+    ...[TABLET_QUER, { width: 1024, height: 768 }].flatMap((viewport) =>
+      (['kompakt', 'komfortabel', 'handschuh'] as const).map((dichte) => ({ viewport, dichte })),
+    ),
+    { viewport: { width: 390, height: 844 }, dichte: 'handschuh' as const },
+  ];
+  for (const { viewport, dichte } of faelle) {
+    const was = `${viewport.width} × ${viewport.height}, ${dichte}`;
+    const handy = viewport.width < 768;
+    await page.setViewportSize(viewport);
+    await page.goto(`/einsaetze/${e}/personen/${person.id}`);
+    await stelleDichte(page, dichte);
+    await patientenkopf(page).getByRole('button', { name: 'Verletzung markieren' }).click();
+    const paneel = page.getByRole('region', { name: 'Verletzung markieren' });
+    const zone = paneel.getByRole('button', { name: 'Unterarm links, vorn' });
+    await zone.scrollIntoViewIfNeeded();
+    await zone.click();
+    const wahl = paneel.getByRole('group', { name: 'Verletzung an Unterarm links, vorn' });
+    await expect(wahl, `${was}: Wahl offen`).toBeVisible();
+    // Der zweite Tipp braucht keinen Bildlauf: jede Art steht ganz im Bild.
+    const arten = wahl.getByRole('radiogroup', { name: 'Art der Verletzung' }).getByRole('radio');
+    await expect(arten).toHaveCount(7);
+    for (const art of await arten.all()) {
+      const name = await art.getAttribute('aria-label');
+      await expect(art, `${was}: ${name} im Bild`).toBeInViewport({ ratio: 1 });
+    }
+    if (!handy) {
+      await expect(zone, `${was}: die getippte Zone bleibt im Bild`).toBeInViewport();
+    }
+    // Zonen schrumpfen nie unter die Stufe (Spec „Jede Region ist erreichbar“).
+    const k = (await zone.boundingBox())!;
+    const boden = { kompakt: 30, komfortabel: 48, handschuh: 72 }[dichte];
+    expect(k.height + 0.5, `${was}: Zonenhöhe`).toBeGreaterThanOrEqual(boden);
+    expect(k.width + 0.5, `${was}: Zonenbreite`).toBeGreaterThanOrEqual(boden);
+  }
+});
+
+/**
+ * Spec `personen-detail`, „Patientenkopf beantwortet die Patientenfragen“ (390 × 844): mit
+ * Schreibrecht und der Kopfzeile aus PAT-Nummer und Kontamination stehen Sichtung, Zustand /
+ * Verdacht und Aufenthalt in der ersten Bildschirmhöhe.
+ */
+test('Patientenkopf bei 390 × 844 mit Schreibrecht und PAT-Zeile: Sichtung, Zustand, Aufenthalt im ersten Bild', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const e = await einsatzPerApi(page, `E2E Kopf Handy ${Date.now()}`);
+  const uhs = await senden(page, `/api/einsaetze/${e}/uhs`, {
+    typ: 'behandlungsplatz',
+    bezeichnung: 'Turnhalle',
+  });
+  await senden(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
+  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+    name: 'Handytest',
+    geschlecht: 'weiblich',
+    sichtung: 'sk2',
+    zustand: 'Verdacht auf Hüftfraktur',
+    uhs_id: uhs.id,
+  });
+  await aendern(page, `/api/einsaetze/${e}/personen/${person.id}`, {
+    pat_nummer: 'A-4711',
+    kontamination: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${e}/personen/${person.id}`);
+  const kopf = patientenkopf(page);
+  await expect(kopf.locator('[data-lfh="aufenthalt"]')).toContainText('Turnhalle · Wartebereich');
+  // Vorbedingung: Schreibrecht und die PAT-Zeile stehen (bedienbar, also am höchsten).
+  await expect(kopf.getByRole('button', { name: /PAT-Nummer/ })).toBeVisible();
+  await expect(kopf.getByText('kontaminiert', { exact: true })).toBeVisible();
+  for (const [name, ort] of [
+    ['Sichtung', kopf.locator('[data-lfh="sichtung"]')],
+    ['Zustand / Verdacht', kopf.getByText('Verdacht auf Hüftfraktur')],
+    ['Aufenthalt', kopf.locator('[data-lfh="aufenthalt"]')],
+  ] as const) {
+    await expect(ort, `390 × 844: ${name} im ersten Bild`).toBeInViewport({ ratio: 1 });
+  }
+  expect(await page.evaluate(() => window.scrollY), 'nichts gescrollt').toBe(0);
+});

@@ -128,6 +128,8 @@ describe('PersonDruckPage', () => {
     expect(wurzel().querySelector('[data-lfh="druckkopf"]')).toHaveTextContent('R-012');
     for (const [etikett, wert] of [
       ['Name', 'Mustermann'],
+      // Das Wort der Oberfläche, nie der Wire-Wert „maennlich“.
+      ['Geschlecht', /^männlich$/],
       ['Sichtung', /^SK II · schwer · \d{6}/],
       ['Zustand / Verdacht', 'Verdacht auf Hüftfraktur'],
       ['Transport', /^dringlich · liegend · Unfallchirurgie/],

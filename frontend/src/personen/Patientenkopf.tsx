@@ -26,7 +26,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
-import { useOnline } from '../offline/useOnline';
+import { useOhneVerbindung } from '../offline/verbindung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
@@ -166,11 +166,19 @@ export default function Patientenkopf({
   const verletzungen = nummeriere(person.verletzungen ?? []).filter(
     (n) => n.verletzung.aufgehoben_at == null,
   );
+  // Die Liste im Kopf zeigt die jüngsten zuerst, wie die Maßnahmen (Durchführung absteigend);
+  // die Nummer bleibt die feste der Figur.
+  const juengsteVerletzungen = [...verletzungen].sort(
+    (a, b) =>
+      b.verletzung.zeitpunkt_at.localeCompare(a.verletzung.zeitpunkt_at) ||
+      b.verletzung.id - a.verletzung.id,
+  );
   const viewport = useViewport();
   const zweiSpalten = viewport.abBreite('lg');
   const mitFigur = viewport.abBreite('md') && verletzungen.length > 0;
-  const online = useOnline();
-  const aufhebenGesperrt = online ? undefined : AUFHEBEN_OHNE_NETZ;
+  // Ohne Verbindung heißt: Browser offline ODER der Server antwortet nicht (WLAN ohne Server,
+  // `frontend/src/offline/AGENTS.md`); `navigator.onLine` allein böte das Aufheben dort an.
+  const aufhebenGesperrt = useOhneVerbindung() ? AUFHEBEN_OHNE_NETZ : undefined;
   // Vorgemerkt an dieser Person, getrennt vom Serverstand (`frontend/src/offline/AGENTS.md`, „Was
   // vorgemerkt ist, kennt der Server noch nicht“); die Notizen quittiert die Notizzeile.
   const benutzerId = useAuthOptional()?.benutzer?.id;
@@ -342,13 +350,14 @@ export default function Patientenkopf({
               <div style={{ minWidth: 0 }}>
                 <GekuerzteListe
                   beschriftung="Verletzungen"
-                  eintraege={verletzungen.map(({ nummer, verletzung: v }) => ({
+                  eintraege={juengsteVerletzungen.map(({ nummer, verletzung: v }) => ({
                     key: v.id,
                     inhalt: (
                       <>
                         <span style={monoStil(13)}>{nummer}</span> {regionName(v.ansicht, v.region)}{' '}
                         · {VERLETZUNG_ART_WORT[v.art]}
-                        {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`}
+                        {v.schwere && ` · ${VERLETZUNG_SCHWERE_WORT[v.schwere]}`} ·{' '}
+                        <ZeitAnzeige wert={v.zeitpunkt_at} format="uhrzeit" />
                       </>
                     ),
                   }))}

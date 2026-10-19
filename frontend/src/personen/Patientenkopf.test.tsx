@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
@@ -8,7 +8,9 @@ import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
-import Patientenkopf from './Patientenkopf';
+import { meldeServerErreichbar, verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
+import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
+import { PAT_OHNE_NETZ } from './PatKennzeichen';
 
 /**
  * Der Patientenkopf (LLH-1094, Spec `personen-detail`): die Patientenfragen auf einen Blick, Sichten,
@@ -467,10 +469,11 @@ describe('Patientenkopf — voller PAT-Kern (LLH-1324/1325/1326/1113, design.md 
     const zeilen = within(liste)
       .getAllByRole('listitem')
       .map((li) => li.textContent);
+    // Die jüngsten zuerst (gleiche Zeit: die spätere Erfassung), jede mit ihrer festen Nummer.
     expect(zeilen).toEqual([
-      '1 Unterarm links, vorn · Fraktur-Verdacht',
-      '3 Thorax, vorn · Prellung/Schwellung',
-      '4 Rücken, hinten · Schmerz',
+      '5 Fuß rechts, vorn · Verbrennung · 1140',
+      '4 Rücken, hinten · Schmerz · 1140',
+      '3 Thorax, vorn · Prellung/Schwellung · 1140',
     ]);
     expect(within(kopf).getByText('+ 1 weitere')).toBeInTheDocument();
   });
@@ -607,13 +610,17 @@ describe('Patientenkopf — Transport, Maßnahme, PAT und Kontamination (D14)', 
     expect(gesendet).toEqual([]);
   });
 
-  it('hebt eine Maßnahme im Paneel auf', async () => {
+  it('hebt eine Maßnahme im Paneel nach Rückfrage auf (unumkehrbar, LFH-363)', async () => {
     const { kopf, onGeschrieben } = zeige(vollerKern);
     await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
     const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
     await userEvent.click(
       within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
     );
+    // Noch nichts gesendet: erst die Rückfrage, ihr Knopf nennt die Handlung.
+    expect(gesendet).toEqual([]);
+    const rueckfrage = await screen.findByRole('tooltip');
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Maßnahme aufheben' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet).toEqual([{ pfad: 'massnahmen/1/aufheben', body: null }]);
   });
@@ -1010,5 +1017,97 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
         daten: expect.objectContaining({ text: 'Infusion läuft' }),
       }),
     ]);
+  });
+});
+
+/**
+ * Befunde aus dem Review des PAT-Kerns (Change `y18v58dt-pat-kern`): Verletzungsliste mit
+ * Uhrzeit und jüngste zuerst, geräumte Gründe beim Öffnen (LFH-1077), Sperre ohne Verbindung
+ * auch bei erreichbarem WLAN ohne Server (`useOhneVerbindung`).
+ */
+describe('Patientenkopf — Review PAT-Kern', () => {
+  beforeEach(() => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/massnahmen/:mid/aufheben', ({ params }) => {
+        gesendet.push({ pfad: `massnahmen/${String(params.mid)}/aufheben`, body: null });
+        return HttpResponse.json({ id: Number(params.mid) });
+      }),
+    );
+  });
+  afterEach(() => {
+    verbindungZuruecksetzenFuerTests();
+  });
+
+  it('räumt den Grund eines gescheiterten Aufhebens beim neuen Öffnen des Paneels', async () => {
+    server.use(
+      http.post('/api/einsaetze/1/personen/10/massnahmen/:mid/aufheben', () =>
+        HttpResponse.json({ error: 'Maßnahme ist bereits aufgehoben' }, { status: 409 }),
+      ),
+    );
+    const { kopf } = zeige(vollerKern);
+    const knopf = within(kopf).getByRole('button', { name: 'Maßnahme erfassen' });
+    await userEvent.click(knopf);
+    let paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await userEvent.click(
+      within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
+    );
+    const rueckfrage = await screen.findByRole('tooltip');
+    await userEvent.click(within(rueckfrage).getByRole('button', { name: 'Maßnahme aufheben' }));
+    expect(await within(paneel).findByText(/bereits aufgehoben/)).toBeVisible();
+    // Schließen (Auslöser im Kopf) und wieder öffnen: der alte Grund steht nicht mehr.
+    await userEvent.click(knopf);
+    await userEvent.click(knopf);
+    paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    expect(within(paneel).queryByText(/bereits aufgehoben/)).toBeNull();
+  });
+
+  it('zeigt die Verletzungen jüngste zuerst, mit Nummer und Uhrzeit', () => {
+    const { kopf } = zeige(
+      {
+        ...vollerKern,
+        verletzungen: [
+          {
+            ...verletzung(1, 'unterarm_l', 'fraktur_verdacht'),
+            zeitpunkt_at: '2026-10-18 09:10:00',
+          },
+          { ...verletzung(2, 'kopf', 'wunde_blutung', true), zeitpunkt_at: '2026-10-18 09:20:00' },
+          {
+            ...verletzung(3, 'thorax', 'prellung_schwellung'),
+            zeitpunkt_at: '2026-10-18 09:30:00',
+          },
+          {
+            ...verletzung(4, 'ruecken', 'schmerz', false, 'hinten'),
+            zeitpunkt_at: '2026-10-18 09:40:00',
+          },
+          { ...verletzung(5, 'fuss_r', 'verbrennung'), zeitpunkt_at: '2026-10-18 09:50:00' },
+        ],
+      },
+      { darfSchreiben: false },
+    );
+    const liste = within(kopf).getByRole('list', { name: 'Verletzungen' });
+    expect(
+      within(liste)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      '5 Fuß rechts, vorn · Verbrennung · 1150',
+      '4 Rücken, hinten · Schmerz · 1140',
+      '3 Thorax, vorn · Prellung/Schwellung · 1130',
+    ]);
+    expect(within(kopf).getByText('+ 1 weitere')).toBeInTheDocument();
+  });
+
+  it('sperrt Aufheben, PAT-Nummer und Kontamination auch, wenn nur der Server fehlt', async () => {
+    const { kopf } = zeige(vollerKern);
+    // Das Gerät hat ein Netz (`navigator.onLine`), aber der Server antwortet nicht.
+    act(() => meldeServerErreichbar(false));
+    expect(within(kopf).queryByRole('button', { name: /PAT-Nummer/ })).toBeNull();
+    expect(within(kopf).getByText(PAT_OHNE_NETZ)).toBeInTheDocument();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    expect(
+      within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
+    ).toBeDisabled();
+    expect(within(paneel).getByText(AUFHEBEN_OHNE_NETZ)).toBeVisible();
   });
 });

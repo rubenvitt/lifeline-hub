@@ -988,6 +988,10 @@ describe('PersonenDetailPage — Stammdaten im Datenraster (LFH-963)', () => {
     const name = within(raster()).getByText('Name');
     expect(name.tagName).toBe('DT');
     expect(name.nextElementSibling).toHaveTextContent('Mustermann');
+    // Das Wort der Oberfläche, nie der Wire-Wert „maennlich“.
+    expect(within(raster()).getByText('Geschlecht').nextElementSibling).toHaveTextContent(
+      /^männlich$/,
+    );
     expect(begriffe()).toEqual(
       expect.arrayContaining(['Name', 'Vorname', 'Geschlecht', 'Alter (geschätzt)', 'Fundort']),
     );

@@ -46,7 +46,7 @@ import {
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META } from '../personen/personMeta';
+import { GESCHLECHT_WORT, STATUS_META } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
@@ -546,7 +546,7 @@ export default function PersonenDetailPage() {
     return [
       { label: 'Name', wert: person.name },
       { label: 'Vorname', wert: person.vorname },
-      { label: 'Geschlecht', wert: person.geschlecht },
+      { label: 'Geschlecht', wert: person.geschlecht ? GESCHLECHT_WORT[person.geschlecht] : null },
       { label: 'Geburtsdatum', wert: person.geburtsdatum, mono: true },
       { label: 'Alter (geschätzt)', wert: person.alter_geschaetzt, mono: true },
       { label: 'Herkunft / Adresse', wert: person.herkunft_adresse, breit: true },

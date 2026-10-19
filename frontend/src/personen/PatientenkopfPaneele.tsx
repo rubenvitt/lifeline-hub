@@ -1,6 +1,7 @@
-import { Button, Flex, Form, Typography } from 'antd';
+import { Button, Flex, Form, Popconfirm, Typography } from 'antd';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
+import { useEffect, useRef } from 'react';
 import type { MassnahmeEingabe, TransportEingabe } from '../api/einsatzPerson';
 import type {
   Fachrichtung,
@@ -173,7 +174,9 @@ export function massnahmeEingabe(v: MassnahmeWerte & { art: MassnahmeArt }): Mas
 /**
  * Maßnahme erfassen: Wahl aus dem Katalog als Flächen, optional die Uhrzeit der Durchführung.
  * Darunter die gültigen Maßnahmen mit „Aufheben“ (genau einmal, Spec `personen-massnahmen`):
- * eine versehentlich erfasste Maßnahme wird so korrigiert, sie bleibt im Verlauf.
+ * eine versehentlich erfasste Maßnahme wird so korrigiert, sie bleibt im Verlauf. Das Aufheben
+ * hat keinen Rückweg (kein „wieder gültig“ am Server): deshalb die Rückfrage mit benannter
+ * Handlung (LFH-363, `frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“).
  */
 export function MassnahmePaneel({
   einsatzId,
@@ -195,6 +198,14 @@ export function MassnahmePaneel({
   const { konventionen } = useAnzeigeKonventionen();
   const [form] = Form.useForm<MassnahmeWerte>();
   const erfasst = gueltig(person.massnahmen ?? []);
+  // Öffnen räumt den Grund eines früheren Aufhebens (LFH-1077): die Mutation hält der Kopf über
+  // ein Schließen hinweg. Den Grund des Erfassens räumt die Hülle (`speicherung`).
+  const aufhebenRef = useRef(aufheben);
+  aufhebenRef.current = aufheben;
+  useEffect(() => {
+    const a = aufhebenRef.current;
+    if (!a.isPending && a.error != null) a.reset();
+  }, []);
   const name = (m: Massnahme) =>
     `Maßnahme ${MASSNAHME_WORT[m.art]} ${taktischeUhrzeit(m.zeitpunkt_at, konventionen)} aufheben`;
   return (
@@ -241,15 +252,24 @@ export function MassnahmePaneel({
                       </Typography.Text>
                     )}
                   </span>
-                  <Button
-                    danger
-                    aria-label={name(m)}
+                  <Popconfirm
+                    title={`${MASSNAHME_WORT[m.art]} aufheben?`}
+                    description="Bleibt im Verlauf als aufgehoben."
+                    okText="Maßnahme aufheben"
+                    cancelText="Abbrechen"
+                    okButtonProps={{ danger: true }}
                     disabled={!!aufhebenGesperrt || aufheben.isPending || mutation.isPending}
-                    loading={aufheben.isPending && aufheben.variables === m.id}
-                    onClick={() => aufheben.mutate(m.id)}
+                    onConfirm={() => aufheben.mutate(m.id)}
                   >
-                    Aufheben
-                  </Button>
+                    <Button
+                      danger
+                      aria-label={name(m)}
+                      disabled={!!aufhebenGesperrt || aufheben.isPending || mutation.isPending}
+                      loading={aufheben.isPending && aufheben.variables === m.id}
+                    >
+                      Aufheben
+                    </Button>
+                  </Popconfirm>
                 </Flex>
               </li>
             ))}

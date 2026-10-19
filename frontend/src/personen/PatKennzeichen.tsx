@@ -8,7 +8,7 @@ import { monoStil, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
 import StatusTag from '../components/StatusTag';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
-import { useOnline } from '../offline/useOnline';
+import { useOhneVerbindung } from '../offline/verbindung';
 import { kontamination as KONTAMINATION } from '../theme/statusFarben';
 
 /**
@@ -53,8 +53,9 @@ export default function PatKennzeichen({
   onGeschrieben?: () => void;
 }) {
   const { token, rollen } = useRollen();
-  const online = useOnline();
-  const schreibt = bedienbar && online;
+  // Ohne Verbindung: Browser offline oder Server unerreichbar (`useOhneVerbindung`).
+  const ohneVerbindung = useOhneVerbindung();
+  const schreibt = bedienbar && !ohneVerbindung;
   const mutation = useMutation({
     mutationFn: (daten: Pick<PersonEingabe, 'pat_nummer' | 'kontamination'>) =>
       aktualisierePerson(einsatzId, person.id, daten),
@@ -125,7 +126,7 @@ export default function PatKennzeichen({
       ) : (
         k === 'ja' && <StatusTag darstellung={KONTAMINATION} />
       )}
-      {bedienbar && !online && (
+      {bedienbar && ohneVerbindung && (
         <span role="status" style={{ color: rollen.text2 }}>
           {PAT_OHNE_NETZ}
         </span>
