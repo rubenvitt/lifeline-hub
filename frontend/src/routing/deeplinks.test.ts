@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  personDruckPfad,
   personenDruckPfad,
   parsePersonenDruckAuswahl,
   tiereDruckPfad,
@@ -121,6 +122,9 @@ describe('deeplinks — Item-Routes (Vollseiten-Detail)', () => {
   });
   it('auftragDruckPfad: Druckansicht eines Auftrags unter auftraege/<id>/druck (LLH-1171)', () => {
     expect(auftragDruckPfad(E, 31)).toBe('/einsaetze/5/auftraege/31/druck');
+  });
+  it('personDruckPfad: Druckansicht einer Person unter personen/<id>/druck (LLH-1120)', () => {
+    expect(personDruckPfad(E, 10)).toBe('/einsaetze/5/personen/10/druck');
   });
   it('personDetailPfad', () => {
     expect(personDetailPfad(E, 10)).toBe('/einsaetze/5/personen/10');

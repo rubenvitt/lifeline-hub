@@ -15,9 +15,12 @@ use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
 use crate::person::abgleich_repo::AbgleichAnzeige;
 use crate::person::audit_repo::ZugriffAnzeige;
+use crate::person::massnahme_repo::{self, MassnahmeAnzeige};
 use crate::person::sichtung_repo::SichtungAnzeige;
+use crate::person::transport_repo::{self, TransportAnzeige};
 use crate::person::verbleib_repo::VerbleibAnzeige;
 use crate::person::verlaufsnotiz_repo::NotizAnzeige;
+use crate::person::verletzung_repo::{self, VerletzungAnzeige};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
@@ -48,6 +51,12 @@ pub struct PersonDetail {
     pub abgleiche: Vec<AbgleichAnzeige>,
     /// UHS, Platz und seit wann; `null` außerhalb jeder UHS (LLH-1129, Patientenkopf).
     pub aufenthalt: Option<AufenthaltAnzeige>,
+    /// Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf.
+    pub transporte: Vec<TransportAnzeige>,
+    /// Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`.
+    pub massnahmen: Vec<MassnahmeAnzeige>,
+    /// Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`.
+    pub verletzungen: Vec<VerletzungAnzeige>,
 }
 
 /// Broadcastet ein dediziertes `person`-SSE-Event OHNE sensible Payload
@@ -333,11 +342,13 @@ pub async fn anlegen(
             "Eine Bestätigung gibt es nur zu einer Erst-Sichtung".into(),
         ));
     }
+    // Die Erst-Sichtung trägt die Serverzeit, also gilt „aktiv jetzt“.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
+        None,
     )
     .await?;
 
@@ -436,10 +447,12 @@ pub async fn anlegen(
                         conn,
                         einsatz_id,
                         id,
-                        k.as_str(),
-                        None,
+                        &sichtung_repo::NeueSichtung {
+                            kategorie: k.as_str(),
+                            bestaetigung: bestaetigung.as_ref(),
+                            ..Default::default()
+                        },
                         ctx.benutzer.id,
-                        bestaetigung.as_ref(),
                         // Anheben nur aus `erfasst` — eine bereits als betroffen angelegte
                         // Person bekäme sonst einen zweiten Statuswechsel ohne Anlass.
                         matches!(status_enum, PersonStatus::Erfasst),
@@ -490,15 +503,10 @@ pub async fn anlegen(
                         id,
                         verbleib_repo::VerbleibDaten {
                             art: art.as_str(),
-                            transportmittel: None,
-                            ziel: None,
-                            status: None,
-                            notiz: None,
                             betreuungsstelle_id: Some(stelle_id),
                             // Eine Bestätigung gibt es nur zu einer Erst-Sichtung (oben).
-                            bestaetigung: None,
+                            ..Default::default()
                         },
-                        &art.kurzform(None),
                         ctx.benutzer.id,
                     )
                     .await?;
@@ -552,6 +560,31 @@ pub async fn detail(
     ctx: EinsatzLesezugriff<Personen>,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<PersonDetail>, AppError> {
+    detail_mit_audit(&state, &ctx, person_id, "detail").await
+}
+
+/// GET /api/einsaetze/{id}/personen/{pid}/druck — die Druckansicht einer Person (LLH-1120, Spec
+/// `druck-dokumente`, „Druckansicht einer Person“): dasselbe Detail, aber im Zugriffsprotokoll
+/// als `druck` mit `person_id` (die CHECK-Liste aus 0141 erlaubt die Art). Muster wie
+/// `…/personen/druck` neben der Liste: ein eigener Pfad statt eines Query-Parameters, damit
+/// die Art des Zugriffs an der Route hängt und kein Aufrufer das Detail-Audit umgehen kann. Die
+/// Route steht in keiner Routenliste der Geräte: am Gerät 403 (`tests/geraet_kopplung.rs`).
+pub async fn detail_druck(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+    PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<PersonDetail>, AppError> {
+    detail_mit_audit(&state, &ctx, person_id, "druck").await
+}
+
+/// Lädt das Detail einer Person und schreibt VOR der Anreicherung genau einen Audit-Eintrag der
+/// Art `art` (`detail` oder `druck`). Eine unbekannte Person ist 404 ohne Eintrag.
+async fn detail_mit_audit(
+    state: &AppState,
+    ctx: &EinsatzLesezugriff<Personen>,
+    person_id: i64,
+    art: &str,
+) -> Result<Json<PersonDetail>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
@@ -560,7 +593,7 @@ pub async fn detail(
         einsatz_id,
         Some(person_id),
         ctx.benutzer.id,
-        "detail",
+        art,
     )
     .await?;
 
@@ -568,6 +601,9 @@ pub async fn detail(
     let notizen = verlaufsnotiz_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let verbleib = verbleib_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     let aufenthalt = belegung_repo::aufenthalt(&state.pool, einsatz_id, person_id).await?;
+    let transporte = transport_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let massnahmen = massnahme_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
+    let verletzungen = verletzung_repo::liste_je_person(&state.pool, einsatz_id, person_id).await?;
     // Den Abgleich mit Vermisstenmeldungen führt kein Gerät (Scope-Matrix): er nennt andere
     // Personen des Einsatzes.
     let abgleiche = if ctx.geraet.is_some() {
@@ -583,6 +619,9 @@ pub async fn detail(
         verbleib,
         abgleiche,
         aufenthalt,
+        transporte,
+        massnahmen,
+        verletzungen,
     }))
 }
 
@@ -620,6 +659,12 @@ pub struct PatchBody {
     /// Leeren nähme der Dashboard-Zählung die Grundlage (design.md D4).
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub vermisst_seit: Option<Option<String>>,
+    /// LLH-1326: PAT-Nummer (Tri-State; `null`/`""` leert).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub pat_nummer: Option<Option<String>>,
+    /// LLH-1326: Kontamination (Tri-State; `null` heißt „keine Angabe“, nicht „nein“).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub kontamination: Option<Option<bool>>,
     /// Optimistisches Lock (LFH-241/F10): der beim Laden gelesene `geaendert_at`-Stand.
     /// Stimmt er nicht mehr → 409 statt stillem Overwrite. Fehlt er (Overwrite aus dem
     /// Konfliktdialog), wird bewusst blind geschrieben.
@@ -658,6 +703,11 @@ pub async fn aktualisieren(
     let melder = trimme_tri(body.melder_kontakt);
     let notiz = trimme_tri(body.notiz);
     let zustand = trimme_tri(body.zustand);
+    let pat_nummer = crate::routes::support::optional_max_tri(
+        body.pat_nummer,
+        "PAT-Nummer",
+        crate::person::PAT_NUMMER_MAX,
+    )?;
 
     // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
     // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).
@@ -706,6 +756,8 @@ pub async fn aktualisieren(
             antreff_lat: body.antreff_lat,
             antreff_lon: body.antreff_lon,
             vermisst_seit: vermisst_seit.as_deref().map(Some),
+            pat_nummer: pat_nummer.as_ref().map(|o| o.as_deref()),
+            kontamination: body.kontamination,
         },
     )
     .await?;
@@ -820,23 +872,53 @@ pub struct SichtungBody {
     pub notiz: Option<String>,
     /// Namentliche Bestätigung am Gerät (LFH-1046): Kennung in `einsatz_personal`.
     pub bestaetigt_personal_id: Option<i64>,
+    /// Erfassungszeit, offline vorgemerkt (LLH-1138); fehlt = jetzt. Gekappt über
+    /// [`crate::routes::support::erfassungszeitpunkt`].
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/sichtung — Sichtung erfassen.
 /// Schreibberechtigt + aktiv. Hebt `erfasst→betroffen` (Annahme 5); bei
 /// `vermisst`/`abgemeldet` → 422; bei storniert → 409. Sichtung=`tot` ändert
 /// den Admin-Status NICHT (Annahme 4). Pseudonyme ETB-Spur + SSE.
+///
+/// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): ein Replay derselben `client_id`
+/// kommt vor dem Aktiv-Gate zurück (Muster `anlegen`), ohne zweiten ETB-Eintrag und ohne
+/// Hinweis. Der Cache folgt der jüngsten Erfassungszeit; eine nachgereichte ältere Sichtung
+/// steht im Verlauf und im ETB („nachgetragen“, zu ihrer Erfassungszeit), meldet aber kein
+/// „Sichtung I“.
 pub async fn sichten(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Personen>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
+    headers: HeaderMap,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<SichtungBody>,
 ) -> Result<(StatusCode, Json<SichtungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = crate::routes::support::parse_client_id(body.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = sichtung_repo::nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |s| s.person_id)?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let kategorie = Sichtungskategorie::parse(&body.kategorie)
         .ok_or_else(|| AppError::Validation("Unbekannte Sichtungskategorie".into()))?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let gesichtet_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        chrono::Utc::now(),
+        &person.erfasst_at,
+    )?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierte Person kann nicht gesichtet werden".into(),
@@ -854,45 +936,140 @@ pub async fn sichten(
         }
     };
     let notiz = trimme(body.notiz);
+    // Zur Erfassungszeit (D7): eine vor der Übertragung entlassene Kraft bestätigt weiter.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
+        Some(&gesichtet_at),
     )
     .await?;
 
     // F06/LFH-244 Tier-A: Sichtungs-Erfassung (optionaler Status-Hub + INSERT + Cache-Update)
-    // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Der ETB-Text ist aus
-    // dem VOR der Tx geladenen `person`-Vorzustand + `kategorie` berechenbar. SSE nach dem Commit.
-    let text = crate::person::etb_text_bestaetigt(
-        crate::person::etb_text_sichtung(person.registrier_nr, kategorie),
-        bestaetigung.as_ref(),
-    );
+    // + System-ETB-Eintrag atomar in EINER Tx (BEGIN IMMEDIATE + Retry). Welcher ETB-Text gilt,
+    // entscheidet erst der Cache nach dem INSERT (gewinnt der Eintrag?). SSE nach dem Commit.
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let (sichtung, vorher) = crate::write_retry!(&state.pool, |conn| {
+    let neu = sichtung_repo::NeueSichtung {
+        kategorie: kategorie.as_str(),
+        notiz: notiz.as_deref(),
+        gesichtet_at: Some(&gesichtet_at),
+        client_id: client_id.as_deref(),
+        bestaetigung: bestaetigung.as_ref(),
+    };
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        // Zwei gleichzeitige Übertragungen desselben Schlüssels: unter `BEGIN IMMEDIATE` sieht
+        // die zweite die erste und liefert sie zurück, statt am Unique-Index zu scheitern.
+        if let Some(cid) = client_id.as_deref() {
+            if let Some(replay) = sichtung_repo::nach_client_id(&mut *conn, einsatz_id, cid).await?
+            {
+                return Ok(Sichtet::Replay(replay));
+            }
+        }
         // Vorzustand in DERSELBEN Transaktion: eine parallele Sichtung kann den vor der Tx
         // geladenen `person.aktuelle_sichtung` schon überholt haben.
         let vorher = sichtung_repo::aktuelle_kategorie_tx(conn, einsatz_id, person_id).await?;
-        let sichtung = sichtung_repo::erfassen_tx(
+        let erfasst = sichtung_repo::erfassen_tx(
             conn,
             einsatz_id,
             person_id,
-            kategorie.as_str(),
-            notiz.as_deref(),
+            &neu,
             ctx.benutzer.id,
-            bestaetigung.as_ref(),
             hebe_auf_betroffen,
         )
         .await?;
-        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
-        Ok((sichtung, vorher))
+        let text = if erfasst.gewinnt {
+            crate::person::etb_text_sichtung(person.registrier_nr, kategorie)
+        } else {
+            let aktuell = sichtung_repo::aktuelle_kategorie_tx(conn, einsatz_id, person_id)
+                .await?
+                .ok_or_else(|| AppError::Internal("Sichtung ohne aktuelle Kategorie".into()))?;
+            crate::person::etb_text_sichtung_nachgetragen(person.registrier_nr, kategorie, aktuell)
+        };
+        let text = crate::person::etb_text_bestaetigt(text, bestaetigung.as_ref());
+        let etb_id = crate::etb::system_audit_zu_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &text,
+            &erfasst.sichtung.gesichtet_at,
+        )
+        .await?;
+        Ok(Sichtet::Neu {
+            erfasst,
+            vorher,
+            etb_id,
+        })
     })?;
+    let (erfasst, vorher, etb_id) = match ergebnis {
+        Sichtet::Replay(replay) => {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |s| s.person_id)?),
+            ))
+        }
+        Sichtet::Neu {
+            erfasst,
+            vorher,
+            etb_id,
+        } => (erfasst, vorher, etb_id),
+    };
+    state.live.publiziere(einsatz_id, etb_id);
     sse_person(&state, einsatz_id, person_id);
-    if wird_sk1(vorher, kategorie) {
+    // Der Hinweis hängt am aktuellen Stand (D6): nur wenn dieser Eintrag ihn bestimmt.
+    if erfasst.gewinnt && wird_sk1(vorher, kategorie) {
         melde_sichtung_eins(&state, einsatz_id, person_id, ctx.benutzer.id).await;
     }
-    Ok((StatusCode::CREATED, Json(sichtung)))
+    Ok((StatusCode::CREATED, Json(erfasst.sichtung)))
+}
+
+/// Ein neuer medizinischer Eintrag (Transport, Maßnahme, Verletzung; Change `y18v58dt-pat-kern`)
+/// gilt nur an einer angetroffenen Person: storniert ist Lebenszyklus (409), vermisst oder
+/// abgemeldet ein Zusammenhang (422, `src/AGENTS.md`, Statuscode-Konvention). `was` nennt den
+/// Eintrag im Wortlaut („keinen Transport“).
+pub(crate) fn fordere_angetroffen(person: &PersonAnzeige, was: &str) -> Result<(), AppError> {
+    if person.storniert_at.is_some() {
+        return Err(AppError::Conflict(format!(
+            "Stornierte Person kann {was} erhalten"
+        )));
+    }
+    match person.status {
+        PersonStatus::Vermisst | PersonStatus::Abgemeldet => {
+            Err(AppError::UnprocessableEntity(format!(
+                "Person ist nicht anwesend (Status {})",
+                person.status.as_str()
+            )))
+        }
+        PersonStatus::Erfasst | PersonStatus::Betroffen | PersonStatus::Verstorben => Ok(()),
+    }
+}
+
+/// Ausgang der Sichtungs-Transaktion.
+enum Sichtet {
+    /// Schon gespeichert (gleichzeitiger Replay derselben `client_id`).
+    Replay(SichtungAnzeige),
+    Neu {
+        erfasst: sichtung_repo::ErfassteSichtung,
+        vorher: Option<Sichtungskategorie>,
+        etb_id: i64,
+    },
+}
+
+/// Ein Replay gilt nur an der Person, an der der Eintrag gespeichert ist; eine `client_id`, die
+/// an einer anderen Person vergeben ist, ist 422 (Muster `betreuung::repo::replay_am_objekt`).
+pub(crate) fn replay_an_person<T>(
+    replay: T,
+    person_id: i64,
+    person: impl Fn(&T) -> i64,
+) -> Result<T, AppError> {
+    if person(&replay) == person_id {
+        Ok(replay)
+    } else {
+        Err(AppError::UnprocessableEntity(
+            "client_id gehört zu einem Eintrag an einer anderen Person".into(),
+        ))
+    }
 }
 
 /// GET /api/einsaetze/{id}/personen/bestaetiger — Auswahl „Bestätigt von“ am Gerät (LFH-1046,
@@ -1016,6 +1193,12 @@ pub struct VerbleibBody {
     pub betreuungsstelle_id: Option<i64>,
     /// Namentliche Bestätigung am Gerät (LFH-1046): Kennung in `einsatz_personal`.
     pub bestaetigt_personal_id: Option<i64>,
+    /// Erfassungszeit, offline vorgemerkt (LLH-1138); fehlt = jetzt.
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
@@ -1027,14 +1210,30 @@ pub struct VerbleibBody {
 /// fremder/unbekannter Stelle, 409 bei stornierter. Eine geschlossene Stelle ist erlaubt
 /// (Entscheidung 24.09.2026: ein Verbleib wird oft nachgetragen). Der Server setzt keinen
 /// Stellennamen in Ziel, Kurzform oder ETB.
+///
+/// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): Replay vor dem Aktiv-Gate,
+/// Erfassungszeit gekappt, Cache und Kurzform aus dem jüngsten Ereignis. Verbleib, Auto-Austritt
+/// und ETB stehen in EINER Transaktion; der Austritt läuft nur, wenn der neue Verbleib gewinnt.
 pub async fn verbleib(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Personen>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
+    headers: HeaderMap,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<VerbleibBody>,
 ) -> Result<(StatusCode, Json<VerbleibAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = crate::routes::support::parse_client_id(body.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) = verbleib_repo::nach_client_id(&state.pool, einsatz_id, cid).await? {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |v| v.person_id)?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
     parse_enum_opt(
@@ -1042,6 +1241,9 @@ pub async fn verbleib(
         body.status.as_deref(),
         "Unbekannter Verbleib-Status",
     )?;
+    // Das Feld für sich (400) vor jedem Zusammenhang (422); die Untergrenze kommt mit der Person.
+    let jetzt = chrono::Utc::now();
+    crate::routes::support::meldezeitpunkt(body.zeitpunkt_at.as_deref(), jetzt)?;
     // Stellenbindung (LFH-1041): ein Gerät der Betreuungsstelle bringt in keine andere
     // Notunterkunft, auch nicht ohne Stelle; die übrigen Verbleib-Arten bleiben frei.
     if art == VerbleibArt::Notunterkunft
@@ -1074,6 +1276,11 @@ pub async fn verbleib(
         }
     }
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let zeitpunkt_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        jetzt,
+        &person.erfasst_at,
+    )?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierte Person kann keinen Verbleib erhalten".into(),
@@ -1082,91 +1289,199 @@ pub async fn verbleib(
     let transportmittel = trimme(body.transportmittel);
     let ziel = trimme(body.ziel);
     let notiz = trimme(body.notiz);
-    let kurzform = art.kurzform(ziel.as_deref());
+    // Zur Erfassungszeit (D7), wie bei der Sichtung.
     let bestaetigung = crate::geraet::bestaetigung::aufloesen(
         &state.pool,
         ctx.geraet.as_ref(),
         einsatz_id,
         body.bestaetigt_personal_id,
+        Some(&zeitpunkt_at),
     )
     .await?;
 
-    let verbleib = verbleib_repo::erfassen(
-        &state.pool,
-        einsatz_id,
-        person_id,
-        verbleib_repo::VerbleibDaten {
-            art: art.as_str(),
-            transportmittel: transportmittel.as_deref(),
-            ziel: ziel.as_deref(),
-            status: body.status.as_deref(),
-            notiz: notiz.as_deref(),
-            betreuungsstelle_id: body.betreuungsstelle_id,
-            bestaetigung: bestaetigung.as_ref(),
-        },
-        &kurzform,
-        ctx.benutzer.id,
-    )
-    .await?;
-
-    // E‑3: bei transport/entlassung/notunterkunft → UHS-Auto-Austritt (eigene ETB-Spur).
-    // Notunterkunft (LFH-613) verlässt die Unfallhilfsstelle ebenso wie ein Transport.
-    if matches!(
-        art,
-        VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
-    ) {
-        let anlass = format!("durch Verbleib {}", art.as_str());
-        if let Some(effekt) =
-            crate::uhs::auto_austritt(&state.pool, einsatz_id, person_id, &anlass, ctx.benutzer.id)
-                .await?
-        {
-            sse_auto_austritt(&state, einsatz_id, &effekt);
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let daten = verbleib_repo::VerbleibDaten {
+        art: art.as_str(),
+        transportmittel: transportmittel.as_deref(),
+        ziel: ziel.as_deref(),
+        status: body.status.as_deref(),
+        notiz: notiz.as_deref(),
+        betreuungsstelle_id: body.betreuungsstelle_id,
+        bestaetigung: bestaetigung.as_ref(),
+        zeitpunkt_at: Some(&zeitpunkt_at),
+        client_id: client_id.as_deref(),
+    };
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        if let Some(cid) = client_id.as_deref() {
+            if let Some(replay) = verbleib_repo::nach_client_id(&mut *conn, einsatz_id, cid).await?
+            {
+                return Ok(Verbleibt::Replay(replay));
+            }
         }
+        let erfasst = verbleib_repo::erfassen_tx(
+            conn,
+            einsatz_id,
+            person_id,
+            verbleib_repo::VerbleibDaten { ..daten },
+            ctx.benutzer.id,
+        )
+        .await?;
+        // E‑3: bei transport/entlassung/notunterkunft → UHS-Auto-Austritt (eigene ETB-Spur).
+        // Notunterkunft (LFH-613) verlässt die Unfallhilfsstelle ebenso wie ein Transport. Nur,
+        // wenn dieser Verbleib der aktuelle ist (D6): ein älterer nachgereichter Transport holt
+        // die zurückgekehrte Person nicht aus der UHS. Ebenso wenig einer, der älter ist als der
+        // jüngste Eintritt oder Wechsel in eine UHS: die Belegung ist dann der jüngere Stand.
+        let austritt = if erfasst.gewinnt
+            && matches!(
+                art,
+                VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
+            )
+            && !crate::uhs::belegung_repo::has_zugang_nach_tx(
+                conn,
+                einsatz_id,
+                person_id,
+                &zeitpunkt_at,
+            )
+            .await?
+        {
+            crate::uhs::auto_austritt_tx(
+                conn,
+                einsatz_id,
+                person_id,
+                &format!("durch Verbleib {}", art.as_str()),
+                ctx.benutzer.id,
+                startwert,
+            )
+            .await?
+        } else {
+            None
+        };
+        let verbleib = verbleib_repo::laden_tx(conn, einsatz_id, erfasst.id).await?;
+        let text = format!(
+            "Person {}: {}",
+            registrier_anzeige(person.registrier_nr),
+            art.etb_sachverhalt()
+        );
+        let text = if erfasst.gewinnt {
+            text
+        } else {
+            format!("{text}, nachgetragen")
+        };
+        let etb_id = crate::etb::system_audit_zu_tx(
+            conn,
+            einsatz_id,
+            ctx.benutzer.id,
+            startwert,
+            &crate::person::etb_text_bestaetigt(text, bestaetigung.as_ref()),
+            &verbleib.zeitpunkt_at,
+        )
+        .await?;
+        Ok(Verbleibt::Neu {
+            verbleib,
+            austritt,
+            etb_id,
+        })
+    })?;
+    let (verbleib, austritt, etb_id) = match ergebnis {
+        Verbleibt::Replay(replay) => {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |v| v.person_id)?),
+            ))
+        }
+        Verbleibt::Neu {
+            verbleib,
+            austritt,
+            etb_id,
+        } => (verbleib, austritt, etb_id),
+    };
+    if let Some(a) = austritt {
+        state.live.publiziere(einsatz_id, a.etb_id);
+        state
+            .live
+            .publiziere_objekt(einsatz_id, LiveEvent::Uhs, "uhs_id", a.uhs_id);
     }
-
-    super::etb_system_degradiert(
-        &state,
-        einsatz_id,
-        ctx.benutzer.id,
-        &crate::person::etb_text_bestaetigt(
-            format!(
-                "Person {}: {}",
-                registrier_anzeige(person.registrier_nr),
-                art.etb_sachverhalt()
-            ),
-            bestaetigung.as_ref(),
-        ),
-    )
-    .await;
+    state.live.publiziere(einsatz_id, etb_id);
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
+}
+
+/// Ausgang der Verbleib-Transaktion.
+enum Verbleibt {
+    /// Schon gespeichert (gleichzeitiger Replay derselben `client_id`).
+    Replay(VerbleibAnzeige),
+    Neu {
+        verbleib: VerbleibAnzeige,
+        austritt: Option<crate::uhs::AutoAustrittTx>,
+        etb_id: i64,
+    },
 }
 
 #[derive(Debug, Deserialize)]
 pub struct NotizBody {
     pub text: String,
+    /// Erfassungszeit, offline vorgemerkt (LLH-1138); fehlt = jetzt.
+    #[serde(default)]
+    pub zeitpunkt_at: Option<String>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/notizen — append-only Befundnotiz.
 /// Schreibberechtigt + aktiv. **KEIN ETB-Eintrag** (besondere Kategorie). SSE.
+///
+/// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): Replay derselben `client_id` vor
+/// dem Aktiv-Gate, Erfassungszeit gekappt.
 pub async fn notiz(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Personen>,
+    ctx: EinsatzSchreibfreigabe<Personen>,
+    headers: HeaderMap,
     PfadParam((_eid, person_id)): PfadParam<(i64, i64)>,
     JsonBody(body): JsonBody<NotizBody>,
 ) -> Result<(StatusCode, Json<NotizAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     stelle::fordere_person(&state.pool, ctx.geraet.as_ref(), person_id).await?;
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+    let client_id = crate::routes::support::parse_client_id(body.client_id.as_deref())?;
+    if let Some(cid) = client_id.as_deref() {
+        if let Some(replay) =
+            verlaufsnotiz_repo::nach_client_id(&state.pool, einsatz_id, cid).await?
+        {
+            return Ok((
+                StatusCode::CREATED,
+                Json(replay_an_person(replay, person_id, |n| n.person_id)?),
+            ));
+        }
+    }
+    ctx.fordere_aktiv()?;
     let text = pflicht(&body.text, "Notiztext")?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
+    let erfasst_at = crate::routes::support::erfassungszeitpunkt(
+        body.zeitpunkt_at.as_deref(),
+        chrono::Utc::now(),
+        &person.erfasst_at,
+    )?;
     if person.storniert_at.is_some() {
         return Err(AppError::Conflict(
             "Stornierte Person kann keine Notiz erhalten".into(),
         ));
     }
-    let notiz =
-        verlaufsnotiz_repo::anlegen(&state.pool, einsatz_id, person_id, &text, ctx.benutzer.id)
-            .await?;
+    let notiz = verlaufsnotiz_repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        person_id,
+        &verlaufsnotiz_repo::NeueNotiz {
+            text: &text,
+            erfasst_at: Some(&erfasst_at),
+            client_id: client_id.as_deref(),
+        },
+        ctx.benutzer.id,
+    )
+    .await?;
+    // Ein gleichzeitiger Replay kam in der Transaktion zurück; er gehört zu dieser Person nur,
+    // wenn die Kennung passt.
+    let notiz = replay_an_person(notiz, person_id, |n| n.person_id)?;
     // BEWUSST kein super::etb_system_degradiert(): besondere Kategorie gehört NICHT in den ETB.
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(notiz)))

@@ -389,6 +389,20 @@ export type PersonDetail = S['PersonDetail'];
 export type PersonZugriff = S['ZugriffAnzeige'];
 export type PersonZugriffArt = S['ZugriffArt'];
 export type PersonAnhang = S['PersonAnhangAnzeige'];
+/** Transport einer Person (LLH-1325): Verlaufseintrag und seine Kataloge. */
+export type Transport = S['TransportAnzeige'];
+export type TransportPrioritaet = S['TransportPrioritaet'];
+export type TransportArt = S['TransportArt'];
+export type Fachrichtung = S['Fachrichtung'];
+/** Maßnahme am Patienten (LLH-1324): Eintrag mit Durchführung, aufgehoben mit `aufgehoben_at`. */
+export type Massnahme = S['MassnahmeAnzeige'];
+export type MassnahmeArt = S['MassnahmeArt'];
+/** Verletzung am Körperschema (LLH-1113): Ansicht, Region, Art, optional Schwere und Lage. */
+export type Verletzung = S['VerletzungAnzeige'];
+export type VerletzungAnsicht = S['VerletzungAnsicht'];
+export type VerletzungArt = S['VerletzungArt'];
+export type VerletzungSchwere = S['VerletzungSchwere'];
+export type KoerperRegion = S['KoerperRegion'];
 
 // ============================== E‑3 Unfallhilfsstellen ==============================
 export type UhsTyp = S['UhsTyp'];

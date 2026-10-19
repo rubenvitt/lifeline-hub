@@ -156,6 +156,8 @@ export const EINSATZ_KEYS = {
   einsatzberichtDruck: 'einsatz-einsatzbericht-druck',
   // Auftragsdruck: ein Auftrag als Schnappschuss, eigener Prefix außerhalb von `auftraege` (LLH-1171).
   auftragDruck: 'einsatz-auftrag-druck',
+  // Druckansicht einer Person: Schnappschuss, eigener Prefix außerhalb von `person` (LLH-1120).
+  personDruck: 'einsatz-person-druck',
 } as const;
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
@@ -464,6 +466,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  * - `auftragDruck` (LLH-1171): derselbe Schnappschuss-Grundsatz für das Blatt eines Auftrags; eine
  *   Quittung an einem anderen Gerät darf es nicht still ändern. Unter `auftraege` zöge ihn das
  *   Ereignis `auftrag` per Präfix mit.
+ * - `personDruck` (LLH-1120): derselbe Schnappschuss-Grundsatz für das Blatt einer Person; jeder
+ *   Abruf schreibt einen `druck`-Eintrag ins Zugriffsprotokoll, ein Live-Refetch schriebe weitere.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
@@ -495,6 +499,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
   EINSATZ_KEYS.auftragDruck,
+  EINSATZ_KEYS.personDruck,
   EINSATZ_KEYS.uhsAnhangZugriffe,
   EINSATZ_KEYS.uhsPlanBild,
   EINSATZ_KEYS.personenListenzugriffe,
@@ -698,6 +703,8 @@ export const einsatzKeys = {
   // Auftragsdruck (LLH-1171): ein Auftrag einzeln, nicht live (siehe NICHT_LIVE_KEYS).
   auftragDruck: (einsatzId: number, auftragId: number) =>
     [EINSATZ_KEYS.auftragDruck, einsatzId, auftragId] as const,
+  personDruck: (einsatzId: number, personId: number) =>
+    [EINSATZ_KEYS.personDruck, einsatzId, personId] as const,
 
   // Stab: Führungsorganisation S1–S6.
   stab: (einsatzId: number) => [EINSATZ_KEYS.stab, einsatzId] as const,

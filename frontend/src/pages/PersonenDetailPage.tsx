@@ -46,7 +46,7 @@ import {
 import { listeUhs, aenderePersonBelegung } from '../api/einsatzUhs';
 import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import { STATUS_META } from '../personen/personMeta';
+import { GESCHLECHT_WORT, STATUS_META } from '../personen/personMeta';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import PersonAnhaenge from './personen/PersonAnhaenge';
@@ -60,7 +60,7 @@ import StammdatenRaster, { type StammdatenAngabe } from '../personen/StammdatenR
 import { UhsZuweisenDialog } from '../personen/ZuweisungsDialoge';
 import KatalogTabelle from '../components/KatalogTabelle';
 import type { Person, PersonDetail, PersonStatus, PersonZugriff } from '../api/types';
-import { lagekartePfad, parseRouteId } from '../routing/deeplinks';
+import { lagekartePfad, parseRouteId, personDruckPfad } from '../routing/deeplinks';
 import { useEinsatzPfade } from '../routing/EinsatzPfade';
 import { useGeraetDarf } from '../geraet/geraetSicht';
 import { koordinatenText } from '../personen/koordinate';
@@ -546,7 +546,7 @@ export default function PersonenDetailPage() {
     return [
       { label: 'Name', wert: person.name },
       { label: 'Vorname', wert: person.vorname },
-      { label: 'Geschlecht', wert: person.geschlecht },
+      { label: 'Geschlecht', wert: person.geschlecht ? GESCHLECHT_WORT[person.geschlecht] : null },
       { label: 'Geburtsdatum', wert: person.geburtsdatum, mono: true },
       { label: 'Alter (geschätzt)', wert: person.alter_geschaetzt, mono: true },
       { label: 'Herkunft / Adresse', wert: person.herkunft_adresse, breit: true },
@@ -921,6 +921,22 @@ export default function PersonenDetailPage() {
         )
       }
       dataUpdatedAt={gemeinsamerDatenstand(detailQuery.dataUpdatedAt, auditQuery.dataUpdatedAt)}
+      // Druckansicht der Person (LLH-1120): Nebenweg auch ohne Schreibrecht, nicht am Gerät.
+      weitere={
+        darf('person-druck')
+          ? {
+              name: `Weitere Wege zu Person ${registrierAnzeige(p.registrier_nr)}`,
+              eintraege: [
+                {
+                  key: 'druck',
+                  label: 'Druckansicht',
+                  ziel: personDruckPfad(einsatzId, p.id),
+                  onWahl: () => navigate(personDruckPfad(einsatzId, p.id)),
+                },
+              ],
+            }
+          : undefined
+      }
       titel={
         <Space>
           Person {registrierAnzeige(p.registrier_nr)}
@@ -981,6 +997,7 @@ export default function PersonenDetailPage() {
           person={p}
           darfSchreiben={darfSchreiben}
           darfSichten={darf('person-sichtung')}
+          darfBehandeln={darf('person-behandlung')}
           aufenthaltAktionen={aufenthaltAktionen}
           onGeschrieben={invalidateDetail}
         />

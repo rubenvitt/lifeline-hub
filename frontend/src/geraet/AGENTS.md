@@ -62,15 +62,26 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   hält ein Gerät dort; `GeraetEinsatzRahmen`, `GeraetUhs` und `GeraetAufnahme` führen fremde
   Einsatz- oder UHS-Kennungen auf die Startseite. Ein 401 führt über die Marke
   `geraet/geraetMarke.ts` (in `GERAETESPEICHER`) auf „Kopplung beendet“, nie auf die Anmeldung.
-- **Bediener am Gerät** (LFH-1046, Spec `geraete-kopplung`): Sichtung, Erst-Sichtung und Verbleib
-  nehmen am UHS-Gerät optional `bestaetigt_personal_id` aus dem Einsatzpersonal an
-  (`src/geraet/bestaetigung.rs`). Die Angabe ist ein Datenfeld, keine Anmeldung: keine Sitzung,
-  keine Rechte über die Ansicht hinaus; eine Person schickt sie nie (422). Im Client nur über
-  `geraet/BestaetigtVonFeld.tsx`, ohne Vorauswahl. ETB-Text und Verlauf nennen „bestätigt: Name“,
-  Erfasser bleibt das Gerät.
-- **Nichts auf der Platte** (design.md D8): kein Lagebild (`offline/lagebildSitzung.ts`
-  überspringt Geräte), keine gemerkte UHS; die Schreib-Warteschlange bleibt an
-  (`useOfflineSync` in der Hülle).
+- **Bediener am Gerät** (LFH-1046, Spec `geraete-kopplung`): Sichtung, Erst-Sichtung, Verbleib,
+  Transport, Maßnahme und Verletzung nehmen am UHS-Gerät optional `bestaetigt_personal_id` aus dem
+  Einsatzpersonal an (`src/geraet/bestaetigung.rs`; Aufheben nicht). Die Angabe ist ein
+  Datenfeld, keine Anmeldung: keine Sitzung, keine Rechte über die Ansicht hinaus; eine Person
+  schickt sie nie (422). Geprüft wird zur Erfassungszeit des Eintrags (Change
+  `y18v58dt-pat-kern`, D7): eine danach entlassene Kraft bestätigt einen vorgemerkten Eintrag
+  weiter, ohne bestimmbare Einsatzzeit gilt „aktiv jetzt“. Ein vorgemerkter Eintrag nimmt die
+  Angabe in der Warteschlange mit. Im Client nur über `geraet/BestaetigtVonFeld.tsx`, ohne
+  Vorauswahl; die Hülle hält die Liste beobachtet (`useKeepBestaetigerLoaded`), sonst wäre sie
+  ohne Netz leer, sobald der Cache sie nach dem letzten Paneel geräumt hat (nur im Speicher des
+  Tabs). ETB-Text und Verlauf nennen „bestätigt: Name“, Erfasser bleibt das Gerät.
+- **Nichts auf der Platte** (design.md D8 der LFH-892): kein Lagebild
+  (`offline/lagebildSitzung.ts` überspringt Geräte), keine gemerkte UHS; die
+  Schreib-Warteschlange bleibt an (`useOfflineSync` in der Hülle). Ohne Netz merkt das UHS-Gerät
+  Aufnahme, Nachsichtung, Verbleib, Notiz, Transport, Maßnahme und Verletzung einer schon
+  geladenen Person vor (Spec `feldgeraet-bedienung`). Die Warteschlange hält dafür deren
+  Eingaben samt Notiztexten auf dem Gerät, bis sie übertragen oder verworfen sind, wie beim
+  Anlegen; auch ein Ende der Kopplung räumt sie nicht (Beweissicherung, Fristen in
+  `frontend/src/offline/AGENTS.md`, „Gerätedaten beim Abmelden“). Was nicht im Speicher des Tabs
+  geladen ist, geht ohne Netz nicht.
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
   Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live

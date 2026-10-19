@@ -6,7 +6,7 @@ pub mod plan;
 pub mod platz_repo;
 pub mod repo;
 
-pub use hooks::{auto_austritt, AutoAustrittEffekt};
+pub use hooks::{auto_austritt, auto_austritt_tx, AutoAustrittEffekt, AutoAustrittTx};
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;

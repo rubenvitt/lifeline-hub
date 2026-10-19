@@ -8988,4 +8988,456 @@ mod tests {
             assert_eq!(zaehle(t).await, 0, "{t} geht mit dem Einsatz");
         }
     }
+
+    // --- LLH-1138: Erfassungszeit und Idempotenz der Personen-Einträge (0217) ---
+
+    /// `client_id` und `eingegangen_at` an Sichtung, Verbleib und Verlaufsnotiz: nullable, ohne
+    /// Vorgabewert (der INSERT setzt die Ankunft), und je Einsatz eindeutig, nur wenn gesetzt.
+    #[tokio::test]
+    async fn migration_0217_person_verlauf_client_id_und_ankunft() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 217).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let e2: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Lage 2') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut personen = Vec::new();
+        for einsatz in [e, e2] {
+            personen.push(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, \
+                        geaendert_von) VALUES (?, 1, ?, ?) RETURNING id",
+                )
+                .bind(einsatz)
+                .bind(b)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            );
+        }
+        let einfuegen = [
+            "INSERT INTO person_sichtung (einsatz_id, person_id, kategorie, gesichtet_von, \
+                client_id) VALUES (?, ?, 'sk2', ?, ?)",
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, erfasst_von, client_id) \
+             VALUES (?, ?, 'vor_ort', ?, ?)",
+            "INSERT INTO person_verlaufsnotiz (einsatz_id, person_id, text, erfasst_von, \
+                client_id) VALUES (?, ?, 'stabil', ?, ?)",
+        ];
+        for (tabelle, sql) in ["person_sichtung", "person_verbleib", "person_verlaufsnotiz"]
+            .into_iter()
+            .zip(einfuegen)
+        {
+            let schreibe = |einsatz: i64, person: i64, client_id: Option<&'static str>| {
+                let pool = pool.clone();
+                async move {
+                    sqlx::query(sql)
+                        .bind(einsatz)
+                        .bind(person)
+                        .bind(b)
+                        .bind(client_id)
+                        .execute(&pool)
+                        .await
+                }
+            };
+            schreibe(e, personen[0], Some("k1")).await.unwrap();
+            assert!(
+                schreibe(e, personen[0], Some("k1")).await.is_err(),
+                "{tabelle}: derselbe Schlüssel im selben Einsatz"
+            );
+            schreibe(e2, personen[1], Some("k1"))
+                .await
+                .unwrap_or_else(|f| panic!("{tabelle}: anderer Einsatz: {f}"));
+            schreibe(e, personen[0], None).await.unwrap();
+            schreibe(e, personen[0], None)
+                .await
+                .unwrap_or_else(|f| panic!("{tabelle}: ohne Schlüssel beliebig oft: {f}"));
+            let ankunft: Vec<Option<String>> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT eingegangen_at FROM {tabelle}"
+            )))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert!(
+                ankunft.iter().all(Option::is_none),
+                "{tabelle}: ohne Vorgabewert bleibt die Ankunft leer, der INSERT setzt sie"
+            );
+        }
+    }
+
+    // --- LLH-1326: PAT-Nummer und Kontamination an der Person (0218) ---
+
+    /// `pat_nummer` und `kontamination` sind nullable (NULL = keine Angabe, nicht „nein“), die
+    /// PAT-Nummer ist nicht eindeutig, die Kontamination nur 0 oder 1.
+    #[tokio::test]
+    async fn migration_0218_pat_nummer_und_kontamination() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 218).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let person = |nr: i64, pat: Option<&'static str>, kont: Option<i64>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, \
+                        geaendert_von, pat_nummer, kontamination) VALUES (?, ?, ?, ?, ?, ?)",
+                )
+                .bind(e)
+                .bind(nr)
+                .bind(b)
+                .bind(b)
+                .bind(pat)
+                .bind(kont)
+                .execute(&pool)
+                .await
+            }
+        };
+        person(1, None, None).await.expect("ohne Angabe");
+        person(2, Some("A-4711"), Some(1)).await.unwrap();
+        person(3, Some("A-4711"), Some(0))
+            .await
+            .expect("dieselbe PAT-Nummer zweimal (Tippfehler im Feld)");
+        assert!(person(4, None, Some(2)).await.is_err(), "nur 0 oder 1");
+    }
+
+    // --- LLH-1325: Transport als Verlauf mit Cache an der Person (0219) ---
+
+    /// `person_transport` nimmt einen vollen Stand je Zeile (jedes Feld einzeln leer, drei leere
+    /// heben auf), nur Katalogwerte, und ist je Einsatz über `client_id` eindeutig. Der Cache an
+    /// `einsatz_person` trägt dieselben Kataloge.
+    #[tokio::test]
+    async fn migration_0219_person_transport() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 219).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let stand = |prio: Option<&'static str>,
+                     art: Option<&'static str>,
+                     fach: Option<&'static str>,
+                     client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_transport (einsatz_id, person_id, prioritaet, art, \
+                        fachrichtung, zeitpunkt_at, erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, ?, ?, '2026-10-18 10:00:00', '2026-10-18 10:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(prio)
+                .bind(art)
+                .bind(fach)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        stand(
+            Some("dringlich"),
+            Some("liegend"),
+            Some("unfallchirurgie"),
+            Some("t1"),
+        )
+        .await
+        .unwrap();
+        stand(None, None, None, None)
+            .await
+            .expect("drei leere heben auf");
+        stand(Some("sofort"), None, Some("psychiatrie"), None)
+            .await
+            .expect("jedes Feld einzeln leer");
+        assert!(
+            stand(Some("dringlich"), None, None, Some("t1"))
+                .await
+                .is_err(),
+            "derselbe Schlüssel im selben Einsatz"
+        );
+        assert!(stand(Some("eilig"), None, None, None).await.is_err());
+        assert!(stand(None, Some("fliegend"), None, None).await.is_err());
+        assert!(stand(None, None, Some("zahn"), None).await.is_err());
+
+        let cache = |prio: &'static str, art: &'static str, fach: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "UPDATE einsatz_person SET transport_prioritaet = ?, transport_art = ?, \
+                        transport_fachrichtung = ?, transport_at = '2026-10-18 10:00:00' \
+                     WHERE id = ?",
+                )
+                .bind(prio)
+                .bind(art)
+                .bind(fach)
+                .bind(p)
+                .execute(&pool)
+                .await
+            }
+        };
+        cache("normal", "mit_notarzt", "geburtshilfe")
+            .await
+            .unwrap();
+        assert!(cache("eilig", "sitzend", "kinder").await.is_err());
+        assert!(cache("normal", "fliegend", "kinder").await.is_err());
+        assert!(cache("normal", "sitzend", "zahn").await.is_err());
+    }
+
+    // --- LLH-1324: Maßnahmen am Patienten (0220) ---
+
+    /// `person_massnahme`: nur Katalogwerte, Durchführung und Ankunft Pflicht, Aufheben als
+    /// Spalten an der Zeile (leer = gilt), `client_id` je Einsatz eindeutig.
+    #[tokio::test]
+    async fn migration_0220_person_massnahme() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 220).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let massnahme = |art: &'static str, client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_massnahme (einsatz_id, person_id, art, zeitpunkt_at, \
+                        erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, '2026-10-18 14:05:00', '2026-10-18 14:06:00', ?, ?) \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(art)
+                .bind(b)
+                .bind(client_id)
+                .fetch_one(&pool)
+                .await
+                .map(|r| sqlx::Row::get::<i64, _>(&r, 0))
+            }
+        };
+        for art in [
+            "blutstillung",
+            "zugang",
+            "infusion",
+            "sauerstoff",
+            "atemweg",
+            "analgesie",
+            "immobilisation",
+            "waermeerhalt",
+            "dekontamination",
+        ] {
+            massnahme(art, None)
+                .await
+                .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        assert!(
+            massnahme("tourniquet", None).await.is_err(),
+            "nur der Katalog"
+        );
+        let m = massnahme("infusion", Some("m1")).await.unwrap();
+        assert!(
+            massnahme("infusion", Some("m1")).await.is_err(),
+            "derselbe Schlüssel im selben Einsatz"
+        );
+        let (at, von): (Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT aufgehoben_at, aufgehoben_von_id FROM person_massnahme WHERE id = ?",
+        )
+        .bind(m)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((at, von), (None, None), "eine neue Maßnahme gilt");
+        sqlx::query(
+            "UPDATE person_massnahme SET aufgehoben_at = '2026-10-18 14:10:00', \
+                aufgehoben_von_id = ? WHERE id = ?",
+        )
+        .bind(b)
+        .bind(m)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    // --- LLH-1113: Verletzungen am Körperschema (0221) ---
+
+    /// `person_verletzung`: Ansicht, Region, Art und Schwere nur aus dem Katalog, Lage je 0..1 und
+    /// nur als Paar, Aufheben als Spalten an der Zeile, `client_id` je Einsatz eindeutig.
+    #[tokio::test]
+    async fn migration_0221_person_verletzung() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 221).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let p: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_person (einsatz_id, registrier_nr, erfasst_von, geaendert_von) \
+             VALUES (?, 1, ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        #[allow(clippy::type_complexity)]
+        let verletzung = |ansicht: &'static str,
+                          region: &'static str,
+                          art: &'static str,
+                          schwere: Option<&'static str>,
+                          lage: (Option<f64>, Option<f64>),
+                          client_id: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(
+                    "INSERT INTO person_verletzung (einsatz_id, person_id, ansicht, region, art, \
+                        schwere, x, y, notiz, zeitpunkt_at, erfasst_at, erfasst_von, client_id) \
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'offen', '2026-10-18 10:00:00', \
+                        '2026-10-18 10:00:05', ?, ?)",
+                )
+                .bind(e)
+                .bind(p)
+                .bind(ansicht)
+                .bind(region)
+                .bind(art)
+                .bind(schwere)
+                .bind(lage.0)
+                .bind(lage.1)
+                .bind(b)
+                .bind(client_id)
+                .execute(&pool)
+                .await
+            }
+        };
+        let ohne = (None, None);
+        for region in [
+            "kopf",
+            "gesicht",
+            "hals",
+            "thorax",
+            "abdomen",
+            "becken",
+            "ruecken",
+            "wirbelsaeule",
+            "gesaess",
+            "oberarm_l",
+            "oberarm_r",
+            "unterarm_l",
+            "unterarm_r",
+            "hand_l",
+            "hand_r",
+            "oberschenkel_l",
+            "oberschenkel_r",
+            "unterschenkel_l",
+            "unterschenkel_r",
+            "fuss_l",
+            "fuss_r",
+        ] {
+            let ansicht = if ["ruecken", "wirbelsaeule", "gesaess"].contains(&region) {
+                "hinten"
+            } else {
+                "vorn"
+            };
+            verletzung(ansicht, region, "schmerz", None, ohne, None)
+                .await
+                .unwrap_or_else(|f| panic!("{region}: {f}"));
+        }
+        for art in [
+            "wunde_blutung",
+            "fraktur_verdacht",
+            "verbrennung",
+            "prellung_schwellung",
+            "amputation",
+            "schmerz",
+            "sonstige",
+        ] {
+            verletzung(
+                "hinten",
+                "kopf",
+                art,
+                Some("schwer"),
+                (Some(0.0), Some(1.0)),
+                None,
+            )
+            .await
+            .unwrap_or_else(|f| panic!("{art}: {f}"));
+        }
+        verletzung(
+            "vorn",
+            "kopf",
+            "schmerz",
+            Some("leicht"),
+            (Some(0.5), Some(0.2)),
+            Some("v1"),
+        )
+        .await
+        .unwrap();
+        for (fall, ergebnis) in [
+            (
+                "Schlüssel doppelt",
+                verletzung("vorn", "kopf", "schmerz", None, ohne, Some("v1")).await,
+            ),
+            (
+                "Rücken vorn",
+                verletzung("vorn", "ruecken", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Thorax hinten",
+                verletzung("hinten", "thorax", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Ansicht",
+                verletzung("seite", "kopf", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Region",
+                verletzung("vorn", "schulter_l", "schmerz", None, ohne, None).await,
+            ),
+            (
+                "Art",
+                verletzung("vorn", "kopf", "biss", None, ohne, None).await,
+            ),
+            (
+                "Schwere",
+                verletzung("vorn", "kopf", "schmerz", Some("kritisch"), ohne, None).await,
+            ),
+            (
+                "x > 1",
+                verletzung(
+                    "vorn",
+                    "kopf",
+                    "schmerz",
+                    None,
+                    (Some(1.1), Some(0.5)),
+                    None,
+                )
+                .await,
+            ),
+            (
+                "y < 0",
+                verletzung(
+                    "vorn",
+                    "kopf",
+                    "schmerz",
+                    None,
+                    (Some(0.1), Some(-0.1)),
+                    None,
+                )
+                .await,
+            ),
+            (
+                "nur x",
+                verletzung("vorn", "kopf", "schmerz", None, (Some(0.1), None), None).await,
+            ),
+        ] {
+            assert!(ergebnis.is_err(), "{fall}");
+        }
+    }
 }

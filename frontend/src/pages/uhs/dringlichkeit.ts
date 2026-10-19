@@ -1,6 +1,6 @@
-import type { Sichtungskategorie, UhsBelegung } from '../../api/types';
+import type { Sichtungskategorie, TransportPrioritaet, UhsBelegung } from '../../api/types';
 import { alsZeitpunkt } from '../../anzeige/zeitEingabe';
-import { SK_REIHE } from '../../personen/personMeta';
+import { SK_REIHE, TRANSPORT_PRIORITAET_REIHE, transportRang } from '../../personen/personMeta';
 
 /**
  * Dringlichkeit in der Unfallhilfsstelle (LLH-1135): wer als Nächstes auf einen freien Platz
@@ -8,7 +8,8 @@ import { SK_REIHE } from '../../personen/personMeta';
  * Patientenliste des UHS-Tablets (`geraet/GeraetPatientenPage.tsx`) dieselbe Folge lesen.
  *
  * Reihe: ungesichtet (muss gesichtet werden), SK I bis SK IV, tot, unverletzt; innerhalb einer
- * Kategorie die längste Wartezeit zuerst. Ungesichtete stehen vorn, weil sie am Ende untergingen.
+ * Kategorie die Transportpriorität (sofort, dringlich, normal, ohne; LLH-1325, design.md D10),
+ * dann die längste Wartezeit zuerst. Ungesichtete stehen vorn, weil sie am Ende untergingen.
  * Die Kategorien folgen `SK_REIHE` (eine Quelle mit der Sichtungswahl, LLH-1083); hier kommt
  * nur „ungesichtet“ davor.
  */
@@ -16,9 +17,14 @@ export type Dringlichkeitsstufe = 'ungesichtet' | Sichtungskategorie;
 
 export const DRINGLICHKEITS_REIHE: readonly Dringlichkeitsstufe[] = ['ungesichtet', ...SK_REIHE];
 
-/** Was die Folge braucht: die aktuelle Sichtung und seit wann die Person wartet (Wire, UTC). */
+/**
+ * Was die Folge braucht: die aktuelle Sichtung, die Transportpriorität und seit wann die Person
+ * wartet (Wire, UTC). Die Priorität ist Pflichtangabe (auch `null`), damit kein Aufrufer sie
+ * vergisst.
+ */
 export interface DringlichkeitsMerkmale {
   sichtung: Sichtungskategorie | null | undefined;
+  prioritaet: TransportPrioritaet | null | undefined;
   seit: string | null | undefined;
 }
 
@@ -27,18 +33,24 @@ export function dringlichkeitsRang(sichtung: Sichtungskategorie | null | undefin
   return DRINGLICHKEITS_REIHE.indexOf(sichtung ?? 'ungesichtet');
 }
 
+/** Die Reihe der Transportpriorität steht bei den Personen (`personen/personMeta.ts`). */
+export { transportRang };
+
 /** Millisekunden seit der Epoche, `null` bei fehlendem oder unlesbarem Zeitpunkt. */
 function zeitMs(seit: string | null | undefined): number | null {
   return alsZeitpunkt(seit)?.valueOf() ?? null;
 }
 
 /**
- * Vergleich zweier Personen: Kategorie, dann der frühere Beginn (längere Wartezeit) zuerst; ohne
- * Beginn hinten in der Kategorie. Gleiche liefern 0, die stabile Sortierung hält ihre Folge.
+ * Vergleich zweier Personen: Kategorie, dann Transportpriorität, dann der frühere Beginn (längere
+ * Wartezeit) zuerst; ohne Beginn hinten in der Stufe. Gleiche liefern 0, die stabile Sortierung
+ * hält ihre Folge.
  */
 export function compareDringlichkeit(a: DringlichkeitsMerkmale, b: DringlichkeitsMerkmale) {
   const abstand = dringlichkeitsRang(a.sichtung) - dringlichkeitsRang(b.sichtung);
   if (abstand !== 0) return abstand;
+  const prio = transportRang(a.prioritaet) - transportRang(b.prioritaet);
+  if (prio !== 0) return prio;
   const za = zeitMs(a.seit);
   const zb = zeitMs(b.seit);
   if (za == null || zb == null) return za == null && zb == null ? 0 : za == null ? 1 : -1;
@@ -53,15 +65,23 @@ export function nachDringlichkeit<T>(
   return [...liste].sort((a, b) => compareDringlichkeit(merkmale(a), merkmale(b)));
 }
 
-/** Abstand je Rang: größer als jeder Zeitpunkt in Millisekunden (Jahr 2286 ≈ 1e13). */
-const RANG_SCHRITT = 1e13;
+/** Abstand je Priorität: größer als jeder Zeitpunkt in Millisekunden (Jahr 2286 ≈ 1e13). */
+const PRIO_SCHRITT = 1e13;
+
+/** Abstand je Kategorie: Platz für alle Prioritätsstufen samt „ohne“ (Summe bleibt < 2^53). */
+const RANG_SCHRITT = PRIO_SCHRITT * (TRANSPORT_PRIORITAET_REIHE.length + 1);
 
 /**
  * Ein Zahlwert in derselben Folge, aufsteigend, für `sortWert` der `Datensicht` (die nur einen
- * Wert je Zeile vergleicht). Ohne Beginn das Ende der eigenen Kategorie.
+ * Wert je Zeile vergleicht): Kategorie, darin die Priorität als Zwischenschritt, darin die Zeit.
+ * Ohne Beginn das Ende der eigenen Stufe.
  */
 export function dringlichkeitsWert(m: DringlichkeitsMerkmale): number {
-  return dringlichkeitsRang(m.sichtung) * RANG_SCHRITT + (zeitMs(m.seit) ?? RANG_SCHRITT - 1);
+  return (
+    dringlichkeitsRang(m.sichtung) * RANG_SCHRITT +
+    transportRang(m.prioritaet) * PRIO_SCHRITT +
+    (zeitMs(m.seit) ?? PRIO_SCHRITT - 1)
+  );
 }
 
 /**

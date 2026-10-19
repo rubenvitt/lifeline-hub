@@ -2,13 +2,13 @@
 titel: UHS-Tablet und UHS-Laptop
 gruppen: [geraete]
 reihenfolge: 720
-quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs]
+quellen: [frontend/src/geraet/GeraetPatientenPage.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/geraet/BestaetigtVonFeld.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/offline/personEintrag.ts, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/geraet/GeraetStellePage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/pages/personen/AufnahmePage.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, src/geraet/mod.rs, src/geraet/bestaetigung.rs]
 ---
 
 ## Überblick
 
 Das **UHS-Tablet** begleitet die Arbeit in einer Unfallhilfsstelle: Patienten aufnehmen, sichten,
-auf Plätze legen und im Blick behalten. Der **UHS-Laptop** am Tisch der UHS-Leitung kann dasselbe
+auf Plätze legen, Transport, Maßnahmen und Verletzungen erfassen und im Blick behalten. Der **UHS-Laptop** am Tisch der UHS-Leitung kann dasselbe
 und pflegt dazu Plätze, Kräfte und Dateien der UHS und schickt Meldungen an die Einsatzleitung.
 
 Beide sind an genau eine Unfallhilfsstelle gekoppelt (siehe [Geräte koppeln](geraete-koppeln.md))
@@ -21,13 +21,14 @@ und zeigen nur deren Patienten. Die Navigation unten führt zu „Patienten“, 
 ### Patienten im Blick behalten
 
 1. „Patienten“ öffnen. Die Liste zeigt je Person Registriernummer, Name, Sichtungskategorie,
-   Zustand, Zeit und Platz in der UHS (Wartebereich oder Platz). Sie steht nach Dringlichkeit:
-   ungesichtet zuerst, dann SK I bis SK IV, tot und unverletzt, je Kategorie wer am längsten
-   wartet.
+   Zustand, Zeit und Platz in der UHS (Wartebereich oder Platz); eine kontaminierte Person trägt
+   „kontaminiert“. Sie steht nach Dringlichkeit: ungesichtet zuerst, dann SK I bis SK IV, tot und
+   unverletzt, je Kategorie nach der Transportpriorität und dann, wer am längsten wartet.
 
    ![Patientenliste eines UHS-Tablets mit der Gruppe „In der UHS“ und dem Knopf „Patient aufnehmen“](../bilder/geraet-uhs/patienten.png)
 
-2. Eine Zeile antippen, um die Person zu öffnen.
+2. Eine Zeile antippen, um die Person zu öffnen. Die Suche findet Personen nach R-Nr.,
+   PAT-Nr. und Name.
 3. Zum Nachsichten ohne Öffnen die Sichtung in der Zeile antippen, die Fläche der Kategorie wählen
    und „Übernehmen“ wählen.
 
@@ -74,6 +75,20 @@ Platzes lässt er sich als frei, defekt, in Aufbereitung oder gesperrt markieren
 
 4. „Übernehmen“ wählen. Die Sichtung trägt danach „bestätigt: …“ mit dem Namen.
 
+### Transport, Maßnahme und Verletzung mit „Bestätigt von“
+
+1. Die Person öffnen. Im Patientenkopf „Transport festlegen“, „Maßnahme erfassen“ oder
+   „Verletzung markieren“ wählen.
+2. Im Paneel die Angaben wählen wie am Arbeitsplatz
+   ([Betroffene und Sichtung](betroffene.md)): beim Transport Priorität, Art und Fachrichtung,
+   bei der Maßnahme die Fläche der Maßnahme, bei der Verletzung erst die Stelle am Körperschema.
+3. Unter „Bestätigt von“ die Person wählen, die den Eintrag verantwortet.
+4. Speichern: „Transport festlegen“ bzw. „Maßnahme erfassen“ wählen; bei der Verletzung
+   speichert der Tipp auf die Fläche der Art. Der Verlauf nennt danach „bestätigt: …“.
+
+Im Handschuh-Betrieb wächst das Körperschema mit, sodass auch Hand, Fuß und Hals groß genug zum
+Antippen sind.
+
 ### Plätze, Kräfte und Meldungen am Laptop
 
 Für den UHS-Laptop:
@@ -101,21 +116,38 @@ Für den UHS-Laptop:
 |                                                           | UHS-Tablet | UHS-Laptop |
 | --------------------------------------------------------- | ---------- | ---------- |
 | Patientenliste, Aufnahme, Sichtung                        | ja         | ja         |
+| Transport, Maßnahmen, Verletzungen                        | ja         | ja         |
 | Grundriss belegen, Verfügbarkeit setzen                   | ja         | ja         |
 | Plätze anlegen und ändern                                 | nein       | ja         |
 | Bereich „UHS“: Kräfte, Material lesen, Meldungen, Dateien | nein       | ja         |
 
 Keines der beiden Geräte legt eine UHS an, löst sie auf oder ordnet ganze Einheiten zu; das bleibt
-der Einsatzleitung. Wechsel in andere Module (Lagekarte, Einsatzübersicht) gibt es am Gerät nicht.
+der Einsatzleitung. Wechsel in andere Module (Lagekarte, Einsatzübersicht) und die Druckansicht
+einer Person gibt es am Gerät nicht.
 
 ### Wer gesichtet hat
 
-Das Tablet ist keine Person. Damit nachvollziehbar bleibt, wer eine Sichtung verantwortet, nennt
-„Bestätigt von“ eine Person aus dem Personal des Einsatzes. Das Feld ist freiwillig und ohne
-Vorauswahl, bei der ersten Sichtung wie bei jeder weiteren.
+Das Tablet ist keine Person. Damit nachvollziehbar bleibt, wer eine Sichtung, einen Verbleib,
+einen Transport, eine Maßnahme oder eine Verletzung verantwortet, nennt „Bestätigt von“ eine
+Person aus dem Personal des Einsatzes. Das Feld ist freiwillig und ohne Vorauswahl, bei der
+ersten Sichtung wie bei jeder weiteren. Es ist keine Anmeldung: das Gerät bekommt dadurch keine
+weiteren Rechte, als Erfasser bleibt das Gerät stehen.
+
+Geprüft wird, ob die Person zum Zeitpunkt der Erfassung im Einsatz eingesetzt war. Wird sie
+entlassen, bevor ein ohne Netz vorgemerkter Eintrag ankommt, gilt die Bestätigung trotzdem.
 
 ### Ohne Netz
 
 Aufnahmen und Meldungen merkt das Gerät ohne Netz vor und sendet sie nach (siehe
 [Arbeiten ohne Netz](ohne-netz.md)). Bis dahin trägt eine aufgenommene Person „R-…“ statt ihrer
 Registriernummer.
+
+An einer schon geöffneten Person merkt das Gerät auch Nachsichtung, Verbleib, Notiz, Transport,
+Maßnahme und Verletzung vor, samt „Bestätigt von“. Der Patientenkopf zeigt sie unter „Offline
+vorgemerkt“ mit ihrer Zeit. Nach der Rückkehr des Netzes steht jeder Eintrag genau einmal mit
+seiner Erfassungszeit im Verlauf. Das Aufheben einer Maßnahme oder Verletzung und das Eintragen
+von PAT-Nummer und Kontamination brauchen Netz; ohne Netz stehen sie gesperrt mit Grund.
+
+Ein gekoppeltes Gerät legt kein Lagebild ab: nach einem Neuladen ohne Netz zeigt es keine
+Patientendaten. Die vorgemerkten Einträge selbst, auch Notiztexte, liegen bis zum Senden oder
+Verwerfen auf dem Gerät.

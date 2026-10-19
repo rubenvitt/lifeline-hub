@@ -192,6 +192,89 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Fenster",
     });
 
+    // LLH-1138: die medizinischen Einträge einer Person nehmen ihren Replay ebenso vor dem
+    // Aktiv-Gate und hinter der Lese-Policy.
+    let p = angelegt(
+        app,
+        cookie,
+        &format!("{basis}/personen"),
+        r#"{"name":"Gesichtet"}"#,
+        "Person",
+    )
+    .await["id"]
+        .as_i64()
+        .unwrap();
+    let url = format!("{basis}/personen/{p}/sichtung");
+    let body =
+        json!({"kategorie":"sk2","notiz":"Geheim-Sichtung Atemnot","client_id":"r-sichtung"});
+    angelegt(app, cookie, &url, &body.to_string(), "Sichtung").await;
+    faelle.push(Fall {
+        route: "personen/sichtung",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"kategorie":"sk2","client_id":"r-sichtung-neu"}).to_string(),
+        geheim: "Geheim-Sichtung",
+    });
+
+    let url = format!("{basis}/personen/{p}/verbleib");
+    let body = json!({"art":"transport","ziel":"Geheim-Klinik Nord","client_id":"r-verbleib"});
+    angelegt(app, cookie, &url, &body.to_string(), "Verbleib").await;
+    faelle.push(Fall {
+        route: "personen/verbleib",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"art":"vor_ort","client_id":"r-verbleib-neu"}).to_string(),
+        geheim: "Geheim-Klinik",
+    });
+
+    let url = format!("{basis}/personen/{p}/notizen");
+    let body = json!({"text":"Geheim-Befund Platzwunde","client_id":"r-notiz"});
+    angelegt(app, cookie, &url, &body.to_string(), "Notiz").await;
+    faelle.push(Fall {
+        route: "personen/notizen",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"text":"Neu","client_id":"r-notiz-neu"}).to_string(),
+        geheim: "Geheim-Befund",
+    });
+
+    // Change y18v58dt-pat-kern: Transport, Maßnahme und Verletzung folgen demselben Muster.
+    let url = format!("{basis}/personen/{p}/transport");
+    let body = json!({"prioritaet":"dringlich","fachrichtung":"psychiatrie","client_id":"r-tr"});
+    angelegt(app, cookie, &url, &body.to_string(), "Transport").await;
+    faelle.push(Fall {
+        route: "personen/transport",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"prioritaet":"normal","client_id":"r-tr-neu"}).to_string(),
+        geheim: "psychiatrie",
+    });
+
+    let url = format!("{basis}/personen/{p}/massnahmen");
+    let body = json!({"art":"analgesie","client_id":"r-massnahme"});
+    angelegt(app, cookie, &url, &body.to_string(), "Maßnahme").await;
+    faelle.push(Fall {
+        route: "personen/massnahmen",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"art":"zugang","client_id":"r-massnahme-neu"}).to_string(),
+        geheim: "analgesie",
+    });
+
+    let url = format!("{basis}/personen/{p}/verletzungen");
+    let body = json!({"ansicht":"vorn","region":"thorax","art":"wunde_blutung",
+                      "notiz":"Geheim-Verletzung","client_id":"r-verletzung"});
+    angelegt(app, cookie, &url, &body.to_string(), "Verletzung").await;
+    faelle.push(Fall {
+        route: "personen/verletzungen",
+        url,
+        body: body.to_string(),
+        body_unbekannt: json!({"ansicht":"vorn","region":"kopf","art":"schmerz",
+                               "client_id":"r-verletzung-neu"})
+        .to_string(),
+        geheim: "Geheim-Verletzung",
+    });
+
     faelle
 }
 

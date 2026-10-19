@@ -812,8 +812,12 @@ async fn find_storno_hindernis_tx(
         ),
         (
             "SELECT EXISTS(SELECT 1 FROM person_sichtung WHERE bestaetigt_personal_id = ?1) \
-                 OR EXISTS(SELECT 1 FROM person_verbleib WHERE bestaetigt_personal_id = ?1)",
-            "Die Person hat eine Sichtung oder einen Verbleib bestätigt",
+                 OR EXISTS(SELECT 1 FROM person_verbleib WHERE bestaetigt_personal_id = ?1) \
+                 OR EXISTS(SELECT 1 FROM person_transport WHERE bestaetigt_personal_id = ?1) \
+                 OR EXISTS(SELECT 1 FROM person_massnahme WHERE bestaetigt_personal_id = ?1) \
+                 OR EXISTS(SELECT 1 FROM person_verletzung WHERE bestaetigt_personal_id = ?1)",
+            "Die Person hat an einem Betroffenen einen Eintrag bestätigt \
+             (Sichtung, Verbleib, Transport, Maßnahme oder Verletzung)",
         ),
     ];
     for (sql, grund) in SPUREN {

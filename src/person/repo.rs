@@ -11,7 +11,8 @@ const SELECT_ALLE: &str = "\
            aktuelle_uhs_id, aktueller_platz_id, \
            zustand, antreff_lat, antreff_lon, vermisst_seit, \
            aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status, \
-           aktuelle_verbleib_betreuungsstelle_id \
+           aktuelle_verbleib_betreuungsstelle_id, pat_nummer, kontamination, \
+           transport_prioritaet, transport_art, transport_fachrichtung, transport_at \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
@@ -65,6 +66,10 @@ pub struct PatchDaten<'a> {
     pub antreff_lat: Option<Option<f64>>,
     pub antreff_lon: Option<Option<f64>>,
     pub vermisst_seit: Option<Option<&'a str>>,
+    // LLH-1326 (design.md D3): PAT-Nummer (Grenze prüft der Handler) und Kontamination, je
+    // einzeln dreiwertig; `Some(None)` heißt „keine Angabe“, nicht „nein“.
+    pub pat_nummer: Option<Option<&'a str>>,
+    pub kontamination: Option<Option<bool>>,
 }
 
 /// Personen eines Einsatzes (ohne stornierte), optional nach Status gefiltert.
@@ -93,7 +98,7 @@ pub async fn auswahl(
     einsatz_id: i64,
 ) -> Result<Vec<super::PersonAuswahl>, AppError> {
     Ok(sqlx::query_as::<_, super::PersonAuswahl>(
-        "SELECT id, registrier_nr, status, name, vorname FROM einsatz_person \
+        "SELECT id, registrier_nr, status, name, vorname, pat_nummer FROM einsatz_person \
          WHERE einsatz_id = ? AND storniert_at IS NULL ORDER BY registrier_nr",
     )
     .bind(einsatz_id)
@@ -267,10 +272,10 @@ pub async fn aktualisiere(
     // `schaden/repo.rs` — das SQL bleibt statisch, dynamisch ist nur das CAS-Suffix
     // (sqlx 0.9 nimmt für `query` ohnehin nur `&'static str`, format!-SQL bräche den Build).
     //
-    // Die Nummerierung ist hier kein Stil, sondern Absicherung: bei dreizehn aufeinanderfolgenden
+    // Die Nummerierung ist hier kein Stil, sondern Absicherung: bei fünfzehn aufeinanderfolgenden
     // Flag/Wert-Paaren würde eine um eine Position verschobene Bind-Kette gleichtypige
-    // Nachbarspalten (name↔vorname, melder_kontakt↔notiz, antreff_lat↔antreff_lon) STILL
-    // vertauschen — ohne Compile-
+    // Nachbarspalten (name↔vorname, melder_kontakt↔notiz, antreff_lat↔antreff_lon,
+    // vermisst_seit↔pat_nummer) STILL vertauschen — ohne Compile-
     // und ohne Laufzeitfehler. Abgesichert von `aktualisiere_setzt_jede_spalte_an_ihren_platz`.
     let mut sql = String::from(
         "UPDATE einsatz_person SET \
@@ -287,12 +292,14 @@ pub async fn aktualisiere(
             antreff_lat = CASE WHEN ?21 IS NULL THEN antreff_lat ELSE ?22 END, \
             antreff_lon = CASE WHEN ?23 IS NULL THEN antreff_lon ELSE ?24 END, \
             vermisst_seit = CASE WHEN ?25 IS NULL THEN vermisst_seit ELSE ?26 END, \
+            pat_nummer = CASE WHEN ?27 IS NULL THEN pat_nummer ELSE ?28 END, \
+            kontamination = CASE WHEN ?29 IS NULL THEN kontamination ELSE ?30 END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
-            geaendert_von = ?27 \
-         WHERE id = ?28 AND einsatz_id = ?29",
+            geaendert_von = ?31 \
+         WHERE id = ?32 AND einsatz_id = ?33",
     );
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?30");
+        sql.push_str(" AND geaendert_at = ?34");
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.name.map(|_| 1_i64))
@@ -321,6 +328,10 @@ pub async fn aktualisiere(
         .bind(daten.antreff_lon.and_then(|v| v))
         .bind(daten.vermisst_seit.map(|_| 1_i64))
         .bind(daten.vermisst_seit.and_then(|v| v))
+        .bind(daten.pat_nummer.map(|_| 1_i64))
+        .bind(daten.pat_nummer.and_then(|v| v))
+        .bind(daten.kontamination.map(|_| 1_i64))
+        .bind(daten.kontamination.and_then(|v| v))
         .bind(geaendert_von)
         .bind(person_id)
         .bind(einsatz_id);
@@ -653,6 +664,8 @@ mod tests {
                 antreff_lat: Some(Some(52.25)),
                 antreff_lon: Some(Some(9.125)),
                 vermisst_seit: Some(Some("2026-09-22 06:00:00")),
+                pat_nummer: Some(Some("W-pat")),
+                kontamination: Some(Some(true)),
             },
         )
         .await
@@ -671,6 +684,8 @@ mod tests {
         assert_eq!(a.antreff_lat, Some(52.25));
         assert_eq!(a.antreff_lon, Some(9.125));
         assert_eq!(a.vermisst_seit.as_deref(), Some("2026-09-22 06:00:00"));
+        assert_eq!(a.pat_nummer.as_deref(), Some("W-pat"));
+        assert_eq!(a.kontamination, Some(true));
     }
 
     /// LFH-266/F12: `Some(None)` leert eine Spalte, `None` lässt sie unverändert.
@@ -896,19 +911,13 @@ mod tests {
         let _leer = stelle("Leer").await;
         let nu = |id| VerbleibDaten {
             art: "notunterkunft",
-            transportmittel: None,
-            ziel: None,
-            status: None,
-            notiz: None,
             betreuungsstelle_id: Some(id),
-            bestaetigung: None,
+            ..VerbleibDaten::default()
         };
         let mut personen = Vec::new();
         for _ in 0..4 {
             let p = anlegen(&pool, e, b, leere_daten()).await.unwrap();
-            erfassen(&pool, e, p.id, nu(nord), "Notunterkunft", b)
-                .await
-                .unwrap();
+            erfassen(&pool, e, p.id, nu(nord), b).await.unwrap();
             personen.push(p.id);
         }
         storniere(&pool, e, personen[2], b).await.unwrap();
@@ -922,7 +931,6 @@ mod tests {
                 bestaetigung: None,
                 ..nu(nord)
             },
-            "entlassen",
             b,
         )
         .await

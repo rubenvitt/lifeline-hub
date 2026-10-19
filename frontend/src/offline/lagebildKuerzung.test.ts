@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Person } from '../api/types';
+import type { Person, PersonAuswahl } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { lagebildKuerzen, nichtGeladen, PERSON_AUF_DER_PLATTE } from './lagebildKuerzung';
 
@@ -30,6 +30,9 @@ const ERWARTET_BEHALTEN = [
   'aktuelle_uhs_id',
   'aktueller_platz_id',
   'vermisst_seit',
+  'kontamination',
+  'transport_prioritaet',
+  'transport_art',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -39,6 +42,9 @@ const ERWARTET_AUSGELASSEN = [
   'antreff_ort',
   'antreff_lat',
   'antreff_lon',
+  'pat_nummer',
+  'transport_fachrichtung',
+  'transport_at',
 ].sort();
 
 /** Eine Person mit JEDEM Feld gesetzt — ein ausgelassenes Feld fiele sonst nicht auf. */
@@ -74,6 +80,12 @@ const VOLL: Person = {
   aktuelles_verbleib_ziel: 'Klinikum',
   aktueller_verbleib_status: 'angemeldet',
   aktuelle_verbleib_betreuungsstelle_id: 2,
+  pat_nummer: 'A-4711',
+  kontamination: true,
+  transport_prioritaet: 'dringlich',
+  transport_art: 'liegend',
+  transport_fachrichtung: 'psychiatrie',
+  transport_at: '2026-10-18 09:00:00',
 };
 
 function eintrag(queryKey: readonly unknown[], data: unknown) {
@@ -114,7 +126,16 @@ describe('lagebildKuerzen', () => {
     expect(p.nicht_geladen).toEqual(ERWARTET_AUSGELASSEN);
     // Kein Freitext in irgendeiner Form, auch nicht als Wert eines anderen Felds.
     const text = JSON.stringify(p);
-    for (const wert of ['Hauptstraße', 'Keller', '0170', 'Diabetikerin', 'unterkühlt', '53.07']) {
+    for (const wert of [
+      'Hauptstraße',
+      'Keller',
+      '0170',
+      'Diabetikerin',
+      'unterkühlt',
+      '53.07',
+      'A-4711',
+      'psychiatrie',
+    ]) {
       expect(text).not.toContain(wert);
     }
   });
@@ -143,6 +164,37 @@ describe('lagebildKuerzen', () => {
     expect(lagebildKuerzen(etb)).toBe(etb);
     const leer = eintrag(einsatzKeys.personen(7), undefined);
     expect(lagebildKuerzen(leer)).toBe(leer);
+  });
+});
+
+describe('lagebildKuerzen — Personenauswahl (LLH-1326, D9)', () => {
+  const AUSWAHL: PersonAuswahl[] = [
+    {
+      id: 1,
+      registrier_nr: 12,
+      status: 'betroffen',
+      name: 'Muster',
+      vorname: 'Erika',
+      pat_nummer: '4711',
+    },
+    { id: 2, registrier_nr: 13, status: 'erfasst', name: null, vorname: null },
+  ];
+
+  it('lässt die PAT-Nummer aus und behält Nummer, Name und Status', () => {
+    const gekuerzt = lagebildKuerzen(eintrag(einsatzKeys.personenAuswahl(7), AUSWAHL)).state
+      .data as Record<string, unknown>[];
+    expect(gekuerzt).toEqual([
+      { id: 1, registrier_nr: 12, status: 'betroffen', name: 'Muster', vorname: 'Erika' },
+      { id: 2, registrier_nr: 13, status: 'erfasst', name: null, vorname: null },
+    ]);
+    expect(JSON.stringify(gekuerzt)).not.toContain('4711');
+  });
+
+  it('ist idempotent und lässt den Eingang stehen', () => {
+    const e = eintrag(einsatzKeys.personenAuswahl(7), AUSWAHL);
+    const einmal = lagebildKuerzen(e);
+    expect(lagebildKuerzen(einmal)).toEqual(einmal);
+    expect(AUSWAHL[0].pat_nummer).toBe('4711');
   });
 });
 

@@ -1,8 +1,8 @@
 import { Button, Flex, Space } from 'antd';
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
 import { PaneelZustand, StatusChip, monoStil, useRollen } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { globalKeys } from '../api/queryKeys';
 import type { SitzungAnzeige } from '../api/types';
@@ -19,23 +19,20 @@ function alsMs(utc: string): number {
   return Date.parse(`${utc.trim().replace(' ', 'T')}Z`);
 }
 
-/** „gerade eben“, „vor 12 min“, „vor 3 h“; ab einem Tag `null` (dann steht der Zeitpunkt). */
+/**
+ * „gerade eben“, „vor 12 min“, „vor 3 h“; ab einem Tag `null` (dann steht der Zeitpunkt).
+ *
+ * Bewusst nicht `anzeige/abstand.ts:formatVor` (LLH-1327): unter 5 min „gerade eben“ nach dem
+ * Server-Takt, „vor n h“ ohne Minuten (der Takt macht sie ungenau) und ab einem Tag kein Text.
+ * Die 5-min-Schwelle beschreibt die Anwenderhilfe (`docs/anwender/kapitel/benutzer.md`,
+ * `profil-sicherheit.md`).
+ */
 export function zuletztText(utc: string, jetztMs: number): string | null {
   const alter = jetztMs - alsMs(utc);
   if (alter < GERADE_EBEN_MS) return 'gerade eben';
   if (alter < 60 * 60_000) return `vor ${Math.floor(alter / 60_000)} min`;
   if (alter < 24 * 60 * 60_000) return `vor ${Math.floor(alter / (60 * 60_000))} h`;
   return null;
-}
-
-/** Die Minute, damit „vor 12 min“ nicht stehen bleibt, solange die Liste offen ist. */
-function useJetzt(): number {
-  const [jetzt, setJetzt] = useState(() => Date.now());
-  useEffect(() => {
-    const t = window.setInterval(() => setJetzt(Date.now()), 60_000);
-    return () => window.clearInterval(t);
-  }, []);
-  return jetzt;
 }
 
 interface SitzungsListeProps {
@@ -68,7 +65,8 @@ export default function SitzungsListe({
   const qc = useQueryClient();
   const { token, rollen } = useRollen();
   const { formatZeit } = useAnzeigeKonventionen();
-  const jetzt = useJetzt();
+  // Die Minute, damit „vor 12 min“ nicht stehen bleibt, solange die Liste offen ist.
+  const jetzt = useMinutenTakt();
   const abfrage = useQuery({ queryKey, queryFn: laden });
 
   // Beide Fächer (eigene und fremde) unter einem Prefix: ein Admin am eigenen Konto sieht dieselbe

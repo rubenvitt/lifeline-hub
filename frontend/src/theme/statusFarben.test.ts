@@ -88,6 +88,11 @@ describe('Statusfarb-Vertrag', () => {
     ]);
   });
 
+  it('warnt bei einer Kontamination mit Wort, als Achtung, nicht als Alarm (LLH-1326, D11)', () => {
+    // `alarm` kollidierte mit dem Rot von SK I; ein neutrales Wort ginge in der Zeile unter.
+    expect(sf.kontamination).toEqual({ rolle: 'achtung', label: 'kontaminiert' });
+  });
+
   it('gibt jedem Eintrag einen zweiten Kanal (WCAG 1.4.1)', () => {
     for (const [name, map] of Object.entries(ALLE_MAPS)) {
       for (const [schluessel, d] of Object.entries(map)) {

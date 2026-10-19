@@ -40,7 +40,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   aenderePersonBelegung,
   aktualisierePlatz,
@@ -48,7 +48,10 @@ import {
   setzePlatzVerfuegbarkeit,
   stornierePlatz,
 } from '../../api/einsatzUhs';
-import { erfasseVerbleib, listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
+import { useSavePersonEintrag } from '../../personen/personEintragSpeichern';
+import { useAuthOptional } from '../../auth/AuthContext';
+import { useVorgemerktePersonEintraege } from '../../offline/useVorgemerkteSchreibaktionen';
 import type {
   Person,
   PlatzTyp,
@@ -63,6 +66,7 @@ import UhsPlanPaneel from './UhsPlanPaneel';
 import PersonDetailDrawer from '../../personen/PersonDetailDrawer';
 import { ErfassungsModal } from '../../components/Erfassung';
 import StatusTag from '../../components/StatusTag';
+import PrioritaetMarke from '../../personen/PrioritaetMarke';
 import SichtungsTag from '../../components/SichtungsTag';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import {
@@ -350,6 +354,23 @@ function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenPr
 }
 
 /**
+ * „Offline vorgemerkt“ an der Person (LLH-1138, `frontend/src/offline/AGENTS.md`, „Was vorgemerkt
+ * ist, kennt der Server noch nicht“): ein vorgemerkter Verbleib lässt die Person stehen, wo sie
+ * steht, bis der Abgleich sendet. Ohne den Hinweis am Ort erfasste jemand ihn ein zweites Mal.
+ */
+function VerbleibVorgemerkt() {
+  const { token, rollen } = useRollen();
+  return (
+    <span
+      data-lfh="verbleib-vorgemerkt"
+      style={{ fontSize: token.fontSizeSM, color: rollen.text2, whiteSpace: 'nowrap' }}
+    >
+      Offline vorgemerkt
+    </span>
+  );
+}
+
+/**
  * Wartezeit „12 min“ im Takt der vollen Minute (`useMinutenTakt`), Mono; der Beginn steht als
  * taktische Zeit im Titel (LLH-1135). Eigene Komponente, damit nur sie im Minutentakt zeichnet.
  */
@@ -473,6 +494,8 @@ interface PlatzKarteProps {
    * keinen Platz für einen Satz), die Karte trägt die Marke `data-fehler`.
    */
   abgelehnt?: boolean;
+  /** Der Verbleib der belegenden Person ist ohne Netz vorgemerkt (LLH-1138). */
+  verbleibVorgemerkt?: boolean;
 }
 
 function PlatzKarte({
@@ -490,6 +513,7 @@ function PlatzKarte({
   niemandWartet,
   onZurueckInWartebereich,
   abgelehnt = false,
+  verbleibVorgemerkt = false,
 }: PlatzKarteProps) {
   // Die Platzkarte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus — Drag-Source
   // (Layout verschieben).
@@ -680,7 +704,13 @@ function PlatzKarte({
         style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}
       >
         {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
-        {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
+        {/* Vorgemerkt statt „belegt“: beides fasst die Zeile nicht, belegt zeigen schon Fläche
+            und Personenmarke. */}
+        {belegtVon && verbleibVorgemerkt ? (
+          <VerbleibVorgemerkt />
+        ) : (
+          belegtVon && <StatusChip ton="bedien" wort="belegt" />
+        )}
       </div>
       {/* Belegung: feste Höhe, auch wenn leer. Die belegte Person ist ziehbar (→ Wartebereich
           oder Transport), im Bearbeiten-Modus nicht. In der Reiterform ist der Rückweg per Drag
@@ -809,6 +839,7 @@ function PersonenSpalte({
   fehler,
   wartetSeitVon,
   schleuse = false,
+  vorgemerkt,
 }: {
   titel: string;
   personen: Person[];
@@ -839,6 +870,8 @@ function PersonenSpalte({
    * Neue stehen solange hinten (`gehalteneFolge`), Entfallene gehen sofort.
    */
   schleuse?: boolean;
+  /** Personen mit ohne Netz vorgemerktem Verbleib (LLH-1138): die Zeile sagt es. */
+  vorgemerkt?: ReadonlySet<number>;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({
@@ -895,6 +928,7 @@ function PersonenSpalte({
               onOeffnen={onOeffnen}
               wartetSeit={wartetSeitVon?.(p)}
             />
+            {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
             {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in keinem
                 klickbaren Vorfahren und braucht keinen `stopPropagation`-/`onPointerDown`-Riegel.
                 Ein antd-`Button` ohne `size` erbt `controlHeight`. Das Wort steht sichtbar, kein
@@ -971,7 +1005,10 @@ function TransportSpalte({
               {/* Die Sichtung auch hier (LLH-1135): jede Personenmarke im Grundriss trägt sie. */}
               <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
               {personLabel(p)}
-            </Button>
+            </Button>{' '}
+            {/* Die Priorität als neutrale Marke neben dem Knopf (LLH-1325, design.md D10); die
+                Spalte sortiert deshalb nicht neu. */}
+            <PrioritaetMarke prioritaet={p.transport_prioritaet} />
             {p.aktueller_verbleib && (
               <div>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -1216,10 +1253,14 @@ export default function Grundriss({
   const beginnJe = new Map(personenInUhs.map((p) => [p.id, wartetSeit(p.id, uhs.belegungen)]));
   const wartetSeitVon = (p: Person) => beginnJe.get(p.id) ?? null;
   // Wartebereich nach Dringlichkeit (`dringlichkeit.ts`): ungesichtet, SK I … IV, tot,
-  // unverletzt; je Kategorie die längste Wartezeit zuerst.
+  // unverletzt; je Kategorie die Transportpriorität, dann die längste Wartezeit zuerst.
   const wartebereichPersonen = nachDringlichkeit(
     personenInUhs.filter((p) => p.aktueller_platz_id == null),
-    (p) => ({ sichtung: p.aktuelle_sichtung, seit: wartetSeitVon(p) }),
+    (p) => ({
+      sichtung: p.aktuelle_sichtung,
+      prioritaet: p.transport_prioritaet,
+      seit: wartetSeitVon(p),
+    }),
   );
   // „Noch nicht aufgenommen": in keiner UHS, nicht storniert, noch nicht final disponiert.
   // Transport/Entlassung/Verstorben leeren `aktuelle_uhs_id` (Auto-Austritt) — ohne den Filter
@@ -1237,6 +1278,7 @@ export default function Grundriss({
     ...wartebereichPersonen,
     ...nachDringlichkeit(nichtAufgenommen, (p) => ({
       sichtung: p.aktuelle_sichtung,
+      prioritaet: p.transport_prioritaet,
       seit: p.erfasst_at,
     })),
   ];
@@ -1424,15 +1466,31 @@ export default function Grundriss({
   // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben). Der Server trägt die Person
   // aus der UHS aus (Auto-Austritt); bei Transport wandert sie nach rechts.
   // `status=abtransportiert` nur bei Transport, sonst null — wie in der PersonenPage.
+  // Ohne Netz merkt der Schreibweg vor (LLH-1138, design.md D8; `networkMode: 'always'`, Regel in
+  // `frontend/src/offline/AGENTS.md`): die Person bleibt dann, wo sie steht, bis der Abgleich sendet.
+  const saveVerbleib = useSavePersonEintrag();
+  // Vorgemerkte Verbleibe zeigt der Ort, nicht nur die Meldung (`frontend/src/offline/AGENTS.md`).
+  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const vorgemerkteEintraege = useVorgemerktePersonEintraege(benutzerId, einsatzId);
+  const verbleibVorgemerkt = useMemo(
+    () =>
+      new Set(
+        vorgemerkteEintraege
+          .filter((e) => e.aktion.art === 'verbleib')
+          .map((e) => e.aktion.person_id),
+      ),
+    [vorgemerkteEintraege],
+  );
   const transportMut = useMutation({
+    networkMode: 'always',
     mutationFn: ({
-      personId,
+      person,
       art,
       ziel,
       transportmittel,
       notiz,
-    }: VerbleibWerte & { personId: number }) =>
-      erfasseVerbleib(einsatzId, personId, {
+    }: VerbleibWerte & { person: Person }) =>
+      saveVerbleib(einsatzId, person, 'verbleib', {
         art,
         ziel: ziel ?? null,
         transportmittel: transportmittel ?? null,
@@ -1440,7 +1498,11 @@ export default function Grundriss({
         notiz: notiz ?? null,
       }),
     // Schließen und Leeren macht die Erfassungshülle, sie zeigt auch die Ablehnung.
-    onSuccess: () => {
+    onSuccess: (ergebnis, { person }) => {
+      if (ergebnis.zustand === 'vorgemerkt') {
+        message.warning(`Offline vorgemerkt: Verbleib ${registrierAnzeige(person.registrier_nr)}`);
+        return;
+      }
       message.success('Verbleib erfasst');
       invalidate();
     },
@@ -1547,6 +1609,7 @@ export default function Grundriss({
         leerText="keine"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+        vorgemerkt={verbleibVorgemerkt}
       />
       <PersonenSpalte
         titel="Wartebereich (Eingang)"
@@ -1559,6 +1622,7 @@ export default function Grundriss({
         leerText="leer"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+        vorgemerkt={verbleibVorgemerkt}
         fehler={platzFehler.grund('warte')}
       />
     </div>
@@ -1657,6 +1721,7 @@ export default function Grundriss({
                   belegungLaeuft={belegungLaeuft}
                   bearbeitbar={platzEditAktiv && !layoutMut.isPending}
                   abgelehnt={platzFehler.grund(p.id) != null}
+                  verbleibVorgemerkt={belegt != null && verbleibVorgemerkt.has(belegt.id)}
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => {
                     const b = belegtAn(p.id);
@@ -1822,7 +1887,7 @@ export default function Grundriss({
         onErfassen={async (werte) => {
           // Der Dialog ist nur offen, solange eine Zielperson steht; die Prüfung engt den Typ ein.
           if (!transportPerson) return;
-          await transportMut.mutateAsync({ personId: transportPerson.id, ...werte });
+          await transportMut.mutateAsync({ person: transportPerson, ...werte });
         }}
         onFertig={() => setTransportPerson(null)}
         onAbbrechen={() => setTransportPerson(null)}

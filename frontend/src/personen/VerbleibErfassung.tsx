@@ -5,7 +5,7 @@ import { ladeModulFreigaben } from '../api/einsaetze';
 import { ladeBetreuung } from '../api/betreuung';
 import { ApiError } from '../api/client';
 import { useAuthOptional } from '../auth/AuthContext';
-import { erfasseVerbleib, type VerbleibEingabe } from '../api/einsatzPerson';
+import type { VerbleibEingabe } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Betreuungsstelle } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -23,15 +23,18 @@ import {
   zielNachStellenwahl,
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
+import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
 
 interface VerbleibErfassungProps {
   einsatzId: number;
-  personId: number;
+  person: PersonZiel;
   /** Nach erfolgreichem POST (Invalidierung der Person); der Dialog schließt danach selbst. */
   onErfasst: () => void;
+  /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand; die Zeile quittiert. */
+  onVorgemerkt?: () => void;
   onSchliessen: () => void;
 }
 
@@ -177,15 +180,19 @@ export function useVerbleibFelder(einsatzId: number, form: FormInstance<Verbleib
  */
 export default function VerbleibErfassung({
   einsatzId,
-  personId,
+  person,
   onErfasst,
+  onVorgemerkt,
   onSchliessen,
 }: VerbleibErfassungProps) {
   const [form] = Form.useForm<VerbleibFormWerte>();
   const { elemente, body } = useVerbleibFelder(einsatzId, form);
+  const save = useSavePersonEintrag();
   const mutation = useMutation({
-    mutationFn: (eingabe: VerbleibEingabe) => erfasseVerbleib(einsatzId, personId, eingabe),
-    onSuccess: onErfasst,
+    // Merkt ohne Netz vor (LLH-1138, design.md D8; `frontend/src/offline/AGENTS.md`).
+    networkMode: 'always',
+    mutationFn: (eingabe: VerbleibEingabe) => save(einsatzId, person, 'verbleib', eingabe),
+    onSuccess: (ergebnis) => (ergebnis.zustand === 'gesendet' ? onErfasst() : onVorgemerkt?.()),
   });
 
   return (

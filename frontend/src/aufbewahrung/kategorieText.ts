@@ -21,7 +21,8 @@ export interface KategorieText {
 export const KATEGORIE_TEXT: Record<Datenkategorie, KategorieText> = {
   behandlung: {
     bezeichnung: 'Behandlung',
-    daten: 'Zustand der Personen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung',
+    daten:
+      'Zustand, PAT-Nummer und benötigte Fachrichtung der Personen, Lage und Notiz ihrer Verletzungen sowie die Notizen zu Sichtung, Verlauf und UHS-Belegung',
     vorschlag: {
       tage: 3650,
       quelle:

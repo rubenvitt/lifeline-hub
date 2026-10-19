@@ -227,6 +227,9 @@ export function lagebildZeit(
 /**
  * Alter des Datenstands als Mono-Meta („Stand vor 40 s"). `0`/ungültig heißt „noch nichts
  * abgerufen". Über einer Stunde steht die Uhrzeit — „vor 184 min" liest niemand. Rein.
+ *
+ * Bewusst nicht `anzeige/abstand.ts:formatVor` (LLH-1327): eine andere Größe mit Präfix „Stand“,
+ * Sekunden unter einer Minute und ab einer Stunde die Uhrzeit statt „vor 3 h 4 min“.
  */
 export function standText(
   datenstand: number,

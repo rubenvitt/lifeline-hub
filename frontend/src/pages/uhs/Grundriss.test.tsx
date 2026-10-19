@@ -4,7 +4,11 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { delay, http, HttpResponse } from 'msw';
 import { MemoryRouter } from 'react-router';
-import { server } from '../../test/server';
+import { meHandler, server } from '../../test/server';
+import { AuthProvider, useAuthOptional } from '../../auth/AuthContext';
+import { benutzerFixture } from '../../test/fixtures';
+import { setzeOnline } from '../../test/utils';
+import { queueLeerenFuerTests, schreibaktionenLaden } from '../../offline/queue';
 import { App as AntApp, ConfigProvider } from 'antd';
 import Grundriss, {
   PLATZ_KARTE_BREITE,
@@ -118,6 +122,11 @@ function uhsDetail(over: Partial<UhsDetail>): UhsDetail {
   };
 }
 
+/** Zeigt, dass die Sitzung geladen ist (Besitzer der Offline-Warteschlange). */
+function AuthSonde() {
+  return useAuthOptional()?.benutzer ? <span data-testid="angemeldet" /> : null;
+}
+
 /**
  * Rendert mit dem App-Theme der gewählten Dichtestufe: die Platzkarte liest ihre Bedienform aus den
  * Tokens (`platzBedienform`), antds Vorgaben ohne Theme ergäben einen Zustand, den die App in
@@ -131,8 +140,11 @@ function renderGrundriss(
   /** Nachtbetrieb mit antds dunklem Algorithmus; ohne ihn liest `useRollen` das Thema als hell. */
   nacht = false,
   platzBearbeitbar = true,
+  /** Mit angemeldetem Benutzer: Besitzer der Offline-Warteschlange (LLH-1138). */
+  angemeldet = false,
 ) {
   server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
+  if (angemeldet) server.use(meHandler(benutzerFixture()));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const baum = (u: UhsDetail) => (
     // MemoryRouter: der Detail-Drawer nutzt useNavigate.
@@ -145,12 +157,24 @@ function renderGrundriss(
           }}
         >
           <AntApp>
-            <Grundriss
-              einsatzId={1}
-              uhs={u}
-              schreibgeschuetzt={schreibgeschuetzt}
-              platzBearbeitbar={platzBearbeitbar}
-            />
+            {angemeldet ? (
+              <AuthProvider>
+                <AuthSonde />
+                <Grundriss
+                  einsatzId={1}
+                  uhs={u}
+                  schreibgeschuetzt={schreibgeschuetzt}
+                  platzBearbeitbar={platzBearbeitbar}
+                />
+              </AuthProvider>
+            ) : (
+              <Grundriss
+                einsatzId={1}
+                uhs={u}
+                schreibgeschuetzt={schreibgeschuetzt}
+                platzBearbeitbar={platzBearbeitbar}
+              />
+            )}
           </AntApp>
         </ConfigProvider>
       </QueryClientProvider>
@@ -366,6 +390,90 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByTitle('Transport')).toBeInTheDocument();
     expect(within(dialog).queryByTitle('Entlassung vor Ort')).not.toBeInTheDocument();
+  });
+});
+
+describe('Grundriss – Verbleib ohne Netz (LLH-1138, design.md D8)', () => {
+  it('merkt den Transport vor, quittiert „Offline vorgemerkt“ und schließt den Dialog', async () => {
+    await queueLeerenFuerTests();
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/7/verbleib', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    renderGrundriss(uhs, [p], false, 'kompakt', false, true, true);
+    await screen.findByTestId('angemeldet');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
+    setzeOnline(false);
+    onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
+
+    expect(await screen.findByText('Offline vorgemerkt: Verbleib R-007')).toBeInTheDocument();
+    // Geschlossen: jsdom beendet antds Ausblendung nicht, der Dialog steht im Ausgang.
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')?.className ?? 'weg').toMatch(/zoom-leave|weg/),
+    );
+    expect(gesendet).toEqual([]);
+    expect((await schreibaktionenLaden(benutzerFixture().id, 1)).map((z) => z.aktion)).toEqual([
+      expect.objectContaining({
+        art: 'verbleib',
+        person_id: 7,
+        bezeichnung: 'R-007',
+        daten: expect.objectContaining({
+          art: 'transport',
+          ziel: 'KH Mitte',
+          status: 'abtransportiert',
+          zeitpunkt_at: expect.any(String),
+        }),
+      }),
+    ]);
+  });
+});
+
+describe('Grundriss – vorgemerkter Verbleib am Ort (LLH-1138, `frontend/src/offline/AGENTS.md`)', () => {
+  it('zeigt „Offline vorgemerkt“ am Platz, solange der Verbleib in der Warteschlange steht', async () => {
+    await queueLeerenFuerTests();
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p], false, 'kompakt', false, true, true);
+    await screen.findByTestId('angemeldet');
+    const karte = (await screen.findByText('Bett 1')).closest(
+      '[data-testid="platz-karte"]',
+    ) as HTMLElement;
+    expect(within(karte).queryByText('Offline vorgemerkt')).toBeNull();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
+    setzeOnline(false);
+    onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
+    // Nicht nur die flüchtige Meldung: der Platz selbst sagt es, sonst erfasst jemand doppelt.
+    expect(await within(karte).findByText('Offline vorgemerkt')).toBeInTheDocument();
+  });
+
+  it('zeigt „Offline vorgemerkt“ an der Person im Wartebereich', async () => {
+    await queueLeerenFuerTests();
+    const p = person({ id: 8, registrier_nr: 8, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+    renderGrundriss(uhsDetail({ plaetze: [] }), [p], false, 'kompakt', false, true, true);
+    await screen.findByTestId('angemeldet');
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: 'Verbleib / Entlassung erfassen — R-008 · unbekannt',
+      }),
+    );
+    setzeOnline(false);
+    onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
+    const zeile = screen
+      .getAllByTestId('personen-zeile')
+      .find((z) => z.textContent?.includes('R-008')) as HTMLElement;
+    expect(await within(zeile).findByText('Offline vorgemerkt')).toBeInTheDocument();
   });
 });
 
@@ -839,7 +947,16 @@ describe('Grundriss – Personenkarte im Neuentwurf (LFH-621)', () => {
 
 describe('Grundriss – Patient-Detail-Drawer (Klick)', () => {
   function detail(p: Person): PersonDetail {
-    return { ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] };
+    return {
+      ...p,
+      sichtungen: [],
+      notizen: [],
+      verbleib: [],
+      abgleiche: [],
+      transporte: [],
+      massnahmen: [],
+      verletzungen: [],
+    };
   }
 
   it('öffnet beim Klick auf eine Wartebereichs-Karte den Detail-Drawer', async () => {
@@ -960,7 +1077,16 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     const p = belegtePerson();
     server.use(
       http.get('/api/einsaetze/1/personen/7', () =>
-        HttpResponse.json({ ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] }),
+        HttpResponse.json({
+          ...p,
+          sichtungen: [],
+          notizen: [],
+          verbleib: [],
+          abgleiche: [],
+          transporte: [],
+          massnahmen: [],
+          verletzungen: [],
+        }),
       ),
     );
     renderGrundriss(unbelegt(), [p], false, 'komfortabel');
@@ -1120,7 +1246,16 @@ describe('Grundriss – Kartenform in den Berührungsstufen (LFH-359)', () => {
     const p = belegtePerson();
     server.use(
       http.get('/api/einsaetze/1/personen/7', () =>
-        HttpResponse.json({ ...p, sichtungen: [], notizen: [], verbleib: [], abgleiche: [] }),
+        HttpResponse.json({
+          ...p,
+          sichtungen: [],
+          notizen: [],
+          verbleib: [],
+          abgleiche: [],
+          transporte: [],
+          massnahmen: [],
+          verletzungen: [],
+        }),
       ),
     );
     renderGrundriss(unbelegt(), [p], true, 'komfortabel');
@@ -2161,6 +2296,87 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
     ]);
     await screen.findByText(/R-005/);
     expect(folgeIn(wartebereich())).toEqual(['R-003', 'R-004', 'R-002', 'R-001', 'R-005']);
+  });
+
+  it('ordnet innerhalb der Kategorie nach Transportpriorität, auch bei der Zuweisung (LLH-1325)', async () => {
+    const uhs = uhsDetail({
+      status: 'aktiv',
+      plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
+      belegungen: [
+        eintritt(3, '2026-10-18 08:00:00'),
+        eintritt(5, '2026-10-18 08:15:00'),
+        eintritt(4, '2026-10-18 07:00:00'),
+        eintritt(6, '2026-10-18 08:19:00'),
+      ],
+    });
+    renderGrundriss(uhs, [
+      wartend(3, 'sk1', { transport_prioritaet: 'normal' }),
+      wartend(5, 'sk1', { transport_prioritaet: 'sofort' }),
+      wartend(4, 'sk2', { transport_prioritaet: 'sofort' }),
+      wartend(6, 'sk1'),
+      person({ id: 7, registrier_nr: 7, aktuelle_sichtung: 'sk3' }),
+      person({
+        id: 8,
+        registrier_nr: 8,
+        aktuelle_sichtung: 'sk3',
+        transport_prioritaet: 'dringlich',
+      }),
+    ]);
+    await screen.findByText(/R-006/);
+    // R-005 (SK I, sofort, 5 min) vor R-003 (SK I, normal, 20 min); R-006 (SK I, ohne) vor
+    // R-004 (SK II, sofort): die Priorität sticht keine Sichtung.
+    expect(folgeIn(wartebereich())).toEqual(['R-005', 'R-003', 'R-006', 'R-004']);
+
+    await userEvent.click(await screen.findByTestId('platz-karte'));
+    const radios = within(await screen.findByRole('radiogroup', { name: 'Patient' })).getAllByRole(
+      'radio',
+    );
+    expect(radios.map((r) => /R-\d+/.exec(r.closest('label')!.textContent!)?.[0])).toEqual([
+      'R-005',
+      'R-003',
+      'R-006',
+      'R-004',
+      'R-008',
+      'R-007',
+    ]);
+  });
+
+  it('die Transportspalte trägt die Priorität als neutrale Marke mit Wort (LLH-1325)', async () => {
+    const austritt = (personId: number): UhsBelegung => ({
+      ...eintritt(personId, '2026-10-18 08:00:00'),
+      art: 'austritt',
+    });
+    renderGrundriss(uhsDetail({ belegungen: [austritt(3), austritt(4)] }), [
+      person({
+        id: 3,
+        registrier_nr: 3,
+        aktuelle_sichtung: 'sk2',
+        aktueller_verbleib: 'Transport',
+        transport_prioritaet: 'dringlich',
+      }),
+      person({
+        id: 4,
+        registrier_nr: 4,
+        aktuelle_sichtung: 'sk3',
+        aktueller_verbleib: 'Transport',
+      }),
+    ]);
+    const spalte = (await screen.findByText('Auf Transport gebracht')).closest<HTMLElement>(
+      '[data-lfh="paneel"]',
+    )!;
+    const marke = await within(spalte).findByText('dringlich');
+    expect(marke.closest('.ant-tag')).not.toBeNull();
+    expect(marke.closest('[data-lfh="transport-prioritaet"]')).toHaveAttribute(
+      'title',
+      'Transportpriorität dringlich',
+    );
+    // Ohne Priorität keine Marke, und die Folge bleibt die der Spalte (kein neues Sortieren).
+    expect(within(spalte).getAllByText(/Transportpriorität|dringlich/)).toHaveLength(1);
+    expect(
+      within(spalte)
+        .getAllByRole('button')
+        .map((b) => /R-\d+/.exec(b.textContent!)?.[0]),
+    ).toEqual(['R-003', 'R-004']);
   });
 
   it('zeigt die Wartezeit im Wartebereich, den Beginn als taktische Zeit im Titel', async () => {

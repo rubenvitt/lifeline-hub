@@ -145,6 +145,8 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("antreff_lat", Mit),
             ("antreff_lon", Mit),
             ("aktuelles_verbleib_ziel", Mit),
+            ("pat_nummer", Mit),
+            ("transport_fachrichtung", Mit),
         ],
     },
     PersonenBezug {
@@ -152,6 +154,32 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         tabelle: "person_sichtung",
         bezug: Bezug::Spalte("person_id"),
         spalten: &[("notiz", Mit), ("bestaetigt_name", Ohne(O_BESTAETIGT))],
+    },
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
+        tabelle: "person_transport",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[
+            ("fachrichtung", Mit),
+            ("bestaetigt_name", Ohne(O_BESTAETIGT)),
+        ],
+    },
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
+        tabelle: "person_massnahme",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[("bestaetigt_name", Ohne(O_BESTAETIGT))],
+    },
+    PersonenBezug {
+        art: PersonenArt::Betroffene,
+        tabelle: "person_verletzung",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[
+            ("x", Mit),
+            ("y", Mit),
+            ("notiz", Mit),
+            ("bestaetigt_name", Ohne(O_BESTAETIGT)),
+        ],
     },
     PersonenBezug {
         art: PersonenArt::Betroffene,
@@ -274,6 +302,32 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
         tabelle: "person_sichtung",
         bezug: Bezug::Spalte("bestaetigt_personal_id"),
         spalten: &[("bestaetigt_name", Mit), ("notiz", Ohne(O_BEHANDELT))],
+    },
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "person_transport",
+        bezug: Bezug::Spalte("bestaetigt_personal_id"),
+        spalten: &[
+            ("bestaetigt_name", Mit),
+            ("fachrichtung", Ohne(O_BEHANDELT)),
+        ],
+    },
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "person_massnahme",
+        bezug: Bezug::Spalte("bestaetigt_personal_id"),
+        spalten: &[("bestaetigt_name", Mit)],
+    },
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "person_verletzung",
+        bezug: Bezug::Spalte("bestaetigt_personal_id"),
+        spalten: &[
+            ("bestaetigt_name", Mit),
+            ("x", Ohne(O_BEHANDELT)),
+            ("y", Ohne(O_BEHANDELT)),
+            ("notiz", Ohne(O_BEHANDELT)),
+        ],
     },
     PersonenBezug {
         art: PersonenArt::ExterneKraft,

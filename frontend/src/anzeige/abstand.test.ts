@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatVor } from './abstand';
 
-/** „vor n min“ für den Patientenkopf (LLH-1094); getaktet über `useMinutenTakt`. */
+/** „vor n min“ für Patientenkopf (LLH-1094) und Lagemonitor (LLH-1327). */
 describe('formatVor', () => {
   const jetzt = Date.parse('2026-10-18T10:00:00Z');
   const vor = (ms: number) => formatVor(new Date(jetzt - ms).toISOString(), jetzt);
@@ -27,6 +27,12 @@ describe('formatVor', () => {
 
   it('meldet eine Zeit in der Zukunft als „gerade eben“ statt mit Minus', () => {
     expect(vor(-120_000)).toBe('gerade eben');
+  });
+
+  it('nimmt auch eine Epoche in Millisekunden (Datenstand des Lagemonitors)', () => {
+    expect(formatVor(jetzt - 30_000, jetzt)).toBe('gerade eben');
+    expect(formatVor(jetzt - 3 * 60_000, jetzt)).toBe('vor 3 min');
+    expect(formatVor(jetzt - 184 * 60_000, jetzt)).toBe('vor 3 h 4 min');
   });
 
   it('liefert ohne Zeitpunkt nichts', () => {

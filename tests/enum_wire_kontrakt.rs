@@ -167,6 +167,81 @@ fn serde_wire_gleich_as_str() {
         Bestaetigt,
         Verworfen,
     });
+    // Transport (LLH-1325, Spec `personen-transport`)
+    enum_wire!(lifeline_hub::person::transport_repo::TransportPrioritaet {
+        Sofort => "sofort",
+        Dringlich => "dringlich",
+        Normal => "normal",
+    });
+    enum_wire!(lifeline_hub::person::transport_repo::TransportArt {
+        Liegend => "liegend",
+        Sitzend => "sitzend",
+        MitNotarzt => "mit_notarzt",
+    });
+    enum_wire!(lifeline_hub::person::transport_repo::Fachrichtung {
+        Unfallchirurgie => "unfallchirurgie",
+        Verbrennung => "verbrennung",
+        Kinder => "kinder",
+        Neuro => "neuro",
+        Innere => "innere",
+        Geburtshilfe => "geburtshilfe",
+        Psychiatrie => "psychiatrie",
+        Sonstige => "sonstige",
+    });
+    // Maßnahmen (LLH-1324, Spec `personen-massnahmen`)
+    enum_wire!(lifeline_hub::person::massnahme_repo::MassnahmeArt {
+        Blutstillung => "blutstillung",
+        Zugang => "zugang",
+        Infusion => "infusion",
+        Sauerstoff => "sauerstoff",
+        Atemweg => "atemweg",
+        Analgesie => "analgesie",
+        Immobilisation => "immobilisation",
+        Waermeerhalt => "waermeerhalt",
+        Dekontamination => "dekontamination",
+    });
+    // Verletzungen (LLH-1113, Spec `personen-verletzungen`)
+    enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungAnsicht {
+        Vorn => "vorn",
+        Hinten => "hinten",
+    });
+    enum_wire!(lifeline_hub::person::verletzung_repo::KoerperRegion {
+        Kopf => "kopf",
+        Gesicht => "gesicht",
+        Hals => "hals",
+        Thorax => "thorax",
+        Abdomen => "abdomen",
+        Becken => "becken",
+        Ruecken => "ruecken",
+        Wirbelsaeule => "wirbelsaeule",
+        Gesaess => "gesaess",
+        OberarmL => "oberarm_l",
+        OberarmR => "oberarm_r",
+        UnterarmL => "unterarm_l",
+        UnterarmR => "unterarm_r",
+        HandL => "hand_l",
+        HandR => "hand_r",
+        OberschenkelL => "oberschenkel_l",
+        OberschenkelR => "oberschenkel_r",
+        UnterschenkelL => "unterschenkel_l",
+        UnterschenkelR => "unterschenkel_r",
+        FussL => "fuss_l",
+        FussR => "fuss_r",
+    });
+    enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungArt {
+        WundeBlutung => "wunde_blutung",
+        FrakturVerdacht => "fraktur_verdacht",
+        Verbrennung => "verbrennung",
+        PrellungSchwellung => "prellung_schwellung",
+        Amputation => "amputation",
+        Schmerz => "schmerz",
+        Sonstige => "sonstige",
+    });
+    enum_wire!(lifeline_hub::person::verletzung_repo::VerletzungSchwere {
+        Leicht => "leicht",
+        Mittel => "mittel",
+        Schwer => "schwer",
+    });
 
     // schaden
     enum_wire_as_str!(lifeline_hub::schaden::SchadenStatus {

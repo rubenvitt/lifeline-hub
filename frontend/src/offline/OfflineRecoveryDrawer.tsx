@@ -29,6 +29,7 @@ import {
   type AbgelehnterEintrag,
   type OfflineSchreibaktion,
 } from './queue';
+import { PERSON_EINTRAG_ABGELEHNT } from './personEintrag';
 
 interface OfflineRecoveryDrawerProps {
   open: boolean;
@@ -38,7 +39,7 @@ interface OfflineRecoveryDrawerProps {
 }
 
 /** Kartentitel einer abgelehnten Schreibaktion; exhaustiv über die Art. Stand- und
- *  Belegungsmeldungen, Ausgaben und Eintreffen nennen ihr Objekt — `bezirk_id: 3` im Inhalt sagt
+ *  Belegungsmeldungen, Ausgaben, Eintreffen und Einträge einer Person nennen ihr Objekt — `bezirk_id: 3` im Inhalt sagt
  *  niemandem etwas. */
 function aktionsTitel(aktion: OfflineSchreibaktion): string {
   switch (aktion.art) {
@@ -56,6 +57,14 @@ function aktionsTitel(aktion: OfflineSchreibaktion): string {
       // LLH-1075 Teil III: Kraft und Raum; der Grund (Raum aufgelöst, schon in einem Raum,
       // schon im Einsatz) steht darunter.
       return `Abgelehntes Eintreffen: ${aktion.name} · ${aktion.bezeichnung}`;
+    case 'sichtung':
+    case 'verbleib':
+    case 'notiz':
+    case 'transport':
+    case 'massnahme':
+    case 'verletzung':
+      // LLH-1138: Art und Registriernummer; der Grund (storniert, nicht anwesend) steht darunter.
+      return `${PERSON_EINTRAG_ABGELEHNT[aktion.art]}: ${aktion.bezeichnung}`;
     default: {
       const nie: never = aktion;
       return `Abgelehnte Offline-Aktion ${JSON.stringify(nie)}`;

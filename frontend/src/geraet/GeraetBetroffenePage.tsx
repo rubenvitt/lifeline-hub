@@ -87,7 +87,7 @@ export default function GeraetBetroffenePage() {
           zeilenSchluessel="id"
           ladend={personenQuery.isLoading}
           leerText="Noch keine Betroffenen in dieser Stelle"
-          suche={{ platzhalter: 'R-Nr., Name' }}
+          suche={{ platzhalter: 'R-Nr., PAT-Nr., Name' }}
           standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
           gruppen={{
             schluessel: (p) => (istHier(p, stelleId) ? HIER : WEITER),

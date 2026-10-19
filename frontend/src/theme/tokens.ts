@@ -40,6 +40,24 @@ export function sichtungsKante(rollen: Pick<Farbrollen, 'text'>): string {
 }
 
 /**
+ * Farben des Körperschemas (LLH-1120, design.md D13) — nur Rollen, keine eigenen Werte. Die
+ * Silhouette ist eine Fläche `flaeche3` mit Kontur `steuerRahmen` (hebt sie vom Paneel ab, ≥ 3 : 1,
+ * WCAG 1.4.11), Sternchen und Nummern stehen in der Textfarbe (nicht in `alarm`: die Sichtung
+ * bleibt die einzige Farbachse an der Person), Fokus und Wahl einer Region in `bedien`. Gerechnet
+ * in `theme/koerperschemaKontrast.test.ts`, im Browser in `e2e/betroffene-kontrast.spec.ts`.
+ */
+export function koerperschemaFarben(
+  rollen: Pick<Farbrollen, 'flaeche3' | 'steuerRahmen' | 'text' | 'bedien'>,
+) {
+  return {
+    silhouette: rollen.flaeche3,
+    kontur: rollen.steuerRahmen,
+    stern: rollen.text,
+    bedien: rollen.bedien,
+  };
+}
+
+/**
  * Gestaltungssprache (LFH-352) in der Fassung des Neuentwurfs „Instrumententafel“.
  * Grundlage: `docs/superpowers/specs/2026-07-25-gestaltungssprache.md` und
  * `docs/design/2026-09-21-neuentwurf/umsetzung.md`; Abweichungen stehen mit Messwert an den

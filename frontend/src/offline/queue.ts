@@ -2,6 +2,7 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { NeuerEintrag } from '../api/etb';
 import { neueClientId } from './clientId';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
+import type { PersonEintragAktion } from './personEintrag';
 import type {
   AusgabeEingabe,
   BelegungsmeldungEingabe,
@@ -19,8 +20,9 @@ export const OFFLINE_QUEUE_EVENT = 'lfh:offline-queue-geaendert';
  * Stand- und Belegungsmeldungen, Verpflegungsausgaben und Eintreffen tragen zusätzlich die
  * `bezeichnung` (Bezirk, Stelle, Zeitfenster bzw. Bereitstellungsraum) — nur für die Anzeige,
  * gesendet wird sie nicht. Ein Eintreffen (LLH-1075 Teil III) nennt dazu die Kraft (`name`): die
- * Zeile „vorgemerkt“ am Raum und die Karte im Wiederherstellungsbereich. Neue Varianten liegen als
- * Wert im bestehenden Store und brauchen keine DB-Version.
+ * Zeile „vorgemerkt“ am Raum und die Karte im Wiederherstellungsbereich. Die medizinischen Einträge
+ * einer Person (LLH-1138, `PersonEintragAktion`) tragen `person_id` und die Registriernummer als
+ * `bezeichnung`. Neue Varianten liegen als Wert im bestehenden Store und brauchen keine DB-Version.
  */
 export type OfflineSchreibaktion =
   | { art: 'person'; daten: PersonAnlegenEingabe }
@@ -34,7 +36,8 @@ export type OfflineSchreibaktion =
       bezeichnung: string;
       name: string;
       daten: EintreffenEingabe;
-    };
+    }
+  | PersonEintragAktion;
 
 export interface AusstehendeSchreibaktion {
   id?: number;

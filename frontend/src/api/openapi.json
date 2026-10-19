@@ -7223,6 +7223,20 @@
           "offline"
         ]
       },
+      "Fachrichtung": {
+        "type": "string",
+        "description": "Benötigte Fachrichtung des Zielkrankenhauses. Diagnosenah (Psychiatrie, Geburtshilfe):\nScrub mit der Kategorie Behandlung (design.md D4), nie im ETB oder Live-Kanal.",
+        "enum": [
+          "unfallchirurgie",
+          "verbrennung",
+          "kinder",
+          "neuro",
+          "innere",
+          "geburtshilfe",
+          "psychiatrie",
+          "sonstige"
+        ]
+      },
       "FahrzeugAnzeige": {
         "type": "object",
         "description": "Öffentliche Fahrzeug-Darstellung (ohne `org_id`).",
@@ -8594,6 +8608,33 @@
           }
         }
       },
+      "KoerperRegion": {
+        "type": "string",
+        "description": "Körperregion aus dem festen Katalog, Seiten aus Sicht des Patienten. String = CHECK in\n`migrations/0221_person_verletzung.sql`.",
+        "enum": [
+          "kopf",
+          "gesicht",
+          "hals",
+          "thorax",
+          "abdomen",
+          "becken",
+          "ruecken",
+          "wirbelsaeule",
+          "gesaess",
+          "oberarm_l",
+          "oberarm_r",
+          "unterarm_l",
+          "unterarm_r",
+          "hand_l",
+          "hand_r",
+          "oberschenkel_l",
+          "oberschenkel_r",
+          "unterschenkel_l",
+          "unterschenkel_r",
+          "fuss_l",
+          "fuss_r"
+        ]
+      },
       "KommunikationsStelle": {
         "type": "object",
         "description": "Eine gepflegte Stelle samt ihren Verbindungen.\n\n`funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit\ndie Seite den Katalog nicht braucht — auch nicht ohne Netz (design.md D3, D9).",
@@ -9789,6 +9830,83 @@
           "lagged"
         ]
       },
+      "MassnahmeAnzeige": {
+        "type": "object",
+        "description": "Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "art",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/MassnahmeArt"
+          },
+          "aufgehoben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aufgehoben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Maßnahme beim Server ankam (Erfassungszeit im Sinne der Spec)."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Durchführung; ohne Angabe die Erfassung, ohne Netz die Zeit am Gerät, gekappt."
+          }
+        }
+      },
+      "MassnahmeArt": {
+        "type": "string",
+        "description": "Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in\n`migrations/0220_person_massnahme.sql`. Katalogwert (Retain), nie im ETB oder Live-Kanal.",
+        "enum": [
+          "blutstillung",
+          "zugang",
+          "infusion",
+          "sauerstoff",
+          "atemweg",
+          "analgesie",
+          "immobilisation",
+          "waermeerhalt",
+          "dekontamination"
+        ]
+      },
       "MaterialAnzeige": {
         "type": "object",
         "description": "Öffentliche Material-Darstellung (ohne `org_id`).",
@@ -10727,12 +10845,20 @@
           "erfasst_von"
         ],
         "properties": {
+          "eingegangen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Eintrag beim Server ankam (LLH-1138). Fehlt bei Einträgen von vor der\nMigration 0217."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
           },
           "erfasst_at": {
-            "type": "string"
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät (LLH-1138), gekappt."
           },
           "erfasst_von": {
             "type": "integer",
@@ -11915,6 +12041,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "kontamination": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,\nausdrücklich nicht „nein“."
+          },
           "melder_kontakt": {
             "type": [
               "string",
@@ -11933,6 +12066,13 @@
               "null"
             ]
           },
+          "pat_nummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig."
+          },
           "registrier_nr": {
             "type": "integer",
             "format": "int64"
@@ -11944,6 +12084,44 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "transport_art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportArt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transport_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Erfassungszeit des aktuellen Transportstands."
+          },
+          "transport_fachrichtung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fachrichtung"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transport_prioritaet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportPrioritaet",
+                "description": "Aktueller Transportstand (LLH-1325, Cache des jüngsten Eintrags in `person_transport`);\nalle vier fehlen ohne Stand oder nach dem Aufheben."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "vermisst_seit": {
@@ -11987,6 +12165,13 @@
               "null"
             ]
           },
+          "pat_nummer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PAT-Nummer (LLH-1326, design.md D12): die Sprungpalette findet die Person auch darüber.\nOhne Netz kürzt `lagebildKuerzen` sie weg (D9)."
+          },
           "registrier_nr": {
             "type": "integer",
             "format": "int64"
@@ -12013,7 +12198,10 @@
               "sichtungen",
               "notizen",
               "verbleib",
-              "abgleiche"
+              "abgleiche",
+              "transporte",
+              "massnahmen",
+              "verletzungen"
             ],
             "properties": {
               "abgleiche": {
@@ -12033,6 +12221,13 @@
                   }
                 ]
               },
+              "massnahmen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MassnahmeAnzeige"
+                },
+                "description": "Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`."
+              },
               "notizen": {
                 "type": "array",
                 "items": {
@@ -12045,11 +12240,25 @@
                   "$ref": "#/components/schemas/SichtungAnzeige"
                 }
               },
+              "transporte": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TransportAnzeige"
+                },
+                "description": "Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf."
+              },
               "verbleib": {
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/VerbleibAnzeige"
                 }
+              },
+              "verletzungen": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/VerletzungAnzeige"
+                },
+                "description": "Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`."
               }
             }
           }
@@ -13293,6 +13502,13 @@
             ],
             "description": "Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person."
           },
+          "eingegangen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Eintrag beim Server ankam (LLH-1138); `gesichtet_at` ist die Erfassungszeit.\nFehlt bei Einträgen von vor der Migration 0217."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
@@ -14329,6 +14545,99 @@
           }
         }
       },
+      "TransportAnzeige": {
+        "type": "object",
+        "description": "Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportArt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann der Stand beim Server ankam."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fachrichtung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Fachrichtung"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "prioritaet": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportPrioritaet"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt."
+          }
+        }
+      },
+      "TransportArt": {
+        "type": "string",
+        "description": "Transportart. Statuskategorie (Retain), erscheint aber nie im ETB oder Live-Kanal.",
+        "enum": [
+          "liegend",
+          "sitzend",
+          "mit_notarzt"
+        ]
+      },
+      "TransportPrioritaet": {
+        "type": "string",
+        "description": "Transportpriorität (Spec `personen-transport`). String = CHECK in\n`migrations/0219_person_transport.sql`. Ordnet innerhalb der Sichtungskategorie, nie über\nihr (design.md D10). Statuskategorie (Retain), deshalb darf sie ins ETB.",
+        "enum": [
+          "sofort",
+          "dringlich",
+          "normal"
+        ]
+      },
       "UebernahmeBody": {
         "type": "object",
         "description": "Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional.",
@@ -14804,6 +15113,13 @@
             "format": "int64",
             "description": "Betreuungsstelle eines Notunterkunft-Verbleibs (LFH-674). Nur die Kennung: den Namen\nliest, wer das Modul Betreuung sehen darf, aus dessen Übersicht."
           },
+          "eingegangen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Eintrag beim Server ankam (LLH-1138); `zeitpunkt_at` ist die Erfassungszeit.\nFehlt bei Einträgen von vor der Migration 0217."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
@@ -14889,6 +15205,137 @@
         "enum": [
           "wechsel",
           "gegen"
+        ]
+      },
+      "VerletzungAnsicht": {
+        "type": "string",
+        "description": "Ansicht des Körperschemas.",
+        "enum": [
+          "vorn",
+          "hinten"
+        ]
+      },
+      "VerletzungAnzeige": {
+        "type": "object",
+        "description": "Eine Verletzung (1:1 zu `person_verletzung`); eine aufgehobene trägt `aufgehoben_at`.",
+        "required": [
+          "id",
+          "einsatz_id",
+          "person_id",
+          "ansicht",
+          "region",
+          "art",
+          "zeitpunkt_at",
+          "erfasst_at",
+          "erfasst_von"
+        ],
+        "properties": {
+          "ansicht": {
+            "$ref": "#/components/schemas/VerletzungAnsicht"
+          },
+          "art": {
+            "$ref": "#/components/schemas/VerletzungArt"
+          },
+          "aufgehoben_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "aufgehoben_von_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "bestaetigt_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Namentliche Bestätigung am Gerät (LFH-1046)."
+          },
+          "einsatz_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "erfasst_at": {
+            "type": "string",
+            "description": "Wann die Verletzung beim Server ankam."
+          },
+          "erfasst_von": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "notiz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "person_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "region": {
+            "$ref": "#/components/schemas/KoerperRegion"
+          },
+          "schwere": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/VerletzungSchwere"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "x": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Lage, je 0 bis 1 normiert auf die Ansicht; nur als Paar."
+          },
+          "y": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "zeitpunkt_at": {
+            "type": "string",
+            "description": "Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt."
+          }
+        }
+      },
+      "VerletzungArt": {
+        "type": "string",
+        "description": "Art der Verletzung aus dem festen Katalog.",
+        "enum": [
+          "wunde_blutung",
+          "fraktur_verdacht",
+          "verbrennung",
+          "prellung_schwellung",
+          "amputation",
+          "schmerz",
+          "sonstige"
+        ]
+      },
+      "VerletzungSchwere": {
+        "type": "string",
+        "description": "Schwere einer Verletzung, optional.",
+        "enum": [
+          "leicht",
+          "mittel",
+          "schwer"
         ]
       },
       "VerpflegtAnderswo": {

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { koordinatenText } from './koordinate';
-import { pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
+import { effektiveDaten, pruefeKartenplan, type Kartenplan } from '../components/Datensicht';
 import type { Person } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 import { lagebildKuerzen } from '../offline/lagebildKuerzung';
@@ -123,6 +123,7 @@ describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
       'status',
       'fundort',
       'verbleib',
+      'transport',
       'vermerk',
       'seit',
     ]);
@@ -145,6 +146,28 @@ describe('personenSpalten — Registerform (Neuentwurf S7)', () => {
     expect(reg.immerSichtbar).toBe(true);
     expect(reg.zahl).toBe(true);
     expect(spalte('seit')[0].zahl).toBe(true);
+  });
+
+  it('findet eine Person über ihre PAT-Nummer in der Spalte Nr. (LLH-1326, D12)', () => {
+    const reg = personenSpalten.find((s) => s.key === 'reg')!;
+    expect(reg.suchText!({ ...basis, registrier_nr: 12, pat_nummer: 'A-4711' })).toBe(
+      'R-012 A-4711',
+    );
+    expect(reg.suchText!(basis)).toBe('R-001');
+    const zeilen = [
+      { ...basis, id: 1, registrier_nr: 12, pat_nummer: 'A-4711' },
+      { ...basis, id: 2, registrier_nr: 13, pat_nummer: 'B-12' },
+      { ...basis, id: 3, registrier_nr: 14 },
+    ];
+    const treffer = effektiveDaten({
+      daten: zeilen,
+      spalten: personenSpalten,
+      sortierung: null,
+      suchbegriff: '4711',
+      filterWerte: {},
+      baum: false,
+    });
+    expect(treffer.map((p) => p.registrier_nr)).toEqual([12]);
   });
 
   it('bricht die Nr. nie um, auch nicht in der Handschuh-Dichte (LFH-1151)', () => {
@@ -539,5 +562,76 @@ describe('personenKarte', () => {
     );
     expect(befunde).toHaveLength(1);
     expect(befunde[0]).toContain('seitt');
+  });
+});
+
+describe('Spalte „Transport“ (LLH-1325, design.md D10)', () => {
+  const mit = (nr: number, over: Partial<Person> = {}): Person => ({
+    ...basis,
+    id: nr,
+    registrier_nr: nr,
+    ...over,
+  });
+  const zeilen = [
+    mit(1),
+    mit(2, { transport_prioritaet: 'normal', transport_art: 'sitzend' }),
+    mit(3, { transport_prioritaet: 'sofort', transport_art: 'liegend' }),
+    mit(4, { transport_art: 'mit_notarzt' }),
+    mit(5, { transport_prioritaet: 'dringlich' }),
+  ];
+  const sortiert = (richtung: 'auf' | 'ab') =>
+    effektiveDaten({
+      daten: zeilen,
+      spalten: personenSpalten,
+      sortierung: { spalte: 'transport', richtung },
+      suchbegriff: '',
+      filterWerte: {},
+      baum: false,
+    }).map((p) => p.registrier_nr);
+
+  it('hält das Fließspalten-Budget: feste Zahlbreite, keine zweite Fließspalte', () => {
+    const [transport] = spalte('transport');
+    expect(transport.title).toBe('Transport');
+    expect(typeof transport.width).toBe('number');
+    expect(transport.mindestBreite).toBeUndefined();
+    expect(transport.abBreite).toBe('lg');
+  });
+
+  it('sortiert nach dem Rang der Priorität, ohne Priorität in beiden Richtungen hinten', () => {
+    expect(sortiert('auf')).toEqual([3, 5, 2, 1, 4]);
+    expect(sortiert('ab').slice(0, 3)).toEqual([2, 5, 3]);
+    expect(sortiert('ab').slice(3).sort()).toEqual([1, 4]);
+  });
+
+  it('zeigt die Priorität als neutrale Marke mit Wort und die Art dahinter', () => {
+    const [transport] = spalte('transport');
+    const { container, rerender } = render(<>{transport.render!(undefined, zeilen[2], 0)}</>);
+    expect(screen.getByText('sofort').closest('.ant-tag')).not.toBeNull();
+    expect(container).toHaveTextContent('sofort liegend');
+    rerender(<>{transport.render!(undefined, zeilen[3], 0)}</>);
+    expect(container).toHaveTextContent('mit Notarzt');
+    expect(container.querySelector('.ant-tag')).toBeNull();
+    rerender(<>{transport.render!(undefined, zeilen[0], 0)}</>);
+    expect(container).toHaveTextContent('—');
+    expect(transport.suchText!(zeilen[2])).toBe('sofort liegend');
+  });
+
+  it('die Vorgabe-Sortierung der Liste bleibt die Zeit', () => {
+    expect(spalte('seit')[0].sortWert).toBe(seitWert);
+  });
+});
+
+describe('Marke „kontaminiert“ (LLH-1326, design.md D11)', () => {
+  it('steht in der Personenzelle nur bei „ja“, mit Wort und Rolle achtung', () => {
+    const render_ = spalte('person')[0].render!;
+    const { container, rerender } = render(
+      <>{render_(undefined, { ...basis, kontamination: true }, 0)}</>,
+    );
+    const marke = screen.getByText('kontaminiert');
+    expect(marke.closest('[data-rolle="achtung"]')).not.toBeNull();
+    for (const kontamination of [false, undefined]) {
+      rerender(<>{render_(undefined, { ...basis, kontamination }, 0)}</>);
+      expect(container).not.toHaveTextContent('kontaminiert');
+    }
   });
 });

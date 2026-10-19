@@ -2336,6 +2336,120 @@ async fn protokoll_zeilen(pool: &sqlx::SqlitePool, e: i64) -> i64 {
         .unwrap()
 }
 
+// ---------- Druckansicht einer Person (LLH-1120, Spec `druck-dokumente`) ----------
+
+async fn audit_je_person(pool: &sqlx::SqlitePool, e: i64, pid: i64) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT art FROM person_zugriff_audit WHERE einsatz_id = ? AND person_id = ? ORDER BY id",
+    )
+    .bind(e)
+    .bind(pid)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn druckansicht_der_person_liefert_das_detail_und_steht_als_druck_im_protokoll() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let pid = person_anlegen(
+        &app,
+        &admin,
+        e,
+        r#"{"name":"Mustermann","status":"betroffen"}"#,
+    )
+    .await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/personen/{pid}/verletzungen"),
+        &admin,
+        Some(r#"{"ansicht":"vorn","region":"unterarm_l","art":"fraktur_verdacht"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let (s, detail) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{pid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, druck) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{pid}/druck"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(druck, detail, "der Druck liefert dasselbe Detail");
+    assert_eq!(druck["verletzungen"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        audit_je_person(&pool, e, pid).await,
+        ["detail", "druck"],
+        "das Öffnen der Druckansicht steht als Druck an der Person, nicht als Detail"
+    );
+
+    // „Neu laden“ ist ein weiterer Abruf und ein weiterer Eintrag.
+    anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{pid}/druck"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        audit_je_person(&pool, e, pid).await,
+        ["detail", "druck", "druck"]
+    );
+}
+
+#[tokio::test]
+async fn druckansicht_als_beobachter_erlaubt_unbekannte_person_404_ohne_eintrag() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let pid = person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, e, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/{pid}/druck"),
+        &erika_c,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Leserecht genügt");
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen/999999/druck"),
+        &erika_c,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let gesamt: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'druck'",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(gesamt, 1, "die unbekannte Person schreibt keinen Eintrag");
+}
+
 #[tokio::test]
 async fn listenzugriffe_zeigt_export_und_druck_neueste_zuerst() {
     let (app, pool) = setup_mit_pool().await;

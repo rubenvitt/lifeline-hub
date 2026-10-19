@@ -2860,6 +2860,12 @@ export interface components {
          * @enum {string}
          */
         FachebeneStatus: "ok" | "leer" | "offline";
+        /**
+         * @description Benötigte Fachrichtung des Zielkrankenhauses. Diagnosenah (Psychiatrie, Geburtshilfe):
+         *     Scrub mit der Kategorie Behandlung (design.md D4), nie im ETB oder Live-Kanal.
+         * @enum {string}
+         */
+        Fachrichtung: "unfallchirurgie" | "verbrennung" | "kinder" | "neuro" | "innere" | "geburtshilfe" | "psychiatrie" | "sonstige";
         /** @description Öffentliche Fahrzeug-Darstellung (ohne `org_id`). */
         FahrzeugAnzeige: {
             angelegt_at: string;
@@ -3391,6 +3397,12 @@ export interface components {
             rechtsgrundlage: string;
         };
         /**
+         * @description Körperregion aus dem festen Katalog, Seiten aus Sicht des Patienten. String = CHECK in
+         *     `migrations/0221_person_verletzung.sql`.
+         * @enum {string}
+         */
+        KoerperRegion: "kopf" | "gesicht" | "hals" | "thorax" | "abdomen" | "becken" | "ruecken" | "wirbelsaeule" | "gesaess" | "oberarm_l" | "oberarm_r" | "unterarm_l" | "unterarm_r" | "hand_l" | "hand_r" | "oberschenkel_l" | "oberschenkel_r" | "unterschenkel_l" | "unterschenkel_r" | "fuss_l" | "fuss_r";
+        /**
          * @description Eine gepflegte Stelle samt ihren Verbindungen.
          *
          *     `funktion_label` ist das wirksame Mandantenlabel („S3 Einsatz“), vom Server aufgelöst, damit
@@ -3852,6 +3864,33 @@ export interface components {
          * @enum {string}
          */
         LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
+        /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
+        MassnahmeAnzeige: {
+            art: components["schemas"]["MassnahmeArt"];
+            aufgehoben_at?: string | null;
+            /** Format: int64 */
+            aufgehoben_von_id?: number | null;
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046). */
+            bestaetigt_name?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann die Maßnahme beim Server ankam (Erfassungszeit im Sinne der Spec). */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            person_id: number;
+            /** @description Durchführung; ohne Angabe die Erfassung, ohne Netz die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`). String = CHECK in
+         *     `migrations/0220_person_massnahme.sql`. Katalogwert (Retain), nie im ETB oder Live-Kanal.
+         * @enum {string}
+         */
+        MassnahmeArt: "blutstillung" | "zugang" | "infusion" | "sauerstoff" | "atemweg" | "analgesie" | "immobilisation" | "waermeerhalt" | "dekontamination";
         /** @description Öffentliche Material-Darstellung (ohne `org_id`). */
         MaterialAnzeige: {
             angelegt_at: string;
@@ -4211,8 +4250,14 @@ export interface components {
         NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt";
         /** @description Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`). */
         NotizAnzeige: {
+            /**
+             * @description Wann der Eintrag beim Server ankam (LLH-1138). Fehlt bei Einträgen von vor der
+             *     Migration 0217.
+             */
+            eingegangen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät (LLH-1138), gekappt. */
             erfasst_at: string;
             /** Format: int64 */
             erfasst_von: number;
@@ -4718,13 +4763,25 @@ export interface components {
             herkunft_adresse?: string | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,
+             *     ausdrücklich nicht „nein“.
+             */
+            kontamination?: boolean | null;
             melder_kontakt?: string | null;
             name?: string | null;
             notiz?: string | null;
+            /** @description Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig. */
+            pat_nummer?: string | null;
             /** Format: int64 */
             registrier_nr: number;
             status: components["schemas"]["PersonStatus"];
             storniert_at?: string | null;
+            transport_art?: components["schemas"]["TransportArt"] | null;
+            /** @description Erfassungszeit des aktuellen Transportstands. */
+            transport_at?: string | null;
+            transport_fachrichtung?: components["schemas"]["Fachrichtung"] | null;
+            transport_prioritaet?: components["schemas"]["TransportPrioritaet"] | null;
             /**
              * @description Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status
              *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
@@ -4743,6 +4800,11 @@ export interface components {
             /** Format: int64 */
             id: number;
             name?: string | null;
+            /**
+             * @description PAT-Nummer (LLH-1326, design.md D12): die Sprungpalette findet die Person auch darüber.
+             *     Ohne Netz kürzt `lagebildKuerzen` sie weg (D9).
+             */
+            pat_nummer?: string | null;
             /** Format: int64 */
             registrier_nr: number;
             status: components["schemas"]["PersonStatus"];
@@ -4755,9 +4817,15 @@ export interface components {
         PersonDetail: components["schemas"]["PersonAnzeige"] & {
             abgleiche: components["schemas"]["AbgleichAnzeige"][];
             aufenthalt?: components["schemas"]["AufenthaltAnzeige"] | null;
+            /** @description Maßnahmen (LLH-1324), die jüngste Durchführung zuerst, aufgehobene mit `aufgehoben_at`. */
+            massnahmen: components["schemas"]["MassnahmeAnzeige"][];
             notizen: components["schemas"]["NotizAnzeige"][];
             sichtungen: components["schemas"]["SichtungAnzeige"][];
+            /** @description Transport-Verlauf (LLH-1325), der aktuelle Stand zuerst; ein Stand ohne Felder hebt auf. */
+            transporte: components["schemas"]["TransportAnzeige"][];
             verbleib: components["schemas"]["VerbleibAnzeige"][];
+            /** @description Verletzungen (LLH-1113) in Erfassungsfolge, aufgehobene mit `aufgehoben_at`. */
+            verletzungen: components["schemas"]["VerletzungAnzeige"][];
         };
         /**
          * @description Perioden einer Person — Zeile der Liste für die Personal-Seite. Nur Personen mit
@@ -5196,6 +5264,11 @@ export interface components {
         SichtungAnzeige: {
             /** @description Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person. */
             bestaetigt_name?: string | null;
+            /**
+             * @description Wann der Eintrag beim Server ankam (LLH-1138); `gesichtet_at` ist die Erfassungszeit.
+             *     Fehlt bei Einträgen von vor der Migration 0217.
+             */
+            eingegangen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             gesichtet_at: string;
@@ -5611,6 +5684,38 @@ export interface components {
             otpauth_url: string;
             secret_base32: string;
         };
+        /** @description Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“. */
+        TransportAnzeige: {
+            art?: components["schemas"]["TransportArt"] | null;
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046). */
+            bestaetigt_name?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann der Stand beim Server ankam. */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            fachrichtung?: components["schemas"]["Fachrichtung"] | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            person_id: number;
+            prioritaet?: components["schemas"]["TransportPrioritaet"] | null;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Transportart. Statuskategorie (Retain), erscheint aber nie im ETB oder Live-Kanal.
+         * @enum {string}
+         */
+        TransportArt: "liegend" | "sitzend" | "mit_notarzt";
+        /**
+         * @description Transportpriorität (Spec `personen-transport`). String = CHECK in
+         *     `migrations/0219_person_transport.sql`. Ordnet innerhalb der Sichtungskategorie, nie über
+         *     ihr (design.md D10). Statuskategorie (Retain), deshalb darf sie ins ETB.
+         * @enum {string}
+         */
+        TransportPrioritaet: "sofort" | "dringlich" | "normal";
         /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
         UebernahmeBody: {
             /** Format: int64 */
@@ -5795,6 +5900,11 @@ export interface components {
              *     liest, wer das Modul Betreuung sehen darf, aus dessen Übersicht.
              */
             betreuungsstelle_id?: number | null;
+            /**
+             * @description Wann der Eintrag beim Server ankam (LLH-1138); `zeitpunkt_at` ist die Erfassungszeit.
+             *     Fehlt bei Einträgen von vor der Migration 0217.
+             */
+            eingegangen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */
@@ -5834,6 +5944,53 @@ export interface components {
          * @enum {string}
          */
         Verkehrsart: "wechsel" | "gegen";
+        /**
+         * @description Ansicht des Körperschemas.
+         * @enum {string}
+         */
+        VerletzungAnsicht: "vorn" | "hinten";
+        /** @description Eine Verletzung (1:1 zu `person_verletzung`); eine aufgehobene trägt `aufgehoben_at`. */
+        VerletzungAnzeige: {
+            ansicht: components["schemas"]["VerletzungAnsicht"];
+            art: components["schemas"]["VerletzungArt"];
+            aufgehoben_at?: string | null;
+            /** Format: int64 */
+            aufgehoben_von_id?: number | null;
+            /** @description Namentliche Bestätigung am Gerät (LFH-1046). */
+            bestaetigt_name?: string | null;
+            /** Format: int64 */
+            einsatz_id: number;
+            /** @description Wann die Verletzung beim Server ankam. */
+            erfasst_at: string;
+            /** Format: int64 */
+            erfasst_von: number;
+            /** Format: int64 */
+            id: number;
+            notiz?: string | null;
+            /** Format: int64 */
+            person_id: number;
+            region: components["schemas"]["KoerperRegion"];
+            schwere?: components["schemas"]["VerletzungSchwere"] | null;
+            /**
+             * Format: double
+             * @description Lage, je 0 bis 1 normiert auf die Ansicht; nur als Paar.
+             */
+            x?: number | null;
+            /** Format: double */
+            y?: number | null;
+            /** @description Erfassungszeit; ohne Netz vorgemerkt die Zeit am Gerät, gekappt. */
+            zeitpunkt_at: string;
+        };
+        /**
+         * @description Art der Verletzung aus dem festen Katalog.
+         * @enum {string}
+         */
+        VerletzungArt: "wunde_blutung" | "fraktur_verdacht" | "verbrennung" | "prellung_schwellung" | "amputation" | "schmerz" | "sonstige";
+        /**
+         * @description Schwere einer Verletzung, optional.
+         * @enum {string}
+         */
+        VerletzungSchwere: "leicht" | "mittel" | "schwer";
         /**
          * @description Was eine Einheit in einem Zeitfenster anderswo bekommen hat (LLH-1048): nur Kennung und
          *     Summe, ohne Stelle, Zeitpunkt, Kostform oder Freitext und ohne Personenbezug. Die Feldmenge ist

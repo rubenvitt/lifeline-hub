@@ -26,6 +26,7 @@ import { stelle, zeitfenster } from '../test/verpflegungDaten';
 import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
+import { queueLeerenFuerTests } from '../offline/queue';
 
 /**
  * Die Gerätehülle im echten Routenbaum (LFH-892, Spec `feldgeraet-bedienung`): Startseite,
@@ -129,6 +130,9 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
         notizen: [],
         verbleib: [],
         abgleiche: [],
+        transporte: [],
+        massnahmen: [],
+        verletzungen: [],
       } as PersonDetail),
     ),
   );
@@ -205,6 +209,68 @@ describe('Gerätehülle — Startseite und Navigation', () => {
         .map((l) => l.textContent),
     ).toEqual(['Patienten', 'Aufnahme', 'Grundriss']);
     expect(screen.queryByRole('button', { name: /Benutzermenü/ })).toBeNull();
+  });
+
+  it('Patientenliste: Priorität innerhalb der Kategorie, Marke „kontaminiert“ (LLH-1325, D11)', async () => {
+    stelleBereit();
+    const normal = person({
+      id: 12,
+      registrier_nr: 3,
+      name: 'Dritte',
+      aktuelle_sichtung: 'sk1',
+      transport_prioritaet: 'normal',
+    });
+    const sofort = person({
+      id: 13,
+      registrier_nr: 5,
+      name: 'Fünfte',
+      aktuelle_sichtung: 'sk1',
+      transport_prioritaet: 'sofort',
+      kontamination: true,
+    });
+    const sk2Sofort = person({
+      id: 14,
+      registrier_nr: 4,
+      name: 'Vierte',
+      aktuelle_sichtung: 'sk2',
+      transport_prioritaet: 'sofort',
+      kontamination: false,
+    });
+    const eintritt = (person_id: number, zeitpunkt_at: string) => ({
+      id: person_id,
+      einsatz_id: 7,
+      uhs_id: 2,
+      person_id,
+      platz_id: null,
+      art: 'eintritt' as const,
+      notiz: null,
+      erfasst_von: 1,
+      zeitpunkt_at,
+    });
+    server.use(
+      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([normal, sofort, sk2Sofort])),
+      http.get('/api/einsaetze/7/uhs/2', () =>
+        HttpResponse.json({
+          ...uhs,
+          belegungen: [
+            eintritt(12, '2026-10-04 09:00:00'),
+            eintritt(13, '2026-10-04 09:45:00'),
+            eintritt(14, '2026-10-04 08:00:00'),
+          ],
+        }),
+      ),
+    );
+    renderApp('/geraet');
+    expect(await screen.findByText('Dritte, Max')).toBeVisible();
+    const reihen = screen
+      .getAllByRole('row')
+      .map((r) => /R-\d+/.exec(r.textContent ?? '')?.[0])
+      .filter(Boolean);
+    expect(reihen).toEqual(['R-005', 'R-003', 'R-004']);
+    // Nur „ja“ trägt die Marke; „nein“ und „keine Angabe“ nicht.
+    const marken = screen.getAllByText('kontaminiert');
+    expect(marken).toHaveLength(1);
+    expect(marken[0].closest('tr')).toHaveTextContent('R-005');
   });
 
   it('Patientenliste: Zustand und Platz, nach Dringlichkeit sortiert (LLH-1135)', async () => {
@@ -288,11 +354,53 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     const flaeche = await screen.findByRole('region', { name: 'Sichtung R-001' });
     await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
     await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
-    await waitFor(() => expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null }]));
+    await waitFor(() =>
+      expect(gesendet).toEqual([{ kategorie: 'sk1', notiz: null, client_id: expect.any(String) }]),
+    );
     // Kein Zeilenklick: die Liste bleibt.
     expect(pfad(router)).toBe('/geraet/7/patienten');
     expect(screen.queryByRole('button', { name: /^Aktionen zu R-/ })).toBeNull();
     expect(screen.queryByText('Auf Lagekarte verorten')).toBeNull();
+  });
+
+  it('UHS-Tablet ohne Netz: die Zeilen-Sichtung zeigt „Offline vorgemerkt“ und geht danach einmal hinaus (LLH-1138)', async () => {
+    vi.useRealTimers();
+    await queueLeerenFuerTests();
+    stelleBereit();
+    const gesendet: { zeitpunkt_at?: string; client_id?: string }[] = [];
+    server.use(
+      http.post('/api/einsaetze/7/personen/10/sichtung', async ({ request }) => {
+        gesendet.push((await request.json()) as (typeof gesendet)[number]);
+        return HttpResponse.json(
+          { id: 1, person_id: 10, kategorie: 'sk1', notiz: null, erfasst_at: '', erfasst_von: 1 },
+          { status: 201 },
+        );
+      }),
+    );
+    renderApp('/geraet');
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('button', { name: 'Sichtung R-001 ändern, aktuell SK II' }),
+    );
+    act(() => setzeOnline(false));
+    const flaeche = await screen.findByRole('region', { name: 'Sichtung R-001' });
+    await user.click(within(flaeche).getByRole('radio', { name: /^SK I,/ }));
+    await user.click(within(flaeche).getByRole('button', { name: 'Übernehmen' }));
+
+    const zeile = () => screen.getByText('R-001').closest('tr') as HTMLElement;
+    expect(await within(zeile()).findByText('Offline vorgemerkt')).toBeVisible();
+    expect(gesendet).toEqual([]);
+
+    // Das Netz kehrt zurück: die Warteschlange der Hülle sendet genau einmal, mit Erfassungszeit.
+    act(() => setzeOnline(true));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      kategorie: 'sk1',
+      client_id: expect.any(String),
+      zeitpunkt_at: expect.stringMatching(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/),
+    });
+    await waitFor(() => expect(within(zeile()).queryByText('Offline vorgemerkt')).toBeNull());
+    expect(gesendet).toHaveLength(1);
   });
 
   it('Fremde Adresse: die Lagekarte führt auf die Startseite', async () => {
@@ -316,6 +424,43 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     expect(await screen.findByRole('heading', { level: 1, name: /Aufnahme/ })).toBeVisible();
     // Keine Brotkrumen in die Stabsoberfläche.
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
+  });
+
+  it('UHS-Tablet ohne Netz: „Bestätigt von“ bietet das Personal, auch wenn vorher kein Paneel offen war (Spec `geraete-kopplung`)', async () => {
+    vi.useRealTimers();
+    await queueLeerenFuerTests();
+    stelleBereit();
+    let abrufe = 0;
+    const gesendet: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/personen/bestaetiger', () => {
+        abrufe += 1;
+        return HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]);
+      }),
+      http.post('/api/einsaetze/7/personen/10/massnahmen', async ({ request }) => {
+        gesendet.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 1 }, { status: 201 });
+      }),
+    );
+    renderApp('/geraet/7/patienten/10');
+    const kopf = await screen.findByRole('region', { name: 'Patientenkopf' });
+    // Die Hülle hält die Liste im Speicher des Tabs, bevor das Netz wegfällt.
+    await waitFor(() => expect(abrufe).toBe(1));
+    act(() => setzeOnline(false));
+    const user = userEvent.setup();
+    await user.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
+    await user.click(within(paneel).getByRole('combobox', { name: 'Bestätigt von' }));
+    await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
+    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    expect(await within(kopf).findByText('Offline vorgemerkt')).toBeVisible();
+    expect(gesendet).toEqual([]);
+
+    // Nach der Rückkehr des Netzes geht die Angabe mit der vorgemerkten Maßnahme hinaus.
+    act(() => setzeOnline(true));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ art: 'zugang', bestaetigt_personal_id: 5 });
   });
 });
 
@@ -401,6 +546,9 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
           notizen: [],
           verbleib: [],
           abgleiche: [],
+          transporte: [],
+          massnahmen: [],
+          verletzungen: [],
         } as PersonDetail),
       ),
     );

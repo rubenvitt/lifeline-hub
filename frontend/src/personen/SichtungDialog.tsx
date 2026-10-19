@@ -1,10 +1,12 @@
 import { Form, Input } from 'antd';
 import { useMutation } from '@tanstack/react-query';
-import { erfasseSichtung } from '../api/einsatzPerson';
+import { useCallback } from 'react';
+import type { SichtungEingabe } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import BestaetigtVonFeld from '../geraet/BestaetigtVonFeld';
 import SichtungsWahl from './SichtungsWahl';
+import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
 
 export interface SichtungWerte {
   kategorie: Sichtungskategorie;
@@ -36,23 +38,34 @@ export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
   );
 }
 
-/** Der Aufruf hinter beiden Hüllen; die Hülle reicht nur ihre Werte durch. */
-export function saveSichtung(einsatzId: number, personId: number, v: SichtungWerte) {
-  return erfasseSichtung(
-    einsatzId,
-    personId,
-    v.kategorie,
-    v.notiz ?? null,
-    v.bestaetigt_personal_id,
+/**
+ * Der eine Sichtungsaufruf hinter jeder Hülle (Patientenkopf, Zeilen-Sichtung, Dialog, Gerät);
+ * die Hülle reicht nur ihre Werte durch. Ohne Netz merkt er vor (LLH-1138, design.md D8), die
+ * Mutation dazu läuft mit `networkMode: 'always'`.
+ */
+export function useSaveSichtung() {
+  const save = useSavePersonEintrag();
+  return useCallback(
+    (einsatzId: number, person: PersonZiel, v: SichtungWerte) => {
+      const eingabe: SichtungEingabe = {
+        kategorie: v.kategorie,
+        notiz: v.notiz ?? null,
+        bestaetigt_personal_id: v.bestaetigt_personal_id,
+      };
+      return save(einsatzId, person, 'sichtung', eingabe);
+    },
+    [save],
   );
 }
 
 interface SichtungDialogProps {
   einsatzId: number;
-  personId: number;
+  person: PersonZiel;
   offen: boolean;
   /** Nach erfolgreichem POST (Invalidierung der Person); der Dialog schließt danach selbst. */
   onErfasst: () => void;
+  /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand, die Seite quittiert am Ort. */
+  onVorgemerkt?: () => void;
   onSchliessen: () => void;
 }
 
@@ -63,15 +76,19 @@ interface SichtungDialogProps {
  */
 export default function SichtungDialog({
   einsatzId,
-  personId,
+  person,
   offen,
   onErfasst,
+  onVorgemerkt,
   onSchliessen,
 }: SichtungDialogProps) {
   const [form] = Form.useForm<SichtungWerte>();
+  const saveSichtung = useSaveSichtung();
   const sichtungMutation = useMutation({
-    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, personId, v),
-    onSuccess: onErfasst,
+    // Die Funktion merkt ohne Netz selbst vor (`frontend/src/offline/AGENTS.md`).
+    networkMode: 'always',
+    mutationFn: (v: SichtungWerte) => saveSichtung(einsatzId, person, v),
+    onSuccess: (ergebnis) => (ergebnis.zustand === 'gesendet' ? onErfasst() : onVorgemerkt?.()),
   });
 
   return (

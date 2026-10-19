@@ -42,6 +42,9 @@ const detail = {
   notizen: [],
   verbleib: [],
   abgleiche: [],
+  transporte: [],
+  massnahmen: [],
+  verletzungen: [],
 } as unknown as PersonDetail;
 
 /**
@@ -71,6 +74,40 @@ describe('PersonVorschau', () => {
       'Ohne Angabe: Geburtsdatum, Herkunft / Adresse, Melder / Kontakt, Notiz',
     );
     expect(screen.queryByText('—')).toBeNull();
+  });
+
+  it('zeigt das Körperschema nur lesend: Figur und Liste, kein Markieren (LLH-1120)', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json({
+          ...detail,
+          verletzungen: [
+            {
+              id: 1,
+              einsatz_id: 1,
+              person_id: 10,
+              ansicht: 'vorn',
+              region: 'unterarm_l',
+              art: 'fraktur_verdacht',
+              x: 0.7,
+              y: 0.45,
+              zeitpunkt_at: '2026-05-27 09:15:00',
+              erfasst_at: '2026-05-27 09:15:00',
+              erfasst_von: 1,
+            },
+          ],
+        }),
+      ),
+    );
+    renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />);
+    const kopf = await screen.findByRole('region', { name: 'Patientenkopf' });
+    expect(within(kopf).getByRole('list', { name: 'Verletzungen' })).toHaveTextContent(
+      '1 Unterarm links, vorn · Fraktur-Verdacht',
+    );
+    expect(kopf.querySelectorAll('[data-lfh="koerperfigur"]')).toHaveLength(2);
+    expect(kopf.querySelectorAll('[data-lfh="stern"]')).toHaveLength(1);
+    expect(within(kopf).queryByRole('button', { name: 'Verletzung markieren' })).toBeNull();
+    expect(kopf.querySelector('[data-lfh="koerperzone"]')).toBeNull();
   });
 
   it('nennt einen Ladefehler, statt leer zu bleiben', async () => {

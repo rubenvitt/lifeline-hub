@@ -23,8 +23,15 @@ import { neueClientId } from './clientId';
 import { istOfflineTransient } from './fehler';
 import { schreibaktionEinreihen } from './queue';
 import { serverJetzt } from './serveruhr';
+import {
+  sendPersonEintrag,
+  type PersonEintragAktion,
+  type PersonEintragAntwort,
+  type PersonEintragArt,
+  type PersonEintragDaten,
+} from './personEintrag';
 
-type OfflineSchreibErgebnis<T> =
+export type OfflineSchreibErgebnis<T> =
   { zustand: 'gesendet'; daten: T } | { zustand: 'vorgemerkt'; client_id: string };
 
 function clientId(vorgegeben?: string | null): string {
@@ -259,4 +266,35 @@ export function merkeVerpflegungsausgabeVor(
   eingabe: AusgabeEingabe,
 ): Promise<{ zustand: 'vorgemerkt'; client_id: string }> {
   return vormerkbar(benutzerId, einsatzId, eingabe, ausgabeAktion(zeitfenster)).vormerkenMitZeit();
+}
+
+/**
+ * Medizinischer Eintrag einer Person senden oder mit Erfassungszeit vormerken (LLH-1138, design.md
+ * D8): Sichtung, Verbleib, Verlaufsnotiz, Transport, Maßnahme und Verletzung, jeweils mit
+ * „Bestätigt von“, falls angegeben (Spec `geraete-kopplung`). Der Server erkennt die `client_id`
+ * wieder (Spec `personen-verlauf`, „Eintrag kommt genau einmal an“) und kappt die Erfassungszeit;
+ * ein älterer Eintrag steht im Verlauf, ändert aber den aktuellen Stand nicht. `person` nennt die
+ * Registriernummer nur für die Anzeige der Queue.
+ */
+export function savePersonEintragOfflineCapable<A extends PersonEintragArt>(
+  benutzerId: number,
+  einsatzId: number,
+  person: SchreibZiel,
+  art: A,
+  eingabe: PersonEintragDaten[A],
+): Promise<OfflineSchreibErgebnis<PersonEintragAntwort[A]>> {
+  // TypeScript verknüpft `art` und `daten` eines generischen `A` nicht mit der Union; die Aktion
+  // entsteht aber genau aus diesem Paar.
+  const aktion = (daten: PersonEintragDaten[A]) =>
+    ({ art, person_id: person.id, bezeichnung: person.bezeichnung, daten }) as PersonEintragAktion;
+  return mitErfassungszeitOfflineFaehig(
+    benutzerId,
+    einsatzId,
+    eingabe,
+    (daten) =>
+      sendPersonEintrag(einsatzId, aktion(daten), {
+        offlineQueueBenutzerId: benutzerId,
+      }) as Promise<PersonEintragAntwort[A]>,
+    aktion,
+  );
 }

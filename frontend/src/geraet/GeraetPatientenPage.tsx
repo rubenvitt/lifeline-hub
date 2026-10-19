@@ -17,7 +17,9 @@ import {
   personenSpalten,
   seitWert,
   verbleibText,
+  vorgemerktJePerson,
 } from '../personen/personenSpalten';
+import { useVorgemerktePersonEintraege } from '../offline/useVorgemerkteSchreibaktionen';
 import { geraetAufnahmePfad, geraetPersonPfad } from '../routing/deeplinks';
 import { dringlichkeitsWert, wartetSeit } from '../pages/uhs/dringlichkeit';
 import { useZeilenFehler } from '../components/useZeilenFehler';
@@ -65,7 +67,7 @@ export function ortInDerUhs(p: Person, uhs: UhsDetail | undefined): string {
  * Gruppe mit seinem Verbleib.
  */
 export default function GeraetPatientenPage() {
-  const { geraet } = useAuth();
+  const { geraet, benutzer } = useAuth();
   const navigate = useNavigate();
   const einsatzId = geraet?.einsatz_id ?? 0;
   const uhsId = geraet?.uhs_id ?? null;
@@ -100,21 +102,29 @@ export default function GeraetPatientenPage() {
     }),
     [beginne, melde, hold],
   );
+  // Ohne Netz vorgemerkte Nachsichtungen zeigt die Zeile (LLH-1138, Spec `betroffene-lagedaten`).
+  const vorgemerkteEintraege = useVorgemerktePersonEintraege(benutzer?.id, einsatzId);
+  const vorgemerkt = useMemo(
+    () => vorgemerktJePerson(vorgemerkteEintraege),
+    [vorgemerkteEintraege],
+  );
   const register = personenSpalten((id) => (id === uhs?.id ? uhs.bezeichnung : undefined), {
     einsatzId,
     darfSchreiben: false,
     darfSichten: darf('person-sichtung'),
     rueckmeldung,
+    vorgemerkt,
   });
   /*
    * Vorgabe-Sortierung nach Dringlichkeit (LLH-1135, `pages/uhs/dringlichkeit.ts`, dieselbe Reihe
-   * wie Wartebereich und Zuweisung): die Sichtungsspalte sortiert nach Reihe und Wartezeit seit
-   * dem Eintritt (bzw. der Rückkehr in den Wartebereich); ohne Belegung zählt die Sichtung oder
-   * Erfassung. Den Zufluss hält die Schleuse der `Datensicht`.
+   * wie Wartebereich und Zuweisung): die Sichtungsspalte sortiert nach Reihe, Transportpriorität
+   * (LLH-1325) und Wartezeit seit dem Eintritt (bzw. der Rückkehr in den Wartebereich); ohne
+   * Belegung zählt die Sichtung oder Erfassung. Den Zufluss hält die Schleuse der `Datensicht`.
    */
   const dringlichkeit = (p: Person) =>
     dringlichkeitsWert({
       sichtung: p.aktuelle_sichtung,
+      prioritaet: p.transport_prioritaet,
       seit: (uhs ? wartetSeit(p.id, uhs.belegungen) : null) ?? seitWert(p),
     });
   const spalten = spaltenFuer<Person>()([
@@ -162,7 +172,7 @@ export default function GeraetPatientenPage() {
           zeilenSchluessel="id"
           ladend={personenQuery.isLoading}
           leerText="Noch keine Patienten in dieser Unfallhilfsstelle"
-          suche={{ platzhalter: 'R-Nr., Name' }}
+          suche={{ platzhalter: 'R-Nr., PAT-Nr., Name' }}
           standardSortierung={{ spalte: 'sk', richtung: 'auf' }}
           gruppen={{
             schluessel: (p) => (uhs && p.aktuelle_uhs_id === uhs.id ? IN_DER_UHS : AUSGETRETEN),

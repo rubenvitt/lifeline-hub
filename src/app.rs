@@ -1053,6 +1053,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::listenzugriffe),
         )
         .route(
+            "/api/einsaetze/{id}/personen/{pid}/druck",
+            get(routes::einsatz_person::detail_druck),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/{pid}",
             get(routes::einsatz_person::detail),
         )
@@ -1075,6 +1079,26 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/personen/{pid}/notizen",
             post(routes::einsatz_person::notiz),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/transport",
+            post(routes::person_transport::festlegen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/massnahmen",
+            post(routes::person_massnahme::erfassen),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/massnahmen/{mid}/aufheben",
+            post(routes::person_massnahme::aufheben),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/verletzungen",
+            post(routes::person_verletzung::markieren),
+        )
+        .route(
+            "/api/einsaetze/{id}/personen/{pid}/verletzungen/{vid}/aufheben",
+            post(routes::person_verletzung::aufheben),
         )
         .route(
             "/api/einsaetze/{id}/personen/{pid}/abgleich",

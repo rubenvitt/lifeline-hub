@@ -1,5 +1,9 @@
 import type {
   Bestaetiger,
+  Fachrichtung,
+  KoerperRegion,
+  Massnahme,
+  MassnahmeArt,
   Person,
   PersonAnhang,
   PersonAuswahl,
@@ -8,10 +12,17 @@ import type {
   PersonZugriff,
   Sichtung,
   Sichtungskategorie,
+  Transport,
+  TransportArt,
+  TransportPrioritaet,
   Verbleib,
   VerbleibArt,
   VerbleibStatus,
   Verlaufsnotiz,
+  Verletzung,
+  VerletzungAnsicht,
+  VerletzungArt,
+  VerletzungSchwere,
   Abgleich,
 } from './types';
 import {
@@ -53,6 +64,10 @@ export interface PersonEingabe {
    * (`undefined` → `null`) mitlaufen, wenn es nicht gesetzt werden soll.
    */
   vermisst_seit?: string | null;
+  /** PAT-Nummer (LLH-1326), höchstens `PAT_NUMMER_MAX` Zeichen; `null` leert. Nur im PATCH. */
+  pat_nummer?: string | null;
+  /** Kontamination: `true`/`false`, `null` = keine Angabe (nicht „nein“). Nur im PATCH. */
+  kontamination?: boolean | null;
 }
 
 /** Offline-/Fastpath-fähige Anlage. `client_id` macht einen Replay nach
@@ -108,6 +123,15 @@ export function ladePersonenExport(einsatzId: number): Promise<Blob> {
 export function ladePerson(einsatzId: number, personId: number): Promise<PersonDetail> {
   // Schreibt serverseitig EINEN detail-Audit-Eintrag.
   return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}`);
+}
+
+/**
+ * Druckansicht einer Person (LLH-1120, Spec `druck-dokumente`): dasselbe Detail, aber
+ * serverseitig als `druck`-Eintrag mit Person im Zugriffsprotokoll. Nie still wiederholen und nie
+ * aus dem Cache des Details ersetzen (`frontend/src/druck/AGENTS.md`, Personendruck).
+ */
+export function loadPersonDruck(einsatzId: number, personId: number): Promise<PersonDetail> {
+  return apiGet<PersonDetail>(`/api/einsaetze/${einsatzId}/personen/${personId}/druck`);
 }
 
 export function legePersonAn(
@@ -166,20 +190,42 @@ export function registrierAnzeige(nr: number): string {
   return registrierNummer('R', nr);
 }
 
-/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. `bestaetigtPersonalId`
- * nennt am Gerät die bestätigende Person (LFH-1046); eine Person schickt es nie (422). */
+/**
+ * Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): jeder medizinische Eintrag einer
+ * Person nimmt `client_id` (Replay ohne zweiten Eintrag) und `zeitpunkt_at` (Erfassungszeit,
+ * serverseitig gekappt). Gesetzt werden beide nur über `offline/schreiben.ts`.
+ */
+export interface OfflineEintragEingabe {
+  client_id?: string | null;
+  zeitpunkt_at?: string | null;
+}
+
+/** Eine Nachsichtung. `bestaetigt_personal_id` nennt am Gerät die bestätigende Person (LFH-1046);
+ * eine Person schickt es nie (422). */
+export interface SichtungEingabe extends OfflineEintragEingabe {
+  kategorie: Sichtungskategorie;
+  notiz?: string | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */
 export function erfasseSichtung(
   einsatzId: number,
   personId: number,
-  kategorie: Sichtungskategorie,
-  notiz?: string | null,
-  bestaetigtPersonalId?: number | null,
+  eingabe: SichtungEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Sichtung> {
-  return apiSend<Sichtung>(`/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`, 'POST', {
-    kategorie,
-    notiz: notiz ?? null,
-    ...(bestaetigtPersonalId != null ? { bestaetigt_personal_id: bestaetigtPersonalId } : {}),
-  });
+  const { bestaetigt_personal_id, notiz, ...rest } = eingabe;
+  return apiSend<Sichtung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`,
+    'POST',
+    {
+      ...rest,
+      notiz: notiz ?? null,
+      ...(bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
+    },
+    optionen,
+  );
 }
 
 /** Auswahl „Bestätigt von“ am UHS-Gerät (LFH-1046): das Personal des Einsatzes. Eine Person und
@@ -188,7 +234,7 @@ export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
   return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
 }
 
-export interface VerbleibEingabe {
+export interface VerbleibEingabe extends OfflineEintragEingabe {
   art: VerbleibArt;
   transportmittel?: string | null;
   ziel?: string | null;
@@ -206,24 +252,135 @@ export function erfasseVerbleib(
   einsatzId: number,
   personId: number,
   daten: VerbleibEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Verbleib> {
   return apiSend<Verbleib>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/verbleib`,
     'POST',
     daten,
+    optionen,
   );
+}
+
+/** Eine Verlaufsnotiz; ihr Text liegt ohne Netz in der Warteschlange (design.md D8). */
+export interface NotizEingabe extends OfflineEintragEingabe {
+  text: string;
 }
 
 /** Befund-/Verlaufsnotiz (append-only, KEIN ETB-Eintrag). */
 export function legeNotizAn(
   einsatzId: number,
   personId: number,
-  text: string,
+  eingabe: NotizEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Verlaufsnotiz> {
   return apiSend<Verlaufsnotiz>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/notizen`,
     'POST',
-    { text },
+    eingabe,
+    optionen,
+  );
+}
+
+// ---------- PAT-Kern: Transport, Maßnahmen, Verletzungen (Change `y18v58dt-pat-kern`) ----------
+//
+// Je Schreibweg GENAU EINE Funktion, und jede Oberfläche ruft sie nur über ihre eine Mutation im
+// Patientenkopf, dort über `offline/schreiben.ts` (`savePersonEintragOfflineCapable`, design.md
+// D8). Das Aufheben bleibt online: seine Route kennt weder `client_id` noch Erfassungszeit.
+
+/** Ein voller Transportstand (Spec `personen-transport`): jedes Feld einzeln leer, alle drei leer
+ * heben den Transport auf. Am Gerät optional „Bestätigt von“ (LFH-1046). */
+export interface TransportEingabe extends OfflineEintragEingabe {
+  prioritaet: TransportPrioritaet | null;
+  art: TransportArt | null;
+  fachrichtung: Fachrichtung | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+/** Transport festlegen: ein neuer Eintrag im Verlauf; ETB nur beim Wechsel der Priorität. */
+export function saveTransport(
+  einsatzId: number,
+  personId: number,
+  eingabe: TransportEingabe,
+  optionen?: ApiSendOptionen,
+): Promise<Transport> {
+  return apiSend<Transport>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/transport`,
+    'POST',
+    eingabe,
+    optionen,
+  );
+}
+
+/** Eine Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`); ohne `zeitpunkt_at` gilt die
+ * Erfassung als Durchführung (vorgemerkt: die Zeit des Vormerkens). Kein ETB. */
+export interface MassnahmeEingabe extends OfflineEintragEingabe {
+  art: MassnahmeArt;
+  bestaetigt_personal_id?: number | null;
+}
+
+export function createMassnahme(
+  einsatzId: number,
+  personId: number,
+  eingabe: MassnahmeEingabe,
+  optionen?: ApiSendOptionen,
+): Promise<Massnahme> {
+  return apiSend<Massnahme>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen`,
+    'POST',
+    eingabe,
+    optionen,
+  );
+}
+
+/** Hebt eine Maßnahme genau einmal auf (zweites Aufheben 409). */
+export function revokeMassnahme(
+  einsatzId: number,
+  personId: number,
+  massnahmeId: number,
+): Promise<Massnahme> {
+  return apiSend<Massnahme>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen/${massnahmeId}/aufheben`,
+    'POST',
+  );
+}
+
+/** Eine Verletzung am Körperschema (Spec `personen-verletzungen`): Region muss in der Ansicht
+ * liegen (sonst 422), die Lage `x`/`y` nur als Paar, je 0..1. Kein ETB. */
+export interface VerletzungEingabe extends OfflineEintragEingabe {
+  ansicht: VerletzungAnsicht;
+  region: KoerperRegion;
+  art: VerletzungArt;
+  schwere?: VerletzungSchwere | null;
+  x?: number;
+  y?: number;
+  notiz?: string | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+export function createVerletzung(
+  einsatzId: number,
+  personId: number,
+  eingabe: VerletzungEingabe,
+  optionen?: ApiSendOptionen,
+): Promise<Verletzung> {
+  return apiSend<Verletzung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen`,
+    'POST',
+    eingabe,
+    optionen,
+  );
+}
+
+/** Hebt eine Verletzung genau einmal auf; die Nummer am Schema bleibt frei (Lücke). */
+export function revokeVerletzung(
+  einsatzId: number,
+  personId: number,
+  verletzungId: number,
+): Promise<Verletzung> {
+  return apiSend<Verletzung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen/${verletzungId}/aufheben`,
+    'POST',
   );
 }
 

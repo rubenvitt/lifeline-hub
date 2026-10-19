@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError, NetzFehler } from '../api/client';
-import { legePersonAn } from '../api/einsatzPerson';
+import {
+  createMassnahme,
+  createVerletzung,
+  erfasseSichtung,
+  erfasseVerbleib,
+  legeNotizAn,
+  legePersonAn,
+  saveTransport,
+} from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { erfasseAusgabe } from '../api/verpflegung';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
@@ -15,11 +23,21 @@ import {
   erfasseStandOfflineFaehig,
   erfasseVerpflegungsausgabeOfflineFaehig,
   merkeVerpflegungsausgabeVor,
+  savePersonEintragOfflineCapable,
 } from './schreiben';
 
 vi.mock('../api/einsatzPerson', async (importOriginal) => {
   const original = await importOriginal<typeof import('../api/einsatzPerson')>();
-  return { ...original, legePersonAn: vi.fn() };
+  return {
+    ...original,
+    legePersonAn: vi.fn(),
+    erfasseSichtung: vi.fn(),
+    erfasseVerbleib: vi.fn(),
+    legeNotizAn: vi.fn(),
+    saveTransport: vi.fn(),
+    createMassnahme: vi.fn(),
+    createVerletzung: vi.fn(),
+  };
 });
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
 vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
@@ -492,5 +510,131 @@ describe('offlinefähiges Eintreffen am Bereitstellungsraum (LLH-1075 Teil III)'
       erfasseEintreffenOfflineFaehig(11, 7, sportplatz, 'FL', unangemeldet),
     ).rejects.toMatchObject({ status: 422 });
     expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+  });
+});
+
+describe('offlinefähige Einträge einer Person (LLH-1138, design.md D8)', () => {
+  const r012 = { id: 10, bezeichnung: 'R-012' };
+  const faelle = [
+    {
+      art: 'sichtung' as const,
+      api: erfasseSichtung,
+      eingabe: { kategorie: 'sk1' as const, notiz: null, bestaetigt_personal_id: 5 },
+    },
+    {
+      art: 'verbleib' as const,
+      api: erfasseVerbleib,
+      eingabe: { art: 'transport' as const, ziel: 'KH Mitte', bestaetigt_personal_id: 5 },
+    },
+    { art: 'notiz' as const, api: legeNotizAn, eingabe: { text: 'Infusion läuft' } },
+    {
+      art: 'transport' as const,
+      api: saveTransport,
+      eingabe: {
+        prioritaet: 'dringlich' as const,
+        art: 'liegend' as const,
+        fachrichtung: null,
+        bestaetigt_personal_id: 5,
+      },
+    },
+    {
+      art: 'massnahme' as const,
+      api: createMassnahme,
+      eingabe: { art: 'blutstillung' as const, bestaetigt_personal_id: 5 },
+    },
+    {
+      art: 'verletzung' as const,
+      api: createVerletzung,
+      eingabe: {
+        ansicht: 'vorn' as const,
+        region: 'kopf' as const,
+        art: 'wunde_blutung' as const,
+        x: 0.5,
+        y: 0.1,
+        bestaetigt_personal_id: 5,
+      },
+    },
+  ];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-18T14:10:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each(faelle)(
+    '$art: ohne Netz vorgemerkt mit client_id, Erfassungszeit, Person und „Bestätigt von“',
+    async ({ art, api, eingabe }) => {
+      online(false);
+      const ergebnis = await savePersonEintragOfflineCapable(11, 7, r012, art, {
+        ...eingabe,
+        client_id: `${art}-1`,
+      } as never);
+      expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: `${art}-1` });
+      expect(api).not.toHaveBeenCalled();
+      expect(await schreibaktionenLaden(11, 7)).toEqual([
+        expect.objectContaining({
+          aktion: {
+            art,
+            person_id: 10,
+            bezeichnung: 'R-012',
+            daten: { ...eingabe, client_id: `${art}-1`, zeitpunkt_at: '2026-10-18 14:10:00' },
+          },
+        }),
+      ]);
+    },
+  );
+
+  it.each(faelle)(
+    '$art: online gesendet mit client_id und Queue-Besitzer, ohne Zeitpunkt',
+    async ({ art, api, eingabe }) => {
+      const antwort = { id: 99 };
+      vi.mocked(api).mockResolvedValue(antwort as never);
+      const ergebnis = await savePersonEintragOfflineCapable(11, 7, r012, art, eingabe as never);
+      expect(ergebnis).toEqual({ zustand: 'gesendet', daten: antwort });
+      const [einsatz, person, gesendet, optionen] = vi.mocked(api).mock.calls[0] as unknown[];
+      expect([einsatz, person, optionen]).toEqual([7, 10, { offlineQueueBenutzerId: 11 }]);
+      expect(gesendet).toEqual({ ...eingabe, client_id: expect.any(String) });
+      expect(gesendet).not.toHaveProperty('zeitpunkt_at');
+      expect(await schreibaktionenLaden(11, 7)).toHaveLength(0);
+    },
+  );
+
+  it.each(faelle)(
+    '$art: abgerissene Antwort merkt mit DERSELBEN client_id vor, eine fachliche 4xx wirft',
+    async ({ art, api, eingabe }) => {
+      vi.mocked(api).mockRejectedValueOnce(new NetzFehler());
+      const ergebnis = await savePersonEintragOfflineCapable(11, 7, r012, art, eingabe as never);
+      const gesendet = vi.mocked(api).mock.calls[0][2] as { client_id: string };
+      expect(gesendet.client_id).toEqual(expect.any(String));
+      expect(ergebnis).toEqual({ zustand: 'vorgemerkt', client_id: gesendet.client_id });
+      const [zeile] = await schreibaktionenLaden(11, 7);
+      expect(zeile.aktion).toMatchObject({ art, person_id: 10 });
+      expect((zeile.aktion as { daten: unknown }).daten).toEqual({
+        ...gesendet,
+        zeitpunkt_at: '2026-10-18 14:10:00',
+      });
+
+      vi.mocked(api).mockRejectedValueOnce(new ApiError(422, 'Person ist nicht anwesend'));
+      await expect(
+        savePersonEintragOfflineCapable(11, 7, r012, art, eingabe as never),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(await schreibaktionenLaden(11, 7)).toHaveLength(1);
+    },
+  );
+
+  it('lässt die eingetragene Durchführung einer Maßnahme beim Vormerken stehen', async () => {
+    online(false);
+    await savePersonEintragOfflineCapable(11, 7, r012, 'massnahme', {
+      art: 'zugang',
+      zeitpunkt_at: '2026-10-18 13:55:00',
+    });
+    const [zeile] = await schreibaktionenLaden(11, 7);
+    expect(zeile.aktion).toMatchObject({
+      art: 'massnahme',
+      daten: { art: 'zugang', zeitpunkt_at: '2026-10-18 13:55:00' },
+    });
   });
 });

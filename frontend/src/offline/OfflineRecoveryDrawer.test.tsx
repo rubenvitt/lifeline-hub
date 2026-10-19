@@ -263,6 +263,74 @@ describe('OfflineRecoveryDrawer: abgelehntes Eintreffen am Bereitstellungsraum (
   });
 });
 
+describe('OfflineRecoveryDrawer: abgelehnte Einträge einer Person (LLH-1138, design.md D8)', () => {
+  it.each([
+    ['sichtung', { kategorie: 'sk1', notiz: null }, 'Abgelehnte Sichtung: R-012'],
+    ['verbleib', { art: 'transport' }, 'Abgelehnter Verbleib: R-012'],
+    ['notiz', { text: 'Infusion läuft' }, 'Abgelehnte Verlaufsnotiz: R-012'],
+    [
+      'transport',
+      { prioritaet: 'dringlich', art: null, fachrichtung: null },
+      'Abgelehnter Transport: R-012',
+    ],
+    ['massnahme', { art: 'zugang' }, 'Abgelehnte Maßnahme: R-012'],
+    [
+      'verletzung',
+      { ansicht: 'vorn', region: 'kopf', art: 'wunde_blutung' },
+      'Abgelehnte Verletzung: R-012',
+    ],
+  ] as const)(
+    '%s: nennt Art und Person, der Grund bleibt bis zum Verwerfen',
+    async (art, daten, titel) => {
+      const aktion = {
+        art,
+        person_id: 10,
+        bezeichnung: 'R-012',
+        daten: { ...daten, client_id: `${art}-abgelehnt`, zeitpunkt_at: '2026-10-18 14:10:00' },
+      } as Parameters<typeof schreibaktionEinreihen>[2];
+      await schreibaktionEinreihen(11, 7, aktion);
+      const [zeile] = await schreibaktionenLaden(11, 7);
+      await schreibaktionAblehnen(11, zeile, 'Stornierte Person kann nicht gesichtet werden');
+      vi.mocked(schreibaktionAbgelehntVerwerfen).mockImplementation(
+        (await vi.importActual<typeof import('./queue')>('./queue'))
+          .schreibaktionAbgelehntVerwerfen,
+      );
+
+      const { rerender } = render(
+        <App>
+          <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+        </App>,
+      );
+      const karte = (await screen.findByText(titel)).closest('.ant-card') as HTMLElement;
+      expect(
+        within(karte).getByText('Stornierte Person kann nicht gesichtet werden'),
+      ).toBeInTheDocument();
+      expect(
+        within(karte).getByText(new RegExp(`"client_id": "${art}-abgelehnt"`)),
+      ).toBeInTheDocument();
+
+      // Wieder geöffnet steht der Grund noch da: er geht erst mit dem Verwerfen.
+      rerender(
+        <App>
+          <OfflineRecoveryDrawer open={false} onClose={vi.fn()} benutzerId={11} />
+        </App>,
+      );
+      rerender(
+        <App>
+          <OfflineRecoveryDrawer open onClose={vi.fn()} benutzerId={11} />
+        </App>,
+      );
+      const wieder = (await screen.findByText(titel)).closest('.ant-card') as HTMLElement;
+      expect(
+        within(wieder).getByText('Stornierte Person kann nicht gesichtet werden'),
+      ).toBeInTheDocument();
+      await userEvent.click(within(wieder).getByRole('button', { name: /Verwerfen/ }));
+      await userEvent.click(await screen.findByRole('button', { name: 'Endgültig verwerfen' }));
+      await waitFor(() => expect(screen.queryByText(titel)).not.toBeInTheDocument());
+    },
+  );
+});
+
 function zurueckgehalten<T>() {
   let erfuellen!: (wert: T) => void;
   let ablehnen!: (grund: unknown) => void;

@@ -58,7 +58,7 @@ function zeige() {
   return renderMitProviders(
     <SichtungDialog
       einsatzId={1}
-      personId={9}
+      person={{ id: 9, registrier_nr: 9 }}
       offen
       onErfasst={() => {}}
       onSchliessen={() => {}}

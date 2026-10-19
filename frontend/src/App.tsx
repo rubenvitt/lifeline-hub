@@ -43,6 +43,7 @@ import BenachrichtigungenPage from './pages/BenachrichtigungenPage';
 import EtbPage from './pages/EtbPage';
 import EtbDruckPage from './pages/EtbDruckPage';
 import PersonenDruckPage from './pages/PersonenDruckPage';
+import PersonDruckPage from './pages/PersonDruckPage';
 import TiereDruckPage from './pages/TiereDruckPage';
 import SchaedenDruckPage from './pages/SchaedenDruckPage';
 import EinsatzberichtDruckPage from './pages/EinsatzberichtDruckPage';
@@ -430,6 +431,7 @@ export const appRouten = createRoutesFromElements(
           />
           <Route path="stab/infotelefon" element={<InfotelefonPage />} />
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
+          <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
         </Route>

@@ -19,6 +19,6 @@ export const ZUGRIFF_SPALTEN: KatalogSpalte<PersonZugriff>[] = [
     title: 'Art',
     dataIndex: 'art',
     key: 'art',
-    render: (art: PersonZugriff['art']) => zugriffArtText(art),
+    render: (_art: PersonZugriff['art'], zeile: PersonZugriff) => zugriffArtText(zeile),
   },
 ];

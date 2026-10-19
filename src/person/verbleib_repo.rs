@@ -25,11 +25,15 @@ pub struct VerbleibAnzeige {
     /// Namentliche Bestätigung am Gerät (LFH-1046): Name der bestätigenden Person.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bestaetigt_name: Option<String>,
+    /// Wann der Eintrag beim Server ankam (LLH-1138); `zeitpunkt_at` ist die Erfassungszeit.
+    /// Fehlt bei Einträgen von vor der Migration 0217.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eingegangen_at: Option<String>,
 }
 
 /// Eingabedaten beim Erfassen; Strings bereits getrimmt (Handler). `art`/`status`
 /// sind bereits validiert (Handler via `VerbleibArt`).
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct VerbleibDaten<'a> {
     pub art: &'a str,
     pub transportmittel: Option<&'a str>,
@@ -40,46 +44,69 @@ pub struct VerbleibDaten<'a> {
     pub betreuungsstelle_id: Option<i64>,
     /// Bereits über [`crate::geraet::bestaetigung::aufloesen`] geprüft (LFH-1046).
     pub bestaetigung: Option<&'a Bestaetigung>,
+    /// Erfassungszeit, bereits über `support::erfassungszeitpunkt` gekappt; `None` = jetzt.
+    pub zeitpunkt_at: Option<&'a str>,
+    /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
+    pub client_id: Option<&'a str>,
 }
 
 const SELECT_VERBLEIB: &str = "\
     SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
-           zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_name \
+           zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_name, eingegangen_at \
     FROM person_verbleib";
 
-/// Erfasst ein Verbleib-Ereignis append-only und aktualisiert in DERSELBEN Transaktion den
-/// Verbleib-Cache an der Person: die Kurzform `aktueller_verbleib` (vom Handler berechnet), Art,
-/// Ziel, Status und den Verweis auf die Betreuungsstelle. Der neue Eintrag ist per Definition
-/// der jüngste, der Cache spiegelt also genau das, was `liste_je_person` zuoberst liefert.
+/// „Aktuell“ (Spec `personen-verlauf`, design.md D6): der Verbleib mit dem jüngsten
+/// Erfassungszeitpunkt, bei Gleichstand der später gespeicherte. Die einzige Stelle, die das für
+/// den Verbleib definiert: Cache und Verlauf lesen dieselbe Ordnung. Sie löst den Kopfkommentar
+/// von `migrations/0022_einsatz_person_med_cache.sql` ab (siehe `sichtung_repo::sichtungsfolge!`).
+macro_rules! verbleibfolge {
+    () => {
+        "ORDER BY zeitpunkt_at DESC, id DESC"
+    };
+}
+
+/// Ergebnis einer Erfassung: die Kennung des Ereignisses und ob es der aktuelle Verbleib ist.
+/// Ein nachgereichtes älteres gewinnt nicht; der Auto-Austritt unterbleibt dann.
+#[derive(Debug, Clone, Copy)]
+pub struct ErfassterVerbleib {
+    pub id: i64,
+    pub gewinnt: bool,
+}
+
+/// Erfasst ein Verbleib-Ereignis append-only und bestimmt in DERSELBEN Transaktion den
+/// Verbleib-Cache an der Person neu aus dem jüngsten Ereignis: die Kurzform
+/// `aktueller_verbleib`, Art, Ziel, Status und den Verweis auf die Betreuungsstelle. Der Cache
+/// spiegelt also genau das, was `liste_je_person` zuoberst liefert.
 pub async fn erfassen(
     pool: &SqlitePool,
     einsatz_id: i64,
     person_id: i64,
     daten: VerbleibDaten<'_>,
-    kurzform: &str,
     erfasst_von: i64,
 ) -> Result<VerbleibAnzeige, AppError> {
     let mut tx = pool.begin().await?;
-    let id = erfassen_tx(&mut tx, einsatz_id, person_id, daten, kurzform, erfasst_von).await?;
+    let erfasst = erfassen_tx(&mut tx, einsatz_id, person_id, daten, erfasst_von).await?;
     tx.commit().await?;
-    laden(pool, einsatz_id, id).await
+    laden(pool, einsatz_id, erfasst.id).await
 }
 
 /// [`erfassen`] in einer laufenden Transaktion, etwa bei der Aufnahme an einer Betreuungsstelle
-/// (LFH-1041); liefert die Kennung des Ereignisses.
+/// (LFH-1041) oder samt Auto-Austritt (LLH-1138).
 pub async fn erfassen_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     person_id: i64,
     daten: VerbleibDaten<'_>,
-    kurzform: &str,
     erfasst_von: i64,
-) -> Result<i64, AppError> {
+) -> Result<ErfassterVerbleib, AppError> {
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO person_verbleib \
             (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
-             betreuungsstelle_id, bestaetigt_personal_id, bestaetigt_name) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             betreuungsstelle_id, bestaetigt_personal_id, bestaetigt_name, zeitpunkt_at, \
+             eingegangen_at, client_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+                 COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now')), \
+                 strftime('%Y-%m-%d %H:%M:%S','now'), ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
@@ -92,6 +119,26 @@ pub async fn erfassen_tx(
     .bind(daten.betreuungsstelle_id)
     .bind(daten.bestaetigung.map(|b| b.personal_id))
     .bind(daten.bestaetigung.map(|b| b.name.as_str()))
+    .bind(daten.zeitpunkt_at)
+    .bind(daten.client_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    // Der Cache folgt dem jüngsten Ereignis (D6), nicht der Einfügung; die Kurzform wird aus der
+    // gewinnenden Zeile berechnet.
+    let (juengste, art, ziel, status, stelle): (
+        i64,
+        VerbleibArt,
+        Option<String>,
+        Option<String>,
+        Option<i64>,
+    ) = sqlx::query_as(concat!(
+        "SELECT id, art, ziel, status, betreuungsstelle_id FROM person_verbleib \
+         WHERE einsatz_id = ? AND person_id = ? ",
+        verbleibfolge!(),
+        " LIMIT 1"
+    ))
+    .bind(einsatz_id)
+    .bind(person_id)
     .fetch_one(&mut *conn)
     .await?;
     sqlx::query(
@@ -100,16 +147,52 @@ pub async fn erfassen_tx(
             aktuelle_verbleib_betreuungsstelle_id = ?5 \
          WHERE id = ?6 AND einsatz_id = ?7",
     )
-    .bind(kurzform)
-    .bind(daten.art)
-    .bind(daten.ziel)
-    .bind(daten.status)
-    .bind(daten.betreuungsstelle_id)
+    .bind(art.kurzform(ziel.as_deref()))
+    .bind(art.as_str())
+    .bind(ziel.as_deref())
+    .bind(status.as_deref())
+    .bind(stelle)
     .bind(person_id)
     .bind(einsatz_id)
     .execute(&mut *conn)
     .await?;
-    Ok(id)
+    Ok(ErfassterVerbleib {
+        id,
+        gewinnt: juengste == id,
+    })
+}
+
+/// Das schon gespeicherte Verbleib-Ereignis zu einer `client_id` im Einsatz (Replay).
+pub async fn nach_client_id(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    client_id: &str,
+) -> Result<Option<VerbleibAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND client_id = ?"
+        )))
+        .bind(einsatz_id)
+        .bind(client_id)
+        .fetch_optional(executor)
+        .await?,
+    )
+}
+
+/// Wie [`laden`], auf einer offenen Verbindung (In-Tx-Reload).
+pub async fn laden_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<VerbleibAnzeige, AppError> {
+    sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_VERBLEIB} WHERE id = ? AND einsatz_id = ?"
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Lädt ein Verbleib-Ereignis; `NotFound`, falls nicht zum Einsatz.
@@ -136,8 +219,8 @@ pub async fn liste_je_person(
 ) -> Result<Vec<VerbleibAnzeige>, AppError> {
     Ok(
         sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
-            "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND person_id = ? \
-         ORDER BY zeitpunkt_at DESC, id DESC"
+            "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND person_id = ? {}",
+            verbleibfolge!()
         )))
         .bind(einsatz_id)
         .bind(person_id)
@@ -181,12 +264,8 @@ mod tests {
     fn daten<'a>(art: &'a str, ziel: Option<&'a str>) -> VerbleibDaten<'a> {
         VerbleibDaten {
             art,
-            transportmittel: None,
             ziel,
-            status: None,
-            notiz: None,
-            betreuungsstelle_id: None,
-            bestaetigung: None,
+            ..VerbleibDaten::default()
         }
     }
 
@@ -228,7 +307,6 @@ mod tests {
                 bestaetigung: None,
                 ..daten("notunterkunft", Some("NU Turnhalle Nord"))
             },
-            "Notunterkunft → NU Turnhalle Nord",
             b,
         )
         .await
@@ -236,7 +314,7 @@ mod tests {
         assert_eq!(erstes.betreuungsstelle_id, Some(stelle));
         assert_eq!(cache(pool.clone()).await, Some(stelle));
 
-        erfassen(&pool, e, p, daten("entlassung", None), "entlassen", b)
+        erfassen(&pool, e, p, daten("entlassung", None), b)
             .await
             .unwrap();
         assert_eq!(
@@ -258,7 +336,7 @@ mod tests {
     async fn anzeige_ohne_verweis_laesst_feld_weg() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        let v = erfassen(&pool, e, p, daten("vor_ort", None), "vor Ort", b)
+        let v = erfassen(&pool, e, p, daten("vor_ort", None), b)
             .await
             .unwrap();
         let json = serde_json::to_value(&v).unwrap();
@@ -272,19 +350,12 @@ mod tests {
     async fn erfassen_ist_append_only_und_cache_spiegelt_juengsten() {
         let pool = test_pool().await;
         let (b, e, p) = setup(&pool).await;
-        erfassen(&pool, e, p, daten("vor_ort", None), "vor Ort", b)
+        erfassen(&pool, e, p, daten("vor_ort", None), b)
             .await
             .unwrap();
-        erfassen(
-            &pool,
-            e,
-            p,
-            daten("transport", Some("KH Mitte")),
-            "Transport → KH Mitte",
-            b,
-        )
-        .await
-        .unwrap();
+        erfassen(&pool, e, p, daten("transport", Some("KH Mitte")), b)
+            .await
+            .unwrap();
         let verlauf = liste_je_person(&pool, e, p).await.unwrap();
         assert_eq!(verlauf.len(), 2, "append-only");
         assert_eq!(verlauf[0].art, VerbleibArt::Transport, "neueste zuerst");
@@ -321,7 +392,6 @@ mod tests {
                 status: Some("angemeldet"),
                 ..daten("transport", Some("KH Mitte"))
             },
-            "Transport → KH Mitte",
             b,
         )
         .await
@@ -334,16 +404,9 @@ mod tests {
                 Some("angemeldet".into())
             )
         );
-        erfassen(
-            &pool,
-            e,
-            p,
-            daten("notunterkunft", None),
-            "Notunterkunft",
-            b,
-        )
-        .await
-        .unwrap();
+        erfassen(&pool, e, p, daten("notunterkunft", None), b)
+            .await
+            .unwrap();
         assert_eq!(
             cache(pool.clone()).await,
             (Some("notunterkunft".into()), None, None),

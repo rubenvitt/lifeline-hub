@@ -20,6 +20,14 @@ export type GeraetFaehigkeit =
   | 'person-status'
   /** Sichten und Re-Sichten; an der Betreuungsstelle nicht (LFH-1041). */
   | 'person-sichtung'
+  /**
+   * Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben (Change
+   * `y18v58dt-pat-kern`): wie die Sichtung nur die UHS-Geräte (Routenlisten `UHS_TABLET`,
+   * `UHS_LAPTOP`; Betreuungsstelle und Lagemonitor 403, `tests/geraet_kopplung.rs`).
+   */
+  | 'person-behandlung'
+  /** Druckansicht einer Person (LLH-1120): nur am Arbeitsplatz, die Route steht in keiner Liste. */
+  | 'person-druck'
   /** Tiere und Schäden einer Person. */
   | 'person-zuordnungen'
   /** Fotos und Dateien einer Person. */
@@ -52,6 +60,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'uhs-anhaenge':
       return geraet.ansicht === 'uhs-laptop';
     case 'person-sichtung':
+    case 'person-behandlung':
       return geraet.ansicht === 'uhs-tablet' || geraet.ansicht === 'uhs-laptop';
     case 'br-eintreffen':
       return geraet.ansicht === 'bereitstellungsraum';
@@ -62,6 +71,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'person-status':
     case 'person-zuordnungen':
     case 'person-anhaenge':
+    case 'person-druck':
     case 'fremde-module':
       return false;
   }

@@ -172,10 +172,11 @@ hat, wann sie eingelöst wurde und wann das Gerät zuletzt zugegriffen hat.
 
 ### Requirement: Namentliche Bestätigung am Gerät
 
-Ein Gerät mit UHS-Ansicht SHALL bei Sichtung, Erst-Sichtung und Verbleib optional eine Person aus
-dem Personal des Einsatzes als Bestätigende angeben können. Der Server MUST prüfen, dass die
-Angabe zum Einsatz gehört, und MUST Kennung und Namen am Schritt speichern. Die Angabe MUST NOT
-eine Sitzung anlegen, die Gerätesitzung ändern oder die Rechte des Geräts erweitern.
+Ein Gerät mit UHS-Ansicht SHALL bei Sichtung, Erst-Sichtung, Verbleib, Verletzung, Maßnahme und
+Transport optional eine Person aus dem Personal des Einsatzes als Bestätigende angeben können. Der
+Server MUST prüfen, dass die Angabe zum Einsatz gehört, und MUST Kennung und Namen am Schritt
+speichern. Die Angabe MUST NOT eine Sitzung anlegen, die Gerätesitzung ändern oder die Rechte des
+Geräts erweitern. Ein ohne Netz vorgemerkter Eintrag MUST die Angabe mitnehmen.
 
 #### Scenario: Bestätigte Sichtung im ETB
 
@@ -206,6 +207,11 @@ eine Sitzung anlegen, die Gerätesitzung ändern oder die Rechte des Geräts erw
 
 - **WHEN** eine angemeldete Person eine Sichtung mit Bestätigungsangabe schickt
 - **THEN** antwortet der Server mit 422
+
+#### Scenario: Bestätigte Maßnahme ohne Netz
+
+- **WHEN** das Tablet ohne Netz eine Maßnahme mit „bestätigt von Dr. A. Muster“ vormerkt
+- **THEN** nennt der Verlauf nach der Übertragung Dr. A. Muster als bestätigende Person
 
 ### Requirement: Auswahlliste der Bestätigenden
 

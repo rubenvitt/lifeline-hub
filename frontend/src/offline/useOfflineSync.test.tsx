@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +6,15 @@ import { meldeBelegung, meldeStand } from '../api/betreuung';
 import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
-import { legePersonAn } from '../api/einsatzPerson';
+import {
+  createMassnahme,
+  createVerletzung,
+  erfasseSichtung,
+  erfasseVerbleib,
+  legeNotizAn,
+  legePersonAn,
+  saveTransport,
+} from '../api/einsatzPerson';
 import { legeMeldungAn } from '../api/meldungen';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person, Verpflegung, VerpflegungZeitfenster } from '../api/types';
@@ -33,7 +41,15 @@ import { useVorgemerkteAusgaben } from './useVorgemerkteAusgaben';
 import { KEINE_SONDERKOST, ausgabe as serverAusgabe, zeitfenster } from '../test/verpflegungDaten';
 
 vi.mock('../api/etb', () => ({ erfasseEtb: vi.fn() }));
-vi.mock('../api/einsatzPerson', () => ({ legePersonAn: vi.fn() }));
+vi.mock('../api/einsatzPerson', () => ({
+  legePersonAn: vi.fn(),
+  erfasseSichtung: vi.fn(),
+  erfasseVerbleib: vi.fn(),
+  legeNotizAn: vi.fn(),
+  saveTransport: vi.fn(),
+  createMassnahme: vi.fn(),
+  createVerletzung: vi.fn(),
+}));
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
 vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
@@ -745,6 +761,173 @@ describe('Eintreffen am Bereitstellungsraum in der Offline-Queue (LLH-1075 Teil 
     );
     expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
       expect.objectContaining({ aktion: eintreffen, grund }),
+    ]);
+  });
+});
+
+describe('Einträge einer Person in der Offline-Queue (LLH-1138, design.md D8)', () => {
+  const faelle = [
+    {
+      art: 'sichtung' as const,
+      api: erfasseSichtung,
+      daten: { kategorie: 'sk1' as const, notiz: null, bestaetigt_personal_id: 5 },
+    },
+    { art: 'verbleib' as const, api: erfasseVerbleib, daten: { art: 'transport' as const } },
+    { art: 'notiz' as const, api: legeNotizAn, daten: { text: 'Infusion läuft' } },
+    {
+      art: 'transport' as const,
+      api: saveTransport,
+      daten: { prioritaet: 'dringlich' as const, art: null, fachrichtung: null },
+    },
+    { art: 'massnahme' as const, api: createMassnahme, daten: { art: 'zugang' as const } },
+    {
+      art: 'verletzung' as const,
+      api: createVerletzung,
+      daten: { ansicht: 'vorn' as const, region: 'kopf' as const, art: 'wunde_blutung' as const },
+    },
+  ];
+  const aktion = <F extends (typeof faelle)[number]>(f: F) =>
+    ({
+      art: f.art,
+      person_id: 10,
+      bezeichnung: 'R-012',
+      daten: { ...f.daten, client_id: `${f.art}-1`, zeitpunkt_at: '2026-10-18 14:10:00' },
+    }) as Parameters<typeof schreibaktionEinreihen>[2];
+
+  it.each(faelle)(
+    '$art: sendet genau einmal mit Erfassungszeit und Queue-Besitzer, lädt das Detail vor dem Entfernen',
+    async (f) => {
+      const { client, Wrapper } = wrapperFuer();
+      const keys = [
+        einsatzKeys.person(7, 10),
+        einsatzKeys.personen(7),
+        einsatzKeys.personenAuswahl(7),
+        einsatzKeys.etb(7),
+      ];
+      for (const key of keys) client.setQueryData(key, []);
+      vi.mocked(f.api).mockResolvedValue({ id: 99 } as never);
+      const eintrag = aktion(f);
+      await schreibaktionEinreihen(BENUTZER_A, 7, eintrag);
+      const beimEntfernen: (boolean | undefined)[] = [];
+      const merke = () =>
+        beimEntfernen.push(client.getQueryState(einsatzKeys.person(7, 10))?.isInvalidated);
+      window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+      try {
+        renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+        await waitFor(async () =>
+          expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({
+            ausstehend: 0,
+            abgelehnt: 0,
+          }),
+        );
+      } finally {
+        window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+      }
+      expect(f.api).toHaveBeenCalledExactlyOnceWith(7, 10, (eintrag as { daten: unknown }).daten, {
+        offlineQueueBenutzerId: BENUTZER_A,
+      });
+      expect(beimEntfernen[0]).toBe(true);
+      for (const key of keys)
+        expect(client.getQueryState(key)?.isInvalidated, String(key)).toBe(true);
+    },
+  );
+
+  it('ein Verbleib lädt auch die UHS der Person nach (Austritt aus der UHS)', async () => {
+    const { client, Wrapper } = wrapperFuer();
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 10, aktuelle_uhs_id: 3 } as Person]);
+    client.setQueryData(einsatzKeys.uhs(7), []);
+    client.setQueryData(einsatzKeys.uhsDetail(7, 3), {});
+    vi.mocked(erfasseVerbleib).mockResolvedValue({ id: 99 } as never);
+    await schreibaktionEinreihen(BENUTZER_A, 7, aktion(faelle[1]));
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0 }),
+    );
+    expect(client.getQueryState(einsatzKeys.uhs(7))?.isInvalidated).toBe(true);
+    expect(client.getQueryState(einsatzKeys.uhsDetail(7, 3))?.isInvalidated).toBe(true);
+  });
+
+  it('ein Verbleib hat Liste und UHS neu geladen, bevor „Offline vorgemerkt“ verschwindet', async () => {
+    // `frontend/src/offline/AGENTS.md`, „Was vorgemerkt ist …“: die Zeile verschwindet erst, wenn
+    // die Fachansicht den neuen Stand hat; sonst stünde die Person einen Takt lang ohne Hinweis
+    // mit dem alten Stand in Liste und Grundriss.
+    const { client, Wrapper } = wrapperFuer();
+    let stand = 'alt';
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 10, aktuelle_uhs_id: 3 } as Person]);
+    client.setQueryData(einsatzKeys.uhsDetail(7, 3), { stand });
+    vi.mocked(erfasseVerbleib).mockImplementation(async () => {
+      stand = 'neu';
+      return { id: 99 } as never;
+    });
+    await schreibaktionEinreihen(BENUTZER_A, 7, aktion(faelle[1]));
+    const beimEntfernen: unknown[] = [];
+    const merke = () =>
+      beimEntfernen.push({
+        personen: client.getQueryData<(Person & { stand?: string })[]>(einsatzKeys.personen(7))?.[0]
+          ?.stand,
+        uhs: client.getQueryData<{ stand: string }>(einsatzKeys.uhsDetail(7, 3))?.stand,
+      });
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      renderHook(
+        () => {
+          useOfflineSync(BENUTZER_A);
+          useQuery({
+            queryKey: einsatzKeys.personen(7),
+            queryFn: async () => [{ id: 10, aktuelle_uhs_id: null, stand } as unknown as Person],
+            staleTime: Infinity,
+          });
+          useQuery({
+            queryKey: einsatzKeys.uhsDetail(7, 3),
+            queryFn: async () => ({ stand }),
+            staleTime: Infinity,
+          });
+        },
+        { wrapper: Wrapper },
+      );
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0 }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(beimEntfernen[0]).toEqual({ personen: 'neu', uhs: 'neu' });
+  });
+
+  it('abgerissene Antwort: der nächste Versuch sendet dieselbe client_id, die Notiz steht einmal', async () => {
+    vi.mocked(legeNotizAn)
+      .mockRejectedValueOnce(new AusgangUnbekannt())
+      .mockResolvedValueOnce({ id: 99 } as never);
+    await schreibaktionEinreihen(BENUTZER_A, 7, aktion(faelle[2]));
+    const { unmount } = renderHook(() => useOfflineSync(BENUTZER_A), {
+      wrapper: wrapperFuer().Wrapper,
+    });
+    await waitFor(() => expect(legeNotizAn).toHaveBeenCalledTimes(1));
+    expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 1, abgelehnt: 0 });
+    window.dispatchEvent(new Event('online'));
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 0 }),
+    );
+    const [erster, zweiter] = vi.mocked(legeNotizAn).mock.calls.map((c) => c[2]);
+    expect(zweiter).toEqual(erster);
+    expect(zweiter.client_id).toBe('notiz-1');
+    unmount();
+  });
+
+  it.each([
+    [422, 'Person ist nicht anwesend (Status vermisst)'],
+    [409, 'Stornierte Person kann nicht gesichtet werden'],
+    [403, 'Keine Berechtigung'],
+  ])('legt eine Ablehnung %i mit Grund unter „abgelehnt“ ab', async (status, grund) => {
+    vi.mocked(erfasseSichtung).mockRejectedValue(new ApiError(status, grund));
+    const eintrag = aktion(faelle[0]);
+    await schreibaktionEinreihen(BENUTZER_A, 7, eintrag);
+    renderHook(() => useOfflineSync(BENUTZER_A), { wrapper: wrapperFuer().Wrapper });
+    await waitFor(async () =>
+      expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0, abgelehnt: 1 }),
+    );
+    expect(await schreibaktionenAbgelehntLaden(BENUTZER_A, 7)).toEqual([
+      expect.objectContaining({ aktion: eintrag, grund }),
     ]);
   });
 });

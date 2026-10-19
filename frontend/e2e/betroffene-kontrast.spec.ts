@@ -1,5 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { kontrast, pruefe, randKontrast } from './kontrast-kern';
+import {
+  flaeche,
+  kontrast,
+  pruefe,
+  randKontrast,
+  svgTextKontrast,
+  verhaeltnis,
+} from './kontrast-kern';
 import { kartenpunktAufSeite, messeKante } from './karten-pixel-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 
@@ -429,6 +436,104 @@ for (const modus of ['light', 'dark'] as const) {
       werte,
     );
 
+    test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+  });
+}
+
+/** `rgb(…)` aus `getComputedStyle` als opake Farbe. */
+function alsFarbe(wert: string): [number, number, number, number] {
+  const teile = /^rgba?\(([^)]+)\)$/
+    .exec(wert)?.[1]
+    .split(/[\s,/]+/)
+    .map(Number);
+  if (!teile || teile.length < 3) throw new Error(`Nicht unterstützte Farbe: ${wert}`);
+  return [teile[0], teile[1], teile[2], 1];
+}
+
+for (const modus of ['light', 'dark'] as const) {
+  const minimum = modus === 'light' ? 7 : 5;
+  /**
+   * Körperschema (LLH-1120, design.md D13): Kontur der Silhouette gegen Grund und Fläche ≥ 3 : 1,
+   * Nummer der Sternchen als Text auf der Silhouette und daneben ≥ Textboden, Sternchen in der
+   * Textfarbe. Gemessen am vollen Schema im Paneel und an der kleinen Figur im Kopf; gerechnet
+   * steht dasselbe in `theme/koerperschemaKontrast.test.ts`.
+   */
+  test(`${modus}: Körperschema — Silhouette und Sternchen im Kopf und im Paneel`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const basis = await vorbereiten(page, modus);
+    const einsatzId = basis.split('/').pop()!;
+    const person = (await post(page, `/einsaetze/${einsatzId}/personen`, {
+      name: 'Kontrast',
+      status: 'betroffen',
+      sichtung: 'sk2',
+    })) as { id: number };
+    // Eine Verletzung auf der Silhouette, eine am Mittelpunkt der Hand.
+    await post(page, `/einsaetze/${einsatzId}/personen/${person.id}/verletzungen`, {
+      ansicht: 'vorn',
+      region: 'thorax',
+      art: 'prellung_schwellung',
+      x: 0.5,
+      y: 0.3,
+    });
+    await post(page, `/einsaetze/${einsatzId}/personen/${person.id}/verletzungen`, {
+      ansicht: 'vorn',
+      region: 'hand_l',
+      art: 'verbrennung',
+    });
+    await page.goto(`${basis}/personen/${person.id}`);
+    const kopf = page.getByRole('region', { name: 'Patientenkopf' });
+    await expect(kopf.locator('[data-lfh="koerperschema-mini"]')).toBeVisible();
+    await kopf.getByRole('button', { name: 'Verletzung markieren' }).click();
+    const paneel = page.getByRole('region', { name: 'Verletzung markieren' });
+    await expect(paneel.locator('[data-lfh="koerperfigur"]')).toHaveCount(2);
+
+    const werte: string[] = [];
+    for (const [ort, bereich] of [
+      ['Paneel', paneel.locator('[data-lfh="koerperschema"]')],
+      ['Kopf', kopf.locator('[data-lfh="koerperschema-mini"]')],
+    ] as const) {
+      const figur = bereich.locator('[data-lfh="koerperfigur"][data-ansicht="vorn"]');
+      const grund = await flaeche(figur.locator('xpath=..'));
+      const umriss = await figur
+        .locator('path')
+        .first()
+        .evaluate((e) => ({
+          fill: getComputedStyle(e).fill,
+          stroke: getComputedStyle(e).stroke,
+        }));
+      const silhouette = alsFarbe(umriss.fill);
+      const kontur = alsFarbe(umriss.stroke);
+      const gegenGrund = verhaeltnis(kontur, grund);
+      const gegenFlaeche = verhaeltnis(kontur, silhouette);
+      werte.push(`${ort} Kontur ${gegenGrund.toFixed(2)}/${gegenFlaeche.toFixed(2)}`);
+      expect(gegenGrund, `${modus}/${ort}/Kontur gegen Grund`).toBeGreaterThanOrEqual(3);
+      expect(gegenFlaeche, `${modus}/${ort}/Kontur gegen Silhouette`).toBeGreaterThanOrEqual(3);
+
+      const sterne = figur.locator('[data-lfh="stern"]');
+      await expect(sterne).toHaveCount(2);
+      for (const stern of await sterne.all()) {
+        const nummer = stern.locator('text');
+        const text = alsFarbe(await nummer.evaluate((e) => getComputedStyle(e).fill));
+        const strich = alsFarbe(
+          await stern.locator('path').evaluate((e) => getComputedStyle(e).stroke),
+        );
+        const daneben = await svgTextKontrast(nummer);
+        const aufSilhouette = verhaeltnis(text, silhouette);
+        werte.push(`${ort} Nummer ${daneben.verhaeltnis.toFixed(2)}/${aufSilhouette.toFixed(2)}`);
+        expect(
+          daneben.verhaeltnis,
+          `${modus}/${ort}/Nummer neben der Figur`,
+        ).toBeGreaterThanOrEqual(minimum);
+        expect(aufSilhouette, `${modus}/${ort}/Nummer auf der Figur`).toBeGreaterThanOrEqual(
+          minimum,
+        );
+        expect(verhaeltnis(strich, silhouette), `${modus}/${ort}/Sternchen`).toBeGreaterThanOrEqual(
+          minimum,
+        );
+      }
+    }
     test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
   });
 }

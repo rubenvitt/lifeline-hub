@@ -151,6 +151,11 @@ interface Kandidat {
   id: number;
   /** Nummernfeld, `null` wenn die Entität keines hat oder es nicht gesetzt ist. */
   nummer: number | null;
+  /**
+   * Eine zweite Kennung, die NUR eine reine Zifferneingabe exakt trifft (PAT-Nummer, LLH-1326,
+   * D12), als Zahl normalisiert wie `nummer`; `null` ohne eine solche oder bei Buchstaben darin.
+   */
+  zweitnummer: number | null;
   basisLabel: string;
   ziel: string;
   /** Lese-Vorschau (Taste →); fehlt bei einer Quelle ohne Vorschau. */
@@ -181,6 +186,7 @@ function baueQuelle<T>(
   f: {
     id: (x: T) => number;
     nummer?: (x: T) => number | null | undefined;
+    zweitnummer?: (x: T) => number | null | undefined;
     label: (x: T) => string;
     ziel: (einsatzId: number, x: T) => string;
     /**
@@ -209,6 +215,7 @@ function baueQuelle<T>(
       modulKey,
       id: f.id(x),
       nummer: f.nummer?.(x) ?? null,
+      zweitnummer: f.zweitnummer?.(x) ?? null,
       basisLabel: f.label(x),
       ziel: f.ziel(einsatzId, x),
       vorschau: f.vorschau?.(einsatzId, x),
@@ -241,7 +248,8 @@ function quellen(k: DatensatzKontext): Quelle[] {
       {
         id: (p) => p.id,
         nummer: (p) => p.registrier_nr,
-        label: personLabel,
+        zweitnummer: (p) => patAlsZahl(p.pat_nummer),
+        label: personPaletteLabel,
         ziel: (id, p) => personDetailPfad(id, p.id),
         vorschau: (einsatzId, p) => ({ art: 'person', einsatzId, id: p.id }),
       },
@@ -359,6 +367,26 @@ function quellen(k: DatensatzKontext): Quelle[] {
 }
 
 /**
+ * Personenzeile der Palette: `personLabel` und, falls erfasst, die PAT-Nummer mit Vorsatz „PAT“
+ * (LLH-1326, D12), damit ein Treffer über sie von einem über die Registriernummer zu
+ * unterscheiden ist. Der Vorsatz steht nur hier, nicht im geteilten `personLabel` des Chats.
+ */
+function personPaletteLabel(p: PersonAuswahl): string {
+  const pat = p.pat_nummer?.trim();
+  return pat ? `${personLabel(p)} · PAT ${pat}` : personLabel(p);
+}
+
+/**
+ * Die PAT-Nummer als Zahl, wenn sie nur aus Ziffern besteht (führende Nullen fallen weg wie bei
+ * `zahlAusSuche`); sonst `null`. „A-4711“ trifft die Ziffern 4711 darum nicht exakt, nur über das
+ * Label im Textzweig.
+ */
+function patAlsZahl(pat: string | null | undefined): number | null {
+  const roh = pat?.trim() ?? '';
+  return /^\d+$/.test(roh) ? Number(roh) : null;
+}
+
+/**
  * Vorschauziel eines ETB-Eintrags, mit `lfdNr`, weil kein Fach einen Eintrag über seine `id`
  * adressiert (Nummerncursor, danach `id`-Prüfung). Beide ETB-Quellen teilen es.
  */
@@ -423,8 +451,15 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
    * Modulfilter, dahinter wirkungslos.
    */
   const heim = (kand: Kandidat): 0 | 1 => (kand.modulKey === k.aktuellerModulKey ? 0 : 1);
-  /** Nummerntreffer mit ihren Ordnungsachsen — gedeckelt werden sie nie, geordnet schon. */
-  const nummerRoh: { treffer: Treffer; heim: 0 | 1; quelle: number; index: number }[] = [];
+  /** Nummerntreffer mit ihren Ordnungsachsen — gedeckelt werden sie nie, geordnet schon. `art`
+   *  stellt in einer Quelle die eigentliche Nummer vor die Zweitnummer (R-4711 vor PAT 4711). */
+  const nummerRoh: {
+    treffer: Treffer;
+    heim: 0 | 1;
+    quelle: number;
+    art: 0 | 1;
+    index: number;
+  }[] = [];
   /** Alle Texttreffer UNGEDECKELT — gedeckelt wird erst nach dem Ordnen, siehe unten. */
   const roh: {
     treffer: Treffer;
@@ -440,18 +475,29 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
   };
 
   if (zahl) {
+    // Die Zweitnummer (PAT-Nummer) trifft nur eine REINE Zifferneingabe: ein Sortenbuchstabe
+    // bindet an die eigentliche Nummer, '#' an die laufende.
+    const nurZiffern = /^\d+$/.test(suche);
     for (const [qi, qu] of offen.entries()) {
       if (qu.zweig === 'text') continue;
       // Ein Sortenbuchstabe bindet: 'R-42' findet die Person 42, nicht den Schaden 42.
       if (zahl.sorte !== null && zahl.sorte !== qu.sorte) continue;
       for (const kand of qu.kandidaten) {
-        if (kand.nummer !== zahl.nummer || gesehen.has(schluessel(kand))) continue;
+        if (gesehen.has(schluessel(kand))) continue;
+        const art =
+          kand.nummer === zahl.nummer
+            ? 0
+            : nurZiffern && kand.zweitnummer === zahl.nummer
+              ? 1
+              : null;
+        if (art === null) continue;
         // Stufe 0: die Suche IST die Kennung. Aus dem Label ('Personen · R-042 · Müller') ließe sie sich
         // nicht ablesen, ein Fuzzy-Treffer stünde sonst vor dem exakten Nummerntreffer.
         nummerRoh.push({
           treffer: alsTreffer(kand, 0),
           heim: heim(kand),
           quelle: qi,
+          art,
           index: nummerRoh.length,
         });
       }
@@ -489,7 +535,9 @@ export function baueDatensatzTreffer(k: DatensatzKontext): Treffer[] {
 
   // Nummerntreffer werden NIE weggedeckelt (exakte Gleichheit, höchstens einer je Quelle). Geordnet
   // werden sie trotzdem, die Herkunft trennt '42' in Person, Meldung und Auftrag.
-  nummerRoh.sort((a, b) => a.heim - b.heim || a.quelle - b.quelle || a.index - b.index);
+  nummerRoh.sort(
+    (a, b) => a.heim - b.heim || a.quelle - b.quelle || a.art - b.art || a.index - b.index,
+  );
   const nummerTreffer = nummerRoh.map((x) => x.treffer);
   const platz = Math.max(0, DECKEL_GESAMT - nummerTreffer.length);
   const jeQuelle = new Map<number, number>();

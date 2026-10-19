@@ -2144,6 +2144,30 @@ async fn aufnahme_scheitert_ganz_wenn_der_eintritt_scheitert() {
     assert_eq!(nachher, vorher, "keine Person ohne Eintritt");
 }
 
+/// Die Druckansicht einer Person gibt es am Gerät nicht (LLH-1120, Spec `druck-dokumente`): die
+/// Route steht in keiner Routenliste, das Tablet erhält 403 und schreibt keinen Druck-Eintrag.
+#[tokio::test]
+async fn tablet_oeffnet_keine_druckansicht_der_person() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let eigen = person_in(&app, &admin, einsatz, Some(nord)).await;
+    let pid = eigen["id"].as_i64().unwrap();
+    let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+    let (s, v) = anfrage_json(&app, "GET", &basis, &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "Vorbedingung: das Detail liest es: {v}");
+    let (s, v) = anfrage_json(&app, "GET", &format!("{basis}/druck"), &geraet, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    let druck: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM person_zugriff_audit WHERE einsatz_id = ? AND art = 'druck'",
+    )
+    .bind(einsatz)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(druck, 0);
+}
+
 #[tokio::test]
 async fn person_der_anderen_uhs_ist_fuer_das_tablet_404() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -3103,6 +3127,281 @@ async fn entlassene_kraft_fehlt_in_der_auswahl_der_bestaetigenden() {
         .map(|b| b["name"].as_str().unwrap())
         .collect();
     assert_eq!(namen, ["Zander"]);
+}
+
+/// Wire-Zeitstempel `versatz_sek` von jetzt (UTC, `YYYY-MM-DD HH:MM:SS`).
+fn zeit(versatz_sek: i64) -> String {
+    (chrono::Utc::now() + chrono::Duration::seconds(versatz_sek))
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string()
+}
+
+/// Verlegt die Alarmierung, die das Disponieren in die Kräfte-Zeitachse schreibt (Status
+/// „alarmiert“ des Standardkatalogs), auf `at`.
+async fn alarmiert_um(pool: &sqlx::SqlitePool, personal: i64, at: &str) {
+    let r = sqlx::query(
+        "UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? \
+         WHERE personal_id = ? AND art = 'alarmierung'",
+    )
+    .bind(at)
+    .bind(personal)
+    .execute(pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        r.rows_affected(),
+        1,
+        "das Disponieren schreibt eine Alarmierung"
+    );
+}
+
+/// Ein Ereignis der Kräfte-Zeitachse einer Person, von Hand nachgetragen.
+async fn zeitachse(pool: &sqlx::SqlitePool, einsatz: i64, personal: i64, art: &str, at: &str) {
+    sqlx::query(
+        "INSERT INTO einsatz_kraft_zeitachse \
+            (einsatz_id, personal_id, art, zeitpunkt_at, quelle, erfasst_von) \
+         VALUES (?, ?, ?, ?, 'nachtrag', (SELECT id FROM benutzer WHERE benutzername = 'admin'))",
+    )
+    .bind(einsatz)
+    .bind(personal)
+    .bind(art)
+    .bind(at)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+/// Person, die vor 30 Minuten angelegt wurde: eine vorgemerkte Sichtung von vor 10 Minuten wird
+/// nicht auf das Anlegen gekappt.
+async fn person_seit_30_min(
+    app: &axum::Router,
+    pool: &sqlx::SqlitePool,
+    geraet: &str,
+    einsatz: i64,
+) -> i64 {
+    let pid = person_in(app, geraet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    sqlx::query("UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?")
+        .bind(zeit(-1800))
+        .bind(pid)
+        .execute(pool)
+        .await
+        .unwrap();
+    pid
+}
+
+/// LLH-1138, design.md D7: „Bestätigt von“ gilt zur Erfassungszeit. Eine Kraft, die laut
+/// Kräfte-Zeitachse damals eingesetzt war und vor der Übertragung entlassen wurde, bestätigt die
+/// vorgemerkte Sichtung weiter.
+#[tokio::test]
+async fn vorgemerkte_bestaetigung_gilt_zur_erfassungszeit() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    alarmiert_um(&pool, aerztin, &zeit(-1500)).await;
+    let pid = person_seit_30_min(&app, &pool, &geraet, einsatz).await;
+    let vorgemerkt = zeit(-600);
+    // Schichtwechsel vor der Übertragung.
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{aerztin}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({
+            "kategorie": "sk2", "bestaetigt_personal_id": aerztin,
+            "zeitpunkt_at": vorgemerkt, "client_id": "offline-best-1"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["bestaetigt_name"], "Dr. A. Muster");
+
+    // Derselbe Verbleib, nach der Entlassung erfasst, bestätigt sie nicht mehr.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/verbleib"),
+        &geraet,
+        Some(&json!({"art": "vor_ort", "bestaetigt_personal_id": aerztin})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "nach der Entlassung erfasst: {v}");
+}
+
+/// LLH-1138 (tasks.md 1.7): die Warteschlange des UHS-Tablets überträgt Sichtung, Verbleib und
+/// Notiz nach einem Netzabbruch ein zweites Mal mit derselben `client_id`. Jeder Eintrag steht
+/// genau einmal im Verlauf, Sichtung und Verbleib je einmal im ETB, mit dem Gerät als Erfasser.
+#[tokio::test]
+async fn replay_am_geraet_legt_jeden_eintrag_einmal_an() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let pid = person_in(&app, &geraet, einsatz, Some(nord)).await["id"]
+        .as_i64()
+        .unwrap();
+    // Anlegen und Eintritt vor 30 Minuten: der vorgemerkte Transport liegt danach.
+    for sql in [
+        "UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?",
+        "UPDATE person_uhs_belegung SET zeitpunkt_at = ? WHERE person_id = ?",
+    ] {
+        sqlx::query(sql)
+            .bind(zeit(-1800))
+            .bind(pid)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
+    let schritte = [
+        (
+            "sichtung",
+            json!({"kategorie": "sk2", "bestaetigt_personal_id": aerztin,
+                   "zeitpunkt_at": zeit(-900), "client_id": "tab-s"}),
+        ),
+        (
+            "notizen",
+            json!({"text": "stabil", "zeitpunkt_at": zeit(-800), "client_id": "tab-n"}),
+        ),
+        (
+            "verbleib",
+            json!({"art": "transport", "bestaetigt_personal_id": aerztin,
+                   "zeitpunkt_at": zeit(-700), "client_id": "tab-v"}),
+        ),
+    ];
+    for (pfad, body) in &schritte {
+        let mut ids = Vec::new();
+        for _ in 0..2 {
+            let (s, v) = anfrage_json(
+                &app,
+                "POST",
+                &format!("{basis}/{pfad}"),
+                &geraet,
+                Some(body),
+            )
+            .await;
+            assert_eq!(s, StatusCode::CREATED, "{pfad}: {v}");
+            ids.push(v["id"].clone());
+        }
+        assert_eq!(
+            ids[0], ids[1],
+            "{pfad}: der Replay liefert den gespeicherten Eintrag"
+        );
+    }
+    let (_, d) = anfrage(&app, "GET", &basis, &admin, None).await;
+    for feld in ["sichtungen", "notizen", "verbleib"] {
+        assert_eq!(d[feld].as_array().unwrap().len(), 1, "{feld}: {d}");
+    }
+    assert_eq!(d["sichtungen"][0]["bestaetigt_name"], "Dr. A. Muster");
+    assert!(
+        d["aufenthalt"].is_null(),
+        "der Transport nimmt die Person aus der UHS: {d}"
+    );
+    let etb = system_etb(&app, &admin, einsatz).await;
+    for wort in ["Sichtung SK II", "abtransportiert", "verlässt"] {
+        let treffer: Vec<_> = etb.iter().filter(|(t, _)| t.contains(wort)).collect();
+        assert_eq!(treffer.len(), 1, "{wort}: {etb:?}");
+        assert_eq!(treffer[0].1, "UHS Nord · Tablet 1");
+    }
+}
+
+/// Laut Zeitachse war die Kraft zur Erfassungszeit schon entlassen: 409 wie bisher.
+#[tokio::test]
+async fn bestaetigung_nach_dem_einsatzende_der_kraft_ist_409() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    alarmiert_um(&pool, aerztin, &zeit(-1500)).await;
+    zeitachse(&pool, einsatz, aerztin, "entlassung", &zeit(-1200)).await;
+    sqlx::query(
+        "UPDATE einsatz_personal SET beendet_at = ?, beendet_als = 'entlassen' WHERE id = ?",
+    )
+    .bind(zeit(-1200))
+    .bind(aerztin)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let pid = person_seit_30_min(&app, &pool, &geraet, einsatz).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung"),
+        &geraet,
+        Some(&json!({
+            "kategorie": "sk2", "bestaetigt_personal_id": aerztin, "zeitpunkt_at": zeit(-600)
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}
+
+/// Rückfall „aktiv jetzt“ (design.md, Risiken): ohne Kräfte-Zeitachse lässt sich die Einsatzzeit
+/// nicht bestimmen. Eine aktive Kraft bestätigt, eine entlassene nicht, auch wenn die Sichtung vor
+/// der Entlassung erfasst wurde.
+#[tokio::test]
+async fn ohne_zeitachse_gilt_aktiv_jetzt() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let aktiv = kraft(&app, &admin, einsatz, "Zander").await;
+    let weg = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    // Ohne Zeitachse: ein Katalog ohne Zeitachsen-Marken schreibt beim Disponieren nichts.
+    sqlx::query("DELETE FROM einsatz_kraft_zeitachse WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pid = person_seit_30_min(&app, &pool, &geraet, einsatz).await;
+    let vorgemerkt = zeit(-600);
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personal/{weg}/entlassen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let pfad = format!("/api/einsaetze/{einsatz}/personen/{pid}/sichtung");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &geraet,
+        Some(
+            &json!({"kategorie": "sk2", "bestaetigt_personal_id": weg, "zeitpunkt_at": vorgemerkt}),
+        ),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::CONFLICT,
+        "entlassen, Einsatzzeit unbekannt: {v}"
+    );
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &geraet,
+        Some(&json!({"kategorie": "sk2", "bestaetigt_personal_id": aktiv, "zeitpunkt_at": vorgemerkt})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "aktiv: {v}");
+    assert_eq!(v["bestaetigt_name"], "Zander");
 }
 
 #[tokio::test]
@@ -5939,4 +6238,178 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Abschnittsgerät");
+}
+
+// ---------- PAT-Kern am UHS-Gerät (Change y18v58dt-pat-kern) ----------
+
+/// Was ein PAT-Kern-Schreibweg am Gerät ergibt: der Einsatz, die Person der eigenen UHS und die
+/// Antwort des Tablets.
+struct PatKernAmGeraet {
+    app: axum::Router,
+    admin: String,
+    einsatz: i64,
+    person: i64,
+    /// Eine Person der UHS Süd.
+    fremde: i64,
+    /// Sitzung des Tablets der UHS Nord.
+    tablet: String,
+    antwort: Value,
+}
+
+/// Ein Schreibweg unter `…/personen/{pid}/{weg}` am Gerät (Specs `funktionsansichten`,
+/// `geraete-kopplung`): Tablet und Laptop der UHS Nord schreiben an einer Person ihrer UHS, das
+/// Tablet mit „Bestätigt von“; eine Person der UHS Süd ist 404, Betreuungsstelle und Lagemonitor
+/// bekommen 403, auch an einer Person, die sie sonst sehen.
+async fn pat_kern_am_geraet(weg: &str, body: Value) -> PatKernAmGeraet {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let laptop = laptop(&app, &admin, einsatz, nord).await;
+    let aerztin = kraft(&app, &admin, einsatz, "Dr. A. Muster").await;
+    let eigene = person_in(&app, &tablet, einsatz, None).await["id"]
+        .as_i64()
+        .unwrap();
+    let fremde = person_in(&app, &admin, einsatz, Some(sued)).await["id"]
+        .as_i64()
+        .unwrap();
+    let pfad = |p: i64| format!("/api/einsaetze/{einsatz}/personen/{p}/{weg}");
+
+    let mut bestaetigt = body.clone();
+    bestaetigt["bestaetigt_personal_id"] = json!(aerztin);
+    let (s, antwort) = anfrage_json(&app, "POST", &pfad(eigene), &tablet, Some(&bestaetigt)).await;
+    assert_eq!(s, StatusCode::CREATED, "Tablet: {antwort}");
+    assert_eq!(antwort["bestaetigt_name"], "Dr. A. Muster", "{antwort}");
+    let (s, v) = anfrage_json(&app, "POST", &pfad(eigene), &laptop, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "Laptop: {v}");
+    let (s, v) = anfrage_json(&app, "POST", &pfad(fremde), &tablet, Some(&body)).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS: {v}");
+
+    let stelle = betreuungsstelle_anlegen(&app, &admin, einsatz, "NU Turnhalle").await;
+    let (_, code) = kopplung(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "betreuungsstelle", "stelle_id": stelle, "bezeichnung": "Tablet NU"}),
+    )
+    .await;
+    let betreuung = koppeln(&app, &code, None)
+        .await
+        .cookie
+        .expect("Sitzungscookie");
+    let in_stelle = person_in_stelle(&app, &admin, einsatz, stelle).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    for (geraet, p, name) in [
+        (&betreuung, in_stelle, "Betreuungsstelle"),
+        (&monitor, eigene, "Lagemonitor"),
+    ] {
+        let (s, v) = anfrage_json(&app, "POST", &pfad(p), geraet, Some(&body)).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{name}: {v}");
+    }
+    PatKernAmGeraet {
+        app,
+        admin,
+        einsatz,
+        person: eigene,
+        fremde,
+        tablet,
+        antwort,
+    }
+}
+
+/// LLH-1325 (Spec `personen-transport`, „Transport am UHS-Gerät“): das Tablet legt den Transport
+/// fest; der ETB-Eintrag nennt das Gerät als Erfasser und die bestätigende Person.
+#[tokio::test]
+async fn transport_am_uhs_geraet() {
+    let lage = pat_kern_am_geraet("transport", json!({"prioritaet": "sofort"})).await;
+    let etb = system_etb(&lage.app, &lage.admin, lage.einsatz).await;
+    let eintraege: Vec<_> = etb
+        .iter()
+        .filter(|(t, _)| t.contains("Transportpriorität"))
+        .collect();
+    assert_eq!(
+        eintraege.len(),
+        1,
+        "der Laptop wiederholt dieselbe Priorität: {etb:?}"
+    );
+    assert_eq!(
+        eintraege[0].0,
+        "Person R-001: Transportpriorität sofort, bestätigt: Dr. A. Muster"
+    );
+    assert_eq!(eintraege[0].1, "UHS Nord · Tablet 1");
+    let (_, d) = anfrage(
+        &lage.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personen/{}", lage.einsatz, lage.person),
+        &lage.admin,
+        None,
+    )
+    .await;
+    assert_eq!(d["transporte"][1]["id"], lage.antwort["id"]);
+    assert_eq!(d["transporte"][1]["bestaetigt_name"], "Dr. A. Muster");
+}
+
+/// LLH-1324 (Spec `personen-massnahmen`, „Maßnahmen am UHS-Gerät“): das Tablet erfasst eine
+/// bestätigte Maßnahme und hebt sie auf; eine Maßnahme einer fremden UHS bleibt 404.
+#[tokio::test]
+async fn massnahme_am_uhs_geraet() {
+    let lage = pat_kern_am_geraet("massnahmen", json!({"art": "sauerstoff"})).await;
+    let (_, d) = anfrage(
+        &lage.app,
+        "GET",
+        &format!("/api/einsaetze/{}/personen/{}", lage.einsatz, lage.person),
+        &lage.admin,
+        None,
+    )
+    .await;
+    let bestaetigt = d["massnahmen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == lage.antwort["id"])
+        .unwrap_or_else(|| panic!("{d}"));
+    assert_eq!(bestaetigt["bestaetigt_name"], "Dr. A. Muster");
+    let etb = system_etb(&lage.app, &lage.admin, lage.einsatz).await;
+    assert!(
+        etb.iter().all(|(t, _)| !t.contains("sauerstoff")),
+        "kein ETB: {etb:?}"
+    );
+
+    let aufheben = |p: i64, m: &Value| {
+        format!(
+            "/api/einsaetze/{}/personen/{p}/massnahmen/{m}/aufheben",
+            lage.einsatz
+        )
+    };
+    // Eine Maßnahme an der Person der UHS Süd hebt das Tablet nicht auf.
+    let (s, fremd) = anfrage_json(
+        &lage.app,
+        "POST",
+        &format!(
+            "/api/einsaetze/{}/personen/{}/massnahmen",
+            lage.einsatz, lage.fremde
+        ),
+        &lage.admin,
+        Some(&json!({"art": "zugang"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fremd}");
+    let (s, v) = anfrage(
+        &lage.app,
+        "POST",
+        &aufheben(lage.fremde, &fremd["id"]),
+        &lage.tablet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremde UHS: {v}");
+    let (s, v) = anfrage(
+        &lage.app,
+        "POST",
+        &aufheben(lage.person, &lage.antwort["id"]),
+        &lage.tablet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["aufgehoben_at"].is_string(), "{v}");
 }

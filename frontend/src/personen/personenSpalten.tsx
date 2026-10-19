@@ -15,10 +15,13 @@ import { fehlerText } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
-import { STATUS_META } from './personMeta';
+import { STATUS_META, TRANSPORT_ART_WORT, transportRang } from './personMeta';
+import PrioritaetMarke from './PrioritaetMarke';
+import { kontamination } from '../theme/statusFarben';
 import { GESCHLECHT_KURZ } from './personBefehl';
 import { koordinatenText } from './koordinate';
 import { nichtGeladen } from '../offline/lagebildKuerzung';
+import type { PersonEintragArt } from '../offline/personEintrag';
 import {
   istAngetroffen,
   lueckenText,
@@ -32,8 +35,8 @@ import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
  * Das EINE Spaltenregister der Betroffenen-Listen; speist Zeilen- und Rasteransicht und über den
  * Kartenplan beide Darstellungsformen, auch am Gerät.
  *
- * Spalten: Nr. · Person (Name + Geschlecht/Alter) · Sichtung · Zustand · Status · Fundort ·
- * Verbleib · Vermerk · Zeit.
+ * Spalten: Nr. · Person (Name + Geschlecht/Alter, Marke „kontaminiert“) · Sichtung · Zustand ·
+ * Status · Fundort · Verbleib · Transport · Vermerk · Zeit.
  *
  * Ohne `bedienung` ist alles Anzeige. Mit ihr bedient die Zeile (LLH-1130, Spec
  * `betroffene-lagedaten`, „Sichtung und Verbleib aus der Betroffenenliste“):
@@ -107,6 +110,10 @@ function PersonZelle({ p }: { p: Person }) {
           {nameText(p) ?? 'unbekannt'}
         </span>
         {ga && <span style={{ ...monoStil(11), color: rollen.gedaempft }}>{ga}</span>}
+        {/* Kontamination „ja“ als Marke (LLH-1326, design.md D11): Gefahr für die Kräfte, Rolle
+            `achtung` mit Wort; „nein“ und „keine Angabe“ tragen keine. Die Personenzelle steht
+            in Liste, Karte und Patientenliste am Gerät. */}
+        {p.kontamination === true && <StatusTag darstellung={kontamination} />}
       </span>
       {offen && (
         <div data-lfh="luecke" style={{ ...monoStil(11), color: rollen.achtungText }}>
@@ -150,6 +157,31 @@ function FundortZelle({ p }: { p: Person }) {
   );
 }
 
+/** Transportpriorität als neutrale Marke, die Art dahinter; ohne Stand „—“ (LLH-1325). */
+function TransportZelle({ p }: { p: Person }) {
+  const { token, rollen } = useRollen();
+  if (p.transport_prioritaet == null && p.transport_art == null) {
+    return <span style={{ color: rollen.schwach }}>—</span>;
+  }
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        flexWrap: 'wrap',
+        alignItems: 'baseline',
+        columnGap: token.marginXS,
+      }}
+    >
+      <PrioritaetMarke prioritaet={p.transport_prioritaet} />{' '}
+      {p.transport_art && (
+        <span style={{ fontSize: 12, color: rollen.text2 }}>
+          {TRANSPORT_ART_WORT[p.transport_art]}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** Bedienung der Zeilen; ohne sie bleibt das Register reine Anzeige. */
 export interface PersonenBedienung {
   einsatzId: number;
@@ -166,6 +198,27 @@ export interface PersonenBedienung {
   onVerbleib?: (p: Person) => void;
   /** Das Zeilenmenü (design.md D3); fehlt es, gibt es keine Aktionsspalte (Gerät). */
   menue?: PersonenZeilenMenue;
+  /**
+   * Ohne Netz vorgemerkte Einträge je Person (LLH-1138, `vorgemerktJePerson`): Sichtungs- und
+   * Verbleib-Zelle zeigen „Offline vorgemerkt“, getrennt vom Serverstand.
+   */
+  vorgemerkt?: VorgemerktJePerson;
+}
+
+/** Arten vorgemerkter Einträge je Person. */
+export type VorgemerktJePerson = ReadonlyMap<number, ReadonlySet<PersonEintragArt>>;
+
+/** Die vorgemerkten Einträge eines Einsatzes nach Person; eine Liste liest sie einmal. */
+export function vorgemerktJePerson(
+  eintraege: readonly { aktion: { art: PersonEintragArt; person_id: number } }[],
+): VorgemerktJePerson {
+  const je = new Map<number, Set<PersonEintragArt>>();
+  for (const { aktion } of eintraege) {
+    const arten = je.get(aktion.person_id) ?? new Set<PersonEintragArt>();
+    arten.add(aktion.art);
+    je.set(aktion.person_id, arten);
+  }
+  return je;
 }
 
 /** Die Handlungen des Zeilenmenüs. */
@@ -337,6 +390,20 @@ function VerbleibZelle({
 }) {
   const { rollen } = useRollen();
   const text = verbleibText(p, uhsName);
+  // Ein vorgemerkter Verbleib (LLH-1138) steht neben dem Serverstand, nicht an seiner Stelle.
+  const vorgemerkt = bedienung?.vorgemerkt?.get(p.id)?.has('verbleib') && (
+    <div data-lfh="zeile-vorgemerkt" style={{ fontSize: 12, color: rollen.text2 }}>
+      Offline vorgemerkt
+    </div>
+  );
+  if (vorgemerkt) {
+    return (
+      <>
+        {text != null && <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>}
+        {vorgemerkt}
+      </>
+    );
+  }
   if (text != null) return <span style={{ fontSize: 12, color: rollen.text2 }}>{text}</span>;
   const offen = lueckenVon(p).verbleib;
   const onVerbleib = bedienung?.darfSchreiben && !p.storniert_at ? bedienung.onVerbleib : undefined;
@@ -370,7 +437,9 @@ export function personenSpalten(
       zahl: true,
       // Sortiert wird über die ZAHL — über den Anzeigetext läge „R-10" vor „R-9".
       sortWert: (p) => p.registrier_nr,
-      suchText: (p) => registrierAnzeige(p.registrier_nr),
+      // Die PAT-Nummer gehört zur Kennung der Person (LLH-1326, design.md D12): „4711“ findet
+      // „A-4711“. Ohne Netz fehlt sie im gekürzten Datensatz, dann trifft nur die Nr.
+      suchText: (p) => [registrierAnzeige(p.registrier_nr), p.pat_nummer].filter(Boolean).join(' '),
       // KEIN Anker hier: den Titel-Link setzt der Kartenplan über `titel.ziel`. Ohne Umbruch: in
       // der Handschuh-Dichte brach „R-001“ sonst in „R-“ / „001“ (LFH-1151).
       render: (_, p) => (
@@ -395,6 +464,7 @@ export function personenSpalten(
             p={p}
             einsatzId={bedienung.einsatzId}
             rueckmeldung={bedienung.rueckmeldung}
+            vorgemerkt={bedienung.vorgemerkt?.get(p.id)?.has('sichtung')}
           />
         ) : (
           <SkTag p={p} />
@@ -427,6 +497,22 @@ export function personenSpalten(
       key: 'verbleib',
       suchText: (p) => verbleibText(p, uhsName),
       render: (_, p) => <VerbleibZelle p={p} uhsName={uhsName} bedienung={bedienung} />,
+    },
+    {
+      title: 'Transport',
+      key: 'transport',
+      // Feste Breite (LFH-523): neben Person und Vermerk fließt keine weitere Spalte. Ab `lg`,
+      // wie der Fundort; darunter trägt die Sichtung die Folge.
+      width: 112,
+      abBreite: 'lg',
+      // Der Rang der Priorität (LLH-1325, design.md D10); ohne Priorität leer, also hinten.
+      sortWert: (p) =>
+        p.transport_prioritaet == null ? null : transportRang(p.transport_prioritaet),
+      suchText: (p) =>
+        [p.transport_prioritaet, p.transport_art && TRANSPORT_ART_WORT[p.transport_art]]
+          .filter(Boolean)
+          .join(' ') || null,
+      render: (_, p) => <TransportZelle p={p} />,
     },
     {
       title: 'Vermerk',

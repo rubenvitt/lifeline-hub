@@ -1,10 +1,13 @@
 pub mod abgleich_repo;
 pub mod anhang;
 pub mod audit_repo;
+pub mod massnahme_repo;
 pub mod repo;
 pub mod sichtung_repo;
+pub mod transport_repo;
 pub mod verbleib_repo;
 pub mod verlaufsnotiz_repo;
+pub mod verletzung_repo;
 
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
@@ -273,6 +276,10 @@ pub struct PersonAuswahl {
     pub status: PersonStatus,
     pub name: Option<String>,
     pub vorname: Option<String>,
+    /// PAT-Nummer (LLH-1326, design.md D12): die Sprungpalette findet die Person auch darüber.
+    /// Ohne Netz kürzt `lagebildKuerzen` sie weg (D9).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pat_nummer: Option<String>,
 }
 
 /// Serialisierbarer Personen-Datensatz (1:1 zur Tabelle `einsatz_person`; kein
@@ -331,6 +338,27 @@ pub struct PersonAnzeige {
     /// Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aktuelle_verbleib_betreuungsstelle_id: Option<i64>,
+    /// Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pat_nummer: Option<String>,
+    /// Kontamination (LLH-1326): `true` kontaminiert, `false` nicht; fehlt = keine Angabe,
+    /// ausdrücklich nicht „nein“.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kontamination: Option<bool>,
+    /// Aktueller Transportstand (LLH-1325, Cache des jüngsten Eintrags in `person_transport`);
+    /// alle vier fehlen ohne Stand oder nach dem Aufheben.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<transport_repo::TransportPrioritaet>)]
+    pub transport_prioritaet: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<transport_repo::TransportArt>)]
+    pub transport_art: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<transport_repo::Fachrichtung>)]
+    pub transport_fachrichtung: Option<String>,
+    /// Erfassungszeit des aktuellen Transportstands.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport_at: Option<String>,
 }
 
 #[cfg(test)]
@@ -470,6 +498,31 @@ pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> S
         "Person {}: Sichtung {}",
         registrier_anzeige(registrier_nr),
         kategorie.etb_label()
+    )
+}
+
+/// Höchstlänge der PAT-Nummer (LLH-1326, Spec `betroffene-lagedaten`): die Nummer einer
+/// Papier-Patientenanhängetasche, ein kurzer Freitext zum Abgleich. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const PAT_NUMMER_MAX: usize = 32;
+
+/// Höchstlänge der Notiz einer Verletzung (LLH-1113, Spec `personen-verletzungen`): ein kurzer
+/// Zusatz zur Markierung am Körperschema, kein Befundtext. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const VERLETZUNG_NOTIZ_MAX: usize = 200;
+
+/// System-ETB einer nachgereichten älteren Sichtung (LLH-1138, Spec `personen-verlauf`): sie
+/// steht im Verlauf, die aktuelle bleibt. «Person R-001: Sichtung SK I, nachgetragen, aktuelle
+/// Sichtung bleibt SK II». Beide Kategorien sind Statuskategorien (Retain), kein Befund.
+pub fn etb_text_sichtung_nachgetragen(
+    registrier_nr: i64,
+    kategorie: Sichtungskategorie,
+    aktuell: Sichtungskategorie,
+) -> String {
+    format!(
+        "{}, nachgetragen, aktuelle Sichtung bleibt {}",
+        etb_text_sichtung(registrier_nr, kategorie),
+        aktuell.etb_label()
     )
 }
 

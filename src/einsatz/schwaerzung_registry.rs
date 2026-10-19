@@ -279,6 +279,41 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktueller_verbleib_status", G_TRIAGE),
             // Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der Stelle).
             retain("aktuelle_verbleib_betreuungsstelle_id", G_FK),
+            // LLH-1326 (Change y18v58dt-pat-kern, design.md D4): die PAT-Nummer verknüpft die
+            // Person mit ihrer Papier-Patientenanhängetasche und fällt mit der Behandlung; die
+            // Kontamination ist eine Statuskategorie wie die Sichtung.
+            scrub("pat_nummer", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("kontamination", G_TRIAGE),
+            // LLH-1325 (design.md D4): Cache des Transportstands. Priorität und Art sind
+            // Statuskategorien wie die Sichtung (der ETB-Text der Priorität braucht das, die
+            // Ausnahmeliste ist für `einsatz_person.*` gesperrt); die Fachrichtung ist
+            // diagnosenah (Psychiatrie, Geburtshilfe) und fällt mit der Behandlung.
+            retain("transport_prioritaet", G_TRIAGE),
+            retain("transport_art", G_TRIAGE),
+            scrub("transport_fachrichtung", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("transport_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "person_transport",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1325 (design.md D4): wie der Cache an der Person.
+            retain("prioritaet", G_TRIAGE),
+            retain("art", G_TRIAGE),
+            scrub("fachrichtung", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            // Namentliche Bestätigung am Gerät (LFH-1046) wie bei der Sichtung.
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     TabellenRegel {
@@ -297,6 +332,60 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
             retain("bestaetigt_personal_id", G_FK),
             scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            // Ohne Netz vorgemerkt (LLH-1138): Schlüssel der Offline-Queue und Ankunft beim
+            // Server; `gesichtet_at` bleibt die Erfassungszeit.
+            retain("client_id", G_IDEMPOTENZ),
+            retain("eingegangen_at", G_ZEIT),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "person_massnahme",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1324 (design.md D4): die Maßnahme ist ein Katalogwert wie die Sichtung.
+            retain("art", G_TRIAGE),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            // Aufheben genau einmal (D1), ohne Grund.
+            retain("aufgehoben_at", G_ZEIT),
+            retain("aufgehoben_von_id", G_FK),
+            retain("client_id", G_IDEMPOTENZ),
+        ],
+    },
+    TabellenRegel {
+        tabelle: "person_verletzung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("person_id", G_FK),
+            // LLH-1113 (design.md D4): wo und was als Katalogwert bleibt auswertbar; die genaue
+            // Lage und die Notiz fallen mit der Behandlung.
+            retain("ansicht", G_TRIAGE),
+            retain("region", G_TRIAGE),
+            retain("art", G_TRIAGE),
+            retain("schwere", G_TRIAGE),
+            scrub("x", Strategie::NullSetzen, Z_BEHANDLUNG),
+            scrub("y", Strategie::NullSetzen, Z_BEHANDLUNG),
+            scrub("notiz", Strategie::NullSetzen, Z_BEHANDLUNG),
+            retain("zeitpunkt_at", G_ZEIT),
+            retain("erfasst_at", G_ZEIT),
+            retain("erfasst_von", G_FK),
+            retain("bestaetigt_personal_id", G_FK),
+            scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            retain("aufgehoben_at", G_ZEIT),
+            retain("aufgehoben_von_id", G_FK),
+            retain("client_id", G_IDEMPOTENZ),
         ],
     },
     TabellenRegel {
@@ -312,6 +401,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("text", Strategie::Platzhalter, Z_BEHANDLUNG),
             retain("erfasst_at", G_ZEIT),
             retain("erfasst_von", G_FK),
+            // Ohne Netz vorgemerkt (LLH-1138): `erfasst_at` ist die Erfassungszeit.
+            retain("client_id", G_IDEMPOTENZ),
+            retain("eingegangen_at", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -338,6 +430,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Namentliche Bestätigung am Gerät (LFH-1046): Kennung und Name einer Einsatzkraft.
             retain("bestaetigt_personal_id", G_FK),
             scrub("bestaetigt_name", Strategie::NullSetzen, Z_EINSATZ),
+            // Ohne Netz vorgemerkt (LLH-1138): `zeitpunkt_at` ist die Erfassungszeit.
+            retain("client_id", G_IDEMPOTENZ),
+            retain("eingegangen_at", G_ZEIT),
         ],
     },
     TabellenRegel {
@@ -2780,19 +2875,30 @@ pub(super) fn set_zuweisungen(scrubs: &[(&'static str, Strategie)]) -> (Vec<Stri
 }
 
 /// Tabellen, deren Zeilen einer Person einen Behandlungsbezug geben (design.md D3), jeweils
-/// über `person_id`. Dazu kommt `einsatz_person.zustand` selbst. Ohne `storniert_at`-Filter: auch
+/// über `person_id`. Dazu kommen an `einsatz_person` selbst der Zustand, die PAT-Nummer und eine
+/// Kontamination „ja“ (LLH-1326, Change `y18v58dt-pat-kern`, design.md D4). Ohne `storniert_at`-Filter: auch
 /// eine stornierte Sichtung war eine medizinische Einschätzung. Gepinnt in
 /// `tests::behandlungsbezug_kennt_jede_personentabelle`.
 pub const BEHANDLUNGSBEZUG_TABELLEN: &[&str] = &[
     "person_sichtung",
     "person_verlaufsnotiz",
     "person_uhs_belegung",
+    // LLH-1325: ein Transportstand, auch ein aufgehobener (design.md D4).
+    "person_transport",
+    // LLH-1324: eine Maßnahme, auch eine aufgehobene.
+    "person_massnahme",
+    // LLH-1113: eine Verletzung, auch eine aufgehobene.
+    "person_verletzung",
 ];
 
 /// `SELECT` der Personen-IDs mit Behandlungsbezug (ohne Einsatz-Eingrenzung; der Aufrufer grenzt
 /// über die Tabellenregel ein).
 fn behandlungsbezug_sql() -> String {
-    let mut teile = vec!["p.zustand IS NOT NULL".to_string()];
+    let mut teile = vec![
+        "p.zustand IS NOT NULL".to_string(),
+        "p.pat_nummer IS NOT NULL".to_string(),
+        "p.kontamination = 1".to_string(),
+    ];
     for t in BEHANDLUNGSBEZUG_TABELLEN {
         teile.push(format!(
             "EXISTS (SELECT 1 FROM {t} x WHERE x.person_id = p.id)"
@@ -3532,10 +3638,16 @@ mod tests {
             (
                 "behandlung".to_string(),
                 menge(&[
+                    "einsatz_person.pat_nummer",
+                    "einsatz_person.transport_fachrichtung",
                     "einsatz_person.zustand",
                     "person_sichtung.notiz",
+                    "person_transport.fachrichtung",
                     "person_uhs_belegung.notiz",
                     "person_verlaufsnotiz.text",
+                    "person_verletzung.notiz",
+                    "person_verletzung.x",
+                    "person_verletzung.y",
                 ]),
             ),
             (

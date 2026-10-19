@@ -1,5 +1,5 @@
 import { Form } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { ladeBestaetiger } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Bestaetiger, GeraetAnzeige } from '../api/types';
@@ -22,6 +22,26 @@ export function bestaetigerOptionen(liste: readonly Bestaetiger[]) {
   return liste.map((b) => ({ value: b.id, label: personLabel(b) }));
 }
 
+/** Abfrage der Liste; Feld und Gerätehülle teilen Key und Abruf. */
+function bestaetigerAbfrage(einsatzId: number, aktiv: boolean) {
+  return queryOptions({
+    queryKey: einsatzKeys.personenBestaetiger(einsatzId),
+    queryFn: () => ladeBestaetiger(einsatzId),
+    enabled: aktiv,
+  });
+}
+
+/**
+ * Hält die Liste in der Gerätehülle beobachtet, solange die Kopplung läuft (Spec
+ * `geraete-kopplung`, „Bestätigte Maßnahme ohne Netz“): das Feld steht erst in einem offenen
+ * Paneel, und ohne Beobachter räumte der Cache die Liste nach `gcTime` ab. Ohne Netz bliebe die
+ * Auswahl dann leer. Nur im Speicher des Tabs, nie auf der Platte (`geraet/AGENTS.md`, „Nichts auf
+ * der Platte“).
+ */
+export function useKeepBestaetigerLoaded(geraet: GeraetAnzeige): void {
+  useQuery(bestaetigerAbfrage(geraet.einsatz_id, kannBestaetigen(geraet)));
+}
+
 /**
  * „Bestätigt von“ am UHS-Gerät (LFH-1046, Spec `geraete-kopplung`): wer den Schritt namentlich
  * verantwortet, aus dem Personal des Einsatzes. Freiwillig und ohne Vorauswahl, damit niemand
@@ -30,11 +50,7 @@ export function bestaetigerOptionen(liste: readonly Bestaetiger[]) {
 export default function BestaetigtVonFeld({ einsatzId }: { einsatzId: number }) {
   const geraet = useAuthOptional()?.geraet ?? null;
   const aktiv = kannBestaetigen(geraet);
-  const query = useQuery({
-    queryKey: einsatzKeys.personenBestaetiger(einsatzId),
-    queryFn: () => ladeBestaetiger(einsatzId),
-    enabled: aktiv,
-  });
+  const query = useQuery(bestaetigerAbfrage(einsatzId, aktiv));
   if (!aktiv) return null;
   return (
     <Form.Item label="Bestätigt von" name={BESTAETIGT_FELD}>
