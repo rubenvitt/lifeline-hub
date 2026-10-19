@@ -11,8 +11,15 @@ nummerierte Liste daneben trägt denselben Stand als Text.
 Das Körperschema SHALL eine Figur in Ansicht vorn und hinten zeigen: männlich bei Geschlecht
 männlich, weiblich bei weiblich, neutral bei divers, unbekannt oder ohne Angabe. Regionen und Lage
 der Markierungen MUST über alle Figuren gleich normiert sein. Ein Wechsel des Geschlechts MUST
-keine Markierung verschieben. Ab `md` MUST vorn und hinten nebeneinander stehen, darunter MUST
-eine Umschaltung zwischen beiden wählen.
+keine Markierung verschieben. Vorn und hinten MUST nebeneinander stehen, wenn die Breite beide
+Ansichten samt der Spalte daneben (Wahl der Art bzw. Liste) trägt; sonst MUST eine Umschaltung
+zwischen beiden wählen. Beim Markieren MUST die Figur nie unter ihren Maßstab schrumpfen: reicht
+die Breite nicht für eine Ansicht, rollt die Figur, und die Trefferzonen behalten ihre Größe.
+
+#### Scenario: Handschuh am Tablet
+- **WHEN** das Schema in der Dichte „Handschuh“ bei 1280 × 800 mit Rail und Modulpanel erscheint
+- **THEN** steht eine Ansicht mit der Umschaltung vorn / hinten, und die Spalte mit der Wahl der
+  Art steht daneben
 
 #### Scenario: Geschlecht nachgetragen
 - **WHEN** eine Person mit markiertem „Unterarm links, vorn“ ohne Geschlecht später als weiblich
@@ -22,10 +29,11 @@ eine Umschaltung zwischen beiden wählen.
 
 ### Requirement: Markieren mit höchstens zwei Tipps
 
-Im Modus Markieren SHALL ein Tipp auf eine Region die Wahl der Art als große Flächen öffnen. Ein
-Tipp auf eine Fläche MUST speichern und an der Tippstelle ein nummeriertes Sternchen setzen. Die
-Schwere MUST optional vor der Wahl der Art wählbar sein, ohne einen zusätzlichen Pflichttipp. Ein
-Tipp auf ein Sternchen MUST „Aufheben“ anbieten, und ein zweiter Tipp hebt auf. Eine Ablehnung des
+Im Modus Markieren SHALL ein Tipp auf eine Region die Wahl der Art als große Flächen öffnen. Die
+Wahl MUST danach in jeder Dichte ohne Bildlauf im Bild stehen. Ein Tipp auf eine Fläche MUST
+speichern und an der Tippstelle ein nummeriertes Sternchen setzen. Die Schwere MUST optional vor
+der Wahl der Art wählbar sein, ohne einen zusätzlichen Pflichttipp, sichtbar beschriftet und nur
+für die gerade gewählte Region. Ein Tipp auf ein Sternchen MUST „Aufheben“ anbieten, und ein zweiter Tipp hebt auf. Eine Ablehnung des
 Servers MUST am Schema stehen bleiben.
 
 #### Scenario: Wunde am Kopf
@@ -42,7 +50,8 @@ Servers MUST am Schema stehen bleiben.
 Jede Region SHALL mit Maus, Touch und Tastatur erreichbar sein. Ihr zugänglicher Name MUST Region,
 Seite und Ansicht nennen, etwa „Unterarm links, vorn“. Die Trefferfläche MUST in jeder Dichte
 mindestens die Höhe eines Bedienelements haben, in der Handschuh-Stufe mindestens 72 px, auch für
-Hand, Fuß und Hals. Die Tastatur MUST die Regionen in fester Folge durchlaufen.
+Hand, Fuß und Hals; ebenso die Trefferfläche eines Sternchens beim Markieren. Die Tastatur MUST
+die Regionen in fester Folge durchlaufen, der Fokus MUST an Region und Sternchen sichtbar sein.
 
 #### Scenario: Hand im Handschuh-Betrieb
 - **WHEN** das Schema in der Dichte „Handschuh“ erscheint

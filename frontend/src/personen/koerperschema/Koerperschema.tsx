@@ -1,6 +1,6 @@
 import { Button, Flex, Form, Typography } from 'antd';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { VerletzungEingabe } from '../../api/einsatzPerson';
 import type {
   Person,
@@ -16,8 +16,15 @@ import { useViewport } from '../../components/useViewport';
 import BestaetigtVonFeld, { BESTAETIGT_FELD } from '../../geraet/BestaetigtVonFeld';
 import FlaechenWahl from '../FlaechenWahl';
 import KoerperFigur, { type KoerperZiel } from './KoerperFigur';
-import { figurMassstab, normiere, sternLage } from './geometrie';
-import { figurVon, nummeriere, regionName, type NummerierteVerletzung } from './koerperschemaKern';
+import { RAHMEN, figurMassstab, normiere, sternLage, zoneVon } from './geometrie';
+import {
+  WAHL_MIN_PX,
+  figurVon,
+  nummeriere,
+  regionName,
+  schemaLayout,
+  type NummerierteVerletzung,
+} from './koerperschemaKern';
 import { VERLETZUNG_ART_REIHE, VERLETZUNG_ART_WORT, VERLETZUNG_SCHWERE_WORT } from '../personMeta';
 
 /**
@@ -30,14 +37,21 @@ import { VERLETZUNG_ART_REIHE, VERLETZUNG_ART_WORT, VERLETZUNG_SCHWERE_WORT } fr
  * (`sternLage`: außerhalb der Silhouette der Mittelpunkt der Region). Die Schwere ist optional und
  * steht als Segmentleiste über den Flächen; sie kostet keinen Pflichttipp. Ein Tipp auf ein
  * Sternchen bietet „Aufheben“ an, der zweite hebt auf. Eine Ablehnung bleibt am Schema stehen, die
- * Wahl offen.
+ * Wahl offen; Einhängen und Abbrechen räumen sie (LFH-1077). Jede Region beginnt ohne Schwere.
+ * Nach Speichern, Aufheben und Abbrechen kehrt der Fokus an die Region bzw. das Sternchen zurück.
+ *
+ * LAYOUT nach der gemessenen Breite (`schemaLayout`): vorn und hinten stehen nur nebeneinander,
+ * wenn die Spalte daneben mitpasst, sonst eine Ansicht mit Umschaltung. Die Wahl der Art steht
+ * neben der Figur und klebt unter dem Rahmen, damit sie nach dem Tipp ohne Bildlauf im Bild steht,
+ * auch in der Handschuh-Stufe am Tablet; reicht die Breite nicht einmal dafür, steht sie darunter
+ * und rückt nach dem Tipp ins Bild. Die Figur schrumpft beim Markieren nie unter ihren Maßstab,
+ * sie rollt waagerecht (Trefferzonen halten die Stufe).
  *
  * Die Mutationen hält der Aufrufer (Patientenkopf: Wechselsperre, ein Schreibweg je Handlung);
  * am UHS-Gerät nennt `BestaetigtVonFeld` die bestätigende Person.
  *
  * LESEN UND DRUCK zeigen Figur und Liste ohne Bedienung; der Druck zeichnet ohne Fläche in
- * `currentColor` (schwarz auf weiß). Ab `md` stehen vorn und hinten nebeneinander, darunter wählt
- * eine Segmentleiste die Ansicht.
+ * `currentColor` (schwarz auf weiß), vorn und hinten immer nebeneinander.
  */
 export interface KoerperschemaProps {
   einsatzId: number;
@@ -64,7 +78,7 @@ type Auswahl = { art: 'region'; ziel: KoerperZiel } | { art: 'stern'; id: number
 const ANSICHTEN: readonly VerletzungAnsicht[] = ['vorn', 'hinten'];
 const OHNE = 'ohne';
 const SCHWERE_OPTIONEN = [
-  { wert: OHNE, label: 'ohne' },
+  { wert: OHNE, label: 'keine Angabe' },
   ...(Object.keys(VERLETZUNG_SCHWERE_WORT) as VerletzungSchwere[]).map((s) => ({
     wert: s,
     label: VERLETZUNG_SCHWERE_WORT[s],
@@ -90,10 +104,40 @@ export default function Koerperschema({
 }: KoerperschemaProps) {
   const { token, rollen } = useRollen();
   const abMd = useViewport().abBreite('md');
-  const [ansichtSchmal, setAnsichtSchmal] = useState<VerletzungAnsicht>('vorn');
+  const [einzelAnsicht, setEinzelAnsicht] = useState<VerletzungAnsicht>('vorn');
   const [auswahl, setAuswahl] = useState<Auswahl>(null);
   const [schwere, setSchwere] = useState<VerletzungSchwere | typeof OHNE>(OHNE);
   const [form] = Form.useForm<{ [BESTAETIGT_FELD]?: number }>();
+  const sectionRef = useRef<HTMLElement>(null);
+  const wahlRef = useRef<HTMLDivElement>(null);
+  const width = useWidth(sectionRef);
+  // Ziel des Fokus nach Speichern, Aufheben oder Abbrechen (ein Selektor im Schema): das
+  // Bedienelement darunter hängt aus, und der Fokus fiele sonst auf `<body>`.
+  const [fokusNach, setFokusNach] = useState<string | null>(null);
+
+  // Einhängen räumt die Gründe der letzten Ablehnung (LFH-1077): der Patientenkopf hält die
+  // Mutationen über ein Schließen des Paneels hinweg. Ref, damit ein neues Mutationsobjekt je
+  // Render den Effekt nicht erneut auslöst; eine laufende Mutation bleibt unberührt.
+  const mutationenRef = useRef({ markierung, aufhebung });
+  mutationenRef.current = { markierung, aufhebung };
+  useEffect(() => {
+    for (const m of Object.values(mutationenRef.current)) {
+      if (m && !m.isPending && m.error != null) m.reset();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (fokusNach == null) return;
+    sectionRef.current?.querySelector<SVGElement | HTMLElement>(fokusNach)?.focus();
+    setFokusNach(null);
+  }, [fokusNach]);
+
+  // Nach dem Tipp steht die Wahl der Art im Bild: neben der Figur klebt sie, darunter rückt sie
+  // nach (ohne zweite Geste). `scrollIntoView` fehlt in jsdom.
+  const wahlOffen = auswahl?.art === 'region' ? auswahl.ziel.zone.region : null;
+  useEffect(() => {
+    if (wahlOffen != null) wahlRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [wahlOffen]);
 
   const figur = figurVon(geschlecht);
   const gueltige = nummeriere(verletzungen).filter((n) => n.verletzung.aufgehoben_at == null);
@@ -105,11 +149,39 @@ export default function Koerperschema({
       : modus === 'druck'
         ? DRUCK_MASSSTAB
         : LESE_MASSSTAB;
-  const sichtbar = abMd || modus === 'druck' ? ANSICHTEN : [ansichtSchmal];
+  const layout =
+    modus === 'druck'
+      ? 'beide'
+      : schemaLayout(
+          width,
+          {
+            figurWidth: RAHMEN.breite * massstab,
+            gapFiguren: token.marginSM,
+            gapWahl: token.marginLG,
+          },
+          abMd,
+        );
+  const sichtbar = layout === 'beide' ? ANSICHTEN : [einzelAnsicht];
+  const daneben = layout !== 'gestapelt';
 
   function waehleRegion(ziel: KoerperZiel) {
     if (laeuft) return;
+    // Jede Region beginnt ohne Schwere: eine Wahl für die vorige wanderte sonst still mit.
+    setSchwere(OHNE);
     setAuswahl({ art: 'region', ziel });
+  }
+
+  function abbrechenWahl() {
+    if (auswahl?.art === 'region') setFokusNach(zoneSelektor(auswahl.ziel));
+    setAuswahl(null);
+    setSchwere(OHNE);
+    if (markierung && !markierung.isPending && markierung.error != null) markierung.reset();
+  }
+
+  function abbrechenAngebot(nummer: number) {
+    setFokusNach(`[data-lfh="stern"][data-nummer="${nummer}"]`);
+    setAuswahl(null);
+    if (aufhebung && !aufhebung.isPending && aufhebung.error != null) aufhebung.reset();
   }
 
   function speichern(art: VerletzungArt) {
@@ -129,16 +201,22 @@ export default function Koerperschema({
       () => {
         setAuswahl(null);
         setSchwere(OHNE);
+        setFokusNach(zoneSelektor(ziel));
       },
       // Die Ablehnung zeigt das Schema aus `markierung.error`; die Wahl bleibt offen.
       () => {},
     );
   }
 
-  function aufheben(id: number) {
+  function aufheben(v: Verletzung) {
     if (!aufhebung || laeuft || aufhebenGesperrt) return;
-    aufhebung.mutateAsync(id).then(
-      () => setAuswahl(null),
+    aufhebung.mutateAsync(v.id).then(
+      () => {
+        setAuswahl(null);
+        // Das Sternchen ist weg: der Fokus geht an seine Region.
+        const zone = zoneVon(v.ansicht, v.region);
+        if (zone) setFokusNach(zoneSelektor({ ansicht: v.ansicht, zone }));
+      },
       () => {},
     );
   }
@@ -149,17 +227,19 @@ export default function Koerperschema({
 
   return (
     <section
+      ref={sectionRef}
       aria-label="Körperschema"
       data-lfh="koerperschema"
+      data-layout={layout}
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
     >
-      {!abMd && modus !== 'druck' && (
+      {layout !== 'beide' && (
         <Segmentleiste<VerletzungAnsicht>
           rolle="tablist"
           beschriftung="Ansicht"
           optionen={ANSICHTEN.map((a) => ({ wert: a, label: a }))}
-          wert={ansichtSchmal}
-          onWechsel={setAnsichtSchmal}
+          wert={einzelAnsicht}
+          onWechsel={setEinzelAnsicht}
         />
       )}
       {modus === 'markieren' && gesperrt && (
@@ -167,8 +247,26 @@ export default function Koerperschema({
           {gesperrt}
         </div>
       )}
-      <Flex gap={token.marginLG} wrap align="flex-start">
-        <Flex gap={token.marginSM} wrap>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: daneben ? 'row' : 'column',
+          gap: token.marginLG,
+          alignItems: 'stretch',
+        }}
+      >
+        <div
+          data-lfh="koerperschema-figuren"
+          style={{
+            display: 'flex',
+            gap: token.marginSM,
+            flex: '0 0 auto',
+            alignSelf: 'flex-start',
+            // Breiter als der Platz (Handschuh am Handy): die Figur rollt, statt zu schrumpfen.
+            maxWidth: '100%',
+            overflowX: daneben ? undefined : 'auto',
+          }}
+        >
           {sichtbar.map((ansicht) => (
             <figure key={ansicht} style={{ margin: 0 }}>
               <KoerperFigur
@@ -194,83 +292,127 @@ export default function Koerperschema({
               </figcaption>
             </figure>
           ))}
-        </Flex>
+        </div>
 
-        <Flex vertical gap={token.marginSM} style={{ flex: '1 1 260px', minWidth: 0 }}>
-          {markieren && auswahl?.art === 'region' && (
-            <Form form={form} layout="vertical" component="div">
+        <div style={{ flex: `1 1 ${WAHL_MIN_PX}px`, minWidth: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: token.marginSM,
+              // Neben der Figur klebt die Spalte unter dem Rahmen: nach dem Tipp steht die Wahl im
+              // Bild, auch wenn die Figur höher ist als das Fenster.
+              ...(daneben && modus === 'markieren'
+                ? { position: 'sticky' as const, top: 'var(--lfh-rahmen-oben, 0px)' }
+                : {}),
+            }}
+          >
+            {markieren && auswahl?.art === 'region' && (
+              <Form form={form} layout="vertical" component="div">
+                <div
+                  ref={wahlRef}
+                  role="group"
+                  aria-label={`Verletzung an ${regionName(auswahl.ziel.ansicht, auswahl.ziel.zone.region)}`}
+                  data-lfh="verletzung-wahl"
+                  style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
+                >
+                  <Typography.Text strong>
+                    {regionName(auswahl.ziel.ansicht, auswahl.ziel.zone.region)}
+                  </Typography.Text>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}>
+                    <Typography.Text type="secondary">Schwere (optional)</Typography.Text>
+                    <Segmentleiste<VerletzungSchwere | typeof OHNE>
+                      beschriftung="Schwere (optional)"
+                      optionen={SCHWERE_OPTIONEN}
+                      wert={schwere}
+                      onWechsel={setSchwere}
+                    />
+                  </div>
+                  <FlaechenWahl<VerletzungArt>
+                    aria-label="Art der Verletzung"
+                    optionen={ART_OPTIONEN}
+                    value={null}
+                    disabled={laeuft}
+                    onChange={speichern}
+                  />
+                  <BestaetigtVonFeld einsatzId={einsatzId} />
+                  <div>
+                    <Button disabled={laeuft} onClick={abbrechenWahl}>
+                      Abbrechen
+                    </Button>
+                  </div>
+                </div>
+              </Form>
+            )}
+            {markieren && stern && (
               <div
                 role="group"
-                aria-label={`Verletzung an ${regionName(auswahl.ziel.ansicht, auswahl.ziel.zone.region)}`}
-                data-lfh="verletzung-wahl"
+                aria-label={`Verletzung ${stern.nummer}`}
+                data-lfh="verletzung-angebot"
                 style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
               >
                 <Typography.Text strong>
-                  {regionName(auswahl.ziel.ansicht, auswahl.ziel.zone.region)}
+                  <span style={monoStil(13)}>{stern.nummer}</span>{' '}
+                  {verletzungText(stern.verletzung)}
                 </Typography.Text>
-                <Segmentleiste<VerletzungSchwere | typeof OHNE>
-                  beschriftung="Schwere (optional)"
-                  optionen={SCHWERE_OPTIONEN}
-                  wert={schwere}
-                  onWechsel={setSchwere}
-                />
-                <FlaechenWahl<VerletzungArt>
-                  aria-label="Art der Verletzung"
-                  optionen={ART_OPTIONEN}
-                  value={null}
-                  disabled={laeuft}
-                  onChange={speichern}
-                />
-                <BestaetigtVonFeld einsatzId={einsatzId} />
-                <div>
-                  <Button disabled={laeuft} onClick={() => setAuswahl(null)}>
+                {aufhebenGesperrt && (
+                  <div role="status" style={{ color: rollen.text2 }}>
+                    {aufhebenGesperrt}
+                  </div>
+                )}
+                <Flex gap="middle" wrap>
+                  <Button
+                    danger
+                    disabled={!!aufhebenGesperrt}
+                    loading={aufhebung?.isPending}
+                    onClick={() => aufheben(stern.verletzung)}
+                  >
+                    Aufheben
+                  </Button>
+                  <Button disabled={laeuft} onClick={() => abbrechenAngebot(stern.nummer)}>
                     Abbrechen
                   </Button>
-                </div>
+                </Flex>
               </div>
-            </Form>
-          )}
-          {markieren && stern && (
-            <div
-              role="group"
-              aria-label={`Verletzung ${stern.nummer}`}
-              data-lfh="verletzung-angebot"
-              style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}
-            >
-              <Typography.Text strong>
-                <span style={monoStil(13)}>{stern.nummer}</span> {verletzungText(stern.verletzung)}
-              </Typography.Text>
-              {aufhebenGesperrt && (
-                <div role="status" style={{ color: rollen.text2 }}>
-                  {aufhebenGesperrt}
-                </div>
-              )}
-              <Flex gap="middle" wrap>
-                <Button
-                  danger
-                  disabled={!!aufhebenGesperrt}
-                  loading={aufhebung?.isPending}
-                  onClick={() => aufheben(stern.verletzung.id)}
-                >
-                  Aufheben
-                </Button>
-                <Button disabled={laeuft} onClick={() => setAuswahl(null)}>
-                  Abbrechen
-                </Button>
-              </Flex>
-            </div>
-          )}
-          {markierung?.error != null && (
-            <SpeicherFehler fehler={markierung.error} titel="Verletzung nicht markiert" />
-          )}
-          {aufhebung?.error != null && (
-            <SpeicherFehler fehler={aufhebung.error} titel="Verletzung nicht aufgehoben" />
-          )}
-          <VerletzungsListe eintraege={gueltige} />
-        </Flex>
-      </Flex>
+            )}
+            {markierung?.error != null && (
+              <SpeicherFehler fehler={markierung.error} titel="Verletzung nicht markiert" />
+            )}
+            {aufhebung?.error != null && (
+              <SpeicherFehler fehler={aufhebung.error} titel="Verletzung nicht aufgehoben" />
+            )}
+            <VerletzungsListe eintraege={gueltige} />
+          </div>
+        </div>
+      </div>
     </section>
   );
+}
+
+/** Selektor der Zone einer Region im Schema (Fokusziel). */
+function zoneSelektor(ziel: Pick<KoerperZiel, 'ansicht' | 'zone'>): string {
+  return `[data-lfh="koerperfigur"][data-ansicht="${ziel.ansicht}"] [data-lfh="koerperzone"][data-region="${ziel.zone.region}"]`;
+}
+
+/**
+ * Die Breite des Elements in px, gemessen (`ResizeObserver`); `null`, solange nichts gemessen ist
+ * (jsdom misst nie). Gemessen vor dem ersten Zeichnen, damit kein falsches Layout aufblitzt.
+ */
+function useWidth(ref: RefObject<HTMLElement | null>): number | null {
+  const [width, setWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const messen = () => {
+      const w = el.getBoundingClientRect().width;
+      setWidth(w > 0 ? w : null);
+    };
+    messen();
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(el);
+    return () => beobachter.disconnect();
+  }, [ref]);
+  return width;
 }
 
 /** Die nummerierte Liste: Nummer, Region mit Seite und Ansicht, Art, Schwere, Uhrzeit. */

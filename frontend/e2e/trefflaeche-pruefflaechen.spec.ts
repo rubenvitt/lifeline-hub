@@ -1371,9 +1371,13 @@ test('Sichtungswahl: sechs Flächen halten 72 × 96 in kompakt und Handschuh, L�
 // ── Körperschema (LLH-1120, Spec `koerperschema`, „Jede Region ist erreichbar“) ──────────
 // Jede Region hält mindestens die Steuerhöhe der Stufe, in der Handschuh-Stufe 72 px, Hand,
 // Fuß und Hals sogar 72 × 72 (design.md D13: ihre Zonen reichen über die Silhouette hinaus).
+// Ebenso die Trefferfläche eines Sternchens (`sternTrefferPx`). Gemessen in allen drei Stufen;
 // Gegenprobe: die Hand ist in `kompakt` kleiner, die Figur folgt der Stufe (`figurMassstab`).
+//
+// Mutationsprobe: in `KoerperFigur.tsx` `sternTrefferPx` fest 40 → in `komfortabel` und
+// `handschuh` rot am Sternchen (gemessen).
 
-test('Körperschema: jede Region hält die Stufe, Hand, Fuß und Hals 72 × 72 im Handschuh', async ({
+test('Körperschema: jede Region und jedes Sternchen hält die Stufe, Hand, Fuß und Hals 72 × 72 im Handschuh', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -1384,10 +1388,15 @@ test('Körperschema: jede Region hält die Stufe, Hand, Fuß und Hals 72 × 72 i
   });
   expect(r.ok(), `Person: ${r.status()}`).toBe(true);
   const pid = ((await r.json()) as { id: number }).id;
+  const v = await page.request.post(`/api/einsaetze/${einsatzId}/personen/${pid}/verletzungen`, {
+    data: { ansicht: 'vorn', region: 'thorax', art: 'prellung_schwellung' },
+  });
+  expect(v.ok(), `Verletzung: ${v.status()}`).toBe(true);
 
   const hand: Record<string, { width: number; height: number }> = {};
   for (const [dichte, boden] of [
     ['kompakt', 30],
+    ['komfortabel', 48],
     ['handschuh', 72],
   ] as const) {
     await page.goto(`/einsaetze/${einsatzId}/personen/${pid}`);
@@ -1397,7 +1406,13 @@ test('Körperschema: jede Region hält die Stufe, Hand, Fuß und Hals 72 × 72 i
       .getByRole('button', { name: 'Verletzung markieren' })
       .click();
     const paneel = page.getByRole('region', { name: 'Verletzung markieren' });
+    // Trägt die Breite nicht beide Ansichten samt Wahl, schaltet die Umschaltung (Spec
+    // `koerperschema`); dann wird jede Ansicht für sich gemessen.
+    const umschaltung = paneel.getByRole('tablist', { name: 'Ansicht' });
     for (const ansicht of ['vorn', 'hinten'] as const) {
+      if ((await umschaltung.count()) > 0) {
+        await umschaltung.getByRole('tab', { name: ansicht }).click();
+      }
       const figur = paneel.locator(`[data-lfh="koerperfigur"][data-ansicht="${ansicht}"]`);
       const zonen = figur.locator('[data-lfh="koerperzone"]');
       await expect(zonen).toHaveCount(ansicht === 'vorn' ? 18 : 17);
@@ -1416,6 +1431,14 @@ test('Körperschema: jede Region hält die Stufe, Hand, Fuß und Hals 72 × 72 i
         }
       }
     }
+    // Das Sternchen der Verletzung (vorn): Trefferfläche mindestens die Stufe.
+    if ((await umschaltung.count()) > 0) {
+      await umschaltung.getByRole('tab', { name: 'vorn' }).click();
+    }
+    const stern = paneel.getByRole('button', { name: /^Verletzung 1, Thorax, vorn/ });
+    const s = (await stern.boundingBox())!;
+    expect(s.height + SUBPIXEL, `${dichte}/Sternchen/Höhe`).toBeGreaterThanOrEqual(boden);
+    expect(s.width + SUBPIXEL, `${dichte}/Sternchen/Breite`).toBeGreaterThanOrEqual(boden);
     // Die Hand links, vorn (Szenario der Spec) wird getroffen: der Tipp öffnet ihre Wahl.
     const handLinks = paneel.getByRole('button', { name: 'Hand links, vorn' });
     hand[dichte] = (await handLinks.boundingBox())!;

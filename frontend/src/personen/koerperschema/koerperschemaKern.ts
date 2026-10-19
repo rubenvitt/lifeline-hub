@@ -69,3 +69,33 @@ export function nummeriere(verletzungen: readonly Verletzung[]): NummerierteVerl
 export function figurVon(geschlecht: Person['geschlecht'] | undefined): Figur {
   return geschlecht === 'maennlich' || geschlecht === 'weiblich' ? geschlecht : 'neutral';
 }
+
+/**
+ * Wie das Schema steht (Spec `koerperschema`, „Figur nach Geschlecht, Lage unabhängig davon“):
+ * `beide` — vorn und hinten nebeneinander, Wahl bzw. Liste daneben; `eine` — eine Ansicht mit
+ * Umschaltung, Wahl daneben; `gestapelt` — eine Ansicht mit Umschaltung, Wahl darunter (die
+ * Figur rollt waagerecht, wenn sie breiter ist als der Platz, und schrumpft nie unter ihren
+ * Maßstab: die Trefferzonen halten die Stufe).
+ */
+export type SchemaLayout = 'beide' | 'eine' | 'gestapelt';
+
+/** Mindestbreite der Spalte neben der Figur (Wahl der Art bzw. Liste), in px. */
+export const WAHL_MIN_PX = 240;
+
+/**
+ * Das Layout aus der gemessenen Breite des Schemas. Nebeneinander steht nur, was samt der Spalte
+ * daneben passt: so bleibt die Wahl der Art nach dem Tipp neben der Figur im Bild, auch in der
+ * Handschuh-Stufe (480 px je Ansicht) am Tablet. `width` `null` heißt ungemessen: dann gilt
+ * `breitVorgabe` (ab `md` beide, wie vor der Messung).
+ */
+export function schemaLayout(
+  width: number | null,
+  masse: { figurWidth: number; gapFiguren: number; gapWahl: number },
+  breitVorgabe: boolean,
+): SchemaLayout {
+  if (width == null || width <= 0) return breitVorgabe ? 'beide' : 'eine';
+  const { figurWidth, gapFiguren, gapWahl } = masse;
+  if (width >= 2 * figurWidth + gapFiguren + gapWahl + WAHL_MIN_PX) return 'beide';
+  if (width >= figurWidth + gapWahl + WAHL_MIN_PX) return 'eine';
+  return 'gestapelt';
+}

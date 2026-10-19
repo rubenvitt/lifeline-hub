@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Verletzung } from '../../api/types';
-import { figurVon, nummeriere, regionName } from './koerperschemaKern';
+import { figurVon, nummeriere, regionName, schemaLayout } from './koerperschemaKern';
 
 /** Kern des Körperschemas (LLH-1120, Spec `koerperschema`). */
 
@@ -55,5 +55,28 @@ describe('nummeriere — feste Nummer nach Erfassungsfolge', () => {
     const nachher = nummeriere([verletzung(1), verletzung(2, true), verletzung(3)]);
     expect(nachher.map((e) => e.nummer)).toEqual(vorher.map((e) => e.nummer));
     expect(nachher.filter((e) => !e.verletzung.aufgehoben_at).map((e) => e.nummer)).toEqual([1, 3]);
+  });
+});
+
+describe('schemaLayout', () => {
+  const handschuh = { figurWidth: 480, gapFiguren: 16, gapWahl: 44 };
+  const kompakt = { figurWidth: 330, gapFiguren: 7, gapWahl: 18 };
+  it('stellt vorn und hinten nur nebeneinander, wenn die Wahl daneben passt', () => {
+    // 2 × 480 + 16 + 44 + 240 = 1260
+    expect(schemaLayout(1260, handschuh, true)).toBe('beide');
+    expect(schemaLayout(1259, handschuh, true)).toBe('eine');
+    // 2 × 330 + 7 + 18 + 240 = 925
+    expect(schemaLayout(925, kompakt, true)).toBe('beide');
+    expect(schemaLayout(924, kompakt, true)).toBe('eine');
+  });
+  it('nimmt eine Ansicht mit der Wahl daneben, sonst gestapelt', () => {
+    // 480 + 44 + 240 = 764
+    expect(schemaLayout(764, handschuh, true)).toBe('eine');
+    expect(schemaLayout(763, handschuh, true)).toBe('gestapelt');
+    expect(schemaLayout(358, kompakt, false)).toBe('gestapelt');
+  });
+  it('folgt ungemessen der Vorgabe nach der Breite des Fensters', () => {
+    expect(schemaLayout(null, handschuh, true)).toBe('beide');
+    expect(schemaLayout(0, handschuh, false)).toBe('eine');
   });
 });

@@ -22,7 +22,9 @@ import { regionName, type NummerierteVerletzung } from './koerperschemaKern';
  *
  * STERNCHEN: sechsstrahlig in der Textfarbe, die Nummer daneben in Mono — Teil der Zeichnung, nicht
  * des Iconsatzes. Die Nummer trägt die Unterscheidung (Form und Zahl, nie Farbe), damit das Blatt
- * schwarz-weiß lesbar bleibt.
+ * schwarz-weiß lesbar bleibt. Beim Markieren trägt jedes Sternchen eine Trefferfläche von
+ * mindestens der Steuerhöhe ({@link sternTrefferPx}); Tastaturfokus und Wahl zeichnen ihren Rand
+ * in `bedien`.
  *
  * TREFFERZONEN: je Region ein `<g role="button">` aus durchsichtigen Rechtecken
  * (`fill-opacity: 0`, nimmt aber Zeiger an). Roving-Tabindex in der festen Folge aus `ZONEN`,
@@ -61,6 +63,18 @@ export interface KoerperZiel {
 const STERN_PX: Record<FigurModus, number> = { lesen: 9, markieren: 10, druck: 9, mini: 5 };
 const NUMMER_PX: Record<FigurModus, number> = { lesen: 13, markieren: 14, druck: 12, mini: 9 };
 
+/** Boden der Trefferfläche eines Sternchens in px (vier Sternradien beim Markieren). */
+export const STERN_TREFFER_BODEN = 40;
+
+/**
+ * Kante der Trefferfläche eines bedienbaren Sternchens in px: mindestens die Steuerhöhe der
+ * Stufe, in der Handschuh-Stufe 72 (Bedien-Leitlinie, „Handgebautes Bedienziel“). Rein und
+ * exportiert, Böden als Literale im Test.
+ */
+export function sternTrefferPx(token: { controlHeight: number }): number {
+  return Math.max(STERN_TREFFER_BODEN, token.controlHeight);
+}
+
 /** Sechs Strahlen eines Sternchens um (0, 0), Radius `r`. */
 function sternPfad(r: number): string {
   return [0, 60, 120]
@@ -97,12 +111,13 @@ export default function KoerperFigur({
   onRegion,
   onStern,
 }: KoerperFigurProps) {
-  const { rollen } = useRollen();
+  const { rollen, token } = useRollen();
   const farben = koerperschemaFarben(rollen);
   const zonen = ZONEN[ansicht];
   const knoepfe = useRef<(SVGGElement | null)[]>([]);
   const [fokusIndex, setFokusIndex] = useState(0);
   const [fokussiert, setFokussiert] = useState<number | null>(null);
+  const [sternFokus, setSternFokus] = useState<number | null>(null);
   const bedienbar = modus === 'markieren' && !gesperrt;
   const druck = modus === 'druck';
   const einheit = 1 / massstab;
@@ -146,11 +161,13 @@ export default function KoerperFigur({
       data-lfh="koerperfigur"
       data-ansicht={ansicht}
       data-figur={figur}
+      // Beim Markieren schrumpft die Figur nie (die Zonen halten die Stufe); ist sie breiter als
+      // der Platz, rollt ihr Behälter waagerecht (`Koerperschema.tsx`). Lesen, Druck und die
+      // kleine Figur passen sich der Breite an.
       style={{
         display: 'block',
         flex: '0 0 auto',
-        maxWidth: '100%',
-        height: 'auto',
+        ...(bedienbar ? {} : { maxWidth: '100%', height: 'auto' }),
         overflow: 'visible',
       }}
     >
@@ -213,6 +230,9 @@ export default function KoerperFigur({
         const nummerGroesse = NUMMER_PX[modus] * einheit;
         const sternBedienbar = bedienbar && onStern != null;
         const gewaehltHier = gewaehlterStern === v.id;
+        // Wahl und Tastaturfokus zeichnen den Rahmen in `bedien` (wie die Zonen).
+        const umrandet = gewaehltHier || sternFokus === v.id;
+        const treffer = sternTrefferPx(token) * einheit;
         return (
           <g
             key={v.id}
@@ -227,6 +247,8 @@ export default function KoerperFigur({
                   'aria-label': `Verletzung ${nummer}, ${regionName(v.ansicht, v.region)} · ${VERLETZUNG_ART_WORT[v.art]}`,
                   'aria-pressed': gewaehltHier,
                   style: { cursor: 'pointer', outline: 'none' },
+                  onFocus: () => setSternFokus(v.id),
+                  onBlur: () => setSternFokus((f) => (f === v.id ? null : f)),
                   onClick: () => onStern?.(v.id),
                   onKeyDown: (e: KeyboardEvent<SVGGElement>) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -238,16 +260,16 @@ export default function KoerperFigur({
               : { 'aria-hidden': true })}
           >
             {sternBedienbar && (
-              // Trefferfläche des Sternchens: so groß wie eine Zone, damit es im Handschuh trifft.
+              // Trefferfläche des Sternchens: mindestens die Steuerhöhe, im Handschuh 72 × 72 px.
               <rect
-                x={-r * 2}
-                y={-r * 2}
-                width={r * 4}
-                height={r * 4}
+                x={-treffer / 2}
+                y={-treffer / 2}
+                width={treffer}
+                height={treffer}
                 fill="currentColor"
                 fillOpacity={0}
                 pointerEvents="all"
-                stroke={gewaehltHier ? farben.bedien : 'none'}
+                stroke={umrandet ? farben.bedien : 'none'}
                 strokeWidth={2 * einheit}
               />
             )}
