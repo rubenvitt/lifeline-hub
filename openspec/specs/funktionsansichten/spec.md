@@ -62,7 +62,7 @@ Einsatzabschnitt“, „Ansicht Verpflegung“).
 | `unfallhilfsstellen`: Kräfte der eigenen UHS zuordnen, ad hoc erfassen, lösen | — | L/S | — |
 | `unfallhilfsstellen`: UHS anlegen, Status wechseln, stornieren | — | — | — |
 | `personen`: Personen der eigenen UHS | L | L | — |
-| `personen`: Aufnahme in die eigene UHS, Stammdaten, Sichtung, Verbleib, Notizen, Auswahl „Bestätigt von“ | S | S | — |
+| `personen`: Aufnahme in die eigene UHS, Stammdaten, Sichtung, Verbleib, Notizen, Verletzungen, Maßnahmen, Transport, Auswahl „Bestätigt von“ | S | S | — |
 | `personen`: Export, Druck, Abgleich, Anhänge | — | — | — |
 | `material`: Material der eigenen UHS | — | L | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | — | L/S | — |
@@ -108,6 +108,11 @@ Der Lagemonitor MUST NOT schreiben dürfen, in keinem Modul.
 - **THEN** zeigt die Karte des Lagemonitors den Absperrbereich und die Fläche des Abschnitts, aber weder den Bezirk noch die Skizze
 - **AND** enthält die Antwort des Servers dafür weder Beschriftung und Notiz der Zone noch Leitung und Bemerkung des Abschnitts
 - **AND** bleiben Zonenliste und Abschnittsliste für den Lagemonitor gesperrt (403), denn sie tragen Notizen und Leiternamen
+
+#### Scenario: Tablet markiert eine Verletzung
+
+- **WHEN** ein UHS-Tablet an einer Person seiner UHS eine Verletzung markiert
+- **THEN** speichert der Server sie
 
 ### Requirement: Stellenbindung
 
