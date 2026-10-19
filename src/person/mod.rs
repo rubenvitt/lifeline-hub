@@ -506,6 +506,24 @@ pub fn etb_text_sichtung(registrier_nr: i64, kategorie: Sichtungskategorie) -> S
 /// `frontend/src/api/eingabegrenzen.ts`.
 pub const PAT_NUMMER_MAX: usize = 32;
 
+/// Höchstlänge von Name und Vorname einer Person (LLH-1329, Spec `eingabegrenzen`, design.md D7
+/// der Change `f8218h1i-personendaten-feldweise`). Die Grenzen der Personen-Freitexte sind
+/// großzügig, damit eine vorgemerkte Anlage aus der Warteschlange nicht scheitert. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const PERSON_NAME_MAX: usize = 200;
+
+/// Höchstlänge von Herkunft / Adresse, Fundort (`antreff_ort`) und Melder / Kontakt (LLH-1329).
+pub const PERSON_ANGABE_MAX: usize = 500;
+
+/// Höchstlänge von „Zustand / Verdacht“ (LLH-1329).
+pub const PERSON_ZUSTAND_MAX: usize = 500;
+
+/// Höchstlänge der Notiz in den Personendaten (LLH-1329).
+pub const PERSON_NOTIZ_MAX: usize = 2_000;
+
+/// Höchstlänge einer Verlaufsnotiz (`POST …/notizen`, LLH-1329).
+pub const VERLAUFSNOTIZ_MAX: usize = 2_000;
+
 /// Höchstlänge der Notiz einer Verletzung (LLH-1113, Spec `personen-verletzungen`): ein kurzer
 /// Zusatz zur Markierung am Körperschema, kein Befundtext. Spiegel:
 /// `frontend/src/api/eingabegrenzen.ts`.

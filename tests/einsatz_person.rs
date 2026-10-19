@@ -2611,3 +2611,154 @@ async fn einsicht_je_person_zeigt_export_nach_erfassung() {
     assert_eq!(arten, vec!["export"]);
     assert_eq!(audit_anzahl(&app, &admin, e, spaet).await, 0);
 }
+
+// ---------- LLH-1329: Grenzen der Personen-Freitexte (Spec `eingabegrenzen`, D7) ----------
+
+/// Wire-Feld, Etikett der Meldung und Grenze je Freitext der Person (design.md D7 der Change
+/// `f8218h1i-personendaten-feldweise`).
+const PERSONEN_FREITEXTE: [(&str, &str, usize); 7] = [
+    ("name", "Name", 200),
+    ("vorname", "Vorname", 200),
+    ("herkunft_adresse", "Herkunft / Adresse", 500),
+    ("antreff_ort", "Fundort", 500),
+    ("melder_kontakt", "Melder / Kontakt", 500),
+    ("zustand", "Zustand / Verdacht", 500),
+    ("notiz", "Notiz", 2_000),
+];
+
+/// Ein Wert mit genau `n` Zeichen; „ä“ hat zwei Bytes, zählt aber als ein Zeichen. Der Rand-
+/// Leerraum zählt nach dem Trimmen nicht mit.
+fn text_mit(n: usize) -> String {
+    format!("  {}  ", "ä".repeat(n))
+}
+
+/// Anlegen: genau an der Grenze angenommen, ein Zeichen mehr ist 400 mit dem Wortlaut der Regel,
+/// und es entsteht keine Person. Mutationsprobe: die Prüfung eines Felds in `anlegen` entfernt →
+/// der Fall „ein Zeichen mehr“ dieses Felds legt an (201) und wird rot.
+#[tokio::test]
+async fn anlegen_prueft_jeden_personen_freitext_an_der_grenze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for (feld, etikett, max) in PERSONEN_FREITEXTE {
+        let (s, json) = personen_post(
+            &app,
+            &admin,
+            e,
+            &serde_json::json!({ feld: text_mit(max) }).to_string(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{feld} an der Grenze: {json}");
+        assert_eq!(json[feld].as_str().unwrap().chars().count(), max, "{feld}");
+
+        let vorher = personen_anzahl(&app, &admin, e).await;
+        let (s, json) = personen_post(
+            &app,
+            &admin,
+            e,
+            &serde_json::json!({ feld: text_mit(max + 1) }).to_string(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld} über der Grenze: {json}");
+        assert_eq!(
+            json["error"],
+            format!("{etikett} darf höchstens {max} Zeichen lang sein")
+        );
+        assert_eq!(personen_anzahl(&app, &admin, e).await, vorher, "{feld}");
+    }
+}
+
+/// PATCH: genau an der Grenze angenommen, ein Zeichen mehr ist 400, und der gespeicherte Wert
+/// bleibt. Mutationsprobe: die Prüfung eines Felds in `aktualisieren` entfernt → der Fall „ein
+/// Zeichen mehr“ dieses Felds schreibt (200) und wird rot.
+#[tokio::test]
+async fn patch_prueft_jeden_personen_freitext_an_der_grenze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    for (feld, etikett, max) in PERSONEN_FREITEXTE {
+        let (s, json) = person_patch(
+            &app,
+            &admin,
+            e,
+            p,
+            &serde_json::json!({ feld: text_mit(max) }).to_string(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{feld} an der Grenze: {json}");
+        let gespeichert = json[feld].clone();
+        assert_eq!(gespeichert.as_str().unwrap().chars().count(), max);
+
+        let (s, json) = person_patch(
+            &app,
+            &admin,
+            e,
+            p,
+            &serde_json::json!({ feld: text_mit(max + 1) }).to_string(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld} über der Grenze: {json}");
+        assert_eq!(
+            json["error"],
+            format!("{etikett} darf höchstens {max} Zeichen lang sein")
+        );
+        assert_eq!(
+            person_detail(&app, &admin, e, p).await[feld],
+            gespeichert,
+            "{feld} unverändert"
+        );
+    }
+}
+
+/// Ein PATCH prüft nur die Felder, die er nennt: ein Altbestand über der Grenze (vor LLH-1329
+/// gespeichert) hält die Änderung eines anderen Felds nicht auf. Mutationsprobe: die Prüfung
+/// gegen den geladenen Bestand statt gegen den Body → 400 und rot.
+#[tokio::test]
+async fn patch_eines_anderen_felds_bei_altbestand_ueber_der_grenze_geht_durch() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"vorname":"Alt"}"#).await;
+    let altbestand = "x".repeat(600);
+    sqlx::query("UPDATE einsatz_person SET melder_kontakt = ? WHERE id = ?")
+        .bind(&altbestand)
+        .bind(p)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (s, json) = person_patch(&app, &admin, e, p, r#"{"vorname":"Neu"}"#).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["vorname"], "Neu");
+    assert_eq!(
+        json["melder_kontakt"],
+        altbestand.as_str(),
+        "Altbestand bleibt"
+    );
+}
+
+/// Verlaufsnotiz: 2 000 Zeichen angenommen, eines mehr ist 400, und der Verlauf bleibt ohne
+/// neue Notiz. Mutationsprobe: `pflicht_max` in `notiz` zurück auf `pflicht` → rot.
+#[tokio::test]
+async fn notiz_post_prueft_die_grenze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, "{}").await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/notizen");
+
+    let body = serde_json::json!({ "text": text_mit(2_000) }).to_string();
+    let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+
+    let body = serde_json::json!({ "text": text_mit(2_001) }).to_string();
+    let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(
+        json["error"],
+        "Notiztext darf höchstens 2000 Zeichen lang sein"
+    );
+    let notizen = person_detail(&app, &admin, e, p).await["notizen"].clone();
+    assert_eq!(notizen.as_array().unwrap().len(), 1, "keine zweite Notiz");
+}

@@ -24,11 +24,12 @@ use crate::person::verletzung_repo::{self, VerletzungAnzeige};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
-    PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
+    PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus, PAT_NUMMER_MAX,
+    PERSON_ANGABE_MAX, PERSON_NAME_MAX, PERSON_NOTIZ_MAX, PERSON_ZUSTAND_MAX, VERLAUFSNOTIZ_MAX,
 };
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pruefe_koordinate, trimme,
-    trimme_tri,
+    deserialize_optional_field, optional_max, optional_max_tri, parse_enum, parse_enum_opt,
+    pflicht_max, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::uhs::{belegung_repo, AufenthaltAnzeige};
 use axum::extract::{Query, State};
@@ -270,6 +271,18 @@ pub async fn anlegen(
         body.geschlecht.as_deref(),
         "Unbekanntes Geschlecht",
     )?;
+    // LLH-1329: die Freitexte für sich (400), vor jedem 422 des Zusammenhangs.
+    let name = optional_max(body.name, "Name", PERSON_NAME_MAX)?;
+    let vorname = optional_max(body.vorname, "Vorname", PERSON_NAME_MAX)?;
+    let herkunft = optional_max(
+        body.herkunft_adresse,
+        "Herkunft / Adresse",
+        PERSON_ANGABE_MAX,
+    )?;
+    let antreff = optional_max(body.antreff_ort, "Fundort", PERSON_ANGABE_MAX)?;
+    let melder = optional_max(body.melder_kontakt, "Melder / Kontakt", PERSON_ANGABE_MAX)?;
+    let zustand = optional_max(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
+    let notiz = optional_max(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
 
     let status = body
         .status
@@ -378,15 +391,7 @@ pub async fn anlegen(
         "antreff_lat",
         "antreff_lon",
     )?;
-    let zustand = trimme(body.zustand);
-
-    let name = trimme(body.name);
-    let vorname = trimme(body.vorname);
     let geburtsdatum = trimme(body.geburtsdatum);
-    let herkunft = trimme(body.herkunft_adresse);
-    let antreff = trimme(body.antreff_ort);
-    let melder = trimme(body.melder_kontakt);
-    let notiz = trimme(body.notiz);
 
     // F06/LFH-244 Tier-A: Domänen-Write (INSERT) + System-ETB-Eintrag atomar in EINER Tx
     // (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für ETB-Text
@@ -694,20 +699,22 @@ pub async fn aktualisieren(
         "Unbekanntes Geschlecht",
     )?;
 
-    let name = trimme_tri(body.name);
-    let vorname = trimme_tri(body.vorname);
+    // LLH-1329: nur die genannten Felder; ein Altbestand über der Grenze in einem anderen Feld
+    // hält die Änderung nicht auf.
+    let name = optional_max_tri(body.name, "Name", PERSON_NAME_MAX)?;
+    let vorname = optional_max_tri(body.vorname, "Vorname", PERSON_NAME_MAX)?;
     let geschlecht = trimme_tri(body.geschlecht);
     let geburtsdatum = trimme_tri(body.geburtsdatum);
-    let herkunft = trimme_tri(body.herkunft_adresse);
-    let antreff = trimme_tri(body.antreff_ort);
-    let melder = trimme_tri(body.melder_kontakt);
-    let notiz = trimme_tri(body.notiz);
-    let zustand = trimme_tri(body.zustand);
-    let pat_nummer = crate::routes::support::optional_max_tri(
-        body.pat_nummer,
-        "PAT-Nummer",
-        crate::person::PAT_NUMMER_MAX,
+    let herkunft = optional_max_tri(
+        body.herkunft_adresse,
+        "Herkunft / Adresse",
+        PERSON_ANGABE_MAX,
     )?;
+    let antreff = optional_max_tri(body.antreff_ort, "Fundort", PERSON_ANGABE_MAX)?;
+    let melder = optional_max_tri(body.melder_kontakt, "Melder / Kontakt", PERSON_ANGABE_MAX)?;
+    let notiz = optional_max_tri(body.notiz, "Notiz", PERSON_NOTIZ_MAX)?;
+    let zustand = optional_max_tri(body.zustand, "Zustand / Verdacht", PERSON_ZUSTAND_MAX)?;
+    let pat_nummer = optional_max_tri(body.pat_nummer, "PAT-Nummer", PAT_NUMMER_MAX)?;
 
     // LFH-613 „vermisst seit": zuerst das Feld isoliert (400 — leeren, unparsebar, Zukunft),
     // danach der Zusammenhang mit dem Status (422, unten gegen den geladenen Bestand).
@@ -1455,7 +1462,7 @@ pub async fn notiz(
         }
     }
     ctx.fordere_aktiv()?;
-    let text = pflicht(&body.text, "Notiztext")?;
+    let text = pflicht_max(&body.text, "Notiztext", VERLAUFSNOTIZ_MAX)?;
     let person = repo::laden(&state.pool, einsatz_id, person_id).await?;
     let erfasst_at = crate::routes::support::erfassungszeitpunkt(
         body.zeitpunkt_at.as_deref(),
