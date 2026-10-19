@@ -71,6 +71,8 @@ ohne Fahrer-Angabe gelten als fremdes Rettungsmittel (bisheriges Verhalten: abge
   „Wartebereich“ (Name lesbar, Symbolknopf) und an die rechte Spalte „Unterwegs“ mit
   „Übergabe quittieren“.
 - `lagekarte-betroffene`: die Ebene zeigt keine abgeschlossenen Patienten.
+- `lage-verdichtung`: abgeschlossene Patienten zählen in keiner Lagezahl „Patienten“ und keiner
+  Sichtungsverteilung der Lage; das gemeinsame Fixture belegt den Versorgungszustand.
 
 ## Impact
 
