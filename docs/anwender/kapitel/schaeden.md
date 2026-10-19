@@ -2,7 +2,7 @@
 titel: Schäden
 gruppen: [alle, fuehrung]
 reihenfolge: 550
-quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
+quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
 ---
 
 ## Überblick
@@ -84,6 +84,14 @@ Dateien zum Schaden liegen auf seiner Seite.
 
 Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Bezug
 hinzufügen“ unter „Bezüge“, [Betroffene und Sichtung](betroffene.md)).
+
+### Bearbeiten
+
+„Speichern“ und „Abbrechen“ bleiben am unteren Rand stehen, auch wenn die Seite rollt. Ohne Ort
+oder mit einer Beschreibung über 8.000 Zeichen speichert die Seite nicht; der Grund steht unter
+dem Feld („Ort ist Pflicht“), und das Feld hat den Fokus. Wer die Seite mit ungespeicherten
+Eingaben verlassen will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ behält die
+Eingaben, „Verwerfen“ verlässt die Seite ohne sie.
 
 ### Einsatztagebuch
 

@@ -12,12 +12,20 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import type { FormRule } from 'antd';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { Datenfeld, Datenraster, Paneel, StatusChip, monoStil } from '../components/instrument';
+import {
+  Datenfeld,
+  DatenfeldEingabe,
+  Datenraster,
+  Paneel,
+  StatusChip,
+  monoStil,
+} from '../components/instrument';
 import { SPEZIES_META, TIER_ABSCHLUSS, TIER_STATUS } from './tiere/tierHelfer';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -40,6 +48,9 @@ import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
 import { registrierNummer } from '../anzeige/registrierNummer';
+import { useSpeicherLeiste } from '../components/speicherLeiste';
+import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
+import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSchutz';
 
 /**
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
@@ -48,6 +59,19 @@ import { registrierNummer } from '../anzeige/registrierNummer';
 type TierFormWerte = TierPatch & { halter?: HalterWert | null };
 
 const STATUS_META = TIER_STATUS;
+
+/** Obergrenze des geschätzten Alters in Jahren. */
+const ALTER_MAX = 120;
+
+/**
+ * Als Regel, NICHT als `max` am `InputNumber`: das klemmte still auf die Grenze (LLH-1101, gleiche
+ * Regelform wie `hoechstensRegel` in `betreuung/BetreuungDialoge.tsx`). Die Meldung steht am Feld.
+ */
+const alterRegel: FormRule = {
+  type: 'number',
+  max: ALTER_MAX,
+  message: `Höchstens ${ALTER_MAX} Jahre`,
+};
 
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: TierStatus): TierStatus[] {
@@ -62,7 +86,7 @@ function naechsteStatus(aktuell: TierStatus): TierStatus[] {
 }
 
 /** Halter-Kurzanzeige. */
-function halterAnzeige(t: Tier): React.ReactNode {
+function halterAnzeige(t: Tier): ReactNode {
   if (t.halter_registrier_nr != null) {
     const label = registrierNummer('R', t.halter_registrier_nr);
     return t.halter_storniert_at ? (
@@ -91,6 +115,14 @@ export default function TiereDetailPage() {
   // still ein Schreiben ohne Lock.
   const sitzung = editSitzung.sitzung;
   const bearbeiten = sitzung != null;
+  const speicherLeiste = useSpeicherLeiste({ hasAbbrechen: true });
+  // Verlassen-Schutz (LLH-1101, `frontend/AGENTS.md` „Formularseiten“): aktiv, solange die
+  // Bearbeiten-Sitzung offen ist. Der `schluessel` hängt an der Sitzung, nicht nur an der ID: eine
+  // abgebrochene Eingabe zählt beim nächsten „Bearbeiten“ nicht als offene Änderung.
+  const schutz = useFormularVerlassenSchutz({
+    aktiv: bearbeiten,
+    schluessel: bearbeiten ? tierId : null,
+  });
   const [abschlussOffen, setAbschlussOffen] = useState(false);
   const [abschlussForm] = Form.useForm<{
     abschluss_grund: AbschlussGrund;
@@ -185,15 +217,17 @@ export default function TiereDetailPage() {
   };
 
   // Die Route hat keinen `key`: der Wechsel zu einem anderen Tier behält die Seite, nicht die
-  // Gründe.
+  // Gründe und nicht die Bearbeiten-Sitzung (ihre Werte und ihr Lock-Stand gehören dem vorigen).
   const { reset: editReset } = editMutation;
   const { reset: statusReset } = statusMutation;
   const { reset: stornoReset } = stornoMutation;
+  const { beende: beendeSitzung } = editSitzung;
   useEffect(() => {
     editReset();
     statusReset();
     stornoReset();
-  }, [tierId, editReset, statusReset, stornoReset]);
+    beendeSitzung();
+  }, [tierId, editReset, statusReset, stornoReset, beendeSitzung]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
@@ -228,79 +262,83 @@ export default function TiereDetailPage() {
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
-  // Eine Detail-Zelle: im Edit-Modus ein noStyle-Form.Item mit Input, sonst die Anzeige — dasselbe
-  // Datenraster bleibt stehen.
-  const zelle = (name: string, input: React.ReactNode, anzeige: React.ReactNode) =>
+  // Eine Detail-Zelle: im Edit-Modus eine `DatenfeldEingabe` (benanntes Feld, Prüffehler sichtbar
+  // darunter, LLH-1101), sonst die Anzeige — dasselbe Datenraster bleibt stehen.
+  const zelle = (
+    name: keyof TierFormWerte,
+    label: string,
+    input: ReactElement<{ id?: string }>,
+    anzeige: ReactNode,
+    {
+      mono = false,
+      breit = false,
+      rules,
+    }: { mono?: boolean; breit?: boolean; rules?: FormRule[] } = {},
+  ) =>
     bearbeiten ? (
-      <Form.Item name={name} noStyle>
+      <DatenfeldEingabe label={label} name={name} rules={rules} breit={breit}>
         {input}
-      </Form.Item>
+      </DatenfeldEingabe>
     ) : (
-      anzeige
+      <Datenfeld label={label} mono={mono} breit={breit}>
+        {anzeige}
+      </Datenfeld>
     );
 
   const detailAnsicht = (
     <Datenraster spalten={3} beschriftung="Tierdaten">
-      <Datenfeld label="Rufname">
-        {zelle('rufname', <Input placeholder="Rufname" />, t.rufname ?? '—')}
-      </Datenfeld>
-      <Datenfeld label="Rasse / Beschreibung">
-        {zelle('rasse_beschreibung', <Input />, t.rasse_beschreibung ?? '—')}
-      </Datenfeld>
-      <Datenfeld label="Geschlecht">
-        {zelle(
-          'geschlecht',
-          <Select
-            allowClear
-            style={{ minWidth: 160 }}
-            placeholder="—"
-            options={[
-              { value: 'maennlich', label: 'männlich' },
-              { value: 'weiblich', label: 'weiblich' },
-              { value: 'unbekannt', label: 'unbekannt' },
-            ]}
-          />,
-          t.geschlecht ?? '—',
-        )}
-      </Datenfeld>
-      <Datenfeld label="Alter in Jahren (geschätzt)" mono>
-        {zelle('alter_geschaetzt', <InputNumber min={0} max={120} />, t.alter_geschaetzt ?? '—')}
-      </Datenfeld>
-      <Datenfeld label="Farbe / Erscheinung">
-        {zelle('farbe_beschreibung', <Input />, t.farbe_beschreibung ?? '—')}
-      </Datenfeld>
-      <Datenfeld label="Kennzeichnung" mono>
-        {zelle(
-          'kennzeichnung',
-          <Input placeholder="Chip / Tätowierung / Halsband" />,
-          t.kennzeichnung ?? '—',
-        )}
-      </Datenfeld>
-      <Datenfeld label="Größe / Gewicht">
-        {zelle('groesse_gewicht', <Input />, t.groesse_gewicht ?? '—')}
-      </Datenfeld>
-      <Datenfeld label="Fundort">{zelle('antreff_ort', <Input />, t.antreff_ort ?? '—')}</Datenfeld>
-      <Datenfeld label="Halter">
-        {zelle(
-          'halter',
-          <HalterPicker einsatzId={einsatzId} />,
-          // Klick auf R-nnn führt zur (auditierten) Personen-Detailseite des Halters.
-          t.halter_person_id != null ? (
-            <Button
-              type="link"
-              style={{ padding: 0 }}
-              onClick={() => navigate(personDetailPfad(einsatzId, t.halter_person_id!))}
-            >
-              {halterAnzeige(t)}
-            </Button>
-          ) : (
-            halterAnzeige(t)
-          ),
-        )}
-      </Datenfeld>
-      <Datenfeld label="Notiz" breit>
-        {zelle('notiz', <Input.TextArea rows={2} />, t.notiz ?? '—')}
-      </Datenfeld>
+      {zelle('rufname', 'Rufname', <Input placeholder="Rufname" />, t.rufname ?? '—')}
+      {zelle('rasse_beschreibung', 'Rasse / Beschreibung', <Input />, t.rasse_beschreibung ?? '—')}
+      {zelle(
+        'geschlecht',
+        'Geschlecht',
+        <Select
+          allowClear
+          style={{ minWidth: 160 }}
+          placeholder="—"
+          options={[
+            { value: 'maennlich', label: 'männlich' },
+            { value: 'weiblich', label: 'weiblich' },
+            { value: 'unbekannt', label: 'unbekannt' },
+          ]}
+        />,
+        t.geschlecht ?? '—',
+      )}
+      {zelle(
+        'alter_geschaetzt',
+        'Alter in Jahren (geschätzt)',
+        <InputNumber min={0} />,
+        t.alter_geschaetzt ?? '—',
+        { mono: true, rules: [alterRegel] },
+      )}
+      {zelle('farbe_beschreibung', 'Farbe / Erscheinung', <Input />, t.farbe_beschreibung ?? '—')}
+      {zelle(
+        'kennzeichnung',
+        'Kennzeichnung',
+        <Input placeholder="Chip / Tätowierung / Halsband" />,
+        t.kennzeichnung ?? '—',
+        { mono: true },
+      )}
+      {zelle('groesse_gewicht', 'Größe / Gewicht', <Input />, t.groesse_gewicht ?? '—')}
+      {zelle('antreff_ort', 'Fundort', <Input />, t.antreff_ort ?? '—')}
+      {zelle(
+        'halter',
+        'Halter',
+        <HalterPicker einsatzId={einsatzId} />,
+        // Klick auf R-nnn führt zur (auditierten) Personen-Detailseite des Halters.
+        t.halter_person_id != null ? (
+          <Button
+            type="link"
+            style={{ padding: 0 }}
+            onClick={() => navigate(personDetailPfad(einsatzId, t.halter_person_id!))}
+          >
+            {halterAnzeige(t)}
+          </Button>
+        ) : (
+          halterAnzeige(t)
+        ),
+      )}
+      {zelle('notiz', 'Notiz', <Input.TextArea rows={2} />, t.notiz ?? '—', { breit: true })}
     </Datenraster>
   );
 
@@ -414,10 +452,14 @@ export default function TiereDetailPage() {
         )
       }
     >
+      <VerlassenRueckfrage ungespeichert={schutz.ungespeichert} />
       <Space orientation="vertical" style={{ width: '100%' }} size="large">
         {sitzung ? (
           <Form
             form={editForm}
+            onValuesChange={schutz.geaendert}
+            // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
+            scrollToFirstError={{ focus: true }}
             onFinish={(daten) => {
               const h = daten.halter ?? null;
               const patch: TierPatch = {
@@ -434,7 +476,11 @@ export default function TiereDetailPage() {
                 halter_person_id: h?.typ === 'person' ? h.refId : null,
                 halter_kontakt: h?.typ === 'extern' ? h.kontakt : null,
               };
-              editMutation.mutate({ daten: patch, basis: sitzung.basis });
+              const fassung = schutz.fassung();
+              editMutation.mutate(
+                { daten: patch, basis: sitzung.basis },
+                { onSuccess: () => schutz.gespeichert(fassung) },
+              );
             }}
           >
             {detailAnsicht}
@@ -443,7 +489,9 @@ export default function TiereDetailPage() {
                 <SpeicherFehler fehler={editFehler} />
               </div>
             )}
-            <Space style={{ marginTop: 16 }}>
+            {/* Stehende Leiste im `<form>` (`frontend/AGENTS.md`, „Formularseiten“): bei zehn
+                Feldern scrollten die Knöpfe sonst aus dem Bild. */}
+            <div {...speicherLeiste} style={{ ...speicherLeiste.style, marginTop: 16 }}>
               <Button type="primary" htmlType="submit" loading={editMutation.isPending}>
                 Speichern
               </Button>
@@ -451,7 +499,7 @@ export default function TiereDetailPage() {
               <Button disabled={editMutation.isPending} onClick={editSitzung.beende}>
                 Abbrechen
               </Button>
-            </Space>
+            </div>
           </Form>
         ) : (
           detailAnsicht

@@ -81,7 +81,9 @@ function render(
       <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
       <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
     </Routes>,
-    { route },
+    // Data Router: der Verlassen-Schutz hält Pfadwechsel über `useBlocker` an, und der wirft ohne
+    // ihn (`frontend/AGENTS.md`, „Formularseiten“).
+    { route, datenRouter: true },
   );
 }
 
@@ -94,8 +96,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   });
 
   it('Einsatzleitung kann bearbeiten und speichern (ohne Halter → beide null)', async () => {
-    // Edit-Modus öffnen, das vorbefüllte Formular direkt speichern und den PATCH prüfen (kein
-    // getByLabelText — antd bindet label/htmlFor nicht zuverlässig).
+    // Edit-Modus öffnen, das vorbefüllte Formular direkt speichern und den PATCH prüfen.
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;
     render(einsatzAktiv, tierBasis, [
       http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
@@ -674,7 +675,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
           <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
         </Routes>
       </>,
-      { route: '/einsaetze/1/tiere/10' },
+      { route: '/einsaetze/1/tiere/10', datenRouter: true },
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Als vermisst markieren' }));
     await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Übergang nicht erlaubt'));
@@ -682,5 +683,130 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Tier' }));
     await screen.findByRole('heading', { name: /Tier T-002/ });
     expect(screen.queryByText('Übergang nicht erlaubt')).toBeNull();
+  });
+});
+
+/**
+ * Prüfung am Feld (LLH-1101): die Zellen stehen auf `DatenfeldEingabe`. Das Alter klemmte vorher
+ * still auf 120 (`max` am `InputNumber`); jetzt nennt eine Regel die Grenze am Feld.
+ */
+describe('TiereDetailPage — Prüfung am Feld (LLH-1101)', () => {
+  function mitPatch() {
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...tierBasis });
+      }),
+    ]);
+    return koerper;
+  }
+
+  it('Alter 121: „Höchstens 120 Jahre“ steht am Feld, der Wert bleibt, kein PATCH', async () => {
+    const koerper = mitPatch();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const alter = await screen.findByLabelText('Alter in Jahren (geschätzt)');
+    await userEvent.clear(alter);
+    await userEvent.type(alter, '121');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Mutationsprobe: `max={120}` zurück an das Feld — es klemmt still, keine Meldung, rot.
+    const meldung = await screen.findByText('Höchstens 120 Jahre');
+    expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(alter.closest('[data-lfh="datenfeld"]'));
+    expect(alter).toHaveValue('121');
+    await waitFor(() => expect(alter).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(koerper).toHaveLength(0);
+  });
+
+  it('Gegenprobe: Alter 120 speichert', async () => {
+    const koerper = mitPatch();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const alter = await screen.findByLabelText('Alter in Jahren (geschätzt)');
+    await userEvent.clear(alter);
+    await userEvent.type(alter, '120');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0].alter_geschaetzt).toBe(120);
+  });
+
+  it('jede Eingabe ist über ihr Etikett erreichbar', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByRole('textbox', { name: 'Rufname' })).toHaveValue('Rex');
+    expect(screen.getByRole('textbox', { name: 'Rasse / Beschreibung' })).toHaveValue(
+      'Schäferhund',
+    );
+    expect(screen.getByRole('combobox', { name: 'Geschlecht' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Alter in Jahren (geschätzt)' })).toHaveValue(
+      '3',
+    );
+    for (const name of ['Farbe / Erscheinung', 'Kennzeichnung', 'Größe / Gewicht', 'Notiz']) {
+      expect(screen.getByRole('textbox', { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole('textbox', { name: 'Fundort' })).toHaveValue('Weide');
+    // Mutationsprobe: ohne `id`-Weitergabe im `HalterPicker` hat die Auswahl keinen Namen.
+    expect(screen.getByRole('combobox', { name: 'Halter' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Verlassen-Schutz (LLH-1101, Spec `formularseiten`, „Rückfrage vor dem Verlassen“): mit offener
+ * Änderung hält ein Pfadwechsel an, ohne fragt niemand.
+ */
+describe('TiereDetailPage — Verlassen-Schutz (LLH-1101)', () => {
+  const rueckfrage = () => screen.queryByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+
+  it('offene Änderung: „Bleiben“ hält die Eingabe, „Verwerfen“ führt zur Liste', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(await screen.findByLabelText('Rufname'), 'i');
+
+    await userEvent.click(screen.getByRole('link', { name: 'Tiere' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByLabelText('Rufname')).toHaveValue('Rexi');
+    expect(screen.queryByText('LISTE')).toBeNull();
+
+    await userEvent.click(screen.getByRole('link', { name: 'Tiere' }));
+    const wieder = await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    await userEvent.click(within(wieder).getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+
+  it('ohne Änderung: der Wechsel geht ohne Rückfrage', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByLabelText('Rufname');
+    await userEvent.click(screen.getByRole('link', { name: 'Tiere' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    expect(rueckfrage()).toBeNull();
+  });
+
+  it('eine abgebrochene Änderung zählt beim nächsten Bearbeiten nicht', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(await screen.findByLabelText('Rufname'), 'i');
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await screen.findByLabelText('Rufname');
+
+    // Mutationsprobe: `schluessel` fest auf die Tier-ID statt auf die offene Sitzung, rot.
+    await userEvent.click(screen.getByRole('link', { name: 'Tiere' }));
+    expect(await screen.findByText('LISTE')).toBeInTheDocument();
+    expect(rueckfrage()).toBeNull();
+  });
+});
+
+describe('TiereDetailPage — stehende Leiste (LLH-1101)', () => {
+  it('Speichern und Abbrechen stehen in der Speicherleiste im Formular', async () => {
+    render(einsatzAktiv, tierBasis);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const speichern = await screen.findByRole('button', { name: 'Speichern' });
+    // Mutationsprobe: die Knöpfe zurück in ein `<Space>` ohne Leiste — `closest` findet nichts.
+    const leiste = speichern.closest('[data-lfh="speicherleiste"]');
+    expect(leiste).not.toBeNull();
+    expect(leiste!.closest('form')).not.toBeNull();
+    expect(within(leiste as HTMLElement).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
   });
 });

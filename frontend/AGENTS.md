@@ -44,7 +44,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Umschaltknopf daneben, LLH-1065) · `Sammelbanner` · `Filterhinweis` (Band über einer gefilterten
   Liste, Achtungsrolle, Zahlen nur aus Serverzählungen, LLH-1071) ·
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
-  `rollenwerte`/`useRollen`.
+  `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
+  `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
+  `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
+  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen`.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
@@ -720,7 +723,8 @@ und `pages/personen/`.
   (`zuUpdate`) immer alle Felder mit, auch `basemap_modus`, `karten_zoom_start`,
   `fachebenen_sichtbar`. Jede Sektion stellt ihre Queries selbst (kein `useOutletContext`).
   Speichern-Leiste sticky im `<form>` (`htmlType="submit"`), gebaut nur über
-  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`) — sie bringt den Fokusabstand
+  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`; mit „Abbrechen“ daneben
+  `useSpeicherLeiste({ hasAbbrechen: true })`, Abstand `padding`) — sie bringt den Fokusabstand
   mit (LFH-475, `scroll-padding` über `:root:has(...)` in `index.css`, Nachweis
   `e2e/fokus-verdeckung.spec.ts`); `speicherLeisteStil`/`feldrasterStil` rein, die Breite liest
   der Aufrufer aus `useViewport`.
@@ -731,7 +735,8 @@ und `pages/personen/`.
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
-  Erfolg; `aktiv` = Schreibrecht, `schluessel` = Datensatz-ID bei `key={id}`) plus
+  Erfolg; `aktiv` = Schreibrecht, `schluessel` = Datensatz-ID bei `key={id}`; im Bearbeiten-Modus
+  einer Detailseite `aktiv` = Sitzung offen, `schluessel` nur bei offener Sitzung, LLH-1101) plus
   `<VerlassenRueckfrage>` (`components/VerlassenRueckfrage.tsx`, `useBlocker` bei Pfadwechsel,
   „Bleiben“/„Verwerfen“). Seiten, die jede Zeile sofort speichern (`EinsatzModule`), nicht. Tests
   solcher Seiten rendern mit `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft
