@@ -36,10 +36,20 @@ Erfasser. Der aktuelle Stand MUST mit der Person geliefert werden. Ein unbekannt
 („, bestätigt: Name“). Wird die Priorität aufgehoben, MUST der Eintrag „Person R-012:
 Transportpriorität aufgehoben“ lauten. Ändert ein Stand nur Art oder Fachrichtung, MUST kein
 Eintrag entstehen. Art und Fachrichtung MUST NOT im ETB oder in einem Live-Ereignis erscheinen.
+Ein nachgereichter älterer Stand, der die Priorität gegenüber dem zeitlich vorigen Stand ändert,
+MUST zusätzlich die weiter geltende Priorität nennen, wie die Sichtung („…, nachgetragen,
+aktuelle Priorität bleibt normal“, ohne aktuelle Priorität „…, nachgetragen, aktuell keine
+Priorität“).
 
 #### Scenario: Nur die Fachrichtung ändert sich
 - **WHEN** bei R-012 nur die Fachrichtung von „Unfallchirurgie“ auf „Verbrennung“ wechselt
 - **THEN** entsteht kein ETB-Eintrag
+
+#### Scenario: Eingeschobener älterer Stand
+- **WHEN** bei R-012 um 14:00 „normal“ und um 14:20 nur die Art festgelegt ist
+- **AND** danach ein um 14:10 vorgemerkter Stand „sofort“ ankommt
+- **THEN** lautet sein ETB-Eintrag zur Zeit 14:10 „Person R-012: Transportpriorität sofort,
+  nachgetragen, aktuelle Priorität bleibt normal“
 
 #### Scenario: Pseudonym im ETB
 - **WHEN** die Priorität von R-012 auf „sofort“ gesetzt wird

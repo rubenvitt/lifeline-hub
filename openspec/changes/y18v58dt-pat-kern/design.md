@@ -318,3 +318,6 @@ Branches vor dem Release, weil Migrationen nie geändert werden.
 - Auto-Austritt (D6): Ein gewinnender Verbleib nimmt die Person nur aus der UHS, wenn er nicht
   älter ist als ihr jüngster Eintritt oder Wechsel in `person_uhs_belegung`. Sonst holte eine
   nachgereichte Entlassung eine inzwischen wieder aufgenommene Person heraus (Review).
+- Transport-ETB (D6): Ein nachgereichter älterer Stand, der die Priorität ändert, nennt wie die
+  Sichtung die weiter geltende („…, nachgetragen, aktuelle Priorität bleibt normal“). Sonst las
+  das ETB einen eingeschobenen Stand als letzten (Review).

@@ -453,7 +453,7 @@ async fn nachgereichter_aelterer_stand_aendert_den_cache_nicht() {
     assert_eq!(nachtraege.len(), 1, "{etb}");
     assert_eq!(
         nachtraege[0]["inhalt"],
-        "Person R-001: Transportpriorität normal, nachgetragen"
+        "Person R-001: Transportpriorität normal, nachgetragen, aktuelle Priorität bleibt sofort"
     );
     assert_eq!(
         nachtraege[0]["ereigniszeit"],
@@ -467,4 +467,53 @@ async fn nachgereichter_aelterer_stand_aendert_den_cache_nicht() {
             .any(|i| i == "Person R-001: Transportpriorität normal"),
         "kein Eintrag, der den aktuellen Stand behauptet"
     );
+}
+
+/// Review A3 (Spec `personen-transport`, „Nur die Priorität steht im ETB“): ein eingeschobener
+/// älterer Stand, der die Priorität gegenüber seinem Vorgänger ändert, nennt im ETB die weiter
+/// geltende Priorität wie die Sichtung. Sonst läse das ETB „sofort“ als letzten Stand, obwohl ein
+/// späterer Stand ohne eigenen Eintrag „normal“ hält.
+#[tokio::test]
+async fn eingeschobener_aelterer_stand_nennt_die_aktuelle_prioritaet() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for (rest, eingeschoben, erwartet) in [
+        (
+            json!({"prioritaet": "normal", "art": "liegend"}),
+            "sofort",
+            "Transportpriorität sofort, nachgetragen, aktuelle Priorität bleibt normal",
+        ),
+        (
+            json!({}),
+            "dringlich",
+            "Transportpriorität dringlich, nachgetragen, aktuell keine Priorität",
+        ),
+    ] {
+        let p = person_anlegen(&app, &admin, e, "{}").await;
+        angelegt_vor(&pool, p, 60).await;
+        let (s, _) = post(
+            &app,
+            &admin,
+            &pfad(e, p),
+            json!({"prioritaet": "normal", "zeitpunkt_at": zeit(-1800)}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED);
+        let (s, _) = post(&app, &admin, &pfad(e, p), rest).await;
+        assert_eq!(s, StatusCode::CREATED);
+        let (s, v) = post(
+            &app,
+            &admin,
+            &pfad(e, p),
+            json!({"prioritaet": eingeschoben, "zeitpunkt_at": zeit(-900)}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        let etb = transport_etb(&app, &admin, e).await;
+        assert!(
+            etb.iter().any(|i| i.ends_with(erwartet)),
+            "{erwartet}: {etb:?}"
+        );
+    }
 }

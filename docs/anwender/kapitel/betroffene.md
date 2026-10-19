@@ -293,9 +293,9 @@ fremder Bezug wird nie still überschrieben.
 Das Einsatztagebuch führt Betroffene nur mit Registriernummer, ohne Namen: „Person R-… erfasst“,
 „Person R-…: Sichtung SK …“, „Person R-…: Transportpriorität dringlich“, Statuswechsel und
 Stornierungen. Ein nachgereichter älterer Eintrag steht dort zu seiner Erfassungszeit mit
-„nachgetragen“, bei der Sichtung mit der Kategorie, die weiter gilt. Art und Fachrichtung des
-Transports, Maßnahmen, Verletzungen, PAT-Nummer und Kontamination stehen nicht im
-Einsatztagebuch. Die Notiz im Patientenkopf ist nicht änderbar und erscheint nicht im
+„nachgetragen“, bei Sichtung und Transportpriorität mit dem Wert, der weiter gilt. Art und
+Fachrichtung des Transports, Maßnahmen, Verletzungen, PAT-Nummer und Kontamination stehen nicht
+im Einsatztagebuch. Die Notiz im Patientenkopf ist nicht änderbar und erscheint nicht im
 Einsatztagebuch.
 
 Jedes Öffnen der Seite einer Person wird protokolliert, ebenso jedes Öffnen ihrer Druckansicht,

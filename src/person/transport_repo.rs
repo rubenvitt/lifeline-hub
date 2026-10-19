@@ -113,6 +113,8 @@ pub struct ErfassterTransport {
     /// Priorität des Stands, der in der Zeitfolge unmittelbar vor diesem liegt (`None` ohne
     /// Vorgänger oder ohne Priorität). Gewinnt der Stand, ist das der bisherige aktuelle.
     pub vorher: Option<TransportPrioritaet>,
+    /// Priorität des aktuellen Stands nach dieser Erfassung (`None` = keine).
+    pub aktuell: Option<TransportPrioritaet>,
 }
 
 impl ErfassterTransport {
@@ -177,8 +179,8 @@ pub async fn erfassen_tx(
         .as_deref()
         .and_then(TransportPrioritaet::parse);
 
-    let juengste: i64 = sqlx::query_scalar(concat!(
-        "SELECT id FROM person_transport WHERE einsatz_id = ? AND person_id = ? ",
+    let (juengste, aktuell): (i64, Option<String>) = sqlx::query_as(concat!(
+        "SELECT id, prioritaet FROM person_transport WHERE einsatz_id = ? AND person_id = ? ",
         transportfolge!(),
         " LIMIT 1"
     ))
@@ -206,6 +208,7 @@ pub async fn erfassen_tx(
         transport,
         gewinnt: juengste == id,
         vorher,
+        aktuell: aktuell.as_deref().and_then(TransportPrioritaet::parse),
     })
 }
 

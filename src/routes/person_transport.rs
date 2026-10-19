@@ -41,20 +41,25 @@ pub struct TransportBody {
 
 /// ETB-Wortlaut eines Prioritätswechsels (Spec `personen-transport`, „Nur die Priorität steht im
 /// ETB“): pseudonym, nur Registriernummer und Priorität. Art und Fachrichtung kennt er nicht.
+/// `nachgetragen` trägt bei einem nachgereichten älteren Stand die weiter geltende Priorität
+/// (`Some(None)` = keine), wie die Sichtung („…, nachgetragen, aktuelle Sichtung bleibt …“).
 pub fn etb_text(
     registrier_nr: i64,
     prioritaet: Option<TransportPrioritaet>,
-    nachgetragen: bool,
+    nachgetragen: Option<Option<TransportPrioritaet>>,
 ) -> String {
     let wert = prioritaet.map_or("aufgehoben", |p| p.as_str());
     let text = format!(
         "Person {}: Transportpriorität {wert}",
         registrier_anzeige(registrier_nr)
     );
-    if nachgetragen {
-        format!("{text}, nachgetragen")
-    } else {
-        text
+    match nachgetragen {
+        None => text,
+        Some(Some(aktuell)) => format!(
+            "{text}, nachgetragen, aktuelle Priorität bleibt {}",
+            aktuell.as_str()
+        ),
+        Some(None) => format!("{text}, nachgetragen, aktuell keine Priorität"),
     }
 }
 
@@ -149,7 +154,8 @@ pub async fn festlegen(
             transport_repo::erfassen_tx(conn, einsatz_id, person_id, &neu, ctx.benutzer.id).await?;
         let etb_id = match erfasst.prioritaetswechsel() {
             Some(neue) => {
-                let text = etb_text(person.registrier_nr, neue, !erfasst.gewinnt);
+                let nachgetragen = (!erfasst.gewinnt).then_some(erfasst.aktuell);
+                let text = etb_text(person.registrier_nr, neue, nachgetragen);
                 Some(
                     crate::etb::system_audit_zu_tx(
                         conn,
@@ -192,16 +198,24 @@ mod tests {
     #[test]
     fn etb_text_nennt_nur_nummer_und_prioritaet() {
         assert_eq!(
-            etb_text(12, Some(TransportPrioritaet::Dringlich), false),
+            etb_text(12, Some(TransportPrioritaet::Dringlich), None),
             "Person R-012: Transportpriorität dringlich"
         );
         assert_eq!(
-            etb_text(12, None, false),
+            etb_text(12, None, None),
             "Person R-012: Transportpriorität aufgehoben"
         );
         assert_eq!(
-            etb_text(12, Some(TransportPrioritaet::Normal), true),
-            "Person R-012: Transportpriorität normal, nachgetragen"
+            etb_text(
+                12,
+                Some(TransportPrioritaet::Normal),
+                Some(Some(TransportPrioritaet::Sofort))
+            ),
+            "Person R-012: Transportpriorität normal, nachgetragen, aktuelle Priorität bleibt sofort"
+        );
+        assert_eq!(
+            etb_text(12, None, Some(None)),
+            "Person R-012: Transportpriorität aufgehoben, nachgetragen, aktuell keine Priorität"
         );
     }
 }
