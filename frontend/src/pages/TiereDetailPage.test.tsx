@@ -688,7 +688,8 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
 /**
  * Prüfung am Feld (LLH-1101): die Zellen stehen auf `DatenfeldEingabe`. Das Alter klemmte vorher
- * still auf 120 (`max` am `InputNumber`); jetzt nennt eine Regel die Grenze am Feld.
+ * still auf 120 (`max` am `InputNumber`) bzw. auf 0 (`min`); jetzt nennen Regeln beide Grenzen am
+ * Feld.
  */
 describe('TiereDetailPage — Prüfung am Feld (LLH-1101)', () => {
   function mitPatch() {
@@ -714,6 +715,23 @@ describe('TiereDetailPage — Prüfung am Feld (LLH-1101)', () => {
     const meldung = await screen.findByText('Höchstens 120 Jahre');
     expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(alter.closest('[data-lfh="datenfeld"]'));
     expect(alter).toHaveValue('121');
+    await waitFor(() => expect(alter).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(koerper).toHaveLength(0);
+  });
+
+  it('Alter -5: „Mindestens 0 Jahre“ steht am Feld, der Wert bleibt, kein PATCH', async () => {
+    const koerper = mitPatch();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const alter = await screen.findByLabelText('Alter in Jahren (geschätzt)');
+    await userEvent.clear(alter);
+    await userEvent.type(alter, '-5');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    // Mutationsprobe: `min={0}` zurück an das Feld — es klemmt still auf 0 und speichert, rot.
+    const meldung = await screen.findByText('Mindestens 0 Jahre');
+    expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(alter.closest('[data-lfh="datenfeld"]'));
+    expect(alter).toHaveValue('-5');
     await waitFor(() => expect(alter).toHaveFocus());
     await new Promise((r) => setTimeout(r, 50));
     expect(koerper).toHaveLength(0);

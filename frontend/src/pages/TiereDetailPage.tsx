@@ -73,6 +73,13 @@ const alterRegel: FormRule = {
   message: `Höchstens ${ALTER_MAX} Jahre`,
 };
 
+/** Nach unten ebenso als Regel statt still geklemmt (`min` am Feld), wie bei den Personendaten. */
+const alterMindestensRegel: FormRule = {
+  type: 'number',
+  min: 0,
+  message: 'Mindestens 0 Jahre',
+};
+
 /** Erlaubte Folge-Status (Spiegel von darf_uebergehen im Backend). */
 function naechsteStatus(aktuell: TierStatus): TierStatus[] {
   switch (aktuell) {
@@ -307,9 +314,9 @@ export default function TiereDetailPage() {
       {zelle(
         'alter_geschaetzt',
         'Alter in Jahren (geschätzt)',
-        <InputNumber min={0} />,
+        <InputNumber />,
         t.alter_geschaetzt ?? '—',
-        { mono: true, rules: [alterRegel] },
+        { mono: true, rules: [alterMindestensRegel, alterRegel] },
       )}
       {zelle('farbe_beschreibung', 'Farbe / Erscheinung', <Input />, t.farbe_beschreibung ?? '—')}
       {zelle(
