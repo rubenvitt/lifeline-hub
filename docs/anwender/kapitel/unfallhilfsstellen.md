@@ -204,5 +204,6 @@ Bedienung an gekoppelten Tablets und Laptops einer Unfallhilfsstelle beschreibt
 Die Unfallhilfsstellen bleiben ohne Netz lesbar, und Patienten lassen sich über „Patient
 aufnehmen“ erfassen; sie landen im Wartebereich, sobald die Verbindung zurück ist. Ein Verbleib
 am Platz („Verbleib / Entlassung erfassen“) wird ohne Netz vorgemerkt („Offline vorgemerkt:
-Verbleib R-…“); der Patient bleibt bis zum Senden auf seinem Platz. Zuweisen, Verlegen und
+Verbleib R-…“); der Patient bleibt bis zum Senden auf seinem Platz, der Platz trägt dann
+„Offline vorgemerkt“ statt „belegt“, eine Person im Wartebereich dasselbe neben ihrer Marke. Zuweisen, Verlegen und
 Zurückweisen gehen nur mit Netz. Mehr in [Arbeiten ohne Netz](ohne-netz.md).

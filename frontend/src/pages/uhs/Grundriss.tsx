@@ -40,7 +40,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   aenderePersonBelegung,
   aktualisierePlatz,
@@ -50,6 +50,8 @@ import {
 } from '../../api/einsatzUhs';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
 import { useSavePersonEintrag } from '../../personen/personEintragSpeichern';
+import { useAuthOptional } from '../../auth/AuthContext';
+import { useVorgemerktePersonEintraege } from '../../offline/useVorgemerkteSchreibaktionen';
 import type {
   Person,
   PlatzTyp,
@@ -352,6 +354,23 @@ function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenPr
 }
 
 /**
+ * „Offline vorgemerkt“ an der Person (LLH-1138, `frontend/src/offline/AGENTS.md`, „Was vorgemerkt
+ * ist, kennt der Server noch nicht“): ein vorgemerkter Verbleib lässt die Person stehen, wo sie
+ * steht, bis der Abgleich sendet. Ohne den Hinweis am Ort erfasste jemand ihn ein zweites Mal.
+ */
+function VerbleibVorgemerkt() {
+  const { token, rollen } = useRollen();
+  return (
+    <span
+      data-lfh="verbleib-vorgemerkt"
+      style={{ fontSize: token.fontSizeSM, color: rollen.text2, whiteSpace: 'nowrap' }}
+    >
+      Offline vorgemerkt
+    </span>
+  );
+}
+
+/**
  * Wartezeit „12 min“ im Takt der vollen Minute (`useMinutenTakt`), Mono; der Beginn steht als
  * taktische Zeit im Titel (LLH-1135). Eigene Komponente, damit nur sie im Minutentakt zeichnet.
  */
@@ -475,6 +494,8 @@ interface PlatzKarteProps {
    * keinen Platz für einen Satz), die Karte trägt die Marke `data-fehler`.
    */
   abgelehnt?: boolean;
+  /** Der Verbleib der belegenden Person ist ohne Netz vorgemerkt (LLH-1138). */
+  verbleibVorgemerkt?: boolean;
 }
 
 function PlatzKarte({
@@ -492,6 +513,7 @@ function PlatzKarte({
   niemandWartet,
   onZurueckInWartebereich,
   abgelehnt = false,
+  verbleibVorgemerkt = false,
 }: PlatzKarteProps) {
   // Die Platzkarte ist Drop-Target (Personen zuweisen) und — nur im Bearbeiten-Modus — Drag-Source
   // (Layout verschieben).
@@ -682,7 +704,13 @@ function PlatzKarte({
         style={{ height: 24, overflow: 'hidden', whiteSpace: 'nowrap' }}
       >
         {zeigeVerfTag && <StatusTag darstellung={verfuegbarkeitVertrag[platz.verfuegbarkeit]} />}
-        {belegtVon && <StatusChip ton="bedien" wort="belegt" />}
+        {/* Vorgemerkt statt „belegt“: beides fasst die Zeile nicht, belegt zeigen schon Fläche
+            und Personenmarke. */}
+        {belegtVon && verbleibVorgemerkt ? (
+          <VerbleibVorgemerkt />
+        ) : (
+          belegtVon && <StatusChip ton="bedien" wort="belegt" />
+        )}
       </div>
       {/* Belegung: feste Höhe, auch wenn leer. Die belegte Person ist ziehbar (→ Wartebereich
           oder Transport), im Bearbeiten-Modus nicht. In der Reiterform ist der Rückweg per Drag
@@ -811,6 +839,7 @@ function PersonenSpalte({
   fehler,
   wartetSeitVon,
   schleuse = false,
+  vorgemerkt,
 }: {
   titel: string;
   personen: Person[];
@@ -841,6 +870,8 @@ function PersonenSpalte({
    * Neue stehen solange hinten (`gehalteneFolge`), Entfallene gehen sofort.
    */
   schleuse?: boolean;
+  /** Personen mit ohne Netz vorgemerktem Verbleib (LLH-1138): die Zeile sagt es. */
+  vorgemerkt?: ReadonlySet<number>;
 }) {
   // Optionales Drop-Target (Wartebereich nimmt Personen ohne Platz auf).
   const drop = useDroppable({
@@ -897,6 +928,7 @@ function PersonenSpalte({
               onOeffnen={onOeffnen}
               wartetSeit={wartetSeitVon?.(p)}
             />
+            {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
             {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in keinem
                 klickbaren Vorfahren und braucht keinen `stopPropagation`-/`onPointerDown`-Riegel.
                 Ein antd-`Button` ohne `size` erbt `controlHeight`. Das Wort steht sichtbar, kein
@@ -1437,6 +1469,18 @@ export default function Grundriss({
   // Ohne Netz merkt der Schreibweg vor (LLH-1138, design.md D8; `networkMode: 'always'`, Regel in
   // `frontend/src/offline/AGENTS.md`): die Person bleibt dann, wo sie steht, bis der Abgleich sendet.
   const saveVerbleib = useSavePersonEintrag();
+  // Vorgemerkte Verbleibe zeigt der Ort, nicht nur die Meldung (`frontend/src/offline/AGENTS.md`).
+  const benutzerId = useAuthOptional()?.benutzer?.id;
+  const vorgemerkteEintraege = useVorgemerktePersonEintraege(benutzerId, einsatzId);
+  const verbleibVorgemerkt = useMemo(
+    () =>
+      new Set(
+        vorgemerkteEintraege
+          .filter((e) => e.aktion.art === 'verbleib')
+          .map((e) => e.aktion.person_id),
+      ),
+    [vorgemerkteEintraege],
+  );
   const transportMut = useMutation({
     networkMode: 'always',
     mutationFn: ({
@@ -1565,6 +1609,7 @@ export default function Grundriss({
         leerText="keine"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+        vorgemerkt={verbleibVorgemerkt}
       />
       <PersonenSpalte
         titel="Wartebereich (Eingang)"
@@ -1577,6 +1622,7 @@ export default function Grundriss({
         leerText="leer"
         onOeffnen={setDetailPersonId}
         onVerbleib={schreibgeschuetzt ? undefined : setTransportPerson}
+        vorgemerkt={verbleibVorgemerkt}
         fehler={platzFehler.grund('warte')}
       />
     </div>
@@ -1675,6 +1721,7 @@ export default function Grundriss({
                   belegungLaeuft={belegungLaeuft}
                   bearbeitbar={platzEditAktiv && !layoutMut.isPending}
                   abgelehnt={platzFehler.grund(p.id) != null}
+                  verbleibVorgemerkt={belegt != null && verbleibVorgemerkt.has(belegt.id)}
                   onVerfuegbarkeit={(v) => verfMut.mutate({ platzId: p.id, verf: v })}
                   onAustritt={() => {
                     const b = belegtAn(p.id);

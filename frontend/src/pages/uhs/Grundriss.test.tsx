@@ -436,6 +436,45 @@ describe('Grundriss – Verbleib ohne Netz (LLH-1138, design.md D8)', () => {
   });
 });
 
+describe('Grundriss – vorgemerkter Verbleib am Ort (LLH-1138, `frontend/src/offline/AGENTS.md`)', () => {
+  it('zeigt „Offline vorgemerkt“ am Platz, solange der Verbleib in der Warteschlange steht', async () => {
+    await queueLeerenFuerTests();
+    const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
+    const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
+    renderGrundriss(uhs, [p], false, 'kompakt', false, true, true);
+    await screen.findByTestId('angemeldet');
+    const karte = (await screen.findByText('Bett 1')).closest(
+      '[data-testid="platz-karte"]',
+    ) as HTMLElement;
+    expect(within(karte).queryByText('Offline vorgemerkt')).toBeNull();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
+    );
+    setzeOnline(false);
+    onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
+    // Nicht nur die flüchtige Meldung: der Platz selbst sagt es, sonst erfasst jemand doppelt.
+    expect(await within(karte).findByText('Offline vorgemerkt')).toBeInTheDocument();
+  });
+
+  it('zeigt „Offline vorgemerkt“ an der Person im Wartebereich', async () => {
+    await queueLeerenFuerTests();
+    const p = person({ id: 8, registrier_nr: 8, aktuelle_uhs_id: 1, aktueller_platz_id: null });
+    renderGrundriss(uhsDetail({ plaetze: [] }), [p], false, 'kompakt', false, true, true);
+    await screen.findByTestId('angemeldet');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen — R-008 · unbekannt' }),
+    );
+    setzeOnline(false);
+    onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
+    const zeile = screen
+      .getAllByTestId('personen-zeile')
+      .find((z) => z.textContent?.includes('R-008')) as HTMLElement;
+    expect(await within(zeile).findByText('Offline vorgemerkt')).toBeInTheDocument();
+  });
+});
+
 describe('Grundriss – Plätze nach Typ anlegen (LFH-16)', () => {
   it('legt über Typ + Menge mehrere Plätze an (Bulk, ohne Namensvergabe)', async () => {
     const uhs = uhsDetail({ plaetze: [], status: 'geplant' });
