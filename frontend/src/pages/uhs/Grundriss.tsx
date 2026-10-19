@@ -304,13 +304,14 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
    * trägt `PersonenkarteDrag`. `data-lfh="personenkarte"` ist die Marke der e2e-Specs.
    *
    * Vorn steht die Sichtung (LLH-1135, BBK: umrandetes Farbfeld plus Wort, `SichtungsTag` in der
-   * kompakten Form, nicht höher als die Schriftzeile); sie kürzt nie, der Name endet mit „…“. Die
-   * Wartezeit steht in den Listen in der zweiten Zeile (`PersonenSpalte`, LLH-1332).
+   * kompakten Form, nicht höher als die Schriftzeile); sie kürzt nie. Auf der Platzkarte endet der
+   * Name mit „…“; in den Listen bricht er um und steht ungekürzt (LLH-1332, Spec `uhs-grundriss`,
+   * „Name in der schmalen Spalte“), die Wartezeit steht dort in der zweiten Zeile (`PersonenSpalte`).
    */
   const nr = registrierAnzeige(person.registrier_nr);
   const style: React.CSSProperties = {
     display: 'inline-flex',
-    alignItems: 'center',
+    alignItems: kompakt ? 'center' : 'flex-start',
     gap: token.paddingXS,
     maxWidth: kompakt ? 124 : '100%',
     // In Listen polstert die Hülle (`markenZielStil`); nur auf der Platzkarte trägt die Marke ihren
@@ -323,9 +324,9 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
     color: rollen.text2,
     fontSize: token.fontSizeSM,
     lineHeight: `${Math.round(token.fontSizeSM * token.lineHeightSM)}px`,
-    whiteSpace: 'nowrap',
     // `kompakt` (auf der Platzkarte): einzeilig mit Ellipsis, damit die absolut positionierte Karte
     // unabhängig von der Namenslänge ihre Höhe hält.
+    whiteSpace: kompakt ? 'nowrap' : 'normal',
     overflow: 'hidden',
     verticalAlign: 'top',
   };
@@ -336,10 +337,18 @@ function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
       style={style}
       title={kompakt ? personLabel(person) : undefined}
     >
-      <SichtungsTag kategorie={person.aktuelle_sichtung ?? null} form="kompakt" />
+      <span style={{ flex: 'none', whiteSpace: 'nowrap', display: 'inline-flex' }}>
+        <SichtungsTag kategorie={person.aktuelle_sichtung ?? null} form="kompakt" />
+      </span>
       {/* Leerzeichen für den zugänglichen Namen; im Flex-Behälter zeichnet es nicht. */}{' '}
-      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        <span style={monoStil(token.fontSizeSM)}>{nr}</span>
+      <span
+        style={
+          kompakt
+            ? { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }
+            : { minWidth: 0, overflowWrap: 'anywhere' }
+        }
+      >
+        <span style={{ ...monoStil(token.fontSizeSM), whiteSpace: 'nowrap' }}>{nr}</span>
         {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
         {` · ${person.name || 'unbekannt'}`}
       </span>

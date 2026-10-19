@@ -41,7 +41,8 @@ Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
 5. Der Statusfilter („Alle“, „Erfasst“, „Vermisst“, „Betroffen“, „Verstorben“) und die Suche
    nach R-Nr., PAT-Nr., Name oder Fundort engen die Liste ein.
 6. „Abgeschlossene zeigen“ neben dem Statusfilter nimmt die abgeschlossenen Patienten wieder in
-   Zeilen, Sichtungsraster und Karte auf; die Zahl dahinter sagt, wie viele es sind.
+   Zeilen, Sichtungsraster und Karte auf; die Zahl dahinter sagt, wie viele es sind. Ohne
+   abgeschlossene Patienten steht der Schalter nicht da.
 
 ### Eine Person mit der Maske erfassen
 

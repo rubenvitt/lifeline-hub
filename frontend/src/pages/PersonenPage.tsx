@@ -1090,18 +1090,21 @@ export default function PersonenPage() {
                 onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
               />
               {/* Abgeschlossene stehen nicht in den Standardansichten (LLH-1332, Spec
-                  `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. */}
-              <Checkbox
-                checked={sicht.abgeschlossen}
-                onChange={(e) =>
-                  aendereSichtFuer(einsatzId, (alt) => ({
-                    ...alt,
-                    abgeschlossen: e.target.checked,
-                  }))
-                }
-              >
-                Abgeschlossene zeigen ({abgeschlosseneZahl})
-              </Checkbox>
+                  `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. Ohne Abgeschlossene
+                  fehlt der Schalter: „(0)“ sagt nichts und kostet am Handy die erste Zeile. */}
+              {(abgeschlosseneZahl > 0 || sicht.abgeschlossen) && (
+                <Checkbox
+                  checked={sicht.abgeschlossen}
+                  onChange={(e) =>
+                    aendereSichtFuer(einsatzId, (alt) => ({
+                      ...alt,
+                      abgeschlossen: e.target.checked,
+                    }))
+                  }
+                >
+                  Abgeschlossene zeigen ({abgeschlosseneZahl})
+                </Checkbox>
+              )}
             </Flex>
             {sicht.ansicht === 'karte' ? (
               // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe Menge wie

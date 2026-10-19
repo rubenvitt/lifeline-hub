@@ -111,7 +111,8 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Grundriss nimmt `VerbleibErfassung` mit `vorbelegung`).
 - **Abgeschlossene stehen nicht in den Standardansichten** (LLH-1332, Spec
   `betroffene-lagedaten`): Zeilen, Board und Kartenansicht folgen `PersonenSicht.abgeschlossen`
-  (Schalter „Abgeschlossene zeigen (n)“, Auftrag `?abgeschlossen=1`), Lagekarte und Lagezahlen
+  (Schalter „Abgeschlossene zeigen (n)“, nur bei n > 0 oder eingeschaltet; Auftrag
+  `?abgeschlossen=1`), Lagekarte und Lagezahlen
   lassen sie immer weg (`ohneAbgeschlossene`, `versorgungsBilanz`); Druck, CSV, Einsatzbericht,
   Sprungpalette und Detailseite bleiben vollständig. Sichtungszeile und Sichtungsbild zählen ohne
   Abgeschlossene, die Verbleib-Zählung mit.

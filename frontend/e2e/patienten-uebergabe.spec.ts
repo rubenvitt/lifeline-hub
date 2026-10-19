@@ -70,7 +70,7 @@ test('Eigentransport ist unterwegs, die quittierte Übergabe schließt ab', asyn
   // Unterwegs: die Person bleibt in der Liste.
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   await expect(page.getByText('Übergabetest')).toBeVisible();
-  await expect(page.getByText('Abgeschlossene zeigen (0)')).toBeVisible();
+  await expect(page.getByText(/Abgeschlossene zeigen/)).toHaveCount(0);
 
   // Übergabe quittieren im Kopf.
   await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
@@ -149,6 +149,13 @@ test('Eigentransport aus dem Wartebereich, Übergabe aus „Unterwegs“', async
   const zeile = wartebereich.getByTestId('personen-zeile');
   // Zweizeilige Zeile (design.md D8): der Name steht voll, „Verbleib“ in der zweiten Zeile.
   await expect(zeile).toContainText(name);
+  // Ungekürzt: kein Teil der Marke schneidet seitlich ab (vorher endete sie mit „…“).
+  const abgeschnitten = await zeile
+    .locator('[data-lfh="personenkarte"]')
+    .evaluate((marke) =>
+      [marke, ...marke.querySelectorAll('*')].some((el) => el.scrollWidth > el.clientWidth + 1),
+    );
+  expect(abgeschnitten, 'Name in der 240-px-Spalte ungekürzt').toBe(false);
   await zeile.getByRole('button', { name: /^Verbleib \/ Entlassung erfassen — / }).click();
 
   const maske = page.getByRole('dialog', { name: /Verbleib erfassen/ });

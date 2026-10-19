@@ -5,7 +5,8 @@
 ### Requirement: Abgeschlossene stehen nicht in den Standardansichten
 Die Betroffenenseite SHALL Personen mit `versorgung: "abgeschlossen"` in Zeilen, Sichtungsraster
 und Kartenansicht nur zeigen, wenn „Abgeschlossene zeigen“ an ist. Der Schalter MUST aus als
-Vorgabe stehen und die Zahl der Abgeschlossenen nennen; ein Link mit `?abgeschlossen=1` MUST die
+Vorgabe stehen und die Zahl der Abgeschlossenen nennen; ohne Abgeschlossene MUST er fehlen,
+solange er aus ist; ein Link mit `?abgeschlossen=1` MUST die
 Seite mit eingeschaltetem Schalter öffnen. Sichtungszeile und Sichtungsbild der Seitenleiste MUST nur
 Nicht-Abgeschlossene zählen. Detailseite, Sprungpalette, Druck und CSV MUST alle Personen finden.
 

@@ -1880,3 +1880,30 @@ describe('PersonenPage — Listenzugriffe (LFH-916)', () => {
     expect(within(kopf).queryByRole('button', { name: 'Listenzugriffe' })).toBeNull();
   });
 });
+
+describe('PersonenPage — Abgeschlossene (LLH-1332)', () => {
+  const entlassen: Person = {
+    ...person,
+    id: 12,
+    registrier_nr: 3,
+    name: 'Entlassen',
+    status: 'betroffen',
+    versorgung: 'abgeschlossen',
+    aktuelle_verbleib_art: 'entlassung',
+    aktueller_verbleib: 'Entlassung vor Ort',
+  };
+
+  it('ohne Abgeschlossene fehlt der Schalter', async () => {
+    render(einsatzAktiv, [person]);
+    expect(await screen.findByText('Mustermann, Max')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Abgeschlossene zeigen/ })).toBeNull();
+  });
+
+  it('mit Abgeschlossenen nennt der Schalter die Zahl und holt sie zurück', async () => {
+    render(einsatzAktiv, [person, entlassen]);
+    const schalter = await screen.findByRole('checkbox', { name: 'Abgeschlossene zeigen (1)' });
+    expect(screen.queryByText(/^Entlassen/)).toBeNull();
+    await userEvent.click(schalter);
+    expect(await screen.findByText(/^Entlassen/)).toBeInTheDocument();
+  });
+});

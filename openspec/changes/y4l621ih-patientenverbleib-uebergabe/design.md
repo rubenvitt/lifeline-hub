@@ -177,7 +177,9 @@ Vorgabe jetzt; Ziel vorbelegt). Fahrzeug und Art stehen im Titel, nicht als Feld
 `false`, in der Adresse als `?abgeschlossen=1`. `filterPersonen` lässt Abgeschlossene weg,
 solange der Schalter aus ist; Zeilen, Board und Kartenansicht folgen dem automatisch. Der
 Schalter steht in der Statusleiste als beschriftetes Kästchen mit Zahl („Abgeschlossene zeigen
-(12)“). Sichtungszeile und Sichtungsbild der Seitenleiste zählen nur Nicht-Abgeschlossene, die
+(12)“). Ohne Abgeschlossene fehlt er, solange er aus ist: „(0)“ sagt nichts und schöbe bei
+390 px die erste Personenzeile aus dem ersten Bild (e2e `betroffene-handy.spec.ts`).
+Sichtungszeile und Sichtungsbild der Seitenleiste zählen nur Nicht-Abgeschlossene, die
 Verbleib-Zählung behält die Posten der Abgeschlossenen und trennt „Unterwegs“ vom Transport.
 Die Sprungmarke „Patienten“ öffnet das Board ohne
 Abgeschlossene.
@@ -194,7 +196,8 @@ Detailseite, Druck und CSV bleiben vollständig.
 ### D8 · UHS-Grundriss: Zeile in zwei Zeilen, Spalte „Unterwegs“
 
 Die Zeile in „Noch nicht aufgenommen“ und „Wartebereich“ wird zweizeilig: oben die
-Personenmarke über die volle Breite (Sichtung, Kennung, Name), unten links die Nebenangabe
+Personenmarke über die volle Breite (Sichtung, Kennung, Name; ein langer Name bricht um, statt
+mit „…“ zu enden — nur auf der Platzkarte bleibt die Marke einzeilig), unten links die Nebenangabe
 (Wartezeit im Wartebereich, „erfasst vor n min“ unter „Noch nicht aufgenommen“), unten rechts
 „Verbleib“ als Textknopf (`type="text"`, Steuerhöhe der Stufe, Wort sichtbar wie in LFH-970
 U73). Damit steht der Name nicht mehr neben einem Wortknopf in 240 px. Hülle und Bedienziel
