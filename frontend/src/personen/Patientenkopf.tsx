@@ -97,7 +97,7 @@ export default function Patientenkopf({
   aufenthaltAktionen,
   onGeschrieben,
 }: PatientenkopfProps) {
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const jetzt = useMinutenTakt();
   const bedienbar = modus === 'bedienen' && darfSchreiben && !person.storniert_at;
   const angetroffen = istAngetroffen(person);
@@ -235,15 +235,12 @@ export default function Patientenkopf({
           </Datenfeld>
 
           <Datenfeld label="Zustand / Verdacht">
-            {bedienbar && angetroffen && !ohneVerbindung ? (
+            {/* Ohne Netz sperrt `ZustandSchreiben` selbst, mit Grund am Feld (LLH-1103, D8); ein
+                getippter Entwurf bleibt stehen, statt gegen den Lesetext getauscht zu werden. */}
+            {bedienbar && angetroffen ? (
               <ZustandSchreiben p={person} einsatzId={einsatzId} />
             ) : (
               <span data-lfh="zustand">{person.zustand || '—'}</span>
-            )}
-            {/* Ohne Netz gesperrt mit Grund (LLH-1103, D8): eine pausierte Änderung überschriebe
-                nach der Rückkehr einen Wert, den niemand gesehen hat. */}
-            {bedienbar && angetroffen && ohneVerbindung && (
-              <div style={{ color: rollen.text2 }}>{ZUSTAND_OHNE_NETZ}</div>
             )}
           </Datenfeld>
 
@@ -531,7 +528,6 @@ function SichtungsAnzeige({
 
 /** Grund, warum ohne Netz nicht aufgehoben wird (LFH-966: wenige Wörter). */
 export const AUFHEBEN_OHNE_NETZ = 'Aufheben ohne Netz nicht möglich';
-export const ZUSTAND_OHNE_NETZ = 'Zustand ohne Netz nicht änderbar';
 
 /**
  * Quittung „Offline vorgemerkt“ im Kopf (LLH-1138, Spec `personen-detail`, „Nachsichtung am

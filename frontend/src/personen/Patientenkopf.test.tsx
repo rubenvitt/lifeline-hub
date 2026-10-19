@@ -9,8 +9,12 @@ import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
-import { meldeServerErreichbar, verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
-import Patientenkopf, { AUFHEBEN_OHNE_NETZ, ZUSTAND_OHNE_NETZ } from './Patientenkopf';
+import {
+  OHNE_VERBINDUNG_NICHT_AENDERBAR,
+  meldeServerErreichbar,
+  verbindungZuruecksetzenFuerTests,
+} from '../offline/verbindung';
+import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
 import { PAT_OHNE_NETZ } from './PatKennzeichen';
 
 /**
@@ -1169,32 +1173,72 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
 });
 
 /**
- * „Zustand / Verdacht“ ohne Netz (LLH-1103, design.md D8): gesperrt mit eigenem sichtbarem Grund;
- * bisher pausierte die Änderung still und überschriebe nach der Rückkehr einen ungesehenen Wert.
- *
- * Mutationsprobe: Sperre entfernt — rot (der Knopf „… bearbeiten“ steht da).
+ * „Zustand / Verdacht“ ohne Netz (LLH-1103, design.md D8, Spec `personendaten-bearbeiten`, „Ohne
+ * Netz gesperrt“): gesperrt mit sichtbarem Grund am Feld, im einen Wortlaut aller Gründe ohne
+ * Netz. Bisher pausierte die Änderung still und überschriebe nach der Rückkehr einen ungesehenen
+ * Wert. Ein schon getippter Entwurf bleibt dabei stehen.
  */
 describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
-  it('sperrt den Zustand ohne Netz und nennt den Grund am Feld', () => {
+  it('sperrt den Zustand ohne Netz und nennt den Grund am Feld', async () => {
+    const { kopf } = zeige({ zustand: 'gehfähig' });
     setzeOnline(false);
     try {
-      const { kopf } = zeige({ zustand: 'gehfähig' });
-      expect(
-        within(kopf).queryByRole('button', { name: /^Zustand \/ Verdacht zu R-012/ }),
-      ).toBeNull();
-      const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand"]')!;
-      expect(zelle).toHaveTextContent('gehfähig');
-      expect(within(kopf).getByText(ZUSTAND_OHNE_NETZ)).toBeVisible();
+      // Mutationsprobe: Sperre entfernt — der Knopf bleibt bedienbar, rot.
+      const knopf = within(kopf).getByRole('button', {
+        name: 'Zustand / Verdacht zu R-012 bearbeiten',
+      });
+      await waitFor(() => expect(knopf).toBeDisabled());
+      const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand-zelle"]')!;
+      expect(within(zelle).getByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+      expect(knopf).toHaveAccessibleDescription(`gehfähig ${OHNE_VERBINDUNG_NICHT_AENDERBAR}`);
     } finally {
       setzeOnline(true);
     }
+  });
+
+  it('ein getippter Entwurf bleibt ohne Netz stehen und geht erst mit Netz hinaus', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ ...basis, zustand: 'Atemnot' });
+      }),
+    );
+    const { kopf } = zeige({ zustand: null });
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 hinzufügen' }),
+    );
+    const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand-zelle"]')!;
+    await userEvent.type(within(zelle).getByRole('textbox'), 'Atemnot');
+    setzeOnline(false);
+    try {
+      // Mutationsprobe: ohne Netz wieder gegen den Textknoten tauschen — der Entwurf ist weg, rot.
+      expect(await within(zelle).findByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+      const feld = within(zelle).getByRole('textbox');
+      expect(feld).toHaveValue('Atemnot');
+      fireEvent.blur(feld);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      expect(within(zelle).getByRole('textbox')).toHaveValue('Atemnot');
+    } finally {
+      setzeOnline(true);
+    }
+    // Mutationsprobe: das Senden ohne Netz nicht sperren — die pausierte Mutation holt nach der
+    // Rückkehr still nach, rot.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    expect(patches).toEqual([]);
+    fireEvent.blur(within(zelle).getByRole('textbox'));
+    await waitFor(() => expect(patches).toEqual([{ zustand: 'Atemnot' }]));
   });
 
   it('mit Netz bleibt er schreibbar, ohne Grund', () => {
     const { kopf } = zeige({ zustand: 'gehfähig' });
     expect(
       within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 bearbeiten' }),
-    ).toBeInTheDocument();
-    expect(within(kopf).queryByText(ZUSTAND_OHNE_NETZ)).toBeNull();
+    ).toBeEnabled();
+    expect(within(kopf).queryByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeNull();
   });
 });

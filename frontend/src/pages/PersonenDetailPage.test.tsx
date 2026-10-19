@@ -2042,8 +2042,9 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     await screen.findByRole('heading', { name: /Person R-001/ });
     setzeOnline(false);
     try {
-      const grund = await screen.findByText('Ohne Verbindung nicht änderbar');
-      expect(screen.getAllByText('Ohne Verbindung nicht änderbar')).toHaveLength(1);
+      const daten = document.querySelector<HTMLElement>('[data-lfh="personendaten"]')!;
+      const grund = await within(daten).findByText('Ohne Verbindung nicht änderbar');
+      expect(within(daten).getAllByText('Ohne Verbindung nicht änderbar')).toHaveLength(1);
       expect(grund).toBeVisible();
       const name = screen.getByRole('button', { name: 'Name bearbeiten' });
       expect(name).toBeDisabled();

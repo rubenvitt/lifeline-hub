@@ -114,6 +114,14 @@ interface BemerkungZelleProps {
    * dem Feld. Ohne Angabe keine Grenze.
    */
   max?: number;
+  /**
+   * Sperrgrund in wenigen Wörtern (LLH-1103, design.md D8: „Zustand / Verdacht“ ohne Netz). Er
+   * steht sichtbar am Feld (`frontend/AGENTS.md`, „Texte: zeigen statt erklären“), die Knöpfe sind
+   * gesperrt und verweisen per `aria-describedby` darauf. Ein schon offenes Feld behält seinen
+   * Entwurf und sendet weder mit Enter noch beim Verlassen, bis die Sperre fällt — nichts geht
+   * still verloren, nichts wird still nachgeholt.
+   */
+  gesperrt?: string;
 }
 
 /** Wortlaut an EINER Stelle — Seiten und Tests greifen denselben Namen.
@@ -128,10 +136,14 @@ export function BemerkungZelle({
   bezeichnung = 'Bemerkung',
   laeuft = false,
   max,
+  gesperrt,
 }: BemerkungZelleProps) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const { token, rollen } = useRollen();
   const wertId = useId();
+  const sperrId = useId();
+  /** Ein leerer Grund sperrt nicht: gesperrt heißt immer mit sichtbarem Grund. */
+  const isGesperrt = Boolean(gesperrt);
   const knopfRef = useFokusRueckgabe(bearbeitet);
   // Ref, weil Enter und das folgende Verlassen im selben Zug ankommen.
   const sendetRef = useRef(false);
@@ -155,13 +167,22 @@ export function BemerkungZelle({
     if (feld) feld.readOnly = sendet;
   }, [sendet, bearbeitet]);
 
-  // Überlänge am Feld selbst angesagt; antd reicht `aria-invalid` nicht durch.
+  // Überlänge am Feld selbst angesagt; antd reicht `aria-invalid` nicht durch. Ebenso der
+  // Sperrgrund als Beschreibung des offenen Felds.
   useLayoutEffect(() => {
     const feld = huelleRef.current?.querySelector('textarea');
     if (!feld) return;
     if (zuLang) feld.setAttribute('aria-invalid', 'true');
     else feld.removeAttribute('aria-invalid');
-  }, [zuLang, bearbeitet]);
+    if (isGesperrt) feld.setAttribute('aria-describedby', sperrId);
+    else feld.removeAttribute('aria-describedby');
+  }, [zuLang, bearbeitet, isGesperrt, sperrId]);
+
+  const sperrHinweis = isGesperrt ? (
+    <div id={sperrId} style={{ color: rollen.text2 }}>
+      {gesperrt}
+    </div>
+  ) : null;
 
   const oeffnen = () => {
     setEntwurf(wert ?? '');
@@ -180,47 +201,56 @@ export function BemerkungZelle({
 
   if (!bearbeitet && !gefuellt) {
     return (
-      <Button
-        ref={knopfRef}
-        type="link"
-        loading={laeuft}
-        // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
-        // Gemessen auf der Lücken-Tönung in `e2e/betroffene-kontrast.spec.ts`.
-        style={{ color: rollen.bedienText }}
-        // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
-        // so breit wie die längste Kennung.
-        aria-label={kennung ? `${bezeichnung} zu ${kennung} hinzufügen` : undefined}
-        onClick={oeffnen}
-      >
-        {`${bezeichnung} hinzufügen`}
-      </Button>
+      <>
+        <Button
+          ref={knopfRef}
+          type="link"
+          loading={laeuft}
+          disabled={isGesperrt}
+          aria-describedby={isGesperrt ? sperrId : undefined}
+          // `bedienText`, die Rolle für blauen TEXT; seit LFH-652 wertgleich mit antds `colorLink`.
+          // Gemessen auf der Lücken-Tönung in `e2e/betroffene-kontrast.spec.ts`.
+          style={{ color: rollen.bedienText }}
+          // Sichtbar bleibt der kurze Text, der Name trägt die Zeile — sonst wird die Spalte
+          // so breit wie die längste Kennung.
+          aria-label={kennung ? `${bezeichnung} zu ${kennung} hinzufügen` : undefined}
+          onClick={oeffnen}
+        >
+          {`${bezeichnung} hinzufügen`}
+        </Button>
+        {sperrHinweis}
+      </>
     );
   }
 
   if (!bearbeitet) {
     return (
-      <Button
-        ref={knopfRef}
-        type="text"
-        // `loading` sperrt den zweiten Klick, solange der erste schreibt, und ersetzt das Stift-Icon
-        // durch antds Ladeanzeige.
-        loading={laeuft}
-        aria-label={
-          kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`
-        }
-        aria-describedby={wertId}
-        style={wertKnopfStil(token)}
-        onClick={oeffnen}
-      >
-        <span id={wertId}>{wert}</span>
-        {/* Icon ohne eigenes Vorleseziel: das Icon des Satzes ist selbst `aria-hidden`
+      <>
+        <Button
+          ref={knopfRef}
+          type="text"
+          disabled={isGesperrt}
+          // `loading` sperrt den zweiten Klick, solange der erste schreibt, und ersetzt das Stift-Icon
+          // durch antds Ladeanzeige.
+          loading={laeuft}
+          aria-label={
+            kennung ? `${bezeichnung} zu ${kennung} bearbeiten` : `${bezeichnung} bearbeiten`
+          }
+          aria-describedby={isGesperrt ? `${wertId} ${sperrId}` : wertId}
+          style={wertKnopfStil(token)}
+          onClick={oeffnen}
+        >
+          <span id={wertId}>{wert}</span>
+          {/* Icon ohne eigenes Vorleseziel: das Icon des Satzes ist selbst `aria-hidden`
             (LFH-595), die Hülle bleibt als zweite Sicherung (früher: antds `role="img"` „edit"). */}
-        {!laeuft && (
-          <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
-            <IconStift />
-          </span>
-        )}
-      </Button>
+          {!laeuft && (
+            <span aria-hidden="true" style={{ color: token.colorTextSecondary }}>
+              <IconStift />
+            </span>
+          )}
+        </Button>
+        {sperrHinweis}
+      </>
     );
   }
 
@@ -231,6 +261,9 @@ export function BemerkungZelle({
 
   const senden = (val: string) => {
     zurueckRef.current = null;
+    // Gesperrt: nichts geht hinaus, das Feld bleibt mit dem Entwurf offen (sonst pausierte die
+    // Mutation ohne Netz und holte nach der Rückkehr still nach, LLH-1103, design.md D8).
+    if (isGesperrt) return;
     // Über der Grenze geht nichts hinaus, der Server lehnte mit 400 ab; das Feld bleibt offen.
     if (max != null && istZuLang(val, max)) return;
     // antd vergleicht NICHT — `onChange` feuert beim Verlassen unbedingt. Ohne diesen Riegel kostete
@@ -294,6 +327,7 @@ export function BemerkungZelle({
         {wert ?? ''}
       </Typography.Text>
       {max != null && <Zeichenzaehler wert={entwurf} max={max} />}
+      {sperrHinweis}
     </div>
   );
 }

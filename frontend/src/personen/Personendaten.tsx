@@ -28,7 +28,7 @@ import {
 } from '../components/offeneBearbeitung';
 import { Select } from '../components/Select';
 import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
-import { useOhneVerbindung } from '../offline/verbindung';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
 import { serverJetzt } from '../offline/serveruhr';
 import { koordinatenText, parseKoordinate } from './koordinate';
 import { istAngetroffen } from './personenBilanz';
@@ -61,8 +61,6 @@ dayjs.extend(utc);
  *
  * „Zustand / Verdacht“, PAT-Nummer und Kontamination stehen nur im Patientenkopf.
  */
-
-export const PERSONENDATEN_OHNE_NETZ = 'Ohne Verbindung nicht änderbar';
 
 /** Wie das Backend: „vermisst seit“ höchstens fünf Minuten in der Zukunft (vorgehende Uhr). */
 const ZUKUNFT_TOLERANZ_MS = 5 * 60_000;
@@ -231,7 +229,11 @@ function PersonendatenInhalt({
   const ohneNetz = useOhneVerbindung();
   const merkerGrund = useOffeneBearbeitungGrund();
   const grundId = useId();
-  const grund = darfSchreiben ? (ohneNetz ? PERSONENDATEN_OHNE_NETZ : merkerGrund) : undefined;
+  const grund = darfSchreiben
+    ? ohneNetz
+      ? OHNE_VERBINDUNG_NICHT_AENDERBAR
+      : merkerGrund
+    : undefined;
   const behaelterRef = useRef<HTMLDivElement>(null);
   const [fokusNach, setFokusNach] = useState<{ etikett: string; vorher: Person } | null>(null);
 
