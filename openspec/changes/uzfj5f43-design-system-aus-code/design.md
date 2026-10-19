@@ -67,6 +67,11 @@ design-system`. Für die Vorschauen genügt der Vergleich, weil die Ausgabe dete
 SSR-CSS nicht stabil, vergleicht der Wächter die Vorschauen nur auf Vorhandensein und die Tokens
 exakt (die Umsetzung entscheidet nach Messung und vermerkt es hier).
 
+**Gemessen (19.10.2026):** Die SSR-Ausgabe ist stabil (mehrere Läufe byte-gleich, `hashed: false`
+am Vorschau-Theme); der Wächter vergleicht alle Dateien byte-genau, ohne Rückfall. Folge: ein
+antd-Update ändert die Vorschauen und macht den Wächter rot, bis `pnpm -C frontend design-system`
+läuft.
+
 **D6 — Veröffentlichen.** Einmalig jetzt: Artifact aus dem Typ „Design System“ anlegen (Titel
 „Lifeline Hub“), dann alle Dateien senden, Index zuletzt. Die URL steht in
 `docs/design/design-system/ARTIFACT.md` und in `frontend/AGENTS.md`. Danach: Der Agent, der einen PR

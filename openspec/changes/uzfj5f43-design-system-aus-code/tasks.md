@@ -12,5 +12,5 @@
 
 ## 3. Veröffentlichen und Regeln
 
-- [ ] 3.1 Artifact aus dem Typ „Design System“ anlegen, Dateien senden, Index zuletzt; URL in `docs/design/design-system/ARTIFACT.md`.
+- [x] 3.1 Artifact aus dem Typ „Design System“ anlegen, Dateien senden, Index zuletzt; URL in `docs/design/design-system/ARTIFACT.md`.
 - [x] 3.2 `frontend/AGENTS.md` Abschnitt „Größere UI-Entwürfe“ nach D7 neu, Skill `dev-zunder-orchestrieren` angeglichen; Verweise auf `DesignSync`/`/design-login` im Repo gegrept und bereinigt. Prettier grün.
