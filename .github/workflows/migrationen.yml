@@ -111,7 +111,7 @@ jobs:
       # Der Token entsteht erst, wenn es etwas zu reparieren gibt, und nur mit dem Recht, das der
       # Push braucht. Die App hat Bypass-Rechte auf `alpha`; die Grenzen dagegen stehen in
       # migrationen-autofix.sh und seinem Selbsttest.
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         if: >-
           steps.pruefen.outputs.code == '1' && env.APP_ID != '' &&
@@ -242,7 +242,7 @@ jobs:
             echo "::warning::\`Migrationsnummern\` ist auf $BASIS kein Required Check — rote PRs lassen sich mergen."
             echo "⚠️ \`Migrationsnummern\` ist auf $BASIS kein Required Check (Ruleset 17017911)." >> "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         if: steps.pruefen.outputs.reparieren != '0' && env.APP_ID != ''
         with:
