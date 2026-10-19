@@ -42,7 +42,8 @@ erst schwärzen, wenn alle Zwecke dieser Person geschwärzt sind. Eine Person mi
 Behandlungsbezug MUST die Zwecke `behandlung` und `personenauskunft` tragen, jede andere nur
 `personenauskunft`. Behandlungsbezug MUST bestehen, sobald eine Sichtung, eine Verlaufsnotiz,
 eine UHS-Belegung, ein Zustand, eine Verletzung, eine Maßnahme, ein Transportstand, eine
-PAT-Nummer oder eine Kontamination vorliegt, auch storniert oder aufgehoben.
+PAT-Nummer oder Kontamination „ja“ vorliegt, auch storniert oder aufgehoben. „Nicht kontaminiert“
+MUST NOT als Behandlungsbezug zählen.
 
 #### Scenario: Nur registriert
 - **WHEN** die Kategorie `personenauskunft` eines Einsatzes geschwärzt wird und eine Person keinen Behandlungsbezug hat

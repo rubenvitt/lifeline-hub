@@ -121,8 +121,9 @@ früher abläuft als die des Einsatzes. Danach wird die Kategorie vorgemerkt und
 Karenz geschwärzt; der Einsatz selbst bleibt lesbar. Name, Geburtsdatum, Fundort und Verbleib
 einer Person bleiben, bis alle Zwecke der Person abgelaufen sind. Zur Behandlung gehört eine
 Person, sobald sie eine Sichtung, eine Verlaufsnotiz, eine UHS-Belegung, einen Zustand, eine
-Verletzung, eine Maßnahme, einen Transport, eine PAT-Nummer oder eine Kontamination trägt, auch
-wenn der Eintrag aufgehoben ist; ihr Name bleibt dann bis zum Ablauf der Behandlung.
+Verletzung, eine Maßnahme, einen Transport, eine PAT-Nummer oder die Kontamination
+„kontaminiert“ trägt, auch wenn der Eintrag aufgehoben ist („nicht kontaminiert“ zählt nicht); ihr
+Name bleibt dann bis zum Ablauf der Behandlung.
 
 Auch nach der Schwärzung bleiben die Angaben aus festen Listen ohne Freitext:
 Sichtungskategorie, Körperregion, Ansicht, Art und Schwere einer Verletzung, die Maßnahmen,
