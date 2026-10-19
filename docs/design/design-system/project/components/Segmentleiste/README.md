@@ -1,8 +1,5 @@
 # Segmentleiste
 
-Quelle: `frontend/src/components/instrument/Segmentleiste.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
-
 Segmentleiste — Umschalter im Instrumentenstil (ETB-Filter, Basiskarte, Ansicht). Ersatz für
 antds `Segmented`, dessen Pillenform, Schatten und Gleitanimation die Formensprache (Radius 0,
 Fugenraster) brechen.
@@ -38,3 +35,6 @@ als Beschreibung (`aria-describedby`). Es ist `aria-disabled`, nicht `disabled`:
 `disabled` nähme es aus Fokus und Hilfstechnik, der Grund wäre unerreichbar. Klick und Pfeile
 wählen es nicht, die Pfeile springen darüber hinweg. Der Grund ist der zweite Kanal neben
 dem Grau (WCAG 1.4.1).
+
+Quelle: `frontend/src/components/instrument/Segmentleiste.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
+dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

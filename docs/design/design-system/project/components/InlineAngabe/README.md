@@ -1,8 +1,5 @@
 # InlineAngabe (geschlossen, leer, offen)
 
-Quelle: `frontend/src/components/InlineAngabe.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
-
 Inline bearbeitbare Angabe mit BELIEBIGER Eingabe (LFH-472) — Text, Textfeld, Zahl, Auswahl,
 Datum/Uhrzeit —, optional als Pflichtangabe.
 
@@ -51,3 +48,6 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
   „Eine offene Bearbeitung zur Zeit“).
 - Erfüllt `onSpeichern` mit `OFFEN_LASSEN`, bleibt die Eingabe mit dem Entwurf offen, ohne
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
+
+Quelle: `frontend/src/components/InlineAngabe.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
+dem echten Baustein gerendert (der offene Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

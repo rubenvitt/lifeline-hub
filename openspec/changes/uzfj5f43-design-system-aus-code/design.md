@@ -70,7 +70,10 @@ exakt (die Umsetzung entscheidet nach Messung und vermerkt es hier).
 **Gemessen (19.10.2026):** Die SSR-Ausgabe ist stabil (mehrere Läufe byte-gleich, `hashed: false`
 am Vorschau-Theme); der Wächter vergleicht alle Dateien byte-genau, ohne Rückfall. Folge: ein
 antd-Update ändert die Vorschauen und macht den Wächter rot, bis `pnpm -C frontend design-system`
-läuft.
+läuft. Den Zustand, den nur ein Klick erreicht (offene `InlineAngabe`), rendert der Generator mit
+`react-dom/client` im jsdom und liest das CSS vor dem Aushängen, weil cssinjs den Cache beim
+Aushängen leert; feste `cssVar`-Schlüssel je Thema machen die Klassen unabhängig vom `useId`-Zähler,
+und der Wächter prüft zusätzlich antd-CSS und Schriften jeder Vorschau.
 
 **D6 — Veröffentlichen.** Einmalig jetzt: Artifact aus dem Typ „Design System“ anlegen (Titel
 „Lifeline Hub“), dann alle Dateien senden, Index zuletzt. Die URL steht in

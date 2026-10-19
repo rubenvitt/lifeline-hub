@@ -1,8 +1,5 @@
 # Paneel
 
-Quelle: `frontend/src/components/instrument/Paneel.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
-
 Paneel — die Grundfläche für Seitenleisten, Kachel-Paneele und Listenblöcke.
 
 Rahmen `linie`, Grund `paneel`, Kopf 38 px mit Augenbraue links und optionalem Mono-Meta bzw.
@@ -22,3 +19,6 @@ ENGER KOPF: der Kopf BRICHT UM (`flexWrap`), der rechte Block rückt als Ganzes 
 Zeile und bleibt rechtsbündig (`marginInlineStart: auto`); reicht selbst die nicht, kürzt das
 Meta mit Auslassung (`paneelMetaStil`), die Aktion nie — ein abgeschnittener Link ist kein
 Ziel. Das volle Meta steht dann im `title`, wenn es ein Text ist.
+
+Quelle: `frontend/src/components/instrument/Paneel.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
+dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

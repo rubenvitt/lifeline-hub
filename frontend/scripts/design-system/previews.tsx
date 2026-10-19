@@ -7,8 +7,12 @@
  * der App am `<html>`.
  *
  * Ein Zustand, den nur eine Bedienung erreicht (die offene `InlineAngabe`), wird im jsdom des
- * Vitest-Laufs mit `react-dom/client` gerendert und angeklickt; das CSS kommt auch dann aus dem
- * Cache, nicht aus dem Dokument.
+ * Vitest-Laufs mit `react-dom/client` gerendert und angeklickt. Das CSS kommt auch dann aus dem
+ * Cache (`mock="server"` hängt nichts ins Dokument), aber nur, solange der Baum hängt: cssinjs
+ * räumt einen Eintrag ab, sobald sein letzter Nutzer aushängt (`useGlobalCache`). Deshalb liest
+ * `renderPreview` das CSS vor dem Aushängen. Die Variablenklasse ist je Thema fest
+ * (`css-var-nacht`, `css-var-tag`; antd setzt den Schlüssel selbst als Klasse) statt antds
+ * `css-var-<useId>`, dessen Wert im Client-Render an einem Zähler des Prozesses hängt.
  *
  * Nachbauten in HTML gibt es nicht: sie drifteten. Kombinationen aus Text und Grund sind die der
  * Bausteine, also von deren Kontrast-Tests gedeckt.
@@ -57,7 +61,11 @@ export interface PreviewSpec {
   name: string;
   title: string;
   group: string;
-  /** Höhe der Karte in px (Nacht und Tag untereinander). */
+  /**
+   * Höhe der Karte in px (Nacht und Tag untereinander): gemessene Inhaltshöhe bei 720 px Breite mit
+   * den Schriften plus etwa 16 px (19.10.2026, Chromium). Die Karte scrollt nicht; wächst der
+   * Inhalt, neu messen.
+   */
   height: number;
   /** Quelldatei relativ zu `frontend/src/`, aus deren JSDoc die README entsteht. */
   source: string;
@@ -148,7 +156,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Datenraster',
     title: 'Datenraster mit DatenfeldEingabe und FeldFehler',
     group: 'Daten',
-    height: 600,
+    height: 550,
     source: 'components/instrument/Datenraster.tsx',
     content: () => (
       <Form layout="vertical" initialValues={{ funkrufname: 'Florian Celle 1-46-1' }}>
@@ -176,7 +184,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Status',
     title: 'StatusZelle, StatusChip und StatusTag',
     group: 'Status',
-    height: 400,
+    height: 340,
     source: 'components/instrument/Status.tsx',
     content: () => (
       <div className="ds-stapel">
@@ -204,7 +212,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Kennzahl',
     title: 'Kennzahl und Kennzahlenband',
     group: 'Daten',
-    height: 560,
+    height: 490,
     source: 'components/instrument/Kennzahl.tsx',
     content: () => (
       <Kennzahlenband spalten={2} beschriftung="Lage in Zahlen">
@@ -219,7 +227,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Segmentleiste',
     title: 'Segmentleiste',
     group: 'Bedienung',
-    height: 220,
+    height: 190,
     source: 'components/instrument/Segmentleiste.tsx',
     content: () => (
       <Segmentleiste<string>
@@ -239,7 +247,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Sammelbanner',
     title: 'Sammelbanner',
     group: 'Rückmeldung',
-    height: 240,
+    height: 200,
     source: 'components/instrument/Sammelbanner.tsx',
     content: () => (
       <Sammelbanner aktion={{ label: 'Anzeigen', onKlick: nichts }}>12 neue Meldungen</Sammelbanner>
@@ -249,7 +257,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'InlineAngabe',
     title: 'InlineAngabe (geschlossen, leer, offen)',
     group: 'Bedienung',
-    height: 600,
+    height: 570,
     source: 'components/InlineAngabe.tsx',
     content: () => (
       <Datenraster spalten={1} beschriftung="Angaben">
@@ -278,7 +286,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Sichtung',
     title: 'Sichtungsmarke (BBK)',
     group: 'Status',
-    height: 280,
+    height: 240,
     source: 'components/SichtungsTag.tsx',
     docAnchor: 'export default function SichtungsTag',
     content: () => (
@@ -301,7 +309,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Speicherleiste',
     title: 'Speicherleiste',
     group: 'Formular',
-    height: 380,
+    height: 360,
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,
@@ -310,7 +318,7 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     name: 'Gesperrt',
     title: 'Frei und gesperrt',
     group: 'Bedienung',
-    height: 400,
+    height: 360,
     source: 'index.css',
     ruleHead: 'Gesperrt trägt die Sperre ohne Farbe',
     moreDoc: 'theme/gesperrtZeichen.guard.test.ts',
@@ -342,7 +350,12 @@ function ThemaAbschnitt({ dunkel, children }: { dunkel: boolean; children: React
       locale={deDE}
       // Ohne Klassen-Hash: der trennt nur die Stile zweier Themes, die in antd 6 ohnehin über
       // CSS-Variablen laufen. Mit ihm stünde jedes Komponenten-CSS je Thema einmal in der Datei.
-      theme={{ ...antdThema(dunkel, DICHTE), hashed: false }}
+      // Fester Schlüssel der Variablenklasse je Thema, gleich in Server- und Client-Render.
+      theme={{
+        ...antdThema(dunkel, DICHTE),
+        hashed: false,
+        cssVar: { key: dunkel ? 'css-var-nacht' : 'css-var-tag' },
+      }}
       button={antdKnopf(DICHTE)}
       collapse={antdKlappkopf(DICHTE)}
       checkbox={antdKaestchen(DICHTE)}
@@ -370,20 +383,20 @@ function tree(spec: PreviewSpec, cache: ReturnType<typeof createCache>): ReactEl
 /** Markup und antd-CSS einer Vorschau. */
 export async function renderPreview(spec: PreviewSpec): Promise<{ html: string; css: string }> {
   const cache = createCache();
-  let html: string;
-  if (spec.interact) {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-    await act(async () => root.render(tree(spec, cache)));
-    await spec.interact(container);
-    html = container.innerHTML;
-    await act(async () => root.unmount());
-    container.remove();
-  } else {
-    html = renderToString(tree(spec, cache));
+  if (!spec.interact) {
+    const html = renderToString(tree(spec, cache));
+    return { html, css: extractStyle(cache, { plain: true }) };
   }
-  return { html, css: extractStyle(cache, { plain: true }) };
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => root.render(tree(spec, cache)));
+  await spec.interact(container);
+  // Vor dem Aushängen: danach ist der Cache leer (Kopf dieser Datei).
+  const result = { html: container.innerHTML, css: extractStyle(cache, { plain: true }) };
+  await act(async () => root.unmount());
+  container.remove();
+  return result;
 }
 
 /** Stile des Rahmens um die Bausteine: nur Anordnung, Farben aus den Rollen der App. */

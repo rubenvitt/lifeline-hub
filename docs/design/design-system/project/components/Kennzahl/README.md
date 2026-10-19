@@ -1,8 +1,5 @@
 # Kennzahl und Kennzahlenband
 
-Quelle: `frontend/src/components/instrument/Kennzahl.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
-
 Kennzahl und Kennzahlenband — „Zahl führt".
 
 Eine Zelle: Augenbraue · Zahl Mono 500 in drei Stufen (22 / 32 / 40 aus `schriftskala`) ·
@@ -84,3 +81,6 @@ nach dem Link die Eskalationskante (`data-lfh="kennzahl-kante"`, siehe
 die Tönung zeigt, wo ein Tippen wirkt, der Rand bleibt still. Herleitung und verworfene
 Wege (breitere Fuge, Kacheln):
 `openspec/changes/archive/2026-10-01-lfh-630-kennzahlenband-handschuh-abstand/design.md`.
+
+Quelle: `frontend/src/components/instrument/Kennzahl.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
+dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

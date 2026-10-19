@@ -2,7 +2,8 @@
  * Deckblatt des Design Systems (`components/Cover/preview.html`): Name, Herkunft, die tragenden
  * Rollen als Farbflächen und die zwei Schriftstimmen, Nacht über Tag. Statisch und allein aus den
  * Werten in `theme/tokens.ts` gesetzt; Text steht nur in Rollen, die die App für Text auf diesem
- * Grund nutzt (`text`, `gedaempft` auf `grund`).
+ * Grund nutzt (`text`, `gedaempft` auf `grund`). Die Schriften kommen als `@font-face` herein
+ * (`fontCss`, dieselben Regeln wie in den Vorschauen).
  */
 import {
   farbenDunkel,
@@ -42,7 +43,7 @@ function themeBand(name: string, rollen: Farbrollen): string {
   ].join('\n');
 }
 
-export function buildCover(): string {
+export function buildCover(fontCss: string): string {
   const titel = schriftskala.ueberschrift;
   const braue = schriftskala.augenbraue;
   const css = [
@@ -60,12 +61,13 @@ export function buildCover(): string {
     `.zahl{margin:16px 0 0;font-family:${schrift.zahl};font-size:22px;font-weight:500;font-variant-numeric:tabular-nums}`,
   ].join('\n');
   return [
-    '<!-- @dsCard group="Deckblatt" height=680 -->',
+    '<!-- @dsCard group="Deckblatt" height=660 -->',
     '<!doctype html>',
     '<html lang="de">',
     '<head>',
     '<meta charset="utf-8">',
     '<title>Lifeline Hub</title>',
+    `<style>\n${fontCss}\n</style>`,
     `<style>\n${css}\n</style>`,
     '</head>',
     '<body>',

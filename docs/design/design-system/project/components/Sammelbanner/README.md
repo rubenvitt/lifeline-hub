@@ -1,8 +1,5 @@
 # Sammelbanner
 
-Quelle: `frontend/src/components/instrument/Sammelbanner.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
-
 Sammelbanner — „12 neue Meldungen" statt eingeschobener Zeilen (Neuentwurf S4;
 Bedien-Leitlinie Festlegung 6: Live-Updates springen nicht unter dem Cursor, CLS ≤ 0,1,
 WCAG 3.2.5).
@@ -28,3 +25,6 @@ eine Polsterung statt zwei, die ganze Fläche Trefffläche. Der Name lautet „1
 (sichtbarer Text im Namen, WCAG 2.5.3); der volle Satz bleibt visuell verborgen im
 Statusbereich und wird wie bisher angesagt. Ob die Kurzform gilt, entscheidet der Aufrufer
 (`useViewport().istSchmal`), nicht dieser Baustein.
+
+Quelle: `frontend/src/components/instrument/Sammelbanner.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
+dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.

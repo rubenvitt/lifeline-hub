@@ -57,6 +57,7 @@ import { docBefore, firstSentence, memberDocs } from './jsdoc';
 import { buildReadme, cutBullet } from './readme';
 import { LAYOUT_CSS, PREVIEWS, renderPreview, type PreviewSpec } from './previews';
 import { buildCover } from './cover';
+import { ANTD_STYLE, fontFaceCss, type FontEntry } from './output';
 
 const FRONTEND = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SRC = join(FRONTEND, 'src');
@@ -331,11 +332,18 @@ function fontPath(url: string): string {
   throw new Error(`Design System: Schriftdatei „${url}“ nicht auflösbar`);
 }
 
+/** Die Schnitte aus `SCHRIFTSCHNITTE` als Einträge von `type.fonts`, Dateien unter `fonts/`. */
+const FONTS: readonly (FontEntry & { source: string })[] = SCHRIFTSCHNITTE.map((s) => ({
+  family: s.familie,
+  file: `fonts/${s.familie.toLowerCase().replace(/\s+/g, '-')}-${s.gewicht}.woff2`,
+  weight: String(s.gewicht),
+  source: s.datei.split('?')[0],
+}));
+
 function buildType(files: DesignSystemFiles) {
-  const fonts = SCHRIFTSCHNITTE.map((s) => {
-    const file = `fonts/${s.familie.toLowerCase().replace(/\s+/g, '-')}-${s.gewicht}.woff2`;
-    files.set(file, new Uint8Array(readFileSync(fontPath(s.datei.split('?')[0]))));
-    return { family: s.familie, file, weight: String(s.gewicht) };
+  const fonts = FONTS.map(({ source, ...font }) => {
+    files.set(font.file, new Uint8Array(readFileSync(fontPath(source))));
+    return font;
   });
   // Zeilenhöhe der Grundschrift, wie antd sie aus dem Theme der App ableitet (ein Faktor, den
   // die Bausteine erben); die Skala nimmt den der kompakten Stufe, wie die Vorschauen.
@@ -392,10 +400,21 @@ function omittedFromCode(): Omitted[] {
   ];
 }
 
-/** Die README eines Bausteins: Quelle, Hinweis zur Vorschau und der JSDoc-Kopf der Quelle. */
+/**
+ * Die README eines Bausteins: der JSDoc-Kopf der Quelle (bzw. die Regel), danach Quelle und
+ * Hinweis zur Vorschau. Der erste Satz ist die Zusammenfassung im Manifest des Formats; eine Regel
+ * steht deshalb ohne Spiegelstrich.
+ */
 function componentReadme(spec: PreviewSpec, agents: string): string {
   const source = read(join(SRC, spec.source));
-  const body = spec.ruleHead ? cutBullet(agents, spec.ruleHead) : docBefore(source, spec.docAnchor);
+  const body = spec.ruleHead
+    ? cutBullet(agents, spec.ruleHead)
+        .replace(/^- /, '')
+        .replace(/\n {2}/g, '\n')
+    : docBefore(source, spec.docAnchor);
+  const rendered = spec.interact
+    ? 'dem echten Baustein gerendert (der offene Zustand nach einem Klick im jsdom), mit dem'
+    : 'dem echten Baustein gerendert, mit dem';
   const more = spec.moreDoc
     ? [
         `Aus \`frontend/src/${spec.moreDoc}\`:`,
@@ -407,12 +426,12 @@ function componentReadme(spec: PreviewSpec, agents: string): string {
   return [
     `# ${spec.title}`,
     '',
-    `Quelle: \`frontend/src/${spec.source}\` im Repo \`rubenvitt/lifeline-hub\`. Die Vorschau ist aus`,
-    'dem echten Baustein gerendert, mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.',
-    '',
     body,
     '',
     ...more,
+    `Quelle: \`frontend/src/${spec.source}\` im Repo \`rubenvitt/lifeline-hub\`. Die Vorschau ist aus`,
+    `${rendered} antd-Theme der App, Nacht und Tag, Dichte \`kompakt\`.`,
+    '',
   ].join('\n');
 }
 
@@ -437,7 +456,8 @@ function previewDocument(spec: PreviewSpec, html: string, antdCss: string, css: 
     '<head>',
     '<meta charset="utf-8">',
     `<title>${escapeHtml(spec.title)}</title>`,
-    `<style>\n${antdCss}\n</style>`,
+    `<style>\n${fontFaceCss(FONTS)}\n</style>`,
+    `${ANTD_STYLE}\n${antdCss}\n</style>`,
     `<style>\n${css}\n</style>`,
     `<style>\n${LAYOUT_CSS}\n</style>`,
     '</head>',
@@ -479,7 +499,7 @@ export async function generateDesignSystem(): Promise<DesignSystemFiles> {
     files.set(`components/${spec.name}/preview.html`, previewDocument(spec, html, antdCss, css));
     files.set(`components/${spec.name}/README.md`, componentReadme(spec, agents));
   }
-  files.set('components/Cover/preview.html', buildCover());
+  files.set('components/Cover/preview.html', buildCover(fontFaceCss(FONTS)));
 
   files.set('README.md', buildReadme(agents, [...omitted, ...omittedFromCode()], PREVIEWS));
   return new Map([...files.entries()].sort(([a], [b]) => a.localeCompare(b, 'en')));

@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   generateDesignSystem,
@@ -7,6 +7,8 @@ import {
   PROJECT_DIR,
   type DesignSystemFiles,
 } from '../scripts/design-system/generate';
+import { checkOutput, listFiles } from '../scripts/design-system/output';
+import { DESIGN_SYSTEM_COMMAND } from '../scripts/design-system/readme';
 
 /**
  * Wächter des Design Systems „Lifeline Hub“ (Change `uzfj5f43-design-system-aus-code`,
@@ -15,10 +17,15 @@ import {
  * `docs/design/design-system/project/` ist erzeugt: Tokens aus `theme/tokens.ts`, README aus
  * `frontend/AGENTS.md`, Vorschauen aus den echten Bausteinen. Der Test erzeugt alles im Speicher
  * neu und vergleicht Datei für Datei, Byte für Byte, auch die Vorschauen: die Ausgabe ist
- * deterministisch (zwei Läufe gleich, gemessen; antds Klassen-Hash hängt am Theme und an der
- * antd-Version, ein antd-Update erzeugt die Vorschauen also mit neu). Dateien, die das
- * Veröffentlichen oder die Seite des Artifacts schreiben (`design-system.json`, `tokens.css`,
- * `manifest.json`, `api/`), sind ausgenommen.
+ * deterministisch (zwei Läufe gleich, gemessen). Einen Klassen-Hash gibt es nicht (`hashed: false`,
+ * feste `cssVar`-Schlüssel je Thema); das antd-CSS hängt an der antd-Version, ein antd-Update
+ * erzeugt die Vorschauen also mit neu. Dateien, die das Veröffentlichen oder die Seite des
+ * Artifacts schreiben (`design-system.json`, `tokens.css`, `manifest.json`, `api/`), und
+ * Punktdateien (`.DS_Store`) sind ausgenommen.
+ *
+ * Daneben prüft er, was ein Byte-Vergleich nicht sieht, weil auch eine falsche Ausgabe
+ * deterministisch ist (`output.ts`, `checkOutput`): antd-CSS und Schriften in jeder Vorschau, den
+ * ersten Satz der Baustein-READMEs und die Grenzen des Artifact-Typs.
  *
  * Schlägt er fehl: `mise exec -- pnpm -C frontend design-system` und die Ausgabe mitcommitten.
  * Dieser Befehl startet dieselbe Datei im Schreibmodus (`DESIGN_SYSTEM_WRITE=1`).
@@ -30,17 +37,13 @@ import {
  */
 
 const WRITE = process.env.DESIGN_SYSTEM_WRITE === '1';
-const COMMAND = 'mise exec -- pnpm -C frontend design-system';
 
-/** Alle Dateien unter `dir`, relativ und mit `/`, ohne die fremden. */
-function listFiles(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir, { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => relative(dir, join(entry.parentPath, entry.name)).split('\\').join('/'))
-    .filter((path) => !isForeign(path))
-    .sort();
-}
+/** Einmal erzeugt je Lauf; alle Prüfungen lesen dieselbe Ausgabe. */
+let generated: Promise<DesignSystemFiles> | undefined;
+const generate = () => (generated ??= generateDesignSystem());
+
+/** Die eingecheckten Dateien ohne die fremden. */
+const listCheckedIn = () => listFiles(PROJECT_DIR).filter((path) => !isForeign(path));
 
 const asBytes = (content: string | Uint8Array) =>
   typeof content === 'string' ? Buffer.from(content, 'utf8') : Buffer.from(content);
@@ -48,7 +51,7 @@ const asBytes = (content: string | Uint8Array) =>
 /** Abweichungen zwischen Erzeugtem und Eingechecktem, je Datei eine Zeile. */
 function compare(files: DesignSystemFiles): string[] {
   const findings: string[] = [];
-  const checkedIn = new Set(listFiles(PROJECT_DIR));
+  const checkedIn = new Set(listCheckedIn());
   for (const [path, content] of files) {
     if (!checkedIn.has(path)) findings.push(`fehlt: ${path}`);
     else if (!asBytes(content).equals(readFileSync(join(PROJECT_DIR, path)))) {
@@ -61,7 +64,7 @@ function compare(files: DesignSystemFiles): string[] {
 }
 
 function write(files: DesignSystemFiles): void {
-  for (const path of listFiles(PROJECT_DIR)) {
+  for (const path of listCheckedIn()) {
     if (!files.has(path)) rmSync(join(PROJECT_DIR, path));
   }
   for (const [path, content] of files) {
@@ -75,7 +78,7 @@ describe('Design System „Lifeline Hub“', () => {
   it.runIf(WRITE)(
     'schreibt das Erzeugte nach docs/design/design-system/project/',
     async () => {
-      write(await generateDesignSystem());
+      write(await generate());
     },
     120_000,
   );
@@ -83,12 +86,16 @@ describe('Design System „Lifeline Hub“', () => {
   it.skipIf(WRITE)(
     'liegt so im Repo, wie der Generator es aus dem Code erzeugt',
     async () => {
-      const findings = compare(await generateDesignSystem());
+      const findings = compare(await generate());
       expect(
         findings,
-        `Das Design System ist nicht aktuell. Neu erzeugen mit \`${COMMAND}\` und mitcommitten.`,
+        `Das Design System ist nicht aktuell. Neu erzeugen mit \`${DESIGN_SYSTEM_COMMAND}\` und mitcommitten.`,
       ).toEqual([]);
     },
     120_000,
   );
+
+  it('trägt in jeder Vorschau antd-CSS und Schriften und hält die Grenzen des Artifact-Typs', async () => {
+    expect(checkOutput(await generate())).toEqual([]);
+  }, 120_000);
 });

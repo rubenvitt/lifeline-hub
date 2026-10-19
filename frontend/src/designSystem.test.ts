@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildFarbTokens,
@@ -8,7 +11,22 @@ import {
   type Omitted,
 } from '../scripts/design-system/tokens';
 import { cleanDoc, docBefore, firstSentence, memberDocs } from '../scripts/design-system/jsdoc';
-import { cutBullet, cutSection } from '../scripts/design-system/readme';
+import {
+  buildReadme,
+  cutBullet,
+  cutSection,
+  DESIGN_SYSTEM_COMMAND,
+  README_SECTIONS,
+} from '../scripts/design-system/readme';
+import {
+  checkComponentReadme,
+  checkFonts,
+  checkLimits,
+  checkPreviewCss,
+  fontFaceCss,
+  LIMITS,
+  listFiles,
+} from '../scripts/design-system/output';
 
 /**
  * Die reinen Teile des Design-System-Generators (Change `uzfj5f43-design-system-aus-code`):
@@ -149,5 +167,148 @@ describe('Regelabschnitte aus frontend/AGENTS.md', () => {
   it('schneidet einen Spiegelstrich samt Fortsetzungszeilen', () => {
     expect(cutBullet(agents, 'Regel A')).toBe('- **Regel A** (X-1): erste Zeile\n  zweite Zeile');
     expect(() => cutBullet(agents, 'Regel C')).toThrow(/fehlt/);
+  });
+
+  it('lässt ausgenommene Spiegelstriche samt Fortsetzung weg und bricht ab, wenn einer fehlt', () => {
+    expect(cutSection(agents, '## Frontend — Gestaltung', ['Regel A'])).toBe(
+      '(1.1.2026)\n\nAbsatz mit **Fett:** mitten drin.\n- **Regel B**: anders',
+    );
+    expect(() => cutSection(agents, '## Frontend — Gestaltung', ['Regel C'])).toThrow(
+      /Regel C.*fehlt/,
+    );
+  });
+});
+
+describe('README des Design Systems', () => {
+  const prozessRegel = 'Größere UI-Entwürfe über das Design System';
+  // Der Ablauf steht als Spiegelstrich im ersten Abschnitt, der Gestaltungssprache.
+  const agents = README_SECTIONS.map(({ head }, i) =>
+    [
+      `${head} (Kopfzeile)`,
+      '',
+      ...(i === 0
+        ? [
+            `- **${prozessRegel}** (Ruben): Ablauf für Agenten,`,
+            '  Veröffentlichen nach dem Merge.',
+            '',
+          ]
+        : []),
+      '- **Gestaltungsregel**: bleibt.',
+      '',
+    ].join('\n'),
+  ).join('\n');
+  const readme = buildReadme(agents, [], []);
+
+  it('trägt die Gestaltungsregeln, nicht den Ablauf der Entwürfe', () => {
+    expect(readme).toContain('**Gestaltungsregel**');
+    expect(readme).not.toContain(prozessRegel);
+    expect(readme).not.toContain('Veröffentlichen nach dem Merge');
+  });
+
+  it('nennt den Befehl mit mise', () => {
+    expect(DESIGN_SYSTEM_COMMAND).toBe('mise exec -- pnpm -C frontend design-system');
+    expect(readme).toContain(`\`${DESIGN_SYSTEM_COMMAND}\``);
+  });
+});
+
+describe('Ausgabe im Format des Typs', () => {
+  const vorschau = (antd: string, markup: string) =>
+    [
+      '<!-- @dsCard group="X" height=100 -->',
+      '<!doctype html>',
+      `<style data-quelle="antd">\n${antd}\n</style>`,
+      '<style>\n.eigen{color:red}\n</style>',
+      markup,
+    ].join('\n');
+
+  it('verlangt antd-CSS in jeder Vorschau und einen Block für jede css-var-Klasse', () => {
+    const leer = '.data-ant-cssinjs-cache-path{content:"";}';
+    expect(checkPreviewCss('components/A/preview.html', vorschau(leer, ''))).toEqual([
+      'components/A/preview.html: antd-CSS fehlt',
+    ]);
+    const css = '.css-var-nacht{--ant-blue:#1677FF;}\n.css-var-nacht.ant-btn{color:red}';
+    const markup =
+      '<button class="ant-btn css-var-nacht ant-input-css-var"></button><i class="css-var-tag"></i>';
+    expect(checkPreviewCss('components/A/preview.html', vorschau(css, markup))).toEqual([
+      'components/A/preview.html: kein CSS für .css-var-tag',
+    ]);
+    expect(
+      checkPreviewCss('components/A/preview.html', vorschau(`${css}\n.css-var-tag{}`, markup)),
+    ).toEqual([]);
+    // `css-var-nacht` deckt nicht `css-var-na`.
+    expect(
+      checkPreviewCss('components/A/preview.html', vorschau(css, '<b class="css-var-na"></b>')),
+    ).toEqual(['components/A/preview.html: kein CSS für .css-var-na']);
+  });
+
+  const fonts = [
+    { family: 'LFH Archivo', file: 'fonts/lfh-archivo-400.woff2', weight: '400' },
+    { family: 'LFH Archivo', file: 'fonts/lfh-archivo-600.woff2', weight: '600' },
+  ];
+
+  it('setzt @font-face je Schnitt relativ zur Vorschau unter components/<Name>/', () => {
+    const css = fontFaceCss(fonts);
+    expect(css).toContain(
+      "@font-face{font-family:'LFH Archivo';src:url('../../fonts/lfh-archivo-400.woff2') format('woff2');font-weight:400;",
+    );
+    expect(checkFonts('components/A/preview.html', `<style>\n${css}\n</style>`, fonts)).toEqual([]);
+    expect(
+      checkFonts('components/A/preview.html', `<style>\n${fontFaceCss(fonts.slice(0, 1))}`, fonts),
+    ).toEqual(['components/A/preview.html: keine Schrift LFH Archivo 600']);
+  });
+
+  it('beginnt die README eines Bausteins mit der Zusammenfassung, nicht mit der Herkunft', () => {
+    const pfad = 'components/A/README.md';
+    expect(checkComponentReadme(pfad, '# A\n\nA — die Fläche.\n\nQuelle: `x`.\n')).toEqual([]);
+    expect(checkComponentReadme(pfad, '# A\n\nQuelle: `x`. Die Vorschau …\n')).toEqual([
+      `${pfad}: erster Satz ist keine Zusammenfassung`,
+    ]);
+    expect(checkComponentReadme(pfad, '# A\n\n- **Regel** (X): Text.\n')).toEqual([
+      `${pfad}: erster Satz ist keine Zusammenfassung`,
+    ]);
+  });
+
+  it('hält die Grenzen des Typs: Datei unter 15 MiB, unter 1.008 Dateien, 256 MiB gesamt', () => {
+    expect(LIMITS).toEqual({ fileBytes: 15 * 2 ** 20, files: 1008, totalBytes: 256 * 2 ** 20 });
+    const klein = new Map<string, string | Uint8Array>([['a.txt', 'x']]);
+    expect(checkLimits(klein)).toEqual([]);
+    const gross = new Map<string, string | Uint8Array>([
+      ['fonts/a.woff2', new Uint8Array(LIMITS.fileBytes)],
+    ]);
+    expect(checkLimits(gross)).toEqual([
+      `fonts/a.woff2: ${LIMITS.fileBytes} Bytes, höchstens ${LIMITS.fileBytes - 1}`,
+    ]);
+    // Der Index `design-system.json` kommt beim Veröffentlichen dazu.
+    const viele = new Map<string, string | Uint8Array>(
+      Array.from({ length: LIMITS.files }, (_, i) => [`d${i}.txt`, 'x']),
+    );
+    expect(checkLimits(viele)).toEqual([
+      `${LIMITS.files} Dateien und der Index, höchstens ${LIMITS.files}`,
+    ]);
+    viele.delete('d0.txt');
+    expect(checkLimits(viele)).toEqual([]);
+    const schwer = new Map<string, string | Uint8Array>(
+      Array.from({ length: 18 }, (_, i) => [`v${i}.mp4`, new Uint8Array(15 * 2 ** 20 - 1)]),
+    );
+    expect(checkLimits(schwer)).toEqual([
+      `${18 * (15 * 2 ** 20 - 1)} Bytes gesamt, höchstens ${LIMITS.totalBytes}`,
+    ]);
+  });
+
+  it('listet Dateien ohne .DS_Store und andere Punktdateien', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'design-system-'));
+    try {
+      mkdirSync(join(dir, 'components', 'A'), { recursive: true });
+      mkdirSync(join(dir, '.git'));
+      writeFileSync(join(dir, 'README.md'), '');
+      writeFileSync(join(dir, '.DS_Store'), '');
+      writeFileSync(join(dir, 'components', 'A', 'preview.html'), '');
+      writeFileSync(join(dir, 'components', 'A', '._preview.html'), '');
+      writeFileSync(join(dir, '.git', 'HEAD'), '');
+      expect(listFiles(dir)).toEqual(['README.md', 'components/A/preview.html']);
+      expect(listFiles(join(dir, 'gibt-es-nicht'))).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
