@@ -1,4 +1,4 @@
-import type { PersonZugriffArt } from '../api/types';
+import type { PersonZugriff, PersonZugriffArt } from '../api/types';
 
 /**
  * Klartext je Art im Zugriffsprotokoll einer Person (Audit-Einsicht der Einsatzleitung). Der
@@ -13,6 +13,11 @@ export const ZUGRIFF_ART_TEXT: Record<PersonZugriffArt, string> = {
   anhang: 'Datei geladen',
 };
 
-export function zugriffArtText(art: PersonZugriffArt): string {
-  return ZUGRIFF_ART_TEXT[art];
+/**
+ * Klartext einer Zeile. `druck` steht für zwei Zugriffe, die nur `person_id` trennt: der Druck der
+ * Liste trägt keine, die Druckansicht einer Person (LLH-1120, `…/personen/{pid}/druck`) ihre.
+ */
+export function zugriffArtText(zugriff: Pick<PersonZugriff, 'art' | 'person_id'>): string {
+  if (zugriff.art === 'druck' && zugriff.person_id != null) return 'Blatt gedruckt';
+  return ZUGRIFF_ART_TEXT[zugriff.art];
 }
