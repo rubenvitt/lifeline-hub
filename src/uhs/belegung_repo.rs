@@ -180,6 +180,28 @@ pub async fn austritt_intern(
     })
 }
 
+/// Ob die Person nach `zeitpunkt_at` in eine UHS eingetreten oder gewechselt ist (LLH-1138,
+/// Spec `personen-verlauf`): ein nachgereichter Verbleib, der älter ist als dieser Zugang, nimmt
+/// sie nicht mehr aus der UHS. Gleicher Zeitpunkt zählt nicht als später (der Verbleib ist
+/// später gespeichert und gewinnt).
+pub async fn has_zugang_nach_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    person_id: i64,
+    zeitpunkt_at: &str,
+) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM person_uhs_belegung \
+                       WHERE einsatz_id = ? AND person_id = ? AND art IN ('eintritt','wechsel') \
+                         AND datetime(zeitpunkt_at) > datetime(?))",
+    )
+    .bind(einsatz_id)
+    .bind(person_id)
+    .bind(zeitpunkt_at)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
 /// [`austritt_intern`] in einer laufenden Transaktion, etwa im selben Schritt wie der
 /// auslösende Verbleib (LLH-1138, design.md D5): der Austritt läuft dann nur, wenn der neue
 /// Verbleib gewinnt.

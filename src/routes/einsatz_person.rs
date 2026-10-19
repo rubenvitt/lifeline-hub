@@ -1329,12 +1329,21 @@ pub async fn verbleib(
         // E‑3: bei transport/entlassung/notunterkunft → UHS-Auto-Austritt (eigene ETB-Spur).
         // Notunterkunft (LFH-613) verlässt die Unfallhilfsstelle ebenso wie ein Transport. Nur,
         // wenn dieser Verbleib der aktuelle ist (D6): ein älterer nachgereichter Transport holt
-        // die zurückgekehrte Person nicht aus der UHS.
+        // die zurückgekehrte Person nicht aus der UHS. Ebenso wenig einer, der älter ist als der
+        // jüngste Eintritt oder Wechsel in eine UHS: die Belegung ist dann der jüngere Stand.
         let austritt = if erfasst.gewinnt
             && matches!(
                 art,
                 VerbleibArt::Transport | VerbleibArt::Entlassung | VerbleibArt::Notunterkunft
-            ) {
+            )
+            && !crate::uhs::belegung_repo::has_zugang_nach_tx(
+                conn,
+                einsatz_id,
+                person_id,
+                &zeitpunkt_at,
+            )
+            .await?
+        {
             crate::uhs::auto_austritt_tx(
                 conn,
                 einsatz_id,

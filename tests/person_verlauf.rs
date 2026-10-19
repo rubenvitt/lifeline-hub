@@ -354,7 +354,7 @@ async fn sichtung_sendet_das_etb_live_ereignis() {
 
 // ---------- Verbleib (tasks.md 1.4) ----------
 
-/// Einsatz mit aktiver UHS und einer Person darin (vor 30 Minuten angelegt). Liefert
+/// Einsatz mit aktiver UHS und einer Person darin (vor 30 Minuten angelegt und eingetreten). Liefert
 /// (Einsatz, UHS, Person).
 async fn person_in_uhs(
     app: &axum::Router,
@@ -389,6 +389,13 @@ async fn person_in_uhs(
     assert_eq!(s, StatusCode::CREATED, "{person}");
     let p = person["id"].as_i64().unwrap();
     angelegt_vor(pool, p, 30).await;
+    // Der Eintritt gehört zum Anlegen: ein nachgereichter Verbleib danach nimmt sie heraus.
+    sqlx::query("UPDATE person_uhs_belegung SET zeitpunkt_at = ? WHERE person_id = ?")
+        .bind(zeit(-60 * 30))
+        .bind(p)
+        .execute(pool)
+        .await
+        .unwrap();
     (e, u, p)
 }
 
@@ -449,6 +456,60 @@ async fn aelterer_verbleib_laesst_den_aktuellen_stehen_und_tritt_nicht_aus() {
     let d = detail(&app, &admin, e, p).await;
     assert_eq!(d["aktueller_verbleib"], "Transport → KH Süd");
     assert!(d["aufenthalt"].is_null(), "{d}");
+}
+
+/// Spec `personen-verlauf`, „Nachgereichter Verbleib vor der Wiederaufnahme“: ein vorgemerkter
+/// Verbleib gewinnt unter den Verbleib-Einträgen, ist aber älter als die spätere Wiederaufnahme
+/// in die UHS. Er wird aktueller Verbleib, nimmt die Person aber nicht aus der UHS.
+#[tokio::test]
+async fn nachgereichter_verbleib_vor_der_wiederaufnahme_tritt_nicht_aus() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, u, p) = person_in_uhs(&app, &pool, &admin).await;
+    let pfad = format!("/api/einsaetze/{e}/personen/{p}/verbleib");
+
+    // 10:00 Transport (Austritt), 10:30 Wiederaufnahme, 10:15 vorgemerkte Entlassung kommt an.
+    let (s, v) = post(
+        &app,
+        &admin,
+        &pfad,
+        json!({ "art": "transport", "zeitpunkt_at": zeit(-1200) }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert!(detail(&app, &admin, e, p).await["aufenthalt"].is_null());
+    let (s, v) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/personen/{p}/uhs-belegung"),
+        json!({ "art": "eintritt", "uhs_id": u }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let vorgemerkt = zeit(-600);
+    let (s, v) = post(
+        &app,
+        &admin,
+        &pfad,
+        json!({ "art": "entlassung", "zeitpunkt_at": vorgemerkt, "client_id": "v-3" }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let d = detail(&app, &admin, e, p).await;
+    assert_eq!(d["aktuelle_verbleib_art"], "entlassung", "{d}");
+    assert!(
+        d["aufenthalt"].is_object(),
+        "die wieder aufgenommene Person bleibt in der UHS: {d}"
+    );
+    let etb = system_etb(&app, &admin, e).await;
+    assert_eq!(
+        etb.iter()
+            .filter(|z| z["inhalt"].as_str().unwrap().contains("verlässt"))
+            .count(),
+        1,
+        "nur der Transport nimmt die Person heraus: {etb:?}"
+    );
 }
 
 #[tokio::test]

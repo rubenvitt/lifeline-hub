@@ -279,7 +279,9 @@ sehen, über der Liste.
 Wer mit „@…“ oder über „Patient aufnehmen“ einer Unfallhilfsstelle zugeordnet wird, steht dort im
 Wartebereich ([Unfallhilfsstellen](unfallhilfsstellen.md)). Ein Verbleib „Transport“,
 „Notunterkunft“ oder „Entlassung vor Ort“ beendet den Aufenthalt in der Unfallhilfsstelle, ebenso
-der Status „verstorben“ oder „abgemeldet“ und das Stornieren.
+der Status „verstorben“ oder „abgemeldet“ und das Stornieren. Ein nachgereichter Verbleib, der
+älter ist als die letzte Aufnahme in eine Unfallhilfsstelle oder der letzte Wechsel dort, beendet
+den Aufenthalt nicht.
 
 Eine Person mit Verbleib „Notunterkunft“ in einer Betreuungsstelle zählt dort unter „davon
 namentlich“ ([Betreuung und Evakuierung](betreuung.md)). Zur Wahl unter „Bezug hinzufügen“ stehen

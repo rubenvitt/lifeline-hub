@@ -315,3 +315,6 @@ Branches vor dem Release, weil Migrationen nie geändert werden.
   gesperrt, weil die Aufheben-Routen weder `client_id` noch Erfassungszeit tragen (D1, D8).
 - Die Figur wächst mit der Dichte, in der Handschuh-Stufe 480 × 704 px je Ansicht. Nur so erreichen
   Hand, Fuß und Hals 72 px (D13 verwirft erst die Variante über 1000 px).
+- Auto-Austritt (D6): Ein gewinnender Verbleib nimmt die Person nur aus der UHS, wenn er nicht
+  älter ist als ihr jüngster Eintritt oder Wechsel in `person_uhs_belegung`. Sonst holte eine
+  nachgereichte Entlassung eine inzwischen wieder aufgenommene Person heraus (Review).

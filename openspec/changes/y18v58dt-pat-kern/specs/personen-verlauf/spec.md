@@ -44,7 +44,9 @@ mit dem jüngsten Erfassungszeitpunkt folgen. Bei gleichem Zeitpunkt MUST der sp
 gewinnen. Ein nachgereichter Eintrag, der älter ist als der aktuelle, MUST im Verlauf stehen, aber
 den aktuellen Stand nicht ändern. Er MUST auch keine Folge auslösen, die am aktuellen Stand hängt:
 keinen Austritt aus der UHS und keinen Hinweis „Sichtung I“. Sein ETB-Eintrag MUST die
-Erfassungszeit tragen und nennen, dass er nachgetragen ist.
+Erfassungszeit tragen und nennen, dass er nachgetragen ist. Ein Verbleib, der älter ist als der
+jüngste Eintritt oder Wechsel der Person in eine UHS, MUST sie nicht aus der UHS nehmen, auch wenn
+er unter den Verbleib-Einträgen der jüngste ist.
 
 #### Scenario: Alte Offline-Sichtung nach neuer Online-Sichtung
 - **WHEN** um 14:20 online SK II erfasst wird und danach eine um 14:10 offline vorgemerkte SK I ankommt
@@ -55,6 +57,12 @@ Erfassungszeit tragen und nennen, dass er nachgetragen ist.
 #### Scenario: Älterer Verbleib nach der Rückkehr
 - **WHEN** ein vorgemerkter Verbleib „Transport“ ankommt, der älter ist als der aktuelle Verbleib
 - **THEN** bleibt der aktuelle Verbleib unverändert, und die Person tritt nicht aus der UHS aus
+
+#### Scenario: Nachgereichter Verbleib vor der Wiederaufnahme
+- **WHEN** eine Person um 10:00 abtransportiert und um 10:30 wieder in die UHS aufgenommen wird
+- **AND** danach eine um 10:15 vorgemerkte Entlassung ankommt
+- **THEN** ist die Entlassung der aktuelle Verbleib
+- **AND** die Person bleibt in der UHS
 
 ### Requirement: Bestätigung gilt zur Erfassungszeit
 
