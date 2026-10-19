@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::geraet::bestaetigung::Bestaetigung;
-use crate::person::{VerbleibArt, VerbleibStatus};
+use crate::person::{verbleib_kurzform, TransportDurch, VerbleibArt, VerbleibStatus};
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use utoipa::ToSchema;
@@ -29,6 +29,12 @@ pub struct VerbleibAnzeige {
     /// Fehlt bei Einträgen von vor der Migration 0217.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eingegangen_at: Option<String>,
+    /// Wer fährt (LLH-1332), nur bei `transport`; fehlt im Bestand (gilt als fremd).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport_durch: Option<TransportDurch>,
+    /// Disposition des Fahrzeugs eines Eigentransports (LLH-1332).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub einsatz_fahrzeug_id: Option<i64>,
 }
 
 /// Eingabedaten beim Erfassen; Strings bereits getrimmt (Handler). `art`/`status`
@@ -48,11 +54,16 @@ pub struct VerbleibDaten<'a> {
     pub zeitpunkt_at: Option<&'a str>,
     /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
     pub client_id: Option<&'a str>,
+    /// Wer fährt (LLH-1332); Paarung mit Art und Fahrzeug prüft der Handler.
+    pub transport_durch: Option<&'a str>,
+    /// Disposition eines Eigentransports, bereits auf Einsatz und Erfassungszeit geprüft.
+    pub einsatz_fahrzeug_id: Option<i64>,
 }
 
 const SELECT_VERBLEIB: &str = "\
     SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
-           zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_name, eingegangen_at \
+           zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_name, eingegangen_at, \
+           transport_durch, einsatz_fahrzeug_id \
     FROM person_verbleib";
 
 /// „Aktuell“ (Spec `personen-verlauf`, design.md D6): der Verbleib mit dem jüngsten
@@ -103,10 +114,10 @@ pub async fn erfassen_tx(
         "INSERT INTO person_verbleib \
             (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, erfasst_von, \
              betreuungsstelle_id, bestaetigt_personal_id, bestaetigt_name, zeitpunkt_at, \
-             eingegangen_at, client_id) \
+             eingegangen_at, client_id, transport_durch, einsatz_fahrzeug_id) \
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
                  COALESCE(?, strftime('%Y-%m-%d %H:%M:%S','now')), \
-                 strftime('%Y-%m-%d %H:%M:%S','now'), ?) RETURNING id",
+                 strftime('%Y-%m-%d %H:%M:%S','now'), ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(person_id)
@@ -121,39 +132,56 @@ pub async fn erfassen_tx(
     .bind(daten.bestaetigung.map(|b| b.name.as_str()))
     .bind(daten.zeitpunkt_at)
     .bind(daten.client_id)
+    .bind(daten.transport_durch)
+    .bind(daten.einsatz_fahrzeug_id)
     .fetch_one(&mut *conn)
     .await?;
     // Der Cache folgt dem jüngsten Ereignis (D6), nicht der Einfügung; die Kurzform wird aus der
     // gewinnenden Zeile berechnet.
-    let (juengste, art, ziel, status, stelle): (
+    type Juengste = (
         i64,
         VerbleibArt,
         Option<String>,
-        Option<String>,
+        Option<VerbleibStatus>,
         Option<i64>,
-    ) = sqlx::query_as(concat!(
-        "SELECT id, art, ziel, status, betreuungsstelle_id FROM person_verbleib \
+        Option<TransportDurch>,
+        Option<i64>,
+        Option<String>,
+    );
+    let (juengste, art, ziel, status, stelle, durch, fahrzeug, transportmittel): Juengste =
+        sqlx::query_as(concat!(
+        "SELECT id, art, ziel, status, betreuungsstelle_id, transport_durch, einsatz_fahrzeug_id, \
+                transportmittel FROM person_verbleib \
          WHERE einsatz_id = ? AND person_id = ? ",
         verbleibfolge!(),
         " LIMIT 1"
     ))
-    .bind(einsatz_id)
-    .bind(person_id)
-    .fetch_one(&mut *conn)
-    .await?;
+        .bind(einsatz_id)
+        .bind(person_id)
+        .fetch_one(&mut *conn)
+        .await?;
     sqlx::query(
         "UPDATE einsatz_person SET aktueller_verbleib = ?1, aktuelle_verbleib_art = ?2, \
             aktuelles_verbleib_ziel = ?3, aktueller_verbleib_status = ?4, \
-            aktuelle_verbleib_betreuungsstelle_id = ?5 \
+            aktuelle_verbleib_betreuungsstelle_id = ?5, aktueller_transport_durch = ?8, \
+            aktuelles_einsatz_fahrzeug_id = ?9 \
          WHERE id = ?6 AND einsatz_id = ?7",
     )
-    .bind(art.kurzform(ziel.as_deref()))
+    .bind(verbleib_kurzform(
+        art,
+        ziel.as_deref(),
+        status,
+        durch,
+        transportmittel.as_deref(),
+    ))
     .bind(art.as_str())
     .bind(ziel.as_deref())
-    .bind(status.as_deref())
+    .bind(status.map(|s| s.as_str()))
     .bind(stelle)
     .bind(person_id)
     .bind(einsatz_id)
+    .bind(durch.map(|d| d.as_str()))
+    .bind(fahrzeug)
     .execute(&mut *conn)
     .await?;
     Ok(ErfassterVerbleib {
@@ -209,6 +237,88 @@ pub async fn laden(
     .fetch_optional(pool)
     .await?
     .ok_or(AppError::NotFound)
+}
+
+/// Ein Fahrzeug aus dem Einsatz für den Eigentransport (LLH-1332, design.md D4). Nur, was die
+/// Verbleib-Maske braucht: kein Kennzeichen, keine Besatzung, keine Position.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct EinsatzTransportfahrzeug {
+    pub einsatz_fahrzeug_id: i64,
+    pub funkrufname: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fahrzeugtyp: Option<String>,
+}
+
+/// Vorschläge zum Rettungsmittel einer Verbleib-Erfassung (LLH-1332, Spec
+/// `patienten-uebergabe`, „Vorschläge für das Rettungsmittel“): Fahrzeuge im Einsatz (Wahl heißt
+/// Eigentransport), bisher eingetragene fremde Rettungsmittel des Einsatzes (häufigste zuerst)
+/// und Funkrufnamen des Fahrzeugstamms, die gerade nicht im Einsatz stehen.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct TransportmittelAuswahl {
+    pub im_einsatz: Vec<EinsatzTransportfahrzeug>,
+    pub bisher: Vec<String>,
+    pub stamm: Vec<String>,
+}
+
+/// Liest die [`TransportmittelAuswahl`] eines Einsatzes. Geschwärzte Verbleibe tragen kein
+/// `transportmittel` mehr und fallen so von selbst heraus; Dubletten über die Gruppen hinweg
+/// nennt nur die erste Gruppe.
+pub async fn transportmittel_auswahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    org_id: i64,
+) -> Result<TransportmittelAuswahl, AppError> {
+    let im_einsatz: Vec<EinsatzTransportfahrzeug> = sqlx::query_as(
+        "SELECT ef.id AS einsatz_fahrzeug_id, \
+                COALESCE(f.funkrufname, ef.snap_funkrufname) AS funkrufname, \
+                COALESCE(f.fahrzeugtyp, ef.snap_fahrzeugtyp) AS fahrzeugtyp \
+         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ef.einsatz_id = ? AND ef.beendet_at IS NULL \
+         ORDER BY 2 COLLATE NOCASE, ef.id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let bisher: Vec<String> = sqlx::query_scalar(
+        "SELECT TRIM(transportmittel) FROM person_verbleib \
+         WHERE einsatz_id = ? AND art = 'transport' \
+           AND (transport_durch IS NULL OR transport_durch = 'fremd') \
+           AND TRIM(COALESCE(transportmittel, '')) <> '' \
+         GROUP BY TRIM(transportmittel) \
+         ORDER BY COUNT(*) DESC, 1 COLLATE NOCASE",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let stamm: Vec<String> = sqlx::query_scalar(
+        "SELECT f.funkrufname FROM fahrzeug f \
+         WHERE f.org_id = ? AND NOT EXISTS ( \
+             SELECT 1 FROM einsatz_fahrzeug ef \
+             WHERE ef.einsatz_id = ? AND ef.fahrzeug_id = f.id AND ef.beendet_at IS NULL) \
+         ORDER BY f.funkrufname COLLATE NOCASE",
+    )
+    .bind(org_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let schluessel = |t: &str| t.trim().to_lowercase();
+    let mut gesehen: std::collections::HashSet<String> = im_einsatz
+        .iter()
+        .map(|f| schluessel(&f.funkrufname))
+        .collect();
+    let bisher: Vec<String> = bisher
+        .into_iter()
+        .filter(|t| gesehen.insert(schluessel(t)))
+        .collect();
+    let stamm: Vec<String> = stamm
+        .into_iter()
+        .filter(|t| gesehen.insert(schluessel(t)))
+        .collect();
+    Ok(TransportmittelAuswahl {
+        im_einsatz,
+        bisher,
+        stamm,
+    })
 }
 
 /// Verbleib-Verlauf einer Person (neueste zuerst).

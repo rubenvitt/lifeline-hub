@@ -62,6 +62,7 @@ const r007: Person = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
   aktuelle_sichtung: 'sk2',
   aktuelle_sichtung_at: '2026-05-27 09:10:00',
 };

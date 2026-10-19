@@ -2672,6 +2672,52 @@ async fn lagemonitor(app: &axum::Router, cookie: &str, einsatz: i64) -> String {
     a.cookie.expect("Sitzungscookie")
 }
 
+// Spec `lage-verdichtung`, „Abgeschlossene Patienten zählen nicht als Patienten“ (LLH-1332).
+#[tokio::test]
+async fn lagemonitor_zaehlt_abgeschlossene_nicht_als_patienten() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, _nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    let mut ids = Vec::new();
+    for _ in 0..3 {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/personen"),
+            &admin,
+            Some(&json!({ "sichtung": "sk2" })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        ids.push(v["id"].as_i64().unwrap());
+    }
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/personen/{}/verbleib", ids[0]),
+        &admin,
+        Some(&json!({ "art": "transport", "transport_durch": "fremd",
+                      "transportmittel": "RTW 3/83-2" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &monitor,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["betroffene"]["sk2"], json!(2));
+    assert_eq!(v["betroffene"]["patienten"], json!(2));
+    assert_eq!(v["betroffene"]["abgeschlossen"], json!(1));
+    assert_eq!(v["betroffene"]["gesamt"], json!(3));
+}
+
 #[tokio::test]
 async fn lagemonitor_antwort_traegt_keine_personen() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

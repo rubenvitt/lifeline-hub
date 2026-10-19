@@ -94,7 +94,8 @@ Kurzform (`VerbleibArt::kurzform` bekommt Durch und Status): fremd „Transport 
 ### D3 · `versorgung` leitet der Server ab
 
 `PersonAnzeige` bekommt `versorgung: offen | unterwegs | abgeschlossen` (Wire-Enum, Typ-Codegen),
-berechnet in Rust aus den Caches, nie gespeichert:
+berechnet in Rust aus den Caches (`person::versorgung_von`, gesetzt von `PersonAnzeige::mit_versorgung`
+nach jedem Lesen im Repo), nie gespeichert:
 
 | aktueller Verbleib | versorgung |
 | --- | --- |
@@ -121,11 +122,12 @@ UHS-Gerät) liefert:
 
 - `im_einsatz`: aktive Fahrzeug-Dispositionen (`einsatz_fahrzeug_id`, `funkrufname`,
   `fahrzeugtyp`), sortiert nach Funkrufname, locale `de`;
-- `vorschlaege`: eindeutige `transportmittel` aus Verbleib-Ereignissen dieses Einsatzes mit
-  `fremd` oder ohne Durch-Angabe, dazu die Funkrufnamen des Fahrzeugstamms der Organisation, die
-  nicht gerade im Einsatz disponiert sind; ohne Dubletten, nach Häufigkeit im Einsatz, dann
-  alphabetisch.
+- `bisher`: eindeutige `transportmittel` aus Verbleib-Ereignissen dieses Einsatzes mit `fremd`
+  oder ohne Durch-Angabe, nach Häufigkeit im Einsatz, dann alphabetisch;
+- `stamm`: die Funkrufnamen des Fahrzeugstamms der Organisation, die nicht gerade im Einsatz
+  disponiert sind, alphabetisch.
 
+Dubletten über die Gruppen hinweg (ohne Groß-/Kleinschreibung) nennt nur die erste Gruppe.
 Keine Kennzeichen, Besatzung oder Positionen: die Route weitet den Fahrzeugzugriff nicht aus.
 Geschwärzte Ereignisse liefern nichts (ihr `transportmittel` ist leer). Query-Key
 `einsatzKeys.personenTransportmittel`, live am `person`- und `fahrzeug`-Ereignis, im

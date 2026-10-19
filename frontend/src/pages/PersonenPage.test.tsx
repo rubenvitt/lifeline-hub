@@ -118,6 +118,7 @@ const person: Person = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 const unbekannt = {
   ...person,

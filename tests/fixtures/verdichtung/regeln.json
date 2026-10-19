@@ -78,5 +78,21 @@
       { "id": 3, "name": "aktiv, der aufgelösten unterstellt", "ueber_einheit_id": 2, "aufgeloest": false, "ist_kumuliert": [0, 0, 1] }
     ],
     "erwartet_einheiten": [1, 1, 4]
+  },
+  "versorgung": {
+    "_regel": "LLH-1332: Versorgungszustand aus dem jüngsten Verbleib (Spec patienten-uebergabe). Rust: person::versorgung_von; der Client liest nur das Feld versorgung, die Lagezählung (Patienten, Sichtungsverteilung) lässt abgeschlossene weg.",
+    "faelle": [
+      { "name": "ohne Verbleib", "art": null, "status": null, "durch": null, "sichtung": "sk1", "versorgung": "offen" },
+      { "name": "verbleibt vor Ort", "art": "vor_ort", "status": null, "durch": null, "sichtung": "sk3", "versorgung": "offen" },
+      { "name": "Transport nur angemeldet", "art": "transport", "status": "angemeldet", "durch": "eigen", "sichtung": "sk2", "versorgung": "offen" },
+      { "name": "Eigentransport unterwegs", "art": "transport", "status": "abtransportiert", "durch": "eigen", "sichtung": "sk2", "versorgung": "unterwegs" },
+      { "name": "Eigentransport übergeben", "art": "transport", "status": "uebergeben", "durch": "eigen", "sichtung": "sk2", "versorgung": "abgeschlossen" },
+      { "name": "fremdes Rettungsmittel", "art": "transport", "status": "abtransportiert", "durch": "fremd", "sichtung": "sk1", "versorgung": "abgeschlossen" },
+      { "name": "Bestands-Transport ohne Fahrer-Angabe", "art": "transport", "status": "abtransportiert", "durch": null, "sichtung": "sk3", "versorgung": "abgeschlossen" },
+      { "name": "Entlassung vor Ort", "art": "entlassung", "status": null, "durch": null, "sichtung": "sk4", "versorgung": "abgeschlossen" },
+      { "name": "Notunterkunft", "art": "notunterkunft", "status": null, "durch": null, "sichtung": "unverletzt", "versorgung": "abgeschlossen" },
+      { "name": "Verbleib des Leichnams", "art": "verstorben", "status": null, "durch": null, "sichtung": "tot", "versorgung": "abgeschlossen" }
+    ],
+    "erwartet": { "offen": 3, "unterwegs": 1, "abgeschlossen": 6, "patienten": 4, "sk1": 1, "sk2": 2, "sk3": 1, "sk4": 0 }
   }
 }

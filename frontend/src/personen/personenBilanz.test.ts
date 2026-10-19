@@ -39,6 +39,7 @@ const basis: Person = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 let n = 1;
 const p = (extra: Partial<Person>): Person => ({ ...basis, id: ++n, registrier_nr: n, ...extra });

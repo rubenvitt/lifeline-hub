@@ -72,6 +72,7 @@ function person(over: Partial<Person>): Person {
     geaendert_at: 'x',
     geaendert_von: 1,
     storniert_at: null,
+    versorgung: 'offen',
     aktuelle_sichtung: null,
     aktuelle_sichtung_at: null,
     aktueller_verbleib: null,

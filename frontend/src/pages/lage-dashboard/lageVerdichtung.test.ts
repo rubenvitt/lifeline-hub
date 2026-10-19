@@ -38,6 +38,7 @@ function person(p: Partial<Person>): Person {
     geaendert_at: '2026-06-08 10:00:00',
     geaendert_von: 1,
     storniert_at: null,
+    versorgung: 'offen',
     aktuelle_sichtung: null,
     aktuelle_sichtung_at: null,
     aktueller_verbleib: null,

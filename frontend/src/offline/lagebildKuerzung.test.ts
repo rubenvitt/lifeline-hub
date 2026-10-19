@@ -67,6 +67,7 @@ const VOLL: Person = {
   geaendert_at: '2026-10-09 10:05:00',
   geaendert_von: 3,
   storniert_at: null,
+  versorgung: 'offen',
   aktuelle_sichtung: 'sk2',
   aktuelle_sichtung_at: '2026-10-09 10:03:00',
   aktueller_verbleib: 'Klinikum',

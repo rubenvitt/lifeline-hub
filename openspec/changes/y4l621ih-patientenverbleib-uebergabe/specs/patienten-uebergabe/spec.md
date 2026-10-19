@@ -127,10 +127,11 @@ Vorschläge MUST mit Lesezugriff auf das Modul Personen abrufbar sein, auch am U
 - **THEN** zeigt sie die Fahrzeuge „Im Einsatz“, ohne dass das Gerät die Fahrzeugliste lesen darf
 
 ### Requirement: Schwärzung von Fahrer-Angabe und Fahrzeug
-Die Schwärzung einer Person SHALL das Fahrzeug eines Verbleib-Ereignisses zusammen mit dem
-Rettungsmittel-Text leeren. Die Fahrer-Angabe (`fremd`/`eigen`) und der Status MUST erhalten
-bleiben, damit der Versorgungszustand nach der Schwärzung unverändert bleibt.
+Die Schwärzung einer Person SHALL den Rettungsmittel-Text eines Verbleib-Ereignisses leeren, auch
+den als Momentaufnahme übernommenen Funkrufnamen. Fahrer-Angabe (`fremd`/`eigen`), Status und der
+Verweis auf die Fahrzeug-Disposition MUST erhalten bleiben: sie tragen keinen Personenbezug, und
+der Versorgungszustand bleibt nach der Schwärzung unverändert.
 
 #### Scenario: Geschwärzter Eigentransport
 - **WHEN** eine Person mit quittierter Übergabe geschwärzt wird
-- **THEN** sind Rettungsmittel-Text und Fahrzeug leer, und die Person trägt weiter `versorgung: "abgeschlossen"`
+- **THEN** ist der Rettungsmittel-Text leer, und die Person trägt weiter `versorgung: "abgeschlossen"`

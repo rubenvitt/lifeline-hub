@@ -37,6 +37,7 @@ const basis = {
   geaendert_at: '2026-10-18 08:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
   aktuelle_sichtung: 'sk2',
   aktuelle_sichtung_at: '2026-10-18 09:18:00',
   aktueller_verbleib: null,

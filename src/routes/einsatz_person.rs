@@ -24,7 +24,7 @@ use crate::person::verletzung_repo::{self, VerletzungAnzeige};
 use crate::person::{abgleich_repo, audit_repo, sichtung_repo, verbleib_repo, verlaufsnotiz_repo};
 use crate::person::{
     darf_uebergehen, registrier_anzeige, repo, AbgleichStatus, Geschlecht, PersonAnzeige,
-    PersonStatus, Sichtungskategorie, VerbleibArt, VerbleibStatus,
+    PersonStatus, Sichtungskategorie, TransportDurch, VerbleibArt, VerbleibStatus,
 };
 use crate::routes::support::{
     deserialize_optional_field, parse_enum, parse_enum_opt, pflicht, pruefe_koordinate, trimme,
@@ -171,6 +171,20 @@ pub async fn auswahl(
         liste.retain(|p| sichtbar.contains(&p.id));
     }
     Ok(Json(liste))
+}
+
+/// GET /api/einsaetze/{id}/personen/transportmittel — Vorschläge zum Rettungsmittel der
+/// Verbleib-Maske (LLH-1332, design.md D4). Am Modul Personen, damit auch das UHS-Gerät ohne
+/// Lesezugriff auf das Modul Fahrzeuge die Fahrzeuge im Einsatz sieht; NICHT auditiert (kein
+/// Personenbezug).
+pub async fn transportmittel(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Personen>,
+) -> Result<Json<verbleib_repo::TransportmittelAuswahl>, AppError> {
+    Ok(Json(
+        verbleib_repo::transportmittel_auswahl(&state.pool, ctx.einsatz.id, ctx.einsatz.org_id)
+            .await?,
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -1199,6 +1213,12 @@ pub struct VerbleibBody {
     /// Idempotenzschlüssel der Offline-Queue (LLH-1138).
     #[serde(default)]
     pub client_id: Option<String>,
+    /// Wer fährt (LLH-1332): `fremd` oder `eigen`, nur bei `transport`.
+    #[serde(default)]
+    pub transport_durch: Option<String>,
+    /// Disposition des Fahrzeugs eines Eigentransports (LLH-1332), Pflicht bei `eigen`.
+    #[serde(default)]
+    pub einsatz_fahrzeug_id: Option<i64>,
 }
 
 /// POST /api/einsaetze/{id}/personen/{pid}/verbleib — Verbleib-Ereignis erfassen.
@@ -1236,10 +1256,15 @@ pub async fn verbleib(
     ctx.fordere_aktiv()?;
     let art = VerbleibArt::parse(&body.art)
         .ok_or_else(|| AppError::Validation("Unbekannte Verbleib-Art".into()))?;
-    parse_enum_opt(
+    let status = parse_enum_opt(
         VerbleibStatus::parse,
         body.status.as_deref(),
         "Unbekannter Verbleib-Status",
+    )?;
+    let durch = parse_enum_opt(
+        TransportDurch::parse,
+        body.transport_durch.as_deref(),
+        "Unbekannte Fahrer-Angabe",
     )?;
     // Das Feld für sich (400) vor jedem Zusammenhang (422); die Untergrenze kommt mit der Person.
     let jetzt = chrono::Utc::now();
@@ -1286,7 +1311,27 @@ pub async fn verbleib(
             "Stornierte Person kann keinen Verbleib erhalten".into(),
         ));
     }
-    let transportmittel = trimme(body.transportmittel);
+    // Fahrer-Angabe (LLH-1332, design.md D2): Paarung vor dem Lesen des Fahrzeugs, die
+    // Momentaufnahme des Funkrufnamens ersetzt einen mitgeschickten Text.
+    pruefe_fahrer_angabe(art, status, durch, body.einsatz_fahrzeug_id)?;
+    let transportmittel = match body.einsatz_fahrzeug_id {
+        Some(ef_id) => {
+            let fahrzeug = crate::fahrzeug::disposition_repo::transport_fahrzeug(
+                &state.pool,
+                einsatz_id,
+                ef_id,
+            )
+            .await?
+            .ok_or(AppError::NotFound)?;
+            if !fahrzeug.bestand_zu(&zeitpunkt_at) {
+                return Err(AppError::UnprocessableEntity(
+                    "Das Fahrzeug war zur Erfassungszeit nicht im Einsatz disponiert".into(),
+                ));
+            }
+            Some(fahrzeug.funkrufname)
+        }
+        None => trimme(body.transportmittel),
+    };
     let ziel = trimme(body.ziel);
     let notiz = trimme(body.notiz);
     // Zur Erfassungszeit (D7), wie bei der Sichtung.
@@ -1310,6 +1355,8 @@ pub async fn verbleib(
         bestaetigung: bestaetigung.as_ref(),
         zeitpunkt_at: Some(&zeitpunkt_at),
         client_id: client_id.as_deref(),
+        transport_durch: durch.map(|d| d.as_str()),
+        einsatz_fahrzeug_id: body.einsatz_fahrzeug_id,
     };
     let ergebnis = crate::write_retry!(&state.pool, |conn| {
         if let Some(cid) = client_id.as_deref() {
@@ -1360,7 +1407,7 @@ pub async fn verbleib(
         let text = format!(
             "Person {}: {}",
             registrier_anzeige(person.registrier_nr),
-            art.etb_sachverhalt()
+            crate::person::verbleib_etb_sachverhalt(art, status, durch)
         );
         let text = if erfasst.gewinnt {
             text
@@ -1404,6 +1451,32 @@ pub async fn verbleib(
     state.live.publiziere(einsatz_id, etb_id);
     sse_person(&state, einsatz_id, person_id);
     Ok((StatusCode::CREATED, Json(verbleib)))
+}
+
+/// Paarung von Art, Status, Fahrer-Angabe und Fahrzeug (LLH-1332, Spec `patienten-uebergabe`):
+/// die Fahrer-Angabe nur beim Transport, ein Eigentransport nur mit Fahrzeug, ein Fahrzeug nur
+/// beim Eigentransport, die Übergabe nur beim Eigentransport. Jeder Verstoß ist 422.
+fn pruefe_fahrer_angabe(
+    art: VerbleibArt,
+    status: Option<VerbleibStatus>,
+    durch: Option<TransportDurch>,
+    einsatz_fahrzeug_id: Option<i64>,
+) -> Result<(), AppError> {
+    let fehler = |text: &str| Err(AppError::UnprocessableEntity(text.into()));
+    if durch.is_some() && art != VerbleibArt::Transport {
+        return fehler("Wer fährt, gibt es nur beim Verbleib Transport");
+    }
+    let eigen = durch == Some(TransportDurch::Eigen);
+    if eigen && einsatz_fahrzeug_id.is_none() {
+        return fehler("Ein Eigentransport braucht ein Fahrzeug aus dem Einsatz");
+    }
+    if !eigen && einsatz_fahrzeug_id.is_some() {
+        return fehler("Ein Fahrzeug aus dem Einsatz gibt es nur beim Eigentransport");
+    }
+    if status == Some(VerbleibStatus::Uebergeben) && !eigen {
+        return fehler("Eine Übergabe gibt es nur beim Eigentransport");
+    }
+    Ok(())
 }
 
 /// Ausgang der Verbleib-Transaktion.
