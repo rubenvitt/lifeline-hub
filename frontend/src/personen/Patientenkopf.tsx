@@ -28,6 +28,8 @@ import {
 import { useViewport } from '../components/useViewport';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { VERLAUFSNOTIZ_MAX } from '../api/eingabegrenzen';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { sichtung as SK_DARSTELLUNG } from '../theme/statusFarben';
 import { sichtungsKante, sichtungsflaechen } from '../theme/tokens';
@@ -727,13 +729,19 @@ function NotizZeile({
           <Form.Item
             name="text"
             noStyle
-            rules={[{ required: true, whitespace: true, message: 'Bitte Text eingeben' }]}
+            rules={[
+              { required: true, whitespace: true, message: 'Bitte Text eingeben' },
+              // Grenze des Servers (LLH-1329): ein zu langer Text geht weder hinaus noch in die
+              // Warteschlange; der Zähler sagt „zu lang“, gekürzt wird nie.
+              zeichenRegel(VERLAUFSNOTIZ_MAX, 'Notiztext'),
+            ]}
           >
             <Input
               aria-label="Verlaufsnotiz"
               aria-describedby={`notiz-folge-${personId}`}
               placeholder="Verlaufsnotiz"
               disabled={mutation.isPending}
+              count={zeichenGrenze(VERLAUFSNOTIZ_MAX)}
             />
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={mutation.isPending}>

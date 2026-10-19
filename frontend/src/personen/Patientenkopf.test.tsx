@@ -1,7 +1,8 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PERSON_ZUSTAND_MAX, VERLAUFSNOTIZ_MAX } from '../api/eingabegrenzen';
 import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
 import { benutzerFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
@@ -1109,5 +1110,60 @@ describe('Patientenkopf — Review PAT-Kern', () => {
       within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
     ).toBeDisabled();
     expect(within(paneel).getByText(AUFHEBEN_OHNE_NETZ)).toBeVisible();
+  });
+});
+
+/**
+ * Grenzen im Kopf (LLH-1329): Notizzeile und „Zustand / Verdacht“ zählen ab 80 % wie der Server,
+ * kürzen nie, und ein Text über der Grenze geht nicht hinaus, auch nicht in die Warteschlange.
+ * Mutationsprobe: `zeichenRegel` an der Notizzeile bzw. `max` am Zustand entfernt → der zu lange
+ * Text geht hinaus und der Fall wird rot.
+ */
+describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
+  it('die Notizzeile zählt, sperrt über der Grenze und kürzt nicht', async () => {
+    const { onGeschrieben } = zeige();
+    const feld = screen.getByRole('textbox', { name: 'Verlaufsnotiz' });
+    fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX + 1) } });
+    expect(screen.getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(gesendet).toEqual([]);
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('x'.repeat(VERLAUFSNOTIZ_MAX + 1));
+
+    fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX) } });
+    expect(screen.getByText('2.000 / 2.000')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+  });
+
+  it('„Zustand / Verdacht“ zählt, sperrt über der Grenze und kürzt nicht', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ ...basis });
+      }),
+    );
+    const { kopf } = zeige({ zustand: null });
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: /^Zustand \/ Verdacht zu R-012 hinzufügen$/ }),
+    );
+    const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand-zelle"]')!;
+    const feld = within(zelle).getByRole('textbox');
+    const lang = 'x'.repeat(PERSON_ZUSTAND_MAX + 1);
+    // Eingefügt statt getippt: die Zelle liest den Entwurf aus den Eingabe-Ereignissen.
+    await userEvent.click(feld);
+    await userEvent.paste(lang);
+    expect(within(zelle).getByText('501 / 500 · zu lang')).toBeInTheDocument();
+    fireEvent.blur(feld);
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(patches).toEqual([]);
+    expect(within(zelle).getByRole('textbox')).toHaveValue(lang);
   });
 });

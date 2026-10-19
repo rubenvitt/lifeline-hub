@@ -1,7 +1,13 @@
-import { Form } from 'antd';
-import { screen, waitFor, within } from '@testing-library/react';
+import { Button, Form } from 'antd';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  PERSON_ANGABE_MAX,
+  PERSON_NAME_MAX,
+  PERSON_NOTIZ_MAX,
+  PERSON_ZUSTAND_MAX,
+} from '../api/eingabegrenzen';
 import { renderMitProviders } from '../test/utils';
 import AufnahmeFelder, { aufnahmeZuEingabe, type AufnahmeModus } from './AufnahmeFelder';
 
@@ -176,4 +182,59 @@ describe('aufnahmeZuEingabe', () => {
       vermisst_seit: '2026-09-22 06:00:00',
     });
   });
+});
+
+/**
+ * Grenzen der Personen-Freitexte (LLH-1329, Spec `eingabegrenzen`): jedes Freitextfeld der Maske
+ * zählt ab 80 % wie der Server, kürzt nie und sperrt das Absenden mit dessen Wortlaut. Je Feld
+ * als Paar: genau an der Grenze geht ab, ein Zeichen mehr nicht. Mutationsprobe: `zeichenRegel`
+ * an einem Feld entfernt → dessen „ein Zeichen mehr“ sendet und wird rot; `count` entfernt → der
+ * Zähler fehlt.
+ */
+describe('AufnahmeFelder — Grenzen der Freitexte (LLH-1329)', () => {
+  function mitAbsenden(modus: AufnahmeModus) {
+    const onFinish = vi.fn();
+    renderMitProviders(
+      <Form onFinish={onFinish}>
+        <AufnahmeFelder modus={modus} />
+        <Button htmlType="submit">Absenden</Button>
+      </Form>,
+    );
+    return { onFinish };
+  }
+
+  const zahl = (n: number) => n.toLocaleString('de-DE');
+
+  it.each<[AufnahmeModus, string, number]>([
+    ['erfassen', 'Name', PERSON_NAME_MAX],
+    ['erfassen', 'Vorname', PERSON_NAME_MAX],
+    ['erfassen', 'Fundort', PERSON_ANGABE_MAX],
+    ['erfassen', 'Zustand / Verdacht', PERSON_ZUSTAND_MAX],
+    ['erfassen', 'Notiz', PERSON_NOTIZ_MAX],
+    ['vermisst', 'Melder / Kontakt', PERSON_ANGABE_MAX],
+  ])(
+    '%s · %s: Zähler, Sperre mit dem Wortlaut des Servers, nie gekürzt',
+    async (modus, label, max) => {
+      const { onFinish } = mitAbsenden(modus);
+      if (label !== 'Fundort') {
+        await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+      }
+      const feld = await screen.findByLabelText(label);
+
+      fireEvent.change(feld, { target: { value: 'x'.repeat(max + 1) } });
+      expect(feld).toHaveValue('x'.repeat(max + 1));
+      expect(screen.getByText(`${zahl(max + 1)} / ${zahl(max)} · zu lang`)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+      expect(
+        await screen.findByText(`${label} darf höchstens ${zahl(max)} Zeichen lang sein`),
+      ).toBeInTheDocument();
+      expect(onFinish).not.toHaveBeenCalled();
+      expect(feld).toHaveValue('x'.repeat(max + 1));
+
+      fireEvent.change(feld, { target: { value: 'x'.repeat(max) } });
+      expect(screen.getByText(`${zahl(max)} / ${zahl(max)}`)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Absenden' }));
+      await waitFor(() => expect(onFinish).toHaveBeenCalledTimes(1));
+    },
+  );
 });

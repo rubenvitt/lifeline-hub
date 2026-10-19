@@ -2,7 +2,7 @@
 
 - [x] 1.1 Konstanten `PERSON_NAME_MAX`, `PERSON_ANGABE_MAX`, `PERSON_ZUSTAND_MAX`, `PERSON_NOTIZ_MAX`, `VERLAUFSNOTIZ_MAX` in `src/person/mod.rs` (D7), gespiegelt in `frontend/src/api/eingabegrenzen.ts` und `tests/eingabegrenzen_spiegel.rs`.
 - [x] 1.2 Prüfung im Anlegen (`AnlegenBody`), im PATCH (nur genannte Felder) und im Notiz-POST mit der Meldung „{Feld} darf höchstens {max} Zeichen lang sein“. Servertests je Feld: an der Grenze angenommen, ein Zeichen mehr 400, Person unverändert; PATCH eines anderen Felds bei Altbestand über der Grenze geht durch.
-- [ ] 1.3 Zähler (`zeichenGrenze`) an Aufnahme (`personen/AufnahmeFelder.tsx`), Schnellerfassung, Notizzeile im Kopf und „Zustand / Verdacht“; nie kürzen. Vitest je Maske.
+- [x] 1.3 Zähler (`zeichenGrenze`) an Aufnahme (`personen/AufnahmeFelder.tsx`), Schnellerfassung, Notizzeile im Kopf und „Zustand / Verdacht“; nie kürzen. Vitest je Maske.
 
 ## 2. Feld-CAS und Geburtsdatum am Server — LLH-1103 (f8218h1i), Backend
 

@@ -12,6 +12,7 @@ import { monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { aktualisierePerson, registrierAnzeige } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
+import { PERSON_ZUSTAND_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
@@ -328,6 +329,7 @@ export function ZustandSchreiben({ p, einsatzId }: { p: Person; einsatzId: numbe
         darfSchreiben
         bezeichnung="Zustand / Verdacht"
         kennung={registrierAnzeige(p.registrier_nr)}
+        max={PERSON_ZUSTAND_MAX}
         onSpeichern={(wert) => mutation.mutate(wert)}
       />
       {fehler && (

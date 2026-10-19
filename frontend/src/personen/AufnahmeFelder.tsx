@@ -1,5 +1,12 @@
 import { Collapse, Form, Input, InputNumber, Typography } from 'antd';
 import { Select } from '../components/Select';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import {
+  PERSON_ANGABE_MAX,
+  PERSON_NAME_MAX,
+  PERSON_NOTIZ_MAX,
+  PERSON_ZUSTAND_MAX,
+} from '../api/eingabegrenzen';
 import type { PersonEingabe } from '../api/einsatzPerson';
 import type { Sichtungskategorie } from '../api/types';
 import { parseKoordinate } from './koordinate';
@@ -71,6 +78,9 @@ export const FOLGESTATUS_HINWEIS = 'Status: erfasst · mit Sichtung → betroffe
  * OHNE `forceRender` (Beleg in `PersonErfassungModal.test.tsx`): ein Wert entsteht nur
  * aufgeklappt, und einmal aufgeklappt bleibt der Bereich eingehängt.
  *
+ * Jeder Freitext trägt die Grenze des Servers (LLH-1329, `api/eingabegrenzen.ts`): Zähler ab
+ * 80 % über `zeichenGrenze`, Sperre über `zeichenRegel`, nie gekürzt.
+ *
  * Zustand und Koordinate fehlen im Vermisst-Modus (sie beschreiben eine angetroffene Person);
  * „vermisst seit" fehlt außerhalb (das Backend lehnt es ohne `vermisst` mit 422 ab).
  *
@@ -91,31 +101,45 @@ export default function AufnahmeFelder({
 }) {
   const weitereAngaben = (
     <>
-      <Form.Item label="Name" name="name">
-        <Input />
+      <Form.Item label="Name" name="name" rules={[zeichenRegel(PERSON_NAME_MAX, 'Name')]}>
+        <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
       </Form.Item>
-      <Form.Item label="Vorname" name="vorname">
-        <Input />
+      <Form.Item label="Vorname" name="vorname" rules={[zeichenRegel(PERSON_NAME_MAX, 'Vorname')]}>
+        <Input count={zeichenGrenze(PERSON_NAME_MAX)} />
       </Form.Item>
       {modus === 'vermisst' && (
         <>
           <VermisstSeitFeld platzhalter="Zeitpunkt der Meldung" />
-          <Form.Item label="Melder / Kontakt" name="melder_kontakt">
-            <Input placeholder="Angehöriger, Kontaktdaten" />
+          <Form.Item
+            label="Melder / Kontakt"
+            name="melder_kontakt"
+            rules={[zeichenRegel(PERSON_ANGABE_MAX, 'Melder / Kontakt')]}
+          >
+            <Input
+              placeholder="Angehöriger, Kontaktdaten"
+              count={zeichenGrenze(PERSON_ANGABE_MAX)}
+            />
           </Form.Item>
         </>
       )}
       {modus !== 'vermisst' && (
         <>
           {einsatzId != null && <BestaetigtVonFeld einsatzId={einsatzId} />}
-          <Form.Item label="Zustand / Verdacht" name="zustand">
-            <Input placeholder="z. B. gehfähig, unterkühlt" />
+          <Form.Item
+            label="Zustand / Verdacht"
+            name="zustand"
+            rules={[zeichenRegel(PERSON_ZUSTAND_MAX, 'Zustand / Verdacht')]}
+          >
+            <Input
+              placeholder="z. B. gehfähig, unterkühlt"
+              count={zeichenGrenze(PERSON_ZUSTAND_MAX)}
+            />
           </Form.Item>
           <KoordinateFeld />
         </>
       )}
-      <Form.Item label="Notiz" name="notiz">
-        <Input.TextArea rows={2} />
+      <Form.Item label="Notiz" name="notiz" rules={[zeichenRegel(PERSON_NOTIZ_MAX, 'Notiz')]}>
+        <Input.TextArea rows={2} count={zeichenGrenze(PERSON_NOTIZ_MAX)} />
       </Form.Item>
     </>
   );
@@ -154,8 +178,12 @@ export default function AufnahmeFelder({
       </Form.Item>
       {/* „Fundort" ist bewusst das LETZTE sichtbare Eingabefeld: Enter darin sendet ab, und der Ort
          steht am Ende eines Aufnahmegesprächs. */}
-      <Form.Item label="Fundort" name="antreff_ort">
-        <Input placeholder="z. B. Brücke, Sammelstelle" />
+      <Form.Item
+        label="Fundort"
+        name="antreff_ort"
+        rules={[zeichenRegel(PERSON_ANGABE_MAX, 'Fundort')]}
+      >
+        <Input placeholder="z. B. Brücke, Sammelstelle" count={zeichenGrenze(PERSON_ANGABE_MAX)} />
       </Form.Item>
       <Collapse
         ghost

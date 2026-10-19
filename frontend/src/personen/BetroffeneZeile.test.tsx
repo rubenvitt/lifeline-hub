@@ -1,6 +1,7 @@
 import userEvent from '@testing-library/user-event';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
 import BetroffeneZeile from './BetroffeneZeile';
@@ -57,5 +58,31 @@ describe('BetroffeneZeile — Kürzel-Hinweis', () => {
     ).not.toHaveAccessibleDescription(expect.stringContaining('Kürzel ausblenden'));
     await userEvent.click(knopf);
     expect(kuerzel()).toHaveStyle({ position: 'absolute' });
+  });
+});
+
+/**
+ * Grenze des Namens in der Schnellerfassung (LLH-1329): ab 80 % steht der Zähler an der Marke,
+ * darüber sendet die Zeile nicht, nennt den Grund und behält den Wortlaut. Mutationsprobe: den
+ * Zähler an der Namensmarke entfernt → „201 / 200 · zu lang“ fehlt und der Fall wird rot.
+ */
+describe('BetroffeneZeile — Grenze des Namens (LLH-1329)', () => {
+  it('zählt ab 80 %, sperrt über der Grenze und kürzt nicht', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(<BetroffeneZeile uhsListe={[]} onErfassen={onErfassen} />);
+    const feld = screen.getByRole('textbox', { name: 'Kurzeingabe Person' });
+
+    fireEvent.change(feld, { target: { value: 'x'.repeat(PERSON_NAME_MAX * 0.8 - 1) } });
+    expect(screen.queryByText(/ \/ 200/)).toBeNull();
+
+    const lang = 'x'.repeat(PERSON_NAME_MAX + 1);
+    fireEvent.change(feld, { target: { value: `${lang} sk2` } });
+    expect(screen.getByText('201 / 200 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Person erfassen' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Nicht erfasst: Name darf höchstens 200 Zeichen lang sein',
+    );
+    expect(onErfassen).not.toHaveBeenCalled();
+    expect(feld).toHaveValue(`${lang} sk2`);
   });
 });
