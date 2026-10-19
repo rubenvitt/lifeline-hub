@@ -1792,6 +1792,61 @@ async fn name_ueber_der_grenze_ist_400_und_schreibt_nichts() {
     assert_eq!(eintrag(&liste, e)["name"], "Z".repeat(200));
 }
 
+/// Spec `eingabegrenzen`, „Freitexte einer Einheit sind begrenzt“ (LLH-1242): Bemerkung,
+/// Funkrufname und Erreichbarkeit über der Grenze sind beim Bilden und beim Ändern 400, bevor etwas
+/// geschrieben wird; genau an der Grenze wird gespeichert.
+#[tokio::test]
+async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten");
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    for (feld, max) in [
+        ("bemerkung", 2_000),
+        ("funkrufname", 200),
+        ("erreichbarkeit", 200),
+    ] {
+        let zu_lang = "Z".repeat(max + 1);
+        let body = serde_json::json!({ "name": "Zug 2", feld: zu_lang }).to_string();
+        let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "POST {feld}: {json}");
+        assert!(
+            json["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("darf höchstens {max} Zeichen lang sein")),
+            "POST {feld}: {json}"
+        );
+        let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+        assert_eq!(
+            liste.as_array().unwrap().len(),
+            1,
+            "POST {feld} hat gebildet"
+        );
+        assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+        let body = serde_json::json!({ feld: zu_lang }).to_string();
+        let (s, json) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "PATCH {feld}: {json}");
+        let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+        assert!(
+            eintrag(&liste, e)[feld].is_null(),
+            "PATCH {feld} hat geschrieben"
+        );
+
+        let genau = "Z".repeat(max);
+        let body = serde_json::json!({ feld: genau }).to_string();
+        let (s, json) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK, "PATCH {feld} an der Grenze: {json}");
+        assert_eq!(json[feld], genau);
+        let body = serde_json::json!({ feld: null }).to_string();
+        let (s, _) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK);
+    }
+}
+
 /// Spec `fahrzeug-bearbeitung`, „Einheit eines Fahrzeugs in der Liste ändern“ (design.md D2): ein
 /// Wechsel A → B nennt im ETB die vorige Einheit und meldet beide Einheiten und das Fahrzeug;
 /// dieselbe Einheit noch einmal schreibt und meldet nichts.

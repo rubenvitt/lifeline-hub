@@ -15,8 +15,8 @@ use crate::katalog::StatusKategorie;
 use crate::live::LiveEvent;
 use crate::material::ort::{self as material_ort, MaterialOrt};
 use crate::routes::support::{
-    deserialize_optional_field, parse_flag, pflicht_max, pruefe_kommunikationsmittel,
-    pruefe_koordinate, trimme, trimme_tri,
+    deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
+    pruefe_kommunikationsmittel, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::staerke::Staerke;
 use axum::extract::{Query, State};
@@ -122,6 +122,23 @@ fn check_fahrzeug_ids(ids: Option<&[i64]>) -> Result<Vec<i64>, AppError> {
     Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
 }
 
+/// Bemerkung, Funkrufname und Erreichbarkeit getrimmt und gegen ihre Grenze geprüft (LLH-1242,
+/// `src/AGENTS.md`, „Eingabegrenzen“), vor jedem 409/422 des Handlers. `pruefe` ist
+/// `optional_max` beim Bilden und `optional_max_tri` beim Teil-Patch.
+fn check_freitexte<T>(
+    bemerkung: T,
+    funkrufname: T,
+    erreichbarkeit: T,
+    pruefe: fn(T, &str, usize) -> Result<T, AppError>,
+) -> Result<(T, T, T), AppError> {
+    use crate::einheit::{BEMERKUNG_MAX, ERREICHBARKEIT_MAX, FUNKRUFNAME_MAX};
+    Ok((
+        pruefe(bemerkung, "Bemerkung", BEMERKUNG_MAX)?,
+        pruefe(funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?,
+        pruefe(erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
+    ))
+}
+
 /// POST /api/einsaetze/{id}/einheiten — Einheit bilden, optional mit Fahrzeugen („Als eigene
 /// Einheit führen“, LLH-1073, Spec `fahrzeug-bearbeitung`). Alles oder nichts in einem
 /// `write_retry!` (design.md D9): Einheit, Sprechgruppen, Vorprüfung der Fahrzeuge (unbekannt,
@@ -143,17 +160,20 @@ pub async fn bilden(
     let fahrzeug_ids = check_fahrzeug_ids(body.fahrzeug_ids.as_deref())?;
     // Der Name geht ins ETB (LLH-1073 design.md D8): Grenze vor jedem Schreiben.
     let name = pflicht_max(&body.name, "Name", crate::einheit::NAME_MAX)?;
+    let (bemerkung, funkrufname, erreichbarkeit) = check_freitexte(
+        body.bemerkung,
+        body.funkrufname,
+        body.erreichbarkeit,
+        optional_max,
+    )?;
     Staerke::from_options(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
         body.soll_mannschaft,
     )
     .map_err(AppError::Validation)?;
-    let bemerkung = trimme(body.bemerkung);
-    let funkrufname = trimme(body.funkrufname);
     let kommunikationsmittel = trimme(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(kommunikationsmittel.as_deref())?;
-    let erreichbarkeit = trimme(body.erreichbarkeit);
     if let Some(ids) = &sprechgruppe_ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(&state.pool, org_id, einsatz_id, ids).await?;
     }
@@ -487,6 +507,12 @@ pub async fn update(
         .as_deref()
         .map(|n| pflicht_max(n, "Name", crate::einheit::NAME_MAX))
         .transpose()?;
+    let (bemerkung, funkrufname, erreichbarkeit) = check_freitexte(
+        body.bemerkung,
+        body.funkrufname,
+        body.erreichbarkeit,
+        optional_max_tri,
+    )?;
 
     require_aktiv(&state, einsatz_id, eid).await?;
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
@@ -506,11 +532,8 @@ pub async fn update(
     )
     .map_err(AppError::Validation)?;
 
-    let bemerkung = trimme_tri(body.bemerkung);
-    let funkrufname = trimme_tri(body.funkrufname);
     let kommunikationsmittel = trimme_tri(body.kommunikationsmittel);
     pruefe_kommunikationsmittel(kommunikationsmittel.as_ref().and_then(|v| v.as_deref()))?;
-    let erreichbarkeit = trimme_tri(body.erreichbarkeit);
 
     // Führerwechsel heißt jetzt „Feld im Patch enthalten UND Wert verschieden". Ein Patch
     // OHNE `fuehrer_id` (so ruft die Einheiten-Seite an) darf keinen Führerwechsel auf

@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Input } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { EINHEIT_NAME_MAX } from '../../api/eingabegrenzen';
+import {
+  EINHEIT_BEMERKUNG_MAX,
+  EINHEIT_FUNKRUFNAME_MAX,
+  EINHEIT_NAME_MAX,
+} from '../../api/eingabegrenzen';
 import type { EinheitPatch } from '../../api/einheiten';
 import { listeFahrzeugStatus } from '../../api/fahrzeugStatus';
 import { leerZuNull } from '../../api/patchTriState';
@@ -25,6 +29,7 @@ import { Select } from '../../components/Select';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import StatusTag from '../../components/StatusTag';
 import StatusWahl from '../../components/StatusWahl';
+import { grenzeText, istZuLang, zeichenGrenze } from '../../components/zeichenGrenze';
 import EinheitZeichen from '../../kraefte/EinheitZeichen';
 import NichtUebernommenMarke from '../../kraefte/NichtUebernommenMarke';
 import { handStatusOptionen, KEIN_HANDSTATUS } from '../../kraefte/fmsTableauKern';
@@ -94,6 +99,9 @@ export default function EinheitKopf({
   onSetHandStatus,
 }: EinheitKopfProps) {
   const { token } = useRollen();
+  // Grenzen wie der Server (Spec `eingabegrenzen`, LLH-1242): der kurze Funkrufname über
+  // `maxLength`, die mehrzeilige Bemerkung mit Zähler und Prüfung, nie gekürzt
+  // (`frontend/AGENTS.md`, „Freitext nie länger als der Server erlaubt“).
   const textRow = (
     etikett: string,
     feld: 'funkrufname' | 'bemerkung',
@@ -112,12 +120,18 @@ export default function EinheitKopf({
       gleich={isSameText}
       darfSchreiben={canEdit}
       mehrzeilig={mehrzeilig}
+      pruefe={(w) =>
+        mehrzeilig && istZuLang(w, EINHEIT_BEMERKUNG_MAX)
+          ? `${etikett} darf höchstens ${grenzeText(EINHEIT_BEMERKUNG_MAX)} Zeichen lang sein`
+          : null
+      }
       onSpeichern={(w) => onPatch(etikett, { [feld]: leerZuNull(w) })}
       eingabe={({ feld: f, value, onChange }) =>
         mehrzeilig ? (
           <Input.TextArea
             {...f}
             autoSize={{ minRows: 2 }}
+            count={zeichenGrenze(EINHEIT_BEMERKUNG_MAX)}
             value={value}
             onChange={(ev) => onChange(ev.target.value)}
           />
@@ -125,6 +139,7 @@ export default function EinheitKopf({
           <Input
             {...f}
             placeholder={placeholder}
+            maxLength={EINHEIT_FUNKRUFNAME_MAX}
             value={value}
             onChange={(ev) => onChange(ev.target.value)}
           />
