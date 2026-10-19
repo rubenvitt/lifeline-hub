@@ -237,7 +237,8 @@ Gerät.
   - *Verworfen: Zoom auf die Körperhälfte.* Das kostet drei Tipps, erlaubt sind zwei.
   - *Verworfen: eine Figur, die mit der Dichte wächst.* Sie wäre über 1000 px hoch.
 - **Ablauf**: Ein Tipp auf die Region öffnet die Wahl der Art als Flächen, wie `SichtungsWahl`.
-  Der zweite Tipp speichert. Die Schwere ist danach optional am Listeneintrag wählbar.
+  Der zweite Tipp speichert. Die Schwere ist vorher optional wählbar, als Leiste vor der Art. Nachträglich
+  geht nicht, weil eine Verletzung nur angehängt und aufgehoben wird (Abweichung aus der Umsetzung).
 - **Sternchen**:
   - Teil der Zeichnung, in Textfarbe, mit Nummer. Fokus und Bedienung sind blau.
   - Sie sind kein Icon des Satzes (Spec `iconsatz`).
@@ -305,3 +306,12 @@ Gerät.
 
 Alle Migrationen fügen nur hinzu, nullable, ohne Datenwanderung. Ein Rollback heißt Revert des
 Branches vor dem Release, weil Migrationen nie geändert werden.
+
+## Nach der Umsetzung angepasst
+
+- Schwere: vor der Art statt nachträglich am Listeneintrag (D13, Spec `koerperschema`). Ein
+  nachträgliches Setzen bräuchte einen Änderungsweg an einer nur anhängenden Tabelle.
+- Ohne Netz: Markieren, Maßnahme und Transport werden vorgemerkt. Aufheben bleibt ohne Netz
+  gesperrt, weil die Aufheben-Routen weder `client_id` noch Erfassungszeit tragen (D1, D8).
+- Die Figur wächst mit der Dichte, in der Handschuh-Stufe 480 × 704 px je Ansicht. Nur so erreichen
+  Hand, Fuß und Hals 72 px (D13 verwirft erst die Variante über 1000 px).

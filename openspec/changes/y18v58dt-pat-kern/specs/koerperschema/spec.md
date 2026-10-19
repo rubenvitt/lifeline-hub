@@ -24,9 +24,9 @@ eine Umschaltung zwischen beiden wählen.
 
 Im Modus Markieren SHALL ein Tipp auf eine Region die Wahl der Art als große Flächen öffnen. Ein
 Tipp auf eine Fläche MUST speichern und an der Tippstelle ein nummeriertes Sternchen setzen. Die
-Schwere MUST optional nachwählbar sein, ohne einen zusätzlichen Pflichttipp. Ein Tipp auf ein
-Sternchen MUST „Aufheben“ anbieten, und ein zweiter Tipp hebt auf. Eine Ablehnung des Servers MUST
-am Schema stehen bleiben.
+Schwere MUST optional vor der Wahl der Art wählbar sein, ohne einen zusätzlichen Pflichttipp. Ein
+Tipp auf ein Sternchen MUST „Aufheben“ anbieten, und ein zweiter Tipp hebt auf. Eine Ablehnung des
+Servers MUST am Schema stehen bleiben.
 
 #### Scenario: Wunde am Kopf
 - **WHEN** jemand im Markieren-Modus auf den Kopf tippt und „Wunde/Blutung“ wählt
@@ -61,10 +61,16 @@ MUST in der Textfarbe stehen, mit Nummer, nicht in der Alarmfarbe.
 
 ### Requirement: Lesen und gesperrt
 
-Im Modus Lesen SHALL das Schema keine Bedienung zeigen. Ohne Schreibrecht und ohne Netz MUST das
-Markieren fehlen bzw. mit Grund gesperrt sein. Im Patientenkopf MUST das Schema als Liste mit einer
-kleinen Figur ab `md` stehen. Das volle Schema MUST ein Paneel „Verletzung markieren“ öffnen.
+Im Modus Lesen SHALL das Schema keine Bedienung zeigen. Ohne Schreibrecht MUST das Markieren
+fehlen. Ohne Netz MUST das Markieren vorgemerkt werden (Spec `personen-verlauf`), das Aufheben MUST
+mit Grund gesperrt sein, weil ein Aufheben keine Erfassungszeit trägt. Im Patientenkopf MUST das
+Schema als Liste mit einer kleinen Figur ab `md` stehen. Das volle Schema MUST ein Paneel
+„Verletzung markieren“ öffnen.
 
 #### Scenario: Beobachter
 - **WHEN** ein Beobachter das Detail einer Person mit zwei Verletzungen öffnet
 - **THEN** sieht er Liste und Figur, aber keinen Knopf „Verletzung markieren“
+
+#### Scenario: Ohne Netz am Tablet
+- **WHEN** am UHS-Tablet ohne Netz „Unterarm links, vorn“ mit „Fraktur-Verdacht“ markiert wird
+- **THEN** steht „Offline vorgemerkt“ am Kopf, und „Aufheben“ ist mit Grund gesperrt
