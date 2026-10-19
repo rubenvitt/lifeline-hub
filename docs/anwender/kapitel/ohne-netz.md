@@ -68,6 +68,9 @@ ist.
 ### Was sich ohne Netz erfassen lässt
 
 - Personen (Betroffene, Patienten), auch über die Aufnahme
+- an einer schon geöffneten Person Sichtung, Verbleib, Verlaufsnotiz, Transport, Maßnahme und
+  Verletzung, aus der Liste der Betroffenen Sichtung und Verbleib; am Ort steht dann „Offline
+  vorgemerkt“
 - Meldungen
 - Stand- und Belegungsmeldungen der Betreuung
 - Ausgaben der Verpflegung
@@ -76,18 +79,27 @@ ist.
 - Einträge im Einsatztagebuch
 
 Anhänge brauchen Netz: Im Einsatztagebuch ist „Anhang“ ohne Netz gesperrt und trägt „offline“.
+Bei Personen brauchen das Aufheben einer Maßnahme oder Verletzung und das Eintragen von PAT-Nummer
+und Kontamination Netz; ohne Netz stehen sie gesperrt mit Grund.
 
 Ein vorgemerkter Eintrag liegt auf dem Gerät und geht hinaus, sobald wieder Netz da ist, ohne
 weiteres Zutun und in der Reihenfolge der Erfassung. Eine erfasste Person trägt bis dahin „R-…“
 statt ihrer Registriernummer; die Nummer vergibt der Server.
 
 Als Zeitpunkt zählt der Moment der **Erfassung**, nicht der des Sendens. Die App gleicht dafür die
-Uhr des Geräts mit der des Servers ab, solange Netz da ist.
+Uhr des Geräts mit der des Servers ab, solange Netz da ist. Bei einer Person steht ein
+nachgereichter Eintrag zu seiner Erfassungszeit im Verlauf, mit „nachgetragen“; ist dort schon
+ein neuerer Stand, etwa eine spätere Sichtung, bleibt dieser der aktuelle
+([Betroffene und Sichtung](betroffene.md)). Jeder Eintrag kommt genau einmal an, auch wenn das
+Senden wiederholt wird.
 
 ### Abgelehnte Einträge
 
 Der Server lehnt einen vorgemerkten Eintrag etwa ab, weil der Einsatz inzwischen abgeschlossen ist,
-ein Pflichtfeld fehlt oder der Bereitstellungsraum inzwischen aufgelöst ist. Im Einsatztagebuch steht der Grund direkt am Eintrag.
+ein Pflichtfeld fehlt, die Person inzwischen storniert oder der Bereitstellungsraum inzwischen
+aufgelöst ist. Im Einsatztagebuch steht der Grund direkt am Eintrag. Unter „Offline-Aktionen
+wiederherstellen“ nennt eine Karte den Eintrag mit der Person, etwa „Abgelehnte Sichtung: R-012“,
+und den Grund.
 
 Abgelehnte Einträge löscht die App erst **30 Tage nach der Ablehnung** von selbst: Sie können das
 einzige Zeugnis einer Erfassung sein. Wer sie vorher nicht mehr braucht, verwirft sie. Ausstehende
@@ -106,4 +118,5 @@ Geräts, nicht durch die App. Was bei Verlust zu tun ist, steht in
 [Gerät verloren](geraet-verloren.md); was das Abmelden löscht, in
 [Anmelden und Abmelden](anmelden-abmelden.md).
 
-Gekoppelte Geräte legen kein Lagebild ab. Erfassen ohne Netz geht dort wie oben.
+Gekoppelte Geräte legen kein Lagebild ab. Erfassen ohne Netz geht dort wie oben; die vorgemerkten
+Einträge, auch Notiztexte zu Personen, liegen bis zum Senden oder Verwerfen auf dem Gerät.

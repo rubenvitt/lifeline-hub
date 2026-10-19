@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
 ---
 
 ## Überblick
@@ -49,7 +49,7 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
    der Wartezeit in Minuten, und wer noch keiner Stelle zugeordnet ist („Noch nicht
    aufgenommen“). Der Wartebereich steht nach Dringlichkeit: wer oben steht, kommt als Nächstes
    auf einen Platz. „Transport“ zeigt, wer die Stelle auf Transport verlassen hat („Auf Transport
-   gebracht“).
+   gebracht“), mit der Transportpriorität, falls festgelegt.
 4. Die Leiste über dem Grundriss wechselt zwischen „Belegung“ (dem Grundriss), „Material“,
    „Kräfte“, „Bewegungen“ und „Dateien“. Jeder Bereich füllt dieselbe Fläche bis zum unteren
    Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
@@ -151,7 +151,9 @@ wenn das im Modul „Betroffene“ geschieht.
 Wartebereich, Dialog „Patient zuweisen“ und die Patientenliste am
 [UHS-Tablet](geraet-uhs.md) ordnen nach derselben Reihe: ungesichtet zuerst (diese Patienten
 müssen gesichtet werden), dann SK I, SK II, SK III, SK IV, tot und unverletzt. Innerhalb einer
-Kategorie steht vorn, wer am längsten wartet. Die Wartezeit zählt ab der Aufnahme in die Stelle;
+Kategorie entscheidet die Transportpriorität („sofort“ vor „dringlich“ vor „normal“ vor ohne
+Priorität), dann steht vorn, wer am längsten wartet. Die Priorität ordnet nie über die Sichtung
+hinweg: SK II „sofort“ steht hinter SK I ohne Priorität. Die Wartezeit zählt ab der Aufnahme in die Stelle;
 kommt ein Patient von einem Platz in den Wartebereich zurück, zählt sie ab dieser Rückkehr. Wer
 noch nicht aufgenommen ist, steht im Dialog hinter dem Wartebereich, in sich nach derselben
 Reihe.
@@ -200,5 +202,7 @@ Bedienung an gekoppelten Tablets und Laptops einer Unfallhilfsstelle beschreibt
 ### Ohne Netz
 
 Die Unfallhilfsstellen bleiben ohne Netz lesbar, und Patienten lassen sich über „Patient
-aufnehmen“ erfassen; sie landen im Wartebereich, sobald die Verbindung zurück ist. Zuweisen,
-Verlegen und Entlassen gehen nur mit Netz. Mehr in [Arbeiten ohne Netz](ohne-netz.md).
+aufnehmen“ erfassen; sie landen im Wartebereich, sobald die Verbindung zurück ist. Ein Verbleib
+am Platz („Verbleib / Entlassung erfassen“) wird ohne Netz vorgemerkt („Offline vorgemerkt:
+Verbleib R-…“); der Patient bleibt bis zum Senden auf seinem Platz. Zuweisen, Verlegen und
+Zurückweisen gehen nur mit Netz. Mehr in [Arbeiten ohne Netz](ohne-netz.md).
