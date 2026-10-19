@@ -17,7 +17,7 @@ Zunder LLH-1254 (`k2gckqtq`). Jede Aufgabe entsteht per TDD. Geprüft wird mit
 
 - [x] 3.1 e2e in `frontend/e2e/material-am-ort.spec.ts`: Zwei schnelle Klicks (`dblclick` bzw. zwei `click` ohne Warten) auf den Lösen-Knopf der ersten von zwei Zeilen lösen nur diesen Posten (Prüfung über die API: der zweite liegt weiter am Ort), und „Gelöst“ steht an der Stelle. Der bestehende Test „Bereitstellungsraum: … lösen“ läuft angepasst auf den neuen Hinweistext weiter. (Geprüft an der Einheit, deren Material aus dem Einheit-DTO kommt: der zweite Klick fällt erst, nachdem `GET …/einheiten` den Posten nicht mehr nennt. Mutationsprobe mit dem Baustein von `alpha`: rot, unter dem Zeiger lag „Spineboard aus Einheit lösen“. Lokal 4/4 grün.)
 - [x] 3.2 Kapitel `docs/anwender/kapitel/einheiten.md`, Abschnitt „Material zuordnen, lösen und ausgeben“: Die gelöste Zeile bleibt kurz als „Gelöst“ stehen, „Rückgängig“ steht im Hinweis. Kurzer Verweis im Material-Absatz von `frontend/AGENTS.md`. Wächter der Anwenderdoku (`hilfe/anwenderdoku.guard.test.ts`) und Prettier grün. (Derselbe Satz auch in `unfallhilfsstellen.md`, `fahrzeuge.md` und `bereitstellungsraeume.md`: alle drei nennen `MaterialAmOrt.tsx` unter `quellen:` und beschreiben das Lösen.)
-- [ ] 3.3 `./scripts/check-all.sh` (Bündel `schnell` lokal, voll in der CI des PRs) grün.
+- [x] 3.3 `./scripts/check-all.sh` (Bündel `schnell` lokal, voll in der CI des PRs) grün. (Lokal: `--nur schnell` grün, dazu Vitest der berührten Bereiche 99 Dateien/1544 Fälle und `e2e/material-am-ort.spec.ts` 4/4 grün. `--geaendert` brach im Container nach 90 min in der vollen Vitest-Suite ohne Fehler ab; die vollen Suiten belegt die CI dieses PRs.)
 
 ## Workflow follow-up
 

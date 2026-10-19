@@ -360,8 +360,8 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
 
 /**
  * Kein Sprung unter dem Zeiger nach dem Lösen (LLH-1254, Change
- * `k2gckqtq-material-loesen-ohne-sprung`): Die gelöste Zeile bleibt als „Gelöst“ an ihrer Stelle,
- * bis Zeiger und Fokus den Baustein verlassen haben und `HOLD_MS` vergangen ist.
+ * `2026-10-19-k2gckqtq-material-loesen-ohne-sprung`): Die gelöste Zeile bleibt als „Gelöst“ an
+ * ihrer Stelle, bis Zeiger und Fokus den Baustein verlassen haben und `HOLD_MS` vergangen ist.
  */
 describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
   afterEach(() => {

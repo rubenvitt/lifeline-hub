@@ -114,7 +114,7 @@ const wrapLabel = (o: { label?: ReactNode }) => (
 
 /**
  * Wie lange eine gelöste Zeile nach dem letzten Tipp im Baustein mindestens steht (LLH-1254,
- * Change `k2gckqtq-material-loesen-ohne-sprung`, design.md D3).
+ * `openspec/changes/archive/2026-10-19-k2gckqtq-material-loesen-ohne-sprung/design.md` D3).
  */
 export const HOLD_MS = 4000;
 
@@ -144,7 +144,7 @@ const geloestStyle = (farbe: string) =>
   }) as const;
 
 /**
- * Die gelöste Zeile hält ihre Stelle (LLH-1254, Spec `material-am-ort`, „Material am Ort lösen“):
+ * Die gelöste Zeile hält ihre Stelle (LLH-1254, Spec `material-am-ort`, „Gelöste Zeile hält ihre Stelle“):
  * sonst rückt der Lösen-Knopf der nächsten Zeile unter Finger oder Zeiger, und ein schneller zweiter
  * Tipp löst den falschen Posten. Alle Platzhalter fallen ZUSAMMEN, sobald kein Maus- oder
  * Stiftzeiger über dem Baustein steht, kein Fokus darin liegt und {@link HOLD_MS} seit dem letzten

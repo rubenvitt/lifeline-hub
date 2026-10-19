@@ -1,18 +1,10 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
-### Requirement: Material am Ort lösen
+### Requirement: Gelöste Zeile hält ihre Stelle
 
-Jede Zeile SHALL das Lösen vom Ort ohne Rückfrage anbieten, als roter Knopf mit Abstand, beschriftet
-je Ort: „Aus Einheit lösen“, „Vom Fahrzeug lösen“, an UHS und Bereitstellungsraum „Lösen“. Ein
-gelöster Posten MUST ohne Ort im Einsatz bleiben. Eine Ablehnung MUST an der Zeile stehen. Die Zeile
-eines selbst gelösten Postens MUST an ihrer Stelle als „Gelöst“ stehen bleiben, bis Zeiger und Fokus
-den Baustein verlassen haben und seit dem letzten Tipp darin einige Sekunden vergangen sind; an der
-Stelle des Knopfs löst dann nichts, und die Zeile behält ihre Höhe. An einem Ort, der nicht beendet
-ist, SHALL das Lösen einen Rückgängig-Weg anbieten, der den Posten wieder diesem Ort zuordnet.
-
-#### Scenario: Vom Fahrzeug lösen
-- **WHEN** die Person im Block „Beladung“ beim Stromerzeuger „Vom Fahrzeug lösen“ wählt
-- **THEN** steht der Stromerzeuger ohne Ort in der Materialliste
+Die Zeile eines selbst gelösten Postens MUST an ihrer Stelle und in ihrer Höhe als „Gelöst“ stehen
+bleiben, bis Zeiger und Fokus den Baustein verlassen haben und seit dem letzten Tipp darin einige
+Sekunden vergangen sind. An der Stelle des Lösen-Knopfs MUST dann nichts auslösen.
 
 #### Scenario: Zwei schnelle Tipps lösen einen Posten
 - **WHEN** die Person an der UHS mit den Posten Trage und Lichtmast zweimal schnell auf „Lösen“ in der Zeile der Trage tippt
@@ -21,6 +13,12 @@ ist, SHALL das Lösen einen Rückgängig-Weg anbieten, der den Posten wieder die
 #### Scenario: Gelöste Zeile fällt nach dem Verlassen
 - **WHEN** die Person die Trage gelöst hat und Zeiger und Fokus den Baustein verlassen
 - **THEN** fällt die Zeile der Trage nach wenigen Sekunden weg, und die übrigen Zeilen rücken nach
+
+### Requirement: Lösen rückgängig machen
+
+An einem Ort, der nicht beendet ist, SHALL das Lösen einen Rückgängig-Weg anbieten, der den Posten
+über denselben Schreibweg wieder diesem Ort zuordnet. Eine Ablehnung MUST über dem Baustein stehen
+bleiben, auch wenn die gelöste Zeile wegfällt.
 
 #### Scenario: Lösen rückgängig machen
 - **WHEN** die Person nach dem Lösen der Trage im Hinweis „Rückgängig“ wählt

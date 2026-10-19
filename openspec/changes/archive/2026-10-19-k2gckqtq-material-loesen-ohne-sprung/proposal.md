@@ -29,9 +29,9 @@ Keine.
 
 ### Modified Capabilities
 
-- `material-am-ort`: Die Anforderung „Material am Ort lösen“ verlangt zusätzlich, dass die gelöste
-  Zeile an ihrer Stelle stehen bleibt, bis die Bedienung den Baustein verlassen hat. Außerdem
-  bietet sie einen Rückgängig-Weg.
+- `material-am-ort`: Neben „Material am Ort lösen“ kommen zwei Anforderungen dazu: „Gelöste Zeile
+  hält ihre Stelle“ (bis die Bedienung den Baustein verlassen hat) und „Lösen rückgängig machen“
+  (nur an einem Ort, der nicht beendet ist).
 
 ## Impact
 
