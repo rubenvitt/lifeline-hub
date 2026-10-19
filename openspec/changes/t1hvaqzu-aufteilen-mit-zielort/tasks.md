@@ -28,13 +28,13 @@ Abschnittsbezüge D1–D6 auf `design.md`.
 
 ## 5. e2e
 
-- [ ] 5.1 `material-liste.spec.ts`: Aufteilen 50 → 30 + 20 mit Ort UHS; danach 30 am alten Ort, 20 an der UHS (Liste und UHS-Bereich „Material“), ein ETB-Eintrag. Verifikation: Spec grün.
-- [ ] 5.2 `material-am-ort.spec.ts`: an der UHS „Material zuordnen …“ → Wolldecke, 20 eintragen → UHS zeigt 20, Ausgangsort 30. Verifikation: Spec grün.
+- [x] 5.1 `material-liste.spec.ts`: Aufteilen 50 → 30 + 20 mit Ort UHS; danach 30 am alten Ort, 20 an der UHS (Liste und UHS-Bereich „Material“), ein ETB-Eintrag. Verifikation: Spec grün.
+- [x] 5.2 `material-am-ort.spec.ts`: an der UHS „Material zuordnen …“ → Wolldecke, 20 eintragen → UHS zeigt 20, Ausgangsort 30. Verifikation: Spec grün.
 
 ## 6. Anwenderdoku (Mitänderungsregel, `docs/anwender/AGENTS.md`)
 
-- [ ] 6.1 `material.md`: Abschnitt „Einen Posten aufteilen“ (Feld „Ort“, kein zweiter Schritt mehr), ETB-Beispiel mit Ortswechsel; Bild `aufteilen.png` neu erzeugen (`pnpm doku:bilder --grep material`). Verifikation: Guard-Test `anwenderdoku.guard.test.ts` grün, Bild zeigt das Feld „Ort“.
-- [ ] 6.2 Zuordnen-Abschnitte in `einheiten.md`, `fahrzeuge.md`, `unfallhilfsstellen.md`, `bereitstellungsraeume.md` um die Mengenfrage ergänzen; neue Quellen (`MaterialHierherModal.tsx` o. ä.) in den `quellen:` der Kapitel. Verifikation: Guard-Test grün.
+- [x] 6.1 `material.md`: Abschnitt „Einen Posten aufteilen“ (Feld „Ort“, kein zweiter Schritt mehr), ETB-Beispiel mit Ortswechsel; Bild `aufteilen.png` neu erzeugen (`pnpm doku:bilder --grep material`). Verifikation: Guard-Test `anwenderdoku.guard.test.ts` grün, Bild zeigt das Feld „Ort“.
+- [x] 6.2 Zuordnen-Abschnitte in `einheiten.md`, `fahrzeuge.md`, `unfallhilfsstellen.md`, `bereitstellungsraeume.md` um die Mengenfrage ergänzen; neue Quellen (`MaterialHierherModal.tsx` o. ä.) in den `quellen:` der Kapitel. Verifikation: Guard-Test grün.
 
 ## 7. Abschluss
 

@@ -3,7 +3,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * Materialliste (LLH-1093, LLH-1225), Durchstich im Browser: Ort setzen und umhängen (das ETB nennt
- * den vorherigen Ort), eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen (50 → 30 + 20).
+ * den vorherigen Ort), eine Ad-hoc-Angabe korrigieren, einen Posten aufteilen (50 → 30 + 20) und
+ * 20 von 50 in einem Schritt an die UHS abteilen (t1hvaqzu).
  * Gewartet wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
@@ -113,4 +114,59 @@ test('eine Ad-hoc-Angabe korrigieren und einen Posten aufteilen', async ({ page 
   await expect
     .poll(() => etbInhalte(page, einsatzId))
     .toContain('Material «Feldbetten» aufgeteilt: 50 → 30 + 20');
+});
+
+test('Aufteilen mit Ort: 20 von 50 an die UHS, der Rest bleibt an der Einheit (t1hvaqzu)', async ({
+  page,
+}) => {
+  const einsatzId = await seed(page, 'Wolldecke', 50);
+  const basis = `/api/einsaetze/${einsatzId}`;
+  const einheiten = (await (await page.request.get(`${basis}/einheiten`)).json()) as {
+    id: number;
+    name: string;
+  }[];
+  const staffelA = einheiten.find((e) => e.name === 'Staffel A')!.id;
+  const material = (await (await page.request.get(`${basis}/material`)).json()) as { id: number }[];
+  const patch = await page.request.patch(`${basis}/material/${material[0].id}`, {
+    data: { einheit_id: staffelA },
+  });
+  expect(patch.ok(), await patch.text()).toBe(true);
+
+  await page.goto(`/einsaetze/${einsatzId}/material`);
+  await expect(liste(page).getByText('Wolldecke')).toBeVisible();
+  await liste(page).getByRole('button', { name: 'Weitere Aktionen zu Wolldecke' }).click();
+  await page.getByRole('menuitem', { name: 'Aufteilen …' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Wolldecke aufteilen' });
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  await dialog.getByRole('spinbutton', { name: 'Menge abteilen' }).fill('20');
+  // Das Feld „Ort“ steht auf dem Ort des Postens; gewählt wird der sichtbare Eintrag.
+  const ort = dialog.getByRole('combobox', { name: 'Ort' });
+  await ort.click();
+  await page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
+    .and(page.getByTitle('UHS Turnhalle', { exact: true }))
+    .click();
+  await dialog.getByRole('button', { name: 'Aufteilen' }).click();
+  await expect(dialog).toHaveCount(0);
+
+  const zeilen = liste(page).locator('[data-row-key]').filter({ hasText: 'Wolldecke' });
+  await expect(zeilen).toHaveCount(2);
+  const anEinheit = zeilen.filter({
+    has: page.getByTestId('material-ort').filter({ hasText: 'Staffel A' }),
+  });
+  const anUhs = zeilen.filter({
+    has: page.getByTestId('material-ort').filter({ hasText: 'UHS Turnhalle' }),
+  });
+  await expect(anEinheit.getByText('30', { exact: true })).toHaveCount(1);
+  await expect(anUhs.getByText('20', { exact: true })).toHaveCount(1);
+  // Genau ein ETB-Eintrag nennt Aufteilen und Ortswechsel, kein eigener Ortswechsel-Eintrag.
+  await expect
+    .poll(() => etbInhalte(page, einsatzId))
+    .toContain(
+      'Material «Wolldecke» aufgeteilt: 50 → 30 + 20, davon 20: Einheit «Staffel A» → UHS «Turnhalle»',
+    );
+  expect(
+    (await etbInhalte(page, einsatzId)).filter((t) => t.includes('(×20)')),
+    'kein zweiter Eintrag für den Ortswechsel',
+  ).toEqual([]);
 });

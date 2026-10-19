@@ -2,7 +2,7 @@
 titel: Einheiten
 gruppen: [fuehrung]
 reihenfolge: 310
-quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
+quellen: [frontend/src/pages/EinheitenPage.tsx, frontend/src/pages/EinheitAusVorlagePage.tsx, frontend/src/einheit/ausVorlageKern.ts, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/einheitenGliederung.ts, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/pages/EinheitDetailPage.tsx, frontend/src/pages/einheit/, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_einheit.rs, src/einheit/mod.rs, src/einheit/repo.rs, src/einheit/mitglied_repo.rs, src/einheit/aus_vorlage.rs, src/kraefte_disposition.rs, src/routes/einsatz_fahrzeug.rs, src/katalog.rs, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/pages/MeldungenPage.tsx]
 ---
 
 ## Überblick
@@ -133,7 +133,10 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    Kopfzeile zählt die Posten und, falls vorhanden, den Ausfall.
 2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
    anderem Ort“ Posten, die schon an einem anderen Ort liegen, mit diesem Ort im Eintrag. Die Wahl
-   holt den Posten an die Einheit.
+   holt den Posten an die Einheit. Bei einem Verbrauchsgut mit Menge ab 2 und Rest fragt ein Dialog
+   zuerst die „Menge hierher“, vorbelegt mit der ganzen Menge: „Hierher“ holt den ganzen Posten,
+   eine kleinere Menge holt nur diesen Teil, und der Rest bleibt am bisherigen Ort. Der Dialog nennt
+   das Ergebnis, etwa „Danach hier 20, UHS Turnhalle 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, im Dialog die „Menge ausgeben“ eingeben und
    mit „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „15 von 20 übrig“.
 4. Mit „Aus Einheit lösen“ einen Posten wieder lösen. Er bleibt ohne Ort im Einsatz.
