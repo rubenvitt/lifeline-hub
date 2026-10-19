@@ -2,15 +2,15 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
 ---
 
 ## Überblick
 
 Eine Unfallhilfsstelle (UHS) ist ein Ort, an dem Patienten versorgt werden: Patientenablage,
 Behandlungsplatz, Verletztensammelstelle oder Sonstige. Das Modul „Unfallhilfsstellen“ zeigt je
-Stelle einen Grundriss mit ihren Plätzen, den Wartebereich am Eingang und wer die Stelle auf
-Transport verlassen hat. Die Einsatzleitung sieht hier, welche Plätze frei und belegt sind und wer
+Stelle einen Grundriss mit ihren Plätzen, den Wartebereich am Eingang und wer die Stelle im
+Eigentransport verlassen hat und noch nicht übergeben ist. Die Einsatzleitung sieht hier, welche Plätze frei und belegt sind und wer
 noch wartet.
 
 Die Patienten selbst sind Betroffene; ihre Sichtung und ihren Verbleib führt das Kapitel
@@ -45,18 +45,20 @@ der Stelle übernehmen (PNG, JPEG oder WebP). Im Betrieb stehen „Plan“ und �
 2. Die Fläche zeigt jeden Platz mit seiner Verfügbarkeit („frei“, „belegt“, „in Aufbereitung“,
    „defekt“, „gesperrt“) und dem Patienten darauf. Jede Patientenmarke trägt vorn die Sichtung
    als Farbfeld mit Kategorie, etwa „SK I“; „—“ heißt ungesichtet.
-3. „Wartebereich“ zeigt, wer in der Stelle auf einen Platz wartet („Wartebereich (Eingang)“), mit
-   der Wartezeit in Minuten, und wer noch keiner Stelle zugeordnet ist („Noch nicht
-   aufgenommen“). Der Wartebereich steht nach Dringlichkeit: wer oben steht, kommt als Nächstes
-   auf einen Platz. „Transport“ zeigt, wer die Stelle auf Transport verlassen hat („Auf Transport
-   gebracht“), mit der Transportpriorität, falls festgelegt.
+3. „Wartebereich“ zeigt, wer in der Stelle auf einen Platz wartet („Wartebereich (Eingang)“), und
+   wer noch keiner Stelle zugeordnet ist („Noch nicht aufgenommen“). Jede Person steht in zwei
+   Zeilen: oben Sichtung, Registriernummer und Name, darunter „wartet … min“ bzw. „erfasst vor …
+   min“ und der Knopf „Verbleib“. Der Wartebereich steht nach Dringlichkeit: wer oben steht,
+   kommt als Nächstes auf einen Platz. „Unterwegs“ zeigt, wer die Stelle im Eigentransport
+   verlassen hat und noch nicht übergeben ist, mit Fahrzeug, Ziel, Transportpriorität und der
+   Zeit seit der Abfahrt; ab einer Stunde trägt die Zeile „Übergabe offen“.
 4. Die Leiste über dem Grundriss wechselt zwischen „Belegung“ (dem Grundriss), „Material“,
    „Kräfte“, „Bewegungen“ und „Dateien“. Jeder Bereich füllt dieselbe Fläche bis zum unteren
    Fensterrand; „Bewegungen“ listet jede Aufnahme, Verlegung und Entlassung mit Zeit und Platz.
    Der gewählte Bereich steht in der Adresse, ein Lesezeichen öffnet ihn direkt.
 
-Auf einem breiten Bildschirm stehen Wartebereich, Fläche und Transport nebeneinander; dann lassen
-sich Patienten auch mit der Maus auf einen Platz ziehen.
+Auf einem breiten Bildschirm stehen Wartebereich, Fläche und „Unterwegs“ nebeneinander; dann
+lassen sich Patienten auch mit der Maus auf einen Platz ziehen.
 
 ### Die Lage der Stelle melden
 
@@ -65,8 +67,9 @@ sich Patienten auch mit der Maus auf einen Platz ziehen.
    darunter je Sichtung als Farbbalken und in Worten, etwa „SK I 1 · SK II 3“.
 3. „Plätze frei“ ablesen: freie von allen Plätzen, etwa „2 / 6“, dazu wie viele in Aufbereitung
    sind.
-4. „Wartend“ und „Abtransportiert“ ablesen: wer im Wartebereich auf einen Platz wartet, mit der
-   längsten Wartezeit, und wer die Stelle auf Transport verlassen hat.
+4. „Wartend“ und „Unterwegs“ ablesen: wer im Wartebereich auf einen Platz wartet, mit der
+   längsten Wartezeit, und wer die Stelle im Eigentransport verlassen hat und noch nicht
+   übergeben ist.
 
 Die Zahlen laufen live mit und stimmen mit dem Grundriss überein; für die Lagemeldung an die
 Einsatzleitung muss niemand abzählen. Am UHS-Laptop steht dieselbe Zeile im Bereich „UHS“
@@ -114,10 +117,12 @@ Zurück in den Wartebereich führt das Platzmenü („…“) mit „Zurück in 
 ### Einen Patienten entlassen oder auf Transport bringen
 
 1. Am belegten Platz „Verbleib / Entlassung erfassen“ wählen (Symbol mit dem Fahrzeug).
-2. Im Dialog „Verbleib erfassen — …“ das „Ziel“ eintragen und die „Art“ prüfen; vorgewählt ist
-   „Transport“. Beim Transport das „Transportmittel (RTW/KTW …)“ angeben.
-3. „Erfassen“ wählen. Der Patient verlässt die Stelle; bei „Transport“ steht er unter „Auf
-   Transport gebracht“.
+2. Im Dialog „Verbleib erfassen — …“ die „Art“ prüfen; vorgewählt ist „Transport“. Beim
+   Transport das „Rettungsmittel“ angeben: ein Fahrzeug unter „Im Einsatz“ für einen
+   Eigentransport, sonst das fremde Rettungsmittel. Dazu das „Ziel“ eintragen.
+3. „Erfassen“ wählen. Der Patient verlässt die Stelle; im Eigentransport steht er unter
+   „Unterwegs“, bis dort „Übergabe quittieren“ gewählt ist. Mit einem fremden Rettungsmittel ist
+   er übergeben und steht nirgends mehr im Grundriss.
 4. Der Platz steht danach auf „in Aufbereitung“. Ist er wieder bereit, „als frei markieren“
    wählen.
 

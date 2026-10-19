@@ -42,7 +42,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
 ## 6. Regeln und Anwenderdoku
 
-- [ ] 6.1 `frontend/src/personen/AGENTS.md`: Abschnitte „Versorgungszustand und Abgeschlossene“ und „Sichtungsboard“; `frontend/AGENTS.md`, Regel „Kein Nutzerschalter Tabelle ↔ Karte“, um das Board als Überblick ergänzt; `src/AGENTS.md`, falls die neue Route eine Geräte-Freigabe braucht. Prüfung: Prettier über `frontend/` grün, Verweise per `grep` geprüft.
+- [x] 6.1 `frontend/src/personen/AGENTS.md`: Abschnitte „Versorgungszustand und Abgeschlossene“ und „Sichtungsboard“; `frontend/AGENTS.md`, Regel „Kein Nutzerschalter Tabelle ↔ Karte“, um das Board als Überblick ergänzt; `src/AGENTS.md`, falls die neue Route eine Geräte-Freigabe braucht. Prüfung: Prettier über `frontend/` grün, Verweise per `grep` geprüft.
 - [ ] 6.2 Anwenderdoku nach `docs/anwender/AGENTS.md` (Mitänderungsregel): `betroffene.md` (Abgeschlossene, Board, Übergabe), `unfallhilfsstellen.md` und `geraet-uhs.md` (Zeile, Spalte „Unterwegs“), `lagebild.md` (Patientenzahl). Prüfung: Wächter der Anwenderdoku grün.
 
 ## 7. Integration
