@@ -191,7 +191,8 @@ nicht, sagt die Seite „Person nicht gefunden“.
    „01.02.80“ gehen ebenso.
 4. Hat jemand anderes dieselbe Angabe seit dem Öffnen geändert, fragt die App
    „Zwischenzeitlich geändert“ und nennt den neuen Wert. „Überschreiben“ speichert die eigene
-   Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand.
+   Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand. Wer die Rückfrage mit Escape
+   schließt, entscheidet nichts: die Eingabe bleibt offen.
 
 ### Den Fundort auf der Lagekarte verorten
 
@@ -203,7 +204,10 @@ nicht, sagt die Seite „Person nicht gefunden“.
    bleiben“ lässt die Karte offen.
 
 Ein erneutes Verorten setzt den Fundort neu und läuft genauso
-([Lagekarte, Zeichnen und Messen](lagekarte.md)).
+([Lagekarte, Zeichnen und Messen](lagekarte.md)). Ist die Koordinate bekannt, lässt sie sich auch
+eintippen: in den Personendaten bei „Koordinate“ den Wert oder „Koordinate eintragen“ wählen,
+Breite und Länge wie „52.2691/9.1342“ eingeben (ein Komma als Dezimalzeichen geht ebenso) und
+„Speichern“ wählen. Ein leeres Feld nimmt die Koordinate weg.
 
 ### Eine vermisste Person melden und abgleichen
 
@@ -288,7 +292,7 @@ abbrechen“), und wer die Seite verlässt, wird gefragt („Bleiben“ oder „
 zweistelliges Jahr im Geburtsdatum gilt als das jüngste, das nicht in der Zukunft liegt; ein Datum
 nach heute und ein geschätztes Alter über 120 lehnt das Feld ab. Ein Geburtsdatum aus früheren
 Fassungen, das kein Datum ist, steht unverändert da. Name und Vorname fassen höchstens 200
-Zeichen, Herkunft, Fundort und Melder 500, die Notiz 2 000; der Zähler erscheint kurz vor der
+Zeichen, Herkunft, Fundort und Melder 500, die Notiz 2.000; der Zähler erscheint kurz vor der
 Grenze. „Zustand / Verdacht“, PAT-Nummer und Kontamination stehen nur im Patientenkopf.
 
 ### Offene Felder
@@ -353,9 +357,10 @@ zur Verbindung tragen sie „R-…“ statt der Nummer. An einer schon geöffnet
 Sichtung, Verbleib, Notiz, Transport, Maßnahme und Verletzung vormerken, aus der Liste Sichtung
 und Verbleib; am Ort
 steht dann „Offline vorgemerkt“, und der Eintrag geht mit seiner Erfassungszeit hinaus, sobald
-Netz da ist. Aufheben, PAT-Nummer, Kontamination, „Zustand / Verdacht“ und die Personendaten
-brauchen Netz und stehen bis dahin mit Grund gesperrt; eine Änderung der Personendaten wird nicht
-vorgemerkt.
+Netz da ist. Aufheben, PAT-Nummer, Kontamination, „Zustand / Verdacht“ (im Kopf und in der Liste)
+und die Personendaten brauchen Netz und stehen bis dahin mit Grund gesperrt („Ohne Verbindung
+nicht änderbar“); eine Änderung der Personendaten wird nicht vorgemerkt. Ein schon getippter
+Zustand bleibt im Feld stehen und lässt sich mit Netz speichern.
 
 Lesbar bleiben in der Liste Sichtung, Verbleib, Unfallhilfsstelle, Kontamination sowie Priorität
 und Art des Transports. Adresse, Melder, Notiz, Zustand und Fundort liegen nicht auf dem Gerät
