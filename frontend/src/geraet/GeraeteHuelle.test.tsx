@@ -568,8 +568,10 @@ describe('Gerätehülle — geteilte Seiten ohne fremde Sprünge', () => {
     expect(
       within(kopf).getByRole('button', { name: 'Nachsichten, aktuell SK II · schwer' }),
     ).toBeVisible();
-    // Primäraktion „Bearbeiten“; ohne Status und Storno bleibt kein Menüeintrag, also kein Menü.
-    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeVisible();
+    // Keine Kopfaktion (LLH-1103): die Personendaten sind am Gerät feldweise schreibbar; ohne
+    // Status und Storno bleibt kein Menüeintrag, also kein Menü.
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Weitere Aktionen zu Person/ })).toBeNull();
     expect(screen.queryByText('Stornieren')).toBeNull();
     expect(screen.queryByText(/^Auf „.*“ setzen$/)).toBeNull();

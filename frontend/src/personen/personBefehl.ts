@@ -1,5 +1,7 @@
 import type { Sichtungskategorie, Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
+import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
+import { istZuLang } from '../components/zeichenGrenze';
 import { parseKoordinate } from './koordinate';
 
 /**
@@ -24,8 +26,9 @@ import { parseKoordinate } from './koordinate';
  *                  `personen/koordinate.ts`. Ein `#`-Wort wird nie als Namensteil geschluckt.
  *
  * ── UNERKANNTES SPERRT DAS ABSENDEN ─────────────────────────────────────────────────────
- * Doppelte Angaben, ein Alter außerhalb 0–120, ein unbrauchbares `#`, ein `@` ohne Bezeichnung
- * und eine nicht eindeutige UHS erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
+ * Doppelte Angaben, ein Alter außerhalb 0–120, ein Name oder Vorname über `PERSON_NAME_MAX`
+ * (LLH-1329), ein unbrauchbares `#`, ein `@` ohne Bezeichnung und eine nicht eindeutige UHS
+ * erzeugen je ein PROBLEM, und dann wird nicht gesendet: ein halb
  * verstandener Befehl legte eine Person mit falscher Sichtung oder in der falschen UHS an.
  */
 
@@ -265,6 +268,13 @@ export function parsePersonBefehl(eingabe: string): PersonBefehl {
 
   const namensText = namensWoerter.join(' ');
   const { name, vorname } = nameAus(namensText);
+  // Grenze des Servers (LLH-1329) vor Senden und Warteschlange; gekürzt wird nie.
+  if (istZuLang(name, PERSON_NAME_MAX)) {
+    probleme.push(`Name darf höchstens ${PERSON_NAME_MAX} Zeichen lang sein`);
+  }
+  if (istZuLang(vorname, PERSON_NAME_MAX)) {
+    probleme.push(`Vorname darf höchstens ${PERSON_NAME_MAX} Zeichen lang sein`);
+  }
   if (namensWoerter.length > 0) {
     teile.splice(namensIndex, 0, { art: 'name', text: namensText, name, vorname });
   }

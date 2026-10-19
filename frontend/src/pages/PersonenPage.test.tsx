@@ -162,7 +162,8 @@ function render(
       <Route path="/einsaetze/:id/personen" element={<PersonenPage />} />
       <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
     </Routes>,
-    { route },
+    // Data Router: die Detailseite trägt den Verlassen-Schutz der Personendaten (`useBlocker`).
+    { route, datenRouter: true },
   );
 }
 

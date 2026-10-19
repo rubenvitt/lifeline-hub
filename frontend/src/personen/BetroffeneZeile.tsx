@@ -3,6 +3,8 @@ import { useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'reac
 import type { Uhs } from '../api/types';
 import type { PersonAnlegenEingabe } from '../api/einsatzPerson';
 import { fehlerText } from '../api/client';
+import { PERSON_NAME_MAX } from '../api/eingabegrenzen';
+import { Zeichenzaehler } from '../components/zeichenGrenze';
 import SichtungsTag from '../components/SichtungsTag';
 import { useViewport } from '../components/useViewport';
 import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instrument';
@@ -63,9 +65,12 @@ function Marke({ teil, uhsListe }: { teil: BefehlTeil; uhsListe: readonly Uhs[] 
   const { rollen } = useRollen();
   switch (teil.art) {
     case 'name':
+      // Zähler je Teil ab 80 % der Grenze (LLH-1329); darüber nennt die Zeile den Grund beim Senden.
       return (
         <span style={{ fontSize: 13, color: rollen.text }}>
           {teil.name == null && teil.vorname == null ? 'unbekannt' : teil.text}
+          {teil.name != null && <Zeichenzaehler wert={teil.name} max={PERSON_NAME_MAX} />}
+          {teil.vorname != null && <Zeichenzaehler wert={teil.vorname} max={PERSON_NAME_MAX} />}
         </span>
       );
     case 'geschlecht':

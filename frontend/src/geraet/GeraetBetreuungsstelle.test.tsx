@@ -216,9 +216,10 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     expect(
       within(kopf).queryByRole('button', { name: /In UHS aufnehmen|Verlegen|Austragen/ }),
     ).toBeNull();
-    // Die Primäraktion ist „Bearbeiten“; Status und Storno gibt es am Gerät nicht, also auch
-    // keinen Auslöser für ein leeres Menü.
-    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeVisible();
+    // Keine Kopfaktion (LLH-1103): die Personendaten sind am Gerät feldweise schreibbar; Status
+    // und Storno gibt es am Gerät nicht, also auch keinen Auslöser für ein leeres Menü.
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Name bearbeiten' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Weitere Aktionen zu Person/ })).toBeNull();
   });
 

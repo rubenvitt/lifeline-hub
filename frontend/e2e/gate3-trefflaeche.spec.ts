@@ -3396,6 +3396,84 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+/**
+ * Personendaten feldweise (LLH-1103, Spec `einsatztauglichkeit-layout`, „Leere Angaben mit
+ * Schreibrecht“): die Knöpfe „+ …“ der Zeile „Ohne Angabe“ und die Wertknöpfe im Raster halten
+ * die Staffel.
+ */
+test('Betroffene Detailseite: Knöpfe „+ …“ und Wertknöpfe der Personendaten folgen der Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personendaten`);
+  const id = await personAnlegen(page, einsatzId, { name: 'Claasen' });
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
+    await stelleDichte(page, dichte);
+    const daten = page.locator('[data-lfh="personendaten"]');
+    const plus = daten.getByRole('button', { name: 'Geburtsdatum eintragen', exact: true });
+    const wert = daten.getByRole('button', { name: 'Name bearbeiten', exact: true });
+    const hPlus = await haeltStufe(plus, soll, `„+ Geburtsdatum“ (${dichte})`);
+    const hWert = await haeltStufe(wert, soll, `Wertknopf „Name“ (${dichte})`);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): + ${hPlus}, Wert ${hWert}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * Die Knöpfe „+ …“ der Zeile „Ohne Angabe“ brechen am Handschirm um. Auch zwischen den Reihen
+ * stehen sie nach der Leitlinie auseinander, ≥ 8 px mit Maus (`kompakt`), ≥ 16 px mit Touch —
+ * dieselbe Stufe wie der Dialogfuß (`padding`, 11/18/26 px). Gemessen wird der Abstand zwischen
+ * den Knopfkanten zweier Reihen, nicht der Stil. Mutationsprobe: `rowGap` weg — 0 px, rot.
+ */
+test('Betroffene Detailseite: die Knöpfe „+ …“ halten auch umgebrochen den Abstand', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(HANDSCHIRM);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ohne Angabe`);
+  const id = await personAnlegen(page, einsatzId, { name: 'Claasen' });
+  const boden = { kompakt: 8, komfortabel: 16, handschuh: 16 } as const;
+
+  const gemessen: string[] = [];
+  for (const { dichte } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
+    await stelleDichte(page, dichte);
+    const zeile = page.locator('[data-lfh="personendaten"] [data-lfh="ohne-angabe"]');
+    await expect(zeile.getByRole('button', { name: 'Notiz eintragen', exact: true })).toBeVisible();
+    const reihen = await zeile.evaluate((el) => {
+      const kanten = Array.from(el.querySelectorAll('[data-lfh="leere-angabe"] button'))
+        .map((k) => k.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0);
+      const nachOben = new Map<number, { oben: number; unten: number }>();
+      for (const r of kanten) {
+        const schluessel = Math.round(r.top);
+        const reihe = nachOben.get(schluessel) ?? { oben: r.top, unten: r.bottom };
+        reihe.oben = Math.min(reihe.oben, r.top);
+        reihe.unten = Math.max(reihe.unten, r.bottom);
+        nachOben.set(schluessel, reihe);
+      }
+      return [...nachOben.values()].sort((a, b) => a.oben - b.oben);
+    });
+    // Ohne Umbruch gäbe es nichts zu messen, und „≥ 16 px“ wäre trivial grün.
+    expect(reihen.length, `„Ohne Angabe“ bricht um (${dichte})`).toBeGreaterThanOrEqual(2);
+    let abstand = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < reihen.length; i += 1) {
+      abstand = Math.min(abstand, reihen[i].oben - reihen[i - 1].unten);
+    }
+    expect(abstand, `Reihenabstand der Knöpfe „+ …“ (${dichte})`).toBeGreaterThanOrEqual(
+      boden[dichte] - SUBPIXEL,
+    );
+    gemessen.push(`${dichte} (Soll ≥ ${boden[dichte]}): ${abstand.toFixed(1)} px`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);

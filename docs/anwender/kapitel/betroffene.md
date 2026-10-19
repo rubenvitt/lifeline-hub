@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
 ---
 
 ## Überblick
@@ -200,6 +200,20 @@ nicht, sagt die Seite „Person nicht gefunden“.
    „Hinzufügen“ wählen. Die Liste nennt den Bezug dann etwa „Halter von T-003 · Hund „Bello““.
 4. „Bezug lösen“ an der Zeile hebt einen Bezug wieder auf.
 
+### Personendaten ergänzen und berichtigen
+
+1. Die Person öffnen. Unter „Personendaten“ steht jede Angabe mit ihrem Wert; was noch fehlt,
+   steht in der Zeile „Ohne Angabe“ als „+ Name“, „+ Geburtsdatum“ und so weiter.
+   ![Personendaten mit der Zeile „Ohne Angabe“ und den Knöpfen „+ Geburtsdatum“, „+ Herkunft / Adresse“ und weiteren](../bilder/betroffene/personendaten.png)
+2. Den Wert oder „+ …“ wählen. Das Feld öffnet sich an seiner Stelle.
+3. Die Angabe schreiben und „Speichern“ wählen; die App meldet etwa „Name gespeichert“.
+   „Abbrechen“ verwirft die Eingabe. Das Geburtsdatum steht als „TT.MM.JJJJ“, „1.2.1980“ und
+   „01.02.80“ gehen ebenso.
+4. Hat jemand anderes dieselbe Angabe seit dem Öffnen geändert, fragt die App
+   „Zwischenzeitlich geändert“ und nennt den neuen Wert. „Überschreiben“ speichert die eigene
+   Eingabe, „Verwerfen und neu laden“ übernimmt den neuen Stand. Wer die Rückfrage mit Escape
+   schließt, entscheidet nichts: die Eingabe bleibt offen.
+
 ### Den Fundort auf der Lagekarte verorten
 
 1. Die Person öffnen und bei „Koordinate“ „Auf Lagekarte verorten“ wählen, oder in der Liste im
@@ -210,7 +224,10 @@ nicht, sagt die Seite „Person nicht gefunden“.
    bleiben“ lässt die Karte offen.
 
 Ein erneutes Verorten setzt den Fundort neu und läuft genauso
-([Lagekarte, Zeichnen und Messen](lagekarte.md)).
+([Lagekarte, Zeichnen und Messen](lagekarte.md)). Ist die Koordinate bekannt, lässt sie sich auch
+eintippen: in den Personendaten bei „Koordinate“ den Wert oder „Koordinate eintragen“ wählen,
+Breite und Länge wie „52.2691/9.1342“ eingeben (ein Komma als Dezimalzeichen geht ebenso) und
+„Speichern“ wählen. Ein leeres Feld nimmt die Koordinate weg.
 
 ### Eine vermisste Person melden und abgleichen
 
@@ -286,6 +303,18 @@ Maßnahmen und drei Verletzungen, die jüngsten zuerst und mit Uhrzeit, und nenn
 Paneel und im Verlauf. Die Nummern der Verletzungen folgen fest der Reihenfolge der Erfassung;
 nach einem Aufheben bleibt eine Lücke.
 
+### Personendaten
+
+Jede Angabe wird einzeln gespeichert; eine Sichtung, ein Statuswechsel oder eine Änderung an einer
+anderen Angabe lösen dabei keine Rückfrage aus, nur eine Änderung derselben Angabe. Solange eine
+Angabe geändert und nicht gespeichert ist, stehen die übrigen gesperrt („Erst „Name“ speichern oder
+abbrechen“), und wer die Seite verlässt, wird gefragt („Bleiben“ oder „Verwerfen“). Ein
+zweistelliges Jahr im Geburtsdatum gilt als das jüngste, das nicht in der Zukunft liegt; ein Datum
+nach heute und ein geschätztes Alter über 120 lehnt das Feld ab. Ein Geburtsdatum aus früheren
+Fassungen, das kein Datum ist, steht unverändert da. Name und Vorname fassen höchstens 200
+Zeichen, Herkunft, Fundort und Melder 500, die Notiz 2.000; der Zähler erscheint kurz vor der
+Grenze. „Zustand / Verdacht“, PAT-Nummer und Kontamination stehen nur im Patientenkopf.
+
 ### Offene Felder
 
 Als Lücke zählt nur, wer angetroffen wurde (erfasst, betroffen, verstorben). Ohne Verbleib heißt:
@@ -357,7 +386,9 @@ darf nur die Einsatzleitung. Wer nicht schreiben darf, sieht über der Liste „
 Grund („nur Einsatzleitung und Führungspersonal“ bzw. „Einsatz abgeschlossen“); Sichtungswahl,
 „Verbleib erfassen“ und das Menü der Zeilen fehlen dann, ebenso „Transport festlegen“,
 „Maßnahme erfassen“, „Verletzung markieren“ und das Eintragen von PAT-Nummer und Kontamination;
-die Angaben stehen lesend da. Am UHS-Gerät lässt sich aus der Liste sichten, aber nicht verorten,
+die Angaben stehen lesend da, leere Personendaten als Satz „Ohne Angabe: …“. Am Gerät (UHS,
+Betreuungsstelle) lassen sich die Personendaten ebenso schreiben. Am UHS-Gerät lässt sich aus der
+Liste sichten, aber nicht verorten,
 und eine Druckansicht gibt es dort nicht ([UHS-Tablet und UHS-Laptop](geraet-uhs.md)).
 
 ### Ohne Netz
@@ -367,8 +398,10 @@ zur Verbindung tragen sie „R-…“ statt der Nummer. An einer schon geöffnet
 Sichtung, Verbleib, Notiz, Transport, Maßnahme und Verletzung vormerken, aus der Liste Sichtung
 und Verbleib; am Ort
 steht dann „Offline vorgemerkt“, und der Eintrag geht mit seiner Erfassungszeit hinaus, sobald
-Netz da ist. Aufheben, PAT-Nummer und Kontamination brauchen Netz und stehen bis dahin mit Grund
-gesperrt.
+Netz da ist. Aufheben, PAT-Nummer, Kontamination, „Zustand / Verdacht“ (im Kopf und in der Liste)
+und die Personendaten brauchen Netz und stehen bis dahin mit Grund gesperrt („Ohne Verbindung
+nicht änderbar“); eine Änderung der Personendaten wird nicht vorgemerkt. Ein schon getippter
+Zustand bleibt im Feld stehen und lässt sich mit Netz speichern.
 
 Lesbar bleiben in der Liste Sichtung, Verbleib, Unfallhilfsstelle, Kontamination sowie Priorität
 und Art des Transports. Adresse, Melder, Notiz, Zustand und Fundort liegen nicht auf dem Gerät

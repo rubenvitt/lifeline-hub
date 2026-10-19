@@ -2,7 +2,7 @@
 titel: Tiere
 gruppen: [alle, fuehrung]
 reihenfolge: 540
-quellen: [frontend/src/pages/TierePage.tsx, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, src/routes/einsatz_tier.rs, src/tier/mod.rs]
+quellen: [frontend/src/pages/TierePage.tsx, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, src/routes/einsatz_tier.rs, src/tier/mod.rs]
 ---
 
 ## Überblick
@@ -81,8 +81,13 @@ Ein abgeschlossenes Tier lässt sich wieder öffnen: „→ aktiv“ oder „Als
 ### Angaben am Tier
 
 „Bearbeiten“ auf der Seite des Tiers zeigt alle Angaben, auch die, die der Erfassungsdialog nicht
-abfragt: „Geschlecht“, „Alter in Jahren (geschätzt)“, „Größe / Gewicht“. Fotos und Dateien zum
-Tier liegen auf seiner Seite. „Stornieren“ nimmt eine Fehlerfassung aus der Liste.
+abfragt: „Geschlecht“, „Alter in Jahren (geschätzt)“, „Größe / Gewicht“. „Speichern“ und
+„Abbrechen“ bleiben am unteren Rand stehen, auch wenn die Seite rollt. Eine Angabe, die nicht
+passt, meldet sich unter ihrem Feld, etwa ein Alter über 120 Jahre („Höchstens 120 Jahre“);
+gespeichert wird erst, wenn sie stimmt. Wer die Seite mit ungespeicherten Eingaben verlassen
+will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ behält die Eingaben,
+„Verwerfen“ verlässt die Seite ohne sie. Fotos und Dateien zum Tier liegen auf seiner Seite.
+„Stornieren“ nimmt eine Fehlerfassung aus der Liste.
 
 ### Einsatztagebuch
 

@@ -10,7 +10,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
 import { ApiError } from '../api/client';
-import { InlineAngabe, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
+import { InlineAngabe, OFFEN_LASSEN, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 
 /**
  * Verhalten der inline bearbeitbaren Angabe (LFH-472).
@@ -418,5 +418,314 @@ describe('InlineAngabe · Zeiteingabe als Eingabe', () => {
     expect(screen.queryByRole('textbox', { name: 'Alarmzeit' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Alarmzeit bearbeiten' })).toBeInTheDocument();
     expect(onSpeichern).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Erweiterung für die feldweise Bearbeitung der Personendaten (LLH-1103, Change
+ * `f8218h1i-personendaten-feldweise`, design.md D3): Prüfung am Feld, Sperrgrund, Entwurfsmeldung,
+ * Knopfabstand. Alle Props optional; die Fälle oben laufen ohne sie unverändert.
+ *
+ * Mutationsproben (von Hand, je rot gesehen, dann zurückgedreht):
+ * - `pruefe` nicht in `abschicken` gefragt: „130“ geht hinaus, rot in „Prüffehler am Feld“.
+ * - `aria-describedby` ohne die Kennung der Fehlerzeile: rot in „Prüffehler am Feld“.
+ * - `disabled` am Wertknopf entfernt: der gesperrte Knopf öffnet, rot in „gesperrt: Auslöser“.
+ * - Sperre schließt eine unveränderte Bearbeitung nicht: rot in „schließt, sobald die Sperre
+ *   kommt“.
+ * - Entwurfsmeldung ohne Flankenriegel (jede Änderung meldet): rot in „meldet nur die Wechsel“.
+ * - Abmelden beim Aushängen entfernt: rot in „Aushängen mit Entwurf“.
+ * - `size="middle"` entfernt: rot in „Knopfabstand“.
+ */
+describe('InlineAngabe · Prüfung am Feld (pruefe)', () => {
+  const hoechstens120 = (w: string) => (Number(w) > 120 ? 'höchstens 120' : null);
+
+  it('Prüffehler am Feld: kein Senden, Meldung als Fehlerzeile, Feld ungültig und beschrieben', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <TextAngabe wert="45" etikett="Alter" pruefe={hoechstens120} onSpeichern={onSpeichern} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alter bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Alter' });
+    // Beim Tippen noch kein Fehler: der Grund kommt erst mit dem Absenden.
+    await user.clear(feld);
+    await user.type(feld, '130');
+    expect(screen.queryByText('höchstens 120')).toBeNull();
+    expect(feld).not.toHaveAttribute('aria-invalid');
+
+    await user.click(screen.getByRole('button', { name: 'Alter speichern' }));
+    expect(onSpeichern).not.toHaveBeenCalled();
+    const meldung = screen.getByText('höchstens 120');
+    expect(meldung).toHaveAttribute('data-fehler');
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld.getAttribute('aria-describedby')).toBe(meldung.id);
+    expect(feld).toHaveAccessibleDescription('höchstens 120');
+    expect(feld).toHaveFocus();
+    expect(feld).toHaveValue('130');
+
+    // Nach dem ersten Fehlversuch folgt die Meldung dem Entwurf.
+    await user.clear(feld);
+    await user.type(feld, '99');
+    expect(screen.queryByText('höchstens 120')).toBeNull();
+    expect(feld).not.toHaveAttribute('aria-invalid');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('99'));
+  });
+
+  it('Enter sendet ebenso nicht', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <TextAngabe wert="" etikett="Alter" pruefe={hoechstens120} onSpeichern={onSpeichern} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alter eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Alter' }), '130{Enter}');
+    expect(onSpeichern).not.toHaveBeenCalled();
+    expect(screen.getByText('höchstens 120')).toBeInTheDocument();
+  });
+
+  it('ein unveränderter Wert wird nicht geprüft (Altbestand bleibt stehen)', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <TextAngabe wert="130" etikett="Alter" pruefe={hoechstens120} onSpeichern={onSpeichern} />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alter bearbeiten' }));
+    await user.keyboard('{Enter}');
+    expect(screen.queryByText('höchstens 120')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Alter bearbeiten' })).toBeInTheDocument();
+    expect(onSpeichern).not.toHaveBeenCalled();
+  });
+
+  it('beim nächsten Öffnen ist die Meldung fort', async () => {
+    renderMitProviders(<TextAngabe wert="45" etikett="Alter" pruefe={hoechstens120} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Alter bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Alter' }), '0{Enter}');
+    expect(screen.getByText('höchstens 120')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Alter abbrechen' }));
+    await user.click(screen.getByRole('button', { name: 'Alter bearbeiten' }));
+    expect(screen.queryByText('höchstens 120')).toBeNull();
+  });
+});
+
+describe('InlineAngabe · Sperrgrund (gesperrt)', () => {
+  const GRUND = 'Ohne Verbindung nicht änderbar';
+
+  it('gesperrt: Auslöser nicht bedienbar, Grund sichtbar und als Beschreibung', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" gesperrt={GRUND} />);
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' });
+    expect(knopf).toBeDisabled();
+    expect(screen.getByText(GRUND)).toBeVisible();
+    expect(knopf).toHaveAccessibleDescription(`ILS-1 ${GRUND}`);
+    await userEvent.click(knopf);
+    expect(screen.queryByRole('textbox')).toBeNull();
+
+    rerender(<TextAngabe wert="" gesperrt={GRUND} />);
+    const leer = screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' });
+    expect(leer).toBeDisabled();
+    expect(leer).toHaveAccessibleDescription(GRUND);
+    expect(screen.getByText(GRUND)).toBeVisible();
+  });
+
+  it('ohne Schreibrecht kein Sperrgrund: es gibt nichts zu bedienen', () => {
+    renderMitProviders(<TextAngabe wert="ILS-1" darfSchreiben={false} gesperrt={GRUND} />);
+    expect(screen.queryByText(GRUND)).toBeNull();
+    expect(screen.getByText('ILS-1')).toBeInTheDocument();
+  });
+
+  it('eine offene Bearbeitung ohne Änderung schließt, sobald die Sperre kommt', async () => {
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    rerender(<TextAngabe wert="ILS-1" gesperrt={GRUND} />);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' })).toBeDisabled();
+  });
+
+  it('ein Entwurf bleibt bei der Sperre stehen, sendet aber nicht', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox'), '2');
+    rerender(<TextAngabe wert="ILS-1" gesperrt={GRUND} onSpeichern={onSpeichern} />);
+
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    expect(feld).toHaveValue('ILS-12');
+    expect(screen.getByText(GRUND)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' })).toBeDisabled();
+    fireEvent.submit(feld.closest('form')!);
+    expect(onSpeichern).not.toHaveBeenCalled();
+    // Abbrechen bleibt: der Entwurf lässt sich verwerfen.
+    await user.click(
+      screen.getByRole('button', { name: 'Bearbeitung von Leitstellen-Nr. abbrechen' }),
+    );
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+});
+
+describe('InlineAngabe · Entwurfsmeldung (onEntwurf)', () => {
+  it('meldet nur die Wechsel zwischen unverändert und geändert', async () => {
+    const onEntwurf = vi.fn();
+    renderMitProviders(<TextAngabe wert="ILS-1" onEntwurf={onEntwurf} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    // Ein offenes Feld ohne Änderung meldet sich nicht.
+    expect(onEntwurf).not.toHaveBeenCalled();
+
+    const feld = screen.getByRole('textbox', { name: 'Leitstellen-Nr.' });
+    await user.type(feld, '23');
+    expect(onEntwurf.mock.calls).toEqual([[true]]);
+
+    // Zurück auf den gespeicherten Wert: wieder unverändert.
+    await user.type(feld, '{Backspace}{Backspace}');
+    expect(onEntwurf.mock.calls).toEqual([[true], [false]]);
+
+    await user.type(feld, '9');
+    await user.click(
+      screen.getByRole('button', { name: 'Bearbeitung von Leitstellen-Nr. abbrechen' }),
+    );
+    expect(onEntwurf.mock.calls).toEqual([[true], [false], [true], [false]]);
+  });
+
+  it('gespeichert: unverändert; abgelehnt: der Entwurf bleibt gemeldet', async () => {
+    const onEntwurf = vi.fn();
+    const onSpeichern = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError(400, 'Server sagt nein'))
+      .mockResolvedValueOnce(undefined);
+    renderMitProviders(<TextAngabe wert="ILS-1" onEntwurf={onEntwurf} onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox'), '2{Enter}');
+    expect(await screen.findByText('Server sagt nein')).toBeInTheDocument();
+    expect(onEntwurf.mock.calls).toEqual([[true]]);
+
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(onEntwurf.mock.calls).toEqual([[true], [false]]));
+  });
+
+  it('Aushängen mit Entwurf meldet unverändert', async () => {
+    const onEntwurf = vi.fn();
+    const { unmount } = renderMitProviders(<TextAngabe wert="ILS-1" onEntwurf={onEntwurf} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await userEvent.type(screen.getByRole('textbox'), '2');
+    unmount();
+    expect(onEntwurf.mock.calls).toEqual([[true], [false]]);
+  });
+});
+
+describe('InlineAngabe · Knopfabstand', () => {
+  it('Speichern und Abbrechen stehen in der Stufe „middle“ auseinander (frontend/AGENTS.md)', async () => {
+    renderMitProviders(<TextAngabe wert="ILS-1" />);
+    await userEvent.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    const reihe = screen
+      .getByRole('button', { name: 'Leitstellen-Nr. speichern' })
+      .closest('.ant-space');
+    expect(reihe).toHaveClass('ant-space-gap-col-middle');
+  });
+});
+
+/**
+ * Sperrgrund an anderer Stelle (LLH-1103, Entscheidung des Orchestrators zu D8): EIN Grund am Kopf
+ * eines Abschnitts statt einer Zeile je Feld. Das Feld ist gesperrt und verweist nur auf ihn.
+ *
+ * Mutationsprobe: externe Kennung nicht ins `aria-describedby` — rot in „verweist auf den Grund“.
+ */
+describe('InlineAngabe · Sperrgrund an anderer Stelle', () => {
+  it('gesperrt, ohne eigene Zeile, verweist auf den Grund', async () => {
+    const { rerender } = renderMitProviders(
+      <>
+        <div id="grund-oben">Ohne Verbindung nicht änderbar</div>
+        <TextAngabe wert="ILS-1" gesperrt={{ beschreibungId: 'grund-oben' }} />
+      </>,
+    );
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('ILS-1 Ohne Verbindung nicht änderbar');
+    expect(screen.getAllByText('Ohne Verbindung nicht änderbar')).toHaveLength(1);
+
+    rerender(
+      <>
+        <div id="grund-oben">Ohne Verbindung nicht änderbar</div>
+        <TextAngabe wert="" gesperrt={{ beschreibungId: 'grund-oben' }} />
+      </>,
+    );
+    const leer = screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' });
+    expect(leer).toBeDisabled();
+    expect(leer).toHaveAccessibleDescription('Ohne Verbindung nicht änderbar');
+  });
+});
+
+/**
+ * `onOeffnen` (LLH-1103, D1): der Aufrufer hält beim Öffnen den Serverstand fest, gegen den der
+ * Feld-CAS vergleicht; ein späterer Refetch ändert ihn nicht mehr.
+ */
+describe('InlineAngabe · onOeffnen', () => {
+  it('meldet jedes Öffnen, nicht das Schließen', async () => {
+    const onOeffnen = vi.fn();
+    renderMitProviders(<TextAngabe wert="ILS-1" onOeffnen={onOeffnen} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+    await user.keyboard('{Escape}');
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * `onSchliessen` (LLH-1103): mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem Ort, bis
+ * es schließt. Gemeldet wird jedes Schließen — abgebrochen, gespeichert, ausgehängt —, nie ohne
+ * vorheriges Öffnen. Mutationsprobe: nur beim Abbrechen melden — der Speicherfall bleibt stumm,
+ * rot.
+ */
+describe('InlineAngabe · onSchliessen', () => {
+  it('meldet Abbrechen, Speichern und Aushängen einer offenen Bearbeitung', async () => {
+    const onSchliessen = vi.fn();
+    const { unmount } = renderMitProviders(<TextAngabe wert="ILS-1" onSchliessen={onSchliessen} />);
+    const user = userEvent.setup();
+    expect(onSchliessen).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.keyboard('{Escape}');
+    expect(onSchliessen).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), '2{Enter}');
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalledTimes(2));
+
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    unmount();
+    expect(onSchliessen).toHaveBeenCalledTimes(3);
+  });
+
+  it('ohne offene Bearbeitung meldet auch das Aushängen nichts', () => {
+    const onSchliessen = vi.fn();
+    const { unmount } = renderMitProviders(<TextAngabe wert="ILS-1" onSchliessen={onSchliessen} />);
+    unmount();
+    expect(onSchliessen).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `OFFEN_LASSEN` (LLH-1103, Personendaten: Escape in der Rückfrage „Zwischenzeitlich geändert“):
+ * nichts gespeichert, nichts gescheitert — die Eingabe bleibt mit dem Entwurf offen, ohne Fehler.
+ * Mutationsprobe: das Ergebnis von `onSpeichern` nicht beachten — die Eingabe schließt, rot.
+ */
+describe('InlineAngabe · OFFEN_LASSEN', () => {
+  it('die Eingabe bleibt mit dem Entwurf offen, ohne Fehler', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(OFFEN_LASSEN);
+    renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), '2{Enter}');
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('ILS-12'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' })).not.toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS-12');
+    expect(document.querySelector('[data-fehler]')).toBeNull();
   });
 });

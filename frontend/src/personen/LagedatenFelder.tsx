@@ -9,11 +9,11 @@ import { parseKoordinate } from './koordinate';
 dayjs.extend(utc);
 
 /**
- * Die zwei Lagedaten-Felder einer Person, die Maske und Detailseite gleich brauchen:
+ * Die zwei Lagedaten-Felder einer Person in der Erfassungsmaske (die Detailseite schreibt
+ * Koordinate und „vermisst seit“ feldweise, `personen/Personendaten.tsx`, LLH-1103):
  *
  *  · **Koordinate** — EIN Textfeld `52.2691/9.1342`, geprüft über `personen/koordinate.ts`.
- *    Leer ist gültig. Zerlegt wird vom Aufrufer: die Maske schickt eine leere Koordinate nicht,
- *    die Detailseite leert mit ihr das Paar.
+ *    Leer ist gültig. Zerlegt wird vom Aufrufer: die Maske schickt eine leere Koordinate nicht.
  *  · **„vermisst seit"** — das Formular hält den WIRE-String (UTC ohne Zone), das Feld zeigt und
  *    liest die Anzeigezone (`ZeitpunktEingabe`, LFH-692). Höchstens fünf Minuten Vorlauf wie im
  *    Backend (sonst 400).

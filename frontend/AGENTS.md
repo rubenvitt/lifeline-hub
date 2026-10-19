@@ -44,7 +44,10 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Umschaltknopf daneben, LLH-1065) · `Sammelbanner` · `Filterhinweis` (Band über einer gefilterten
   Liste, Achtungsrolle, Zahlen nur aus Serverzählungen, LLH-1071) ·
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
-  `rollenwerte`/`useRollen`.
+  `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
+  `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
+  `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
+  von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen`.
 - **Seitenkopf** `components/EinsatzSeite.tsx` (`SEITENKOPF_HOEHE` 44 px, wächst mit der
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` Mono, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
@@ -522,7 +525,16 @@ anwendbar), „nicht geprüft" ist keins.
   andere Eingabearten** (Datum, Auswahl, Zahl) nehmen `components/InlineAngabe.tsx` (LFH-472):
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
   Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
-  Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
+  Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`. Für die feldweise
+  Bearbeitung in einer Ansicht (LLH-1103) trägt `InlineAngabe` optional `pruefe` (Grund nach dem
+  Absenden als `FeldFehler`, `aria-invalid`, kein Senden; ein unveränderter Wert wird nicht
+  geprüft; auch die Überlänge eines Freitexts), `gesperrt` (Grund als Text am Feld oder
+  `{ beschreibungId }`, Verweis auf einen Grund an anderer Stelle; der Auslöser ist `disabled`),
+  `onEntwurf` (nur die Wechsel geändert ↔ unverändert), `onOeffnen`/`onSchliessen` (Serverstand
+  für einen Feld-CAS festhalten, ein offenes Feld an seinem Ort halten) und `OFFEN_LASSEN` als
+  Ergebnis von `onSpeichern` (nichts gespeichert, Eingabe bleibt offen). `BemerkungZelle` trägt
+  `gesperrt` ebenso: Grund am Feld, ein offenes Feld behält den Entwurf und sendet nicht.
+  Personendaten werden nur so geschrieben (`frontend/src/personen/AGENTS.md`).
   Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
   (`patcheEinsatz`); ein Vollformular gibt es nicht. Ausnahmen (LFH-1175, Spec
   `einsatzdaten-bearbeitung`): die Zeile „Koordinate“ schickt das Paar, die Zeile „Adresse“ mit
@@ -556,7 +568,12 @@ anwendbar), „nicht geprüft" ist keins.
   Anzeigezone Berlin blind. Eine **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
   `zeiteingabe`, „Uhrzeit ohne Datum“) liest nur `anzeige/uhrzeit.ts:parseUhrzeit` („0630“, „6:30“)
   und legt nur `uhrzeitAmTag` in der Anzeigezone auf einen Tag (doppelte Stunde: die erste, Lücke:
-  nach vorn); die Tagesgrenzen `tagesgrenzen`.
+  nach vorn); die Tagesgrenzen `tagesgrenzen`. Ein **Kalenderdatum ohne Uhrzeit** (Geburtsdatum,
+  LLH-1103, Spec `zeiteingabe`, „Kalenderdatum ohne Uhrzeit und Zone“) ist die Ausnahme von der
+  Anzeigezone: gelesen nur über `anzeige/kalenderdatum.ts:parseKalenderdatum` („TT.MM.JJJJ“,
+  „T.M.JJJJ“, „TT.MM.JJ“, `YYYY-MM-DD`; zweistelliges Jahr = jüngstes nicht zukünftiges; „heute“
+  als Tag der Anzeigezone vom Aufrufer), gespeichert als `YYYY-MM-DD`, gezeigt über
+  `formatKalenderdatum` („TT.MM.JJJJ“, Altbestand roh); keine Schnellwahl, keine relative Eingabe.
 - **Zeiteingabe ist ein Textfeld** (LLH-1070, Spec `zeiteingabe`, „Eingabe als Text“ ff.,
   `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`): getippte
   Zeiten deutet nur `anzeige/zeitParser.ts:deuteZeit` (taktisch `1430`/`101430`/`101430okt26`,
@@ -723,7 +740,8 @@ und `pages/personen/`.
   (`zuUpdate`) immer alle Felder mit, auch `basemap_modus`, `karten_zoom_start`,
   `fachebenen_sichtbar`. Jede Sektion stellt ihre Queries selbst (kein `useOutletContext`).
   Speichern-Leiste sticky im `<form>` (`htmlType="submit"`), gebaut nur über
-  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`) — sie bringt den Fokusabstand
+  `<div {...useSpeicherLeiste()}>` (`components/speicherLeiste.ts`; mit „Abbrechen“ daneben
+  `useSpeicherLeiste({ hasAbbrechen: true })`, Abstand `padding`) — sie bringt den Fokusabstand
   mit (LFH-475, `scroll-padding` über `:root:has(...)` in `index.css`, Nachweis
   `e2e/fokus-verdeckung.spec.ts`); `speicherLeisteStil`/`feldrasterStil` rein, die Breite liest
   der Aufrufer aus `useViewport`.
@@ -734,11 +752,21 @@ und `pages/personen/`.
 - **Formularseiten mit Leiste tragen den Verlassen-Schutz:** Merker
   `components/useFormularVerlassenSchutz.ts` (eigener Zähler, nicht `isFieldsTouched`;
   `onValuesChange` → `geaendert`, `fassung()` beim Absenden, `gespeichert(fassung)` nur bei
-  Erfolg; `aktiv` = Schreibrecht, `schluessel` = Datensatz-ID bei `key={id}`) plus
+  Erfolg; `aktiv` = Schreibrecht, `schluessel` = Datensatz-ID bei `key={id}`; im Bearbeiten-Modus
+  einer Detailseite `aktiv` = Sitzung offen, `schluessel` nur bei offener Sitzung, LLH-1101) plus
   `<VerlassenRueckfrage>` (`components/VerlassenRueckfrage.tsx`, `useBlocker` bei Pfadwechsel,
   „Bleiben“/„Verwerfen“). Seiten, die jede Zeile sofort speichern (`EinsatzModule`), nicht. Tests
-  solcher Seiten rendern mit `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft
-  ohne Data Router.
+  jeder Seite mit `VerlassenRueckfrage`, auch über den Merker unten, rendern mit
+  `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft ohne Data Router.
+- **Ein offenes, geändertes Einzelfeld in einer Ansicht trägt denselben Schutz** (LLH-1103, Spec
+  `formularseiten`, „Rückfrage vor dem Verlassen“): über den Merker
+  `components/offeneBearbeitung.tsx` (`OffeneBearbeitungProvider` speist
+  `useFormularVerlassenSchutz` und rendert `VerlassenRueckfrage`; ein Feld meldet sich mit
+  `useOffeneBearbeitung(etikett)` über `onEntwurf` an). Höchstens ein Entwurf je Seite: die
+  übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
+  (`useOffeneBearbeitungGrund` liefert den Grund der Seite; wo er steht, sagt die Bereichsdatei,
+  für Personendaten `frontend/src/personen/AGENTS.md`). Ein offenes Feld ohne Änderung meldet sich
+  nicht an.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;

@@ -76,7 +76,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   await expect(kopf).toBeVisible();
   await expect(verlauf).toBeVisible();
   await expect(personendaten).toBeVisible();
-  await expect(page.locator('dl[aria-label="Stammdaten"]')).toContainText('Mustermann');
+  await expect(page.locator('dl[aria-label="Personendaten"]')).toContainText('Mustermann');
   await expect(page.getByText('Medizinischer Verlauf', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('tab', { name: /Verlauf|Personendaten/ })).toHaveCount(0);
   const y = async (l: typeof kopf) => (await l.boundingBox())!.y;
@@ -88,6 +88,59 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
 
   // Zurück zur Liste über den Breadcrumb.
   await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
+});
+
+/**
+ * Personendaten feldweise (LLH-1103, Spec `personendaten-bearbeiten`): ein leeres Feld über
+ * „+ …“ ergänzen, einen Wert ändern, und ein offenes, geändertes Feld hält den Wechsel in die
+ * Liste an („Bleiben“ behält, „Verwerfen“ wechselt). Geprüft auch, was der Server gespeichert hat.
+ */
+test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlassen', async ({
+  page,
+}) => {
+  test.slow();
+  await anmelden(page);
+  const e = await einsatzPerApi(page, `E2E Personendaten ${Date.now()}`);
+  const person = await senden(page, `/api/einsaetze/${e}/personen`, { name: 'Claasen' });
+  await page.goto(`/einsaetze/${e}/personen/${person.id}`);
+  const daten = page.locator('[data-lfh="personendaten"]');
+  const ohne = daten.locator('[data-lfh="ohne-angabe"]');
+
+  // Leeres Feld ergänzen: „+ Geburtsdatum“ öffnet das Feld an seiner Stelle, mit Fokus.
+  await ohne.getByRole('button', { name: 'Geburtsdatum eintragen' }).click();
+  const geburt = daten.getByRole('textbox', { name: 'Geburtsdatum' });
+  await expect(geburt).toBeFocused();
+  await geburt.fill('01.02.80');
+  await daten.getByRole('button', { name: 'Geburtsdatum speichern' }).click();
+  await expect(page.getByText('Geburtsdatum gespeichert')).toBeVisible();
+  await expect(daten.locator('dl[aria-label="Personendaten"]')).toContainText('01.02.1980');
+
+  // Wert ändern: der Name.
+  await daten.getByRole('button', { name: 'Name bearbeiten', exact: true }).click();
+  const name = daten.getByRole('textbox', { name: 'Name', exact: true });
+  await name.fill('Claasen-Meyer');
+  await name.press('Enter');
+  await expect(page.getByText('Name gespeichert')).toBeVisible();
+  await expect(daten.locator('dl[aria-label="Personendaten"]')).toContainText('Claasen-Meyer');
+
+  const gespeichert = await (
+    await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+  ).json();
+  expect(gespeichert).toMatchObject({ name: 'Claasen-Meyer', geburtsdatum: '1980-02-01' });
+
+  // Rückfrage beim Verlassen mit offenem, geändertem Feld.
+  await ohne.getByRole('button', { name: 'Vorname eintragen' }).click();
+  await daten.getByRole('textbox', { name: 'Vorname' }).fill('Mül');
+  await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
+  const rueckfrage = page.getByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+  await expect(rueckfrage).toBeVisible();
+  await rueckfrage.getByRole('button', { name: 'Bleiben' }).click();
+  await expect(daten.getByRole('textbox', { name: 'Vorname' })).toHaveValue('Mül');
+  await expect(page).toHaveURL(new RegExp(`/personen/${person.id}$`));
+
+  await page.getByRole('link', { name: 'Betroffene', exact: true }).click();
+  await rueckfrage.getByRole('button', { name: 'Verwerfen' }).click();
   await expect(page.getByRole('heading', { name: 'Betroffene', exact: true })).toBeVisible();
 });
 

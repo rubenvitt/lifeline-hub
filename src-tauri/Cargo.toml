@@ -15,6 +15,10 @@ tauri-build = { version = "2.5", features = [] }
 
 [dependencies]
 tauri = { version = "2.12", features = [] }
+# 2.6.2 baut unter Linux `rust_ini::ParseOption` ohne die zwei Felder, die rust-ini 0.21.3
+# dazubekam, verlangt aber nur `rust-ini = "0.21"`. Das Cargo.lock hält rust-ini deshalb auf
+# 0.21.1, dem Stand des Upstream-Lockfiles; ein `cargo update` hebt es auf 0.21.3, und die
+# Hülle baut unter Linux nicht mehr. Der Halt fällt mit einem deep-link, das die Felder setzt.
 tauri-plugin-deep-link = "2"
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-updater = "2"

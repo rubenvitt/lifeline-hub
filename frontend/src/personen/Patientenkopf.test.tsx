@@ -1,14 +1,19 @@
 import { http, HttpResponse } from 'msw';
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PERSON_ZUSTAND_MAX, VERLAUFSNOTIZ_MAX } from '../api/eingabegrenzen';
 import type { Massnahme, PersonDetail, Verletzung } from '../api/types';
 import { benutzerFixture } from '../test/fixtures';
 import { meHandler, server } from '../test/server';
 import { setzeViewportBreite } from '../test/viewport';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
-import { meldeServerErreichbar, verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
+import {
+  OHNE_VERBINDUNG_NICHT_AENDERBAR,
+  meldeServerErreichbar,
+  verbindungZuruecksetzenFuerTests,
+} from '../offline/verbindung';
 import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
 import { PAT_OHNE_NETZ } from './PatKennzeichen';
 
@@ -1148,5 +1153,131 @@ describe('Patientenkopf — Review PAT-Kern', () => {
       within(paneel).getByRole('button', { name: /^Maßnahme Blutstillung .* aufheben$/ }),
     ).toBeDisabled();
     expect(within(paneel).getByText(AUFHEBEN_OHNE_NETZ)).toBeVisible();
+  });
+});
+
+/**
+ * Grenzen im Kopf (LLH-1329): Notizzeile und „Zustand / Verdacht“ zählen ab 80 % wie der Server,
+ * kürzen nie, und ein Text über der Grenze geht nicht hinaus, auch nicht in die Warteschlange.
+ * Mutationsprobe: `zeichenRegel` an der Notizzeile bzw. `max` am Zustand entfernt → der zu lange
+ * Text geht hinaus und der Fall wird rot.
+ */
+describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
+  it('die Notizzeile zählt, sperrt über der Grenze und kürzt nicht', async () => {
+    const { onGeschrieben } = zeige();
+    const feld = screen.getByRole('textbox', { name: 'Verlaufsnotiz' });
+    fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX + 1) } });
+    expect(screen.getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(gesendet).toEqual([]);
+    expect(onGeschrieben).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('x'.repeat(VERLAUFSNOTIZ_MAX + 1));
+
+    fireEvent.change(feld, { target: { value: 'x'.repeat(VERLAUFSNOTIZ_MAX) } });
+    expect(screen.getByText('2.000 / 2.000')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Notiz anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+  });
+
+  it('„Zustand / Verdacht“ zählt, sperrt über der Grenze und kürzt nicht', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ ...basis });
+      }),
+    );
+    const { kopf } = zeige({ zustand: null });
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: /^Zustand \/ Verdacht zu R-012 hinzufügen$/ }),
+    );
+    const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand-zelle"]')!;
+    const feld = within(zelle).getByRole('textbox');
+    const lang = 'x'.repeat(PERSON_ZUSTAND_MAX + 1);
+    // Eingefügt statt getippt: die Zelle liest den Entwurf aus den Eingabe-Ereignissen.
+    await userEvent.click(feld);
+    await userEvent.paste(lang);
+    expect(within(zelle).getByText('501 / 500 · zu lang')).toBeInTheDocument();
+    fireEvent.blur(feld);
+    fireEvent.keyDown(feld, { key: 'Enter' });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(patches).toEqual([]);
+    expect(within(zelle).getByRole('textbox')).toHaveValue(lang);
+  });
+});
+
+/**
+ * „Zustand / Verdacht“ ohne Netz (LLH-1103, design.md D8, Spec `personendaten-bearbeiten`, „Ohne
+ * Netz gesperrt“): gesperrt mit sichtbarem Grund am Feld, im einen Wortlaut aller Gründe ohne
+ * Netz. Bisher pausierte die Änderung still und überschriebe nach der Rückkehr einen ungesehenen
+ * Wert. Ein schon getippter Entwurf bleibt dabei stehen.
+ */
+describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
+  it('sperrt den Zustand ohne Netz und nennt den Grund am Feld', async () => {
+    const { kopf } = zeige({ zustand: 'gehfähig' });
+    setzeOnline(false);
+    try {
+      // Mutationsprobe: Sperre entfernt — der Knopf bleibt bedienbar, rot.
+      const knopf = within(kopf).getByRole('button', {
+        name: 'Zustand / Verdacht zu R-012 bearbeiten',
+      });
+      await waitFor(() => expect(knopf).toBeDisabled());
+      const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand-zelle"]')!;
+      expect(within(zelle).getByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+      expect(knopf).toHaveAccessibleDescription(`gehfähig ${OHNE_VERBINDUNG_NICHT_AENDERBAR}`);
+    } finally {
+      setzeOnline(true);
+    }
+  });
+
+  it('ein getippter Entwurf bleibt ohne Netz stehen und geht erst mit Netz hinaus', async () => {
+    const patches: unknown[] = [];
+    server.use(
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        patches.push(await request.json());
+        return HttpResponse.json({ ...basis, zustand: 'Atemnot' });
+      }),
+    );
+    const { kopf } = zeige({ zustand: null });
+    await userEvent.click(
+      within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 hinzufügen' }),
+    );
+    const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand-zelle"]')!;
+    await userEvent.type(within(zelle).getByRole('textbox'), 'Atemnot');
+    setzeOnline(false);
+    try {
+      // Mutationsprobe: ohne Netz wieder gegen den Textknoten tauschen — der Entwurf ist weg, rot.
+      expect(await within(zelle).findByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+      const feld = within(zelle).getByRole('textbox');
+      expect(feld).toHaveValue('Atemnot');
+      fireEvent.blur(feld);
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+      expect(within(zelle).getByRole('textbox')).toHaveValue('Atemnot');
+    } finally {
+      setzeOnline(true);
+    }
+    // Mutationsprobe: das Senden ohne Netz nicht sperren — die pausierte Mutation holt nach der
+    // Rückkehr still nach, rot.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    expect(patches).toEqual([]);
+    fireEvent.blur(within(zelle).getByRole('textbox'));
+    await waitFor(() => expect(patches).toEqual([{ zustand: 'Atemnot' }]));
+  });
+
+  it('mit Netz bleibt er schreibbar, ohne Grund', () => {
+    const { kopf } = zeige({ zustand: 'gehfähig' });
+    expect(
+      within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 bearbeiten' }),
+    ).toBeEnabled();
+    expect(within(kopf).queryByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeNull();
   });
 });

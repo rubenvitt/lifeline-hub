@@ -60,6 +60,13 @@ export function useServerErreichbar(): boolean {
   );
 }
 
+/**
+ * Der eine Wortlaut für eine Angabe, die ohne Verbindung gesperrt ist (LLH-1103, design.md D8):
+ * die Personendaten am Kopf ihres Abschnitts, „Zustand / Verdacht“ im Patientenkopf und in der
+ * Betroffenenliste am Feld (`frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“).
+ */
+export const OHNE_VERBINDUNG_NICHT_AENDERBAR = 'Ohne Verbindung nicht änderbar';
+
 /** Ohne Verbindung: der Browser ist offline ODER der Server antwortet nicht. */
 export function useOhneVerbindung(): boolean {
   const online = useOnline();

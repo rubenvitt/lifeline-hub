@@ -13,6 +13,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   kurzeingabe.png  frontend/src/personen/BetroffeneZeile.tsx
  *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx,
  *                    frontend/src/personen/RettungsmittelFeld.tsx
+ *   personendaten.png frontend/src/personen/Personendaten.tsx, frontend/src/components/InlineAngabe.tsx
  *   koerperschema.png frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatKennzeichen.tsx,
  *                    frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/koerperschema/KoerperFigur.tsx
  *
@@ -72,6 +73,18 @@ test.describe(KAPITEL, () => {
     await expect(band.locator('[data-lfh="erkannt"]')).toContainText('UHS Turnhalle');
     await feld.blur();
     await fotografiere(band, KAPITEL, 'kurzeingabe');
+  });
+
+  test('Personendaten mit der Zeile „Ohne Angabe“', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const id = await personId(page, demo.id, 'Mustermann');
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/personen/${id}`);
+    const daten = page.locator('[data-lfh="personendaten"]');
+    await expect(daten.getByRole('button', { name: 'Name bearbeiten', exact: true })).toBeVisible();
+    await expect(daten.getByRole('button', { name: 'Geburtsdatum eintragen' })).toBeVisible();
+    await fotografiere(daten, KAPITEL, 'personendaten');
   });
 
   test('Patientenkopf mit Paneel „Verbleib erfassen“', async ({ page }) => {

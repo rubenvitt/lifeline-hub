@@ -49,12 +49,20 @@ interface Props {
   /** Anzeigename der eigenen Organisation (für die Org-Option). Die Org-ID wird vom
    *  Aufrufer beim Submit gesetzt und serverseitig ohnehin auf die Einsatz-Org geklemmt. */
   orgName: string;
+  /** Kennung der Eingabe: ein Etikett (`htmlFor`) benennt die Auswahl (LLH-1101). */
+  id?: string;
   /** value/onChange optional → als Form.Item-Kind nutzbar (Form injiziert beide). */
   value?: GeschaedigtWert;
   onChange?: (v: GeschaedigtWert) => void;
 }
 
-export default function GeschaedigtPicker({ einsatzId, orgName, value = null, onChange }: Props) {
+export default function GeschaedigtPicker({
+  einsatzId,
+  orgName,
+  id,
+  value = null,
+  onChange,
+}: Props) {
   const [suche, setSuche] = useState('');
 
   // Auswahl ohne Freitexte (LFH-940): nur Nummer, Name, Status.
@@ -166,6 +174,7 @@ export default function GeschaedigtPicker({ einsatzId, orgName, value = null, on
 
   return (
     <Select
+      id={id}
       allowClear
       placeholder="Person, Einsatzkraft, eigene Organisation oder Freitext …"
       style={{ width: '100%' }}
