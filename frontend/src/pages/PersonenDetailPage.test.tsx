@@ -1766,8 +1766,12 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
       client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
         ...detail,
         name: 'Extern',
+        vorname: 'Moritz',
       });
     });
+    // Erst wenn der neue Stand angekommen ist, belegt der Fall etwas (der Query-Cache meldet
+    // asynchron). Mutationsprobe: `ausgang` je Render aus `person` statt beim Öffnen — rot.
+    expect(await screen.findByText('Moritz')).toBeInTheDocument();
     expect(feld).toHaveValue('Lokal');
     await user.keyboard('{Enter}');
     await waitFor(() => expect(koerper).toHaveLength(1));
@@ -1806,6 +1810,147 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     expect(koerper[0]).toEqual({ name: 'Müller', erwartet: { name: 'Mustermann' } });
     expect(koerper[1]).toEqual({ name: 'Müller' });
     expect(await screen.findByText('Name gespeichert')).toBeInTheDocument();
+  });
+
+  /**
+   * B schreibt dazwischen (Spec `personendaten-bearbeiten`, „Eine offene Bearbeitung zur Zeit“):
+   * ein offenes Feld bleibt an seinem Ort und mit seinem Entwurf, bis es gespeichert oder
+   * abgebrochen ist, auch wenn der neue Stand es zwischen Zeile „Ohne Angabe“ und Raster
+   * verschöbe. Mutationsprobe: Einordnung nach dem neuen Stand statt dem beim Öffnen — das Feld
+   * hängt aus, der Entwurf ist still weg und der Merker meldet ab, rot.
+   */
+  it('ein offenes „+ Name“ bleibt mit Entwurf stehen, wenn ein neuer Stand einen Namen bringt', async () => {
+    const ohneName = { ...detail, name: null } as PersonDetail;
+    const { client } = render(einsatzAktiv, ohneName);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
+    await user.type(within(ohneAngabe()).getByRole('textbox', { name: 'Name' }), 'Mül');
+    act(() => {
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
+        ...ohneName,
+        name: 'Meier',
+        vorname: 'Moritz',
+      });
+    });
+    // Der neue Stand ist angekommen (der Query-Cache meldet asynchron).
+    expect(await within(stammdatenRaster()).findByText('Moritz')).toBeInTheDocument();
+    const feld = within(ohneAngabe()).getByRole('textbox', { name: 'Name' });
+    expect(feld).toHaveValue('Mül');
+    expect(feld).toHaveFocus();
+    // Der Merker hält weiter: die übrigen Felder bleiben gesperrt.
+    expect(screen.getByText('Erst „Name“ speichern oder abbrechen')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+
+    // Abgebrochen steht die Angabe dort, wo der neue Stand sie hinstellt.
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
+    expect(within(stammdatenRaster()).getByText('Meier')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeEnabled();
+  });
+
+  it('ein offener gesetzter Name bleibt mit Entwurf im Raster, wenn ein neuer Stand ihn leert', async () => {
+    const { client } = render(einsatzAktiv, detail);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'x');
+    act(() => {
+      client.setQueryData<PersonDetail>(einsatzKeys.person(1, 10), {
+        ...detail,
+        name: null,
+        vorname: 'Moritz',
+      });
+    });
+    expect(await within(stammdatenRaster()).findByText('Moritz')).toBeInTheDocument();
+    const feld = within(stammdatenRaster()).getByRole('textbox', { name: 'Name' });
+    expect(feld).toHaveValue('Mustermannx');
+    expect(feld).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
+    expect(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' })).toBeEnabled();
+  });
+
+  /**
+   * D2 mit Verschiebung: der 409 lädt den neuen Stand, in dem „Name“ nicht mehr leer ist. Während
+   * der Rückfrage bleibt das Feld eingehängt (und die übrigen gesperrt); scheitert
+   * „Überschreiben“, steht der Grund am Feld. Mutationsprobe: Einordnung nach dem neuen Stand —
+   * das Feld hängt beim Neuladen aus, der zweite Fehler steht nirgends, rot.
+   */
+  it('409 mit Verschiebung: das Feld bleibt während der Rückfrage, ein gescheitertes Überschreiben steht am Feld', async () => {
+    const ohneName = { ...detail, name: null } as PersonDetail;
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = ohneName;
+    render(einsatzAktiv, ohneName, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        if (koerper.length === 1) {
+          // B hat inzwischen „Meier“ gespeichert.
+          stand = { ...ohneName, name: 'Meier' };
+          return HttpResponse.json(
+            { error: 'Das Feld wurde zwischenzeitlich geändert. Bitte neu laden.' },
+            { status: 409 },
+          );
+        }
+        return HttpResponse.json(
+          { error: 'Einsatz ist abgeschlossen und schreibgeschützt' },
+          { status: 409 },
+        );
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(within(ohneAngabe()).getByRole('button', { name: 'Name eintragen' }));
+    await user.type(within(ohneAngabe()).getByRole('textbox', { name: 'Name' }), 'Müller{Enter}');
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('„Meier“');
+    expect(within(ohneAngabe()).getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Überschreiben' }));
+    expect(
+      await within(ohneAngabe()).findByText('Einsatz ist abgeschlossen und schreibgeschützt'),
+    ).toBeInTheDocument();
+    expect(within(ohneAngabe()).getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
+    expect(koerper).toEqual([{ name: 'Müller', erwartet: { name: null } }, { name: 'Müller' }]);
+    expect(screen.queryByText('Name gespeichert')).toBeNull();
+  });
+
+  /**
+   * Escape (oder Schließen) der Rückfrage entscheidet nichts: weder überschreiben noch verwerfen,
+   * das Feld bleibt mit dem Entwurf offen. Mutationsprobe: Escape wieder als „Verwerfen“ — das
+   * Feld schließt und der Entwurf ist weg, rot.
+   */
+  it('409: Escape schließt die Rückfrage, das Feld bleibt mit dem Entwurf offen', async () => {
+    const koerper: Array<Record<string, unknown>> = [];
+    let stand: PersonDetail = detail;
+    render(einsatzAktiv, detail, [
+      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        stand = { ...detail, name: 'Meier' };
+        return HttpResponse.json({ error: 'geändert' }, { status: 409 });
+      }),
+    ]);
+    await screen.findByRole('heading', { name: /Person R-001/ });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Müller{Enter}');
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Name speichern' })).not.toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Müller');
+    expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
+    expect(koerper).toHaveLength(1);
+    expect(screen.queryByText('Name gespeichert')).toBeNull();
   });
 
   it('409: „Verwerfen und neu laden“ schließt das Feld und zeigt den neuen Stand', async () => {

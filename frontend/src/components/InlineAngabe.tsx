@@ -59,7 +59,16 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  * - `onEntwurf`: meldet nur die Wechsel zwischen „unverändert“ und „geändert“ (auch beim
  *   Aushängen), für den Merker `components/offeneBearbeitung.tsx`.
  * - `onOeffnen`: jedes Öffnen; der Aufrufer hält dort den Serverstand für den Feld-CAS fest.
+ * - `onSchliessen`: jedes Schließen einer offenen Bearbeitung (gespeichert, abgebrochen, von der
+ *   Sperre geschlossen, ausgehängt). Mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem
+ *   Ort, auch wenn ein neuer Stand es woanders einordnete (Spec `personendaten-bearbeiten`,
+ *   „Eine offene Bearbeitung zur Zeit“).
+ * - Erfüllt `onSpeichern` mit {@link OFFEN_LASSEN}, bleibt die Eingabe mit dem Entwurf offen, ohne
+ *   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
  */
+
+/** Rückgabe von `onSpeichern`: nichts gespeichert, nichts gescheitert — die Eingabe bleibt offen. */
+export const OFFEN_LASSEN = Symbol('offen lassen');
 
 /** Was die Eingabe zum Einhängen bekommt. `feld` ist unverändert auf das antd-Element spreizbar. */
 export interface InlineEingabe<T> {
@@ -137,6 +146,8 @@ export interface InlineAngabeProps<T> {
   onOeffnen?: () => void;
   /** Meldet, ob die offene Bearbeitung einen geänderten, ungespeicherten Entwurf hat. */
   onEntwurf?: (geaendert: boolean) => void;
+  /** Jedes Schließen einer offenen Bearbeitung, auch durch Sperre oder Aushängen. */
+  onSchliessen?: () => void;
 }
 
 /**
@@ -182,6 +193,7 @@ export function InlineAngabe<T>({
   gesperrt,
   onEntwurf,
   onOeffnen,
+  onSchliessen,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const [entwurf, setEntwurfZustand] = useState<T>(wert);
@@ -251,6 +263,30 @@ export function InlineAngabe<T>({
     [],
   );
 
+  // Schließen an der Flanke offen → zu, und beim Aushängen einer offenen Bearbeitung.
+  const onSchliessenRef = useRef(onSchliessen);
+  const warOffenRef = useRef(false);
+  useEffect(() => {
+    onSchliessenRef.current = onSchliessen;
+  });
+  useEffect(() => {
+    if (bearbeitet) {
+      warOffenRef.current = true;
+      return;
+    }
+    if (!warOffenRef.current) return;
+    warOffenRef.current = false;
+    onSchliessenRef.current?.();
+  }, [bearbeitet]);
+  useEffect(
+    () => () => {
+      if (!warOffenRef.current) return;
+      warOffenRef.current = false;
+      onSchliessenRef.current?.();
+    },
+    [],
+  );
+
   if (!darfSchreiben) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
 
   function oeffnen() {
@@ -298,8 +334,7 @@ export function InlineAngabe<T>({
     setSendet(true);
     setFehler(null);
     try {
-      await onSpeichern(entwurf);
-      schliessen();
+      if ((await onSpeichern(entwurf)) !== OFFEN_LASSEN) schliessen();
     } catch (e) {
       setFehler(e);
     } finally {

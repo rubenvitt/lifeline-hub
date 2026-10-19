@@ -10,7 +10,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
 import { ApiError } from '../api/client';
-import { InlineAngabe, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
+import { InlineAngabe, OFFEN_LASSEN, leerKnopfStil, type InlineAngabeProps } from './InlineAngabe';
 
 /**
  * Verhalten der inline bearbeitbaren Angabe (LFH-472).
@@ -671,5 +671,61 @@ describe('InlineAngabe · onOeffnen', () => {
     expect(onOeffnen).toHaveBeenCalledTimes(1);
     await user.keyboard('{Escape}');
     expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * `onSchliessen` (LLH-1103): mit `onOeffnen` hält der Aufrufer ein offenes Feld an seinem Ort, bis
+ * es schließt. Gemeldet wird jedes Schließen — abgebrochen, gespeichert, ausgehängt —, nie ohne
+ * vorheriges Öffnen. Mutationsprobe: nur beim Abbrechen melden — der Speicherfall bleibt stumm,
+ * rot.
+ */
+describe('InlineAngabe · onSchliessen', () => {
+  it('meldet Abbrechen, Speichern und Aushängen einer offenen Bearbeitung', async () => {
+    const onSchliessen = vi.fn();
+    const { unmount } = renderMitProviders(<TextAngabe wert="ILS-1" onSchliessen={onSchliessen} />);
+    const user = userEvent.setup();
+    expect(onSchliessen).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.keyboard('{Escape}');
+    expect(onSchliessen).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), '2{Enter}');
+    await waitFor(() => expect(onSchliessen).toHaveBeenCalledTimes(2));
+
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    unmount();
+    expect(onSchliessen).toHaveBeenCalledTimes(3);
+  });
+
+  it('ohne offene Bearbeitung meldet auch das Aushängen nichts', () => {
+    const onSchliessen = vi.fn();
+    const { unmount } = renderMitProviders(<TextAngabe wert="ILS-1" onSchliessen={onSchliessen} />);
+    unmount();
+    expect(onSchliessen).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * `OFFEN_LASSEN` (LLH-1103, Personendaten: Escape in der Rückfrage „Zwischenzeitlich geändert“):
+ * nichts gespeichert, nichts gescheitert — die Eingabe bleibt mit dem Entwurf offen, ohne Fehler.
+ * Mutationsprobe: das Ergebnis von `onSpeichern` nicht beachten — die Eingabe schließt, rot.
+ */
+describe('InlineAngabe · OFFEN_LASSEN', () => {
+  it('die Eingabe bleibt mit dem Entwurf offen, ohne Fehler', async () => {
+    const onSpeichern = vi.fn().mockResolvedValue(OFFEN_LASSEN);
+    renderMitProviders(<TextAngabe wert="ILS-1" onSpeichern={onSpeichern} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    await user.type(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' }), '2{Enter}');
+    await waitFor(() => expect(onSpeichern).toHaveBeenCalledWith('ILS-12'));
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Leitstellen-Nr. speichern' })).not.toHaveClass(
+        'ant-btn-loading',
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: 'Leitstellen-Nr.' })).toHaveValue('ILS-12');
+    expect(document.querySelector('[data-fehler]')).toBeNull();
   });
 });

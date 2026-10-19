@@ -18,7 +18,12 @@ import { formatKalenderdatum, parseKalenderdatum } from '../anzeige/kalenderdatu
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt, heuteInZone } from '../anzeige/zeitEingabe';
-import { InlineAngabe, leerKnopfStil, type InlineEingabe } from '../components/InlineAngabe';
+import {
+  InlineAngabe,
+  OFFEN_LASSEN,
+  leerKnopfStil,
+  type InlineEingabe,
+} from '../components/InlineAngabe';
 import { Datenfeld, Datenraster } from '../components/instrument';
 import { useRollen } from '../components/instrument/rollenwerte';
 import {
@@ -54,8 +59,11 @@ dayjs.extend(utc);
  *   Schreibrecht der Satz „Ohne Angabe: …“.
  * - **Eine offene Bearbeitung zur Zeit (D4):** `OffeneBearbeitungProvider` hält den Entwurf, fragt
  *   beim Verlassen nach und sperrt die übrigen Felder. **Ohne Netz (D8)** ist alles gesperrt.
- *   Beide Gründe stehen EINMAL am Kopf des Abschnitts; die gesperrten Felder verweisen per
- *   `aria-describedby` darauf, statt ihn zu wiederholen.
+ *   Beide Gründe stehen EINMAL am Kopf des Abschnitts (`frontend/src/personen/AGENTS.md`,
+ *   „Personendaten nur feldweise“); die gesperrten Felder verweisen per `aria-describedby` darauf.
+ * - **Ein offenes Feld bleibt an seinem Ort**, bis es gespeichert oder abgebrochen ist: seine
+ *   Einordnung (Raster oder Zeile „Ohne Angabe“) gilt vom Stand beim Öffnen. Ein neuer Stand, der
+ *   den Wert leert oder setzt, hängt es sonst aus, und der Entwurf wäre still weg.
  * - Nach dem Speichern wandert eine Angabe zwischen Raster und Zeile „Ohne Angabe“; der Fokus
  *   folgt ihr auf ihren neuen Auslöser, statt auf `<body>` zu fallen.
  *
@@ -95,14 +103,20 @@ function isGleicherWireWert(a: unknown, b: unknown): boolean {
 }
 
 interface Schreiben {
-  /** Schreibt ein Feld mit Feld-CAS; lehnt bei Ablehnung ab (die Eingabe bleibt offen). */
+  /**
+   * Schreibt ein Feld mit Feld-CAS; lehnt bei Ablehnung ab (die Eingabe bleibt offen) und erfüllt
+   * mit `OFFEN_LASSEN`, wenn die Rückfrage ohne Entscheidung geschlossen wurde.
+   */
   speichere: <K extends PersonFeld>(
     feld: K,
     etikett: string,
     wert: PersonFeldEingabe[K],
     erwartet: PersonFeldEingabe[K],
     text: (w: PersonFeldEingabe[K]) => string,
-  ) => Promise<void>;
+  ) => Promise<void | typeof OFFEN_LASSEN>;
+  /** Ein Feld öffnet: sein Ort (Raster oder Zeile „Ohne Angabe“) gilt, bis es schließt. */
+  oeffnet: (etikett: string, imRaster: boolean) => void;
+  schliesst: (etikett: string) => void;
   /** Kennung der Kopfzeile mit dem Sperrgrund. */
   grundId: string;
   ohneNetz: boolean;
@@ -157,7 +171,9 @@ function PersonFeldAngabe<T, K extends PersonFeld>({
       onEntwurf={bearbeitung.onEntwurf}
       onOeffnen={() => {
         ausgang.current = feldWertAus(person, feld);
+        schreiben.oeffnet(etikett, !inZeileOhneAngabe);
       }}
+      onSchliessen={() => schreiben.schliesst(etikett)}
       onSpeichern={(w) => schreiben.speichere(feld, etikett, zuWire(w), ausgang.current, text)}
       ausloeser={
         inZeileOhneAngabe
@@ -236,6 +252,17 @@ function PersonendatenInhalt({
     : undefined;
   const behaelterRef = useRef<HTMLDivElement>(null);
   const [fokusNach, setFokusNach] = useState<{ etikett: string; vorher: Person } | null>(null);
+  // Offene Felder (Etikett → im Raster beim Öffnen). Sie bleiben an diesem Ort, bis sie schließen.
+  const [offen, setOffen] = useState<Readonly<Record<string, boolean>>>({});
+  const oeffnet = (etikett: string, imRaster: boolean) =>
+    setOffen((alt) => (alt[etikett] === imRaster ? alt : { ...alt, [etikett]: imRaster }));
+  const schliesst = (etikett: string) =>
+    setOffen((alt) => {
+      if (!(etikett in alt)) return alt;
+      const rest = { ...alt };
+      delete rest[etikett];
+      return rest;
+    });
 
   const detailKey = einsatzKeys.person(einsatzId, person.id);
 
@@ -261,18 +288,34 @@ function PersonendatenInhalt({
       // Steht das Feld noch wie beim Öffnen, war es kein Feldkonflikt (etwa ein abgeschlossener
       // Einsatz): der Grund des Servers gehört ans Feld.
       if (isGleicherWireWert(aktuell, erwartet)) throw e;
-      const ueberschreiben = await new Promise<boolean>((fertig) => {
-        modal.confirm({
+      const entscheidung = await new Promise<'ueberschreiben' | 'verwerfen' | 'offen'>((fertig) => {
+        const rueckfrage = modal.confirm({
           title: 'Zwischenzeitlich geändert',
           content: `${etikett} inzwischen: ${aktuell == null ? 'ohne Angabe' : `„${text(aktuell)}“`}`,
           okText: 'Überschreiben',
           okButtonProps: { danger: true },
-          cancelText: 'Verwerfen und neu laden',
-          onOk: () => fertig(true),
-          onCancel: () => fertig(false),
+          onOk: () => fertig('ueberschreiben'),
+          // Escape und Schließen entscheiden nichts: weder überschreiben noch verwerfen, das
+          // Feld bleibt mit dem Entwurf offen. Darum ist „Verwerfen“ ein eigener Knopf statt
+          // antds Abbrechen (das auch Escape auslöst).
+          onCancel: () => fertig('offen'),
+          footer: (_, { OkBtn }) => (
+            <>
+              <Button
+                onClick={() => {
+                  fertig('verwerfen');
+                  rueckfrage.destroy();
+                }}
+              >
+                Verwerfen und neu laden
+              </Button>
+              <OkBtn />
+            </>
+          ),
         });
       });
-      if (!ueberschreiben) return;
+      if (entscheidung === 'offen') return OFFEN_LASSEN;
+      if (entscheidung === 'verwerfen') return;
       // Ohne Altwert: bewusst über den neuen Stand. Ein zweiter 409 (Einsatz abgeschlossen)
       // steht am Feld.
       uebernehme(await savePersonFeld(einsatzId, person.id, feld, wert, undefined));
@@ -286,7 +329,8 @@ function PersonendatenInhalt({
   // steht noch der alte Auslöser da (`InlineAngabe` gibt ihm den Fokus zurück), danach hängt er
   // aus. Bleibt die Angabe an ihrem Ort, hat `InlineAngabe` den Fokus schon zurückgegeben.
   useEffect(() => {
-    if (!fokusNach || person === fokusNach.vorher) return;
+    // Erst wenn das gespeicherte Feld geschlossen ist: bis dahin steht es noch an seinem Ort.
+    if (!fokusNach || person === fokusNach.vorher || fokusNach.etikett in offen) return;
     setFokusNach(null);
     const aktiv = document.activeElement;
     if (aktiv && aktiv !== document.body) return;
@@ -296,9 +340,16 @@ function PersonendatenInhalt({
         namen.includes(knopf.getAttribute('aria-label') ?? knopf.textContent?.trim() ?? ''),
       )
       ?.focus();
-  }, [fokusNach, person]);
+  }, [fokusNach, person, offen]);
 
-  const schreiben: Schreiben = { speichere, grundId, ohneNetz, darfSchreiben };
+  const schreiben: Schreiben = {
+    speichere,
+    oeffnet,
+    schliesst,
+    grundId,
+    ohneNetz,
+    darfSchreiben,
+  };
   const gemeinsam = { person, schreiben };
 
   const textFeld = (
@@ -567,14 +618,19 @@ function PersonendatenInhalt({
     alter,
     textFeld('herkunft_adresse', 'Herkunft / Adresse', PERSON_ANGABE_MAX, true),
     textFeld('antreff_ort', 'Fundort', PERSON_ANGABE_MAX),
-    // Koordinate beschreibt eine angetroffene Person; „vermisst seit“ nur eine vermisste.
-    ...(angetroffen || koordinate ? [koordinateAngabe] : []),
-    ...(person.status === 'vermisst' ? [vermisstSeit] : []),
+    // Koordinate beschreibt eine angetroffene Person; „vermisst seit“ nur eine vermisste. Ein
+    // offenes Feld bleibt, bis es schließt.
+    ...(angetroffen || koordinate || 'Koordinate' in offen ? [koordinateAngabe] : []),
+    ...(person.status === 'vermisst' || 'vermisst seit' in offen ? [vermisstSeit] : []),
     textFeld('melder_kontakt', 'Melder / Kontakt', PERSON_ANGABE_MAX, true),
     textFeld('notiz', 'Notiz', PERSON_NOTIZ_MAX, true),
   ];
 
-  const gesetzt = angaben.filter((a) => !a.isLeer || (darfSchreiben && a.imRaster));
+  // Ein offenes Feld steht, wo es beim Öffnen stand (Spec `personendaten-bearbeiten`, „Eine
+  // offene Bearbeitung zur Zeit“).
+  const gesetzt = angaben.filter((a) =>
+    a.etikett in offen ? offen[a.etikett] : !a.isLeer || (darfSchreiben && a.imRaster),
+  );
   const ohne = angaben.filter((a) => !gesetzt.includes(a));
   // Ohne Schreibrecht steht die Koordinate leer nur mit Verorten-Weg im Raster; den gibt es ohne
   // Schreibrecht nicht.
