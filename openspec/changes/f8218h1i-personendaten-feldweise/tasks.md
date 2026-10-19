@@ -13,9 +13,9 @@
 
 ## 3. Bausteine — LLH-1103 (f8218h1i), Frontend
 
-- [ ] 3.1 `anzeige/kalenderdatum.ts`: `parseKalenderdatum`, `formatKalenderdatum` (D6). Vitest: alle Schreibweisen, zweistelliges Jahr an der Jahrhundertgrenze, 29.02., Zukunft, Unsinn, Rohanzeige alter Werte, Zone ohne Einfluss.
-- [ ] 3.2 `components/InlineAngabe.tsx`: `pruefe` (Meldung mit `FeldFehler` aus LLH-1101, `aria-describedby`, Senden gesperrt), `gesperrt` (Grund sichtbar, Auslöser nicht bedienbar), `onEntwurf`, Knopfabstand. Vitest; bestehende Nutzer und ihre Tests unverändert grün.
-- [ ] 3.3 `components/offeneBearbeitung` (D4): Kontext für eine offene, geänderte Bearbeitung je Seite, speist `useFormularVerlassenSchutz`/`VerlassenRueckfrage`, liefert anderen Feldern den Sperrgrund. Vitest mit `renderMitProviders(…, { datenRouter: true })`: Rückfrage bei Entwurf, keine ohne Änderung, „Bleiben“ behält, „Verwerfen“ wechselt.
+- [x] 3.1 `anzeige/kalenderdatum.ts`: `parseKalenderdatum`, `formatKalenderdatum` (D6). Vitest: alle Schreibweisen, zweistelliges Jahr an der Jahrhundertgrenze, 29.02., Zukunft, Unsinn, Rohanzeige alter Werte, Zone ohne Einfluss.
+- [x] 3.2 `components/InlineAngabe.tsx`: `pruefe` (Meldung mit `FeldFehler` aus LLH-1101, `aria-describedby`, Senden gesperrt), `gesperrt` (Grund sichtbar, Auslöser nicht bedienbar), `onEntwurf`, Knopfabstand. Vitest; bestehende Nutzer und ihre Tests unverändert grün.
+- [x] 3.3 `components/offeneBearbeitung` (D4): Kontext für eine offene, geänderte Bearbeitung je Seite, speist `useFormularVerlassenSchutz`/`VerlassenRueckfrage`, liefert anderen Feldern den Sperrgrund. Vitest mit `renderMitProviders(…, { datenRouter: true })`: Rückfrage bei Entwurf, keine ohne Änderung, „Bleiben“ behält, „Verwerfen“ wechselt.
 
 ## 4. Personendaten feldweise — LLH-1103 (f8218h1i), Frontend
 
