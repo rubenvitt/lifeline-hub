@@ -212,20 +212,21 @@ export function useOfflineSync(benutzerId?: number): void {
               offlineQueueBenutzerId: aktuellerBenutzerId,
             });
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
-            // Der Eintrag steht im Detail, BEVOR „Offline vorgemerkt“ verschwindet (wie beim
-            // Eintreffen); der Abruf wirft nicht.
-            await qc.invalidateQueries({
-              queryKey: einsatzKeys.person(einsatzId, aktion.person_id),
-            });
+            // Der Eintrag steht in Detail, Liste und Grundriss, BEVOR „Offline vorgemerkt“ dort
+            // verschwindet (wie beim Eintreffen); sonst stünde die Person einen Takt lang ohne
+            // Hinweis mit dem alten Stand da. Die Abrufe werfen nicht.
+            await Promise.all([
+              qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, aktion.person_id) }),
+              qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) }),
+              aktion.art === 'verbleib' && uhsId != null
+                ? qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) })
+                : undefined,
+            ]);
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
-            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
             void qc.invalidateQueries({ queryKey: einsatzKeys.personenAuswahl(einsatzId) });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
             if (aktion.art === 'verbleib') {
               void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
-              if (uhsId != null) {
-                void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
-              }
             }
           } else {
             const nie: never = aktion;

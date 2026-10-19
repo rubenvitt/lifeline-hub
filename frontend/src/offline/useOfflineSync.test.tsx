@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -845,6 +845,53 @@ describe('Einträge einer Person in der Offline-Queue (LLH-1138, design.md D8)',
     );
     expect(client.getQueryState(einsatzKeys.uhs(7))?.isInvalidated).toBe(true);
     expect(client.getQueryState(einsatzKeys.uhsDetail(7, 3))?.isInvalidated).toBe(true);
+  });
+
+  it('ein Verbleib hat Liste und UHS neu geladen, bevor „Offline vorgemerkt“ verschwindet', async () => {
+    // `frontend/src/offline/AGENTS.md`, „Was vorgemerkt ist …“: die Zeile verschwindet erst, wenn
+    // die Fachansicht den neuen Stand hat; sonst stünde die Person einen Takt lang ohne Hinweis
+    // mit dem alten Stand in Liste und Grundriss.
+    const { client, Wrapper } = wrapperFuer();
+    let stand = 'alt';
+    client.setQueryData(einsatzKeys.personen(7), [{ id: 10, aktuelle_uhs_id: 3 } as Person]);
+    client.setQueryData(einsatzKeys.uhsDetail(7, 3), { stand });
+    vi.mocked(erfasseVerbleib).mockImplementation(async () => {
+      stand = 'neu';
+      return { id: 99 } as never;
+    });
+    await schreibaktionEinreihen(BENUTZER_A, 7, aktion(faelle[1]));
+    const beimEntfernen: unknown[] = [];
+    const merke = () =>
+      beimEntfernen.push({
+        personen: client.getQueryData<(Person & { stand?: string })[]>(einsatzKeys.personen(7))?.[0]
+          ?.stand,
+        uhs: client.getQueryData<{ stand: string }>(einsatzKeys.uhsDetail(7, 3))?.stand,
+      });
+    window.addEventListener(OFFLINE_QUEUE_EVENT, merke);
+    try {
+      renderHook(
+        () => {
+          useOfflineSync(BENUTZER_A);
+          useQuery({
+            queryKey: einsatzKeys.personen(7),
+            queryFn: async () => [{ id: 10, aktuelle_uhs_id: null, stand } as Person],
+            staleTime: Infinity,
+          });
+          useQuery({
+            queryKey: einsatzKeys.uhsDetail(7, 3),
+            queryFn: async () => ({ stand }),
+            staleTime: Infinity,
+          });
+        },
+        { wrapper: Wrapper },
+      );
+      await waitFor(async () =>
+        expect(await queueZaehlerLaden(BENUTZER_A, 7)).toMatchObject({ ausstehend: 0 }),
+      );
+    } finally {
+      window.removeEventListener(OFFLINE_QUEUE_EVENT, merke);
+    }
+    expect(beimEntfernen[0]).toEqual({ personen: 'neu', uhs: 'neu' });
   });
 
   it('abgerissene Antwort: der nächste Versuch sendet dieselbe client_id, die Notiz steht einmal', async () => {
