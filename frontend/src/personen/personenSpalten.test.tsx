@@ -214,7 +214,9 @@ describe('geschlechtAlter / verbleibText', () => {
   it('schreibt Geschlecht und Alter in der Kurzform der Zeile', () => {
     expect(geschlechtAlter(basis)).toBe('m ~40');
     expect(geschlechtAlter({ ...basis, geschlecht: null, alter_geschaetzt: null })).toBeNull();
-    expect(geschlechtAlter({ ...basis, geburtsdatum: '1990-01-02' })).toBe('m 1990-01-02');
+    // Kalenderdatum als TT.MM.JJJJ (LLH-1103, D6), Altbestand roh.
+    expect(geschlechtAlter({ ...basis, geburtsdatum: '1990-01-02' })).toBe('m 02.01.1990');
+    expect(geschlechtAlter({ ...basis, geburtsdatum: 'ca. 1990' })).toBe('m ca. 1990');
   });
 
   it('nennt die Kurzform der Art, sonst die UHS beim Namen, sonst nichts', () => {

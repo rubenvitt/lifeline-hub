@@ -142,6 +142,13 @@ describe('PersonDruckPage', () => {
     }
   });
 
+  it('druckt das Geburtsdatum als TT.MM.JJJJ (LLH-1103)', async () => {
+    renderPage(() => HttpResponse.json({ ...person(), geburtsdatum: '1980-07-14' }));
+    await fertig();
+    const dt = within(wurzel()).getByText('Geburtsdatum', { selector: 'dt' });
+    expect(dt.nextElementSibling).toHaveTextContent(/^14\.07\.1980$/);
+  });
+
   it('zeigt das Körperschema schwarz-weiß: Figur ohne Fläche, Sternchen 1 bis 3 wie die Liste', async () => {
     renderPage(() => HttpResponse.json(person()));
     await fertig();

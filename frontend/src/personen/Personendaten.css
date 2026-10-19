@@ -1,0 +1,6 @@
+/* Zeile „Ohne Angabe“ mit Schreibrecht (`personen/Personendaten.tsx`, LLH-1103, design.md D5):
+   die Knöpfe „+ Name“ … stehen nebeneinander; ein geöffnetes Feld nimmt die ganze Breite der Zeile,
+   damit Eingabe, Fehlerzeile und „Speichern“ nicht zwischen den Knöpfen eingeklemmt stehen. */
+[data-lfh='ohne-angabe'] > [data-lfh='leere-angabe']:has(form) {
+  flex-basis: 100%;
+}

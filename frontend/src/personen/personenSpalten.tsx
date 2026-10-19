@@ -16,6 +16,7 @@ import { PERSON_ZUSTAND_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
 import { personDetailPfad } from '../routing/deeplinks';
 import type { Person } from '../api/types';
+import { formatKalenderdatum } from '../anzeige/kalenderdatum';
 import { STATUS_META, TRANSPORT_ART_WORT, transportRang } from './personMeta';
 import PrioritaetMarke from './PrioritaetMarke';
 import { kontamination } from '../theme/statusFarben';
@@ -59,7 +60,7 @@ import ZeilenSichtung, { type ZeilenRueckmeldung } from './ZeilenSichtung';
 
 /** Alter-Anzeige: Geburtsdatum > geschätztes Alter (mit Tilde — das Feld IST geschätzt). */
 function alterAnzeige(p: Pick<Person, 'geburtsdatum' | 'alter_geschaetzt'>): string | null {
-  if (p.geburtsdatum) return p.geburtsdatum;
+  if (p.geburtsdatum) return formatKalenderdatum(p.geburtsdatum);
   if (p.alter_geschaetzt != null) return `~${p.alter_geschaetzt}`;
   return null;
 }

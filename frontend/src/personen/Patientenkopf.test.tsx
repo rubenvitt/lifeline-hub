@@ -10,7 +10,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import { meldeServerErreichbar, verbindungZuruecksetzenFuerTests } from '../offline/verbindung';
-import Patientenkopf, { AUFHEBEN_OHNE_NETZ } from './Patientenkopf';
+import Patientenkopf, { AUFHEBEN_OHNE_NETZ, ZUSTAND_OHNE_NETZ } from './Patientenkopf';
 import { PAT_OHNE_NETZ } from './PatKennzeichen';
 
 /**
@@ -1165,5 +1165,36 @@ describe('Patientenkopf — Grenzen der Freitexte (LLH-1329)', () => {
     });
     expect(patches).toEqual([]);
     expect(within(zelle).getByRole('textbox')).toHaveValue(lang);
+  });
+});
+
+/**
+ * „Zustand / Verdacht“ ohne Netz (LLH-1103, design.md D8): gesperrt mit eigenem sichtbarem Grund;
+ * bisher pausierte die Änderung still und überschriebe nach der Rückkehr einen ungesehenen Wert.
+ *
+ * Mutationsprobe: Sperre entfernt — rot (der Knopf „… bearbeiten“ steht da).
+ */
+describe('Patientenkopf — Zustand / Verdacht ohne Netz (LLH-1103)', () => {
+  it('sperrt den Zustand ohne Netz und nennt den Grund am Feld', () => {
+    setzeOnline(false);
+    try {
+      const { kopf } = zeige({ zustand: 'gehfähig' });
+      expect(
+        within(kopf).queryByRole('button', { name: /^Zustand \/ Verdacht zu R-012/ }),
+      ).toBeNull();
+      const zelle = kopf.querySelector<HTMLElement>('[data-lfh="zustand"]')!;
+      expect(zelle).toHaveTextContent('gehfähig');
+      expect(within(kopf).getByText(ZUSTAND_OHNE_NETZ)).toBeVisible();
+    } finally {
+      setzeOnline(true);
+    }
+  });
+
+  it('mit Netz bleibt er schreibbar, ohne Grund', () => {
+    const { kopf } = zeige({ zustand: 'gehfähig' });
+    expect(
+      within(kopf).getByRole('button', { name: 'Zustand / Verdacht zu R-012 bearbeiten' }),
+    ).toBeInTheDocument();
+    expect(within(kopf).queryByText(ZUSTAND_OHNE_NETZ)).toBeNull();
   });
 });

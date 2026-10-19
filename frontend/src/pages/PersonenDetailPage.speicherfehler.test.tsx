@@ -126,8 +126,20 @@ const schaden = {
 const freierSchaden = { ...schaden, id: 51, registrier_nr: 11, geschaedigt_person_id: null };
 
 const abgelehnt = (text: string, status = 422) => HttpResponse.json({ error: text }, { status });
-/** Eine Antwort, die nie kommt: geprüft wird der Zustand, solange sie aussteht. */
-const nie = () => new Promise<never>(() => {});
+/**
+ * Eine Antwort, die im Test nie kommt: geprüft wird der Zustand, solange sie aussteht. Zum
+ * Testende antwortet sie mit einer fachlichen Ablehnung. Bliebe sie offen, liefe die Anfrage in
+ * ihr Zeitlimit und meldete MITTEN in einem späteren Test „Server nicht erreichbar“
+ * (`offline/verbindung.ts`); die Personendaten stünden dort dann gesperrt (LLH-1103).
+ */
+const ausstehend: Array<() => void> = [];
+const nie = () =>
+  new Promise<Response>((fertig) => {
+    ausstehend.push(() => fertig(abgelehnt('Testende')));
+  });
+afterEach(() => {
+  for (const loese of ausstehend.splice(0)) loese();
+});
 
 function render(
   person: PersonDetail,
@@ -155,7 +167,7 @@ function render(
       <Route path="/einsaetze/:id/personen" element={<div>LISTE</div>} />
       <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
     </Routes>,
-    { route: '/einsaetze/1/personen/10', client },
+    { route: '/einsaetze/1/personen/10', client, datenRouter: true },
   );
 }
 
@@ -181,9 +193,13 @@ async function klappeBezuegeAuf() {
 const kopf = () => screen.getByRole('region', { name: 'Patientenkopf' });
 const paneel = (name: string) => within(kopf()).getByRole('region', { name });
 
-/** Das Bearbeiten-Formular der Personendaten öffnen (Primäraktion des Seitenkopfs). */
-async function starteBearbeiten() {
-  await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+/**
+ * Den Namen in den Personendaten feldweise ändern und absenden (LLH-1103): ein Tipp auf den Wert,
+ * ein Zeichen dazu, Enter.
+ */
+async function aendereName() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Name bearbeiten' }));
+  await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'x{Enter}');
 }
 
 /**
@@ -561,62 +577,62 @@ describe('PersonenDetailPage — Stornieren mit Rückfrage (LFH-1077)', () => {
   });
 });
 
-describe('PersonenDetailPage — Bearbeiten und Notiz (LFH-1077)', () => {
-  it('Bearbeiten: der Grund steht am Formular, das Formular bleibt, kein Toast', async () => {
-    render(detail, [
-      http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Geburtsdatum ungültig')),
-    ]);
+describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', () => {
+  it('Personendaten: der Grund steht am Feld, das Feld bleibt offen, kein Toast', async () => {
+    render(detail, [http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Name zu lang'))]);
     await kopfueberschrift();
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await aendereName();
 
     const grund = await screen.findByRole('alert');
-    expect(grund).toHaveTextContent('Geburtsdatum ungültig');
+    expect(grund).toHaveTextContent('Name zu lang');
     expect(grund.closest('form')).not.toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Mustermannx');
     keinToast();
   });
 
-  it('Bearbeiten: das nächste Speichern räumt den Grund; Abbrechen ist bis dahin gesperrt', async () => {
+  it('Personendaten: das nächste Speichern räumt den Grund; Abbrechen ist bis dahin gesperrt', async () => {
     let zweiter = false;
     render(detail, [
       http.patch('/api/einsaetze/1/personen/10', async () => {
         if (zweiter) return nie();
         zweiter = true;
-        return abgelehnt('Geburtsdatum ungültig');
+        return abgelehnt('Name zu lang');
       }),
     ]);
     await kopfueberschrift();
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await screen.findByText('Geburtsdatum ungültig');
+    await aendereName();
+    await screen.findByText('Name zu lang');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(screen.queryByText('Geburtsdatum ungültig')).toBeNull());
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Name speichern' }));
+    await waitFor(() => expect(screen.queryByText('Name zu lang')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' })).toBeDisabled();
   });
 
-  it('Bearbeiten: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
-    render(detail, [
-      http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Geburtsdatum ungültig')),
-    ]);
+  it('Personendaten: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
+    render(detail, [http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Name zu lang'))]);
     await kopfueberschrift();
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await screen.findByText('Geburtsdatum ungültig');
+    await aendereName();
+    await screen.findByText('Name zu lang');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    await starteBearbeiten();
-    await screen.findByRole('button', { name: 'Speichern' });
-    expect(screen.queryByText('Geburtsdatum ungültig')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Name bearbeiten' }));
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument();
+    expect(screen.queryByText('Name zu lang')).toBeNull();
   });
 
-  it('Bearbeiten: der Sperrkonflikt (409) fragt weiter nach und steht nicht am Formular', async () => {
+  it('Personendaten: der Feldkonflikt (409) fragt nach und steht nicht am Feld', async () => {
+    let geaendert = false;
     render(detail, [
-      http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Zwischenzeitlich geändert', 409)),
+      http.get('/api/einsaetze/1/personen/10', () =>
+        HttpResponse.json(geaendert ? { ...detail, name: 'Meier' } : detail),
+      ),
+      http.patch('/api/einsaetze/1/personen/10', () => {
+        geaendert = true;
+        return abgelehnt('Das Feld wurde zwischenzeitlich geändert. Bitte neu laden.', 409);
+      }),
     ]);
     await kopfueberschrift();
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await aendereName();
 
     expect(await screen.findByRole('button', { name: 'Überschreiben' })).toBeInTheDocument();
     expect(document.querySelector('form [role="alert"]')).toBeNull();
@@ -825,7 +841,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
           <Route path="/einsaetze/:id/personen/:personId" element={<PersonenDetailPage />} />
         </Routes>
       </>,
-      { route: '/einsaetze/1/personen/10', client },
+      { route: '/einsaetze/1/personen/10', client, datenRouter: true },
     );
   }
   const zurZweiten = async () => {
@@ -833,11 +849,11 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     await screen.findByRole('heading', { name: /Person R-011/ });
   };
 
-  it('räumt Notiz-, Bearbeiten- und Austrags-Grund und den getippten Notiztext', async () => {
+  it('räumt Notiz-, Personendaten- und Austrags-Grund und den getippten Notiztext', async () => {
     renderMitWechsel({ ...detail, aktuelle_uhs_id: 5 } as PersonDetail, [
       http.post('/api/einsaetze/1/personen/10/notizen', () => abgelehnt('Person storniert')),
       http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => abgelehnt('Bereits entlassen')),
-      http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Geburtsdatum ungültig')),
+      http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Name zu lang')),
     ]);
     await kopfueberschrift();
     await userEvent.type(screen.getByRole('textbox', { name: /Verlaufsnotiz/ }), 'trinkt Wasser');
@@ -845,17 +861,19 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     await screen.findByText('Person storniert');
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
     await screen.findByText('Bereits entlassen');
-    await starteBearbeiten();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    await screen.findByText('Geburtsdatum ungültig');
+    await aendereName();
+    await screen.findByText('Name zu lang');
 
-    await zurZweiten();
+    // Der abgelehnte Name ist ein offener Entwurf: der Wechsel fragt nach (LLH-1103).
+    await userEvent.click(screen.getByRole('button', { name: 'Zur zweiten Person' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Verwerfen' }));
+    await screen.findByRole('heading', { name: /Person R-011/ });
     expect(screen.queryByText('Person storniert')).toBeNull();
     expect(screen.queryByText('Bereits entlassen')).toBeNull();
-    expect(screen.queryByText('Geburtsdatum ungültig')).toBeNull();
+    expect(screen.queryByText('Name zu lang')).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
     // Die Bearbeitung gehört zur ersten Person; ihr Speichern träfe sonst die zweite.
-    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Name speichern' })).toBeNull();
     expect(screen.getByRole('textbox', { name: /Verlaufsnotiz/ })).toHaveValue('');
   });
 
