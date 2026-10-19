@@ -120,3 +120,52 @@ test('Sichtungsboard am Handy und am Fükw ohne seitlichen Bildlauf', async ({ p
     await expect(board.getByTestId('board-spalte')).toHaveCount(7);
   }
 });
+
+test('Eigentransport aus dem Wartebereich, Übergabe aus „Unterwegs“', async ({ page }) => {
+  test.slow();
+  // Drei-Spalten-Form: Wartebereich und „Unterwegs“ stehen neben der Fläche.
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Wartebereich ${Date.now()}`);
+  await seedeFahrzeug(page, einsatzId, '1/83-1');
+  const uhs = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+    data: { typ: 'behandlungsplatz', bezeichnung: 'BHP Übergabe' },
+  });
+  expect(uhs.ok()).toBeTruthy();
+  const uhsId = ((await uhs.json()) as { id: number }).id;
+  expect(
+    (
+      await page.request.post(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/status`, {
+        data: { status: 'aktiv' },
+      })
+    ).ok(),
+  ).toBeTruthy();
+  const name = 'Grünwald-Langname, Gerlinde-Mareike';
+  await seedePerson(page, einsatzId, { name, sichtung: 'sk3', uhs_id: uhsId });
+
+  await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/${uhsId}`);
+  await page.mouse.move(0, 0);
+  const wartebereich = page.getByRole('region', { name: /Wartebereich/ });
+  const zeile = wartebereich.getByTestId('personen-zeile');
+  // Zweizeilige Zeile (design.md D8): der Name steht voll, „Verbleib“ in der zweiten Zeile.
+  await expect(zeile).toContainText(name);
+  await zeile.getByRole('button', { name: /^Verbleib \/ Entlassung erfassen — / }).click();
+
+  const maske = page.getByRole('dialog', { name: /Verbleib erfassen/ });
+  await maske.getByRole('combobox', { name: /Rettungsmittel/ }).fill('1/83');
+  await page.getByTitle('1/83-1').click();
+  await expect(maske).toContainText('Eigentransport');
+  await maske.getByLabel('Ziel').fill('KH Mitte');
+  await maske.getByRole('button', { name: 'Erfassen', exact: true }).click();
+
+  const unterwegs = page.getByTestId('unterwegs-zeile');
+  await expect(unterwegs).toHaveCount(1);
+  await expect(unterwegs).toContainText('1/83-1');
+  await expect(zeile).toHaveCount(0);
+
+  await unterwegs.getByRole('button', { name: /^Übergabe quittieren — / }).click();
+  const quittung = page.getByRole('dialog', { name: /Übergabe/ });
+  await expect(quittung.getByLabel('Ziel')).toHaveValue('KH Mitte');
+  await quittung.getByRole('button', { name: 'Übergabe quittieren' }).click();
+  await expect(unterwegs).toHaveCount(0);
+});
