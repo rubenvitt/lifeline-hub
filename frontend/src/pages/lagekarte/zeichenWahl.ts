@@ -58,7 +58,7 @@ import {
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
 
 /**
- * Deutsche Namen der 27 Grundzeichenarten, wie die Lagekarte sie nennt. Eine Hub-Tabelle (D7):
+ * Deutsche Namen der 29 Grundzeichenarten, wie die Lagekarte sie nennt. Eine Hub-Tabelle (D7):
  * die Bezeichnungen der Bibliothek (`symbolKindChoiceLabel`) sind geometrisch („12-mm-Kreis“,
  * „Konkreter Punkt“) und bleiben Suchbegriff neben dem Namen.
  */
@@ -90,6 +90,8 @@ export const GRUNDZEICHEN_NAMEN: Record<SymbolKind, string> = {
   'swap-container': 'Wechselbehälter',
   'swap-body': 'Wechselbrücke',
   'wheeled-container': 'Rollcontainer',
+  'two-wheeler': 'Zweirad',
+  'motorized-two-wheeler': 'Kraftrad',
 };
 
 /** Weitere Alltagsbegriffe für die Suche, wo Name und Bibliothek sie nicht tragen. */
@@ -100,6 +102,8 @@ const GRUNDZEICHEN_SUCHE: Partial<Record<SymbolKind, string>> = {
   event: 'Anlass Schadensereignis',
   'circle-12': 'Einrichtung',
   formation: 'Einheit',
+  'two-wheeler': 'Fahrrad',
+  'motorized-two-wheeler': 'Motorrad Krad',
 };
 
 /** Deutsche Namen der Palettenfarben (`TECHNICAL_FILL_TOKENS`). */

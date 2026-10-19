@@ -1,6 +1,6 @@
 {
   "_erzeugt": "frontend/scripts/zeichen-werte.mjs aus @einsatzzeichen (LFH-836) — nicht von Hand ändern, neu erzeugen mit: mise exec -- pnpm -C frontend zeichen-werte",
-  "bibliothek": "6.1.0",
+  "bibliothek": "6.4.0",
   "formatVersion": 1,
   "freestanding": {
     "animal-state": {
@@ -482,6 +482,8 @@
           "fire-fighting",
           "foam-agent",
           "forklift-lifting",
+          "formation-chevron-18mm",
+          "formation-chevron-18mm-over-notched-line",
           "formation-chevron-top",
           "formation-hooked-crossed-disks-over-lowered-wave-diamond",
           "formation-opposed-triangles-top",
@@ -631,6 +633,8 @@
           "fire-fighting",
           "foam-agent",
           "forklift-lifting",
+          "formation-chevron-18mm",
+          "formation-chevron-18mm-over-notched-line",
           "formation-chevron-top",
           "formation-hooked-crossed-disks-over-lowered-wave-diamond",
           "formation-opposed-triangles-top",
@@ -877,6 +881,7 @@
           "formation",
           "hazard",
           "measure",
+          "motorized-two-wheeler",
           "person",
           "point",
           "post",
@@ -891,6 +896,7 @@
           "swap-container-trailer",
           "swap-loader-vehicle",
           "trailer",
+          "two-wheeler",
           "upright-rectangle",
           "vehicle-air",
           "vehicle-land",
