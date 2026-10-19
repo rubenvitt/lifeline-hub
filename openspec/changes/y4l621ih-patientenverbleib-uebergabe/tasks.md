@@ -36,8 +36,8 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
 ## 5. Sichtungsboard
 
-- [ ] 5.1 Test zuerst, dann umsetzen: `personen/Sichtungsboard.tsx` nach D9 (feste Spalten, Farbkopf mit Wort und Zahl, Karte mit Kennung, PAT-Nummer, Name, „gesichtet vor“, Aufenthalt, Priorität, Kontamination; Folge nach Sichtungszeit; Zuflussschleuse). Prüfung: Vitest für „Leere Kategorie“, „Patient im Eigentransport“, „Folge nach Wartezeit“, „Neue Sichtung unter dem Zeiger“ grün.
-- [ ] 5.2 Bedienung: Karte als Link zur Detailseite, Sichtungsmarke mit `ZeilenSichtung`-Popover nur mit Schreibrecht, Bedienziele in Steuerhöhe; Zweig `raster` in `pages/PersonenPage.tsx` nutzt das Board, bestehende Raster-Tests in `PersonenPage.test.tsx` und `personenFilter.test.ts` auf das Board umgestellt. Prüfung: Vitest grün, axe ohne `nested-interactive`.
+- [x] 5.1 Test zuerst, dann umsetzen: `personen/Sichtungsboard.tsx` nach D9 (feste Spalten, Farbkopf mit Wort und Zahl, Karte mit Kennung, PAT-Nummer, Name, „gesichtet vor“, Aufenthalt, Priorität, Kontamination; Folge nach Sichtungszeit; Zuflussschleuse). Prüfung: Vitest für „Leere Kategorie“, „Patient im Eigentransport“, „Folge nach Wartezeit“, „Neue Sichtung unter dem Zeiger“ grün.
+- [x] 5.2 Bedienung: Karte als Link zur Detailseite, Sichtungsmarke mit `ZeilenSichtung`-Popover nur mit Schreibrecht, Bedienziele in Steuerhöhe; Zweig `raster` in `pages/PersonenPage.tsx` nutzt das Board, bestehende Raster-Tests in `PersonenPage.test.tsx` und `personenFilter.test.ts` auf das Board umgestellt. Prüfung: Vitest grün, axe ohne `nested-interactive`.
 - [ ] 5.3 Schmaler Schirm: ab `lg` nebeneinander mit eigenem Bildlauf, darunter gestapelt und einklappbar, leere eingeklappt. Prüfung: e2e-Fall bei 390 px und 1440 × 900 ohne seitlichen Bildlauf grün (`e2e/betroffene-handy.spec.ts` erweitert).
 
 ## 6. Regeln und Anwenderdoku

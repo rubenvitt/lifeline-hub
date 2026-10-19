@@ -201,8 +201,8 @@ wird `unterwegsAus` und liest `versorgung` statt der Kurzform; `uhsLage` zählt 
 Folge `SICHTUNGSBILD_REIHE`, **alle immer sichtbar** (eine leere Spalte schmal mit „0“): eine
 stehende Folge springt bei Live-Updates nicht. Spaltenkopf: Sichtungsfarbe als Fläche nach
 `sichtungsfarben` plus Wort und Zahl (zweiter Kanal). Karte: Kennung (Mono) und PAT-Nummer,
-Name, „gesichtet vor n min“ (`useMinutenTakt`), Aufenthalt (UHS und Platz, Wartebereich, Fundort,
-„unterwegs · 1/83-1“), `PrioritaetMarke`, Marke „kontaminiert“. Innerhalb der Spalte die älteste
+Name, „gesichtet vor n min“ (`useMinutenTakt`), Aufenthalt (UHS, Verbleib-Kurzform wie
+„Eigentransport 1/83-1 → KH“, sonst Fundort), `PrioritaetMarke`, Marke „kontaminiert“. Innerhalb der Spalte die älteste
 Sichtung oben (wie bisher). Die Karte ist ein Link zur Detailseite; das Umsichten geht über die
 Sichtungsmarke der Karte (`ZeilenSichtung`-Popover, gleicher Schreibweg). Die Folge hält die
 Zuflussschleuse wie in `PersonenSpalte` (`useZuflussSchleuse`). Ab `lg` stehen die Spalten

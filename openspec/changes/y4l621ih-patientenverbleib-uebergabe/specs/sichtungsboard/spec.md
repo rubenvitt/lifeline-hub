@@ -25,12 +25,12 @@ dieselbe Personenmenge gelten wie in der Ansicht „Zeilen“ (Statusfilter, Lü
 ### Requirement: Karte je Person
 Jede Person SHALL als Karte mit Kennung, PAT-Nummer (falls vorhanden), Name (sonst „unbekannt“),
 der Zeit seit der Sichtung, dem Aufenthalt und der Transportpriorität erscheinen. Der Aufenthalt
-MUST UHS und Platz, Wartebereich, Fundort oder „unterwegs · <Fahrzeug>“ nennen. Innerhalb der
+MUST die UHS, den Verbleib (im Eigentransport mit Fahrzeug) oder den Fundort nennen. Innerhalb der
 Spalte MUST die am längsten zurückliegende Sichtung oben stehen.
 
 #### Scenario: Patient im Eigentransport
 - **WHEN** R-011 in SK III mit Eigentransport „1/83-1“ unterwegs ist
-- **THEN** zeigt seine Karte in der Spalte SK III „unterwegs · 1/83-1“
+- **THEN** zeigt seine Karte in der Spalte SK III „Eigentransport 1/83-1 → KH Mitte“
 
 #### Scenario: Folge nach Wartezeit
 - **WHEN** R-009 vor 20 min und R-008 vor 5 min mit SK II gesichtet wurden

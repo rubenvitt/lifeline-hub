@@ -43,20 +43,20 @@ import {
   SICHT_VORGABE,
   filterPersonen,
   gefundenePersonen,
-  rasterSchluessel,
   sichtFuerNeuePerson,
   sichtNachSprung,
   type PersonenAnsicht,
   type PersonenFilter,
   type PersonenSicht,
 } from '../personen/personenFilter';
-import { hatLuecke, istAbgeschlossen, SICHTUNGSBILD_REIHE } from '../personen/personenBilanz';
+import { hatLuecke, istAbgeschlossen } from '../personen/personenBilanz';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
 import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
 import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
+import Sichtungsboard from '../personen/Sichtungsboard';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
 import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
@@ -762,13 +762,6 @@ export default function PersonenPage() {
     }),
     [bedienung, selectZeilenAktion],
   );
-  const rasterKarte = useMemo(
-    () => ({
-      ...personenKarte(einsatzId),
-      weitere: darfSchreibenListe ? kartenMenue : undefined,
-    }),
-    [einsatzId, darfSchreibenListe, kartenMenue],
-  );
   const listenKarte = useMemo(
     () => ({
       ...personenKarte(einsatzId),
@@ -1127,41 +1120,22 @@ export default function PersonenPage() {
               </Suspense>
             ) : sicht.ansicht === 'raster' ? (
               /**
-               * Sichtungsraster: alle Personen der Filtermenge nach Sichtung gruppiert, samt
-               * „unverletzt" und „ohne Sichtung". Eine Sicht mit Gruppenachse statt n Tabellen:
-               * eine Kopfzeile, eine fixierte Kennungsspalte, ein Spaltenschalter. Innerhalb der
-               * Kategorie der älteste Sichtungszeitpunkt zuerst — wer am längsten wartet, steht
-               * oben.
+               * Sichtungsraster als Board (LLH-1332, Spec `sichtungsboard`): eine Spalte je
+               * Kategorie, Karten je Person, dieselbe Menge wie die Zeilen. Innerhalb der Spalte
+               * die älteste Sichtung zuerst — wer am längsten wartet, steht oben.
                */
-              <Datensicht
-                /**
-                 * `key` ist nötig: beide Ansichten stehen an derselben Stelle im Baum mit demselben
-                 * Komponententyp, React reichte sonst die Instanz samt Sortierung, Suchbegriff und
-                 * Zeilenschleuse weiter — die Dringlichkeitsordnung nach `seit` griffe nie.
-                 * `datensicht.guard.test.ts` hält die Regel fest.
-                 */
-                key={`raster-${sicht.filter}`}
-                bezeichnung="Betroffene nach Sichtungskategorie"
-                spalten={register}
-                daten={zeilen}
-                zeilenSchluessel="id"
-                ladend={personenQuery.isLoading}
-                leerText={leerText}
-                standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
-                gruppen={{
-                  schluessel: rasterSchluessel,
-                  etikett: (sk) =>
-                    sk === 'ohne' ? 'ohne Sichtung' : SK_META[sk as Sichtungskategorie].label,
-                  reihenfolge: [...SICHTUNGSBILD_REIHE],
-                  // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
-                  unterEbene: 1,
-                }}
-                onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
-                zeilenKlasse={zeilenKlasse}
-                karte={rasterKarte}
-                zeilenFehler={zeilenGrund}
-                halten={halten}
-              />
+              personenQuery.isLoading ? (
+                <SeitenSkeleton />
+              ) : (
+                <Sichtungsboard
+                  einsatzId={einsatzId}
+                  personen={zeilen}
+                  uhsName={uhsName}
+                  bedienung={bedienung}
+                  halten={halten}
+                  leerText={leerText}
+                />
+              )
             ) : (
               <Datensicht
                 /**
