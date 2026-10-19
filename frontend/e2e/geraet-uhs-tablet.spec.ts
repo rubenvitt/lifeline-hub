@@ -183,6 +183,89 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
   expect(eintrag?.erfasser_name).toBe('UHS Nord · Tablet 1');
 });
 
+/**
+ * Bediener am Gerät auch für Verletzungen (Change `y18v58dt-pat-kern`, Spec `geraete-kopplung`,
+ * „Namentliche Bestätigung am Gerät“): am Tablet markiert jemand eine Verletzung am Körperschema
+ * und nennt unter „Bestätigt von“ die Notärztin. Der Server speichert Name und Kennung am
+ * Eintrag, der Verlauf nennt sie, Erfasser bleibt das Gerät; ins ETB kommt keine Verletzung.
+ *
+ * Mutationsprobe: in `Koerperschema.tsx` `<BestaetigtVonFeld>` entfernt → das Feld fehlt (rot).
+ */
+test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, browser }) => {
+  await anmeldenAlsAdmin(page);
+  const e = (
+    await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Verletzung Gerät ${Date.now()}` })
+  ).id;
+  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+    typ: 'behandlungsplatz',
+    bezeichnung: 'UHS Nord',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/einsaetze/${e}/personal`, {
+    adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
+  });
+  const person = await anlegen(page, `/api/einsaetze/${e}/personen`, {
+    name: 'Patient',
+    geschlecht: 'weiblich',
+    sichtung: 'sk2',
+    uhs_id: nord.id,
+  });
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+    ansicht: 'uhs-tablet',
+    uhs_id: nord.id,
+    bezeichnung: 'Tablet 1',
+  });
+
+  const kontext = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    hasTouch: true,
+  });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/patienten$`));
+
+    await tablet.goto(`/geraet/${e}/patienten/${person.id}`);
+    const kopf = tablet.getByRole('region', { name: 'Patientenkopf' });
+    await kopf.getByRole('button', { name: 'Verletzung markieren' }).click();
+    const paneel = tablet.getByRole('region', { name: 'Verletzung markieren' });
+    await expect(tablet.getByRole('dialog')).toHaveCount(0);
+    // Erster Tipp: die Region; die Wahl der Art trägt „Bestätigt von“ ohne Vorauswahl.
+    await paneel.getByRole('button', { name: 'Unterarm links, vorn' }).click();
+    const wahl = paneel.getByRole('group', { name: 'Verletzung an Unterarm links, vorn' });
+    const bestaetigt = wahl.getByRole('combobox', { name: 'Bestätigt von' });
+    await expect(bestaetigt).toHaveValue('');
+    await waehleIn(bestaetigt, 'Dr. A. Muster · Notärztin');
+    // Zweiter Tipp: die Art speichert.
+    await wahl.getByRole('radio', { name: 'Fraktur-Verdacht' }).click();
+    await expect(
+      paneel.getByRole('button', {
+        name: 'Verletzung 1, Unterarm links, vorn · Fraktur-Verdacht',
+      }),
+    ).toBeVisible();
+    // Der Verlauf nennt die bestätigende Person an der Verletzung.
+    await expect(tablet.getByText('· bestätigt: Dr. A. Muster')).toBeVisible();
+  } finally {
+    await kontext.close();
+  }
+
+  const detail = (await (
+    await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+  ).json()) as {
+    verletzungen: { region: string; bestaetigt_name?: string }[];
+  };
+  expect(detail.verletzungen).toHaveLength(1);
+  expect(detail.verletzungen[0]).toMatchObject({
+    region: 'unterarm_l',
+    bestaetigt_name: 'Dr. A. Muster',
+  });
+  const etb = (await (await page.request.get(`/api/einsaetze/${e}/etb`)).json()) as {
+    inhalt: string;
+  }[];
+  expect(etb.some((x) => /Unterarm|Fraktur/.test(x.inhalt))).toBe(false);
+});
+
 /** Backend-Zeit „YYYY-MM-DD HH:MM:SS“ (UTC) in Millisekunden. */
 const ms = (zeit: string) => Date.parse(`${zeit.replace(' ', 'T')}Z`);
 
