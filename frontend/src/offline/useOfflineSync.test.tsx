@@ -783,7 +783,7 @@ describe('Einträge einer Person in der Offline-Queue (LLH-1138, design.md D8)',
     {
       art: 'verletzung' as const,
       api: createVerletzung,
-      daten: { ansicht: 'vorn' as const, region: 'kopf' as const, art: 'wunde' as const },
+      daten: { ansicht: 'vorn' as const, region: 'kopf' as const, art: 'wunde_blutung' as const },
     },
   ];
   const aktion = <F extends (typeof faelle)[number]>(f: F) =>

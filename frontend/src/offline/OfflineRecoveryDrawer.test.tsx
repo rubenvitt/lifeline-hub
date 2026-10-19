@@ -276,7 +276,7 @@ describe('OfflineRecoveryDrawer: abgelehnte Einträge einer Person (LLH-1138, de
     ['massnahme', { art: 'zugang' }, 'Abgelehnte Maßnahme: R-012'],
     [
       'verletzung',
-      { ansicht: 'vorn', region: 'kopf', art: 'wunde' },
+      { ansicht: 'vorn', region: 'kopf', art: 'wunde_blutung' },
       'Abgelehnte Verletzung: R-012',
     ],
   ] as const)(

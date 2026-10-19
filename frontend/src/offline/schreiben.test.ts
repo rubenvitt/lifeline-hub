@@ -548,7 +548,7 @@ describe('offlinefähige Einträge einer Person (LLH-1138, design.md D8)', () =>
       eingabe: {
         ansicht: 'vorn' as const,
         region: 'kopf' as const,
-        art: 'wunde' as const,
+        art: 'wunde_blutung' as const,
         x: 0.5,
         y: 0.1,
         bestaetigt_personal_id: 5,
