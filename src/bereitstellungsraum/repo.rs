@@ -340,13 +340,22 @@ pub async fn storniere(
     })
 }
 
-/// Wie [`storniere`] auf einer offenen Transaktion.
+/// Wie [`storniere`] auf einer offenen Transaktion. Erst gehört der Raum zum Einsatz und steht
+/// noch (fremd 404, storniert 409), dann zählen die Sperren: so verrät ein fremder Raum weder
+/// Belegung noch Material.
 pub async fn storniere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
+    if laden_tx(&mut *conn, einsatz_id, id)
+        .await?
+        .storniert_at
+        .is_some()
+    {
+        return Err(AppError::Conflict("BR ist bereits storniert".into()));
+    }
     let belegt = aktive_belegungen_tx(&mut *conn, id).await?;
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
@@ -355,6 +364,7 @@ pub async fn storniere_tx(
     }
     let material = crate::material::ort::count_posten_tx(
         &mut *conn,
+        einsatz_id,
         crate::material::ort::MaterialOrt::Bereitstellungsraum(id),
     )
     .await?;
@@ -1022,6 +1032,44 @@ mod tests {
             .unwrap();
         storniere(&pool, e, br.id, b).await.unwrap();
         assert!(laden(&pool, e, br.id).await.unwrap().storniert_at.is_some());
+    }
+
+    /// LLH-1249 (Review): Die Sperren zählen erst, wenn der Raum zum Einsatz gehört und noch
+    /// steht. Ein fremder Raum mit Material bleibt 404 und verrät seine Posten nicht; ein schon
+    /// stornierter bleibt 409.
+    #[tokio::test]
+    async fn storniere_fremd_oder_storniert_vor_der_materialsperre() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let fremd_e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, begonnen_at, einsatzart, angelegt_at) \
+             VALUES (1, 'Andere Lage', 'aktiv', '2026-05-28', 'realeinsatz', '2026-05-28') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let fremd = create(&pool, fremd_e, b, neu("BR fremd")).await.unwrap();
+        let eigen = create(&pool, e, b, neu("BR eigen")).await.unwrap();
+        storniere(&pool, e, eigen.id, b).await.unwrap();
+        for (einsatz, br) in [(fremd_e, fremd.id), (e, eigen.id)] {
+            sqlx::query(
+                "INSERT INTO einsatz_material (einsatz_id, br_id, snap_bezeichnung, menge, art) \
+                 VALUES (?, ?, 'Feldbett', 1, 'geraet')",
+            )
+            .bind(einsatz)
+            .bind(br)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let err = storniere(&pool, e, fremd.id, b).await.unwrap_err();
+        assert!(matches!(err, AppError::NotFound), "{err:?}");
+        let err = storniere(&pool, e, eigen.id, b).await.unwrap_err();
+        assert!(
+            matches!(&err, AppError::Conflict(m) if m == "BR ist bereits storniert"),
+            "{err:?}"
+        );
     }
 
     #[tokio::test]

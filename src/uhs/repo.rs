@@ -281,18 +281,27 @@ pub async fn storniere(
     id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    storniere_tx(&mut conn, einsatz_id, id, geaendert_von).await
+    crate::write_retry!(pool, |conn| {
+        storniere_tx(conn, einsatz_id, id, geaendert_von).await
+    })
 }
 
 /// Wie [`storniere`] auf einer offenen Transaktion (LFH-1045: der Handler löst die Kräfte der
-/// UHS im selben Schreibvorgang).
+/// UHS im selben Schreibvorgang). Erst gehört die UHS zum Einsatz und steht noch (fremd 404,
+/// storniert 409), dann zählen die Sperren.
 pub async fn storniere_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
+    if laden_tx(&mut *conn, einsatz_id, id)
+        .await?
+        .storniert_at
+        .is_some()
+    {
+        return Err(AppError::Conflict("UHS ist bereits storniert".into()));
+    }
     let belegt = aktive_belegungen_tx(&mut *conn, id).await?;
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
@@ -301,6 +310,7 @@ pub async fn storniere_tx(
     }
     let material = crate::material::ort::count_posten_tx(
         &mut *conn,
+        einsatz_id,
         crate::material::ort::MaterialOrt::Uhs(id),
     )
     .await?;

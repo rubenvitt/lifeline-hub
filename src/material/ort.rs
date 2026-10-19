@@ -213,11 +213,12 @@ pub async fn set_ort_tx(
     Ok(wechsel)
 }
 
-/// Wie viele Posten liegen noch an diesem Ort? Gezählt wird nur Material im Einsatz
+/// Wie viele Posten des Einsatzes liegen noch an diesem Ort? Gezählt wird nur Material im Einsatz
 /// (`beendet_at IS NULL`). Storno von UHS und Bereitstellungsraum lehnt ab, solange es welche gibt
 /// (LLH-1249), sonst zeigte ein Posten auf einen stornierten Ort.
 pub async fn count_posten_tx(
     conn: &mut SqliteConnection,
+    einsatz_id: i64,
     ort: MaterialOrt,
 ) -> Result<i64, AppError> {
     let (spalte, id) = match ort {
@@ -227,8 +228,10 @@ pub async fn count_posten_tx(
         MaterialOrt::Bereitstellungsraum(id) => ("br_id", id),
     };
     Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-        "SELECT COUNT(*) FROM einsatz_material WHERE {spalte} = ? AND beendet_at IS NULL"
+        "SELECT COUNT(*) FROM einsatz_material \
+         WHERE einsatz_id = ? AND {spalte} = ? AND beendet_at IS NULL"
     )))
+    .bind(einsatz_id)
     .bind(id)
     .fetch_one(&mut *conn)
     .await?)
