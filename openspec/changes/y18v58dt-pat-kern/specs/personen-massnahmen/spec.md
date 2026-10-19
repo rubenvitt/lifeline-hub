@@ -42,11 +42,16 @@ Warnung.
 
 Eine Maßnahme SHALL sich genau einmal aufheben lassen, mit Zeitpunkt und Aufhebendem. Ein zweites
 Aufheben MUST 409 ergeben, auch bei gleichzeitigen Anfragen. Das Detail MUST aufgehobene Maßnahmen
-als solche liefern.
+als solche liefern. Weil das Aufheben keinen Rückweg hat, MUST die Oberfläche vor dem Senden
+zurückfragen.
 
 #### Scenario: Irrtum korrigieren
 - **WHEN** eine versehentlich erfasste „Infusion“ aufgehoben wird
 - **THEN** steht sie im Verlauf als aufgehoben, und der Patientenkopf zählt sie nicht mehr
+
+#### Scenario: Fehltipp auf „Aufheben“
+- **WHEN** jemand im Maßnahme-Paneel auf „Aufheben“ tippt und die Rückfrage verneint
+- **THEN** wird nichts gesendet, und die Maßnahme bleibt gültig
 
 ### Requirement: Maßnahmen bleiben aus ETB und Live-Kanal heraus
 
