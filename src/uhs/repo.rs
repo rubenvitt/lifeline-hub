@@ -273,7 +273,8 @@ pub async fn setze_status(
 }
 
 /// Soft-Delete der UHS. Identische Belegungs-Vorbedingung wie `aufgeloest`
-/// (Annahme 6): aktiv belegt → `Conflict`. Doppel-Storno → `Conflict`.
+/// (Annahme 6): aktiv belegt → `Conflict`; Material an der UHS → `UnprocessableEntity`
+/// (LLH-1249). Doppel-Storno → `Conflict`.
 pub async fn storniere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -296,6 +297,16 @@ pub async fn storniere_tx(
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
             "Storno nicht möglich — noch {belegt} Person(en) belegt"
+        )));
+    }
+    let material = crate::material::ort::count_posten_tx(
+        &mut *conn,
+        crate::material::ort::MaterialOrt::Uhs(id),
+    )
+    .await?;
+    if material > 0 {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Storno nicht möglich — noch {material} Material-Posten an der UHS; erst lösen"
         )));
     }
     crate::storno::storniere(
@@ -590,6 +601,60 @@ mod tests {
         let err = storniere(&pool, e, u.id, b).await.unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
         let _ = p; // unbenutzt — nur als Belegungs-Quelle
+    }
+
+    /// LLH-1249: Material an der UHS sperrt den Storno (422 mit Grund), sonst zeigte der Posten
+    /// auf einen stornierten Ort. Nichts wird geschrieben; beendetes Material zählt nicht, und
+    /// nach dem Lösen geht der Storno.
+    #[tokio::test]
+    async fn storniere_mit_material_an_der_uhs_ist_422() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let u = anlegen(&pool, e, b, daten("behandlungsplatz", "BHP Material"))
+            .await
+            .unwrap();
+        let posten = |beendet: bool| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_material (einsatz_id, uhs_id, snap_bezeichnung, menge, \
+                        art, beendet_at, beendet_als) \
+                     VALUES (?, ?, 'Wolldecke', 20, 'verbrauchsgut', ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(u.id)
+                .bind(beendet.then_some("2026-05-28 10:00:00"))
+                .bind(beendet.then_some("entlassen"))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        posten(true).await;
+        let an_uhs = posten(false).await;
+
+        let err = storniere(&pool, e, u.id, b).await.unwrap_err();
+        assert!(
+            matches!(&err, AppError::UnprocessableEntity(m)
+                if m == "Storno nicht möglich — noch 1 Material-Posten an der UHS; erst lösen"),
+            "{err:?}"
+        );
+        assert!(laden(&pool, e, u.id).await.unwrap().storniert_at.is_none());
+        let ort: Option<i64> =
+            sqlx::query_scalar("SELECT uhs_id FROM einsatz_material WHERE id = ?")
+                .bind(an_uhs)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ort, Some(u.id), "der Posten bleibt an der UHS");
+
+        sqlx::query("UPDATE einsatz_material SET uhs_id = NULL WHERE id = ?")
+            .bind(an_uhs)
+            .execute(&pool)
+            .await
+            .unwrap();
+        storniere(&pool, e, u.id, b).await.unwrap();
+        assert!(laden(&pool, e, u.id).await.unwrap().storniert_at.is_some());
     }
 
     #[tokio::test]

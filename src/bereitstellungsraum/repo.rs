@@ -327,22 +327,44 @@ pub async fn setze_status(
 }
 
 /// Soft-Delete des BR. Blockt mit `Conflict`, wenn aktive Belegung existiert
-/// (Einheit oder Fahrzeug). Doppel-Storno → `Conflict`.
+/// (Einheit oder Fahrzeug), und mit `UnprocessableEntity`, solange Material im Raum liegt
+/// (LLH-1249). Doppel-Storno → `Conflict`. Prüfen und Schreiben laufen in einer Transaktion.
 pub async fn storniere(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     geaendert_von: i64,
 ) -> Result<(), AppError> {
-    let mut conn = pool.acquire().await?;
-    let belegt = aktive_belegungen_tx(&mut conn, id).await?;
+    crate::write_retry!(pool, |conn| {
+        storniere_tx(conn, einsatz_id, id, geaendert_von).await
+    })
+}
+
+/// Wie [`storniere`] auf einer offenen Transaktion.
+pub async fn storniere_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+    geaendert_von: i64,
+) -> Result<(), AppError> {
+    let belegt = aktive_belegungen_tx(&mut *conn, id).await?;
     if belegt > 0 {
         return Err(AppError::Conflict(format!(
             "Storno nicht möglich — noch {belegt} Einheit(en)/Fahrzeug(e) belegt"
         )));
     }
+    let material = crate::material::ort::count_posten_tx(
+        &mut *conn,
+        crate::material::ort::MaterialOrt::Bereitstellungsraum(id),
+    )
+    .await?;
+    if material > 0 {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Storno nicht möglich — noch {material} Material-Posten im BR; erst lösen"
+        )));
+    }
     crate::storno::storniere(
-        &mut conn,
+        &mut *conn,
         "bereitstellungsraum",
         "einsatz_id",
         einsatz_id,
@@ -948,6 +970,58 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, AppError::Conflict(_)));
+    }
+
+    /// LLH-1249: Material im Raum sperrt den Storno (422 mit Grund), sonst zeigte der Posten auf
+    /// einen stornierten Ort. Nichts wird geschrieben; beendetes Material zählt nicht, und nach
+    /// dem Lösen geht der Storno.
+    #[tokio::test]
+    async fn storniere_mit_material_im_raum_ist_422() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let br = create(&pool, e, b, neu("BR Material")).await.unwrap();
+        let posten = |beendet: bool| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO einsatz_material (einsatz_id, br_id, snap_bezeichnung, menge, \
+                        art, beendet_at, beendet_als) \
+                     VALUES (?, ?, 'Feldbett', 1, 'geraet', ?, ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(br.id)
+                .bind(beendet.then_some("2026-05-28 10:00:00"))
+                .bind(beendet.then_some("entlassen"))
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        posten(true).await;
+        let im_raum = posten(false).await;
+
+        let err = storniere(&pool, e, br.id, b).await.unwrap_err();
+        assert!(
+            matches!(&err, AppError::UnprocessableEntity(m)
+                if m == "Storno nicht möglich — noch 1 Material-Posten im BR; erst lösen"),
+            "{err:?}"
+        );
+        assert!(laden(&pool, e, br.id).await.unwrap().storniert_at.is_none());
+        let ort: Option<i64> =
+            sqlx::query_scalar("SELECT br_id FROM einsatz_material WHERE id = ?")
+                .bind(im_raum)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(ort, Some(br.id), "der Posten bleibt im Raum");
+
+        sqlx::query("UPDATE einsatz_material SET br_id = NULL WHERE id = ?")
+            .bind(im_raum)
+            .execute(&pool)
+            .await
+            .unwrap();
+        storniere(&pool, e, br.id, b).await.unwrap();
+        assert!(laden(&pool, e, br.id).await.unwrap().storniert_at.is_some());
     }
 
     #[tokio::test]

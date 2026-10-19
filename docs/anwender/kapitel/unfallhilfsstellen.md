@@ -130,7 +130,9 @@ dann wieder unter „Noch nicht aufgenommen“.
    Stelle ist, steht der Knopf als „Auflösen (noch … Personen)“ gesperrt.
 2. „Auflösen“ wählen und die Rückfrage „Unfallhilfsstelle auflösen?“ bestätigen.
 
-Eine Stelle, die noch „geplant“ ist, wird stattdessen mit „Stornieren“ verworfen.
+Eine Stelle, die noch „geplant“ ist, wird stattdessen mit „Stornieren“ verworfen. Liegt dort noch
+Material, lehnt die App den Storno ab und nennt den Grund über der Seite; erst die Posten unter
+„Material“ mit „Lösen“ von der Stelle nehmen.
 
 ## Hintergrund
 
