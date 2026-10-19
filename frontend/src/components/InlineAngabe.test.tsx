@@ -626,3 +626,50 @@ describe('InlineAngabe · Knopfabstand', () => {
     expect(reihe).toHaveClass('ant-space-gap-col-middle');
   });
 });
+
+/**
+ * Sperrgrund an anderer Stelle (LLH-1103, Entscheidung des Orchestrators zu D8): EIN Grund am Kopf
+ * eines Abschnitts statt einer Zeile je Feld. Das Feld ist gesperrt und verweist nur auf ihn.
+ *
+ * Mutationsprobe: externe Kennung nicht ins `aria-describedby` — rot in „verweist auf den Grund“.
+ */
+describe('InlineAngabe · Sperrgrund an anderer Stelle', () => {
+  it('gesperrt, ohne eigene Zeile, verweist auf den Grund', async () => {
+    const { rerender } = renderMitProviders(
+      <>
+        <div id="grund-oben">Ohne Verbindung nicht änderbar</div>
+        <TextAngabe wert="ILS-1" gesperrt={{ beschreibungId: 'grund-oben' }} />
+      </>,
+    );
+    const knopf = screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('ILS-1 Ohne Verbindung nicht änderbar');
+    expect(screen.getAllByText('Ohne Verbindung nicht änderbar')).toHaveLength(1);
+
+    rerender(
+      <>
+        <div id="grund-oben">Ohne Verbindung nicht änderbar</div>
+        <TextAngabe wert="" gesperrt={{ beschreibungId: 'grund-oben' }} />
+      </>,
+    );
+    const leer = screen.getByRole('button', { name: 'Leitstellen-Nr. eintragen' });
+    expect(leer).toBeDisabled();
+    expect(leer).toHaveAccessibleDescription('Ohne Verbindung nicht änderbar');
+  });
+});
+
+/**
+ * `onOeffnen` (LLH-1103, D1): der Aufrufer hält beim Öffnen den Serverstand fest, gegen den der
+ * Feld-CAS vergleicht; ein späterer Refetch ändert ihn nicht mehr.
+ */
+describe('InlineAngabe · onOeffnen', () => {
+  it('meldet jedes Öffnen, nicht das Schließen', async () => {
+    const onOeffnen = vi.fn();
+    renderMitProviders(<TextAngabe wert="ILS-1" onOeffnen={onOeffnen} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }));
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+    await user.keyboard('{Escape}');
+    expect(onOeffnen).toHaveBeenCalledTimes(1);
+  });
+});

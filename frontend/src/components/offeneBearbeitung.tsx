@@ -20,7 +20,7 @@ import VerlassenRueckfrage from './VerlassenRueckfrage';
  * hält höchstens EINE offene, geänderte Bearbeitung. Solange es sie gibt,
  * - hält `VerlassenRueckfrage` jeden Pfadwechsel an („Bleiben“/„Verwerfen“), und der Merker
  *   `useFormularVerlassenSchutz` warnt beim Schließen oder Neuladen des Tabs;
- * - bekommt jedes andere angemeldete Feld den Sperrgrund „Erst „Name“ speichern oder verwerfen“.
+ * - bekommt jedes andere angemeldete Feld den Sperrgrund „Erst „Name“ speichern oder abbrechen“.
  *
  * ```tsx
  * <OffeneBearbeitungProvider aktiv={darfSchreiben} schluessel={personId}>
@@ -47,7 +47,7 @@ import VerlassenRueckfrage from './VerlassenRueckfrage';
 
 /** Sperrgrund für die übrigen Felder; wenige Wörter (`frontend/AGENTS.md`, „Texte“). */
 export function sperrGrundOffeneBearbeitung(etikett: string): string {
-  return `Erst „${etikett}“ speichern oder verwerfen`;
+  return `Erst „${etikett}“ speichern oder abbrechen`;
 }
 
 interface Eintrag {
@@ -143,4 +143,14 @@ export function useOffeneBearbeitung(etikett: string): OffeneBearbeitung {
   const gesperrt =
     halter && !kontext?.isAngemeldet(id) ? sperrGrundOffeneBearbeitung(halter.etikett) : undefined;
   return { gesperrt, onEntwurf };
+}
+
+/**
+ * Der Sperrgrund der Seite, solange ein Feld einen Entwurf hat, sonst `undefined`: für EINE Zeile
+ * am Kopf eines Abschnitts, auf die die gesperrten Felder verweisen (`InlineAngabe`,
+ * `gesperrt={{ beschreibungId }}`), statt den Grund an jedem Feld zu wiederholen.
+ */
+export function useOffeneBearbeitungGrund(): string | undefined {
+  const halter = useContext(OffeneBearbeitungContext)?.halter;
+  return halter ? sperrGrundOffeneBearbeitung(halter.etikett) : undefined;
 }

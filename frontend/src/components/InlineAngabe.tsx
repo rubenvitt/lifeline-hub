@@ -47,7 +47,7 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *
  * ── FELDWEISE BEARBEITUNG IN EINER ANSICHT (LLH-1103) ──────────────────────────────────
  *
- * Für die Personendaten (Change `f8218h1i-personendaten-feldweise`, design.md D3) kamen drei
+ * Für die Personendaten (Change `f8218h1i-personendaten-feldweise`, design.md D3) kamen vier
  * optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
  * - `pruefe`: Prüfung ohne Server. Der Grund steht nach dem Absenden als `FeldFehler` unter der
  *   Eingabe (`aria-invalid`, `aria-describedby`), der Fokus geht ins Feld, gesendet wird nicht;
@@ -58,6 +58,7 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  *   nicht, bis die Sperre fällt.
  * - `onEntwurf`: meldet nur die Wechsel zwischen „unverändert“ und „geändert“ (auch beim
  *   Aushängen), für den Merker `components/offeneBearbeitung.tsx`.
+ * - `onOeffnen`: jedes Öffnen; der Aufrufer hält dort den Serverstand für den Feld-CAS fest.
  */
 
 /** Was die Eingabe zum Einhängen bekommt. `feld` ist unverändert auf das antd-Element spreizbar. */
@@ -125,8 +126,15 @@ export interface InlineAngabeProps<T> {
    * Senden und steht als `FeldFehler` unter der Eingabe; `null` = in Ordnung.
    */
   pruefe?: (wert: T) => string | null;
-  /** Sperrgrund in wenigen Wörtern, sichtbar am Feld; der Auslöser ist nicht bedienbar. */
-  gesperrt?: string;
+  /**
+   * Sperrgrund in wenigen Wörtern, sichtbar am Feld; der Auslöser ist nicht bedienbar. Steht der
+   * Grund schon an anderer Stelle sichtbar (EIN Grund am Kopf eines Abschnitts statt einer Zeile je
+   * Feld, LLH-1103), nennt `{ beschreibungId }` dessen Element: das Feld ist gesperrt und verweist
+   * per `aria-describedby` darauf, eine eigene Zeile gibt es nicht.
+   */
+  gesperrt?: string | { beschreibungId: string };
+  /** Jedes Öffnen der Eingabe, etwa um den Serverstand für einen Feld-CAS festzuhalten. */
+  onOeffnen?: () => void;
   /** Meldet, ob die offene Bearbeitung einen geänderten, ungespeicherten Entwurf hat. */
   onEntwurf?: (geaendert: boolean) => void;
 }
@@ -173,6 +181,7 @@ export function InlineAngabe<T>({
   pruefe,
   gesperrt,
   onEntwurf,
+  onOeffnen,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const [entwurf, setEntwurfZustand] = useState<T>(wert);
@@ -208,6 +217,9 @@ export function InlineAngabe<T>({
   const name = kennung ? `${etikett} zu ${kennung}` : etikett;
   /** Ein leerer Grund sperrt nicht: gesperrt heißt immer mit sichtbarem Grund. */
   const isGesperrt = Boolean(gesperrt);
+  /** Der Grund steht hier (Text) oder an anderer Stelle (Kennung seines Elements). */
+  const sperrText = typeof gesperrt === 'string' ? gesperrt : undefined;
+  const sperrBeschreibung = typeof gesperrt === 'object' ? gesperrt.beschreibungId : sperrId;
   const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, wert);
   const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
 
@@ -249,6 +261,7 @@ export function InlineAngabe<T>({
     setPflichtHinweis(false);
     setPruefungAktiv(false);
     setBearbeitet(true);
+    onOeffnen?.();
   }
 
   function schliessen() {
@@ -315,9 +328,9 @@ export function InlineAngabe<T>({
     }
   }
 
-  const sperrHinweis = isGesperrt ? (
+  const sperrHinweis = sperrText ? (
     <div id={sperrId} style={{ color: rollen.text2 }}>
-      {gesperrt}
+      {sperrText}
     </div>
   ) : null;
 
@@ -358,7 +371,7 @@ export function InlineAngabe<T>({
             loading={sendet}
             disabled={isGesperrt}
             aria-label={`${name} speichern`}
-            aria-describedby={isGesperrt ? sperrId : undefined}
+            aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
           >
             Speichern
           </Button>
@@ -398,7 +411,7 @@ export function InlineAngabe<T>({
           type="link"
           disabled={isGesperrt}
           aria-label={kennung ? `${name} eintragen` : undefined}
-          aria-describedby={isGesperrt ? sperrId : undefined}
+          aria-describedby={isGesperrt ? sperrBeschreibung : undefined}
           style={leerKnopfStil(token, rollen.bedienText)}
           onClick={oeffnen}
         >
@@ -417,7 +430,7 @@ export function InlineAngabe<T>({
         type="text"
         disabled={isGesperrt}
         aria-label={`${name} bearbeiten`}
-        aria-describedby={isGesperrt ? `${wertId} ${sperrId}` : wertId}
+        aria-describedby={isGesperrt ? `${wertId} ${sperrBeschreibung}` : wertId}
         style={{
           ...wertKnopfStil(token),
           color: 'inherit',

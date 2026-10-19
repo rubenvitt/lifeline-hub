@@ -10,6 +10,7 @@ import {
   OffeneBearbeitungProvider,
   sperrGrundOffeneBearbeitung,
   useOffeneBearbeitung,
+  useOffeneBearbeitungGrund,
 } from './offeneBearbeitung';
 
 /**
@@ -68,7 +69,7 @@ function rendern(ui = <Seite />) {
   return renderMitProviders(ui, { route: '/person', datenRouter: true });
 }
 
-const NAME_SPERRT = 'Erst „Name“ speichern oder verwerfen';
+const NAME_SPERRT = 'Erst „Name“ speichern oder abbrechen';
 
 describe('offene Bearbeitung · Rückfrage beim Verlassen', () => {
   it('Rückfrage bei Entwurf: „Bleiben“ behält die Eingabe', async () => {
@@ -185,7 +186,7 @@ describe('offene Bearbeitung · eine zur Zeit', () => {
     expect(vorname).toHaveAccessibleDescription(`Erika ${NAME_SPERRT}`);
     // Der Halter selbst bleibt bedienbar.
     expect(screen.getByRole('button', { name: 'Name speichern' })).toBeEnabled();
-    expect(screen.queryByText('Erst „Vorname“ speichern oder verwerfen')).toBeNull();
+    expect(screen.queryByText('Erst „Vorname“ speichern oder abbrechen')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Bearbeitung von Name abbrechen' }));
     expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeEnabled();
@@ -203,9 +204,27 @@ describe('offene Bearbeitung · eine zur Zeit', () => {
     expect(screen.getByRole('button', { name: 'Vorname bearbeiten' })).toBeDisabled();
   });
 
+  it('der Grund der Seite steht für eine Zeile am Abschnittskopf bereit', async () => {
+    function Kopf() {
+      return <div data-testid="kopf">{useOffeneBearbeitungGrund() ?? 'frei'}</div>;
+    }
+    const user = userEvent.setup();
+    renderMitProviders(
+      <OffeneBearbeitungProvider>
+        <Kopf />
+        <Angabe etikett="Name" />
+      </OffeneBearbeitungProvider>,
+      { datenRouter: true },
+    );
+    expect(screen.getByTestId('kopf')).toHaveTextContent('frei');
+    await user.click(screen.getByRole('button', { name: 'Name eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), 'M');
+    expect(screen.getByTestId('kopf')).toHaveTextContent(NAME_SPERRT);
+  });
+
   it('Wortlaut des Sperrgrunds', () => {
     expect(sperrGrundOffeneBearbeitung('Herkunft / Adresse')).toBe(
-      'Erst „Herkunft / Adresse“ speichern oder verwerfen',
+      'Erst „Herkunft / Adresse“ speichern oder abbrechen',
     );
   });
 });
