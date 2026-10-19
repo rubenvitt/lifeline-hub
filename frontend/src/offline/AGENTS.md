@@ -24,8 +24,8 @@ draußen gelassen werden.
 - **Die Personenauswahl liegt neben der Vollliste auf der Platte** (`personenAuswahl`, LFH-940,
   Entscheidung Ruben 06.10.2026): nur Nummer, Name und Status, keine neue Datenart. Sie hält
   Sprungpalette und Auswahlfelder ohne Netz am Leben. `lagebildKuerzen` kürzt auch sie, auf die
-  Positivliste `PERSONENAUSWAHL_AUF_DER_PLATTE`; die PAT-Nummer bleibt draußen, ohne Netz findet
-  die Palette eine Person darüber nicht (Change `y18v58dt-pat-kern`, D9). Die Meldungsseite (offen, Seiten der
+  Positivliste `PERSONENAUSWAHL_AUF_DER_PLATTE`; die PAT-Nummer bleibt draußen, nach einem Start
+  ohne Netz findet die Palette eine Person darüber nicht (Change `y18v58dt-pat-kern`, D9). Die Meldungsseite (offen, Seiten der
   abgeschlossenen, Kennzahlen, Einzelabruf) bleibt draußen wie die Vollliste.
 - **Die Betroffenen liegen ohne Freitexte auf der Platte** (LFH-1095, Entscheidung Ruben
   09.10.2026): `lagebildKuerzen` (`offline/lagebildKuerzung.ts`) kürzt jede Person beim Speichern

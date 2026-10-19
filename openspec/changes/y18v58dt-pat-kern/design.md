@@ -183,8 +183,9 @@ Sichtung.
 - `auslassen`: Fachrichtung, `transport_at`, PAT-Nummer
 
 `lagebildKuerzen` kürzt künftig auch den Präfix `personenAuswahl`, weil die PAT-Nummer dort
-hineinkommt. Ohne Netz findet die Palette die PAT-Nummer deshalb nicht. Das Detail liegt
-weiterhin nicht auf der Platte, Verletzungen und Maßnahmen also auch nicht.
+hineinkommt. Nach einem Start ohne Netz findet die Palette die PAT-Nummer deshalb nicht; ein
+offener Tab behält sie im Speicher. Das Detail liegt weiterhin nicht auf der Platte, Verletzungen
+und Maßnahmen also auch nicht.
 
 ### D10 Sortierung nach Priorität
 

@@ -23,6 +23,8 @@ import type {
   Uhs,
 } from '../api/types';
 import { freigabenFixture } from '../test/fixtures';
+import { einsatzKeys } from '../api/queryKeys';
+import { lagebildKuerzen } from '../offline/lagebildKuerzung';
 
 /**
  * Fixturen als TEILOBJEKTE mit `as`-Cast: der Kern liest je Entität zwei bis drei Felder, volle
@@ -230,15 +232,30 @@ describe('baueDatensatzTreffer — PAT-Nummer (LLH-1326, design.md D12)', () => 
     expect(labels(t)).toEqual(['Betroffene · R-005 · PAT 0815']);
   });
 
-  /** Spec `sprungpalette`, „Ohne Netz“: die gekürzte Auswahl trägt keine PAT-Nummer. */
-  it('findet ohne PAT-Nummer in der Auswahl niemanden über sie', () => {
-    const t = baueDatensatzTreffer(
-      kontext({
-        suche: '4711',
-        quellen: { personen: [person({ id: 12, registrier_nr: 12, name: 'Muster' })] },
-      }),
-    );
-    expect(t).toEqual([]);
+  /**
+   * Spec `sprungpalette`, „Start ohne Netz“: nach einem Start ohne Netz kommt die Auswahl aus dem
+   * Lagebild, und `lagebildKuerzen` hat die PAT-Nummer dort ausgelassen (design.md D9). Gegenprobe:
+   * dieselbe Auswahl ungekürzt trifft, wie in einem Tab, der sie vor dem Netzausfall geladen hat.
+   */
+  it('findet nach einem Start ohne Netz niemanden über die PAT-Nummer', () => {
+    const auswahl = [person({ id: 12, registrier_nr: 12, name: 'Muster', pat_nummer: '4711' })];
+    expect(
+      ids(baueDatensatzTreffer(kontext({ suche: '4711', quellen: { personen: auswahl } }))),
+      'ungekürzt trifft sie — sonst prüft der Test nichts',
+    ).toEqual(['datensatz:personen:12']);
+    const vonDerPlatte = lagebildKuerzen({
+      queryKey: einsatzKeys.personenAuswahl(5),
+      state: { data: auswahl },
+    }).state.data as typeof auswahl;
+    expect(
+      baueDatensatzTreffer(kontext({ suche: '4711', quellen: { personen: vonDerPlatte } })),
+    ).toEqual([]);
+    // Registriernummer und Name bleiben auf der Platte und treffen weiter.
+    for (const suche of ['12', 'Muster']) {
+      expect(
+        ids(baueDatensatzTreffer(kontext({ suche, quellen: { personen: vonDerPlatte } }))),
+      ).toEqual(['datensatz:personen:12']);
+    }
   });
 });
 
