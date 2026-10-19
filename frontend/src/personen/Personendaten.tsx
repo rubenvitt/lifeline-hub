@@ -9,7 +9,7 @@ import {
   ladePerson,
   savePersonFeld,
   type PersonFeld,
-  type PersonFeldWerte,
+  type PersonFeldEingabe,
 } from '../api/einsatzPerson';
 import { PERSON_ANGABE_MAX, PERSON_NAME_MAX, PERSON_NOTIZ_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys } from '../api/queryKeys';
@@ -76,15 +76,15 @@ const isGleichText = (a: string, b: string) => a.trim() === b.trim();
 const textOderNull = (w: string) => (w.trim() === '' ? null : w.trim());
 
 /** Der Serverstand eines Felds, in der Form des Wire-Werts. */
-function feldWertAus<K extends PersonFeld>(p: Person, feld: K): PersonFeldWerte[K] {
+function feldWertAus<K extends PersonFeld>(p: Person, feld: K): PersonFeldEingabe[K] {
   if (feld === 'koordinate') {
     return (
       p.antreff_lat != null && p.antreff_lon != null
         ? { lat: p.antreff_lat, lon: p.antreff_lon }
         : null
-    ) as PersonFeldWerte[K];
+    ) as PersonFeldEingabe[K];
   }
-  return ((p as unknown as Record<string, unknown>)[feld] ?? null) as PersonFeldWerte[K];
+  return ((p as unknown as Record<string, unknown>)[feld] ?? null) as PersonFeldEingabe[K];
 }
 
 function isGleicherWireWert(a: unknown, b: unknown): boolean {
@@ -101,9 +101,9 @@ interface Schreiben {
   speichere: <K extends PersonFeld>(
     feld: K,
     etikett: string,
-    wert: PersonFeldWerte[K],
-    erwartet: PersonFeldWerte[K],
-    text: (w: PersonFeldWerte[K]) => string,
+    wert: PersonFeldEingabe[K],
+    erwartet: PersonFeldEingabe[K],
+    text: (w: PersonFeldEingabe[K]) => string,
   ) => Promise<void>;
   /** Kennung der Kopfzeile mit dem Sperrgrund. */
   grundId: string;
@@ -121,9 +121,9 @@ interface FeldProps<T, K extends PersonFeld> {
   anzeige: ReactNode;
   leer: (w: T) => boolean;
   gleich?: (a: T, b: T) => boolean;
-  zuWire: (w: T) => PersonFeldWerte[K];
+  zuWire: (w: T) => PersonFeldEingabe[K];
   /** Wert für die Rückfrage („Inzwischen gespeichert: …“). */
-  text: (w: PersonFeldWerte[K]) => string;
+  text: (w: PersonFeldEingabe[K]) => string;
   eingabe: (p: InlineEingabe<T>) => ReactNode;
   pruefe?: (w: T) => string | null;
   isValid?: (w: T) => boolean;
@@ -147,7 +147,7 @@ function PersonFeldAngabe<T, K extends PersonFeld>({
   const bearbeitung = useOffeneBearbeitung(etikett);
   // Serverstand beim Öffnen: der Altwert des Feld-CAS. Ein Refetch während der Bearbeitung
   // ändert ihn nicht, sonst überschriebe das Speichern still, was inzwischen dasteht.
-  const ausgang = useRef<PersonFeldWerte[K]>(feldWertAus(person, feld));
+  const ausgang = useRef<PersonFeldEingabe[K]>(feldWertAus(person, feld));
   const gesperrt =
     schreiben.ohneNetz || bearbeitung.gesperrt ? { beschreibungId: schreiben.grundId } : undefined;
   return (
@@ -578,7 +578,7 @@ function PersonendatenInhalt({
   // Schreibrecht nicht.
 
   return (
-    <div ref={behaelterRef}>
+    <div ref={behaelterRef} data-lfh="personendaten">
       {grund && (
         <div id={grundId} data-lfh="personendaten-grund" style={{ color: rollen.text2 }}>
           {grund}

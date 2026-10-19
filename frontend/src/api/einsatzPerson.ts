@@ -173,7 +173,7 @@ export function aktualisierePerson(
  * Wire-Wert; `null` leert. Die Koordinate ist EIN Feld und geht als Paar `antreff_lat`/`antreff_lon`.
  * „vermisst seit“ lässt sich nicht leeren (`null` ist am Server 400).
  */
-export interface PersonFeldWerte {
+export interface PersonFeldEingabe {
   name: string | null;
   vorname: string | null;
   geschlecht: string | null;
@@ -186,11 +186,11 @@ export interface PersonFeldWerte {
   koordinate: { lat: number; lon: number } | null;
   vermisst_seit: string;
 }
-export type PersonFeld = keyof PersonFeldWerte;
+export type PersonFeld = keyof PersonFeldEingabe;
 
-function feldAufWire<K extends PersonFeld>(feld: K, wert: PersonFeldWerte[K]): PersonEingabe {
+function feldAufWire<K extends PersonFeld>(feld: K, wert: PersonFeldEingabe[K]): PersonEingabe {
   if (feld === 'koordinate') {
-    const k = wert as PersonFeldWerte['koordinate'];
+    const k = wert as PersonFeldEingabe['koordinate'];
     return { antreff_lat: k?.lat ?? null, antreff_lon: k?.lon ?? null };
   }
   return { [feld]: wert } as PersonEingabe;
@@ -207,8 +207,8 @@ export function savePersonFeld<K extends PersonFeld>(
   einsatzId: number,
   personId: number,
   feld: K,
-  wert: PersonFeldWerte[K],
-  erwartet: PersonFeldWerte[K] | undefined,
+  wert: PersonFeldEingabe[K],
+  erwartet: PersonFeldEingabe[K] | undefined,
 ): Promise<Person> {
   const body: PersonEingabe & { erwartet?: PersonErwartet } = feldAufWire(feld, wert);
   if (erwartet !== undefined) body.erwartet = feldAufWire(feld, erwartet);
