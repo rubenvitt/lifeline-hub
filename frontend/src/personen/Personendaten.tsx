@@ -32,7 +32,7 @@ import {
   useOffeneBearbeitungGrund,
 } from '../components/offeneBearbeitung';
 import { Select } from '../components/Select';
-import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
+import { grenzeText, istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
 import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../offline/verbindung';
 import { serverJetzt } from '../offline/serveruhr';
 import { koordinatenText, parseKoordinate } from './koordinate';
@@ -377,7 +377,12 @@ function PersonendatenInhalt({
           gleich={isGleichText}
           zuWire={textOderNull}
           text={(w) => w ?? ''}
-          isValid={(w) => !istZuLang(w, max)}
+          // Überlänge als Prüfung am Feld (`FeldFehler`, `aria-invalid`), nie gekürzt.
+          pruefe={(w) =>
+            istZuLang(w, max)
+              ? `${etikett} darf höchstens ${grenzeText(max)} Zeichen lang sein`
+              : null
+          }
           mehrzeilig={mehrzeilig}
           eingabe={({ feld: f, value, onChange }) =>
             mehrzeilig ? (

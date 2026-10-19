@@ -2041,7 +2041,13 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     expect(koerper).toEqual([]);
   });
 
-  it('Name über der Grenze: kein Request, nie gekürzt', async () => {
+  /**
+   * Überlänge als Prüfung am Feld (Spec `personendaten-bearbeiten`, „Prüfungen am Feld“): der Grund
+   * steht als `FeldFehler` unter der Eingabe, die Eingabe ist `aria-invalid` und beschrieben, kein
+   * Request, nie gekürzt. Mutationsprobe: zurück auf `isValid` — kein Grund, keine Beschreibung,
+   * rot.
+   */
+  it('Name über der Grenze: Grund am Feld, kein Request, nie gekürzt', async () => {
     const { koerper, handler } = patchMitschnitt();
     render(einsatzAktiv, detail, handler);
     await screen.findByRole('heading', { name: /Person R-001/ });
@@ -2051,6 +2057,13 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     await userEvent.clear(feld);
     await userEvent.paste('x'.repeat(201));
     await userEvent.keyboard('{Enter}');
+    const grund = 'Name darf höchstens 200 Zeichen lang sein';
+    expect(await screen.findByText(grund)).toBeInTheDocument();
+    expect(feld).toHaveAttribute('aria-invalid', 'true');
+    expect(feld).toHaveAccessibleDescription(grund);
+    // Erst warten, dann „kein Request“ (wie Tier und Schaden): ein Request liefe asynchron.
+    await waitFor(() => expect(feld).toHaveFocus());
+    await new Promise((r) => setTimeout(r, 50));
     expect(koerper).toEqual([]);
     expect(feld).toHaveValue('x'.repeat(201));
   });
