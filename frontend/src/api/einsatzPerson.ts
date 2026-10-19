@@ -15,6 +15,8 @@ import type {
   Transport,
   TransportArt,
   TransportPrioritaet,
+  TransportDurch,
+  TransportmittelAuswahl,
   Verbleib,
   VerbleibArt,
   VerbleibStatus,
@@ -234,6 +236,11 @@ export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
   return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
 }
 
+/** Vorschläge zum Rettungsmittel der Verbleib-Maske (LLH-1332, Spec `patienten-uebergabe`). */
+export function ladeTransportmittel(einsatzId: number): Promise<TransportmittelAuswahl> {
+  return apiGet<TransportmittelAuswahl>(`/api/einsaetze/${einsatzId}/personen/transportmittel`);
+}
+
 export interface VerbleibEingabe extends OfflineEintragEingabe {
   art: VerbleibArt;
   transportmittel?: string | null;
@@ -247,6 +254,10 @@ export interface VerbleibEingabe extends OfflineEintragEingabe {
   betreuungsstelle_id?: number | null;
   /** Wer den Verbleib am Gerät namentlich bestätigt (LFH-1046); eine Person schickt es nie. */
   bestaetigt_personal_id?: number | null;
+  /** Wer fährt (LLH-1332), nur bei `art: 'transport'`. */
+  transport_durch?: TransportDurch | null;
+  /** Disposition des Fahrzeugs eines Eigentransports (LLH-1332), Pflicht bei `eigen`. */
+  einsatz_fahrzeug_id?: number | null;
 }
 export function erfasseVerbleib(
   einsatzId: number,

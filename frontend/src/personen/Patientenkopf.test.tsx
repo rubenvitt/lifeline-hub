@@ -96,6 +96,9 @@ let gesendet: { pfad: string; body: unknown }[];
 beforeEach(() => {
   gesendet = [];
   server.use(
+    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+      HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
+    ),
     http.post('/api/einsaetze/1/personen/10/:was', async ({ request, params }) => {
       gesendet.push({ pfad: String(params.was), body: await request.json() });
       return HttpResponse.json({ id: 99 }, { status: 201 });
@@ -247,13 +250,47 @@ describe('Patientenkopf — Bedienung ohne Dialog (LLH-1094)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     await userEvent.click(within(paneel).getByRole('combobox', { name: 'Art' }));
     await userEvent.click(await screen.findByTitle('Transport'));
+    await userEvent.type(
+      within(paneel).getByRole('combobox', { name: /Rettungsmittel/ }),
+      'RTW 3/83-2',
+    );
     await userEvent.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
     await userEvent.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
     await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
     expect(gesendet[0]).toMatchObject({
       pfad: 'verbleib',
-      body: { art: 'transport', ziel: 'KH Mitte' },
+      body: { art: 'transport', ziel: 'KH Mitte', transport_durch: 'fremd' },
     });
+  });
+
+  it('quittiert die Übergabe eines Eigentransports als Paneel (LLH-1332)', async () => {
+    const { kopf, onGeschrieben } = zeige({
+      aufenthalt: null,
+      versorgung: 'unterwegs',
+      aktuelles_einsatz_fahrzeug_id: 9,
+      aktuelles_verbleib_ziel: 'KH Mitte',
+      aktueller_verbleib: 'Eigentransport 1/83-1 → KH Mitte',
+    });
+    await userEvent.click(within(kopf).getByRole('button', { name: 'Übergabe quittieren' }));
+    const paneel = screen.getByRole('region', { name: 'Übergabe quittieren' });
+    expect(within(paneel).getByLabelText('Ziel')).toHaveValue('KH Mitte');
+    await userEvent.click(within(paneel).getByRole('button', { name: 'Übergabe quittieren' }));
+    await waitFor(() => expect(onGeschrieben).toHaveBeenCalledTimes(1));
+    expect(gesendet[0]).toMatchObject({
+      pfad: 'verbleib',
+      body: {
+        art: 'transport',
+        transport_durch: 'eigen',
+        einsatz_fahrzeug_id: 9,
+        status: 'uebergeben',
+        ziel: 'KH Mitte',
+      },
+    });
+  });
+
+  it('bietet „Übergabe quittieren“ nur an, solange der Patient unterwegs ist', () => {
+    const { kopf } = zeige();
+    expect(within(kopf).queryByRole('button', { name: 'Übergabe quittieren' })).toBeNull();
   });
 
   it('legt eine Notiz über die Eingabezeile an', async () => {
@@ -939,6 +976,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
     let paneel = await paneelOhneNetz(kopf, 'Verbleib erfassen', 'Verbleib erfassen');
     await user.click(within(paneel).getByRole('combobox', { name: 'Art' }));
     await user.click(await screen.findByTitle('Transport'));
+    await user.type(within(paneel).getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW 1');
     await user.type(within(paneel).getByLabelText('Ziel'), 'KH Mitte');
     await user.click(within(paneel).getByRole('button', { name: 'Verbleib erfassen' }));
     await waitFor(() =>
@@ -963,7 +1001,7 @@ describe('Patientenkopf — ohne Netz am UHS-Tablet (LLH-1138)', () => {
 
     const quittung = within(kopf).getByRole('region', { name: 'Offline vorgemerkt' });
     await waitFor(() => expect(within(quittung).getAllByRole('listitem')).toHaveLength(3));
-    expect(quittung).toHaveTextContent('Verbleib Transport → KH Mitte');
+    expect(quittung).toHaveTextContent('Verbleib Transport → KH Mitte (RTW 1)');
     expect(quittung).toHaveTextContent('Transport dringlich');
     expect(quittung).toHaveTextContent('Maßnahme Zugang');
     expect(gesendet).toEqual([]);

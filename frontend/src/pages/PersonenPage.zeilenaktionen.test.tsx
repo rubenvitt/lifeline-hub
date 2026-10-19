@@ -35,7 +35,12 @@ beforeEach(async () => {
   vi.stubGlobal('BroadcastChannel', StummerKanal);
   setzeOnline(true);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-  server.use(http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])));
+  server.use(
+    http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:einsatzId/personen/transportmittel', () =>
+      HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
+    ),
+  );
   await queueLeerenFuerTests();
 });
 afterEach(() => {
@@ -190,6 +195,7 @@ async function erfasseTransport(user: Nutzer, ziel: string) {
   const dialog = await screen.findByRole('dialog', { name: 'Verbleib erfassen' });
   await user.click(within(dialog).getByRole('combobox', { name: 'Art' }));
   await user.click(await screen.findByTitle('Transport'));
+  await user.type(within(dialog).getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW 3/83-2');
   await user.type(within(dialog).getByLabelText('Ziel'), ziel);
   await user.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
 }
@@ -364,6 +370,46 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
     expect(screen.getByTestId('ort')).toHaveTextContent(
       lagekartePfad(1, { platzieren: { typ: 'person', id: 70, zurueck: true } }),
     );
+  });
+
+  it('im Eigentransport: „Übergabe quittieren“ im Menü, quittiert mit Fahrzeug (LLH-1332)', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/personen/70/verbleib', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json(verbleibAntwort, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(() => [
+      {
+        ...r007,
+        versorgung: 'unterwegs',
+        aktuelle_verbleib_art: 'transport',
+        aktueller_verbleib: 'Eigentransport 1/83-1 → KH Mitte',
+        aktuelles_verbleib_ziel: 'KH Mitte',
+        aktuelles_einsatz_fahrzeug_id: 9,
+      },
+    ]);
+    await user.click(await screen.findByRole('button', { name: 'Aktionen zu R-007' }));
+    const menue = await offenesMenue();
+    expect(eintraege(menue)).toEqual([
+      'Sichten',
+      'Übergabe quittieren',
+      'Verbleib erfassen',
+      'Auf Lagekarte verorten',
+    ]);
+    await user.click(within(menue).getByRole('menuitem', { name: 'Übergabe quittieren' }));
+    const dialog = await screen.findByRole('dialog', { name: /Übergabe — R-007/ });
+    await user.click(within(dialog).getByRole('button', { name: 'Übergabe quittieren' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      art: 'transport',
+      transport_durch: 'eigen',
+      einsatz_fahrzeug_id: 9,
+      status: 'uebergeben',
+      ziel: 'KH Mitte',
+    });
   });
 
   it('„Sichten“ öffnet die Nachsichtung, „Verbleib erfassen“ den Verbleib-Dialog', async () => {

@@ -49,6 +49,7 @@ import { ZustandSchreiben } from './personenSpalten';
 import { SichtungFelder, useSaveSichtung, type SichtungWerte } from './SichtungDialog';
 import { useSavePersonEintrag, vormerkungText } from './personEintragSpeichern';
 import { useVerbleibFelder } from './VerbleibErfassung';
+import { UebergabePaneel } from './UebergabeQuittieren';
 import type { VerbleibFormWerte } from './verbleibErfassungKern';
 
 export interface PatientenkopfProps {
@@ -265,6 +266,17 @@ export default function Patientenkopf({
               {modus === 'bedienen' && (
                 <Flex gap={token.marginSM} wrap>
                   {aufenthaltAktionen}
+                  {/* Ein Eigentransport endet mit der quittierten Übergabe (LLH-1332). */}
+                  {bedienbar && angetroffen && person.versorgung === 'unterwegs' && (
+                    <Button
+                      type="primary"
+                      aria-expanded={offen === 'uebergabe'}
+                      disabled={isSpeichernd}
+                      onClick={() => toggle('uebergabe')}
+                    >
+                      Übergabe quittieren
+                    </Button>
+                  )}
                   {bedienbar && angetroffen && (
                     <Button
                       aria-expanded={offen === 'verbleib'}
@@ -397,6 +409,13 @@ export default function Patientenkopf({
           einsatzId={einsatzId}
           mutation={sichtungMutation}
           onSchliessen={close('sichtung')}
+        />
+      )}
+      {offen === 'uebergabe' && (
+        <UebergabePaneel
+          person={person}
+          mutation={verbleibMutation}
+          onSchliessen={close('uebergabe')}
         />
       )}
       {offen === 'verbleib' && (
@@ -606,7 +625,7 @@ function GekuerzteListe({
   );
 }
 
-type Paneel = 'sichtung' | 'verbleib' | 'transport' | 'massnahme' | 'verletzung';
+type Paneel = 'sichtung' | 'verbleib' | 'uebergabe' | 'transport' | 'massnahme' | 'verletzung';
 
 /** Auslöser eines Paneels im Datenfeld; solange ein Paneel speichert, wechselt keiner. */
 function PaneelKnopf({

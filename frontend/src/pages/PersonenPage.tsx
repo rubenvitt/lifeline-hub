@@ -60,6 +60,7 @@ import Sichtungszeile from '../personen/Sichtungszeile';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
 import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
+import { UebergabeDialog } from '../personen/UebergabeQuittieren';
 import SichtungDialog from '../personen/SichtungDialog';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useDichte } from '../theme/ThemeModeProvider';
@@ -272,6 +273,10 @@ export default function PersonenPage() {
   const sichtungZeilen = useZeilenFehler<number>();
   const { isHolding: isZeileHolding, hold } = useHalteQuellen();
   /** „Verbleib erfassen“ aus der Zeile: der Dialog gehört zum Einsatz, in dem er aufging. */
+  const [uebergabeFuer, setUebergabeFuer] = useState<{
+    einsatzId: number;
+    person: Person;
+  } | null>(null);
   const [verbleibFuer, setVerbleibFuer] = useState<{ einsatzId: number; person: Person } | null>(
     null,
   );
@@ -295,6 +300,7 @@ export default function PersonenPage() {
     (aktion: PersonZeilenAktion, p: Person) => {
       if (aktion === 'sichten') setSichtungFuer({ einsatzId, person: p });
       else if (aktion === 'verbleib') setVerbleibFuer({ einsatzId, person: p });
+      else if (aktion === 'uebergabe') setUebergabeFuer({ einsatzId, person: p });
       else
         navigate(
           // Mit Herkunft: „Zurück zu R-…“ führt danach auf die Person (LLH-1125).
@@ -864,6 +870,7 @@ export default function PersonenPage() {
   const halten =
     isZeileHolding ||
     verbleibFuer?.einsatzId === einsatzId ||
+    uebergabeFuer?.einsatzId === einsatzId ||
     sichtungFuer?.einsatzId === einsatzId;
   /** Ein Grund je Zeile: die jüngste Aktion der Zeile räumt ihren, die Abgleichspalte ihren. */
   const zeilenGrund = (p: Person) =>
@@ -1236,6 +1243,20 @@ export default function PersonenPage() {
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
           }}
           onSchliessen={() => setSichtungFuer(null)}
+        />
+      )}
+      {uebergabeFuer?.einsatzId === einsatzId && (
+        <UebergabeDialog
+          key={uebergabeFuer.person.id}
+          einsatzId={einsatzId}
+          person={uebergabeFuer.person}
+          onErfasst={() => {
+            const personId = uebergabeFuer.person.id;
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, personId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          }}
+          onSchliessen={() => setUebergabeFuer(null)}
         />
       )}
       {verbleibFuer?.einsatzId === einsatzId && (

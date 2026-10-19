@@ -24,6 +24,7 @@ import {
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
+import RettungsmittelFeld from './RettungsmittelFeld';
 
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
@@ -134,11 +135,8 @@ export function useVerbleibFelder(einsatzId: number, form: FormInstance<Verbleib
       <Form.Item label="Ziel" name="ziel">
         <Input placeholder={art === 'transport' ? 'z. B. Krankenhaus' : 'Freitext'} />
       </Form.Item>
-      {felder.transportmittel && (
-        <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel">
-          <Input />
-        </Form.Item>
-      )}
+      {/* Wer fährt (LLH-1332): Wahl aus „Im Einsatz“ heißt Eigentransport, sonst fremd. */}
+      {felder.transportmittel && <RettungsmittelFeld einsatzId={einsatzId} form={form} />}
       <Collapse
         ghost
         items={[
