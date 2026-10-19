@@ -556,3 +556,82 @@ async fn verletzung_am_uhs_geraet() {
         assert_eq!(s, StatusCode::FORBIDDEN, "{name}: {x}");
     }
 }
+
+/// Storno-Sperre (LLH-1079, `personal::disposition_repo`, Spur „bestätigt“): eine Kraft, die am
+/// Gerät eine Verletzung, eine Maßnahme oder einen Transport bestätigt hat, lässt sich nicht mehr
+/// stornieren (422), sonst stünde die Bestätigung an einer Kraft, die nie eingesetzt war.
+#[tokio::test]
+async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_stornierbar() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let uhs = aktive_stelle(
+        &app,
+        &admin,
+        e,
+        "uhs",
+        json!({"typ": "behandlungsplatz", "bezeichnung": "UHS Nord"}),
+    )
+    .await;
+    let (s, _) = post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+        json!({"status": "aktiv"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let tablet = geraet(
+        &app,
+        &admin,
+        e,
+        json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet 1"}),
+    )
+    .await;
+    let (s, person) = post(
+        &app,
+        &tablet,
+        &format!("/api/einsaetze/{e}/personen"),
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{person}");
+    let p = person["id"].as_i64().unwrap();
+
+    for (name, unterpfad, body) in [
+        ("Verletzung", "verletzungen", unterarm()),
+        ("Maßnahme", "massnahmen", json!({"art": "sauerstoff"})),
+        ("Transport", "transport", json!({"prioritaet": "sofort"})),
+    ] {
+        let (s, kraft) = post(
+            &app,
+            &admin,
+            &format!("/api/einsaetze/{e}/personal"),
+            json!({"adhoc": {"name": format!("Bestätigt {name}")}}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{kraft}");
+        let mut body = body;
+        body["bestaetigt_personal_id"] = kraft["id"].clone();
+        let (s, v) = post(
+            &app,
+            &tablet,
+            &format!("/api/einsaetze/{e}/personen/{p}/{unterpfad}"),
+            body,
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{name}: {v}");
+        let (s, v) = post(
+            &app,
+            &admin,
+            &format!("/api/einsaetze/{e}/personal/{}/stornieren", kraft["id"]),
+            json!({}),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{name}: {v}");
+        assert!(
+            v["error"].as_str().unwrap().contains("bestätigt"),
+            "{name}: {v}"
+        );
+    }
+}
