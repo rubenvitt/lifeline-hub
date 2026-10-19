@@ -866,9 +866,12 @@ describe('PersonenDetailPage — Stammdaten', () => {
   });
 });
 
-/** Der Stammdaten-Raster der Personendaten; der Kopf trägt einen eigenen („Patientenangaben“). */
+/**
+ * Das Datenraster der Personendaten; der Kopf trägt ein eigenes („Patientenangaben“). Es heißt wie
+ * sein Abschnitt („Personendaten“), nicht mehr „Stammdaten“.
+ */
 function stammdatenRaster(): HTMLElement {
-  const r = document.querySelector<HTMLElement>('dl[aria-label="Stammdaten"]');
+  const r = document.querySelector<HTMLElement>('dl[aria-label="Personendaten"]');
   expect(r).not.toBeNull();
   return r!;
 }

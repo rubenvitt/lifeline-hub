@@ -76,7 +76,7 @@ test('Personen: Liste navigiert zur Detail-Vollseite, die mit dem Patientenkopf 
   await expect(kopf).toBeVisible();
   await expect(verlauf).toBeVisible();
   await expect(personendaten).toBeVisible();
-  await expect(page.locator('dl[aria-label="Stammdaten"]')).toContainText('Mustermann');
+  await expect(page.locator('dl[aria-label="Personendaten"]')).toContainText('Mustermann');
   await expect(page.getByText('Medizinischer Verlauf', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('tab', { name: /Verlauf|Personendaten/ })).toHaveCount(0);
   const y = async (l: typeof kopf) => (await l.boundingBox())!.y;
@@ -114,7 +114,7 @@ test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlas
   await geburt.fill('01.02.80');
   await daten.getByRole('button', { name: 'Geburtsdatum speichern' }).click();
   await expect(page.getByText('Geburtsdatum gespeichert')).toBeVisible();
-  await expect(daten.locator('dl[aria-label="Stammdaten"]')).toContainText('01.02.1980');
+  await expect(daten.locator('dl[aria-label="Personendaten"]')).toContainText('01.02.1980');
 
   // Wert ändern: der Name.
   await daten.getByRole('button', { name: 'Name bearbeiten', exact: true }).click();
@@ -122,7 +122,7 @@ test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlas
   await name.fill('Claasen-Meyer');
   await name.press('Enter');
   await expect(page.getByText('Name gespeichert')).toBeVisible();
-  await expect(daten.locator('dl[aria-label="Stammdaten"]')).toContainText('Claasen-Meyer');
+  await expect(daten.locator('dl[aria-label="Personendaten"]')).toContainText('Claasen-Meyer');
 
   const gespeichert = await (
     await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)

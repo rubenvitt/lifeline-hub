@@ -141,14 +141,14 @@ function patientenkopf(page: Page) {
 
 /**
  * Oberkante des Patientenkopfs über der Oberkante der Personendaten (Spec
- * `einsatztauglichkeit-layout`). Die Personendaten stehen im Datenraster „Stammdaten".
+ * `einsatztauglichkeit-layout`). Die Personendaten stehen im Datenraster „Personendaten".
  */
 async function pruefeKopfUeberPersonendaten(page: Page, breite: number) {
   const pk = patientenkopf(page);
   const personendaten = page.getByText('Personendaten', { exact: true });
   await expect(pk.locator('[data-lfh="aufenthalt"]')).toBeVisible();
   await expect(personendaten).toBeVisible();
-  await expect(page.locator('dl[aria-label="Stammdaten"]')).toContainText('Lindenweg 3');
+  await expect(page.locator('dl[aria-label="Personendaten"]')).toContainText('Lindenweg 3');
   await expect(page.locator('.ant-descriptions')).toHaveCount(0);
   const oben = (await pk.boundingBox())!;
   const unten = (await personendaten.boundingBox())!;

@@ -648,7 +648,7 @@ function PersonendatenInhalt({
         </div>
       )}
       {gesetzt.length > 0 && (
-        <Datenraster spalten={2} beschriftung="Stammdaten">
+        <Datenraster spalten={2} beschriftung="Personendaten">
           {gesetzt.map((a) => (
             <Datenfeld key={a.etikett} label={a.etikett} mono={a.mono} breit={a.breit}>
               {darfSchreiben ? (
