@@ -185,7 +185,9 @@ geplanten Raum:
    Posten liegt danach im Raum.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
-4. Mit „Lösen“ einen Posten aus dem Raum lösen. Er bleibt ohne Ort im Einsatz.
+4. Mit „Lösen“ einen Posten aus dem Raum lösen. Er bleibt ohne Ort im Einsatz. Die Zeile bleibt als
+   „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein anderer
+   Knopf unter den Finger rückt. „Rückgängig“ im Hinweis oben holt den Posten zurück.
 
 ### Einen Bereitstellungsraum auflösen oder stornieren
 

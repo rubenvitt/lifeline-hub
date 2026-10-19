@@ -1,4 +1,15 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent as ReactFocusEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { App, Button, Space, Typography } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { setzeMaterialStatus, updateDisposition } from '../api/einsatzMaterial';
@@ -13,6 +24,7 @@ import { sprungGesperrtText } from '../components/Sprung';
 import StatusWahl from '../components/StatusWahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { modulName } from '../einsatz/modulRegistry';
+import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { materialPfad } from '../routing/deeplinks';
 import MaterialAdhocDialog from './MaterialAdhocDialog';
@@ -39,7 +51,9 @@ import { useMaterialOrt } from './useMaterialOrt';
  *   `StatusWahl`, derselbe Schreibweg `setzeMaterialStatus` und dieselben Einträge wie die
  *   Materialliste); eine Ablehnung steht an der Zeile. Bei Verbrauchsgut mit Rest „Ausgeben“
  *   (derselbe Dialog wie die Materialliste), rechts das Lösen in Rot mit Abstand und ohne
- *   Rückfrage (LFH-363: die gelöste Zuordnung ist umkehrbar, über die Auswahl darunter).
+ *   Rückfrage (LFH-363: die gelöste Zuordnung ist umkehrbar, über die Auswahl darunter und über
+ *   „Rückgängig“ im Hinweis). Die gelöste Zeile hält ihre Stelle als „Gelöst“, bis die Bedienung
+ *   den Baustein verlassen hat ({@link useGeloestHalten}, LLH-1254).
  * - Kopfzahl „n Posten · k Ausfall“ aus der einen Material-Zählung.
  * - „Material zuordnen …“: wählen schreibt, Gruppen „Ohne Ort“ und „An anderem Ort“
  *   ({@link buildZuordnenOptions}). Zuordnen und Lösen laufen über den EINEN Schreibweg
@@ -98,6 +112,180 @@ const wrapLabel = (o: { label?: ReactNode }) => (
   <span style={{ whiteSpace: 'normal' }}>{o.label}</span>
 );
 
+/**
+ * Wie lange eine gelöste Zeile nach dem letzten Tipp im Baustein mindestens steht (LLH-1254,
+ * Change `k2gckqtq-material-loesen-ohne-sprung`, design.md D3).
+ */
+export const HALTEN_MS = 4000;
+
+/**
+ * Ein selbst gelöster Posten. `wartet`: die Quelle zeigt ihn noch (das Einheit-DTO gleicht ohne
+ * Warten ab), trotzdem steht der Platzhalter, sonst wäre der Knopf noch einmal bedienbar. `weg`: die
+ * Quelle zeigt ihn nicht mehr; taucht er wieder auf (Rückgängig, ein anderer ordnet zu), gewinnt die
+ * echte Zeile (design.md D4).
+ */
+interface Geloest {
+  p: MaterialAmOrtPosten;
+  /** Stelle in der zuletzt gezeichneten Folge. */
+  index: number;
+  phase: 'wartet' | 'weg';
+}
+
+const KEINE_GELOESTEN: ReadonlyMap<number, Geloest> = new Map();
+
+/** Die Marke „Gelöst“: gedämpft, ohne Fläche und Rand, kein Bedienziel mehr. */
+const GELOEST_STIL = (farbe: string) =>
+  ({
+    color: farbe,
+    background: 'transparent',
+    borderColor: 'transparent',
+    boxShadow: 'none',
+    cursor: 'default',
+  }) as const;
+
+/**
+ * Die gelöste Zeile hält ihre Stelle (LLH-1254, Spec `material-am-ort`, „Material am Ort lösen“):
+ * sonst rückt der Lösen-Knopf der nächsten Zeile unter Finger oder Zeiger, und ein schneller zweiter
+ * Tipp löst den falschen Posten. Alle Platzhalter fallen ZUSAMMEN, sobald kein Maus- oder Stiftzeiger
+ * über dem Baustein steht, kein Fokus darin liegt und {@link HALTEN_MS} seit dem letzten Tipp vergangen
+ * ist; einzeln fallende sprängen wieder. Die Bedingungen Zeiger und Fokus folgen der Zuflussschleuse
+ * (`components/useZuflussSchleuse.ts`): Touch zählt nicht, weil ein Tipp betritt und verlässt; ein
+ * Portal-Menü ist kein Verlassen. Die Schleuse selbst hält nur Zuwachs, Entfallenes fällt dort sofort
+ * (design.md D1).
+ */
+function useGeloestHalten(posten: readonly MaterialAmOrtPosten[], ortSchluessel: string) {
+  const [stand, setStand] = useState<{ ort: string; eintraege: ReadonlyMap<number, Geloest> }>(
+    () => ({ ort: ortSchluessel, eintraege: KEINE_GELOESTEN }),
+  );
+  // Ein anderer Ort (oder Einsatz) leert: die Platzhalter gehören zum Ort, an dem gelöst wurde.
+  const geloest = stand.ort === ortSchluessel ? stand.eintraege : KEINE_GELOESTEN;
+  const aendern = useCallback(
+    (f: (alt: ReadonlyMap<number, Geloest>) => ReadonlyMap<number, Geloest>) =>
+      setStand((alt) => {
+        const vorher = alt.ort === ortSchluessel ? alt.eintraege : KEINE_GELOESTEN;
+        const neu = f(vorher);
+        return neu === vorher && alt.ort === ortSchluessel
+          ? alt
+          : { ort: ortSchluessel, eintraege: neu };
+      }),
+    [ortSchluessel],
+  );
+
+  // Die Folge, wie sie gezeichnet ist: der Platzhalter steht an der Stelle des gelösten Postens,
+  // die übrigen in der Folge der Quelle. Mehrere behalten ihre Plätze, weil aufsteigend eingefügt wird.
+  const zeilen = useMemo(() => {
+    const da = new Set(posten.map((p) => p.id));
+    const liste = posten.map((p) => ({ p, isGeloest: geloest.get(p.id)?.phase === 'wartet' }));
+    [...geloest.values()]
+      .filter((g) => !da.has(g.p.id))
+      .sort((a, b) => a.index - b.index)
+      .forEach((g) =>
+        liste.splice(Math.min(g.index, liste.length), 0, { p: g.p, isGeloest: true }),
+      );
+    return liste;
+  }, [posten, geloest]);
+
+  const gezeigt = useRef<number[]>([]);
+  const aktuell = useRef(geloest);
+  useLayoutEffect(() => {
+    gezeigt.current = zeilen.map((z) => z.p.id);
+    aktuell.current = geloest;
+  });
+
+  // Phasen nachführen; zeichnen tut die Folge oben schon richtig, das hier ist nur Buchhaltung.
+  useEffect(() => {
+    const da = new Set(posten.map((p) => p.id));
+    aendern((alt) => {
+      let neu: Map<number, Geloest> | null = null;
+      for (const [id, g] of alt) {
+        if (da.has(id) && g.phase === 'weg') {
+          neu ??= new Map(alt);
+          neu.delete(id);
+        } else if (!da.has(id) && g.phase === 'wartet') {
+          neu ??= new Map(alt);
+          neu.set(id, { ...g, phase: 'weg' });
+        }
+      }
+      return neu ?? alt;
+    });
+  }, [posten, aendern]);
+
+  const bedingung = useRef({ zeiger: false, fokus: false, letzterTipp: 0 });
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pruefen = useCallback(
+    function pruefen() {
+      clearTimeout(timer.current);
+      const b = bedingung.current;
+      if (b.zeiger || b.fokus) return;
+      const rest = HALTEN_MS - (Date.now() - b.letzterTipp);
+      if (rest > 0) {
+        timer.current = setTimeout(pruefen, rest);
+        return;
+      }
+      aendern((alt) => (alt.size === 0 ? alt : KEINE_GELOESTEN));
+    },
+    [aendern],
+  );
+  const isHaltend = geloest.size > 0;
+  useEffect(() => {
+    if (!isHaltend) return;
+    timer.current = setTimeout(pruefen, HALTEN_MS);
+    return () => clearTimeout(timer.current);
+  }, [isHaltend, pruefen]);
+
+  /** Nach dem Erfolg des Lösens: die Zeile wird Platzhalter, das Lösen zählt als Tipp. */
+  const markieren = useCallback(
+    (p: MaterialAmOrtPosten) => {
+      bedingung.current.letzterTipp = Date.now();
+      const index = gezeigt.current.indexOf(p.id);
+      aendern((alt) =>
+        new Map(alt).set(p.id, {
+          p,
+          index: index < 0 ? gezeigt.current.length : index,
+          phase: 'wartet',
+        }),
+      );
+    },
+    [aendern],
+  );
+  /** Nach „Rückgängig“: kehrt der Posten in die Quelle zurück, gewinnt die echte Zeile. */
+  const freigeben = useCallback(
+    (id: number) =>
+      aendern((alt) => {
+        const g = alt.get(id);
+        return g == null || g.phase === 'weg' ? alt : new Map(alt).set(id, { ...g, phase: 'weg' });
+      }),
+    [aendern],
+  );
+  const isGeloest = useCallback((id: number) => aktuell.current.has(id), []);
+
+  const wurzelProps = {
+    onPointerMove: (e: ReactPointerEvent) => {
+      if (e.pointerType !== 'touch') bedingung.current.zeiger = true;
+    },
+    onPointerLeave: (e: ReactPointerEvent) => {
+      if (e.pointerType === 'touch') return;
+      bedingung.current.zeiger = false;
+      pruefen();
+    },
+    onPointerDown: () => {
+      bedingung.current.letzterTipp = Date.now();
+    },
+    onFocus: () => {
+      bedingung.current.fokus = true;
+    },
+    onBlur: (e: ReactFocusEvent<HTMLDivElement>) => {
+      const ziel = e.relatedTarget;
+      if (ziel != null && e.currentTarget.contains(ziel)) return;
+      if (ziel?.closest?.('.ant-dropdown, .ant-select-dropdown, .ant-picker-dropdown')) return;
+      bedingung.current.fokus = false;
+      pruefen();
+    },
+  };
+
+  return { zeilen, markieren, freigeben, isGeloest, wurzelProps };
+}
+
 export default function MaterialAmOrt({
   einsatzId,
   ort,
@@ -129,6 +317,7 @@ export default function MaterialAmOrt({
   });
 
   const zeilen = useZeilenFehler<number>();
+  const halten = useGeloestHalten(posten, `${einsatzId}:${ort.art}:${ort.id}`);
   const zuordnenFehler = useZeilenFehler<'zuordnen'>();
   // Was gerade gelöst wird, je Posten: die Rückmeldung steht am Knopf vor der Antwort.
   const [loesend, setLoesend] = useState<ReadonlySet<number>>(() => new Set());
@@ -146,9 +335,27 @@ export default function MaterialAmOrt({
       zeilen.beginne(p.id);
       mark(p.id, true);
     },
-    onSuccess: (_d, p) => void message.success(`${p.bezeichnung} gelöst`),
+    onSuccess: (_d, p) => {
+      halten.markieren(p);
+      zeigeRueckgaengig(message, `${p.bezeichnung} gelöst`, () => zuruecknehmen.mutate(p));
+    },
     onError: (e, p) => zeilen.melde(p.id, e, 'Lösen fehlgeschlagen'),
     onSettled: (_d, _e, p) => mark(p.id, false),
+  });
+  // „Rückgängig“ ordnet über den einen Schreibweg wieder diesem Ort zu (design.md D5).
+  const zuruecknehmen = useMutation({
+    mutationFn: (p: MaterialAmOrtPosten) =>
+      setOrt(
+        { id: p.id, einheit_id: null, einsatz_fahrzeug_id: null, uhs_id: null, br_id: null },
+        ort,
+      ),
+    onMutate: (p) => zeilen.beginne(p.id),
+    onSuccess: (_d, p) => halten.freigeben(p.id),
+    onError: (e, p) =>
+      // Steht die Zeile nicht mehr, gehört der Grund zur Auswahl darunter.
+      halten.isGeloest(p.id)
+        ? zeilen.melde(p.id, e, 'Nicht zurückgenommen')
+        : zuordnenFehler.melde('zuordnen', e, 'Nicht zurückgenommen'),
   });
   const zuordnen = useMutation({
     mutationFn: (p: ZuordnenPosten) => setOrt(p, ort),
@@ -213,7 +420,7 @@ export default function MaterialAmOrt({
   );
 
   return (
-    <div data-lfh="material-am-ort">
+    <div data-lfh="material-am-ort" {...halten.wurzelProps}>
       {(titel || kopfzahl) && (
         <Space size={token.marginXS} style={{ marginBottom: token.marginXS }}>
           {titel && <Typography.Text type="secondary">{titel}</Typography.Text>}
@@ -232,13 +439,17 @@ export default function MaterialAmOrt({
           <Typography.Text type="secondary">{leerText}</Typography.Text>
         </div>
       )}
-      {posten.map((p) => {
+      {halten.zeilen.map(({ p, isGeloest }) => {
         const grund = zeilen.grund(p.id);
         // Bis der Abgleich steht, zeigt die Zeile den gewählten Status.
         const isStatusPending = statusWechsel.isPending && statusWechsel.variables?.p.id === p.id;
         const statusStand = isStatusPending ? { ...p, status: statusWechsel.variables.status } : p;
         const isAusgebbar =
-          isBedienbar && !sperrgrund && p.art === 'verbrauchsgut' && p.ausgegeben < p.menge;
+          isBedienbar &&
+          !isGeloest &&
+          !sperrgrund &&
+          p.art === 'verbrauchsgut' &&
+          p.ausgegeben < p.menge;
         return (
           <div
             key={p.id}
@@ -247,7 +458,9 @@ export default function MaterialAmOrt({
             // gegen die Statuswahl des Fahrzeugs.
             data-row-key={`material-${p.id}`}
             data-lfh="material-am-ort-zeile"
+            data-geloest={isGeloest || undefined}
             style={{
+              color: isGeloest ? rollen.gedaempft : undefined,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
@@ -272,20 +485,22 @@ export default function MaterialAmOrt({
               {p.kategorie && <Typography.Text type="secondary">{p.kategorie}</Typography.Text>}
               {/* Eine Zahl bricht nicht um. */}
               <span style={{ ...monoStil(13), whiteSpace: 'nowrap' }}>{mengeText(p)}</span>
-              <StatusWahl
-                darstellung={materialDarstellung(statusStand)}
-                aktuell={statusStand.status}
-                optionen={materialStatusWahl(p.art)}
-                kennung={p.bezeichnung}
-                darfSchreiben={isBedienbar}
-                laeuft={isStatusPending}
-                gesperrt={statusWechsel.isPending}
-                onWaehlen={(status) => {
-                  if (!statusWechsel.isPending && status !== p.status) {
-                    statusWechsel.mutate({ p, status });
-                  }
-                }}
-              />
+              {!isGeloest && (
+                <StatusWahl
+                  darstellung={materialDarstellung(statusStand)}
+                  aktuell={statusStand.status}
+                  optionen={materialStatusWahl(p.art)}
+                  kennung={p.bezeichnung}
+                  darfSchreiben={isBedienbar}
+                  laeuft={isStatusPending}
+                  gesperrt={statusWechsel.isPending}
+                  onWaehlen={(status) => {
+                    if (!statusWechsel.isPending && status !== p.status) {
+                      statusWechsel.mutate({ p, status });
+                    }
+                  }}
+                />
+              )}
             </span>
             {isBedienbar && (
               <Space size="middle" wrap>
@@ -300,13 +515,34 @@ export default function MaterialAmOrt({
                     Ausgeben
                   </Button>
                 )}
+                {/* Gelöst bleibt es DERSELBE Knopf, träge (`aria-disabled`, nicht `disabled`): der Fokus
+                    bleibt, und ein zweiter Tipp trifft nichts. Kein Wechsel von `type`: antd hängt den
+                    Knopf dann neu ein, und der Fokus fiele auf `body`. Beide Wörter liegen im selben
+                    Gitterfeld, so ist die Marke nie schmaler als der Knopf (design.md D2). */}
                 <Button
-                  danger
-                  aria-label={loesenName(p.bezeichnung, loesenText)}
-                  loading={loesend.has(p.id)}
-                  onClick={() => loesen.mutate(p)}
+                  danger={!isGeloest}
+                  aria-label={
+                    isGeloest ? `${p.bezeichnung} gelöst` : loesenName(p.bezeichnung, loesenText)
+                  }
+                  aria-disabled={isGeloest || undefined}
+                  loading={!isGeloest && loesend.has(p.id)}
+                  style={isGeloest ? GELOEST_STIL(rollen.gedaempft) : undefined}
+                  onClick={() => {
+                    if (!isGeloest) loesen.mutate(p);
+                  }}
                 >
-                  {loesenText}
+                  <span style={{ display: 'inline-grid' }}>
+                    <span
+                      style={{ gridArea: '1 / 1', visibility: isGeloest ? 'hidden' : undefined }}
+                    >
+                      {loesenText}
+                    </span>
+                    <span
+                      style={{ gridArea: '1 / 1', visibility: isGeloest ? undefined : 'hidden' }}
+                    >
+                      Gelöst
+                    </span>
+                  </span>
                 </Button>
               </Space>
             )}
