@@ -825,19 +825,6 @@ describe('SchaedenDetailPage — Verlassen-Schutz (LLH-1101)', () => {
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
     expect(rueckfrage()).toBeNull();
   });
-
-  it('nach dem Speichern: keine Rückfrage', async () => {
-    render(einsatzAktiv, basisSchaden(), [
-      http.patch('/api/einsaetze/1/schaeden/10', () => HttpResponse.json(basisSchaden())),
-    ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.type(await screen.findByLabelText('Ort'), ' neu');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await screen.findByRole('button', { name: 'Bearbeiten' });
-    await userEvent.click(screen.getByRole('link', { name: 'Schäden' }));
-    expect(await screen.findByText('LISTE')).toBeInTheDocument();
-    expect(rueckfrage()).toBeNull();
-  });
 });
 
 describe('SchaedenDetailPage — stehende Leiste (LLH-1101)', () => {

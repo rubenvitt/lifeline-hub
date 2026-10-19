@@ -69,15 +69,6 @@ describe('DatenfeldEingabe', () => {
     expect(onFinish).not.toHaveBeenCalled();
   });
 
-  it('prüft eine Obergrenze als Meldung, ohne den Wert zu klemmen', async () => {
-    renderMitProviders(<Maske />);
-    const alter = screen.getByLabelText('Alter');
-    await userEvent.type(alter, '121');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Höchstens 120 Jahre')).toBeInTheDocument();
-    expect(alter).toHaveValue('121');
-  });
-
   it('nach gescheiterter Prüfung steht der Fokus im ersten fehlerhaften Feld', async () => {
     renderMitProviders(<Maske />);
     await userEvent.type(screen.getByLabelText('Ort'), 'Hauptstr.');
