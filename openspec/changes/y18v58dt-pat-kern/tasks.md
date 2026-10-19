@@ -67,7 +67,7 @@ Für jede Aufgabe gilt:
 
 ## 8. Ohne Netz im Frontend — LLH-1138 (ewjfqaek)
 
-- [ ] 8.1 `offline/schreiben.ts`, `queue.ts`, `useOfflineSync.ts`, `OfflineRecoveryDrawer.tsx`: Aktionsarten Sichtung, Verbleib, Notiz, Transport, Maßnahme, Verletzung über `mitErfassungszeitOfflineFaehig`. Vitest mit `setzeOnline`: vorgemerkt, übertragen und abgelehnt mit Grund im Wiederherstellungsbereich.
+- [x] 8.1 `offline/schreiben.ts`, `queue.ts`, `useOfflineSync.ts`, `OfflineRecoveryDrawer.tsx`: Aktionsarten Sichtung, Verbleib, Notiz, Transport, Maßnahme, Verletzung über `mitErfassungszeitOfflineFaehig`. Vitest mit `setzeOnline`: vorgemerkt, übertragen und abgelehnt mit Grund im Wiederherstellungsbereich.
 - [ ] 8.2 Ansatzstellen auf die vorgemerkten Wege umstellen (`saveSichtung`, Verbleib-Mutationen samt Grundriss-Transport, Notizzeile, die neuen Paneele) mit `networkMode: 'always'` und Quittung „Offline vorgemerkt“ am Ort. Vitest je Stelle.
 - [ ] 8.3 e2e am UHS-Tablet: Nachsichtung, Verbleib und Notiz ohne Netz, danach genau einmal mit Erfassungszeit im Verlauf.
 

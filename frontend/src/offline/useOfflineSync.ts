@@ -13,6 +13,7 @@ import { meldeSitzungAbgelaufen } from '../auth/sitzungsEvent';
 import { eintreffenQueryKeys } from '../bereitstellungsraum/eintreffenQueryKeys';
 import { meldeOfflineSchreibaktionGesendet } from './ereignisse';
 import { istOfflineTransient } from './fehler';
+import { isPersonEintrag, sendPersonEintrag } from './personEintrag';
 import {
   OFFLINE_QUEUE_EVENT,
   queueAblehnen,
@@ -194,6 +195,38 @@ export function useOfflineSync(benutzerId?: number): void {
             await qc.invalidateQueries({ queryKey: detail });
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
             for (const queryKey of weitere) void qc.invalidateQueries({ queryKey });
+          } else if (isPersonEintrag(aktion)) {
+            // LLH-1138, design.md D8: Sichtung, Verbleib, Notiz, Transport, Maßnahme, Verletzung.
+            // Dieselbe `client_id` wie beim ersten Versuch: nach einer abgerissenen Antwort liefert
+            // der Server den schon gespeicherten Eintrag. Ablehnungen (Person storniert 409, nicht
+            // anwesend 422, Rechte 403) gehen unten in den Wiederherstellungsbereich.
+            const einsatzId = element.wert.einsatz_id;
+            // Die UHS vor dem Senden lesen: ein Verbleib trägt die Person dort aus.
+            const uhsId =
+              aktion.art === 'verbleib'
+                ? qc
+                    .getQueryData<Person[]>(einsatzKeys.personen(einsatzId))
+                    ?.find((p) => p.id === aktion.person_id)?.aktuelle_uhs_id
+                : null;
+            await sendPersonEintrag(einsatzId, aktion, {
+              offlineQueueBenutzerId: aktuellerBenutzerId,
+            });
+            if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
+            // Der Eintrag steht im Detail, BEVOR „Offline vorgemerkt“ verschwindet (wie beim
+            // Eintreffen); der Abruf wirft nicht.
+            await qc.invalidateQueries({
+              queryKey: einsatzKeys.person(einsatzId, aktion.person_id),
+            });
+            await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personenAuswahl(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+            if (aktion.art === 'verbleib') {
+              void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
+              if (uhsId != null) {
+                void qc.invalidateQueries({ queryKey: einsatzKeys.uhsDetail(einsatzId, uhsId) });
+              }
+            }
           } else {
             const nie: never = aktion;
             throw new Error(`Unbekannte Offline-Schreibaktion ${JSON.stringify(nie)}`);

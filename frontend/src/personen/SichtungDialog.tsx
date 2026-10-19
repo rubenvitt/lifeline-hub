@@ -38,13 +38,11 @@ export function SichtungFelder({ einsatzId }: { einsatzId: number }) {
 
 /** Der Aufruf hinter beiden Hüllen; die Hülle reicht nur ihre Werte durch. */
 export function saveSichtung(einsatzId: number, personId: number, v: SichtungWerte) {
-  return erfasseSichtung(
-    einsatzId,
-    personId,
-    v.kategorie,
-    v.notiz ?? null,
-    v.bestaetigt_personal_id,
-  );
+  return erfasseSichtung(einsatzId, personId, {
+    kategorie: v.kategorie,
+    notiz: v.notiz ?? null,
+    bestaetigt_personal_id: v.bestaetigt_personal_id,
+  });
 }
 
 interface SichtungDialogProps {

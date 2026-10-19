@@ -190,20 +190,42 @@ export function registrierAnzeige(nr: number): string {
   return registrierNummer('R', nr);
 }
 
-/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. `bestaetigtPersonalId`
- * nennt am Gerät die bestätigende Person (LFH-1046); eine Person schickt es nie (422). */
+/**
+ * Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): jeder medizinische Eintrag einer
+ * Person nimmt `client_id` (Replay ohne zweiten Eintrag) und `zeitpunkt_at` (Erfassungszeit,
+ * serverseitig gekappt). Gesetzt werden beide nur über `offline/schreiben.ts`.
+ */
+export interface OfflineEintragFelder {
+  client_id?: string | null;
+  zeitpunkt_at?: string | null;
+}
+
+/** Eine Nachsichtung. `bestaetigt_personal_id` nennt am Gerät die bestätigende Person (LFH-1046);
+ * eine Person schickt es nie (422). */
+export interface SichtungEingabe extends OfflineEintragFelder {
+  kategorie: Sichtungskategorie;
+  notiz?: string | null;
+  bestaetigt_personal_id?: number | null;
+}
+
+/** Sichtung (Triage) erfassen. Hebt erfasst→betroffen serverseitig an. */
 export function erfasseSichtung(
   einsatzId: number,
   personId: number,
-  kategorie: Sichtungskategorie,
-  notiz?: string | null,
-  bestaetigtPersonalId?: number | null,
+  eingabe: SichtungEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Sichtung> {
-  return apiSend<Sichtung>(`/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`, 'POST', {
-    kategorie,
-    notiz: notiz ?? null,
-    ...(bestaetigtPersonalId != null ? { bestaetigt_personal_id: bestaetigtPersonalId } : {}),
-  });
+  const { bestaetigt_personal_id, notiz, ...rest } = eingabe;
+  return apiSend<Sichtung>(
+    `/api/einsaetze/${einsatzId}/personen/${personId}/sichtung`,
+    'POST',
+    {
+      ...rest,
+      notiz: notiz ?? null,
+      ...(bestaetigt_personal_id != null ? { bestaetigt_personal_id } : {}),
+    },
+    optionen,
+  );
 }
 
 /** Auswahl „Bestätigt von“ am UHS-Gerät (LFH-1046): das Personal des Einsatzes. Eine Person und
@@ -212,7 +234,7 @@ export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
   return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
 }
 
-export interface VerbleibEingabe {
+export interface VerbleibEingabe extends OfflineEintragFelder {
   art: VerbleibArt;
   transportmittel?: string | null;
   ziel?: string | null;
@@ -230,36 +252,45 @@ export function erfasseVerbleib(
   einsatzId: number,
   personId: number,
   daten: VerbleibEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Verbleib> {
   return apiSend<Verbleib>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/verbleib`,
     'POST',
     daten,
+    optionen,
   );
+}
+
+/** Eine Verlaufsnotiz; ihr Text liegt ohne Netz in der Warteschlange (design.md D8). */
+export interface NotizEingabe extends OfflineEintragFelder {
+  text: string;
 }
 
 /** Befund-/Verlaufsnotiz (append-only, KEIN ETB-Eintrag). */
 export function legeNotizAn(
   einsatzId: number,
   personId: number,
-  text: string,
+  eingabe: NotizEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Verlaufsnotiz> {
   return apiSend<Verlaufsnotiz>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/notizen`,
     'POST',
-    { text },
+    eingabe,
+    optionen,
   );
 }
 
 // ---------- PAT-Kern: Transport, Maßnahmen, Verletzungen (Change `y18v58dt-pat-kern`) ----------
 //
 // Je Schreibweg GENAU EINE Funktion, und jede Oberfläche ruft sie nur über ihre eine Mutation im
-// Patientenkopf: die Offline-Vormerkung (Abschnitt 8, design.md D8) tauscht hier den Aufruf gegen
-// den vorgemerkten Weg aus. `client_id` und `zeitpunkt_at` kennt der Server schon (LLH-1138).
+// Patientenkopf, dort über `offline/schreiben.ts` (`savePersonEintragOfflineCapable`, design.md
+// D8). Das Aufheben bleibt online: seine Route kennt weder `client_id` noch Erfassungszeit.
 
 /** Ein voller Transportstand (Spec `personen-transport`): jedes Feld einzeln leer, alle drei leer
  * heben den Transport auf. Am Gerät optional „Bestätigt von“ (LFH-1046). */
-export interface TransportEingabe {
+export interface TransportEingabe extends OfflineEintragFelder {
   prioritaet: TransportPrioritaet | null;
   art: TransportArt | null;
   fachrichtung: Fachrichtung | null;
@@ -271,19 +302,20 @@ export function saveTransport(
   einsatzId: number,
   personId: number,
   eingabe: TransportEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Transport> {
   return apiSend<Transport>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/transport`,
     'POST',
     eingabe,
+    optionen,
   );
 }
 
 /** Eine Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`); ohne `zeitpunkt_at` gilt die
- * Erfassung als Durchführung. Kein ETB. */
-export interface MassnahmeEingabe {
+ * Erfassung als Durchführung (vorgemerkt: die Zeit des Vormerkens). Kein ETB. */
+export interface MassnahmeEingabe extends OfflineEintragFelder {
   art: MassnahmeArt;
-  zeitpunkt_at?: string | null;
   bestaetigt_personal_id?: number | null;
 }
 
@@ -291,11 +323,13 @@ export function createMassnahme(
   einsatzId: number,
   personId: number,
   eingabe: MassnahmeEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Massnahme> {
   return apiSend<Massnahme>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/massnahmen`,
     'POST',
     eingabe,
+    optionen,
   );
 }
 
@@ -313,7 +347,7 @@ export function revokeMassnahme(
 
 /** Eine Verletzung am Körperschema (Spec `personen-verletzungen`): Region muss in der Ansicht
  * liegen (sonst 422), die Lage `x`/`y` nur als Paar, je 0..1. Kein ETB. */
-export interface VerletzungEingabe {
+export interface VerletzungEingabe extends OfflineEintragFelder {
   ansicht: VerletzungAnsicht;
   region: KoerperRegion;
   art: VerletzungArt;
@@ -328,11 +362,13 @@ export function createVerletzung(
   einsatzId: number,
   personId: number,
   eingabe: VerletzungEingabe,
+  optionen?: ApiSendOptionen,
 ): Promise<Verletzung> {
   return apiSend<Verletzung>(
     `/api/einsaetze/${einsatzId}/personen/${personId}/verletzungen`,
     'POST',
     eingabe,
+    optionen,
   );
 }
 

@@ -617,7 +617,7 @@ function NotizZeile({
   const { token } = useRollen();
   const [form] = Form.useForm<{ text: string }>();
   const mutation = useMutation({
-    mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, v.text),
+    mutationFn: (v: { text: string }) => legeNotizAn(einsatzId, personId, { text: v.text }),
     onSuccess: () => {
       form.resetFields();
       onGeschrieben?.();
