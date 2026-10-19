@@ -70,7 +70,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   `y18v58dt-pat-kern`, D7): eine danach entlassene Kraft bestätigt einen vorgemerkten Eintrag
   weiter, ohne bestimmbare Einsatzzeit gilt „aktiv jetzt“. Ein vorgemerkter Eintrag nimmt die
   Angabe in der Warteschlange mit. Im Client nur über `geraet/BestaetigtVonFeld.tsx`, ohne
-  Vorauswahl. ETB-Text und Verlauf nennen „bestätigt: Name“, Erfasser bleibt das Gerät.
+  Vorauswahl; die Hülle hält die Liste beobachtet (`useKeepBestaetigerLoaded`), sonst wäre sie
+  ohne Netz leer, sobald der Cache sie nach dem letzten Paneel geräumt hat (nur im Speicher des
+  Tabs). ETB-Text und Verlauf nennen „bestätigt: Name“, Erfasser bleibt das Gerät.
 - **Nichts auf der Platte** (design.md D8 der LFH-892): kein Lagebild
   (`offline/lagebildSitzung.ts` überspringt Geräte), keine gemerkte UHS; die
   Schreib-Warteschlange bleibt an (`useOfflineSync` in der Hülle). Ohne Netz merkt das UHS-Gerät

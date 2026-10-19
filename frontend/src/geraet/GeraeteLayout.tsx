@@ -55,6 +55,7 @@ import AusgabeAnsicht from '../verpflegung/AusgabeAnsicht';
 import GeraetMeldungenPage from './GeraetMeldungenPage';
 import GeraetStellePage from './GeraetStellePage';
 import LagemonitorPage from './LagemonitorPage';
+import { useKeepBestaetigerLoaded } from './BestaetigtVonFeld';
 import { GeraeteKopf } from './GeraeteKopf';
 import { geraetDarf } from './geraetSicht';
 
@@ -428,6 +429,8 @@ function GeraeteHuelle({ geraet }: { geraet: GeraetAnzeige }) {
   useEinsatzLiveStream(geraet.einsatz_id);
   // Die Warteschlange bleibt an: eine Aufnahme ohne Netz geht nicht verloren (design.md D8).
   useOfflineSync(abgleichFuer(benutzer, konflikt !== null));
+  // „Bestätigt von“ bleibt ohne Netz wählbar: die Liste liegt im Speicher, solange die Hülle steht.
+  useKeepBestaetigerLoaded(geraet);
   const pfade = geraet.ansicht === 'betreuungsstelle' ? GERAET_BETREUUNG_PFADE : GERAET_PFADE;
   return (
     <EinsatzPfadeProvider pfade={pfade}>

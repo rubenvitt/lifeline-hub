@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -8,7 +8,7 @@ import { http, HttpResponse } from 'msw';
 import { appRouten } from '../App';
 import { meHandler, server } from '../test/server';
 import { neuerQueryClient, setzeOnline } from '../test/utils';
-import { benutzerFixture, einsatzFixture } from '../test/fixtures';
+import { benutzerFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import type {
   Betreuungsstelle,
@@ -220,6 +220,32 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     // keinen Auslöser für ein leeres Menü.
     expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeVisible();
     expect(screen.queryByRole('button', { name: /Weitere Aktionen zu Person/ })).toBeNull();
+  });
+
+  it('ohne Netz: die Pflicht-Stelle der Notunterkunft bleibt wählbar, auch wenn vorher kein Paneel offen war', async () => {
+    bereit();
+    let freigabeAbrufe = 0;
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () => {
+        freigabeAbrufe += 1;
+        return HttpResponse.json(freigabenFixture());
+      }),
+    );
+    renderApp('/geraet/7/betroffene/10');
+    const kopf = await screen.findByRole('region', { name: 'Patientenkopf' });
+    // Die Personenseite lädt die Freigaben mit (Sprünge), die Kopfzeile hält die Stellen: beide
+    // liegen im Speicher des Tabs, solange die Person geladen ist.
+    await waitFor(() => expect(freigabeAbrufe).toBe(1));
+    act(() => setzeOnline(false));
+    const user = userEvent.setup();
+    await user.click(within(kopf).getByRole('button', { name: 'Verbleib erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Verbleib erfassen' });
+    await user.click(within(paneel).getByRole('combobox', { name: 'Art' }));
+    await user.click(await screen.findByTitle('Notunterkunft'));
+    await user.click(await within(paneel).findByRole('combobox', { name: 'Betreuungsstelle' }));
+    await user.click(await screen.findByTitle('NU Turnhalle Nord'));
+    // Die Wahl belegt „Ziel“ mit dem Namen der Stelle vor.
+    expect(within(paneel).getByRole('textbox', { name: 'Ziel' })).toHaveValue('NU Turnhalle Nord');
   });
 });
 

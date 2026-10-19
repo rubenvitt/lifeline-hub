@@ -425,6 +425,43 @@ describe('Gerätehülle — Startseite und Navigation', () => {
     // Keine Brotkrumen in die Stabsoberfläche.
     expect(screen.queryByRole('link', { name: 'Einsätze' })).toBeNull();
   });
+
+  it('UHS-Tablet ohne Netz: „Bestätigt von“ bietet das Personal, auch wenn vorher kein Paneel offen war (Spec `geraete-kopplung`)', async () => {
+    vi.useRealTimers();
+    await queueLeerenFuerTests();
+    stelleBereit();
+    let abrufe = 0;
+    const gesendet: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/einsaetze/7/personen/bestaetiger', () => {
+        abrufe += 1;
+        return HttpResponse.json([{ id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' }]);
+      }),
+      http.post('/api/einsaetze/7/personen/10/massnahmen', async ({ request }) => {
+        gesendet.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 1 }, { status: 201 });
+      }),
+    );
+    renderApp('/geraet/7/patienten/10');
+    const kopf = await screen.findByRole('region', { name: 'Patientenkopf' });
+    // Die Hülle hält die Liste im Speicher des Tabs, bevor das Netz wegfällt.
+    await waitFor(() => expect(abrufe).toBe(1));
+    act(() => setzeOnline(false));
+    const user = userEvent.setup();
+    await user.click(within(kopf).getByRole('button', { name: 'Maßnahme erfassen' }));
+    const paneel = screen.getByRole('region', { name: 'Maßnahme erfassen' });
+    await user.click(within(paneel).getByRole('radio', { name: 'Zugang' }));
+    await user.click(within(paneel).getByRole('combobox', { name: 'Bestätigt von' }));
+    await user.click(await screen.findByTitle('Dr. A. Muster · Notärztin'));
+    await user.click(within(paneel).getByRole('button', { name: 'Maßnahme erfassen' }));
+    expect(await within(kopf).findByText('Offline vorgemerkt')).toBeVisible();
+    expect(gesendet).toEqual([]);
+
+    // Nach der Rückkehr des Netzes geht die Angabe mit der vorgemerkten Maßnahme hinaus.
+    act(() => setzeOnline(true));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ art: 'zugang', bestaetigt_personal_id: 5 });
+  });
 });
 
 describe('Gerätehülle — Kopfzeile', () => {
