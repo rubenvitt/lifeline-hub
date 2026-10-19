@@ -48,7 +48,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 ## 7. Integration
 
 - [x] 7.1 e2e: Eigentransport aus dem Wartebereich, Patient in „Unterwegs“, Übergabe quittiert, Patient aus Liste und Board verschwunden, mit „Abgeschlossene zeigen“ wieder da. Prüfung: neuer Spec unter `frontend/e2e/` grün.
-- [ ] 7.2 `superpowers:verification-before-completion` und `superpowers:requesting-code-review`; `./scripts/check-all.sh` vollständig grün (kein `| tail`). Prüfung: Gesamtstatus aus dem Lauf, Abweichungen im PR benannt.
+- [x] 7.2 `superpowers:verification-before-completion` und `superpowers:requesting-code-review`; `./scripts/check-all.sh` vollständig grün (kein `| tail`). Prüfung: Gesamtstatus aus dem Lauf, Abweichungen im PR benannt.
 
 ## Workflow follow-up
 
