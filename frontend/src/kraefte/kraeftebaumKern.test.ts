@@ -20,7 +20,7 @@ import {
   type KraeftebaumKnoten,
   type StufenZeile,
 } from './kraeftebaumKern';
-import { verdichte, type StaerkeSumme } from './kraeftebild';
+import { filtereKraefte, verdichte, type StaerkeSumme } from './kraeftebild';
 import { isMaterialAusfall, materialAusfall } from './materialVerdichtungKern';
 import { staerkeText } from '../anzeige/staerke';
 import type {
@@ -952,5 +952,54 @@ describe('kraeftebaum — Beladung und Material am Ort (LLH-1225 D14)', () => {
     const o = mittelDerEinheit(null, roh);
     expect(o.material.map((x) => x.id)).toEqual([7]);
     expect(o.fahrzeuge.map((f) => f.beladung.map((x) => x.id))).toEqual([[4]]);
+  });
+});
+
+describe('kraeftebaum — Suche über Fahrzeug und Beladung (LLH-1250)', () => {
+  const einheiten = [eh(1, 10, null, { name: 'Zug' })];
+  const fahrzeuge = [fz(10, 1, 'LF 1'), fz(20, 1, 'MTW')];
+  const material = [
+    { ...mo(1, { einheit_id: 1 }), bezeichnung: 'Trage' },
+    { ...mo(2, { einsatz_fahrzeug_id: 10 }), bezeichnung: 'Schere' },
+    { ...mo(3, { einsatz_fahrzeug_id: 10 }), bezeichnung: 'Spreizer' },
+    { ...mo(4, { einsatz_fahrzeug_id: 20 }), bezeichnung: 'Funkgerät' },
+  ];
+  const nachSuche = (suche: string) => {
+    const wurzeln = kraeftebaum(
+      filtereKraefte(
+        { abschnitte: [ab(10)], einheiten, personal: [], fahrzeuge, material },
+        { abschnittId: null, traeger: null, kategorie: null, suche },
+      ),
+    );
+    const zug = wurzeln[0];
+    if (zug.art !== 'einheit') throw new Error('Einheit erwartet');
+    return {
+      einheit: zug.knoten.einheit.name,
+      fahrzeuge: zug.knoten.mittel.fahrzeuge.map((f) => [
+        f.fahrzeug.funkrufname,
+        f.beladung.map((m) => m.bezeichnung),
+      ]),
+      material: zug.knoten.mittel.material.map((m) => m.bezeichnung),
+    };
+  };
+
+  it('ein Treffer am Fahrzeug zeigt seine ganze Beladung mit', () => {
+    expect(nachSuche('lf')).toEqual({
+      einheit: 'Zug',
+      fahrzeuge: [['LF 1', ['Schere', 'Spreizer']]],
+      material: [],
+    });
+  });
+
+  it('ein Treffer an einem Posten zeigt das tragende Fahrzeug und seine Einheit, nicht die übrige Beladung', () => {
+    expect(nachSuche('sprei')).toEqual({
+      einheit: 'Zug',
+      fahrzeuge: [['LF 1', ['Spreizer']]],
+      material: [],
+    });
+  });
+
+  it('trifft die Suche weder Fahrzeug noch Beladung, fehlen beide', () => {
+    expect(nachSuche('trage')).toEqual({ einheit: 'Zug', fahrzeuge: [], material: ['Trage'] });
   });
 });
