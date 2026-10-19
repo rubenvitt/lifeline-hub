@@ -1,3 +1,100 @@
+## [1.0.0-alpha.143](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.142...v1.0.0-alpha.143) (2026-10-19)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen 0217 bis 0221** werden beim Start automatisch eingespielt:
+  - Sichtung, Verbleib und Verlaufsnotiz speichern jetzt eine Erfassungszeit und eine Kennung gegen doppeltes Speichern.
+  - An der Person kommen PAT-Nummer und Kontamination hinzu.
+  - Neue Tabellen für Transport, Maßnahmen und Verletzungen.
+- **Neue Schnittstellen an der Person:**
+  - Transport festlegen
+  - Maßnahme erfassen und aufheben
+  - Verletzung markieren und aufheben
+  - Druckansicht einer Person, die einen Eintrag im Zugriffsprotokoll schreibt
+- **Bestehende Schnittstellen sind erweitert:** Sichtung, Verbleib und Notiz nehmen optional eine Erfassungszeit und eine Kennung an. Die Personendetails enthalten jetzt Aufenthalt, Transporte, Maßnahmen und Verletzungen.
+- **Aufbewahrung:** In die Kategorie „Behandlung“ fallen jetzt auch Transport, Maßnahmen, Verletzungen, PAT-Nummer und eine Kontamination „ja“. Sie halten den Namen der Person, bis die Behandlungsdaten geschwärzt sind. Beim Schwärzen werden die PAT-Nummer, die benötigte Fachrichtung, die Lage am Körperschema und Notizen zu Verletzungen geleert.
+- **Neue Gerätefähigkeit „Behandlung“:** Nur Geräte einer Unfallhilfsstelle (UHS) erfassen Behandlungsdaten. Betreuungsstelle und Lagemonitor sehen sie nicht.
+
+### Betroffene
+
+- **Patientenkopf auf der Detailseite:**
+  - Er zeigt oben Sichtung mit Zeitpunkt und „vor n min“, Zustand / Verdacht, Aufenthalt bzw. Verbleib, Transport, Maßnahmen, Verletzungen und die letzte Notiz. Auf breiten Bildschirmen steht das in zwei Spalten.
+  - Sichten, Verbleib, Notiz, Transport und Maßnahme werden direkt im Kopf erfasst, ohne Dialog.
+  - Aufnehmen in die UHS, Verlegen und Austragen stehen ebenfalls im Kopf.
+- **Transport:** Priorität (sofort, dringlich, normal), Transportart und benötigte Fachrichtung lassen sich festlegen. Ins Einsatztagebuch kommt nur ein Wechsel der Priorität. Ein nachgetragener älterer Stand nennt dort auch die weiter geltende Priorität.
+- **Maßnahmen:** Erfasst werden sie aus einem festen Katalog, optional mit der Uhrzeit der Durchführung. Diese Uhrzeit darf vor der Registrierung der Person liegen, etwa bei einem Tourniquet am Fundort. Eine Maßnahme lässt sich genau einmal aufheben, nach einer Rückfrage.
+- **Körperschema für Verletzungen:**
+  - Es gibt eigene Figuren für männlich und weiblich sowie eine neutrale Figur, jeweils von vorn und von hinten.
+  - Markiert wird mit zwei Tipps: erst die Region, dann die Art. Die Schwere ist optional.
+  - Jede Verletzung bekommt eine feste Nummer, als Sternchen in der Figur und in einer Liste daneben. Die Liste zeigt die jüngsten Einträge zuerst, mit Uhrzeit.
+  - Die Trefferflächen sind auch im Handschuh-Modus groß genug. Die Figur passt sich der Bildschirmbreite an und lässt sich mit der Tastatur bedienen.
+- **PAT-Nummer und Kontamination:** Beide werden direkt in der Kopfzeile bearbeitet. Kontaminierte Personen tragen in den Listen die Marke „kontaminiert“. Die PAT-Nummer lässt sich in der Betroffenenliste suchen.
+- **Verlauf:** Er führt jetzt auch Transporte, Maßnahmen und Verletzungen, Aufgehobene mit Zeitpunkt. Einträge, die später eingegangen sind, tragen „nachgetragen“.
+- **Sichtung über große Farbflächen:** Die Kategorien stehen als Flächen in den Farben des BBK, statt in einem Auswahlmenü, sowohl bei der Erfassung als auch beim Nachsichten.
+- **Betroffenenliste:**
+  - Sichten und Verbleib erfassen geht direkt aus der Zeile.
+  - Das Zeilenmenü bietet „Sichten“, „Verbleib erfassen“ und „Auf Lagekarte verorten“.
+  - Neu ist die sortierbare Spalte „Transport“.
+  - Ohne Schreibrecht steht „Nur Ansicht“ über der Liste, und die leere Spalte „Aktionen“ entfällt.
+- **Tiere und Schäden** werden auf der Personenseite als eine Liste „Bezüge“ geführt und über „Bezug hinzufügen“ ergänzt.
+- **Einheitlicher Begriff:** Das Feld heißt überall „Fundort“, auch im Einsatztagebuch-Eintrag beim Schwärzen. Bisher stand dort teils „Antreffort“.
+- **Fehlerbehebungen:**
+  - Beim Wechsel auf eine andere Person bleiben keine Notiz und kein offenes Paneel der vorigen Person stehen.
+  - Solange gespeichert wird, ist der Wechsel zwischen den Paneelen gesperrt.
+  - Ein Zeilenmenü, dessen Einträge alle wegfallen, gibt die Liste wieder frei.
+
+### Unfallhilfsstellen
+
+- **Bereiche:** Die UHS-Seite ist in die Bereiche Belegung, Material, Kräfte, Bewegungen und Dateien gegliedert. Der gewählte Bereich steht in der Adresse.
+- **Lage der Stelle in Zahlen:** Am Führungskraftwagen über dem Grundriss und am UHS-Laptop stehen die Personen in der Stelle, freie Plätze, Wartende (mit der längsten Wartezeit) und Abtransportierte.
+- **Grundriss:**
+  - Jede Personenmarke zeigt die Sichtung.
+  - Im Wartebereich steht die Wartezeit, und die Personen sind nach Dringlichkeit sortiert: erst nach Sichtung, dann nach Transportpriorität, dann nach Wartezeit.
+  - Die Transportspalte zeigt die Priorität.
+- **„Patient zuweisen“:** Die Kandidaten stehen als Liste mit Sichtung, Wartezeit und Zustand, der dringlichste ist vorgewählt. Fällt die gewählte Person weg, kommt eine Meldung statt einer stillen Umverteilung.
+- **Material am Ort:** Status setzen und Material erfassen geht direkt an der UHS, an der Einheit, am Fahrzeug und im Bereitstellungsraum. Die Materialzahl im Kopf springt in den Bereich Material.
+- **„Fehlmenge melden“** an der UHS öffnet eine vorbelegte Nachforderung.
+
+### Ohne Netz
+
+- **Einträge vormerken:** Sichtung, Verbleib, Notiz, Transport, Maßnahme und Verletzung lassen sich ohne Verbindung vormerken. Am jeweiligen Ort steht dann „Offline vorgemerkt“, auch am Platz und im Wartebereich des Grundrisses. Mit dem Netz wird jeder Eintrag genau einmal gesendet und behält die Erfassungszeit von unterwegs.
+- **Abgelehnte Einträge** zeigt der Wiederherstellungsbereich mit Art und Registriernummer an.
+- **Weiterhin nur mit Verbindung:** Maßnahmen und Verletzungen aufheben sowie PAT-Nummer und Kontamination ändern. Die Sperre greift auch bei WLAN ohne erreichbaren Server.
+- **PAT-Nummer:** Sie wird nicht auf dem Gerät gespeichert. Nach einem Start ohne Netz findet die Suche sie deshalb nicht.
+- **Fehlerbehebungen:**
+  - Ein nachgereichter Verbleib, der älter ist als eine erneute Aufnahme, trägt die Person nicht mehr aus der UHS aus.
+  - Nach dem Abgleich zeigen Liste und Grundriss sofort den neuen Stand.
+
+### Gekoppelte Geräte
+
+- **„Bestätigt von“** gibt es am UHS-Tablet und -Laptop jetzt für alle Einträge. Geprüft wird zum Zeitpunkt der Erfassung: Eine inzwischen entlassene Kraft kann einen vorgemerkten Eintrag aus ihrer Einsatzzeit noch bestätigen.
+- **Das UHS-Tablet** zeigt in der Patientenliste die Spalte Zustand und sortiert nach Dringlichkeit vor.
+- **Fehlerbehebung:** Die Auswahl „Bestätigt von“ bleibt auch ohne Netz gefüllt.
+
+### Kräfte und Mittel
+
+- **Fehlerbehebung:** Eine Kraft, die am Gerät eine Verletzung, eine Maßnahme oder einen Transport bestätigt hat, lässt sich nicht mehr stornieren.
+
+### Lagekarte
+
+- **Verorten aus Person, Schaden, Betreuungsstelle oder Bereitstellungsraum:**
+  - Die passende Ebene wird eingeblendet, auch wenn sie ausgeschaltet ist.
+  - Nach dem Tipp erscheint „… verortet“ mit „Zurück zu …“ und „Auf der Karte bleiben“.
+  - „Zurück“ im Browser führt danach auf die Liste, nicht noch einmal auf die Karte.
+
+### Druck
+
+- **Druckansicht einer Person:** Personendaten, Sichtung, Zustand, Transport, PAT-Nummer, Kontamination, Maßnahmen und das Körperschema in Schwarz-Weiß. Sie ist auch ohne Schreibrecht erreichbar, aber nicht an Geräten.
+- **Zugriffsprotokoll:** Es unterscheidet „Blatt gedruckt“ (eine Person) von „Liste gedruckt“.
+
+### Sprungpalette
+
+- **Suche nach PAT-Nummer:** Eine reine Zifferneingabe findet Personen jetzt auch über die PAT-Nummer.
+
+### Lagemonitor
+
+- **Datenstand:** Ab einer Stunde heißt es „vor 3 h 4 min“ statt „vor 184 min“.
+
 ## [1.0.0-alpha.142](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.141...v1.0.0-alpha.142) (2026-10-18)
 
 ### Einsatztagebuch
