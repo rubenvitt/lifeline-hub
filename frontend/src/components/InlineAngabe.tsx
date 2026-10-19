@@ -1,5 +1,6 @@
 import { IconStift } from '../icons';
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -9,6 +10,7 @@ import {
   type Ref,
 } from 'react';
 import { Button, Space } from 'antd';
+import { FeldFehler } from './instrument';
 import { useRollen } from './instrument/rollenwerte';
 import { wertKnopfStil } from './BemerkungZelle';
 import { SpeicherFehler } from './SpeicherHinweis';
@@ -42,11 +44,32 @@ import { useFokusRueckgabe } from './useFokusRueckgabe';
  * **Kein Speichern beim Verlassen (Blur).** Kalender der Zeiteingabe und Select öffnen Portale; ein Klick
  * darin verlässt die Eingabe, und ein Blur-Speichern schriebe einen halben Zeitpunkt. Gespeichert
  * wird nur ausdrücklich: Enter, Strg/⌘+Enter im Textfeld, oder „Speichern".
+ *
+ * ── FELDWEISE BEARBEITUNG IN EINER ANSICHT (LLH-1103) ──────────────────────────────────
+ *
+ * Für die Personendaten (Change `f8218h1i-personendaten-feldweise`, design.md D3) kamen drei
+ * optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
+ * - `pruefe`: Prüfung ohne Server. Der Grund steht nach dem Absenden als `FeldFehler` unter der
+ *   Eingabe (`aria-invalid`, `aria-describedby`), der Fokus geht ins Feld, gesendet wird nicht;
+ *   danach folgt die Meldung dem Entwurf. Ein unveränderter Wert wird nicht geprüft (Altbestand).
+ * - `gesperrt`: der Grund steht sichtbar am Feld (`frontend/AGENTS.md`, „Texte: zeigen statt
+ *   erklären“: nie nur im Tooltip), der Auslöser ist `disabled`. Eine offene Bearbeitung ohne
+ *   Änderung schließt; ein Entwurf bleibt stehen, damit nichts still verloren geht, sendet aber
+ *   nicht, bis die Sperre fällt.
+ * - `onEntwurf`: meldet nur die Wechsel zwischen „unverändert“ und „geändert“ (auch beim
+ *   Aushängen), für den Merker `components/offeneBearbeitung.tsx`.
  */
 
 /** Was die Eingabe zum Einhängen bekommt. `feld` ist unverändert auf das antd-Element spreizbar. */
 export interface InlineEingabe<T> {
-  feld: { id: string; 'aria-label': string; autoFocus: true };
+  /** Die Zugangsmerkmale `aria-invalid`/`aria-describedby` kommen nur bei einem Prüffehler. */
+  feld: {
+    id: string;
+    'aria-label': string;
+    autoFocus: true;
+    'aria-invalid'?: true;
+    'aria-describedby'?: string;
+  };
   value: T;
   onChange: (wert: T) => void;
   /**
@@ -86,12 +109,26 @@ export interface InlineAngabeProps<T> {
    * Öffnen; Name und Trefffläche verantwortet der Aufrufer. Ohne Schreibrecht entfällt er, und
    * es steht nichts da — der Wert steht ja woanders.
    */
-  ausloeser?: (p: { ref: Ref<HTMLButtonElement>; onClick: () => void }) => ReactNode;
+  ausloeser?: (p: {
+    ref: Ref<HTMLButtonElement>;
+    onClick: () => void;
+    /** Gesetzt bei `gesperrt`; der Grund steht schon daneben. */
+    disabled: boolean;
+  }) => ReactNode;
   /**
    * Übernahme. Lehnt bei Ablehnung ab (`mutateAsync`) — dann bleibt die Eingabe mit dem Entwurf
    * offen und der Fehler steht an der Zeile. Erfüllt erst, wenn der neue Wert im Cache steht.
    */
   onSpeichern: (wert: T) => Promise<unknown>;
+  /**
+   * Prüfung ohne Server (LLH-1103): ein Grund in wenigen Wörtern („höchstens 120“) sperrt das
+   * Senden und steht als `FeldFehler` unter der Eingabe; `null` = in Ordnung.
+   */
+  pruefe?: (wert: T) => string | null;
+  /** Sperrgrund in wenigen Wörtern, sichtbar am Feld; der Auslöser ist nicht bedienbar. */
+  gesperrt?: string;
+  /** Meldet, ob die offene Bearbeitung einen geänderten, ungespeicherten Entwurf hat. */
+  onEntwurf?: (geaendert: boolean) => void;
 }
 
 /**
@@ -133,6 +170,9 @@ export function InlineAngabe<T>({
   eingabe,
   ausloeser,
   onSpeichern,
+  pruefe,
+  gesperrt,
+  onEntwurf,
 }: InlineAngabeProps<T>) {
   const [bearbeitet, setBearbeitet] = useState(false);
   const [entwurf, setEntwurfZustand] = useState<T>(wert);
@@ -147,6 +187,9 @@ export function InlineAngabe<T>({
   const [sendet, setSendet] = useState(false);
   const [fehler, setFehler] = useState<unknown>(null);
   const [pflichtHinweis, setPflichtHinweis] = useState(false);
+  // Erst nach einem gescheiterten Absenden zeigt das Feld den Prüfgrund, danach folgt er dem
+  // Entwurf (wie antds Formularmeldung): beim ersten Tippen stünde sonst schon ein Fehler da.
+  const [pruefungAktiv, setPruefungAktiv] = useState(false);
   // Riegel in der Absende-Funktion, nicht am Knopf: Enter und ein zweiter Klick liefen sonst an
   // `loading` vorbei, bevor React neu gerendert hat.
   const sendetRef = useRef(false);
@@ -159,15 +202,52 @@ export function InlineAngabe<T>({
   const { token, rollen } = useRollen();
   const wertId = useId();
   const feldId = useId();
+  const pruefId = useId();
+  const sperrId = useId();
   /** Zugänglicher Name der Angabe, in einer Liste mit der Zeile. */
   const name = kennung ? `${etikett} zu ${kennung}` : etikett;
+  /** Ein leerer Grund sperrt nicht: gesperrt heißt immer mit sichtbarem Grund. */
+  const isGesperrt = Boolean(gesperrt);
+  const geaendert = darfSchreiben && bearbeitet && !gleich(entwurf, wert);
+  const pruefGrund = bearbeitet && pruefungAktiv && pruefe ? pruefe(entwurf) : null;
+
+  // Die Sperre schließt eine offene Bearbeitung ohne Änderung (Zustand beim Rendern angepasst,
+  // nicht per Effekt: sonst stünde einen Frame lang ein bedienbares Feld unter der Sperre). Ein
+  // Entwurf bleibt stehen.
+  if (isGesperrt && bearbeitet && !geaendert) {
+    setBearbeitet(false);
+    setFehler(null);
+  }
+
+  // Entwurfsmeldung nur an den Flanken; der Aufrufer bekommt seinen jüngsten Rückruf.
+  const onEntwurfRef = useRef(onEntwurf);
+  const gemeldetRef = useRef(false);
+  useEffect(() => {
+    onEntwurfRef.current = onEntwurf;
+  });
+  useEffect(() => {
+    if (gemeldetRef.current === geaendert) return;
+    gemeldetRef.current = geaendert;
+    onEntwurfRef.current?.(geaendert);
+  }, [geaendert]);
+  useEffect(
+    () => () => {
+      if (!gemeldetRef.current) return;
+      gemeldetRef.current = false;
+      onEntwurfRef.current?.(false);
+    },
+    [],
+  );
 
   if (!darfSchreiben) return ausloeser ? null : <>{leer(wert) ? '—' : anzeige}</>;
 
   function oeffnen() {
+    if (isGesperrt) return;
+    popupOffenRef.current = false;
     setEntwurf(wert);
     setFehler(null);
     setPflichtHinweis(false);
+    setPruefungAktiv(false);
     setBearbeitet(true);
   }
 
@@ -178,7 +258,7 @@ export function InlineAngabe<T>({
   }
 
   async function abschicken() {
-    if (sendetRef.current) return;
+    if (sendetRef.current || isGesperrt) return;
     const entwurf = entwurfRef.current;
     if (pflicht && leer(entwurf)) {
       setPflichtHinweis(true);
@@ -193,6 +273,11 @@ export function InlineAngabe<T>({
     // hier stünde doppelt. Der Fokus geht ins Feld zurück, damit ein Screenreader ihn vorliest,
     // auch wenn „Speichern“ per Klick kam.
     if (isValid && !isValid(entwurf)) {
+      document.getElementById(feldId)?.focus();
+      return;
+    }
+    if (pruefe && pruefe(entwurf) !== null) {
+      setPruefungAktiv(true);
       document.getElementById(feldId)?.focus();
       return;
     }
@@ -230,6 +315,12 @@ export function InlineAngabe<T>({
     }
   }
 
+  const sperrHinweis = isGesperrt ? (
+    <div id={sperrId} style={{ color: rollen.text2 }}>
+      {gesperrt}
+    </div>
+  ) : null;
+
   if (bearbeitet) {
     return (
       <form
@@ -242,7 +333,12 @@ export function InlineAngabe<T>({
         style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
       >
         {eingabe({
-          feld: { id: feldId, 'aria-label': name, autoFocus: true },
+          feld: {
+            id: feldId,
+            'aria-label': name,
+            autoFocus: true,
+            ...(pruefGrund ? { 'aria-invalid': true, 'aria-describedby': pruefId } : {}),
+          },
           value: entwurf,
           onChange: setEntwurf,
           popup: {
@@ -251,13 +347,18 @@ export function InlineAngabe<T>({
             },
           },
         })}
+        <FeldFehler id={pruefId}>{pruefGrund}</FeldFehler>
         <SpeicherFehler fehler={fehler} />
-        <Space wrap>
+        {sperrHinweis}
+        {/* Abstand der Dialogfüße (frontend/AGENTS.md, „Rot steht nicht bündig neben Neutralem“). */}
+        <Space wrap size="middle">
           <Button
             type="primary"
             htmlType="submit"
             loading={sendet}
+            disabled={isGesperrt}
             aria-label={`${name} speichern`}
+            aria-describedby={isGesperrt ? sperrId : undefined}
           >
             Speichern
           </Button>
@@ -282,7 +383,8 @@ export function InlineAngabe<T>({
   if (ausloeser) {
     return (
       <>
-        {ausloeser({ ref: knopfRef, onClick: oeffnen })}
+        {ausloeser({ ref: knopfRef, onClick: oeffnen, disabled: isGesperrt })}
+        {sperrHinweis}
         {hinweis}
       </>
     );
@@ -294,12 +396,15 @@ export function InlineAngabe<T>({
         <Button
           ref={knopfRef}
           type="link"
+          disabled={isGesperrt}
           aria-label={kennung ? `${name} eintragen` : undefined}
+          aria-describedby={isGesperrt ? sperrId : undefined}
           style={leerKnopfStil(token, rollen.bedienText)}
           onClick={oeffnen}
         >
           {`${etikett} eintragen`}
         </Button>
+        {sperrHinweis}
         {hinweis}
       </>
     );
@@ -310,8 +415,9 @@ export function InlineAngabe<T>({
       <Button
         ref={knopfRef}
         type="text"
+        disabled={isGesperrt}
         aria-label={`${name} bearbeiten`}
-        aria-describedby={wertId}
+        aria-describedby={isGesperrt ? `${wertId} ${sperrId}` : wertId}
         style={{
           ...wertKnopfStil(token),
           color: 'inherit',
@@ -326,6 +432,7 @@ export function InlineAngabe<T>({
           <IconStift />
         </span>
       </Button>
+      {sperrHinweis}
       {hinweis}
     </>
   );
