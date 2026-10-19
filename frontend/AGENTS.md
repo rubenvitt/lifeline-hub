@@ -522,7 +522,13 @@ anwendbar), „nicht geprüft" ist keins.
   andere Eingabearten** (Datum, Auswahl, Zahl) nehmen `components/InlineAngabe.tsx` (LFH-472):
   eigenes `<form>`, kein Speichern beim Verlassen, leere Pflicht → kein PATCH, alter Wert und
   Hinweis per `data-fehler`; Zeitpunkte über `ZeitpunktEingabe` und Gleichheit am Instant. Die
-  Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`.
+  Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`. Für die feldweise
+  Bearbeitung in einer Ansicht (LLH-1103) trägt `InlineAngabe` optional `pruefe` (Grund nach dem
+  Absenden als `FeldFehler`, `aria-invalid`, kein Senden; ein unveränderter Wert wird nicht
+  geprüft), `gesperrt` (Grund als Text am Feld oder `{ beschreibungId }` für EINEN Grund am
+  Abschnittskopf; der Auslöser ist `disabled`), `onEntwurf` (nur die Wechsel geändert ↔
+  unverändert) und `onOeffnen` (Serverstand für einen Feld-CAS festhalten). Personendaten werden
+  nur so geschrieben (`frontend/src/personen/AGENTS.md`).
   Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
   (`patcheEinsatz`); ein Vollformular gibt es nicht. Ausnahmen (LFH-1175, Spec
   `einsatzdaten-bearbeitung`): die Zeile „Koordinate“ schickt das Paar, die Zeile „Adresse“ mit
@@ -556,7 +562,12 @@ anwendbar), „nicht geprüft" ist keins.
   Anzeigezone Berlin blind. Eine **Uhrzeit ohne Datum** (Verpflegungsplan, LLH-1058, Spec
   `zeiteingabe`, „Uhrzeit ohne Datum“) liest nur `anzeige/uhrzeit.ts:parseUhrzeit` („0630“, „6:30“)
   und legt nur `uhrzeitAmTag` in der Anzeigezone auf einen Tag (doppelte Stunde: die erste, Lücke:
-  nach vorn); die Tagesgrenzen `tagesgrenzen`.
+  nach vorn); die Tagesgrenzen `tagesgrenzen`. Ein **Kalenderdatum ohne Uhrzeit** (Geburtsdatum,
+  LLH-1103, Spec `zeiteingabe`, „Kalenderdatum ohne Uhrzeit und Zone“) ist die Ausnahme von der
+  Anzeigezone: gelesen nur über `anzeige/kalenderdatum.ts:parseKalenderdatum` („TT.MM.JJJJ“,
+  „T.M.JJJJ“, „TT.MM.JJ“, `YYYY-MM-DD`; zweistelliges Jahr = jüngstes nicht zukünftiges; „heute“
+  als Tag der Anzeigezone vom Aufrufer), gespeichert als `YYYY-MM-DD`, gezeigt über
+  `formatKalenderdatum` („TT.MM.JJJJ“, Altbestand roh); keine Schnellwahl, keine relative Eingabe.
 - **Zeiteingabe ist ein Textfeld** (LLH-1070, Spec `zeiteingabe`, „Eingabe als Text“ ff.,
   `openspec/changes/archive/2026-10-17-ri685cfi-zeiteingabe-tippen-schnellwahl/design.md`): getippte
   Zeiten deutet nur `anzeige/zeitParser.ts:deuteZeit` (taktisch `1430`/`101430`/`101430okt26`,
@@ -741,6 +752,14 @@ und `pages/personen/`.
   „Bleiben“/„Verwerfen“). Seiten, die jede Zeile sofort speichern (`EinsatzModule`), nicht. Tests
   solcher Seiten rendern mit `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft
   ohne Data Router.
+- **Ein offenes, geändertes Einzelfeld in einer Ansicht trägt denselben Schutz** (LLH-1103, Spec
+  `formularseiten`, „Rückfrage vor dem Verlassen“): über den Merker
+  `components/offeneBearbeitung.tsx` (`OffeneBearbeitungProvider` speist
+  `useFormularVerlassenSchutz` und rendert `VerlassenRueckfrage`; ein Feld meldet sich mit
+  `useOffeneBearbeitung(etikett)` über `onEntwurf` an). Höchstens ein Entwurf je Seite: die
+  übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
+  (`useOffeneBearbeitungGrund` für EINE Zeile am Abschnittskopf). Ein offenes Feld ohne Änderung
+  meldet sich nicht an.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;

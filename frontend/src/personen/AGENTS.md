@@ -23,9 +23,22 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Patientenkopf, Verlauf, Personendaten, eingeklappt Bezüge, Fotos und Dateien,
   Zugriffsprotokoll; ein Baum. Den Aufenthalt (UHS- und Platzname, seit) liefert der Detail-GET
   (`aufenthalt`), ebenso Transporte, Maßnahmen und Verletzungen: kein zweiter Abruf beim Öffnen.
-  Personendaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“, kein
+  Personendaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“ (mit
+  Schreibrecht als Knöpfe „+ Etikett“, Name „Etikett eintragen“, siehe nächster Punkt), kein
   `Descriptions`; das Geschlecht als Wort (`GESCHLECHT_WORT`), auch im Druckblatt, nie als
   Wire-Wert. Nachweis: `e2e/betroffene-handy.spec.ts`.
+- **Personendaten nur feldweise** (LLH-1103, Spec `personendaten-bearbeiten`,
+  `personen/Personendaten.tsx`): jede Angabe ist eine `InlineAngabe` in der Ansicht, ein PATCH
+  je Feld über `savePersonFeld` mit Feld-CAS (`erwartet` = Serverstand beim Öffnen, festgehalten
+  in `onOeffnen`), Toast „{Feld} gespeichert“. Ein 409 lädt das Detail neu: hat sich genau dieses
+  Feld geändert, fragt „Zwischenzeitlich geändert“ mit dem aktuellen Wert („Überschreiben“ ohne
+  Altwert, „Verwerfen und neu laden“), sonst steht der Grund am Feld. Kein Sammelformular, keine
+  Kopfaktion „Bearbeiten“, auch nicht am Gerät; „Zustand / Verdacht“, PAT-Nummer und Kontamination
+  nur im Patientenkopf. Das Geburtsdatum ist ein Kalenderdatum (`anzeige/kalenderdatum.ts`), überall
+  als „TT.MM.JJJJ“ angezeigt, Altbestand roh. Eine offene Bearbeitung zur Zeit über den Merker
+  `components/offeneBearbeitung.tsx` (Rückfrage beim Verlassen, Sperre der übrigen Felder); der
+  Sperrgrund steht EINMAL am Kopf des Abschnitts. Tests der Detailseite rendern mit
+  `datenRouter: true`.
 - **Patientenkopf mit vollem PAT-Kern** (`personen/Patientenkopf.tsx`, Change
   `y18v58dt-pat-kern`, D14): Kopfzeile mit PAT-Nummer und Marke „kontaminiert“
   (`personen/PatKennzeichen.tsx`), darunter ab `lg` zwei Spalten — links Sichtung (DTG, „vor n
