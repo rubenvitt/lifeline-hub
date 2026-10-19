@@ -6,7 +6,6 @@ import { Route, Routes, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
-import { offeneRueckfrage } from '../test/rueckfrage';
 import SchaedenDetailPage from './SchaedenDetailPage';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
@@ -321,7 +320,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
     expect(link).toHaveAttribute('href', '/einsaetze/1/personen/42');
   });
 
-  it('Stornieren bestätigt per Popconfirm, ruft DELETE und navigiert zur Liste', async () => {
+  it('Stornieren fragt über einen Dialog zurück, ruft DELETE und navigiert zur Liste', async () => {
     let geloescht = false;
     render(einsatzAktiv, basisSchaden(), [
       http.delete('/api/einsaetze/1/schaeden/10', () => {
@@ -329,12 +328,152 @@ describe('SchaedenDetailPage — Stammdaten', () => {
         return new HttpResponse(null, { status: 204 });
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
-    // Popconfirm-Bestätigung trägt denselben okText → der zweite „Stornieren"-Button.
-    const stornoButtons = screen.getAllByRole('button', { name: 'Stornieren' });
-    await userEvent.click(stornoButtons[stornoButtons.length - 1]);
+    await ausKopfmenue('Stornieren');
+    const dialog = await screen.findByRole('dialog', { name: 'Schaden S-001 stornieren?' });
+    // Die tragende Hälfte: bis zur Bestätigung ist nichts passiert.
+    expect(geloescht).toBe(false);
+    expect(document.querySelector('.ant-popconfirm')).toBeNull();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden stornieren' }));
     await waitFor(() => expect(geloescht).toBe(true));
     expect(await screen.findByText('LISTE')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Das Menü der Kopfleiste öffnen und den Eintragsknoten des geöffneten Portals liefern.
+ * `.ant-dropdown:not(.ant-dropdown-hidden)` ist Pflicht: antd lässt die Portale geschlossener
+ * Dropdowns im Baum stehen.
+ */
+async function oeffneKopfmenue(): Promise<HTMLElement> {
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Weitere Aktionen zu Schaden S-001' }),
+  );
+  const menue = document.querySelector('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]');
+  expect(menue).not.toBeNull();
+  return menue as HTMLElement;
+}
+
+async function ausKopfmenue(name: string) {
+  const menue = await oeffneKopfmenue();
+  await userEvent.click(within(menue).getByRole('menuitem', { name }));
+}
+
+/** Die Knöpfe im Seitenkopf, über die Marke des Primitivs eingegrenzt. */
+function kopfKnoepfe(): HTMLElement[] {
+  const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]');
+  return kopf ? [...kopf.querySelectorAll<HTMLElement>('button')] : [];
+}
+
+function kopfPrimaeraktionen(): HTMLElement[] {
+  const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]');
+  return kopf ? [...kopf.querySelectorAll<HTMLElement>('.ant-btn-primary')] : [];
+}
+
+/**
+ * Kopfaktionen nach Leitlinie (LLH-1105, `frontend/AGENTS.md`, „Aktionen“): je Zustand genau eine
+ * Primäraktion, „Bearbeiten“ sekundär sichtbar, der Rest im Menü mit Stornieren rot hinter dem
+ * Trenner. Die Statuskanten spiegeln `darf_uebergehen` (`src/schaden/mod.rs`).
+ */
+describe('SchaedenDetailPage — Kopfaktionen (LLH-1105)', () => {
+  it.each([
+    { status: 'offen', primaer: 'Schaden übergeben' },
+    { status: 'uebergeben', primaer: 'Schaden abschließen' },
+  ])('$status: genau eine Primäraktion „$primaer“', async ({ status, primaer }) => {
+    render(einsatzAktiv, basisSchaden({ status }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    const primaer_ = kopfPrimaeraktionen();
+    expect(primaer_).toHaveLength(1);
+    expect(primaer_[0]).toHaveAccessibleName(primaer);
+  });
+
+  it('abgeschlossen: keine Primäraktion', async () => {
+    render(einsatzAktiv, basisSchaden({ status: 'abgeschlossen' }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(kopfPrimaeraktionen()).toHaveLength(0);
+  });
+
+  it.each(['offen', 'uebergeben', 'abgeschlossen'])(
+    '%s: „Bearbeiten“ steht sekundär im Kopf, kein Knopf gesperrt, kein „Zurück zur Liste“',
+    async (status) => {
+      render(einsatzAktiv, basisSchaden({ status }));
+      await screen.findByRole('heading', { name: /Schaden S-001/ });
+      const bearbeiten = screen.getByRole('button', { name: 'Bearbeiten' });
+      expect(kopfKnoepfe()).toContain(bearbeiten);
+      expect(bearbeiten).not.toHaveClass('ant-btn-primary');
+      // Eine gesperrte Handlung steht nicht stumm da: sie entfällt oder nennt im Menü ihren Grund.
+      expect(kopfKnoepfe().filter((k) => k.hasAttribute('disabled'))).toEqual([]);
+      // Die Brotkrume trägt den Rückweg.
+      expect(screen.queryByRole('button', { name: 'Zurück zur Liste' })).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    { status: 'offen', eintraege: ['Ohne Übergabe abschließen', 'Stornieren'] },
+    { status: 'uebergeben', eintraege: ['Stornieren'] },
+    { status: 'abgeschlossen', eintraege: ['Stornieren'] },
+  ])('$status: das Menü trägt $eintraege', async ({ status, eintraege }) => {
+    render(einsatzAktiv, basisSchaden({ status }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    const menue = await oeffneKopfmenue();
+    expect(
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(eintraege);
+  });
+
+  it('kein Knopf und kein Menüeintrag gleicht einem Statuswort (LFH-959)', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    const menue = await oeffneKopfmenue();
+    const texte = [...kopfKnoepfe(), ...within(menue).getAllByRole('menuitem')].map((e) =>
+      (e.textContent ?? '').trim().toLocaleLowerCase('de'),
+    );
+    for (const wort of ['offen', 'übergeben', 'abgeschlossen']) expect(texte).not.toContain(wort);
+  });
+
+  it('„Stornieren“ steht rot hinter dem einen Trenner', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    const menue = await oeffneKopfmenue();
+    expect(menue.querySelectorAll('.ant-dropdown-menu-item-divider')).toHaveLength(1);
+    const eintraege = [
+      ...menue.querySelectorAll('[role="menuitem"], .ant-dropdown-menu-item-divider'),
+    ];
+    const trenner = eintraege.findIndex((e) =>
+      e.classList.contains('ant-dropdown-menu-item-divider'),
+    );
+    const storno = within(menue).getByRole('menuitem', { name: 'Stornieren' });
+    expect(eintraege.indexOf(storno)).toBeGreaterThan(trenner);
+    expect(storno).toHaveClass('ant-dropdown-menu-item-danger');
+  });
+
+  it('offen: „Ohne Übergabe abschließen“ öffnet den Abschluss-Dialog', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await ausKopfmenue('Ohne Übergabe abschließen');
+    const dialog = (await screen.findAllByRole('dialog'))[0];
+    expect(within(dialog).getByLabelText('Abschlussgrund')).toBeInTheDocument();
+  });
+
+  it('stornierter Schaden: keine Kopfaktionen, „storniert“ als neutrale Zustandsmarke', async () => {
+    render(einsatzAktiv, basisSchaden({ storniert_at: '2026-05-29 11:00:00' }));
+    const titel = await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(kopfKnoepfe()).toEqual([]);
+    expect(
+      screen.queryByRole('button', { name: 'Weitere Aktionen zu Schaden S-001' }),
+    ).not.toBeInTheDocument();
+    const marke = within(titel).getByText('storniert').closest('[data-lfh="status-chip"]');
+    expect(marke).toHaveAttribute('data-ton', 'neutral');
+    // Kein farbloser antd-`Tag` mehr daneben: die Zustandsmarke ist das neutrale Muster.
+    expect([...titel.querySelectorAll('.ant-tag')].map((t) => t.textContent)).not.toContain(
+      'storniert',
+    );
+  });
+
+  it('ohne Schreibrecht steht weder Primäraktion noch Menü', async () => {
+    render(einsatzBeobachter, basisSchaden());
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(kopfKnoepfe()).toEqual([]);
   });
 });
 
@@ -349,19 +488,19 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
         );
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden übergeben' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
     expect(await screen.findByText('Adressat ist Pflicht')).toBeInTheDocument();
     expect(body.uebergeben_an).toBeUndefined();
     await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
     await waitFor(() => expect(body.uebergeben_an).toBe('Stadtwerke'));
   });
 
   it('Abschließen-Modal erzwingt einen Grund und schickt ihn', async () => {
     let body: { abschluss_grund?: string } = {};
-    render(einsatzAktiv, basisSchaden(), [
+    render(einsatzAktiv, basisSchaden({ status: 'uebergeben' }), [
       http.post('/api/einsaetze/1/schaeden/10/abschliessen', async ({ request }) => {
         body = (await request.json()) as { abschluss_grund?: string };
         return HttpResponse.json(
@@ -369,9 +508,9 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
         );
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden abschließen' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden abschließen' }));
     expect(await screen.findByText('Grund ist Pflicht')).toBeInTheDocument();
     expect(body.abschluss_grund).toBeUndefined();
     await userEvent.click(within(dialog).getByRole('combobox'));
@@ -379,7 +518,7 @@ describe('SchaedenDetailPage — Status-Aktionen', () => {
       el.closest('.ant-select-item-option'),
     );
     await userEvent.click(option!);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden abschließen' }));
     await waitFor(() => expect(body.abschluss_grund).toBe('behoben'));
   });
 
@@ -423,15 +562,16 @@ describe('SchaedenDetailPage — Robustheit', () => {
 // Erfassungs-Norm (frontend/AGENTS.md, LFH-796): beide Status-Dialoge liegen auf der
 // Erfassungshülle.
 describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', () => {
+  // Je Zustand die Primäraktion; der Bestätigungsknopf nennt dieselbe Handlung wie der Titel.
   it.each([
-    { ausloeser: 'Übergeben', titel: 'Schaden übergeben' },
-    { ausloeser: 'Abschließen', titel: 'Schaden abschließen' },
-  ])('$titel: Knopf im Formular, keine Fußzeile', async ({ ausloeser, titel }) => {
-    render(einsatzAktiv, basisSchaden());
-    await userEvent.click(await screen.findByRole('button', { name: ausloeser }));
+    { status: 'offen', titel: 'Schaden übergeben' },
+    { status: 'uebergeben', titel: 'Schaden abschließen' },
+  ])('$titel: Knopf im Formular, keine Fußzeile', async ({ status, titel }) => {
+    render(einsatzAktiv, basisSchaden({ status }));
+    await userEvent.click(await screen.findByRole('button', { name: titel }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
-    expect(within(dialog).getByText(titel)).toBeInTheDocument();
-    const knopf = within(dialog).getByRole('button', { name: ausloeser });
+    expect(dialog.querySelector('.ant-modal-title')).toHaveTextContent(titel);
+    const knopf = within(dialog).getByRole('button', { name: titel });
     expect(knopf.closest('form')).not.toBeNull();
     expect(document.querySelector('.ant-modal-footer')).toBeNull();
   });
@@ -446,7 +586,7 @@ describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
         );
       }),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden übergeben' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     const feld = within(dialog).getByLabelText('Übergeben an');
     await waitFor(() => expect(feld).toHaveFocus());
@@ -455,8 +595,8 @@ describe('SchaedenDetailPage — Dialoge auf der Erfassungshülle (LFH-796)', ()
   });
 
   it('Abschließen: Notiz ohne Erklärung im Etikett (LFH-1078)', async () => {
-    render(einsatzAktiv, basisSchaden());
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    render(einsatzAktiv, basisSchaden({ status: 'uebergeben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden abschließen' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     expect(within(dialog).getByLabelText('Notiz (optional)')).toBeInTheDocument();
   });
@@ -508,7 +648,7 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
 
 /**
  * Speicherfehler am Ort (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“): Bearbeiten am
- * Formular, Übergeben und Abschließen im Dialog, Storno im Seitenhinweis. Kein Fehler-Toast.
+ * Formular, Übergeben, Abschließen und Storno im Dialog. Kein Fehler-Toast.
  */
 describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   const abgelehnt =
@@ -529,16 +669,15 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     };
   }
 
-  const seitenHinweis = () =>
-    document.querySelector<HTMLElement>('[data-lfh="seiten-beschreibung"]');
   const formular = () => screen.getByRole('button', { name: 'Speichern' }).closest('form')!;
   const keinToast = () => expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
 
-  async function storniere() {
-    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
-    await userEvent.click(
-      within(await offeneRueckfrage()).getByRole('button', { name: 'Stornieren' }),
-    );
+  /** Über das Kopfmenü stornieren und bestätigen; liefert die Rückfrage. */
+  async function storniere(): Promise<HTMLElement> {
+    await ausKopfmenue('Stornieren');
+    const dialog = await screen.findByRole('dialog', { name: 'Schaden S-001 stornieren?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden stornieren' }));
+    return dialog;
   }
 
   it('Bearbeiten: der Grund steht am Formular, das nächste Speichern räumt ihn', async () => {
@@ -598,10 +737,10 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
         erstAblehnenDannWarten('Schaden ist bereits übergeben'),
       ),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden übergeben' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'Schaden ist bereits übergeben',
@@ -610,7 +749,7 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     keinToast();
 
     // Solange das nächste Absenden läuft, ist Abbrechen gesperrt.
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
     await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
     expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
   });
@@ -622,11 +761,11 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
         abgelehnt('Schaden ist bereits übergeben'),
       ),
     ]);
-    const oeffnen = await screen.findByRole('button', { name: 'Übergeben' });
+    const oeffnen = await screen.findByRole('button', { name: 'Schaden übergeben' });
     await userEvent.click(oeffnen);
     const dialog = (await screen.findAllByRole('dialog'))[0];
     await userEvent.type(within(dialog).getByLabelText('Übergeben an'), 'Stadtwerke');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden übergeben' }));
     await within(dialog).findByRole('alert');
 
     // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
@@ -637,39 +776,55 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   });
 
   it('Abschließen: der Grund steht im Dialog, kein Toast', async () => {
-    render(einsatzAktiv, basisSchaden(), [
+    render(einsatzAktiv, basisSchaden({ status: 'uebergeben' }), [
       http.post(
         '/api/einsaetze/1/schaeden/10/abschliessen',
         abgelehnt('Schaden ist storniert', 409),
       ),
     ]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Abschließen' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Schaden abschließen' }));
     const dialog = (await screen.findAllByRole('dialog'))[0];
     await userEvent.click(within(dialog).getByRole('combobox'));
     const option = (await screen.findAllByText('behoben')).find((el) =>
       el.closest('.ant-select-item-option'),
     );
     await userEvent.click(option!);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Abschließen' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden abschließen' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Schaden ist storniert');
     expect(within(dialog).getByText('Nicht abgeschlossen')).toBeInTheDocument();
     keinToast();
   });
 
-  it('Stornieren: der Grund steht im Seitenhinweis, das nächste Storno räumt ihn', async () => {
+  it('Stornieren: der Grund steht in der Rückfrage, das nächste Bestätigen räumt ihn', async () => {
     render(einsatzAktiv, basisSchaden(), [
       http.delete('/api/einsaetze/1/schaeden/10', erstAblehnenDannWarten('Schaden ist verknüpft')),
     ]);
-    await storniere();
+    const dialog = await storniere();
 
-    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Schaden ist verknüpft'));
-    expect(seitenHinweis()).toHaveTextContent('Nicht storniert');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Schaden ist verknüpft');
+    expect(within(dialog).getByText('Nicht storniert')).toBeInTheDocument();
     expect(screen.queryByText('LISTE')).toBeNull();
     keinToast();
 
-    await storniere();
-    await waitFor(() => expect(screen.queryByText('Schaden ist verknüpft')).toBeNull());
+    // Solange das nächste Bestätigen läuft, ist Abbrechen gesperrt.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schaden stornieren' }));
+    await waitFor(() => expect(within(dialog).queryByRole('alert')).toBeNull());
+    expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
+  });
+
+  it('Stornieren: nach Abbrechen und erneutem Öffnen kein alter Grund', async () => {
+    render(einsatzAktiv, basisSchaden(), [
+      http.delete('/api/einsaetze/1/schaeden/10', abgelehnt('Schaden ist verknüpft')),
+    ]);
+    const dialog = await storniere();
+    await within(dialog).findByRole('alert');
+
+    // Kein Warten auf das Verschwinden: rc-dialog friert einen schließenden Dialog ein.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    await ausKopfmenue('Stornieren');
+    const wieder = await screen.findByRole('dialog', { name: 'Schaden S-001 stornieren?' });
+    await waitFor(() => expect(within(wieder).queryByRole('alert')).toBeNull());
   });
 
   it('der Wechsel zu einem anderen Schaden räumt die Gründe', async () => {
@@ -700,12 +855,15 @@ describe('SchaedenDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
       </>,
       { route: '/einsaetze/1/schaeden/10', datenRouter: true },
     );
-    await storniere();
-    await waitFor(() => expect(seitenHinweis()).toHaveTextContent('Schaden ist verknüpft'));
+    const dialog = await storniere();
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Schaden ist verknüpft');
 
     await userEvent.click(screen.getByRole('button', { name: 'Zum zweiten Schaden' }));
     await screen.findByRole('heading', { name: /Schaden S-002/ });
     expect(screen.queryByText('Schaden ist verknüpft')).toBeNull();
+    // Die Rückfrage gehört dem vorigen Schaden: offen gelassen, stornierte sie den neuen. jsdom
+    // beendet das Ausblenden nie, „offen“ heißt hier: ohne `ant-zoom-leave`.
+    expect(document.querySelectorAll('.ant-modal:not(.ant-zoom-leave)')).toHaveLength(0);
   });
 });
 

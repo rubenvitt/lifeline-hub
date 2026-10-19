@@ -50,7 +50,8 @@ offen, mit „Werte behalten“ bleiben Spezies und Fundort stehen.
 3. Wird es gefunden, die Seite des Tiers öffnen und „Aufgefunden“ wählen. Das Tier steht wieder
    als „aktiv“ in der Liste.
 
-Ein aktives Tier, das entlaufen ist, setzt „Als vermisst markieren“ auf „vermisst“.
+Ein aktives Tier, das entlaufen ist, setzt „Als vermisst melden“ im Menü „Weitere Aktionen“ auf
+„vermisst“.
 
 ### Einen Halter zuordnen
 
@@ -63,18 +64,24 @@ Umgekehrt ordnet „Bezug hinzufügen“ unter „Bezüge“ auf der Seite einer
 Tier zu, das noch keinen Halter hat ([Betroffene und Sichtung](betroffene.md)). Die Liste der
 Tiere zeigt den Halter dann mit seiner Registriernummer.
 
-### Ein Tier abschließen
+### Den Verbleib eines Tiers erfassen
 
-1. Die Seite des Tiers öffnen und „Abschließen“ wählen.
-2. Den „Abschlussgrund“ wählen: „Übergabe an Halter“, „Übergabe an Tierarzt“, „Übergabe an
-   Tierheim“, „verstorben“, „Freilauf“ oder „Sonstiges“. Unter „Ziel“ eintragen, wohin das Tier
-   gegangen ist.
+Verlässt ein Tier die Obhut der Einsatzkräfte, wird sein Verbleib erfasst. Es gilt danach als
+„abgeschlossen“.
 
-   ![Dialog „Tier abschließen“ mit Abschlussgrund Übergabe an Halter und Ziel](../bilder/tiere/abschliessen.png)
+1. Die Seite des Tiers öffnen und „Verbleib erfassen“ wählen.
+2. Den „Verbleib“ wählen: „an Halter übergeben“, „an Tierarzt übergeben“, „an Tierheim
+   übergeben“, „verstorben“, „freigelassen“ oder „Sonstiges“. Unter „Übergeben an / Ort“
+   eintragen, wohin das Tier gegangen ist; bei „an Halter übergeben“ steht ein bekannter Halter
+   schon darin.
 
-3. „Abschließen“ wählen. Die Seite des Tiers zeigt Grund und Ziel unter „Abschluss“.
+   ![Dialog „Verbleib von T-…“ mit Verbleib an Halter übergeben und Ziel](../bilder/tiere/verbleib.png)
 
-Ein abgeschlossenes Tier lässt sich wieder öffnen: „→ aktiv“ oder „Als vermisst markieren“.
+3. „Verbleib speichern“ wählen. Die Seite des Tiers zeigt den Verbleib unter „Verbleib“, die
+   Liste in der Spalte „Verbleib“.
+
+Ein abgeschlossenes Tier lässt sich zurückholen: „Wieder aufnehmen“ oder im Menü „Weitere
+Aktionen“ „Als vermisst melden“.
 
 ## Hintergrund
 
@@ -87,13 +94,14 @@ passt, meldet sich unter ihrem Feld, etwa ein Alter über 120 Jahre („Höchste
 gespeichert wird erst, wenn sie stimmt. Wer die Seite mit ungespeicherten Eingaben verlassen
 will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ behält die Eingaben,
 „Verwerfen“ verlässt die Seite ohne sie. Fotos und Dateien zum Tier liegen auf seiner Seite.
-„Stornieren“ nimmt eine Fehlerfassung aus der Liste.
+„Stornieren“ im Menü „Weitere Aktionen“ nimmt eine Fehlerfassung aus der Liste.
 
 ### Einsatztagebuch
 
 Das Einsatztagebuch führt Tiere nur mit Registriernummer und Spezies, ohne Rufname, Kennzeichnung,
 Halter oder Ziel: „Tier T-… (Hund) erfasst“, „Tier T-… (Katze) als vermisst gemeldet“, „Tier T-…:
-vermisst → aktiv (aufgefunden)“, der Abschluss mit seinem Grund und das Stornieren.
+vermisst → aktiv (aufgefunden)“, der Verbleib als Handlung („Tier T-… (Hund): an Tierarzt
+übergeben“), „Tier T-…: wieder aufgenommen (Verbleib zurückgenommen)“ und das Stornieren.
 
 ### Druck und Export
 

@@ -13,15 +13,32 @@ export const SPEZIES_META: Record<Spezies, string> = {
   sonstige: 'Sonstige',
 };
 
-/** Abschlussgrund eines Tiers als Wort — Detailseite und Archivakte. */
-export const TIER_ABSCHLUSS: Record<AbschlussGrund, string> = {
-  uebergabe_halter: 'Übergabe an Halter',
-  uebergabe_tierarzt: 'Übergabe an Tierarzt',
-  uebergabe_tierheim: 'Übergabe an Tierheim',
+/**
+ * Verbleib eines Tiers in Handlungsform (LLH-1092): was mit dem Tier geschah, als es die Obhut der
+ * Einsatzkräfte verließ — Dialog, Detailseite, Liste und Druck. Der Drahtwert heißt weiter
+ * `abschluss_grund` (`freilauf` bleibt `freilauf`); dieselben Wörter nennt das ETB
+ * (`AbschlussGrund::etb_label` in `src/tier/mod.rs`).
+ */
+export const TIER_VERBLEIB: Record<AbschlussGrund, string> = {
+  uebergabe_halter: 'an Halter übergeben',
+  uebergabe_tierarzt: 'an Tierarzt übergeben',
+  uebergabe_tierheim: 'an Tierheim übergeben',
   verstorben: 'verstorben',
-  freilauf: 'Freilauf',
+  freilauf: 'freigelassen',
   sonstiges: 'Sonstiges',
 };
+
+/**
+ * Verbleib als eine Zeile für Liste und Druck: Handlung, mit Ziel dahinter. Nur am abgeschlossenen
+ * Tier — beim Wiederaufnehmen bleiben Grund und Ziel gespeichert, gelten aber nicht mehr.
+ */
+export function verbleibText(
+  t: Pick<Tier, 'status' | 'abschluss_grund' | 'abschluss_ziel'>,
+): string | null {
+  if (t.status !== 'abgeschlossen' || t.abschluss_grund == null) return null;
+  const wort = TIER_VERBLEIB[t.abschluss_grund];
+  return t.abschluss_ziel ? `${wort}: ${t.abschluss_ziel}` : wort;
+}
 
 /**
  * Tierstatus als Wort + Ton der Statusfläche, die eine Zuordnung für Liste und Detailseite.
@@ -55,6 +72,13 @@ export const TIERE_SICHTEN: readonly { key: TiereSicht; label: string }[] = [
 /** Registriernummer des Halters in Anzeigeschreibweise, oder `null` — Liste und Druck. */
 export function halterNummer(t: Pick<Tier, 'halter_registrier_nr'>): string | null {
   return t.halter_registrier_nr != null ? registrierNummer('R', t.halter_registrier_nr) : null;
+}
+
+/** Vorbelegung von „Übergeben an / Ort“ bei „an Halter übergeben“: der bekannte Halter, sonst nichts. */
+export function halterVorbelegung(
+  t: Pick<Tier, 'halter_registrier_nr' | 'halter_kontakt'>,
+): string | null {
+  return halterNummer(t) ?? (t.halter_kontakt || null);
 }
 
 /** Zeilenmenge aus Statussicht UND Spezies — Schnittmenge, keine Vereinigung. */

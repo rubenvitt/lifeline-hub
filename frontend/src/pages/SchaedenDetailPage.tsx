@@ -1,10 +1,11 @@
 import StatusTag from '../components/StatusTag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
-import { Alert, App, Breadcrumb, Button, Form, Input, Popconfirm, Space, Spin, Tag } from 'antd';
+import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { monoStil } from '../components/instrument';
+import { StatusChip, monoStil } from '../components/instrument';
+import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useEffect, useState } from 'react';
@@ -24,7 +25,7 @@ import {
 import { istKonflikt } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
-import type { Ausmass, SchadenTyp } from '../api/types';
+import type { Ausmass, SchadenStatus, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 import SchadenDaten from './schaeden/SchadenDaten';
 import SchadenAnhaenge from './schaeden/SchadenAnhaenge';
@@ -37,7 +38,7 @@ import {
   geschaedigtAusSchaden,
   geschaedigtFelder,
 } from './schaeden/schadenHelfer';
-import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
 import { useSpeicherLeiste } from '../components/speicherLeiste';
 import VerlassenRueckfrage from '../components/VerlassenRueckfrage';
@@ -53,6 +54,48 @@ const AUSMASS_OPTIONS = (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
 }));
 
 type EditWerte = SchadenPatch & { geschaedigt?: GeschaedigtWert };
+
+/**
+ * Eine ändernde Aktion der Kopfleiste (LLH-1105, Vorbild `PersonenDetailPage.tsx`). Deskriptor statt
+ * `ReactNode`, damit dieselbe Beschreibung als Primärknopf oder als Menüeintrag gerendert wird und
+ * die Rangfolge an einer Stelle entschieden ist.
+ */
+interface Kopfaktion {
+  art: 'uebergeben' | 'abschliessen' | 'stornieren';
+  key: string;
+  /** Nennt die Handlung, nie ein Statuswort („übergeben“ ist eins, `frontend/AGENTS.md`, Aktionen). */
+  label: string;
+  /** Rot und hinter dem einen Trenner des Menüs (`components/MenueAusloeser.tsx`). */
+  gefahr?: true;
+}
+
+const UEBERGEBEN: Kopfaktion = { art: 'uebergeben', key: 'uebergeben', label: 'Schaden übergeben' };
+const ABSCHLIESSEN: Kopfaktion = {
+  art: 'abschliessen',
+  key: 'abschliessen',
+  label: 'Schaden abschließen',
+};
+const STORNIEREN: Kopfaktion = {
+  art: 'stornieren',
+  key: 'stornieren',
+  label: 'Stornieren',
+  gefahr: true,
+};
+
+/**
+ * Was der Kopf je Status anbietet: genau eine Primäraktion, der Rest ins Menü. Spiegel von
+ * `darf_uebergehen` (`src/schaden/mod.rs`): offen → übergeben oder direkt abgeschlossen,
+ * übergeben → abgeschlossen, abgeschlossen ist endgültig. Was ein Status nie erlaubt, entfällt,
+ * statt gesperrt dazustehen; Stornieren geht in jedem Status.
+ */
+const KOPFAKTIONEN: Record<SchadenStatus, { primaer: Kopfaktion | null; weitere: Kopfaktion[] }> = {
+  offen: {
+    primaer: UEBERGEBEN,
+    weitere: [{ ...ABSCHLIESSEN, label: 'Ohne Übergabe abschließen' }, STORNIEREN],
+  },
+  uebergeben: { primaer: ABSCHLIESSEN, weitere: [STORNIEREN] },
+  abgeschlossen: { primaer: null, weitere: [STORNIEREN] },
+};
 
 export default function SchaedenDetailPage() {
   const { id, schadenId: schadenIdParam } = useParams();
@@ -82,6 +125,13 @@ export default function SchaedenDetailPage() {
   });
   const [uebergebenOffen, setUebergebenOffen] = useState(false);
   const [abschlussOffen, setAbschlussOffen] = useState(false);
+  /**
+   * Die Storno-Rückfrage als `<Modal>` außerhalb des Menüs (kein `Popconfirm`, `frontend/AGENTS.md`,
+   * Aktionen). Sie gehört dem Schaden, für den sie geöffnet wurde: der Wechsel auf einen anderen
+   * (gleiche Route, kein `key`) schließt sie, statt den neuen zu stornieren.
+   */
+  const [stornoFuer, setStornoFuer] = useState<number | null>(null);
+  const stornoOffen = stornoFuer === schadenId;
   const [uebergebForm] = Form.useForm<{ uebergeben_an: string }>();
   const [abschlussForm] = Form.useForm<{ abschluss_grund: string; notiz?: string }>();
 
@@ -148,7 +198,9 @@ export default function SchaedenDetailPage() {
   });
   const stornoMutation = useMutation({
     mutationFn: () => storniereSchaden(einsatzId, schadenId),
+    // Die Rückfrage schließt erst hier; eine Ablehnung steht in ihr.
     onSuccess: () => {
+      setStornoFuer(null);
       invalidate();
       navigate(schaedenPfad(einsatzId));
     },
@@ -156,8 +208,8 @@ export default function SchaedenDetailPage() {
 
   /*
    * Jede Ablehnung steht an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
-   * Fehler“): Bearbeiten am Formular, Übergeben und Abschließen im Dialog, Storno im
-   * Seitenhinweis. Den Sperrkonflikt beantwortet weiter der Konfliktdialog.
+   * Fehler“): Bearbeiten am Formular, Übergeben, Abschließen und Storno im Dialog. Den
+   * Sperrkonflikt beantwortet weiter der Konfliktdialog.
    */
   const sperrkonflikt = istKonflikt(editMutation.error) && !editMutation.variables?.overwrite;
   const editFehler = sperrkonflikt ? null : editMutation.error;
@@ -206,6 +258,18 @@ export default function SchaedenDetailPage() {
   const orgId = einsatz.org_id ?? 0;
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  const kennung = schadenRegistrierAnzeige(s.registrier_nr);
+
+  // Ohne Schreibrecht, am stornierten Schaden und während der Bearbeitung trägt der Kopf nichts.
+  const aktionenPlan =
+    darfSchreiben && !s.storniert_at && !bearbeiten ? KOPFAKTIONEN[s.status] : null;
+  const primaer = aktionenPlan?.primaer;
+
+  function fuehreKopfaktionAus(aktion: Kopfaktion) {
+    if (aktion.art === 'uebergeben') setUebergebenOffen(true);
+    else if (aktion.art === 'abschliessen') setAbschlussOffen(true);
+    else setStornoFuer(schadenId);
+  }
 
   const detailAnsicht = (
     <SchadenDaten
@@ -257,69 +321,58 @@ export default function SchaedenDetailPage() {
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
             { title: <Link to={zurueck}>Schäden</Link> },
-            { title: schadenRegistrierAnzeige(s.registrier_nr) },
+            { title: kennung },
           ]}
         />
       }
       titel={
         <Space wrap size={8}>
           <span>
-            Schaden{' '}
-            <span style={monoStil(14, 500)}>{schadenRegistrierAnzeige(s.registrier_nr)}</span>
+            Schaden <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
           <StatusTag darstellung={STATUS_META[s.status]} />
-          {s.storniert_at && <Tag color="default">storniert</Tag>}
+          {s.storniert_at && <StatusChip ton="neutral" wort="storniert" />}
         </Space>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       aktionen={
-        <Space wrap>
-          {darfSchreiben && !s.storniert_at && !bearbeiten && (
-            <Space wrap size="middle">
-              <Button disabled={s.status !== 'offen'} onClick={() => setUebergebenOffen(true)}>
-                Übergeben
+        /**
+         * Genau eine Primäraktion je Status, „Bearbeiten“ sekundär daneben, der Rest im Menü
+         * (LLH-1105). Einen „Zurück zur Liste“-Knopf gibt es nicht: die Brotkrume trägt denselben
+         * Weg; nach dem Stornieren springt die Seite selbst zurück.
+         */
+        aktionenPlan && (
+          <Space wrap>
+            {primaer && (
+              <Button type="primary" onClick={() => fuehreKopfaktionAus(primaer)}>
+                {primaer.label}
               </Button>
-              <Button
-                disabled={s.status === 'abgeschlossen'}
-                onClick={() => setAbschlussOffen(true)}
-              >
-                Abschließen
-              </Button>
-              <Button
-                onClick={() => {
-                  if (!editMutation.isPending) editMutation.reset();
-                  editSitzung.starte(s, {
-                    typ: s.typ,
-                    ausmass: s.ausmass,
-                    ort: s.ort,
-                    beschreibung: s.beschreibung,
-                    geschaedigt: geschaedigtAusSchaden(s),
-                  });
-                }}
-              >
-                Bearbeiten
-              </Button>
-              <Popconfirm
-                title="Schaden stornieren?"
-                onConfirm={() => stornoMutation.mutate()}
-                okText="Stornieren"
-                okButtonProps={{ danger: true }}
-              >
-                <Button danger>Stornieren</Button>
-              </Popconfirm>
-            </Space>
-          )}
-          <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
-        </Space>
-      }
-      // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
-      hinweis={
-        stornoMutation.error != null && (
-          <SeitenHinweise
-            fehler={stornoMutation.error}
-            fehlerTitel="Nicht storniert"
-            fehlerFallback="Stornieren fehlgeschlagen"
-          />
+            )}
+            <Button
+              onClick={() => {
+                if (!editMutation.isPending) editMutation.reset();
+                editSitzung.starte(s, {
+                  typ: s.typ,
+                  ausmass: s.ausmass,
+                  ort: s.ort,
+                  beschreibung: s.beschreibung,
+                  geschaedigt: geschaedigtAusSchaden(s),
+                });
+              }}
+            >
+              Bearbeiten
+            </Button>
+            <MenueAusloeser
+              eintraege={aktionenPlan.weitere}
+              // Die Kennung im Namen: auf einer Seite mit mehreren Menüs lieferten gleichnamige
+              // Knöpfe kein Ziel.
+              zugaenglicherName={`Weitere Aktionen zu Schaden ${kennung}`}
+              onWahl={(key) => {
+                const eintrag = aktionenPlan.weitere.find((w) => w.key === key);
+                if (eintrag) fuehreKopfaktionAus(eintrag);
+              }}
+            />
+          </Space>
         )
       }
     >
@@ -380,7 +433,7 @@ export default function SchaedenDetailPage() {
         offen={uebergebenOffen}
         titel="Schaden übergeben"
         form={uebergebForm}
-        erfassenText="Übergeben"
+        erfassenText={UEBERGEBEN.label}
         laeuft={uebergebMutation.isPending}
         speicherung={uebergebMutation}
         speicherFehlerTitel="Nicht übergeben"
@@ -402,7 +455,7 @@ export default function SchaedenDetailPage() {
         offen={abschlussOffen}
         titel="Schaden abschließen"
         form={abschlussForm}
-        erfassenText="Abschließen"
+        erfassenText={ABSCHLIESSEN.label}
         laeuft={abschlussMutation.isPending}
         speicherung={abschlussMutation}
         speicherFehlerTitel="Nicht abgeschlossen"
@@ -422,6 +475,39 @@ export default function SchaedenDetailPage() {
           <Input.TextArea rows={2} />
         </Form.Item>
       </ErfassungsModal>
+
+      {/* Wartet auf die Antwort: schließt erst beim Erfolg, bis dahin sind die Auswege gesperrt,
+          und eine Ablehnung steht in ihr (Vorbild `PersonenDetailPage.tsx`). */}
+      <Modal
+        open={stornoOffen}
+        title={`Schaden ${kennung} stornieren?`}
+        okText="Schaden stornieren"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true }}
+        confirmLoading={stornoMutation.isPending}
+        cancelButtonProps={{ disabled: stornoMutation.isPending }}
+        closable={stornoMutation.isPending ? { disabled: true } : true}
+        mask={{ closable: !stornoMutation.isPending }}
+        keyboard={!stornoMutation.isPending}
+        onOk={() => stornoMutation.mutate()}
+        onCancel={() => {
+          if (stornoMutation.isPending) return;
+          // Abbrechen räumt den Grund; das nächste Öffnen beginnt ohne ihn.
+          if (stornoMutation.error != null) stornoMutation.reset();
+          setStornoFuer(null);
+        }}
+      >
+        Der Schaden verschwindet aus der Liste. Das Einsatztagebuch vermerkt das Stornieren.
+        {stornoMutation.error != null && (
+          <div style={{ marginTop: 16 }}>
+            <SpeicherFehler
+              fehler={stornoMutation.error}
+              titel="Nicht storniert"
+              fallback="Stornieren fehlgeschlagen"
+            />
+          </div>
+        )}
+      </Modal>
     </EinsatzSeite>
   );
 }

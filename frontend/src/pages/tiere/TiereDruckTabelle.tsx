@@ -2,7 +2,7 @@ import type { Tier } from '../../api/types';
 import { tierRegistrierAnzeige } from '../../api/einsatzTier';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import DruckTabelle, { druckZeit, type DruckSpalte } from '../../druck/DruckTabelle';
-import { SPEZIES_META, TIER_STATUS, halterNummer } from './tierHelfer';
+import { SPEZIES_META, TIER_STATUS, halterNummer, verbleibText } from './tierHelfer';
 
 interface Props {
   /** Die gedruckte Auswahl, in beliebiger Ordnung. */
@@ -25,6 +25,7 @@ export default function TiereDruckTabelle({ tiere, konventionen }: Props) {
   const spalten: DruckSpalte<Tier>[] = [
     { titel: 'Nr.', mono: true, wert: (t) => tierRegistrierAnzeige(t.registrier_nr) },
     { titel: 'Status', wert: (t) => TIER_STATUS[t.status].label },
+    { titel: 'Verbleib', wert: (t) => verbleibText(t) ?? '—' },
     { titel: 'Spezies', wert: (t) => SPEZIES_META[t.spezies] },
     { titel: 'Rufname', wert: (t) => t.rufname ?? '—' },
     { titel: 'Rasse', wert: (t) => t.rasse_beschreibung ?? '—' },

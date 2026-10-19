@@ -550,17 +550,49 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
             .any(|i| i.contains("T-001") && i.contains("aufgefunden")),
         "vermisst→aktiv (aufgefunden)"
     );
-    // LFH-1144: der Grund im Wort der Oberfläche, kein Schlüssel im ETB.
+    // LFH-1144/LLH-1092: der Verbleib als Handlung im Wort der Oberfläche, kein Schlüssel im ETB.
     assert!(
         inhalte
             .iter()
-            .any(|i| i.as_str() == "Tier T-001: abgeschlossen (Übergabe an Tierarzt)"),
-        "Abschluss nennt nur den Grund: {inhalte:?}"
+            .any(|i| i.as_str() == "Tier T-001 (Katze): an Tierarzt übergeben"),
+        "Verbleib nennt nur die Handlung: {inhalte:?}"
     );
     for i in &inhalte {
         assert!(!i.contains('_'), "Schlüssel im ETB: {i}");
     }
     assert!(inhalte.iter().any(|i| i.contains("T-001 storniert")));
+}
+
+/// LLH-1092: der Verbleib steht als Handlung im ETB, das Wiederaufnehmen nimmt ihn sichtbar zurück.
+#[tokio::test]
+async fn verbleib_und_wiederaufnahme_stehen_als_handlung_im_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
+    let status = format!("/api/einsaetze/{e}/tiere/{t}/status");
+    for body in [
+        json!({"status":"abgeschlossen","abschluss_grund":"sonstiges"}),
+        json!({"status":"aktiv"}),
+        json!({"status":"abgeschlossen","abschluss_grund":"freilauf"}),
+        json!({"status":"vermisst"}),
+    ] {
+        let (s, _) = anfrage_json(&app, "POST", &status, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK, "{body}");
+    }
+
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    for erwartet in [
+        "Tier T-001 (Hund): Verbleib erfasst (Sonstiges)",
+        "Tier T-001: wieder aufgenommen (Verbleib zurückgenommen)",
+        "Tier T-001 (Hund): freigelassen",
+        "Tier T-001: als vermisst gemeldet (Verbleib zurückgenommen)",
+    ] {
+        assert!(
+            inhalte.iter().any(|i| i == erwartet),
+            "fehlt „{erwartet}“: {inhalte:?}"
+        );
+    }
 }
 
 // ---------- Tests: Rechte-Matrix + Org-Isolation + Read-only ----------

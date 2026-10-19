@@ -36,6 +36,7 @@ import {
   TIER_STATUS,
   filterTiere,
   halterNummer,
+  verbleibText,
   type TiereSicht,
 } from './tiere/tierHelfer';
 import type { Spezies, Tier } from '../api/types';
@@ -92,6 +93,13 @@ const tierSpalten = spaltenFuer<Tier>()([
     render: (_, t) => (
       <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
     ),
+  },
+  {
+    // LLH-1092: wohin das Tier gegangen ist, ohne Klick — „—“, solange es nicht abgeschlossen ist.
+    title: 'Verbleib',
+    key: 'verbleib',
+    suchText: (t) => verbleibText(t),
+    render: (_, t) => verbleibText(t) ?? <Typography.Text type="secondary">—</Typography.Text>,
   },
   { title: 'Spezies', key: 'spezies', width: 120, render: (_, t) => SPEZIES_META[t.spezies] },
   {
