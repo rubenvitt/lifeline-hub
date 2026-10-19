@@ -57,7 +57,8 @@ const SELECT_VERBLEIB: &str = "\
 
 /// „Aktuell“ (Spec `personen-verlauf`, design.md D6): der Verbleib mit dem jüngsten
 /// Erfassungszeitpunkt, bei Gleichstand der später gespeicherte. Die einzige Stelle, die das für
-/// den Verbleib definiert: Cache und Verlauf lesen dieselbe Ordnung.
+/// den Verbleib definiert: Cache und Verlauf lesen dieselbe Ordnung. Sie löst den Kopfkommentar
+/// von `migrations/0022_einsatz_person_med_cache.sql` ab (siehe `sichtung_repo::sichtungsfolge!`).
 macro_rules! verbleibfolge {
     () => {
         "ORDER BY zeitpunkt_at DESC, id DESC"

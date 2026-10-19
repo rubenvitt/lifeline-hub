@@ -34,6 +34,11 @@ const SELECT_SICHTUNG: &str = "\
 /// Erfassungszeitpunkt, bei Gleichstand die später gespeicherte. **Die einzige Stelle, die das
 /// für die Sichtung definiert**: Cache und Verlauf lesen dieselbe Ordnung. Als Makro, damit
 /// `concat!` daraus ein `&'static str` baut (Muster `betreuung::repo::juengste_meldung!`).
+///
+/// Überholt ist der Kopfkommentar von `migrations/0022_einsatz_person_med_cache.sql` („jüngster
+/// Eintrag = zuletzt eingefügt“): seit 0217 nimmt der POST eine Erfassungszeit an, und der Cache
+/// folgt dieser Ordnung, auch für den Verbleib (`verbleib_repo::verbleibfolge!`). Die Migration
+/// bleibt trotzdem unverändert: sqlx prüft die Checksumme der ganzen Datei samt Kommentaren.
 macro_rules! sichtungsfolge {
     () => {
         "ORDER BY gesichtet_at DESC, id DESC"

@@ -164,7 +164,9 @@ ClickUp. Dieser Abschnitt ist die **eine** Stelle für IDs, Status und Kennungen
 ## Backend — Migrationsvergabe (LFH-658)
 
 - **Anhängen, nicht einschieben:** neue Migrationen tragen eine Nummer **größer als jede auf dem
-  Ziel-Branch**; bestehende werden nie geändert, umbenannt oder gelöscht.
+  Ziel-Branch**; bestehende werden nie geändert, umbenannt oder gelöscht, auch nicht im
+  Kommentar: sqlx prüft die Checksumme der ganzen Datei, jede bestehende DB bräche mit
+  `VersionMismatch`. Ein überholter Kommentar wird im Code berichtigt, der die Spalte schreibt.
 - `scripts/check-migrationen.sh` (gegen `origin/alpha`, vorher `git fetch`), Umlegen mit
   `--umnummerieren`. Durchgesetzt über `.github/workflows/migrationen.yml` (Required Check
   `Migrationsnummern` im Ruleset 17017911; fehlt er, warnt der Push-Lauf auf `alpha`); Netz
