@@ -195,14 +195,14 @@ export function registrierAnzeige(nr: number): string {
  * Person nimmt `client_id` (Replay ohne zweiten Eintrag) und `zeitpunkt_at` (Erfassungszeit,
  * serverseitig gekappt). Gesetzt werden beide nur über `offline/schreiben.ts`.
  */
-export interface OfflineEintragFelder {
+export interface OfflineEintragEingabe {
   client_id?: string | null;
   zeitpunkt_at?: string | null;
 }
 
 /** Eine Nachsichtung. `bestaetigt_personal_id` nennt am Gerät die bestätigende Person (LFH-1046);
  * eine Person schickt es nie (422). */
-export interface SichtungEingabe extends OfflineEintragFelder {
+export interface SichtungEingabe extends OfflineEintragEingabe {
   kategorie: Sichtungskategorie;
   notiz?: string | null;
   bestaetigt_personal_id?: number | null;
@@ -234,7 +234,7 @@ export function ladeBestaetiger(einsatzId: number): Promise<Bestaetiger[]> {
   return apiGet<Bestaetiger[]>(`/api/einsaetze/${einsatzId}/personen/bestaetiger`);
 }
 
-export interface VerbleibEingabe extends OfflineEintragFelder {
+export interface VerbleibEingabe extends OfflineEintragEingabe {
   art: VerbleibArt;
   transportmittel?: string | null;
   ziel?: string | null;
@@ -263,7 +263,7 @@ export function erfasseVerbleib(
 }
 
 /** Eine Verlaufsnotiz; ihr Text liegt ohne Netz in der Warteschlange (design.md D8). */
-export interface NotizEingabe extends OfflineEintragFelder {
+export interface NotizEingabe extends OfflineEintragEingabe {
   text: string;
 }
 
@@ -290,7 +290,7 @@ export function legeNotizAn(
 
 /** Ein voller Transportstand (Spec `personen-transport`): jedes Feld einzeln leer, alle drei leer
  * heben den Transport auf. Am Gerät optional „Bestätigt von“ (LFH-1046). */
-export interface TransportEingabe extends OfflineEintragFelder {
+export interface TransportEingabe extends OfflineEintragEingabe {
   prioritaet: TransportPrioritaet | null;
   art: TransportArt | null;
   fachrichtung: Fachrichtung | null;
@@ -314,7 +314,7 @@ export function saveTransport(
 
 /** Eine Maßnahme aus dem festen Katalog (Spec `personen-massnahmen`); ohne `zeitpunkt_at` gilt die
  * Erfassung als Durchführung (vorgemerkt: die Zeit des Vormerkens). Kein ETB. */
-export interface MassnahmeEingabe extends OfflineEintragFelder {
+export interface MassnahmeEingabe extends OfflineEintragEingabe {
   art: MassnahmeArt;
   bestaetigt_personal_id?: number | null;
 }
@@ -347,7 +347,7 @@ export function revokeMassnahme(
 
 /** Eine Verletzung am Körperschema (Spec `personen-verletzungen`): Region muss in der Ansicht
  * liegen (sonst 422), die Lage `x`/`y` nur als Paar, je 0..1. Kein ETB. */
-export interface VerletzungEingabe extends OfflineEintragFelder {
+export interface VerletzungEingabe extends OfflineEintragEingabe {
   ansicht: VerletzungAnsicht;
   region: KoerperRegion;
   art: VerletzungArt;
