@@ -31,14 +31,14 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 ## 4. UHS-Grundriss
 
 - [x] 4.1 Test zuerst, dann umsetzen: Grundriss nimmt `useVerbleibFelder` statt der eigenen Maske (Vorbelegung Art Transport). Prüfung: `Grundriss.test.tsx` Verbleib-Fälle grün, Betreuungsstelle und „Bestätigt von“ dort erreichbar.
-- [ ] 4.2 Test zuerst, dann umsetzen: Zeile der Listen „Noch nicht aufgenommen“ und „Wartebereich“ zweizeilig nach D8 (`PersonenSpalte`, `grundrissLayout.ts`), „Verbleib“ sichtbar als Textknopf in der zweiten Zeile. Prüfung: `grundrissLayout.test.ts`, `Grundriss.test.tsx`, `GrundrissTabs.test.tsx` grün; e2e `trefflaeche-pruefflaechen.spec.ts` in allen drei Stufen grün; Bild bei 240 px Spaltenbreite zeigt den vollen Namen.
+- [x] 4.2 Test zuerst, dann umsetzen: Zeile der Listen „Noch nicht aufgenommen“ und „Wartebereich“ zweizeilig nach D8 (`PersonenSpalte`, `grundrissLayout.ts`), „Verbleib“ sichtbar als Textknopf in der zweiten Zeile. Prüfung: `grundrissLayout.test.ts`, `Grundriss.test.tsx`, `GrundrissTabs.test.tsx` grün; e2e `trefflaeche-pruefflaechen.spec.ts` in allen drei Stufen grün; Bild bei 240 px Spaltenbreite zeigt den vollen Namen.
 - [x] 4.3 Test zuerst, dann umsetzen: Spalte „Unterwegs“ (`TransportSpalte`) mit Fahrzeug, Ziel, Dauer, Priorität, „Übergabe quittieren“ und Marke „Übergabe offen“ ab 60 min (`useMinutenTakt`); Abgeschlossene fehlen. Prüfung: Tests „Übergabe aus der Spalte“, „Fremdes Rettungsmittel“, „Lange unterwegs“ grün; `UhsLagezeile.test.tsx` grün.
 
 ## 5. Sichtungsboard
 
 - [x] 5.1 Test zuerst, dann umsetzen: `personen/Sichtungsboard.tsx` nach D9 (feste Spalten, Farbkopf mit Wort und Zahl, Karte mit Kennung, PAT-Nummer, Name, „gesichtet vor“, Aufenthalt, Priorität, Kontamination; Folge nach Sichtungszeit; Zuflussschleuse). Prüfung: Vitest für „Leere Kategorie“, „Patient im Eigentransport“, „Folge nach Wartezeit“, „Neue Sichtung unter dem Zeiger“ grün.
 - [x] 5.2 Bedienung: Karte als Link zur Detailseite, Sichtungsmarke mit `ZeilenSichtung`-Popover nur mit Schreibrecht, Bedienziele in Steuerhöhe; Zweig `raster` in `pages/PersonenPage.tsx` nutzt das Board, bestehende Raster-Tests in `PersonenPage.test.tsx` und `personenFilter.test.ts` auf das Board umgestellt. Prüfung: Vitest grün, axe ohne `nested-interactive`.
-- [ ] 5.3 Schmaler Schirm: ab `lg` nebeneinander mit eigenem Bildlauf, darunter gestapelt und einklappbar, leere eingeklappt. Prüfung: e2e-Fall bei 390 px und 1440 × 900 ohne seitlichen Bildlauf grün (`e2e/patienten-uebergabe.spec.ts`, beim Flow der Change statt in `betroffene-handy.spec.ts`).
+- [x] 5.3 Schmaler Schirm: ab `lg` nebeneinander mit eigenem Bildlauf, darunter gestapelt und einklappbar, leere eingeklappt. Prüfung: e2e-Fall bei 390 px und 1440 × 900 ohne seitlichen Bildlauf grün (`e2e/patienten-uebergabe.spec.ts`, beim Flow der Change statt in `betroffene-handy.spec.ts`).
 
 ## 6. Regeln und Anwenderdoku
 
@@ -47,7 +47,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 
 ## 7. Integration
 
-- [ ] 7.1 e2e: Eigentransport aus dem Wartebereich, Patient in „Unterwegs“, Übergabe quittiert, Patient aus Liste und Board verschwunden, mit „Abgeschlossene zeigen“ wieder da. Prüfung: neuer Spec unter `frontend/e2e/` grün.
+- [x] 7.1 e2e: Eigentransport aus dem Wartebereich, Patient in „Unterwegs“, Übergabe quittiert, Patient aus Liste und Board verschwunden, mit „Abgeschlossene zeigen“ wieder da. Prüfung: neuer Spec unter `frontend/e2e/` grün.
 - [ ] 7.2 `superpowers:verification-before-completion` und `superpowers:requesting-code-review`; `./scripts/check-all.sh` vollständig grün (kein `| tail`). Prüfung: Gesamtstatus aus dem Lauf, Abweichungen im PR benannt.
 
 ## Workflow follow-up
