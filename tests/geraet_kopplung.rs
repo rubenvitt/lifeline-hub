@@ -3252,12 +3252,18 @@ async fn replay_am_geraet_legt_jeden_eintrag_einmal_an() {
     let pid = person_in(&app, &geraet, einsatz, Some(nord)).await["id"]
         .as_i64()
         .unwrap();
-    sqlx::query("UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?")
-        .bind(zeit(-1800))
-        .bind(pid)
-        .execute(&pool)
-        .await
-        .unwrap();
+    // Anlegen und Eintritt vor 30 Minuten: der vorgemerkte Transport liegt danach.
+    for sql in [
+        "UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?",
+        "UPDATE person_uhs_belegung SET zeitpunkt_at = ? WHERE person_id = ?",
+    ] {
+        sqlx::query(sql)
+            .bind(zeit(-1800))
+            .bind(pid)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
     let basis = format!("/api/einsaetze/{einsatz}/personen/{pid}");
     let schritte = [
         (
