@@ -287,6 +287,21 @@ async fn vorschlaege_nennen_einsatz_bisher_und_stamm() {
 
     let (s, v) = anfrage(
         &w.app,
+        "POST",
+        "/api/fahrzeuge",
+        &w.admin,
+        Some(r#"{"funkrufname":"Ausgemustert 83-9"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
+        .bind(v["id"].as_i64().unwrap())
+        .execute(&w.pool)
+        .await
+        .unwrap();
+
+    let (s, v) = anfrage(
+        &w.app,
         "GET",
         &format!("/api/einsaetze/{}/personen/transportmittel", w.einsatz),
         &w.admin,
@@ -306,4 +321,114 @@ async fn vorschlaege_nennen_einsatz_bisher_und_stamm() {
             .contains(&json!("Rotkreuz Musterstadt 83-1")),
         "{v}"
     );
+    assert!(
+        !v["stamm"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("Ausgemustert 83-9")),
+        "außer Dienst fehlt: {v}"
+    );
+}
+
+#[tokio::test]
+async fn uebergabe_geht_nach_der_entlassung_des_fahrzeugs_durch() {
+    let w = Welt::neu().await;
+    let p = w.person().await;
+    let ef = w.fahrzeug(w.einsatz, "1/83-1").await;
+    let (s, v) = w
+        .verbleib(
+            p,
+            json!({ "art": "transport", "transport_durch": "eigen", "einsatz_fahrzeug_id": ef,
+                    "ziel": "KH Mitte" }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    // Das Fahrzeug wird entlassen, bevor die UHS die Übergabe quittiert.
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET beendet_at = ?, beendet_als = 'entlassen' WHERE id = ?",
+    )
+    .bind(zeit(0))
+    .bind(ef)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let (s, v) = w
+        .verbleib(
+            p,
+            json!({ "art": "transport", "status": "uebergeben", "transport_durch": "eigen",
+                    "einsatz_fahrzeug_id": ef, "ziel": "KH Mitte", "zeitpunkt_at": zeit(1) }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "Übergabe nach der Entlassung: {v}");
+    assert_eq!(w.detail(p).await["versorgung"], "abgeschlossen");
+}
+
+#[tokio::test]
+async fn uebergabe_braucht_den_laufenden_eigentransport() {
+    let w = Welt::neu().await;
+    let p = w.person().await;
+    let ef = w.fahrzeug(w.einsatz, "1/83-1").await;
+    let anderes = w.fahrzeug(w.einsatz, "1/83-2").await;
+    let uebergabe = |fahrzeug: i64, zeitpunkt: Option<String>| {
+        let mut b = json!({ "art": "transport", "status": "uebergeben",
+                            "transport_durch": "eigen", "einsatz_fahrzeug_id": fahrzeug });
+        if let Some(z) = zeitpunkt {
+            b["zeitpunkt_at"] = json!(z);
+        }
+        b
+    };
+
+    let (s, v) = w.verbleib(p, uebergabe(ef, None)).await;
+    assert_eq!(
+        s,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "ohne Eigentransport: {v}"
+    );
+
+    let (s, v) = w
+        .verbleib(
+            p,
+            json!({ "art": "transport", "transport_durch": "eigen", "einsatz_fahrzeug_id": ef }),
+        )
+        .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let beginn = v["zeitpunkt_at"].as_str().unwrap().to_string();
+
+    let (s, v) = w.verbleib(p, uebergabe(anderes, None)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "anderes Fahrzeug: {v}");
+
+    // Eine Übergabe vor dem Beginn des Eigentransports ist 422, statt still nachgetragen zu werden.
+    sqlx::query("UPDATE einsatz_person SET erfasst_at = ? WHERE id = ?")
+        .bind(zeit(-3600))
+        .bind(p)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let frueher = (chrono::NaiveDateTime::parse_from_str(&beginn, "%Y-%m-%d %H:%M:%S").unwrap()
+        - chrono::Duration::minutes(5))
+    .format("%Y-%m-%d %H:%M:%S")
+    .to_string();
+    let (s, v) = w.verbleib(p, uebergabe(ef, Some(frueher))).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "vor dem Beginn: {v}");
+    assert_eq!(w.detail(p).await["versorgung"], "unterwegs");
+
+    let (s, v) = w.verbleib(p, uebergabe(ef, None)).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = w.verbleib(p, uebergabe(ef, None)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "schon übergeben: {v}");
+}
+
+#[tokio::test]
+async fn vermisste_person_bleibt_offen_trotz_verbleib() {
+    let w = Welt::neu().await;
+    let p = w.person().await;
+    let (s, v) = w.verbleib(p, json!({ "art": "entlassung" })).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(w.detail(p).await["versorgung"], "abgeschlossen");
+    sqlx::query("UPDATE einsatz_person SET status = 'vermisst' WHERE id = ?")
+        .bind(p)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    assert_eq!(w.detail(p).await["versorgung"], "offen");
 }

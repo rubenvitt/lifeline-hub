@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Person } from '../api/types';
 import { renderMitProviders } from '../test/utils';
+import { setzeViewportBreite } from '../test/viewport';
 import Sichtungsboard from './Sichtungsboard';
 
 /**
@@ -159,5 +160,23 @@ describe('Sichtungsboard', () => {
     unmount();
     zeige([p(4, { aktuelle_sichtung: 'sk2' })]);
     expect(screen.queryByRole('button', { name: /Sichtung R-004/ })).toBeNull();
+  });
+
+  it('am Handy: leere Spalten zu, eine später belegte geht von selbst auf (Spec „Handy“)', () => {
+    setzeViewportBreite(390);
+    const offen = (sk: string) =>
+      spalte(sk).closest('.ant-collapse-item')!.classList.contains('ant-collapse-item-active');
+    const { rerender } = zeige([p(1, { aktuelle_sichtung: 'sk2' })]);
+    expect(spalten()).toHaveLength(7);
+    expect(offen('sk2')).toBe(true);
+    expect(offen('sk1')).toBe(false);
+    rerender(
+      <Sichtungsboard
+        einsatzId={1}
+        uhsName={() => 'Turnhalle'}
+        personen={[p(1, { aktuelle_sichtung: 'sk2' }), p(2, { aktuelle_sichtung: 'sk1' })]}
+      />,
+    );
+    expect(offen('sk1')).toBe(true);
   });
 });

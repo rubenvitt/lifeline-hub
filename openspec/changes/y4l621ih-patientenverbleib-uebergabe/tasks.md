@@ -6,7 +6,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 ## 1. Datenmodell und Migration
 
 - [x] 1.1 Test zuerst (`db::tests`, Muster `migration_0112_*`): Rebuild von `person_verbleib` erhält alle Zeilen samt Spalten aus 0121/0165/0217, Indizes (auch den eindeutigen `client_id`-Index) und `sqlite_sequence`; der CHECK nimmt `status = 'uebergeben'`, `transport_durch IN ('fremd','eigen')` und weist anderes ab. Prüfung: Test rot.
-- [x] 1.2 Migration mit der nächsten freien Nummer über `origin/alpha` (heute 0222, `scripts/check-migrationen.sh`): Rebuild nach D1, neue Spalten `transport_durch`, `einsatz_fahrzeug_id` (Verweis `einsatz_fahrzeug`), Cache-Spalten `aktueller_transport_durch`, `aktuelles_einsatz_fahrzeug_id` an `einsatz_person` samt Backfill aus dem jüngsten Ereignis. Prüfung: Test aus 1.1 grün, `db::tests::migrationsnummern_sind_eindeutig` grün.
+- [x] 1.2 Migration mit der nächsten freien Nummer über `origin/alpha` (heute 0222, `scripts/check-migrationen.sh`): Rebuild nach D1, neue Spalten `transport_durch`, `einsatz_fahrzeug_id` (Verweis `einsatz_fahrzeug`), Cache-Spalten `aktueller_transport_durch`, `aktuelles_einsatz_fahrzeug_id` an `einsatz_person` (ohne Backfill: kein Bestandsereignis trägt eine Fahrer-Angabe, D1). Prüfung: Test aus 1.1 grün, `db::tests::migrationsnummern_sind_eindeutig` grün.
 - [x] 1.3 Schwärzung: neue Spalten (Ereignis und Cache) in `einsatz/schwaerzung_registry.rs` einordnen: `transport_durch` wie Art/Status (`G_TRIAGE`), `einsatz_fahrzeug_id` wie `betreuungsstelle_id` (`G_FK`); der Funkrufname fällt mit `transportmittel`. Prüfung: Registry-Wächter grün, neuer Test „geschwärzter Eigentransport bleibt abgeschlossen“ grün.
 
 ## 2. Server: Verbleib, Übergabe, Versorgungszustand

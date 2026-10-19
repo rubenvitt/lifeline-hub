@@ -1947,6 +1947,40 @@ async fn person_in(app: &axum::Router, cookie: &str, einsatz: i64, uhs: Option<i
 }
 
 #[tokio::test]
+async fn tablet_bekommt_rettungsmittel_nur_aus_verbleiben_der_eigenen_uhs() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, sued, geraet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    for (uhs, rettungsmittel) in [(nord, "KTW Nord"), (sued, "KTW Süd")] {
+        let p = person_in(&app, &admin, einsatz, Some(uhs)).await;
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/personen/{}/verbleib", p["id"]),
+            &admin,
+            Some(&json!({ "art": "transport", "transport_durch": "fremd",
+                          "transportmittel": rettungsmittel })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+    }
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/personen/transportmittel"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["bisher"],
+        json!(["KTW Nord"]),
+        "Freitexte nur aus Verbleiben der eigenen Personen"
+    );
+}
+
+#[tokio::test]
 async fn tablet_kennt_nur_die_eigene_uhs() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;

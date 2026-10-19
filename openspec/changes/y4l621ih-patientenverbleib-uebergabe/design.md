@@ -57,7 +57,8 @@ hinzugekommenen Spalten (0121, 0165, 0217), Indizes und `sqlite_sequence`.
 
 `einsatz_person` bekommt die Cache-Spalten `aktueller_transport_durch` und
 `aktuelles_einsatz_fahrzeug_id`, gepflegt in derselben Anweisung wie die übrigen
-Verbleib-Caches (`erfassen_tx`), mit Backfill aus dem jüngsten Ereignis.
+Verbleib-Caches (`erfassen_tx`). Ein Backfill entfällt: kein Bestandsereignis trägt eine
+Fahrer-Angabe, die Caches sind also für den Bestand leer, wie es der jüngste Stand verlangt.
 
 Bestand: Transport-Ereignisse ohne `transport_durch` lesen sich als `fremd`. Das ist das
 bisherige Verhalten (Transport = abgeschlossen), es ändert keine laufende Lage.
@@ -78,9 +79,15 @@ Offline-Vormerken (`client_id`) und ETB ohne neuen Schreibweg. Der Client baut d
 Prüfungen im Handler, nach den bestehenden: `transport_durch` nur bei `transport` (422);
 `eigen` ohne `einsatz_fahrzeug_id` (422); `einsatz_fahrzeug_id` ohne `eigen` (422); das
 Fahrzeug muss zu diesem Einsatz gehören (404) und zur Erfassungszeit disponiert gewesen sein
-(`disponiert_at ≤ zeitpunkt_at` und `beendet_at` leer oder danach, sonst 422) — so geht eine
-vorgemerkte Übergabe auch nach der Entlassung des Fahrzeugs durch; `status = 'uebergeben'` nur
-mit `eigen` (422). Stornierte Disposition gilt als nie disponiert.
+(`disponiert_at ≤ zeitpunkt_at` und `beendet_at` leer oder danach, sonst 422) — so geht ein
+vorgemerkter Eigentransport auch nach der Entlassung des Fahrzeugs durch; `status = 'uebergeben'`
+nur mit `eigen` (422). Stornierte Disposition gilt als nie disponiert.
+
+Die Übergabe prüft statt der Disposition den laufenden Eigentransport (Review 19.10.2026): der
+aktuelle Verbleib der Person ist ein nicht übergebener Eigentransport mit demselben Fahrzeug, und
+die Übergabe liegt nicht vor ihm (sonst 422). Die Fahrt ist beim Eigentransport schon geprüft; das
+Fahrzeug darf bei der Übergabe längst entlassen sein. Und eine Übergabe, die älter wäre als der
+Eigentransport, würde still nachgetragen, der Patient bliebe unterwegs.
 
 Der Server übernimmt den Funkrufnamen als Momentaufnahme in `transportmittel`, damit Kurzform,
 Verlauf und Schwärzung unverändert auf einem Text arbeiten.
@@ -124,8 +131,12 @@ UHS-Gerät) liefert:
   `fahrzeugtyp`), sortiert nach Funkrufname, locale `de`;
 - `bisher`: eindeutige `transportmittel` aus Verbleib-Ereignissen dieses Einsatzes mit `fremd`
   oder ohne Durch-Angabe, nach Häufigkeit im Einsatz, dann alphabetisch;
-- `stamm`: die Funkrufnamen des Fahrzeugstamms der Organisation, die nicht gerade im Einsatz
-  disponiert sind, alphabetisch.
+- `stamm`: die Funkrufnamen des Fahrzeugstamms der Organisation im Dienst, die nicht gerade im
+  Einsatz disponiert sind, alphabetisch.
+
+Ein an eine Stelle gebundenes Gerät (UHS, Betreuungsstelle) bekommt `bisher` nur aus Verbleiben
+seiner eigenen Personen (`geraet::stelle::sichtbare_personen`, wie die Personenliste): die
+Freitexte stammen aus Personenakten.
 
 Dubletten über die Gruppen hinweg (ohne Groß-/Kleinschreibung) nennt nur die erste Gruppe.
 Keine Kennzeichen, Besatzung oder Positionen: die Route weitet den Fahrzeugzugriff nicht aus.
@@ -222,7 +233,7 @@ diesen Satz als Abgrenzung.
   seit Abfahrt; ab 60 min trägt die Zeile die Marke „Übergabe offen“ (Rolle `achtung`). Kein
   Zwang, kein Toast.
 - [Fahrzeug wird entlassen, während der Patient unterwegs ist] → der Patient bleibt unterwegs;
-  die Übergabe geht über die Prüfung „zur Erfassungszeit disponiert“ durch.
+  die Übergabe prüft nur den laufenden Eigentransport, nicht die Disposition, und geht durch.
 - [Funkrufname als Momentaufnahme veraltet] → gewollt: der Verlauf zeigt, womit gefahren wurde.
 - [Zählwechsel im Lage-Dashboard während einer laufenden Lage] → „Patienten“ sinkt um die
   Abgeschlossenen; die Notiz „n abgeschlossen“ nennt sie, damit niemand einen Datenverlust
@@ -231,7 +242,7 @@ diesen Satz als Abgrenzung.
 ## Migration Plan
 
 1. Migration 0222 (bzw. nächste freie Nummer, `scripts/check-migrationen.sh`) baut
-   `person_verbleib` neu und ergänzt die Caches samt Backfill. Bestand ohne Durch-Angabe liest
+   `person_verbleib` neu und ergänzt die Caches (ohne Backfill, siehe D1). Bestand ohne Durch-Angabe liest
    sich als fremd, also unverändert abgeschlossen.
 2. Server und Client gehen zusammen aus (ein Release). Ein alter Client ohne die neuen Felder
    erfasst Transporte als fremd, wie bisher.

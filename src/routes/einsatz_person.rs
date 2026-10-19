@@ -181,9 +181,16 @@ pub async fn transportmittel(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personen>,
 ) -> Result<Json<verbleib_repo::TransportmittelAuswahl>, AppError> {
+    // Stellenbindung (LFH-892) wie die Liste: die Freitexte stammen aus Verbleiben von Personen.
+    let sichtbar = stelle::sichtbare_personen(&state.pool, ctx.geraet.as_ref()).await?;
     Ok(Json(
-        verbleib_repo::transportmittel_auswahl(&state.pool, ctx.einsatz.id, ctx.einsatz.org_id)
-            .await?,
+        verbleib_repo::transportmittel_auswahl(
+            &state.pool,
+            ctx.einsatz.id,
+            ctx.einsatz.org_id,
+            sichtbar.as_ref(),
+        )
+        .await?,
     ))
 }
 
@@ -1314,6 +1321,14 @@ pub async fn verbleib(
     // Fahrer-Angabe (LLH-1332, design.md D2): Paarung vor dem Lesen des Fahrzeugs, die
     // Momentaufnahme des Funkrufnamens ersetzt einen mitgeschickten Text.
     pruefe_fahrer_angabe(art, status, durch, body.einsatz_fahrzeug_id)?;
+    let uebergabe = status == Some(VerbleibStatus::Uebergeben);
+    if uebergabe {
+        pruefe_uebergabe(
+            verbleib_repo::aktueller(&state.pool, einsatz_id, person_id).await?,
+            body.einsatz_fahrzeug_id,
+            &zeitpunkt_at,
+        )?;
+    }
     let transportmittel = match body.einsatz_fahrzeug_id {
         Some(ef_id) => {
             let fahrzeug = crate::fahrzeug::disposition_repo::transport_fahrzeug(
@@ -1323,7 +1338,9 @@ pub async fn verbleib(
             )
             .await?
             .ok_or(AppError::NotFound)?;
-            if !fahrzeug.bestand_zu(&zeitpunkt_at) {
+            // Die Übergabe quittiert eine Fahrt, die schon geprüft ist: das Fahrzeug darf
+            // inzwischen entlassen oder neu disponiert sein (design.md, Risiken).
+            if !uebergabe && !fahrzeug.bestand_zu(&zeitpunkt_at) {
                 return Err(AppError::UnprocessableEntity(
                     "Das Fahrzeug war zur Erfassungszeit nicht im Einsatz disponiert".into(),
                 ));
@@ -1475,6 +1492,34 @@ fn pruefe_fahrer_angabe(
     }
     if status == Some(VerbleibStatus::Uebergeben) && !eigen {
         return fehler("Eine Übergabe gibt es nur beim Eigentransport");
+    }
+    Ok(())
+}
+
+/// Eine Übergabe schließt den laufenden Eigentransport ab (LLH-1332, Spec `patienten-uebergabe`):
+/// der aktuelle Verbleib ist ein noch nicht übergebener Eigentransport mit demselben Fahrzeug, und
+/// die Übergabe liegt nicht vor ihm. Sonst würde sie still nachgetragen und der Patient bliebe
+/// unterwegs, obwohl der Dialog „quittiert“ meldet. Jeder Verstoß ist 422.
+fn pruefe_uebergabe(
+    aktuell: Option<VerbleibAnzeige>,
+    einsatz_fahrzeug_id: Option<i64>,
+    zeitpunkt_at: &str,
+) -> Result<(), AppError> {
+    let laufend = aktuell.filter(|v| {
+        v.art == VerbleibArt::Transport
+            && v.transport_durch == Some(TransportDurch::Eigen)
+            && v.status != Some(VerbleibStatus::Uebergeben)
+            && v.einsatz_fahrzeug_id == einsatz_fahrzeug_id
+    });
+    let Some(laufend) = laufend else {
+        return Err(AppError::UnprocessableEntity(
+            "Die Person ist nicht mit diesem Fahrzeug im Eigentransport".into(),
+        ));
+    };
+    if zeitpunkt_at < laufend.zeitpunkt_at.as_str() {
+        return Err(AppError::UnprocessableEntity(
+            "Die Übergabe kann nicht vor dem Beginn des Eigentransports liegen".into(),
+        ));
     }
     Ok(())
 }

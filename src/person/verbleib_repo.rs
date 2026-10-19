@@ -3,6 +3,7 @@ use crate::geraet::bestaetigung::Bestaetigung;
 use crate::person::{verbleib_kurzform, TransportDurch, VerbleibArt, VerbleibStatus};
 use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
+use std::collections::{HashMap, HashSet};
 use utoipa::ToSchema;
 
 /// Ein Verbleib-Ereignis (1:1 zu `person_verbleib`).
@@ -262,11 +263,14 @@ pub struct TransportmittelAuswahl {
 
 /// Liest die [`TransportmittelAuswahl`] eines Einsatzes. Geschwärzte Verbleibe tragen kein
 /// `transportmittel` mehr und fallen so von selbst heraus; Dubletten über die Gruppen hinweg
-/// nennt nur die erste Gruppe.
+/// nennt nur die erste Gruppe. `sichtbar` ist die Stellenbindung des Geräts
+/// (`geraet::stelle::sichtbare_personen`): ein gebundenes Gerät bekommt die Freitexte nur aus den
+/// Verbleiben seiner eigenen Personen. Der Fahrzeugstamm nennt nur Fahrzeuge im Dienst.
 pub async fn transportmittel_auswahl(
     pool: &SqlitePool,
     einsatz_id: i64,
     org_id: i64,
+    sichtbar: Option<&HashSet<i64>>,
 ) -> Result<TransportmittelAuswahl, AppError> {
     let im_einsatz: Vec<EinsatzTransportfahrzeug> = sqlx::query_as(
         "SELECT ef.id AS einsatz_fahrzeug_id, \
@@ -279,20 +283,32 @@ pub async fn transportmittel_auswahl(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    let bisher: Vec<String> = sqlx::query_scalar(
-        "SELECT TRIM(transportmittel) FROM person_verbleib \
+    let zeilen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT person_id, TRIM(transportmittel) FROM person_verbleib \
          WHERE einsatz_id = ? AND art = 'transport' \
            AND (transport_durch IS NULL OR transport_durch = 'fremd') \
-           AND TRIM(COALESCE(transportmittel, '')) <> '' \
-         GROUP BY TRIM(transportmittel) \
-         ORDER BY COUNT(*) DESC, 1 COLLATE NOCASE",
+           AND TRIM(COALESCE(transportmittel, '')) <> ''",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
+    // Häufigste zuerst, bei Gleichstand nach Namen ohne Groß und Klein.
+    let mut haeufigkeit: HashMap<String, usize> = HashMap::new();
+    for (person_id, text) in zeilen {
+        if sichtbar.is_none_or(|s| s.contains(&person_id)) {
+            *haeufigkeit.entry(text).or_default() += 1;
+        }
+    }
+    let mut bisher: Vec<(String, usize)> = haeufigkeit.into_iter().collect();
+    bisher.sort_by(|(a, na), (b, nb)| {
+        nb.cmp(na)
+            .then_with(|| a.to_lowercase().cmp(&b.to_lowercase()))
+            .then_with(|| a.cmp(b))
+    });
+    let bisher: Vec<String> = bisher.into_iter().map(|(t, _)| t).collect();
     let stamm: Vec<String> = sqlx::query_scalar(
         "SELECT f.funkrufname FROM fahrzeug f \
-         WHERE f.org_id = ? AND NOT EXISTS ( \
+         WHERE f.org_id = ? AND f.dienststatus = 'in_dienst' AND NOT EXISTS ( \
              SELECT 1 FROM einsatz_fahrzeug ef \
              WHERE ef.einsatz_id = ? AND ef.fahrzeug_id = f.id AND ef.beendet_at IS NULL) \
          ORDER BY f.funkrufname COLLATE NOCASE",
@@ -302,7 +318,7 @@ pub async fn transportmittel_auswahl(
     .fetch_all(pool)
     .await?;
     let schluessel = |t: &str| t.trim().to_lowercase();
-    let mut gesehen: std::collections::HashSet<String> = im_einsatz
+    let mut gesehen: HashSet<String> = im_einsatz
         .iter()
         .map(|f| schluessel(&f.funkrufname))
         .collect();
@@ -319,6 +335,24 @@ pub async fn transportmittel_auswahl(
         bisher,
         stamm,
     })
+}
+
+/// Der aktuelle Verbleib einer Person (Ordnung `verbleibfolge!`), `None` ohne Verbleib.
+pub async fn aktueller(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    person_id: i64,
+) -> Result<Option<VerbleibAnzeige>, AppError> {
+    Ok(
+        sqlx::query_as::<_, VerbleibAnzeige>(sqlx::AssertSqlSafe(format!(
+            "{SELECT_VERBLEIB} WHERE einsatz_id = ? AND person_id = ? {} LIMIT 1",
+            verbleibfolge!()
+        )))
+        .bind(einsatz_id)
+        .bind(person_id)
+        .fetch_optional(pool)
+        .await?,
+    )
 }
 
 /// Verbleib-Verlauf einer Person (neueste zuerst).

@@ -1,5 +1,5 @@
 import { Collapse, Typography } from 'antd';
-import { useMemo, useRef, type CSSProperties } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router';
 import { registrierAnzeige } from '../api/einsatzPerson';
 import type { Person } from '../api/types';
@@ -40,7 +40,7 @@ import ZeilenSichtung from './ZeilenSichtung';
  * - Die Zuflussschleuse hält Menge, Spalte (`gruppeVon`) und Folge, solange Zeiger oder Fokus im
  *   Board sind oder eine Nachsichtung offen ist (`halten`); Neue warten hinten in ihrer Spalte.
  * - Ab `lg` nebeneinander mit eigenem Bildlauf je Spalte; darunter untereinander und einklappbar,
- *   leere eingeklappt. Die Seite rollt nie seitlich.
+ *   leere eingeklappt, auch eine, die erst später voll wird. Die Seite rollt nie seitlich.
  */
 
 const personSchluessel = (p: Person) => p.id;
@@ -98,6 +98,15 @@ export default function Sichtungsboard({
   const je = new Map<string, Person[]>(SICHTUNGSBILD_REIHE.map((k) => [k, []]));
   for (const p of gezeigt) je.get(spalteVon(p))?.push(p);
 
+  // Am schmalen Schirm: belegte Spalten offen, leere zu, solange niemand umklappt. Gemerkt wird
+  // nur die Abweichung, damit eine Spalte, die später voll wird, von selbst aufgeht.
+  const [abweichend, setAbweichend] = useState<ReadonlySet<SichtungsbildSchluessel>>(new Set());
+  const offen = SICHTUNGSBILD_REIHE.filter((k) => je.get(k)!.length > 0 !== abweichend.has(k));
+  const klappen = (keys: string | string[]) => {
+    const auf = new Set(Array.isArray(keys) ? keys : [keys]);
+    setAbweichend(new Set(SICHTUNGSBILD_REIHE.filter((k) => auf.has(k) !== je.get(k)!.length > 0)));
+  };
+
   const karten = (k: SichtungsbildSchluessel) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
       {je.get(k)!.map((p) => (
@@ -153,9 +162,12 @@ export default function Sichtungsboard({
           ))
         ) : (
           <Collapse
-            defaultActiveKey={SICHTUNGSBILD_REIHE.filter((k) => je.get(k)!.length > 0)}
+            activeKey={offen}
+            onChange={klappen}
             items={SICHTUNGSBILD_REIHE.map((k) => ({
               key: k,
+              // Eingeklappte Spalten bleiben im DOM: die Folge aller Kategorien steht auch am Handy.
+              forceRender: true,
               label: <SpaltenKopf k={k} zahl={je.get(k)!.length} inline />,
               children: (
                 <section data-testid="board-spalte" data-sichtung={k} aria-label={wort(k)}>

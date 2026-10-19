@@ -230,12 +230,18 @@ wire_enum! {
 
 /// Versorgungszustand aus dem jüngsten Verbleib (Spec `patienten-uebergabe`, „Versorgungszustand
 /// der Person“). Gepinnt im gemeinsamen Fixture `tests/fixtures/verdichtung/regeln.json`
-/// (Abschnitt `versorgung`); der Client liest nur das Feld `versorgung`.
+/// (Abschnitt `versorgung`); der Client liest nur das Feld `versorgung`. Eine vermisste Person ist
+/// immer `offen`, auch mit einem älteren Verbleib (design.md D3): sie wird gesucht und darf nicht
+/// aus der Liste fallen.
 pub fn versorgung_von(
+    person_status: PersonStatus,
     art: Option<VerbleibArt>,
     status: Option<VerbleibStatus>,
     durch: Option<TransportDurch>,
 ) -> Versorgung {
+    if person_status == PersonStatus::Vermisst {
+        return Versorgung::Offen;
+    }
     match art {
         None | Some(VerbleibArt::VorOrt) => Versorgung::Offen,
         Some(VerbleibArt::Transport) => match (status, durch) {
@@ -534,6 +540,7 @@ impl PersonAnzeige {
     /// Setzt den abgeleiteten Versorgungszustand aus den Verbleib-Caches.
     pub fn mit_versorgung(mut self) -> Self {
         self.versorgung = versorgung_von(
+            self.status,
             self.aktuelle_verbleib_art,
             self.aktueller_verbleib_status,
             self.aktueller_transport_durch,

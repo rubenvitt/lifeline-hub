@@ -70,6 +70,19 @@ sonst 422. Die Übergabe MUST ohne Netz vormerkbar sein wie jeder Verbleib.
 - **WHEN** die Übergabe ohne Verbindung gespeichert wird
 - **THEN** steht am Ort „Offline vorgemerkt“, und der Abgleich legt das Ereignis mit der Erfassungszeit am Gerät an
 
+### Requirement: Übergabe schließt den laufenden Eigentransport ab
+Der aktuelle Verbleib der Person SHALL bei einer Übergabe ein nicht übergebener Eigentransport
+mit demselben Fahrzeug sein, und die Übergabe MUST NOT vor ihm liegen, sonst 422. Ob das
+Fahrzeug bei der Übergabe noch disponiert ist, MUST NOT zählen.
+
+#### Scenario: Fahrzeug vor der Übergabe entlassen
+- **WHEN** R-008 um 10:00 mit „1/83-1“ im Eigentransport ist, das Fahrzeug um 10:30 entlassen wird und die Übergabe um 10:45 quittiert wird
+- **THEN** wird die Übergabe gespeichert, und R-008 ist abgeschlossen
+
+#### Scenario: Übergabe ohne laufenden Eigentransport
+- **WHEN** eine Übergabe für eine Person ohne Eigentransport, mit einem anderen Fahrzeug oder mit einer Zeit vor dem Beginn des Eigentransports gesendet wird
+- **THEN** antwortet der Server mit 422, und die Person bleibt, wie sie war
+
 ### Requirement: Übergabe im ETB und in der Kurzform
 Das ETB SHALL einen Eigentransport als „Person R-…: im Eigentransport“ und die Übergabe als
 „Person R-…: übergeben“ führen, ohne Ziel und ohne Fahrzeug. Die Kurzform `aktueller_verbleib`
@@ -103,12 +116,21 @@ Alles andere (kein Verbleib, „verbleibt vor Ort“, Transport `angemeldet`) MU
 - **WHEN** der Lagemonitor und das Lage-Dashboard dieselben Personen zählen
 - **THEN** ergeben beide dieselbe Zahl je Versorgungszustand
 
+### Requirement: Vermisste Personen bleiben offen
+Eine Person im Status `vermisst` SHALL immer `versorgung: "offen"` tragen, auch mit einem älteren
+Verbleib, damit sie nicht aus den Standardansichten fällt.
+
+#### Scenario: Entlassene Person wird vermisst
+- **WHEN** eine Person mit Verbleib „Entlassung vor Ort“ auf vermisst gesetzt wird
+- **THEN** trägt sie `versorgung: "offen"` und steht wieder in der Liste
+
 ### Requirement: Vorschläge für das Rettungsmittel
 Die Verbleib-Maske SHALL zum Rettungsmittel Vorschläge in drei Gruppen anbieten: „Im Einsatz“
 (aktive Fahrzeug-Dispositionen; Wahl heißt Eigentransport), „Bisher verwendet“ (fremde
-Rettungsmittel aus Verbleiben dieses Einsatzes) und „Fahrzeugstamm“ (Fahrzeuge der Organisation,
-die nicht im Einsatz disponiert sind). Freier Text MUST als fremdes Rettungsmittel gelten. Die
-Vorschläge MUST mit Lesezugriff auf das Modul Personen abrufbar sein, auch am UHS-Gerät.
+Rettungsmittel aus Verbleiben dieses Einsatzes) und „Fahrzeugstamm“ (Fahrzeuge der Organisation
+im Dienst, die nicht im Einsatz disponiert sind). Freier Text MUST als fremdes Rettungsmittel
+gelten. Die Vorschläge MUST mit Lesezugriff auf das Modul Personen abrufbar sein, auch am
+UHS-Gerät.
 
 #### Scenario: Einsatzfahrzeug wählen
 - **WHEN** jemand im Feld „Rettungsmittel“ „1/83“ tippt und aus „Im Einsatz“ „1/83-1“ wählt
@@ -125,6 +147,14 @@ Vorschläge MUST mit Lesezugriff auf das Modul Personen abrufbar sein, auch am U
 #### Scenario: UHS-Gerät ohne Modul Fahrzeuge
 - **WHEN** ein gekoppeltes UHS-Tablet die Verbleib-Maske öffnet
 - **THEN** zeigt sie die Fahrzeuge „Im Einsatz“, ohne dass das Gerät die Fahrzeugliste lesen darf
+
+### Requirement: Vorschläge unter der Stellenbindung
+Ein an eine Stelle gebundenes Gerät (UHS, Betreuungsstelle) SHALL „Bisher verwendet“ nur aus
+Verbleiben seiner eigenen Personen bekommen, wie die Personenliste.
+
+#### Scenario: Freitexte nur der eigenen Stelle
+- **WHEN** in UHS Nord „KTW Nord“ und in UHS Süd „KTW Süd“ als fremdes Rettungsmittel eingetragen wurde und das Tablet von UHS Nord die Vorschläge lädt
+- **THEN** steht unter „Bisher verwendet“ nur „KTW Nord“
 
 ### Requirement: Schwärzung von Fahrer-Angabe und Fahrzeug
 Die Schwärzung einer Person SHALL den Rettungsmittel-Text eines Verbleib-Ereignisses leeren, auch

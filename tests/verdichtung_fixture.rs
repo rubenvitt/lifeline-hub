@@ -13,8 +13,8 @@ use lifeline_hub::einsatz::zaehler::{
 use lifeline_hub::entlassung::BeendetAls;
 use lifeline_hub::meldung::MeldungStatus;
 use lifeline_hub::person::{
-    versorgung_von, zaehle_lage_sichtung, Sichtungskategorie, TransportDurch, VerbleibArt,
-    VerbleibStatus, Versorgung,
+    versorgung_von, zaehle_lage_sichtung, PersonStatus, Sichtungskategorie, TransportDurch,
+    VerbleibArt, VerbleibStatus, Versorgung,
 };
 use lifeline_hub::staerke::{Staerke, StaerkePosition};
 use serde_json::Value;
@@ -194,7 +194,9 @@ fn versorgung_und_lagesichtung_wie_das_fixture() {
         let durch = f["durch"]
             .as_str()
             .map(|s| TransportDurch::parse(s).expect("bekannte Fahrer-Angabe"));
-        let versorgung = versorgung_von(art, status, durch);
+        let person = PersonStatus::parse(f["person_status"].as_str().unwrap_or("betroffen"))
+            .expect("bekannter Personenstatus");
+        let versorgung = versorgung_von(person, art, status, durch);
         assert_eq!(
             versorgung.as_str(),
             f["versorgung"].as_str().unwrap(),

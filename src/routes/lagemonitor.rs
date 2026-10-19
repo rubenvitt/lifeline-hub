@@ -24,8 +24,8 @@ use crate::error::AppError;
 use crate::geraet::Funktionsansicht;
 use crate::lage_zone::LageZoneTyp;
 use crate::person::{
-    versorgung_von, zaehle_lage_sichtung, Sichtungskategorie, TransportDurch, VerbleibArt,
-    VerbleibStatus,
+    versorgung_von, zaehle_lage_sichtung, PersonStatus, Sichtungskategorie, TransportDurch,
+    VerbleibArt, VerbleibStatus,
 };
 use crate::staerke::{Staerke, StaerkePosition};
 use crate::uhs::{UhsStatus, UhsTyp};
@@ -131,13 +131,14 @@ pub async fn lagebild(
     // Sichtung und Versorgungszustand je Person; die Zählung ist die gemeinsame Regel
     // (`person::zaehle_lage_sichtung`, Fixture `regeln.json` Abschnitt `versorgung`).
     type Zeile = (
+        String,
         Option<Sichtungskategorie>,
         Option<VerbleibArt>,
         Option<VerbleibStatus>,
         Option<TransportDurch>,
     );
     let zeilen: Vec<Zeile> = sqlx::query_as(
-        "SELECT aktuelle_sichtung, aktuelle_verbleib_art, aktueller_verbleib_status, \
+        "SELECT status, aktuelle_sichtung, aktuelle_verbleib_art, aktueller_verbleib_status, \
                 aktueller_transport_durch \
          FROM einsatz_person WHERE einsatz_id = ? AND storniert_at IS NULL",
     )
@@ -145,11 +146,12 @@ pub async fn lagebild(
     .fetch_all(pool)
     .await?;
     betroffene.gesamt = zeilen.len() as i64;
-    let lage = zaehle_lage_sichtung(
-        zeilen
-            .into_iter()
-            .map(|(sk, art, status, durch)| (sk, versorgung_von(art, status, durch))),
-    );
+    let mut lage_zeilen = Vec::with_capacity(zeilen.len());
+    for (person, sk, art, status, durch) in zeilen {
+        let person = PersonStatus::try_from(person).map_err(AppError::Internal)?;
+        lage_zeilen.push((sk, versorgung_von(person, art, status, durch)));
+    }
+    let lage = zaehle_lage_sichtung(lage_zeilen);
     betroffene.sk1 = lage.sk1;
     betroffene.sk2 = lage.sk2;
     betroffene.sk3 = lage.sk3;
