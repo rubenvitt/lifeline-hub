@@ -162,7 +162,7 @@ async function pruefeKopfUeberPersonendaten(page: Page, breite: number) {
  * Detail bei 390 und 820: der Kopf steht über den Personendaten. Bei 390 × 844 liegen Sichtung,
  * Zustand / Verdacht und Aufenthalt OHNE Scrollen ganz im ersten Bild (Spec `personen-detail`).
  */
-async function pruefeDetail(page: Page, einsatzId: string, personId: number) {
+async function pruefeDetail(page: Page, einsatzId: string, personId: number, schreibt: boolean) {
   for (const viewport of [HANDSCHIRM, TABLET_HOCH]) {
     await page.setViewportSize(viewport);
     await page.goto(`/einsaetze/${einsatzId}/personen/${personId}`);
@@ -183,7 +183,28 @@ async function pruefeDetail(page: Page, einsatzId: string, personId: number) {
       }
     }
     await pruefeKopfUeberPersonendaten(page, viewport.width);
+    await pruefeOhneAngabe(page, viewport.width, schreibt);
   }
+}
+
+/**
+ * Leere Personendaten (LLH-1103, Spec `einsatztauglichkeit-layout`, „Leere Angaben …“): mit
+ * Schreibrecht Knöpfe „+ Etikett“, ohne Schreibrecht der Satz; die Zeile läuft nicht über den
+ * Rand.
+ */
+async function pruefeOhneAngabe(page: Page, breite: number, schreibt: boolean) {
+  const zeile = page.locator('[data-lfh="ohne-angabe"]');
+  await expect(zeile).toBeVisible();
+  if (schreibt) {
+    await expect(zeile.getByRole('button', { name: 'Geburtsdatum eintragen' })).toHaveText(
+      '+ Geburtsdatum',
+    );
+  } else {
+    await expect(zeile).toContainText('Ohne Angabe: Geburtsdatum');
+    await expect(zeile.getByRole('button')).toHaveCount(0);
+  }
+  const rechts = await zeile.evaluate((el) => el.getBoundingClientRect().right);
+  expect(rechts, `${breite} px: Zeile „Ohne Angabe“ im Bild`).toBeLessThanOrEqual(breite);
 }
 
 test('Admin bei 390 px: Personenzeile und Sichtungszeile im ersten Bild, Nebenwege im Menü, Detail beginnt mit dem Patientenkopf', async ({
@@ -196,7 +217,7 @@ test('Admin bei 390 px: Personenzeile und Sichtungszeile im ersten Bild, Nebenwe
   const einsatzId = await einsatzAnlegen(page, `E2E Betroffene Handy ${Date.now()}`);
   const personId = await seedeLage(page, einsatzId);
   await pruefeListeAmHandy(page, einsatzId, true);
-  await pruefeDetail(page, einsatzId, personId);
+  await pruefeDetail(page, einsatzId, personId, true);
 });
 
 test('Beobachter bei 390 px: Personenzeile und Sichtungszeile im ersten Bild, Detail beginnt mit dem Patientenkopf', async ({
@@ -209,7 +230,7 @@ test('Beobachter bei 390 px: Personenzeile und Sichtungszeile im ersten Bild, De
   const personId = await seedeLage(page, einsatzId);
   await wechsleZuRolle(page, 'beobachter', einsatzId);
   await pruefeListeAmHandy(page, einsatzId, false);
-  await pruefeDetail(page, einsatzId, personId);
+  await pruefeDetail(page, einsatzId, personId, false);
 });
 
 /**

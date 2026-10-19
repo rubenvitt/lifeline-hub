@@ -3396,6 +3396,34 @@ test('Betroffene Liste (Beobachter): die Ansichtsleiste folgt der Staffel, Zusta
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+/**
+ * Personendaten feldweise (LLH-1103, Spec `einsatztauglichkeit-layout`, „Leere Angaben mit
+ * Schreibrecht“): die Knöpfe „+ …“ der Zeile „Ohne Angabe“ und die Wertknöpfe im Raster halten
+ * die Staffel.
+ */
+test('Betroffene Detailseite: Knöpfe „+ …“ und Wertknöpfe der Personendaten folgen der Staffel', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Personendaten`);
+  const id = await personAnlegen(page, einsatzId, { name: 'Claasen' });
+
+  const gemessen: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/personen/${id}`);
+    await stelleDichte(page, dichte);
+    const daten = page.locator('[data-lfh="personendaten"]');
+    const plus = daten.getByRole('button', { name: 'Geburtsdatum eintragen', exact: true });
+    const wert = daten.getByRole('button', { name: 'Name bearbeiten', exact: true });
+    const hPlus = await haeltStufe(plus, soll, `„+ Geburtsdatum“ (${dichte})`);
+    const hWert = await haeltStufe(wert, soll, `Wertknopf „Name“ (${dichte})`);
+    gemessen.push(`${dichte} (Soll ≥ ${soll}): + ${hPlus}, Wert ${hWert}`);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 test('Betroffene Detailseite: „Auf Lagekarte verorten" folgt der Staffel', async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize(FUEKW);
