@@ -38,8 +38,8 @@ Abschnittsbezüge D1–D6 auf `design.md`.
 
 ## 7. Abschluss
 
-- [ ] 7.1 `./scripts/check-all.sh` grün (lokal oder der CI-Lauf des PRs).
-- [ ] 7.2 Review (`superpowers:requesting-code-review`) ohne offene bestätigte Findings.
+- [x] 7.1 `./scripts/check-all.sh` grün (lokal oder der CI-Lauf des PRs). Lokal grün: Bündel `schnell` und `frontend` (16 250 Vitest), `cargo test --lib` (3326) und `--test einsatz_material`, e2e `material-liste` und `material-am-ort` (7); den vollen Rust-Workspace und die ganze e2e-Suite belegt der CI-Lauf des PRs (lokal fehlte der Platz zum Linken aller Testbinaries).
+- [x] 7.2 Review ohne offene bestätigte Findings (Review-Agent: ein Blocker — Ort-Vorbelegung beim erneuten Öffnen — und fünf kleinere Punkte, alle behoben).
 
 ## Workflow follow-up
 
