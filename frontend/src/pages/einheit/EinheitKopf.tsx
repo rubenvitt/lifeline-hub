@@ -105,6 +105,7 @@ export default function EinheitKopf({
   const textRow = (
     etikett: string,
     feld: 'funkrufname' | 'bemerkung',
+    max: number,
     mehrzeilig: boolean,
     placeholder?: string,
   ) => (
@@ -121,8 +122,8 @@ export default function EinheitKopf({
       darfSchreiben={canEdit}
       mehrzeilig={mehrzeilig}
       pruefe={(w) =>
-        mehrzeilig && istZuLang(w, EINHEIT_BEMERKUNG_MAX)
-          ? `${etikett} darf höchstens ${grenzeText(EINHEIT_BEMERKUNG_MAX)} Zeichen lang sein`
+        mehrzeilig && istZuLang(w, max)
+          ? `${etikett} darf höchstens ${grenzeText(max)} Zeichen lang sein`
           : null
       }
       onSpeichern={(w) => onPatch(etikett, { [feld]: leerZuNull(w) })}
@@ -131,7 +132,7 @@ export default function EinheitKopf({
           <Input.TextArea
             {...f}
             autoSize={{ minRows: 2 }}
-            count={zeichenGrenze(EINHEIT_BEMERKUNG_MAX)}
+            count={zeichenGrenze(max)}
             value={value}
             onChange={(ev) => onChange(ev.target.value)}
           />
@@ -139,7 +140,7 @@ export default function EinheitKopf({
           <Input
             {...f}
             placeholder={placeholder}
-            maxLength={EINHEIT_FUNKRUFNAME_MAX}
+            maxLength={max}
             value={value}
             onChange={(ev) => onChange(ev.target.value)}
           />
@@ -232,7 +233,13 @@ export default function EinheitKopf({
             {/* Der Rufname der Einheit, nicht eines ihrer Fahrzeuge. Leer zeigt das Meldebild
                 höchstens den Rufnamen des einzigen Fahrzeugs. */}
             <Datenfeld label="Funkrufname">
-              {textRow('Funkrufname', 'funkrufname', false, 'z. B. Florian HM 12/44')}
+              {textRow(
+                'Funkrufname',
+                'funkrufname',
+                EINHEIT_FUNKRUFNAME_MAX,
+                false,
+                'z. B. Florian HM 12/44',
+              )}
             </Datenfeld>
             <Datenfeld label="Abschnitt">
               <InlineAngabe<number | null>
@@ -342,7 +349,7 @@ export default function EinheitKopf({
               <StatusZeile einheit={e} canEdit={canEdit} onSetHandStatus={onSetHandStatus} />
             </Datenfeld>
             <Datenfeld label="Bemerkung" breit>
-              {textRow('Bemerkung', 'bemerkung', true)}
+              {textRow('Bemerkung', 'bemerkung', EINHEIT_BEMERKUNG_MAX, true)}
             </Datenfeld>
           </Datenraster>
         </div>

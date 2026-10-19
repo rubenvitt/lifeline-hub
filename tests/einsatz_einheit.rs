@@ -1803,10 +1803,10 @@ async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
     let pfad = format!("/api/einsaetze/{einsatz}/einheiten");
     let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
     let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
-    for (feld, max) in [
-        ("bemerkung", 2_000),
-        ("funkrufname", 200),
-        ("erreichbarkeit", 200),
+    for (feld, etikett, max) in [
+        ("bemerkung", "Bemerkung", 2_000),
+        ("funkrufname", "Funkrufname", 200),
+        ("erreichbarkeit", "Erreichbarkeit", 200),
     ] {
         let zu_lang = "Z".repeat(max + 1);
         let body = serde_json::json!({ "name": "Zug 2", feld: zu_lang }).to_string();
@@ -1816,7 +1816,7 @@ async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
             json["error"]
                 .as_str()
                 .unwrap()
-                .contains(&format!("darf höchstens {max} Zeichen lang sein")),
+                .contains(&format!("{etikett} darf höchstens {max} Zeichen lang sein")),
             "POST {feld}: {json}"
         );
         let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
@@ -1845,6 +1845,19 @@ async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
         let (s, _) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
         assert_eq!(s, StatusCode::OK);
     }
+
+    // Die Grenze kommt vor dem 409 einer aufgelösten Einheit (`src/AGENTS.md`, „Eingabegrenzen“).
+    // Mit Mitglied löst DELETE auf, statt die Einheit zu löschen.
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, _) = anfrage(&app, "DELETE", &format!("{pfad}/{e}"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let kurz = serde_json::json!({ "bemerkung": "Z" }).to_string();
+    let (s, _) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&kurz)).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let lang = serde_json::json!({ "bemerkung": "Z".repeat(2_001) }).to_string();
+    let (s, json) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "aufgelöst: {json}");
 }
 
 /// Spec `fahrzeug-bearbeitung`, „Einheit eines Fahrzeugs in der Liste ändern“ (design.md D2): ein

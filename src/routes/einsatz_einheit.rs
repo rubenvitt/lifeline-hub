@@ -4,7 +4,9 @@ use super::einsatz_personal::sse_personal;
 use crate::app::AppState;
 use crate::benachrichtigung::{BenachrichtigungBezugTyp, Bezug};
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
-use crate::einheit::{aus_vorlage, mitglied_repo, EinheitAnzeige};
+use crate::einheit::{
+    aus_vorlage, mitglied_repo, EinheitAnzeige, BEMERKUNG_MAX, ERREICHBARKEIT_MAX, FUNKRUFNAME_MAX,
+};
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::{Einheiten, Fahrzeuge, Personal};
@@ -122,23 +124,6 @@ fn check_fahrzeug_ids(ids: Option<&[i64]>) -> Result<Vec<i64>, AppError> {
     Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
 }
 
-/// Bemerkung, Funkrufname und Erreichbarkeit getrimmt und gegen ihre Grenze geprüft (LLH-1242,
-/// `src/AGENTS.md`, „Eingabegrenzen“), vor jedem 409/422 des Handlers. `pruefe` ist
-/// `optional_max` beim Bilden und `optional_max_tri` beim Teil-Patch.
-fn check_freitexte<T>(
-    bemerkung: T,
-    funkrufname: T,
-    erreichbarkeit: T,
-    pruefe: fn(T, &str, usize) -> Result<T, AppError>,
-) -> Result<(T, T, T), AppError> {
-    use crate::einheit::{BEMERKUNG_MAX, ERREICHBARKEIT_MAX, FUNKRUFNAME_MAX};
-    Ok((
-        pruefe(bemerkung, "Bemerkung", BEMERKUNG_MAX)?,
-        pruefe(funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?,
-        pruefe(erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
-    ))
-}
-
 /// POST /api/einsaetze/{id}/einheiten — Einheit bilden, optional mit Fahrzeugen („Als eigene
 /// Einheit führen“, LLH-1073, Spec `fahrzeug-bearbeitung`). Alles oder nichts in einem
 /// `write_retry!` (design.md D9): Einheit, Sprechgruppen, Vorprüfung der Fahrzeuge (unbekannt,
@@ -160,12 +145,10 @@ pub async fn bilden(
     let fahrzeug_ids = check_fahrzeug_ids(body.fahrzeug_ids.as_deref())?;
     // Der Name geht ins ETB (LLH-1073 design.md D8): Grenze vor jedem Schreiben.
     let name = pflicht_max(&body.name, "Name", crate::einheit::NAME_MAX)?;
-    let (bemerkung, funkrufname, erreichbarkeit) = check_freitexte(
-        body.bemerkung,
-        body.funkrufname,
-        body.erreichbarkeit,
-        optional_max,
-    )?;
+    // Freitexte ebenso vor jedem Schreiben (LLH-1242, Spec `eingabegrenzen`).
+    let bemerkung = optional_max(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let funkrufname = optional_max(body.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
+    let erreichbarkeit = optional_max(body.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?;
     Staerke::from_options(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
@@ -507,12 +490,11 @@ pub async fn update(
         .as_deref()
         .map(|n| pflicht_max(n, "Name", crate::einheit::NAME_MAX))
         .transpose()?;
-    let (bemerkung, funkrufname, erreichbarkeit) = check_freitexte(
-        body.bemerkung,
-        body.funkrufname,
-        body.erreichbarkeit,
-        optional_max_tri,
-    )?;
+    // Freitexte vor `require_aktiv` (409) und den Soll-Prüfungen (LLH-1242, Spec `eingabegrenzen`).
+    let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
+    let funkrufname = optional_max_tri(body.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
+    let erreichbarkeit =
+        optional_max_tri(body.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?;
 
     require_aktiv(&state, einsatz_id, eid).await?;
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
