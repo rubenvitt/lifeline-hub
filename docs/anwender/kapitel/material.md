@@ -271,7 +271,8 @@ Fahrzeuge (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 
 Derselbe Stammposten lässt sich mehrmals disponieren, jeweils als eigene Zeile mit eigener Menge und
 eigenem Status. Aufteilen macht aus einer Zeile zwei: Die neue Zeile übernimmt Art, Status,
-Bemerkung, Ort und den Zeitpunkt der Disposition, die Ausgangszeile behält den Rest der Menge.
+Bemerkung, Ort und den Zeitpunkt der Disposition oder steht an dem im Dialog gewählten Ort, die
+Ausgangszeile behält den Rest der Menge.
 Abgeteilt wird nur, was noch nicht ausgegeben ist; die Ausgabe bleibt an der Ausgangszeile, die neue
 Zeile beginnt ohne Ausgabe. Die
 Auswahl beim Disponieren bietet den Materialstamm an, soweit er in Dienst steht; Demo-Posten stehen

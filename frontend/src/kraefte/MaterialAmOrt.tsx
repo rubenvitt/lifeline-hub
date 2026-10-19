@@ -28,6 +28,7 @@ import {
   ORT_FELD,
   ortText,
   ortVon,
+  ZUGEORDNET,
   type MaterialOrtRef,
 } from './materialPosten';
 import { materialKopfzahl } from './materialVerdichtungKern';
@@ -483,7 +484,10 @@ function ZuordnenAuswahl({
         optionRender={wrapLabel}
         onSelect={(wert) => {
           const p = angebot.data?.find((x) => String(x.id) === wert);
-          if (p) onWaehlen(p, ortText(ortVon(p), kontext.namen));
+          if (!p) return;
+          // Ohne Leserecht am bisherigen Ort hieße die Ergebniszeile sonst „…, zugeordnet 30“.
+          const bisher = ortText(ortVon(p), kontext.namen);
+          onWaehlen(p, bisher === ZUGEORDNET ? 'am bisherigen Ort' : bisher);
         }}
       />
       {erfassen}

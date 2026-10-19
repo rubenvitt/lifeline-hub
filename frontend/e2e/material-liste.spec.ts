@@ -169,4 +169,11 @@ test('Aufteilen mit Ort: 20 von 50 an die UHS, der Rest bleibt an der Einheit (t
     (await etbInhalte(page, einsatzId)).filter((t) => t.includes('(×20)')),
     'kein zweiter Eintrag für den Ortswechsel',
   ).toEqual([]);
+
+  // Die UHS zeigt die 20 in ihrem Bereich „Material“.
+  const uhs = (await (await page.request.get(`${basis}/uhs`)).json()) as { id: number }[];
+  await page.goto(`/einsaetze/${einsatzId}/unfallhilfsstellen/${uhs[0].id}?bereich=material`);
+  await expect(
+    page.locator('[data-lfh="material-am-ort-zeile"]').filter({ hasText: 'Wolldecke' }),
+  ).toContainText('20');
 });

@@ -1,4 +1,5 @@
 import { Form, Typography } from 'antd';
+import { useEffect } from 'react';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
@@ -73,13 +74,22 @@ export default function MaterialAufteilenModal({
   const menge = posten?.menge ?? 0;
   const hoechste = posten ? hoechsteTeilmenge({ ...posten, art: 'verbrauchsgut' }) : 0;
   const bisher = posten ? ortVon(posten) : null;
+  const bisherWert = toOrtValue(bisher);
+  // Vorbelegen beim Öffnen per `setFieldsValue`, nie über `initialValues`: die Hülle setzt nach
+  // jedem Schließen zurück, und rc-field-form behält dabei den Ort des vorigen Postens
+  // (`frontend/AGENTS.md`, „Erfassungs-Norm“). Hängt ein anderer Platz den Posten bei offenem
+  // Dialog um, zieht das Feld nach, solange es niemand angefasst hat.
+  const offenId = posten?.id ?? null;
+  useEffect(() => {
+    if (offenId == null || form.isFieldTouched('ort')) return;
+    form.setFieldsValue({ ort: bisherWert });
+  }, [offenId, bisherWert, form]);
   return (
     <ErfassungsModal<Werte>
       offen={posten != null}
       titel={posten ? `${posten.bezeichnung} aufteilen` : undefined}
       form={form}
       erfassenText="Aufteilen"
-      initialValues={{ ort: toOrtValue(bisher) }}
       laeuft={laeuft}
       speicherung={speicherung}
       speicherFehlerTitel="Nicht aufgeteilt"

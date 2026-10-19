@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
@@ -61,6 +62,38 @@ describe('MaterialAufteilenModal (LLH-1093, design.md D12)', () => {
     const dialog = await screen.findByRole('dialog');
     const ort = within(dialog).getByRole('combobox', { name: 'Ort' });
     expect(ort.closest('.ant-select')).toHaveTextContent('Staffel A');
+  });
+
+  it('erneut geöffnet mit einem Posten an anderem Ort steht das Feld auf dessen Ort', async () => {
+    const onAufteilen = vi.fn().mockResolvedValue(undefined);
+    const AN_UHS = { ...POSTEN, id: 11, bezeichnung: 'Feldbett', einheit_id: null, uhs_id: 4 };
+    function Rahmen() {
+      const [posten, setPosten] = useState<MaterialAufteilenModalProps['posten']>(POSTEN);
+      return (
+        <>
+          <button type="button" onClick={() => setPosten(AN_UHS)}>
+            zweiter
+          </button>
+          <MaterialAufteilenModal
+            posten={posten}
+            ortOptionen={ORT_OPTIONEN}
+            laeuft={false}
+            speicherung={{ error: null, isPending: false, reset: () => {} }}
+            onAufteilen={onAufteilen}
+            onSchliessen={() => setPosten(null)}
+          />
+        </>
+      );
+    }
+    renderMitProviders(<Rahmen />);
+    const erster = await screen.findByRole('dialog', { name: 'Wolldecke aufteilen' });
+    await userEvent.click(within(erster).getByRole('button', { name: 'Abbrechen' }));
+    // In jsdom endet die Schließanimation nie; der zweite Dialog wird über seinen Titel gefunden.
+    await userEvent.click(screen.getByRole('button', { name: 'zweiter' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Feldbett aufteilen' });
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(3, { art: 'uhs', id: 4 }));
   });
 
   it('20 von 50 an die UHS: die UHS ist das Ziel', async () => {

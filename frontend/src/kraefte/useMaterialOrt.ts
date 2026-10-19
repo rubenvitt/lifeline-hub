@@ -19,7 +19,7 @@ import type { OrtPosten } from './materialOrtWahl';
 export function useMaterialOrt(einsatzId: number) {
   const qc = useQueryClient();
   /** Die Einheit trägt ihr Material im DTO, UHS und Bereitstellungsraum im Detail. */
-  const gleicheAb = useCallback(
+  const syncOrte = useCallback(
     async (orte: readonly (MaterialOrtRef | null)[]): Promise<void> => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
       void qc.invalidateQueries({ queryKey: einsatzKeys.uhs(einsatzId) });
@@ -41,9 +41,9 @@ export function useMaterialOrt(einsatzId: number) {
       const patch = ortPatch(ziel, vorher);
       if (patch == null) return;
       await updateDisposition(einsatzId, em.id, patch);
-      await gleicheAb([vorher, ziel]);
+      await syncOrte([vorher, ziel]);
     },
-    [einsatzId, gleicheAb],
+    [einsatzId, syncOrte],
   );
   /**
    * `menge` vom Posten abteilen und an `ziel` setzen, in EINEM Request (t1hvaqzu, design.md D1/D6):
@@ -53,9 +53,9 @@ export function useMaterialOrt(einsatzId: number) {
     async (em: OrtPosten, menge: number, ziel: MaterialOrtRef | null): Promise<void> => {
       const vorher = ortVon(em);
       await teileAuf(einsatzId, em.id, menge, ortPatch(ziel, vorher));
-      await gleicheAb([vorher, ziel]);
+      await syncOrte([vorher, ziel]);
     },
-    [einsatzId, gleicheAb],
+    [einsatzId, syncOrte],
   );
   return { setOrt, teileAufNach };
 }

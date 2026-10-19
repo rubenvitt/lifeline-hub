@@ -21,9 +21,10 @@ die Entscheidung vom 13.10.2026 Nr. 4 („Aufteilen ohne Zielort“) ab.
 - **Dialog „Aufteilen …“** in der Materialliste: neues Feld „Ort“ für den abgeteilten Teil,
   vorbelegt mit dem Ort der Ausgangszeile; Auswahl wie in der Spalte „Ort“, samt „ohne Ort“.
 - **Am Ort „Teilmenge hierher“:** Wählt die Person unter „Material zuordnen …“ ein Verbrauchsgut
-  mit Menge ab 2, fragt ein kleiner Dialog „Wie viel hierher?“, vorbelegt mit der ganzen Menge.
-  Die ganze Menge holt den Posten wie bisher; weniger teilt auf und setzt den abgeteilten Teil an
-  diesen Ort, in einem Schritt. Geräte und Posten mit Menge 1 holt die Wahl weiter sofort.
+  mit Menge ab 2, fragt ein Dialog „<Bezeichnung> hierher“ die „Menge hierher“, vorbelegt mit der
+  ganzen Menge. Die ganze Menge holt den Posten wie bisher; weniger teilt auf und setzt den
+  abgeteilten Teil an diesen Ort, in einem Schritt. Geräte und Posten mit Menge 1 holt die Wahl
+  weiter sofort.
 - Anwenderdoku: Kapitel `material.md` (Aufteilen, ETB, Bild `aufteilen.png`), Abschnitte zum
   Zuordnen in `einheiten.md`, `bereitstellungsraeume.md`, `unfallhilfsstellen.md` und
   `fahrzeuge.md`, soweit sie das Zuordnen beschreiben.
