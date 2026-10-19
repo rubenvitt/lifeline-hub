@@ -65,7 +65,7 @@ jobs:
       # `Pull requests` nicht mehr. Das `permissions:` oben gilt nur für GITHUB_TOKEN. Bewusst
       # nicht per `permission-*` eingeengt: fehlte der App eine angeforderte Berechtigung, bräche
       # der ganze Release.
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
         if: steps.bereit.outputs.bereit == 'true'
         with:
@@ -104,7 +104,7 @@ jobs:
         if: steps.fenster.outputs.freigabe == 'true' && steps.edit-cache.outputs.cache-hit != 'true'
         run: cargo install cargo-edit --locked --version 0.13.7 --no-default-features --features set-version
 
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
         if: steps.fenster.outputs.freigabe == 'true'
         with:
           version: 2026.9.1
