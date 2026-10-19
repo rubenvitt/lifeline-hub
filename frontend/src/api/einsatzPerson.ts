@@ -168,6 +168,53 @@ export function aktualisierePerson(
   return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
 }
 
+/**
+ * Die einzeln schreibbaren Personendaten (LLH-1103, Spec `personendaten-bearbeiten`) mit ihrem
+ * Wire-Wert; `null` leert. Die Koordinate ist EIN Feld und geht als Paar `antreff_lat`/`antreff_lon`.
+ * „vermisst seit“ lässt sich nicht leeren (`null` ist am Server 400).
+ */
+export interface PersonFeldWerte {
+  name: string | null;
+  vorname: string | null;
+  geschlecht: string | null;
+  geburtsdatum: string | null;
+  alter_geschaetzt: number | null;
+  herkunft_adresse: string | null;
+  antreff_ort: string | null;
+  melder_kontakt: string | null;
+  notiz: string | null;
+  koordinate: { lat: number; lon: number } | null;
+  vermisst_seit: string;
+}
+export type PersonFeld = keyof PersonFeldWerte;
+
+function feldAufWire<K extends PersonFeld>(feld: K, wert: PersonFeldWerte[K]): PersonEingabe {
+  if (feld === 'koordinate') {
+    const k = wert as PersonFeldWerte['koordinate'];
+    return { antreff_lat: k?.lat ?? null, antreff_lon: k?.lon ?? null };
+  }
+  return { [feld]: wert } as PersonEingabe;
+}
+
+/**
+ * Ein Feld der Personendaten schreiben, mit Feld-CAS (design.md D1): `erwartet` ist der Wert beim
+ * Öffnen (`null` = leer); weicht der gespeicherte ab, antwortet der Server mit 409 und schreibt
+ * nichts. `erwartet` `undefined` schreibt ohne Vergleich („Überschreiben“ nach der Rückfrage).
+ * Der Body nennt nur dieses Feld, kein anderes wird geleert; `aktualisierePerson` bleibt für den
+ * Kopf (Zustand, PAT) und andere Aufrufer.
+ */
+export function savePersonFeld<K extends PersonFeld>(
+  einsatzId: number,
+  personId: number,
+  feld: K,
+  wert: PersonFeldWerte[K],
+  erwartet: PersonFeldWerte[K] | undefined,
+): Promise<Person> {
+  const body: PersonEingabe & { erwartet?: PersonErwartet } = feldAufWire(feld, wert);
+  if (erwartet !== undefined) body.erwartet = feldAufWire(feld, erwartet);
+  return apiSend<Person>(`/api/einsaetze/${einsatzId}/personen/${personId}`, 'PATCH', body);
+}
+
 export function setzePersonStatus(
   einsatzId: number,
   personId: number,

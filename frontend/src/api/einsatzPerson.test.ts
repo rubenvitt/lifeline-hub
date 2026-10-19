@@ -11,6 +11,7 @@ import {
   legePersonAnhangAb,
   listePersonAnhaenge,
   personAnhangDownloadPfad,
+  savePersonFeld,
 } from './einsatzPerson';
 import { installiereXhrAttrappe } from '../test/xhrAttrappe';
 import type { UploadFortschritt } from './client';
@@ -179,5 +180,56 @@ describe('loadPersonDruck', () => {
     const [pfad, init] = fetchMock.mock.calls[0];
     expect(pfad).toBe('/api/einsaetze/7/personen/3/druck');
     expect(init?.method ?? 'GET').toBe('GET');
+  });
+});
+
+/**
+ * Ein Feld je PATCH mit Feld-CAS (LLH-1103, design.md D1): genau das Feld und sein Wert beim Öffnen
+ * unter `erwartet`; die Koordinate als Paar; ohne Altwert (Überschreiben) kein `erwartet`.
+ *
+ * Mutationsprobe: `erwartet` immer mitsenden — rot in „ohne Altwert“.
+ */
+describe('savePersonFeld', () => {
+  function body(fetchMock: { mock: { calls: unknown[][] } }) {
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    return { methode: init.method, daten: JSON.parse(String(init.body)) };
+  }
+  function attrappe() {
+    return vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
+  }
+
+  it('schickt genau ein Feld mit seinem Altwert', async () => {
+    const fetchMock = attrappe();
+    await savePersonFeld(7, 3, 'name', 'Müller', 'Meier');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/personen/3');
+    expect(body(fetchMock)).toEqual({
+      methode: 'PATCH',
+      daten: { name: 'Müller', erwartet: { name: 'Meier' } },
+    });
+  });
+
+  it('leer erwartet ist null, Leeren ist null', async () => {
+    const fetchMock = attrappe();
+    await savePersonFeld(7, 3, 'melder_kontakt', null, null);
+    expect(body(fetchMock).daten).toEqual({
+      melder_kontakt: null,
+      erwartet: { melder_kontakt: null },
+    });
+  });
+
+  it('die Koordinate geht als Paar, auch im Altwert', async () => {
+    const fetchMock = attrappe();
+    await savePersonFeld(7, 3, 'koordinate', { lat: 52.1, lon: 9.2 }, null);
+    expect(body(fetchMock).daten).toEqual({
+      antreff_lat: 52.1,
+      antreff_lon: 9.2,
+      erwartet: { antreff_lat: null, antreff_lon: null },
+    });
+  });
+
+  it('ohne Altwert (Überschreiben) kein `erwartet`', async () => {
+    const fetchMock = attrappe();
+    await savePersonFeld(7, 3, 'koordinate', null, undefined);
+    expect(body(fetchMock).daten).toEqual({ antreff_lat: null, antreff_lon: null });
   });
 });
