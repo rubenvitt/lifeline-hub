@@ -182,9 +182,11 @@ draußen gelassen werden.
 - **Personendaten und „Zustand / Verdacht“ sind ohne Netz gesperrt, nie vorgemerkt** (LLH-1103,
   Spec `personendaten-bearbeiten`, „Ohne Netz gesperrt“): es gibt keinen PATCH-Weg in die Queue,
   und eine pausierte Änderung überschriebe nach der Rückkehr einen Wert, den niemand gesehen hat.
-  Gefragt wird `useOhneVerbindung`. Die Personendaten tragen EINEN Grund am Kopf des Abschnitts
-  (`PERSONENDATEN_OHNE_NETZ`), auf den jedes gesperrte Feld per `aria-describedby` verweist;
-  „Zustand / Verdacht“ im Patientenkopf trägt seinen eigenen (`ZUSTAND_OHNE_NETZ`).
+  Gefragt wird `useOhneVerbindung`. Ein Wortlaut für jeden dieser Gründe:
+  `OHNE_VERBINDUNG_NICHT_AENDERBAR` (`offline/verbindung.ts`). Wo der Grund der Personendaten
+  steht: `frontend/src/personen/AGENTS.md`, „Personendaten nur feldweise“. „Zustand / Verdacht“
+  (Patientenkopf und Betroffenenliste, `ZustandSchreiben`) trägt ihn am Feld; ein getippter
+  Entwurf bleibt stehen und geht erst mit Verbindung hinaus.
 - **Ein gesammelter Schreibvorgang setzt die `client_id` beim Abschluss, nicht beim ersten
   Tipp** (LLH-1032, Sammelbuchung der Verpflegung, `verpflegung/useAusgabeSammlung.ts`). Ein
   Abschluss ohne Ort für Erfolg oder Ablehnung (Unmount, Routenwechsel, `pagehide`,

@@ -525,10 +525,13 @@ anwendbar), „nicht geprüft" ist keins.
   Fokusrückgabe beider Primitive steht in `components/useFokusRueckgabe.ts`. Für die feldweise
   Bearbeitung in einer Ansicht (LLH-1103) trägt `InlineAngabe` optional `pruefe` (Grund nach dem
   Absenden als `FeldFehler`, `aria-invalid`, kein Senden; ein unveränderter Wert wird nicht
-  geprüft), `gesperrt` (Grund als Text am Feld oder `{ beschreibungId }` für EINEN Grund am
-  Abschnittskopf; der Auslöser ist `disabled`), `onEntwurf` (nur die Wechsel geändert ↔
-  unverändert) und `onOeffnen` (Serverstand für einen Feld-CAS festhalten). Personendaten werden
-  nur so geschrieben (`frontend/src/personen/AGENTS.md`).
+  geprüft; auch die Überlänge eines Freitexts), `gesperrt` (Grund als Text am Feld oder
+  `{ beschreibungId }`, Verweis auf einen Grund an anderer Stelle; der Auslöser ist `disabled`),
+  `onEntwurf` (nur die Wechsel geändert ↔ unverändert), `onOeffnen`/`onSchliessen` (Serverstand
+  für einen Feld-CAS festhalten, ein offenes Feld an seinem Ort halten) und `OFFEN_LASSEN` als
+  Ergebnis von `onSpeichern` (nichts gespeichert, Eingabe bleibt offen). `BemerkungZelle` trägt
+  `gesperrt` ebenso: Grund am Feld, ein offenes Feld behält den Entwurf und sendet nicht.
+  Personendaten werden nur so geschrieben (`frontend/src/personen/AGENTS.md`).
   Einsatzdaten haben nur den Zeilenweg (LFH-1170): eine Zeile schickt ihre Angabe
   (`patcheEinsatz`); ein Vollformular gibt es nicht. Ausnahmen (LFH-1175, Spec
   `einsatzdaten-bearbeitung`): die Zeile „Koordinate“ schickt das Paar, die Zeile „Adresse“ mit
@@ -750,16 +753,17 @@ und `pages/personen/`.
   einer Detailseite `aktiv` = Sitzung offen, `schluessel` nur bei offener Sitzung, LLH-1101) plus
   `<VerlassenRueckfrage>` (`components/VerlassenRueckfrage.tsx`, `useBlocker` bei Pfadwechsel,
   „Bleiben“/„Verwerfen“). Seiten, die jede Zeile sofort speichern (`EinsatzModule`), nicht. Tests
-  solcher Seiten rendern mit `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft
-  ohne Data Router.
+  jeder Seite mit `VerlassenRueckfrage`, auch über den Merker unten, rendern mit
+  `renderMitProviders(…, { datenRouter: true })` — `useBlocker` wirft ohne Data Router.
 - **Ein offenes, geändertes Einzelfeld in einer Ansicht trägt denselben Schutz** (LLH-1103, Spec
   `formularseiten`, „Rückfrage vor dem Verlassen“): über den Merker
   `components/offeneBearbeitung.tsx` (`OffeneBearbeitungProvider` speist
   `useFormularVerlassenSchutz` und rendert `VerlassenRueckfrage`; ein Feld meldet sich mit
   `useOffeneBearbeitung(etikett)` über `onEntwurf` an). Höchstens ein Entwurf je Seite: die
   übrigen Felder sind gesperrt mit „Erst „Name“ speichern oder abbrechen“
-  (`useOffeneBearbeitungGrund` für EINE Zeile am Abschnittskopf). Ein offenes Feld ohne Änderung
-  meldet sich nicht an.
+  (`useOffeneBearbeitungGrund` liefert den Grund der Seite; wo er steht, sagt die Bereichsdatei,
+  für Personendaten `frontend/src/personen/AGENTS.md`). Ein offenes Feld ohne Änderung meldet sich
+  nicht an.
 - Ein Collapse-Kopf im Formular ist kein Übermittlungsknopf (`MaterialFormModal.test.tsx`).
 - **Direkteinstieg** (LFH-347, `components/Direkteinstieg.tsx`,
   `components/EinstiegSwitcher.tsx`, `components/direkteinstiegKern.ts`; Tabelle unter `…/liste`;
