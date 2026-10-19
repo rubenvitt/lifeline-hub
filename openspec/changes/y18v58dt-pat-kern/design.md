@@ -316,6 +316,28 @@ Branches vor dem Release, weil Migrationen nie geändert werden.
   gesperrt, weil die Aufheben-Routen weder `client_id` noch Erfassungszeit tragen (D1, D8).
 - Die Figur wächst mit der Dichte, in der Handschuh-Stufe 480 × 704 px je Ansicht. Nur so erreichen
   Hand, Fuß und Hals 72 px (D13 verwirft erst die Variante über 1000 px).
+- Vorn und hinten stehen nicht mehr fest „ab `md`“ nebeneinander, sondern nach der gemessenen
+  Breite (`schemaLayout` in `koerperschemaKern.ts`): nebeneinander nur, wenn die Spalte daneben
+  (Wahl der Art bzw. Liste, mindestens 240 px) mitpasst, sonst eine Ansicht mit Umschaltung. In
+  der Handschuh-Stufe am Tablet (1280 × 800 mit Rail und Modulpanel, 1024 × 768) stünde die Wahl
+  sonst 700 px und mehr unter dem Tipp, aus „zwei Tipps“ würde Tipp, Bildlauf, Tipp. Die Spalte
+  mit der Wahl klebt neben der Figur unter dem Rahmen; reicht die Breite nicht einmal für eine
+  Ansicht mit Spalte (Handy), steht die Wahl darunter und rückt nach dem Tipp ins Bild. Beim
+  Markieren schrumpft die Figur nie unter ihren Maßstab (vorher `maxWidth: 100%`: bei 390 px
+  Zonen unter 72 px), sie rollt waagerecht. Nachweis `e2e/personen-detail.spec.ts`
+  („Körperschema: Wahl der Art nach dem Tipp im Bild“).
+- Aus dem Review: die Trefferfläche eines Sternchens hält die Steuerhöhe (vorher fest 40 px, auch
+  im Handschuh), der Tastaturfokus ist am Sternchen sichtbar, der Fokus kehrt nach Speichern,
+  Aufheben und Abbrechen an Region bzw. Sternchen zurück, jede Region beginnt ohne Schwere, die
+  Schwere ist sichtbar beschriftet („keine Angabe“ statt „ohne“), Öffnen und Abbrechen räumen
+  Ablehnungen (LFH-1077). Das Aufheben einer Maßnahme fragt nach („Maßnahme aufheben“, LFH-363):
+  es hat keinen Rückweg am Server. Am Sternchen ist der zweite Tipp die Rückfrage. Die
+  Verletzungsliste im Kopf zeigt die jüngsten zuerst mit Uhrzeit, wie die Maßnahmen. Die Sperren
+  ohne Netz (Aufheben, PAT-Nummer, Kontamination) folgen `useOhneVerbindung`, nicht
+  `navigator.onLine` allein: im WLAN ohne Server boten sie sonst an, was scheitert.
+- Offen: im Handschuh deckt die Trefferfläche eines Sternchens (72 px) eine kleine Zone wie die
+  Hand fast ganz; eine zweite Verletzung an derselben Hand geht dann per Tastatur oder nach dem
+  Aufheben. Ein Weg „weitere Verletzung hier“ am Sternchen wäre ein eigener Schritt.
 - Auto-Austritt (D6): Ein gewinnender Verbleib nimmt die Person nur aus der UHS, wenn er nicht
   älter ist als ihr jüngster Eintritt oder Wechsel in `person_uhs_belegung`. Sonst holte eine
   nachgereichte Entlassung eine inzwischen wieder aufgenommene Person heraus (Review).

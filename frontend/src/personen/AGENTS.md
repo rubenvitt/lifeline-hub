@@ -24,17 +24,20 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Zugriffsprotokoll; ein Baum. Den Aufenthalt (UHS- und Platzname, seit) liefert der Detail-GET
   (`aufenthalt`), ebenso Transporte, Maßnahmen und Verletzungen: kein zweiter Abruf beim Öffnen.
   Personendaten im `Datenraster`, leere Angaben in EINER Zeile „Ohne Angabe: …“, kein
-  `Descriptions`. Nachweis: `e2e/betroffene-handy.spec.ts`.
+  `Descriptions`; das Geschlecht als Wort (`GESCHLECHT_WORT`), auch im Druckblatt, nie als
+  Wire-Wert. Nachweis: `e2e/betroffene-handy.spec.ts`.
 - **Patientenkopf mit vollem PAT-Kern** (`personen/Patientenkopf.tsx`, Change
   `y18v58dt-pat-kern`, D14): Kopfzeile mit PAT-Nummer und Marke „kontaminiert“
   (`personen/PatKennzeichen.tsx`), darunter ab `lg` zwei Spalten — links Sichtung (DTG, „vor n
   min“, „bestätigt: Name“), „Zustand / Verdacht“, Aufenthalt bzw. Verbleib, Transport; rechts
   Maßnahmen, Verletzungen (Liste, ab `md` Mini-Figur) und letzte Notiz. Maßnahmen und
-  Verletzungen höchstens drei, dann „+ n weitere“: bei 1280 × 800 und 1440 × 900 steht alles
+  Verletzungen mit Uhrzeit, die jüngsten zuerst, höchstens drei, dann „+ n weitere“: bei 1280 × 800 und 1440 × 900 steht alles
   ohne Bildlauf (Nachweis `e2e/personen-detail.spec.ts`). Sichten, Verbleib, Transport, Maßnahme
   und Verletzung haben je ein Paneel, die Notiz eine Zeile; kein Dialog, Grund am Ort. Alle
   Mutationen liegen im Kopf: immer nur ein Paneel offen, der Wechsel ist gesperrt, solange eines
-  speichert. Transport, Maßnahme und Verletzung nur mit `darfBehandeln` (am Gerät
+  speichert; ein Paneel räumt beim Öffnen die Gründe seiner Mutationen (LFH-1077). Das Aufheben
+  einer Maßnahme fragt nach („Maßnahme aufheben“, LFH-363), am Sternchen ist der zweite Tipp die
+  Rückfrage. Die Sperren ohne Netz fragen `useOhneVerbindung`, nie `navigator.onLine` allein. Transport, Maßnahme und Verletzung nur mit `darfBehandeln` (am Gerät
   `geraetDarf('person-behandlung')`, nur UHS). Die Lesefassung (`modus="lesen"`) dient den
   Schnellansichten.
 - **Ein Schreibweg für die medizinischen Einträge** (`personen/personEintragSpeichern.ts`,
@@ -67,14 +70,20 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `personen/koerperschema/Koerperschema.tsx` für Lesen, Markieren und Druck; Geometrie nur in
   `personen/koerperschema/geometrie.ts` (normiert 0..1 je Ansicht, drei Umrisse, eine
   Regionskarte; Guard `geometrie.test.ts`: jeder Mittelpunkt in jedem Umriss), Figur nach
-  Geschlecht, Name und Nummer in `koerperschemaKern.ts`. Markieren in zwei Tipps (Region, dann
-  Art; Schwere vorher optional), Aufheben am Sternchen; ohne Netz merkt das Markieren vor, das
+  Geschlecht, Name, Nummer und Layout in `koerperschemaKern.ts`. Markieren in zwei Tipps (Region,
+  dann Art; Schwere vorher optional, je Region neu, sichtbar beschriftet), Aufheben am Sternchen;
+  vorn und hinten nebeneinander nur, wenn die Spalte daneben mitpasst (`schemaLayout`, gemessen),
+  sonst Umschaltung; die Wahl klebt neben der Figur unter dem Rahmen und steht nach dem Tipp ohne
+  Bildlauf im Bild (Nachweis `e2e/personen-detail.spec.ts`); beim Markieren schrumpft die Figur
+  nie, sie rollt. Der Fokus kehrt nach Speichern, Aufheben und Abbrechen an Region bzw. Sternchen
+  zurück; ohne Netz merkt das Markieren vor, das
   Aufheben ist gesperrt mit Grund (die Route trägt weder `client_id` noch Erfassungszeit). Die
   Nummer folgt fest der Erfassungsfolge, auch über aufgehobene (Lücken bleiben). Sternchen in der
   Textfarbe mit Nummer, nie in der Alarmfarbe; Farben nur aus `koerperschemaFarben`
   (`theme/tokens.ts`, Kontrast in `theme/koerperschemaKontrast.test.ts`). Trefferzonen
   mindestens Steuerhöhe, im Handschuh 72 × 72 px auch für Hand, Fuß und Hals
-  (`figurMassstab`; Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts`).
+  (`figurMassstab`), ebenso die Trefferfläche eines Sternchens (`sternTrefferPx`); Nachweis in
+  allen drei Stufen `e2e/trefflaeche-pruefflaechen.spec.ts`.
 - **Bezüge** (LLH-1129): Tier und Schaden als EINE Liste in Einsatzsprache
   (`personen/PersonBezuege.tsx`), „Bezug hinzufügen“ über eine gemeinsame Suche freier Tiere und
   Schäden (`BezugHinzufuegenDialog`, XOR-Leerung im selben PATCH), „Bezug lösen“ mit Grund an der

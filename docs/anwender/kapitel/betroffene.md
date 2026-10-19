@@ -122,19 +122,22 @@ der Transport aufgehoben.
    eine vor dem Erfassen der Person; ohne Angabe gilt der Zeitpunkt der Erfassung.
 4. „Maßnahme erfassen“ im Paneel wählen. Der Kopf nennt die Maßnahme mit Uhrzeit.
 
-Eine versehentlich erfasste Maßnahme hebt „Aufheben“ unter „Erfasst“ im selben Paneel auf; sie
-bleibt im Verlauf als aufgehoben stehen.
+Eine versehentlich erfasste Maßnahme hebt „Aufheben“ unter „Erfasst“ im selben Paneel auf, nach
+der Rückfrage mit „Maßnahme aufheben“; sie bleibt im Verlauf als aufgehoben stehen.
 
 ### Eine Verletzung am Körperschema markieren
 
 1. Im Patientenkopf bei „Verletzungen“ „Verletzung markieren“ wählen. Das Paneel zeigt das
-   Körperschema mit vorn und hinten, daneben die nummerierte Liste.
+   Körperschema mit vorn und hinten, daneben die nummerierte Liste. Ist der Platz zu schmal für
+   beide Ansichten samt Wahl daneben (etwa in der Dichte „Handschuh“ am Tablet), steht eine Ansicht;
+   „vorn“ und „hinten“ darüber schalten um.
 2. Auf die verletzte Stelle der Figur tippen, etwa den linken Unterarm. Daneben erscheint der
    Name der Stelle („Unterarm links, vorn“) mit der Wahl der Art.
 
    ![Patientenkopf mit PAT-Nummer, „kontaminiert“, Transport und Maßnahmen, darunter das Paneel „Verletzung markieren“: Körperschema vorn und hinten mit zwei Sternchen, gewählt „Unterarm links, vorn“ mit Schwere und den Flächen der Art, daneben die nummerierte Liste](../bilder/betroffene/koerperschema.png)
 
-3. Bei Bedarf unter „Schwere (optional)“ „leicht“, „mittel“ oder „schwer“ wählen.
+3. Bei Bedarf unter „Schwere (optional)“ „leicht“, „mittel“ oder „schwer“ wählen; vorgewählt ist
+   „keine Angabe“. Die Schwere gilt nur für die gewählte Stelle.
 4. Die Fläche der Art antippen, etwa „Fraktur-Verdacht“. Damit ist die Verletzung gespeichert:
    an der Stelle steht ein Sternchen mit der nächsten Nummer, die Liste nennt dieselbe Nummer.
 5. Zum Aufheben auf das Sternchen tippen und „Aufheben“ wählen. Das Sternchen verschwindet, die
@@ -258,7 +261,8 @@ nach der Priorität sortieren.
 
 Maßnahmen und Verletzungen werden nur angehängt. Korrigiert wird durch „Aufheben“, genau einmal;
 der Eintrag bleibt im Verlauf mit der Zeit des Aufhebens. Der Kopf zeigt höchstens drei
-Maßnahmen und drei Verletzungen und nennt den Rest als „+ n weitere“; vollständig stehen sie im
+Maßnahmen und drei Verletzungen, die jüngsten zuerst und mit Uhrzeit, und nennt den Rest als
+„+ n weitere“; vollständig stehen sie im
 Paneel und im Verlauf. Die Nummern der Verletzungen folgen fest der Reihenfolge der Erfassung;
 nach einem Aufheben bleibt eine Lücke.
 
