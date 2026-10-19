@@ -21,3 +21,4 @@ vite.config.d.ts
 blob-report/
 all-blob-reports/
 .vitest-reports/
+.vitest/
