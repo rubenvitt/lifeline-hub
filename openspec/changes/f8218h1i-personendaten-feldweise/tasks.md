@@ -6,7 +6,7 @@
 
 ## 2. Feld-CAS und Geburtsdatum am Server — LLH-1103 (f8218h1i), Backend
 
-- [x] 2.1 `PatchBody.erwartet` (optional, gleiche Feldnamen, Tri-State-Werte), `repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an (Koordinate als Paar); 409 bei vorhandener Person, 404 sonst; `erwartet`-Feld ohne Änderung desselben Felds 400. `basis_geaendert_at` bleibt unverändert nutzbar.
+- [x] 2.1 `PatchBody.erwartet` (optional, gleiche Feldnamen, Tri-State-Werte), `repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an (Koordinate als Paar); 409 bei vorhandener Person, 404 sonst; `erwartet`-Feld ohne Änderung desselben Felds und halbe Koordinate 422 (nach dem Review, D1). `basis_geaendert_at` bleibt unverändert nutzbar.
 - [x] 2.2 Tests (`tests/einsatz_person.rs`): gleicher Altwert schreibt; fremd geänderter Wert 409 und nichts geschrieben; Sichtung, Status, PAT-Nummer und ein anderes Feld zwischendurch lösen keinen 409 aus; leerer Altwert (`null`) gegen gesetzten Wert 409; Koordinate als Paar; ohne `erwartet` wie bisher; Bind-Reihenfolge-Test erweitert.
 - [x] 2.3 Geburtsdatum im PATCH: `YYYY-MM-DD`, gültiger Kalendertag, nicht in der Zukunft (D6), sonst 400; Leeren erlaubt. Tests.
 - [x] 2.4 Typ-Codegen (`scripts/check-typ-codegen.sh`), falls der Request-Typ im OpenAPI erscheint; `src/AGENTS.md` (CAS-Baseline: Personen nutzen Feld-CAS, `useEditSitzung` nur noch Tier und Schaden).
@@ -32,3 +32,7 @@
 - [x] 5.2 Anwenderdoku: `betroffene.md` neuer Ablauf „Personendaten ergänzen und berichtigen“, „Den Fundort verorten“, „Ohne Netz“, „Rechte“; `ohne-netz.md`. Bild der Personendaten in `e2e/doku-bilder/betroffene.bilder.ts`, falls ein Bild den Ablauf trägt; Doku-Wächter grün.
 - [x] 5.3 e2e: `personen-detail.spec.ts` (leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlassen), `betroffene-handy.spec.ts` (Struktur der Personendaten), `gate3-trefflaeche.spec.ts` (Knöpfe „+ …“ und Wertknöpfe in 30/48/72). `tsc` und `eslint` über `frontend/e2e` grün.
 - [x] 5.4 Gate-Bündel `schnell` und `frontend` von `scripts/check-all.sh` grün, Rust gezielt für `einsatz_person`, `person_verlauf`, `eingabegrenzen_spiegel`, `geraet_kopplung` und `--lib`.
+
+## 6. Review
+
+- [x] 6.1 Review in drei Schnitten (Backend, Oberfläche der Personendaten, Tier/Schaden mit Spec und Doku), jeder Befund vor dem Fix mit rotem Test bestätigt. Behoben: offenes Feld bleibt bei neuem Stand an seinem Ort, Konflikt-Rückfrage hält das Feld und Escape entscheidet nichts, „Zustand / Verdacht“ ohne Verbindung gesperrt in Kopf und Liste mit stehendem Entwurf, einheitlicher Grund „Ohne Verbindung nicht änderbar“, Überlänge als Prüfung am Feld, Zeilenabstand der Knöpfe „+ …“, Geburtsdatum auch beim Anlegen geprüft, Kombinationsfehler in `erwartet` als 422, leerer Altwert trifft leere Zeichenkette, Tier-Alter ohne stilles Kappen nach unten, schwache Tests geschärft, Regeln je einmal, Doku berichtigt.
