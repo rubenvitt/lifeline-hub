@@ -18,7 +18,7 @@ import { useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
-  betreuungPfad,
+  evakuierungPfad,
   gefahrenPfad,
   parseKartenzentrum,
   parsePlatzierenAuftrag,
@@ -251,6 +251,7 @@ export default function LagekartePage() {
     personenFehler,
     personenNichtGeladen,
     betreuungZugriff,
+    evakuierungZugriff,
     brZugriff,
     datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
@@ -782,7 +783,7 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
-  // Bezirksfläche: ?evakuierungsbezirk=<id> von der Betreuungsseite, apply-then-clean wie
+  // Bezirksfläche: ?evakuierungsbezirk=<id> von der Evakuierungsseite, apply-then-clean wie
   // `?gefahrengebiet=`, mit zwei Unterschieden, weil der Sprung die Kartenansicht nicht kennt:
   // (1) gesucht wird in allen Zonen; liegt die Fläche in einer anderen Ansicht, wechselt die Karte
   //     zuerst dorthin (`?ansicht=`), der Auftrag bleibt für die nächste Runde stehen;
@@ -1024,9 +1025,9 @@ export default function LagekartePage() {
             onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
             ansichten={ansichten ?? []}
             bezirke={bezirke}
-            betreuungFrei={betreuungZugriff === 'frei'}
+            evakuierungFrei={evakuierungZugriff === 'frei'}
             matrixGesperrt={sprungGesperrt('gefahrenzonen')}
-            bezirkPfad={(bid) => betreuungPfad(einsatzId, { bezirk: bid })}
+            bezirkPfad={(bid) => evakuierungPfad(einsatzId, { bezirk: bid })}
           />
         )}
       </>

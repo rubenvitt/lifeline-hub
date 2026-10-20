@@ -46,14 +46,14 @@ export interface ZonenInspectorProps {
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
   ansichten: KartenAnsicht[];
-  /** Evakuierungsbezirke — leer ohne Lesezugriff auf das Modul Betreuung. */
+  /** Evakuierungsbezirke — leer ohne Lesezugriff auf das Modul Evakuierung (LLH-1034). */
   bezirke?: Evakuierungsbezirk[];
   /**
-   * Darf der Benutzer das Modul Betreuung lesen? Ohne Recht keine Zuordnung und keine
+   * Darf der Benutzer das Modul Evakuierung lesen? Ohne Recht keine Zuordnung und keine
    * Bezirksangaben (der Server lehnte das Setzen mit 403 ab).
    */
-  betreuungFrei?: boolean;
-  /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (`betreuungPfad(?bezirk=)`). */
+  evakuierungFrei?: boolean;
+  /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (`evakuierungPfad(?bezirk=)`). */
   bezirkPfad?: (bezirkId: number) => string;
   /** Zielmodul Gefahren gesperrt: „Gefahrenmatrix bearbeiten" steht gesperrt (LFH-888). */
   matrixGesperrt?: boolean;
@@ -69,7 +69,7 @@ export default function ZonenInspector({
   onLoeschen,
   ansichten,
   bezirke = [],
-  betreuungFrei = false,
+  evakuierungFrei = false,
   bezirkPfad,
   matrixGesperrt = false,
 }: ZonenInspectorProps) {
@@ -145,7 +145,7 @@ export default function ZonenInspector({
   // Bezirksfläche: der zugeordnete Bezirk, sofern lesbar.
   const istBezirksflaeche = entwurf.typ === 'evakuierungsbezirk';
   const aktuellerBezirk =
-    istBezirksflaeche && betreuungFrei
+    istBezirksflaeche && evakuierungFrei
       ? (bezirke.find((b) => b.id === entwurf.evakuierungsbezirk_id) ?? null)
       : null;
   const bezirkZuordnen = (ziel: number) => {
@@ -275,12 +275,12 @@ export default function ZonenInspector({
 
         {/* Grund in wenigen Wörtern als Lesezeile (LFH-1083): ein gesperrtes Select läse der
             Vorleser ohne seinen Platzhalter. */}
-        {istBezirksflaeche && !betreuungFrei && (
+        {istBezirksflaeche && !evakuierungFrei && (
           <Typography.Text type="secondary">
-            Evakuierungsbezirk · kein Zugriff auf Betreuung
+            Evakuierungsbezirk · kein Zugriff auf Evakuierung
           </Typography.Text>
         )}
-        {istBezirksflaeche && betreuungFrei && darfSchreiben && (
+        {istBezirksflaeche && evakuierungFrei && darfSchreiben && (
           <FeldLabel text="Gehört zu Evakuierungsbezirk" htmlFor={bezirkFeldId}>
             <Select<number>
               id={bezirkFeldId}
@@ -301,7 +301,7 @@ export default function ZonenInspector({
             />
           </FeldLabel>
         )}
-        {istBezirksflaeche && betreuungFrei && !darfSchreiben && !aktuellerBezirk && (
+        {istBezirksflaeche && evakuierungFrei && !darfSchreiben && !aktuellerBezirk && (
           <Typography.Text type="secondary">keinem Evakuierungsbezirk zugeordnet</Typography.Text>
         )}
         {aktuellerBezirk && (
@@ -329,7 +329,7 @@ export default function ZonenInspector({
               >
                 <Link
                   to={bezirkPfad(aktuellerBezirk.id)}
-                  aria-label={`Betreuung zu ${aktuellerBezirk.bezeichnung}`}
+                  aria-label={`Evakuierung zu ${aktuellerBezirk.bezeichnung}`}
                   style={{ display: 'block', flex: '1 1 auto' }}
                 >
                   <Button block>

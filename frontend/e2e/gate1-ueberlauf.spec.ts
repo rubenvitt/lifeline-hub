@@ -427,10 +427,11 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
     );
     await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 390 }, 'Schicht');
 
-    // Ein Bezirk mit allen drei Sekundärfeldern der Karte und eine Stelle, deren Belegung
-    // „fast voll" neben die Zahl setzt — die breiteste Tabellenzelle. Namen ohne „Betreuung".
+    // Ein Bezirk mit allen Sekundärfeldern (Modul Evakuierung, LLH-1034) und eine Stelle, deren
+    // Belegung „fast voll" neben die Zahl setzt — die breiteste Tabellenzelle. Namen ohne
+    // „Betreuung".
     const bezirk = await post(
-      'betreuung/bezirke',
+      'evakuierung/bezirke',
       {
         bezeichnung: 'Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest',
         plan_personen: 1210,
@@ -440,12 +441,12 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
       'Bezirk',
     );
     await post(
-      `betreuung/bezirke/${bezirk.id}/staende`,
+      `evakuierung/bezirke/${bezirk.id}/staende`,
       { evakuiert: 1180, erhebung: 'geschaetzt' },
       'Stand',
     );
     const antwort = await page.request.patch(
-      `/api/einsaetze/${einsatzId}/betreuung/bezirke/${bezirk.id}`,
+      `/api/einsaetze/${einsatzId}/evakuierung/bezirke/${bezirk.id}`,
       { data: { raeumung: 'laeuft' } },
     );
     expect(antwort.ok(), `Seeding Räumung: ${antwort.status()}`).toBeTruthy();
@@ -860,21 +861,34 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
-      // Datenanker ist die Bezirkskarte (in jeder Breite Karte); die Stellen-Tabelle trägt auf
-      // 390 px ihren eigenen Bildlauf, der kein Verstoß ist.
-      pfad: `/einsaetze/${einsatzId}/betreuung`,
+      // Evakuierung (LLH-1034): Kennzahlenband und Bezirkstabelle; die Tabelle trägt auf 390 px
+      // ihren eigenen Bildlauf, der kein Verstoß ist.
+      pfad: `/einsaetze/${einsatzId}/evakuierung`,
       anker: (p: Page) =>
-        p
-          .getByRole('region', { name: 'Evakuierungsbezirke' })
-          .getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
+        p.getByText('Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest'),
       lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
-      // Dieselbe Seite mit AUFGEKLAPPTEM Verlauf an Karte und Zeile. Der Anker steht erst,
-      // wenn beide Bereiche offen und geladen sind.
-      pfad: `/einsaetze/${einsatzId}/betreuung`,
+      // Dieselbe Seite mit AUFGEKLAPPTEM Verlauf am Bezirk; der Anker steht erst, wenn er geladen
+      // ist.
+      pfad: `/einsaetze/${einsatzId}/evakuierung`,
       vorbereiten: async (p: Page) => {
         await p.getByRole('button', { name: /^Verlauf zu Bezirk / }).click();
+      },
+      anker: (p: Page) => p.locator('[data-lfh="verlauf-eintrag"]').getByText(/1.180 evakuiert/),
+    },
+    {
+      // Betreuung: nur noch die Stellen-Tabelle, mit ihrem eigenen Bildlauf auf 390 px.
+      pfad: `/einsaetze/${einsatzId}/betreuung`,
+      anker: (p: Page) =>
+        p.getByText('Notunterkunft Mehrzweckhalle Gesamtschule Musterstadt-Nordwest'),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
+    },
+    {
+      // Dieselbe Seite mit AUFGEKLAPPTEM Verlauf an der Zeile. Der Anker steht erst, wenn der
+      // Bereich offen und geladen ist.
+      pfad: `/einsaetze/${einsatzId}/betreuung`,
+      vorbereiten: async (p: Page) => {
         await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
       },
       // Auf den Verlaufseintrag eingegrenzt: dieselbe Zahl steht auch als Kopfzahl des Blocks.

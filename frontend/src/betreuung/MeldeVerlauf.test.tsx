@@ -29,6 +29,9 @@ vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
 });
 
 const B = '/api/einsaetze/7/betreuung';
+/** Bezirke und Stände gehören seit LLH-1034 zum Modul Evakuierung. */
+const E = '/api/einsaetze/7/evakuierung';
+const basis = (pfad: string) => (/^\/(bezirke|staende)\//.test(pfad) ? E : B);
 
 const STAENDE: StandVerlaufEintrag[] = [
   {
@@ -85,7 +88,7 @@ const BELEGUNGEN: BelegungVerlaufEintrag[] = [
 function liefere(pfad: string, antwort: unknown, status = 200) {
   const aufrufe = { n: 0 };
   server.use(
-    http.get(`${B}${pfad}`, () => {
+    http.get(`${basis(pfad)}${pfad}`, () => {
       aufrufe.n += 1;
       return HttpResponse.json(antwort as object, { status });
     }),
@@ -96,7 +99,7 @@ function liefere(pfad: string, antwort: unknown, status = 200) {
 function faengeRuecknahme(pfadMuster: string, antwort: () => Response) {
   const ids: string[] = [];
   server.use(
-    http.post(`${B}${pfadMuster}`, ({ params }) => {
+    http.post(`${basis(pfadMuster)}${pfadMuster}`, ({ params }) => {
       ids.push(String(params.id));
       return antwort();
     }),
@@ -129,7 +132,7 @@ describe('MeldeVerlauf · Zustände', () => {
   });
 
   it('der Ladezustand steht in Worten da, nicht nur als Skelett', async () => {
-    server.use(http.get(`${B}/bezirke/5/staende`, () => new Promise<Response>(() => {})));
+    server.use(http.get(`${E}/bezirke/5/staende`, () => new Promise<Response>(() => {})));
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     expect(await screen.findByText('Verlauf wird geladen …')).toBeVisible();
   });
@@ -305,7 +308,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
     let antworte: (r: Response) => void = () => {};
     server.use(
       http.post(
-        `${B}/staende/:id/zuruecknehmen`,
+        `${E}/staende/:id/zuruecknehmen`,
         () => new Promise<Response>((fertig) => (antworte = fertig)),
       ),
     );

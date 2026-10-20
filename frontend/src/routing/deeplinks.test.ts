@@ -41,6 +41,7 @@ import {
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
+  evakuierungPfad,
   verpflegungAusgabePfad,
   verpflegungAusVorlagePfad,
   parseVerpflegungTag,
@@ -487,17 +488,20 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(betreuungPfad(E, {})).toBe('/einsaetze/5/betreuung');
   });
 
-  it('betreuungPfad selektiert Bezirk bzw. Stelle per Query-Param — Round-Trip (LFH-639)', () => {
+  it('betreuungPfad selektiert die Stelle per Query-Param — Round-Trip (LFH-639)', () => {
     // Query-Param statt Item-Route: das Modul hat keine Detailseite (LFH-25, design.md D7).
-    const bezirk = betreuungPfad(E, { bezirk: 12 });
-    expect(bezirk.split('?')[0]).toBe('/einsaetze/5/betreuung');
-    const pb = new URLSearchParams(bezirk.split('?')[1]);
-    expect(pb.get('bezirk')).toBe('12');
-    expect(pb.has('stelle')).toBe(false);
+    const stelle = betreuungPfad(E, { stelle: 4 });
+    expect(stelle.split('?')[0]).toBe('/einsaetze/5/betreuung');
+    const ps = new URLSearchParams(stelle.split('?')[1]);
+    expect(ps.get('stelle')).toBe('4');
+    expect(ps.has('bezirk')).toBe(false);
+  });
 
-    const stelle = new URLSearchParams(betreuungPfad(E, { stelle: 4 }).split('?')[1]);
-    expect(stelle.get('stelle')).toBe('4');
-    expect(stelle.has('bezirk')).toBe(false);
+  it('evakuierungPfad trifft die Registry-Route und selektiert den Bezirk (LLH-1034)', () => {
+    expect(evakuierungPfad(E)).toBe('/einsaetze/5/evakuierung');
+    const bezirk = evakuierungPfad(E, { bezirk: 12 });
+    expect(bezirk.split('?')[0]).toBe('/einsaetze/5/evakuierung');
+    expect(new URLSearchParams(bezirk.split('?')[1]).get('bezirk')).toBe('12');
   });
 
   it('wetterPegelPfad (LFH-633)', () => {

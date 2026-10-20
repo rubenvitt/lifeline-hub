@@ -9,7 +9,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BetreuungUebersicht, Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
+import type { BetreuungUebersicht, Betreuungsstelle } from '../api/types';
 import { queueLeerenFuerTests, schreibaktionenLaden } from '../offline/queue';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
@@ -30,39 +30,15 @@ vi.mock('../api/einsatzabschnitte', () => ({
 
 const api = vi.hoisted(() => ({
   ladeBetreuung: vi.fn(),
-  legeBezirkAn: vi.fn(),
-  aendereBezirk: vi.fn(),
-  storniereBezirk: vi.fn(),
-  meldeStand: vi.fn(),
-  nimmStandZurueck: vi.fn(),
   legeStelleAn: vi.fn(),
   aendereStelle: vi.fn(),
   storniereStelle: vi.fn(),
   meldeBelegung: vi.fn(),
   nimmBelegungZurueck: vi.fn(),
   ladeBelegungKopfzahl: vi.fn(),
-  ladeStandVerlauf: vi.fn(),
   ladeBelegungVerlauf: vi.fn(),
 }));
 vi.mock('../api/betreuung', () => api);
-
-/**
- * Tausendertrenner, wie `getByText` ihn sieht: die Seite setzt ein schmales geschütztes Leerzeichen
- * (U+202F, gepinnt in `betreuungText.test.ts`), der Normalisierer von Testing Library faltet jedes
- * `\s` des Knotentextes zu einem Leerzeichen — der Suchtext nicht.
- */
-const T = ' ';
-
-const bezirk = (over: Partial<Evakuierungsbezirk> & { id: number }): Evakuierungsbezirk => ({
-  einsatz_id: 1,
-  bezeichnung: `Bezirk ${over.id}`,
-  plan_personen: 640,
-  plan_erhebung: 'geschaetzt',
-  raeumung: 'angeordnet',
-  flaechen: 0,
-  angelegt_at: '2026-09-23 08:00:00',
-  ...over,
-});
 
 const stelle = (over: Partial<Betreuungsstelle> & { id: number }): Betreuungsstelle => ({
   einsatz_id: 1,
@@ -73,21 +49,6 @@ const stelle = (over: Partial<Betreuungsstelle> & { id: number }): Betreuungsste
   ...over,
 });
 
-const UFER = bezirk({
-  id: 5,
-  bezeichnung: 'Uferstraße 12–40',
-  raeumung: 'laeuft',
-  abschnitt_id: 3,
-  abschnitt_name: 'Deichwache Nord',
-  // Die AKTUELLE Meldung trägt id 55 — die gerade gemeldete (77) ist eine andere.
-  stand: { id: 55, evakuiert: 480, erhebung: 'gezaehlt', zeitpunkt_at: '2026-09-23 10:15:00' },
-});
-const HAFEN = bezirk({
-  id: 6,
-  bezeichnung: 'Hafenviertel',
-  plan_personen: 1210,
-  plan_erhebung: 'gezaehlt',
-});
 const TURNHALLE = stelle({
   id: 8,
   bezeichnung: 'Turnhalle Ost',
@@ -103,14 +64,11 @@ const STADION = stelle({
 });
 const SCHULE = stelle({ id: 10, bezeichnung: 'Schule Nord', art: 'betreuungsstelle' });
 
-const MIT_DATEN: BetreuungUebersicht = {
-  bezirke: [UFER, HAFEN],
-  stellen: [TURNHALLE, STADION, SCHULE],
-};
+const MIT_DATEN: BetreuungUebersicht = { stellen: [TURNHALLE, STADION, SCHULE] };
 
 /**
- * Angemeldet als Benutzer 1: Stand- und Belegungsmeldungen laufen über die Offline-Queue, und die
- * gehört einem Benutzer.
+ * Angemeldet als Benutzer 1: Belegungsmeldungen laufen über die Offline-Queue, und die gehört
+ * einem Benutzer.
  */
 const BENUTZER_ID = 1;
 
@@ -125,6 +83,7 @@ function renderPage(pfad = '/einsaetze/1/betreuung') {
             <Routes>
               <Route path="/einsaetze/:id/betreuung" element={<BetreuungPage />} />
               <Route path="/einsaetze/:id/lagekarte" element={<LagekarteSonde />} />
+              <Route path="/einsaetze/:id/evakuierung" element={<EvakuierungSonde />} />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
@@ -140,9 +99,15 @@ function LagekarteSonde() {
   return <div data-testid="lagekarte-ziel">{ort.pathname + ort.search}</div>;
 }
 
+/** Ziel der Umleitung alter Bezirkslinks (LLH-1034): zeigt die angesteuerte Adresse. */
+function EvakuierungSonde() {
+  const ort = useLocation();
+  return <div data-testid="evakuierung-ziel">{ort.pathname + ort.search}</div>;
+}
+
 /**
- * Einsatz-Abrufe seit dem ersten. Eine Bezirksänderung kann den Auslöser der Lagekennzahl
- * `evakuiert` kippen und muss den Einsatz neu abrufen lassen.
+ * Einsatz-Abrufe seit dem ersten. Eine Stelle kippt die Lagekennzahl `evakuiert` nie; der Einsatz
+ * wird nach ihren Änderungen nicht neu abgerufen.
  */
 async function einsatzAbrufeNach(aktion: () => Promise<void>): Promise<() => number> {
   await waitFor(() => expect(vi.mocked(ladeEinsatz)).toHaveBeenCalled());
@@ -151,8 +116,6 @@ async function einsatzAbrufeNach(aktion: () => Promise<void>): Promise<() => num
   return () => vi.mocked(ladeEinsatz).mock.calls.length - vorher;
 }
 
-const karteVon = (titel: string) =>
-  screen.getByText(titel).closest('[data-lfh="datensicht-karte"]') as HTMLElement;
 const zeileVon = (titel: string) => screen.getByText(titel).closest('tr') as HTMLElement;
 
 /**
@@ -201,35 +164,19 @@ describe('BetreuungPage (LFH-639)', () => {
     freigaben.wert = freigabenFixture();
   });
 
-  it('Leerzustand: beide Blöcke sagen, dass nichts da ist', async () => {
-    api.ladeBetreuung.mockResolvedValue({ bezirke: [], stellen: [] });
+  it('Leerzustand: die Tabelle sagt, dass keine Stelle da ist', async () => {
+    api.ladeBetreuung.mockResolvedValue({ stellen: [] });
     renderPage();
-    expect(await screen.findByText(/Keine Evakuierungsbezirke/)).toBeInTheDocument();
-    expect(screen.getByText(/Keine Betreuungsstellen/)).toBeInTheDocument();
-    expect(screen.getByText('keine geplante Evakuierung')).toBeInTheDocument();
+    expect(await screen.findByText(/Keine Betreuungsstellen/)).toBeInTheDocument();
+    // Die Bezirke sind das Modul Evakuierung (LLH-1034).
+    expect(screen.queryByText(/Evakuierungsbezirk/)).toBeNull();
   });
 
   it('ein Abruffehler ist kein Leerzustand', async () => {
     api.ladeBetreuung.mockRejectedValue(new Error('500'));
     renderPage();
     expect(await screen.findByText('Betreuung konnte nicht geladen werden')).toBeInTheDocument();
-    expect(screen.queryByText(/Keine Evakuierungsbezirke/)).toBeNull();
-    expect(screen.queryByText('keine geplante Evakuierung')).toBeNull();
-  });
-
-  it('Block Evakuierung: Karte mit Status, „N · von M geplant", ≈ und „keine Meldung"', async () => {
-    renderPage();
-    await screen.findByText('Uferstraße 12–40');
-    const ufer = karteVon('Uferstraße 12–40');
-    expect(within(ufer).getByText('läuft')).toBeInTheDocument();
-    expect(within(ufer).getByText('480 · von ≈ 640 geplant')).toBeInTheDocument();
-    expect(within(ufer).getByText('Deichwache Nord')).toBeInTheDocument();
-    const hafen = karteVon('Hafenviertel');
-    expect(within(hafen).getByText(`keine Meldung · von 1${T}210 geplant`)).toBeInTheDocument();
-    // Blockkopf: die Kennzahl über alle aktiven Bezirke.
-    expect(
-      screen.getByText(`480 · von 1${T}850 geplant · 1 ohne Meldung`, { exact: false }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Keine Betreuungsstellen/)).toBeNull();
   });
 
   it('Block Betreuungsstellen: Tabelle, „frei" nur mit Kapazität, Auslastungswort als zweiter Kanal', async () => {
@@ -302,7 +249,6 @@ describe('BetreuungPage (LFH-639)', () => {
   it('Kopf Betreuungsstellen ohne jede Meldung: „keine Meldung", nicht „0 untergebracht"', async () => {
     // „nichts gemeldet" ist nicht „niemand in Betreuung".
     api.ladeBetreuung.mockResolvedValue({
-      bezirke: [],
       stellen: [SCHULE, stelle({ id: 11, bezeichnung: 'Halle West' })],
     });
     renderPage();
@@ -313,7 +259,6 @@ describe('BetreuungPage (LFH-639)', () => {
 
   it('volle Stellen im Blickfeld: „n voll" im Seitenkopf und im Blockkopf, „fast voll" zählt nicht (LFH-678)', async () => {
     api.ladeBetreuung.mockResolvedValue({
-      bezirke: [UFER],
       stellen: [
         TURNHALLE,
         STADION, // fast voll — zählt nicht
@@ -334,8 +279,8 @@ describe('BetreuungPage (LFH-639)', () => {
     });
     renderPage();
     await screen.findByText('Halle Süd');
-    // Seitenkopf: die einzige Zeile, die auch mit vielen Bezirkskarten über der Falz steht.
-    expect(screen.getByText('1 Bezirk · 5 Betreuungsstellen · 2 voll')).toBeInTheDocument();
+    // Seitenkopf: die einzige Zeile, die auch bei langer Tabelle über der Falz steht.
+    expect(screen.getByText('5 Betreuungsstellen · 2 voll')).toBeInTheDocument();
     // Blockkopf: dieselbe Zahl neben der Summe.
     expect(screen.getByText('361 untergebracht · 2 voll · 1 ohne Meldung')).toBeInTheDocument();
     // Die Zeilen tragen weiter ihr eigenes Wort — der Kopf fasst nur zusammen.
@@ -346,45 +291,59 @@ describe('BetreuungPage (LFH-639)', () => {
   it('ohne volle Stelle kein „0 voll" — weder im Seitenkopf noch im Blockkopf (LFH-678)', async () => {
     renderPage();
     await screen.findByText('Turnhalle Ost');
-    expect(screen.getByText('2 Bezirke · 3 Betreuungsstellen')).toBeInTheDocument();
+    expect(screen.getByText('3 Betreuungsstellen')).toBeInTheDocument();
     expect(screen.queryByText(/\bvoll\b.*·|· \d+ voll/)).toBeNull();
   });
 
-  it('genau EINE Primäraktion im Kopf; „Betreuungsstelle anlegen" steht sekundär im Block', async () => {
+  it('genau EINE Primäraktion im Kopf: „Betreuungsstelle anlegen" (LLH-1034)', async () => {
     renderPage();
-    await screen.findByText('Uferstraße 12–40');
+    await screen.findByText('Turnhalle Ost');
     const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
     const primaer = [...kopf.querySelectorAll('button')].filter((b) =>
       b.className.includes('-btn-primary'),
     );
     expect(primaer).toHaveLength(1);
-    expect(primaer[0]).toHaveAccessibleName('Evakuierungsbezirk anlegen');
-    const stelleAnlegen = screen.getByRole('button', { name: 'Betreuungsstelle anlegen' });
-    expect(kopf.contains(stelleAnlegen)).toBe(false);
-    expect(stelleAnlegen.className).not.toContain('-btn-primary');
+    expect(primaer[0]).toHaveAccessibleName('Betreuungsstelle anlegen');
+    // Kein zweiter Anlegen-Knopf im Block, kein Bezirk mehr auf dieser Seite.
+    expect(screen.getAllByRole('button', { name: 'Betreuungsstelle anlegen' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Evakuierungsbezirk anlegen' })).toBeNull();
+  });
+
+  it('Betreuungsstelle anlegen aus dem Kopf: Dialog, POST mit den Feldern', async () => {
+    api.legeStelleAn.mockResolvedValue(stelle({ id: 14, bezeichnung: 'Halle West' }));
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    await userEvent.click(screen.getByRole('button', { name: 'Betreuungsstelle anlegen' }));
+    const dialog = await dialogMit('Betreuungsstelle anlegen');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Halle West');
+    await userEvent.type(within(dialog).getByLabelText('Kapazität (Personen)'), '80');
+    const neu = await einsatzAbrufeNach(async () => {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+      await waitFor(() =>
+        expect(api.legeStelleAn).toHaveBeenCalledWith(
+          1,
+          expect.objectContaining({ bezeichnung: 'Halle West', kapazitaet_personen: 80 }),
+        ),
+      );
+    });
+    expect(await screen.findByText('Betreuungsstelle Halle West angelegt')).toBeInTheDocument();
+    // Eine Stelle kippt die Lagekennzahl nie — der Einsatz wird nicht neu gefragt.
+    expect(neu()).toBe(0);
   });
 
   it('Beobachter: Hinweis mit Grund, Primäraktion gesperrt — Zeilenaktionen entfallen', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
     renderPage();
-    await screen.findByText('Uferstraße 12–40');
+    await screen.findByText('Turnhalle Ost');
     expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Betreuungsstelle anlegen' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: /^Stand melden/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Belegung melden/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Aktionen zu/ })).toBeNull();
   });
 
   it('Gegenstück mit Schreibrecht: Zeilenaktionen tragen die Zeilenkennung', async () => {
     renderPage();
-    await screen.findByText('Uferstraße 12–40');
-    expect(
-      screen.getByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    ).toBeInTheDocument();
+    await screen.findByText('Turnhalle Ost');
     expect(
       screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
     ).toBeInTheDocument();
@@ -404,12 +363,19 @@ describe('BetreuungPage (LFH-639)', () => {
       Element.prototype.scrollIntoView = vorher;
     });
 
-    it('?bezirk=<id> hebt die Karte hervor und scrollt zu ihr', async () => {
+    it('ein alter Link ?bezirk=<id> leitet zur Evakuierung um, ohne die Betreuung zu laden (LLH-1034)', async () => {
       renderPage('/einsaetze/1/betreuung?bezirk=6');
-      await screen.findByText('Hafenviertel');
-      await waitFor(() => expect(karteVon('Hafenviertel')).toHaveClass('zeile-hervorgehoben'));
-      expect(karteVon('Uferstraße 12–40')).not.toHaveClass('zeile-hervorgehoben');
-      await waitFor(() => expect(gescrollt).toContain(karteVon('Hafenviertel')));
+      expect(await screen.findByTestId('evakuierung-ziel')).toHaveTextContent(
+        '/einsaetze/1/evakuierung?bezirk=6',
+      );
+      expect(api.ladeBetreuung).not.toHaveBeenCalled();
+    });
+
+    it('ein unlesbarer ?bezirk= führt auf die Evakuierung ohne Auswahl (LLH-1034)', async () => {
+      renderPage('/einsaetze/1/betreuung?bezirk=abc');
+      expect(await screen.findByTestId('evakuierung-ziel')).toHaveTextContent(
+        /^\/einsaetze\/1\/evakuierung$/,
+      );
     });
 
     it('?stelle=<id> hebt die Tabellenzeile hervor und scrollt zu ihr', async () => {
@@ -422,69 +388,54 @@ describe('BetreuungPage (LFH-639)', () => {
   });
 
   describe('Rückgängig nach dem Melden (4.3)', () => {
-    it('„Rückgängig" nimmt die GERADE gemeldete Standmeldung zurück, nicht die aktuelle', async () => {
-      api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
-      api.nimmStandZurueck.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
-      renderPage();
-      await userEvent.click(
-        await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
-      );
-      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
-      await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '500');
-      const neu = await einsatzAbrufeNach(async () => {
-        await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-        await waitFor(() =>
-          expect(api.meldeStand).toHaveBeenCalledWith(
-            1,
-            5,
-            { evakuiert: 500, erhebung: 'gezaehlt', client_id: expect.any(String) },
-            { offlineQueueBenutzerId: BENUTZER_ID },
-          ),
-        );
-        await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
-        await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
-      });
-      expect(api.nimmStandZurueck).not.toHaveBeenCalledWith(1, 55);
-      // Eine Standmeldung ist ein Messwert, keine Entscheidung — der Einsatz bleibt.
-      expect(neu()).toBe(0);
-    });
-
-    it('eine zweite Meldung ersetzt den stehenden Toast — ein Rückweg, der zur jüngsten gehört', async () => {
-      api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
+    it('„Rückgängig" nimmt die GERADE gemeldete Belegung zurück, nicht die aktuelle', async () => {
       api.meldeBelegung.mockResolvedValue({ meldung_id: 91, stelle: TURNHALLE });
       api.nimmBelegungZurueck.mockResolvedValue({ meldung_id: 91, stelle: TURNHALLE });
       renderPage();
       await userEvent.click(
-        await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
+        await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
-      let dialog = await screen.findByRole('dialog');
-      await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '500');
+      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
+      const neu = await einsatzAbrufeNach(async () => {
+        await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
+        await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
+        await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 91));
+      });
+      // Die aktuelle Meldung der Stelle (30) bleibt unberührt.
+      expect(api.nimmBelegungZurueck).not.toHaveBeenCalledWith(1, 30);
+      expect(neu()).toBe(0);
+    });
+
+    it('eine zweite Meldung ersetzt den stehenden Toast — ein Rückweg, der zur jüngsten gehört', async () => {
+      api.meldeBelegung
+        .mockResolvedValueOnce({ meldung_id: 91, stelle: TURNHALLE })
+        .mockResolvedValueOnce({ meldung_id: 92, stelle: STADION });
+      api.nimmBelegungZurueck.mockResolvedValue({ meldung_id: 92, stelle: STADION });
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+      );
+      let dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       await screen.findByRole('button', { name: /Rückgängig/ });
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 
       await userEvent.click(
-        screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+        screen.getByRole('button', { name: 'Belegung melden für Weserstadion' }),
       );
-      dialog = await dialogMit('Belegung melden: Turnhalle Ost');
-      await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
+      dialog = await dialogMit('Belegung melden: Weserstadion');
+      await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '120');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       await waitFor(() =>
-        expect(api.meldeBelegung).toHaveBeenCalledWith(
-          1,
-          8,
-          { belegt: 95, client_id: expect.any(String) },
-          { offlineQueueBenutzerId: BENUTZER_ID },
-        ),
-      );
-      await waitFor(() =>
-        expect(screen.getByText(/Belegung Turnhalle Ost gemeldet/)).toBeInTheDocument(),
+        expect(screen.getByText(/Belegung Weserstadion gemeldet/)).toBeInTheDocument(),
       );
       const rueckwege = screen.getAllByRole('button', { name: /Rückgängig/ });
       expect(rueckwege).toHaveLength(1);
       await userEvent.click(rueckwege[0]);
-      await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 91));
-      expect(api.nimmStandZurueck).not.toHaveBeenCalled();
+      await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 92));
+      expect(api.nimmBelegungZurueck).not.toHaveBeenCalledWith(1, 91);
     });
   });
 
@@ -520,40 +471,17 @@ describe('BetreuungPage (LFH-639)', () => {
       });
     });
 
-    it('offline: Standmeldung wird vorgemerkt statt angehalten (LFH-705, D6)', async () => {
-      await queueLeerenFuerTests();
-      renderPage();
-      const melden = await screen.findByRole('button', {
-        name: 'Stand melden für Bezirk Uferstraße 12–40',
-      });
-      setzeOnline(false);
-      await userEvent.click(melden);
-      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
-      await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '200');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-
-      expect(await screen.findByText(/Offline vorgemerkt: Standmeldung/)).toBeInTheDocument();
-      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-      expect(api.meldeStand).not.toHaveBeenCalled();
-      const [zeile] = await schreibaktionenLaden(BENUTZER_ID, 1);
-      expect(zeile.aktion).toMatchObject({
-        art: 'stand',
-        bezeichnung: 'Uferstraße 12–40',
-        daten: { evakuiert: 200, zeitpunkt_at: expect.any(String) },
-      });
-    });
-
     it('online: gesendet ohne Zeitpunkt — die Serveruhr gilt, Rückgängig bleibt', async () => {
-      api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
+      api.meldeBelegung.mockResolvedValue({ meldung_id: 91, stelle: TURNHALLE });
       renderPage();
       await userEvent.click(
-        await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
+        await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
-      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
-      await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '500');
+      const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
+      await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
       expect(await screen.findByRole('button', { name: /Rückgängig/ })).toBeInTheDocument();
-      expect(api.meldeStand.mock.calls[0][2]).not.toHaveProperty('zeitpunkt_at');
+      expect(api.meldeBelegung.mock.calls[0][2]).not.toHaveProperty('zeitpunkt_at');
       expect(screen.queryByText(/Offline vorgemerkt/)).toBeNull();
     });
   });
@@ -561,21 +489,9 @@ describe('BetreuungPage (LFH-639)', () => {
   describe('Fehler einer Rücknahme (C10/H14)', () => {
     const TITEL = 'Meldung konnte nicht zurückgenommen werden';
 
-    async function meldeStandUndNimmZurueck() {
-      await userEvent.click(
-        await screen.findByRole('button', { name: 'Stand melden für Bezirk Uferstraße 12–40' }),
-      );
-      const dialog = await dialogMit('Stand melden: Uferstraße 12–40');
-      await userEvent.type(within(dialog).getByLabelText('Evakuiert gesamt (Personen)'), '500');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Melden' }));
-      await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
-      await waitFor(() => expect(api.nimmStandZurueck).toHaveBeenCalledWith(1, 77));
-      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    }
-
     async function meldeBelegung() {
       await userEvent.click(
-        screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+        await screen.findByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
       );
       const dialog = await dialogMit('Belegung melden: Turnhalle Ost');
       await userEvent.type(within(dialog).getByLabelText('Belegt gesamt (Personen)'), '95');
@@ -588,44 +504,30 @@ describe('BetreuungPage (LFH-639)', () => {
           { offlineQueueBenutzerId: BENUTZER_ID },
         ),
       );
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     }
 
     beforeEach(() => {
-      api.meldeStand.mockResolvedValue({ meldung_id: 77, bezirk: UFER });
       api.meldeBelegung.mockResolvedValue({ meldung_id: 91, stelle: TURNHALLE });
-      // Zwei verschiedene Wortlaute als `ApiError`: mit einem nackten `Error` zeigte der Alert
-      // beide Male denselben Rückfalltext.
-      api.nimmStandZurueck.mockRejectedValue(new ApiError(422, 'Stand-Rücknahme abgelehnt'));
       api.nimmBelegungZurueck.mockRejectedValue(new ApiError(422, 'Belegungs-Rücknahme abgelehnt'));
     });
 
-    it('eine spätere Ablehnung der anderen Rücknahme wird gezeigt, nicht vom alten Fehler verdeckt', async () => {
+    it('steht über der Seite und verschwindet mit der nächsten Meldung', async () => {
       renderPage();
-      await meldeStandUndNimmZurueck();
-      expect(await screen.findByText('Stand-Rücknahme abgelehnt')).toBeInTheDocument();
-      expect(screen.getByText(TITEL)).toBeInTheDocument();
-
       await meldeBelegung();
       await userEvent.click(await screen.findByRole('button', { name: /Rückgängig/ }));
       await waitFor(() => expect(api.nimmBelegungZurueck).toHaveBeenCalledWith(1, 91));
       expect(await screen.findByText('Belegungs-Rücknahme abgelehnt')).toBeInTheDocument();
-      expect(screen.queryByText('Stand-Rücknahme abgelehnt')).toBeNull();
-    });
-
-    it('nach einer erfolgreichen Meldung ist der Fehler der Rücknahme weg', async () => {
-      renderPage();
-      await meldeStandUndNimmZurueck();
-      expect(await screen.findByText('Stand-Rücknahme abgelehnt')).toBeInTheDocument();
+      expect(screen.getByText(TITEL)).toBeInTheDocument();
 
       await meldeBelegung();
       await waitFor(() => expect(screen.queryByText(TITEL)).toBeNull());
-      expect(screen.queryByText('Stand-Rücknahme abgelehnt')).toBeNull();
+      expect(screen.queryByText('Belegungs-Rücknahme abgelehnt')).toBeNull();
     });
   });
 
   it('„Auf Karte verorten" nur an unverorteter Stelle, führt in den Platziermodus (LFH-673)', async () => {
     api.ladeBetreuung.mockResolvedValue({
-      bezirke: [],
       stellen: [TURNHALLE, { ...SCHULE, lat: 51.9, lon: 8.8 }],
     });
     renderPage();
@@ -662,7 +564,7 @@ describe('BetreuungPage (LFH-639)', () => {
 
   it('gesperrte Lagekarte: „Auf Karte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
     freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
-    api.ladeBetreuung.mockResolvedValue({ bezirke: [], stellen: [TURNHALLE] });
+    api.ladeBetreuung.mockResolvedValue({ stellen: [TURNHALLE] });
     const { client } = renderPage();
     await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
     await userEvent.click(
@@ -674,156 +576,13 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(eintrag).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('gesperrte Lagekarte: „Auf Karte zeigen" am Bezirk steht gesperrt mit Grund (LFH-888)', async () => {
-    freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
-    api.ladeBetreuung.mockResolvedValue({ bezirke: [{ ...UFER, flaechen: 2 }], stellen: [] });
-    const { client } = renderPage();
-    await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    const eintrag = within(await offenesMenue()).getByRole('menuitem', {
-      name: /Auf Karte zeigen \(Keine Berechtigung\)/,
-    });
-    expect(eintrag).toHaveAttribute('aria-disabled', 'true');
-  });
-
-  it('„Auf Karte zeigen" am Bezirk mit Fläche führt zur Fläche (LFH-673)', async () => {
-    api.ladeBetreuung.mockResolvedValue({
-      bezirke: [{ ...UFER, flaechen: 2 }, HAFEN],
-      stellen: [],
-    });
-    renderPage();
-    // Ohne Fläche: kein Eintrag.
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
-    );
-    expect(
-      within(await offenesMenue()).queryByRole('menuitem', { name: /Auf Karte zeigen/ }),
-    ).toBeNull();
-    await userEvent.keyboard('{Escape}');
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    await waitFor(() => {
-      const offen = document.querySelectorAll(
-        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-      );
-      expect(
-        within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
-          name: /Auf Karte zeigen/,
-        }),
-      ).toBeTruthy();
-    });
-    const offen = document.querySelectorAll(
-      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-    );
-    await userEvent.click(
-      within(offen[offen.length - 1] as HTMLElement).getByRole('menuitem', {
-        name: /Auf Karte zeigen/,
-      }),
-    );
-    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
-      '/einsaetze/1/lagekarte?evakuierungsbezirk=5',
-    );
-  });
-
-  it('ohne Schreibrecht: am Bezirk mit Fläche nur „Auf Karte zeigen", ohne Fläche kein Menü (LFH-673)', async () => {
-    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
-    api.ladeBetreuung.mockResolvedValue({
-      bezirke: [{ ...UFER, flaechen: 1 }, HAFEN],
-      stellen: [],
-    });
-    renderPage();
-    await screen.findByText('Hafenviertel');
-    expect(screen.queryByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' })).toBeNull();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    const menue = await offenesMenue();
-    expect(
-      within(menue)
-        .getAllByRole('menuitem')
-        .map((m) => m.textContent),
-    ).toEqual(['Auf Karte zeigen']);
-  });
-
   it('ohne Schreibrecht gibt es keinen Einstieg „Auf Karte verorten" (LFH-673)', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
-    api.ladeBetreuung.mockResolvedValue({ bezirke: [], stellen: [TURNHALLE] });
+    api.ladeBetreuung.mockResolvedValue({ stellen: [TURNHALLE] });
     renderPage();
     await screen.findByText('Turnhalle Ost');
     expect(screen.queryByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost' })).toBeNull();
     expect(screen.queryByText(/Auf Karte verorten/)).toBeNull();
-  });
-
-  it('Stornieren über das Menü: eigener Dialog mit rotem Knopf, dann POST', async () => {
-    api.storniereBezirk.mockResolvedValue({ ...UFER, storniert_at: '2026-09-23 11:00:00' });
-    renderPage();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    const menue = await offenesMenue();
-    await userEvent.click(within(menue).getByRole('menuitem', { name: /Stornieren/ }));
-    const dialog = await dialogMit('Bezirk Uferstraße 12–40 stornieren?');
-    const ok = within(dialog).getByRole('button', { name: 'Stornieren' });
-    expect(ok).toHaveClass('ant-btn-dangerous');
-    const neu = await einsatzAbrufeNach(async () => {
-      await userEvent.click(ok);
-      await waitFor(() => expect(api.storniereBezirk).toHaveBeenCalledWith(1, 5));
-    });
-    // Stornieren kann die Lagekennzahl `evakuiert` wegnehmen.
-    await waitFor(() => expect(neu()).toBeGreaterThan(0));
-  });
-
-  it('Bezirk anlegen aus dem Kopf: Dialog, POST mit den Feldern', async () => {
-    api.legeBezirkAn.mockResolvedValue(bezirk({ id: 11 }));
-    renderPage();
-    await screen.findByText('Uferstraße 12–40');
-    await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
-    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
-    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
-    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
-    const neu = await einsatzAbrufeNach(async () => {
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-      await waitFor(() =>
-        expect(api.legeBezirkAn).toHaveBeenCalledWith(1, {
-          bezeichnung: 'Deichweg 1–9',
-          plan_personen: 120,
-          plan_erhebung: 'geschaetzt',
-        }),
-      );
-    });
-    // Anlegen ist die Anordnung — der Einsatz trägt danach `evakuiert`.
-    await waitFor(() => expect(neu()).toBeGreaterThan(0));
-  });
-
-  it('Menü „Plangröße fortschreiben" öffnet den Bearbeiten-Dialog des Bezirks und schickt nur die neue Plangröße (LFH-682)', async () => {
-    api.aendereBezirk.mockResolvedValue({ ...UFER, plan_personen: 820 });
-    renderPage();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Plangröße fortschreiben/ }),
-    );
-    const dialog = await dialogMit('Bezirk bearbeiten: Uferstraße 12–40');
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    expect(feld).toHaveValue('640');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    const abrufeVorher = api.ladeBetreuung.mock.calls.length;
-    const neu = await einsatzAbrufeNach(async () => {
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-      await waitFor(() =>
-        expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { plan_personen: 820 }),
-      );
-    });
-    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(await screen.findByText('Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
-    await waitFor(() => expect(api.ladeBetreuung.mock.calls.length).toBeGreaterThan(abrufeVorher));
-    // Jede Bezirksänderung fragt den Einsatz neu, auch die Plangröße.
-    await waitFor(() => expect(neu()).toBeGreaterThan(0));
   });
 
   it('Menü „Bearbeiten" an einer Stelle: Dialog mit ihren Werten, PATCH nur mit der Änderung (LFH-682)', async () => {
@@ -916,7 +675,6 @@ describe('BetreuungPage (LFH-639)', () => {
       await waitFor(() => expect(api.storniereStelle).toHaveBeenCalledWith(1, 8));
     });
     expect(api.storniereStelle).toHaveBeenCalledTimes(1);
-    expect(api.storniereBezirk).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(await screen.findByText('Betreuungsstelle Turnhalle Ost storniert')).toBeInTheDocument();
     await waitFor(() => expect(api.ladeBetreuung.mock.calls.length).toBeGreaterThan(abrufeVorher));
@@ -937,22 +695,6 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(api.storniereStelle).not.toHaveBeenCalled();
   });
 
-  it('Bezirk stornieren zeigt „Stattdessen Räumung setzen“ und öffnet den Räumungsdialog (LFH-1078)', async () => {
-    renderPage();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Stornieren/ }),
-    );
-    const bezirkStorno = await dialogMit('Bezirk Uferstraße 12–40 stornieren?');
-    await userEvent.click(
-      within(bezirkStorno).getByRole('button', { name: 'Stattdessen Räumung setzen' }),
-    );
-    await dialogUnter('Räumung: Uferstraße 12–40');
-    expect(api.storniereBezirk).not.toHaveBeenCalled();
-  });
-
   it('Stelle stornieren zeigt „Stattdessen Status setzen“ und öffnet „Stelle bearbeiten“ (LFH-1078)', async () => {
     renderPage();
     await userEvent.click(
@@ -969,69 +711,22 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(api.storniereStelle).not.toHaveBeenCalled();
   });
 
-  it('Menü „Räumung setzen" öffnet den Räumungsdialog und schickt den neuen Zustand', async () => {
-    api.aendereBezirk.mockResolvedValue({ ...UFER, raeumung: 'geraeumt' });
-    renderPage();
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-    );
-    await userEvent.click(
-      within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
-    );
-    const dialog = await dialogMit('Räumung: Uferstraße 12–40');
-    await userEvent.click(within(dialog).getByRole('radio', { name: 'geräumt' }).closest('label')!);
-    const neu = await einsatzAbrufeNach(async () => {
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-      await waitFor(() =>
-        expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'geraeumt' }),
-      );
-    });
-    // „aufgehoben" nähme die Lagekennzahl weg; jede Bezirksänderung fragt nach.
-    await waitFor(() => expect(neu()).toBeGreaterThan(0));
-  });
-
   // ── Verlauf (LFH-676) ──
-  it('Verlauf: Auslöser an jeder Karte und Zeile, auch ohne Schreibrecht, Abruf erst beim Aufklappen', async () => {
+  it('Verlauf: Auslöser an jeder Zeile, auch ohne Schreibrecht, Abruf erst beim Aufklappen (LFH-676)', async () => {
     einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
-    api.ladeStandVerlauf.mockResolvedValue([
-      {
-        id: 55,
-        evakuiert: 480,
-        erhebung: 'gezaehlt',
-        zeitpunkt_at: '2026-09-23 10:15:00',
-        erfasst_at: '2026-09-23 10:15:00',
-        erfasst_von: 'Leitung',
-        aktuell: true,
-      },
-    ]);
     api.ladeBelegungVerlauf.mockResolvedValue([]);
     renderPage();
-    const bezirkKnopf = await screen.findByRole('button', {
-      name: 'Verlauf zu Bezirk Uferstraße 12–40',
-    });
+    const knopf = await screen.findByRole('button', { name: 'Verlauf zu Stelle Turnhalle Ost' });
     expect(
-      screen.getByRole('button', { name: 'Verlauf zu Bezirk Hafenviertel' }),
+      screen.getByRole('button', { name: 'Verlauf zu Stelle Weserstadion' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Verlauf zu Stelle Turnhalle Ost' }),
-    ).toBeInTheDocument();
-    expect(api.ladeStandVerlauf).not.toHaveBeenCalled();
     expect(api.ladeBelegungVerlauf).not.toHaveBeenCalled();
-
-    await userEvent.click(bezirkKnopf);
-    expect(await screen.findByText('480 evakuiert (gezählt)')).toBeInTheDocument();
-    expect(api.ladeStandVerlauf).toHaveBeenCalledWith(1, 5);
-    expect(api.ladeBelegungVerlauf).not.toHaveBeenCalled();
-    // Ohne Schreibrecht kein Auslöser „Zurücknehmen".
-    expect(screen.queryByRole('button', { name: /zurücknehmen$/ })).toBeNull();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Verlauf zu Stelle Turnhalle Ost' }));
+    await userEvent.click(knopf);
     await waitFor(() => expect(api.ladeBelegungVerlauf).toHaveBeenCalledWith(1, 8));
   });
 
   it('Verlauf einer geschlossenen Stelle: Hinweis statt Auslöser (LFH-676)', async () => {
     api.ladeBetreuung.mockResolvedValue({
-      bezirke: [],
       stellen: [{ ...TURNHALLE, status: 'geschlossen' }],
     });
     api.ladeBelegungVerlauf.mockResolvedValue([
@@ -1060,28 +755,6 @@ describe('BetreuungPage (LFH-639)', () => {
       act(() => {
         client.setQueryData(einsatzKeys.betreuung(1), daten);
       });
-
-    it('Räumung: der Dialog zeigt den Live-Stand, zurück auf den alten geht als PATCH raus', async () => {
-      api.aendereBezirk.mockResolvedValue(UFER);
-      const { client } = renderPage();
-      await userEvent.click(
-        await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
-      );
-      await userEvent.click(
-        within(await offenesMenue()).getByRole('menuitem', { name: /Räumung setzen/ }),
-      );
-      const dialog = await dialogMit('Räumung: Uferstraße 12–40');
-      // Fremd auf „geräumt" gesetzt: der Dialog zeigt es, die Person wählt zurück auf „läuft".
-      liveStand(client, { ...MIT_DATEN, bezirke: [{ ...UFER, raeumung: 'geraeumt' }, HAFEN] });
-      await waitFor(() =>
-        expect(within(dialog).getByRole('radio', { name: 'geräumt' })).toBeChecked(),
-      );
-      await userEvent.click(within(dialog).getByRole('radio', { name: 'läuft' }).closest('label')!);
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-      await waitFor(() =>
-        expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, { raeumung: 'laeuft' }),
-      );
-    });
 
     it('seit dem Öffnen belegt: der Dialog bietet die Leermeldung an, statt am 422 zu scheitern', async () => {
       api.meldeBelegung.mockResolvedValue({ meldung_id: 92, stelle: SCHULE });

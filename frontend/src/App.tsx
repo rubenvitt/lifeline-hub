@@ -88,6 +88,7 @@ import PressePage from './pages/PressePage';
 import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
+import EvakuierungPage from './pages/EvakuierungPage';
 import VerpflegungPage from './pages/VerpflegungPage';
 import AusgabeAnsicht from './verpflegung/AusgabeAnsicht';
 import TagAusVorlage from './verpflegung/TagAusVorlage';
@@ -176,6 +177,7 @@ const MODUL_ELEMENTE: Record<string, ReactElement> = {
   'wetter-pegel': <WetterPegelPage />,
   personen: <PersonenPage />,
   unfallhilfsstellen: <UnfallhilfsstellenDefault />,
+  evakuierung: <EvakuierungPage />,
   betreuung: <BetreuungPage />,
   bereitstellungsraeume: <BereitstellungsraeumeDefault />,
   tiere: <TierePage />,

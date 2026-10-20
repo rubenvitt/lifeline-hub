@@ -1,8 +1,8 @@
 # betreuung-lagekarte Specification
 
 ## Purpose
-Betreuungsstellen und Evakuierungsbezirke des Fachmoduls Betreuung erscheinen auf der
-Lagekarte: Stellen als verortete Marker, Bezirke als Flächen aus einer oder mehreren
+Betreuungsstellen des Fachmoduls Betreuung und Evakuierungsbezirke des Fachmoduls
+Evakuierung erscheinen auf der Lagekarte: Stellen als verortete Marker, Bezirke als Flächen aus einer oder mehreren
 Teilzonen. Damit sieht die Führung auf einen Blick, wo untergebracht wird und welche
 Gebiete geräumt werden, ohne die Modulfreigabe zu umgehen.
 
@@ -163,12 +163,13 @@ Das System SHALL eine Zone vom Typ Evakuierungsbezirk optional genau einem
 Evakuierungsbezirk desselben Einsatzes zuordnen. Ein Bezirk MUST beliebig viele Zonen
 haben dürfen. Eine Zuordnung an eine Zone eines anderen Typs MUST mit 422 abgelehnt
 werden. Ein Bezirk, der nicht existiert oder zu einem anderen Einsatz gehört, MUST 404
-ergeben, ein stornierter Bezirk 409. Wer das Modul Betreuung nicht lesen darf, MUST keine
-Zuordnung setzen oder ändern können (403). Wechselt eine Zone ihren Typ weg von
+ergeben, ein stornierter Bezirk 409. Wer das Modul Evakuierung nicht lesen darf, MUST keine
+Zuordnung setzen oder ändern können (403); das Lesen des Moduls Betreuung allein MUST dafür
+nicht genügen und nicht nötig sein. Wechselt eine Zone ihren Typ weg von
 Evakuierungsbezirk, MUST ihre Zuordnung entfallen. Die Anzeige einer Zone MUST den Verweis
 tragen, wenn einer gesetzt ist, aber keine Angaben des Bezirks selbst. Jede Änderung der
 Zuordnung, einschließlich der Aufhebung einer zugeordneten Zone, MUST zusätzlich als
-Änderung des Moduls Betreuung live verteilt werden.
+Änderung des Moduls Evakuierung live verteilt werden.
 
 #### Scenario: Zwei Teilflächen
 - **WHEN** zwei Zonen vom Typ Evakuierungsbezirk dem Bezirk „Uferstraße 12–40“ zugeordnet werden
@@ -187,8 +188,12 @@ Zuordnung, einschließlich der Aufhebung einer zugeordneten Zone, MUST zusätzli
 - **THEN** antwortet das System mit 409
 
 #### Scenario: Ohne Modulrecht
-- **WHEN** eine Person mit Schreibrecht auf die Karte, aber ohne Lesezugriff auf das Modul Betreuung eine Zuordnung setzen will
+- **WHEN** eine Person mit Schreibrecht auf die Karte, aber ohne Lesezugriff auf das Modul Evakuierung eine Zuordnung setzen will
 - **THEN** antwortet das System mit 403
+
+#### Scenario: Nur das Modul Betreuung ausgeblendet
+- **WHEN** das Modul Betreuung ausgeblendet, das Modul Evakuierung aber lesbar ist und eine Person mit Schreibrecht auf die Karte eine Zuordnung setzt
+- **THEN** antwortet das System mit 201
 
 #### Scenario: Typwechsel
 - **WHEN** eine zugeordnete Zone zum Typ Absperrbereich wechselt
@@ -211,7 +216,7 @@ erhalten bleiben. Die Änderung MUST live an die Karte verteilt werden.
 ### Requirement: Bezirk und Fläche in beide Richtungen verbunden
 
 Die Anzeige eines Evakuierungsbezirks SHALL die Zahl der ihm zugeordneten Zonen tragen.
-Die Betreuungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
+Die Evakuierungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
 auch Personen ohne Schreibrecht (ein Sprung ist Lesen).
 Die Adresse `/einsaetze/<id>/lagekarte?evakuierungsbezirk=<bezirk-id>` MUST eine Zone dieses
 Bezirks auswählen, die Karte dorthin führen und den Parameter danach entfernen. Liegt die
@@ -223,7 +228,7 @@ anbieten, der den Bezirk dort auswählt. Die Beschriftung einer zugeordneten Zon
 Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 #### Scenario: Aus dem Modul auf die Karte
-- **WHEN** auf der Betreuungsseite am Bezirk „Uferstraße 12–40“ „Auf Karte zeigen“ gewählt wird
+- **WHEN** auf der Evakuierungsseite am Bezirk „Uferstraße 12–40“ „Auf Karte zeigen“ gewählt wird
 - **THEN** öffnet die Lagekarte mit einer Zone dieses Bezirks ausgewählt, und die Adresse enthält danach kein `evakuierungsbezirk` mehr
 
 #### Scenario: Fläche in einer anderen Ansicht
@@ -232,11 +237,11 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 #### Scenario: Bezirk ohne Fläche
 - **WHEN** ein Bezirk keine zugeordnete Zone hat
-- **THEN** bietet die Betreuungsseite an ihm kein „Auf Karte zeigen“ an
+- **THEN** bietet die Evakuierungsseite an ihm kein „Auf Karte zeigen“ an
 
 #### Scenario: Aus der Karte ins Modul
 - **WHEN** eine zugeordnete Zone ausgewählt und der Sprung ins Modul gewählt wird
-- **THEN** öffnet sich die Betreuungsseite mit diesem Bezirk ausgewählt
+- **THEN** öffnet sich die Evakuierungsseite mit diesem Bezirk ausgewählt
 
 #### Scenario: Räumungszustand auf der Fläche
 - **WHEN** der Räumungszustand des Bezirks auf `laeuft` wechselt
@@ -246,8 +251,9 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 Ein Lage-Snapshot SHALL die nicht stornierten Betreuungsstellen und Evakuierungsbezirke des
 Einsatzes zum Zeitpunkt der Aufnahme einfrieren, mit Koordinate und Zonenverweis. Beim
-Abruf MUST der Snapshot diese Inhalte für Personen ohne Lesezugriff auf das Modul
-Betreuung weglassen, wie die übrigen modulgebundenen Inhalte. Die Schwärzung eines
+Abruf MUST der Snapshot die Stellen für Personen ohne Lesezugriff auf das Modul Betreuung
+und die Bezirke für Personen ohne Lesezugriff auf das Modul Evakuierung weglassen, wie die
+übrigen modulgebundenen Inhalte. Die Schwärzung eines
 Einsatzes MUST Koordinaten der Stellen und Zonenverweise auf Bezirke als operatives
 Geo- bzw. Verweisskelett erhalten.
 
@@ -256,8 +262,12 @@ Geo- bzw. Verweisskelett erhalten.
 - **THEN** zeigt die Karte im Rückblick den Marker an der eingefrorenen Koordinate
 
 #### Scenario: Snapshot ohne Modulrecht
-- **WHEN** eine Person ohne Lesezugriff auf das Modul Betreuung einen Snapshot abruft
-- **THEN** enthält die Antwort keine Betreuungsstellen und keine Bezirke
+- **WHEN** eine Person ohne Lesezugriff auf das Modul Betreuung, aber mit Lesezugriff auf das Modul Evakuierung einen Snapshot abruft
+- **THEN** enthält die Antwort keine Betreuungsstellen, die Bezirke aber schon
+
+#### Scenario: Snapshot ohne Evakuierung
+- **WHEN** eine Person ohne Lesezugriff auf das Modul Evakuierung einen Snapshot abruft
+- **THEN** enthält die Antwort keine Bezirke
 
 #### Scenario: Schwärzung
 - **WHEN** ein Einsatz geschwärzt wird

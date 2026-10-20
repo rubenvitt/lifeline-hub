@@ -2,12 +2,83 @@
 
 ## Purpose
 Die Einsatzleitung führt je Evakuierungsbezirk, wie viele Menschen evakuiert werden sollen
-und wie viele es sind. Sie führt je Betreuungsstelle, wie viele Menschen dort untergebracht
-sind. Beides wird als Menge gemeldet, nicht über einzeln erfasste Personen. Jede Meldung
+und wie viele es sind (Modul Evakuierung). Sie führt je Betreuungsstelle, wie viele Menschen
+dort untergebracht sind (Modul Betreuung). Seit LLH-1034 sind beide eigene Module mit eigenem
+Recht, eigener Seite und eigenem Zähler; Fachlogik und Tabellen bleiben gemeinsam. Beides wird als Menge gemeldet, nicht über einzeln erfasste Personen. Jede Meldung
 ist im Einsatztagebuch nachgewiesen, wird live verteilt und speist die Kennzahl „Evakuiert
 N · von M geplant“ sowie die Kopfzahl „in Betreuung“ für die Verpflegung.
 
 ## Requirements
+
+### Requirement: Zwei Module Evakuierung und Betreuung
+
+Das System SHALL Evakuierungsbezirke und ihre Standmeldungen im Modul `evakuierung` und
+Betreuungsstellen und ihre Belegungsmeldungen im Modul `betreuung` führen. Die Endpunkte der
+Bezirke MUST unter `/api/einsaetze/{id}/evakuierung` liegen (Übersicht `GET …/evakuierung`,
+Bezirke `…/evakuierung/bezirke…`, Rücknahme `…/evakuierung/staende/{id}/zuruecknehmen`), die
+der Stellen unter `/api/einsaetze/{id}/betreuung`. Die Übersicht der Betreuung MUST keine
+Bezirke enthalten. Die bisherigen Bezirkspfade unter `…/betreuung/bezirke…` MUST NOT weiter
+bedient werden. Die Lagekennzahl „Evakuiert“, die Bezirksflächen der Lagekarte und jeder
+Sprung auf einen Bezirk MUST am Modul Evakuierung hängen. Ein an eine Betreuungsstelle
+gebundenes Gerät MUST weiter nur seine Stelle sehen und keinen Zugang zu Bezirken haben.
+
+#### Scenario: Getrennte Übersichten
+- **WHEN** ein Mitglied mit Zugriff auf beide Module `GET …/betreuung` und `GET …/evakuierung` abruft
+- **THEN** enthält die erste nur Stellen und die zweite nur Bezirke
+
+#### Scenario: Alter Bezirkspfad
+- **WHEN** ein Client einen Bezirk unter `…/betreuung/bezirke` anlegen will
+- **THEN** antwortet das System mit 404 oder 405 und legt nichts an
+
+#### Scenario: Gerät der Betreuungsstelle
+- **WHEN** ein an eine Betreuungsstelle gebundenes Gerät `GET …/evakuierung` abruft
+- **THEN** antwortet das System mit 403
+
+### Requirement: Modul-Einstellungen der Evakuierung übernommen
+
+Beim Einführen des Moduls Evakuierung MUST das System jede bestehende Einstellung des Moduls
+Betreuung, im Einsatz wie in der Organisation, für das Modul Evakuierung übernehmen:
+Sichtbarkeit und benötigte Rolle gleich, samt Zeitpunkt und Urheber der Änderung. Einstellungen
+anderer Module MUST unberührt bleiben. Wer die Bezirke bisher nicht sehen durfte, MUST sie
+danach ebenso wenig sehen dürfen.
+
+#### Scenario: Ausgeblendete Betreuung
+- **WHEN** das Modul Betreuung in einem Einsatz vor der Umstellung ausgeblendet war
+- **THEN** ist danach auch das Modul Evakuierung in diesem Einsatz ausgeblendet
+
+#### Scenario: Rollensperre der Organisation
+- **WHEN** die Organisation das Modul Betreuung auf die Rolle Einsatzführung beschränkt hatte
+- **THEN** gilt dieselbe Beschränkung danach für das Modul Evakuierung
+
+### Requirement: Modulseite Evakuierung
+
+Die Oberfläche SHALL das Modul Evakuierung als eigene Seite der Kategorie Erfassung direkt vor
+„Betreuung“ führen, beschrieben mit „Räumungsbezirke, Stand evakuiert“. Die Seite MUST genau
+eine Primäraktion „Evakuierungsbezirk anlegen“ tragen, darunter ein Kennzahlenband der Räumung
+(Evakuiert, Geplant, Räumung läuft, Geräumt, Ohne Meldung) und eine Tabelle der Bezirke mit
+„Stand melden“ je Zeile und dem Verlauf als Aufklappbereich. Ohne aktiven Bezirk MUST das
+Kennzahlenband entfallen statt Nullen zu zeigen. `?bezirk=<id>` MUST den Bezirk hervorheben.
+Die Adresse `…/betreuung?bezirk=<id>` MUST auf `…/evakuierung?bezirk=<id>` umleiten. Die Seite
+Betreuung MUST nur Stellen führen, mit der Primäraktion „Betreuungsstelle anlegen“.
+
+#### Scenario: Alter Link auf einen Bezirk
+- **WHEN** jemand `/einsaetze/1/betreuung?bezirk=6` öffnet
+- **THEN** steht die Evakuierungsseite mit Bezirk 6 hervorgehoben, und die Betreuung wird nicht geladen
+
+#### Scenario: Kein aktiver Bezirk
+- **WHEN** der Einsatz keinen aktiven Bezirk hat
+- **THEN** zeigt die Seite kein Kennzahlenband und sagt „Keine Evakuierungsbezirke“
+
+### Requirement: Modulzähler Evakuierung und Betreuung
+
+Der Navigationsrahmen SHALL am Modul Evakuierung die Zahl der aktiven Bezirke (nicht
+storniert, nicht aufgehoben) und am Modul Betreuung die Zahl der Stellen in Betrieb (nicht
+storniert) zeigen, jeweils nur bei Lesezugriff auf das Modul und mit der Bedeutung als
+zugänglichem Namen.
+
+#### Scenario: Zwei Zähler
+- **WHEN** ein Einsatz zwei aktive Bezirke, einen aufgehobenen Bezirk und drei Stellen hat, von denen zwei in Betrieb sind
+- **THEN** zeigt das Modulpanel an Evakuierung 2 und an Betreuung 2
 
 ### Requirement: Evakuierungsbezirk
 
@@ -315,24 +386,26 @@ nie als „keine Kennzahl“.
 
 ### Requirement: Live-Verteilung
 
-Jede Änderung an Bezirken, Standmeldungen, Stellen oder Belegungen MUST nach dem Commit ein
-Live-Ereignis `betreuung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul
-Betreuung lesen dürfen. Die Nutzlast MUST nur Kennungen tragen, keine Anzahlen,
+Jede Änderung an Bezirken oder Standmeldungen MUST nach dem Commit ein Live-Ereignis
+`evakuierung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul Evakuierung
+lesen dürfen. Jede Änderung an Stellen oder Belegungen MUST ein Live-Ereignis `betreuung` an
+alle auslösen, die das Modul Betreuung lesen dürfen. Die Nutzlast MUST nur Kennungen tragen, keine Anzahlen,
 Bezeichnungen oder Freitexte. Der zugehörige ETB-Eintrag MUST zusätzlich als ETB-Ereignis
 verteilt werden.
 
 #### Scenario: Zweiter Client sieht den neuen Stand
-- **WHEN** Client A einen Stand meldet, während Client B die Betreuungsseite desselben Einsatzes geöffnet hat
+- **WHEN** Client A einen Stand meldet, während Client B die Evakuierungsseite desselben Einsatzes geöffnet hat
 - **THEN** zeigt Client B den neuen Stand ohne Neuladen
 
 #### Scenario: Leser ohne Modulrecht
-- **WHEN** einem verbundenen Benutzer das Modul Betreuung ausgeblendet ist
-- **THEN** erhält er das Ereignis `betreuung` nicht
+- **WHEN** einem verbundenen Benutzer das Modul Evakuierung ausgeblendet ist
+- **THEN** erhält er das Ereignis `evakuierung` nicht
+- **AND** das Ereignis `betreuung` erhält er, solange er das Modul Betreuung lesen darf
 
 ### Requirement: Rechte
 
-Lesende Endpunkte des Moduls MUST Lesezugriff auf den Einsatz und das Modul Betreuung
-verlangen. Schreibende Endpunkte MUST zusätzlich Schreibrecht und einen aktiven Einsatz
+Lesende Endpunkte MUST Lesezugriff auf den Einsatz und ihr Modul verlangen: für Bezirke und
+Standmeldungen das Modul Evakuierung, für Stellen und Belegungen das Modul Betreuung. Schreibende Endpunkte MUST zusätzlich Schreibrecht und einen aktiven Einsatz
 verlangen. Die Oberfläche MUST ohne Schreibrecht einen Hinweis mit Grund zeigen und die
 Primäraktion gesperrt stehen lassen.
 
@@ -341,8 +414,12 @@ Primäraktion gesperrt stehen lassen.
 - **THEN** antwortet das System mit 403
 
 #### Scenario: Modul ausgeblendet
-- **WHEN** das Modul Betreuung für den Einsatz ausgeblendet ist und ein Nicht-Admin die Bezirke abruft
+- **WHEN** das Modul Evakuierung für den Einsatz ausgeblendet ist und ein Nicht-Admin die Bezirke abruft
 - **THEN** antwortet das System mit 403
+
+#### Scenario: Nur Betreuung ausgeblendet
+- **WHEN** das Modul Betreuung ausgeblendet, das Modul Evakuierung aber sichtbar ist
+- **THEN** liest ein Mitglied die Bezirke, und die Stellen antworten mit 403
 
 #### Scenario: Fremde Organisation
 - **WHEN** ein Benutzer einer anderen Organisation die Bezirke eines Einsatzes abruft
@@ -383,7 +460,9 @@ bemessen sein, soweit das Gerät seinen Versatz zur Serveruhr aus einer Antwort 
 kennt; ohne bekannten Versatz gilt die Geräteuhr. Ein eingetragener Zeitpunkt MUST
 unverändert gesendet werden. Eine vom Server fachlich abgelehnte vorgemerkte Meldung MUST
 mit Grund und vollständigem Inhalt sichtbar bleiben, bis sie verworfen oder erneut versucht
-wird.
+wird. Eine vor der Trennung der Module vorgemerkte Standmeldung MUST
+beim Senden die Route des Moduls Evakuierung nehmen und dabei Inhalt, `client_id` und
+Erfassungszeitpunkt behalten.
 
 #### Scenario: Wiederholte Standmeldung
 - **WHEN** eine Standmeldung „480 evakuiert“ mit `client_id` „a1“ gespeichert ist und dieselbe Meldung mit „a1“ erneut eintrifft
@@ -433,6 +512,10 @@ wird.
 #### Scenario: Vorgemerkte Meldung wird abgelehnt
 - **WHEN** eine vorgemerkte Standmeldung beim Senden abgelehnt wird, weil der Bezirk inzwischen storniert ist
 - **THEN** steht sie im Wiederherstellungsbereich als abgelehnte Standmeldung mit Grund und vollständigem Inhalt
+
+#### Scenario: Vor dem Umzug vorgemerkte Standmeldung
+- **WHEN** ein Gerät eine Standmeldung vor LLH-1034 vorgemerkt hat und sie danach sendet
+- **THEN** geht sie an `…/evakuierung/bezirke/{bezirk}/staende`, nie an den alten Pfad, mit derselben `client_id`
 
 #### Scenario: Vorgehende Geräteuhr bei kurzem Ausfall
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät vor dem Ausfall eine Antwort des Servers erhalten hat und es eine Standmeldung offline vormerkt, die nach 30 s Ausfall gesendet wird

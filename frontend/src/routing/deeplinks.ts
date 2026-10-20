@@ -390,17 +390,20 @@ export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
 }
 
 /**
- * Betreuungs-Modul. Keine Detailroute — Bezirk bzw. Stelle per Query-Param (`?bezirk=<id>` /
- * `?stelle=<id>`), die Seite scrollt auf die Zeile.
+ * Betreuungs-Modul. Keine Detailroute — Stelle per Query-Param (`?stelle=<id>`), die Seite scrollt
+ * auf die Zeile. Bezirke liegen seit LLH-1034 im Modul Evakuierung ({@link evakuierungPfad}); ein
+ * alter Link `…/betreuung?bezirk=<id>` leitet die Betreuungsseite dorthin um.
  */
-export function betreuungPfad(
-  einsatzId: number,
-  opts: { bezirk?: number; stelle?: number } = {},
-): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), {
-    bezirk: opts.bezirk,
-    stelle: opts.stelle,
-  });
+export function betreuungPfad(einsatzId: number, opts: { stelle?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), { stelle: opts.stelle });
+}
+
+/**
+ * Evakuierungs-Modul (LLH-1034). Keine Detailroute — Bezirk per Query-Param (`?bezirk=<id>`), die
+ * Seite hebt die Zeile hervor und scrollt auf sie.
+ */
+export function evakuierungPfad(einsatzId: number, opts: { bezirk?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'evakuierung'), { bezirk: opts.bezirk });
 }
 
 /** Stab-Modul. Den Abschluss der Lagebesprechung trägt seit LLH-1111 `lagebesprechungPfad`. */

@@ -124,9 +124,9 @@ export function zonenBeschriftung(
  *
  * Der Name ist der Zonenname, sonst die Bezeichnung des Bezirks, sonst das Typwort. Den
  * Räumungszustand trägt der Text, nicht die Farbe; das Wort kommt aus {@link raeumungszustand},
- * derselben Quelle wie auf der Betreuungsseite.
+ * derselben Quelle wie auf der Evakuierungsseite.
  *
- * `bezirk = null` heißt nicht zugeordnet oder nicht lesbar (kein Modulrecht, Betreuung lädt noch).
+ * `bezirk = null` heißt nicht zugeordnet oder nicht lesbar (kein Modulrecht, Evakuierung lädt noch).
  * Beides zeigt nur Name bzw. Typwort — sonst stünden Bezirksname oder Zustand bei Personen ohne
  * Modulrecht auf der Karte.
  */

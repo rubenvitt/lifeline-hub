@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { einsatzKeys } from '../api/queryKeys';
-import type { BetreuungUebersicht } from '../api/types';
+import type { EvakuierungUebersicht } from '../api/types';
 import { useEvakuierungKennzahl } from './useEvakuierungKennzahl';
 import { freigabenFixture } from '../test/fixtures';
 
@@ -19,9 +19,9 @@ import { freigabenFixture } from '../test/fixtures';
 /** Modul-Freigaben des Servers: alles frei. */
 const freigaben = freigabenFixture();
 
-const PFAD = '/api/einsaetze/7/betreuung';
+const PFAD = '/api/einsaetze/7/evakuierung';
 
-const UEBERSICHT: BetreuungUebersicht = {
+const UEBERSICHT: EvakuierungUebersicht = {
   bezirke: [
     {
       id: 1,
@@ -40,7 +40,6 @@ const UEBERSICHT: BetreuungUebersicht = {
       },
     },
   ],
-  stellen: [],
 };
 const KENNZAHL = { evakuiert: 600, geplant: 640, bezirke: 1, ohneMeldung: 0, geschaetzt: false };
 
@@ -63,7 +62,7 @@ function zaehleAbrufe(antwort: () => Response): { anzahl: number } {
 
 describe('useEvakuierungKennzahl', () => {
   it('kein Bezirk → Zustand `daten` mit `kennzahl: null` (keine geplante Evakuierung)', async () => {
-    zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
+    zaehleAbrufe(() => HttpResponse.json({ bezirke: [] }));
     const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, freigaben }), {
       wrapper: wrapper(neuerQueryClient()),
     });
@@ -84,7 +83,7 @@ describe('useEvakuierungKennzahl', () => {
     // Plain `QueryClient` statt `neuerQueryClient()`: dessen `gcTime: 0` räumte den per
     // `setQueryData` gesetzten Eintrag weg, und der Test prüfte nur den Fehlerfall ohne Cache.
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    client.setQueryData(einsatzKeys.betreuung(7), UEBERSICHT);
+    client.setQueryData(einsatzKeys.evakuierung(7), UEBERSICHT);
     zaehleAbrufe(() => HttpResponse.json({ error: 'kaputt' }, { status: 500 }));
     const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7, freigaben }), {
       wrapper: wrapper(client),
@@ -94,7 +93,7 @@ describe('useEvakuierungKennzahl', () => {
     // … der Neuabruf (Daten sind sofort veraltet, `staleTime` 0) scheitert …
     await waitFor(() => expect(result.current.zustand).toBe('fehler'));
     // … und die Daten stehen weiter im Cache. Genau diese Lage entscheidet der Hook.
-    expect(client.getQueryData(einsatzKeys.betreuung(7))).toEqual(UEBERSICHT);
+    expect(client.getQueryData(einsatzKeys.evakuierung(7))).toEqual(UEBERSICHT);
     expect(result.current).not.toHaveProperty('kennzahl');
   });
 
@@ -109,8 +108,8 @@ describe('useEvakuierungKennzahl', () => {
   });
 
   it('lädt NICHT bei ausgeblendetem Modul — kein Abruf, Zustand `aus` (weder fehler noch null)', async () => {
-    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
-    const versteckt = freigabenFixture({ betreuung: { sichtbar: false } });
+    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [] }));
+    const versteckt = freigabenFixture({ evakuierung: { sichtbar: false } });
     const { result } = renderHook(
       () => useEvakuierungKennzahl({ einsatzId: 7, freigaben: versteckt }),
       { wrapper: wrapper(neuerQueryClient()) },
@@ -122,8 +121,8 @@ describe('useEvakuierungKennzahl', () => {
   });
 
   it('lädt NICHT bei gesperrtem Modul (Freigabe ohne Zugriff)', async () => {
-    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
-    const gesperrt = freigabenFixture({ betreuung: { zugriff: false } });
+    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [] }));
+    const gesperrt = freigabenFixture({ evakuierung: { zugriff: false } });
     const { result } = renderHook(
       () => useEvakuierungKennzahl({ einsatzId: 7, freigaben: gesperrt }),
       { wrapper: wrapper(neuerQueryClient()) },
@@ -134,7 +133,7 @@ describe('useEvakuierungKennzahl', () => {
   });
 
   it('lädt NICHT bei unbekannten Freigaben — unbekannt gibt nichts frei (LFH-669)', async () => {
-    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
+    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [] }));
     const { result } = renderHook(() => useEvakuierungKennzahl({ einsatzId: 7 }), {
       wrapper: wrapper(neuerQueryClient()),
     });
@@ -145,7 +144,7 @@ describe('useEvakuierungKennzahl', () => {
 
   it('`bereit: false` (Freigaben noch unbekannt) → `laden` OHNE Abruf, danach entscheidet das Recht (LFH-607)', async () => {
     // Ohne diesen Riegel stünde `aus` in der Zelle, solange die Freigaben laden, statt `laden`.
-    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [], stellen: [] }));
+    const abrufe = zaehleAbrufe(() => HttpResponse.json({ bezirke: [] }));
     const { result, rerender } = renderHook(
       ({ bereit }: { bereit: boolean }) =>
         useEvakuierungKennzahl({ einsatzId: 7, freigaben, bereit }),

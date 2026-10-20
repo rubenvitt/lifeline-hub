@@ -1321,8 +1321,9 @@ mod tests {
             ]
         );
         let uebersicht = crate::betreuung::repo::uebersicht(&pool, e).await.unwrap();
-        assert!(uebersicht
-            .bezirke
+        assert!(crate::betreuung::repo::bezirke(&pool, e)
+            .await
+            .unwrap()
             .iter()
             .all(|b| b.stand.as_ref().map(|s| s.evakuiert) == Some(212)));
         assert!(uebersicht

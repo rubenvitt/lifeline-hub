@@ -311,9 +311,8 @@ async fn bezirk_anlegen_angeordnet_ohne_stand_mit_entscheidung() {
         etb[0].2
     );
 
-    let u = uebersicht(&w.pool, w.e).await.unwrap();
-    assert_eq!(u.bezirke.len(), 1);
-    assert!(u.stellen.is_empty());
+    assert_eq!(bezirke(&w.pool, w.e).await.unwrap().len(), 1);
+    assert!(stellen(&w.pool, w.e).await.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -722,7 +721,7 @@ async fn stornieren_nimmt_bezirk_aus_der_liste_und_schreibt_etb() {
         .await
         .unwrap();
     let g = bezirk_stornieren(&w, id).await.unwrap();
-    assert!(uebersicht(&w.pool, w.e).await.unwrap().bezirke.is_empty());
+    assert!(bezirke(&w.pool, w.e).await.unwrap().is_empty());
     assert!(bezirk_laden(&w.pool, w.e, id)
         .await
         .unwrap()
@@ -2026,8 +2025,8 @@ async fn flaechen_zaehlt_die_zugeordneten_zonen() {
     bezirksflaeche(&w, Some(ufer)).await;
     bezirksflaeche(&w, Some(ufer)).await;
     bezirksflaeche(&w, None).await;
-    let u = uebersicht(&w.pool, w.e).await.unwrap();
-    let flaechen = |id: i64| u.bezirke.iter().find(|b| b.id == id).unwrap().flaechen;
+    let u = bezirke(&w.pool, w.e).await.unwrap();
+    let flaechen = |id: i64| u.iter().find(|b| b.id == id).unwrap().flaechen;
     assert_eq!(flaechen(ufer), 2);
     assert_eq!(flaechen(hafen), 0);
     let v = serde_json::to_value(bezirk_laden(&w.pool, w.e, hafen).await.unwrap()).unwrap();

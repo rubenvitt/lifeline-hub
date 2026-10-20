@@ -11,6 +11,7 @@ import {
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
 import { ladeBetreuung } from '../../api/betreuung';
+import { ladeEvakuierung } from '../../api/evakuierung';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
@@ -60,6 +61,8 @@ export const QUELLE_BETROFFENE = 'Betroffene';
 const PERSONEN_MODUL = modulRegistry.find((m) => m.key === 'personen');
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Ebene „Betreuungsstellen". */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
+/** Registry-Eintrag des Moduls „Evakuierung" (LLH-1034) — Grenze der Bezirksangaben an Flächen. */
+const EVAKUIERUNG_MODUL = modulRegistry.find((m) => m.key === 'evakuierung');
 /** Leere Personenliste mit fester Identität: ohne Modul oder vor dem Abruf. */
 const LEER_PERSONEN: readonly Person[] = [];
 
@@ -246,6 +249,25 @@ export function useLagekarteDaten({
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
   const betreuungFehler = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
+  // Evakuierungsbezirke (LLH-1034, eigenes Modul): dieselbe Grenze, eigenes Fach
+  // (`einsatzKeys.evakuierung`, live über das `evakuierung`-Event). Keine eigene Ebene: die Bezirke
+  // beschriften die Bezirksflächen und füllen den Zonen-Inspector.
+  const evakuierungVorab = betreuungZugriffVon({
+    modul: EVAKUIERUNG_MODUL,
+    freigaben,
+    abgelehnt: false,
+  });
+  const evakuierungQuery = useQuery({
+    queryKey: einsatzKeys.evakuierung(einsatzId),
+    queryFn: () => ladeEvakuierung(einsatzId),
+    enabled: liveAn && evakuierungVorab === 'frei',
+  });
+  const evakuierungZugriff = betreuungZugriffVon({
+    modul: EVAKUIERUNG_MODUL,
+    freigaben,
+    abgelehnt: evakuierungQuery.error instanceof ApiError && evakuierungQuery.error.status === 403,
+  });
+  const evakuierungFehler = liveAn && evakuierungZugriff === 'frei' && evakuierungQuery.isError;
   // Ebene „Bereitstellungsräume" (LLH-1107): dieselbe Grenze wie bei den Betreuungsstellen. Das
   // Fach ist die Liste der Modulseite (`einsatzKeys.br`, mit Belegung), live invalidiert vom
   // `bereitstellungsraum`-Event, das nur Leser mit Modulrecht bekommen. Im Historien-Modus kommen
@@ -319,16 +341,16 @@ export function useLagekarteDaten({
         : betreuungQuery.isError
           ? undefined
           : betreuungQuery.data?.stellen;
-  // Bezirke hinter derselben Grenze: Bezeichnung und Räumungszustand beschriften die
-  // Bezirksflächen, die jeder Karten-Leser sieht.
+  // Bezirke hinter der Grenze des Moduls Evakuierung: Bezeichnung und Räumungszustand beschriften
+  // die Bezirksflächen, die jeder Karten-Leser sieht.
   const bezirkeRoh =
-    betreuungZugriff !== 'frei'
+    evakuierungZugriff !== 'frei'
       ? undefined
       : istSnapshot
         ? snap?.evakuierungsbezirke
-        : betreuungQuery.isError
+        : evakuierungQuery.isError
           ? undefined
-          : betreuungQuery.data?.bezirke;
+          : evakuierungQuery.data?.bezirke;
   // Räume hinter derselben Grenze wie die Stellen.
   const raeumeRoh =
     brZugriff !== 'frei'
@@ -516,6 +538,8 @@ export function useLagekarteDaten({
       // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS, ihr Ausfall ist ein
       // Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
       ['Betreuungsstellen', betreuungFehler],
+      // Ohne Bezirke stünden die Bezirksflächen ohne Namen und Räumung da (LLH-1034).
+      ['Evakuierungsbezirke', evakuierungFehler],
       // Räume ebenso (LLH-1107); ein 403 ist kein Ausfall (`brFehler`).
       ['Bereitstellungsräume', brFehler],
       [QUELLE_BETROFFENE, personenFehler],
@@ -545,6 +569,7 @@ export function useLagekarteDaten({
     lageMeldungenQuery.isError,
     fkQuery.isError,
     betreuungFehler,
+    evakuierungFehler,
     brFehler,
     personenFehler,
   ]);
@@ -573,6 +598,7 @@ export function useLagekarteDaten({
     // wiederholt.
     if (personenFehler) void personenQuery.refetch();
     if (betreuungFehler) void betreuungQuery.refetch();
+    if (evakuierungFehler) void evakuierungQuery.refetch();
     if (brFehler) void brQuery.refetch();
   };
 
@@ -687,6 +713,8 @@ export function useLagekarteDaten({
     gebiete: gebieteRoh ?? [],
     // Evakuierungsbezirke für den Zonen-Inspector — leer ohne Modulrecht.
     bezirke: bezirkeRoh ?? [],
+    // Modul Evakuierung frei? Der Inspector bietet Zuordnung und Sprung nur dann an (LLH-1034).
+    evakuierungZugriff,
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup.
     freieZeichen,
     // Rohlisten für das Datenraster im Paneel „Ausgewählt": die Marker tragen nur Name/Ort/Zeichen,

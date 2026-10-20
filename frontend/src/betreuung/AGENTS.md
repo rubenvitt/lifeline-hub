@@ -1,15 +1,27 @@
 # Betreuung und Verpflegung — Regeln
 
-Gilt für `frontend/src/betreuung/`, `frontend/src/verpflegung/`, `pages/VerpflegungPage.tsx`
-und die Server-Gegenstücke `src/betreuung/`, `src/verpflegung/`; ergänzt `frontend/AGENTS.md`.
-Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
+Gilt für `frontend/src/betreuung/`, `frontend/src/verpflegung/`, `pages/BetreuungPage.tsx`,
+`pages/EvakuierungPage.tsx`, `pages/VerpflegungPage.tsx` und die Server-Gegenstücke
+`src/betreuung/`, `src/routes/betreuung.rs`, `src/routes/evakuierung.rs`, `src/verpflegung/`;
+ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
+
+- **Zwei Module** (LLH-1034, Spec `betreuung-evakuierung`): `evakuierung` (Räumungsbezirke,
+  Stand evakuiert) und `betreuung` (Stellen, Belegung) sind getrennte Module mit eigenem Recht,
+  eigener Route (`…/evakuierung/bezirke/…` bzw. `…/betreuung/stellen/…`), eigenem Lese-Endpunkt,
+  Live-Ereignis, Query-Prefix und Zähler. Fachcode und Tabellen bleiben gemeinsam in
+  `src/betreuung/`. Die Lagekennzahl „Evakuiert“, die Bezirksflächen der Lagekarte und jeder
+  `?bezirk=`-Sprung hängen an `evakuierung`; `…/betreuung?bezirk=` leitet um (`BetreuungPage`).
+  Das Gerät „Betreuungsstelle“ bleibt auf `betreuung` und sieht keine Bezirke. Handlungen an
+  Bezirken nur über `useBezirkHandlungen` (eine Wahrheit für Toasts, Offline, Rückweg).
+  Vorgemerkte Standmeldungen tragen keine URL; ein Umzug der Route braucht keine Queue-Migration
+  (`offline/standReplay.test.tsx`).
 
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
   (`person_verbleib.betreuungsstelle_id`, Cache
   `einsatz_person.aktuelle_verbleib_betreuungsstelle_id`), den Namen belegt der Client vor; der Server kopiert
   keinen Stellennamen (Ziel, Kurzform, ETB). Prüfkette 422 → 403 (vor jedem Lesen) → 404 → 409.
-  „davon namentlich n" rechnet `…/betreuung`, nicht `repo::uebersicht`; ohne Personenrecht fehlt
+  „davon namentlich n" rechnet `…/betreuung`, nicht `repo::stellen`; ohne Personenrecht fehlt
   es. Live über `EINSATZ_STREAM_EVENTS.person → betreuung`. `betreuungsstelle` ist kein Leaf
   (Rebuild braucht den FK-Schalter).
 - **Meldeverlauf** (LFH-676, `openspec/changes/archive/2026-09-29-lfh-676-betreuung-meldeverlauf/design.md`):

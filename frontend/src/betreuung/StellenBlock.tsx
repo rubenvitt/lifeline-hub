@@ -26,7 +26,7 @@ import {
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
- * Block „Betreuungsstellen" der Betreuungsseite.
+ * Block „Betreuungsstellen" der Betreuungsseite (seit LLH-1034 ihr einziger Block).
  *
  * Tabelle in JEDER Breite — hier wird verglichen („welche Stelle hat noch Platz?"). Fixierte
  * Kennung ist die Bezeichnung, nie die DB-`id`.
@@ -306,7 +306,8 @@ export default function StellenBlock({
   /** Per Deeplink angesteuerte Stelle (`?stelle=`). */
   hervorgehoben: number | null;
   dataUpdatedAt?: number;
-  onAnlegen: () => void;
+  /** Ohne: kein Anlegen-Knopf im Blockkopf (die Seite trägt ihn als Primäraktion, LLH-1034). */
+  onAnlegen?: () => void;
   onBelegungMelden: (s: Betreuungsstelle) => void;
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
 }) {
@@ -364,7 +365,7 @@ export default function StellenBlock({
   const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
   const ohne = stellen.length - gemeldet.length;
   // Hat keine Stelle gemeldet, ist die Summe 0 nur „nichts gemeldet", nicht „niemand in
-  // Betreuung" — dasselbe Wort wie im Evakuierungsblock.
+  // Betreuung" — dasselbe Wort wie bei den Bezirken der Evakuierung.
   const kopfzahl = gemeldet.length === 0 ? 'keine Meldung' : `${personenZahl(summe)} untergebracht`;
 
   return (
@@ -378,12 +379,13 @@ export default function StellenBlock({
             : `${kopfzahl}${volleStellenSegment(stellen)}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
         }
         dataUpdatedAt={dataUpdatedAt}
-        // Sekundär und im Block: die EINE Primäraktion der Seite ist „Evakuierungsbezirk anlegen".
         // Gesperrt statt versteckt; der Grund steht im Hinweis über der Seite.
         aktion={
-          <Button disabled={!darfSchreiben} onClick={onAnlegen}>
-            Betreuungsstelle anlegen
-          </Button>
+          onAnlegen ? (
+            <Button disabled={!darfSchreiben} onClick={onAnlegen}>
+              Betreuungsstelle anlegen
+            </Button>
+          ) : undefined
         }
       />
       <Datensicht

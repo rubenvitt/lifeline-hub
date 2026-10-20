@@ -273,7 +273,7 @@ export function vermisstNotiz(vermisst: number, lang: number): string {
 /**
  * Was die Seite über die Evakuierung weiß. Vier Fälle, weil der Abruf am Modulrecht hängt:
  * - `laden` / `fehler` — Zustand ihrer Abfrage; „····" bzw. „?".
- * - `kein-zugriff` — Betreuung ist ausgeblendet oder gesperrt, es wird nicht abgerufen. Die Zelle
+ * - `kein-zugriff` — Evakuierung ist ausgeblendet oder gesperrt, es wird nicht abgerufen. Die Zelle
  *   bleibt auf ihrem Platz (Kriterium 9) und nennt den Grund statt einer Zahl.
  * - `daten` — die Kennzahl, oder `null`, wenn kein aktiver Bezirk da ist, der (nicht live
  *   gehaltene) Einsatz den Auslöser aber noch trägt.
@@ -313,7 +313,7 @@ function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
     case 'fehler':
       return { wert: '', notiz: '' };
     case 'kein-zugriff':
-      return { wert: '—', notiz: 'Modul Betreuung nicht freigegeben' };
+      return { wert: '—', notiz: 'Modul Evakuierung nicht freigegeben' };
     case 'daten': {
       if (e.kennzahl == null) return { wert: '—', notiz: 'keine geplante Evakuierung' };
       // Formatierung wie der Blockkopf der Modulseite (`betreuungText.ts`). Ohne Meldung „—" statt
@@ -346,7 +346,7 @@ export interface Rohdaten {
   /** Stand der Evakuierungskennzahl, siehe {@link evakuierungStand}. */
   evakuierung: EvakuierungStand;
   /**
-   * Ziel der Zelle „Evakuiert": die Modulseite Betreuung, nur wenn feststeht, dass sie frei ist.
+   * Ziel der Zelle „Evakuiert": die Modulseite Evakuierung, nur wenn feststeht, dass sie frei ist.
    * Ohne Angabe führt die Zelle nirgends hin, auch beim Laden.
    */
   evakuierungZiel?: string;
@@ -435,7 +435,7 @@ export function baueLagebild(
       etikett: 'Evakuiert',
       ...evakuiertZelle(r.evakuierung),
       ton: 'neutral',
-      route: 'betreuung',
+      route: 'evakuierung',
       zielPfad: r.evakuierungZiel,
       ohneZiel: r.evakuierungZiel == null,
     },

@@ -503,6 +503,8 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("auftraege", "auftraege"),
     ("abloesung", "abloesungen"),
     ("betreuung", "betreuung"),
+    // LLH-1034: die Bezirke sind ein eigenes Modul.
+    ("evakuierung", "evakuierung"),
     ("verpflegung", "verpflegung"),
     ("meldungen", "meldungen"),
     ("nachforderungen", "nachforderungen"),

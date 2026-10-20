@@ -107,11 +107,7 @@ const KARTEN_EIGENBAU: string[] = [];
 /**
  * Dateien, die `form="karte"` tragen MÜSSEN: Module, die kartenbasiert gelesen werden.
  */
-const NUR_KARTE: string[] = [
-  // Ein Evakuierungsbezirk wird GELESEN („was ist mit diesem Bezirk?“), nicht verglichen.
-  '/src/betreuung/EvakuierungBlock.tsx',
-  '/src/pages/LageberichtePage.tsx',
-];
+const NUR_KARTE: string[] = ['/src/pages/LageberichtePage.tsx'];
 
 /**
  * Dateien, die `form="tabelle"` tragen MÜSSEN: Vergleichsflächen (Kriterium 14). Die Listen sind
@@ -121,6 +117,9 @@ const NUR_KARTE: string[] = [
 const NUR_TABELLE: string[] = [
   // Aufbewahrungsübersicht, Vergleichsfläche in jeder Breite.
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
+  // Evakuierungsbezirke werden seit LLH-1034 VERGLICHEN („wo läuft die Räumung, wo fehlt ein
+  // Stand?“), Tabelle in jeder Breite; das Lesen eines Bezirks übernimmt seine Detailseite.
+  '/src/betreuung/BezirkTabelle.tsx',
   // Betreuungsstellen werden VERGLICHEN („welche hat noch Platz?“), Tabelle in jeder Breite.
   '/src/betreuung/StellenBlock.tsx',
   // Die Einheiten-Gliederung (LLH-1029): „welche Einheit?“ ist ein Vergleich über Ist und Soll,
@@ -169,9 +168,9 @@ const REITERSCHLUESSEL_OFFEN: string[] = [];
 const KONSUMENTEN = [
   // Die Aufbewahrungsübersicht: verglichen wird („welcher Einsatz läuft als nächstes ab?“).
   '/src/aufbewahrung/AufbewahrungUebersicht.tsx',
-  // Die Betreuungsseite trägt ZWEI Sichten in zwei Dateien (Bezirke als Karten, Stellen als
-  // Tabelle), je mit eigener Formbegründung und eigenem Spaltenregister.
-  '/src/betreuung/EvakuierungBlock.tsx',
+  // Evakuierung und Betreuung (seit LLH-1034 zwei Seiten): Bezirke und Stellen je als Tabelle mit
+  // eigenem Spaltenregister.
+  '/src/betreuung/BezirkTabelle.tsx',
   '/src/betreuung/StellenBlock.tsx',
   // Die Betroffenen einer Betreuungsstelle (LFH-1041): Register der eigenen Stelle.
   '/src/geraet/GeraetBetroffenePage.tsx',
@@ -713,11 +712,11 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Zwei Kartenmodule (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`), sechs
-    // Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
-    // umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(2);
-    expect(NUR_TABELLE).toHaveLength(6);
+    // Ein Kartenmodul (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`, die Bezirke seit
+    // LLH-1034 als Tabelle), sieben Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am
+    // Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(1);
+    expect(NUR_TABELLE).toHaveLength(7);
     // Zwei PFLICHTEN, dateibezogen: Meldebild und Einheiten-Gliederung (beide kumulieren über den
     // Kräftebaum). Ein weiterer Eintrag braucht dieselbe Herleitung.
     expect(VOLLMENGE_PFLICHT).toHaveLength(2);

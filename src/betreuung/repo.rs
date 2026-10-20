@@ -295,13 +295,14 @@ impl TryFrom<StelleZeile> for BetreuungsstelleAnzeige {
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
 
-/// Alle nicht stornierten Bezirke und Stellen des Einsatzes in Anlagereihenfolge, je mit
-/// aktueller Meldung (über den Zeiger gejoint) und Abschnittsname.
-pub async fn uebersicht(
+/// Alle nicht stornierten Bezirke des Einsatzes in Anlagereihenfolge, je mit aktueller Meldung
+/// (über den Zeiger gejoint) und Abschnittsname. Lesequelle des Moduls Evakuierung (LLH-1034)
+/// und des gesicherten Lagestands.
+pub async fn bezirke(
     pool: &SqlitePool,
     einsatz_id: i64,
-) -> Result<BetreuungUebersicht, AppError> {
-    let bezirke = sqlx::query_as::<_, BezirkZeile>(concat!(
+) -> Result<Vec<EvakuierungsbezirkAnzeige>, AppError> {
+    sqlx::query_as::<_, BezirkZeile>(concat!(
         bezirk_select!(),
         "WHERE b.einsatz_id = ? AND b.storniert_at IS NULL ORDER BY b.id"
     ))
@@ -310,8 +311,17 @@ pub async fn uebersicht(
     .await?
     .into_iter()
     .map(EvakuierungsbezirkAnzeige::try_from)
-    .collect::<Result<Vec<_>, _>>()?;
-    let stellen = sqlx::query_as::<_, StelleZeile>(concat!(
+    .collect()
+}
+
+/// Alle nicht stornierten Stellen des Einsatzes in Anlagereihenfolge, je mit aktueller Meldung
+/// (über den Zeiger gejoint) und Abschnittsname. Lesequelle des Moduls Betreuung und des
+/// gesicherten Lagestands.
+pub async fn stellen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<BetreuungsstelleAnzeige>, AppError> {
+    sqlx::query_as::<_, StelleZeile>(concat!(
         stelle_select!(),
         "WHERE s.einsatz_id = ? AND s.storniert_at IS NULL ORDER BY s.id"
     ))
@@ -320,10 +330,16 @@ pub async fn uebersicht(
     .await?
     .into_iter()
     .map(BetreuungsstelleAnzeige::try_from)
-    .collect::<Result<Vec<_>, _>>()?;
+    .collect()
+}
+
+/// Die Übersicht des Moduls Betreuung: [`stellen`], `namentlich` noch leer.
+pub async fn uebersicht(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<BetreuungUebersicht, AppError> {
     Ok(BetreuungUebersicht {
-        bezirke,
-        stellen,
+        stellen: stellen(pool, einsatz_id).await?,
         // Personenbezogene Zahl: setzt nur die Route, nach Prüfung des Personenrechts.
         namentlich: None,
     })

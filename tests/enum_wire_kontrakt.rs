@@ -1275,6 +1275,7 @@ fn live_event_wire() {
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",
+        Evakuierung => "evakuierung",
         Verpflegung => "verpflegung",
         Presse => "presse",
         Infotelefon => "infotelefon",

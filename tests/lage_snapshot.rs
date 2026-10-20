@@ -528,7 +528,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/betreuung/bezirke"),
+        &format!("/api/einsaetze/{e}/evakuierung/bezirke"),
         &admin,
         Some(r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt"}"#),
     )
@@ -544,7 +544,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
         "Uferstraße 12–40"
     );
 
-    // Ein Leser ohne Modul Betreuung bekommt beide Felder leer.
+    // Seit LLH-1034 zwei Module: ohne Betreuung fehlen nur die Stellen, die Bezirke bleiben.
     let leser_id = benutzer_anlegen(&app, &admin, "leser2", "keine").await;
     rolle_setzen(&app, &admin, e, leser_id, "beobachter").await;
     let leser = login_cookie(&app, "leser2", "leser2pw1").await;
@@ -567,6 +567,24 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
             .is_empty(),
         "{dok}"
     );
+    assert_eq!(
+        dok["daten"]["evakuierungsbezirke"][0]["bezeichnung"], "Uferstraße 12–40",
+        "{dok}"
+    );
+    assert!(!dok.to_string().contains("Turnhalle"), "{dok}");
+
+    // Ohne Evakuierung fehlen auch die Bezirke.
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/evakuierung"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
     assert!(
         dok["daten"]["evakuierungsbezirke"]
             .as_array()
