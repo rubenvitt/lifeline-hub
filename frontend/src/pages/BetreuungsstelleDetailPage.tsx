@@ -38,6 +38,7 @@ import {
   type StelleWerte,
 } from '../betreuung/BetreuungDialoge';
 import MeldeVerlauf from '../betreuung/MeldeVerlauf';
+import StelleBedarf from '../betreuung/StelleBedarf';
 import StelleBelegung from '../betreuung/StelleBelegung';
 import StelleBetroffene from '../betreuung/StelleBetroffene';
 import { GESCHLOSSEN_HINWEIS } from '../betreuung/StellenBlock';
@@ -64,7 +65,7 @@ import { useSpeicherLeiste } from '../components/speicherLeiste';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { KEINE_BERECHTIGUNG, modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { useModulFreigaben, useSprungSperre } from '../einsatz/useSprungSperre';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import { betreuungPfad, lagekartePfad, parseRouteId, verpflegungPfad } from '../routing/deeplinks';
@@ -105,7 +106,8 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
 
 /**
  * Detailseite einer Betreuungsstelle (LLH-1044, Spec `betreuung-evakuierung`): Belegung in
- * Zahlen, Stammdaten, Meldeverlauf, Betroffene hier und Verpflegung auf einer Seite.
+ * Zahlen, Bedarf (LLH-1082), Stammdaten, Meldeverlauf, Betroffene hier und Verpflegung auf einer
+ * Seite.
  *
  * Die Stelle kommt aus `GET …/betreuung` (derselbe Cache wie Übersicht und Gerät, live über das
  * `betreuung`-Ereignis); es gibt keinen Einzel-Endpunkt. Eine unbekannte, fremde oder stornierte
@@ -129,6 +131,7 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
   const { message } = App.useApp();
   const qc = useQueryClient();
   const gesperrt = useSprungSperre(einsatzId);
+  const freigaben = useModulFreigaben(einsatzId);
   const [form] = Form.useForm<StelleWerte>();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [sitzung, setSitzung] = useState<Sitzung | null>(null);
@@ -482,6 +485,13 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
       <Space orientation="vertical" size="large" style={{ width: '100%' }}>
         {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
         <StelleBelegung stelle={s} namentlich={namentlich} />
+        {/* Was die Stelle braucht, direkt unter dem, was sie hat (LLH-1082). */}
+        <StelleBedarf
+          einsatzId={einsatzId}
+          stelleId={s.id}
+          freigaben={freigaben}
+          darfSchreiben={darfSchreiben}
+        />
 
         <Paneel
           titel="Stelle"

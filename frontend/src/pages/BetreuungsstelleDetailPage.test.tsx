@@ -107,6 +107,7 @@ function renderPage(pfad = '/einsaetze/1/betreuung/8') {
       { path: '/einsaetze/:id/lagekarte', element: <Sonde name="lagekarte" /> },
       { path: '/einsaetze/:id/verpflegung', element: <Sonde name="verpflegung" /> },
       { path: '/einsaetze/:id/personen/:pid', element: <Sonde name="person" /> },
+      { path: '/einsaetze/:id/nachforderungen', element: <Sonde name="nachforderungen" /> },
     ],
     { initialEntries: [pfad] },
   );
@@ -350,6 +351,63 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     expect(await screen.findByText('Betroffene hier · Keine Berechtigung')).toBeInTheDocument();
     expect(screen.queryByText('Davon namentlich')).toBeNull();
     expect(personenAnfragen).toHaveLength(0);
+  });
+
+  it('Bedarf (LLH-1082): offene Nachforderungen der Stelle, „Bedarf anfordern“ führt in die Erfassung mit Bezug', async () => {
+    freigaben.wert = freigabenFixture();
+    server.use(
+      http.get('/api/einsaetze/1/nachforderungen', () =>
+        HttpResponse.json([
+          {
+            id: 21,
+            einsatz_id: 1,
+            art: 'Feldbetten',
+            bezeichnung: 'Feldbetten für die Nacht',
+            anzahl: 40,
+            adressat_kategorie: 'leitstelle',
+            prioritaet: 'normal',
+            status: 'zugesagt',
+            angefordert_at: '2026-09-23 09:00:00',
+            erstellt_von_id: 1,
+            erstellt_at: '2026-09-23 09:00:00',
+            ist_offen: true,
+            material_ids: [],
+            betreuungsstelle_id: 8,
+          },
+          {
+            id: 22,
+            einsatz_id: 1,
+            art: 'Decken',
+            bezeichnung: 'Decken für das Weserstadion',
+            adressat_kategorie: 'leitstelle',
+            prioritaet: 'normal',
+            status: 'angefordert',
+            angefordert_at: '2026-09-23 09:00:00',
+            erstellt_von_id: 1,
+            erstellt_at: '2026-09-23 09:00:00',
+            ist_offen: true,
+            material_ids: [],
+            betreuungsstelle_id: 9,
+          },
+        ]),
+      ),
+    );
+    renderPage();
+    const paneel = await screen.findByRole('region', { name: 'Bedarf' });
+    expect(await within(paneel).findByRole('link', { name: '40× Feldbetten' })).toBeInTheDocument();
+    expect(within(paneel).getByText('Zugesagt')).toBeInTheDocument();
+    expect(within(paneel).queryByText(/Decken/)).toBeNull();
+    await userEvent.click(within(paneel).getByRole('link', { name: /Bedarf anfordern/ }));
+    expect(await screen.findByTestId('ziel-nachforderungen')).toHaveTextContent(
+      '/einsaetze/1/nachforderungen?neu=1&betreuungsstelle=8&stelle=8',
+    );
+  });
+
+  it('Bedarf ohne Freigabe Nachforderungen: der Grund steht als Zeile', async () => {
+    freigaben.wert = freigabenFixture({ nachforderungen: { zugriff: false } });
+    renderPage();
+    expect(await screen.findByText('Bedarf · Keine Berechtigung')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Bedarf' })).toBeNull();
   });
 
   it('Verpflegung: Anteil an „in Betreuung“ und Sprung ins Modul', async () => {

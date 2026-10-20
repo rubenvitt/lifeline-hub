@@ -193,3 +193,38 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
     expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
   });
 });
+
+/** LLH-1082 (design.md D7): der Stellenbezug steht als Zeile mit Sprung auf die Stelle. */
+describe('NachforderungKarte — Stellenbezug (LLH-1082)', () => {
+  const stellen = new Map([[8, { name: 'Turnhalle Ost', pfad: '/einsaetze/1/betreuung/8' }]]);
+
+  it('„Für Betreuungsstelle Turnhalle Ost ↗“ führt auf die Stelle', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({ betreuungsstelle_id: 8 })}
+        ansicht="offen"
+        stellenJeId={stellen}
+      />,
+    );
+    expect(screen.getByText(/Für Betreuungsstelle/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Turnhalle Ost/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/betreuung/8',
+    );
+  });
+
+  it('unbekannte Stelle (Betreuung nicht freigegeben): ohne Namen und Sprung', () => {
+    renderMitProviders(
+      <NachforderungKarte nachforderung={nf({ betreuungsstelle_id: 9 })} ansicht="offen" />,
+    );
+    expect(screen.getByText('Für eine Betreuungsstelle')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Betreuungsstelle/ })).toBeNull();
+  });
+
+  it('ohne Bezug keine Zeile', () => {
+    renderMitProviders(
+      <NachforderungKarte nachforderung={nf()} ansicht="offen" stellenJeId={stellen} />,
+    );
+    expect(screen.queryByText(/Betreuungsstelle/)).toBeNull();
+  });
+});

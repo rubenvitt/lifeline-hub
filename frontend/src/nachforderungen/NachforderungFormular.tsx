@@ -1,4 +1,4 @@
-import { AutoComplete, Col, Form, Input, InputNumber, Row } from 'antd';
+import { AutoComplete, Col, Form, Input, InputNumber, Row, Typography } from 'antd';
 import {
   ETB_PARTEI_MAX,
   NACHFORDERUNG_ART_MAX,
@@ -17,6 +17,7 @@ import {
   zustaendigeLeitstelle,
 } from '../stammdaten/externeStellenVorschlaege';
 import { teilwortSuche } from '../components/teilwortSuche';
+import { KennungsLink } from '../components/kennungsLink';
 
 const { TextArea } = Input;
 
@@ -39,6 +40,23 @@ interface FormWerte {
 }
 
 /**
+ * Stellenbezug einer neuen Nachforderung (LLH-1082, design.md D7): die Betreuungsstelle, für die
+ * angefordert wird. `name` und `pfad` liest die Seite aus der Betreuungsübersicht; ohne sie steht
+ * „Für eine Betreuungsstelle“, gesendet wird die Kennung trotzdem (der Server prüft sie).
+ */
+export interface NachforderungBezug {
+  betreuungsstelleId: number;
+  name?: string;
+  /** Sprung auf die Seite der Stelle (der Weg zurück). */
+  pfad?: string;
+}
+
+/** Vorbelegte Begründung eines Stellenbezugs; leer, solange der Name fehlt. */
+export function bezugBegruendung(bezug: NachforderungBezug | null | undefined): string {
+  return bezug?.name ? `Für Betreuungsstelle ${bezug.name}` : '';
+}
+
+/**
  * Wiederholfelder einer Serie: meist mehreres bei DERSELBEN Stelle; Art und Bezeichnung
  * wechseln und werden geleert.
  */
@@ -53,6 +71,7 @@ export default function NachforderungFormular({
   onAnlegen,
   card = true,
   vorbelegung,
+  bezug,
   speicherung,
 }: {
   senden: boolean;
@@ -70,6 +89,13 @@ export default function NachforderungFormular({
    * Druck vor der Dublette. `setFieldsValue` beim Öffnen ist Vorbelegen, kein Reset.
    */
   vorbelegung?: NachforderungVorbelegung | null;
+  /**
+   * Stellenbezug (LLH-1082): steht über den Feldern, geht als `betreuungsstelle_id` mit und belegt
+   * die Begründung „Für Betreuungsstelle …“ vor. Über die Startwerte, anders als die
+   * `vorbelegung`: in einer Serie für dieselbe Stelle (Feldbetten, Decken, …) steht sie nach jedem
+   * Absetzen wieder da; Art und Bezeichnung bleiben leer, eine Dublette entsteht so nicht.
+   */
+  bezug?: NachforderungBezug | null;
   /**
    * Die Anlege-Mutation: ihr Fehler steht im Formular bis zum nächsten Absetzen; Einhängen und
    * Abbrechen räumen ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
@@ -108,6 +134,16 @@ export default function NachforderungFormular({
     });
   }, [form, vorbelegung]);
 
+  // Der Name der Stelle kommt mit der Betreuungsübersicht, oft nach dem Einhängen: dann vorbelegen,
+  // solange die Begründung leer und unberührt ist. Den Reset nach dem Absetzen decken die
+  // Startwerte ab.
+  const begruendungVorgabe = bezugBegruendung(bezug);
+  useEffect(() => {
+    if (!begruendungVorgabe) return;
+    if (form.getFieldValue('begruendung') || form.isFieldTouched('begruendung')) return;
+    form.setFieldValue('begruendung', begruendungVorgabe);
+  }, [form, begruendungVorgabe]);
+
   // Das `return` ist tragend: die Hülle wartet auf diese Zusage.
   const absenden = (w: FormWerte) => {
     return onAnlegen({
@@ -118,6 +154,7 @@ export default function NachforderungFormular({
       adressat_bezeichnung: w.adressatBezeichnung?.trim() || undefined,
       begruendung: w.begruendung?.trim() || undefined,
       prioritaet: w.prioritaet,
+      betreuungsstelle_id: bezug?.betreuungsstelleId,
     });
   };
 
@@ -131,7 +168,7 @@ export default function NachforderungFormular({
         adressatKategorie: 'leitstelle',
         adressatBezeichnung: vorgabeLeitstelle,
         prioritaet: 'normal',
-        begruendung: '',
+        begruendung: begruendungVorgabe,
       }}
       onErfassen={absenden}
       // Das Inline-Formular schließt nach dem Absetzen NICHT — Zuklappen ist ausdrückliche Nutzeraktion.
@@ -144,6 +181,26 @@ export default function NachforderungFormular({
       serie
       uebernahme={UEBERNAHME}
     >
+      {bezug && (
+        // Der Bezug ist keine Eingabe: er steht fest, solange die Erfassung offen ist. Der Name ist
+        // der Weg zurück auf die Stelle.
+        <Typography.Paragraph data-lfh="nachforderung-bezug" style={{ marginBottom: 12 }}>
+          {bezug.name ? (
+            <>
+              Für Betreuungsstelle{' '}
+              {bezug.pfad ? (
+                <KennungsLink to={bezug.pfad}>
+                  {bezug.name} <span aria-hidden="true">↗</span>
+                </KennungsLink>
+              ) : (
+                <strong>{bezug.name}</strong>
+              )}
+            </>
+          ) : (
+            'Für eine Betreuungsstelle'
+          )}
+        </Typography.Paragraph>
+      )}
       <Row gutter={16}>
         <Col xs={24} sm={16}>
           <Form.Item

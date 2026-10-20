@@ -831,20 +831,50 @@ export interface NachforderungVorbelegung {
  * und hängt `art`, `bezeichnung`, `anzahl` und `begruendung` kodiert an. `?nachforderung=<id>`
  * steuert eine Nachforderung an: die Seite wählt ihre Ansicht und hebt die Karte hervor (LLH-1226
  * D10, Sprung aus der Materialzeile). Die Seite räumt alles nach dem Lesen.
+ *
+ * Stellenbezug (LLH-1082, design.md D7): `bezugStelle` setzt `neu=1` und
+ * `?betreuungsstelle=<id>` — ein Auftrag, die neue Nachforderung für diese Betreuungsstelle
+ * anzufordern; die Seite räumt ihn wie die Vorbelegung. `stelle` setzt `?stelle=<id>`, den
+ * Filter „für Stelle“: Zustand, er bleibt in der Adresse.
  */
 export function nachforderungenPfad(
   einsatzId: number,
-  opts: { neu?: boolean; vorbelegung?: NachforderungVorbelegung; nachforderung?: number } = {},
+  opts: {
+    neu?: boolean;
+    vorbelegung?: NachforderungVorbelegung;
+    nachforderung?: number;
+    bezugStelle?: number;
+    stelle?: number;
+  } = {},
 ): string {
   const v = opts.vorbelegung;
   return mitQuery(einsatzModulPfad(einsatzId, 'nachforderungen'), {
     nachforderung: opts.nachforderung,
-    neu: opts.neu || v ? 1 : undefined,
+    neu: opts.neu || v || opts.bezugStelle != null ? 1 : undefined,
     art: v?.art,
     bezeichnung: v?.bezeichnung,
     anzahl: v?.anzahl,
     begruendung: v?.begruendung,
+    betreuungsstelle: opts.bezugStelle,
+    stelle: opts.stelle,
   });
+}
+
+/** Der Query-Schlüssel des Stellenbezugs einer neuen Nachforderung (LLH-1082) — die Seite räumt ihn. */
+export const NACHFORDERUNG_BEZUG_PARAM = 'betreuungsstelle';
+
+/**
+ * Liest den Stellenbezug einer neuen Nachforderung aus `?betreuungsstelle=<id>` (LLH-1082). Nur
+ * eine positive Ganzzahl gilt, sonst kein Bezug: die Nachforderung entsteht dann einsatzweit, und
+ * der Server prüft die Stelle ohnehin (404/409).
+ */
+export function parseNachforderungBezug(params: URLSearchParams): number | null {
+  return parseRouteId(params.get(NACHFORDERUNG_BEZUG_PARAM) ?? undefined);
+}
+
+/** Liest den Filter „für Stelle“ aus `?stelle=<id>` (LLH-1082); Unlesbares heißt kein Filter. */
+export function parseNachforderungStelle(params: URLSearchParams): number | null {
+  return parseRouteId(params.get('stelle') ?? undefined);
 }
 
 /** Die Query-Schlüssel der Vorbelegung — die Seite räumt genau diese (plus `neu`). */
