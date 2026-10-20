@@ -43,6 +43,27 @@ describe('KlappPaneel', () => {
     );
     expect(screen.getByRole('heading', { level: 2, name: 'Einsatzort' })).toBeInTheDocument();
   });
+
+  it('Untergruppe: Überschrift der dritten Ebene, Zusatz als eigenes Ziel neben dem Kopf', () => {
+    renderMitProviders(
+      <KlappPaneel
+        titel="Wasser"
+        kennung="wasser"
+        ebene={3}
+        einzug
+        offen={false}
+        onUmschalten={() => {}}
+        zusatz={<button type="button">Zusatz</button>}
+      >
+        x
+      </KlappPaneel>,
+    );
+    const ueberschrift = screen.getByRole('heading', { level: 3, name: 'Wasser' });
+    const zusatz = screen.getByRole('button', { name: 'Zusatz' });
+    // Nicht im Klappknopf und nicht in der Überschrift: ein Ziel im Ziel wäre keins.
+    expect(ueberschrift).not.toContainElement(zusatz);
+    expect(screen.getByRole('button', { name: 'Wasser' })).not.toContainElement(zusatz);
+  });
 });
 
 describe('klappKopfStil', () => {
@@ -66,9 +87,14 @@ describe('paneeleLesen', () => {
   });
 
   it('übernimmt nur gültige Einträge bekannter Paneele', () => {
-    const z = paneeleLesen(JSON.stringify({ bilder: true, zeichnen: 'ja', fremd: true }));
-    expect(z.bilder).toBe(true);
+    const z = paneeleLesen(JSON.stringify({ verortet: false, zeichnen: 'ja', fremd: true }));
+    expect(z.verortet).toBe(false);
     expect(z.zeichnen).toBe(PANEEL_VORGABE.zeichnen);
     expect('fremd' in z).toBe(false);
+  });
+
+  it('übergeht Einträge der Paneele, die in den Ebenenbaum gezogen sind (LLH-1028)', () => {
+    const z = paneeleLesen(JSON.stringify({ bilder: true, fachebenen: true, ansicht: false }));
+    expect(z).toEqual(PANEEL_VORGABE);
   });
 });

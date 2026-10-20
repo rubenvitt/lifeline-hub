@@ -11,6 +11,7 @@ import type {
   Uhs,
 } from '../../api/types';
 import type { OnlineStyle } from '../../api/karte';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { Farbrollen } from '../../theme/tokens';
 import {
   auslastung,
@@ -213,6 +214,163 @@ function personenZeile(
 /** Zahl der verorteten Objekte für den Seitenkopf (ohne die Anker Einsatzort und Führungsstelle). */
 export function verortetAnzahl(verortet: readonly Pick<KarteMarker, 'typ'>[]): number {
   return verortet.filter((m) => m.typ !== 'einsatzort' && m.typ !== 'fuehrungsstelle').length;
+}
+
+// ── Ebenenbaum ──
+
+/** Kennungen der Gruppen eigener Ebenen. */
+export type EbenenGruppeKennung = 'kraefte' | 'lage' | 'betroffene';
+
+/**
+ * Gruppen der eigenen Ebenen im Ebenenbaum, Reihenfolge des Entwurfs (Zielgliederung der Leiste):
+ * Kräfte, Lage, Betroffene & Versorgung. Jede Ebene steht in genau einer Gruppe (Vitest-Wächter).
+ */
+export const EBENEN_GRUPPEN: readonly {
+  kennung: EbenenGruppeKennung;
+  name: string;
+  ebenen: readonly (keyof LayerSichtbar)[];
+}[] = [
+  {
+    kennung: 'kraefte',
+    name: 'Kräfte',
+    ebenen: ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt', 'bereitstellungsraum'],
+  },
+  {
+    kennung: 'lage',
+    name: 'Lage',
+    ebenen: ['einsatzort', 'fuehrungsstelle', 'zone', 'schaden', 'lagemeldung', 'freies_zeichen'],
+  },
+  {
+    kennung: 'betroffene',
+    name: 'Betroffene & Versorgung',
+    ebenen: ['person', 'uhs', 'betreuungsstelle'],
+  },
+];
+
+/** Kennungen der Fachebenen-Untergruppen. */
+export type FachebenenGruppeKennung = 'warnungen' | 'wasser' | 'umwelt' | 'verkehr';
+
+/** Untergruppen der Fachebenen — jede Quelle in genau einer (Vitest-Wächter). */
+export const FACHEBENEN_GRUPPEN: readonly {
+  kennung: FachebenenGruppeKennung;
+  name: string;
+  ebenen: readonly FachebeneQuelle[];
+}[] = [
+  { kennung: 'warnungen', name: 'Warnungen', ebenen: ['nina', 'dwd'] },
+  { kennung: 'wasser', name: 'Wasser', ebenen: ['pegelonline', 'hochwasser'] },
+  { kennung: 'umwelt', name: 'Umwelt', ebenen: ['luftqualitaet', 'odl'] },
+  {
+    kennung: 'verkehr',
+    name: 'Verkehr & Infrastruktur',
+    ebenen: ['autobahn', 'kritis', 'energie'],
+  },
+];
+
+export interface EbenenGruppe {
+  kennung: EbenenGruppeKennung;
+  name: string;
+  zeilen: EbenenZeile[];
+  /** Eingeschaltete Ebenen der Gruppe. */
+  an: number;
+  /** Alle Zeilen der Gruppe, gesperrte eingeschlossen (die sind nie an). */
+  gesamt: number;
+}
+
+/**
+ * Die Zeilen von {@link ebenenZeilen} je Gruppe. Eine ausgeblendete Ebene (ohne Modulzugriff) hat
+ * keine Zeile und fehlt deshalb auch hier; eine gesperrte zählt zu „gesamt“, nie zu „an“.
+ */
+export function ebenenGruppen(zeilen: readonly EbenenZeile[]): EbenenGruppe[] {
+  return EBENEN_GRUPPEN.map(({ kennung, name, ebenen }) => {
+    const inGruppe = ebenen.flatMap((key) => zeilen.filter((z) => z.key === key));
+    return {
+      kennung,
+      name,
+      zeilen: inGruppe,
+      an: inGruppe.filter((z) => z.sichtbar && !z.sperrgrund).length,
+      gesamt: inGruppe.length,
+    };
+  });
+}
+
+export type GruppenZustand = 'an' | 'aus' | 'teilweise';
+
+/**
+ * Zustand des Gruppenschalters über die frei zugänglichen Ebenen. Gesperrte zählen nicht — der
+ * Gruppenschalter schaltet sie nicht. `null`: keine schaltbare Ebene, also kein Schalter.
+ */
+export function gruppenZustand(
+  zeilen: readonly { sichtbar: boolean; sperrgrund?: string }[],
+): GruppenZustand | null {
+  const frei = zeilen.filter((z) => !z.sperrgrund);
+  if (frei.length === 0) return null;
+  const an = frei.filter((z) => z.sichtbar).length;
+  if (an === frei.length) return 'an';
+  return an === 0 ? 'aus' : 'teilweise';
+}
+
+/** Wohin der Gruppenschalter schaltet: aus und teilweise → alles an, an → alles aus. */
+export function gruppenZiel(zustand: GruppenZustand): boolean {
+  return zustand !== 'an';
+}
+
+/**
+ * Filter „Ebene suchen“: Treffer im Namen der Ebene oder im Namen einer umfassenden Gruppe (dann
+ * steht die ganze Gruppe). Ohne Groß-/Kleinschreibung, Leerraum am Rand zählt nicht.
+ */
+export function filtereGruppe<Z extends { name: string }>(
+  begriff: string,
+  gruppenNamen: readonly string[],
+  zeilen: readonly Z[],
+): Z[] {
+  const b = begriff.trim().toLocaleLowerCase('de');
+  if (!b) return [...zeilen];
+  if (gruppenNamen.some((n) => n.toLocaleLowerCase('de').includes(b))) return [...zeilen];
+  return zeilen.filter((z) => z.name.toLocaleLowerCase('de').includes(b));
+}
+
+/** Klappbare Knoten des Ebenenbaums: Gruppen, Fachebenen-Untergruppen, Hintergrund-Untergruppen. */
+export type BaumKnoten =
+  | EbenenGruppeKennung
+  | 'fachebenen'
+  | FachebenenGruppeKennung
+  | 'hintergrund'
+  | 'grundlage'
+  | 'bilder';
+
+/**
+ * Vorgabe: offen, was im Einsatz laufend geschaltet wird (Kräfte, Lage); zu, was man einmal
+ * einstellt (Betroffene, Fachebenen, Hintergrund). Innerhalb einer Gruppe stehen die Warnungen und
+ * beide Hintergrund-Untergruppen offen — wer die Gruppe öffnet, sieht sie sofort.
+ */
+export const BAUM_KLAPP_VORGABE: Record<BaumKnoten, boolean> = {
+  kraefte: true,
+  lage: true,
+  betroffene: false,
+  fachebenen: false,
+  warnungen: true,
+  wasser: false,
+  umwelt: false,
+  verkehr: false,
+  hintergrund: false,
+  grundlage: true,
+  bilder: true,
+};
+
+/** Gespeicherten Klappzustand lesen — ungültige oder fehlende Einträge fallen auf die Vorgabe. */
+export function baumKlappLesen(roh: string | null): Record<BaumKnoten, boolean> {
+  const zustand = { ...BAUM_KLAPP_VORGABE };
+  if (!roh) return zustand;
+  try {
+    const gelesen = JSON.parse(roh) as Record<string, unknown>;
+    if (!gelesen || typeof gelesen !== 'object') return zustand;
+    for (const k of Object.keys(BAUM_KLAPP_VORGABE) as BaumKnoten[]) {
+      if (typeof gelesen[k] === 'boolean') zustand[k] = gelesen[k];
+    }
+  } catch {
+    // Kaputter Eintrag: Vorgabe — eine Bequemlichkeit darf die Leiste nicht brechen.
+  }
+  return zustand;
 }
 
 // ── Ausgewählt ──

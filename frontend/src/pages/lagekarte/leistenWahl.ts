@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
+import { baumKlappLesen, type BaumKnoten } from './leistenDaten';
 
 /**
  * Ein-/Ausblenden der rechten Kartenleiste. Per Vorgabe offen, auf jeder Breite ausblendbar (am
@@ -99,4 +100,49 @@ export function useLeistenWahl(breit: boolean, modusAktiv = false) {
     zeige,
     umschalteImModus: setImModus,
   };
+}
+
+/** Die Ansichten der Leiste, getragen von der Segmentleiste über ihrem Inhalt. */
+export type LeistenAnsicht = 'ebenen' | 'objekte';
+
+export const LEISTEN_ANSICHT_SCHLUESSEL = 'lfh:lagekarte:leiste-ansicht';
+
+/** Gespeicherte Ansicht lesen — ohne oder mit unbekanntem Eintrag gilt „Ebenen“. */
+export function leistenAnsichtLesen(roh: string | null): LeistenAnsicht {
+  return roh === 'objekte' ? 'objekte' : 'ebenen';
+}
+
+/**
+ * Zuletzt gewählte Ansicht der Leiste, je Gerät gemerkt (nicht je Breitenklasse: wer am Tablet die
+ * Objekte bearbeitet, will sie nach dem Drehen nicht neu suchen). Das Einhängen schreibt nichts.
+ * `wechsle` ist das eigene Umschalten und ein Wechsel, den eine Handlung auslöst (Zeichnen, `?ort=`);
+ * beides gilt danach als die gemerkte Ansicht.
+ */
+export function useLeistenAnsicht() {
+  const [ansicht, setAnsicht] = useState<LeistenAnsicht>(() =>
+    leistenAnsichtLesen(sicherLesen(LEISTEN_ANSICHT_SCHLUESSEL)),
+  );
+  const wechsle = useCallback((neu: LeistenAnsicht) => {
+    setAnsicht(neu);
+    sicherSchreiben(LEISTEN_ANSICHT_SCHLUESSEL, neu);
+  }, []);
+  return { ansicht, wechsle };
+}
+
+export const BAUM_KLAPP_SCHLUESSEL = 'lfh:lagekarte:ebenen-gruppen';
+
+/** Offen/zu je Knoten des Ebenenbaums, je Gerät gemerkt (Muster `usePaneelZustand`). */
+export function useBaumKlapp() {
+  const [offen, setOffen] = useState<Record<BaumKnoten, boolean>>(() =>
+    baumKlappLesen(sicherLesen(BAUM_KLAPP_SCHLUESSEL)),
+  );
+  const setze = useCallback((knoten: BaumKnoten, wert: boolean) => {
+    setOffen((alt) => {
+      if (alt[knoten] === wert) return alt;
+      const neu = { ...alt, [knoten]: wert };
+      sicherSchreiben(BAUM_KLAPP_SCHLUESSEL, JSON.stringify(neu));
+      return neu;
+    });
+  }, []);
+  return { offen, setze };
 }

@@ -12,9 +12,18 @@ import type {
 import { farbenDunkel } from '../../theme/tokens';
 import type { KarteMarker } from './marker';
 import type { LayerSichtbar } from './Sidebar';
+import { fachebeneKeys } from './fachebenen';
 import {
+  BAUM_KLAPP_VORGABE,
   EBENEN,
+  EBENEN_GRUPPEN,
+  FACHEBENEN_GRUPPEN,
   LEERE_ROHDATEN,
+  baumKlappLesen,
+  ebenenGruppen,
+  filtereGruppe,
+  gruppenZiel,
+  gruppenZustand,
   auswahlRaster,
   auswahlUnterzeile,
   ebenenFarbe,
@@ -659,5 +668,137 @@ describe('Personal in der Leiste — Einsatzfunktion als Text (LLH-1239)', () =>
       { label: 'Funktion', wert: '—', mono: false },
       { label: 'Qualifikation', wert: 'Sanitäter', mono: false },
     ]);
+  });
+});
+
+// ── Ebenenbaum (LLH-1028): reine Gruppierung ────────────────────────────────────────────
+
+describe('Gruppen des Ebenenbaums', () => {
+  it('ordnet jede eigene Ebene genau einer Gruppe zu', () => {
+    const zugeordnet = EBENEN_GRUPPEN.flatMap((g) => g.ebenen);
+    expect([...zugeordnet].sort()).toEqual(EBENEN.map((e) => e.key).sort());
+    expect(new Set(zugeordnet).size).toBe(zugeordnet.length);
+  });
+
+  it('ordnet jede Fachebene genau einer Untergruppe zu', () => {
+    const zugeordnet = FACHEBENEN_GRUPPEN.flatMap((g) => g.ebenen);
+    expect([...zugeordnet].sort()).toEqual([...fachebeneKeys()].sort());
+    expect(new Set(zugeordnet).size).toBe(zugeordnet.length);
+  });
+
+  it('Gruppen in fester Reihenfolge mit den Zeilen des Entwurfs', () => {
+    expect(EBENEN_GRUPPEN.map((g) => [g.name, g.ebenen])).toEqual([
+      ['Kräfte', ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt', 'bereitstellungsraum']],
+      [
+        'Lage',
+        ['einsatzort', 'fuehrungsstelle', 'zone', 'schaden', 'lagemeldung', 'freies_zeichen'],
+      ],
+      ['Betroffene & Versorgung', ['person', 'uhs', 'betreuungsstelle']],
+    ]);
+    expect(FACHEBENEN_GRUPPEN.map((g) => [g.name, g.ebenen])).toEqual([
+      ['Warnungen', ['nina', 'dwd']],
+      ['Wasser', ['pegelonline', 'hochwasser']],
+      ['Umwelt', ['luftqualitaet', 'odl']],
+      ['Verkehr & Infrastruktur', ['autobahn', 'kritis', 'energie']],
+    ]);
+  });
+
+  it('verteilt die Zeilen auf ihre Gruppen und zählt an/gesamt', () => {
+    const zeilen = ebenenZeilen(
+      [],
+      0,
+      { ...ALLE_AN, fahrzeug: false, bereitstellungsraum: false },
+      false,
+      { zugriff: 'frei', anzahl: 0 },
+      { zugriff: 'frei' },
+      { zugriff: 'frei' },
+    );
+    const gruppen = ebenenGruppen(zeilen);
+    expect(gruppen.map((g) => [g.kennung, g.zeilen.map((z) => z.key), g.an, g.gesamt])).toEqual([
+      ['kraefte', ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt', 'bereitstellungsraum'], 3, 5],
+      [
+        'lage',
+        ['einsatzort', 'fuehrungsstelle', 'zone', 'schaden', 'lagemeldung', 'freies_zeichen'],
+        6,
+        6,
+      ],
+      ['betroffene', ['person', 'uhs', 'betreuungsstelle'], 3, 3],
+    ]);
+  });
+
+  it('eine ausgeblendete Ebene fehlt auch in ihrer Gruppe, eine gesperrte zählt nur zu „gesamt“', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'gesperrt', anzahl: 4 });
+    const betroffene = ebenenGruppen(zeilen).find((g) => g.kennung === 'betroffene')!;
+    // Betreuungsstellen ohne Angabe: ausgeblendet, also keine Zeile.
+    expect(betroffene.zeilen.map((z) => z.key)).toEqual(['person', 'uhs']);
+    expect([betroffene.an, betroffene.gesamt]).toEqual([1, 2]);
+  });
+});
+
+describe('Gruppenschalter', () => {
+  const z = (sichtbar: boolean, sperrgrund?: string) => ({ sichtbar, sperrgrund });
+
+  it('an, aus und teilweise über die frei zugänglichen Ebenen', () => {
+    expect(gruppenZustand([z(true), z(true)])).toBe('an');
+    expect(gruppenZustand([z(false), z(false)])).toBe('aus');
+    expect(gruppenZustand([z(true), z(false)])).toBe('teilweise');
+  });
+
+  it('eine gesperrte Ebene zählt nicht mit — sie ist nie an', () => {
+    expect(gruppenZustand([z(true), z(false, 'Keine Berechtigung')])).toBe('an');
+  });
+
+  it('ohne frei zugängliche Ebene gibt es keinen Schalter', () => {
+    expect(gruppenZustand([z(false, 'Keine Berechtigung')])).toBeNull();
+    expect(gruppenZustand([])).toBeNull();
+  });
+
+  it('aus und teilweise schalten alles an, an schaltet alles aus', () => {
+    expect(gruppenZiel('aus')).toBe(true);
+    expect(gruppenZiel('teilweise')).toBe(true);
+    expect(gruppenZiel('an')).toBe(false);
+  });
+});
+
+describe('Ebene suchen', () => {
+  const zeilen = [{ name: 'Pegel / Hochwasser' }, { name: 'Hochwasser-Meldeklassen (LHP)' }];
+
+  it('ohne Begriff bleibt alles stehen', () => {
+    expect(filtereGruppe('', ['Wasser'], zeilen)).toEqual(zeilen);
+    expect(filtereGruppe('   ', ['Wasser'], zeilen)).toEqual(zeilen);
+  });
+
+  it('trifft den Namen der Ebene ohne Rücksicht auf Groß- und Kleinschreibung', () => {
+    expect(filtereGruppe('pegel', ['Fachebenen', 'Wasser'], zeilen)).toEqual([zeilen[0]]);
+    expect(filtereGruppe(' LHP ', ['Fachebenen', 'Wasser'], zeilen)).toEqual([zeilen[1]]);
+  });
+
+  it('trifft der Name einer Gruppe, steht die ganze Gruppe', () => {
+    expect(filtereGruppe('wass', ['Fachebenen', 'Wasser'], zeilen)).toEqual(zeilen);
+    expect(filtereGruppe('fach', ['Fachebenen', 'Wasser'], zeilen)).toEqual(zeilen);
+  });
+
+  it('ohne Treffer bleibt die Gruppe leer', () => {
+    expect(filtereGruppe('xyz', ['Fachebenen', 'Wasser'], zeilen)).toEqual([]);
+  });
+});
+
+describe('Klappzustand des Ebenenbaums', () => {
+  it('Vorgabe: Kräfte und Lage offen, die übrigen Gruppen zu', () => {
+    expect(BAUM_KLAPP_VORGABE).toMatchObject({
+      kraefte: true,
+      lage: true,
+      betroffene: false,
+      fachebenen: false,
+      hintergrund: false,
+    });
+  });
+
+  it('liest eine gespeicherte Wahl, ungültige und fehlende Einträge fallen auf die Vorgabe', () => {
+    expect(baumKlappLesen(null)).toEqual(BAUM_KLAPP_VORGABE);
+    expect(baumKlappLesen('kaputt')).toEqual(BAUM_KLAPP_VORGABE);
+    expect(
+      baumKlappLesen(JSON.stringify({ kraefte: false, fachebenen: true, x: true, lage: 1 })),
+    ).toEqual({ ...BAUM_KLAPP_VORGABE, kraefte: false, fachebenen: true });
   });
 });
