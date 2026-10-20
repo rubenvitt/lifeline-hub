@@ -6,13 +6,12 @@ import { renderMitProviders } from '../../test/utils';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, {
   SPALTEN_FREIRAUM,
-  ZELLE_UNBEWERTET,
+  schraffurStil,
   setzeSpaltenFreiraum,
   type GefahrenMatrixProps,
   zellBalkenStil,
 } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
   id: 1,
@@ -91,7 +90,7 @@ describe('GefahrenMatrix', () => {
     const onSetzen = vi.fn();
     rendereMatrix({ onSetzen });
     await userEvent.click(
-      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: nicht bewertet' }),
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     );
     // Regex mit `i`: der Normalisierer von Testing Library faltet Leerraum, schreibt aber nicht
     // klein.
@@ -115,13 +114,34 @@ describe('GefahrenMatrix', () => {
     expect(new Set(bewertungen).size).toBe(bewertungen.length);
   });
 
-  it('macht die 7 ungültigen Kombinationen ohne Farbe erkennbar — und unbedienbar', () => {
+  /**
+   * LLH-1090: kein „n. a.“ mehr als Text. Zweiter Kanal ist das Muster (WCAG 1.4.1), für
+   * Hilfstechnik der Name; einen Knopf gibt es nicht.
+   */
+  it('macht die 7 ungültigen Kombinationen schraffiert, benannt, ohne Text und ohne Knopf', () => {
     rendereMatrix();
-    // Zweiter Kanal ist TEXT: die Zelle sagt „nicht anwendbar", statt nur blass zu sein.
-    expect(screen.getAllByText('n. a.')).toHaveLength(7);
+    const kacheln = screen.getAllByRole('img', { name: /: nicht anwendbar$/ });
+    expect(kacheln).toHaveLength(7);
+    for (const k of kacheln) {
+      expect(k).toHaveTextContent('');
+      expect(k.style.backgroundImage).toMatch(/^repeating-linear-gradient\(/);
+      expect(k.closest('td')!.querySelector('button')).toBeNull();
+      expect(k.closest('td')).not.toHaveAttribute('data-warnstufe');
+    }
+    expect(
+      screen.getByRole('img', { name: 'Atemgifte × Sachwerte: nicht anwendbar' }),
+    ).toBeTruthy();
+    expect(screen.queryByText('n. a.')).toBeNull();
     expect(
       screen.queryByRole('button', { name: /Bewertung Atemgifte × Sachwerte/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it('schraffurStil trägt die Farbe in `color` und im Verlauf', () => {
+    expect(schraffurStil('rgb(1, 2, 3)')).toEqual({
+      color: 'rgb(1, 2, 3)',
+      backgroundImage: 'repeating-linear-gradient(135deg, rgb(1, 2, 3) 0 1px, transparent 1px 6px)',
+    });
   });
 
   it('behält beschreibung/gemeldet_von bei Warnstufen-Wechsel', async () => {
@@ -145,11 +165,9 @@ describe('GefahrenMatrix', () => {
     rendereMatrix({ laufendeZelle: 'brand×menschen' });
     // antd klont den Auslöser mit `disabled` — die Prop am Dropdown erreicht wirklich den Knopf.
     expect(
-      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: nicht bewertet' }),
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     ).toBeDisabled();
-    expect(
-      screen.getByRole('button', { name: 'Bewertung Brand × Tiere: nicht bewertet' }),
-    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Bewertung Brand × Tiere: keine' })).toBeEnabled();
   });
 
   it('zeigt die Stufe als Kürzel — die Fläche allein wäre der einzige Kanal', () => {
@@ -159,57 +177,60 @@ describe('GefahrenMatrix', () => {
   });
 
   /**
-   * LFH-969: „keine" ist eine Meldung, eine gültige Zelle ohne Bewertung eine Lücke. Mit dem alten
-   * Rückfall `?? 'keine'` hießen beide „keine" und zeigten beide „–" — dann wird dieser Fall rot.
+   * LLH-1090: „keine“ ist die Vorgabe. Eine gültige Zelle ohne Zeile und eine ausdrücklich auf
+   * „keine“ gesetzte sind dieselbe Aussage — im Zeichen, im Namen und an der Zelle. Die offene
+   * Beurteilung steht am Gebiet, nicht als leere Zelle.
    */
-  it('trennt „nicht bewertet" von „keine" im Zeichen, im Namen und an der Zelle', () => {
+  it('zeigt eine Zelle ohne Bewertung wie „keine“: Strich, Name und Kennung', () => {
     rendereMatrix({ matrix: [zelle({ warnstufe: 'keine' })] });
 
-    const keine = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' });
-    expect(keine).toHaveTextContent('–');
-    expect(keine.closest('td')).toHaveAttribute('data-warnstufe', 'keine');
-
-    const offen = screen.getByRole('button', { name: 'Bewertung Brand × Tiere: nicht bewertet' });
-    expect(offen.textContent).toBe(ZELLE_UNBEWERTET.kuerzel);
-    expect(offen.textContent).not.toBe('–');
-    expect(offen.closest('td')).toHaveAttribute('data-warnstufe', 'unbewertet');
-
-    // „n. a." bleibt, wie es war: Text, kein Knopf.
-    expect(screen.getByLabelText('Atemgifte × Sachwerte: nicht anwendbar')).toHaveTextContent(
-      'n. a.',
-    );
-  });
-
-  it('nennt über der Matrix alle Zellzeichen und zählt die unbewerteten Felder', () => {
-    rendereMatrix({
-      matrix: [zelle({ warnstufe: 'keine' }), zelle({ id: 2, schutzobjekt: 'tiere' })],
-    });
-    const legende = screen.getByRole('note', { name: 'Legende der Matrix' });
-    for (const teil of ['– keine', 'N niedrig', 'M mittel', 'H hoch', 'A akut']) {
-      expect(legende).toHaveTextContent(teil);
+    const gesetzt = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: keine' });
+    const vorgabe = screen.getByRole('button', { name: 'Bewertung Brand × Tiere: keine' });
+    for (const knopf of [gesetzt, vorgabe]) {
+      expect(knopf).toHaveTextContent('–');
+      expect(knopf.closest('td')).toHaveAttribute('data-warnstufe', 'keine');
     }
-    expect(legende).toHaveTextContent('leer unbewertet');
-    expect(legende).toHaveTextContent('n. a. nicht anwendbar');
-    // 58 gültige Felder, zwei bewertet — „keine" zählt als bewertet.
-    expect(screen.getByText(/Felder unbewertet/)).toHaveTextContent('56 Felder unbewertet');
-  });
-
-  it('zählt ein einzelnes unbewertetes Feld in der Einzahl und meldet die volle Matrix', () => {
-    const alle = GEFAHRENTYPEN.flatMap((g, i) =>
-      SCHUTZOBJEKTE.filter((o) => kombinationGueltig(g.wert, o.wert)).map((o, j) =>
-        zelle({ id: i * 10 + j, gefahrentyp: g.wert, schutzobjekt: o.wert, warnstufe: 'keine' }),
-      ),
-    );
-    const { rerender } = rendereMatrix({ matrix: alle.slice(1) });
-    expect(screen.getByText('1 Feld unbewertet')).toBeInTheDocument();
-    rerender(matrixElement({ matrix: alle }));
-    expect(screen.getByText('Alle Felder bewertet')).toBeInTheDocument();
-  });
-
-  it('behauptet beim Laden weder „nicht bewertet" noch eine Zahl und sperrt die Zellen', () => {
-    rendereMatrix({ laedt: true });
+    // Alle 58 gültigen Zellen tragen den Strich, keine ist leer.
+    const zellen = screen.getAllByRole('button', { name: /^Bewertung / });
+    expect(zellen).toHaveLength(58);
+    for (const z of zellen) expect(z).toHaveTextContent('–');
     expect(screen.queryByRole('button', { name: /nicht bewertet$/ })).toBeNull();
-    expect(screen.queryByText(/Felder unbewertet/)).toBeNull();
+  });
+
+  it('nennt in der Legende Kürzel und Schraffur, ohne Zellzählung', () => {
+    rendereMatrix({ matrix: [zelle({ warnstufe: 'keine' })] });
+    const legende = screen.getByRole('note', { name: 'Legende der Matrix' });
+    expect(legende).toHaveTextContent(
+      '– keine · N niedrig · M mittel · H hoch · A akut · nicht anwendbar',
+    );
+    const feld = legende.querySelector<HTMLElement>('[data-lfh="legende-schraffur"]');
+    expect(feld, 'das Legendenfeld zeigt das Muster').not.toBeNull();
+    expect(feld).toHaveAttribute('aria-hidden', 'true');
+    expect(feld!.style.backgroundImage).toMatch(/^repeating-linear-gradient\(/);
+    expect(legende).not.toHaveTextContent(/unbewertet|n\. a\./);
+    expect(screen.queryByText(/Felder? unbewertet|Alle Felder bewertet/)).toBeNull();
+  });
+
+  it('bietet „Details …“ auch an einer Zelle ohne Bewertung und speichert sie als „keine“', async () => {
+    const onDetailsSpeichern = vi.fn().mockResolvedValue(undefined);
+    rendereMatrix({ onDetailsSpeichern });
+    const feld = await oeffneDetails('keine');
+    await userEvent.type(feld, 'Hang beobachten');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(onDetailsSpeichern).toHaveBeenCalledWith({
+        gefahrentyp: 'brand',
+        schutzobjekt: 'menschen',
+        warnstufe: 'keine',
+        beschreibung: 'Hang beobachten',
+        gemeldet_von: null,
+      }),
+    );
+  });
+
+  it('behauptet beim Laden keine Stufe, auch nicht „keine“, und sperrt die Zellen', () => {
+    rendereMatrix({ laedt: true });
+    expect(screen.queryByRole('button', { name: /: keine$/ })).toBeNull();
     expect(screen.getByText('Bewertungen laden …')).toBeInTheDocument();
     const zelle = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: lädt' });
     expect(zelle).toBeDisabled();
@@ -358,17 +379,17 @@ describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
     expect(zellBalkenStil('red')).toEqual({ boxShadow: 'inset 0 -3px 0 0 red' });
   });
 
-  it('trägt den Balken an einer bewerteten Zelle und keinen an einer unbewerteten', () => {
+  it('trägt den Balken an einer bewerteten Zelle und keinen an einer mit „keine“', () => {
     const { container } = rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch' })] });
     const bewertet = container.querySelector<HTMLElement>('td[data-warnstufe="hoch"]');
     expect(bewertet, 'die bewertete Zelle trägt ihre Stufe').not.toBeNull();
     expect(bewertet!.style.boxShadow).toMatch(/^inset 0(px)? -3px 0(px)? 0(px)? /);
     // Gegenprobe: ohne Warnstufe kein Balken — sonst wäre die erste Aussage auch mit einem
     // unbedingten Schatten wahr.
-    const leer = container.querySelector<HTMLElement>('td[data-warnstufe="unbewertet"]');
+    const leer = container.querySelector<HTMLElement>('td[data-warnstufe="keine"]');
     expect(leer).not.toBeNull();
     expect(leer!.style.boxShadow).toBe('');
-    expect(leer!.style.backgroundColor).toBe('');
+    expect(leer!.style.backgroundColor).toBe('transparent');
   });
 });
 

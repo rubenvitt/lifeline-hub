@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import type { GefahrBewertung } from '../../api/types';
 import GefahrenMatrixAuszug from './GefahrenMatrixAuszug';
-import { ZELLE_UNBEWERTET } from './GefahrenMatrix';
 
 const bewertung = (o: Partial<GefahrBewertung>): GefahrBewertung =>
   ({
@@ -55,15 +54,15 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
     const akut = screen.getByRole('cell', { name: 'Brand × Menschen: akut' });
     expect(akut).toHaveTextContent('A');
     expect(akut).toHaveAttribute('data-warnstufe', 'akut');
-    // Ausdrücklich „keine" ist etwas anderes als gar nicht bewertet — im Text UND im Namen.
+    // Ausdrücklich „keine“ und gar nicht bewertet sind dieselbe Aussage (LLH-1090): „–“.
     expect(screen.getByRole('cell', { name: 'Brand × Tiere: keine' })).toHaveTextContent('–');
-    const offen = screen.getByRole('cell', { name: 'Brand × Umwelt: nicht bewertet' });
-    // Dasselbe Zeichen wie die Matrix (LFH-969): beide lesen es aus einer Quelle.
-    expect(offen.textContent).toBe(ZELLE_UNBEWERTET.kuerzel);
-    expect(offen).toHaveAttribute('data-warnstufe', 'unbewertet');
+    const vorgabe = screen.getByRole('cell', { name: 'Brand × Umwelt: keine' });
+    expect(vorgabe).toHaveTextContent('–');
+    expect(vorgabe).toHaveAttribute('data-warnstufe', 'keine');
+    expect(screen.queryByRole('cell', { name: /nicht bewertet$/ })).toBeNull();
   });
 
-  it('trägt „n. a." an ungültigen Paaren', () => {
+  it('schraffiert ungültige Paare ohne Text und nennt sie „nicht anwendbar“', () => {
     renderMitProviders(
       <GefahrenMatrixAuszug
         matrix={[
@@ -73,26 +72,23 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
     );
 
     const zeile = screen.getByRole('row', { name: /Ertrinken/ });
-    expect(within(zeile).getAllByText('n. a.')).toHaveLength(2);
-    expect(
-      within(zeile).getByRole('cell', { name: 'Ertrinken × Sachwerte: nicht anwendbar' }),
-    ).toHaveTextContent('n. a.');
+    expect(within(zeile).queryByText('n. a.')).toBeNull();
+    const kacheln = within(zeile).getAllByRole('img', { name: /: nicht anwendbar$/ });
+    expect(kacheln).toHaveLength(2);
+    const sache = within(zeile).getByRole('img', {
+      name: 'Ertrinken × Sachwerte: nicht anwendbar',
+    });
+    expect(sache).toHaveTextContent('');
+    expect(sache.style.backgroundImage).toMatch(/^repeating-linear-gradient\(/);
   });
 
-  it('sagt „Keine Gefahren bewertet." statt einer leeren Tabelle', () => {
-    renderMitProviders(<GefahrenMatrixAuszug matrix={[]} />);
-
-    expect(screen.getByText('Keine Gefahren bewertet.')).toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-  });
-
-  it('nennt nur „Keine" vergebene Stufen nicht „nicht bewertet" (LFH-1153)', () => {
-    // „Keine" ist eine Bewertung (LFH-969): der Satz darf sie nicht als Lücke ausgeben.
-    renderMitProviders(<GefahrenMatrixAuszug matrix={[bewertung({ warnstufe: 'keine' })]} />);
-
-    expect(screen.getByText('Keine Gefahr über Stufe „Keine“ bewertet.')).toBeInTheDocument();
-    expect(screen.queryByText('Keine Gefahren bewertet.')).not.toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  it('sagt ohne Gefahr über „keine“ einen Satz statt einer leeren Tabelle', () => {
+    for (const matrix of [[], [bewertung({ warnstufe: 'keine' })]]) {
+      const { unmount } = renderMitProviders(<GefahrenMatrixAuszug matrix={matrix} />);
+      expect(screen.getByText('Keine Gefahr über Stufe „keine“.')).toBeInTheDocument();
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+      unmount();
+    }
   });
 
   it('liest nur: kein Knopf, kein Auswahlfeld', () => {

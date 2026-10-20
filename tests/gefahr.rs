@@ -526,3 +526,163 @@ async fn schwaerzung_nullt_zonen_und_gebietslabel_und_haelt_den_etb_wortlaut() {
         "der ETB-Wortlaut mit dem Label bleibt (G_ETB, LFH-632/E9)"
     );
 }
+
+/// LLH-1090: „Beurteilung bestätigen“ setzt Zeit und Person am Gebiet, schreibt einen
+/// System-ETB-Eintrag und meldet die Änderung live. Ein neues Gebiet ist „nicht beurteilt“:
+/// die Felder fehlen in der Antwort.
+#[tokio::test]
+async fn beurteilung_bestaetigen_setzt_gebiet_schreibt_etb_und_meldet_live() {
+    let (app, live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Hangrutsch Kirchberg").await;
+    let liste_u = format!("/api/einsaetze/{einsatz}/gefahrengebiete");
+
+    let (_, vorher) = anfrage(&app, "GET", &liste_u, &admin, None).await;
+    let gebiet = vorher[0].as_object().unwrap();
+    assert!(
+        !gebiet.contains_key("beurteilt_at"),
+        "nicht beurteilt: {gebiet:?}"
+    );
+    assert!(!gebiet.contains_key("beurteilt_von"));
+
+    let mut rx = live.abonniere(einsatz);
+    let (status, g) = anfrage(
+        &app,
+        "POST",
+        &format!("{liste_u}/{gid}/beurteilung"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{g:?}");
+    assert_eq!(g["id"], gid);
+    assert!(g["beurteilt_at"].is_string(), "{g:?}");
+    assert!(g["beurteilt_von"].is_i64());
+    assert!(g["beurteilt_von_name"].is_string());
+    let n = recv_until_tag(&mut rx, "gefahr", Duration::from_secs(1)).await;
+    let v: Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(v["gefahrengebiet_id"], gid);
+
+    let (_, nachher) = anfrage(&app, "GET", &liste_u, &admin, None).await;
+    assert_eq!(nachher[0]["beurteilt_at"], g["beurteilt_at"]);
+
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|i| i == "Beurteilung der Gefahrenmatrix in «Hangrutsch Kirchberg» bestätigt."),
+        "ETB: {etb:?}"
+    );
+    // Jede Bestätigung ist ein eigener Akt: die zweite schreibt einen zweiten Eintrag.
+    let basis = etb.len();
+    anfrage(
+        &app,
+        "POST",
+        &format!("{liste_u}/{gid}/beurteilung"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        system_etb_inhalte(&app, &admin, einsatz).await.len(),
+        basis + 1
+    );
+}
+
+/// Eine Zelländerung frischt nur eine schon bestätigte Beurteilung auf (design.md E4): vorher
+/// bleibt das Gebiet „nicht beurteilt“, danach trägt es Zeit und Person der Änderung — ohne
+/// eigenen ETB-Eintrag.
+#[tokio::test]
+async fn zellaenderung_frischt_nur_bestehende_beurteilung_auf() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let liste_u = format!("/api/einsaetze/{einsatz}/gefahrengebiete");
+    let put = |warn: &'static str| {
+        let app = app.clone();
+        let admin = admin.clone();
+        let u = format!("{liste_u}/{gid}/matrix/bewertung");
+        async move {
+            let (s, z) = anfrage(
+                &app,
+                "PUT",
+                &u,
+                &admin,
+                Some(&bewertung("brand", "menschen", warn)),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "{z:?}");
+        }
+    };
+
+    put("hoch").await;
+    let (_, liste) = anfrage(&app, "GET", &liste_u, &admin, None).await;
+    assert!(
+        !liste[0].as_object().unwrap().contains_key("beurteilt_at"),
+        "eine Zelle allein beurteilt das Gebiet nicht: {liste:?}"
+    );
+
+    anfrage(
+        &app,
+        "POST",
+        &format!("{liste_u}/{gid}/beurteilung"),
+        &admin,
+        None,
+    )
+    .await;
+    // Zeitpunkt in die Vergangenheit legen: die Auffrischung muss ihn sichtbar ändern.
+    sqlx::query("UPDATE gefahrengebiet SET beurteilt_at = '2026-01-01 00:00:00' WHERE id = ?")
+        .bind(gid)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let etb_vorher = system_etb_inhalte(&app, &admin, einsatz).await.len();
+
+    put("akut").await;
+    let (_, liste) = anfrage(&app, "GET", &liste_u, &admin, None).await;
+    let at = liste[0]["beurteilt_at"].as_str().unwrap().to_string();
+    assert_ne!(at, "2026-01-01 00:00:00", "aufgefrischt");
+    assert_eq!(
+        system_etb_inhalte(&app, &admin, einsatz).await.len(),
+        etb_vorher + 1,
+        "nur der Eintrag des Stufenwechsels, keiner für die Auffrischung"
+    );
+}
+
+#[tokio::test]
+async fn beurteilung_braucht_schreibrecht_und_eigenes_gebiet() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let gid = gefahrengebiet_anlegen(&app, &admin, einsatz, "Nord").await;
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/gefahrengebiete/{gid}/beurteilung"),
+            &erika_c,
+            None
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{anderer}/gefahrengebiete/{gid}/beurteilung"),
+            &admin,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+}

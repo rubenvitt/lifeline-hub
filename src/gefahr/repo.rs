@@ -161,8 +161,21 @@ pub async fn gebiete_liste(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<GefahrengebietAnzeige>, AppError> {
-    let gruppen = sqlx::query_as::<_, (i64, i64, Option<String>)>(
-        "SELECT id, einsatz_id, label FROM gefahrengebiet WHERE einsatz_id = ? ORDER BY id",
+    #[allow(clippy::type_complexity)]
+    let gruppen = sqlx::query_as::<
+        _,
+        (
+            i64,
+            i64,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+        ),
+    >(
+        "SELECT g.id, g.einsatz_id, g.label, g.beurteilt_at, g.beurteilt_von, b.anzeigename \
+         FROM gefahrengebiet g LEFT JOIN benutzer b ON b.id = g.beurteilt_von \
+         WHERE g.einsatz_id = ? ORDER BY g.id",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -189,25 +202,30 @@ pub async fn gebiete_liste(
 
     Ok(gruppen
         .into_iter()
-        .map(|(id, einsatz_id, label)| {
-            let zonen_ids = zonen
-                .iter()
-                .filter(|(gid, _)| *gid == id)
-                .map(|(_, zid)| *zid)
-                .collect();
-            let rang = raenge
-                .iter()
-                .find(|(gid, _)| *gid == id)
-                .map(|(_, r)| *r)
-                .unwrap_or(0);
-            GefahrengebietAnzeige {
-                id,
-                einsatz_id,
-                label,
-                zonen_ids,
-                hoechste_warnstufe: super::warnstufe_von_rang(rang),
-            }
-        })
+        .map(
+            |(id, einsatz_id, label, beurteilt_at, beurteilt_von, beurteilt_von_name)| {
+                let zonen_ids = zonen
+                    .iter()
+                    .filter(|(gid, _)| *gid == id)
+                    .map(|(_, zid)| *zid)
+                    .collect();
+                let rang = raenge
+                    .iter()
+                    .find(|(gid, _)| *gid == id)
+                    .map(|(_, r)| *r)
+                    .unwrap_or(0);
+                GefahrengebietAnzeige {
+                    id,
+                    einsatz_id,
+                    label,
+                    zonen_ids,
+                    hoechste_warnstufe: super::warnstufe_von_rang(rang),
+                    beurteilt_at,
+                    beurteilt_von,
+                    beurteilt_von_name,
+                }
+            },
+        )
         .collect())
 }
 
@@ -222,6 +240,50 @@ pub async fn gebiet_laden(
         .into_iter()
         .find(|g| g.id == gid)
         .ok_or(AppError::NotFound)
+}
+
+/// Bestätigt die Beurteilung der Matrix (LLH-1090) INNERHALB einer offenen Transaktion, atomar
+/// mit dem System-ETB-Eintrag des Aufrufers. `NotFound`, falls das Gebiet nicht zum Einsatz
+/// gehört.
+pub async fn beurteilen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    gid: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    let betroffen = sqlx::query(
+        "UPDATE gefahrengebiet SET beurteilt_at = datetime('now'), beurteilt_von = ? \
+         WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(benutzer_id)
+    .bind(gid)
+    .bind(einsatz_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if betroffen == 0 {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+/// Frischt eine BESTEHENDE Beurteilung auf (Zeit und Person der Zelländerung), in der
+/// Transaktion des Bewertungs-PUT. Ein nie bestätigtes Gebiet bleibt „nicht beurteilt“: eine
+/// einzelne Zelle sagt nichts über die übrigen (LLH-1090, design.md E4).
+pub async fn beurteilung_auffrischen_tx(
+    conn: &mut SqliteConnection,
+    gid: i64,
+    benutzer_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE gefahrengebiet SET beurteilt_at = datetime('now'), beurteilt_von = ? \
+         WHERE id = ? AND beurteilt_at IS NOT NULL",
+    )
+    .bind(benutzer_id)
+    .bind(gid)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Benennt ein Gefahrengebiet um. `NotFound`, falls nicht zum Einsatz.
@@ -396,6 +458,94 @@ mod tests {
             Warnstufe::Akut,
             "Severity-Maximum, nicht lexikalisch"
         );
+    }
+
+    /// LLH-1090: ein neues Gebiet ist nicht beurteilt; die Bestätigung setzt Zeit und Person, und
+    /// die Liste nennt die Person mit Namen.
+    #[tokio::test]
+    async fn beurteilen_setzt_zeit_und_person_und_liste_nennt_den_namen() {
+        let pool = crate::db::test_pool().await;
+        let (gid, bid) = setup(&pool).await;
+        let eid: i64 = sqlx::query_scalar("SELECT einsatz_id FROM gefahrengebiet WHERE id = ?")
+            .bind(gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let neu = gebiet_laden(&pool, eid, gid).await.unwrap();
+        assert_eq!(neu.beurteilt_at, None);
+        assert_eq!(neu.beurteilt_von, None);
+        assert_eq!(neu.beurteilt_von_name, None);
+
+        beurteilen_tx(&mut *pool.acquire().await.unwrap(), eid, gid, bid)
+            .await
+            .unwrap();
+        let g = gebiet_laden(&pool, eid, gid).await.unwrap();
+        assert!(g.beurteilt_at.is_some(), "Zeitpunkt gesetzt");
+        assert_eq!(g.beurteilt_von, Some(bid));
+        assert_eq!(g.beurteilt_von_name.as_deref(), Some("A"));
+    }
+
+    #[tokio::test]
+    async fn beurteilen_fremdes_gebiet_ist_notfound() {
+        let pool = crate::db::test_pool().await;
+        let (gid, bid) = setup(&pool).await;
+        let fremd: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Andere') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(matches!(
+            beurteilen_tx(&mut *pool.acquire().await.unwrap(), fremd, gid, bid)
+                .await
+                .unwrap_err(),
+            AppError::NotFound
+        ));
+    }
+
+    /// Eine Zelländerung frischt nur eine BESTEHENDE Beurteilung auf: eine einzelne Zelle sagt
+    /// nichts über die übrigen (design.md E4).
+    #[tokio::test]
+    async fn auffrischen_nur_bei_bestehender_beurteilung() {
+        let pool = crate::db::test_pool().await;
+        let (gid, bid) = setup(&pool).await;
+        let eid: i64 = sqlx::query_scalar("SELECT einsatz_id FROM gefahrengebiet WHERE id = ?")
+            .bind(gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        beurteilung_auffrischen_tx(&mut *pool.acquire().await.unwrap(), gid, bid)
+            .await
+            .unwrap();
+        assert_eq!(
+            gebiet_laden(&pool, eid, gid).await.unwrap().beurteilt_at,
+            None,
+            "nie bestätigt bleibt nicht beurteilt"
+        );
+
+        let zweiter: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'B', 'b', 'x') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE gefahrengebiet SET beurteilt_at = '2026-10-01 08:00:00', beurteilt_von = ? \
+             WHERE id = ?",
+        )
+        .bind(bid)
+        .bind(gid)
+        .execute(&pool)
+        .await
+        .unwrap();
+        beurteilung_auffrischen_tx(&mut *pool.acquire().await.unwrap(), gid, zweiter)
+            .await
+            .unwrap();
+        let g = gebiet_laden(&pool, eid, gid).await.unwrap();
+        assert_ne!(g.beurteilt_at.as_deref(), Some("2026-10-01 08:00:00"));
+        assert_eq!(g.beurteilt_von, Some(zweiter));
+        assert_eq!(g.beurteilt_von_name.as_deref(), Some("B"));
     }
 
     #[tokio::test]
