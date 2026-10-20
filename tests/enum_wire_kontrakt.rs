@@ -101,7 +101,10 @@ fn serde_wire_gleich_as_str() {
         Verletztensammelstelle,
         Sonstige,
     });
-    enum_wire_as_str!(lifeline_hub::vorlagendokument::anlage::AnlageArt { Fernmeldeskizze });
+    enum_wire_as_str!(lifeline_hub::vorlagendokument::anlage::AnlageArt {
+        Fernmeldeskizze,
+        Lageplan
+    });
     enum_wire_as_str!(lifeline_hub::uhs::UhsStatus {
         Geplant,
         Aktiv,

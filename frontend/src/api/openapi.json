@@ -743,7 +743,8 @@
         "type": "string",
         "description": "Art einer Anlage. Neue Art = neue Variante plus CHECK-Rebuild der beiden Linker.",
         "enum": [
-          "fernmeldeskizze"
+          "fernmeldeskizze",
+          "lageplan"
         ]
       },
       "AnmeldeEintragAnzeige": {
