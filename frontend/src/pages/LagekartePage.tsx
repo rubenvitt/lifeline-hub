@@ -63,6 +63,9 @@ import {
 } from './lagekarte/useEigenposition';
 import MessSteuerung from './lagekarte/MessSteuerung';
 import SuchnadelBand from './lagekarte/SuchnadelBand';
+import FokusBand from './lagekarte/FokusBand';
+import { useAbschnittFokus } from './lagekarte/useAbschnittFokus';
+import { daempfeFlaechen, daempfeMarker } from './lagekarte/abschnittFokus';
 import type { GefundenerOrt } from '../anzeige/ortssuche';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import PlatzierSteuerung, {
@@ -672,6 +675,48 @@ export default function LagekartePage() {
     [zonen, zoneAuswahl],
   );
 
+  // Fokus auf einen Einsatzabschnitt (LLH-1057, `lagekarte/useAbschnittFokus.ts`): reine
+  // Darstellung. Die Kräfte fremder Abschnitte werden gedämpft, nie entfernt; Ebenen, Zähler und
+  // Suche sehen den Fokus nicht. Esc gehört erst der Auswahl („Ausgewählt“), dann dem Fokus.
+  const auswahlOffen =
+    (aktiverMarker != null && aktiverMarker.typ !== 'freies_zeichen') ||
+    ausgewaehltesZeichen != null ||
+    fachebeneAuswahl != null ||
+    ausgewaehlteZone != null;
+  const fokusQuelle = useMemo(
+    () => ({
+      abschnitte: rohdaten.abschnitte,
+      einheiten: rohdaten.einheiten,
+      fahrzeuge: rohdaten.fahrzeuge,
+    }),
+    [rohdaten.abschnitte, rohdaten.einheiten, rohdaten.fahrzeuge],
+  );
+  const abschnittFokus = useAbschnittFokus({
+    einsatzId,
+    quelle: fokusQuelle,
+    flaechen,
+    marker: alleVerortet,
+    kartenRef,
+    auswahlOffen,
+    onAuswahlAufheben: () => {
+      setAuswahl(null);
+      setZoneAuswahl(null);
+      setFachebeneAuswahl(null);
+    },
+    modusAktiv: exklusiverModusAktiv,
+  });
+  const fokusSicht = abschnittFokus.sicht;
+  const fokussiereAbschnitt = abschnittFokus.fokussiere;
+  // Gedämpft statt gefiltert; ohne Fokus dieselben Listen (stabile Identität, LFH-945).
+  const kartenMarker = useMemo(
+    () => daempfeMarker(sichtbareMarker, fokusSicht),
+    [sichtbareMarker, fokusSicht],
+  );
+  const kartenFlaechenImFokus = useMemo(
+    () => daempfeFlaechen(kartenFlaechen, fokusSicht),
+    [kartenFlaechen, fokusSicht],
+  );
+
   const attribution = useMemo(() => {
     const teile = [basisAttribution, ...fachebenenAttribution].filter(Boolean) as string[];
     return teile.length ? teile.join(' · ') : null;
@@ -961,6 +1006,24 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, ladt, zeigeLeiste]);
 
+  /**
+   * Abschnittsfokus per Link: `?abschnitt=<id>` (LLH-1057) — fokussieren, dann räumen; der Fokus
+   * wird nie gespeichert. Erst mit geladener Seite und entschiedener Startansicht: vorher fehlt die
+   * Karte, und die Abschnitte stehen noch nicht fest. Die Startansicht greift in derselben Runde
+   * zuerst, „Fokus aufheben“ führt also auf sie zurück. Ein unbekannter Abschnitt wird trotzdem
+   * geräumt.
+   */
+  useEffect(() => {
+    const roh = searchParams.get('abschnitt');
+    if (roh === null) return;
+    if (ladt || start === undefined) return;
+    const id = parseRouteId(roh);
+    if (id != null) fokussiereAbschnitt(id);
+    const naechste = new URLSearchParams(searchParams);
+    naechste.delete('abschnitt');
+    setSearchParams(naechste, { replace: true });
+  }, [searchParams, setSearchParams, ladt, start, fokussiereAbschnitt]);
+
   if (ladt) {
     return <SeitenSkeleton />;
   }
@@ -988,6 +1051,11 @@ export default function LagekartePage() {
             onVerortungLoeschen={loescheVerortung}
             onSymbolAendern={aendereSymbol}
             roh={rohdaten}
+            onAbschnittFokussieren={
+              aktiverMarker.typ === 'abschnitt' && fokusSicht?.abschnittId !== aktiverMarker.id
+                ? () => fokussiereAbschnitt(aktiverMarker.id)
+                : undefined
+            }
           />
         )}
         {ausgewaehltesZeichen && (
@@ -1210,7 +1278,7 @@ export default function LagekartePage() {
         ref={kartenRef}
         style={style}
         attribution={attribution}
-        markers={sichtbareMarker}
+        markers={kartenMarker}
         onKarteKlick={onKarteKlick}
         // Ein Marker-Klick während eines exklusiven Modus öffnet kein Panel. Nur der Kartenpfad ist
         // gegatet, die Leisten-Selektion bleibt frei.
@@ -1220,7 +1288,7 @@ export default function LagekartePage() {
         flyToZiel={flyToZiel}
         startAnsicht={start}
         onStyleFehler={onStyleFehler}
-        flaechen={kartenFlaechen}
+        flaechen={kartenFlaechenImFokus}
         zeichnen={zeichneAbschnittId != null}
         onFlaecheGezeichnet={onFlaecheGezeichnet}
         onFlaecheKlick={onFlaecheKlick}
@@ -1375,6 +1443,11 @@ export default function LagekartePage() {
           onBeenden={onMessenBeenden}
         />
         <SuchnadelBand ort={suchnadel} onEntfernen={() => setSuchnadel(null)} />
+        <FokusBand
+          name={fokusSicht?.name ?? null}
+          escHebtAuf={abschnittFokus.escHebtAuf}
+          onAufheben={abschnittFokus.aufheben}
+        />
         {/* Maßstab: MapLibres `ScaleControl`, von `Kartenflaeche` über `IControl` in dieses
             Band gehängt — nicht in MapLibres Ecke, die absolut über dem Fuß läge. */}
         <div
