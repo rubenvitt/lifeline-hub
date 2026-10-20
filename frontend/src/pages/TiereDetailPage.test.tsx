@@ -2,7 +2,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { einsatzKeys } from '../api/queryKeys';
 import { renderMitProviders } from '../test/utils';
@@ -10,6 +10,12 @@ import TiereDetailPage from './TiereDetailPage';
 import type { Tier } from '../api/types';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+
+/** Ziel des Sprungs „Auf Karte verorten“ (LLH-1123): zeigt den Auftrag aus der Adresse. */
+function KartenSonde() {
+  const { search } = useLocation();
+  return <div data-testid="karte">KARTE{search}</div>;
+}
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
 afterEach(() => vi.unstubAllGlobals());
@@ -79,6 +85,7 @@ function render(
       <Route path="/einsaetze/:id/tiere" element={<div>LISTE</div>} />
       <Route path="/einsaetze/:id/tiere/:tierId" element={<TiereDetailPage />} />
       <Route path="/einsaetze/:id/personen/:personId" element={<div>PERSON-DETAIL</div>} />
+      <Route path="/einsaetze/:id/lagekarte" element={<KartenSonde />} />
     </Routes>,
     // Data Router: der Verlassen-Schutz hält Pfadwechsel über `useBlocker` an, und der wirft ohne
     // ihn (`frontend/AGENTS.md`, „Formularseiten“).
@@ -255,8 +262,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    // Comboboxen im Edit-Formular: [0] Geschlecht, [1] Halter.
-    await userEvent.click(screen.getAllByRole('combobox')[1]);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Halter' }));
     const option = (await screen.findAllByText('R-007 · Anna Meier')).find((el) =>
       el.closest('.ant-select-item-option'),
     );
@@ -276,7 +282,7 @@ describe('TiereDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    const halterCb = screen.getAllByRole('combobox')[1];
+    const halterCb = screen.getByRole('combobox', { name: 'Halter' });
     await userEvent.click(halterCb);
     await userEvent.type(halterCb, 'Familie Krause');
     const extern = (await screen.findAllByText(/Als externen Kontakt/)).find((el) =>
@@ -992,5 +998,85 @@ describe('TiereDetailPage — stehende Leiste (LLH-1101)', () => {
     expect(leiste).not.toBeNull();
     expect(leiste!.closest('form')).not.toBeNull();
     expect(within(leiste as HTMLElement).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+  });
+});
+
+describe('TiereDetailPage — Verortung (LLH-1123)', () => {
+  const verortet: Tier = { ...tierBasis, antreff_lat: 51.5, antreff_lon: 8.25 };
+  const ortVorschau = http.get('/api/einsaetze/:id/ort-vorschau', () =>
+    HttpResponse.json({ peilung: null, ortsname: null }),
+  );
+
+  it('unverortet: „nicht verortet“ und „Auf Karte verorten“ schickt den Auftrag mit Herkunft', async () => {
+    render(einsatzAktiv, tierBasis);
+    expect(await screen.findByText('nicht verortet')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Auf Karte verorten' }));
+    expect(await screen.findByTestId('karte')).toHaveTextContent(
+      'KARTE?platzieren=tier%3A10&zurueck=1',
+    );
+  });
+
+  it('verortet: die Koordinate steht da, der Knopf heißt „Auf Karte versetzen“', async () => {
+    render(einsatzAktiv, verortet, [ortVorschau]);
+    expect(await screen.findByRole('button', { name: 'Auf Karte versetzen' })).toBeInTheDocument();
+    expect(screen.queryByText('nicht verortet')).toBeNull();
+  });
+
+  it.each([
+    ['Beobachter', einsatzBeobachter, tierBasis],
+    ['abgeschlossen', einsatzAktiv, { ...tierBasis, status: 'abgeschlossen' } as Tier],
+    ['storniert', einsatzAktiv, { ...tierBasis, storniert_at: '2026-05-29 10:00:00' }],
+  ] as const)('%s: „nicht verortet“ ohne Knopf', async (_fall, einsatz, tier) => {
+    render(einsatz, tier);
+    expect(await screen.findByText('nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Auf Karte/ })).toBeNull();
+  });
+
+  it('Bearbeiten: die Koordinate geht unverändert als Paar mit', async () => {
+    let body: Record<string, unknown> | null = null;
+    render(einsatzAktiv, verortet, [
+      ortVorschau,
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(verortet);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.antreff_lat).toBe(51.5);
+    expect(body!.antreff_lon).toBe(8.25);
+  });
+
+  it('Bearbeiten: eine geleerte Koordinate geht als null/null', async () => {
+    let body: Record<string, unknown> | null = null;
+    render(einsatzAktiv, verortet, [
+      ortVorschau,
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(tierBasis);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.clear(await screen.findByLabelText('Verortung'));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.antreff_lat).toBeNull();
+    expect(body!.antreff_lon).toBeNull();
+  });
+
+  it('Bearbeiten: eine unlesbare Koordinate sperrt das Speichern mit Meldung am Feld', async () => {
+    let gesendet = false;
+    render(einsatzAktiv, tierBasis, [
+      http.patch('/api/einsaetze/1/tiere/10', () => {
+        gesendet = true;
+        return HttpResponse.json(tierBasis);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.type(await screen.findByLabelText('Verortung'), 'irgendwo');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByLabelText('Verortung')).toHaveAttribute('aria-invalid', 'true');
+    expect(gesendet).toBe(false);
   });
 });

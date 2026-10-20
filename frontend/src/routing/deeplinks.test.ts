@@ -28,6 +28,7 @@ import {
   parseZurueck,
   rueckwegPfad,
   parseZeichnenAuftrag,
+  parseZeichnenBezug,
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
@@ -43,6 +44,7 @@ import {
   betreuungPfad,
   betreuungsstellePfad,
   evakuierungPfad,
+  evakuierungsbezirkPfad,
   verpflegungAusgabePfad,
   verpflegungAusVorlagePfad,
   parseVerpflegungTag,
@@ -339,6 +341,36 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet',
     );
   });
+  it('Zeichnen mit Bezirk: `bezirk=<id>` neben `zeichnen` und zurück (LLH-1069)', () => {
+    const pfad = lagekartePfad(E, { zeichnen: { typ: 'evakuierungsbezirk', bezirk: 12 } });
+    expect(pfad).toBe('/einsaetze/5/lagekarte?zeichnen=evakuierungsbezirk&bezirk=12');
+    const params = new URLSearchParams(pfad.split('?')[1]);
+    expect(
+      parseZeichnenBezug(parseZeichnenAuftrag(params.get('zeichnen')), params.get('bezirk')),
+    ).toEqual({ typ: 'evakuierungsbezirk', bezirk: 12 });
+  });
+  it('parseZeichnenBezug: ohne Bezug unverändert, ein falscher Bezug verwirft den ganzen Auftrag', () => {
+    const eb = { typ: 'evakuierungsbezirk' as const };
+    // Ohne `bezirk` bleibt der Auftrag, wie er ist (LFH-825).
+    expect(parseZeichnenBezug(eb, null)).toEqual(eb);
+    expect(parseZeichnenBezug({ typ: 'gefahrengebiet' }, null)).toEqual({ typ: 'gefahrengebiet' });
+    expect(parseZeichnenBezug(null, null)).toBeNull();
+    // Mit Fläche als ausdrücklicher Form.
+    expect(parseZeichnenBezug({ ...eb, form: 'flaeche' }, '3')).toEqual({
+      ...eb,
+      form: 'flaeche',
+      bezirk: 3,
+    });
+    // `bezirk` gilt nur am Typ Evakuierungsbezirk: sonst kein Auftrag, kein Zeichnen ohne Bezug.
+    expect(parseZeichnenBezug({ typ: 'gefahrengebiet' }, '3')).toBeNull();
+    expect(parseZeichnenBezug({ typ: 'freie_skizze', form: 'linie' }, '3')).toBeNull();
+    // Unbrauchbare Kennung.
+    for (const roh of ['abc', '', '0', '-2', '1.5', ' ', '3x']) {
+      expect(parseZeichnenBezug(eb, roh), roh).toBeNull();
+    }
+    // Ein Bezug ohne Auftrag ist kein Auftrag.
+    expect(parseZeichnenBezug(null, '3')).toBeNull();
+  });
   it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
     expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });
     expect(parsePlatzierenAuftrag('uhs:2')).toEqual({ typ: 'uhs', id: 2 });
@@ -351,7 +383,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parsePlatzierenAuftrag('schaden:abc')).toBeNull();
     expect(parsePlatzierenAuftrag('schaden:0')).toBeNull();
     expect(parsePlatzierenAuftrag('schaden:-1')).toBeNull();
-    expect(parsePlatzierenAuftrag('tier:7')).toBeNull();
+    expect(parsePlatzierenAuftrag('katze:7')).toBeNull();
     expect(parsePlatzierenAuftrag('person:x')).toBeNull();
     // Kein Prototyp-Schlüssel schlüpft als Typ durch.
     expect(parsePlatzierenAuftrag('toString:7')).toBeNull();
@@ -403,13 +435,22 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       expect(rueckwegPfad(E, 'schaden', 7)).toBe(schadenDetailPfad(E, 7));
       expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungsstellePfad(E, 3));
       expect(rueckwegPfad(E, 'bereitstellungsraum', 9)).toBe(bereitstellungsraumDetailPfad(E, 9));
+      expect(rueckwegPfad(E, 'tier', 4)).toBe(tiereDetailPfad(E, 4));
     });
     it('rueckwegPfad: die UHS hat keinen äußeren Einstieg, ein unbekannter Typ kein Ziel', () => {
       expect(rueckwegPfad(E, 'uhs', 2)).toBeNull();
       // Ein Typ von außerhalb der Union (etwa aus einer manipulierten URL) findet kein Ziel.
-      expect(rueckwegPfad(E, 'tier' as never, 2)).toBeNull();
+      expect(rueckwegPfad(E, 'katze' as never, 2)).toBeNull();
       expect(rueckwegPfad(E, 'toString' as never, 2)).toBeNull();
     });
+  });
+  it('der Platzier-Auftrag „tier“ überlebt den Weg durch die URL (LLH-1123)', () => {
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'tier', id: 4, zurueck: true } });
+    const url = new URL(pfad, 'http://x');
+    expect(url.searchParams.get('platzieren')).toBe('tier:4');
+    expect(url.searchParams.get('zurueck')).toBe('1');
+    expect(parsePlatzierenAuftrag('tier:4')).toEqual({ typ: 'tier', id: 4 });
+    expect(parsePlatzierenAuftrag('tier:abc')).toBeNull();
   });
   it('lagekartePfad trägt ?evakuierungsbezirk= (LFH-673)', () => {
     const pfad = lagekartePfad(E, { evakuierungsbezirk: 5 });
@@ -519,6 +560,11 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     const bezirk = evakuierungPfad(E, { bezirk: 12 });
     expect(bezirk.split('?')[0]).toBe('/einsaetze/5/evakuierung');
     expect(new URLSearchParams(bezirk.split('?')[1]).get('bezirk')).toBe('12');
+  });
+
+  it('evakuierungsbezirkPfad ist die Item-Route unter dem Modul (LLH-1076)', () => {
+    // Unter dem Segment `evakuierung`: Sperre und Sichtbarkeit erbt die Detailseite vom Modul.
+    expect(evakuierungsbezirkPfad(E, 12)).toBe('/einsaetze/5/evakuierung/12');
   });
 
   it('wetterPegelPfad (LFH-633)', () => {

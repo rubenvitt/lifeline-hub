@@ -1,7 +1,8 @@
 # Entwürfe — Regeln
 
-Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDetailPage.tsx`
-und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
+Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDetailPage.tsx`,
+`pages/LageberichtDetailPage.tsx` und `pages/PressemitteilungDetailPage.tsx`, ergänzt
+`frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
 - **Verlustschutz ist ein Hook:** `entwurf/useEntwurfVerlustschutz.ts` (Riegel gegen
   Fremd-Refetch, Autosave 30 s + Blur, `beforeunload`); `pages/BefehlDetailPage.tsx` und
@@ -12,7 +13,8 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   Formularseiten (`components/VerlassenRueckfrage.tsx`, LFH-979) mit „Speichern und weiter“.
 - **Ein Klick auf „Entwurf speichern" ist EIN PATCH:** einzige Pforte `speichereJetzt`,
   `gesichertRef` (Start `-1`), `speichertGerade` speist den Blocker, **nicht** `loading` am Knopf.
-- Einstiegsfokus im ersten LEEREN Abschnitt (`entwurf/Einstiegsfokus.tsx`).
+- Einstiegsfokus im ersten LEEREN Abschnitt des Serverstands (`entwurf/Einstiegsfokus.tsx`, im
+  Baustein `DokumentEntwurf`, beim Einhängen eingefroren).
 - **Anlagen** (LFH-1028): `entwurf/DokumentAnlagen.tsx` an Lagebericht und Befehl, am Schirm ein
   Paneel, auf Papier je Anlage ein Blatt A4 quer (`entwurf/dokumentAnlagen.css`; das Bild bleibt
   inline, als Block schob Chromium es auf ein eigenes Blatt). Die Druckfassung hängt immer im DOM,
@@ -20,9 +22,28 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
   Anlage und ohne Anfügen steht nichts außer dem Grund eines gescheiterten Anfügens (Höhe der
   Entwurfsseite, `e2e/lagebericht-schmal.spec.ts`).
   Live über `anlagen` am Ereignis des Dokuments, eigene Keys außerhalb des Offline-Lagebilds.
-- Lagebericht: Abschnitte als Akkordeon (`lageberichte/AbschnittsAkkordeon.tsx`, `memo`, alle
-  Props identitätsstabil; Gate ist der Render-Zähler im Test, `rerender` mit neuem Element).
-  Tippmessung `e2e/lagebericht-tippen.spec.ts` (Deckel nur mit `PW_LATENZ=1`).
+- **Gegliederte Dokumente: ein Baustein `entwurf/DokumentEntwurf.tsx`** (LLH-1074, Spec
+  `dokument-entwurf`; ersetzt das Akkordeon des Lageberichts aus LFH-348). Lagebericht, Befehl
+  und Pressemitteilung schreiben ihre Abschnitte nur darüber, keine Seite baut eine eigene
+  Abschnittsmechanik. Paneel „Entwurf“ mit Füllstand und Umschalter „Bearbeiten | Lesefassung“
+  für das GANZE Dokument; der Kopfblock (`kopf`) trägt die Felder der Seite. Die Gliederung ist
+  eine Sprungleiste mit Leer-Marke (Zeichen und Wort „leer“), ab `xl` links und klebend, darunter
+  eine Zeile, die in sich rollt. Alle Abschnitte stehen offen untereinander; der Editor wächst mit
+  dem Inhalt (leer einzeilig, `EDITOR_ZEILEN`), damit löst sich die Höhenfrage aus LFH-348 nicht
+  durch Verstecken. Keine Vorschau-Spalte je Abschnitt: die Lesefassung zeigt das Dokument, wie
+  es gedruckt wird; die Editoren bleiben dabei eingehängt (`hidden`).
+  - Der Kopf eines Abschnitts trägt Name (h3), Hilfetext (`aria-describedby`) und die
+    `aktion`-Render-Prop der Seite: dort setzt der Lagebericht `AbschnittUebernahme`. Neue
+    Füllwege setzen an derselben Stelle an, der Baustein kennt keine Quelle.
+  - Tippen rendert nur das eigene `Form.Item`: die Seite beobachtet nur die Felder des
+    Druckkopfs, nie `useWatch([])`; der Baustein liest die Leer-Kette über `Form.useWatch` mit
+    Selektor (`dokumentEntwurfKern.ts`). `AbschnittBlock` ist `memo`, alle Props
+    identitätsstabil (`aktion` per `useCallback`). Gate ist der Render-Zähler in
+    `DokumentEntwurf.test.tsx` (`rerender` mit neuem Element), die Tippmessung
+    `e2e/lagebericht-tippen.spec.ts` (Deckel nur mit `PW_LATENZ=1`, beide Seiten).
+  - Druck in `entwurf/dokumentEntwurf.css`: im Bearbeiten die Druckfassung je Editor mit
+    Papiertitel (LFH-1008), in der Lesefassung die Lesefassung; Bedienung weicht. Die
+    Druck-CSS der Seiten trägt keine Editor-Regel (`pages/*Print.test.ts`).
 - **Lageberichte-Übersicht** (LLH-1064): Paneele „Aktueller Lagevortrag“ (jüngste Freigabe nach
   Zeitstand) · „In Arbeit“ · „Verlauf“, Teilung nur in `lageberichte/uebersicht.ts`, jeder Bericht
   genau einmal. Text, Füllstand („5/8 Abschnitte“) und „zuletzt gespeichert“ aus dem Einzelabruf

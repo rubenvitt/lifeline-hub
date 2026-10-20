@@ -62,6 +62,12 @@ const brApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/einsatzBereitstellungsraum', () => brApi);
 
+// Tier verorten (LLH-1123): der Platzier-Auftrag PATCHt nur das Fundort-Paar.
+const tierApi = vi.hoisted(() => ({
+  aktualisiereTier: vi.fn(() => Promise.resolve({ id: 12 })),
+}));
+vi.mock('../../api/einsatzTier', () => tierApi);
+
 // Die übrigen Zweige von `loescheVerortung`: je Objektart eine eigene API.
 const einsatzSchadenApi = vi.hoisted(() => ({
   aktualisiereSchaden: vi.fn(() => Promise.resolve({ id: 3 })),
@@ -989,6 +995,107 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
   });
 });
 
+/**
+ * Zeichnen mit Bezirk (LLH-1069): die Zone entsteht in EINEM POST mit Bezeichnung und Zuordnung,
+ * danach steht die Rückmeldung „Gebiet … gespeichert“ statt einer Serie.
+ */
+describe('useKartenInteraktion — Gebiet eines Bezirks zeichnen (LLH-1069)', () => {
+  const UFER = { id: 5, bezeichnung: 'Uferstraße 12–40' };
+  const ENTWURF = { typ: 'evakuierungsbezirk' as const, modus: 'polygon' as const, bezirk: UFER };
+
+  it('ein POST mit label und evakuierungsbezirk_id, danach die Rückmeldung — keine Serie', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const erfolg = vi.fn();
+    const client = neuerQueryClient();
+    const spion = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbarRef: { current: [] },
+          aktiveAnsichtId: 2,
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
+          erfolg,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    act(() => result.current.onZoneZeichnenStart(ENTWURF));
+    // Serie an (Vorgabe) — mit Bezug zählt sie nicht.
+    expect(result.current.zoneSerie).toBe(true);
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+    expect(lagezonenApi.legeZoneAn).toHaveBeenCalledWith(1, {
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      geometrie: JSON.stringify(POLYGON),
+      label: 'Uferstraße 12–40',
+      farbe: null,
+      ansicht_id: 2,
+      evakuierungsbezirk_id: 5,
+    });
+    await waitFor(() => expect(result.current.gebietGezeichnet).toEqual(UFER));
+    expect(erfolg).toHaveBeenCalledWith('Zone angelegt');
+    expect(result.current.zoneEntwurf).toBeNull();
+    expect(result.current.zoneSerieAnzahl).toBe(0);
+    // Die Rückmeldung ist kein exklusiver Modus: die Karte ist wieder frei bedienbar.
+    expect(result.current.exklusiverModusAktiv).toBe(false);
+    // Die Flächenzahl am Bezirk: der eigene Abruf wirkt auch bei gestörtem Strom.
+    const schluessel = spion.mock.calls.map((c) =>
+      JSON.stringify((c[0] as { queryKey: unknown }).queryKey),
+    );
+    expect(schluessel).toContain(JSON.stringify(einsatzKeys.evakuierung(1)));
+
+    act(() => result.current.onGebietGezeichnetSchliessen());
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+
+  it('ohne Bezug geht keine Zuordnung und keine Bezeichnung hinaus', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'evakuierungsbezirk', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+    const body = (lagezonenApi.legeZoneAn.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+    expect(body).not.toHaveProperty('evakuierungsbezirk_id');
+    expect(body).not.toHaveProperty('label');
+    await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+
+  it('scheitert das Anlegen, gibt es keine Rückmeldung „gespeichert“', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    lagezonenApi.legeZoneAn.mockImplementationOnce(() => Promise.reject(new Error('409')));
+    const fehler = vi.fn();
+    const { result } = rendere(fehler);
+    act(() => result.current.onZoneZeichnenStart(ENTWURF));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(fehler).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.zoneEntwurf).toBeNull());
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+
+  it('ein anderer Modus verdrängt die Rückmeldung', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart(ENTWURF));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(result.current.gebietGezeichnet).toEqual(UFER));
+    act(() => result.current.onMessenStart('strecke'));
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+});
+
 describe('useKartenInteraktion — Messen (LFH-616)', () => {
   it('wechselt die Form ohne Umweg über idle und endet nur auf eigenes Beenden', () => {
     const { result } = rendere();
@@ -1097,6 +1204,48 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
       expect(keys).toContainEqual(einsatzKeys.br(1));
     });
   });
+
+  it('Tier (LLH-1123): Klick PATCHt NUR das Fundort-Paar und invalidiert Liste und Detail', async () => {
+    tierApi.aktualisiereTier.mockClear();
+    const { result, invalidiert, erfolg } = mitClient();
+    act(() => result.current.onPlatzierenStart({ typ: 'tier', id: 12 }));
+    act(() => result.current.onKarteKlick({ lng: 8.87, lat: 51.93 }));
+    await waitFor(() => expect(tierApi.aktualisiereTier).toHaveBeenCalledTimes(1));
+    // Ohne `basis_geaendert_at`: der Punkt auf der Karte ist die neueste Aussage.
+    expect(tierApi.aktualisiereTier).toHaveBeenCalledWith(1, 12, {
+      antreff_lat: 51.93,
+      antreff_lon: 8.87,
+    });
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+    expect(keys).toContainEqual(einsatzKeys.tiere(1));
+    expect(keys).toContainEqual(einsatzKeys.tier(1, 12));
+  });
+
+  it('Tier (LLH-1123): Verortung löschen schickt null/null', async () => {
+    tierApi.aktualisiereTier.mockClear();
+    const { result, invalidiert } = mitClient();
+    act(() =>
+      result.current.loescheVerortung({
+        schluessel: 'tier-12',
+        typ: 'tier',
+        id: 12,
+        lat: 51.93,
+        lon: 8.87,
+        label: 'T-012 (Hund)',
+        farbe: '#000',
+      }),
+    );
+    await waitFor(() => expect(tierApi.aktualisiereTier).toHaveBeenCalledTimes(1));
+    expect(tierApi.aktualisiereTier).toHaveBeenCalledWith(1, 12, {
+      antreff_lat: null,
+      antreff_lon: null,
+    });
+    await waitFor(() => {
+      const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+      expect(keys).toContainEqual(einsatzKeys.tiere(1));
+    });
+  });
 });
 
 /**
@@ -1168,6 +1317,7 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     ['abschnitt', einsatzabschnitteApi.zeichneAbschnitt],
     ['betreuungsstelle', betreuungApi.aendereStelle],
     ['bereitstellungsraum', brApi.aktualisiereBr],
+    ['tier', tierApi.aktualisiereTier],
     ['person', einsatzPersonApi.aktualisierePerson],
   ];
 

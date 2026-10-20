@@ -169,11 +169,11 @@ ETB-Sammeltreffer „Alle Einträge zu …“ und der Koordinatensprung.
 
 #### Scenario: Gefahrengebiet mit bewerteten Gefahren
 - **WHEN** ein Gefahrengebiet als Treffer markiert ist, dessen Matrix Bewertungen über „keine“ trägt, und → gedrückt wird
-- **THEN** zeigt die Palette Name und höchste Warnstufe des Gebiets und eine Gefahrenmatrix nur mit den Gefahren, die mindestens eine solche Bewertung haben; jede Zelle nennt ihre Warnstufe mit Kürzel, nicht allein über Farbe
+- **THEN** zeigt die Palette Name, höchste Warnstufe und Beurteilung des Gebiets („beurteilt <DTG> · <Name>“ oder „nicht beurteilt“) und eine Gefahrenmatrix nur mit den Gefahren, die mindestens eine solche Bewertung haben; jede gültige Zelle nennt ihre Warnstufe mit Kürzel, nicht allein über Farbe, eine Zelle ohne Bewertung steht als „–“ (keine), und eine nicht anwendbare Zelle ist schraffiert, ohne Text
 
 #### Scenario: Gefahrengebiet ohne bewertete Gefahren
 - **WHEN** ein Gefahrengebiet ohne Bewertung über „keine“ in der Vorschau geöffnet wird
-- **THEN** steht statt der Matrix der Satz, dass keine Gefahren bewertet sind
+- **THEN** steht statt der Matrix der Satz „Keine Gefahr über Stufe „keine“.“, und die Beurteilung des Gebiets steht weiter in der Vorschau
 
 #### Scenario: Ziel an jeder Datensatzzeile
 - **WHEN** Treffer jeder der zwölf Datensatzsorten in der Liste stehen

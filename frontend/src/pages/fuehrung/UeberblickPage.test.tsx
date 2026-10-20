@@ -296,7 +296,7 @@ describe('UeberblickPage', () => {
     expect(b.getByText('F/UF/M//Σ 1/0/1//2')).toBeInTheDocument();
     // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz.
     expect(links[2]).toHaveTextContent('hoch');
-    expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe');
+    expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt');
     expect(links[2]).not.toHaveTextContent(/Pegel/);
     expect(b.getByText('davon 1 ü.')).toBeInTheDocument();
     expect(b.getByText('Abschnitt Nord')).toBeInTheDocument();
@@ -317,7 +317,10 @@ describe('UeberblickPage', () => {
     await waitFor(() => expect(within(band()).getByText(/Pegel 6,84 m/)).toBeInTheDocument());
     const warnstufe = within(band()).getAllByRole('link')[2];
     expect(warnstufe).toHaveTextContent('hoch');
-    expect(warnstufe).toHaveTextContent('1 Gefahrengebiet mit Warnstufe · Pegel 6,84 m steigend');
+    // Das Gebiet der Testdaten ist nicht beurteilt (LLH-1090): das steht vor dem Pegel.
+    expect(warnstufe).toHaveTextContent(
+      '1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt · Pegel 6,84 m steigend',
+    );
     // Die Kennzahl gehört weiter der Warnstufe: Ziel bleibt die Gefahrenseite.
     expect(warnstufe).toHaveAttribute('href', '/einsaetze/1/gefahren');
   });

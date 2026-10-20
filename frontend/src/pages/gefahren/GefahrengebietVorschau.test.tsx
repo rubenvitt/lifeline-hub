@@ -69,7 +69,31 @@ describe('GefahrengebietVorschau (LFH-664)', () => {
 
     expect(await screen.findByText('keine Stufe gesetzt')).toBeInTheDocument();
     expect(screen.queryByText(/unbewertet/)).not.toBeInTheDocument();
-    expect(await screen.findByText('Keine Gefahren bewertet.')).toBeInTheDocument();
+    expect(await screen.findByText('Keine Gefahr über Stufe „keine“.')).toBeInTheDocument();
+  });
+
+  /** LLH-1090: statt der Zellzählung steht die Beurteilung des Gebiets. */
+  it('nennt ein nie bestätigtes Gebiet „nicht beurteilt“', async () => {
+    liefere([gebiet()]);
+    renderMitProviders(<GefahrengebietVorschau einsatzId={5} id={3} />);
+
+    expect(await screen.findByText('nicht beurteilt')).toBeInTheDocument();
+  });
+
+  it('nennt Zeit und Person einer bestätigten Beurteilung', async () => {
+    liefere([
+      gebiet({
+        beurteilt_at: '2026-10-20 13:15:00',
+        beurteilt_von: 2,
+        beurteilt_von_name: 'Einsatzleitung',
+      }),
+    ]);
+    renderMitProviders(<GefahrengebietVorschau einsatzId={5} id={3} />);
+
+    expect(
+      await screen.findByText(/^beurteilt \d{6}[A-Z]{3}\d{4} · Einsatzleitung$/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('nicht beurteilt')).not.toBeInTheDocument();
   });
 
   it('zeigt das Gebiet, während die Matrix noch lädt', async () => {

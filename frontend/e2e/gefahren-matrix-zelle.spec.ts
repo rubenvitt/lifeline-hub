@@ -62,8 +62,8 @@ test('jede Matrix-Zelle misst auf dem Tablet mindestens 44 px', async ({ page })
   const zellen = page.getByRole('button', { name: /^Bewertung / });
   await expect(zellen.first()).toBeVisible();
   const n = await zellen.count();
-  // 13 Gefahrentypen × 5 Schutzobjekte = 65, davon 58 bedienbar; der Rest ist `n. a.` ohne
-  // Knopf.
+  // 13 Gefahrentypen × 5 Schutzobjekte = 65, davon 58 bedienbar; der Rest ist schraffiert
+  // („nicht anwendbar“) ohne Knopf.
   expect(n).toBeGreaterThanOrEqual(58);
   for (let i = 0; i < n; i += 1) {
     const zelle = zellen.nth(i);

@@ -143,7 +143,7 @@ describe('BefehlDetailPage', () => {
   });
 
   // Die Überschriftenebene nennt der Einbauort: lesend unter dem Abschnittskopf (h3) → `#` wird h4;
-  // im Entwurf unter dem Paneel „Entwurf" (h2) → h3.
+  // im Entwurf ebenso unter dem Abschnittskopf (h3) des Bausteins `DokumentEntwurf` → h4.
   it('setzt eine Markdown-Überschrift lesend unter den Abschnittskopf (h4)', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
       ...befehl('freigegeben'),
@@ -156,16 +156,15 @@ describe('BefehlDetailPage', () => {
     );
   });
 
-  it('setzt eine Markdown-Überschrift im Entwurf unter das Paneel (h3)', async () => {
+  it('setzt eine Markdown-Überschrift im Entwurf unter den Abschnittskopf (h4)', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
       ...befehl('entwurf'),
       abschnitte: [{ schluessel: 'lage', text: '# Kopfzeile' }],
     } as never);
     renderAt(7);
-    expect(await screen.findByRole('heading', { name: 'Kopfzeile' })).toHaveProperty(
-      'tagName',
-      'H3',
-    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Lesefassung' }));
+    expect(screen.getByRole('heading', { level: 3, name: 'Lage' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Kopfzeile' })).toHaveProperty('tagName', 'H4');
   });
 
   it('zeigt freigegeben read-only mit Fortschreiben', async () => {
@@ -948,14 +947,15 @@ describe('BefehlDetailPage — Druckwurzel (LFH-71)', () => {
     expect(wurzel()).toContainElement(screen.getByText('Die Lage ist ruhig.'));
   });
 
-  it('Entwurfszweig: genau eine Wurzel, jede Editor-Vorschau liegt darin', async () => {
+  it('Entwurfszweig: genau eine Wurzel, jede Druckfassung liegt darin', async () => {
     vi.mocked(befehleApi.ladeBefehl).mockResolvedValue({
       ...befehl('entwurf'),
       abschnitte: [{ schluessel: 'lage', text: 'Die Lage ist ruhig.' }],
     } as never);
     renderAt(7);
     await screen.findByLabelText('Lage');
-    const vorschauen = document.querySelectorAll('.markdown-editor__vorschau');
+    // Im Entwurf die Druckfassung je Editor (`entwurf/dokumentEntwurf.css`).
+    const vorschauen = document.querySelectorAll('.markdown-editor__druck');
     expect(vorschauen.length).toBeGreaterThan(0);
     for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
     expect(wurzel()).toContainElement(screen.getByLabelText('Lage'));
@@ -1029,7 +1029,8 @@ describe('BefehlDetailPage — Entwurfsdruck (LFH-731)', () => {
     );
     // Gespeichert wurde nichts: der Kopf folgt dem Formular, nicht einem PATCH.
     expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
-    expect(feld.closest('.befehl-no-print')).not.toBeNull();
+    // Der Kopfblock weicht im Druck (`entwurf/dokumentEntwurf.css`).
+    expect(feld.closest('[data-lfh="entwurf-kopf"]')).not.toBeNull();
   });
 
   it('Lesezweig: der Druckkopf trägt weiter den gespeicherten Titel (Gegenaussage)', async () => {
@@ -1267,7 +1268,8 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
     await waitFor(() => expect(within(druckkopf()).getByText('Verteiler')).toBeInTheDocument());
     expect(within(druckkopf()).getByText('EA Süd')).toBeInTheDocument();
     expect(befehleApi.aktualisiereBefehl).not.toHaveBeenCalled();
-    expect(feld.closest('.befehl-no-print')).not.toBeNull();
+    // Der Kopfblock weicht im Druck (`entwurf/dokumentEntwurf.css`).
+    expect(feld.closest('[data-lfh="entwurf-kopf"]')).not.toBeNull();
   });
 
   it('ein freigegebener Befehl nennt den Verteiler am Schirm und im Druckkopf', async () => {

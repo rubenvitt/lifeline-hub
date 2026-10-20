@@ -2,7 +2,7 @@
 titel: Presse und Infotelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
+quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick
@@ -45,10 +45,12 @@ Zurück auf „offen“ geht jeder Kontakt an derselben Stelle; die App bietet d
 1. In der „Pressearbeit“ „Neue Pressemitteilung“ wählen.
 2. „Titel“ eintragen und die „Vorlage“ wählen: Erstinformation, Folgeinformation, Hinweis an die
    Bevölkerung oder Freie Mitteilung. „Anlegen“ öffnet den Entwurf.
-3. Die Abschnitte der Vorlage nacheinander aufklappen und ausfüllen; „Vorschau neben dem Text“
-   zeigt das Ergebnis daneben.
+3. Die Abschnitte der Vorlage ausfüllen. Sie stehen offen untereinander; die „Gliederung“ springt
+   zu einem Abschnitt und nennt leere mit „leer“. „Lesefassung“ zeigt die ganze Mitteilung
+   gesetzt, „Bearbeiten“ führt zurück. Der Entwurf ist derselbe wie beim Lagebericht
+   ([Lageberichte](lageberichte.md)).
 
-   ![Entwurf einer Pressemitteilung mit Titel, Zeitstand und aufgeklapptem Abschnitt „Sachverhalt“](../bilder/presse-infotelefon/pressemitteilung.png)
+   ![Entwurf einer Pressemitteilung mit Gliederung, Titel, Zeitstand und den offenen Abschnitten, darin „Sachverhalt“ mit Text](../bilder/presse-infotelefon/pressemitteilung.png)
 
 4. „Entwurf speichern“ wählen.
 5. Für die Einsatzleitung: „Freigeben“ wählen und die Rückfrage „Pressemitteilung freigeben?“

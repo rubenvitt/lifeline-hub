@@ -4452,6 +4452,12 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
       soll,
       `Auf Karte zeigen (${dichte})`,
     );
+    // LLH-1090: die Beurteilung je Gebiet ist ein Knopf in Steuerhöhe.
+    const beurteilung = await haeltStufe(
+      page.getByRole('button', { name: 'Beurteilung bestätigen', exact: true }),
+      soll,
+      `Beurteilung bestätigen (${dichte})`,
+    );
     await expect(page.locator('a button'), 'kein Knopf in einem Link').toHaveCount(0);
     // Knopf und Sprung stehen nebeneinander: der Zielabstand der Stufe gilt zwischen ihnen.
     const abstand = await abstandZuNachbarn(
@@ -4469,13 +4475,14 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
     je.set(`${dichte} Gebietszeile`, gebiet);
     je.set(`${dichte} Umbenennen`, umbenennen);
     je.set(`${dichte} Sprung`, sprung);
+    je.set(`${dichte} Beurteilung`, beurteilung);
     gemessen.push(
       `${dichte}: Zelle kurz ${zelle.kleinstes} / lang ${zelle.groesstes}, Gebietszeile ${gebiet}, ` +
-        `Umbenennen ${umbenennen}, Sprung ${sprung}, Abstand ${abstand}`,
+        `Umbenennen ${umbenennen}, Sprung ${sprung}, Beurteilung ${beurteilung}, Abstand ${abstand}`,
     );
   }
 
-  for (const sorte of ['Matrixzelle', 'Gebietszeile', 'Umbenennen', 'Sprung'])
+  for (const sorte of ['Matrixzelle', 'Gebietszeile', 'Umbenennen', 'Sprung', 'Beurteilung'])
     gegenprobe(je, sorte);
   // Obergrenze: in `kompakt` ist keine Zelle ≥ 48 px — sonst stünde sie auch ohne Staffel auf
   // komfortabel-Maß, und die Messung oben bewiese nichts.
@@ -4513,7 +4520,11 @@ test('Gefahrenmatrix (Beobachter): Gebietszeilen und „Auf Karte zeigen" folgen
     ).toHaveCount(0);
     // Die Legende bleibt auch lesend da (LFH-969).
     await expect(page.getByRole('note', { name: 'Legende der Matrix' })).toBeVisible();
-    await expect(page.getByText('58 Felder unbewertet')).toBeVisible();
+    // LLH-1090: statt der Zellzählung die Beurteilung des Gebiets, ohne Knopf.
+    await expect(
+      page.locator('[data-lfh="gefahrengebiet-beurteilung"]').getByText('nicht beurteilt'),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Beurteilung bestätigen' })).toHaveCount(0);
 
     let gebiet = Number.POSITIVE_INFINITY;
     for (const label of gebiete) {

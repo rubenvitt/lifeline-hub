@@ -78,15 +78,30 @@ describe('PressemitteilungDetailPage (LFH-554)', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Warnung Deich' }),
     ).toBeInTheDocument();
-    // Die Akkordeon-Köpfe sind die Gliederung; jeder Abschnitt trägt zusätzlich ein Feldetikett.
-    const koepfe = [...document.querySelectorAll('.ant-collapse-header')].map((k) => k.textContent);
-    expect(koepfe).toEqual([
+    // Die Gliederung des Bausteins `DokumentEntwurf` (LLH-1074): je Abschnitt ein Sprung, leere
+    // mit dem Wort „leer“; alle Abschnitte stehen offen mit ihrem Feld.
+    const gliederung = await screen.findByRole('navigation', { name: 'Gliederung' });
+    await waitFor(() =>
+      expect(
+        within(gliederung)
+          .getAllByRole('button')
+          .map((b) => b.textContent),
+      ).toEqual([
+        'Gefahr',
+        'Betroffenes Gebiet leer',
+        'Verhaltenshinweise leer',
+        'Weitere Informationen leer',
+      ]),
+    );
+    for (const name of [
       'Gefahr',
-      'Betroffenes Gebiet (leer)',
-      'Verhaltenshinweise (leer)',
-      'Weitere Informationen (leer)',
-    ]);
-    expect(screen.getByText('Entwurf')).toBeInTheDocument();
+      'Betroffenes Gebiet',
+      'Verhaltenshinweise',
+      'Weitere Informationen',
+    ])
+      expect(screen.getByRole('textbox', { name })).toBeVisible();
+    // Status im Seitenkopf, Paneel „Entwurf“ über den Abschnitten.
+    expect(screen.getAllByText('Entwurf').length).toBeGreaterThanOrEqual(1);
   });
 
   it('Führungspersonal: Freigeben gesperrt sichtbar, der Grund nennt die Einsatzleitung', async () => {

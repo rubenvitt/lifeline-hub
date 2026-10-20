@@ -15,7 +15,7 @@ import {
   verdichtePersonen,
 } from './lageVerdichtung';
 import { verdichteSchaeden, verdichteTiere, verdichteUhs } from './lageVerdichtung';
-import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
+import { beurteilungHinweis, sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { sichtungsbild } from '../../personen/personenBilanz';
 
 function person(p: Partial<Person>): Person {
@@ -308,8 +308,8 @@ describe('verdichteGefahrenmatrix', () => {
       schutzobjekt: 'menschen',
     }) as GefahrBewertung;
 
-  it('leere Matrix → keine Zeilen, alle 13 Typen unbewertet', () => {
-    expect(verdichteGefahrenmatrix([])).toEqual({ zeilen: [], unbewertet: 13 });
+  it('leere Matrix → keine Zeilen', () => {
+    expect(verdichteGefahrenmatrix([])).toEqual({ zeilen: [] });
   });
 
   it('nimmt je Typ die höchste Stufe über Gebiete und Schutzobjekte (ordinal, nicht lexikalisch)', () => {
@@ -335,10 +335,41 @@ describe('verdichteGefahrenmatrix', () => {
     expect(zeilen.map((z) => z.typ)).toEqual(['atemgifte', 'explosion', 'ertrinken']);
   });
 
-  it('„keine" ist eine bewertete Zeile, kein unbewerteter Typ', () => {
-    const v = verdichteGefahrenmatrix([b('brand', 'keine')]);
-    expect(v.zeilen).toEqual([{ typ: 'brand', label: 'Brand', stufe: 'keine' }]);
-    expect(v.unbewertet).toBe(12);
+  /** LLH-1090: „keine“ ist die Vorgabe; gesetzt oder nicht, sie ergibt keine Zeile. */
+  it('„keine“ ergibt keine Zeile, auch ausdrücklich gesetzt', () => {
+    expect(verdichteGefahrenmatrix([b('brand', 'keine')])).toEqual({ zeilen: [] });
+    expect(verdichteGefahrenmatrix([b('brand', 'keine', 1), b('brand', 'niedrig', 2)])).toEqual({
+      zeilen: [{ typ: 'brand', label: 'Brand', stufe: 'niedrig' }],
+    });
+  });
+});
+
+describe('beurteilungHinweis (LLH-1090)', () => {
+  const g = (id: number, label: string | null, beurteilt = false): Gefahrengebiet => ({
+    id,
+    einsatz_id: 1,
+    label,
+    zonen_ids: [],
+    hoechste_warnstufe: 'keine',
+    ...(beurteilt ? { beurteilt_at: '2026-10-20 13:15:00', beurteilt_von: 1 } : {}),
+  });
+
+  it('ohne Gebiete oder mit lauter beurteilten: kein Hinweis', () => {
+    expect(beurteilungHinweis([])).toBeNull();
+    expect(beurteilungHinweis([g(1, 'Nord', true)])).toBeNull();
+  });
+
+  it('nennt bis zu zwei nicht beurteilte Gebiete mit Namen', () => {
+    expect(beurteilungHinweis([g(1, 'Hangrutsch Kirchberg'), g(2, 'Nord', true)])).toBe(
+      'Hangrutsch Kirchberg: nicht beurteilt',
+    );
+    expect(beurteilungHinweis([g(1, 'Hangrutsch Kirchberg'), g(2, null)])).toBe(
+      'Hangrutsch Kirchberg: nicht beurteilt · Gefahrengebiet #2: nicht beurteilt',
+    );
+  });
+
+  it('zählt ab drei', () => {
+    expect(beurteilungHinweis([g(1, 'A'), g(2, 'B'), g(3, 'C')])).toBe('3 Gebiete nicht beurteilt');
   });
 });
 

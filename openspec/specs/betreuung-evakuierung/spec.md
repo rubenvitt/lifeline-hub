@@ -57,17 +57,94 @@ Die Oberfläche SHALL das Modul Evakuierung als eigene Seite der Kategorie Erfas
 eine Primäraktion „Evakuierungsbezirk anlegen“ tragen, darunter ein Kennzahlenband der Räumung
 (Evakuiert, Geplant, Räumung läuft, Geräumt, Ohne Meldung) und eine Tabelle der Bezirke mit
 „Stand melden“ je Zeile und dem Verlauf als Aufklappbereich. Ohne aktiven Bezirk MUST das
-Kennzahlenband entfallen statt Nullen zu zeigen. `?bezirk=<id>` MUST den Bezirk hervorheben.
-Die Adresse `…/betreuung?bezirk=<id>` MUST auf `…/evakuierung?bezirk=<id>` umleiten. Die Seite
-Betreuung MUST nur Stellen führen, mit der Primäraktion „Betreuungsstelle anlegen“.
+Kennzahlenband entfallen statt Nullen zu zeigen. Die Bezeichnung jedes Bezirks MUST ein Link
+auf seine Detailseite sein. `?bezirk=<id>` ist eine Altadresse: sie MUST auf die Detailseite
+`…/evakuierung/<id>` umleiten, ohne die Übersicht zu laden; ein unlesbarer Wert MUST auf der
+Übersicht bleiben. Die Adresse `…/betreuung?bezirk=<id>` MUST auf `…/evakuierung?bezirk=<id>`
+umleiten. Die Seite Betreuung MUST nur Stellen führen, mit der Primäraktion
+„Betreuungsstelle anlegen“.
 
 #### Scenario: Alter Link auf einen Bezirk
 - **WHEN** jemand `/einsaetze/1/betreuung?bezirk=6` öffnet
-- **THEN** steht die Evakuierungsseite mit Bezirk 6 hervorgehoben, und die Betreuung wird nicht geladen
+- **THEN** steht die Detailseite von Bezirk 6, und die Betreuung wird nicht geladen
+
+#### Scenario: Bezirk aus der Übersicht öffnen
+- **WHEN** in der Tabelle die Bezeichnung „Uferstraße 12–40“ gewählt wird
+- **THEN** öffnet sich die Detailseite dieses Bezirks
 
 #### Scenario: Kein aktiver Bezirk
 - **WHEN** der Einsatz keinen aktiven Bezirk hat
 - **THEN** zeigt die Seite kein Kennzahlenband und sagt „Keine Evakuierungsbezirke“
+
+### Requirement: Detailseite eines Evakuierungsbezirks
+
+Die Oberfläche SHALL je nicht storniertem Bezirk eine Detailseite unter
+`/einsaetze/<id>/evakuierung/<bezirk-id>` führen, gegatet wie die Modulseite Evakuierung. Eine
+ungültige, unbekannte, fremde oder stornierte Kennung MUST zur Übersicht zurückführen. Der Kopf
+MUST die Bezeichnung mit dem Räumungszustand als Wort und genau eine Primäraktion „Stand
+melden“ tragen. Die Seite MUST die Kennzahlen Evakuiert, Geplant, Anteil mit Balken und letzte
+Meldung zeigen, geschätzte Werte mit „≈“. 
+#### Scenario: Unbekannte Kennung
+- **WHEN** jemand `/einsaetze/1/evakuierung/99` öffnet und der Einsatz keinen Bezirk 99 führt
+- **THEN** steht die Übersicht der Evakuierung
+
+#### Scenario: Beobachter
+- **WHEN** eine Person ohne Schreibrecht die Detailseite öffnet
+- **THEN** sieht sie Kennzahlen, Gebiet, Stammdaten und Verlauf, aber weder „Stand melden“ noch „Bearbeiten“
+- **AND** ein Hinweis nennt den Grund
+
+### Requirement: Räumungsschritte auf der Detailseite
+
+Die Detailseite SHALL die Wechsel des Räumungszustands als Knöpfe anbieten: den nächsten
+Schritt neben der Primäraktion, Rückwege im Menü. „Anordnung aufheben“ MUST rot abgesetzt im
+Menü stehen und vor dem Senden eine Rückfrage stellen; „Stornieren“ MUST im Menü stehen. Ein
+Schritt MUST dieselben ETB-Einträge erzeugen wie jeder andere Wechsel des Räumungszustands.
+
+#### Scenario: Räumung beginnen
+- **WHEN** auf der Detailseite eines angeordneten Bezirks „Räumung beginnen“ gewählt wird
+- **THEN** trägt der Bezirk den Zustand `laeuft`, und das ETB enthält einen Meldungseintrag
+
+#### Scenario: Anordnung aufheben fragt nach
+- **WHEN** im Menü „Anordnung aufheben“ gewählt wird
+- **THEN** erscheint eine Rückfrage mit rotem Knopf, und erst ihre Bestätigung setzt `aufgehoben`
+
+### Requirement: Gebiet auf der Detailseite
+
+Die Detailseite SHALL die dem Bezirk zugeordneten Flächen in einem nicht bedienbaren
+Kartenausschnitt zeigen und einen Sprung „Auf Lagekarte öffnen“ anbieten. Ohne Fläche MUST ein
+Leerzustand in Worten stehen, ohne Sprung. Personen mit Schreibrecht MUST das Gebiet ohne Fläche
+„Gebiet zeichnen“ und mit Fläche „Weitere Teilfläche zeichnen“ anbieten (LLH-1069); beides öffnet
+die Lagekarte im Zeichenmodus für eine Fläche dieses Bezirks. Ohne Lesezugriff auf das Modul
+Lagekarte MUST die Seite die Flächen nicht abrufen, ihre Zahl nennen und den Sprung wie das Zeichnen
+gesperrt mit Grund zeigen.
+
+#### Scenario: Bezirk ohne Fläche
+- **WHEN** der Bezirk keine zugeordnete Zone hat
+- **THEN** sagt das Gebiet „Kein Gebiet auf der Lagekarte“, bietet keinen Sprung an und mit Schreibrecht „Gebiet zeichnen“
+
+#### Scenario: Weitere Teilfläche von der Detailseite
+- **WHEN** der Bezirk eine Fläche hat und die Person schreiben darf
+- **THEN** steht neben „Auf Lagekarte öffnen“ „Weitere Teilfläche zeichnen“
+
+#### Scenario: Lagekarte gesperrt
+- **WHEN** der Bezirk zwei Flächen hat und die Person die Lagekarte nicht lesen darf
+- **THEN** steht „2 Flächen auf der Lagekarte“, und „Auf Lagekarte öffnen“ ist gesperrt mit Grund
+
+### Requirement: Stammdaten des Bezirks in der Ansicht bearbeiten
+
+Die Detailseite SHALL Bezeichnung, Plangröße mit Erhebung, Einsatzabschnitt, Sammelstelle und
+Notiz in der Ansicht bearbeitbar machen. Ein Speichern MUST nur die Felder senden, die die
+Person geändert hat und die der aktuelle Stand noch nicht trägt, und ohne solche Felder nichts
+senden. Prüffehler MUST am Feld stehen. Mit ungespeicherter Änderung MUST ein Wechsel der Seite
+nachfragen.
+
+#### Scenario: Plangröße bearbeiten, während jemand die Notiz ändert
+- **WHEN** eine Person die Plangröße auf 820 ändert und währenddessen eine andere die Notiz schreibt
+- **THEN** sendet das Speichern nur `plan_personen: 820`, und die fremde Notiz bleibt
+
+#### Scenario: Verlassen mit offener Änderung
+- **WHEN** während der Bearbeitung die Brotkrume „Evakuierung“ gewählt wird
+- **THEN** fragt die Seite nach, ob die Änderung verworfen werden soll
 
 ### Requirement: Übersicht der Betreuung
 

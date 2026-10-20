@@ -23,6 +23,7 @@ const ALLE_AUS: LayerSichtbar = {
   person: false,
   betreuungsstelle: false,
   bereitstellungsraum: false,
+  tier: false,
 };
 
 describe('Ebenen-Vorrang des Verortungsauftrags (LLH-1125)', () => {
@@ -33,6 +34,7 @@ describe('Ebenen-Vorrang des Verortungsauftrags (LLH-1125)', () => {
       uhs: 'uhs',
       betreuungsstelle: 'betreuungsstelle',
       bereitstellungsraum: 'bereitstellungsraum',
+      tier: 'tier',
     });
   });
 

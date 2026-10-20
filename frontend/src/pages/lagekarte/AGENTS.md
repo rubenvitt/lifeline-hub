@@ -62,12 +62,19 @@ diese Zusage.
   `spider-geplant`, Klickziel wie der Statusring) plus das Wort „geplant“, nie eine Farbe.
   Die Räume fließen über die Marker-Quelle, also ohne eigenen Schlüssel für
   `wendeKartenDatenAn` (sie gehen mit `marker`).
+- **Tiere auf der Karte** (LLH-1123, Spec `tier-lagekarte`): Muster der Bereitstellungsräume
+  (`alleVerortet`, „Nicht verortet“, `?platzieren=tier:<id>`, Sperre an der Datenquelle
+  `pages/lagekarte/tierEbene.ts`, Fach `einsatzKeys.tiere`). Nur `aktiv` und `vermisst` stehen auf der
+  Karte, abgeschlossene und stornierte nie. DV 102 kennt kein Tier ohne Zustand: der Marker bleibt
+  ein Kreis mit Kurzzeichen „T“ (`tierMarker.ts`), kein Eigenbau-Zeichen; vermisst heißt Rolle
+  `achtung` plus das Wort „vermisst“. Die Liste trägt Halterkontakt und Kennzeichnung, deshalb
+  bewusst nicht in `LAGEBILD_OFFLINE`.
 - **Kartenquellen eines fremden Moduls laden nur mit Freigabe des Servers** (LFH-669, Spec
   `modul-freigabe`, `openspec/changes/archive/2026-10-01-lfh-669-modulfreigabe-vom-server/design.md` D4):
   `useLagekarteDaten` fragt UHS, Schäden, Einheiten, Fahrzeuge, Abschnitte, Gefahrengebiete,
-  Lagemeldungen und Rückmeldungen nur bei `istKeyFreigegeben(<modul>, freigaben)` ab, Betreuung
-  und Bereitstellungsräume über ihren Ebenen-Zugriff (`betreuungEbene.ts`, `brEbene.ts`), ohne
-  bekannte Freigaben gar nicht. Gesperrt ist kein Ausfall (keine Rohdaten, kein Eintrag im
+  Lagemeldungen und Rückmeldungen nur bei `istKeyFreigegeben(<modul>, freigaben)` ab, Betreuung,
+  Bereitstellungsräume und Tiere über ihren Ebenen-Zugriff (`betreuungEbene.ts`, `brEbene.ts`,
+  `tierEbene.ts`), ohne bekannte Freigaben gar nicht. Gesperrt ist kein Ausfall (keine Rohdaten, kein Eintrag im
   Ausfallhinweis); fehlen die Freigaben, nennt der Ausfallhinweis „Berechtigungen“. Eine neue
   modulgebundene Quelle bekommt dasselbe Gate; der Modul-Key folgt `PFAD_KEY` in
   `src/einsatz/modul.rs`.
@@ -196,6 +203,12 @@ diese Zusage.
   `FREIE_SKIZZE_VORGABEFARBE`, für Paneel und Link dieselbe. Das Zonen-Zeichnen startet in
   `Kartenflaeche` erst mit angewandtem Style-JSON (Merker ab `style.load`, nie
   `isStyleLoaded()` — das wartet auf Kacheln) und beginnt nach `setStyle` neu wie die Messung.
+  **Bezug `&bezirk=<id>`** (LLH-1069, Spec `betreuung-lagekarte`): nur am Typ
+  `evakuierungsbezirk` (`parseZeichnenBezug`, sonst ganzer Auftrag `null`), wartet zusätzlich auf
+  `rechteBekannt` und `bezirkeGeladen`, startet nur mit freiem Modul Evakuierung für einen Bezirk
+  der Kartenliste (`lagekarte/bezirkZeichnen.ts`) und räumt `zeichnen` und `bezirk` zusammen. Der
+  Entwurf trägt `bezirk`: POST mit `label` und `evakuierungsbezirk_id`, keine Serie, danach der
+  Modus `gebietGezeichnet` (Rückmeldung wie `verortet`, Rückweg nur aus der Kennung).
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe
   aus `lagekarte/zeichnenEsc.ts`, **ein** `keydown`-Zuhörer der Seite, terra-draw-Modi mit

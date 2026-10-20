@@ -1,18 +1,7 @@
-import {
-  App,
-  Breadcrumb,
-  Button,
-  Checkbox,
-  Form,
-  Input,
-  Space,
-  Spin,
-  Typography,
-  theme,
-} from 'antd';
+import { App, Breadcrumb, Button, Form, Input, Space, Spin, Typography, theme } from 'antd';
 import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -26,19 +15,14 @@ import {
   schreibeLageberichtFort,
 } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtAnzeige } from '../api/types';
-import { vorlage, type AbschnittDef } from '../lageberichte/vorlagen';
+import { vorlage } from '../lageberichte/vorlagen';
 import LageberichtText from '../lageberichte/LageberichtText';
-import {
-  AbschnittsAkkordeon,
-  befuellungsKette,
-  mengeAusKette,
-} from '../lageberichte/AbschnittsAkkordeon';
-import MarkdownEditor from '../components/MarkdownEditor';
+import DokumentEntwurf, { type AbschnittAktion } from '../entwurf/DokumentEntwurf';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
 import { uebernahmeFuer } from '../lageberichte/uebernahmen';
-import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
+import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -67,11 +51,9 @@ import './lageberichtPrint.css';
 
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
- * beim Senden — `anzeige/zeitEingabe.ts`) und je Abschnitt der Markdown-Text unter seinem Schlüssel.
- */
-/**
- * Formularwerte des Entwurfs: Titel, Zeitstand, Abschnitte als Text und der Verteiler (LLH-1172).
- * Kein Abschnitt heißt `titel` oder `verteiler` (`entwurf/verteilerField.guard.test.ts`).
+ * beim Senden — `anzeige/zeitEingabe.ts`), je Abschnitt der Markdown-Text unter seinem Schlüssel
+ * und der Verteiler (LLH-1172). Kein Abschnitt heißt `titel` oder `verteiler`
+ * (`entwurf/verteilerField.guard.test.ts`).
  */
 type FormWerte = {
   titel: string;
@@ -97,28 +79,14 @@ function LageberichtDetail() {
   const navigate = useNavigate();
   const [form] = Form.useForm<FormWerte>();
   const { token } = theme.useToken();
-  // Alle Werte beobachten: die Leer-Marke je Kopfzeile folgt dem Tippen, nicht dem Speichern.
-  const werte = Form.useWatch([], form) as Record<string, unknown> | undefined;
   /**
-   * Genau ein offener Abschnitt, die Vorschau nur auf Wunsch neben dem Text. „Vorschau neben dem
-   * Text" ist eine Einstellung, keine Aktion — eigene Zeile über den Abschnitten, Vorgabe aus.
+   * Nur die Felder beobachten, die den Druckkopf speisen (LFH-731) — nicht alle Werte: sonst
+   * rendert die ganze Seite je Anschlag in einem Abschnitt neu. Die Leer-Marke der Abschnitte
+   * beobachtet `DokumentEntwurf` selbst (LLH-1074, Messung `e2e/lagebericht-tippen.spec.ts`).
    */
-  const [offenerAbschnitt, setOffenerAbschnitt] = useState<string | null>(null);
-  const [vorschauNeben, setVorschauNeben] = useState(false);
-  /**
-   * Der Einstiegs-Abschnitt: offen und fokussiert ist der erste leere. Einmal je Bericht bestimmt,
-   * der Remount über `key={lbId}` ist der Reset. Eine lebende Ableitung zeigte nach dem Befüllen
-   * auf den nächsten leeren, und das Akkordeon klappte beim ersten Autosave unter dem Cursor
-   * weiter.
-   *
-   * Während des Renderns abgeleitet: der `useState`-Initialwert geht nicht (`berichtQuery.data`
-   * fehlt beim ersten Render, die Seite zeigt einen `<Spin>`), und ein Effekt käme zu spät —
-   * `Einstiegsfokus` friert sein Ziel beim Mount ein, der Fokus landete auf `<body>`. React rendert
-   * nach einem `setState` im Renderlauf sofort neu, bevor es zeichnet. Der Riegel gegen die
-   * Schleife ist das Objekt: `feld` darf `null` sein („Vorlage ohne Abschnitte"), ein nackter
-   * `null`-Vergleich liefe endlos.
-   */
-  const [einstieg, setEinstieg] = useState<{ feld: string | null } | null>(null);
+  const titelWert = Form.useWatch('titel', form) as unknown;
+  const zeitstandWert = Form.useWatch('zeitstand', form) as unknown;
+  const formVerteiler = Form.useWatch(VERTEILER_FIELD, form) as VerteilerFormValues | undefined;
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -129,10 +97,8 @@ function LageberichtDetail() {
     queryFn: () => ladeLagebericht(einsatzId, berichtId),
     enabled: idGueltig,
   });
-  // Vor den frühen Rückgaben (Hook-Reihenfolge); `vorlage()` liefert je Schlüssel dasselbe Objekt
-  // aus `VORLAGEN`, die Abhängigkeit ist stabil.
-  const vorlageDef = berichtQuery.data ? vorlage(berichtQuery.data.vorlage) : undefined;
-  // Als Primitiv für `abschnittsEditor` (Übernahme-Zuordnung je Vorlage, LFH-870).
+  // Als Primitiv für die Übernahme im Abschnittskopf (Zuordnung je Vorlage, LFH-870), vor den
+  // frühen Rückgaben (Hook-Reihenfolge).
   const vorlageKey = berichtQuery.data?.vorlage;
   // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur am
   // freigegebenen Bericht: ein Entwurf hat noch keinen ETB-Eintrag.
@@ -149,30 +115,6 @@ function LageberichtDetail() {
       : false,
   );
   const verteilerSync = useVerteilerSync(verteilerQuellen);
-  /**
-   * Die Leer-Marke je Kopfzeile — über ein Primitiv memoisiert. `befuellteAbschnitte(werte, …)`
-   * liefert je Tastenanschlag ein neues `Set` mit gleichem Inhalt; als Prop am memoisierten
-   * Akkordeon höbe das die Sperre auf, und alle acht Editoren rendern samt `autoSize`-Nachmessung
-   * neu. Die Kette ist ein String und ändert sich nur beim Kippen leer↔befüllt (Messung:
-   * `e2e/lagebericht-tippen.spec.ts`).
-   */
-  const befuelltKette = befuellungsKette(werte, vorlageDef?.abschnitte ?? []);
-  const befuellt = useMemo(
-    () => mengeAusKette(befuelltKette, vorlageDef?.abschnitte ?? []),
-    [befuelltKette, vorlageDef],
-  );
-
-  if (einstieg === null && berichtQuery.data && vorlageDef) {
-    const geladen = berichtQuery.data;
-    setEinstieg({
-      feld:
-        einstiegsAbschnitt(
-          vorlageDef.abschnitte.map((a) => a.schluessel),
-          (schluessel) => geladen.abschnitte.find((x) => x.schluessel === schluessel)?.text,
-        ) ?? null,
-    });
-  }
-
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.lagebericht(einsatzId, berichtId) });
     qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
@@ -238,45 +180,27 @@ function LageberichtDetail() {
   // Stabil (`useCallback` im Hook): die Übernahmen in Abschnitte melden ihre Änderung darüber.
   const { markiereGeaendert } = schutz;
   /**
-   * `useCallback`, nicht inline: eine neue Funktionsidentität je Anschlag höbe die `memo`-Sperre
-   * des Akkordeons auf — ohne Fehlerbild, nur langsam. Abhängig von `vorschauNeben` und der Vorlage.
+   * Die Aktion im Kopf eines Abschnitts (LFH-870): Abschnitte des Lagevortrags aus vorhandenen
+   * Lagedaten (Medienlage seit LFH-554, Eigene Lage, LFH-869). Der Baustein prüft die Freigabe
+   * seiner Quelle selbst; er steht nur im Schreibzweig, denn nur dort gibt es den Editor.
+   * `useCallback`, nicht inline: eine neue Funktionsidentität je Render höbe die `memo`-Sperre
+   * jedes Abschnitts auf — ohne Fehlerbild, nur langsam (Render-Zähler in
+   * `entwurf/DokumentEntwurf.test.tsx`).
    */
-  const abschnittsEditor = useCallback(
-    (a: AbschnittDef) => {
-      // LFH-870: Abschnitte des Lagevortrags aus vorhandenen Lagedaten (Medienlage seit LFH-554,
-      // Eigene Lage). Der Baustein prüft die Freigabe seiner Quelle selbst; er steht nur im
-      // Schreibzweig, denn nur dort gibt es den Editor.
+  const uebernahme = useCallback<AbschnittAktion>(
+    (a) => {
       const quelle = vorlageKey ? uebernahmeFuer(vorlageKey, a.schluessel) : undefined;
-      return (
-        // Die Kopfzeile trägt den Namen sichtbar; das Etikett des Feldes bleibt für die
-        // Label-Verknüpfung, steht aber nicht ein zweites Mal da.
-        <>
-          {quelle && (
-            <AbschnittUebernahme
-              quelle={quelle}
-              einsatzId={einsatzId}
-              form={form}
-              feld={a.schluessel}
-              onGeaendert={markiereGeaendert}
-            />
-          )}
-          <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
-            {/* Direkt unter dem Seitentitel (h1): die Akkordeon-Köpfe sind Schaltflächen, keine
-            Überschriften, und ein Paneel rahmt den Entwurf nicht (s. u.). */}
-            <MarkdownEditor
-              layout={vorschauNeben ? 'split' : 'toggle'}
-              // Ohne sie druckte das Toggle-Layout sein Textfeld (`lageberichtPrint.css`).
-              druckfassung
-              druckTitel={a.label}
-              unterEbene={1}
-              variante="dokument"
-              autoSize={{ minRows: 6 }}
-            />
-          </Form.Item>
-        </>
-      );
+      return quelle ? (
+        <AbschnittUebernahme
+          quelle={quelle}
+          einsatzId={einsatzId}
+          form={form}
+          feld={a.schluessel}
+          onGeaendert={markiereGeaendert}
+        />
+      ) : null;
     },
-    [vorschauNeben, einsatzId, form, markiereGeaendert, vorlageKey],
+    [einsatzId, form, markiereGeaendert, vorlageKey],
   );
 
   /**
@@ -346,18 +270,16 @@ function LageberichtDetail() {
    * Druckkopf im Entwurf aus dem Formular (LFH-731): Titel- und Zeitstand-Feld sind im Druck
    * ausgeblendet, das Papier trägt beide nur noch im Kopf. Der gespeicherte Stand verlöre dort eine
    * ungespeicherte Änderung. Kein Speichern vor dem Druck: Strg+P läuft am `DruckKnopf` vorbei,
-   * und ein Druck soll keinen PATCH auslösen. Vor dem Einhängen des Formulars (`werte` leer) gilt
+   * und ein Druck soll keinen PATCH auslösen. Vor dem Einhängen des Formulars (Felder leer) gilt
    * der Serverstand.
    */
   const schreibtEntwurf = istEntwurf && darfSchreiben;
-  const druckTitel =
-    schreibtEntwurf && typeof werte?.titel === 'string' ? werte.titel : bericht.titel;
+  const druckTitel = schreibtEntwurf && typeof titelWert === 'string' ? titelWert : bericht.titel;
   const druckZeitstand =
-    schreibtEntwurf && dayjs.isDayjs(werte?.zeitstand)
-      ? alsBackendZeit(werte.zeitstand)
+    schreibtEntwurf && dayjs.isDayjs(zeitstandWert)
+      ? alsBackendZeit(zeitstandWert)
       : bericht.zeitstand;
   // Ebenso der Verteiler (LLH-1172): im Entwurf aus dem Formular, sonst der gespeicherte Stand.
-  const formVerteiler = werte?.[VERTEILER_FIELD] as VerteilerFormValues | undefined;
   const druckVerteiler =
     schreibtEntwurf && formVerteiler !== undefined
       ? verteilerNamesFromForm(formVerteiler, verteilerQuellen, bericht.verteiler)
@@ -540,9 +462,8 @@ function LageberichtDetail() {
           </Typography.Paragraph>
         )}
 
-        {/* Im Entwurf trägt das Abschnittsakkordeon die Gliederung selbst; ein Paneel darum
-            kostete Kopfzeile und Polster auf einer Seite, deren Höhe gemessen gedeckelt ist
-            (`e2e/lagebericht-schmal.spec.ts`). Das Paneel rahmt nur den Lesezweig. */}
+        {/* Im Entwurf trägt `DokumentEntwurf` das Paneel „Entwurf“ mit Gliederung, Umschalter
+            und allen Abschnitten (LLH-1074, `entwurf/AGENTS.md`, „Gegliederte Dokumente“). */}
         {schreibtEntwurf ? (
           <Form
             form={form}
@@ -556,48 +477,44 @@ function LageberichtDetail() {
             {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
                 (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
             <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
-            {/* Titel und Zeitstand trägt auf Papier der Druckkopf, aus diesen Feldern gespeist
-                (LFH-731); als Formularfeld stünde der Titel doppelt auf dem Blatt. */}
-            <Form.Item
-              label="Titel"
-              name="titel"
-              rules={[{ required: true }]}
-              className="lagebericht-no-print"
-            >
-              <Input />
-            </Form.Item>
-            {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe in der
-                Anzeigezone“. */}
-            <Form.Item label="Zeitstand" name="zeitstand" className="lagebericht-no-print">
-              {/* Nicht löschbar: `zeitstand` ist serverseitig nicht nullbar, ein leeres Feld
-                  würde beim Speichern weggelassen und zeigte dauerhaft etwas anderes als die
-                  DB. */}
-              <ZeitpunktEingabe art="ereignis" allowClear={false} style={{ width: '100%' }} />
-            </Form.Item>
-            {/* An wen der Bericht geht (LLH-1172); auf Papier steht er im Druckkopf. */}
-            <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="lagebericht-no-print" />
-            {/* Umschalter = Bedienung, kein Inhalt: im Druck weg. */}
-            <Checkbox
-              className="lagebericht-no-print"
-              checked={vorschauNeben}
-              onChange={(e) => setVorschauNeben(e.target.checked)}
-              style={{ marginBottom: token.margin }}
-            >
-              Vorschau neben dem Text
-            </Checkbox>
             {v && (
-              <AbschnittsAkkordeon
+              <DokumentEntwurf
+                form={form}
                 abschnitte={v.abschnitte}
-                befuellt={befuellt}
-                // Vorgabe ist der Einstiegs-Abschnitt, nicht stur der erste.
-                offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
-                onOffen={setOffenerAbschnitt}
-                editor={abschnittsEditor}
+                aktion={uebernahme}
+                // Der erste LEERE Abschnitt des Serverstands; `Einstiegsfokus` friert ihn beim
+                // Einhängen ein, der Remount über `key={lbId}` ist der Reset.
+                einstieg={einstiegsAbschnitt(
+                  v.abschnitte.map((a) => a.schluessel),
+                  (schluessel) => bericht.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+                )}
+                kopf={
+                  // Titel, Zeitstand und Verteiler trägt auf Papier der Druckkopf, aus diesen
+                  // Feldern gespeist (LFH-731, LLH-1172); der Kopfblock weicht im Druck
+                  // (`entwurf/dokumentEntwurf.css`).
+                  <>
+                    <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+                      <Input />
+                    </Form.Item>
+                    {/* Feld in der Anzeigezone, Wire in UTC — frontend/AGENTS.md, „Zeiteingabe
+                        in der Anzeigezone“. Nicht löschbar: `zeitstand` ist serverseitig nicht
+                        nullbar, ein leeres Feld würde beim Speichern weggelassen und zeigte
+                        dauerhaft etwas anderes als die DB. */}
+                    <Form.Item label="Zeitstand" name="zeitstand">
+                      <ZeitpunktEingabe
+                        art="ereignis"
+                        allowClear={false}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                    <VerteilerField
+                      sources={verteilerQuellen}
+                      ohneDruckKlasse="lagebericht-no-print"
+                    />
+                  </>
+                }
               />
             )}
-            {/* Einstiegsfokus in den offenen Abschnitt. Als letztes Kind, damit beim
-                Mount-Effekt alle Felder im DOM stehen. */}
-            <Einstiegsfokus form={form} feld={einstieg?.feld ?? undefined} />
           </Form>
         ) : (
           <Paneel

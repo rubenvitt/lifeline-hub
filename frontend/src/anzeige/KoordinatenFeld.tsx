@@ -1,6 +1,8 @@
 import { Form, type FormItemProps } from 'antd';
+import type { ReactNode } from 'react';
 import KoordinatenEingabe from './KoordinatenEingabe';
 import { koordinatenRegel } from './koordinatenWert';
+import { DatenfeldEingabe } from '../components/instrument';
 
 type Props = Omit<FormItemProps, 'children' | 'rules'> & {
   /** Einsatz für die Ort-Zeile (Peilung), s. `KoordinatenEingabe`. */
@@ -20,5 +22,28 @@ export default function KoordinatenFeld({ einsatzId, exclude, ...item }: Props) 
     <Form.Item {...item} rules={[koordinatenRegel]}>
       <KoordinatenEingabe einsatzId={einsatzId} exclude={exclude} fehlerImFormular />
     </Form.Item>
+  );
+}
+
+/**
+ * Dieselbe Koordinate als Zelle im Bearbeiten-Modus einer Detailseite (`DatenfeldEingabe`,
+ * LLH-1101): benannt über die Augenbraue, Regel `koordinatenRegel`, gesendet über `alsLatLon`.
+ * Leer heißt „nicht verortet“ (LLH-1123, Fundort eines Tiers).
+ */
+export function KoordinatenDatenfeld({
+  label,
+  name,
+  einsatzId,
+  exclude,
+}: {
+  label: ReactNode;
+  name: FormItemProps['name'];
+  einsatzId?: number;
+  exclude?: string;
+}) {
+  return (
+    <DatenfeldEingabe label={label} name={name} rules={[koordinatenRegel]}>
+      <KoordinatenEingabe einsatzId={einsatzId} exclude={exclude} fehlerImFormular />
+    </DatenfeldEingabe>
   );
 }

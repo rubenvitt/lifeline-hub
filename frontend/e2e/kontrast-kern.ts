@@ -225,6 +225,28 @@ export async function umrissKontrast(ziel: Locator) {
   return { ...umriss, umriss: m.vordergrund, grund: m.grund, verhaeltnis: m.verhaeltnis };
 }
 
+/**
+ * Kontrast eines Musters (Schraffur, WCAG 1.4.11) gegen die Fläche, auf der es liegt (LLH-1090).
+ * Das Muster ist ein `repeating-linear-gradient` am Element selbst in seiner Schriftfarbe
+ * (`schraffurStil` in `pages/gefahren/GefahrenMatrix.tsx`): gemessen wird `color` gegen die
+ * komponierte Fläche des Elternteils — die durchsichtigen Lücken zeigen sie. Ohne Muster oder mit
+ * einer anderen Linienfarbe ist es ein Fehler, keine Messung.
+ */
+export async function musterKontrast(ziel: Locator) {
+  await amEingehaengten(() =>
+    ziel.evaluate((el) => {
+      if (!el.isConnected) throw new Error('Ziel ausgehängt');
+      const stil = getComputedStyle(el);
+      if (!stil.backgroundImage.startsWith('repeating-linear-gradient('))
+        throw new Error(`Kein Muster: ${stil.backgroundImage}`);
+      if (!stil.backgroundImage.includes(stil.color))
+        throw new Error(`Musterfarbe ≠ color: ${stil.backgroundImage} / ${stil.color}`);
+    }),
+  );
+  const m = await messe(ziel, { vordergrund: 'color', grund: 'eltern' });
+  return { linie: m.vordergrund, grund: m.grund, verhaeltnis: m.verhaeltnis };
+}
+
 export async function pruefe(tag: Locator, minimum: number, name: string) {
   await expect(tag, name).toBeVisible();
   // Modal-Einblendung erst abwarten: Opacity-Gruppen liefern keine belastbare Messung.

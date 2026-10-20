@@ -227,6 +227,8 @@ mod tests {
                 halter_person_id: None,
                 halter_kontakt: Some("Müller, 0171 1234567"),
                 antreff_ort: None,
+                antreff_lat: None,
+                antreff_lon: None,
                 notiz: None,
             },
         )

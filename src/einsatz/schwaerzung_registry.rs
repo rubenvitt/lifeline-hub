@@ -536,6 +536,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("halter_person_id", G_FK),
             scrub("halter_kontakt", Strategie::NullSetzen, Z_EINSATZ),
             scrub("antreff_ort", Strategie::NullSetzen, Z_EINSATZ),
+            // LLH-1123: Koordinate des Fundorts bleibt als Geo-Skelett (wie Schaden/UHS); der
+            // Freitext daneben fällt.
+            retain("antreff_lat", G_GEO),
+            retain("antreff_lon", G_GEO),
             scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             retain("abschluss_grund", G_ENUM),
             scrub("abschluss_ziel", Strategie::NullSetzen, Z_EINSATZ),
@@ -966,6 +970,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
+            // Beurteilung der Matrix (LLH-1090): Zeitpunkt und Benutzer-FK, kein Freitext.
+            retain("beurteilt_at", G_ZEIT),
+            retain("beurteilt_von", G_FK),
         ],
     },
     TabellenRegel {

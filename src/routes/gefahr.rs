@@ -117,6 +117,8 @@ pub async fn bewerten(
             },
         )
         .await?;
+        // Eine bestätigte Beurteilung nennt den letzten Stand (LLH-1090, design.md E4).
+        gefahr_repo::beurteilung_auffrischen_tx(conn, gid, ctx.benutzer.id).await?;
         if z.warnstufe.as_str() != alt {
             let text = gefahr::etb_text_bewertung(
                 z.gefahrentyp.as_str(),
@@ -132,6 +134,29 @@ pub async fn bewerten(
     })?;
     sse_gefahr(&state, einsatz_id, gid);
     Ok(Json(z))
+}
+
+/// POST /api/einsaetze/{id}/gefahrengebiete/{gid}/beurteilung — Beurteilung der Matrix
+/// bestätigen (LLH-1090). Ohne Body: setzt Zeit und Person am Gebiet und schreibt atomar einen
+/// System-ETB-Eintrag; jede Bestätigung ist ein eigener Akt. Live danach `gefahr` und der Eintrag.
+pub async fn beurteilen(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Gefahrenzonen>,
+    PfadParam((_eid, gid)): PfadParam<(i64, i64)>,
+) -> Result<Json<GefahrengebietAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let gebiet = gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?; // Ownership-Gate
+    let text = gefahr::etb_text_beurteilung(gebiet.label.as_deref(), gid);
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
+        gefahr_repo::beurteilen_tx(conn, einsatz_id, gid, ctx.benutzer.id).await?;
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await
+    })?;
+    state.live.publiziere(einsatz_id, etb_id);
+    sse_gefahr(&state, einsatz_id, gid);
+    Ok(Json(
+        gefahr_repo::gebiet_laden(&state.pool, einsatz_id, gid).await?,
+    ))
 }
 
 /// PATCH-Body des Gefahrengebiets (LFH-306, Tri-State). `gefahrengebiet.label` ist nullable
