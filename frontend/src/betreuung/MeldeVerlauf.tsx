@@ -1,12 +1,8 @@
 import { App, Button, Modal, Skeleton, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import {
-  ladeBelegungVerlauf,
-  ladeStandVerlauf,
-  nimmBelegungZurueck,
-  nimmStandZurueck,
-} from '../api/betreuung';
+import { ladeBelegungVerlauf, nimmBelegungZurueck } from '../api/betreuung';
+import { ladeStandVerlauf, nimmStandZurueck } from '../api/evakuierung';
 import { einsatzKeys, type BetreuungVerlaufArt } from '../api/queryKeys';
 import type { BelegungVerlaufEintrag, StandVerlaufEintrag } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
@@ -34,8 +30,8 @@ import {
  * Meldeverlauf eines Evakuierungsbezirks bzw. einer Betreuungsstelle.
  *
  * Wird erst beim Aufklappen gerendert, die Abfrage läuft also nur für die aufgeklappte Zeile.
- * Der Schlüssel hängt unter dem Betreuungs-Prefix, damit Live-Ereignis und eigene Mutationen
- * einen offenen Verlauf mitziehen.
+ * Der Schlüssel hängt unter dem Prefix seines Moduls (Bezirk: Evakuierung, Stelle: Betreuung),
+ * damit Live-Ereignis und eigene Mutationen einen offenen Verlauf mitziehen.
  *
  * Darstellung als Zeitachse (`Zeitachseneintrag`) mit Typkante und Typwort des ETB; aktuelle,
  * nachgetragene und zurückgenommene Meldung tragen je ein WORT (WCAG 1.4.1).
@@ -71,7 +67,10 @@ export default function MeldeVerlauf({
   const { konventionen } = useAnzeigeKonventionen();
   const abfrage = useQuery<StandVerlaufEintrag[] | BelegungVerlaufEintrag[], Error, VerlaufZeile[]>(
     {
-      queryKey: einsatzKeys.betreuungVerlauf(einsatzId, art, objektId),
+      queryKey:
+        art === 'bezirk'
+          ? einsatzKeys.evakuierungVerlauf(einsatzId, objektId)
+          : einsatzKeys.betreuungVerlauf(einsatzId, objektId),
       queryFn: () =>
         art === 'bezirk'
           ? ladeStandVerlauf(einsatzId, objektId)
@@ -95,7 +94,10 @@ export default function MeldeVerlauf({
     if (ziel == null && fokusZurueck) wurzel.current?.focus();
   }, [ziel, fokusZurueck]);
   const invalidiere = () => {
-    void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
+    void qc.invalidateQueries({
+      queryKey:
+        art === 'bezirk' ? einsatzKeys.evakuierung(einsatzId) : einsatzKeys.betreuung(einsatzId),
+    });
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   };
   const ruecknahme = useMutation({

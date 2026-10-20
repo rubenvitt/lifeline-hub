@@ -390,17 +390,26 @@ export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
 }
 
 /**
- * Betreuungs-Modul. Keine Detailroute — Bezirk bzw. Stelle per Query-Param (`?bezirk=<id>` /
- * `?stelle=<id>`), die Seite scrollt auf die Zeile.
+ * Betreuungs-Modul. `?stelle=<id>` ist seit LLH-1044 eine Altadresse: die Betreuungsseite leitet
+ * auf die Detailseite der Stelle um ({@link betreuungsstellePfad}). Bezirke liegen seit LLH-1034 im
+ * Modul Evakuierung ({@link evakuierungPfad}); ein alter Link `…/betreuung?bezirk=<id>` leitet die
+ * Betreuungsseite dorthin um.
  */
-export function betreuungPfad(
-  einsatzId: number,
-  opts: { bezirk?: number; stelle?: number } = {},
-): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), {
-    bezirk: opts.bezirk,
-    stelle: opts.stelle,
-  });
+export function betreuungPfad(einsatzId: number, opts: { stelle?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), { stelle: opts.stelle });
+}
+
+/** Detailseite einer Betreuungsstelle (LLH-1044), unter dem Modul Betreuung. */
+export function betreuungsstellePfad(einsatzId: number, stelleId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'betreuung')}/${stelleId}`;
+}
+
+/**
+ * Evakuierungs-Modul (LLH-1034). Keine Detailroute — Bezirk per Query-Param (`?bezirk=<id>`), die
+ * Seite hebt die Zeile hervor und scrollt auf sie.
+ */
+export function evakuierungPfad(einsatzId: number, opts: { bezirk?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'evakuierung'), { bezirk: opts.bezirk });
 }
 
 /** Stab-Modul. Den Abschluss der Lagebesprechung trägt seit LLH-1111 `lagebesprechungPfad`. */
@@ -1053,8 +1062,7 @@ export function parseZurueck(wert: string | null | undefined): boolean {
 const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => string) | null> = {
   person: personDetailPfad,
   schaden: schadenDetailPfad,
-  // Keine Detailroute: die Betreuungsseite hebt die Stelle hervor (`?stelle=`).
-  betreuungsstelle: (einsatzId, id) => betreuungPfad(einsatzId, { stelle: id }),
+  betreuungsstelle: betreuungsstellePfad,
   bereitstellungsraum: bereitstellungsraumDetailPfad,
   // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
   // verortet, es gibt keine Seite, zu der man zurückwollte.

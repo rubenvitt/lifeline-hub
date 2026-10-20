@@ -102,9 +102,19 @@ export interface PersonAnlegenEingabe extends PersonEingabe {
   uhs_id?: number | null;
 }
 
-export function listePersonen(einsatzId: number, status?: PersonStatus): Promise<Person[]> {
-  const q = status ? `?status=${status}` : '';
-  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${q}`);
+export function listePersonen(
+  einsatzId: number,
+  filter: { status?: PersonStatus; betreuungsstelleId?: number } = {},
+): Promise<Person[]> {
+  const q = new URLSearchParams();
+  if (filter.status) q.set('status', filter.status);
+  // LLH-1044: nur Personen, deren aktueller Verbleib diese Betreuungsstelle ist (Serverfilter,
+  // dasselbe Recht wie die Liste, nicht protokolliert).
+  if (filter.betreuungsstelleId != null) {
+    q.set('betreuungsstelle_id', String(filter.betreuungsstelleId));
+  }
+  const qs = q.toString();
+  return apiGet<Person[]>(`/api/einsaetze/${einsatzId}/personen${qs ? `?${qs}` : ''}`);
 }
 
 /**

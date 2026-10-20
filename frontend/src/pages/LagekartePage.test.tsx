@@ -425,7 +425,8 @@ function basisHandler(
     // Ebene „Betroffene": der MSW-Default meldet jedes Modul frei (`test/server.ts`), die Query
     // läuft in jedem Test — ohne diese zwei Handler stünde „Betroffene" überall im Ausfallbanner.
     http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ stellen: [] })),
+    http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [] })),
     http.get('/api/organisation', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
@@ -1339,14 +1340,12 @@ describe('LagekartePage', () => {
     };
     basisHandler([
       http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_EB])),
-      http.get('/api/einsaetze/1/betreuung', () =>
-        HttpResponse.json({ bezirke: [UFER], stellen: [] }),
-      ),
+      http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke: [UFER] })),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
     expect(await screen.findByLabelText('Gehört zu Evakuierungsbezirk')).toBeInTheDocument();
     expect(
-      await screen.findByRole('link', { name: 'Betreuung zu Uferstraße 12–40' }),
+      await screen.findByRole('link', { name: 'Evakuierung zu Uferstraße 12–40' }),
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('evakuierungsbezirk'),

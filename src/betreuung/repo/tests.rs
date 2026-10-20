@@ -176,6 +176,8 @@ fn stelle_eingabe(bezeichnung: &str, art: Art, kapazitaet: Option<i64>) -> Stell
         kapazitaet_personen: kapazitaet,
         standort: None,
         notiz: None,
+        leitung: None,
+        erreichbarkeit: None,
     }
 }
 
@@ -311,9 +313,8 @@ async fn bezirk_anlegen_angeordnet_ohne_stand_mit_entscheidung() {
         etb[0].2
     );
 
-    let u = uebersicht(&w.pool, w.e).await.unwrap();
-    assert_eq!(u.bezirke.len(), 1);
-    assert!(u.stellen.is_empty());
+    assert_eq!(bezirke(&w.pool, w.e).await.unwrap().len(), 1);
+    assert!(stellen(&w.pool, w.e).await.unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -722,7 +723,7 @@ async fn stornieren_nimmt_bezirk_aus_der_liste_und_schreibt_etb() {
         .await
         .unwrap();
     let g = bezirk_stornieren(&w, id).await.unwrap();
-    assert!(uebersicht(&w.pool, w.e).await.unwrap().bezirke.is_empty());
+    assert!(bezirke(&w.pool, w.e).await.unwrap().is_empty());
     assert!(bezirk_laden(&w.pool, w.e, id)
         .await
         .unwrap()
@@ -1864,6 +1865,67 @@ async fn kopfzahl_mit_unlesbarem_zeitpunkt_ist_400() {
     }
 }
 
+// ── LLH-1044: Leitung und Erreichbarkeit ────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn leitung_und_erreichbarkeit_aendern_leeren_und_als_weitere_angaben_ins_etb() {
+    let w = welt().await;
+    let mut se = stelle_eingabe("Gesamtschule", Art::Notunterkunft, Some(80));
+    se.leitung = Some("  Frau Schulz ".into());
+    se.erreichbarkeit = Some("".into());
+    let id = stelle_anlegen(&w, se).await.unwrap().id;
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(s.leitung.as_deref(), Some("Frau Schulz"), "getrimmt");
+    assert_eq!(s.erreichbarkeit, None, "leer heißt keine Angabe");
+
+    let n = etb(&w.pool, w.e).await.len();
+    let g = stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            erreichbarkeit: Some(Some("Kanal 42".into())),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(g.etb_ids.len(), 1, "eine Änderung, ein Eintrag");
+    let alle = etb(&w.pool, w.e).await;
+    assert_eq!(alle.len(), n + 1);
+    let text = &alle.last().unwrap().2;
+    assert!(text.contains("weitere Angaben"), "{text}");
+    assert!(!text.contains("Kanal 42"), "kein Wert im ETB: {text}");
+
+    // Gleicher Wert: Leerlauf, kein Eintrag.
+    let g = stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            leitung: Some(Some("Frau Schulz".into())),
+            erreichbarkeit: Some(Some("Kanal 42".into())),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert!(g.etb_ids.is_empty());
+
+    // Leeren (`null`).
+    stelle_aendern(
+        &w,
+        id,
+        StelleAenderung {
+            leitung: Some(None),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let s = stelle_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(s.leitung, None);
+    assert_eq!(s.erreichbarkeit.as_deref(), Some("Kanal 42"), "unberührt");
+}
+
 // ── D5: kein ETB-Text trägt Sammelstelle, Standort oder Notiz ──────────────────────────────
 
 #[tokio::test]
@@ -1874,6 +1936,11 @@ async fn etb_nennt_keine_freitexte() {
         "Ostring 5",
         "Schlüssel beim Hausmeister",
         "Rollstuhl Frau M.",
+        // LLH-1044: Leitung und Erreichbarkeit.
+        "Frau Schulz",
+        "0171 2345678",
+        "Herr Brandt",
+        "Kanal 42",
     ];
     let mut be = bezirk_eingabe("Uferstraße", 640, Erhebung::Geschaetzt);
     be.sammelstelle = Some(geheim[0].into());
@@ -1900,6 +1967,8 @@ async fn etb_nennt_keine_freitexte() {
     let mut se = stelle_eingabe("Turnhalle Ost", Art::Notunterkunft, Some(150));
     se.standort = Some(geheim[1].into());
     se.notiz = Some(geheim[2].into());
+    se.leitung = Some(geheim[4].into());
+    se.erreichbarkeit = Some(geheim[5].into());
     let sid = stelle_anlegen(&w, se).await.unwrap().id;
     stelle_aendern(
         &w,
@@ -1907,6 +1976,8 @@ async fn etb_nennt_keine_freitexte() {
         StelleAenderung {
             standort: Some(Some(geheim[0].into())),
             notiz: Some(Some(geheim[3].into())),
+            leitung: Some(Some(geheim[6].into())),
+            erreichbarkeit: Some(Some(geheim[7].into())),
             status: Some(Status::InBetrieb),
             ..Default::default()
         },
@@ -2026,8 +2097,8 @@ async fn flaechen_zaehlt_die_zugeordneten_zonen() {
     bezirksflaeche(&w, Some(ufer)).await;
     bezirksflaeche(&w, Some(ufer)).await;
     bezirksflaeche(&w, None).await;
-    let u = uebersicht(&w.pool, w.e).await.unwrap();
-    let flaechen = |id: i64| u.bezirke.iter().find(|b| b.id == id).unwrap().flaechen;
+    let u = bezirke(&w.pool, w.e).await.unwrap();
+    let flaechen = |id: i64| u.iter().find(|b| b.id == id).unwrap().flaechen;
     assert_eq!(flaechen(ufer), 2);
     assert_eq!(flaechen(hafen), 0);
     let v = serde_json::to_value(bezirk_laden(&w.pool, w.e, hafen).await.unwrap()).unwrap();

@@ -7,7 +7,7 @@
   "icons": [
     {
       "name": "abmelden",
-      "bedeutung": "Abmelden; in der UHS 'zurückweisen'",
+      "bedeutung": "Abmelden; in der UHS 'zurückweisen'; Modul Evakuierung (Notausgang)",
       "herkunft": "icons8",
       "icons8": {
         "id": "2445",

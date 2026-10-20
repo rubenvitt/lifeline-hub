@@ -20,6 +20,7 @@ const api = vi.hoisted(() => ({
   ladeLagebericht: vi.fn(),
   listePersonen: vi.fn(),
   listeSchaeden: vi.fn(),
+  ladeEvakuierung: vi.fn(),
   ladeBetreuung: vi.fn(),
   ladeVerpflegung: vi.fn(),
   ladeEtbZaehler: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('../../api/lageberichte', () => ({
 }));
 vi.mock('../../api/einsatzPerson', () => ({ listePersonen: api.listePersonen }));
 vi.mock('../../api/einsatzSchaden', () => ({ listeSchaeden: api.listeSchaeden }));
+vi.mock('../../api/evakuierung', () => ({ ladeEvakuierung: api.ladeEvakuierung }));
 vi.mock('../../api/betreuung', () => ({ ladeBetreuung: api.ladeBetreuung }));
 vi.mock('../../api/verpflegung', () => ({ ladeVerpflegung: api.ladeVerpflegung }));
 vi.mock('../../api/etb', () => ({ ladeEtbZaehler: api.ladeEtbZaehler }));

@@ -111,7 +111,7 @@ for (const breite of BREITEN) {
   }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, 'E2E Notizhöhe Evakuierung');
-    const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+    const basis = `/api/einsaetze/${einsatzId}/evakuierung`;
     const bezirk = await senden<{ id: number }>(page, 'post', `${basis}/bezirke`, {
       bezeichnung: 'Uferstraße 12–40',
       plan_personen: 1850,

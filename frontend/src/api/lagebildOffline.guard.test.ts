@@ -46,6 +46,8 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-lagemeldungen',
   'einsatz-fuehrungskraefte',
   'einsatz-betreuung',
+  // Eigenes Modul seit LLH-1034: Räumungsstand gehört zum Lagebild ohne Netz.
+  'einsatz-evakuierung',
   'einsatz-karten-ansicht',
   'einsatz-kartenbilder',
   'einsatz-lage-snapshot',

@@ -1060,7 +1060,7 @@ async fn pegel_und_evakuierung_schalten_beide_lagekennzahlen() {
     let (status, b) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
         &admin,
         Some(
             r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"gezaehlt"}"#,

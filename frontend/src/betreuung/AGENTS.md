@@ -1,15 +1,52 @@
 # Betreuung und Verpflegung — Regeln
 
-Gilt für `frontend/src/betreuung/`, `frontend/src/verpflegung/`, `pages/VerpflegungPage.tsx`
-und die Server-Gegenstücke `src/betreuung/`, `src/verpflegung/`; ergänzt `frontend/AGENTS.md`.
-Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
+Gilt für `frontend/src/betreuung/`, `frontend/src/verpflegung/`, `pages/BetreuungPage.tsx`,
+`pages/EvakuierungPage.tsx`, `pages/VerpflegungPage.tsx` und die Server-Gegenstücke
+`src/betreuung/`, `src/routes/betreuung.rs`, `src/routes/evakuierung.rs`, `src/verpflegung/`;
+ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `src/…` (Server).
 
+- **Zwei Module** (LLH-1034, Spec `betreuung-evakuierung`): `evakuierung` (Räumungsbezirke,
+  Stand evakuiert) und `betreuung` (Stellen, Belegung) sind getrennte Module mit eigenem Recht,
+  eigener Route (`…/evakuierung/bezirke/…` bzw. `…/betreuung/stellen/…`), eigenem Lese-Endpunkt,
+  Live-Ereignis, Query-Prefix und Zähler. Fachcode und Tabellen bleiben gemeinsam in
+  `src/betreuung/`. Die Lagekennzahl „Evakuiert“, die Bezirksflächen der Lagekarte und jeder
+  `?bezirk=`-Sprung hängen an `evakuierung`; `…/betreuung?bezirk=` leitet um (`BetreuungPage`).
+  Das Gerät „Betreuungsstelle“ bleibt auf `betreuung` und sieht keine Bezirke. Handlungen an
+  Bezirken nur über `useBezirkHandlungen` (eine Wahrheit für Toasts, Offline, Rückweg).
+  Vorgemerkte Standmeldungen tragen keine URL; ein Umzug der Route braucht keine Queue-Migration
+  (`offline/standReplay.test.tsx`).
+
+- **Detailseite der Betreuungsstelle** (LLH-1044, Spec `betreuung-evakuierung`,
+  `pages/BetreuungsstelleDetailPage.tsx`, Route `betreuung/:stelleId`, Pfad nur über
+  `betreuungsstellePfad`): liest die Stelle aus `GET …/betreuung` (`einsatzKeys.betreuung`), es
+  gibt keinen Einzel-Endpunkt; unbekannt, fremd oder storniert → `<Navigate>` auf die Übersicht.
+  `?stelle=` ist eine Altadresse und leitet in `BetreuungPage` um, vor jedem Abruf. Bearbeiten
+  (Datenraster, dreiseitiger PATCH über `stellePatchDreiseitig`) und Status (Handlungen aus
+  `betreuung/stelleStatus.ts`, Schließen einer belegten Stelle über `StelleSchliessenDialog` mit
+  Leermeldung) stehen **nur** dort, nie wieder als Zeilenmenü der Übersicht. „Belegung in Zahlen“
+  ist **ein** Baustein (`betreuung/StelleBelegung.tsx`) für Detailseite und Gerät; `freiePlaetze`
+  gibt es nur in `betreuungText.ts`, nie negativ. „Betroffene hier“ fragt die Personenliste mit
+  `?betreuungsstelle_id=` (Serverfilter, Key `einsatzKeys.personenDerStelle`) und nur, wenn die
+  Übersicht `namentlich` liefert (Personenrecht); sonst steht der Grund als Zeile.
+  Leitung und Erreichbarkeit (Migration 0226, je 200 Zeichen) sind personenbezogen: im ETB nur
+  „weitere Angaben“, Schwärzung leert sie, der gesicherte Lagestand friert sie nicht ein.
+- **Übersicht als Lagebild** (LLH-1050, Spec `betreuung-evakuierung`, „Übersicht der
+  Betreuung“): das Band „Unterbringung in Zahlen“ (`betreuung/UnterbringungKennzahlen.tsx`) rechnet
+  nur über `betreuung/unterbringungKennzahl.ts`, und die nur mit `inBetreuung`, `freiePlaetze` und
+  `volleStellen` aus `betreuungText.ts`; Abwesenheit statt 0 wie `evakuierungKennzahl.ts`.
+  „Ohne Meldung“ zählt nur Stellen in Betrieb (dieselbe Menge wie die Kopfzahl, LFH-679),
+  Kapazität und Frei nur nicht geschlossene Stellen. **„in Betreuung“ ist eine Wahrheit:** Band,
+  Detailseite und Verpflegung lesen dieselbe Belegung — die Verpflegung über die Kopfzahl
+  `…/betreuung/belegung`, die an `juengste_meldung!` hängt wie der Zeiger der Übersicht. Keine
+  zweite Summe im Backend, keine Summe im Blockkopf von `StellenBlock`. Ohne Stelle stehen statt
+  Band und Tabelle `SeitenLeer` mit „Betreuungsstelle anlegen“ (ohne Schreibrecht gesperrt mit
+  Grund).
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
   (`person_verbleib.betreuungsstelle_id`, Cache
   `einsatz_person.aktuelle_verbleib_betreuungsstelle_id`), den Namen belegt der Client vor; der Server kopiert
   keinen Stellennamen (Ziel, Kurzform, ETB). Prüfkette 422 → 403 (vor jedem Lesen) → 404 → 409.
-  „davon namentlich n" rechnet `…/betreuung`, nicht `repo::uebersicht`; ohne Personenrecht fehlt
+  „davon namentlich n" rechnet `…/betreuung`, nicht `repo::stellen`; ohne Personenrecht fehlt
   es. Live über `EINSATZ_STREAM_EVENTS.person → betreuung`. `betreuungsstelle` ist kein Leaf
   (Rebuild braucht den FK-Schalter).
 - **Meldeverlauf** (LFH-676, `openspec/changes/archive/2026-09-29-lfh-676-betreuung-meldeverlauf/design.md`):

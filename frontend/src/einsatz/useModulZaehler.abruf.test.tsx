@@ -11,7 +11,7 @@ import { freigabenFixture } from '../test/fixtures';
 
 /**
  * Der Hook des Modulzählers am Draht (LFH-639). Der Test von `darfZaehlerZeigen` sieht NICHT,
- * ob die Entscheidung an der `useQuery` ankommt — fiele `enabled: betreuungAktiv` weg, fragte
+ * ob die Entscheidung an der `useQuery` ankommt — fiele `enabled: evakuierungAktiv` weg, fragte
  * die Navigation ein verstecktes Modul ab (403-Rauschen, Seitenkanal). Deshalb der
  * MSW-Anfragezähler als Paar: versteckt, gesperrt oder Freigaben unbekannt → 0 Anfragen,
  * sichtbar und frei → genau 1. Die Freigaben kommen vom Server (LFH-669).
@@ -20,7 +20,8 @@ import { freigabenFixture } from '../test/fixtures';
  * aus `test/server.ts`.
  */
 
-const PFAD = '/api/einsaetze/7/betreuung';
+const PFAD_EVAK = '/api/einsaetze/7/evakuierung';
+const PFAD_BETREUUNG = '/api/einsaetze/7/betreuung';
 
 const ANDERE = ['meldungen', 'auftraege', 'erinnerungen', 'chat', 'dokumente', 'abloesung'];
 
@@ -36,88 +37,130 @@ function wrapper(client: QueryClient) {
   };
 }
 
-function zaehleAbrufe(): { anzahl: number } {
+function zaehleAbrufe(pfad: string, antwort: object): { anzahl: number } {
   const zaehler = { anzahl: 0 };
   server.use(
-    http.get(PFAD, () => {
+    http.get(pfad, () => {
       zaehler.anzahl += 1;
-      return HttpResponse.json({
-        bezirke: [
-          {
-            id: 1,
-            einsatz_id: 7,
-            bezeichnung: 'Uferstraße 12–40',
-            plan_personen: 640,
-            plan_erhebung: 'gezaehlt',
-            raeumung: 'laeuft',
-            angelegt_at: '2026-09-23 08:00:00',
-          },
-        ],
-        stellen: [],
-      });
+      return HttpResponse.json(antwort);
     }),
   );
   return zaehler;
 }
 
-describe('useModulZaehler am Draht — Betreuung (LFH-639)', () => {
-  it('Modul ausgeblendet → keine Anfrage an …/betreuung, kein Zähler', async () => {
-    const abrufe = zaehleAbrufe();
-    const { result } = renderHook(
-      () =>
-        useModulZaehler({
-          einsatzId: 7,
-          freigaben: ausgeblendet([...ANDERE, 'betreuung']),
-        }),
-      { wrapper: wrapper(neuerQueryClient()) },
-    );
-    // Wie im Kennzahl-Hook: einen Takt warten, damit ein fälschlich aktiver Abruf ankäme.
-    await new Promise((r) => setTimeout(r, 20));
-    expect(abrufe.anzahl).toBe(0);
-    expect(result.current.betreuung).toBeUndefined();
-  });
+const EVAKUIERUNG = {
+  bezirke: [
+    {
+      id: 1,
+      einsatz_id: 7,
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'gezaehlt',
+      raeumung: 'laeuft',
+      angelegt_at: '2026-09-23 08:00:00',
+    },
+  ],
+};
 
-  it('Modul sichtbar → genau eine Anfrage, Zähler der aktiven Bezirke', async () => {
-    const abrufe = zaehleAbrufe();
-    const { result } = renderHook(
-      () => useModulZaehler({ einsatzId: 7, freigaben: ausgeblendet(ANDERE) }),
-      { wrapper: wrapper(neuerQueryClient()) },
-    );
-    await waitFor(() => expect(result.current.betreuung).toBeDefined());
-    expect(result.current.betreuung).toEqual({
-      wert: 1,
-      beschreibung: '1 aktiver Evakuierungsbezirk',
-    });
-    expect(abrufe.anzahl).toBe(1);
-  });
+const BETREUUNG = {
+  stellen: [
+    {
+      id: 3,
+      einsatz_id: 7,
+      bezeichnung: 'Turnhalle Ost',
+      art: 'notunterkunft',
+      status: 'in_betrieb',
+      angelegt_at: '2026-09-23 08:00:00',
+    },
+    {
+      id: 4,
+      einsatz_id: 7,
+      bezeichnung: 'Schule Nord',
+      art: 'notunterkunft',
+      status: 'vorbereitet',
+      angelegt_at: '2026-09-23 08:00:00',
+    },
+  ],
+};
 
-  it('Modul gesperrt (zugriff: false) → keine Anfrage an …/betreuung, kein Zähler', async () => {
-    const abrufe = zaehleAbrufe();
-    const gesperrt = { ...ausgeblendet(ANDERE), betreuung: { sichtbar: true, zugriff: false } };
-    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: gesperrt }), {
-      wrapper: wrapper(neuerQueryClient()),
+// Je Modul dieselben vier Fälle: ausgeblendet, sichtbar, gesperrt, Freigaben unbekannt. Das
+// jeweils andere der beiden Module ist ausgeblendet (LLH-1034: zwei getrennte Abrufe).
+describe.each([
+  {
+    modul: 'evakuierung' as const,
+    anderes: 'betreuung',
+    pfad: PFAD_EVAK,
+    antwort: EVAKUIERUNG,
+    erwartet: { wert: 1, beschreibung: '1 aktiver Evakuierungsbezirk' },
+  },
+  {
+    modul: 'betreuung' as const,
+    anderes: 'evakuierung',
+    pfad: PFAD_BETREUUNG,
+    antwort: BETREUUNG,
+    erwartet: { wert: 1, beschreibung: '1 Betreuungsstelle in Betrieb' },
+  },
+])(
+  'useModulZaehler am Draht — $modul (LFH-639, LLH-1034)',
+  ({ modul, anderes, pfad, antwort, erwartet }) => {
+    it('Modul ausgeblendet → keine Anfrage, kein Zähler', async () => {
+      const abrufe = zaehleAbrufe(pfad, antwort);
+      const { result } = renderHook(
+        () =>
+          useModulZaehler({
+            einsatzId: 7,
+            freigaben: ausgeblendet([...ANDERE, anderes, modul]),
+          }),
+        { wrapper: wrapper(neuerQueryClient()) },
+      );
+      // Wie im Kennzahl-Hook: einen Takt warten, damit ein fälschlich aktiver Abruf ankäme.
+      await new Promise((r) => setTimeout(r, 20));
+      expect(abrufe.anzahl).toBe(0);
+      expect(result.current[modul]).toBeUndefined();
     });
-    await new Promise((r) => setTimeout(r, 20));
-    expect(abrufe.anzahl).toBe(0);
-    expect(result.current.betreuung).toBeUndefined();
-  });
 
-  it('Freigaben unbekannt (laden noch/gescheitert) → keine Anfrage an …/betreuung', async () => {
-    const abrufe = zaehleAbrufe();
-    const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: undefined }), {
-      wrapper: wrapper(neuerQueryClient()),
+    it('Modul sichtbar → genau eine Anfrage, Zähler', async () => {
+      const abrufe = zaehleAbrufe(pfad, antwort);
+      const { result } = renderHook(
+        () => useModulZaehler({ einsatzId: 7, freigaben: ausgeblendet([...ANDERE, anderes]) }),
+        { wrapper: wrapper(neuerQueryClient()) },
+      );
+      await waitFor(() => expect(result.current[modul]).toBeDefined());
+      expect(result.current[modul]).toEqual(erwartet);
+      expect(abrufe.anzahl).toBe(1);
     });
-    await new Promise((r) => setTimeout(r, 20));
-    expect(abrufe.anzahl).toBe(0);
-    expect(result.current.betreuung).toBeUndefined();
-  });
-});
+
+    it('Modul gesperrt (zugriff: false) → keine Anfrage, kein Zähler', async () => {
+      const abrufe = zaehleAbrufe(pfad, antwort);
+      const gesperrt = {
+        ...ausgeblendet([...ANDERE, anderes]),
+        [modul]: { sichtbar: true, zugriff: false },
+      };
+      const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: gesperrt }), {
+        wrapper: wrapper(neuerQueryClient()),
+      });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(abrufe.anzahl).toBe(0);
+      expect(result.current[modul]).toBeUndefined();
+    });
+
+    it('Freigaben unbekannt (laden noch/gescheitert) → keine Anfrage', async () => {
+      const abrufe = zaehleAbrufe(pfad, antwort);
+      const { result } = renderHook(() => useModulZaehler({ einsatzId: 7, freigaben: undefined }), {
+        wrapper: wrapper(neuerQueryClient()),
+      });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(abrufe.anzahl).toBe(0);
+      expect(result.current[modul]).toBeUndefined();
+    });
+  },
+);
 
 describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
   const WETTER = '/api/einsaetze/7/wetter';
   const JETZT = Date.now();
   const um = (ms: number) => new Date(JETZT + ms).toISOString();
-  const ALLE_ANDEREN = [...ANDERE, 'betreuung'];
+  const ALLE_ANDEREN = [...ANDERE, 'betreuung', 'evakuierung'];
 
   function zaehleWetterAbrufe(): { anzahl: number } {
     const zaehler = { anzahl: 0 };

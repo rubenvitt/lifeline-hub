@@ -197,9 +197,15 @@ und MUST NOT eine Zahl daraus zeigen.
 
 #### Scenario: Sanitätsdienst ohne Betreuung
 
-- **WHEN** das Modul Betreuung im Einsatz ausgeblendet ist und alle übrigen Module lesbar sind
+- **WHEN** die Module Betreuung und Evakuierung im Einsatz ausgeblendet sind und alle übrigen Module lesbar sind
 - **THEN** ist der Bericht druckbar
 - **AND** bei Betreuung und Evakuierung steht „In diesem Einsatz nicht genutzt“
+
+#### Scenario: Betreuung ohne Evakuierung
+
+- **WHEN** nur das Modul Evakuierung im Einsatz ausgeblendet ist
+- **THEN** steht bei Evakuierung „In diesem Einsatz nicht genutzt“
+- **AND** die Betreuungsstellen stehen mit ihren Zahlen in der Bilanz
 
 ### Requirement: Laufender Einsatz ist vorläufig
 

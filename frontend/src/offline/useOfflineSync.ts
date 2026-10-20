@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
-import { meldeBelegung, meldeStand } from '../api/betreuung';
+import { meldeBelegung } from '../api/betreuung';
+import { meldeStand } from '../api/evakuierung';
 import { ApiError, fehlerText } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
@@ -139,7 +140,9 @@ export function useOfflineSync(benutzerId?: number): void {
               });
             }
           } else if (aktion.art === 'stand' || aktion.art === 'belegung') {
-            // Stand- und Belegungsmeldungen: die Seite lädt über dieselben zwei Keys nach wie online.
+            // Stand- und Belegungsmeldungen: die Seite lädt über dieselben Keys nach wie online.
+            // Der Eintrag trägt keine URL, nur die Kennung: ein vor LLH-1034 eingereihter Stand
+            // geht deshalb ebenfalls an `…/evakuierung/bezirke/{id}/staende`.
             const optionen = { offlineQueueBenutzerId: aktuellerBenutzerId };
             if (aktion.art === 'stand') {
               await meldeStand(element.wert.einsatz_id, aktion.bezirk_id, aktion.daten, optionen);
@@ -153,7 +156,12 @@ export function useOfflineSync(benutzerId?: number): void {
             }
             if (!montiert.current || aktiverBenutzer.current !== aktuellerBenutzerId) break;
             await schreibaktionEntfernen(aktuellerBenutzerId, element.wert.id!);
-            void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(element.wert.einsatz_id) });
+            void qc.invalidateQueries({
+              queryKey:
+                aktion.art === 'stand'
+                  ? einsatzKeys.evakuierung(element.wert.einsatz_id)
+                  : einsatzKeys.betreuung(element.wert.einsatz_id),
+            });
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(element.wert.einsatz_id) });
           } else if (aktion.art === 'ausgabe') {
             // LFH-688, design.md D7: das bestätigte Zeitfenster steht im Cache, BEVOR die

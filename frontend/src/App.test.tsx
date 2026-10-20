@@ -331,11 +331,25 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+      http.get('/api/einsaetze/7/betreuung', () => HttpResponse.json({ stellen: [] })),
     );
     renderApp('/einsaetze/7/betreuung');
     await waitFor(() =>
       expect(screen.getByRole('heading', { level: 1, name: 'Betreuung' })).toBeInTheDocument(),
+    );
+    expect(platzhalterTitel()).toBeNull();
+  });
+
+  it('evakuierung-Route rendert die EvakuierungPage statt Stub (LLH-1034)', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+    );
+    renderApp('/einsaetze/7/evakuierung');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 1, name: 'Evakuierung' })).toBeInTheDocument(),
     );
     expect(platzhalterTitel()).toBeNull();
   });

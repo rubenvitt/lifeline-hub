@@ -1181,6 +1181,9 @@ mod tests {
                     kapazitaet_personen: Some(150),
                     standort: Some("Ostring 5".into()),
                     notiz: Some("Ansprechpartner Herr Meier 0170".into()),
+                    // LLH-1044: Name und Rufnummer der Leitung gehen mit dem Einsatz.
+                    leitung: Some("Frau Schulz".into()),
+                    erreichbarkeit: Some("0171 2345678".into()),
                 },
             )
             .await
@@ -1273,6 +1276,18 @@ mod tests {
             assert_eq!(art, "notunterkunft");
             assert_eq!(status, "in_betrieb");
         }
+        let leitungen: Vec<(Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT leitung, erreichbarkeit FROM betreuungsstelle WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            leitungen,
+            vec![(None, None), (None, None)],
+            "Leitung und Erreichbarkeit leer (LLH-1044)"
+        );
         assert_eq!(bezirk_zeilen.len(), 2);
         assert_eq!(stellen_zeilen.len(), 2);
         assert_eq!(bezeichnungen.len(), 2, "je Bezirk ein eigener Platzhalter");
@@ -1321,8 +1336,9 @@ mod tests {
             ]
         );
         let uebersicht = crate::betreuung::repo::uebersicht(&pool, e).await.unwrap();
-        assert!(uebersicht
-            .bezirke
+        assert!(crate::betreuung::repo::bezirke(&pool, e)
+            .await
+            .unwrap()
             .iter()
             .all(|b| b.stand.as_ref().map(|s| s.evakuiert) == Some(212)));
         assert!(uebersicht

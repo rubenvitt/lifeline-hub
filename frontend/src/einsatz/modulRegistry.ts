@@ -1,4 +1,5 @@
 import {
+  IconAbmelden,
   IconArzttasche,
   IconBericht,
   IconBesprechungstisch,
@@ -62,10 +63,11 @@ export type ServerZaehlerQuelle =
   | 'lagemeldungen';
 /**
  * Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet: `abloesung` hängt an der
- * Uhr (Vorwarnzeit), `betreuung` teilt sich die Übersicht mit Seite und Kennzahl,
- * `wetter-pegel` zählt Unwetterwarnungen aus einer externen Quelle ohne Live-Ereignis (LFH-663).
+ * Uhr (Vorwarnzeit), `evakuierung` teilt sich die Übersicht mit Seite und Kennzahl, `betreuung`
+ * mit der Seite, `wetter-pegel` zählt Unwetterwarnungen aus einer externen Quelle ohne
+ * Live-Ereignis (LFH-663).
  */
-export type ClientZaehlerQuelle = 'abloesung' | 'betreuung' | 'wetter-pegel';
+export type ClientZaehlerQuelle = 'abloesung' | 'betreuung' | 'evakuierung' | 'wetter-pegel';
 export type ModulZaehlerQuelle = ServerZaehlerQuelle | ClientZaehlerQuelle;
 
 export interface Kategorie {
@@ -335,16 +337,27 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Behandlungsplätze, Belegung, Material',
   },
   {
-    // Evakuierung und Unterbringung als MENGEN mit Zeitbezug. Der Zähler nennt die aktiven
-    // Evakuierungsbezirke; dieselbe Übersicht speist die Kennzahl „Evakuiert".
-    // Reihenfolge wie `MODUL_KEYS` im Backend.
+    // Räumung als MENGE mit Zeitbezug, seit LLH-1034 ein eigenes Modul neben der Betreuung. Der
+    // Zähler nennt die aktiven Evakuierungsbezirke; dieselbe Übersicht speist die Kennzahl
+    // „Evakuiert". Reihenfolge wie `MODUL_KEYS` im Backend.
+    key: 'evakuierung',
+    kategorie: 'erfassung',
+    label: 'Evakuierung',
+    icon: IconAbmelden,
+    route: 'evakuierung',
+    status: 'fertig',
+    beschreibung: 'Räumungsbezirke, Stand evakuiert',
+    zaehlerQuelle: 'evakuierung',
+  },
+  {
+    // Unterbringung als MENGE mit Zeitbezug. Der Zähler nennt die Stellen in Betrieb.
     key: 'betreuung',
     kategorie: 'erfassung',
     label: 'Betreuung',
     icon: IconHausHerz,
     route: 'betreuung',
     status: 'fertig',
-    beschreibung: 'Evakuierung, Betreuungsstellen',
+    beschreibung: 'Betreuungsstellen, Unterbringung',
     zaehlerQuelle: 'betreuung',
   },
   {

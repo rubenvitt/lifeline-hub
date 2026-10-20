@@ -1,0 +1,316 @@
+import { Button, Space, Typography, theme } from 'antd';
+import { useMemo } from 'react';
+import type { Evakuierungsbezirk, Raeumungszustand } from '../api/types';
+import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import StatusTag from '../components/StatusTag';
+import { Balken, useRollen } from '../components/instrument';
+import { useViewport } from '../components/useViewport';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { raeumungszustand } from '../theme/statusFarben';
+import { evakuiertText, personenZahl, RAEUMUNG_FOLGE } from './betreuungText';
+import MeldeVerlauf from './MeldeVerlauf';
+
+/**
+ * Die Bezirkstabelle der Evakuierungsseite (LLH-1034, ersetzt die Bezirkskarten der früheren
+ * Betreuungsseite).
+ *
+ * Tabelle in JEDER Breite: verglichen wird über Bezirke hinweg („wo läuft die Räumung, wo fehlt
+ * ein Stand?"). Fixierte Kennung ist die Bezeichnung, nie die DB-`id`. Rangfolge nach der
+ * Zielfrage: Räumung und Evakuiert direkt hinter der Kennung; Stand, Sammelstelle, Fläche und
+ * Abschnitt weichen in schmalen Breiten (`abBreite`, zurückholbar über den Spaltenschalter).
+ *
+ * „Evakuiert" führt mit der Zahl („N · von M geplant", „≈" bei geschätzt, „keine Meldung" statt
+ * 0); der Balken darunter ist der zweite Kanal und trägt denselben Wortlaut als Namen.
+ *
+ * Zeilenaktionen: „Stand melden" direkt — unter `md` in der fixierten Kennung unter dem Namen,
+ * sonst läge der Knopf bei 390 px hinter dem Querscrollen (wie „Belegung melden" der Stellen) —,
+ * alles Weitere im Menü. „Auf Karte zeigen" steht im Menü, sobald der Bezirk eine Fläche hat,
+ * auch ohne Schreibrecht (ein Sprung ist Lesen).
+ *
+ * „Verlauf" als Aufklappbereich je Zeile, auch ohne Schreibrecht; lädt erst beim Aufklappen.
+ *
+ * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`): `scrolleZurZeile` und alte Deeplinks suchen
+ * diese Marke. Ein Zeilenklick hat (noch) kein Ziel; die Detailseite eines Bezirks folgt.
+ */
+
+export type BezirkAktion = 'karte' | 'plangroesse' | 'raeumung' | 'stornieren';
+
+const MENUE: readonly MenueEintrag<BezirkAktion>[] = [
+  { key: 'plangroesse', label: 'Plangröße fortschreiben' },
+  { key: 'raeumung', label: 'Räumung setzen' },
+  { key: 'stornieren', label: 'Stornieren', gefahr: true },
+];
+
+/**
+ * Menü einer Zeile: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche hat — auch OHNE
+ * Schreibrecht. Ist die Lagekarte gesperrt, steht der Sprung gesperrt mit Grund da (LFH-888).
+ */
+export function bezirkMenue(
+  b: Pick<Evakuierungsbezirk, 'flaechen'>,
+  darfSchreiben: boolean,
+  karteGesperrt: boolean,
+): readonly MenueEintrag<BezirkAktion>[] {
+  const karte: MenueEintrag<BezirkAktion>[] =
+    b.flaechen > 0
+      ? [
+          karteGesperrt
+            ? { key: 'karte', label: `Auf Karte zeigen (${KEINE_BERECHTIGUNG})`, gesperrt: true }
+            : { key: 'karte', label: 'Auf Karte zeigen' },
+        ]
+      : [];
+  return darfSchreiben ? [...karte, ...MENUE] : karte;
+}
+
+/** Breite, in der ein langer Bezirksname unter `md` umbricht (wie bei den Stellen). */
+const KENNUNG_MAX_PX = 150;
+
+const leer = <Typography.Text type="secondary">—</Typography.Text>;
+
+const bezirkSpalten = (
+  darfSchreiben: boolean,
+  onStandMelden: (b: Evakuierungsbezirk) => void,
+  onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void,
+  karteGesperrt: boolean,
+  /** Unter `md`: „Stand melden" reitet in der fixierten Kennung mit. */
+  meldenInKennung: boolean,
+  kennungAbstand: number,
+  balkenFarbe: string,
+) => {
+  const meldeKnopf = (b: Evakuierungsbezirk) =>
+    darfSchreiben ? (
+      <Button
+        aria-label={`Stand melden für Bezirk ${b.bezeichnung}`}
+        onClick={() => onStandMelden(b)}
+      >
+        Stand melden
+      </Button>
+    ) : null;
+  return spaltenFuer<Evakuierungsbezirk>()([
+    {
+      key: 'bezeichnung',
+      title: 'Bezirk',
+      immerSichtbar: true,
+      sortWert: (b) => b.bezeichnung,
+      suchText: (b) => b.bezeichnung,
+      render: (_, b) => {
+        const name = (
+          <Typography.Text
+            strong
+            style={
+              meldenInKennung ? { display: 'inline-block', maxWidth: KENNUNG_MAX_PX } : undefined
+            }
+          >
+            {b.bezeichnung}
+          </Typography.Text>
+        );
+        const knopf = meldenInKennung ? meldeKnopf(b) : null;
+        return knopf ? (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              gap: kennungAbstand,
+            }}
+          >
+            {name}
+            {knopf}
+          </div>
+        ) : (
+          name
+        );
+      },
+    },
+    {
+      key: 'raeumung',
+      title: 'Räumung',
+      sortWert: (b) => RAEUMUNG_FOLGE.indexOf(b.raeumung),
+      filter: {
+        werte: RAEUMUNG_FOLGE.map((r: Raeumungszustand) => ({
+          text: raeumungszustand[r].label,
+          value: r,
+        })),
+        trifft: (b, w) => b.raeumung === w,
+      },
+      render: (_, b) => <StatusTag darstellung={raeumungszustand[b.raeumung]} />,
+    },
+    {
+      key: 'evakuiert',
+      title: 'Evakuiert',
+      zahl: true,
+      sortWert: (b) => b.stand?.evakuiert,
+      render: (_, b) => {
+        const text = evakuiertText(b);
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: kennungAbstand / 2 }}>
+            <span>{text}</span>
+            {b.stand && (
+              <Balken
+                wert={b.stand.evakuiert}
+                max={b.plan_personen}
+                farbe={balkenFarbe}
+                beschriftung={`Bezirk ${b.bezeichnung}: ${text}`}
+                style={{ minWidth: 96 }}
+              />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'stand',
+      title: 'Stand',
+      zahl: true,
+      abBreite: 'md',
+      sortWert: (b) => b.stand?.zeitpunkt_at,
+      // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
+      render: (_, b) =>
+        b.stand ? <ZeitAnzeige wert={b.stand.zeitpunkt_at} format="kurz" /> : leer,
+    },
+    {
+      key: 'sammelstelle',
+      title: 'Sammelstelle',
+      abBreite: 'lg',
+      suchText: (b) => b.sammelstelle,
+      render: (_, b) => b.sammelstelle ?? leer,
+    },
+    {
+      key: 'flaeche',
+      title: 'Fläche',
+      abBreite: 'lg',
+      sortWert: (b) => b.flaechen,
+      // Zeichen und Wort: ohne Fläche „—“ mit „keine“, damit Farbe oder Zeichen nie allein tragen.
+      render: (_, b) =>
+        b.flaechen > 0 ? (
+          <span>
+            <span aria-hidden="true">▰ </span>
+            {b.flaechen === 1 ? '1 Fläche' : `${personenZahl(b.flaechen)} Flächen`}
+          </span>
+        ) : (
+          <Typography.Text type="secondary">
+            <span aria-hidden="true">— </span>keine
+          </Typography.Text>
+        ),
+    },
+    {
+      key: 'abschnitt',
+      title: 'Abschnitt',
+      abBreite: 'xl',
+      suchText: (b) => b.abschnitt_name,
+      render: (_, b) => b.abschnitt_name ?? leer,
+    },
+    {
+      key: 'aktionen' as const,
+      title: 'Aktionen',
+      immerSichtbar: true,
+      render: (_: unknown, b: Evakuierungsbezirk) => {
+        const eintraege = bezirkMenue(b, darfSchreiben, karteGesperrt);
+        return (
+          // `middle`: hält ≥ 16 px zwischen Knopf und Dreipunkt im Handschuh-Betrieb.
+          <Space wrap size="middle">
+            {!meldenInKennung && meldeKnopf(b)}
+            {eintraege.length > 0 && (
+              <MenueAusloeser
+                eintraege={eintraege}
+                zugaenglicherName={`Aktionen zu Bezirk ${b.bezeichnung}`}
+                onWahl={(aktion) => onAktion(aktion, b)}
+              />
+            )}
+          </Space>
+        );
+      },
+    },
+  ]);
+};
+
+type BezirkSpalte = ReturnType<typeof bezirkSpalten>[number]['key'];
+
+/**
+ * Der Kartenplan ist Pflicht am Primitiv, greift bei `form="tabelle"` aber nie; ehrlich belegt,
+ * falls die Form je auf `auto` wechselt.
+ */
+const KARTE: Kartenplan<Evakuierungsbezirk, BezirkSpalte> = {
+  art: 'plan',
+  titel: { spalte: 'bezeichnung' },
+  status: (b) => raeumungszustand[b.raeumung],
+  sekundaer: ['evakuiert', 'stand', 'abschnitt'],
+};
+
+export default function BezirkTabelle({
+  einsatzId,
+  bezirke,
+  ladend,
+  darfSchreiben,
+  hervorgehoben,
+  onStandMelden,
+  onAktion,
+}: {
+  einsatzId: number;
+  bezirke: readonly Evakuierungsbezirk[];
+  ladend: boolean;
+  darfSchreiben: boolean;
+  /** Per Deeplink angesteuerter Bezirk (`?bezirk=`). */
+  hervorgehoben: number | null;
+  onStandMelden: (b: Evakuierungsbezirk) => void;
+  onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void;
+}) {
+  const { token } = theme.useToken();
+  const { rollen } = useRollen();
+  const { istSchmal } = useViewport();
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
+  const spalten = useMemo(
+    () =>
+      bezirkSpalten(
+        darfSchreiben,
+        onStandMelden,
+        onAktion,
+        karteGesperrt,
+        istSchmal,
+        token.marginXS,
+        rollen.gedaempft,
+      ),
+    [
+      darfSchreiben,
+      onStandMelden,
+      onAktion,
+      karteGesperrt,
+      istSchmal,
+      token.marginXS,
+      rollen.gedaempft,
+    ],
+  );
+  const aufklappen = useMemo(
+    () => ({
+      etikett: 'Verlauf',
+      zugaenglicherName: (b: Evakuierungsbezirk) => `Verlauf zu Bezirk ${b.bezeichnung}`,
+      inhalt: (b: Evakuierungsbezirk) => (
+        <MeldeVerlauf
+          einsatzId={einsatzId}
+          art="bezirk"
+          objektId={b.id}
+          darfZuruecknehmen={darfSchreiben}
+        />
+      ),
+    }),
+    [einsatzId, darfSchreiben],
+  );
+
+  return (
+    <Datensicht
+      bezeichnung="Evakuierungsbezirke"
+      form="tabelle"
+      spalten={spalten}
+      daten={bezirke}
+      zeilenSchluessel={(b) => `bezirk-${b.id}`}
+      ladend={ladend}
+      // Der Anlegen-Knopf steht im Seitenkopf (die EINE Primäraktion).
+      leerText="Keine Evakuierungsbezirke"
+      karte={KARTE}
+      aufklappen={aufklappen}
+      zeilenKlasse={(b) => (b.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
+    />
+  );
+}

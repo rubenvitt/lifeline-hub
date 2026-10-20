@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Erhebung, Evakuierungsbezirk, Raeumungszustand } from '../api/types';
-import { evakuierungKennzahl, istAktiverBezirk } from './evakuierungKennzahl';
+import { bezirkLage, evakuierungKennzahl, istAktiverBezirk } from './evakuierungKennzahl';
 
 /**
  * Kennzahl „Evakuiert N · von M geplant": jedes Spec-Szenario als eigener Test. Der Fall
@@ -139,5 +139,39 @@ describe('istAktiverBezirk', () => {
     expect(istAktiverBezirk(bezirk(1, { raeumung: 'geraeumt' }))).toBe(true);
     expect(istAktiverBezirk(bezirk(1, { raeumung: 'aufgehoben' }))).toBe(false);
     expect(istAktiverBezirk(bezirk(1, { storniert: true }))).toBe(false);
+  });
+});
+
+describe('bezirkLage — Kennzahlenband der Evakuierungsseite (LLH-1034)', () => {
+  it('ohne aktiven Bezirk null: das Band entfällt, keine Nullen', () => {
+    expect(bezirkLage([])).toBeNull();
+    expect(
+      bezirkLage([bezirk(100, { raeumung: 'aufgehoben' }), bezirk(50, { storniert: true })]),
+    ).toBeNull();
+  });
+
+  it('zählt Räumungszustände nur über die aktiven Bezirke', () => {
+    const lage = bezirkLage([
+      bezirk(100, { raeumung: 'angeordnet' }),
+      bezirk(200, { raeumung: 'laeuft', stand: 80 }),
+      bezirk(300, { raeumung: 'laeuft', stand: 120, standErhebung: 'geschaetzt' }),
+      bezirk(400, { raeumung: 'geraeumt', stand: 400 }),
+      bezirk(500, { raeumung: 'aufgehoben', stand: 10 }),
+      bezirk(600, { raeumung: 'laeuft', storniert: true }),
+    ]);
+    expect(lage).toMatchObject({
+      angeordnet: 1,
+      laeuft: 2,
+      geraeumt: 1,
+      planGeschaetzt: false,
+      standGeschaetzt: true,
+      kennzahl: { evakuiert: 600, geplant: 1000, bezirke: 4, ohneMeldung: 1 },
+    });
+  });
+
+  it('trennt geschätzte Plangröße und geschätzten Stand', () => {
+    const lage = bezirkLage([bezirk(100, { planErhebung: 'geschaetzt' })]);
+    expect(lage?.planGeschaetzt).toBe(true);
+    expect(lage?.standGeschaetzt).toBe(false);
   });
 });

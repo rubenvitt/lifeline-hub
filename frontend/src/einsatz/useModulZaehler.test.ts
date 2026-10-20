@@ -5,6 +5,7 @@ import { modulRegistry } from './modulRegistry';
 import {
   berechneAbloesungZaehler,
   berechneBetreuungZaehler,
+  berechneEvakuierungZaehler,
   berechneUnwetterZaehler,
   bildeZaehler,
   darfZaehlerZeigen,
@@ -107,7 +108,7 @@ describe('Modul-Zähler', () => {
       storniert_at?: string,
     ) => ({ id, raeumung, storniert_at });
     expect(
-      berechneBetreuungZaehler([
+      berechneEvakuierungZaehler([
         bezirk(1, 'angeordnet'),
         bezirk(2, 'laeuft'),
         bezirk(3, 'geraeumt'),
@@ -116,20 +117,45 @@ describe('Modul-Zähler', () => {
         bezirk(5, 'angeordnet', '2026-09-23 10:00:00'),
       ]),
     ).toEqual({ wert: 3, beschreibung: '3 aktive Evakuierungsbezirke' });
-    expect(berechneBetreuungZaehler([bezirk(1, 'laeuft')])).toEqual({
+    expect(berechneEvakuierungZaehler([bezirk(1, 'laeuft')])).toEqual({
       wert: 1,
       beschreibung: '1 aktiver Evakuierungsbezirk',
     });
-    expect(berechneBetreuungZaehler([])).toEqual({
+    expect(berechneEvakuierungZaehler([])).toEqual({
       wert: 0,
       beschreibung: '0 aktive Evakuierungsbezirke',
     });
   });
 
-  it('zeigt den Betreuungszähler nur bei sichtbarem Modul (LFH-639)', () => {
+  it('zählt die Betreuungsstellen in Betrieb — ohne vorbereitete, geschlossene, stornierte (LLH-1034)', () => {
+    const stelle = (
+      status: 'vorbereitet' | 'in_betrieb' | 'geschlossen',
+      storniert_at?: string,
+    ) => ({ status, storniert_at });
+    expect(
+      berechneBetreuungZaehler([
+        stelle('in_betrieb'),
+        stelle('in_betrieb'),
+        stelle('vorbereitet'),
+        stelle('geschlossen'),
+        stelle('in_betrieb', '2026-09-23 10:00:00'),
+      ]),
+    ).toEqual({ wert: 2, beschreibung: '2 Betreuungsstellen in Betrieb' });
+    expect(berechneBetreuungZaehler([stelle('in_betrieb')])).toEqual({
+      wert: 1,
+      beschreibung: '1 Betreuungsstelle in Betrieb',
+    });
+  });
+
+  it('zeigt Betreuungs- und Evakuierungszähler je nur bei sichtbarem Modul (LFH-639, LLH-1034)', () => {
     expect(darfZaehlerZeigen('betreuung', freigabenFixture())).toBe(true);
+    expect(darfZaehlerZeigen('evakuierung', freigabenFixture())).toBe(true);
     const versteckt = freigabenFixture({ betreuung: { sichtbar: false, zugriff: false } });
     expect(darfZaehlerZeigen('betreuung', versteckt)).toBe(false);
+    expect(darfZaehlerZeigen('evakuierung', versteckt)).toBe(true);
+    const ohneEvak = freigabenFixture({ evakuierung: { sichtbar: false, zugriff: false } });
+    expect(darfZaehlerZeigen('evakuierung', ohneEvak)).toBe(false);
+    expect(darfZaehlerZeigen('betreuung', ohneEvak)).toBe(true);
   });
 
   it('zählt Unwetterwarnungen am Einsatzort — nur schwer/extrem, nie 0 ohne Stand (LFH-663)', () => {
