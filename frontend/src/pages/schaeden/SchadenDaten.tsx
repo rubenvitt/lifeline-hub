@@ -8,10 +8,18 @@ import { Datenfeld, DatenfeldEingabe, Datenraster } from '../../components/instr
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
 import { lagekartePfad } from '../../routing/deeplinks';
 import type { Schaden } from '../../api/types';
-import { ABSCHLUSS_LABEL, AUSMASS_META, TYP_LABEL, geschaedigtAnzeige } from './schadenHelfer';
+import {
+  ABSCHLUSS_LABEL,
+  AUSMASS_META,
+  GEFAHR_LABEL,
+  SCHADENSGRAD_LABEL,
+  TYP_LABEL,
+  geschaedigtAnzeige,
+} from './schadenHelfer';
 
 /** Die Felder, die die Detailseite im Bearbeiten-Modus an Ort und Stelle als Eingabe zeigt. */
-type SchadenEingabeFeld = 'typ' | 'ausmass' | 'ort' | 'beschreibung' | 'geschaedigt';
+type SchadenEingabeFeld =
+  'typ' | 'ausmass' | 'gefahrenart' | 'schadensgrad' | 'ort' | 'beschreibung' | 'geschaedigt';
 
 /** Eingabe eines Felds im Bearbeiten-Modus: das Steuerelement und seine Prüfregeln. */
 export interface SchadenEingabe {
@@ -68,6 +76,14 @@ export default function SchadenDaten({
     <Datenraster spalten={spalten} beschriftung="Schadensdaten">
       {zelle('typ', 'Typ', <Tag>{TYP_LABEL[s.typ]}</Tag>)}
       {zelle('ausmass', 'Ausmaß', <StatusTag darstellung={AUSMASS_META[s.ausmass]} />)}
+      {/* Gefahr und Schadensgrad in Worten, wie im Gefahrengebiet und im Lagekarten-Inspektor
+          (LLH-1115); das Zeichen dazu steht auf der Karte. */}
+      {zelle('gefahrenart', 'Gefahr', s.gefahrenart ? GEFAHR_LABEL[s.gefahrenart] : '—')}
+      {zelle(
+        'schadensgrad',
+        'Schadensgrad',
+        s.schadensgrad ? SCHADENSGRAD_LABEL[s.schadensgrad] : '—',
+      )}
       {zelle('ort', 'Ort', s.ort)}
       {zelle('beschreibung', 'Beschreibung', s.beschreibung || '—', true)}
       {/* Verortung sichtbar machen: eine unverortete Lage, die niemand als unverortet sieht, ist

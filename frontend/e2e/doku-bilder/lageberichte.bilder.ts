@@ -6,8 +6,9 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep lageberichte`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   lageberichte.png       frontend/src/pages/LageberichtePage.tsx
- *   neuer-lagebericht.png  frontend/src/pages/LageberichtePage.tsx (Dialog „Neuer Lagebericht“)
+ *   lageberichte.png       frontend/src/pages/LageberichtePage.tsx,
+ *                          frontend/src/lageberichte/LageberichtUebersicht.tsx,
+ *                          frontend/src/lageberichte/NeuerLagevortragKnopf.tsx
  *   entwurf.png            frontend/src/pages/LageberichtDetailPage.tsx,
  *                          frontend/src/entwurf/VerteilerField.tsx,
  *                          frontend/src/lageberichte/AbschnittsAkkordeon.tsx,
@@ -69,37 +70,32 @@ async function freigegebenerBericht(page: Page, einsatzId: number): Promise<numb
 }
 
 test.describe(KAPITEL, () => {
-  test('Liste der Lageberichte', async ({ page }) => {
+  test('Übersicht der Lageberichte', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await entwurfAnlegen(page, demo.id);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/lageberichte`);
-    await expect(page.getByRole('link', { name: ENTWURF })).toBeVisible();
-    await expect(page.getByText('Freigegeben', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Aktueller Lagevortrag' })).toBeVisible();
+    const inArbeit = page.getByRole('region', { name: 'In Arbeit' });
+    await expect(inArbeit.getByRole('link', { name: ENTWURF })).toBeVisible();
+    // Füllstand und „zuletzt gespeichert“ kommen aus dem Einzelabruf: erst danach fotografieren.
+    await expect(inArbeit.getByText(/^\d+\/8 Abschnitte$/)).toBeVisible();
     await fotografiere(page, KAPITEL, 'lageberichte');
-    // Ablauf weiter: suchen, dann den Entwurf öffnen.
-    const suche = page.getByPlaceholder('Titel oder Vorlage');
-    await suche.fill('13. Stunde');
-    await expect(page.getByRole('link', { name: /^Lagebericht 1/ })).toHaveCount(0);
-    await page.getByRole('link', { name: ENTWURF }).click();
+    // Ablauf weiter: den Entwurf öffnen.
+    await inArbeit.getByRole('link', { name: ENTWURF }).click();
     await expect(page.getByRole('button', { name: 'Entwurf speichern' })).toBeVisible();
   });
 
-  test('Dialog „Neuer Lagebericht“', async ({ page }) => {
+  test('„Neuer Lagevortrag“ öffnet den Entwurf', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/lageberichte`);
-    await page.getByRole('button', { name: 'Neuer Bericht' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Neuer Lagebericht' });
-    // Der Titel ist mit „Lageüberblick“ und der Uhrzeit vorbelegt.
-    await expect(dialog.getByLabel('Titel')).toHaveValue(/^Lageüberblick \d{4}$/);
-    await dialog.getByLabel('Titel').blur();
-    await fotografiere(dialog, KAPITEL, 'neuer-lagebericht');
-    await dialog.getByRole('button', { name: 'Anlegen' }).click();
-    await expect(dialog).toBeHidden();
-    await expect(page.getByRole('link', { name: /^Lageüberblick \d{4}$/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Neuer Lagevortrag' }).click();
+    // Kein Dialog: der Entwurf öffnet sich, der Titel nennt „Lageüberblick“ und die Uhrzeit.
+    await expect(page.getByRole('button', { name: 'Entwurf speichern' })).toBeVisible();
+    await expect(page.getByLabel('Titel')).toHaveValue(/^Lageüberblick \d{4}$/);
   });
 
   test('Entwurf mit Übernahme in die Eigene Lage', async ({ page }) => {

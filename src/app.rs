@@ -1213,6 +1213,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_schaden::auswahl),
         )
         .route(
+            "/api/einsaetze/{id}/schaeden/export",
+            get(routes::einsatz_schaden::export),
+        )
+        .route(
             "/api/einsaetze/{id}/schaeden/{sid}",
             get(routes::einsatz_schaden::detail),
         )

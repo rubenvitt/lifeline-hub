@@ -738,7 +738,12 @@ export function verdichteEinsatzbericht(
       abschnittAus('Personen', daten(q.personen), (p) => p.length === 0, personenBilanz),
       abschnittAus('Schäden', daten(q.schaeden), (s) => s.length === 0, schadenBilanz),
       // Zwei Module seit LLH-1034: je Modul ein Abschnitt, jeder mit eigenem Rechtevermerk.
-      abschnittAus('Evakuierung', daten(q.evakuierung), (e) => e.bezirke.length === 0, evakuierungBilanz),
+      abschnittAus(
+        'Evakuierung',
+        daten(q.evakuierung),
+        (e) => e.bezirke.length === 0,
+        evakuierungBilanz,
+      ),
       abschnittAus('Betreuung', daten(q.betreuung), (b) => b.stellen.length === 0, betreuungBilanz),
       abschnittAus(
         'Verpflegung',

@@ -81,7 +81,10 @@ const bezirkSpalten = (
 ) => {
   const meldeKnopf = (b: Evakuierungsbezirk) =>
     darfSchreiben ? (
-      <Button aria-label={`Stand melden für Bezirk ${b.bezeichnung}`} onClick={() => onStandMelden(b)}>
+      <Button
+        aria-label={`Stand melden für Bezirk ${b.bezeichnung}`}
+        onClick={() => onStandMelden(b)}
+      >
         Stand melden
       </Button>
     ) : null;
@@ -164,7 +167,8 @@ const bezirkSpalten = (
       abBreite: 'md',
       sortWert: (b) => b.stand?.zeitpunkt_at,
       // `ZeitAnzeige` liest den Wire-String als UTC — nie `dayjs(s)`.
-      render: (_, b) => (b.stand ? <ZeitAnzeige wert={b.stand.zeitpunkt_at} format="kurz" /> : leer),
+      render: (_, b) =>
+        b.stand ? <ZeitAnzeige wert={b.stand.zeitpunkt_at} format="kurz" /> : leer,
     },
     {
       key: 'sammelstelle',

@@ -9,6 +9,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * (`pnpm doku:bilder --grep wetter-pegel`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   wetter-pegel.png     frontend/src/pages/WetterPegelPage.tsx,
  *                        frontend/src/wetter/PegelPaneel.tsx, frontend/src/wetter/WetterPaneele.tsx
+ *                        (Hochwasserlage: Pegel festgelegt, Reihenfolge Warnungen · Pegel · …,
+ *                        LLH-1117)
  *   warnung-offen.png    frontend/src/wetter/WetterPaneele.tsx (WarnungenPaneel)
  *   unwetter-hinweis.png frontend/src/einsatz/AlarmZentrale.tsx,
  *                        frontend/src/wetter/useUnwetterHinweis.ts
@@ -218,12 +220,21 @@ async function unwetterHinweisSchliessen(page: Page) {
 test.describe(KAPITEL, () => {
   test('Seite Wetter und Pegel', async ({ page }) => {
     const id = await vorbereiten(page);
+    // Die Reihenfolge der Seite folgt der Festlegung am Einsatz (LLH-1117), nicht der gestellten
+    // Liste: für die Hochwasserlage werden die Pegel echt festgelegt.
+    await fuelle(page, 'put', `/api/einsaetze/${id}/pegel`, {
+      stationen: PEGEL.map((p) => ({
+        station_uuid: p.station_uuid,
+        name: p.name,
+        gewaesser: p.gewaesser,
+      })),
+    });
     await page.goto(`/einsaetze/${id}/wetter-pegel`);
     await expect(page.locator('[data-lfh="pegel-zeile"]')).toHaveCount(2);
     await expect(page.getByLabel('Vorhersage je drei Stunden')).toBeVisible();
     await unwetterHinweisSchliessen(page);
     await fotografiere(page, KAPITEL, 'wetter-pegel');
-    // Ablauf weiter: vom Seitenkopf zu den maßgeblichen Pegeln.
+    // Ablauf weiter: vom Nebenweg im Seitenkopf zu den maßgeblichen Pegeln.
     await page.getByRole('button', { name: 'Pegel festlegen' }).click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${id}/einstellungen/pegel`));
   });

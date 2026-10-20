@@ -2,7 +2,8 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Schaden } from '../../api/types';
 import { renderMitProviders } from '../../test/utils';
-import { geschaedigtAnzeige } from './schadenHelfer';
+import { GEFAHR_LABEL, gefahrText, geschaedigtAnzeige } from './schadenHelfer';
+import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
 
 describe('geschaedigtAnzeige', () => {
   /**
@@ -21,5 +22,20 @@ describe('geschaedigtAnzeige', () => {
       'href',
       '/einsaetze/5/personal?personal=12',
     );
+  });
+});
+
+describe('gefahrText (LLH-1115)', () => {
+  it('nennt Gefahr und Schadensgrad in Worten, nie als Schlüssel', () => {
+    expect(gefahrText({ gefahrenart: 'elektrizitaet', schadensgrad: 'zerstoert' })).toBe(
+      'Elektrizität · total zerstört',
+    );
+    expect(gefahrText({ schadensgrad: 'teilzerstoert' })).toBe('teilzerstört');
+    expect(gefahrText({ gefahrenart: 'chemische_stoffe' })).toBe('Chemische Stoffe');
+    expect(gefahrText({})).toBe('—');
+  });
+
+  it('benennt jede Gefahr wie das Gefahrengebiet', () => {
+    for (const g of GEFAHRENTYPEN) expect(GEFAHR_LABEL[g.wert]).toBe(g.label);
   });
 });
