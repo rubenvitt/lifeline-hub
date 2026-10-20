@@ -18,7 +18,7 @@ import { useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
-  evakuierungPfad,
+  evakuierungsbezirkPfad,
   gefahrenPfad,
   parseKartenzentrum,
   parsePlatzierenAuftrag,
@@ -1095,7 +1095,7 @@ export default function LagekartePage() {
             bezirke={bezirke}
             evakuierungFrei={evakuierungZugriff === 'frei'}
             matrixGesperrt={sprungGesperrt('gefahrenzonen')}
-            bezirkPfad={(bid) => evakuierungPfad(einsatzId, { bezirk: bid })}
+            bezirkPfad={(bid) => evakuierungsbezirkPfad(einsatzId, bid)}
           />
         )}
       </>

@@ -2,11 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * LLH-1034: „Evakuierung" ist ein eigenes Modul neben „Betreuung". Ein alter Link auf einen
- * Bezirk unter `…/betreuung?bezirk=<id>` führt auf die Evakuierungsseite und hebt dort den Bezirk
- * hervor; das Modulpanel führt „Evakuierung" direkt vor „Betreuung".
+ * Bezirk unter `…/betreuung?bezirk=<id>` führt über die Evakuierung auf die Detailseite des
+ * Bezirks (LLH-1076); das Modulpanel führt „Evakuierung" direkt vor „Betreuung".
  *
- * Gegen den echten Server: die Umleitung hängt am Router, die Hervorhebung an den echten
- * Bezirksdaten der neuen Route.
+ * Gegen den echten Server: die Umleitung hängt am Router, die Detailseite an den echten
+ * Bezirksdaten.
  */
 
 async function anmelden(page: Page) {
@@ -23,7 +23,7 @@ async function senden<T = { id: number }>(page: Page, pfad: string, data: unknow
   return (await r.json()) as T;
 }
 
-test('alter Bezirkslink unter Betreuung führt auf die Evakuierung, mit dem Bezirk hervorgehoben', async ({
+test('alter Bezirkslink unter Betreuung führt auf die Detailseite des Bezirks', async ({
   page,
 }) => {
   await anmelden(page);
@@ -43,12 +43,14 @@ test('alter Bezirkslink unter Betreuung führt auf die Evakuierung, mit dem Bezi
   });
 
   await page.goto(`/einsaetze/${einsatzId}/betreuung?bezirk=${bezirkId}`);
-  // Die Seite wendet `?bezirk=` an und räumt den Parameter danach (apply-then-clean).
+  // Betreuung → Evakuierung → Detailseite, jeweils mit `replace`.
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/evakuierung/${bezirkId}$`));
+  await expect(page.getByRole('heading', { level: 1, name: /Bezirk Hafenviertel/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Bezirk in Zahlen' })).toBeVisible();
+
+  // Zurück über die Brotkrume: die Übersicht mit dem Band aller Bezirke.
+  await page.locator('.ant-breadcrumb').getByRole('link', { name: 'Evakuierung' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/evakuierung$`));
-  await expect(page.getByRole('heading', { level: 1, name: 'Evakuierung' })).toBeVisible();
-  await expect(page.locator(`tr[data-row-key="bezirk-${bezirkId}"]`)).toHaveClass(
-    /zeile-hervorgehoben/,
-  );
   await expect(page.getByRole('group', { name: 'Räumung in Zahlen' })).toBeVisible();
 
   // Modulpanel: „Evakuierung" mit dem Zähler der aktiven Bezirke, direkt über „Betreuung".

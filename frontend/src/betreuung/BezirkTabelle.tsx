@@ -2,13 +2,15 @@ import { Button, Space, Typography, theme } from 'antd';
 import { useMemo } from 'react';
 import type { Evakuierungsbezirk, Raeumungszustand } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { KennungsLink } from '../components/kennungsLink';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { Balken, useRollen } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { evakuierungsbezirkPfad } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
 import { evakuiertText, personenZahl, RAEUMUNG_FOLGE } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
@@ -30,16 +32,23 @@ import MeldeVerlauf from './MeldeVerlauf';
  * alles Weitere im Menü. „Auf Karte zeigen" steht im Menü, sobald der Bezirk eine Fläche hat,
  * auch ohne Schreibrecht (ein Sprung ist Lesen).
  *
- * „Verlauf" als Aufklappbereich je Zeile, auch ohne Schreibrecht; lädt erst beim Aufklappen.
+ * „Verlauf" als Aufklappbereich je Zeile, auch ohne Schreibrecht; lädt erst beim Aufklappen. Er
+ * bleibt neben der Detailseite stehen (LLH-1076, design.md D8): nach „Stand melden" in der Liste
+ * gleicht man mehrere Bezirke ab und nimmt eine Fehlmeldung zurück, ohne die Liste zu verlassen.
  *
- * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`): `scrolleZurZeile` und alte Deeplinks suchen
- * diese Marke. Ein Zeilenklick hat (noch) kein Ziel; die Detailseite eines Bezirks folgt.
+ * Die Bezeichnung ist der Kennungs-Link auf die Detailseite des Bezirks (LLH-1076); einen
+ * Zeilenklick gibt es nicht, weil die Zeile Knöpfe, Menü und Aufklapper trägt, deren Klicks sonst
+ * mitnavigierten (der Riegel von `onZeileKlick` kennt nur Anker). Der Link steht im `render` der Spalte und nicht als
+ * `titel.ziel` der Datensicht: unter `md` reitet „Stand melden" in derselben Zelle mit, und ein
+ * Knopf in einem Anker wäre ungültig. Den Plangröße-Dialog gibt es nicht mehr: die Plangröße
+ * schreibt die Detailseite.
+ *
+ * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`).
  */
 
-export type BezirkAktion = 'karte' | 'plangroesse' | 'raeumung' | 'stornieren';
+export type BezirkAktion = 'karte' | 'raeumung' | 'stornieren';
 
 const MENUE: readonly MenueEintrag<BezirkAktion>[] = [
-  { key: 'plangroesse', label: 'Plangröße fortschreiben' },
   { key: 'raeumung', label: 'Räumung setzen' },
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
@@ -70,6 +79,7 @@ const KENNUNG_MAX_PX = 150;
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
 const bezirkSpalten = (
+  einsatzId: number,
   darfSchreiben: boolean,
   onStandMelden: (b: Evakuierungsbezirk) => void,
   onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void,
@@ -97,14 +107,15 @@ const bezirkSpalten = (
       suchText: (b) => b.bezeichnung,
       render: (_, b) => {
         const name = (
-          <Typography.Text
-            strong
-            style={
-              meldenInKennung ? { display: 'inline-block', maxWidth: KENNUNG_MAX_PX } : undefined
-            }
+          <KennungsLink
+            to={evakuierungsbezirkPfad(einsatzId, b.id)}
+            style={{
+              fontWeight: 600,
+              ...(meldenInKennung ? { maxWidth: KENNUNG_MAX_PX } : {}),
+            }}
           >
             {b.bezeichnung}
-          </Typography.Text>
+          </KennungsLink>
         );
         const knopf = meldenInKennung ? meldeKnopf(b) : null;
         return knopf ? (
@@ -244,7 +255,6 @@ export default function BezirkTabelle({
   bezirke,
   ladend,
   darfSchreiben,
-  hervorgehoben,
   onStandMelden,
   onAktion,
 }: {
@@ -252,8 +262,6 @@ export default function BezirkTabelle({
   bezirke: readonly Evakuierungsbezirk[];
   ladend: boolean;
   darfSchreiben: boolean;
-  /** Per Deeplink angesteuerter Bezirk (`?bezirk=`). */
-  hervorgehoben: number | null;
   onStandMelden: (b: Evakuierungsbezirk) => void;
   onAktion: (aktion: BezirkAktion, b: Evakuierungsbezirk) => void;
 }) {
@@ -264,6 +272,7 @@ export default function BezirkTabelle({
   const spalten = useMemo(
     () =>
       bezirkSpalten(
+        einsatzId,
         darfSchreiben,
         onStandMelden,
         onAktion,
@@ -273,6 +282,7 @@ export default function BezirkTabelle({
         rollen.gedaempft,
       ),
     [
+      einsatzId,
       darfSchreiben,
       onStandMelden,
       onAktion,
@@ -310,7 +320,6 @@ export default function BezirkTabelle({
       leerText="Keine Evakuierungsbezirke"
       karte={KARTE}
       aufklappen={aufklappen}
-      zeilenKlasse={(b) => (b.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
     />
   );
 }

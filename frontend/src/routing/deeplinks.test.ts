@@ -43,6 +43,7 @@ import {
   betreuungPfad,
   betreuungsstellePfad,
   evakuierungPfad,
+  evakuierungsbezirkPfad,
   verpflegungAusgabePfad,
   verpflegungAusVorlagePfad,
   parseVerpflegungTag,
@@ -517,6 +518,11 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     const bezirk = evakuierungPfad(E, { bezirk: 12 });
     expect(bezirk.split('?')[0]).toBe('/einsaetze/5/evakuierung');
     expect(new URLSearchParams(bezirk.split('?')[1]).get('bezirk')).toBe('12');
+  });
+
+  it('evakuierungsbezirkPfad ist die Item-Route unter dem Modul (LLH-1076)', () => {
+    // Unter dem Segment `evakuierung`: Sperre und Sichtbarkeit erbt die Detailseite vom Modul.
+    expect(evakuierungsbezirkPfad(E, 12)).toBe('/einsaetze/5/evakuierung/12');
   });
 
   it('wetterPegelPfad (LFH-633)', () => {

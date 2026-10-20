@@ -224,7 +224,7 @@ Zone in einer anderen Kartenansicht, MUST die Karte zuerst zu dieser Ansicht wec
 unbrauchbarer Wert oder ein Bezirk ohne Zone MUST den Parameter ebenfalls entfernen. Die
 Auswahl einer zugeordneten Zone MUST für Personen mit Lesezugriff auf das Modul Bezirk,
 Räumungszustand und den Stand „evakuiert N von M“ zeigen und einen Sprung ins Modul
-anbieten, der den Bezirk dort auswählt. Die Beschriftung einer zugeordneten Zone auf der
+anbieten, der die Detailseite des Bezirks öffnet. Die Beschriftung einer zugeordneten Zone auf der
 Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 #### Scenario: Aus dem Modul auf die Karte
@@ -241,7 +241,7 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 #### Scenario: Aus der Karte ins Modul
 - **WHEN** eine zugeordnete Zone ausgewählt und der Sprung ins Modul gewählt wird
-- **THEN** öffnet sich die Evakuierungsseite mit diesem Bezirk ausgewählt
+- **THEN** öffnet sich die Detailseite dieses Bezirks
 
 #### Scenario: Räumungszustand auf der Fläche
 - **WHEN** der Räumungszustand des Bezirks auf `laeuft` wechselt
