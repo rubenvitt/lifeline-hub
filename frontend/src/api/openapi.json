@@ -13106,6 +13106,17 @@
             "type": "integer",
             "format": "int64"
           },
+          "gefahrenart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Gefahrentyp",
+                "description": "Gefahrenart im Vokabular der Gefahrengebiete (LLH-1115); fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "geschaedigt_kontakt": {
             "type": [
               "string",
@@ -13182,6 +13193,17 @@
           "registrier_nr": {
             "type": "integer",
             "format": "int64"
+          },
+          "schadensgrad": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Schadensgrad",
+                "description": "Schadensgrad nach DV 102, 5.8.4 (LLH-1115); fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/SchadenStatus"
@@ -13296,6 +13318,17 @@
           "ausmass": {
             "$ref": "#/components/schemas/Ausmass"
           },
+          "gefahrenart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Gefahrentyp",
+                "description": "Bestimmt mit dem Schadensgrad das Kartenzeichen (LLH-1115); fehlt = keine Angabe."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -13317,6 +13350,16 @@
           "registrier_nr": {
             "type": "integer",
             "format": "int64"
+          },
+          "schadensgrad": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Schadensgrad"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "status": {
             "$ref": "#/components/schemas/SchadenStatus"
@@ -13343,6 +13386,15 @@
           "umweltschaden",
           "tierkadaver",
           "sonstige"
+        ]
+      },
+      "Schadensgrad": {
+        "type": "string",
+        "description": "Schadensgrad nach DV 102, Kap. 5.8.4 (LLH-1115, design.md D1/D3). Das Kartenzeichen bildet\nerst der Client (`frontend/src/zeichen/fachobjektZeichen.ts`).",
+        "enum": [
+          "angeschlagen",
+          "teilzerstoert",
+          "zerstoert"
         ]
       },
       "Schichtmodell": {

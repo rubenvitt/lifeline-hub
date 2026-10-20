@@ -8,7 +8,7 @@ import {
   type SchadenSortierung,
   type SchadenSortSpalte,
 } from '../api/einsatzSchaden';
-import type { Ausmass, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
+import type { Ausmass, Gefahrentyp, Schaden, SchadenStatus, SchadenTyp } from '../api/types';
 
 /**
  * Attrappe der Schaden-Leserouten für Seitentests (LFH-1075): Seiten, Kennzahlen, Auswahl und
@@ -26,6 +26,7 @@ export function schaedenAttrappe(einsatzId: number, quelle: () => readonly objec
       status: (q.get('status') ?? undefined) as SchadenStatus | undefined,
       typen: werte('typ') as SchadenTyp[] | undefined,
       ausmasse: werte('ausmass') as Ausmass[] | undefined,
+      gefahrenarten: werte('gefahrenart') as Gefahrentyp[] | undefined,
       verortet: werte('verortet') as ('ja' | 'nein')[] | undefined,
     };
     const begriff = q.get('q')?.toLowerCase();

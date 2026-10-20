@@ -518,7 +518,9 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
     expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
     expect(screen.queryByText('Uferstraße 12–40')).toBeNull();
     expect(screen.queryByText('läuft')).toBeNull();
-    expect(screen.getByText('Evakuierungsbezirk · kein Zugriff auf Evakuierung')).toBeInTheDocument();
+    expect(
+      screen.getByText('Evakuierungsbezirk · kein Zugriff auf Evakuierung'),
+    ).toBeInTheDocument();
   });
 
   it('an anderen Zonentypen erscheint nichts vom Bezirk', () => {

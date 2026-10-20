@@ -2,7 +2,7 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -17,8 +17,9 @@ aus dem Modul, in dem sie erfasst wird.
 ### Das Lagebild lesen
 
 1. Im Bereich „Lage“ „Lagebild“ öffnen. Im Seitenkopf stehen Datum und Uhrzeit, rechts das Alter
-   des Datenstands („Stand vor … s“) und, sobald eine erhöhte Warnstufe gilt, der Hinweis
-   „Warnstufe …“.
+   des Datenstands („Stand vor … s“), sobald eine erhöhte Warnstufe gilt, der Hinweis
+   „Warnstufe …“ und, sobald für den Einsatzort eine Wetterwarnung gilt oder angekündigt ist, ihre
+   Marke, etwa „Markantes Wetter Dauerregen bis 21:00 ↗“. Die Marke öffnet „Wetter & Pegel“.
 2. Das Kennzahlenband lesen. Fest stehen „Betroffene“, „Kräfte“, „Vermisste“ und „Einsatzdauer“;
    die Plätze ganz links und in der Mitte richten sich nach der Lage (siehe Hintergrund).
 3. Die drei Paneele darunter lesen: „Gefahrenmatrix“, „Sichtung“ und „Meldungsstrom“.
@@ -52,6 +53,15 @@ Wer die Plätze belegt, steht am Einsatz. Ändert sich das, während das Lagebil
 die Reihe nicht unter dem Blick: Ein Hinweis „Kennzahlreihe geändert: …“ bietet den neuen
 Zuschnitt an, „übernehmen“ setzt ihn. „Vermisste“ nennt dazu, wie viele Fälle seit über vier
 Stunden offen sind.
+
+### Wetter im Seitenkopf
+
+Die Wettermarke nennt die Warnung des Deutschen Wetterdienstes mit der höchsten Stufe, bei
+gleicher Stufe die geltende vor der angekündigten, und zählt die übrigen („(+ 1 weitere)“). Sie
+steht bei jeder amtlichen Stufe, ohne Ton und ohne Hinweis; eine neue Unwetterwarnung meldet der
+Unwetterhinweis (Kapitel [Wetter und Pegel](wetter-pegel.md)). Ist „Wetter & Pegel“ für die Person
+nicht freigegeben oder der Stand der Warnungen unbekannt, fehlt die Marke. Das Wetter steht nie im
+Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Messwert.
 
 ### Was die Paneele verdichten
 
