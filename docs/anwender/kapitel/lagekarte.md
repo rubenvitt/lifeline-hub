@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, src/routes/karte.rs, src/routes/lage_zone.rs]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, src/routes/karte.rs, src/routes/lage_zone.rs]
 ---
 
 ## Überblick
@@ -29,9 +29,9 @@ wer im Einsatz schreiben darf.
 
 ### Ein Objekt von seiner Seite aus verorten
 
-1. Auf der Seite einer Person „Auf Lagekarte verorten“ wählen, auf der Seite eines Schadens oder
-   Bereitstellungsraums „Auf Karte verorten“, für eine Betreuungsstelle „Auf Karte verorten“ in
-   ihrem Menü. Die Lagekarte öffnet sich zum Platzieren dieses Objekts.
+1. Auf der Seite einer Person „Auf Lagekarte verorten“ wählen, auf der Seite eines Schadens,
+   Bereitstellungsraums oder Tiers „Auf Karte verorten“, für eine Betreuungsstelle „Auf Karte
+   verorten“ in ihrem Menü. Die Lagekarte öffnet sich zum Platzieren dieses Objekts.
 2. Auf die Stelle der Karte tippen, an die das Objekt gehört. Die Karte fliegt den neuen Marker
    an und zeigt ihn unter „Ausgewählt“. Oben in der Leiste, am Handy im Band unten auf der Karte,
    steht die Kennung mit „verortet“, etwa „R-005 verortet“.
@@ -150,6 +150,16 @@ Seite heraus oder unter „Nicht verortet“ (Kapitel [Bereitstellungsräume](be
 Wer das Modul Bereitstellungsräume nicht sehen darf, sieht die Ebene gesperrt mit „Keine
 Berechtigung“ und findet keinen Raum in der Suche.
 
+### Tiere
+
+Die Ebene „Tiere“ zeigt offene und vermisste Tiere mit Koordinate als Kreis mit „T“, beschriftet
+mit Registriernummer und Spezies, etwa „T-003 (Hund)“; ein vermisstes Tier trägt zusätzlich
+„vermisst“. Ein abgeschlossenes Tier fehlt. Ausgewählt zeigt die Karte Status, Spezies, Rufname
+und Fundort und springt mit „Im Fachmodul öffnen“ zur Seite des Tiers. Verortet wird ein Tier aus
+seiner Seite heraus oder unter „Nicht verortet“ (Kapitel [Tiere](tiere.md)). Wer das Modul Tiere
+nicht sehen darf, sieht die Ebene gesperrt mit „Keine Berechtigung“ und findet kein Tier in der
+Suche.
+
 ### Die eigene Führungsstelle
 
 Trägt die eigene Führungsstelle in den Einsatzdaten eine Koordinate, steht sie auf der Karte mit
@@ -162,8 +172,8 @@ in einem früheren Lagestand fehlt sie.
 
 Zonen, Zeichen, Gefahrengebiete, Schäden, Lagemeldungen, Kartenbilder und die übrigen Objekte der
 Karte hält die App für die Arbeit ohne Netz vor (Kapitel [Arbeiten ohne Netz](ohne-netz.md)).
-Ausgenommen sind die Bereitstellungsräume: nach einem Neuladen ohne Netz fehlen sie auf der
-Karte.
+Ausgenommen sind die Bereitstellungsräume und die Tiere: nach einem Neuladen ohne Netz fehlen
+sie auf der Karte.
 
 Die Kartengrundlage ist davon getrennt: Eine Online-Karte holt der Server aus dem Internet,
 „Offline“ zeigt eine Karte, die auf dem Server selbst liegt, und kommt ohne Internet aus. Ist eine

@@ -2,7 +2,7 @@
 
 ## Purpose
 Legt fest, wie die Lagekarte einen Verortungsauftrag von außen ausführt (Person, Schaden,
-Betreuungsstelle, Bereitstellungsraum). Das Verortete muss danach sichtbar sein, und es gibt
+Betreuungsstelle, Bereitstellungsraum, Tier). Das Verortete muss danach sichtbar sein, und es gibt
 einen sicheren Rückweg zum Datensatz.
 
 ## Requirements
