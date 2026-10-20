@@ -91,7 +91,9 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 6. Fehlt Material, „Fehlmenge melden“ wählen. Die Erfassung einer Nachforderung öffnet mit der
    Art „Material“ und der Stelle in der Begründung; Bezeichnung und Anzahl dort eintragen und die
    Nachforderung absetzen.
-7. Mit „Lösen“ einen Posten von der Stelle lösen. Er bleibt ohne Ort im Einsatz.
+7. Mit „Lösen“ einen Posten von der Stelle lösen. Er bleibt ohne Ort im Einsatz. Die Zeile bleibt
+   als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
+   anderer Knopf unter den Finger rückt. „Rückgängig“ im Hinweis oben holt den Posten zurück.
 
 ### Einen Patienten aufnehmen und einem Platz zuweisen
 
