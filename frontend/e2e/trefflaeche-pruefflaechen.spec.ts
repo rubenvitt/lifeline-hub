@@ -1,5 +1,4 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { oeffneMenue } from './menue-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import {
   FUEKW,
@@ -1081,9 +1080,13 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
       pfad: `${R}/lageberichte`,
       anker: (page) =>
         inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
-      // Gemessen wird erst, wenn das Menü steht: antds `slide-up` startet mit `scaleY(0.8)`.
+      // Gemessen wird erst das stehende Menü: beim Einblenden (`ant-slide-up-appear`)
+      // staucht die Skalierung die Einträge unter 72 px.
       vorbereiten: async (page) => {
-        await oeffneMenue(page, knopf('Andere Vorlage wählen')(page));
+        await knopf('Andere Vorlage wählen')(page).click();
+        const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+        await expect(menue).toBeVisible();
+        await expect(menue).not.toHaveClass(/ant-slide-(up|down)-(appear|enter)/);
       },
       ziele: [
         {

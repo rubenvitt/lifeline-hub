@@ -948,6 +948,8 @@ export function lagekartePfad(
     /** Adresssuche (LFH-638): die Karte übernimmt den Text ins Suchfeld und sucht ihn. */
     ort?: string;
     evakuierungsbezirk?: number;
+    /** Fokus auf einen Einsatzabschnitt (LLH-1057): die Karte fokussiert ihn und räumt den Parameter. */
+    abschnitt?: number;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
@@ -972,6 +974,8 @@ export function lagekartePfad(
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
     // Adresssuche der Sprungpalette (LFH-638): Suchfeld der Leiste vorbelegen, suchen, räumen.
     ort: opts.ort,
+    // Abschnittsfokus (LLH-1057): Darstellung, nicht gespeichert — die Karte fokussiert und räumt.
+    abschnitt: opts.abschnitt,
   });
 }
 

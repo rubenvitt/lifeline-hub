@@ -261,6 +261,14 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     // Ohne Text kein Parameter.
     expect(lagekartePfad(E, { ort: '' })).not.toContain('ort=');
   });
+  it('lagekartePfad trägt den Abschnittsfokus als ?abschnitt= (LLH-1057)', () => {
+    const pfad = lagekartePfad(E, { abschnitt: 12 });
+    expect(pfad).toBe('/einsaetze/5/lagekarte?abschnitt=12');
+    const wert = new URL(pfad, 'http://x').searchParams.get('abschnitt');
+    expect(parseRouteId(wert ?? undefined)).toBe(12);
+    // Ohne Abschnitt kein Parameter.
+    expect(lagekartePfad(E)).not.toContain('abschnitt=');
+  });
   it('der Kartenmittelpunkt überlebt den Weg durch die URL', () => {
     const pfad = lagekartePfad(E, { zentrum: { lat: -33.8688, lon: 151.2093 } });
     const wert = new URL(pfad, 'http://x').searchParams.get('zentrum');
