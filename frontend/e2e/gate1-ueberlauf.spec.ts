@@ -894,7 +894,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       vorbereiten: async (p: Page) => {
         await p.getByRole('button', { name: /^Verlauf zu Stelle / }).click();
       },
-      // Auf den Verlaufseintrag eingegrenzt: dieselbe Zahl steht auch als Kopfzahl des Blocks.
+      // Auf den Verlaufseintrag eingegrenzt: dieselbe Zahl steht auch im Band über der Tabelle.
       anker: (p: Page) =>
         p.locator('[data-lfh="verlauf-eintrag"]').getByText(/1.420 untergebracht/),
     },

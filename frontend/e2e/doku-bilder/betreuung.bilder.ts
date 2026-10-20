@@ -8,7 +8,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder e2e/doku-bilder/betreuung.bilder.ts`, Mitänderungsregel in
  * `docs/anwender/AGENTS.md`; `--grep betreuung` träfe auch `geraet-betreuungsstelle`):
- *   uebersicht.png       frontend/src/pages/BetreuungPage.tsx, frontend/src/betreuung/StellenBlock.tsx
+ *   uebersicht.png       frontend/src/pages/BetreuungPage.tsx, frontend/src/betreuung/StellenBlock.tsx,
+ *                        frontend/src/betreuung/UnterbringungKennzahlen.tsx
  *   belegung-melden.png  frontend/src/betreuung/BetreuungDialoge.tsx
  *   stelle.png           frontend/src/pages/BetreuungsstelleDetailPage.tsx,
  *                        frontend/src/betreuung/StelleBelegung.tsx
@@ -53,6 +54,7 @@ test.describe(KAPITEL, () => {
     await expect(
       page.getByRole('button', { name: 'Belegung melden für Sporthalle Nord' }),
     ).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Unterbringung in Zahlen' })).toBeVisible();
     await fotografiere(page, KAPITEL, 'uebersicht');
   });
 

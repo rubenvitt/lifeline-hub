@@ -30,6 +30,17 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Übersicht `namentlich` liefert (Personenrecht); sonst steht der Grund als Zeile.
   Leitung und Erreichbarkeit (Migration 0226, je 200 Zeichen) sind personenbezogen: im ETB nur
   „weitere Angaben“, Schwärzung leert sie, der gesicherte Lagestand friert sie nicht ein.
+- **Übersicht als Lagebild** (LLH-1050, Spec `betreuung-evakuierung`, „Übersicht der
+  Betreuung“): das Band „Unterbringung in Zahlen“ (`betreuung/UnterbringungKennzahlen.tsx`) rechnet
+  nur über `betreuung/unterbringungKennzahl.ts`, und die nur mit `inBetreuung`, `freiePlaetze` und
+  `volleStellen` aus `betreuungText.ts`; Abwesenheit statt 0 wie `evakuierungKennzahl.ts`.
+  „Ohne Meldung“ zählt nur Stellen in Betrieb (dieselbe Menge wie die Kopfzahl, LFH-679),
+  Kapazität und Frei nur nicht geschlossene Stellen. **„in Betreuung“ ist eine Wahrheit:** Band,
+  Detailseite und Verpflegung lesen dieselbe Belegung — die Verpflegung über die Kopfzahl
+  `…/betreuung/belegung`, die an `juengste_meldung!` hängt wie der Zeiger der Übersicht. Keine
+  zweite Summe im Backend, keine Summe im Blockkopf von `StellenBlock`. Ohne Stelle stehen statt
+  Band und Tabelle `SeitenLeer` mit „Betreuungsstelle anlegen“ (ohne Schreibrecht gesperrt mit
+  Grund).
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
   (`person_verbleib.betreuungsstelle_id`, Cache

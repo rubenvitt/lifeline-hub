@@ -69,6 +69,37 @@ Betreuung MUST nur Stellen führen, mit der Primäraktion „Betreuungsstelle an
 - **WHEN** der Einsatz keinen aktiven Bezirk hat
 - **THEN** zeigt die Seite kein Kennzahlenband und sagt „Keine Evakuierungsbezirke“
 
+### Requirement: Übersicht der Betreuung
+
+Die Seite Betreuung SHALL die Unterbringung als Lagebild zeigen: über der Tabelle der Stellen
+ein Kennzahlenband „Unterbringung in Zahlen“ mit In Betreuung (Summe der aktuellen
+Belegungen), Kapazität (Summe nur über nicht geschlossene Stellen mit Kapazität), Frei (Summe
+der freien Plätze je nicht geschlossener Stelle mit Kapazität und Meldung, je Stelle nie
+negativ), Stellen in Betrieb (n von m), Voll/überbelegt und, nur mit Personenrecht, Davon
+namentlich. Hat keine Stelle gemeldet, MUST „In Betreuung“ „keine Meldung“ statt 0 zeigen;
+ohne jede Kapazität MUST „Kapazität“ ohne Zahl stehen. Als „ohne Meldung“ MUST nur eine Stelle
+in Betrieb gelten. Der Seitenkopf MUST „n Stellen · n in Betrieb“ und bei vollen Stellen
+„· n voll“ nennen. Ohne Stelle MUST statt Band und Tabelle „Keine Betreuungsstellen“ mit dem
+Knopf „Betreuungsstelle anlegen“ stehen, ohne Schreibrecht gesperrt mit sichtbarem Grund. Ein
+Klick in eine Zeile MUST auf die Detailseite der Stelle führen; Knöpfe der Zeile MUST nur ihre
+eigene Handlung auslösen.
+
+#### Scenario: Summen der Stellen
+- **WHEN** „Turnhalle Ost“ (Kapazität 150, belegt 89), „Weserstadion“ (Kapazität 150, belegt 140) und „Schule Nord“ (ohne Kapazität, ohne Meldung) in Betrieb sind
+- **THEN** zeigt das Band In Betreuung 229 mit „1 Stelle ohne Meldung“, Kapazität 300 mit „1 ohne Kapazität“, Frei 71 und Stellen in Betrieb 3 von 3
+
+#### Scenario: Überbelegung
+- **WHEN** eine Stelle mit Kapazität 40 mit 52 belegt ist und eine mit Kapazität 80 mit 80
+- **THEN** zeigt „Frei“ 0, nicht −12, und „Voll/überbelegt“ 2
+
+#### Scenario: Geschlossene Stelle
+- **WHEN** eine geschlossene Stelle eine Kapazität von 200 trägt
+- **THEN** zählt sie weder in „Kapazität“ noch in „Frei“
+
+#### Scenario: Keine Stelle
+- **WHEN** der Einsatz keine Betreuungsstelle hat
+- **THEN** zeigt die Seite kein Kennzahlenband, sondern „Keine Betreuungsstellen“ mit dem Knopf „Betreuungsstelle anlegen“
+
 ### Requirement: Modulzähler Evakuierung und Betreuung
 
 Der Navigationsrahmen SHALL am Modul Evakuierung die Zahl der aktiven Bezirke (nicht

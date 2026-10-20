@@ -2,6 +2,7 @@ import { Button, Space, Typography, theme } from 'antd';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useMemo, type CSSProperties } from 'react';
+import { useNavigate } from 'react-router';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -18,13 +19,7 @@ import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
-import {
-  ART_LABEL,
-  freiePlaetze,
-  namentlichTeile,
-  personenZahl,
-  volleStellenSegment,
-} from './betreuungText';
+import { ART_LABEL, freiePlaetze, namentlichTeile, personenZahl } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
@@ -42,12 +37,13 @@ import MeldeVerlauf from './MeldeVerlauf';
  * Spaltenschalter). Sonst sah man bei 390 px nur Bezeichnung und Art, und die Belegung lag
  * hinter dem Querscrollen.
  *
- * Volle Stellen: Block- und Seitenkopf nennen „n voll", weil die Tabelle oft unter der Falz
- * liegt. Sortiert wird nach Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder
- * Meldung unter dem Cursor.
+ * Summen (in Betreuung, Kapazität, frei, voll) stehen seit LLH-1050 nur im Band über der Tabelle
+ * (`UnterbringungKennzahlen`), nicht mehr im Blockkopf: eine Heimat je Zahl. Sortiert wird nach
+ * Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder Meldung unter dem Cursor.
  *
  * Die Bezeichnung führt auf die Detailseite der Stelle (LLH-1044); dort stehen Bearbeiten und
- * Status, die Zeile trägt sie nicht mehr.
+ * Status, die Zeile trägt sie nicht mehr. Ein Klick in die Zeile führt als Komfort ebenfalls dorthin
+ * (LLH-1050); Knöpfe und Links der Zeile bedienen ihren Klick allein (Riegel der `Datensicht`).
  *
  * Zeilenaktionen: „Belegung melden" direkt — unter `md` in der fixierten Kennung unter dem Namen,
  * sonst läge der Knopf bei 390 px hinter dem Querscrollen (LFH-967) —, „Stornieren" im Menü, an
@@ -299,7 +295,6 @@ export default function StellenBlock({
   ladend,
   darfSchreiben,
   dataUpdatedAt,
-  onAnlegen,
   onBelegungMelden,
   onAktion,
 }: {
@@ -310,12 +305,11 @@ export default function StellenBlock({
   ladend: boolean;
   darfSchreiben: boolean;
   dataUpdatedAt?: number;
-  /** Ohne: kein Anlegen-Knopf im Blockkopf (die Seite trägt ihn als Primäraktion, LLH-1034). */
-  onAnlegen?: () => void;
   onBelegungMelden: (s: Betreuungsstelle) => void;
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
 }) {
   const { token } = theme.useToken();
+  const navigate = useNavigate();
   const { istSchmal } = useViewport();
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const namentlichJeStelle = useMemo(
@@ -367,33 +361,10 @@ export default function StellenBlock({
     }),
     [einsatzId, darfSchreiben],
   );
-  const gemeldet = stellen.filter((s) => s.belegung != null);
-  const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
-  const ohne = stellen.length - gemeldet.length;
-  // Hat keine Stelle gemeldet, ist die Summe 0 nur „nichts gemeldet", nicht „niemand in
-  // Betreuung" — dasselbe Wort wie bei den Bezirken der Evakuierung.
-  const kopfzahl = gemeldet.length === 0 ? 'keine Meldung' : `${personenZahl(summe)} untergebracht`;
 
   return (
     <div style={{ marginBottom: token.marginLG }}>
-      <Bereichskopf
-        titel="Betreuungsstellen"
-        ueberschrift="h2"
-        meta={
-          ladend || stellen.length === 0
-            ? undefined
-            : `${kopfzahl}${volleStellenSegment(stellen)}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
-        }
-        dataUpdatedAt={dataUpdatedAt}
-        // Gesperrt statt versteckt; der Grund steht im Hinweis über der Seite.
-        aktion={
-          onAnlegen ? (
-            <Button disabled={!darfSchreiben} onClick={onAnlegen}>
-              Betreuungsstelle anlegen
-            </Button>
-          ) : undefined
-        }
-      />
+      <Bereichskopf titel="Betreuungsstellen" ueberschrift="h2" dataUpdatedAt={dataUpdatedAt} />
       <Datensicht
         bezeichnung="Betreuungsstellen"
         form="tabelle"
@@ -404,6 +375,7 @@ export default function StellenBlock({
         leerText="Keine Betreuungsstellen"
         karte={KARTE}
         aufklappen={aufklappen}
+        onZeileKlick={(s) => navigate(betreuungsstellePfad(einsatzId, s.id))}
       />
     </div>
   );
