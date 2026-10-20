@@ -12,7 +12,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
-  `einsatzbericht-deckel-druck`, `koerperschema-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `lagekarte-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
@@ -62,6 +62,14 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   Firefox-Druck brechen Spaltenköpfe am Deckel nicht um, sie müssen kurz bleiben. Nachweis
   `e2e/einsatzbericht-deckel-druck.spec.ts`, Umbruch mit der Verschiebeprobe im `werkzeug/` der
   Change.
+- **Lageplan der Lagekarte** (LLH-1051, Spec `lagekarte-druck`): Nebenweg über
+  `useDruckNebenwege({ vorbereiten })`; `vorbereiten` nimmt die Karte auf
+  (`pages/lagekarte/kartenAufnahme.ts`: `once('render')` + `toBlob`, nie `preserveDrawingBuffer`)
+  und meldet erst mit geladenem Bild `true`. Die Druckwurzel (`LageplanDruck.tsx`) hängt nur vom
+  Knopf bis `afterprint` (`useLageplan.ts`): Strg+P ohne Knopf druckt nie ein altes Bild. A4 quer
+  über `@page lageplan` (`lageplanDruck.css`, Muster `dokumentAnlagen.css`). Die Legende entsteht
+  nur aus dem Gezeichneten (`lageplan.ts`), nie aus den Schaltern: eine gesperrte Ebene hat keine
+  Daten und steht deshalb nirgends.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für
   jede Druckwurzel, beide Hüllen (`.ant-table-body`/`-content`), antds Messzeile aus, Zellen
   brechen um. Nachweis immer mit ausgelöstem `beforeprint` (`e2e/funkplan-druck.spec.ts`), nicht nur

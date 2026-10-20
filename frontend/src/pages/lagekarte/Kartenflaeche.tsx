@@ -37,7 +37,8 @@ import {
 } from './spiderfy';
 import { baueZeichenRegistry, kartenPixelRatio, ZEICHEN_KARTEN_PX } from './markerIcons';
 import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
-import { baueClusterDonut, setzeHuelleDurchlaessig } from './clusterDonut';
+import { baueClusterDonut, donutBild, setzeHuelleDurchlaessig } from './clusterDonut';
+import { nimmKartenbildAuf, type KartenAufnahme } from './kartenAufnahme';
 import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
@@ -329,7 +330,15 @@ export interface KartenHandle {
   nachNorden(): void;
   /** Ein aufgefächertes Bündel einklappen (meldet `onSpiderOffen(false)`); sonst nichts. */
   klappeSpiderEin(): void;
+  /**
+   * Den aktuellen Ausschnitt als PNG aufnehmen, samt Bündel-Donuts (Lageplan, LLH-1051);
+   * `null` ohne Karte oder wenn die Leinwand kein Bild hergibt.
+   */
+  nimmBildAuf(): Promise<KartenAufnahme | null>;
 }
+
+/** Eigenschaften des Clusters, den ein DOM-Donut zeigt — für die Aufnahme des Lageplans. */
+const clusterMerkmale = new WeakMap<maplibregl.Marker, Record<string, unknown>>();
 
 const klickzielJeTipp = new WeakMap<Event, Klickziel<maplibregl.MapGeoJSONFeature> | null>();
 
@@ -602,6 +611,18 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       klappeSpiderEin() {
         schliesseSpiderRef.current();
+      },
+      nimmBildAuf() {
+        const map = mapRef.current;
+        if (!map) return Promise.resolve(null);
+        return nimmKartenbildAuf(map, () =>
+          Object.values(clusterDomOnScreenRef.current).flatMap((m) => {
+            const merkmale = clusterMerkmale.get(m);
+            if (!merkmale) return [];
+            const { x, y } = map.project(m.getLngLat());
+            return [{ ...donutBild(merkmale), x, y }];
+          }),
+        );
       },
     };
   }, []);
@@ -1299,6 +1320,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           if (spiderOffenRef.current === id) setzeHuelleDurchlaessig(el, true);
         }
         neu[id] = marker;
+        clusterMerkmale.set(marker, props);
         if (!clusterDomOnScreenRef.current[id]) marker.addTo(map);
       }
       for (const id in clusterDomOnScreenRef.current) {

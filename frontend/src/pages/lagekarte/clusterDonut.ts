@@ -133,6 +133,45 @@ function zahlLabel(gesamt: number): string {
   return gesamt >= 1000 ? `${Math.round(gesamt / 100) / 10}k` : String(gesamt);
 }
 
+/** Breite des farbigen Rings in px. */
+const DONUT_RING = 6;
+
+/** Durchmesser eines Donuts in px, wächst logarithmisch mit der Zahl seiner Marker. */
+function donutDurchmesser(gesamt: number): number {
+  return Math.round(36 + Math.min(28, Math.log2(gesamt + 1) * 6));
+}
+
+/** Ein Donut als Maße und Farben, ohne DOM (Lageplan, LLH-1051). */
+export interface DonutBild {
+  durchmesser: number;
+  ring: number;
+  /** Anteile am Ring in der Folge von {@link donutSegmente}, Summe 1; leer = neutraler Ring. */
+  segmente: { farbe: string; anteil: number }[];
+  neutral: string;
+  zahl: string;
+  /** Kürzel der dringlichsten Sichtung eines Personen-Clusters. */
+  kurz: string | null;
+}
+
+/**
+ * Derselbe Donut wie {@link baueClusterDonut}, als Daten: der Lageplan zeichnet ihn auf sein Bild,
+ * weil die DOM-Donuts nicht auf der Leinwand der Karte liegen.
+ */
+export function donutBild(props: Record<string, unknown>): DonutBild {
+  const gesamt = Number(props.point_count ?? 0);
+  const segs = donutSegmente(props);
+  const total = segs.reduce((s, x) => s + x.count, 0) || 1;
+  const dringlichst = dringlichsteSichtung(props);
+  return {
+    durchmesser: donutDurchmesser(gesamt),
+    ring: DONUT_RING,
+    segmente: segs.map((s) => ({ farbe: s.farbe, anteil: s.count / total })),
+    neutral: DONUT_NEUTRAL,
+    zahl: zahlLabel(gesamt),
+    kurz: dringlichst ? SK_KURZZEICHEN[dringlichst] : null,
+  };
+}
+
 /**
  * DOM-Element eines Cluster-Donuts: conic-gradient-Ring mit Schatten, weißer Kern mit Gesamtzahl.
  * Per DOM-API (kein innerHTML); alle Werte stammen aus kontrollierten Quellen.
@@ -157,8 +196,8 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
     const b = (acc / total) * 100;
     stops.push(`${s.farbe} ${a}% ${b}%`);
   }
-  const size = Math.round(36 + Math.min(28, Math.log2(gesamt + 1) * 6));
-  const innen = size - 12;
+  const size = donutDurchmesser(gesamt);
+  const innen = size - DONUT_RING * 2;
 
   const ring = document.createElement('div');
   ring.style.cssText = [

@@ -226,9 +226,10 @@ export interface SeitenNebenwege {
 /**
  * Die Nebenwege im Kopf (LFH-963): ab `md` je Eintrag ein sekundärer Knopf, unter `md` EIN
  * Auslöser „Weitere“ — Regel `frontend/AGENTS.md`, Aktionen. Der Dreipunkt ist derselbe Baustein
- * wie im ETB-Kopf (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht.
+ * wie im ETB-Kopf (`MenueAusloeser`), damit der Weg auf jeder Seite gleich aussieht. Exportiert für
+ * Seiten mit eigenem Kopf (Lagekarte, LLH-1051).
  */
-function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
+export function NebenwegeImKopf({ name, eintraege }: SeitenNebenwege) {
   const { istSchmal } = useViewport();
   if (eintraege.length === 0) return null;
   if (istSchmal) {

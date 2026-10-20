@@ -1,0 +1,89 @@
+/* Druckblatt des Lageplans (LLH-1051, `LageplanDruck.tsx`). Die Mechanik (Wurzel, Papierfarben,
+   Seitenrand und -zählung) liegt in `druck/druck.css`; hier nur die Eigenheiten des Blatts.
+
+   Das Blatt hängt nur zwischen Knopf und `afterprint` im DOM, am Bildschirm nie sichtbar. A4 quer
+   über eine benannte Seite wie die Anlagen (`entwurf/dokumentAnlagen.css`): sie erbt Rand und
+   Seitenzahl der unbenannten `@page`. Die Bildmaße in mm setzt die Seite inline
+   (`lageplan.ts`, `LAGEPLAN_BILD_MAX_MM`: 267 × 95 mm, der Rest gehört Kopf und Legende). */
+@media screen {
+  .lageplan-druck {
+    display: none;
+  }
+}
+
+@media print {
+  @page lageplan {
+    size: A4 landscape;
+  }
+
+  .lageplan-blatt {
+    page: lageplan;
+  }
+
+  .lageplan-figur {
+    margin: 2mm 0 0;
+    break-inside: avoid;
+  }
+
+  /* Die Breite steht inline in mm; `max-width: 100%` der Wurzel bliebe bei A4 quer ohne Wirkung. */
+  .lageplan-figur img {
+    display: block;
+    border: 0.3mm solid black;
+    object-fit: contain;
+  }
+
+  .lageplan-unterzeile {
+    display: flex;
+    align-items: center;
+    gap: 6mm;
+    margin-top: 1.5mm;
+    font-size: 9pt;
+  }
+
+  .lageplan-massstab {
+    display: inline-flex;
+    align-items: center;
+    gap: 2mm;
+  }
+
+  /* Der Nordpfeil steht rechts, unter der rechten Bildkante. */
+  .lageplan-unterzeile [data-lfh='lageplan-nordpfeil'] {
+    margin-left: auto;
+  }
+
+  .lageplan-veraltet {
+    margin: 2mm 0 0;
+    font-size: 9pt;
+    font-weight: 600;
+  }
+
+  .lageplan-legende {
+    margin-top: 2mm;
+    font-size: 9pt;
+  }
+
+  .lageplan-legende h2 {
+    margin: 0 0 1mm;
+    font-size: 10pt;
+    font-weight: 600;
+  }
+
+  .lageplan-legende ul {
+    columns: 3;
+    column-gap: 6mm;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .lageplan-legende li {
+    display: flex;
+    align-items: center;
+    gap: 1.5mm;
+    break-inside: avoid;
+  }
+
+  .lageplan-legende li svg {
+    flex: none;
+  }
+}
