@@ -202,3 +202,52 @@ diese Zusage.
   `keyEvents: { cancel: null }`. Offene antd-Overlays schließen per eigenem `window`-keydown
   **ohne** `preventDefault` → Riegel `escGehoertOverlay`, `defaultPrevented` allein reicht nicht.
   Punktzahl aus terra-draws `history`, nie aus DOM-Klicks (die laufen an terra-draw vorbei).
+
+**Zielgliederung der Leiste (LLH-1023, Entscheidung 20.10.2026) — Zielbild, noch nicht gebaut**
+
+Vorgabe für jeden Umbau der Kartenleiste. Bis ein Punkt gebaut ist, gelten die Regeln oben
+unverändert; das Ticket, das ihn baut, schreibt die betroffene Regel oben und die Specs fort und
+streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekarte-leiste/README.md`.
+
+- **Drei Fragen, drei Ansichten statt eines Stapels.** Erste Zeile der Leiste ist eine
+  `Segmentleiste` (`rolle="tablist"`): „Ebenen“ · „Objekte“ · „Auswahl“, je ein festes Drittel.
+  „Auswahl“ gibt es nur mit einer Auswahl; ohne sie bleibt ihr Drittel leer (kein gesperrtes
+  Segment), damit die anderen nicht wandern. Die Leiste bleibt 300 px und Inhalt (Kopf, LFH-557):
+  keine Reiter am Kartenrand, kein Drawer, keine neue Breite. Ansicht und Klappzustand der Gruppen
+  merkt das Gerät (neue Schlüssel in `GERAETESPEICHER`).
+- **Auswahl:** eine neue Auswahl schaltet auf „Auswahl“ (Inspectors wie heute, mehrere
+  untereinander). Der Rückweg im Kopf benennt das Ziel („← Ebenen“, „← Objekte“), hebt die
+  Auswahl auf und zeigt die vorige Ansicht samt Suchbegriff, Filter und Klappzustand. Esc wirkt
+  genauso, aber nur, wenn kein Modus die Taste hat (Zeichnen zweistufig, Messen), kein Overlay
+  offen ist (`escGehoertOverlay`) und der Fokus in keinem Feld steht. Ein Tipp auf „Ebenen“ oder
+  „Objekte“ lässt die Auswahl bestehen.
+- **Modus-Band:** direkt unter der Segmentleiste, in jeder Ansicht gleich. Ab `lg` trägt es die
+  ganze Bedienung der Leistenmodi (Platzieren samt Koordinate, Taktisches Zeichen, Bild
+  einpassen) und die Rückmeldung „… verortet“, mit demselben Inhalt wie das Fuß-Band
+  `PlatzierSteuerung` unter `lg`; Zeilen und Gruppen zeigen nur den Zustand („wird platziert“).
+  Je Breite genau ein Knopf je Handlung, wie oben.
+- **Ebenen = ein Ebenenbaum** (neu: `pages/lagekarte/Ebenenbaum.tsx`): Gruppen Kräfte (Einheiten,
+  Fahrzeuge, Personal, Abschnitte, Bereitstellungsräume) · Lage (Einsatzort, Führungsstelle,
+  Zonen, Schäden, Lagemeldungen, Taktische Zeichen) · Betroffene & Versorgung (Betroffene, UHS,
+  Betreuungsstellen) · Fachebenen (Warnungen, Wasser, Umwelt, Verkehr & Infrastruktur) ·
+  Hintergrund (Kartengrundlage, Bild-Hintergründe). Eine Zeilenform für eigene und Fachebenen:
+  die Zeile ist der Schalter (`role="switch"`), kein zweiter `Switch`. Gruppenschalter
+  `role="checkbox"` mit `aria-checked="mixed"` für „teilweise“, schaltet nur frei zugängliche
+  Ebenen; keiner an „Fachebenen“ als Ganzem und an „Hintergrund“. Die Kartengrundlage steht im
+  Baum nur unter `md`, ab `md` über der Karte (ein Weg je Breite, LFH-1083). Kartenansicht und
+  „Ebene suchen“ stehen im Kopf der Ansicht, nicht als Abschnitt dazwischen.
+- **Objekte = eine Liste** verorteter und nicht verorteter Objekte, nach Typ gruppiert
+  („verortet/gesamt“), ein Suchfeld (Objekt, Koordinate, Adresse auf Enter wie LFH-638). „Nicht
+  verortet“ ist eine Marke im Kopf, die den Filter setzt (0 → „Alles verortet“, Ausfall → „—“),
+  keine eigene Langliste. Eine verortete Zeile ist ein Ziel (anfliegen, auswählen), eine nicht
+  verortete trägt nur „Platzieren“ bzw. „Fläche zeichnen“; das laufende Ziel bleibt bei jedem
+  Filter stehen. Der Einsatzort ist die erste Zeile, kein eigenes Paneel. Keine `unterEbene` an
+  der `Liste` (Auswahlliste, LFH-826).
+- **Zeichnen an der Karte:** der Knopf „Zeichenwerkzeuge“ öffnet ein Werkzeugmenü an diesem Knopf
+  (Flächen und Linien, Taktisches Zeichen mit „Zuletzt verwendet“, Picker als Dialog); kein
+  `PunktankerMenue`, keine Klickebene. Die Leiste trägt keinen Zeichenweg. Messen bleibt der
+  eigene Knopf, seine Formen stehen in `MessSteuerung`, nicht im Menü.
+- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum; „Ausgewählt“ steht bis dahin über
+  beiden Ansichten) → LLH-1033 (Objekte, Auswahl) → LLH-1038 (Werkzeugmenü). Der Kreis (LLH-1043)
+  kommt als Form ins Menü, „Abschnitt fokussieren“ (LLH-1057) in den Inspector, nicht an die
+  Listenzeile.
