@@ -3,7 +3,7 @@
 //! (403 → 404 → 409, geschlossen erlaubt), der Storno der Stelle (löst den Bezug, die
 //! Nachforderung bleibt) und die Mengenwahrheit (LFH-553): die Stelle selbst trägt nichts davon.
 //!
-//! Die Schwärzung prüft `einsatz::purge_scheduler`, die Spalte `db::tests::migration_0228_*`.
+//! Die Schwärzung prüft `einsatz::purge_scheduler`, die Spalte `db::tests::migration_0230_*`.
 
 use axum::http::StatusCode;
 use serde_json::Value;

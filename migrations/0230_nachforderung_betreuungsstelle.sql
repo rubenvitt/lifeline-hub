@@ -8,7 +8,7 @@
 --
 -- ADD COLUMN ohne CHECK: kein Rebuild. `ON DELETE SET NULL` wie `einsatz_material.nachforderung_id`
 -- (0198): Stellen gehen nur mit dem Einsatz, und der Bezug darf das Löschen nicht aufhalten.
--- Bestand ohne Bezug. Abgesichert von db::tests::migration_0228_*.
+-- Bestand ohne Bezug. Abgesichert von db::tests::migration_0230_*.
 ALTER TABLE nachforderung ADD COLUMN betreuungsstelle_id INTEGER
     REFERENCES betreuungsstelle(id) ON DELETE SET NULL;
 

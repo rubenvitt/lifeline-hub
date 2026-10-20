@@ -7721,7 +7721,7 @@ mod tests {
     /// NULL`, Teilindex; der Bestand bleibt ohne Bezug, und weder das Löschen einer Stelle noch das
     /// des Einsatzes bleibt am Bezug hängen.
     #[tokio::test]
-    async fn migration_0228_haengt_betreuungsstelle_an_nachforderung() {
+    async fn migration_0230_haengt_betreuungsstelle_an_nachforderung() {
         let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 226).await;
         let (e, b) = bild_grundlage(&pool).await;
         let nachforderung = |bez: &'static str| {
@@ -7743,7 +7743,7 @@ mod tests {
         };
         let alt = nachforderung("40 Feldbetten").await;
 
-        migriere_bis(&pool, 228).await;
+        migriere_bis(&pool, 230).await;
 
         let bezug: Option<i64> =
             sqlx::query_scalar("SELECT betreuungsstelle_id FROM nachforderung WHERE id = ?")
