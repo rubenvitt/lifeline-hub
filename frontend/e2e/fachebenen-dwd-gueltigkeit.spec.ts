@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kartenConfigBeantworten } from './kartenFixture';
 import { kartenpunktAufSeite } from './karten-pixel-kern';
+import { oeffneEbenenGruppe } from './leisten-kern';
 
 /**
  * Gültigkeit der DWD-Warnungen auf der Lagekarte (LFH-662, Spec `lagekarte-fachebenen`):
@@ -135,8 +136,8 @@ test('DWD: abgelaufen fehlt, angekündigt gestrichelt, Inspector nennt „angek�
     undefined,
     { timeout: 60_000 },
   );
-  const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
-  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  // Ebenenbaum (LLH-1028): DWD steht in „Fachebenen › Warnungen“.
+  await oeffneEbenenGruppe(page, 'warnungen');
   const schalter = page.getByRole('switch', { name: 'Wetterwarnungen (DWD)' });
   await schalter.click();
   await expect(schalter).toHaveAttribute('aria-checked', 'true');

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kachelnBeantworten, kartenConfigBeantworten } from './kartenFixture';
 import { kartenpunktAufSeite, messeKante, type KantenStrahl } from './karten-pixel-kern';
+import { oeffneAlleFachebenen } from './leisten-kern';
 
 /**
  * Kontur der Fachebenen-Punkte gegen den Kartengrund (LFH-600, Prüfliste Kriterium 5, WCAG
@@ -225,8 +226,8 @@ for (const g of GRUNDLAGEN) {
       undefined,
       { timeout: 60_000 },
     );
-    const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
-    if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+    // Ebenenbaum (LLH-1028): jede Fachebenen-Untergruppe aufklappen.
+    await oeffneAlleFachebenen(page);
     for (const schalter of Object.values(SCHALTER)) {
       const knopf = page.getByRole('switch', { name: schalter });
       if ((await knopf.getAttribute('aria-checked')) !== 'true') await knopf.click();

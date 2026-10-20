@@ -1827,7 +1827,9 @@ const KARTENMODI: Kartenmodus[] = [
   },
   {
     name: 'Bild einpassen',
-    speicher: { 'lfh:lagekarte:paneele': JSON.stringify({ bilder: true }) },
+    speicher: {
+      'lfh:lagekarte:ebenen-gruppen': JSON.stringify({ hintergrund: true, bilder: true }),
+    },
     betreten: async (page, breit768) => {
       // Bei 768 px ist die Leiste per Vorgabe offen, bei 390 px zu.
       if (!breit768) await page.getByRole('button', { name: 'Leiste einblenden' }).click();

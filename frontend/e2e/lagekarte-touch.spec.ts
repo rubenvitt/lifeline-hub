@@ -1,4 +1,5 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
+import { oeffneEbenenGruppe, zeigeLeistenAnsicht } from './leisten-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 // Die Lagekarte unter Touch, auf Handschirm (390 px) und Führungs-Tablet (1024 px).
@@ -683,12 +684,6 @@ function quadratEcken(mitte: [number, number], halb: number, grad: number): [num
   });
 }
 
-async function paneelAuf(page: Page, kennung: string) {
-  const kopf = page.locator(`section[data-paneel="${kennung}"] button[aria-expanded]`).first();
-  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
-  await expect(kopf).toHaveAttribute('aria-expanded', 'true');
-}
-
 test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
   test.use({ hasTouch: true, viewport: { width: 1024, height: 768 } });
 
@@ -735,7 +730,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
         return Math.hypot(k.project(b).x - k.project(a).x, k.project(b).y - k.project(a).y);
       }, faelle[0].ecken);
       await springe(page, MITTE, 16 + Math.log2(120 / breite16));
-      await paneelAuf(page, 'bilder');
+      await oeffneEbenenGruppe(page, 'bilder');
 
       for (const f of faelle) {
         await page.getByRole('button', { name: `Aktionen zu ${f.name}` }).click();
@@ -873,7 +868,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
       return [o.lng, o.lat] as [number, number];
     }, EINZEL);
 
-    await paneelAuf(page, 'fachebenen');
+    await oeffneEbenenGruppe(page, 'verkehr');
     await page.getByRole('switch', { name: 'KRITIS / sensible Objekte' }).click();
 
     // Vorbedingung am Tipppunkt: Bündel UND Trefferzone des Markers, aber kein gezeichnetes
@@ -1045,6 +1040,7 @@ for (const viewport of [
       await oeffneKarte(page);
       if (!vorgabeOffen) await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
       await leisteOffen(page);
+      await zeigeLeistenAnsicht(page, 'Objekte');
       const suche = page.getByRole('textbox', { name: 'Nicht verortete Objekte durchsuchen' });
       await suche.fill('Reserve 3');
       await page
@@ -1163,7 +1159,10 @@ for (const viewport of [
 
     test('Bild einpassen: Griff liegt frei, ein Zug verschiebt das Bild', async ({ page }) => {
       await page.evaluate(() =>
-        localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ bilder: true })),
+        localStorage.setItem(
+          'lfh:lagekarte:ebenen-gruppen',
+          JSON.stringify({ hintergrund: true, bilder: true }),
+        ),
       );
       await oeffneKarte(page);
       if (!vorgabeOffen) await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
@@ -1493,7 +1492,7 @@ test.describe('Flächen-Auswahlmenü am Führungs-Tablet (LFH-812)', () => {
     await springe(page, EINZEL, 15);
 
     // 4. Zone unter einer DWD-Warnfläche: eigene Fläche zuerst, dann die Warnung.
-    await paneelAuf(page, 'fachebenen');
+    await oeffneEbenenGruppe(page, 'warnungen');
     await page.getByRole('switch', { name: 'Wetterwarnungen (DWD)' }).click();
     const ost: [number, number] = [lng + 0.005, lat];
     await expect
@@ -1938,12 +1937,11 @@ for (const viewport of [
           false,
         );
 
-        // Unter `md` steht die Grundlage im Paneel „Kartengrundlage“ der Leiste, die dort per
-        // Vorgabe zu ist.
+        // Unter `md` steht die Grundlage im Ebenenbaum unter „Hintergrund“, der per Vorgabe zu ist.
         if (viewport.width < 768) {
           await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
           await leisteOffen(page);
-          await page.getByRole('button', { name: 'Kartengrundlage' }).tap();
+          await oeffneEbenenGruppe(page, 'grundlage');
         }
         const grundlage = page.getByRole('radiogroup', { name: 'Kartengrundlage' });
         const offline = grundlage.getByRole('radio', { name: 'Offline' });

@@ -33,8 +33,9 @@ for (const modus of ['light', 'dark'] as const) {
     // Ab `lg` steht die Leiste neben der Karte (`leistenWahl.ts`).
     await page.setViewportSize({ width: 1366, height: 900 });
     await vorbereiten(page, modus);
-    const gruppe = page.getByRole('group', { name: 'Ebenen ein- und ausblenden' });
-    const schalter = gruppe.getByRole('switch');
+    // Ebenenbaum (LLH-1028): Kräfte und Lage stehen in der Vorgabe offen.
+    const baum = page.getByRole('tabpanel', { name: 'Ebenen' });
+    const schalter = baum.locator('[data-ebene][role="switch"]');
     await expect(schalter.first()).toBeVisible({ timeout: 30_000 });
     const anzahl = await schalter.count();
     expect(anzahl, 'schaltbare Ebenen-Zeilen').toBeGreaterThan(5);

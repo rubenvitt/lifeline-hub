@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
  * Fußfuge eines Dialogs mit antds STANDARDFUSS (LFH-653, Spec `einsatztauglichkeit-layout`,
@@ -68,8 +69,8 @@ for (const { dichte, soll, fuge: fugeBoden, titel } of STAFFEL) {
     // Wache: trennt „Fuge zu schmal" von „Stufe gar nicht angekommen".
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 
-    const kopf = page.locator('section[data-paneel="ansicht"] button[aria-expanded]').first();
-    if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+    // Die Kartenansicht steht fest im Kopf der Ansicht „Ebenen“ (LLH-1028).
+    await zeigeLeistenAnsicht(page, 'Ebenen');
     await page.getByRole('button', { name: 'Ansichts-Aktionen' }).click();
     await page.getByRole('menuitem', { name: /Neue Ansicht/ }).click();
 

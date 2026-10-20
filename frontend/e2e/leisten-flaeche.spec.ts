@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { beobachteShifts, bericht, ruheShifts, setzeShiftsZurueck } from './cls-kern';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 import { ADMIN, ADMIN_PW, wechsleZuRolle } from './rollen-kern';
 import { SUBPIXEL, ZIELABSTAND } from './trefflaeche-kern';
 
@@ -823,6 +824,8 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
       if (lage.leiste) {
         const leiste = page.getByRole('complementary', { name: 'Kartenleiste' });
         await expect(leiste).toBeVisible();
+        // Die Objekte tragen die Platzier-Aktionen; in „Ebenen“ wäre ihre Abwesenheit geschenkt.
+        await zeigeLeistenAnsicht(page, 'Objekte');
         // Positiver Nachbar: ohne ihn wäre eine zugeklappte oder leere Leiste „aktionslos".
         await expect(leiste.locator('section[data-paneel="verortet"]')).toBeVisible();
         await expect(
