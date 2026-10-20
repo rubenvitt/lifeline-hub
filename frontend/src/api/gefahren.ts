@@ -40,6 +40,17 @@ export function setzeBewertung(
   );
 }
 
+/** Bestätigt die Beurteilung der Matrix eines Gebiets (LLH-1090); Antwort ist das Gebiet. */
+export function bestaetigeBeurteilung(
+  einsatzId: number,
+  gefahrengebietId: number,
+): Promise<Gefahrengebiet> {
+  return apiSend<Gefahrengebiet>(
+    `/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}/beurteilung`,
+    'POST',
+  );
+}
+
 export function benenneGefahrengebiet(
   einsatzId: number,
   gefahrengebietId: number,

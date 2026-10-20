@@ -669,7 +669,7 @@ export default function UeberblickPage() {
                 notiz={
                   zWarnstufe === 'gesperrt'
                     ? [NICHT_FREIGEGEBEN, pegelNotiz].filter(Boolean).join(' · ')
-                    : warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz)
+                    : warnstufeNotiz(warnstufe.anzahlAktiv, pegelNotiz, warnstufe.nichtBeurteilt)
                 }
                 ziel={zWarnstufe === 'gesperrt' ? undefined : gefahrenPfad(einsatzId)}
               />

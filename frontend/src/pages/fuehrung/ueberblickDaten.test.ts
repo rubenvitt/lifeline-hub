@@ -178,6 +178,22 @@ describe('Kennzahlen', () => {
     );
   });
 
+  /** LLH-1090: „keine“ ist die Vorgabe jeder Zelle; ungeprüft heißt „nicht beurteilt“. */
+  it('Warnstufe: zählt die nicht beurteilten Gebiete, die Notiz nennt sie vor dem Pegel', () => {
+    const g = (beurteilt: boolean) =>
+      ({
+        hoechste_warnstufe: 'keine',
+        ...(beurteilt ? { beurteilt_at: '2026-09-21 13:00:00' } : {}),
+      }) as unknown as Gefahrengebiet;
+    expect(warnstufeKennzahlVon([g(false), g(true), g(false)]).nichtBeurteilt).toBe(2);
+    expect(warnstufeKennzahlVon([]).nichtBeurteilt).toBe(0);
+    expect(warnstufeNotiz(0, null, 2)).toBe('0 Gefahrengebiete mit Warnstufe · 2 nicht beurteilt');
+    expect(warnstufeNotiz(1, 'Pegel 6,84 m steigend', 1)).toBe(
+      '1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt · Pegel 6,84 m steigend',
+    );
+    expect(warnstufeNotiz(1, null, 0)).toBe('1 Gefahrengebiet mit Warnstufe');
+  });
+
   it('Offene Aufträge: Zahlen des Modulzählers, Ton alarm bei Überfälligen (LFH-550)', () => {
     expect(auftraegeKennzahl({ offen: 2, in_arbeit: 1, ueberfaellig: 1 })).toEqual({
       offen: 2,

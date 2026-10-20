@@ -7852,7 +7852,7 @@
       },
       "GefahrBewertungAnzeige": {
         "type": "object",
-        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,\nauch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt\neine Zelle ohne Eintrag als „nicht bewertet\".",
+        "description": "Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,\nauch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt\neine Zelle ohne Eintrag mit der Vorgabe „keine\" (LLH-1090).",
         "required": [
           "id",
           "gefahrengebiet_id",
@@ -7907,7 +7907,7 @@
       },
       "GefahrengebietAnzeige": {
         "type": "object",
-        "description": "Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.\n`zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte\nZelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.",
+        "description": "Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.\n`zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte\nZelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.\n\n`beurteilt_*` (LLH-1090): wann und von wem die Matrix zuletzt als beurteilt bestätigt oder\ndanach durch eine Zelländerung aufgefrischt wurde. Fehlt `beurteilt_at`, ist das Gebiet\n„nicht beurteilt“: eine Zelle ohne Bewertung zeigt „keine“, die offene Beurteilung steht hier.",
         "required": [
           "id",
           "einsatz_id",
@@ -7915,6 +7915,26 @@
           "hoechste_warnstufe"
         ],
         "properties": {
+          "beurteilt_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "beurteilt_von": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "beurteilt_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `beurteilt_von` zur Lesezeit."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
