@@ -79,7 +79,7 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 
 | Abschnitt | Knopf | Was übernommen wird |
 | --- | --- | --- |
-| Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel |
+| Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel (nur bei festgelegtem Pegel) |
 | Eigene Lage | „Aus Meldebild und Führungsorganisation übernehmen“ | Kräftemeldebild und Führungsorganisation des ganzen Einsatzes |
 | Lageentwicklung | „Aus dem ETB übernehmen“ | neue Einträge seit der letzten Lagebesprechung je Typ, neue Entscheidungen mit Nummer und Zeit |
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
@@ -92,6 +92,9 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
   Nummern, Arten und Zeiten, keinen Freitext aus Aufträgen, Meldungen, Einsatztagebuch,
   Betroffenen oder Schäden.
 - Eine gesperrte oder nicht geladene Quelle steht als „—“ mit Grund, nie als 0.
+- Den Teil „Pegel“ übernimmt die Gefahren-/Schadenlage nur, wenn am Einsatz ein maßgeblicher Pegel
+  festgelegt ist (Kapitel [Wetter und Pegel](wetter-pegel.md)); sonst entfällt er ganz. Das Wetter
+  steht vor dem Pegel.
 - Gab es noch keine Lagebesprechung, zählt die Lageentwicklung seit Einsatzbeginn.
 - Steht im Abschnitt schon Text, fragt die App vor der Übernahme „… ersetzen?“; „Ersetzen“
   überschreibt ihn.
