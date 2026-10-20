@@ -45,23 +45,29 @@ behalten“ bleibt der Ort stehen.
 
 ### Einen Schaden übergeben
 
-1. Die Seite des Schadens öffnen und „Übergeben“ wählen.
+1. Die Seite eines offenen Schadens öffnen und „Schaden übergeben“ wählen.
 2. Unter „Übergeben an“ die zuständige Stelle eintragen, etwa Stadtwerke, Bauhof oder Umweltamt.
 
    ![Dialog „Schaden übergeben“ mit dem Feld „Übergeben an“](../bilder/schaeden/uebergeben.png)
 
-3. „Übergeben“ wählen. Der Schaden steht auf „übergeben“.
+3. „Schaden übergeben“ wählen. Der Schaden steht auf „übergeben“.
 
 Übergeben lässt sich nur ein offener Schaden.
 
 ### Einen Schaden abschließen
 
-1. Die Seite des Schadens öffnen und „Abschließen“ wählen.
+1. Die Seite des Schadens öffnen. Bei einem übergebenen Schaden „Schaden abschließen“ wählen, bei
+   einem offenen im Menü „Weitere Aktionen“ „Ohne Übergabe abschließen“.
 2. Den „Abschlussgrund“ wählen: „behoben“, „kein Handlungsbedarf“ oder „abgewiesen“; bei Bedarf
    eine „Notiz (optional)“.
-3. „Abschließen“ wählen.
+3. „Schaden abschließen“ wählen.
 
 „abgeschlossen“ ist endgültig.
+
+### Einen Schaden stornieren
+
+1. Die Seite des Schadens öffnen und im Menü „Weitere Aktionen“ „Stornieren“ wählen.
+2. Die Rückfrage mit „Schaden stornieren“ bestätigen. Die Seite kehrt zur Liste zurück.
 
 ### Einen Schaden auf der Karte verorten
 
@@ -79,8 +85,9 @@ Wer die Koordinate schon beim Erfassen kennt, trägt sie unter „Weitere Angabe
 
 Ein Schaden geht von „offen“ nach „übergeben“ oder direkt nach „abgeschlossen“, von „übergeben“
 nach „abgeschlossen“. „Bearbeiten“ auf der Seite des Schadens ändert Typ, Ausmaß, Ort,
-Beschreibung und Geschädigt. „Stornieren“ nimmt eine Fehlerfassung aus der Liste. Fotos und
-Dateien zum Schaden liegen auf seiner Seite.
+Beschreibung und Geschädigt, auch nach dem Abschluss. „Stornieren“ nimmt eine Fehlerfassung aus
+der Liste, in jedem Status; ein stornierter Schaden trägt im Titel „storniert“ und lässt sich
+nicht mehr ändern. Fotos und Dateien zum Schaden liegen auf seiner Seite.
 
 Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Bezug
 hinzufügen“ unter „Bezüge“, [Betroffene und Sichtung](betroffene.md)).

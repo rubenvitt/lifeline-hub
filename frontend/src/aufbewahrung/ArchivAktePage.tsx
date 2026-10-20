@@ -38,7 +38,7 @@ import { MELDEWEG_OPTIONEN } from '../etb/schnellerfassungModell';
 import { istNachgetragen } from '../etb/typFarben';
 import { verfasserText } from '../etb/verfasser';
 import { ABSCHLUSS_LABEL, TYP_LABEL } from '../pages/schaeden/schadenHelfer';
-import { SPEZIES_META, TIER_ABSCHLUSS, TIER_STATUS } from '../pages/tiere/tierHelfer';
+import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB } from '../pages/tiere/tierHelfer';
 import { parseRouteId } from '../routing/deeplinks';
 import {
   aufbewahrungZustand,
@@ -153,9 +153,13 @@ const tierSpalten: KatalogSpalte<ArchivTier>[] = [
   },
   {
     key: 'abschluss',
-    title: 'Abschlussgrund',
+    // Dasselbe Wort wie auf der Seite des Tiers (LLH-1092).
+    title: 'Verbleib',
     width: 200,
-    render: (_, t) => (t.abschluss_grund ? TIER_ABSCHLUSS[t.abschluss_grund] : leer),
+    // Nur am abgeschlossenen Tier: beim Wiederaufnehmen bleibt der Grund gespeichert, gilt aber
+    // nicht mehr (wie `verbleibText` in Liste und Druck).
+    render: (_, t) =>
+      t.status === 'abgeschlossen' && t.abschluss_grund ? TIER_VERBLEIB[t.abschluss_grund] : leer,
   },
   {
     key: 'erfasst',

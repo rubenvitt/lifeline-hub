@@ -139,6 +139,20 @@ describe('TierePage', () => {
     expect(screen.queryByText('T-002')).not.toBeInTheDocument();
   });
 
+  it('zeigt den Verbleib abgeschlossener Tiere ohne Klick in der Liste (LLH-1092)', async () => {
+    render(einsatzAktiv, [
+      {
+        ...tierBasis,
+        status: 'abgeschlossen',
+        abschluss_grund: 'uebergabe_tierarzt',
+        abschluss_ziel: 'Dr. Müller',
+      },
+    ]);
+    await userEvent.click(await screen.findByRole('radio', { name: 'Abgeschlossen' }));
+    expect(await screen.findByRole('columnheader', { name: 'Verbleib' })).toBeInTheDocument();
+    expect(screen.getByText('an Tierarzt übergeben: Dr. Müller')).toBeInTheDocument();
+  });
+
   it('filtert per Tab auf Vermisst', async () => {
     render(einsatzAktiv, [tierBasis, tierVermisst]);
     await screen.findByText('T-001');

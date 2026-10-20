@@ -374,17 +374,25 @@ pub async fn status_wechsel(
 
     // Pseudonyme ETB-Spur (Spec-Tabelle): nie Rufname/Kennzeichnung/Halter/Ziel. Aus `vorher`
     // + `body` VOR der Tx berechenbar (kein In-Tx-Reload nötig).
+    // LLH-1092: der Verbleib steht als Handlung da („Tier T-001 (Hund): an Tierarzt übergeben“),
+    // die Spezies wie beim Erfassen; ein Wiederaufnehmen nimmt ihn sichtbar zurück.
     let r = registrier_anzeige(vorher.registrier_nr);
+    let spezies = vorher.spezies.etb_label();
     let text = match body.status.as_str() {
-        "abgeschlossen" => format!(
-            "Tier {r}: abgeschlossen ({})",
-            grund
-                .as_deref()
-                .and_then(AbschlussGrund::parse)
-                .map_or("", |g| g.etb_label())
-        ),
+        "abgeschlossen" => match grund.as_deref().and_then(AbschlussGrund::parse) {
+            Some(AbschlussGrund::Sonstiges) | None => {
+                format!("Tier {r} ({spezies}): Verbleib erfasst (Sonstiges)")
+            }
+            Some(g) => format!("Tier {r} ({spezies}): {}", g.etb_label()),
+        },
         "aktiv" if vorher.status == TierStatus::Vermisst => {
             format!("Tier {r}: vermisst → aktiv (aufgefunden)")
+        }
+        "aktiv" if vorher.status == TierStatus::Abgeschlossen => {
+            format!("Tier {r}: wieder aufgenommen (Verbleib zurückgenommen)")
+        }
+        "vermisst" if vorher.status == TierStatus::Abgeschlossen => {
+            format!("Tier {r}: als vermisst gemeldet (Verbleib zurückgenommen)")
         }
         _ => format!("Tier {r}: {} → {}", vorher.status.as_str(), body.status),
     };

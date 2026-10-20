@@ -53,10 +53,21 @@ describe('TiereDruckTabelle', () => {
       Array.from(document.querySelectorAll('[data-lfh="tiere-druck-tabelle"] thead th')).map(
         (th) => th.textContent,
       ),
-    ).toEqual(['Nr.', 'Status', 'Spezies', 'Rufname', 'Rasse', 'Halter', 'Fundort', 'erfasst']);
-    expect(zellen(0).slice(0, 7)).toEqual([
+    ).toEqual([
+      'Nr.',
+      'Status',
+      'Verbleib',
+      'Spezies',
+      'Rufname',
+      'Rasse',
+      'Halter',
+      'Fundort',
+      'erfasst',
+    ]);
+    expect(zellen(0).slice(0, 8)).toEqual([
       'T-001',
       'aktiv',
+      '—',
       'Hund',
       'Rex',
       'Schäferhund',
@@ -84,8 +95,25 @@ describe('TiereDruckTabelle', () => {
         konventionen={DEFAULT_KONVENTIONEN}
       />,
     );
-    expect(zellen(0)[5]).toBe('R-012');
-    expect(zellen(1)[5]).toBe('R-013 (storniert)');
-    expect(zellen(2)[5]).toBe('Nachbar, 0170 123');
+    expect(zellen(0)[6]).toBe('R-012');
+    expect(zellen(1)[6]).toBe('R-013 (storniert)');
+    expect(zellen(2)[6]).toBe('Nachbar, 0170 123');
+  });
+
+  it('nennt den Verbleib abgeschlossener Tiere wie die Liste (LLH-1092)', () => {
+    render(
+      <TiereDruckTabelle
+        tiere={[
+          {
+            ...basis,
+            status: 'abgeschlossen',
+            abschluss_grund: 'uebergabe_tierheim',
+            abschluss_ziel: 'Tierheim Nord',
+          },
+        ]}
+        konventionen={DEFAULT_KONVENTIONEN}
+      />,
+    );
+    expect(zellen(0)[2]).toBe('an Tierheim übergeben: Tierheim Nord');
   });
 });

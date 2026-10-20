@@ -6,7 +6,7 @@ import {
   Form,
   Input,
   InputNumber,
-  Popconfirm,
+  Modal,
   Space,
   Spin,
   Tag,
@@ -22,7 +22,8 @@ import {
   StatusChip,
   monoStil,
 } from '../components/instrument';
-import { SPEZIES_META, TIER_ABSCHLUSS, TIER_STATUS } from './tiere/tierHelfer';
+import { SPEZIES_META, TIER_STATUS, TIER_VERBLEIB, halterVorbelegung } from './tiere/tierHelfer';
+import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
@@ -92,6 +93,45 @@ function naechsteStatus(aktuell: TierStatus): TierStatus[] {
   }
 }
 
+/**
+ * Eine Aktion des Seitenkopfs (LLH-1105). Deskriptor statt `ReactNode`, damit dieselbe Beschreibung
+ * als Primärknopf oder als Menüeintrag erscheint und die Rangfolge an einer Stelle entschieden wird
+ * (Muster `PersonenDetailPage`).
+ */
+type Kopfaktion =
+  | { art: 'verbleib'; key: string; label: string }
+  | { art: 'status'; key: string; label: string; status: TierStatus }
+  | { art: 'stornieren'; key: string; label: string; gefahr: true };
+
+/** Knopftext je Übergang: die Handlung, nie das Statuswort (LFH-959, `frontend/AGENTS.md`). */
+function statusHandlung(von: TierStatus, nach: TierStatus): string {
+  if (nach === 'vermisst') return 'Als vermisst melden';
+  return von === 'vermisst' ? 'Aufgefunden' : 'Wieder aufnehmen';
+}
+
+/**
+ * Was der Kopf je Zustand anbietet (LLH-1105): genau eine Primäraktion — der Weg aus dem Zustand
+ * heraus (offen → Verbleib erfassen, vermisst → Aufgefunden, abgeschlossen → Wieder aufnehmen) —,
+ * die übrigen Übergänge und Stornieren im Menü. Aus `naechsteStatus` abgeleitet, damit kein
+ * Übergang verloren geht, den der Server erlaubt.
+ */
+function kopfplan(status: TierStatus): { primaer: Kopfaktion; weitere: Kopfaktion[] } {
+  const uebergaenge = naechsteStatus(status).map((s): Kopfaktion =>
+    s === 'abgeschlossen'
+      ? { art: 'verbleib', key: 'verbleib', label: 'Verbleib erfassen' }
+      : { art: 'status', key: `status:${s}`, label: statusHandlung(status, s), status: s },
+  );
+  const primaerKey = status === 'aktiv' ? 'verbleib' : 'status:aktiv';
+  const primaer = uebergaenge.find((a) => a.key === primaerKey)!;
+  const stornieren: Kopfaktion = {
+    art: 'stornieren',
+    key: 'stornieren',
+    label: 'Stornieren',
+    gefahr: true,
+  };
+  return { primaer, weitere: [...uebergaenge.filter((a) => a !== primaer), stornieren] };
+}
+
 /** Halter-Kurzanzeige. */
 function halterAnzeige(t: Tier): ReactNode {
   if (t.halter_registrier_nr != null) {
@@ -131,6 +171,9 @@ export default function TiereDetailPage() {
     schluessel: bearbeiten ? tierId : null,
   });
   const [abschlussOffen, setAbschlussOffen] = useState(false);
+  // Rückfrage als `<Modal>` außerhalb des Menüs, nicht als `Popconfirm` (`frontend/AGENTS.md`,
+  // Aktionen): ein Etikett im Menü ist Text.
+  const [stornoOffen, setStornoOffen] = useState(false);
   const [abschlussForm] = Form.useForm<{
     abschluss_grund: AbschlussGrund;
     abschluss_ziel?: string;
@@ -212,13 +255,11 @@ export default function TiereDetailPage() {
 
   /*
    * Jede Ablehnung steht an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`, „Rückwege und
-   * Fehler“): Bearbeiten am Formular, Status und Storno im Seitenhinweis, Abschließen im Dialog.
+   * Fehler“): Bearbeiten am Formular, Status im Seitenhinweis, Verbleib und Storno im Dialog.
    * Den Sperrkonflikt beantwortet weiter der Konfliktdialog, er steht nicht noch am Formular.
    */
   const sperrkonflikt = istKonflikt(editMutation.error) && !editMutation.variables?.overwrite;
   const editFehler = sperrkonflikt ? null : editMutation.error;
-  // Status und Storno teilen sich den Seitenhinweis: der Start der einen räumt die andere.
-  const kopfFehler = statusMutation.error ?? stornoMutation.error;
   const raeume = (m: { isPending: boolean; error: unknown; reset: () => void }) => {
     if (!m.isPending && m.error != null) m.reset();
   };
@@ -234,7 +275,12 @@ export default function TiereDetailPage() {
     statusReset();
     stornoReset();
     beendeSitzung();
-  }, [tierId, editReset, statusReset, stornoReset, beendeSitzung]);
+    // Dialoge gehören dem Tier, für das sie geöffnet wurden: offen gelassen, schriebe „Verbleib
+    // speichern“ den Verbleib des vorigen (samt dessen Halter) an das neue.
+    setStornoOffen(false);
+    setAbschlussOffen(false);
+    abschlussForm.resetFields();
+  }, [tierId, editReset, statusReset, stornoReset, beendeSitzung, abschlussForm]);
 
   // Bad-ID-Guard nach allen Hooks (Rules-of-Hooks): ungültige Route-ID → zurück auf die Liste.
   if (!idGueltig) {
@@ -268,6 +314,51 @@ export default function TiereDetailPage() {
   const t = detailQuery.data;
 
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  const kennung = tierRegistrierAnzeige(t.registrier_nr);
+
+  // Kein Kopf am stornierten Tier, ohne Schreibrecht und während der Bearbeiten-Sitzung (deren
+  // Knöpfe stehen in der Speicherleiste im Formular).
+  const plan = darfSchreiben && !t.storniert_at && !bearbeiten ? kopfplan(t.status) : null;
+  const laeuftStatus = (aktion: Kopfaktion) =>
+    statusMutation.isPending &&
+    aktion.art === 'status' &&
+    statusMutation.variables?.status === aktion.status;
+
+  function fuehreAus(aktion: Kopfaktion) {
+    if (aktion.art === 'verbleib') setAbschlussOffen(true);
+    else if (aktion.art === 'stornieren') {
+      raeume(stornoMutation);
+      setStornoOffen(true);
+    } else statusMutation.mutate({ status: aktion.status });
+  }
+
+  function starteBearbeiten() {
+    raeume(editMutation);
+    editSitzung.starte(t, {
+      rufname: t.rufname,
+      rasse_beschreibung: t.rasse_beschreibung,
+      geschlecht: t.geschlecht,
+      alter_geschaetzt: t.alter_geschaetzt,
+      farbe_beschreibung: t.farbe_beschreibung,
+      kennzeichnung: t.kennzeichnung,
+      groesse_gewicht: t.groesse_gewicht,
+      antreff_ort: t.antreff_ort,
+      notiz: t.notiz,
+      halter:
+        t.halter_person_id != null
+          ? {
+              typ: 'person',
+              refId: t.halter_person_id,
+              label:
+                t.halter_registrier_nr != null
+                  ? registrierNummer('R', t.halter_registrier_nr)
+                  : 'Halter',
+            }
+          : t.halter_kontakt
+            ? { typ: 'extern', kontakt: t.halter_kontakt }
+            : null,
+    });
+  }
 
   // Eine Detail-Zelle: im Edit-Modus eine `DatenfeldEingabe` (benanntes Feld, Prüffehler sichtbar
   // darunter, LLH-1101), sonst die Anzeige — dasselbe Datenraster bleibt stehen.
@@ -357,104 +448,56 @@ export default function TiereDetailPage() {
             { title: <Link to="/einsaetze">Einsätze</Link> },
             { title: einsatz.bezeichnung },
             { title: <Link to={zurueck}>Tiere</Link> },
-            { title: tierRegistrierAnzeige(t.registrier_nr) },
+            { title: kennung },
           ]}
         />
       }
       titel={
         <Space wrap size={8}>
           <span>
-            Tier <span style={monoStil(14, 500)}>{tierRegistrierAnzeige(t.registrier_nr)}</span>
+            Tier <span style={monoStil(14, 500)}>{kennung}</span>
           </span>
           <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
           <Tag>{SPEZIES_META[t.spezies]}</Tag>
-          {t.storniert_at && <Tag color="default">storniert</Tag>}
+          {t.storniert_at && <StatusChip ton="neutral" wort="storniert" />}
         </Space>
       }
       dataUpdatedAt={detailQuery.dataUpdatedAt}
       aktionen={
-        <Space>
-          {darfSchreiben && !t.storniert_at && !bearbeiten && (
-            <Space wrap size="middle">
-              {naechsteStatus(t.status).map((s) =>
-                s === 'abgeschlossen' ? (
-                  <Button key={s} onClick={() => setAbschlussOffen(true)}>
-                    Abschließen
-                  </Button>
-                ) : (
-                  <Button
-                    key={s}
-                    onClick={() => {
-                      raeume(stornoMutation);
-                      statusMutation.mutate({ status: s });
-                    }}
-                  >
-                    {s === 'vermisst'
-                      ? 'Als vermisst markieren'
-                      : s === 'aktiv' && t.status === 'vermisst'
-                        ? 'Aufgefunden'
-                        : `→ ${STATUS_META[s].label}`}
-                  </Button>
-                ),
-              )}
-              <Button
-                onClick={() => {
-                  raeume(editMutation);
-                  editSitzung.starte(t, {
-                    rufname: t.rufname,
-                    rasse_beschreibung: t.rasse_beschreibung,
-                    geschlecht: t.geschlecht,
-                    alter_geschaetzt: t.alter_geschaetzt,
-                    farbe_beschreibung: t.farbe_beschreibung,
-                    kennzeichnung: t.kennzeichnung,
-                    groesse_gewicht: t.groesse_gewicht,
-                    antreff_ort: t.antreff_ort,
-                    notiz: t.notiz,
-                    halter:
-                      t.halter_person_id != null
-                        ? {
-                            typ: 'person',
-                            refId: t.halter_person_id,
-                            label:
-                              t.halter_registrier_nr != null
-                                ? registrierNummer('R', t.halter_registrier_nr)
-                                : 'Halter',
-                          }
-                        : t.halter_kontakt
-                          ? { typ: 'extern', kontakt: t.halter_kontakt }
-                          : null,
-                  });
-                }}
-              >
-                Bearbeiten
-              </Button>
-              <Popconfirm
-                title="Tier stornieren?"
-                onConfirm={() => {
-                  raeume(statusMutation);
-                  stornoMutation.mutate(t.id);
-                }}
-                okText="Tier stornieren"
-                okButtonProps={{ danger: true }}
-              >
-                <Button danger>Stornieren</Button>
-              </Popconfirm>
-            </Space>
-          )}
-          <Button onClick={() => navigate(zurueck)}>Zurück zur Liste</Button>
-        </Space>
+        /**
+         * Genau eine Primäraktion je Zustand, „Bearbeiten“ sichtbar daneben (Vorbild der Bearbeitung
+         * in der Ansicht, LLH-1101), alles Weitere im Menü (LLH-1105). Einen „Zurück zur
+         * Liste“-Knopf gibt es nicht: die Brotkrume trägt denselben Weg.
+         */
+        plan && (
+          <Space wrap size="middle">
+            <Button
+              type="primary"
+              loading={laeuftStatus(plan.primaer)}
+              onClick={() => fuehreAus(plan.primaer)}
+            >
+              {plan.primaer.label}
+            </Button>
+            <Button onClick={starteBearbeiten}>Bearbeiten</Button>
+            <MenueAusloeser
+              eintraege={plan.weitere}
+              laeuft={plan.weitere.some(laeuftStatus)}
+              zugaenglicherName={`Weitere Aktionen zu Tier ${kennung}`}
+              onWahl={(key) => {
+                const aktion = plan.weitere.find((a) => a.key === key);
+                if (aktion) fuehreAus(aktion);
+              }}
+            />
+          </Space>
+        )
       }
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
-        kopfFehler != null && (
+        statusMutation.error != null && (
           <SeitenHinweise
-            fehler={kopfFehler}
-            fehlerTitel={statusMutation.error != null ? 'Status nicht geändert' : 'Nicht storniert'}
-            fehlerFallback={
-              statusMutation.error != null
-                ? 'Statuswechsel fehlgeschlagen'
-                : 'Stornieren fehlgeschlagen'
-            }
+            fehler={statusMutation.error}
+            fehlerTitel="Status nicht geändert"
+            fehlerFallback="Statuswechsel fehlgeschlagen"
           />
         )
       }
@@ -513,12 +556,12 @@ export default function TiereDetailPage() {
         )}
 
         {t.status === 'abgeschlossen' && (
-          <Paneel titel="Abschluss">
-            <Datenraster spalten={2} beschriftung="Abschluss">
-              <Datenfeld label="Grund">
-                {t.abschluss_grund ? TIER_ABSCHLUSS[t.abschluss_grund] : '—'}
+          <Paneel titel="Verbleib">
+            <Datenraster spalten={2} beschriftung="Verbleib">
+              <Datenfeld label="Verbleib">
+                {t.abschluss_grund ? TIER_VERBLEIB[t.abschluss_grund] : '—'}
               </Datenfeld>
-              <Datenfeld label="Ziel">{t.abschluss_ziel ?? '—'}</Datenfeld>
+              <Datenfeld label="Übergeben an / Ort">{t.abschluss_ziel ?? '—'}</Datenfeld>
             </Datenraster>
           </Paneel>
         )}
@@ -529,36 +572,82 @@ export default function TiereDetailPage() {
         <TierAnhaenge einsatzId={einsatzId} tier={t} darfSchreiben={darfSchreiben} />
       </Space>
 
-      {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). */}
+      {/* Erfassungshülle (`frontend/AGENTS.md`, Erfassungs-Norm). „Verbleib erfassen“ wie bei
+          Personen (LLH-1092): das Tier verlässt die Obhut der Einsatzkräfte. Der Status heißt
+          danach weiter „abgeschlossen“, die Drahtwerte bleiben. */}
       <ErfassungsModal<{ abschluss_grund: AbschlussGrund; abschluss_ziel?: string }>
         offen={abschlussOffen}
-        titel="Tier abschließen"
+        titel={`Verbleib von ${kennung}`}
         form={abschlussForm}
-        erfassenText="Abschließen"
+        erfassenText="Verbleib speichern"
         laeuft={abschlussMutation.isPending}
         speicherung={abschlussMutation}
-        speicherFehlerTitel="Nicht abgeschlossen"
-        speicherFehlerFallback="Abschließen fehlgeschlagen"
+        speicherFehlerTitel="Verbleib nicht gespeichert"
+        speicherFehlerFallback="Speichern fehlgeschlagen"
         onErfassen={(v) => abschlussMutation.mutateAsync(v)}
         onFertig={() => setAbschlussOffen(false)}
         onAbbrechen={() => setAbschlussOffen(false)}
       >
         <Form.Item
-          label="Abschlussgrund"
+          label="Verbleib"
           name="abschluss_grund"
-          rules={[{ required: true, message: 'Grund ist Pflicht' }]}
+          rules={[{ required: true, message: 'Verbleib ist Pflicht' }]}
         >
           <Select
-            options={(Object.keys(TIER_ABSCHLUSS) as AbschlussGrund[]).map((k) => ({
+            options={(Object.keys(TIER_VERBLEIB) as AbschlussGrund[]).map((k) => ({
               value: k,
-              label: TIER_ABSCHLUSS[k],
+              label: TIER_VERBLEIB[k],
             }))}
+            // Den bekannten Halter vorbelegen, nie ein schon eingetragenes Ziel überschreiben; beim
+            // Wechsel auf einen anderen Verbleib die unveränderte Vorbelegung wieder herausnehmen.
+            onChange={(grund: AbschlussGrund) => {
+              const halter = halterVorbelegung(t);
+              const ziel: unknown = abschlussForm.getFieldValue('abschluss_ziel');
+              if (halter == null) return;
+              if (grund === 'uebergabe_halter' && !ziel)
+                abschlussForm.setFieldValue('abschluss_ziel', halter);
+              else if (grund !== 'uebergabe_halter' && ziel === halter)
+                abschlussForm.setFieldValue('abschluss_ziel', undefined);
+            }}
           />
         </Form.Item>
-        <Form.Item label="Ziel" name="abschluss_ziel">
-          <Input placeholder="z. B. Tierarzt Müller, R-Nr. des Halters" />
+        <Form.Item label="Übergeben an / Ort" name="abschluss_ziel">
+          <Input placeholder="z. B. Tierarzt Dr. Müller, Tierheim Nord" />
         </Form.Item>
       </ErfassungsModal>
+
+      <Modal
+        open={stornoOffen}
+        title={`Tier ${kennung} stornieren?`}
+        okText="Tier stornieren"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true }}
+        confirmLoading={stornoMutation.isPending}
+        cancelButtonProps={{ disabled: stornoMutation.isPending }}
+        closable={stornoMutation.isPending ? { disabled: true } : true}
+        mask={{ closable: !stornoMutation.isPending }}
+        keyboard={!stornoMutation.isPending}
+        onOk={() => {
+          raeume(statusMutation);
+          stornoMutation.mutate(t.id);
+        }}
+        onCancel={() => {
+          if (stornoMutation.isPending) return;
+          raeume(stornoMutation);
+          setStornoOffen(false);
+        }}
+      >
+        Der Datensatz bleibt erhalten und verschwindet aus den Arbeitssichten.
+        {stornoMutation.error != null && (
+          <div style={{ marginTop: 16 }}>
+            <SpeicherFehler
+              fehler={stornoMutation.error}
+              titel="Nicht storniert"
+              fallback="Stornieren fehlgeschlagen"
+            />
+          </div>
+        )}
+      </Modal>
     </EinsatzSeite>
   );
 }

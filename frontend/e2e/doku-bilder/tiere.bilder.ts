@@ -9,7 +9,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * (`pnpm doku:bilder --grep tiere`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   liste.png         frontend/src/pages/TierePage.tsx
  *   erfassen.png      frontend/src/pages/TierePage.tsx
- *   abschliessen.png  frontend/src/pages/TiereDetailPage.tsx
+ *   verbleib.png      frontend/src/pages/TiereDetailPage.tsx
  *
  * Daten: der Demo-Einsatz hat keine Tiere. Vier kommen per API dazu (D3): eines mit einer
  * betroffenen Person als Halter, eines vermisst, eines abgeschlossen.
@@ -99,18 +99,20 @@ test.describe(KAPITEL, () => {
     await fotografiere(dialog, KAPITEL, 'erfassen');
   });
 
-  test('Dialog „Tier abschließen“', async ({ page }) => {
+  test('Dialog „Verbleib von T-…“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const tiere = await tiereAnlegen(page, demo.id);
     const bello = tiere.find((t) => t.rufname === 'Bello')!;
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/tiere/${bello.id}`);
-    await page.getByRole('button', { name: 'Abschließen' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Tier abschließen' });
-    await waehleIn(dialog.getByRole('combobox', { name: 'Abschlussgrund' }), 'Übergabe an Halter');
-    await dialog.getByLabel('Ziel').fill('Halterin R-001, Betreuungsstelle Gesamtschule');
-    await dialog.getByLabel('Ziel').blur();
-    await fotografiere(dialog, KAPITEL, 'abschliessen');
+    await page.getByRole('button', { name: 'Verbleib erfassen' }).click();
+    const dialog = page.getByRole('dialog', { name: /^Verbleib von T-/ });
+    await waehleIn(dialog.getByRole('combobox', { name: 'Verbleib' }), 'an Halter übergeben');
+    await dialog
+      .getByLabel('Übergeben an / Ort')
+      .fill('Halterin R-001, Betreuungsstelle Gesamtschule');
+    await dialog.getByLabel('Übergeben an / Ort').blur();
+    await fotografiere(dialog, KAPITEL, 'verbleib');
   });
 });

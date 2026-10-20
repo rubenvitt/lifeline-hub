@@ -101,7 +101,7 @@ test.describe(KAPITEL, () => {
     const oel = schaeden.find((s) => s.ort === 'Mühlbachweg 12')!;
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/schaeden/${oel.id}`);
-    await page.getByRole('button', { name: 'Übergeben', exact: true }).click();
+    await page.getByRole('button', { name: 'Schaden übergeben', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Schaden übergeben' });
     await dialog.getByLabel('Übergeben an').fill('Untere Wasserbehörde');
     await dialog.getByLabel('Übergeben an').blur();

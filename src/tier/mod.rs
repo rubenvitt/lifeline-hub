@@ -133,9 +133,9 @@ where
 }
 
 wire_enum! {
-    /// Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
-    /// `etb_label` erscheint in Klammern in der ETB-Spur ("abgeschlossen (Übergabe an
-    /// Tierarzt)").
+    /// Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).
+    /// String = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur
+    /// ("Tier T-001 (Hund): an Tierarzt übergeben").
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AbschlussGrund {
         UebergabeHalter => "uebergabe_halter",
@@ -148,15 +148,16 @@ wire_enum! {
 }
 
 impl AbschlussGrund {
-    /// Beschriftung im ETB-Text, dieselbe wie `TIER_ABSCHLUSS` in
-    /// `frontend/src/pages/tiere/tierHelfer.ts` (LFH-1144: das ETB nennt keine Schlüssel).
+    /// Beschriftung im ETB-Text, dieselbe wie `TIER_VERBLEIB` in
+    /// `frontend/src/pages/tiere/tierHelfer.ts` (LFH-1144: das ETB nennt keine Schlüssel;
+    /// LLH-1092: Handlungsform, „freigelassen“ statt „Freilauf“).
     pub fn etb_label(&self) -> &'static str {
         match self {
-            AbschlussGrund::UebergabeHalter => "Übergabe an Halter",
-            AbschlussGrund::UebergabeTierarzt => "Übergabe an Tierarzt",
-            AbschlussGrund::UebergabeTierheim => "Übergabe an Tierheim",
+            AbschlussGrund::UebergabeHalter => "an Halter übergeben",
+            AbschlussGrund::UebergabeTierarzt => "an Tierarzt übergeben",
+            AbschlussGrund::UebergabeTierheim => "an Tierheim übergeben",
             AbschlussGrund::Verstorben => "verstorben",
-            AbschlussGrund::Freilauf => "Freilauf",
+            AbschlussGrund::Freilauf => "freigelassen",
             AbschlussGrund::Sonstiges => "Sonstiges",
         }
     }
@@ -303,9 +304,10 @@ mod tests {
         assert!(AbschlussGrund::parse("vergessen").is_none());
         assert_eq!(
             AbschlussGrund::UebergabeTierheim.etb_label(),
-            "Übergabe an Tierheim"
+            "an Tierheim übergeben"
         );
         assert_eq!(AbschlussGrund::Verstorben.etb_label(), "verstorben");
+        assert_eq!(AbschlussGrund::Freilauf.etb_label(), "freigelassen");
     }
 
     #[test]

@@ -65,11 +65,6 @@ const MIT_NACHBARSCHAFT = [
   // geprüft in `Sidebar.test.tsx`.
   'karten/OfflineKartenVerwaltung.tsx',
   'karten/OnlineQuellenVerwaltung.tsx',
-  // ── Detailseiten Schäden/Tiere (LFH-370) ──────────────────────────────────
-  // „Stornieren" (`danger`) steht in der inneren Aktionsreihe neben drei gleich hohen neutralen
-  // Aktionen.
-  'pages/SchaedenDetailPage.tsx',
-  'pages/TiereDetailPage.tsx',
   // Die Meldungskarte steht in keiner Liste mehr: „Bestätigen" ist seit LFH-962 Primärknopf, nicht
   // `danger`, und sonst trägt die Karte keine destruktive Aktion als Knopf.
   // ── Personen-Detailseite (LFH-340) ────────────────────────────────────────
@@ -133,6 +128,10 @@ const OHNE_NACHBARSCHAFT = [
   // den Feldern; die neutralen Knöpfe (Gefahrenmatrix, Sprung ins Fachmodul) stehen in der
   // inneren.
   'pages/lagekarte/ZonenInspector.tsx',
+  // Detailseiten Schäden/Tiere (LFH-370 → LLH-1105): „Stornieren“ steht im Kopfmenü wie bei
+  // Personen, dessen Trenner der Komponententest prüft; ein Knopf mit `danger` gibt es dort nicht.
+  'pages/SchaedenDetailPage.tsx',
+  'pages/TiereDetailPage.tsx',
 ];
 
 const BEREICH = [...MIT_NACHBARSCHAFT, ...OHNE_NACHBARSCHAFT];

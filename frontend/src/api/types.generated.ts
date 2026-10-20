@@ -239,9 +239,9 @@ export interface components {
          */
         AbloesungWarnungArt: "schon_geplant" | "im_einsatz";
         /**
-         * @description Abschlussgrund beim Übergang `→ abgeschlossen`. String = CHECK-Constraint.
-         *     `etb_label` erscheint in Klammern in der ETB-Spur ("abgeschlossen (Übergabe an
-         *     Tierarzt)").
+         * @description Abschlussgrund beim Übergang `→ abgeschlossen`, in der Oberfläche „Verbleib“ (LLH-1092).
+         *     String = CHECK-Constraint. `etb_label` ist die Handlung in der ETB-Spur
+         *     ("Tier T-001 (Hund): an Tierarzt übergeben").
          * @enum {string}
          */
         AbschlussGrund: "uebergabe_halter" | "uebergabe_tierarzt" | "uebergabe_tierheim" | "verstorben" | "freilauf" | "sonstiges";

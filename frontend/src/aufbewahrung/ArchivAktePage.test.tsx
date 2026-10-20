@@ -142,6 +142,34 @@ describe('ArchivAktePage — genau eine Primäraktion je Zustand', () => {
 });
 
 describe('ArchivAktePage — Inhalt', () => {
+  it('LLH-1092: nennt den Verbleib nur am abgeschlossenen Tier, nie einen zurückgenommenen', async () => {
+    const mitTieren: ArchivAkte = {
+      ...akte('frist_laeuft'),
+      tiere: [
+        {
+          registrier_nr: 1,
+          registrier_anzeige: 'T-001',
+          spezies: 'hund',
+          // Wieder aufgenommen: der alte Grund bleibt gespeichert, gilt aber nicht mehr.
+          status: 'aktiv',
+          abschluss_grund: 'uebergabe_tierarzt',
+          erfasst_at: '2026-05-01 09:30:00',
+        },
+        {
+          registrier_nr: 2,
+          registrier_anzeige: 'T-002',
+          spezies: 'katze',
+          status: 'abgeschlossen',
+          abschluss_grund: 'freilauf',
+          erfasst_at: '2026-05-01 09:40:00',
+        },
+      ],
+    };
+    zeige('frist_laeuft', undefined, undefined, mitTieren);
+    expect(await screen.findByText('freigelassen')).toBeInTheDocument();
+    expect(screen.queryByText('an Tierarzt übergeben')).toBeNull();
+  });
+
   it('Register mit Registriernummer und Kategorie, Zustand mit Wort', async () => {
     zeige('vorgemerkt');
     expect(await screen.findByText('R-001')).toBeInTheDocument();
