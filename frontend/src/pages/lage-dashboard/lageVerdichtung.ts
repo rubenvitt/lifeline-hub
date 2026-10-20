@@ -11,6 +11,8 @@ import type {
   Warnstufe,
 } from '../../api/types';
 import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
+import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
+import { gefahrengebietName } from '../../api/gefahren';
 import { ohneAbgeschlossene, sichtungsbild } from '../../personen/personenBilanz';
 
 export interface SkVerteilung {
@@ -79,18 +81,17 @@ export interface GefahrenZeile {
 }
 
 interface GefahrenmatrixVerdichtung {
-  /** Nur BEWERTETE Gefahrentypen, in Katalogreihenfolge. */
+  /** Nur Gefahrentypen mit einer Stufe über „keine“, in Katalogreihenfolge. */
   zeilen: GefahrenZeile[];
-  /** Gefahrentypen ohne jede Bewertung in irgendeinem Gebiet. */
-  unbewertet: number;
 }
 
 /**
  * Verdichtet die Matrizen aller Gefahrengebiete eines Einsatzes.
  *
- * „keine" und „unbewertet" sind zwei Aussagen: Warnstufe `keine` ist eine Meldung und steht als
- * Zeile mit leerem Balken; ein Typ ohne jede Bewertung ist eine Lücke und erscheint nur als Zähler
- * — sonst sähen dreizehn Zeilen „keine" aus wie ein geprüfter, ruhiger Einsatz.
+ * „keine“ ist die Vorgabe jeder Zelle (LLH-1090, Spec `gefahrenmatrix`): eine ausdrücklich auf
+ * „keine“ gesetzte Zelle sagt dasselbe wie eine ohne Bewertung, deshalb steht ein Typ nur mit einer
+ * Stufe darüber als Zeile da — wie im Matrixauszug der Palette. Ob überhaupt jemand hingesehen hat,
+ * sagt nicht die Matrix, sondern die Beurteilung je Gebiet ({@link beurteilungHinweis}).
  *
  * Reihenfolge des Katalogs, nicht der Dringlichkeit (Prüfliste Kriterium 9).
  */
@@ -107,9 +108,24 @@ export function verdichteGefahrenmatrix(
   const zeilen: GefahrenZeile[] = [];
   for (const { wert, label } of GEFAHRENTYPEN) {
     const stufe = hoechste.get(wert);
-    if (stufe != null) zeilen.push({ typ: wert, label, stufe });
+    if (stufe != null && stufe !== 'keine') zeilen.push({ typ: wert, label, stufe });
   }
-  return { zeilen, unbewertet: GEFAHRENTYPEN.length - zeilen.length };
+  return { zeilen };
+}
+
+/** Bis zu so vielen nicht beurteilten Gebieten nennt der Hinweis die Namen, darüber die Zahl. */
+const NAMEN_HOECHSTENS = 2;
+
+/**
+ * Hinweis auf nicht beurteilte Gefahrengebiete (LLH-1090) statt der früheren Zählung
+ * unbewerteter Gefahrentypen: „Hangrutsch Kirchberg: nicht beurteilt“, bei mehr als zwei Gebieten
+ * „3 Gebiete nicht beurteilt“. `null`, wenn jedes Gebiet beurteilt ist oder es keines gibt.
+ */
+export function beurteilungHinweis(gebiete: readonly Gefahrengebiet[]): string | null {
+  const offen = gebiete.filter((g) => !istBeurteilt(g));
+  if (offen.length === 0) return null;
+  if (offen.length > NAMEN_HOECHSTENS) return `${offen.length} Gebiete ${NICHT_BEURTEILT}`;
+  return offen.map((g) => `${gefahrengebietName(g.label, g.id)}: ${NICHT_BEURTEILT}`).join(' · ');
 }
 
 /** Eine Zeile des Sichtungsbilds. */

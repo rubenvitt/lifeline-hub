@@ -275,6 +275,84 @@ describe('GefahrenPage', () => {
     expect(screen.getByRole('link', { name: 'Auf Karte zeigen' })).toBeInTheDocument();
   });
 
+  describe('Beurteilung (LLH-1090)', () => {
+    it('nennt ein nie bestätigtes Gebiet „nicht beurteilt“ — am Kopf und in der Liste', async () => {
+      server.use(...handlers());
+      renderPage();
+      await screen.findByRole('button', { name: 'Beurteilung bestätigen' });
+      const kopf = document.querySelector<HTMLElement>('[data-lfh="gefahrengebiet-beurteilung"]');
+      expect(kopf).not.toBeNull();
+      expect(within(kopf!).getByText('nicht beurteilt')).toBeInTheDocument();
+      const liste = screen.getByRole('region', { name: 'Gefahrengebiete' });
+      expect(within(liste).getByText('nicht beurteilt')).toBeInTheDocument();
+    });
+
+    it('nennt Zeit und Person einer Bestätigung, ohne Listenzusatz', async () => {
+      const beurteilt = {
+        ...gebiet,
+        beurteilt_at: '2026-10-20 13:15:00',
+        beurteilt_von: 2,
+        beurteilt_von_name: 'Einsatzleitung',
+      };
+      server.use(...handlers([beurteilt]));
+      renderPage();
+      const stand = await screen.findByText(/^beurteilt /, {
+        selector: '[data-lfh="beurteilung-stand"]',
+      });
+      expect(stand).toHaveTextContent(/^beurteilt \d{6}[A-Z]{3}\d{4} · Einsatzleitung$/);
+      expect(screen.queryByText('nicht beurteilt')).toBeNull();
+    });
+
+    it('bestätigt die Beurteilung (POST auf das gewählte Gebiet) und lädt die Liste nach', async () => {
+      let posts = 0;
+      let gebiete = 0;
+      // Vor `handlers()`: der erste passende Handler antwortet.
+      server.use(
+        http.get('/api/einsaetze/1/gefahrengebiete', () => {
+          gebiete += 1;
+          return HttpResponse.json([gebiet]);
+        }),
+        ...handlers(),
+        http.post('/api/einsaetze/1/gefahrengebiete/7/beurteilung', () => {
+          posts += 1;
+          return HttpResponse.json({ ...gebiet, beurteilt_at: '2026-10-20 13:15:00' });
+        }),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      const knopf = await screen.findByRole('button', { name: 'Beurteilung bestätigen' });
+      await waitFor(() => expect(knopf).toBeEnabled());
+      const vorher = gebiete;
+      await user.click(knopf);
+      await waitFor(() => expect(posts).toBe(1));
+      await waitFor(() => expect(gebiete).toBeGreaterThan(vorher));
+    });
+
+    it('zeigt ein abgelehntes Bestätigen an der Stelle', async () => {
+      server.use(
+        ...handlers(),
+        http.post('/api/einsaetze/1/gefahrengebiete/7/beurteilung', () =>
+          HttpResponse.json({ error: 'Einsatz abgeschlossen' }, { status: 409 }),
+        ),
+      );
+      const user = userEvent.setup();
+      renderPage();
+      const knopf = await screen.findByRole('button', { name: 'Beurteilung bestätigen' });
+      await waitFor(() => expect(knopf).toBeEnabled());
+      await user.click(knopf);
+      expect(await screen.findByText('Beurteilung nicht bestätigt')).toBeInTheDocument();
+      expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
+    });
+
+    it('ohne Schreibrecht kein Knopf, die Aussage bleibt', async () => {
+      server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
+      renderPage();
+      expect(await screen.findByText('Nur Ansicht')).toBeInTheDocument();
+      expect(screen.getAllByText('nicht beurteilt').length).toBeGreaterThan(0);
+      expect(screen.queryByRole('button', { name: 'Beurteilung bestätigen' })).toBeNull();
+    });
+  });
+
   it('korrigiert die Auswahl, wenn das gewählte Gebiet aus der Liste verschwindet', async () => {
     const nord = {
       id: 7,
@@ -415,7 +493,7 @@ describe('GefahrenPage', () => {
     renderPage();
     // Die Zelle trägt einen Auslöser; sein Name nennt Zeile, Spalte und aktuelle Stufe.
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: nicht bewertet' }),
+      await screen.findByRole('button', { name: 'Bewertung Brand × Menschen: keine' }),
     );
     // Über das offene Menü greifen — antd lässt Portale geschlossener Dropdowns stehen.
     const menue = document.querySelector<HTMLElement>(
@@ -568,7 +646,7 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
       );
       renderPage();
       const zelle = await screen.findByRole('button', {
-        name: 'Bewertung Brand × Menschen: nicht bewertet',
+        name: 'Bewertung Brand × Menschen: keine',
       });
       await userEvent.click(zelle);
       await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: /hoch/i }));
