@@ -1731,3 +1731,283 @@ async fn patch_leerer_ort_ist_400() {
     assert_eq!(s, StatusCode::OK, "{v:?}");
     assert_eq!(v["ort"], "Nebenstr. 2");
 }
+
+// ---------- Tests: Gefahrenart und Schadensgrad (LLH-1115) ----------
+
+#[tokio::test]
+async fn gefahrenart_und_schadensgrad_werden_gespeichert_und_im_etb_in_worten_genannt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/schaeden"),
+        &admin,
+        Some(&json!({
+            "typ": "infrastruktur", "ausmass": "gross", "ort": "Trafostation",
+            "gefahrenart": "elektrizitaet", "schadensgrad": "zerstoert"
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["gefahrenart"], "elektrizitaet");
+    assert_eq!(v["schadensgrad"], "zerstoert");
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert_eq!(
+        inhalte[0],
+        "Schaden S-001 angelegt: Infrastruktur (groß), Gefahr: Elektrizität, Schadensgrad: total zerstört"
+    );
+    assert!(!inhalte[0].contains("elektrizitaet") && !inhalte[0].contains("zerstoert"));
+}
+
+#[tokio::test]
+async fn ohne_gefahrenart_fehlen_die_felder_in_der_antwort() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/schaeden"),
+        &admin,
+        Some(
+            &json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "A",
+                      "gefahrenart": null, "schadensgrad": "" }),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let o = v.as_object().unwrap();
+    assert!(
+        !o.contains_key("gefahrenart") && !o.contains_key("schadensgrad"),
+        "{v}"
+    );
+}
+
+#[tokio::test]
+async fn unbekannte_gefahrenart_oder_schadensgrad_ist_400_ohne_write() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for (feld, wert) in [("gefahrenart", "lawine"), ("schadensgrad", "kaputt")] {
+        let mut body = gueltig();
+        body[feld] = json!(wert);
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/schaeden"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{feld}: {v}");
+    }
+    let (_, liste) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
+
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    for (feld, wert) in [("gefahrenart", "lawine"), ("schadensgrad", "kaputt")] {
+        let mut body = json!({});
+        body[feld] = json!(wert);
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{e}/schaeden/{sid}"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "PATCH {feld}: {v}");
+    }
+    let (s, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden?gefahrenart=lawine"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "Filter: {v}");
+}
+
+#[tokio::test]
+async fn patch_setzt_laesst_und_leert_gefahrenart_dreiwertig() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let pfad = format!("/api/einsaetze/{e}/schaeden/{sid}");
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "gefahrenart": "explosion", "schadensgrad": "teilzerstoert" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["gefahrenart"], "explosion");
+    assert_eq!(v["schadensgrad"], "teilzerstoert");
+    // Fehlt das Feld, bleibt der Wert.
+    let (_, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({ "ort": "B" }))).await;
+    assert_eq!(v["gefahrenart"], "explosion");
+    assert_eq!(v["schadensgrad"], "teilzerstoert");
+    // `null` leert.
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "gefahrenart": null, "schadensgrad": null })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let o = v.as_object().unwrap();
+    assert!(
+        !o.contains_key("gefahrenart") && !o.contains_key("schadensgrad"),
+        "{v}"
+    );
+}
+
+#[tokio::test]
+async fn liste_kennzahlen_und_marker_kennen_die_gefahrenart() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    schaden_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({ "typ": "sachschaden", "ausmass": "mittel", "ort": "A", "lat": 52.0, "lon": 9.0,
+                 "gefahrenart": "explosion", "schadensgrad": "angeschlagen" }),
+    )
+    .await;
+    schaden_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({ "typ": "sachschaden", "ausmass": "mittel", "ort": "B", "gefahrenart": "brand" }),
+    )
+    .await;
+    schaden_anlegen(&app, &admin, e, &gueltig()).await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden?gefahrenart=explosion,brand"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v.as_array().unwrap().len(), 2);
+    let (_, k) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden/kennzahlen?gefahrenart=explosion"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(k["gesamt"], 1, "{k}");
+
+    let (_, m) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/schaeden/marker"),
+        &admin,
+        None,
+    )
+    .await;
+    let erster = m
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|z| z["registrier_nr"] == 1)
+        .unwrap();
+    assert_eq!(erster["gefahrenart"], "explosion");
+    assert_eq!(erster["schadensgrad"], "angeschlagen");
+}
+
+#[tokio::test]
+async fn csv_export_nennt_gefahr_und_schadensgrad_in_worten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    schaden_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({ "typ": "infrastruktur", "ausmass": "gross", "ort": "=Formel",
+                 "gefahrenart": "atomare_strahlung", "schadensgrad": "teilzerstoert" }),
+    )
+    .await;
+    schaden_anlegen(&app, &admin, e, &gueltig()).await;
+    let antwort = tower::ServiceExt::oneshot(
+        app.clone(),
+        axum::http::Request::builder()
+            .uri(format!("/api/einsaetze/{e}/schaeden/export"))
+            .header("cookie", &admin)
+            .body(axum::body::Body::empty())
+            .unwrap(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(antwort.status(), StatusCode::OK);
+    assert!(antwort.headers()["content-type"]
+        .to_str()
+        .unwrap()
+        .starts_with("text/csv"));
+    let bytes = axum::body::to_bytes(antwort.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let csv = String::from_utf8(bytes.to_vec()).unwrap();
+    let zeilen: Vec<&str> = csv.lines().collect();
+    assert_eq!(
+        zeilen[0],
+        "registrier_nr;status;typ;ausmass;gefahr;schadensgrad;ort;lat;lon;beschreibung;erfasst_at"
+    );
+    assert!(
+        zeilen[1].starts_with(
+            "S-001;\"offen\";\"Infrastruktur\";\"groß\";\"Atomare Strahlung\";\"teilzerstört\";\"'=Formel\""
+        ),
+        "{}",
+        zeilen[1]
+    );
+    assert!(zeilen[2].starts_with("S-002;\"offen\";\"Sachschaden\";\"gering\";\"\";\"\";"));
+}
+
+#[tokio::test]
+async fn lage_snapshot_friert_gefahrenart_und_schadensgrad_ein() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    schaden_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({ "typ": "sachschaden", "ausmass": "gross", "ort": "A",
+                 "gefahrenart": "elektrizitaet", "schadensgrad": "zerstoert" }),
+    )
+    .await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &admin,
+        Some(&json!({ "bezeichnung": "Stand" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let schaden = &v["daten"]["schaeden"][0];
+    assert_eq!(schaden["gefahrenart"], "elektrizitaet");
+    assert_eq!(schaden["schadensgrad"], "zerstoert");
+}

@@ -8,7 +8,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep schaeden`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   liste.png       frontend/src/pages/SchaedenPage.tsx
- *   erfassen.png    frontend/src/pages/schaeden/SchadenErfassenModal.tsx
+ *   erfassen.png    frontend/src/pages/schaeden/SchadenErfassenModal.tsx, GefahrAuswahl.tsx
  *   uebergeben.png  frontend/src/pages/SchaedenDetailPage.tsx
  *
  * Daten: der Demo-Einsatz hat keine Schäden. Vier kommen per API dazu (D3), in allen drei Status;
@@ -32,6 +32,7 @@ async function schaedenAnlegen(page: Page, einsatzId: number): Promise<Schaden[]
     ausmass: 'gross',
     ort: 'Mühlbachweg 12',
     beschreibung: 'Heizöltank im Keller aufgeschwommen, Ölfilm auf dem Wasser',
+    gefahrenart: 'chemische_stoffe',
     lat: 50.953,
     lon: 10.246,
   });
@@ -58,6 +59,8 @@ async function schaedenAnlegen(page: Page, einsatzId: number): Promise<Schaden[]
     ausmass: 'gross',
     ort: 'Brücke Mühlbachweg',
     beschreibung: 'Widerlager unterspült, Brücke für Fahrzeuge gesperrt',
+    gefahrenart: 'einsturz',
+    schadensgrad: 'teilzerstoert',
     lat: 50.951,
     lon: 10.243,
   });
@@ -88,8 +91,8 @@ test.describe(KAPITEL, () => {
     await waehleIn(dialog.getByRole('combobox', { name: 'Typ' }), 'Sachschaden');
     await waehleIn(dialog.getByRole('combobox', { name: 'Ausmaß' }), 'mittel');
     await dialog.getByLabel('Ort').fill('Mühlbachweg 18');
-    await dialog.getByLabel('Beschreibung').fill('Garagentor eingedrückt, Fahrzeug im Wasser');
-    await dialog.getByLabel('Beschreibung').blur();
+    await waehleIn(dialog.getByRole('combobox', { name: 'Gefahr' }), 'Elektrizität');
+    await dialog.getByLabel('Ort').blur();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'erfassen');
   });

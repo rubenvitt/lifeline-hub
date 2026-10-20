@@ -7,8 +7,11 @@ import type {
   SchadenStatus,
   SchadenTyp,
   Ausmass,
+  Gefahrentyp,
+  Schadensgrad,
 } from './types';
 import {
+  apiDatei,
   apiGet,
   apiSend,
   apiUploadMitFortschritt,
@@ -16,12 +19,16 @@ import {
   type UploadFortschritt,
 } from './client';
 import { UPLOAD_TIMEOUT_MS } from './upload';
+import { EXPORT_TIMEOUT_MS } from './exportTimeout';
 import { registrierNummer } from '../anzeige/registrierNummer';
 
 /** Felder beim Anlegen (Typ + Ort + Ausmaß Pflicht; Rest optional). Geschädigt FK XOR Freitext. */
 export interface SchadenEingabe {
   typ: SchadenTyp;
   ausmass: Ausmass;
+  /** Optional (LLH-1115); `null` = keine Angabe. */
+  gefahrenart?: Gefahrentyp | null;
+  schadensgrad?: Schadensgrad | null;
   ort: string;
   beschreibung?: string | null;
   lat?: number | null;
@@ -37,6 +44,9 @@ export interface SchadenEingabe {
 export interface SchadenPatch {
   typ?: SchadenTyp;
   ausmass?: Ausmass;
+  /** Dreiwertig (LLH-1115): fehlt = unverändert, `null` = leeren. */
+  gefahrenart?: Gefahrentyp | null;
+  schadensgrad?: Schadensgrad | null;
   ort?: string;
   beschreibung?: string;
   geschaedigt_person_id?: number | null;
@@ -90,6 +100,8 @@ export interface SchaedenFilter {
   status?: SchadenStatus;
   typen?: readonly SchadenTyp[];
   ausmasse?: readonly Ausmass[];
+  /** Gefahrenarten (LLH-1115); ein Schaden ohne Gefahrenart trifft keine. */
+  gefahrenarten?: readonly Gefahrentyp[];
   verortet?: readonly ('ja' | 'nein')[];
   /** Suchbegriff, getrimmt; trifft als Teil Nummer, Ort, Beschreibung oder Geschädigten. */
   q?: string;
@@ -152,6 +164,7 @@ function sichtParameter(sicht: SchaedenFilter) {
   return {
     typ: sicht.typen?.join(','),
     ausmass: sicht.ausmasse?.join(','),
+    gefahrenart: sicht.gefahrenarten?.join(','),
     verortet: sicht.verortet?.join(','),
     q: sicht.q?.trim(),
   };
@@ -197,6 +210,12 @@ export function passtZurSicht(s: Schaden, sicht: SchaedenFilter): boolean | null
   if (sicht.status && s.status !== sicht.status) return false;
   if (sicht.typen?.length && !sicht.typen.includes(s.typ)) return false;
   if (sicht.ausmasse?.length && !sicht.ausmasse.includes(s.ausmass)) return false;
+  if (
+    sicht.gefahrenarten?.length &&
+    !(s.gefahrenart && sicht.gefahrenarten.includes(s.gefahrenart))
+  ) {
+    return false;
+  }
   if (sicht.verortet?.length === 1) {
     if ((verortetWert(s) === 1) !== (sicht.verortet[0] === 'ja')) return false;
   }
@@ -245,6 +264,9 @@ export function alsSchadenMarker(s: Schaden): SchadenMarker {
     status: s.status,
     typ: s.typ,
     ausmass: s.ausmass,
+    // Wie der Server (`skip_serializing_if`): ohne Angabe fehlt das Feld.
+    ...(s.gefahrenart ? { gefahrenart: s.gefahrenart } : {}),
+    ...(s.schadensgrad ? { schadensgrad: s.schadensgrad } : {}),
     lat: s.lat ?? null,
     lon: s.lon ?? null,
   };
@@ -309,6 +331,11 @@ export function schliesseSchadenAb(
 
 export function storniereSchaden(einsatzId: number, schadenId: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`, 'DELETE');
+}
+
+/** CSV aller nicht stornierten Schäden des Einsatzes (`routes/einsatz_schaden.rs`, `export`). */
+export function ladeSchaedenExport(einsatzId: number): Promise<Blob> {
+  return apiDatei(`/api/einsaetze/${einsatzId}/schaeden/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
 }
 
 /** Registriernummer-Anzeige wie im Backend (S-007). */
