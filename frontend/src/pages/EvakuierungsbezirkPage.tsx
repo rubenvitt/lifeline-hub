@@ -7,6 +7,7 @@ import { ladeEvakuierung } from '../api/evakuierung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Evakuierungsbezirk } from '../api/types';
 import BezirkGebiet from '../betreuung/BezirkGebiet';
+import GebietZeichnenKnopf from '../betreuung/GebietZeichnenKnopf';
 import BezirkKennzahlen from '../betreuung/BezirkKennzahlen';
 import BezirkStammdaten from '../betreuung/BezirkStammdaten';
 import BezirkStandlinie from '../betreuung/BezirkStandlinie';
@@ -136,6 +137,9 @@ export default function EvakuierungsbezirkPage() {
   };
 
   const fehlerOben = handlungen.raeumungFehler ?? null;
+  const gebietZeichnen = darfSchreiben ? (
+    <GebietZeichnenKnopf einsatzId={einsatzId} bezirk={bezirk} gesperrt={karteGesperrt} />
+  ) : null;
 
   return (
     <EinsatzSeite
@@ -222,7 +226,15 @@ export default function EvakuierungsbezirkPage() {
           onSpeichern={(patch) => handlungen.speichereStammdaten(bezirk.id, patch)}
           onBeenden={() => setBeimOeffnen(null)}
         />
-        <BezirkGebiet einsatzId={einsatzId} bezirk={bezirk} karteGesperrt={karteGesperrt} />
+        <BezirkGebiet
+          einsatzId={einsatzId}
+          bezirk={bezirk}
+          karteGesperrt={karteGesperrt}
+          // „Gebiet zeichnen“ (ohne Fläche) bzw. „Weitere Teilfläche zeichnen“ (LLH-1069) schreibt:
+          // nur mit Recht. Das Paneel zeigt je nach Flächenzahl genau eine der beiden Stellen.
+          leerAktion={gebietZeichnen}
+          zeichnenAktion={gebietZeichnen}
+        />
       </div>
       <Paneel titel="Standverlauf" koerperPolster>
         <BezirkStandlinie einsatzId={einsatzId} bezirkId={bezirk.id} plan={bezirk.plan_personen} />

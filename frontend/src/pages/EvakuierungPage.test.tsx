@@ -485,12 +485,13 @@ describe('EvakuierungPage (LLH-1034)', () => {
     expect(api.storniereBezirk).not.toHaveBeenCalled();
   });
 
-  it('Bezirk anlegen aus dem Kopf: Dialog, POST mit den Feldern, Einsatz neu', async () => {
+  it('Bezirk anlegen aus dem Kopf mit „Keins“: Dialog, POST mit den Feldern, Einsatz neu, bleibt hier', async () => {
     api.legeBezirkAn.mockResolvedValue(bezirk({ id: 11, bezeichnung: 'Deichweg 1–9' }));
     renderPage();
     await screen.findByText('Uferstraße 12–40');
     await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
     const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Keins' }));
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
     const neu = await einsatzAbrufeNach(async () => {
@@ -506,6 +507,95 @@ describe('EvakuierungPage (LLH-1034)', () => {
     expect(await screen.findByText('Evakuierungsbezirk Deichweg 1–9 angelegt')).toBeInTheDocument();
     // Anlegen ist die Anordnung — der Einsatz trägt danach `evakuiert`.
     await waitFor(() => expect(neu()).toBeGreaterThan(0));
+    // „Keins“ wie bisher: die Seite bleibt, kein Sprung auf die Karte.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByTestId('lagekarte-ziel')).toBeNull();
+  });
+
+  it('Bezirk anlegen mit „Fläche zeichnen“ (Vorgabe): danach auf die Karte im Zeichenmodus mit Bezug (LLH-1069)', async () => {
+    api.legeBezirkAn.mockResolvedValue(bezirk({ id: 11, bezeichnung: 'Deichweg 1–9' }));
+    renderPage();
+    await screen.findByText('Uferstraße 12–40');
+    await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
+    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    expect(within(dialog).getByRole('radio', { name: 'Fläche zeichnen' })).toBeChecked();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg 1–9');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=11',
+    );
+    expect(await screen.findByText('Evakuierungsbezirk Deichweg 1–9 angelegt')).toBeInTheDocument();
+  });
+
+  it('abgelehntes Anlegen mit „Fläche zeichnen“: kein Sprung, der Dialog bleibt mit dem Grund (LLH-1069)', async () => {
+    api.legeBezirkAn.mockRejectedValue(new ApiError(409, 'Bezeichnung schon vergeben'));
+    renderPage();
+    await screen.findByText('Uferstraße 12–40');
+    await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
+    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Uferstraße 12–40');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '120');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(
+      await within(dialog).findByText('Bezirk konnte nicht angelegt werden'),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('lagekarte-ziel')).toBeNull();
+  });
+
+  it('gesperrte Lagekarte: im Anlegedialog „Keins“ vorgewählt, „Fläche zeichnen“ gesperrt mit Grund (LLH-1069)', async () => {
+    freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
+    const { client } = renderPage();
+    await screen.findByText('Uferstraße 12–40');
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
+    await userEvent.click(screen.getByRole('button', { name: 'Evakuierungsbezirk anlegen' }));
+    const dialog = await dialogMit('Evakuierungsbezirk anlegen');
+    expect(within(dialog).getByRole('radio', { name: 'Keins' })).toBeChecked();
+    expect(
+      within(dialog).getByRole('radio', { name: 'Fläche zeichnen (Keine Berechtigung)' }),
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('Menü: „Gebiet zeichnen“ ohne Fläche, „Weitere Teilfläche zeichnen“ mit Fläche — beide führen in den Zeichenmodus (LLH-1069)', async () => {
+    api.ladeEvakuierung.mockResolvedValue({ bezirke: [{ ...UFER, flaechen: 2 }, HAFEN] });
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
+    );
+    const ohne = await offenesMenue();
+    expect(within(ohne).queryByRole('menuitem', { name: /Weitere Teilfläche/ })).toBeNull();
+    await userEvent.click(within(ohne).getByRole('menuitem', { name: 'Gebiet zeichnen' }));
+    expect(await screen.findByTestId('lagekarte-ziel')).toHaveTextContent(
+      '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=6',
+    );
+  });
+
+  it('Menü am Bezirk mit Fläche: Reihenfolge Karte, Teilfläche, Räumung, Stornieren (LLH-1069)', async () => {
+    api.ladeEvakuierung.mockResolvedValue({ bezirke: [{ ...UFER, flaechen: 2 }] });
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }),
+    );
+    expect(
+      within(await offenesMenue())
+        .getAllByRole('menuitem')
+        .map((m) => m.textContent),
+    ).toEqual(['Auf Karte zeigen', 'Weitere Teilfläche zeichnen', 'Räumung setzen', 'Stornieren']);
+  });
+
+  it('gesperrte Lagekarte: „Gebiet zeichnen“ im Menü gesperrt mit Grund (LLH-1069)', async () => {
+    freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
+    api.ladeEvakuierung.mockResolvedValue({ bezirke: [HAFEN] });
+    const { client } = renderPage();
+    await waitFor(() => expect(client.getQueryData(einsatzKeys.modulFreigaben(1))).toBeDefined());
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Aktionen zu Bezirk Hafenviertel' }),
+    );
+    expect(
+      within(await offenesMenue()).getByRole('menuitem', {
+        name: /Gebiet zeichnen \(Keine Berechtigung\)/,
+      }),
+    ).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('das Zeilenmenü bietet keine „Plangröße fortschreiben" mehr — das trägt die Detailseite', async () => {

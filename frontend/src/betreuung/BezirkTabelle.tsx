@@ -14,6 +14,7 @@ import { evakuierungsbezirkPfad } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
 import { evakuiertText, personenZahl, RAEUMUNG_FOLGE } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
+import { gebietZeichnenText } from './gebietZeichnen';
 
 /**
  * Die Bezirkstabelle der Evakuierungsseite (LLH-1034, ersetzt die Bezirkskarten der früheren
@@ -46,7 +47,7 @@ import MeldeVerlauf from './MeldeVerlauf';
  * Der Zeilenschlüssel trägt ein Präfix (`bezirk-5`).
  */
 
-export type BezirkAktion = 'karte' | 'raeumung' | 'stornieren';
+export type BezirkAktion = 'karte' | 'zeichnen' | 'raeumung' | 'stornieren';
 
 const MENUE: readonly MenueEintrag<BezirkAktion>[] = [
   { key: 'raeumung', label: 'Räumung setzen' },
@@ -55,22 +56,21 @@ const MENUE: readonly MenueEintrag<BezirkAktion>[] = [
 
 /**
  * Menü einer Zeile: „Auf Karte zeigen" zuerst, sobald der Bezirk eine Fläche hat — auch OHNE
- * Schreibrecht. Ist die Lagekarte gesperrt, steht der Sprung gesperrt mit Grund da (LFH-888).
+ * Schreibrecht. Mit Schreibrecht danach „Gebiet zeichnen“ bzw. „Weitere Teilfläche zeichnen“
+ * (LLH-1069). Ist die Lagekarte gesperrt, stehen beide gesperrt mit Grund da (LFH-888).
  */
 export function bezirkMenue(
   b: Pick<Evakuierungsbezirk, 'flaechen'>,
   darfSchreiben: boolean,
   karteGesperrt: boolean,
 ): readonly MenueEintrag<BezirkAktion>[] {
-  const karte: MenueEintrag<BezirkAktion>[] =
-    b.flaechen > 0
-      ? [
-          karteGesperrt
-            ? { key: 'karte', label: `Auf Karte zeigen (${KEINE_BERECHTIGUNG})`, gesperrt: true }
-            : { key: 'karte', label: 'Auf Karte zeigen' },
-        ]
-      : [];
-  return darfSchreiben ? [...karte, ...MENUE] : karte;
+  const eintrag = (key: BezirkAktion, label: string): MenueEintrag<BezirkAktion> =>
+    karteGesperrt
+      ? { key, label: `${label} (${KEINE_BERECHTIGUNG})`, gesperrt: true }
+      : { key, label };
+  const karte = b.flaechen > 0 ? [eintrag('karte', 'Auf Karte zeigen')] : [];
+  if (!darfSchreiben) return karte;
+  return [...karte, eintrag('zeichnen', gebietZeichnenText(b.flaechen)), ...MENUE];
 }
 
 /** Breite, in der ein langer Bezirksname unter `md` umbricht (wie bei den Stellen). */

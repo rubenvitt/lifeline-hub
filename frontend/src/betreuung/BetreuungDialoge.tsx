@@ -21,6 +21,9 @@ import type {
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { sprungGesperrtText } from '../components/Sprung';
+import { Segmentleiste, type SegmentOption } from '../components/instrument';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { betreuungsstelleStatus, raeumungszustand } from '../theme/statusFarben';
 import {
@@ -104,10 +107,18 @@ export function belegungBody(w: BelegungWerte): BelegungsmeldungEingabe {
   return { belegt: w.belegt, ...zeitpunkt(w.zeitpunkt) };
 }
 
+/**
+ * Gebiet beim Anlegen (LLH-1069): „Keins“ oder gleich danach eine Fläche auf der Lagekarte zeichnen.
+ * „Radius“ kommt dazu, sobald die Karte einen Kreis um einen Punkt zeichnen kann (LLH-1043).
+ */
+export type GebietWahl = 'keins' | 'flaeche';
+
 export interface BezirkWerte {
   bezeichnung: string;
   plan_personen: number;
   plan_erhebung: Erhebung;
+  /** Nur im Anlegedialog; die Bearbeitung kennt keine Gebietswahl. */
+  gebiet?: GebietWahl;
   abschnitt_id?: number | null;
   sammelstelle?: string | null;
   notiz?: string | null;
@@ -328,15 +339,53 @@ interface DialogBasis {
 
 // ── Evakuierungsbezirk ──────────────────────────────────────────────────────────────────
 
+/**
+ * Die Gebietswahl als Formularfeld (`Form.Item` reicht `value`/`onChange` hinein). Ist die Lagekarte
+ * gesperrt, steht „Fläche zeichnen“ gesperrt und nennt den Grund im Wortlaut (LFH-888) — ein
+ * Tooltip allein erreichte Tablet und Handy nicht.
+ */
+function GebietFeld({
+  value,
+  onChange,
+  karteGesperrt,
+}: {
+  value?: GebietWahl;
+  onChange?: (wahl: GebietWahl) => void;
+  karteGesperrt: boolean;
+}) {
+  const optionen: SegmentOption<GebietWahl>[] = [
+    { wert: 'keins', label: 'Keins' },
+    karteGesperrt
+      ? {
+          wert: 'flaeche',
+          label: sprungGesperrtText('Fläche zeichnen'),
+          gesperrt: KEINE_BERECHTIGUNG,
+        }
+      : { wert: 'flaeche', label: 'Fläche zeichnen' },
+  ];
+  return (
+    <Segmentleiste<GebietWahl>
+      beschriftung="Gebiet auf der Lagekarte"
+      wert={value ?? 'keins'}
+      onWechsel={(wahl) => onChange?.(wahl)}
+      optionen={optionen}
+    />
+  );
+}
+
 export function BezirkAnlegenDialog({
   abschnitte,
+  karteGesperrt,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
   abschnitte: readonly AbschnittOption[];
-  onErfassen: (body: EvakuierungsbezirkEingabe) => Promise<unknown>;
+  /** Modul Lagekarte für diese Person gesperrt (`useSprungSperre`): kein Zeichnen danach. */
+  karteGesperrt: boolean;
+  /** `gebiet`: was nach dem Anlegen geschieht (LLH-1069); der Server sieht es nicht. */
+  onErfassen: (body: EvakuierungsbezirkEingabe, gebiet: GebietWahl) => Promise<unknown>;
 }) {
   const [form] = Form.useForm<BezirkWerte>();
   return (
@@ -347,9 +396,9 @@ export function BezirkAnlegenDialog({
       erfassenText="Anlegen"
       laeuft={laeuft}
       // Eine Plangröße ist zu Beginn meist geschätzt; die Erhebung ist sichtbar, der Vorgabewert also
-      // nie still.
-      initialValues={{ plan_erhebung: 'geschaetzt' }}
-      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w))}
+      // nie still. Das Gebiet wird gleich gezeichnet, wenn die Karte frei ist (LLH-1069).
+      initialValues={{ plan_erhebung: 'geschaetzt', gebiet: karteGesperrt ? 'keins' : 'flaeche' }}
+      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w), w.gebiet ?? 'keins')}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
@@ -364,6 +413,9 @@ export function BezirkAnlegenDialog({
       </Form.Item>
       {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
       {erhebungFeld('plan_erhebung', 'Erhebung')}
+      <Form.Item name="gebiet" label="Gebiet auf der Lagekarte">
+        <GebietFeld karteGesperrt={karteGesperrt} />
+      </Form.Item>
       {weitere(
         <>
           {abschnittFeld(abschnitte)}

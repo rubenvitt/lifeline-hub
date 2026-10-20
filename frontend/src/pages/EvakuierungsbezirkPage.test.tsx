@@ -276,12 +276,38 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
   });
 
   describe('Gebiet', () => {
-    it('ohne Fläche: Leerzustand in Worten, kein Sprung, kein Zonenabruf', async () => {
+    it('ohne Fläche: Leerzustand mit „Gebiet zeichnen“, kein Sprung, kein Zonenabruf (LLH-1069)', async () => {
       renderSeite('/einsaetze/1/evakuierung/6');
       expect(await screen.findByText('Kein Gebiet auf der Lagekarte')).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: /Auf Lagekarte öffnen/ })).toBeNull();
       expect(screen.queryByRole('button', { name: /Auf Lagekarte öffnen/ })).toBeNull();
       expect(zonenApi.listeZonen).not.toHaveBeenCalled();
+      const zeichnen = screen.getByRole('link', { name: 'Gebiet zeichnen' });
+      expect(zeichnen).toHaveAttribute(
+        'href',
+        '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=6',
+      );
+      await userEvent.click(zeichnen);
+      expect(await screen.findByText('LAGEKARTE')).toBeInTheDocument();
+    });
+
+    it('mit Fläche: „Weitere Teilfläche zeichnen“ neben „Auf Lagekarte öffnen“ (LLH-1069)', async () => {
+      api.ladeEvakuierung.mockResolvedValue({ bezirke: [{ ...UFER, flaechen: 1 }] });
+      renderSeite();
+      const zeichnen = await screen.findByRole('link', { name: 'Weitere Teilfläche zeichnen' });
+      expect(zeichnen).toHaveAttribute(
+        'href',
+        '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5',
+      );
+      expect(screen.queryByRole('link', { name: 'Gebiet zeichnen' })).toBeNull();
+    });
+
+    it('gesperrte Lagekarte: „Gebiet zeichnen“ gesperrt mit Grund (LLH-1069)', async () => {
+      freigaben.wert = freigabenFixture({ lagekarte: { zugriff: false } });
+      renderSeite('/einsaetze/1/evakuierung/6');
+      expect(
+        await screen.findByRole('button', { name: 'Gebiet zeichnen (Keine Berechtigung)' }),
+      ).toBeDisabled();
     });
 
     it('mit Fläche: Kartenausschnitt und „Auf Lagekarte öffnen" mit dem Bezirk als Ziel', async () => {
@@ -444,6 +470,10 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
       expect(screen.queryByRole('button', { name: /Weitere Aktionen/ })).toBeNull();
       expect(await screen.findByRole('link', { name: /Auf Lagekarte öffnen/ })).toBeInTheDocument();
+      // Zeichnen schreibt: ohne Schreibrecht kein Knopf (der Hinweis über der Seite nennt den Grund).
+      expect(
+        screen.queryByRole('link', { name: /Teilfläche zeichnen|Gebiet zeichnen/ }),
+      ).toBeNull();
     });
 
     it.each([

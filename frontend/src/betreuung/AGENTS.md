@@ -28,6 +28,13 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   freier Lagekarte abrufen; der Ausschnitt `BezirkKartenbild.tsx` ist nicht bedienbar und baut
   seine Karte im Cleanup ab. Die Stufenlinie (`standlinieKern.ts`) teilt die Abfrage mit
   `MeldeVerlauf`, ohne Diagrammpaket und ohne Interpolation.
+- **Gebiet beim Anlegen und am Bezirk** (LLH-1069, Spec `betreuung-lagekarte`): die Gebietswahl
+  „Keins“ · „Fläche zeichnen“ steht sichtbar im Anlegedialog (Vorgabe Fläche nur bei freier
+  Lagekarte, sonst gesperrt mit Grund); nach dem Anlegen springt `useBezirkHandlungen` erst beim
+  Schließen des Dialogs auf `gebietZeichnenPfad`. „Gebiet zeichnen“/„Weitere Teilfläche zeichnen“
+  nur aus `betreuung/gebietZeichnen.ts` (Menü, `GebietZeichnenKnopf`), nur mit Schreibrecht. Die
+  Zone entsteht auf der Karte (`pages/lagekarte/AGENTS.md`, „Zeichnen per Link“); das Modul legt
+  keine Zone an. Ein Radius kommt erst mit dem Kreis der Lagekarte (LLH-1043).
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
   (`person_verbleib.betreuungsstelle_id`, Cache
