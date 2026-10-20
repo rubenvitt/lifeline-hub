@@ -52,6 +52,19 @@ Maßstabsangabe der Karte MUST die Leiste fehlen statt geraten.
 - **THEN** steht er auf einem Blatt A4 quer mit Druckkopf, Bild, Maßstab, Nordpfeil und Legende
 - **AND** von der Bedienung der Karte steht nichts auf dem Blatt
 
+### Requirement: Ein Blatt bei hohem Kopf und langer Legende
+
+Kopf, Maßstabszeile, Hinweis und Legende MUST auf demselben Blatt stehen wie das Bild, auch mit
+Organisationslogo, langer Einsatzbezeichnung oder langer Legende. Das Bild SHALL dafür kleiner
+gedruckt werden, höchstens 95 mm und mindestens 35 mm hoch. Maßstabsleiste und „Maßstab ca. 1 : N“
+MUST zur gedruckten Bildbreite passen.
+
+#### Scenario: Hoher Kopf und lange Legende
+
+- **WHEN** der Druckkopf ein Organisationslogo und eine zweizeilige Einsatzbezeichnung trägt und die Legende viele Zonen nennt
+- **THEN** steht der Lageplan weiter auf einem Blatt, das Bild ist kleiner
+- **AND** die Maßstabsleiste und „Maßstab ca. 1 : N“ gelten für das kleinere Bild
+
 ### Requirement: Legende nur aus dem Gezeichneten
 
 Die Legende SHALL nur nennen, was auf dem Bild gezeichnet ist: Ebenen mit Anzahl in der Folge der

@@ -11,11 +11,33 @@ import { zoneTypLabel } from './zonenStil';
  */
 
 /**
- * Nutzfläche des Bildes auf A4 quer bei 15 mm Rand (267 × 180 mm): der Druckkopf braucht rund
- * 52 mm, Maßstabszeile und eine kurze Legende rund 25 mm (gemessen in Chromium,
- * `e2e/lagekarte-druck.spec.ts`). Eine lange Legende bricht auf ein zweites Blatt.
+ * Größte Bildfläche auf A4 quer bei 15 mm Rand (267 × 180 mm): der Druckkopf braucht ohne Logo
+ * rund 52 mm, Maßstabszeile und eine kurze Legende rund 25 mm (gemessen in Chromium,
+ * `e2e/lagekarte-druck.spec.ts`). Ist der Rest höher, wird das Bild kleiner
+ * ({@link lageplanBildHoehe}).
  */
 export const LAGEPLAN_BILD_MAX_MM = { breite: 267, hoehe: 95 } as const;
+
+/**
+ * Höhe, die das Blatt höchstens belegt: 180 mm Nutzhöhe der Seite, 3 mm Luft für Rundung und
+ * Unterschiede zwischen Messung und Druck.
+ */
+export const LAGEPLAN_BLATT_HOEHE_MM = 177;
+
+/** Kleiner wird das Bild nicht; reicht auch das nicht, bricht das Blatt um. */
+export const LAGEPLAN_BILD_MIN_HOEHE_MM = 35;
+
+/**
+ * Höchste Bildhöhe in mm, wenn alles außer dem Bild (Druckkopf, Abstände, Maßstabszeile, Hinweis,
+ * Legende) `restMm` hoch ist: der Rest des Blatts, zwischen {@link LAGEPLAN_BILD_MIN_HOEHE_MM} und
+ * der größten Fläche, auf 0,1 mm abgerundet. Ohne Messung (`restMm` ungültig) die größte Fläche.
+ */
+export function lageplanBildHoehe(restMm: number): number {
+  if (!Number.isFinite(restMm) || restMm <= 0) return LAGEPLAN_BILD_MAX_MM.hoehe;
+  // Auf 0,1 mm abgerundet (die Messung kommt in Pixeln); das Epsilon fängt Gleitkommareste.
+  const frei = Math.floor((LAGEPLAN_BLATT_HOEHE_MM - restMm) * 10 + 1e-6) / 10;
+  return Math.max(LAGEPLAN_BILD_MIN_HOEHE_MM, Math.min(LAGEPLAN_BILD_MAX_MM.hoehe, frei));
+}
 
 /** Die Maßstabsleiste deckt höchstens ein Viertel der Bildbreite. */
 const MASSSTAB_HOECHSTANTEIL = 0.25;

@@ -1,5 +1,9 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Druckkopf from '../../components/druck/Druckkopf';
 import {
+  LAGEPLAN_BILD_MAX_MM,
+  lageplanBildHoehe,
   lageplanFlaeche,
   massstabLeiste,
   massstabZahl,
@@ -10,6 +14,9 @@ import {
 } from './lageplan';
 import type { LageplanBlatt } from './useLageplan';
 import './lageplanDruck.css';
+
+/** CSS-Pixel je Millimeter (96 dpi). */
+const PX_JE_MM = 96 / 25.4;
 
 /** Farbfeld einer Zone: Füllung, Rand und Strichelung wie auf der Karte. */
 function ZonenFeld({ zone }: { zone: LegendenZone }) {
@@ -57,12 +64,46 @@ function Nordpfeil({ peilung }: { peilung: number }) {
  * Druckkopf, der Ausschnitt in fester Breite in mm, Maßstab samt Verhältnis und Nordpfeil, Hinweis
  * auf veraltete Fachebenen und die Legende dessen, was gezeichnet ist.
  *
+ * EIN BLATT: Kopf und Legende sind verschieden hoch (Logo, lange Einsatzbezeichnung, viele Zonen,
+ * Schriftmetrik). Das Blatt vermisst sich deshalb vor dem Druck (beim Einhängen und bei
+ * `beforeprint`, dann ist das Logo geladen): unsichtbar in Seitenbreite gesetzt (`data-messen`),
+ * mit den echten Schriften. Das Bild bekommt, was vom Blatt übrig bleibt
+ * ({@link lageplanBildHoehe}); Breite in mm, Leiste und „Maßstab ca. 1 : N“ folgen dieser Höhe.
+ *
  * Hängt nur, solange ein Blatt da ist (`useLageplan`, vom Knopf bis `afterprint`), am Bildschirm
  * nie sichtbar.
  */
 export default function LageplanDruck({ blatt }: { blatt: LageplanBlatt }) {
   const { aufnahme, legende } = blatt;
-  const { breiteMm, hoeheMm } = lageplanFlaeche(aufnahme.cssBreite, aufnahme.cssHoehe);
+  const wurzelRef = useRef<HTMLDivElement>(null);
+  const [bildHoeheMm, setBildHoeheMm] = useState<number>(LAGEPLAN_BILD_MAX_MM.hoehe);
+  const { breiteMm, hoeheMm } = lageplanFlaeche(aufnahme.cssBreite, aufnahme.cssHoehe, {
+    breite: LAGEPLAN_BILD_MAX_MM.breite,
+    hoehe: bildHoeheMm,
+  });
+
+  // Alles außer dem Bild ist von dessen Größe unabhängig (die Maßstabszeile hat eine feste Höhe):
+  // Blatt minus Bild ist der Rest, egal mit welcher Bildhöhe gemessen wird.
+  const vermessen = useCallback(() => {
+    const wurzel = wurzelRef.current;
+    const blattKnoten = wurzel?.querySelector('.lageplan-blatt');
+    const bild = wurzel?.querySelector('[data-lfh="lageplan-bild"]');
+    if (!wurzel || !blattKnoten || !bild) return;
+    wurzel.dataset.messen = '';
+    const blattPx = blattKnoten.getBoundingClientRect().height;
+    const bildPx = bild.getBoundingClientRect().height;
+    delete wurzel.dataset.messen;
+    // Ohne Layout (jsdom) ist alles 0: dann bleibt die größte Fläche.
+    if (blattPx > 0) setBildHoeheMm(lageplanBildHoehe((blattPx - bildPx) / PX_JE_MM));
+  }, []);
+
+  useLayoutEffect(vermessen, [vermessen, blatt]);
+  useEffect(() => {
+    const vorDruck = () => flushSync(vermessen);
+    window.addEventListener('beforeprint', vorDruck);
+    return () => window.removeEventListener('beforeprint', vorDruck);
+  }, [vermessen]);
+
   const massstab = massstabLeiste(aufnahme.meterJePx, aufnahme.cssBreite);
   const zahl = massstabZahl(aufnahme.meterJePx, aufnahme.cssBreite, breiteMm);
   const hinweis = veraltetHinweis(legende);
@@ -73,7 +114,7 @@ export default function LageplanDruck({ blatt }: { blatt: LageplanBlatt }) {
     ...legende.bilder.map((z) => ({ ...z, text: `Bild: ${z.text}`, zone: null })),
   ];
   return (
-    <div data-lfh="druckwurzel" className="lageplan-druck">
+    <div data-lfh="druckwurzel" className="lageplan-druck" ref={wurzelRef}>
       <div className="lageplan-blatt">
         <Druckkopf
           dokumentart="Lageplan"

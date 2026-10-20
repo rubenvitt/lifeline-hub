@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FACHEBENEN } from './fachebenen';
 import {
+  LAGEPLAN_BILD_MAX_MM,
+  lageplanBildHoehe,
   lageplanFlaeche,
   lageplanLegende,
   legendenTexte,
@@ -55,6 +57,29 @@ describe('lageplanFlaeche', () => {
     expect(lageplanFlaeche(2000, 500)).toEqual({ breiteMm: 267, hoeheMm: 66.75 });
     const hoch = lageplanFlaeche(1000, 1000);
     expect(hoch).toEqual({ breiteMm: 95, hoeheMm: 95 });
+  });
+
+  it('nimmt eine kleinere Höchsthöhe, die Breite folgt dem Seitenverhältnis', () => {
+    expect(lageplanFlaeche(1000, 500, { ...LAGEPLAN_BILD_MAX_MM, hoehe: 45 })).toEqual({
+      breiteMm: 90,
+      hoeheMm: 45,
+    });
+  });
+});
+
+describe('lageplanBildHoehe', () => {
+  it('gibt dem Bild, was Kopf, Maßstabszeile und Legende vom Blatt übrig lassen', () => {
+    // 177 mm Blatt: Rest 82 mm → 95 mm (größte Fläche), Rest 100 mm → 77 mm.
+    expect(lageplanBildHoehe(70)).toBe(95);
+    expect(lageplanBildHoehe(82)).toBe(95);
+    expect(lageplanBildHoehe(100)).toBe(77);
+    expect(lageplanBildHoehe(100.04)).toBe(76.9);
+  });
+
+  it('wird nicht kleiner als 35 mm und nimmt ohne Messung die größte Fläche', () => {
+    expect(lageplanBildHoehe(160)).toBe(35);
+    expect(lageplanBildHoehe(0)).toBe(95);
+    expect(lageplanBildHoehe(Number.NaN)).toBe(95);
   });
 });
 

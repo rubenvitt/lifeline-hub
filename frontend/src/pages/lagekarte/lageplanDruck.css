@@ -3,12 +3,42 @@
 
    Das Blatt hängt nur zwischen Knopf und `afterprint` im DOM, am Bildschirm nie sichtbar. A4 quer
    über eine benannte Seite wie die Anlagen (`entwurf/dokumentAnlagen.css`): sie erbt Rand und
-   Seitenzahl der unbenannten `@page`. Die Bildmaße in mm setzt die Seite inline
-   (`lageplan.ts`, `LAGEPLAN_BILD_MAX_MM`: 267 × 95 mm, der Rest gehört Kopf und Legende). */
+   Seitenzahl der unbenannten `@page`. Die Bildmaße in mm setzt die Seite inline (`lageplan.ts`,
+   höchstens `LAGEPLAN_BILD_MAX_MM`).
+
+   EIN BLATT: Vor dem Druck vermisst sich das Blatt (`data-messen`): unsichtbar und fest in
+   Seitenbreite (267 mm) gesetzt, mit denselben Regeln wie auf Papier. Deshalb stehen die
+   Blattregeln unten AUSSERHALB von `@media print`; am Bildschirm blendet `.lageplan-druck` sie aus.
+   Die Maßstabszeile hat eine feste Höhe und bricht nicht um, sonst änderte ein kleineres Bild die
+   gemessene Resthöhe. Ein festes Bildmaß hielt nur, solange Kopf und Legende so hoch waren wie beim
+   Messen: ein Organisationslogo im Kopf schob die Legende auf ein zweites Blatt.
+
+   Keine Containerabfrage für die Bildgröße: Chromium setzt beim Drucken jedes Element mit
+   Größen-Eindämmung (`container-type: size`, `contain: size`) auf die nächste Seite, auch ein 20 mm
+   hohes (gemessen mit `page.pdf()`). */
 @media screen {
   .lageplan-druck {
     display: none;
   }
+}
+
+/* Vermessen vor dem Druck (`LageplanDruck.tsx`): gesetzt, aber unsichtbar und ohne Wirkung auf
+   die Seite. Der Druckkopf zeigt sich sonst nur auf Papier (`druck/druck.css`). `!important` gegen
+   die Wurzelregeln aus `druck.css` (`position: static`, `width: auto`): `page.pdf()` in Chromium
+   löst `beforeprint` schon unter Druckmedium aus, und dort stünde das Blatt sonst in der Breite
+   des Fensters statt der Seite. */
+.lageplan-druck[data-messen] {
+  display: block !important;
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 267mm !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lageplan-druck[data-messen] .druckkopf--nur-druck {
+  display: block;
 }
 
 @media print {
@@ -19,71 +49,75 @@
   .lageplan-blatt {
     page: lageplan;
   }
+}
 
-  .lageplan-figur {
-    margin: 2mm 0 0;
-    break-inside: avoid;
-  }
+.lageplan-figur {
+  margin: 2mm 0 0;
+  break-inside: avoid;
+}
 
-  /* Die Breite steht inline in mm; `max-width: 100%` der Wurzel bliebe bei A4 quer ohne Wirkung. */
-  .lageplan-figur img {
-    display: block;
-    border: 0.3mm solid black;
-    object-fit: contain;
-  }
+/* Die Breite steht inline in mm; `max-width: 100%` der Wurzel bliebe bei A4 quer ohne Wirkung. */
+.lageplan-figur img {
+  display: block;
+  border: 0.3mm solid black;
+  object-fit: contain;
+}
 
-  .lageplan-unterzeile {
-    display: flex;
-    align-items: center;
-    gap: 6mm;
-    margin-top: 1.5mm;
-    font-size: 9pt;
-  }
+/* Feste Höhe, kein Umbruch: die Zeile ist bei jeder Bildbreite gleich hoch (Vermessen). */
+.lageplan-unterzeile {
+  display: flex;
+  align-items: center;
+  gap: 6mm;
+  height: 10mm;
+  margin-top: 1.5mm;
+  font-size: 9pt;
+  white-space: nowrap;
+}
 
-  .lageplan-massstab {
-    display: inline-flex;
-    align-items: center;
-    gap: 2mm;
-  }
+.lageplan-massstab {
+  display: inline-flex;
+  align-items: center;
+  gap: 2mm;
+}
 
-  /* Der Nordpfeil steht rechts, unter der rechten Bildkante. */
-  .lageplan-unterzeile [data-lfh='lageplan-nordpfeil'] {
-    margin-left: auto;
-  }
+/* Der Nordpfeil steht rechts, unter der rechten Bildkante. */
+.lageplan-unterzeile [data-lfh='lageplan-nordpfeil'] {
+  flex: none;
+  margin-left: auto;
+}
 
-  .lageplan-veraltet {
-    margin: 2mm 0 0;
-    font-size: 9pt;
-    font-weight: 600;
-  }
+.lageplan-veraltet {
+  margin: 2mm 0 0;
+  font-size: 9pt;
+  font-weight: 600;
+}
 
-  .lageplan-legende {
-    margin-top: 2mm;
-    font-size: 9pt;
-  }
+.lageplan-legende {
+  margin-top: 2mm;
+  font-size: 9pt;
+}
 
-  .lageplan-legende h2 {
-    margin: 0 0 1mm;
-    font-size: 10pt;
-    font-weight: 600;
-  }
+.lageplan-legende h2 {
+  margin: 0 0 1mm;
+  font-size: 10pt;
+  font-weight: 600;
+}
 
-  .lageplan-legende ul {
-    columns: 3;
-    column-gap: 6mm;
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
+.lageplan-legende ul {
+  columns: 3;
+  column-gap: 6mm;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 
-  .lageplan-legende li {
-    display: flex;
-    align-items: center;
-    gap: 1.5mm;
-    break-inside: avoid;
-  }
+.lageplan-legende li {
+  display: flex;
+  align-items: center;
+  gap: 1.5mm;
+  break-inside: avoid;
+}
 
-  .lageplan-legende li svg {
-    flex: none;
-  }
+.lageplan-legende li svg {
+  flex: none;
 }

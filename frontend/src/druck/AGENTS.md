@@ -12,8 +12,9 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
-  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `lagekarte-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
-  Druckmedium).
+  `einsatzbericht-deckel-druck`, `koerperschema-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  Druckmedium). Druck-Specs mit Lagekarte (`lagekarte-druck`) stehen in `KARTEN_DRUCK_SPECS`:
+  Chromium und WebKit, denn der headless Firefox hat kein WebGL2 (LLH-1051).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
   Firefox und Safari zeigt nur das Blatt (Handprüfung). Eine neue Druck-Spec gehört in
   `DRUCK_SPECS` der `playwright.config.ts`.
@@ -67,7 +68,13 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (`pages/lagekarte/kartenAufnahme.ts`: `once('render')` + `toBlob`, nie `preserveDrawingBuffer`)
   und meldet erst mit geladenem Bild `true`. Die Druckwurzel (`LageplanDruck.tsx`) hängt nur vom
   Knopf bis `afterprint` (`useLageplan.ts`): Strg+P ohne Knopf druckt nie ein altes Bild. A4 quer
-  über `@page lageplan` (`lageplanDruck.css`, Muster `dokumentAnlagen.css`). Die Legende entsteht
+  über `@page lageplan` (`lageplanDruck.css`, Muster `dokumentAnlagen.css`). **Ein Blatt, was auch
+  darauf steht:** das Blatt vermisst sich beim Einhängen und bei `beforeprint` unsichtbar in
+  Seitenbreite (`data-messen`, echte Schriften, Logo geladen) und gibt dem Bild den Rest
+  (`lageplanBildHoehe`); Breite, Leiste und „Maßstab ca. 1 : N“ folgen. Ein festes Bildmaß kippte
+  mit Logo im Kopf auf zwei Blätter. Keine Containerabfrage für Druckmaße: Chromium setzt beim
+  Drucken jedes Element mit Größen-Eindämmung (`container-type: size`) auf die nächste Seite.
+  Die Legende entsteht
   nur aus dem Gezeichneten (`lageplan.ts`), nie aus den Schaltern: eine gesperrte Ebene hat keine
   Daten und steht deshalb nirgends.
 - **Tabellen im Druck** (LFH-548): Neutralisierer der `KatalogTabelle` stehen in `druck.css` für

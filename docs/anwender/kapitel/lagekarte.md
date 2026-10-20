@@ -91,7 +91,9 @@ wer im Einsatz schreiben darf.
 
 Gedruckt und angehängt wird der Ausschnitt, der gerade zu sehen ist, als Bild: auf einem Blatt A4
 quer mit Druckkopf (Stand, Ansicht, Kartengrundlage), Maßstabsleiste, „Maßstab ca. 1 : …“,
-Nordpfeil und einer Legende. Die Legende nennt nur, was auf dem Bild steht: Ebenen mit Anzahl,
+Nordpfeil und einer Legende. Alles steht auf einem Blatt: Trägt der Kopf ein Logo oder ist die
+Legende lang, wird das Bild kleiner gedruckt, Maßstabsleiste und „Maßstab ca. 1 : …“ gelten für
+das gedruckte Bild. Die Legende nennt nur, was auf dem Bild steht: Ebenen mit Anzahl,
 jede Zone mit ihrer Beschriftung samt Warnstufe, Fachebenen mit Stand und sichtbare
 Bild-Hintergründe. Eine Ebene, die die eigene Rolle nicht sehen darf, steht weder auf dem Bild
 noch in der Legende. Ist eine Fachebene veraltet, steht das über der Legende. Kacheln, die noch

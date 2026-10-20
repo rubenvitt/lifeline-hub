@@ -1,5 +1,5 @@
-import { screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +49,34 @@ const blatt = (teil: Partial<LageplanBlatt> = {}): LageplanBlatt => ({
   ...teil,
 });
 
+const PX_JE_MM = 96 / 25.4;
+
+/**
+ * Höhen wie im gesetzten Blatt: jsdom setzt nichts, deshalb liefert die Attrappe für Blatt und Bild
+ * Höhen in mm — aber nur im Messmodus (`data-messen`), denn am Bildschirm ist das Blatt
+ * ausgeblendet und hätte keine Höhe.
+ */
+function setzeHoehen(hoehen: () => { blattMm: number; bildMm: number }) {
+  return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: Element,
+  ) {
+    const messen = this.closest('[data-lfh="druckwurzel"]')?.hasAttribute('data-messen');
+    const { blattMm, bildMm } = hoehen();
+    const mm = !messen
+      ? 0
+      : this.classList.contains('lageplan-blatt')
+        ? blattMm
+        : this.matches('[data-lfh="lageplan-bild"]')
+          ? bildMm
+          : 0;
+    return new DOMRect(0, 0, 0, mm * PX_JE_MM);
+  });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('LageplanDruck', () => {
   it('trägt Druckkopf, Bild in mm, Maßstab, Verhältnis, Nordpfeil, Hinweis und Legende', () => {
     renderMitProviders(<LageplanDruck blatt={blatt()} />);
@@ -95,6 +123,56 @@ describe('LageplanDruck', () => {
     expect(document.querySelector('[data-lfh="lageplan-massstab"]')).toBeNull();
     expect(screen.queryByText(/Maßstab ca\./)).toBeNull();
     expect(document.querySelector('[data-lfh="lageplan-veraltet"]')).toBeNull();
+  });
+
+  it('vermisst sich und gibt dem Bild den Rest des Blatts; Breite und Maßstab folgen', () => {
+    // Rest (Kopf mit Logo, Maßstabszeile, lange Legende) 105 mm: 177 − 105 = 72 mm Bildhöhe.
+    let hoehen = { blattMm: 200, bildMm: 95 };
+    setzeHoehen(() => hoehen);
+    renderMitProviders(<LageplanDruck blatt={blatt()} />);
+    const wurzel = document.querySelector<HTMLElement>('[data-lfh="druckwurzel"]')!;
+    const bild = wurzel.querySelector<HTMLImageElement>('[data-lfh="lageplan-bild"]')!;
+    expect(bild.style.height).toBe('72mm');
+    expect(bild.style.width).toBe('144mm');
+    // 2 km auf 144 mm → 1 : 13.889 → 1 : 14.000; die Leiste bleibt ein Viertel der Bildbreite.
+    expect(screen.getByText(/^Maßstab ca\. 1 : 14\.000$/)).toBeInTheDocument();
+    expect(wurzel.querySelector('[data-lfh="lageplan-massstab"] svg')?.getAttribute('width')).toBe(
+      '36mm',
+    );
+    expect(wurzel.hasAttribute('data-messen'), 'nach dem Messen wieder ausgeblendet').toBe(false);
+
+    // Bei `beforeprint` neu (das Logo ist jetzt geladen, der Kopf höher): Rest 120 mm → 57 mm.
+    hoehen = { blattMm: 192, bildMm: 72 };
+    act(() => {
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(bild.style.height).toBe('57mm');
+    expect(bild.style.width).toBe('114mm');
+  });
+
+  it('ohne Messung (nicht gesetzt) bleibt die größte Fläche', () => {
+    setzeHoehen(() => ({ blattMm: 0, bildMm: 0 }));
+    renderMitProviders(<LageplanDruck blatt={blatt()} />);
+    expect(
+      document.querySelector<HTMLImageElement>('[data-lfh="lageplan-bild"]')!.style.height,
+    ).toBe('95mm');
+  });
+
+  it('Messmodus: unsichtbar in Seitenbreite, Kopf sichtbar, Blattregeln auch außerhalb des Drucks', () => {
+    const css = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'lageplanDruck.css'),
+      'utf8',
+    );
+    expect(css).toMatch(
+      /\.lageplan-druck\[data-messen\]\s*\{[^}]*display: block !important;[^}]*position: fixed !important;[^}]*width: 267mm !important;[^}]*visibility: hidden;/,
+    );
+    expect(css).toMatch(
+      /\.lageplan-druck\[data-messen\] \.druckkopf--nur-druck\s*\{\s*display: block;/,
+    );
+    // Nur Seite und Seitenname hängen am Druckmedium; Bild, Zeile und Legende gelten beim Messen.
+    const druck = /@media print \{([\s\S]*?)\n\}/.exec(css)![1];
+    expect(druck).not.toMatch(/lageplan-(figur|unterzeile|legende)/);
+    expect(css).toMatch(/\.lageplan-unterzeile\s*\{[^}]*height: 10mm;[^}]*white-space: nowrap;/);
   });
 
   it('A4 quer über die benannte Seite, am Bildschirm ausgeblendet', () => {
