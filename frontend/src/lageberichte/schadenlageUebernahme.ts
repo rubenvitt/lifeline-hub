@@ -146,7 +146,8 @@ function wetterZeilen(w: WetterAnzeige, jetzt: number, dtg: (iso: string) => str
 
 /**
  * Je maßgeblichem Pegel eine Zeile in der festgelegten Reihenfolge, nach `pegelZeile` (dieselben
- * Regeln wie Kennzahl und Modulseite). Messzeit und Prognose als DTG.
+ * Regeln wie Kennzahl und Modulseite). Messzeit und Prognose als DTG. Die leere Liste trifft nur den
+ * Wettlauf mit dem Entfernen: ohne Entscheidung am Einsatz entfällt der Teil ganz.
  */
 function pegelZeilen(pegel: readonly PegelAnzeige[], jetzt: number, dtg: (iso: string) => string) {
   if (pegel.length === 0) return ['- keine maßgeblichen Pegel festgelegt'];
@@ -232,6 +233,10 @@ export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
       wetter.zustand === 'daten' && wetter.daten
         ? wetterZeilen(wetter.daten, jetzt, dtg)
         : [`- ${grund(wetter.zustand === 'daten' ? 'fehler' : wetter.zustand)}`];
+    // Der Teil „Pegel“ nur bei festgelegtem Pegel (LLH-1117, Spec `lagevortrag-uebernahme`): die
+    // Entscheidung am Einsatz, wie die Pegel-Kennzahl im Lagebild (LFH-640), nie die Liste. Ohne
+    // Einsatz ist sie unbekannt — dann bleibt der Teil mit dem Grund stehen, statt zu schweigen.
+    const pegelFestgelegt = lage.basis ? lage.basis.einsatz.lagekennzahlen.includes('pegel') : true;
     const pegelZustand = zustand('pegel');
     const pegelTeil =
       pegelZustand === 'daten' && lage.basis
@@ -252,9 +257,7 @@ export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
       '**Wetter**',
       ...wetterTeil,
       '',
-      '**Pegel**',
-      ...pegelTeil,
-      '',
+      ...(pegelFestgelegt ? ['**Pegel**', ...pegelTeil, ''] : []),
     ].join('\n');
   },
 };

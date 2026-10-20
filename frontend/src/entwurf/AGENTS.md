@@ -23,7 +23,12 @@ und `pages/LageberichtDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade rela
 - Lagebericht: Abschnitte als Akkordeon (`lageberichte/AbschnittsAkkordeon.tsx`, `memo`, alle
   Props identitätsstabil; Gate ist der Render-Zähler im Test, `rerender` mit neuem Element).
   Tippmessung `e2e/lagebericht-tippen.spec.ts` (Deckel nur mit `PW_LATENZ=1`).
-  Liste zeigt Kettenköpfe (`lageberichte/ketten.ts`), Zyklen verlieren keinen Bericht.
+- **Lageberichte-Übersicht** (LLH-1064): Paneele „Aktueller Lagevortrag“ (jüngste Freigabe nach
+  Zeitstand) · „In Arbeit“ · „Verlauf“, Teilung nur in `lageberichte/uebersicht.ts`, jeder Bericht
+  genau einmal. Text, Füllstand („5/8 Abschnitte“) und „zuletzt gespeichert“ aus dem Einzelabruf
+  (Spec `listen-projektion`), nie als Feld der Liste. „Neuer Lagevortrag“ legt ohne Dialog mit
+  EINEM POST an und öffnet den Entwurf (`lageberichte/NeuerLagevortragKnopf.tsx`, Pfeil für die
+  übrigen Vorlagen); ein Startinhalt geht in denselben POST.
 - **Übernahme in Abschnitte des Lagevortrags** (LFH-870,
   `openspec/changes/archive/2026-10-04-lfh-870-eigene-lage-uebernahme/design.md`, Spec
   `lagevortrag-uebernahme`): ein Baustein `lageberichte/AbschnittUebernahme.tsx` (Knopf nur im

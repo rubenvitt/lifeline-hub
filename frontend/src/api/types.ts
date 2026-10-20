@@ -464,6 +464,7 @@ export type SchadenAbschlussGrund = S['SchadenAbschlussGrund'];
 export type Schaden = S['SchadenAnzeige'];
 /** LFH-931: Schadenmarker für Lagekarte und Lage-Dashboard, ohne Freitexte. */
 export type SchadenMarker = S['SchadenMarker'];
+export type Schadensgrad = S['Schadensgrad'];
 export type SchadenKennzahlen = S['SchadenKennzahlen'];
 export type SchadenAuswahl = S['SchadenAuswahl'];
 /** LFH-21: Foto/Datei an einem Schaden; `id` ist die Linker-id, nicht `anhang.id`. */

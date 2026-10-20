@@ -8,18 +8,21 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { AuthProvider } from '../auth/AuthContext';
 import type { PegelAnzeige, PegelVerlauf, WetterAnzeige } from '../api/types';
+import { ladeEinsatz } from '../api/einsaetze';
+import type { EinsatzAnzeige, Lagekennzahl } from '../api/types';
 import WetterPegelPage, { verlaufLuecke, warnungenMeta } from './WetterPegelPage';
 
-vi.mock('../api/einsaetze', () => ({
-  ladeEinsatz: vi.fn(() =>
-    Promise.resolve({
-      id: 1,
-      bezeichnung: 'Hochwasser',
-      status: 'aktiv',
-      meine_rolle: 'einsatzleitung',
-    }),
-  ),
-}));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
+
+/** Der Einsatz; `lagekennzahlen` trägt die Entscheidung „Pegel festgelegt“ (LFH-640). */
+const einsatz = (lagekennzahlen: Lagekennzahl[]) =>
+  ({
+    id: 1,
+    bezeichnung: 'Hochwasser',
+    status: 'aktiv',
+    meine_rolle: 'einsatzleitung',
+    lagekennzahlen,
+  }) as unknown as EinsatzAnzeige;
 
 const MIN = 60_000;
 /** RFC 3339 relativ zu jetzt (die Seite rechnet gegen die echte Uhr). */
@@ -123,8 +126,7 @@ function antworten({
   );
 }
 
-function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function renderPage(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   return render(
     <QueryClientProvider client={client}>
       <AntApp>
@@ -152,6 +154,12 @@ async function waitForPaneel(): Promise<HTMLElement> {
 
 const pegelZeilen = () => document.querySelectorAll('[data-lfh="pegel-zeile"]');
 
+/** Die Paneel-Überschriften in Dokumentfolge, ohne Zählung („Warnungen (DWD)“ → „Warnungen“). */
+const paneelFolge = () =>
+  Array.from(document.querySelectorAll('h2')).map((h) =>
+    (h.textContent ?? '').replace(/\s*\(.*$/, '').replace(/ 24 h$/, ''),
+  );
+
 describe('reine Helfer der Seite', () => {
   it('warnungenMeta: Singular und Plural', () => {
     expect(warnungenMeta(0)).toBe('0 Warnungen');
@@ -173,7 +181,89 @@ describe('reine Helfer der Seite', () => {
 });
 
 describe('WetterPegelPage (LFH-633)', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Vorgabe: Hochwasserlage, Pegel festgelegt.
+    vi.mocked(ladeEinsatz).mockResolvedValue(einsatz(['pegel']));
+  });
+
+  describe('Reihenfolge nach der Pegel-Entscheidung (LLH-1117)', () => {
+    it('ohne festgelegten Pegel: Warnungen, Bedingungen, Vorhersage, der Pegel als Zeile zuletzt', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValue(einsatz([]));
+      antworten({ liste: [], reihen: [] });
+      renderPage();
+      const zeile = await screen.findByRole('region', { name: 'Pegel' });
+      expect(zeile.closest('[data-lfh="pegel-leerzeile"]')).not.toBeNull();
+      expect(within(zeile).getByText('kein Pegel festgelegt')).toBeInTheDocument();
+      await screen.findByText('Aktuelle Bedingungen');
+      expect(paneelFolge()).toEqual(['Warnungen', 'Aktuelle Bedingungen', 'Vorhersage', 'Pegel']);
+      expect(pegelZeilen()).toHaveLength(0);
+    });
+
+    it('ohne festgelegten Pegel: keine Primäraktion im Kopf, die Pflege steht als Nebenweg', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValue(einsatz([]));
+      antworten({ liste: [], reihen: [] });
+      renderPage();
+      await screen.findByText('kein Pegel festgelegt');
+      const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
+      expect(kopf.querySelectorAll('.ant-btn-primary')).toHaveLength(0);
+      const nebenweg = within(kopf).getByRole('button', { name: 'Pegel festlegen' });
+      expect(nebenweg.className).not.toMatch(/ant-btn-primary/);
+      await userEvent.click(nebenweg);
+      expect(await screen.findByText('Pegel-Einstellungen')).toBeInTheDocument();
+    });
+
+    it('die Pegelzeile führt zu Einstellungen › Pegel', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValue(einsatz([]));
+      antworten({ liste: [], reihen: [] });
+      renderPage();
+      const zeile = await screen.findByRole('region', { name: 'Pegel' });
+      await userEvent.click(
+        within(zeile).getByRole('button', { name: 'Zu Einstellungen › Pegel' }),
+      );
+      expect(await screen.findByText('Pegel-Einstellungen')).toBeInTheDocument();
+    });
+
+    it('mit festgelegtem Pegel: der Pegel direkt nach den Warnungen', async () => {
+      antworten();
+      renderPage();
+      await screen.findByText('STATION 1 · WESER');
+      expect(paneelFolge()).toEqual(['Warnungen', 'Pegel', 'Aktuelle Bedingungen', 'Vorhersage']);
+      const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
+      expect(kopf.querySelectorAll('.ant-btn-primary')).toHaveLength(0);
+      expect(within(kopf).getByRole('button', { name: 'Pegel festlegen' })).toBeInTheDocument();
+    });
+
+    it('der Zuschnitt hält beim Betrachten: ein neu festgelegter Pegel erscheint zuletzt', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValue(einsatz([]));
+      antworten({ liste: [], reihen: [] });
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      renderPage(client);
+      await screen.findByText('kein Pegel festgelegt');
+      await screen.findByText('Aktuelle Bedingungen');
+      // Jemand legt währenddessen einen Pegel fest: Einsatz und Liste kommen neu.
+      vi.mocked(ladeEinsatz).mockResolvedValue(einsatz(['pegel']));
+      antworten({ liste: [pegel({ id: 1 })], reihen: [verlauf(1)] });
+      await client.invalidateQueries();
+      expect(await screen.findByText('STATION 1 · WESER')).toBeInTheDocument();
+      expect(paneelFolge()).toEqual(['Warnungen', 'Aktuelle Bedingungen', 'Vorhersage', 'Pegel']);
+      expect(vi.mocked(ladeEinsatz).mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('Kopf-Meta: Warnungen vorn, „0 Pegel“ entfällt', async () => {
+      vi.mocked(ladeEinsatz).mockResolvedValue(einsatz([]));
+      antworten({ liste: [], reihen: [] });
+      renderPage();
+      expect(await screen.findByText('2 Warnungen')).toBeInTheDocument();
+      expect(screen.queryByText(/0 Pegel/)).toBeNull();
+    });
+
+    it('Kopf-Meta mit Pegel: „2 Warnungen · 2 Pegel“', async () => {
+      antworten();
+      renderPage();
+      expect(await screen.findByText('2 Warnungen · 2 Pegel')).toBeInTheDocument();
+    });
+  });
 
   describe('Pegel', () => {
     it('zeigt die Pegel in Reihenfolge mit Wert, Trend und Verlauf; Ausfall ohne Linie', async () => {
@@ -231,22 +321,11 @@ describe('WetterPegelPage (LFH-633)', () => {
       expect(screen.getByText('6,84')).toBeInTheDocument();
     });
 
-    it('ohne festgelegten Pegel: „kein Pegel festgelegt" und der Weg zu den Einstellungen', async () => {
+    it('Entscheidung da, Liste gerade leer: das Paneel sagt „kein Pegel festgelegt" mit Weg', async () => {
       antworten({ liste: [], reihen: [] });
       renderPage();
       expect(await screen.findByText('kein Pegel festgelegt')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Zu Einstellungen › Pegel' }));
-      expect(await screen.findByText('Pegel-Einstellungen')).toBeInTheDocument();
-    });
-
-    it('genau eine Primäraktion im Kopf, und sie öffnet die Pegel-Einstellungen', async () => {
-      antworten();
-      renderPage();
-      await screen.findByText('STATION 1 · WESER');
-      const kopf = document.querySelector('[data-lfh="seitenkopf-aktionen"]') as HTMLElement;
-      const primaer = kopf.querySelectorAll('.ant-btn-primary');
-      expect(primaer).toHaveLength(1);
-      await userEvent.click(within(kopf).getByRole('button', { name: 'Pegel festlegen' }));
       expect(await screen.findByText('Pegel-Einstellungen')).toBeInTheDocument();
     });
   });
@@ -375,17 +454,6 @@ describe('WetterPegelPage (LFH-633)', () => {
   });
 
   describe('Aktuelle Bedingungen (LFH-864)', () => {
-    it('steht nach den Pegeln und vor Warnungen und Vorhersage', async () => {
-      antworten();
-      renderPage();
-      await screen.findByText('Aktuelle Bedingungen');
-      const titel = Array.from(document.querySelectorAll('h2')).map((h) => h.textContent);
-      const i = (t: string) => titel.findIndex((x) => x?.startsWith(t));
-      expect(i('Aktuelle Bedingungen')).toBeGreaterThan(i('Pegel'));
-      expect(i('Aktuelle Bedingungen')).toBeLessThan(i('Warnungen'));
-      expect(i('Warnungen')).toBeLessThan(i('Vorhersage'));
-    });
-
     it('zeigt die Messung der Station mit Messzeit', async () => {
       antworten();
       renderPage();
