@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/lageberichte/ketten.ts, frontend/src/lageberichte/AbschnittsAkkordeon.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/lageberichte/AbschnittsAkkordeon.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -14,29 +14,28 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 
 ## Abläufe
 
-### Lageberichte finden
+### Den aktuellen Stand lesen
 
-1. Im Bereich „Lage“ „Lageberichte“ öffnen. Die Berichte stehen in zwei Gruppen, Entwürfe und
-   „Freigegeben“, je mit Status, Vorlage und Fassung. Der Gruppenkopf nennt die Anzahl, bei einem
-   Bericht „1 Entwurf“.
+1. Im Bereich „Lage“ „Lageberichte“ öffnen. Oben steht „Aktueller Lagevortrag“: der jüngste
+   freigegebene Bericht mit Zeitstand, wer ihn wann freigegeben hat, und den ersten Zeilen der
+   Zusammenfassung.
 
-   ![Liste der Lageberichte mit einem Entwurf und einem freigegebenen Bericht](../bilder/lageberichte/lageberichte.png)
+   ![Übersicht der Lageberichte mit aktuellem Lagevortrag, einem Entwurf in Arbeit und dem Verlauf](../bilder/lageberichte/lageberichte.png)
 
-2. Zum Eingrenzen im Suchfeld nach Titel oder Vorlage suchen.
-3. Den Titel eines Berichts wählen, um ihn zu öffnen.
+2. „Öffnen ↗“ wählen, um den ganzen Bericht zu lesen.
+3. Unter „In Arbeit“ stehen die Entwürfe mit „zuletzt gespeichert“ und der Zahl der gefüllten
+   Abschnitte, etwa „5/8 Abschnitte“. Den Titel wählen, um einen Entwurf zu öffnen.
+4. Unter „Verlauf“ stehen die früheren Freigaben, die jüngste zuerst.
 
-### Einen Lagebericht anlegen
+### Einen Lagevortrag anlegen
 
-1. In den Lageberichten „Neuer Bericht“ wählen.
-2. Den vorgeschlagenen „Titel“ übernehmen oder ändern; er nennt die Uhrzeit, etwa
-   „Lageüberblick 1410“.
-3. Die „Vorlage“ prüfen: Vorgewählt ist „Lagevortrag zur Information“; zur Wahl stehen außerdem
-   „Lagevortrag zur Entscheidung“ und „Freier Bericht“.
-4. Den „Zeitstand“ leer lassen, dann gilt „jetzt“, oder einen Zeitpunkt wählen.
-
-   ![Dialog „Neuer Lagebericht“ mit Titel, Vorlage und Zeitstand](../bilder/lageberichte/neuer-lagebericht.png)
-
-5. „Anlegen“ wählen. Der neue Entwurf steht in der Liste bei den Entwürfen.
+1. In den Lageberichten „Neuer Lagevortrag“ wählen. Es entsteht sofort ein Entwurf
+   „Lagevortrag zur Information“, und er öffnet sich.
+2. Für eine andere Vorlage stattdessen den Pfeil neben dem Knopf wählen und „Lagevortrag zur
+   Entscheidung“ oder „Freier Bericht“ wählen.
+3. Im Entwurf den vorgeschlagenen „Titel“ übernehmen oder ändern; er nennt die Uhrzeit, etwa
+   „Lageüberblick 1410“. Der „Zeitstand“ ist der Zeitpunkt des Anlegens und lässt sich dort
+   ebenfalls ändern.
 
 ### Einen Entwurf schreiben
 
@@ -79,7 +78,7 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 
 | Abschnitt | Knopf | Was übernommen wird |
 | --- | --- | --- |
-| Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel |
+| Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel (nur bei festgelegtem Pegel) |
 | Eigene Lage | „Aus Meldebild und Führungsorganisation übernehmen“ | Kräftemeldebild und Führungsorganisation des ganzen Einsatzes |
 | Lageentwicklung | „Aus dem ETB übernehmen“ | neue Einträge seit der letzten Lagebesprechung je Typ, neue Entscheidungen mit Nummer und Zeit |
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
@@ -92,6 +91,9 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
   Nummern, Arten und Zeiten, keinen Freitext aus Aufträgen, Meldungen, Einsatztagebuch,
   Betroffenen oder Schäden.
 - Eine gesperrte oder nicht geladene Quelle steht als „—“ mit Grund, nie als 0.
+- Den Teil „Pegel“ übernimmt die Gefahren-/Schadenlage nur, wenn am Einsatz ein maßgeblicher Pegel
+  festgelegt ist (Kapitel [Wetter und Pegel](wetter-pegel.md)); sonst entfällt er ganz. Das Wetter
+  steht vor dem Pegel.
 - Gab es noch keine Lagebesprechung, zählt die Lageentwicklung seit Einsatzbeginn.
 - Steht im Abschnitt schon Text, fragt die App vor der Übernahme „… ersetzen?“; „Ersetzen“
   überschreibt ihn.
@@ -105,8 +107,12 @@ ob „ungespeicherte Änderungen“ vorliegen oder wann „zuletzt gespeichert�
 
 Die Freigabe ist endgültig: Der Text geht ins Einsatztagebuch, eine Korrektur gibt es nur als
 Fortschreibung. Die Fortschreibung ist eine neue Fassung mit demselben Titel; die Vorgänger
-bleiben freigegeben. Die Liste zeigt je Bericht die jüngste Fassung, die früheren sind über die
-Fassungszeile erreichbar.
+bleiben freigegeben und stehen im Verlauf. Als aktueller Lagevortrag gilt die Freigabe mit dem
+jüngsten Zeitstand, gleich welcher Vorlage. Die ersten Zeilen darunter stammen aus der
+„Zusammenfassung“, beim Lagevortrag zur Entscheidung aus dem „Vorschlag der besten Möglichkeit“,
+beim freien Bericht aus dem „Bericht“; ist der Abschnitt leer, fehlen sie. „Fortschreiben“ steht in der Übersicht nur, solange
+der aktuelle Bericht noch nicht fortgeschrieben ist; eine Fortschreibung in Arbeit steht unter
+„In Arbeit“.
 
 ### Verteiler
 
@@ -134,7 +140,8 @@ Anlage auf einem eigenen Blatt.
 
 ### Rechte und ohne Netz
 
-Lesen kann jede Person im Einsatz, auch ein Beobachter. Anlegen, schreiben, freigeben und
+Lesen kann jede Person im Einsatz, auch ein Beobachter; ohne Schreibrecht ist „Neuer
+Lagevortrag“ gesperrt, und der Grund steht darüber. Anlegen, schreiben, freigeben und
 fortschreiben brauchen das Schreibrecht: Einsatzleitung oder Führungspersonal in einem laufenden
 Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Die Lageberichte hält die App für
 die Arbeit ohne Netz nicht vor (Kapitel [Arbeiten ohne Netz](ohne-netz.md)).
