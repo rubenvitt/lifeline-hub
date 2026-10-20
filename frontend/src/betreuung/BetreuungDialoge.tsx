@@ -104,7 +104,7 @@ export function belegungBody(w: BelegungWerte): BelegungsmeldungEingabe {
   return { belegt: w.belegt, ...zeitpunkt(w.zeitpunkt) };
 }
 
-interface BezirkWerte {
+export interface BezirkWerte {
   bezeichnung: string;
   plan_personen: number;
   plan_erhebung: Erhebung;
@@ -195,6 +195,10 @@ function dreiseitig<P extends object>(eigeneAenderung: P, gegenAktuell: P): P {
   return patch;
 }
 
+/**
+ * Seit LLH-1076 Rechenweg der Stammdaten auf der Detailseite eines Bezirks
+ * (`betreuung/BezirkStammdaten.tsx`); der Bearbeiten-Dialog ist entfallen.
+ */
 export function bezirkPatchDreiseitig(
   beimOeffnen: Evakuierungsbezirk,
   aktuell: Evakuierungsbezirk,
@@ -372,69 +376,6 @@ export function BezirkAnlegenDialog({
         </>,
       )}
       <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht angelegt werden" />
-    </ErfassungsModal>
-  );
-}
-
-export function BezirkBearbeitenDialog({
-  bezirk,
-  abschnitte,
-  laeuft,
-  fehler,
-  onErfassen,
-  onSchliessen,
-}: DialogBasis & {
-  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
-  bezirk: Evakuierungsbezirk;
-  abschnitte: readonly AbschnittOption[];
-  onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
-}) {
-  const [form] = Form.useForm<BezirkWerte>();
-  const [beimOeffnen] = useState(bezirk);
-  return (
-    <ErfassungsModal<BezirkWerte>
-      offen
-      titel={`Bezirk bearbeiten: ${bezirk.bezeichnung}`}
-      form={form}
-      erfassenText="Speichern"
-      laeuft={laeuft}
-      initialValues={{
-        bezeichnung: beimOeffnen.bezeichnung,
-        plan_personen: beimOeffnen.plan_personen,
-        plan_erhebung: beimOeffnen.plan_erhebung,
-        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
-        sammelstelle: beimOeffnen.sammelstelle ?? undefined,
-        notiz: beimOeffnen.notiz ?? undefined,
-      }}
-      onErfassen={(w) =>
-        nurWennGeaendert(bezirkPatchDreiseitig(beimOeffnen, bezirk, w), onErfassen)
-      }
-      onFertig={onSchliessen}
-      onAbbrechen={onSchliessen}
-    >
-      {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
-      {erhebungFeld('plan_erhebung', 'Erhebung')}
-      {weitere(
-        <>
-          <Form.Item
-            name="bezeichnung"
-            label="Bezeichnung"
-            rules={[
-              { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          {abschnittFeld(abschnitte)}
-          <Form.Item name="sammelstelle" label="Sammelstelle">
-            <Input />
-          </Form.Item>
-          <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
-          </Form.Item>
-        </>,
-      )}
-      <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );
 }

@@ -399,11 +399,17 @@ export function betreuungPfad(einsatzId: number, opts: { stelle?: number } = {})
 }
 
 /**
- * Evakuierungs-Modul (LLH-1034). Keine Detailroute — Bezirk per Query-Param (`?bezirk=<id>`), die
- * Seite hebt die Zeile hervor und scrollt auf sie.
+ * Evakuierungs-Modul (LLH-1034). `?bezirk=<id>` ist seit LLH-1076 nur noch Altadresse: die Seite
+ * leitet auf die Detailseite des Bezirks um ({@link evakuierungsbezirkPfad}). Neue Sprünge auf einen
+ * Bezirk nehmen die Item-Route.
  */
 export function evakuierungPfad(einsatzId: number, opts: { bezirk?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'evakuierung'), { bezirk: opts.bezirk });
+}
+
+/** Detailseite eines Evakuierungsbezirks (LLH-1076), Item-Route unter dem Modul. */
+export function evakuierungsbezirkPfad(einsatzId: number, bezirkId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'evakuierung')}/${bezirkId}`;
 }
 
 /** Stab-Modul. Den Abschluss der Lagebesprechung trägt seit LLH-1111 `lagebesprechungPfad`. */

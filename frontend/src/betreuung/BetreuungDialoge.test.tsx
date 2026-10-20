@@ -13,7 +13,6 @@ import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveru
 import {
   BelegungMeldenDialog,
   BezirkAnlegenDialog,
-  BezirkBearbeitenDialog,
   RaeumungDialog,
   StandMeldenDialog,
   StelleAnlegenDialog,
@@ -340,34 +339,6 @@ describe('BezirkAnlegenDialog', () => {
   });
 });
 
-describe('BezirkBearbeitenDialog', () => {
-  it('Plangröße fortschreiben schickt nur die Änderung', async () => {
-    const onErfassen = vi.fn().mockResolvedValue(undefined);
-    renderMitProviders(
-      <BezirkBearbeitenDialog
-        bezirk={bezirk()}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onSchliessen={() => {}}
-      />,
-    );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Bezirk bearbeiten: Uferstraße 12–40',
-    });
-    await budgetUndAufklappen(dialog, 2);
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    await waehle(dialog, 'gezählt');
-    await userEvent.click(pruefeFormStruktur(dialog, 'Speichern'));
-    await waitFor(() =>
-      expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820, plan_erhebung: 'gezaehlt' }),
-    );
-  });
-});
-
 describe('RaeumungDialog', () => {
   it('ein Feld, vorbelegt mit dem aktuellen Zustand; sendet den neuen', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
@@ -494,30 +465,6 @@ describe('LFH-681: Mehrfeld-Dialoge vergleichen dreiseitig', () => {
       kapazitaet_personen: 150,
     };
     expect(stellePatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ status: 'geschlossen' });
-  });
-
-  it('BezirkBearbeitenDialog: eine fremd geänderte Notiz wird nicht mit dem alten Wert überschrieben', async () => {
-    const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const dialogMit = (b: Evakuierungsbezirk) => (
-      <BezirkBearbeitenDialog
-        bezirk={b}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onSchliessen={() => {}}
-      />
-    );
-    const { rerender } = renderMitProviders(dialogMit(bezirk({ notiz: 'Zufahrt Nord' })));
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Bezirk bearbeiten: Uferstraße 12–40',
-    });
-    rerender(dialogMit(bezirk({ notiz: 'Zufahrt Süd gesperrt' })));
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820 }));
   });
 });
 

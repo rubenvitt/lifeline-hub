@@ -89,6 +89,7 @@ import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
 import EvakuierungPage from './pages/EvakuierungPage';
+import EvakuierungsbezirkPage from './pages/EvakuierungsbezirkPage';
 import VerpflegungPage from './pages/VerpflegungPage';
 import AusgabeAnsicht from './verpflegung/AusgabeAnsicht';
 import TagAusVorlage from './verpflegung/TagAusVorlage';
@@ -436,6 +437,8 @@ export const appRouten = createRoutesFromElements(
           <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
+          {/* Detailseite eines Evakuierungsbezirks; gegatet über das Segment `evakuierung`. */}
+          <Route path="evakuierung/:bezirkId" element={<EvakuierungsbezirkPage />} />
         </Route>
       </Route>
     </Route>
