@@ -4,7 +4,7 @@
  * `e2e/rahmen-stehen-bleiben.spec.ts`.
  */
 import { act, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCallback, useRef } from 'react';
 import {
   RAHMEN_OBEN_VAR,
@@ -138,5 +138,60 @@ describe('rahmenOben', () => {
     expect(screen.getByTestId('dokument').textContent).toBe('52');
     expect(screen.getByTestId('drawer').textContent).toBe('0');
     expect(screen.getByTestId('modal').textContent).toBe('0');
+  });
+
+  /**
+   * LLH-1335: Die Variable verändert, was an ihr hängt (die Höhe der IconRail). Schriebe der
+   * Beobachter sie in seiner Auslieferungsrunde, wüchsen beobachtete Vorfahren noch in derselben
+   * Runde, und der Browser meldete beim Dichtewechsel „ResizeObserver loop completed with
+   * undelivered notifications“ (`e2e/uhs-hoehe.spec.ts`).
+   */
+  it('eine gemeldete Größenänderung schreibt erst im nächsten Bild, gebündelt', () => {
+    const rueckrufe: ResizeObserverCallback[] = [];
+    const bilder: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(rueckruf: ResizeObserverCallback) {
+          rueckrufe.push(rueckruf);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    vi.stubGlobal('requestAnimationFrame', (rueckruf: FrameRequestCallback) => {
+      bilder.push(rueckruf);
+      return bilder.length;
+    });
+    try {
+      let hoehe = 145;
+      function Wechselnd() {
+        const ref = useRahmenObenQuelle<HTMLDivElement>(true);
+        return (
+          <div
+            ref={(el) => {
+              if (el)
+                Object.defineProperty(el, 'offsetHeight', { configurable: true, get: () => hoehe });
+              ref(el);
+            }}
+          />
+        );
+      }
+      render(<Wechselnd />);
+      expect(variable()).toBe('145px');
+      // Dichtewechsel: der Kopf schrumpft, der Beobachter meldet es (zweimal in einem Bild).
+      hoehe = 53;
+      const melden = rueckrufe[rueckrufe.length - 1];
+      melden([], {} as ResizeObserver);
+      melden([], {} as ResizeObserver);
+      expect(variable()).toBe('145px');
+      expect(bilder).toHaveLength(1);
+      act(() => bilder[0](0));
+      expect(variable()).toBe('53px');
+      expect(leseRahmenOben()).toBe(53);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
