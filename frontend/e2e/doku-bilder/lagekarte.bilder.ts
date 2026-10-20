@@ -4,6 +4,7 @@ import {
   kartenConfigBeantworten,
   vektorStilBeantworten,
 } from '../kartenFixture';
+import { zeigeLeistenAnsicht } from '../leisten-kern';
 import {
   anmelden,
   demoEinsatz,
@@ -21,7 +22,8 @@ import {
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep lagekarte`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   lagekarte.png          frontend/src/pages/LagekartePage.tsx,
- *                          frontend/src/pages/lagekarte/Sidebar.tsx,
+ *                          frontend/src/pages/lagekarte/Sidebar.tsx (Ansichten),
+ *                          frontend/src/pages/lagekarte/Ebenenbaum.tsx,
  *                          frontend/src/pages/lagekarte/KartenUeberlagerung.tsx,
  *                          frontend/src/pages/lagekarte/markerLayer.ts (Raumzeichen, LLH-1107)
  *   taktisches-zeichen.png frontend/src/pages/lagekarte/Sidebar.tsx (Paneel „Zeichnen“),
@@ -138,6 +140,7 @@ test.describe(KAPITEL, () => {
     await expect(zonen).toHaveAttribute('aria-checked', 'false');
     await zonen.click();
     await expect(zonen).toHaveAttribute('aria-checked', 'true');
+    await zeigeLeistenAnsicht(page, 'Objekte');
     await page
       .getByRole('listitem')
       .filter({ hasText: 'UHS: Turnhalle Musterstadt' })
@@ -182,6 +185,7 @@ test.describe(KAPITEL, () => {
     // Das Paneel ist mit offener Zeichenwahl höher als der Fükw; so steht es ganz im Bild.
     await page.setViewportSize({ width: 1440, height: 1500 });
     const canvas = await oeffneKarte(page);
+    await zeigeLeistenAnsicht(page, 'Objekte');
     const zeichnen = page.locator('section[data-paneel="zeichnen"]');
     await zeichnen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
     const grundzeichen = zeichnen.getByRole('radiogroup', { name: 'Grundzeichen' });
@@ -193,8 +197,10 @@ test.describe(KAPITEL, () => {
     await tippe(page, canvas, 220, 40);
     await expect(page.getByText('Taktisches Zeichen angelegt')).toBeVisible();
     // „Weitere platzieren“ ist an: der Modus bleibt, bis „Fertig“ ihn beendet.
-    await expect(zeichnen.getByText('1 platziert')).toBeVisible();
-    await zeichnen.getByRole('button', { name: 'Fertig' }).click();
+    // Die Bedienung des Modus steht im Modus-Band über den Ansichten.
+    const band = page.locator('[data-modus-band="zeichen"]');
+    await expect(band.getByText('1 platziert')).toBeVisible();
+    await band.getByRole('button', { name: 'Fertig' }).click();
     await expect(
       zeichnen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }),
     ).toBeVisible();
@@ -202,6 +208,7 @@ test.describe(KAPITEL, () => {
 
   test('Zone zeichnen', async ({ page }) => {
     const canvas = await oeffneKarte(page);
+    await zeigeLeistenAnsicht(page, 'Objekte');
     await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
     await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
     await expect(canvas).toHaveCSS('cursor', 'crosshair');

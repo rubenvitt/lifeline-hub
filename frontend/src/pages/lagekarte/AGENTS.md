@@ -125,11 +125,17 @@ diese Zusage.
   `openspec/changes/archive/2026-09-30-lfh-765-lagekarte-modi-karte-freigeben/design.md`): abgeleitet aus
   `exklusiverModusAktiv` in `leisteSichtbar` (`lagekarte/leistenWahl.ts`), nie per Aufruf je
   Startweg; nach dem Modus gilt wieder der vorherige Zustand (Entscheidung 29.09.2026).
-  „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Die Bedienung der
-  Leistenmodi (Platzieren, Taktisches Zeichen, Bild) steht unter `lg` im Fuß-Band
-  `PlatzierSteuerung`, die Sidebar zeigt dann nur Zustand und Zusatzangaben
-  (`modusBedienungImFuss`: „wird platziert“, Koordinate, Mittelpunkt) — je Breite genau ein Knopf
-  je Handlung. Ab `lg` erzwingen die Leistenmodi die Leiste wie bisher.
+  „Leiste einblenden" im Modus ist `umschalteImModus` (nie gespeichert). Ab `lg` erzwingen die
+  Leistenmodi die Leiste wie bisher.
+- **Leistenmodi haben je Breite eine Bedienstelle** (LLH-1028, Spec `lagekarte-kartenleiste`):
+  die Bedienung von Platzieren, Taktischem Zeichen, Bild einpassen und der Rückmeldung
+  „… verortet“ ist EIN Baustein `ModusBedienung` (`PlatzierSteuerung.tsx`). Unter `lg` steht sie im
+  Fuß-Band `PlatzierSteuerung`, ab `lg` im Modus-Band der Leiste (`ModusBand.tsx`, direkt unter der
+  Segmentleiste, außerhalb der Ansichten); Prop `modusBedienung: 'fuss' | 'band'`. Unter `lg`
+  trägt das Modus-Band nur Titel und Zusatzangaben (Koordinate, Mittelpunkt). Zeilen und Paneele
+  zeigen nur den Zustand („wird platziert“, „wird eingepasst“) — je Breite genau ein Knopf je
+  Handlung, auch wenn die Ansicht wechselt. Eingabeentwürfe leben im Band, das je Ziel neu
+  eingehängt wird (`key`).
 - **Verortungsauftrag von außen** (LLH-1125, Spec `lagekarte-verortungsauftrag`,
   `openspec/changes/archive/2026-10-18-pao1s6uw-verorten-rueckweg/design.md`): `?platzieren=<typ>:<id>[&zurueck=1]`
   startet über `onVerortungsauftragStart`. Der **Ebenen-Vorrang** ist abgeleitet, nie gespeichert:
@@ -138,11 +144,35 @@ diese Zusage.
   `layer`; die Schalterzeile trägt „eingeblendet“, die Modulsperre bleibt an der Datenquelle.
   Nach Erfolg wird der Modus zu `verortet` (kein exklusiver Modus, kein Toast): Marker gewählt und
   angeflogen, Rückmeldung „<Kennung> verortet“ mit „Zurück zu …“ (nur mit `zurueck`) und „Auf der
-  Karte bleiben“, unter `lg` im Fuß-Band, ab `lg` oben in der Leiste — je Breite genau ein Knopf
-  je Handlung. Der **Rückweg** folgt allein aus Typ und Kennung (`rueckwegPfad`, exhaustiver
+  Karte bleiben“, unter `lg` im Fuß-Band, ab `lg` im Modus-Band der Leiste — je Breite genau ein
+  Knopf je Handlung. Der **Rückweg** folgt allein aus Typ und Kennung (`rueckwegPfad`, exhaustiver
   `Record`; UHS ohne äußeren Einstieg `null`), nie aus der URL (kein offener Weiterleiter). Ein
   Start in der Karte selbst („Nicht verortet“, Einsatzort) endet wie bisher mit Toast und
   Modusende (LFH-765). Nachweis `e2e/lagekarte-betroffene.spec.ts`, `e2e/lagekarte-touch.spec.ts`.
+- **Die Kartenleiste hat zwei Ansichten** (LLH-1028, Spec `lagekarte-kartenleiste`): erste Zeile
+  ist eine `Segmentleiste` (`rolle="tablist"`) „Ebenen“ · „Objekte“ auf festen Dritteln
+  (`.lfh-leisten-ansichten` in `lagekarte.css`; das dritte Drittel bleibt frei). Beide Tabpanels
+  bleiben montiert (`hidden`): Suchbegriffe, Filter, Klappzustand und Entwürfe überleben Wechsel und
+  Modus ohne eigenen Speicher. Die Ansicht hält `LagekartePage` (`useLeistenAnsicht`, je Gerät,
+  `lfh:lagekarte:leiste-ansicht`), weil die Seite entscheidet, ob ein abgelehnter
+  Ansichts-Speicherversuch im Kopf der Ebenen oder als Kartenhinweis steht (Kopf nur bei sichtbarer
+  Leiste UND „Ebenen“ vorn; LFH-1077). „Zeichenwerkzeuge“ und `?ort=` schalten auf „Objekte“ und
+  merken das wie ein Tipp. „Ausgewählt“ steht über beiden Ansichten, „Objekte“ trägt die
+  bisherigen Paneele (`ObjekteAnsicht` in `Sidebar.tsx`). e2e-Wege: `e2e/leisten-kern.ts`.
+- **Ebenen = ein Ebenenbaum** (LLH-1028, `Ebenenbaum.tsx`, lagekarte-eigen): Gruppen und
+  Untergruppen sind Daten (`EBENEN_GRUPPEN`, `FACHEBENEN_GRUPPEN` in `leistenDaten.ts`, Wächter
+  „jede Ebene genau einmal“) — eine neue Ebene bekommt dort ihre Gruppe. Eine Zeilenform für eigene
+  und Fachebenen: die Zeile ist der Schalter (`<button role="switch">`, Name = Ebenenname), kein
+  zweiter `Switch`; Geltung und Stand einer Fachebene per `aria-describedby`, Klassenlegende unter
+  dem Knopf (eine Liste darf nicht in einen Knopf). Gruppenschalter `role="checkbox"` mit
+  `aria-checked="mixed"`, schaltet nur frei zugängliche Ebenen (`gruppenZustand`/`gruppenZiel`);
+  keiner an „Fachebenen“ als Ganzem und an „Hintergrund“. Klappzustand `useBaumKlapp`
+  (`lfh:lagekarte:ebenen-gruppen`); „Ebene suchen“ öffnet Gruppen mit Treffern nur für die Dauer
+  der Suche und schreibt den Klappzustand nicht. Eine Gruppe mit Fehler-Slot steht offen. Kopf
+  (Kartenansicht, „Ebene suchen“) rollt mit, Segmentleiste und Modus-Band stehen. Die
+  Kartengrundlage steht im Baum nur unter `md` (ab `md` über der Karte). Bild-Hintergründe haben
+  ihre eigene Zeilenform (`BildHintergruende.tsx`: Schalter, Deckkraft, Menü). Nachweis
+  `e2e/lagekarte-ebenenbaum.spec.ts` (1440 × 900 ohne Rollen, Handschuh-Maße).
 - **Kartengrundlage** (LFH-558, Spec `lagekarte-kartengrundlage`, Herleitung D6 in
   `openspec/changes/archive/2026-09-30-lfh-558-lagekarte-kartenpfade-fixture-basemap/design.md`):
   die Karte entsteht mit dem Blindstil, der Style der Ansicht kommt per `setStyle`. Jeder
@@ -209,33 +239,17 @@ Vorgabe für jeden Umbau der Kartenleiste. Bis ein Punkt gebaut ist, gelten die 
 unverändert; das Ticket, das ihn baut, schreibt die betroffene Regel oben und die Specs fort und
 streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekarte-leiste/README.md`.
 
-- **Drei Fragen, drei Ansichten statt eines Stapels.** Erste Zeile der Leiste ist eine
-  `Segmentleiste` (`rolle="tablist"`): „Ebenen“ · „Objekte“ · „Auswahl“, je ein festes Drittel.
-  „Auswahl“ gibt es nur mit einer Auswahl; ohne sie bleibt ihr Drittel leer (kein gesperrtes
-  Segment), damit die anderen nicht wandern. Die Leiste bleibt 300 px und Inhalt (Kopf, LFH-557):
-  keine Reiter am Kartenrand, kein Drawer, keine neue Breite. Ansicht und Klappzustand der Gruppen
-  merkt das Gerät (neue Schlüssel in `GERAETESPEICHER`).
+- **Drittes Segment „Auswahl“** im freien Drittel der Segmentleiste (Ebenen · Objekte stehen,
+  siehe oben). „Auswahl“ gibt es nur mit einer Auswahl; ohne sie bleibt ihr Drittel leer (kein
+  gesperrtes Segment), damit die anderen nicht wandern. Die Leiste bleibt 300 px und Inhalt (Kopf,
+  LFH-557): keine Reiter am Kartenrand, kein Drawer, keine neue Breite. Ein neuer Klappzustand
+  (Objekt-Gruppen) bekommt einen Schlüssel in `GERAETESPEICHER`.
 - **Auswahl:** eine neue Auswahl schaltet auf „Auswahl“ (Inspectors wie heute, mehrere
   untereinander). Der Rückweg im Kopf benennt das Ziel („← Ebenen“, „← Objekte“), hebt die
   Auswahl auf und zeigt die vorige Ansicht samt Suchbegriff, Filter und Klappzustand. Esc wirkt
   genauso, aber nur, wenn kein Modus die Taste hat (Zeichnen zweistufig, Messen), kein Overlay
   offen ist (`escGehoertOverlay`) und der Fokus in keinem Feld steht. Ein Tipp auf „Ebenen“ oder
   „Objekte“ lässt die Auswahl bestehen.
-- **Modus-Band:** direkt unter der Segmentleiste, in jeder Ansicht gleich. Ab `lg` trägt es die
-  ganze Bedienung der Leistenmodi (Platzieren samt Koordinate, Taktisches Zeichen, Bild
-  einpassen) und die Rückmeldung „… verortet“, mit demselben Inhalt wie das Fuß-Band
-  `PlatzierSteuerung` unter `lg`; Zeilen und Gruppen zeigen nur den Zustand („wird platziert“).
-  Je Breite genau ein Knopf je Handlung, wie oben.
-- **Ebenen = ein Ebenenbaum** (neu: `pages/lagekarte/Ebenenbaum.tsx`): Gruppen Kräfte (Einheiten,
-  Fahrzeuge, Personal, Abschnitte, Bereitstellungsräume) · Lage (Einsatzort, Führungsstelle,
-  Zonen, Schäden, Lagemeldungen, Taktische Zeichen) · Betroffene & Versorgung (Betroffene, UHS,
-  Betreuungsstellen) · Fachebenen (Warnungen, Wasser, Umwelt, Verkehr & Infrastruktur) ·
-  Hintergrund (Kartengrundlage, Bild-Hintergründe). Eine Zeilenform für eigene und Fachebenen:
-  die Zeile ist der Schalter (`role="switch"`), kein zweiter `Switch`. Gruppenschalter
-  `role="checkbox"` mit `aria-checked="mixed"` für „teilweise“, schaltet nur frei zugängliche
-  Ebenen; keiner an „Fachebenen“ als Ganzem und an „Hintergrund“. Die Kartengrundlage steht im
-  Baum nur unter `md`, ab `md` über der Karte (ein Weg je Breite, LFH-1083). Kartenansicht und
-  „Ebene suchen“ stehen im Kopf der Ansicht, nicht als Abschnitt dazwischen.
 - **Objekte = eine Liste** verorteter und nicht verorteter Objekte, nach Typ gruppiert
   („verortet/gesamt“), ein Suchfeld (Objekt, Koordinate, Adresse auf Enter wie LFH-638). „Nicht
   verortet“ ist eine Marke im Kopf, die den Filter setzt (0 → „Alles verortet“, Ausfall → „—“),
@@ -247,7 +261,8 @@ streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekart
   (Flächen und Linien, Taktisches Zeichen mit „Zuletzt verwendet“, Picker als Dialog); kein
   `PunktankerMenue`, keine Klickebene. Die Leiste trägt keinen Zeichenweg. Messen bleibt der
   eigene Knopf, seine Formen stehen in `MessSteuerung`, nicht im Menü.
-- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum; „Ausgewählt“ steht bis dahin über
-  beiden Ansichten) → LLH-1033 (Objekte, Auswahl) → LLH-1038 (Werkzeugmenü). Der Kreis (LLH-1043)
+- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum — gebaut, Regeln oben; „Ausgewählt“
+  steht bis LLH-1033 über beiden Ansichten) → LLH-1033 (Objekte, Auswahl) → LLH-1038
+  (Werkzeugmenü). Der Kreis (LLH-1043)
   kommt als Form ins Menü, „Abschnitt fokussieren“ (LLH-1057) in den Inspector, nicht an die
   Listenzeile.
