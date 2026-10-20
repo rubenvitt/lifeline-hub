@@ -6,13 +6,14 @@ import {
   plakettenBild,
   plakettenBildId,
   reAnlegenAlles,
+  sorgeFuerAbschnittLayer,
   sorgeFuerZonenLayer,
   zonenPlakette,
   type ZoneFeature,
 } from './kartenLayer';
 import { farbenDunkel, farbenHell } from '../../theme/tokens';
 import { FACHEBENEN } from './fachebenen';
-import { MARKER_CLUSTER_QUELLE } from './markerLayer';
+import { MARKER_CLUSTER_QUELLE, deckkraftImFokus } from './markerLayer';
 import { blindStyle, offlineStyle } from './basemapStil';
 
 const leereFlaechen = baueFlaechenFc([]);
@@ -372,5 +373,40 @@ describe('baueZonenFc: Zonentyp (LFH-812)', () => {
 
   it('ohne Typ bleibt die Eigenschaft leer', () => {
     expect(baueZonenFc([ZONE]).features[0].properties.typ).toBe('');
+  });
+});
+
+describe('Abschnittsflächen im Fokus (LLH-1057)', () => {
+  const POLY = {
+    type: 'Polygon' as const,
+    coordinates: [
+      [
+        [9, 52],
+        [9.1, 52],
+        [9.1, 52.1],
+        [9, 52],
+      ],
+    ],
+  };
+
+  it('trägt `gedaempft` als Feature-Property, ungedämpft `false`', () => {
+    const fc = baueFlaechenFc([
+      { id: 1, label: 'EA 1', polygon: POLY },
+      { id: 2, label: 'EA 2', polygon: POLY, gedaempft: true },
+    ]);
+    expect(fc.features.map((f) => f.properties.gedaempft)).toEqual([false, true]);
+  });
+
+  it('dämpft Füllung und Umriss fremder Flächen über die Deckkraft', () => {
+    const { map } = fakeMap(() => true);
+    sorgeFuerAbschnittLayer(map, baueFlaechenFc([]));
+    const specs = map.addLayer.mock.calls.map((c: [{ id: string }]) => c[0]) as Array<{
+      id: string;
+      paint?: Record<string, unknown>;
+    }>;
+    const fuellung = specs.find((l) => l.id === 'abschnitte-fill')!;
+    const umriss = specs.find((l) => l.id === 'abschnitte-line')!;
+    expect(fuellung.paint?.['fill-opacity']).toEqual(deckkraftImFokus(0.15));
+    expect(umriss.paint?.['line-opacity']).toEqual(deckkraftImFokus(1));
   });
 });

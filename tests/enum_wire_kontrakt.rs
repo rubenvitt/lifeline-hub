@@ -271,6 +271,11 @@ fn serde_wire_gleich_as_str() {
         Gross,
         Katastrophal,
     });
+    enum_wire_as_str!(lifeline_hub::schaden::Schadensgrad {
+        Angeschlagen,
+        Teilzerstoert,
+        Zerstoert,
+    });
     // Namensgleich mit tier::AbschlussGrund — als PFAD sind das zwei getrennte Verpflichtungen.
     enum_wire_as_str!(lifeline_hub::schaden::AbschlussGrund {
         Behoben,

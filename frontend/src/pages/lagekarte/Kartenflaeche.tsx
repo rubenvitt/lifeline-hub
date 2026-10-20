@@ -60,6 +60,7 @@ import {
   planeReAnlegenNachStyle,
   sorgeFuerAbschnittLayer,
   sorgeFuerZonenLayer,
+  type AbschnittFlaeche,
   type FlaechenFeatureCollection,
   type ZonenFeatureCollection,
   type ZoneFeature,
@@ -108,6 +109,8 @@ import {
   fliegeEigenpositionAn,
   hoereAufBedienung,
 } from './kamera';
+import { fokussiereRahmen, stelleKameraHer, type KameraStand } from './fokusKamera';
+import type { Rahmen } from './abschnittFokus';
 
 /** Ein Aufruf von `transformRequest`: was MapLibre wollte (`ein`) und was es bekam (`aus`). */
 interface KartenAnfrage {
@@ -209,8 +212,11 @@ export interface KartenflaecheProps {
   onStyleFehler?: () => void;
   /** Config-autoritative Pflicht-Attribution des aktiven Online-Views (null = keine). */
   attribution?: string | null;
-  /** Abschnittsflächen als Polygone rendern (Befehlsstellen-Marker laufen über `markers`). */
-  flaechen?: { id: number; label: string; polygon: GeoJsonPolygon }[];
+  /**
+   * Abschnittsflächen als Polygone rendern (Befehlsstellen-Marker laufen über `markers`); im Fokus
+   * auf einen Abschnitt tragen fremde `gedaempft` (LLH-1057).
+   */
+  flaechen?: readonly AbschnittFlaeche[];
   /** Polygon-Zeichenmodus aktiv. */
   zeichnen?: boolean;
   /** Callback nach abgeschlossenem Zeichnen einer Fläche. */
@@ -343,6 +349,13 @@ export interface KartenHandle {
   nachNorden(): void;
   /** Ein aufgefächertes Bündel einklappen (meldet `onSpiderOffen(false)`); sonst nichts. */
   klappeSpiderEin(): void;
+  /**
+   * Fokus auf einen Abschnitt (LLH-1057): den Rahmen einpassen (Bedienung, verbraucht die
+   * Startansicht wie `flyToZiel`). Gibt die Kamera davor zurück, ohne Karte `null`.
+   */
+  fokussiere(rahmen: Rahmen): KameraStand | null;
+  /** „Fokus aufheben“: zurück auf die Kamera vor dem Fokus. */
+  stelleKameraHer(stand: KameraStand): void;
 }
 
 const klickzielJeTipp = new WeakMap<Event, Klickziel<maplibregl.MapGeoJSONFeature> | null>();
@@ -625,6 +638,17 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       },
       klappeSpiderEin() {
         schliesseSpiderRef.current();
+      },
+      fokussiere(rahmen) {
+        const map = mapRef.current;
+        if (!map) return null;
+        // Wie ein Anflug: eine später entschiedene Startansicht zieht die Karte nicht weg.
+        startAufKarteRef.current = map;
+        return fokussiereRahmen(map, rahmen);
+      },
+      stelleKameraHer(stand) {
+        const map = mapRef.current;
+        if (map) stelleKameraHer(map, stand);
       },
     };
   }, []);

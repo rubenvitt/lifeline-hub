@@ -35,6 +35,7 @@ import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
 import { staerkeText } from '../../anzeige/staerke';
 import { funktionText } from '../../kraefte/einsatzfunktionKern';
+import { GEFAHR_LABEL, SCHADENSGRAD_LABEL } from '../schaeden/gefahrWorte';
 
 /**
  * Reine Ableitungen der rechten Kartenleiste — getrennt von `Sidebar.tsx`, damit Zähler,
@@ -441,6 +442,17 @@ export function auswahlRaster(
           label: 'Ausmaß',
           wert: am?.label ?? text(s.ausmass),
           rolle: am?.rolle,
+          mono: false,
+        },
+        // In Worten, wie im Gefahrengebiet (LLH-1115): das Zeichen sagt es nur dem Geübten.
+        {
+          label: 'Gefahr',
+          wert: s.gefahrenart ? (GEFAHR_LABEL[s.gefahrenart] ?? s.gefahrenart) : '—',
+          mono: false,
+        },
+        {
+          label: 'Schadensgrad',
+          wert: s.schadensgrad ? (SCHADENSGRAD_LABEL[s.schadensgrad] ?? s.schadensgrad) : '—',
           mono: false,
         },
       ];

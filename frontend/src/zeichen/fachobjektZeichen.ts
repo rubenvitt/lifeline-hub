@@ -36,10 +36,12 @@ import {
   type FunctionRoleId,
   type OrganizationId,
   type PictogramSpec,
+  type StateId,
   type SymbolSpec,
   type TechnicalBodyMarkId,
 } from '@einsatzzeichen/schema';
 import { AUSMASS_FARBE, type TzProps } from '../pages/lagekarte/taktischesZeichen';
+import type { Gefahrentyp, Schadensgrad } from '../api/types';
 
 export interface FachobjektZeichen {
   /**
@@ -165,6 +167,50 @@ const FARBE_TOKEN: Record<string, ColorToken> = {
   [AUSMASS_FARBE.katastrophal]: 'rot',
 };
 
+// Gefahrenart eines Schadens → Gefahrenhinweis nach DV 102, 5.8.1 (LLH-1115, design.md D3). Der
+// Hinweis steht als Zustand am Träger „Gefahr“; die Bibliothek setzt ihn in die Randlage neben den
+// verkleinerten Träger (abgeleitet aus 5.8.1.13_2), die Füllung (Ausmaß) bleibt. `undefined` ist
+// eine Lücke im Katalog: das Zeichen bleibt das leere Dreieck. Vollständig per Typ, damit eine neue
+// Gefahrenart hier entschieden werden muss.
+const GEFAHRENHINWEIS: Record<Gefahrentyp, StateId | undefined> = {
+  atemgifte: undefined,
+  angstreaktion: undefined,
+  ausbreitung: undefined,
+  atomare_strahlung: 'radioactivity-hazard',
+  chemische_stoffe: 'hazardous-substances',
+  erkrankung_verletzung: undefined,
+  explosion: 'explosion-hazard',
+  elektrizitaet: 'electrical-energy-hazard',
+  einsturz: undefined,
+  absturz: undefined,
+  // Brandphasen (5.8.5) bezeichnen die Phase eines Brandes, keine Gefahrenart.
+  brand: undefined,
+  durchbruch: undefined,
+  // Näherung: Gefahr durch Wasser (5.8.1.6 „Gefahr durch Wassereinbruch“).
+  ertrinken: 'water-ingress-hazard',
+};
+
+// Schadensgrad eines Schadens → Zustand nach DV 102, 5.8.4 (LLH-1115), auf der Körpermitte.
+const SCHADENSGRAD_ZUSTAND: Record<Schadensgrad, StateId> = {
+  angeschlagen: 'damaged',
+  teilzerstoert: 'partially-destroyed',
+  zerstoert: 'destroyed',
+};
+
+/**
+ * Die Zustandsstufen eines Schadens in Versuchsreihenfolge: Hinweis und Schadensgrad, nur der
+ * Hinweis, nur der Schadensgrad. Die Gefahrenart wiegt mehr, sie bestimmt das Kartenzeichen.
+ */
+function zustandsStufen(tz: TzProps): Teil[] {
+  const hinweis = eigen(GEFAHRENHINWEIS, tz.gefahrenart);
+  const grad = eigen(SCHADENSGRAD_ZUSTAND, tz.schadensgrad);
+  const stufen: Teil[] = [];
+  if (hinweis && grad) stufen.push({ states: [hinweis, grad] });
+  if (hinweis) stufen.push({ states: [hinweis] });
+  if (grad) stufen.push({ states: [grad] });
+  return stufen;
+}
+
 /**
  * Liest eine Abbildungstabelle nur über eigene Schlüssel. Gespeicherte Kennungen sind Eingabe:
  * `constructor` oder `__proto__` dürfen keine Prototyp-Eigenschaft liefern (LFH-836, Review).
@@ -265,9 +311,12 @@ function kandidaten(tz: TzProps): SymbolSpec[][] | null {
   const fachaufgabe = tz.fachaufgabe ?? eigen(SYMBOL_ERSATZ, tz.symbol);
   const farbe: Teil = tz.farbe ? { technicalFill: eigen(FARBE_TOKEN, tz.farbe) ?? 'grau' } : {};
 
-  const liste: SymbolSpec[][] = fassungen(fachaufgabe, koerper).map((stufe) =>
-    stufe.map((f) => verbinde(koerper, org, farbe, staerke, f)),
-  );
+  const liste: SymbolSpec[][] = [
+    ...zustandsStufen(tz).map((z) => [verbinde(koerper, org, farbe, staerke, z)]),
+    ...fassungen(fachaufgabe, koerper).map((stufe) =>
+      stufe.map((f) => verbinde(koerper, org, farbe, staerke, f)),
+    ),
+  ];
   liste.push([verbinde(koerper, org, farbe, staerke)]);
   liste.push([verbinde(koerper, org, farbe)]);
   liste.push([verbinde(koerper, farbe, { organization: undefined })]);
@@ -306,6 +355,8 @@ function eingangsSchluessel(tz: TzProps): string {
     tz.symbol,
     tz.farbe,
     tz.funktion,
+    tz.gefahrenart,
+    tz.schadensgrad,
   ]);
 }
 

@@ -42,8 +42,9 @@ und unverändert anzeigen.
 ### Requirement: Lagekarte und Lage-Dashboard lesen Schadenmarker
 
 Das System SHALL je Einsatz eine Markerliste der Schäden anbieten. Sie enthält je nicht
-stornierten Schaden nur Kennung, Registriernummer, Typ, Ausmaß, Status und Lage und MUST NOT
-Ort, Beschreibung oder Angaben zu Geschädigten enthalten. Sie steht hinter demselben Recht wie
+stornierten Schaden nur Kennung, Registriernummer, Typ, Ausmaß, Gefahr, Schadensgrad, Status
+und Lage (Gefahr und Schadensgrad nur, wenn gesetzt) und MUST NOT Ort, Beschreibung oder Angaben
+zu Geschädigten enthalten. Sie steht hinter demselben Recht wie
 die Schadenliste. Lagekarte und Lage-Dashboard SHALL Schäden aus dieser Markerliste lesen; die
 Modulseite Schäden, Druck, Einsatzbericht, Chat-Bezug und Sprungpalette lesen weiter die
 Schadenliste. Die Markerliste MUST im Offline-Lagebild auf dem Gerät gespeichert werden, damit
@@ -56,6 +57,10 @@ die Lagekarte ohne Netz ihre Schäden zeigt.
 #### Scenario: Stornierter Schaden
 - **WHEN** ein Schaden storniert wird
 - **THEN** fehlt er in der Markerliste
+
+#### Scenario: Marker mit Gefahr
+- **WHEN** ein Schaden mit Gefahr „Explosion“ und Schadensgrad „teilzerstört“ erfasst ist
+- **THEN** trägt sein Eintrag in der Markerliste beide Werte, und die Karte zeichnet ihn ohne die Schadenliste
 
 #### Scenario: Ohne Modulrecht
 - **WHEN** eine Person ohne Zugriff auf das Modul Schäden die Markerliste abruft

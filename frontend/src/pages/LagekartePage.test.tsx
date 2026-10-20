@@ -26,6 +26,9 @@ import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 const kartenHandle = vi.hoisted(() => ({
   punktZurueck: vi.fn(() => true),
   zeichnungVerwerfen: vi.fn(),
+  // Abschnittsfokus (LLH-1057): Anflug auf einen Rahmen, gibt die Kamera davor zurück.
+  fokussiere: vi.fn(() => ({ center: [8.5, 50] as [number, number], zoom: 9, bearing: 0 })),
+  stelleKameraHer: vi.fn(),
 }));
 
 const KONTEXT_PUNKT = vi.hoisted(() => ({ lng: 8.6, lat: 50.1, quelle: 'maus' as const }));
@@ -137,7 +140,11 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
             </button>
           )}
           {(props.markers ?? []).map((m) => (
-            <button key={m.schluessel} onClick={() => props.onMarkerKlick?.(m.schluessel)}>
+            <button
+              key={m.schluessel}
+              data-gedaempft={m.gedaempft ? 'ja' : undefined}
+              onClick={() => props.onMarkerKlick?.(m.schluessel)}
+            >
               marker-{m.schluessel}
             </button>
           ))}
@@ -3864,5 +3871,132 @@ describe('LLH-1154: späte Ansichts-Antwort nach Verlassen der Lagekarte', () =>
 
     expect(ort()).toBe('/einsaetze/1/etb');
     expect(screen.queryByText('Ansicht gelöscht')).toBeNull();
+  });
+});
+
+describe('LLH-1057: Abschnitt fokussieren', () => {
+  const flaeche = (w: number, s: number) =>
+    JSON.stringify({
+      type: 'Polygon',
+      coordinates: [
+        [
+          [w, s],
+          [w + 0.1, s],
+          [w + 0.1, s + 0.1],
+          [w, s],
+        ],
+      ],
+    });
+  const NORD = {
+    ...ABSCHNITT_OHNE_FLAECHE,
+    ueber_abschnitt_id: null,
+    flaeche_geojson: flaeche(8.6, 50.1),
+  };
+  const SUED = {
+    ...ABSCHNITT_OHNE_FLAECHE,
+    id: 4,
+    name: 'EA Süd',
+    ueber_abschnitt_id: null,
+    flaeche_geojson: flaeche(8.6, 49.9),
+  };
+  // Gruppe A gehört zu EA Süd: im Fokus auf EA Nord ist sie fremd.
+  const GRUPPE_SUED = {
+    ...EINHEIT_VERORTET,
+    ueber_einheit_id: null,
+    abschnitt_id: 4,
+    abschnitt_name: 'EA Süd',
+  };
+  const handler = () =>
+    basisHandler([
+      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([NORD, SUED])),
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([GRUPPE_SUED])),
+    ]);
+  const band = () => document.querySelector('[data-lfh="fokus-band"]');
+
+  beforeEach(() => {
+    kartenHandle.fokussiere.mockClear();
+    kartenHandle.stelleKameraHer.mockClear();
+  });
+
+  it('?abschnitt= fokussiert, dämpft fremde Kräfte und Flächen, räumt den Parameter', async () => {
+    handler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?abschnitt=3');
+    await waitFor(() => expect(band()).toHaveTextContent('EA Nord'));
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('abschnitt'),
+    );
+    // Anflug auf die Fläche von EA Nord.
+    expect(kartenHandle.fokussiere).toHaveBeenCalledWith([
+      [8.6, 50.1],
+      [8.7, 50.2],
+    ]);
+    // Gedämpft, nicht entfernt: die fremde Gruppe und das Zeichen von EA Süd stehen noch da.
+    expect(screen.getByText('marker-einheit-1')).toHaveAttribute('data-gedaempft', 'ja');
+    expect(screen.getByText('marker-abschnitt-4')).toHaveAttribute('data-gedaempft', 'ja');
+    expect(screen.getByText('marker-abschnitt-3')).not.toHaveAttribute('data-gedaempft');
+    expect(screen.getByText('marker-schaden-9')).not.toHaveAttribute('data-gedaempft');
+    const flaechen = flaechenProps[flaechenProps.length - 1] as { id: number; gedaempft?: true }[];
+    expect(flaechen.map((f) => [f.id, f.gedaempft ?? false])).toEqual([
+      [3, false],
+      [4, true],
+    ]);
+  });
+
+  it('ein unbekannter Abschnitt im Link wird geräumt, ohne Fokus', async () => {
+    handler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?abschnitt=99');
+    await screen.findByText('marker-abschnitt-3');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('abschnitt'),
+    );
+    expect(band()).toBeNull();
+    expect(kartenHandle.fokussiere).not.toHaveBeenCalled();
+  });
+
+  it('Einstieg über den Inspector; „Fokus aufheben“ stellt die Kamera wieder her', async () => {
+    handler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-abschnitt-4'));
+    await user.click(await screen.findByRole('button', { name: 'Abschnitt fokussieren' }));
+    expect(band()).toHaveTextContent('EA Süd');
+    // Für den fokussierten Abschnitt steht die Handlung nicht noch einmal.
+    expect(screen.queryByRole('button', { name: 'Abschnitt fokussieren' })).toBeNull();
+    expect(screen.getByText('marker-einheit-1')).not.toHaveAttribute('data-gedaempft');
+    expect(screen.getByText('marker-abschnitt-3')).toHaveAttribute('data-gedaempft', 'ja');
+
+    await user.click(screen.getByRole('button', { name: 'Fokus aufheben' }));
+    expect(band()).toBeNull();
+    expect(kartenHandle.stelleKameraHer).toHaveBeenCalledWith({
+      center: [8.5, 50],
+      zoom: 9,
+      bearing: 0,
+    });
+    expect(screen.getByText('marker-abschnitt-3')).not.toHaveAttribute('data-gedaempft');
+  });
+
+  it('Esc hebt erst die Auswahl auf, dann den Fokus', async () => {
+    handler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-abschnitt-3'));
+    await user.click(await screen.findByRole('button', { name: 'Abschnitt fokussieren' }));
+    expect(band()).toHaveTextContent('EA Nord');
+    expect(document.querySelector('[data-lfh="fokus-band"] [aria-keyshortcuts]')).toBeNull();
+
+    await user.keyboard('{Escape}');
+    // Die Auswahl ist zu, der Fokus steht noch — und nimmt jetzt Esc.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Abschnitt fokussieren' })).toBeNull(),
+    );
+    expect(band()).toHaveTextContent('EA Nord');
+    expect(screen.getByRole('button', { name: 'Fokus aufheben' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Escape',
+    );
+
+    await user.keyboard('{Escape}');
+    expect(band()).toBeNull();
+    expect(kartenHandle.stelleKameraHer).toHaveBeenCalledTimes(1);
   });
 });
