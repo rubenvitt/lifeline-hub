@@ -8950,8 +8950,8 @@ mod tests {
     /// Schlüssel und Indizes bleiben; die DDL unterscheidet sich nur in der `art`-Liste, die neue
     /// Art geht durch, eine unbekannte nicht, und die Kaskade an der Datei hält.
     #[tokio::test]
-    async fn migration_0227_baut_die_anlagen_linker_mit_der_art_lageplan_neu() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 226).await;
+    async fn migration_0230_baut_die_anlagen_linker_mit_der_art_lageplan_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 229).await;
         let (e, b) = bild_grundlage(&pool).await;
         let anhang = |name: &'static str| {
             let pool = pool.clone();
@@ -9049,10 +9049,10 @@ mod tests {
             lageplan_an("lagebericht_anlage", "lagebericht_id", lb)
                 .await
                 .is_err(),
-            "vor 0227 kennt der CHECK den Lageplan nicht"
+            "vor 0230 kennt der CHECK den Lageplan nicht"
         );
 
-        migriere_bis(&pool, 227).await;
+        migriere_bis(&pool, 230).await;
 
         for (tabelle, alle, zeilen, schema, ddl) in &vorher {
             let nachher: Vec<Zeile> = sqlx::query_as(sqlx::AssertSqlSafe(alle.clone()))

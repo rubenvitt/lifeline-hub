@@ -4,7 +4,7 @@
 //! auch der Lageplan der Lagekarte: der Browser zeichnet die Druckform als PNG, der Server legt es
 //! über die gewöhnliche Anhang-Kette ab (Endung, Größe, Virenscan, Bereinigung, Vorschau). Die
 //! Bytes liegen in `anhang`, die Verknüpfung in einem Linker je Dokumentart ([`AnlagenTabelle`],
-//! Migration `0157_dokument_anlage.sql`, Art `lageplan` aus `0227_dokument_anlage_lageplan.sql`),
+//! Migration `0157_dokument_anlage.sql`, Art `lageplan` aus `0230_dokument_anlage_lageplan.sql`),
 //! registriert in `anhang::repo::MODUL_LINKER`.
 //!
 //! Anfügen und Entfernen gelingen nur im Entwurf; geprüft wird der Status im selben
@@ -45,7 +45,7 @@ wire_enum! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AnlageArt {
         Fernmeldeskizze => "fernmeldeskizze",
-        /// Ausschnitt der Lagekarte mit Maßstab, Nordpfeil und Legende (LLH-1051, Migration 0227).
+        /// Ausschnitt der Lagekarte mit Maßstab, Nordpfeil und Legende (LLH-1051, Migration 0230).
         Lageplan => "lageplan",
     }
     try_from = |s| format!("Unbekannte Anlagen-Art «{s}»");
