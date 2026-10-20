@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { oeffneMenue } from './menue-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import {
   FUEKW,
@@ -1080,8 +1081,9 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
       pfad: `${R}/lageberichte`,
       anker: (page) =>
         inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
+      // Gemessen wird erst, wenn das Menü steht: antds `slide-up` startet mit `scaleY(0.8)`.
       vorbereiten: async (page) => {
-        await knopf('Andere Vorlage wählen')(page).click();
+        await oeffneMenue(page, knopf('Andere Vorlage wählen')(page));
       },
       ziele: [
         {
