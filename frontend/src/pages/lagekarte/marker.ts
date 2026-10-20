@@ -230,7 +230,7 @@ export function baueMarker(
 
   for (const s of schaeden) {
     if (s.lat != null && s.lon != null) {
-      const tz = schadenTz(s.ausmass);
+      const tz = schadenTz(s.ausmass, s.gefahrenart, s.schadensgrad);
       verortet.push({
         schluessel: `schaden-${s.id}`,
         typ: 'schaden',

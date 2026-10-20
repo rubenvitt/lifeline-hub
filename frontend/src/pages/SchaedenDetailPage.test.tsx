@@ -276,8 +276,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    // Comboboxen im Edit-Formular: [0] Typ, [1] Ausmaß, [2] Geschädigt.
-    await userEvent.click(screen.getAllByRole('combobox')[2]);
+    await userEvent.click(screen.getByRole('combobox', { name: 'Geschädigt' }));
     const option = (await screen.findAllByText('R-007 · Anna Meier')).find((el) =>
       el.closest('.ant-select-item-option'),
     );
@@ -374,6 +373,69 @@ function kopfPrimaeraktionen(): HTMLElement[] {
  * Primäraktion, „Bearbeiten“ sekundär sichtbar, der Rest im Menü mit Stornieren rot hinter dem
  * Trenner. Die Statuskanten spiegeln `darf_uebergehen` (`src/schaden/mod.rs`).
  */
+/** Gefahr und Schadensgrad (LLH-1115): in Worten lesen, an Ort und Stelle ändern und leeren. */
+describe('SchaedenDetailPage — Gefahr und Schadensgrad (LLH-1115)', () => {
+  const zelle = (label: string) =>
+    screen
+      .getByText(label, { selector: '[data-lfh="datenfeld"] *' })
+      .closest('[data-lfh="datenfeld"]')!;
+
+  it('zeigt Gefahr und Schadensgrad in Worten', async () => {
+    render(einsatzAktiv, basisSchaden({ gefahrenart: 'elektrizitaet', schadensgrad: 'zerstoert' }));
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(within(zelle('Gefahr') as HTMLElement).getByText('Elektrizität')).toBeInTheDocument();
+    expect(
+      within(zelle('Schadensgrad') as HTMLElement).getByText('total zerstört'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne Angabe steht ein Strich', async () => {
+    render(einsatzAktiv, basisSchaden());
+    await screen.findByRole('heading', { name: /Schaden S-001/ });
+    expect(within(zelle('Gefahr') as HTMLElement).getByText('—')).toBeInTheDocument();
+    expect(within(zelle('Schadensgrad') as HTMLElement).getByText('—')).toBeInTheDocument();
+  });
+
+  it('Bearbeiten hält Gefahr und Schadensgrad und sendet sie mit', async () => {
+    let body: Record<string, unknown> | null = null;
+    const s = basisSchaden({ gefahrenart: 'brand', schadensgrad: 'angeschlagen' });
+    render(einsatzAktiv, s, [
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(s);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    expect(await screen.findByRole('combobox', { name: 'Gefahr' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Schadensgrad' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.gefahrenart).toBe('brand');
+    expect(body!.schadensgrad).toBe('angeschlagen');
+  });
+
+  it('eine geleerte Gefahr geht als null an den Server', async () => {
+    let body: Record<string, unknown> | null = null;
+    const s = basisSchaden({ gefahrenart: 'brand' });
+    render(einsatzAktiv, s, [
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(s);
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const feld = (await screen.findByRole('combobox', { name: 'Gefahr' })).closest('.ant-select')!;
+    const clear = feld.querySelector('.ant-select-clear');
+    expect(clear, 'Gefahr muss sich leeren lassen').toBeTruthy();
+    fireEvent.mouseDown(clear!);
+    fireEvent.click(clear!);
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.gefahrenart).toBeNull();
+    expect(body!.schadensgrad).toBeNull();
+  });
+});
+
 describe('SchaedenDetailPage — Kopfaktionen (LLH-1105)', () => {
   it.each([
     { status: 'offen', primaer: 'Schaden übergeben' },
@@ -634,7 +696,7 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
   it('Geschädigt: ein Suchbegriff über 500 Zeichen wird nicht als externer Kontakt angeboten', async () => {
     render(einsatzAktiv, basisSchaden());
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    const geschaedigt = screen.getAllByRole('combobox')[2];
+    const geschaedigt = screen.getByRole('combobox', { name: 'Geschädigt' });
     await userEvent.click(geschaedigt);
     fireEvent.change(geschaedigt, { target: { value: 'k'.repeat(500) } });
     expect(await screen.findByText(/Als externen Kontakt/)).toBeInTheDocument();

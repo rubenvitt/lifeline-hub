@@ -110,7 +110,7 @@ const KARTEN_EIGENBAU: string[] = [];
 const NUR_KARTE: string[] = [
   // Ein Evakuierungsbezirk wird GELESEN („was ist mit diesem Bezirk?“), nicht verglichen.
   '/src/betreuung/EvakuierungBlock.tsx',
-  '/src/pages/LageberichtePage.tsx',
+  // Die Lageberichte sind seit LLH-1064 eine Übersicht aus Paneelen, keine Datensicht mehr.
 ];
 
 /**
@@ -188,7 +188,6 @@ const KONSUMENTEN = [
   // Der Kommunikationsplan S6 (LFH-848): Gruppen als Baumknoten, Aktionsspalte selbst gebaut.
   '/src/pages/KommunikationsplanPage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
-  '/src/pages/LageberichtePage.tsx',
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
@@ -713,10 +712,10 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Zwei Kartenmodule (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`), sechs
-    // Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
+    // Ein Kartenmodul (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`, die Lageberichte
+    // seit LLH-1064 auf Paneelen), sechs Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
     // umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(2);
+    expect(NUR_KARTE).toHaveLength(1);
     expect(NUR_TABELLE).toHaveLength(6);
     // Zwei PFLICHTEN, dateibezogen: Meldebild und Einheiten-Gliederung (beide kumulieren über den
     // Kräftebaum). Ein weiterer Eintrag braucht dieselbe Herleitung.

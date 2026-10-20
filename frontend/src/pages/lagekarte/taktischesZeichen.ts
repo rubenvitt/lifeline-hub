@@ -3,7 +3,7 @@
 // Die Kennungen stammen aus dem früheren Paket taktische-zeichen (bis LFH-836); ihre Typen stehen
 // seitdem hier, nur mit den Werten, die der Hub für Fachobjekte vergibt (design.md D9). Freie
 // Zeichen tippt der Leseadapter `zeichen/freiesZeichen.ts` als `string`, denn sie sind Eingabe.
-import type { Ausmass, UhsTyp } from '../../api/types';
+import type { Ausmass, Gefahrentyp, Schadensgrad, UhsTyp } from '../../api/types';
 
 /** Grundzeichen der Fachobjekte; jedes hat einen Körper in `fachobjektZeichen` (`KOERPER`). */
 export const GRUNDZEICHEN_IDS = [
@@ -157,6 +157,13 @@ export interface TzProps {
   /** Freie Farbe (nur Schäden, `AUSMASS_FARBE`); `fachobjektZeichen` bildet sie aufs Palettentoken ab. */
   farbe?: string;
   funktion?: FunktionId;
+  /**
+   * Gefahrenart eines Schadens im Vokabular `Gefahrentyp` (LLH-1115). Gespeicherter Wert, roh:
+   * `fachobjektZeichen` bildet ihn auf den Gefahrenhinweis ab und liest Unbekanntes wie keinen.
+   */
+  gefahrenart?: string;
+  /** Schadensgrad eines Schadens (`Schadensgrad`, LLH-1115), roh wie `gefahrenart`. */
+  schadensgrad?: string;
 }
 
 // Fahrzeugtyp (Freitext) → spezifischeres DV-102-Grundzeichen. Konservativ: nur eindeutige Fälle,
@@ -277,10 +284,22 @@ export function fuehrungsstelleTz(): TzProps {
 
 /**
  * Schaden: Warn-Dreieck „gefahr"; das Ausmaß steuert nur die Farbe (die Form trägt die Bedeutung,
- * farbenblind-tauglich). Die Farbe ist immer gesetzt.
+ * farbenblind-tauglich). Die Farbe ist immer gesetzt. Gefahrenart und Schadensgrad (LLH-1115)
+ * gehen roh durch; das Zeichen bildet `fachobjektZeichen` daraus.
  */
-export function schadenTz(ausmass: Ausmass): TzProps & { farbe: string } {
-  return { grundzeichen: 'gefahr', farbe: AUSMASS_FARBE[ausmass] ?? AUSMASS_FALLBACK };
+export function schadenTz(
+  ausmass: Ausmass | null | undefined,
+  gefahrenart?: Gefahrentyp | null,
+  schadensgrad?: Schadensgrad | null,
+): TzProps & { farbe: string } {
+  const tz: TzProps & { farbe: string } = {
+    grundzeichen: 'gefahr',
+    // Ohne Ausmaß (etwa die Vorschau im Erfassen, bevor eins gewählt ist) grau wie unbekannt.
+    farbe: (ausmass && AUSMASS_FARBE[ausmass]) || AUSMASS_FALLBACK,
+  };
+  if (gefahrenart) tz.gefahrenart = gefahrenart;
+  if (schadensgrad) tz.schadensgrad = schadensgrad;
+  return tz;
 }
 
 // UHS: „stelle" (Kreis) + sanitätsdienstliches Overlay je UhsTyp.
