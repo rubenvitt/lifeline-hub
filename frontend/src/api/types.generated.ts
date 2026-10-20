@@ -4242,6 +4242,13 @@ export interface components {
             anzahl?: number | null;
             art: string;
             begruendung?: string | null;
+            /**
+             * Format: int64
+             * @description Betreuungsstelle, für die angefordert wurde (LLH-1082, design.md D1/D4). Nur die Kennung:
+             *     den Namen liest die Oberfläche aus dem Modul Betreuung, sonst sähe ihn auch, wer
+             *     Betreuung nicht lesen darf. Fehlt ohne Bezug; der Storno der Stelle löst ihn (D3).
+             */
+            betreuungsstelle_id?: number | null;
             bezeichnung: string;
             eingetroffen_at?: string | null;
             /** Format: int64 */

@@ -71,6 +71,34 @@ pub struct NeueNachforderung {
     pub prioritaet: Option<String>,
     /// Ereigniszeit der Anforderung (UTC); leer = jetzt.
     pub angefordert_at: Option<String>,
+    /// Betreuungsstelle, für die angefordert wird (LLH-1082); fehlt = einsatzweit.
+    #[serde(default)]
+    pub betreuungsstelle_id: Option<i64>,
+}
+
+/// LLH-1082 (design.md D2): ein Bezug auf eine Betreuungsstelle wird in fester Reihenfolge
+/// geprüft, wie der Verbleib (LFH-674) — 403 ohne Lesezugriff auf das Modul Betreuung (VOR jedem
+/// Lesen der Stelle, sonst verrieten 404/409 ihre Existenz), 404 bei fremder oder unbekannter
+/// Stelle, 409 bei stornierter. Eine geschlossene Stelle ist zulässig.
+async fn pruefe_betreuungsstelle(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Nachforderungen>,
+    stelle_id: i64,
+) -> Result<(), AppError> {
+    ctx.fordere_modul_zugriff(
+        &state.pool,
+        <crate::einsatz::modul::Betreuung as crate::einsatz::modul::ModulMarker>::KEY
+            .expect("Betreuung ist an ein Modul gebunden"),
+    )
+    .await?;
+    let stelle =
+        crate::betreuung::repo::stelle_laden(&state.pool, ctx.einsatz.id, stelle_id).await?;
+    if stelle.storniert_at.is_some() {
+        return Err(AppError::Conflict(
+            "Die Betreuungsstelle ist storniert".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// POST /api/einsaetze/{id}/nachforderungen — Nachforderung absetzen (Schreibrecht + aktiv).
@@ -115,6 +143,9 @@ pub async fn anlegen(
         Some(a) => parse_zeit(a)?,
         None => jetzt(),
     };
+    if let Some(stelle_id) = req.betreuungsstelle_id {
+        pruefe_betreuungsstelle(&state, &ctx, stelle_id).await?;
+    }
 
     let n = repo::create(
         &state.pool,
@@ -129,6 +160,7 @@ pub async fn anlegen(
             begruendung: trimme(&req.begruendung),
             prioritaet,
             angefordert_at: &angefordert,
+            betreuungsstelle_id: req.betreuungsstelle_id,
         },
     )
     .await?;

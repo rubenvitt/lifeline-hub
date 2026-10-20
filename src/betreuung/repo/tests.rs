@@ -217,7 +217,9 @@ async fn stelle_status(w: &Welt, id: i64, s: Status) -> Result<Geschrieben, AppE
 
 async fn stelle_stornieren(w: &Welt, id: i64) -> Result<Geschrieben, AppError> {
     write_retry!(&w.pool, |conn| {
-        stelle_stornieren_tx(conn, w.e, id, w.b, STARTWERT).await
+        stelle_stornieren_tx(conn, w.e, id, w.b, STARTWERT)
+            .await
+            .map(|(g, _)| g)
     })
 }
 

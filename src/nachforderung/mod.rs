@@ -122,6 +122,11 @@ pub struct NachforderungAnzeige {
     #[sqlx(try_from = "String")]
     #[schema(value_type = Vec<i64>)]
     pub material_ids: MaterialIds,
+    /// Betreuungsstelle, für die angefordert wurde (LLH-1082, design.md D1/D4). Nur die Kennung:
+    /// den Namen liest die Oberfläche aus dem Modul Betreuung, sonst sähe ihn auch, wer
+    /// Betreuung nicht lesen darf. Fehlt ohne Bezug; der Storno der Stelle löst ihn (D3).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub betreuungsstelle_id: Option<i64>,
 }
 
 /// Kennungen übernommener Materialposten, gelesen aus dem JSON-Array der Unterabfrage in
