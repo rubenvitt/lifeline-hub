@@ -9,7 +9,7 @@ import {
   meldungenPfad,
   einsatzdatenPfad,
   personDetailPfad,
-  betreuungPfad,
+  betreuungsstellePfad,
   bereitstellungsraumDetailPfad,
 } from '../../routing/deeplinks';
 
@@ -38,9 +38,9 @@ export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
     // Betroffene: Vollseiten-Detail → Item-Route.
     case 'person':
       return personDetailPfad(einsatzId, marker.id);
-    // Betreuungsstelle: keine Detailroute, Auswahl per `?stelle=`.
+    // Betreuungsstelle (LLH-1044): Vollseiten-Detail → Item-Route.
     case 'betreuungsstelle':
-      return betreuungPfad(einsatzId, { stelle: marker.id });
+      return betreuungsstellePfad(einsatzId, marker.id);
     // Bereitstellungsraum (LLH-1107): Vollseiten-Detail → Item-Route.
     case 'bereitstellungsraum':
       return bereitstellungsraumDetailPfad(einsatzId, marker.id);

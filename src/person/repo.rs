@@ -116,14 +116,32 @@ pub async fn liste(
     einsatz_id: i64,
     status: Option<&str>,
 ) -> Result<Vec<PersonAnzeige>, AppError> {
+    liste_gefiltert(pool, einsatz_id, status, None).await
+}
+
+/// Wie [`liste`], zusätzlich auf die Betroffenen einer Betreuungsstelle eingegrenzt (LLH-1044):
+/// jüngster Verbleib `notunterkunft` an dieser, nicht stornierten Stelle — dieselbe Menge, die
+/// [`namentlich_je_stelle`] zählt. Eine unbekannte oder fremde Stelle ergibt eine leere Liste.
+pub async fn liste_gefiltert(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    status: Option<&str>,
+    betreuungsstelle_id: Option<i64>,
+) -> Result<Vec<PersonAnzeige>, AppError> {
     let sql = format!(
         "{SELECT_ALLE} WHERE einsatz_id = ?1 AND storniert_at IS NULL \
-         AND (?2 IS NULL OR status = ?2) ORDER BY registrier_nr"
+         AND (?2 IS NULL OR status = ?2) \
+         AND (?3 IS NULL OR (aktuelle_verbleib_art = 'notunterkunft' \
+              AND aktuelle_verbleib_betreuungsstelle_id = ?3 \
+              AND EXISTS (SELECT 1 FROM betreuungsstelle s WHERE s.id = ?3 \
+                          AND s.einsatz_id = ?1 AND s.storniert_at IS NULL))) \
+         ORDER BY registrier_nr"
     );
     Ok(
         sqlx::query_as::<_, PersonAnzeige>(sqlx::AssertSqlSafe(&*sql))
             .bind(einsatz_id)
             .bind(status)
+            .bind(betreuungsstelle_id)
             .fetch_all(pool)
             .await?
             .into_iter()

@@ -726,6 +726,12 @@ export function gruppenZahl(g: { etikett: string; zeilen: readonly unknown[] }):
 export const HERVORGEHOBEN = 'zeile-hervorgehoben';
 
 /**
+ * Bedienziele in einer Zeile, deren Klick nicht zusätzlich als Zeilenklick zählt — für
+ * `onZeileKlick` und das Aufklappen im Baum dieselbe Menge (LFH-548, LLH-1050).
+ */
+const ZEILEN_BEDIENZIEL = 'a, button, input, select, textarea, [role="button"]';
+
+/**
  * Scrollt die per Deeplink angesteuerte Zeile ins Bild, in BEIDEN Zweigen: `[data-row-key]` allein
  * trifft nur die Tabelle, unter `md` liefe der Sprung ins Leere. Deshalb hier und nicht in den
  * Seiten. `scrollIntoView` fehlt in jsdom; der optionale Aufruf hält das No-op fest.
@@ -1907,7 +1913,9 @@ export default function Datensicht<T extends object, const K extends string>(
           // Ein Portal (Auswahlliste eines Selects in der Zeile) reicht seinen Klick an die Zeile
           // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile (wie im Baum unten).
           if (!event.currentTarget.contains(event.target as Node)) return;
-          if ((event.target as HTMLElement).closest('a')) return;
+          // Eigene Bedienziele der Zeile bedienen den Klick allein (LLH-1050: sonst öffnete ein
+          // Zeilenknopf seinen Dialog UND die Zeile spränge auf ihr Ziel).
+          if ((event.target as HTMLElement).closest(ZEILEN_BEDIENZIEL)) return;
           onZeileKlick(zeile);
         },
       })
@@ -1927,7 +1935,7 @@ export default function Datensicht<T extends object, const K extends string>(
             // weiter, liegt im DOM aber woanders: er gehört nicht der Zeile.
             if (!event.currentTarget.contains(ziel)) return;
             // Eigene Bedienziele in der Zeile (Link, Knopf, Feld) bedienen den Klick allein.
-            if (ziel.closest('a, button, input, select, textarea, [role="button"]')) return;
+            if (ziel.closest(ZEILEN_BEDIENZIEL)) return;
             const kinder = zeile[baum.kinder] as readonly T[] | undefined;
             if (!kinder || kinder.length === 0) return;
             const k = schluessel(zeile);

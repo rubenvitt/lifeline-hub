@@ -175,6 +175,8 @@ const KONSUMENTEN = [
   // eigenem Spaltenregister.
   '/src/betreuung/BezirkTabelle.tsx',
   '/src/betreuung/StellenBlock.tsx',
+  // „Betroffene hier“ der Detailseite einer Betreuungsstelle (LLH-1044): Register der Stelle.
+  '/src/betreuung/StelleBetroffene.tsx',
   // Die Betroffenen einer Betreuungsstelle (LFH-1041): Register der eigenen Stelle.
   '/src/geraet/GeraetBetroffenePage.tsx',
   // Die Patientenliste eines UHS-Geräts (LFH-892): Register der eigenen UHS plus Spalte „Ort“.

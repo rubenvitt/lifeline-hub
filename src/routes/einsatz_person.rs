@@ -137,9 +137,13 @@ fn pruefe_vermisst_seit(roh: &str, jetzt: chrono::NaiveDateTime) -> Result<Strin
 #[derive(Debug, Deserialize)]
 pub struct ListeParams {
     pub status: Option<String>,
+    /// Nur die Betroffenen dieser Betreuungsstelle (LLH-1044): jüngster Verbleib
+    /// „Notunterkunft“ an ihr. Unlesbar → 400 (Query-Extractor).
+    pub betreuungsstelle_id: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/personen — Liste (optional `?status=`). NICHT auditiert.
+/// GET /api/einsaetze/{id}/personen — Liste (optional `?status=`, `?betreuungsstelle_id=`).
+/// NICHT auditiert, auch gefiltert nicht: auditiert ist das Detail, auf das die Liste führt.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personen>,
@@ -151,7 +155,13 @@ pub async fn liste(
         params.status.as_deref(),
         "Unbekannter Status im Filter",
     )?;
-    let mut liste = repo::liste(&state.pool, einsatz_id, params.status.as_deref()).await?;
+    let mut liste = repo::liste_gefiltert(
+        &state.pool,
+        einsatz_id,
+        params.status.as_deref(),
+        params.betreuungsstelle_id,
+    )
+    .await?;
     // Stellenbindung (LFH-892): ein Gerät sieht die Personen seiner Stelle, ein UHS-Gerät etwa,
     // wer je in seiner UHS belegt war.
     if let Some(sichtbar) = stelle::sichtbare_personen(&state.pool, ctx.geraet.as_ref()).await? {

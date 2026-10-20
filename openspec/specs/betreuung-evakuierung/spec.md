@@ -69,6 +69,37 @@ Betreuung MUST nur Stellen führen, mit der Primäraktion „Betreuungsstelle an
 - **WHEN** der Einsatz keinen aktiven Bezirk hat
 - **THEN** zeigt die Seite kein Kennzahlenband und sagt „Keine Evakuierungsbezirke“
 
+### Requirement: Übersicht der Betreuung
+
+Die Seite Betreuung SHALL die Unterbringung als Lagebild zeigen: über der Tabelle der Stellen
+ein Kennzahlenband „Unterbringung in Zahlen“ mit In Betreuung (Summe der aktuellen
+Belegungen), Kapazität (Summe nur über nicht geschlossene Stellen mit Kapazität), Frei (Summe
+der freien Plätze je nicht geschlossener Stelle mit Kapazität und Meldung, je Stelle nie
+negativ), Stellen in Betrieb (n von m), Voll/überbelegt und, nur mit Personenrecht, Davon
+namentlich. Hat keine Stelle gemeldet, MUST „In Betreuung“ „keine Meldung“ statt 0 zeigen;
+ohne jede Kapazität MUST „Kapazität“ ohne Zahl stehen. Als „ohne Meldung“ MUST nur eine Stelle
+in Betrieb gelten. Der Seitenkopf MUST „n Stellen · n in Betrieb“ und bei vollen Stellen
+„· n voll“ nennen. Ohne Stelle MUST statt Band und Tabelle „Keine Betreuungsstellen“ mit dem
+Knopf „Betreuungsstelle anlegen“ stehen, ohne Schreibrecht gesperrt mit sichtbarem Grund. Ein
+Klick in eine Zeile MUST auf die Detailseite der Stelle führen; Knöpfe der Zeile MUST nur ihre
+eigene Handlung auslösen.
+
+#### Scenario: Summen der Stellen
+- **WHEN** „Turnhalle Ost“ (Kapazität 150, belegt 89), „Weserstadion“ (Kapazität 150, belegt 140) und „Schule Nord“ (ohne Kapazität, ohne Meldung) in Betrieb sind
+- **THEN** zeigt das Band In Betreuung 229 mit „1 Stelle ohne Meldung“, Kapazität 300 mit „1 ohne Kapazität“, Frei 71 und Stellen in Betrieb 3 von 3
+
+#### Scenario: Überbelegung
+- **WHEN** eine Stelle mit Kapazität 40 mit 52 belegt ist und eine mit Kapazität 80 mit 80
+- **THEN** zeigt „Frei“ 0, nicht −12, und „Voll/überbelegt“ 2
+
+#### Scenario: Geschlossene Stelle
+- **WHEN** eine geschlossene Stelle eine Kapazität von 200 trägt
+- **THEN** zählt sie weder in „Kapazität“ noch in „Frei“
+
+#### Scenario: Keine Stelle
+- **WHEN** der Einsatz keine Betreuungsstelle hat
+- **THEN** zeigt die Seite kein Kennzahlenband, sondern „Keine Betreuungsstellen“ mit dem Knopf „Betreuungsstelle anlegen“
+
 ### Requirement: Modulzähler Evakuierung und Betreuung
 
 Der Navigationsrahmen SHALL am Modul Evakuierung die Zahl der aktiven Bezirke (nicht
@@ -239,11 +270,14 @@ Das System SHALL je Einsatz Betreuungsstellen führen. Eine Stelle trägt eine B
 (Pflicht, eindeutig unter den nicht stornierten Stellen des Einsatzes), eine Art
 (`anlaufstelle`, `betreuungsstelle`, `betreuungsplatz`, `notunterkunft`), optional einen
 Einsatzabschnitt desselben Einsatzes, optional eine Kapazität in Personen (ganzzahlig ≥ 1),
-optional Standort und Notiz sowie einen Status (`vorbereitet`, `in_betrieb`,
+optional Standort und Notiz, optional Leitung und Erreichbarkeit (Freitext, je höchstens 200
+Zeichen nach dem Trimmen, darüber 400) sowie einen Status (`vorbereitet`, `in_betrieb`,
 `geschlossen`; Vorgabe `vorbereitet`). Anlage, Änderung, Statuswechsel und Stornierung
-MUST je einen ETB-Eintrag schreiben, sofern sich ein Wert tatsächlich ändert. Eine Stelle
-MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre aktuelle Belegung 0 ist
-oder sie keine Belegungsmeldung hat.
+MUST je einen ETB-Eintrag schreiben, sofern sich ein Wert tatsächlich ändert. Eine Änderung
+von Leitung oder Erreichbarkeit MUST im ETB nur als „weitere Angaben“ erscheinen, nie mit
+ihrem Wert. Ein gesicherter Lagestand MUST Leitung und Erreichbarkeit nicht einfrieren. Eine
+Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre aktuelle Belegung
+0 ist oder sie keine Belegungsmeldung hat.
 
 #### Scenario: Stelle anlegen
 - **WHEN** die Notunterkunft „Turnhalle Ost“ mit Kapazität 150 angelegt wird
@@ -272,6 +306,65 @@ oder sie keine Belegungsmeldung hat.
 #### Scenario: Geschlossene Stelle wieder öffnen
 - **WHEN** eine geschlossene Stelle auf `in_betrieb` gesetzt wird
 - **THEN** ist sie wieder in Betrieb und nimmt Belegungsmeldungen an
+
+#### Scenario: Leitung und Erreichbarkeit
+- **WHEN** an der Stelle „Turnhalle Ost“ die Leitung „Frau Schulz“ und die Erreichbarkeit „0171 2345678“ gesetzt werden
+- **THEN** trägt die Übersicht beide Werte
+- **AND** der ETB-Eintrag der Änderung nennt „weitere Angaben“, aber weder den Namen noch die Nummer
+
+#### Scenario: Leitung zu lang
+- **WHEN** eine Leitung mit 201 Zeichen gesendet wird
+- **THEN** antwortet das System mit 400 „Leitung darf höchstens 200 Zeichen lang sein“ und ändert nichts
+
+#### Scenario: Lagestand ohne Leitung
+- **WHEN** ein Lagestand gesichert wird, während eine Stelle Leitung und Erreichbarkeit trägt
+- **THEN** enthält der gesicherte Stand die Stelle ohne Leitung und Erreichbarkeit
+
+### Requirement: Detailseite einer Betreuungsstelle
+
+Die Oberfläche SHALL jede nicht stornierte Betreuungsstelle unter
+`/einsaetze/<id>/betreuung/<stellen-id>` als eigene Seite zeigen. Die Seite MUST ihre Daten aus
+der Betreuungsübersicht lesen. Eine unbekannte, fremde oder stornierte Stelle und eine
+unlesbare Kennung MUST auf die Übersicht führen. Die Adresse `…/betreuung?stelle=<id>` MUST
+auf diese Seite umleiten. Die Bezeichnung einer Stelle in der Übersicht MUST auf ihre Seite
+führen; Sprünge von der Lagekarte und der Rückweg nach dem Verorten MUST dorthin führen.
+
+Der Kopf MUST Bezeichnung, Art und Status zeigen und genau eine Primäraktion „Belegung
+melden“ tragen; an einer geschlossenen Stelle MUST sie gesperrt stehen und der Grund sichtbar
+daneben. Der Statuswechsel MUST als Handlung benannt sein: „In Betrieb nehmen“
+(`vorbereitet`), „Schließen“ (`in_betrieb`), „Wieder öffnen“ (`geschlossen`). Das Schließen
+einer belegten Stelle MUST eine ausdrückliche Leermeldung verlangen und erst sie, dann den
+Status senden. Bearbeiten und Status MUST nur auf dieser Seite stehen, nicht in der Übersicht.
+
+Die Seite MUST zeigen: „Belegung in Zahlen“ (Belegt, Kapazität, Frei, mit Personenrecht
+„Davon namentlich“), die Stammdaten in einem Datenraster mit Bearbeiten in der Ansicht, den
+Meldeverlauf, mit Personenrecht die namentlich hier untergebrachten Personen und den Anteil
+der Stelle an „in Betreuung“ mit einem Sprung ins Modul Verpflegung, wenn dieses frei ist.
+„Frei“ MUST nie negativ sein; eine Überbelegung nennt das Auslastungswort.
+
+#### Scenario: Aus der Übersicht hinein
+- **WHEN** in der Übersicht die Bezeichnung „Turnhalle Ost“ gewählt wird
+- **THEN** öffnet sich ihre Detailseite mit „Belegung melden“ als Primäraktion
+
+#### Scenario: Alte Adresse
+- **WHEN** `…/betreuung?stelle=8` aufgerufen wird
+- **THEN** steht die Adresse auf `…/betreuung/8`
+
+#### Scenario: Stornierte Stelle
+- **WHEN** die Detailseite einer stornierten Stelle aufgerufen wird
+- **THEN** zeigt die Oberfläche die Übersicht
+
+#### Scenario: Schließen einer belegten Stelle
+- **WHEN** an einer Stelle mit Belegung 40 „Schließen“ gewählt und die Leermeldung bestätigt wird
+- **THEN** wird zuerst Belegung 0 gemeldet und danach der Status `geschlossen` gesetzt
+
+#### Scenario: Ohne Personenrecht
+- **WHEN** eine Person ohne Zugriff auf das Modul Personen die Detailseite öffnet
+- **THEN** fehlen „Davon namentlich“ und die Liste der Personen, eine Zeile nennt den Grund, und die Personenliste wird nicht abgefragt
+
+#### Scenario: Überbelegt
+- **WHEN** eine Stelle mit Kapazität 150 eine Belegung von 170 trägt
+- **THEN** zeigt „Frei“ 0 und „Belegt“ das Wort „überbelegt“
 
 ### Requirement: Belegung melden
 
@@ -429,12 +522,12 @@ Primäraktion gesperrt stehen lassen.
 
 Beim Schwärzen eines Einsatzes MUST das System Freitexte mit möglichem Personen- oder
 Adressbezug entfernen: Bezeichnungen von Bezirken und Stellen durch Platzhalter ersetzen,
-Sammelstelle, Standort und Notiz leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
+Sammelstelle, Standort, Notiz sowie Leitung und Erreichbarkeit einer Stelle leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
 Arten und Zeitpunkte MUST erhalten bleiben.
 
 #### Scenario: Einsatz schwärzen
 - **WHEN** ein Einsatz mit Bezirk „Uferstraße 12–40“ und Stelle „Turnhalle Ost, Ostring 5“ geschwärzt wird
-- **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort und Notiz sind leer
+- **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort, Notiz, Leitung und Erreichbarkeit sind leer
 - **AND** Plangröße, Stände, Kapazität und Belegungen sind unverändert
 
 ### Requirement: Offline-Erfassung von Stand- und Belegungsmeldungen

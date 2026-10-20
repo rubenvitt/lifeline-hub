@@ -88,6 +88,7 @@ import PressePage from './pages/PressePage';
 import PressemitteilungDetailPage from './pages/PressemitteilungDetailPage';
 import AbloesungPage from './pages/AbloesungPage';
 import BetreuungPage from './pages/BetreuungPage';
+import BetreuungsstelleDetailPage from './pages/BetreuungsstelleDetailPage';
 import EvakuierungPage from './pages/EvakuierungPage';
 import VerpflegungPage from './pages/VerpflegungPage';
 import AusgabeAnsicht from './verpflegung/AusgabeAnsicht';
@@ -435,6 +436,7 @@ export const appRouten = createRoutesFromElements(
           <Route path="personen/:personId" element={<PersonenDetailPage />} />
           <Route path="personen/:personId/druck" element={<PersonDruckPage />} />
           <Route path="tiere/:tierId" element={<TiereDetailPage />} />
+          <Route path="betreuung/:stelleId" element={<BetreuungsstelleDetailPage />} />
           <Route path="schaeden/:schadenId" element={<SchaedenDetailPage />} />
         </Route>
       </Route>

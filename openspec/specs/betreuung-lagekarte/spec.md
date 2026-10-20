@@ -69,7 +69,7 @@ Die Lagekarte SHALL jede nicht stornierte, verortete Betreuungsstelle als Marker
 Koordinate zeigen, mit dem taktischen Zeichen Grundzeichen „Stelle“ und Fachaufgabe
 „Betreuung“. Die Marker MUST eine eigene, schaltbare Ebene „Betreuungsstellen“ bilden. Die
 Auswahl eines Markers MUST Bezeichnung, Art und Status der Stelle zeigen und einen Sprung
-ins Modul Betreuung anbieten, der die Stelle dort auswählt. Stornierte Stellen MUST weder
+ins Modul Betreuung anbieten, der die Detailseite der Stelle öffnet. Stornierte Stellen MUST weder
 als Marker noch in einer Liste der Karte erscheinen.
 
 #### Scenario: Verortete Stelle
@@ -78,7 +78,7 @@ als Marker noch in einer Liste der Karte erscheinen.
 
 #### Scenario: Sprung ins Modul
 - **WHEN** der Marker ausgewählt und „Im Fachmodul öffnen“ gewählt wird
-- **THEN** öffnet sich die Betreuungsseite mit dieser Stelle ausgewählt
+- **THEN** öffnet sich die Detailseite dieser Stelle
 
 #### Scenario: Ebene ausblenden
 - **WHEN** die Ebene „Betreuungsstellen“ ausgeschaltet wird
@@ -95,9 +95,9 @@ verortet“ führen. Eine Person mit Schreibrecht MUST eine solche Stelle von do
 einen Klick in die Karte verorten können. Die Adresse
 `/einsaetze/<id>/lagekarte?platzieren=betreuungsstelle:<stellen-id>` MUST die Karte in den
 Platziermodus für diese Stelle schicken und den Parameter danach aus der Adresse entfernen.
-Ohne Schreibrecht MUST der Platziermodus nicht betreten werden. Die Betreuungsseite MUST
-an jeder nicht verorteten Stelle einen Einstieg „Auf Karte verorten“ anbieten, der zu
-dieser Adresse führt, sofern die Person Schreibrecht hat.
+Ohne Schreibrecht MUST der Platziermodus nicht betreten werden. Die Betreuungsseite und die
+Detailseite einer Stelle MUST an jeder nicht verorteten Stelle einen Einstieg „Auf Karte
+verorten“ anbieten, der zu dieser Adresse führt, sofern die Person Schreibrecht hat.
 
 #### Scenario: Aus der Liste platzieren
 - **WHEN** eine Person mit Schreibrecht in „Nicht verortet“ die Stelle „AS Rathaus“ wählt und in die Karte klickt

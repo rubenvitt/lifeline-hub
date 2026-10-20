@@ -346,20 +346,26 @@ for (const modus of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape');
     await expect(stelleAnlegen).toBeHidden();
 
-    // „Stelle bearbeiten" an der belegten Stelle, Status auf „geschlossen": erst dann stehen
-    // Leermeldungs-Hinweis und Häkchen im Dialog.
-    await menue(page, 'Aktionen zu Stelle Gemeindehaus Süd', 'Bearbeiten (Status, Kapazität)');
-    const bearbeiten = page.getByRole('dialog', { name: 'Stelle bearbeiten: Gemeindehaus Süd' });
-    await dialogSteht(page, bearbeiten);
-    await bearbeiten.getByText('geschlossen', { exact: true }).click();
-    const hinweis = bearbeiten.locator('.ant-alert');
+    // „Schließen“ an der belegten Stelle steht seit LLH-1044 auf ihrer Detailseite: erst dort
+    // stehen Leermeldungs-Hinweis und Häkchen im Dialog.
+    await inhalt.getByRole('link', { name: 'Gemeindehaus Süd', exact: true }).click();
+    await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    const schliessen = page.getByRole('dialog', {
+      name: 'Betreuungsstelle Gemeindehaus Süd schließen',
+    });
+    await dialogSteht(page, schliessen);
+    const hinweis = schliessen.locator('.ant-alert');
     await expect(hinweis).toHaveCount(1);
     await expect(hinweis).toContainText('Die Stelle ist mit 150 Personen belegt.');
-    await expect(bearbeiten.getByRole('checkbox')).toBeVisible();
-    await weitereAufklappen(page, bearbeiten);
-    await messeTexte(bearbeiten, 'Stelle bearbeiten');
+    await expect(schliessen.getByRole('checkbox')).toBeVisible();
+    await messeTexte(schliessen, 'Stelle schließen');
     await page.keyboard.press('Escape');
-    await expect(bearbeiten).toBeHidden();
+    await expect(schliessen).toBeHidden();
+    await page.goBack();
+    await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
+      STELLEN.length,
+    );
+    await eingeschwungen();
 
     // Das Zeilenmenü liegt als Portal AUSSERHALB des Seiteninhalts — der Textbaum sieht es nicht.
     await page
@@ -429,7 +435,7 @@ for (const modus of ['light', 'dark'] as const) {
     };
     for (const [flaeche, tragend] of [
       ['kopf', 'Betreuung'],
-      ['kopf', /^6 Betreuungsstellen · 2 voll$/],
+      ['kopf', /^6 Stellen · 4 in Betrieb · 2 voll$/],
       ['evakuierung-kopf', 'Evakuierung'],
       ['evakuierung-kopf', /^4 Bezirke$/],
       // Kennzahlenband und die Zellen „Evakuiert", mit „≈" und „keine Meldung" als zweitem Kanal.
@@ -448,30 +454,27 @@ for (const modus of ['light', 'dark'] as const) {
       ['inhalt', 'in Betrieb'],
       ['inhalt', 'vorbereitet'],
       ['inhalt', 'geschlossen'],
-      // Kopf der Stellentabelle.
-      ['inhalt', /^457 untergebracht · 2 voll · 2 ohne Meldung$/],
+      // Band „Unterbringung in Zahlen“ (LLH-1050): In Betreuung, Kapazität und Frei mit Notiz.
+      ['inhalt', /^457$/],
+      ['inhalt', /^530$/],
+      ['inhalt', '1 ohne Kapazität'],
+      ['inhalt', /^15$/],
+      ['inhalt', '1 ohne Meldung'],
       ['inhalt', 'Belegung melden'],
       ['Betreuungsstelle anlegen', 'Bezeichnung'],
-      // Leermeldungs-Hinweis und die Felder von „Stelle bearbeiten".
-      ['Stelle bearbeiten', 'Die Stelle ist mit 150 Personen belegt.'],
-      ['Stelle bearbeiten', 'Alle haben die Stelle verlassen — Belegung 0 melden'],
-      ['Stelle bearbeiten', 'Status'],
-      ['Stelle bearbeiten', 'Kapazität (Personen)'],
-      ['Stelle bearbeiten', 'Art'],
-      ['Stelle bearbeiten', 'Weitere Angaben'],
-      ['Stelle bearbeiten', 'Standort'],
-      ['Stelle bearbeiten', 'Abbrechen'],
+      // Leermeldungs-Hinweis und Häkchen von „Stelle schließen“ (Detailseite, LLH-1044).
+      ['Stelle schließen', 'Die Stelle ist mit 150 Personen belegt.'],
+      ['Stelle schließen', 'Alle haben die Stelle verlassen — Belegung 0 melden'],
+      ['Stelle schließen', 'Abbrechen'],
       ['Evakuierungsbezirk anlegen', 'Bezeichnung'],
       ['Stand melden: Uferstraße 12–40', 'Zeitpunkt'],
       // Der GEWÄHLTE Radio-Knopf, tragend (Text über `--lfh-bedien-text`).
-      ['Stelle bearbeiten', 'geschlossen'],
       ['Evakuierungsbezirk anlegen', 'geschätzt'],
       ['Stand melden: Uferstraße 12–40', 'gezählt'],
-      ['Zeilenmenü', 'Bearbeiten (Status, Kapazität)'],
       ['Stornieren', 'Betreuungsstelle Turnhalle Ost stornieren?'],
       ['Stornieren', 'Abbrechen'],
       // Primärknöpfe: Kopfknopf und Absende-Knopf (Weiß auf `bedien`, LFH-661).
-      ['Stelle bearbeiten', 'Speichern'],
+      ['Stelle schließen', 'Stelle schließen'],
       ['kopf', 'Betreuungsstelle anlegen'],
       ['evakuierung-kopf', 'Evakuierungsbezirk anlegen'],
     ] as const)
@@ -485,6 +488,7 @@ for (const modus of ['light', 'dark'] as const) {
       // Augenbrauen: Blockkopf der Stellen, Titel des Kennzahlenbands; dazu die Tabellenköpfe.
       ['inhalt', 'Betreuungsstellen'],
       ['inhalt', 'Kapazität'],
+      ['inhalt', 'In Betreuung'],
       ['evakuierung-inhalt', 'Evakuiert'],
       ['evakuierung-inhalt', 'Räumung'],
       ['Evakuierungsbezirk anlegen', 'Keine Namen von Bewohnern.'],
@@ -646,14 +650,15 @@ const DIALOGE: DialogFall[] = [
       page.getByRole('button', { name: 'Belegung melden für Gemeindehaus Süd' }).click(),
   },
   {
-    name: 'Stelle bearbeiten (Schließen mit Leermeldung)',
+    // Seit LLH-1044 auf der Detailseite der Stelle; geöffnet über ihre Kennung in der Übersicht.
+    name: 'Stelle schließen (mit Leermeldung)',
     seite: 'betreuung',
-    scrollt: true,
-    titel: 'Stelle bearbeiten: Gemeindehaus Süd',
-    oeffne: (page) =>
-      menue(page, 'Aktionen zu Stelle Gemeindehaus Süd', 'Bearbeiten (Status, Kapazität)'),
+    titel: 'Betreuungsstelle Gemeindehaus Süd schließen',
+    oeffne: async (page) => {
+      await page.getByRole('link', { name: 'Gemeindehaus Süd', exact: true }).click();
+      await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    },
     vorbereiten: async (_page, dialog) => {
-      await dialog.getByText('geschlossen', { exact: true }).click();
       await expect(dialog.locator('.ant-alert')).toHaveCount(1);
       await expect(dialog.getByRole('checkbox')).toBeVisible();
     },

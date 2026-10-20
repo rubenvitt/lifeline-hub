@@ -19,7 +19,7 @@ import type {
 } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import { istHier } from './GeraetBetroffenePage';
-import { freiePlaetze } from './GeraetBetreuungsstellePage';
+import { freiePlaetze } from '../betreuung/betreuungText';
 import { geraetDarf } from './geraetSicht';
 
 /**
