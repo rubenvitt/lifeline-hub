@@ -2,7 +2,7 @@ import type { Schaden } from '../../api/types';
 import { schadenRegistrierAnzeige } from '../../api/einsatzSchaden';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import DruckTabelle, { druckZeit, type DruckSpalte } from '../../druck/DruckTabelle';
-import { AUSMASS_META, STATUS_META, TYP_LABEL, geschaedigtText } from './schadenHelfer';
+import { AUSMASS_META, STATUS_META, TYP_LABEL, gefahrText, geschaedigtText } from './schadenHelfer';
 
 interface Props {
   /** Die gedruckte Auswahl, in beliebiger Ordnung. */
@@ -20,6 +20,8 @@ export default function SchaedenDruckTabelle({ schaeden, konventionen }: Props) 
     { titel: 'Nr.', mono: true, wert: (s) => schadenRegistrierAnzeige(s.registrier_nr) },
     { titel: 'Typ', wert: (s) => TYP_LABEL[s.typ] },
     { titel: 'Ausmaß', wert: (s) => AUSMASS_META[s.ausmass].label },
+    // Gefahr und Schadensgrad in Worten, wie in der Liste (LLH-1115).
+    { titel: 'Gefahr', wert: gefahrText },
     { titel: 'Ort', wert: (s) => s.ort },
     {
       titel: 'Status',

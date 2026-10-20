@@ -11,6 +11,7 @@ import SchaedenPage from './SchaedenPage';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 import { schaedenAttrappe } from '../test/schaedenAttrappe';
+import * as dateiSpeichern from '../components/dateiSpeichern';
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
@@ -47,6 +48,12 @@ const einePerson = {
   vorname: 'Anna',
 };
 const eineEinsatzkraft = { id: 99, einsatz_id: 1, name: 'Schulz', funktion: 'Sanitäter' };
+
+/**
+ * Comboboxen im Erfassungsdialog bei aufgeklappten „Weiteren Angaben“: Typ, Ausmaß, Gefahr,
+ * Schadensgrad (LLH-1115), Geschädigt.
+ */
+const GESCHAEDIGT = 4;
 
 function basisSchaden(overrides: Record<string, unknown> = {}) {
   return {
@@ -330,7 +337,8 @@ describe('SchaedenPage', () => {
     expect(weitereAngaben).toHaveAttribute('aria-expanded', 'false');
     await oeffneWeitereAngaben(dialog);
     expect(within(dialog).getByRole('textbox', { name: 'Koordinate' })).toBeInTheDocument();
-    expect(sichtbareFelder()).toHaveLength(6);
+    // Aufgeklappt: Beschreibung, Schadensgrad (LLH-1115), Geschädigt, Koordinate.
+    expect(sichtbareFelder()).toHaveLength(8);
     await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
 
     const panel = within(dialog)
@@ -477,7 +485,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
     await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
     await oeffneWeitereAngaben(dialog);
-    await userEvent.click(within(dialog).getAllByRole('combobox')[2]); // Geschädigt
+    await userEvent.click(within(dialog).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('R-007 · Anna Meier');
     await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
@@ -566,7 +574,7 @@ describe('SchaedenPage', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
     const ersterDialog = await modalDialog();
     await oeffneWeitereAngaben(ersterDialog);
-    expect(within(ersterDialog).getAllByRole('combobox')[2]).toHaveValue('');
+    expect(within(ersterDialog).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
     await fuelleSchaden(ersterDialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
     await userEvent.type(
       within(ersterDialog).getByPlaceholderText('Koordinate eingeben'),
@@ -585,7 +593,7 @@ describe('SchaedenPage', () => {
     expect(
       within(zweiterDialog).getByRole('checkbox', { name: 'Werte behalten' }),
     ).not.toBeChecked();
-    expect(within(zweiterDialog).getAllByRole('combobox')[2]).toHaveValue('');
+    expect(within(zweiterDialog).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
     expect(within(zweiterDialog).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
   });
 
@@ -696,9 +704,9 @@ describe('SchaedenPage', () => {
     await waehleOption('Sachschaden');
     await userEvent.click(within(dialogA).getAllByRole('combobox')[1]);
     await waehleOption('gering');
-    await userEvent.type(within(dialogA).getByLabelText('Beschreibung'), 'Nur Einsatz A');
     await oeffneWeitereAngaben(dialogA);
-    await userEvent.click(within(dialogA).getAllByRole('combobox')[2]);
+    await userEvent.type(within(dialogA).getByLabelText('Beschreibung'), 'Nur Einsatz A');
+    await userEvent.click(within(dialogA).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('R-007 · Anna Meier');
     await userEvent.type(within(dialogA).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
@@ -707,9 +715,9 @@ describe('SchaedenPage', () => {
     await waitFor(() => expect(within(dialogB).getByLabelText('Ort')).toHaveValue('Schadenort B'));
     expect(within(dialogB).getAllByRole('combobox')[0]).toHaveValue('');
     expect(within(dialogB).getAllByRole('combobox')[1]).toHaveValue('');
-    expect(within(dialogB).getByLabelText('Beschreibung')).toHaveValue('');
     await oeffneWeitereAngaben(dialogB);
-    expect(within(dialogB).getAllByRole('combobox')[2]).toHaveValue('');
+    expect(within(dialogB).getByLabelText('Beschreibung')).toHaveValue('');
+    expect(within(dialogB).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
     expect(within(dialogB).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
   });
 
@@ -729,9 +737,9 @@ describe('SchaedenPage', () => {
     await userEvent.click(within(dialog).getAllByRole('combobox')[1]); // Ausmaß
     await waehleOption('gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
-    // Geschädigt-Combobox (3.) öffnen und die betroffene Person wählen.
+    // Geschädigt-Combobox öffnen und die betroffene Person wählen.
     await oeffneWeitereAngaben(dialog);
-    await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
+    await userEvent.click(within(dialog).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('R-007 · Anna Meier');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body.geschaedigt_person_id).toBe(42));
@@ -757,7 +765,7 @@ describe('SchaedenPage', () => {
     await waehleOption('gering');
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
     await oeffneWeitereAngaben(dialog);
-    await userEvent.click(within(dialog).getAllByRole('combobox')[2]);
+    await userEvent.click(within(dialog).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('Schulz · Sanitäter');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(body.geschaedigt_personal_id).toBe(99));
@@ -784,7 +792,7 @@ describe('SchaedenPage', () => {
     await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
     // In die Geschädigt-Combobox tippen → synthetische „extern"-Option erscheint.
     await oeffneWeitereAngaben(dialog);
-    const geschaedigt = within(dialog).getAllByRole('combobox')[2];
+    const geschaedigt = within(dialog).getAllByRole('combobox')[GESCHAEDIGT];
     await userEvent.click(geschaedigt);
     await userEvent.type(geschaedigt, 'Familie Krause');
     const externOption = (await screen.findAllByText(/Als externen Kontakt/)).find((el) =>
@@ -946,5 +954,81 @@ describe('SchaedenPage — Einstieg in den Druck (LFH-727)', () => {
     render(einsatzBeobachter, [basisSchaden()]);
     await screen.findByText('S-001');
     expect(await druckLink()).toBeInTheDocument();
+  });
+});
+
+/** Gefahr und Schadensgrad in der Liste, Filter nach Gefahr und CSV (LLH-1115). */
+describe('SchaedenPage — Gefahr und CSV (LLH-1115)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('nennt Gefahr und Schadensgrad in Worten, ohne Angabe einen Strich', async () => {
+    render(einsatzAktiv, [
+      basisSchaden({ gefahrenart: 'elektrizitaet', schadensgrad: 'zerstoert' }),
+      basisSchaden({ id: 11, registrier_nr: 2 }),
+    ]);
+    const mit = await screen.findByRole('row', { name: /S-001/ });
+    expect(within(mit).getByText('Elektrizität · total zerstört')).toBeInTheDocument();
+    const ohne = screen.getByRole('row', { name: /S-002/ });
+    expect(within(ohne).getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('der Filter „Gefahr“ geht an den Server', async () => {
+    const attrappe = schaedenAttrappe(1, () => [
+      basisSchaden({ gefahrenart: 'atemgifte' }),
+      basisSchaden({ id: 11, registrier_nr: 2 }),
+    ]);
+    server.use(
+      meHandler(nutzer),
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      ...attrappe.handler,
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/schaeden" element={<SchaedenPage />} />
+      </Routes>,
+      { route: '/einsaetze/1/schaeden' },
+    );
+    await screen.findByText('S-002');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Gefahr' }));
+    const option = (await screen.findAllByText('Atemgifte')).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await userEvent.click(option!);
+    await waitFor(() => expect(screen.queryByText('S-002')).toBeNull());
+    expect(screen.getByText('S-001')).toBeInTheDocument();
+    expect(attrappe.abrufe[attrappe.abrufe.length - 1].get('gefahrenart')).toBe('atemgifte');
+  });
+
+  it('„CSV exportieren“ lädt den Export und speichert ihn', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    render(einsatzBeobachter, [basisSchaden()]);
+    // Nach `render`: sonst finge die Einzelabruf-Route der Attrappe `/export` als Schaden-ID.
+    server.use(
+      http.get(
+        '/api/einsaetze/1/schaeden/export',
+        () => new HttpResponse('registrier_nr;status\nS-001;offen\n'),
+      ),
+    );
+    await screen.findByText('S-001');
+    await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    const [datei, name] = speichern.mock.calls[0];
+    expect(await (datei as Blob).text()).toContain('S-001');
+    expect(name).toMatch(/^schaeden-einsatz-1-\d{4}-\d{2}-\d{2}-\d{4}\.csv$/);
+  });
+
+  it('ein gescheiterter Export meldet sich an der Seite', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    render(einsatzAktiv, [basisSchaden()]);
+    server.use(
+      http.get('/api/einsaetze/1/schaeden/export', () =>
+        HttpResponse.json({ error: 'Kein Zugriff auf das Modul Schäden' }, { status: 403 }),
+      ),
+    );
+    await screen.findByText('S-001');
+    await userEvent.click(await screen.findByRole('button', { name: 'CSV exportieren' }));
+    expect(await screen.findByText('Kein Zugriff auf das Modul Schäden')).toBeInTheDocument();
+    expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
+    expect(speichern).not.toHaveBeenCalled();
   });
 });

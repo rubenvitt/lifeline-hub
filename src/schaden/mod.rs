@@ -7,6 +7,7 @@ pub const ORT_MAX: usize = 500;
 /// Höchstlänge der Beschreibung eines Schadens (LFH-937, design.md D6).
 pub const BESCHREIBUNG_MAX: usize = 8_000;
 
+use crate::gefahr::Gefahrentyp;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -149,6 +150,53 @@ where
     }
 }
 
+// ---------- Schadensgrad ----------
+
+wire_enum! {
+    /// Schadensgrad nach DV 102, Kap. 5.8.4 (LLH-1115, design.md D1/D3). Das Kartenzeichen bildet
+    /// erst der Client (`frontend/src/zeichen/fachobjektZeichen.ts`).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum Schadensgrad {
+        Angeschlagen => "angeschlagen",
+        Teilzerstoert => "teilzerstoert",
+        Zerstoert => "zerstoert",
+    }
+}
+
+impl Schadensgrad {
+    /// Wort im ETB-Text, dasselbe wie `SCHADENSGRAD_LABEL` in
+    /// `frontend/src/pages/schaeden/schadenHelfer.tsx` (DV 102: „Total zerstört“).
+    pub fn etb_label(&self) -> &'static str {
+        match self {
+            Schadensgrad::Angeschlagen => "angeschlagen",
+            Schadensgrad::Teilzerstoert => "teilzerstört",
+            Schadensgrad::Zerstoert => "total zerstört",
+        }
+    }
+}
+
+// Nullable Spalte (`schadensgrad`) — gleiches Muster wie `AbschlussGrund` (s. u.).
+impl<DB: sqlx::Database> sqlx::Type<DB> for Schadensgrad
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Schadensgrad
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Schadensgrad::parse(s).ok_or_else(|| format!("Ungültiger Schadensgrad: {s}").into())
+    }
+}
+
 // ---------- Abschlussgrund ----------
 
 wire_enum! {
@@ -231,6 +279,12 @@ pub struct SchadenAnzeige {
     pub status: SchadenStatus,
     pub typ: SchadenTyp,
     pub ausmass: Ausmass,
+    /// Gefahrenart im Vokabular der Gefahrengebiete (LLH-1115); fehlt = keine Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gefahrenart: Option<Gefahrentyp>,
+    /// Schadensgrad nach DV 102, 5.8.4 (LLH-1115); fehlt = keine Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schadensgrad: Option<Schadensgrad>,
     pub ort: String,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
@@ -268,6 +322,11 @@ pub struct SchadenMarker {
     pub status: SchadenStatus,
     pub typ: SchadenTyp,
     pub ausmass: Ausmass,
+    /// Bestimmt mit dem Schadensgrad das Kartenzeichen (LLH-1115); fehlt = keine Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gefahrenart: Option<Gefahrentyp>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schadensgrad: Option<Schadensgrad>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
 }
@@ -321,6 +380,16 @@ mod tests {
         for s in ["gering", "mittel", "gross", "katastrophal"] {
             assert_eq!(Ausmass::parse(s).unwrap().as_str(), s);
         }
+    }
+
+    #[test]
+    fn schadensgrad_roundtrip_und_worte_nach_dv_102() {
+        for s in ["angeschlagen", "teilzerstoert", "zerstoert"] {
+            assert_eq!(Schadensgrad::parse(s).unwrap().as_str(), s);
+        }
+        assert!(Schadensgrad::parse("kaputt").is_none());
+        assert_eq!(Schadensgrad::Teilzerstoert.etb_label(), "teilzerstört");
+        assert_eq!(Schadensgrad::Zerstoert.etb_label(), "total zerstört");
     }
 
     #[test]
