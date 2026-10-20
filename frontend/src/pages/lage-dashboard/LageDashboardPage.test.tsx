@@ -911,7 +911,9 @@ describe('LageDashboardPage — Wetterwarnung im Seitenkopf (LLH-1117)', () => {
       return el as HTMLElement;
     });
     expect(m.closest('[data-lfh="lagebild-meta"]')).not.toBeNull();
-    expect(m.textContent).toMatch(/^Unwetterwarnung Starkregen ab \d\d:\d\d ↗$/);
+    // Beginn ist jetzt + 3 h: nach 21 Uhr liegt er am Folgetag, dann steht der Tag davor
+    // (`standZeit`: `DD. HH:mm`).
+    expect(m.textContent).toMatch(/^Unwetterwarnung Starkregen ab (\d\d\. )?\d\d:\d\d ↗$/);
     const link = within(m).getByRole('link', { name: /^Unwetterwarnung Starkregen ab / });
     expect(link).toHaveAttribute('href', '/einsaetze/1/wetter-pegel');
     // Nie im Kennzahlenband (LFH-640) und still: kein Toast, kein Hinweis.
