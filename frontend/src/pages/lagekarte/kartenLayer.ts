@@ -7,7 +7,7 @@ import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
 import type { ZoneTyp } from '../../api/types';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
-import { reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
+import { deckkraftImFokus, reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 
@@ -51,7 +51,8 @@ export type FlaechenFeatureCollection = {
   features: {
     type: 'Feature';
     id: number;
-    properties: { id: number; label: string };
+    /** `gedaempft`: Fläche eines fremden Abschnitts im Fokus (LLH-1057), nur Deckkraft. */
+    properties: { id: number; label: string; gedaempft: boolean };
     geometry: GeoJsonPolygon;
   }[];
 };
@@ -78,15 +79,24 @@ export type ZonenFeatureCollection = {
   }>;
 };
 
+/** Eine Abschnittsfläche, wie die Karte sie bekommt. */
+export interface AbschnittFlaeche {
+  id: number;
+  label: string;
+  polygon: GeoJsonPolygon;
+  /** Fremder Abschnitt im Fokus (LLH-1057, `abschnittFokus.ts`): gedämpft, nicht entfernt. */
+  gedaempft?: true;
+}
+
 export function baueFlaechenFc(
-  flaechen: { id: number; label: string; polygon: GeoJsonPolygon }[] | undefined,
+  flaechen: readonly AbschnittFlaeche[] | undefined,
 ): FlaechenFeatureCollection {
   return {
     type: 'FeatureCollection',
     features: (flaechen ?? []).map((f) => ({
       type: 'Feature',
       id: f.id,
-      properties: { id: f.id, label: f.label },
+      properties: { id: f.id, label: f.label, gedaempft: f.gedaempft === true },
       geometry: f.polygon,
     })),
   };
@@ -131,7 +141,7 @@ export function sorgeFuerAbschnittLayer(map: MapLibreMap, daten: FlaechenFeature
       id: 'abschnitte-fill',
       type: 'fill',
       source: 'abschnitte',
-      paint: { 'fill-color': ABSCHNITT_FARBE, 'fill-opacity': 0.15 },
+      paint: { 'fill-color': ABSCHNITT_FARBE, 'fill-opacity': deckkraftImFokus(0.15) },
     });
   }
   if (!map.getLayer('abschnitte-line')) {
@@ -139,7 +149,11 @@ export function sorgeFuerAbschnittLayer(map: MapLibreMap, daten: FlaechenFeature
       id: 'abschnitte-line',
       type: 'line',
       source: 'abschnitte',
-      paint: { 'line-color': ABSCHNITT_FARBE, 'line-width': 2 },
+      paint: {
+        'line-color': ABSCHNITT_FARBE,
+        'line-width': 2,
+        'line-opacity': deckkraftImFokus(1),
+      },
     });
   }
 }
