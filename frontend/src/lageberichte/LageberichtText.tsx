@@ -1,14 +1,11 @@
-import { Typography, theme } from 'antd';
-import Markdown from '../components/Markdown';
 import type { LageberichtAnzeige } from '../api/types';
-import { vorlage, type AbschnittDef } from './vorlagen';
-
-/** Ebene der Überschrift über dem Berichtstext; Titel und `#` im Text rücken eine darunter. */
-type BerichtUnterEbene = 1 | 2 | 3 | 4;
+import AbschnittsText, { type AbschnittsTextUnterEbene } from '../entwurf/AbschnittsText';
+import { vorlage } from './vorlagen';
 
 /**
  * Der Berichtstext eines Lageberichts zum Lesen: je Vorlagen-Abschnitt Titel und Markdown,
- * ein leerer Abschnitt als „—". Ein Bauteil für Detailseite und Sprungpalette.
+ * ein leerer Abschnitt als „—". Ein Bauteil für Detailseite und Sprungpalette; die Mechanik
+ * trägt `entwurf/AbschnittsText.tsx`.
  *
  * `unterEbene` wie an `components/Markdown.tsx`: die Ebene der nächsten Überschrift ÜBER dem
  * Bauteil. Abschnittstitel und `#` im Text stehen eine Ebene darunter. Der Rahmen bleibt beim
@@ -19,7 +16,7 @@ export default function LageberichtText({
   unterEbene,
 }: {
   bericht: LageberichtAnzeige;
-  unterEbene: BerichtUnterEbene;
+  unterEbene: AbschnittsTextUnterEbene;
 }) {
   return (
     <AbschnittsText
@@ -27,50 +24,5 @@ export default function LageberichtText({
       abschnitte={bericht.abschnitte}
       unterEbene={unterEbene}
     />
-  );
-}
-
-/**
- * Der Lesetext eines Vorlagendokuments aus Gliederung und gefüllten Abschnitten. Geteilt von
- * Lagebericht und Pressemitteilung (LFH-554); die Gliederung liefert die Vorlage der Art.
- */
-export function AbschnittsText({
-  gliederung,
-  abschnitte,
-  unterEbene,
-}: {
-  gliederung: readonly AbschnittDef[];
-  abschnitte: readonly { schluessel: string; text: string }[];
-  unterEbene: BerichtUnterEbene;
-}) {
-  const { token } = theme.useToken();
-  const abschnittEbene = (unterEbene + 1) as 2 | 3 | 4 | 5;
-  return (
-    <>
-      {gliederung.map((a) => {
-        const text = abschnitte.find((x) => x.schluessel === a.schluessel)?.text ?? '';
-        // Eine Ebene unter dem Rahmen; Satz bleibt der von h5. Im Titelblock mit dem ersten
-        // Absatz, damit er im Druck nicht allein am Seitenende steht (LFH-1008).
-        const titel = (
-          <Typography.Title level={abschnittEbene} style={{ fontSize: token.fontSizeHeading5 }}>
-            {a.label}
-          </Typography.Title>
-        );
-        return (
-          <section key={a.schluessel} style={{ marginBottom: 16 }}>
-            {text.trim() ? (
-              <Markdown variante="dokument" unterEbene={abschnittEbene} titel={titel}>
-                {text}
-              </Markdown>
-            ) : (
-              <div data-lfh="titelblock">
-                {titel}
-                <Typography.Paragraph>—</Typography.Paragraph>
-              </div>
-            )}
-          </section>
-        );
-      })}
-    </>
   );
 }

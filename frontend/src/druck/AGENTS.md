@@ -42,8 +42,8 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   um, ein Titel bliebe allein am Seitenende. Titel und erster Block teilen sich eine Hülle
   `data-lfh="titelblock"`, die `druck.css` nicht brechen lässt. Überschriften im Markdown fasst
   `components/markdownTitelbloecke.ts` zusammen; einen Abschnittstitel außerhalb des Textes gibt
-  man `Markdown` als `titel` (Lesefassung) bzw. dem Editor als `druckTitel` (Entwurf: Akkordeonkopf
-  und Feldetikett weichen auf Papier). Wirkung nur im echten Firefox-Druck sichtbar
+  man `Markdown` als `titel` (Lesefassung) bzw. dem Editor als `druckTitel` (Entwurf: der Abschnittskopf
+  des Bausteins `entwurf/DokumentEntwurf` weicht auf Papier, `entwurf/dokumentEntwurf.css`). Wirkung nur im echten Firefox-Druck sichtbar
   (Minimalprobe `docs/superpowers/specs/2026-09-25-lfh-22-belege/lfh-813/werkzeug/`).
   Im Einsatzbericht (LFH-1098, `druck/einsatzbericht/Bloecke.tsx`) reichen Block und Abschnitt
   ihre Titel an das erste Inhaltsstück weiter: eine Liste nimmt sie mit ihrer ersten Zeile auf

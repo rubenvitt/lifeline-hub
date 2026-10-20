@@ -1020,7 +1020,7 @@ async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichn
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
         cookie,
         Some(
             &json!({"bezeichnung": bezeichnung, "plan_personen": 640, "plan_erhebung": "geschaetzt"})
@@ -1056,7 +1056,7 @@ async fn flaechen(app: &axum::Router, cookie: &str, einsatz: i64, bezirk: i64) -
     let (_, u) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &format!("/api/einsaetze/{einsatz}/evakuierung"),
         cookie,
         None,
     )
@@ -1117,7 +1117,7 @@ async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
     let (s, a) = bezirksflaeche(&app, &admin, e, Some(ufer)).await;
     assert_eq!(s, StatusCode::CREATED, "{a:?}");
     assert_eq!(a["evakuierungsbezirk_id"], ufer);
-    let n = recv_until_tag(&mut rx, "betreuung", Duration::from_secs(1)).await;
+    let n = recv_until_tag(&mut rx, "evakuierung", Duration::from_secs(1)).await;
     let v: Value = serde_json::from_str(&n.data).unwrap();
     assert_eq!(
         v["bezirk_id"], ufer,
@@ -1165,7 +1165,7 @@ async fn zwei_teilflaechen_an_einem_bezirk_und_flaechen_zaehlt_mit() {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let n = recv_until_tag(&mut rx, "betreuung", Duration::from_secs(1)).await;
+    let n = recv_until_tag(&mut rx, "evakuierung", Duration::from_secs(1)).await;
     let v: Value = serde_json::from_str(&n.data).unwrap();
     assert_eq!(v["bezirk_id"], ufer);
     assert_eq!(flaechen(&app, &admin, e, ufer).await, 0);
@@ -1190,7 +1190,7 @@ async fn typwechsel_weg_vom_bezirk_loescht_die_zuordnung() {
     .await;
     assert_eq!(s, StatusCode::OK, "{z:?}");
     assert!(!z.as_object().unwrap().contains_key("evakuierungsbezirk_id"));
-    let n = recv_until_tag(&mut rx, "betreuung", Duration::from_secs(1)).await;
+    let n = recv_until_tag(&mut rx, "evakuierung", Duration::from_secs(1)).await;
     let v: Value = serde_json::from_str(&n.data).unwrap();
     assert_eq!(
         v["bezirk_id"], ufer,
@@ -1243,7 +1243,7 @@ async fn zuordnung_statuscodes_422_404_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/betreuung/bezirke/{ufer}/stornieren"),
+        &format!("/api/einsaetze/{e}/evakuierung/bezirke/{ufer}/stornieren"),
         &admin,
         None,
     )
@@ -1254,7 +1254,7 @@ async fn zuordnung_statuscodes_422_404_409() {
 }
 
 #[tokio::test]
-async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
+async fn zuordnung_ohne_modul_evakuierung_ist_403_loesen_bleibt_erlaubt() {
     let (app, _) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -1265,7 +1265,8 @@ async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     common::rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    // Betreuung nur für Führungskräfte der Organisation.
+    // Seit LLH-1034 hängt die Zuordnung am Modul Evakuierung, nicht an Betreuung: eine
+    // Betreuungs-Schranke allein sperrt sie nicht.
     let (s, j) = anfrage(
         &app,
         "PUT",
@@ -1275,10 +1276,23 @@ async fn zuordnung_ohne_modul_betreuung_ist_403_loesen_bleibt_erlaubt() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "Override: {j:?}");
+    let (s, j) = bezirksflaeche(&app, &frieda, e, Some(ufer)).await;
+    assert_eq!(s, StatusCode::CREATED, "nur Betreuung beschränkt: {j:?}");
+
+    // Evakuierung nur für Führungskräfte der Organisation.
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/evakuierung"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"fuehrungskraft"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "Override: {j:?}");
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/betreuung"),
+        &format!("/api/einsaetze/{e}/evakuierung"),
         &frieda,
         None,
     )
@@ -1333,7 +1347,7 @@ async fn bezirk_storno_meldet_jede_geloeste_flaeche_als_lage_zone() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/betreuung/bezirke/{ufer}/stornieren"),
+        &format!("/api/einsaetze/{e}/evakuierung/bezirke/{ufer}/stornieren"),
         &admin,
         None,
     )

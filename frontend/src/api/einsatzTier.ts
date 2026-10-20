@@ -26,6 +26,9 @@ export interface TierEingabe {
   halter_person_id?: number | null;
   halter_kontakt?: string | null;
   antreff_ort?: string | null;
+  /** Fundort-Koordinate (LLH-1123), nur als Paar. */
+  antreff_lat?: number | null;
+  antreff_lon?: number | null;
   notiz?: string | null;
 }
 
@@ -39,6 +42,9 @@ export interface TierPatch {
   kennzeichnung?: string | null;
   groesse_gewicht?: string | null;
   antreff_ort?: string | null;
+  /** Fundort-Koordinate (LLH-1123): nur als Paar setzen oder leeren, ein halbes Paar ist 422. */
+  antreff_lat?: number | null;
+  antreff_lon?: number | null;
   notiz?: string | null;
   halter_person_id?: number | null;
   halter_kontakt?: string | null;

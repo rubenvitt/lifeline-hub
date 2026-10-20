@@ -16,6 +16,7 @@ import type {
   KartenAnsicht,
 } from '../../api/types';
 import type { Hintergrundbild } from '../../api/kartenbilder';
+import type { TierKartenEintrag } from './tierMarker';
 
 /**
  * Woraus die Lagekarte ihre Objekte zieht: der Live-Zustand oder ein eingefrorener Snapshot
@@ -63,4 +64,9 @@ export interface SnapshotDaten {
    * „Bereitstellungsräume" lässt der Server es weg.
    */
   bereitstellungsraeume?: BrListenEintrag[];
+  /**
+   * Offene und vermisste Tiere mit Fundort-Koordinate (LLH-1123), schmal ohne Halter und Notiz
+   * (`TierKarte` in `src/tier/mod.rs`). Optional wie `bereitstellungsraeume`.
+   */
+  tiere?: TierKartenEintrag[];
 }

@@ -572,8 +572,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen",
             post(routes::abloesung::zuruecknehmen),
         )
-        // Betreuung: Evakuierungsbezirke und Betreuungsstellen mit je einer Meldereihe. Rücknahmen
-        // hängen an der Meldung; Bezirk bzw. Stelle kennt die Route erst aus ihr.
+        // Betreuung: Betreuungsstellen mit ihrer Belegungsreihe. Rücknahmen hängen an der Meldung;
+        // die Stelle kennt die Route erst aus ihr.
         .route(
             "/api/einsaetze/{id}/betreuung",
             get(routes::betreuung::uebersicht),
@@ -582,25 +582,30 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/betreuung/belegung",
             get(routes::betreuung::kopfzahl),
         )
+        // Modul Evakuierung (LLH-1034): die Bezirksrouten sind aus `…/betreuung` umgezogen.
         .route(
-            "/api/einsaetze/{id}/betreuung/bezirke",
-            post(routes::betreuung::bezirk_anlegen),
+            "/api/einsaetze/{id}/evakuierung",
+            get(routes::evakuierung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/bezirke/{bid}",
-            patch(routes::betreuung::bezirk_aendern),
+            "/api/einsaetze/{id}/evakuierung/bezirke",
+            post(routes::evakuierung::bezirk_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/bezirke/{bid}/stornieren",
-            post(routes::betreuung::bezirk_stornieren),
+            "/api/einsaetze/{id}/evakuierung/bezirke/{bid}",
+            patch(routes::evakuierung::bezirk_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende",
-            get(routes::betreuung::stand_verlauf).post(routes::betreuung::stand_melden),
+            "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/stornieren",
+            post(routes::evakuierung::bezirk_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/staende/{sid}/zuruecknehmen",
-            post(routes::betreuung::stand_zuruecknehmen),
+            "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende",
+            get(routes::evakuierung::stand_verlauf).post(routes::evakuierung::stand_melden),
+        )
+        .route(
+            "/api/einsaetze/{id}/evakuierung/staende/{sid}/zuruecknehmen",
+            post(routes::evakuierung::stand_zuruecknehmen),
         )
         .route(
             "/api/einsaetze/{id}/betreuung/stellen",

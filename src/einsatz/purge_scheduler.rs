@@ -1101,6 +1101,61 @@ mod tests {
         );
     }
 
+    /// LLH-1123: Die Fundort-Koordinate eines Tiers bleibt als Geo-Skelett (`G_GEO`) stehen, der
+    /// Freitext-Fundort daneben fällt.
+    #[tokio::test]
+    async fn schwaerzung_tier_haelt_koordinate_und_leert_fundort() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, \
+                geaendert_von, antreff_ort, antreff_lat, antreff_lon) \
+             VALUES (?, 1, 'hund', ?, ?, 'Garten von Familie Müller', 51.93, 8.87)",
+        )
+        .bind(e)
+        .bind(nutzer)
+        .bind(nutzer)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .unwrap(),
+            "Einsatz wurde geschwärzt"
+        );
+
+        let zeile: (Option<String>, Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT antreff_ort, antreff_lat, antreff_lon FROM einsatz_tier WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(zeile, (None, Some(51.93), Some(8.87)));
+    }
+
     /// LFH-639, Spec-Szenario „Einsatz schwärzen“ — bewusst mit ZWEI aktiven Bezirken und
     /// ZWEI aktiven Stellen: die Bezeichnung steht unter einem partiellen UNIQUE-Index
     /// `(einsatz_id, bezeichnung) WHERE storniert_at IS NULL`. Ein für alle Zeilen gleicher
@@ -1181,6 +1236,9 @@ mod tests {
                     kapazitaet_personen: Some(150),
                     standort: Some("Ostring 5".into()),
                     notiz: Some("Ansprechpartner Herr Meier 0170".into()),
+                    // LLH-1044: Name und Rufnummer der Leitung gehen mit dem Einsatz.
+                    leitung: Some("Frau Schulz".into()),
+                    erreichbarkeit: Some("0171 2345678".into()),
                 },
             )
             .await
@@ -1273,6 +1331,18 @@ mod tests {
             assert_eq!(art, "notunterkunft");
             assert_eq!(status, "in_betrieb");
         }
+        let leitungen: Vec<(Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT leitung, erreichbarkeit FROM betreuungsstelle WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            leitungen,
+            vec![(None, None), (None, None)],
+            "Leitung und Erreichbarkeit leer (LLH-1044)"
+        );
         assert_eq!(bezirk_zeilen.len(), 2);
         assert_eq!(stellen_zeilen.len(), 2);
         assert_eq!(bezeichnungen.len(), 2, "je Bezirk ein eigener Platzhalter");
@@ -1321,8 +1391,9 @@ mod tests {
             ]
         );
         let uebersicht = crate::betreuung::repo::uebersicht(&pool, e).await.unwrap();
-        assert!(uebersicht
-            .bezirke
+        assert!(crate::betreuung::repo::bezirke(&pool, e)
+            .await
+            .unwrap()
             .iter()
             .all(|b| b.stand.as_ref().map(|s| s.evakuiert) == Some(212)));
         assert!(uebersicht

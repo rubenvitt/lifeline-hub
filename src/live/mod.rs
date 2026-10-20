@@ -47,6 +47,8 @@ wire_enum! {
         Dokument => "dokument",
         Abloesung => "abloesung",
         Betreuung => "betreuung",
+        /// Evakuierungsbezirke und ihre Standmeldungen (LLH-1034).
+        Evakuierung => "evakuierung",
         Verpflegung => "verpflegung",
         /// Presse-Log und Pressemitteilungen des Sachgebiets S5 (LFH-554).
         Presse => "presse",
@@ -155,13 +157,17 @@ impl LiveEvent {
             // `erinnerung` — so erreicht er Ablösungs-Leser, ohne dass sie alle Erinnerungen
             // des Einsatzes erfahren (LFH-635, design.md D3).
             LiveEvent::Abloesung => &["abloesung"],
-            // Nur `betreuung`: Bezirke, Stellen und ihre Meldereihen sind Datenobjekte des
+            // Nur `betreuung`: Stellen und ihre Belegungsreihen sind Datenobjekte des
             // Betreuungsmoduls (LFH-639). NICHT `einsatzabschnitte`, obwohl die Übersicht den
             // Abschnittsnamen per Join mitliest: die Richtung ist umgekehrt — ein
             // Abschnitts-Ereignis macht die Betreuungs-Übersicht stale, und das invalidiert das
             // Frontend über `EINSATZ_STREAM_EVENTS.abschnitt` (design.md D6), ohne dass ein
-            // Abschnitts-Leser von Bezirken erführe. Der ETB-Nachweis läuft über `etb`.
+            // Abschnitts-Leser von Stellen erführe. Der ETB-Nachweis läuft über `etb`.
             LiveEvent::Betreuung => &["betreuung"],
+            // Nur `evakuierung` (LLH-1034): Bezirke und ihre Standreihen gehören seit der Trennung
+            // dem eigenen Modul. NICHT `betreuung`: wer nur die Stellen liest, erführe sonst von
+            // jedem Bezirk. Abschnittsnamen wie bei `Betreuung` über das Frontend.
+            LiveEvent::Evakuierung => &["evakuierung"],
             // Nur `verpflegung`: Zeitfenster und Ausgaben sind Datenobjekte des
             // Verpflegungsmoduls (LFH-634). NICHT `nachforderungen`, obwohl eine Ausgabe auf
             // eine Nachforderung verweist: das DTO trägt davon nur die Kennung, die Namen löst
@@ -1001,6 +1007,7 @@ mod tests {
             (LiveEvent::Dokument, &["dokumente"]),
             (LiveEvent::Abloesung, &["abloesung"]),
             (LiveEvent::Betreuung, &["betreuung"]),
+            (LiveEvent::Evakuierung, &["evakuierung"]),
             (LiveEvent::Verpflegung, &["verpflegung"]),
             (LiveEvent::Presse, &["stab"]),
             (LiveEvent::Infotelefon, &["stab"]),

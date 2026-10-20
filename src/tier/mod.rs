@@ -235,6 +235,12 @@ pub struct TierAnzeige {
     pub halter_person_id: Option<i64>,
     pub halter_kontakt: Option<String>,
     pub antreff_ort: Option<String>,
+    /// Koordinate des Fundorts (LLH-1123), nur als Paar; fehlt, solange das Tier nicht verortet
+    /// ist.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antreff_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antreff_lon: Option<f64>,
     pub notiz: Option<String>,
     pub abschluss_grund: Option<AbschlussGrund>,
     pub abschluss_ziel: Option<String>,
@@ -246,6 +252,23 @@ pub struct TierAnzeige {
     // Join-Felder (read-only): Halter-Auflösung über einsatz_person.
     pub halter_registrier_nr: Option<i64>,
     pub halter_storniert_at: Option<String>,
+}
+
+/// Ein Tier, wie der Lage-Snapshot es einfriert (LLH-1123, design.md D3): nur, was die Karte
+/// zeigt, mit denselben Feldnamen wie [`TierAnzeige`]. Halter, Kennzeichnung, Notiz und Verbleib
+/// fehlen bewusst: ein eingefrorenes JSON-Dokument erreicht der Personen-Antrag nicht.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct TierKarte {
+    pub id: i64,
+    pub registrier_nr: i64,
+    pub status: TierStatus,
+    pub spezies: Spezies,
+    pub rufname: Option<String>,
+    pub antreff_ort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antreff_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub antreff_lon: Option<f64>,
 }
 
 #[cfg(test)]

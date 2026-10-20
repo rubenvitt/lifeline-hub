@@ -391,7 +391,7 @@ describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
     expect(wurzel()).toContainElement(screen.getByText('Lage halten.'));
   });
 
-  it('Entwurfszweig: Abschnittstitel und Editor-Vorschau liegen in der Wurzel, der Umschalter wird nicht gedruckt', async () => {
+  it('Entwurfszweig: Druckfassung mit Papiertitel liegt in der Wurzel, die Bedienung weicht', async () => {
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
       bericht({
         status: 'entwurf',
@@ -399,15 +399,17 @@ describe('LageberichtDetailPage — Druckwurzel (LFH-71)', () => {
       }) as never,
     );
     renderBei('/einsaetze/1/lageberichte/9');
-    const umschalter = await screen.findByRole('checkbox', { name: 'Vorschau neben dem Text' });
-    await userEvent.click(umschalter);
-    // Abschnittstitel = Kopf des Akkordeons (steht außerhalb von `.markdown`).
-    expect(wurzel()).toContainElement(screen.getAllByText('Auftrag')[0]);
-    const vorschauen = document.querySelectorAll('.markdown-editor__vorschau');
-    expect(vorschauen.length).toBeGreaterThan(0);
-    for (const v of vorschauen) expect(wurzel()).toContainElement(v as HTMLElement);
-    // Ein Umschalter ist Bedienung, kein Inhalt (spec „Rahmen und schwebende Ebenen").
-    expect(umschalter.closest('.lagebericht-no-print')).not.toBeNull();
+    const gliederung = await screen.findByRole('navigation', { name: 'Gliederung' });
+    // Papiertitel im Titelblock der Druckfassung (LFH-1008), je Abschnitt genau eine.
+    const fassungen = document.querySelectorAll('.markdown-editor__druck');
+    expect(fassungen).toHaveLength(8);
+    for (const f of fassungen) expect(wurzel()).toContainElement(f as HTMLElement);
+    expect(fassungen[0].querySelector('.markdown-editor__titel')).toHaveTextContent('Auftrag');
+    // Gliederung und Umschalter sind Bedienung, kein Inhalt (`entwurf/dokumentEntwurf.css`).
+    expect(gliederung).toHaveAttribute('data-lfh', 'gliederung');
+    expect(
+      screen.getByRole('tab', { name: 'Lesefassung' }).closest('[data-lfh="paneel"]'),
+    ).not.toBeNull();
   });
 });
 
@@ -515,8 +517,9 @@ describe('LageberichtDetailPage — Entwurfsdruck (LFH-731)', () => {
     );
     // Gespeichert wurde nichts: der Kopf folgt dem Formular, nicht einem PATCH.
     expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();
-    expect(titel.closest('.lagebericht-no-print')).not.toBeNull();
-    expect(screen.getByLabelText('Zeitstand').closest('.lagebericht-no-print')).not.toBeNull();
+    // Der Kopfblock weicht im Druck (`entwurf/dokumentEntwurf.css`).
+    expect(titel.closest('[data-lfh="entwurf-kopf"]')).not.toBeNull();
+    expect(screen.getByLabelText('Zeitstand').closest('[data-lfh="entwurf-kopf"]')).not.toBeNull();
   });
 
   it('trägt einen ungespeicherten Zeitstand im Druckkopf, als taktische DTG in der Anzeigezone', async () => {

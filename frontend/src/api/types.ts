@@ -834,6 +834,8 @@ export type BetreuungsstelleStatus = S['BetreuungsstelleStatus'];
 export type Evakuierungsbezirk = S['EvakuierungsbezirkAnzeige'];
 export type Betreuungsstelle = S['BetreuungsstelleAnzeige'];
 export type BetreuungUebersicht = S['BetreuungUebersicht'];
+/** Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): die Bezirke. */
+export type EvakuierungUebersicht = S['EvakuierungUebersicht'];
 export type StelleNamentlich = S['StelleNamentlich'];
 export type BelegungKopfzahl = S['BelegungKopfzahl'];
 /** Antwort auf Melden/Zurücknehmen eines Stands: `meldung_id` ist die GEMELDETE bzw.
@@ -847,7 +849,7 @@ export type StandVerlaufEintrag = S['StandVerlaufEintrag'];
 /** Eine Belegungsmeldung im Verlauf einer Stelle. */
 export type BelegungVerlaufEintrag = S['BelegungVerlaufEintrag'];
 
-/** Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/bezirke` (`BezirkAnlegen`), FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke` (`BezirkAnlegen`), FE-lokal. */
 export interface EvakuierungsbezirkEingabe {
   bezeichnung: string;
   /** Ganzzahlig ≥ 1; fehlt oder kleiner → 400. */
@@ -859,7 +861,7 @@ export interface EvakuierungsbezirkEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH …/betreuung/bezirke/{id}` (`BezirkAendern`).
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/evakuierung/bezirke/{id}` (`BezirkAendern`).
  * DREIWERTIG bei `abschnitt_id`/`sammelstelle`/`notiz`: Schlüssel fehlt = unverändert · `null` =
  * lösen bzw. leeren. Ein PATCH ohne tatsächliche Änderung schreibt keinen ETB-Eintrag.
  */
@@ -874,7 +876,7 @@ export interface EvakuierungsbezirkPatch {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/betreuung/bezirke/{id}/staende` (`StandMelden`).
+ * Kein Backend-Schema: Eingabe-Body von `POST …/evakuierung/bezirke/{id}/staende` (`StandMelden`).
  * `evakuiert` ist eine ABSOLUTE Anzahl (≥ 0), kein Delta. Ohne `zeitpunkt_at` gilt „jetzt“, sonst
  * UTC `YYYY-MM-DD HH:mm:ss` über `alsBackendZeit`, höchstens 60 s in der Zukunft.
  */
@@ -898,12 +900,17 @@ export interface BetreuungsstelleEingabe {
   kapazitaet_personen?: number;
   standort?: string;
   notiz?: string;
+  /** Wer die Stelle leitet (LLH-1044), höchstens `BETREUUNG_LEITUNG_MAX` Zeichen. */
+  leitung?: string;
+  /** Wie die Stelle erreichbar ist, höchstens `BETREUUNG_ERREICHBARKEIT_MAX` Zeichen. */
+  erreichbarkeit?: string;
 }
 
 /**
  * Kein Backend-Schema: Eingabe-Body von `PATCH …/betreuung/stellen/{id}` (`StelleAendern`).
- * DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`: Schlüssel fehlt =
- * unverändert · `null` = lösen bzw. „keine Kapazität“ bzw. leeren. `status: 'geschlossen'` bei
+ * DREIWERTIG bei `abschnitt_id`/`kapazitaet_personen`/`standort`/`notiz`/`leitung`/
+ * `erreichbarkeit`: Schlüssel fehlt = unverändert · `null` = lösen bzw. „keine Kapazität“ bzw.
+ * leeren. `status: 'geschlossen'` bei
  * Belegung > 0 ist 422.
  */
 export interface BetreuungsstellePatch {
@@ -914,6 +921,8 @@ export interface BetreuungsstellePatch {
   status?: BetreuungsstelleStatus;
   standort?: string | null;
   notiz?: string | null;
+  leitung?: string | null;
+  erreichbarkeit?: string | null;
   /** Koordinate: als Paar senden; `null`/`null` entfernt die Verortung. */
   lat?: number | null;
   lon?: number | null;

@@ -325,8 +325,17 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{betreuung}");
-    assert_eq!(betreuung["bezirke"].as_array().unwrap().len(), 1);
     assert_eq!(betreuung["stellen"].as_array().unwrap().len(), 1);
+    let (status, evakuierung) = common::anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/evakuierung"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{evakuierung}");
+    assert_eq!(evakuierung["bezirke"].as_array().unwrap().len(), 1);
 
     // Sichtung nach BBK: jede Kategorie SK I–IV mindestens einmal.
     let personen = liste(&app, &admin, e, "/personen").await;

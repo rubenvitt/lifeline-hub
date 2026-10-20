@@ -17,15 +17,17 @@ const UHS = m('uhs', 1, 'UHS Süd');
 const STELLE = m('betreuungsstelle', 2, 'Turnhalle Mitte');
 const RAUM = m('bereitstellungsraum', 4, 'BR Sportplatz');
 const PERSON = m('person', 3, 'Müller, Anna');
+const TIER = m('tier', 5, 'T-005 (Hund)');
 
 describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
   const basis = {
-    verortet: [UHS, STELLE, RAUM],
+    verortet: [UHS, STELLE, RAUM, TIER],
     personen: [PERSON],
     personenZugriff: 'frei' as const,
     personenEbeneAn: true,
     betreuungZugriff: 'frei' as const,
     brZugriff: 'frei' as const,
+    tierZugriff: 'frei' as const,
   };
   const namen = (a: typeof basis | Parameters<typeof suchbareMarker>[0]) =>
     suchbareMarker(a).map((x) => x.label);
@@ -54,6 +56,19 @@ describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
       const liste = namen({ ...basis, brZugriff: zugriff });
       expect(liste).not.toContain('BR Sportplatz');
       expect(liste).toContain('Turnhalle Mitte');
+    },
+  );
+
+  it('mit Recht auf Tiere: das Tier ist suchbar (LLH-1123)', () => {
+    expect(namen(basis)).toContain('T-005 (Hund)');
+  });
+
+  it.each(['gesperrt', 'ausgeblendet'] as const)(
+    'ohne Recht auf Tiere (%s): kein Tier in der Suche (LLH-1123)',
+    (zugriff) => {
+      const liste = namen({ ...basis, tierZugriff: zugriff });
+      expect(liste).not.toContain('T-005 (Hund)');
+      expect(liste).toContain('BR Sportplatz');
     },
   );
 

@@ -3,6 +3,7 @@ import type { Zeile } from '../ZeilenListe';
 import utc from 'dayjs/plugin/utc';
 import type {
   BetreuungUebersicht,
+  EvakuierungUebersicht,
   Einheit,
   EinheitPerioden,
   EinsatzAnzeige,
@@ -466,11 +467,8 @@ function schadenBilanz(schaeden: Schaden[]): Inhalt[] {
   ];
 }
 
-function betreuungBilanz(b: BetreuungUebersicht): Inhalt[] {
-  const evak = evakuierungKennzahl(b.bezirke);
-  const stellen = b.stellen.filter((s) => !s.storniert_at);
-  const kapazitaet = stellen.reduce((n, s) => n + (s.kapazitaet_personen ?? 0), 0);
-  const belegt = stellen.reduce((n, s) => n + (s.belegung?.belegt ?? 0), 0);
+function evakuierungBilanz(e: EvakuierungUebersicht): Inhalt[] {
+  const evak = evakuierungKennzahl(e.bezirke);
   const evakZeilen: Zeile[] = evak
     ? [
         {
@@ -480,10 +478,16 @@ function betreuungBilanz(b: BetreuungUebersicht): Inhalt[] {
         { etikett: 'Bezirke', wert: zahl(evak.bezirke) },
         { etikett: 'Bezirke ohne Standmeldung', wert: zahl(evak.ohneMeldung) },
       ]
-    : [{ etikett: 'Evakuierung', wert: 'kein Bezirk' }];
+    : [{ etikett: 'Aktive Bezirke', wert: 'keiner' }];
+  return [zeilen(evakZeilen)];
+}
+
+function betreuungBilanz(b: BetreuungUebersicht): Inhalt[] {
+  const stellen = b.stellen.filter((s) => !s.storniert_at);
+  const kapazitaet = stellen.reduce((n, s) => n + (s.kapazitaet_personen ?? 0), 0);
+  const belegt = stellen.reduce((n, s) => n + (s.belegung?.belegt ?? 0), 0);
   return [
     zeilen([
-      ...evakZeilen,
       { etikett: 'Betreuungsstellen', wert: zahl(stellen.length) },
       {
         etikett: 'Belegt',
@@ -733,12 +737,14 @@ export function verdichteEinsatzbericht(
     bilanz: () => [
       abschnittAus('Personen', daten(q.personen), (p) => p.length === 0, personenBilanz),
       abschnittAus('Schäden', daten(q.schaeden), (s) => s.length === 0, schadenBilanz),
+      // Zwei Module seit LLH-1034: je Modul ein Abschnitt, jeder mit eigenem Rechtevermerk.
       abschnittAus(
-        'Betreuung und Evakuierung',
-        daten(q.betreuung),
-        (b) => b.bezirke.length === 0 && b.stellen.length === 0,
-        betreuungBilanz,
+        'Evakuierung',
+        daten(q.evakuierung),
+        (e) => e.bezirke.length === 0,
+        evakuierungBilanz,
       ),
+      abschnittAus('Betreuung', daten(q.betreuung), (b) => b.stellen.length === 0, betreuungBilanz),
       abschnittAus(
         'Verpflegung',
         daten(q.verpflegung),

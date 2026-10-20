@@ -13,11 +13,10 @@ import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveru
 import {
   BelegungMeldenDialog,
   BezirkAnlegenDialog,
-  BezirkBearbeitenDialog,
   RaeumungDialog,
   StandMeldenDialog,
   StelleAnlegenDialog,
-  StelleBearbeitenDialog,
+  StelleSchliessenDialog,
   StornierenDialog,
   belegungBody,
   bezirkPatch,
@@ -169,6 +168,23 @@ describe('PATCH nur mit geänderten Schlüsseln', () => {
       }),
     ).toStrictEqual({ status: 'geschlossen' });
   });
+
+  it('LLH-1044: Leitung und Erreichbarkeit getrimmt, geleert → null nur mit Vorwert, fehlend unberührt', () => {
+    const basis = {
+      art: 'notunterkunft' as const,
+      bezeichnung: 'Turnhalle Ost',
+      kapazitaet_personen: 150,
+    };
+    const mitLeitung = stelle({ leitung: 'Frau Schulz', erreichbarkeit: 'Kanal 3' });
+    expect(stellePatch(stelle(), { ...basis, leitung: ' Herr Ott ', erreichbarkeit: '' })).toEqual({
+      leitung: 'Herr Ott',
+    });
+    expect(stellePatch(mitLeitung, { ...basis, leitung: '  ', erreichbarkeit: 'Kanal 3' })).toEqual(
+      { leitung: null },
+    );
+    // Ein Formular ohne die Felder (Schlüssel fehlt) lässt sie stehen.
+    expect(stellePatch(mitLeitung, basis)).toEqual({});
+  });
 });
 
 describe('StandMeldenDialog', () => {
@@ -310,11 +326,12 @@ describe('Obergrenze der Personenzahlen (LFH-680)', () => {
 });
 
 describe('BezirkAnlegenDialog', () => {
-  it('Bezeichnung, Plangröße, Erhebung sichtbar; Abschnitt, Sammelstelle, Notiz eingeklappt', async () => {
+  it('Bezeichnung, Plangröße, Erhebung und Gebiet sichtbar; Abschnitt, Sammelstelle, Notiz eingeklappt', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <BezirkAnlegenDialog
         abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
         laeuft={false}
         fehler={null}
         onErfassen={onErfassen}
@@ -322,49 +339,83 @@ describe('BezirkAnlegenDialog', () => {
       />,
     );
     const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
-    await budgetUndAufklappen(dialog, 3);
-    expect(sichtbareFelder(dialog)).toBe(6);
+    // Drei Angaben plus die Gebietswahl (LLH-1069): sie ist der nächste Schritt, kein Datenfeld,
+    // und steht nach der Erfassungs-Norm sichtbar; der Rest bleibt eingeklappt.
+    await budgetUndAufklappen(dialog, 4);
+    expect(sichtbareFelder(dialog)).toBe(7);
     const knopf = pruefeFormStruktur(dialog, 'Anlegen');
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Uferstraße 12–40');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '640');
     await userEvent.type(within(dialog).getByLabelText('Sammelstelle'), 'Schulhof');
     await userEvent.click(knopf);
     await waitFor(() =>
-      expect(onErfassen).toHaveBeenCalledWith({
-        bezeichnung: 'Uferstraße 12–40',
-        plan_personen: 640,
-        plan_erhebung: 'geschaetzt',
-        sammelstelle: 'Schulhof',
-      }),
+      expect(onErfassen).toHaveBeenCalledWith(
+        {
+          bezeichnung: 'Uferstraße 12–40',
+          plan_personen: 640,
+          plan_erhebung: 'geschaetzt',
+          sammelstelle: 'Schulhof',
+        },
+        'flaeche',
+      ),
     );
   });
-});
 
-describe('BezirkBearbeitenDialog', () => {
-  it('Plangröße fortschreiben schickt nur die Änderung', async () => {
+  it('Gebiet: Vorgabe „Fläche zeichnen“ bei freier Lagekarte, „Keins“ wählbar (LLH-1069)', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
-      <BezirkBearbeitenDialog
-        bezirk={bezirk()}
+      <BezirkAnlegenDialog
         abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
         laeuft={false}
         fehler={null}
         onErfassen={onErfassen}
         onSchliessen={() => {}}
       />,
     );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Bezirk bearbeiten: Uferstraße 12–40',
-    });
-    await budgetUndAufklappen(dialog, 2);
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    await waehle(dialog, 'gezählt');
-    await userEvent.click(pruefeFormStruktur(dialog, 'Speichern'));
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    const gruppe = within(dialog).getByRole('radiogroup', { name: 'Gebiet auf der Lagekarte' });
+    expect(within(gruppe).getByRole('radio', { name: 'Fläche zeichnen' })).toBeChecked();
+    // Kein „Radius“, solange die Karte keinen Kreis kann (nach LLH-1043).
+    expect(within(gruppe).getAllByRole('radio')).toHaveLength(2);
+    await userEvent.click(within(gruppe).getByRole('radio', { name: 'Keins' }));
+    expect(within(gruppe).getByRole('radio', { name: 'Keins' })).toBeChecked();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
-      expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820, plan_erhebung: 'gezaehlt' }),
+      expect(onErfassen).toHaveBeenCalledWith(
+        { bezeichnung: 'Deichweg', plan_personen: 12, plan_erhebung: 'geschaetzt' },
+        'keins',
+      ),
     );
+  });
+
+  it('Lagekarte gesperrt: Vorgabe „Keins“, „Fläche zeichnen“ gesperrt mit sichtbarem Grund (LFH-888)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BezirkAnlegenDialog
+        abschnitte={ABSCHNITTE}
+        karteGesperrt
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    const gruppe = within(dialog).getByRole('radiogroup', { name: 'Gebiet auf der Lagekarte' });
+    expect(within(gruppe).getByRole('radio', { name: 'Keins' })).toBeChecked();
+    const flaeche = within(gruppe).getByRole('radio', {
+      name: 'Fläche zeichnen (Keine Berechtigung)',
+    });
+    expect(flaeche).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(flaeche);
+    expect(flaeche).not.toBeChecked();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith(expect.anything(), 'keins'));
   });
 });
 
@@ -495,30 +546,6 @@ describe('LFH-681: Mehrfeld-Dialoge vergleichen dreiseitig', () => {
     };
     expect(stellePatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ status: 'geschlossen' });
   });
-
-  it('BezirkBearbeitenDialog: eine fremd geänderte Notiz wird nicht mit dem alten Wert überschrieben', async () => {
-    const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const dialogMit = (b: Evakuierungsbezirk) => (
-      <BezirkBearbeitenDialog
-        bezirk={b}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onSchliessen={() => {}}
-      />
-    );
-    const { rerender } = renderMitProviders(dialogMit(bezirk({ notiz: 'Zufahrt Nord' })));
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Bezirk bearbeiten: Uferstraße 12–40',
-    });
-    rerender(dialogMit(bezirk({ notiz: 'Zufahrt Süd gesperrt' })));
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820 }));
-  });
 });
 
 describe('StelleAnlegenDialog', () => {
@@ -548,30 +575,75 @@ describe('StelleAnlegenDialog', () => {
       }),
     );
   });
-});
 
-describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md D4)', () => {
-  const belegt = stelle({ belegung: { id: 30, belegt: 40, zeitpunkt_at: '2026-09-23 09:00:00' } });
-
-  it('bietet die Leermeldung im selben Dialog an; ohne Häkchen wird nicht gesendet', async () => {
+  it('LLH-1044: Leitung und Erreichbarkeit unter „Weitere Angaben“, getrimmt; über 200 Zeichen gesperrt', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const onLeermeldung = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
-      <StelleBearbeitenDialog
-        stelle={belegt}
+      <StelleAnlegenDialog
         abschnitte={ABSCHNITTE}
         laeuft={false}
         fehler={null}
         onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
         onSchliessen={() => {}}
       />,
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
-    expect(within(dialog).queryByRole('checkbox')).toBeNull();
-    await waehle(dialog, 'geschlossen');
-    const haken = await within(dialog).findByRole('checkbox', { name: /Belegung 0 melden/ });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Turnhalle Ost');
+    const leitung = within(dialog).getByLabelText('Leitung');
+    await userEvent.click(leitung);
+    await userEvent.paste('x'.repeat(201));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(
+      await within(dialog).findByText('Leitung darf höchstens 200 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onErfassen).not.toHaveBeenCalled();
+
+    await userEvent.clear(leitung);
+    await userEvent.type(leitung, '  Frau Schulz ');
+    await userEvent.type(within(dialog).getByLabelText('Erreichbarkeit'), 'Kanal 3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        bezeichnung: 'Turnhalle Ost',
+        art: 'betreuungsstelle',
+        leitung: 'Frau Schulz',
+        erreichbarkeit: 'Kanal 3',
+      }),
+    );
+  });
+});
+
+describe('StelleSchliessenDialog — Schließen einer belegten Stelle (LLH-1044)', () => {
+  const belegt = stelle({ belegung: { id: 30, belegt: 40, zeitpunkt_at: '2026-09-23 09:00:00' } });
+  const TITEL = 'Betreuungsstelle Turnhalle Ost schließen';
+
+  function dialogMit(
+    s: Betreuungsstelle,
+    onErfassen: (p: unknown) => Promise<unknown>,
+    onLeermeldung: () => Promise<unknown>,
+    onSchliessen: () => void = () => {},
+  ) {
+    return (
+      <StelleSchliessenDialog
+        stelle={s}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onLeermeldung={onLeermeldung}
+        onSchliessen={onSchliessen}
+      />
+    );
+  }
+
+  it('verlangt die Leermeldung als Häkchen; ohne Häkchen wird nichts gesendet', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    const onLeermeldung = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(dialogMit(belegt, onErfassen, onLeermeldung));
+    const dialog = await screen.findByRole('dialog', { name: TITEL });
+    expect(within(dialog).getByText(/mit 40 Personen belegt/)).toBeInTheDocument();
+    const haken = within(dialog).getByRole('checkbox', { name: /Belegung 0 melden/ });
+    await userEvent.click(pruefeFormStruktur(dialog, 'Stelle schließen'));
     expect(
       await within(dialog).findByText(/erst nach einer Leermeldung schließen/),
     ).toBeInTheDocument();
@@ -579,7 +651,7 @@ describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md
     expect(onErfassen).not.toHaveBeenCalled();
 
     await userEvent.click(haken);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ status: 'geschlossen' }));
     // Erst die Leermeldung, dann das Schließen — zwei ehrliche Tatsachen.
     expect(onLeermeldung.mock.invocationCallOrder[0]).toBeLessThan(
@@ -593,58 +665,14 @@ describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md
       .mockRejectedValueOnce(new ApiError(409, 'Stelle ist storniert'))
       .mockResolvedValue(undefined);
     const onLeermeldung = vi.fn().mockResolvedValue(undefined);
-    renderMitProviders(
-      <StelleBearbeitenDialog
-        stelle={belegt}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
-        onSchliessen={() => {}}
-      />,
-    );
+    renderMitProviders(dialogMit(belegt, onErfassen, onLeermeldung));
     const dialog = await screen.findByRole('dialog');
-    await waehle(dialog, 'geschlossen');
-    await userEvent.click(await within(dialog).findByRole('checkbox', { name: /Belegung 0/ }));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Belegung 0/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(2));
     expect(onLeermeldung).toHaveBeenCalledTimes(1);
-  });
-
-  it('LFH-681: ist die Stelle seit dem Öffnen belegt worden, verlangt das Schließen die Leermeldung', async () => {
-    const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const onLeermeldung = vi.fn().mockResolvedValue(undefined);
-    const dialogMit = (s: Betreuungsstelle) => (
-      <StelleBearbeitenDialog
-        stelle={s}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
-        onSchliessen={() => {}}
-      />
-    );
-    const { rerender } = renderMitProviders(dialogMit(stelle()));
-    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
-    await waehle(dialog, 'geschlossen');
-    expect(within(dialog).queryByRole('checkbox')).toBeNull();
-    // Live-Refetch: inzwischen sind 12 Personen gemeldet.
-    rerender(
-      dialogMit(stelle({ belegung: { id: 32, belegt: 12, zeitpunkt_at: '2026-09-23 11:00:00' } })),
-    );
-    const haken = await within(dialog).findByRole('checkbox', { name: /Belegung 0 melden/ });
-    expect(within(dialog).getByText(/mit 12 Personen belegt/)).toBeInTheDocument();
-    await userEvent.click(haken);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ status: 'geschlossen' }));
-    expect(onLeermeldung).toHaveBeenCalledTimes(1);
-    expect(onLeermeldung.mock.invocationCallOrder[0]).toBeLessThan(
-      onErfassen.mock.invocationCallOrder[0],
-    );
   });
 
   it('LFH-681: kommt nach der eigenen Leermeldung eine NEUE Belegung, wird wieder geleert — nicht übersprungen', async () => {
@@ -653,36 +681,32 @@ describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md
       .mockRejectedValueOnce(new ApiError(503, 'Dienst nicht erreichbar'))
       .mockResolvedValue(undefined);
     const onLeermeldung = vi.fn().mockResolvedValue(undefined);
-    const dialogMit = (s: Betreuungsstelle) => (
-      <StelleBearbeitenDialog
-        stelle={s}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
-        onSchliessen={() => {}}
-      />
-    );
-    const { rerender } = renderMitProviders(dialogMit(belegt));
-    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
-    await waehle(dialog, 'geschlossen');
-    await userEvent.click(await within(dialog).findByRole('checkbox', { name: /Belegung 0/ }));
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    const { rerender } = renderMitProviders(dialogMit(belegt, onErfassen, onLeermeldung));
+    const dialog = await screen.findByRole('dialog', { name: TITEL });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /Belegung 0/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(1));
     expect(onLeermeldung).toHaveBeenCalledTimes(1);
     // Refetch: die eigene 0 steht da …
     rerender(
-      dialogMit(stelle({ belegung: { id: 41, belegt: 0, zeitpunkt_at: '2026-09-23 11:00:00' } })),
+      dialogMit(
+        stelle({ belegung: { id: 41, belegt: 0, zeitpunkt_at: '2026-09-23 11:00:00' } }),
+        onErfassen,
+        onLeermeldung,
+      ),
     );
     await waitFor(() => expect(within(dialog).queryByRole('checkbox')).toBeNull());
     // … dann meldet jemand anderes 3 Personen.
     rerender(
-      dialogMit(stelle({ belegung: { id: 42, belegt: 3, zeitpunkt_at: '2026-09-23 11:05:00' } })),
+      dialogMit(
+        stelle({ belegung: { id: 42, belegt: 3, zeitpunkt_at: '2026-09-23 11:05:00' } }),
+        onErfassen,
+        onLeermeldung,
+      ),
     );
     const haken = await within(dialog).findByRole('checkbox', { name: /Belegung 0/ });
     if (!(haken as HTMLInputElement).checked) await userEvent.click(haken);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledTimes(2));
     expect(onLeermeldung).toHaveBeenCalledTimes(2);
     expect(onLeermeldung.mock.invocationCallOrder[1]).toBeLessThan(
@@ -694,83 +718,42 @@ describe('StelleBearbeitenDialog — Schließen einer belegten Stelle (design.md
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onLeermeldung = vi.fn();
     const onSchliessen = vi.fn();
-    const dialogMit = (s: Betreuungsstelle) => (
-      <StelleBearbeitenDialog
-        stelle={s}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
-        onSchliessen={onSchliessen}
-      />
+    const { rerender } = renderMitProviders(
+      dialogMit(belegt, onErfassen, onLeermeldung, onSchliessen),
     );
-    const { rerender } = renderMitProviders(dialogMit(belegt));
-    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
-    await waehle(dialog, 'geschlossen');
-    await within(dialog).findByRole('checkbox', { name: /Belegung 0 melden/ });
+    const dialog = await screen.findByRole('dialog', { name: TITEL });
     rerender(
       dialogMit(
         stelle({
           status: 'geschlossen',
           belegung: { id: 33, belegt: 0, zeitpunkt_at: '2026-09-23 11:00:00' },
         }),
+        onErfassen,
+        onLeermeldung,
+        onSchliessen,
       ),
     );
     await waitFor(() => expect(within(dialog).queryByRole('checkbox')).toBeNull());
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
     expect(onLeermeldung).not.toHaveBeenCalled();
     expect(onErfassen).not.toHaveBeenCalled();
   });
 
-  it('LFH-681: fremd wiedereröffnet und belegt — ein unberührtes „geschlossen" sperrt das Speichern nicht', async () => {
+  it('inzwischen leer gemeldet: schließt ohne Leermeldung', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     const onLeermeldung = vi.fn();
-    const dialogMit = (s: Betreuungsstelle) => (
-      <StelleBearbeitenDialog
-        stelle={s}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
-        onSchliessen={() => {}}
-      />
-    );
-    const { rerender } = renderMitProviders(dialogMit(stelle({ status: 'geschlossen' })));
-    const dialog = await screen.findByRole('dialog', { name: 'Stelle bearbeiten: Turnhalle Ost' });
+    const { rerender } = renderMitProviders(dialogMit(belegt, onErfassen, onLeermeldung));
+    const dialog = await screen.findByRole('dialog', { name: TITEL });
     rerender(
-      dialogMit(stelle({ belegung: { id: 34, belegt: 5, zeitpunkt_at: '2026-09-23 11:00:00' } })),
+      dialogMit(
+        stelle({ belegung: { id: 31, belegt: 0, zeitpunkt_at: '2026-09-23 09:00:00' } }),
+        onErfassen,
+        onLeermeldung,
+      ),
     );
-    expect(within(dialog).queryByRole('checkbox')).toBeNull();
-    const feld = within(dialog).getByLabelText('Kapazität (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '200');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ kapazitaet_personen: 200 }));
-    expect(onLeermeldung).not.toHaveBeenCalled();
-  });
-
-  it('eine unbelegte Stelle schließt ohne Leermeldung', async () => {
-    const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const onLeermeldung = vi.fn();
-    renderMitProviders(
-      <StelleBearbeitenDialog
-        stelle={stelle({ belegung: { id: 31, belegt: 0, zeitpunkt_at: '2026-09-23 09:00:00' } })}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onLeermeldung={onLeermeldung}
-        onSchliessen={() => {}}
-      />,
-    );
-    const dialog = await screen.findByRole('dialog');
-    await budgetUndAufklappen(dialog, 3);
-    await waehle(dialog, 'geschlossen');
-    expect(within(dialog).queryByRole('checkbox')).toBeNull();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(within(dialog).queryByRole('checkbox')).toBeNull());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Stelle schließen' }));
     await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ status: 'geschlossen' }));
     expect(onLeermeldung).not.toHaveBeenCalled();
   });

@@ -51,7 +51,7 @@ beforeEach(() => {
     http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/betreuung', () => {
       betreuungAbrufe += 1;
-      return HttpResponse.json({ bezirke: [], stellen: [NORD, SUED] });
+      return HttpResponse.json({ stellen: [NORD, SUED] });
     }),
     http.get('/api/einsaetze/1/personen/transportmittel', () =>
       HttpResponse.json({

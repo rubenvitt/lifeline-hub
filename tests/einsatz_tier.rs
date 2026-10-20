@@ -860,3 +860,207 @@ async fn patch_leeres_objekt_laesst_tier_unveraendert() {
     assert_eq!(v["rufname"], "Rex");
     assert_eq!(v["notiz"], "scheu");
 }
+
+// ---------- LLH-1123: Koordinate des Fundorts ----------
+
+/// Verorten per PATCH, Detail und Liste tragen das Paar; entfernen per `null` lässt die Felder in
+/// der Antwort weg. Das Verorten schreibt kein ETB (Stammfelder).
+#[tokio::test]
+async fn koordinate_setzen_und_entfernen_ohne_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(
+        &app,
+        &admin,
+        e,
+        &json!({"spezies":"grosstier","antreff_ort":"Weide am Deich"}),
+    )
+    .await;
+    let etb_vorher = system_etb_inhalte(&app, &admin, e).await.len();
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"antreff_lat": 52.25, "antreff_lon": 9.125})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["antreff_lat"], 52.25);
+    assert_eq!(v["antreff_lon"], 9.125);
+    assert_eq!(v["antreff_ort"], "Weide am Deich", "der Freitext bleibt");
+
+    let (_, liste) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/tiere"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste[0]["antreff_lat"], 52.25);
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"antreff_lat": null, "antreff_lon": null})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    let obj = v.as_object().unwrap();
+    assert!(
+        !obj.contains_key("antreff_lat"),
+        "nicht verortet = Feld fehlt"
+    );
+    assert!(!obj.contains_key("antreff_lon"));
+
+    assert_eq!(
+        system_etb_inhalte(&app, &admin, e).await.len(),
+        etb_vorher,
+        "Verorten schreibt kein ETB"
+    );
+}
+
+#[tokio::test]
+async fn anlegen_mit_koordinate() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere"),
+        &admin,
+        Some(&json!({"spezies":"hund","antreff_lat": 51.93, "antreff_lon": 8.87})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    assert_eq!(v["antreff_lat"], 51.93);
+    assert_eq!(v["antreff_lon"], 8.87);
+    let inhalte = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        inhalte
+            .iter()
+            .all(|i| !i.contains("51.93") && !i.contains("51,93")),
+        "das ETB nennt keine Koordinate: {inhalte:?}"
+    );
+}
+
+/// Das Paar: nur ein Wert (gegen den wirksamen Zustand) oder ein Wert außerhalb des Bereichs ist
+/// ein Zusammenhangsfehler (422) und ändert nichts.
+#[tokio::test]
+async fn halbes_paar_und_bereich_sind_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere"),
+        &admin,
+        Some(&json!({"spezies":"hund","antreff_lat": 52.0})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "POST mit halbem Paar");
+
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
+    for body in [
+        json!({"antreff_lat": 52.0}),
+        json!({"antreff_lat": 91.0, "antreff_lon": 8.0}),
+        json!({"antreff_lat": 52.0, "antreff_lon": 181.0}),
+    ] {
+        let (s, v) = anfrage_json(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{e}/tiere/{t}"),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {v:?}");
+    }
+
+    // Verortet: nur `lat: null` zerreißt das Paar → 422, die Koordinate bleibt.
+    anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"antreff_lat": 52.0, "antreff_lon": 9.0})),
+    )
+    .await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"antreff_lat": null})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (_, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        (v["antreff_lat"].clone(), v["antreff_lon"].clone()),
+        (json!(52.0), json!(9.0))
+    );
+}
+
+/// Ein Patch nur der Koordinate lässt eine zwischenzeitliche Änderung eines anderen Felds stehen
+/// (kein Vollersatz).
+#[tokio::test]
+async fn verorten_aendert_keine_anderen_angaben() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund","notiz":"alt"})).await;
+    anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"notiz":"neu"})),
+    )
+    .await;
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &admin,
+        Some(&json!({"antreff_lat": 52.0, "antreff_lon": 9.0})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["notiz"], "neu");
+}
+
+/// Beobachter dürfen nicht verorten (403), der Datensatz bleibt unverortet.
+#[tokio::test]
+async fn beobachter_kann_nicht_verorten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
+    let b = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
+    rolle_setzen(&app, &admin, e, b, "beobachter").await;
+    let beob = login_cookie(&app, "beobachter", "beobachterpw1").await;
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/tiere/{t}"),
+        &beob,
+        Some(&json!({"antreff_lat": 52.0, "antreff_lon": 9.0})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}

@@ -390,17 +390,32 @@ export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
 }
 
 /**
- * Betreuungs-Modul. Keine Detailroute — Bezirk bzw. Stelle per Query-Param (`?bezirk=<id>` /
- * `?stelle=<id>`), die Seite scrollt auf die Zeile.
+ * Betreuungs-Modul. `?stelle=<id>` ist seit LLH-1044 eine Altadresse: die Betreuungsseite leitet
+ * auf die Detailseite der Stelle um ({@link betreuungsstellePfad}). Bezirke liegen seit LLH-1034 im
+ * Modul Evakuierung ({@link evakuierungPfad}); ein alter Link `…/betreuung?bezirk=<id>` leitet die
+ * Betreuungsseite dorthin um.
  */
-export function betreuungPfad(
-  einsatzId: number,
-  opts: { bezirk?: number; stelle?: number } = {},
-): string {
-  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), {
-    bezirk: opts.bezirk,
-    stelle: opts.stelle,
-  });
+export function betreuungPfad(einsatzId: number, opts: { stelle?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), { stelle: opts.stelle });
+}
+
+/** Detailseite einer Betreuungsstelle (LLH-1044), unter dem Modul Betreuung. */
+export function betreuungsstellePfad(einsatzId: number, stelleId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'betreuung')}/${stelleId}`;
+}
+
+/**
+ * Evakuierungs-Modul (LLH-1034). `?bezirk=<id>` ist seit LLH-1076 nur noch Altadresse: die Seite
+ * leitet auf die Detailseite des Bezirks um ({@link evakuierungsbezirkPfad}). Neue Sprünge auf einen
+ * Bezirk nehmen die Item-Route.
+ */
+export function evakuierungPfad(einsatzId: number, opts: { bezirk?: number } = {}): string {
+  return mitQuery(einsatzModulPfad(einsatzId, 'evakuierung'), { bezirk: opts.bezirk });
+}
+
+/** Detailseite eines Evakuierungsbezirks (LLH-1076), Item-Route unter dem Modul. */
+export function evakuierungsbezirkPfad(einsatzId: number, bezirkId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'evakuierung')}/${bezirkId}`;
 }
 
 /** Stab-Modul. Den Abschluss der Lagebesprechung trägt seit LLH-1111 `lagebesprechungPfad`. */
@@ -966,6 +981,8 @@ export function lagekartePfad(
         ? `${opts.zeichnen.typ}:${opts.zeichnen.form}`
         : opts.zeichnen.typ
       : undefined,
+    // Bezug des Zeichnen-Auftrags (LLH-1069): die neue Fläche gehört diesem Evakuierungsbezirk.
+    bezirk: opts.zeichnen?.bezirk,
     // Kartenmittelpunkt (Koordinatensprung der Sprungpalette): die Karte fliegt hin und räumt den
     // Parameter. Fünf Nachkommastellen ≙ rund 1 m.
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
@@ -1008,7 +1025,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * `pages/LagekartePage.tsx` mit.
  */
 export type PlatzierenZielTyp =
-  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
+  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum' | 'tier';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -1020,6 +1037,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   betreuungsstelle: true,
   // Bereitstellungsraum („Auf Karte verorten" der BR-Detailseite, LLH-1107).
   bereitstellungsraum: true,
+  // Fundort eines Tiers („Auf Karte verorten" der Tier-Detailseite, LLH-1123).
+  tier: true,
 };
 
 /**
@@ -1047,15 +1066,15 @@ export function parseZurueck(wert: string | null | undefined): boolean {
 
 /**
  * Rückweg nach dem Verorten: die Seite, von der der Auftrag kam, allein aus Typ und Kennung
- * (LLH-1125, Spec `lagekarte-verortungsauftrag`). Exhaustiv: ein neuer Zieltyp (etwa `tier`,
- * LFH-1263) bricht den Typcheck, bis er hier sein Ziel bekommt.
+ * (LLH-1125, Spec `lagekarte-verortungsauftrag`). Exhaustiv: ein neuer Zieltyp bricht den
+ * Typcheck, bis er hier sein Ziel bekommt.
  */
 const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => string) | null> = {
   person: personDetailPfad,
   schaden: schadenDetailPfad,
-  // Keine Detailroute: die Betreuungsseite hebt die Stelle hervor (`?stelle=`).
-  betreuungsstelle: (einsatzId, id) => betreuungPfad(einsatzId, { stelle: id }),
+  betreuungsstelle: betreuungsstellePfad,
   bereitstellungsraum: bereitstellungsraumDetailPfad,
+  tier: tiereDetailPfad,
   // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
   // verortet, es gibt keine Seite, zu der man zurückwollte.
   uhs: null,
@@ -1077,6 +1096,11 @@ export type ZeichnenForm = 'flaeche' | 'linie';
 export interface ZeichnenAuftrag {
   typ: ZoneTyp;
   form?: ZeichnenForm;
+  /**
+   * `&bezirk=<id>` (LLH-1069): die Fläche gehört diesem Evakuierungsbezirk; nur am Typ
+   * `evakuierungsbezirk` ({@link parseZeichnenBezug}). Ob es den Bezirk gibt, prüft die Lagekarte.
+   */
+  bezirk?: number;
 }
 
 /**
@@ -1113,6 +1137,24 @@ export function parseZeichnenAuftrag(wert: string | null | undefined): ZeichnenA
   if (form === undefined) return { typ: typ as ZoneTyp };
   if (!istEigenerSchluessel(ZEICHNEN_FORM_ERLAUBT, form)) return null;
   return { typ: typ as ZoneTyp, form: form as ZeichnenForm };
+}
+
+/**
+ * Ergänzt einen Zeichnen-Auftrag um seinen Bezug `?bezirk=<id>` (LLH-1069). Ohne `bezirk` bleibt der
+ * Auftrag, wie er ist. Ein Bezug gilt nur am Typ `evakuierungsbezirk` und nur mit gültiger Kennung;
+ * sonst liefert die Funktion `null` und verwirft damit den GANZEN Auftrag — eine Fläche ohne den
+ * verlangten Bezug zu zeichnen, wäre still etwas anderes als bestellt. Ein Bezug ohne Auftrag ist
+ * keiner. Getrennt von {@link parseZeichnenAuftrag}, damit dessen Vertrag unberührt bleibt.
+ */
+export function parseZeichnenBezug(
+  auftrag: ZeichnenAuftrag | null,
+  bezirk: string | null | undefined,
+): ZeichnenAuftrag | null {
+  if (!auftrag) return null;
+  if (bezirk == null) return auftrag;
+  if (auftrag.typ !== 'evakuierungsbezirk') return null;
+  const id = parseRouteId(bezirk);
+  return id == null ? null : { ...auftrag, bezirk: id };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

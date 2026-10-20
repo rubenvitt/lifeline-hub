@@ -98,6 +98,14 @@ Schreibrecht nicht ausgeführt wurde, damit ein Neuladen die Karte nicht erneut 
 Das Zeichnen per Link MUST denselben Regeln folgen wie das Zeichnen über das Paneel, insbesondere
 dem zweistufigen Esc.
 
+Ein Auftrag MAY einen Bezug `bezirk=<id>` tragen (LLH-1069). Er MUST nur am Typ
+`evakuierungsbezirk` gelten; an einem anderen Typ oder mit unbrauchbarer Kennung MUST der ganze
+Auftrag verworfen werden. Mit Bezug MUST die Karte zusätzlich warten, bis die Modulfreigaben und die
+Bezirke feststehen, und nur für einen nicht stornierten Bezirk dieses Einsatzes bei lesbarem Modul
+Evakuierung starten. Die gespeicherte Fläche MUST dann die Bezeichnung und die Zuordnung des Bezirks
+tragen; der Bezug MUST keine Serie fortsetzen. `bezirk` MUST mit dem Auftrag aus der Adresse entfernt
+werden, auch allein.
+
 #### Scenario: Gefahrengebiet per Link
 - **WHEN** eine Person mit Schreibrecht die Lagekarte mit dem Auftrag `zeichnen=gefahrengebiet` öffnet
 - **THEN** steht die Karte im Zeichenmodus für ein Gefahrengebiet als Fläche, die Zeichnen-Steuerung ist sichtbar, und der Auftrag ist aus der Adresse verschwunden
@@ -125,6 +133,14 @@ dem zweistufigen Esc.
 #### Scenario: Kaltstart über den Link
 - **WHEN** der Link in einem neuen Tab geöffnet wird und der Einsatz erst nach dem ersten Bild geladen ist
 - **THEN** startet der Zeichenmodus, sobald Einsatz und Rechte feststehen, und der Auftrag wird nicht vorher verworfen
+
+#### Scenario: Bezug an einem anderen Typ
+- **WHEN** der Auftrag `zeichnen=gefahrengebiet&bezirk=5` lautet
+- **THEN** startet kein Zeichenmodus, und beide Parameter sind aus der Adresse verschwunden
+
+#### Scenario: Bezug beim Kaltstart
+- **WHEN** der Auftrag `zeichnen=evakuierungsbezirk&bezirk=5` in einem neuen Tab geöffnet wird und die Bezirke erst nach dem ersten Bild geladen sind
+- **THEN** startet der Zeichenmodus für Bezirk 5, sobald die Bezirke feststehen, und der Auftrag wird nicht vorher verworfen
 
 #### Scenario: Esc nach dem Link
 - **WHEN** der Zeichenmodus per Link gestartet ist, noch kein Punkt gesetzt ist und Esc gedrückt wird

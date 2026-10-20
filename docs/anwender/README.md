@@ -55,7 +55,8 @@ Dieselben Kapitel erscheinen an drei Stellen:
 | Stab | [Lagebesprechung](kapitel/lagebesprechung.md) | Führung |
 | Betroffene | [Betroffene und Sichtung](kapitel/betroffene.md) | Alle, Führung |
 | Betroffene | [Unfallhilfsstellen](kapitel/unfallhilfsstellen.md) | Alle, Führung |
-| Betroffene | [Betreuung und Evakuierung](kapitel/betreuung.md) | Alle, Führung |
+| Betroffene | [Evakuierung](kapitel/evakuierung.md) | Alle, Führung |
+| Betroffene | [Betreuung](kapitel/betreuung.md) | Alle, Führung |
 | Betroffene | [Tiere](kapitel/tiere.md) | Alle, Führung |
 | Betroffene | [Schäden](kapitel/schaeden.md) | Alle, Führung |
 | Einstellungen und Verwaltung | [Einstellungen des Einsatzes und Module](kapitel/einsatz-einstellungen.md) | Führung |

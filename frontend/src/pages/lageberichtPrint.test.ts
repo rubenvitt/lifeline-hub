@@ -4,12 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Der Entwurfs-Ausdruck des Lageberichts (LFH-350, M86).
- *
- * Im Status `entwurf` rendert `LageberichtDetailPage` je Abschnitt einen `MarkdownEditor` innerhalb
- * von `.lagebericht-print-root`. Ohne Druckregeln kam der Abschnitt im `split`-Layout doppelt aufs
- * Papier (Roh-Markdown neben gerendertem Text), im Akkordeon nur der eine offene: die zugeklappten
- * stehen per `forceRender` im DOM, sind aber ausgeblendet.
+ * Druckregeln der Seite (`lageberichtPrint.css`). Den Entwurfsausdruck (LFH-350/M86: jeder Abschnitt genau
+ * einmal; LFH-1008: Papiertitel im Titelblock) trägt seit LLH-1074 der Baustein der Schreibfläche
+ * (`entwurf/dokumentEntwurf.css`, Test `entwurf/dokumentEntwurfCss.test.ts`); diese Datei hält
+ * nur noch die Bedienung der Seite aus dem Druck.
  *
  * Geprüft wird die CSS-Quelle: jsdom lädt diese Datei nicht und kennt kein `@media print`.
  */
@@ -71,15 +69,8 @@ function versteckt(regel: Regel): boolean {
   return /display:\s*none/.test(regel.koerper);
 }
 
-/** Regeln, deren Selektor auf die ROHE Eingabe zielt (Textfeld oder Eingabespalte). */
-function eingabeRegeln(): Regel[] {
-  return regeln().filter((r) => /textarea|markdown-editor__eingabe/.test(r.selektor));
-}
-
-describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
+describe('lageberichtPrint.css — Bedienung aus dem Druck', () => {
   it('haelt jede Regel im @media print — der Bildschirm bleibt unberuehrt', () => {
-    // Die schärfere Hälfte: eine Regel außerhalb des Blocks versteckte das Eingabefeld auch beim
-    // Schreiben. Der Block umfasst die ganze Datei.
     expect(css.trim().startsWith('@media print')).toBe(true);
     expect(css.slice(grenzen()[1] + 1).trim()).toBe('');
   });
@@ -87,122 +78,33 @@ describe('lageberichtPrint.css — Entwurfsausdruck (M86)', () => {
   it('scopt jede Regel auf den Druckbereich', () => {
     for (const r of regeln()) {
       for (const s of einzeln(r)) {
-        expect(/^(body\b|\.lagebericht-)/.test(s), `ungescopter Selektor in ${DATEI}: ${s}`).toBe(
-          true,
-        );
+        expect(/^\.lagebericht-/.test(s), `ungescopter Selektor in ${DATEI}: ${s}`).toBe(true);
       }
     }
   });
 
-  it('blendet die Eingabespalte des split-Layouts aus', () => {
-    const treffer = regeln().filter(
-      (r) =>
-        r.selektor.includes('.markdown-editor--split') &&
-        r.selektor.includes('.markdown-editor__eingabe') &&
-        versteckt(r),
-    );
-    expect(treffer, 'keine Regel versteckt die Eingabespalte im split-Layout').toHaveLength(1);
-    // Die Spalte selbst, nicht ihr Textfeld: der Wrapper trägt `flex: 1 1 50%`.
-    expect(treffer[0].selektor.endsWith('.markdown-editor__eingabe')).toBe(true);
-  });
-
-  it('versteckt die Eingabe nur dort, wo eine gerenderte Fassung danebensteht', () => {
-    // Gegenaussage: im `toggle`-Layout (Vorgabe der Seite) ist das Textfeld nicht in
-    // `.markdown-editor__eingabe` gewickelt, daneben steht immer eine gerenderte Fassung (Vorschau
-    // oder `druckfassung`). Jede versteckende Regel ist an `split` oder `toggle` gebunden, und die
-    // Seite muss die Druckfassung anfordern — sonst druckte ein Toggle-Abschnitt leer.
-    for (const r of eingabeRegeln().filter(versteckt)) {
-      expect(
-        r.selektor.includes('.markdown-editor--split') ||
-          r.selektor.includes('.markdown-editor--toggle'),
-        `ungebundene Eingabe-Ausblendung in ${DATEI}: ${r.selektor}`,
-      ).toBe(true);
-    }
-    const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), SEITE), 'utf8');
-    expect(seite, 'Toggle-Editor ohne Druckfassung — der Abschnitt druckte leer').toMatch(
-      /<MarkdownEditor[^>]*\bdruckfassung\b/,
-    );
-    // Und der Editor wird nirgends als GANZES versteckt (das träfe die Vorschau mit).
-    for (const r of regeln().filter(versteckt)) {
-      for (const s of einzeln(r)) {
-        expect(/\.markdown-editor(--\w+)?$/.test(s), `Editor ganz versteckt: ${s}`).toBe(false);
-      }
-    }
-  });
-
-  /**
-   * Das Textfeld geht im toggle-Layout immer weg, nicht nur bei offener Vorschau — sonst kam die
-   * `<textarea>` mit Rohtext und abgeschnittenem Inhalt aufs Papier.
-   */
-  it('nimmt dem toggle-Layout das Textfeld immer und zeigt die Druckfassung', () => {
-    const textfeld = regeln().filter(
-      (r) =>
-        r.selektor.includes('.markdown-editor--toggle') &&
-        r.selektor.includes('textarea') &&
-        versteckt(r),
-    );
-    expect(textfeld, 'Textfeld des Toggle-Layouts im Druck').toHaveLength(1);
-    expect(textfeld[0].selektor).not.toContain(':has(');
-
-    const fassung = regeln().find((r) =>
-      einzeln(r).includes('.lagebericht-print-root .markdown-editor__druck'),
-    );
-    expect(fassung, 'Druckfassung bleibt im Druck verborgen').toBeDefined();
-    expect(fassung!.koerper).toMatch(/display:\s*block\s*!important/);
-  });
-
-  it('druckt auch die zugeklappten Akkordeon-Abschnitte', () => {
-    // Ein nie geöffneter Abschnitt trägt ein inline `display:none` von rc-motion, ein wieder
-    // zugeklappter die Klasse `ant-collapse-panel-hidden`; gemeinsam ist beiden `-panel-inactive`.
-    const treffer = regeln().filter((r) => r.selektor.includes('.ant-collapse-panel-inactive'));
-    expect(treffer, 'ohne diese Regel druckt der Entwurf einen von acht Abschnitten').toHaveLength(
-      1,
-    );
-    expect(treffer[0].koerper).toMatch(/display:\s*block/);
-    // Ohne `!important` gewinnt der Inline-Stil des nie geöffneten Abschnitts.
-    expect(treffer[0].koerper).toContain('!important');
-  });
-
-  /**
-   * LFH-1008: der Akkordeonkopf steht außerhalb der gerenderten Fassung und bliebe in Firefox
-   * allein am Seitenende. Auf Papier trägt der Titel der Fassung (`druckTitel`) den Abschnitt.
-   */
-  it('ersetzt den Akkordeonkopf auf Papier durch den Titel der Fassung', () => {
-    const kopf = regeln().find((r) =>
-      einzeln(r).includes('.lagebericht-print-root .ant-collapse-header'),
-    );
-    expect(kopf, 'Akkordeonkopf wird mitgedruckt').toBeDefined();
-    expect(versteckt(kopf!)).toBe(true);
-    const titel = regeln().find((r) =>
-      einzeln(r).includes('.lagebericht-print-root .markdown-editor__titel'),
-    );
-    expect(titel, 'Titel der Fassung bleibt verborgen').toBeDefined();
-    expect(titel!.koerper).toMatch(/display:\s*block\s*!important/);
-    // Ohne `druckTitel` stünde der Abschnitt auf Papier ohne Namen.
-    const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), SEITE), 'utf8');
-    expect(seite).toMatch(/druckTitel=\{a\.label\}/);
-    const presse = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), 'PressemitteilungDetailPage.tsx'),
-      'utf8',
-    );
-    expect(presse).toMatch(/druckTitel=\{a\.label\}/);
-  });
-
-  it('laesst Beschriftung und Vorschau-Umschalter des Editors weg', () => {
-    const chrome = regeln().filter(
-      (r) => versteckt(r) && /markdown-editor__label|markdown-editor \.ant-btn/.test(r.selektor),
-    );
-    expect(chrome.length).toBeGreaterThan(0);
-    const alle = chrome.flatMap(einzeln).join(' ');
-    expect(alle).toContain('.markdown-editor__label');
-    expect(alle).toContain('.markdown-editor .ant-btn');
-  });
-
-  it('behaelt die Bestandszusicherungen des Druckbereichs', () => {
-    const bestand = regeln();
-    expect(bestand.some((r) => r.selektor.includes('.lagebericht-no-print') && versteckt(r))).toBe(
+  it('nimmt die Bedienung aus dem Druck', () => {
+    expect(regeln().some((r) => r.selektor.includes('.lagebericht-no-print') && versteckt(r))).toBe(
       true,
     );
+  });
+
+  /**
+   * EINE Mechanik für den Entwurfsausdruck: die Seite schreibt über `DokumentEntwurf` und trägt
+   * keine eigene Editor- oder Akkordeonregel. Eine zweite liefe still auseinander (vorher: Toggle-
+   * und Akkordeonregeln hier, Split- und Etikettregeln beim Befehl).
+   */
+  it('überlässt den Entwurfsausdruck dem Baustein der Schreibfläche', () => {
+    for (const r of regeln()) {
+      expect(r.selektor, `Entwurfsregel in ${DATEI}`).not.toMatch(
+        /markdown-editor|ant-collapse|ant-form-item/,
+      );
+    }
+    for (const datei of ['LageberichtDetailPage.tsx', 'PressemitteilungDetailPage.tsx']) {
+      const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), datei), 'utf8');
+      expect(seite, datei).toMatch(/<DokumentEntwurf\b/);
+      expect(seite, datei).not.toMatch(/<MarkdownEditor\b/);
+    }
   });
 });
 

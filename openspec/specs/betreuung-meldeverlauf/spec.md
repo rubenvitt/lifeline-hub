@@ -57,7 +57,8 @@ Rücknahmeangaben, Zeitformat und 404 für fremde oder unbekannte Stellen. An di
 ### Requirement: Rechte am Verlauf
 
 Die Lese-Endpunkte der Meldereihen MUST dieselben Rechte verlangen wie die übrigen lesenden
-Endpunkte des Moduls Betreuung: Lesezugriff auf den Einsatz und das Modul. Ein Beobachter
+Endpunkte ihres Moduls: Lesezugriff auf den Einsatz und, für die Reihe eines Bezirks, das
+Modul Evakuierung bzw., für die Reihe einer Stelle, das Modul Betreuung. Ein Beobachter
 MUST den Verlauf lesen können. Ein Zurücknehmen aus dem Verlauf MUST über die bestehenden
 Rücknahme-Endpunkte laufen und deren Rechte, Statuscodes und ETB-Wirkung unverändert haben.
 
@@ -66,16 +67,22 @@ Rücknahme-Endpunkte laufen und deren Rechte, Statuscodes und ETB-Wirkung unver�
 - **THEN** liefert das System die Reihe
 
 #### Scenario: Modul ausgeblendet
-- **WHEN** das Modul Betreuung für den Einsatz ausgeblendet ist und ein Nicht-Admin eine Reihe abruft
+- **WHEN** das Modul Betreuung für den Einsatz ausgeblendet ist und ein Nicht-Admin die Reihe einer Stelle abruft
 - **THEN** antwortet das System mit 403
+
+#### Scenario: Modul Evakuierung ausgeblendet
+- **WHEN** das Modul Evakuierung für den Einsatz ausgeblendet ist und ein Nicht-Admin die Reihe eines Bezirks abruft
+- **THEN** antwortet das System mit 403
+- **AND** die Reihe einer Stelle bleibt für ihn lesbar
 
 #### Scenario: Fremde Organisation
 - **WHEN** ein Benutzer einer anderen Organisation eine Reihe abruft
 - **THEN** antwortet das System mit 403 oder 404 und gibt keine Meldung preis
 
-### Requirement: Verlauf auf der Betreuungsseite
+### Requirement: Verlauf auf den Modulseiten
 
-Die Betreuungsseite SHALL an jeder Bezirkskarte und an jeder Stellenzeile einen
+Die Evakuierungsseite SHALL an jeder Bezirkszeile und die Betreuungsseite an jeder
+Stellenzeile einen
 Aufklappbereich „Verlauf“ anbieten. Der Auslöser MUST beschriftet sein, seinen Zustand
 (auf- oder zugeklappt) zugänglich melden und die Bezeichnung des Bezirks bzw. der Stelle im
 zugänglichen Namen tragen. Er MUST ohne Schreibrecht verfügbar sein. Die Reihe MUST erst
@@ -95,6 +102,23 @@ erscheinen.
 #### Scenario: Neue Meldung bei geöffnetem Verlauf
 - **WHEN** bei geöffnetem Verlauf eine andere Person für denselben Bezirk einen Stand meldet
 - **THEN** erscheint die neue Meldung im Verlauf ohne Neuladen der Seite
+
+### Requirement: Verlauf auf der Detailseite eines Bezirks
+
+Die Detailseite eines Evakuierungsbezirks SHALL seinen Verlauf ohne Aufklappen zeigen, mit
+denselben Zuständen in Worten und derselben Rücknahme wie der Aufklappbereich. Ab zwei gültigen
+Meldungen MUST darüber eine Stufenlinie des Stands über die Zeit stehen: nur gültige Meldungen,
+Stufen statt Schrägen, die Plangröße als gestrichelte Linie mit Wort und Zahl, zugänglich als
+ein Bild mit einer Aussage in Worten. Mit weniger als zwei gültigen Meldungen MUST die Linie
+entfallen. Linie und Verlauf MUST dieselbe Abfrage teilen.
+
+#### Scenario: Zwei Meldungen
+- **WHEN** ein Bezirk die Meldungen 200 und 480 trägt
+- **THEN** zeigt die Detailseite eine Stufenlinie mit beiden Werten und darunter den Verlauf
+
+#### Scenario: Zurückgenommene Meldung
+- **WHEN** eine der Meldungen zurückgenommen wurde
+- **THEN** fehlt sie in der Stufenlinie, und mit nur einer gültigen Meldung entfällt die Linie
 
 ### Requirement: Kennzeichnung im Verlauf
 

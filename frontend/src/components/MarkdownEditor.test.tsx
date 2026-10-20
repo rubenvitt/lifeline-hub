@@ -106,7 +106,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
   });
 
   /**
-   * Die Voraussetzung der Druckregeln aus `pages/lageberichtPrint.css` (LFH-350/M86), als
+   * Die Voraussetzung der Druckregeln aus `entwurf/dokumentEntwurf.css` (LFH-350/M86), als
    * DOM-Messung: `split` wickelt sein Textfeld in `.markdown-editor__eingabe`, `toggle` NICHT. Eine
    * Druckregel darauf kann einen Toggle-Abschnitt nicht leer drucken, und eine Regel auf
    * `textarea` braucht eine gerenderte Fassung daneben (offene Vorschau oder `druckfassung`).
@@ -166,7 +166,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
   });
 
   /**
-   * LFH-1008: der Kopf des Einbauorts (Akkordeonkopf, Feldetikett) liegt außerhalb der gerenderten
+   * LFH-1008: der Kopf des Einbauorts (Abschnittskopf des Entwurfs) liegt außerhalb der gerenderten
    * Fassung und stünde in Firefox allein am Seitenende. Auf Papier trägt der Titel der Fassung
    * den Abschnitt, im selben Titelblock wie der erste Absatz; am Bildschirm ist er verborgen.
    */
@@ -208,6 +208,24 @@ describe('MarkdownEditor – toggle-Variante', () => {
     );
     const block = container.querySelector('.markdown-editor__druck [data-lfh="titelblock"]');
     expect(block).toHaveTextContent(/^Medienlage—$/);
+  });
+
+  // Der Hilfetext im Abschnittskopf des Entwurfs beschreibt das Feld (LLH-1074).
+  it('reicht `aria-describedby` an das Textfeld durch', () => {
+    renderMitProviders(
+      <>
+        <span id="hilfe">a. Eigene Absicht</span>
+        <MarkdownEditor
+          unterEbene={3}
+          layout="toggle"
+          umschalterAussen
+          aria-describedby="hilfe"
+          value=""
+          onChange={() => {}}
+        />
+      </>,
+    );
+    expect(screen.getByRole('textbox')).toHaveAccessibleDescription('a. Eigene Absicht');
   });
 
   it('rendert ohne `druckTitel` keinen Titel', () => {

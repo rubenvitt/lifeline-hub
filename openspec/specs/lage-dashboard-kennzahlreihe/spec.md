@@ -68,10 +68,11 @@ der Antwort MUST die Reihe nicht beeinflussen.
 ### Requirement: Wert und Notiz von „Evakuiert“
 
 Die Zelle „Evakuiert“ SHALL als Wert die Zahl der Evakuierten (N) und als Notiz „von M
-geplant“ zeigen, gerechnet nach der Kennzahl-Anforderung des Fachmoduls Betreuung (LFH-639).
+geplant“ zeigen, gerechnet nach der Kennzahl-Anforderung des Fachmoduls Evakuierung (LFH-639, seit LLH-1034
+eigenes Modul).
 Hat kein aktiver Bezirk eine Standmeldung, MUST der Wert „—“ lauten, nie 0. Bezirke ohne
 Meldung MUST in der Notiz ausgewiesen werden. Ein geschätzter Anteil MUST mit „≈“
-gekennzeichnet sein. Die Zelle MUST zur Modulseite Betreuung führen. Modulseite und
+gekennzeichnet sein. Die Zelle MUST zur Modulseite Evakuierung führen. Modulseite und
 Dashboard MUST dieselbe Formatierung verwenden. Die Zelle MUST keinen Warnton tragen.
 
 #### Scenario: Zwei gemeldete Bezirke
@@ -92,18 +93,18 @@ Dashboard MUST dieselbe Formatierung verwenden. Die Zelle MUST keinen Warnton tr
 
 ### Requirement: Datenzustände der Zelle „Evakuiert“
 
-Die Zelle „Evakuiert“ SHALL die Zustände ihrer eigenen Datenquelle (Betreuungs-Übersicht)
+Die Zelle „Evakuiert“ SHALL die Zustände ihrer eigenen Datenquelle (Evakuierungs-Übersicht)
 zeigen, unabhängig von den übrigen Kennzahlen. Lädt die Quelle, MUST die Zelle „laden“
 zeigen. Ist der Abruf gescheitert, MUST sie „Stand unbekannt“ zeigen, auch wenn ältere Daten
 vorliegen. Meldet der Einsatz den Auslöser, die Quelle aber keinen aktiven Bezirk (Stände aus
 verschiedenen Abrufen), MUST die Zelle „—“ mit dem Hinweis „keine geplante Evakuierung“
-zeigen und keine erfundene Zahl. Darf die Person das Modul Betreuung nicht sehen, MUST die
+zeigen und keine erfundene Zahl. Darf die Person das Modul Evakuierung nicht sehen, MUST die
 Quelle nicht abgerufen werden. Die Zelle MUST dann ohne Zahl und ohne Ziel stehen und den
 fehlenden Zugriff benennen. Der Platz MUST dabei nicht mit einer anderen Kennzahl belegt
 werden.
 
 #### Scenario: Abruf gescheitert
-- **WHEN** der Abruf der Betreuungs-Übersicht fehlschlägt
+- **WHEN** der Abruf der Evakuierungs-Übersicht fehlschlägt
 - **THEN** zeigt die Zelle „Stand unbekannt“, und die übrigen Kennzahlen bleiben lesbar
 
 #### Scenario: Auslöser und Quelle laufen auseinander
@@ -111,7 +112,7 @@ werden.
 - **THEN** zeigt die Zelle „—“ mit „keine geplante Evakuierung“
 
 #### Scenario: Modul für die Person gesperrt
-- **WHEN** der Einsatz `evakuiert` trägt und das Modul Betreuung für die Person ausgeblendet oder gesperrt ist
+- **WHEN** der Einsatz `evakuiert` trägt und das Modul Evakuierung für die Person ausgeblendet oder gesperrt ist
 - **THEN** steht auf Platz 3 „Evakuiert“ ohne Zahl und ohne Link, mit Hinweis auf den fehlenden Zugriff, und die Übersicht wird nicht abgerufen
 
 ### Requirement: Wechsel von „Evakuiert“ während der Betrachtung
@@ -126,5 +127,5 @@ damit der Rückweg zum Dashboard den neuen Zuschnitt ohne Banner zeigt.
 - **THEN** bleibt „Schäden offen“ auf Platz 3 stehen, und ein Banner bietet „Evakuiert statt Schäden offen · übernehmen“ an
 
 #### Scenario: Eigene Anordnung
-- **WHEN** eine Person auf der Modulseite Betreuung einen Bezirk anlegt
+- **WHEN** eine Person auf der Modulseite Evakuierung einen Bezirk anlegt
 - **THEN** wird der Einsatz neu abgerufen

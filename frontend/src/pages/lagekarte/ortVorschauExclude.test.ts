@@ -16,6 +16,9 @@ describe('ortVorschauExclude', () => {
   it('bereitstellungsraum → ebenso nichts, die Peilung kennt keine Räume (LLH-1107)', () => {
     expect(ortVorschauExclude({ typ: 'bereitstellungsraum', id: 3 }, 1)).toBeUndefined();
   });
+  it('tier → ebenso nichts, die Peilung kennt keine Tiere (LLH-1123)', () => {
+    expect(ortVorschauExclude({ typ: 'tier', id: 3 }, 1)).toBeUndefined();
+  });
   it('uhs → uhs:<id>', () => {
     expect(ortVorschauExclude({ typ: 'uhs', id: 3 }, 1)).toBe('uhs:3');
   });

@@ -11,7 +11,9 @@ import {
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
 import { ladeBetreuung } from '../../api/betreuung';
+import { ladeEvakuierung } from '../../api/evakuierung';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
+import { listeTiere } from '../../api/einsatzTier';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { ohneAbgeschlossene } from '../../personen/personenBilanz';
@@ -48,6 +50,8 @@ import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 import { personenZugriffVon } from './personenEbene';
 import { betreuungZugriffVon } from './betreuungEbene';
 import { checkBrZugriff } from './brEbene';
+import { checkTierZugriff } from './tierEbene';
+import { buildTierMarker } from './tierMarker';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 
 /**
@@ -60,6 +64,8 @@ export const QUELLE_BETROFFENE = 'Betroffene';
 const PERSONEN_MODUL = modulRegistry.find((m) => m.key === 'personen');
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Ebene „Betreuungsstellen". */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
+/** Registry-Eintrag des Moduls „Evakuierung" (LLH-1034) — Grenze der Bezirksangaben an Flächen. */
+const EVAKUIERUNG_MODUL = modulRegistry.find((m) => m.key === 'evakuierung');
 /** Leere Personenliste mit fester Identität: ohne Modul oder vor dem Abruf. */
 const LEER_PERSONEN: readonly Person[] = [];
 
@@ -246,6 +252,25 @@ export function useLagekarteDaten({
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
   const betreuungFehler = liveAn && betreuungZugriff === 'frei' && betreuungQuery.isError;
+  // Evakuierungsbezirke (LLH-1034, eigenes Modul): dieselbe Grenze, eigenes Fach
+  // (`einsatzKeys.evakuierung`, live über das `evakuierung`-Event). Keine eigene Ebene: die Bezirke
+  // beschriften die Bezirksflächen und füllen den Zonen-Inspector.
+  const evakuierungVorab = betreuungZugriffVon({
+    modul: EVAKUIERUNG_MODUL,
+    freigaben,
+    abgelehnt: false,
+  });
+  const evakuierungQuery = useQuery({
+    queryKey: einsatzKeys.evakuierung(einsatzId),
+    queryFn: () => ladeEvakuierung(einsatzId),
+    enabled: liveAn && evakuierungVorab === 'frei',
+  });
+  const evakuierungZugriff = betreuungZugriffVon({
+    modul: EVAKUIERUNG_MODUL,
+    freigaben,
+    abgelehnt: evakuierungQuery.error instanceof ApiError && evakuierungQuery.error.status === 403,
+  });
+  const evakuierungFehler = liveAn && evakuierungZugriff === 'frei' && evakuierungQuery.isError;
   // Ebene „Bereitstellungsräume" (LLH-1107): dieselbe Grenze wie bei den Betreuungsstellen. Das
   // Fach ist die Liste der Modulseite (`einsatzKeys.br`, mit Belegung), live invalidiert vom
   // `bereitstellungsraum`-Event, das nur Leser mit Modulrecht bekommen. Im Historien-Modus kommen
@@ -262,6 +287,21 @@ export function useLagekarteDaten({
   });
   // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
   const brFehler = liveAn && brZugriff === 'frei' && brQuery.isError;
+  // Ebene „Tiere" (LLH-1123): dieselbe Grenze. Das Fach ist die Liste der Modulseite
+  // (`einsatzKeys.tiere`), live invalidiert vom `tier`-Event, das nur Leser mit Modulrecht
+  // bekommen. Im Historien-Modus kommen die Tiere aus dem Dokument.
+  const tierVorab = checkTierZugriff({ freigaben, abgelehnt: false });
+  const tierQuery = useQuery({
+    queryKey: einsatzKeys.tiere(einsatzId),
+    queryFn: () => listeTiere(einsatzId),
+    enabled: liveAn && tierVorab === 'frei',
+  });
+  const tierZugriff = checkTierZugriff({
+    freigaben,
+    abgelehnt: tierQuery.error instanceof ApiError && tierQuery.error.status === 403,
+  });
+  // Nur bei freiem Modul: ein 403 ist „gesperrt", kein Ausfall.
+  const tierFehler = liveAn && tierZugriff === 'frei' && tierQuery.isError;
   const orgQuery = useQuery({
     queryKey: globalKeys.organisation(),
     queryFn: ladeOrganisation,
@@ -319,16 +359,16 @@ export function useLagekarteDaten({
         : betreuungQuery.isError
           ? undefined
           : betreuungQuery.data?.stellen;
-  // Bezirke hinter derselben Grenze: Bezeichnung und Räumungszustand beschriften die
-  // Bezirksflächen, die jeder Karten-Leser sieht.
+  // Bezirke hinter der Grenze des Moduls Evakuierung: Bezeichnung und Räumungszustand beschriften
+  // die Bezirksflächen, die jeder Karten-Leser sieht.
   const bezirkeRoh =
-    betreuungZugriff !== 'frei'
+    evakuierungZugriff !== 'frei'
       ? undefined
       : istSnapshot
         ? snap?.evakuierungsbezirke
-        : betreuungQuery.isError
+        : evakuierungQuery.isError
           ? undefined
-          : betreuungQuery.data?.bezirke;
+          : evakuierungQuery.data?.bezirke;
   // Räume hinter derselben Grenze wie die Stellen.
   const raeumeRoh =
     brZugriff !== 'frei'
@@ -338,6 +378,15 @@ export function useLagekarteDaten({
         : brQuery.isError
           ? undefined
           : brQuery.data;
+  // Tiere hinter derselben Grenze.
+  const tiereRoh =
+    tierZugriff !== 'frei'
+      ? undefined
+      : istSnapshot
+        ? snap?.tiere
+        : tierQuery.isError
+          ? undefined
+          : tierQuery.data;
   // Org-TZ-Default aus dem Dokument, nicht aus der Live-Query — sonst schriebe eine Org-Umbenennung
   // den historischen Stand um.
   const orgDefault = (istSnapshot ? snap?.org_default : orgQuery.data?.tz_organisation) ?? null;
@@ -373,6 +422,7 @@ export function useLagekarteDaten({
     () => buildBrMarker(raeumeRoh ?? [], einheitenRoh, token),
     [raeumeRoh, einheitenRoh, token],
   );
+  const tiere = useMemo(() => buildTierMarker(tiereRoh ?? [], token), [tiereRoh, token]);
   const fuehrungsstelleMarker = useMemo(
     () => baueFuehrungsstelleMarker(fuehrungsstelleRoh, token),
     [fuehrungsstelleRoh, token],
@@ -383,12 +433,18 @@ export function useLagekarteDaten({
       ...(fuehrungsstelleMarker ? [fuehrungsstelleMarker] : []),
       ...stellen.verortet,
       ...raeume.verortet,
+      ...tiere.verortet,
     ],
-    [basisVerortet, fuehrungsstelleMarker, stellen.verortet, raeume.verortet],
+    [basisVerortet, fuehrungsstelleMarker, stellen.verortet, raeume.verortet, tiere.verortet],
   );
   const nichtVerortet = useMemo(
-    () => [...basisNichtVerortet, ...stellen.nichtVerortet, ...raeume.nichtVerortet],
-    [basisNichtVerortet, stellen.nichtVerortet, raeume.nichtVerortet],
+    () => [
+      ...basisNichtVerortet,
+      ...stellen.nichtVerortet,
+      ...raeume.nichtVerortet,
+      ...tiere.nichtVerortet,
+    ],
+    [basisNichtVerortet, stellen.nichtVerortet, raeume.nichtVerortet, tiere.nichtVerortet],
   );
 
   const taktisch = useMemo(
@@ -516,8 +572,12 @@ export function useLagekarteDaten({
       // Betreuungsstellen stehen in Kopfzahl und „Nicht verortet" wie die UHS, ihr Ausfall ist ein
       // Ausfall des Lagebilds. Ein 403 ist es nicht (`betreuungFehler`).
       ['Betreuungsstellen', betreuungFehler],
+      // Ohne Bezirke stünden die Bezirksflächen ohne Namen und Räumung da (LLH-1034).
+      ['Evakuierungsbezirke', evakuierungFehler],
       // Räume ebenso (LLH-1107); ein 403 ist kein Ausfall (`brFehler`).
       ['Bereitstellungsräume', brFehler],
+      // Tiere ebenso (LLH-1123); ein 403 ist kein Ausfall (`tierFehler`).
+      ['Tiere', tierFehler],
       [QUELLE_BETROFFENE, personenFehler],
     ];
     return katalog.filter(([, kaputt]) => kaputt).map(([name]) => name);
@@ -545,7 +605,9 @@ export function useLagekarteDaten({
     lageMeldungenQuery.isError,
     fkQuery.isError,
     betreuungFehler,
+    evakuierungFehler,
     brFehler,
+    tierFehler,
     personenFehler,
   ]);
 
@@ -573,7 +635,9 @@ export function useLagekarteDaten({
     // wiederholt.
     if (personenFehler) void personenQuery.refetch();
     if (betreuungFehler) void betreuungQuery.refetch();
+    if (evakuierungFehler) void evakuierungQuery.refetch();
     if (brFehler) void brQuery.refetch();
+    if (tierFehler) void tierQuery.refetch();
   };
 
   const lageMeldungMarker = useMemo(
@@ -647,7 +711,8 @@ export function useLagekarteDaten({
         // speisen den Startausschnitt).
         !freigabenQuery.isFetched ||
         betreuungQuery.isLoading ||
-        brQuery.isLoading,
+        brQuery.isLoading ||
+        tierQuery.isLoading,
     // Datenstand der Karte (LFH-723): der älteste geladene Teil der Live-Ebenen, wie beim
     // Meldebild. Im Snapshot-Modus keiner — dort nennt der Historien-Banner den Stand, und eine
     // Uhrzeit daneben widerspräche ihm.
@@ -667,6 +732,7 @@ export function useLagekarteDaten({
           lageMeldungenFrei ? lageMeldungenQuery.dataUpdatedAt : undefined,
           fkQuery.dataUpdatedAt,
           brZugriff === 'frei' ? brQuery.dataUpdatedAt : undefined,
+          tierZugriff === 'frei' ? tierQuery.dataUpdatedAt : undefined,
         ),
     // Namen der Lagebild-Quellen, deren Abruf scheiterte (leer = vollständig). Die Kürzung für die
     // Anzeige ist Darstellung und liegt bei der Seite.
@@ -687,6 +753,11 @@ export function useLagekarteDaten({
     gebiete: gebieteRoh ?? [],
     // Evakuierungsbezirke für den Zonen-Inspector — leer ohne Modulrecht.
     bezirke: bezirkeRoh ?? [],
+    // Steht die Bezirksliste fest (geladen oder gescheitert)? Ein Zeichnen-Auftrag mit Bezirk
+    // (LLH-1069) wartet darauf, statt den Bezirk beim Kaltstart als unbekannt zu verwerfen.
+    bezirkeGeladen: istSnapshot ? !snapQuery.isLoading : evakuierungQuery.isFetched,
+    // Modul Evakuierung frei? Der Inspector bietet Zuordnung und Sprung nur dann an (LLH-1034).
+    evakuierungZugriff,
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup.
     freieZeichen,
     // Rohlisten für das Datenraster im Paneel „Ausgewählt": die Marker tragen nur Name/Ort/Zeichen,
@@ -701,6 +772,7 @@ export function useLagekarteDaten({
       abschnitte: abschnitteRoh ?? [],
       betreuungsstellen: stellenRoh ?? [],
       bereitstellungsraeume: raeumeRoh ?? [],
+      tiere: tiereRoh ?? [],
       fuehrungsstelle: fuehrungsstelleRoh ?? null,
       // Nur ein erfolgreicher Live-Abruf; nach Fehler bliebe `data` als stiller Altstand stehen.
       rueckmeldungen:
@@ -717,6 +789,8 @@ export function useLagekarteDaten({
     betreuungZugriff,
     // Ebene „Bereitstellungsräume" (LLH-1107): ebenso nur der Zugriffszustand.
     brZugriff,
+    // Ebene „Tiere" (LLH-1123): ebenso nur der Zugriffszustand.
+    tierZugriff,
     // Ebene „Betroffene": Zugriffszustand für Zeile/Legende, Marker getrennt.
     personenZugriff,
     personenVerortet,

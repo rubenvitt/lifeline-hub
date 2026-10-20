@@ -69,7 +69,6 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
     http.get('/api/einsaetze/1/betreuung', () =>
       HttpResponse.json({
-        bezirke: [],
         stellen: [
           { id: 7, bezeichnung: 'Turnhalle Ost', status: 'geschlossen' },
           {

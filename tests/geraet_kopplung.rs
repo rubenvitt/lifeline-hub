@@ -4653,7 +4653,7 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
         &admin,
         Some(
             &json!({"bezeichnung": "Uferstraße", "plan_personen": 40, "plan_erhebung": "gezaehlt"}),
@@ -4678,7 +4678,21 @@ async fn betreuungsstelle_kennt_nur_die_eigene_stelle() {
         .map(|st| st["id"].as_i64().unwrap())
         .collect();
     assert_eq!(ids, vec![nord], "nur die eigene Stelle");
-    assert_eq!(v["bezirke"], json!([]), "keine Bezirke");
+    assert!(v.get("bezirke").is_none(), "keine Bezirke: {v}");
+    // Bezirke sind das Modul Evakuierung (LLH-1034); das Gerät erreicht es nicht.
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/evakuierung"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Evakuierung ist für das Gerät gesperrt"
+    );
 
     // Melden und Meldeverlauf: eigene Stelle ja, fremde 404.
     let (s, v) = belegung_melden(&app, &geraet, einsatz, nord, 12).await;

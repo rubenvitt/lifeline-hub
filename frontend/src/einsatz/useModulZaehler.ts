@@ -2,10 +2,17 @@ import { useQuery } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { listeAbloesungen } from '../api/abloesungen';
 import { ladeBetreuung } from '../api/betreuung';
+import { ladeEvakuierung } from '../api/evakuierung';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { wetterAbfrage } from '../api/wetter';
 import { EINSATZ_KEYS, einsatzKeys, type EinsatzKey } from '../api/queryKeys';
-import type { Abloesung, Evakuierungsbezirk, ModulFreigaben, ModulZaehler } from '../api/types';
+import type {
+  Abloesung,
+  Betreuungsstelle,
+  Evakuierungsbezirk,
+  ModulFreigaben,
+  ModulZaehler,
+} from '../api/types';
 import { countFaellige } from '../abloesung/einstufung';
 import { useEinstufungsUhr } from '../abloesung/useUhr';
 import { istAktiverBezirk } from '../betreuung/evakuierungKennzahl';
@@ -129,13 +136,27 @@ export function berechneAbloesungZaehler(
  * Aktive Evakuierungsbezirke; „aktiv" steht EINMAL in `betreuung/evakuierungKennzahl.ts`.
  * Browser-Zähler, weil Seite und Kennzahl dieselbe Übersicht ohnehin laden.
  */
-export function berechneBetreuungZaehler(
+export function berechneEvakuierungZaehler(
   bezirke: ReadonlyArray<Pick<Evakuierungsbezirk, 'raeumung' | 'storniert_at'>>,
 ): ModulZaehlerWert {
   const aktiv = bezirke.filter(istAktiverBezirk).length;
   return {
     wert: aktiv,
     beschreibung: anzahl(aktiv, 'aktiver Evakuierungsbezirk', 'aktive Evakuierungsbezirke'),
+  };
+}
+
+/**
+ * Betreuungsstellen in Betrieb (LLH-1034): vorbereitete und geschlossene zählen nicht, stornierte
+ * liefert die Übersicht gar nicht. Browser-Zähler wie {@link berechneEvakuierungZaehler}.
+ */
+export function berechneBetreuungZaehler(
+  stellen: ReadonlyArray<Pick<Betreuungsstelle, 'status' | 'storniert_at'>>,
+): ModulZaehlerWert {
+  const inBetrieb = stellen.filter((s) => s.status === 'in_betrieb' && !s.storniert_at).length;
+  return {
+    wert: inBetrieb,
+    beschreibung: anzahl(inBetrieb, 'Betreuungsstelle in Betrieb', 'Betreuungsstellen in Betrieb'),
   };
 }
 
@@ -180,6 +201,7 @@ export function darfZaehlerZeigen(quelle: ModulZaehlerQuelle, freigaben?: ModulF
 export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap {
   const abloesungAktiv = darfZaehlerZeigen('abloesung', freigaben);
   const betreuungAktiv = darfZaehlerZeigen('betreuung', freigaben);
+  const evakuierungAktiv = darfZaehlerZeigen('evakuierung', freigaben);
   // Das Wetter nur bei bekannter Freigabe (LFH-663, LFH-669): unbekannte Freigaben geben
   // nichts frei, ein ausgeblendetes Modul bekommt keine Anfrage.
   const wetterAktiv = darfZaehlerZeigen('wetter-pegel', freigaben);
@@ -193,11 +215,17 @@ export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap
     queryFn: () => listeAbloesungen(einsatzId, 'laufend'),
     enabled: abloesungAktiv,
   });
-  // Dieselbe Übersicht wie Seite und Kennzahl: ein Abruf, ein Cache-Fach.
+  // Dieselbe Übersicht wie die Seite: ein Abruf, ein Cache-Fach.
   const betreuung = useQuery({
     queryKey: einsatzKeys.betreuung(einsatzId),
     queryFn: () => ladeBetreuung(einsatzId),
     enabled: betreuungAktiv,
+  });
+  // Dieselbe Übersicht wie Seite und Kennzahl „Evakuiert“ (LLH-1034).
+  const evakuierung = useQuery({
+    queryKey: einsatzKeys.evakuierung(einsatzId),
+    queryFn: () => ladeEvakuierung(einsatzId),
+    enabled: evakuierungAktiv,
   });
   // Dieselbe Abfrage wie Modulseite und Unwetterhinweis: ein Abruf je 5 min, ein Cache-Fach.
   const wetter = useQuery({ ...wetterAbfrage(einsatzId), enabled: wetterAktiv });
@@ -215,7 +243,10 @@ export function useModulZaehler({ einsatzId, freigaben }: Args): ModulZaehlerMap
     karte.abloesung = berechneAbloesungZaehler(abloesungen.data, jetzt);
   }
   if (betreuungAktiv && betreuung.isSuccess) {
-    karte.betreuung = berechneBetreuungZaehler(betreuung.data.bezirke);
+    karte.betreuung = berechneBetreuungZaehler(betreuung.data.stellen);
+  }
+  if (evakuierungAktiv && evakuierung.isSuccess) {
+    karte.evakuierung = berechneEvakuierungZaehler(evakuierung.data.bezirke);
   }
   if (wetterAktiv && wetter.isSuccess) {
     const unwetter = berechneUnwetterZaehler(wetter.data.warnungen, wetterJetzt);
