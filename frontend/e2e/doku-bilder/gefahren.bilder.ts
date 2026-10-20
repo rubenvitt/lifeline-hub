@@ -7,7 +7,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep gefahren`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   gefahren.png          frontend/src/pages/gefahren/GefahrenPage.tsx,
- *                         frontend/src/pages/gefahren/GefahrenMatrix.tsx
+ *                         frontend/src/pages/gefahren/GefahrenMatrix.tsx,
+ *                         frontend/src/pages/gefahren/GefahrenBeurteilung.tsx
  *   bewertung-waehlen.png frontend/src/pages/gefahren/GefahrenMatrix.tsx (Menü einer Zelle)
  *   bewertung-details.png frontend/src/pages/gefahren/GefahrenZelleDetails.tsx
  *
@@ -81,6 +82,17 @@ test.describe(KAPITEL, () => {
     await expect(
       page.getByRole('button', { name: 'Bewertung Elektrizität × Menschen: hoch' }),
     ).toBeVisible();
+  });
+
+  test('Beurteilung bestätigen', async ({ page }) => {
+    // Ohne Bild: der Ablauf ist nachgeklickt, die Ansicht zeigt schon `gefahren.png`.
+    await oeffneGefahren(page);
+    const beurteilung = page.locator('[data-lfh="gefahrengebiet-beurteilung"]');
+    await expect(beurteilung).toContainText('nicht beurteilt');
+    await beurteilung.getByRole('button', { name: 'Beurteilung bestätigen' }).click();
+    await expect(beurteilung.locator('[data-lfh="beurteilung-stand"]')).toContainText(
+      /^beurteilt /,
+    );
   });
 
   test('Details einer Bewertung', async ({ page }) => {

@@ -55,9 +55,11 @@ Stunden offen sind.
 
 ### Was die Paneele verdichten
 
-- **Gefahrenmatrix:** je Gefahrentyp die höchste Warnstufe über alle Gefahrengebiete und
-  Schutzobjekte; darunter, wie viele Gefahrentypen noch unbewertet sind. Bewertet wird im
-  Kapitel [Gefahren](gefahren.md).
+- **Gefahrenmatrix:** je Gefahrentyp mit einer Stufe über „keine“ die höchste Warnstufe über
+  alle Gefahrengebiete und Schutzobjekte; ohne solche Stufe steht „Keine Gefahr über Stufe
+  „keine“.“ Darunter stehen die Gebiete, deren Matrix noch nicht beurteilt ist, etwa
+  „Hangrutsch Kirchberg: nicht beurteilt“, bei mehr als zwei nur ihre Zahl. Bewertet und
+  beurteilt wird im Kapitel [Gefahren](gefahren.md).
 - **Sichtung:** die Betroffenen in Versorgung je Sichtungskategorie, dazu „Ohne Sichtung“ und
   „Unterwegs / offen / abgeschlossen“: unterwegs im Eigentransport, ohne Verbleib, abgeschlossen
   (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner

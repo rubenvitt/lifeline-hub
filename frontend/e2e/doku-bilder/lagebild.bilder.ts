@@ -19,6 +19,10 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/lage-dashboard`);
     await expect(page.locator('[data-lfh="gefahrenzeile"]').first()).toBeVisible();
+    // Die Demo-Gebiete sind nicht beurteilt: der Fuß des Paneels nennt sie.
+    await expect(page.locator('[data-lfh="gefahren-beurteilung"]')).toContainText(
+      'nicht beurteilt',
+    );
     await expect(page.locator('[data-sichtung]').first()).toBeVisible();
     await expect(page.getByRole('list', { name: 'Jüngste Einträge' })).toBeVisible();
     await fotografiere(page, KAPITEL, 'lagebild');
