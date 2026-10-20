@@ -1082,8 +1082,13 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
       pfad: `${R}/lageberichte`,
       anker: (page) =>
         inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
+      // Gemessen wird erst das stehende Menü: beim Einblenden (`ant-slide-up-appear`)
+      // staucht die Skalierung die Einträge unter 72 px.
       vorbereiten: async (page) => {
         await knopf('Andere Vorlage wählen')(page).click();
+        const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+        await expect(menue).toBeVisible();
+        await expect(menue).not.toHaveClass(/ant-slide-(up|down)-(appear|enter)/);
       },
       ziele: [
         {
