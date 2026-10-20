@@ -38,6 +38,7 @@ function person(p: Partial<Person>): Person {
     geaendert_at: '2026-06-08 10:00:00',
     geaendert_von: 1,
     storniert_at: null,
+    versorgung: 'offen',
     aktuelle_sichtung: null,
     aktuelle_sichtung_at: null,
     aktueller_verbleib: null,
@@ -79,6 +80,20 @@ describe('verdichtePersonen', () => {
     expect(v.sk.ohne).toBe(1);
     expect(v.patienten).toBe(3);
     expect(v.gesamt).toBe(6);
+  });
+
+  it('lässt Abgeschlossene aus Patienten und SK-Verteilung, zählt sie gesondert (LLH-1332)', () => {
+    const v = verdichtePersonen([
+      person({ aktuelle_sichtung: 'sk2' }),
+      person({ aktuelle_sichtung: 'sk2', versorgung: 'unterwegs' }),
+      person({ aktuelle_sichtung: 'sk2', versorgung: 'abgeschlossen' }),
+      person({ aktuelle_sichtung: 'tot', versorgung: 'abgeschlossen' }),
+    ]);
+    expect(v.sk.sk2).toBe(2);
+    expect(v.sk.tot).toBe(0);
+    expect(v.patienten).toBe(2);
+    expect(v.abgeschlossen).toBe(2);
+    expect(v.gesamt).toBe(4);
   });
 
   it('dieselbe SK-Verteilung wie die Seitenleiste der Betroffenen (LFH-550)', () => {

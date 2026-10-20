@@ -96,7 +96,7 @@ Für den UHS-Laptop:
 1. Unten „UHS“ wählen. Die Leiste oben wechselt zwischen „Plätze“, „Kräfte“, „Material“,
    „Meldungen“ und „Dateien“.
 2. „Plätze“ zeigt die Lage der Stelle in Zahlen wie am Fükw: „In der Stelle“ mit der Sichtung,
-   „Plätze frei“, „Wartend“ mit der längsten Wartezeit und „Abtransportiert“
+   „Plätze frei“, „Wartend“ mit der längsten Wartezeit und „Unterwegs“
    ([Unfallhilfsstellen](unfallhilfsstellen.md)). Ein Tipp auf „In der Stelle“ öffnet die
    Patienten, auf die übrigen Zahlen den Grundriss. „Grundriss bearbeiten“ führt in den
    Grundriss, wo „Plätze bearbeiten“ Plätze anlegt und ändert.

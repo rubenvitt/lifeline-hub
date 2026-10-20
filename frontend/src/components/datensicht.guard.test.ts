@@ -857,11 +857,12 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     ).toEqual([]);
   });
 
-  it('Sentinel: der Schlüssel-Scan sieht die zwei Sichten von PersonenPage', () => {
+  it('Sentinel: der Schlüssel-Scan sieht die zwei Sichten der Zugangsprotokoll-Seite', () => {
     // Ein Scanner, der überall [] liefert, meldete „keine Datei hat ≥ 2 Sichten“ und wäre still grün.
-    // Gepinnt gegen den echten Baum, samt Block-Kommentar im öffnenden Element (Trivia). Bewusst nicht
-    // auf die Schlüsselwerte gepinnt, die Seite gehört einem anderen Bündel.
-    const pfad = '/src/pages/PersonenPage.tsx';
+    // Gepinnt gegen den echten Baum. Bewusst nicht auf die Schlüsselwerte gepinnt, die Seite gehört
+    // einem anderen Bündel. (Bis LLH-1332 trug PersonenPage zwei Sichten; das Sichtungsraster ist
+    // seitdem ein Board ohne `Datensicht`.)
+    const pfad = '/src/zugangsprotokoll/ZugangsprotokollPage.tsx';
     const stellen = sichtstellen(pfad, dateien[pfad] ?? '');
     expect(stellen).toHaveLength(2);
     expect(stellen.every((s) => s.schluessel != null)).toBe(true);

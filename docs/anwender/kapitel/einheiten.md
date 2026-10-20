@@ -136,7 +136,9 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    holt den Posten an die Einheit.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, im Dialog die „Menge ausgeben“ eingeben und
    mit „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „15 von 20 übrig“.
-4. Mit „Aus Einheit lösen“ einen Posten wieder lösen. Er bleibt ohne Ort im Einsatz.
+4. Mit „Aus Einheit lösen“ einen Posten wieder lösen. Er bleibt ohne Ort im Einsatz. Die Zeile
+   bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
+   anderer Knopf unter den Finger rückt. „Rückgängig“ im Hinweis oben holt den Posten zurück.
 
 ### Eine Einheit auflösen
 

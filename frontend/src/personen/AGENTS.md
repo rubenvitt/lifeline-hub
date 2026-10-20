@@ -109,10 +109,36 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
 - **Zeilenaktionen der Betroffenenliste** (LLH-1130, Spec `betroffene-lagedaten`): die
   Sichtungszelle ist der Auslöser (`personen/ZeilenSichtung.tsx`, Popover mit `SichtungsWahl` und
   „Übernehmen“, Grund an der Zeile), die leere Verbleib-Zelle bietet „Verbleib erfassen“, das
-  Zeilenmenü „Sichten“, „Verbleib erfassen“, „Auf Lagekarte verorten“ (mit `zurueck`). Alles über
+  Zeilenmenü „Sichten“, im Eigentransport „Übergabe quittieren“, „Verbleib erfassen“, „Auf
+  Lagekarte verorten“ (mit `zurueck`). Alles über
   `bedienung` von `personenSpalten`; das Gerät gibt nur `darfSichten`, kein Menü. Unter „Nur
   Lücken zeigen“ bleibt eine aus der Zeile geschlossene Lücke stehen, bis sich die Sicht ändert.
   Ein Wort „Fundort“ für `antreff_ort` (Wächter `personen/fundortWort.guard.test.ts`).
+- **Wer fährt, Übergabe und Versorgungszustand** (LLH-1332, Spec `patienten-uebergabe`, Change
+  `y4l621ih-patientenverbleib-uebergabe`): ein Transport nennt sein Rettungsmittel in EINEM Feld
+  (`personen/RettungsmittelFeld.tsx`, Pflicht): eine Wahl aus „Im Einsatz“ setzt
+  `einsatz_fahrzeug_id` und heißt Eigentransport, jede Texteingabe heißt fremd; die Marke am Feld
+  (`transportDurch` im Statusvertrag) sagt den Ausgang. Vorschläge nur über
+  `einsatzKeys.personenTransportmittel` (Route am Modul Personen, auch am UHS-Gerät). Den Body
+  bauen nur `verbleibBody` und `uebergabeBody` (`verbleibErfassungKern.ts`). Ein Eigentransport
+  endet mit „Übergabe quittieren“ (`personen/UebergabeQuittieren.tsx`: Paneel im Kopf, Dialog in
+  Liste und Grundriss), einem Verbleib mit Status `uebergeben` über denselben Schreibweg. Ob eine
+  Person `offen`, `unterwegs` oder `abgeschlossen` ist, leitet NUR der Server ab (`versorgung`);
+  der Client rechnet nicht nach. Eine Verbleib-Maske für alle Orte (`useVerbleibFelder`, der
+  Grundriss nimmt `VerbleibErfassung` mit `vorbelegung`).
+- **Abgeschlossene stehen nicht in den Standardansichten** (LLH-1332, Spec
+  `betroffene-lagedaten`): Zeilen, Board und Kartenansicht folgen `PersonenSicht.abgeschlossen`
+  (Schalter „Abgeschlossene zeigen (n)“, nur bei n > 0 oder eingeschaltet; Auftrag
+  `?abgeschlossen=1`), Lagekarte und Lagezahlen
+  lassen sie immer weg (`ohneAbgeschlossene`, `versorgungsBilanz`); Druck, CSV, Einsatzbericht,
+  Sprungpalette und Detailseite bleiben vollständig. Sichtungszeile und Sichtungsbild zählen ohne
+  Abgeschlossene, die Verbleib-Zählung mit.
+- **Sichtungsboard** (LLH-1332, Spec `sichtungsboard`, `personen/Sichtungsboard.tsx`): die Ansicht
+  `raster` ist ein Board, keine `Datensicht`. Alle Spalten in der Folge `SICHTUNGSBILD_REIHE`
+  immer, auch leer; Kopf aus `sichtungsflaechen` mit Wort und Zahl. Die Karte ist kein Klickziel
+  im Klickziel: Kennung und Name sind der Link zur Detailseite, die Sichtungsmarke daneben ist
+  `ZeilenSichtung`. Die Zuflussschleuse hält Spalte (`gruppeVon`) und Folge. Unter `lg` gestapelt
+  und einklappbar.
 - **`SK_META`** führt Schlüssel von `sichtungsfarben` oder `null`, keine CSS-Werte.
 - **Verortungsauftrag** per `lagekartePfad(…, { platzieren })` → `?platzieren=<typ>:<id>`;
   `parsePlatzierenAuftrag` verwirft Unbrauchbares ganz; die Karte räumt den Parameter und betritt

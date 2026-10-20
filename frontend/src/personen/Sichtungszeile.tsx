@@ -2,7 +2,12 @@ import type { Person } from '../api/types';
 import { monoStil, useRollen } from '../components/instrument';
 import { sichtung } from '../theme/statusFarben';
 import { sichtungsfarben } from '../theme/tokens';
-import { sichtungsbild, SICHTUNGSBILD_REIHE, type SichtungsbildSchluessel } from './personenBilanz';
+import {
+  ohneAbgeschlossene,
+  sichtungsbild,
+  SICHTUNGSBILD_REIHE,
+  type SichtungsbildSchluessel,
+} from './personenBilanz';
 
 /**
  * Das Sichtungsbild als EINE Zeile über der Betroffenenliste (LFH-963, design.md D5): am Handy und
@@ -26,10 +31,11 @@ function wort(k: SichtungsbildSchluessel): string {
 export default function Sichtungszeile({
   alle,
 }: {
-  alle: readonly Pick<Person, 'aktuelle_sichtung'>[];
+  alle: readonly Pick<Person, 'aktuelle_sichtung' | 'versorgung'>[];
 }) {
   const { token, rollen } = useRollen();
-  const bild = sichtungsbild(alle);
+  // Abgeschlossene zählen nicht (LLH-1332): die Zeile ist die Lage der Versorgung.
+  const bild = sichtungsbild(ohneAbgeschlossene(alle));
   const kategorien = SICHTUNGSBILD_REIHE.filter((k) => IMMER.includes(k) || bild.je[k] > 0);
   return (
     <ul

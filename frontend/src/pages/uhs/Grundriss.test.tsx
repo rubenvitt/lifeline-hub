@@ -72,6 +72,7 @@ function person(over: Partial<Person>): Person {
     geaendert_at: 'x',
     geaendert_von: 1,
     storniert_at: null,
+    versorgung: 'offen',
     aktuelle_sichtung: null,
     aktuelle_sichtung_at: null,
     aktueller_verbleib: null,
@@ -132,6 +133,21 @@ function AuthSonde() {
  * Tokens (`platzBedienform`), antds Vorgaben ohne Theme ergäben einen Zustand, den die App in
  * `kompakt` nie hat.
  */
+/** Ein Austritt aus der UHS 1 (Beginn von „Unterwegs“, LLH-1332). */
+function austrittVon(personId: number, zeitpunkt_at: string, id = 1): UhsBelegung {
+  return {
+    id,
+    einsatz_id: 1,
+    person_id: personId,
+    uhs_id: 1,
+    platz_id: null,
+    art: 'austritt',
+    notiz: null,
+    zeitpunkt_at,
+    erfasst_von: 1,
+  };
+}
+
 function renderGrundriss(
   uhs: UhsDetail,
   personen: Person[],
@@ -143,7 +159,14 @@ function renderGrundriss(
   /** Mit angemeldetem Benutzer: Besitzer der Offline-Warteschlange (LLH-1138). */
   angemeldet = false,
 ) {
-  server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
+  server.use(
+    http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)),
+    // Die gemeinsame Verbleib-Maske (LLH-1332) liest Rettungsmittel und Betreuungsstellen.
+    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+      HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
+    ),
+    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+  );
   if (angemeldet) server.use(meHandler(benutzerFixture()));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   const baum = (u: UhsDetail) => (
@@ -289,15 +312,16 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
     );
-    // Abschluss-Screen: Art ist mit Transport vorbelegt → nur Ziel + Transportmittel erfassen.
-    await userEvent.type(screen.getByRole('textbox', { name: /Transportmittel/ }), 'RTW');
-    // Ziel ist das erste Arbeitsfeld; Enter dort muss die native Formularübermittlung auslösen.
+    // Abschluss-Screen: Art ist mit Transport vorbelegt → nur Rettungsmittel + Ziel erfassen.
+    await userEvent.type(await screen.findByRole('combobox', { name: /Rettungsmittel/ }), 'RTW');
+    // Enter im Ziel muss die native Formularübermittlung auslösen.
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
     await waitFor(() => expect(body).not.toBeNull());
     expect(body!.art).toBe('transport');
     expect(body!.status).toBe('abtransportiert');
     expect(body!.ziel).toBe('KH Mitte');
     expect(body!.transportmittel).toBe('RTW');
+    expect(body).toMatchObject({ transport_durch: 'fremd' });
   });
 
   it('erfasst eine Entlassung vor Ort (Art umgestellt) ohne abtransportiert-Status', async () => {
@@ -335,17 +359,17 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     expect(body!.status).toBeNull();
   });
 
-  it('setzt den Fokus beim Öffnen auf „Ziel", nicht auf das vorbelegte „Art"', async () => {
-    // Die Erfassungshülle fokussiert das erste bedienbare Feld, deshalb steht „Ziel" vor „Art" (die
-    // mit Transport vorbelegt ist). Der Test pinnt die Feldreihenfolge über ihre Wirkung.
+  it('setzt den Fokus beim Öffnen auf „Rettungsmittel“, nicht auf das vorbelegte „Art"', async () => {
+    // Die Art ist mit Transport vorbelegt; das Rettungsmittel trägt die Fokusmarke der
+    // Erfassungshülle (LLH-1332, gemeinsame Verbleib-Maske).
     const p = person({ id: 7, registrier_nr: 7, aktuelle_uhs_id: 1, aktueller_platz_id: 10 });
     const uhs = uhsDetail({ plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })] });
     renderGrundriss(uhs, [p]);
     await userEvent.click(
       await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
     );
-    const ziel = await screen.findByRole('textbox', { name: /Ziel/ });
-    await waitFor(() => expect(ziel).toHaveFocus());
+    const feld = await screen.findByRole('combobox', { name: /Rettungsmittel/ });
+    await waitFor(() => expect(feld).toHaveFocus());
     // „Art" bleibt trotz der Umsortierung sichtbar und bedienbar.
     expect(screen.getByRole('combobox', { name: 'Art' })).toBeEnabled();
   });
@@ -364,6 +388,7 @@ describe('Grundriss – Verbleib / Entlassung erfassen (LFH-17)', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' }),
     );
+    await userEvent.type(await screen.findByRole('combobox', { name: /Rettungsmittel/ }), 'RTW');
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
     expect(await screen.findByText('Verbleib abgelehnt')).toBeInTheDocument();
@@ -412,6 +437,7 @@ describe('Grundriss – Verbleib ohne Netz (LLH-1138, design.md D8)', () => {
     );
     setzeOnline(false);
     onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('combobox', { name: /Rettungsmittel/ }), 'RTW');
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
 
     expect(await screen.findByText('Offline vorgemerkt: Verbleib R-007')).toBeInTheDocument();
@@ -452,6 +478,7 @@ describe('Grundriss – vorgemerkter Verbleib am Ort (LLH-1138, `frontend/src/of
     );
     setzeOnline(false);
     onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('combobox', { name: /Rettungsmittel/ }), 'RTW');
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
     // Nicht nur die flüchtige Meldung: der Platz selbst sagt es, sonst erfasst jemand doppelt.
     expect(await within(karte).findByText('Offline vorgemerkt')).toBeInTheDocument();
@@ -469,6 +496,7 @@ describe('Grundriss – vorgemerkter Verbleib am Ort (LLH-1138, `frontend/src/of
     );
     setzeOnline(false);
     onTestFinished(() => setzeOnline(true));
+    await userEvent.type(await screen.findByRole('combobox', { name: /Rettungsmittel/ }), 'RTW');
     await userEvent.type(await screen.findByRole('textbox', { name: /Ziel/ }), 'KH Mitte{Enter}');
     const zeile = screen
       .getAllByTestId('personen-zeile')
@@ -532,12 +560,13 @@ describe('Grundriss – Leerzustand ohne Plätze (LFH-1078)', () => {
 });
 
 describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
-  it('zeigt aus DIESER UHS abtransportierte Personen in der rechten Spalte', async () => {
+  it('zeigt aus DIESER UHS im Eigentransport abgefahrene Personen in „Unterwegs“', async () => {
     const p = person({
       id: 9,
       registrier_nr: 9,
       aktuelle_uhs_id: null,
-      aktueller_verbleib: 'Transport → KH Mitte',
+      aktueller_verbleib: 'Eigentransport 1/83-1 → KH Mitte',
+      versorgung: 'unterwegs',
     });
     const austritt: UhsBelegung = {
       id: 1,
@@ -552,10 +581,90 @@ describe('Grundriss – Spalten-Fluss (LFH-58)', () => {
     };
     const uhs = uhsDetail({ belegungen: [austritt] });
     renderGrundriss(uhs, [p]);
-    expect(await screen.findByText('Auf Transport gebracht')).toBeInTheDocument();
-    expect(await screen.findByText('Transport → KH Mitte')).toBeInTheDocument();
+    expect(await screen.findByText('Unterwegs')).toBeInTheDocument();
+    expect(await screen.findByText('Eigentransport 1/83-1 → KH Mitte')).toBeInTheDocument();
     // Auto-Austritt leert aktuelle_uhs_id → keine Doppelanzeige unter „Noch nicht aufgenommen".
     expect(screen.getAllByText(/R-009/)).toHaveLength(1);
+  });
+
+  it('ein an ein fremdes Rettungsmittel übergebener Patient steht nicht in „Unterwegs“ (LLH-1332)', async () => {
+    const p = person({
+      id: 9,
+      registrier_nr: 9,
+      aktuelle_uhs_id: null,
+      aktueller_verbleib: 'Transport → KH Mitte',
+      versorgung: 'abgeschlossen',
+    });
+    const uhs = uhsDetail({
+      belegungen: [austrittVon(9, '2026-10-18 08:00:00')],
+    });
+    renderGrundriss(uhs, [p]);
+    expect(await screen.findByText('Unterwegs')).toBeInTheDocument();
+    expect(screen.queryByText(/R-009/)).toBeNull();
+  });
+
+  it('„Übergabe quittieren“ aus „Unterwegs“ sendet die Übergabe (LLH-1332)', async () => {
+    let body: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/einsaetze/1/personen/9/verbleib', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 2, person_id: 9 }, { status: 201 });
+      }),
+    );
+    const p = person({
+      id: 9,
+      registrier_nr: 9,
+      aktuelle_uhs_id: null,
+      aktueller_verbleib: 'Eigentransport 1/83-1 → KH Mitte',
+      aktuelles_verbleib_ziel: 'KH Mitte',
+      aktuelles_einsatz_fahrzeug_id: 4,
+      versorgung: 'unterwegs',
+    });
+    const uhs = uhsDetail({
+      belegungen: [austrittVon(9, '2026-10-18 08:00:00')],
+    });
+    renderGrundriss(uhs, [p]);
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Übergabe quittieren — R-009 · unbekannt' }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergabe quittieren' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      art: 'transport',
+      transport_durch: 'eigen',
+      einsatz_fahrzeug_id: 4,
+      status: 'uebergeben',
+      ziel: 'KH Mitte',
+    });
+  });
+
+  it('ab 60 Minuten unterwegs trägt die Zeile „Übergabe offen“ (LLH-1332)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.parse('2026-10-18T09:05:00Z'));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const lang = person({
+      id: 9,
+      registrier_nr: 9,
+      aktuelle_uhs_id: null,
+      versorgung: 'unterwegs',
+    });
+    const kurz = person({
+      id: 8,
+      registrier_nr: 8,
+      aktuelle_uhs_id: null,
+      versorgung: 'unterwegs',
+    });
+    const uhs = uhsDetail({
+      belegungen: [austrittVon(9, '2026-10-18 08:00:00'), austrittVon(8, '2026-10-18 08:50:00', 2)],
+    });
+    renderGrundriss(uhs, [lang, kurz]);
+    const zeilen = await screen.findAllByTestId('unterwegs-zeile');
+    const zeileVon = (nr: string) => zeilen.find((z) => z.textContent?.includes(nr))!;
+    expect(within(zeileVon('R-009')).getByText('Übergabe offen')).toBeInTheDocument();
+    expect(within(zeileVon('R-008')).queryByText('Übergabe offen')).toBeNull();
   });
 
   it('zeigt noch nicht aufgenommene Personen in der linken Spalte', async () => {
@@ -2160,6 +2269,7 @@ describe('Grundriss – Speicherfehler am Ort (LFH-1077)', () => {
     const oeffnen = await screen.findByRole('button', { name: 'Verbleib / Entlassung erfassen' });
     await userEvent.click(oeffnen);
     const d = await dialog();
+    await userEvent.type(within(d).getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW');
     await userEvent.click(within(d).getByRole('button', { name: 'Erfassen' }));
 
     expect(await within(d).findByRole('alert')).toHaveTextContent('Verbleib abgelehnt');
@@ -2259,7 +2369,8 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
       id: 3,
       registrier_nr: 3,
       aktuelle_sichtung: 'sk3',
-      aktueller_verbleib: 'Transport KH Mitte',
+      aktueller_verbleib: 'Eigentransport 1/83-1 → KH Mitte',
+      versorgung: 'unterwegs',
     });
     const uhs = uhsDetail({
       plaetze: [platz({ id: 10, bezeichnung: 'Bett 1' })],
@@ -2351,17 +2462,19 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
         id: 3,
         registrier_nr: 3,
         aktuelle_sichtung: 'sk2',
-        aktueller_verbleib: 'Transport',
+        aktueller_verbleib: 'Eigentransport',
+        versorgung: 'unterwegs',
         transport_prioritaet: 'dringlich',
       }),
       person({
         id: 4,
         registrier_nr: 4,
         aktuelle_sichtung: 'sk3',
-        aktueller_verbleib: 'Transport',
+        aktueller_verbleib: 'Eigentransport',
+        versorgung: 'unterwegs',
       }),
     ]);
-    const spalte = (await screen.findByText('Auf Transport gebracht')).closest<HTMLElement>(
+    const spalte = (await screen.findByText('Unterwegs')).closest<HTMLElement>(
       '[data-lfh="paneel"]',
     )!;
     const marke = await within(spalte).findByText('dringlich');
@@ -2374,8 +2487,8 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
     expect(within(spalte).getAllByText(/Transportpriorität|dringlich/)).toHaveLength(1);
     expect(
       within(spalte)
-        .getAllByRole('button')
-        .map((b) => /R-\d+/.exec(b.textContent!)?.[0]),
+        .getAllByTestId('unterwegs-zeile')
+        .map((z) => /R-\d+/.exec(z.textContent!)?.[0]),
     ).toEqual(['R-003', 'R-004']);
   });
 
@@ -2391,7 +2504,8 @@ describe('Grundriss – Sichtung und Dringlichkeit (LLH-1135)', () => {
     });
     renderGrundriss(uhs, [wartend(1, 'sk2'), wartend(2, 'sk2', { aktueller_platz_id: 10 })]);
     await screen.findByText(/R-001/);
-    const zeit = within(wartebereich()).getByText('12 min');
+    const zeit = within(wartebereich()).getByText('12 min').closest('[data-lfh="wartezeit"]');
+    expect(zeit).toHaveTextContent('wartet 12 min');
     expect(zeit).toHaveAttribute(
       'title',
       `seit ${taktischeDtg('2026-10-18 08:00:00', DEFAULT_KONVENTIONEN)}`,

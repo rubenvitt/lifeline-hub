@@ -38,7 +38,7 @@ function kuerzel(k: SichtungsbildSchluessel): string {
 /**
  * Lage der Stelle in Zahlen (LLH-1136), an Fükw (`UhsDetailPage`) und UHS-Laptop
  * (`geraet/GeraetStellePage`) gleich: In der Stelle mit SK-Aufgliederung, Plätze frei, Wartend
- * mit längster Wartezeit, Abtransportiert. Ohne Personennamen. Die Zahlen leitet `uhsLage.ts`
+ * mit längster Wartezeit, Unterwegs. Ohne Personennamen. Die Zahlen leitet `uhsLage.ts`
  * aus denselben Mengen wie der Grundriss ab; derselbe Personen-Abruf wie dort (ein Cache-Fach).
  *
  * Feste Höhe: die Zeile ist eine Schriftzeile; im Band trägt jede Zelle im Datenzustand immer eine
@@ -104,7 +104,7 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
         zusatz: platzZusatz,
       },
       { titel: 'Wartend', wert: lage.wartend, zusatz: warteZusatz },
-      { titel: 'Abtransportiert', wert: lage.abtransportiert },
+      { titel: 'Unterwegs', wert: lage.unterwegs },
     ];
     const volltext = posten
       .map((p) =>
@@ -176,9 +176,9 @@ export default function UhsLagezeile({ einsatzId, uhs, ziele, form = 'zeile' }: 
         ziel={ziele?.grundriss}
       />
       <Kennzahl
-        titel="Abtransportiert"
+        titel="Unterwegs"
         groesse="klein"
-        wert={lage.abtransportiert}
+        wert={lage.unterwegs}
         zustand={zustand}
         notiz="aus dieser Stelle"
         ziel={ziele?.grundriss}

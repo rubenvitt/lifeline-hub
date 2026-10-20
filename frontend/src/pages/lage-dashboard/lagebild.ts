@@ -36,7 +36,7 @@ import { warnstufeKennzahl } from '../../theme/statusFarben';
 import type { KennzahlTon } from '../../components/instrument';
 import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import { pegelKennzahl } from '../../pegel/pegelKennzahl';
-import { transportBilanz } from '../../personen/personenBilanz';
+import { versorgungsBilanz } from '../../personen/personenBilanz';
 import type { EvakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import type { EvakuierungKennzahlZustand } from '../../betreuung/useEvakuierungKennzahl';
 import { kennzahlTeile } from '../../betreuung/betreuungText';
@@ -377,7 +377,7 @@ export function baueLagebild(
   const bericht = neuesterLagebericht(r.lageberichte);
   const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
   const pegel = pegelKennzahl(r.pegel, jetzt, konv);
-  const transport = transportBilanz(r.personen);
+  const versorgung = versorgungsBilanz(r.personen);
 
   // Jede Kennzahl, die das Band tragen kann; die Reihe wählt sechs davon. Der `Record` über
   // `KennzahlEtikett` erzwingt, dass jedes Etikett gebaut wird.
@@ -394,18 +394,23 @@ export function baueLagebild(
       zielPfad: r.pegelZiel ?? einsatzEinstellungenPfad(r.einsatz.id, 'pegel'),
     },
     'Verbleib offen': {
-      // Angetroffene ohne Verbleib — dieselbe Zählung wie „Transportiert / offen" im
-      // Sichtungspaneel.
+      // Angetroffene ohne Verbleib — dieselbe Zählung wie „Unterwegs / offen / abgeschlossen“ im
+      // Sichtungspaneel (LLH-1332).
       etikett: 'Verbleib offen',
-      wert: String(transport.offen),
-      notiz: `${transport.transportiert} transportiert`,
-      ton: transport.offen > 0 ? 'achtung' : 'neutral',
+      wert: String(versorgung.offen),
+      notiz: `${versorgung.unterwegs} unterwegs`,
+      ton: versorgung.offen > 0 ? 'achtung' : 'neutral',
       route: 'personen',
     },
     Betroffene: {
       etikett: 'Betroffene',
       wert: String(betroffene.gesamt),
-      notiz: `${betroffene.patienten} Patienten`,
+      // Abgeschlossene nennt die Notiz, damit die gesunkene Patientenzahl nicht wie ein
+      // Datenverlust aussieht (LLH-1332).
+      notiz:
+        betroffene.abgeschlossen > 0
+          ? `${betroffene.patienten} Patienten · ${betroffene.abgeschlossen} abgeschlossen`
+          : `${betroffene.patienten} Patienten`,
       ton: 'neutral',
       route: 'personen',
     },

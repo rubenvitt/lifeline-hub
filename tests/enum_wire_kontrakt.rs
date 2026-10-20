@@ -161,6 +161,14 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(lifeline_hub::person::VerbleibStatus {
         Angemeldet,
         Abtransportiert,
+        Uebergeben,
+    });
+    // Übergabe und Versorgungszustand (LLH-1332, Spec `patienten-uebergabe`)
+    enum_wire_as_str!(lifeline_hub::person::TransportDurch { Fremd, Eigen });
+    enum_wire_as_str!(lifeline_hub::person::Versorgung {
+        Offen,
+        Unterwegs,
+        Abgeschlossen,
     });
     enum_wire_as_str!(lifeline_hub::person::AbgleichStatus {
         Verdacht,

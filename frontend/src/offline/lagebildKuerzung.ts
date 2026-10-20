@@ -60,6 +60,11 @@ export const PERSON_AUF_DER_PLATTE = {
   transport_art: 'behalten',
   transport_fachrichtung: 'auslassen',
   transport_at: 'auslassen',
+  // LLH-1332: wer fährt, das Fahrzeug und der Versorgungszustand halten „Unterwegs“ und das
+  // Ausblenden der Abgeschlossenen auch ohne Netz.
+  aktueller_transport_durch: 'behalten',
+  aktuelles_einsatz_fahrzeug_id: 'behalten',
+  versorgung: 'behalten',
 } as const satisfies Record<keyof Person, 'behalten' | 'auslassen'>;
 
 /**

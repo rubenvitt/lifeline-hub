@@ -5851,6 +5851,29 @@
           "abgeschlossen"
         ]
       },
+      "EinsatzTransportfahrzeug": {
+        "type": "object",
+        "description": "Ein Fahrzeug aus dem Einsatz für den Eigentransport (LLH-1332, design.md D4). Nur, was die\nVerbleib-Maske braucht: kein Kennzeichen, keine Besatzung, keine Position.",
+        "required": [
+          "einsatz_fahrzeug_id",
+          "funkrufname"
+        ],
+        "properties": {
+          "einsatz_fahrzeug_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fahrzeugtyp": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "funkrufname": {
+            "type": "string"
+          }
+        }
+      },
       "EinsatzabschnittAnzeige": {
         "type": "object",
         "description": "Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über\n`ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.",
@@ -9597,9 +9620,15 @@
           "tot",
           "unverletzt",
           "ohne",
-          "vermisst"
+          "vermisst",
+          "abgeschlossen"
         ],
         "properties": {
+          "abgeschlossen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Abgeschlossene Patienten (LLH-1332): in `gesamt` enthalten, in keiner Sichtungszahl."
+          },
           "gesamt": {
             "type": "integer",
             "format": "int64"
@@ -11895,7 +11924,8 @@
           "erfasst_at",
           "erfasst_von",
           "geaendert_at",
-          "geaendert_von"
+          "geaendert_von",
+          "versorgung"
         ],
         "properties": {
           "aktuelle_sichtung": {
@@ -11947,6 +11977,17 @@
             ],
             "format": "int64"
           },
+          "aktueller_transport_durch": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportDurch",
+                "description": "Wer den jüngsten Transport fährt (LLH-1332); fehlt bei anderen Arten und im Bestand."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "aktueller_verbleib": {
             "type": [
               "string",
@@ -11962,6 +12003,14 @@
                 "type": "null"
               }
             ]
+          },
+          "aktuelles_einsatz_fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Disposition des Fahrzeugs eines Eigentransports (LLH-1332), sonst leer."
           },
           "aktuelles_verbleib_ziel": {
             "type": [
@@ -12130,6 +12179,10 @@
               "null"
             ],
             "description": "Seit wann die Person vermisst wird (`YYYY-MM-DD HH:MM:SS`, UTC). Nur bei Status\n`vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen."
+          },
+          "versorgung": {
+            "$ref": "#/components/schemas/Versorgung",
+            "description": "Abgeleiteter Versorgungszustand (LLH-1332, design.md D3). Nie gespeichert: das Repo setzt\nihn nach jedem Lesen über [`PersonAnzeige::mit_versorgung`]."
           },
           "vorname": {
             "type": [
@@ -14629,6 +14682,14 @@
           "mit_notarzt"
         ]
       },
+      "TransportDurch": {
+        "type": "string",
+        "description": "Wer einen Transport fährt (LLH-1332, design.md D1). Nur bei `art = transport`; ein\nBestands-Transport ohne Angabe gilt als `fremd`.",
+        "enum": [
+          "fremd",
+          "eigen"
+        ]
+      },
       "TransportPrioritaet": {
         "type": "string",
         "description": "Transportpriorität (Spec `personen-transport`). String = CHECK in\n`migrations/0219_person_transport.sql`. Ordnet innerhalb der Sichtungskategorie, nie über\nihr (design.md D10). Statuskategorie (Retain), deshalb darf sie ins ETB.",
@@ -14637,6 +14698,35 @@
           "dringlich",
           "normal"
         ]
+      },
+      "TransportmittelAuswahl": {
+        "type": "object",
+        "description": "Vorschläge zum Rettungsmittel einer Verbleib-Erfassung (LLH-1332, Spec\n`patienten-uebergabe`, „Vorschläge für das Rettungsmittel“): Fahrzeuge im Einsatz (Wahl heißt\nEigentransport), bisher eingetragene fremde Rettungsmittel des Einsatzes (häufigste zuerst)\nund Funkrufnamen des Fahrzeugstamms, die gerade nicht im Einsatz stehen.",
+        "required": [
+          "im_einsatz",
+          "bisher",
+          "stamm"
+        ],
+        "properties": {
+          "bisher": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "im_einsatz": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EinsatzTransportfahrzeug"
+            }
+          },
+          "stamm": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "UebernahmeBody": {
         "type": "object",
@@ -15120,6 +15210,14 @@
             ],
             "description": "Wann der Eintrag beim Server ankam (LLH-1138); `zeitpunkt_at` ist die Erfassungszeit.\nFehlt bei Einträgen von vor der Migration 0217."
           },
+          "einsatz_fahrzeug_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Disposition des Fahrzeugs eines Eigentransports (LLH-1332)."
+          },
           "einsatz_id": {
             "type": "integer",
             "format": "int64"
@@ -15146,6 +15244,17 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/VerbleibStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transport_durch": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TransportDurch",
+                "description": "Wer fährt (LLH-1332), nur bei `transport`; fehlt im Bestand (gilt als fremd)."
               },
               {
                 "type": "null"
@@ -15185,7 +15294,8 @@
         "description": "Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.",
         "enum": [
           "angemeldet",
-          "abtransportiert"
+          "abtransportiert",
+          "uebergeben"
         ]
       },
       "Verfuegbarkeit": {
@@ -15599,6 +15709,15 @@
             "description": "Die Version davor, nur wenn ein Versionswechsel stattfand."
           }
         }
+      },
+      "Versorgung": {
+        "type": "string",
+        "description": "Versorgungszustand einer Person (LLH-1332, design.md D3), abgeleitet aus dem jüngsten\nVerbleib, nie gespeichert. Die eine Regel steht in [`versorgung_von`].",
+        "enum": [
+          "offen",
+          "unterwegs",
+          "abgeschlossen"
+        ]
       },
       "VerteilerEintragAnzeige": {
         "type": "object",

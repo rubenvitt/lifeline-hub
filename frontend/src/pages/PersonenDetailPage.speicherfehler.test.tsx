@@ -43,6 +43,7 @@ const detail = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
   aktuelle_sichtung: null,
   aktuelle_sichtung_at: null,
   aktueller_verbleib: null,
@@ -153,6 +154,9 @@ function render(
     http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
+    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+      HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
+    ),
     http.get('/api/einsaetze/1/personen/10/audit', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
@@ -296,6 +300,11 @@ describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)'
     await userEvent.click(within(bereich).getByRole('combobox', { name: 'Art' }));
     await userEvent.click(await screen.findByTitle('Transport'));
     await userEvent.type(within(bereich).getByRole('textbox', { name: 'Ziel' }), 'KH Mitte');
+    // Ein Transport braucht das Rettungsmittel (LLH-1332, Spec `patienten-uebergabe`).
+    await userEvent.type(
+      within(bereich).getByRole('combobox', { name: /Rettungsmittel/ }),
+      'RTW 3/83-2',
+    );
     await userEvent.click(within(bereich).getByRole('button', { name: 'Verbleib erfassen' }));
     return bereich;
   }

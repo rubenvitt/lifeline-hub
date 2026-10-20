@@ -11,7 +11,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                    frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx
  *   erfassen.png     frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx
  *   kurzeingabe.png  frontend/src/personen/BetroffeneZeile.tsx
- *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx
+ *   verbleib.png     frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/VerbleibErfassung.tsx,
+ *                    frontend/src/personen/RettungsmittelFeld.tsx
  *   personendaten.png frontend/src/personen/Personendaten.tsx, frontend/src/components/InlineAngabe.tsx
  *   koerperschema.png frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatKennzeichen.tsx,
  *                    frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/koerperschema/KoerperFigur.tsx
@@ -97,8 +98,9 @@ test.describe(KAPITEL, () => {
     const paneel = page.getByRole('region', { name: 'Verbleib erfassen' });
     await waehleIn(paneel.getByRole('combobox', { name: 'Art' }), 'Transport');
     await paneel.getByLabel('Ziel').fill('Klinikum Musterstadt');
-    await paneel.getByLabel('Transportmittel (RTW/KTW …)').fill('KTW 1');
-    await paneel.getByLabel('Transportmittel (RTW/KTW …)').blur();
+    // Fremdes Rettungsmittel (LLH-1332): getippt, die Marke zeigt „fremdes Rettungsmittel“.
+    await paneel.getByRole('combobox', { name: /Rettungsmittel/ }).fill('KTW 1');
+    await paneel.getByRole('combobox', { name: /Rettungsmittel/ }).blur();
     await fotografiere(kopf, KAPITEL, 'verbleib');
   });
 

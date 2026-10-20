@@ -1,5 +1,5 @@
 import type { VerbleibEingabe } from '../api/einsatzPerson';
-import type { Betreuungsstelle, VerbleibArt } from '../api/types';
+import type { Betreuungsstelle, Person, TransportmittelAuswahl, VerbleibArt } from '../api/types';
 
 /**
  * Reiner Kern des Verbleib-Dialogs (`VerbleibErfassung.tsx`). Felder je Art halten das Budget:
@@ -17,6 +17,11 @@ export interface VerbleibFormWerte {
   betreuungsstelle_id?: number | null;
   /** Nur am UHS-Gerät (LFH-1046, `geraet/BestaetigtVonFeld`). */
   bestaetigt_personal_id?: number | null;
+  /**
+   * Disposition, wenn „Rettungsmittel“ aus „Im Einsatz“ gewählt ist (LLH-1332, design.md D5):
+   * dann ist der Transport ein Eigentransport. Jede Texteingabe danach leert sie.
+   */
+  einsatz_fahrzeug_id?: number | null;
 }
 
 export const VERBLEIB_ART_OPTIONEN: { value: VerbleibArt; label: string }[] = [
@@ -96,9 +101,69 @@ export function verbleibBody(
     status: w.art === 'transport' ? 'abtransportiert' : null,
     notiz: w.notiz ?? null,
   };
+  // Wer fährt (LLH-1332): ein Fahrzeug aus dem Einsatz heißt Eigentransport, alles andere fremd.
+  if (w.art === 'transport') {
+    if (w.einsatz_fahrzeug_id != null) {
+      body.transport_durch = 'eigen';
+      body.einsatz_fahrzeug_id = w.einsatz_fahrzeug_id;
+    } else {
+      body.transport_durch = 'fremd';
+    }
+  }
   if (stelleSichtbar && w.art === 'notunterkunft' && w.betreuungsstelle_id != null) {
     body.betreuungsstelle_id = w.betreuungsstelle_id;
   }
   if (w.bestaetigt_personal_id != null) body.bestaetigt_personal_id = w.bestaetigt_personal_id;
   return body;
+}
+
+/** Eine Vorschlagsoption des Felds „Rettungsmittel“; `einsatzFahrzeugId` nur bei „Im Einsatz“. */
+export interface RettungsmittelOption {
+  value: string;
+  label: string;
+  einsatzFahrzeugId?: number;
+}
+
+/**
+ * Gruppen des Felds „Rettungsmittel“ (LLH-1332, Spec `patienten-uebergabe`, „Vorschläge für das
+ * Rettungsmittel“): „Im Einsatz“ (Wahl heißt Eigentransport), „Bisher verwendet“ und
+ * „Fahrzeugstamm“. Leere Gruppen fallen weg.
+ */
+export function rettungsmittelOptionen(
+  auswahl: TransportmittelAuswahl | undefined,
+): { label: string; options: RettungsmittelOption[] }[] {
+  if (!auswahl) return [];
+  const gruppen = [
+    {
+      label: 'Im Einsatz',
+      options: auswahl.im_einsatz.map((f) => ({
+        value: f.funkrufname,
+        label: f.fahrzeugtyp ? `${f.funkrufname} · ${f.fahrzeugtyp}` : f.funkrufname,
+        einsatzFahrzeugId: f.einsatz_fahrzeug_id,
+      })),
+    },
+    { label: 'Bisher verwendet', options: auswahl.bisher.map((t) => ({ value: t, label: t })) },
+    { label: 'Fahrzeugstamm', options: auswahl.stamm.map((t) => ({ value: t, label: t })) },
+  ];
+  return gruppen.filter((g) => g.options.length > 0);
+}
+
+/**
+ * Body von „Übergabe quittieren“ (LLH-1332, design.md D2): ein Verbleib-Ereignis Transport,
+ * eigen, dasselbe Fahrzeug, Status `uebergeben`. Ohne eigenes Ziel gilt das bisherige; ohne
+ * Uhrzeit setzt der Server jetzt.
+ */
+export function uebergabeBody(
+  person: Pick<Person, 'aktuelles_einsatz_fahrzeug_id' | 'aktuelles_verbleib_ziel'>,
+  werte: { ziel?: string; zeitpunkt_at?: string },
+): VerbleibEingabe {
+  const ziel = werte.ziel?.trim() || person.aktuelles_verbleib_ziel || null;
+  return {
+    art: 'transport',
+    transport_durch: 'eigen',
+    einsatz_fahrzeug_id: person.aktuelles_einsatz_fahrzeug_id ?? null,
+    status: 'uebergeben',
+    ziel,
+    ...(werte.zeitpunkt_at ? { zeitpunkt_at: werte.zeitpunkt_at } : {}),
+  };
 }

@@ -12,7 +12,8 @@ const SELECT_ALLE: &str = "\
            zustand, antreff_lat, antreff_lon, vermisst_seit, \
            aktuelle_verbleib_art, aktuelles_verbleib_ziel, aktueller_verbleib_status, \
            aktuelle_verbleib_betreuungsstelle_id, pat_nummer, kontamination, \
-           transport_prioritaet, transport_art, transport_fachrichtung, transport_at \
+           transport_prioritaet, transport_art, transport_fachrichtung, transport_at, \
+           aktueller_transport_durch, aktuelles_einsatz_fahrzeug_id \
     FROM einsatz_person";
 
 /// Eingabedaten beim Anlegen. Strings bereits getrimmt (Handler-Aufgabe);
@@ -124,7 +125,10 @@ pub async fn liste(
             .bind(einsatz_id)
             .bind(status)
             .fetch_all(pool)
-            .await?,
+            .await?
+            .into_iter()
+            .map(PersonAnzeige::mit_versorgung)
+            .collect(),
     )
 }
 
@@ -156,6 +160,7 @@ pub async fn laden(
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?
+    .map(PersonAnzeige::mit_versorgung)
     .ok_or(AppError::NotFound)
 }
 
@@ -174,6 +179,7 @@ pub async fn laden_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?
+    .map(PersonAnzeige::mit_versorgung)
     .ok_or(AppError::NotFound)
 }
 
@@ -270,7 +276,8 @@ pub async fn laden_nach_client_id(
         .bind(einsatz_id)
         .bind(client_id)
         .fetch_optional(pool)
-        .await?,
+        .await?
+        .map(PersonAnzeige::mit_versorgung),
     )
 }
 

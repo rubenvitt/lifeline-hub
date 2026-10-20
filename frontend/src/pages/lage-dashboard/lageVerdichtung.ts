@@ -11,7 +11,7 @@ import type {
   Warnstufe,
 } from '../../api/types';
 import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
-import { sichtungsbild } from '../../personen/personenBilanz';
+import { ohneAbgeschlossene, sichtungsbild } from '../../personen/personenBilanz';
 
 export interface SkVerteilung {
   sk1: number;
@@ -35,8 +35,10 @@ interface PersonStatusVerteilung {
 interface BetroffeneVerdichtung {
   sk: SkVerteilung;
   status: PersonStatusVerteilung;
-  /** Personen mit Sichtung SK I–IV (medizinisch/triage-relevant). */
+  /** Personen mit Sichtung SK I–IV in Versorgung (medizinisch/triage-relevant). */
   patienten: number;
+  /** Abgeschlossene Patienten (LLH-1332): in `gesamt`, in keiner SK-Zahl. */
+  abgeschlossen: number;
   vermisst: number;
   gesamt: number;
 }
@@ -139,8 +141,10 @@ export function sichtungsZeilen(sk: SkVerteilung): SichtungsZeile[] {
 
 export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
   // Die SK-Verteilung zählt EINE Stelle (LFH-550): `sichtungsbild`, wie die Seitenleiste der
-  // Betroffenen. Hier nur die Übernahme der Schlüssel.
-  const sk: SkVerteilung = { ...sichtungsbild(personen).je };
+  // Betroffenen. Hier nur die Übernahme der Schlüssel. Abgeschlossene zählen nicht (LLH-1332,
+  // Spec `lage-verdichtung`; Gegenstück im Lagemonitor `person::zaehle_lage_sichtung`).
+  const inVersorgung = ohneAbgeschlossene(personen);
+  const sk: SkVerteilung = { ...sichtungsbild(inVersorgung).je };
   const status: PersonStatusVerteilung = {
     erfasst: 0,
     vermisst: 0,
@@ -153,6 +157,7 @@ export function verdichtePersonen(personen: Person[]): BetroffeneVerdichtung {
     sk,
     status,
     patienten: sk.sk1 + sk.sk2 + sk.sk3 + sk.sk4,
+    abgeschlossen: personen.length - inVersorgung.length,
     vermisst: status.vermisst,
     gesamt: personen.length,
   };

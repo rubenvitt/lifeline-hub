@@ -29,6 +29,7 @@ const basis: Person = {
   geaendert_at: '2026-05-27 11:22:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 
 const vermisst: Person = { ...basis, id: 11, registrier_nr: 2, status: 'vermisst' };
@@ -53,7 +54,12 @@ const patient: Person = {
 const alle = [basis, vermisst, betroffen, verstorben, betroffenStorniert, patient];
 const nummern = (p: readonly Person[]) => p.map((x) => x.registrier_nr);
 
-const SICHT = { ansicht: 'zeilen', filter: 'alle', nurLuecken: false } as const;
+const SICHT = {
+  ansicht: 'zeilen',
+  filter: 'alle',
+  nurLuecken: false,
+  abgeschlossen: false,
+} as const;
 
 describe('filterPersonen', () => {
   it('„alle" filtert nichts weg und behält die Lieferreihenfolge', () => {
@@ -104,6 +110,22 @@ describe('filterPersonen', () => {
   });
 });
 
+describe('Abgeschlossene (LLH-1332)', () => {
+  it('fehlen ohne den Schalter und stehen mit ihm wieder da', () => {
+    const offen = { ...betroffen, id: 70, registrier_nr: 70 };
+    const unterwegs = { ...betroffen, id: 71, registrier_nr: 71, versorgung: 'unterwegs' as const };
+    const fertig = {
+      ...betroffen,
+      id: 72,
+      registrier_nr: 72,
+      versorgung: 'abgeschlossen' as const,
+    };
+    const menge = [offen, unterwegs, fertig];
+    expect(nummern(filterPersonen(menge, SICHT))).toEqual([70, 71]);
+    expect(nummern(filterPersonen(menge, { ...SICHT, abgeschlossen: true }))).toEqual([70, 71, 72]);
+  });
+});
+
 describe('sichtFuerNeuePerson', () => {
   it('lässt eine passende Sicht unangetastet (dieselbe Referenz)', () => {
     const sicht = { ...SICHT, filter: 'betroffen' } as const;
@@ -112,8 +134,8 @@ describe('sichtFuerNeuePerson', () => {
 
   it('nimmt einen verbergenden Statusfilter auf „Alle" zurück, die Ansicht bleibt', () => {
     expect(
-      sichtFuerNeuePerson({ ansicht: 'raster', filter: 'vermisst', nurLuecken: false }, patient),
-    ).toEqual({ ansicht: 'raster', filter: 'alle', nurLuecken: false });
+      sichtFuerNeuePerson({ ...SICHT, ansicht: 'raster', filter: 'vermisst' }, patient),
+    ).toEqual({ ...SICHT, ansicht: 'raster', filter: 'alle' });
   });
 
   it('nimmt „Nur Lücken" nur zurück, wenn die neue Person keine Lücke hat', () => {
@@ -145,19 +167,27 @@ describe('gefundenePersonen', () => {
 });
 
 describe('sichtNachSprung (LFH-620)', () => {
-  const vorher = { ansicht: 'raster', filter: 'betroffen', nurLuecken: true } as const;
+  const vorher = {
+    ansicht: 'raster',
+    filter: 'betroffen',
+    nurLuecken: true,
+    abgeschlossen: true,
+  } as const;
 
   it('übernimmt nur die genannten Achsen und nimmt den Lücken-Filter immer zurück', () => {
     expect(sichtNachSprung(vorher, { filter: 'vermisst' })).toEqual({
       ansicht: 'raster',
       filter: 'vermisst',
       nurLuecken: false,
+      abgeschlossen: false,
     });
     expect(sichtNachSprung(vorher, { ansicht: 'zeilen', filter: 'alle' })).toEqual({
       ansicht: 'zeilen',
       filter: 'alle',
       nurLuecken: false,
+      abgeschlossen: false,
     });
+    expect(sichtNachSprung(SICHT_VORGABE, { abgeschlossen: true }).abgeschlossen).toBe(true);
   });
 
   it('lässt die Sicht ohne Vorgabe unverändert, samt Identität', () => {

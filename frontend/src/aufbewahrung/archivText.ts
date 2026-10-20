@@ -31,6 +31,7 @@ export const ZIEL_ART: Record<AntragZielArt, string> = {
 export const VERBLEIB_STATUS: Record<VerbleibStatus, string> = {
   angemeldet: 'angemeldet',
   abtransportiert: 'abtransportiert',
+  uebergeben: 'übergeben',
 };
 
 /**

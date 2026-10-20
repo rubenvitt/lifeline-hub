@@ -23,6 +23,10 @@ use crate::einsatz::zaehler::{count_kraefte, KraefteZaehler, KraftMerkmale};
 use crate::error::AppError;
 use crate::geraet::Funktionsansicht;
 use crate::lage_zone::LageZoneTyp;
+use crate::person::{
+    versorgung_von, zaehle_lage_sichtung, PersonStatus, Sichtungskategorie, TransportDurch,
+    VerbleibArt, VerbleibStatus,
+};
 use crate::staerke::{Staerke, StaerkePosition};
 use crate::uhs::{UhsStatus, UhsTyp};
 use axum::extract::State;
@@ -45,6 +49,8 @@ pub struct LagemonitorBetroffene {
     /// Noch nicht gesichtet.
     pub ohne: i64,
     pub vermisst: i64,
+    /// Abgeschlossene Patienten (LLH-1332): in `gesamt` enthalten, in keiner Sichtungszahl.
+    pub abgeschlossen: i64,
 }
 
 /// Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke.
@@ -122,26 +128,39 @@ pub async fn lagebild(
     let pool = &state.pool;
 
     let mut betroffene = LagemonitorBetroffene::default();
-    let sichtungen: Vec<(Option<String>, i64)> = sqlx::query_as(
-        "SELECT aktuelle_sichtung, COUNT(*) FROM einsatz_person \
-         WHERE einsatz_id = ? AND storniert_at IS NULL GROUP BY aktuelle_sichtung",
+    // Sichtung und Versorgungszustand je Person; die Zählung ist die gemeinsame Regel
+    // (`person::zaehle_lage_sichtung`, Fixture `regeln.json` Abschnitt `versorgung`).
+    type Zeile = (
+        String,
+        Option<Sichtungskategorie>,
+        Option<VerbleibArt>,
+        Option<VerbleibStatus>,
+        Option<TransportDurch>,
+    );
+    let zeilen: Vec<Zeile> = sqlx::query_as(
+        "SELECT status, aktuelle_sichtung, aktuelle_verbleib_art, aktueller_verbleib_status, \
+                aktueller_transport_durch \
+         FROM einsatz_person WHERE einsatz_id = ? AND storniert_at IS NULL",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
-    for (sk, n) in sichtungen {
-        betroffene.gesamt += n;
-        match sk.as_deref() {
-            Some("sk1") => betroffene.sk1 += n,
-            Some("sk2") => betroffene.sk2 += n,
-            Some("sk3") => betroffene.sk3 += n,
-            Some("sk4") => betroffene.sk4 += n,
-            Some("tot") => betroffene.tot += n,
-            Some("unverletzt") => betroffene.unverletzt += n,
-            _ => betroffene.ohne += n,
-        }
+    betroffene.gesamt = zeilen.len() as i64;
+    let mut lage_zeilen = Vec::with_capacity(zeilen.len());
+    for (person, sk, art, status, durch) in zeilen {
+        let person = PersonStatus::try_from(person).map_err(AppError::Internal)?;
+        lage_zeilen.push((sk, versorgung_von(person, art, status, durch)));
     }
-    betroffene.patienten = betroffene.sk1 + betroffene.sk2 + betroffene.sk3 + betroffene.sk4;
+    let lage = zaehle_lage_sichtung(lage_zeilen);
+    betroffene.sk1 = lage.sk1;
+    betroffene.sk2 = lage.sk2;
+    betroffene.sk3 = lage.sk3;
+    betroffene.sk4 = lage.sk4;
+    betroffene.tot = lage.tot;
+    betroffene.unverletzt = lage.unverletzt;
+    betroffene.ohne = lage.ohne;
+    betroffene.abgeschlossen = lage.abgeschlossen;
+    betroffene.patienten = lage.patienten();
     betroffene.vermisst = sqlx::query_scalar(
         "SELECT COUNT(*) FROM einsatz_person \
          WHERE einsatz_id = ? AND storniert_at IS NULL AND status = 'vermisst'",

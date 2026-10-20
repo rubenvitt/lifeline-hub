@@ -34,6 +34,9 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-personen',
   // Auswahl ohne Freitexte (LFH-940, D8): Personensuche der Palette ohne Netz.
   'einsatz-personen-auswahl',
+  // Vorschläge zum Rettungsmittel (LLH-1332, design.md D4): Verbleib ohne Netz mit Eigentransport.
+  // Funkrufnamen und fremde Rettungsmittel, gebundene Geräte nur aus den eigenen Personen.
+  'einsatz-personen-transportmittel',
   'einsatz-uhs',
   'einsatz-zonen',
   'einsatz-freie-zeichen',

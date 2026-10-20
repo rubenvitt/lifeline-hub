@@ -3859,6 +3859,182 @@ mod tests {
         assert_eq!(neue_id, 3, "gelöschte ids werden nicht wiedervergeben");
     }
 
+    // --- Migration 0222: Leaf-Rebuild von person_verbleib mit Fahrer-Angabe (LLH-1332) ---
+    //
+    // Echte Migrationen bis 0221 (FK-Zwang aus, damit Verbleibe ohne vollständigen Einsatz
+    // stehen dürfen), befüllt samt Spalten aus 0121/0165/0217 und gelöschter höchster Zeile,
+    // dann die echte 0222.
+    async fn db_bis_0221() -> SqlitePool {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .expect("In-Memory-Pool");
+        let bis: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version <= 221)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(bis),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("0221 läuft durch");
+        // Rebuild-Migrationen schalten die Fremdschlüssel am Ende wieder ein.
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool
+    }
+
+    #[tokio::test]
+    async fn migration_0222_person_verbleib_rebuild_erhaelt_zeilen_sequenz_und_indizes() {
+        let pool = db_bis_0221().await;
+        sqlx::query(
+            "INSERT INTO person_verbleib \
+                (einsatz_id, person_id, art, transportmittel, ziel, status, notiz, zeitpunkt_at, \
+                 erfasst_von, betreuungsstelle_id, bestaetigt_personal_id, bestaetigt_name, \
+                 client_id, eingegangen_at) VALUES \
+                (1, 1, 'transport', 'RTW', 'KH Mitte', 'abtransportiert', 'n1', '2026-10-19 10:00:00', 1, NULL, 4, 'Kim', 'c-1', '2026-10-19 10:00:05'), \
+                (1, 2, 'notunterkunft', NULL, 'Turnhalle', NULL, NULL, '2026-10-19 10:01:00', 1, 3, NULL, NULL, NULL, NULL), \
+                (1, 2, 'entlassung', NULL, NULL, NULL, NULL, '2026-10-19 10:02:00', 1, NULL, NULL, NULL, NULL, NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("DELETE FROM person_verbleib WHERE id = 3")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let schema_vorher = schema_von(&pool, "person_verbleib").await;
+        let alle = "SELECT id, einsatz_id, person_id, art, transportmittel, ziel, status, notiz, \
+                           zeitpunkt_at, erfasst_von, betreuungsstelle_id, bestaetigt_personal_id, \
+                           bestaetigt_name, client_id, eingegangen_at \
+                    FROM person_verbleib ORDER BY id";
+        let zeilen_vorher: Vec<sqlx::sqlite::SqliteRow> =
+            sqlx::query(alle).fetch_all(&pool).await.unwrap();
+        let als_text = |zeilen: &[sqlx::sqlite::SqliteRow]| -> Vec<String> {
+            zeilen
+                .iter()
+                .map(|z| {
+                    (0..15)
+                        .map(|i| {
+                            z.try_get::<Option<String>, _>(i)
+                                .ok()
+                                .flatten()
+                                .or_else(|| {
+                                    z.try_get::<Option<i64>, _>(i)
+                                        .ok()
+                                        .flatten()
+                                        .map(|n| n.to_string())
+                                })
+                                .unwrap_or_else(|| "∅".into())
+                        })
+                        .collect::<Vec<_>>()
+                        .join("|")
+                })
+                .collect()
+        };
+        let vorher = als_text(&zeilen_vorher);
+
+        let migration = include_str!("../migrations/0222_person_verbleib_transport_durch.sql");
+        assert!(
+            migration.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+        sqlx::raw_sql(migration)
+            .execute(&pool)
+            .await
+            .expect("0222 muss auf einer befüllten DB durchlaufen");
+
+        let zeilen_nachher: Vec<sqlx::sqlite::SqliteRow> =
+            sqlx::query(alle).fetch_all(&pool).await.unwrap();
+        assert_eq!(
+            als_text(&zeilen_nachher),
+            vorher,
+            "alle Zeilen verlustfrei kopiert"
+        );
+        let schema_nachher = schema_von(&pool, "person_verbleib").await;
+        let neu: Vec<&String> = schema_nachher
+            .iter()
+            .filter(|z| !schema_vorher.contains(z))
+            .collect();
+        assert_eq!(
+            neu.len(),
+            3,
+            "genau zwei neue Spalten und ein neuer FK, sonst nichts: {neu:?}"
+        );
+        assert!(
+            schema_vorher.iter().all(|z| schema_nachher.contains(z)),
+            "keine Spalte, kein FK und kein Index geht verloren"
+        );
+
+        // Die Sequenz überlebt, und der neue CHECK nimmt die neuen Werte.
+        let neue_id: i64 = sqlx::query_scalar(
+            "INSERT INTO person_verbleib \
+                (einsatz_id, person_id, art, transportmittel, status, transport_durch, \
+                 einsatz_fahrzeug_id, erfasst_von) \
+             VALUES (1, 1, 'transport', '1/83-1', 'uebergeben', 'eigen', 9, 1) RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("der neue CHECK nimmt 'uebergeben' und 'eigen'");
+        assert_eq!(neue_id, 4, "AUTOINCREMENT-Sequenz bleibt erhalten");
+        for falsch in [
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, transport_durch, erfasst_von) \
+             VALUES (1, 1, 'transport', 'nachbar', 1)",
+            "INSERT INTO person_verbleib (einsatz_id, person_id, art, status, erfasst_von) \
+             VALUES (1, 1, 'transport', 'angekommen', 1)",
+        ] {
+            assert!(
+                sqlx::query(sqlx::AssertSqlSafe(falsch))
+                    .execute(&pool)
+                    .await
+                    .is_err(),
+                "der CHECK lehnt ab: {falsch}"
+            );
+        }
+        // Der eindeutige client_id-Index steht wieder.
+        assert!(
+            sqlx::query(
+                "INSERT INTO person_verbleib (einsatz_id, person_id, art, client_id, erfasst_von) \
+                 VALUES (1, 2, 'vor_ort', 'c-1', 1)",
+            )
+            .execute(&pool)
+            .await
+            .is_err(),
+            "client_id bleibt je Einsatz eindeutig"
+        );
+        let cache: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM pragma_table_info('einsatz_person') \
+             WHERE name IN ('aktueller_transport_durch', 'aktuelles_einsatz_fahrzeug_id') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            cache,
+            ["aktueller_transport_durch", "aktuelles_einsatz_fahrzeug_id"]
+        );
+        let reste: i64 = sqlx::query_scalar(
+            "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'person_verbleib_neu') \
+                  + (SELECT COUNT(*) FROM sqlite_sequence WHERE name = 'person_verbleib_neu')",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(reste, 0, "keine Reste der Zwischentabelle");
+    }
+
     const MIGRATION_0141: &str = include_str!("../migrations/0141_person_zugriff_audit_anhang.sql");
 
     /// Alt-DB im 0132-Stand: die 0021-Alt-DB aus [`alt_db_person_zugriff_audit`], dazu die echte
