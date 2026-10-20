@@ -948,6 +948,11 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Verweis auf den Evakuierungsbezirk; dessen Bezeichnung schwärzt der Block
             // `evakuierungsbezirk`.
             retain("evakuierungsbezirk_id", G_FK),
+            // Kreis um einen Punkt (LLH-1043): Mitte und Radius sind Geo-Skelett wie die
+            // Geometrie, die aus ihnen gerechnet ist.
+            retain("kreis_mitte_lat", G_GEO),
+            retain("kreis_mitte_lon", G_GEO),
+            retain("kreis_radius_m", G_GEO),
         ],
     },
     TabellenRegel {

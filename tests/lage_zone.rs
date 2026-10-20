@@ -1346,3 +1346,269 @@ async fn bezirk_storno_meldet_jede_geloeste_flaeche_als_lage_zone() {
         "die Karte zeichnet die Fläche ohne Bezirk neu"
     );
 }
+
+// ── Kreis um einen Punkt (LLH-1043) ────────────────────────────────────────────────────────
+
+/// Kreis anlegen: `kreis` statt `geometrie`; der Server rechnet das Polygon (64 Ecken, Ring
+/// geschlossen → 65 Positionen), liefert die Kreisangaben zurück und schreibt den Radius in
+/// den ETB.
+#[tokio::test]
+async fn kreis_anlegen_rechnet_polygon_und_schreibt_radius_in_den_etb() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let body = json!({
+        "typ": "absperrbereich",
+        "label": "Nord",
+        "kreis": {"mitte_lat": 54.0, "mitte_lon": 9.5, "radius_m": 1500.0}
+    })
+    .to_string();
+    let (s, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    assert_eq!(z["geometrie_typ"], "Polygon");
+    assert_eq!(z["kreis_mitte_lat"], 54.0);
+    assert_eq!(z["kreis_mitte_lon"], 9.5);
+    assert_eq!(z["kreis_radius_m"], 1500.0);
+    let g: Value = serde_json::from_str(z["geometrie"].as_str().unwrap()).unwrap();
+    let ring = g["coordinates"][0].as_array().unwrap();
+    assert_eq!(ring.len(), 65);
+    assert_eq!(ring[0], ring[64], "Ring geschlossen");
+
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .any(|i| i == "Absperrbereich «Nord» eingerichtet · Kreis r = 1.500 m"),
+        "ETB: {etb:?}"
+    );
+
+    // Eine Zone ohne Kreis trägt die Felder nicht (skip_serializing_if).
+    let (_, frei) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(
+            &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY}).to_string(),
+        ),
+    )
+    .await;
+    assert!(frei.get("kreis_radius_m").is_none(), "{frei:?}");
+}
+
+/// Statuscodes am Kreis (design.md D2): ein Feld für sich → 400, der Zusammenhang → 422.
+#[tokio::test]
+async fn kreis_grenzen_sind_400_kombinationen_422() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{e}/zonen");
+    let kreis = |r: f64, lat: f64| json!({"mitte_lat": lat, "mitte_lon": 9.5, "radius_m": r});
+    let faelle = [
+        (
+            json!({"typ":"absperrbereich","kreis":kreis(0.0, 54.0)}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"typ":"absperrbereich","kreis":kreis(-5.0, 54.0)}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"typ":"absperrbereich","kreis":kreis(50_001.0, 54.0)}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            json!({"typ":"absperrbereich","kreis":kreis(300.0, 91.0)}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (json!({"typ":"absperrbereich"}), StatusCode::BAD_REQUEST),
+        (
+            json!({"typ":"absperrgrenze","kreis":kreis(300.0, 54.0)}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"typ":"absperrbereich","kreis":kreis(300.0, 54.0),"geometrie":POLY}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            json!({"typ":"absperrbereich","kreis":kreis(300.0, 54.0),"geometrie_typ":"LineString"}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ];
+    for (body, erwartet) in faelle {
+        let (s, j) = anfrage(&app, "POST", &pfad, &admin, Some(&body.to_string())).await;
+        assert_eq!(s, erwartet, "{body} → {j:?}");
+    }
+    // Genau an der Grenze geht es.
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(&json!({"typ":"absperrbereich","kreis":kreis(50_000.0, 54.0)}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+}
+
+async fn kreiszone(app: &axum::Router, cookie: &str, e: i64, typ: &str, r: f64) -> Value {
+    let (s, z) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        cookie,
+        Some(
+            &json!({"typ":typ,"label":"Nord","kreis":{"mitte_lat":54.0,"mitte_lon":9.5,"radius_m":r}})
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z:?}");
+    z
+}
+
+/// Radius ändern (D3): neues Polygon um dieselbe Mitte, ETB „Radius alt → neu“.
+#[tokio::test]
+async fn radius_patch_rechnet_neu_und_schreibt_etb() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let z = kreiszone(&app, &admin, e, "absperrbereich", 300.0).await;
+    let zid = z["id"].as_i64().unwrap();
+    let (s, neu) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"kreis_radius_m": 500.0}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{neu:?}");
+    assert_eq!(neu["kreis_radius_m"], 500.0);
+    assert_eq!(neu["kreis_mitte_lat"], 54.0);
+    assert_ne!(neu["geometrie"], z["geometrie"], "Polygon neu gerechnet");
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .any(|i| i == "Absperrbereich «Nord»: Radius 300 m → 500 m"),
+        "ETB: {etb:?}"
+    );
+
+    // Ungültiger Radius → 400; derselbe Radius schreibt keinen zweiten ETB.
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"kreis_radius_m": 0}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"kreis_radius_m": 500.0}).to_string()),
+    )
+    .await;
+    let etb2 = system_etb_inhalte(&app, &admin, e).await;
+    assert_eq!(
+        etb2.iter().filter(|i| i.contains("Radius")).count(),
+        1,
+        "ETB: {etb2:?}"
+    );
+}
+
+/// Radius an einer Zone ohne Kreis → 422; Geometrie und Radius zugleich → 422; eine neue
+/// Geometrie (punktweise Bearbeitung) löscht die Kreisangaben.
+#[tokio::test]
+async fn punktweise_bearbeitung_loescht_den_kreis() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, frei) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(
+            &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY}).to_string(),
+        ),
+    )
+    .await;
+    let frei_id = frei["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{frei_id}"),
+        &admin,
+        Some(&json!({"kreis_radius_m": 500.0}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let z = kreiszone(&app, &admin, e, "absperrbereich", 300.0).await;
+    let zid = z["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"kreis_radius_m": 500.0, "geometrie": POLY}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"geometrie": LINE}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Klasse bleibt");
+
+    let (s, neu) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/zonen/{zid}"),
+        &admin,
+        Some(&json!({"geometrie": POLY}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{neu:?}");
+    assert_eq!(neu["geometrie"], POLY);
+    assert!(neu.get("kreis_radius_m").is_none(), "{neu:?}");
+    assert!(neu.get("kreis_mitte_lat").is_none(), "{neu:?}");
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter().any(|i| i == "Absperrbereich «Nord» geändert"),
+        "ETB: {etb:?}"
+    );
+}
+
+/// Ein Gefahrengebiet als Kreis ist ein Gefahrengebiet wie jedes andere: Gruppe und Matrix.
+#[tokio::test]
+async fn kreis_gefahrengebiet_hat_gruppe_und_matrix() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let z = kreiszone(&app, &admin, e, "gefahrengebiet", 500.0).await;
+    let gebiet = z["gefahrengebiet_id"].as_i64().expect("Gruppe angelegt");
+    let (s, m) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/gefahrengebiete/{gebiet}/matrix"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{m:?}");
+}

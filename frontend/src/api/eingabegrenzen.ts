@@ -80,6 +80,8 @@ export const EINSATZORT_MAX = 500;
 export const SCHADEN_BESCHREIBUNG_MAX = 8_000;
 /** Stützpunkte einer Zone oder Abschnittsfläche (alle Ringe zusammen). */
 export const GEOMETRIE_STUETZPUNKTE_MAX = 5_000;
+/** Höchster Radius eines Kreises um einen Punkt in Metern (LLH-1043). */
+export const KREIS_RADIUS_M_MAX = 50_000;
 /** Netz und Sicherheit einer Sprechgruppe (Bedingungszeichen, LFH-1030). */
 export const SPRECHGRUPPE_BEDINGUNG_MAX = 40;
 /** Bezeichnung der eigenen Führungsstelle (LFH-1181). */

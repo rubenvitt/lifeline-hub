@@ -3604,6 +3604,17 @@ export interface components {
             geometrie_typ: string;
             /** Format: int64 */
             id: number;
+            /**
+             * Format: double
+             * @description Kreis um einen Punkt (LLH-1043): Mitte (WGS84) und Radius in Metern. Alle drei gesetzt =
+             *     die Geometrie ist die Kreisnäherung des Servers (64 Ecken); alle drei fehlen =
+             *     freie Fläche oder Linie. Eine punktweise Bearbeitung der Geometrie entfernt sie.
+             */
+            kreis_mitte_lat?: number | null;
+            /** Format: double */
+            kreis_mitte_lon?: number | null;
+            /** Format: double */
+            kreis_radius_m?: number | null;
             label?: string | null;
             notiz?: string | null;
             typ: components["schemas"]["LageZoneTyp"];

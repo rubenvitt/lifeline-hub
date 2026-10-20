@@ -768,6 +768,7 @@ impl Ablauf<'_> {
                         notiz: None,
                         ansicht_id: None,
                         evakuierungsbezirk_id: None,
+                        kreis: None,
                         erstellt_von: self.admin_id,
                     },
                 )

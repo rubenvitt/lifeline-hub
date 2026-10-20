@@ -9616,4 +9616,53 @@ mod tests {
             assert!(ergebnis.is_err(), "{fall}");
         }
     }
+
+    // --- LLH-1043: Kreisangaben an der Zone (0225) ---
+
+    /// `lage_zone` bekommt drei nullable Kreisspalten; Bestandszeilen bleiben unverändert und
+    /// lesen sich als freie Fläche (alle drei NULL).
+    #[tokio::test]
+    async fn migration_0225_lage_zone_kreis_haengt_drei_nullable_spalten_an() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 224).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let poly =
+            r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO lage_zone (einsatz_id, typ, geometrie_typ, geometrie, erstellt_von) \
+             VALUES (?, 'absperrbereich', 'Polygon', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(poly)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, 225).await;
+
+        let spalten: Vec<(String, String, i64)> = sqlx::query_as(
+            "SELECT name, type, \"notnull\" FROM pragma_table_info('lage_zone') \
+             WHERE name LIKE 'kreis_%' ORDER BY cid",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            vec![
+                ("kreis_mitte_lat".to_string(), "REAL".to_string(), 0),
+                ("kreis_mitte_lon".to_string(), "REAL".to_string(), 0),
+                ("kreis_radius_m".to_string(), "REAL".to_string(), 0),
+            ]
+        );
+        let (lat, lon, r, geo): (Option<f64>, Option<f64>, Option<f64>, String) = sqlx::query_as(
+            "SELECT kreis_mitte_lat, kreis_mitte_lon, kreis_radius_m, geometrie \
+             FROM lage_zone WHERE id = ?",
+        )
+        .bind(alt)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((lat, lon, r), (None, None, None), "Bestand ist kein Kreis");
+        assert_eq!(geo, poly, "Geometrie bleibt");
+    }
 }

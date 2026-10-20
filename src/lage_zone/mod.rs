@@ -2,7 +2,7 @@ pub mod repo;
 
 use crate::routes::support::parse_enum;
 use crate::wire_enum::wire_enum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 wire_enum! {
@@ -49,7 +49,8 @@ wire_enum! {
 impl GeometrieTyp {}
 
 /// Eine freie Lage-Zone (Gefahren-/Absperrzone). Eigenständige Entität — kein Fachobjekt.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+// Kein `Eq`: die Kreisangaben sind Gleitkommazahlen (LLH-1043).
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct LageZoneAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
@@ -68,6 +69,15 @@ pub struct LageZoneAnzeige {
     /// aus dessen Übersicht — die Zonenliste liest jeder Karten-Leser.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub evakuierungsbezirk_id: Option<i64>,
+    /// Kreis um einen Punkt (LLH-1043): Mitte (WGS84) und Radius in Metern. Alle drei gesetzt =
+    /// die Geometrie ist die Kreisnäherung des Servers (64 Ecken); alle drei fehlen =
+    /// freie Fläche oder Linie. Eine punktweise Bearbeitung der Geometrie entfernt sie.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kreis_mitte_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kreis_mitte_lon: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kreis_radius_m: Option<f64>,
     pub erstellt_von: i64,
     pub erstellt_at: String,
     pub geaendert_at: String,
@@ -219,6 +229,284 @@ pub fn pruefe_geometrie_struktur(
         }
     }
     Ok(())
+}
+
+// ── Kreis um einen Punkt (LLH-1043) ─────────────────────────────────────────────────
+
+/// Höchster Radius eines Kreises in Metern. Spiegel: `frontend/src/api/eingabegrenzen.ts`
+/// (`KREIS_RADIUS_M_MAX`), geprüft in `tests/eingabegrenzen_spiegel.rs`.
+pub const KREIS_RADIUS_M_MAX: usize = 50_000;
+/// Ecken der Polygon-Näherung eines Kreises (ohne Schlusspunkt). Spiegel: `KREIS_ECKEN` in
+/// `frontend/src/pages/lagekarte/geo.ts` (die Vorschau rechnet dieselbe Näherung).
+pub const KREIS_ECKEN: usize = 64;
+/// Erdradius der Kreisrechnung in Metern — derselbe wie im Frontend (`geo.ts`, `ERD_RADIUS_M`).
+const ERD_RADIUS_M: f64 = 6_371_000.0;
+
+/// Ein Kreis: Mitte in WGS84 und Radius in Metern. Wire-Form im Anlege-Body (`kreis`).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub struct Kreis {
+    pub mitte_lat: f64,
+    pub mitte_lon: f64,
+    pub radius_m: f64,
+}
+
+/// Radius für sich: endlich, größer 0, höchstens [`KREIS_RADIUS_M_MAX`] — sonst 400 (Feldfehler).
+pub fn pruefe_radius(radius_m: f64) -> Result<(), crate::error::AppError> {
+    if !radius_m.is_finite() || radius_m <= 0.0 || radius_m > KREIS_RADIUS_M_MAX as f64 {
+        return Err(crate::error::AppError::Validation(format!(
+            "Radius muss größer 0 und höchstens {} m sein",
+            format_meter(KREIS_RADIUS_M_MAX as f64)
+        )));
+    }
+    Ok(())
+}
+
+/// Ein Kreis für sich: Radius nach [`pruefe_radius`], Mitte endlich und in WGS84 — sonst 400.
+pub fn pruefe_kreis(k: &Kreis) -> Result<(), crate::error::AppError> {
+    pruefe_radius(k.radius_m)?;
+    if !k.mitte_lat.is_finite()
+        || !k.mitte_lon.is_finite()
+        || !(-90.0..=90.0).contains(&k.mitte_lat)
+        || !(-180.0..=180.0).contains(&k.mitte_lon)
+    {
+        return Err(crate::error::AppError::Validation(
+            "Kreismitte außerhalb von WGS84".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Prüft eine neue Kreiszone (statt `validiere_neu`): Kreis für sich 400, Typ ohne Fläche
+/// (`absperrgrenze`) oder ein `geometrie_typ` außer Polygon 422 (Zusammenhang).
+pub fn validiere_kreis_neu(
+    typ: &str,
+    geometrie_typ: Option<&str>,
+    kreis: &Kreis,
+) -> Result<(), crate::error::AppError> {
+    use crate::error::AppError;
+    parse_enum(
+        LageZoneTyp::parse,
+        typ,
+        format!("Unbekannter Zonen-Typ: {}", typ),
+    )?;
+    pruefe_kreis(kreis)?;
+    if let Some(g) = geometrie_typ {
+        parse_enum(
+            GeometrieTyp::parse,
+            g,
+            format!("Unbekannter Geometrie-Typ: {}", g),
+        )?;
+        if g != "Polygon" {
+            return Err(AppError::UnprocessableEntity(
+                "Ein Kreis ist eine Fläche (geometrie_typ Polygon)".into(),
+            ));
+        }
+    }
+    if !geometrie_klasse_passt(typ, "Polygon") {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Typ {} ist als Kreis nicht zulässig",
+            typ
+        )));
+    }
+    Ok(())
+}
+
+/// Geodätische Polygon-Näherung eines Kreises auf der Kugel: [`KREIS_ECKEN`] Ecken im gleichen
+/// Winkelabstand, Außenring gegen den Uhrzeigersinn (RFC 7946), geschlossen. Koordinaten auf 7
+/// Nachkommastellen (≈ 1 cm). Liefert den GeoJSON-String der Geometrie.
+pub fn kreis_polygon(mitte_lat: f64, mitte_lon: f64, radius_m: f64) -> String {
+    let phi1 = mitte_lat.to_radians();
+    let lambda1 = mitte_lon.to_radians();
+    let delta = radius_m / ERD_RADIUS_M;
+    let runde = |x: f64| (x * 1e7).round() / 1e7;
+    let mut ring: Vec<[f64; 2]> = (0..KREIS_ECKEN)
+        .map(|i| {
+            // Peilung von Nord im Uhrzeigersinn, rückwärts gezählt → Ring gegen den Uhrzeigersinn.
+            let theta = -(i as f64) * std::f64::consts::TAU / KREIS_ECKEN as f64;
+            let phi2 = (phi1.sin() * delta.cos() + phi1.cos() * delta.sin() * theta.cos()).asin();
+            let lambda2 = lambda1
+                + (theta.sin() * delta.sin() * phi1.cos())
+                    .atan2(delta.cos() - phi1.sin() * phi2.sin());
+            // Länge in [-180, 180] zurückfalten (Kreise nahe der Datumsgrenze).
+            let lon = (lambda2.to_degrees() + 540.0).rem_euclid(360.0) - 180.0;
+            [runde(lon), runde(phi2.to_degrees())]
+        })
+        .collect();
+    ring.push(ring[0]);
+    serde_json::json!({ "type": "Polygon", "coordinates": [ring] }).to_string()
+}
+
+/// Meter als ganze Zahl mit deutschem Tausenderpunkt: „300 m“, „1.500 m“. Dieselbe Form zeigt das
+/// Frontend (`formatRadius` in `geo.ts`).
+pub fn format_meter(m: f64) -> String {
+    let ganz = m.round() as i64;
+    let ziffern = ganz.abs().to_string();
+    let mut aus = String::new();
+    for (i, c) in ziffern.chars().enumerate() {
+        if i > 0 && (ziffern.len() - i).is_multiple_of(3) {
+            aus.push('.');
+        }
+        aus.push(c);
+    }
+    format!("{}{aus} m", if ganz < 0 { "-" } else { "" })
+}
+
+/// ETB-Wortlaut der Anlage einer Kreiszone: „Absperrbereich «Nord» eingerichtet · Kreis r = 300 m“.
+pub fn etb_text_kreis_eingerichtet(typ: &str, label: Option<&str>, radius_m: f64) -> String {
+    format!(
+        "{} · Kreis r = {}",
+        etb_text(typ, label, "eingerichtet"),
+        format_meter(radius_m)
+    )
+}
+
+/// ETB-Wortlaut einer Radiusänderung: „Absperrbereich «Nord»: Radius 300 m → 500 m“.
+pub fn etb_text_radius(typ: &str, label: Option<&str>, alt_m: f64, neu_m: f64) -> String {
+    let wer = match label {
+        Some(l) => format!("{} «{}»", typ_label(typ), l),
+        None => typ_label(typ).to_string(),
+    };
+    format!(
+        "{wer}: Radius {} → {}",
+        format_meter(alt_m),
+        format_meter(neu_m)
+    )
+}
+
+#[cfg(test)]
+mod kreis_tests {
+    use super::*;
+
+    /// Großkreisabstand (Haversine) in Metern, unabhängig von der Rechnung oben.
+    fn abstand_m(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+        let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
+        let dp = (lat2 - lat1).to_radians();
+        let dl = (lon2 - lon1).to_radians();
+        let a = (dp / 2.0).sin().powi(2) + p1.cos() * p2.cos() * (dl / 2.0).sin().powi(2);
+        2.0 * ERD_RADIUS_M * a.sqrt().min(1.0).asin()
+    }
+
+    fn ring(geo: &str) -> Vec<(f64, f64)> {
+        let v: serde_json::Value = serde_json::from_str(geo).unwrap();
+        assert_eq!(v["type"], "Polygon");
+        v["coordinates"][0]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| (p[0].as_f64().unwrap(), p[1].as_f64().unwrap()))
+            .collect()
+    }
+
+    /// Fläche in m² über eine lokale winkeltreue Näherung (Shoelace) — reicht für r ≤ 50 km.
+    fn flaeche_m2(r: &[(f64, f64)], ref_lat: f64) -> f64 {
+        let m = ERD_RADIUS_M * std::f64::consts::PI / 180.0;
+        let c = ref_lat.to_radians().cos();
+        let mut a = 0.0;
+        for w in r.windows(2) {
+            let (x0, y0) = (w[0].0 * m * c, w[0].1 * m);
+            let (x1, y1) = (w[1].0 * m * c, w[1].1 * m);
+            a += x0 * y1 - x1 * y0;
+        }
+        a / 2.0
+    }
+
+    /// AK LLH-1043: jede Ecke liegt höchstens 1 % neben dem Sollradius, auch bei 54° N, und die
+    /// Fläche weicht höchstens 1 % von π r² ab. Ring geschlossen, gegen den Uhrzeigersinn.
+    #[test]
+    fn kreis_polygon_weicht_hoechstens_ein_prozent_ab() {
+        for (lat, lon, r) in [
+            (54.0, 9.5, 300.0),
+            (54.0, 9.5, 50.0),
+            (54.0, 9.5, 50_000.0),
+            (51.3, 9.9, 1_000.0),
+            (0.0, 179.999, 500.0),
+        ] {
+            let ecken = ring(&kreis_polygon(lat, lon, r));
+            assert_eq!(ecken.len(), KREIS_ECKEN + 1, "64 Ecken + Schlusspunkt");
+            assert_eq!(ecken.first(), ecken.last(), "geschlossen");
+            for &(x, y) in &ecken {
+                let d = abstand_m(lat, lon, y, x);
+                assert!(
+                    (d - r).abs() / r <= 0.01,
+                    "{lat}/{lon} r={r}: Ecke bei {d} m"
+                );
+                assert!((-180.0..=180.0).contains(&x));
+            }
+            if lon.abs() < 179.0 {
+                let a = flaeche_m2(&ecken, lat);
+                let soll = std::f64::consts::PI * r * r;
+                assert!(a > 0.0, "Außenring gegen den Uhrzeigersinn");
+                assert!((a - soll).abs() / soll <= 0.01, "Fläche {a} statt {soll}");
+            }
+        }
+        // Die Kreisnäherung besteht die Strukturprüfung jeder Zone.
+        let geo = kreis_polygon(54.0, 9.5, 300.0);
+        assert!(validiere_neu("absperrbereich", "Polygon", &geo).is_ok());
+    }
+
+    #[test]
+    fn radius_grenzen_sind_400_und_linie_als_kreis_422() {
+        let code = |r: Result<(), crate::error::AppError>| r.err().map(|e| e.status().as_u16());
+        let k = |r: f64| Kreis {
+            mitte_lat: 54.0,
+            mitte_lon: 9.5,
+            radius_m: r,
+        };
+        assert_eq!(code(pruefe_kreis(&k(300.0))), None);
+        assert_eq!(code(pruefe_kreis(&k(50_000.0))), None);
+        for r in [0.0, -1.0, 50_000.5, f64::NAN, f64::INFINITY] {
+            assert_eq!(code(pruefe_kreis(&k(r))), Some(400), "{r}");
+        }
+        let ausserhalb = Kreis {
+            mitte_lat: 91.0,
+            ..k(300.0)
+        };
+        assert_eq!(code(pruefe_kreis(&ausserhalb)), Some(400));
+        assert_eq!(
+            code(validiere_kreis_neu("absperrgrenze", None, &k(300.0))),
+            Some(422)
+        );
+        assert_eq!(
+            code(validiere_kreis_neu(
+                "absperrbereich",
+                Some("LineString"),
+                &k(300.0)
+            )),
+            Some(422)
+        );
+        assert_eq!(
+            code(validiere_kreis_neu("quatsch", None, &k(300.0))),
+            Some(400)
+        );
+        assert_eq!(
+            code(validiere_kreis_neu(
+                "gefahrengebiet",
+                Some("Polygon"),
+                &k(300.0)
+            )),
+            None
+        );
+    }
+
+    #[test]
+    fn etb_wortlaute_des_kreises() {
+        assert_eq!(format_meter(300.0), "300 m");
+        assert_eq!(format_meter(1_500.0), "1.500 m");
+        assert_eq!(format_meter(50_000.0), "50.000 m");
+        assert_eq!(format_meter(299.6), "300 m");
+        assert_eq!(
+            etb_text_kreis_eingerichtet("absperrbereich", Some("Nord"), 300.0),
+            "Absperrbereich «Nord» eingerichtet · Kreis r = 300 m"
+        );
+        assert_eq!(
+            etb_text_radius("absperrbereich", None, 300.0, 500.0),
+            "Absperrbereich: Radius 300 m → 500 m"
+        );
+        assert_eq!(
+            etb_text_radius("gefahrengebiet", Some("Werk"), 1_000.0, 300.0),
+            "Gefahrengebiet «Werk»: Radius 1.000 m → 300 m"
+        );
+    }
 }
 
 #[cfg(test)]
