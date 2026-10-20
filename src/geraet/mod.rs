@@ -258,6 +258,8 @@ const UHS_TABLET: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
     ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
+    // Vorschläge zum Rettungsmittel (LLH-1332): Fahrzeuge im Einsatz ohne Modul Fahrzeuge.
+    ("GET", "/api/einsaetze/{id}/personen/transportmittel"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
@@ -312,6 +314,8 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
     ("GET", "/api/einsaetze/{id}/personen/bestaetiger"),
+    // Vorschläge zum Rettungsmittel (LLH-1332): Fahrzeuge im Einsatz ohne Modul Fahrzeuge.
+    ("GET", "/api/einsaetze/{id}/personen/transportmittel"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
@@ -427,6 +431,7 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("POST", "/api/einsaetze/{id}/personen"),
     ("GET", "/api/einsaetze/{id}/personen/{pid}"),
     ("PATCH", "/api/einsaetze/{id}/personen/{pid}"),
+    ("GET", "/api/einsaetze/{id}/personen/transportmittel"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/verbleib"),
     ("POST", "/api/einsaetze/{id}/personen/{pid}/notizen"),
     ("GET", "/api/einsaetze/{id}/meldungen"),

@@ -384,6 +384,46 @@ async fn ruecknahme_nach_uebernahme_ist_422() {
     assert_eq!(liste[0]["status"], "eingetroffen");
 }
 
+/// LLH-1247: „Rückgängig“ nach „Zusage erfassen“ nimmt die Zusage zurück (früher 400
+/// „Ungültiger Zielstatus“) und leert ihren Zeitpunkt; die nächste Zusage trägt ihren eigenen.
+#[tokio::test]
+async fn ruecknahme_auf_angefordert_geht_und_leert_den_zeitpunkt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (_, n) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &admin,
+        Some(&body()),
+    )
+    .await;
+    let nid = n["id"].as_i64().unwrap();
+
+    let (s, json) = set_status(&app, &admin, e, nid, "zugesagt").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(json["zugesagt_at"].is_string());
+
+    let (s, json) = set_status(&app, &admin, e, nid, "angefordert").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["status"], "angefordert");
+    assert!(json["zugesagt_at"].is_null(), "{json}");
+    assert_eq!(json["ist_offen"], true);
+
+    let (s, json) = set_status(&app, &admin, e, nid, "zugesagt").await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(json["zugesagt_at"].is_string());
+
+    // Zwei Stufen zurück bleiben zu.
+    assert_eq!(
+        set_status(&app, &admin, e, nid, "unterwegs").await.0,
+        StatusCode::OK
+    );
+    let (s, _) = set_status(&app, &admin, e, nid, "angefordert").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
 /// Ohne Posten und mit nur storniertem Posten bleibt die Rücknahme (LFH-343 C8) erlaubt.
 #[tokio::test]
 async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {

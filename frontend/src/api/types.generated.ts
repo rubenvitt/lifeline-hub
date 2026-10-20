@@ -2315,6 +2315,16 @@ export interface components {
          */
         EinsatzStatus: "aktiv" | "abgeschlossen";
         /**
+         * @description Ein Fahrzeug aus dem Einsatz für den Eigentransport (LLH-1332, design.md D4). Nur, was die
+         *     Verbleib-Maske braucht: kein Kennzeichen, keine Besatzung, keine Position.
+         */
+        EinsatzTransportfahrzeug: {
+            /** Format: int64 */
+            einsatz_fahrzeug_id: number;
+            fahrzeugtyp?: string | null;
+            funkrufname: string;
+        };
+        /**
          * @description Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über
          *     `ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.
          */
@@ -3758,6 +3768,11 @@ export interface components {
         };
         /** @description Betroffene in Zahlen, wie die Kopfzahl des Lage-Dashboards (`lageVerdichtung.ts`). */
         LagemonitorBetroffene: {
+            /**
+             * Format: int64
+             * @description Abgeschlossene Patienten (LLH-1332): in `gesamt` enthalten, in keiner Sichtungszahl.
+             */
+            abgeschlossen: number;
             /** Format: int64 */
             gesamt: number;
             /**
@@ -4737,8 +4752,14 @@ export interface components {
             aktuelle_verbleib_betreuungsstelle_id?: number | null;
             /** Format: int64 */
             aktueller_platz_id?: number | null;
+            aktueller_transport_durch?: components["schemas"]["TransportDurch"] | null;
             aktueller_verbleib?: string | null;
             aktueller_verbleib_status?: components["schemas"]["VerbleibStatus"] | null;
+            /**
+             * Format: int64
+             * @description Disposition des Fahrzeugs eines Eigentransports (LLH-1332), sonst leer.
+             */
+            aktuelles_einsatz_fahrzeug_id?: number | null;
             aktuelles_verbleib_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
@@ -4787,6 +4808,11 @@ export interface components {
              *     `vermisst` bedeutsam; beim Verlassen des Status bleibt der Wert dokumentarisch stehen.
              */
             vermisst_seit?: string | null;
+            /**
+             * @description Abgeleiteter Versorgungszustand (LLH-1332, design.md D3). Nie gespeichert: das Repo setzt
+             *     ihn nach jedem Lesen über [`PersonAnzeige::mit_versorgung`].
+             */
+            versorgung: components["schemas"]["Versorgung"];
             vorname?: string | null;
             /** @description Zustand in Kurzform (Freitext, z. B. „gehfähig, unterkühlt"). */
             zustand?: string | null;
@@ -5710,12 +5736,29 @@ export interface components {
          */
         TransportArt: "liegend" | "sitzend" | "mit_notarzt";
         /**
+         * @description Wer einen Transport fährt (LLH-1332, design.md D1). Nur bei `art = transport`; ein
+         *     Bestands-Transport ohne Angabe gilt als `fremd`.
+         * @enum {string}
+         */
+        TransportDurch: "fremd" | "eigen";
+        /**
          * @description Transportpriorität (Spec `personen-transport`). String = CHECK in
          *     `migrations/0219_person_transport.sql`. Ordnet innerhalb der Sichtungskategorie, nie über
          *     ihr (design.md D10). Statuskategorie (Retain), deshalb darf sie ins ETB.
          * @enum {string}
          */
         TransportPrioritaet: "sofort" | "dringlich" | "normal";
+        /**
+         * @description Vorschläge zum Rettungsmittel einer Verbleib-Erfassung (LLH-1332, Spec
+         *     `patienten-uebergabe`, „Vorschläge für das Rettungsmittel“): Fahrzeuge im Einsatz (Wahl heißt
+         *     Eigentransport), bisher eingetragene fremde Rettungsmittel des Einsatzes (häufigste zuerst)
+         *     und Funkrufnamen des Fahrzeugstamms, die gerade nicht im Einsatz stehen.
+         */
+        TransportmittelAuswahl: {
+            bisher: string[];
+            im_einsatz: components["schemas"]["EinsatzTransportfahrzeug"][];
+            stamm: string[];
+        };
         /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
         UebernahmeBody: {
             /** Format: int64 */
@@ -5905,6 +5948,11 @@ export interface components {
              *     Fehlt bei Einträgen von vor der Migration 0217.
              */
             eingegangen_at?: string | null;
+            /**
+             * Format: int64
+             * @description Disposition des Fahrzeugs eines Eigentransports (LLH-1332).
+             */
+            einsatz_fahrzeug_id?: number | null;
             /** Format: int64 */
             einsatz_id: number;
             /** Format: int64 */
@@ -5915,6 +5963,7 @@ export interface components {
             /** Format: int64 */
             person_id: number;
             status?: components["schemas"]["VerbleibStatus"] | null;
+            transport_durch?: components["schemas"]["TransportDurch"] | null;
             transportmittel?: string | null;
             zeitpunkt_at: string;
             ziel?: string | null;
@@ -5931,7 +5980,7 @@ export interface components {
          * @description Verbleib-Status (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `status`.
          * @enum {string}
          */
-        VerbleibStatus: "angemeldet" | "abtransportiert";
+        VerbleibStatus: "angemeldet" | "abtransportiert" | "uebergeben";
         /**
          * @description Verfügbarkeit eines Platzes (getrennt von Belegung). String = CHECK in
          *     `migrations/0028_uhs_platz.sql`. `reserviert` ist im DB-CHECK an
@@ -6110,6 +6159,12 @@ export interface components {
             /** @description Die Version davor, nur wenn ein Versionswechsel stattfand. */
             zuletzt_gestartet?: string | null;
         };
+        /**
+         * @description Versorgungszustand einer Person (LLH-1332, design.md D3), abgeleitet aus dem jüngsten
+         *     Verbleib, nie gespeichert. Die eine Regel steht in [`versorgung_von`].
+         * @enum {string}
+         */
+        Versorgung: "offen" | "unterwegs" | "abgeschlossen";
         /** @description Ein Eintrag des Verteilers auf dem Wire, in Verteiler-Reihenfolge. */
         VerteilerEintragAnzeige: {
             /**

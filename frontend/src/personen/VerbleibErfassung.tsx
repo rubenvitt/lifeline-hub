@@ -7,7 +7,7 @@ import { ApiError } from '../api/client';
 import { useAuthOptional } from '../auth/AuthContext';
 import type { VerbleibEingabe } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
-import type { Betreuungsstelle } from '../api/types';
+import type { Betreuungsstelle, VerbleibArt } from '../api/types';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -24,6 +24,7 @@ import {
   type VerbleibFormWerte,
 } from './verbleibErfassungKern';
 import { useSavePersonEintrag, type PersonZiel } from './personEintragSpeichern';
+import RettungsmittelFeld from './RettungsmittelFeld';
 
 /** Registry-Eintrag des Moduls „Betreuung" — Grenze der Stellen-Auswahl. */
 const BETREUUNG_MODUL = modulRegistry.find((m) => m.key === 'betreuung');
@@ -36,6 +37,10 @@ interface VerbleibErfassungProps {
   /** Ohne Netz vorgemerkt (LLH-1138): kein Serverstand; die Zeile quittiert. */
   onVorgemerkt?: () => void;
   onSchliessen: () => void;
+  /** Titel; Vorgabe „Verbleib erfassen“ (der Grundriss nennt die Person). */
+  titel?: string;
+  /** Startwerte, etwa die Art Transport beim Abwurf auf „Unterwegs“ im Grundriss. */
+  vorbelegung?: Partial<VerbleibFormWerte>;
 }
 
 /**
@@ -43,8 +48,18 @@ interface VerbleibErfassungProps {
  * im Patientenkopf (LLH-1094). Der Aufrufer hält das `<Form>`; `body` baut aus den Werten den
  * Request (die Stellen-Frage kennt nur dieser Hook).
  */
-export function useVerbleibFelder(einsatzId: number, form: FormInstance<VerbleibFormWerte>) {
-  const art = Form.useWatch('art', form);
+export function useVerbleibFelder(
+  einsatzId: number,
+  form: FormInstance<VerbleibFormWerte>,
+  /**
+   * Die Art steht schon fest (Grundriss): ihre Felder stehen ab dem ersten Bild, und die Eingabe
+   * beginnt am Rettungsmittel. `useWatch` liefert die Startwerte erst einen Takt später; ohne
+   * diesen Rückfall fokussierte die Hülle beim Öffnen die Art.
+   */
+  vorbelegteArt?: VerbleibArt,
+) {
+  const art = Form.useWatch('art', form) ?? vorbelegteArt;
+  const artVorbelegt = vorbelegteArt != null;
   // Das Gerät einer Betreuungsstelle bringt nur in die eigene Stelle (LFH-1041); ohne Stelle
   // lehnt der Server die Notunterkunft ab.
   const stellePflicht = useAuthOptional()?.geraet?.ansicht === 'betreuungsstelle';
@@ -134,10 +149,9 @@ export function useVerbleibFelder(einsatzId: number, form: FormInstance<Verbleib
       <Form.Item label="Ziel" name="ziel">
         <Input placeholder={art === 'transport' ? 'z. B. Krankenhaus' : 'Freitext'} />
       </Form.Item>
+      {/* Wer fährt (LLH-1332): Wahl aus „Im Einsatz“ heißt Eigentransport, sonst fremd. */}
       {felder.transportmittel && (
-        <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel">
-          <Input />
-        </Form.Item>
+        <RettungsmittelFeld einsatzId={einsatzId} form={form} fokus={artVorbelegt} />
       )}
       <Collapse
         ghost
@@ -184,9 +198,11 @@ export default function VerbleibErfassung({
   onErfasst,
   onVorgemerkt,
   onSchliessen,
+  titel = 'Verbleib erfassen',
+  vorbelegung,
 }: VerbleibErfassungProps) {
   const [form] = Form.useForm<VerbleibFormWerte>();
-  const { elemente, body } = useVerbleibFelder(einsatzId, form);
+  const { elemente, body } = useVerbleibFelder(einsatzId, form, vorbelegung?.art);
   const save = useSavePersonEintrag();
   const mutation = useMutation({
     // Merkt ohne Netz vor (LLH-1138, design.md D8; `frontend/src/offline/AGENTS.md`).
@@ -198,8 +214,9 @@ export default function VerbleibErfassung({
   return (
     <ErfassungsModal<VerbleibFormWerte>
       offen
-      titel="Verbleib erfassen"
+      titel={titel}
       form={form}
+      initialValues={vorbelegung}
       laeuft={mutation.isPending}
       onErfassen={(werte) => mutation.mutateAsync(body(werte))}
       onFertig={onSchliessen}

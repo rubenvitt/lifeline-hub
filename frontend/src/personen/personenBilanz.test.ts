@@ -6,8 +6,10 @@ import {
   lueckenText,
   lueckenVon,
   offeneFelder,
+  ohneAbgeschlossene,
   sichtungsbild,
   transportBilanz,
+  versorgungsBilanz,
   verbleibKlasse,
   verbleibZaehlung,
 } from './personenBilanz';
@@ -39,6 +41,7 @@ const basis: Person = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 let n = 1;
 const p = (extra: Partial<Person>): Person => ({ ...basis, id: ++n, registrier_nr: n, ...extra });
@@ -151,11 +154,19 @@ describe('offeneFelder', () => {
 
 describe('verbleibKlasse / verbleibZaehlung', () => {
   it('leitet die Klasse aus der Art, dann UHS, sonst offen ab', () => {
-    expect(verbleibKlasse({ aktuelle_verbleib_art: 'entlassung', aktuelle_uhs_id: 7 })).toBe(
+    const o = { versorgung: 'offen' } as const;
+    expect(verbleibKlasse({ ...o, aktuelle_verbleib_art: 'entlassung', aktuelle_uhs_id: 7 })).toBe(
       'entlassung',
     );
-    expect(verbleibKlasse({ aktuelle_verbleib_art: null, aktuelle_uhs_id: 7 })).toBe('uhs');
-    expect(verbleibKlasse({ aktuelle_uhs_id: null })).toBe('offen');
+    expect(verbleibKlasse({ ...o, aktuelle_verbleib_art: null, aktuelle_uhs_id: 7 })).toBe('uhs');
+    expect(verbleibKlasse({ ...o, aktuelle_uhs_id: null })).toBe('offen');
+    expect(
+      verbleibKlasse({
+        aktuelle_verbleib_art: 'transport',
+        aktuelle_uhs_id: null,
+        versorgung: 'unterwegs',
+      }),
+    ).toBe('unterwegs');
   });
 
   it('zählt nach Art — das Spec-Szenario „Zählung nach Art" (LFH-613)', () => {
@@ -198,6 +209,30 @@ describe('verbleibKlasse / verbleibZaehlung', () => {
     ]);
   });
 
+  it('trennt Unterwegs vom Transport — das Spec-Szenario „Zählung nach Art" (LLH-1332)', () => {
+    const ohneVerbleib = { aktuelle_verbleib_art: undefined, aktueller_verbleib: null };
+    const fremd = {
+      aktuelle_verbleib_art: 'transport' as const,
+      versorgung: 'abgeschlossen' as const,
+    };
+    const alle = [
+      p(fremd),
+      p(fremd),
+      p({ aktuelle_verbleib_art: 'transport', versorgung: 'unterwegs' }),
+      p({ aktuelle_verbleib_art: 'notunterkunft', versorgung: 'abgeschlossen' }),
+      p({ ...ohneVerbleib, aktuelle_uhs_id: 7 }),
+      p(ohneVerbleib),
+    ];
+    const namen: Record<number, string> = { 7: 'Weserstadion' };
+    expect(verbleibZaehlung(alle, (id) => namen[id])).toEqual([
+      { schluessel: 'transport', label: 'Transport', wert: 2, offen: false },
+      { schluessel: 'unterwegs', label: 'Unterwegs', wert: 1, offen: false },
+      { schluessel: 'notunterkunft', label: 'Notunterkunft', wert: 1, offen: false },
+      { schluessel: 'uhs:7', label: 'Weserstadion', wert: 1, offen: false },
+      { schluessel: 'offen', label: 'offen', wert: 1, offen: true },
+    ]);
+  });
+
   it('zählt eine Kurzform ohne Art NICHT still als Art', () => {
     const alle = [p({ aktuelle_verbleib_art: undefined, aktueller_verbleib: 'Transport' })];
     expect(verbleibZaehlung(alle, () => undefined)).toEqual([
@@ -228,6 +263,36 @@ describe('transportBilanz', () => {
       p({ aktuelle_verbleib_art: 'notunterkunft' }),
     ];
     expect(transportBilanz(alle)).toEqual({ transportiert: 0, offen: 0 });
+  });
+});
+
+describe('versorgungsBilanz', () => {
+  it('zählt das Spec-Szenario „Unterwegs / offen / abgeschlossen“ als 1 / 2 / 3', () => {
+    const ohneVerbleib = { aktuelle_verbleib_art: undefined, aktueller_verbleib: null };
+    const fremd = {
+      aktuelle_verbleib_art: 'transport' as const,
+      versorgung: 'abgeschlossen' as const,
+    };
+    const alle = [
+      p({ aktuelle_verbleib_art: 'transport', versorgung: 'unterwegs' }),
+      p(ohneVerbleib),
+      p(ohneVerbleib),
+      p(fremd),
+      p(fremd),
+      p(fremd),
+      // Vermisst zählt in keinem Posten.
+      p({ status: 'vermisst', ...ohneVerbleib }),
+    ];
+    expect(versorgungsBilanz(alle)).toEqual({ unterwegs: 1, offen: 2, abgeschlossen: 3 });
+  });
+
+  it('ohneAbgeschlossene lässt offen und unterwegs stehen', () => {
+    const alle = [
+      p({ versorgung: 'offen' }),
+      p({ versorgung: 'unterwegs' }),
+      p({ versorgung: 'abgeschlossen' }),
+    ];
+    expect(ohneAbgeschlossene(alle).map((x) => x.versorgung)).toEqual(['offen', 'unterwegs']);
   });
 });
 

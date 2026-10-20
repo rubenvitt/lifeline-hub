@@ -394,7 +394,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     // Die Seitenspalten sind Reiter, nicht Nachbarn — und die Fläche steht vorn.
     await expect(page.getByRole('tab', { name: 'Fläche' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Wartebereich' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Transport' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Unterwegs' })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Fläche' })).toHaveAttribute(
       'aria-selected',
       'true',

@@ -53,6 +53,13 @@ beforeEach(() => {
       betreuungAbrufe += 1;
       return HttpResponse.json({ bezirke: [], stellen: [NORD, SUED] });
     }),
+    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+      HttpResponse.json({
+        im_einsatz: [{ einsatz_fahrzeug_id: 9, funkrufname: '1/83-1', fahrzeugtyp: 'RTW' }],
+        bisher: ['RTW 3/83-2'],
+        stamm: ['KTW 4/85-1'],
+      }),
+    ),
     http.post('/api/einsaetze/1/personen/2/verbleib', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return postAntwort();
@@ -82,7 +89,9 @@ async function waehle(user: Nutzer, feld: string, eintrag: string) {
   await user.click(await screen.findByTitle(eintrag));
 }
 
-const feldZahl = (dialog: HTMLElement) => dialog.querySelectorAll('.ant-form-item').length;
+/** Sichtbare Felder: das versteckte `einsatz_fahrzeug_id` (LLH-1332) zählt nicht zum Budget. */
+const feldZahl = (dialog: HTMLElement) =>
+  dialog.querySelectorAll('.ant-form-item:not(.ant-form-item-hidden)').length;
 
 describe('VerbleibErfassung — Hülle und Feldbudget', () => {
   it('trägt keine antd-Fusszeile — der Absende-Knopf liegt im Formular', async () => {
@@ -97,7 +106,7 @@ describe('VerbleibErfassung — Hülle und Feldbudget', () => {
     zeige();
     await waehle(user, 'Art', 'Transport');
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByLabelText('Transportmittel (RTW/KTW …)')).toBeInTheDocument();
+    expect(within(dialog).getByRole('combobox', { name: /Rettungsmittel/ })).toBeInTheDocument();
     expect(feldZahl(dialog)).toBe(3);
     expect(within(dialog).queryByLabelText('Notiz')).not.toBeInTheDocument();
 
@@ -106,11 +115,65 @@ describe('VerbleibErfassung — Hülle und Feldbudget', () => {
     expect(feldZahl(dialog)).toBeGreaterThan(3);
   });
 
-  it('Transportmittel nur beim Transport', async () => {
+  it('Rettungsmittel nur beim Transport', async () => {
     const user = userEvent.setup();
     zeige();
     await waehle(user, 'Art', 'Entlassung vor Ort');
-    expect(screen.queryByLabelText('Transportmittel (RTW/KTW …)')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Rettungsmittel/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('VerbleibErfassung — Rettungsmittel (LLH-1332)', () => {
+  const feld = () => screen.getByRole('combobox', { name: /Rettungsmittel/ });
+
+  it('Einsatzfahrzeug wählen: Marke „Eigentransport“, gesendet als eigen mit Fahrzeug', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Transport');
+    await user.type(feld(), '1/83');
+    await user.click(await screen.findByTitle('1/83-1 · RTW'));
+    expect(screen.getByRole('dialog')).toHaveTextContent('Eigentransport');
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      art: 'transport',
+      transport_durch: 'eigen',
+      einsatz_fahrzeug_id: 9,
+      transportmittel: '1/83-1',
+    });
+  });
+
+  it('Text nach der Wahl geändert: fremdes Rettungsmittel', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Transport');
+    await user.type(feld(), '1/83');
+    await user.click(await screen.findByTitle('1/83-1 · RTW'));
+    await user.type(feld(), ' RD');
+    expect(screen.getByRole('dialog')).toHaveTextContent('fremdes Rettungsmittel');
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ transport_durch: 'fremd', transportmittel: '1/83-1 RD' });
+    expect(gesendet[0]).not.toHaveProperty('einsatz_fahrzeug_id');
+  });
+
+  it('bietet bisher verwendete und Stamm-Fahrzeuge in eigenen Gruppen an', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Transport');
+    await user.click(feld());
+    expect(await screen.findByText('Bisher verwendet')).toBeInTheDocument();
+    expect(screen.getByText('Fahrzeugstamm')).toBeInTheDocument();
+    expect(screen.getByTitle('RTW 3/83-2')).toBeInTheDocument();
+  });
+
+  it('Transport ohne Rettungsmittel wird nicht gespeichert', async () => {
+    const user = userEvent.setup();
+    zeige();
+    await waehle(user, 'Art', 'Transport');
+    await user.click(screen.getByRole('button', { name: 'Erfassen' }));
+    expect(await screen.findByText('Rettungsmittel angeben')).toBeInTheDocument();
+    expect(gesendet).toHaveLength(0);
   });
 });
 
@@ -158,6 +221,7 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
     await waehle(user, 'Betreuungsstelle (optional)', 'NU Turnhalle Nord');
     await waehle(user, 'Art', 'Transport');
     expect(screen.queryByRole('combobox', { name: 'Betreuungsstelle (optional)' })).toBeNull();
+    await user.type(screen.getByRole('combobox', { name: /Rettungsmittel/ }), 'RTW 3/83-2');
 
     await user.click(screen.getByRole('button', { name: 'Erfassen' }));
     await waitFor(() => expect(gesendet).toHaveLength(1));

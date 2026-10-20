@@ -3,6 +3,8 @@ import type { Betreuungsstelle } from '../api/types';
 import {
   sichtbareVerbleibFelder,
   stellenOptionen,
+  rettungsmittelOptionen,
+  uebergabeBody,
   verbleibBody,
   zielNachArtwechsel,
   zielNachStellenwahl,
@@ -173,5 +175,64 @@ describe('zielNachArtwechsel', () => {
       zielNachArtwechsel({ art: 'notunterkunft', ziel: 'NU Turnhalle Nord', gewaehlt: nord }),
     ).toBe('NU Turnhalle Nord');
     expect(zielNachArtwechsel({ art: 'transport', ziel: 'X', gewaehlt: undefined })).toBe('X');
+  });
+});
+
+describe('Fahrer-Angabe (LLH-1332, Spec `patienten-uebergabe`)', () => {
+  it('Transport mit Fahrzeug aus dem Einsatz ist ein Eigentransport', () => {
+    expect(
+      verbleibBody(
+        { art: 'transport', transportmittel: '1/83-1', einsatz_fahrzeug_id: 9, ziel: 'KH' },
+        false,
+      ),
+    ).toMatchObject({
+      art: 'transport',
+      transport_durch: 'eigen',
+      einsatz_fahrzeug_id: 9,
+      status: 'abtransportiert',
+    });
+  });
+
+  it('Transport mit freiem Text ist ein fremdes Rettungsmittel', () => {
+    const body = verbleibBody({ art: 'transport', transportmittel: 'RTW 3/83-2' }, false);
+    expect(body).toMatchObject({ transport_durch: 'fremd', transportmittel: 'RTW 3/83-2' });
+    expect(body).not.toHaveProperty('einsatz_fahrzeug_id');
+  });
+
+  it('andere Arten tragen keine Fahrer-Angabe, auch kein liegengebliebenes Fahrzeug', () => {
+    const body = verbleibBody({ art: 'entlassung', einsatz_fahrzeug_id: 9 }, false);
+    expect(body).not.toHaveProperty('transport_durch');
+    expect(body).not.toHaveProperty('einsatz_fahrzeug_id');
+  });
+
+  it('rettungsmittelOptionen gruppiert „Im Einsatz“, „Bisher verwendet“, „Fahrzeugstamm“', () => {
+    const gruppen = rettungsmittelOptionen({
+      im_einsatz: [{ einsatz_fahrzeug_id: 9, funkrufname: '1/83-1', fahrzeugtyp: 'RTW' }],
+      bisher: ['RTW 3/83-2'],
+      stamm: [],
+    });
+    expect(gruppen.map((g) => g.label)).toEqual(['Im Einsatz', 'Bisher verwendet']);
+    expect(gruppen[0].options[0]).toMatchObject({ value: '1/83-1', einsatzFahrzeugId: 9 });
+    expect(gruppen[1].options[0]).toMatchObject({ value: 'RTW 3/83-2' });
+    expect(gruppen[1].options[0]).not.toHaveProperty('einsatzFahrzeugId');
+  });
+
+  it('uebergabeBody quittiert die Übergabe mit Fahrzeug, Ziel und Erfassungszeit', () => {
+    expect(
+      uebergabeBody(
+        { aktuelles_einsatz_fahrzeug_id: 9, aktuelles_verbleib_ziel: 'KH Mitte' },
+        { ziel: 'KH Nord', zeitpunkt_at: '2026-10-19 10:42:00' },
+      ),
+    ).toEqual({
+      art: 'transport',
+      transport_durch: 'eigen',
+      einsatz_fahrzeug_id: 9,
+      status: 'uebergeben',
+      ziel: 'KH Nord',
+      zeitpunkt_at: '2026-10-19 10:42:00',
+    });
+    expect(
+      uebergabeBody({ aktuelles_einsatz_fahrzeug_id: 9, aktuelles_verbleib_ziel: 'KH Mitte' }, {}),
+    ).toMatchObject({ ziel: 'KH Mitte' });
   });
 });

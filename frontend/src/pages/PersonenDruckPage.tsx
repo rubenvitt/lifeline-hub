@@ -59,6 +59,8 @@ export default function PersonenDruckPage() {
             ansicht: 'zeilen',
             filter: auswahl.filter,
             nurLuecken: auswahl.nurLuecken,
+            // Der Druck ist Nachweis und bleibt vollständig (LLH-1332).
+            abgeschlossen: true,
           })
         : [],
     [daten, auswahl],

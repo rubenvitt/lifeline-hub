@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
@@ -421,5 +421,259 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     zeige({ posten: [], leerText: 'Keine Beladung' });
     expect(screen.getByText('Keine Beladung')).toBeInTheDocument();
     expect(screen.getByTestId('material-am-ort-kopf')).toHaveTextContent('0 Posten');
+  });
+});
+
+/**
+ * Kein Sprung unter dem Zeiger nach dem Lösen (LLH-1254, Change
+ * `2026-10-19-k2gckqtq-material-loesen-ohne-sprung`): Die gelöste Zeile bleibt als „Gelöst“ an
+ * ihrer Stelle, bis Zeiger und Fokus den Baustein verlassen haben und `HOLD_MS` vergangen ist.
+ */
+describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const reihenfolge = () =>
+    [...document.querySelectorAll('[data-lfh="material-am-ort-zeile"]')].map(
+      (z) => z.querySelector('span > span')?.textContent,
+    );
+  const ohne = (...ids: number[]) => POSTEN.filter((p) => !ids.includes(p.id));
+  const marke = (bezeichnung: string) =>
+    screen.getByRole('button', { name: `${bezeichnung} gelöst` });
+
+  /** Rendert, löst einen Posten und lässt ihn aus der Quelle fallen wie nach dem Abgleich. */
+  async function loeseUndGleicheAb(
+    user: ReturnType<typeof userEvent.setup>,
+    bezeichnung: string,
+    id: number,
+    props: Partial<MaterialAmOrtProps> = {},
+  ) {
+    const gesendet = patchMitschnitt();
+    const r = zeige(props);
+    await user.click(
+      within(zeile(bezeichnung)).getByRole('button', { name: `${bezeichnung} lösen` }),
+    );
+    await screen.findByRole('button', { name: `${bezeichnung} gelöst` });
+    const neu = (p: Partial<MaterialAmOrtProps>) =>
+      r.rerender(
+        <MaterialAmOrt
+          einsatzId={1}
+          ort={UHS}
+          posten={ohne(id)}
+          angebot={{ data: ANGEBOT, isError: false }}
+          darfSchreiben
+          materialFrei
+          loesenText="Lösen"
+          {...props}
+          {...p}
+        />,
+      );
+    neu({});
+    return { gesendet, neu };
+  }
+
+  it('die gelöste Zeile steht als träge Marke „Gelöst“ an ihrer Stelle; ein zweiter Klick schickt nichts', async () => {
+    const user = userEvent.setup();
+    const { gesendet } = await loeseUndGleicheAb(user, 'Trage', 2);
+    expect(reihenfolge()).toEqual(['Wolldecke', 'Trage', 'Zeltbahn']);
+    const knopf = marke('Trage');
+    expect(knopf).toHaveTextContent('Gelöst');
+    expect(knopf).toHaveAttribute('aria-disabled', 'true');
+    // Der Fokus bleibt auf derselben Stelle: kein Sprung für die Tastatur.
+    expect(knopf).toHaveFocus();
+    await user.click(knopf);
+    await user.click(knopf);
+    expect(gesendet).toHaveLength(1);
+    // Status und Ausgeben entfallen; die Kopfzahl zählt nur echte Posten.
+    expect(within(zeile('Trage')).queryByRole('button', { name: /Status von/ })).toBeNull();
+    expect(screen.getByTestId('material-am-ort-kopf')).toHaveTextContent('2 Posten · 1 Ausfall');
+  });
+
+  it('solange die Quelle den Posten noch zeigt, steht schon die Marke statt des Knopfs', async () => {
+    const user = userEvent.setup();
+    const gesendet = patchMitschnitt();
+    zeige();
+    await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
+    expect(await screen.findByRole('button', { name: 'Trage gelöst' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Trage lösen' })).toBeNull();
+    await user.click(marke('Trage'));
+    expect(gesendet).toHaveLength(1);
+  });
+
+  it('kehrt der Posten zurück, gewinnt die echte Zeile', async () => {
+    const user = userEvent.setup();
+    const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    neu({ posten: POSTEN });
+    expect(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull();
+    expect(reihenfolge()).toEqual(['Wolldecke', 'Trage', 'Zeltbahn']);
+  });
+
+  it('mehrere Platzhalter behalten ihre Plätze, auch in umgekehrter Folge gelöst', async () => {
+    const user = userEvent.setup();
+    const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    await user.click(within(zeile('Wolldecke')).getByRole('button', { name: 'Wolldecke lösen' }));
+    await screen.findByRole('button', { name: 'Wolldecke gelöst' });
+    neu({ posten: ohne(1, 2) });
+    expect(reihenfolge()).toEqual(['Wolldecke', 'Trage', 'Zeltbahn']);
+  });
+
+  it('fällt erst, wenn Zeiger und Fokus draußen sind und die Haltezeit um ist; dann alle zusammen', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await loeseUndGleicheAb(user, 'Trage', 2);
+    // Zeiger und Fokus im Baustein: die Zeit allein löst nichts.
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(marke('Trage')).toBeInTheDocument();
+    // Zeiger raus, Fokus noch drin.
+    await user.pointer({ target: document.body });
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(marke('Trage')).toBeInTheDocument();
+    // Fokus raus: die Haltezeit ist längst um, die Zeile fällt.
+    act(() => marke('Trage').blur());
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull());
+    expect(reihenfolge()).toEqual(['Wolldecke', 'Zeltbahn']);
+  });
+
+  it('der Zeiger allein hält, auch ohne Fokus', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await loeseUndGleicheAb(user, 'Trage', 2);
+    act(() => marke('Trage').blur());
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(marke('Trage')).toBeInTheDocument();
+    await user.pointer({ target: document.body });
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull());
+  });
+
+  it('nach dem Verlassen wartet die Zeile die Haltezeit seit dem letzten Tipp ab', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await loeseUndGleicheAb(user, 'Trage', 2);
+    await user.pointer({ target: document.body });
+    act(() => marke('Trage').blur());
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(marke('Trage')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(4_000));
+    expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull();
+  });
+
+  it('ein Touch-Zeiger hält nicht, nur die Zeit seit dem Tipp', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    patchMitschnitt();
+    const r = zeige();
+    const knopf = within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' });
+    // Ein Tipp: betritt und verlässt den Baustein, der Fokus bleibt nicht.
+    await user.pointer([
+      { keys: '[TouchA>]', target: knopf, coords: { x: 1, y: 1 } },
+      { pointerName: 'TouchA', target: knopf, coords: { x: 3, y: 3 } },
+      { keys: '[/TouchA]', target: knopf },
+    ]);
+    await screen.findByRole('button', { name: 'Trage gelöst' });
+    act(() => (document.activeElement as HTMLElement | null)?.blur());
+    r.rerender(
+      <MaterialAmOrt
+        einsatzId={1}
+        ort={UHS}
+        posten={ohne(2)}
+        angebot={{ data: ANGEBOT, isError: false }}
+        darfSchreiben
+        materialFrei
+        loesenText="Lösen"
+      />,
+    );
+    act(() => vi.advanceTimersByTime(3_000));
+    expect(marke('Trage')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(2_000));
+    expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull();
+  });
+
+  it('ein anderer Ort leert die Platzhalter', async () => {
+    const user = userEvent.setup();
+    const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    neu({ ort: { art: 'uhs', id: 8 }, posten: [] });
+    expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull();
+  });
+
+  it('„Rückgängig“ im Hinweis ordnet den Posten wieder diesem Ort zu', async () => {
+    const user = userEvent.setup();
+    const { gesendet, neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    const hinweis = (await screen.findByText('Trage gelöst')).closest('.ant-message-notice')!;
+    await user.click(within(hinweis as HTMLElement).getByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
+        { url: '/api/einsaetze/1/material/2', body: { uhs_id: 7 } },
+      ]),
+    );
+    neu({ posten: POSTEN });
+    expect(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' })).toBeEnabled();
+  });
+
+  it('„Rückgängig“, bevor die Quelle abgeglichen hat: die echte Zeile kehrt sofort zurück', async () => {
+    const user = userEvent.setup();
+    patchMitschnitt();
+    zeige();
+    await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
+    const hinweis = (await screen.findByText('Trage gelöst')).closest('.ant-message-notice')!;
+    await user.click(within(hinweis as HTMLElement).getByRole('button', { name: 'Rückgängig' }));
+    // Der Zeiger kehrt in den Baustein zurück: nur die Rücknahme, nicht die Zeit, darf die Marke lösen.
+    await user.hover(zeile('Wolldecke'));
+    expect(
+      await within(zeile('Trage')).findByRole('button', { name: 'Trage lösen' }),
+    ).toBeEnabled();
+  });
+
+  it('eine Ablehnung des Rückgängig steht über dem Block und bleibt, wenn die Zeile fällt', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let n = 0;
+    patchMitschnitt(() =>
+      ++n === 1
+        ? HttpResponse.json({})
+        : HttpResponse.json({ error: 'Material ist verliehen' }, { status: 409 }),
+    );
+    zeige();
+    await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
+    const hinweis = (await screen.findByText('Trage gelöst')).closest('.ant-message-notice')!;
+    await user.click(within(hinweis as HTMLElement).getByRole('button', { name: 'Rückgängig' }));
+    expect(await screen.findByText('Material ist verliehen')).toBeInTheDocument();
+    expect(screen.getByText('Trage nicht zurückgenommen')).toBeInTheDocument();
+    expect(document.querySelector('.ant-message-error')).toBeNull();
+    // Zeiger und Fokus sind im Hinweis, die Haltezeit läuft ab: die Zeile fällt, der Grund bleibt.
+    act(() => vi.advanceTimersByTime(10_000));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Trage gelöst' })).toBeNull());
+    expect(screen.getByText('Material ist verliehen')).toBeInTheDocument();
+  });
+
+  it('am beendeten Ort gibt es kein Rückgängig, weil der Server das Zuordnen ablehnt', async () => {
+    const user = userEvent.setup();
+    patchMitschnitt();
+    zeige({ sperrgrund: 'UHS aufgelöst' });
+    await user.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
+    const hinweis = (await screen.findByText('Trage gelöst')).closest('.ant-message-notice')!;
+    expect(within(hinweis as HTMLElement).queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+    expect(marke('Trage')).toBeInTheDocument();
+  });
+
+  it('der letzte Posten gelöst: kein Leertext über dem Platzhalter', async () => {
+    const user = userEvent.setup();
+    const { neu } = await loeseUndGleicheAb(user, 'Trage', 2);
+    neu({ posten: [] });
+    expect(screen.queryByText('Kein Material')).toBeNull();
+    expect(reihenfolge()).toEqual(['Trage']);
+  });
+
+  it('am Platzhalter stehen Status und „Ausgeben“ unsichtbar weiter: die Höhe bleibt', async () => {
+    const user = userEvent.setup();
+    await loeseUndGleicheAb(user, 'Wolldecke', 1);
+    const z = zeile('Wolldecke');
+    const ausgeben = z.querySelector<HTMLElement>('[aria-label="Wolldecke ausgeben"]');
+    expect(ausgeben).not.toBeNull();
+    expect(within(z).queryByRole('button', { name: 'Wolldecke ausgeben' })).toBeNull();
+    expect(z.querySelector('[aria-label="Status von Wolldecke ändern"]')).not.toBeNull();
+    expect(within(z).queryByRole('button', { name: /Status von/ })).toBeNull();
   });
 });

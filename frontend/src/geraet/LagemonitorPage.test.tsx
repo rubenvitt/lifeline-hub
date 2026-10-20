@@ -63,6 +63,7 @@ const lage: LagemonitorAnzeige = {
     unverletzt: 4,
     ohne: 3,
     vermisst: 2,
+    abgeschlossen: 0,
   },
   kraefte: { einheiten: 4, personal: 38, staerke: { fuehrer: 2, unterfuehrer: 6, mannschaft: 30 } },
   uhs: [

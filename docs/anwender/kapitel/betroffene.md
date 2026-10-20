@@ -2,7 +2,7 @@
 titel: Betroffene und Sichtung
 gruppen: [alle, fuehrung]
 reihenfolge: 510
-quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
+quellen: [frontend/src/pages/PersonenPage.tsx, frontend/src/pages/PersonenDetailPage.tsx, frontend/src/personen/Personendaten.tsx, frontend/src/components/offeneBearbeitung.tsx, frontend/src/anzeige/kalenderdatum.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/BetroffeneZeile.tsx, frontend/src/personen/personBefehl.ts, frontend/src/personen/BetroffenenSeitenleiste.tsx, frontend/src/personen/personenBilanz.ts, frontend/src/personen/personenSpalten.tsx, frontend/src/personen/ZeilenSichtung.tsx, frontend/src/personen/personenFilter.ts, frontend/src/personen/BetroffeneKarte.tsx, frontend/src/personen/SichtungDialog.tsx, frontend/src/personen/SichtungsWahl.tsx, frontend/src/personen/Patientenkopf.tsx, frontend/src/personen/PatientenkopfPaneele.tsx, frontend/src/personen/PatKennzeichen.tsx, frontend/src/personen/koerperschema/Koerperschema.tsx, frontend/src/personen/PersonVerlauf.tsx, frontend/src/personen/personEintragSpeichern.ts, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/PersonBezuege.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/personen/VerbleibErfassung.tsx, frontend/src/personen/RettungsmittelFeld.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/personen/Sichtungsboard.tsx, frontend/src/personen/AbgleichVorschlagModal.tsx, frontend/src/personen/personMeta.ts, frontend/src/offline/lagebildKuerzung.ts, src/routes/einsatz_person.rs, src/person/mod.rs, src/person/abgleich_repo.rs, src/person/audit_repo.rs, src/person/sichtung_repo.rs, src/routes/person_transport.rs, src/routes/person_massnahme.rs, src/routes/person_verletzung.rs]
 ---
 
 ## Überblick
@@ -14,9 +14,10 @@ das Modul dazu den Transport, die Maßnahmen, die Verletzungen am Körperschema,
 Patientenanhängetasche (PAT-Nummer) und eine Kontamination. Pflichtfelder gibt
 es nicht; Name und Alter dürfen fehlen.
 
-Die Liste zeigt neben den Personen das Sichtungsbild, den Verbleib und die offenen Felder. Im
-Modulpanel führen „Patienten“ direkt ins Sichtungsraster und „Vermisste“ in die Liste der
-Vermissten.
+Die Liste zeigt neben den Personen das Sichtungsbild, den Verbleib und die offenen Felder.
+Abgeschlossene Patienten (übergeben, vor Ort entlassen, in einer Notunterkunft oder mit Verbleib
+des Leichnams) stehen nur auf Wunsch darin. Im Modulpanel führen „Patienten“ direkt ins
+Sichtungsraster und „Vermisste“ in die Liste der Vermissten.
 
 ## Abläufe
 
@@ -28,13 +29,20 @@ Vermissten.
 
    ![Liste der Betroffenen mit Statusfilter, Suche und der Seitenleiste mit Sichtungsbild, Verbleib und offenen Feldern](../bilder/betroffene/liste.png)
 
-2. Rechts zählt das „Sichtungsbild“ die Personen je Sichtungskategorie, „Verbleib“ zählt sie je
-   Verbleib und Unfallhilfsstelle, „Offene Felder“ nennt, wem Verbleib oder Fundort fehlt.
+2. Rechts zählt das „Sichtungsbild“ die Personen in Versorgung je Sichtungskategorie, „Verbleib“
+   zählt alle angetroffenen Personen je Verbleib („Unterwegs“, „Transport“, „Notunterkunft“ …)
+   und Unfallhilfsstelle, „Offene Felder“ nennt, wem Verbleib oder Fundort fehlt.
 3. Mit „Nur Lücken zeigen“ bleiben nur die Personen mit offenen Feldern in der Liste.
-4. Über die Leiste oben wechselt die Ansicht zwischen „Zeilen“, „Sichtungsraster“ (nach
-   Kategorien gruppiert, die älteste Sichtung zuerst) und „Karte“ (Fundorte mit Koordinate).
+4. Über die Leiste oben wechselt die Ansicht zwischen „Zeilen“, „Sichtungsraster“ und „Karte“
+   (Fundorte mit Koordinate). Das Sichtungsraster zeigt je Kategorie eine Spalte mit Zahl, darin
+   je Person eine Karte mit Kennung, Name, Zeit seit der Sichtung, Aufenthalt und
+   Transportpriorität; die älteste Sichtung steht oben. Ein Tipp auf Kennung oder Name öffnet die
+   Person, ein Tipp auf die Sichtung öffnet die Sichtungswahl.
 5. Der Statusfilter („Alle“, „Erfasst“, „Vermisst“, „Betroffen“, „Verstorben“) und die Suche
    nach R-Nr., PAT-Nr., Name oder Fundort engen die Liste ein.
+6. „Abgeschlossene zeigen“ neben dem Statusfilter nimmt die abgeschlossenen Patienten wieder in
+   Zeilen, Sichtungsraster und Karte auf; die Zahl dahinter sagt, wie viele es sind. Ohne
+   abgeschlossene Patienten steht der Schalter nicht da.
 
 ### Eine Person mit der Maske erfassen
 
@@ -75,9 +83,11 @@ Fundorts; „@Name“ für die Unfallhilfsstelle, in die die Person aufgenommen 
 2. Die Fläche der Kategorie antippen und „Übernehmen“ wählen. Die Zeile zeigt die neue Kategorie,
    die Liste bleibt offen. „Abbrechen“ schließt die Wahl, ohne zu speichern.
 3. Fehlt einer Person der Verbleib, steht in ihrer Spalte „Verbleib“ der Knopf „Verbleib
-   erfassen“. Ihn wählen, „Art“ und „Ziel“ angeben und „Erfassen“ wählen.
+   erfassen“. Ihn wählen, „Art“ und „Ziel“ angeben (beim Transport das „Rettungsmittel“) und
+   „Erfassen“ wählen.
 4. Das Menü am Ende der Zeile (am Handy in der Karte der Person) bietet „Sichten“, „Verbleib
-   erfassen“ und „Auf Lagekarte verorten“.
+   erfassen“ und „Auf Lagekarte verorten“, bei einem Patienten im Eigentransport zusätzlich
+   „Übergabe quittieren“.
 
 Mit „Nur Lücken zeigen“ lässt sich die Liste so Zeile für Zeile abarbeiten: eine Zeile, deren
 Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansicht, der Filter oder
@@ -93,14 +103,24 @@ Lücke gerade geschlossen wurde, bleibt mit dem neuen Wert stehen, bis die Ansic
    antippen, bei Bedarf eine „Kurzbegründung (optional)“, und „Übernehmen“ wählen.
 3. Verlässt die Person die Einsatzstelle, im Kopf „Verbleib erfassen“ wählen und die „Art“
    wählen: „Transport“, „Notunterkunft“, „Entlassung vor Ort“, „verbleibt vor Ort“ oder
-   „Verbleib des Leichnams“. Dazu das „Ziel“ und beim Transport das „Transportmittel (RTW/KTW …)“.
+   „Verbleib des Leichnams“. Dazu das „Ziel“ und beim Transport das „Rettungsmittel“: ein
+   Fahrzeug unter „Im Einsatz“ wählen, wenn ein Fahrzeug des Einsatzes fährt (die Marke am Feld
+   zeigt „Eigentransport“), sonst das fremde Rettungsmittel eintippen oder unter „Bisher
+   verwendet“ bzw. „Fahrzeugstamm“ wählen (Marke „fremdes Rettungsmittel“).
 
-   ![Patientenkopf mit aufgeklapptem Paneel „Verbleib erfassen“: Art Transport, Ziel und Transportmittel](../bilder/betroffene/verbleib.png)
+   ![Patientenkopf mit aufgeklapptem Paneel „Verbleib erfassen“: Art Transport, Ziel und Rettungsmittel](../bilder/betroffene/verbleib.png)
 
 4. „Verbleib erfassen“ im Paneel wählen. Danach zeigt der Kopf den Verbleib.
 
 Bei „Notunterkunft“ bietet das Paneel die Betreuungsstellen des Einsatzes an; die gewählte Stelle
 wird zum Ziel. Eine Notiz entsteht über die Zeile „Notiz“ im Kopf mit „Notiz anlegen“.
+
+### Die Übergabe eines Eigentransports quittieren
+
+1. Die Person im Eigentransport öffnen. Im Kopf steht beim Verbleib „Übergabe quittieren“; in der
+   Liste bietet ihn das Menü der Zeile, im Grundriss der Unfallhilfsstelle die Spalte „Unterwegs“.
+2. Bei Bedarf „Übergeben um“ (leer heißt jetzt) und das „Ziel“ anpassen.
+3. „Übergabe quittieren“ wählen. Der Kopf zeigt „übergeben → Ziel“, der Patient ist abgeschlossen.
 
 ### Den Transport festlegen
 
@@ -308,6 +328,27 @@ neu eintreffende Personen nicht in die Liste, und die Reihenfolge bleibt; ein Ba
 nennt sie („1 neuer Eintrag — anzeigen“). So springt keine Zeile unter dem Finger weg. Wird eine
 Sichtung aus der Liste abgelehnt, steht der Grund an der Zeile; ist die Zeile gerade nicht zu
 sehen, über der Liste.
+
+### Unterwegs und abgeschlossen
+
+Wer einen Patienten transportiert, entscheidet, ob er noch in der Verantwortung des Einsatzes ist.
+Fährt ein fremdes Rettungsmittel, ist der Patient mit dem Speichern übergeben und abgeschlossen.
+Fährt ein Fahrzeug, das im Einsatz disponiert ist (Eigentransport), ist der Patient „unterwegs“,
+bis die Übergabe am Ziel quittiert ist; erst dann ist er abgeschlossen. Ohne Fahrzeug aus dem
+Einsatz lässt sich kein Eigentransport speichern. Ein vorgemerkter Eigentransport oder eine
+vorgemerkte Übergabe geht auch dann durch, wenn das Fahrzeug inzwischen entlassen wurde, solange
+es zur Erfassungszeit disponiert war.
+
+Abgeschlossen sind außerdem „Entlassung vor Ort“, „Notunterkunft“ und „Verbleib des Leichnams“.
+„verbleibt vor Ort“ und ein nur angemeldeter Transport schließen nicht ab. Abgeschlossene fehlen
+in Zeilen, Sichtungsraster und Karte, bis „Abgeschlossene zeigen“ an ist, und immer auf der
+Lagekarte und in den Patientenzahlen der Lage; Detailseite, Suche, Druck und Export finden sie
+weiter. In einer Notunterkunft bleibt die Person im Modul Betreuung sichtbar.
+
+Die Vorschläge zum Rettungsmittel kommen aus den Fahrzeugen im Einsatz, den bisher im Einsatz
+eingetragenen fremden Rettungsmitteln und dem Fahrzeugstamm der Organisation. Im
+Einsatztagebuch steht „Person R-…: im Eigentransport“ bzw. „Person R-…: übergeben“, ohne Ziel und
+ohne Fahrzeug.
 
 ### Unfallhilfsstelle und Verbleib
 

@@ -10,6 +10,7 @@ import Sichtungszeile from './Sichtungszeile';
  */
 const p = (aktuelle_sichtung: 'sk1' | 'sk2' | 'sk3' | 'sk4' | 'tot' | 'unverletzt' | null) => ({
   aktuelle_sichtung,
+  versorgung: 'offen' as const,
 });
 
 function eintraege() {
@@ -19,6 +20,19 @@ function eintraege() {
 }
 
 describe('Sichtungszeile', () => {
+  it('zählt Abgeschlossene nicht mit, unterwegs schon (LLH-1332)', () => {
+    renderMitProviders(
+      <Sichtungszeile
+        alle={[
+          p('sk1'),
+          { ...p('sk1'), versorgung: 'unterwegs' },
+          { ...p('sk1'), versorgung: 'abgeschlossen' },
+        ]}
+      />,
+    );
+    expect(eintraege()[0]).toBe('2 gesamt');
+  });
+
   it('nennt Summe und je Kategorie die Zahl vor dem Wort', () => {
     renderMitProviders(<Sichtungszeile alle={[p('sk1'), p('sk1'), p('sk3'), p(null)]} />);
     expect(eintraege()).toEqual([

@@ -1,5 +1,5 @@
 import { IconKreuz } from '../icons';
-import { Alert, App, Breadcrumb, Button, Flex, type InputRef } from 'antd';
+import { Alert, App, Breadcrumb, Button, Checkbox, Flex, type InputRef } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -43,23 +43,24 @@ import {
   SICHT_VORGABE,
   filterPersonen,
   gefundenePersonen,
-  rasterSchluessel,
   sichtFuerNeuePerson,
   sichtNachSprung,
   type PersonenAnsicht,
   type PersonenFilter,
   type PersonenSicht,
 } from '../personen/personenFilter';
-import { hatLuecke, SICHTUNGSBILD_REIHE } from '../personen/personenBilanz';
+import { hatLuecke, istAbgeschlossen } from '../personen/personenBilanz';
 import AbgleichVorschlagModal from '../personen/AbgleichVorschlagModal';
 import PersonErfassungModal, { type ErfassungsModus } from '../personen/PersonErfassungModal';
 import type { AufnahmeEingabe } from '../personen/AufnahmeFelder';
 import BetroffeneZeile from '../personen/BetroffeneZeile';
 import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
+import Sichtungsboard from '../personen/Sichtungsboard';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
 import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
+import { UebergabeDialog } from '../personen/UebergabeQuittieren';
 import SichtungDialog from '../personen/SichtungDialog';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useDichte } from '../theme/ThemeModeProvider';
@@ -272,6 +273,10 @@ export default function PersonenPage() {
   const sichtungZeilen = useZeilenFehler<number>();
   const { isHolding: isZeileHolding, hold } = useHalteQuellen();
   /** „Verbleib erfassen“ aus der Zeile: der Dialog gehört zum Einsatz, in dem er aufging. */
+  const [uebergabeFuer, setUebergabeFuer] = useState<{
+    einsatzId: number;
+    person: Person;
+  } | null>(null);
   const [verbleibFuer, setVerbleibFuer] = useState<{ einsatzId: number; person: Person } | null>(
     null,
   );
@@ -295,6 +300,7 @@ export default function PersonenPage() {
     (aktion: PersonZeilenAktion, p: Person) => {
       if (aktion === 'sichten') setSichtungFuer({ einsatzId, person: p });
       else if (aktion === 'verbleib') setVerbleibFuer({ einsatzId, person: p });
+      else if (aktion === 'uebergabe') setUebergabeFuer({ einsatzId, person: p });
       else
         navigate(
           // Mit Herkunft: „Zurück zu R-…“ führt danach auf die Person (LLH-1125).
@@ -567,7 +573,12 @@ export default function PersonenPage() {
   // Keine Weiche „eigene gegen fremde Änderung" wie auf der ETB-Seite: `sicht` ist kontrollierter
   // Zustand, nichts wird neu aufgesetzt.
   useEffect(() => {
-    if (!searchParams.has('filter') && !searchParams.has('ansicht')) return;
+    if (
+      !searchParams.has('filter') &&
+      !searchParams.has('ansicht') &&
+      !searchParams.has('abgeschlossen')
+    )
+      return;
     const vorgabe = parsePersonenSicht(searchParams);
     setSichtNachEinsatz((alt) => {
       const bisher = alt[einsatzId] ?? SICHT_VORGABE;
@@ -577,6 +588,7 @@ export default function PersonenPage() {
     const rest = new URLSearchParams(searchParams);
     rest.delete('filter');
     rest.delete('ansicht');
+    rest.delete('abgeschlossen');
     setSearchParams(rest, { replace: true });
   }, [searchParams, setSearchParams, einsatzId]);
 
@@ -750,13 +762,6 @@ export default function PersonenPage() {
     }),
     [bedienung, selectZeilenAktion],
   );
-  const rasterKarte = useMemo(
-    () => ({
-      ...personenKarte(einsatzId),
-      weitere: darfSchreibenListe ? kartenMenue : undefined,
-    }),
-    [einsatzId, darfSchreibenListe, kartenMenue],
-  );
   const listenKarte = useMemo(
     () => ({
       ...personenKarte(einsatzId),
@@ -808,6 +813,12 @@ export default function PersonenPage() {
   const listeGescheitert = personenQuery.isError && alle.length === 0;
   const standVeraltet = personenQuery.isError && alle.length > 0;
   const zeilen = filterPersonen(alle, sicht, lueckeGeschlossen);
+  /** Abgeschlossene der Statusmenge — die Zahl am Schalter „Abgeschlossene zeigen“ (LLH-1332). */
+  const abgeschlosseneZahl = filterPersonen(alle, {
+    ...sicht,
+    nurLuecken: false,
+    abgeschlossen: true,
+  }).filter(istAbgeschlossen).length;
   /*
    * Der Grund eines abgelehnten Vorschlags steht an der Zeile, solange sie mit der Abgleichspalte
    * dasteht; ist sie weggefiltert oder die Ansicht gewechselt, im Seitenhinweis.
@@ -852,6 +863,7 @@ export default function PersonenPage() {
   const halten =
     isZeileHolding ||
     verbleibFuer?.einsatzId === einsatzId ||
+    uebergabeFuer?.einsatzId === einsatzId ||
     sichtungFuer?.einsatzId === einsatzId;
   /** Ein Grund je Zeile: die jüngste Aktion der Zeile räumt ihren, die Abgleichspalte ihren. */
   const zeilenGrund = (p: Person) =>
@@ -1069,14 +1081,31 @@ export default function PersonenPage() {
             {/* Unter `xl` steht die Seitenleiste unter allen Zeilen; die Lagezahl bleibt hier im
                 ersten Bildschirm (LFH-963). Ab `xl` steht die Seitenleiste daneben. */}
             {!mitSeitenleiste && !personenQuery.isLoading && <Sichtungszeile alle={alle} />}
-            <Segmentleiste<PersonenFilter>
-              rolle="tablist"
-              beschriftung="Personen nach Status filtern"
-              optionen={FILTER_OPTIONEN}
-              wert={sicht.filter}
-              onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
-              style={{ marginBottom: token.marginSM }}
-            />
+            <Flex wrap align="center" gap={token.marginSM} style={{ marginBottom: token.marginSM }}>
+              <Segmentleiste<PersonenFilter>
+                rolle="tablist"
+                beschriftung="Personen nach Status filtern"
+                optionen={FILTER_OPTIONEN}
+                wert={sicht.filter}
+                onWechsel={(filter) => aendereSichtFuer(einsatzId, (alt) => ({ ...alt, filter }))}
+              />
+              {/* Abgeschlossene stehen nicht in den Standardansichten (LLH-1332, Spec
+                  `betroffene-lagedaten`); die Zahl sagt, wie viele fehlen. Ohne Abgeschlossene
+                  fehlt der Schalter: „(0)“ sagt nichts und kostet am Handy die erste Zeile. */}
+              {(abgeschlosseneZahl > 0 || sicht.abgeschlossen) && (
+                <Checkbox
+                  checked={sicht.abgeschlossen}
+                  onChange={(e) =>
+                    aendereSichtFuer(einsatzId, (alt) => ({
+                      ...alt,
+                      abgeschlossen: e.target.checked,
+                    }))
+                  }
+                >
+                  Abgeschlossene zeigen ({abgeschlosseneZahl})
+                </Checkbox>
+              )}
+            </Flex>
             {sicht.ansicht === 'karte' ? (
               // Statusfilter und Lücken-Filter gelten auch hier: die Karte zeigt dieselbe Menge wie
               // die Zeilen, nur verortet.
@@ -1094,41 +1123,22 @@ export default function PersonenPage() {
               </Suspense>
             ) : sicht.ansicht === 'raster' ? (
               /**
-               * Sichtungsraster: alle Personen der Filtermenge nach Sichtung gruppiert, samt
-               * „unverletzt" und „ohne Sichtung". Eine Sicht mit Gruppenachse statt n Tabellen:
-               * eine Kopfzeile, eine fixierte Kennungsspalte, ein Spaltenschalter. Innerhalb der
-               * Kategorie der älteste Sichtungszeitpunkt zuerst — wer am längsten wartet, steht
-               * oben.
+               * Sichtungsraster als Board (LLH-1332, Spec `sichtungsboard`): eine Spalte je
+               * Kategorie, Karten je Person, dieselbe Menge wie die Zeilen. Innerhalb der Spalte
+               * die älteste Sichtung zuerst — wer am längsten wartet, steht oben.
                */
-              <Datensicht
-                /**
-                 * `key` ist nötig: beide Ansichten stehen an derselben Stelle im Baum mit demselben
-                 * Komponententyp, React reichte sonst die Instanz samt Sortierung, Suchbegriff und
-                 * Zeilenschleuse weiter — die Dringlichkeitsordnung nach `seit` griffe nie.
-                 * `datensicht.guard.test.ts` hält die Regel fest.
-                 */
-                key={`raster-${sicht.filter}`}
-                bezeichnung="Betroffene nach Sichtungskategorie"
-                spalten={register}
-                daten={zeilen}
-                zeilenSchluessel="id"
-                ladend={personenQuery.isLoading}
-                leerText={leerText}
-                standardSortierung={{ spalte: 'seit', richtung: 'auf' }}
-                gruppen={{
-                  schluessel: rasterSchluessel,
-                  etikett: (sk) =>
-                    sk === 'ohne' ? 'ohne Sichtung' : SK_META[sk as Sichtungskategorie].label,
-                  reihenfolge: [...SICHTUNGSBILD_REIHE],
-                  // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
-                  unterEbene: 1,
-                }}
-                onZeileKlick={(p) => navigate(personDetailPfad(einsatzId, p.id))}
-                zeilenKlasse={zeilenKlasse}
-                karte={rasterKarte}
-                zeilenFehler={zeilenGrund}
-                halten={halten}
-              />
+              personenQuery.isLoading ? (
+                <SeitenSkeleton />
+              ) : (
+                <Sichtungsboard
+                  einsatzId={einsatzId}
+                  personen={zeilen}
+                  uhsName={uhsName}
+                  bedienung={bedienung}
+                  halten={halten}
+                  leerText={leerText}
+                />
+              )
             ) : (
               <Datensicht
                 /**
@@ -1210,6 +1220,20 @@ export default function PersonenPage() {
             void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
           }}
           onSchliessen={() => setSichtungFuer(null)}
+        />
+      )}
+      {uebergabeFuer?.einsatzId === einsatzId && (
+        <UebergabeDialog
+          key={uebergabeFuer.person.id}
+          einsatzId={einsatzId}
+          person={uebergabeFuer.person}
+          onErfasst={() => {
+            const personId = uebergabeFuer.person.id;
+            void qc.invalidateQueries({ queryKey: einsatzKeys.personen(einsatzId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.person(einsatzId, personId) });
+            void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+          }}
+          onSchliessen={() => setUebergabeFuer(null)}
         />
       )}
       {verbleibFuer?.einsatzId === einsatzId && (

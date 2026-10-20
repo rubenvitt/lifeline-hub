@@ -1074,6 +1074,22 @@ describe('BrDetailPage — Ablehnung am Ort (LFH-1077)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'In Betrieb nehmen' }));
     await waitFor(() => expect(hinweis()).toBeNull());
   });
+
+  it('Storno mit Material im Raum: der Grund (422) steht im Seitenhinweis (LLH-1249)', async () => {
+    const grundText = 'Storno nicht möglich — noch 2 Material-Posten im BR; erst lösen';
+    server.use(
+      http.delete('/api/einsaetze/1/bereitstellungsraeume/1', () =>
+        HttpResponse.json({ error: grundText }, { status: 422 }),
+      ),
+    );
+    seite(brDetail({ status: 'geplant' }), abgelehnt('x'));
+    await userEvent.click(await screen.findByRole('button', { name: 'Stornieren' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'BR stornieren' }));
+
+    const grund = await within(hinweis()!).findByRole('alert');
+    expect(grund).toHaveTextContent(grundText);
+    expect(grund).toHaveTextContent('Nicht storniert');
+  });
 });
 
 describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {

@@ -171,7 +171,9 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    das Ergebnis, etwa „Danach hier 20, Staffel A 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen; die Zeile nennt danach den Rest.
-4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen. Er bleibt ohne Ort im Einsatz.
+4. Mit „Vom Fahrzeug lösen“ einen Posten wieder abladen. Er bleibt ohne Ort im Einsatz. Die Zeile
+   bleibt als „Gelöst“ an ihrer Stelle, bis Zeiger und Fokus den Bereich verlassen haben, damit kein
+   anderer Knopf unter den Finger rückt. „Rückgängig“ im Hinweis oben holt den Posten zurück.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
 

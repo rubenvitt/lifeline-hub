@@ -7,7 +7,8 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * zugeordnet (die Einheit-Ansicht zeigt ihn nicht mehr, das ETB nennt alt und neu), Decken an der
  * UHS ausgegeben, ein Stromerzeuger auf ein Fahrzeug geladen (Block „Beladung“ und Meldebild),
  * Material im geplanten Bereitstellungsraum zugeordnet und gelöst, 20 von 50 Decken der Einheit
- * als Teilmenge an die UHS geholt (t1hvaqzu). Gewartet wird auf
+ * als Teilmenge an die UHS geholt (t1hvaqzu). Nach dem Lösen rückt nichts unter den Zeiger
+ * (LLH-1254): ein zweiter Klick auf dieselbe Stelle löst keinen anderen Posten. Gewartet wird auf
  * Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
@@ -143,6 +144,10 @@ test('Bereitstellungsraum: im geplanten Raum zuordnen und lösen (LLH-1225)', as
   await expect(zeile(page, 'Lichtmast')).toBeVisible();
   await zeile(page, 'Lichtmast').getByRole('button', { name: 'Lichtmast lösen' }).click();
   await expect(page.getByText('Lichtmast gelöst')).toBeVisible();
+  // Die Zeile hält ihre Stelle als „Gelöst“ (LLH-1254), bis Zeiger und Fokus draußen sind.
+  await expect(sektion.getByRole('button', { name: 'Lichtmast gelöst' })).toBeVisible();
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expect(zeile(page, 'Lichtmast')).toHaveCount(0);
   await expect(sektion.getByText('Kein Material', { exact: true })).toBeVisible();
 });
@@ -178,4 +183,68 @@ test('UHS: Teilmenge hierher – 20 von 50 Rettungsdecken, der Rest bleibt an de
     .toContain(
       'Material «Rettungsdecke» aufgeteilt: 50 → 30 + 20, davon 20: Einheit «Staffel A» → UHS «Turnhalle»',
     );
+});
+
+test('Einheit: zwei Klicks auf dieselbe Stelle lösen nur einen Posten (LLH-1254)', async ({
+  page,
+}) => {
+  const s = await seed(page);
+  const basis = `/api/einsaetze/${s.einsatzId}`;
+  await post(page, `${basis}/material`, {
+    adhoc: { bezeichnung: 'Spineboard' },
+    einheit_id: s.einheitId,
+  });
+  const patches: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'PATCH' && r.url().includes('/material/')) patches.push(r.url());
+  });
+  await page.goto(`/einsaetze/${s.einsatzId}/einheiten/${s.einheitId}`);
+  const paneel = page.getByRole('region', { name: 'Material' });
+  const zeilen = paneel.locator('[data-lfh="material-am-ort-zeile"]');
+  await expect(zeilen).toHaveCount(2);
+  // Gelöst wird die obere Zeile; ohne Halten rückte die untere mit ihrem Knopf an diese Stelle.
+  const oben = (await zeilen.first().textContent())?.includes('Trage') ? 'Trage' : 'Spineboard';
+  const unten = oben === 'Trage' ? 'Spineboard' : 'Trage';
+  const knopf = zeile(page, oben).getByRole('button', { name: `${oben} aus Einheit lösen` });
+  // `mouse.click` nimmt Koordinaten im Bild: der Knopf muss darin liegen.
+  await knopf.scrollIntoViewIfNeeded();
+  const box = await knopf.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box!.x + box!.width / 2;
+  const y = box!.y + box!.height / 2;
+
+  // Erst wenn die Einheit neu geladen ist, stünde ohne Halten der fremde Knopf unter dem Zeiger.
+  const abgleich = page.waitForResponse(async (r) => {
+    if (r.request().method() !== 'GET' || !/\/einheiten$/.test(new URL(r.url()).pathname)) {
+      return false;
+    }
+    const einheiten = (await r.json()) as {
+      id: number;
+      material_mitglieder: { bezeichnung: string }[];
+    }[];
+    const einheit = einheiten.find((e) => e.id === s.einheitId);
+    return einheit != null && !einheit.material_mitglieder.some((m) => m.bezeichnung === oben);
+  });
+  await page.mouse.click(x, y);
+  await expect(page.getByText(`${oben} gelöst`)).toBeVisible();
+  await abgleich;
+  await page.mouse.click(x, y);
+  await page.mouse.dblclick(x, y);
+
+  // An der Stelle steht die träge Marke, nicht der Lösen-Knopf des anderen Postens.
+  const unterDemZeiger = await page.evaluate(
+    ([px, py]) => document.elementFromPoint(px, py)?.closest('button')?.getAttribute('aria-label'),
+    [x, y],
+  );
+  expect(unterDemZeiger).toBe(`${oben} gelöst`);
+  await expect(
+    zeile(page, unten).getByRole('button', { name: `${unten} aus Einheit lösen` }),
+  ).toBeVisible();
+  expect(patches).toHaveLength(1);
+  const material = (await (await page.request.get(`${basis}/material`)).json()) as {
+    bezeichnung: string;
+    einheit_id: number | null;
+  }[];
+  expect(material.find((m) => m.bezeichnung === oben)?.einheit_id).toBeNull();
+  expect(material.find((m) => m.bezeichnung === unten)?.einheit_id).toBe(s.einheitId);
 });

@@ -1037,6 +1037,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_person::auswahl),
         )
         .route(
+            "/api/einsaetze/{id}/personen/transportmittel",
+            get(routes::einsatz_person::transportmittel),
+        )
+        .route(
             "/api/einsaetze/{id}/personen/bestaetiger",
             get(routes::einsatz_person::bestaetiger),
         )

@@ -21,6 +21,20 @@ import { nichtGeladen } from '../offline/lagebildKuerzung';
  * Präzedenz je Person: Verbleib-Art vor UHS vor „offen".
  */
 
+/**
+ * Abgeschlossen (LLH-1332, Spec `patienten-uebergabe`): übergeben, entlassen, in Notunterkunft
+ * oder Verbleib des Leichnams. Der Server leitet `versorgung` ab, der Client rechnet nicht nach.
+ * Standardansichten und Lagezahlen lassen solche Personen weg (`ohneAbgeschlossene`).
+ */
+export function istAbgeschlossen(p: Pick<Person, 'versorgung'>): boolean {
+  return p.versorgung === 'abgeschlossen';
+}
+
+/** Personen in Versorgung (offen oder unterwegs), Reihenfolge unverändert. */
+export function ohneAbgeschlossene<T extends Pick<Person, 'versorgung'>>(alle: readonly T[]): T[] {
+  return alle.filter((p) => !istAbgeschlossen(p));
+}
+
 /** Angetroffen = eine Person, bei der Fundort und Verbleib erwartbar sind. */
 export function istAngetroffen(p: Pick<Person, 'status'>): boolean {
   return p.status === 'erfasst' || p.status === 'betroffen' || p.status === 'verstorben';
@@ -38,6 +52,7 @@ interface Luecken {
 type LueckenFelder = Pick<
   Person,
   | 'status'
+  | 'versorgung'
   | 'aktuelle_verbleib_art'
   | 'aktuelle_uhs_id'
   | 'antreff_ort'
@@ -66,11 +81,16 @@ export function lueckenText(l: Luecken): string | null {
 
 // ── Verbleib ────────────────────────────────────────────────────────────────────────────
 
-type VerbleibKlasse = VerbleibArt | 'uhs' | 'offen';
+type VerbleibKlasse = VerbleibArt | 'unterwegs' | 'uhs' | 'offen';
 
+/**
+ * Klasse des Verbleibs: ein Eigentransport ohne Übergabe ist „unterwegs“ (LLH-1332), sonst die
+ * Art; ohne Art die UHS, sonst offen.
+ */
 export function verbleibKlasse(
-  p: Pick<Person, 'aktuelle_verbleib_art' | 'aktuelle_uhs_id'>,
+  p: Pick<Person, 'aktuelle_verbleib_art' | 'aktuelle_uhs_id' | 'versorgung'>,
 ): VerbleibKlasse {
+  if (p.versorgung === 'unterwegs') return 'unterwegs';
   if (p.aktuelle_verbleib_art != null) return p.aktuelle_verbleib_art;
   if (p.aktuelle_uhs_id != null) return 'uhs';
   return 'offen';
@@ -78,6 +98,7 @@ export function verbleibKlasse(
 
 /** Exhaustiv über `VerbleibArt`: eine neue Art bricht den Typcheck statt still zu fehlen. */
 const VERBLEIB_LABEL: Record<Exclude<VerbleibKlasse, 'uhs'>, string> = {
+  unterwegs: 'Unterwegs',
   transport: 'Transport',
   notunterkunft: 'Notunterkunft',
   entlassung: 'entlassen',
@@ -87,7 +108,7 @@ const VERBLEIB_LABEL: Record<Exclude<VerbleibKlasse, 'uhs'>, string> = {
 };
 
 /** Wort einer Verbleib-Art — Rückfall der Anzeige, wenn die Kurzform fehlt. */
-export function verbleibLabel(art: VerbleibArt): string {
+export function verbleibLabel(art: VerbleibArt | 'unterwegs'): string {
   return VERBLEIB_LABEL[art];
 }
 
@@ -132,7 +153,8 @@ export function verbleibZaehlung(
 }
 
 /**
- * „Transportiert / offen" (Lage-Dashboard, Fuß des Sichtungspaneels).
+ * „Transportiert / offen" (Einsatzbericht; die Lage zählt seit LLH-1332 über
+ * {@link versorgungsBilanz}).
  *  · transportiert — angetroffen, Verbleib-Art `transport`, Status NICHT `angemeldet` (eine
  *    Voranmeldung ist kein erledigter Transport; ohne Status zählt der Transport).
  *  · offen — dieselbe Lücke „Verbleib offen" wie auf der Betroffenen-Seite ({@link lueckenVon}).
@@ -140,7 +162,11 @@ export function verbleibZaehlung(
 export function transportBilanz(
   alle: readonly Pick<
     Person,
-    'status' | 'aktuelle_verbleib_art' | 'aktueller_verbleib_status' | 'aktuelle_uhs_id'
+    | 'status'
+    | 'versorgung'
+    | 'aktuelle_verbleib_art'
+    | 'aktueller_verbleib_status'
+    | 'aktuelle_uhs_id'
   >[],
 ): { transportiert: number; offen: number } {
   let transportiert = 0;
@@ -148,10 +174,36 @@ export function transportBilanz(
   for (const p of alle) {
     if (!istAngetroffen(p)) continue;
     const k = verbleibKlasse(p);
-    if (k === 'transport' && p.aktueller_verbleib_status !== 'angemeldet') transportiert++;
+    if ((k === 'transport' || k === 'unterwegs') && p.aktueller_verbleib_status !== 'angemeldet')
+      transportiert++;
     else if (k === 'offen') offen++;
   }
   return { transportiert, offen };
+}
+
+/**
+ * „Unterwegs / offen / abgeschlossen“ (Lage-Dashboard, Fuß des Sichtungspaneels; LLH-1332, Spec
+ * `betroffene-lagedaten`) über die angetroffenen Personen:
+ *  · unterwegs — Eigentransport ohne quittierte Übergabe;
+ *  · offen — dieselbe Lücke „Verbleib offen" wie auf der Betroffenen-Seite ({@link lueckenVon});
+ *  · abgeschlossen — übergeben, entlassen, Notunterkunft, Verbleib des Leichnams.
+ */
+export function versorgungsBilanz(
+  alle: readonly Pick<
+    Person,
+    'status' | 'versorgung' | 'aktuelle_verbleib_art' | 'aktuelle_uhs_id'
+  >[],
+): { unterwegs: number; offen: number; abgeschlossen: number } {
+  let unterwegs = 0;
+  let offen = 0;
+  let abgeschlossen = 0;
+  for (const p of alle) {
+    if (!istAngetroffen(p)) continue;
+    if (p.versorgung === 'abgeschlossen') abgeschlossen++;
+    else if (p.versorgung === 'unterwegs') unterwegs++;
+    else if (verbleibKlasse(p) === 'offen') offen++;
+  }
+  return { unterwegs, offen, abgeschlossen };
 }
 
 // ── Offene Felder ───────────────────────────────────────────────────────────────────────
