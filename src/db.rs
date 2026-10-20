@@ -9775,13 +9775,13 @@ mod tests {
         );
     }
 
-    // --- LLH-1043: Kreisangaben an der Zone (0230) ---
+    // --- LLH-1043: Kreisangaben an der Zone (0231) ---
 
     /// `lage_zone` bekommt drei nullable Kreisspalten; Bestandszeilen bleiben unverändert und
     /// lesen sich als freie Fläche (alle drei NULL).
     #[tokio::test]
-    async fn migration_0230_lage_zone_kreis_haengt_drei_nullable_spalten_an() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 229).await;
+    async fn migration_0231_lage_zone_kreis_haengt_drei_nullable_spalten_an() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 230).await;
         let (e, b) = bild_grundlage(&pool).await;
         let poly =
             r#"{"type":"Polygon","coordinates":[[[8.6,50.1],[8.7,50.1],[8.7,50.2],[8.6,50.1]]]}"#;
@@ -9795,7 +9795,7 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        migriere_bis(&pool, 230).await;
+        migriere_bis(&pool, 231).await;
 
         let spalten: Vec<(String, String, i64)> = sqlx::query_as(
             "SELECT name, type, \"notnull\" FROM pragma_table_info('lage_zone') \
