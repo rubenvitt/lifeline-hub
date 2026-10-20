@@ -981,6 +981,8 @@ export function lagekartePfad(
         ? `${opts.zeichnen.typ}:${opts.zeichnen.form}`
         : opts.zeichnen.typ
       : undefined,
+    // Bezug des Zeichnen-Auftrags (LLH-1069): die neue Fläche gehört diesem Evakuierungsbezirk.
+    bezirk: opts.zeichnen?.bezirk,
     // Kartenmittelpunkt (Koordinatensprung der Sprungpalette): die Karte fliegt hin und räumt den
     // Parameter. Fünf Nachkommastellen ≙ rund 1 m.
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
@@ -1091,6 +1093,11 @@ export type ZeichnenForm = 'flaeche' | 'linie';
 export interface ZeichnenAuftrag {
   typ: ZoneTyp;
   form?: ZeichnenForm;
+  /**
+   * `&bezirk=<id>` (LLH-1069): die Fläche gehört diesem Evakuierungsbezirk; nur am Typ
+   * `evakuierungsbezirk` ({@link parseZeichnenBezug}). Ob es den Bezirk gibt, prüft die Lagekarte.
+   */
+  bezirk?: number;
 }
 
 /**
@@ -1127,6 +1134,24 @@ export function parseZeichnenAuftrag(wert: string | null | undefined): ZeichnenA
   if (form === undefined) return { typ: typ as ZoneTyp };
   if (!istEigenerSchluessel(ZEICHNEN_FORM_ERLAUBT, form)) return null;
   return { typ: typ as ZoneTyp, form: form as ZeichnenForm };
+}
+
+/**
+ * Ergänzt einen Zeichnen-Auftrag um seinen Bezug `?bezirk=<id>` (LLH-1069). Ohne `bezirk` bleibt der
+ * Auftrag, wie er ist. Ein Bezug gilt nur am Typ `evakuierungsbezirk` und nur mit gültiger Kennung;
+ * sonst liefert die Funktion `null` und verwirft damit den GANZEN Auftrag — eine Fläche ohne den
+ * verlangten Bezug zu zeichnen, wäre still etwas anderes als bestellt. Ein Bezug ohne Auftrag ist
+ * keiner. Getrennt von {@link parseZeichnenAuftrag}, damit dessen Vertrag unberührt bleibt.
+ */
+export function parseZeichnenBezug(
+  auftrag: ZeichnenAuftrag | null,
+  bezirk: string | null | undefined,
+): ZeichnenAuftrag | null {
+  if (!auftrag) return null;
+  if (bezirk == null) return auftrag;
+  if (auftrag.typ !== 'evakuierungsbezirk') return null;
+  const id = parseRouteId(bezirk);
+  return id == null ? null : { ...auftrag, bezirk: id };
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

@@ -989,6 +989,107 @@ describe('useKartenInteraktion — Serienmodus Zone (LFH-332)', () => {
   });
 });
 
+/**
+ * Zeichnen mit Bezirk (LLH-1069): die Zone entsteht in EINEM POST mit Bezeichnung und Zuordnung,
+ * danach steht die Rückmeldung „Gebiet … gespeichert“ statt einer Serie.
+ */
+describe('useKartenInteraktion — Gebiet eines Bezirks zeichnen (LLH-1069)', () => {
+  const UFER = { id: 5, bezeichnung: 'Uferstraße 12–40' };
+  const ENTWURF = { typ: 'evakuierungsbezirk' as const, modus: 'polygon' as const, bezirk: UFER };
+
+  it('ein POST mit label und evakuierungsbezirk_id, danach die Rückmeldung — keine Serie', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const erfolg = vi.fn();
+    const client = neuerQueryClient();
+    const spion = vi.spyOn(client, 'invalidateQueries');
+    const { result } = renderHook(
+      () =>
+        useKartenInteraktion({
+          einsatzId: 1,
+          darfSchreiben: true,
+          waehlbarRef: { current: [] },
+          aktiveAnsichtId: 2,
+          beginneHandlung: () => vi.fn(),
+          verwirfHandlung: vi.fn(),
+          erfolg,
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      },
+    );
+    act(() => result.current.onZoneZeichnenStart(ENTWURF));
+    // Serie an (Vorgabe) — mit Bezug zählt sie nicht.
+    expect(result.current.zoneSerie).toBe(true);
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+    expect(lagezonenApi.legeZoneAn).toHaveBeenCalledWith(1, {
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      geometrie: JSON.stringify(POLYGON),
+      label: 'Uferstraße 12–40',
+      farbe: null,
+      ansicht_id: 2,
+      evakuierungsbezirk_id: 5,
+    });
+    await waitFor(() => expect(result.current.gebietGezeichnet).toEqual(UFER));
+    expect(erfolg).toHaveBeenCalledWith('Zone angelegt');
+    expect(result.current.zoneEntwurf).toBeNull();
+    expect(result.current.zoneSerieAnzahl).toBe(0);
+    // Die Rückmeldung ist kein exklusiver Modus: die Karte ist wieder frei bedienbar.
+    expect(result.current.exklusiverModusAktiv).toBe(false);
+    // Die Flächenzahl am Bezirk: der eigene Abruf wirkt auch bei gestörtem Strom.
+    const schluessel = spion.mock.calls.map((c) =>
+      JSON.stringify((c[0] as { queryKey: unknown }).queryKey),
+    );
+    expect(schluessel).toContain(JSON.stringify(einsatzKeys.evakuierung(1)));
+
+    act(() => result.current.onGebietGezeichnetSchliessen());
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+
+  it('ohne Bezug geht keine Zuordnung und keine Bezeichnung hinaus', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart({ typ: 'evakuierungsbezirk', modus: 'polygon' }));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1));
+    const body = (lagezonenApi.legeZoneAn.mock.calls[0] as unknown[])[1] as Record<string, unknown>;
+    expect(body).not.toHaveProperty('evakuierungsbezirk_id');
+    expect(body).not.toHaveProperty('label');
+    await waitFor(() => expect(result.current.zoneSerieAnzahl).toBe(1));
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+
+  it('scheitert das Anlegen, gibt es keine Rückmeldung „gespeichert“', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    lagezonenApi.legeZoneAn.mockImplementationOnce(() => Promise.reject(new Error('409')));
+    const fehler = vi.fn();
+    const { result } = rendere(fehler);
+    act(() => result.current.onZoneZeichnenStart(ENTWURF));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(fehler).toHaveBeenCalled());
+    await waitFor(() => expect(result.current.zoneEntwurf).toBeNull());
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+
+  it('ein anderer Modus verdrängt die Rückmeldung', async () => {
+    lagezonenApi.legeZoneAn.mockClear();
+    const { result } = rendere();
+    act(() => result.current.onZoneZeichnenStart(ENTWURF));
+    act(() => result.current.onZoneGezeichnet(POLYGON));
+    act(() => result.current.bestaetigungSpeichern());
+    await waitFor(() => expect(result.current.gebietGezeichnet).toEqual(UFER));
+    act(() => result.current.onMessenStart('strecke'));
+    expect(result.current.gebietGezeichnet).toBeNull();
+  });
+});
+
 describe('useKartenInteraktion — Messen (LFH-616)', () => {
   it('wechselt die Form ohne Umweg über idle und endet nur auf eigenes Beenden', () => {
     const { result } = rendere();

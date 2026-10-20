@@ -227,6 +227,22 @@ Räumungszustand und den Stand „evakuiert N von M“ zeigen und einen Sprung i
 anbieten, der die Detailseite des Bezirks öffnet. Die Beschriftung einer zugeordneten Zone auf der
 Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
+Vom Bezirk zur Fläche (LLH-1069): Der Dialog „Evakuierungsbezirk anlegen“ MUST sichtbar die Wahl
+„Gebiet auf der Lagekarte“ mit „Keins“ und „Fläche zeichnen“ tragen; Vorgabe ist „Fläche zeichnen“,
+wenn die Person die Lagekarte nutzen darf, sonst „Keins“, und „Fläche zeichnen“ MUST dann gesperrt
+mit sichtbarem Grund stehen. Mit „Fläche zeichnen“ MUST die Oberfläche nach erfolgreichem Anlegen die
+Lagekarte mit `zeichnen=evakuierungsbezirk&bezirk=<bezirk-id>` öffnen; mit „Keins“ MUST sie auf der
+Evakuierungsseite bleiben. Die Evakuierungsseite MUST jedem Bezirk für Personen mit Schreibrecht im
+Menü „Gebiet zeichnen“ (ohne Fläche) bzw. „Weitere Teilfläche zeichnen“ (mit Fläche) anbieten, die
+Detailseite dasselbe im Gebiet; beide führen auf dieselbe Adresse. Die Karte MUST für diesen Auftrag
+den Zeichenmodus einer Fläche vom Typ Evakuierungsbezirk betreten und die neue Zone in EINER Anlage
+mit der Bezeichnung des Bezirks und seiner Zuordnung anlegen. Danach MUST die Karte „Zurück zu
+Bezirk <Bezeichnung>“ anbieten, das die Detailseite des Bezirks öffnet. Ein Abbruch MUST den Bezirk
+ohne Fläche stehen lassen. Ist der Bezirk unbekannt, aus einem anderen Einsatz oder storniert, fehlt
+der Person das Schreibrecht oder der Lesezugriff auf das Modul Evakuierung, MUST kein Zeichenmodus
+starten und keine Zuordnung entstehen; der Auftrag MUST aus der Adresse entfernt werden. Die
+Kennzahl „Evakuiert“ und die Lagekennzahl MUST davon unberührt bleiben.
+
 #### Scenario: Aus dem Modul auf die Karte
 - **WHEN** auf der Evakuierungsseite am Bezirk „Uferstraße 12–40“ „Auf Karte zeigen“ gewählt wird
 - **THEN** öffnet die Lagekarte mit einer Zone dieses Bezirks ausgewählt, und die Adresse enthält danach kein `evakuierungsbezirk` mehr
@@ -246,6 +262,34 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 #### Scenario: Räumungszustand auf der Fläche
 - **WHEN** der Räumungszustand des Bezirks auf `laeuft` wechselt
 - **THEN** trägt die Beschriftung seiner Zonen „Räumung: läuft“
+
+#### Scenario: Bezirk mit Gebiet anlegen
+- **WHEN** eine Person mit Schreibrecht den Bezirk „Deichweg 1–9“ mit „Fläche zeichnen“ anlegt, auf der Karte eine Fläche zeichnet und speichert
+- **THEN** trägt die neue Zone die Zuordnung zu „Deichweg 1–9“ und dessen Bezeichnung, der Bezirk hat eine Fläche, und die Karte bietet „Zurück zu Bezirk Deichweg 1–9“ an
+
+#### Scenario: Bezirk ohne Gebiet anlegen
+- **WHEN** der Bezirk mit „Keins“ angelegt wird
+- **THEN** bleibt die Evakuierungsseite stehen, und es entsteht keine Zone
+
+#### Scenario: Zeichnen abgebrochen
+- **WHEN** nach dem Anlegen mit „Fläche zeichnen“ das Zeichnen auf der Karte abgebrochen wird
+- **THEN** bleibt der Bezirk ohne Fläche bestehen
+
+#### Scenario: Weitere Teilfläche
+- **WHEN** an einem Bezirk mit einer Fläche „Weitere Teilfläche zeichnen“ gewählt und eine Fläche gespeichert wird
+- **THEN** hat der Bezirk zwei Flächen
+
+#### Scenario: Unbrauchbarer, fremder oder stornierter Bezirk im Auftrag
+- **WHEN** die Lagekarte mit `zeichnen=evakuierungsbezirk&bezirk=abc`, mit einem Bezirk eines anderen Einsatzes oder mit einem stornierten Bezirk geöffnet wird
+- **THEN** startet kein Zeichenmodus, und `zeichnen` und `bezirk` sind aus der Adresse verschwunden
+
+#### Scenario: Ohne Modul Evakuierung
+- **WHEN** eine Person mit Schreibrecht auf die Karte, aber ohne Lesezugriff auf das Modul Evakuierung den Auftrag öffnet
+- **THEN** startet kein Zeichenmodus, und der Auftrag ist aus der Adresse verschwunden
+
+#### Scenario: Lagekarte gesperrt beim Anlegen
+- **WHEN** eine Person die Lagekarte nicht nutzen darf und den Dialog „Evakuierungsbezirk anlegen“ öffnet
+- **THEN** ist „Keins“ gewählt und „Fläche zeichnen“ gesperrt mit Grund
 
 ### Requirement: Lage-Snapshot und Schwärzung
 

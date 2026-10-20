@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Typography } from 'antd';
+import { Space, Typography } from 'antd';
 import { useMemo, type ReactNode } from 'react';
 import { listeZonen } from '../api/lagezonen';
 import { einsatzKeys } from '../api/queryKeys';
@@ -24,21 +24,25 @@ export function flaechenText(n: number): string {
  * - Die Geometrien kommen aus der Zonenliste der Lagekarte (`einsatzKeys.zonen`). Sie gehört dem
  *   Modul Lagekarte: ohne dessen Freigabe wird sie nicht abgerufen, das Paneel nennt nur die Zahl
  *   der Flächen und der Sprung steht gesperrt mit Grund (LFH-888).
- * - Ohne Fläche ein Leerzustand in Worten, ohne Knopf. `leerAktion` ist die Stelle für „Gebiet
- *   zeichnen“ (LLH-1069); heute bleibt sie leer.
+ * - Ohne Fläche ein Leerzustand in Worten; `leerAktion` trägt dort „Gebiet zeichnen“ (LLH-1069).
+ *   Mit Fläche steht `zeichnenAktion` („Weitere Teilfläche zeichnen“) neben dem Sprung im Fuß.
+ *   Beide gibt nur die Seite mit Schreibrecht hinein.
  */
 export default function BezirkGebiet({
   einsatzId,
   bezirk,
   karteGesperrt,
   leerAktion,
+  zeichnenAktion,
 }: {
   einsatzId: number;
   bezirk: Evakuierungsbezirk;
   /** Modul Lagekarte für diese Person gesperrt (`useSprungSperre`). */
   karteGesperrt: boolean;
-  /** Handlung im Leerzustand (LLH-1069: Gebiet zeichnen). */
+  /** Handlung im Leerzustand (LLH-1069: „Gebiet zeichnen“). */
   leerAktion?: ReactNode;
+  /** Handlung neben dem Sprung, wenn es schon Flächen gibt (LLH-1069: „Weitere Teilfläche zeichnen“). */
+  zeichnenAktion?: ReactNode;
 }) {
   const { token, rollen } = useRollen();
   const mitFlaeche = bezirk.flaechen > 0;
@@ -52,7 +56,7 @@ export default function BezirkGebiet({
     [zonenQuery.data, bezirk.id],
   );
 
-  const hinweis = (text: string) => (
+  const hinweis = (text: string, aktion?: ReactNode) => (
     <div
       data-lfh="bezirk-gebiet-hinweis"
       style={{
@@ -67,13 +71,13 @@ export default function BezirkGebiet({
       }}
     >
       <span>{text}</span>
-      {leerAktion}
+      {aktion}
     </div>
   );
 
   let inhalt: ReactNode;
   if (!mitFlaeche) {
-    inhalt = hinweis('Kein Gebiet auf der Lagekarte');
+    inhalt = hinweis('Kein Gebiet auf der Lagekarte', leerAktion);
   } else if (karteGesperrt) {
     inhalt = (
       <Typography.Text>{`${flaechenText(bezirk.flaechen)} auf der Lagekarte`}</Typography.Text>
@@ -102,12 +106,15 @@ export default function BezirkGebiet({
       koerperPolster
       fuss={
         mitFlaeche ? (
-          <SprungKnopf
-            to={lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id })}
-            gesperrt={karteGesperrt}
-          >
-            Auf Lagekarte öffnen
-          </SprungKnopf>
+          <Space wrap size="middle">
+            <SprungKnopf
+              to={lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id })}
+              gesperrt={karteGesperrt}
+            >
+              Auf Lagekarte öffnen
+            </SprungKnopf>
+            {zeichnenAktion}
+          </Space>
         ) : undefined
       }
     >

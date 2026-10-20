@@ -1,6 +1,6 @@
 import { App, Modal, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { aendereBezirk, legeBezirkAn, nimmStandZurueck, storniereBezirk } from '../api/evakuierung';
@@ -16,6 +16,7 @@ import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useAuth } from '../auth/AuthContext';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseStandOfflineFaehig } from '../offline/schreiben';
+import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { lagekartePfad } from '../routing/deeplinks';
 import { raeumungszustand } from '../theme/statusFarben';
 import {
@@ -26,6 +27,7 @@ import {
 } from './BetreuungDialoge';
 import type { BezirkAktion } from './BezirkTabelle';
 import { personenZahl } from './betreuungText';
+import { gebietZeichnenPfad } from './gebietZeichnen';
 
 /**
  * Welcher Dialog offen ist — einer zur Zeit, jeder frisch montiert (`initialValues`). Der Datensatz
@@ -41,12 +43,12 @@ type Dialog =
 
 export interface BezirkHandlungen {
   /**
-   * Einstieg „Evakuierungsbezirk anlegen". Eigener Einstieg, damit das Anlegen mit Gebiet (Wahl
-   * oder Zeichnung einer Fläche) hier einhängen kann, ohne die Seite umzubauen.
+   * Einstieg „Evakuierungsbezirk anlegen". Mit der Gebietswahl „Fläche zeichnen“ (LLH-1069) geht es
+   * nach dem Anlegen auf die Lagekarte, im Zeichenmodus für eine Fläche des neuen Bezirks.
    */
   oeffneAnlegen: () => void;
   oeffneStand: (bezirk: Evakuierungsbezirk) => void;
-  /** Menü einer Zeile (`BezirkTabelle`): Karte, Räumung, Stornieren. */
+  /** Menü einer Zeile (`BezirkTabelle`): Karte, Gebiet zeichnen, Räumung, Stornieren. */
   bezirkAktion: (aktion: BezirkAktion, bezirk: Evakuierungsbezirk) => void;
   /**
    * Ein Räumungsschritt der Detailseite (LLH-1076, design.md D3): `PATCH { raeumung }` gegen den
@@ -105,6 +107,15 @@ export function useBezirkHandlungen({
   const qc = useQueryClient();
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const schliessen = useCallback(() => setDialog(null), []);
+  // Gebiet nach dem Anlegen (LLH-1069): die Lagekarte muss frei sein. Gesperrt steht die Wahl
+  // „Fläche zeichnen“ im Dialog gesperrt mit Grund.
+  const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
+  /**
+   * Der eben angelegte Bezirk, dessen Fläche gezeichnet werden soll — gesetzt nach dem Erfolg des
+   * Anlegens, verbraucht beim Schließen des Dialogs. Ein Ref, weil die Erfassungs-Hülle den
+   * Dialog erst nach `onErfassen` schließt; der Sprung kommt danach, nicht mitten im Absenden.
+   */
+  const zeichnenNachAnlegen = useRef<number | null>(null);
 
   // Die Abschnitte braucht nur, wer anlegen oder bearbeiten darf.
   const abschnitteQuery = useQuery({
@@ -215,8 +226,15 @@ export function useBezirkHandlungen({
 
   const oeffneAnlegen = useCallback(() => {
     resetAnlegen();
+    zeichnenNachAnlegen.current = null;
     setDialog({ art: 'anlegen' });
   }, [resetAnlegen]);
+  const schliesseAnlegen = useCallback(() => {
+    const bezirkId = zeichnenNachAnlegen.current;
+    zeichnenNachAnlegen.current = null;
+    setDialog(null);
+    if (bezirkId != null) navigate(gebietZeichnenPfad(einsatzId, bezirkId));
+  }, [navigate, einsatzId]);
   const oeffneStand = useCallback(
     (bezirk: Evakuierungsbezirk) => {
       resetStand();
@@ -229,6 +247,11 @@ export function useBezirkHandlungen({
       // Sprung auf die Karte; dort wählt die Seite eine Fläche und räumt den Parameter.
       if (aktion === 'karte') {
         navigate(lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id }));
+        return;
+      }
+      // Zeichenmodus auf der Karte, Bezeichnung und Zuordnung vorbelegt (LLH-1069).
+      if (aktion === 'zeichnen') {
+        navigate(gebietZeichnenPfad(einsatzId, bezirk.id));
         return;
       }
       if (aktion === 'stornieren') {
@@ -268,10 +291,14 @@ export function useBezirkHandlungen({
       {dialog?.art === 'anlegen' && (
         <BezirkAnlegenDialog
           abschnitte={abschnitte}
+          karteGesperrt={karteGesperrt}
           laeuft={anlegenMut.isPending}
           fehler={anlegenMut.error}
-          onErfassen={(body) => anlegenMut.mutateAsync(body)}
-          onSchliessen={schliessen}
+          onErfassen={async (body, gebiet) => {
+            const b = await anlegenMut.mutateAsync(body);
+            zeichnenNachAnlegen.current = gebiet === 'flaeche' && !karteGesperrt ? b.id : null;
+          }}
+          onSchliessen={schliesseAnlegen}
         />
       )}
       {dialog?.art === 'aufheben' && (
