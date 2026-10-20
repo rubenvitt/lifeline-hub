@@ -2,30 +2,34 @@
 titel: Wetter und Pegel
 gruppen: [fuehrung]
 reihenfolge: 240
-quellen: [frontend/src/pages/WetterPegelPage.tsx, frontend/src/wetter/PegelPaneel.tsx, frontend/src/wetter/WetterPaneele.tsx, frontend/src/wetter/wetterStand.ts, frontend/src/wetter/unwetter.ts, frontend/src/wetter/useUnwetterHinweis.ts, frontend/src/wetter/UnwetterHinweis.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungsEinstellungen.ts, frontend/src/pages/einstellungen/EinsatzPegel.tsx, frontend/src/pages/einstellungen/PegelPrognoseModal.tsx, frontend/src/pegel/pegelKennzahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/WetterPegelPage.tsx, frontend/src/wetter/PegelPaneel.tsx, frontend/src/wetter/WetterPaneele.tsx, frontend/src/wetter/wetterStand.ts, frontend/src/wetter/unwetter.ts, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/useUnwetterHinweis.ts, frontend/src/wetter/UnwetterHinweis.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungsEinstellungen.ts, frontend/src/pages/einstellungen/EinsatzPegel.tsx, frontend/src/pages/einstellungen/PegelPrognoseModal.tsx, frontend/src/pegel/pegelKennzahl.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
 
-„Wetter & Pegel“ zeigt, was von außen auf den Einsatz wirkt: die Wasserstände der maßgeblichen
-Pegel mit Verlauf und Prognose, die aktuellen Wetterbedingungen am Einsatzort, die amtlichen
-Warnungen des Deutschen Wetterdienstes und die Vorhersage für 24 Stunden. Welche Pegel maßgeblich
-sind, legt die Führung in den Einstellungen des Einsatzes fest. Eine neue Unwetterwarnung meldet
-die App von selbst.
+„Wetter & Pegel“ zeigt, was von außen auf den Einsatz wirkt: die amtlichen Warnungen des
+Deutschen Wetterdienstes, die aktuellen Wetterbedingungen am Einsatzort, die Vorhersage für 24
+Stunden und, in einer Hochwasserlage, die Wasserstände der maßgeblichen Pegel mit Verlauf und
+Prognose. Welche Pegel maßgeblich sind, legt die Führung in den Einstellungen des Einsatzes fest.
+Eine neue Unwetterwarnung meldet die App von selbst.
 
 ## Abläufe
 
 ### Wetter und Pegel ansehen
 
 1. Im Bereich „Lage“ „Wetter & Pegel“ öffnen.
-2. Im Paneel „Pegel“ je Station den Wasserstand, den Trend („steigend“, „gleichbleibend“), die
-   Zeit der Messung, eine erfasste Prognose und den Verlauf der letzten 24 Stunden lesen.
+2. Oben „Warnungen (DWD)“ lesen.
+3. Ist ein maßgeblicher Pegel festgelegt, folgt das Paneel „Pegel“: je Station der Wasserstand,
+   der Trend („steigend“, „gleichbleibend“), die Zeit der Messung, eine erfasste Prognose und der
+   Verlauf der letzten 24 Stunden.
 
-   ![Seite „Wetter & Pegel“ mit zwei Pegeln, aktuellen Bedingungen, Warnungen und dem Beginn der Vorhersage](../bilder/wetter-pegel/wetter-pegel.png)
+   ![Seite „Wetter & Pegel“ mit Warnungen, zwei Pegeln, aktuellen Bedingungen und dem Beginn der Vorhersage](../bilder/wetter-pegel/wetter-pegel.png)
 
-3. Darunter „Aktuelle Bedingungen“ (Messung der nächsten Station), „Warnungen (DWD)“ und
-   „Vorhersage 24 h“ lesen.
-4. Um die maßgeblichen Pegel zu ändern, „Pegel festlegen“ im Seitenkopf wählen. Es öffnen sich die
+4. Darunter „Aktuelle Bedingungen“ (Messung der nächsten Station) und „Vorhersage 24 h“ lesen.
+   Ohne festgelegten Pegel stehen sie direkt unter den Warnungen, und ganz unten steht die Zeile
+   „Pegel“ mit „kein Pegel festgelegt“.
+5. Um die maßgeblichen Pegel zu ändern, „Pegel festlegen“ im Seitenkopf wählen (auf dem Handy
+   unter „Weitere“) oder in der Zeile „Pegel“ „Zu Einstellungen › Pegel“. Es öffnen sich die
    Einstellungen des Einsatzes bei „Pegel“.
 
 ### Eine Warnung im Wortlaut lesen
@@ -69,6 +73,17 @@ die App von selbst.
 
 ## Hintergrund
 
+### Wetter vorn, Pegel nach Entscheidung
+
+Wetter betrifft fast jede Lage, auch den Schutz der Einsatzkräfte und Großveranstaltungen; ein
+Pegel ist nur in einer Hochwasserlage die führende Größe. Deshalb stehen die amtlichen Warnungen
+immer oben, und der Pegel steht nur dann gleich darunter, wenn die Führung einen maßgeblichen
+Pegel festgelegt hat. Dieselbe Festlegung belegt im Lagebild den ersten Platz der Kennzahlen
+(Kapitel [Lagebild](lagebild.md)) und entscheidet, ob die Übernahme „Aus dem Lagebild
+übernehmen“ im Lagevortrag einen Teil „Pegel“ enthält (Kapitel [Lageberichte](lageberichte.md)).
+Wird ein Pegel festgelegt, während die Seite offen ist, bleibt die Reihenfolge stehen, und der
+Pegel erscheint ganz unten; beim nächsten Öffnen steht er oben.
+
 ### Pegel und Prognose
 
 - Höchstens fünf Pegel sind maßgeblich; danach meldet die Liste „Maximum erreicht“.
@@ -105,8 +120,10 @@ dieselbe Warnung nur einmal. Wer unter „Benachrichtigungen“ den Schalter „
 ausschaltet, bekommt den Hinweis nicht mehr (Kapitel
 [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)); die Warnung steht weiter auf der
 Seite. Kommen viele Hinweise zugleich, fasst die App sie wie alle Benachrichtigungen zu einem
-Sammelhinweis zusammen. Warnungen geringer und mäßiger Stufe stehen nur auf der Seite. Der
-Beginn einer angekündigten Unwetterwarnung steht zudem im Überblick unter „Nächste Marken“.
+Sammelhinweis zusammen. Warnungen geringer und mäßiger Stufe lösen keinen Hinweis aus. Der
+Beginn einer angekündigten Unwetterwarnung steht zudem im Überblick unter „Nächste Marken“. Jede
+geltende oder angekündigte Warnung, gleich welcher Stufe, steht außerdem still als Marke im
+Seitenkopf des Lagebilds (Kapitel [Lagebild](lagebild.md)).
 
 ### Rechte und ohne Netz
 

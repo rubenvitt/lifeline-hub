@@ -232,6 +232,8 @@ mod tests {
             NeueDaten {
                 typ: "sachschaden",
                 ausmass: "gering",
+                gefahrenart: None,
+                schadensgrad: None,
                 ort: "Hauptstr. 1",
                 beschreibung: None,
                 lat: None,

@@ -791,6 +791,69 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
   });
 });
 
+describe('Inspector: „Abschnitt fokussieren“ (LLH-1057)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  const abschnitt = {
+    schluessel: 'abschnitt-3',
+    typ: 'abschnitt',
+    id: 3,
+    lat: 50.005,
+    lon: 8.005,
+    label: 'EA Nord',
+    farbe: '#722ed1',
+  } as KarteMarker;
+
+  it('steht an einem Abschnitt, auch ohne Schreibrecht, und meldet die Wahl', async () => {
+    const onFokussieren = vi.fn();
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={abschnitt}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        onAbschnittFokussieren={onFokussieren}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abschnitt fokussieren' }));
+    expect(onFokussieren).toHaveBeenCalledTimes(1);
+  });
+
+  it('fehlt ohne Handler (Abschnitt schon im Fokus) und an jedem anderen Objekt', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={abschnitt}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Abschnitt fokussieren' })).toBeNull();
+  });
+
+  it('fehlt an einer Einheit, selbst mit Handler', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={{ ...abschnitt, schluessel: 'einheit-3', typ: 'einheit' }}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        onAbschnittFokussieren={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Abschnitt fokussieren' })).toBeNull();
+  });
+});
+
 describe('Inspector für Tiere (LLH-1123)', () => {
   beforeEach(() => {
     server.use(

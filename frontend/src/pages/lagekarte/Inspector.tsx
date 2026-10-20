@@ -45,6 +45,12 @@ interface InspectorProps {
   ) => void;
   /** Rohlisten für das Datenraster (Stärke, Abschnitt, Status …); ohne Angabe nur Ort. */
   roh?: AuswahlRoh;
+  /**
+   * „Abschnitt fokussieren“ (LLH-1057): nur an einem Abschnitt. Ohne Handler fehlt der Knopf, etwa
+   * wenn genau dieser Abschnitt schon im Fokus steht — dann trägt das Fuß-Band „Fokus aufheben“.
+   * Darstellung, kein Schreiben: auch ohne Schreibrecht und im Historien-Modus.
+   */
+  onAbschnittFokussieren?: () => void;
 }
 
 const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'];
@@ -146,6 +152,7 @@ export default function Inspector({
   onVerortungLoeschen,
   onSymbolAendern,
   roh = LEERE_ROHDATEN,
+  onAbschnittFokussieren,
 }: InspectorProps) {
   const { token, rollen } = useRollen();
   const { formatZeitKurz } = useAnzeigeKonventionen();
@@ -267,6 +274,12 @@ export default function Inspector({
           und „ETB" zählen als eine Zeile Navigation, nicht als Aktionen. `size="middle"`: Rot
           steht nicht bündig unter Blau. */}
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        {/* Fokus (LLH-1057): eine Handlung an der Karte, keine Änderung am Abschnitt. */}
+        {marker.typ === 'abschnitt' && onAbschnittFokussieren && (
+          <Button block onClick={onAbschnittFokussieren}>
+            Abschnitt fokussieren
+          </Button>
+        )}
         {/* Umbrechende Zeile: in der Handschuh-Stufe bricht „ETB ↗" unter den Fachmodul-Knopf,
             statt abgeschnitten zu werden. */}
         <div

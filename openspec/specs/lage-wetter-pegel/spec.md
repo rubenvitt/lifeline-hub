@@ -33,6 +33,32 @@ modul-los, weil Dashboard und Überblick sie ebenfalls lesen.
 - **WHEN** eine Person den Wetter-Endpunkt eines Einsatzes aufruft, den es nicht gibt
 - **THEN** antwortet das System mit 404
 
+### Requirement: Reihenfolge der Modulseite
+
+Die Modulseite SHALL die amtlichen Warnungen zuerst zeigen. Ist am Einsatz ein maßgeblicher Pegel
+festgelegt (dieselbe Entscheidung wie die Pegel-Kennzahl im Lagebild), MUST die Reihenfolge
+Warnungen, Pegel, aktuelle Bedingungen, Vorhersage sein. Ohne diese Entscheidung MUST die
+Reihenfolge Warnungen, aktuelle Bedingungen, Vorhersage sein, und der Pegel MUST als eine Zeile
+zuletzt stehen. Der Seitenkopf MUST keine Primäraktion „Pegel festlegen“ tragen; der Weg zu
+Einstellungen › Pegel steht dort als Nebenweg. Ändert sich die Entscheidung, während die Seite
+offen ist, MUST die Reihenfolge bis zum nächsten Öffnen stehen bleiben.
+
+#### Scenario: Ohne festgelegten Pegel
+- **WHEN** eine Person „Wetter & Pegel“ eines Einsatzes ohne maßgeblichen Pegel öffnet
+- **THEN** stehen Warnungen, aktuelle Bedingungen und Vorhersage in dieser Reihenfolge, darunter
+  die Zeile „kein Pegel festgelegt“
+- **AND** der Seitenkopf trägt keine Primäraktion
+
+#### Scenario: Mit festgelegtem Pegel
+- **WHEN** am Einsatz zwei maßgebliche Pegel festgelegt sind
+- **THEN** steht das Pegel-Paneel direkt nach den Warnungen und vor den aktuellen Bedingungen
+
+#### Scenario: Pegel wird während des Lesens festgelegt
+- **WHEN** jemand einen maßgeblichen Pegel festlegt, während eine andere Person die Seite ohne
+  Pegel liest
+- **THEN** bleiben Warnungen, Bedingungen und Vorhersage an ihrer Stelle, und der Pegel erscheint
+  zuletzt
+
 ### Requirement: Pegel mit 24-h-Verlauf
 
 Das System SHALL auf der Modulseite je maßgeblichem Pegel des Einsatzes, in dessen
@@ -56,7 +82,8 @@ letzten 60 Minuten gerechnet werden.
 
 #### Scenario: Keine Pegel festgelegt
 - **WHEN** der Einsatz keinen maßgeblichen Pegel hat
-- **THEN** zeigt der Pegelbereich „kein Pegel festgelegt“ und einen Weg zu Einstellungen › Pegel
+- **THEN** zeigt der Pegelbereich als eine Zeile „kein Pegel festgelegt“ und einen Weg zu
+  Einstellungen › Pegel
 
 #### Scenario: Pflege bleibt in den Einstellungen
 - **WHEN** eine Person auf der Modulseite Pegel festlegen oder eine Prognose ändern will
@@ -348,3 +375,32 @@ Ereignis und springt zur Modulseite. Sie MUST verschwinden, sobald die Warnung g
 #### Scenario: Warnung beginnt
 - **WHEN** der Beginn einer markierten Unwetterwarnung erreicht ist
 - **THEN** verschwindet die Marke, und der Modulzähler zählt die Warnung weiter
+
+### Requirement: Wetterwarnung im Seitenkopf des Lagebilds
+
+Das Lagebild SHALL eine für den Einsatzort geltende oder angekündigte DWD-Warnung als Marke im
+Seitenkopf zeigen, nie im Kennzahlenband. Die Marke nennt die Stufenbezeichnung als Wort, das
+Ereignis und den Zeitraum („ab“ bei angekündigten, „bis“ bei geltenden Warnungen) und springt zur
+Modulseite. Gelten mehrere, MUST sie die Warnung der höchsten Stufe nennen, bei gleicher Stufe die
+geltende vor der angekündigten, und die übrigen zählen. Die Marke MUST nur erscheinen, wenn das
+Modul für die Person sichtbar und frei ist und der Warnstand verwertbar ist; sie MUST dieselbe
+Abfrage wie Modulzähler und Unwetterhinweis lesen und keinen eigenen Abruf auslösen. Sie MUST
+keinen Ton und keinen Hinweis in der AlarmZentrale auslösen.
+
+#### Scenario: Angekündigte Unwetterwarnung
+- **WHEN** für den Einsatzort eine Warnung „STARKREGEN“ der Stufe „schwer“ ab 18:11 angekündigt ist
+- **THEN** zeigt der Seitenkopf des Lagebilds „Unwetterwarnung: Starkregen ab 18:11“ mit einem
+  Sprung zu „Wetter & Pegel“
+
+#### Scenario: Keine Warnung
+- **WHEN** für den Einsatzort keine Warnung gilt oder angekündigt ist
+- **THEN** zeigt der Seitenkopf des Lagebilds keine Wettermarke
+
+#### Scenario: Modul nicht frei
+- **WHEN** das Modul „Wetter & Pegel“ für die Person ausgeblendet oder gesperrt ist
+- **THEN** zeigt der Seitenkopf keine Wettermarke, und das Lagebild fragt den Wetter-Endpunkt
+  nicht ab
+
+#### Scenario: Stand unbekannt
+- **WHEN** der Warnstand „Stand unbekannt“ ist
+- **THEN** zeigt der Seitenkopf keine Wettermarke

@@ -1055,12 +1055,45 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
       anker: (page) =>
         inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
       ziele: [
-        { sorte: 'Berichtsliste Neuer Bericht', ziele: knopf('Neuer Bericht'), mindestens: 1 },
         {
-          sorte: 'Berichtsliste Karte',
+          sorte: 'Berichtsliste Neuer Lagevortrag',
+          ziele: knopf('Neuer Lagevortrag'),
+          mindestens: 1,
+        },
+        // Der Pfeil des geteilten Knopfs trägt kein Wort: Boden auf beiden Achsen (LLH-1064).
+        {
+          sorte: 'Berichtsliste Andere Vorlage',
+          ziele: knopf('Andere Vorlage wählen'),
+          mindestens: 1,
+          kurz: true,
+        },
+        {
+          sorte: 'Berichtsliste Entwurf',
           ziele: (page) =>
             inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
           mindestens: 1,
+        },
+      ],
+    },
+    {
+      // Das Menü am Pfeil liegt im Portal, nicht in `main`.
+      pfad: `${R}/lageberichte`,
+      anker: (page) =>
+        inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
+      // Gemessen wird erst das stehende Menü: beim Einblenden (`ant-slide-up-appear`)
+      // staucht die Skalierung die Einträge unter 72 px.
+      vorbereiten: async (page) => {
+        await knopf('Andere Vorlage wählen')(page).click();
+        const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+        await expect(menue).toBeVisible();
+        await expect(menue).not.toHaveClass(/ant-slide-(up|down)-(appear|enter)/);
+      },
+      ziele: [
+        {
+          sorte: 'Berichtsliste Vorlagenmenü',
+          ziele: (page) =>
+            page.locator('.ant-dropdown:not(.ant-dropdown-hidden)').getByRole('menuitem'),
+          mindestens: 2,
         },
       ],
     },
@@ -1104,7 +1137,7 @@ test('C13 · Lagebericht, Berichtsliste und Lagemeldungen halten 72 px, kompakt 
   await messeFlaechen(page, lageFlaechen(einsatzId, berichtId));
 });
 
-test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen, der Lesezweig hält 72 px', async ({
+test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen oder sind gesperrt, der Lesezweig hält 72 px', async ({
   page,
 }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 724 LageB ${Date.now()}`);
@@ -1124,10 +1157,11 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen,
       pfad: `${R}/lageberichte`,
       anker: (page) =>
         inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
-      fehlt: knopf('Neuer Bericht'),
+      gesperrt: knopf('Neuer Lagevortrag'),
+      hinweis: /nur Einsatzleitung und Führungspersonal/,
       ziele: [
         {
-          sorte: 'Berichtsliste Karte',
+          sorte: 'Berichtsliste Entwurf',
           ziele: (page) =>
             inMain(page).getByRole('link', { name: 'Lagevortrag zur Entscheidung 1000' }),
           mindestens: 1,

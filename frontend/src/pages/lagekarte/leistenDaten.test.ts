@@ -441,6 +441,36 @@ describe('auswahlRaster — Bereitstellungsraum (LLH-1107)', () => {
   });
 });
 
+describe('auswahlRaster — Schaden (LLH-1115)', () => {
+  it('Status, Ausmaß, Gefahr und Schadensgrad in Worten', () => {
+    const roh: AuswahlRoh = {
+      ...ROH,
+      schaeden: [
+        {
+          id: 9,
+          status: 'offen',
+          ausmass: 'gross',
+          gefahrenart: 'elektrizitaet',
+          schadensgrad: 'zerstoert',
+        } as unknown as Schaden,
+      ],
+    };
+    const raster = auswahlRaster(marker('schaden', 9), roh, zeit);
+    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+      ['Status', 'offen'],
+      ['Ausmaß', 'groß'],
+      ['Gefahr', 'Elektrizität'],
+      ['Schadensgrad', 'total zerstört'],
+    ]);
+  });
+
+  it('ohne Angabe steht ein Strich', () => {
+    const raster = auswahlRaster(marker('schaden', 9), ROH, zeit);
+    expect(raster.find((f) => f.label === 'Gefahr')?.wert).toBe('—');
+    expect(raster.find((f) => f.label === 'Schadensgrad')?.wert).toBe('—');
+  });
+});
+
 describe('auswahlRaster', () => {
   it('Einheit: Stärke in BOS-Schreibweise, Status mit Code, Seit, Abschnitt, Führer (LFH-609)', () => {
     const raster = auswahlRaster(marker('einheit', 1), ROH, zeit);

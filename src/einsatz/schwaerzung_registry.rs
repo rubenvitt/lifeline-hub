@@ -563,6 +563,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             retain("typ", G_ENUM),
             retain("ausmass", G_ENUM),
+            retain("gefahrenart", G_ENUM),
+            retain("schadensgrad", G_ENUM),
             // Schadensort ist faktisch die Adresse Betroffener → gescrubbt; NOT NULL → Platzhalter.
             scrub("ort", Strategie::Platzhalter, Z_EINSATZ),
             // Unstrukturierter Freitext, kann dieselbe PII tragen wie `ort` → gescrubbt.

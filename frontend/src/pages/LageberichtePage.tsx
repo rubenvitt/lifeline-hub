@@ -1,141 +1,75 @@
-import { IconPlus } from '../icons';
-import { Breadcrumb, Button, Form, Input, Spin, Typography, theme } from 'antd';
-import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
-import dayjs, { type Dayjs } from 'dayjs';
-import { Select } from '../components/Select';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Breadcrumb, Spin, Typography } from 'antd';
+import dayjs from 'dayjs';
+import { useEffect, useRef } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
-import { legeLageberichtAn, listeLageberichte } from '../api/lageberichte';
-import type { LageberichtKopf, LageberichtVorlageKey } from '../api/types';
-import { VORLAGEN } from '../lageberichte/vorlagen';
-import { kettenKoepfe, type KettenKopf } from '../lageberichte/ketten';
+import { legeLageberichtAn, listeLageberichte, schreibeLageberichtFort } from '../api/lageberichte';
+import type { LageberichtAbschnitt, LageberichtVorlageKey } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
-import Datensicht, { spaltenFuer } from '../components/Datensicht';
-import { ErfassungsModal } from '../components/Erfassung';
-import { SpeicherFehler } from '../components/SpeicherHinweis';
-import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
+import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { SeitenHinweise } from '../components/SpeicherHinweis';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
+import { einsatzRechteGrund } from '../components/nurAnsicht';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
+import NeuerLagevortragKnopf, { VORGABE_VORLAGE } from '../lageberichte/NeuerLagevortragKnopf';
+import LageberichtUebersicht from '../lageberichte/LageberichtUebersicht';
+import { hatNachfolger, teileUebersicht, titelVorschlag } from '../lageberichte/uebersicht';
 
 /**
- * Lageberichte als Kartensicht — Zwilling der Befehlsliste. `form="karte"` in jeder Breite: ein
- * Lagebericht wird als Einheit gelesen (Vorlage, Fassung, Freigabestand), nicht spaltenweise
- * verglichen.
+ * Lageberichte: Übersicht und Anlegen (LLH-1064).
  *
- * Die Sicht zeigt Kettenköpfe, nicht Berichte. Die Fortschreibung legt eine neue Zeile mit `version
- * + 1` und demselben Titel an, der Vorgänger bleibt freigegeben liegen. Jede Kette trägt eine Karte
- * mit dem jüngsten Stand im Kopf und den Vorgängern als Links in der Fassungszeile
- * (`lageberichte/ketten.ts`). Suche, Filter und Gruppen laufen über den Kopf; ein Vorgänger ist
- * über seinen Link erreichbar, aber kein eigener Treffer.
+ * Die Übersicht beantwortet zuerst „was gilt?“ (jüngste Freigabe vorn), dann „was ist in Arbeit?“
+ * und zuletzt „was galt früher?“ (`lageberichte/LageberichtUebersicht.tsx`, Ableitung in
+ * `lageberichte/uebersicht.ts`).
+ *
+ * Anlegen ohne Dialog: „Neuer Lagevortrag“ legt mit EINEM POST einen Entwurf an und öffnet ihn;
+ * Titel und Zeitstand ändert man dort. Der Pfeil am Knopf wählt eine andere Vorlage. Abgelehnt
+ * steht der Grund im Seitenhinweis (LFH-1077), es wird nicht navigiert, und der Server legt nichts
+ * an. `abschnitte` reicht einen Startinhalt in denselben POST (Spec `dokument-uebernahme`).
  */
 
-function vorlageLabel(schluessel: LageberichtVorlageKey | string): string {
-  return VORLAGEN.find((v) => v.schluessel === schluessel)?.label ?? String(schluessel);
-}
-
-/**
- * Die Spalten brauchen die `einsatzId` (Vorgänger-Links) und entstehen in der Komponente — mit
- * `spaltenFuer`, weil der Guard die Marke je Konsumentendatei verlangt. Nie annotieren: eine
- * Typangabe weitete `K` auf `string`, und der Kartenplan nähme Slot-Tippfehler an.
- */
-function lageberichtSpalten(einsatzId: number) {
-  return spaltenFuer<KettenKopf<LageberichtKopf>>()([
-    {
-      key: 'titel',
-      title: 'Titel',
-      immerSichtbar: true,
-      sortWert: (k) => k.kopf.titel,
-      suchText: (k) => k.kopf.titel,
-      // Kein Anker hier: den Link setzt `karte.titel.ziel`, sonst verschachtelte Links.
-      render: (_t, k) => k.kopf.titel,
-    },
-    {
-      key: 'status',
-      title: 'Status',
-      // Sekundärslot statt `karte.status`: das Modul bleibt auf der Phasenachse aus
-      // `kommunikation/phase.ts`, die bewusst außerhalb des Statusfarb-Vertrags liegt.
-      render: (_t, k) => (
-        <StatusBadge
-          phase={LAGEBERICHT_STATUS[k.kopf.status].phase}
-          label={LAGEBERICHT_STATUS[k.kopf.status].label}
-        />
-      ),
-    },
-    {
-      key: 'vorlage',
-      // Beim Lagebericht heißt die Achse „Vorlage", beim Befehl „Schema".
-      title: 'Vorlage',
-      suchText: (k) => vorlageLabel(k.kopf.vorlage),
-      filter: {
-        werte: VORLAGEN.map((v) => ({ text: v.label, value: v.schluessel })),
-        trifft: (k, w) => k.kopf.vorlage === w,
-      },
-      render: (_t, k) => vorlageLabel(k.kopf.vorlage),
-    },
-    {
-      key: 'fassung',
-      title: 'Fassung',
-      sortWert: (k) => k.kopf.zeitstand,
-      // v-Nummer, Zeitstand und Ersteller in einer Zeile — drei Slots sind das Maximum. `zeitstand`
-      // läuft durch `ZeitAnzeige` (taktische DTG in der Anzeigezone); `sortWert` bleibt der
-      // UTC-Wirestring, der lexikografisch sortiert, die DTG nicht. Die Vorgänger als Deeplinks aus
-      // dem Spalten-`render` — erlaubt, weil nicht die Titelspalte; der Klick-Riegel im Primitiv
-      // trennt Link- und Zeilenklick.
-      render: (_t, k) => (
-        <>
-          {`v${k.kopf.version} · `}
-          <ZeitAnzeige wert={k.kopf.zeitstand} />
-          {` · ${k.kopf.ersteller_name}`}
-          {k.vorgaenger.length > 0 && (
-            <span style={{ display: 'block' }}>
-              {'Vorgänger: '}
-              {k.vorgaenger.map((v, i) => (
-                <span key={v.id}>
-                  {i > 0 && ', '}
-                  <KennungsLink to={lageberichtDetailPfad(einsatzId, v.id)}>
-                    v{v.version}
-                  </KennungsLink>
-                </span>
-              ))}
-            </span>
-          )}
-        </>
-      ),
-    },
-  ]);
-}
-
-/** Werte des Anlegedialogs — `zeitstand` als Zeitpunkt, UTC erst beim Senden (LFH-692). */
-interface AnlegenWerte {
-  titel: string;
+interface Anlegen {
+  einsatzId: number;
   vorlage: LageberichtVorlageKey;
-  zeitstand?: Dayjs;
-}
-
-/**
- * Titelvorschlag aus der Uhrzeit („Lageüberblick 10:30 Uhr") in taktischer Schreibweise — in der
- * Anzeigezone, nicht in der des Geräts (LFH-692, Spec `zeiteingabe`).
- */
-function titelVorschlag(jetzt: Dayjs, formatiere: (d: Dayjs, format: string) => string): string {
-  return `Lageüberblick ${formatiere(jetzt, 'HHmm')}`;
+  /** Startinhalt; fehlt er, legt der Server das leere Skelett der Vorlage an. */
+  abschnitte?: LageberichtAbschnitt[];
 }
 
 export default function LageberichtePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
   const qc = useQueryClient();
-  const [anlegenOffen, setAnlegenOffen] = useState(false);
-  const [form] = Form.useForm<AnlegenWerte>();
-  const { token } = theme.useToken();
-  const spalten = useMemo(() => lageberichtSpalten(einsatzId), [einsatzId]);
+  const navigate = useNavigate();
+  const { formatiere } = useZeitEingabe();
+
+  // Der Einsatz, in dem die Seite gerade steht: eine Antwort aus einem verlassenen Einsatz
+  // navigiert nicht und meldet nicht am neuen Ort (`frontend/AGENTS.md`, „Rückwege und Fehler“).
+  const aktuellerEinsatz = useRef(einsatzId);
+  const eingehaengt = useRef(true);
+  // Riegel gegen den Doppelklick: zwischen Klick und Render der Ladeanzeige läge sonst ein
+  // zweiter POST, und es entstünden zwei Entwürfe. Nach einem Erfolg bleibt er bis zum Wechsel
+  // auf den Entwurf zu; ein Einsatzwechsel löst ihn.
+  const sendetRef = useRef(false);
+  useEffect(() => {
+    aktuellerEinsatz.current = einsatzId;
+    sendetRef.current = false;
+  }, [einsatzId]);
+  useEffect(() => {
+    eingehaengt.current = true;
+    return () => {
+      eingehaengt.current = false;
+    };
+  }, []);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -146,43 +80,47 @@ export default function LageberichtePage() {
     queryFn: () => listeLageberichte(einsatzId),
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(einsatzId) });
+  const oeffne = (vars: { einsatzId: number }, neuId: number) => {
+    void qc.invalidateQueries({ queryKey: einsatzKeys.lageberichte(vars.einsatzId) });
+    if (eingehaengt.current && aktuellerEinsatz.current === vars.einsatzId) {
+      void navigate(lageberichtDetailPfad(vars.einsatzId, neuId));
+    } else {
+      sendetRef.current = false;
+    }
+  };
+  const loese = () => {
+    sendetRef.current = false;
+  };
 
+  // Kein `onError`: der Grund steht im Seitenhinweis, bis zum nächsten Versuch.
   const anlegenMutation = useMutation({
-    mutationFn: (w: AnlegenWerte) =>
-      legeLageberichtAn(einsatzId, {
-        vorlage: w.vorlage,
-        titel: w.titel,
-        // Leer = jetzt (Backend-Default); ein leeres Feld wird nicht mitgeschickt.
-        ...(w.zeitstand ? { zeitstand: alsBackendZeit(w.zeitstand) } : {}),
+    mutationFn: (a: Anlegen) =>
+      legeLageberichtAn(a.einsatzId, {
+        vorlage: a.vorlage,
+        titel: titelVorschlag(a.vorlage, dayjs(), formatiere),
+        // Kein Zeitstand: der Server setzt jetzt (`routes/vorlagendokument.rs`).
+        ...(a.abschnitte ? { abschnitte: a.abschnitte } : {}),
       }),
-    onSuccess: invalidate,
-    // Kein Toast: der Grund steht im Dialog, der die Werte bei Ablehnung stehen lässt. Es bleibt
-    // bei `mutation.error` mit react-querys Räumen beim Absenden — anders als beim Autosave drückt
-    // hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
+    onSuccess: (neu, vars) => oeffne(vars, neu.id),
+  });
+  const fortschreibenMutation = useMutation({
+    mutationFn: (f: { einsatzId: number; id: number }) =>
+      schreibeLageberichtFort(f.einsatzId, f.id),
+    onSuccess: (neu, vars) => oeffne(vars, neu.id),
   });
 
-  // Als Ref: der Vorschlag gilt beim ÖFFNEN; eine später geladene Zone darf einen schon getippten
-  // Titel nicht überschreiben (Review LFH-692, Muster `entwurf/useEntwurfVerlustschutz.ts`).
-  const { formatiere } = useZeitEingabe();
-  const formatiereRef = useRef(formatiere);
-  formatiereRef.current = formatiere;
-  /**
-   * Der Titelvorschlag wird beim Öffnen in den Formularspeicher geschrieben, nicht über
-   * `initialValues`: der Speicher von rc-field-form überlebt `destroyOnHidden`, und beim nächsten
-   * Einhängen gewinnt der alte Store (`merge(initialValues, store)`). Ein zweites Öffnen zeigte
-   * sonst die Uhrzeit des ersten — in einer Kette, in der die Uhrzeit im Titel der
-   * Ordnungsschlüssel ist, eine falsche Angabe. Dieselbe Falle beschreibt
-   * `components/Erfassung.tsx`.
-   *
-   * Der Vorschlag braucht den Effekt (der Formularspeicher steht erst nach dem Einhängen); das
-   * Räumen des letzten Fehlers liegt im Öffnen-Handler, weil ein Effekt nach dem Paint läuft und
-   * der alte Grund sonst ein Bild lang über einem frischen Formular stünde.
-   */
-  useEffect(() => {
-    if (anlegenOffen)
-      form.setFieldsValue({ titel: titelVorschlag(dayjs(), formatiereRef.current) });
-  }, [anlegenOffen, form]);
+  const lege = (vorlage: LageberichtVorlageKey) => {
+    if (sendetRef.current) return;
+    sendetRef.current = true;
+    fortschreibenMutation.reset();
+    anlegenMutation.mutate({ einsatzId, vorlage }, { onError: loese });
+  };
+  const schreibeFort = (berichtId: number) => {
+    if (sendetRef.current) return;
+    sendetRef.current = true;
+    anlegenMutation.reset();
+    fortschreibenMutation.mutate({ einsatzId, id: berichtId }, { onError: loese });
+  };
 
   if (einsatzQuery.isLoading) {
     return (
@@ -200,16 +138,68 @@ export default function LageberichtePage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   const berichte = berichteQuery.data ?? [];
-  const koepfe = kettenKoepfe(berichte);
-  const entwuerfe = berichte.filter((lb) => lb.status === 'entwurf').length;
+  const uebersicht = teileUebersicht(berichte);
+
+  // Nur der Grund aus DIESEM Einsatz; ein Wechsel räumt ihn so von selbst.
+  const anlegenFehler =
+    anlegenMutation.variables?.einsatzId === einsatzId ? anlegenMutation.error : null;
+  const fortschreibenFehler =
+    fortschreibenMutation.variables?.einsatzId === einsatzId ? fortschreibenMutation.error : null;
+
+  const aktuell = uebersicht.aktuell;
+  const fortschreiben =
+    aktuell && darfSchreiben && !hatNachfolger(berichte, aktuell.id)
+      ? {
+          onKlick: () => schreibeFort(aktuell.id),
+          laeuft: fortschreibenMutation.isPending,
+        }
+      : null;
+
+  const inhalt = (() => {
+    if (berichteQuery.isLoading) return <SeitenSkeleton />;
+    if (berichteQuery.isError && !berichteQuery.data) {
+      return (
+        <SeitenFehler
+          text="Lageberichte nicht abrufbar · Stand unbekannt"
+          ursache={berichteQuery.error}
+          onWiederholen={() => void berichteQuery.refetch()}
+        />
+      );
+    }
+    if (berichte.length === 0) {
+      return (
+        <SeitenLeer
+          titel="Noch keine Lageberichte"
+          aktion={
+            darfSchreiben
+              ? { label: 'Neuer Lagevortrag', onClick: () => lege(VORGABE_VORLAGE) }
+              : undefined
+          }
+        />
+      );
+    }
+    return (
+      <>
+        {berichteQuery.isError && (
+          <SeitenStandVeraltet onWiederholen={() => void berichteQuery.refetch()} />
+        )}
+        <LageberichtUebersicht
+          einsatzId={einsatzId}
+          uebersicht={uebersicht}
+          fortschreiben={fortschreiben}
+        />
+      </>
+    );
+  })();
 
   return (
-    // Die Mengen im Kopf zählen den Bestand, die Gruppenköpfe das Angezeigte — bei aktiver Suche
-    // laufen die Zahlen auseinander. Gewollt: der Seitenkopf ist die Lageauskunft, der Gruppenkopf
-    // die Auskunft über die Trefferliste.
     <EinsatzSeite
       titel={modulName('lageberichte')}
-      meta={`${anzahl(berichte.length, 'Bericht', 'Berichte')} in ${anzahl(koepfe.length, 'Kette', 'Ketten')} · ${entwuerfe} im Entwurf`}
+      meta={
+        berichteQuery.data
+          ? `${anzahl(berichte.length, 'Bericht', 'Berichte')} · ${uebersicht.inArbeit.length} in Arbeit`
+          : undefined
+      }
       dataUpdatedAt={berichteQuery.dataUpdatedAt}
       breadcrumb={
         <Breadcrumb
@@ -221,86 +211,23 @@ export default function LageberichtePage() {
         />
       }
       aktionen={
-        darfSchreiben && (
-          // Kein `size`-Prop: die Dichte trägt das Token am `ConfigProvider`. `aria-label` gegen
-          // antds Icon-Etikett: `<span role="img" aria-label="plus">` flösse sonst in den Namen ein
-          // („plus Neuer Bericht").
-          <Button
-            type="primary"
-            icon={<IconPlus />}
-            aria-label="Neuer Bericht"
-            onClick={() => {
-              anlegenMutation.reset();
-              setAnlegenOffen(true);
-            }}
-          >
-            Neuer Bericht
-          </Button>
-        )
+        <NeuerLagevortragKnopf
+          onAnlegen={lege}
+          laeuft={anlegenMutation.isPending}
+          gesperrt={!darfSchreiben || fortschreibenMutation.isPending}
+        />
+      }
+      hinweis={
+        <SeitenHinweise
+          fehler={anlegenFehler ?? fortschreibenFehler}
+          fehlerTitel={anlegenFehler ? 'Nicht angelegt' : 'Nicht fortgeschrieben'}
+          fehlerFallback={anlegenFehler ? 'Anlegen fehlgeschlagen' : 'Fortschreiben fehlgeschlagen'}
+          rechteFehlt={!darfSchreiben}
+          rechteText={einsatzRechteGrund(einsatz.status)}
+        />
       }
     >
-      <Datensicht
-        bezeichnung="Lageberichte"
-        form="karte"
-        spalten={spalten}
-        daten={koepfe}
-        zeilenSchluessel={(k) => k.kopf.id}
-        ladend={berichteQuery.isLoading}
-        leerText="Noch keine Lageberichte"
-        suche={{ platzhalter: 'Titel oder Vorlage' }}
-        standardSortierung={{ spalte: 'fassung', richtung: 'ab' }}
-        gruppen={{
-          schluessel: (k) => k.kopf.status,
-          etikett: (w, n) => (w === 'entwurf' ? (n === 1 ? 'Entwurf' : 'Entwürfe') : 'Freigegeben'),
-          reihenfolge: ['entwurf', 'freigegeben'],
-          // Die Gruppenköpfe stehen direkt unter dem Seitentitel (h1).
-          unterEbene: 1,
-        }}
-        karte={{
-          art: 'plan',
-          titel: { spalte: 'titel', ziel: (k) => lageberichtDetailPfad(einsatzId, k.kopf.id) },
-          // Keine `aktion`: Freigeben/Fortschreiben/Drucken liegen auf der Detailseite, die einzige
-          // Interaktion der Zeile ist der Titel-Link.
-          sekundaer: ['status', 'vorlage', 'fassung'],
-        }}
-      />
-
-      {/* Erfassungs-Hülle: Absende-Knopf im Formular (Enter sendet), Fokus im ersten Feld — das
-          ist der Titel, deshalb steht er vor der Vorlage. Drei Felder, innerhalb der
-          Modal-Grenze. */}
-      <ErfassungsModal<AnlegenWerte>
-        offen={anlegenOffen}
-        titel="Neuer Lagebericht"
-        form={form}
-        erfassenText="Anlegen"
-        laeuft={anlegenMutation.isPending}
-        initialValues={{ vorlage: 'lagebericht' }}
-        onErfassen={(w) => anlegenMutation.mutateAsync(w)}
-        onFertig={() => setAnlegenOffen(false)}
-        onAbbrechen={() => setAnlegenOffen(false)}
-      >
-        {/* Der Grund der Ablehnung steht über den stehengebliebenen Feldern — sonst wäre der
-            unveränderte Dialog von „nichts passiert" nicht zu unterscheiden. */}
-        {anlegenMutation.error != null && (
-          <div style={{ marginBottom: token.marginSM }}>
-            <SpeicherFehler fehler={anlegenMutation.error} titel="Nicht angelegt" />
-          </div>
-        )}
-        <Form.Item
-          label="Titel"
-          name="titel"
-          rules={[{ required: true, message: 'Titel erforderlich' }]}
-        >
-          <Input placeholder="z. B. Lageüberblick 1030" />
-        </Form.Item>
-        <Form.Item label="Vorlage" name="vorlage" rules={[{ required: true }]}>
-          <Select options={VORLAGEN.map((v) => ({ value: v.schluessel, label: v.label }))} />
-        </Form.Item>
-        {/* Leer setzt der Server jetzt (`routes/vorlagendokument.rs`). */}
-        <Form.Item label="Zeitstand" name="zeitstand">
-          <ZeitpunktEingabe art="ereignis" placeholder="jetzt" style={{ width: '100%' }} />
-        </Form.Item>
-      </ErfassungsModal>
+      {inhalt}
     </EinsatzSeite>
   );
 }

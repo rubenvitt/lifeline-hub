@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { schadenDetailPfad, schaedenDruckPfad } from '../routing/deeplinks';
-import { Alert, Breadcrumb, Button, Tag, Typography, theme } from 'antd';
+import { Alert, Breadcrumb, Button, Flex, Tag, Typography, theme } from 'antd';
 import { Segmentleiste, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import {
   ladeSchadenKennzahlen,
+  ladeSchaedenExport,
   listeSchaedenSeite,
   SCHADEN_SORTIERUNG_VORGABE,
   schadenCursor,
@@ -21,9 +22,12 @@ import {
   type SchadenSortierung,
   type SchadenSortSpalte,
 } from '../api/einsatzSchaden';
-import type { Ausmass, Schaden, SchadenTyp } from '../api/types';
+import type { Ausmass, Gefahrentyp, Schaden, SchadenTyp } from '../api/types';
 import {
   AUSMASS_META,
+  GEFAHR_LABEL,
+  GEFAHRENARTEN,
+  gefahrText,
   STATUS_META,
   TYP_LABEL,
   geschaedigtAnzeige,
@@ -40,13 +44,15 @@ import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components
 import EinsatzSeite from '../components/EinsatzSeite';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { modulName } from '../einsatz/modulRegistry';
+import { useCsvExport } from '../components/useCsvExport';
+import { SpeicherFehler } from '../components/SpeicherHinweis';
 
 /**
  * Das eine Spaltenregister der Schadensliste. Funktion von `einsatzId`, weil die Geschädigt-Spalte
  * Deeplinks baut (`geschaedigtAnzeige(s, einsatzId)`). Durch `spaltenFuer<Schaden>()` geführt, nie
  * annotiert: eine Annotation weitete die Schlüsselliterale auf `string`.
  *
- * Typ und Ausmaß sind Spaltenfilter: geschlossene Wertemengen aus `schadenHelfer`, dort, wo die
+ * Typ, Ausmaß und Gefahr sind Spaltenfilter: geschlossene Wertemengen aus `schadenHelfer`, dort, wo die
  * Werte stehen. Die Reiterachse (Status) bleibt außen — sie ist das Arbeitsfach, nicht eine
  * Einengung darin.
  */
@@ -92,6 +98,18 @@ const schaedenSpalten = (einsatzId: number) =>
         trifft: (s, wert) => s.ausmass === wert,
       },
       render: (_, s) => <StatusTag darstellung={AUSMASS_META[s.ausmass]} />,
+    },
+    {
+      // Gefahr und Schadensgrad in Worten (LLH-1115); gefiltert wird nach der Gefahr, wie im
+      // Gefahrengebiet. Ohne Sortierung: die Gefahrenmatrix ist keine Rangfolge.
+      title: 'Gefahr',
+      key: 'gefahrenart',
+      abBreite: 'md',
+      filter: {
+        werte: GEFAHRENARTEN.map((g) => ({ text: GEFAHR_LABEL[g], value: g })),
+        trifft: (s, wert) => s.gefahrenart === wert,
+      },
+      render: (_, s) => gefahrText(s),
     },
     {
       title: 'Ort',
@@ -201,6 +219,8 @@ function serverFilter(
   if (sicht !== 'alle') f.status = sicht;
   if (spaltenFilter.typ?.length) f.typen = spaltenFilter.typ as SchadenTyp[];
   if (spaltenFilter.ausmass?.length) f.ausmasse = spaltenFilter.ausmass as Ausmass[];
+  if (spaltenFilter.gefahrenart?.length)
+    f.gefahrenarten = spaltenFilter.gefahrenart as Gefahrentyp[];
   if (spaltenFilter.verortet?.length) f.verortet = spaltenFilter.verortet as ('ja' | 'nein')[];
   if (suche) f.q = suche;
   return f;
@@ -282,6 +302,9 @@ export default function SchaedenPage() {
 
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
   const spalten = useMemo(() => schaedenSpalten(einsatzId), [einsatzId]);
+  // CSV des ganzen Einsatzes (LLH-1115): alle Schäden, Gefahr und Schadensgrad in Worten. Lesen,
+  // ohne Schreib-Riegel.
+  const csvExport = useCsvExport(einsatzId, 'schaeden', ladeSchaedenExport);
 
   // Schnellaktion: ?neu=1 öffnet die Erfassung (Command-Palette). Warten bis der Einsatz geladen
   // ist; Param immer löschen, Modal nur bei Schreibrecht.
@@ -312,6 +335,7 @@ export default function SchaedenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
 
   const geladen = schaedenQuery.data?.pages.flat() ?? [];
   const ausschnitt = ausschnittQuery.data;
@@ -356,8 +380,8 @@ export default function SchaedenPage() {
           </Button>
         )
       }
-      // Drucken öffnet und sendet nichts ab: Nebenweg, unter `md` hinter „Weitere"
-      // (`frontend/AGENTS.md`, Aktionen). Drucken ist Lesen — ohne Schreib-Riegel.
+      // Drucken und CSV öffnen bzw. laden und senden nichts ab: Nebenwege, unter `md` hinter
+      // „Weitere" (`frontend/AGENTS.md`, Aktionen). Beides ist Lesen — ohne Schreib-Riegel.
       weitere={{
         name: 'Weitere Aktionen zu den Schäden',
         eintraege: [
@@ -367,15 +391,29 @@ export default function SchaedenPage() {
             ziel: schaedenDruckPfad(einsatzId, { sicht }),
             onWahl: () => navigate(schaedenDruckPfad(einsatzId, { sicht })),
           },
+          {
+            key: 'csv',
+            label: 'CSV exportieren',
+            laeuft: csvExport.laeuft,
+            onWahl: csvExport.exportieren,
+          },
         ],
       }}
       // Zweiter Bedienweg auf die Primäraktion („Neue Zeile" in der Palette) — mit demselben
       // Rechte-Riegel wie der Knopf.
       neueZeile={darfSchreiben ? () => setErfassenOffen(true) : undefined}
       hinweis={
-        !darfSchreiben &&
-        einsatz.status !== 'aktiv' && (
-          <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+        (nurAnsicht || csvExport.fehler != null) && (
+          <Flex vertical gap={8}>
+            {nurAnsicht && (
+              <Alert type="info" showIcon title="Einsatz ist abgeschlossen — nur Ansicht." />
+            )}
+            <SpeicherFehler
+              fehler={csvExport.fehler}
+              titel="Export fehlgeschlagen"
+              fallback="Keine Verbindung zum Server — Export nicht möglich"
+            />
+          </Flex>
         )
       }
     >

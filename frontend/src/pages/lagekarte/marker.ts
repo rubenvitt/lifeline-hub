@@ -131,6 +131,11 @@ export interface KarteMarker {
    */
   isGeplant?: true;
   /**
+   * Fokus auf einen Abschnitt (LLH-1057, `abschnittFokus.ts`): Kraft eines fremden Abschnitts. Die
+   * Karte zeichnet sie mit verringerter Deckkraft, sie bleibt Klickziel. Nur gesetzt, wenn wahr.
+   */
+  gedaempft?: true;
+  /**
    * Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). `meldungId` = id der
    * Quell-Meldung (Deeplink ?meldung=), `meldungLfdNr` = Anzeigenummer.
    */
@@ -232,7 +237,7 @@ export function baueMarker(
 
   for (const s of schaeden) {
     if (s.lat != null && s.lon != null) {
-      const tz = schadenTz(s.ausmass);
+      const tz = schadenTz(s.ausmass, s.gefahrenart, s.schadensgrad);
       verortet.push({
         schluessel: `schaden-${s.id}`,
         typ: 'schaden',
