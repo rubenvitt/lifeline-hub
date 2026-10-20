@@ -230,6 +230,7 @@ async fn snapshot_hat_alle_quellen_und_friert_org_default_ein() {
         "betreuungsstellen",
         "evakuierungsbezirke",
         "bereitstellungsraeume",
+        "tiere",
     ] {
         assert!(
             snap.daten[key].is_array(),
@@ -724,6 +725,83 @@ async fn snapshot_post_und_patch_redigieren_br_ohne_modulrecht() {
         dok["daten"]["bereitstellungsraeume"][0]["bezeichnung"], "BR Sportplatz",
         "{dok}"
     );
+}
+
+// ---------- LLH-1123: Tiere im Stand ----------
+
+/// Offene und vermisste Tiere frieren mit Fundort-Koordinate ein, abgeschlossene nicht; Halter
+/// und Notiz stehen nicht im Stand. Ein Leser, für den das Modul Tiere ausgeblendet ist, bekommt
+/// `[]`.
+#[tokio::test]
+async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let (s, tier) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere"),
+        &admin,
+        Some(
+            r#"{"spezies":"hund","rufname":"Bello","antreff_ort":"Garten","antreff_lat":51.93,
+                "antreff_lon":8.87,"halter_kontakt":"Frau Huber 0170","notiz":"bissig"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{tier:?}");
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/tiere"),
+        &admin,
+        Some(r#"{"spezies":"katze","status":"vermisst"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+
+    let snap = repo::erzeuge(&pool, e, benutzer_id, Some("S"), None)
+        .await
+        .unwrap();
+    let tiere = snap.daten["tiere"].as_array().unwrap();
+    assert_eq!(tiere.len(), 2, "{}", snap.daten["tiere"]);
+    let bello = tiere.iter().find(|t| t["rufname"] == "Bello").unwrap();
+    assert_eq!(bello["antreff_lat"], 51.93, "{bello}");
+    assert_eq!(bello["antreff_lon"], 8.87);
+    assert_eq!(bello["status"], "aktiv");
+    assert_eq!(bello["spezies"], "hund");
+    let katze = tiere.iter().find(|t| t["spezies"] == "katze").unwrap();
+    assert_eq!(katze["status"], "vermisst");
+    assert!(katze.get("antreff_lat").is_none(), "{katze}");
+    let text = snap.daten["tiere"].to_string();
+    assert!(!text.contains("Huber"), "{text}");
+    assert!(!text.contains("bissig"), "{text}");
+
+    // Für einen Beobachter ist das Modul ausgeblendet: das Feld kommt leer.
+    let leser_id = benutzer_anlegen(&app, &admin, "leser4", "keine").await;
+    rolle_setzen(&app, &admin, e, leser_id, "beobachter").await;
+    let leser = login_cookie(&app, "leser4", "leser4pw1").await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/modul-overrides/tiere"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let pfad = format!("/api/einsaetze/{e}/lage-snapshots/{}", snap.id);
+    let (s, dok) = anfrage(&app, "GET", &pfad, &leser, None).await;
+    assert_eq!(s, StatusCode::OK, "{dok:?}");
+    assert_eq!(dok["daten"]["tiere"], json!([]), "{dok}");
+    assert!(!dok.to_string().contains("Bello"), "{dok}");
+    // Der Admin liest es weiter.
+    let (_, dok) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(dok["daten"]["tiere"].as_array().unwrap().len(), 2, "{dok}");
 }
 
 // ---------- LFH-836: Zeichenbeschreibung freier Zeichen im Stand ----------

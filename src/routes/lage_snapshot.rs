@@ -74,6 +74,8 @@ const REDIGIERBARE_MODUL_FELDER: &[(&str, &str)] = &[
     ("evakuierungsbezirke", "betreuung"),
     // LLH-1107: Räume hängen am Modul Bereitstellungsräume (`EinsatzLesezugriff<…>` der Liste).
     ("bereitstellungsraeume", "bereitstellungsraeume"),
+    // LLH-1123: Tiere hängen am Modul Tiere.
+    ("tiere", "tiere"),
 ];
 
 /// Redigiert das eingefrorene `daten`-Dokument auf die Per-Layer-Autorisierung des Lesers —

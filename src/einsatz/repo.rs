@@ -1907,6 +1907,8 @@ mod tests {
                 halter_person_id: None,
                 halter_kontakt: None,
                 antreff_ort: None,
+                antreff_lat: None,
+                antreff_lon: None,
                 notiz: None,
             },
         )

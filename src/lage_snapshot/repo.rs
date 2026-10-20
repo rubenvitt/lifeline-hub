@@ -220,6 +220,10 @@ struct SnapshotDaten {
     /// am Modul Bereitstellungsräume gegatet (`REDIGIERBARE_MODUL_FELDER`). Ältere Stände tragen
     /// das Feld nicht.
     bereitstellungsraeume: Vec<crate::bereitstellungsraum::BrListenEintrag>,
+    /// Offene und vermisste Tiere (ohne stornierte) mit Fundort-Koordinate, schmal ohne Halter,
+    /// Kennzeichnung und Notiz (LLH-1123); am Modul Tiere gegatet (`REDIGIERBARE_MODUL_FELDER`).
+    /// Ältere Stände tragen das Feld nicht.
+    tiere: Vec<crate::tier::TierKarte>,
 }
 
 /// Friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein.
@@ -300,6 +304,7 @@ pub async fn erzeuge(
             crate::bereitstellungsraum::repo::ListenFilter::default(),
         )
         .await?,
+        tiere: crate::tier::repo::karte_liste(pool, einsatz_id).await?,
     };
 
     let daten_value = serde_json::to_value(&daten)

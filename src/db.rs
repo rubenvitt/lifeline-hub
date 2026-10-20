@@ -9616,4 +9616,72 @@ mod tests {
             assert!(ergebnis.is_err(), "{fall}");
         }
     }
+
+    /// LLH-1123: `antreff_lat`/`antreff_lon` am Tier. Eine Bestandszeile von vorher behält jeden
+    /// Wert, die Koordinate ist leer; beide Spalten existieren als REAL.
+    #[tokio::test]
+    async fn migration_0225_tier_antreff_koordinate() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 224).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::query(
+            "INSERT INTO einsatz_tier \
+                (id, einsatz_id, registrier_nr, status, spezies, rufname, antreff_ort, notiz, \
+                 erfasst_at, erfasst_von, geaendert_at, geaendert_von) \
+             VALUES (7, ?, 1, 'vermisst', 'grosstier', 'Fritz', 'Weide am Deich', 'x', \
+                     '2026-10-01 08:00:00', ?, '2026-10-01 09:00:00', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        type Zeile = (
+            i64,
+            i64,
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+        );
+        let lies = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, Zeile>(
+                "SELECT id, einsatz_id, registrier_nr, status, spezies, rufname, antreff_ort, \
+                        notiz, erfasst_at, geaendert_at \
+                 FROM einsatz_tier ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = lies(pool.clone()).await;
+
+        migriere_bis(&pool, 225).await;
+
+        assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
+        let koordinate: (Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT antreff_lat, antreff_lon FROM einsatz_tier WHERE id = 7")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(koordinate, (None, None));
+        let spalten: Vec<(String, String)> = sqlx::query_as(
+            "SELECT name, type FROM pragma_table_info('einsatz_tier') \
+             WHERE name IN ('antreff_lat', 'antreff_lon') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                ("antreff_lat".to_string(), "REAL".to_string()),
+                ("antreff_lon".to_string(), "REAL".to_string())
+            ]
+        );
+    }
 }
