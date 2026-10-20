@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { Route, Routes, useNavigate } from 'react-router';
+import { Route, Routes, useNavigate, useParams } from 'react-router';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient } from '@tanstack/react-query';
@@ -48,49 +48,6 @@ const bericht: LageberichtAnzeige = {
   freigegeben_at: null,
   etb_eintrag_id: null,
 };
-
-/**
- * Fortschreibungskette, neben `bericht` angelegt (den `setupDetail` über `lagebericht7Abschnitte`
- * weiterverwendet). Zwei Fassungen mit identischem Titel — die Fortschreibung legt eine neue Zeile
- * mit `version + 1` an, der Vorgänger bleibt freigegeben liegen.
- *
- * Absichtlich aufsteigend, also gegen die Serverordnung (`zeitstand DESC, id DESC`): in
- * Serverordnung wäre jede Sortierbehauptung unfälschbar grün.
- */
-const KETTE: LageberichtAnzeige[] = [
-  {
-    ...bericht,
-    id: 14,
-    titel: 'Vortrag Nachmittag',
-    vorlage: 'lagebericht',
-    version: 1,
-    status: 'freigegeben',
-    zeitstand: '2026-06-02 09:00:00',
-  },
-  { ...bericht, id: 11, version: 1, status: 'freigegeben', zeitstand: '2026-06-02 10:00:00' },
-  {
-    ...bericht,
-    id: 13,
-    version: 2,
-    status: 'entwurf',
-    zeitstand: '2026-06-02 12:00:00',
-    vorgaenger_id: 11,
-  },
-];
-
-function setup(berichte: LageberichtAnzeige[] = [bericht]) {
-  server.use(
-    meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json(berichte)),
-  );
-  return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
-    </Routes>,
-    { route: '/einsaetze/7/lageberichte' },
-  );
-}
 
 const lagebericht7Abschnitte: LageberichtAnzeige = {
   ...bericht,
@@ -670,241 +627,318 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
   });
 });
 
-describe('LageberichtePage', () => {
-  it('zeigt den Grund eines gescheiterten Anlegens im Dialog, nicht nur im Toast (LFH-494)', async () => {
-    // Die Erfassungs-Hülle lässt die Werte bei Ablehnung stehen, und der Grund steht dabei. Dieser
-    // Pfad läuft über `mutation.error` und räumt beim nächsten Absenden; anders als beim Autosave
-    // drückt hier ein Mensch den Knopf, es gibt keinen Auto-Retry.
-    server.use(
-      http.post('/api/einsaetze/7/lageberichte', () =>
-        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
-      ),
-    );
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    await screen.findByLabelText('Titel');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+/**
+ * ── Übersicht und Anlegen (LLH-1064) ──
+ *
+ * Die Liste liefert Köpfe, Text und „zuletzt gespeichert“ kommen aus dem Einzelabruf (Spec
+ * `listen-projektion`). `setup` bedient beide aus derselben Menge; die Detailroute ist ein
+ * Platzhalter, an dem die Navigation sichtbar wird.
+ */
+function setupListe(
+  berichte: LageberichtAnzeige[] = [bericht],
+  optionen: { einsatz?: typeof einsatz } = {},
+) {
+  server.use(
+    meHandler(admin),
+    http.get('/api/einsaetze/7', () => HttpResponse.json(optionen.einsatz ?? einsatz)),
+    http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json(berichte)),
+    http.get('/api/einsaetze/7/lageberichte/:lbId', ({ params }) => {
+      const lb = berichte.find((b) => b.id === Number(params.lbId));
+      return lb ? HttpResponse.json(lb) : HttpResponse.json({ error: 'fehlt' }, { status: 404 });
+    }),
+  );
+  return renderMitProviders(
+    <Routes>
+      <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+      <Route path="/einsaetze/:id/lageberichte/:lbId" element={<DetailOrt />} />
+    </Routes>,
+    { route: '/einsaetze/7/lageberichte' },
+  );
+}
 
-    const treffer = await screen.findByText('Titel bereits vergeben');
-    expect(treffer.closest('.ant-message')).toBeNull();
-    // Der Dialog steht weiter offen und hat die Werte behalten.
-    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeInTheDocument();
-    expect((screen.getByLabelText('Titel') as HTMLInputElement).value).toMatch(
-      /^Lageüberblick \d{4}$/,
-    );
+function DetailOrt() {
+  const { lbId } = useParams();
+  return <p>Entwurf {lbId} geöffnet</p>;
+}
+
+/** Zählt die anlegenden POSTs und antwortet mit einem neuen Entwurf 41. */
+function zaehlePosts(antwort?: () => Response) {
+  const posts: Record<string, unknown>[] = [];
+  server.use(
+    http.post('/api/einsaetze/7/lageberichte', async ({ request }) => {
+      posts.push((await request.json()) as Record<string, unknown>);
+      return antwort?.() ?? HttpResponse.json({ ...bericht, id: 41 }, { status: 201 });
+    }),
+  );
+  return posts;
+}
+
+const freigegeben: LageberichtAnzeige = {
+  ...lagebericht7Abschnitte,
+  id: 20,
+  titel: 'Lageüberblick 0930',
+  status: 'freigegeben',
+  version: 2,
+  vorgaenger_id: 19,
+  zeitstand: '2026-06-02 09:30:00',
+  freigegeben_von_id: 1,
+  freigegeben_von_name: 'Einsatzleiter Nord',
+  freigegeben_at: '2026-06-02 09:45:00',
+  abschnitte: [
+    { schluessel: 'auftrag', text: 'Schutz der Unterstadt' },
+    {
+      schluessel: 'zusammenfassung',
+      text: 'Lage angespannt\n\nPegel steigt\nBetreuung gesichert\nVierte Zeile',
+    },
+  ],
+};
+const vorgaenger: LageberichtAnzeige = {
+  ...freigegeben,
+  id: 19,
+  version: 1,
+  vorgaenger_id: null,
+  zeitstand: '2026-06-02 08:00:00',
+  freigegeben_at: '2026-06-02 08:10:00',
+};
+const entwurf: LageberichtAnzeige = {
+  ...lagebericht7Abschnitte,
+  id: 25,
+  titel: 'Lagebeurteilung 1100',
+  vorlage: 'lagebeurteilung',
+  zeitstand: '2026-06-02 11:00:00',
+  ersteller_name: 'S2 Lage',
+  aktualisiert_at: '2026-06-02 11:20:00',
+  abschnitte: [
+    { schluessel: 'auftrag', text: 'A' },
+    { schluessel: 'anlass', text: 'B' },
+    { schluessel: 'beurteilung_schadenlage', text: 'C' },
+    { schluessel: 'beurteilung_eigene_lage', text: '   ' },
+    { schluessel: 'gemeinsame_elemente', text: 'D' },
+    { schluessel: 'entschlussvorschlaege', text: 'E' },
+  ],
+};
+
+const paneel = (name: string) => screen.queryByRole('region', { name });
+
+describe('LageberichtePage — Anlegen ohne Dialog (LLH-1064)', () => {
+  it('ein Klick auf „Neuer Lagevortrag“ schickt genau einen POST und öffnet den neuen Entwurf', async () => {
+    const posts = zaehlePosts();
+    setupListe();
+    const knopf = await screen.findByRole('button', { name: 'Neuer Lagevortrag' });
+    // Doppelklick: der Riegel hält es bei einem POST, es entsteht EIN Entwurf.
+    await userEvent.dblClick(knopf);
+    expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
+    expect(posts).toHaveLength(1);
+    // Vorlage zur Information, Titel aus der Uhrzeit, kein Zeitstand (der Server setzt jetzt).
+    expect(posts[0]).toEqual({
+      vorlage: 'lagebericht',
+      titel: expect.stringMatching(/^Lageüberblick \d{4}$/),
+    });
+    // Kein Dialog mehr auf dem Standardweg.
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('ersetzt den Grund beim nächsten Absenden, statt ihn zu stapeln (Gegenaussage)', async () => {
-    /*
-     * Hier räumt react-query beim Übergang nach `pending`, weil ein Mensch den Knopf drückt; der
-     * Autosave räumt dagegen erst bei Erfolg.
-     *
-     * Gemessen mit einem zweiten Fehlschlag und anderem Wortlaut, nicht mit einem Erfolg: antds
-     * Modal räumt sein DOM erst nach der Schließ-Transition, die in jsdom nie läuft — die
-     * Abwesenheits-Zusicherung wäre unfälschbar rot. Mit offenem Dialog misst der Fall genau, dass
-     * der Grund ersetzt wird.
-     */
-    let zweiter = false;
-    server.use(
-      http.post('/api/einsaetze/7/lageberichte', () =>
-        HttpResponse.json(
-          { error: zweiter ? 'Vorlage unbekannt' : 'Titel bereits vergeben' },
-          { status: 409 },
-        ),
-      ),
-    );
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    await screen.findByLabelText('Titel');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
-    expect(await screen.findByText('Titel bereits vergeben')).toBeInTheDocument();
-
-    zweiter = true;
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
-    expect(await screen.findByText('Vorlage unbekannt')).toBeInTheDocument();
-    expect(screen.queryByText('Titel bereits vergeben')).not.toBeInTheDocument();
-  });
-
-  it('trägt beim erneuten Öffnen keinen Grund aus dem vorigen Versuch', async () => {
-    // Der Store überlebt das Schließen: ohne `reset()` stünde der Fehler des letzten Anlegeversuchs
-    // über einem frischen, leeren Formular.
-    server.use(
-      http.post('/api/einsaetze/7/lageberichte', () =>
-        HttpResponse.json({ error: 'Titel bereits vergeben' }, { status: 409 }),
-      ),
-    );
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    await screen.findByLabelText('Titel');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
-    expect(await screen.findByText('Titel bereits vergeben')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
-    await screen.findByLabelText('Titel');
-    expect(screen.queryByText('Titel bereits vergeben')).not.toBeInTheDocument();
-  });
-
-  it('zeigt die Berichte des Einsatzes', async () => {
-    setup();
-    expect(await screen.findByText('Lage 10:00')).toBeInTheDocument();
-  });
-
-  it('zeigt für Schreibberechtigte den Anlegen-Button', async () => {
-    setup();
-    expect(await screen.findByRole('button', { name: /Neuer Bericht/i })).toBeInTheDocument();
-  });
-
-  it('zeigt leeren Zustand ohne Berichte', async () => {
-    setup([]);
-    expect(await screen.findByText(/Noch keine Lageberichte/i)).toBeInTheDocument();
-  });
-
-  it('zeigt leeren Zustand ohne eigenen Leer-Knoten', async () => {
-    // Wächter: der Riss entsteht, wenn `leerText` weggelassen wird — dann rendert der Fallback in
-    // `Liste.tsx` einen `.ant-empty`-Knoten.
-    const { container } = setup([]);
-    await screen.findByText(/Noch keine Lageberichte/i);
-    expect(container.querySelector('.ant-empty')).toBeNull();
-  });
-
-  it('zeigt je Fortschreibungskette EINE Karte mit dem jüngsten Stand und den Vorgängern als Links (N23)', async () => {
-    setup(KETTE);
-    const sicht = await screen.findByRole('region', { name: 'Lageberichte' });
-
-    // EINE Karte für die Kette 11 → 13: der Kopf ist v2 (Entwurf), v1 steht als Vorgänger-Link.
-    const links = await screen.findAllByRole('link', { name: 'Lage 10:00' });
-    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/einsaetze/7/lageberichte/13']);
-    // Kein zweiter Anker im Titel-Link: der Link entsteht in `karte.titel.ziel`.
-    links.forEach((l) => expect(l.querySelector('a')).toBeNull());
-    expect(screen.getByRole('link', { name: 'v1' })).toHaveAttribute(
-      'href',
-      '/einsaetze/7/lageberichte/11',
-    );
-    expect(sicht).toHaveTextContent('v2');
-    expect(sicht).toHaveTextContent(/Vorgänger:\s*v1/);
-    // Die Vorlage steht je KETTE einmal, nicht je Fassung.
-    expect(screen.getAllByText('Freier Bericht')).toHaveLength(1);
-
-    // Gruppenköpfe mit Zähler, Entwürfe zuerst; die Zählerform (Zahl vor Wort) gehört dem
-    // Primitiv (`gruppenZahl`).
-    // Einzahl bei einem (LFH-1153): „1 Entwürfe“ war falsch.
-    expect(sicht).toHaveTextContent(/1\s*Entwurf(?!e)/);
-    expect(sicht).not.toHaveTextContent(/Entwürfe/);
-    expect(sicht).toHaveTextContent(/1\s*Freigegeben/);
-    const text = sicht.textContent ?? '';
-    expect(text.indexOf('Entwurf')).toBeLessThan(text.indexOf('Freigegeben'));
-
-    // Gruppenachse führend; der freigegebene Kopf 14 steht in seiner Gruppe.
+  it('bietet am Pfeil die übrigen Vorlagen an, die Wahl legt sofort an', async () => {
+    const posts = zaehlePosts();
+    setupListe();
+    await userEvent.click(await screen.findByRole('button', { name: 'Andere Vorlage wählen' }));
+    const menue = await screen.findByRole('menu');
     expect(
-      within(sicht)
-        .getAllByRole('link')
-        .map((l) => l.getAttribute('href')),
-    ).toEqual([
-      '/einsaetze/7/lageberichte/13',
-      '/einsaetze/7/lageberichte/11',
-      '/einsaetze/7/lageberichte/14',
+      within(menue)
+        .getAllByRole('menuitem')
+        .map((e) => e.textContent),
+    ).toEqual(['Lagevortrag zur Entscheidung', 'Freier Bericht']);
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Freier Bericht' }));
+    expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
+    expect(posts).toEqual([
+      { vorlage: 'freitext', titel: expect.stringMatching(/^Bericht \d{4}$/) },
     ]);
   });
 
-  it('öffnet das Anlege-Modal mit Fokus im Titel und vorbelegtem Titel aus der Uhrzeit (N23)', async () => {
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    const titel = await screen.findByLabelText('Titel');
-    await waitFor(() => expect(titel).toHaveFocus());
-    expect((titel as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/);
-    // Der Absende-Knopf liegt im Formular — Enter sendet; kein antd-Footer, in dem ein Knopf
-    // außerhalb des `<form>` stünde.
-    const knopf = screen.getByRole('button', { name: 'Anlegen' });
-    expect(knopf.closest('form')).not.toBeNull();
-    expect(document.querySelector('.ant-modal-footer')).toBeNull();
-    // Drittes, optionales Feld: der Zeitstand. Leer gilt jetzt — als Platzhalter, nicht als Satz
-    // (LFH-1078).
-    expect(screen.getByLabelText('Zeitstand')).toHaveAttribute('placeholder', 'jetzt');
-    expect(screen.queryByText(/Leer gelassen/)).toBeNull();
-  });
+  it.each([
+    [400, 'Vorlage unbekannt'],
+    [503, 'Datenbank nicht erreichbar'],
+  ])(
+    'zeigt bei %i den Grund an der Seite, ohne Toast und ohne zu navigieren',
+    async (status, grund) => {
+      const posts = zaehlePosts(() => HttpResponse.json({ error: grund }, { status }));
+      setupListe();
+      await userEvent.click(await screen.findByRole('button', { name: 'Neuer Lagevortrag' }));
+      const treffer = await screen.findByText(grund);
+      expect(treffer.closest('.ant-message')).toBeNull();
+      expect(screen.getByText('Nicht angelegt')).toBeInTheDocument();
+      expect(screen.queryByText(/geöffnet$/)).toBeNull();
+      expect(posts).toHaveLength(1);
+    },
+  );
 
-  it('trägt beim zweiten Öffnen einen frischen Titelvorschlag, nicht den Speicher des ersten', async () => {
-    // Der Speicher von rc-field-form überlebt `destroyOnHidden` und gewinnt gegen `initialValues`.
-    // Wer den Vorschlag über `initialValues` setzt, sieht beim zweiten Öffnen den Stand des ersten
-    // — hier durch eigenen Wortlaut sichtbar gemacht, weil zwei Uhrzeiten im selben Test gleich
-    // sein können.
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    const erstes = await screen.findByLabelText('Titel');
-    await userEvent.clear(erstes);
-    await userEvent.type(erstes, 'Handgeschrieben');
-    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    await userEvent.click(screen.getByRole('button', { name: /Neuer Bericht/i }));
-    const zweites = await screen.findByLabelText('Titel');
-    await waitFor(() =>
-      expect((zweites as HTMLInputElement).value).toMatch(/^Lageüberblick \d{4}$/),
+  it('räumt den Grund beim nächsten Versuch (Gegenaussage)', async () => {
+    let fehlschlag = true;
+    zaehlePosts(() =>
+      fehlschlag
+        ? HttpResponse.json({ error: 'Vorlage unbekannt' }, { status: 400 })
+        : HttpResponse.json({ ...bericht, id: 41 }, { status: 201 }),
     );
+    setupListe();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Lagevortrag' }));
+    expect(await screen.findByText('Vorlage unbekannt')).toBeInTheDocument();
+    fehlschlag = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Neuer Lagevortrag' }));
+    expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
   });
 
-  it('schickt Vorlage und Titel; ein leerer Zeitstand wird nicht mitgeschickt', async () => {
-    const posts: Record<string, unknown>[] = [];
+  it('sperrt den Knopf ohne Schreibrecht sichtbar und nennt den Grund', async () => {
+    setupListe([bericht], { einsatz: { ...einsatz, meine_rolle: 'beobachter' } });
+    expect(await screen.findByRole('button', { name: 'Neuer Lagevortrag' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Andere Vorlage wählen' })).toBeDisabled();
+    expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+  });
+});
+
+describe('LageberichtePage — Übersicht (LLH-1064)', () => {
+  it('zeigt den aktuellen freigegebenen Stand vorn: Zeitstand, Freigabe, Auszug, Öffnen', async () => {
+    setupListe([vorgaenger, freigegeben, entwurf]);
+    const aktuell = await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
+    expect(
+      within(aktuell).getByRole('heading', { name: 'Lageüberblick 0930' }),
+    ).toBeInTheDocument();
+    expect(aktuell).toHaveTextContent('Lagevortrag zur Information · v2');
+    expect(aktuell).toHaveTextContent('Einsatzleiter Nord');
+    // Die ersten drei Zeilen der Zusammenfassung, gekürzt mit „…“; die vierte fehlt.
+    expect(await within(aktuell).findByText(/Pegel steigt/)).toBeInTheDocument();
+    expect(aktuell).toHaveTextContent('…');
+    expect(aktuell).not.toHaveTextContent('Vierte Zeile');
+    // Er steht VOR „In Arbeit“.
+    const inArbeit = screen.getByRole('region', { name: 'In Arbeit' });
+    expect(
+      aktuell.compareDocumentPosition(inArbeit) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await userEvent.click(within(aktuell).getByRole('button', { name: /Öffnen/ }));
+    expect(await screen.findByText('Entwurf 20 geöffnet')).toBeInTheDocument();
+  });
+
+  it('lässt das Paneel „Aktueller Lagevortrag“ ohne Freigabe weg, ebenso den Verlauf', async () => {
+    setupListe([entwurf]);
+    expect(await screen.findByRole('region', { name: 'In Arbeit' })).toBeInTheDocument();
+    expect(paneel('Aktueller Lagevortrag')).toBeNull();
+    expect(paneel('Verlauf')).toBeNull();
+  });
+
+  it('zeigt Entwürfe mit „zuletzt gespeichert“ und dem Füllstand der Vorlage', async () => {
+    setupListe([entwurf]);
+    const inArbeit = await screen.findByRole('region', { name: 'In Arbeit' });
+    expect(within(inArbeit).getByRole('link', { name: 'Lagebeurteilung 1100' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/lageberichte/25',
+    );
+    expect(inArbeit).toHaveTextContent('S2 Lage');
+    // Fünf von acht Abschnitten tragen Text; Leerraum zählt nicht.
+    expect(await within(inArbeit).findByText('5/8 Abschnitte')).toBeInTheDocument();
+    expect(inArbeit).toHaveTextContent(/zuletzt gespeichert \d{4,6}/);
+  });
+
+  it('nennt „Kein Entwurf in Arbeit“, wenn alles freigegeben ist', async () => {
+    setupListe([freigegeben]);
+    const inArbeit = await screen.findByRole('region', { name: 'In Arbeit' });
+    expect(inArbeit).toHaveTextContent('Kein Entwurf in Arbeit');
+  });
+
+  it('führt frühere Freigaben im Verlauf, jüngste zuerst, und keinen Bericht doppelt', async () => {
+    const aelter = { ...vorgaenger, id: 18, titel: 'Erstlage', zeitstand: '2026-06-02 07:00:00' };
+    setupListe([aelter, freigegeben, vorgaenger, entwurf]);
+    const verlauf = await screen.findByRole('region', { name: 'Verlauf' });
+    expect(
+      within(verlauf)
+        .getAllByRole('link')
+        .map((l) => l.getAttribute('href')),
+    ).toEqual(['/einsaetze/7/lageberichte/19', '/einsaetze/7/lageberichte/18']);
+    expect(verlauf).toHaveTextContent('v1');
+    // Jede Kennung genau einmal auf der Seite verlinkt (Aktuell öffnet per Knopf).
+    const hrefs = screen.getAllByRole('link').map((l) => l.getAttribute('href'));
+    expect(hrefs.filter((h) => h?.startsWith('/einsaetze/7/lageberichte/')).sort()).toEqual([
+      '/einsaetze/7/lageberichte/18',
+      '/einsaetze/7/lageberichte/19',
+      '/einsaetze/7/lageberichte/25',
+    ]);
+  });
+
+  it('bietet Fortschreiben nur am Kettenkopf an und öffnet die neue Fassung', async () => {
+    const posts: string[] = [];
     server.use(
-      http.post('/api/einsaetze/7/lageberichte', async ({ request }) => {
-        posts.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(bericht, { status: 201 });
+      http.post('/api/einsaetze/7/lageberichte/20/fortschreiben', () => {
+        posts.push('fort');
+        return HttpResponse.json({ ...entwurf, id: 42 }, { status: 201 });
       }),
     );
-    setup();
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    const titel = await screen.findByLabelText('Titel');
-    await userEvent.clear(titel);
-    await userEvent.type(titel, 'Lage 1200{Enter}');
-    await waitFor(() => expect(posts).toHaveLength(1));
-    expect(posts[0]).toEqual({ vorlage: 'lagebericht', titel: 'Lage 1200' });
+    setupListe([vorgaenger, freigegeben]);
+    const aktuell = await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
+    await userEvent.click(within(aktuell).getByRole('button', { name: 'Fortschreiben' }));
+    expect(await screen.findByText('Entwurf 42 geöffnet')).toBeInTheDocument();
+    expect(posts).toEqual(['fort']);
   });
 
-  it('bleibt in jeder Breite eine Kartensicht (form="karte", kein Breakpoint-Rückfall)', async () => {
-    setzeViewportBreite(390);
-    const schmal = setup(KETTE);
-    await screen.findAllByRole('link', { name: 'Lage 10:00' });
-    expect(schmal.container.querySelector('.ant-table')).toBeNull();
-    schmal.unmount();
-
-    setzeViewportBreite(1366);
-    const breit = setup(KETTE);
-    await screen.findAllByRole('link', { name: 'Lage 10:00' });
-    expect(breit.container.querySelector('.ant-table')).toBeNull();
+  it('bietet kein Fortschreiben, wenn schon eine Fortschreibung in Arbeit ist', async () => {
+    setupListe([freigegeben, { ...entwurf, vorgaenger_id: freigegeben.id }]);
+    const aktuell = await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
+    expect(within(aktuell).queryByRole('button', { name: 'Fortschreiben' })).toBeNull();
   });
 
-  it('filtert die Kartenliste über die Suche (Titel UND Vorlage)', async () => {
-    setup(KETTE);
-    await screen.findAllByRole('link', { name: 'Lage 10:00' });
-
-    // „zur Information" steht nur im Vorlagen-Label, in keinem Titel — ein nur auf den Titel
-    // gelegter `suchText` wäre hier rot.
-    await userEvent.type(screen.getByPlaceholderText('Titel oder Vorlage'), 'zur Information');
-
-    expect(screen.queryAllByRole('link', { name: 'Lage 10:00' })).toHaveLength(0);
-    expect(screen.getByRole('link', { name: 'Vortrag Nachmittag' })).toBeInTheDocument();
+  it('zeigt ohne Bericht den Leerzustand mit der Aktion „Neuer Lagevortrag“', async () => {
+    const posts = zaehlePosts();
+    const { container } = setupListe([]);
+    expect(await screen.findByText('Noch keine Lageberichte')).toBeInTheDocument();
+    expect(container.querySelector('.ant-empty')).toBeNull();
+    expect(paneel('In Arbeit')).toBeNull();
+    const knoepfe = screen.getAllByRole('button', { name: 'Neuer Lagevortrag' });
+    expect(knoepfe).toHaveLength(2);
+    await userEvent.click(knoepfe[1]);
+    expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
+    expect(posts).toHaveLength(1);
   });
 
-  it('trägt Überschrift und Kennzahlenzeile', async () => {
-    setup(KETTE);
-    // Seitenkopf (`EinsatzSeite`): der Titel ist die Überschrift der Kopfleiste, die Mengen stehen
-    // als Mono-Meta daneben.
+  it('nennt einen Ladefehler als „Stand unbekannt“ statt als leer', async () => {
+    server.use(
+      meHandler(admin),
+      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/7/lageberichte', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderMitProviders(
+      <Routes>
+        <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+      </Routes>,
+      { route: '/einsaetze/7/lageberichte' },
+    );
+    expect(await screen.findByText(/Stand unbekannt/)).toBeInTheDocument();
+    expect(screen.queryByText('Noch keine Lageberichte')).toBeNull();
+  });
+
+  it('trägt Überschrift und Mengen im Kopf', async () => {
+    setupListe([vorgaenger, freigegeben, entwurf]);
     expect(
       await screen.findByRole('heading', { name: 'Lageberichte', level: 1 }),
     ).toBeInTheDocument();
-    expect(await screen.findByText(/3 Berichte in 2 Ketten · 1 im Entwurf/)).toBeInTheDocument();
+    expect(await screen.findByText('3 Berichte · 1 in Arbeit')).toBeInTheDocument();
   });
 
-  it('zählt einen einzelnen Bericht in einer Kette in der Einzahl', async () => {
-    setup([bericht]);
-    expect(await screen.findByText(/^1 Bericht in 1 Kette · /)).toBeInTheDocument();
+  it('zählt einen einzelnen Bericht in der Einzahl', async () => {
+    setupListe([bericht]);
+    expect(await screen.findByText('1 Bericht · 1 in Arbeit')).toBeInTheDocument();
+  });
+
+  it('stapelt die Paneele am schmalen Schirm in einer Spalte', async () => {
+    setzeViewportBreite(390);
+    const { container } = setupListe([freigegeben, entwurf]);
+    await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
+    const raster = container.querySelector<HTMLElement>('[data-lfh="lageberichte-uebersicht"]');
+    expect(raster?.style.gridTemplateColumns).toBe('minmax(0, 1fr)');
   });
 });
 
 /**
- * ── Zeitstand der Fassungszeile (LFH-350) ──
- *
- * Die Anzeige läuft über `ZeitAnzeige`; `sortWert` bleibt der Wirestring (lexikografisch
- * sortierbar).
+ * ── Zeitstand in der Anzeigezone (LFH-350, LFH-692) ──
  *
  * Die Zone wird ausdrücklich gestellt und der Cache vorbelegt: ohne Provider fiele
  * `useAnzeigeKonventionen` auf die lokale Zone zurück, und nur den Provider einzuhängen genügt
@@ -916,6 +950,9 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
     meHandler(admin),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json(berichte)),
+    http.get('/api/einsaetze/7/lageberichte/:lbId', ({ params }) =>
+      HttpResponse.json(berichte.find((b) => b.id === Number(params.lbId))),
+    ),
     http.get('/api/einsaetze/7/einstellungen', () =>
       HttpResponse.json({ einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
@@ -932,54 +969,40 @@ function setupMitZone(berichte: LageberichtAnzeige[]) {
     <EinsatzAnzeigeProvider einsatzId={7}>
       <Routes>
         <Route path="/einsaetze/:id/lageberichte" element={<LageberichtePage />} />
+        <Route path="/einsaetze/:id/lageberichte/:lbId" element={<DetailOrt />} />
       </Routes>
     </EinsatzAnzeigeProvider>,
     { route: '/einsaetze/7/lageberichte', client },
   );
 }
 
-describe('LageberichtePage — Fassungszeile (LFH-350 · H60)', () => {
-  it('zeigt den Zeitstand als taktische DTG in der Anzeigezone, nicht roh', async () => {
-    setupMitZone([{ ...bericht, id: 21, version: 1, zeitstand: '2026-07-25 12:00:00' }]);
-    // 12:00 UTC → 14:00 Sommerzeit in Berlin.
-    expect(await screen.findByText('v1 · 251400JUL2026 · A')).toBeInTheDocument();
-    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
-  });
-});
-
-/**
- * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Einsatz auf Europe/Berlin. Titelvorschlag und
- * Zeitstand stehen in der Anzeigezone.
- */
-describe('LageberichtePage — Anlegen in der Anzeigezone (LFH-692)', () => {
+describe('LageberichtePage — Anzeigezone (LFH-350, LFH-692)', () => {
   mitProzessZone('UTC');
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('Titelvorschlag nennt 1200 für 10:00 UTC, ein Zeitstand 13:00 Berlin geht als 11:00 UTC hinaus', async () => {
+  it('zeigt den Zeitstand als taktische DTG in der Anzeigezone, nicht roh', async () => {
+    setupMitZone([
+      { ...freigegeben, zeitstand: '2026-07-25 12:00:00' },
+      { ...vorgaenger, zeitstand: '2026-07-25 10:00:00' },
+    ]);
+    // 12:00 UTC → 14:00 Sommerzeit in Berlin; der Verlauf 10:00 UTC → 1200.
+    const aktuell = await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
+    expect(aktuell).toHaveTextContent('251400JUL2026');
+    expect(screen.getByRole('region', { name: 'Verlauf' })).toHaveTextContent('251200JUL2026');
+    expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
+  });
+
+  it('Titelvorschlag nennt 1200 für 10:00 UTC', async () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-07-25T10:00:00Z'));
-    const posts: Record<string, unknown>[] = [];
+    const posts = zaehlePosts();
     setupMitZone([]);
-    server.use(
-      http.post('/api/einsaetze/7/lageberichte', async ({ request }) => {
-        posts.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(bericht, { status: 201 });
-      }),
-    );
-    await userEvent.click(await screen.findByRole('button', { name: /Neuer Bericht/i }));
-    const titel = await screen.findByLabelText('Titel');
-    await waitFor(() => expect(titel).toHaveValue('Lageüberblick 1200'));
-    const zeitstand = screen.getByRole('textbox', { name: 'Zeitstand' });
-    await userEvent.click(zeitstand);
-    await userEvent.type(zeitstand, '25.07.2026 13:00');
-    // Enter übernimmt die Zeit UND sendet das Formular (Erfassungs-Norm: Knopf im `<form>`).
-    await userEvent.keyboard('{Enter}');
+    // Warten, bis die Zone der Einstellungen greift: der Kopf zählt erst mit Daten.
+    await screen.findByText('Noch keine Lageberichte');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Neuer Lagevortrag' })[0]);
     await waitFor(() => expect(posts).toHaveLength(1));
-    expect(posts[0]).toMatchObject({
-      titel: 'Lageüberblick 1200',
-      zeitstand: '2026-07-25 11:00:00',
-    });
+    expect(posts[0]).toEqual({ vorlage: 'lagebericht', titel: 'Lageüberblick 1200' });
   });
 });

@@ -14,6 +14,7 @@ export {
   schadenAusmass as AUSMASS_META,
 } from '../../theme/statusFarben';
 import { KennungsLink } from '../../components/kennungsLink';
+export { GEFAHR_LABEL, GEFAHRENARTEN, SCHADENSGRAD_LABEL, gefahrText } from './gefahrWorte';
 
 export const TYP_LABEL: Record<SchadenTyp, string> = {
   sachschaden: 'Sachschaden',
