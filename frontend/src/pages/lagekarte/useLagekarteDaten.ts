@@ -713,6 +713,9 @@ export function useLagekarteDaten({
     gebiete: gebieteRoh ?? [],
     // Evakuierungsbezirke für den Zonen-Inspector — leer ohne Modulrecht.
     bezirke: bezirkeRoh ?? [],
+    // Steht die Bezirksliste fest (geladen oder gescheitert)? Ein Zeichnen-Auftrag mit Bezirk
+    // (LLH-1069) wartet darauf, statt den Bezirk beim Kaltstart als unbekannt zu verwerfen.
+    bezirkeGeladen: istSnapshot ? !snapQuery.isLoading : evakuierungQuery.isFetched,
     // Modul Evakuierung frei? Der Inspector bietet Zuordnung und Sprung nur dann an (LLH-1034).
     evakuierungZugriff,
     // Ansichts-gefilterte freie Zeichen für den Inspector-Lookup.

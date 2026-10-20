@@ -196,6 +196,12 @@ diese Zusage.
   `FREIE_SKIZZE_VORGABEFARBE`, für Paneel und Link dieselbe. Das Zonen-Zeichnen startet in
   `Kartenflaeche` erst mit angewandtem Style-JSON (Merker ab `style.load`, nie
   `isStyleLoaded()` — das wartet auf Kacheln) und beginnt nach `setStyle` neu wie die Messung.
+  **Bezug `&bezirk=<id>`** (LLH-1069, Spec `betreuung-lagekarte`): nur am Typ
+  `evakuierungsbezirk` (`parseZeichnenBezug`, sonst ganzer Auftrag `null`), wartet zusätzlich auf
+  `rechteBekannt` und `bezirkeGeladen`, startet nur mit freiem Modul Evakuierung für einen Bezirk
+  der Kartenliste (`lagekarte/bezirkZeichnen.ts`) und räumt `zeichnen` und `bezirk` zusammen. Der
+  Entwurf trägt `bezirk`: POST mit `label` und `evakuierungsbezirk_id`, keine Serie, danach der
+  Modus `gebietGezeichnet` (Rückmeldung wie `verortet`, Rückweg nur aus der Kennung).
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe
   aus `lagekarte/zeichnenEsc.ts`, **ein** `keydown`-Zuhörer der Seite, terra-draw-Modi mit

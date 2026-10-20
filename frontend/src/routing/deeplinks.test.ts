@@ -28,6 +28,7 @@ import {
   parseZurueck,
   rueckwegPfad,
   parseZeichnenAuftrag,
+  parseZeichnenBezug,
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
@@ -328,6 +329,36 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(lagekartePfad(E, { zeichnen: { typ: 'gefahrengebiet' } })).toBe(
       '/einsaetze/5/lagekarte?zeichnen=gefahrengebiet',
     );
+  });
+  it('Zeichnen mit Bezirk: `bezirk=<id>` neben `zeichnen` und zurück (LLH-1069)', () => {
+    const pfad = lagekartePfad(E, { zeichnen: { typ: 'evakuierungsbezirk', bezirk: 12 } });
+    expect(pfad).toBe('/einsaetze/5/lagekarte?zeichnen=evakuierungsbezirk&bezirk=12');
+    const params = new URLSearchParams(pfad.split('?')[1]);
+    expect(
+      parseZeichnenBezug(parseZeichnenAuftrag(params.get('zeichnen')), params.get('bezirk')),
+    ).toEqual({ typ: 'evakuierungsbezirk', bezirk: 12 });
+  });
+  it('parseZeichnenBezug: ohne Bezug unverändert, ein falscher Bezug verwirft den ganzen Auftrag', () => {
+    const eb = { typ: 'evakuierungsbezirk' as const };
+    // Ohne `bezirk` bleibt der Auftrag, wie er ist (LFH-825).
+    expect(parseZeichnenBezug(eb, null)).toEqual(eb);
+    expect(parseZeichnenBezug({ typ: 'gefahrengebiet' }, null)).toEqual({ typ: 'gefahrengebiet' });
+    expect(parseZeichnenBezug(null, null)).toBeNull();
+    // Mit Fläche als ausdrücklicher Form.
+    expect(parseZeichnenBezug({ ...eb, form: 'flaeche' }, '3')).toEqual({
+      ...eb,
+      form: 'flaeche',
+      bezirk: 3,
+    });
+    // `bezirk` gilt nur am Typ Evakuierungsbezirk: sonst kein Auftrag, kein Zeichnen ohne Bezug.
+    expect(parseZeichnenBezug({ typ: 'gefahrengebiet' }, '3')).toBeNull();
+    expect(parseZeichnenBezug({ typ: 'freie_skizze', form: 'linie' }, '3')).toBeNull();
+    // Unbrauchbare Kennung.
+    for (const roh of ['abc', '', '0', '-2', '1.5', ' ', '3x']) {
+      expect(parseZeichnenBezug(eb, roh), roh).toBeNull();
+    }
+    // Ein Bezug ohne Auftrag ist kein Auftrag.
+    expect(parseZeichnenBezug(null, '3')).toBeNull();
   });
   it('parsePlatzierenAuftrag liest den Auftrag zurück', () => {
     expect(parsePlatzierenAuftrag('schaden:7')).toEqual({ typ: 'schaden', id: 7 });
