@@ -2,7 +2,7 @@
 titel: Schäden
 gruppen: [alle, fuehrung]
 reihenfolge: 550
-quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
+quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/SchaedenDetailPage.tsx, frontend/src/pages/schaeden/SchadenErfassenModal.tsx, frontend/src/pages/schaeden/SchadenDaten.tsx, frontend/src/pages/schaeden/GeschaedigtPicker.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/schaeden/schadenHelfer.tsx, frontend/src/pages/schaeden/GefahrAuswahl.tsx, frontend/src/pages/schaeden/gefahrWorte.ts, frontend/src/pages/schaeden/SchaedenDruckTabelle.tsx, frontend/src/zeichen/fachobjektZeichen.ts, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz_schaden.rs, src/schaden/mod.rs]
 ---
 
 ## Überblick
@@ -10,7 +10,7 @@ quellen: [frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/SchaedenDetail
 Das Modul „Schäden“ sammelt, was im Einsatz beschädigt oder im Weg ist und nicht gleich behoben
 wird: Sachschäden, Verkehrshindernisse, Schäden an der Infrastruktur, Umweltschäden, Tierkadaver
 und Sonstiges. Jeder Schaden bekommt eine Registriernummer (S-001, S-002 …), einen Typ, ein Ausmaß
-und einen Ort. Er ist „offen“, bis er an eine zuständige Stelle „übergeben“ oder
+und einen Ort, bei Bedarf eine Gefahr und einen Schadensgrad. Er ist „offen“, bis er an eine zuständige Stelle „übergeben“ oder
 „abgeschlossen“ wird. Verortete Schäden erscheinen als Zeichen auf der Lagekarte.
 
 ## Abläufe
@@ -22,9 +22,11 @@ und einen Ort. Er ist „offen“, bis er an eine zuständige Stelle „übergeb
    ![Liste der Schäden in der Sicht „Alle“ mit offenen, übergebenen und abgeschlossenen Schäden](../bilder/schaeden/liste.png)
 
 2. Die Leiste „Offen“, „Übergeben“, „Abgeschlossen“, „Alle“ wählt die Sicht. Die Filter „Typ“,
-   „Ausmaß“ und „Verortet“ und die Suche nach S-Nr., Ort und Beschreibung engen die Liste ein.
-3. Der Status nennt bei übergebenen Schäden, an wen sie gingen. „Verortet“ zeigt, ob der Schaden
-   auf der Karte steht.
+   „Ausmaß“, „Gefahr“ und „Verortet“ und die Suche nach S-Nr., Ort und Beschreibung engen die
+   Liste ein.
+3. Der Status nennt bei übergebenen Schäden, an wen sie gingen. „Gefahr“ nennt Gefahr und
+   Schadensgrad, etwa „Elektrizität · total zerstört“. „Verortet“ zeigt, ob der Schaden auf der
+   Karte steht.
 4. Ein Klick auf eine Zeile öffnet die Seite des Schadens. Stehen mehr Schäden an, lädt „Ältere
    laden“ den nächsten Teil.
 
@@ -32,11 +34,13 @@ und einen Ort. Er ist „offen“, bis er an eine zuständige Stelle „übergeb
 
 1. „Schaden erfassen“ wählen. Es öffnet sich der gleichnamige Dialog.
 2. „Typ“, „Ausmaß“ („gering“, „mittel“, „groß“, „katastrophal“) und „Ort“ angeben; die drei
-   Felder sind Pflicht. Dazu eine „Beschreibung“.
+   Felder sind Pflicht. Bei Bedarf die „Gefahr“ wählen, etwa „Elektrizität“ oder „Brand“. Neben
+   jeder Gefahr steht das Zeichen, das der Schaden damit auf der Lagekarte bekommt.
 
-   ![Dialog „Schaden erfassen“ mit Typ, Ausmaß, Ort und Beschreibung](../bilder/schaeden/erfassen.png)
+   ![Dialog „Schaden erfassen“ mit Typ, Ausmaß, Ort und Gefahr](../bilder/schaeden/erfassen.png)
 
-3. Unter „Weitere Angaben“ bei Bedarf „Geschädigt“ (eine betroffene Person, eine Einsatzkraft,
+3. Unter „Weitere Angaben“ bei Bedarf eine „Beschreibung“, den „Schadensgrad“ („angeschlagen“,
+   „teilzerstört“, „total zerstört“), „Geschädigt“ (eine betroffene Person, eine Einsatzkraft,
    die eigene Organisation oder ein freier Kontakt) und die „Koordinate“ eintragen.
 4. „Anlegen“ wählen. Der Schaden steht als „offen“ in der Liste.
 
@@ -84,10 +88,19 @@ Wer die Koordinate schon beim Erfassen kennt, trägt sie unter „Weitere Angabe
 ### Status
 
 Ein Schaden geht von „offen“ nach „übergeben“ oder direkt nach „abgeschlossen“, von „übergeben“
-nach „abgeschlossen“. „Bearbeiten“ auf der Seite des Schadens ändert Typ, Ausmaß, Ort,
-Beschreibung und Geschädigt, auch nach dem Abschluss. „Stornieren“ nimmt eine Fehlerfassung aus
+nach „abgeschlossen“. „Bearbeiten“ auf der Seite des Schadens ändert Typ, Ausmaß, Gefahr,
+Schadensgrad, Ort, Beschreibung und Geschädigt, auch nach dem Abschluss. „Stornieren“ nimmt eine Fehlerfassung aus
 der Liste, in jedem Status; ein stornierter Schaden trägt im Titel „storniert“ und lässt sich
 nicht mehr ändern. Fotos und Dateien zum Schaden liegen auf seiner Seite.
+
+### Gefahr und Schadensgrad
+
+Die Gefahr nimmt dieselben Wörter wie die Gefahrengebiete ([Gefahren](gefahren.md)). Auf der
+Lagekarte trägt das Gefahrenzeichen des Schadens weiter die Farbe seines Ausmaßes; dazu kommen
+der Gefahrenhinweis nach DV 102 und der Schadensgrad als Schraffur. Einen Gefahrenhinweis gibt
+es für Atomare Strahlung, Chemische Stoffe, Explosion, Elektrizität und Ertrinken (als
+Wassereinbruch); bei den übrigen Gefahren bleibt das Zeichen ohne Hinweis. Die Auswahl auf der
+Karte nennt Gefahr und Schadensgrad in Worten.
 
 Wer geschädigt ist, lässt sich auch von der Seite einer betroffenen Person aus zuordnen („Bezug
 hinzufügen“ unter „Bezüge“, [Betroffene und Sichtung](betroffene.md)).
@@ -102,12 +115,15 @@ Eingaben, „Verwerfen“ verlässt die Seite ohne sie.
 
 ### Einsatztagebuch
 
-Das Einsatztagebuch vermerkt Anlegen (mit Typ und Ausmaß, ohne Ort), Übergabe (ohne Empfänger),
-Abschluss (mit Grund) und Stornieren, jeweils mit der Registriernummer.
+Das Einsatztagebuch vermerkt Anlegen (mit Typ, Ausmaß, Gefahr und Schadensgrad, ohne Ort),
+Übergabe (ohne Empfänger), Abschluss (mit Grund) und Stornieren, jeweils mit der
+Registriernummer.
 
-### Druck
+### Druck und Export
 
-„Drucken / als PDF“ druckt die Liste in der gewählten Sicht.
+„Drucken / als PDF“ druckt die Liste in der gewählten Sicht, „CSV exportieren“ gibt alle nicht
+stornierten Schäden als Tabelle aus, ohne Angaben zu Geschädigten. Beide nennen Gefahr und
+Schadensgrad in Worten.
 
 ### Rechte
 

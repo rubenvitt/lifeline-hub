@@ -1,3 +1,27 @@
+## [1.0.0-alpha.145](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.144...v1.0.0-alpha.145) (2026-10-20)
+
+### Betroffene: Tiere
+
+- **„Verbleib erfassen“ statt „Abschließen“:** Ein Tier wird jetzt so abgeschlossen wie eine Person. Im Dialog „Verbleib von T-…“ wählen Sie aus, was mit dem Tier geschehen ist, zum Beispiel „an Tierarzt übergeben“ oder „freigelassen“.
+- **Halter wird vorgeschlagen:** Wählen Sie „an Halter übergeben“, steht der bekannte Halter schon im Feld „Übergeben an / Ort“.
+- **„Wieder aufnehmen“ statt „Wiederöffnen“:** Ein abgeschlossenes Tier lässt sich wieder in Bearbeitung nehmen.
+- **Verbleib überall sichtbar:** Liste, Druck und Archivakte zeigen den Verbleib in einer eigenen Spalte bzw. Angabe. Im Einsatztagebuch steht er als Handlung, etwa „Tier T-001 (Hund): an Tierarzt übergeben“. Wird ein Tier wieder aufgenommen, vermerkt das Einsatztagebuch „Verbleib zurückgenommen“.
+
+### Schadenserfassung
+
+- **Neue Beschriftungen:** Die Schaltflächen heißen jetzt „Schaden übergeben“ und „Schaden abschließen“. So sind sie nicht mit dem Status „übergeben“ zu verwechseln.
+
+### Bedienung der Detailansichten (Tiere und Schäden)
+
+- **Klarere Kopfzeile:** Je Zustand gibt es genau eine Hauptaktion. Daneben steht immer sichtbar „Bearbeiten“. Weitere Statuswechsel und „Stornieren“ finden Sie im Menü der Kopfzeile.
+- **Stornieren mit Rückfrage:** Vor dem Stornieren fragt ein Dialog nach. Schlägt das Stornieren fehl, erscheint der Fehler direkt in diesem Dialog.
+- **Storniert auf einen Blick:** Stornierte Einträge tragen eine Zustandsmarke „storniert“.
+- Die Schaltfläche „Zurück zur Liste“ gibt es nicht mehr.
+
+### Anwenderdokumentation
+
+- Die Kapitel „Tiere“ und „Schäden“ samt Bildern beschreiben die neue Bedienung.
+
 ## [1.0.0-alpha.144](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.143...v1.0.0-alpha.144) (2026-10-20)
 
 ### Wichtige Änderungen

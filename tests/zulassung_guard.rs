@@ -52,6 +52,10 @@ const OHNE_EIGENE_GRENZE: &[(&str, &str, &str)] = &[
         "GET",
         "/api/einsaetze/{id}/tiere/export",
         "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
+    ),    (
+        "GET",
+        "/api/einsaetze/{id}/schaeden/export",
+        "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
     ),
 ];
 

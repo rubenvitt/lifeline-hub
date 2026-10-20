@@ -142,8 +142,8 @@ for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {
 }
 
 /**
- * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Liste verliert „Neuer Bericht"
- * (`LageberichtePage.tsx`, `aktionen` nur mit `darfSchreiben`); die Detailseite rendert statt
+ * LFH-435 · Zweig: Beobachter (kein Schreibrecht). Die Übersicht zeigt „Neuer Lagevortrag"
+ * gesperrt mit Grund (`LageberichtePage.tsx`, LLH-1064, Regel M16); die Detailseite rendert statt
  * des Formulars mit acht Editoren den Lesezweig (`LageberichtDetailPage.tsx`, Paneel
  * „Berichtstext"). Gemessen wird wie im Admin-Geschwister: Liste ohne Querlauf bei 390 px,
  * Detail unter `MAX_HOEHE` bei 1366 px.
@@ -167,9 +167,9 @@ test('Lageberichte: Liste ohne Querlauf und Detail unter der Höhengrenze (Beoba
   // ── VORBEDINGUNG: der Nur-Lese-Zweig steht. Das `aria-label` ist gesetzt (siehe Seite),
   // der Name also belastbar.
   await expect(
-    page.getByRole('button', { name: 'Neuer Bericht' }),
-    'Vorbedingung: ohne Schreibrecht kein „Neuer Bericht"',
-  ).toHaveCount(0);
+    page.getByRole('button', { name: 'Neuer Lagevortrag' }),
+    'Vorbedingung: ohne Schreibrecht ist „Neuer Lagevortrag" gesperrt',
+  ).toBeDisabled();
   const mass = await page.evaluate(() => ({
     scroll: document.documentElement.scrollWidth,
     klient: document.documentElement.clientWidth,

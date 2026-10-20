@@ -1,6 +1,6 @@
-import { Alert, Breadcrumb, Button, Spin } from 'antd';
+import { Alert, Breadcrumb, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
 import type { PegelAnzeige, PegelVerlauf } from '../api/types';
@@ -13,7 +13,7 @@ import { gemeinsamerDatenstand } from '../components/Datenstand';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { useRollen, type PaneelDatenzustand } from '../components/instrument';
 import { einsatzdatenPfad, einsatzEinstellungenPfad } from '../routing/deeplinks';
-import PegelPaneel from '../wetter/PegelPaneel';
+import PegelPaneel, { PegelLeerzeile } from '../wetter/PegelPaneel';
 import { AktuellPaneel, VorhersagePaneel, WarnungenPaneel } from '../wetter/WetterPaneele';
 import { teileWarnungen } from '../wetter/wetterStand';
 import { modulName } from '../einsatz/modulRegistry';
@@ -48,15 +48,24 @@ function paneelZustand(q: { isLoading: boolean; isError: boolean }): PaneelDaten
 }
 
 /**
- * Fachmodul „Wetter & Pegel" (LFH-633): was Wasser und Wetter am Einsatzort tun.
+ * Fachmodul „Wetter & Pegel" (LFH-633): was Wetter und Wasser am Einsatzort tun.
  *
- * Vier Paneele, vier Stände: Pegel, aktuelle Bedingungen (LFH-864), Warnungen und Vorhersage kommen
+ * Vier Paneele, vier Stände: Warnungen, Pegel, aktuelle Bedingungen (LFH-864) und Vorhersage kommen
  * aus zwei Quellen (PEGELONLINE, Bright Sky) und tragen je ihren Stand. Fällt ein Teil aus, zeigt
- * nur sein Paneel „Stand unbekannt". Reihenfolge: Wasser, Wetter jetzt, was kommt.
- * Der Seitenkopf zeigt den ältesten Abruf (`gemeinsamerDatenstand`).
+ * nur sein Paneel „Stand unbekannt". Der Seitenkopf zeigt den ältesten Abruf
+ * (`gemeinsamerDatenstand`).
  *
- * Leseseite: gepflegt wird in Einstellungen › Pegel. Die Primäraktion im Kopf öffnet dorthin; diese
- * Seite schreibt nichts und braucht keinen Rechte-Hinweis.
+ * Reihenfolge (LLH-1117, Spec `lage-wetter-pegel`, „Reihenfolge der Modulseite"): Wetter betrifft
+ * fast jede Lage, ein Pegel führt nur in einer Hochwasserlage. Amtliche Warnungen stehen immer
+ * vorn. Mit festgelegtem Pegel folgt das Pegel-Paneel, dann Bedingungen und Vorhersage; ohne
+ * stehen Bedingungen und Vorhersage direkt nach den Warnungen und der Pegel als EINE Zeile zuletzt.
+ * „Festgelegt" ist die Entscheidung am Einsatz (`lagekennzahlen`, wie die Kennzahlreihe des
+ * Lagebilds, LFH-640), nicht die Pegelliste: der Einsatz ist zuerst da, die Reihenfolge flackert
+ * nicht beim Laden. Der Zuschnitt hält beim Betrachten (siehe `zuschnitt`).
+ *
+ * Leseseite: gepflegt wird in Einstellungen › Pegel. Der Weg dorthin ist ein Nebenweg im Kopf
+ * (`weitere`, LFH-963), keine Primäraktion; diese Seite schreibt nichts und braucht keinen
+ * Rechte-Hinweis.
  *
  * Kein Live-Ereignis: alle drei Abfragen (Pegel, Verlauf, Wetter) fragen alle 5 min nach. Die Uhr (30 s) lässt „veraltet"
  * auch ohne Abruf umschlagen.
@@ -76,6 +85,24 @@ export default function WetterPegelPage() {
   const pegelQuery = useQuery(pegelAbfrage(einsatzId));
   const verlaufQuery = useQuery(pegelVerlaufAbfrage(einsatzId));
   const wetterQuery = useQuery(wetterAbfrage(einsatzId));
+
+  /*
+   * Der Zuschnitt (mit oder ohne Pegel-Paneel vorn), mit dem die Seite für diesen Einsatz aufgebaut
+   * wurde — Muster der Kennzahlreihe im Lagebild, im Render angeglichen, nicht per Effekt. Gesetzt
+   * erst, wenn kein Einsatz-Abruf mehr läuft (wer gerade einen Pegel festgelegt hat und herwechselt,
+   * findet sonst den alten Einsatz im Speicher). Danach hält er: legt jemand währenddessen einen
+   * Pegel fest, springt nichts unter dem Blick — das volle Paneel erscheint an der Stelle der Zeile,
+   * ganz unten. Beim nächsten Öffnen gilt der neue Zuschnitt.
+   */
+  const pegelFestgelegt = einsatzQuery.data
+    ? einsatzQuery.data.lagekennzahlen.includes('pegel')
+    : null;
+  const [zuschnitt, setZuschnitt] = useState<{ einsatzId: number; mitPegel: boolean } | null>(null);
+  if (pegelFestgelegt != null && !einsatzQuery.isFetching && zuschnitt?.einsatzId !== einsatzId) {
+    setZuschnitt({ einsatzId, mitPegel: pegelFestgelegt });
+  }
+  const mitPegel =
+    zuschnitt?.einsatzId === einsatzId ? zuschnitt.mitPegel : (pegelFestgelegt ?? false);
 
   // Den Verlauf an die Liste koppeln (siehe `verlaufLuecke`): jede neue Listenantwort zieht ihn
   // einmal nach, solange eine Lücke besteht. Bleibt sie, geschieht bis zur nächsten Listenantwort
@@ -109,13 +136,30 @@ export default function WetterPegelPage() {
   const warnLage =
     warnungen?.zustand === 'ok' ? teileWarnungen(warnungen.daten ?? [], jetzt) : null;
   const warnAnzahl = warnLage ? warnLage.giltJetzt.length + warnLage.angekuendigt.length : null;
+  const zelle = { minWidth: 0 };
+  const volleBreite = { gridColumn: '1 / -1', minWidth: 0 };
+  const pegelPaneel = (
+    <PegelPaneel
+      zustand={pegelZustand}
+      pegel={pegel}
+      verlauf={verlaufQuery.isError ? null : verlaufQuery.data}
+      jetzt={jetzt}
+      konv={konv}
+      onEinstellungen={zuDenEinstellungen}
+      onNeuladen={() => {
+        void pegelQuery.refetch();
+        void verlaufQuery.refetch();
+      }}
+    />
+  );
 
   return (
     <EinsatzSeite
       titel={modulName('wetter-pegel')}
+      // Wetter vorn; „0 Pegel" ist ohne Hochwasserlage nur Rauschen.
       meta={[
-        pegelQuery.data ? `${pegel.length} Pegel` : null,
         warnAnzahl != null ? warnungenMeta(warnAnzahl) : null,
+        pegel.length > 0 ? `${pegel.length} Pegel` : null,
       ]
         .filter(Boolean)
         .join(' · ')}
@@ -129,11 +173,10 @@ export default function WetterPegelPage() {
           ]}
         />
       }
-      aktionen={
-        <Button type="primary" onClick={zuDenEinstellungen}>
-          Pegel festlegen
-        </Button>
-      }
+      weitere={{
+        name: 'Weitere Aktionen zu Wetter & Pegel',
+        eintraege: [{ key: 'pegel', label: 'Pegel festlegen', onWahl: zuDenEinstellungen }],
+      }}
     >
       <div
         data-lfh="wetter-pegel-raster"
@@ -144,30 +187,7 @@ export default function WetterPegelPage() {
           alignItems: 'start',
         }}
       >
-        <div style={{ gridColumn: '1 / -1', minWidth: 0 }}>
-          <PegelPaneel
-            zustand={pegelZustand}
-            pegel={pegel}
-            verlauf={verlaufQuery.isError ? null : verlaufQuery.data}
-            jetzt={jetzt}
-            konv={konv}
-            onEinstellungen={zuDenEinstellungen}
-            onNeuladen={() => {
-              void pegelQuery.refetch();
-              void verlaufQuery.refetch();
-            }}
-          />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <AktuellPaneel
-            zustand={paneelZustand(wetterQuery)}
-            wetter={wetterQuery.data}
-            jetzt={jetzt}
-            konv={konv}
-            onNeuladen={() => void wetterQuery.refetch()}
-          />
-        </div>
-        <div style={{ minWidth: 0 }}>
+        <div style={volleBreite}>
           <WarnungenPaneel
             zustand={paneelZustand(wetterQuery)}
             wetter={wetterQuery.data}
@@ -177,7 +197,17 @@ export default function WetterPegelPage() {
             onEinsatzdaten={() => navigate(einsatzdatenPfad(einsatzId))}
           />
         </div>
-        <div style={{ minWidth: 0 }}>
+        {mitPegel && <div style={volleBreite}>{pegelPaneel}</div>}
+        <div style={zelle}>
+          <AktuellPaneel
+            zustand={paneelZustand(wetterQuery)}
+            wetter={wetterQuery.data}
+            jetzt={jetzt}
+            konv={konv}
+            onNeuladen={() => void wetterQuery.refetch()}
+          />
+        </div>
+        <div style={zelle}>
           <VorhersagePaneel
             zustand={paneelZustand(wetterQuery)}
             wetter={wetterQuery.data}
@@ -186,6 +216,16 @@ export default function WetterPegelPage() {
             onNeuladen={() => void wetterQuery.refetch()}
           />
         </div>
+        {/* Ohne Entscheidung: eine Zeile — es sei denn, während des Lesens kam eine Liste. */}
+        {!mitPegel && (
+          <div style={volleBreite} data-lfh="pegel-leerzeile">
+            {pegel.length > 0 ? (
+              pegelPaneel
+            ) : (
+              <PegelLeerzeile onEinstellungen={zuDenEinstellungen} />
+            )}
+          </div>
+        )}
       </div>
     </EinsatzSeite>
   );

@@ -107,7 +107,10 @@ const KARTEN_EIGENBAU: string[] = [];
 /**
  * Dateien, die `form="karte"` tragen MÜSSEN: Module, die kartenbasiert gelesen werden.
  */
-const NUR_KARTE: string[] = ['/src/pages/LageberichtePage.tsx'];
+const NUR_KARTE: string[] = [
+  // Die Bezirke stehen seit LLH-1034 als Tabelle (`BezirkTabelle`), die Lageberichte seit
+  // LLH-1064 auf Paneelen; kein Modul wird derzeit kartenbasiert gelesen.
+];
 
 /**
  * Dateien, die `form="tabelle"` tragen MÜSSEN: Vergleichsflächen (Kriterium 14). Die Listen sind
@@ -187,7 +190,6 @@ const KONSUMENTEN = [
   // Der Kommunikationsplan S6 (LFH-848): Gruppen als Baumknoten, Aktionsspalte selbst gebaut.
   '/src/pages/KommunikationsplanPage.tsx',
   '/src/pages/KraefteuebersichtPage.tsx',
-  '/src/pages/LageberichtePage.tsx',
   '/src/pages/MaterialPage.tsx',
   '/src/pages/PersonalPage.tsx',
   '/src/pages/PersonenPage.tsx',
@@ -712,10 +714,11 @@ describe('Datensicht-Guard (LFH-330 · B2)', () => {
     // LEER. Wer einträgt, begründet wie über der Liste beschrieben, sonst wäre der Kartenplan nur
     // ein Vorschlag.
     expect(KARTEN_EIGENBAU).toHaveLength(0);
-    // Ein Kartenmodul (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`, die Bezirke seit
-    // LLH-1034 als Tabelle), sieben Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am
-    // Anwesenheits-Gegentest auf; wer umbaut, ohne einzutragen, an der Formprüfung.
-    expect(NUR_KARTE).toHaveLength(1);
+    // Kein Kartenmodul mehr (die Befehlsliste steht seit oxgob5gk auf `ListeDetail`, die Bezirke
+    // seit LLH-1034 als Tabelle, die Lageberichte seit LLH-1064 auf Paneelen), sieben
+    // Vergleichsflächen. Wer einträgt, ohne umzubauen, fällt am Anwesenheits-Gegentest auf; wer
+    // umbaut, ohne einzutragen, an der Formprüfung.
+    expect(NUR_KARTE).toHaveLength(0);
     expect(NUR_TABELLE).toHaveLength(7);
     // Zwei PFLICHTEN, dateibezogen: Meldebild und Einheiten-Gliederung (beide kumulieren über den
     // Kräftebaum). Ein weiterer Eintrag braucht dieselbe Herleitung.

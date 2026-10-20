@@ -372,6 +372,7 @@ use utoipa::OpenApi;
         crate::schaden::AbschlussGrund,
         crate::schaden::Ausmass,
         crate::schaden::SchadenAnzeige,
+        crate::schaden::Schadensgrad,
         crate::schaden::SchadenMarker,
         crate::schaden::SchadenKennzahlen,
         crate::schaden::SchadenAuswahl,
