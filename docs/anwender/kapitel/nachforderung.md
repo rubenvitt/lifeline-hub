@@ -108,7 +108,8 @@ die Person, die sie angelegt hat, und die Personen, die S4 besetzen (laut Stab-B
 laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa „Nachforderung
 eingetroffen“ mit „2× an Leitstelle“. Art, Bezeichnung, Adressat-Bezeichnung und Ablehnungsgrund
 stehen nie im Hinweis; er führt in das Modul „Nachforderung“. Auch ein „Rückgängig“ zurück auf
-„Zugesagt“ oder „Unterwegs“ meldet die neue Stufe. Das Absetzen selbst meldet nichts.
+„Zugesagt“ oder „Unterwegs“ meldet die neue Stufe, eines zurück auf „Angefordert“ meldet nichts.
+Das Absetzen selbst meldet nichts.
 
 Eigene Aktionen bleiben still: Wer den Stand selbst fortschreibt oder ablehnt, bekommt dazu
 nichts. Wer die Nachforderung angelegt hat und zugleich S4 besetzt, erhält den Hinweis einmal.
@@ -138,7 +139,9 @@ Die Felder bleiben vor dem Absetzen änderbar.
 ### Ablauf der Stufen
 
 Die Stufen laufen vorwärts, jeweils um eine: Angefordert, Zugesagt, Unterwegs, Eingetroffen.
-„Rückgängig“ nimmt den letzten Schritt um genau eine Stufe zurück, solange der Hinweis steht.
+„Rückgängig“ nimmt den letzten Schritt um genau eine Stufe zurück, solange der Hinweis steht, auch
+die Zusage zurück auf „Angefordert“. Der Zeitpunkt der zurückgenommenen Stufe entfällt; wer sie
+erneut meldet, setzt einen neuen.
 Ablehnen geht aus jeder Stufe vor „Eingetroffen“; was eingetroffen ist, wird nicht mehr
 abgelehnt. Ist aus einer Nachforderung Material übernommen, lässt sich „Eingetroffen“ nicht mehr
 zurücknehmen; die App nennt den Grund über der Liste. Wer versehentlich übernommen hat, storniert
