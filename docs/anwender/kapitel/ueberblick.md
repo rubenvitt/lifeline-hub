@@ -45,7 +45,8 @@ Modulen selbst.
 
 - **Kräfte im Einsatz** zählt nur das Personal, nicht Fahrzeuge oder Material.
 - **Warnstufe** ist die höchste Stufe aller Gefahrengebiete; darunter steht, wie viele Gebiete
-  eine Warnstufe tragen (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort
+  eine Warnstufe tragen und, falls es welche gibt, wie viele „nicht beurteilt“ sind (Kapitel
+  [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort
   auch sein Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
 - **Offene Aufträge** nennt dieselbe Zahl wie das Modul „Aufträge/Befehle“ und dazu, wie viele
   über ihrer Frist sind. Das Paneel zeigt höchstens acht, die überfälligen zuerst; alle weiteren

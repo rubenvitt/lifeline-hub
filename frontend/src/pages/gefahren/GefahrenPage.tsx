@@ -8,6 +8,7 @@ import type { BewertungEingabe } from '../../api/gefahren';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   benenneGefahrengebiet,
+  bestaetigeBeurteilung,
   gefahrengebietName,
   ladeGefahrengebiete,
   setzeBewertung,
@@ -21,6 +22,8 @@ import { warnstufeKarte } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
+import GefahrenBeurteilung from './GefahrenBeurteilung';
+import { NICHT_BEURTEILT, istBeurteilt } from './beurteilung';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
@@ -126,6 +129,14 @@ export default function GefahrenPage() {
   // Kein `onError`-Toast: `InlineAngabe` zeigt die Ablehnung an der Zeile (`mutateAsync` lehnt
   // ab). `onSuccess` gibt die Invalidierung zurück, damit `mutateAsync` erst mit dem neuen Namen
   // im Cache erfüllt.
+  // Bestätigen der Beurteilung (LLH-1090): Antwort ist das Gebiet, die Liste lädt nach.
+  const beurteilen = useMutation({
+    mutationFn: (gebietId: number) => bestaetigeBeurteilung(einsatzId, gebietId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
+  });
+  // Ein Fehler gehört zu seinem Gebiet: beim Wechsel steht er nicht am nächsten.
+  const beurteilenFehler =
+    beurteilen.isError && beurteilen.variables === gewaehlt ? beurteilen.error : null;
   const umbenennen = useMutation({
     mutationFn: (label: string) => benenneGefahrengebiet(einsatzId, gewaehlt as number, label),
     onSuccess: () => qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
@@ -236,14 +247,23 @@ export default function GefahrenPage() {
                 background: g.id === gewaehlt ? token.colorPrimaryBg : undefined,
               }}
             >
-              <Space>
+              {/* `wrap`: in der 240-px-Spalte bricht die Zeile zwischen den Angaben um, nicht in
+                  einem Wort („1 Zon e“). */}
+              <Space wrap>
                 {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
                 {/* Zahl vor Wort, mit Einheit (LFH-971): „(1)" las sich als Rang oder Meldung. */}
-                <Typography.Text type="secondary">
-                  {g.zonen_ids.length === 1 ? '1 Zone' : `${g.zonen_ids.length} Zonen`}
+                <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
+                  <span>{g.zonen_ids.length === 1 ? '1 Zone' : `${g.zonen_ids.length} Zonen`}</span>
+                  {/* Die offene Beurteilung als Wort (LLH-1090): hier wählt man, was zu tun ist. */}
+                  {!istBeurteilt(g) && (
+                    <>
+                      {' · '}
+                      <span>{NICHT_BEURTEILT}</span>
+                    </>
+                  )}
                 </Typography.Text>
               </Space>
             </ListenEintrag>
@@ -340,6 +360,18 @@ export default function GefahrenPage() {
             </div>
           </div>
         )}
+        {aktuell && (
+          <GefahrenBeurteilung
+            // Je Gebiet ein eigener Zustand: nichts wandert ins nächste.
+            key={aktuell.id}
+            gebiet={aktuell}
+            darfSchreiben={darfSchreiben}
+            matrixLaedt={matrixQuery.isPending}
+            laeuft={beurteilen.isPending && beurteilen.variables === aktuell.id}
+            fehler={beurteilenFehler}
+            onBestaetigen={() => beurteilen.mutate(aktuell.id)}
+          />
+        )}
         {!darfSchreiben && (
           <div style={{ marginBottom: 12 }}>
             <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
@@ -355,7 +387,7 @@ export default function GefahrenPage() {
         ) : (
           <GefahrenMatrix
             matrix={matrixQuery.data ?? []}
-            // Ohne Daten wäre jede Zelle „nicht bewertet" — eine Aussage, die niemand geprüft hat.
+            // Ohne Daten zeigte jede Zelle „keine“ — eine Aussage, die niemand geprüft hat.
             laedt={matrixQuery.isPending}
             darfSchreiben={darfSchreiben}
             // Nur die Zelle des laufenden PUT sperren; `variables` ist genau die Eingabe der

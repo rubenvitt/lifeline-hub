@@ -6,11 +6,11 @@ import {
   IconSpross,
   type Icon,
 } from '../../icons';
-import { useEffect, useRef, useState, type RefObject } from 'react';
-import { Button, Dropdown, Space, Table, Tooltip, Typography, theme } from 'antd';
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { Button, Dropdown, Space, Table, Tooltip, Typography } from 'antd';
 import type { GlobalToken, TableColumnsType, TableRef } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
-import { monoStil } from '../../components/instrument';
+import { monoStil, useRollen } from '../../components/instrument';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
@@ -104,32 +104,40 @@ export function zellFlaechenStil(
 }
 
 /**
- * Die beiden Zellzustände ohne Warnstufe (LFH-969) — EINE Quelle für Matrix, Auszug und Legende,
- * damit dieselbe Zelle überall dasselbe Zeichen trägt. „–" heißt ausschließlich „keine": das ist
- * eine Meldung. Eine gültige Zelle ohne Bewertung ist eine Lücke und bleibt leer, sonst sähe eine
- * offene Beurteilung aus wie eine Entwarnung. `legende` ist das Wort für das Zeichen in der Legende,
- * weil sich ein leeres Zeichen nicht vorzeigen lässt; „unbewertet" wie im Lage-Dashboard.
+ * Zellzustände ohne gesetzte Stufe — EINE Quelle für Matrix, Auszug und Legende, damit dieselbe
+ * Zelle überall dasselbe Zeichen trägt.
+ *
+ * „keine“ ist die Vorgabe (LLH-1090, Spec `gefahrenmatrix`, fortgeschrieben aus LFH-969): eine
+ * gültige Zelle ohne Bewertung zeigt „–“ wie eine ausdrücklich auf „keine“ gesetzte, mit demselben
+ * Namen und derselben Kennung. Die Sorge von LFH-969 („sonst sähe eine offene Beurteilung aus wie
+ * eine Entwarnung“) trägt jetzt die Beurteilung am Gefahrengebiet („nicht beurteilt“,
+ * `GefahrenBeurteilung`), nicht mehr eine leere Zelle.
  */
-export const ZELLE_UNBEWERTET = {
-  label: 'nicht bewertet',
-  kuerzel: '',
-  legende: 'leer',
-  begriff: 'unbewertet',
-} as const;
+export function zellStufe(zelle: GefahrBewertung | undefined): Warnstufe {
+  return zelle?.warnstufe ?? 'keine';
+}
 
-/** Zelle, solange die Matrix lädt: weder Stufe noch Lücke ist bekannt. */
+/** Zelle, solange die Matrix lädt: noch keine Aussage, auch nicht „keine“. */
 const ZELLE_LAEDT = { label: 'lädt', kuerzel: '' } as const;
 
-/** Ungültige Kombination: Text als zweiter Kanal, kein Knopf (WCAG 1.4.1). */
-export const ZELLE_NICHT_ANWENDBAR = { label: 'nicht anwendbar', kuerzel: 'n. a.' } as const;
+/**
+ * Ungültige Kombination: kein Text, kein Knopf (ein gesperrter Auslöser gäbe vor, es gäbe hier
+ * eine Entscheidung). Zweiter Kanal neben der fehlenden Bedienung ist das Muster
+ * ({@link schraffurStil}, WCAG 1.4.1), für Hilfstechnik der Name.
+ */
+export const ZELLE_NICHT_ANWENDBAR = { label: 'nicht anwendbar' } as const;
 
-/** Wert für `data-warnstufe` einer gültigen Zelle ohne Bewertung. */
-export const DATEN_UNBEWERTET = 'unbewertet';
-
-/** Zähler über der Matrix: Einzahl, Mehrzahl, und die volle Matrix als eigener Satz. */
-export function unbewertetText(anzahl: number): string {
-  if (anzahl === 0) return 'Alle Felder bewertet';
-  return `${anzahl} ${anzahl === 1 ? 'Feld' : 'Felder'} ${ZELLE_UNBEWERTET.begriff}`;
+/**
+ * Schraffur einer nicht anwendbaren Zelle und ihres Legendenfelds — eine Stelle für Matrix,
+ * Legende und Palettenauszug. Die Linien tragen die Farbe in `color` (danach misst
+ * `e2e/gefahrenmatrix-kontrast.spec.ts` gegen den Grund, ≥ 3 : 1 nach WCAG 1.4.11) und im Verlauf.
+ * Aufrufer geben `rollen.steuerRahmen`: die Rolle hält auf jeder Fläche 3 : 1.
+ */
+export function schraffurStil(farbe: string): CSSProperties {
+  return {
+    color: farbe,
+    backgroundImage: `repeating-linear-gradient(135deg, ${farbe} 0 1px, transparent 1px 6px)`,
+  };
 }
 
 /** Die eine Schreibweise der Zell-Identität — auch für den Schlüssel der laufenden Mutation. */
@@ -141,8 +149,8 @@ export interface GefahrenMatrixProps {
   matrix: GefahrBewertung[];
   darfSchreiben: boolean;
   /**
-   * Die Matrix ist noch nicht geladen (LFH-969). Dann sagt keine Zelle „nicht bewertet" und der
-   * Zähler keine Zahl, und alle Zellen sind gesperrt: ein Klick schriebe sonst über Details, die
+   * Die Matrix ist noch nicht geladen (LFH-969). Dann zeigt keine Zelle eine Stufe, auch nicht die
+   * Vorgabe „keine“, und alle Zellen sind gesperrt: ein Klick schriebe sonst über Details, die
    * noch unterwegs sind.
    */
   laedt?: boolean;
@@ -175,7 +183,7 @@ export default function GefahrenMatrix({
   detailsFehler,
   onDetailsSchliessen,
 }: GefahrenMatrixProps) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   // Freiraum unter der stehenden Kopfzeile beim Rückwärtstabben.
   const tabelleRef = useRef<TableRef>(null);
   useKopfFreiraum(tabelleRef);
@@ -214,10 +222,14 @@ export default function GefahrenMatrix({
           </Tooltip>
         ),
         onCell: (zeile: ZeilenDaten) => {
-          // Ohne Bewertung keine Fläche und kein Balken — und eine eigene Kennung, nicht „keine".
-          const stufe = zelleVon(zeile.typ, obj.wert)?.warnstufe;
+          // Eine nicht anwendbare Zelle trägt keine Stufe; während des Ladens ist keine bekannt.
+          const zelle = zelleVon(zeile.typ, obj.wert);
+          const stufe =
+            !kombinationGueltig(zeile.typ, obj.wert) || (!zelle && laedt)
+              ? undefined
+              : zellStufe(zelle);
           return {
-            'data-warnstufe': stufe ?? (laedt ? undefined : DATEN_UNBEWERTET),
+            'data-warnstufe': stufe,
             style: {
               ...(stufe ? zellFlaechenStil(stufe, token) : {}),
               textAlign: 'center' as const,
@@ -226,33 +238,34 @@ export default function GefahrenMatrix({
         },
         render: (_: unknown, zeile: ZeilenDaten) => {
           if (!kombinationGueltig(zeile.typ, obj.wert)) {
-            // Zweiter Kanal für „ungültig" ist Text, nicht Blässe (WCAG 1.4.1). Kein Knopf — ein
-            // deaktivierter Auslöser gäbe vor, es gäbe hier eine Entscheidung.
+            // Muster statt Wort, kein Knopf; die Kachel hat die Höhe der Zellknöpfe, damit das
+            // Raster ruhig bleibt (LLH-1090).
             return (
-              <Typography.Text
-                type="secondary"
+              <span
+                role="img"
+                data-lfh="nicht-anwendbar"
                 aria-label={`${zeile.label} × ${obj.label}: ${ZELLE_NICHT_ANWENDBAR.label}`}
-              >
-                {ZELLE_NICHT_ANWENDBAR.kuerzel}
-              </Typography.Text>
+                style={{
+                  display: 'block',
+                  minWidth: token.controlHeight,
+                  height: token.controlHeight,
+                  ...schraffurStil(rollen.steuerRahmen),
+                }}
+              />
             );
           }
           const zelle = zelleVon(zeile.typ, obj.wert);
-          // Kein Rückfall auf „keine" (LFH-969): die Lücke ist ein eigener Zustand.
-          const anzeige = zelle
-            ? warnstufeFlaeche[zelle.warnstufe]
-            : laedt
-              ? ZELLE_LAEDT
-              : ZELLE_UNBEWERTET;
+          // Ohne Zeile gilt „keine“ (LLH-1090); nur vor dem Laden ist nichts bekannt.
+          const anzeige = !zelle && laedt ? ZELLE_LAEDT : warnstufeFlaeche[zellStufe(zelle)];
           const schluessel = zellSchluessel(zeile.typ, obj.wert);
+          // „Details …“ an jeder gültigen Zelle: ob sie eine Zeile hat, sieht man nicht mehr.
           const items = [
             ...WARNSTUFEN.map((w) => ({
               key: w.wert,
               label: `${warnstufeFlaeche[w.wert].kuerzel} · ${w.label}`,
             })),
-            ...(zelle
-              ? [{ type: 'divider' as const }, { key: 'details', label: 'Details …' }]
-              : []),
+            { type: 'divider' as const },
+            { key: 'details', label: 'Details …' },
           ];
           return (
             <Dropdown
@@ -309,18 +322,11 @@ export default function GefahrenMatrix({
       ` × ${SCHUTZOBJEKTE.find((s) => s.wert === detailKennung.objekt)?.label ?? detailKennung.objekt}`
     : '';
 
-  const unbewertet = GEFAHRENTYPEN.reduce(
-    (summe, g) =>
-      summe +
-      SCHUTZOBJEKTE.filter((o) => kombinationGueltig(g.wert, o.wert) && !zelleVon(g.wert, o.wert))
-        .length,
-    0,
-  );
-
   return (
     <>
-      {/* Legende und Zähler (LFH-969): ohne sie wäre „–" neben einer leeren Zelle ein Rätsel. Als
-          Text, nicht als Tooltip — den gibt es auf Touch nicht. */}
+      {/* Legende (LFH-969, LLH-1090): Kürzel und Muster mit ihrem Wort. Als Text, nicht als
+          Tooltip — den gibt es auf Touch nicht. Ob die Matrix beurteilt ist, steht am Gebiet
+          (`GefahrenBeurteilung`), nicht als Zellzählung. */}
       <div
         style={{
           display: 'flex',
@@ -331,18 +337,27 @@ export default function GefahrenMatrix({
         }}
       >
         <Typography.Text type="secondary" role="note" aria-label="Legende der Matrix">
-          {[
-            ...WARNSTUFEN.map((w) => {
-              const { kuerzel, label } = warnstufeFlaeche[w.wert];
-              return `${kuerzel} ${label}`;
-            }),
-            `${ZELLE_UNBEWERTET.legende} ${ZELLE_UNBEWERTET.begriff}`,
-            `${ZELLE_NICHT_ANWENDBAR.kuerzel} ${ZELLE_NICHT_ANWENDBAR.label}`,
-          ].join(' · ')}
+          {WARNSTUFEN.map((w) => {
+            const { kuerzel, label } = warnstufeFlaeche[w.wert];
+            return `${kuerzel} ${label}`;
+          }).join(' · ')}
+          {' · '}
+          <span
+            aria-hidden="true"
+            data-lfh="legende-schraffur"
+            style={{
+              display: 'inline-block',
+              width: '1em',
+              height: '1em',
+              verticalAlign: '-0.15em',
+              ...schraffurStil(rollen.steuerRahmen),
+            }}
+          />{' '}
+          {ZELLE_NICHT_ANWENDBAR.label}
         </Typography.Text>
-        <Typography.Text style={monoStil(token.fontSize)}>
-          {laedt ? 'Bewertungen laden …' : unbewertetText(unbewertet)}
-        </Typography.Text>
+        {laedt && (
+          <Typography.Text style={monoStil(token.fontSize)}>Bewertungen laden …</Typography.Text>
+        )}
       </div>
       <Table<ZeilenDaten>
         rowKey="typ"
@@ -365,13 +380,13 @@ export default function GefahrenMatrix({
         titel={detailTitel}
         laeuft={detailSchluessel !== null && laufendeZelle === detailSchluessel}
         // `onDetailsSpeichern`, nicht `onSetzen`: die Hülle leert nur, wenn der PUT angenommen
-        // wurde. `warnstufe` kommt aus der abgeleiteten Zelle, nicht aus dem Zustand; `'keine'`
-        // greift nur, wenn die Zelle inzwischen aus der Matrix verschwunden ist.
+        // wurde. `warnstufe` kommt aus der abgeleiteten Zelle, nicht aus dem Zustand; ohne Zeile
+        // gilt die Vorgabe „keine“.
         onSpeichern={(beschreibung, gemeldetVon) =>
           onDetailsSpeichern({
             gefahrentyp: detailKennung!.typ,
             schutzobjekt: detailKennung!.objekt,
-            warnstufe: detailZelle?.warnstufe ?? 'keine',
+            warnstufe: zellStufe(detailZelle ?? undefined),
             beschreibung,
             gemeldet_von: gemeldetVon,
           })

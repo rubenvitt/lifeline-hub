@@ -5,25 +5,24 @@ import { monoStil, useRollen } from '../../components/instrument';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
 import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
 import {
-  DATEN_UNBEWERTET,
   SPALTENKOPF,
   ZELLE_NICHT_ANWENDBAR,
-  ZELLE_UNBEWERTET,
+  schraffurStil,
   zellFlaechenStil,
+  zellStufe,
 } from './GefahrenMatrix';
 
 /**
  * Auszug der Gefahrenmatrix zum Lesen, für die Gefahrengebiet-Vorschau der Sprungpalette.
  *
  * Zeilen: nur Gefahrentypen mit mindestens einer Zelle über „keine"; Spalten: alle fünf
- * Schutzobjekte. Ohne solche Zeile steht ein Satz statt einer leeren Tabelle; er trennt „nur ‚keine'
- * vergeben" von „nichts bewertet". Keine Bedienung — die
- * volle `GefahrenMatrix` zeigte 13 Zeilen gesperrter Knöpfe. Kopf und Zellfläche kommen aus
- * `GefahrenMatrix`, damit beide dieselbe Zelle zeigen.
+ * Schutzobjekte. Ohne solche Zeile steht ein Satz statt einer leeren Tabelle. Keine Bedienung — die
+ * volle `GefahrenMatrix` zeigte 13 Zeilen gesperrter Knöpfe. Kopf, Zellfläche, Vorgabe und
+ * Schraffur kommen aus `GefahrenMatrix`, damit beide dieselbe Zelle zeigen.
  *
- * Drei Zellzustände, im Text und im zugänglichen Namen getrennt: bewertet → Kürzel (auch „–" für
- * „keine"); gültig ohne Bewertung → leer, „nicht bewertet"; ungültig → „n. a.", „nicht anwendbar".
- * Zeichen und Namen der beiden letzten kommen aus `GefahrenMatrix` (LFH-969), wie in der Matrix.
+ * Zwei Zellzustände (LLH-1090): gültig → Kürzel der Stufe, ohne Bewertung „–“ für die Vorgabe
+ * „keine“; ungültig → Schraffur ohne Text, „nicht anwendbar“ im zugänglichen Namen. Ob die Matrix
+ * beurteilt ist, nennt die Vorschau am Gebiet (`GefahrengebietVorschau`).
  */
 export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertung[] }) {
   const { token, rollen } = useRollen();
@@ -40,14 +39,8 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
   );
 
   if (zeilen.length === 0) {
-    // „Keine" ist eine Bewertung, keine Lücke (LFH-969/LFH-1153): ohne höhere Stufe sagt der Satz,
-    // ob überhaupt bewertet wurde.
-    const nurKeine = matrix.some((m) => kombinationGueltig(m.gefahrentyp, m.schutzobjekt));
-    return (
-      <Typography.Paragraph>
-        {nurKeine ? 'Keine Gefahr über Stufe „Keine“ bewertet.' : 'Keine Gefahren bewertet.'}
-      </Typography.Paragraph>
-    );
+    // Ohne Zeile gilt „keine“ (LLH-1090): ob jemand hingesehen hat, steht an der Beurteilung.
+    return <Typography.Paragraph>Keine Gefahr über Stufe „keine“.</Typography.Paragraph>;
   }
 
   const rand = `1px solid ${rollen.linie}`;
@@ -110,35 +103,28 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
               const name = `${g.label} × ${obj.label}`;
               if (!kombinationGueltig(g.wert, obj.wert)) {
                 return (
-                  <td
-                    key={obj.wert}
-                    aria-label={`${name}: ${ZELLE_NICHT_ANWENDBAR.label}`}
-                    style={{ ...zellStil, fontFamily: undefined, color: rollen.gedaempft }}
-                  >
-                    {ZELLE_NICHT_ANWENDBAR.kuerzel}
+                  <td key={obj.wert} style={zellStil}>
+                    <span
+                      role="img"
+                      data-lfh="nicht-anwendbar"
+                      aria-label={`${name}: ${ZELLE_NICHT_ANWENDBAR.label}`}
+                      style={{
+                        display: 'block',
+                        height: '1.25em',
+                        ...schraffurStil(rollen.steuerRahmen),
+                      }}
+                    />
                   </td>
                 );
               }
-              const zelle = zelleVon(g.wert, obj.wert);
-              if (!zelle) {
-                return (
-                  <td
-                    key={obj.wert}
-                    data-warnstufe={DATEN_UNBEWERTET}
-                    aria-label={`${name}: ${ZELLE_UNBEWERTET.label}`}
-                    style={zellStil}
-                  >
-                    {ZELLE_UNBEWERTET.kuerzel}
-                  </td>
-                );
-              }
-              const stufe = warnstufeFlaeche[zelle.warnstufe];
+              const wert = zellStufe(zelleVon(g.wert, obj.wert));
+              const stufe = warnstufeFlaeche[wert];
               return (
                 <td
                   key={obj.wert}
-                  data-warnstufe={zelle.warnstufe}
+                  data-warnstufe={wert}
                   aria-label={`${name}: ${stufe.label}`}
-                  style={{ ...zellStil, ...zellFlaechenStil(zelle.warnstufe, token) }}
+                  style={{ ...zellStil, ...zellFlaechenStil(wert, token) }}
                 >
                   {stufe.kuerzel}
                 </td>

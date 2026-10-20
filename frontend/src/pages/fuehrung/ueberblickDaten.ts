@@ -54,6 +54,7 @@ import { istUnwetter, paarSchluessel, unwetterMarkenText } from '../../wetter/un
 import { warnstufeKennzahl, type Statusrolle } from '../../theme/statusFarben';
 import { mitBesetzung } from '../../fuehrung/funktionsOptionenKern';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
+import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
 
 dayjs.extend(utc);
 
@@ -123,6 +124,8 @@ interface WarnstufeKennzahl {
   wort: string;
   ton: KennzahlTon;
   anzahlAktiv: number;
+  /** Gebiete ohne bestätigte Beurteilung (LLH-1090): ihr „keine“ hat niemand geprüft. */
+  nichtBeurteilt: number;
 }
 
 /**
@@ -137,20 +140,27 @@ export function warnstufeKennzahlVon(gebiete: Gefahrengebiet[]): WarnstufeKennza
     wort: d.label,
     ton: ROLLE_ALS_TON[d.rolle],
     anzahlAktiv: v.anzahlAktiv,
+    nichtBeurteilt: gebiete.filter((g) => !istBeurteilt(g)).length,
   };
 }
 
 /**
- * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die Pegel-Notiz (`pegelNotizKurz`).
- * Angehängt statt ersetzt: die Gebietszahl begründet den Wert, der Pegel ist die Lage daneben. Ohne
- * festgelegten Pegel (`null`) nur die Gebietszahl.
+ * Notiz der Warnstufen-Kennzahl: die Gebietszahl, dahinter die nicht beurteilten Gebiete
+ * (LLH-1090, nur wenn es welche gibt) und die Pegel-Notiz (`pegelNotizKurz`). Angehängt statt
+ * ersetzt: die Gebietszahl begründet den Wert, „nicht beurteilt“ schränkt ihn ein, der Pegel ist
+ * die Lage daneben. Ohne festgelegten Pegel (`null`) fehlt er.
  */
-export function warnstufeNotiz(anzahlAktiv: number, pegelNotiz: string | null): string {
+export function warnstufeNotiz(
+  anzahlAktiv: number,
+  pegelNotiz: string | null,
+  nichtBeurteilt = 0,
+): string {
   const gebiete =
     anzahlAktiv === 1
       ? '1 Gefahrengebiet mit Warnstufe'
       : `${anzahlAktiv} Gefahrengebiete mit Warnstufe`;
-  return pegelNotiz ? `${gebiete} · ${pegelNotiz}` : gebiete;
+  const offen = nichtBeurteilt > 0 ? `${nichtBeurteilt} ${NICHT_BEURTEILT}` : null;
+  return [gebiete, offen, pegelNotiz].filter(Boolean).join(' · ');
 }
 
 interface AuftraegeKennzahl {

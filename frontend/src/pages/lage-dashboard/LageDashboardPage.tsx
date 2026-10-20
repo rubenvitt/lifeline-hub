@@ -100,7 +100,7 @@ import {
   type Quellzustand,
   type KennzahlEtikett,
 } from './lagebild';
-import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
+import { beurteilungHinweis, sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstrom';
 import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
 import { versorgungsBilanz } from '../../personen/personenBilanz';
@@ -492,7 +492,7 @@ export default function LageDashboardPage() {
             <GefahrenmatrixPaneel
               zustand={zMatrix}
               zeilen={matrix.zeilen}
-              unbewertet={matrix.unbewertet}
+              beurteilung={beurteilungHinweis(daten.gefahren ?? [])}
               gebiete={anzahlGebiete}
               onNeuladen={() => {
                 nachladen('gefahren');
