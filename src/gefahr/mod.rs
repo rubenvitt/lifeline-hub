@@ -25,6 +25,38 @@ wire_enum! {
     try_from = |s| format!("Ungültiger Gefahrentyp: {s}");
 }
 
+impl Gefahrentyp {
+    /// Wort der Oberfläche und des ETB, dasselbe wie `GEFAHRENTYPEN` in
+    /// `frontend/src/pages/gefahren/gefahrenSchema.ts`.
+    pub fn label(&self) -> &'static str {
+        gefahrentyp_label(self.as_str())
+    }
+}
+
+// Die Gefahrenart am Schaden (LLH-1115) ist eine nullable Spalte in einer `FromRow`-Anzeige:
+// `Type`/`Decode` direkt am Enum wie bei den Schaden-Enums (`src/schaden/mod.rs`), weil
+// `#[sqlx(try_from = …)]` kein `Option<Enum>` trägt.
+impl<DB: sqlx::Database> sqlx::Type<DB> for Gefahrentyp
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for Gefahrentyp
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        Gefahrentyp::parse(s).ok_or_else(|| format!("Ungültiger Gefahrentyp: {s}").into())
+    }
+}
+
 wire_enum! {
     /// Schutzobjekt (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `schutzobjekt`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

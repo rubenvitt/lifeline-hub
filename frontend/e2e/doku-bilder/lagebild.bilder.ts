@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
@@ -6,18 +7,52 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep lagebild`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   lagebild.png          frontend/src/pages/lage-dashboard/LageDashboardPage.tsx,
- *                         frontend/src/pages/lage-dashboard/LagePaneele.tsx
+ *                         frontend/src/pages/lage-dashboard/LagePaneele.tsx,
+ *                         frontend/src/wetter/WetterKopfMarke.tsx (Wettermarke im Kopf, LLH-1117)
  *   meldungsstrom-neu.png frontend/src/pages/lage-dashboard/LagePaneele.tsx (MeldungsstromPaneel)
  */
 
 const KAPITEL = 'lagebild';
 
+/**
+ * Das Wetter am Einsatzort als Literal in der Wire-Form (wie `wetter-pegel.bilder.ts`): sonst ginge
+ * das Backend an Bright Sky, und das Bild zeigte das Wetter des Lauftags. Stufe „mäßig“: die Marke
+ * im Kopf erscheint, der Unwetterhinweis der AlarmZentrale nicht (er läge über dem Bild).
+ */
+async function stelleWetter(page: Page, einsatzId: number, jetzt: Date) {
+  const um = (ms: number) => new Date(jetzt.getTime() + ms).toISOString();
+  await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
+    route.fulfill({
+      json: {
+        ort: { name: 'Musterstadt', kreis: 'Landkreis Musterland', land: 'Niedersachsen' },
+        warnungen: {
+          zustand: 'ok',
+          abgerufen_at: um(-4 * 60_000),
+          daten: [
+            {
+              stufe: 'maessig',
+              ereignis: 'DAUERREGEN',
+              ueberschrift: 'Amtliche WARNUNG vor DAUERREGEN',
+              beginn: um(-3 * 3_600_000),
+              ende: um(9 * 3_600_000),
+            },
+          ],
+        },
+        vorhersage: { zustand: 'kein_ort' },
+        aktuell: { zustand: 'kein_ort' },
+      },
+    }),
+  );
+}
+
 test.describe(KAPITEL, () => {
   test('Lagebild des Demo-Einsatzes', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    await uhrAnhalten(page);
+    const jetzt = await uhrAnhalten(page);
+    await stelleWetter(page, demo.id, jetzt);
     await page.goto(`/einsaetze/${demo.id}/lage-dashboard`);
+    await expect(page.locator('[data-lfh="wetter-kopfmarke"]')).toContainText('Dauerregen');
     await expect(page.locator('[data-lfh="gefahrenzeile"]').first()).toBeVisible();
     // Die Demo-Gebiete sind nicht beurteilt: der Fuß des Paneels nennt sie.
     await expect(page.locator('[data-lfh="gefahren-beurteilung"]')).toContainText(

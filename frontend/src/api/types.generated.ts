@@ -5143,6 +5143,7 @@ export interface components {
             geaendert_at: string;
             /** Format: int64 */
             geaendert_von: number;
+            gefahrenart?: components["schemas"]["Gefahrentyp"] | null;
             geschaedigt_kontakt?: string | null;
             /** Format: int64 */
             geschaedigt_organisation_id?: number | null;
@@ -5164,6 +5165,7 @@ export interface components {
             ort: string;
             /** Format: int64 */
             registrier_nr: number;
+            schadensgrad?: components["schemas"]["Schadensgrad"] | null;
             status: components["schemas"]["SchadenStatus"];
             storniert_at?: string | null;
             /** Format: int64 */
@@ -5206,6 +5208,7 @@ export interface components {
          */
         SchadenMarker: {
             ausmass: components["schemas"]["Ausmass"];
+            gefahrenart?: components["schemas"]["Gefahrentyp"] | null;
             /** Format: int64 */
             id: number;
             /** Format: double */
@@ -5214,6 +5217,7 @@ export interface components {
             lon?: number | null;
             /** Format: int64 */
             registrier_nr: number;
+            schadensgrad?: components["schemas"]["Schadensgrad"] | null;
             status: components["schemas"]["SchadenStatus"];
             typ: components["schemas"]["SchadenTyp"];
         };
@@ -5221,6 +5225,12 @@ export interface components {
         SchadenStatus: "offen" | "uebergeben" | "abgeschlossen";
         /** @enum {string} */
         SchadenTyp: "sachschaden" | "verkehrshindernis" | "infrastruktur" | "umweltschaden" | "tierkadaver" | "sonstige";
+        /**
+         * @description Schadensgrad nach DV 102, Kap. 5.8.4 (LLH-1115, design.md D1/D3). Das Kartenzeichen bildet
+         *     erst der Client (`frontend/src/zeichen/fachobjektZeichen.ts`).
+         * @enum {string}
+         */
+        Schadensgrad: "angeschlagen" | "teilzerstoert" | "zerstoert";
         /** @description Ein Schichtmodell der Organisation. */
         Schichtmodell: {
             bezeichnung: string;

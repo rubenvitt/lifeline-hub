@@ -28,6 +28,7 @@ import { parseRouteId, schaedenPfad } from '../routing/deeplinks';
 import type { Ausmass, SchadenStatus, SchadenTyp } from '../api/types';
 import GeschaedigtPicker, { type GeschaedigtWert } from './schaeden/GeschaedigtPicker';
 import SchadenDaten from './schaeden/SchadenDaten';
+import { GefahrAuswahlImFormular, SchadensgradAuswahl } from './schaeden/GefahrAuswahl';
 import SchadenAnhaenge from './schaeden/SchadenAnhaenge';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import {
@@ -289,6 +290,8 @@ export default function SchaedenDetailPage() {
           ? {
               typ: { feld: <Select style={{ minWidth: 200 }} options={TYP_OPTIONS} /> },
               ausmass: { feld: <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} /> },
+              gefahrenart: { feld: <GefahrAuswahlImFormular /> },
+              schadensgrad: { feld: <SchadensgradAuswahl /> },
               ort: {
                 feld: (
                   <Input
@@ -359,6 +362,8 @@ export default function SchaedenDetailPage() {
                 editSitzung.starte(s, {
                   typ: s.typ,
                   ausmass: s.ausmass,
+                  gefahrenart: s.gefahrenart ?? null,
+                  schadensgrad: s.schadensgrad ?? null,
                   ort: s.ort,
                   beschreibung: s.beschreibung,
                   geschaedigt: geschaedigtAusSchaden(s),
@@ -392,6 +397,9 @@ export default function SchaedenDetailPage() {
             const patch: SchadenPatch = {
               typ: daten.typ,
               ausmass: daten.ausmass,
+              // Leeren heißt „keine Angabe“: `null` leert am Server (PATCH dreiwertig).
+              gefahrenart: daten.gefahrenart ?? null,
+              schadensgrad: daten.schadensgrad ?? null,
               ort: daten.ort,
               beschreibung: daten.beschreibung,
               // Geschädigt XOR: immer alle vier Felder explizit senden (das nicht gewählte ist null).

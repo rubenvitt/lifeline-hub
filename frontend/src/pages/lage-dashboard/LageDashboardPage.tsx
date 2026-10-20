@@ -15,7 +15,9 @@
  *    Modulpanel und im Führungsüberblick.
  *
  * Die Warnstufe hat keine eigene Kennzahl: sie steht als Hinweis im Seitenkopf und je Gefahrentyp
- * in der Matrix. Der Verbindungszustand steht in der SYNC-Anzeige der Kopfleiste und als Meta des
+ * in der Matrix. Daneben steht eine geltende oder angekündigte DWD-Warnung als Marke (LLH-1117,
+ * `wetter/WetterKopfMarke.tsx`), nie im Kennzahlenband: nur mit freiem Modul „Wetter & Pegel“ und
+ * aus derselben Abfrage wie Rahmen und Überblick, also ohne zusätzlichen Abruf; still, ohne Ton. Der Verbindungszustand steht in der SYNC-Anzeige der Kopfleiste und als Meta des
  * Meldungsstroms („live" nur bei offener Leitung).
  *
  * Lagebezogene Kennzahlreihe (LFH-640, Spec
@@ -57,12 +59,16 @@ import {
   pegelZielPfad,
   personenPfad,
   unfallhilfsstellenListePfad,
+  wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
 import { ladeModulFreigaben } from '../../api/einsaetze';
 import { istKeyFreigegeben, istPfadGesperrt, modulName } from '../../einsatz/modulRegistry';
 import { useModulWahl } from '../../einsatz/useModulWahl';
 import { ladeMatrix } from '../../api/gefahren';
+import { wetterAbfrage } from '../../api/wetter';
+import { kopfWarnung } from '../../wetter/kopfWarnung';
+import WetterKopfMarke from '../../wetter/WetterKopfMarke';
 import { listeEtb } from '../../api/etb';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { formatUhrzeitMitTag } from '../../anzeige/format';
@@ -208,6 +214,13 @@ export default function LageDashboardPage() {
     freigabenBekannt && darfZaehlerZeigen('betreuung', freigabenQuery.data)
       ? betreuungPfad(einsatzId)
       : undefined;
+  // DWD-Warnung im Kopf (LLH-1117): dieselbe Abfrage und dieselbe Bedingung wie Modulzähler,
+  // Unwetterhinweis und Warnsperre im Rahmen — der Cache ist geteilt, kein eigener Abruf. Ohne
+  // Freigabe auch kein Altstand aus dem Cache; nach einem gescheiterten Folgeabruf keine Marke.
+  const wetterFrei = darfZaehlerZeigen('wetter-pegel', freigabenQuery.data);
+  const wetterQuery = useQuery({ ...wetterAbfrage(einsatzId), enabled: wetterFrei });
+  const wetterWarnungen =
+    wetterFrei && wetterQuery.isSuccess ? wetterQuery.data.warnungen : undefined;
 
   const einsatz = einsatzQuery.data;
 
@@ -323,6 +336,7 @@ export default function LageDashboardPage() {
 
   const warnTon =
     zGefahren === 'daten' && lagebild ? warnstufeTon(lagebild.hoechsteWarnstufe) : 'neutral';
+  const dwdWarnung = kopfWarnung(wetterWarnungen, jetzt, konv);
   const breit = abBreite('lg');
   const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
   const fuehrung = lagebild?.fuehrung;
@@ -356,7 +370,7 @@ export default function LageDashboardPage() {
             ]}
           />
         }
-        // Der rechte Slot trägt hier Meta, keinen Knopf.
+        // Der rechte Slot trägt hier Meta und die Wettermarke (ein Sprung), keinen Knopf.
         aktionen={
           <span
             data-lfh="lagebild-meta"
@@ -385,6 +399,9 @@ export default function LageDashboardPage() {
                 </span>
                 Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
               </span>
+            )}
+            {dwdWarnung && (
+              <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
             )}
           </span>
         }
