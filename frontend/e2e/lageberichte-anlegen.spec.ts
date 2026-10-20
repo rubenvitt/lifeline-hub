@@ -4,7 +4,10 @@ import { einsatzAnlegen } from './einsatz-kern';
 /**
  * Lageberichte (LLH-1064): „Neuer Lagevortrag“ legt mit EINEM POST an und öffnet den Entwurf,
  * der Pfeil wählt eine andere Vorlage, und die Übersicht zeigt den freigegebenen Stand vorn.
- * Seeding (Freigabe) über `page.request`, geprüft wird die Oberfläche.
+ * Seit LLH-1081 trägt der POST die fünf Abschnitte mit Quelle als Startinhalt (der echte Server
+ * prüft die Schlüssel), „Leerer Lagevortrag“ verzichtet darauf, und im Entwurf füllt „Leere
+ * Abschnitte aus dem Lagebild füllen“ nach. Seeding (Freigabe) über `page.request`, geprüft wird
+ * die Oberfläche.
  */
 
 const ADMIN = 'admin';
@@ -18,19 +21,34 @@ async function anmelden(page: Page) {
   await expect(page).toHaveURL(/\/einsaetze/);
 }
 
+interface AnlegenBody {
+  vorlage: string;
+  abschnitte?: { schluessel: string; text: string }[];
+}
+
 /** Zählt die POSTs, die einen Lagebericht anlegen (nicht Fortschreiben, nicht PATCH). */
-function zaehleAnlegen(page: Page, einsatzId: string): { anzahl: number } {
-  const zaehler = { anzahl: 0 };
+function zaehleAnlegen(page: Page, einsatzId: string): { anzahl: number; bodies: AnlegenBody[] } {
+  const zaehler = { anzahl: 0, bodies: [] as AnlegenBody[] };
   page.on('request', (r) => {
     if (
       r.method() === 'POST' &&
       new URL(r.url()).pathname === `/api/einsaetze/${einsatzId}/lageberichte`
     ) {
       zaehler.anzahl += 1;
+      zaehler.bodies.push(r.postDataJSON() as AnlegenBody);
     }
   });
   return zaehler;
 }
+
+/** Die Abschnitte mit Quelle im Lagevortrag zur Information, in der Reihenfolge der Vorlage. */
+const MIT_QUELLE = [
+  'gefahren_schadenlage',
+  'eigene_lage',
+  'lageentwicklung',
+  'fuehrungsprobleme',
+  'medienlage',
+];
 
 test.setTimeout(90_000);
 
@@ -55,6 +73,53 @@ test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', a
   expect(posts.anzahl).toBe(1);
   // Kein Dialog auf dem Weg.
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  // Startinhalt aus dem Lagebild im selben POST (LLH-1081), der Server hat ihn angenommen.
+  expect(posts.bodies[0].abschnitte?.map((a) => a.schluessel)).toEqual(MIT_QUELLE);
+  for (const a of posts.bodies[0].abschnitte ?? [])
+    expect(a.text.trim(), a.schluessel).not.toBe('');
+  await expect(page.getByRole('textbox', { name: 'Eigene Lage' })).toHaveValue(/Kräftemeldebild/);
+  await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
+  // Nichts mehr leer, was eine Quelle hat: kein Sammelknopf.
+  await expect(
+    page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }),
+  ).toHaveCount(0);
+});
+
+test('„Leerer Lagevortrag“ legt ohne Startinhalt an, der Entwurf füllt leere Abschnitte nach', async ({
+  page,
+}) => {
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E Lagevortrag leer ${Date.now()}`);
+  const posts = zaehleAnlegen(page, einsatzId);
+
+  await page.goto(`/einsaetze/${einsatzId}/lageberichte`);
+  await expect(page.getByText('Noch keine Lageberichte')).toBeVisible();
+  await page.getByRole('button', { name: 'Andere Vorlage wählen' }).click();
+  await page
+    .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+    .getByRole('menuitem', { name: 'Leerer Lagevortrag' })
+    .click();
+
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
+  expect(posts.anzahl).toBe(1);
+  expect(posts.bodies[0].vorlage).toBe('lagebericht');
+  expect(posts.bodies[0].abschnitte).toBeUndefined();
+
+  const eigeneLage = page.getByRole('textbox', { name: 'Eigene Lage' });
+  await expect(eigeneLage).toHaveValue('');
+  // Ein Abschnitt von Hand vorweg: die Sammelfüllung lässt ihn stehen.
+  await page.getByRole('textbox', { name: 'Medienlage' }).fill('Von Hand');
+  await page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }).click();
+  await expect(eigeneLage).toHaveValue(/Kräftemeldebild/);
+  await expect(page.getByRole('textbox', { name: 'Medienlage' })).toHaveValue('Von Hand');
+  await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Leere Abschnitte aus dem Lagebild füllen' }),
+  ).toHaveCount(0);
+  // Gespeichert wird wie jede Änderung des Entwurfs.
+  await page.getByRole('button', { name: 'Entwurf speichern' }).click();
+  await expect(page.getByText(/^zuletzt gespeichert \d{2}:\d{2}/)).toBeVisible();
 });
 
 test('der Pfeil legt einen freien Bericht an, die Übersicht zeigt ihn in Arbeit', async ({
@@ -69,6 +134,7 @@ test('der Pfeil legt einen freien Bericht an, die Übersicht zeigt ihn in Arbeit
   await page.getByRole('button', { name: 'Andere Vorlage wählen' }).click();
   const menue = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
   await expect(menue.getByRole('menuitem')).toHaveText([
+    'Leerer Lagevortrag',
     'Lagevortrag zur Entscheidung',
     'Freier Bericht',
   ]);

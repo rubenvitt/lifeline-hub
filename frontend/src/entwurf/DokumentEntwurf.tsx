@@ -34,6 +34,12 @@ export interface DokumentEntwurfProps {
   /** Erweiterungsstelle je Abschnitt im Abschnittskopf — siehe {@link AbschnittAktion}. */
   aktion?: AbschnittAktion;
   /**
+   * Aktion der Seite für das ganze Dokument im Kopf der Gliederung (Lagebericht: „Leere Abschnitte
+   * aus dem Lagebild füllen“, `lageberichte/LeereAbschnitteFuellen.tsx`). Steht über der
+   * Sprungleiste, nicht in ihr: die Landmarke „Gliederung“ trägt nur Sprünge.
+   */
+  gliederungKopf?: ReactNode;
+  /**
    * Feld des Einstiegsfokus (`entwurf/Einstiegsfokus.tsx`: der erste LEERE Abschnitt des
    * Serverstands). Beim Einhängen eingefroren; der Remount der Seite über `key={id}` ist der Reset.
    */
@@ -49,7 +55,8 @@ export interface DokumentEntwurfProps {
  *   Lesefassung“ für das GANZE Dokument; darunter der Kopfblock der Seite.
  * - **Gliederung** als Sprungleiste: je Abschnitt Zeichen und Wort „leer“ (zweiter Kanal, WCAG
  *   1.4.1). Ab `xl` klebt sie links unter dem Rahmen, darunter steht sie oben als eine Zeile, die
- *   in sich rollt (`dokumentEntwurf.css`).
+ *   in sich rollt (`dokumentEntwurf.css`). Darüber optional eine Aktion der Seite
+ *   (`gliederungKopf`).
  * - **Alle Abschnitte offen**, untereinander; der Editor wächst mit dem Inhalt (leer einzeilig,
  *   {@link EDITOR_ZEILEN}). Kopf mit Name (h3), Leer-Marke, Hilfetext und Aktion.
  * - **Lesefassung** aus den aktuellen Formularwerten, so wie gedruckt (`AbschnittsText`). Die
@@ -67,6 +74,7 @@ export default function DokumentEntwurf({
   abschnitte,
   kopf,
   aktion,
+  gliederungKopf,
   einstieg,
 }: DokumentEntwurfProps) {
   const { token } = useRollen();
@@ -130,7 +138,14 @@ export default function DokumentEntwurf({
           </div>
         )}
         <div className="dokument-entwurf__koerper" style={{ gap: token.margin }}>
-          <DokumentGliederung abschnitte={abschnitte} kette={kette} onSprung={springen} />
+          <div className="dokument-entwurf__gliederung">
+            {gliederungKopf != null && (
+              <div data-lfh="gliederung-kopf" style={{ marginBottom: token.marginXS }}>
+                {gliederungKopf}
+              </div>
+            )}
+            <DokumentGliederung abschnitte={abschnitte} kette={kette} onSprung={springen} />
+          </div>
           <div style={{ minWidth: 0 }}>
             <div
               id={bearbeitenId}
@@ -207,7 +222,7 @@ const DokumentGliederung = memo(function DokumentGliederung({
 }: GliederungProps) {
   const { token } = useRollen();
   return (
-    <nav aria-label="Gliederung" data-lfh="gliederung" className="dokument-entwurf__gliederung">
+    <nav aria-label="Gliederung" data-lfh="gliederung">
       <ol className="dokument-entwurf__gliederungsliste" style={{ gap: token.marginXXS }}>
         {abschnitte.map((a, i) => {
           const leer = istLeer(kette, i);

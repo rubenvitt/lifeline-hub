@@ -188,3 +188,75 @@ Entscheidungen mit Nummer und Zeit nennen, ohne Wortlaut. Ohne abgehaltene Lageb
 #### Scenario: Noch keine Lagebesprechung
 - **WHEN** im Einsatz noch keine Lagebesprechung abgehalten wurde
 - **THEN** beginnt die Zusammenfassung mit „seit Einsatzbeginn“
+
+### Requirement: Neuer Lagevortrag startet mit dem Lagebild
+„Neuer Lagevortrag“ SHALL den Lagevortrag zur Information mit allen Abschnitten anlegen, denen
+eine Quelle zugeordnet ist, als Startinhalt in genau einer anlegenden Anfrage. Die Daten der
+Quellen MUST erst mit diesem Klick geladen werden. Jeder Text MUST derselbe sein, den die
+Übernahme im Abschnitt aus demselben Datenstand erzeugt. Lehnt der Server das Anlegen ab, MUST
+kein Entwurf entstehen und MUST der Grund an der Seite stehen.
+
+#### Scenario: Anlegen mit Startinhalt
+- **WHEN** eine Person mit Schreibrecht „Neuer Lagevortrag“ wählt
+- **THEN** sendet der Client genau eine anlegende Anfrage mit Texten für Gefahren-/Schadenlage,
+  Eigene Lage, Lageentwicklung, Besondere (Führungs-)Probleme und Medienlage, und der Entwurf
+  öffnet sich
+
+#### Scenario: Anlegen abgelehnt
+- **WHEN** der Server das Anlegen mit 400 ablehnt
+- **THEN** steht der Grund an der Seite, es folgt keine weitere Anfrage, und kein Entwurf öffnet
+  sich
+
+### Requirement: Ausfall im Startinhalt
+Ist eine Quelle für die Person nicht freigegeben, MUST ihr Abschnitt im Startinhalt „—“ mit dem
+Grund tragen, und die Daten dieser Quelle MUST NOT angefragt werden. Dasselbe MUST gelten, wenn
+die Freigaben nicht ermittelbar sind oder eine Quelle ihren Text nicht erzeugen kann. Kein
+Abschnitt mit Quelle MUST leer bleiben oder für Fehlendes eine 0 tragen.
+
+#### Scenario: Gesperrte Quelle
+- **WHEN** der Stab für die Person nicht freigegeben ist und sie „Neuer Lagevortrag“ wählt
+- **THEN** trägt die Medienlage „— (Stab nicht freigegeben)“ ohne Zahl, und keine Liste der
+  Medienlage wurde angefragt
+
+#### Scenario: Freigaben nicht ermittelbar
+- **WHEN** die Modulfreigaben beim Klick nicht geladen werden können
+- **THEN** trägt jeder Abschnitt mit Quelle „— (Freigaben nicht ermittelbar)“
+
+### Requirement: Leerer Lagevortrag
+Ein Menüeintrag „Leerer Lagevortrag“ am Knopf „Neuer Lagevortrag“ SHALL den Lagevortrag zur
+Information ohne Startinhalt anlegen. Die übrigen Vorlagen MUST ohne Startinhalt angelegt werden.
+
+#### Scenario: Leerer Lagevortrag
+- **WHEN** die Person am Pfeil „Leerer Lagevortrag“ wählt
+- **THEN** entsteht der Lagevortrag zur Information ohne Startinhalt, und keine Quelle wurde
+  angefragt
+
+### Requirement: Leere Abschnitte aus dem Lagebild füllen
+Im Entwurf des Lagevortrags zur Information SHALL im Schreibzweig im Kopf der Gliederung ein Knopf
+„Leere Abschnitte aus dem Lagebild füllen“ stehen, solange mindestens ein Abschnitt mit Quelle
+leer ist. Der Klick MUST nur die Quellen der leeren Abschnitte laden und nur Abschnitte füllen,
+die beim Eintreffen der Texte noch leer sind; eine Rückfrage MUST NOT erscheinen. Der Text MUST
+derselbe sein wie bei der Übernahme im Abschnitt.
+
+#### Scenario: Gemischter Entwurf
+- **WHEN** „Eigene Lage“ schon Text enthält, die übrigen Abschnitte mit Quelle leer sind und die
+  Person „Leere Abschnitte aus dem Lagebild füllen“ wählt
+- **THEN** bleibt „Eigene Lage“ unverändert, die übrigen Abschnitte mit Quelle tragen den
+  übernommenen Text, und der Entwurf gilt als geändert
+
+#### Scenario: Nichts zu füllen
+- **WHEN** alle Abschnitte mit Quelle Text enthalten
+- **THEN** steht der Knopf nicht
+
+#### Scenario: Lagevortrag zur Entscheidung
+- **WHEN** ein Entwurf der Vorlage „Lagevortrag zur Entscheidung“ bearbeitet wird
+- **THEN** steht der Knopf nicht
+
+### Requirement: Sammelfüllung meldet sich beim Verlustschutz
+Die Füllung leerer Abschnitte MUST nur das Formular ändern und den Entwurf als geändert melden;
+gespeichert wird mit dem nächsten Speichern oder Autosave.
+
+#### Scenario: Ungespeichert nach der Füllung
+- **WHEN** die Person „Leere Abschnitte aus dem Lagebild füllen“ wählt und mindestens ein
+  Abschnitt gefüllt wird
+- **THEN** zeigt der Entwurf „ungespeicherte Änderungen“

@@ -21,7 +21,8 @@ import DokumentEntwurf, { type AbschnittAktion } from '../entwurf/DokumentEntwur
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
-import { uebernahmeFuer } from '../lageberichte/uebernahmen';
+import LeereAbschnitteFuellen from '../lageberichte/LeereAbschnitteFuellen';
+import { UEBERNAHMEN, uebernahmeFuer } from '../lageberichte/uebernahmen';
 import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
@@ -264,6 +265,8 @@ function LageberichtDetail() {
   const einsatz = einsatzQuery.data;
   const bericht = berichtQuery.data;
   const v = vorlage(bericht.vorlage);
+  // Quellen der Vorlage für die Sammelfüllung (LLH-1081); ohne Quellen kein Knopf.
+  const quellen = UEBERNAHMEN[bericht.vorlage];
   const istEntwurf = bericht.status === 'entwurf';
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   /**
@@ -482,6 +485,18 @@ function LageberichtDetail() {
                 form={form}
                 abschnitte={v.abschnitte}
                 aktion={uebernahme}
+                // Alle leeren Abschnitte mit Quelle in einem Schritt (LLH-1081), ohne Rückfrage:
+                // es wird nichts ersetzt.
+                gliederungKopf={
+                  quellen ? (
+                    <LeereAbschnitteFuellen
+                      quellen={quellen}
+                      einsatzId={einsatzId}
+                      form={form}
+                      onGeaendert={markiereGeaendert}
+                    />
+                  ) : undefined
+                }
                 // Der erste LEERE Abschnitt des Serverstands; `Einstiegsfokus` friert ihn beim
                 // Einhängen ein, der Remount über `key={lbId}` ist der Reset.
                 einstieg={einstiegsAbschnitt(

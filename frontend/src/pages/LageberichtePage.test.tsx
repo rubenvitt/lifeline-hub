@@ -14,7 +14,13 @@ import { einsatzKeys } from '../api/queryKeys';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { mitProzessZone } from '../test/prozessZone';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { adminFixture, einsatzFixture } from '../test/fixtures';
+import { adminFixture, einsatzFixture, freigabenFixture } from '../test/fixtures';
+import { MEDIENLAGE_QUELLE } from '../stab/medienlageQuelle';
+import { EIGENE_LAGE_QUELLE } from '../lageberichte/eigeneLageUebernahme';
+import { FUEHRUNGSPROBLEME_QUELLE } from '../lageberichte/fuehrungsproblemeUebernahme';
+import { LAGEENTWICKLUNG_QUELLE } from '../lageberichte/lageentwicklungUebernahme';
+import { SCHADENLAGE_QUELLE } from '../lageberichte/schadenlageUebernahme';
+import type { UebernahmeQuelle } from '../lageberichte/uebernahmeQuelle';
 
 const admin = adminFixture({
   anzeigename: 'A',
@@ -332,6 +338,59 @@ function setupLebend(start: LageberichtAnzeige) {
  * mit unverändertem Stand ändert dank Structural Sharing nichts — deshalb schiebt jeder Test einen
  * geänderten Stand nach, nicht bloß eine Invalidierung.
  */
+describe('LageberichtDetailPage — Leere Abschnitte aus dem Lagebild füllen (LLH-1081)', () => {
+  const FUELLEN = 'Leere Abschnitte aus dem Lagebild füllen';
+
+  it('füllt im Kopf der Gliederung nur die leeren Abschnitte mit Quelle und meldet die Änderung', async () => {
+    const erzeuge = QUELLEN.map(
+      ([s, q]) => [s, vi.spyOn(q, 'erzeuge').mockResolvedValue(`Text ${s}`)] as const,
+    );
+    server.use(
+      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+    );
+    setupDetail({
+      ...lagebericht7Abschnitte,
+      abschnitte: lagebericht7Abschnitte.abschnitte.map((a) =>
+        a.schluessel === 'eigene_lage' ? { ...a, text: 'Eigene Fassung' } : a,
+      ),
+    });
+    const knopf = await screen.findByRole('button', { name: FUELLEN });
+    // Im Kopf der Gliederung, nicht in der Sprungleiste.
+    expect(knopf.closest('[data-lfh="gliederung-kopf"]')).not.toBeNull();
+    await userEvent.click(knopf);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Gefahren-/Schadenlage')).toHaveValue(
+        'Text gefahren_schadenlage',
+      ),
+    );
+    expect(screen.getByLabelText('Eigene Lage')).toHaveValue('Eigene Fassung');
+    expect(screen.getByLabelText('Medienlage')).toHaveValue('Text medienlage');
+    // Abschnitte ohne Quelle bleiben von Hand.
+    expect(screen.getByLabelText('Auftrag')).toHaveValue('');
+    expect(screen.getByLabelText('Zusammenfassung')).toHaveValue('');
+    for (const [s, spion] of erzeuge) {
+      if (s === 'eigene_lage') expect(spion).not.toHaveBeenCalled();
+      else expect(spion).toHaveBeenCalledTimes(1);
+    }
+    // Verlustschutz: der Entwurf gilt als geändert. Nichts mehr leer → der Knopf geht.
+    expect(screen.getByText('ungespeicherte Änderungen')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('button', { name: FUELLEN })).toBeNull());
+  });
+
+  it('steht nicht im Lagevortrag zur Entscheidung', async () => {
+    setupDetail({ ...lagebericht7Abschnitte, vorlage: 'lagebeurteilung' });
+    await screen.findByRole('navigation', { name: 'Gliederung' });
+    expect(screen.queryByRole('button', { name: FUELLEN })).toBeNull();
+  });
+
+  it('steht nicht im freigegebenen Bericht', async () => {
+    setupDetail({ ...lagebericht7Abschnitte, status: 'freigegeben' });
+    await screen.findByText('Berichtstext');
+    expect(screen.queryByRole('button', { name: FUELLEN })).toBeNull();
+  });
+});
+
 describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)', () => {
   it('überschreibt getippten Text NICHT, wenn der Bericht serverseitig geändert wurde', async () => {
     const { fremdeAenderung } = setupLebend(lagebericht7Abschnitte);
@@ -648,16 +707,47 @@ function DetailOrt() {
   return <p>Entwurf {lbId} geöffnet</p>;
 }
 
-/** Zählt die anlegenden POSTs und antwortet mit einem neuen Entwurf 41. */
-function zaehlePosts(antwort?: () => Response) {
+/** Die fünf Quellen des Lagevortrags zur Information, in der Reihenfolge der Vorlage. */
+const QUELLEN: ReadonlyArray<readonly [string, UebernahmeQuelle]> = [
+  ['gefahren_schadenlage', SCHADENLAGE_QUELLE],
+  ['eigene_lage', EIGENE_LAGE_QUELLE],
+  ['lageentwicklung', LAGEENTWICKLUNG_QUELLE],
+  ['fuehrungsprobleme', FUEHRUNGSPROBLEME_QUELLE],
+  ['medienlage', MEDIENLAGE_QUELLE],
+];
+
+/** Der Startinhalt, den die gestubbten Quellen liefern (`zaehlePosts`). */
+const STARTINHALT = QUELLEN.map(([s]) => ({ schluessel: s, text: `Text ${s}` }));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+/**
+ * Zählt die anlegenden POSTs und antwortet mit einem neuen Entwurf 41. Die Quellen des
+ * Startinhalts (LLH-1081) liefern feste Texte, ihr Wortlaut ist in ihren eigenen Tests belegt;
+ * die Freigaben kommen vom Server und zählen mit.
+ */
+function zaehlePosts(
+  antwort?: () => Response,
+  freigaben: ReturnType<typeof freigabenFixture> = freigabenFixture(),
+) {
   const posts: Record<string, unknown>[] = [];
+  const freigabenAbrufe = { anzahl: 0 };
+  const erzeuge = Object.fromEntries(
+    QUELLEN.map(([s, q]) => [s, vi.spyOn(q, 'erzeuge').mockResolvedValue(`Text ${s}`)]),
+  );
   server.use(
+    http.get('/api/einsaetze/7/modul-freigaben', () => {
+      freigabenAbrufe.anzahl += 1;
+      return HttpResponse.json(freigaben);
+    }),
     http.post('/api/einsaetze/7/lageberichte', async ({ request }) => {
       posts.push((await request.json()) as Record<string, unknown>);
       return antwort?.() ?? HttpResponse.json({ ...bericht, id: 41 }, { status: 201 });
     }),
   );
-  return posts;
+  return Object.assign(posts, { freigabenAbrufe, erzeuge });
 }
 
 const freigegeben: LageberichtAnzeige = {
@@ -716,11 +806,14 @@ describe('LageberichtePage — Anlegen ohne Dialog (LLH-1064)', () => {
     await userEvent.dblClick(knopf);
     expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
     expect(posts).toHaveLength(1);
-    // Vorlage zur Information, Titel aus der Uhrzeit, kein Zeitstand (der Server setzt jetzt).
+    // Vorlage zur Information, Titel aus der Uhrzeit, kein Zeitstand (der Server setzt jetzt),
+    // und die fünf Abschnitte mit Quelle als Startinhalt im selben POST (LLH-1081).
     expect(posts[0]).toEqual({
       vorlage: 'lagebericht',
       titel: expect.stringMatching(/^Lageüberblick \d{4}$/),
+      abschnitte: STARTINHALT,
     });
+    for (const spion of Object.values(posts.erzeuge)) expect(spion).toHaveBeenCalledTimes(1);
     // Kein Dialog mehr auf dem Standardweg.
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -734,12 +827,56 @@ describe('LageberichtePage — Anlegen ohne Dialog (LLH-1064)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual(['Lagevortrag zur Entscheidung', 'Freier Bericht']);
+    ).toEqual(['Leerer Lagevortrag', 'Lagevortrag zur Entscheidung', 'Freier Bericht']);
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Freier Bericht' }));
     expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
-    expect(posts).toEqual([
+    // Ohne Quelle kein Startinhalt und kein Abruf (LFH-869: von Hand).
+    expect([...posts]).toEqual([
       { vorlage: 'freitext', titel: expect.stringMatching(/^Bericht \d{4}$/) },
     ]);
+    expect(posts.freigabenAbrufe.anzahl).toBe(0);
+  });
+
+  it('„Leerer Lagevortrag“ legt die Vorlage zur Information ohne Startinhalt und ohne Abruf an (LLH-1081)', async () => {
+    const posts = zaehlePosts();
+    setupListe();
+    await userEvent.click(await screen.findByRole('button', { name: 'Andere Vorlage wählen' }));
+    await userEvent.click(
+      within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Leerer Lagevortrag' }),
+    );
+    expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
+    expect([...posts]).toEqual([
+      { vorlage: 'lagebericht', titel: expect.stringMatching(/^Lageüberblick \d{4}$/) },
+    ]);
+    expect(posts.freigabenAbrufe.anzahl).toBe(0);
+    for (const spion of Object.values(posts.erzeuge)) expect(spion).not.toHaveBeenCalled();
+  });
+
+  it('nennt eine gesperrte Quelle im Startinhalt „— (Grund)“ und fragt sie nicht an (LLH-1081)', async () => {
+    const posts = zaehlePosts(undefined, freigabenFixture({ stab: { zugriff: false } }));
+    setupListe();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Lagevortrag' }));
+    expect(await screen.findByText('Entwurf 41 geöffnet')).toBeInTheDocument();
+    expect(posts).toHaveLength(1);
+    expect(posts[0].abschnitte).toEqual([
+      ...STARTINHALT.slice(0, 4),
+      { schluessel: 'medienlage', text: '— (Stab nicht freigegeben)' },
+    ]);
+    expect(posts.erzeuge.medienlage).not.toHaveBeenCalled();
+  });
+
+  it('legt bei 400 mit Startinhalt keinen Entwurf an und fragt nicht nach (LLH-1081)', async () => {
+    const posts = zaehlePosts(() =>
+      HttpResponse.json({ error: 'Abschnitt gehört nicht zur Vorlage' }, { status: 400 }),
+    );
+    setupListe();
+    await userEvent.click(await screen.findByRole('button', { name: 'Neuer Lagevortrag' }));
+    expect(await screen.findByText('Abschnitt gehört nicht zur Vorlage')).toBeInTheDocument();
+    expect(posts).toHaveLength(1);
+    expect(posts[0].abschnitte).toEqual(STARTINHALT);
+    expect(screen.queryByText(/geöffnet$/)).toBeNull();
+    // Der Knopf ist wieder frei: der Riegel löst sich mit der Ablehnung.
+    expect(screen.getByRole('button', { name: 'Neuer Lagevortrag' })).toBeEnabled();
   });
 
   it.each([
@@ -990,6 +1127,10 @@ describe('LageberichtePage — Anzeigezone (LFH-350, LFH-692)', () => {
     await screen.findByText('Noch keine Lageberichte');
     await userEvent.click(screen.getAllByRole('button', { name: 'Neuer Lagevortrag' })[0]);
     await waitFor(() => expect(posts).toHaveLength(1));
-    expect(posts[0]).toEqual({ vorlage: 'lagebericht', titel: 'Lageüberblick 1200' });
+    expect(posts[0]).toEqual({
+      vorlage: 'lagebericht',
+      titel: 'Lageüberblick 1200',
+      abschnitte: STARTINHALT,
+    });
   });
 });
