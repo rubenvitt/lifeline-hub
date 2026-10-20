@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import type { Einheit } from '../../api/types';
+import { EINHEIT_ERREICHBARKEIT_MAX } from '../../api/eingabegrenzen';
 import type { EinheitPatchHandler } from './EinheitKopf';
 import EinheitFunk from './EinheitFunk';
 
@@ -98,6 +99,16 @@ describe('EinheitFunk', () => {
     await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer speichern' }));
     await waitFor(() =>
       expect(onPatch).toHaveBeenCalledWith('Erreichbarkeit / Nummer', { erreichbarkeit: null }),
+    );
+  });
+
+  it('Erreichbarkeit nimmt nicht mehr Zeichen an als der Server (Spec eingabegrenzen)', async () => {
+    const user = userEvent.setup();
+    renderFunk();
+    await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }));
+    expect(screen.getByRole('textbox', { name: 'Erreichbarkeit / Nummer' })).toHaveAttribute(
+      'maxLength',
+      String(EINHEIT_ERREICHBARKEIT_MAX),
     );
   });
 

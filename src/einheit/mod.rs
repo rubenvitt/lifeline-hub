@@ -43,9 +43,20 @@ pub const NAME_MAX: usize = 200;
 
 /// Höchstlänge der Bemerkung einer Einheit nach dem Trimmen (LLH-1075 design.md D2, wie
 /// `einheit_vorlage::BEMERKUNG_MAX`). Gilt beim Erfassen einer unangemeldeten Kraft am
-/// Bereitstellungsraum; `bilden` und `PATCH` begrenzen sie noch nicht (Folgeaufgabe). Spiegel:
+/// Bereitstellungsraum und in `POST/PATCH …/einheiten` (LLH-1242). Spiegel:
 /// `EINHEIT_BEMERKUNG_MAX` in `frontend/src/api/eingabegrenzen.ts`.
 pub const BEMERKUNG_MAX: usize = 2_000;
+
+/// Höchstlänge des Funkrufnamens einer Einheit nach dem Trimmen, in `POST/PATCH …/einheiten`
+/// (LLH-1242 design.md D1). So weit wie `fahrzeug::ADHOC_TEXT_MAX`, denn das Erfassen am
+/// Bereitstellungsraum übernimmt den Funkrufnamen des ersten Fahrzeugs; die Vorlage
+/// (`einheit_vorlage::FUNKRUFNAME_MAX`) liegt darunter. Spiegel: `EINHEIT_FUNKRUFNAME_MAX`.
+pub const FUNKRUFNAME_MAX: usize = 200;
+
+/// Höchstlänge der Erreichbarkeit (Rufnummer oder kurzer Freitext) einer Einheit nach dem
+/// Trimmen, in `POST/PATCH …/einheiten` (LLH-1242 design.md D1). Spiegel:
+/// `EINHEIT_ERREICHBARKEIT_MAX`.
+pub const ERREICHBARKEIT_MAX: usize = 200;
 
 /// Default-Einheitstyp-Katalog je neu angelegter Organisation
 /// (label, soll_fuehrer, soll_unterfuehrer, soll_mannschaft, sortier).

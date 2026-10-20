@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { ApiError } from '../../api/client';
+import { EINHEIT_BEMERKUNG_MAX, EINHEIT_FUNKRUFNAME_MAX } from '../../api/eingabegrenzen';
 import type { Einheit, EinheitTyp, Einsatzabschnitt } from '../../api/types';
 import EinheitKopf, { type EinheitPatchHandler, type HandStatusHandler } from './EinheitKopf';
 
@@ -303,6 +304,36 @@ describe('EinheitKopf · Angaben an der Zeile (D1, D2)', () => {
     await waitFor(() =>
       expect(onPatch).toHaveBeenCalledWith('Bemerkung', { bemerkung: 'Zufahrt\nNord' }),
     );
+  });
+
+  it('Funkrufname nimmt nicht mehr Zeichen an als der Server (Spec eingabegrenzen)', async () => {
+    const user = userEvent.setup();
+    renderKopf(einheit({ funkrufname: 'Heros 3/1' }));
+    await user.click(screen.getByRole('button', { name: 'Funkrufname bearbeiten' }));
+    expect(screen.getByRole('textbox', { name: 'Funkrufname' })).toHaveAttribute(
+      'maxLength',
+      String(EINHEIT_FUNKRUFNAME_MAX),
+    );
+  });
+
+  /**
+   * Spec `eingabegrenzen`, „Freitexte einer Einheit sind begrenzt“ (LLH-1242). Mutationsprobe:
+   * `pruefe` an der Bemerkung entfernt → der PATCH geht hinaus und der Fall wird rot.
+   */
+  it('Bemerkung über der Grenze: Überlänge am Feld, nicht gekürzt, keine Anfrage', async () => {
+    const user = userEvent.setup();
+    const voll = 'Z'.repeat(EINHEIT_BEMERKUNG_MAX);
+    const { onPatch } = renderKopf(einheit({ bemerkung: voll }));
+    await user.click(screen.getByRole('button', { name: 'Bemerkung bearbeiten' }));
+    const feld = screen.getByRole('textbox', { name: 'Bemerkung' });
+    await user.type(feld, 'Z');
+    expect(feld).toHaveValue(`${voll}Z`);
+    expect(within(kopf()).getByText('2.001 / 2.000 · zu lang')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Bemerkung speichern' }));
+    expect(
+      await within(kopf()).findByText('Bemerkung darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(onPatch).not.toHaveBeenCalled();
   });
 
   it('Ablehnung: die Eingabe bleibt mit dem Entwurf offen, der Grund steht an der Zeile', async () => {
