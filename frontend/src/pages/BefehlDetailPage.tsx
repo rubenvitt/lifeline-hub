@@ -11,13 +11,13 @@ import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } fro
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
 import { vorlage } from '../befehle/vorlagen';
 import BefehlLesefassung from '../auftraege/BefehlLesefassung';
-import MarkdownEditor from '../components/MarkdownEditor';
+import DokumentEntwurf from '../entwurf/DokumentEntwurf';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
-import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
+import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useViewport } from '../components/useViewport';
 import { AKTIONSLEISTE_AB, aktionsleisteStil } from '../befehle/aktionsleiste';
@@ -506,77 +506,62 @@ function BefehlDetail() {
           Zeitstand: <ZeitAnzeige wert={befehl.zeitstand} />
         </Typography.Paragraph>
 
-        <Paneel
-          titel={istEntwurf && darfSchreiben ? 'Entwurf' : 'Befehlstext'}
-          meta={`${v?.abschnitte.length ?? 0} Abschnitte`}
-          koerperPolster
-        >
-          {istEntwurf && darfSchreiben ? (
-            <Form
-              form={form}
-              layout="vertical"
-              onValuesChange={schutz.markiereGeaendert}
-              // Der zweite Auslöser neben der Frist: ein verlassenes Feld. `onBlur` steigt aus den
-              // Feldern auf, ein Handler am Formular genügt.
-              onBlur={schutz.autosaveJetzt}
-              onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
-            >
-              {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
-                  (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
-              <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
-              {/* Den Titel trägt auf Papier der Druckkopf, aus diesem Feld gespeist (LFH-731); als
-                  Formularfeld stünde er doppelt auf dem Blatt. */}
-              <Form.Item
-                label="Titel"
-                name="titel"
-                rules={[{ required: true }]}
-                className="befehl-no-print"
-              >
-                <Input />
-              </Form.Item>
-              {/* An wen der Befehl geht (LLH-1172); auf Papier steht er im Druckkopf. */}
-              <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
-              {v?.abschnitte.map((a) => (
-                <Form.Item
-                  key={a.schluessel}
-                  label={a.label}
-                  name={a.schluessel}
-                  extra={a.hilfetext}
-                >
-                  {/* Unter dem Paneel „Entwurf" (h2); das Feldetikett ist keine Überschrift. */}
-                  <MarkdownEditor
-                    layout="split"
-                    druckTitel={a.label}
-                    unterEbene={2}
-                    variante="dokument"
-                    autoSize={{ minRows: 8 }}
-                  />
-                </Form.Item>
-              ))}
-              {/* Einstiegsfokus in den ersten leeren Abschnitt. Als letztes Kind, damit beim
-                  Mount-Effekt alle Felder im DOM stehen. */}
-              <Einstiegsfokus
+        {/* Im Entwurf trägt `DokumentEntwurf` das Paneel „Entwurf“ mit Gliederung, Umschalter
+            und allen Abschnitten (LLH-1074, `entwurf/AGENTS.md`, „Gegliederte Dokumente“). */}
+        {istEntwurf && darfSchreiben ? (
+          <Form
+            form={form}
+            layout="vertical"
+            onValuesChange={schutz.markiereGeaendert}
+            // Der zweite Auslöser neben der Frist: ein verlassenes Feld. `onBlur` steigt aus den
+            // Feldern auf, ein Handler am Formular genügt.
+            onBlur={schutz.autosaveJetzt}
+            onFinish={(werte) => speichernMutation.mutate(werte as FormWerte)}
+          >
+            {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
+                (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
+            <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
+            {v && (
+              <DokumentEntwurf
                 form={form}
-                feld={einstiegsAbschnitt(
-                  (v?.abschnitte ?? []).map((a) => a.schluessel),
+                abschnitte={v.abschnitte}
+                // Der erste LEERE Abschnitt des Serverstands; `Einstiegsfokus` friert ihn beim
+                // Einhängen ein, der Remount über `key={befehlId}` ist der Reset.
+                einstieg={einstiegsAbschnitt(
+                  v.abschnitte.map((a) => a.schluessel),
                   (schluessel) => befehl.abschnitte.find((x) => x.schluessel === schluessel)?.text,
                 )}
+                kopf={
+                  // Titel und Verteiler trägt auf Papier der Druckkopf, aus diesen Feldern
+                  // gespeist (LFH-731, LLH-1172); der Kopfblock weicht im Druck
+                  // (`entwurf/dokumentEntwurf.css`).
+                  <>
+                    <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+                      <Input />
+                    </Form.Item>
+                    <VerteilerField sources={verteilerQuellen} ohneDruckKlasse="befehl-no-print" />
+                  </>
+                }
               />
-            </Form>
-          ) : (
-            <>
-              {/* Am Schirm; auf Papier trägt ihn der Druckkopf (LLH-1172). */}
-              <VerteilerAnzeige verteiler={befehl.verteiler} className="befehl-no-print" />
-              {/* h3 unter dem Paneel (h2); die Druckklasse bleibt an der Vollseite. */}
-              <BefehlLesefassung
-                className="befehl-druck"
-                vorlage={v}
-                abschnitte={befehl.abschnitte}
-                ebene={3}
-              />
-            </>
-          )}
-        </Paneel>
+            )}
+          </Form>
+        ) : (
+          <Paneel
+            titel="Befehlstext"
+            meta={`${v?.abschnitte.length ?? 0} Abschnitte`}
+            koerperPolster
+          >
+            {/* Am Schirm; auf Papier trägt ihn der Druckkopf (LLH-1172). */}
+            <VerteilerAnzeige verteiler={befehl.verteiler} className="befehl-no-print" />
+            {/* h3 unter dem Paneel (h2); die Druckklasse bleibt an der Vollseite. */}
+            <BefehlLesefassung
+              className="befehl-druck"
+              vorlage={v}
+              abschnitte={befehl.abschnitte}
+              ebene={3}
+            />
+          </Paneel>
+        )}
         {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}
         <DokumentAnlagen
           dokument="befehle"

@@ -1,0 +1,111 @@
+/* Baustein `DokumentEntwurf` (`entwurf/DokumentEntwurf.tsx`, `entwurf/AGENTS.md` „Gegliederte
+   Dokumente“): Anordnung am Schirm und Druckregeln der Schreibfläche. Abstände aus Tokens setzt
+   der Baustein inline; hier steht nur, was Medienabfragen braucht. Keine Farbe (Farbquelle
+   `theme/rollen.css`). */
+
+/* ---------- Schirm ---------- */
+
+/* Kopfblock: die Felder der Seite (Titel, Zeitstand, Verteiler) nebeneinander, solange sie Platz
+   haben, sonst untereinander — ohne eigene Breakpoints. */
+.dokument-entwurf__kopf {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  align-items: start;
+}
+
+/* Unter `xl` steht die Gliederung oben im Fluss: EINE Zeile, die in sich waagerecht rollt (kein
+   Querlauf der Seite bei 390 px). Sie klebt dort bewusst nicht (LLH-1074): eine klebende
+   Zeile verdeckte beim Fokus-Scroll den Kopf des Abschnitts. */
+.dokument-entwurf__koerper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dokument-entwurf__gliederung {
+  min-width: 0;
+}
+
+.dokument-entwurf__gliederungsliste {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dokument-entwurf__gliederungsliste > li {
+  flex: 0 0 auto;
+}
+
+/* Ab `xl` (antd 1200 px): Gliederung links als Spalte, klebt unter dem Rahmen. */
+@media screen and (min-width: 1200px) {
+  .dokument-entwurf__koerper {
+    grid-template-columns: 13rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .dokument-entwurf__gliederung {
+    position: sticky;
+    top: var(--lfh-rahmen-oben, 0px);
+    max-height: calc(100dvh - var(--lfh-rahmen-oben, 0px));
+    overflow-y: auto;
+  }
+
+  .dokument-entwurf__gliederungsliste {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  /* Lange Abschnittsnamen („Beurteilung der Gefahren-/Schadenlage“) brechen in der Spalte um. */
+  .dokument-entwurf__sprung.ant-btn {
+    width: 100%;
+    height: auto;
+    justify-content: flex-start;
+    text-align: start;
+    white-space: normal;
+  }
+}
+
+/* ---------- Druck ----------
+
+   Gedruckt wird, was steht (LLH-1074): im Bearbeiten die Druckfassung je Editor, in der
+   Lesefassung die Lesefassung (das jeweils andere Paneel ist `hidden`). Bedienung weicht:
+   Paneelkopf mit Umschalter, Gliederung, Kopfblock (den Titel trägt der Druckkopf der Seite) und
+   die Abschnittsköpfe — den Abschnittstitel trägt auf Papier der Titel der Druckfassung im selben
+   Titelblock wie der erste Absatz (`MarkdownEditor druckTitel`, LFH-1008); ein Kopf daneben bliebe
+   in Firefox allein am Seitenende stehen. */
+@media print {
+  [data-lfh='dokument-entwurf']
+    :is([data-lfh='gliederung'], [data-lfh='entwurf-kopf'], [data-lfh='abschnitt-kopf']) {
+    display: none !important;
+  }
+
+  [data-lfh='dokument-entwurf'] > [data-lfh='paneel'] > :first-child {
+    display: none !important;
+  }
+
+  /* Das Paneel ist auf Papier kein Kasten: kein Rahmen, kein Polster. */
+  [data-lfh='dokument-entwurf'] > [data-lfh='paneel'] {
+    border: 0 !important;
+  }
+
+  [data-lfh='dokument-entwurf'] > [data-lfh='paneel'] > * {
+    padding: 0 !important;
+  }
+
+  [data-lfh='dokument-entwurf'] .dokument-entwurf__koerper {
+    display: block;
+  }
+
+  /* Das Textfeld weicht IMMER, daneben steht die Druckfassung (`druckfassung`, am Schirm
+     `display: none` aus `MarkdownEditor.css`): sonst käme Rohtext in Schirmhöhe aufs Papier,
+     langer Text abgeschnitten (M86). */
+  [data-lfh='dokument-entwurf'] .markdown-editor--toggle textarea {
+    display: none !important;
+  }
+
+  [data-lfh='dokument-entwurf'] :is(.markdown-editor__druck, .markdown-editor__titel) {
+    display: block !important;
+  }
+}

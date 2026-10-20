@@ -228,7 +228,8 @@ async function druckLage(page: Page) {
     ).length;
     // LFH-1008: jeder sichtbare Abschnittstitel steht in einem Titelblock mit seinem ersten
     // Absatz. Abschnittstitel sind die Titel der Lesefassung (im Titelplatz des Markdowns) und
-    // die Papiertitel des Entwurfs; Akkordeonkopf und Feldetikett weichen dafür. Im Auftragsblatt
+    // die Papiertitel des Entwurfs; Abschnittskopf, Gliederung, Kopfblock und Feldetikett weichen
+    // dafür (`entwurf/dokumentEntwurf.css`, LLH-1074). Im Auftragsblatt
     // sind es die `h3` der Etikett-Wert-Listen (LLH-1171).
     const sichtbar = (el: Element) => el.getClientRects().length > 0;
     const titel = Array.from(
@@ -255,7 +256,8 @@ async function druckLage(page: Page) {
       ].join(','),
       entwurfskopf: Array.from(
         wurzel.querySelectorAll(
-          '.ant-collapse-header, .ant-form-item:has(.markdown-editor) .ant-form-item-label',
+          '.ant-collapse-header, .ant-form-item:has(.markdown-editor) .ant-form-item-label, ' +
+            '[data-lfh="abschnitt-kopf"], [data-lfh="gliederung"], [data-lfh="entwurf-kopf"]',
         ),
       ).filter(sichtbar).length,
     };
@@ -327,7 +329,9 @@ async function pruefeDruckImFluss(page: Page, fall: string) {
     `${fall}: jeder Abschnittstitel steht mit seinem ersten Block zusammen`,
   ).toBe(0);
   expect(rahmen.titelblockUmbruch, `${fall}: Titelblock bricht nicht`).toBe('avoid');
-  expect(rahmen.entwurfskopf, `${fall}: Akkordeonkopf und Feldetikett weichen`).toBe(0);
+  expect(rahmen.entwurfskopf, `${fall}: Abschnittskopf, Gliederung und Feldetikett weichen`).toBe(
+    0,
+  );
 
   // (2) UMFANG — auf Papierbreite, weil die Zeilenzahl an der Breite hängt.
   await page.setViewportSize({ width: NUTZ_BREITE, height: 900 });
@@ -483,12 +487,12 @@ test('Pressemitteilung (Entwurf) druckt jeden Abschnitt und trägt „Entwurf“
 });
 
 /**
- * Die VORGABE der Entwurfsseite: „Vorschau neben dem Text" aus, Toggle-Layout mit
- * geschlossener Vorschau — der Zustand, in dem die `<textarea>` am ehesten mitgedruckt wird.
- * Diskriminierend: die Endmarke des LETZTEN (zugeklappten) Abschnitts steht als dargestellter
- * Markdown-Absatz jenseits der ersten Seite, und kein Textfeld ist im Druck sichtbar.
+ * Die VORGABE der Entwurfsseite: „Bearbeiten“ (`entwurf/DokumentEntwurf`), je Abschnitt ein
+ * Textfeld — der Zustand, in dem die `<textarea>` am ehesten mitgedruckt wird. Diskriminierend: die
+ * Endmarke des LETZTEN Abschnitts steht als dargestellter Markdown-Absatz jenseits der ersten
+ * Seite, und kein Textfeld ist im Druck sichtbar.
  */
-test('Lagebericht (Entwurf, Vorgabe ohne Vorschau) druckt jeden Abschnitt vollständig als Markdown', async ({
+test('Lagebericht (Entwurf, Bearbeiten) druckt jeden Abschnitt vollständig als Markdown', async ({
   page,
 }) => {
   await anmelden(page);
@@ -496,28 +500,33 @@ test('Lagebericht (Entwurf, Vorgabe ohne Vorschau) druckt jeden Abschnitt vollst
   const id = await lageberichtSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-  // Vorbedingung: die Vorgabe steht — kein Haken, keine Eingabespalte.
-  await expect(page.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
+  // Vorbedingung: die Vorgabe steht — Bearbeiten, keine Eingabespalte.
+  await expect(page.getByRole('tab', { name: 'Bearbeiten' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
   await expect(page.locator('.markdown-editor--split')).toHaveCount(0);
   await expect(page.locator('.markdown-editor--toggle').first()).toBeAttached();
   // Eine echte schwebende Ebene: der Erfolgs-Toast nach dem Speichern.
   await page.getByRole('button', { name: 'Entwurf speichern' }).click();
   await expect(page.locator('.ant-message-notice')).toBeVisible();
-  await pruefeDruckImFluss(page, 'Lagebericht Entwurf (Vorgabe)');
+  await pruefeDruckImFluss(page, 'Lagebericht Entwurf (Bearbeiten)');
 });
 
-test('Lagebericht (Entwurf, Vorschau neben dem Text) druckt im normalen Fluss', async ({
-  page,
-}) => {
+test('Lagebericht (Entwurf, Lesefassung) druckt im normalen Fluss', async ({ page }) => {
   await anmelden(page);
-  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss LB-Split ${Date.now()}`);
+  const einsatzId = await einsatzAnlegen(page, `E2E Druckfluss LB-Lesefassung ${Date.now()}`);
   const id = await lageberichtSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-  // Split-Layout: die gerenderte Vorschau trägt den Text, die Eingabe weicht im Druck.
-  await page.getByRole('checkbox', { name: 'Vorschau neben dem Text' }).check();
-  await expect(page.locator('.markdown p', { hasText: ENDMARKE })).toBeAttached();
-  await pruefeDruckImFluss(page, 'Lagebericht Entwurf (Split)');
+  // Lesefassung: das ganze Dokument gesetzt, die Textfelder hängen verborgen weiter im Formular.
+  await page.getByRole('tab', { name: 'Lesefassung' }).click();
+  await expect(
+    page
+      .getByRole('tabpanel', { name: 'Lesefassung' })
+      .locator('.markdown p', { hasText: ENDMARKE }),
+  ).toBeVisible();
+  await pruefeDruckImFluss(page, 'Lagebericht Entwurf (Lesefassung)');
 });
 
 test('Befehl (Entwurf) druckt im normalen Fluss, Abschnittstitel bleibt beim Text', async ({
@@ -667,7 +676,7 @@ test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite
 
 /**
  * LFH-498: der Entwurf der Vorlage mit ACHT Abschnitten (`lagebeurteilung`). Jeder Abschnitt
- * trägt eine eigene Marke; einer davon (zugeklappt, im Akkordeon weit hinten) langen
+ * trägt eine eigene Marke; einer davon (weit hinten) langen
  * Fließtext mit Markdown-Auszeichnung — Überschrift, Fettung, Liste — und die Endmarke.
  */
 const LAGEBEURTEILUNG_ABSCHNITTE = [
@@ -800,54 +809,32 @@ async function pruefeBildschirm(page: Page, fall: string) {
 }
 
 test.describe('Lagebericht-Entwurf druckt die Lesefassung (LFH-498)', () => {
-  test('Vorgabe (Toggle, Vorschau zu): acht Abschnitte je einmal, gerendert, vollständig', async ({
-    page,
-  }) => {
+  test('Bearbeiten: acht Abschnitte je einmal, gerendert, vollständig', async ({ page }) => {
     await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Toggle ${Date.now()}`);
+    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Bearbeiten ${Date.now()}`);
     const id = await lagebeurteilungSaeen(page, einsatzId);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-    await expect(page.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
     await expect(page.locator('.markdown-editor--toggle')).toHaveCount(8);
     await expect(page.locator('.markdown-editor__druck')).toHaveCount(8);
-    await pruefeBildschirm(page, 'Toggle');
-    await pruefeLesefassung(page, 'Toggle, Vorschau zu');
+    await expect(page.locator('.markdown-editor--split')).toHaveCount(0);
+    await pruefeBildschirm(page, 'Bearbeiten');
+    await pruefeLesefassung(page, 'Bearbeiten');
   });
 
-  test('Toggle mit geöffneter Vorschau im offenen Abschnitt: kein Abschnitt doppelt', async ({
-    page,
-  }) => {
+  test('Lesefassung: acht Abschnitte je einmal, gerendert, vollständig', async ({ page }) => {
     await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Toggle offen ${Date.now()}`);
+    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Lesefassung ${Date.now()}`);
     const id = await lagebeurteilungSaeen(page, einsatzId);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-    // Zugeklappte Abschnitte sind verborgen, `getByRole` findet nur den Knopf im offenen.
-    await page
-      .locator('.markdown-editor--toggle')
-      .getByRole('button', { name: /Vorschau/ })
-      .first()
-      .click();
-    // Der offene Abschnitt trägt jetzt seine Vorschau statt der Druckfassung.
-    await expect(page.locator('.markdown-editor--toggle .markdown-editor__vorschau')).toHaveCount(
-      1,
-    );
-    await expect(page.locator('.markdown-editor__druck')).toHaveCount(7);
-    await pruefeLesefassung(page, 'Toggle, eine Vorschau offen');
-  });
-
-  test('Split (Vorschau neben dem Text): acht Abschnitte je einmal, gerendert, vollständig', async ({
-    page,
-  }) => {
-    await anmelden(page);
-    const einsatzId = await einsatzAnlegen(page, `E2E LFH-498 Split ${Date.now()}`);
-    const id = await lagebeurteilungSaeen(page, einsatzId);
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-    await page.getByRole('checkbox', { name: 'Vorschau neben dem Text' }).check();
-    await expect(page.locator('.markdown-editor--split')).toHaveCount(8);
-    await pruefeBildschirm(page, 'Split');
-    await pruefeLesefassung(page, 'Split');
+    await page.getByRole('tab', { name: 'Lesefassung' }).click();
+    // Am Schirm: die Lesefassung steht, kein Textfeld ist sichtbar — und die Druckfassungen der
+    // verborgenen Editoren kommen nicht zusätzlich aufs Papier (je Abschnitt genau EINMAL).
+    await expect(
+      page.getByRole('tabpanel', { name: 'Lesefassung' }).getByText(abschnittsMarke(0)),
+    ).toBeVisible();
+    await expect(page.locator('textarea:visible')).toHaveCount(0);
+    await pruefeLesefassung(page, 'Lesefassung');
   });
 });

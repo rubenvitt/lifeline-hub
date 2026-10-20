@@ -382,7 +382,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   und Mittellage); antd hat dafür kein Token, das Label wäre nur so hoch wie die Schrift
   (21,5/36). Ohne Text (antds Tabellenfilter) kein Boden; im Menüeintrag hebt
   `style={{ minHeight: 0 }}` ihn auf, dort ist der Eintrag das Ziel (`SpaltenSchalter`).
-  Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7, C13).
+  Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7).
 - **Handgebautes Bedienziel** (LFH-365): `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine
   reine exportierte Stilfunktion (`bedienzielStil`) mit Böden als **Literalen**. **Ein `<a>` erbt

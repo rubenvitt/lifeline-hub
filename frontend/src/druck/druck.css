@@ -85,10 +85,10 @@
   }
 
   /* ---- Umbruchregeln ----
-     An der Wurzel, damit sie im Lese- UND im Entwurfszweig gelten. Im Entwurf ist der
-     Abschnittstitel keine Überschrift, sondern Akkordeonkopf (Lagebericht) bzw. Feldetikett
-     (Befehl) — beide stehen deshalb mit in der Liste. Auf Papier vertritt sie dort seit
-     LFH-1008 der Titel der Druckfassung (`MarkdownEditor druckTitel`). */
+     An der Wurzel, damit sie im Lese- UND im Entwurfszweig gelten. Klappkopf und Feldetikett
+     stehen mit in der Liste, wo ein Druckstück sie als Abschnittstitel trägt. Im Entwurf der
+     gegliederten Dokumente vertritt den Abschnittskopf seit LFH-1008 der Titel der
+     Druckfassung (`MarkdownEditor druckTitel`, `entwurf/dokumentEntwurf.css`). */
   [data-lfh='druckwurzel'] :is(h1, h2, h3, h4, h5, h6, .ant-collapse-header, .ant-form-item-label) {
     break-after: avoid;
   }

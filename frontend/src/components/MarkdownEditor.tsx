@@ -25,9 +25,10 @@ interface Props {
   /** Liefert den neuen Markdown-Text als reinen String. */
   onChange?: (value: string) => void;
   /**
-   * `split` (Default): Eingabe und Live-Vorschau nebeneinander (Lagebericht).
+   * `split` (Default): Eingabe und Live-Vorschau nebeneinander.
    * `tabs`: kompakter Schreiben/Vorschau-Umschalter (ETB-Schnellerfassung).
-   * `toggle`: schlankes Feld + dezenter Vorschau-Button (Command-Bar-Flow).
+   * `toggle`: schlankes Feld + dezenter Vorschau-Button (Command-Bar-Flow); mit
+   * {@link umschalterAussen} das Feld der Entwurfsseite (`entwurf/DokumentEntwurf.tsx`).
    */
   layout?: Layout;
   /** Darstellung der Vorschau — soll der späteren Anzeige entsprechen. */
@@ -42,6 +43,11 @@ interface Props {
   rows?: number;
   /** Von antd Form.Item gesetzt (für Label-Verknüpfung). */
   id?: string;
+  /**
+   * Beschreibung des Feldes (Hilfetext im Abschnittskopf des Entwurfs, oder von antd Form.Item bei
+   * `extra`/Prüffehler gesetzt) — ans Textfeld durchgereicht, sonst ginge sie hier verloren.
+   */
+  'aria-describedby'?: string;
   onKeyDown?: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   /** Beschriftung der Eingabetaste auf der Bildschirmtastatur (LFH-955: ETB „enter“). */
   enterKeyHint?: TextareaHTMLAttributes<HTMLTextAreaElement>['enterKeyHint'];
@@ -52,15 +58,16 @@ interface Props {
   readOnly?: boolean;
   /**
    * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die nur
-   * der Druck zeigt (`.markdown-editor__druck`). Sonst trüge auf Papier eine `<textarea>` mit
-   * abgeschnittenem Rohtext (LFH-71). Opt-in, weil sie einen Markdown-Render je Anschlag kostet.
+   * der Druck zeigt (`.markdown-editor__druck`, sichtbar gemacht von `entwurf/dokumentEntwurf.css`).
+   * Sonst trüge auf Papier eine `<textarea>` mit abgeschnittenem Rohtext (LFH-71). Opt-in, weil sie
+   * einen Markdown-Render je Anschlag kostet.
    */
   druckfassung?: boolean;
   /**
    * Abschnittstitel auf Papier (LFH-1008). Steht im selben Titelblock wie der erste Block der
    * gerenderten Fassung, damit er im Druck nicht allein am Seitenende bleibt; der Kopf des
-   * Einbauorts (Akkordeonkopf, Feldetikett) liegt außerhalb und weicht im Druck dafür
-   * (`lageberichtPrint.css`, `befehlPrint.css`). Am Bildschirm unsichtbar.
+   * Einbauorts (Abschnittskopf des Entwurfs) liegt außerhalb und weicht im Druck dafür
+   * (`entwurf/dokumentEntwurf.css`). Am Bildschirm unsichtbar.
    */
   druckTitel?: string;
   /**
@@ -103,6 +110,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     autoSize,
     rows,
     id,
+    'aria-describedby': beschreibung,
     onKeyDown,
     enterKeyHint,
     readOnly,
@@ -122,6 +130,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     <Input.TextArea
       ref={ref}
       id={id}
+      aria-describedby={beschreibung}
       value={value}
       placeholder={placeholder}
       autoSize={autoSize}
