@@ -1141,6 +1141,8 @@ export interface components {
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
+            /** @description Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe. */
+            erreichbarkeit?: string | null;
             geaendert_at?: string | null;
             /** Format: int64 */
             id: number;
@@ -1155,6 +1157,8 @@ export interface components {
              *     sie als Paar.
              */
             lat?: number | null;
+            /** @description Wer die Stelle leitet (LLH-1044), Freitext. Fehlt ohne Angabe. */
+            leitung?: string | null;
             /** Format: double */
             lon?: number | null;
             notiz?: string | null;

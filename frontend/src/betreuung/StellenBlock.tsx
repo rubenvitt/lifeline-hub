@@ -2,6 +2,7 @@ import { Button, Space, Typography, theme } from 'antd';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useMemo, type CSSProperties } from 'react';
+import { useNavigate } from 'react-router';
 import type {
   Betreuungsstelle,
   BetreuungsstelleArt,
@@ -9,20 +10,16 @@ import type {
   StelleNamentlich,
 } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { KennungsLink } from '../components/kennungsLink';
+import { betreuungsstellePfad } from '../routing/deeplinks';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { monoStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import Bereichskopf from '../kommunikation/Bereichskopf';
 import { auslastung, betreuungsstelleStatus } from '../theme/statusFarben';
-import {
-  ART_LABEL,
-  freiePlaetze,
-  namentlichTeile,
-  personenZahl,
-  volleStellenSegment,
-} from './betreuungText';
+import { ART_LABEL, freiePlaetze, namentlichTeile, personenZahl } from './betreuungText';
 import MeldeVerlauf from './MeldeVerlauf';
 
 /**
@@ -40,13 +37,17 @@ import MeldeVerlauf from './MeldeVerlauf';
  * Spaltenschalter). Sonst sah man bei 390 px nur Bezeichnung und Art, und die Belegung lag
  * hinter dem Querscrollen.
  *
- * Volle Stellen: Block- und Seitenkopf nennen „n voll", weil die Tabelle oft unter der Falz
- * liegt. Sortiert wird nach Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder
- * Meldung unter dem Cursor.
+ * Summen (in Betreuung, Kapazität, frei, voll) stehen seit LLH-1050 nur im Band über der Tabelle
+ * (`UnterbringungKennzahlen`), nicht mehr im Blockkopf: eine Heimat je Zahl. Sortiert wird nach
+ * Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder Meldung unter dem Cursor.
+ *
+ * Die Bezeichnung führt auf die Detailseite der Stelle (LLH-1044); dort stehen Bearbeiten und
+ * Status, die Zeile trägt sie nicht mehr. Ein Klick in die Zeile führt als Komfort ebenfalls dorthin
+ * (LLH-1050); Knöpfe und Links der Zeile bedienen ihren Klick allein (Riegel der `Datensicht`).
  *
  * Zeilenaktionen: „Belegung melden" direkt — unter `md` in der fixierten Kennung unter dem Namen,
- * sonst läge der Knopf bei 390 px hinter dem Querscrollen (LFH-967) —, „Bearbeiten" und „Stornieren" im Menü, an einer
- * unverorteten Stelle zuerst „Auf Karte verorten". Auch an einer geschlossenen Stelle (ohne
+ * sonst läge der Knopf bei 390 px hinter dem Querscrollen (LFH-967) —, „Stornieren" im Menü, an
+ * einer unverorteten Stelle zuerst „Auf Karte verorten". Auch an einer geschlossenen Stelle (ohne
  * „Belegung melden") bleibt es ein Menü: gezählt wird NACH der Rechteprüfung, nicht nach dem
  * Zeilenzustand, sonst wechselte die Form der Spalte mit jedem Statuswechsel. Ohne
  * Schreibrecht entfällt die Spalte.
@@ -58,7 +59,7 @@ import MeldeVerlauf from './MeldeVerlauf';
  * „Verlauf“ als Aufklappbereich je Zeile, auch ohne Schreibrecht; lädt erst beim Aufklappen.
  */
 
-export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
+export type StelleAktion = 'verorten' | 'stornieren';
 
 /**
  * Warum an einer geschlossenen Stelle nichts zurückgenommen werden kann (sonst stünde sie
@@ -68,7 +69,6 @@ export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
 export const GESCHLOSSEN_HINWEIS = 'Stelle geschlossen: Zurücknehmen gesperrt';
 
 const MENUE: readonly MenueEintrag<StelleAktion>[] = [
-  { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
 
@@ -97,6 +97,7 @@ const STATUS = Object.keys(betreuungsstelleStatus) as BetreuungsstelleStatus[];
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
 const stellenSpalten = (
+  einsatzId: number,
   darfSchreiben: boolean,
   onBelegungMelden: (s: Betreuungsstelle) => void,
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
@@ -133,14 +134,16 @@ const stellenSpalten = (
          * steht er wie bisher einzeilig.
          */
         const name = (
-          <Typography.Text
-            strong
+          <KennungsLink
+            to={betreuungsstellePfad(einsatzId, s.id)}
             style={
-              meldenInKennung ? { display: 'inline-block', maxWidth: KENNUNG_MAX_PX } : undefined
+              meldenInKennung ? { display: 'inline-flex', maxWidth: KENNUNG_MAX_PX } : undefined
             }
           >
-            {s.bezeichnung}
-          </Typography.Text>
+            <Typography.Text strong style={{ color: 'inherit' }}>
+              {s.bezeichnung}
+            </Typography.Text>
+          </KennungsLink>
         );
         const knopf = meldenInKennung ? meldeKnopf(s) : null;
         return knopf ? (
@@ -198,7 +201,7 @@ const stellenSpalten = (
       // Überbelegung zeigt 0 frei; wie weit darüber, sagt „überbelegt" neben der Belegung.
       render: (_, s) => {
         const frei = freiePlaetze(s);
-        return frei == null ? leer : personenZahl(Math.max(0, frei));
+        return frei == null ? leer : personenZahl(frei);
       },
     },
     {
@@ -291,9 +294,7 @@ export default function StellenBlock({
   namentlich,
   ladend,
   darfSchreiben,
-  hervorgehoben,
   dataUpdatedAt,
-  onAnlegen,
   onBelegungMelden,
   onAktion,
 }: {
@@ -303,15 +304,12 @@ export default function StellenBlock({
   namentlich?: readonly StelleNamentlich[] | null;
   ladend: boolean;
   darfSchreiben: boolean;
-  /** Per Deeplink angesteuerte Stelle (`?stelle=`). */
-  hervorgehoben: number | null;
   dataUpdatedAt?: number;
-  /** Ohne: kein Anlegen-Knopf im Blockkopf (die Seite trägt ihn als Primäraktion, LLH-1034). */
-  onAnlegen?: () => void;
   onBelegungMelden: (s: Betreuungsstelle) => void;
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void;
 }) {
   const { token } = theme.useToken();
+  const navigate = useNavigate();
   const { istSchmal } = useViewport();
   const karteGesperrt = useSprungSperre(einsatzId)('lagekarte');
   const namentlichJeStelle = useMemo(
@@ -321,6 +319,7 @@ export default function StellenBlock({
   const spalten = useMemo(
     () =>
       stellenSpalten(
+        einsatzId,
         darfSchreiben,
         onBelegungMelden,
         onAktion,
@@ -331,6 +330,7 @@ export default function StellenBlock({
         token.marginXS,
       ),
     [
+      einsatzId,
       darfSchreiben,
       onBelegungMelden,
       onAktion,
@@ -361,33 +361,10 @@ export default function StellenBlock({
     }),
     [einsatzId, darfSchreiben],
   );
-  const gemeldet = stellen.filter((s) => s.belegung != null);
-  const summe = gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
-  const ohne = stellen.length - gemeldet.length;
-  // Hat keine Stelle gemeldet, ist die Summe 0 nur „nichts gemeldet", nicht „niemand in
-  // Betreuung" — dasselbe Wort wie bei den Bezirken der Evakuierung.
-  const kopfzahl = gemeldet.length === 0 ? 'keine Meldung' : `${personenZahl(summe)} untergebracht`;
 
   return (
     <div style={{ marginBottom: token.marginLG }}>
-      <Bereichskopf
-        titel="Betreuungsstellen"
-        ueberschrift="h2"
-        meta={
-          ladend || stellen.length === 0
-            ? undefined
-            : `${kopfzahl}${volleStellenSegment(stellen)}${ohne > 0 ? ` · ${personenZahl(ohne)} ohne Meldung` : ''}`
-        }
-        dataUpdatedAt={dataUpdatedAt}
-        // Gesperrt statt versteckt; der Grund steht im Hinweis über der Seite.
-        aktion={
-          onAnlegen ? (
-            <Button disabled={!darfSchreiben} onClick={onAnlegen}>
-              Betreuungsstelle anlegen
-            </Button>
-          ) : undefined
-        }
-      />
+      <Bereichskopf titel="Betreuungsstellen" ueberschrift="h2" dataUpdatedAt={dataUpdatedAt} />
       <Datensicht
         bezeichnung="Betreuungsstellen"
         form="tabelle"
@@ -398,7 +375,7 @@ export default function StellenBlock({
         leerText="Keine Betreuungsstellen"
         karte={KARTE}
         aufklappen={aufklappen}
-        zeilenKlasse={(s) => (s.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
+        onZeileKlick={(s) => navigate(betreuungsstellePfad(einsatzId, s.id))}
       />
     </div>
   );

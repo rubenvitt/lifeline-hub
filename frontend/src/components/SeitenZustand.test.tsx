@@ -162,6 +162,29 @@ describe('SeitenLeer', () => {
     expect(screen.getByText('Aufnahmemaske')).toBeInTheDocument();
   });
 
+  it('`gesperrt`: Knopf gesperrt, der Grund steht sichtbar darunter, ein Klick tut nichts (LLH-1050)', async () => {
+    const anlegen = vi.fn();
+    renderMitProviders(
+      <SeitenLeer
+        titel="Keine Betreuungsstellen"
+        aktion={{
+          label: 'Betreuungsstelle anlegen',
+          onClick: anlegen,
+          gesperrt: 'nur Einsatzleitung und Führungspersonal',
+        }}
+      />,
+    );
+
+    const knopf = screen.getByRole('button', { name: 'Betreuungsstelle anlegen' });
+    expect(knopf).toBeDisabled();
+    // Sichtbar, nicht nur Tooltip (Touch, LFH-1078), und als Beschreibung am Knopf.
+    const grund = screen.getByText('nur Einsatzleitung und Führungspersonal');
+    expect(grund).toBeVisible();
+    expect(knopf).toHaveAccessibleDescription('nur Einsatzleitung und Führungspersonal');
+    await userEvent.click(knopf).catch(() => undefined);
+    expect(anlegen).not.toHaveBeenCalled();
+  });
+
   it('rendert kein antd-`Empty`', () => {
     // Kein Selbstzweck: AK3 verlangt 0 `<Empty>`-Knoten im Frontend, und dieses
     // Primitiv ist die Stelle, an der ein `Empty` am naheliegendsten wäre. Fällt die

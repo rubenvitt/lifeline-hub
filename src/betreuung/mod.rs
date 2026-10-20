@@ -147,6 +147,15 @@ impl BetreuungsstelleStatus {
 /// also **400** — Vorbild `verpflegung::MAX_EP`.
 pub const MAX_PERSONEN: i64 = 1_000_000;
 
+/// Leitung einer Betreuungsstelle (LLH-1044): ein Name, Freitext, höchstens so lang wie der
+/// Name einer Einheit (`einheit::NAME_MAX`). Personenbezogen: nie im ETB, geschwärzt mit dem
+/// Einsatz.
+pub const LEITUNG_MAX: usize = 200;
+
+/// Erreichbarkeit einer Betreuungsstelle (LLH-1044, Begriff wie `einheit::ERREICHBARKEIT_MAX`):
+/// Rufnummer, Funkrufname oder Kanal, Freitext. Personenbezogen wie [`LEITUNG_MAX`].
+pub const ERREICHBARKEIT_MAX: usize = 200;
+
 /// Liest einen Enum-Wert aus einer Eingabe. Ein unbekannter Wert scheitert am Feld für sich
 /// und ist deshalb **400** (src/AGENTS.md „Statuscode-Konvention“, `src/error.rs`), nicht 422.
 pub fn enum_wert<T: TryFrom<String, Error = String>>(s: &str) -> Result<T, AppError> {
@@ -225,6 +234,12 @@ pub struct BetreuungsstelleAnzeige {
     pub standort: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notiz: Option<String>,
+    /// Wer die Stelle leitet (LLH-1044), Freitext. Fehlt ohne Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leitung: Option<String>,
+    /// Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub erreichbarkeit: Option<String>,
     /// Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält
     /// sie als Paar.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -401,7 +416,7 @@ pub mod etb_text {
         /// `(vorher, neu)`
         pub kapazitaet: Option<(Option<i64>, Option<i64>)>,
         pub abschnitt: bool,
-        /// Standort und/oder Notiz.
+        /// Standort, Notiz, Leitung und/oder Erreichbarkeit (LLH-1044) — ohne Wert im Text.
         pub weitere_angaben: bool,
     }
 

@@ -1,4 +1,5 @@
 import { Alert, Button, theme } from 'antd';
+import { useId } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiError } from '../api/client';
 import { flaeche } from '../theme/tokens';
@@ -60,6 +61,12 @@ interface SeitenLeerAktion {
    * (`pages/UnfallhilfsstellenDefault.tsx`).
    */
   onClick?: () => void;
+  /**
+   * Grund, warum die Handlung gesperrt ist (etwa fehlendes Schreibrecht, LLH-1050): der Knopf
+   * steht gesperrt, der Grund in wenigen Wörtern sichtbar darunter, nie nur im Tooltip (Touch,
+   * `frontend/AGENTS.md`, „Texte: zeigen statt erklären“).
+   */
+  gesperrt?: string;
 }
 
 interface SeitenLeerProps {
@@ -89,6 +96,7 @@ interface SeitenLeerProps {
 export function SeitenLeer({ titel, hinweis, aktion }: SeitenLeerProps) {
   const { token } = useToken();
   const navigate = useNavigate();
+  const grundId = useId();
   return (
     <div style={{ padding: token.padding, textAlign: 'center' }}>
       <div style={{ color: token.colorTextSecondary, fontSize: token.fontSize }}>{titel}</div>
@@ -107,6 +115,8 @@ export function SeitenLeer({ titel, hinweis, aktion }: SeitenLeerProps) {
         <div style={{ marginBlockStart: token.margin }}>
           <Button
             type="primary"
+            disabled={aktion.gesperrt != null}
+            aria-describedby={aktion.gesperrt != null ? grundId : undefined}
             onClick={
               aktion.onClick ??
               (aktion.pfad != null ? () => void navigate(aktion.pfad!) : undefined)
@@ -114,6 +124,18 @@ export function SeitenLeer({ titel, hinweis, aktion }: SeitenLeerProps) {
           >
             {aktion.label}
           </Button>
+          {aktion.gesperrt != null && (
+            <div
+              id={grundId}
+              style={{
+                color: token.colorTextDescription,
+                fontSize: token.fontSizeSM,
+                marginBlockStart: token.marginXXS,
+              }}
+            >
+              {aktion.gesperrt}
+            </div>
+          )}
         </div>
       )}
     </div>

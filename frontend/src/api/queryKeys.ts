@@ -587,6 +587,10 @@ export const einsatzKeys = {
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
+  /** Betroffene einer Betreuungsstelle (LLH-1044, Serverfilter); unter `personen`, damit das
+   *  `person`-Ereignis und jede Personen-Mutation sie mit auffrischen. */
+  personenDerStelle: (einsatzId: number, stelleId: number) =>
+    [EINSATZ_KEYS.personen, einsatzId, 'stelle', stelleId] as const,
   personenAuswahl: (einsatzId: number) => [EINSATZ_KEYS.personenAuswahl, einsatzId] as const,
   // personId nullbar: der Person-Detail-Drawer rendert ohne Auswahl (enabled-Guard).
   person: (einsatzId: number, personId: number | null) =>
