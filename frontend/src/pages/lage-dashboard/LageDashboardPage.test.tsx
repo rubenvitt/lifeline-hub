@@ -577,7 +577,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     const erster = render();
     // Wartesignal „Gebiete geladen": der Leerzustand der Matrix entsteht erst danach.
     expect(
-      await within(paneel('Gefahrenmatrix')).findByText('Noch keine Gefahr bewertet.'),
+      await within(paneel('Gefahrenmatrix')).findByText('Keine Gefahr über Stufe „keine“.'),
     ).toBeInTheDocument();
     expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
     erster.unmount();
@@ -885,30 +885,29 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     });
     render();
     const box = paneel('Gefahrenmatrix');
-    await waitFor(() => expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(3));
+    await waitFor(() => expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(2));
     const zeilen = Array.from(box.querySelectorAll<HTMLElement>('[data-lfh="gefahrenzeile"]'));
-    // Katalog: Atemgifte vor Brand vor Ertrinken.
+    // Katalog: Brand vor Ertrinken. Atemgifte trägt nur „keine“, die Vorgabe (LLH-1090): keine Zeile.
     expect(zeilen.map((z) => [z.firstChild?.textContent, z.dataset.stufe])).toEqual([
-      ['Atemgifte', 'keine'],
       ['Brand', 'akut'],
       ['Ertrinken', 'hoch'],
     ]);
-    // Segmente bis zur Stufe gefüllt: keine 0, akut 4, hoch 3.
+    // Segmente bis zur Stufe gefüllt: akut 4, hoch 3.
     const voll = (z: HTMLElement) => z.querySelectorAll('[data-voll="ja"]').length;
-    expect(zeilen.map(voll)).toEqual([0, 4, 3]);
+    expect(zeilen.map(voll)).toEqual([4, 3]);
     // Das Stufenwort ist der zweite Kanal — es steht in jeder Zeile.
-    expect(zeilen[1]).toHaveTextContent('akut');
+    expect(zeilen[0]).toHaveTextContent('akut');
     expect(within(box).getByText('2 Gebiete')).toBeInTheDocument();
 
     // Legende bündig unter den Segmenten: dieselbe Zeilenklasse UND dasselbe Vier-Stufen-
     // Raster wie die Balken (die Geometrie steht in `gefahrenmatrix.css`, geprüft in
     // `matrixGeometrie.test.ts`; jsdom rechnet weder Layout noch Container-Abfragen).
     const legende = box.querySelector<HTMLElement>('[data-lfh="gefahrenlegende"]')!;
-    const balken = zeilen[1].querySelector<HTMLElement>('[data-lfh="gefahrenbalken"]')!;
-    expect(zeilen[1]).toHaveClass('lfh-matrixzeile');
+    const balken = zeilen[0].querySelector<HTMLElement>('[data-lfh="gefahrenbalken"]')!;
+    expect(zeilen[0]).toHaveClass('lfh-matrixzeile');
     expect(legende).toHaveClass('lfh-matrixzeile');
-    expect(legende.style.gap).toBe(zeilen[1].style.gap);
-    expect(legende.closest('.lfh-gefahrenmatrix')).toBe(zeilen[1].closest('.lfh-gefahrenmatrix'));
+    expect(legende.style.gap).toBe(zeilen[0].style.gap);
+    expect(legende.closest('.lfh-gefahrenmatrix')).toBe(zeilen[0].closest('.lfh-gefahrenmatrix'));
     const legendenRaster = legende.querySelector<HTMLElement>('.lfh-stufenraster')!;
     expect(balken).toHaveClass('lfh-stufenraster');
     // Kein Inline-Raster: es schlüge die Container-Abfrage der Klasse.
@@ -923,17 +922,25 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     expect(balken.children).toHaveLength(4);
   });
 
-  it('trennt „keine" (bewertet) von „unbewertet" (Lücke)', async () => {
+  /**
+   * LLH-1090: statt „n Gefahrentypen unbewertet“ steht, welches Gebiet niemand beurteilt hat —
+   * eine Zelle ohne Bewertung heißt „keine“, die offene Beurteilung trägt das Gebiet.
+   */
+  it('nennt nicht beurteilte Gebiete im Fuß, beurteilte nicht', async () => {
     mockEndpunkte({
-      gefahren: [gebiet(1)],
-      matrix: { 1: [bewertung(1, 'brand', 'keine')] },
+      gefahren: [
+        { ...gebiet(1, 'hoch'), label: 'Hangrutsch Kirchberg' },
+        { ...gebiet(2), beurteilt_at: '2026-06-11 09:00:00', beurteilt_von: 1 },
+      ],
+      matrix: { 1: [bewertung(1, 'brand', 'hoch')], 2: [] },
     });
     render();
     const box = paneel('Gefahrenmatrix');
-    await waitFor(() =>
-      expect(within(box).getByText('12 Gefahrentypen unbewertet')).toBeInTheDocument(),
-    );
-    expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(1);
+    expect(
+      await within(box).findByText('Hangrutsch Kirchberg: nicht beurteilt'),
+    ).toBeInTheDocument();
+    expect(within(box).queryByText(/Gebiet 2/)).toBeNull();
+    expect(within(box).queryByText(/unbewertet/)).toBeNull();
   });
 
   it('ohne Gefahrengebiete zeigt es den Leerzustand mit Weg zur Gefahrenseite', async () => {
@@ -947,11 +954,16 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     expect(await screen.findByText('GEFAHREN-MODUL')).toBeInTheDocument();
   });
 
-  it('Gebiete ohne jede Bewertung sind leer, nicht „keine Gefahr"', async () => {
-    mockEndpunkte({ gefahren: [gebiet(1)], matrix: { 1: [] } });
+  it('Gebiete ohne Stufe über „keine“ sind leer und bleiben „nicht beurteilt“', async () => {
+    mockEndpunkte({
+      gefahren: [gebiet(1)],
+      matrix: { 1: [bewertung(1, 'brand', 'keine')] },
+    });
     render();
     const box = paneel('Gefahrenmatrix');
-    expect(await within(box).findByText('Noch keine Gefahr bewertet.')).toBeInTheDocument();
+    expect(await within(box).findByText('Keine Gefahr über Stufe „keine“.')).toBeInTheDocument();
+    expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(0);
+    expect(within(box).getByText('Gebiet 1: nicht beurteilt')).toBeInTheDocument();
   });
 
   it('ein gescheiterter Matrix-Abruf ist ein Fehler, kein Leerzustand', async () => {

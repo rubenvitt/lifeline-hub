@@ -41,9 +41,10 @@ export const WARNSTUFEN: Katalogeintrag<Warnstufe>[] = [
 ];
 
 /**
- * Ungültige Paare (verbatim aus bluelight-hub) → die Zelle trägt „n. a." als Text und keinen
- * Auslöser: eine blasse Fläche ohne Wort wäre von „noch nicht bewertet" nicht zu unterscheiden
- * (WCAG 1.4.1), ein deaktivierter Knopf gäbe eine Entscheidung vor.
+ * Ungültige Paare (verbatim aus bluelight-hub) → die Zelle trägt eine Schraffur und keinen
+ * Auslöser (LLH-1090, `schraffurStil` in `GefahrenMatrix.tsx`): eine blasse Fläche ohne zweiten
+ * Kanal wäre von einer gültigen nicht zu unterscheiden (WCAG 1.4.1), ein deaktivierter Knopf gäbe
+ * eine Entscheidung vor.
  */
 export function kombinationGueltig(typ: Gefahrentyp, objekt: Schutzobjekt): boolean {
   if (objekt === 'sachwerte') {

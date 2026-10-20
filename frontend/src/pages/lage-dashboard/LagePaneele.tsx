@@ -33,7 +33,7 @@ const LEGENDE = ['niedrig', 'mittel', 'hoch', 'akut'] as const;
 export function GefahrenmatrixPaneel({
   zustand,
   zeilen,
-  unbewertet,
+  beurteilung,
   gebiete,
   onNeuladen,
   onGefahren,
@@ -41,7 +41,11 @@ export function GefahrenmatrixPaneel({
   /** `gesperrt`: Modul Gefahren nicht freigegeben — Grund statt Fehler, kein Weg dorthin. */
   zustand: Quellzustand;
   zeilen: GefahrenZeile[];
-  unbewertet: number;
+  /**
+   * Nicht beurteilte Gebiete (LLH-1090, `beurteilungHinweis`), `null` wenn alle beurteilt sind.
+   * Ersetzt die Zählung unbewerteter Gefahrentypen: eine Zelle ohne Bewertung heißt „keine“.
+   */
+  beurteilung: string | null;
   gebiete: number;
   onNeuladen: () => void;
   onGefahren: () => void;
@@ -52,16 +56,16 @@ export function GefahrenmatrixPaneel({
     ? 'Modul Gefahren nicht freigegeben.'
     : gebiete === 0
       ? 'Noch keine Gefahrengebiete angelegt.'
-      : 'Noch keine Gefahr bewertet.';
+      : 'Keine Gefahr über Stufe „keine“.';
   return (
     <Paneel
       titel="Gefahrenmatrix"
       meta={zustand === 'daten' ? `${gebiete} ${gebiete === 1 ? 'Gebiet' : 'Gebiete'}` : undefined}
       aktion={gesperrt ? undefined : <PaneelLink label="Gefahren" onKlick={onGefahren} />}
       fuss={
-        zustand === 'daten' && unbewertet > 0 ? (
-          <span style={{ ...monoStil(11), color: rollen.schwach }}>
-            {unbewertet} Gefahrentypen unbewertet
+        (zustand === 'daten' || zustand === 'leer') && !gesperrt && beurteilung ? (
+          <span data-lfh="gefahren-beurteilung" style={{ fontSize: 11, color: rollen.achtungText }}>
+            {beurteilung}
           </span>
         ) : undefined
       }
