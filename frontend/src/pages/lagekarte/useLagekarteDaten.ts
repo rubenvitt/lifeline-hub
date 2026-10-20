@@ -40,8 +40,14 @@ import {
   buildBrMarker,
   baueAbschnittMarker,
 } from './marker';
-import { parsePolygon, parseGeometry, polygonZentroid } from './geo';
-import { zoneStil, gefahrengebietStil, zonenBeschriftung, bezirkBeschriftung } from './zonenStil';
+import { kreisAusZone, parsePolygon, parseGeometry, polygonZentroid } from './geo';
+import {
+  zoneStil,
+  gefahrengebietStil,
+  zonenBeschriftung,
+  bezirkBeschriftung,
+  kreisBeschriftung,
+} from './zonenStil';
 import { zonenPlakette, type ZoneFeature } from './kartenLayer';
 import { rollenwerte } from '../../components/instrument';
 import type { SnapshotDaten, Standquelle } from './snapshotDaten';
@@ -456,7 +462,7 @@ export function useLagekarteDaten({
             ? gefahrengebietStil(warnstufe ?? 'keine', token)
             : zoneStil(z.typ, z.farbe);
         // Bezirksfläche: Name und Räumungszustand nur, wenn der Bezirk lesbar ist.
-        const beschriftung =
+        const grundBeschriftung =
           z.typ === 'evakuierungsbezirk'
             ? bezirkBeschriftung(
                 z.label,
@@ -465,6 +471,11 @@ export function useLagekarteDaten({
                   : null,
               )
             : zonenBeschriftung(z.label, gebietId != null ? (warnstufe ?? 'unbekannt') : null);
+        // Kreiszone (LLH-1043): der Radius steht hinter Name und Stufe.
+        const kreis = kreisAusZone(z);
+        const beschriftung = kreis
+          ? kreisBeschriftung(grundBeschriftung, z.typ, kreis.radiusM)
+          : grundBeschriftung;
         return [
           {
             id: z.id,

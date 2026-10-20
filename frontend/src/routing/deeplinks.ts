@@ -22,7 +22,7 @@ import {
   type BlockSchluessel,
 } from '../druck/einsatzbericht/auswahl';
 import type { EtbTyp, SchadenStatus, Spezies, ZoneTyp } from '../api/types';
-import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
+import { ETB_INHALT_MAX, KREIS_RADIUS_M_MAX } from '../api/eingabegrenzen';
 import type { PersonenAnsicht, PersonenFilter } from '../personen/personenFilter';
 import type { TiereSicht } from '../pages/tiere/tierHelfer';
 import type { SchaedenSicht } from '../pages/schaeden/schadenHelfer';
@@ -964,6 +964,15 @@ export function lagekartePfad(
         ? `${opts.zeichnen.typ}:${opts.zeichnen.form}`
         : opts.zeichnen.typ
       : undefined,
+    // Vorbelegung eines Kreises (LLH-1043): nur mit der Form `kreis`, sonst ohne Bedeutung.
+    radius:
+      opts.zeichnen?.form === 'kreis' && opts.zeichnen.radius != null
+        ? String(opts.zeichnen.radius)
+        : undefined,
+    mitte:
+      opts.zeichnen?.form === 'kreis' && opts.zeichnen.mitte
+        ? `${runde5(opts.zeichnen.mitte.lat)},${runde5(opts.zeichnen.mitte.lon)}`
+        : undefined,
     // Kartenmittelpunkt (Koordinatensprung der Sprungpalette): die Karte fliegt hin und räumt den
     // Parameter. Fünf Nachkommastellen ≙ rund 1 m.
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
@@ -1065,14 +1074,26 @@ export function rueckwegPfad(einsatzId: number, typ: PlatzierenZielTyp, id: numb
 
 /**
  * Form eines Zeichnen-Auftrags. Deutsch und sprechend, weil der Link ein äußerer Vertrag ist; die
- * Übersetzung in den Kartenmodus steht in `pages/lagekarte/zeichenAuftrag.ts`.
+ * Übersetzung in den Kartenmodus steht in `pages/lagekarte/zeichenAuftrag.ts`. `kreis` (LLH-1043)
+ * gilt nur für Flächentypen.
  */
-export type ZeichnenForm = 'flaeche' | 'linie';
+export type ZeichnenForm = 'flaeche' | 'linie' | 'kreis';
 
-/** Ein Zeichnen-Auftrag `?zeichnen=<zonentyp>[:flaeche|:linie]` (LFH-825). */
+/**
+ * Ein Zeichnen-Auftrag `?zeichnen=<zonentyp>[:flaeche|:linie|:kreis]` (LFH-825, LLH-1043).
+ *
+ * Mit der Form `kreis` belegen `&radius=<m>` und `&mitte=<lat>,<lon>` den Kreis vor
+ * ({@link parseKreisVorbelegung}); die Bestätigung bleibt beim Menschen. Ein äußerer, stabiler
+ * Vertrag (Spec `lagekarte-zeichnen`, „Zeichnen per Link“): das Anlegen eines
+ * Evakuierungsbezirks verlinkt `?zeichnen=evakuierungsbezirk:kreis&radius=…&mitte=…`.
+ */
 export interface ZeichnenAuftrag {
   typ: ZoneTyp;
   form?: ZeichnenForm;
+  /** Vorbelegter Radius in Metern; nur mit `form: 'kreis'`. */
+  radius?: number;
+  /** Vorbelegte Mitte; nur mit `form: 'kreis'`. */
+  mitte?: Kartenzentrum;
 }
 
 /**
@@ -1089,7 +1110,11 @@ const ZEICHNEN_TYP_ERLAUBT: Record<ZoneTyp, true> = {
   evakuierungsbezirk: true,
 };
 
-const ZEICHNEN_FORM_ERLAUBT: Record<ZeichnenForm, true> = { flaeche: true, linie: true };
+const ZEICHNEN_FORM_ERLAUBT: Record<ZeichnenForm, true> = {
+  flaeche: true,
+  linie: true,
+  kreis: true,
+};
 
 const istEigenerSchluessel = (o: object, k: string): boolean =>
   Object.prototype.hasOwnProperty.call(o, k);
@@ -1109,6 +1134,26 @@ export function parseZeichnenAuftrag(wert: string | null | undefined): ZeichnenA
   if (form === undefined) return { typ: typ as ZoneTyp };
   if (!istEigenerSchluessel(ZEICHNEN_FORM_ERLAUBT, form)) return null;
   return { typ: typ as ZoneTyp, form: form as ZeichnenForm };
+}
+
+/**
+ * Liest die Vorbelegung eines Kreis-Auftrags aus `?radius=<m>` und `?mitte=<lat>,<lon>` (LLH-1043).
+ * Jeder Teil steht für sich: ein unbrauchbarer fällt weg, der andere bleibt, und der Kreis-Modus
+ * startet trotzdem — gespeichert wird erst, wenn der Mensch übernimmt. Der Radius ist eine Zahl in
+ * Dezimalschreibweise, größer 0 und höchstens `KREIS_RADIUS_M_MAX`; die Mitte wie `?zentrum=`.
+ */
+export function parseKreisVorbelegung(
+  radius: string | null | undefined,
+  mitte: string | null | undefined,
+): { radius?: number; mitte?: Kartenzentrum } {
+  const aus: { radius?: number; mitte?: Kartenzentrum } = {};
+  if (radius != null && /^\d+(\.\d+)?$/.test(radius.trim())) {
+    const r = Number(radius.trim());
+    if (r > 0 && r <= KREIS_RADIUS_M_MAX) aus.radius = r;
+  }
+  const m = parseKartenzentrum(mitte);
+  if (m) aus.mitte = m;
+  return aus;
 }
 
 // ── Route-Param-Robustheit ───────────────────────────────────────────────────

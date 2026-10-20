@@ -554,3 +554,49 @@ describe('ZonenInspector — Vorgabefarbe der freien Skizze (LFH-797)', () => {
     expect(onAendern).toHaveBeenCalledWith({ farbe: '#00ff00' });
   });
 });
+
+describe('ZonenInspector — Kreiszone (LLH-1043)', () => {
+  const kreisZone: LageZone = {
+    ...basisZone,
+    typ: 'absperrbereich',
+    gefahrengebiet_id: null,
+    label: 'Nord',
+    kreis_mitte_lat: 54,
+    kreis_mitte_lon: 9.5,
+    kreis_radius_m: 300,
+  };
+
+  it('zeigt den Radius als Kennzahl und schreibt eine Änderung beim Verlassen', async () => {
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() => Promise.resolve());
+    renderInspector({ zone: kreisZone, onAendern });
+    expect(screen.getByText('Radius')).toBeInTheDocument();
+    expect(screen.getByText('300 m')).toBeInTheDocument();
+    const feld = screen.getByRole('spinbutton', { name: 'Radius in Metern' });
+    expect(feld).toHaveValue('300');
+    fireEvent.focus(feld);
+    fireEvent.blur(feld);
+    // Unverändert verlassen schreibt nichts.
+    expect(onAendern).not.toHaveBeenCalled();
+    fireEvent.change(feld, { target: { value: '500' } });
+    fireEvent.blur(feld);
+    await waitFor(() => expect(onAendern).toHaveBeenCalledWith({ kreis_radius_m: 500 }));
+  });
+
+  it('ein ungültiger Radius springt auf den gespeicherten zurück, ohne zu schreiben', () => {
+    const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() => Promise.resolve());
+    renderInspector({ zone: kreisZone, onAendern });
+    const feld = screen.getByRole('spinbutton', { name: 'Radius in Metern' });
+    fireEvent.change(feld, { target: { value: '' } });
+    fireEvent.blur(feld);
+    expect(onAendern).not.toHaveBeenCalled();
+    expect(feld).toHaveValue('300');
+  });
+
+  it('ohne Schreibrecht nur die Kennzahl; ohne Kreis kein Radius', () => {
+    const { rerenderZone } = renderInspector({ zone: kreisZone, darfSchreiben: false });
+    expect(screen.getByText('300 m')).toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: 'Radius in Metern' })).toBeNull();
+    rerenderZone({ ...kreisZone, id: 2, kreis_radius_m: null });
+    expect(screen.queryByText('Radius')).toBeNull();
+  });
+});

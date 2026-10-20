@@ -23,9 +23,12 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import {
   ZU_VIELE_STUETZPUNKTE,
+  kreisPolygon,
+  radiusGueltig,
   zuVieleStuetzpunkte,
   type GeoJsonGeometry,
   type GeoJsonPolygon,
+  type GeoPunkt,
 } from './geo';
 import type { ZeichenModus } from './zeichnen';
 import type { MessForm } from './messung';
@@ -34,7 +37,20 @@ import { merkeZuletztVerwendet } from './zuletztVerwendet';
 import type { BeginneKartenHandlung } from './useKartenFehler';
 import type { PlatzierenZielTyp } from '../../routing/deeplinks';
 
-export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
+/**
+ * Form des Zonen-Zeichnens: die beiden terra-draw-Modi oder der Kreis um einen Punkt (LLH-1043),
+ * der ohne terra-draw auskommt (Band `KreisSteuerung`, Vorschau `kreisVorschau.ts`).
+ */
+export type ZonenForm = ZeichenModus | 'kreis';
+/** Stand eines Kreises im Entstehen: Mitte und Radius, beide noch offen. */
+export interface KreisEntwurf {
+  mitte: GeoPunkt | null;
+  radiusM: number | null;
+}
+const KEIN_KREIS: KreisEntwurf = { mitte: null, radiusM: null };
+/** `kreis`: Vorbelegung beim Start (Link, Kontextmenü); nur mit `modus: 'kreis'`. */
+export type ZoneEntwurf = { typ: ZoneTyp; modus: ZonenForm; farbe?: string; kreis?: KreisEntwurf };
+
 type PlatzierZiel = { typ: PlatzierenPunktTyp | 'einsatzort'; id: number };
 /**
  * Was gerade verortet wurde (LLH-1125, Spec `lagekarte-verortungsauftrag`): Stoff der Rückmeldung
@@ -66,7 +82,14 @@ type KartenModus =
    */
   | { art: 'verortet'; ziel: VerortetZiel }
   | { art: 'abschnitt'; id: number }
-  | { art: 'zone'; entwurf: ZoneEntwurf; bestaetigung: ZoneBestaetigung | null; speichern: boolean }
+  /** `kreis`: der laufende Kreis (nur bei `entwurf.modus === 'kreis'` von Belang). */
+  | {
+      art: 'zone';
+      entwurf: ZoneEntwurf;
+      bestaetigung: ZoneBestaetigung | null;
+      speichern: boolean;
+      kreis: KreisEntwurf;
+    }
   | { art: 'bild'; id: number }
   | { art: 'zeichen'; spec: FreiesZeichenUpdate }
   /**
@@ -89,6 +112,10 @@ type ModusAktion =
   | { t: 'messen'; form: MessForm }
   | { t: 'zoneGezeichnet'; geometrie: GeoJsonGeometry }
   | { t: 'zoneSpeichernStart' }
+  /** Kreis-Modus: Mitte und/oder Radius setzen (LLH-1043); außerhalb wirkungslos. */
+  | { t: 'kreis'; kreis: Partial<KreisEntwurf> }
+  /** Kreis-Modus: die Art wechseln (nur Flächentypen, Farbe der freien Skizze mit). */
+  | { t: 'zoneTyp'; typ: ZoneTyp; farbe?: string }
   /** Beenden nur, wenn der laufende Modus einer der genannten ist (sonst No-op). */
   | { t: 'beenden'; arten: KartenModus['art'][] };
 
@@ -129,7 +156,21 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
     case 'messen':
       return { art: 'messen', form: a.form };
     case 'zone':
-      return { art: 'zone', entwurf: a.entwurf, bestaetigung: null, speichern: false };
+      return {
+        art: 'zone',
+        entwurf: a.entwurf,
+        bestaetigung: null,
+        speichern: false,
+        kreis: a.entwurf.kreis ?? KEIN_KREIS,
+      };
+    case 'kreis':
+      return state.art === 'zone' && state.entwurf.modus === 'kreis' && !state.speichern
+        ? { ...state, kreis: { ...state.kreis, ...a.kreis } }
+        : state;
+    case 'zoneTyp':
+      return state.art === 'zone' && state.entwurf.modus === 'kreis' && !state.speichern
+        ? { ...state, entwurf: { ...state.entwurf, typ: a.typ, farbe: a.farbe } }
+        : state;
     case 'zoneGezeichnet':
       // Nicht sofort persistieren: erst Bestätigung, der Entwurf bleibt sichtbar.
       return state.art === 'zone'
@@ -269,6 +310,8 @@ export function useKartenInteraktion({
   const zoneEntwurf = modus.art === 'zone' ? modus.entwurf : null;
   const zoneBestaetigung = modus.art === 'zone' ? modus.bestaetigung : null;
   const zoneSpeichern = modus.art === 'zone' ? modus.speichern : false;
+  // Der laufende Kreis (LLH-1043); `null` außerhalb des Kreis-Modus.
+  const kreisEntwurf = modus.art === 'zone' && modus.entwurf.modus === 'kreis' ? modus.kreis : null;
   const bildPlatzierenId = modus.art === 'bild' ? modus.id : null;
   const zeichenPlatzieren = modus.art === 'zeichen' ? modus.spec : null;
   const messForm = modus.art === 'messen' ? modus.form : null;
@@ -447,6 +490,11 @@ export function useKartenInteraktion({
 
   function onKarteKlick(lngLat: { lng: number; lat: number }) {
     if (!darfSchreiben) return;
+    // Kreis-Modus (LLH-1043): ein Tipp setzt oder versetzt die Mitte; der Radius bleibt.
+    if (modusRef.current.art === 'zone' && modusRef.current.entwurf.modus === 'kreis') {
+      dispatch({ t: 'kreis', kreis: { mitte: { lat: lngLat.lat, lon: lngLat.lng } } });
+      return;
+    }
     // Platzieren XOR Verorten — beides sind exklusive Modi, nie gleichzeitig aktiv.
     if (zeichenPlatzieren) {
       // isPending-Guard: ein Doppelklick während des POST legte ein Duplikat an
@@ -605,15 +653,42 @@ export function useKartenInteraktion({
       warnung?.(ZU_VIELE_STUETZPUNKTE);
       return;
     }
+    speichereZone(zu, null);
+  };
+  /**
+   * „Übernehmen“ im Kreis-Modus (LLH-1043, design.md D5): legt die Zone sofort an — die Vorschau
+   * hat der Mensch gesehen, eine zweite Bestätigung gibt es nicht. Das Polygon rechnet der Server;
+   * die Vorschau-Geometrie geht nur in den Serienneustart.
+   */
+  const kreisUebernehmen = () => {
+    const m = modusRef.current;
+    if (m.art !== 'zone' || m.entwurf.modus !== 'kreis' || m.speichern) return;
+    const { mitte, radiusM } = m.kreis;
+    if (!mitte || !radiusGueltig(radiusM)) return;
+    speichereZone(
+      { ...m.entwurf, geometrie: kreisPolygon(mitte, radiusM) },
+      { mitte_lat: mitte.lat, mitte_lon: mitte.lon, radius_m: radiusM },
+    );
+  };
+  const speichereZone = (
+    zu: ZoneBestaetigung,
+    kreis: { mitte_lat: number; mitte_lon: number; radius_m: number } | null,
+  ) => {
     dispatch({ t: 'zoneSpeichernStart' });
     const melde = beginneHandlung('zone-anlegen', 'Zone nicht angelegt', 'Anlegen fehlgeschlagen');
-    legeZoneAn(einsatzId, {
-      typ: zu.typ,
-      geometrie_typ: zu.geometrie.type,
-      geometrie: JSON.stringify(zu.geometrie),
-      farbe: zu.typ === 'freie_skizze' ? (zu.farbe ?? null) : null,
-      ansicht_id: aktiveAnsichtId ?? null,
-    })
+    const farbe = zu.typ === 'freie_skizze' ? (zu.farbe ?? null) : null;
+    legeZoneAn(
+      einsatzId,
+      kreis
+        ? { typ: zu.typ, kreis, farbe, ansicht_id: aktiveAnsichtId ?? null }
+        : {
+            typ: zu.typ,
+            geometrie_typ: zu.geometrie.type,
+            geometrie: JSON.stringify(zu.geometrie),
+            farbe,
+            ansicht_id: aktiveAnsichtId ?? null,
+          },
+    )
       .then(() => {
         erfolg('Zone angelegt');
         // Beide Fächer: das Anlegen einer `gefahrengebiet`-Zone legt serverseitig eine neue Gruppe
@@ -646,7 +721,14 @@ export function useKartenInteraktion({
         const nochUnserZug = modusRef.current.art === 'zone' && modusRef.current.speichern;
         if (!nochUnserZug) return;
         if (erfolg && zoneSerieRef.current) {
-          dispatch({ t: 'zone', entwurf: { typ: zu.typ, modus: zu.modus, farbe: zu.farbe } });
+          // Ein Kreis beginnt neu ohne Mitte, der Radius bleibt als Vorgabe stehen.
+          const kreisVorgabe: Pick<ZoneEntwurf, 'kreis'> = kreis
+            ? { kreis: { mitte: null, radiusM: kreis.radius_m } }
+            : {};
+          dispatch({
+            t: 'zone',
+            entwurf: { typ: zu.typ, modus: zu.modus, farbe: zu.farbe, ...kreisVorgabe },
+          });
           setZoneZeichnenNonce((n) => n + 1);
           setZoneSerieAnzahl((n) => n + 1);
         } else {
@@ -737,6 +819,24 @@ export function useKartenInteraktion({
   );
   /** Beendet eine laufende Zonen-Serie — Vorbild: onBildPlatzierenFertig. */
   const onZoneZeichnenFertig = beendeZone;
+  // Kreis-Modus (LLH-1043): Mitte, Radius und Art setzen. Außerhalb des Modus wirkungslos
+  // (Reducer). Der Radius kommt aus Zahlenfeld, Schnellwahl oder Griff, die Mitte aus Tipp,
+  // Einsatzort oder Suchnadel.
+  const onKreisMitte = (mitte: GeoPunkt) => dispatch({ t: 'kreis', kreis: { mitte } });
+  const onKreisRadius = (radiusM: number | null) => dispatch({ t: 'kreis', kreis: { radiusM } });
+  const onKreisTyp = (typ: ZoneTyp, farbe?: string) => dispatch({ t: 'zoneTyp', typ, farbe });
+  /** Erste Esc-Stufe im Kreis-Modus (D7): die Mitte geht, der Radius bleibt als Eingabe. */
+  const onKreisVerwerfen = () => dispatch({ t: 'kreis', kreis: { mitte: null } });
+  /**
+   * „Kreis hier …“ aus dem Kontextmenü (D8): Kreis-Modus mit der Druckstelle als Mitte, Art
+   * Absperrbereich als Vorgabe (änderbar im Band).
+   */
+  const onKreisHier = (punkt: { lng: number; lat: number }) =>
+    onZoneZeichnenStart({
+      typ: 'absperrbereich',
+      modus: 'kreis',
+      kreis: { mitte: { lat: punkt.lat, lon: punkt.lng }, radiusM: null },
+    });
   const onKoordinateEingeben = (lat: number, lon: number) => {
     if (darfSchreiben) verorten(lat, lon);
   };
@@ -910,6 +1010,7 @@ export function useKartenInteraktion({
     zoneEntwurf,
     zoneBestaetigung,
     zoneSpeichern,
+    kreisEntwurf,
     zoneZeichnenNonce,
     zoneAuswahl,
     auswahl,
@@ -947,6 +1048,12 @@ export function useKartenInteraktion({
     loescheVerortung,
     aendereSymbol,
     bestaetigungSpeichern,
+    kreisUebernehmen,
+    onKreisMitte,
+    onKreisRadius,
+    onKreisTyp,
+    onKreisVerwerfen,
+    onKreisHier,
     onBestaetigungZurueck,
     bestaetigungVerwerfen,
     onPlatzierenStart,

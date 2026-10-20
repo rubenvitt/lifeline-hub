@@ -1,6 +1,7 @@
 import type { GlobalToken } from 'antd';
 import { raeumungszustand, rollenFarbe, warnstufeKarte } from '../../theme/statusFarben';
 import type { Evakuierungsbezirk, Warnstufe, ZoneTyp } from '../../api/types';
+import { formatRadius } from './geo';
 
 export interface ZoneStil {
   fillColor: string;
@@ -117,6 +118,16 @@ export function zonenBeschriftung(
   if (warnstufe === null) return name;
   const stufe = stufenWort(warnstufe);
   return name ? `${name} · ${stufe}` : stufe;
+}
+
+/**
+ * Beschriftung einer Kreiszone (LLH-1043, design.md D10): die übrige Beschriftung (Name, bei
+ * Gefahrengebieten mit Stufe) und dahinter der Radius — „Nord · r = 300 m“. Ohne Namen steht das
+ * Typwort davor: ein Radius allein sagte nicht, was er umgrenzt.
+ */
+export function kreisBeschriftung(beschriftung: string, typ: ZoneTyp, radiusM: number): string {
+  const vorne = beschriftung.trim() || zoneTypLabel(typ);
+  return `${vorne} · r = ${formatRadius(radiusM)}`;
 }
 
 /**

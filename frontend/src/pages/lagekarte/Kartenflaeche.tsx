@@ -42,6 +42,13 @@ import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
 import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
 import { createMessung, type MessZeichnung } from './messZeichnung';
+import {
+  entferneKreisVorschau,
+  erzeugeKreisGriff,
+  sorgeFuerKreisVorschau,
+  type KreisGriff,
+  type KreisVorschau,
+} from './kreisVorschau';
 import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
@@ -233,6 +240,13 @@ export interface KartenflaecheProps {
    * exklusiven Modus (Zeichnen, Messen, Platzieren) — dort gehört der Tipp dem Modus. Vorgabe aus.
    */
   flaechenwahl?: boolean;
+  /**
+   * Kreis um einen Punkt (LLH-1043): Vorschau des laufenden Kreises samt Radius-Griff; `null` =
+   * kein Kreis-Modus. Gezeichnet wird ohne terra-draw (`kreisVorschau.ts`).
+   */
+  kreis?: KreisVorschau | null;
+  /** Radius aus dem Griff, laufend (`fertig = false`) und am Ende des Zugs. */
+  onKreisRadius?: (radiusM: number, fertig: boolean) => void;
   /** Messwerkzeug: aktive Form oder `null`. */
   messen?: MessForm | null;
   /**
@@ -375,6 +389,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     flaechenwahl = false,
     messen,
     messStart = null,
+    kreis = null,
+    onKreisRadius,
     kontextmenue = null,
     onMessung,
     onZeichnenStandAenderung,
@@ -535,6 +551,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Dritter Controller: Messen. Eigene Instanz, weil er bei jeder Änderung meldet statt erst beim
   // Abschluss (`messZeichnung.ts`).
   const messRef = useRef<MessZeichnung | null>(null);
+  // Radius-Griff des Kreis-Modus (LLH-1043). Hier oben, weil der Karten-Effekt ihn vor
+  // `map.remove()` abbaut (LFH-943).
+  const kreisGriffRef = useRef<KreisGriff | null>(null);
+  const kreisRef = useRef<KreisVorschau | null>(kreis);
+  kreisRef.current = kreis;
+  const onKreisRadiusRef = useRef(onKreisRadius);
+  onKreisRadiusRef.current = onKreisRadius;
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus. Hier oben, weil der
   // Karten-Effekt sie vor `map.remove()` abbaut (LFH-943).
   const handlesRef = useRef<BildHandles | null>(null);
@@ -700,6 +723,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       messRef.current = null;
       handlesRef.current?.zerstoeren();
       handlesRef.current = null;
+      kreisGriffRef.current?.zerstoeren();
+      kreisGriffRef.current = null;
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
       // Die Merker gehören zu DIESER Karte: eine neue (Remount, Fast Refresh) lädt ihren Style
@@ -773,6 +798,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     wendeKartenDatenAn(map, 'suchnadel', () =>
       sorgeFuerSuchnadelLayer(map, suchnadelRef.current.daten, suchnadelRef.current.farbe),
     );
+    // Die Kreis-Vorschau (LLH-1043) überlebt `setStyle` nicht; neu aus dem Ref.
+    wendeKartenDatenAn(map, 'kreis-vorschau', () => sorgeFuerKreisVorschau(map, kreisRef.current));
     // Zuletzt angemeldet → dieser Eintrag läuft zuletzt, der Punkt liegt oben.
     wendeKartenDatenAn(map, 'eigenposition', () =>
       sorgeFuerEigenpositionLayer(
@@ -1206,6 +1233,43 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     );
   }, [suchnadel, rollen.bedien]);
 
+  // Maße und Rolle der Griffe (Bild-Griffe, Radius-Griff des Kreises) gehen über einen Ref in die
+  // Erzeugung: als Deps zerstörten sie die Griffe bei jedem Umschalten.
+  const griffKontextRef = useRef<GriffKontext>({
+    controlHeight: token.controlHeight,
+    bedien: rollen.bedien,
+  });
+  griffKontextRef.current = { controlHeight: token.controlHeight, bedien: rollen.bedien };
+
+  // Kreis-Vorschau und Radius-Griff nachführen (LLH-1043, design.md D5/D6). Die Ebenen tragen den
+  // Präfix `td-` und liegen damit über der Eigenposition wie jede Zeichnung.
+  const kreisMitteLat = kreis?.mitte?.lat ?? null;
+  const kreisMitteLon = kreis?.mitte?.lon ?? null;
+  const kreisRadius = kreis?.radiusM ?? null;
+  const kreisFarbe = kreis?.farbe ?? null;
+  const kreisAktiv = kreis != null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!kreisAktiv) {
+      kreisGriffRef.current?.zerstoeren();
+      kreisGriffRef.current = null;
+      wendeKartenDatenAn(map, 'kreis-vorschau', () => entferneKreisVorschau(map));
+      return;
+    }
+    wendeKartenDatenAn(map, 'kreis-vorschau', () => sorgeFuerKreisVorschau(map, kreisRef.current));
+    if (!kreisGriffRef.current) {
+      kreisGriffRef.current = erzeugeKreisGriff(map, griffKontextRef.current, (r, fertig) =>
+        onKreisRadiusRef.current?.(r, fertig),
+      );
+    }
+    const mitte =
+      kreisMitteLat != null && kreisMitteLon != null
+        ? { lat: kreisMitteLat, lon: kreisMitteLon }
+        : null;
+    kreisGriffRef.current.setze(mitte, kreisRadius);
+  }, [kreisAktiv, kreisMitteLat, kreisMitteLon, kreisRadius, kreisFarbe]);
+
   // Eigenposition nachführen. Nach dem Marker-Effekt registriert, damit sie über den Markern liegt.
   useEffect(() => {
     const map = mapRef.current;
@@ -1622,11 +1686,6 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   // Umschalten. Einen Wechsel mitten in einer Ziehgeste stellt `bildHandles` bis `dragend` zurück;
   // die Maße gelten ab dem nächsten Platzieren.
   const griffModusRef = useRef<GriffModus>(griffModus ?? 'groesse');
-  const griffKontextRef = useRef<GriffKontext>({
-    controlHeight: token.controlHeight,
-    bedien: rollen.bedien,
-  });
-  griffKontextRef.current = { controlHeight: token.controlHeight, bedien: rollen.bedien };
 
   // Griffe nur an der Bild-ID erzeugen/zerstören, damit Ecken-Änderungen (Eingabe, Refetch) keine
   // laufende Ziehgeste unterbrechen. Live-Vorschau + PATCH bei dragend kapselt `bildHandles`.

@@ -11,11 +11,22 @@ import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
  *   ungültig (eine Absperrgrenze als Fläche wird nicht still umgedeutet).
  * - Typ mit `beides`: die Form wählt, ohne Form gilt die Fläche (erster Knopf im Paneel), Farbe
  *   wie im Paneel.
+ * - Form `kreis` (LLH-1043): jeder Typ mit Fläche; Radius und Mitte des Auftrags belegen den
+ *   Kreis vor. Eine Linie wird kein Kreis.
  * - Typ ohne Eintrag in `ZONE_TYPEN`: `null`.
  */
 export function zeichenAuftragZuEntwurf(auftrag: ZeichnenAuftrag): ZoneEntwurf | null {
   const info = ZONE_TYPEN.find((t) => t.typ === auftrag.typ);
   if (!info) return null;
+  if (auftrag.form === 'kreis') {
+    if (info.geometrie === 'LineString') return null;
+    return {
+      typ: info.typ,
+      modus: 'kreis',
+      ...(info.geometrie === 'beides' ? { farbe: FREIE_SKIZZE_VORGABEFARBE } : {}),
+      kreis: { mitte: auftrag.mitte ?? null, radiusM: auftrag.radius ?? null },
+    };
+  }
   if (info.geometrie === 'beides') {
     return {
       typ: info.typ,

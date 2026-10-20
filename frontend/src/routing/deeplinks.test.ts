@@ -28,6 +28,7 @@ import {
   parseZurueck,
   rueckwegPfad,
   parseZeichnenAuftrag,
+  parseKreisVorbelegung,
   personenAufnahmePfad,
   personenPfad,
   schaedenPfad,
@@ -312,6 +313,56 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     // Kein Prototyp-Schlüssel schlüpft als Typ oder Form durch.
     expect(parseZeichnenAuftrag('toString')).toBeNull();
     expect(parseZeichnenAuftrag('gefahrengebiet:toString')).toBeNull();
+  });
+  it('parseZeichnenAuftrag kennt die Form kreis (LLH-1043)', () => {
+    expect(parseZeichnenAuftrag('absperrbereich:kreis')).toEqual({
+      typ: 'absperrbereich',
+      form: 'kreis',
+    });
+    expect(parseZeichnenAuftrag('evakuierungsbezirk:kreis')).toEqual({
+      typ: 'evakuierungsbezirk',
+      form: 'kreis',
+    });
+    expect(parseZeichnenAuftrag('absperrbereich:kreis:300')).toBeNull();
+  });
+  it('parseKreisVorbelegung nimmt jeden Teil für sich (LLH-1043)', () => {
+    expect(parseKreisVorbelegung('300', '54.1,9.5')).toEqual({
+      radius: 300,
+      mitte: { lat: 54.1, lon: 9.5 },
+    });
+    expect(parseKreisVorbelegung('12.5', null)).toEqual({ radius: 12.5 });
+    expect(parseKreisVorbelegung(null, null)).toEqual({});
+    // Unbrauchbares fällt weg, der Rest bleibt.
+    for (const r of ['0', '-5', '1e3', '50001', 'abc', '', ' ', 'Infinity']) {
+      expect(parseKreisVorbelegung(r, '54,9'), r).toEqual({ mitte: { lat: 54, lon: 9 } });
+    }
+    expect(parseKreisVorbelegung('50000', '91,0')).toEqual({ radius: 50_000 });
+  });
+  it('der Kreis-Auftrag überlebt den Weg durch die URL (LLH-1043)', () => {
+    const pfad = lagekartePfad(E, {
+      zeichnen: {
+        typ: 'evakuierungsbezirk',
+        form: 'kreis',
+        radius: 300,
+        mitte: { lat: 54.123456, lon: 9.5 },
+      },
+    });
+    expect(pfad).toBe(
+      '/einsaetze/5/lagekarte?zeichnen=evakuierungsbezirk%3Akreis&radius=300&mitte=54.12346%2C9.5',
+    );
+    const params = new URLSearchParams(pfad.split('?')[1]);
+    expect(parseZeichnenAuftrag(params.get('zeichnen'))).toEqual({
+      typ: 'evakuierungsbezirk',
+      form: 'kreis',
+    });
+    expect(parseKreisVorbelegung(params.get('radius'), params.get('mitte'))).toEqual({
+      radius: 300,
+      mitte: { lat: 54.12346, lon: 9.5 },
+    });
+    // Ohne Form kreis schreibt der Builder keine Vorbelegung.
+    expect(lagekartePfad(E, { zeichnen: { typ: 'absperrbereich', radius: 300 } as never })).toBe(
+      '/einsaetze/5/lagekarte?zeichnen=absperrbereich',
+    );
   });
   it('der Zeichnen-Auftrag überlebt den Weg durch die URL (LFH-825)', () => {
     for (const zeichnen of [

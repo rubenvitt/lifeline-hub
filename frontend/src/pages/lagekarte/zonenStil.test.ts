@@ -3,6 +3,7 @@ import { theme } from 'antd';
 import {
   bezirkBeschriftung,
   gefahrengebietStil,
+  kreisBeschriftung,
   zoneStil,
   zonenBeschriftung,
   ZONE_TYPEN,
@@ -161,5 +162,19 @@ describe('Evakuierungsbezirk (LFH-673)', () => {
   it('ohne Zuordnung oder ohne Modulrecht: nur Name bzw. Typwort, kein Zustand', () => {
     expect(bezirkBeschriftung(null, null)).toBe('Evakuierungsbezirk');
     expect(bezirkBeschriftung('Nordufer', null)).toBe('Nordufer');
+  });
+});
+
+describe('kreisBeschriftung (LLH-1043)', () => {
+  it('hängt den Radius an Name bzw. Name · Stufe', () => {
+    expect(kreisBeschriftung('Nord', 'absperrbereich', 300)).toBe('Nord · r = 300 m');
+    expect(kreisBeschriftung('Werk · hoch', 'gefahrengebiet', 1500)).toBe(
+      'Werk · hoch · r = 1.500 m',
+    );
+  });
+
+  it('ohne Namen steht das Typwort davor', () => {
+    expect(kreisBeschriftung('', 'absperrbereich', 50)).toBe('Absperrbereich · r = 50 m');
+    expect(kreisBeschriftung('  ', 'sperrgebiet', 100)).toBe('Sperrgebiet · r = 100 m');
   });
 });

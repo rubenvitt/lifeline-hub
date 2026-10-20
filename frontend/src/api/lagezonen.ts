@@ -1,10 +1,22 @@
 import type { LageZone, ZoneTyp } from './types';
 import { apiGet, apiSend } from './client';
 
+/** Kreis um einen Punkt beim Anlegen (LLH-1043): das Polygon rechnet der Server. */
+export interface ZoneKreisEingabe {
+  mitte_lat: number;
+  mitte_lon: number;
+  radius_m: number;
+}
+
+/**
+ * Body des Anlegens. Entweder `geometrie_typ` + `geometrie` (gezeichnet) oder `kreis` (LLH-1043);
+ * beides zugleich lehnt der Server ab (422), keins von beiden ebenso (400).
+ */
 export interface ZoneNeu {
   typ: ZoneTyp;
-  geometrie_typ: 'Polygon' | 'LineString';
-  geometrie: string;
+  geometrie_typ?: 'Polygon' | 'LineString';
+  geometrie?: string;
+  kreis?: ZoneKreisEingabe;
   label?: string | null;
   farbe?: string | null;
   notiz?: string | null;
@@ -23,6 +35,13 @@ export interface ZonePatch {
   ansicht_id?: number | null;
   /** Bezirks-Zuordnung (LFH-673), nur an Zonen vom Typ `evakuierungsbezirk`; `null` löst. */
   evakuierungsbezirk_id?: number | null;
+  /** Neuer Radius einer Kreiszone in Metern (LLH-1043); der Server rechnet das Polygon neu. */
+  kreis_radius_m?: number;
+  /**
+   * Neue Geometrie (GeoJSON-String, gleiche Klasse) — punktweise Bearbeitung; nimmt der Zone die
+   * Kreisangaben (LLH-1043).
+   */
+  geometrie?: string;
 }
 
 export function listeZonen(einsatzId: number): Promise<LageZone[]> {

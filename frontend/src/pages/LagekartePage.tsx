@@ -21,6 +21,7 @@ import {
   betreuungPfad,
   gefahrenPfad,
   parseKartenzentrum,
+  parseKreisVorbelegung,
   parsePlatzierenAuftrag,
   parseZeichnenAuftrag,
   parseRouteId,
@@ -37,7 +38,7 @@ import { suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
-import { ZONE_TYPEN } from './lagekarte/zonenStil';
+import { ZONE_TYPEN, zoneStil } from './lagekarte/zonenStil';
 import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
 import Kartenflaeche, {
   type KartenHandle,
@@ -54,6 +55,7 @@ import FreiesZeichenInspector from './lagekarte/FreiesZeichenInspector';
 import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
+import KreisSteuerung from './lagekarte/KreisSteuerung';
 import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
 import {
@@ -464,6 +466,13 @@ export default function LagekartePage() {
     zoneSerie,
     setZoneSerie,
     zoneSerieAnzahl,
+    kreisEntwurf,
+    kreisUebernehmen,
+    onKreisMitte,
+    onKreisRadius,
+    onKreisTyp,
+    onKreisVerwerfen,
+    onKreisHier,
     setAuswahl,
     setZoneAuswahl,
     setFachebeneAuswahl,
@@ -591,9 +600,15 @@ export default function LagekartePage() {
             void kopiereKoordinate(formatKoordinate(p.lat, p.lng), navigator.clipboard, message);
           else if (key === 'messen') onMessenAb(p);
           else if (key === 'zeichen' && darfSchreiben) setZeichenHier(p);
+          else if (key === 'kreis' && darfSchreiben) onKreisHier(p);
         },
       };
   const [suchnadel, setSuchnadel] = useState<GefundenerOrt | null>(null);
+  // Mitte des Kreises auf Knopfdruck (LLH-1043): der Einsatzort, auch mit ausgeblendeter Ebene.
+  const einsatzortMarker = alleVerortet.find((m) => m.typ === 'einsatzort');
+  const einsatzortPunkt = einsatzortMarker
+    ? { lat: einsatzortMarker.lat, lon: einsatzortMarker.lon }
+    : null;
   const [ortVorbelegung, setOrtVorbelegung] = useState<{ text: string; nonce: number } | null>(
     null,
   );
@@ -738,14 +753,16 @@ export default function LagekartePage() {
     const stufe = escStufe({
       phase: zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen',
       speichernLaeuft: zoneSpeichern || abschnittSpeichern,
-      punkte: zeichenStand.punkte,
+      // Im Kreis-Modus ist die Figur die Mitte (LLH-1043, D7).
+      punkte: kreisEntwurf ? (kreisEntwurf.mitte ? 1 : 0) : zeichenStand.punkte,
       serieGespeichert: zeichneAbschnittId != null ? 0 : zoneSerieAnzahl,
     });
     if (stufe === 'zurueckZumZeichnen') {
       onBestaetigungZurueck();
       message.info(QUITTUNG_VERWORFEN);
     } else if (stufe === 'verwerfen') {
-      kartenRef.current?.zeichnungVerwerfen();
+      if (kreisEntwurf) onKreisVerwerfen();
+      else kartenRef.current?.zeichnungVerwerfen();
       message.info(QUITTUNG_VERWORFEN);
     } else if (stufe === 'fertig') {
       onZoneZeichnenFertig();
@@ -895,10 +912,18 @@ export default function LagekartePage() {
     if (roh === null) return;
     if (ladt) return;
     const auftrag = parseZeichnenAuftrag(roh);
-    const entwurf = auftrag ? zeichenAuftragZuEntwurf(auftrag) : null;
+    // Kreis (LLH-1043, D9): Radius und Mitte belegen nur mit `:kreis` vor; ein unbrauchbarer
+    // Teil fällt einzeln weg, der Modus startet trotzdem.
+    const vorbelegung =
+      auftrag?.form === 'kreis'
+        ? parseKreisVorbelegung(searchParams.get('radius'), searchParams.get('mitte'))
+        : {};
+    const entwurf = auftrag ? zeichenAuftragZuEntwurf({ ...auftrag, ...vorbelegung }) : null;
     if (darfSchreiben && entwurf) onZoneZeichnenStart(entwurf);
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('zeichnen');
+    naechste.delete('radius');
+    naechste.delete('mitte');
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, ladt, darfSchreiben, onZoneZeichnenStart]);
 
@@ -1225,7 +1250,14 @@ export default function LagekartePage() {
         onFlaecheGezeichnet={onFlaecheGezeichnet}
         onFlaecheKlick={onFlaecheKlick}
         zonen={zonenFeatures}
-        zoneZeichnen={zoneEntwurf ? zoneEntwurf.modus : null}
+        // Der Kreis kommt ohne terra-draw aus: eigene Vorschau und Griff (LLH-1043, D6).
+        zoneZeichnen={zoneEntwurf && zoneEntwurf.modus !== 'kreis' ? zoneEntwurf.modus : null}
+        kreis={
+          kreisEntwurf && zoneEntwurf
+            ? { ...kreisEntwurf, farbe: zoneStil(zoneEntwurf.typ, zoneEntwurf.farbe).lineColor }
+            : null
+        }
+        onKreisRadius={(r) => onKreisRadius(r)}
         zoneZeichnenNonce={zoneZeichnenNonce}
         onZoneKlick={onZoneKlick}
         flaechenwahl={!exklusiverModusAktiv}
@@ -1311,7 +1343,11 @@ export default function LagekartePage() {
           `lagekarte/KartenFuss.tsx`. */}
       <KartenFuss>
         <ZeichnenSteuerung
-          aktiv={zoneEntwurf != null || zoneBestaetigung != null || zeichneAbschnittId != null}
+          aktiv={
+            (zoneEntwurf != null && kreisEntwurf == null) ||
+            zoneBestaetigung != null ||
+            zeichneAbschnittId != null
+          }
           titel={
             zeichneAbschnittId != null
               ? 'Abschnitt'
@@ -1355,6 +1391,29 @@ export default function LagekartePage() {
           serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
           onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
         />
+        <KreisSteuerung
+          aktiv={kreisEntwurf != null && zoneEntwurf != null}
+          typ={zoneEntwurf?.typ ?? 'absperrbereich'}
+          onTyp={onKreisTyp}
+          mitte={kreisEntwurf?.mitte ?? null}
+          mitteText={
+            kreisEntwurf?.mitte
+              ? formatKoordinate(kreisEntwurf.mitte.lat, kreisEntwurf.mitte.lon)
+              : null
+          }
+          einsatzort={einsatzortPunkt}
+          suchnadel={suchnadel ? { lat: suchnadel.lat, lon: suchnadel.lon } : null}
+          onMitte={onKreisMitte}
+          radiusM={kreisEntwurf?.radiusM ?? null}
+          onRadius={onKreisRadius}
+          speichernLaeuft={zoneSpeichern}
+          onUebernehmen={kreisUebernehmen}
+          onAbbrechen={onZeichnenAbbrechen}
+          serie={zoneSerie}
+          onSerieWechsel={setZoneSerie}
+          serieAnzahl={zoneSerieAnzahl}
+          onFertig={onZoneZeichnenFertig}
+        />
         {/* Unter `lg` trägt dieses Band die Bedienung der Leistenmodi — die Leiste ist im Modus zu
             (LFH-765). Ab `lg` bleibt sie in der Leiste. */}
         {!breit && <PlatzierSteuerung modus={platzierModus} />}
@@ -1367,7 +1426,9 @@ export default function LagekartePage() {
               message.warning(
                 messForm === 'flaeche'
                   ? 'Mindestens 3 verschiedene Punkte für eine Fläche'
-                  : 'Mindestens 2 verschiedene Punkte für eine Strecke',
+                  : messForm === 'radius'
+                    ? 'Mitte und Rand für einen Radius'
+                    : 'Mindestens 2 verschiedene Punkte für eine Strecke',
               );
             }
           }}
