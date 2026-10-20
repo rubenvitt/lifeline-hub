@@ -53,7 +53,7 @@ wire_enum! {
 
 /// Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
 /// auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
-/// eine Zelle ohne Eintrag als „nicht bewertet".
+/// eine Zelle ohne Eintrag mit der Vorgabe „keine" (LLH-1090).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GefahrBewertungAnzeige {
     pub id: i64,
@@ -71,6 +71,10 @@ pub struct GefahrBewertungAnzeige {
 /// Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.
 /// `zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte
 /// Zelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.
+///
+/// `beurteilt_*` (LLH-1090): wann und von wem die Matrix zuletzt als beurteilt bestätigt oder
+/// danach durch eine Zelländerung aufgefrischt wurde. Fehlt `beurteilt_at`, ist das Gebiet
+/// „nicht beurteilt“: eine Zelle ohne Bewertung zeigt „keine“, die offene Beurteilung steht hier.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct GefahrengebietAnzeige {
     pub id: i64,
@@ -78,6 +82,13 @@ pub struct GefahrengebietAnzeige {
     pub label: Option<String>,
     pub zonen_ids: Vec<i64>,
     pub hoechste_warnstufe: Warnstufe,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beurteilt_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beurteilt_von: Option<i64>,
+    /// Anzeigename von `beurteilt_von` zur Lesezeit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beurteilt_von_name: Option<String>,
 }
 
 /// Severity-Rang einer Warnstufe (für „höchste Warnstufe je Gebiet"). Lexikalisches
@@ -170,6 +181,15 @@ pub fn etb_text_bewertung(
     }
 }
 
+/// System-ETB beim Bestätigen der Beurteilung (LLH-1090). Jede Bestätigung ist ein eigener Akt
+/// und schreibt einen Eintrag; das Auffrischen durch eine spätere Zelländerung schreibt keinen.
+pub fn etb_text_beurteilung(gebiet_label: Option<&str>, gebiet_id: i64) -> String {
+    let gname = gebiet_label
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("Gefahrengebiet #{gebiet_id}"));
+    format!("Beurteilung der Gefahrenmatrix in «{gname}» bestätigt.")
+}
+
 #[cfg(test)]
 mod etb_text_tests {
     use super::*;
@@ -199,6 +219,18 @@ mod etb_text_tests {
         assert_eq!(
             etb_text_bewertung("einsturz", "einsatzkraefte", None, 7, Warnstufe::Akut),
             "Gefahr «Einsturz» für «Einsatzkräfte» in «Gefahrengebiet #7» auf Warnstufe «akut» gesetzt."
+        );
+    }
+
+    #[test]
+    fn beurteilung_mit_und_ohne_label() {
+        assert_eq!(
+            etb_text_beurteilung(Some("Hangrutsch Kirchberg"), 3),
+            "Beurteilung der Gefahrenmatrix in «Hangrutsch Kirchberg» bestätigt."
+        );
+        assert_eq!(
+            etb_text_beurteilung(None, 7),
+            "Beurteilung der Gefahrenmatrix in «Gefahrengebiet #7» bestätigt."
         );
     }
 }

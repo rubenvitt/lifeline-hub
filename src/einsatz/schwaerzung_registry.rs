@@ -964,6 +964,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("geaendert_at", G_ZEIT),
+            // Beurteilung der Matrix (LLH-1090): Zeitpunkt und Benutzer-FK, kein Freitext.
+            retain("beurteilt_at", G_ZEIT),
+            retain("beurteilt_von", G_FK),
         ],
     },
     TabellenRegel {

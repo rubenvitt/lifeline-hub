@@ -1613,6 +1613,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/gefahrengebiete/{gid}/matrix/bewertung",
             put(routes::gefahr::bewerten),
         )
+        .route(
+            "/api/einsaetze/{id}/gefahrengebiete/{gid}/beurteilung",
+            post(routes::gefahr::beurteilen),
+        )
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
         // Wiederherstellen und Löschersuchen (Antrag, Rücknahme; die Suche ist POST, liest aber
         // nur). Guard in tests/aufbewahrung.rs.

@@ -3104,7 +3104,7 @@ export interface components {
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
          *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
-         *     eine Zelle ohne Eintrag als „nicht bewertet".
+         *     eine Zelle ohne Eintrag mit der Vorgabe „keine" (LLH-1090).
          */
         GefahrBewertungAnzeige: {
             /** Format: int64 */
@@ -3125,8 +3125,17 @@ export interface components {
          * @description Ein Gefahrengebiet (Gruppe aus 1..n gefahrengebiet-Zonen), trägt eine Matrix.
          *     `zonen_ids`: zugehörige lage_zone-IDs. `hoechste_warnstufe`: stärkste gesetzte
          *     Zelle der Matrix (Severity-Maximum), `keine` wenn nichts gesetzt.
+         *
+         *     `beurteilt_*` (LLH-1090): wann und von wem die Matrix zuletzt als beurteilt bestätigt oder
+         *     danach durch eine Zelländerung aufgefrischt wurde. Fehlt `beurteilt_at`, ist das Gebiet
+         *     „nicht beurteilt“: eine Zelle ohne Bewertung zeigt „keine“, die offene Beurteilung steht hier.
          */
         GefahrengebietAnzeige: {
+            beurteilt_at?: string | null;
+            /** Format: int64 */
+            beurteilt_von?: number | null;
+            /** @description Anzeigename von `beurteilt_von` zur Lesezeit. */
+            beurteilt_von_name?: string | null;
             /** Format: int64 */
             einsatz_id: number;
             hoechste_warnstufe: components["schemas"]["Warnstufe"];
