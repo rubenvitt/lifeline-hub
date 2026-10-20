@@ -16,6 +16,18 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Vorgemerkte Standmeldungen tragen keine URL; ein Umzug der Route braucht keine Queue-Migration
   (`offline/standReplay.test.tsx`).
 
+- **Detailseite eines Bezirks** (LLH-1076, Spec `betreuung-evakuierung`; gilt auch für
+  `pages/EvakuierungsbezirkPage.tsx`): Item-Route `…/evakuierung/:bezirkId`
+  (`evakuierungsbezirkPfad`), gegatet über das Segment `evakuierung`. Kein Einzel-GET: gelesen
+  wird aus `einsatzKeys.evakuierung`; unbekannt, fremd oder storniert → `Navigate` zur Übersicht.
+  `?bezirk=` und der Sprung „Im Fachmodul öffnen“ der Lagekarte landen dort. Räumungsschritte nur
+  aus `raeumungSchritte.ts` (`raeumungPlan`), gesendet über `useBezirkHandlungen.setzeRaeumung`
+  (gleicht mit dem Live-Stand ab, „aufgehoben“ nur nach Rückfrage). Stammdaten in der Ansicht
+  (`BezirkStammdaten.tsx`): PATCH nur dreiseitig (`bezirkPatchDreiseitig`, der Bezirk hat keinen
+  CAS), Sitzung je Öffnen frisch montiert. Gebiet (`BezirkGebiet.tsx`): Zonen nur bei Fläche und
+  freier Lagekarte abrufen; der Ausschnitt `BezirkKartenbild.tsx` ist nicht bedienbar und baut
+  seine Karte im Cleanup ab. Die Stufenlinie (`standlinieKern.ts`) teilt die Abfrage mit
+  `MeldeVerlauf`, ohne Diagrammpaket und ohne Interpolation.
 - **Verbleib → Betreuungsstelle** (LFH-674,
   `openspec/changes/archive/2026-09-29-lfh-674-verbleib-notunterkunft-betreuungsstelle/design.md`): nur die Kennung
   (`person_verbleib.betreuungsstelle_id`, Cache

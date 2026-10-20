@@ -11,6 +11,11 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                        frontend/src/betreuung/BezirkTabelle.tsx
  *   bezirk-anlegen.png   frontend/src/betreuung/BetreuungDialoge.tsx
  *   stand-melden.png     frontend/src/betreuung/BetreuungDialoge.tsx
+ *   bezirk-detail.png    frontend/src/pages/EvakuierungsbezirkPage.tsx,
+ *                        frontend/src/betreuung/BezirkKennzahlen.tsx,
+ *                        frontend/src/betreuung/BezirkStammdaten.tsx,
+ *                        frontend/src/betreuung/BezirkGebiet.tsx,
+ *                        frontend/src/betreuung/BezirkStandlinie.tsx
  *
  * Daten: der Demo-Einsatz hat einen Bezirk. Ein zweiter, geräumter Bezirk kommt per API dazu (D3),
  * damit Räumung und Kennzahlenband zu sehen sind.
@@ -34,6 +39,13 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<void> {
       sammelstelle: 'Parkplatz Uferstraße',
     });
     await fuelle(page, 'patch', `${basis}/bezirke/${bezirk.id}`, { raeumung: 'laeuft' });
+    // Eine frühere Meldung, damit die Detailseite eine Stufenlinie zeigt (LLH-1076).
+    const frueher = new Date(Date.now() - 45 * 60_000).toISOString().slice(0, 19).replace('T', ' ');
+    await fuelle(page, 'post', `${basis}/bezirke/${bezirk.id}/staende`, {
+      evakuiert: 30,
+      erhebung: 'geschaetzt',
+      zeitpunkt_at: frueher,
+    });
     await fuelle(page, 'post', `${basis}/bezirke/${bezirk.id}/staende`, {
       evakuiert: 64,
       erhebung: 'gezaehlt',
@@ -79,5 +91,17 @@ test.describe(KAPITEL, () => {
     await dialog.getByLabel('Evakuiert gesamt (Personen)').fill('104');
     await dialog.getByLabel('Evakuiert gesamt (Personen)').blur();
     await fotografiere(dialog, KAPITEL, 'stand-melden');
+  });
+
+  test('Detailseite eines Bezirks', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await lageErgaenzen(page, demo.id);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/evakuierung`);
+    await page.getByRole('link', { name: 'Uferstraße 2–18' }).click();
+    await expect(page.getByRole('group', { name: 'Bezirk in Zahlen' })).toBeVisible();
+    await expect(page.locator('[data-lfh="bezirk-standlinie"]')).toBeVisible();
+    await fotografiere(page, KAPITEL, 'bezirk-detail');
   });
 });
