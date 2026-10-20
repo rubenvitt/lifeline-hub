@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Der Entwurfs-Ausdruck des Befehls (LFH-350, M86) — Schwesterdatei zu `lageberichtPrint.test.ts`
- * mit einem Unterschied: `BefehlDetailPage` verdrahtet `layout="split"` fest und reiht die
- * Abschnitte ohne `Collapse`. Die Toggle- und Akkordeon-Regeln des Lageberichts träfen hier nichts;
- * die letzte Behauptung unten pinnt diese Voraussetzung.
+ * Druckregeln der Seite (`befehlPrint.css`). Den Entwurfsausdruck (LFH-350/M86: jeder Abschnitt genau
+ * einmal; LFH-1008: Papiertitel im Titelblock) trägt seit LLH-1074 der Baustein der Schreibfläche
+ * (`entwurf/dokumentEntwurf.css`, Test `entwurf/dokumentEntwurfCss.test.ts`); diese Datei hält
+ * nur noch die Bedienung der Seite aus dem Druck.
  *
  * Geprüft wird die CSS-Quelle: jsdom lädt diese Datei nicht und kennt kein `@media print`.
  */
@@ -58,7 +58,7 @@ function versteckt(regel: Regel): boolean {
   return /display:\s*none/.test(regel.koerper);
 }
 
-describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
+describe('befehlPrint.css — Bedienung aus dem Druck', () => {
   it('haelt jede Regel im @media print — der Bildschirm bleibt unberuehrt', () => {
     expect(css.trim().startsWith('@media print')).toBe(true);
     expect(css.slice(grenzen()[1] + 1).trim()).toBe('');
@@ -67,81 +67,33 @@ describe('befehlPrint.css — Entwurfsausdruck (M86)', () => {
   it('scopt jede Regel auf den Druckbereich', () => {
     for (const r of regeln()) {
       for (const s of einzeln(r)) {
-        expect(/^(body\b|\.befehl-)/.test(s), `ungescopter Selektor in ${DATEI}: ${s}`).toBe(true);
+        expect(/^\.befehl-/.test(s), `ungescopter Selektor in ${DATEI}: ${s}`).toBe(true);
       }
     }
   });
 
-  it('blendet die Eingabespalte des split-Layouts aus', () => {
-    const treffer = regeln().filter(
-      (r) =>
-        r.selektor.includes('.markdown-editor--split') &&
-        r.selektor.includes('.markdown-editor__eingabe') &&
-        versteckt(r),
+  it('nimmt die Bedienung aus dem Druck', () => {
+    expect(regeln().some((r) => r.selektor.includes('.befehl-no-print') && versteckt(r))).toBe(
+      true,
     );
-    expect(treffer, 'keine Regel versteckt die Eingabespalte im split-Layout').toHaveLength(1);
-    // Die Spalte selbst, nicht ihr Textfeld: der Wrapper trägt `flex: 1 1 50%`.
-    expect(treffer[0].selektor.endsWith('.markdown-editor__eingabe')).toBe(true);
-  });
-
-  it('versteckt die Eingabe NIE unbedingt — sonst druckt ein Abschnitt leer', () => {
-    for (const r of regeln().filter(versteckt)) {
-      if (!/textarea|markdown-editor__eingabe/.test(r.selektor)) continue;
-      expect(
-        r.selektor.includes('.markdown-editor--split') ||
-          r.selektor.includes(':has(.markdown-editor__vorschau)'),
-        `unbedingte Eingabe-Ausblendung in ${DATEI}: ${r.selektor}`,
-      ).toBe(true);
-    }
-    for (const r of regeln().filter(versteckt)) {
-      for (const s of einzeln(r)) {
-        expect(/\.markdown-editor(--\w+)?$/.test(s), `Editor ganz versteckt: ${s}`).toBe(false);
-      }
-    }
   });
 
   /**
-   * LFH-1008: das Feldetikett steht außerhalb der Vorschau und bliebe in Firefox allein am
-   * Seitenende. Auf Papier trägt der Titel der Vorschau (`druckTitel`) den Abschnitt.
+   * EINE Mechanik für den Entwurfsausdruck: die Seite schreibt über `DokumentEntwurf` und trägt
+   * keine eigene Editor- oder Akkordeonregel. Eine zweite liefe still auseinander (vorher: Toggle-
+   * und Akkordeonregeln hier, Split- und Etikettregeln beim Befehl).
    */
-  it('ersetzt das Feldetikett auf Papier durch den Titel der Vorschau', () => {
-    const etikett = regeln().find((r) =>
-      einzeln(r).includes(
-        '.befehl-print-root .ant-form-item:has(.markdown-editor__titel) .ant-form-item-label',
-      ),
-    );
-    expect(etikett, 'Feldetikett wird mitgedruckt').toBeDefined();
-    expect(versteckt(etikett!)).toBe(true);
-    const titel = regeln().find((r) =>
-      einzeln(r).includes('.befehl-print-root .markdown-editor__titel'),
-    );
-    expect(titel, 'Titel der Vorschau bleibt verborgen').toBeDefined();
-    expect(titel!.koerper).toMatch(/display:\s*block\s*!important/);
-    const seite = readFileSync(join(hier, SEITE), 'utf8');
-    expect(seite).toMatch(/druckTitel=\{a\.label\}/);
-  });
-
-  it('laesst Beschriftung und Vorschau-Umschalter des Editors weg', () => {
-    const alle = regeln().filter(versteckt).flatMap(einzeln).join(' ');
-    expect(alle).toContain('.markdown-editor__label');
-    expect(alle).toContain('.markdown-editor .ant-btn');
-  });
-
-  it('behaelt die Bestandszusicherungen des Druckbereichs', () => {
-    const bestand = regeln();
-    expect(bestand.some((r) => r.selektor.includes('.befehl-no-print') && versteckt(r))).toBe(true);
-  });
-
-  it('pinnt die Voraussetzung: der Befehl kennt nur split und kein Akkordeon', () => {
-    // Fällt diese Behauptung, fehlen dieser Datei die Toggle- und die
-    // Akkordeon-Regel aus `lageberichtPrint.css`.
-    const seite = readFileSync(join(hier, 'BefehlDetailPage.tsx'), 'utf8');
-    // Als Muster, nicht als Zeichenkette: mit mehr Props bricht Prettier das Tag um.
-    expect(seite).toMatch(/<MarkdownEditor\s+layout="split"/);
-    // Als JSX-Prop bzw. Import gepinnt, nicht als Wort: ein Kommentar, der „toggle" oder
-    // „Akkordeon" erwähnt, ändert am Layout nichts und darf nicht rot färben.
-    expect(seite).not.toContain('layout="toggle"');
-    expect(seite).not.toMatch(/import .*AbschnittsAkkordeon/);
+  it('überlässt den Entwurfsausdruck dem Baustein der Schreibfläche', () => {
+    for (const r of regeln()) {
+      expect(r.selektor, `Entwurfsregel in ${DATEI}`).not.toMatch(
+        /markdown-editor|ant-collapse|ant-form-item/,
+      );
+    }
+    for (const datei of ['BefehlDetailPage.tsx']) {
+      const seite = readFileSync(join(dirname(fileURLToPath(import.meta.url)), datei), 'utf8');
+      expect(seite, datei).toMatch(/<DokumentEntwurf\b/);
+      expect(seite, datei).not.toMatch(/<MarkdownEditor\b/);
+    }
   });
 });
 

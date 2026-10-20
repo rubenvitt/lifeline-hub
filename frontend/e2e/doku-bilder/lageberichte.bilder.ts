@@ -11,7 +11,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                          frontend/src/lageberichte/NeuerLagevortragKnopf.tsx
  *   entwurf.png            frontend/src/pages/LageberichtDetailPage.tsx,
  *                          frontend/src/entwurf/VerteilerField.tsx,
- *                          frontend/src/lageberichte/AbschnittsAkkordeon.tsx,
+ *                          frontend/src/entwurf/DokumentEntwurf.tsx,
  *                          frontend/src/lageberichte/AbschnittUebernahme.tsx,
  *                          frontend/src/lageberichte/eigeneLageUebernahme.ts
  *   freigeben.png          frontend/src/pages/LageberichtDetailPage.tsx (FreigabeDialog)
@@ -104,20 +104,18 @@ test.describe(KAPITEL, () => {
     const id = await entwurfAnlegen(page, demo.id);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/lageberichte/${id}`);
-    await page.getByRole('tab', { name: /^Eigene Lage/ }).click();
+    // Alle Abschnitte stehen offen; die Übernahme steht im Kopf der Eigenen Lage.
     await page
       .getByRole('button', { name: 'Aus Meldebild und Führungsorganisation übernehmen' })
       .click();
     const feld = page.getByRole('textbox', { name: 'Eigene Lage' });
     await expect(feld).not.toHaveValue('');
-    await page.getByRole('checkbox', { name: 'Vorschau neben dem Text' }).check();
     await expect(page.getByText(/^(zuletzt gespeichert|ungespeicherte Änderungen)/)).toBeVisible();
     await page.mouse.move(0, 0);
-    // Der Klick ins Akkordeon hat die Seite verschoben; das Bild zeigt sie vom Kopf an.
+    // Der Klick auf die Übernahme hat die Seite verschoben; das Bild zeigt sie vom Kopf an.
     await page.getByRole('heading', { level: 1 }).scrollIntoViewIfNeeded();
     await fotografiere(page, KAPITEL, 'entwurf');
     // Ablauf weiter: einen Abschnitt von Hand schreiben und speichern.
-    await page.getByRole('tab', { name: /^Zusammenfassung/ }).click();
     await page
       .getByRole('textbox', { name: 'Zusammenfassung' })
       .fill('Lage in der Unterstadt angespannt, Betreuung gesichert.');

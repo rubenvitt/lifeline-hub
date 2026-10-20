@@ -1,7 +1,7 @@
-import { App, Breadcrumb, Button, Checkbox, Form, Input, Space, Typography } from 'antd';
+import { App, Breadcrumb, Button, Form, Input, Space, Typography } from 'antd';
 import { useZumEtbEintrag } from '../etb/useZumEtbEintrag';
-import type { Dayjs } from 'dayjs';
-import { useCallback, useMemo, useState } from 'react';
+import dayjs, { type Dayjs } from 'dayjs';
+import { useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
@@ -15,18 +15,12 @@ import {
   schreibePressemitteilungFort,
 } from '../api/presse';
 import type { Pressemitteilung, PressemitteilungAbschnitt } from '../api/types';
-import type { AbschnittDef } from '../lageberichte/vorlagen';
 import { mitteilungVorlage } from '../presse/vorlagen';
-import { AbschnittsText } from '../lageberichte/LageberichtText';
-import {
-  AbschnittsAkkordeon,
-  befuellungsKette,
-  mengeAusKette,
-} from '../lageberichte/AbschnittsAkkordeon';
-import MarkdownEditor from '../components/MarkdownEditor';
+import AbschnittsText from '../entwurf/AbschnittsText';
+import DokumentEntwurf from '../entwurf/DokumentEntwurf';
 import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
-import Einstiegsfokus, { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
+import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -41,7 +35,8 @@ import StatusTag from '../components/StatusTag';
 import { pressemitteilungStatus } from '../theme/statusFarben';
 import { NUR_LEITUNG } from '../components/nurAnsicht';
 import { stabFreigabeAnzeige, useStabFreigabe } from '../stab/useStabFreigabe';
-// Dieselben Druck-Eigenheiten wie der Lagebericht: Akkordeon-Entwurf, Bedienung ausgeblendet.
+// Dieselben Druck-Eigenheiten wie der Lagebericht: Bedienung und Seitenkopf ausgeblendet; die
+// Druckregeln des Entwurfs trägt `entwurf/dokumentEntwurf.css`.
 import './lageberichtPrint.css';
 
 /**
@@ -50,8 +45,9 @@ import './lageberichtPrint.css';
  * `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md` (D4).
  *
  * Zwilling von `LageberichtDetailPage` und `BefehlDetailPage` (dasselbe Muster: Verlustschutz,
- * Einstiegsfokus, Akkordeon, Freigabedialog). Eine gemeinsame Hülle für alle drei ist ein eigener
- * Umbau; die Begründungen der einzelnen Riegel stehen dort.
+ * Einstiegsfokus, Freigabedialog; die Schreibfläche ist `entwurf/DokumentEntwurf`, LLH-1074). Eine
+ * gemeinsame Hülle der ganzen Seite ist ein eigener Umbau; die Begründungen der einzelnen Riegel
+ * stehen dort.
  *
  * Abweichungen vom Lagebericht:
  * - **Freigeben** nur mit `darfEinsatzLeiten`. Führungspersonal sieht den Knopf gesperrt und
@@ -82,10 +78,9 @@ function PressemitteilungDetail() {
   const navigate = useNavigate();
   const [form] = Form.useForm<FormWerte>();
   const { token } = useRollen();
-  const werte = Form.useWatch([], form) as Record<string, unknown> | undefined;
-  const [offenerAbschnitt, setOffenerAbschnitt] = useState<string | null>(null);
-  const [vorschauNeben, setVorschauNeben] = useState(false);
-  const [einstieg, setEinstieg] = useState<{ feld: string | null } | null>(null);
+  // Nur die Felder des Druckkopfs, nicht alle Werte (Begründung in `LageberichtDetailPage`).
+  const titelWert = Form.useWatch('titel', form) as unknown;
+  const zeitstandWert = Form.useWatch('zeitstand', form) as unknown;
   const stabFreigabe = useStabFreigabe(einsatzId);
 
   const einsatzQuery = useQuery({
@@ -97,7 +92,6 @@ function PressemitteilungDetail() {
     queryFn: () => ladePressemitteilung(einsatzId, pmId),
     enabled: idGueltig && stabFreigabe.zustand === 'frei',
   });
-  const vorlageDef = pmQuery.data ? mitteilungVorlage(pmQuery.data.vorlage) : undefined;
   // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur an der
   // freigegebenen Mitteilung: ein Entwurf hat noch keinen ETB-Eintrag.
   const etbSprung = useZumEtbEintrag(
@@ -105,41 +99,6 @@ function PressemitteilungDetail() {
     pmQuery.data?.status === 'entwurf' ? null : pmQuery.data?.etb_eintrag_id,
   );
   const druckWege = useDruckNebenwege();
-  // Über ein Primitiv memoisiert, damit das `memo`-Akkordeon nicht je Anschlag neu rendert
-  // (Begründung in `LageberichtDetailPage`).
-  const befuelltKette = befuellungsKette(werte, vorlageDef?.abschnitte ?? []);
-  const befuellt = useMemo(
-    () => mengeAusKette(befuelltKette, vorlageDef?.abschnitte ?? []),
-    [befuelltKette, vorlageDef],
-  );
-
-  if (einstieg === null && pmQuery.data && vorlageDef) {
-    const geladen = pmQuery.data;
-    setEinstieg({
-      feld:
-        einstiegsAbschnitt(
-          vorlageDef.abschnitte.map((a) => a.schluessel),
-          (schluessel) => geladen.abschnitte.find((x) => x.schluessel === schluessel)?.text,
-        ) ?? null,
-    });
-  }
-
-  const abschnittsEditor = useCallback(
-    (a: AbschnittDef) => (
-      <Form.Item label={a.label} name={a.schluessel} labelCol={{ style: { display: 'none' } }}>
-        <MarkdownEditor
-          layout={vorschauNeben ? 'split' : 'toggle'}
-          druckfassung
-          druckTitel={a.label}
-          unterEbene={1}
-          variante="dokument"
-          autoSize={{ minRows: 6 }}
-        />
-      </Form.Item>
-    ),
-    [vorschauNeben],
-  );
-
   // Liste, Detail und Presseseite hängen unter demselben Prefix.
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: einsatzKeys.presse(einsatzId) });
@@ -216,6 +175,12 @@ function PressemitteilungDetail() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   const darfFreigeben = darfEinsatzLeiten(einsatz);
   const status = pressemitteilungStatus[pm.status];
+  const schreibtEntwurf = istEntwurf && darfSchreiben;
+  // Druckkopf im Entwurf aus dem Formular (wie `LageberichtDetailPage`, LFH-731): der Kopfblock
+  // mit Titel und Zeitstand weicht auf Papier.
+  const druckTitel = schreibtEntwurf && typeof titelWert === 'string' ? titelWert : pm.titel;
+  const druckZeitstand =
+    schreibtEntwurf && dayjs.isDayjs(zeitstandWert) ? alsBackendZeit(zeitstandWert) : pm.zeitstand;
 
   const freigabeBestaetigen = async () => {
     let w: FormWerte;
@@ -258,12 +223,12 @@ function PressemitteilungDetail() {
       />
       <Druckkopf
         dokumentart="Pressemitteilung"
-        titel={pm.titel}
+        titel={druckTitel}
         einsatz={einsatz}
         sichtbarkeit="druck"
         zeilen={[
           { etikett: 'Stand', wert: `${status.label} · Version ${pm.version}` },
-          { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={pm.zeitstand} /> },
+          { etikett: 'Zeitstand', wert: <ZeitAnzeige wert={druckZeitstand} /> },
           ...(pm.freigegeben_von_name
             ? [{ etikett: 'Freigegeben von', wert: pm.freigegeben_von_name }]
             : []),
@@ -354,12 +319,12 @@ function PressemitteilungDetail() {
             />
           </div>
         )}
-        {!(istEntwurf && darfSchreiben) && (
+        {!schreibtEntwurf && (
           <Typography.Paragraph type="secondary" style={monoStil(12)}>
             Zeitstand: <ZeitAnzeige wert={pm.zeitstand} />
           </Typography.Paragraph>
         )}
-        {istEntwurf && darfSchreiben ? (
+        {schreibtEntwurf ? (
           <Form
             form={form}
             layout="vertical"
@@ -370,30 +335,31 @@ function PressemitteilungDetail() {
             {/* Erst wenn das `<Form>` hängt, übernimmt der Verlustschutz den Serverstand
                 (LFH-627, `entwurf/useEntwurfVerlustschutz.ts` (4)). */}
             <FormularEingehaengt onWechsel={schutz.formularEingehaengt} />
-            <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
-              <Input />
-            </Form.Item>
-            <Form.Item label="Zeitstand" name="zeitstand">
-              <ZeitpunktEingabe art="ereignis" allowClear={false} style={{ width: '100%' }} />
-            </Form.Item>
-            <Checkbox
-              className="lagebericht-no-print"
-              checked={vorschauNeben}
-              onChange={(e) => setVorschauNeben(e.target.checked)}
-              style={{ marginBottom: token.margin }}
-            >
-              Vorschau neben dem Text
-            </Checkbox>
             {v && (
-              <AbschnittsAkkordeon
+              <DokumentEntwurf
+                form={form}
                 abschnitte={v.abschnitte}
-                befuellt={befuellt}
-                offen={offenerAbschnitt ?? einstieg?.feld ?? v.abschnitte[0].schluessel}
-                onOffen={setOffenerAbschnitt}
-                editor={abschnittsEditor}
+                // Der erste LEERE Abschnitt des Serverstands, beim Einhängen eingefroren.
+                einstieg={einstiegsAbschnitt(
+                  v.abschnitte.map((a) => a.schluessel),
+                  (schluessel) => pm.abschnitte.find((x) => x.schluessel === schluessel)?.text,
+                )}
+                kopf={
+                  <>
+                    <Form.Item label="Titel" name="titel" rules={[{ required: true }]}>
+                      <Input />
+                    </Form.Item>
+                    <Form.Item label="Zeitstand" name="zeitstand">
+                      <ZeitpunktEingabe
+                        art="ereignis"
+                        allowClear={false}
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </>
+                }
               />
             )}
-            <Einstiegsfokus form={form} feld={einstieg?.feld ?? undefined} />
           </Form>
         ) : (
           <Paneel

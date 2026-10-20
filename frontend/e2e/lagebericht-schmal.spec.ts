@@ -7,8 +7,10 @@ import { einsatzAnlegen } from './einsatz-kern';
  * waagerechter Überlauf der beiden Listen.
  *
  * `MAX_HOEHE` ist gemessen, keine Setzung: die halbe Höhe der Seite mit acht offenen
- * Split-Editoren ohne Navigation. Gemessen wird `document.body.scrollHeight` — die
- * Scrollstrecke, die die Person am 13"-Schirm zurücklegt.
+ * Split-Editoren ohne Navigation (vor LFH-348). Seit LLH-1074 stehen die acht Abschnitte wieder
+ * offen (`entwurf/DokumentEntwurf`), aber leer einzeilig: der mitwachsende Editor hält die Höhe,
+ * nicht das Verstecken. Gemessen wird `document.body.scrollHeight` — die Scrollstrecke, die die
+ * Person am 13"-Schirm zurücklegt.
  *
  * Kein Device-Descriptor; Anmelden und Anlegen am Fükw-Maß, erst danach umstellen. Seeding per
  * `page.request`.
@@ -18,8 +20,8 @@ const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 /**
- * Halbe Bestandshöhe: ohne Akkordeon maß die Seite 2108 px. Der Körper hat einen Boden von
- * `100vh` = 768 px — darunter kann keine Seite fallen.
+ * Halbe Bestandshöhe: mit acht festen Split-Editoren maß die Seite 2108 px. Der Körper hat einen
+ * Boden von `100vh` = 768 px — darunter kann keine Seite fallen.
  */
 const MAX_HOEHE = 1054;
 
@@ -92,7 +94,8 @@ test('Detailseite „Lagevortrag zur Entscheidung" bleibt bei 1366 px unter der 
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${berichtId}`);
   await expect(page.getByLabel('Auftrag')).toBeVisible();
-  await expect(page.getByLabel('Vorschlag der besten Möglichkeit')).toBeAttached();
+  // Alle acht offen (LLH-1074) — die Höhe gilt für das ganze Dokument, nicht für einen Abschnitt.
+  await expect(page.getByLabel('Vorschlag der besten Möglichkeit')).toBeVisible();
 
   // Erst messen, wenn die Höhe STEHT: `autoSize` misst die Textfelder nach dem Einhängen nach.
   const hoehe = await stabileHoehe(page);
@@ -110,6 +113,35 @@ test('Detailseite „Lagevortrag zur Entscheidung" bleibt bei 1366 px unter der 
     description: `body.scrollHeight = ${hoehe} px bei 1366×768, Einsatz ${einsatzId}, Bericht ${berichtId}`,
   });
   expect(hoehe).toBeLessThanOrEqual(MAX_HOEHE);
+});
+
+/**
+ * Der Entwurf am Handy: die Gliederung steht unter `xl` als eine Zeile über den Abschnitten und
+ * rollt in sich (`entwurf/dokumentEntwurf.css`); die Seite darf dabei nicht quer laufen.
+ */
+test('Detailseite im Entwurf: kein waagerechter Überlauf bei 390 px, Gliederung rollt in sich', async ({
+  page,
+}) => {
+  await vorbereiten(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${einsatzId}/lageberichte/${berichtId}`);
+  await expect(page.getByLabel('Auftrag')).toBeVisible();
+  const gliederung = page.getByRole('navigation', { name: 'Gliederung' });
+  await expect(gliederung.getByRole('button')).toHaveCount(8);
+  const mass = await page.evaluate(() => {
+    const liste = document.querySelector('.dokument-entwurf__gliederungsliste');
+    return {
+      scroll: document.documentElement.scrollWidth,
+      klient: document.documentElement.clientWidth,
+      listeScroll: liste?.scrollWidth ?? -1,
+      listeKlient: liste?.clientWidth ?? -1,
+    };
+  });
+  expect(mass.scroll, 'Entwurf: Body breiter als der Viewport').toBeLessThanOrEqual(
+    mass.klient + 1,
+  );
+  // Gegenprobe: die Gliederung ist breiter als ihr Platz und rollt — sonst wäre die Aussage leer.
+  expect(mass.listeScroll).toBeGreaterThan(mass.listeKlient);
 });
 
 for (const pfad of ['lageberichte', 'lagemeldungen'] as const) {

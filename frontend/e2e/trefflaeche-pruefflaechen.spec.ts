@@ -1034,8 +1034,10 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
       anker: knopf('Freigeben'),
       ziele: [
         {
-          sorte: 'Lagebericht Abschnittsköpfe',
-          ziele: (page) => inMain(page).locator('.ant-collapse-header'),
+          // Gliederung des Entwurfs (`entwurf/DokumentEntwurf`, LLH-1074; vorher Akkordeonköpfe).
+          sorte: 'Lagebericht Gliederung',
+          ziele: (page) =>
+            inMain(page).getByRole('navigation', { name: 'Gliederung' }).getByRole('button'),
           mindestens: 8,
         },
         {
@@ -1044,9 +1046,9 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
           mindestens: 2,
         },
         {
-          sorte: 'Lagebericht Vorschau-Schalter',
-          ziele: kaestchen('Vorschau neben dem Text'),
-          mindestens: 1,
+          sorte: 'Lagebericht Umschalter Bearbeiten | Lesefassung',
+          ziele: segment(/^(Bearbeiten|Lesefassung)$/, 'tab'),
+          mindestens: 2,
         },
       ],
     },
@@ -1142,7 +1144,7 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen 
   await messeImRollenzweig(page, 'beobachter', [
     {
       pfad: `${R}/lageberichte/${berichtId}`,
-      // Der Lesezweig rendert ohne Akkordeon (`LageberichtDetailPage`: nur Entwurf UND
+      // Der Lesezweig rendert ohne Entwurfsfläche (`LageberichtDetailPage`: nur Entwurf UND
       // Schreibrecht zeigen das Formular); es bleibt die Druckaktion.
       anker: (page) => inMain(page).getByText('Zeitstand:'),
       fehlt: knopf('Freigeben'),

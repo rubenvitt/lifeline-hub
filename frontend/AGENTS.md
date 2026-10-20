@@ -454,7 +454,7 @@ anwendbar), „nicht geprüft" ist keins.
   und Mittellage); antd hat dafür kein Token, das Label wäre nur so hoch wie die Schrift
   (21,5/36). Ohne Text (antds Tabellenfilter) kein Boden; im Menüeintrag hebt
   `style={{ minHeight: 0 }}` ihn auf, dort ist der Eintrag das Ziel (`SpaltenSchalter`).
-  Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7, C13).
+  Nachweis `e2e/trefflaeche-pruefflaechen.spec.ts` (C7).
 - **Handgebautes Bedienziel** (LFH-365): `minHeight: token.controlHeight` **plus** `padding` aus
   `token.paddingSM`/`token.padding` (aufgelöste Tokens, nie `var(--lfh-*)`), geprüft über eine
   reine exportierte Stilfunktion (`bedienzielStil`) mit Böden als **Literalen**. **Ein `<a>` erbt
@@ -796,9 +796,10 @@ und `pages/personen/`.
   Feld je PATCH, Spec `einsatzabschnitt-bearbeitung`, LFH-1208,
   `openspec/changes/archive/2026-10-11-lfh-1208-abschnitt-bearbeiten-in-ansicht/design.md`).
 
-**Entwürfe** (Verlustschutz, Navigationsschutz, „Entwurf speichern“, Lagebericht-Akkordeon):
-`frontend/src/entwurf/AGENTS.md` — gilt auch für `lageberichte/`, `pages/BefehlDetailPage.tsx` und
-`pages/LageberichtDetailPage.tsx`.
+**Entwürfe** (Verlustschutz, Navigationsschutz, „Entwurf speichern“, gegliederte Dokumente über
+`entwurf/DokumentEntwurf`): `frontend/src/entwurf/AGENTS.md` — gilt auch für `lageberichte/`,
+`pages/BefehlDetailPage.tsx`, `pages/LageberichtDetailPage.tsx` und
+`pages/PressemitteilungDetailPage.tsx`.
 
 **Layout und Live**
 
