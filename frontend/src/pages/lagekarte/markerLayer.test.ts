@@ -18,6 +18,7 @@ import {
   setzeSpiderDaten,
   BESCHRIFTUNG_AB_ZOOM,
 } from './markerLayer';
+import { GEDAEMPFT_DECKKRAFT } from './abschnittFokus';
 import { FREIES_ZEICHEN_ERSATZLABEL, type KarteMarker } from './marker';
 import { plakettenBildId, zonenPlakette } from './plakette';
 import { GEPLANT_RING_BILD } from './geplantRing';
@@ -703,5 +704,50 @@ describe('naechstesMerkmal (Review LFH-650)', () => {
     const flaeche = { geometry: { type: 'Polygon' }, properties: { schluessel: 'x' } };
     expect(naechstesMerkmal([flaeche], { x: 0, y: 0 }, projiziere)).toBe(flaeche);
     expect(naechstesMerkmal([], { x: 0, y: 0 }, projiziere)).toBeUndefined();
+  });
+});
+
+describe('Gedämpfte Kräfte im Fokus auf einen Abschnitt (LLH-1057)', () => {
+  /** Deckkraft-Ausdruck: gedämpft der Bruchteil, sonst der volle Wert. */
+  const deckkraft = (voll: number) => [
+    'case',
+    ['==', ['get', 'gedaempft'], true],
+    voll * GEDAEMPFT_DECKKRAFT,
+    voll,
+  ];
+
+  it('trägt `gedaempft` nur an gedämpften Markern als Feature-Property', () => {
+    const fc = baueMarkerFc([
+      mk({ schluessel: 'einheit-1', typ: 'einheit', gedaempft: true }),
+      mk({ schluessel: 'einheit-2', typ: 'einheit' }),
+    ]);
+    expect(fc.features[0].properties.gedaempft).toBe(true);
+    expect('gedaempft' in fc.features[1].properties).toBe(false);
+  });
+
+  it('dämpft Zeichen, Kreis, Ringe, Kürzel und Plakette über ihre Deckkraft — Einzelmarker und Spider', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const paint = (id: string) => (layers.get(id) as { paint?: Record<string, unknown> }).paint;
+    for (const pfad of ['marker', 'spider']) {
+      expect(paint(`${pfad}-symbol`)?.['icon-opacity']).toEqual(deckkraft(1));
+      expect(paint(`${pfad}-geplant`)?.['icon-opacity']).toEqual(deckkraft(1));
+      expect(paint(`${pfad}-kreis`)?.['circle-opacity']).toEqual(deckkraft(1));
+      expect(paint(`${pfad}-kreis`)?.['circle-stroke-opacity']).toEqual(deckkraft(1));
+      expect(paint(`${pfad}-status-ring`)?.['circle-opacity']).toEqual(deckkraft(0.9));
+      expect(paint(`${pfad}-kurz`)?.['text-opacity']).toEqual(deckkraft(1));
+      expect(paint(`${pfad}-label`)?.['text-opacity']).toEqual(deckkraft(1));
+      expect(paint(`${pfad}-label`)?.['icon-opacity']).toEqual(deckkraft(1));
+    }
+    // Die Trefferzone bleibt unsichtbar und Klickziel: gedämpft heißt nicht entfernt.
+    expect(paint('marker-treffer')?.['circle-opacity']).toBe(0);
+  });
+
+  it('der Einsatzort und die Betroffenen tragen keine Dämpfung (keine Kräfte)', () => {
+    const { map, layers } = fakeMap();
+    sorgeFuerMarkerLayer(map as never, leer, leer);
+    const paint = (id: string) => (layers.get(id) as { paint?: Record<string, unknown> }).paint;
+    expect(paint('marker-einsatzort-symbol')?.['icon-opacity']).toBeUndefined();
+    expect(paint('personen-kreis')?.['circle-opacity']).toBeUndefined();
   });
 });

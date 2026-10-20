@@ -125,6 +125,11 @@ export interface KarteMarker {
    */
   isGeplant?: true;
   /**
+   * Fokus auf einen Abschnitt (LLH-1057, `abschnittFokus.ts`): Kraft eines fremden Abschnitts. Die
+   * Karte zeichnet sie mit verringerter Deckkraft, sie bleibt Klickziel. Nur gesetzt, wenn wahr.
+   */
+  gedaempft?: true;
+  /**
    * Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). `meldungId` = id der
    * Quell-Meldung (Deeplink ?meldung=), `meldungLfdNr` = Anzeigenummer.
    */
