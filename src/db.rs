@@ -9710,8 +9710,8 @@ mod tests {
     /// LLH-1123: `antreff_lat`/`antreff_lon` am Tier. Eine Bestandszeile von vorher behält jeden
     /// Wert, die Koordinate ist leer; beide Spalten existieren als REAL.
     #[tokio::test]
-    async fn migration_0225_tier_antreff_koordinate() {
-        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 224).await;
+    async fn migration_0227_tier_antreff_koordinate() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 226).await;
         let (e, b) = bild_grundlage(&pool).await;
         sqlx::query(
             "INSERT INTO einsatz_tier \
@@ -9750,7 +9750,7 @@ mod tests {
         };
         let vorher = lies(pool.clone()).await;
 
-        migriere_bis(&pool, 225).await;
+        migriere_bis(&pool, 227).await;
 
         assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
         let koordinate: (Option<f64>, Option<f64>) =
