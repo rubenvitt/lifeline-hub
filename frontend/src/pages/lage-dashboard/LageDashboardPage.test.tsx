@@ -870,6 +870,121 @@ describe('LageDashboardPage — Seitenkopf', () => {
   });
 });
 
+describe('LageDashboardPage — Wetterwarnung im Seitenkopf (LLH-1117)', () => {
+  const STUNDE = 3_600_000;
+  /** Wetter-Antwort mit verwertbarem Warnstand; zählt die Abrufe. */
+  function stelleWetter(daten: unknown[], abrufe = { n: 0 }) {
+    server.use(
+      http.get('/api/einsaetze/1/wetter', () => {
+        abrufe.n += 1;
+        return HttpResponse.json({
+          ort: { name: 'Musterstadt' },
+          warnungen: {
+            zustand: 'ok',
+            abgerufen_at: new Date(Date.now() - 60_000).toISOString(),
+            daten,
+          },
+          vorhersage: { zustand: 'kein_ort' },
+          aktuell: { zustand: 'kein_ort' },
+        });
+      }),
+    );
+    return abrufe;
+  }
+  const marke = () => document.querySelector<HTMLElement>('[data-lfh="wetter-kopfmarke"]');
+
+  it('eine angekündigte Unwetterwarnung steht mit Stufe als Wort und Ziel im Kopf, nicht im Band', async () => {
+    mockEndpunkte({});
+    stelleWetter([
+      {
+        stufe: 'schwer',
+        ereignis: 'STARKREGEN',
+        ueberschrift: 'Amtliche UNWETTERWARNUNG vor STARKREGEN',
+        beginn: new Date(Date.now() + 3 * STUNDE).toISOString(),
+        ende: new Date(Date.now() + 6 * STUNDE).toISOString(),
+      },
+    ]);
+    render();
+    const m = await waitFor(() => {
+      const el = marke();
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(m.closest('[data-lfh="lagebild-meta"]')).not.toBeNull();
+    expect(m.textContent).toMatch(/^Unwetterwarnung Starkregen ab \d\d:\d\d ↗$/);
+    const link = within(m).getByRole('link', { name: /^Unwetterwarnung Starkregen ab / });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/wetter-pegel');
+    // Nie im Kennzahlenband (LFH-640) und still: kein Toast, kein Hinweis.
+    await kennzahlGeladen('Betroffene');
+    expect(zellen().map((z) => z.textContent)).not.toContainEqual(
+      expect.stringContaining('Starkregen'),
+    );
+    expect(document.querySelector('.ant-notification-notice')).toBeNull();
+    expect(document.querySelector('.ant-message-notice')).toBeNull();
+  });
+
+  it('mehrere Warnungen: die höchste Stufe, die übrigen gezählt', async () => {
+    mockEndpunkte({});
+    stelleWetter([
+      {
+        stufe: 'maessig',
+        ereignis: 'STURMBÖEN',
+        ueberschrift: 'x',
+        beginn: new Date(Date.now() - STUNDE).toISOString(),
+        ende: new Date(Date.now() + STUNDE).toISOString(),
+      },
+      {
+        stufe: 'extrem',
+        ereignis: 'ORKANBÖEN',
+        ueberschrift: 'x',
+        beginn: new Date(Date.now() - STUNDE).toISOString(),
+        ende: null,
+      },
+    ]);
+    render();
+    const m = await waitFor(() => {
+      const el = marke();
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(m.textContent).toBe('Extremes Unwetter Orkanböen bis auf Weiteres (+ 1 weitere) ↗');
+  });
+
+  it('ohne Warnung zeigt der Kopf nichts (Abwesenheit, auch keine 0)', async () => {
+    mockEndpunkte({});
+    const abrufe = stelleWetter([]);
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() => expect(abrufe.n).toBeGreaterThan(0));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(marke()).toBeNull();
+  });
+
+  it('Modul „Wetter & Pegel“ ausgeblendet: keine Marke und kein Abruf', async () => {
+    const freigabenGeliefert = { n: 0 };
+    mockEndpunkte({ freigabenGeliefert, freigaben: { 'wetter-pegel': { sichtbar: false } } });
+    const abrufe = stelleWetter([
+      {
+        stufe: 'schwer',
+        ereignis: 'GEWITTER',
+        ueberschrift: 'x',
+        beginn: new Date(Date.now() - STUNDE).toISOString(),
+        ende: new Date(Date.now() + STUNDE).toISOString(),
+      },
+    ]);
+    render();
+    await kennzahlGeladen('Betroffene');
+    await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(abrufe.n).toBe(0);
+    expect(marke()).toBeNull();
+  });
+});
+
 describe('LageDashboardPage — Gefahrenmatrix', () => {
   it('verdichtet je Gefahrentyp über ALLE Gebiete auf die höchste Stufe, in Katalogreihenfolge', async () => {
     mockEndpunkte({

@@ -17,8 +17,15 @@ import { OBERGRENZE_MS, teilStand, teileWarnungen } from './wetterStand';
 
 export const UNWETTER_STUFEN: readonly WetterWarnstufe[] = ['schwer', 'extrem'];
 
-/** Rangfolge der Stufen; ein Record, damit eine neue Stufe den Typcheck bricht. */
-const RANG: Record<WetterWarnstufe, number> = { gering: 0, maessig: 1, schwer: 2, extrem: 3 };
+/** Rangfolge der Stufen; ein Record, damit eine neue Stufe den Typcheck bricht. Auch für die
+    Kopfmarke des Lagebilds (`kopfWarnung.ts`), damit es nur eine Rangfolge gibt. */
+export const WARNSTUFE_RANG: Record<WetterWarnstufe, number> = {
+  gering: 0,
+  maessig: 1,
+  schwer: 2,
+  extrem: 3,
+};
+const RANG = WARNSTUFE_RANG;
 
 /**
  * Wie lange ein gemeldetes Paar als gemeldet gilt — die Obergrenze des Warnstands: eine Lücke
