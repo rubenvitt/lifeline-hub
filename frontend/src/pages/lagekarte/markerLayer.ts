@@ -13,6 +13,7 @@ import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
 import { ordneEigenpositionEin } from './eigenpositionLayer';
 import { GEPLANT_RING_BILD } from './geplantRing';
+import { GEDAEMPFT_DECKKRAFT } from './abschnittFokus';
 
 // Felder, die eine Layer-Expression, ein Filter, der Klick-Handler oder die Cluster-Aggregation
 // liest: schluessel (Klick → Inspector), typ (Donut-Segmente), farbe (marker-kreis), icon
@@ -41,6 +42,8 @@ export interface MarkerProps {
   quelle?: 'personen';
   /** Geplanter Raum (`KarteMarker.isGeplant`): gestrichelter Ring (`marker-geplant`). */
   isGeplant?: true;
+  /** Kraft eines fremden Abschnitts im Fokus (`KarteMarker.gedaempft`, LLH-1057): Deckkraft. */
+  gedaempft?: true;
 }
 
 export type MarkerFeature = {
@@ -90,6 +93,7 @@ function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
   if (mk.sichtung) properties.sk = mk.sichtung;
   if (mk.clusterQuelle) properties.quelle = mk.clusterQuelle;
   if (mk.isGeplant) properties.isGeplant = true;
+  if (mk.gedaempft) properties.gedaempft = true;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -230,12 +234,22 @@ const MARKER_LAYER_REIHENFOLGE = [
   'spider-symbol',
 ] as const;
 
+/**
+ * Deckkraft im Fokus auf einen Abschnitt (LLH-1057, Spec `lagekarte-abschnitt-fokus`): ein Feature
+ * mit `gedaempft` zeichnet mit dem Bruchteil `GEDAEMPFT_DECKKRAFT` der vollen Deckkraft, alle
+ * übrigen voll. Datengetrieben, damit der Fokus nur die Daten ändert und kein Layer neu entsteht.
+ * Die Trefferzone bleibt, wie sie ist: gedämpft heißt nicht entfernt.
+ */
+export function deckkraftImFokus(voll: number): ExpressionSpecification {
+  return ['case', ['==', ['get', 'gedaempft'], true], voll * GEDAEMPFT_DECKKRAFT, voll];
+}
+
 // Geteilte Paint/Layout-Configs für Einzelmarker- und Spider-Leaf-Layer. Die Spider-Source ist
 // ungeclustert → dieselben Paints, andere Filter.
 const STATUS_RING_PAINT: CircleLayerSpecification['paint'] = {
   'circle-radius': 20,
   'circle-color': ['get', 'statusFarbe'],
-  'circle-opacity': 0.9,
+  'circle-opacity': deckkraftImFokus(0.9),
 };
 /**
  * Unsichtbare Trefferzone: ein Kreis mit dem Durchmesser aus `treffer`, ohne Füllung und Rand,
@@ -269,6 +283,15 @@ const KREIS_PAINT: CircleLayerSpecification['paint'] = {
   'circle-stroke-width': 2,
 };
 /**
+ * Kreis der Kräfte-Marker (Lagemeldung ohne Zeichen) und Spider-Blätter: wie {@link KREIS_PAINT},
+ * dazu die Dämpfung im Fokus. Die Betroffenen behalten den reinen Kreis — sie sind keine Kräfte.
+ */
+const KREIS_PAINT_FOKUS: CircleLayerSpecification['paint'] = {
+  ...KREIS_PAINT,
+  'circle-opacity': deckkraftImFokus(1),
+  'circle-stroke-opacity': deckkraftImFokus(1),
+};
+/**
  * Kurzzeichen im Kreis (Betroffenen-Karte): die Sichtung als Kürzel („II") in der Markerfläche —
  * der zweite Kanal neben der Farbe, der anders als die Plakette weder am Mindestzoom hängt noch
  * einer Kollision weicht. Schwarz mit weißem Hof liest sich auf allen Sichtungsfarben.
@@ -288,6 +311,14 @@ const KURZ_PAINT: SymbolLayerSpecification['paint'] = {
   'text-color': '#000',
   'text-halo-color': '#fff',
   'text-halo-width': 1.5,
+};
+const KURZ_PAINT_FOKUS: SymbolLayerSpecification['paint'] = {
+  ...KURZ_PAINT,
+  'text-opacity': deckkraftImFokus(1),
+};
+/** Zeichen und gestrichelter Ring: Bild-Deckkraft im Fokus. */
+const BILD_PAINT_FOKUS: SymbolLayerSpecification['paint'] = {
+  'icon-opacity': deckkraftImFokus(1),
 };
 /**
  * Gestrichelter Ring eines geplanten Raums (`geplantRing.ts`): ein festes Bild unter dem Zeichen,
@@ -332,6 +363,12 @@ function plakettenLayout(
   };
 }
 const PLAKETTEN_PAINT: SymbolLayerSpecification['paint'] = { 'text-color': ['get', 'textFarbe'] };
+/** Plakette einer Kraft: Name und Grund treten im Fokus mit dem Zeichen zurück. */
+const PLAKETTEN_PAINT_FOKUS: SymbolLayerSpecification['paint'] = {
+  ...PLAKETTEN_PAINT,
+  'text-opacity': deckkraftImFokus(1),
+  'icon-opacity': deckkraftImFokus(1),
+};
 
 const leerFc = (): MarkerFeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
@@ -427,6 +464,7 @@ export function sorgeFuerMarkerLayer(
       source: MARKER_CLUSTER_QUELLE,
       filter: ['all', ['!', ['has', 'point_count']], ['has', 'isGeplant']],
       layout: { ...GEPLANT_LAYOUT },
+      paint: { ...BILD_PAINT_FOKUS },
     });
   }
   if (!map.getLayer('marker-treffer')) {
@@ -454,7 +492,7 @@ export function sorgeFuerMarkerLayer(
       type: 'circle',
       source: MARKER_CLUSTER_QUELLE,
       filter: ['all', ['!', ['has', 'point_count']], ['!', ['has', 'icon']]],
-      paint: { ...KREIS_PAINT },
+      paint: { ...KREIS_PAINT_FOKUS },
     });
   }
   // Zeichen-Marker — Symbol mit lazy über den Bild-Resolver (`kartenbildResolver.ts`) angelegtem Icon.
@@ -465,6 +503,7 @@ export function sorgeFuerMarkerLayer(
       source: MARKER_CLUSTER_QUELLE,
       filter: ['all', ['!', ['has', 'point_count']], ['has', 'icon']],
       layout: { ...SYMBOL_LAYOUT },
+      paint: { ...BILD_PAINT_FOKUS },
     });
   }
   // Cluster-Bubbles sind DOM-Donut-Marker, kein Layer (weiche Schatten + Typ-Zusammensetzung kann
@@ -609,7 +648,7 @@ export function sorgeFuerMarkerLayer(
       source: MARKER_CLUSTER_QUELLE,
       filter: ['all', ['!', ['has', 'point_count']], ['has', 'kurzzeichen']],
       layout: kurzLayout(schrift),
-      paint: { ...KURZ_PAINT },
+      paint: { ...KURZ_PAINT_FOKUS },
     });
   }
   if (fehlt('marker-label')) {
@@ -620,7 +659,7 @@ export function sorgeFuerMarkerLayer(
       minzoom: BESCHRIFTUNG_AB_ZOOM,
       filter: ['all', ['!', ['has', 'point_count']], ['has', 'beschriftung']],
       layout: plakettenLayout(schrift),
-      paint: { ...PLAKETTEN_PAINT },
+      paint: { ...PLAKETTEN_PAINT_FOKUS },
     });
   }
   if (fehlt('marker-einsatzort-label')) {
@@ -683,6 +722,7 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'isGeplant'],
       layout: { ...GEPLANT_LAYOUT },
+      paint: { ...BILD_PAINT_FOKUS },
     });
   }
   if (!map.getLayer('spider-kante')) {
@@ -700,7 +740,7 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       type: 'circle',
       source: SPIDER_LEAVES_QUELLE,
       filter: ['!', ['has', 'icon']],
-      paint: { ...KREIS_PAINT },
+      paint: { ...KREIS_PAINT_FOKUS },
     });
   }
   if (!map.getLayer('spider-symbol')) {
@@ -710,6 +750,7 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'icon'],
       layout: { ...SYMBOL_LAYOUT },
+      paint: { ...BILD_PAINT_FOKUS },
     });
   }
   if (!map.getLayer('spider-kurz')) {
@@ -719,7 +760,7 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'kurzzeichen'],
       layout: kurzLayout(schrift),
-      paint: { ...KURZ_PAINT },
+      paint: { ...KURZ_PAINT_FOKUS },
     });
   }
   // Ohne Mindestzoom: aufgefächert wird, um zu unterscheiden. Mit Kollision wie überall.
@@ -730,7 +771,7 @@ function sorgeFuerSpiderLayer(map: MapLibreMap, schrift: string[] | undefined) {
       source: SPIDER_LEAVES_QUELLE,
       filter: ['has', 'beschriftung'],
       layout: plakettenLayout(schrift),
-      paint: { ...PLAKETTEN_PAINT },
+      paint: { ...PLAKETTEN_PAINT_FOKUS },
     });
   }
 }

@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, src/routes/karte.rs, src/routes/lage_zone.rs, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, src/vorlagendokument/anlage.rs]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs]
 ---
 
 ## Überblick
@@ -37,6 +37,17 @@ wer im Einsatz schreiben darf.
    steht die Kennung mit „verortet“, etwa „R-005 verortet“.
 3. „Zurück zu R-005“ wählen: Die Seite des Objekts öffnet sich wieder und zeigt die neue
    Koordinate. Wer weiter auf der Karte arbeitet, wählt „Auf der Karte bleiben“.
+
+### Einen Abschnitt fokussieren
+
+1. Auf der Karte die Fläche oder das Zeichen eines Einsatzabschnitts antippen. Er erscheint unter
+   „Ausgewählt“.
+2. „Abschnitt fokussieren“ wählen. Die Karte zeigt die Fläche des Abschnitts, Kräfte anderer
+   Abschnitte erscheinen blass. Unten auf der Karte steht ein Band mit „Fokus“ und dem Namen des
+   Abschnitts.
+3. „Fokus aufheben“ wählen oder Esc drücken. Steht noch ein Objekt unter „Ausgewählt“, schließt
+   das erste Esc dieses, das zweite hebt den Fokus auf. Die Karte kehrt zum Ausschnitt vor dem
+   Fokus zurück.
 
 ### Eine Strecke oder Fläche messen
 
@@ -151,6 +162,20 @@ bis die Lagekarte verlassen wird. Betroffene zeigt die Karte auch so nur mit Zug
 „Zurück zu …“ steht nur, wenn die Karte von der Seite des Objekts geöffnet wurde. Eine
 Unfallhilfsstelle wird über „Nicht verortet“ verortet und hat deshalb keinen Rückweg. Ein Objekt,
 das über „Nicht verortet“ platziert wird, meldet sich wie bisher mit „Objekt verortet“.
+
+### Fokus auf einen Abschnitt
+
+Der Fokus ändert nur, wie die Karte aussieht. Kräfte anderer Abschnitte bleiben auf der Karte und
+lassen sich weiter antippen, sie erscheinen nur blass: Einheiten, Fahrzeuge, Abschnittszeichen und
+Flächen. Eine Einheit ohne eigenen Abschnitt zählt zum Abschnitt der Einheit, unter der sie steht,
+ein Fahrzeug zum Abschnitt seiner Einheit. Unterabschnitte gehören zum fokussierten Abschnitt und
+bleiben voll. Kräfte ohne Abschnitt, Personal, Schäden, Zonen und alles Übrige bleiben ebenfalls
+voll. Ebenen, Zahlen und Listen der Leiste ändern sich nicht.
+
+Hat der Abschnitt keine Fläche, zeigt die Karte seine Unterabschnitte und seine verorteten
+Kräfte; gibt es auch die nicht, bleibt der Ausschnitt, wie er ist. Der Fokus wird nicht
+gespeichert: Nach dem Neuladen und in einem anderen Einsatz ist er aufgehoben. Ein Link auf die
+Lagekarte kann einen Abschnitt mitbringen; die Karte öffnet dann mit diesem Fokus.
 
 ### Gefahrengebiete
 
