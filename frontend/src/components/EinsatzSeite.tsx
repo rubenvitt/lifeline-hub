@@ -367,9 +367,13 @@ export function seitenBreiteMax(breite: SeitenBreite): number | undefined {
  * antd-Prefix am `ConfigProvider` konfigurierbar ist.
  */
 function primaeraktionen(wurzel: HTMLElement): number {
-  return Array.from(wurzel.querySelectorAll('button')).filter((knopf) =>
+  const primaer = Array.from(wurzel.querySelectorAll('button')).filter((knopf) =>
     Array.from(knopf.classList).some((klasse) => klasse.endsWith('-btn-primary')),
-  ).length;
+  );
+  // Ein geteilter Knopf (Primärteil + Pfeil für Varianten derselben Handlung,
+  // `lageberichte/NeuerLagevortragKnopf.tsx`) ist EINE Aktion.
+  return new Set(primaer.map((knopf) => knopf.closest('[data-lfh="geteilter-knopf"]') ?? knopf))
+    .size;
 }
 
 /**
