@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Collapse, Form, Input } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../../api/eingabegrenzen';
-import { zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
+import { istZuLang, zeichenGrenze, zeichenRegel } from '../../components/zeichenGrenze';
 import { Select } from '../../components/Select';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -21,6 +21,7 @@ import {
   schreibeErfassungsSitzungswert,
 } from '../../components/erfassungsSitzung';
 import GeschaedigtPicker, { type GeschaedigtWert } from './GeschaedigtPicker';
+import { GefahrAuswahlImFormular, SchadensgradAuswahl } from './GefahrAuswahl';
 import { AUSMASS_META, TYP_LABEL, geschaedigtFelder } from './schadenHelfer';
 
 interface Props {
@@ -39,8 +40,9 @@ type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon'> & {
 
 /**
  * Schnellerfassungs-Modal für Schäden. Die Seite hält nur `open`; Formular, Geschädigt-Auswahl und
- * Mutation liegen hier. Vier Kernfelder sichtbar, Geschädigt und Koordinate unter „Weitere
- * Angaben“.
+ * Mutation liegen hier. Vier Kernfelder sichtbar: Typ, Ausmaß, Ort und Gefahr, weil die Gefahr das
+ * Kartenzeichen bestimmt (LLH-1115, design.md D4). Beschreibung, Schadensgrad, Geschädigt und
+ * Koordinate liegen unter „Weitere Angaben“.
  *
  * Serienmodus: der Ort überlebt als `uebernahme` ein Serien-Speichern und wird sitzungsweit
  * gemerkt; beim nächsten Öffnen wird er per Formularwert eingesetzt, nicht als `initialValues`,
@@ -110,6 +112,8 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       daten: {
         typ: daten.typ,
         ausmass: daten.ausmass,
+        gefahrenart: daten.gefahrenart ?? null,
+        schadensgrad: daten.schadensgrad ?? null,
         ort: daten.ort,
         beschreibung: daten.beschreibung ?? null,
         lat: koord?.lat ?? null,
@@ -169,14 +173,22 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
       <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
         <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" maxLength={SCHADEN_ORT_MAX} />
       </Form.Item>
-      <Form.Item
-        label="Beschreibung"
-        name="beschreibung"
-        rules={[zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')]}
-      >
-        <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />
+      {/* Mit Zeichenvorschau in Ausmaßfarbe und gewähltem Schadensgrad (LLH-1115): die Vorschau
+          zeigt das Zeichen, das der Schaden auf der Karte bekommt. */}
+      <Form.Item label="Gefahr" name="gefahrenart">
+        <GefahrAuswahlImFormular />
       </Form.Item>
       <WeitereAngaben>
+        <Form.Item
+          label="Beschreibung"
+          name="beschreibung"
+          rules={[zeichenRegel(SCHADEN_BESCHREIBUNG_MAX, 'Beschreibung')]}
+        >
+          <Input.TextArea rows={2} count={zeichenGrenze(SCHADEN_BESCHREIBUNG_MAX)} />
+        </Form.Item>
+        <Form.Item label="Schadensgrad" name="schadensgrad">
+          <SchadensgradAuswahl />
+        </Form.Item>
         <Form.Item label="Geschädigt">
           <GeschaedigtPicker
             einsatzId={einsatzId}
@@ -193,9 +205,10 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
 
 /**
  * „Weitere Angaben“ unter den Kernfeldern. Eine ungültige Koordinate sperrt das Anlegen
- * (LFH-517); der Abschnitt lässt sich dann nicht zuklappen, sonst schlüge das Anlegen an einem
- * verborgenen Feld fehl (Erfassungs-Norm: was eine Ablehnung auslöst, bleibt sichtbar). Der
- * Zustand liegt hier, im Dialoginhalt, damit er wie zuvor mit dem Dialog neu beginnt.
+ * (LFH-517), eine zu lange Beschreibung ebenso (LFH-937); der Abschnitt lässt sich dann nicht
+ * zuklappen, sonst schlüge das Anlegen an einem verborgenen Feld fehl (Erfassungs-Norm: was eine
+ * Ablehnung auslöst, bleibt sichtbar). Der Zustand liegt hier, im Dialoginhalt, damit er wie zuvor
+ * mit dem Dialog neu beginnt.
  */
 function WeitereAngaben({ children }: { children: ReactNode }) {
   const form = Form.useFormInstance<SchadenFormular>();
@@ -204,7 +217,13 @@ function WeitereAngaben({ children }: { children: ReactNode }) {
     <Collapse
       activeKey={offen}
       onChange={(keys) => {
-        if (keys.length === 0 && istUngueltigeKoordinate(form.getFieldValue('koordinaten'))) return;
+        if (
+          keys.length === 0 &&
+          (istUngueltigeKoordinate(form.getFieldValue('koordinaten')) ||
+            istZuLang(form.getFieldValue('beschreibung'), SCHADEN_BESCHREIBUNG_MAX))
+        ) {
+          return;
+        }
         setOffen(keys);
       }}
       items={[{ key: 'weitere', label: 'Weitere Angaben', children }]}
