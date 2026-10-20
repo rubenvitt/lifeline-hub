@@ -376,7 +376,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     // Der eine Angetroffene hat keinen Verbleib: offene Arbeit, Achtung.
     const verbleib = kennzahl('Verbleib offen');
     expect(verbleib.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('1');
-    expect(verbleib).toHaveTextContent('0 transportiert');
+    expect(verbleib).toHaveTextContent('0 unterwegs');
     expect(verbleib.getAttribute('data-ton')).toBe('achtung');
     expect(verbleib).toHaveAttribute('href', '/einsaetze/1/personen');
   });
@@ -983,24 +983,29 @@ describe('LageDashboardPage — Sichtung', () => {
     expect(zeilen[0].querySelector('[data-lfh="sichtungsfeld"]')).not.toBeNull();
     expect(zeilen[0]).toHaveTextContent('SK I');
     expect(within(box).getByText('Ohne Sichtung')).toBeInTheDocument();
-    // Ohne jeden Verbleib: nichts transportiert, alle fünf angetroffen und offen.
+    // Ohne jeden Verbleib: niemand unterwegs, alle fünf angetroffen und offen.
     expect(box.querySelector('[data-lfh="transport-bilanz"]')).toHaveTextContent(
-      'Transportiert / offen0 / 5',
+      'Unterwegs / offen / abgeschlossen0 / 5 / 0',
     );
   });
 
-  it('Spec-Szenario „Transportiert / offen": 2 / 2 — eine Voranmeldung ist kein Transport', async () => {
-    const transport = (verbleibStatus?: string) =>
+  it('Spec-Szenario „Transportiert / offen“: Unterwegs / offen / abgeschlossen 1 / 2 / 3 (LLH-1332)', async () => {
+    const fremd = () =>
       person('sk2', 'betroffen', {
         aktuelle_verbleib_art: 'transport',
         aktueller_verbleib: 'Transport → KH Nord',
-        ...(verbleibStatus ? { aktueller_verbleib_status: verbleibStatus } : {}),
+        versorgung: 'abgeschlossen',
       });
     mockEndpunkte({
       personen: [
-        transport('abtransportiert'),
-        transport(),
-        transport('angemeldet'),
+        person('sk2', 'betroffen', {
+          aktuelle_verbleib_art: 'transport',
+          aktueller_verbleib: 'Eigentransport 1/83-1 → KH Nord',
+          versorgung: 'unterwegs',
+        }),
+        fremd(),
+        fremd(),
+        fremd(),
         person('sk3'),
         person('sk3'),
         // Weder noch: in einer UHS verortet, und vermisst ist nicht angetroffen.
@@ -1012,9 +1017,12 @@ describe('LageDashboardPage — Sichtung', () => {
     const box = paneel('Sichtung');
     await waitFor(() =>
       expect(box.querySelector('[data-lfh="transport-bilanz"]')).toHaveTextContent(
-        'Transportiert / offen2 / 2',
+        'Unterwegs / offen / abgeschlossen1 / 2 / 3',
       ),
     );
+    // Die Patientenzahl lässt die drei Abgeschlossenen weg und nennt sie (Spec
+    // `betroffene-lagedaten`, „Patienten ohne Abgeschlossene“).
+    expect(kennzahl('Betroffene')).toHaveTextContent('4 Patienten · 3 abgeschlossen');
   });
 
   it('„Ohne Sichtung" steht auch bei 0 — die Zeile springt nicht mit dem Wert (LFH-650)', async () => {

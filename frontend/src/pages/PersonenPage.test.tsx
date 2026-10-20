@@ -118,6 +118,7 @@ const person: Person = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 const unbekannt = {
   ...person,
@@ -197,6 +198,15 @@ function OfflineSyncTest({ benutzerId }: { benutzerId: number }) {
   useOfflineSync(benutzerId);
   return null;
 }
+
+/** Zahl im Kopf einer Board-Spalte (LLH-1332). */
+const boardSpalte = (sk: string) =>
+  screen.getAllByTestId('board-spalte').find((s) => s.dataset.sichtung === sk)!;
+const boardZahl = (sk: string) => within(boardSpalte(sk)).getByTestId('board-zahl').textContent;
+const boardKarten = (sk: string) =>
+  within(boardSpalte(sk))
+    .queryAllByTestId('board-karte')
+    .map((k) => /R-\d+/.exec(k.textContent ?? '')?.[0]);
 
 describe('PersonenPage', () => {
   it('zeigt in der Vorgabe ALLE Personen; der Filter „Erfasst" zeigt nur erfasste', async () => {
@@ -1018,17 +1028,18 @@ describe('PersonenPage', () => {
     expect(
       await screen.findByRole('region', { name: 'Betroffene nach Sichtungskategorie' }),
     ).toBeInTheDocument();
-    // Die Gruppenachse erscheint im Tabellenzweig als Zählerstreifen der Werkzeugzeile, keine
-    // synthetischen Zwischenzeilen.
-    expect(screen.getByText('1 SK II')).toBeInTheDocument();
-    expect(screen.getByText('1 tot')).toBeInTheDocument();
-    expect(screen.getByText('1 unverletzt')).toBeInTheDocument();
-    expect(screen.getByText('1 ohne Sichtung')).toBeInTheDocument();
-    // Dringlichkeit zuerst: SK II vor tot vor unverletzt vor ohne Sichtung.
-    await waitFor(() => expect(regFolge()).toEqual(['R-003', 'R-004', 'R-005', 'R-001']));
-    // Der Statusfilter gilt auch im Raster.
+    // Ein Board (LLH-1332, Spec `sichtungsboard`): eine Spalte je Kategorie mit Zahl, keine Tabelle.
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(boardZahl('sk2')).toBe('1');
+    expect(boardZahl('tot')).toBe('1');
+    expect(boardZahl('unverletzt')).toBe('1');
+    expect(boardZahl('ohne')).toBe('1');
+    expect(boardKarten('sk2')).toEqual(['R-003']);
+    expect(boardKarten('ohne')).toEqual(['R-001']);
+    // Der Statusfilter gilt auch im Board.
     await userEvent.click(screen.getByRole('tab', { name: 'Verstorben' }));
-    await waitFor(() => expect(regFolge()).toEqual(['R-004']));
+    await waitFor(() => expect(boardKarten('tot')).toEqual(['R-004']));
+    expect(boardKarten('sk2')).toEqual([]);
   });
 
   it('öffnet via ?neu=1 die Maske „Betroffene erfassen“ (nicht die Zeile)', async () => {
@@ -1061,7 +1072,7 @@ describe('PersonenPage', () => {
     expect(regFolge()).toEqual(['R-003', 'R-002', 'R-001']);
   });
 
-  it('zeigt die Zeit und ordnet im Raster dieselbe SK ältester-zuerst', async () => {
+  it('zeigt die Zeit und ordnet im Board dieselbe SK ältester-zuerst', async () => {
     /**
      * Alle Bestandsfixtures teilen `erfasst_at`; eine Zeitsortier-Behauptung über gleiche
      * Zeitstempel wäre eine Attrappe. Diese beiden tragen verschiedene Sichtungszeitpunkte, die
@@ -1085,20 +1096,14 @@ describe('PersonenPage', () => {
     };
     render(einsatzAktiv, [spaet, frueh]);
     await userEvent.click(await screen.findByRole('radio', { name: 'Sichtungsraster' }));
-    await waitFor(() => expect(regFolge()).toHaveLength(2));
-    // Die Spalte existiert überhaupt …
-    expect(screen.getByRole('columnheader', { name: /Zeit/ })).toBeInTheDocument();
-    // … und trägt eine taktische DTG `DDHHmm` (Muster, kein Fixwert — Lokalzeit des Testrechners) …
-    const dtg = screen.getAllByText(/^\d{6}$/).map((e) => e.textContent);
-    expect(dtg).toHaveLength(2);
-    // … mit zwei verschiedenen Werten: beide Fixtures teilen `erfasst_at` und `geaendert_at`, nur
-    // der Sichtungszeitpunkt unterscheidet sie.
-    expect(new Set(dtg).size).toBe(2);
+    await waitFor(() => expect(boardKarten('sk2')).toHaveLength(2));
+    // Jede Karte sagt, wie lange die Sichtung her ist …
+    expect(screen.getAllByText(/gesichtet vor \d+/)).toHaveLength(2);
     // … und die ältere Sichtung steht oben, obwohl die jüngere zuerst geliefert wurde.
-    expect(regFolge()).toEqual(['R-009', 'R-008']);
+    expect(boardKarten('sk2')).toEqual(['R-009', 'R-008']);
   });
 
-  it('gibt nur BELEGTEN SK-Gruppen einen Zähler', async () => {
+  it('zeigt jede Kategorie als Spalte, leere mit 0 (Spec „Leere Kategorie“)', async () => {
     const sk2 = {
       ...person,
       id: 50,
@@ -1107,27 +1112,12 @@ describe('PersonenPage', () => {
       aktuelle_sichtung: 'sk2' as const,
       aktuelle_sichtung_at: '2026-05-27 09:30:00',
     };
-    const tot = {
-      ...person,
-      id: 51,
-      registrier_nr: 4,
-      status: 'verstorben' as const,
-      aktuelle_sichtung: 'tot' as const,
-      aktuelle_sichtung_at: '2026-05-27 09:40:00',
-    };
-    render(einsatzAktiv, [sk2, tot]);
+    render(einsatzAktiv, [sk2]);
     await userEvent.click(await screen.findByRole('radio', { name: 'Sichtungsraster' }));
-    expect(await screen.findByText('1 SK II')).toBeInTheDocument();
-    expect(screen.getByText('1 tot')).toBeInTheDocument();
-    /**
-     * Die tragende Hälfte: SK I, III und IV stehen in der festen Gruppenfolge, haben aber keine
-     * Zeile. Emittierte `gruppiere` sie mit Zähler 0, zöge lautlos ein „0 SK I" ein. `$`-Anker,
-     * weil „SK I" sonst in „SK II" matcht.
-     */
-    expect(screen.queryByText(/^\d+ SK I$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^\d+ SK III$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^\d+ SK IV$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/^\d+ ohne Sichtung$/)).not.toBeInTheDocument();
+    await waitFor(() => expect(boardZahl('sk2')).toBe('1'));
+    expect(boardZahl('sk1')).toBe('0');
+    expect(boardZahl('sk3')).toBe('0');
+    expect(boardZahl('ohne')).toBe('0');
   });
 
   it('trägt die Zeit in den Kartenzweig und ersetzt dort die Abgleich-Zelle durch einen Dialog', async () => {
@@ -1889,5 +1879,32 @@ describe('PersonenPage — Listenzugriffe (LFH-916)', () => {
     const kopf = await kopfAktionen();
     expect(within(kopf).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
     expect(within(kopf).queryByRole('button', { name: 'Listenzugriffe' })).toBeNull();
+  });
+});
+
+describe('PersonenPage — Abgeschlossene (LLH-1332)', () => {
+  const entlassen: Person = {
+    ...person,
+    id: 12,
+    registrier_nr: 3,
+    name: 'Entlassen',
+    status: 'betroffen',
+    versorgung: 'abgeschlossen',
+    aktuelle_verbleib_art: 'entlassung',
+    aktueller_verbleib: 'Entlassung vor Ort',
+  };
+
+  it('ohne Abgeschlossene fehlt der Schalter', async () => {
+    render(einsatzAktiv, [person]);
+    expect(await screen.findByText('Mustermann, Max')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Abgeschlossene zeigen/ })).toBeNull();
+  });
+
+  it('mit Abgeschlossenen nennt der Schalter die Zahl und holt sie zurück', async () => {
+    render(einsatzAktiv, [person, entlassen]);
+    const schalter = await screen.findByRole('checkbox', { name: 'Abgeschlossene zeigen (1)' });
+    expect(screen.queryByText(/^Entlassen/)).toBeNull();
+    await userEvent.click(schalter);
+    expect(await screen.findByText(/^Entlassen/)).toBeInTheDocument();
   });
 });

@@ -23,11 +23,18 @@ export function istPatient(p: { aktuelle_sichtung?: Sichtungskategorie | null })
 }
 
 /** Einzeilige Kurzfassung eines Verbleib-Eintrags für den Personen-Verlauf. */
-export function kurzVerbleib(v: Pick<Verbleib, 'art' | 'ziel' | 'transportmittel'>): string {
+export function kurzVerbleib(
+  v: Pick<Verbleib, 'art' | 'ziel' | 'transportmittel'> &
+    Partial<Pick<Verbleib, 'status' | 'transport_durch'>>,
+): string {
   const ziel = v.ziel ? ` → ${v.ziel}` : '';
   const tm = v.transportmittel ? ` (${v.transportmittel})` : '';
   switch (v.art) {
     case 'transport':
+      // Eigentransport und quittierte Übergabe heißen so (LLH-1332, wie die Kurzform des Servers).
+      if (v.transport_durch === 'eigen') {
+        return v.status === 'uebergeben' ? `übergeben${ziel}${tm}` : `Eigentransport${ziel}${tm}`;
+      }
       return `Transport${ziel}${tm}`;
     case 'entlassung':
       return 'entlassen';

@@ -621,6 +621,51 @@ pub async fn require_nicht_beendet(
     }
 }
 
+/// Fahrzeug eines Eigentransports (LLH-1332, design.md D2): Funkrufname für die Momentaufnahme
+/// und die Lebenszeit der Disposition, gegen die der Verbleib-Handler die Erfassungszeit prüft.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TransportFahrzeug {
+    pub funkrufname: String,
+    pub disponiert_at: String,
+    pub beendet_at: Option<String>,
+    pub beendet_als: Option<String>,
+}
+
+impl TransportFahrzeug {
+    /// Bestand die Disposition zur Erfassungszeit? Stornierte gelten als nie disponiert; eine
+    /// entlassene nur bis zu ihrer Entlassung. Beide Zeiten im kanonischen Format.
+    pub fn bestand_zu(&self, zeitpunkt_at: &str) -> bool {
+        if self.beendet_als.as_deref() == Some(BeendetAls::Storniert.as_str()) {
+            return false;
+        }
+        self.disponiert_at.as_str() <= zeitpunkt_at
+            && self
+                .beendet_at
+                .as_deref()
+                .is_none_or(|ende| zeitpunkt_at < ende)
+    }
+}
+
+/// Lädt eine Disposition dieses Einsatzes für einen Eigentransport; `None` bei fremder oder
+/// unbekannter Kennung. Liest auch beendete Zeilen: eine vorgemerkte Übergabe kommt womöglich
+/// nach der Entlassung des Fahrzeugs an.
+pub async fn transport_fahrzeug(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    einsatz_id: i64,
+    ef_id: i64,
+) -> Result<Option<TransportFahrzeug>, AppError> {
+    Ok(sqlx::query_as::<_, TransportFahrzeug>(
+        "SELECT COALESCE(f.funkrufname, ef.snap_funkrufname) AS funkrufname, ef.disponiert_at, \
+                ef.beendet_at, ef.beendet_als \
+         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ef.id = ? AND ef.einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .fetch_optional(executor)
+    .await?)
+}
+
 /// Was das Entlassen eines Fahrzeugs über die Zeile hinaus berührt hat; der Aufrufer meldet es
 /// nach dem Commit und nennt die Einheit im ETB-Text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

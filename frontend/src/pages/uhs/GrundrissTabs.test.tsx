@@ -45,6 +45,7 @@ function person(over: Partial<Person>): Person {
     geaendert_at: 'x',
     geaendert_von: 1,
     storniert_at: null,
+    versorgung: 'offen',
     aktuelle_sichtung: null,
     aktuelle_sichtung_at: null,
     aktueller_verbleib: null,
@@ -198,7 +199,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     // Beide Seitenspalten und die Fläche gleichzeitig im Baum — die Aussage „nebeneinander".
     expect(await screen.findByText('Noch nicht aufgenommen')).toBeInTheDocument();
     expect(screen.getByText('Wartebereich (Eingang)')).toBeInTheDocument();
-    expect(screen.getByText('Auf Transport gebracht')).toBeInTheDocument();
+    expect(screen.getByText('Unterwegs')).toBeInTheDocument();
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
     // Beide Richtungen, sonst bliebe der Test grün, wenn der breite Zweig selbst stapelte. Prüfbar
     // ist der Inline-Style.
@@ -217,7 +218,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
       'true',
     );
     expect(within(reiter).getByRole('tab', { name: 'Wartebereich' })).toBeInTheDocument();
-    expect(within(reiter).getByRole('tab', { name: 'Transport' })).toBeInTheDocument();
+    expect(within(reiter).getByRole('tab', { name: 'Unterwegs' })).toBeInTheDocument();
   });
 
   it('hält in der Reiterform genau EINEN Zweig im Baum — der inaktive Reiter ist nicht bloß verborgen', async () => {
@@ -388,7 +389,7 @@ describe('Grundriss — Breakpoint-Weiche (LFH-341 · H40)', () => {
     }
   });
 
-  it('öffnet damit denselben Verbleib-Dialog wie der Drag auf „Auf Transport gebracht"', async () => {
+  it('öffnet damit denselben Verbleib-Dialog wie der Drag auf „Unterwegs“', async () => {
     const { listePersonen } = await import('../../api/einsatzPerson');
     vi.mocked(listePersonen).mockResolvedValue(personenOhneBelegung);
     setzeRahmen(800, RAHMEN_SCHMAL);

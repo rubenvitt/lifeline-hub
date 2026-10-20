@@ -16,7 +16,6 @@ import {
   Dropdown,
   Flex,
   Form,
-  Input,
   InputNumber,
   Radio,
   Space,
@@ -49,17 +48,11 @@ import {
   stornierePlatz,
 } from '../../api/einsatzUhs';
 import { listePersonen, registrierAnzeige } from '../../api/einsatzPerson';
-import { useSavePersonEintrag } from '../../personen/personEintragSpeichern';
+import VerbleibErfassung from '../../personen/VerbleibErfassung';
+import { UebergabeDialog } from '../../personen/UebergabeQuittieren';
 import { useAuthOptional } from '../../auth/AuthContext';
 import { useVorgemerktePersonEintraege } from '../../offline/useVorgemerkteSchreibaktionen';
-import type {
-  Person,
-  PlatzTyp,
-  UhsDetail,
-  UhsPlatz,
-  VerbleibArt,
-  Verfuegbarkeit,
-} from '../../api/types';
+import type { Person, PlatzTyp, UhsDetail, UhsPlatz, Verfuegbarkeit } from '../../api/types';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ladePlanBild, type UhsPlan } from '../../api/uhsPlan';
 import UhsPlanPaneel from './UhsPlanPaneel';
@@ -77,7 +70,11 @@ import {
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { taktischeDtg } from '../../anzeige/format';
 import { Augenbraue, Paneel, StatusChip, monoStil, useRollen } from '../../components/instrument';
-import { rollenFarbe, verfuegbarkeit as verfuegbarkeitVertrag } from '../../theme/statusFarben';
+import {
+  rollenFarbe,
+  uebergabeOffen,
+  verfuegbarkeit as verfuegbarkeitVertrag,
+} from '../../theme/statusFarben';
 import { SpeicherFehler, ZeilenFehler } from '../../components/SpeicherHinweis';
 import { useZeilenFehler, type ZeilenGrund } from '../../components/useZeilenFehler';
 import { ZugPointerSensor } from '../../components/zugPointerSensor';
@@ -95,7 +92,12 @@ import {
   wartezeitMinuten,
   wartezeitText,
 } from './dringlichkeit';
-import { personenInUhs as personenInUhsVon, transportiertAus } from './uhsLage';
+import {
+  ausgetretenSeit,
+  personenInUhs as personenInUhsVon,
+  UEBERGABE_OFFEN_AB_MIN,
+  unterwegsAus,
+} from './uhsLage';
 
 // Feste Karten-Höhe: unter dem Raster-Zeilenabstand (`raster_position` SCHRITT_Y=120 im Backend),
 // damit absolut platzierte Karten nicht überlappen, und groß genug für den Worst Case (2-zeiliger
@@ -286,15 +288,13 @@ function personLabel(person: Person): string {
 interface PersonenkartenProps {
   person: Person | undefined;
   kompakt?: boolean;
-  /** Beginn der Wartezeit (Wire, UTC); gesetzt nur im Wartebereich (LLH-1135). */
-  wartetSeit?: string | null;
   /**
    * Test-Marke an der gerenderten Personenmarke, nur vom DragOverlay gesetzt: ohne sie ist „der
    * Drag läuft wirklich" in Playwright nicht behauptbar.
    */
   testId?: string;
 }
-function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenProps) {
+function Personenkarte({ person, kompakt, testId }: PersonenkartenProps) {
   const { token, rollen } = useRollen();
   if (!person) return null;
   /*
@@ -304,13 +304,14 @@ function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenPr
    * trägt `PersonenkarteDrag`. `data-lfh="personenkarte"` ist die Marke der e2e-Specs.
    *
    * Vorn steht die Sichtung (LLH-1135, BBK: umrandetes Farbfeld plus Wort, `SichtungsTag` in der
-   * kompakten Form, nicht höher als die Schriftzeile); sie kürzt nie, der Name endet mit „…“. Im
-   * Wartebereich steht dahinter die Wartezeit.
+   * kompakten Form, nicht höher als die Schriftzeile); sie kürzt nie. Auf der Platzkarte endet der
+   * Name mit „…“; in den Listen bricht er um und steht ungekürzt (LLH-1332, Spec `uhs-grundriss`,
+   * „Name in der schmalen Spalte“), die Wartezeit steht dort in der zweiten Zeile (`PersonenSpalte`).
    */
   const nr = registrierAnzeige(person.registrier_nr);
   const style: React.CSSProperties = {
     display: 'inline-flex',
-    alignItems: 'center',
+    alignItems: kompakt ? 'center' : 'flex-start',
     gap: token.paddingXS,
     maxWidth: kompakt ? 124 : '100%',
     // In Listen polstert die Hülle (`markenZielStil`); nur auf der Platzkarte trägt die Marke ihren
@@ -323,9 +324,9 @@ function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenPr
     color: rollen.text2,
     fontSize: token.fontSizeSM,
     lineHeight: `${Math.round(token.fontSizeSM * token.lineHeightSM)}px`,
-    whiteSpace: 'nowrap',
     // `kompakt` (auf der Platzkarte): einzeilig mit Ellipsis, damit die absolut positionierte Karte
     // unabhängig von der Namenslänge ihre Höhe hält.
+    whiteSpace: kompakt ? 'nowrap' : 'normal',
     overflow: 'hidden',
     verticalAlign: 'top',
   };
@@ -336,19 +337,21 @@ function Personenkarte({ person, kompakt, testId, wartetSeit }: PersonenkartenPr
       style={style}
       title={kompakt ? personLabel(person) : undefined}
     >
-      <SichtungsTag kategorie={person.aktuelle_sichtung ?? null} form="kompakt" />
+      <span style={{ flex: 'none', whiteSpace: 'nowrap', display: 'inline-flex' }}>
+        <SichtungsTag kategorie={person.aktuelle_sichtung ?? null} form="kompakt" />
+      </span>
       {/* Leerzeichen für den zugänglichen Namen; im Flex-Behälter zeichnet es nicht. */}{' '}
-      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        <span style={monoStil(token.fontSizeSM)}>{nr}</span>
+      <span
+        style={
+          kompakt
+            ? { minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }
+            : { minWidth: 0, overflowWrap: 'anywhere' }
+        }
+      >
+        <span style={{ ...monoStil(token.fontSizeSM), whiteSpace: 'nowrap' }}>{nr}</span>
         {/* `||` wie in `personLabel`: ein leerer Name ist „unbekannt“, nicht „R-007 · “. */}
         {` · ${person.name || 'unbekannt'}`}
       </span>
-      {wartetSeit && (
-        <>
-          {' '}
-          <Wartezeit seit={wartetSeit} />
-        </>
-      )}
     </span>
   );
 }
@@ -374,9 +377,10 @@ function VerbleibVorgemerkt() {
  * Wartezeit „12 min“ im Takt der vollen Minute (`useMinutenTakt`), Mono; der Beginn steht als
  * taktische Zeit im Titel (LLH-1135). Eigene Komponente, damit nur sie im Minutentakt zeichnet.
  */
-function Wartezeit({ seit }: { seit: string }) {
+function Wartezeit({ seit, vorwort }: { seit: string; vorwort?: string }) {
   const jetzt = useMinutenTakt();
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
   const { konventionen } = useAnzeigeKonventionen();
   const minuten = wartezeitMinuten(seit, jetzt);
   if (minuten == null) return null;
@@ -384,9 +388,10 @@ function Wartezeit({ seit }: { seit: string }) {
     <span
       data-lfh="wartezeit"
       title={`seit ${taktischeDtg(seit, konventionen)}`}
-      style={{ ...monoStil(token.fontSizeSM), flex: 'none' }}
+      style={{ flex: 'none', fontSize: token.fontSizeSM, color: rollen.text2 }}
     >
-      {wartezeitText(minuten)}
+      {vorwort && `${vorwort} `}
+      <span style={monoStil(token.fontSizeSM)}>{wartezeitText(minuten)}</span>
     </span>
   );
 }
@@ -397,12 +402,10 @@ function PersonenkarteDrag({
   kompakt,
   onOeffnen,
   keinZiel,
-  wartetSeit,
 }: {
   person: Person;
   disabled: boolean;
   kompakt?: boolean;
-  wartetSeit?: string | null;
   onOeffnen?: (personId: number) => void;
   /**
    * Die Marke liegt in einem Auslöser, der selbst das Ziel ist (Kartenform). `useDraggable` setzt
@@ -462,7 +465,7 @@ function PersonenkarteDrag({
       style={style}
       onClick={onOeffnen ? () => onOeffnen(person.id) : undefined}
     >
-      <Personenkarte person={person} kompakt={kompakt} wartetSeit={wartetSeit} />
+      <Personenkarte person={person} kompakt={kompakt} />
     </div>
   );
 }
@@ -861,7 +864,10 @@ function PersonenSpalte({
   onVerbleib?: (person: Person) => void;
   /** Grund einer abgelehnten Ablage in dieser Spalte (Ziehen in den Wartebereich). */
   fehler?: ZeilenGrund | null;
-  /** Beginn der Wartezeit je Person; gesetzt, zeigt die Marke die Wartezeit (LLH-1135). */
+  /**
+   * Beginn der Wartezeit je Person (LLH-1135); gesetzt, steht „wartet 12 min“ in der zweiten
+   * Zeile. Sonst steht dort die Zeit seit der Erfassung (LLH-1332).
+   */
   wartetSeitVon?: (person: Person) => string | null;
   /**
    * Die Liste ist nach Dringlichkeit sortiert und hält ihre Folge, solange Zeiger oder Fokus darin
@@ -916,42 +922,73 @@ function PersonenSpalte({
         {...(schleuse ? bereich : {})}
         style={{ minHeight: 48, display: 'flex', flexDirection: 'column', gap: token.marginXS }}
       >
-        {gezeigt.map((p) => (
-          <div
-            key={p.id}
-            data-testid="personen-zeile"
-            style={{ display: 'flex', alignItems: 'center', gap: token.marginXS }}
-          >
-            <PersonenkarteDrag
-              person={p}
-              disabled={schreibgeschuetzt || belegungLaeuft}
-              onOeffnen={onOeffnen}
-              wartetSeit={wartetSeitVon?.(p)}
-            />
-            {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
-            {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in keinem
-                klickbaren Vorfahren und braucht keinen `stopPropagation`-/`onPointerDown`-Riegel.
-                Ein antd-`Button` ohne `size` erbt `controlHeight`. Das Wort steht sichtbar, kein
-                Tooltip: auf Touch gibt es keinen, und ein Auto-Symbol allein las sich als
-                Statusmarke (LFH-970, U73). Der Name trägt die Zeilenkennung und beginnt mit dem
-                sichtbaren Wort; das Icon steckt in einer `aria-hidden`-Hülle, weil antd-Icons ein
-                eigenes englisches `aria-label` mitbringen. */}
-            {onVerbleib && (
-              <Button
-                aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
-                icon={
-                  <span aria-hidden="true">
-                    <IconAuto />
-                  </span>
-                }
-                style={{ flexShrink: 0 }}
-                onClick={() => onVerbleib(p)}
+        {gezeigt.map((p) => {
+          const wartet = wartetSeitVon?.(p);
+          return (
+            /* Zwei Zeilen (LLH-1332, Spec `uhs-grundriss`, „Personenzeile“): oben die Marke über
+               die volle Spaltenbreite — Sichtung, Kennung und Name lesen sich ungekürzt —, unten
+               Wartezeit bzw. Zeit seit der Erfassung und „Verbleib“. Vorher teilte sich die Marke
+               die 240-px-Zeile mit dem Wortknopf und endete nach der Kennung mit „…“. */
+            <div
+              key={p.id}
+              data-testid="personen-zeile"
+              style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
+            >
+              <PersonenkarteDrag
+                person={p}
+                disabled={schreibgeschuetzt || belegungLaeuft}
+                onOeffnen={onOeffnen}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: token.marginXS,
+                  minWidth: 0,
+                }}
               >
-                Verbleib
-              </Button>
-            )}
-          </div>
-        ))}
+                <span
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: token.marginXS,
+                    minWidth: 0,
+                  }}
+                >
+                  {wartet ? (
+                    <Wartezeit seit={wartet} vorwort="wartet" />
+                  ) : (
+                    <Wartezeit seit={p.erfasst_at} vorwort="erfasst vor" />
+                  )}
+                  {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
+                </span>
+                {/* Geschwisterknoten der Drag-Karte, nicht ihr Kind: so hängt der Auslöser in
+                    keinem klickbaren Vorfahren und braucht keinen `stopPropagation`-Riegel. Ein
+                    antd-`Button` ohne `size` erbt `controlHeight`. Das Wort steht sichtbar, kein
+                    Tooltip: auf Touch gibt es keinen, und ein Auto-Symbol allein las sich als
+                    Statusmarke (LFH-970, U73). Der Name trägt die Zeilenkennung und beginnt mit
+                    dem sichtbaren Wort; das Icon steckt in einer `aria-hidden`-Hülle, weil
+                    antd-Icons ein eigenes englisches `aria-label` mitbringen. */}
+                {onVerbleib && (
+                  <Button
+                    aria-label={`Verbleib / Entlassung erfassen — ${personLabel(p)}`}
+                    icon={
+                      <span aria-hidden="true">
+                        <IconAuto />
+                      </span>
+                    }
+                    style={{ flexShrink: 0 }}
+                    onClick={() => onVerbleib(p)}
+                  >
+                    Verbleib
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
         {personen.length === 0 && <Typography.Text type="secondary">{leerText}</Typography.Text>}
         {fehler && <ZeilenFehler fehler={fehler.fehler} fallback={fehler.fallback} />}
       </div>
@@ -960,23 +997,32 @@ function PersonenSpalte({
 }
 
 /**
- * Rechte Spalte: aus dieser UHS heraus auf Transport gebrachte Personen. Drop-Target: eine belegte
- * Person hierher ziehen öffnet den Transport-Abschluss-Screen.
+ * Rechte Spalte „Unterwegs“ (LLH-1332, Spec `uhs-grundriss`): aus dieser UHS heraus im
+ * Eigentransport, Übergabe noch nicht quittiert. Wer an ein fremdes Rettungsmittel übergeben ist,
+ * ist abgeschlossen und steht hier nicht. Drop-Target: eine Person hierher ziehen öffnet die
+ * Verbleib-Maske mit der Art Transport.
  */
-function TransportSpalte({
+function UnterwegsSpalte({
   personen,
+  belegungen,
   schreibgeschuetzt,
   belegungLaeuft,
   onOeffnen,
+  onUebergabe,
+  vorgemerkt,
 }: {
   personen: Person[];
+  belegungen: UhsDetail['belegungen'];
   schreibgeschuetzt: boolean;
   belegungLaeuft: boolean;
   onOeffnen: (personId: number) => void;
+  /** Nicht gesetzt heißt kein Schreibrecht: dann steht kein Auslöser da. */
+  onUebergabe?: (person: Person) => void;
+  /** Personen mit ohne Netz vorgemerktem Verbleib, etwa einer Übergabe: die Zeile sagt es. */
+  vorgemerkt?: ReadonlySet<number>;
 }) {
-  // Das Drop-Target ruht während einer Belegung — nicht wegen derselben Mutation (`kind:
-  // 'transport'` führt auf `erfasseVerbleib`), sondern weil die Quelle dann ohnehin nicht ziehbar
-  // ist und ein Ziel ohne Quelle eine Einladung ins Leere wäre.
+  // Das Drop-Target ruht während einer Belegung — nicht wegen derselben Mutation, sondern weil die
+  // Quelle dann ohnehin nicht ziehbar ist und ein Ziel ohne Quelle eine Einladung ins Leere wäre.
   const gesperrt = schreibgeschuetzt || belegungLaeuft;
   const drop = useDroppable({
     id: 'drop-transport',
@@ -984,41 +1030,85 @@ function TransportSpalte({
     disabled: gesperrt,
   });
   const { token } = theme.useToken();
+  const { rollen } = useRollen();
+  const jetzt = useMinutenTakt();
   return (
     <Paneel
-      titel="Auf Transport gebracht"
+      titel="Unterwegs"
       ueberschrift="h3"
       meta={personen.length}
       koerperPolster
       style={{ background: !gesperrt && drop.isOver ? token.colorPrimaryBg : undefined }}
     >
-      <div ref={gesperrt ? undefined : drop.setNodeRef} style={{ minHeight: 48 }}>
-        {personen.map((p) => (
-          <div key={p.id} style={{ marginBottom: 6 }}>
-            {/* Ein echter Knopf statt eines klickbaren `Tag` (`<span onClick>` ohne Rolle und
-                Tastaturweg). `type="link"` erbt die Steuerhöhe. */}
-            <Button
-              type="link"
-              style={{ ...monoStil(12), paddingInline: 0 }}
-              onClick={() => onOeffnen(p.id)}
+      <div
+        ref={gesperrt ? undefined : drop.setNodeRef}
+        style={{ minHeight: 48, display: 'flex', flexDirection: 'column', gap: token.marginSM }}
+      >
+        {personen.map((p) => {
+          const seit = ausgetretenSeit(p.id, belegungen);
+          const minuten = seit ? wartezeitMinuten(seit, jetzt) : null;
+          return (
+            <div
+              key={p.id}
+              data-testid="unterwegs-zeile"
+              style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
             >
-              {/* Die Sichtung auch hier (LLH-1135): jede Personenmarke im Grundriss trägt sie. */}
-              <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
-              {personLabel(p)}
-            </Button>{' '}
-            {/* Die Priorität als neutrale Marke neben dem Knopf (LLH-1325, design.md D10); die
-                Spalte sortiert deshalb nicht neu. */}
-            <PrioritaetMarke prioritaet={p.transport_prioritaet} />
-            {p.aktueller_verbleib && (
-              <div>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {/* Ein echter Knopf statt eines klickbaren `Tag` (`<span onClick>` ohne Rolle und
+                  Tastaturweg). `type="link"` erbt die Steuerhöhe. */}
+              <Button
+                type="link"
+                style={{
+                  ...monoStil(12),
+                  paddingInline: 0,
+                  justifyContent: 'flex-start',
+                  maxWidth: '100%',
+                }}
+                onClick={() => onOeffnen(p.id)}
+              >
+                {/* Die Sichtung auch hier (LLH-1135): jede Personenmarke im Grundriss trägt sie. */}
+                <SichtungsTag kategorie={p.aktuelle_sichtung ?? null} form="kompakt" />{' '}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {personLabel(p)}
+                </span>
+              </Button>
+              {/* Fahrzeug und Ziel aus der Kurzform des Servers („Eigentransport 1/83-1 → KH“). */}
+              {p.aktueller_verbleib && (
+                <Typography.Text type="secondary" style={{ fontSize: token.fontSizeSM }}>
                   {p.aktueller_verbleib}
                 </Typography.Text>
+              )}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: token.marginXS,
+                  color: rollen.text2,
+                  fontSize: token.fontSizeSM,
+                }}
+              >
+                {/* Die Priorität als neutrale Marke (LLH-1325, design.md D10); die Spalte
+                    sortiert deshalb nicht neu. */}
+                <PrioritaetMarke prioritaet={p.transport_prioritaet} />
+                {seit && <Wartezeit seit={seit} vorwort="seit" />}
+                {minuten != null && minuten >= UEBERGABE_OFFEN_AB_MIN && (
+                  <StatusTag darstellung={uebergabeOffen} />
+                )}
+                {vorgemerkt?.has(p.id) && <VerbleibVorgemerkt />}
               </div>
-            )}
-          </div>
-        ))}
-        {personen.length === 0 && <Typography.Text type="secondary">keine</Typography.Text>}
+              {onUebergabe && (
+                <Button
+                  aria-label={`Übergabe quittieren — ${personLabel(p)}`}
+                  style={{ alignSelf: 'flex-start' }}
+                  onClick={() => onUebergabe(p)}
+                >
+                  Übergabe quittieren
+                </Button>
+              )}
+            </div>
+          );
+        })}
+        {personen.length === 0 && <Typography.Text type="secondary">niemand</Typography.Text>}
       </div>
     </Paneel>
   );
@@ -1073,9 +1163,6 @@ function UeberlaufKante({
     </div>
   );
 }
-
-/** Felder des Abschluss-Screens „Verbleib erfassen". */
-type VerbleibWerte = { art: VerbleibArt; ziel?: string; transportmittel?: string; notiz?: string };
 
 /** Einziges Feld des Klick-Zuweisungswegs. */
 type ZuweisenWerte = { personId: number };
@@ -1231,7 +1318,8 @@ export default function Grundriss({
 
   // Zielperson des „Verbleib erfassen"-Abschluss-Screens (null = geschlossen).
   const [transportPerson, setTransportPerson] = useState<Person | null>(null);
-  const [transportForm] = Form.useForm<VerbleibWerte>();
+  // Zielperson von „Übergabe quittieren“ aus „Unterwegs“ (null = geschlossen).
+  const [uebergabePerson, setUebergabePerson] = useState<Person | null>(null);
 
   // Klick auf eine Patientenkarte öffnet den Detail-Drawer (nur ansehen).
   const [detailPersonId, setDetailPersonId] = useState<number | null>(null);
@@ -1284,10 +1372,9 @@ export default function Grundriss({
   ];
   const zuweisenKandidaten = gehalteneFolge(zuweisenFolge, zuweisbarePersonen, personSchluessel);
 
-  // Rechte Spalte: Personen, die aus dieser UHS auf Transport gingen — Austritts-Historie
-  // (`uhs.belegungen`) ∩ aktueller Verbleib „Transport".
+  // Rechte Spalte „Unterwegs“: aus dieser UHS im Eigentransport, Übergabe offen (LLH-1332).
   // Dieselbe Menge zählt die Lage der Stelle (`uhsLage.ts`, LLH-1136).
-  const transportiert = transportiertAus(uhs, personen);
+  const unterwegs = unterwegsAus(uhs, personen);
 
   // Innenfläche so groß, dass alle Plätze hineinpassen — sie scrollt innerhalb der Mittelspalte.
   const maxX = Math.max(0, ...uhs.plaetze.map((p) => p.pos_x ?? 0));
@@ -1463,12 +1550,11 @@ export default function Grundriss({
     onSuccess: () => invalidate(),
     onError: (e, { platzId }) => platzFehler.melde(platzId, e, 'Zurückweisen fehlgeschlagen'),
   });
-  // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben). Der Server trägt die Person
-  // aus der UHS aus (Auto-Austritt); bei Transport wandert sie nach rechts.
-  // `status=abtransportiert` nur bei Transport, sonst null — wie in der PersonenPage.
-  // Ohne Netz merkt der Schreibweg vor (LLH-1138, design.md D8; `networkMode: 'always'`, Regel in
+  // Verbleib erfassen (Transport / Entlassung / vor Ort / verstorben) über DIESELBE Maske wie die
+  // Betroffenenliste (`personen/VerbleibErfassung`, LLH-1332 design.md D5). Der Server trägt die
+  // Person aus der UHS aus (Auto-Austritt); im Eigentransport wandert sie nach rechts in
+  // „Unterwegs“. Ohne Netz merkt der Schreibweg vor (LLH-1138, design.md D8, Regel in
   // `frontend/src/offline/AGENTS.md`): die Person bleibt dann, wo sie steht, bis der Abgleich sendet.
-  const saveVerbleib = useSavePersonEintrag();
   // Vorgemerkte Verbleibe zeigt der Ort, nicht nur die Meldung (`frontend/src/offline/AGENTS.md`).
   const benutzerId = useAuthOptional()?.benutzer?.id;
   const vorgemerkteEintraege = useVorgemerktePersonEintraege(benutzerId, einsatzId);
@@ -1481,32 +1567,6 @@ export default function Grundriss({
       ),
     [vorgemerkteEintraege],
   );
-  const transportMut = useMutation({
-    networkMode: 'always',
-    mutationFn: ({
-      person,
-      art,
-      ziel,
-      transportmittel,
-      notiz,
-    }: VerbleibWerte & { person: Person }) =>
-      saveVerbleib(einsatzId, person, 'verbleib', {
-        art,
-        ziel: ziel ?? null,
-        transportmittel: transportmittel ?? null,
-        status: art === 'transport' ? 'abtransportiert' : null,
-        notiz: notiz ?? null,
-      }),
-    // Schließen und Leeren macht die Erfassungshülle, sie zeigt auch die Ablehnung.
-    onSuccess: (ergebnis, { person }) => {
-      if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Verbleib ${registrierAnzeige(person.registrier_nr)}`);
-        return;
-      }
-      message.success('Verbleib erfasst');
-      invalidate();
-    },
-  });
   const verfMut = useMutation({
     mutationFn: ({ platzId, verf }: { platzId: number; verf: Verfuegbarkeit }) =>
       setzePlatzVerfuegbarkeit(einsatzId, uhs.id, platzId, verf, null),
@@ -1777,11 +1837,14 @@ export default function Grundriss({
   // Reiterinhalt, eine lange Liste liefe sonst über den Reiter hinaus.
   const transport = (
     <div style={{ height: '100%', minHeight: 0, overflow: 'auto' }}>
-      <TransportSpalte
-        personen={transportiert}
+      <UnterwegsSpalte
+        personen={unterwegs}
+        belegungen={uhs.belegungen}
         schreibgeschuetzt={schreibgeschuetzt}
         belegungLaeuft={belegungLaeuft}
         onOeffnen={setDetailPersonId}
+        onUebergabe={schreibgeschuetzt ? undefined : setUebergabePerson}
+        vorgemerkt={verbleibVorgemerkt}
       />
     </div>
   );
@@ -1814,7 +1877,7 @@ export default function Grundriss({
             </div>
             {/* Mitte: Unfallhilfsstelle */}
             {flaeche}
-            {/* Rechts: Auf Transport gebracht */}
+            {/* Rechts: Unterwegs */}
             <div style={{ width: SEITENSPALTE_BREITE, flexShrink: 0, minHeight: 0 }}>
               {transport}
             </div>
@@ -1856,7 +1919,7 @@ export default function Grundriss({
               items={[
                 { key: 'flaeche', label: 'Fläche', children: flaeche },
                 { key: 'warte', label: 'Wartebereich', children: wartebereich },
-                { key: 'transport', label: 'Transport', children: transport },
+                { key: 'transport', label: 'Unterwegs', children: transport },
               ]}
             />
           </div>
@@ -1867,53 +1930,46 @@ export default function Grundriss({
         {aktivePerson ? <Personenkarte person={aktivePerson} testId="drag-overlay" /> : null}
       </DragOverlay>
 
-      {/* Abschluss-Screen „Verbleib erfassen" — Art vorbelegt mit Transport. Kein Serienmodus:
-          ein Verbleib je Patient.
-
-          „Ziel" steht vor „Art", weil die Hülle das erste Feld fokussiert und „Art" schon
-          vorbelegt ist. Wer umsortiert, verschiebt den Fokus. */}
-      <ErfassungsModal<VerbleibWerte>
-        offen={transportPerson != null}
-        titel={
-          transportPerson
-            ? `Verbleib erfassen — ${personLabel(transportPerson)}`
-            : 'Verbleib erfassen'
-        }
-        form={transportForm}
-        initialValues={{ art: 'transport' }}
-        laeuft={transportMut.isPending}
-        speicherung={transportMut}
-        speicherFehlerTitel="Verbleib nicht erfasst"
-        onErfassen={async (werte) => {
-          // Der Dialog ist nur offen, solange eine Zielperson steht; die Prüfung engt den Typ ein.
-          if (!transportPerson) return;
-          await transportMut.mutateAsync({ person: transportPerson, ...werte });
-        }}
-        onFertig={() => setTransportPerson(null)}
-        onAbbrechen={() => setTransportPerson(null)}
-      >
-        <Form.Item label="Ziel" name="ziel">
-          <Input placeholder="z. B. Krankenhaus" />
-        </Form.Item>
-        <Form.Item label="Art" name="art" rules={[{ required: true }]}>
-          <Select
-            options={[
-              { value: 'transport', label: 'Transport' },
-              // Beendet den UHS-Aufenthalt wie Transport und Entlassung.
-              { value: 'notunterkunft', label: 'Notunterkunft' },
-              { value: 'entlassung', label: 'Entlassung vor Ort' },
-              { value: 'vor_ort', label: 'verbleibt vor Ort' },
-              { value: 'verstorben', label: 'Verbleib des Leichnams' },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item label="Transportmittel (RTW/KTW …)" name="transportmittel">
-          <Input />
-        </Form.Item>
-        <Form.Item label="Notiz" name="notiz">
-          <Input.TextArea rows={2} />
-        </Form.Item>
-      </ErfassungsModal>
+      {/* Abschluss-Screen „Verbleib erfassen“ — Art vorbelegt mit Transport, dieselbe Maske wie
+          in der Betroffenenliste (Rettungsmittel, Betreuungsstelle, „Bestätigt von“). Kein
+          Serienmodus: ein Verbleib je Patient. Montiert = offen. */}
+      {transportPerson && (
+        <VerbleibErfassung
+          key={transportPerson.id}
+          einsatzId={einsatzId}
+          person={transportPerson}
+          titel={`Verbleib erfassen — ${personLabel(transportPerson)}`}
+          vorbelegung={{ art: 'transport' }}
+          onErfasst={() => {
+            message.success('Verbleib erfasst');
+            void invalidate();
+          }}
+          onVorgemerkt={() =>
+            message.warning(
+              `Offline vorgemerkt: Verbleib ${registrierAnzeige(transportPerson.registrier_nr)}`,
+            )
+          }
+          onSchliessen={() => setTransportPerson(null)}
+        />
+      )}
+      {/* „Übergabe quittieren“ aus der Spalte „Unterwegs“ (LLH-1332, design.md D6). */}
+      {uebergabePerson && (
+        <UebergabeDialog
+          key={uebergabePerson.id}
+          einsatzId={einsatzId}
+          person={uebergabePerson}
+          onErfasst={() => {
+            message.success('Übergabe quittiert');
+            void invalidate();
+          }}
+          onVorgemerkt={() =>
+            message.warning(
+              `Offline vorgemerkt: Übergabe ${registrierAnzeige(uebergabePerson.registrier_nr)}`,
+            )
+          }
+          onSchliessen={() => setUebergabePerson(null)}
+        />
+      )}
 
       {/* Klick-Zuweisungsweg, der Ersatz für das Ziehen auf den Platz. Ein Feld, der Platz steht
           im Titel. Kein Serienmodus: der Zielplatz ist je Vorgang ein anderer.

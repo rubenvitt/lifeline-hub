@@ -59,6 +59,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       EINSATZ_KEYS.betreuung,
       EINSATZ_KEYS.personAnhaenge,
+      // Bisher verwendete Rettungsmittel (LLH-1332).
+      EINSATZ_KEYS.personenTransportmittel,
     ]);
   });
 
@@ -91,6 +93,8 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.kraefteZeitachse,
       // Der Zustand jedes Fahrzeugs einer Vorlage im Einsatz (LLH-1049).
       EINSATZ_KEYS.einheitAusVorlage,
+      // „Im Einsatz“ der Verbleib-Maske (LLH-1332).
+      EINSATZ_KEYS.personenTransportmittel,
     ]);
   });
 

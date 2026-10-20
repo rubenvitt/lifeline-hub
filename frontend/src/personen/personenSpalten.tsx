@@ -225,7 +225,7 @@ export function vorgemerktJePerson(
 }
 
 /** Die Handlungen des Zeilenmenüs. */
-export type PersonZeilenAktion = 'sichten' | 'verbleib' | 'verorten';
+export type PersonZeilenAktion = 'sichten' | 'verbleib' | 'uebergabe' | 'verorten';
 
 export interface PersonenZeilenMenue {
   /** Breite der Aktionsspalte: Steuerhöhe der Dichte plus Zellpolster beidseits. */
@@ -239,8 +239,9 @@ export interface PersonenZeilenMenue {
 const VERORTEN = 'Auf Lagekarte verorten';
 
 /**
- * Die Einträge des Zeilenmenüs einer Person (LLH-1130, design.md D3): „Sichten“, „Verbleib
- * erfassen“, „Auf Lagekarte verorten“. Nur für eine angetroffene, nicht stornierte Person und nur
+ * Die Einträge des Zeilenmenüs einer Person (LLH-1130, design.md D3): „Sichten“, bei einem
+ * Patienten im Eigentransport „Übergabe quittieren“ (LLH-1332), „Verbleib erfassen“, „Auf
+ * Lagekarte verorten“. Nur für eine angetroffene, nicht stornierte Person und nur
  * mit Schreibrecht; eine gesperrte Lagekarte steht gesperrt mit Grund da (M16). Gebündelt wird ab
  * drei Einträgen (`frontend/AGENTS.md`, „Datensatz-Aktionen werden gebündelt“); darunter gibt es
  * kein Menü, Sichtung und Verbleib bleiben in ihren Zellen.
@@ -254,6 +255,10 @@ export function zeilenMenueEintraege(
   const eintraege: MenueEintrag<PersonZeilenAktion>[] = [
     ...((bedienung.darfSichten ?? bedienung.darfSchreiben)
       ? [{ key: 'sichten' as const, label: 'Sichten' }]
+      : []),
+    // Ein Eigentransport endet mit der quittierten Übergabe (LLH-1332, design.md D6).
+    ...(bedienung.onVerbleib && p.versorgung === 'unterwegs'
+      ? [{ key: 'uebergabe' as const, label: 'Übergabe quittieren' }]
       : []),
     ...(bedienung.onVerbleib ? [{ key: 'verbleib' as const, label: 'Verbleib erfassen' }] : []),
     menue.lagekarte === 'gesperrt'
@@ -372,7 +377,10 @@ function ZustandZelle({ p, bedienung }: { p: Person; bedienung?: PersonenBedienu
 
 /** Verbleib-Anzeige: Kurzform (sonst Wort) der Art, sonst die aktuelle UHS, sonst „—". */
 export function verbleibText(
-  p: Pick<Person, 'aktuelle_verbleib_art' | 'aktueller_verbleib' | 'aktuelle_uhs_id'>,
+  p: Pick<
+    Person,
+    'aktuelle_verbleib_art' | 'aktueller_verbleib' | 'aktuelle_uhs_id' | 'versorgung'
+  >,
   uhsName: (id: number) => string | undefined,
 ): string | null {
   const k = verbleibKlasse(p);

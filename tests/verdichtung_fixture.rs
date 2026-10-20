@@ -12,6 +12,10 @@ use lifeline_hub::einsatz::zaehler::{
 };
 use lifeline_hub::entlassung::BeendetAls;
 use lifeline_hub::meldung::MeldungStatus;
+use lifeline_hub::person::{
+    versorgung_von, zaehle_lage_sichtung, PersonStatus, Sichtungskategorie, TransportDurch,
+    VerbleibArt, VerbleibStatus, Versorgung,
+};
 use lifeline_hub::staerke::{Staerke, StaerkePosition};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -172,5 +176,52 @@ fn kraefte_zaehlen_nur_aktive_wie_das_fixture() {
             personal: zahl(&e["personal"]),
             staerke: staerke(&e["staerke"]),
         }
+    );
+}
+
+#[test]
+fn versorgung_und_lagesichtung_wie_das_fixture() {
+    let fx = fixture();
+    let v = &fx["versorgung"];
+    let mut zeilen = Vec::new();
+    for f in v["faelle"].as_array().unwrap() {
+        let art = f["art"]
+            .as_str()
+            .map(|s| VerbleibArt::parse(s).expect("bekannte Art"));
+        let status = f["status"]
+            .as_str()
+            .map(|s| VerbleibStatus::parse(s).expect("bekannter Status"));
+        let durch = f["durch"]
+            .as_str()
+            .map(|s| TransportDurch::parse(s).expect("bekannte Fahrer-Angabe"));
+        let person = PersonStatus::parse(f["person_status"].as_str().unwrap_or("betroffen"))
+            .expect("bekannter Personenstatus");
+        let versorgung = versorgung_von(person, art, status, durch);
+        assert_eq!(
+            versorgung.as_str(),
+            f["versorgung"].as_str().unwrap(),
+            "Versorgung im Fall „{}“",
+            f["name"]
+        );
+        let sichtung = f["sichtung"]
+            .as_str()
+            .map(|s| Sichtungskategorie::parse(s).expect("bekannte Sichtung"));
+        zeilen.push((sichtung, versorgung));
+    }
+    let e = &v["erwartet"];
+    let je = |z: Versorgung| zeilen.iter().filter(|(_, v)| *v == z).count() as i64;
+    assert_eq!(je(Versorgung::Offen), zahl(&e["offen"]));
+    assert_eq!(je(Versorgung::Unterwegs), zahl(&e["unterwegs"]));
+    assert_eq!(je(Versorgung::Abgeschlossen), zahl(&e["abgeschlossen"]));
+    let lage = zaehle_lage_sichtung(zeilen);
+    assert_eq!(lage.patienten(), zahl(&e["patienten"]));
+    assert_eq!(
+        [lage.sk1, lage.sk2, lage.sk3, lage.sk4],
+        [
+            zahl(&e["sk1"]),
+            zahl(&e["sk2"]),
+            zahl(&e["sk3"]),
+            zahl(&e["sk4"])
+        ]
     );
 }

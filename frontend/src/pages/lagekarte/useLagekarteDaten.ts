@@ -14,6 +14,7 @@ import { ladeBetreuung } from '../../api/betreuung';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
+import { ohneAbgeschlossene } from '../../personen/personenBilanz';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
@@ -601,8 +602,10 @@ export function useLagekarteDaten({
   // statt der stehengebliebenen Altdaten.
   const personenDaten =
     personenZugriff === 'frei' && !personenQuery.isError ? personenQuery.data : undefined;
+  // Abgeschlossene Patienten stehen nicht auf der Lagekarte (LLH-1332, Spec
+  // `lagekarte-betroffene`); die Kartenansicht der Betroffenen folgt dagegen ihrem Schalter.
   const personenKarte = useMemo(
-    () => (personenDaten ? personenMarker(personenDaten, token) : null),
+    () => (personenDaten ? personenMarker(ohneAbgeschlossene(personenDaten), token) : null),
     [personenDaten, token],
   );
   const personenVerortet = useMemo(() => personenKarte?.marker ?? [], [personenKarte]);

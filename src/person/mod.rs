@@ -175,6 +175,171 @@ wire_enum! {
     pub enum VerbleibStatus {
         Angemeldet => "angemeldet",
         Abtransportiert => "abtransportiert",
+        /// Quittierte Übergabe eines Eigentransports am Ziel (LLH-1332, design.md D2).
+        Uebergeben => "uebergeben",
+    }
+}
+
+wire_enum! {
+    /// Wer einen Transport fährt (LLH-1332, design.md D1). Nur bei `art = transport`; ein
+    /// Bestands-Transport ohne Angabe gilt als `fremd`.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum TransportDurch {
+        /// Ein fremdes Rettungsmittel übernimmt; der Patient ist übergeben.
+        Fremd => "fremd",
+        /// Ein Fahrzeug aus dem Einsatz fährt; der Patient bleibt bis zur Übergabe bei uns.
+        Eigen => "eigen",
+    }
+}
+
+impl<DB: sqlx::Database> sqlx::Type<DB> for TransportDurch
+where
+    str: sqlx::Type<DB>,
+{
+    fn type_info() -> DB::TypeInfo {
+        <str as sqlx::Type<DB>>::type_info()
+    }
+}
+
+impl<'r, DB: sqlx::Database> sqlx::Decode<'r, DB> for TransportDurch
+where
+    &'r str: sqlx::Decode<'r, DB>,
+{
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, sqlx::error::BoxDynError> {
+        let s = <&str as sqlx::Decode<DB>>::decode(value)?;
+        TransportDurch::parse(s).ok_or_else(|| format!("Ungültiges TransportDurch: {s}").into())
+    }
+}
+
+wire_enum! {
+    /// Versorgungszustand einer Person (LLH-1332, design.md D3), abgeleitet aus dem jüngsten
+    /// Verbleib, nie gespeichert. Die eine Regel steht in [`versorgung_von`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, ToSchema)]
+    pub enum Versorgung {
+        /// Noch bei uns: kein Verbleib, „verbleibt vor Ort“ oder ein nur angemeldeter Transport.
+        #[default]
+        Offen => "offen",
+        /// Im Eigentransport, Übergabe noch nicht quittiert.
+        Unterwegs => "unterwegs",
+        /// Übergeben, entlassen, in Notunterkunft oder Verbleib des Leichnams.
+        Abgeschlossen => "abgeschlossen",
+    }
+}
+
+/// Versorgungszustand aus dem jüngsten Verbleib (Spec `patienten-uebergabe`, „Versorgungszustand
+/// der Person“). Gepinnt im gemeinsamen Fixture `tests/fixtures/verdichtung/regeln.json`
+/// (Abschnitt `versorgung`); der Client liest nur das Feld `versorgung`. Eine vermisste Person ist
+/// immer `offen`, auch mit einem älteren Verbleib (design.md D3): sie wird gesucht und darf nicht
+/// aus der Liste fallen.
+pub fn versorgung_von(
+    person_status: PersonStatus,
+    art: Option<VerbleibArt>,
+    status: Option<VerbleibStatus>,
+    durch: Option<TransportDurch>,
+) -> Versorgung {
+    if person_status == PersonStatus::Vermisst {
+        return Versorgung::Offen;
+    }
+    match art {
+        None | Some(VerbleibArt::VorOrt) => Versorgung::Offen,
+        Some(VerbleibArt::Transport) => match (status, durch) {
+            (Some(VerbleibStatus::Angemeldet), _) => Versorgung::Offen,
+            (Some(VerbleibStatus::Uebergeben), _) => Versorgung::Abgeschlossen,
+            (_, Some(TransportDurch::Eigen)) => Versorgung::Unterwegs,
+            _ => Versorgung::Abgeschlossen,
+        },
+        Some(VerbleibArt::Entlassung | VerbleibArt::Notunterkunft | VerbleibArt::Verstorben) => {
+            Versorgung::Abgeschlossen
+        }
+    }
+}
+
+/// Sichtungsverteilung der Lage ohne abgeschlossene Patienten (LLH-1332, Spec
+/// `lage-verdichtung`, „Abgeschlossene Patienten zählen nicht als Patienten“). Gegenstück im
+/// Client: `sichtungsbild` mit `ohneAbgeschlossene` in `personen/personenBilanz.ts`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct LageSichtung {
+    pub sk1: i64,
+    pub sk2: i64,
+    pub sk3: i64,
+    pub sk4: i64,
+    pub tot: i64,
+    pub unverletzt: i64,
+    pub ohne: i64,
+    /// Abgeschlossene, in keiner Kategorie oben gezählt.
+    pub abgeschlossen: i64,
+}
+
+impl LageSichtung {
+    /// SK I bis SK IV.
+    pub fn patienten(&self) -> i64 {
+        self.sk1 + self.sk2 + self.sk3 + self.sk4
+    }
+}
+
+/// Zählt Sichtung und Versorgungszustand je Person zur [`LageSichtung`].
+pub fn zaehle_lage_sichtung(
+    personen: impl IntoIterator<Item = (Option<Sichtungskategorie>, Versorgung)>,
+) -> LageSichtung {
+    let mut z = LageSichtung::default();
+    for (sichtung, versorgung) in personen {
+        if versorgung == Versorgung::Abgeschlossen {
+            z.abgeschlossen += 1;
+            continue;
+        }
+        match sichtung {
+            Some(Sichtungskategorie::Sk1) => z.sk1 += 1,
+            Some(Sichtungskategorie::Sk2) => z.sk2 += 1,
+            Some(Sichtungskategorie::Sk3) => z.sk3 += 1,
+            Some(Sichtungskategorie::Sk4) => z.sk4 += 1,
+            Some(Sichtungskategorie::Tot) => z.tot += 1,
+            Some(Sichtungskategorie::Unverletzt) => z.unverletzt += 1,
+            None => z.ohne += 1,
+        }
+    }
+    z
+}
+
+/// Kurzform des Verbleib-Caches `aktueller_verbleib` samt Fahrer-Angabe (LLH-1332, design.md
+/// D2): ein Eigentransport nennt sein Fahrzeug, die quittierte Übergabe heißt „übergeben“.
+pub fn verbleib_kurzform(
+    art: VerbleibArt,
+    ziel: Option<&str>,
+    status: Option<VerbleibStatus>,
+    durch: Option<TransportDurch>,
+    transportmittel: Option<&str>,
+) -> String {
+    let nach = |kopf: String| match ziel {
+        Some(z) => format!("{kopf} → {z}"),
+        None => kopf,
+    };
+    match (art, durch, status) {
+        (VerbleibArt::Transport, Some(TransportDurch::Eigen), Some(VerbleibStatus::Uebergeben)) => {
+            nach("übergeben".to_string())
+        }
+        (VerbleibArt::Transport, Some(TransportDurch::Eigen), _) => nach(match transportmittel {
+            Some(t) => format!("Eigentransport {t}"),
+            None => "Eigentransport".to_string(),
+        }),
+        _ => art.kurzform(ziel),
+    }
+}
+
+/// Pseudonymer ETB-Sachverhalt samt Fahrer-Angabe; wie [`VerbleibArt::etb_sachverhalt`] ohne
+/// Ziel und ohne Fahrzeug (Scrub, LFH-752).
+pub fn verbleib_etb_sachverhalt(
+    art: VerbleibArt,
+    status: Option<VerbleibStatus>,
+    durch: Option<TransportDurch>,
+) -> &'static str {
+    match (art, durch, status) {
+        (VerbleibArt::Transport, Some(TransportDurch::Eigen), Some(VerbleibStatus::Uebergeben)) => {
+            "übergeben"
+        }
+        (VerbleibArt::Transport, Some(TransportDurch::Eigen), _) => "im Eigentransport",
+        _ => art.etb_sachverhalt(),
     }
 }
 
@@ -338,6 +503,16 @@ pub struct PersonAnzeige {
     /// Betreuungsstelle des jüngsten Verbleibs (LFH-674), nur bei `notunterkunft` gesetzt.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aktuelle_verbleib_betreuungsstelle_id: Option<i64>,
+    /// Wer den jüngsten Transport fährt (LLH-1332); fehlt bei anderen Arten und im Bestand.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktueller_transport_durch: Option<TransportDurch>,
+    /// Disposition des Fahrzeugs eines Eigentransports (LLH-1332), sonst leer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktuelles_einsatz_fahrzeug_id: Option<i64>,
+    /// Abgeleiteter Versorgungszustand (LLH-1332, design.md D3). Nie gespeichert: das Repo setzt
+    /// ihn nach jedem Lesen über [`PersonAnzeige::mit_versorgung`].
+    #[sqlx(skip)]
+    pub versorgung: Versorgung,
     /// Nummer der Papier-Patientenanhängetasche (LLH-1326), zum Abgleich; nicht eindeutig.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pat_nummer: Option<String>,
@@ -359,6 +534,19 @@ pub struct PersonAnzeige {
     /// Erfassungszeit des aktuellen Transportstands.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transport_at: Option<String>,
+}
+
+impl PersonAnzeige {
+    /// Setzt den abgeleiteten Versorgungszustand aus den Verbleib-Caches.
+    pub fn mit_versorgung(mut self) -> Self {
+        self.versorgung = versorgung_von(
+            self.status,
+            self.aktuelle_verbleib_art,
+            self.aktueller_verbleib_status,
+            self.aktueller_transport_durch,
+        );
+        self
+    }
 }
 
 #[cfg(test)]
@@ -464,6 +652,73 @@ mod tests {
         // LFH-752: Der ETB-Sachverhalt kennt kein Ziel (Scrub des Verbleibs).
         assert_eq!(n.etb_sachverhalt(), "in Notunterkunft");
         assert_eq!(VerbleibArt::Transport.etb_sachverhalt(), "abtransportiert");
+    }
+
+    #[test]
+    fn kurzform_und_etb_mit_fahrer_angabe() {
+        use TransportDurch::*;
+        use VerbleibArt::Transport;
+        use VerbleibStatus::*;
+        assert_eq!(
+            verbleib_kurzform(
+                Transport,
+                Some("KH Mitte"),
+                Some(Abtransportiert),
+                Some(Fremd),
+                Some("RTW 3/83-2")
+            ),
+            "Transport → KH Mitte"
+        );
+        assert_eq!(
+            verbleib_kurzform(
+                Transport,
+                Some("KH Mitte"),
+                Some(Abtransportiert),
+                Some(Eigen),
+                Some("1/83-1")
+            ),
+            "Eigentransport 1/83-1 → KH Mitte"
+        );
+        assert_eq!(
+            verbleib_kurzform(
+                Transport,
+                None,
+                Some(Abtransportiert),
+                Some(Eigen),
+                Some("1/83-1")
+            ),
+            "Eigentransport 1/83-1"
+        );
+        assert_eq!(
+            verbleib_kurzform(
+                Transport,
+                Some("KH Mitte"),
+                Some(Uebergeben),
+                Some(Eigen),
+                Some("1/83-1")
+            ),
+            "übergeben → KH Mitte"
+        );
+        assert_eq!(
+            verbleib_kurzform(Transport, None, Some(Uebergeben), Some(Eigen), None),
+            "übergeben"
+        );
+        assert_eq!(
+            verbleib_etb_sachverhalt(Transport, Some(Abtransportiert), Some(Eigen)),
+            "im Eigentransport"
+        );
+        assert_eq!(
+            verbleib_etb_sachverhalt(Transport, Some(Uebergeben), Some(Eigen)),
+            "übergeben"
+        );
+        assert_eq!(
+            verbleib_etb_sachverhalt(Transport, Some(Abtransportiert), Some(Fremd)),
+            "abtransportiert"
+        );
+        assert_eq!(
+            verbleib_etb_sachverhalt(VerbleibArt::Entlassung, None, None),
+            "entlassen"
+        );
     }
 
     #[test]

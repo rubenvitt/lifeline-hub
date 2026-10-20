@@ -344,6 +344,8 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
     const verbleib = tablet.getByRole('region', { name: 'Verbleib erfassen' });
     await waehleIn(verbleib.getByRole('combobox', { name: 'Art' }), 'Transport');
     await verbleib.getByLabel('Ziel').fill('KH Mitte');
+    // Ein Transport nennt das Rettungsmittel (LLH-1332); freier Text heißt fremdes Rettungsmittel.
+    await verbleib.getByRole('combobox', { name: /Rettungsmittel/ }).fill('RTW 3/83-2');
     await verbleib.getByRole('button', { name: 'Verbleib erfassen' }).click();
     await expect(verbleib).toHaveCount(0);
     await expect(quittung).toContainText('Verbleib Transport → KH Mitte');

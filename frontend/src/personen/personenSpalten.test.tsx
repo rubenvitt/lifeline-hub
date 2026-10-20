@@ -53,6 +53,7 @@ const basis: Person = {
   geaendert_at: '2026-05-27 11:22:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 
 describe('seitWert', () => {
@@ -225,6 +226,7 @@ describe('geschlechtAlter / verbleibText', () => {
     expect(
       verbleibText(
         {
+          versorgung: 'abgeschlossen',
           aktuelle_verbleib_art: 'transport',
           aktueller_verbleib: 'Transport → KH Nord',
           aktuelle_uhs_id: 7,
@@ -232,18 +234,27 @@ describe('geschlechtAlter / verbleibText', () => {
         name,
       ),
     ).toBe('Transport → KH Nord');
-    expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: 7 }, name)).toBe(
-      'UHS Weserstadion',
-    );
-    expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: 99 }, name)).toBe('UHS');
-    expect(verbleibText({ aktueller_verbleib: null, aktuelle_uhs_id: null }, name)).toBeNull();
+    expect(
+      verbleibText({ versorgung: 'offen', aktueller_verbleib: null, aktuelle_uhs_id: 7 }, name),
+    ).toBe('UHS Weserstadion');
+    expect(
+      verbleibText({ versorgung: 'offen', aktueller_verbleib: null, aktuelle_uhs_id: 99 }, name),
+    ).toBe('UHS');
+    expect(
+      verbleibText({ versorgung: 'offen', aktueller_verbleib: null, aktuelle_uhs_id: null }, name),
+    ).toBeNull();
   });
 
   it('fällt ohne Kurzform auf das Wort der Art zurück, statt „—" zu zeigen', () => {
     const name = (id: number) => uhsNamen[id];
     expect(
       verbleibText(
-        { aktuelle_verbleib_art: 'notunterkunft', aktueller_verbleib: null, aktuelle_uhs_id: null },
+        {
+          versorgung: 'abgeschlossen',
+          aktuelle_verbleib_art: 'notunterkunft',
+          aktueller_verbleib: null,
+          aktuelle_uhs_id: null,
+        },
         name,
       ),
     ).toBe('Notunterkunft');

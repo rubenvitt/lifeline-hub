@@ -14,6 +14,7 @@ import { sichtungsfarben } from '../theme/tokens';
 import { SK_WORT } from './personMeta';
 import {
   offeneFelder,
+  ohneAbgeschlossene,
   sichtungsbild,
   SICHTUNGSBILD_REIHE,
   verbleibZaehlung,
@@ -87,7 +88,8 @@ export default function BetroffenenSeitenleiste({
   onNurLuecken,
 }: Props) {
   const { token, rollen } = useRollen();
-  const bild = sichtungsbild(alle);
+  // Abgeschlossene zählen im Sichtungsbild nicht, im Verbleib schon (LLH-1332).
+  const bild = sichtungsbild(ohneAbgeschlossene(alle));
   const verbleib = verbleibZaehlung(alle, uhsName);
   const offen = offeneFelder(alle);
   // Alle Kategorien, auch die leeren: der zugängliche Name zählt sie vollständig auf.

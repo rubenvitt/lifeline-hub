@@ -134,6 +134,9 @@ export const EINSATZ_KEYS = {
   // Auswahl „Bestätigt von“ am UHS-Gerät (LFH-1046): eigener Prefix, unter `personen` zöge ihn
   // jedes `person`-Ereignis mit; das Personal liefert dem Gerät kein Ereignis.
   personenBestaetiger: 'einsatz-personen-bestaetiger',
+  // Vorschläge zum Rettungsmittel der Verbleib-Maske (LLH-1332): eigener Prefix, live über
+  // `person` (bisher verwendete) und `fahrzeug` (Fahrzeuge im Einsatz).
+  personenTransportmittel: 'einsatz-personen-transportmittel',
   // Fotos und Dateien an einer Person (LFH-757): live über das `person`-Ereignis. Nicht im
   // Lagebild offline (Patientenfotos und ihre Dateinamen bleiben vom Gerät fern, LFH-767).
   personAnhaenge: 'einsatz-person-anhaenge',
@@ -195,6 +198,8 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.kraefteZeitachse,
     // Der Zustand jedes Fahrzeugs einer Vorlage im Einsatz (LLH-1049).
     EINSATZ_KEYS.einheitAusVorlage,
+    // „Im Einsatz“ der Verbleib-Maske (LLH-1332).
+    EINSATZ_KEYS.personenTransportmittel,
   ],
   // Das UHS-Detail trägt das dort verortete Material (LFH-892).
   material: [EINSATZ_KEYS.material, EINSATZ_KEYS.uhsDetail],
@@ -255,6 +260,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.betreuung,
     EINSATZ_KEYS.personAnhaenge,
+    EINSATZ_KEYS.personenTransportmittel,
   ],
   // Disponiertes Personal (Modul `personal`) — die Zuordnung wirkt zugleich auf
   // Einheiten-/Abschnittsführung und die Führungskräfte-Sicht der Lagekarte.
@@ -584,6 +590,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.personenListenzugriffe, einsatzId] as const,
   personenBestaetiger: (einsatzId: number) =>
     [EINSATZ_KEYS.personenBestaetiger, einsatzId] as const,
+  personenTransportmittel: (einsatzId: number) =>
+    [EINSATZ_KEYS.personenTransportmittel, einsatzId] as const,
   personAnhaenge: (einsatzId: number, personId: number) =>
     [EINSATZ_KEYS.personAnhaenge, einsatzId, personId] as const,
   personal: (einsatzId: number) => [EINSATZ_KEYS.personal, einsatzId] as const,
@@ -1260,6 +1268,8 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.personen,
     // Auswahl ohne Freitexte (LFH-940, D8): hält die Personensuche der Palette ohne Netz.
     EINSATZ_KEYS.personenAuswahl,
+    // Vorschläge zum Rettungsmittel (LLH-1332): die Verbleib-Maske merkt ohne Netz vor.
+    EINSATZ_KEYS.personenTransportmittel,
     EINSATZ_KEYS.uhs,
     // Lagekarte
     EINSATZ_KEYS.zonen,
