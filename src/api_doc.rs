@@ -60,6 +60,7 @@ use utoipa::OpenApi;
         crate::betreuung::BelegungVerlaufEintrag,
         crate::betreuung::BelegungsmeldungAnzeige,
         crate::betreuung::BetreuungUebersicht,
+        crate::betreuung::EvakuierungUebersicht,
         crate::betreuung::BetreuungsstelleAnzeige,
         crate::betreuung::BetreuungsstelleArt,
         crate::betreuung::BetreuungsstelleStatus,

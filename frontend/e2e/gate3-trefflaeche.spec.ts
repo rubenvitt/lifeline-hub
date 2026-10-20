@@ -2492,26 +2492,32 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-// ── Betreuung ────────────────────────────────────────────────────────────────────────
+// ── Evakuierung und Betreuung ─────────────────────────────────────────────────────────
 //
-// Bezirke als Karten (`Datensicht`), Stellen als Tabelle, nur antd-`Button`. Gemessen wird
-// trotzdem: der Menü-Auslöser `weitere` steht in der Aktionsleiste von `ListenEintrag`, und
-// in der Tabellenzelle entscheidet der Abstand im `Space wrap` (≥ 16 px im Handschuh-Betrieb).
+// Seit LLH-1034 zwei Seiten: Bezirke als Tabelle auf der Evakuierungsseite, Stellen als Tabelle
+// auf der Betreuungsseite, nur antd-`Button`. Gemessen wird trotzdem: in der Tabellenzelle
+// entscheidet der Abstand im `Space wrap` (≥ 16 px im Handschuh-Betrieb).
 //
 // Gesät: ZWEI Bezirke und DREI Stellen, davon eine geschlossen — dort entfällt „Belegung
 // melden", der Dreipunkt bleibt. Namen ohne „Betreuung", weil die Palette Module und Einsätze
 // gemeinsam durchsucht.
 
-test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
+test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung`);
 
-  const senden = async (methode: 'post' | 'patch', pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/betreuung/${pfad}`, {
+  const senden = async (
+    modul: 'evakuierung' | 'betreuung',
+    methode: 'post' | 'patch',
+    pfad: string,
+    data: unknown,
+    was: string,
+  ) => {
+    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/${modul}/${pfad}`, {
       data,
     });
     expect(
@@ -2523,12 +2529,14 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
   const BEZIRKE = ['Deichweg 1–9', 'Uferstraße 12–40'];
   for (const bezeichnung of BEZIRKE) {
     const bezirk = await senden(
+      'evakuierung',
       'post',
       'bezirke',
       { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
       `Bezirk ${bezeichnung}`,
     );
     await senden(
+      'evakuierung',
       'post',
       `bezirke/${bezirk.id}/staende`,
       { evakuiert: 212, erhebung: 'gezaehlt' },
@@ -2538,41 +2546,74 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
   const OFFEN = ['Turnhalle Ost', 'Gemeindehaus Süd'];
   for (const bezeichnung of OFFEN) {
     const stelle = await senden(
+      'betreuung',
       'post',
       'stellen',
       { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
       `Stelle ${bezeichnung}`,
     );
-    await senden('patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
-    await senden('post', `stellen/${stelle.id}/belegungen`, { belegt: 140 }, 'Belegung');
+    await senden('betreuung', 'patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden(
+      'betreuung',
+      'post',
+      `stellen/${stelle.id}/belegungen`,
+      { belegt: 140 },
+      'Belegung',
+    );
   }
   // Ohne Meldung darf eine Stelle schließen.
   const zu = await senden(
+    'betreuung',
     'post',
     'stellen',
     { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
     'Stelle Schule Nord',
   );
-  await senden('patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await senden('betreuung', 'patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+
+  // Abstand Primäraktion ↔ Dreipunkt an der ersten Zeile: im Handschuh-Betrieb ≥ 16 px
+  // (MIL-STD-1472F Fig. 24 [abgeleitet]).
+  const luecke = async (links: Locator, rechts: Locator) => {
+    const l = (await links.boundingBox())!;
+    const r = (await rechts.boundingBox())!;
+    return Math.round(r.x - (l.x + l.width));
+  };
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+    // ── Evakuierung ──
+    await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
     await stelleDichte(page, dichte);
 
-    const karten = page
-      .getByRole('region', { name: 'Evakuierungsbezirke' })
-      .locator('[data-lfh="datensicht-karte"]');
-    await expect(karten).toHaveCount(2);
-    const standMelden = karten.getByRole('button', { name: /^Stand melden für Bezirk / });
-    const karteMenue = karten.getByRole('button', { name: /^Aktionen zu Bezirk / });
-    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze und bliebe
-    // grün, wenn die geschlossene Stelle doch „Belegung melden" trüge.
+    const bezirkZeilen = page.locator('tr[data-row-key^="bezirk-"]');
+    await expect(bezirkZeilen).toHaveCount(2);
+    const standMelden = bezirkZeilen.getByRole('button', { name: /^Stand melden für Bezirk / });
+    const bezirkMenue = bezirkZeilen.getByRole('button', { name: /^Aktionen zu Bezirk / });
+    // GENAUE Zahlen vor der Messung: `alleHaltenStufe` prüft nur eine Untergrenze.
     await expect(standMelden).toHaveCount(2);
-    await expect(karteMenue).toHaveCount(2);
-    const karteStand = await alleHaltenStufe(standMelden, soll, `Stand melden (${dichte})`, 2);
-    const karteDrei = await alleHaltenStufe(karteMenue, soll, `Dreipunkt Bezirk (${dichte})`, 2);
+    await expect(bezirkMenue).toHaveCount(2);
+    const zeileStand = await alleHaltenStufe(standMelden, soll, `Stand melden (${dichte})`, 2);
+    const bezirkDrei = await alleHaltenStufe(bezirkMenue, soll, `Dreipunkt Bezirk (${dichte})`, 2);
+    const kopfEvak = await haeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }),
+      soll,
+      `Kopfaktion Evakuierung (${dichte})`,
+    );
+    // Der Aufklapp-Auslöser „Verlauf" an jeder Zeile, dazu „Zurücknehmen" im aufgeklappten
+    // Verlauf.
+    const verlaufBezirk = page.getByRole('button', { name: /^Verlauf zu Bezirk / });
+    await expect(verlaufBezirk).toHaveCount(2);
+    const vBezirk = await alleHaltenStufe(verlaufBezirk, soll, `Verlauf Bezirk (${dichte})`, 2);
+    await verlaufBezirk.first().click();
+    const zurueck = page.getByRole('button', { name: /zurücknehmen$/ });
+    await expect(zurueck).toHaveCount(1);
+    const vZurueck = await haeltStufe(zurueck, soll, `Zurücknehmen im Verlauf (${dichte})`);
+    const lueckeBezirk = await luecke(standMelden.first(), bezirkMenue.first());
 
+    // ── Betreuung ──
+    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
     const tabelle = page.getByRole('region', { name: 'Betreuungsstellen' });
     await expect(tabelle.locator('tr[data-row-key^="stelle-"]')).toHaveCount(3);
     const belegung = tabelle.getByRole('button', { name: /^Belegung melden für / });
@@ -2582,78 +2623,58 @@ test('Betreuung: Karten- und Zeilenaktionen folgen der Dichte-Staffel 30 / 48 / 
     const zeileBelegung = await alleHaltenStufe(belegung, soll, `Belegung melden (${dichte})`, 2);
     // Drei, nicht zwei: auch die geschlossene Stelle behält ihr Menü.
     const zeileDrei = await alleHaltenStufe(zeileMenue, soll, `Dreipunkt Stelle (${dichte})`, 3);
-
-    const kopf = await haeltStufe(
+    const kopfStelle = await haeltStufe(
       page
         .locator('[data-lfh="seitenkopf-aktionen"]')
-        .getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }),
+        .getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }),
       soll,
-      `Kopfaktion (${dichte})`,
+      `Kopfaktion Betreuung (${dichte})`,
     );
-    const stelleAnlegen = await haeltStufe(
-      page.getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }),
-      soll,
-      `Betreuungsstelle anlegen (${dichte})`,
-    );
-
-    // Der Aufklapp-Auslöser „Verlauf" an jeder Karte und Zeile, dazu „Zurücknehmen" im
-    // aufgeklappten Verlauf.
-    const verlaufKarte = karten.getByRole('button', { name: /^Verlauf zu Bezirk / });
     const verlaufZeile = tabelle.getByRole('button', { name: /^Verlauf zu Stelle / });
-    await expect(verlaufKarte).toHaveCount(2);
     await expect(verlaufZeile).toHaveCount(3);
-    const vKarte = await alleHaltenStufe(verlaufKarte, soll, `Verlauf Bezirk (${dichte})`, 2);
     const vZeile = await alleHaltenStufe(verlaufZeile, soll, `Verlauf Stelle (${dichte})`, 3);
-    await verlaufKarte.first().click();
-    const zurueck = karten.first().getByRole('button', { name: /zurücknehmen$/ });
-    const vZurueck = await haeltStufe(zurueck, soll, `Zurücknehmen im Verlauf (${dichte})`);
-    gemessen.push(
-      `${dichte}: Verlauf Bezirk ${vKarte}, Verlauf Stelle ${vZeile}, Zurücknehmen ${vZurueck}`,
-    );
-
-    // Abstand Primäraktion ↔ Dreipunkt an der ersten Karte bzw. Zeile: im Handschuh-Betrieb
-    // ≥ 16 px (MIL-STD-1472F Fig. 24 [abgeleitet]).
-    const luecke = async (links: Locator, rechts: Locator) => {
-      const l = (await links.boundingBox())!;
-      const r = (await rechts.boundingBox())!;
-      return Math.round(r.x - (l.x + l.width));
-    };
-    const lueckeKarte = await luecke(standMelden.first(), karteMenue.first());
     const lueckeZeile = await luecke(belegung.first(), zeileMenue.first());
+
     if (dichte === 'handschuh') {
       expect(
-        lueckeKarte,
-        `Abstand Kartenaktionen (handschuh, gemessen ${lueckeKarte}px)`,
+        lueckeBezirk,
+        `Abstand Bezirksaktionen (handschuh, gemessen ${lueckeBezirk}px)`,
       ).toBeGreaterThanOrEqual(16);
       expect(
         lueckeZeile,
-        `Abstand Zeilenaktionen (handschuh, gemessen ${lueckeZeile}px)`,
+        `Abstand Stellenaktionen (handschuh, gemessen ${lueckeZeile}px)`,
       ).toBeGreaterThanOrEqual(16);
     }
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Stand melden ${karteStand}, Dreipunkt Bezirk ${karteDrei}, ` +
-        `Belegung melden ${zeileBelegung}, Dreipunkt Stelle ${zeileDrei}, Kopf ${kopf}, ` +
-        `Stelle anlegen ${stelleAnlegen}, Abstand Karte ${lueckeKarte}, Abstand Zeile ${lueckeZeile}`,
+      `${dichte} (Soll ≥ ${soll}): Stand melden ${zeileStand}, Dreipunkt Bezirk ${bezirkDrei}, ` +
+        `Kopf Evakuierung ${kopfEvak}, Verlauf Bezirk ${vBezirk}, Zurücknehmen ${vZurueck}, ` +
+        `Belegung melden ${zeileBelegung}, Dreipunkt Stelle ${zeileDrei}, Kopf Betreuung ${kopfStelle}, ` +
+        `Verlauf Stelle ${vZeile}, Abstand Bezirk ${lueckeBezirk}, Abstand Stelle ${lueckeZeile}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verlaufs-Auslöser folgen der Staffel, Meldeaktionen fehlen', async ({
+test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verlaufs-Auslöser folgen der Staffel, Meldeaktionen fehlen', async ({
   page,
 }) => {
-  // LFH-435: ohne Schreibrecht stehen „Evakuierungsbezirk anlegen" (Kopf) und
-  // „Betreuungsstelle anlegen" (Block) GESPERRT, darüber der Rechtehinweis. „Stand melden",
-  // „Belegung melden", beide Dreipunkte (die Bezirke haben keine Fläche, also kein „Auf Karte
-  // zeigen") und „Zurücknehmen" im Verlauf fehlen. Die Verlaufs-Auslöser bleiben — Aufklappen
-  // ist Lesen.
+  // LFH-435, seit LLH-1034 auf zwei Seiten: ohne Schreibrecht stehen „Evakuierungsbezirk
+  // anlegen" und „Betreuungsstelle anlegen" GESPERRT, darüber der Rechtehinweis. „Stand melden",
+  // „Belegung melden", beide Dreipunkte und „Zurücknehmen" im Verlauf fehlen. Die
+  // Verlaufs-Auslöser bleiben — Aufklappen ist Lesen.
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Raeumung Lesend`);
 
-  const senden = async (methode: 'post' | 'patch', pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/betreuung/${pfad}`, {
+  const senden = async (
+    modul: 'evakuierung' | 'betreuung',
+    methode: 'post' | 'patch',
+    pfad: string,
+    data: unknown,
+    was: string,
+  ) => {
+    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/${modul}/${pfad}`, {
       data,
     });
     expect(
@@ -2666,12 +2687,14 @@ test('Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verlaufs-Auslöser fo
   // „Zurücknehmen" fehlen KANN; die offenen Stellen tragen Belegungen.
   for (const bezeichnung of ['Deichweg 1–9', 'Uferstraße 12–40']) {
     const bezirk = await senden(
+      'evakuierung',
       'post',
       'bezirke',
       { bezeichnung, plan_personen: 640, plan_erhebung: 'geschaetzt' },
       `Bezirk ${bezeichnung}`,
     );
     await senden(
+      'evakuierung',
       'post',
       `bezirke/${bezirk.id}/staende`,
       { evakuiert: 212, erhebung: 'gezaehlt' },
@@ -2680,78 +2703,90 @@ test('Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verlaufs-Auslöser fo
   }
   for (const bezeichnung of ['Turnhalle Ost', 'Gemeindehaus Süd']) {
     const stelle = await senden(
+      'betreuung',
       'post',
       'stellen',
       { bezeichnung, art: 'notunterkunft', kapazitaet_personen: 150 },
       `Stelle ${bezeichnung}`,
     );
-    await senden('patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
-    await senden('post', `stellen/${stelle.id}/belegungen`, { belegt: 140 }, 'Belegung');
+    await senden('betreuung', 'patch', `stellen/${stelle.id}`, { status: 'in_betrieb' }, 'Status');
+    await senden(
+      'betreuung',
+      'post',
+      `stellen/${stelle.id}/belegungen`,
+      { belegt: 140 },
+      'Belegung',
+    );
   }
   const zu = await senden(
+    'betreuung',
     'post',
     'stellen',
     { bezeichnung: 'Schule Nord', art: 'anlaufstelle' },
     'Stelle Schule Nord',
   );
-  await senden('patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
+  await senden('betreuung', 'patch', `stellen/${zu.id}`, { status: 'geschlossen' }, 'Schließen');
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
-    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+    // ── Evakuierung ──
+    await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
     await stelleDichte(page, dichte);
 
-    // Datenanker: zwei Bezirkskarten und drei Stellenzeilen sind geladen.
-    const karten = page
-      .getByRole('region', { name: 'Evakuierungsbezirke' })
-      .locator('[data-lfh="datensicht-karte"]');
-    await expect(karten).toHaveCount(2);
-    const tabelle = page.getByRole('region', { name: 'Betreuungsstellen' });
-    await expect(tabelle.locator('tr[data-row-key^="stelle-"]')).toHaveCount(3);
-
-    // ── VORBEDINGUNGEN: Rechtehinweis steht, die Meldeaktionen fehlen.
+    // Datenanker: zwei Bezirkszeilen sind geladen.
+    const bezirkZeilen = page.locator('tr[data-row-key^="bezirk-"]');
+    await expect(bezirkZeilen).toHaveCount(2);
     await rechteHinweisSteht(page);
     for (const [ziel, was] of [
-      [karten.getByRole('button', { name: /^Stand melden für Bezirk / }), '„Stand melden"'],
-      [karten.getByRole('button', { name: /^Aktionen zu Bezirk / }), 'Dreipunkt Bezirk'],
-      [tabelle.getByRole('button', { name: /^Belegung melden für / }), '„Belegung melden"'],
-      [tabelle.getByRole('button', { name: /^Aktionen zu Stelle / }), 'Dreipunkt Stelle'],
+      [bezirkZeilen.getByRole('button', { name: /^Stand melden für Bezirk / }), '„Stand melden"'],
+      [bezirkZeilen.getByRole('button', { name: /^Aktionen zu Bezirk / }), 'Dreipunkt Bezirk'],
     ] as const) {
       await expect(ziel, `Vorbedingung: ohne Schreibrecht kein ${was}`).toHaveCount(0);
     }
-
-    // ── Was bleibt: die zwei gesperrten Anlage-Knöpfe und die Verlaufs-Auslöser.
     const kopf = await gesperrtHaeltStufe(
       page
         .locator('[data-lfh="seitenkopf-aktionen"]')
         .getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }),
       soll,
-      `Kopfaktion gesperrt (${dichte})`,
+      `Kopfaktion Evakuierung gesperrt (${dichte})`,
     );
-    const stelleAnlegen = await gesperrtHaeltStufe(
-      page.getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }),
-      soll,
-      `„Betreuungsstelle anlegen" gesperrt (${dichte})`,
-    );
-    const verlaufKarte = karten.getByRole('button', { name: /^Verlauf zu Bezirk / });
-    const verlaufZeile = tabelle.getByRole('button', { name: /^Verlauf zu Stelle / });
-    await expect(verlaufKarte).toHaveCount(2);
-    await expect(verlaufZeile).toHaveCount(3);
-    const vKarte = await alleHaltenStufe(verlaufKarte, soll, `Verlauf Bezirk (${dichte})`, 2);
-    const vZeile = await alleHaltenStufe(verlaufZeile, soll, `Verlauf Stelle (${dichte})`, 3);
-
+    const verlaufBezirk = page.getByRole('button', { name: /^Verlauf zu Bezirk / });
+    await expect(verlaufBezirk).toHaveCount(2);
+    const vBezirk = await alleHaltenStufe(verlaufBezirk, soll, `Verlauf Bezirk (${dichte})`, 2);
     // Aufgeklappt: erst der Verlaufseintrag (Anker), dann fehlt „Zurücknehmen".
-    await verlaufKarte.first().click();
-    await expect(karten.first().locator('[data-lfh="verlauf-eintrag"]').first()).toBeVisible();
+    await verlaufBezirk.first().click();
+    await expect(page.locator('[data-lfh="verlauf-eintrag"]').first()).toBeVisible();
     await expect(
-      karten.first().getByRole('button', { name: /zurücknehmen/i }),
+      page.getByRole('button', { name: /zurücknehmen/i }),
       'Vorbedingung: ohne Schreibrecht kein „Zurücknehmen" im Verlauf',
     ).toHaveCount(0);
 
+    // ── Betreuung ──
+    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+    const tabelle = page.getByRole('region', { name: 'Betreuungsstellen' });
+    await expect(tabelle.locator('tr[data-row-key^="stelle-"]')).toHaveCount(3);
+    await rechteHinweisSteht(page);
+    for (const [ziel, was] of [
+      [tabelle.getByRole('button', { name: /^Belegung melden für / }), '„Belegung melden"'],
+      [tabelle.getByRole('button', { name: /^Aktionen zu Stelle / }), 'Dreipunkt Stelle'],
+    ] as const) {
+      await expect(ziel, `Vorbedingung: ohne Schreibrecht kein ${was}`).toHaveCount(0);
+    }
+    const stelleAnlegen = await gesperrtHaeltStufe(
+      page
+        .locator('[data-lfh="seitenkopf-aktionen"]')
+        .getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }),
+      soll,
+      `Kopfaktion Betreuung gesperrt (${dichte})`,
+    );
+    const verlaufZeile = tabelle.getByRole('button', { name: /^Verlauf zu Stelle / });
+    await expect(verlaufZeile).toHaveCount(3);
+    const vZeile = await alleHaltenStufe(verlaufZeile, soll, `Verlauf Stelle (${dichte})`, 3);
+
     gemessen.push(
-      `${dichte} (Soll ≥ ${soll}): Kopf gesperrt ${kopf}, Stelle anlegen gesperrt ${stelleAnlegen}, ` +
-        `Verlauf Bezirk ${vKarte}, Verlauf Stelle ${vZeile}`,
+      `${dichte} (Soll ≥ ${soll}): Kopf Evakuierung gesperrt ${kopf}, Verlauf Bezirk ${vBezirk}, ` +
+        `Kopf Betreuung gesperrt ${stelleAnlegen}, Verlauf Stelle ${vZeile}`,
     );
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });

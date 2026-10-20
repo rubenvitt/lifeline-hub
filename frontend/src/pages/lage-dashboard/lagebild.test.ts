@@ -383,7 +383,7 @@ describe('Vermisste seit über 4 h (LFH-613)', () => {
 
 describe('Kennzahl „Evakuiert" (LFH-607)', () => {
   const mitEvakuierung = { ...roh().einsatz, lagekennzahlen: ['evakuiert'] } as EinsatzAnzeige;
-  const ZIEL = '/einsaetze/1/betreuung';
+  const ZIEL = '/einsaetze/1/evakuierung';
   // `null` = die Seite gibt kein Ziel (ein explizites `undefined` löste den Vorgabewert aus).
   const zelle = (evakuierung: Rohdaten['evakuierung'], ziel: string | null = ZIEL) =>
     baueLagebild(
@@ -444,7 +444,7 @@ describe('Kennzahl „Evakuiert" (LFH-607)', () => {
     expect(k).toMatchObject({
       etikett: 'Evakuiert',
       wert: '—',
-      notiz: 'Modul Betreuung nicht freigegeben',
+      notiz: 'Modul Evakuierung nicht freigegeben',
       ton: 'neutral',
       ohneZiel: true,
     });

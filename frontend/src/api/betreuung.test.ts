@@ -2,24 +2,28 @@ import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import {
-  aendereBezirk,
   aendereStelle,
   ladeBelegungKopfzahl,
   ladeBetreuung,
   ladeBelegungVerlauf,
-  ladeStandVerlauf,
-  legeBezirkAn,
   legeStelleAn,
   meldeBelegung,
-  meldeStand,
   nimmBelegungZurueck,
-  nimmStandZurueck,
-  storniereBezirk,
   storniereStelle,
 } from './betreuung';
+import {
+  aendereBezirk,
+  ladeEvakuierung,
+  ladeStandVerlauf,
+  legeBezirkAn,
+  meldeStand,
+  nimmStandZurueck,
+  storniereBezirk,
+} from './evakuierung';
 
 /**
- * Client des Fachmoduls Betreuung (LFH-639). Geprüft wird, was beim Server ANKOMMT — Pfad,
+ * Clients der Fachmodule Betreuung (LFH-639) und Evakuierung (LLH-1034, Bezirke unter
+ * `…/evakuierung`). Geprüft wird, was beim Server ANKOMMT — Pfad,
  * Methode, Query und Body —, nicht das Objekt davor: `JSON.stringify` verschluckt einen
  * `undefined`-Schlüssel, und genau dort entsteht der Unterschied zwischen „leeren" und
  * „nicht anfassen" (Muster `stab.test.ts`, `patchTriState.test.ts`).
@@ -33,8 +37,9 @@ interface Anfrage {
 }
 
 const B = '/api/einsaetze/7/betreuung';
+const E = '/api/einsaetze/7/evakuierung';
 
-/** Fängt jede Anfrage unter dem Modulpfad und antwortet mit `{ ok: true }`. */
+/** Fängt jede Anfrage unter beiden Modulpfaden und antwortet mit `{ ok: true }`. */
 function faengeAnfragen(): Anfrage[] {
   const anfragen: Anfrage[] = [];
   const antwort = async ({ request }: { request: Request }) => {
@@ -48,18 +53,25 @@ function faengeAnfragen(): Anfrage[] {
     });
     return HttpResponse.json({ ok: true });
   };
-  server.use(http.all(`${B}`, antwort), http.all(`${B}/*`, antwort));
+  server.use(
+    http.all(`${B}`, antwort),
+    http.all(`${B}/*`, antwort),
+    http.all(`${E}`, antwort),
+    http.all(`${E}/*`, antwort),
+  );
   return anfragen;
 }
 
-describe('api/betreuung — Pfade und Methoden der zwölf Endpunkte', () => {
-  it('liest Übersicht und Kopfzahl', async () => {
+describe('api/betreuung und api/evakuierung — Pfade und Methoden der Endpunkte', () => {
+  it('liest Übersichten und Kopfzahl', async () => {
     const a = faengeAnfragen();
     await ladeBetreuung(7);
     await ladeBelegungKopfzahl(7);
+    await ladeEvakuierung(7);
     expect(a.map((x) => [x.methode, x.pfad, x.query])).toEqual([
       ['GET', B, ''],
       ['GET', `${B}/belegung`, ''],
+      ['GET', E, ''],
     ]);
   });
 
@@ -68,7 +80,7 @@ describe('api/betreuung — Pfade und Methoden der zwölf Endpunkte', () => {
     await ladeStandVerlauf(7, 5);
     await ladeBelegungVerlauf(7, 9);
     expect(a.map((x) => [x.methode, x.pfad, x.query])).toEqual([
-      ['GET', `${B}/bezirke/5/staende`, ''],
+      ['GET', `${E}/bezirke/5/staende`, ''],
       ['GET', `${B}/stellen/9/belegungen`, ''],
     ]);
   });
@@ -99,11 +111,11 @@ describe('api/betreuung — Pfade und Methoden der zwölf Endpunkte', () => {
     await meldeStand(7, 3, { evakuiert: 212, erhebung: 'gezaehlt' });
     await nimmStandZurueck(7, 11);
     expect(a.map((x) => [x.methode, x.pfad])).toEqual([
-      ['POST', `${B}/bezirke`],
-      ['PATCH', `${B}/bezirke/3`],
-      ['POST', `${B}/bezirke/3/stornieren`],
-      ['POST', `${B}/bezirke/3/staende`],
-      ['POST', `${B}/staende/11/zuruecknehmen`],
+      ['POST', `${E}/bezirke`],
+      ['PATCH', `${E}/bezirke/3`],
+      ['POST', `${E}/bezirke/3/stornieren`],
+      ['POST', `${E}/bezirke/3/staende`],
+      ['POST', `${E}/staende/11/zuruecknehmen`],
     ]);
     expect(a[0].body).toEqual({
       bezeichnung: 'Uferstraße 12–40',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evakuiertText,
   freiePlaetze,
+  inBetreuung,
   kennzahlTeile,
   kennzahlText,
   mengeText,
@@ -56,7 +57,7 @@ describe('betreuungText (LFH-639)', () => {
     ).toBe('700 · von 640 geplant');
   });
 
-  it('freie Plätze nur mit Kapazität und Meldung; Überbelegung wird negativ', () => {
+  it('freie Plätze nur mit Kapazität und Meldung, nie negativ (LLH-1044)', () => {
     expect(freiePlaetze({ kapazitaet_personen: undefined, belegung: undefined })).toBeNull();
     expect(
       freiePlaetze({
@@ -76,7 +77,17 @@ describe('betreuungText (LFH-639)', () => {
         kapazitaet_personen: 150,
         belegung: { id: 1, belegt: 170, zeitpunkt_at: 'x' },
       }),
-    ).toBe(-20);
+    ).toBe(0);
+  });
+
+  it('in Betreuung: Summe der Meldungen, ohne jede Meldung null (LLH-1044)', () => {
+    const b = (belegt: number) => ({ id: 1, belegt, zeitpunkt_at: 'x' });
+    expect(inBetreuung([])).toBeNull();
+    expect(inBetreuung([{ belegung: undefined }])).toBeNull();
+    expect(inBetreuung([{ belegung: b(0) }])).toBe(0);
+    expect(inBetreuung([{ belegung: b(40) }, { belegung: undefined }, { belegung: b(12) }])).toBe(
+      52,
+    );
   });
 
   it('volle Stellen: „voll" und „überbelegt" zählen, „fast voll" und Stellen ohne Einstufung nicht (LFH-678)', () => {

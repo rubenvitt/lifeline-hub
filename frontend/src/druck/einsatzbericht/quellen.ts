@@ -35,6 +35,7 @@ export type QuellenSchluessel =
   | 'lageberichte'
   | 'personen'
   | 'schaeden'
+  | 'evakuierung'
   | 'betreuung'
   | 'verpflegung'
   | 'etbZaehler'
@@ -98,7 +99,9 @@ export const QUELLEN: readonly Quelle[] = [
   { schluessel: 'personen', bloecke: nur('bilanz'), modul: 'personen' },
   // GET …/schaeden — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
   { schluessel: 'schaeden', bloecke: nur('bilanz'), modul: 'schaeden' },
-  // GET …/betreuung — `EinsatzLesezugriff<Betreuung>` (src/routes/betreuung.rs:132).
+  // GET …/evakuierung — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
+  { schluessel: 'evakuierung', bloecke: nur('bilanz'), modul: 'evakuierung' },
+  // GET …/betreuung — `EinsatzLesezugriff<Betreuung>` (src/routes/betreuung.rs).
   { schluessel: 'betreuung', bloecke: nur('bilanz'), modul: 'betreuung' },
   // GET …/verpflegung — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
   { schluessel: 'verpflegung', bloecke: nur('bilanz'), modul: 'verpflegung' },

@@ -471,7 +471,7 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
   const HAFEN = { ...UFER, id: 6, bezeichnung: 'Hafenviertel', flaechen: 0, stand: undefined };
 
   function mitBezirk(
-    opts: { zone?: LageZone; darfSchreiben?: boolean; betreuungFrei?: boolean } = {},
+    opts: { zone?: LageZone; darfSchreiben?: boolean; evakuierungFrei?: boolean } = {},
   ) {
     const onAendern = vi.fn<ZonenInspectorProps['onAendern']>(() => Promise.resolve());
     renderMitProviders(
@@ -485,8 +485,8 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
         onLoeschen={vi.fn()}
         ansichten={[]}
         bezirke={[UFER, HAFEN]}
-        betreuungFrei={opts.betreuungFrei ?? true}
-        bezirkPfad={(id) => `/einsaetze/1/betreuung?bezirk=${id}`}
+        evakuierungFrei={opts.evakuierungFrei ?? true}
+        bezirkPfad={(id) => `/einsaetze/1/evakuierung?bezirk=${id}`}
       />,
     );
     return { onAendern };
@@ -496,8 +496,8 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
     mitBezirk();
     expect(screen.getByText('läuft')).toBeInTheDocument();
     expect(screen.getByText(/480 · von/)).toBeInTheDocument();
-    const sprung = screen.getByRole('link', { name: 'Betreuung zu Uferstraße 12–40' });
-    expect(sprung).toHaveAttribute('href', '/einsaetze/1/betreuung?bezirk=5');
+    const sprung = screen.getByRole('link', { name: 'Evakuierung zu Uferstraße 12–40' });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/evakuierung?bezirk=5');
   });
 
   it('Auswahl eines anderen Bezirks und „nicht zugeordnet" schicken den PATCH', async () => {
@@ -514,11 +514,13 @@ describe('ZonenInspector — Evakuierungsbezirk (LFH-673)', () => {
   });
 
   it('ohne Modulrecht: keine Auswahl, keine Bezirksangaben, nur der Grund', () => {
-    mitBezirk({ betreuungFrei: false });
+    mitBezirk({ evakuierungFrei: false });
     expect(screen.queryByLabelText('Gehört zu Evakuierungsbezirk')).toBeNull();
     expect(screen.queryByText('Uferstraße 12–40')).toBeNull();
     expect(screen.queryByText('läuft')).toBeNull();
-    expect(screen.getByText('Evakuierungsbezirk · kein Zugriff auf Betreuung')).toBeInTheDocument();
+    expect(
+      screen.getByText('Evakuierungsbezirk · kein Zugriff auf Evakuierung'),
+    ).toBeInTheDocument();
   });
 
   it('an anderen Zonentypen erscheint nichts vom Bezirk', () => {

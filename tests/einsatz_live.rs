@@ -777,15 +777,15 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     assert_eq!(anzahl(&eingegangen(&mut rx), LiveEvent::Einsatz), 0);
 }
 
-fn betreuung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/betreuung")
+fn evakuierung_pfad(einsatz: i64) -> String {
+    format!("/api/einsaetze/{einsatz}/evakuierung")
 }
 
 async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke", betreuung_pfad(einsatz)),
+        &format!("{}/bezirke", evakuierung_pfad(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","plan_personen":640,"plan_erhebung":"geschaetzt"}}"#
@@ -800,7 +800,7 @@ async fn bezirk_aendern(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64
     let (status, json) = anfrage(
         app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", betreuung_pfad(einsatz)),
+        &format!("{}/bezirke/{bid}", evakuierung_pfad(einsatz)),
         cookie,
         Some(rumpf),
     )
@@ -812,7 +812,7 @@ async fn bezirk_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, bid: 
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke/{bid}/stornieren", betreuung_pfad(einsatz)),
+        &format!("{}/bezirke/{bid}/stornieren", evakuierung_pfad(einsatz)),
         cookie,
         None,
     )
@@ -830,7 +830,7 @@ async fn erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht() {
     let erster = bezirk_anlegen(&app, &admin, einsatz, "Uferstraße").await;
     let alle = eingegangen(&mut rx);
     assert_eq!(
-        anzahl(&alle, LiveEvent::Betreuung),
+        anzahl(&alle, LiveEvent::Evakuierung),
         1,
         "Vorbedingung: {alle:?}"
     );
@@ -843,7 +843,7 @@ async fn erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{erster}/staende", betreuung_pfad(einsatz)),
+        &format!("{}/bezirke/{erster}/staende", evakuierung_pfad(einsatz)),
         &admin,
         Some(r#"{"evakuiert":120,"erhebung":"gezaehlt"}"#),
     )
@@ -860,7 +860,7 @@ async fn erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht() {
     .await;
     let alle = eingegangen(&mut rx);
     assert_eq!(
-        anzahl(&alle, LiveEvent::Betreuung),
+        anzahl(&alle, LiveEvent::Evakuierung),
         5,
         "Vorbedingung: {alle:?}"
     );

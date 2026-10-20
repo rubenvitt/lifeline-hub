@@ -3,9 +3,9 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 import { kontrast, randKontrast } from './kontrast-kern';
 
 /**
- * Browser-Nachweise für die Prüfliste der Betreuungsseite `/einsaetze/:id/betreuung`
- * (Kriterien 5 und 13). Fixture-Namen tragen kein „Betreuung" — die Palette sucht Module und
- * Einsätze gemeinsam.
+ * Browser-Nachweise für die Prüfliste der Betreuungsseite `/einsaetze/:id/betreuung` und, seit
+ * LLH-1034 getrennt, der Evakuierungsseite `/einsaetze/:id/evakuierung` (Kriterien 5 und 13).
+ * Fixture-Namen tragen kein „Betreuung" — die Palette sucht Module und Einsätze gemeinsam.
  *
  * ═══ KRITERIUM 5 — Kontrast der ZUSAMMENGESETZTEN Paare, Tag und Nacht ═══════════════════
  *
@@ -14,7 +14,7 @@ import { kontrast, randKontrast } from './kontrast-kern';
  * „überbelegt", vorbereitet ohne Meldung, ohne Kapazität, geschlossen).
  *
  * SCHRANKEN (Literale): Text Tag ≥ 7 : 1, Nacht ≥ 5 : 1 für JEDEN sichtbaren Text in
- * Seitenkopf, Inhalt, geöffnetem Zeilenmenü und vier Dialogen — über den Textbaum gefunden und
+ * Seitenkopf, Inhalt, geöffnetem Zeilenmenü und vier Dialogen beider Seiten — über den Textbaum gefunden und
  * gegen den Grund gemessen, auf dem er WIRKLICH steht. Der Rand jedes zustandstragenden
  * Etiketts ≥ 3 : 1 (WCAG 1.4.11); neutrale Etiketten tragen ihre Aussage im Wort, ihr Rand
  * wird nur protokolliert.
@@ -121,21 +121,27 @@ async function senden<T = { id: number }>(
   return (await r.json()) as T;
 }
 
-/** Einsatz samt gesäter Lage; gibt die Einsatz-ID und die Stellen-IDs nach Namen zurück. */
+/**
+ * Einsatz samt gesäter Lage; gibt die Einsatz-ID und die IDs von Bezirken und Stellen nach Namen
+ * zurück. Bezirke gehören seit LLH-1034 zum Modul Evakuierung, Stellen zur Betreuung.
+ */
 async function saeLage(page: Page, name: string) {
   const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `${name} ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+  const evak = `/api/einsaetze/${einsatzId}/evakuierung`;
+  const bezirke: Record<string, number> = {};
   for (const b of BEZIRKE) {
-    const { id } = await senden(page, 'post', `${basis}/bezirke`, {
+    const { id } = await senden(page, 'post', `${evak}/bezirke`, {
       bezeichnung: b.name,
       ...b.plan,
     });
-    if (b.stand) await senden(page, 'post', `${basis}/bezirke/${id}/staende`, b.stand);
+    bezirke[b.name] = id;
+    if (b.stand) await senden(page, 'post', `${evak}/bezirke/${id}/staende`, b.stand);
     if (b.raeumung !== 'angeordnet')
-      await senden(page, 'patch', `${basis}/bezirke/${id}`, { raeumung: b.raeumung });
+      await senden(page, 'patch', `${evak}/bezirke/${id}`, { raeumung: b.raeumung });
   }
+  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
   const stellen: Record<string, number> = {};
   for (const s of STELLEN) {
     const { id } = await senden(page, 'post', `${basis}/stellen`, {
@@ -149,7 +155,7 @@ async function saeLage(page: Page, name: string) {
     if (s.belegt != null)
       await senden(page, 'post', `${basis}/stellen/${id}/belegungen`, { belegt: s.belegt });
   }
-  return { einsatzId, stellen };
+  return { einsatzId, bezirke, stellen };
 }
 
 /** Der Provider liest die gespeicherte Wahl beim Montieren, deshalb das Neuladen. */
@@ -162,11 +168,7 @@ async function stelleDichte(page: Page, dichte: string) {
   await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 }
 
-const bezirkKarte = (page: Page, name: string) =>
-  page
-    .getByRole('region', { name: 'Evakuierungsbezirke' })
-    .locator('[data-lfh="datensicht-karte"]')
-    .filter({ hasText: name });
+const bezirkZeile = (page: Page, id: number) => page.locator(`tr[data-row-key="bezirk-${id}"]`);
 
 const stellenZeile = (page: Page, id: number) => page.locator(`tr[data-row-key="stelle-${id}"]`);
 
@@ -229,35 +231,34 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
 // ═══ Kriterium 5 ═════════════════════════════════════════════════════════════════════════
 
 for (const modus of ['light', 'dark'] as const) {
-  test(`Kontrast ${modus}: Bezirkskarten, Stellentabelle, Kopf und Dialoge`, async ({
+  test(`Kontrast ${modus}: Bezirkstabelle, Stellentabelle, Köpfe und Dialoge`, async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(150_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page);
-    const { einsatzId, stellen } = await saeLage(page, 'E2E 677 Kontrast');
+    const { einsatzId, bezirke, stellen } = await saeLage(page, 'E2E 677 Kontrast');
+
+    /** Ein Nachladen dimmt den Block über `.ant-spin-container`; der Messkern lehnt Opacity ab. */
+    const eingeschwungen = async () => {
+      await expect
+        .poll(() =>
+          page
+            .locator('.ant-spin-container')
+            .evaluateAll((alle) => alle.filter((e) => getComputedStyle(e).opacity !== '1').length),
+        )
+        .toBe(0);
+      await page.mouse.move(0, 0);
+    };
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await page.goto(`/einsaetze/${einsatzId}/betreuung`);
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
     // Den EINGESCHWUNGENEN Stand messen: erst dann zeigen die Messmarken auf bleibende Knoten.
-    await expect(
-      page
-        .getByRole('region', { name: 'Evakuierungsbezirke' })
-        .locator('[data-lfh="datensicht-karte"]'),
-    ).toHaveCount(BEZIRKE.length);
     await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
       STELLEN.length,
     );
-    // Ein Nachladen dimmt den Block über `.ant-spin-container`; der Messkern lehnt Opacity ab.
-    await expect
-      .poll(() =>
-        page
-          .locator('.ant-spin-container')
-          .evaluateAll((alle) => alle.filter((e) => getComputedStyle(e).opacity !== '1').length),
-      )
-      .toBe(0);
-    await page.mouse.move(0, 0);
+    await eingeschwungen();
 
     const messwerte: Record<string, unknown>[] = [];
 
@@ -285,14 +286,7 @@ for (const modus of ['light', 'dark'] as const) {
         .toBeGreaterThanOrEqual(ZUSTAND);
     };
 
-    // (1) Räumungs-Etiketten der Bezirkskarten — „angeordnet" und „läuft" sind kritisch.
-    for (const b of BEZIRKE) {
-      const etikett = bezirkKarte(page, b.name).locator('.ant-tag');
-      await expect(etikett).toHaveCount(1);
-      await pruefeEtikett(etikett, `Bezirk ${b.name}`, b.wort, b.rolle);
-    }
-
-    // (2) Status- und Auslastungsetiketten der Stellentabelle — „fast voll", „voll" und
+    // (1) Status- und Auslastungsetiketten der Stellentabelle — „fast voll", „voll" und
     // „überbelegt" sind kritisch.
     for (const a of AUSLASTUNG) {
       const zeile = stellenZeile(page, stellen[a.stelle]);
@@ -322,7 +316,7 @@ for (const modus of ['light', 'dark'] as const) {
       await pruefeEtikett(etikett, `Stelle ${stelle}`, wort, 'neutral');
     }
 
-    // (3) Jeder Text — Seitenkopf, Seiteninhalt und drei Dialoge.
+    // (2) Jeder Text — Seitenkopf, Seiteninhalt und die Dialoge.
     const kopf = page.locator('[data-lfh="seitenkopf"]');
     const inhalt = page.locator('[data-lfh="seiten-inhalt"]');
     const gemessen: [string, string][] = [];
@@ -344,20 +338,66 @@ for (const modus of ['light', 'dark'] as const) {
     await messeTexte(kopf, 'kopf');
     await messeTexte(inhalt, 'inhalt');
 
-    // „Stelle bearbeiten" an der belegten Stelle, Status auf „geschlossen": erst dann stehen
-    // Leermeldungs-Hinweis und Häkchen im Dialog.
-    await menue(page, 'Aktionen zu Stelle Gemeindehaus Süd', 'Bearbeiten (Status, Kapazität)');
-    const bearbeiten = page.getByRole('dialog', { name: 'Stelle bearbeiten: Gemeindehaus Süd' });
-    await dialogSteht(page, bearbeiten);
-    await bearbeiten.getByText('geschlossen', { exact: true }).click();
-    const hinweis = bearbeiten.locator('.ant-alert');
+    const stelleAnlegen = page.getByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await kopf.getByRole('button', { name: 'Betreuungsstelle anlegen', exact: true }).click();
+    await dialogSteht(page, stelleAnlegen);
+    await weitereAufklappen(page, stelleAnlegen);
+    await messeTexte(stelleAnlegen, 'Betreuungsstelle anlegen');
+    await page.keyboard.press('Escape');
+    await expect(stelleAnlegen).toBeHidden();
+
+    // „Schließen“ an der belegten Stelle steht seit LLH-1044 auf ihrer Detailseite: erst dort
+    // stehen Leermeldungs-Hinweis und Häkchen im Dialog.
+    await inhalt.getByRole('link', { name: 'Gemeindehaus Süd', exact: true }).click();
+    await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    const schliessen = page.getByRole('dialog', {
+      name: 'Betreuungsstelle Gemeindehaus Süd schließen',
+    });
+    await dialogSteht(page, schliessen);
+    const hinweis = schliessen.locator('.ant-alert');
     await expect(hinweis).toHaveCount(1);
     await expect(hinweis).toContainText('Die Stelle ist mit 150 Personen belegt.');
-    await expect(bearbeiten.getByRole('checkbox')).toBeVisible();
-    await weitereAufklappen(page, bearbeiten);
-    await messeTexte(bearbeiten, 'Stelle bearbeiten');
+    await expect(schliessen.getByRole('checkbox')).toBeVisible();
+    await messeTexte(schliessen, 'Stelle schließen');
     await page.keyboard.press('Escape');
-    await expect(bearbeiten).toBeHidden();
+    await expect(schliessen).toBeHidden();
+    await page.goBack();
+    await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
+      STELLEN.length,
+    );
+    await eingeschwungen();
+
+    // Das Zeilenmenü liegt als Portal AUSSERHALB des Seiteninhalts — der Textbaum sieht es nicht.
+    await page
+      .getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost', exact: true })
+      .click();
+    const offen = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
+    await expect(offen.getByRole('menuitem', { name: 'Stornieren' })).toBeVisible();
+    await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
+    await messeTexte(offen, 'Zeilenmenü');
+    await offen.getByRole('menuitem', { name: 'Stornieren' }).click();
+    const storno = page.getByRole('dialog', { name: 'Betreuungsstelle Turnhalle Ost stornieren?' });
+    await dialogSteht(page, storno);
+    await messeTexte(storno, 'Stornieren');
+    await page.keyboard.press('Escape');
+    await expect(storno).toBeHidden();
+
+    // ── Evakuierungsseite (eigenes Modul seit LLH-1034) ──
+    await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
+    await expect(page.getByRole('button', { name: /^Aktionen zu Bezirk / })).toHaveCount(
+      BEZIRKE.length,
+    );
+    await expect(page.getByRole('group', { name: 'Räumung in Zahlen' })).toBeVisible();
+    await eingeschwungen();
+
+    // (3) Räumungs-Etiketten der Bezirkstabelle — „angeordnet" und „läuft" sind kritisch.
+    for (const b of BEZIRKE) {
+      const etikett = bezirkZeile(page, bezirke[b.name]).locator('.ant-tag');
+      await expect(etikett).toHaveCount(1);
+      await pruefeEtikett(etikett, `Bezirk ${b.name}`, b.wort, b.rolle);
+    }
+    await messeTexte(kopf, 'evakuierung-kopf');
+    await messeTexte(inhalt, 'evakuierung-inhalt');
 
     for (const [ausloeser, titel] of [
       [
@@ -381,21 +421,6 @@ for (const modus of ['light', 'dark'] as const) {
       await expect(dialog).toBeHidden();
     }
 
-    // Das Zeilenmenü liegt als Portal AUSSERHALB des Seiteninhalts — der Textbaum sieht es nicht.
-    await page
-      .getByRole('button', { name: 'Aktionen zu Stelle Turnhalle Ost', exact: true })
-      .click();
-    const offen = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)');
-    await expect(offen.getByRole('menuitem', { name: 'Stornieren' })).toBeVisible();
-    await expect(page.locator('.ant-slide-up-appear, .ant-slide-up-enter')).toHaveCount(0);
-    await messeTexte(offen, 'Zeilenmenü');
-    await offen.getByRole('menuitem', { name: 'Stornieren' }).click();
-    const storno = page.getByRole('dialog', { name: 'Betreuungsstelle Turnhalle Ost stornieren?' });
-    await dialogSteht(page, storno);
-    await messeTexte(storno, 'Stornieren');
-    await page.keyboard.press('Escape');
-    await expect(storno).toBeHidden();
-
     // Die Probe hat die Texte wirklich gesehen — sonst wäre ein grüner Lauf trivial wahr.
     const pruefeGesehen = (flaeche: string | null, pflicht: string | RegExp) => {
       const treffer = gemessen.filter(
@@ -410,48 +435,48 @@ for (const modus of ['light', 'dark'] as const) {
     };
     for (const [flaeche, tragend] of [
       ['kopf', 'Betreuung'],
-      ['kopf', /^4 Bezirke · 6 Betreuungsstellen · 2 voll$/],
-      // Kennzahl im Blockkopf und die Sekundärfelder der Bezirkskarten, mit „≈" und
-      // „keine Meldung" als zweitem Kanal.
-      ['inhalt', /^≈ 362 · von 1\s170 geplant · 1 ohne Meldung$/],
-      ['inhalt', 'keine Meldung · von ≈ 640 geplant'],
-      ['inhalt', '≈ 212 · von 380 geplant'],
-      ['inhalt', '150 · von 150 geplant'],
+      ['kopf', /^6 Stellen · 4 in Betrieb · 2 voll$/],
+      ['evakuierung-kopf', 'Evakuierung'],
+      ['evakuierung-kopf', /^4 Bezirke$/],
+      // Kennzahlenband und die Zellen „Evakuiert", mit „≈" und „keine Meldung" als zweitem Kanal.
+      ['evakuierung-inhalt', /^≈ 362$/],
+      ['evakuierung-inhalt', /^≈ 1\s170$/],
+      ['evakuierung-inhalt', 'keine Meldung · von ≈ 640 geplant'],
+      ['evakuierung-inhalt', '≈ 212 · von 380 geplant'],
+      ['evakuierung-inhalt', '150 · von 150 geplant'],
       ...BEZIRKE.flatMap((b) => [
-        ['inhalt', b.name],
-        ['inhalt', b.wort],
+        ['evakuierung-inhalt', b.name],
+        ['evakuierung-inhalt', b.wort],
       ]),
+      ['evakuierung-inhalt', 'Stand melden'],
       ...STELLEN.map((s) => ['inhalt', s.name]),
       ...AUSLASTUNG.map((a) => ['inhalt', a.wort]),
       ['inhalt', 'in Betrieb'],
       ['inhalt', 'vorbereitet'],
       ['inhalt', 'geschlossen'],
-      // Kopf der Stellentabelle.
-      ['inhalt', /^457 untergebracht · 2 voll · 2 ohne Meldung$/],
-      ['inhalt', 'Stand melden'],
+      // Band „Unterbringung in Zahlen“ (LLH-1050): In Betreuung, Kapazität und Frei mit Notiz.
+      ['inhalt', /^457$/],
+      ['inhalt', /^530$/],
+      ['inhalt', '1 ohne Kapazität'],
+      ['inhalt', /^15$/],
+      ['inhalt', '1 ohne Meldung'],
       ['inhalt', 'Belegung melden'],
-      ['inhalt', 'Betreuungsstelle anlegen'],
-      // Leermeldungs-Hinweis und die Felder von „Stelle bearbeiten".
-      ['Stelle bearbeiten', 'Die Stelle ist mit 150 Personen belegt.'],
-      ['Stelle bearbeiten', 'Alle haben die Stelle verlassen — Belegung 0 melden'],
-      ['Stelle bearbeiten', 'Status'],
-      ['Stelle bearbeiten', 'Kapazität (Personen)'],
-      ['Stelle bearbeiten', 'Art'],
-      ['Stelle bearbeiten', 'Weitere Angaben'],
-      ['Stelle bearbeiten', 'Standort'],
-      ['Stelle bearbeiten', 'Abbrechen'],
+      ['Betreuungsstelle anlegen', 'Bezeichnung'],
+      // Leermeldungs-Hinweis und Häkchen von „Stelle schließen“ (Detailseite, LLH-1044).
+      ['Stelle schließen', 'Die Stelle ist mit 150 Personen belegt.'],
+      ['Stelle schließen', 'Alle haben die Stelle verlassen — Belegung 0 melden'],
+      ['Stelle schließen', 'Abbrechen'],
       ['Evakuierungsbezirk anlegen', 'Bezeichnung'],
       ['Stand melden: Uferstraße 12–40', 'Zeitpunkt'],
       // Der GEWÄHLTE Radio-Knopf, tragend (Text über `--lfh-bedien-text`).
-      ['Stelle bearbeiten', 'geschlossen'],
       ['Evakuierungsbezirk anlegen', 'geschätzt'],
       ['Stand melden: Uferstraße 12–40', 'gezählt'],
-      ['Zeilenmenü', 'Bearbeiten (Status, Kapazität)'],
       ['Stornieren', 'Betreuungsstelle Turnhalle Ost stornieren?'],
       ['Stornieren', 'Abbrechen'],
       // Primärknöpfe: Kopfknopf und Absende-Knopf (Weiß auf `bedien`, LFH-661).
-      ['Stelle bearbeiten', 'Speichern'],
-      ['kopf', 'Evakuierungsbezirk anlegen'],
+      ['Stelle schließen', 'Stelle schließen'],
+      ['kopf', 'Betreuungsstelle anlegen'],
+      ['evakuierung-kopf', 'Evakuierungsbezirk anlegen'],
     ] as const)
       pruefeGesehen(flaeche, tragend);
     // Tertiärtext (`schwach`), bis LFH-643 unter einer Ausnahme, jetzt tragend.
@@ -460,11 +485,12 @@ for (const modus of ['light', 'dark'] as const) {
       // „—" (frei, Kapazität, Stand, Abschnitt).
       ['inhalt', 'keine Meldung'],
       ['inhalt', '—'],
-      // Augenbrauen: Blockköpfe und Feldetiketten der Bezirkskarte; dazu der Tabellenkopf.
-      ['inhalt', 'Evakuierung'],
+      // Augenbrauen: Blockkopf der Stellen, Titel des Kennzahlenbands; dazu die Tabellenköpfe.
       ['inhalt', 'Betreuungsstellen'],
-      ['inhalt', 'Evakuiert'],
       ['inhalt', 'Kapazität'],
+      ['inhalt', 'In Betreuung'],
+      ['evakuierung-inhalt', 'Evakuiert'],
+      ['evakuierung-inhalt', 'Räumung'],
       ['Evakuierungsbezirk anlegen', 'Keine Namen von Bewohnern.'],
     ] as const)
       pruefeGesehen(flaeche, tertiaer);
@@ -559,6 +585,8 @@ for (const [viewport, dichte] of [
 
 interface DialogFall {
   name: string;
+  /** Seit LLH-1034 liegen die Bezirksdialoge auf der Evakuierungsseite. */
+  seite: 'evakuierung' | 'betreuung';
   titel: string;
   oeffne: (page: Page) => Promise<void>;
   /** Nach dem Öffnen: den Dialog in seinen höchsten Zustand bringen. */
@@ -573,6 +601,7 @@ interface DialogFall {
 const DIALOGE: DialogFall[] = [
   {
     name: 'Evakuierungsbezirk anlegen',
+    seite: 'evakuierung',
     scrollt: true,
     titel: 'Evakuierungsbezirk anlegen',
     oeffne: (page) =>
@@ -580,17 +609,20 @@ const DIALOGE: DialogFall[] = [
   },
   {
     name: 'Plangröße fortschreiben',
+    seite: 'evakuierung',
     scrollt: true,
     titel: 'Bezirk bearbeiten: Uferstraße 12–40',
     oeffne: (page) => menue(page, 'Aktionen zu Bezirk Uferstraße 12–40', 'Plangröße fortschreiben'),
   },
   {
     name: 'Räumung setzen',
+    seite: 'evakuierung',
     titel: 'Räumung: Uferstraße 12–40',
     oeffne: (page) => menue(page, 'Aktionen zu Bezirk Uferstraße 12–40', 'Räumung setzen'),
   },
   {
     name: 'Stand melden',
+    seite: 'evakuierung',
     scrollt: true,
     titel: 'Stand melden: Uferstraße 12–40',
     oeffne: (page) =>
@@ -598,11 +630,13 @@ const DIALOGE: DialogFall[] = [
   },
   {
     name: 'Bezirk stornieren',
+    seite: 'evakuierung',
     titel: 'Bezirk Uferstraße 12–40 stornieren?',
     oeffne: (page) => menue(page, 'Aktionen zu Bezirk Uferstraße 12–40', 'Stornieren'),
   },
   {
     name: 'Betreuungsstelle anlegen',
+    seite: 'betreuung',
     scrollt: true,
     titel: 'Betreuungsstelle anlegen',
     oeffne: (page) =>
@@ -610,24 +644,28 @@ const DIALOGE: DialogFall[] = [
   },
   {
     name: 'Belegung melden',
+    seite: 'betreuung',
     titel: 'Belegung melden: Gemeindehaus Süd',
     oeffne: (page) =>
       page.getByRole('button', { name: 'Belegung melden für Gemeindehaus Süd' }).click(),
   },
   {
-    name: 'Stelle bearbeiten (Schließen mit Leermeldung)',
-    scrollt: true,
-    titel: 'Stelle bearbeiten: Gemeindehaus Süd',
-    oeffne: (page) =>
-      menue(page, 'Aktionen zu Stelle Gemeindehaus Süd', 'Bearbeiten (Status, Kapazität)'),
+    // Seit LLH-1044 auf der Detailseite der Stelle; geöffnet über ihre Kennung in der Übersicht.
+    name: 'Stelle schließen (mit Leermeldung)',
+    seite: 'betreuung',
+    titel: 'Betreuungsstelle Gemeindehaus Süd schließen',
+    oeffne: async (page) => {
+      await page.getByRole('link', { name: 'Gemeindehaus Süd', exact: true }).click();
+      await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    },
     vorbereiten: async (_page, dialog) => {
-      await dialog.getByText('geschlossen', { exact: true }).click();
       await expect(dialog.locator('.ant-alert')).toHaveCount(1);
       await expect(dialog.getByRole('checkbox')).toBeVisible();
     },
   },
   {
     name: 'Stelle stornieren',
+    seite: 'betreuung',
     titel: 'Betreuungsstelle Gemeindehaus Süd stornieren?',
     oeffne: (page) => menue(page, 'Aktionen zu Stelle Gemeindehaus Süd', 'Stornieren'),
   },
@@ -641,11 +679,16 @@ for (const fall of DIALOGE) {
     await page.setViewportSize(HANDSCHIRM);
     await anmelden(page);
     const { einsatzId } = await saeLage(page, 'E2E 677 Dialogfokus');
-    await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+    await page.goto(`/einsaetze/${einsatzId}/${fall.seite}`);
     await stelleDichte(page, 'handschuh');
-    await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
-      STELLEN.length,
-    );
+    if (fall.seite === 'betreuung')
+      await expect(page.getByRole('button', { name: /^Aktionen zu Stelle / })).toHaveCount(
+        STELLEN.length,
+      );
+    else
+      await expect(page.getByRole('button', { name: /^Aktionen zu Bezirk / })).toHaveCount(
+        BEZIRKE.length,
+      );
 
     await fall.oeffne(page);
     const dialog = page.getByRole('dialog', { name: fall.titel });

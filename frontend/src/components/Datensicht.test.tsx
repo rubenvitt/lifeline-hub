@@ -1360,6 +1360,46 @@ describe('Datensicht · Tabellenzweig', () => {
     expect(zeileGeklickt).not.toHaveBeenCalled();
   });
 
+  /**
+   * LLH-1050: Knöpfe in der Zeile („Belegung melden", Aktionsmenü) bedienen ihren Klick allein,
+   * wie Links — sonst öffnete der Knopf seinen Dialog UND die Zeile spränge auf ihr Ziel. Dieselbe
+   * Menge Bedienziele wie der Baum-Riegel.
+   */
+  it('ein Klick auf einen Knopf oder ein Feld in der Zeile löst onZeileKlick nicht aus', async () => {
+    const zeileGeklickt = vi.fn();
+    const knopfGeklickt = vi.fn();
+    const mitKnopf = spaltenFuer<Fahrzeug>()([
+      ...spalten,
+      {
+        key: 'knopf',
+        title: 'Aktion',
+        render: (_t, f) => (
+          <>
+            <button type="button" onClick={knopfGeklickt}>
+              Melden {f.funkrufname}
+            </button>
+            <input aria-label={`Wert ${f.funkrufname}`} />
+          </>
+        ),
+      },
+    ]);
+    renderMitProviders(
+      <Datensicht<Fahrzeug, (typeof mitKnopf)[number]['key']>
+        bezeichnung="Fahrzeuge im Einsatz"
+        spalten={mitKnopf}
+        daten={DREI}
+        zeilenSchluessel="id"
+        karte={karte}
+        form="tabelle"
+        onZeileKlick={zeileGeklickt}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Melden Florian 1' }));
+    await userEvent.click(screen.getByRole('textbox', { name: 'Wert Florian 1' }));
+    expect(knopfGeklickt).toHaveBeenCalledTimes(1);
+    expect(zeileGeklickt).not.toHaveBeenCalled();
+  });
+
   it('rendert durch KatalogTabelle: Scrollcontainer, stehende Kopfzeile, fixierte Kennung', () => {
     const { container } = rendere();
     expect(container.querySelector('.ant-table-sticky-holder')).not.toBeNull();

@@ -29,8 +29,8 @@
  * da. Kommt während der Betrachtung ein neuer Zuschnitt, bietet ein Sammelbanner ihn an, statt die
  * Reihe zu tauschen.
  *
- * „Evakuiert" liest die Betreuungs-Übersicht über `betreuung/useEvakuierungKennzahl.ts`. Wer
- * Betreuung nicht sehen darf, sieht auf Platz 3 „Evakuiert" ohne Zahl und Link, mit Grund — nie
+ * „Evakuiert" liest die Evakuierungs-Übersicht über `betreuung/useEvakuierungKennzahl.ts`. Wer
+ * Evakuierung nicht sehen darf, sieht auf Platz 3 „Evakuiert" ohne Zahl und Link, mit Grund — nie
  * eine andere Kennzahl, sonst hinge die Reihe am Rollenzuschnitt. Die Pegel-Prognose steht in der
  * Pegel-Notiz (`pegel/pegelKennzahl.ts`). Die Notiz „n seit über 4 h" an „Vermisste" zieht mit dem
  * Uhr-Takt (`TAKT_MS`) nach.
@@ -48,7 +48,7 @@ import { Alert, Breadcrumb } from 'antd';
 import { einsatzKeys } from '../../api/queryKeys';
 import {
   auftraegePfad,
-  betreuungPfad,
+  evakuierungPfad,
   einsatzModulPfad,
   etbPfad,
   gefahrenPfad,
@@ -211,8 +211,8 @@ export default function LageDashboardPage() {
     [freigabenFehler, evakuierungZustand],
   );
   const evakuierungZiel =
-    freigabenBekannt && darfZaehlerZeigen('betreuung', freigabenQuery.data)
-      ? betreuungPfad(einsatzId)
+    freigabenBekannt && darfZaehlerZeigen('evakuierung', freigabenQuery.data)
+      ? evakuierungPfad(einsatzId)
       : undefined;
   // DWD-Warnung im Kopf (LLH-1117): dieselbe Abfrage und dieselbe Bedingung wie Modulzähler,
   // Unwetterhinweis und Warnsperre im Rahmen — der Cache ist geteilt, kein eigener Abruf. Ohne
