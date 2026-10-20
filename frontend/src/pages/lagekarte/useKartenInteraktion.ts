@@ -9,6 +9,7 @@ import { verortePerson } from '../../api/einsatzPersonal';
 import { aktualisierePerson } from '../../api/einsatzPerson';
 import { aendereStelle } from '../../api/betreuung';
 import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
+import { aktualisiereTier } from '../../api/einsatzTier';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
@@ -307,6 +308,13 @@ export function useKartenInteraktion({
         // Bereitstellungsraum (LLH-1107): nur das Paar, wie bei der Betreuungsstelle. Der Server
         // schreibt dafür keinen ETB-Eintrag, verteilt aber live.
         await aktualisiereBr(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'tier') {
+        // Tier (LLH-1123): nur das Paar — `patchBody` liest vorhandene Keys, jeder weitere wäre ein
+        // „leeren". Ohne `basis_geaendert_at`: der Punkt ist die neueste Aussage. Kein ETB.
+        await aktualisiereTier(einsatzId, platzierungZiel.id, {
+          antreff_lat: p.lat,
+          antreff_lon: p.lon,
+        });
       } else if (platzierungZiel.typ === 'einsatzort') {
         // Einsatzort: nur das Koordinatenpaar. Ein Kopf aus dem Cache überschriebe die
         // gleichzeitige Änderung einer anderen Person (Leitstellen-Nr., Stichwort …).
@@ -339,6 +347,10 @@ export function useKartenInteraktion({
       if (ziel?.typ === 'bereitstellungsraum') {
         qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
         qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, ziel.id) });
+      }
+      if (ziel?.typ === 'tier') {
+        qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.tier(einsatzId, ziel.id) });
       }
       // Ein Auftrag von außen meldet am Ort statt per Toast (LLH-1125, design.md D2): der Modus wird
       // zu „verortet“, der neue Marker ist gewählt und angeflogen — eine Fehlplatzierung fällt so
@@ -539,6 +551,13 @@ export function useKartenInteraktion({
         return {
           aufruf: aktualisiereBr(einsatzId, marker.id, { lat: null, lon: null }),
           faecher: [einsatzKeys.br(einsatzId), einsatzKeys.brDetail(einsatzId, marker.id)],
+        };
+      case 'tier':
+        // Ebenso: das Tier bleibt, nur sein Fundort-Punkt geht (LLH-1123). Umkehrbar über „Auf
+        // Karte verorten" der Tier-Detailseite, deshalb ohne Rückfrage.
+        return {
+          aufruf: aktualisiereTier(einsatzId, marker.id, { antreff_lat: null, antreff_lon: null }),
+          faecher: [einsatzKeys.tiere(einsatzId), einsatzKeys.tier(einsatzId, marker.id)],
         };
       case 'person':
         // Betroffene: nur die zwei Koordinatenfelder wie im Platzier-Zweig; die Person bleibt, nur

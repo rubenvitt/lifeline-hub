@@ -252,6 +252,7 @@ export default function LagekartePage() {
     personenNichtGeladen,
     betreuungZugriff,
     brZugriff,
+    tierZugriff,
     datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
@@ -554,6 +555,7 @@ export default function LagekartePage() {
         personenEbeneAn: layerEffektiv.person,
         betreuungZugriff,
         brZugriff,
+        tierZugriff,
       }),
     [
       alleVerortet,
@@ -562,6 +564,7 @@ export default function LagekartePage() {
       layerEffektiv.person,
       betreuungZugriff,
       brZugriff,
+      tierZugriff,
     ],
   );
 
@@ -856,7 +859,10 @@ export default function LagekartePage() {
           ? brZugriff
           : auftrag.typ === 'person'
             ? personenZugriff
-            : null;
+            : // Ein Tier nur mit dem Modul Tiere (LLH-1123).
+              auftrag.typ === 'tier'
+              ? tierZugriff
+              : null;
     if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
@@ -879,6 +885,7 @@ export default function LagekartePage() {
     betreuungZugriff,
     brZugriff,
     personenZugriff,
+    tierZugriff,
   ]);
 
   /**
@@ -1470,6 +1477,7 @@ export default function LagekartePage() {
         }}
         betreuung={{ zugriff: betreuungZugriff }}
         br={{ zugriff: brZugriff }}
+        tier={{ zugriff: tierZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={onMarkerWaehlen}

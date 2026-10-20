@@ -201,5 +201,10 @@ export const server = setupServer(
    * überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
+  /**
+   * Tiere — leer als Default. Die Lagekarte fragt sie mit Freigabe `tiere` ab (Ebene „Tiere",
+   * LLH-1123); Tests mit Tieren überschreiben per `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
   http.get('/api/externe-stellen', () => HttpResponse.json([])),
 );

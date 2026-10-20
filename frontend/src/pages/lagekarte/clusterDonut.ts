@@ -25,6 +25,8 @@ export const CLUSTER_TYP_FARBE: Record<Exclude<ClusterTyp, 'person'>, string> = 
   betreuungsstelle: '#0891b2', // cyan
   // Ort der wartenden Kräfte: abgesetzt vom Einheiten-Grün und vom Meldungs-Amber.
   bereitstellungsraum: '#65a30d', // limette
+  // Tiere (LLH-1123): weder Gefahr noch Kräfte, abgesetzt von Indigo und Violett.
+  tier: '#db2777', // pink
 };
 
 /**
@@ -66,6 +68,7 @@ const TYP_REIHENFOLGE: Exclude<ClusterTyp, 'person'>[] = [
   'uhs',
   'betreuungsstelle',
   'bereitstellungsraum',
+  'tier',
   'schaden',
   'lagemeldung',
   'freies_zeichen',

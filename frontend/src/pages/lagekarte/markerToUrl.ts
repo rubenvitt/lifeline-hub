@@ -11,6 +11,7 @@ import {
   personDetailPfad,
   betreuungPfad,
   bereitstellungsraumDetailPfad,
+  tiereDetailPfad,
 } from '../../routing/deeplinks';
 
 /**
@@ -44,6 +45,9 @@ export function markerToUrl(marker: KarteMarker, einsatzId: number): string {
     // Bereitstellungsraum (LLH-1107): Vollseiten-Detail → Item-Route.
     case 'bereitstellungsraum':
       return bereitstellungsraumDetailPfad(einsatzId, marker.id);
+    // Tier (LLH-1123): Vollseiten-Detail → Item-Route.
+    case 'tier':
+      return tiereDetailPfad(einsatzId, marker.id);
     case 'lagemeldung':
       return meldungenPfad(
         einsatzId,

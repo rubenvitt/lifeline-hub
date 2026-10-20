@@ -87,6 +87,9 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
     // Bereitstellungsräume ebenso (LLH-1107).
     case 'bereitstellungsraum':
       return undefined;
+    // Tiere ebenso (LLH-1123).
+    case 'tier':
+      return undefined;
   }
 }
 

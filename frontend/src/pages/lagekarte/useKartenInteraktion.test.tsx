@@ -62,6 +62,12 @@ const brApi = vi.hoisted(() => ({
 }));
 vi.mock('../../api/einsatzBereitstellungsraum', () => brApi);
 
+// Tier verorten (LLH-1123): der Platzier-Auftrag PATCHt nur das Fundort-Paar.
+const tierApi = vi.hoisted(() => ({
+  aktualisiereTier: vi.fn(() => Promise.resolve({ id: 12 })),
+}));
+vi.mock('../../api/einsatzTier', () => tierApi);
+
 // Die übrigen Zweige von `loescheVerortung`: je Objektart eine eigene API.
 const einsatzSchadenApi = vi.hoisted(() => ({
   aktualisiereSchaden: vi.fn(() => Promise.resolve({ id: 3 })),
@@ -1097,6 +1103,48 @@ describe('useKartenInteraktion — Betreuungsstelle (LFH-673)', () => {
       expect(keys).toContainEqual(einsatzKeys.br(1));
     });
   });
+
+  it('Tier (LLH-1123): Klick PATCHt NUR das Fundort-Paar und invalidiert Liste und Detail', async () => {
+    tierApi.aktualisiereTier.mockClear();
+    const { result, invalidiert, erfolg } = mitClient();
+    act(() => result.current.onPlatzierenStart({ typ: 'tier', id: 12 }));
+    act(() => result.current.onKarteKlick({ lng: 8.87, lat: 51.93 }));
+    await waitFor(() => expect(tierApi.aktualisiereTier).toHaveBeenCalledTimes(1));
+    // Ohne `basis_geaendert_at`: der Punkt auf der Karte ist die neueste Aussage.
+    expect(tierApi.aktualisiereTier).toHaveBeenCalledWith(1, 12, {
+      antreff_lat: 51.93,
+      antreff_lon: 8.87,
+    });
+    await waitFor(() => expect(erfolg).toHaveBeenCalledWith('Objekt verortet'));
+    const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+    expect(keys).toContainEqual(einsatzKeys.tiere(1));
+    expect(keys).toContainEqual(einsatzKeys.tier(1, 12));
+  });
+
+  it('Tier (LLH-1123): Verortung löschen schickt null/null', async () => {
+    tierApi.aktualisiereTier.mockClear();
+    const { result, invalidiert } = mitClient();
+    act(() =>
+      result.current.loescheVerortung({
+        schluessel: 'tier-12',
+        typ: 'tier',
+        id: 12,
+        lat: 51.93,
+        lon: 8.87,
+        label: 'T-012 (Hund)',
+        farbe: '#000',
+      }),
+    );
+    await waitFor(() => expect(tierApi.aktualisiereTier).toHaveBeenCalledTimes(1));
+    expect(tierApi.aktualisiereTier).toHaveBeenCalledWith(1, 12, {
+      antreff_lat: null,
+      antreff_lon: null,
+    });
+    await waitFor(() => {
+      const keys = invalidiert.mock.calls.map((c) => c[0]?.queryKey);
+      expect(keys).toContainEqual(einsatzKeys.tiere(1));
+    });
+  });
 });
 
 /**
@@ -1168,6 +1216,7 @@ describe('useKartenInteraktion — Quittungen der Karten-Mutationen (LFH-710)', 
     ['abschnitt', einsatzabschnitteApi.zeichneAbschnitt],
     ['betreuungsstelle', betreuungApi.aendereStelle],
     ['bereitstellungsraum', brApi.aktualisiereBr],
+    ['tier', tierApi.aktualisiereTier],
     ['person', einsatzPersonApi.aktualisierePerson],
   ];
 

@@ -35,6 +35,7 @@ import {
   type PersonenEbenenAngabe,
   type BetreuungEbenenAngabe,
   type BrEbenenAngabe,
+  type TierEbenenAngabe,
 } from './leistenDaten';
 import Sichtungslegende from './Sichtungslegende';
 import Klassenlegende from './Klassenlegende';
@@ -90,6 +91,8 @@ export interface LayerSichtbar {
   betreuungsstelle: boolean;
   /** Ebene „Bereitstellungsräume" (LLH-1107), Grenze an der Datenquelle (`brEbene.ts`). */
   bereitstellungsraum: boolean;
+  /** Ebene „Tiere" (LLH-1123), Grenze an der Datenquelle (`tierEbene.ts`). */
+  tier: boolean;
 }
 
 /**
@@ -105,7 +108,8 @@ export type PlatzierenPunktTyp =
   | 'fuehrung'
   | 'person'
   | 'betreuungsstelle'
-  | 'bereitstellungsraum';
+  | 'bereitstellungsraum'
+  | 'tier';
 
 const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   uhs: 'UHS',
@@ -116,6 +120,7 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
   abschnitt: 'Abschnitt',
   betreuungsstelle: 'Betreuungsstelle',
   bereitstellungsraum: 'Bereitstellungsraum',
+  tier: 'Tier',
 };
 
 /**
@@ -173,8 +178,8 @@ export function ortVorschauExclude(
 ): string | undefined {
   if (!ziel) return undefined;
   if (ziel.typ === 'einsatzort') return `einsatzort:${einsatzId}`; // Marker-id = echte Einsatz-ID, nicht 0
-  // Sidebar-Typen → Backend-Marker-Tags; 'fuehrung' → 'personal'. Keine Betreuungsstelle und kein
-  // Bereitstellungsraum: die Peilung prüft nur den Einsatz-Lesezugriff und darf keine
+  // Sidebar-Typen → Backend-Marker-Tags; 'fuehrung' → 'personal'. Keine Betreuungsstelle, kein
+  // Bereitstellungsraum und kein Tier (LLH-1123): die Peilung prüft nur den Einsatz-Lesezugriff und darf keine
   // modulgebundenen Orte kennen (wie `person`).
   const map: Record<string, string> = {
     uhs: 'uhs',
@@ -296,6 +301,8 @@ export interface SidebarProps {
   betreuung?: BetreuungEbenenAngabe;
   /** Ebene „Bereitstellungsräume" (LLH-1107): ebenso nur die Zugriffsgrenze. */
   br?: BrEbenenAngabe;
+  /** Ebene „Tiere" (LLH-1123): ebenso nur die Zugriffsgrenze. */
+  tier?: TierEbenenAngabe;
   /**
    * Gewählte Kartengrundlage. Gewählt wird sie in der Segmentleiste über der Karte; das Paneel
    * trägt nur, was dort keinen Platz hat.
@@ -693,6 +700,7 @@ export default function Sidebar(props: SidebarProps) {
     props.betreuung,
     props.br,
     props.eingeblendet ?? null,
+    props.tier,
   );
   const zeigeSichtungslegende =
     (props.layer.person || props.eingeblendet === 'person') && props.personen?.zugriff === 'frei';
