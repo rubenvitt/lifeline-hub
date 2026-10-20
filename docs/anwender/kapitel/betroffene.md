@@ -360,9 +360,9 @@ der Status „verstorben“ oder „abgemeldet“ und das Stornieren. Ein nachge
 den Aufenthalt nicht.
 
 Eine Person mit Verbleib „Notunterkunft“ in einer Betreuungsstelle zählt dort unter „davon
-namentlich“ ([Betreuung und Evakuierung](betreuung.md)). Zur Wahl unter „Bezug hinzufügen“ stehen
-nur freie Tiere (ohne Halter) und Schäden ohne Geschädigte, die nicht abgeschlossen sind; ein
-fremder Bezug wird nie still überschrieben.
+namentlich“ ([Betreuung](betreuung.md)). Zur Wahl unter „Bezug hinzufügen“ stehen nur freie
+Tiere (ohne Halter) und Schäden ohne Geschädigte, die nicht abgeschlossen sind; ein fremder Bezug
+wird nie still überschrieben.
 
 ### Einsatztagebuch und Zugriffsprotokoll
 
