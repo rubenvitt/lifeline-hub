@@ -421,12 +421,23 @@ pub fn etb_text_erneut_disponiert(bezeichnung: &str, menge: i64) -> String {
 }
 
 /// System-ETB beim Aufteilen eines Postens (LLH-1093, design.md D8): „aufgeteilt: 50 → 30 + 20“
-/// mit Ausgangsmenge, verbleibender und abgeteilter Menge.
-pub fn etb_text_aufgeteilt(bezeichnung: &str, ausgang: i64, abgeteilt: i64) -> String {
-    format!(
+/// mit Ausgangsmenge, verbleibender und abgeteilter Menge. Wechselt der abgeteilte Teil den Ort
+/// (t1hvaqzu, design.md D3), nennt derselbe Eintrag alten und neuen Ort im Wortlaut von
+/// [`ort::ort_text_tx`]: „…, davon 20: Einheit «Staffel A» → UHS «Turnhalle»“.
+pub fn etb_text_aufgeteilt(
+    bezeichnung: &str,
+    ausgang: i64,
+    abgeteilt: i64,
+    ortswechsel: Option<(&str, &str)>,
+) -> String {
+    let basis = format!(
         "Material «{bezeichnung}» aufgeteilt: {ausgang} → {} + {abgeteilt}",
         ausgang - abgeteilt
-    )
+    );
+    match ortswechsel {
+        Some((vorher, nachher)) => format!("{basis}, davon {abgeteilt}: {vorher} → {nachher}"),
+        None => basis,
+    }
 }
 
 /// System-ETB beim Korrigieren der Angaben eines Ad-hoc-Postens (LLH-1093, design.md D6): EIN
@@ -535,8 +546,24 @@ mod etb_text_tests {
     #[test]
     fn aufgeteilt_nennt_ausgang_rest_und_teil() {
         assert_eq!(
-            etb_text_aufgeteilt("Wolldecke", 50, 20),
+            etb_text_aufgeteilt("Wolldecke", 50, 20, None),
             "Material «Wolldecke» aufgeteilt: 50 → 30 + 20"
+        );
+    }
+
+    /// t1hvaqzu (LLH-1251), design.md D3: wandert der abgeteilte Teil, nennt derselbe Eintrag den
+    /// Ortswechsel in der Pfeilform von [`etb_text_ort_gewechselt`].
+    #[test]
+    fn aufgeteilt_mit_ortswechsel_in_einem_eintrag() {
+        assert_eq!(
+            etb_text_aufgeteilt(
+                "Wolldecke",
+                50,
+                20,
+                Some(("Einheit «Staffel A»", "UHS «Turnhalle»"))
+            ),
+            "Material «Wolldecke» aufgeteilt: 50 → 30 + 20, davon 20: Einheit «Staffel A» → \
+             UHS «Turnhalle»"
         );
     }
 

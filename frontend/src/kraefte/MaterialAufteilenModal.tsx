@@ -1,44 +1,69 @@
 import { Form, Typography } from 'antd';
+import { useEffect } from 'react';
 import type { EinsatzMaterial } from '../api/types';
 import { ErfassungsModal, type Speicherung } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
-import { mengeText } from './materialPosten';
+import { Select } from '../components/Select';
+import type { buildOrtOptions } from './materialOrtWahl';
+import {
+  hoechsteTeilmenge,
+  mengeText,
+  ortVon,
+  parseOrtValue,
+  toOrtValue,
+  type MaterialOrtRef,
+} from './materialPosten';
 
 interface Werte {
   menge?: number;
+  /** Ort des abgeteilten Teils als Auswahlwert ({@link toOrtValue}). */
+  ort?: string;
 }
 
 export interface MaterialAufteilenModalProps {
   /** Der Posten, der aufgeteilt wird; `null` = zu. */
-  posten: Pick<EinsatzMaterial, 'id' | 'bezeichnung' | 'menge' | 'ausgegeben'> | null;
+  posten: Pick<
+    EinsatzMaterial,
+    | 'id'
+    | 'bezeichnung'
+    | 'menge'
+    | 'ausgegeben'
+    | 'einheit_id'
+    | 'einsatz_fahrzeug_id'
+    | 'uhs_id'
+    | 'br_id'
+  > | null;
+  /**
+   * Angebot des Felds „Ort“ (`buildOrtOptions` mit dem Ort des Postens als `aktuell`), dieselben
+   * Gruppen wie die Spalte „Ort“.
+   */
+  ortOptionen: ReturnType<typeof buildOrtOptions>;
   laeuft: boolean;
   speicherung: Speicherung;
-  /** Lehnt bei Ablehnung ab (`mutateAsync`). */
-  onAufteilen: (menge: number) => Promise<unknown>;
+  /**
+   * Lehnt bei Ablehnung ab (`mutateAsync`). `ziel` ist der gewählte Ort des abgeteilten Teils,
+   * `null` = ohne Ort; die Felder baut `useMaterialOrt().teileAufNach`.
+   */
+  onAufteilen: (menge: number, ziel: MaterialOrtRef | null) => Promise<unknown>;
   onSchliessen: () => void;
 }
 
-/**
- * Höchste abzuteilende Menge: die Ausgangszeile behält mindestens eins, und abgeteilt wird nur aus
- * dem Rest (LLH-1224 D14: Ausgegebenes bleibt an der Ausgangszeile).
- */
-function hoechsteMenge(p: { menge: number; ausgegeben: number }): number {
-  return Math.min(p.menge - 1, p.menge - p.ausgegeben);
-}
-
-/** Gültige abzuteilende Menge: 1 bis {@link hoechsteMenge}. */
+/** Gültige abzuteilende Menge: 1 bis {@link hoechsteTeilmenge}. */
 function isValidMenge(n: number | undefined, hoechste: number): n is number {
   return n != null && Number.isInteger(n) && n >= 1 && n <= hoechste;
 }
 
 /**
- * „Aufteilen“ (LLH-1093, design.md D8, D12; Entscheidung 13.10.2026 Nr. 4: ohne Zielort): EIN
- * Mengenfeld „Menge abteilen“ (1 bis Menge − 1, höchstens der Rest), darunter das Ergebnis „Danach 30 + 20“. Die neue
- * Zeile kommt über die Invalidierung der Liste; ihren Ort ändert man danach in der Spalte „Ort“.
- * Die Grenzen prüft das Feld vor dem Senden; was der Server dennoch ablehnt, steht im Dialog.
+ * „Aufteilen“ (LLH-1093, design.md D8, D12): EIN Mengenfeld „Menge abteilen“ (1 bis Menge − 1,
+ * höchstens der Rest), darunter das Ergebnis „Danach 30 + 20“, und das Feld „Ort“ für den
+ * abgeteilten Teil, vorbelegt mit dem Ort des Postens (t1hvaqzu, design.md D5; löst die
+ * Entscheidung vom 13.10.2026 Nr. 4 „ohne Zielort“ ab). Ein anderer Ort geht im selben Request
+ * mit, Aufteilen und Ortswechsel sind ein ETB-Eintrag. Die Grenzen prüft das Feld vor dem Senden;
+ * was der Server dennoch ablehnt (auch ein nicht mehr wählbares Ziel), steht im Dialog.
  */
 export default function MaterialAufteilenModal({
   posten,
+  ortOptionen,
   laeuft,
   speicherung,
   onAufteilen,
@@ -47,7 +72,18 @@ export default function MaterialAufteilenModal({
   const [form] = Form.useForm<Werte>();
   const abteilen = Form.useWatch('menge', form);
   const menge = posten?.menge ?? 0;
-  const hoechste = posten ? hoechsteMenge(posten) : 0;
+  const hoechste = posten ? hoechsteTeilmenge({ ...posten, art: 'verbrauchsgut' }) : 0;
+  const bisher = posten ? ortVon(posten) : null;
+  const bisherWert = toOrtValue(bisher);
+  // Vorbelegen beim Öffnen per `setFieldsValue`, nie über `initialValues`: die Hülle setzt nach
+  // jedem Schließen zurück, und rc-field-form behält dabei den Ort des vorigen Postens
+  // (`frontend/AGENTS.md`, „Erfassungs-Norm“). Hängt ein anderer Platz den Posten bei offenem
+  // Dialog um, zieht das Feld nach, solange es niemand angefasst hat.
+  const offenId = posten?.id ?? null;
+  useEffect(() => {
+    if (offenId == null || form.isFieldTouched('ort')) return;
+    form.setFieldsValue({ ort: bisherWert });
+  }, [offenId, bisherWert, form]);
   return (
     <ErfassungsModal<Werte>
       offen={posten != null}
@@ -59,7 +95,9 @@ export default function MaterialAufteilenModal({
       speicherFehlerTitel="Nicht aufgeteilt"
       speicherFehlerFallback="Aufteilen fehlgeschlagen"
       onErfassen={async (w) => {
-        if (posten && isValidMenge(w.menge, hoechste)) await onAufteilen(w.menge);
+        if (!posten || !isValidMenge(w.menge, hoechste)) return;
+        const ziel = w.ort == null ? undefined : parseOrtValue(w.ort);
+        await onAufteilen(w.menge, ziel === undefined ? bisher : ziel);
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
@@ -91,6 +129,9 @@ export default function MaterialAufteilenModal({
         }
       >
         <MengenFeld beschriftung="Menge abteilen" style={{ width: 120 }} />
+      </Form.Item>
+      <Form.Item label="Ort" name="ort" extra="Ort des abgeteilten Teils">
+        <Select<string> options={ortOptionen} popupMatchSelectWidth={false} />
       </Form.Item>
     </ErfassungsModal>
   );

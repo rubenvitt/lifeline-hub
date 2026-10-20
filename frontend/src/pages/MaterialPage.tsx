@@ -28,7 +28,6 @@ import {
   reaktiviereDisposition,
   setzeMaterialStatus,
   storniereDisposition,
-  teileAuf,
   type MaterialOrtPatch,
   type MaterialPatch,
 } from '../api/einsatzMaterial';
@@ -52,7 +51,9 @@ import {
   mengeText,
   OHNE_ORT_WERT,
   ortPostFields,
+  ortText,
   ortVon,
+  type MaterialOrtRef,
 } from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
 import MaterialAufteilenModal from '../kraefte/MaterialAufteilenModal';
@@ -306,7 +307,7 @@ export default function MaterialPage() {
     emQuery.data,
   );
   // Der eine Schreibweg eines Orts (D2): derselbe PATCH aus jeder Ansicht.
-  const { setOrt } = useMaterialOrt(einsatzId);
+  const { setOrt, teileAufNach } = useMaterialOrt(einsatzId);
 
   const disponiereMutation = useMutation({
     mutationFn: (v: { materialId: number; menge: number; ort?: MaterialOrtPatch }) =>
@@ -368,8 +369,11 @@ export default function MaterialPage() {
     },
     onError: (e, v) => zeilen.melde(v.emId, e, 'Art nicht geändert'),
   });
+  // Aufteilen mit dem Ort des abgeteilten Teils über den einen Schreibweg (t1hvaqzu, design.md
+  // D5): er gleicht Material, alten und neuen Ort ab.
   const aufteilenMutation = useMutation({
-    mutationFn: (v: { emId: number; menge: number }) => teileAuf(einsatzId, v.emId, v.menge),
+    mutationFn: (v: { em: EinsatzMaterial; menge: number; ziel: MaterialOrtRef | null }) =>
+      teileAufNach(v.em, v.menge, v.ziel),
     onSuccess: () => {
       message.success('Aufgeteilt');
       return invalidate();
@@ -465,7 +469,7 @@ export default function MaterialPage() {
   /** Läuft für diese Zeile eine Handlung aus Knopf oder Menü? Dann keine zweite. */
   const isZeileBusy = (emId: number) =>
     (herausnehmenMutation.isPending && herausnehmenMutation.variables?.emId === emId) ||
-    (aufteilenMutation.isPending && aufteilenMutation.variables?.emId === emId) ||
+    (aufteilenMutation.isPending && aufteilenMutation.variables?.em.id === emId) ||
     (artMutation.isPending && artMutation.variables?.emId === emId) ||
     (stornierenMutation.isPending && stornierenMutation.variables === emId);
   /**
@@ -561,6 +565,12 @@ export default function MaterialPage() {
   const aufteilenPosten = aufteilenFuer
     ? (ems.find((em) => em.id === aufteilenFuer.id) ?? aufteilenFuer)
     : null;
+  // Das Feld „Ort“ des Dialogs: dasselbe Angebot wie die Spalte, der Ort des Postens vorn.
+  const aufteilenOrt = aufteilenPosten ? ortVon(aufteilenPosten) : null;
+  const aufteilenOrtOptionen = buildOrtOptions(ortKontext.quellen, {
+    ort: aufteilenOrt,
+    text: ortText(aufteilenOrt, ortKontext.namen),
+  });
   const ausgabePosten = ausgabeFuer
     ? (ems.find((em) => em.id === ausgabeFuer.posten.id) ?? ausgabeFuer.posten)
     : null;
@@ -781,7 +791,7 @@ export default function MaterialPage() {
                   gesperrt={isZeileBusy(em.id)}
                   laeuft={
                     (stornierenMutation.isPending && stornierenMutation.variables === em.id) ||
-                    (aufteilenMutation.isPending && aufteilenMutation.variables?.emId === em.id) ||
+                    (aufteilenMutation.isPending && aufteilenMutation.variables?.em.id === em.id) ||
                     (artMutation.isPending && artMutation.variables?.emId === em.id)
                   }
                   onWahl={(key) => handleAktion(key, em)}
@@ -1023,11 +1033,12 @@ export default function MaterialPage() {
       />
       <MaterialAufteilenModal
         posten={aufteilenPosten}
+        ortOptionen={aufteilenOrtOptionen}
         laeuft={aufteilenMutation.isPending}
         speicherung={aufteilenMutation}
-        onAufteilen={(menge) => {
+        onAufteilen={(menge, ziel) => {
           if (!aufteilenPosten) return Promise.resolve();
-          return aufteilenMutation.mutateAsync({ emId: aufteilenPosten.id, menge });
+          return aufteilenMutation.mutateAsync({ em: aufteilenPosten, menge, ziel });
         }}
         onSchliessen={() => setAufteilenFuer(null)}
       />

@@ -29,13 +29,18 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { materialPfad } from '../routing/deeplinks';
 import MaterialAdhocDialog from './MaterialAdhocDialog';
 import MaterialAusgabeModal from './MaterialAusgabeModal';
+import MaterialHierherModal from './MaterialHierherModal';
 import { useMaterialOrtKontext } from './MaterialOrtAngabe';
 import { buildZuordnenOptions, type OrtPosten, type ZuordnenPosten } from './materialOrtWahl';
 import {
+  hoechsteTeilmenge,
   materialDarstellung,
   materialStatusWahl,
   mengeText,
   ORT_FELD,
+  ortText,
+  ortVon,
+  ZUGEORDNET,
   type MaterialOrtRef,
 } from './materialPosten';
 import { materialKopfzahl } from './materialVerdichtungKern';
@@ -56,8 +61,11 @@ import { useMaterialOrt } from './useMaterialOrt';
  *   den Baustein verlassen hat ({@link useHoldGeloest}, LLH-1254).
  * - Kopfzahl „n Posten · k Ausfall“ aus der einen Material-Zählung.
  * - „Material zuordnen …“: wählen schreibt, Gruppen „Ohne Ort“ und „An anderem Ort“
- *   ({@link buildZuordnenOptions}). Zuordnen und Lösen laufen über den EINEN Schreibweg
- *   ({@link useMaterialOrt}, Recht Material, nie die Route eines Zielmoduls).
+ *   ({@link buildZuordnenOptions}). Ein aufteilbares Verbrauchsgut fragt zuerst die Menge
+ *   ({@link MaterialHierherModal}, vorbelegt mit der ganzen Menge; t1hvaqzu, design.md D6): die
+ *   ganze Menge holt den Posten, eine kleinere teilt ihn auf und setzt den Teil hierher. Zuordnen,
+ *   Teilmenge und Lösen laufen über den EINEN Schreibweg ({@link useMaterialOrt}, Recht Material,
+ *   nie die Route eines Zielmoduls).
  * - „Material erfassen“ (LLH-1133 D4): Ad-hoc-Material ohne Stamm mit diesem Ort in EINEM
  *   Request, im geteilten Dialog der Materialliste ({@link MaterialAdhocDialog}).
  * - Ein beendeter Ort sperrt nur das Zuordnen, Erfassen und Ausgeben, mit Kurzgrund daneben;
@@ -298,7 +306,7 @@ export default function MaterialAmOrt({
   const qc = useQueryClient();
   const { message } = App.useApp();
   const { token, rollen } = useRollen();
-  const { setOrt } = useMaterialOrt(einsatzId);
+  const { setOrt, teileAufNach } = useMaterialOrt(einsatzId);
   const grundId = useId();
   const isBedienbar = darfSchreiben && materialFrei;
 
@@ -357,6 +365,36 @@ export default function MaterialAmOrt({
     onSuccess: (_d, p) => void message.success(`${p.bezeichnung} zugeordnet`),
     onError: (e) => zuordnenFehler.melde('zuordnen', e, 'Zuordnen fehlgeschlagen'),
   });
+  // Die Mengenfrage beim Zuordnen (t1hvaqzu, design.md D6): ein Dialog für alle Posten, mit dem
+  // Stand beim Öffnen; die Ablehnung steht in ihm.
+  // Entfällt der Posten live aus dem Angebot, bleibt der Dialog mit dem Stand beim Öffnen offen
+  // und trägt die Ablehnung (Muster der Materialliste).
+  const [hierherFuer, setHierherFuer] = useState<{
+    p: ZuordnenPosten;
+    bisherText: string;
+  } | null>(null);
+  const hierherPosten =
+    hierherFuer == null
+      ? null
+      : (angebot?.data?.find((p) => p.id === hierherFuer.p.id) ?? hierherFuer.p);
+  const hierher = useMutation({
+    mutationFn: (v: { p: ZuordnenPosten; menge: number }) =>
+      v.menge === v.p.menge ? setOrt(v.p, ort) : teileAufNach(v.p, v.menge, ort),
+    onSuccess: (_d, v) =>
+      void message.success(
+        v.menge === v.p.menge
+          ? `${v.p.bezeichnung} zugeordnet`
+          : `${v.menge} ${v.p.bezeichnung} zugeordnet`,
+      ),
+  });
+  const waehle = (p: ZuordnenPosten, bisherText: string) => {
+    if (hoechsteTeilmenge(p) < 1) {
+      zuordnen.mutate(p);
+      return;
+    }
+    hierher.reset();
+    setHierherFuer({ p, bisherText });
+  };
 
   /**
    * Gleicht nach einer Änderung am Posten ab: die Einheit trägt ihr Material im DTO, UHS und
@@ -583,8 +621,8 @@ export default function MaterialAmOrt({
               einsatzId={einsatzId}
               ort={ort}
               angebot={angebot}
-              laeuft={zuordnen.isPending}
-              onWaehlen={(p) => zuordnen.mutate(p)}
+              laeuft={zuordnen.isPending || hierher.isPending}
+              onWaehlen={waehle}
               erfassen={erfassenKnopf}
             />
           )}
@@ -605,6 +643,18 @@ export default function MaterialAmOrt({
           ort={ort}
           offen={erfassenOffen}
           onSchliessen={() => setErfassenOffen(false)}
+        />
+      )}
+      {isBedienbar && !sperrgrund && (
+        <MaterialHierherModal
+          posten={hierherPosten}
+          bisherText={hierherFuer?.bisherText ?? ''}
+          laeuft={hierher.isPending}
+          speicherung={hierher}
+          onHolen={(menge) =>
+            hierherPosten ? hierher.mutateAsync({ p: hierherPosten, menge }) : Promise.resolve()
+          }
+          onSchliessen={() => setHierherFuer(null)}
         />
       )}
       {/* Außerhalb der Zeilen-`map`: ein Dialog für alle Posten (`frontend/AGENTS.md`, „Aktionen“). */}
@@ -631,7 +681,8 @@ interface ZuordnenAuswahlProps {
   ort: MaterialOrtRef;
   angebot: NonNullable<MaterialAmOrtProps['angebot']>;
   laeuft: boolean;
-  onWaehlen: (p: ZuordnenPosten) => void;
+  /** Der gewählte Posten und sein bisheriger Ort im Wortlaut der Auswahl. */
+  onWaehlen: (p: ZuordnenPosten, bisherText: string) => void;
   /** „Material erfassen“ neben der Auswahl. */
   erfassen: ReactNode;
 }
@@ -674,7 +725,10 @@ function ZuordnenAuswahl({
         optionRender={wrapLabel}
         onSelect={(wert) => {
           const p = angebot.data?.find((x) => String(x.id) === wert);
-          if (p) onWaehlen(p);
+          if (!p) return;
+          // Ohne Leserecht am bisherigen Ort hieße die Ergebniszeile sonst „…, zugeordnet 30“.
+          const bisher = ortText(ortVon(p), kontext.namen);
+          onWaehlen(p, bisher === ZUGEORDNET ? 'am bisherigen Ort' : bisher);
         }}
       />
       {erfassen}

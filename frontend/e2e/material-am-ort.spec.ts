@@ -6,9 +6,10 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Fahrzeug und Bereitstellungsraum, ein Schreibweg. Ein Posten der Einheit wird im UHS-Reiter
  * zugeordnet (die Einheit-Ansicht zeigt ihn nicht mehr, das ETB nennt alt und neu), Decken an der
  * UHS ausgegeben, ein Stromerzeuger auf ein Fahrzeug geladen (Block „Beladung“ und Meldebild),
- * Material im geplanten Bereitstellungsraum zugeordnet und gelöst. Nach dem Lösen rückt nichts unter
- * den Zeiger (LLH-1254): ein zweiter Klick auf dieselbe Stelle löst keinen anderen Posten. Gewartet
- * wird auf Inhaltsanker, nie auf `networkidle` (LFH-385).
+ * Material im geplanten Bereitstellungsraum zugeordnet und gelöst, 20 von 50 Decken der Einheit
+ * als Teilmenge an die UHS geholt (t1hvaqzu). Nach dem Lösen rückt nichts unter den Zeiger
+ * (LLH-1254): ein zweiter Klick auf dieselbe Stelle löst keinen anderen Posten. Gewartet wird auf
+ * Inhaltsanker, nie auf `networkidle` (LFH-385).
  */
 
 async function post<T = { id: number }>(page: Page, pfad: string, data: unknown): Promise<T> {
@@ -149,6 +150,39 @@ test('Bereitstellungsraum: im geplanten Raum zuordnen und lösen (LLH-1225)', as
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await expect(zeile(page, 'Lichtmast')).toHaveCount(0);
   await expect(sektion.getByText('Kein Material', { exact: true })).toBeVisible();
+});
+
+test('UHS: Teilmenge hierher – 20 von 50 Rettungsdecken, der Rest bleibt an der Einheit (t1hvaqzu)', async ({
+  page,
+}) => {
+  const s = await seed(page);
+  await post(page, `/api/einsaetze/${s.einsatzId}/material`, {
+    adhoc: { bezeichnung: 'Rettungsdecke' },
+    menge: 50,
+    art: 'verbrauchsgut',
+    einheit_id: s.einheitId,
+  });
+  await page.goto(`/einsaetze/${s.einsatzId}/unfallhilfsstellen/${s.uhsId}?bereich=material`);
+  await expect(zeile(page, 'Wolldecke')).toContainText('20');
+  // Ein aufteilbares Verbrauchsgut fragt die Menge, vorbelegt mit der ganzen.
+  await zuordnen(page.locator('main'), page, 'Rettungsdecke · 50 · Staffel A');
+  const dialog = page.getByRole('dialog', { name: 'Rettungsdecke hierher' });
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  const feld = dialog.getByRole('spinbutton', { name: 'Menge hierher' });
+  await expect(feld).toHaveValue('50');
+  await feld.fill('20');
+  await expect(dialog.getByText('Danach hier 20, Staffel A 30')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Hierher' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(zeile(page, 'Rettungsdecke')).toContainText('20');
+
+  await page.goto(`/einsaetze/${s.einsatzId}/einheiten/${s.einheitId}`);
+  await expect(zeile(page, 'Rettungsdecke')).toContainText('30');
+  await expect
+    .poll(() => etbInhalte(page, s.einsatzId))
+    .toContain(
+      'Material «Rettungsdecke» aufgeteilt: 50 → 30 + 20, davon 20: Einheit «Staffel A» → UHS «Turnhalle»',
+    );
 });
 
 test('Einheit: zwei Klicks auf dieselbe Stelle lösen nur einen Posten (LLH-1254)', async ({

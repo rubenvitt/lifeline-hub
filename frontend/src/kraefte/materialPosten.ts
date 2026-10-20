@@ -88,6 +88,17 @@ export function mengeText(em: Zeile): string {
   return restText(em);
 }
 
+/**
+ * Höchste abzuteilende Menge eines Postens (LLH-1224 D14): die Ausgangszeile behält mindestens
+ * eins, und abgeteilt wird nur aus dem Rest, denn Ausgegebenes bleibt an der Ausgangszeile. Ein
+ * Gerät lässt sich nicht teilen. Unter 1 heißt: nicht teilbar. Eine Grenze für den Dialog
+ * „Aufteilen …“ und die Mengenfrage beim Zuordnen am Ort (t1hvaqzu, design.md D6).
+ */
+export function hoechsteTeilmenge(em: Zeile): number {
+  if (em.art === 'geraet') return 0;
+  return Math.max(0, Math.min(em.menge - 1, em.menge - em.ausgegeben));
+}
+
 export type MaterialOrtArt = 'einheit' | 'fahrzeug' | 'uhs' | 'bereitstellungsraum';
 
 /** Der eine Ort eines Postens (D6); `null` heißt „ohne Ort“. */

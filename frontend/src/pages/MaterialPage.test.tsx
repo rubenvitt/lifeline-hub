@@ -1762,6 +1762,44 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(gesendet).toEqual([{ menge: 20 }]));
   });
 
+  it('„Aufteilen“ bringt 20 von 50 in einem Schritt an die UHS (t1hvaqzu, design.md D5)', async () => {
+    const gesendet: unknown[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material/10/aufteilen', async ({ request }) => {
+        gesendet.push(await request.json());
+        return HttpResponse.json([
+          { ...em, einheit_id: 1, menge: 30 },
+          { ...em, id: 11, menge: 20, uhs_id: 7 },
+        ]);
+      }),
+    );
+    render(einsatzAktiv, [{ ...em, einheit_id: 1 }]);
+    await screen.findByText('Wolldecke');
+    const menue = await openZeilenmenue('Wolldecke');
+    await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen …' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
+    // Das Feld „Ort“ des Dialogs; die Seite trägt weitere Felder dieses Namens (Filter der Spalte).
+    const ort = within(dialog).getByRole('combobox', { name: 'Ort' });
+    await userEvent.click(ort);
+    const liste = await waitFor(() => {
+      const l = document.getElementById(ort.getAttribute('aria-controls') ?? '');
+      expect(l).not.toBeNull();
+      return l!.closest<HTMLElement>('.ant-select-dropdown')!;
+    });
+    await userEvent.click(
+      await waitFor(() => {
+        const k = liste.querySelector<HTMLElement>(
+          '.ant-select-item-option[title="UHS Turnhalle"]',
+        );
+        expect(k).toBeTruthy();
+        return k!;
+      }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    await waitFor(() => expect(gesendet).toEqual([{ menge: 20, uhs_id: 7 }]));
+  });
+
   /**
    * Der Dialog hält seinen Posten (`frontend/AGENTS.md`, „Rückwege und Fehler“): nimmt ein anderer
    * Platz die Zeile live heraus, schließt er nicht, und die Ablehnung des Servers steht an ihm.

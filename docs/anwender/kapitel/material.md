@@ -2,7 +2,7 @@
 titel: Material
 gruppen: [fuehrung]
 reihenfolge: 340
-quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
+quellen: [frontend/src/pages/MaterialPage.tsx, frontend/src/kraefte/MaterialOrtAngabe.tsx, frontend/src/kraefte/materialOrtWahl.ts, frontend/src/kraefte/useMaterialOrt.ts, frontend/src/kraefte/MaterialAusgabeModal.tsx, frontend/src/kraefte/MaterialMengeModal.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/MaterialVerdichtung.tsx, frontend/src/kraefte/materialVerdichtungKern.ts, frontend/src/kraefte/MaterialAngabenModal.tsx, frontend/src/kraefte/MaterialAufteilenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/instrument/Segmentleiste.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/theme/statusFarben.ts, frontend/src/stammdaten/demoAuswahl.tsx, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, src/routes/einsatz_material.rs, src/material/mod.rs, src/material/disposition_repo.rs, src/material/ort.rs, src/fahrzeug/disposition_repo.rs, frontend/src/kraefte/materialPosten.ts, frontend/src/stammdaten/MaterialFormModal.tsx, migrations/0019_einsatz_material.sql, migrations/0197_material_modell.sql, migrations/0198_material_nachforderung.sql, frontend/src/api/nachforderungen.ts]
 ---
 
 ## Überblick
@@ -160,10 +160,17 @@ Für Einsatzleitung und Führungspersonal, wenn ein Teil der Menge woanders gebr
 2. Unter „Menge abteilen“ die Menge für die neue Zeile eingeben, von 1 bis eins unter der
    Menge und höchstens den Rest, der noch nicht ausgegeben ist. Darunter steht das Ergebnis, etwa
    „Danach 30 + 20“.
+3. Unter „Ort“ wählen, wohin die neue Zeile kommt. Vorbelegt ist der Ort des Postens; zur Wahl
+   stehen dieselben Orte wie in der Spalte „Ort“ und „ohne Ort“.
 
-   ![Dialog „Spende-Decken aufteilen“ mit dem Hinweis „30 von 50 übrig“, „Menge abteilen“ 20 und dem Ergebnis „Danach 30 + 20“](../bilder/material/aufteilen.png)
+   ![Dialog „Spende-Decken aufteilen“ mit dem Hinweis „30 von 50 übrig“, „Menge abteilen“ 20, dem Ergebnis „Danach 30 + 20“ und dem Feld „Ort“](../bilder/material/aufteilen.png)
 
-3. „Aufteilen“ wählen. Die neue Zeile steht in der Liste; ihren Ort in der Spalte „Ort“ ändern.
+4. „Aufteilen“ wählen. Die neue Zeile steht in der Liste an ihrem Ort, der Rest bleibt am
+   bisherigen Ort. Das Einsatztagebuch hält beides in einem Eintrag fest.
+
+Am Ort selbst geht es auch andersherum: An einer Einheit, einem Fahrzeug, einer Unfallhilfsstelle
+oder einem Bereitstellungsraum fragt „Material zuordnen …“ bei einem Verbrauchsgut, das sich
+aufteilen lässt, zuerst die „Menge hierher“. Eine kleinere als die ganze Menge holt nur diesen Teil.
 
 Bei Menge 1 heißt der Eintrag „Aufteilen · Rest 1“ und ist gesperrt, bei einem aufgebrauchten
 Verbrauchsgut „Aufteilen · aufgebraucht“. Ein Gerät hat den Eintrag nicht.
@@ -264,7 +271,8 @@ Fahrzeuge (Kapitel [Meldebild und Kräfte-Zeitachse](meldebild.md)).
 
 Derselbe Stammposten lässt sich mehrmals disponieren, jeweils als eigene Zeile mit eigener Menge und
 eigenem Status. Aufteilen macht aus einer Zeile zwei: Die neue Zeile übernimmt Art, Status,
-Bemerkung, Ort und den Zeitpunkt der Disposition, die Ausgangszeile behält den Rest der Menge.
+Bemerkung, Ort und den Zeitpunkt der Disposition oder steht an dem im Dialog gewählten Ort, die
+Ausgangszeile behält den Rest der Menge.
 Abgeteilt wird nur, was noch nicht ausgegeben ist; die Ausgabe bleibt an der Ausgangszeile, die neue
 Zeile beginnt ohne Ausgabe. Die
 Auswahl beim Disponieren bietet den Materialstamm an, soweit er in Dienst steht; Demo-Posten stehen
@@ -316,7 +324,9 @@ Stornieren stehen im Einsatztagebuch, mit alter und neuer Menge bzw. altem und n
   „… → ohne Ort“.
 - Ausgeben und zurücknehmen: „Material «Wolldecke»: Ausgabe 0 → 20 (Rest 30 von 50)“.
 - Art wechseln: „Material «Wolldecke»: Art Gerät → Verbrauchsgut“.
-- Aufteilen: „Material «Wolldecke» aufgeteilt: 50 → 30 + 20“.
+- Aufteilen: „Material «Wolldecke» aufgeteilt: 50 → 30 + 20“; geht der abgeteilte Teil an einen
+  anderen Ort, steht der Wechsel im selben Eintrag: „…, davon 20: Einheit «Staffel A» → UHS
+  «Turnhalle»“.
 - Angaben ändern: ein Eintrag, der jede geänderte Angabe mit altem und neuem Wert nennt.
 - Aus einer Nachforderung übernehmen: der Eintrag des Disponierens mit der Herkunft, etwa
   „Material «Tauchpumpe» (×1) disponiert, Ort Einheit «Rettungsstaffel», aus Nachforderung «3
