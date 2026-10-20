@@ -1,5 +1,5 @@
 import type { Gefahrentyp, Schadensgrad } from '../../api/types';
-import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
+import { GEFAHRENTYPEN, GEFAHRENTYPEN_ALPHABETISCH } from '../gefahren/gefahrenSchema';
 
 // Wörter für Gefahr und Schadensgrad eines Schadens (LLH-1115), ohne JSX: die Lagekarte
 // (Inspektor) liest sie, ohne die Seitenhelfer der Schadensliste mitzuladen.
@@ -12,8 +12,8 @@ export const GEFAHR_LABEL = Object.fromEntries(
   GEFAHRENTYPEN.map((g) => [g.wert, g.label]),
 ) as Record<Gefahrentyp, string>;
 
-/** Die Gefahrenarten in der Reihenfolge der Gefahrenmatrix. */
-export const GEFAHRENARTEN: readonly Gefahrentyp[] = GEFAHRENTYPEN.map((g) => g.wert);
+/** Die Gefahrenarten in der Reihenfolge der Gefahrenmatrix: alphabetisch (LLH-1102). */
+export const GEFAHRENARTEN: readonly Gefahrentyp[] = GEFAHRENTYPEN_ALPHABETISCH.map((g) => g.wert);
 
 /** Schadensgrad nach DV 102, 5.8.4 (LLH-1115); dieselben Wörter wie `Schadensgrad::etb_label`. */
 export const SCHADENSGRAD_LABEL: Record<Schadensgrad, string> = {

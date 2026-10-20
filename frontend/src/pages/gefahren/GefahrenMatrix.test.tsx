@@ -12,6 +12,7 @@ import GefahrenMatrix, {
   zellBalkenStil,
 } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
+import { GEFAHRENTYPEN_ALPHABETISCH } from './gefahrenSchema';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
   id: 1,
@@ -370,6 +371,60 @@ describe('GefahrenMatrix — die kurze Achse des Zell-Auslösers folgt der Dicht
     ['handschuh', 72],
   ] as const)('erreicht in %s den Trefflächenboden von %i px', (dichte, boden) => {
     expect(parseFloat(ausloeserBreite(dichte))).toBeGreaterThanOrEqual(boden);
+  });
+});
+
+/** Die Matrix unter der Staffel einer Dichtestufe (nicht `renderMitProviders`, siehe oben). */
+function rendereInDichte(dichte: Dichte) {
+  return render(
+    <ConfigProvider theme={{ token: antdToken(farbenHell, dichte) }}>
+      {matrixElement()}
+    </ConfigProvider>,
+  );
+}
+
+describe('GefahrenMatrix — verdichtet (LLH-1102)', () => {
+  it('ordnet die Zeilen alphabetisch, nicht nach dem Katalog', () => {
+    const { container } = rendereInDichte('kompakt');
+    const zeilen = Array.from(
+      container.querySelectorAll<HTMLTableRowElement>('.ant-table-tbody tr.ant-table-row'),
+    ).map((tr) => tr.cells[0].textContent);
+    expect(zeilen).toEqual(GEFAHRENTYPEN_ALPHABETISCH.map((g) => g.label));
+    expect(zeilen[0]).toBe('Absturz');
+  });
+
+  /**
+   * Die ganze Zelle ist das Bedienziel: ohne Polsterung, der Auslöser füllt sie. Vorher stand ein
+   * Knopf in Steuerhöhe mittig in einer gepolsterten Zelle, und ein Tipp daneben traf nichts.
+   * Die Staffel als Literale; das Pixel misst `e2e/gefahren-matrix-zelle.spec.ts`.
+   */
+  it.each([
+    ['kompakt', 30],
+    ['komfortabel', 48],
+    ['handschuh', 72],
+  ] as const)('füllt in %s die Zelle mit dem Auslöser, Zeilenhöhe %i px', (dichte, hoehe) => {
+    const { container } = rendereInDichte(dichte);
+    const knopf = container.querySelector<HTMLElement>(
+      'button[aria-label="Bewertung Brand × Menschen: keine"]',
+    )!;
+    const zelle = knopf.closest('td')!;
+    expect(zelle.style.padding).toBe('0px');
+    expect(knopf.style.width).toBe('100%');
+    expect(knopf.style.height).toBe(`${hoehe}px`);
+    expect(parseFloat(knopf.style.minWidth)).toBe(hoehe);
+    expect(knopf.classList).toContain('gefahren-zelle');
+    // Die Spalte „Gefahr“ polstert nur waagerecht: sie bestimmte sonst die Zeilenhöhe.
+    const kennung = zelle.closest('tr')!.cells[0];
+    expect(kennung.style.paddingBlock).toBe('0px');
+    expect(kennung.style.height).toBe(`${hoehe}px`);
+  });
+
+  it('die schraffierte Kachel füllt ihre Zelle ebenso', () => {
+    const { container } = rendereInDichte('handschuh');
+    const kachel = container.querySelector<HTMLElement>('[data-lfh="nicht-anwendbar"]')!;
+    expect(kachel.closest('td')!.style.padding).toBe('0px');
+    expect(kachel.style.width).toBe('100%');
+    expect(kachel.style.height).toBe('72px');
   });
 });
 

@@ -23,13 +23,16 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
           // Explosion trägt nur „keine" — die Zeile fällt weg.
           bewertung({ gefahrentyp: 'explosion', schutzobjekt: 'tiere', warnstufe: 'keine' }),
           bewertung({ gefahrentyp: 'ertrinken', schutzobjekt: 'tiere', warnstufe: 'niedrig' }),
+          bewertung({ gefahrentyp: 'absturz', schutzobjekt: 'menschen', warnstufe: 'mittel' }),
+          bewertung({ gefahrentyp: 'atemgifte', schutzobjekt: 'menschen', warnstufe: 'niedrig' }),
         ]}
       />,
     );
 
     const zeilenkoepfe = screen.getAllByRole('rowheader').map((k) => k.textContent);
-    // Katalogreihenfolge, nicht Reihenfolge der Antwort.
-    expect(zeilenkoepfe).toEqual(['Brand', 'Ertrinken']);
+    // Alphabetisch wie die Matrix (LLH-1102), nicht nach Katalog (Atemgifte vor Absturz) und
+    // nicht in der Reihenfolge der Antwort.
+    expect(zeilenkoepfe).toEqual(['Absturz', 'Atemgifte', 'Brand', 'Ertrinken']);
     expect(screen.queryByText('Explosion')).not.toBeInTheDocument();
   });
 

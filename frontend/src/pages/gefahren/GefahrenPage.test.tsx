@@ -68,7 +68,12 @@ describe('GefahrenPage', () => {
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
   });
 
-  it('nennt die Zonenzahl eines Gebiets mit Einheit, Zahl vor Wort (LFH-971)', async () => {
+  /**
+   * LLH-1102: die Zeile sagt, was im Gebiet los ist („1 Zone“ sagte im Einsatz nichts). Gezählt
+   * werden Gefahren über „keine“, nicht Zellen; ein nicht beurteiltes Gebiet heißt so (LLH-1090).
+   */
+  it('nennt in der Liste Gefahren und höchste Stufe statt der Zonenzahl (LLH-1102)', async () => {
+    const nord = { ...gebiet, beurteilt_at: '2026-10-20 13:15:00', beurteilt_von: 2 };
     const sued = {
       id: 8,
       einsatz_id: 1,
@@ -76,10 +81,26 @@ describe('GefahrenPage', () => {
       zonen_ids: [11, 12],
       hoechste_warnstufe: 'mittel',
     };
-    server.use(...handlers([gebiet, sued]));
+    const nordMatrix = [
+      { gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' },
+      { gefahrentyp: 'brand', schutzobjekt: 'tiere', warnstufe: 'mittel' },
+      { gefahrentyp: 'ertrinken', schutzobjekt: 'menschen', warnstufe: 'niedrig' },
+    ];
+    server.use(...handlers([nord, sued], nordMatrix));
     renderPage();
-    expect(await screen.findByText('1 Zone')).toBeInTheDocument();
-    expect(screen.getByText('2 Zonen')).toBeInTheDocument();
+    const liste = await screen.findByRole('region', { name: 'Gefahrengebiete' });
+    expect(await within(liste).findByText('2 Gefahren · hoch')).toBeInTheDocument();
+    expect(within(liste).getByText('nicht beurteilt')).toBeInTheDocument();
+    expect(within(liste).queryByText(/Zonen?$/)).toBeNull();
+  });
+
+  it('nennt die Zonenzahl am Sprung zur Karte, Zahl vor Wort (LFH-971)', async () => {
+    server.use(...handlers([{ ...gebiet, zonen_ids: [9, 10] }]));
+    renderPage();
+    const link = await screen.findByRole('link', { name: 'Auf Karte zeigen' });
+    const zusatz = screen.getByText('· 2 Zonen');
+    expect(zusatz.closest('[data-lfh="karte-zonen"]')).toContainElement(link);
+    expect(link).not.toContainElement(zusatz);
     expect(screen.queryByText('(1)')).not.toBeInTheDocument();
   });
 

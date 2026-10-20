@@ -326,13 +326,15 @@ describe('verdichteGefahrenmatrix', () => {
     ]);
   });
 
-  it('hält die Katalogreihenfolge, nicht die Eingangs- oder Stufenreihenfolge', () => {
+  it('ordnet alphabetisch wie die Matrix, nicht nach Katalog, Eingang oder Stufe (LLH-1102)', () => {
     const { zeilen } = verdichteGefahrenmatrix([
-      b('ertrinken', 'akut'),
-      b('atemgifte', 'niedrig'),
-      b('explosion', 'hoch'),
+      b('explosion', 'akut'),
+      b('absturz', 'niedrig'),
+      b('atemgifte', 'hoch'),
+      b('ertrinken', 'mittel'),
     ]);
-    expect(zeilen.map((z) => z.typ)).toEqual(['atemgifte', 'explosion', 'ertrinken']);
+    // Katalog wäre atemgifte, explosion, absturz, ertrinken.
+    expect(zeilen.map((z) => z.typ)).toEqual(['absturz', 'atemgifte', 'ertrinken', 'explosion']);
   });
 
   /** LLH-1090: „keine“ ist die Vorgabe; gesetzt oder nicht, sie ergibt keine Zeile. */

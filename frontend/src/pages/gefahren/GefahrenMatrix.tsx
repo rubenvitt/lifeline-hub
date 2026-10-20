@@ -13,7 +13,13 @@ import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../.
 import { monoStil, useRollen } from '../../components/instrument';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
+import {
+  GEFAHRENTYPEN,
+  GEFAHRENTYPEN_ALPHABETISCH,
+  SCHUTZOBJEKTE,
+  WARNSTUFEN,
+  kombinationGueltig,
+} from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import { useRahmenOben } from '../../components/rahmenOben';
@@ -172,7 +178,10 @@ export interface GefahrenMatrixProps {
   onDetailsSchliessen?: () => void;
 }
 
-/** Das 13×5-Raster eines Gefahrengebiets. */
+/**
+ * Das 13×5-Raster eines Gefahrengebiets, verdichtet (LLH-1102, Spec `gefahrenmatrix`): Zeilen
+ * alphabetisch, Zeilenhöhe = Steuerhöhe der Stufe, die ganze Zelle ist das Bedienziel.
+ */
 export default function GefahrenMatrix({
   matrix,
   darfSchreiben,
@@ -208,6 +217,9 @@ export default function GefahrenMatrix({
       key: 'label',
       fixed: 'left',
       width: GEFAHR_SPALTE_BREITE,
+      // Dichte Zeilen (LLH-1102): die Zeile ist so hoch wie die Steuerhöhe der Stufe. Senkrecht
+      // keine Polsterung, sonst bestimmte die Kennungsspalte die Zeilenhöhe; waagerecht bleibt sie.
+      onCell: () => ({ style: { paddingBlock: 0, height: token.controlHeight } }),
     },
     ...SCHUTZOBJEKTE.map((obj) => {
       const { icon: Icon, kurz } = SPALTENKOPF[obj.wert];
@@ -232,14 +244,17 @@ export default function GefahrenMatrix({
             'data-warnstufe': stufe,
             style: {
               ...(stufe ? zellFlaechenStil(stufe, token) : {}),
+              // Die ganze Zelle ist das Bedienziel (LLH-1102): keine Polsterung, der Auslöser
+              // füllt sie. Fläche und Balken bleiben an der Zelle, der Knopf ist durchsichtig.
+              padding: 0,
               textAlign: 'center' as const,
             },
           };
         },
         render: (_: unknown, zeile: ZeilenDaten) => {
           if (!kombinationGueltig(zeile.typ, obj.wert)) {
-            // Muster statt Wort, kein Knopf; die Kachel hat die Höhe der Zellknöpfe, damit das
-            // Raster ruhig bleibt (LLH-1090).
+            // Muster statt Wort, kein Knopf; die Kachel füllt die Zelle wie die Zellknöpfe, damit
+            // das Raster ruhig bleibt (LLH-1090, LLH-1102).
             return (
               <span
                 role="img"
@@ -247,6 +262,7 @@ export default function GefahrenMatrix({
                 aria-label={`${zeile.label} × ${obj.label}: ${ZELLE_NICHT_ANWENDBAR.label}`}
                 style={{
                   display: 'block',
+                  width: '100%',
                   minWidth: token.controlHeight,
                   height: token.controlHeight,
                   ...schraffurStil(rollen.steuerRahmen),
@@ -294,11 +310,21 @@ export default function GefahrenMatrix({
             >
               <Button
                 type="text"
+                className="gefahren-zelle"
                 // Der Name trägt Zeilenkennung und Stufe: 58 gleichnamige Knöpfe wären unbrauchbar.
                 aria-label={`Bewertung ${zeile.label} × ${obj.label}: ${anzeige.label}`}
-                // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider. `minWidth` = Höhe
-                // hält die Zelle quadratisch und die Matrix im Breitenbudget.
-                style={{ minWidth: token.controlHeight }}
+                // Keine Größen-Prop: die Höhe kommt aus der Staffel des ConfigProviders. Der Knopf
+                // füllt die Zelle (LLH-1102): ein Tipp irgendwo in ihr trifft, auch neben das
+                // Kürzel. `minWidth` = Höhe hält die kurze Achse, wenn die Spalte schmal wird;
+                // Radius 0, damit die Fläche bis in die Ecken Ziel ist. Den Fokusring trägt
+                // `gefahrenMatrix.css` nach innen.
+                style={{
+                  display: 'flex',
+                  width: '100%',
+                  minWidth: token.controlHeight,
+                  height: token.controlHeight,
+                  borderRadius: 0,
+                }}
               >
                 {anzeige.kuerzel}
               </Button>
@@ -308,7 +334,11 @@ export default function GefahrenMatrix({
       };
     }),
   ];
-  const zeilen: ZeilenDaten[] = GEFAHRENTYPEN.map((g) => ({ typ: g.wert, label: g.label }));
+  // Alphabetisch (LLH-1102): dieselbe Folge wie Lagebild, Palettenauszug und Schäden.
+  const zeilen: ZeilenDaten[] = GEFAHRENTYPEN_ALPHABETISCH.map((g) => ({
+    typ: g.wert,
+    label: g.label,
+  }));
 
   // Je Render frisch aus `matrix` abgeleitet — so erreicht ein Nachladen den offenen Dialog.
   const detailZelle = detailKennung

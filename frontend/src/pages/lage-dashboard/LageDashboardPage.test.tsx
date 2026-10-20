@@ -1004,7 +1004,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     const box = paneel('Gefahrenmatrix');
     await waitFor(() => expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(2));
     const zeilen = Array.from(box.querySelectorAll<HTMLElement>('[data-lfh="gefahrenzeile"]'));
-    // Katalog: Brand vor Ertrinken. Atemgifte trägt nur „keine“, die Vorgabe (LLH-1090): keine Zeile.
+    // Alphabetisch: Brand vor Ertrinken. Atemgifte trägt nur „keine“, die Vorgabe (LLH-1090): keine Zeile.
     expect(zeilen.map((z) => [z.firstChild?.textContent, z.dataset.stufe])).toEqual([
       ['Brand', 'akut'],
       ['Ertrinken', 'hoch'],
