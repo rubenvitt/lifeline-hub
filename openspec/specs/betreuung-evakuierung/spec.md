@@ -112,12 +112,19 @@ Schritt MUST dieselben ETB-Einträge erzeugen wie jeder andere Wechsel des Räum
 
 Die Detailseite SHALL die dem Bezirk zugeordneten Flächen in einem nicht bedienbaren
 Kartenausschnitt zeigen und einen Sprung „Auf Lagekarte öffnen“ anbieten. Ohne Fläche MUST ein
-Leerzustand in Worten stehen, ohne Knopf. Ohne Lesezugriff auf das Modul Lagekarte MUST die
-Seite die Flächen nicht abrufen, ihre Zahl nennen und den Sprung gesperrt mit Grund zeigen.
+Leerzustand in Worten stehen, ohne Sprung. Personen mit Schreibrecht MUST das Gebiet ohne Fläche
+„Gebiet zeichnen“ und mit Fläche „Weitere Teilfläche zeichnen“ anbieten (LLH-1069); beides öffnet
+die Lagekarte im Zeichenmodus für eine Fläche dieses Bezirks. Ohne Lesezugriff auf das Modul
+Lagekarte MUST die Seite die Flächen nicht abrufen, ihre Zahl nennen und den Sprung wie das Zeichnen
+gesperrt mit Grund zeigen.
 
 #### Scenario: Bezirk ohne Fläche
 - **WHEN** der Bezirk keine zugeordnete Zone hat
-- **THEN** sagt das Gebiet „Kein Gebiet auf der Lagekarte“ und bietet keinen Sprung an
+- **THEN** sagt das Gebiet „Kein Gebiet auf der Lagekarte“, bietet keinen Sprung an und mit Schreibrecht „Gebiet zeichnen“
+
+#### Scenario: Weitere Teilfläche von der Detailseite
+- **WHEN** der Bezirk eine Fläche hat und die Person schreiben darf
+- **THEN** steht neben „Auf Lagekarte öffnen“ „Weitere Teilfläche zeichnen“
 
 #### Scenario: Lagekarte gesperrt
 - **WHEN** der Bezirk zwei Flächen hat und die Person die Lagekarte nicht lesen darf

@@ -2,7 +2,7 @@
 titel: Evakuierung
 gruppen: [alle, fuehrung]
 reihenfolge: 525
-quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -46,7 +46,8 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
 3. „Stammdaten“ nennt Bezeichnung, Plangröße, Erhebung, Einsatzabschnitt, Sammelstelle und Notiz.
 4. „Gebiet“ zeigt die zugeordneten Flächen der Lagekarte als kleinen Ausschnitt. „Auf Lagekarte
    öffnen“ führt auf die Karte, mit einer Fläche des Bezirks ausgewählt. Ohne Fläche steht „Kein
-   Gebiet auf der Lagekarte“.
+   Gebiet auf der Lagekarte“. „Gebiet zeichnen“ (ohne Fläche) und „Weitere Teilfläche zeichnen“
+   (mit Fläche) öffnen die Lagekarte zum Zeichnen einer Fläche für diesen Bezirk.
 5. „Standverlauf“ zeigt ab zwei Meldungen eine Linie des Stands über die Zeit, die Plangröße
    gestrichelt, darunter alle Meldungen.
 
@@ -56,11 +57,30 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
 2. Unter „Bezeichnung“ das Gebiet nennen, etwa Straße und Hausnummern, ohne Namen von Bewohnern.
 3. Die „Plangröße (Personen)“ eintragen und unter „Erhebung“ angeben, ob sie „gezählt“ oder
    „geschätzt“ ist.
-4. Unter „Weitere Angaben“ bei Bedarf „Einsatzabschnitt“, „Sammelstelle“ und „Notiz“ ergänzen.
+4. Unter „Gebiet auf der Lagekarte“ „Keins“ wählen, wenn das Gebiet nicht gleich gezeichnet
+   werden soll. Vorgewählt ist „Fläche zeichnen“ (weiter unter „Einen Bezirk mit Gebiet
+   anlegen“).
+5. Unter „Weitere Angaben“ bei Bedarf „Einsatzabschnitt“, „Sammelstelle“ und „Notiz“ ergänzen.
 
-   ![Dialog „Evakuierungsbezirk anlegen“ mit Bezeichnung, Plangröße, Erhebung und Sammelstelle](../bilder/evakuierung/bezirk-anlegen.png)
+   ![Dialog „Evakuierungsbezirk anlegen“ mit Bezeichnung, Plangröße, Erhebung, Gebietswahl und Sammelstelle](../bilder/evakuierung/bezirk-anlegen.png)
 
-5. „Anlegen“ wählen. Der Bezirk steht auf „angeordnet“.
+6. „Anlegen“ wählen. Der Bezirk steht auf „angeordnet“.
+
+### Einen Bezirk mit Gebiet anlegen
+
+1. Den Bezirk anlegen wie oben, unter „Gebiet auf der Lagekarte“ „Fläche zeichnen“ gewählt.
+2. Nach „Anlegen“ öffnet die Lagekarte zum Zeichnen. Das Band unten auf der Karte nennt „Bezirk …
+   · Fläche“ mit der Bezeichnung des Bezirks.
+3. Die Eckpunkte des Gebiets auf der Karte setzen, „Abschließen“ und „Speichern“ wählen.
+
+   ![Lagekarte mit dem neu gezeichneten Gebiet und der Rückmeldung „Gebiet für Bezirk Lindenstraße 1–20 gespeichert“](../bilder/evakuierung/bezirk-gebiet-zeichnen.png)
+
+4. Die Rückmeldung „Gebiet für Bezirk … gespeichert“ bietet „Zurück zu Bezirk …“ an; „Auf der
+   Karte bleiben“ schließt sie. Die Fläche ist dem Bezirk zugeordnet und trägt seine Bezeichnung.
+
+Ein Gebiet für einen bestehenden Bezirk entsteht ebenso über „Gebiet zeichnen“ oder „Weitere
+Teilfläche zeichnen“ im Menü des Bezirks oder auf seiner Seite. „Verwerfen“ beim Zeichnen lässt
+den Bezirk ohne neue Fläche.
 
 ### Den Stand eines Bezirks melden
 
@@ -149,7 +169,10 @@ Rücknahme als Berichtigung.
 Anlegen und melden dürfen Einsatzleitung und Führungspersonal eines laufenden Einsatzes
 ([Rechte im Einsatz](rechte-im-einsatz.md)); ohne dieses Recht steht ein Hinweis über der Seite,
 und die Knöpfe sind gesperrt. Die Seite eines Bezirks bleibt lesbar, ohne „Stand melden“ und
-„Bearbeiten“. Wer die Lagekarte nicht sehen darf, sieht unter „Gebiet“ nur die Zahl der Flächen. „Evakuierung“ und „Betreuung“ sind getrennte Module: jedes lässt sich
+„Bearbeiten“. Wer die Lagekarte nicht sehen darf, sieht unter „Gebiet“ nur die Zahl der Flächen
+und kann kein Gebiet zeichnen: „Fläche zeichnen“, „Gebiet zeichnen“ und „Weitere Teilfläche
+zeichnen“ sind dann gesperrt. Ein Link zum Zeichnen auf einen fremden oder stornierten Bezirk
+öffnet die Lagekarte ohne Zeichenmodus. „Evakuierung“ und „Betreuung“ sind getrennte Module: jedes lässt sich
 für sich ausblenden oder auf Rollen beschränken
 ([Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Das gekoppelte Gerät einer
 Betreuungsstelle sieht keine Bezirke.
