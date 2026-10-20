@@ -57,7 +57,9 @@ setzen Status, tragen nach und streichen.
    gebunden, nicht verfügbar) filtern; der Knopf nennt dann die Zahl, etwa „Filter (1)“. Jeder
    gesetzte Filter steht als Marke in der Werkzeugzeile und lässt sich dort einzeln entfernen. Die
    Zahl links, etwa „20 von 20 Kräften“, nennt, wie viele Kräfte die Auswahl zeigt; „Filter
-   zurücksetzen“ hebt alle Filter auf.
+   zurücksetzen“ hebt alle Filter auf. Trifft die Suche ein Fahrzeug, steht seine ganze Beladung
+   darunter; trifft sie einen Posten der Beladung, steht das Fahrzeug mit seiner Einheit darüber,
+   aber nur mit diesem Posten.
 
 Die Zeile „Ohne Einheit“ sammelt Fahrzeuge und Personal, die keiner Einheit zugeordnet sind, und
 Material ohne Ort; ein Fahrzeug ohne Einheit bringt seine Beladung mit. Material an einer UHS oder
