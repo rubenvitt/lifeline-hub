@@ -4,12 +4,15 @@
  * Eine LISTE, keine Tabelle: 1 bis 5 Stationen, gelesen statt verglichen. Die Werte kommen aus
  * {@link pegelZeile}, damit Dashboard, Überblick und diese Seite dieselben Schwellen lesen.
  * Der Verlauf ist eine eigene Abfrage; fällt nur sie aus, bleiben die Werte stehen.
+ *
+ * Ohne festgelegten Pegel steht statt des Paneels {@link PegelLeerzeile} (LLH-1117).
  */
 import type { PegelAnzeige, PegelVerlauf } from '../api/types';
 import type { AnzeigeKonventionen } from '../anzeige/format';
 import {
   Augenbraue,
   Paneel,
+  PaneelLink,
   PaneelZustand,
   monoStil,
   useRollen,
@@ -20,9 +23,25 @@ import Verlaufslinie from './Verlaufslinie';
 
 const VERLAUF_FEHLT = 'Verlauf nicht abrufbar';
 const KEIN_VERLAUF = 'noch kein Verlauf';
-/** Wortlaut des Leerzustands — bewusst NICHT „Pegel festlegen": das ist die Primäraktion im
-    Seitenkopf, zwei gleichnamige Ziele sagten nicht, welches wohin führt. */
+/** Wortlaut des Leerzustands — bewusst NICHT „Pegel festlegen": so heißt der Nebenweg im
+    Seitenkopf, zwei gleichnamige Ziele wären für Vorlesende nicht zu unterscheiden. */
 const ZU_DEN_EINSTELLUNGEN = 'Zu Einstellungen › Pegel';
+
+/**
+ * Der Pegel als EINE Zeile, wenn am Einsatz kein Pegel festgelegt ist (LLH-1117, Spec
+ * `lage-wetter-pegel`, „Reihenfolge der Modulseite"): nur der Kopf eines Paneels, „kein Pegel
+ * festgelegt" als Meta, der Weg zu Einstellungen › Pegel als Aktion. Ein Pegel ist nur in einer
+ * Hochwasserlage die führende Größe; sonst steht er zuletzt und klein.
+ */
+export function PegelLeerzeile({ onEinstellungen }: { onEinstellungen: () => void }) {
+  return (
+    <Paneel
+      titel="Pegel"
+      meta={KEIN_PEGEL}
+      aktion={<PaneelLink label={ZU_DEN_EINSTELLUNGEN} onKlick={onEinstellungen} />}
+    />
+  );
+}
 
 interface PegelPaneelProps {
   zustand: PaneelDatenzustand;

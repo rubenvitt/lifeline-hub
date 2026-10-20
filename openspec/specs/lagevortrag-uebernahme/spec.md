@@ -145,7 +145,11 @@ sagen.
 Die Übernahme SHALL Betroffene, Vermisste, Sichtung nach Kategorien, offene Schäden, die höchste
 Warnstufe mit der Zahl der Gebiete, geltende und angekündigte Wetterwarnungen, die aktuellen
 Bedingungen am Einsatzort und je maßgeblichem Pegel Stand und Trend enthalten. Fehlt ein
-Einsatzort oder ein Pegel, MUST der Text das sagen statt einer leeren Zeile.
+Einsatzort, MUST der Text das sagen statt einer leeren Zeile. Das Wetter MUST vor den Pegeln stehen.
+Einen Teil „Pegel“ MUST der Text nur enthalten, wenn am Einsatz ein maßgeblicher Pegel festgelegt
+ist (die Entscheidung, die auch die Pegel-Kennzahl im Lagebild trägt); ohne diese Entscheidung MUST
+der Teil ganz entfallen. Ist der Einsatz nicht abrufbar, MUST der Teil mit dem Grund stehen
+bleiben.
 
 #### Scenario: Ohne Einsatzort
 - **WHEN** der Einsatz keinen Ort hat und die Person die Gefahren-/Schadenlage übernimmt
@@ -155,6 +159,16 @@ Einsatzort oder ein Pegel, MUST der Text das sagen statt einer leeren Zeile.
 - **WHEN** zwei maßgebliche Pegel festgelegt sind
 - **THEN** nennt der Text beide mit Gewässer, Stand, Trend und Messzeit in der festgelegten
   Reihenfolge
+
+#### Scenario: Kein Pegel festgelegt
+- **WHEN** am Einsatz kein maßgeblicher Pegel festgelegt ist und die Person die
+  Gefahren-/Schadenlage übernimmt
+- **THEN** enthält der Text keinen Teil „Pegel“, und die Teile Betroffene, Schäden und Gefahren
+  sowie Wetter tragen ihre Werte
+
+#### Scenario: Wetter vor Pegel
+- **WHEN** ein maßgeblicher Pegel festgelegt ist
+- **THEN** steht der Teil „Wetter“ vor dem Teil „Pegel“
 
 ### Requirement: Inhalt der Lageentwicklung
 Die Übernahme SHALL die ETB-Einträge seit dem Eintrag der letzten abgehaltenen Lagebesprechung

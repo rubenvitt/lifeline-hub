@@ -49,8 +49,10 @@ const EINSATZ = {
   begonnen_at: '2026-10-04 05:00:00',
   abgeschlossen_at: null,
   status: 'aktiv',
-  lagekennzahlen: [],
+  // Hochwasserlage per Entscheidung (LLH-1117): der Teil „Pegel“ steht nur damit.
+  lagekennzahlen: ['pegel'],
 } as unknown as EinsatzAnzeige;
+const OHNE_PEGEL = { ...EINSATZ, lagekennzahlen: [] } as unknown as EinsatzAnzeige;
 
 /** Freitext mit Namen Dritter: darf nie im Lagevortrag landen. */
 const FREITEXT = ['Erika Muster', 'Familie Müller', 'Hauptstraße 5', 'Herr Schmidt'];
@@ -288,9 +290,35 @@ describe('Gefahren-/Schadenlage (LFH-872)', () => {
     );
   });
 
-  it('sagt „keine maßgeblichen Pegel festgelegt“ bei leerer Auswahl', async () => {
+  it('steht das Wetter vor dem Pegel', async () => {
+    const text = await erzeuge();
+    expect(text.indexOf('**Wetter**')).toBeGreaterThan(-1);
+    expect(text.indexOf('**Wetter**')).toBeLessThan(text.indexOf('**Pegel**'));
+  });
+
+  it('ohne festgelegten Pegel entfällt der Teil „Pegel“ ganz (LLH-1117)', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(OHNE_PEGEL);
+    vi.mocked(listePegel).mockResolvedValue([]);
+    const text = await erzeuge();
+    expect(text).not.toContain('Pegel');
+    // Die übrigen Teile tragen ihre Werte, der Text endet nach dem Wetter.
+    expect(text).toContain('- Schäden offen: 2 (von 3 gemeldet)');
+    expect(text).toMatch(/\*\*Wetter\*\*\n[^*]*$/);
+  });
+
+  it('entscheidet der Einsatz, nicht die Liste: ohne Entscheidung kein Teil, auch mit Liste', async () => {
+    vi.mocked(ladeEinsatz).mockResolvedValue(OHNE_PEGEL);
+    expect(await erzeuge()).not.toContain('**Pegel**');
+  });
+
+  it('mit Entscheidung, aber gerade geleerter Liste: „keine maßgeblichen Pegel festgelegt“', async () => {
     vi.mocked(listePegel).mockResolvedValue([]);
     expect(await erzeuge()).toContain('**Pegel**\n- keine maßgeblichen Pegel festgelegt');
+  });
+
+  it('ohne ladbaren Einsatz bleibt der Teil „Pegel“ mit Grund stehen', async () => {
+    vi.mocked(ladeEinsatz).mockRejectedValue(new Error('500'));
+    expect(await erzeuge()).toContain('**Pegel**\n- — (nicht geladen)');
   });
 
   it('Personen gesperrt: „— (nicht freigegeben)“ ohne Anfrage, der Rest bleibt', async () => {

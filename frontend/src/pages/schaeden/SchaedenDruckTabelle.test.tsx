@@ -56,9 +56,16 @@ describe('SchaedenDruckTabelle', () => {
       Array.from(document.querySelectorAll('[data-lfh="schaeden-druck-tabelle"] thead th')).map(
         (th) => th.textContent,
       ),
-    ).toEqual(['Nr.', 'Typ', 'Ausmaß', 'Ort', 'Status', 'Geschädigt', 'erfasst']);
+    ).toEqual(['Nr.', 'Typ', 'Ausmaß', 'Gefahr', 'Ort', 'Status', 'Geschädigt', 'erfasst']);
     expect([zellen(0)[0], zellen(1)[0], zellen(2)[0]]).toEqual(['S-001', 'S-002', 'S-003']);
-    expect(zellen(0).slice(1, 6)).toEqual(['Sachschaden', 'mittel', 'Hauptstr. 17', 'offen', '—']);
+    expect(zellen(0).slice(1, 7)).toEqual([
+      'Sachschaden',
+      'mittel',
+      '—',
+      'Hauptstr. 17',
+      'offen',
+      '—',
+    ]);
   });
 
   it('nennt „übergeben an“ und den Geschädigten als Text ohne Link', () => {
@@ -78,12 +85,26 @@ describe('SchaedenDruckTabelle', () => {
         konventionen={DEFAULT_KONVENTIONEN}
       />,
     );
-    expect(zellen(0)[4]).toBe('übergeben an Stadtwerke');
-    expect(zellen(1)[5]).toBe('R-007');
-    expect(zellen(2)[5]).toBe('Schulz');
-    expect(zellen(3)[5]).toBe('R-008 (storniert)');
-    expect(zellen(4)[5]).toBe('DRK');
-    expect(zellen(5)[5]).toBe('Hausverwaltung');
+    expect(zellen(0)[5]).toBe('übergeben an Stadtwerke');
+    expect(zellen(1)[6]).toBe('R-007');
+    expect(zellen(2)[6]).toBe('Schulz');
+    expect(zellen(3)[6]).toBe('R-008 (storniert)');
+    expect(zellen(4)[6]).toBe('DRK');
+    expect(zellen(5)[6]).toBe('Hausverwaltung');
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+  });
+
+  it('nennt Gefahr und Schadensgrad in Worten (LLH-1115)', () => {
+    render(
+      <SchaedenDruckTabelle
+        schaeden={[
+          schaden(1, { gefahrenart: 'elektrizitaet', schadensgrad: 'zerstoert' }),
+          schaden(2, { schadensgrad: 'teilzerstoert' }),
+        ]}
+        konventionen={DEFAULT_KONVENTIONEN}
+      />,
+    );
+    expect(zellen(0)[3]).toBe('Elektrizität · total zerstört');
+    expect(zellen(1)[3]).toBe('teilzerstört');
   });
 });
