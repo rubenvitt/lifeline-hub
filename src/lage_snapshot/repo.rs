@@ -248,7 +248,18 @@ pub async fn erzeuge(
 
     // Eine Abfrage für beide Betreuungsfelder, wie die Modulseite: nur nicht stornierte Stellen und
     // Bezirke.
-    let betreuungsstellen = crate::betreuung::repo::stellen(pool, einsatz_id).await?;
+    // Leitung und Erreichbarkeit (LLH-1044) friert der Stand nicht ein: das Lagebild braucht sie
+    // nicht, und ein Name im Dokument bräuchte einen eigenen Schwärzungspfad (wie der
+    // Einsatzleiter unten, LLH-1168).
+    let betreuungsstellen = crate::betreuung::repo::stellen(pool, einsatz_id)
+        .await?
+        .into_iter()
+        .map(|s| crate::betreuung::BetreuungsstelleAnzeige {
+            leitung: None,
+            erreichbarkeit: None,
+            ..s
+        })
+        .collect();
     let evakuierungsbezirke = crate::betreuung::repo::bezirke(pool, einsatz_id).await?;
 
     let daten = SnapshotDaten {

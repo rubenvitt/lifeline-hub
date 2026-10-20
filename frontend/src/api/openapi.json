@@ -2909,6 +2909,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "erreichbarkeit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe."
+          },
           "geaendert_at": {
             "type": [
               "string",
@@ -2934,6 +2941,13 @@
             ],
             "format": "double",
             "description": "Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält\nsie als Paar."
+          },
+          "leitung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wer die Stelle leitet (LLH-1044), Freitext. Fehlt ohne Angabe."
           },
           "lon": {
             "type": [
