@@ -3,11 +3,12 @@ use super::{
     SchadenTyp,
 };
 use crate::error::AppError;
+use crate::gefahr::Gefahrentyp;
 use sqlx::{SqliteConnection, SqlitePool};
 
 const SELECT_ALLE: &str = "\
-    SELECT s.id, s.einsatz_id, s.registrier_nr, s.status, s.typ, s.ausmass, s.ort, \
-           s.lat, s.lon, \
+    SELECT s.id, s.einsatz_id, s.registrier_nr, s.status, s.typ, s.ausmass, \
+           s.gefahrenart, s.schadensgrad, s.ort, s.lat, s.lon, \
            s.beschreibung, s.geschaedigt_person_id, s.geschaedigt_kontakt, \
            s.geschaedigt_personal_id, s.geschaedigt_organisation_id, \
            s.uebergeben_an, s.uebergeben_at, s.abschluss_grund, s.abschluss_at, \
@@ -28,6 +29,9 @@ const SELECT_ALLE: &str = "\
 pub struct NeueDaten<'a> {
     pub typ: &'a str,
     pub ausmass: &'a str,
+    /// Geprüfter Wire-Wert oder `None` (LLH-1115).
+    pub gefahrenart: Option<&'a str>,
+    pub schadensgrad: Option<&'a str>,
     pub ort: &'a str,
     pub beschreibung: Option<&'a str>,
     pub lat: Option<f64>,
@@ -42,6 +46,9 @@ pub struct NeueDaten<'a> {
 pub struct PatchDaten<'a> {
     pub typ: Option<&'a str>,
     pub ausmass: Option<&'a str>,
+    /// `Some(Some(w))` = setzen, `Some(None)` = leeren, `None` = unverändert (LLH-1115).
+    pub gefahrenart: Option<Option<&'a str>>,
+    pub schadensgrad: Option<Option<&'a str>>,
     pub ort: Option<&'a str>,
     pub beschreibung: Option<&'a str>,
     /// `Some(Some(id))` = setzen, `Some(None)` = auf NULL, `None` = unverändert.
@@ -63,6 +70,8 @@ pub struct SchadenFilter {
     /// Mehrere Werte: einer muss zutreffen. Leer = kein Filter.
     pub typen: Vec<SchadenTyp>,
     pub ausmasse: Vec<Ausmass>,
+    /// Gefahrenarten (LLH-1115); ein Schaden ohne Gefahrenart trifft keinen Wert.
+    pub gefahrenarten: Vec<Gefahrentyp>,
     /// `Some(true)` nur verortete, `Some(false)` nur unverortete.
     pub verortet: Option<bool>,
     pub geschaedigt_person_id: Option<i64>,
@@ -181,6 +190,16 @@ fn filter_bedingung(f: &SchadenFilter, mit_status: bool) -> (String, Vec<Bind>) 
             f.ausmasse
                 .iter()
                 .map(|a| Bind::Text(a.as_str().to_string())),
+        );
+    }
+    if !f.gefahrenarten.is_empty() {
+        sql.push_str(" AND s.gefahrenart IN (");
+        sql.push_str(&vec!["?"; f.gefahrenarten.len()].join(", "));
+        sql.push(')');
+        werte.extend(
+            f.gefahrenarten
+                .iter()
+                .map(|g| Bind::Text(g.as_str().to_string())),
         );
     }
     match f.verortet {
@@ -322,7 +341,8 @@ pub async fn auswahl(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<SchadenAu
 /// (LFH-931). Ohne Joins und Freitexte.
 pub async fn marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<SchadenMarker>, AppError> {
     Ok(sqlx::query_as::<_, SchadenMarker>(
-        "SELECT id, registrier_nr, status, typ, ausmass, lat, lon FROM einsatz_schaden \
+        "SELECT id, registrier_nr, status, typ, ausmass, gefahrenart, schadensgrad, lat, lon \
+         FROM einsatz_schaden \
          WHERE einsatz_id = ? AND storniert_at IS NULL ORDER BY registrier_nr DESC",
     )
     .bind(einsatz_id)
@@ -395,9 +415,10 @@ pub async fn anlegen_tx(
         "INSERT INTO einsatz_schaden \
             (einsatz_id, registrier_nr, status, typ, ausmass, ort, beschreibung, \
              geschaedigt_person_id, geschaedigt_kontakt, geschaedigt_personal_id, \
-             geschaedigt_organisation_id, erfasst_von, geaendert_von, lat, lon) \
+             geschaedigt_organisation_id, erfasst_von, geaendert_von, lat, lon, \
+             gefahrenart, schadensgrad) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, 'offen', ?2, ?3, ?4, \
-                COALESCE(?5, ''), ?6, ?7, ?9, ?10, ?8, ?8, ?11, ?12 \
+                COALESCE(?5, ''), ?6, ?7, ?9, ?10, ?8, ?8, ?11, ?12, ?13, ?14 \
          FROM einsatz_schaden WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
@@ -413,6 +434,8 @@ pub async fn anlegen_tx(
     .bind(daten.geschaedigt_organisation_id)
     .bind(daten.lat)
     .bind(daten.lon)
+    .bind(daten.gefahrenart)
+    .bind(daten.schadensgrad)
     .fetch_one(&mut *conn)
     .await?;
 
@@ -454,6 +477,8 @@ pub async fn aktualisiere(
         "UPDATE einsatz_schaden SET \
             typ = COALESCE(?, typ), \
             ausmass = COALESCE(?, ausmass), \
+            gefahrenart  = CASE WHEN ? THEN ? ELSE gefahrenart END, \
+            schadensgrad = CASE WHEN ? THEN ? ELSE schadensgrad END, \
             ort = COALESCE(?, ort), \
             beschreibung = COALESCE(?, beschreibung), \
             geschaedigt_person_id = CASE WHEN ? THEN ? ELSE geschaedigt_person_id END, \
@@ -474,6 +499,10 @@ pub async fn aktualisiere(
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.typ)
         .bind(daten.ausmass)
+        .bind(daten.gefahrenart.is_some())
+        .bind(daten.gefahrenart.flatten())
+        .bind(daten.schadensgrad.is_some())
+        .bind(daten.schadensgrad.flatten())
         .bind(daten.ort)
         .bind(daten.beschreibung)
         .bind(daten.geschaedigt_person_id.is_some())
@@ -665,6 +694,8 @@ mod tests {
         NeueDaten {
             typ: "sachschaden",
             ausmass: "gering",
+            gefahrenart: None,
+            schadensgrad: None,
             ort: "Hauptstr. 1",
             beschreibung: None,
             lat: None,

@@ -5,6 +5,7 @@ use crate::einsatz::modul::Schaeden;
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::gefahr::Gefahrentyp;
 use crate::live::LiveEvent;
 use crate::person::repo as person_repo; // Org-Isolation der Geschädigt-FK (404 bei fremder Person)
 use crate::routes::support::{
@@ -14,9 +15,11 @@ use crate::routes::support::{
 use crate::schaden::{
     darf_uebergehen, registrier_anzeige, repo as schaden_repo, AbschlussGrund, Ausmass,
     SchadenAnzeige, SchadenAuswahl, SchadenKennzahlen, SchadenMarker, SchadenStatus, SchadenTyp,
+    Schadensgrad,
 };
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::Json;
 use serde::Deserialize;
 
@@ -59,6 +62,8 @@ pub struct ListeParams {
     pub typ: Option<String>,
     /// Kommagetrennt, einer muss zutreffen (LFH-1075).
     pub ausmass: Option<String>,
+    /// Gefahrenarten, kommagetrennt, eine muss zutreffen (LLH-1115).
+    pub gefahrenart: Option<String>,
     /// `ja`, `nein` oder beides kommagetrennt (LFH-1075).
     pub verortet: Option<String>,
     pub geschaedigt_person_id: Option<i64>,
@@ -98,6 +103,7 @@ fn filter_aus(
     status: Option<&str>,
     typ: Option<&str>,
     ausmass: Option<&str>,
+    gefahrenart: Option<&str>,
     verortet: Option<&str>,
     geschaedigt_person_id: Option<i64>,
     inkl_storniert: bool,
@@ -110,6 +116,11 @@ fn filter_aus(
     let status = parse_enum_opt(SchadenStatus::parse, status, "Unbekannter Status im Filter")?;
     let typen = werte(typ, SchadenTyp::parse, "Unbekannter Typ im Filter")?;
     let ausmasse = werte(ausmass, Ausmass::parse, "Unbekanntes Ausmaß im Filter")?;
+    let gefahrenarten = werte(
+        gefahrenart,
+        Gefahrentyp::parse,
+        "Unbekannte Gefahr im Filter",
+    )?;
     let verortet_werte = werte(
         verortet,
         |w| match w {
@@ -135,6 +146,7 @@ fn filter_aus(
         status,
         typen,
         ausmasse,
+        gefahrenarten,
         verortet,
         geschaedigt_person_id,
         inkl_storniert,
@@ -226,6 +238,7 @@ pub async fn liste(
         params.status.as_deref(),
         params.typ.as_deref(),
         params.ausmass.as_deref(),
+        params.gefahrenart.as_deref(),
         params.verortet.as_deref(),
         params.geschaedigt_person_id,
         params.inkl_storniert,
@@ -243,6 +256,7 @@ pub async fn liste(
 pub struct KennzahlenParams {
     pub typ: Option<String>,
     pub ausmass: Option<String>,
+    pub gefahrenart: Option<String>,
     pub verortet: Option<String>,
     pub q: Option<String>,
 }
@@ -258,6 +272,7 @@ pub async fn kennzahlen(
         None,
         params.typ.as_deref(),
         params.ausmass.as_deref(),
+        params.gefahrenart.as_deref(),
         params.verortet.as_deref(),
         None,
         false,
@@ -294,6 +309,66 @@ pub async fn marker(
     ))
 }
 
+// ---------- GET /schaeden/export (CSV) ----------
+
+/// Einfaches CSV-Feld-Quoting (RFC 4180 + Formel-Injektions-Schutz), wie in
+/// `routes::einsatz_tier::csv_feld`.
+fn csv_feld(s: &str) -> String {
+    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{s}")
+    } else {
+        s.to_string()
+    };
+    format!("\"{}\"", s.replace('"', "\"\""))
+}
+
+/// GET /api/einsaetze/{id}/schaeden/export — CSV aller nicht stornierten Schäden, älteste Nummer
+/// zuerst (LLH-1115). Aufzählungen in Worten wie die Oberfläche; Gefahr und Schadensgrad leer,
+/// wenn nicht angegeben. Ohne Geschädigte: die Liste ist eine Lageübersicht, kein Register
+/// betroffener Personen. Gleiches Gate wie die Liste, nicht auditiert.
+pub async fn export(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Schaeden>,
+) -> Result<Response, AppError> {
+    let mut schaeden = schaden_repo::liste(
+        &state.pool,
+        ctx.einsatz.id,
+        &schaden_repo::SchadenFilter::default(),
+        None,
+    )
+    .await?;
+    schaeden.reverse();
+    let mut csv = String::from(
+        "registrier_nr;status;typ;ausmass;gefahr;schadensgrad;ort;lat;lon;beschreibung;erfasst_at\n",
+    );
+    for s in &schaeden {
+        let status = match s.status {
+            SchadenStatus::Offen => "offen",
+            SchadenStatus::Uebergeben => "übergeben",
+            SchadenStatus::Abgeschlossen => "abgeschlossen",
+        };
+        csv.push_str(&format!(
+            "{};{};{};{};{};{};{};{};{};{};{}\n",
+            registrier_anzeige(s.registrier_nr),
+            csv_feld(status),
+            csv_feld(s.typ.etb_label()),
+            csv_feld(s.ausmass.etb_label()),
+            csv_feld(s.gefahrenart.map(|g| g.label()).unwrap_or("")),
+            csv_feld(s.schadensgrad.map(|g| g.etb_label()).unwrap_or("")),
+            csv_feld(&s.ort),
+            s.lat.map(|v| v.to_string()).unwrap_or_default(),
+            s.lon.map(|v| v.to_string()).unwrap_or_default(),
+            csv_feld(&s.beschreibung),
+            csv_feld(&s.erfasst_at),
+        ));
+    }
+    Ok((
+        [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
+        csv,
+    )
+        .into_response())
+}
+
 // ---------- POST /schaeden (Anlegen) ----------
 
 #[derive(Debug, Deserialize)]
@@ -301,6 +376,9 @@ pub struct AnlegenBody {
     pub status: Option<String>,
     pub typ: Option<String>,
     pub ausmass: Option<String>,
+    /// Optional; fehlt, `null` oder leer = keine Angabe (LLH-1115).
+    pub gefahrenart: Option<String>,
+    pub schadensgrad: Option<String>,
     pub ort: Option<String>,
     pub beschreibung: Option<String>,
     pub lat: Option<f64>,
@@ -341,6 +419,17 @@ pub async fn anlegen(
     let Some(ausmass) = Ausmass::parse(ausmass_roh) else {
         return Err(AppError::Validation("Unbekanntes Ausmaß".into()));
     };
+    // Optionale Katalogwerte: unbekannt ist für sich unbrauchbar → 400 (LLH-1115).
+    let gefahrenart = optionaler_wert(
+        body.gefahrenart.as_deref(),
+        Gefahrentyp::parse,
+        "Unbekannte Gefahr",
+    )?;
+    let schadensgrad = optionaler_wert(
+        body.schadensgrad.as_deref(),
+        Schadensgrad::parse,
+        "Unbekannter Schadensgrad",
+    )?;
     // Gleiches Muster wie im PATCH derselben Datei: fehlend ≠ vorhanden-aber-leer.
     let Some(ort_roh) = body.ort.clone() else {
         return Err(AppError::Validation("Ort ist Pflicht".into()));
@@ -405,6 +494,8 @@ pub async fn anlegen(
             schaden_repo::NeueDaten {
                 typ: typ.as_str(),
                 ausmass: ausmass.as_str(),
+                gefahrenart: gefahrenart.map(|g| g.as_str()),
+                schadensgrad: schadensgrad.map(|g| g.as_str()),
                 ort: &ort,
                 beschreibung: beschreibung.as_deref(),
                 lat: body.lat,
@@ -419,12 +510,7 @@ pub async fn anlegen(
         let schaden = schaden_repo::laden_tx(conn, einsatz_id, id).await?;
         // Ohne Ort: er ist Scrub der Schadenszeile und bliebe sonst über die Schwärzung hinaus
         // im ETB stehen (LFH-752, Spec `aufbewahrung`).
-        let text = format!(
-            "Schaden {} angelegt: {} ({})",
-            registrier_anzeige(schaden.registrier_nr),
-            typ.etb_label(),
-            ausmass.etb_label(),
-        );
+        let text = anlege_text(&schaden, typ, ausmass, gefahrenart, schadensgrad);
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                 .await?;
@@ -432,6 +518,43 @@ pub async fn anlegen(
     })?;
     sse_lebenszyklus(&state, einsatz_id, schaden.id, etb_id);
     Ok((StatusCode::CREATED, Json(schaden)))
+}
+
+/// Ein optionaler Katalogwert: fehlt, `null` oder leer = keine Angabe; unbekannt → 400.
+fn optionaler_wert<T>(
+    roh: Option<&str>,
+    parse: impl Fn(&str) -> Option<T>,
+    meldung: &str,
+) -> Result<Option<T>, AppError> {
+    match roh.map(str::trim).filter(|w| !w.is_empty()) {
+        None => Ok(None),
+        Some(w) => parse_enum(&parse, w, meldung).map(Some),
+    }
+}
+
+/// ETB-Text beim Anlegen, nur in Worten (LFH-1144): Gefahr und Schadensgrad nur, wenn gesetzt
+/// (LLH-1115). Ohne Ort: er ist Scrub der Schadenszeile und bliebe sonst über die Schwärzung
+/// hinaus im ETB stehen (LFH-752, Spec `aufbewahrung`).
+fn anlege_text(
+    schaden: &SchadenAnzeige,
+    typ: SchadenTyp,
+    ausmass: Ausmass,
+    gefahrenart: Option<Gefahrentyp>,
+    schadensgrad: Option<Schadensgrad>,
+) -> String {
+    let mut text = format!(
+        "Schaden {} angelegt: {} ({})",
+        registrier_anzeige(schaden.registrier_nr),
+        typ.etb_label(),
+        ausmass.etb_label(),
+    );
+    if let Some(g) = gefahrenart {
+        text.push_str(&format!(", Gefahr: {}", g.label()));
+    }
+    if let Some(g) = schadensgrad {
+        text.push_str(&format!(", Schadensgrad: {}", g.etb_label()));
+    }
+    text
 }
 
 // ---------- GET /schaeden/{sid} (Detail) ----------
@@ -453,6 +576,11 @@ pub async fn detail(
 pub struct PatchBody {
     pub typ: Option<String>,
     pub ausmass: Option<String>,
+    /// Dreiwertig (LLH-1115): fehlt = unverändert, `null` = leeren, Wert = setzen.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub gefahrenart: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub schadensgrad: Option<Option<String>>,
     pub ort: Option<String>,
     pub beschreibung: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -500,6 +628,23 @@ pub async fn aktualisieren(
     // lautlos den alten Statuscode zurück.
     parse_enum_opt(SchadenTyp::parse, body.typ.as_deref(), "Ungültiger Typ")?;
     parse_enum_opt(Ausmass::parse, body.ausmass.as_deref(), "Ungültiges Ausmaß")?;
+    // Dreiwertig: `Some(None)` und leer leeren, ein unbekannter Wert ist 400 (LLH-1115).
+    let gefahrenart_norm: Option<Option<Gefahrentyp>> = body
+        .gefahrenart
+        .as_ref()
+        .map(|o| optionaler_wert(o.as_deref(), Gefahrentyp::parse, "Unbekannte Gefahr"))
+        .transpose()?;
+    let schadensgrad_norm: Option<Option<Schadensgrad>> = body
+        .schadensgrad
+        .as_ref()
+        .map(|o| {
+            optionaler_wert(
+                o.as_deref(),
+                Schadensgrad::parse,
+                "Unbekannter Schadensgrad",
+            )
+        })
+        .transpose()?;
     if let Some(Some(g)) = &body.abschluss_grund {
         parse_enum(AbschlussGrund::parse, g.trim(), "Ungültiger Abschlussgrund")?;
     }
@@ -620,6 +765,8 @@ pub async fn aktualisieren(
         schaden_repo::PatchDaten {
             typ: body.typ.as_deref(),
             ausmass: body.ausmass.as_deref(),
+            gefahrenart: gefahrenart_norm.map(|o| o.map(|g| g.as_str())),
+            schadensgrad: schadensgrad_norm.map(|o| o.map(|g| g.as_str())),
             ort: ort_norm.as_deref(),
             beschreibung: beschreibung_norm.as_deref(),
             geschaedigt_person_id: body.geschaedigt_person_id,
