@@ -150,7 +150,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
   (`bereitstellungsraum/brZahlen.ts`); „noch n belegt“ vor dem Auflösen zählt wie
   `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Lage einer UHS (In der Stelle,
-  Plätze frei, Wartend, Abtransportiert; LLH-1136) nur über `pages/uhs/uhsLage.ts`, aus denselben
+  Plätze frei, Wartend, Unterwegs; LLH-1136, LLH-1332) nur über `pages/uhs/uhsLage.ts`, aus denselben
   Mengen wie der Grundriss. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
