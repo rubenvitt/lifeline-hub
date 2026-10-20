@@ -406,6 +406,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
     antreff_lat: 50.05,
     antreff_lon: 8.55,
     storniert_at: null,
+    versorgung: 'offen',
   };
 
   /** Alle Live-Quellen gesund; Freigaben und Personen je Fall. Liefert den Personen-Zähler. */
@@ -478,6 +479,22 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
     expect(result.current.alleVerortet.some((m) => m.typ === 'person')).toBe(false);
     expect(z.personen).toBe(1);
     expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('abgeschlossene Patienten stehen nicht auf der Karte (LLH-1332)', async () => {
+    handler({}, () =>
+      HttpResponse.json([
+        PERSON,
+        { ...PERSON, id: 12, registrier_nr: 43, versorgung: 'unterwegs' },
+        { ...PERSON, id: 13, registrier_nr: 44, versorgung: 'abgeschlossen' },
+      ]),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.personenVerortet).toHaveLength(2));
+    expect(result.current.personenVerortet.map((m) => m.schluessel)).toEqual([
+      'person-11',
+      'person-12',
+    ]);
   });
 
   it('Modul im Einsatz ausgeblendet: „ausgeblendet" und KEIN Request an …/personen', async () => {

@@ -1,5 +1,5 @@
 import type { Person } from '../api/types';
-import { hatLuecke } from './personenBilanz';
+import { hatLuecke, istAbgeschlossen } from './personenBilanz';
 
 /**
  * Filterkette und Sichtzustand der Betroffenen-Seite als reine Funktionen. Zwei Achsen plus
@@ -10,6 +10,9 @@ import { hatLuecke } from './personenBilanz';
  *                   zeigt die Fundorte.
  *  · `filter`     — der Personenstatus, gilt in allen Ansichten.
  *  · `nurLuecken` — Umschalter aus der Seitenleiste „Offene Felder", gilt ebenfalls überall.
+ *  · `abgeschlossen` — „Abgeschlossene zeigen“ (LLH-1332, Spec `betroffene-lagedaten`): ohne ihn
+ *                   fehlen übergebene, entlassene, in Notunterkunft gebrachte und verstorbene
+ *                   Patienten mit Verbleib in allen Ansichten.
  *
  * Die Freitextsuche lebt NICHT hier, sondern im `Datensicht`-Primitiv — ein zweites Suchfeld
  * wäre eine zweite Wahrheit.
@@ -24,6 +27,7 @@ export interface PersonenSicht {
   ansicht: PersonenAnsicht;
   filter: PersonenFilter;
   nurLuecken: boolean;
+  abgeschlossen: boolean;
 }
 
 /**
@@ -35,6 +39,7 @@ export const SICHT_VORGABE: PersonenSicht = {
   ansicht: 'zeilen',
   filter: 'alle',
   nurLuecken: false,
+  abgeschlossen: false,
 };
 
 export const FILTER_OPTIONEN: readonly { wert: PersonenFilter; label: string }[] = [
@@ -66,6 +71,7 @@ export function filterPersonen(
   return alle.filter(
     (p) =>
       trifftFilter(p, sicht.filter) &&
+      (sicht.abgeschlossen || !istAbgeschlossen(p)) &&
       (!sicht.nurLuecken || hatLuecke(p) || (behalten?.has(p.id) ?? false)),
   );
 }
@@ -83,20 +89,22 @@ export function sichtFuerNeuePerson(sicht: PersonenSicht, p: Person): PersonenSi
 }
 
 /**
- * Die Sicht nach einem Sprung von außen (Sprungmarken „Patienten"/„Vermisste").
+ * Die Sicht nach einem Sprung von außen (Sprungmarken „Patienten"/„Vermisste", `?abgeschlossen=1`).
  * Übernommen wird nur, was die Vorgabe nennt. Der Lücken-Filter fällt IMMER: ein stehen
  * gebliebenes „nur offene Felder" zeigte still eine Teilmenge, und der Schalter ist unter `xl`
- * nicht im Blick. Ohne Vorgabe bleibt die Sicht identisch, damit kein Render entsteht.
+ * nicht im Blick. „Abgeschlossene zeigen“ steht nach einem Sprung nur, wenn die Vorgabe es nennt.
+ * Ohne Vorgabe bleibt die Sicht identisch, damit kein Render entsteht.
  */
 export function sichtNachSprung(
   sicht: PersonenSicht,
-  vorgabe: { filter?: PersonenFilter; ansicht?: PersonenAnsicht },
+  vorgabe: { filter?: PersonenFilter; ansicht?: PersonenAnsicht; abgeschlossen?: boolean },
 ): PersonenSicht {
-  if (!vorgabe.filter && !vorgabe.ansicht) return sicht;
+  if (!vorgabe.filter && !vorgabe.ansicht && !vorgabe.abgeschlossen) return sicht;
   return {
     ansicht: vorgabe.ansicht ?? sicht.ansicht,
     filter: vorgabe.filter ?? sicht.filter,
     nurLuecken: false,
+    abgeschlossen: vorgabe.abgeschlossen ?? false,
   };
 }
 

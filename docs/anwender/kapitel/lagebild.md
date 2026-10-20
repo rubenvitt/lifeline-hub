@@ -58,8 +58,11 @@ Stunden offen sind.
 - **Gefahrenmatrix:** je Gefahrentyp die höchste Warnstufe über alle Gefahrengebiete und
   Schutzobjekte; darunter, wie viele Gefahrentypen noch unbewertet sind. Bewertet wird im
   Kapitel [Gefahren](gefahren.md).
-- **Sichtung:** die Betroffenen je Sichtungskategorie, dazu „Ohne Sichtung“ und „Transportiert /
-  offen“.
+- **Sichtung:** die Betroffenen in Versorgung je Sichtungskategorie, dazu „Ohne Sichtung“ und
+  „Unterwegs / offen / abgeschlossen“: unterwegs im Eigentransport, ohne Verbleib, abgeschlossen
+  (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner
+  Sichtungskategorie; die Kennzahl „Betroffene“ nennt sie hinter den Patienten („3 Patienten · 2
+  abgeschlossen“), „Verbleib offen“ nennt, wie viele unterwegs sind.
 - **Meldungsstrom:** die jüngsten Einträge des Einsatztagebuchs. Rechts im Kopf steht der Zustand
   der Leitung: „live“, „Verbindung wird aufgebaut“ oder „Verbindung unterbrochen“.
 - **Führungsstand:** „Aufträge offen“ und „Meldungen offen“ zählen wie die Module selbst; ein

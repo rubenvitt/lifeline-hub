@@ -185,7 +185,7 @@ export function SichtungsPaneel({
   zeilen,
   erfasst,
   ohneSichtung,
-  transport,
+  versorgung,
   onNeuladen,
   onPersonen,
   onAufnehmen,
@@ -195,8 +195,8 @@ export function SichtungsPaneel({
   zeilen: SichtungsZeile[];
   erfasst: number;
   ohneSichtung: number;
-  /** „Transportiert / offen" aus `transportBilanz`. */
-  transport: { transportiert: number; offen: number };
+  /** „Unterwegs / offen / abgeschlossen“ aus `versorgungsBilanz` (LLH-1332). */
+  versorgung: { unterwegs: number; offen: number; abgeschlossen: number };
   onNeuladen: () => void;
   onPersonen: () => void;
   onAufnehmen: () => void;
@@ -210,8 +210,8 @@ export function SichtungsPaneel({
       aktion={
         gesperrt ? undefined : <PaneelLink label={modulName('personen')} onKlick={onPersonen} />
       }
-      // Fuß: „Ohne Sichtung" und „Transportiert / offen" (`transportBilanz`: nach Verbleib-Art,
-      // eine Voranmeldung ist kein Transport). „Ohne Sichtung" steht immer, auch mit 0 — sonst
+      // Fuß: „Ohne Sichtung" und „Unterwegs / offen / abgeschlossen“ (`versorgungsBilanz`, der
+      // Versorgungszustand des Servers). „Ohne Sichtung" steht immer, auch mit 0 — sonst
       // schob die live kommende und gehende Zeile das Paneel.
       fuss={
         zustand === 'daten' ? (
@@ -227,9 +227,11 @@ export function SichtungsPaneel({
               data-lfh="transport-bilanz"
               style={{ display: 'flex', justifyContent: 'space-between', gap: token.paddingSM }}
             >
-              <span style={{ fontSize: 11, color: rollen.schwach }}>Transportiert / offen</span>
+              <span style={{ fontSize: 11, color: rollen.schwach }}>
+                Unterwegs / offen / abgeschlossen
+              </span>
               <span style={{ ...monoStil(12), color: rollen.text2 }}>
-                {transport.transportiert} / {transport.offen}
+                {versorgung.unterwegs} / {versorgung.offen} / {versorgung.abgeschlossen}
               </span>
             </span>
           </span>

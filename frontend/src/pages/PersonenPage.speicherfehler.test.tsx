@@ -60,6 +60,7 @@ const basis: Person = {
   geaendert_at: '2026-05-27 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 const gefunden = { ...basis, id: 20, registrier_nr: 7, name: 'Funde' };
 const vermisstA = {

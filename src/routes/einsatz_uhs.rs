@@ -317,7 +317,7 @@ pub async fn status_wechsel(
 }
 
 /// DELETE /api/einsaetze/{id}/uhs/{uid} — Soft-Delete. Blockt mit 409 bei aktiver
-/// Belegung (Repo). KEIN ETB-Eintrag (Spec: nur Lifecycle aktiv/aufgeloest).
+/// Belegung und mit 422 bei Material an der UHS (Repo, LLH-1249). KEIN ETB-Eintrag (Spec: nur Lifecycle aktiv/aufgeloest).
 pub async fn stornieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,

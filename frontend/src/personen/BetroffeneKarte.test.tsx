@@ -55,6 +55,7 @@ const basis: Person = {
   geaendert_at: '2026-10-01 09:00:00',
   geaendert_von: 1,
   storniert_at: null,
+  versorgung: 'offen',
 };
 
 function p(id: number, teil: Partial<Person> = {}): Person {

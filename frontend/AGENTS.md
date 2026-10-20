@@ -12,16 +12,29 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
 `_ds/…/tokens/*.css` ist alt). Bei Konflikten gewinnt das Design — **außer bei der Sichtung**
 (BBK). Umgekehrte Altregeln tragen „Neuentwurf 22.09.2026".
 
-- **Größere UI-Entwürfe über Claude Design** (Ruben, 08.10.2026, geändert 12.10.2026): Bei etwas
-  wirklich Größerem (neue Seite, neues Modul, Umbau des Rahmens, neuer Baustein; nicht bei einem
-  Feld oder Knopf) entwirft der Agent selbst in Claude Design, **wenn er Zugriff hat**
-  (`DesignSync`). Dort liegt das Design System **„Lifeline Hub“**; es baut auf den Entwurf, nicht
-  auf antd. Das Ergebnis landet wie der Neuentwurf unter `docs/design/<datum>-<thema>/`
-  (Inline-Styles maßgeblich). Ohne Zugriff (etwa in einer Cloud-Sitzung, `DesignSync` braucht
-  `/design-login` aus einer interaktiven Sitzung) baut er direkt nach dieser Gestaltungssprache:
-  kein Angebot, kein Prompt für Ruben, kein Entwurfsabschnitt im Ticket. Ändert ein PR Rollen,
-  `schriftskala`, Dichten, Bausteine oder Textregeln, sagt der Agent, dass das Design System
-  nachgezogen werden muss.
+- **Größere UI-Entwürfe über das Design System** (Ruben, 08.10.2026, geändert 19.10.2026,
+  LLH-1333): Bei etwas wirklich Größerem (neue Seite, neues Modul, Umbau des Rahmens, neuer
+  Baustein; nicht bei einem Feld oder Knopf) entwirft der Agent selbst mit `/design` bzw. dem
+  Artifact-Typ „Design“ auf Grundlage des Design Systems **„Lifeline Hub“** (Adresse in
+  `docs/design/design-system/ARTIFACT.md`), auch in einer Cloud-Sitzung: kein Angebot, kein
+  Prompt für Ruben, kein Entwurfsabschnitt im Ticket. Das Ergebnis landet wie der Neuentwurf unter
+  `docs/design/<datum>-<thema>/` (Inline-Styles maßgeblich).
+  - **Das Design System ist aus dem Code erzeugt** (`docs/design/design-system/project/`,
+    Generator `frontend/scripts/design-system/`, Wächter `designSystem.guard.test.ts`, Change
+    `uzfj5f43-design-system-aus-code`); von Hand gepflegt wird es nicht, Änderungen auf der Seite
+    überschreibt die nächste Veröffentlichung. Ändert ein PR das Theme (`theme/tokens.ts`,
+    `theme/schriften.ts`, `theme/statusFarben.ts`, `theme/rollen.css`, `theme/sprache.css`,
+    `index.css`), `components/instrument/statusFlaeche.ts`, einen vorgestellten Baustein, einen
+    Regelabschnitt, den die README trägt, oder `theme/gesperrtZeichen.guard.test.ts` (README
+    „Gesperrt“), oder hebt er antd oder eine Schrift, läuft
+    `mise exec -- pnpm -C frontend design-system`, und das Erzeugte kommt mit in den PR. Ein roter
+    Wächter heißt dasselbe.
+  - **Nach dem Merge veröffentlicht der Agent, der den PR abschließt, neu**: aus dem Stand von
+    `alpha` auf die Adresse in `ARTIFACT.md`, nur die geänderten Dateien unter `project/`. Den
+    Index `design-system.json` gibt es nur im Artifact: zuletzt und einzeln senden, unmittelbar
+    vorher lesen, alle Schlüssel und `createdOnFiles` behalten, nur `lastChange` setzen (`via`
+    „Claude Code aus lifeline-hub <Commit>“). Ohne claude.ai-Anmeldung vermerkt er das als
+    Kommentar an der Aufgabe.
 
 - **Nachtbetrieb ist Vorgabe:** `MODUS_DEFAULT = 'dark'` in `theme/ThemeModeProvider.tsx`,
   **gespiegelt im Bootstrap-Skript von `index.html`** — immer beide ändern. Hellpalette aus der
@@ -128,7 +141,7 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   des Servers (Liste, Detail und Lagekarte), Stärke im Raum nur über `staerkeImRaum`
   (`bereitstellungsraum/brZahlen.ts`); „noch n belegt“ vor dem Auflösen zählt wie
   `aktive_belegungen_tx` (Einheiten und einheitenlose Fahrzeuge). Lage einer UHS (In der Stelle,
-  Plätze frei, Wartend, Abtransportiert; LLH-1136) nur über `pages/uhs/uhsLage.ts`, aus denselben
+  Plätze frei, Wartend, Unterwegs; LLH-1136, LLH-1332) nur über `pages/uhs/uhsLage.ts`, aus denselben
   Mengen wie der Grundriss. Dashboard und Vorbereitung der Lagebesprechung teilen `useLagebild` +
   `baueLagebild`. Regeln beider Sprachen pinnt `tests/fixtures/verdichtung/regeln.json`
   (`tests/verdichtung_fixture.rs`, `lage/verdichtungFixture.test.ts`).
@@ -167,7 +180,10 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
 
 - **Kein Nutzerschalter Tabelle ↔ Karte** (LFH-507, `openspec/changes/archive/2026-09-30-lfh-507-palette-status-setzen/`):
   die Form bleibt die begründete Entscheidung je Seite, auch in der Palette („Ansicht wechseln“
-  gibt es nicht). Wer einen Schalter will, schreibt zuerst diese Regel fort.
+  gibt es nicht). Wer einen Schalter will, schreibt zuerst diese Regel fort. Keine Ausnahme
+  davon ist ein **Überblick nach einer Achse** wie das Sichtungsboard der Betroffenen (LLH-1332,
+  `personen/Sichtungsboard.tsx`): es ordnet dieselbe Menge in Spalten je Kategorie, statt dieselbe
+  Liste als Tabelle oder Karten zu zeigen.
 - **FMS-Tableau** (LFH-642, `kraefte/FmsTableau.tsx`): Ansicht `?ansicht=tableau` der
   Fahrzeugseite, kein Modul; je Kachel genau ein Bedienziel (`StatusWahl`), Kachel selbst nicht
   klickbar; Sortierung Abschnitt → Einheit → Funkrufname, nie Status; der Abschnitt ist der
@@ -324,7 +340,7 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
 **Lagekarte** (auch `pages/LagekartePage.tsx`): `frontend/src/pages/lagekarte/AGENTS.md`.
 
 **Sprungmarken sind keine Module** (LFH-620, `einsatz/sprungmarken.ts`): Entscheidungen = ETB
-`?typ=entscheidung`, Patienten = Personen im Sichtungsraster, Vermisste = Personen
+`?typ=entscheidung`, Patienten = Personen im Sichtungsboard (`ansicht=raster`), Vermisste = Personen
 `?filter=vermisst`. Kein Registry-Eintrag, kein `verweistAuf`; Marke erbt Sichtbarkeit/Sperre,
 nie `aria-current`, Ziel im zugänglichen Namen, Pfad aus `routing/deeplinks.ts`;
 `parsePersonenSicht`/`sichtNachSprung` apply-then-clean. Kein Filterwert „patienten".
@@ -600,6 +616,9 @@ anwendbar), „nicht geprüft" ist keins.
   beiden Stellen nur `kraefte/MaterialAdhocDialog.tsx` (am Ort mit festem `ort`, ein Request).
   Rechte wie beim Zuordnen (Schreibrecht und Freigabe Material); ein beendeter Ort sperrt Zuordnen,
   Erfassen und Ausgeben, nicht Status und Lösen. Nachweis `kraefte/materialSchreibweg.test.tsx`.
+  Eine selbst gelöste Zeile hält ihre Stelle als träge Marke „Gelöst“, bis Zeiger und Fokus den
+  Baustein verlassen haben (LLH-1254, `useHoldGeloest` in `kraefte/MaterialAmOrt.tsx`); Rückgängig
+  über `kommunikation/rueckgaengig.tsx`, nicht am beendeten Ort, Ablehnung über dem Block.
 - Portal-Menüs sind kein Verlassen der `Datensicht` (`checkVerlassen`, `components/useZuflussSchleuse.ts`); in jsdom wandert der
   Fokus nicht — Handler direkt mit `relatedTarget` prüfen.
 - **Ein Status gehört in den Vertrag:** jede `Record<…, StatusDarstellung>` steht in

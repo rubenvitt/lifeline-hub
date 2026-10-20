@@ -453,38 +453,57 @@ export function filtereKraefte(alles: Rohdaten, f: FilterWerte): Rohdaten {
     einheit_id: number | null | undefined,
     traeger: string | null | undefined,
     kat: StatusKategorie | null | undefined,
-    txt: (string | null | undefined)[],
+    txt: boolean,
   ) =>
-    abschnittOk(einheit_id) &&
-    traegerOk(traeger) &&
-    (!f.kategorie || kat === f.kategorie) &&
-    treffer(txt);
+    abschnittOk(einheit_id) && traegerOk(traeger) && (!f.kategorie || kat === f.kategorie) && txt;
+  // Fahrzeug und Beladung teilen ihren Suchtreffer (LLH-1250): trifft die Suche das Fahrzeug,
+  // steht seine ganze Beladung darunter; trifft sie einen Posten, steht das tragende Fahrzeug als
+  // Kontext darüber (nur mit diesem Posten). Die Einheit bleibt ohnehin, Einheiten filtert allein
+  // der Abschnitt. Die übrigen Filter gelten weiter je Mittel.
+  const fahrzeugDes = (em: EinsatzMaterial): number | null => {
+    const ort = ortVon(em);
+    return ort?.art === 'fahrzeug' ? ort.id : null;
+  };
+  const materialOk = (x: EinsatzMaterial) =>
+    abschnittOk(einheitDesOrts(x)) && traegerOk(x.traegerorganisation);
+  const fahrzeugTrifft = new Set(
+    roh.fahrzeuge.filter((x) => treffer([x.funkrufname, x.fahrzeugtyp])).map((x) => x.id),
+  );
+  const beladungTrifft = new Set(
+    roh.material
+      .filter((x) => materialOk(x) && treffer([x.bezeichnung]))
+      .map(fahrzeugDes)
+      .filter((id): id is number => id != null),
+  );
   return {
     abschnitte:
       f.abschnittId == null ? roh.abschnitte : roh.abschnitte.filter((a) => a.id === f.abschnittId),
     einheiten: roh.einheiten.filter(einheitErlaubt),
     personal: roh.personal.filter((x) =>
-      passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [
-        x.name,
-        x.funktion,
-        x.einsatzfunktion,
-      ]),
+      passt(
+        x.einheit_id,
+        x.traegerorganisation,
+        x.status_kategorie,
+        treffer([x.name, x.funktion, x.einsatzfunktion]),
+      ),
     ),
     fahrzeuge: roh.fahrzeuge.filter((x) =>
-      passt(x.einheit_id, x.traegerorganisation, x.status_kategorie, [
-        x.funkrufname,
-        x.fahrzeugtyp,
-      ]),
+      passt(
+        x.einheit_id,
+        x.traegerorganisation,
+        x.status_kategorie,
+        fahrzeugTrifft.has(x.id) || beladungTrifft.has(x.id),
+      ),
     ),
     // Material hat keine `status_kategorie` (eigene Achse) → nicht nach Kategorie filtern. Der
     // Abschnitt über die Einheit seines Orts (LLH-1225 D14): Fahrzeug → dessen Einheit; an UHS
     // oder Bereitstellungsraum hat es keine und fällt bei einem Abschnittsfilter heraus.
-    material: roh.material.filter(
-      (x) =>
-        abschnittOk(einheitDesOrts(x)) &&
-        traegerOk(x.traegerorganisation) &&
-        treffer([x.bezeichnung]),
-    ),
+    material: roh.material.filter((x) => {
+      const fzId = fahrzeugDes(x);
+      return (
+        materialOk(x) && (treffer([x.bezeichnung]) || (fzId != null && fahrzeugTrifft.has(fzId)))
+      );
+    }),
   };
 }
 

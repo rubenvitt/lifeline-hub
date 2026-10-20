@@ -214,15 +214,28 @@ pub async fn check_uebernahme_tx(
     Ok(bezeichnung)
 }
 
-/// Schaltet den Bedarfs-Status weiter (linear) und setzt den zugehörigen Zeitstempel
-/// (first-write-wins via COALESCE). `erwartet` ist der vom Handler geprüfte Bestandsstatus:
-/// das UPDATE greift NUR, wenn er unverändert ist (optimistische Sperre gegen TOCTOU —
-/// die FSM ist back-edge-frei, daher kann der Guard keinen gültigen Übergang fälschlich
-/// abweisen). Liefert `true`, wenn eine Zeile geändert wurde; `false` = Status zwischenzeitlich
-/// geändert. `abgelehnt` läuft über [`lehne_ab`]. Die Rücknahme aus `eingetroffen` greift
-/// zusätzlich nur ohne zählenden Materialposten (LLH-1226, design.md D9), damit eine gleichzeitige
-/// Übernahme keine zurückgenommene Nachforderung mit Posten hinterlässt; die verständliche 422
-/// prüft der Handler vorher über [`has_material`].
+/// Stufe im linearen Bedarfsfluss und die Spalte mit ihrem Zeitpunkt; `angefordert` trägt
+/// seinen Zeitpunkt in `angefordert_at` ab dem Anlegen, ohne Stempel beim Übergang.
+fn stufe(status: &str) -> Option<(u8, Option<&'static str>)> {
+    match status {
+        super::STATUS_ANGEFORDERT => Some((0, None)),
+        super::STATUS_ZUGESAGT => Some((1, Some("zugesagt_at"))),
+        super::STATUS_UNTERWEGS => Some((2, Some("unterwegs_at"))),
+        super::STATUS_EINGETROFFEN => Some((3, Some("eingetroffen_at"))),
+        _ => None,
+    }
+}
+
+/// Schaltet den Bedarfs-Status um genau eine Stufe weiter oder nimmt ihn um genau eine zurück
+/// (LFH-343 · C8). Vorwärts setzt den Zeitstempel der neuen Stufe (first-write-wins via
+/// COALESCE); die Rücknahme leert den der verlassenen Stufe (LLH-1247), damit die nächste
+/// Meldung ihren eigenen Zeitpunkt trägt und keine Karte einen zurückgenommenen zeigt.
+/// `erwartet` ist der vom Handler geprüfte Bestandsstatus: das UPDATE greift NUR, wenn er
+/// unverändert ist (optimistische Sperre gegen TOCTOU). Liefert `true`, wenn eine Zeile geändert
+/// wurde; `false` = Status zwischenzeitlich geändert. `abgelehnt` läuft über [`lehne_ab`]. Die
+/// Rücknahme aus `eingetroffen` greift zusätzlich nur ohne zählenden Materialposten (LLH-1226,
+/// design.md D9), damit eine gleichzeitige Übernahme keine zurückgenommene Nachforderung mit
+/// Posten hinterlässt; die verständliche 422 prüft der Handler vorher über [`has_material`].
 pub async fn update_status(
     pool: &SqlitePool,
     id: i64,
@@ -230,11 +243,15 @@ pub async fn update_status(
     erwartet: &str,
     jetzt: &str,
 ) -> Result<bool, AppError> {
-    let stempel_spalte = match neuer_status {
-        super::STATUS_ZUGESAGT => "zugesagt_at",
-        super::STATUS_UNTERWEGS => "unterwegs_at",
-        super::STATUS_EINGETROFFEN => "eingetroffen_at",
-        _ => return Err(AppError::Validation("Ungültiger Zielstatus".into())),
+    let ungueltig = || AppError::Validation("Ungültiger Zielstatus".into());
+    let (neu_stufe, neu_spalte) = stufe(neuer_status).ok_or_else(ungueltig)?;
+    let (alt_stufe, alt_spalte) = stufe(erwartet).ok_or_else(ungueltig)?;
+    let (stempel, vorwaerts) = match (neu_stufe, neu_spalte, alt_spalte) {
+        (n, Some(spalte), _) if n == alt_stufe + 1 => {
+            (format!("{spalte} = COALESCE({spalte}, ?)"), true)
+        }
+        (n, _, Some(spalte)) if n + 1 == alt_stufe => (format!("{spalte} = NULL"), false),
+        _ => return Err(ungueltig()),
     };
     let ohne_posten = if erwartet == super::STATUS_EINGETROFFEN {
         " AND NOT EXISTS (SELECT 1 FROM einsatz_material em \
@@ -243,16 +260,11 @@ pub async fn update_status(
         ""
     };
     let sql = format!(
-        "UPDATE nachforderung SET status = ?, {stempel_spalte} = COALESCE({stempel_spalte}, ?) \
-         WHERE id = ? AND status = ?{ohne_posten}"
+        "UPDATE nachforderung SET status = ?, {stempel} WHERE id = ? AND status = ?{ohne_posten}"
     );
-    let r = sqlx::query(sqlx::AssertSqlSafe(&*sql))
-        .bind(neuer_status)
-        .bind(jetzt)
-        .bind(id)
-        .bind(erwartet)
-        .execute(pool)
-        .await?;
+    let query = sqlx::query(sqlx::AssertSqlSafe(&*sql)).bind(neuer_status);
+    let query = if vorwaerts { query.bind(jetzt) } else { query };
+    let r = query.bind(id).bind(erwartet).execute(pool).await?;
     Ok(r.rows_affected() > 0)
 }
 
@@ -412,6 +424,93 @@ mod tests {
         )
         .await
         .unwrap());
+    }
+
+    /// LLH-1247: Die Rücknahme um eine Stufe (LFH-343 · C8) greift auf jeder Stufe, auch zurück
+    /// auf `angefordert`, und leert den Zeitpunkt der verlassenen Stufe. Sonst behielte das
+    /// erneute Weiterschalten über das COALESCE den zurückgenommenen Zeitpunkt.
+    #[tokio::test]
+    async fn ruecknahme_leert_den_zeitpunkt_der_verlassenen_stufe() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        for (neu, alt, jetzt) in [
+            (STATUS_ZUGESAGT, STATUS_ANGEFORDERT, "2026-06-12 09:05:00"),
+            (STATUS_UNTERWEGS, STATUS_ZUGESAGT, "2026-06-12 09:10:00"),
+            (STATUS_EINGETROFFEN, STATUS_UNTERWEGS, "2026-06-12 09:30:00"),
+        ] {
+            assert!(update_status(&pool, n.id, neu, alt, jetzt).await.unwrap());
+        }
+
+        assert!(update_status(
+            &pool,
+            n.id,
+            STATUS_UNTERWEGS,
+            STATUS_EINGETROFFEN,
+            "2026-06-12 09:31:00"
+        )
+        .await
+        .unwrap());
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.status, NachforderungStatus::Unterwegs);
+        assert_eq!(nach.eingetroffen_at, None);
+        assert_eq!(nach.unterwegs_at.as_deref(), Some("2026-06-12 09:10:00"));
+
+        assert!(update_status(
+            &pool,
+            n.id,
+            STATUS_ZUGESAGT,
+            STATUS_UNTERWEGS,
+            "2026-06-12 09:32:00"
+        )
+        .await
+        .unwrap());
+        assert!(update_status(
+            &pool,
+            n.id,
+            STATUS_ANGEFORDERT,
+            STATUS_ZUGESAGT,
+            "2026-06-12 09:33:00"
+        )
+        .await
+        .unwrap());
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.status, NachforderungStatus::Angefordert);
+        assert_eq!(nach.zugesagt_at, None);
+        assert_eq!(nach.unterwegs_at, None);
+        assert!(nach.ist_offen);
+
+        // Die nächste Zusage trägt ihren eigenen Zeitpunkt, nicht den zurückgenommenen.
+        assert!(update_status(
+            &pool,
+            n.id,
+            STATUS_ZUGESAGT,
+            STATUS_ANGEFORDERT,
+            "2026-06-12 10:00:00"
+        )
+        .await
+        .unwrap());
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 10:00:00"));
+    }
+
+    /// Sprünge über mehr als eine Stufe nimmt das Repo nicht an, auch wenn der Handler sie
+    /// vorher abweist.
+    #[tokio::test]
+    async fn update_status_lehnt_spruenge_ab() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        for (neu, alt) in [
+            (STATUS_UNTERWEGS, STATUS_ANGEFORDERT),
+            (STATUS_ANGEFORDERT, STATUS_UNTERWEGS),
+            (STATUS_ANGEFORDERT, STATUS_ANGEFORDERT),
+        ] {
+            assert!(matches!(
+                update_status(&pool, n.id, neu, alt, "2026-06-12 09:05:00").await,
+                Err(AppError::Validation(_))
+            ));
+        }
     }
 
     #[tokio::test]

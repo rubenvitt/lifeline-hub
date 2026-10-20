@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SK_META, STATUS_META } from './personMeta';
+import { kurzVerbleib, SK_META, STATUS_META } from './personMeta';
 
 describe('personMeta', () => {
   it('SK_META deckt alle Sichtungskategorien ab', () => {
@@ -18,5 +18,18 @@ describe('personMeta', () => {
     for (const status of ['erfasst', 'betroffen', 'verstorben', 'abgemeldet'] as const) {
       expect(STATUS_META[status].rolle).toBe('neutral');
     }
+  });
+});
+
+describe('kurzVerbleib (LLH-1332)', () => {
+  const t = { art: 'transport' as const, ziel: 'KH Mitte', transportmittel: '1/83-1' };
+  it('nennt Eigentransport und quittierte Übergabe wie die Kurzform des Servers', () => {
+    expect(kurzVerbleib({ ...t, transport_durch: 'fremd' })).toBe('Transport → KH Mitte (1/83-1)');
+    expect(kurzVerbleib({ ...t, transport_durch: 'eigen', status: 'abtransportiert' })).toBe(
+      'Eigentransport → KH Mitte (1/83-1)',
+    );
+    expect(kurzVerbleib({ ...t, transport_durch: 'eigen', status: 'uebergeben' })).toBe(
+      'übergeben → KH Mitte (1/83-1)',
+    );
   });
 });

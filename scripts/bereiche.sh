@@ -39,6 +39,10 @@ bereiche_von() {
     # Vitest und e2e lesen die Kapitel. Steht vor der Doku-Regel, die Markdown sonst ausnimmt.
     docs/anwender/*)
       echo "frontend e2e" ;;
+    # Vitest erzeugt das Design System aus dem Code und vergleicht es mit der Ausgabe im Repo
+    # (designSystem.guard.test.ts); die README schneidet es aus den Frontend-Regeln.
+    docs/design/design-system/project/* | frontend/AGENTS.md)
+      echo "frontend" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/**/*.md` läuft in den Schnellprüfungen.

@@ -1080,3 +1080,18 @@ export function antdToken(farben: Farbrollen, dichte: Dichte = 'kompakt'): Theme
     motionDurationSlow: '150ms',
   };
 }
+
+/**
+ * Das antd-Theme eines Modus und einer Dichte: Tokens, Algorithmus und Komponenten-Tokens aus
+ * EINER Stelle. `ThemeModeProvider` gibt es an den `ConfigProvider` der App, der Generator des
+ * Design Systems (`frontend/scripts/design-system/`) an den seiner Vorschauen, damit beide
+ * dasselbe Theme rendern.
+ */
+export function antdThema(dunkel: boolean, dichte: Dichte): ThemeConfig {
+  const farben = dunkel ? farbenDunkel : farbenHell;
+  return {
+    token: antdToken(farben, dichte),
+    algorithm: antdAlgorithmus(dunkel),
+    components: antdKomponenten(farben, dichte),
+  };
+}

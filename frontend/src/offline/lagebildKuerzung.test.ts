@@ -33,6 +33,9 @@ const ERWARTET_BEHALTEN = [
   'kontamination',
   'transport_prioritaet',
   'transport_art',
+  'aktueller_transport_durch',
+  'aktuelles_einsatz_fahrzeug_id',
+  'versorgung',
 ].sort();
 const ERWARTET_AUSGELASSEN = [
   'herkunft_adresse',
@@ -67,6 +70,9 @@ const VOLL: Person = {
   geaendert_at: '2026-10-09 10:05:00',
   geaendert_von: 3,
   storniert_at: null,
+  versorgung: 'unterwegs',
+  aktueller_transport_durch: 'eigen',
+  aktuelles_einsatz_fahrzeug_id: 9,
   aktuelle_sichtung: 'sk2',
   aktuelle_sichtung_at: '2026-10-09 10:03:00',
   aktueller_verbleib: 'Klinikum',

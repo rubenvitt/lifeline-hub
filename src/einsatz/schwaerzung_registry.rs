@@ -279,6 +279,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktueller_verbleib_status", G_TRIAGE),
             // Kennung der Betreuungsstelle, kein Personenbezug (der Name hängt an der Stelle).
             retain("aktuelle_verbleib_betreuungsstelle_id", G_FK),
+            // LLH-1332: wer fährt (CHECK-Enum wie die Art) und die Disposition des Fahrzeugs,
+            // kein Personenbezug; der Versorgungszustand bleibt nach der Schwärzung stehen.
+            retain("aktueller_transport_durch", G_TRIAGE),
+            retain("aktuelles_einsatz_fahrzeug_id", G_FK),
             // LLH-1326 (Change y18v58dt-pat-kern, design.md D4): die PAT-Nummer verknüpft die
             // Person mit ihrer Papier-Patientenanhängetasche und fällt mit der Behandlung; die
             // Kontamination ist eine Statuskategorie wie die Sichtung.
@@ -433,6 +437,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Ohne Netz vorgemerkt (LLH-1138): `zeitpunkt_at` ist die Erfassungszeit.
             retain("client_id", G_IDEMPOTENZ),
             retain("eingegangen_at", G_ZEIT),
+            // LLH-1332: wer fährt und die Disposition des Fahrzeugs; der Funkrufname steht als
+            // Momentaufnahme in `transportmittel` und fällt mit ihm.
+            retain("transport_durch", G_TRIAGE),
+            retain("einsatz_fahrzeug_id", G_FK),
         ],
     },
     TabellenRegel {

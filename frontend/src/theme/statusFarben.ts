@@ -36,6 +36,7 @@ import type {
   SchadenStatus,
   Sichtungskategorie,
   StatusKategorie,
+  TransportDurch,
   UhsStatus,
   UhsTyp,
   Verfuegbarkeit,
@@ -333,6 +334,23 @@ export const brAbgerufen: StatusDarstellung = { rolle: 'achtung', label: 'abgeru
  * Angabe“ tragen keine Marke. Steht in Patientenkopf, Betroffenenliste und Patientenliste am Gerät.
  */
 export const kontamination: StatusDarstellung = { rolle: 'achtung', label: 'kontaminiert' };
+
+/**
+ * Wer einen Patienten transportiert (LLH-1332, Change `y4l621ih-patientenverbleib-uebergabe`,
+ * design.md D5): die Marke am Feld „Rettungsmittel“ sagt den Ausgang. Ein Eigentransport bleibt
+ * bis zur Übergabe in unserer Verantwortung, darum `achtung`; ein fremdes Rettungsmittel schließt
+ * den Patienten ab und bleibt neutral.
+ */
+export const transportDurch: Record<TransportDurch, StatusDarstellung> = {
+  eigen: { rolle: 'achtung', label: 'Eigentransport' },
+  fremd: { rolle: 'neutral', label: 'fremdes Rettungsmittel' },
+};
+
+/**
+ * Ein Eigentransport seit mehr als 60 Minuten ohne quittierte Übergabe (LLH-1332, Spec
+ * `uhs-grundriss`): Hinweis, keine Gefahr. Eine einzelne Darstellung wie {@link brAbgerufen}.
+ */
+export const uebergabeOffen: StatusDarstellung = { rolle: 'achtung', label: 'Übergabe offen' };
 
 /** Bewegungsart einer UHS-Belegung. */
 export const belegungsArt: Record<BelegungsArt, StatusDarstellung> = {

@@ -97,7 +97,7 @@ import {
 import { sichtungsZeilen, verdichteGefahrenmatrix } from './lageVerdichtung';
 import { STROM_ABRUF, stromAuswahl, wassermarkeNachziehen } from './meldungsstrom';
 import { GefahrenmatrixPaneel, MeldungsstromPaneel, SichtungsPaneel } from './LagePaneele';
-import { transportBilanz } from '../../personen/personenBilanz';
+import { versorgungsBilanz } from '../../personen/personenBilanz';
 import { useEvakuierungKennzahl } from '../../betreuung/useEvakuierungKennzahl';
 import { darfZaehlerZeigen } from '../../einsatz/useModulZaehler';
 import {
@@ -492,7 +492,7 @@ export default function LageDashboardPage() {
               zeilen={lagebild ? sichtungsZeilen(lagebild.sk) : []}
               erfasst={lagebild?.betroffeneGesamt ?? 0}
               ohneSichtung={lagebild?.sk.ohne ?? 0}
-              transport={transportBilanz(daten.personen ?? [])}
+              versorgung={versorgungsBilanz(daten.personen ?? [])}
               onNeuladen={() => nachladen('personen')}
               onPersonen={() => waehle(personenPfad(einsatzId))}
               onAufnehmen={() => waehle(personenAufnahmePfad(einsatzId))}

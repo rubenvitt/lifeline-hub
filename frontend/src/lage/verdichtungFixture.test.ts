@@ -2,12 +2,21 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { Auftrag, Einheit, Einsatzabschnitt, EinsatzPersonal, Meldung } from '../api/types';
+import type {
+  Auftrag,
+  Einheit,
+  Einsatzabschnitt,
+  EinsatzPersonal,
+  Meldung,
+  Person,
+  Sichtungskategorie,
+} from '../api/types';
 import { summiereStaerke } from '../anzeige/staerke';
 import { baueKraeftebild, verdichte, type MeldebildZeile } from '../kraefte/kraeftebild';
 import { istAlarmiert } from '../meldungen/meldungKennzahlen';
 import { istOffen } from '../pages/fuehrung/ueberblickDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
+import { ohneAbgeschlossene, sichtungsbild, versorgungsBilanz } from '../personen/personenBilanz';
 
 /**
  * Gemeinsames Fixture der Zählregeln (LFH-550): `tests/fixtures/verdichtung/regeln.json`, dieselbe
@@ -27,6 +36,23 @@ const fixture = JSON.parse(
 type Tripel = [number, number, number];
 
 interface Fixture {
+  versorgung: {
+    faelle: Array<{
+      name: string;
+      sichtung: Sichtungskategorie | null;
+      versorgung: Person['versorgung'];
+    }>;
+    erwartet: {
+      offen: number;
+      unterwegs: number;
+      abgeschlossen: number;
+      patienten: number;
+      sk1: number;
+      sk2: number;
+      sk3: number;
+      sk4: number;
+    };
+  };
   auftraege: {
     faelle: Array<{
       name: string;
@@ -243,5 +269,41 @@ describe('Fixture: Kräfte (LLH-1079, LLH-1234)', () => {
     }));
     expect(summiereStaerke(einheiten)).toEqual(alsStaerke(k.erwartet_einheiten));
     expect(summiereStaerke(einheiten.filter((e) => e.aufgeloest_at))).toBeNull();
+  });
+});
+
+/**
+ * Versorgungszustand (LLH-1332): der Server leitet ihn ab (`person::versorgung_von`, Rust-Seite
+ * des Fixtures); der Client zählt darüber. Abgeschlossene zählen in keiner Sichtungsverteilung
+ * der Lage, unterwegs befindliche schon.
+ */
+describe('Versorgung und Lagesichtung wie das Fixture', () => {
+  const v = fixture.versorgung;
+  const personen = v.faelle.map(
+    (f) =>
+      ({
+        status: 'betroffen',
+        aktuelle_sichtung: f.sichtung,
+        versorgung: f.versorgung,
+        aktuelle_verbleib_art: f.versorgung === 'offen' ? null : 'transport',
+        aktuelle_uhs_id: null,
+      }) as Person,
+  );
+
+  it('Abgeschlossene fehlen in der Sichtungsverteilung', () => {
+    const { je } = sichtungsbild(ohneAbgeschlossene(personen));
+    expect(je.sk1 + je.sk2 + je.sk3 + je.sk4).toBe(v.erwartet.patienten);
+    expect([je.sk1, je.sk2, je.sk3, je.sk4]).toEqual([
+      v.erwartet.sk1,
+      v.erwartet.sk2,
+      v.erwartet.sk3,
+      v.erwartet.sk4,
+    ]);
+  });
+
+  it('versorgungsBilanz zählt unterwegs und abgeschlossen wie der Server', () => {
+    const b = versorgungsBilanz(personen);
+    expect(b.unterwegs).toBe(v.erwartet.unterwegs);
+    expect(b.abgeschlossen).toBe(v.erwartet.abgeschlossen);
   });
 });
