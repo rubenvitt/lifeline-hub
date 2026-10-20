@@ -147,9 +147,8 @@ Wegen), bewertet vorher ein Workflow oder eine Handvoll Subagents konkurrierende
 beides landet in `design.md`. Zwischen Panel und Proposal hältst du **nicht** an. Die Wahl
 trifft der Mensch am Freigabe-Checkpoint, und will er einen anderen Weg, läuft `/opsx:update`.
 
-**Größere UI:** Trägt ein Task eine neue Seite, ein neues Modul oder einen Rahmenumbau, entwirfst
-du sie selbst in Claude Design, wenn du Zugriff hast; sonst baust du direkt. Einen Prompt für den
-Menschen gibt es nicht (Regel: `frontend/AGENTS.md`, „Größere UI-Entwürfe über Claude Design“).
+**Größere UI:** Regel und Pflichten (Entwurf mit `/design`, Design System neu erzeugen und nach
+dem Merge veröffentlichen): `frontend/AGENTS.md`, „Größere UI-Entwürfe über das Design System“.
 
 **Checkpoint — Pflicht (LFH-588).** Nach den `/opsx:propose`-Läufen hältst du an und legst
 **alle Changes des Laufs gesammelt** vor, samt offenen Optionen und Empfehlung. Die Tasks
