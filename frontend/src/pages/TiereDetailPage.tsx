@@ -45,6 +45,9 @@ import { parseRouteId, personDetailPfad, tierePfad } from '../routing/deeplinks'
 import type { AbschlussGrund, Tier, TierStatus } from '../api/types';
 import HalterPicker, { type HalterWert } from '../personen/HalterPicker';
 import TierAnhaenge from './tiere/TierAnhaenge';
+import TierVerortung from './tiere/TierVerortung';
+import { KoordinatenDatenfeld } from '../anzeige/KoordinatenFeld';
+import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { useEditSitzung, type CasBasis } from '../components/useEditSitzung';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -57,7 +60,14 @@ import { useFormularVerlassenSchutz } from '../components/useFormularVerlassenSc
  * Formularwerte der Bearbeiten-Maske: der Patch plus die zusammengesetzte Halter-Auswahl, die erst
  * beim Absenden in das XOR-Feldpaar zerlegt wird.
  */
-type TierFormWerte = TierPatch & { halter?: HalterWert | null };
+/**
+ * Formularwerte: die Fundort-Koordinate steht als ein Wert der `KoordinatenEingabe` im Formular
+ * (`koord`) und geht über `alsLatLon` als Paar an den Server (LLH-1123).
+ */
+type TierFormWerte = Omit<TierPatch, 'antreff_lat' | 'antreff_lon'> & {
+  halter?: HalterWert | null;
+  koord?: KoordinatenWert;
+};
 
 const STATUS_META = TIER_STATUS;
 
@@ -343,6 +353,10 @@ export default function TiereDetailPage() {
       kennzeichnung: t.kennzeichnung,
       groesse_gewicht: t.groesse_gewicht,
       antreff_ort: t.antreff_ort,
+      koord:
+        t.antreff_lat != null && t.antreff_lon != null
+          ? { lat: t.antreff_lat, lon: t.antreff_lon }
+          : null,
       notiz: t.notiz,
       halter:
         t.halter_person_id != null
@@ -419,6 +433,18 @@ export default function TiereDetailPage() {
       )}
       {zelle('groesse_gewicht', 'Größe / Gewicht', <Input />, t.groesse_gewicht ?? '—')}
       {zelle('antreff_ort', 'Fundort', <Input />, t.antreff_ort ?? '—')}
+      {/* Verortung sichtbar machen wie am Schaden (LLH-1123): eine unverortete Lage, die niemand als
+          unverortet sieht, ist so gut wie nicht erfasst. Verortet wird über die Karte; im
+          Bearbeiten-Modus lässt sich die Koordinate auch eintippen oder leeren. */}
+      {bearbeiten ? (
+        <KoordinatenDatenfeld label="Verortung" name="koord" einsatzId={einsatzId} />
+      ) : (
+        <TierVerortung
+          einsatzId={einsatzId}
+          tier={t}
+          darfVerorten={darfSchreiben && !t.storniert_at && t.status !== 'abgeschlossen'}
+        />
+      )}
       {zelle(
         'halter',
         'Halter',
@@ -512,6 +538,7 @@ export default function TiereDetailPage() {
             scrollToFirstError={{ focus: true }}
             onFinish={(daten) => {
               const h = daten.halter ?? null;
+              const koord = alsLatLon(daten.koord);
               const patch: TierPatch = {
                 rasse_beschreibung: daten.rasse_beschreibung,
                 rufname: daten.rufname,
@@ -521,6 +548,9 @@ export default function TiereDetailPage() {
                 kennzeichnung: daten.kennzeichnung,
                 groesse_gewicht: daten.groesse_gewicht,
                 antreff_ort: daten.antreff_ort,
+                // Paar: beide gesetzt oder beide leer (`null`), nie ein halbes.
+                antreff_lat: koord?.lat ?? null,
+                antreff_lon: koord?.lon ?? null,
                 notiz: daten.notiz,
                 // Halter XOR: immer beide Felder explizit senden (das nicht gewählte ist null).
                 halter_person_id: h?.typ === 'person' ? h.refId : null,
