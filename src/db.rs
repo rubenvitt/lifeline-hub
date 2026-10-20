@@ -748,6 +748,96 @@ mod tests {
         );
     }
 
+    /// LLH-1034: `evakuierung` übernimmt jede Vorgabe von `betreuung` vollständig (Rolle und
+    /// Sichtbarkeit), andere Module bleiben unberührt.
+    #[tokio::test]
+    async fn migration_0224_spiegelt_betreuung_auf_evakuierung() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 224)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0224");
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'betreuung', NULL, 'fuehrungskraft'), (2, 'betreuung', 0, NULL), \
+                    (3, 'betreuung', 1, 'admin'), (4, 'etb', 0, 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'betreuung', 0, NULL), (2, 'etb', NULL, 'admin'), \
+                    (3, 'betreuung', NULL, 'einsatzfuehrung')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migrate(&pool).await.expect("0224 läuft durch");
+
+        let einsatz: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
+             WHERE modul_key = 'evakuierung' ORDER BY einsatz_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, None, Some("fuehrungskraft".to_string())),
+                (2, Some(0), None),
+                (3, Some(1), Some("admin".to_string())),
+            ]
+        );
+        let org: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, sichtbar, benoetigte_rolle FROM org_modul_einstellung \
+             WHERE modul_key = 'evakuierung' ORDER BY org_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            org,
+            [
+                (1, Some(0), None),
+                (3, None, Some("einsatzfuehrung".to_string()))
+            ]
+        );
+        // Die Quelle bleibt unverändert.
+        let betreuung: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_modul_override WHERE modul_key = 'betreuung'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(betreuung, 3);
+    }
+
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
     /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
     /// und die Migrationsbuchhaltung.
@@ -9615,6 +9705,74 @@ mod tests {
         ] {
             assert!(ergebnis.is_err(), "{fall}");
         }
+    }
+
+    /// LLH-1123: `antreff_lat`/`antreff_lon` am Tier. Eine Bestandszeile von vorher behält jeden
+    /// Wert, die Koordinate ist leer; beide Spalten existieren als REAL.
+    #[tokio::test]
+    async fn migration_0227_tier_antreff_koordinate() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 226).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::query(
+            "INSERT INTO einsatz_tier \
+                (id, einsatz_id, registrier_nr, status, spezies, rufname, antreff_ort, notiz, \
+                 erfasst_at, erfasst_von, geaendert_at, geaendert_von) \
+             VALUES (7, ?, 1, 'vermisst', 'grosstier', 'Fritz', 'Weide am Deich', 'x', \
+                     '2026-10-01 08:00:00', ?, '2026-10-01 09:00:00', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        type Zeile = (
+            i64,
+            i64,
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+        );
+        let lies = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, Zeile>(
+                "SELECT id, einsatz_id, registrier_nr, status, spezies, rufname, antreff_ort, \
+                        notiz, erfasst_at, geaendert_at \
+                 FROM einsatz_tier ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = lies(pool.clone()).await;
+
+        migriere_bis(&pool, 227).await;
+
+        assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
+        let koordinate: (Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT antreff_lat, antreff_lon FROM einsatz_tier WHERE id = 7")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(koordinate, (None, None));
+        let spalten: Vec<(String, String)> = sqlx::query_as(
+            "SELECT name, type FROM pragma_table_info('einsatz_tier') \
+             WHERE name IN ('antreff_lat', 'antreff_lon') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                ("antreff_lat".to_string(), "REAL".to_string()),
+                ("antreff_lon".to_string(), "REAL".to_string())
+            ]
+        );
     }
 
     // --- LLH-1043: Kreisangaben an der Zone (0228) ---

@@ -18,12 +18,13 @@ import { useRollen } from '../components/instrument';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import {
-  betreuungPfad,
+  evakuierungsbezirkPfad,
   gefahrenPfad,
   parseKartenzentrum,
   parseKreisVorbelegung,
   parsePlatzierenAuftrag,
   parseZeichnenAuftrag,
+  parseZeichnenBezug,
   parseRouteId,
   parseZurueck,
 } from '../routing/deeplinks';
@@ -40,6 +41,7 @@ import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN, zoneStil } from './lagekarte/zonenStil';
 import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
+import { bezirkAuftragEntschieden, bezirkZeichnenEntwurf } from './lagekarte/bezirkZeichnen';
 import Kartenflaeche, {
   type KartenHandle,
   type KartenKontextmenue,
@@ -237,6 +239,7 @@ export default function LagekartePage() {
     markerLaden,
     gebiete,
     bezirke,
+    bezirkeGeladen,
     fehlerhafteQuellen,
     neuLaden,
     verortet,
@@ -256,7 +259,9 @@ export default function LagekartePage() {
     personenFehler,
     personenNichtGeladen,
     betreuungZugriff,
+    evakuierungZugriff,
     brZugriff,
+    tierZugriff,
     datenstand,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
@@ -448,6 +453,7 @@ export default function LagekartePage() {
   const {
     platzierungZiel,
     verortetZiel,
+    gebietGezeichnet,
     verortungsTyp,
     zeichneAbschnittId,
     zoneEntwurf,
@@ -490,6 +496,7 @@ export default function LagekartePage() {
     onPlatzierenStart,
     onVerortungsauftragStart,
     onVerortetSchliessen,
+    onGebietGezeichnetSchliessen,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
     onZoneZeichnenStart,
@@ -566,6 +573,7 @@ export default function LagekartePage() {
         personenEbeneAn: layerEffektiv.person,
         betreuungZugriff,
         brZugriff,
+        tierZugriff,
       }),
     [
       alleVerortet,
@@ -574,6 +582,7 @@ export default function LagekartePage() {
       layerEffektiv.person,
       betreuungZugriff,
       brZugriff,
+      tierZugriff,
     ],
   );
 
@@ -844,7 +853,7 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [zonen, searchParams, setSearchParams, setZoneAuswahl, setFlyToZiel]);
 
-  // Bezirksfläche: ?evakuierungsbezirk=<id> von der Betreuungsseite, apply-then-clean wie
+  // Bezirksfläche: ?evakuierungsbezirk=<id> von der Evakuierungsseite, apply-then-clean wie
   // `?gefahrengebiet=`, mit zwei Unterschieden, weil der Sprung die Kartenansicht nicht kennt:
   // (1) gesucht wird in allen Zonen; liegt die Fläche in einer anderen Ansicht, wechselt die Karte
   //     zuerst dorthin (`?ansicht=`), der Auftrag bleibt für die nächste Runde stehen;
@@ -918,7 +927,10 @@ export default function LagekartePage() {
           ? brZugriff
           : auftrag.typ === 'person'
             ? personenZugriff
-            : null;
+            : // Ein Tier nur mit dem Modul Tiere (LLH-1123).
+              auftrag.typ === 'tier'
+              ? tierZugriff
+              : null;
     if (modulZugriff !== null && !rechteBekannt) return;
     // Erst anwenden, dann räumen: mit dem Räumen zuerst kam die Navigation nicht durch, während der
     // Modus startete, und der Parameter blieb in der URL stehen.
@@ -941,6 +953,7 @@ export default function LagekartePage() {
     betreuungZugriff,
     brZugriff,
     personenZugriff,
+    tierZugriff,
   ]);
 
   /**
@@ -951,26 +964,49 @@ export default function LagekartePage() {
    *
    * Der Parameter wird als LITERAL gelesen: daran erkennt `schnellaktionen.guard.test.ts` die
    * Seite als Leser. Hinter einer Konstante wird der Guard rot.
+   *
+   * Mit Bezug `&bezirk=<id>` (LLH-1069, `lagekarte/bezirkZeichnen.ts`): die Fläche gehört diesem
+   * Evakuierungsbezirk. Der Auftrag wartet zusätzlich auf Modulfreigaben und Bezirksliste und
+   * startet nur mit freiem Modul Evakuierung für einen Bezirk der Liste; sonst wird er wie jeder
+   * ungültige Auftrag nur geräumt — beide Parameter, auch ein `bezirk` ohne `zeichnen`.
    */
   useEffect(() => {
     const roh = searchParams.get('zeichnen');
-    if (roh === null) return;
+    const rohBezirk = searchParams.get('bezirk');
+    if (roh === null && rohBezirk === null) return;
     if (ladt) return;
-    const auftrag = parseZeichnenAuftrag(roh);
+    const auftrag = parseZeichnenBezug(parseZeichnenAuftrag(roh), rohBezirk);
     // Kreis (LLH-1043, D9): Radius und Mitte belegen nur mit `:kreis` vor; ein unbrauchbarer
     // Teil fällt einzeln weg, der Modus startet trotzdem.
     const vorbelegung =
       auftrag?.form === 'kreis'
         ? parseKreisVorbelegung(searchParams.get('radius'), searchParams.get('mitte'))
         : {};
-    const entwurf = auftrag ? zeichenAuftragZuEntwurf({ ...auftrag, ...vorbelegung }) : null;
-    if (darfSchreiben && entwurf) onZoneZeichnenStart(entwurf);
+    let entwurf =
+      darfSchreiben && auftrag ? zeichenAuftragZuEntwurf({ ...auftrag, ...vorbelegung }) : null;
+    if (entwurf && auftrag?.bezirk != null) {
+      const evakuierungFrei = evakuierungZugriff === 'frei';
+      if (!bezirkAuftragEntschieden({ rechteBekannt, evakuierungFrei, bezirkeGeladen })) return;
+      entwurf = bezirkZeichnenEntwurf(entwurf, auftrag.bezirk, { evakuierungFrei, bezirke });
+    }
+    if (entwurf) onZoneZeichnenStart(entwurf);
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('zeichnen');
     naechste.delete('radius');
     naechste.delete('mitte');
+    naechste.delete('bezirk');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, darfSchreiben, onZoneZeichnenStart]);
+  }, [
+    searchParams,
+    setSearchParams,
+    ladt,
+    darfSchreiben,
+    onZoneZeichnenStart,
+    rechteBekannt,
+    evakuierungZugriff,
+    bezirkeGeladen,
+    bezirke,
+  ]);
 
   /**
    * Picker-Kosten (LFH-836, design.md Risiko „Picker-Kosten“): steht die Karte und darf geschrieben
@@ -1117,9 +1153,9 @@ export default function LagekartePage() {
             onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
             ansichten={ansichten ?? []}
             bezirke={bezirke}
-            betreuungFrei={betreuungZugriff === 'frei'}
+            evakuierungFrei={evakuierungZugriff === 'frei'}
             matrixGesperrt={sprungGesperrt('gefahrenzonen')}
-            bezirkPfad={(bid) => betreuungPfad(einsatzId, { bezirk: bid })}
+            bezirkPfad={(bid) => evakuierungsbezirkPfad(einsatzId, bid)}
           />
         )}
       </>
@@ -1137,7 +1173,8 @@ export default function LagekartePage() {
     platzierungZiel != null ||
     bildPlatzierenId != null ||
     zeichenPlatzieren != null ||
-    verortetZiel != null;
+    verortetZiel != null ||
+    gebietGezeichnet != null;
   const leisteErzwungen = auswahlInhalt != null || (breit && leistenModusAktiv);
   const leisteIstSichtbar = leisteSichtbar({
     gemerkt: leistenWahl.wahl,
@@ -1245,23 +1282,38 @@ export default function LagekartePage() {
     </div>
   );
 
+  const ohneSerie = zeichneAbschnittId != null || zoneEntwurf?.bezirk != null;
   const platzierBild =
     bildPlatzierenId != null ? bilder.find((b) => b.id === bildPlatzierenId) : undefined;
   // Rückmeldung nach dem Verorten (LLH-1125): unter `lg` im Fuß-Band, ab `lg` oben in der Leiste.
   const verortetRueckweg = verortetZiel ? rueckwegZiel(einsatzId, verortetZiel) : null;
-  const verortetMeldung: VerortetMeldung | null = verortetZiel
+  // Nach dem Gebiet eines Bezirks (LLH-1069) dieselbe Rückmeldung mit eigenem Titel; der Rückweg
+  // folgt allein aus der Kennung des Bezirks, nie aus der URL, und ersetzt den Kartenschritt.
+  const gebietMeldung: VerortetMeldung | null = gebietGezeichnet
     ? {
-        kennung: verortetKennung(verortetZiel, {
-          personen,
-          marker: alleVerortet,
-          nichtVerortet: nichtVerortetAlle,
-        }),
-        // Ersetzen statt Anhängen: „Zurück“ im Detail führt danach auf die Liste, nicht noch
-        // einmal auf die Karte ohne Auftrag.
-        onZurueck: verortetRueckweg ? () => navigate(verortetRueckweg, { replace: true }) : null,
-        onBleiben: onVerortetSchliessen,
+        kennung: `Bezirk ${gebietGezeichnet.bezeichnung}`,
+        titel: `Gebiet für Bezirk ${gebietGezeichnet.bezeichnung} gespeichert`,
+        onZurueck: () =>
+          navigate(evakuierungsbezirkPfad(einsatzId, gebietGezeichnet.id), { replace: true }),
+        onBleiben: onGebietGezeichnetSchliessen,
       }
     : null;
+  // Beide Rückmeldungen schließen einander aus (ein Modus); dieselbe Stelle im Band und in der Leiste.
+  const verortetMeldung: VerortetMeldung | null =
+    gebietMeldung ??
+    (verortetZiel
+      ? {
+          kennung: verortetKennung(verortetZiel, {
+            personen,
+            marker: alleVerortet,
+            nichtVerortet: nichtVerortetAlle,
+          }),
+          // Ersetzen statt Anhängen: „Zurück“ im Detail führt danach auf die Liste, nicht noch
+          // einmal auf die Karte ohne Auftrag.
+          onZurueck: verortetRueckweg ? () => navigate(verortetRueckweg, { replace: true }) : null,
+          onBleiben: onVerortetSchliessen,
+        }
+      : null);
   const platzierModus: PlatzierModus | null = platzierungZiel
     ? {
         art: 'platzieren',
@@ -1419,9 +1471,11 @@ export default function LagekartePage() {
           titel={
             zeichneAbschnittId != null
               ? 'Abschnitt'
-              : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
-                  (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
-                }`
+              : zoneEntwurf?.bezirk
+                ? `Bezirk ${zoneEntwurf.bezirk.bezeichnung} · Fläche`
+                : `${ZONE_TYPEN.find((t) => t.typ === (zoneBestaetigung?.typ ?? zoneEntwurf?.typ))?.label ?? 'Zone'} · ${
+                    (zoneBestaetigung?.modus ?? zoneEntwurf?.modus) === 'linie' ? 'Linie' : 'Fläche'
+                  }`
           }
           phase={zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen'}
           speichernLaeuft={zoneSpeichern || abschnittSpeichern}
@@ -1453,11 +1507,12 @@ export default function LagekartePage() {
           onAbbrechen={onZeichnenAbbrechen}
           onSpeichern={bestaetigungSpeichern}
           onVerwerfen={bestaetigungVerwerfen}
-          // Serienmodus nur für Zonen — eine Abschnittsfläche gehört zu genau einem Abschnitt.
-          serie={zeichneAbschnittId != null ? undefined : zoneSerie}
-          onSerieWechsel={zeichneAbschnittId != null ? undefined : setZoneSerie}
-          serieAnzahl={zeichneAbschnittId != null ? undefined : zoneSerieAnzahl}
-          onFertig={zeichneAbschnittId != null ? undefined : onZoneZeichnenFertig}
+          // Serienmodus nur für Zonen — eine Abschnittsfläche gehört zu genau einem Abschnitt, ein
+          // Auftrag mit Bezirk ist genau eine Fläche (LLH-1069).
+          serie={ohneSerie ? undefined : zoneSerie}
+          onSerieWechsel={ohneSerie ? undefined : setZoneSerie}
+          serieAnzahl={ohneSerie ? undefined : zoneSerieAnzahl}
+          onFertig={ohneSerie ? undefined : onZoneZeichnenFertig}
         />
         <KreisSteuerung
           aktiv={kreisEntwurf != null && zoneEntwurf != null}
@@ -1477,10 +1532,10 @@ export default function LagekartePage() {
           speichernLaeuft={zoneSpeichern}
           onUebernehmen={kreisUebernehmen}
           onAbbrechen={onZeichnenAbbrechen}
-          serie={zoneSerie}
-          onSerieWechsel={setZoneSerie}
-          serieAnzahl={zoneSerieAnzahl}
-          onFertig={onZoneZeichnenFertig}
+          serie={ohneSerie ? undefined : zoneSerie}
+          onSerieWechsel={ohneSerie ? undefined : setZoneSerie}
+          serieAnzahl={ohneSerie ? undefined : zoneSerieAnzahl}
+          onFertig={ohneSerie ? undefined : onZoneZeichnenFertig}
         />
         {/* Unter `lg` trägt dieses Band die Bedienung der Leistenmodi — die Leiste ist im Modus zu
             (LFH-765). Ab `lg` bleibt sie in der Leiste. */}
@@ -1604,6 +1659,7 @@ export default function LagekartePage() {
         }}
         betreuung={{ zugriff: betreuungZugriff }}
         br={{ zugriff: brZugriff }}
+        tier={{ zugriff: tierZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
         onMarkerWaehlen={onMarkerWaehlen}

@@ -9,7 +9,7 @@
 
 /// Alle gültigen Modul-Keys (Spiegel der Frontend-`modulRegistry`-`key`-Werte).
 /// Reihenfolge wie in der FE-Registry (Kategorie für Kategorie) — rein dokumentarisch.
-pub const MODUL_KEYS: [&str; 33] = [
+pub const MODUL_KEYS: [&str; 34] = [
     // Führung (Neuentwurf 21.09.2026: Überblick als Startseite, Aufträge hierher verschoben)
     "ueberblick",
     "einsatzdaten",
@@ -31,6 +31,8 @@ pub const MODUL_KEYS: [&str; 33] = [
     "etb",
     "personen",
     "unfallhilfsstellen",
+    // LLH-1034: Räumung (Bezirke, Stand evakuiert) als eigenes Modul vor der Betreuung.
+    "evakuierung",
     "betreuung",
     "tiere",
     "schaeden",
@@ -122,6 +124,7 @@ modul_marker! {
     Dokumente => "dokumente",
     Abloesung => "abloesung",
     Betreuung => "betreuung",
+    Evakuierung => "evakuierung",
     Verpflegung => "verpflegung",
     WetterPegel => "wetter-pegel",
     Schaeden => "schaeden",
@@ -175,6 +178,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
+    // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
+    ("/api/einsaetze/{id}/evakuierung", Some("evakuierung")),
     ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
     ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
     ("/api/einsaetze/{id}/tiere", Some("tiere")),
@@ -349,6 +354,7 @@ mod tests {
         assert_eq!(Dokumente::KEY, Some("dokumente"));
         assert_eq!(Abloesung::KEY, Some("abloesung"));
         assert_eq!(Betreuung::KEY, Some("betreuung"));
+        assert_eq!(Evakuierung::KEY, Some("evakuierung"));
         assert_eq!(Verpflegung::KEY, Some("verpflegung"));
         assert_eq!(WetterPegel::KEY, Some("wetter-pegel"));
         assert_eq!(OhneModul::KEY, None);
@@ -370,10 +376,19 @@ mod tests {
             key_fuer_pfad("/api/einsaetze/{id}/lage/meldungen"),
             Some(Some("lagemeldungen"))
         );
-        // Betreuung (LFH-639): alle zwölf Routen hängen unter einem Präfix.
+        // Betreuung (LFH-639): Stellen und Belegungen hängen unter einem Präfix.
         assert_eq!(
             key_fuer_pfad("/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen"),
             Some(Some("betreuung"))
+        );
+        // Evakuierung (LLH-1034): die Bezirke sind umgezogen, eigener Key.
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende"),
+            Some(Some("evakuierung"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/evakuierung"),
+            Some(Some("evakuierung"))
         );
         // Verpflegung (LFH-634): Zeitfenster und Ausgaben hängen unter einem Präfix.
         assert_eq!(

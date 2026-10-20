@@ -44,7 +44,8 @@ test('vorgemerkte Standmeldung eines vorgehenden Geräts wird nach kurzem Ausfal
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Uhrversatz ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+  // Bezirke gehören seit LLH-1034 zum Modul Evakuierung.
+  const basis = `/api/einsaetze/${einsatzId}/evakuierung`;
   await senden(page, `${basis}/bezirke`, {
     bezeichnung: BEZIRK,
     plan_personen: 640,
@@ -56,7 +57,7 @@ test('vorgemerkte Standmeldung eines vorgehenden Geräts wird nach kurzem Ausfal
   expect(geraetVorlauf).toBeGreaterThan(VORLAUF_MS - 30_000);
 
   // Die Seite lädt online und misst dabei die Serveruhr an den echten Antworten.
-  await page.goto(`/einsaetze/${einsatzId}/betreuung`);
+  await page.goto(`/einsaetze/${einsatzId}/evakuierung`);
   const melden = page.getByRole('button', { name: `Stand melden für Bezirk ${BEZIRK}` });
   await expect(melden).toBeVisible();
 

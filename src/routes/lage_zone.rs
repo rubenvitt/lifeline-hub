@@ -25,20 +25,21 @@ pub(crate) fn sse_zone(state: &AppState, einsatz_id: i64, zid: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::LageZone, "zone_id", zid);
 }
 
-/// SSE-Notify an das Modul Betreuung (LFH-673): die Flächenzahl eines Bezirks hat sich
-/// geändert. Eigenes Ereignis statt der Frontend-Zuordnung `lage_zone → betreuung`, denn
-/// `lage_zone` erreicht nur Leser von Lagekarte/Gefahren — wer nur die Betreuung liest, sähe
-/// `flaechen` sonst nie nachziehen. Nutzlast nur Kennungen, wie in `routes/betreuung.rs`.
+/// SSE-Notify an das Modul Evakuierung (LFH-673, seit LLH-1034 eigenes Modul): die
+/// Flächenzahl eines Bezirks hat sich geändert. Eigenes Ereignis statt der Frontend-Zuordnung
+/// `lage_zone → evakuierung`, denn `lage_zone` erreicht nur Leser von Lagekarte/Gefahren — wer
+/// nur die Evakuierung liest, sähe `flaechen` sonst nie nachziehen. Nutzlast nur Kennungen, wie
+/// in `routes/evakuierung.rs`.
 fn sse_bezirk(state: &AppState, einsatz_id: i64, bezirk_id: i64) {
     state
         .live
-        .publiziere_objekt(einsatz_id, LiveEvent::Betreuung, "bezirk_id", bezirk_id);
+        .publiziere_objekt(einsatz_id, LiveEvent::Evakuierung, "bezirk_id", bezirk_id);
 }
 
 /// Prüft eine Bezirks-Zuordnung (LFH-673, design.md D4/D5). Reihenfolge = Codes:
 /// - Zone anderen Typs → **422** (Zusammenhang: Typ × Zuordnung, wie beim Gefahrengebiet);
-/// - kein Zugriff auf das Modul Betreuung → **403** (sonst ließen sich fremde Bezirks-ids per
-///   404/409 abtasten);
+/// - kein Zugriff auf das Modul Evakuierung (LLH-1034) → **403** (sonst ließen sich fremde
+///   Bezirks-ids per 404/409 abtasten);
 /// - Bezirk fehlt oder gehört zu einem anderen Einsatz → **404**;
 /// - Bezirk storniert → **409** (Lebenszyklus, kein CAS — die Zonen-Route hat keinen
 ///   Überschreiben-Dialog).
@@ -53,7 +54,8 @@ async fn pruefe_bezirk_zuordnung(
             "Bezirks-Zuordnung nur an Zonen vom Typ evakuierungsbezirk".into(),
         ));
     }
-    ctx.fordere_modul_zugriff(&state.pool, "betreuung").await?;
+    ctx.fordere_modul_zugriff(&state.pool, "evakuierung")
+        .await?;
     let bezirk =
         crate::betreuung::repo::bezirk_laden(&state.pool, ctx.einsatz.id, bezirk_id).await?;
     if bezirk.storniert_at.is_some() {

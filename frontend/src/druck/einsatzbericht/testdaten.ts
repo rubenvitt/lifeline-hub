@@ -1,5 +1,6 @@
 import type {
   BetreuungUebersicht,
+  EvakuierungUebersicht,
   Einheit,
   EinheitPerioden,
   EinsatzFahrzeug,
@@ -192,7 +193,8 @@ export function rohBericht(
         geschaedigt_kontakt: 'Geschaedigtenname Ottokar',
       } as unknown as Schaden,
     ]),
-    betreuung: daten({ bezirke: [], stellen: [] } as unknown as BetreuungUebersicht),
+    evakuierung: daten({ bezirke: [] } as unknown as EvakuierungUebersicht),
+    betreuung: daten({ stellen: [] } as unknown as BetreuungUebersicht),
     verpflegung: daten({
       zeitfenster: [],
       stellen: [],

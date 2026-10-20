@@ -17,7 +17,8 @@ import {
  * (`pnpm doku:bilder --grep presse-infotelefon`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   pressearbeit.png      frontend/src/pages/PressePage.tsx
  *   medienkontakt.png     frontend/src/pages/PressePage.tsx (Dialog „Medienkontakt erfassen“)
- *   pressemitteilung.png  frontend/src/pages/PressemitteilungDetailPage.tsx
+ *   pressemitteilung.png  frontend/src/pages/PressemitteilungDetailPage.tsx,
+ *                         frontend/src/entwurf/DokumentEntwurf.tsx
  *   infotelefon.png       frontend/src/pages/InfotelefonPage.tsx,
  *                         frontend/src/infotelefon/AnrufErfassung.tsx
  *
@@ -142,10 +143,11 @@ test.describe(KAPITEL, () => {
     await page.goto(`/einsaetze/${demo.id}/stab/presse/mitteilungen/${mitteilungId}`);
     await expect(page.getByRole('button', { name: 'Freigeben' })).toBeVisible();
     await expect(page.locator('textarea#sachverhalt')).toHaveValue(/Ortsteil Nord/);
-    // Der Einstieg öffnet den ersten leeren Abschnitt; gezeigt wird der Sachverhalt mit Text.
-    await page.getByRole('tab', { name: /Sachverhalt/ }).click();
+    // Alle Abschnitte stehen offen; der Einstiegsfokus hätte die Seite zum ersten leeren gerollt,
+    // das Bild zeigt sie vom Kopf an.
     await expect(page.locator('textarea#sachverhalt')).toBeVisible();
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.getByRole('heading', { level: 1 }).scrollIntoViewIfNeeded();
     await page.mouse.move(0, 0);
     await fotografiere(page, KAPITEL, 'pressemitteilung');
   });

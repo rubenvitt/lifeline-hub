@@ -1,55 +1,47 @@
 import { App, Breadcrumb, Button } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useCallback, useMemo, useState } from 'react';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
-  aendereBezirk,
-  aendereStelle,
   ladeBetreuung,
-  legeBezirkAn,
   legeStelleAn,
-  meldeBelegung,
   nimmBelegungZurueck,
-  nimmStandZurueck,
-  storniereBezirk,
   storniereStelle,
 } from '../api/betreuung';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { einsatzKeys } from '../api/queryKeys';
-import { lagekartePfad } from '../routing/deeplinks';
+import {
+  betreuungPfad,
+  betreuungsstellePfad,
+  evakuierungPfad,
+  lagekartePfad,
+} from '../routing/deeplinks';
 import type {
   BelegungsmeldungEingabe,
   Betreuungsstelle,
   BetreuungsstelleEingabe,
-  BetreuungsstellePatch,
-  Evakuierungsbezirk,
-  EvakuierungsbezirkEingabe,
-  EvakuierungsbezirkPatch,
-  StandmeldungEingabe,
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import {
   BelegungMeldenDialog,
-  BezirkAnlegenDialog,
-  BezirkBearbeitenDialog,
-  RaeumungDialog,
-  StandMeldenDialog,
   StelleAnlegenDialog,
-  StelleBearbeitenDialog,
   StornierenDialog,
 } from '../betreuung/BetreuungDialoge';
 import { personenZahl, volleStellenSegment } from '../betreuung/betreuungText';
-import EvakuierungBlock, { type BezirkAktion } from '../betreuung/EvakuierungBlock';
 import StellenBlock, { type StelleAktion } from '../betreuung/StellenBlock';
-import { scrolleZurZeile } from '../components/Datensicht';
+import UnterbringungKennzahlen from '../betreuung/UnterbringungKennzahlen';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-import { erfasseBelegungOfflineFaehig, erfasseStandOfflineFaehig } from '../offline/schreiben';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -62,31 +54,25 @@ const betreuungRechteText = einsatzRechteGrund;
  * storniert); der Dialog bekommt den aktuellen.
  */
 type Dialog =
-  | { art: 'bezirkAnlegen' }
-  | { art: 'bezirkBearbeiten'; bezirk: Evakuierungsbezirk }
-  | { art: 'raeumung'; bezirk: Evakuierungsbezirk }
-  | { art: 'stand'; bezirk: Evakuierungsbezirk }
-  | { art: 'bezirkStornieren'; bezirk: Evakuierungsbezirk }
   | { art: 'stelleAnlegen' }
-  | { art: 'stelleBearbeiten'; stelle: Betreuungsstelle }
   | { art: 'belegung'; stelle: Betreuungsstelle }
   | { art: 'stelleStornieren'; stelle: Betreuungsstelle };
 
-type Hervorhebung = { art: 'bezirk' | 'stelle'; id: number } | null;
-
 /**
- * Fachmodul Betreuung (LFH-639): eine Route, zwei Blöcke, keine Detailroute.
+ * Fachmodul Betreuung (LFH-639): Übersicht der Betreuungsstellen und ihrer Belegung. Jede Stelle
+ * hat seit LLH-1044 eine Detailseite (`BetreuungsstelleDetailPage`); dort stehen Bearbeiten und
+ * Status. Ein alter Link `…/betreuung?stelle=<id>` leitet auf sie um. Die Evakuierungsbezirke
+ * sind seit LLH-1034 das eigene Modul Evakuierung (`EvakuierungPage`); ein alter Link
+ * `…/betreuung?bezirk=<id>` leitet dorthin um.
  *
- * - **Evakuierung** — Karten, weil gelesen wird („was ist mit diesem Bezirk?").
- * - **Betreuungsstellen** — Tabelle, weil verglichen wird („welche hat noch Platz?").
+ * Aufbau (LLH-1050, Lagebild der Unterbringung): Kopf mit genau einer Primäraktion
+ * „Betreuungsstelle anlegen" und der Meta „n Stellen · n in Betrieb · n voll", darunter das Band
+ * „Unterbringung in Zahlen" (`UnterbringungKennzahlen`), darunter die Tabelle — Tabelle, weil
+ * verglichen wird („welche Stelle hat noch Platz?"). Ohne Stelle stehen statt Band und Tabelle
+ * „Keine Betreuungsstellen" und der Knopf zum Anlegen (ohne Schreibrecht gesperrt mit Grund).
  *
- * Kopf: genau eine Primäraktion, „Evakuierungsbezirk anlegen". „Betreuungsstelle anlegen" steht
- * sekundär im eigenen Blockkopf.
- *
- * Melden ohne Rückfrage, mit Rückweg: Stand und Belegung haben eine serverseitige Rücknahme. Der
- * Toast nimmt die `meldung_id` der gerade angelegten Meldung — nie `bezirk.stand.id`: bei einer
- * nachgetragenen, älteren Meldung ist der aktuelle Stand eine andere, und „Rückgängig" nähme die
- * falsche zurück.
+ * Melden ohne Rückfrage, mit Rückweg: die Belegung hat eine serverseitige Rücknahme. Der Toast
+ * nimmt die `meldung_id` der gerade angelegten Meldung.
  *
  * Fehler der Dialoge stehen im Dialog (`SpeicherFehler`), die einer Rücknahme (ohne Dialog) an der
  * Seite (`SeitenHinweise`). Erfolg quittiert der Toast.
@@ -98,13 +84,44 @@ type Hervorhebung = { art: 'bezirk' | 'stelle'; id: number } | null;
 export default function BetreuungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  const [suche] = useSearchParams();
+  const alterBezirk = suche.get('bezirk');
+  // Vor jedem Abruf: ein alter Link auf einen Bezirk gehört seit LLH-1034 zur Evakuierung.
+  if (alterBezirk != null) {
+    const bezirk = Number(alterBezirk);
+    return (
+      <Navigate
+        replace
+        to={evakuierungPfad(einsatzId, Number.isInteger(bezirk) ? { bezirk } : {})}
+      />
+    );
+  }
+  // Ebenso vor jedem Abruf: `?stelle=` war die Adresse einer Stelle, bis sie eine eigene Seite
+  // bekam (LLH-1044). Ein unlesbarer Wert führt auf die Übersicht ohne Parameter.
+  const alteStelle = suche.get('stelle');
+  if (alteStelle != null) {
+    const stelle = Number(alteStelle);
+    return (
+      <Navigate
+        replace
+        to={
+          Number.isInteger(stelle) && stelle > 0
+            ? betreuungsstellePfad(einsatzId, stelle)
+            : betreuungPfad(einsatzId)
+        }
+      />
+    );
+  }
+  return <BetreuungInhalt einsatzId={einsatzId} />;
+}
+
+function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
   const navigate = useNavigate();
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const qc = useQueryClient();
 
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [hervorhebung, setHervorhebung] = useState<Hervorhebung>(null);
   const schliessen = useCallback(() => setDialog(null), []);
 
   const einsatzQuery = useQuery({
@@ -127,71 +144,14 @@ export default function BetreuungPage() {
     [abschnitteQuery.data],
   );
 
-  const bezirke = useMemo(() => betreuungQuery.data?.bezirke ?? [], [betreuungQuery.data]);
   const stellen = useMemo(() => betreuungQuery.data?.stellen ?? [], [betreuungQuery.data]);
   // Ein Live-Refetch kommt bei offenem Dialog an; die Dialoge rechnen gegen diesen Stand.
-  const aktuellerBezirk = (b: Evakuierungsbezirk) => bezirke.find((x) => x.id === b.id) ?? b;
   const aktuelleStelle = (s: Betreuungsstelle) => stellen.find((x) => x.id === s.id) ?? s;
-
-  // Cross-Modul-Deeplinks: `?bezirk=` / `?stelle=` heben die Zeile hervor.
-  useQueryParamSelektion('bezirk', betreuungQuery.isSuccess, (bid) => {
-    if (bezirke.some((b) => b.id === bid)) setHervorhebung({ art: 'bezirk', id: bid });
-  });
-  useQueryParamSelektion('stelle', betreuungQuery.isSuccess, (sid) => {
-    if (stellen.some((s) => s.id === sid)) setHervorhebung({ art: 'stelle', id: sid });
-  });
-  useEffect(() => {
-    if (hervorhebung == null) return;
-    scrolleZurZeile(`${hervorhebung.art}-${hervorhebung.id}`);
-  }, [hervorhebung]);
 
   const invalidiere = useCallback(() => {
     void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
   }, [qc, einsatzId]);
-  /**
-   * Nach einer Bezirksänderung zusätzlich den Einsatz: Anlegen, Räumung und Stornieren können die
-   * Lagekennzahl `evakuiert` kippen. Andere Schirme erfahren das Kippen über `einsatz` (LFH-855);
-   * der eigene Abruf hier wirkt auch bei gestörtem Strom, damit der Rückweg zum Dashboard den neuen
-   * Zuschnitt ohne Banner zeigt. Stand- und Stellenmeldungen kippen ihn nie.
-   */
-  const invalidiereBezirk = useCallback(() => {
-    invalidiere();
-    void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
-  }, [invalidiere, qc, einsatzId]);
-
-  // ── Evakuierungsbezirke ──
-  const bezirkAnlegenMut = useMutation({
-    mutationFn: (body: EvakuierungsbezirkEingabe) => legeBezirkAn(einsatzId, body),
-    onSuccess: (b) => {
-      invalidiereBezirk();
-      message.success(`Evakuierungsbezirk ${b.bezeichnung} angelegt`);
-    },
-  });
-  const bezirkAendernMut = useMutation({
-    mutationFn: ({ bezirkId, patch }: { bezirkId: number; patch: EvakuierungsbezirkPatch }) =>
-      aendereBezirk(einsatzId, bezirkId, patch),
-    onSuccess: (b) => {
-      invalidiereBezirk();
-      message.success(`Bezirk ${b.bezeichnung} gespeichert`);
-    },
-  });
-  const bezirkStornierenMut = useMutation({
-    mutationFn: (bezirkId: number) => storniereBezirk(einsatzId, bezirkId),
-    onSuccess: (b) => {
-      invalidiereBezirk();
-      setDialog(null);
-      message.success(`Bezirk ${b.bezeichnung} storniert`);
-    },
-  });
-  const standZurueckMut = useMutation({
-    mutationFn: (meldungId: number) => nimmStandZurueck(einsatzId, meldungId),
-    onSuccess: (r) => {
-      invalidiere();
-      message.success(`Meldung zu ${r.bezirk.bezeichnung} zurückgenommen`);
-    },
-    onError: invalidiere,
-  });
   const belegungZurueckMut = useMutation({
     mutationFn: (meldungId: number) => nimmBelegungZurueck(einsatzId, meldungId),
     onSuccess: (r) => {
@@ -200,51 +160,10 @@ export default function BetreuungPage() {
     },
     onError: invalidiere,
   });
-  // Beide Rücknahmen melden ihren Fehler an derselben Stelle über der Seite. Ohne Räumen bliebe ein
-  // alter Fehler dort stehen (die Rücknahme startet aus dem Toast, ein erneutes Absenden gibt es
-  // nicht) und verdeckte über das `??` jede spätere Ablehnung der anderen. Jede Rücknahme räumt
-  // deshalb die andere, jede Meldung beide.
-  const { reset: resetStandZurueck, mutate: standZuruecknehmen } = standZurueckMut;
+  // Der Fehler einer Rücknahme steht über der Seite. Ohne Räumen bliebe er dort stehen (die
+  // Rücknahme startet aus dem Toast, ein erneutes Absenden gibt es nicht); jede neue Meldung räumt
+  // ihn deshalb.
   const { reset: resetBelegungZurueck, mutate: belegungZuruecknehmen } = belegungZurueckMut;
-  const nimmStandmeldungZurueck = (meldungId: number) => {
-    resetBelegungZurueck();
-    standZuruecknehmen(meldungId);
-  };
-  const nimmBelegungsmeldungZurueck = (meldungId: number) => {
-    resetStandZurueck();
-    belegungZuruecknehmen(meldungId);
-  };
-  const raeumeRuecknahmeFehler = () => {
-    resetStandZurueck();
-    resetBelegungZurueck();
-  };
-  // Stand- und Belegungsmeldungen kommen vom Handschirm, oft ohne Netz: ohne Verbindung werden sie
-  // mit dem Erfassungszeitpunkt vorgemerkt und später gesendet. „Vorgemerkt" ist ein Erfolg ohne
-  // Rückweg (noch keine `meldung_id`); der Dialog schließt, weil der Wortlaut in IndexedDB liegt.
-  const standMut = useMutation({
-    // Die Funktion merkt ohne Netz selbst vor; TanStacks Vorgabe hielte die Mutation an
-    // (LFH-705, design.md D6).
-    networkMode: 'always',
-    mutationFn: ({ bezirk, body }: { bezirk: Evakuierungsbezirk; body: StandmeldungEingabe }) => {
-      if (!benutzer) throw new Error('Nicht angemeldet');
-      return erfasseStandOfflineFaehig(benutzer.id, einsatzId, bezirk, body);
-    },
-    onMutate: raeumeRuecknahmeFehler,
-    onSuccess: (ergebnis, { bezirk, body }) => {
-      if (ergebnis.zustand === 'vorgemerkt') {
-        message.warning(`Offline vorgemerkt: Standmeldung ${bezirk.bezeichnung}`);
-        return;
-      }
-      const r = ergebnis.daten;
-      invalidiere();
-      zeigeRueckgaengig(
-        message,
-        `Stand ${r.bezirk.bezeichnung} gemeldet: ${personenZahl(body.evakuiert)} evakuiert`,
-        () => nimmStandmeldungZurueck(r.meldung_id),
-      );
-    },
-  });
-
   // ── Betreuungsstellen ──
   const stelleAnlegenMut = useMutation({
     mutationFn: (body: BetreuungsstelleEingabe) => legeStelleAn(einsatzId, body),
@@ -252,21 +171,6 @@ export default function BetreuungPage() {
       invalidiere();
       message.success(`Betreuungsstelle ${s.bezeichnung} angelegt`);
     },
-  });
-  const stelleAendernMut = useMutation({
-    mutationFn: ({ stelleId, patch }: { stelleId: number; patch: BetreuungsstellePatch }) =>
-      aendereStelle(einsatzId, stelleId, patch),
-    onSuccess: (s) => {
-      invalidiere();
-      message.success(`Betreuungsstelle ${s.bezeichnung} gespeichert`);
-    },
-  });
-  // Die Leermeldung vor dem Schließen: eigene Mutation ohne Rückgängig-Toast — sie ist Teil des
-  // Schließens, ein Rückweg auf die 0 ließe eine geschlossene, belegte Stelle zu (der Server lehnt
-  // das mit 422 ab).
-  const leermeldungMut = useMutation({
-    mutationFn: (stelleId: number) => meldeBelegung(einsatzId, stelleId, { belegt: 0 }),
-    onSuccess: invalidiere,
   });
   const stelleStornierenMut = useMutation({
     mutationFn: (stelleId: number) => storniereStelle(einsatzId, stelleId),
@@ -284,7 +188,7 @@ export default function BetreuungPage() {
       if (!benutzer) throw new Error('Nicht angemeldet');
       return erfasseBelegungOfflineFaehig(benutzer.id, einsatzId, stelle, body);
     },
-    onMutate: raeumeRuecknahmeFehler,
+    onMutate: () => resetBelegungZurueck(),
     onSuccess: (ergebnis, { stelle, body }) => {
       if (ergebnis.zustand === 'vorgemerkt') {
         message.warning(`Offline vorgemerkt: Belegungsmeldung ${stelle.bezeichnung}`);
@@ -295,60 +199,26 @@ export default function BetreuungPage() {
       zeigeRueckgaengig(
         message,
         `Belegung ${r.stelle.bezeichnung} gemeldet: ${personenZahl(body.belegt)} untergebracht`,
-        () => nimmBelegungsmeldungZurueck(r.meldung_id),
+        () => belegungZuruecknehmen(r.meldung_id),
       );
     },
   });
 
   // ── Öffnen: jede Öffnung beginnt ohne den Fehler der letzten ──
-  const { reset: resetBezirkAnlegen } = bezirkAnlegenMut;
-  const { reset: resetBezirkAendern } = bezirkAendernMut;
-  const { reset: resetBezirkStornieren } = bezirkStornierenMut;
-  const { reset: resetStand } = standMut;
   const { reset: resetStelleAnlegen } = stelleAnlegenMut;
-  const { reset: resetStelleAendern } = stelleAendernMut;
-  const { reset: resetLeermeldung } = leermeldungMut;
   const { reset: resetStelleStornieren } = stelleStornierenMut;
   const { reset: resetBelegung } = belegungMut;
 
-  const oeffneBezirkAnlegen = useCallback(() => {
-    resetBezirkAnlegen();
-    setDialog({ art: 'bezirkAnlegen' });
-  }, [resetBezirkAnlegen]);
   const oeffneStelleAnlegen = useCallback(() => {
     resetStelleAnlegen();
     setDialog({ art: 'stelleAnlegen' });
   }, [resetStelleAnlegen]);
-  const oeffneStand = useCallback(
-    (bezirk: Evakuierungsbezirk) => {
-      resetStand();
-      setDialog({ art: 'stand', bezirk });
-    },
-    [resetStand],
-  );
   const oeffneBelegung = useCallback(
     (stelle: Betreuungsstelle) => {
       resetBelegung();
       setDialog({ art: 'belegung', stelle });
     },
     [resetBelegung],
-  );
-  const bezirkAktion = useCallback(
-    (aktion: BezirkAktion, bezirk: Evakuierungsbezirk) => {
-      // Sprung auf die Karte; dort wählt die Seite eine Fläche und räumt den Parameter.
-      if (aktion === 'karte') {
-        navigate(lagekartePfad(einsatzId, { evakuierungsbezirk: bezirk.id }));
-        return;
-      }
-      if (aktion === 'stornieren') {
-        resetBezirkStornieren();
-        setDialog({ art: 'bezirkStornieren', bezirk });
-        return;
-      }
-      resetBezirkAendern();
-      setDialog({ art: aktion === 'raeumung' ? 'raeumung' : 'bezirkBearbeiten', bezirk });
-    },
-    [resetBezirkAendern, resetBezirkStornieren, navigate, einsatzId],
   );
   const stelleAktion = useCallback(
     (aktion: StelleAktion, stelle: Betreuungsstelle) => {
@@ -362,16 +232,10 @@ export default function BetreuungPage() {
         );
         return;
       }
-      if (aktion === 'stornieren') {
-        resetStelleStornieren();
-        setDialog({ art: 'stelleStornieren', stelle });
-        return;
-      }
-      resetStelleAendern();
-      resetLeermeldung();
-      setDialog({ art: 'stelleBearbeiten', stelle });
+      resetStelleStornieren();
+      setDialog({ art: 'stelleStornieren', stelle });
     },
-    [resetStelleAendern, resetLeermeldung, resetStelleStornieren, navigate, einsatzId],
+    [resetStelleStornieren, navigate, einsatzId],
   );
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
@@ -391,15 +255,16 @@ export default function BetreuungPage() {
   const gescheitert = betreuungQuery.isError && betreuungQuery.data == null;
   const veraltet = betreuungQuery.isError && betreuungQuery.data != null;
   const ladend = betreuungQuery.isLoading;
+  const leer = !ladend && stellen.length === 0;
+  const inBetrieb = stellen.filter((s) => s.status === 'in_betrieb').length;
 
   return (
     <EinsatzSeite
       titel={modulName('betreuung')}
-      // „n voll" auch hier, nicht nur im Blockkopf der Stellen: der Seitenkopf ist die einzige
-      // Zeile, die mit vielen Bezirkskarten über der Falz steht.
+      // „n voll" nur über 0 (LFH-678), „n in Betrieb" immer: auch 0 ist eine Aussage (LLH-1050).
       meta={
         betreuungQuery.data
-          ? `${bezirke.length} ${bezirke.length === 1 ? 'Bezirk' : 'Bezirke'} · ${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}${volleStellenSegment(stellen)}`
+          ? `${stellen.length === 1 ? '1 Stelle' : `${personenZahl(stellen.length)} Stellen`} · ${personenZahl(inBetrieb)} in Betrieb${volleStellenSegment(stellen)}`
           : undefined
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}
@@ -414,16 +279,16 @@ export default function BetreuungPage() {
       }
       // Gesperrt statt versteckt: der Hinweis darunter nennt den Grund.
       aktionen={
-        <Button type="primary" disabled={!darfSchreiben} onClick={oeffneBezirkAnlegen}>
-          Evakuierungsbezirk anlegen
+        <Button type="primary" disabled={!darfSchreiben} onClick={oeffneStelleAnlegen}>
+          Betreuungsstelle anlegen
         </Button>
       }
-      neueZeile={darfSchreiben ? oeffneBezirkAnlegen : undefined}
+      neueZeile={darfSchreiben ? oeffneStelleAnlegen : undefined}
       hinweis={
         <SeitenHinweise
           rechteFehlt={!darfSchreiben}
           rechteText={betreuungRechteText(einsatz.status)}
-          fehler={standZurueckMut.error ?? belegungZurueckMut.error}
+          fehler={belegungZurueckMut.error}
           fehlerTitel="Meldung konnte nicht zurückgenommen werden"
         />
       }
@@ -434,17 +299,26 @@ export default function BetreuungPage() {
           ursache={betreuungQuery.error}
           onWiederholen={() => void betreuungQuery.refetch()}
         />
+      ) : leer ? (
+        // Ohne Stelle keine Nullen: Band und leere Tabelle entfallen, der Knopf führt heraus.
+        <>
+          {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
+          <SeitenLeer
+            titel="Keine Betreuungsstellen"
+            aktion={{
+              label: 'Betreuungsstelle anlegen',
+              onClick: oeffneStelleAnlegen,
+              gesperrt: darfSchreiben ? undefined : betreuungRechteText(einsatz.status),
+            }}
+          />
+        </>
       ) : (
         <>
           {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
-          <EvakuierungBlock
-            einsatzId={einsatzId}
-            bezirke={bezirke}
+          <UnterbringungKennzahlen
+            stellen={stellen}
+            namentlich={betreuungQuery.data?.namentlich}
             ladend={ladend}
-            darfSchreiben={darfSchreiben}
-            hervorgehoben={hervorhebung?.art === 'bezirk' ? hervorhebung.id : null}
-            onStandMelden={oeffneStand}
-            onAktion={bezirkAktion}
           />
           <StellenBlock
             einsatzId={einsatzId}
@@ -452,8 +326,6 @@ export default function BetreuungPage() {
             namentlich={betreuungQuery.data?.namentlich}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
-            hervorgehoben={hervorhebung?.art === 'stelle' ? hervorhebung.id : null}
-            onAnlegen={oeffneStelleAnlegen}
             onBelegungMelden={oeffneBelegung}
             onAktion={stelleAktion}
           />
@@ -462,84 +334,12 @@ export default function BetreuungPage() {
 
       {/* Dialoge je Ziel frisch montiert: `initialValues` greift nur beim Einhängen, und der
           Speicher von rc-field-form überlebt sonst ein Schließen. */}
-      {dialog?.art === 'bezirkAnlegen' && (
-        <BezirkAnlegenDialog
-          abschnitte={abschnitte}
-          laeuft={bezirkAnlegenMut.isPending}
-          fehler={bezirkAnlegenMut.error}
-          onErfassen={(body) => bezirkAnlegenMut.mutateAsync(body)}
-          onSchliessen={schliessen}
-        />
-      )}
-      {dialog?.art === 'bezirkBearbeiten' && (
-        <BezirkBearbeitenDialog
-          key={dialog.bezirk.id}
-          bezirk={aktuellerBezirk(dialog.bezirk)}
-          abschnitte={abschnitte}
-          laeuft={bezirkAendernMut.isPending}
-          fehler={bezirkAendernMut.error}
-          onErfassen={(patch) =>
-            bezirkAendernMut.mutateAsync({ bezirkId: dialog.bezirk.id, patch })
-          }
-          onSchliessen={schliessen}
-        />
-      )}
-      {dialog?.art === 'raeumung' && (
-        <RaeumungDialog
-          key={dialog.bezirk.id}
-          bezirk={aktuellerBezirk(dialog.bezirk)}
-          laeuft={bezirkAendernMut.isPending}
-          fehler={bezirkAendernMut.error}
-          onErfassen={(patch) =>
-            bezirkAendernMut.mutateAsync({ bezirkId: dialog.bezirk.id, patch })
-          }
-          onSchliessen={schliessen}
-        />
-      )}
-      {dialog?.art === 'stand' && (
-        <StandMeldenDialog
-          key={dialog.bezirk.id}
-          bezirk={aktuellerBezirk(dialog.bezirk)}
-          laeuft={standMut.isPending}
-          fehler={standMut.error}
-          onErfassen={(body) => standMut.mutateAsync({ bezirk: dialog.bezirk, body })}
-          onSchliessen={schliessen}
-        />
-      )}
-      {dialog?.art === 'bezirkStornieren' && (
-        <StornierenDialog
-          titel={`Bezirk ${dialog.bezirk.bezeichnung} stornieren?`}
-          text="Nur für Fehlanlagen. Nicht umkehrbar; der ETB-Nachweis bleibt."
-          stattdessen={{
-            text: 'Stattdessen Räumung setzen',
-            onKlick: () => bezirkAktion('raeumung', dialog.bezirk),
-          }}
-          laeuft={bezirkStornierenMut.isPending}
-          fehler={bezirkStornierenMut.error}
-          onBestaetigen={() => bezirkStornierenMut.mutate(dialog.bezirk.id)}
-          onSchliessen={schliessen}
-        />
-      )}
       {dialog?.art === 'stelleAnlegen' && (
         <StelleAnlegenDialog
           abschnitte={abschnitte}
           laeuft={stelleAnlegenMut.isPending}
           fehler={stelleAnlegenMut.error}
           onErfassen={(body) => stelleAnlegenMut.mutateAsync(body)}
-          onSchliessen={schliessen}
-        />
-      )}
-      {dialog?.art === 'stelleBearbeiten' && (
-        <StelleBearbeitenDialog
-          key={dialog.stelle.id}
-          stelle={aktuelleStelle(dialog.stelle)}
-          abschnitte={abschnitte}
-          laeuft={stelleAendernMut.isPending || leermeldungMut.isPending}
-          fehler={leermeldungMut.error ?? stelleAendernMut.error}
-          onLeermeldung={() => leermeldungMut.mutateAsync(dialog.stelle.id)}
-          onErfassen={(patch) =>
-            stelleAendernMut.mutateAsync({ stelleId: dialog.stelle.id, patch })
-          }
           onSchliessen={schliessen}
         />
       )}
@@ -557,9 +357,10 @@ export default function BetreuungPage() {
         <StornierenDialog
           titel={`Betreuungsstelle ${dialog.stelle.bezeichnung} stornieren?`}
           text="Nur für Fehlanlagen. Nicht umkehrbar; der ETB-Nachweis bleibt."
+          // Der umkehrbare Weg: Status steht auf der Detailseite der Stelle (LLH-1044).
           stattdessen={{
             text: 'Stattdessen Status setzen',
-            onKlick: () => stelleAktion('bearbeiten', dialog.stelle),
+            onKlick: () => navigate(betreuungsstellePfad(einsatzId, dialog.stelle.id)),
           }}
           laeuft={stelleStornierenMut.isPending}
           fehler={stelleStornierenMut.error}

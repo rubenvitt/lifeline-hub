@@ -9,10 +9,11 @@ import type { Betreuungsstelle, BelegungsmeldungEingabe } from '../api/types';
 import { BelegungMeldenDialog } from '../betreuung/BetreuungDialoge';
 import MeldeVerlauf from '../betreuung/MeldeVerlauf';
 import { GESCHLOSSEN_HINWEIS } from '../betreuung/StellenBlock';
+import StelleBelegung from '../betreuung/StelleBelegung';
 import { personenZahl } from '../betreuung/betreuungText';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Kennzahl, Kennzahlenband, Paneel, Segmentleiste } from '../components/instrument';
+import { Paneel, Segmentleiste } from '../components/instrument';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
 import GeraetMeldungen from './GeraetMeldungen';
@@ -20,12 +21,6 @@ import GeraetMeldungen from './GeraetMeldungen';
 const BEREICH_NAME = { belegung: 'Belegung', meldungen: 'Meldungen' } as const;
 type Bereich = keyof typeof BEREICH_NAME;
 const BEREICHE = Object.keys(BEREICH_NAME) as Bereich[];
-
-/** Freie Plätze, nur wenn Kapazität und Belegung bekannt sind; nie negativ. */
-export function freiePlaetze(stelle: Betreuungsstelle): number | null {
-  if (stelle.kapazitaet_personen == null || !stelle.belegung) return null;
-  return Math.max(0, stelle.kapazitaet_personen - stelle.belegung.belegt);
-}
 
 function BelegungBereich({
   einsatzId,
@@ -39,29 +34,9 @@ function BelegungBereich({
   darfSchreiben: boolean;
 }) {
   const geschlossen = stelle.status === 'geschlossen';
-  const frei = freiePlaetze(stelle);
   return (
     <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
-      <Kennzahlenband beschriftung="Belegung in Zahlen">
-        <Kennzahl
-          titel="Belegt"
-          wert={stelle.belegung ? personenZahl(stelle.belegung.belegt) : '—'}
-          ton={stelle.belegung ? 'bedien' : 'neutral'}
-        />
-        <Kennzahl
-          titel="Kapazität"
-          wert={stelle.kapazitaet_personen != null ? personenZahl(stelle.kapazitaet_personen) : '—'}
-        />
-        <Kennzahl
-          titel="Frei"
-          wert={frei != null ? personenZahl(frei) : '—'}
-          ton={frei === 0 ? 'achtung' : frei != null ? 'normal' : 'neutral'}
-        />
-        {/* Nur mit Personenrecht geliefert; ein Hinweis neben der Mengenmeldung, kein Summand. */}
-        {namentlich !== undefined && (
-          <Kennzahl titel="Davon namentlich" wert={personenZahl(namentlich)} />
-        )}
-      </Kennzahlenband>
+      <StelleBelegung stelle={stelle} namentlich={namentlich} />
       <Paneel titel="Meldeverlauf" koerperPolster>
         <MeldeVerlauf
           einsatzId={einsatzId}

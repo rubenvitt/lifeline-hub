@@ -448,3 +448,186 @@ async fn gesicherter_lagestand_enthaelt_keine_namentliche_zahl() {
         "Lagestand trägt keine namentliche Zahl: {text}"
     );
 }
+
+// ---------- Betroffene einer Stelle (LLH-1044) ----------
+
+async fn personen_ids(app: &axum::Router, cookie: &str, uri: &str) -> Vec<i64> {
+    let (s, j) = anfrage(app, "GET", uri, cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{uri}: {j:?}");
+    j.as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["id"].as_i64().unwrap())
+        .collect()
+}
+
+/// `?betreuungsstelle_id=` liefert dieselbe Menge, die „davon namentlich“ zählt: nicht storniert,
+/// jüngster Verbleib „Notunterkunft“ an genau dieser Stelle.
+#[tokio::test]
+async fn personenliste_filtert_nach_betreuungsstelle() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
+    let personen = format!("/api/einsaetze/{e}/personen");
+    let hier = personen_ids(&app, &admin, &personen).await;
+    assert_eq!(hier.len(), 2, "Vorbedingung: zwei Personen an der Stelle");
+
+    // Eine dritte an einer anderen Stelle, eine vierte weitergezogen, eine fünfte ohne Verbleib.
+    let andere = stelle(&app, &admin, e, "NU Schule Süd").await;
+    let p3 = person(&app, &admin, e).await;
+    let (s, v) = verbleib(
+        &app,
+        &admin,
+        e,
+        p3,
+        &format!(r#"{{"art":"notunterkunft","betreuungsstelle_id":{andere}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let p4 = person(&app, &admin, e).await;
+    let (s, v) = verbleib(
+        &app,
+        &admin,
+        e,
+        p4,
+        &format!(r#"{{"art":"notunterkunft","betreuungsstelle_id":{sid}}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let (s, v) = verbleib(&app, &admin, e, p4, r#"{"art":"entlassung"}"#).await;
+    assert_eq!(s, StatusCode::CREATED, "{v:?}");
+    let _p5 = person(&app, &admin, e).await;
+
+    let mut gefiltert = personen_ids(
+        &app,
+        &admin,
+        &format!("{personen}?betreuungsstelle_id={sid}"),
+    )
+    .await;
+    gefiltert.sort();
+    let mut erwartet = hier.clone();
+    erwartet.sort();
+    assert_eq!(gefiltert, erwartet, "nur die beiden, die jetzt hier sind");
+    assert_eq!(
+        personen_ids(
+            &app,
+            &admin,
+            &format!("{personen}?betreuungsstelle_id={andere}")
+        )
+        .await,
+        vec![p3]
+    );
+    assert_eq!(
+        personen_ids(&app, &admin, &personen).await.len(),
+        5,
+        "ohne Filter alle"
+    );
+    // Mit dem Statusfilter kombinierbar (Verbleib „Notunterkunft“ setzt `betroffen`).
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{personen}?status=vermisst&betreuungsstelle_id={sid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(personen_ids(
+        &app,
+        &admin,
+        &format!("{personen}?status=vermisst&betreuungsstelle_id={sid}")
+    )
+    .await
+    .is_empty());
+
+    // Ein Filter, kein Objektzugriff: eine unbekannte Stelle liefert eine leere Liste.
+    assert!(personen_ids(
+        &app,
+        &admin,
+        &format!("{personen}?betreuungsstelle_id=999999")
+    )
+    .await
+    .is_empty());
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{personen}?betreuungsstelle_id=abc"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "unlesbarer Wert");
+
+    // Eine stornierte Stelle hat keine Betroffenen mehr (wie „davon namentlich“).
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen/{andere}/stornieren", betreuung(e)),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert!(personen_ids(
+        &app,
+        &admin,
+        &format!("{personen}?betreuungsstelle_id={andere}")
+    )
+    .await
+    .is_empty());
+}
+
+/// Der Filter ändert nichts am Gate: ohne Personenrecht 403 wie die Liste.
+#[tokio::test]
+async fn filter_nach_stelle_ohne_personenrecht_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
+    let bernd = fuehrung(&app, &admin, e, "bernd").await;
+    modul_ausblenden(&app, &admin, e, "personen").await;
+    let (s, _) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/personen?betreuungsstelle_id={sid}"),
+        &bernd,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Leitung und Erreichbarkeit (LLH-1044) friert der gesicherte Lagestand nicht ein.
+#[tokio::test]
+async fn gesicherter_lagestand_enthaelt_keine_leitung_und_erreichbarkeit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", betreuung(e)),
+        &admin,
+        Some(r#"{"leitung":"Frau Schulz","erreichbarkeit":"0171 2345678"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(j["leitung"], "Frau Schulz", "die Stelle trägt beides");
+    let (s, dok) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/lage-snapshots"),
+        &admin,
+        Some(r#"{"bezeichnung":"Stand 1"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{dok:?}");
+    let text = dok.to_string();
+    assert!(
+        text.contains("NU Turnhalle Nord"),
+        "Vorbedingung: die Stelle steht im Stand"
+    );
+    assert!(
+        !text.contains("Frau Schulz") && !text.contains("0171"),
+        "kein Name und keine Rufnummer im Stand: {text}"
+    );
+}

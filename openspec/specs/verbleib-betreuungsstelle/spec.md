@@ -104,6 +104,28 @@ aufsummieren.
 - **WHEN** ein Lagestand gesichert wird, während Personen namentlich einer Stelle zugeordnet sind
 - **THEN** enthält das gesicherte Dokument keine namentliche Zahl
 
+### Requirement: Personenliste nach Betreuungsstelle
+
+Die Personenliste SHALL den Filter `betreuungsstelle_id` annehmen und dann nur die nicht
+stornierten Personen liefern, deren jüngster Verbleib `notunterkunft` mit Verweis auf diese
+Stelle ist — dieselbe Menge, die „davon namentlich“ zählt. Recht und Stellenbindung eines
+Geräts MUST wie bei der ungefilterten Liste gelten; wie sie schreibt die gefilterte Liste kein
+Zugriffsprotokoll, protokolliert bleibt das Detail einer Person. Eine unbekannte, fremde
+oder stornierte Stelle MUST eine leere Liste ergeben, ein unlesbarer Wert 400. Der Filter
+MUST sich mit `status` kombinieren lassen.
+
+#### Scenario: Personen einer Stelle
+- **WHEN** zwei Personen zuletzt mit Verbleib `notunterkunft` an Stelle 7 erfasst sind, eine an Stelle 8 und eine zuerst an Stelle 7, danach mit `entlassung`
+- **THEN** liefert `?betreuungsstelle_id=7` genau die zwei Personen
+
+#### Scenario: Ohne Personenrecht
+- **WHEN** eine Person ohne Zugriff auf das Modul Personen die gefilterte Liste abruft
+- **THEN** antwortet das System mit 403
+
+#### Scenario: Stornierte Stelle
+- **WHEN** die Stelle 7 storniert ist
+- **THEN** liefert `?betreuungsstelle_id=7` eine leere Liste
+
 ### Requirement: Live-Aktualisierung der namentlichen Zahl
 
 Erfasst jemand einen Verbleib oder storniert eine Person, SHALL eine geöffnete

@@ -1116,16 +1116,15 @@ export interface components {
             name: string;
         };
         /**
-         * @description Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke
-         *     und Stellen eines Einsatzes.
+         * @description Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen
+         *     eines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].
          */
         BetreuungUebersicht: {
-            bezirke: components["schemas"]["EvakuierungsbezirkAnzeige"][];
             /**
              * @description „davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib
              *     `notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt
              *     ganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in
-             *     der Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in
+             *     der Route: `repo::stellen` speist auch den gesicherten Lagestand. Die Zahl geht in
              *     keine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung.
              */
             namentlich?: components["schemas"]["StelleNamentlich"][] | null;
@@ -1142,6 +1141,8 @@ export interface components {
             bezeichnung: string;
             /** Format: int64 */
             einsatz_id: number;
+            /** @description Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe. */
+            erreichbarkeit?: string | null;
             geaendert_at?: string | null;
             /** Format: int64 */
             id: number;
@@ -1156,6 +1157,8 @@ export interface components {
              *     sie als Paar.
              */
             lat?: number | null;
+            /** @description Wer die Stelle leitet (LLH-1044), Freitext. Fehlt ohne Angabe. */
+            leitung?: string | null;
             /** Format: double */
             lon?: number | null;
             notiz?: string | null;
@@ -2780,6 +2783,14 @@ export interface components {
             gesamt: number;
             je_typ: components["schemas"]["EtbTypZaehler"];
         };
+        /**
+         * @description Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht
+         *     stornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne
+         *     Bruch des Drahts dazukommen.
+         */
+        EvakuierungUebersicht: {
+            bezirke: components["schemas"]["EvakuierungsbezirkAnzeige"][];
+        };
         /** @description Öffentliche Darstellung eines Evakuierungsbezirks mit seinem aktuellen Stand. */
         EvakuierungsbezirkAnzeige: {
             /** Format: int64 */
@@ -2792,7 +2803,7 @@ export interface components {
             /**
              * Format: int64
              * @description Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind
-             *     (LFH-673). Immer gesetzt, 0 ohne Fläche — die Betreuungsseite bietet „Auf Karte
+             *     (LFH-673). Immer gesetzt, 0 ohne Fläche — die Evakuierungsseite bietet „Auf Karte
              *     zeigen" nur bei > 0 an und braucht dafür keine Zonenliste (die hängt am Modul Lagekarte).
              */
             flaechen: number;
@@ -3889,7 +3900,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "stab" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "presse" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "benachrichtigung" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -5671,6 +5682,14 @@ export interface components {
             abschluss_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
+            /**
+             * Format: double
+             * @description Koordinate des Fundorts (LLH-1123), nur als Paar; fehlt, solange das Tier nicht verortet
+             *     ist.
+             */
+            antreff_lat?: number | null;
+            /** Format: double */
+            antreff_lon?: number | null;
             antreff_ort?: string | null;
             /** Format: int64 */
             einsatz_id: number;

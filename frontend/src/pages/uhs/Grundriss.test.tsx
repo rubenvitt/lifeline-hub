@@ -165,7 +165,7 @@ function renderGrundriss(
     http.get('/api/einsaetze/1/personen/transportmittel', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
     ),
-    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+    http.get('/api/einsaetze/1/betreuung', () => HttpResponse.json({ stellen: [] })),
   );
   if (angemeldet) server.use(meHandler(benutzerFixture()));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });

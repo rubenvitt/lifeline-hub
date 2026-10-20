@@ -31,6 +31,9 @@ import type { LayerSichtbar } from './Sidebar';
 import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
 import { BETREUUNG_SPERRGRUND, type BetreuungZugriff } from './betreuungEbene';
 import { BR_SPERRGRUND, type BrZugriff } from './brEbene';
+import { TIER_SPERRGRUND, type TierZugriff } from './tierEbene';
+import type { TierKartenEintrag } from './tierMarker';
+import { SPEZIES_META, TIER_STATUS } from '../tiere/tierHelfer';
 import { staerkeImRaum } from '../../bereitstellungsraum/brZahlen';
 import { ART_LABEL, personenZahl } from '../../betreuung/betreuungText';
 import { staerkeText } from '../../anzeige/staerke';
@@ -60,6 +63,7 @@ export const EBENEN: readonly { key: keyof LayerSichtbar; name: string }[] = [
   { key: 'uhs', name: 'UHS' },
   { key: 'betreuungsstelle', name: 'Betreuungsstellen' },
   { key: 'bereitstellungsraum', name: 'Bereitstellungsräume' },
+  { key: 'tier', name: 'Tiere' },
   { key: 'schaden', name: 'Schäden' },
   { key: 'lagemeldung', name: 'Lagemeldungen' },
   { key: 'freies_zeichen', name: 'Taktische Zeichen' },
@@ -136,6 +140,11 @@ export interface BrEbenenAngabe {
   zugriff: BrZugriff;
 }
 
+/** Zugriffsangabe der Ebene „Tiere" (LLH-1123), wie bei den Bereitstellungsräumen. */
+export interface TierEbenenAngabe {
+  zugriff: TierZugriff;
+}
+
 /**
  * Die Zeilen des Paneels „Ebenen".
  *
@@ -155,6 +164,7 @@ export function ebenenZeilen(
   br: BrEbenenAngabe = { zugriff: 'ausgeblendet' },
   /** Die Ebene, die nur der Verortungsauftrag zeichnet (`ebeneMitVorrang`, LLH-1125). */
   eingeblendet: keyof LayerSichtbar | null = null,
+  tier: TierEbenenAngabe = { zugriff: 'ausgeblendet' },
 ): EbenenZeile[] {
   const zaehlung = new Map<MarkerTyp, number>();
   for (const m of verortet) zaehlung.set(m.typ, (zaehlung.get(m.typ) ?? 0) + 1);
@@ -173,6 +183,13 @@ export function ebenenZeilen(
       if (br.zugriff === 'ausgeblendet') return [];
       if (br.zugriff === 'gesperrt') {
         return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: BR_SPERRGRUND }];
+      }
+    }
+    // Tiere ebenso (LLH-1123).
+    if (key === 'tier') {
+      if (tier.zugriff === 'ausgeblendet') return [];
+      if (tier.zugriff === 'gesperrt') {
+        return [{ key, name, anzahl: null, sichtbar: false, sperrgrund: TIER_SPERRGRUND }];
       }
     }
     const n = key === 'zone' ? zonenAnzahl : (zaehlung.get(key) ?? 0);
@@ -229,6 +246,8 @@ export interface AuswahlRoh {
   betreuungsstellen: readonly Betreuungsstelle[];
   /** Bereitstellungsräume (LLH-1107) — leer ohne Modulrecht. */
   bereitstellungsraeume: readonly BrListenEintrag[];
+  /** Tiere (LLH-1123) — leer ohne Modulrecht. */
+  tiere: readonly TierKartenEintrag[];
   /** Eigene Führungsstelle (LFH-1181); fehlt sie, zeigt der Inspector nur den Sprung. */
   fuehrungsstelle?: Fuehrungsstelle | null;
   /**
@@ -248,6 +267,7 @@ export const LEERE_ROHDATEN: AuswahlRoh = {
   abschnitte: [],
   betreuungsstellen: [],
   bereitstellungsraeume: [],
+  tiere: [],
 };
 
 /** Ein Feld des Datenrasters: Augenbraue + Wert, optional mit Statusrolle (getönter Chip). */
@@ -274,6 +294,7 @@ export const OBJEKTART: Record<MarkerTyp, string> = {
   person: 'Person',
   betreuungsstelle: 'Betreuungsstelle',
   bereitstellungsraum: 'Bereitstellungsraum',
+  tier: 'Tier',
 };
 
 export { staerkeText };
@@ -410,6 +431,22 @@ export function auswahlRaster(
         { label: 'Status', wert: st?.label ?? s.status, rolle: st?.rolle, mono: false },
         { label: 'Belegung', wert: belegung, rolle: auslastung(belegt, kap)?.rolle },
         { label: 'Abschnitt', wert: abschnittName(s.abschnitt_id), mono: false },
+      ];
+    }
+    // Tier (LLH-1123): der Rufname steht hier, nicht auf der Karte; „vermisst" trägt die Rolle.
+    case 'tier': {
+      const t = roh.tiere.find((x) => x.id === marker.id);
+      if (!t) return [];
+      return [
+        {
+          label: 'Status',
+          wert: TIER_STATUS[t.status].label,
+          rolle: t.status === 'vermisst' ? 'achtung' : undefined,
+          mono: false,
+        },
+        { label: 'Tierart', wert: SPEZIES_META[t.spezies], mono: false },
+        { label: 'Rufname', wert: text(t.rufname), mono: false },
+        { label: 'Fundort', wert: text(t.antreff_ort), mono: false },
       ];
     }
     // Bereitstellungsraum (LLH-1107): Zahlen nur aus `belegung` des Servers, Stärke nur über

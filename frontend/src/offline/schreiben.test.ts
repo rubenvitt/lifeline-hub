@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { meldeBelegung, meldeStand } from '../api/betreuung';
+import { meldeBelegung } from '../api/betreuung';
+import { meldeStand } from '../api/evakuierung';
 import { ApiError, NetzFehler } from '../api/client';
 import {
   createMassnahme,
@@ -40,7 +41,8 @@ vi.mock('../api/einsatzPerson', async (importOriginal) => {
   };
 });
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
-vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
+vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
+vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
 

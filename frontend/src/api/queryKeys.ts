@@ -88,6 +88,8 @@ export const EINSATZ_KEYS = {
   // `einheit`, `personal`, `fahrzeug` oder `abloesung` ohnehin sendet.
   kraefteZeitachse: 'einsatz-kraefte-zeitachse',
   betreuung: 'einsatz-betreuung',
+  // Evakuierungsbezirke (LLH-1034): eigenes Modul neben der Betreuung, eigener Prefix.
+  evakuierung: 'einsatz-evakuierung',
   verpflegung: 'einsatz-verpflegung',
   // Presse- und Medienarbeit S5 (LFH-554): Presse-Log und Pressemitteilungen unter EINEM Prefix,
   // das Informationstelefon unter einem eigenen. Beide NICHT im Lagebild offline (Personenbezug).
@@ -165,8 +167,8 @@ export const EINSATZ_KEYS = {
 
 export type EinsatzKey = (typeof EINSATZ_KEYS)[keyof typeof EINSATZ_KEYS];
 
-/** Wessen Meldereihe ein Betreuungsverlauf trägt: Standmeldungen eines Bezirks oder
- *  Belegungsmeldungen einer Stelle. Getyptes Token als Sub-Key, kein Objekt. */
+/** Wessen Meldereihe ein Verlauf trägt: Standmeldungen eines Bezirks (Modul Evakuierung) oder
+ *  Belegungsmeldungen einer Stelle (Modul Betreuung). */
 export type BetreuungVerlaufArt = 'bezirk' | 'stelle';
 
 /**
@@ -239,6 +241,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.modulZaehler,
     EINSATZ_KEYS.abloesungen,
     EINSATZ_KEYS.betreuung,
+    EINSATZ_KEYS.evakuierung,
     // Abschnittsflächen im Lagebild des Lagemonitors (LLH-1153).
     EINSATZ_KEYS.lagemonitor,
     // Die BR-Liste trägt den Abschnittsnamen per Join (LLH-1095).
@@ -323,9 +326,13 @@ export const EINSATZ_STREAM_EVENTS = {
   // das Ereignis `art`, stammt es vom Scheduler; alarmiert wird über die Benachrichtigung.
   // Der Vollzug beendet die Einsatzperiode der abgelösten Einheit (LFH-552).
   abloesung: [EINSATZ_KEYS.abloesungen, EINSATZ_KEYS.kraefteZeitachse],
-  // Bezirke, Stellen und ihre Meldereihen unter EINEM Prefix, damit ein Ereignis Übersicht und
-  // Kopfzahl trifft. Nutzlast nur Kennungen.
+  // Stellen und ihre Meldereihen unter EINEM Prefix, damit ein Ereignis Übersicht und Kopfzahl
+  // trifft. Nutzlast nur Kennungen. Den Modulzähler rechnet der Client aus der Übersicht
+  // (`ClientZaehlerQuelle`), er hängt am selben Prefix.
   betreuung: [EINSATZ_KEYS.betreuung],
+  // Bezirke und ihre Standreihen (LLH-1034), wie `betreuung`. Die Kennzahl „Evakuiert“ und der
+  // Modulzähler lesen dieselbe Übersicht.
+  evakuierung: [EINSATZ_KEYS.evakuierung],
   // Zeitfenster samt Deckung und Ausgaben unter EINEM Prefix. Kein Fan-out von `nachforderung`:
   // das DTO trägt nur die Kennung.
   verpflegung: [EINSATZ_KEYS.verpflegung],
@@ -580,6 +587,10 @@ export const einsatzKeys = {
 
   // Personen / Personal
   personen: (einsatzId: number) => [EINSATZ_KEYS.personen, einsatzId] as const,
+  /** Betroffene einer Betreuungsstelle (LLH-1044, Serverfilter); unter `personen`, damit das
+   *  `person`-Ereignis und jede Personen-Mutation sie mit auffrischen. */
+  personenDerStelle: (einsatzId: number, stelleId: number) =>
+    [EINSATZ_KEYS.personen, einsatzId, 'stelle', stelleId] as const,
   personenAuswahl: (einsatzId: number) => [EINSATZ_KEYS.personenAuswahl, einsatzId] as const,
   // personId nullbar: der Person-Detail-Drawer rendert ohne Auswahl (enabled-Guard).
   person: (einsatzId: number, personId: number | null) =>
@@ -741,17 +752,22 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'einheit', einheitId] as const,
   kraefteZeitachsePerson: (einsatzId: number, epId: number) =>
     [EINSATZ_KEYS.kraefteZeitachse, einsatzId, 'person', epId] as const,
-  // Betreuung: argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und Kennzahl teilen
-  // ihn). Die Kopfzahl hängt als Sub-Key darunter, der Stichtag als Wire-String (UTC ohne
+  // Betreuung: argumentlos = Invalidierungs-Prefix (Übersicht und Modulzähler teilen ihn). Die Kopfzahl hängt als Sub-Key darunter, der Stichtag als Wire-String (UTC ohne
   // Zonenkennung), ohne Stichtag der feste Platzhalter 'jetzt'. Nie „jetzt“ als Zeitstempel: der
   // wäre bei jedem Rendern ein neues Cache-Fach samt Abruf.
   betreuung: (einsatzId: number) => [EINSATZ_KEYS.betreuung, einsatzId] as const,
   betreuungKopfzahl: (einsatzId: number, zeitpunkt?: string) =>
     [EINSATZ_KEYS.betreuung, einsatzId, 'kopfzahl', zeitpunkt ?? 'jetzt'] as const,
-  /** Meldereihe eines Bezirks bzw. einer Stelle, Sub-Key unter dem Betreuungs-Prefix: das
-   *  `betreuung`-Ereignis und jede eigene Mutation treffen den offenen Verlauf mit. */
-  betreuungVerlauf: (einsatzId: number, art: BetreuungVerlaufArt, id: number) =>
-    [EINSATZ_KEYS.betreuung, einsatzId, 'verlauf', art, id] as const,
+  /** Belegungsreihe einer Stelle, Sub-Key unter dem Betreuungs-Prefix: das `betreuung`-Ereignis
+   *  und jede eigene Mutation treffen den offenen Verlauf mit. */
+  betreuungVerlauf: (einsatzId: number, stelleId: number) =>
+    [EINSATZ_KEYS.betreuung, einsatzId, 'verlauf', stelleId] as const,
+  // Evakuierung (LLH-1034): argumentlos = Invalidierungs-Prefix (Übersicht, Modulzähler und
+  // Kennzahl „Evakuiert“ teilen ihn).
+  evakuierung: (einsatzId: number) => [EINSATZ_KEYS.evakuierung, einsatzId] as const,
+  /** Standreihe eines Bezirks unter dem Evakuierungs-Prefix, wie {@link betreuungVerlauf}. */
+  evakuierungVerlauf: (einsatzId: number, bezirkId: number) =>
+    [EINSATZ_KEYS.evakuierung, einsatzId, 'verlauf', bezirkId] as const,
   // Verpflegung: ein Abruf trägt alle Zeitfenster samt Deckung und Ausgaben.
   verpflegung: (einsatzId: number) => [EINSATZ_KEYS.verpflegung, einsatzId] as const,
   // Presse S5 (LFH-554): argumentlos = Invalidierungs-Prefix; Listen und Detail als Sub-Keys.
@@ -1238,7 +1254,9 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * (Presse-Log, Pressemitteilungen, Informationstelefon: Kontaktdaten und Rückrufnummern,
  * LFH-554 design.md D8, offen mit LFH-767), die Daten der Fernmeldeskizze (LFH-893: bearbeitet
  * nur mit Server; der Funkplan nennt sie ohne Netz „nicht geladen“), die Bild-Anlagen an
- * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild).
+ * Lagebericht und Befehl (LFH-1028: ohne Netz lädt kein Bild), die Tierliste und mit ihr die
+ * Kartenebene „Tiere" (LLH-1123: sie trägt Halterkontakt und Kennzeichnung; ohne Netz zeigt die
+ * Karte keine Tiere, wie keine Bereitstellungsräume).
  * `lagebildOffline.guard.test.ts` vergleicht die Liste mit JEDEM verwalteten Prefix.
  */
 export const LAGEBILD_OFFLINE = {
@@ -1280,6 +1298,7 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.lagemeldungen,
     EINSATZ_KEYS.fuehrungskraefte,
     EINSATZ_KEYS.betreuung,
+    EINSATZ_KEYS.evakuierung,
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
     EINSATZ_KEYS.lageSnapshot,

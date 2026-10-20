@@ -38,7 +38,9 @@ beforeEach(() => {
   server.use(
     http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
     // Ebene „Betreuungsstellen": dieselbe Lage, ohne Benutzer ist das Modul frei.
-    http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+    http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ stellen: [] })),
+    // Bezirke für die Bezirksflächen: Modul Evakuierung (LLH-1034).
+    http.get('/api/einsaetze/5/evakuierung', () => HttpResponse.json({ bezirke: [] })),
   );
 });
 
@@ -586,7 +588,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 
   /** Alle Live-Quellen gesund; Overrides und Betreuung je Fall. Liefert den Abrufzähler. */
   function handler(freigaben: Record<string, Partial<ModulFreigabe>>, betreuung: () => Response) {
-    const zaehler = { betreuung: 0 };
+    const zaehler = { betreuung: 0, evakuierung: 0 };
     server.use(
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
@@ -629,6 +631,12 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
         zaehler.betreuung += 1;
         return betreuung();
       }),
+      // Dieselbe Antwort trägt die Bezirke; seit LLH-1034 liest die Karte sie aus dem Modul
+      // Evakuierung. Ein Feld zu viel stört keine der beiden Abfragen.
+      http.get('/api/einsaetze/5/evakuierung', () => {
+        zaehler.evakuierung += 1;
+        return betreuung();
+      }),
     );
     return zaehler;
   }
@@ -640,7 +648,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
   }
 
   it('frei: verortete Stelle in `alleVerortet`, unverortete in „Nicht verortet", Rohdaten fürs Raster', async () => {
-    handler({}, () => HttpResponse.json({ bezirke: [], stellen: [STELLE, UNVERORTET] }));
+    handler({}, () => HttpResponse.json({ stellen: [STELLE, UNVERORTET] }));
     const { result } = render();
     await waitFor(() =>
       expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
@@ -661,7 +669,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 
   it('Server verweigert das Modul: „gesperrt" und KEIN Request an …/betreuung', async () => {
     const z = handler({ betreuung: { zugriff: false } }, () =>
-      HttpResponse.json({ bezirke: [], stellen: [STELLE] }),
+      HttpResponse.json({ stellen: [STELLE] }),
     );
     const { result } = render();
     await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
@@ -678,10 +686,15 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
 
-  it('echter Ausfall (500) bei freiem Modul: „Betreuungsstellen" steht im Ausfall', async () => {
+  it('echter Ausfall (500) bei freiem Modul: „Betreuungsstellen" und „Evakuierungsbezirke" stehen im Ausfall', async () => {
     handler({}, () => new HttpResponse(null, { status: 500 }));
     const { result } = render();
-    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Betreuungsstellen']));
+    await waitFor(() =>
+      expect(result.current.fehlerhafteQuellen).toEqual([
+        'Betreuungsstellen',
+        'Evakuierungsbezirke',
+      ]),
+    );
     expect(result.current.betreuungZugriff).toBe('frei');
     expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
   });
@@ -791,7 +804,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
     );
     expect(result.current.bezirke).toHaveLength(1);
-    // Die Leitung sperrt das Modul; die Freigaben laden neu, der Betreuungs-Cache bleibt stehen.
+    // Die Leitung sperrt die Betreuung; die Freigaben laden neu, der Betreuungs-Cache bleibt stehen.
     server.use(
       http.get('/api/einsaetze/5/modul-freigaben', () =>
         HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
@@ -802,8 +815,22 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(client.getQueryData(['einsatz-betreuung', 5])).toBeTruthy(); // Vorbedingung: Altstand
     expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
     expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
-    expect(result.current.bezirke).toEqual([]);
     expect(result.current.rohdaten.betreuungsstellen).toEqual([]);
+    // Zwei Module (LLH-1034): die Bezirke hängen an der Evakuierung und bleiben.
+    expect(result.current.bezirke).toHaveLength(1);
+
+    // Erst die gesperrte Evakuierung nimmt sie, trotz Altstand im Cache.
+    server.use(
+      http.get('/api/einsaetze/5/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({ betreuung: { zugriff: false }, evakuierung: { zugriff: false } }),
+        ),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: ['einsatz-modul-freigaben', 5] });
+    await waitFor(() => expect(result.current.evakuierungZugriff).toBe('gesperrt'));
+    expect(client.getQueryData(['einsatz-evakuierung', 5])).toBeTruthy(); // Vorbedingung
+    expect(result.current.bezirke).toEqual([]);
   });
 
   it('Bezirksfläche ohne Modulrecht: nur das Typwort, keine Bezirksangaben', async () => {
@@ -825,7 +852,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       ),
     );
     const { result } = render();
-    await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
+    await waitFor(() => expect(result.current.evakuierungZugriff).toBe('gesperrt'));
     await waitFor(() => expect(result.current.zonenFeatures[0]?.label).toBe('Evakuierungsbezirk'));
     expect(result.current.bezirke).toEqual([]);
   });
@@ -1015,6 +1042,174 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
     await waitFor(() => expect(result.current.ladt).toBe(false));
     await waitFor(() => expect(result.current.brZugriff).toBe('frei'));
     expect(result.current.alleVerortet.some((m) => m.typ === 'bereitstellungsraum')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+});
+
+/**
+ * Ebene „Tiere" (LLH-1123): dieselbe Grenze wie bei den Bereitstellungsräumen. Die Tests zählen die
+ * Requests an `…/tiere` mit.
+ */
+describe('useLagekarteDaten Tiere (LLH-1123)', () => {
+  const VERORTET = {
+    id: 21,
+    einsatz_id: 5,
+    registrier_nr: 3,
+    status: 'vermisst',
+    spezies: 'katze',
+    rufname: 'Minka',
+    antreff_ort: 'Scheune',
+    antreff_lat: 50.03,
+    antreff_lon: 8.52,
+  };
+  const UNVERORTET = { ...VERORTET, id: 22, registrier_nr: 4, status: 'aktiv', spezies: 'hund' };
+  delete (UNVERORTET as Partial<typeof VERORTET>).antreff_lat;
+  delete (UNVERORTET as Partial<typeof VERORTET>).antreff_lon;
+  const ABGESCHLOSSEN = { ...VERORTET, id: 23, registrier_nr: 5, status: 'abgeschlossen' };
+
+  /** Alle Live-Quellen gesund; Freigaben und Tiere je Fall. Liefert den Abrufzähler. */
+  function handler(freigaben: Record<string, Partial<ModulFreigabe>>, tiere: () => Response) {
+    const zaehler = { tiere: 0 };
+    server.use(
+      http.get('/api/einsaetze/5', () =>
+        HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
+      ),
+      http.get('/api/karte/config', () =>
+        HttpResponse.json({
+          online_styles: [],
+          offline_verfuegbar: false,
+          offline_tiles_url: null,
+          offline_attribution: null,
+          offline_regionen: [],
+          karten_bau_verfuegbar: false,
+        }),
+      ),
+      http.get('/api/einsaetze/5/einstellungen', () =>
+        HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
+      ),
+      ...[
+        '/api/einsaetze/5/uhs',
+        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/einheiten',
+        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/abschnitte',
+        '/api/einsaetze/5/zonen',
+        '/api/einsaetze/5/freie-zeichen',
+        '/api/einsaetze/5/gefahrengebiete',
+        '/api/einsaetze/5/lage/meldungen',
+        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/meldungen/rueckmeldungen',
+      ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
+      http.get('/api/einsaetze/5/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture(freigaben)),
+      ),
+      http.get('/api/einsaetze/5/tiere', () => {
+        zaehler.tiere += 1;
+        return tiere();
+      }),
+    );
+    return zaehler;
+  }
+
+  function render() {
+    return renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
+      wrapper: wrapper(),
+    });
+  }
+
+  it('frei: verortetes Tier in `alleVerortet`, unverortetes in „Nicht verortet", abgeschlossenes nirgends', async () => {
+    handler({}, () => HttpResponse.json([VERORTET, UNVERORTET, ABGESCHLOSSEN]));
+    const { result } = render();
+    await waitFor(() =>
+      expect(result.current.alleVerortet.find((m) => m.typ === 'tier')).toMatchObject({
+        schluessel: 'tier-21',
+        label: 'T-003 (Katze)',
+        beschriftungZusatz: 'vermisst',
+        kurzzeichen: 'T',
+      }),
+    );
+    expect(result.current.tierZugriff).toBe('frei');
+    expect(result.current.nichtVerortetAlle).toContainEqual({
+      typ: 'tier',
+      id: 22,
+      label: 'T-004 (Hund)',
+    });
+    expect(result.current.alleVerortet.some((m) => m.schluessel === 'tier-23')).toBe(false);
+    expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'tier' && m.id === 23)).toBe(
+      false,
+    );
+    expect(result.current.rohdaten.tiere).toHaveLength(3);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('Server verweigert das Modul: „gesperrt", KEIN Request und KEIN Ausfallhinweis', async () => {
+    const z = handler({ tiere: { zugriff: false } }, () => HttpResponse.json([VERORTET]));
+    const { result } = render();
+    await waitFor(() => expect(result.current.tierZugriff).toBe('gesperrt'));
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'tier')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+    expect(z.tiere).toBe(0);
+  });
+
+  it('Modul im Einsatz ausgeblendet: „ausgeblendet" und KEIN Request', async () => {
+    const z = handler({ tiere: { sichtbar: false, zugriff: false } }, () =>
+      HttpResponse.json([VERORTET]),
+    );
+    const { result } = render();
+    await waitFor(() => expect(result.current.markerLaden).toBe(false));
+    expect(result.current.tierZugriff).toBe('ausgeblendet');
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+    expect(z.tiere).toBe(0);
+  });
+
+  it('Server lehnt mit 403 ab: „gesperrt", keine Marker, KEIN Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 403 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.tierZugriff).toBe('gesperrt'));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'tier')).toBe(false);
+    expect(result.current.fehlerhafteQuellen).toEqual([]);
+  });
+
+  it('echter Ausfall (500) bei freiem Modul: „Tiere" steht im Ausfall', async () => {
+    handler({}, () => new HttpResponse(null, { status: 500 }));
+    const { result } = render();
+    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Tiere']));
+    expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'tier')).toBe(false);
+  });
+
+  it('Historien-Modus: Tiere kommen aus dem Dokument, kein Live-Request', async () => {
+    const z = handler({}, () => HttpResponse.json([]));
+    const doc = dokument('keine');
+    ladeLageSnapshot.mockResolvedValue({
+      ...doc,
+      daten: { ...doc.daten, tiere: [VERORTET] },
+    });
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() =>
+      expect(result.current.alleVerortet.find((m) => m.schluessel === 'tier-21')).toMatchObject({
+        lat: 50.03,
+        lon: 8.52,
+      }),
+    );
+    expect(z.tiere).toBe(0);
+  });
+
+  it('Historien-Modus mit altem Dokument ohne Feld: keine Tiere, kein Fehler', async () => {
+    handler({}, () => HttpResponse.json([]));
+    ladeLageSnapshot.mockResolvedValue(dokument('keine'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(result.current.ladt).toBe(false));
+    await waitFor(() => expect(result.current.tierZugriff).toBe('frei'));
+    expect(result.current.alleVerortet.some((m) => m.typ === 'tier')).toBe(false);
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
 });

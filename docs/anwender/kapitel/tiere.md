@@ -2,7 +2,7 @@
 titel: Tiere
 gruppen: [alle, fuehrung]
 reihenfolge: 540
-quellen: [frontend/src/pages/TierePage.tsx, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, src/routes/einsatz_tier.rs, src/tier/mod.rs]
+quellen: [frontend/src/pages/TierePage.tsx, frontend/src/pages/TiereDetailPage.tsx, frontend/src/pages/tiere/tierHelfer.ts, frontend/src/personen/HalterPicker.tsx, frontend/src/personen/ZuweisungsDialoge.tsx, frontend/src/components/VerlassenRueckfrage.tsx, frontend/src/pages/tiere/TierVerortung.tsx, frontend/src/pages/lagekarte/tierMarker.ts, src/routes/einsatz_tier.rs, src/tier/mod.rs]
 ---
 
 ## Überblick
@@ -64,6 +64,20 @@ Umgekehrt ordnet „Bezug hinzufügen“ unter „Bezüge“ auf der Seite einer
 Tier zu, das noch keinen Halter hat ([Betroffene und Sichtung](betroffene.md)). Die Liste der
 Tiere zeigt den Halter dann mit seiner Registriernummer.
 
+### Ein Tier auf der Lagekarte verorten
+
+1. Die Seite des Tiers öffnen. Das Feld „Verortung“ zeigt die Koordinate des Fundorts oder
+   „nicht verortet“.
+2. „Auf Karte verorten“ wählen, bei einem schon verorteten Tier „Auf Karte versetzen“. Die
+   Lagekarte öffnet sich zum Platzieren dieses Tiers.
+3. Auf die Stelle der Karte tippen, an der das Tier gefunden wurde. Die Karte meldet etwa „T-003
+   (Hund) verortet“.
+4. „Zurück zu T-003 (Hund)“ wählen: Die Seite des Tiers zeigt die neue Koordinate.
+
+Ein Tier ohne Koordinate lässt sich auch auf der Lagekarte unter „Nicht verortet“ platzieren
+(Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Unter „Bearbeiten“ lässt sich die
+Koordinate eintippen oder leeren.
+
 ### Den Verbleib eines Tiers erfassen
 
 Verlässt ein Tier die Obhut der Einsatzkräfte, wird sein Verbleib erfasst. Es gilt danach als
@@ -96,6 +110,18 @@ will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ beh
 „Verwerfen“ verlässt die Seite ohne sie. Fotos und Dateien zum Tier liegen auf seiner Seite.
 „Stornieren“ im Menü „Weitere Aktionen“ nimmt eine Fehlerfassung aus der Liste.
 
+### Tiere auf der Lagekarte
+
+Die Lagekarte zeigt offene und vermisste Tiere mit Koordinate in der Ebene „Tiere“, als Kreis mit
+„T“ und beschriftet mit Registriernummer und Spezies, etwa „T-003 (Hund)“. Ein vermisstes Tier
+trägt zusätzlich „vermisst“. Den Rufnamen zeigt die Karte erst, wenn das Tier ausgewählt ist.
+Ein abgeschlossenes oder storniertes Tier verschwindet von der Karte; verorten lässt sich nur ein
+offenes oder vermisstes Tier. Der Fundort als Text bleibt neben der Koordinate stehen. Das
+Verorten schreibt keinen Eintrag ins Einsatztagebuch.
+
+Für ein Tier ohne Zustand kennen die taktischen Zeichen nach DV 102 kein eigenes Zeichen, deshalb
+steht das Tier als Kreis auf der Karte.
+
 ### Einsatztagebuch
 
 Das Einsatztagebuch führt Tiere nur mit Registriernummer und Spezies, ohne Rufname, Kennzeichnung,
@@ -116,5 +142,6 @@ Modul sehen.
 
 ### Ohne Netz
 
-Die Tiere hält die App nicht für die Arbeit ohne Netz vor; erfassen und ändern gehen nur mit Netz
-([Arbeiten ohne Netz](ohne-netz.md)).
+Die Tiere hält die App nicht für die Arbeit ohne Netz vor; erfassen, ändern und verorten gehen
+nur mit Netz ([Arbeiten ohne Netz](ohne-netz.md)). Auch die Ebene „Tiere“ der Lagekarte bleibt
+nach einem Neuladen ohne Netz leer, weil die Liste Halter und Kennzeichnung trägt.

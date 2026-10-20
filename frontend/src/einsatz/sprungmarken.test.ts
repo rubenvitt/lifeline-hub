@@ -96,6 +96,7 @@ describe('Sprungmarken (LFH-620)', () => {
         '↗patienten',
         '↗vermisste',
         'unfallhilfsstellen',
+        'evakuierung',
         'betreuung',
         'tiere',
         'schaeden',

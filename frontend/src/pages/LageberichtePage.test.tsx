@@ -203,39 +203,26 @@ describe('LageberichtDetailPage', () => {
     expect(within(dialog).getByText(/endgültig|unveränderlich|ETB/i)).toBeInTheDocument();
   });
 
-  it('Entwurf-Editor zeigt die Vorschau auf Wunsch neben dem Text (Umschalter, Vorgabe AUS)', async () => {
+  it('Entwurf-Editor zeigt Markdown formatiert in der Lesefassung des ganzen Dokuments', async () => {
     setupDetail(lagebericht7Abschnitte);
     const auftragFeld = await screen.findByLabelText('Auftrag');
     await userEvent.type(auftragFeld, '## Schwerpunkt\n- Punkt A');
-    // Vorgabe: keine Vorschau neben dem Text (der Split kostete die halbe Schreibbreite). Im
-    // Entwurf steht über dem Text nur der Seitentitel (`unterEbene` 1): `##` wird h3.
+    // Im Bearbeiten steht nur der Text; keine Vorschau-Spalte je Abschnitt (LLH-1074).
     expect(screen.queryByRole('heading', { name: 'Schwerpunkt' })).toBeNull();
-    // Der Umschalter ist eine Einstellung in eigener Zeile, keine Aktion in der Knopfreihe.
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
-    expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 3 }),
-    ).toBeInTheDocument();
-    // Listeneintrag muss als listitem erscheinen
-    expect(screen.getByText('Punkt A')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    // Der Umschalter gilt für das ganze Dokument: Abschnittstitel h3, `##` im Text h5.
+    await userEvent.click(screen.getByRole('tab', { name: 'Lesefassung' }));
+    const lesen = screen.getByRole('tabpanel', { name: 'Lesefassung' });
+    expect(within(lesen).getByRole('heading', { name: 'Auftrag', level: 3 })).toBeVisible();
+    expect(within(lesen).getByRole('heading', { name: 'Schwerpunkt', level: 5 })).toBeVisible();
+    expect(within(lesen).getByText('Punkt A').closest('li')).not.toBeNull();
     // "## Schwerpunkt" darf NICHT als sichtbarer Text (außerhalb der Textarea) erscheinen
-    const rohTexte = screen.queryAllByText(/## Schwerpunkt/);
-    for (const el of rohTexte) {
+    for (const el of screen.queryAllByText(/## Schwerpunkt/)) {
       expect(el.tagName.toLowerCase()).toBe('textarea');
     }
   });
 
-  it('Entwurf-Editor spiegelt Markdown im eingeklappten Modus über den Vorschau-Knopf des Abschnitts', async () => {
-    setupDetail(lagebericht7Abschnitte);
-    const auftragFeld = await screen.findByLabelText('Auftrag');
-    await userEvent.type(auftragFeld, '## Schwerpunkt');
-    const abschnitt = auftragFeld.closest('.ant-collapse-item') as HTMLElement;
-    await userEvent.click(within(abschnitt).getByRole('button', { name: /Vorschau/ }));
-    expect(
-      await screen.findByRole('heading', { name: 'Schwerpunkt', level: 3 }),
-    ).toBeInTheDocument();
-  });
-
-  it('Abschnittsnavigation listet alle acht Abschnitte, markiert leere und hält EINEN offen (H62)', async () => {
+  it('Abschnittsnavigation listet alle acht Abschnitte in der Gliederung, markiert leere, alle offen (H62)', async () => {
     const acht: LageberichtAnzeige = {
       ...lagebericht7Abschnitte,
       id: 15,
@@ -253,19 +240,23 @@ describe('LageberichtDetailPage', () => {
     };
     setupDetail(acht);
     await screen.findByLabelText('Auftrag');
-    const koepfe = await screen.findAllByRole('tab');
-    expect(koepfe).toHaveLength(8);
-    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke. Exakter Name: der
-    // Aufklapp-Pfeil ist in antd 6.6 `aria-hidden` und stellt dem Namen nichts voran.
-    expect(screen.getByRole('tab', { name: /^Auftrag$/ })).toBeInTheDocument();
-    expect(
-      screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }),
-    ).toBeInTheDocument();
-    expect(koepfe.filter((k) => k.getAttribute('aria-expanded') === 'true')).toHaveLength(1);
-    // Die Marke folgt dem Tippen: leeren Abschnitt befüllen → „(leer)" verschwindet.
-    await userEvent.click(screen.getByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ }));
+    const gliederung = screen.getByRole('navigation', { name: 'Gliederung' });
+    await waitFor(() =>
+      expect(
+        within(gliederung).getByRole('button', { name: 'Anlass des Lagevortrags leer' }),
+      ).toBeInTheDocument(),
+    );
+    expect(within(gliederung).getAllByRole('button')).toHaveLength(8);
+    // Leer-Marke im Klartext (zweiter Kanal), befüllter Abschnitt ohne Marke.
+    expect(within(gliederung).getByRole('button', { name: 'Auftrag' })).toBeInTheDocument();
+    // Alle Abschnitte stehen offen untereinander (LLH-1074, statt EINES offenen, H62).
+    for (const a of ['Auftrag', 'Anlass des Lagevortrags', 'Vorschlag der besten Möglichkeit'])
+      expect(screen.getByRole('textbox', { name: a })).toBeVisible();
+    // Die Marke folgt dem Tippen: leeren Abschnitt befüllen → „leer" verschwindet.
     await userEvent.type(screen.getByLabelText('Anlass des Lagevortrags'), 'Pegel steigt');
-    expect(screen.queryByRole('tab', { name: /Anlass des Lagevortrags \(leer\)$/ })).toBeNull();
+    expect(
+      within(gliederung).getByRole('button', { name: 'Anlass des Lagevortrags' }),
+    ).toBeInTheDocument();
     // Alle acht Editoren stehen im DOM — ein Speichern schickt keinen Abschnitt leer. `[id]`:
     // rc-textarea hängt für `autoSize` ein neuntes, unbeschriftetes Messfeld ein.
     expect(document.querySelectorAll('textarea[id]')).toHaveLength(8);
@@ -474,8 +465,8 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
  * ── Einstiegsfokus (LFH-495) ──
  *
  * Die Bedienentscheidung ist der erste leere Abschnitt (Begründung in `entwurf/Einstiegsfokus.tsx`,
- * Mechanik in dessen Test). Hier steht, was die Seite daraus macht: der offene Abschnitt des
- * Akkordeons folgt derselben Wahl, sonst stünde der Cursor in einem zugeklappten Editor.
+ * Mechanik in dessen Test). Alle Abschnitte stehen offen (LLH-1074); der Fokus scrollt bis zu
+ * seinem Ziel.
  */
 describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
   /** Die ersten zwei Abschnitte befüllt: der Einstieg ist damit der dritte. */
@@ -487,33 +478,28 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
     })),
   };
 
-  const offeneKopfzeile = () =>
-    screen.getAllByRole('tab').filter((b) => b.getAttribute('aria-expanded') === 'true');
-
-  it('klappt den ersten LEEREN Abschnitt auf und setzt den Fokus hinein', async () => {
+  it('setzt den Fokus in den ersten LEEREN Abschnitt', async () => {
     setupLebend(teilweiseBefuellt);
     // Der fortgeschriebene Bericht trägt „Auftrag" und „Gefahren-/Schadenlage" schon —
     // weitergearbeitet wird an „Eigene Lage".
-    await waitFor(() => expect(offeneKopfzeile()).toHaveLength(1));
-    expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage (leer)')).toBeInTheDocument();
     expect(await screen.findByLabelText('Eigene Lage')).toHaveFocus();
   });
 
   it('nimmt am LEEREN Bericht den ersten Abschnitt (Gegenaussage)', async () => {
-    // Ohne diese Hälfte wäre „öffnet immer den dritten" vom richtigen nicht zu unterscheiden.
+    // Ohne diese Hälfte wäre „fokussiert immer den dritten" vom richtigen nicht zu unterscheiden.
     setupLebend(lagebericht7Abschnitte);
-    await waitFor(() => expect(offeneKopfzeile()).toHaveLength(1));
-    expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument();
     expect(await screen.findByLabelText('Auftrag')).toHaveFocus();
   });
 
-  it('lässt den offenen Abschnitt beim Befüllen NICHT weiterwandern', async () => {
-    // Der Einstieg wird einmal je Bericht bestimmt. Als lebende Ableitung klappte das Akkordeon
-    // beim ersten Autosave weiter — unter dem Cursor der Person, die gerade schreibt.
+  it('springt beim Befüllen und Speichern NICHT zum nächsten leeren Abschnitt', async () => {
+    // Der Einstieg wird einmal je Bericht bestimmt (beim Einhängen eingefroren). Als lebende
+    // Ableitung spränge der Fokus beim ersten Autosave weiter — unter dem Cursor der Person.
     const { fremdeAenderung, patches } = setupLebend(teilweiseBefuellt);
     const feld = await screen.findByLabelText('Eigene Lage');
+    await waitFor(() => expect(feld).toHaveFocus());
     await userEvent.type(feld, 'jetzt befüllt');
-    await userEvent.tab();
+    // Speichern über „Entwurf speichern“: der Fokus geht dabei auf den Knopf, nicht ins Formular.
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
     await waitFor(() => expect(patches).toHaveLength(1));
     await fremdeAenderung({
       ...teilweiseBefuellt,
@@ -521,16 +507,16 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
         a.schluessel === 'eigene_lage' ? { ...a, text: 'jetzt befüllt' } : a,
       ),
     });
-    // Der Refetch kann unter Last einen Takt nach `invalidateQueries` rendern; bis dahin trägt der
-    // Kopf noch „(leer)“. Wanderte das Akkordeon, stünde dort nie „Eigene Lage“.
+    const gliederung = screen.getByRole('navigation', { name: 'Gliederung' });
     await waitFor(() =>
-      expect(within(offeneKopfzeile()[0]).getByText('Eigene Lage')).toBeInTheDocument(),
+      expect(within(gliederung).getByRole('button', { name: 'Eigene Lage' })).toBeInTheDocument(),
     );
+    expect(screen.getByLabelText('Lageentwicklung')).not.toHaveFocus();
   });
 
-  it('setzt offenen Abschnitt und Vorschau-Schalter beim Wechsel auf einen anderen Bericht zurück', async () => {
-    // `key={lbId}` ist der Reset: beide Zustände gehören zu einem Bericht — ein mitgeschleppter
-    // offener Abschnitt zeigte am nächsten Bericht einen, den niemand gewählt hat.
+  it('setzt die Ansicht beim Wechsel auf einen anderen Bericht zurück', async () => {
+    // `key={lbId}` ist der Reset: beide gehören zu einem Bericht — eine mitgeschleppte
+    // Lesefassung zeigte am nächsten Bericht keine Felder, die niemand verlassen hat.
     const zweiter: LageberichtAnzeige = {
       ...lagebericht7Abschnitte,
       id: 13,
@@ -559,21 +545,22 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
       </>,
       { route: '/einsaetze/7/lageberichte/12' },
     );
-    // Von Hand einen ANDEREN Abschnitt wählen und die Vorschau einschalten.
-    await userEvent.click(await screen.findByText('Zusammenfassung (leer)'));
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' }));
-    await waitFor(() =>
-      expect(within(offeneKopfzeile()[0]).getByText('Zusammenfassung (leer)')).toBeInTheDocument(),
+    expect(await screen.findByLabelText('Eigene Lage')).toHaveFocus();
+    await userEvent.click(screen.getByRole('tab', { name: 'Lesefassung' }));
+    expect(screen.getByRole('tab', { name: 'Lesefassung' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
-    expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).toBeChecked();
 
     await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
     await screen.findByRole('heading', { name: 'Zweiter Bericht' });
-    // Der zweite Bericht ist ganz leer → Einstieg ist „Auftrag", nicht die alte Wahl.
-    await waitFor(() =>
-      expect(within(offeneKopfzeile()[0]).getByText('Auftrag (leer)')).toBeInTheDocument(),
+    // Wieder im Bearbeiten. (Den Fokus behält hier der Knopf „weiter“: `Einstiegsfokus` nimmt
+    // keinen Fokus, den jemand gesetzt hat.)
+    expect(await screen.findByLabelText('Auftrag')).toBeVisible();
+    expect(screen.getByRole('tab', { name: 'Bearbeiten' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
-    expect(screen.getByRole('checkbox', { name: 'Vorschau neben dem Text' })).not.toBeChecked();
   });
 });
 

@@ -164,7 +164,7 @@ Palette lesen dieselbe Tabelle, LLH-1127), jede Seite prüft
 `useStabFreigabe` selbst. Die Pressemitteilung ist die dritte `Dokumentart`
 (Snapshot, Fortschreibung, ETB `meldung`), **freigeben darf nur die Einsatzleitung**
 (`EinsatzLeitungszugriff<Stab>`, Paar-Test gegen Lagebericht/Befehl), die Seite ist Zwilling von
-`LageberichtDetailPage`. Personenbezug (Ansprechperson, Erreichbarkeit, Anrufer, Rückruf, Notiz)
+`LageberichtDetailPage` und schreibt über `entwurf/DokumentEntwurf` (`frontend/src/entwurf/AGENTS.md`). Personenbezug (Ansprechperson, Erreichbarkeit, Anrufer, Rückruf, Notiz)
 und jeder Freitext des Presse-Logs (Medium, Thema, Antwort, Freigabeangabe; Linie A, LFH-901)
 werden geschwärzt, `rueckruf` und `antwort` per `PlatzhalterWennGesetzt`; die Medienlage
 (`stab/medienlage.ts`, „Aus S5 übernehmen“ im Lagevortrag, Quelle `stab/medienlageQuelle.ts` des

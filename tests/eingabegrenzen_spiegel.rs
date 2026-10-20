@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 
 use lifeline_hub::einsatz::fuehrungsstelle;
 use lifeline_hub::{
-    abloesung, auftrag, chat, einheit, einheit_vorlage, einsatz, etb, externe_stelle, fahrzeug,
-    fuehrung, infotelefon, kraefte_disposition, lage_zone, lagebesprechung, material,
+    abloesung, auftrag, betreuung, chat, einheit, einheit_vorlage, einsatz, etb, externe_stelle,
+    fahrzeug, fuehrung, infotelefon, kraefte_disposition, lage_zone, lagebesprechung, material,
     nachforderung, person, personal, presse, schaden, schichtmodell, sprechgruppe, verpflegung,
     vorlagendokument,
 };
@@ -15,6 +15,11 @@ use lifeline_hub::{
 fn backend() -> BTreeMap<&'static str, usize> {
     BTreeMap::from([
         ("ETB_INHALT_MAX", etb::INHALT_MAX),
+        ("BETREUUNG_LEITUNG_MAX", betreuung::LEITUNG_MAX),
+        (
+            "BETREUUNG_ERREICHBARKEIT_MAX",
+            betreuung::ERREICHBARKEIT_MAX,
+        ),
         ("ETB_PARTEI_MAX", etb::PARTEI_MAX),
         ("AUFTRAG_TEXT_MAX", auftrag::AUFTRAG_TEXT_MAX),
         ("AUFTRAG_BEFEHLSFELD_MAX", auftrag::BEFEHLSFELD_MAX),

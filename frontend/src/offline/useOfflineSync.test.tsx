@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { meldeBelegung, meldeStand } from '../api/betreuung';
+import { meldeBelegung } from '../api/betreuung';
+import { meldeStand } from '../api/evakuierung';
 import { ApiError, AusgangUnbekannt, NetzFehler } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { erfasseEtb } from '../api/etb';
@@ -51,7 +52,8 @@ vi.mock('../api/einsatzPerson', () => ({
   createVerletzung: vi.fn(),
 }));
 vi.mock('../api/meldungen', () => ({ legeMeldungAn: vi.fn() }));
-vi.mock('../api/betreuung', () => ({ meldeStand: vi.fn(), meldeBelegung: vi.fn() }));
+vi.mock('../api/betreuung', () => ({ meldeBelegung: vi.fn() }));
+vi.mock('../api/evakuierung', () => ({ meldeStand: vi.fn() }));
 vi.mock('../api/verpflegung', () => ({ erfasseAusgabe: vi.fn() }));
 vi.mock('../api/einsatzBereitstellungsraum', () => ({ bucheEintreffen: vi.fn() }));
 
@@ -436,8 +438,9 @@ describe('Stand- und Belegungsmeldungen in der Offline-Queue (LFH-675)', () => {
     daten: { belegt: 37, zeitpunkt_at: '2026-09-24 10:01:00', client_id: 'beleg-1' },
   };
 
-  it('sendet beide mit dem Queue-Besitzer, entfernt sie und invalidiert Betreuung und ETB', async () => {
+  it('sendet beide mit dem Queue-Besitzer, entfernt sie und invalidiert Evakuierung, Betreuung und ETB', async () => {
     const { client, Wrapper } = wrapperFuer();
+    client.setQueryData(einsatzKeys.evakuierung(7), {});
     client.setQueryData(einsatzKeys.betreuung(7), {});
     client.setQueryData(einsatzKeys.betreuungKopfzahl(7), {});
     client.setQueryData(einsatzKeys.etb(7), []);
@@ -457,6 +460,8 @@ describe('Stand- und Belegungsmeldungen in der Offline-Queue (LFH-675)', () => {
       offlineQueueBenutzerId: BENUTZER_A,
     });
     expect(legeMeldungAn).not.toHaveBeenCalled();
+    // Der Stand trifft das Modul Evakuierung, die Belegung das Modul Betreuung (LLH-1034).
+    expect(client.getQueryState(einsatzKeys.evakuierung(7))?.isInvalidated).toBe(true);
     expect(client.getQueryState(einsatzKeys.betreuung(7))?.isInvalidated).toBe(true);
     expect(client.getQueryState(einsatzKeys.betreuungKopfzahl(7))?.isInvalidated).toBe(true);
     expect(client.getQueryState(einsatzKeys.etb(7))?.isInvalidated).toBe(true);

@@ -21,8 +21,13 @@ import type {
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { sprungGesperrtText } from '../components/Sprung';
+import { Segmentleiste, type SegmentOption } from '../components/instrument';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { BETREUUNG_ERREICHBARKEIT_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { betreuungsstelleStatus, raeumungszustand } from '../theme/statusFarben';
+import { raeumungszustand } from '../theme/statusFarben';
 import {
   ART_LABEL,
   ERHEBUNG_LABEL,
@@ -104,10 +109,18 @@ export function belegungBody(w: BelegungWerte): BelegungsmeldungEingabe {
   return { belegt: w.belegt, ...zeitpunkt(w.zeitpunkt) };
 }
 
-interface BezirkWerte {
+/**
+ * Gebiet beim Anlegen (LLH-1069): „Keins“ oder gleich danach eine Fläche auf der Lagekarte zeichnen.
+ * „Radius“ kommt dazu, sobald die Karte einen Kreis um einen Punkt zeichnen kann (LLH-1043).
+ */
+export type GebietWahl = 'keins' | 'flaeche';
+
+export interface BezirkWerte {
   bezeichnung: string;
   plan_personen: number;
   plan_erhebung: Erhebung;
+  /** Nur im Anlegedialog; die Bearbeitung kennt keine Gebietswahl. */
+  gebiet?: GebietWahl;
   abschnitt_id?: number | null;
   sammelstelle?: string | null;
   notiz?: string | null;
@@ -149,7 +162,7 @@ export function bezirkPatch(vorher: Evakuierungsbezirk, w: BezirkWerte): Evakuie
   return patch;
 }
 
-interface StelleWerte {
+export interface StelleWerte {
   bezeichnung: string;
   art: BetreuungsstelleArt;
   status?: BetreuungsstelleStatus;
@@ -157,6 +170,8 @@ interface StelleWerte {
   abschnitt_id?: number | null;
   standort?: string | null;
   notiz?: string | null;
+  leitung?: string | null;
+  erreichbarkeit?: string | null;
 }
 
 function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
@@ -165,7 +180,12 @@ function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
     art: w.art,
     ...(w.kapazitaet_personen != null ? { kapazitaet_personen: w.kapazitaet_personen } : {}),
     ...(w.abschnitt_id != null ? { abschnitt_id: w.abschnitt_id } : {}),
-    ...optionaleTexte({ standort: w.standort, notiz: w.notiz }),
+    ...optionaleTexte({
+      standort: w.standort,
+      notiz: w.notiz,
+      leitung: w.leitung,
+      erreichbarkeit: w.erreichbarkeit,
+    }),
   };
 }
 
@@ -180,6 +200,11 @@ export function stellePatch(vorher: Betreuungsstelle, w: StelleWerte): Betreuung
   wennGeaendert(patch, 'abschnitt_id', vorher.abschnitt_id, w.abschnitt_id);
   wennGeaendert(patch, 'standort', vorher.standort, text(w.standort));
   wennGeaendert(patch, 'notiz', vorher.notiz, text(w.notiz));
+  // Nur Felder, die das Formular trägt: fehlt der Schlüssel in den Werten, bleibt er unberührt.
+  if ('leitung' in w) wennGeaendert(patch, 'leitung', vorher.leitung, text(w.leitung));
+  if ('erreichbarkeit' in w) {
+    wennGeaendert(patch, 'erreichbarkeit', vorher.erreichbarkeit, text(w.erreichbarkeit));
+  }
   return patch;
 }
 
@@ -195,6 +220,10 @@ function dreiseitig<P extends object>(eigeneAenderung: P, gegenAktuell: P): P {
   return patch;
 }
 
+/**
+ * Seit LLH-1076 Rechenweg der Stammdaten auf der Detailseite eines Bezirks
+ * (`betreuung/BezirkStammdaten.tsx`); der Bearbeiten-Dialog ist entfallen.
+ */
 export function bezirkPatchDreiseitig(
   beimOeffnen: Evakuierungsbezirk,
   aktuell: Evakuierungsbezirk,
@@ -226,7 +255,7 @@ const ERHEBUNG_OPTIONEN = (['gezaehlt', 'geschaetzt'] as const).map((e) => ({
   label: ERHEBUNG_LABEL[e],
 }));
 
-const ART_OPTIONEN = (Object.keys(ART_LABEL) as BetreuungsstelleArt[]).map((a) => ({
+export const ART_OPTIONEN = (Object.keys(ART_LABEL) as BetreuungsstelleArt[]).map((a) => ({
   value: a,
   label: ART_LABEL[a],
 }));
@@ -248,7 +277,7 @@ const zeitRegel = {
  */
 const MAX_PERSONEN = 1_000_000;
 
-const hoechstensRegel = {
+export const hoechstensRegel = {
   type: 'number' as const,
   max: MAX_PERSONEN,
   message: `Höchstens ${personenZahl(MAX_PERSONEN)} Personen`,
@@ -324,15 +353,53 @@ interface DialogBasis {
 
 // ── Evakuierungsbezirk ──────────────────────────────────────────────────────────────────
 
+/**
+ * Die Gebietswahl als Formularfeld (`Form.Item` reicht `value`/`onChange` hinein). Ist die Lagekarte
+ * gesperrt, steht „Fläche zeichnen“ gesperrt und nennt den Grund im Wortlaut (LFH-888) — ein
+ * Tooltip allein erreichte Tablet und Handy nicht.
+ */
+function GebietFeld({
+  value,
+  onChange,
+  karteGesperrt,
+}: {
+  value?: GebietWahl;
+  onChange?: (wahl: GebietWahl) => void;
+  karteGesperrt: boolean;
+}) {
+  const optionen: SegmentOption<GebietWahl>[] = [
+    { wert: 'keins', label: 'Keins' },
+    karteGesperrt
+      ? {
+          wert: 'flaeche',
+          label: sprungGesperrtText('Fläche zeichnen'),
+          gesperrt: KEINE_BERECHTIGUNG,
+        }
+      : { wert: 'flaeche', label: 'Fläche zeichnen' },
+  ];
+  return (
+    <Segmentleiste<GebietWahl>
+      beschriftung="Gebiet auf der Lagekarte"
+      wert={value ?? 'keins'}
+      onWechsel={(wahl) => onChange?.(wahl)}
+      optionen={optionen}
+    />
+  );
+}
+
 export function BezirkAnlegenDialog({
   abschnitte,
+  karteGesperrt,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
   abschnitte: readonly AbschnittOption[];
-  onErfassen: (body: EvakuierungsbezirkEingabe) => Promise<unknown>;
+  /** Modul Lagekarte für diese Person gesperrt (`useSprungSperre`): kein Zeichnen danach. */
+  karteGesperrt: boolean;
+  /** `gebiet`: was nach dem Anlegen geschieht (LLH-1069); der Server sieht es nicht. */
+  onErfassen: (body: EvakuierungsbezirkEingabe, gebiet: GebietWahl) => Promise<unknown>;
 }) {
   const [form] = Form.useForm<BezirkWerte>();
   return (
@@ -343,9 +410,9 @@ export function BezirkAnlegenDialog({
       erfassenText="Anlegen"
       laeuft={laeuft}
       // Eine Plangröße ist zu Beginn meist geschätzt; die Erhebung ist sichtbar, der Vorgabewert also
-      // nie still.
-      initialValues={{ plan_erhebung: 'geschaetzt' }}
-      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w))}
+      // nie still. Das Gebiet wird gleich gezeichnet, wenn die Karte frei ist (LLH-1069).
+      initialValues={{ plan_erhebung: 'geschaetzt', gebiet: karteGesperrt ? 'keins' : 'flaeche' }}
+      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w), w.gebiet ?? 'keins')}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
@@ -360,6 +427,9 @@ export function BezirkAnlegenDialog({
       </Form.Item>
       {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
       {erhebungFeld('plan_erhebung', 'Erhebung')}
+      <Form.Item name="gebiet" label="Gebiet auf der Lagekarte">
+        <GebietFeld karteGesperrt={karteGesperrt} />
+      </Form.Item>
       {weitere(
         <>
           {abschnittFeld(abschnitte)}
@@ -372,69 +442,6 @@ export function BezirkAnlegenDialog({
         </>,
       )}
       <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht angelegt werden" />
-    </ErfassungsModal>
-  );
-}
-
-export function BezirkBearbeitenDialog({
-  bezirk,
-  abschnitte,
-  laeuft,
-  fehler,
-  onErfassen,
-  onSchliessen,
-}: DialogBasis & {
-  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
-  bezirk: Evakuierungsbezirk;
-  abschnitte: readonly AbschnittOption[];
-  onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
-}) {
-  const [form] = Form.useForm<BezirkWerte>();
-  const [beimOeffnen] = useState(bezirk);
-  return (
-    <ErfassungsModal<BezirkWerte>
-      offen
-      titel={`Bezirk bearbeiten: ${bezirk.bezeichnung}`}
-      form={form}
-      erfassenText="Speichern"
-      laeuft={laeuft}
-      initialValues={{
-        bezeichnung: beimOeffnen.bezeichnung,
-        plan_personen: beimOeffnen.plan_personen,
-        plan_erhebung: beimOeffnen.plan_erhebung,
-        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
-        sammelstelle: beimOeffnen.sammelstelle ?? undefined,
-        notiz: beimOeffnen.notiz ?? undefined,
-      }}
-      onErfassen={(w) =>
-        nurWennGeaendert(bezirkPatchDreiseitig(beimOeffnen, bezirk, w), onErfassen)
-      }
-      onFertig={onSchliessen}
-      onAbbrechen={onSchliessen}
-    >
-      {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
-      {erhebungFeld('plan_erhebung', 'Erhebung')}
-      {weitere(
-        <>
-          <Form.Item
-            name="bezeichnung"
-            label="Bezeichnung"
-            rules={[
-              { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          {abschnittFeld(abschnitte)}
-          <Form.Item name="sammelstelle" label="Sammelstelle">
-            <Input />
-          </Form.Item>
-          <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
-          </Form.Item>
-        </>,
-      )}
-      <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );
 }
@@ -575,6 +582,20 @@ export function StelleAnlegenDialog({
           <Form.Item name="standort" label="Standort">
             <Input />
           </Form.Item>
+          <Form.Item
+            name="leitung"
+            label="Leitung"
+            rules={[zeichenRegel(BETREUUNG_LEITUNG_MAX, 'Leitung')]}
+          >
+            <Input count={zeichenGrenze(BETREUUNG_LEITUNG_MAX)} />
+          </Form.Item>
+          <Form.Item
+            name="erreichbarkeit"
+            label="Erreichbarkeit"
+            rules={[zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Erreichbarkeit')]}
+          >
+            <Input count={zeichenGrenze(BETREUUNG_ERREICHBARKEIT_MAX)} />
+          </Form.Item>
           <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
             <Input.TextArea autoSize={{ minRows: 2 }} />
           </Form.Item>
@@ -585,30 +606,25 @@ export function StelleAnlegenDialog({
   );
 }
 
-interface StelleBearbeitenWerte extends StelleWerte {
+interface StelleSchliessenWerte {
   leermeldung?: boolean;
 }
 
-const STATUS_FOLGE: readonly BetreuungsstelleStatus[] = [
-  'vorbereitet',
-  'in_betrieb',
-  'geschlossen',
-];
-
 /**
- * Stelle bearbeiten — Status, Kapazität, Art sichtbar, der Rest eingeklappt.
+ * Schließen einer BELEGTEN Stelle (LLH-1044, Knopf „Schließen" der Detailseite): der Server
+ * verlangt Belegung 0. Der Dialog bietet die Leermeldung als ausdrückliches Häkchen an, nicht als
+ * stille Vorgabe — eine ungemeldete „0" wäre eine erfundene Zahl. Erst die Meldung, dann der
+ * Status.
  *
- * Schließen einer BELEGTEN Stelle: der Server verlangt Belegung 0. Der Dialog bietet die
- * Leermeldung als ausdrückliches Häkchen an, nicht als stille Vorgabe — eine ungemeldete „0"
- * wäre eine erfundene Zahl. Erst die Meldung, dann der Status.
+ * Gerechnet wird gegen den AKTUELLEN Stand: hat inzwischen jemand geleert, entfällt das Häkchen;
+ * hat jemand geschlossen, geht nichts mehr hinaus.
  *
  * Scheitert der zweite Aufruf, darf ein neuer Versuch die 0 nicht noch einmal melden (doppelt
  * im ETB). Der Merker hält deshalb die Belegungsmeldung fest, gegen die geleert wurde: meldet
  * danach jemand anderes wieder Personen, gilt der Haken neu.
  */
-export function StelleBearbeitenDialog({
+export function StelleSchliessenDialog({
   stelle,
-  abschnitte,
   laeuft,
   fehler,
   onErfassen,
@@ -617,61 +633,40 @@ export function StelleBearbeitenDialog({
 }: DialogBasis & {
   /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
   stelle: Betreuungsstelle;
-  abschnitte: readonly AbschnittOption[];
   onErfassen: (patch: BetreuungsstellePatch) => Promise<unknown>;
   /** Meldet Belegung 0 (ohne Zeitpunkt = jetzt). */
   onLeermeldung: () => Promise<unknown>;
 }) {
-  const [form] = Form.useForm<StelleBearbeitenWerte>();
-  const [beimOeffnen] = useState(stelle);
+  const [form] = Form.useForm<StelleSchliessenWerte>();
   const geleertGegen = useRef<number | null>(null);
-  const status = Form.useWatch('status', form);
   const belegt = stelle.belegung?.belegt ?? 0;
-  // Nötig genau dann, wenn der PATCH das Schließen trägt (dreiseitig) und die Stelle JETZT belegt
-  // ist. Ein unberührtes „geschlossen" einer fremd wiedereröffneten Stelle sperrt nichts.
-  const brauchtLeermeldung =
-    status === 'geschlossen' &&
-    beimOeffnen.status !== 'geschlossen' &&
-    stelle.status !== 'geschlossen' &&
-    belegt > 0;
+  const schonGeschlossen = stelle.status === 'geschlossen';
+  const brauchtLeermeldung = !schonGeschlossen && belegt > 0;
 
   return (
-    <ErfassungsModal<StelleBearbeitenWerte>
+    <ErfassungsModal<StelleSchliessenWerte>
       offen
-      titel={`Stelle bearbeiten: ${stelle.bezeichnung}`}
+      titel={`Betreuungsstelle ${stelle.bezeichnung} schließen`}
       form={form}
-      erfassenText="Speichern"
+      erfassenText="Stelle schließen"
       laeuft={laeuft}
-      initialValues={{
-        status: beimOeffnen.status,
-        kapazitaet_personen: beimOeffnen.kapazitaet_personen ?? undefined,
-        art: beimOeffnen.art,
-        bezeichnung: beimOeffnen.bezeichnung,
-        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
-        standort: beimOeffnen.standort ?? undefined,
-        notiz: beimOeffnen.notiz ?? undefined,
-      }}
       onErfassen={async (w) => {
-        const patch = stellePatchDreiseitig(beimOeffnen, stelle, w);
-        if (Object.keys(patch).length === 0) return;
+        if (schonGeschlossen) return;
         const meldung = stelle.belegung?.id ?? null;
         if (brauchtLeermeldung && w.leermeldung && geleertGegen.current !== meldung) {
           await onLeermeldung();
           geleertGegen.current = meldung;
         }
-        await onErfassen(patch);
+        await onErfassen({ status: 'geschlossen' });
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item name="status" label="Status" rules={[{ required: true }]}>
-        <Radio.Group
-          name="status"
-          optionType="button"
-          options={STATUS_FOLGE.map((s) => ({ value: s, label: betreuungsstelleStatus[s].label }))}
-        />
-      </Form.Item>
-      {brauchtLeermeldung && (
+      {schonGeschlossen ? (
+        <Typography.Paragraph type="secondary">
+          Die Stelle ist bereits geschlossen.
+        </Typography.Paragraph>
+      ) : brauchtLeermeldung ? (
         <>
           <Alert
             type="info"
@@ -682,6 +677,7 @@ export function StelleBearbeitenDialog({
           <Form.Item
             name="leermeldung"
             valuePropName="checked"
+            style={{ marginBottom: 0 }}
             rules={[
               {
                 validator: (_, v) =>
@@ -698,35 +694,10 @@ export function StelleBearbeitenDialog({
             <Checkbox>Alle haben die Stelle verlassen — Belegung 0 melden</Checkbox>
           </Form.Item>
         </>
+      ) : (
+        <Typography.Paragraph type="secondary">Die Stelle ist leer gemeldet.</Typography.Paragraph>
       )}
-      <Form.Item name="kapazitaet_personen" label="Kapazität (Personen)" rules={[hoechstensRegel]}>
-        {/* Leer: keine Kapazität, dann auch keine Zahl freier Plätze. */}
-        <InputNumber min={1} precision={0} placeholder="keine Angabe" style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item name="art" label="Art" rules={[{ required: true }]}>
-        <Select options={ART_OPTIONEN} />
-      </Form.Item>
-      {weitere(
-        <>
-          <Form.Item
-            name="bezeichnung"
-            label="Bezeichnung"
-            rules={[
-              { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          {abschnittFeld(abschnitte)}
-          <Form.Item name="standort" label="Standort">
-            <Input />
-          </Form.Item>
-          <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
-          </Form.Item>
-        </>,
-      )}
-      <SpeicherFehler fehler={fehler} titel="Betreuungsstelle konnte nicht gespeichert werden" />
+      <SpeicherFehler fehler={fehler} titel="Betreuungsstelle konnte nicht geschlossen werden" />
     </ErfassungsModal>
   );
 }

@@ -36,15 +36,16 @@ describe('markerToUrl (LFH-25) — Inspector-Deeplinks je Marker-Typ', () => {
     });
     expect(markerToUrl(marker, E)).toBe('/einsaetze/7/meldungen?meldung=42');
   });
-  it('betreuungsstelle → Betreuungsseite mit ?stelle= (LFH-673)', () => {
-    expect(markerToUrl(m({ typ: 'betreuungsstelle', id: 4 }), E)).toBe(
-      '/einsaetze/7/betreuung?stelle=4',
-    );
+  it('betreuungsstelle → Item-Route der Detailseite (LLH-1044)', () => {
+    expect(markerToUrl(m({ typ: 'betreuungsstelle', id: 4 }), E)).toBe('/einsaetze/7/betreuung/4');
   });
   it('bereitstellungsraum → Item-Route der BR-Detailseite (LLH-1107)', () => {
     expect(markerToUrl(m({ typ: 'bereitstellungsraum', id: 6 }), E)).toBe(
       '/einsaetze/7/bereitstellungsraeume/6',
     );
+  });
+  it('tier → Item-Route der Tier-Detailseite (LLH-1123)', () => {
+    expect(markerToUrl(m({ typ: 'tier', id: 6 }), E)).toBe('/einsaetze/7/tiere/6');
   });
   it('person → Item-Route der Personen-Detailseite (LFH-648), nicht die Einsatzdaten', () => {
     // Ohne eigenen Zweig fiele `person` still in den `default` — der Typcheck warnte nicht.

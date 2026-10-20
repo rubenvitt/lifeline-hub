@@ -22,6 +22,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                          frontend/src/auftraege/EmpfaengerQuittung.tsx,
  *                          frontend/src/auftraege/EmpfaengerFilter.tsx
  *   befehl-entwurf.png     frontend/src/pages/BefehlDetailPage.tsx,
+ *                          frontend/src/entwurf/DokumentEntwurf.tsx,
  *                          frontend/src/entwurf/VerteilerField.tsx,
  *                          frontend/src/fuehrung/EmpfaengerWahl.tsx,
  *                          frontend/src/fuehrung/ExterneEmpfaenger.tsx

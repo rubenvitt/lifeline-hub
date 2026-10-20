@@ -2,12 +2,191 @@
 
 ## Purpose
 Die Einsatzleitung führt je Evakuierungsbezirk, wie viele Menschen evakuiert werden sollen
-und wie viele es sind. Sie führt je Betreuungsstelle, wie viele Menschen dort untergebracht
-sind. Beides wird als Menge gemeldet, nicht über einzeln erfasste Personen. Jede Meldung
+und wie viele es sind (Modul Evakuierung). Sie führt je Betreuungsstelle, wie viele Menschen
+dort untergebracht sind (Modul Betreuung). Seit LLH-1034 sind beide eigene Module mit eigenem
+Recht, eigener Seite und eigenem Zähler; Fachlogik und Tabellen bleiben gemeinsam. Beides wird als Menge gemeldet, nicht über einzeln erfasste Personen. Jede Meldung
 ist im Einsatztagebuch nachgewiesen, wird live verteilt und speist die Kennzahl „Evakuiert
 N · von M geplant“ sowie die Kopfzahl „in Betreuung“ für die Verpflegung.
 
 ## Requirements
+
+### Requirement: Zwei Module Evakuierung und Betreuung
+
+Das System SHALL Evakuierungsbezirke und ihre Standmeldungen im Modul `evakuierung` und
+Betreuungsstellen und ihre Belegungsmeldungen im Modul `betreuung` führen. Die Endpunkte der
+Bezirke MUST unter `/api/einsaetze/{id}/evakuierung` liegen (Übersicht `GET …/evakuierung`,
+Bezirke `…/evakuierung/bezirke…`, Rücknahme `…/evakuierung/staende/{id}/zuruecknehmen`), die
+der Stellen unter `/api/einsaetze/{id}/betreuung`. Die Übersicht der Betreuung MUST keine
+Bezirke enthalten. Die bisherigen Bezirkspfade unter `…/betreuung/bezirke…` MUST NOT weiter
+bedient werden. Die Lagekennzahl „Evakuiert“, die Bezirksflächen der Lagekarte und jeder
+Sprung auf einen Bezirk MUST am Modul Evakuierung hängen. Ein an eine Betreuungsstelle
+gebundenes Gerät MUST weiter nur seine Stelle sehen und keinen Zugang zu Bezirken haben.
+
+#### Scenario: Getrennte Übersichten
+- **WHEN** ein Mitglied mit Zugriff auf beide Module `GET …/betreuung` und `GET …/evakuierung` abruft
+- **THEN** enthält die erste nur Stellen und die zweite nur Bezirke
+
+#### Scenario: Alter Bezirkspfad
+- **WHEN** ein Client einen Bezirk unter `…/betreuung/bezirke` anlegen will
+- **THEN** antwortet das System mit 404 oder 405 und legt nichts an
+
+#### Scenario: Gerät der Betreuungsstelle
+- **WHEN** ein an eine Betreuungsstelle gebundenes Gerät `GET …/evakuierung` abruft
+- **THEN** antwortet das System mit 403
+
+### Requirement: Modul-Einstellungen der Evakuierung übernommen
+
+Beim Einführen des Moduls Evakuierung MUST das System jede bestehende Einstellung des Moduls
+Betreuung, im Einsatz wie in der Organisation, für das Modul Evakuierung übernehmen:
+Sichtbarkeit und benötigte Rolle gleich, samt Zeitpunkt und Urheber der Änderung. Einstellungen
+anderer Module MUST unberührt bleiben. Wer die Bezirke bisher nicht sehen durfte, MUST sie
+danach ebenso wenig sehen dürfen.
+
+#### Scenario: Ausgeblendete Betreuung
+- **WHEN** das Modul Betreuung in einem Einsatz vor der Umstellung ausgeblendet war
+- **THEN** ist danach auch das Modul Evakuierung in diesem Einsatz ausgeblendet
+
+#### Scenario: Rollensperre der Organisation
+- **WHEN** die Organisation das Modul Betreuung auf die Rolle Einsatzführung beschränkt hatte
+- **THEN** gilt dieselbe Beschränkung danach für das Modul Evakuierung
+
+### Requirement: Modulseite Evakuierung
+
+Die Oberfläche SHALL das Modul Evakuierung als eigene Seite der Kategorie Erfassung direkt vor
+„Betreuung“ führen, beschrieben mit „Räumungsbezirke, Stand evakuiert“. Die Seite MUST genau
+eine Primäraktion „Evakuierungsbezirk anlegen“ tragen, darunter ein Kennzahlenband der Räumung
+(Evakuiert, Geplant, Räumung läuft, Geräumt, Ohne Meldung) und eine Tabelle der Bezirke mit
+„Stand melden“ je Zeile und dem Verlauf als Aufklappbereich. Ohne aktiven Bezirk MUST das
+Kennzahlenband entfallen statt Nullen zu zeigen. Die Bezeichnung jedes Bezirks MUST ein Link
+auf seine Detailseite sein. `?bezirk=<id>` ist eine Altadresse: sie MUST auf die Detailseite
+`…/evakuierung/<id>` umleiten, ohne die Übersicht zu laden; ein unlesbarer Wert MUST auf der
+Übersicht bleiben. Die Adresse `…/betreuung?bezirk=<id>` MUST auf `…/evakuierung?bezirk=<id>`
+umleiten. Die Seite Betreuung MUST nur Stellen führen, mit der Primäraktion
+„Betreuungsstelle anlegen“.
+
+#### Scenario: Alter Link auf einen Bezirk
+- **WHEN** jemand `/einsaetze/1/betreuung?bezirk=6` öffnet
+- **THEN** steht die Detailseite von Bezirk 6, und die Betreuung wird nicht geladen
+
+#### Scenario: Bezirk aus der Übersicht öffnen
+- **WHEN** in der Tabelle die Bezeichnung „Uferstraße 12–40“ gewählt wird
+- **THEN** öffnet sich die Detailseite dieses Bezirks
+
+#### Scenario: Kein aktiver Bezirk
+- **WHEN** der Einsatz keinen aktiven Bezirk hat
+- **THEN** zeigt die Seite kein Kennzahlenband und sagt „Keine Evakuierungsbezirke“
+
+### Requirement: Detailseite eines Evakuierungsbezirks
+
+Die Oberfläche SHALL je nicht storniertem Bezirk eine Detailseite unter
+`/einsaetze/<id>/evakuierung/<bezirk-id>` führen, gegatet wie die Modulseite Evakuierung. Eine
+ungültige, unbekannte, fremde oder stornierte Kennung MUST zur Übersicht zurückführen. Der Kopf
+MUST die Bezeichnung mit dem Räumungszustand als Wort und genau eine Primäraktion „Stand
+melden“ tragen. Die Seite MUST die Kennzahlen Evakuiert, Geplant, Anteil mit Balken und letzte
+Meldung zeigen, geschätzte Werte mit „≈“. 
+#### Scenario: Unbekannte Kennung
+- **WHEN** jemand `/einsaetze/1/evakuierung/99` öffnet und der Einsatz keinen Bezirk 99 führt
+- **THEN** steht die Übersicht der Evakuierung
+
+#### Scenario: Beobachter
+- **WHEN** eine Person ohne Schreibrecht die Detailseite öffnet
+- **THEN** sieht sie Kennzahlen, Gebiet, Stammdaten und Verlauf, aber weder „Stand melden“ noch „Bearbeiten“
+- **AND** ein Hinweis nennt den Grund
+
+### Requirement: Räumungsschritte auf der Detailseite
+
+Die Detailseite SHALL die Wechsel des Räumungszustands als Knöpfe anbieten: den nächsten
+Schritt neben der Primäraktion, Rückwege im Menü. „Anordnung aufheben“ MUST rot abgesetzt im
+Menü stehen und vor dem Senden eine Rückfrage stellen; „Stornieren“ MUST im Menü stehen. Ein
+Schritt MUST dieselben ETB-Einträge erzeugen wie jeder andere Wechsel des Räumungszustands.
+
+#### Scenario: Räumung beginnen
+- **WHEN** auf der Detailseite eines angeordneten Bezirks „Räumung beginnen“ gewählt wird
+- **THEN** trägt der Bezirk den Zustand `laeuft`, und das ETB enthält einen Meldungseintrag
+
+#### Scenario: Anordnung aufheben fragt nach
+- **WHEN** im Menü „Anordnung aufheben“ gewählt wird
+- **THEN** erscheint eine Rückfrage mit rotem Knopf, und erst ihre Bestätigung setzt `aufgehoben`
+
+### Requirement: Gebiet auf der Detailseite
+
+Die Detailseite SHALL die dem Bezirk zugeordneten Flächen in einem nicht bedienbaren
+Kartenausschnitt zeigen und einen Sprung „Auf Lagekarte öffnen“ anbieten. Ohne Fläche MUST ein
+Leerzustand in Worten stehen, ohne Sprung. Personen mit Schreibrecht MUST das Gebiet ohne Fläche
+„Gebiet zeichnen“ und mit Fläche „Weitere Teilfläche zeichnen“ anbieten (LLH-1069); beides öffnet
+die Lagekarte im Zeichenmodus für eine Fläche dieses Bezirks. Ohne Lesezugriff auf das Modul
+Lagekarte MUST die Seite die Flächen nicht abrufen, ihre Zahl nennen und den Sprung wie das Zeichnen
+gesperrt mit Grund zeigen.
+
+#### Scenario: Bezirk ohne Fläche
+- **WHEN** der Bezirk keine zugeordnete Zone hat
+- **THEN** sagt das Gebiet „Kein Gebiet auf der Lagekarte“, bietet keinen Sprung an und mit Schreibrecht „Gebiet zeichnen“
+
+#### Scenario: Weitere Teilfläche von der Detailseite
+- **WHEN** der Bezirk eine Fläche hat und die Person schreiben darf
+- **THEN** steht neben „Auf Lagekarte öffnen“ „Weitere Teilfläche zeichnen“
+
+#### Scenario: Lagekarte gesperrt
+- **WHEN** der Bezirk zwei Flächen hat und die Person die Lagekarte nicht lesen darf
+- **THEN** steht „2 Flächen auf der Lagekarte“, und „Auf Lagekarte öffnen“ ist gesperrt mit Grund
+
+### Requirement: Stammdaten des Bezirks in der Ansicht bearbeiten
+
+Die Detailseite SHALL Bezeichnung, Plangröße mit Erhebung, Einsatzabschnitt, Sammelstelle und
+Notiz in der Ansicht bearbeitbar machen. Ein Speichern MUST nur die Felder senden, die die
+Person geändert hat und die der aktuelle Stand noch nicht trägt, und ohne solche Felder nichts
+senden. Prüffehler MUST am Feld stehen. Mit ungespeicherter Änderung MUST ein Wechsel der Seite
+nachfragen.
+
+#### Scenario: Plangröße bearbeiten, während jemand die Notiz ändert
+- **WHEN** eine Person die Plangröße auf 820 ändert und währenddessen eine andere die Notiz schreibt
+- **THEN** sendet das Speichern nur `plan_personen: 820`, und die fremde Notiz bleibt
+
+#### Scenario: Verlassen mit offener Änderung
+- **WHEN** während der Bearbeitung die Brotkrume „Evakuierung“ gewählt wird
+- **THEN** fragt die Seite nach, ob die Änderung verworfen werden soll
+
+### Requirement: Übersicht der Betreuung
+
+Die Seite Betreuung SHALL die Unterbringung als Lagebild zeigen: über der Tabelle der Stellen
+ein Kennzahlenband „Unterbringung in Zahlen“ mit In Betreuung (Summe der aktuellen
+Belegungen), Kapazität (Summe nur über nicht geschlossene Stellen mit Kapazität), Frei (Summe
+der freien Plätze je nicht geschlossener Stelle mit Kapazität und Meldung, je Stelle nie
+negativ), Stellen in Betrieb (n von m), Voll/überbelegt und, nur mit Personenrecht, Davon
+namentlich. Hat keine Stelle gemeldet, MUST „In Betreuung“ „keine Meldung“ statt 0 zeigen;
+ohne jede Kapazität MUST „Kapazität“ ohne Zahl stehen. Als „ohne Meldung“ MUST nur eine Stelle
+in Betrieb gelten. Der Seitenkopf MUST „n Stellen · n in Betrieb“ und bei vollen Stellen
+„· n voll“ nennen. Ohne Stelle MUST statt Band und Tabelle „Keine Betreuungsstellen“ mit dem
+Knopf „Betreuungsstelle anlegen“ stehen, ohne Schreibrecht gesperrt mit sichtbarem Grund. Ein
+Klick in eine Zeile MUST auf die Detailseite der Stelle führen; Knöpfe der Zeile MUST nur ihre
+eigene Handlung auslösen.
+
+#### Scenario: Summen der Stellen
+- **WHEN** „Turnhalle Ost“ (Kapazität 150, belegt 89), „Weserstadion“ (Kapazität 150, belegt 140) und „Schule Nord“ (ohne Kapazität, ohne Meldung) in Betrieb sind
+- **THEN** zeigt das Band In Betreuung 229 mit „1 Stelle ohne Meldung“, Kapazität 300 mit „1 ohne Kapazität“, Frei 71 und Stellen in Betrieb 3 von 3
+
+#### Scenario: Überbelegung
+- **WHEN** eine Stelle mit Kapazität 40 mit 52 belegt ist und eine mit Kapazität 80 mit 80
+- **THEN** zeigt „Frei“ 0, nicht −12, und „Voll/überbelegt“ 2
+
+#### Scenario: Geschlossene Stelle
+- **WHEN** eine geschlossene Stelle eine Kapazität von 200 trägt
+- **THEN** zählt sie weder in „Kapazität“ noch in „Frei“
+
+#### Scenario: Keine Stelle
+- **WHEN** der Einsatz keine Betreuungsstelle hat
+- **THEN** zeigt die Seite kein Kennzahlenband, sondern „Keine Betreuungsstellen“ mit dem Knopf „Betreuungsstelle anlegen“
+
+### Requirement: Modulzähler Evakuierung und Betreuung
+
+Der Navigationsrahmen SHALL am Modul Evakuierung die Zahl der aktiven Bezirke (nicht
+storniert, nicht aufgehoben) und am Modul Betreuung die Zahl der Stellen in Betrieb (nicht
+storniert) zeigen, jeweils nur bei Lesezugriff auf das Modul und mit der Bedeutung als
+zugänglichem Namen.
+
+#### Scenario: Zwei Zähler
+- **WHEN** ein Einsatz zwei aktive Bezirke, einen aufgehobenen Bezirk und drei Stellen hat, von denen zwei in Betrieb sind
+- **THEN** zeigt das Modulpanel an Evakuierung 2 und an Betreuung 2
 
 ### Requirement: Evakuierungsbezirk
 
@@ -168,11 +347,14 @@ Das System SHALL je Einsatz Betreuungsstellen führen. Eine Stelle trägt eine B
 (Pflicht, eindeutig unter den nicht stornierten Stellen des Einsatzes), eine Art
 (`anlaufstelle`, `betreuungsstelle`, `betreuungsplatz`, `notunterkunft`), optional einen
 Einsatzabschnitt desselben Einsatzes, optional eine Kapazität in Personen (ganzzahlig ≥ 1),
-optional Standort und Notiz sowie einen Status (`vorbereitet`, `in_betrieb`,
+optional Standort und Notiz, optional Leitung und Erreichbarkeit (Freitext, je höchstens 200
+Zeichen nach dem Trimmen, darüber 400) sowie einen Status (`vorbereitet`, `in_betrieb`,
 `geschlossen`; Vorgabe `vorbereitet`). Anlage, Änderung, Statuswechsel und Stornierung
-MUST je einen ETB-Eintrag schreiben, sofern sich ein Wert tatsächlich ändert. Eine Stelle
-MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre aktuelle Belegung 0 ist
-oder sie keine Belegungsmeldung hat.
+MUST je einen ETB-Eintrag schreiben, sofern sich ein Wert tatsächlich ändert. Eine Änderung
+von Leitung oder Erreichbarkeit MUST im ETB nur als „weitere Angaben“ erscheinen, nie mit
+ihrem Wert. Ein gesicherter Lagestand MUST Leitung und Erreichbarkeit nicht einfrieren. Eine
+Stelle MUST nur dann in den Status `geschlossen` wechseln können, wenn ihre aktuelle Belegung
+0 ist oder sie keine Belegungsmeldung hat.
 
 #### Scenario: Stelle anlegen
 - **WHEN** die Notunterkunft „Turnhalle Ost“ mit Kapazität 150 angelegt wird
@@ -201,6 +383,65 @@ oder sie keine Belegungsmeldung hat.
 #### Scenario: Geschlossene Stelle wieder öffnen
 - **WHEN** eine geschlossene Stelle auf `in_betrieb` gesetzt wird
 - **THEN** ist sie wieder in Betrieb und nimmt Belegungsmeldungen an
+
+#### Scenario: Leitung und Erreichbarkeit
+- **WHEN** an der Stelle „Turnhalle Ost“ die Leitung „Frau Schulz“ und die Erreichbarkeit „0171 2345678“ gesetzt werden
+- **THEN** trägt die Übersicht beide Werte
+- **AND** der ETB-Eintrag der Änderung nennt „weitere Angaben“, aber weder den Namen noch die Nummer
+
+#### Scenario: Leitung zu lang
+- **WHEN** eine Leitung mit 201 Zeichen gesendet wird
+- **THEN** antwortet das System mit 400 „Leitung darf höchstens 200 Zeichen lang sein“ und ändert nichts
+
+#### Scenario: Lagestand ohne Leitung
+- **WHEN** ein Lagestand gesichert wird, während eine Stelle Leitung und Erreichbarkeit trägt
+- **THEN** enthält der gesicherte Stand die Stelle ohne Leitung und Erreichbarkeit
+
+### Requirement: Detailseite einer Betreuungsstelle
+
+Die Oberfläche SHALL jede nicht stornierte Betreuungsstelle unter
+`/einsaetze/<id>/betreuung/<stellen-id>` als eigene Seite zeigen. Die Seite MUST ihre Daten aus
+der Betreuungsübersicht lesen. Eine unbekannte, fremde oder stornierte Stelle und eine
+unlesbare Kennung MUST auf die Übersicht führen. Die Adresse `…/betreuung?stelle=<id>` MUST
+auf diese Seite umleiten. Die Bezeichnung einer Stelle in der Übersicht MUST auf ihre Seite
+führen; Sprünge von der Lagekarte und der Rückweg nach dem Verorten MUST dorthin führen.
+
+Der Kopf MUST Bezeichnung, Art und Status zeigen und genau eine Primäraktion „Belegung
+melden“ tragen; an einer geschlossenen Stelle MUST sie gesperrt stehen und der Grund sichtbar
+daneben. Der Statuswechsel MUST als Handlung benannt sein: „In Betrieb nehmen“
+(`vorbereitet`), „Schließen“ (`in_betrieb`), „Wieder öffnen“ (`geschlossen`). Das Schließen
+einer belegten Stelle MUST eine ausdrückliche Leermeldung verlangen und erst sie, dann den
+Status senden. Bearbeiten und Status MUST nur auf dieser Seite stehen, nicht in der Übersicht.
+
+Die Seite MUST zeigen: „Belegung in Zahlen“ (Belegt, Kapazität, Frei, mit Personenrecht
+„Davon namentlich“), die Stammdaten in einem Datenraster mit Bearbeiten in der Ansicht, den
+Meldeverlauf, mit Personenrecht die namentlich hier untergebrachten Personen und den Anteil
+der Stelle an „in Betreuung“ mit einem Sprung ins Modul Verpflegung, wenn dieses frei ist.
+„Frei“ MUST nie negativ sein; eine Überbelegung nennt das Auslastungswort.
+
+#### Scenario: Aus der Übersicht hinein
+- **WHEN** in der Übersicht die Bezeichnung „Turnhalle Ost“ gewählt wird
+- **THEN** öffnet sich ihre Detailseite mit „Belegung melden“ als Primäraktion
+
+#### Scenario: Alte Adresse
+- **WHEN** `…/betreuung?stelle=8` aufgerufen wird
+- **THEN** steht die Adresse auf `…/betreuung/8`
+
+#### Scenario: Stornierte Stelle
+- **WHEN** die Detailseite einer stornierten Stelle aufgerufen wird
+- **THEN** zeigt die Oberfläche die Übersicht
+
+#### Scenario: Schließen einer belegten Stelle
+- **WHEN** an einer Stelle mit Belegung 40 „Schließen“ gewählt und die Leermeldung bestätigt wird
+- **THEN** wird zuerst Belegung 0 gemeldet und danach der Status `geschlossen` gesetzt
+
+#### Scenario: Ohne Personenrecht
+- **WHEN** eine Person ohne Zugriff auf das Modul Personen die Detailseite öffnet
+- **THEN** fehlen „Davon namentlich“ und die Liste der Personen, eine Zeile nennt den Grund, und die Personenliste wird nicht abgefragt
+
+#### Scenario: Überbelegt
+- **WHEN** eine Stelle mit Kapazität 150 eine Belegung von 170 trägt
+- **THEN** zeigt „Frei“ 0 und „Belegt“ das Wort „überbelegt“
 
 ### Requirement: Belegung melden
 
@@ -315,24 +556,26 @@ nie als „keine Kennzahl“.
 
 ### Requirement: Live-Verteilung
 
-Jede Änderung an Bezirken, Standmeldungen, Stellen oder Belegungen MUST nach dem Commit ein
-Live-Ereignis `betreuung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul
-Betreuung lesen dürfen. Die Nutzlast MUST nur Kennungen tragen, keine Anzahlen,
+Jede Änderung an Bezirken oder Standmeldungen MUST nach dem Commit ein Live-Ereignis
+`evakuierung` an alle verbundenen Clients des Einsatzes auslösen, die das Modul Evakuierung
+lesen dürfen. Jede Änderung an Stellen oder Belegungen MUST ein Live-Ereignis `betreuung` an
+alle auslösen, die das Modul Betreuung lesen dürfen. Die Nutzlast MUST nur Kennungen tragen, keine Anzahlen,
 Bezeichnungen oder Freitexte. Der zugehörige ETB-Eintrag MUST zusätzlich als ETB-Ereignis
 verteilt werden.
 
 #### Scenario: Zweiter Client sieht den neuen Stand
-- **WHEN** Client A einen Stand meldet, während Client B die Betreuungsseite desselben Einsatzes geöffnet hat
+- **WHEN** Client A einen Stand meldet, während Client B die Evakuierungsseite desselben Einsatzes geöffnet hat
 - **THEN** zeigt Client B den neuen Stand ohne Neuladen
 
 #### Scenario: Leser ohne Modulrecht
-- **WHEN** einem verbundenen Benutzer das Modul Betreuung ausgeblendet ist
-- **THEN** erhält er das Ereignis `betreuung` nicht
+- **WHEN** einem verbundenen Benutzer das Modul Evakuierung ausgeblendet ist
+- **THEN** erhält er das Ereignis `evakuierung` nicht
+- **AND** das Ereignis `betreuung` erhält er, solange er das Modul Betreuung lesen darf
 
 ### Requirement: Rechte
 
-Lesende Endpunkte des Moduls MUST Lesezugriff auf den Einsatz und das Modul Betreuung
-verlangen. Schreibende Endpunkte MUST zusätzlich Schreibrecht und einen aktiven Einsatz
+Lesende Endpunkte MUST Lesezugriff auf den Einsatz und ihr Modul verlangen: für Bezirke und
+Standmeldungen das Modul Evakuierung, für Stellen und Belegungen das Modul Betreuung. Schreibende Endpunkte MUST zusätzlich Schreibrecht und einen aktiven Einsatz
 verlangen. Die Oberfläche MUST ohne Schreibrecht einen Hinweis mit Grund zeigen und die
 Primäraktion gesperrt stehen lassen.
 
@@ -341,8 +584,12 @@ Primäraktion gesperrt stehen lassen.
 - **THEN** antwortet das System mit 403
 
 #### Scenario: Modul ausgeblendet
-- **WHEN** das Modul Betreuung für den Einsatz ausgeblendet ist und ein Nicht-Admin die Bezirke abruft
+- **WHEN** das Modul Evakuierung für den Einsatz ausgeblendet ist und ein Nicht-Admin die Bezirke abruft
 - **THEN** antwortet das System mit 403
+
+#### Scenario: Nur Betreuung ausgeblendet
+- **WHEN** das Modul Betreuung ausgeblendet, das Modul Evakuierung aber sichtbar ist
+- **THEN** liest ein Mitglied die Bezirke, und die Stellen antworten mit 403
 
 #### Scenario: Fremde Organisation
 - **WHEN** ein Benutzer einer anderen Organisation die Bezirke eines Einsatzes abruft
@@ -352,12 +599,12 @@ Primäraktion gesperrt stehen lassen.
 
 Beim Schwärzen eines Einsatzes MUST das System Freitexte mit möglichem Personen- oder
 Adressbezug entfernen: Bezeichnungen von Bezirken und Stellen durch Platzhalter ersetzen,
-Sammelstelle, Standort und Notiz leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
+Sammelstelle, Standort, Notiz sowie Leitung und Erreichbarkeit einer Stelle leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
 Arten und Zeitpunkte MUST erhalten bleiben.
 
 #### Scenario: Einsatz schwärzen
 - **WHEN** ein Einsatz mit Bezirk „Uferstraße 12–40“ und Stelle „Turnhalle Ost, Ostring 5“ geschwärzt wird
-- **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort und Notiz sind leer
+- **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort, Notiz, Leitung und Erreichbarkeit sind leer
 - **AND** Plangröße, Stände, Kapazität und Belegungen sind unverändert
 
 ### Requirement: Offline-Erfassung von Stand- und Belegungsmeldungen
@@ -383,7 +630,9 @@ bemessen sein, soweit das Gerät seinen Versatz zur Serveruhr aus einer Antwort 
 kennt; ohne bekannten Versatz gilt die Geräteuhr. Ein eingetragener Zeitpunkt MUST
 unverändert gesendet werden. Eine vom Server fachlich abgelehnte vorgemerkte Meldung MUST
 mit Grund und vollständigem Inhalt sichtbar bleiben, bis sie verworfen oder erneut versucht
-wird.
+wird. Eine vor der Trennung der Module vorgemerkte Standmeldung MUST
+beim Senden die Route des Moduls Evakuierung nehmen und dabei Inhalt, `client_id` und
+Erfassungszeitpunkt behalten.
 
 #### Scenario: Wiederholte Standmeldung
 - **WHEN** eine Standmeldung „480 evakuiert“ mit `client_id` „a1“ gespeichert ist und dieselbe Meldung mit „a1“ erneut eintrifft
@@ -433,6 +682,10 @@ wird.
 #### Scenario: Vorgemerkte Meldung wird abgelehnt
 - **WHEN** eine vorgemerkte Standmeldung beim Senden abgelehnt wird, weil der Bezirk inzwischen storniert ist
 - **THEN** steht sie im Wiederherstellungsbereich als abgelehnte Standmeldung mit Grund und vollständigem Inhalt
+
+#### Scenario: Vor dem Umzug vorgemerkte Standmeldung
+- **WHEN** ein Gerät eine Standmeldung vor LLH-1034 vorgemerkt hat und sie danach sendet
+- **THEN** geht sie an `…/evakuierung/bezirke/{bezirk}/staende`, nie an den alten Pfad, mit derselben `client_id`
 
 #### Scenario: Vorgehende Geräteuhr bei kurzem Ausfall
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät vor dem Ausfall eine Antwort des Servers erhalten hat und es eine Standmeldung offline vormerkt, die nach 30 s Ausfall gesendet wird

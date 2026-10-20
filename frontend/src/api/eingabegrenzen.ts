@@ -150,3 +150,7 @@ export const ABLOESUNG_RHYTHMUS_MAX_MINUTEN = 10_080;
 export const ABLOESUNG_ABLOESER_MAX = 8;
 /** Neue Besatzung beim Besatzungswechsel im Request, gezählt vor dem Entdoppeln (LLH-1150). */
 export const ABLOESUNG_BESATZUNG_MAX = 50;
+/** Leitung einer Betreuungsstelle (LLH-1044). */
+export const BETREUUNG_LEITUNG_MAX = 200;
+/** Erreichbarkeit einer Betreuungsstelle (LLH-1044). */
+export const BETREUUNG_ERREICHBARKEIT_MAX = 200;

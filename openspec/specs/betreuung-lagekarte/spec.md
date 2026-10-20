@@ -1,8 +1,8 @@
 # betreuung-lagekarte Specification
 
 ## Purpose
-Betreuungsstellen und Evakuierungsbezirke des Fachmoduls Betreuung erscheinen auf der
-Lagekarte: Stellen als verortete Marker, Bezirke als Flächen aus einer oder mehreren
+Betreuungsstellen des Fachmoduls Betreuung und Evakuierungsbezirke des Fachmoduls
+Evakuierung erscheinen auf der Lagekarte: Stellen als verortete Marker, Bezirke als Flächen aus einer oder mehreren
 Teilzonen. Damit sieht die Führung auf einen Blick, wo untergebracht wird und welche
 Gebiete geräumt werden, ohne die Modulfreigabe zu umgehen.
 
@@ -69,7 +69,7 @@ Die Lagekarte SHALL jede nicht stornierte, verortete Betreuungsstelle als Marker
 Koordinate zeigen, mit dem taktischen Zeichen Grundzeichen „Stelle“ und Fachaufgabe
 „Betreuung“. Die Marker MUST eine eigene, schaltbare Ebene „Betreuungsstellen“ bilden. Die
 Auswahl eines Markers MUST Bezeichnung, Art und Status der Stelle zeigen und einen Sprung
-ins Modul Betreuung anbieten, der die Stelle dort auswählt. Stornierte Stellen MUST weder
+ins Modul Betreuung anbieten, der die Detailseite der Stelle öffnet. Stornierte Stellen MUST weder
 als Marker noch in einer Liste der Karte erscheinen.
 
 #### Scenario: Verortete Stelle
@@ -78,7 +78,7 @@ als Marker noch in einer Liste der Karte erscheinen.
 
 #### Scenario: Sprung ins Modul
 - **WHEN** der Marker ausgewählt und „Im Fachmodul öffnen“ gewählt wird
-- **THEN** öffnet sich die Betreuungsseite mit dieser Stelle ausgewählt
+- **THEN** öffnet sich die Detailseite dieser Stelle
 
 #### Scenario: Ebene ausblenden
 - **WHEN** die Ebene „Betreuungsstellen“ ausgeschaltet wird
@@ -95,9 +95,9 @@ verortet“ führen. Eine Person mit Schreibrecht MUST eine solche Stelle von do
 einen Klick in die Karte verorten können. Die Adresse
 `/einsaetze/<id>/lagekarte?platzieren=betreuungsstelle:<stellen-id>` MUST die Karte in den
 Platziermodus für diese Stelle schicken und den Parameter danach aus der Adresse entfernen.
-Ohne Schreibrecht MUST der Platziermodus nicht betreten werden. Die Betreuungsseite MUST
-an jeder nicht verorteten Stelle einen Einstieg „Auf Karte verorten“ anbieten, der zu
-dieser Adresse führt, sofern die Person Schreibrecht hat.
+Ohne Schreibrecht MUST der Platziermodus nicht betreten werden. Die Betreuungsseite und die
+Detailseite einer Stelle MUST an jeder nicht verorteten Stelle einen Einstieg „Auf Karte
+verorten“ anbieten, der zu dieser Adresse führt, sofern die Person Schreibrecht hat.
 
 #### Scenario: Aus der Liste platzieren
 - **WHEN** eine Person mit Schreibrecht in „Nicht verortet“ die Stelle „AS Rathaus“ wählt und in die Karte klickt
@@ -163,12 +163,13 @@ Das System SHALL eine Zone vom Typ Evakuierungsbezirk optional genau einem
 Evakuierungsbezirk desselben Einsatzes zuordnen. Ein Bezirk MUST beliebig viele Zonen
 haben dürfen. Eine Zuordnung an eine Zone eines anderen Typs MUST mit 422 abgelehnt
 werden. Ein Bezirk, der nicht existiert oder zu einem anderen Einsatz gehört, MUST 404
-ergeben, ein stornierter Bezirk 409. Wer das Modul Betreuung nicht lesen darf, MUST keine
-Zuordnung setzen oder ändern können (403). Wechselt eine Zone ihren Typ weg von
+ergeben, ein stornierter Bezirk 409. Wer das Modul Evakuierung nicht lesen darf, MUST keine
+Zuordnung setzen oder ändern können (403); das Lesen des Moduls Betreuung allein MUST dafür
+nicht genügen und nicht nötig sein. Wechselt eine Zone ihren Typ weg von
 Evakuierungsbezirk, MUST ihre Zuordnung entfallen. Die Anzeige einer Zone MUST den Verweis
 tragen, wenn einer gesetzt ist, aber keine Angaben des Bezirks selbst. Jede Änderung der
 Zuordnung, einschließlich der Aufhebung einer zugeordneten Zone, MUST zusätzlich als
-Änderung des Moduls Betreuung live verteilt werden.
+Änderung des Moduls Evakuierung live verteilt werden.
 
 #### Scenario: Zwei Teilflächen
 - **WHEN** zwei Zonen vom Typ Evakuierungsbezirk dem Bezirk „Uferstraße 12–40“ zugeordnet werden
@@ -187,8 +188,12 @@ Zuordnung, einschließlich der Aufhebung einer zugeordneten Zone, MUST zusätzli
 - **THEN** antwortet das System mit 409
 
 #### Scenario: Ohne Modulrecht
-- **WHEN** eine Person mit Schreibrecht auf die Karte, aber ohne Lesezugriff auf das Modul Betreuung eine Zuordnung setzen will
+- **WHEN** eine Person mit Schreibrecht auf die Karte, aber ohne Lesezugriff auf das Modul Evakuierung eine Zuordnung setzen will
 - **THEN** antwortet das System mit 403
+
+#### Scenario: Nur das Modul Betreuung ausgeblendet
+- **WHEN** das Modul Betreuung ausgeblendet, das Modul Evakuierung aber lesbar ist und eine Person mit Schreibrecht auf die Karte eine Zuordnung setzt
+- **THEN** antwortet das System mit 201
 
 #### Scenario: Typwechsel
 - **WHEN** eine zugeordnete Zone zum Typ Absperrbereich wechselt
@@ -211,7 +216,7 @@ erhalten bleiben. Die Änderung MUST live an die Karte verteilt werden.
 ### Requirement: Bezirk und Fläche in beide Richtungen verbunden
 
 Die Anzeige eines Evakuierungsbezirks SHALL die Zahl der ihm zugeordneten Zonen tragen.
-Die Betreuungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
+Die Evakuierungsseite MUST je Bezirk mit mindestens einer Zone „Auf Karte zeigen“ anbieten,
 auch Personen ohne Schreibrecht (ein Sprung ist Lesen).
 Die Adresse `/einsaetze/<id>/lagekarte?evakuierungsbezirk=<bezirk-id>` MUST eine Zone dieses
 Bezirks auswählen, die Karte dorthin führen und den Parameter danach entfernen. Liegt die
@@ -219,11 +224,27 @@ Zone in einer anderen Kartenansicht, MUST die Karte zuerst zu dieser Ansicht wec
 unbrauchbarer Wert oder ein Bezirk ohne Zone MUST den Parameter ebenfalls entfernen. Die
 Auswahl einer zugeordneten Zone MUST für Personen mit Lesezugriff auf das Modul Bezirk,
 Räumungszustand und den Stand „evakuiert N von M“ zeigen und einen Sprung ins Modul
-anbieten, der den Bezirk dort auswählt. Die Beschriftung einer zugeordneten Zone auf der
+anbieten, der die Detailseite des Bezirks öffnet. Die Beschriftung einer zugeordneten Zone auf der
 Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
+Vom Bezirk zur Fläche (LLH-1069): Der Dialog „Evakuierungsbezirk anlegen“ MUST sichtbar die Wahl
+„Gebiet auf der Lagekarte“ mit „Keins“ und „Fläche zeichnen“ tragen; Vorgabe ist „Fläche zeichnen“,
+wenn die Person die Lagekarte nutzen darf, sonst „Keins“, und „Fläche zeichnen“ MUST dann gesperrt
+mit sichtbarem Grund stehen. Mit „Fläche zeichnen“ MUST die Oberfläche nach erfolgreichem Anlegen die
+Lagekarte mit `zeichnen=evakuierungsbezirk&bezirk=<bezirk-id>` öffnen; mit „Keins“ MUST sie auf der
+Evakuierungsseite bleiben. Die Evakuierungsseite MUST jedem Bezirk für Personen mit Schreibrecht im
+Menü „Gebiet zeichnen“ (ohne Fläche) bzw. „Weitere Teilfläche zeichnen“ (mit Fläche) anbieten, die
+Detailseite dasselbe im Gebiet; beide führen auf dieselbe Adresse. Die Karte MUST für diesen Auftrag
+den Zeichenmodus einer Fläche vom Typ Evakuierungsbezirk betreten und die neue Zone in EINER Anlage
+mit der Bezeichnung des Bezirks und seiner Zuordnung anlegen. Danach MUST die Karte „Zurück zu
+Bezirk <Bezeichnung>“ anbieten, das die Detailseite des Bezirks öffnet. Ein Abbruch MUST den Bezirk
+ohne Fläche stehen lassen. Ist der Bezirk unbekannt, aus einem anderen Einsatz oder storniert, fehlt
+der Person das Schreibrecht oder der Lesezugriff auf das Modul Evakuierung, MUST kein Zeichenmodus
+starten und keine Zuordnung entstehen; der Auftrag MUST aus der Adresse entfernt werden. Die
+Kennzahl „Evakuiert“ und die Lagekennzahl MUST davon unberührt bleiben.
+
 #### Scenario: Aus dem Modul auf die Karte
-- **WHEN** auf der Betreuungsseite am Bezirk „Uferstraße 12–40“ „Auf Karte zeigen“ gewählt wird
+- **WHEN** auf der Evakuierungsseite am Bezirk „Uferstraße 12–40“ „Auf Karte zeigen“ gewählt wird
 - **THEN** öffnet die Lagekarte mit einer Zone dieses Bezirks ausgewählt, und die Adresse enthält danach kein `evakuierungsbezirk` mehr
 
 #### Scenario: Fläche in einer anderen Ansicht
@@ -232,22 +253,51 @@ Karte MUST für diese Personen den Räumungszustand als Text tragen.
 
 #### Scenario: Bezirk ohne Fläche
 - **WHEN** ein Bezirk keine zugeordnete Zone hat
-- **THEN** bietet die Betreuungsseite an ihm kein „Auf Karte zeigen“ an
+- **THEN** bietet die Evakuierungsseite an ihm kein „Auf Karte zeigen“ an
 
 #### Scenario: Aus der Karte ins Modul
 - **WHEN** eine zugeordnete Zone ausgewählt und der Sprung ins Modul gewählt wird
-- **THEN** öffnet sich die Betreuungsseite mit diesem Bezirk ausgewählt
+- **THEN** öffnet sich die Detailseite dieses Bezirks
 
 #### Scenario: Räumungszustand auf der Fläche
 - **WHEN** der Räumungszustand des Bezirks auf `laeuft` wechselt
 - **THEN** trägt die Beschriftung seiner Zonen „Räumung: läuft“
 
+#### Scenario: Bezirk mit Gebiet anlegen
+- **WHEN** eine Person mit Schreibrecht den Bezirk „Deichweg 1–9“ mit „Fläche zeichnen“ anlegt, auf der Karte eine Fläche zeichnet und speichert
+- **THEN** trägt die neue Zone die Zuordnung zu „Deichweg 1–9“ und dessen Bezeichnung, der Bezirk hat eine Fläche, und die Karte bietet „Zurück zu Bezirk Deichweg 1–9“ an
+
+#### Scenario: Bezirk ohne Gebiet anlegen
+- **WHEN** der Bezirk mit „Keins“ angelegt wird
+- **THEN** bleibt die Evakuierungsseite stehen, und es entsteht keine Zone
+
+#### Scenario: Zeichnen abgebrochen
+- **WHEN** nach dem Anlegen mit „Fläche zeichnen“ das Zeichnen auf der Karte abgebrochen wird
+- **THEN** bleibt der Bezirk ohne Fläche bestehen
+
+#### Scenario: Weitere Teilfläche
+- **WHEN** an einem Bezirk mit einer Fläche „Weitere Teilfläche zeichnen“ gewählt und eine Fläche gespeichert wird
+- **THEN** hat der Bezirk zwei Flächen
+
+#### Scenario: Unbrauchbarer, fremder oder stornierter Bezirk im Auftrag
+- **WHEN** die Lagekarte mit `zeichnen=evakuierungsbezirk&bezirk=abc`, mit einem Bezirk eines anderen Einsatzes oder mit einem stornierten Bezirk geöffnet wird
+- **THEN** startet kein Zeichenmodus, und `zeichnen` und `bezirk` sind aus der Adresse verschwunden
+
+#### Scenario: Ohne Modul Evakuierung
+- **WHEN** eine Person mit Schreibrecht auf die Karte, aber ohne Lesezugriff auf das Modul Evakuierung den Auftrag öffnet
+- **THEN** startet kein Zeichenmodus, und der Auftrag ist aus der Adresse verschwunden
+
+#### Scenario: Lagekarte gesperrt beim Anlegen
+- **WHEN** eine Person die Lagekarte nicht nutzen darf und den Dialog „Evakuierungsbezirk anlegen“ öffnet
+- **THEN** ist „Keins“ gewählt und „Fläche zeichnen“ gesperrt mit Grund
+
 ### Requirement: Lage-Snapshot und Schwärzung
 
 Ein Lage-Snapshot SHALL die nicht stornierten Betreuungsstellen und Evakuierungsbezirke des
 Einsatzes zum Zeitpunkt der Aufnahme einfrieren, mit Koordinate und Zonenverweis. Beim
-Abruf MUST der Snapshot diese Inhalte für Personen ohne Lesezugriff auf das Modul
-Betreuung weglassen, wie die übrigen modulgebundenen Inhalte. Die Schwärzung eines
+Abruf MUST der Snapshot die Stellen für Personen ohne Lesezugriff auf das Modul Betreuung
+und die Bezirke für Personen ohne Lesezugriff auf das Modul Evakuierung weglassen, wie die
+übrigen modulgebundenen Inhalte. Die Schwärzung eines
 Einsatzes MUST Koordinaten der Stellen und Zonenverweise auf Bezirke als operatives
 Geo- bzw. Verweisskelett erhalten.
 
@@ -256,8 +306,12 @@ Geo- bzw. Verweisskelett erhalten.
 - **THEN** zeigt die Karte im Rückblick den Marker an der eingefrorenen Koordinate
 
 #### Scenario: Snapshot ohne Modulrecht
-- **WHEN** eine Person ohne Lesezugriff auf das Modul Betreuung einen Snapshot abruft
-- **THEN** enthält die Antwort keine Betreuungsstellen und keine Bezirke
+- **WHEN** eine Person ohne Lesezugriff auf das Modul Betreuung, aber mit Lesezugriff auf das Modul Evakuierung einen Snapshot abruft
+- **THEN** enthält die Antwort keine Betreuungsstellen, die Bezirke aber schon
+
+#### Scenario: Snapshot ohne Evakuierung
+- **WHEN** eine Person ohne Lesezugriff auf das Modul Evakuierung einen Snapshot abruft
+- **THEN** enthält die Antwort keine Bezirke
 
 #### Scenario: Schwärzung
 - **WHEN** ein Einsatz geschwärzt wird
