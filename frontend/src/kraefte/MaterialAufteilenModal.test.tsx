@@ -1,16 +1,35 @@
 import { describe, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../test/utils';
 import { ApiError } from '../api/client';
+import { waehle } from '../test/auswahlListe';
 import MaterialAufteilenModal, { type MaterialAufteilenModalProps } from './MaterialAufteilenModal';
+import { buildOrtOptions } from './materialOrtWahl';
+
+const POSTEN = {
+  id: 10,
+  bezeichnung: 'Wolldecke',
+  menge: 50,
+  ausgegeben: 0,
+  einheit_id: 3,
+  einsatz_fahrzeug_id: null,
+  uhs_id: null,
+  br_id: null,
+};
+const ORT_OPTIONEN = buildOrtOptions({
+  einheiten: [{ id: 3, name: 'Staffel A', pfad: 'Staffel A', tiefe: 0, abschnitt: null }],
+  uhs: [{ id: 4, bezeichnung: 'Turnhalle', status: 'aktiv', storniert_at: null }],
+});
 
 function zeige(p: Partial<MaterialAufteilenModalProps> = {}) {
   const onAufteilen = p.onAufteilen ?? vi.fn().mockResolvedValue(undefined);
   const onSchliessen = p.onSchliessen ?? vi.fn();
   renderMitProviders(
     <MaterialAufteilenModal
-      posten={{ id: 10, bezeichnung: 'Wolldecke', menge: 50, ausgegeben: 0 }}
+      posten={POSTEN}
+      ortOptionen={ORT_OPTIONEN}
       laeuft={false}
       speicherung={{ error: null, isPending: false, reset: () => {} }}
       {...p}
@@ -33,8 +52,66 @@ describe('MaterialAufteilenModal (LLH-1093, design.md D12)', () => {
     const knopf = within(dialog).getByRole('button', { name: 'Aufteilen' });
     expect(knopf.closest('form')).not.toBeNull();
     await userEvent.click(knopf);
-    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(20));
+    // Der Ort bleibt der der Ausgangszeile (t1hvaqzu, design.md D5).
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(20, { art: 'einheit', id: 3 }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
+  });
+
+  it('das Feld „Ort“ steht auf dem Ort des Postens (t1hvaqzu, design.md D5)', async () => {
+    zeige();
+    const dialog = await screen.findByRole('dialog');
+    const ort = within(dialog).getByRole('combobox', { name: 'Ort' });
+    expect(ort.closest('.ant-select')).toHaveTextContent('Staffel A');
+  });
+
+  it('erneut geöffnet mit einem Posten an anderem Ort steht das Feld auf dessen Ort', async () => {
+    const onAufteilen = vi.fn().mockResolvedValue(undefined);
+    const AN_UHS = { ...POSTEN, id: 11, bezeichnung: 'Feldbett', einheit_id: null, uhs_id: 4 };
+    function Rahmen() {
+      const [posten, setPosten] = useState<MaterialAufteilenModalProps['posten']>(POSTEN);
+      return (
+        <>
+          <button type="button" onClick={() => setPosten(AN_UHS)}>
+            zweiter
+          </button>
+          <MaterialAufteilenModal
+            posten={posten}
+            ortOptionen={ORT_OPTIONEN}
+            laeuft={false}
+            speicherung={{ error: null, isPending: false, reset: () => {} }}
+            onAufteilen={onAufteilen}
+            onSchliessen={() => setPosten(null)}
+          />
+        </>
+      );
+    }
+    renderMitProviders(<Rahmen />);
+    const erster = await screen.findByRole('dialog', { name: 'Wolldecke aufteilen' });
+    await userEvent.click(within(erster).getByRole('button', { name: 'Abbrechen' }));
+    // In jsdom endet die Schließanimation nie; der zweite Dialog wird über seinen Titel gefunden.
+    await userEvent.click(screen.getByRole('button', { name: 'zweiter' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Feldbett aufteilen' });
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(3, { art: 'uhs', id: 4 }));
+  });
+
+  it('20 von 50 an die UHS: die UHS ist das Ziel', async () => {
+    const { onAufteilen } = zeige();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
+    await waehle('Ort', 'UHS Turnhalle');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(20, { art: 'uhs', id: 4 }));
+  });
+
+  it('„ohne Ort“ ist das Ziel `null`', async () => {
+    const { onAufteilen } = zeige();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByRole('spinbutton', { name: 'Menge abteilen' }), '20');
+    await waehle('Ort', 'ohne Ort');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(20, null));
   });
 
   it('die ganze Menge oder mehr lässt sich nicht abteilen', async () => {
@@ -49,7 +126,7 @@ describe('MaterialAufteilenModal (LLH-1093, design.md D12)', () => {
 
   it('abgeteilt wird nur aus dem Rest; Ausgegebenes bleibt an der Zeile (LLH-1224 D14)', async () => {
     const { onAufteilen } = zeige({
-      posten: { id: 10, bezeichnung: 'Wolldecke', menge: 50, ausgegeben: 20 },
+      posten: { ...POSTEN, ausgegeben: 20 },
     });
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('30 von 50 übrig');
@@ -66,7 +143,7 @@ describe('MaterialAufteilenModal (LLH-1093, design.md D12)', () => {
       'Danach 20 + 30',
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Aufteilen' }));
-    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(30));
+    await waitFor(() => expect(onAufteilen).toHaveBeenCalledWith(30, { art: 'einheit', id: 3 }));
   });
 
   it('ohne Menge meldet das Feld den Grund', async () => {

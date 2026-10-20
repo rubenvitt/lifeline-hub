@@ -2,7 +2,7 @@
 titel: Unfallhilfsstellen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
+quellen: [frontend/src/pages/UnfallhilfsstellenPage.tsx, frontend/src/pages/UnfallhilfsstellenDefault.tsx, frontend/src/pages/uhs/UhsDetailPage.tsx, frontend/src/pages/uhs/Grundriss.tsx, frontend/src/personen/UebergabeQuittieren.tsx, frontend/src/pages/uhs/UhsLagezeile.tsx, frontend/src/pages/uhs/uhsLage.ts, frontend/src/pages/uhs/dringlichkeit.ts, frontend/src/components/SichtungsTag.tsx, frontend/src/pages/uhs/UhsAnlegenDrawer.tsx, frontend/src/pages/uhs/UhsSwitcher.tsx, frontend/src/pages/uhs/UhsPlanPaneel.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/MaterialAdhocDialog.tsx, frontend/src/components/StatusWahl.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/pages/uhs/UhsKraefte.tsx, frontend/src/pages/uhs/BewegungenTab.tsx, frontend/src/pages/personen/AufnahmePage.tsx, src/routes/einsatz_uhs.rs, src/uhs/mod.rs, src/uhs/repo.rs, src/uhs/belegung_repo.rs, src/uhs/hooks.rs, frontend/src/personen/PrioritaetMarke.tsx, frontend/src/personen/personEintragSpeichern.ts]
 ---
 
 ## Überblick
@@ -84,7 +84,10 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
    Status, darüber dieselbe Zahl.
 2. Unter „Material zuordnen …“ einen Posten wählen: unter „Ohne Ort“ die freien Posten, unter „An
    anderem Ort“ Posten, die schon an einem anderen Ort liegen, etwa bei einer Einheit, mit diesem
-   Ort im Eintrag. Der Posten liegt danach an der Stelle.
+   Ort im Eintrag. Der Posten liegt danach an der Stelle. Bei einem Verbrauchsgut mit Menge ab 2 und
+   Rest fragt ein Dialog zuerst die „Menge hierher“, vorbelegt mit der ganzen Menge: „Hierher“ holt
+   den ganzen Posten, eine kleinere Menge holt nur diesen Teil, und der Rest bleibt am bisherigen
+   Ort. Der Dialog nennt das Ergebnis, etwa „Danach hier 20, Staffel A 30“.
 3. Bei einem Verbrauchsgut mit Rest „Ausgeben“ wählen, die „Menge ausgeben“ eingeben und mit
    „Ausgeben“ bestätigen. Die Zeile nennt danach den Rest, etwa „30 von 50 übrig“.
 4. Den Status eines Postens an seiner Statusanzeige wählen, etwa „defekt“. Die Zeile zeigt den
@@ -186,8 +189,9 @@ Posten samt Ausfall; Ausfall fasst defekt, verbraucht, Desinfektion nötig und a
 zusammen (Kapitel [Material](material.md)). Unter „Kräfte“ werden Kräfte und Einheiten mit „Kraft
 zuordnen“ und „Einheit zuordnen“ an die Stelle gesetzt, „Kraft erfassen“ legt eine Kraft neu an.
 Unter „Material“ holt „Material zuordnen …“ Material des Einsatzes an die Stelle: Posten ohne Ort
-und Posten an einem anderen Ort, die ohne Rückfrage umgehängt werden; das Einsatztagebuch nennt den
-alten und den neuen Ort. „Material erfassen“ legt Ad-hoc-Material in einem Schritt an der Stelle
+und Posten an einem anderen Ort. Geräte und Posten, die sich nicht aufteilen lassen, hängt die Wahl
+ohne Rückfrage um; bei einem Verbrauchsgut, das sich aufteilen lässt, fragt die App vorher die
+Menge und holt auf Wunsch nur einen Teil. Das Einsatztagebuch nennt den alten und den neuen Ort. „Material erfassen“ legt Ad-hoc-Material in einem Schritt an der Stelle
 an, im selben Dialog wie im Modul [Material](material.md), nur ohne das Feld „Ort“; Material aus
 dem Materialstamm disponiert das Modul Material. Ein Statuswechsel an der Stelle ist derselbe wie
 in der Materialliste und steht ebenso im Einsatztagebuch. Zugeordnet und erfasst wird an einer

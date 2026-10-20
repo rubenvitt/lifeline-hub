@@ -1792,6 +1792,74 @@ async fn name_ueber_der_grenze_ist_400_und_schreibt_nichts() {
     assert_eq!(eintrag(&liste, e)["name"], "Z".repeat(200));
 }
 
+/// Spec `eingabegrenzen`, „Freitexte einer Einheit sind begrenzt“ (LLH-1242): Bemerkung,
+/// Funkrufname und Erreichbarkeit über der Grenze sind beim Bilden und beim Ändern 400, bevor etwas
+/// geschrieben wird; genau an der Grenze wird gespeichert.
+#[tokio::test]
+async fn freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/einheiten");
+    let e = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+    for (feld, etikett, max) in [
+        ("bemerkung", "Bemerkung", 2_000),
+        ("funkrufname", "Funkrufname", 200),
+        ("erreichbarkeit", "Erreichbarkeit", 200),
+    ] {
+        let zu_lang = "Z".repeat(max + 1);
+        let body = serde_json::json!({ "name": "Zug 2", feld: zu_lang }).to_string();
+        let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "POST {feld}: {json}");
+        assert!(
+            json["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("{etikett} darf höchstens {max} Zeichen lang sein")),
+            "POST {feld}: {json}"
+        );
+        let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+        assert_eq!(
+            liste.as_array().unwrap().len(),
+            1,
+            "POST {feld} hat gebildet"
+        );
+        assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+        let body = serde_json::json!({ feld: zu_lang }).to_string();
+        let (s, json) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "PATCH {feld}: {json}");
+        let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+        assert!(
+            eintrag(&liste, e)[feld].is_null(),
+            "PATCH {feld} hat geschrieben"
+        );
+
+        let genau = "Z".repeat(max);
+        let body = serde_json::json!({ feld: genau }).to_string();
+        let (s, json) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK, "PATCH {feld} an der Grenze: {json}");
+        assert_eq!(json[feld], genau);
+        let body = serde_json::json!({ feld: null }).to_string();
+        let (s, _) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::OK);
+    }
+
+    // Die Grenze kommt vor dem 409 einer aufgelösten Einheit (`src/AGENTS.md`, „Eingabegrenzen“).
+    // Mit Mitglied löst DELETE auf, statt die Einheit zu löschen.
+    let ef = fahrzeug_anlegen(&app, &admin, einsatz, "83-1").await;
+    fahrzeug_zuordnen(&app, &admin, einsatz, e, ef).await;
+    let (s, _) = anfrage(&app, "DELETE", &format!("{pfad}/{e}"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let kurz = serde_json::json!({ "bemerkung": "Z" }).to_string();
+    let (s, _) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&kurz)).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let lang = serde_json::json!({ "bemerkung": "Z".repeat(2_001) }).to_string();
+    let (s, json) = anfrage(&app, "PATCH", &format!("{pfad}/{e}"), &admin, Some(&lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "aufgelöst: {json}");
+}
+
 /// Spec `fahrzeug-bearbeitung`, „Einheit eines Fahrzeugs in der Liste ändern“ (design.md D2): ein
 /// Wechsel A → B nennt im ETB die vorige Einheit und meldet beide Einheiten und das Fahrzeug;
 /// dieselbe Einheit noch einmal schreibt und meldet nichts.

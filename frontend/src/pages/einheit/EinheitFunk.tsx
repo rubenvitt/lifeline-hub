@@ -1,4 +1,5 @@
 import { Input } from 'antd';
+import { EINHEIT_ERREICHBARKEIT_MAX } from '../../api/eingabegrenzen';
 import { leerZuNull } from '../../api/patchTriState';
 import type { Einheit } from '../../api/types';
 import { InlineAngabe } from '../../components/InlineAngabe';
@@ -101,6 +102,7 @@ export default function EinheitFunk({
               <Input
                 {...feld}
                 placeholder="z. B. 0151 23456"
+                maxLength={EINHEIT_ERREICHBARKEIT_MAX}
                 value={value}
                 onChange={(ev) => onChange(ev.target.value)}
               />

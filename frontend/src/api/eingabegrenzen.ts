@@ -108,8 +108,12 @@ export const EINHEIT_VORLAGE_PERSONAL_MAX = 200;
 export const SAMMEL_MAX = 50;
 /** Name der obersten Einheit beim Bilden aus einer Vorlage (LLH-1049). */
 export const EINHEIT_NAME_MAX = 200;
-/** Bemerkung einer unangemeldet am Bereitstellungsraum erfassten Einheit (LLH-1075). */
+/** Bemerkung einer Einheit im Einsatz (LLH-1075, LLH-1242). */
 export const EINHEIT_BEMERKUNG_MAX = 2_000;
+/** Funkrufname einer Einheit im Einsatz (LLH-1242). */
+export const EINHEIT_FUNKRUFNAME_MAX = 200;
+/** Erreichbarkeit / Nummer einer Einheit im Einsatz (LLH-1242). */
+export const EINHEIT_ERREICHBARKEIT_MAX = 200;
 /** Erwähnungen je Chat-Nachricht im Request (LLH-1220, vor dem Entdoppeln). */
 export const ERWAEHNUNGEN_MAX = 20;
 /** Bezeichnung eines Verpflegungszeitfensters (LLH-1040). */

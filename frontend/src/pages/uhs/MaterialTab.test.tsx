@@ -191,6 +191,11 @@ describe('MaterialTab · Zuordnen und Lösen über den einen Schreibweg (LLH-122
     const { patches } = render();
     await userEvent.click(await bereit());
     await userEvent.click(await screen.findByText('Wolldecke · 50'));
+    // Ein aufteilbares Verbrauchsgut fragt die Menge (t1hvaqzu, design.md D6); die vorbelegte
+    // ganze Menge holt den Posten wie bisher über den PATCH.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Wolldecke hierher');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
     await waitFor(() => expect(patches).toEqual([{ emId: 10, body: { uhs_id: 3 } }]));
   });
 
@@ -300,8 +305,12 @@ describe('MaterialTab · Speicherfehler am Ort (LFH-1077)', () => {
     });
     await userEvent.click(await bereit());
     await userEvent.click(await screen.findByText('Wolldecke · 50'));
-    expect(await screen.findByText('Material ist ausgegeben')).toBeInTheDocument();
-    expect(screen.getByText('Nicht zugeordnet')).toBeInTheDocument();
+    // Bei der Mengenfrage steht der Grund im Dialog (t1hvaqzu, Spec `material-am-ort`).
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Wolldecke hierher');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
+    expect(await within(dialog).findByText('Material ist ausgegeben')).toBeInTheDocument();
+    expect(within(dialog).getByText('Nicht zugeordnet')).toBeInTheDocument();
     expect(toasts()).toBe(0);
   });
 

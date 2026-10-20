@@ -98,3 +98,56 @@ describe('useMaterialOrt (LLH-1225 D2)', () => {
     );
   });
 });
+
+/**
+ * Eine Teilmenge an einen Ort (t1hvaqzu, design.md D1/D6): derselbe Hook schickt das Aufteilen mit
+ * den Ort-Feldern, bezogen auf den Ort des Postens, und gleicht wie `setOrt` beide Orte ab.
+ */
+describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
+  function renderTeile() {
+    const gesendet: { url: string; body: unknown }[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material/:emId/aufteilen', async ({ request }) => {
+        gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
+        return HttpResponse.json([{}, {}]);
+      }),
+    );
+    const client = new QueryClient();
+    const invalidiert = vi.spyOn(client, 'invalidateQueries');
+    const Wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useMaterialOrt(1), { wrapper: Wrapper });
+    const keys = () => invalidiert.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    return { teileAufNach: result.current.teileAufNach, gesendet, keys };
+  }
+
+  it('20 von der Einheit an die UHS: Menge und Ort-Feld der UHS', async () => {
+    const { teileAufNach, gesendet } = renderTeile();
+    await teileAufNach(posten({ einheit_id: 2 }), 20, { art: 'uhs', id: 7 });
+    expect(gesendet).toEqual([
+      { url: '/api/einsaetze/1/material/10/aufteilen', body: { menge: 20, uhs_id: 7 } },
+    ]);
+  });
+
+  it('gleicher Ort schickt nur die Menge, „ohne Ort“ das Feld des bisherigen Orts leer', async () => {
+    const { teileAufNach, gesendet } = renderTeile();
+    await teileAufNach(posten({ einheit_id: 2 }), 5, { art: 'einheit', id: 2 });
+    await teileAufNach(posten({ einheit_id: 2 }), 5, null);
+    expect(gesendet.map((g) => g.body)).toEqual([{ menge: 5 }, { menge: 5, einheit_id: null }]);
+  });
+
+  it('gleicht Material, Einheiten, UHS, den alten und neuen Ort und das ETB ab', async () => {
+    const { teileAufNach, keys } = renderTeile();
+    await teileAufNach(posten({ uhs_id: 7 }), 20, { art: 'bereitstellungsraum', id: 4 });
+    const erwartet = [
+      einsatzKeys.material(1),
+      einsatzKeys.einheiten(1),
+      einsatzKeys.uhs(1),
+      einsatzKeys.uhsDetail(1, 7),
+      einsatzKeys.brDetail(1, 4),
+      einsatzKeys.etb(1),
+    ].map((k) => JSON.stringify(k));
+    expect(keys()).toEqual(expect.arrayContaining(erwartet));
+  });
+});

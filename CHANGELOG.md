@@ -1,3 +1,83 @@
+## [1.0.0-alpha.144](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.143...v1.0.0-alpha.144) (2026-10-20)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migration für den Patientenverbleib:** Der Verbleib einer Person wird neu aufgebaut. Er kennt jetzt, wer transportiert (fremdes Rettungsmittel oder Eigentransport mit einem Fahrzeug aus dem Einsatz), und den neuen Status „übergeben“. Die Migration läuft beim Start automatisch.
+- **Transport braucht ein Rettungsmittel:** Wer einen Transport erfasst, muss jetzt das Rettungsmittel angeben.
+- **Schnittstelle Personendaten:** Personendaten lassen sich feldweise ändern. Dabei kann der Client den erwarteten bisherigen Wert mitgeben. Einen Konflikt (409) gibt es nur noch, wenn genau dieses Feld inzwischen geändert wurde. Ein Geburtsdatum muss ein gültiger Kalendertag sein und darf nicht in der Zukunft liegen, auch beim Anlegen.
+- **Neue Höchstlängen, Überschreitung wird abgelehnt:**
+  - **Personen:** Name und Vorname je 200 Zeichen; Herkunft, Fundort, Melder und Zustand/Verdacht je 500; Notiz und Verlaufsnotiz je 2.000.
+  - **Einheiten:** Funkrufname und Erreichbarkeit je 200 Zeichen, Bemerkung 2.000.
+- **Storno von Bereitstellungsräumen und Unfallhilfsstellen:** Liegt dort noch Material, wird der Storno abgelehnt. Das Material muss vorher gelöst werden.
+
+### Betroffene
+
+- **Rettungsmittel beim Transport:**
+  - Die Verbleib-Maske hat ein Feld „Rettungsmittel“.
+  - Es schlägt Fahrzeuge aus dem Einsatz vor (Eigentransport), außerdem bisher verwendete Rettungsmittel und Fahrzeuge aus dem Fahrzeugstamm.
+  - Die Vorschläge stehen auch ohne Netz und an UHS- und Betreuungsgeräten zur Verfügung.
+- **„Übergabe quittieren“:** Bei einem Eigentransport wird die Übergabe im Patientenkopf oder über das Zeilenmenü der Betroffenenliste bestätigt. Das geht auch ohne Netz, die Quittung wird vorgemerkt.
+- **Versorgungszustand offen, unterwegs oder abgeschlossen:**
+  - Abgeschlossene Patienten werden in der Betroffenenliste, in der Lage und auf der Lagekarte standardmäßig ausgeblendet.
+  - Der Schalter „Abgeschlossene zeigen (n)“ blendet sie wieder ein.
+  - Der Druck bleibt vollständig.
+  - Vermisste Personen gelten immer als offen.
+- **Sichtungsboard:** Das Sichtungsraster zeigt jetzt je Sichtungskategorie eine Spalte, die älteste Sichtung oben.
+  - Die Karten springen nicht weg, solange Zeiger oder Fokus auf ihnen liegen.
+  - Auf schmalen Bildschirmen stehen die Spalten untereinander und lassen sich einklappen.
+- **Personendaten feldweise bearbeiten:**
+  - Das Sammelformular „Bearbeiten“ entfällt. Jede Angabe wird direkt in der Ansicht einzeln gespeichert.
+  - Leere Angaben erscheinen als Knöpfe „+ …“ in der Zeile „Ohne Angabe“.
+  - Hat jemand ein Feld zwischenzeitlich geändert, fragt die App nach und zeigt den aktuellen Wert. Zur Wahl stehen „Überschreiben“ und „Verwerfen und neu laden“.
+  - Wer eine offene Änderung hat und die Seite verlassen will, wird gefragt.
+- **Geburtsdatum als Datum:** Es wird als Datum eingegeben und als TT.MM.JJJJ angezeigt, auch in Liste, Vorschau und Druckblatt.
+- **Personendaten und „Zustand / Verdacht“ ohne Netz:** Sie sind ohne Netz mit sichtbarem Grund gesperrt, im Kopf wie in der Liste. Ein angefangener Entwurf bleibt erhalten.
+- **Zu lange Freitexte:** Ein Zeichenzähler zeigt die Länge, ein Fehler steht direkt am Feld. Zu lange Texte werden nicht gesendet und nie still gekürzt.
+- **Tiere und Schäden:**
+  - Prüffehler wie „Ort ist Pflicht“ stehen sichtbar am Feld.
+  - Ein Alter außerhalb von 0–120 wird gemeldet statt still korrigiert.
+  - Wer ungespeicherte Änderungen hat und die Seite verlassen will, wird gefragt.
+  - Speichern und Abbrechen stehen in der festen Speicherleiste.
+
+### Unfallhilfsstellen
+
+- **Gemeinsame Verbleib-Maske:** Der Grundriss nutzt dieselbe Verbleib-Maske wie die Betroffenenliste, einschließlich Betreuungsstelle und „Bestätigt von“.
+- **Spalte „Unterwegs“ statt „Auf Transport gebracht“:**
+  - Sie zeigt nur Eigentransporte mit offener Übergabe, mit der Dauer seit Abfahrt.
+  - Ab 60 Minuten erscheint die Marke „Übergabe offen“.
+  - Die Übergabe lässt sich direkt in der Spalte quittieren.
+- **Wartebereich und „Noch nicht aufgenommen“:** Jede Person steht zweizeilig. Lange Namen werden umbrochen statt gekürzt.
+- **Lagezeile:** Sie zählt „Unterwegs“ statt „Abtransportiert“.
+
+### Kräfte und Mittel
+
+- **Teilmenge an einen Ort verlegen:**
+  - Der Dialog „Aufteilen …“ hat ein Feld „Ort“. Die abgeteilte Menge wird in einem Schritt mit einem ETB-Eintrag verlegt.
+  - Beim Zuordnen eines aufteilbaren Verbrauchsguts an Einheit, Fahrzeug, UHS oder Bereitstellungsraum fragt die App die Menge ab.
+- **Material lösen ohne Fehlgriff:**
+  - Nach „Lösen“ bleibt die Zeile als „Gelöst“ stehen, bis Zeiger und Fokus den Baustein verlassen haben. Ein schneller zweiter Tipp trifft so nicht versehentlich den nächsten Posten.
+  - Über „Rückgängig“ lässt sich das Lösen zurücknehmen.
+- **Meldebild-Suche:** Ein Treffer am Fahrzeug zeigt dessen ganze Beladung. Ein Treffer an einem Beladungsposten zeigt das tragende Fahrzeug mit.
+- **Einheiten:** Die Ansicht beachtet die neuen Höchstlängen. Die Bemerkung zeigt einen Zeichenzähler und sperrt das Speichern bei Überlänge.
+- **Nachforderungen:** „Rückgängig“ nach „Zusage erfassen“ funktioniert wieder. Der Zeitpunkt der zurückgenommenen Zusage wird nicht mehr angezeigt.
+
+### Lage und Lagemonitor
+
+- **Lage-Dashboard:** Es zeigt „Unterwegs / offen / abgeschlossen“ und weist abgeschlossene Patienten gesondert aus.
+- **Lagemonitor:** Abgeschlossene Patienten zählen nicht mehr als Patienten.
+
+### Lagekarte
+
+- **Neue Grundzeichen:** „Zweirad“ und „Kraftrad“. Der Server nimmt diese Zeichen und die neuen Körpermarken jetzt an.
+
+### Bedienung
+
+- **Wechsel auf „Kompakt“:** Der Wechsel der Darstellungsdichte im laufenden Betrieb löst keine Browserwarnung mehr aus.
+
+### Betrieb und Installation
+
+- **Desktop-App unter Linux:** Sie baut nach dem Update der Desktop-Plugins wieder.
+
 ## [1.0.0-alpha.143](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.142...v1.0.0-alpha.143) (2026-10-19)
 
 ### Wichtige Änderungen

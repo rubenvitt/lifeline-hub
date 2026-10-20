@@ -52,6 +52,7 @@ const ANGEBOT = [
   ...POSTEN,
   em({ id: 10, bezeichnung: 'Stromerzeuger' }),
   em({ id: 11, bezeichnung: 'Feldbett', einheit_id: 2 }),
+  em({ id: 12, bezeichnung: 'Rettungsdecke', art: 'verbrauchsgut', menge: 50, einheit_id: 2 }),
 ];
 
 function grundHandler() {
@@ -237,6 +238,71 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     await waitFor(() =>
       expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/11', body: { uhs_id: 7 } }]),
     );
+    // Ein Gerät holt die Wahl sofort, ohne Mengenfrage (t1hvaqzu, design.md D6).
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  function aufteilenMitschnitt(antwort?: () => Response) {
+    const gesendet: { url: string; body: unknown }[] = [];
+    server.use(
+      http.post('/api/einsaetze/1/material/:emId/aufteilen', async ({ request }) => {
+        gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
+        return antwort ? antwort() : HttpResponse.json([{}, {}]);
+      }),
+    );
+    return gesendet;
+  }
+
+  async function waehleRettungsdecke(): Promise<HTMLElement> {
+    await userEvent.click(screen.getByRole('combobox', { name: 'Material zuordnen' }));
+    await userEvent.click(await screen.findByText('Rettungsdecke · 50 · Staffel A'));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Rettungsdecke hierher');
+    return dialog;
+  }
+
+  it('Teilmenge hierher: 20 von 50 an die UHS, der Rest bleibt an der Einheit (t1hvaqzu)', async () => {
+    const patches = patchMitschnitt();
+    const gesendet = aufteilenMitschnitt();
+    zeige();
+    const dialog = await waehleRettungsdecke();
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Menge hierher' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '20');
+    expect(within(dialog).getByTestId('hierher-danach')).toHaveTextContent(
+      'Danach hier 20, Staffel A 30',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
+    await waitFor(() =>
+      expect(gesendet).toEqual([
+        { url: '/api/einsaetze/1/material/12/aufteilen', body: { menge: 20, uhs_id: 7 } },
+      ]),
+    );
+    expect(patches).toEqual([]);
+  });
+
+  it('die vorbelegte ganze Menge holt den Posten wie bisher (PATCH)', async () => {
+    const patches = patchMitschnitt();
+    const gesendet = aufteilenMitschnitt();
+    zeige();
+    const dialog = await waehleRettungsdecke();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
+    await waitFor(() =>
+      expect(patches).toEqual([{ url: '/api/einsaetze/1/material/12', body: { uhs_id: 7 } }]),
+    );
+    expect(gesendet).toEqual([]);
+  });
+
+  it('eine Ablehnung der Teilmenge steht im Dialog', async () => {
+    aufteilenMitschnitt(() => HttpResponse.json({ error: 'UHS ist aufgelöst' }, { status: 422 }));
+    zeige();
+    const dialog = await waehleRettungsdecke();
+    const feld = within(dialog).getByRole('spinbutton', { name: 'Menge hierher' });
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '20');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
+    expect(await within(dialog).findByText('UHS ist aufgelöst')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBe(dialog);
   });
 
   it('eine Ablehnung des Zuordnens steht unter der Auswahl', async () => {

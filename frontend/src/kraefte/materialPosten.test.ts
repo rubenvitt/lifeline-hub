@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MaterialStatus } from '../api/types';
 import { materialStatus } from '../theme/statusFarben';
 import {
+  hoechsteTeilmenge,
   isAufgebraucht,
   materialDarstellung,
   materialStatusOptionen,
@@ -80,6 +81,19 @@ describe('mengeText (D15)', () => {
     expect(mengeText(decke(0))).toBe('50');
     expect(mengeText(decke(20))).toBe('30 von 50 übrig');
     expect(mengeText(decke(50))).toBe('0 von 50 übrig');
+  });
+});
+
+describe('hoechsteTeilmenge (LLH-1224 D14, t1hvaqzu D6)', () => {
+  it('die Ausgangszeile behält mindestens eins, abgeteilt wird nur aus dem Rest', () => {
+    expect(hoechsteTeilmenge(decke(0))).toBe(49);
+    expect(hoechsteTeilmenge(decke(20))).toBe(30);
+    expect(hoechsteTeilmenge(decke(40))).toBe(10);
+  });
+  it('aufgebraucht, Menge 1 und ein Gerät lassen sich nicht teilen', () => {
+    expect(hoechsteTeilmenge(decke(50))).toBe(0);
+    expect(hoechsteTeilmenge(decke(0, 1))).toBe(0);
+    expect(hoechsteTeilmenge(geraet)).toBe(0);
   });
 });
 

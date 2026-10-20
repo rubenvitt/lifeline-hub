@@ -69,7 +69,7 @@ export function useRahmenOben(): number {
  *
  * Die erste Messung läuft in `useLayoutEffect`, also vor dem ersten Bild: sonst säße ein stehender
  * Tabellenkopf ein Bild lang unter dem Kopf. Danach hält ein `ResizeObserver` den Wert (Umbruch,
- * Dichtewechsel).
+ * Dichtewechsel), geschrieben im nächsten Bild.
  */
 export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el: T | null) => void {
   const [el, setEl] = useState<T | null>(null);
@@ -81,10 +81,23 @@ export function useRahmenObenQuelle<T extends HTMLElement>(aktiv: boolean): (el:
       neuRechnen();
     };
     messen();
-    const beobachter = new ResizeObserver(messen);
+    // Nicht im ResizeObserver schreiben: die Variable verändert sofort, was an ihr hängt (die Höhe
+    // der IconRail, `calc(100dvh - var(--lfh-rahmen-oben))`), und Vorfahren, die der Fensterrahmen
+    // beobachtet, wüchsen noch in derselben Auslieferungsrunde. Beim Live-Wechsel der Dichte
+    // meldete der Browser dann „ResizeObserver loop completed with undelivered notifications“
+    // (LLH-1335, `e2e/uhs-hoehe.spec.ts`). Ein Bild später, wie `FensterRahmen` und `alarmOben`.
+    let geplant = 0;
+    const beobachter = new ResizeObserver(() => {
+      if (geplant) return;
+      geplant = requestAnimationFrame(() => {
+        geplant = 0;
+        messen();
+      });
+    });
     beobachter.observe(el);
     return () => {
       beobachter.disconnect();
+      if (geplant) cancelAnimationFrame(geplant);
       anteile.delete(schluessel);
       neuRechnen();
     };
