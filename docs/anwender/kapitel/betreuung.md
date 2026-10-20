@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 530
-quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -13,7 +13,8 @@ Räumungsbezirke und den Stand „evakuiert“ führt das Modul „Evakuierung�
 ([Evakuierung](evakuierung.md)).
 
 Der Kopf der Seite zählt die Betreuungsstellen und nennt volle Stellen. Über der Tabelle steht die
-Summe der Untergebrachten.
+Summe der Untergebrachten. Jede Stelle hat eine eigene Seite mit ihrer Belegung, ihren Angaben,
+dem Meldeverlauf und den namentlich dort untergebrachten Betroffenen.
 
 ## Abläufe
 
@@ -27,16 +28,33 @@ Summe der Untergebrachten.
    Betrieb“, „geschlossen“), die Kapazität, die Art und die Zeit der letzten Meldung. Die Filter
    „Status“ und „Art“ engen die Tabelle ein.
 3. „Verlauf“ an einer Stelle klappt alle Meldungen dazu auf.
+4. Die Bezeichnung einer Stelle öffnet ihre Seite.
+
+### Die Seite einer Betreuungsstelle
+
+1. In der Tabelle die Bezeichnung der Stelle wählen, auf der Lagekarte „Im Fachmodul öffnen“.
+2. Oben unter „Belegung in Zahlen“ belegt, Kapazität und frei ablesen, mit Zugriff auf
+   „Betroffene“ auch „Davon namentlich“. Unter „Belegt“ steht „fast voll“, „voll“ oder
+   „überbelegt“.
+
+   ![Seite der Betreuungsstelle „Sporthalle Nord“ mit Belegung in Zahlen, Angaben der Stelle und Meldeverlauf](../bilder/betreuung/stelle.png)
+
+3. Unter „Stelle“ stehen Bezeichnung, Art, Kapazität, Einsatzabschnitt, Standort, Koordinate,
+   Leitung, Erreichbarkeit und Notiz, unter „Meldeverlauf“ alle Belegungsmeldungen der Stelle.
+4. Unter „Betroffene hier“ stehen die Betroffenen, deren Verbleib „Notunterkunft“ auf diese
+   Stelle zeigt; ein Klick öffnet die Person. Ohne Zugriff auf „Betroffene“ steht dort „Keine
+   Berechtigung“.
+5. Unter „Verpflegung“ steht, wie viele der Personen „in Betreuung“ in dieser Stelle
+   untergebracht sind; „Zur Verpflegung“ öffnet das Modul.
 
 ### Eine Betreuungsstelle anlegen und ihre Belegung melden
 
 1. „Betreuungsstelle anlegen“ wählen, „Bezeichnung“ und „Art“ angeben („Anlaufstelle“,
    „Betreuungsstelle“, „Betreuungsplatz“, „Notunterkunft“), dazu „Kapazität (Personen)“ und
-   unter „Weitere Angaben“ „Standort“ und „Notiz“. „Anlegen“ wählen. Die Stelle steht auf
-   „vorbereitet“.
-2. Öffnet die Stelle, im Menü der Stelle „Bearbeiten (Status, Kapazität)“ wählen und den Status
-   „in Betrieb“ setzen.
-3. An der Stelle „Belegung melden“ wählen.
+   unter „Weitere Angaben“ „Standort“, „Leitung“, „Erreichbarkeit“ und „Notiz“. „Anlegen“
+   wählen. Die Stelle steht auf „vorbereitet“.
+2. Öffnet die Stelle, ihre Bezeichnung wählen und auf ihrer Seite „In Betrieb nehmen“ wählen.
+3. An der Stelle in der Tabelle oder auf ihrer Seite „Belegung melden“ wählen.
 4. Unter „Belegt gesamt (Personen)“ die Gesamtzahl der Untergebrachten eintragen.
 
    ![Dialog „Belegung melden: Gesamtschule“ mit bisheriger Belegung, Kapazität und neuer Anzahl](../bilder/betreuung/belegung-melden.png)
@@ -44,7 +62,18 @@ Summe der Untergebrachten.
 5. „Melden“ wählen.
 
 Eine Stelle ohne Koordinate lässt sich über „Auf Karte verorten“ im Menü auf der Lagekarte
-setzen; „Zurück zu …“ führt danach auf die Betreuungsseite zurück.
+setzen; „Zurück zu …“ führt danach auf die Seite der Stelle.
+
+### Die Angaben einer Stelle ändern
+
+1. Auf der Seite der Stelle am Abschnitt „Stelle“ „Bearbeiten“ wählen.
+2. Die Felder ändern. Ein ungültiger Wert wird am Feld genannt, etwa eine leere Bezeichnung oder
+   eine Leitung mit mehr als 200 Zeichen.
+3. „Speichern“ wählen, oder „Abbrechen“, um nichts zu ändern.
+
+Gespeichert werden nur die geänderten Felder; eine Änderung, die jemand anderes inzwischen an
+einem anderen Feld gespeichert hat, bleibt erhalten. Wer die Seite mit ungespeicherten Änderungen
+verlassen will, wird gefragt.
 
 ### Eine Meldung zurücknehmen
 
@@ -72,17 +101,21 @@ Meldung davor. Das lässt sich nicht umkehren.
 
 ### Schließen und Stornieren
 
-Eine Stelle wird über „Bearbeiten (Status, Kapazität)“ geschlossen. Ist sie noch belegt, verlangt
-der Dialog zuerst die Leermeldung („Alle haben die Stelle verlassen — Belegung 0 melden“). An einer
-geschlossenen Stelle lassen sich keine Meldungen mehr zurücknehmen.
+Eine Stelle wird auf ihrer Seite mit „Schließen“ geschlossen. Ist sie noch belegt, verlangt der
+Dialog zuerst die Leermeldung („Alle haben die Stelle verlassen — Belegung 0 melden“). An einer
+geschlossenen Stelle lassen sich keine Belegungen melden und keine Meldungen zurücknehmen; „Wieder
+öffnen“ setzt sie zurück in Betrieb.
 
-„Stornieren“ ist nur für Fehlanlagen gedacht und nicht umkehrbar. Der Dialog bietet stattdessen
-„Status setzen“ an. Der Nachweis im Einsatztagebuch bleibt.
+„Stornieren“ steht im Menü der Stelle, in der Tabelle wie auf ihrer Seite. Es ist nur für
+Fehlanlagen gedacht und nicht umkehrbar. Der Dialog bietet stattdessen das Schließen an. Der
+Nachweis im Einsatztagebuch bleibt.
 
 ### Einsatztagebuch
 
 Jede Anlage, jede Belegungsmeldung und jeder Statuswechsel einer Stelle steht im
-Einsatztagebuch, eine Rücknahme als Berichtigung.
+Einsatztagebuch, eine Rücknahme als Berichtigung. Eine geänderte Leitung oder Erreichbarkeit
+steht dort nur als „weitere Angaben“, ohne Namen und Nummer. Beim Schwärzen des Einsatzes werden
+Leitung und Erreichbarkeit geleert.
 
 ### Verpflegung
 

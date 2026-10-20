@@ -461,6 +461,7 @@ async function gate1Vorbereiten(page: Page): Promise<string> {
       'Stelle',
     );
     await post(`betreuung/stellen/${stelle.id}/belegungen`, { belegt: 1420 }, 'Belegung');
+    BETREUUNGSSTELLE.set(einsatzId, stelle.id);
 
     // Ein LAUFENDES Zeitfenster (sonst stünde die Karte unter „vergangen") mit Sonderkost und
     // einer Ausgabe mit langem Ort — die breiteste Zeile der Karte.
@@ -542,6 +543,8 @@ const PM_TITEL = 'Hochwasser Musterstadt-Nordwest: Evakuierung Deichverteidigung
 const PRESSEMITTEILUNG = new Map<string, number>();
 /** Einheiten-Vorlage je Einsatz für „Einheit aus Vorlage bilden“ (LLH-1049). */
 const VORLAGE = new Map<string, GesaeteVorlage>();
+/** Kennung der gesäten Betreuungsstelle je Einsatz (Detailseite, LLH-1044). */
+const BETREUUNGSSTELLE = new Map<string, number>();
 
 type Gate1Route = {
   pfad: string;
@@ -894,6 +897,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       // Auf den Verlaufseintrag eingegrenzt: dieselbe Zahl steht auch als Kopfzahl des Blocks.
       anker: (p: Page) =>
         p.locator('[data-lfh="verlauf-eintrag"]').getByText(/1.420 untergebracht/),
+    },
+    {
+      // Detailseite der Stelle (LLH-1044): langer Name im Seitenkopf, Datenraster und Band.
+      pfad: `/einsaetze/${einsatzId}/betreuung/${BETREUUNGSSTELLE.get(einsatzId)}`,
+      anker: (p: Page) => p.getByRole('group', { name: 'Belegung in Zahlen' }),
+      lesend: { vorbedingung: (p: Page) => rechteHinweis(p, NUR_SCHREIBENDE) },
     },
     {
       // Der zugängliche Name trägt hinter der Bezeichnung den Zeitraum — Präfix statt Wortlaut.

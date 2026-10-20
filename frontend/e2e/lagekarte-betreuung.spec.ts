@@ -186,18 +186,15 @@ test('Betreuungsstelle: aus dem Modul verorten, Marker live auf einer zweiten Ka
   }).toPass({ timeout: 20_000 });
   await expect(ausgewaehlt.getByText('Betreuungsstelle · Notunterkunft')).toBeVisible();
   await page.screenshot({ path: info.outputPath('stelle-nacht.png') });
-  /*
-   * Der Sprung zielt auf `?stelle=`, und die Betreuungsseite räumt den Parameter nach dem
-   * Anwenden (`useQueryParamSelektion`, apply-then-clean). Die Adresse MIT Parameter lebt also
-   * nur, bis die Stellen geladen sind; unter Last war sie schon fort, wenn `toHaveURL` las
-   * (LFH-742, 6 von 90 rot). Geprüft wird deshalb das Ziel am Link und danach der stehende
-   * Endzustand: Adresse ohne Parameter, die Zeile der Stelle hervorgehoben.
-   */
+  // Der Sprung zielt seit LLH-1044 auf die Detailseite der Stelle (Item-Route, kein Parameter,
+  // den eine Seite erst anwenden und räumen müsste).
   const sprung = ausgewaehlt.getByRole('link', { name: /Im Fachmodul öffnen/ });
-  await expect(sprung).toHaveAttribute('href', new RegExp(`/betreuung\\?stelle=${sid}$`));
+  await expect(sprung).toHaveAttribute('href', new RegExp(`/betreuung/${sid}$`));
   await sprung.click();
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/betreuung$`));
-  await expect(page.locator(`tr[data-row-key="stelle-${sid}"]`)).toHaveClass(/zeile-hervorgehoben/);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/betreuung/${sid}$`));
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Betreuungsstelle NU Turnhalle Nord/ }),
+  ).toBeVisible();
   await andere.context().close();
 });
 

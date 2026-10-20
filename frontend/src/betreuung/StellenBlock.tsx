@@ -9,7 +9,9 @@ import type {
   StelleNamentlich,
 } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import Datensicht, { HERVORGEHOBEN, spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import Datensicht, { spaltenFuer, type Kartenplan } from '../components/Datensicht';
+import { KennungsLink } from '../components/kennungsLink';
+import { betreuungsstellePfad } from '../routing/deeplinks';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
 import StatusTag from '../components/StatusTag';
 import { monoStil } from '../components/instrument';
@@ -44,9 +46,12 @@ import MeldeVerlauf from './MeldeVerlauf';
  * liegt. Sortiert wird nach Anlagereihenfolge — nach Auslastung sprängen die Zeilen bei jeder
  * Meldung unter dem Cursor.
  *
+ * Die Bezeichnung führt auf die Detailseite der Stelle (LLH-1044); dort stehen Bearbeiten und
+ * Status, die Zeile trägt sie nicht mehr.
+ *
  * Zeilenaktionen: „Belegung melden" direkt — unter `md` in der fixierten Kennung unter dem Namen,
- * sonst läge der Knopf bei 390 px hinter dem Querscrollen (LFH-967) —, „Bearbeiten" und „Stornieren" im Menü, an einer
- * unverorteten Stelle zuerst „Auf Karte verorten". Auch an einer geschlossenen Stelle (ohne
+ * sonst läge der Knopf bei 390 px hinter dem Querscrollen (LFH-967) —, „Stornieren" im Menü, an
+ * einer unverorteten Stelle zuerst „Auf Karte verorten". Auch an einer geschlossenen Stelle (ohne
  * „Belegung melden") bleibt es ein Menü: gezählt wird NACH der Rechteprüfung, nicht nach dem
  * Zeilenzustand, sonst wechselte die Form der Spalte mit jedem Statuswechsel. Ohne
  * Schreibrecht entfällt die Spalte.
@@ -58,7 +63,7 @@ import MeldeVerlauf from './MeldeVerlauf';
  * „Verlauf“ als Aufklappbereich je Zeile, auch ohne Schreibrecht; lädt erst beim Aufklappen.
  */
 
-export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
+export type StelleAktion = 'verorten' | 'stornieren';
 
 /**
  * Warum an einer geschlossenen Stelle nichts zurückgenommen werden kann (sonst stünde sie
@@ -68,7 +73,6 @@ export type StelleAktion = 'verorten' | 'bearbeiten' | 'stornieren';
 export const GESCHLOSSEN_HINWEIS = 'Stelle geschlossen: Zurücknehmen gesperrt';
 
 const MENUE: readonly MenueEintrag<StelleAktion>[] = [
-  { key: 'bearbeiten', label: 'Bearbeiten (Status, Kapazität)' },
   { key: 'stornieren', label: 'Stornieren', gefahr: true },
 ];
 
@@ -97,6 +101,7 @@ const STATUS = Object.keys(betreuungsstelleStatus) as BetreuungsstelleStatus[];
 const leer = <Typography.Text type="secondary">—</Typography.Text>;
 
 const stellenSpalten = (
+  einsatzId: number,
   darfSchreiben: boolean,
   onBelegungMelden: (s: Betreuungsstelle) => void,
   onAktion: (aktion: StelleAktion, s: Betreuungsstelle) => void,
@@ -133,14 +138,16 @@ const stellenSpalten = (
          * steht er wie bisher einzeilig.
          */
         const name = (
-          <Typography.Text
-            strong
+          <KennungsLink
+            to={betreuungsstellePfad(einsatzId, s.id)}
             style={
-              meldenInKennung ? { display: 'inline-block', maxWidth: KENNUNG_MAX_PX } : undefined
+              meldenInKennung ? { display: 'inline-flex', maxWidth: KENNUNG_MAX_PX } : undefined
             }
           >
-            {s.bezeichnung}
-          </Typography.Text>
+            <Typography.Text strong style={{ color: 'inherit' }}>
+              {s.bezeichnung}
+            </Typography.Text>
+          </KennungsLink>
         );
         const knopf = meldenInKennung ? meldeKnopf(s) : null;
         return knopf ? (
@@ -198,7 +205,7 @@ const stellenSpalten = (
       // Überbelegung zeigt 0 frei; wie weit darüber, sagt „überbelegt" neben der Belegung.
       render: (_, s) => {
         const frei = freiePlaetze(s);
-        return frei == null ? leer : personenZahl(Math.max(0, frei));
+        return frei == null ? leer : personenZahl(frei);
       },
     },
     {
@@ -291,7 +298,6 @@ export default function StellenBlock({
   namentlich,
   ladend,
   darfSchreiben,
-  hervorgehoben,
   dataUpdatedAt,
   onAnlegen,
   onBelegungMelden,
@@ -303,8 +309,6 @@ export default function StellenBlock({
   namentlich?: readonly StelleNamentlich[] | null;
   ladend: boolean;
   darfSchreiben: boolean;
-  /** Per Deeplink angesteuerte Stelle (`?stelle=`). */
-  hervorgehoben: number | null;
   dataUpdatedAt?: number;
   /** Ohne: kein Anlegen-Knopf im Blockkopf (die Seite trägt ihn als Primäraktion, LLH-1034). */
   onAnlegen?: () => void;
@@ -321,6 +325,7 @@ export default function StellenBlock({
   const spalten = useMemo(
     () =>
       stellenSpalten(
+        einsatzId,
         darfSchreiben,
         onBelegungMelden,
         onAktion,
@@ -331,6 +336,7 @@ export default function StellenBlock({
         token.marginXS,
       ),
     [
+      einsatzId,
       darfSchreiben,
       onBelegungMelden,
       onAktion,
@@ -398,7 +404,6 @@ export default function StellenBlock({
         leerText="Keine Betreuungsstellen"
         karte={KARTE}
         aufklappen={aufklappen}
-        zeilenKlasse={(s) => (s.id === hervorgehoben ? HERVORGEHOBEN : undefined)}
       />
     </div>
   );
