@@ -1,26 +1,26 @@
 import { Breadcrumb, Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useMemo } from 'react';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router';
 import { ladeEinsatz } from '../api/einsaetze';
 import { ladeEvakuierung } from '../api/evakuierung';
 import { einsatzKeys } from '../api/queryKeys';
 import BezirkTabelle from '../betreuung/BezirkTabelle';
 import EvakuierungKennzahlen from '../betreuung/EvakuierungKennzahlen';
 import { useBezirkHandlungen } from '../betreuung/useBezirkHandlungen';
-import { scrolleZurZeile } from '../components/Datensicht';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
+import { evakuierungsbezirkPfad, parseRouteId } from '../routing/deeplinks';
 
 /**
  * Fachmodul Evakuierung (LLH-1034, bis dahin der obere Block der Betreuungsseite): Räumungsbezirke
- * mit ihrem Stand „evakuiert". Eine Route, keine Detailroute; ein Bezirk wird per `?bezirk=`
- * hervorgehoben (auch aus alten Links `…/betreuung?bezirk=`, die die Betreuungsseite umleitet).
+ * mit ihrem Stand „evakuiert". Jeder Bezirk hat seine Detailseite (LLH-1076,
+ * `pages/EvakuierungsbezirkPage.tsx`); `?bezirk=<id>` ist Altadresse (auch aus `…/betreuung?bezirk=`,
+ * die die Betreuungsseite hierher umleitet) und führt vor jedem Abruf auf die Detailseite.
  *
  * Aufbau: Kopf mit genau einer Primäraktion „Evakuierungsbezirk anlegen", darunter das
  * Kennzahlenband der Räumung (entfällt ohne aktiven Bezirk), darunter die Bezirkstabelle mit
@@ -33,7 +33,8 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 export default function EvakuierungPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
-  const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
+  const [params] = useSearchParams();
+  const altBezirk = parseRouteId(params.get('bezirk') ?? undefined);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -42,20 +43,18 @@ export default function EvakuierungPage() {
   const evakuierungQuery = useQuery({
     queryKey: einsatzKeys.evakuierung(einsatzId),
     queryFn: () => ladeEvakuierung(einsatzId),
+    enabled: altBezirk == null,
   });
   const darfSchreiben = einsatzQuery.data ? darfImEinsatzSchreiben(einsatzQuery.data) : false;
   const bezirke = useMemo(() => evakuierungQuery.data?.bezirke ?? [], [evakuierungQuery.data]);
 
   const handlungen = useBezirkHandlungen({ einsatzId, bezirke, darfSchreiben });
 
-  // Cross-Modul-Deeplink: `?bezirk=` hebt die Zeile hervor.
-  useQueryParamSelektion('bezirk', evakuierungQuery.isSuccess, (bid) => {
-    if (bezirke.some((b) => b.id === bid)) setHervorgehoben(bid);
-  });
-  useEffect(() => {
-    if (hervorgehoben == null) return;
-    scrolleZurZeile(`bezirk-${hervorgehoben}`);
-  }, [hervorgehoben]);
+  // Altadresse `?bezirk=<id>` (LLH-1076, design.md D2): auf die Detailseite. Ein unbekannter oder
+  // fremder Bezirk führt von dort zurück hierher, ohne Parameter.
+  if (altBezirk != null) {
+    return <Navigate to={evakuierungsbezirkPfad(einsatzId, altBezirk)} replace />;
+  }
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
   if (einsatzQuery.isError || !einsatzQuery.data) {
@@ -126,7 +125,6 @@ export default function EvakuierungPage() {
             bezirke={bezirke}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
-            hervorgehoben={hervorgehoben}
             onStandMelden={handlungen.oeffneStand}
             onAktion={handlungen.bezirkAktion}
           />

@@ -53,7 +53,7 @@ export interface ZonenInspectorProps {
    * Bezirksangaben (der Server lehnte das Setzen mit 403 ab).
    */
   evakuierungFrei?: boolean;
-  /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (`evakuierungPfad(?bezirk=)`). */
+  /** Ziel des Sprungs „Im Fachmodul öffnen" zu einem Bezirk (Detailseite, `evakuierungsbezirkPfad`). */
   bezirkPfad?: (bezirkId: number) => string;
   /** Zielmodul Gefahren gesperrt: „Gefahrenmatrix bearbeiten" steht gesperrt (LFH-888). */
   matrixGesperrt?: boolean;

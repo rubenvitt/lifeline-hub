@@ -608,13 +608,6 @@ const DIALOGE: DialogFall[] = [
       page.getByRole('button', { name: 'Evakuierungsbezirk anlegen', exact: true }).click(),
   },
   {
-    name: 'Plangröße fortschreiben',
-    seite: 'evakuierung',
-    scrollt: true,
-    titel: 'Bezirk bearbeiten: Uferstraße 12–40',
-    oeffne: (page) => menue(page, 'Aktionen zu Bezirk Uferstraße 12–40', 'Plangröße fortschreiben'),
-  },
-  {
     name: 'Räumung setzen',
     seite: 'evakuierung',
     titel: 'Räumung: Uferstraße 12–40',

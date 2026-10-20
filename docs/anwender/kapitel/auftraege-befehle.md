@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 120
-quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs, src/vorlagendokument/benachrichtigung.rs, src/auftrag/benachrichtigung.rs, src/benachrichtigung/text.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs, src/vorlagendokument/benachrichtigung.rs, src/auftrag/benachrichtigung.rs, src/benachrichtigung/text.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
@@ -137,10 +137,13 @@ Für Einsatzleitung und Führungspersonal:
 3. Unter „Verteiler“ wählen, an wen der Befehl geht: Einsatzabschnitte, Einheiten und
    Funktionen stehen zur Auswahl, ein eigener Text gilt mit Enter oder Komma. Externe Stellen
    kommen mit „Externe Stelle hinzufügen“ dazu, je Zeile mit Kategorie und Bezeichnung.
-4. Die Abschnitte des Schemas ausfüllen. Neben jedem Feld zeigt die „Vorschau“ den gesetzten
-   Text.
+4. Die Abschnitte des Schemas ausfüllen. Sie stehen offen untereinander, unter dem Namen eines
+   Abschnitts stehen die Unterpunkte des Schemas. Die „Gliederung“ springt zu einem Abschnitt und
+   nennt leere mit „leer“. „Lesefassung“ zeigt den ganzen Befehl gesetzt, so wie er gedruckt
+   wird; „Bearbeiten“ führt zurück. Der Entwurf ist derselbe wie beim Lagebericht
+   ([Lageberichte](lageberichte.md)).
 
-   ![Befehlsentwurf mit Titel, Verteiler samt externer Stelle und den Abschnitten „Lage“, „Auftrag“ und „Durchführung“ samt Vorschau, darüber „Entwurf speichern“, „Freigeben“ und „Drucken / als PDF“](../bilder/auftraege-befehle/befehl-entwurf.png)
+   ![Befehlsentwurf mit Gliederung, Titel, Verteiler samt externer Stelle und den offenen Abschnitten „Lage“, „Auftrag“ und „Durchführung“, darüber „Entwurf speichern“, „Freigeben“ und „Drucken / als PDF“](../bilder/auftraege-befehle/befehl-entwurf.png)
 
 5. „Entwurf speichern“ wählen oder einfach weiterarbeiten: Der Entwurf speichert sich alle 30
    Sekunden und beim Verlassen eines Feldes selbst; neben den Knöpfen steht „zuletzt gespeichert

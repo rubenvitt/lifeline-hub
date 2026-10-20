@@ -11,6 +11,7 @@ import type {
 } from '../../api/types';
 import { farbenDunkel } from '../../theme/tokens';
 import type { KarteMarker } from './marker';
+import type { TierKartenEintrag } from './tierMarker';
 import type { LayerSichtbar } from './Sidebar';
 import { fachebeneKeys } from './fachebenen';
 import {
@@ -53,6 +54,7 @@ const ALLE_AN: LayerSichtbar = {
   person: true,
   betreuungsstelle: true,
   bereitstellungsraum: true,
+  tier: true,
 };
 
 const marker = (typ: KarteMarker['typ'], id = 1, label = 'X'): KarteMarker => ({
@@ -251,6 +253,37 @@ describe('ebenenZeilen', () => {
       zugriff: 'gesperrt',
     });
     const z = zeilen.find((x) => x.key === 'bereitstellungsraum')!;
+    expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
+  });
+
+  // Ebene „Tiere" (LLH-1123): dieselbe Regel, Zeile nach den Bereitstellungsräumen.
+  it('„Tiere" ohne Angabe: keine Zeile (Vorgabe „ausgeblendet")', () => {
+    const zeilen = ebenenZeilen([marker('tier')], 0, ALLE_AN, false);
+    expect(zeilen.map((z) => z.key)).not.toContain('tier');
+  });
+
+  it('„Tiere" frei: Zeile nach den Bereitstellungsräumen, gezählt aus den Markern', () => {
+    const zeilen = ebenenZeilen(
+      [marker('tier', 1), marker('tier', 2), marker('tier', 3)],
+      0,
+      ALLE_AN,
+      false,
+      undefined,
+      { zugriff: 'frei' },
+      { zugriff: 'frei' },
+      null,
+      { zugriff: 'frei' },
+    );
+    const i = zeilen.findIndex((z) => z.key === 'tier');
+    expect(zeilen[i]).toMatchObject({ name: 'Tiere', anzahl: 3, sichtbar: true });
+    expect(zeilen[i - 1].key).toBe('bereitstellungsraum');
+  });
+
+  it('„Tiere" gesperrt: Grund, keine Zahl, nie „an"', () => {
+    const zeilen = ebenenZeilen([], 0, ALLE_AN, false, undefined, undefined, undefined, null, {
+      zugriff: 'gesperrt',
+    });
+    const z = zeilen.find((x) => x.key === 'tier')!;
     expect(z).toMatchObject({ anzahl: null, sichtbar: false, sperrgrund: 'Keine Berechtigung' });
   });
 
@@ -723,7 +756,7 @@ describe('Gruppen des Ebenenbaums', () => {
         'Lage',
         ['einsatzort', 'fuehrungsstelle', 'zone', 'schaden', 'lagemeldung', 'freies_zeichen'],
       ],
-      ['Betroffene & Versorgung', ['person', 'uhs', 'betreuungsstelle']],
+      ['Betroffene & Versorgung', ['person', 'uhs', 'betreuungsstelle', 'tier']],
     ]);
     expect(FACHEBENEN_GRUPPEN.map((g) => [g.name, g.ebenen])).toEqual([
       ['Warnungen', ['nina', 'dwd']],
@@ -742,6 +775,8 @@ describe('Gruppen des Ebenenbaums', () => {
       { zugriff: 'frei', anzahl: 0 },
       { zugriff: 'frei' },
       { zugriff: 'frei' },
+      null,
+      { zugriff: 'frei' },
     );
     const gruppen = ebenenGruppen(zeilen);
     expect(gruppen.map((g) => [g.kennung, g.zeilen.map((z) => z.key), g.an, g.gesamt])).toEqual([
@@ -752,14 +787,14 @@ describe('Gruppen des Ebenenbaums', () => {
         6,
         6,
       ],
-      ['betroffene', ['person', 'uhs', 'betreuungsstelle'], 3, 3],
+      ['betroffene', ['person', 'uhs', 'betreuungsstelle', 'tier'], 4, 4],
     ]);
   });
 
   it('eine ausgeblendete Ebene fehlt auch in ihrer Gruppe, eine gesperrte zählt nur zu „gesamt“', () => {
     const zeilen = ebenenZeilen([], 0, ALLE_AN, false, { zugriff: 'gesperrt', anzahl: 4 });
     const betroffene = ebenenGruppen(zeilen).find((g) => g.kennung === 'betroffene')!;
-    // Betreuungsstellen ohne Angabe: ausgeblendet, also keine Zeile.
+    // Betreuungsstellen und Tiere ohne Angabe: ausgeblendet, also keine Zeile.
     expect(betroffene.zeilen.map((z) => z.key)).toEqual(['person', 'uhs']);
     expect([betroffene.an, betroffene.gesamt]).toEqual([1, 2]);
   });
@@ -830,5 +865,42 @@ describe('Klappzustand des Ebenenbaums', () => {
     expect(
       baumKlappLesen(JSON.stringify({ kraefte: false, fachebenen: true, x: true, lage: 1 })),
     ).toEqual({ ...BAUM_KLAPP_VORGABE, kraefte: false, fachebenen: true });
+  });
+});
+
+const TIER: TierKartenEintrag = {
+  id: 7,
+  registrier_nr: 7,
+  status: 'vermisst',
+  spezies: 'hund',
+  rufname: 'Bello',
+  antreff_ort: 'Garten am Deich',
+  antreff_lat: 51.9,
+  antreff_lon: 8.8,
+};
+
+describe('auswahlRaster — Tier (LLH-1123)', () => {
+  const roh: AuswahlRoh = { ...ROH, tiere: [TIER] };
+  it('Status mit Rolle, Tierart, Rufname und Fundort — der Rufname nur hier, nicht auf der Karte', () => {
+    const raster = auswahlRaster(marker('tier', 7), roh, zeit);
+    expect(raster.map((f) => [f.label, f.wert])).toEqual([
+      ['Status', 'vermisst'],
+      ['Tierart', 'Hund'],
+      ['Rufname', 'Bello'],
+      ['Fundort', 'Garten am Deich'],
+    ]);
+    expect(raster[0].rolle).toBe('achtung');
+  });
+  it('ein offenes Tier ohne Rufname und Fundort: „—", keine Rolle', () => {
+    const offen = { ...TIER, status: 'aktiv', rufname: null, antreff_ort: null } as const;
+    const raster = auswahlRaster(marker('tier', 7), { ...roh, tiere: [offen] }, zeit);
+    expect(raster.map((f) => f.wert)).toEqual(['aktiv', 'Hund', '—', '—']);
+    expect(raster[0].rolle).toBeUndefined();
+  });
+  it('fehlt das Tier in der Liste, bleibt das Raster leer', () => {
+    expect(auswahlRaster(marker('tier', 8), roh, zeit)).toEqual([]);
+  });
+  it('Unterzeile nennt die Objektart', () => {
+    expect(auswahlUnterzeile(marker('tier', 7), roh)).toBe('Tier');
   });
 });

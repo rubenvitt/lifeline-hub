@@ -237,7 +237,11 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   await karteBereit(page);
   await expect(page).not.toHaveURL(/evakuierungsbezirk=/);
   await expect(page.getByLabel('Gehört zu Evakuierungsbezirk')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Evakuierung zu Uferstraße 12–40' })).toBeVisible();
+  // „Im Fachmodul öffnen" führt auf die Detailseite des Bezirks (LLH-1076).
+  await expect(page.getByRole('link', { name: 'Evakuierung zu Uferstraße 12–40' })).toHaveAttribute(
+    'href',
+    `/einsaetze/${e}/evakuierung/${bid}`,
+  );
   await expect
     .poll(() => zonenLabel(page), { timeout: 30_000 })
     .toContain('Uferstraße 12–40 · Räumung: angeordnet');

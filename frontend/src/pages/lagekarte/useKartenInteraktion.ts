@@ -9,6 +9,7 @@ import { verortePerson } from '../../api/einsatzPersonal';
 import { aktualisierePerson } from '../../api/einsatzPerson';
 import { aendereStelle } from '../../api/betreuung';
 import { aktualisiereBr } from '../../api/einsatzBereitstellungsraum';
+import { aktualisiereTier } from '../../api/einsatzTier';
 import { zeichneAbschnitt } from '../../api/einsatzabschnitte';
 import { legeZoneAn, aktualisiereZone, loescheZone, type ZonePatch } from '../../api/lagezonen';
 import {
@@ -34,7 +35,18 @@ import { merkeZuletztVerwendet } from './zuletztVerwendet';
 import type { BeginneKartenHandlung } from './useKartenFehler';
 import type { PlatzierenZielTyp } from '../../routing/deeplinks';
 
-export type ZoneEntwurf = { typ: ZoneTyp; modus: ZeichenModus; farbe?: string };
+/** Der Bezirk, dem eine per Link bestellte Fläche gehört (LLH-1069). */
+export type ZeichenBezirk = { id: number; bezeichnung: string };
+/**
+ * `bezirk`: die Fläche gehört diesem Evakuierungsbezirk (`?zeichnen=evakuierungsbezirk&bezirk=<id>`,
+ * LLH-1069) — sie geht mit seiner Bezeichnung und Zuordnung hinaus, ohne Serie.
+ */
+export type ZoneEntwurf = {
+  typ: ZoneTyp;
+  modus: ZeichenModus;
+  farbe?: string;
+  bezirk?: ZeichenBezirk;
+};
 type PlatzierZiel = { typ: PlatzierenPunktTyp | 'einsatzort'; id: number };
 /**
  * Was gerade verortet wurde (LLH-1125, Spec `lagekarte-verortungsauftrag`): Stoff der Rückmeldung
@@ -67,6 +79,12 @@ type KartenModus =
   | { art: 'verortet'; ziel: VerortetZiel }
   | { art: 'abschnitt'; id: number }
   | { art: 'zone'; entwurf: ZoneEntwurf; bestaetigung: ZoneBestaetigung | null; speichern: boolean }
+  /**
+   * Nach dem Speichern einer Fläche mit Bezirk (LLH-1069): die Rückmeldung „Gebiet für Bezirk …
+   * gespeichert“ mit „Zurück zu …“ steht, bis jemand „Auf der Karte bleiben“ wählt oder einen
+   * anderen Modus beginnt. Kein exklusiver Modus, wie `verortet`.
+   */
+  | { art: 'gebietGezeichnet'; bezirk: ZeichenBezirk }
   | { art: 'bild'; id: number }
   | { art: 'zeichen'; spec: FreiesZeichenUpdate }
   /**
@@ -89,6 +107,8 @@ type ModusAktion =
   | { t: 'messen'; form: MessForm }
   | { t: 'zoneGezeichnet'; geometrie: GeoJsonGeometry }
   | { t: 'zoneSpeichernStart' }
+  /** Erfolg des Speicherns einer Fläche mit Bezirk; läuft kein Zonen-Modus mit Bezug mehr, No-op. */
+  | { t: 'gebietGezeichnet' }
   /** Beenden nur, wenn der laufende Modus einer der genannten ist (sonst No-op). */
   | { t: 'beenden'; arten: KartenModus['art'][] };
 
@@ -137,6 +157,10 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
         : state;
     case 'zoneSpeichernStart':
       return state.art === 'zone' ? { ...state, speichern: true } : state;
+    case 'gebietGezeichnet':
+      return state.art === 'zone' && state.entwurf.bezirk
+        ? { art: 'gebietGezeichnet', bezirk: state.entwurf.bezirk }
+        : state;
     case 'beenden':
       return a.arten.includes(state.art) ? { art: 'idle' } : state;
   }
@@ -265,6 +289,7 @@ export function useKartenInteraktion({
   // sein.
   const platzierungZiel = modus.art === 'platzieren' ? modus.ziel : null;
   const verortetZiel = modus.art === 'verortet' ? modus.ziel : null;
+  const gebietGezeichnet = modus.art === 'gebietGezeichnet' ? modus.bezirk : null;
   const zeichneAbschnittId = modus.art === 'abschnitt' ? modus.id : null;
   const zoneEntwurf = modus.art === 'zone' ? modus.entwurf : null;
   const zoneBestaetigung = modus.art === 'zone' ? modus.bestaetigung : null;
@@ -275,8 +300,10 @@ export function useKartenInteraktion({
   const messStart = messForm ? messStartWert : null;
 
   // Während eines exklusiven Modus darf ein Karten-Klick auf ein Objekt kein Auswahl-Panel öffnen
-  // (sonst Doppel-Panel neben der ZeichnenSteuerung). Die Rückmeldung „verortet“ ist keiner.
-  const exklusiverModusAktiv = modus.art !== 'idle' && modus.art !== 'verortet';
+  // (sonst Doppel-Panel neben der ZeichnenSteuerung). Die Rückmeldungen „verortet“ und „Gebiet …
+  // gespeichert“ sind keiner.
+  const exklusiverModusAktiv =
+    modus.art !== 'idle' && modus.art !== 'verortet' && modus.art !== 'gebietGezeichnet';
 
   // Verorten je nach Ziel-Typ (UHS/Schaden live; Einsatzort über Teil-PATCH des Kopfs, dann invalidieren).
   const verortenMutation = useMutation({
@@ -307,6 +334,13 @@ export function useKartenInteraktion({
         // Bereitstellungsraum (LLH-1107): nur das Paar, wie bei der Betreuungsstelle. Der Server
         // schreibt dafür keinen ETB-Eintrag, verteilt aber live.
         await aktualisiereBr(einsatzId, platzierungZiel.id, { lat: p.lat, lon: p.lon });
+      } else if (platzierungZiel.typ === 'tier') {
+        // Tier (LLH-1123): nur das Paar — `patchBody` liest vorhandene Keys, jeder weitere wäre ein
+        // „leeren". Ohne `basis_geaendert_at`: der Punkt ist die neueste Aussage. Kein ETB.
+        await aktualisiereTier(einsatzId, platzierungZiel.id, {
+          antreff_lat: p.lat,
+          antreff_lon: p.lon,
+        });
       } else if (platzierungZiel.typ === 'einsatzort') {
         // Einsatzort: nur das Koordinatenpaar. Ein Kopf aus dem Cache überschriebe die
         // gleichzeitige Änderung einer anderen Person (Leitstellen-Nr., Stichwort …).
@@ -339,6 +373,10 @@ export function useKartenInteraktion({
       if (ziel?.typ === 'bereitstellungsraum') {
         qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
         qc.invalidateQueries({ queryKey: einsatzKeys.brDetail(einsatzId, ziel.id) });
+      }
+      if (ziel?.typ === 'tier') {
+        qc.invalidateQueries({ queryKey: einsatzKeys.tiere(einsatzId) });
+        qc.invalidateQueries({ queryKey: einsatzKeys.tier(einsatzId, ziel.id) });
       }
       // Ein Auftrag von außen meldet am Ort statt per Toast (LLH-1125, design.md D2): der Modus wird
       // zu „verortet“, der neue Marker ist gewählt und angeflogen — eine Fehlplatzierung fällt so
@@ -540,6 +578,13 @@ export function useKartenInteraktion({
           aufruf: aktualisiereBr(einsatzId, marker.id, { lat: null, lon: null }),
           faecher: [einsatzKeys.br(einsatzId), einsatzKeys.brDetail(einsatzId, marker.id)],
         };
+      case 'tier':
+        // Ebenso: das Tier bleibt, nur sein Fundort-Punkt geht (LLH-1123). Umkehrbar über „Auf
+        // Karte verorten" der Tier-Detailseite, deshalb ohne Rückfrage.
+        return {
+          aufruf: aktualisiereTier(einsatzId, marker.id, { antreff_lat: null, antreff_lon: null }),
+          faecher: [einsatzKeys.tiere(einsatzId), einsatzKeys.tier(einsatzId, marker.id)],
+        };
       case 'person':
         // Betroffene: nur die zwei Koordinatenfelder wie im Platzier-Zweig; die Person bleibt, nur
         // ihr Fundort-Punkt geht. Umkehrbar über „Auf Lagekarte verorten", deshalb ohne Rückfrage.
@@ -613,16 +658,22 @@ export function useKartenInteraktion({
       geometrie: JSON.stringify(zu.geometrie),
       farbe: zu.typ === 'freie_skizze' ? (zu.farbe ?? null) : null,
       ansicht_id: aktiveAnsichtId ?? null,
+      // Fläche eines Bezirks (LLH-1069): Bezeichnung und Zuordnung im selben POST.
+      ...(zu.bezirk ? { label: zu.bezirk.bezeichnung, evakuierungsbezirk_id: zu.bezirk.id } : {}),
     })
       .then(() => {
         erfolg('Zone angelegt');
         // Beide Fächer: das Anlegen einer `gefahrengebiet`-Zone legt serverseitig eine neue Gruppe
         // an. Ohne die zweite Invalidierung kennt die veraltete Gebiets-Liste die
         // `gefahrengebiet_id` der frischen Zone nicht, und die Karte beschriftet „Stufe unbekannt",
-        // bis ein fremder Refetch kommt (sichtbar nur bei hängendem Live-Strom).
+        // bis ein fremder Refetch kommt (sichtbar nur bei hängendem Live-Strom). Mit Bezirk dazu
+        // die Evakuierung: der Bezirk trägt danach eine Fläche mehr.
         return Promise.all([
           qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }),
           qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
+          ...(zu.bezirk
+            ? [qc.invalidateQueries({ queryKey: einsatzKeys.evakuierung(einsatzId) })]
+            : []),
         ]).then(() => true);
       })
       .catch((e) => {
@@ -645,7 +696,10 @@ export function useKartenInteraktion({
         // löscht sie.
         const nochUnserZug = modusRef.current.art === 'zone' && modusRef.current.speichern;
         if (!nochUnserZug) return;
-        if (erfolg && zoneSerieRef.current) {
+        // Eine Fläche je Auftrag mit Bezirk: statt der Serie die Rückmeldung mit Rückweg.
+        if (erfolg && zu.bezirk) {
+          dispatch({ t: 'gebietGezeichnet' });
+        } else if (erfolg && zoneSerieRef.current) {
           dispatch({ t: 'zone', entwurf: { typ: zu.typ, modus: zu.modus, farbe: zu.farbe } });
           setZoneZeichnenNonce((n) => n + 1);
           setZoneSerieAnzahl((n) => n + 1);
@@ -711,6 +765,11 @@ export function useKartenInteraktion({
   /** „Auf der Karte bleiben“: schließt nur die Rückmeldung; Auswahl und Ebenen-Vorrang bleiben. */
   const onVerortetSchliessen = useCallback(
     () => dispatch({ t: 'beenden', arten: ['verortet'] }),
+    [],
+  );
+  /** „Auf der Karte bleiben“ nach dem Gebiet eines Bezirks (LLH-1069): schließt die Rückmeldung. */
+  const onGebietGezeichnetSchliessen = useCallback(
+    () => dispatch({ t: 'beenden', arten: ['gebietGezeichnet'] }),
     [],
   );
   const onPlatzierenAbbrechen = () => {
@@ -905,6 +964,7 @@ export function useKartenInteraktion({
     // FSM-State (Display/Wiring).
     platzierungZiel,
     verortetZiel,
+    gebietGezeichnet,
     verortungsTyp,
     zeichneAbschnittId,
     zoneEntwurf,
@@ -952,6 +1012,7 @@ export function useKartenInteraktion({
     onPlatzierenStart,
     onVerortungsauftragStart,
     onVerortetSchliessen,
+    onGebietGezeichnetSchliessen,
     onPlatzierenAbbrechen,
     onAbschnittZeichnenStart,
     onZoneZeichnenStart,

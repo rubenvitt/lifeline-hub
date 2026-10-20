@@ -1713,6 +1713,29 @@ describe('LagekartePage', () => {
     expect(platzierModusAn()).toBe(false);
   });
 
+  it('Deeplink ?platzieren=tier: startet den Platzier-Modus und räumt (LLH-1123)', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=tier:4&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(screen.getByTestId('location-search')).not.toHaveTextContent('zurueck');
+  });
+
+  it('Deeplink ?platzieren=tier: ohne Modul Tiere kein Platziermodus, der Auftrag wird geräumt (LLH-1123)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ tiere: { zugriff: false } })),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=tier:4');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(platzierModusAn()).toBe(false);
+  });
+
   it('Deeplink ?platzieren=person: startet den Platzier-Modus und räumt (LFH-670)', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');
@@ -2964,6 +2987,174 @@ describe('LFH-825: Zeichnen per Link', () => {
     await waitFor(() =>
       expect(screen.queryByText('Gefahrengebiet · Fläche')).not.toBeInTheDocument(),
     );
+  });
+});
+
+/**
+ * Zeichnen mit Bezirk (LLH-1069, Spec `betreuung-lagekarte`): `?zeichnen=evakuierungsbezirk&bezirk=<id>`
+ * aus dem Modul Evakuierung. Die Karte prüft den Bezirk gegen ihre Bezirksliste, belegt Bezeichnung
+ * und Zuordnung vor, legt die Zone in EINEM POST an und bietet danach „Zurück zu Bezirk …“ an.
+ * Ungültig, unbekannt/fremd/storniert (fehlt in der Liste), ohne Schreibrecht oder ohne Modul
+ * Evakuierung: kein Modus, beide Parameter geräumt, keine Zuordnung.
+ */
+describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
+  const UFER = {
+    id: 5,
+    einsatz_id: 1,
+    bezeichnung: 'Uferstraße 12–40',
+    plan_personen: 640,
+    plan_erhebung: 'geschaetzt',
+    raeumung: 'angeordnet',
+    flaechen: 0,
+    angelegt_at: '',
+  };
+  const mitBezirken = (bezirke: unknown[] = [UFER]) =>
+    http.get('/api/einsaetze/1/evakuierung', () => HttpResponse.json({ bezirke }));
+  const ort = () => screen.getByTestId('location-search');
+  const geraeumt = () =>
+    waitFor(() => {
+      expect(ort()).not.toHaveTextContent('zeichnen');
+      expect(ort()).not.toHaveTextContent('bezirk');
+    });
+
+  function renderMitRueckweg(route: string) {
+    return renderMitProviders(
+      <>
+        <Routes>
+          <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+          <Route
+            path="/einsaetze/:id/evakuierung/:bezirkId"
+            element={<div data-testid="bezirk-ziel">Bezirksseite</div>}
+          />
+        </Routes>
+        <LocationSonde />
+      </>,
+      { route },
+    );
+  }
+
+  it('startet den Modus mit Bezug, POST mit Bezeichnung und Zuordnung, dann „Zurück zu Bezirk …“', async () => {
+    let body: Record<string, unknown> | null = null;
+    basisHandler([
+      mitBezirken(),
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 9, ...body });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderMitRueckweg('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    expect(await screen.findByText('Bezirk Uferstraße 12–40 · Fläche')).toBeInTheDocument();
+    await geraeumt();
+    // Eine Fläche je Auftrag: kein Serienschalter.
+    expect(screen.queryByRole('switch', { name: 'Weitere zeichnen' })).not.toBeInTheDocument();
+
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      typ: 'evakuierungsbezirk',
+      geometrie_typ: 'Polygon',
+      label: 'Uferstraße 12–40',
+      evakuierungsbezirk_id: 5,
+    });
+
+    expect(
+      await screen.findByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Zurück zu Bezirk Uferstraße 12–40' }));
+    expect(await screen.findByTestId('bezirk-ziel')).toBeInTheDocument();
+  });
+
+  it('„Auf der Karte bleiben“ schließt die Rückmeldung', async () => {
+    basisHandler([
+      mitBezirken(),
+      http.post('/api/einsaetze/1/zonen', () => HttpResponse.json({ id: 9 })),
+    ]);
+    const user = userEvent.setup();
+    renderMitRueckweg('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    await user.click(await screen.findByRole('button', { name: 'Auf der Karte bleiben' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('bezirk-ziel')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['unbrauchbare Kennung', 'zeichnen=evakuierungsbezirk&bezirk=abc'],
+    ['unbekannter, fremder oder stornierter Bezirk', 'zeichnen=evakuierungsbezirk&bezirk=77'],
+    ['Bezug an einem anderen Typ', 'zeichnen=gefahrengebiet&bezirk=5'],
+    ['Bezug ohne Auftrag', 'bezirk=5'],
+  ])('%s: kein Zeichenmodus, beide Parameter geräumt', async (_fall, query) => {
+    basisHandler([mitBezirken()]);
+    // „Gefahrengebiet zeichnen“ steht in der Ansicht „Objekte“ (LLH-1028).
+    objekteVorn();
+    renderSeiteMitSonde(`/einsaetze/1/lagekarte?${query}`);
+    await geraeumt();
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/· Fläche$/)).not.toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht: kein Modus, Parameter geräumt', async () => {
+    basisHandler([
+      mitBezirken(),
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    await geraeumt();
+    expect(screen.queryByText('Bezirk Uferstraße 12–40 · Fläche')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  it('ohne Freigabe des Moduls Evakuierung: kein Modus, Parameter geräumt', async () => {
+    basisHandler([
+      mitBezirken(),
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ evakuierung: { sichtbar: false, zugriff: false } })),
+      ),
+    ]);
+    objekteVorn();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    await geraeumt();
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Bezirk Uferstraße 12–40 · Fläche')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  it('wartet auf die Bezirksliste, statt den Auftrag beim Kaltstart zu verwerfen', async () => {
+    let freigeben!: () => void;
+    const listeDa = new Promise<void>((r) => {
+      freigeben = r;
+    });
+    basisHandler([
+      http.get('/api/einsaetze/1/evakuierung', async () => {
+        await listeDa;
+        return HttpResponse.json({ bezirke: [UFER] });
+      }),
+    ]);
+    objekteVorn();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    expect(
+      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+    ).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(ort()).toHaveTextContent('bezirk=5');
+    freigeben();
+    expect(await screen.findByText('Bezirk Uferstraße 12–40 · Fläche')).toBeInTheDocument();
+    await geraeumt();
   });
 });
 

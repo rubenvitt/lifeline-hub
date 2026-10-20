@@ -10,6 +10,8 @@ export interface ZoneNeu {
   notiz?: string | null;
   /** Ansichts-Zugehörigkeit (LFH-320): aktive Ansicht beim Anlegen; `null` = auf allen. */
   ansicht_id?: number | null;
+  /** Bezirks-Zuordnung beim Anlegen (LLH-1069), nur bei Typ `evakuierungsbezirk`. */
+  evakuierungsbezirk_id?: number | null;
 }
 
 export interface ZonePatch {

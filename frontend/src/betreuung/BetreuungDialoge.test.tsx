@@ -13,7 +13,6 @@ import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveru
 import {
   BelegungMeldenDialog,
   BezirkAnlegenDialog,
-  BezirkBearbeitenDialog,
   RaeumungDialog,
   StandMeldenDialog,
   StelleAnlegenDialog,
@@ -327,11 +326,12 @@ describe('Obergrenze der Personenzahlen (LFH-680)', () => {
 });
 
 describe('BezirkAnlegenDialog', () => {
-  it('Bezeichnung, Plangröße, Erhebung sichtbar; Abschnitt, Sammelstelle, Notiz eingeklappt', async () => {
+  it('Bezeichnung, Plangröße, Erhebung und Gebiet sichtbar; Abschnitt, Sammelstelle, Notiz eingeklappt', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <BezirkAnlegenDialog
         abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
         laeuft={false}
         fehler={null}
         onErfassen={onErfassen}
@@ -339,49 +339,83 @@ describe('BezirkAnlegenDialog', () => {
       />,
     );
     const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
-    await budgetUndAufklappen(dialog, 3);
-    expect(sichtbareFelder(dialog)).toBe(6);
+    // Drei Angaben plus die Gebietswahl (LLH-1069): sie ist der nächste Schritt, kein Datenfeld,
+    // und steht nach der Erfassungs-Norm sichtbar; der Rest bleibt eingeklappt.
+    await budgetUndAufklappen(dialog, 4);
+    expect(sichtbareFelder(dialog)).toBe(7);
     const knopf = pruefeFormStruktur(dialog, 'Anlegen');
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Uferstraße 12–40');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '640');
     await userEvent.type(within(dialog).getByLabelText('Sammelstelle'), 'Schulhof');
     await userEvent.click(knopf);
     await waitFor(() =>
-      expect(onErfassen).toHaveBeenCalledWith({
-        bezeichnung: 'Uferstraße 12–40',
-        plan_personen: 640,
-        plan_erhebung: 'geschaetzt',
-        sammelstelle: 'Schulhof',
-      }),
+      expect(onErfassen).toHaveBeenCalledWith(
+        {
+          bezeichnung: 'Uferstraße 12–40',
+          plan_personen: 640,
+          plan_erhebung: 'geschaetzt',
+          sammelstelle: 'Schulhof',
+        },
+        'flaeche',
+      ),
     );
   });
-});
 
-describe('BezirkBearbeitenDialog', () => {
-  it('Plangröße fortschreiben schickt nur die Änderung', async () => {
+  it('Gebiet: Vorgabe „Fläche zeichnen“ bei freier Lagekarte, „Keins“ wählbar (LLH-1069)', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
-      <BezirkBearbeitenDialog
-        bezirk={bezirk()}
+      <BezirkAnlegenDialog
         abschnitte={ABSCHNITTE}
+        karteGesperrt={false}
         laeuft={false}
         fehler={null}
         onErfassen={onErfassen}
         onSchliessen={() => {}}
       />,
     );
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Bezirk bearbeiten: Uferstraße 12–40',
-    });
-    await budgetUndAufklappen(dialog, 2);
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    await waehle(dialog, 'gezählt');
-    await userEvent.click(pruefeFormStruktur(dialog, 'Speichern'));
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    const gruppe = within(dialog).getByRole('radiogroup', { name: 'Gebiet auf der Lagekarte' });
+    expect(within(gruppe).getByRole('radio', { name: 'Fläche zeichnen' })).toBeChecked();
+    // Kein „Radius“, solange die Karte keinen Kreis kann (nach LLH-1043).
+    expect(within(gruppe).getAllByRole('radio')).toHaveLength(2);
+    await userEvent.click(within(gruppe).getByRole('radio', { name: 'Keins' }));
+    expect(within(gruppe).getByRole('radio', { name: 'Keins' })).toBeChecked();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() =>
-      expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820, plan_erhebung: 'gezaehlt' }),
+      expect(onErfassen).toHaveBeenCalledWith(
+        { bezeichnung: 'Deichweg', plan_personen: 12, plan_erhebung: 'geschaetzt' },
+        'keins',
+      ),
     );
+  });
+
+  it('Lagekarte gesperrt: Vorgabe „Keins“, „Fläche zeichnen“ gesperrt mit sichtbarem Grund (LFH-888)', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <BezirkAnlegenDialog
+        abschnitte={ABSCHNITTE}
+        karteGesperrt
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Evakuierungsbezirk anlegen' });
+    const gruppe = within(dialog).getByRole('radiogroup', { name: 'Gebiet auf der Lagekarte' });
+    expect(within(gruppe).getByRole('radio', { name: 'Keins' })).toBeChecked();
+    const flaeche = within(gruppe).getByRole('radio', {
+      name: 'Fläche zeichnen (Keine Berechtigung)',
+    });
+    expect(flaeche).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(flaeche);
+    expect(flaeche).not.toBeChecked();
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Deichweg');
+    await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith(expect.anything(), 'keins'));
   });
 });
 
@@ -511,30 +545,6 @@ describe('LFH-681: Mehrfeld-Dialoge vergleichen dreiseitig', () => {
       kapazitaet_personen: 150,
     };
     expect(stellePatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ status: 'geschlossen' });
-  });
-
-  it('BezirkBearbeitenDialog: eine fremd geänderte Notiz wird nicht mit dem alten Wert überschrieben', async () => {
-    const onErfassen = vi.fn().mockResolvedValue(undefined);
-    const dialogMit = (b: Evakuierungsbezirk) => (
-      <BezirkBearbeitenDialog
-        bezirk={b}
-        abschnitte={ABSCHNITTE}
-        laeuft={false}
-        fehler={null}
-        onErfassen={onErfassen}
-        onSchliessen={() => {}}
-      />
-    );
-    const { rerender } = renderMitProviders(dialogMit(bezirk({ notiz: 'Zufahrt Nord' })));
-    const dialog = await screen.findByRole('dialog', {
-      name: 'Bezirk bearbeiten: Uferstraße 12–40',
-    });
-    rerender(dialogMit(bezirk({ notiz: 'Zufahrt Süd gesperrt' })));
-    const feld = within(dialog).getByLabelText('Plangröße (Personen)');
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '820');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ plan_personen: 820 }));
   });
 });
 

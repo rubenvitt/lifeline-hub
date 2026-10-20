@@ -1101,6 +1101,61 @@ mod tests {
         );
     }
 
+    /// LLH-1123: Die Fundort-Koordinate eines Tiers bleibt als Geo-Skelett (`G_GEO`) stehen, der
+    /// Freitext-Fundort daneben fällt.
+    #[tokio::test]
+    async fn schwaerzung_tier_haelt_koordinate_und_leert_fundort() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_tier (einsatz_id, registrier_nr, spezies, erfasst_von, \
+                geaendert_von, antreff_ort, antreff_lat, antreff_lon) \
+             VALUES (?, 1, 'hund', ?, ?, 'Garten von Familie Müller', 51.93, 8.87)",
+        )
+        .bind(e)
+        .bind(nutzer)
+        .bind(nutzer)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .unwrap(),
+            "Einsatz wurde geschwärzt"
+        );
+
+        let zeile: (Option<String>, Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT antreff_ort, antreff_lat, antreff_lon FROM einsatz_tier WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(zeile, (None, Some(51.93), Some(8.87)));
+    }
+
     /// LFH-639, Spec-Szenario „Einsatz schwärzen“ — bewusst mit ZWEI aktiven Bezirken und
     /// ZWEI aktiven Stellen: die Bezeichnung steht unter einem partiellen UNIQUE-Index
     /// `(einsatz_id, bezeichnung) WHERE storniert_at IS NULL`. Ein für alle Zeilen gleicher

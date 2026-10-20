@@ -103,6 +103,23 @@ erscheinen.
 - **WHEN** bei geöffnetem Verlauf eine andere Person für denselben Bezirk einen Stand meldet
 - **THEN** erscheint die neue Meldung im Verlauf ohne Neuladen der Seite
 
+### Requirement: Verlauf auf der Detailseite eines Bezirks
+
+Die Detailseite eines Evakuierungsbezirks SHALL seinen Verlauf ohne Aufklappen zeigen, mit
+denselben Zuständen in Worten und derselben Rücknahme wie der Aufklappbereich. Ab zwei gültigen
+Meldungen MUST darüber eine Stufenlinie des Stands über die Zeit stehen: nur gültige Meldungen,
+Stufen statt Schrägen, die Plangröße als gestrichelte Linie mit Wort und Zahl, zugänglich als
+ein Bild mit einer Aussage in Worten. Mit weniger als zwei gültigen Meldungen MUST die Linie
+entfallen. Linie und Verlauf MUST dieselbe Abfrage teilen.
+
+#### Scenario: Zwei Meldungen
+- **WHEN** ein Bezirk die Meldungen 200 und 480 trägt
+- **THEN** zeigt die Detailseite eine Stufenlinie mit beiden Werten und darunter den Verlauf
+
+#### Scenario: Zurückgenommene Meldung
+- **WHEN** eine der Meldungen zurückgenommen wurde
+- **THEN** fehlt sie in der Stufenlinie, und mit nur einer gültigen Meldung entfällt die Linie
+
 ### Requirement: Kennzeichnung im Verlauf
 
 Jede Meldung im Verlauf MUST Anzahl, Zeitpunkt und erfassende Person zeigen, beim Stand

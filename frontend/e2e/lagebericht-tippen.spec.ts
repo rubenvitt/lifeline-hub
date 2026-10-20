@@ -2,28 +2,26 @@ import { expect, test, type Page } from '@playwright/test';
 import { einsatzAnlegen } from './einsatz-kern';
 
 /**
- * Tippverzögerung im Lageberichtsentwurf am Fükw-Maß. `Form.useWatch([], form)` in
- * `LageberichtDetailPage` lässt die Seite je Anschlag neu rendern; ohne Memoisierung des
- * `AbschnittsAkkordeon` renderten auch die acht Editoren mit ihrer `autoSize`-Nachmessung mit.
- * jsdom führt `autoSize` nicht aus — deshalb hier.
+ * Tippverzögerung in den Entwürfen von Lagebericht und Befehl am Fükw-Maß. Beide schreiben über
+ * denselben Baustein `entwurf/DokumentEntwurf` (LLH-1074): alle Abschnitte offen, je ein
+ * mitwachsender Editor (`autoSize`). Die Seiten beobachten nur die Felder des Druckkopfs, der
+ * Baustein nur die Leer-Kette; Tippen rendert damit nur das eigene Feld. jsdom führt `autoSize`
+ * nicht aus — deshalb hier.
  *
  * GEMESSEN WIRD DIE VERZÖGERUNG BIS ZUM BILD: je `keydown` ein Zeitstempel, abgelesen im
  * zweiten `requestAnimationFrame` danach (hinter dem Paint). Eine `performance.now()`-Klammer
  * um den Anschlag ließe Layout und Paint draußen.
  *
- * DER BEFEHLSENTWURF IST DIE KONTROLLE: dieselben Editoren mit `autoSize`, aber ohne
- * `Form.useWatch`. Der Unterschied ist der Preis der Beobachtung.
+ * KEINE ZEITSCHWELLE IN DER CI: auf dem GitHub-Runner (2 vCPU, zwei Worker) waren p90 und
+ * Vergleiche so verrauscht, dass „behoben" und „nicht behoben" überlappten. Die Zusicherung steht
+ * deterministisch in `entwurf/DokumentEntwurf.test.tsx` (Render-Zähler über die
+ * `aktion`-Render-Prop). Hier bleiben die Messung samt Struktur-Vorbedingungen und die Zahlen in
+ * Log und Annotation; die RAIL-Deckel gelten nur mit `PW_LATENZ=1` auf ruhiger Hardware, für
+ * BEIDE Seiten. Den früheren Vergleich „Befehl als Kontrolle ohne `useWatch`“ gibt es nicht
+ * mehr: beide Seiten haben dieselbe Mechanik.
  *
- * KEINE ZEITSCHWELLE IN DER CI: auf dem GitHub-Runner (2 vCPU, zwei Worker) waren p90 und das
- * Verhältnis zur Kontrolle so verrauscht, dass „behoben" und „nicht behoben" überlappten. Die
- * Zusicherung steht deterministisch in `lageberichte/AbschnittsAkkordeon.test.tsx` (Zählung
- * der `editor`-Render-Prop). Hier bleiben die Messung samt Struktur-Vorbedingungen und die
- * Zahlen in Log und Annotation; die RAIL-Deckel gelten nur mit `PW_LATENZ=1` auf ruhiger
- * Hardware.
- *
- * OFFEN: der schlechteste Anschlag liegt bei 120–130 ms, über der RAIL-Grenze von 100 ms, und
- * hängt nicht an `useWatch` (Verdacht: `autoSize`-Neumessung beim Zeilenumbruch, die auch die
- * Kontrolle hebt). Eigene Untersuchung.
+ * OFFEN: der schlechteste Anschlag lag bei 120–130 ms (Verdacht: `autoSize`-Neumessung beim
+ * Zeilenumbruch). Eigene Untersuchung.
  */
 
 const ADMIN = 'admin';
@@ -33,7 +31,7 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const LATENZ_GATE = process.env.PW_LATENZ === '1';
 /** RAIL: Verarbeitungsbudget eines Eingabeereignisses. */
 const MEDIAN_MAX_MS = 50;
-/** Gemessen 43–48 ms mit memoisiertem Akkordeon, 73 ms ohne. */
+/** Gemessen 43–48 ms mit memoisiertem Akkordeon (LFH-495), 73 ms ohne. */
 const P90_MAX_MS = 60;
 /** RAIL: ab hier wirkt eine Reaktion nicht mehr unmittelbar. */
 const SCHLECHTESTER_MAX_MS = 150;
@@ -58,7 +56,7 @@ async function lageberichtAnlegen(page: Page, einsatzId: string): Promise<number
   return (await antwort.json()).id as number;
 }
 
-/** Befehl LADEF (erweitert): fünf Abschnitte, alle gleichzeitig ausgeklappt. */
+/** Befehl LADEF (erweitert): fünf Abschnitte. */
 async function befehlAnlegen(page: Page, einsatzId: string): Promise<number> {
   const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
     data: { vorlage: 'befehl_ladef', titel: 'Tippmessung Befehl' },
@@ -121,7 +119,29 @@ const TEXT = 'Lage unveraendert, Abschnitt wird fortgeschrieben.'.slice(0, ANSCH
 // Erster Lauf zahlt den Vite-Kaltstart der Detailroute mit.
 test.setTimeout(120_000);
 
-test('Tippen im Lageberichtsentwurf: Verzögerung Anschlag-bis-Bild bei 1366 px', async ({
+/** Die RAIL-Deckel je Seite, nur mit `PW_LATENZ=1`. */
+function deckel(m: Messung, seite: string, bericht: string) {
+  expect(
+    m.p90,
+    `${seite}: p90 über dem Deckel — Memoisierung der Abschnitte aufgehoben? ${bericht}`,
+  ).toBeLessThanOrEqual(P90_MAX_MS);
+  expect(m.median, `${seite}: Median über RAIL-Budget. ${bericht}`).toBeLessThanOrEqual(
+    MEDIAN_MAX_MS,
+  );
+  expect(
+    m.schlechtester,
+    `${seite}: schlechtester Anschlag weiter gewachsen. ${bericht}`,
+  ).toBeLessThanOrEqual(SCHLECHTESTER_MAX_MS);
+}
+
+function zeile(m: Messung): string {
+  return (
+    `Median ${m.median.toFixed(1)} ms, p90 ${m.p90.toFixed(1)} ms, ` +
+    `schlechtester ${m.schlechtester.toFixed(1)} ms`
+  );
+}
+
+test('Tippen in den Entwürfen von Lagebericht und Befehl: Verzögerung Anschlag-bis-Bild bei 1366 px', async ({
   page,
 }) => {
   await anmelden(page);
@@ -134,43 +154,31 @@ test('Tippen im Lageberichtsentwurf: Verzögerung Anschlag-bis-Bild bei 1366 px'
   // Person vorfindet.
   const feld = page.getByRole('textbox', { name: 'Auftrag', exact: true });
   await expect(feld).toBeFocused();
-  // Alle acht Editoren stehen im DOM (`forceRender`) — die Voraussetzung des Befundes.
-  // `getByLabel`, nicht `getByRole`: ein zugeklapptes Collapse-Panel liegt nicht im
-  // Zugänglichkeitsbaum.
-  await expect(page.getByLabel('Vorschlag der besten Möglichkeit')).toBeAttached();
-
+  // Alle acht Editoren stehen offen — die Voraussetzung der Messung.
+  await expect(
+    page.getByRole('textbox', { name: 'Vorschlag der besten Möglichkeit' }),
+  ).toBeVisible();
   const lb = await tippverzoegerung(page, TEXT);
+  // Der Anschlag hat die Leer-Marke gekippt — die Beobachtung lief mit.
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Gliederung' })
+      .getByRole('button', { name: 'Auftrag', exact: true }),
+  ).toBeVisible();
 
-  // ── Kontrolle: derselbe Editor, dieselbe autoSize-Arbeit, aber ohne `Form.useWatch` ──
   const befehlId = await befehlAnlegen(page, einsatzId);
   await page.goto(`/einsaetze/${einsatzId}/auftraege/befehle/${befehlId}`);
   await expect(page.getByRole('textbox', { name: 'Lage', exact: true })).toBeFocused();
+  await expect(page.getByRole('textbox', { name: 'Einsatzunterstützung' })).toBeVisible();
   const bf = await tippverzoegerung(page, TEXT);
 
   const bericht =
-    `[gemessen] 1366x768, ${lb.anzahl} Anschläge — Lagebericht (8 Editoren): ` +
-    `Median ${lb.median.toFixed(1)} ms, p90 ${lb.p90.toFixed(1)} ms, ` +
-    `schlechtester ${lb.schlechtester.toFixed(1)} ms · ` +
-    `Befehl (ohne useWatch, 5 Editoren): Median ${bf.median.toFixed(1)} ms, ` +
-    `p90 ${bf.p90.toFixed(1)} ms, schlechtester ${bf.schlechtester.toFixed(1)} ms`;
+    `[gemessen] 1366x768, ${lb.anzahl}/${bf.anzahl} Anschläge — Lagebericht (8 Abschnitte): ` +
+    `${zeile(lb)} · Befehl (5 Abschnitte): ${zeile(bf)}`;
   console.log(bericht);
   test.info().annotations.push({ type: 'gemessen', description: bericht });
 
-  // STRUKTUR, nicht Uhr: die Kontrolle muss schneller sein als die beobachtete Seite — nur die
-  // Richtung, kein Schwellwert; sie fiele auf, wenn `useWatch` ganz entfiele.
-  expect(
-    bf.median,
-    `Kontrolle nicht schneller als die beobachtete Seite. ${bericht}`,
-  ).toBeLessThanOrEqual(lb.median);
-
   if (!LATENZ_GATE) return;
-  expect(
-    lb.p90,
-    `p90 über dem Deckel — Memoisierung des Akkordeons aufgehoben? ${bericht}`,
-  ).toBeLessThanOrEqual(P90_MAX_MS);
-  expect(lb.median, `Median über RAIL-Budget. ${bericht}`).toBeLessThanOrEqual(MEDIAN_MAX_MS);
-  expect(
-    lb.schlechtester,
-    `schlechtester Anschlag weiter gewachsen. ${bericht}`,
-  ).toBeLessThanOrEqual(SCHLECHTESTER_MAX_MS);
+  deckel(lb, 'Lagebericht', bericht);
+  deckel(bf, 'Befehl', bericht);
 });

@@ -44,7 +44,8 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
   Speichern-Knopf der Seite „Einsatz-Vorgaben“.
 - Einsatzabschnitte: die Baumknoten, ihre Aufklapper und die Aktionen der Detailkarte.
   Bereitstellungsraum: der Raumwechsler und die Knöpfe „zuweisen“ der Leiste „Kräfte ohne BR“.
-- Lagebericht: die Abschnittsköpfe des Akkordeons und die Kopfaktionen der Detailseite, „Neuer
+- Lagebericht: die Sprungziele der Gliederung und der Umschalter „Bearbeiten | Lesefassung“ des
+  Entwurfs und die Kopfaktionen der Detailseite, „Neuer
   Bericht“ und der Link einer Berichtskarte, die Filtersegmente und das Suchfeld der Seite
   „Lagemeldungen“.
 - Seitenkopf: jeder Link im Ortspfad (Brotkrume) jeder Seite, die den gemeinsamen Seitenkopf

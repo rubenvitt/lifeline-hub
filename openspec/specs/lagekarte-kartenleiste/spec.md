@@ -116,8 +116,8 @@ behalten. Der Kartenknopf „Zeichenwerkzeuge“ und ein Sprung zu einem Ort (`?
 Die Ansicht „Ebenen“ SHALL jede Ebene der Karte in einer festen Gruppe führen: Kräfte (Einheiten,
 Fahrzeuge, Personal, Abschnitte, Bereitstellungsräume), Lage (Einsatzort, Führungsstelle, Zonen,
 Schäden, Lagemeldungen, Taktische Zeichen), Betroffene & Versorgung (Betroffene, UHS,
-Betreuungsstellen), Fachebenen mit den Untergruppen Warnungen, Wasser, Umwelt sowie Verkehr &
-Infrastruktur, und Hintergrund mit den Untergruppen Kartengrundlage und Bild-Hintergründe. Jede
+Betreuungsstellen, Tiere), Fachebenen mit den Untergruppen Warnungen, Wasser, Umwelt sowie
+Verkehr & Infrastruktur, und Hintergrund mit den Untergruppen Kartengrundlage und Bild-Hintergründe. Jede
 Ebene MUST in genau einer Gruppe stehen. Der Gruppenkopf MUST den Namen und die Zahl
 eingeschalteter zu allen Ebenen der Gruppe zeigen und klappt die Gruppe. Der Klappzustand SHALL je
 Gerät gemerkt werden; Vorgabe: Kräfte und Lage offen, die übrigen Gruppen zu, die Untergruppen

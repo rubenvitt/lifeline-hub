@@ -124,6 +124,9 @@ export default function KoordinatenEingabe({
           placeholder="Koordinate eingeben"
         />
         <Select<Koordinatenformat>
+          // Eigene Kennung neben der des Textfelds: ohne sie vergibt antd im Test eine feste
+          // (`test-id`), die mit der Titelkennung eines Dialogs auf derselben Seite kollidiert.
+          id={id ? `${id}-format` : undefined}
           aria-label="Koordinatenformat"
           value={system}
           onChange={setzeOverride}

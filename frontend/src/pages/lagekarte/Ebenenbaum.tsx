@@ -106,8 +106,8 @@ function Farbfeld({ an, farbe }: { an: boolean; farbe: string }) {
 }
 
 /**
- * Eine gesperrte Ebenen-Zeile (Betroffene, Betreuungsstellen, Bereitstellungsräume ohne Zugriff),
- * gebaut wie ein gesperrtes Modul in `einsatz/ModulPanel.tsx`: `disabled`, Schloss in
+ * Eine gesperrte Ebenen-Zeile (Betroffene, Betreuungsstellen, Bereitstellungsräume, Tiere ohne
+ * Zugriff), gebaut wie ein gesperrtes Modul in `einsatz/ModulPanel.tsx`: `disabled`, Schloss in
  * `aria-hidden`-Hülle, der Grund als Text statt einer Zahl. Kein `role="switch"` — ohne Zugriff
  * gibt es keinen Zustand. Die Zahl entfällt, weil sie die Menge wäre, die der Benutzer nicht sehen
  * darf.
@@ -355,6 +355,7 @@ export default function Ebenenbaum(props: SidebarProps) {
     props.betreuung,
     props.br,
     props.eingeblendet ?? null,
+    props.tier,
   );
   const eigene = ebenenGruppen(zeilen).map((g) => ({
     ...g,

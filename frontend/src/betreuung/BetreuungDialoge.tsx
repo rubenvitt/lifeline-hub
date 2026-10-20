@@ -21,6 +21,9 @@ import type {
 import { ErfassungsModal } from '../components/Erfassung';
 import { Select } from '../components/Select';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
+import { sprungGesperrtText } from '../components/Sprung';
+import { Segmentleiste, type SegmentOption } from '../components/instrument';
+import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 import { BETREUUNG_ERREICHBARKEIT_MAX, BETREUUNG_LEITUNG_MAX } from '../api/eingabegrenzen';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
@@ -106,10 +109,18 @@ export function belegungBody(w: BelegungWerte): BelegungsmeldungEingabe {
   return { belegt: w.belegt, ...zeitpunkt(w.zeitpunkt) };
 }
 
-interface BezirkWerte {
+/**
+ * Gebiet beim Anlegen (LLH-1069): „Keins“ oder gleich danach eine Fläche auf der Lagekarte zeichnen.
+ * „Radius“ kommt dazu, sobald die Karte einen Kreis um einen Punkt zeichnen kann (LLH-1043).
+ */
+export type GebietWahl = 'keins' | 'flaeche';
+
+export interface BezirkWerte {
   bezeichnung: string;
   plan_personen: number;
   plan_erhebung: Erhebung;
+  /** Nur im Anlegedialog; die Bearbeitung kennt keine Gebietswahl. */
+  gebiet?: GebietWahl;
   abschnitt_id?: number | null;
   sammelstelle?: string | null;
   notiz?: string | null;
@@ -209,6 +220,10 @@ function dreiseitig<P extends object>(eigeneAenderung: P, gegenAktuell: P): P {
   return patch;
 }
 
+/**
+ * Seit LLH-1076 Rechenweg der Stammdaten auf der Detailseite eines Bezirks
+ * (`betreuung/BezirkStammdaten.tsx`); der Bearbeiten-Dialog ist entfallen.
+ */
 export function bezirkPatchDreiseitig(
   beimOeffnen: Evakuierungsbezirk,
   aktuell: Evakuierungsbezirk,
@@ -338,15 +353,53 @@ interface DialogBasis {
 
 // ── Evakuierungsbezirk ──────────────────────────────────────────────────────────────────
 
+/**
+ * Die Gebietswahl als Formularfeld (`Form.Item` reicht `value`/`onChange` hinein). Ist die Lagekarte
+ * gesperrt, steht „Fläche zeichnen“ gesperrt und nennt den Grund im Wortlaut (LFH-888) — ein
+ * Tooltip allein erreichte Tablet und Handy nicht.
+ */
+function GebietFeld({
+  value,
+  onChange,
+  karteGesperrt,
+}: {
+  value?: GebietWahl;
+  onChange?: (wahl: GebietWahl) => void;
+  karteGesperrt: boolean;
+}) {
+  const optionen: SegmentOption<GebietWahl>[] = [
+    { wert: 'keins', label: 'Keins' },
+    karteGesperrt
+      ? {
+          wert: 'flaeche',
+          label: sprungGesperrtText('Fläche zeichnen'),
+          gesperrt: KEINE_BERECHTIGUNG,
+        }
+      : { wert: 'flaeche', label: 'Fläche zeichnen' },
+  ];
+  return (
+    <Segmentleiste<GebietWahl>
+      beschriftung="Gebiet auf der Lagekarte"
+      wert={value ?? 'keins'}
+      onWechsel={(wahl) => onChange?.(wahl)}
+      optionen={optionen}
+    />
+  );
+}
+
 export function BezirkAnlegenDialog({
   abschnitte,
+  karteGesperrt,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
   abschnitte: readonly AbschnittOption[];
-  onErfassen: (body: EvakuierungsbezirkEingabe) => Promise<unknown>;
+  /** Modul Lagekarte für diese Person gesperrt (`useSprungSperre`): kein Zeichnen danach. */
+  karteGesperrt: boolean;
+  /** `gebiet`: was nach dem Anlegen geschieht (LLH-1069); der Server sieht es nicht. */
+  onErfassen: (body: EvakuierungsbezirkEingabe, gebiet: GebietWahl) => Promise<unknown>;
 }) {
   const [form] = Form.useForm<BezirkWerte>();
   return (
@@ -357,9 +410,9 @@ export function BezirkAnlegenDialog({
       erfassenText="Anlegen"
       laeuft={laeuft}
       // Eine Plangröße ist zu Beginn meist geschätzt; die Erhebung ist sichtbar, der Vorgabewert also
-      // nie still.
-      initialValues={{ plan_erhebung: 'geschaetzt' }}
-      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w))}
+      // nie still. Das Gebiet wird gleich gezeichnet, wenn die Karte frei ist (LLH-1069).
+      initialValues={{ plan_erhebung: 'geschaetzt', gebiet: karteGesperrt ? 'keins' : 'flaeche' }}
+      onErfassen={(w) => onErfassen(bezirkAnlegenBody(w), w.gebiet ?? 'keins')}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
@@ -374,6 +427,9 @@ export function BezirkAnlegenDialog({
       </Form.Item>
       {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
       {erhebungFeld('plan_erhebung', 'Erhebung')}
+      <Form.Item name="gebiet" label="Gebiet auf der Lagekarte">
+        <GebietFeld karteGesperrt={karteGesperrt} />
+      </Form.Item>
       {weitere(
         <>
           {abschnittFeld(abschnitte)}
@@ -386,69 +442,6 @@ export function BezirkAnlegenDialog({
         </>,
       )}
       <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht angelegt werden" />
-    </ErfassungsModal>
-  );
-}
-
-export function BezirkBearbeitenDialog({
-  bezirk,
-  abschnitte,
-  laeuft,
-  fehler,
-  onErfassen,
-  onSchliessen,
-}: DialogBasis & {
-  /** Der AKTUELLE Stand aus dem Cache — nicht der beim Öffnen. */
-  bezirk: Evakuierungsbezirk;
-  abschnitte: readonly AbschnittOption[];
-  onErfassen: (patch: EvakuierungsbezirkPatch) => Promise<unknown>;
-}) {
-  const [form] = Form.useForm<BezirkWerte>();
-  const [beimOeffnen] = useState(bezirk);
-  return (
-    <ErfassungsModal<BezirkWerte>
-      offen
-      titel={`Bezirk bearbeiten: ${bezirk.bezeichnung}`}
-      form={form}
-      erfassenText="Speichern"
-      laeuft={laeuft}
-      initialValues={{
-        bezeichnung: beimOeffnen.bezeichnung,
-        plan_personen: beimOeffnen.plan_personen,
-        plan_erhebung: beimOeffnen.plan_erhebung,
-        abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
-        sammelstelle: beimOeffnen.sammelstelle ?? undefined,
-        notiz: beimOeffnen.notiz ?? undefined,
-      }}
-      onErfassen={(w) =>
-        nurWennGeaendert(bezirkPatchDreiseitig(beimOeffnen, bezirk, w), onErfassen)
-      }
-      onFertig={onSchliessen}
-      onAbbrechen={onSchliessen}
-    >
-      {personenFeld('plan_personen', 'Plangröße (Personen)', 1, true)}
-      {erhebungFeld('plan_erhebung', 'Erhebung')}
-      {weitere(
-        <>
-          <Form.Item
-            name="bezeichnung"
-            label="Bezeichnung"
-            rules={[
-              { required: true, whitespace: true, message: 'Bitte eine Bezeichnung angeben' },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          {abschnittFeld(abschnitte)}
-          <Form.Item name="sammelstelle" label="Sammelstelle">
-            <Input />
-          </Form.Item>
-          <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
-            <Input.TextArea autoSize={{ minRows: 2 }} />
-          </Form.Item>
-        </>,
-      )}
-      <SpeicherFehler fehler={fehler} titel="Bezirk konnte nicht gespeichert werden" />
     </ErfassungsModal>
   );
 }

@@ -7,10 +7,13 @@ import { bandStil } from './KartenFuss';
 /**
  * Rückmeldung nach dem Verorten (LLH-1125, Spec `lagekarte-verortungsauftrag`): „<Kennung>
  * verortet“, primär „Zurück zu <Kennung>“ (nur mit Herkunft), daneben „Auf der Karte bleiben“.
+ * Dieselbe Form trägt die Rückmeldung nach dem Gebiet eines Bezirks (LLH-1069), mit eigenem Titel.
  */
 export interface VerortetMeldung {
   /** z. B. „R-005“; `null`, wenn das Objekt nicht geladen ist — dann „Objekt verortet“. */
   kennung: string | null;
+  /** Titel statt „<Kennung> verortet“, etwa „Gebiet für Bezirk … gespeichert“ (LLH-1069). */
+  titel?: string;
   /** Rückweg zur Seite des Datensatzes; `null` ohne Herkunft (kein `?zurueck=1`). */
   onZurueck: (() => void) | null;
   onBleiben: () => void;
@@ -21,11 +24,11 @@ export interface VerortetMeldung {
  * (ab `lg`), damit beide denselben Wortlaut tragen. Gerendert wird er je Breite nur an einer Stelle.
  */
 export function VerortetInhalt({ meldung }: { meldung: VerortetMeldung }) {
-  const { kennung, onZurueck, onBleiben } = meldung;
+  const { kennung, titel, onZurueck, onBleiben } = meldung;
   return (
     <Space orientation="vertical" size={8} style={{ width: '100%' }}>
       <Typography.Text strong>
-        {kennung ? `${kennung} verortet` : 'Objekt verortet'}
+        {titel ?? (kennung ? `${kennung} verortet` : 'Objekt verortet')}
       </Typography.Text>
       <Space wrap>
         {onZurueck && (
