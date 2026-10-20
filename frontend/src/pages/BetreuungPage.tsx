@@ -30,8 +30,14 @@ import {
 } from '../betreuung/BetreuungDialoge';
 import { personenZahl, volleStellenSegment } from '../betreuung/betreuungText';
 import StellenBlock, { type StelleAktion } from '../betreuung/StellenBlock';
+import UnterbringungKennzahlen from '../betreuung/UnterbringungKennzahlen';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
@@ -59,8 +65,11 @@ type Dialog =
  * sind seit LLH-1034 das eigene Modul Evakuierung (`EvakuierungPage`); ein alter Link
  * `…/betreuung?bezirk=<id>` leitet dorthin um.
  *
- * Tabelle, weil verglichen wird („welche Stelle hat noch Platz?"). Kopf: genau eine Primäraktion,
- * „Betreuungsstelle anlegen".
+ * Aufbau (LLH-1050, Lagebild der Unterbringung): Kopf mit genau einer Primäraktion
+ * „Betreuungsstelle anlegen" und der Meta „n Stellen · n in Betrieb · n voll", darunter das Band
+ * „Unterbringung in Zahlen" (`UnterbringungKennzahlen`), darunter die Tabelle — Tabelle, weil
+ * verglichen wird („welche Stelle hat noch Platz?"). Ohne Stelle stehen statt Band und Tabelle
+ * „Keine Betreuungsstellen" und der Knopf zum Anlegen (ohne Schreibrecht gesperrt mit Grund).
  *
  * Melden ohne Rückfrage, mit Rückweg: die Belegung hat eine serverseitige Rücknahme. Der Toast
  * nimmt die `meldung_id` der gerade angelegten Meldung.
@@ -246,14 +255,16 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
   const gescheitert = betreuungQuery.isError && betreuungQuery.data == null;
   const veraltet = betreuungQuery.isError && betreuungQuery.data != null;
   const ladend = betreuungQuery.isLoading;
+  const leer = !ladend && stellen.length === 0;
+  const inBetrieb = stellen.filter((s) => s.status === 'in_betrieb').length;
 
   return (
     <EinsatzSeite
       titel={modulName('betreuung')}
-      // „n voll" auch im Seitenkopf: er steht bei langen Tabellen als einzige Zeile über der Falz.
+      // „n voll" nur über 0 (LFH-678), „n in Betrieb" immer: auch 0 ist eine Aussage (LLH-1050).
       meta={
         betreuungQuery.data
-          ? `${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}${volleStellenSegment(stellen)}`
+          ? `${stellen.length === 1 ? '1 Stelle' : `${personenZahl(stellen.length)} Stellen`} · ${personenZahl(inBetrieb)} in Betrieb${volleStellenSegment(stellen)}`
           : undefined
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}
@@ -288,9 +299,27 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
           ursache={betreuungQuery.error}
           onWiederholen={() => void betreuungQuery.refetch()}
         />
+      ) : leer ? (
+        // Ohne Stelle keine Nullen: Band und leere Tabelle entfallen, der Knopf führt heraus.
+        <>
+          {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
+          <SeitenLeer
+            titel="Keine Betreuungsstellen"
+            aktion={{
+              label: 'Betreuungsstelle anlegen',
+              onClick: oeffneStelleAnlegen,
+              gesperrt: darfSchreiben ? undefined : betreuungRechteText(einsatz.status),
+            }}
+          />
+        </>
       ) : (
         <>
           {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
+          <UnterbringungKennzahlen
+            stellen={stellen}
+            namentlich={betreuungQuery.data?.namentlich}
+            ladend={ladend}
+          />
           <StellenBlock
             einsatzId={einsatzId}
             stellen={stellen}

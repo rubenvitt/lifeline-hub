@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 530
-quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -12,9 +12,11 @@ und wie viel Platz noch frei ist. Gezählt wird ohne Namen: Meldungen nennen nur
 Räumungsbezirke und den Stand „evakuiert“ führt das Modul „Evakuierung“
 ([Evakuierung](evakuierung.md)).
 
-Der Kopf der Seite zählt die Betreuungsstellen und nennt volle Stellen. Über der Tabelle steht die
-Summe der Untergebrachten. Jede Stelle hat eine eigene Seite mit ihrer Belegung, ihren Angaben,
-dem Meldeverlauf und den namentlich dort untergebrachten Betroffenen.
+Die Seite beantwortet auf einen Blick: Wie viele Personen sind untergebracht, wo ist noch Platz,
+welche Stelle ist voll? Der Kopf zählt die Stellen, die Stellen in Betrieb und die vollen Stellen.
+Darunter steht „Unterbringung in Zahlen“, darunter die Tabelle der Stellen. Jede Stelle hat eine
+eigene Seite mit ihrer Belegung, ihren Angaben, dem Meldeverlauf und den namentlich dort
+untergebrachten Betroffenen.
 
 ## Abläufe
 
@@ -22,17 +24,24 @@ dem Meldeverlauf und den namentlich dort untergebrachten Betroffenen.
 
 1. Im Modulpanel „Betreuung“ öffnen.
 
-   ![Seite „Betreuung“ mit einer Tabelle von zwei Betreuungsstellen](../bilder/betreuung/uebersicht.png)
+   ![Seite „Betreuung“ mit „Unterbringung in Zahlen“ und einer Tabelle von zwei Betreuungsstellen](../bilder/betreuung/uebersicht.png)
 
-2. Die Tabelle nennt je Stelle die Belegung, die freien Plätze, den Status („vorbereitet“, „in
+2. Unter „Unterbringung in Zahlen“ die Summen über alle Stellen ablesen: „In Betreuung“, die
+   „Kapazität“, die freien Plätze („Frei“), die „Stellen in Betrieb“ und wie viele Stellen
+   „Voll/überbelegt“ sind; mit Zugriff auf „Betroffene“ auch „Davon namentlich“. Steht „Frei“ auf
+   0, ist kein gemeldeter Platz mehr frei.
+3. Die Tabelle nennt je Stelle die Belegung, die freien Plätze, den Status („vorbereitet“, „in
    Betrieb“, „geschlossen“), die Kapazität, die Art und die Zeit der letzten Meldung. Die Filter
    „Status“ und „Art“ engen die Tabelle ein.
-3. „Verlauf“ an einer Stelle klappt alle Meldungen dazu auf.
-4. Die Bezeichnung einer Stelle öffnet ihre Seite.
+4. „Verlauf“ an einer Stelle klappt alle Meldungen dazu auf.
+5. Die Bezeichnung einer Stelle oder ein Klick in ihre Zeile öffnet ihre Seite.
+
+Gibt es noch keine Stelle, steht dort „Keine Betreuungsstellen“ mit dem Knopf „Betreuungsstelle
+anlegen“.
 
 ### Die Seite einer Betreuungsstelle
 
-1. In der Tabelle die Bezeichnung der Stelle wählen, auf der Lagekarte „Im Fachmodul öffnen“.
+1. In der Tabelle die Stelle wählen, auf der Lagekarte „Im Fachmodul öffnen“.
 2. Oben unter „Belegung in Zahlen“ belegt, Kapazität und frei ablesen, mit Zugriff auf
    „Betroffene“ auch „Davon namentlich“. Unter „Belegt“ steht „fast voll“, „voll“ oder
    „überbelegt“.
@@ -107,7 +116,14 @@ Meldung davor. Das lässt sich nicht umkehren.
   „überbelegt“.
 - Ab 90 % der Kapazität steht eine Stelle auf „fast voll“, bei genau 100 % auf „voll“. Ohne
   Kapazität zeigt sie keine freien Plätze.
-- Eine Stelle ohne Meldung zählt nicht als null: sie steht auf „keine Meldung“.
+- Eine Stelle ohne Meldung zählt nicht als null: sie steht auf „keine Meldung“. Hat noch keine
+  Stelle gemeldet, steht auch bei „In Betreuung“ „keine Meldung“. Als „ohne Meldung“ zählen dort
+  nur Stellen in Betrieb.
+- „Kapazität“ und „Frei“ in „Unterbringung in Zahlen“ zählen nur Stellen, die nicht geschlossen
+  sind. „Kapazität“ summiert nur Stellen mit Kapazität, die übrigen stehen als „ohne Kapazität“
+  darunter. „Frei“ zählt je Stelle die freien Plätze, nie weniger als 0: eine überbelegte Stelle
+  nimmt einer anderen keinen Platz weg. Eine Stelle mit Kapazität, aber ohne Meldung zählt nicht
+  in „Frei“; sie steht als „ohne Meldung“ darunter.
 - Ein Zeitpunkt in der Zukunft wird abgelehnt. Eine Meldung mit einem älteren Zeitpunkt als die
   aktuelle wird als nachgetragen geführt („nachgetragen um …“), die aktuelle bleibt stehen.
 - „davon namentlich“ an einer Stelle zählt die Betroffenen, deren Verbleib „Notunterkunft“ auf

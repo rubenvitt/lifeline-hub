@@ -105,7 +105,13 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
 
   // Die zweite Seite bekommt die Zahl über das Personen-Ereignis, ohne Neuladen.
   await expect(zeile).toContainText('davon namentlich 1', { timeout: 30_000 });
-  await expect(zweite.getByText('40 untergebracht')).toBeVisible();
+  // Die Belegung selbst bleibt die Mengenmeldung: „In Betreuung“ im Band zählt 40 (LLH-1050).
+  await expect(
+    zweite
+      .getByRole('group', { name: 'Unterbringung in Zahlen' })
+      .locator('[data-lfh="kennzahl"]')
+      .filter({ hasText: 'In Betreuung' }),
+  ).toContainText('40');
   await zweite.screenshot({ path: info.outputPath('betreuung-davon-namentlich.png') });
 });
 

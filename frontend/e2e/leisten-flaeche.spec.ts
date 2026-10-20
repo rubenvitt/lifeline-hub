@@ -992,3 +992,126 @@ test('Gefahrenmatrix (LFH-373): Hinweis über der Matrix — Laden ohne Sprung, 
     await schreiber.close();
   }
 });
+
+/** Geschlossenes Rechteck als GeoJSON-Text (Fläche eines Abschnitts). */
+function rechteckText(w: number, s: number, o: number, n: number): string {
+  return JSON.stringify({
+    type: 'Polygon',
+    coordinates: [
+      [
+        [w, s],
+        [o, s],
+        [o, n],
+        [w, n],
+        [w, s],
+      ],
+    ],
+  });
+}
+
+test('Lagekarte (LLH-1057): auf 390 px stehen Fokus-Band, Messband und Zeitachse getrennt in der Karte', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `Flaeche 1057 Fokus ${Date.now()}`);
+  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+    data: { bezeichnung: 'Stand A' },
+  });
+  expect(stand.ok(), await stand.text()).toBeTruthy();
+  // Langer Name: das Band bricht ihn um, statt über den Rand zu laufen.
+  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+    data: { name: 'EA 3 Deichverteidigung Unterstadt Hafenkante Süd' },
+  });
+  expect(abschnitt.ok(), await abschnitt.text()).toBeTruthy();
+  const abschnittId = ((await abschnitt.json()) as { id: number }).id;
+  const flaeche = await page.request.patch(
+    `/api/einsaetze/${einsatzId}/abschnitte/${abschnittId}/flaeche`,
+    { data: { flaeche_geojson: rechteckText(8.6, 50.1, 8.62, 50.11) } },
+  );
+  expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
+  await page.evaluate(() => {
+    localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+    localStorage.removeItem('lfh:lagekarte:leiste-offen:unter-lg');
+  });
+  const gemessen: string[] = [];
+  for (const dichte of DICHTEN) {
+    await stelleDichte(page, dichte);
+    // Der Fokus wird nicht gespeichert: jeder Lauf kommt über den Link.
+    await page.goto(`/einsaetze/${einsatzId}/lagekarte?abschnitt=${abschnittId}`);
+    await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+      { timeout: 60_000 },
+    );
+    const fokus = page.locator('[data-lfh="fokus-band"]');
+    await expect(fokus).toContainText('EA 3 Deichverteidigung');
+    await expect(page).not.toHaveURL(/abschnitt=/);
+    await expect(
+      page.locator('[data-lfh="zeitachse"]').getByRole('combobox', { name: 'Stand' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Messen' }).click();
+    await expect(page.locator('[data-lfh="mess-steuerung"]')).toBeVisible();
+    await schriftenGeladen(page);
+
+    const m = await page.evaluate(() => {
+      const k = document.querySelector('[data-lfh="kartenspalte"]')!.getBoundingClientRect();
+      const baender = ['fokus-band', 'mess-steuerung', 'zeitachse'].map((name) => {
+        const el = document.querySelector(`[data-lfh="${name}"]`) as HTMLElement;
+        const r = el.getBoundingClientRect();
+        return {
+          name,
+          r: { left: r.left, right: r.right, top: r.top, bottom: r.bottom },
+          inSpalte:
+            r.left >= k.left - 0.5 &&
+            r.right <= k.right + 0.5 &&
+            r.top >= k.top - 0.5 &&
+            r.bottom <= k.bottom + 0.5,
+          ueberlauf: el.scrollWidth - el.clientWidth,
+        };
+      });
+      const ueberlappungen: string[] = [];
+      for (const [i, a] of baender.entries()) {
+        for (const b of baender.slice(i + 1)) {
+          const x = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+          const y = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+          if (x > 0.5 && y > 0.5) ueberlappungen.push(`${a.name}/${b.name}`);
+        }
+      }
+      // Der Knopf „Fokus aufheben“ liegt oben auf, nichts deckt ihn zu.
+      const knopf = Array.from(document.querySelectorAll('[data-lfh="fokus-band"] button')).find(
+        (el) => el.textContent?.includes('Fokus aufheben'),
+      )!;
+      const kr = knopf.getBoundingClientRect();
+      const oben = document.elementFromPoint(kr.left + kr.width / 2, kr.top + kr.height / 2);
+      return {
+        baender,
+        ueberlappungen,
+        knopfFrei: oben != null && knopf.contains(oben),
+        seiteUeberlauf: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    gemessen.push(
+      `${dichte}: ${m.baender.map((b) => `${b.name} ${Math.round(b.r.top)}–${Math.round(b.r.bottom)}`).join(', ')}`,
+    );
+    for (const b of m.baender) {
+      expect(b.inSpalte, `${dichte}: ${b.name} steht in der Kartenspalte`).toBe(true);
+      expect(b.ueberlauf, `${dichte}: ${b.name} läuft waagerecht über`).toBeLessThanOrEqual(1);
+    }
+    expect(m.ueberlappungen, `${dichte}: Bänder überdecken sich`).toEqual([]);
+    expect(m.knopfFrei, `${dichte}: „Fokus aufheben“ ist verdeckt`).toBe(true);
+    expect(m.seiteUeberlauf, `${dichte}: die Seite läuft waagerecht über`).toBeLessThanOrEqual(1);
+
+    // Esc gehört zuerst dem Messen, der Fokus bleibt; danach hebt der Knopf ihn auf (geklickt,
+    // nicht nur sichtbar).
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
+    await expect(fokus).toBeVisible();
+    await klickeWieEinMensch(page, fokus.getByRole('button', { name: 'Fokus aufheben' }));
+    await expect(fokus).toHaveCount(0);
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});

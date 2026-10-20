@@ -435,7 +435,7 @@ for (const modus of ['light', 'dark'] as const) {
     };
     for (const [flaeche, tragend] of [
       ['kopf', 'Betreuung'],
-      ['kopf', /^6 Betreuungsstellen · 2 voll$/],
+      ['kopf', /^6 Stellen · 4 in Betrieb · 2 voll$/],
       ['evakuierung-kopf', 'Evakuierung'],
       ['evakuierung-kopf', /^4 Bezirke$/],
       // Kennzahlenband und die Zellen „Evakuiert", mit „≈" und „keine Meldung" als zweitem Kanal.
@@ -454,8 +454,12 @@ for (const modus of ['light', 'dark'] as const) {
       ['inhalt', 'in Betrieb'],
       ['inhalt', 'vorbereitet'],
       ['inhalt', 'geschlossen'],
-      // Kopf der Stellentabelle.
-      ['inhalt', /^457 untergebracht · 2 voll · 2 ohne Meldung$/],
+      // Band „Unterbringung in Zahlen“ (LLH-1050): In Betreuung, Kapazität und Frei mit Notiz.
+      ['inhalt', /^457$/],
+      ['inhalt', /^530$/],
+      ['inhalt', '1 ohne Kapazität'],
+      ['inhalt', /^15$/],
+      ['inhalt', '1 ohne Meldung'],
       ['inhalt', 'Belegung melden'],
       ['Betreuungsstelle anlegen', 'Bezeichnung'],
       // Leermeldungs-Hinweis und Häkchen von „Stelle schließen“ (Detailseite, LLH-1044).
@@ -484,6 +488,7 @@ for (const modus of ['light', 'dark'] as const) {
       // Augenbrauen: Blockkopf der Stellen, Titel des Kennzahlenbands; dazu die Tabellenköpfe.
       ['inhalt', 'Betreuungsstellen'],
       ['inhalt', 'Kapazität'],
+      ['inhalt', 'In Betreuung'],
       ['evakuierung-inhalt', 'Evakuiert'],
       ['evakuierung-inhalt', 'Räumung'],
       ['Evakuierungsbezirk anlegen', 'Keine Namen von Bewohnern.'],

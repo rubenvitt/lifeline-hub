@@ -160,12 +160,31 @@ describe('BetreuungPage (LFH-639)', () => {
     freigaben.wert = freigabenFixture();
   });
 
-  it('Leerzustand: die Tabelle sagt, dass keine Stelle da ist', async () => {
+  it('Leerzustand: „Keine Betreuungsstellen" mit dem Knopf „Betreuungsstelle anlegen", ohne Band und Tabelle (LLH-1050)', async () => {
     api.ladeBetreuung.mockResolvedValue({ stellen: [] });
     renderPage();
-    expect(await screen.findByText(/Keine Betreuungsstellen/)).toBeInTheDocument();
+    expect(await screen.findByText('Keine Betreuungsstellen')).toBeInTheDocument();
+    // Ohne Stelle keine Nullen: das Band entfällt, ebenso die leere Tabelle.
+    expect(screen.queryByRole('group', { name: 'Unterbringung in Zahlen' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Betreuungsstellen' })).toBeNull();
+    // Kopfknopf und Knopf im Leerzustand: dieselbe Handlung, derselbe Wortlaut.
+    const knoepfe = screen.getAllByRole('button', { name: 'Betreuungsstelle anlegen' });
+    expect(knoepfe).toHaveLength(2);
+    await userEvent.click(knoepfe[1]);
+    await dialogMit('Betreuungsstelle anlegen');
     // Die Bezirke sind das Modul Evakuierung (LLH-1034).
     expect(screen.queryByText(/Evakuierungsbezirk/)).toBeNull();
+  });
+
+  it('Leerzustand ohne Schreibrecht: der Knopf steht gesperrt, der Grund sichtbar daneben (LLH-1050)', async () => {
+    einsatz.wert = { ...einsatz.wert, meine_rolle: 'beobachter' };
+    api.ladeBetreuung.mockResolvedValue({ stellen: [] });
+    renderPage();
+    await screen.findByText('Keine Betreuungsstellen');
+    const knoepfe = screen.getAllByRole('button', { name: 'Betreuungsstelle anlegen' });
+    expect(knoepfe).toHaveLength(2);
+    for (const k of knoepfe) expect(k).toBeDisabled();
+    expect(knoepfe[1]).toHaveAccessibleDescription('nur Einsatzleitung und Führungspersonal');
   });
 
   it('ein Abruffehler ist kein Leerzustand', async () => {
@@ -192,11 +211,60 @@ describe('BetreuungPage (LFH-639)', () => {
     expect(within(schule).queryByText(/voll|überbelegt/)).toBeNull();
   });
 
-  it('Kopf Betreuungsstellen: gemeldete Summe mit „ohne Meldung" — ohne jede Meldung „keine Meldung", nie 0', async () => {
+  /** Wert und Notiz einer Zelle des Bands „Unterbringung in Zahlen" (LLH-1050). */
+  function bandZelle(titel: string): HTMLElement {
+    const band = screen.getByRole('group', { name: 'Unterbringung in Zahlen' });
+    const zelle = [...band.querySelectorAll<HTMLElement>('[data-lfh="kennzahl"]')].find((z) =>
+      z.textContent?.startsWith(titel),
+    );
+    expect(zelle, `Zelle ${titel}`).toBeDefined();
+    return zelle!;
+  }
+
+  it('Band „Unterbringung in Zahlen": die Summen der Stellen über der Tabelle (LLH-1050)', async () => {
     renderPage();
     await screen.findByText('Turnhalle Ost');
     // 89 + 140, die Schule hat nicht gemeldet.
-    expect(screen.getByText('229 untergebracht · 1 ohne Meldung')).toBeInTheDocument();
+    expect(bandZelle('In Betreuung')).toHaveTextContent('229');
+    expect(bandZelle('In Betreuung')).toHaveTextContent('1 Stelle ohne Meldung');
+    // Nur Stellen mit Kapazität: 150 + 150; die Schule hat keine.
+    expect(bandZelle('Kapazität')).toHaveTextContent('300');
+    expect(bandZelle('Kapazität')).toHaveTextContent('1 ohne Kapazität');
+    // 61 + 10.
+    expect(bandZelle('Frei')).toHaveTextContent('71');
+    expect(bandZelle('Stellen in Betrieb')).toHaveTextContent('3von 3');
+    expect(bandZelle('Voll/überbelegt')).toHaveTextContent('0');
+    expect(bandZelle('Voll/überbelegt')).toHaveAttribute('data-ton', 'neutral');
+    // Ohne Personenrecht fehlt „Davon namentlich" ganz.
+    expect(screen.queryByText('Davon namentlich')).toBeNull();
+    // Eine Heimat je Zahl: der Blockkopf trägt die Summe nicht mehr.
+    expect(screen.queryByText(/untergebracht/)).toBeNull();
+  });
+
+  it('Band: „Frei" 0 im Ton Achtung, volle und überbelegte Stellen im Ton Alarm (LLH-1050)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      stellen: [
+        stelle({
+          id: 12,
+          bezeichnung: 'Halle Süd',
+          kapazitaet_personen: 80,
+          belegung: { id: 32, belegt: 80, zeitpunkt_at: '2026-09-23 10:00:00' },
+        }),
+        stelle({
+          id: 13,
+          bezeichnung: 'Gemeindehaus',
+          kapazitaet_personen: 40,
+          belegung: { id: 33, belegt: 52, zeitpunkt_at: '2026-09-23 10:00:00' },
+        }),
+      ],
+    });
+    renderPage();
+    await screen.findByText('Halle Süd');
+    // Nie negativ: die Überbelegung im Gemeindehaus nimmt keinen Platz weg.
+    expect(bandZelle('Frei')).toHaveTextContent('0');
+    expect(bandZelle('Frei')).toHaveAttribute('data-ton', 'achtung');
+    expect(bandZelle('Voll/überbelegt')).toHaveTextContent('2');
+    expect(bandZelle('Voll/überbelegt')).toHaveAttribute('data-ton', 'alarm');
   });
 
   describe('„davon namentlich" (LFH-674, design.md D7)', () => {
@@ -226,12 +294,19 @@ describe('BetreuungPage (LFH-639)', () => {
       expect(hinweis(zeileVon('Weserstadion'))).toBeNull();
     });
 
-    it('geht in keine Summe ein — Kopf und „frei" lesen nur die Belegung', async () => {
+    it('geht in keine Summe ein — Band und „frei" lesen nur die Belegung', async () => {
       api.ladeBetreuung.mockResolvedValue(MIT_NAMENTLICH);
       renderPage();
       await screen.findByText('Turnhalle Ost');
-      expect(screen.getByText('229 untergebracht · 1 ohne Meldung')).toBeInTheDocument();
+      expect(bandZelle('In Betreuung')).toHaveTextContent('229');
       expect(within(zeileVon('Turnhalle Ost')).getByText('61')).toBeInTheDocument();
+    });
+
+    it('mit Personenrecht steht „Davon namentlich" im Band, als Summe über die Stellen (LLH-1050)', async () => {
+      api.ladeBetreuung.mockResolvedValue(MIT_NAMENTLICH);
+      renderPage();
+      await screen.findByText('Turnhalle Ost');
+      expect(bandZelle('Davon namentlich')).toHaveTextContent('5');
     });
 
     it('fehlt `namentlich` in der Antwort (kein Personenrecht), steht nirgends etwas', async () => {
@@ -242,18 +317,22 @@ describe('BetreuungPage (LFH-639)', () => {
     });
   });
 
-  it('Kopf Betreuungsstellen ohne jede Meldung: „keine Meldung", nicht „0 untergebracht"', async () => {
+  it('Band ohne jede Meldung: „In Betreuung" sagt „keine Meldung", nicht 0 (LLH-1050)', async () => {
     // „nichts gemeldet" ist nicht „niemand in Betreuung".
     api.ladeBetreuung.mockResolvedValue({
       stellen: [SCHULE, stelle({ id: 11, bezeichnung: 'Halle West' })],
     });
     renderPage();
     await screen.findByText('Halle West');
-    expect(screen.getByText('keine Meldung · 2 ohne Meldung')).toBeInTheDocument();
-    expect(screen.queryByText(/0 untergebracht/)).toBeNull();
+    const zelle = bandZelle('In Betreuung');
+    expect(zelle).toHaveTextContent('keine Meldung');
+    expect(zelle).not.toHaveTextContent(/\b0\b/);
+    // Ohne jede Kapazität auch keine Summe für Kapazität und Frei.
+    expect(bandZelle('Kapazität')).toHaveTextContent('nicht festgelegt');
+    expect(bandZelle('Frei')).not.toHaveTextContent(/\d/);
   });
 
-  it('volle Stellen im Blickfeld: „n voll" im Seitenkopf und im Blockkopf, „fast voll" zählt nicht (LFH-678)', async () => {
+  it('volle Stellen im Blickfeld: „n voll" im Seitenkopf und im Band, „fast voll" zählt nicht (LFH-678)', async () => {
     api.ladeBetreuung.mockResolvedValue({
       stellen: [
         TURNHALLE,
@@ -275,20 +354,31 @@ describe('BetreuungPage (LFH-639)', () => {
     });
     renderPage();
     await screen.findByText('Halle Süd');
-    // Seitenkopf: die einzige Zeile, die auch bei langer Tabelle über der Falz steht.
-    expect(screen.getByText('5 Betreuungsstellen · 2 voll')).toBeInTheDocument();
-    // Blockkopf: dieselbe Zahl neben der Summe.
-    expect(screen.getByText('361 untergebracht · 2 voll · 1 ohne Meldung')).toBeInTheDocument();
+    // Seitenkopf: n Stellen · n in Betrieb · n voll (LLH-1050).
+    expect(screen.getByText('5 Stellen · 5 in Betrieb · 2 voll')).toBeInTheDocument();
+    // Band: dieselbe Zahl, dazu die Summe.
+    expect(bandZelle('Voll/überbelegt')).toHaveTextContent('2');
+    expect(bandZelle('In Betreuung')).toHaveTextContent('361');
     // Die Zeilen tragen weiter ihr eigenes Wort — der Kopf fasst nur zusammen.
     expect(within(zeileVon('Halle Süd')).getByText('voll')).toBeInTheDocument();
     expect(within(zeileVon('Gemeindehaus')).getByText('überbelegt')).toBeInTheDocument();
   });
 
-  it('ohne volle Stelle kein „0 voll" — weder im Seitenkopf noch im Blockkopf (LFH-678)', async () => {
+  it('ohne volle Stelle kein „0 voll" im Seitenkopf (LFH-678); „in Betrieb" zählt nur den Status (LLH-1050)', async () => {
+    api.ladeBetreuung.mockResolvedValue({
+      stellen: [TURNHALLE, { ...SCHULE, status: 'vorbereitet' }],
+    });
     renderPage();
     await screen.findByText('Turnhalle Ost');
-    expect(screen.getByText('3 Betreuungsstellen')).toBeInTheDocument();
-    expect(screen.queryByText(/\bvoll\b.*·|· \d+ voll/)).toBeNull();
+    expect(screen.getByText('2 Stellen · 1 in Betrieb')).toBeInTheDocument();
+    expect(screen.queryByText(/· \d+ voll/)).toBeNull();
+  });
+
+  it('eine Stelle: „1 Stelle" im Seitenkopf (LLH-1050)', async () => {
+    api.ladeBetreuung.mockResolvedValue({ stellen: [TURNHALLE] });
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    expect(screen.getByText('1 Stelle · 1 in Betrieb')).toBeInTheDocument();
   });
 
   it('genau EINE Primäraktion im Kopf: „Betreuungsstelle anlegen" (LLH-1034)', async () => {
@@ -598,6 +688,21 @@ describe('BetreuungPage (LFH-639)', () => {
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('link', { name: 'Turnhalle Ost' }));
     expect(await screen.findByTestId('stelle-ziel')).toHaveTextContent('/einsaetze/1/betreuung/8');
+  });
+
+  it('Zeilenklick führt auf die Detailseite; Knöpfe der Zeile bedienen nur sich (LLH-1050)', async () => {
+    renderPage();
+    await screen.findByText('Turnhalle Ost');
+    // „Belegung melden" öffnet den Dialog, die Zeile springt nicht mit.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Belegung melden für Turnhalle Ost' }),
+    );
+    await dialogMit('Belegung melden: Turnhalle Ost');
+    expect(screen.queryByTestId('stelle-ziel')).toBeNull();
+    await userEvent.keyboard('{Escape}');
+    // Ein Klick in eine Zelle ohne eigenes Bedienziel (Status) führt auf die Seite der Stelle.
+    await userEvent.click(within(zeileVon('Weserstadion')).getByText('in Betrieb'));
+    expect(await screen.findByTestId('stelle-ziel')).toHaveTextContent('/einsaetze/1/betreuung/9');
   });
 
   it('Stelle stornieren über das Menü: eigener Dialog mit rotem Knopf, dann POST an DIESE Stelle (LFH-682)', async () => {
