@@ -146,9 +146,10 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "/api/einsaetze/{id}/befehle/{bid}/anlagen/{aid}/datei",
     ),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
-    // Betroffenen-/Tierzahl der Lage.
+    // Betroffenen-, Tier- und Schadenszahl der Lage.
     ("GET", "/api/einsaetze/{id}/personen/export"),
     ("GET", "/api/einsaetze/{id}/tiere/export"),
+    ("GET", "/api/einsaetze/{id}/schaeden/export"),
 ];
 
 /// Konfiguration der Zulassungssteuerung, als State an der Middleware, damit Tests enge Grenzen

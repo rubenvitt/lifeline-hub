@@ -433,6 +433,81 @@ describe('fachobjektZeichen — Rückfall statt Ausfall (design.md D3)', () => {
   });
 });
 
+// Schaden mit Gefahrenart und Schadensgrad (LLH-1115, design.md D2/D3): der Gefahrenhinweis 5.8.1
+// und der Schadensgrad 5.8.4 hängen als `states` am Träger „Gefahr“, das Ausmaß bleibt die Füllung.
+describe('fachobjektZeichen — Schaden mit Gefahrenart und Schadensgrad (LLH-1115)', () => {
+  it('zeichnet Elektrizität bei Ausmaß „groß“ als orangen Träger mit Hinweis „elektrische Energie“', () => {
+    expect(wirksam(schadenTz('gross', 'elektrizitaet'))).toEqual({
+      kind: 'hazard',
+      technicalFill: 'orange',
+      states: ['electrical-energy-hazard'],
+    });
+  });
+
+  it.each([
+    ['atomare_strahlung', 'radioactivity-hazard'],
+    ['chemische_stoffe', 'hazardous-substances'],
+    ['explosion', 'explosion-hazard'],
+    ['elektrizitaet', 'electrical-energy-hazard'],
+    ['ertrinken', 'water-ingress-hazard'],
+  ] as const)('bildet die Gefahr %s auf den Hinweis %s ab', (gefahr, zustand) => {
+    expect(wirksam(schadenTz('mittel', gefahr)).states).toEqual([zustand]);
+  });
+
+  it.each([
+    'atemgifte',
+    'angstreaktion',
+    'ausbreitung',
+    'erkrankung_verletzung',
+    'einsturz',
+    'absturz',
+    'brand',
+    'durchbruch',
+  ] as const)('lässt die Gefahr %s ohne Hinweis im Katalog beim leeren Dreieck', (gefahr) => {
+    expect(wirksam(schadenTz('gering', gefahr))).toEqual({
+      kind: 'hazard',
+      technicalFill: 'gruen',
+    });
+  });
+
+  it.each([
+    ['angeschlagen', 'damaged'],
+    ['teilzerstoert', 'partially-destroyed'],
+    ['zerstoert', 'destroyed'],
+  ] as const)('zeichnet den Schadensgrad %s als %s (5.8.4)', (grad, zustand) => {
+    expect(wirksam(schadenTz('katastrophal', undefined, grad))).toEqual({
+      kind: 'hazard',
+      technicalFill: 'rot',
+      states: [zustand],
+    });
+  });
+
+  it('trägt Gefahrenhinweis und Schadensgrad zugleich', () => {
+    expect(wirksam(schadenTz('gross', 'explosion', 'zerstoert')).states).toEqual([
+      'explosion-hazard',
+      'destroyed',
+    ]);
+  });
+
+  it('ohne Gefahrenart und Schadensgrad bleibt das Zeichen wie bisher', () => {
+    expect(wirksam(schadenTz('gross', null, null))).toEqual({
+      kind: 'hazard',
+      technicalFill: 'orange',
+    });
+  });
+
+  it('liest einen unbekannten gespeicherten Wert wie keinen (Snapshot, Offline-Stand)', () => {
+    const tz = schadenTz('mittel', 'lawine' as never, '__proto__' as never);
+    expect(wirksam(tz)).toEqual({ kind: 'hazard', technicalFill: 'gelb' });
+  });
+
+  it('unterscheidet Gefahrenarten im Bildschlüssel', () => {
+    const a = fachobjektZeichen(schadenTz('gross', 'explosion'))!;
+    const b = fachobjektZeichen(schadenTz('gross', 'elektrizitaet'))!;
+    expect(a.schluessel).not.toBe(b.schluessel);
+  });
+});
+
 // Drift-Wache: welche Fachaufgaben des Hub-Vokabulars die Bibliothek am Körper NICHT zeichnet
 // (Rückfall ohne Fachaufgabe) und welche sie nur ABGELEITET zeichnet. Ändert ein Update von
 // @einsatzzeichen die Komponierbarkeit oder die Vermessung, wird das hier in BEIDE Richtungen rot —

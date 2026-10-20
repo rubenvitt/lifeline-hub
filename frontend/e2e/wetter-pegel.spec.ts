@@ -255,7 +255,7 @@ test('Gate 1: kein waagerechter Querlauf auf 1366, 1024 und 390 px — auch aufg
   test.info().annotations.push({ type: 'messwert', description: messwerte.join(' | ') });
 });
 
-test('Gate 3: Primäraktion und Beschreibungs-Umschalter folgen der Staffel 30 / 48 / 72 px', async ({
+test('Gate 3: Nebenweg „Pegel festlegen“ und Beschreibungs-Umschalter folgen der Staffel 30 / 48 / 72 px', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -272,19 +272,20 @@ test('Gate 3: Primäraktion und Beschreibungs-Umschalter folgen der Staffel 30 /
     ] as const);
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-    const primaer = await haeltStufe(
+    // Ab `md` steht der Nebenweg als sekundärer Knopf im Kopf (LLH-1117: keine Primäraktion).
+    const nebenweg = await haeltStufe(
       page
         .locator('[data-lfh="seitenkopf-aktionen"]')
         .getByRole('button', { name: 'Pegel festlegen' }),
       soll,
-      `Primäraktion ${dichte}`,
+      `Nebenweg ${dichte}`,
     );
     const umschalter = await haeltStufe(
       page.getByRole('button', { name: 'Beschreibung und Handlungsempfehlung' }),
       soll,
       `Umschalter ${dichte}`,
     );
-    gemessen.push(`${dichte}: ${primaer}/${umschalter}`);
+    gemessen.push(`${dichte}: ${nebenweg}/${umschalter}`);
   }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

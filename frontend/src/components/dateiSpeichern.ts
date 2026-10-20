@@ -11,7 +11,7 @@
 const FREIGABE_NACH_MS = 10_000;
 
 /** Was exportiert wird — der erste Teil des Dateinamens. */
-export type ExportInhalt = 'personen' | 'tiere';
+export type ExportInhalt = 'personen' | 'tiere' | 'schaeden';
 
 const zweistellig = (n: number) => String(n).padStart(2, '0');
 

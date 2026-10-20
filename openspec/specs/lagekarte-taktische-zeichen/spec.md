@@ -30,7 +30,11 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
 - **Einsatzabschnitt**: taktische Formation in der Farbe „Führung und Leitung“, ohne Kürzel.
 - **Einsatzort**: Zeichen „Ereignis“.
 - **Schaden**: Zeichen „Gefahr“. Die Füllung folgt dem Ausmaß: gering grün, mittel gelb, groß
-  orange, katastrophal rot, unbekannt grau.
+  orange, katastrophal rot, unbekannt grau. Trägt der Schaden eine Gefahr, für die DV 102 einen
+  Gefahrenhinweis kennt, MUST das Zeichen diesen Hinweis tragen (Atomare Strahlung, Chemische
+  Stoffe, Explosion, Elektrizität, Ertrinken als Wassereinbruch). Trägt er einen Schadensgrad, MUST
+  das Zeichen den Schadensgrad nach 5.8.4 tragen. Eine Gefahr ohne Hinweis MUST das Zeichen wie
+  ohne Gefahr lassen. Das Zeichen MUST beim Lesen aus Gefahr und Schadensgrad gebildet werden.
 - **Unfallhilfsstelle und Betreuungsstelle**: Stelle mit Arzt (Behandlungsplatz), Sanität
   (sonstige) oder Betreuung (Betreuungsstelle). Die Stelle trägt die Organisation des Betreibers,
   also die Organisations-Vorgabe des Hubs. Ist keine hinterlegt, MUST sie ohne Organisation
@@ -72,6 +76,18 @@ Das System SHALL die Zeichen der Fachobjekte nach der Systematik der Bibliothek 
 - **WHEN** ein Schaden mit Ausmaß „groß“ verortet ist
 - **THEN** zeigt die Karte das Gefahrenzeichen orange gefüllt
 
+#### Scenario: Schaden mit Gefahr Elektrizität
+- **WHEN** ein Schaden mit Ausmaß „groß“ und Gefahr „Elektrizität“ verortet ist
+- **THEN** zeigt die Karte das Gefahrenzeichen orange gefüllt mit dem Hinweis „Gefahr durch elektrische Energie“
+
+#### Scenario: Schaden mit Schadensgrad
+- **WHEN** ein Schaden mit Schadensgrad „total zerstört“ verortet ist
+- **THEN** zeigt die Karte das Gefahrenzeichen mit dem Schadensgrad „Total zerstört“
+
+#### Scenario: Gefahr ohne Hinweis
+- **WHEN** ein Schaden mit Gefahr „Brand“ verortet ist
+- **THEN** zeigt die Karte das Gefahrenzeichen ohne Hinweis in der Farbe seines Ausmaßes
+
 ### Requirement: Gespeicherte Werte bleiben ohne Migration lesbar
 Das System SHALL die gespeicherten Zeichenwerte weiter lesen und MUST sie nicht umschreiben.
 Das gilt für `tz_fachaufgabe` und `tz_organisation` an Einheit, Fahrzeug, Führungskraft und
@@ -107,6 +123,9 @@ Organisation die Farbe. Lässt sich bei einem freien Zeichen nicht einmal ein K�
 Piktogramm darstellen, MUST die Karte einen neutralen Platzhalter zeigen, damit das Zeichen
 auswählbar und löschbar bleibt.
 
+Bei einem Schaden entfällt zuerst der Schadensgrad, dann der Gefahrenhinweis; ein unbekannter
+gespeicherter Wert gilt als nicht gesetzt.
+
 #### Scenario: Unbekannte Fachaufgabe
 - **WHEN** eine Einheit `tz_fachaufgabe = 'gibt-es-nicht'` trägt
 - **THEN** zeigen Meldebild und Karte die Formation ohne Fachaufgabe, und die Seite bleibt bedienbar
@@ -122,6 +141,10 @@ auswählbar und löschbar bleibt.
 #### Scenario: Altzeichen ohne Nachfolger
 - **WHEN** ein freies Altzeichen nur das Symbol „Fernschreiben“ ohne Grundzeichen trägt
 - **THEN** zeigt die Karte an seiner Stelle einen neutralen Platzhalter, den die Person auswählen und löschen kann
+
+#### Scenario: Schadensgrad nicht darstellbar
+- **WHEN** die Bibliothek einen Schaden mit Gefahrenhinweis und Schadensgrad nicht zusammensetzen kann
+- **THEN** zeigt die Karte das Gefahrenzeichen mit Hinweis ohne Schadensgrad, und die Seite bleibt bedienbar
 
 ### Requirement: Kartenzeichen in Bildschirmschärfe
 Die Lagekarte SHALL jedes Fachobjekt-Zeichen und jedes freie Zeichen einheitlich 34 CSS-Pixel
