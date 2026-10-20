@@ -155,15 +155,6 @@
       }
     },
     {
-      "name": "ebenen",
-      "bedeutung": "Kartenebenen",
-      "herkunft": "icons8",
-      "icons8": {
-        "id": "727",
-        "commonName": "layers"
-      }
-    },
-    {
       "name": "extern-pfeil",
       "bedeutung": "Verweis auf anderes Modul (Sprungmarke)",
       "herkunft": "icons8",
