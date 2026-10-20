@@ -1987,3 +1987,99 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, _) = anfrage(&app, "GET", &staende, &beob_cookie, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+// ── Leitung und Erreichbarkeit (LLH-1044) ───────────────────────────────────────────────────
+
+#[tokio::test]
+async fn leitung_und_erreichbarkeit_anlegen_aendern_leeren_und_grenze() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, st) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &admin,
+        Some(
+            r#"{"bezeichnung":"Gesamtschule","art":"notunterkunft","leitung":" Frau Schulz ","erreichbarkeit":"Kanal 42"}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{st:?}");
+    assert_eq!(st["leitung"], "Frau Schulz", "getrimmt");
+    assert_eq!(st["erreichbarkeit"], "Kanal 42");
+    let sid = st["id"].as_i64().unwrap();
+
+    // Die Übersicht trägt beide Felder.
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["stellen"][0]["leitung"], "Frau Schulz");
+
+    // Ändern schreibt „weitere Angaben“ ohne Wert ins ETB.
+    let (s, st) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(r#"{"leitung":"Herr Brandt"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{st:?}");
+    assert_eq!(st["leitung"], "Herr Brandt");
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert_eq!(treffer(&etb, "system", &["weitere Angaben"]).len(), 1);
+    assert!(
+        etb.iter()
+            .all(|x| !x["inhalt"].as_str().unwrap_or("").contains("Brandt")),
+        "kein Name im ETB"
+    );
+
+    // `null` leert; das Feld fehlt dann in der Antwort.
+    let (s, st) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(r#"{"erreichbarkeit":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{st:?}");
+    assert!(!st.as_object().unwrap().contains_key("erreichbarkeit"));
+    assert_eq!(st["leitung"], "Herr Brandt", "unberührt");
+
+    // Grenze: 200 Zeichen gehen, 201 sind 400 — beim Anlegen und beim Ändern.
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(&format!(r#"{{"leitung":"{}"}}"#, "x".repeat(200))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{}/stellen/{sid}", pfad(e)),
+        &admin,
+        Some(&format!(r#"{{"erreichbarkeit":"{}"}}"#, "x".repeat(201))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j:?}");
+    assert!(
+        j.to_string()
+            .contains("Erreichbarkeit darf höchstens 200 Zeichen"),
+        "{j}"
+    );
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &admin,
+        Some(&format!(
+            r#"{{"bezeichnung":"Zweite","art":"anlaufstelle","leitung":"{}"}}"#,
+            "x".repeat(201)
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}

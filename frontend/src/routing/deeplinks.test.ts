@@ -41,6 +41,7 @@ import {
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
+  betreuungsstellePfad,
   evakuierungPfad,
   evakuierungsbezirkPfad,
   verpflegungAusgabePfad,
@@ -262,6 +263,14 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     // Ohne Text kein Parameter.
     expect(lagekartePfad(E, { ort: '' })).not.toContain('ort=');
   });
+  it('lagekartePfad trägt den Abschnittsfokus als ?abschnitt= (LLH-1057)', () => {
+    const pfad = lagekartePfad(E, { abschnitt: 12 });
+    expect(pfad).toBe('/einsaetze/5/lagekarte?abschnitt=12');
+    const wert = new URL(pfad, 'http://x').searchParams.get('abschnitt');
+    expect(parseRouteId(wert ?? undefined)).toBe(12);
+    // Ohne Abschnitt kein Parameter.
+    expect(lagekartePfad(E)).not.toContain('abschnitt=');
+  });
   it('der Kartenmittelpunkt überlebt den Weg durch die URL', () => {
     const pfad = lagekartePfad(E, { zentrum: { lat: -33.8688, lon: 151.2093 } });
     const wert = new URL(pfad, 'http://x').searchParams.get('zentrum');
@@ -391,7 +400,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     it('rueckwegPfad leitet das Ziel allein aus Typ und Kennung ab', () => {
       expect(rueckwegPfad(E, 'person', 42)).toBe(personDetailPfad(E, 42));
       expect(rueckwegPfad(E, 'schaden', 7)).toBe(schadenDetailPfad(E, 7));
-      expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungPfad(E, { stelle: 3 }));
+      expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungsstellePfad(E, 3));
       expect(rueckwegPfad(E, 'bereitstellungsraum', 9)).toBe(bereitstellungsraumDetailPfad(E, 9));
     });
     it('rueckwegPfad: die UHS hat keinen äußeren Einstieg, ein unbekannter Typ kein Ziel', () => {
@@ -489,8 +498,14 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(betreuungPfad(E, {})).toBe('/einsaetze/5/betreuung');
   });
 
-  it('betreuungPfad selektiert die Stelle per Query-Param — Round-Trip (LFH-639)', () => {
-    // Query-Param statt Item-Route: das Modul hat keine Detailseite (LFH-25, design.md D7).
+  it('betreuungsstellePfad: Item-Route unter dem Modul Betreuung (LLH-1044)', () => {
+    expect(betreuungsstellePfad(E, 4)).toBe('/einsaetze/5/betreuung/4');
+    // Der Modulwächter liest das Modul aus dem dritten Segment — die Detailseite gehört dazu.
+    expect(betreuungsstellePfad(E, 4).split('/')[3]).toBe('betreuung');
+  });
+
+  it('betreuungPfad trägt `?stelle=` weiter als Altadresse — Round-Trip (LFH-639, LLH-1044)', () => {
+    // Die Betreuungsseite leitet sie auf die Detailseite um.
     const stelle = betreuungPfad(E, { stelle: 4 });
     expect(stelle.split('?')[0]).toBe('/einsaetze/5/betreuung');
     const ps = new URLSearchParams(stelle.split('?')[1]);

@@ -43,7 +43,8 @@ use crate::app::AppState;
 use crate::betreuung::repo::{self, BelegungEingabe, StelleAenderung, StelleEingabe};
 use crate::betreuung::{
     enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, BetreuungUebersicht,
-    BetreuungsstelleAnzeige, StelleMeldungAnzeige, StelleNamentlich,
+    BetreuungsstelleAnzeige, StelleMeldungAnzeige, StelleNamentlich, ERREICHBARKEIT_MAX,
+    LEITUNG_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
@@ -53,7 +54,7 @@ use crate::extract::{JsonBody, PfadParam};
 use crate::geraet::stelle::{self, Sicht};
 use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
-use crate::routes::support;
+use crate::routes::support::{self, optional_max, optional_max_tri};
 
 /// Nach dem Commit: ETB-Kurzruf je Eintrag, dann das Modul-Ereignis mit Kennungen only.
 fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], stelle_id: i64) {
@@ -182,6 +183,12 @@ pub struct StelleAnlegen {
     standort: Option<String>,
     #[serde(default)]
     notiz: Option<String>,
+    /// Leitung und Erreichbarkeit (LLH-1044), Freitext bis [`LEITUNG_MAX`] bzw.
+    /// [`ERREICHBARKEIT_MAX`] Zeichen.
+    #[serde(default)]
+    leitung: Option<String>,
+    #[serde(default)]
+    erreichbarkeit: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/betreuung/stellen
@@ -198,6 +205,8 @@ pub async fn stelle_anlegen(
         kapazitaet_personen: req.kapazitaet_personen,
         standort: req.standort,
         notiz: req.notiz,
+        leitung: optional_max(req.leitung, "Leitung", LEITUNG_MAX)?,
+        erreichbarkeit: optional_max(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
@@ -229,6 +238,11 @@ pub struct StelleAendern {
     standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     notiz: Option<Option<String>>,
+    /// Tri-State wie `notiz` (LLH-1044).
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    leitung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    erreichbarkeit: Option<Option<String>>,
     /// Koordinate auf der Lagekarte (LFH-673), tri-state je Wert: fehlt = unverändert,
     /// `null` = entfernen. Halbes Paar oder Wert außerhalb des Bereichs → **422**, wie an der
     /// UHS (`einsatz_uhs.rs`, von src/AGENTS.md als legitimes 422 geführt): das Paar ist ein
@@ -256,6 +270,9 @@ pub async fn stelle_aendern(
         status: enum_opt(req.status)?,
         standort: req.standort,
         notiz: req.notiz,
+        // Feldgrenze vor jedem 422 des Zusammenhangs (src/AGENTS.md, Eingabegrenzen).
+        leitung: optional_max_tri(req.leitung, "Leitung", LEITUNG_MAX)?,
+        erreichbarkeit: optional_max_tri(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
         lat: req.lat,
         lon: req.lon,
     };

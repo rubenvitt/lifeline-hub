@@ -390,12 +390,18 @@ export function pegelZielPfad(einsatzId: number, modulFrei: boolean): string {
 }
 
 /**
- * Betreuungs-Modul. Keine Detailroute — Stelle per Query-Param (`?stelle=<id>`), die Seite scrollt
- * auf die Zeile. Bezirke liegen seit LLH-1034 im Modul Evakuierung ({@link evakuierungPfad}); ein
- * alter Link `…/betreuung?bezirk=<id>` leitet die Betreuungsseite dorthin um.
+ * Betreuungs-Modul. `?stelle=<id>` ist seit LLH-1044 eine Altadresse: die Betreuungsseite leitet
+ * auf die Detailseite der Stelle um ({@link betreuungsstellePfad}). Bezirke liegen seit LLH-1034 im
+ * Modul Evakuierung ({@link evakuierungPfad}); ein alter Link `…/betreuung?bezirk=<id>` leitet die
+ * Betreuungsseite dorthin um.
  */
 export function betreuungPfad(einsatzId: number, opts: { stelle?: number } = {}): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'betreuung'), { stelle: opts.stelle });
+}
+
+/** Detailseite einer Betreuungsstelle (LLH-1044), unter dem Modul Betreuung. */
+export function betreuungsstellePfad(einsatzId: number, stelleId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'betreuung')}/${stelleId}`;
 }
 
 /**
@@ -954,6 +960,8 @@ export function lagekartePfad(
     /** Adresssuche (LFH-638): die Karte übernimmt den Text ins Suchfeld und sucht ihn. */
     ort?: string;
     evakuierungsbezirk?: number;
+    /** Fokus auf einen Einsatzabschnitt (LLH-1057): die Karte fokussiert ihn und räumt den Parameter. */
+    abschnitt?: number;
   } = {},
 ): string {
   return mitQuery(einsatzModulPfad(einsatzId, 'lagekarte'), {
@@ -978,6 +986,8 @@ export function lagekartePfad(
     zentrum: opts.zentrum ? `${runde5(opts.zentrum.lat)},${runde5(opts.zentrum.lon)}` : undefined,
     // Adresssuche der Sprungpalette (LFH-638): Suchfeld der Leiste vorbelegen, suchen, räumen.
     ort: opts.ort,
+    // Abschnittsfokus (LLH-1057): Darstellung, nicht gespeichert — die Karte fokussiert und räumt.
+    abschnitt: opts.abschnitt,
   });
 }
 
@@ -1058,8 +1068,7 @@ export function parseZurueck(wert: string | null | undefined): boolean {
 const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => string) | null> = {
   person: personDetailPfad,
   schaden: schadenDetailPfad,
-  // Keine Detailroute: die Betreuungsseite hebt die Stelle hervor (`?stelle=`).
-  betreuungsstelle: (einsatzId, id) => betreuungPfad(einsatzId, { stelle: id }),
+  betreuungsstelle: betreuungsstellePfad,
   bereitstellungsraum: bereitstellungsraumDetailPfad,
   // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
   // verortet, es gibt keine Seite, zu der man zurückwollte.

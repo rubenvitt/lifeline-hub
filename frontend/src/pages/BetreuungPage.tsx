@@ -1,42 +1,47 @@
 import { App, Breadcrumb, Button } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
-  aendereStelle,
   ladeBetreuung,
   legeStelleAn,
-  meldeBelegung,
   nimmBelegungZurueck,
   storniereStelle,
 } from '../api/betreuung';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { einsatzKeys } from '../api/queryKeys';
-import { evakuierungPfad, lagekartePfad } from '../routing/deeplinks';
+import {
+  betreuungPfad,
+  betreuungsstellePfad,
+  evakuierungPfad,
+  lagekartePfad,
+} from '../routing/deeplinks';
 import type {
   BelegungsmeldungEingabe,
   Betreuungsstelle,
   BetreuungsstelleEingabe,
-  BetreuungsstellePatch,
 } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import {
   BelegungMeldenDialog,
   StelleAnlegenDialog,
-  StelleBearbeitenDialog,
   StornierenDialog,
 } from '../betreuung/BetreuungDialoge';
 import { personenZahl, volleStellenSegment } from '../betreuung/betreuungText';
 import StellenBlock, { type StelleAktion } from '../betreuung/StellenBlock';
-import { scrolleZurZeile } from '../components/Datensicht';
+import UnterbringungKennzahlen from '../betreuung/UnterbringungKennzahlen';
 import EinsatzSeite from '../components/EinsatzSeite';
-import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
+import {
+  SeitenFehler,
+  SeitenLeer,
+  SeitenSkeleton,
+  SeitenStandVeraltet,
+} from '../components/SeitenZustand';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import { erfasseBelegungOfflineFaehig } from '../offline/schreiben';
-import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
 
@@ -50,17 +55,21 @@ const betreuungRechteText = einsatzRechteGrund;
  */
 type Dialog =
   | { art: 'stelleAnlegen' }
-  | { art: 'stelleBearbeiten'; stelle: Betreuungsstelle }
   | { art: 'belegung'; stelle: Betreuungsstelle }
   | { art: 'stelleStornieren'; stelle: Betreuungsstelle };
 
 /**
- * Fachmodul Betreuung (LFH-639): Betreuungsstellen und ihre Belegung, eine Route, keine
- * Detailroute. Die Evakuierungsbezirke sind seit LLH-1034 das eigene Modul Evakuierung
- * (`EvakuierungPage`); ein alter Link `…/betreuung?bezirk=<id>` leitet dorthin um.
+ * Fachmodul Betreuung (LFH-639): Übersicht der Betreuungsstellen und ihrer Belegung. Jede Stelle
+ * hat seit LLH-1044 eine Detailseite (`BetreuungsstelleDetailPage`); dort stehen Bearbeiten und
+ * Status. Ein alter Link `…/betreuung?stelle=<id>` leitet auf sie um. Die Evakuierungsbezirke
+ * sind seit LLH-1034 das eigene Modul Evakuierung (`EvakuierungPage`); ein alter Link
+ * `…/betreuung?bezirk=<id>` leitet dorthin um.
  *
- * Tabelle, weil verglichen wird („welche Stelle hat noch Platz?"). Kopf: genau eine Primäraktion,
- * „Betreuungsstelle anlegen".
+ * Aufbau (LLH-1050, Lagebild der Unterbringung): Kopf mit genau einer Primäraktion
+ * „Betreuungsstelle anlegen" und der Meta „n Stellen · n in Betrieb · n voll", darunter das Band
+ * „Unterbringung in Zahlen" (`UnterbringungKennzahlen`), darunter die Tabelle — Tabelle, weil
+ * verglichen wird („welche Stelle hat noch Platz?"). Ohne Stelle stehen statt Band und Tabelle
+ * „Keine Betreuungsstellen" und der Knopf zum Anlegen (ohne Schreibrecht gesperrt mit Grund).
  *
  * Melden ohne Rückfrage, mit Rückweg: die Belegung hat eine serverseitige Rücknahme. Der Toast
  * nimmt die `meldung_id` der gerade angelegten Meldung.
@@ -87,6 +96,22 @@ export default function BetreuungPage() {
       />
     );
   }
+  // Ebenso vor jedem Abruf: `?stelle=` war die Adresse einer Stelle, bis sie eine eigene Seite
+  // bekam (LLH-1044). Ein unlesbarer Wert führt auf die Übersicht ohne Parameter.
+  const alteStelle = suche.get('stelle');
+  if (alteStelle != null) {
+    const stelle = Number(alteStelle);
+    return (
+      <Navigate
+        replace
+        to={
+          Number.isInteger(stelle) && stelle > 0
+            ? betreuungsstellePfad(einsatzId, stelle)
+            : betreuungPfad(einsatzId)
+        }
+      />
+    );
+  }
   return <BetreuungInhalt einsatzId={einsatzId} />;
 }
 
@@ -97,7 +122,6 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
   const qc = useQueryClient();
 
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [hervorgehoben, setHervorgehoben] = useState<number | null>(null);
   const schliessen = useCallback(() => setDialog(null), []);
 
   const einsatzQuery = useQuery({
@@ -124,15 +148,6 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
   // Ein Live-Refetch kommt bei offenem Dialog an; die Dialoge rechnen gegen diesen Stand.
   const aktuelleStelle = (s: Betreuungsstelle) => stellen.find((x) => x.id === s.id) ?? s;
 
-  // Cross-Modul-Deeplink: `?stelle=` hebt die Zeile hervor.
-  useQueryParamSelektion('stelle', betreuungQuery.isSuccess, (sid) => {
-    if (stellen.some((s) => s.id === sid)) setHervorgehoben(sid);
-  });
-  useEffect(() => {
-    if (hervorgehoben == null) return;
-    scrolleZurZeile(`stelle-${hervorgehoben}`);
-  }, [hervorgehoben]);
-
   const invalidiere = useCallback(() => {
     void qc.invalidateQueries({ queryKey: einsatzKeys.betreuung(einsatzId) });
     void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
@@ -156,21 +171,6 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
       invalidiere();
       message.success(`Betreuungsstelle ${s.bezeichnung} angelegt`);
     },
-  });
-  const stelleAendernMut = useMutation({
-    mutationFn: ({ stelleId, patch }: { stelleId: number; patch: BetreuungsstellePatch }) =>
-      aendereStelle(einsatzId, stelleId, patch),
-    onSuccess: (s) => {
-      invalidiere();
-      message.success(`Betreuungsstelle ${s.bezeichnung} gespeichert`);
-    },
-  });
-  // Die Leermeldung vor dem Schließen: eigene Mutation ohne Rückgängig-Toast — sie ist Teil des
-  // Schließens, ein Rückweg auf die 0 ließe eine geschlossene, belegte Stelle zu (der Server lehnt
-  // das mit 422 ab).
-  const leermeldungMut = useMutation({
-    mutationFn: (stelleId: number) => meldeBelegung(einsatzId, stelleId, { belegt: 0 }),
-    onSuccess: invalidiere,
   });
   const stelleStornierenMut = useMutation({
     mutationFn: (stelleId: number) => storniereStelle(einsatzId, stelleId),
@@ -206,8 +206,6 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
 
   // ── Öffnen: jede Öffnung beginnt ohne den Fehler der letzten ──
   const { reset: resetStelleAnlegen } = stelleAnlegenMut;
-  const { reset: resetStelleAendern } = stelleAendernMut;
-  const { reset: resetLeermeldung } = leermeldungMut;
   const { reset: resetStelleStornieren } = stelleStornierenMut;
   const { reset: resetBelegung } = belegungMut;
 
@@ -234,16 +232,10 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
         );
         return;
       }
-      if (aktion === 'stornieren') {
-        resetStelleStornieren();
-        setDialog({ art: 'stelleStornieren', stelle });
-        return;
-      }
-      resetStelleAendern();
-      resetLeermeldung();
-      setDialog({ art: 'stelleBearbeiten', stelle });
+      resetStelleStornieren();
+      setDialog({ art: 'stelleStornieren', stelle });
     },
-    [resetStelleAendern, resetLeermeldung, resetStelleStornieren, navigate, einsatzId],
+    [resetStelleStornieren, navigate, einsatzId],
   );
 
   if (einsatzQuery.isLoading) return <SeitenSkeleton />;
@@ -263,14 +255,16 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
   const gescheitert = betreuungQuery.isError && betreuungQuery.data == null;
   const veraltet = betreuungQuery.isError && betreuungQuery.data != null;
   const ladend = betreuungQuery.isLoading;
+  const leer = !ladend && stellen.length === 0;
+  const inBetrieb = stellen.filter((s) => s.status === 'in_betrieb').length;
 
   return (
     <EinsatzSeite
       titel={modulName('betreuung')}
-      // „n voll" auch im Seitenkopf: er steht bei langen Tabellen als einzige Zeile über der Falz.
+      // „n voll" nur über 0 (LFH-678), „n in Betrieb" immer: auch 0 ist eine Aussage (LLH-1050).
       meta={
         betreuungQuery.data
-          ? `${stellen.length} ${stellen.length === 1 ? 'Betreuungsstelle' : 'Betreuungsstellen'}${volleStellenSegment(stellen)}`
+          ? `${stellen.length === 1 ? '1 Stelle' : `${personenZahl(stellen.length)} Stellen`} · ${personenZahl(inBetrieb)} in Betrieb${volleStellenSegment(stellen)}`
           : undefined
       }
       dataUpdatedAt={betreuungQuery.dataUpdatedAt}
@@ -305,16 +299,33 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
           ursache={betreuungQuery.error}
           onWiederholen={() => void betreuungQuery.refetch()}
         />
+      ) : leer ? (
+        // Ohne Stelle keine Nullen: Band und leere Tabelle entfallen, der Knopf führt heraus.
+        <>
+          {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
+          <SeitenLeer
+            titel="Keine Betreuungsstellen"
+            aktion={{
+              label: 'Betreuungsstelle anlegen',
+              onClick: oeffneStelleAnlegen,
+              gesperrt: darfSchreiben ? undefined : betreuungRechteText(einsatz.status),
+            }}
+          />
+        </>
       ) : (
         <>
           {veraltet && <SeitenStandVeraltet onWiederholen={() => void betreuungQuery.refetch()} />}
+          <UnterbringungKennzahlen
+            stellen={stellen}
+            namentlich={betreuungQuery.data?.namentlich}
+            ladend={ladend}
+          />
           <StellenBlock
             einsatzId={einsatzId}
             stellen={stellen}
             namentlich={betreuungQuery.data?.namentlich}
             ladend={ladend}
             darfSchreiben={darfSchreiben}
-            hervorgehoben={hervorgehoben}
             onBelegungMelden={oeffneBelegung}
             onAktion={stelleAktion}
           />
@@ -332,20 +343,6 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
           onSchliessen={schliessen}
         />
       )}
-      {dialog?.art === 'stelleBearbeiten' && (
-        <StelleBearbeitenDialog
-          key={dialog.stelle.id}
-          stelle={aktuelleStelle(dialog.stelle)}
-          abschnitte={abschnitte}
-          laeuft={stelleAendernMut.isPending || leermeldungMut.isPending}
-          fehler={leermeldungMut.error ?? stelleAendernMut.error}
-          onLeermeldung={() => leermeldungMut.mutateAsync(dialog.stelle.id)}
-          onErfassen={(patch) =>
-            stelleAendernMut.mutateAsync({ stelleId: dialog.stelle.id, patch })
-          }
-          onSchliessen={schliessen}
-        />
-      )}
       {dialog?.art === 'belegung' && (
         <BelegungMeldenDialog
           key={dialog.stelle.id}
@@ -360,9 +357,10 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
         <StornierenDialog
           titel={`Betreuungsstelle ${dialog.stelle.bezeichnung} stornieren?`}
           text="Nur für Fehlanlagen. Nicht umkehrbar; der ETB-Nachweis bleibt."
+          // Der umkehrbare Weg: Status steht auf der Detailseite der Stelle (LLH-1044).
           stattdessen={{
             text: 'Stattdessen Status setzen',
-            onKlick: () => stelleAktion('bearbeiten', dialog.stelle),
+            onKlick: () => navigate(betreuungsstellePfad(einsatzId, dialog.stelle.id)),
           }}
           laeuft={stelleStornierenMut.isPending}
           fehler={stelleStornierenMut.error}

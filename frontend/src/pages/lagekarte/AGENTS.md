@@ -203,6 +203,23 @@ diese Zusage.
   **ohne** `preventDefault` → Riegel `escGehoertOverlay`, `defaultPrevented` allein reicht nicht.
   Punktzahl aus terra-draws `history`, nie aus DOM-Klicks (die laufen an terra-draw vorbei).
 
+**Abschnittsfokus**
+
+- **Fokus ist Darstellung, kein Filter** (LLH-1057, Spec `lagekarte-abschnitt-fokus`): Zustand
+  nur in `useAbschnittFokus.ts`, an den Einsatz gebunden, nie in Ansicht, Gerätespeicher oder
+  URL. Fremde Kräfte (Einheiten, Fahrzeuge, Abschnittszeichen und -flächen fremder Abschnitte;
+  eigen = Abschnitt samt Unterabschnitten, Einheiten nach `abschnittDerEinheit`) bekommen
+  `gedaempft: true` (`daempfeMarker`/`daempfeFlaechen` in `abschnittFokus.ts`); die Layer lesen
+  es datengetrieben über `deckkraftImFokus` (`markerLayer.ts`). Nie aus der Liste filtern —
+  Ebenenbaum, Zähler, Suche und Klickziele sehen den Fokus nicht. Ohne Fokus kommt dieselbe Liste
+  zurück (Identität, LFH-945). Bündel-Donuts bleiben ungedämpft.
+- Einstieg nur über „Abschnitt fokussieren“ im `Inspector` (Prop `onAbschnittFokussieren`), nicht
+  an der Listenzeile; Band `FokusBand.tsx` im `KartenFuss`. Kamera über
+  `KartenHandle.fokussiere`/`stelleKameraHer` (`fokusKamera.ts`, `BEDIENUNG`): der Stand vor dem
+  ersten Fokus bleibt beim Wechsel A → B. Esc nur bei aktivem Fokus und ohne Modus: erst die
+  Auswahl, dann der Fokus (`escZiel`). `?abschnitt=<id>` liest die Seite als Literal, wartet auf
+  `ladt` und `start`, räumt immer.
+
 **Zielgliederung der Leiste (LLH-1023, Entscheidung 20.10.2026) — Zielbild, noch nicht gebaut**
 
 Vorgabe für jeden Umbau der Kartenleiste. Bis ein Punkt gebaut ist, gelten die Regeln oben
@@ -249,5 +266,4 @@ streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekart
   eigene Knopf, seine Formen stehen in `MessSteuerung`, nicht im Menü.
 - **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum; „Ausgewählt“ steht bis dahin über
   beiden Ansichten) → LLH-1033 (Objekte, Auswahl) → LLH-1038 (Werkzeugmenü). Der Kreis (LLH-1043)
-  kommt als Form ins Menü, „Abschnitt fokussieren“ (LLH-1057) in den Inspector, nicht an die
-  Listenzeile.
+  kommt als Form ins Menü. „Abschnitt fokussieren“ (LLH-1057) ist gebaut (Regel oben).
