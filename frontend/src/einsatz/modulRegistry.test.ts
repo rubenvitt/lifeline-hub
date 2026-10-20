@@ -68,28 +68,39 @@ describe('modulRegistry', () => {
     expect(etb?.route).toBe('etb');
   });
 
-  it('führt Betreuung in der Erfassung direkt nach den Unfallhilfsstellen (LFH-639)', () => {
+  it('führt Evakuierung direkt vor der Betreuung, beide nach den Unfallhilfsstellen (LFH-639, LLH-1034)', () => {
     // Reihenfolge-Pin: dieselbe Folge wie `MODUL_KEYS` im Backend (`src/einsatz/modul.rs`).
     expect(moduleNachKategorie('erfassung').map((m) => m.key)).toEqual([
       'etb',
       'personen',
       'unfallhilfsstellen',
+      'evakuierung',
       'betreuung',
       'tiere',
       'schaeden',
     ]);
+    const evakuierung = modulRegistry.find((m) => m.key === 'evakuierung');
+    expect(evakuierung).toMatchObject({
+      kategorie: 'erfassung',
+      label: 'Evakuierung',
+      route: 'evakuierung',
+      status: 'fertig',
+      beschreibung: 'Räumungsbezirke, Stand evakuiert',
+      // Ohne Zählerquelle fände `darfZaehlerZeigen('evakuierung', …)` kein Modul, Zähler und
+      // Kennzahl blieben aus.
+      zaehlerQuelle: 'evakuierung',
+    });
+    expect(typeof evakuierung?.icon).toBe('function');
     const betreuung = modulRegistry.find((m) => m.key === 'betreuung');
     expect(betreuung).toMatchObject({
       kategorie: 'erfassung',
       label: 'Betreuung',
       route: 'betreuung',
       status: 'fertig',
-      // Ohne Zählerquelle fände `darfZaehlerZeigen('betreuung', …)` kein Modul, Zähler und Kennzahl
-      // blieben aus.
+      beschreibung: 'Betreuungsstellen, Unterbringung',
       zaehlerQuelle: 'betreuung',
     });
     expect(typeof betreuung?.icon).toBe('function');
-    expect(betreuung?.beschreibung?.trim()).toBeTruthy();
   });
 
   it('liefert jede Kategorie aus der Reihenfolge mit mindestens einem Modul', () => {

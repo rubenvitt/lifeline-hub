@@ -1,6 +1,7 @@
 /**
  * Die Kennzahl „Evakuiert N · von M geplant" — reine Ableitung aus den Bezirken der Übersicht
- * (`GET …/betreuung`), für Modulseite, Modulzähler und Lage-Dashboard.
+ * (`GET …/evakuierung`, Modul Evakuierung seit LLH-1034), für Modulseite, Modulzähler und
+ * Lage-Dashboard.
  *
  * Das Prädikat {@link istAktiverBezirk} steht wortgleich im Backend als Auslöser der
  * Lagekennzahl `evakuiert` (`lagekennzahl::ableiten`); wer es ändert, ändert beide.
@@ -71,4 +72,35 @@ export function evakuierungKennzahl(
     }
   }
   return { evakuiert, geplant, bezirke: aktive.length, ohneMeldung, geschaetzt };
+}
+
+/**
+ * Die Lage der Räumung für das Kennzahlenband der Evakuierungsseite (LLH-1034): die Kennzahl
+ * und, über dieselben aktiven Bezirke, wie viele angeordnet, in Räumung und geräumt sind.
+ * `null` ohne aktiven Bezirk — das Band entfällt dann (Abwesenheit, keine Nullen). Rein.
+ */
+export interface BezirkLage {
+  kennzahl: EvakuierungKennzahl;
+  angeordnet: number;
+  laeuft: number;
+  geraeumt: number;
+  /** Eine Plangröße der aktiven Bezirke ist geschätzt („≈" vor „Geplant"). */
+  planGeschaetzt: boolean;
+  /** Ein aktueller Stand der aktiven Bezirke ist geschätzt („≈" vor „Evakuiert"). */
+  standGeschaetzt: boolean;
+}
+
+export function bezirkLage(bezirke: readonly KennzahlBezirk[]): BezirkLage | null {
+  const kennzahl = evakuierungKennzahl(bezirke);
+  if (kennzahl == null) return null;
+  const aktive = bezirke.filter(istAktiverBezirk);
+  const zahl = (r: KennzahlBezirk['raeumung']) => aktive.filter((b) => b.raeumung === r).length;
+  return {
+    kennzahl,
+    angeordnet: zahl('angeordnet'),
+    laeuft: zahl('laeuft'),
+    geraeumt: zahl('geraeumt'),
+    planGeschaetzt: aktive.some((b) => b.plan_erhebung === 'geschaetzt'),
+    standGeschaetzt: aktive.some((b) => b.stand?.erhebung === 'geschaetzt'),
+  };
 }

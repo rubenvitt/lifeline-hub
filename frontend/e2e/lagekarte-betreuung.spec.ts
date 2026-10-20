@@ -186,18 +186,15 @@ test('Betreuungsstelle: aus dem Modul verorten, Marker live auf einer zweiten Ka
   }).toPass({ timeout: 20_000 });
   await expect(ausgewaehlt.getByText('Betreuungsstelle · Notunterkunft')).toBeVisible();
   await page.screenshot({ path: info.outputPath('stelle-nacht.png') });
-  /*
-   * Der Sprung zielt auf `?stelle=`, und die Betreuungsseite räumt den Parameter nach dem
-   * Anwenden (`useQueryParamSelektion`, apply-then-clean). Die Adresse MIT Parameter lebt also
-   * nur, bis die Stellen geladen sind; unter Last war sie schon fort, wenn `toHaveURL` las
-   * (LFH-742, 6 von 90 rot). Geprüft wird deshalb das Ziel am Link und danach der stehende
-   * Endzustand: Adresse ohne Parameter, die Zeile der Stelle hervorgehoben.
-   */
+  // Der Sprung zielt seit LLH-1044 auf die Detailseite der Stelle (Item-Route, kein Parameter,
+  // den eine Seite erst anwenden und räumen müsste).
   const sprung = ausgewaehlt.getByRole('link', { name: /Im Fachmodul öffnen/ });
-  await expect(sprung).toHaveAttribute('href', new RegExp(`/betreuung\\?stelle=${sid}$`));
+  await expect(sprung).toHaveAttribute('href', new RegExp(`/betreuung/${sid}$`));
   await sprung.click();
-  await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/betreuung$`));
-  await expect(page.locator(`tr[data-row-key="stelle-${sid}"]`)).toHaveClass(/zeile-hervorgehoben/);
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/betreuung/${sid}$`));
+  await expect(
+    page.getByRole('heading', { level: 1, name: /Betreuungsstelle NU Turnhalle Nord/ }),
+  ).toBeVisible();
   await andere.context().close();
 });
 
@@ -217,7 +214,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: bid } = await senden(page, 'post', `${basis}/betreuung/bezirke`, {
+  const { id: bid } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
     bezeichnung: 'Uferstraße 12–40',
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',
@@ -229,8 +226,8 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
     evakuierungsbezirk_id: bid,
   });
 
-  // Aus dem Modul: „Auf Karte zeigen" am Bezirk.
-  await page.goto(`/einsaetze/${e}/betreuung`);
+  // Aus dem Modul: „Auf Karte zeigen" am Bezirk (Modul Evakuierung seit LLH-1034).
+  await page.goto(`/einsaetze/${e}/evakuierung`);
   await page.getByRole('button', { name: 'Aktionen zu Bezirk Uferstraße 12–40' }).click();
   await page
     .locator('.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]')
@@ -239,7 +236,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   await karteBereit(page);
   await expect(page).not.toHaveURL(/evakuierungsbezirk=/);
   await expect(page.getByLabel('Gehört zu Evakuierungsbezirk')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Betreuung zu Uferstraße 12–40' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Evakuierung zu Uferstraße 12–40' })).toBeVisible();
   await expect
     .poll(() => zonenLabel(page), { timeout: 30_000 })
     .toContain('Uferstraße 12–40 · Räumung: angeordnet');
@@ -248,7 +245,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   // Räumung aus einer anderen Sitzung → die Beschriftung folgt live.
   await liveOffen(page);
   const andere = await zweiteSitzung(browser);
-  await senden(andere, 'patch', `${basis}/betreuung/bezirke/${bid}`, { raeumung: 'laeuft' });
+  await senden(andere, 'patch', `${basis}/evakuierung/bezirke/${bid}`, { raeumung: 'laeuft' });
   await expect
     .poll(() => zonenLabel(page), { timeout: 30_000 })
     .toContain('Uferstraße 12–40 · Räumung: läuft');
@@ -266,12 +263,14 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   // Storno löst die Fläche; sie bleibt als nicht zugeordnete Bezirksfläche stehen. Nach dem
   // Neuladen verbindet der Strom neu, das Storno darf ihm nicht zuvorkommen.
   await liveOffen(page);
-  await senden(andere, 'post', `${basis}/betreuung/bezirke/${bid}/stornieren`);
+  await senden(andere, 'post', `${basis}/evakuierung/bezirke/${bid}/stornieren`);
   await expect.poll(() => zonenLabel(page), { timeout: 30_000 }).toEqual(['Evakuierungsbezirk']);
   await andere.context().close();
 });
 
-test('ohne Modul Betreuung: Sperrzeile, Fläche nur mit Typwort', async ({ page }) => {
+test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   const LAUF = Date.now();
   const NUTZER = `e2e-betreuung-${LAUF}`;
@@ -286,7 +285,7 @@ test('ohne Modul Betreuung: Sperrzeile, Fläche nur mit Typwort', async ({ page 
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: bid } = await senden(page, 'post', `${basis}/betreuung/bezirke`, {
+  const { id: bid } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
     bezeichnung: 'Uferstraße 12–40',
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',
@@ -297,10 +296,13 @@ test('ohne Modul Betreuung: Sperrzeile, Fläche nur mit Typwort', async ({ page 
     geometrie: JSON.stringify(FLAECHE),
     evakuierungsbezirk_id: bid,
   });
-  await senden(page, 'put', `${basis}/modul-overrides/betreuung`, {
-    sichtbar: true,
-    benoetigte_rolle: 'fuehrungskraft',
-  });
+  // Seit LLH-1034 zwei Module: die Stellen hängen an `betreuung`, Name und Räumung der Fläche an
+  // `evakuierung`.
+  for (const modul of ['betreuung', 'evakuierung'])
+    await senden(page, 'put', `${basis}/modul-overrides/${modul}`, {
+      sichtbar: true,
+      benoetigte_rolle: 'fuehrungskraft',
+    });
   const { id: nutzerId } = await kontoAnlegen(page.request, {
     anzeigename: `E2E Betreuung ${LAUF}`,
     benutzername: NUTZER,

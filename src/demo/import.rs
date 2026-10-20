@@ -1049,6 +1049,8 @@ impl Ablauf<'_> {
                         kapazitaet_personen: Some(v.kapazitaet),
                         standort: Some(v.standort.to_string()),
                         notiz: None,
+                        leitung: None,
+                        erreichbarkeit: None,
                     },
                 )
                 .await?;

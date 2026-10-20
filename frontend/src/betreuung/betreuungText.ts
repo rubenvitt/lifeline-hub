@@ -77,12 +77,27 @@ export function kennzahlText(k: EvakuierungKennzahl | null): string {
   return `${evakuiert ?? 'keine Meldung'} · ${notiz}`;
 }
 
-/** Freie Plätze — `null` ohne Kapazität (Spec: „keine Zahl freier Plätze") oder ohne Meldung. */
+/**
+ * Freie Plätze — `null` ohne Kapazität (Spec: „keine Zahl freier Plätze") oder ohne Meldung. Nie
+ * negativ (LLH-1044): „frei" fragt nach Platz, wie weit eine Stelle darüber liegt, sagt das
+ * Auslastungswort „überbelegt". Die einzige Rechnung dafür — Übersicht, Detailseite und Gerät.
+ */
 export function freiePlaetze(
   s: Pick<Betreuungsstelle, 'kapazitaet_personen' | 'belegung'>,
 ): number | null {
   if (s.kapazitaet_personen == null || s.belegung == null) return null;
-  return s.kapazitaet_personen - s.belegung.belegt;
+  return Math.max(0, s.kapazitaet_personen - s.belegung.belegt);
+}
+
+/**
+ * „in Betreuung": Summe der aktuellen Belegungen aller Stellen (die Liste trägt keine
+ * stornierten). `null`, solange keine Stelle gemeldet hat — „nichts gemeldet" ist nicht
+ * „niemand in Betreuung".
+ */
+export function inBetreuung(stellen: readonly Pick<Betreuungsstelle, 'belegung'>[]): number | null {
+  const gemeldet = stellen.filter((s) => s.belegung != null);
+  if (gemeldet.length === 0) return null;
+  return gemeldet.reduce((n, s) => n + s.belegung!.belegt, 0);
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
   BetreuungUebersicht,
+  EvakuierungUebersicht,
   Einheit,
   EinheitPerioden,
   EinsatzAnzeige,
@@ -442,10 +443,10 @@ describe('3.4 Bilanz', () => {
     expect(vermerke(abschnitt(leer, 'bilanz', 'Schäden'))).toEqual([KEINE_EINTRAEGE]);
   });
 
-  it('Betreuung und Evakuierung aus Bezirken und Stellen; ausgeblendet mit Vermerk', () => {
+  it('Evakuierung aus den Bezirken, Betreuung aus den Stellen; je Modul ein Vermerk (LLH-1034)', () => {
     const b = verdichteEinsatzbericht(
       rohBericht({
-        betreuung: daten({
+        evakuierung: daten({
           bezirke: [
             {
               raeumung: 'laufend',
@@ -462,6 +463,8 @@ describe('3.4 Bilanz', () => {
               stand: null,
             },
           ],
+        } as unknown as EvakuierungUebersicht),
+        betreuung: daten({
           stellen: [
             { storniert_at: null, kapazitaet_personen: 100, belegung: { belegt: 30 } },
             {
@@ -474,18 +477,24 @@ describe('3.4 Bilanz', () => {
       }),
       konv,
     );
-    const a = abschnitt(b, 'bilanz', 'Betreuung und Evakuierung');
-    expect(wert(a, 'Evakuiert')).toBe('25 von 50 geplant');
-    expect(wert(a, 'Bezirke ohne Standmeldung')).toBe('1');
+    const e = abschnitt(b, 'bilanz', 'Evakuierung');
+    expect(wert(e, 'Evakuiert')).toBe('25 von 50 geplant');
+    expect(wert(e, 'Bezirke ohne Standmeldung')).toBe('1');
+    const a = abschnitt(b, 'bilanz', 'Betreuung');
     expect(wert(a, 'Betreuungsstellen')).toBe('1');
     expect(wert(a, 'Belegt')).toBe('30 von 100 Plätzen');
+    // Zwei Module, zwei Vermerke: ohne Betreuung bleibt die Evakuierung im Bericht.
     const aus = verdichteEinsatzbericht(
       rohBericht({ betreuung: { zustand: 'nicht-genutzt' } }),
       konv,
     );
-    expect(vermerke(abschnitt(aus, 'bilanz', 'Betreuung und Evakuierung'))).toEqual([
-      NICHT_GENUTZT,
-    ]);
+    expect(vermerke(abschnitt(aus, 'bilanz', 'Betreuung'))).toEqual([NICHT_GENUTZT]);
+    expect(vermerke(abschnitt(aus, 'bilanz', 'Evakuierung'))).toEqual([KEINE_EINTRAEGE]);
+    const ohneEvak = verdichteEinsatzbericht(
+      rohBericht({ evakuierung: { zustand: 'nicht-genutzt' } }),
+      konv,
+    );
+    expect(vermerke(abschnitt(ohneEvak, 'bilanz', 'Evakuierung'))).toEqual([NICHT_GENUTZT]);
   });
 
   it('Verpflegung als Summe über die Zeitfenster', () => {

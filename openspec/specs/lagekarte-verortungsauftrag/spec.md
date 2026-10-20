@@ -51,5 +51,5 @@ Auftrag übernommen werden. Unter `lg` MUST jede Handlung genau einen Knopf habe
 
 #### Scenario: Schaden und Betreuungsstelle
 - **WHEN** ein Schaden aus seinem Detail oder eine Betreuungsstelle aus der Betreuungsseite
-  verortet wird
-- **THEN** führt „Zurück zu …“ auf die Seite, von der der Auftrag kam
+  oder ihrer Detailseite verortet wird
+- **THEN** führt „Zurück zu …“ auf die Detailseite des Schadens bzw. der Stelle

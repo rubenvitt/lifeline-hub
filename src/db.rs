@@ -748,6 +748,96 @@ mod tests {
         );
     }
 
+    /// LLH-1034: `evakuierung` übernimmt jede Vorgabe von `betreuung` vollständig (Rolle und
+    /// Sichtbarkeit), andere Module bleiben unberührt.
+    #[tokio::test]
+    async fn migration_0224_spiegelt_betreuung_auf_evakuierung() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 224)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0224");
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'betreuung', NULL, 'fuehrungskraft'), (2, 'betreuung', 0, NULL), \
+                    (3, 'betreuung', 1, 'admin'), (4, 'etb', 0, 'admin')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO org_modul_einstellung (org_id, modul_key, sichtbar, benoetigte_rolle) \
+             VALUES (1, 'betreuung', 0, NULL), (2, 'etb', NULL, 'admin'), \
+                    (3, 'betreuung', NULL, 'einsatzfuehrung')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migrate(&pool).await.expect("0224 läuft durch");
+
+        let einsatz: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT einsatz_id, sichtbar, benoetigte_rolle FROM einsatz_modul_override \
+             WHERE modul_key = 'evakuierung' ORDER BY einsatz_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, None, Some("fuehrungskraft".to_string())),
+                (2, Some(0), None),
+                (3, Some(1), Some("admin".to_string())),
+            ]
+        );
+        let org: Vec<(i64, Option<i64>, Option<String>)> = sqlx::query_as(
+            "SELECT org_id, sichtbar, benoetigte_rolle FROM org_modul_einstellung \
+             WHERE modul_key = 'evakuierung' ORDER BY org_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            org,
+            [
+                (1, Some(0), None),
+                (3, None, Some("einsatzfuehrung".to_string()))
+            ]
+        );
+        // Die Quelle bleibt unverändert.
+        let betreuung: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_modul_override WHERE modul_key = 'betreuung'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(betreuung, 3);
+    }
+
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
     /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
     /// und die Migrationsbuchhaltung.

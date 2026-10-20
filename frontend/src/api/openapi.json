@@ -2837,18 +2837,11 @@
       },
       "BetreuungUebersicht": {
         "type": "object",
-        "description": "Die eine Lesequelle der Modulseite (`GET …/betreuung`): alle nicht stornierten Bezirke\nund Stellen eines Einsatzes.",
+        "description": "Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen\neines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].",
         "required": [
-          "bezirke",
           "stellen"
         ],
         "properties": {
-          "bezirke": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/EvakuierungsbezirkAnzeige"
-            }
-          },
           "namentlich": {
             "type": [
               "array",
@@ -2857,7 +2850,7 @@
             "items": {
               "$ref": "#/components/schemas/StelleNamentlich"
             },
-            "description": "„davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib\n`notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt\nganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in\nder Route: `repo::uebersicht` speist auch den gesicherten Lagestand. Die Zahl geht in\nkeine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung."
+            "description": "„davon namentlich“ (LFH-674): je Stelle die Zahl der Personen, deren jüngster Verbleib\n`notunterkunft` an dieser Stelle ist — nur Stellen mit mindestens einer Person. Fehlt\nganz, wenn der Lesende das Modul Personen nicht sehen darf (nicht „0“). Gefüllt NUR in\nder Route: `repo::stellen` speist auch den gesicherten Lagestand. Die Zahl geht in\nkeine Belegung, Kopfzahl oder Summe ein — führend ist die Mengenmeldung."
           },
           "stellen": {
             "type": "array",
@@ -2916,6 +2909,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "erreichbarkeit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wie die Stelle erreichbar ist (LLH-1044), Freitext. Fehlt ohne Angabe."
+          },
           "geaendert_at": {
             "type": [
               "string",
@@ -2941,6 +2941,13 @@
             ],
             "format": "double",
             "description": "Koordinate auf der Lagekarte (LFH-673). Beide fehlen = nicht verortet; die App hält\nsie als Paar."
+          },
+          "leitung": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wer die Stelle leitet (LLH-1044), Freitext. Fehlt ohne Angabe."
           },
           "lon": {
             "type": [
@@ -7025,6 +7032,21 @@
           }
         }
       },
+      "EvakuierungUebersicht": {
+        "type": "object",
+        "description": "Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht\nstornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne\nBruch des Drahts dazukommen.",
+        "required": [
+          "bezirke"
+        ],
+        "properties": {
+          "bezirke": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvakuierungsbezirkAnzeige"
+            }
+          }
+        }
+      },
       "EvakuierungsbezirkAnzeige": {
         "type": "object",
         "description": "Öffentliche Darstellung eines Evakuierungsbezirks mit seinem aktuellen Stand.",
@@ -7065,7 +7087,7 @@
           "flaechen": {
             "type": "integer",
             "format": "int64",
-            "description": "Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind\n(LFH-673). Immer gesetzt, 0 ohne Fläche — die Betreuungsseite bietet „Auf Karte\nzeigen\" nur bei > 0 an und braucht dafür keine Zonenliste (die hängt am Modul Lagekarte)."
+            "description": "Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind\n(LFH-673). Immer gesetzt, 0 ohne Fläche — die Evakuierungsseite bietet „Auf Karte\nzeigen\" nur bei > 0 an und braucht dafür keine Zonenliste (die hängt am Modul Lagekarte)."
           },
           "geaendert_at": {
             "type": [
@@ -9848,6 +9870,7 @@
           "dokument",
           "abloesung",
           "betreuung",
+          "evakuierung",
           "verpflegung",
           "presse",
           "infotelefon",

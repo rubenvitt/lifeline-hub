@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ladeBetreuung } from '../api/betreuung';
+import { ladeEvakuierung } from '../api/evakuierung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben } from '../api/types';
 import { darfZaehlerZeigen } from '../einsatz/useModulZaehler';
@@ -35,19 +35,19 @@ interface Args {
 }
 
 /**
- * Kennzahl aus der Betreuungs-Übersicht, gelesen vom Lage-Dashboard. DIESELBE Query wie
- * Modulseite und Modulzähler; gegatet über `darfZaehlerZeigen('betreuung', …)` wie der Zähler
- * in der Navigation.
+ * Kennzahl aus der Evakuierungs-Übersicht (Modul Evakuierung, LLH-1034), gelesen vom
+ * Lage-Dashboard. DIESELBE Query wie Modulseite und Modulzähler; gegatet über
+ * `darfZaehlerZeigen('evakuierung', …)` wie der Zähler in der Navigation.
  */
 export function useEvakuierungKennzahl({
   einsatzId,
   freigaben,
   bereit = true,
 }: Args): EvakuierungKennzahlZustand {
-  const aktiv = Number.isFinite(einsatzId) && darfZaehlerZeigen('betreuung', freigaben);
+  const aktiv = Number.isFinite(einsatzId) && darfZaehlerZeigen('evakuierung', freigaben);
   const query = useQuery({
-    queryKey: einsatzKeys.betreuung(einsatzId),
-    queryFn: () => ladeBetreuung(einsatzId),
+    queryKey: einsatzKeys.evakuierung(einsatzId),
+    queryFn: () => ladeEvakuierung(einsatzId),
     enabled: bereit && aktiv,
   });
   const { isError, error, isSuccess, data } = query;

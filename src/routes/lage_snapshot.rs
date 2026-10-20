@@ -69,9 +69,10 @@ const REDIGIERBARE_MODUL_FELDER: &[(&str, &str)] = &[
     ("abschnitte", "einsatzabschnitte"),
     ("gefahrengebiete", "gefahrenzonen"),
     ("lagemeldungen", "lagemeldungen"),
-    // LFH-673: Stellen und Bezirke hängen am Modul Betreuung (`EinsatzLesezugriff<Betreuung>`).
+    // LFH-673: Stellen hängen am Modul Betreuung (`EinsatzLesezugriff<Betreuung>`), Bezirke seit
+    // LLH-1034 am Modul Evakuierung (`EinsatzLesezugriff<Evakuierung>`).
     ("betreuungsstellen", "betreuung"),
-    ("evakuierungsbezirke", "betreuung"),
+    ("evakuierungsbezirke", "evakuierung"),
     // LLH-1107: Räume hängen am Modul Bereitstellungsräume (`EinsatzLesezugriff<…>` der Liste).
     ("bereitstellungsraeume", "bereitstellungsraeume"),
     // LLH-1123: Tiere hängen am Modul Tiere.

@@ -865,12 +865,17 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren",
             ),
-            ("POST", "/api/einsaetze/{id}/betreuung/bezirke"),
+            // Bezirke sind das eigene Modul Evakuierung (LLH-1034); die Stelle sieht keins davon.
+            ("GET", "/api/einsaetze/{id}/evakuierung"),
+            ("POST", "/api/einsaetze/{id}/evakuierung/bezirke"),
             (
                 "POST",
-                "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende",
+                "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende",
             ),
-            ("GET", "/api/einsaetze/{id}/betreuung/bezirke/{bid}/staende"),
+            (
+                "GET",
+                "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende",
+            ),
             ("POST", "/api/einsaetze/{id}/personen/{pid}/sichtung"),
             ("POST", "/api/einsaetze/{id}/personen/{pid}/uhs-belegung"),
             ("GET", "/api/einsaetze/{id}/uhs"),

@@ -38,7 +38,9 @@ beforeEach(() => {
   server.use(
     http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
     // Ebene „Betreuungsstellen": dieselbe Lage, ohne Benutzer ist das Modul frei.
-    http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+    http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ stellen: [] })),
+    // Bezirke für die Bezirksflächen: Modul Evakuierung (LLH-1034).
+    http.get('/api/einsaetze/5/evakuierung', () => HttpResponse.json({ bezirke: [] })),
   );
 });
 
@@ -586,7 +588,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 
   /** Alle Live-Quellen gesund; Overrides und Betreuung je Fall. Liefert den Abrufzähler. */
   function handler(freigaben: Record<string, Partial<ModulFreigabe>>, betreuung: () => Response) {
-    const zaehler = { betreuung: 0 };
+    const zaehler = { betreuung: 0, evakuierung: 0 };
     server.use(
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
@@ -629,6 +631,12 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
         zaehler.betreuung += 1;
         return betreuung();
       }),
+      // Dieselbe Antwort trägt die Bezirke; seit LLH-1034 liest die Karte sie aus dem Modul
+      // Evakuierung. Ein Feld zu viel stört keine der beiden Abfragen.
+      http.get('/api/einsaetze/5/evakuierung', () => {
+        zaehler.evakuierung += 1;
+        return betreuung();
+      }),
     );
     return zaehler;
   }
@@ -640,7 +648,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
   }
 
   it('frei: verortete Stelle in `alleVerortet`, unverortete in „Nicht verortet", Rohdaten fürs Raster', async () => {
-    handler({}, () => HttpResponse.json({ bezirke: [], stellen: [STELLE, UNVERORTET] }));
+    handler({}, () => HttpResponse.json({ stellen: [STELLE, UNVERORTET] }));
     const { result } = render();
     await waitFor(() =>
       expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
@@ -661,7 +669,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
 
   it('Server verweigert das Modul: „gesperrt" und KEIN Request an …/betreuung', async () => {
     const z = handler({ betreuung: { zugriff: false } }, () =>
-      HttpResponse.json({ bezirke: [], stellen: [STELLE] }),
+      HttpResponse.json({ stellen: [STELLE] }),
     );
     const { result } = render();
     await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
@@ -678,10 +686,15 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
 
-  it('echter Ausfall (500) bei freiem Modul: „Betreuungsstellen" steht im Ausfall', async () => {
+  it('echter Ausfall (500) bei freiem Modul: „Betreuungsstellen" und „Evakuierungsbezirke" stehen im Ausfall', async () => {
     handler({}, () => new HttpResponse(null, { status: 500 }));
     const { result } = render();
-    await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Betreuungsstellen']));
+    await waitFor(() =>
+      expect(result.current.fehlerhafteQuellen).toEqual([
+        'Betreuungsstellen',
+        'Evakuierungsbezirke',
+      ]),
+    );
     expect(result.current.betreuungZugriff).toBe('frei');
     expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
   });
@@ -791,7 +804,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(true),
     );
     expect(result.current.bezirke).toHaveLength(1);
-    // Die Leitung sperrt das Modul; die Freigaben laden neu, der Betreuungs-Cache bleibt stehen.
+    // Die Leitung sperrt die Betreuung; die Freigaben laden neu, der Betreuungs-Cache bleibt stehen.
     server.use(
       http.get('/api/einsaetze/5/modul-freigaben', () =>
         HttpResponse.json(freigabenFixture({ betreuung: { zugriff: false } })),
@@ -802,8 +815,22 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
     expect(client.getQueryData(['einsatz-betreuung', 5])).toBeTruthy(); // Vorbedingung: Altstand
     expect(result.current.alleVerortet.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
     expect(result.current.nichtVerortetAlle.some((m) => m.typ === 'betreuungsstelle')).toBe(false);
-    expect(result.current.bezirke).toEqual([]);
     expect(result.current.rohdaten.betreuungsstellen).toEqual([]);
+    // Zwei Module (LLH-1034): die Bezirke hängen an der Evakuierung und bleiben.
+    expect(result.current.bezirke).toHaveLength(1);
+
+    // Erst die gesperrte Evakuierung nimmt sie, trotz Altstand im Cache.
+    server.use(
+      http.get('/api/einsaetze/5/modul-freigaben', () =>
+        HttpResponse.json(
+          freigabenFixture({ betreuung: { zugriff: false }, evakuierung: { zugriff: false } }),
+        ),
+      ),
+    );
+    await client.invalidateQueries({ queryKey: ['einsatz-modul-freigaben', 5] });
+    await waitFor(() => expect(result.current.evakuierungZugriff).toBe('gesperrt'));
+    expect(client.getQueryData(['einsatz-evakuierung', 5])).toBeTruthy(); // Vorbedingung
+    expect(result.current.bezirke).toEqual([]);
   });
 
   it('Bezirksfläche ohne Modulrecht: nur das Typwort, keine Bezirksangaben', async () => {
@@ -825,7 +852,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       ),
     );
     const { result } = render();
-    await waitFor(() => expect(result.current.betreuungZugriff).toBe('gesperrt'));
+    await waitFor(() => expect(result.current.evakuierungZugriff).toBe('gesperrt'));
     await waitFor(() => expect(result.current.zonenFeatures[0]?.label).toBe('Evakuierungsbezirk'));
     expect(result.current.bezirke).toEqual([]);
   });

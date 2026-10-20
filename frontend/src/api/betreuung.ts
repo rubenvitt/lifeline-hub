@@ -7,23 +7,17 @@ import type {
   Betreuungsstelle,
   BetreuungsstelleEingabe,
   BetreuungsstellePatch,
-  BezirkMeldung,
-  Evakuierungsbezirk,
-  EvakuierungsbezirkEingabe,
-  EvakuierungsbezirkPatch,
-  StandVerlaufEintrag,
-  StandmeldungEingabe,
   StelleMeldung,
 } from './types';
 
 /**
- * Fachmodul Betreuung: Evakuierungsbezirke mit Standmeldungen, Betreuungsstellen mit
- * Belegungsmeldungen. Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über
+ * Fachmodul Betreuung: Betreuungsstellen mit Belegungsmeldungen. Die Evakuierungsbezirke sind seit
+ * LLH-1034 das eigene Modul Evakuierung (`api/evakuierung.ts`). Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über
  * `alsBackendZeit`, zurück über `alsZeitpunkt` (`anzeige/zeitEingabe.ts`), nie über `dayjs(s)`.
  */
 const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/betreuung`;
 
-/** Die eine Lesequelle: alle nicht stornierten Bezirke und Stellen samt aktueller Meldung. */
+/** Die eine Lesequelle: alle nicht stornierten Stellen samt aktueller Meldung. */
 export function ladeBetreuung(einsatzId: number): Promise<BetreuungUebersicht> {
   return apiGet<BetreuungUebersicht>(basis(einsatzId));
 }
@@ -42,66 +36,14 @@ export function ladeBelegungKopfzahl(
 }
 
 /**
- * Standreihe eines Bezirks samt zurückgenommener Meldungen, in der Ordnung, in der der Server
- * „aktuell“ bestimmt (jüngster Zeitpunkt zuerst). Fremder/unbekannter Bezirk: 404.
+ * Belegungsreihe einer Stelle samt zurückgenommener Meldungen, in der Ordnung, in der der Server
+ * „aktuell“ bestimmt (jüngster Zeitpunkt zuerst). Fremde/unbekannte Stelle: 404.
  */
-export function ladeStandVerlauf(
-  einsatzId: number,
-  bezirkId: number,
-): Promise<StandVerlaufEintrag[]> {
-  return apiGet<StandVerlaufEintrag[]>(`${basis(einsatzId)}/bezirke/${bezirkId}/staende`);
-}
-
-/** Belegungsreihe einer Stelle, wie {@link ladeStandVerlauf}. */
 export function ladeBelegungVerlauf(
   einsatzId: number,
   stelleId: number,
 ): Promise<BelegungVerlaufEintrag[]> {
   return apiGet<BelegungVerlaufEintrag[]>(`${basis(einsatzId)}/stellen/${stelleId}/belegungen`);
-}
-
-export function legeBezirkAn(
-  einsatzId: number,
-  body: EvakuierungsbezirkEingabe,
-): Promise<Evakuierungsbezirk> {
-  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/bezirke`, 'POST', body);
-}
-
-export function aendereBezirk(
-  einsatzId: number,
-  bezirkId: number,
-  body: EvakuierungsbezirkPatch,
-): Promise<Evakuierungsbezirk> {
-  return apiSend<Evakuierungsbezirk>(`${basis(einsatzId)}/bezirke/${bezirkId}`, 'PATCH', body);
-}
-
-/** Unumkehrbar (Fehlanlage); ein zweites Stornieren ist 409. */
-export function storniereBezirk(einsatzId: number, bezirkId: number): Promise<Evakuierungsbezirk> {
-  return apiSend<Evakuierungsbezirk>(
-    `${basis(einsatzId)}/bezirke/${bezirkId}/stornieren`,
-    'POST',
-    {},
-  );
-}
-
-/** Mit `client_id` idempotent: ein Replay liefert die gespeicherte Meldung. */
-export function meldeStand(
-  einsatzId: number,
-  bezirkId: number,
-  body: StandmeldungEingabe,
-  optionen?: ApiSendOptionen,
-): Promise<BezirkMeldung> {
-  return apiSend<BezirkMeldung>(
-    `${basis(einsatzId)}/bezirke/${bezirkId}/staende`,
-    'POST',
-    body,
-    optionen,
-  );
-}
-
-/** Rückweg einer Standmeldung; `standId` ist `BezirkMeldung.meldung_id`. Zweimal → 422. */
-export function nimmStandZurueck(einsatzId: number, standId: number): Promise<BezirkMeldung> {
-  return apiSend<BezirkMeldung>(`${basis(einsatzId)}/staende/${standId}/zuruecknehmen`, 'POST', {});
 }
 
 export function legeStelleAn(

@@ -131,18 +131,18 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     let bezirk = angelegt(
         app,
         cookie,
-        &format!("{basis}/betreuung/bezirke"),
+        &format!("{basis}/evakuierung/bezirke"),
         r#"{"bezeichnung":"Geheim-Bezirk Ufer","plan_personen":640,"plan_erhebung":"geschaetzt"}"#,
         "Bezirk",
     )
     .await["id"]
         .as_i64()
         .unwrap();
-    let url = format!("{basis}/betreuung/bezirke/{bezirk}/staende");
+    let url = format!("{basis}/evakuierung/bezirke/{bezirk}/staende");
     let body = json!({"evakuiert":12,"erhebung":"gezaehlt","client_id":"r-stand"});
     angelegt(app, cookie, &url, &body.to_string(), "Stand").await;
     faelle.push(Fall {
-        route: "betreuung/staende",
+        route: "evakuierung/staende",
         url,
         body: body.to_string(),
         body_unbekannt: json!({"evakuiert":13,"erhebung":"gezaehlt","client_id":"r-stand-neu"})

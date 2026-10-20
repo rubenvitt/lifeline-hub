@@ -1,4 +1,5 @@
-import { meldeBelegung, meldeStand } from '../api/betreuung';
+import { meldeBelegung } from '../api/betreuung';
+import { meldeStand } from '../api/evakuierung';
 import { ApiError } from '../api/client';
 import { bucheEintreffen } from '../api/einsatzBereitstellungsraum';
 import { legePersonAn, type PersonAnlegenEingabe } from '../api/einsatzPerson';

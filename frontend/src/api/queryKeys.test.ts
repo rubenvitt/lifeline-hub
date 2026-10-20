@@ -36,6 +36,7 @@ describe('EINSATZ_KEYS', () => {
     expect(EINSATZ_KEYS.abloesungen).toBe('einsatz-abloesungen');
     expect(EINSATZ_KEYS.kraefteZeitachse).toBe('einsatz-kraefte-zeitachse');
     expect(EINSATZ_KEYS.betreuung).toBe('einsatz-betreuung');
+    expect(EINSATZ_KEYS.evakuierung).toBe('einsatz-evakuierung');
     expect(EINSATZ_KEYS.verpflegung).toBe('einsatz-verpflegung');
     expect(EINSATZ_KEYS.presse).toBe('einsatz-presse');
     expect(EINSATZ_KEYS.infotelefon).toBe('einsatz-infotelefon');
@@ -119,7 +120,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
     ]);
   });
 
-  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055)', () => {
+  it('bildet abschnitt auf Abschnitte, Führungskräfte, Modulzähler, Ablösung, Betreuung, Evakuierung, Lagemonitor, BR-Liste und Verpflegung ab (LFH-612/635/639, LLH-1095, LLH-1055, LLH-1034)', () => {
     // Bezirke, Stellen und die Liste der Bereitstellungsräume tragen den Abschnittsnamen per Join;
     // fehlen sie hier, zeigt die Seite still den alten Namen. Der Lagemonitor zeigt die
     // Abschnittsflächen (LLH-1153).
@@ -129,6 +130,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.modulZaehler,
       EINSATZ_KEYS.abloesungen,
       EINSATZ_KEYS.betreuung,
+      EINSATZ_KEYS.evakuierung,
       EINSATZ_KEYS.lagemonitor,
       EINSATZ_KEYS.br,
       // Die Empfängerliste der Verpflegung trägt die Abschnitte (LLH-1055 D4).
@@ -475,21 +477,11 @@ describe('einsatzKeys (Factory-Output)', () => {
     // Ohne Stichtag ein fester Platzhalter statt eines Zeitstempels, sonst entstünde bei jedem
     // Rendern ein neuer Key.
     expect(einsatzKeys.betreuungKopfzahl(1)).toEqual(['einsatz-betreuung', 1, 'kopfzahl', 'jetzt']);
-    // Verlauf UNTER dem Betreuungs-Prefix, ohne eigenen Event-Eintrag.
-    expect(einsatzKeys.betreuungVerlauf(1, 'bezirk', 5)).toEqual([
-      'einsatz-betreuung',
-      1,
-      'verlauf',
-      'bezirk',
-      5,
-    ]);
-    expect(einsatzKeys.betreuungVerlauf(1, 'stelle', 9)).toEqual([
-      'einsatz-betreuung',
-      1,
-      'verlauf',
-      'stelle',
-      9,
-    ]);
+    // Verlauf UNTER dem Prefix seines Moduls, ohne eigenen Event-Eintrag (LLH-1034: Bezirke
+    // gehören zur Evakuierung).
+    expect(einsatzKeys.betreuungVerlauf(1, 9)).toEqual(['einsatz-betreuung', 1, 'verlauf', 9]);
+    expect(einsatzKeys.evakuierung(1)).toEqual(['einsatz-evakuierung', 1]);
+    expect(einsatzKeys.evakuierungVerlauf(1, 5)).toEqual(['einsatz-evakuierung', 1, 'verlauf', 5]);
     expect(einsatzKeys.verpflegung(1)).toEqual(['einsatz-verpflegung', 1]);
     // Presse S5: Listen und Detail als Sub-Keys unter EINEM Prefix, das `presse`-Ereignis trifft alle.
     expect(einsatzKeys.presse(1)).toEqual(['einsatz-presse', 1]);

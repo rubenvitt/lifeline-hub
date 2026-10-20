@@ -1,9 +1,10 @@
-//! Routen des Fachmoduls Betreuung (LFH-639): Evakuierungsbezirke mit Standmeldungen,
-//! Betreuungsstellen mit Belegungsmeldungen und die Kopfzahl „in Betreuung“.
+//! Routen des Fachmoduls Betreuung (LFH-639): Betreuungsstellen mit Belegungsmeldungen und die
+//! Kopfzahl „in Betreuung“. Die Evakuierungsbezirke sind seit LLH-1034 ein eigenes Modul
+//! (`routes/evakuierung.rs`); Tabellen und Repo teilen beide.
 //!
 //! Gates strukturell über `EinsatzLesezugriff<Betreuung>` (alle Einsatzmitglieder inkl.
 //! Beobachter) bzw. `EinsatzSchreibzugriff<Betreuung>` (Schreibrecht, aktiver Einsatz, Modul).
-//! Die zwei Melde-Routen nehmen `EinsatzSchreibfreigabe<Betreuung>` und prüfen den aktiven
+//! Die Melde-Route nimmt `EinsatzSchreibfreigabe<Betreuung>` und prüft den aktiven
 //! Einsatz selbst, NACH dem Replay-Lookup ihrer `client_id` (LFH-675, design.md D2): eine
 //! offline erfasste und schon gespeicherte Meldung kommt auch nach Einsatzende zurück, solange
 //! der Einsatz lesbar ist (Lese-Gate im Extractor, LFH-769).
@@ -20,22 +21,17 @@
 //!   hier nicht entstehen.
 //! - **422** — ein umkehrbarer Zustand verbietet die Aktion: belegte Stelle schließen,
 //!   geschlossene Stelle belegen, Belegungsmeldung an geschlossener Stelle zurücknehmen,
-//!   bereits zurückgenommene Meldung erneut zurücknehmen, `client_id` einer Meldung an einem
-//!   anderen Bezirk bzw. einer anderen Stelle (LFH-675).
+//!   bereits zurückgenommene Meldung erneut zurücknehmen, `client_id` einer Meldung an einer
+//!   anderen Stelle (LFH-675).
 //!
 //! Die fachlichen Prüfungen liegen im Repo; die Route liest JSON, Enums und Zeitpunkte und
 //! öffnet die Transaktion. Zeiten werden hier normalisiert (`etb::normalisiere_zeit`), nie im
 //! Repo — dieselbe Arbeitsteilung wie in `routes/abloesung.rs`.
 //!
 //! **Live** nach dem Commit (design.md D5): jeder ETB-Eintrag als ETB-Kurzruf, danach
-//! `LiveEvent::Betreuung` mit Kennungen only (`{einsatz_id, bezirk_id}` bzw.
-//! `{einsatz_id, stelle_id}`) — keine Anzahlen, Bezeichnungen oder Freitexte. Ein PATCH ohne
-//! wirksame Änderung (Leerlauf-Riegel im Repo, leere `etb_ids`) publiziert nichts.
-//!
-//! **Lagekennzahl** (LFH-855): Anlegen, Ändern und Stornieren eines Bezirks lesen die
-//! Lagekennzahlen des Einsatzes vor und nach dem Repo-Aufruf in derselben Transaktion. Schaltet
-//! `evakuiert` um, meldet die Route nach dem Commit zusätzlich den Einsatzkopf (`einsatz`,
-//! [`kopf_bei_umschalten`]). Stand- und Stellenmeldungen schalten ihn nie.
+//! `LiveEvent::Betreuung` mit Kennungen only (`{einsatz_id, stelle_id}`) — keine Anzahlen,
+//! Bezeichnungen oder Freitexte. Ein PATCH ohne wirksame Änderung (Leerlauf-Riegel im Repo,
+//! leere `etb_ids`) publiziert nichts.
 
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -44,42 +40,28 @@ use chrono::Utc;
 use serde::Deserialize;
 
 use crate::app::AppState;
-use crate::betreuung::repo::{
-    self, BelegungEingabe, BezirkAenderung, BezirkEingabe, StandEingabe, StelleAenderung,
-    StelleEingabe,
-};
+use crate::betreuung::repo::{self, BelegungEingabe, StelleAenderung, StelleEingabe};
 use crate::betreuung::{
     enum_wert, BelegungKopfzahl, BelegungVerlaufEintrag, BetreuungUebersicht,
-    BetreuungsstelleAnzeige, BezirkMeldungAnzeige, EvakuierungsbezirkAnzeige, StandVerlaufEintrag,
-    StelleMeldungAnzeige, StelleNamentlich,
+    BetreuungsstelleAnzeige, StelleMeldungAnzeige, StelleNamentlich, ERREICHBARKEIT_MAX,
+    LEITUNG_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
-use crate::einsatz::lagekennzahl;
 use crate::einsatz::modul::Betreuung;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::geraet::stelle::{self, Sicht};
 use crate::geraet::Bindungsart;
 use crate::live::LiveEvent;
-use crate::routes::support;
-
-/// Worauf ein Live-Ereignis zeigt. Nur die Kennung geht auf den Draht.
-#[derive(Clone, Copy)]
-enum Objekt {
-    Bezirk(i64),
-    Stelle(i64),
-}
+use crate::routes::support::{self, optional_max, optional_max_tri};
 
 /// Nach dem Commit: ETB-Kurzruf je Eintrag, dann das Modul-Ereignis mit Kennungen only.
-fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], objekt: Objekt) {
+fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], stelle_id: i64) {
     for etb_id in etb_ids {
         state.live.publiziere(einsatz_id, *etb_id);
     }
-    let nutzlast = match objekt {
-        Objekt::Bezirk(id) => serde_json::json!({ "einsatz_id": einsatz_id, "bezirk_id": id }),
-        Objekt::Stelle(id) => serde_json::json!({ "einsatz_id": einsatz_id, "stelle_id": id }),
-    };
+    let nutzlast = serde_json::json!({ "einsatz_id": einsatz_id, "stelle_id": stelle_id });
     state
         .live
         .publiziere_event(einsatz_id, LiveEvent::Betreuung, nutzlast.to_string());
@@ -89,19 +71,9 @@ fn publiziere(state: &AppState, einsatz_id: i64, etb_ids: &[i64], objekt: Objekt
 /// ohne neuen Wert schreibt keinen ETB-Eintrag und soll auch niemanden neu laden lassen).
 /// Wirksam ist auch eine Änderung ohne ETB-Eintrag — die Verortung einer Stelle
 /// (`still_geaendert`, LFH-673 design.md D3).
-fn publiziere_wirksam(state: &AppState, einsatz_id: i64, g: &repo::Geschrieben, objekt: Objekt) {
+fn publiziere_wirksam(state: &AppState, einsatz_id: i64, g: &repo::Geschrieben) {
     if !g.etb_ids.is_empty() || g.still_geaendert {
-        publiziere(state, einsatz_id, &g.etb_ids, objekt);
-    }
-}
-
-/// Nach dem Commit: den Einsatzkopf melden, wenn die Bezirksänderung eine Lagekennzahl
-/// umgeschaltet hat (LFH-855). Der Kopf zeigt `lagekennzahlen` jedem Leser, auch ohne Modul
-/// Betreuung — das ungegatete `einsatz` verrät also nichts darüber hinaus, und eine Änderung
-/// ohne Umschalten bleibt für ihn unsichtbar.
-async fn kopf_bei_umschalten(state: &AppState, einsatz_id: i64, umgeschaltet: bool) {
-    if umgeschaltet {
-        crate::routes::einsatz::kopf_geaendert(state, einsatz_id).await;
+        publiziere(state, einsatz_id, &g.etb_ids, g.id);
     }
 }
 
@@ -111,8 +83,8 @@ fn enum_opt<T: TryFrom<String, Error = String>>(s: Option<String>) -> Result<Opt
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/betreuung — nicht stornierte Bezirke und Stellen mit aktueller
-/// Meldung. Die eine Quelle für Modulseite, Modulzähler und Kennzahl.
+/// GET /api/einsaetze/{id}/betreuung — nicht stornierte Stellen mit aktueller Meldung. Die eine
+/// Quelle für Modulseite und Modulzähler; die Bezirke liefert seit LLH-1034 `GET …/evakuierung`.
 ///
 /// LFH-674 (design.md D4): „davon namentlich“ je Stelle steht nur für Lesende, die zusätzlich
 /// das Modul Personen sehen dürfen — dieselbe Rangfolge-Auswertung wie der Modulzähler, nur
@@ -124,10 +96,9 @@ pub async fn uebersicht(
     ctx: EinsatzLesezugriff<Betreuung>,
 ) -> Result<Json<BetreuungUebersicht>, AppError> {
     let mut uebersicht = repo::uebersicht(&state.pool, ctx.einsatz.id).await?;
-    // Stellenbindung (LFH-1041): ein Gerät sieht nur seine Betreuungsstelle, keine Bezirke.
+    // Stellenbindung (LFH-1041): ein Gerät sieht nur seine Betreuungsstelle.
     let sicht = stelle::sicht(ctx.geraet.as_ref(), Bindungsart::Betreuungsstelle);
     if sicht != Sicht::Alle {
-        uebersicht.bezirke.clear();
         uebersicht.stellen.retain(|s| sicht.sieht(s.id));
     }
     // Ein 403 heißt „keine Auskunft“; jeder andere Fehler (DB) bleibt ein Fehler, statt still
@@ -173,19 +144,6 @@ pub async fn kopfzahl(
     ))
 }
 
-/// GET /api/einsaetze/{id}/betreuung/bezirke/{bid}/staende — die ganze Standreihe des
-/// Bezirks samt zurückgenommener Meldungen (LFH-676). Auch ein stornierter Bezirk liefert sie:
-/// 409 steht in diesem Modul für Lebenszyklus-AKTIONEN, Lesen ist keine. Fremd/unbekannt → 404.
-pub async fn stand_verlauf(
-    State(state): State<AppState>,
-    ctx: EinsatzLesezugriff<Betreuung>,
-    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
-) -> Result<Json<Vec<StandVerlaufEintrag>>, AppError> {
-    Ok(Json(
-        repo::stand_verlauf(&state.pool, ctx.einsatz.id, bid).await?,
-    ))
-}
-
 /// GET /api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen — die ganze Belegungsreihe der
 /// Stelle (LFH-676), wie [`stand_verlauf`]; auch an einer geschlossenen Stelle.
 pub async fn belegung_verlauf(
@@ -199,206 +157,6 @@ pub async fn belegung_verlauf(
     ))
 }
 
-// ── Bezirke ─────────────────────────────────────────────────────────────────────────────────
-
-#[derive(Debug, Deserialize)]
-pub struct BezirkAnlegen {
-    bezeichnung: String,
-    #[serde(default)]
-    abschnitt_id: Option<i64>,
-    /// Pflicht: fehlt es, scheitert der Body am Extractor (400).
-    plan_personen: i64,
-    /// `gezaehlt` | `geschaetzt`. Als `String`, damit ein unbekannter Wert eine benannte 400
-    /// liefert.
-    plan_erhebung: String,
-    #[serde(default)]
-    sammelstelle: Option<String>,
-    #[serde(default)]
-    notiz: Option<String>,
-}
-
-/// POST /api/einsaetze/{id}/betreuung/bezirke
-pub async fn bezirk_anlegen(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Betreuung>,
-    JsonBody(req): JsonBody<BezirkAnlegen>,
-) -> Result<(StatusCode, Json<EvakuierungsbezirkAnzeige>), AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let eingabe = BezirkEingabe {
-        bezeichnung: req.bezeichnung,
-        abschnitt_id: req.abschnitt_id,
-        plan_personen: req.plan_personen,
-        plan_erhebung: enum_wert(&req.plan_erhebung)?,
-        sammelstelle: req.sammelstelle,
-        notiz: req.notiz,
-    };
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let benutzer_id = ctx.benutzer.id;
-    let (g, umgeschaltet) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
-        let g = repo::bezirk_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, &eingabe).await?;
-        Ok((g, lagekennzahl::lesen(conn, einsatz_id).await? != vorher))
-    })?;
-    publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
-    kopf_bei_umschalten(&state, einsatz_id, umgeschaltet).await;
-    Ok((
-        StatusCode::CREATED,
-        Json(repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?),
-    ))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct BezirkAendern {
-    #[serde(default)]
-    bezeichnung: Option<String>,
-    /// Tri-State: fehlt = unverändert, `null` = Abschnitt lösen.
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    abschnitt_id: Option<Option<i64>>,
-    #[serde(default)]
-    plan_personen: Option<i64>,
-    #[serde(default)]
-    plan_erhebung: Option<String>,
-    #[serde(default)]
-    raeumung: Option<String>,
-    /// Tri-State: fehlt = unverändert, `null` = leeren.
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    sammelstelle: Option<Option<String>>,
-    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
-    notiz: Option<Option<String>>,
-}
-
-/// PATCH /api/einsaetze/{id}/betreuung/bezirke/{bid}
-pub async fn bezirk_aendern(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Betreuung>,
-    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
-    JsonBody(req): JsonBody<BezirkAendern>,
-) -> Result<Json<EvakuierungsbezirkAnzeige>, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let eingabe = BezirkAenderung {
-        bezeichnung: req.bezeichnung,
-        abschnitt_id: req.abschnitt_id,
-        plan_personen: req.plan_personen,
-        plan_erhebung: enum_opt(req.plan_erhebung)?,
-        raeumung: enum_opt(req.raeumung)?,
-        sammelstelle: req.sammelstelle,
-        notiz: req.notiz,
-    };
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let benutzer_id = ctx.benutzer.id;
-    let (g, umgeschaltet) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
-        let g = repo::bezirk_aendern_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe)
-            .await?;
-        Ok((g, lagekennzahl::lesen(conn, einsatz_id).await? != vorher))
-    })?;
-    publiziere_wirksam(&state, einsatz_id, &g, Objekt::Bezirk(g.id));
-    kopf_bei_umschalten(&state, einsatz_id, umgeschaltet).await;
-    Ok(Json(
-        repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,
-    ))
-}
-
-/// POST /api/einsaetze/{id}/betreuung/bezirke/{bid}/stornieren — Fehlanlage; liefert den
-/// Bezirk mit gesetztem `storniert_at`.
-pub async fn bezirk_stornieren(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Betreuung>,
-    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
-) -> Result<Json<EvakuierungsbezirkAnzeige>, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let benutzer_id = ctx.benutzer.id;
-    let ((g, geloeste_zonen), umgeschaltet) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = lagekennzahl::lesen(conn, einsatz_id).await?;
-        let r = repo::bezirk_stornieren_tx(conn, einsatz_id, bid, benutzer_id, startwert).await?;
-        Ok((r, lagekennzahl::lesen(conn, einsatz_id).await? != vorher))
-    })?;
-    publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Bezirk(g.id));
-    kopf_bei_umschalten(&state, einsatz_id, umgeschaltet).await;
-    // LFH-673: die Karte zeichnet die gelösten Flächen jetzt ohne Bezirk.
-    for zid in geloeste_zonen {
-        super::lage_zone::sse_zone(&state, einsatz_id, zid);
-    }
-    Ok(Json(
-        repo::bezirk_laden(&state.pool, einsatz_id, g.id).await?,
-    ))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct StandMelden {
-    evakuiert: i64,
-    /// `gezaehlt` | `geschaetzt`.
-    erhebung: String,
-    /// Fehlt = jetzt. Eine offline vorgemerkte Meldung trägt hier ihren Erfassungszeitpunkt
-    /// (design.md D6), sonst stempelte der Flush die Sendezeit.
-    #[serde(default)]
-    zeitpunkt_at: Option<String>,
-    /// Idempotenzschlüssel der Offline-Queue (LFH-675).
-    #[serde(default)]
-    client_id: Option<String>,
-}
-
-/// POST /api/einsaetze/{id}/betreuung/bezirke/{bid}/staende
-///
-/// Mit `client_id` idempotent (LFH-675): ein Replay liefert die gespeicherte Meldung (201),
-/// ohne Zeile, ETB-Eintrag oder Live-Ereignis — auch am inzwischen stornierten Bezirk und nach
-/// Einsatzende. Ein Schlüssel, der an einem anderen Bezirk hängt, ist 422.
-pub async fn stand_melden(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibfreigabe<Betreuung>,
-    headers: HeaderMap,
-    PfadParam((_eid, bid)): PfadParam<(i64, i64)>,
-    JsonBody(req): JsonBody<StandMelden>,
-) -> Result<(StatusCode, Json<BezirkMeldungAnzeige>), AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
-    let client_id = support::parse_client_id(req.client_id.as_deref())?;
-    // Vorab-Lookup nach den Gates, vor der Aktiv-Prüfung und der Validierung: der Replay
-    // bewertet den Body nicht, maßgeblich ist allein der Schlüssel (Muster `routes/meldung.rs`).
-    if let Some(cid) = client_id.as_deref() {
-        if let Some(replay) = repo::stand_nach_client_id(&state.pool, einsatz_id, cid).await? {
-            let m = repo::replay_am_objekt(replay, bid, "einem anderen Evakuierungsbezirk")?;
-            return Ok((
-                StatusCode::CREATED,
-                Json(bezirk_meldung(&state, einsatz_id, m).await?),
-            ));
-        }
-    }
-    ctx.fordere_aktiv()?;
-    let eingabe = StandEingabe {
-        evakuiert: req.evakuiert,
-        erhebung: enum_wert(&req.erhebung)?,
-        zeitpunkt_at: support::meldezeitpunkt(req.zeitpunkt_at.as_deref(), Utc::now())?,
-        client_id,
-    };
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let benutzer_id = ctx.benutzer.id;
-    // Die Transaktion sucht den Schlüssel noch einmal: zwei Flushes, die beide am Vorab-Lookup
-    // vorbeikamen, entscheidet `BEGIN IMMEDIATE` — der zweite ist dann ein Replay (`neu: false`).
-    let m = crate::write_retry!(&state.pool, |conn| {
-        repo::stand_melden_tx(conn, einsatz_id, bid, benutzer_id, startwert, &eingabe).await
-    })?;
-    if m.neu {
-        publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Bezirk(m.objekt_id));
-    }
-    Ok((
-        StatusCode::CREATED,
-        Json(bezirk_meldung(&state, einsatz_id, m).await?),
-    ))
-}
-
-async fn bezirk_meldung(
-    state: &AppState,
-    einsatz_id: i64,
-    m: repo::Gemeldet,
-) -> Result<BezirkMeldungAnzeige, AppError> {
-    Ok(BezirkMeldungAnzeige {
-        meldung_id: m.meldung_id,
-        bezirk: repo::bezirk_laden(&state.pool, einsatz_id, m.objekt_id).await?,
-    })
-}
-
 async fn stelle_meldung(
     state: &AppState,
     einsatz_id: i64,
@@ -408,25 +166,6 @@ async fn stelle_meldung(
         meldung_id: m.meldung_id,
         stelle: repo::stelle_laden(&state.pool, einsatz_id, m.objekt_id).await?,
     })
-}
-
-/// POST /api/einsaetze/{id}/betreuung/staende/{sid}/zuruecknehmen
-pub async fn stand_zuruecknehmen(
-    State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Betreuung>,
-    PfadParam((_eid, stand_id)): PfadParam<(i64, i64)>,
-) -> Result<Json<BezirkMeldungAnzeige>, AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let benutzer_id = ctx.benutzer.id;
-    let m = crate::write_retry!(&state.pool, |conn| {
-        repo::stand_zuruecknehmen_tx(conn, einsatz_id, stand_id, benutzer_id, startwert).await
-    })?;
-    publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Bezirk(m.objekt_id));
-    Ok(Json(BezirkMeldungAnzeige {
-        meldung_id: m.meldung_id,
-        bezirk: repo::bezirk_laden(&state.pool, einsatz_id, m.objekt_id).await?,
-    }))
 }
 
 // ── Stellen ─────────────────────────────────────────────────────────────────────────────────
@@ -444,6 +183,12 @@ pub struct StelleAnlegen {
     standort: Option<String>,
     #[serde(default)]
     notiz: Option<String>,
+    /// Leitung und Erreichbarkeit (LLH-1044), Freitext bis [`LEITUNG_MAX`] bzw.
+    /// [`ERREICHBARKEIT_MAX`] Zeichen.
+    #[serde(default)]
+    leitung: Option<String>,
+    #[serde(default)]
+    erreichbarkeit: Option<String>,
 }
 
 /// POST /api/einsaetze/{id}/betreuung/stellen
@@ -460,13 +205,15 @@ pub async fn stelle_anlegen(
         kapazitaet_personen: req.kapazitaet_personen,
         standort: req.standort,
         notiz: req.notiz,
+        leitung: optional_max(req.leitung, "Leitung", LEITUNG_MAX)?,
+        erreichbarkeit: optional_max(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_anlegen_tx(conn, einsatz_id, benutzer_id, startwert, &eingabe).await
     })?;
-    publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Stelle(g.id));
+    publiziere(&state, einsatz_id, &g.etb_ids, g.id);
     Ok((
         StatusCode::CREATED,
         Json(repo::stelle_laden(&state.pool, einsatz_id, g.id).await?),
@@ -491,6 +238,11 @@ pub struct StelleAendern {
     standort: Option<Option<String>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     notiz: Option<Option<String>>,
+    /// Tri-State wie `notiz` (LLH-1044).
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    leitung: Option<Option<String>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    erreichbarkeit: Option<Option<String>>,
     /// Koordinate auf der Lagekarte (LFH-673), tri-state je Wert: fehlt = unverändert,
     /// `null` = entfernen. Halbes Paar oder Wert außerhalb des Bereichs → **422**, wie an der
     /// UHS (`einsatz_uhs.rs`, von src/AGENTS.md als legitimes 422 geführt): das Paar ist ein
@@ -518,6 +270,9 @@ pub async fn stelle_aendern(
         status: enum_opt(req.status)?,
         standort: req.standort,
         notiz: req.notiz,
+        // Feldgrenze vor jedem 422 des Zusammenhangs (src/AGENTS.md, Eingabegrenzen).
+        leitung: optional_max_tri(req.leitung, "Leitung", LEITUNG_MAX)?,
+        erreichbarkeit: optional_max_tri(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
         lat: req.lat,
         lon: req.lon,
     };
@@ -526,7 +281,7 @@ pub async fn stelle_aendern(
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_aendern_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
     })?;
-    publiziere_wirksam(&state, einsatz_id, &g, Objekt::Stelle(g.id));
+    publiziere_wirksam(&state, einsatz_id, &g);
     Ok(Json(
         repo::stelle_laden(&state.pool, einsatz_id, g.id).await?,
     ))
@@ -544,7 +299,7 @@ pub async fn stelle_stornieren(
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_stornieren_tx(conn, einsatz_id, sid, benutzer_id, startwert).await
     })?;
-    publiziere(&state, einsatz_id, &g.etb_ids, Objekt::Stelle(g.id));
+    publiziere(&state, einsatz_id, &g.etb_ids, g.id);
     Ok(Json(
         repo::stelle_laden(&state.pool, einsatz_id, g.id).await?,
     ))
@@ -597,7 +352,7 @@ pub async fn belegung_melden(
         repo::belegung_melden_tx(conn, einsatz_id, sid, benutzer_id, startwert, &eingabe).await
     })?;
     if m.neu {
-        publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Stelle(m.objekt_id));
+        publiziere(&state, einsatz_id, &[m.etb_id], m.objekt_id);
     }
     Ok((
         StatusCode::CREATED,
@@ -624,7 +379,7 @@ pub async fn belegung_zuruecknehmen(
     let m = crate::write_retry!(&state.pool, |conn| {
         repo::belegung_zuruecknehmen_tx(conn, einsatz_id, mid, benutzer_id, startwert).await
     })?;
-    publiziere(&state, einsatz_id, &[m.etb_id], Objekt::Stelle(m.objekt_id));
+    publiziere(&state, einsatz_id, &[m.etb_id], m.objekt_id);
     Ok(Json(StelleMeldungAnzeige {
         meldung_id: m.meldung_id,
         stelle: repo::stelle_laden(&state.pool, einsatz_id, m.objekt_id).await?,

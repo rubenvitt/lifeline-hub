@@ -41,6 +41,8 @@ import {
   dokumentePfad,
   abloesungPfad,
   betreuungPfad,
+  betreuungsstellePfad,
+  evakuierungPfad,
   verpflegungAusgabePfad,
   verpflegungAusVorlagePfad,
   parseVerpflegungTag,
@@ -397,7 +399,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     it('rueckwegPfad leitet das Ziel allein aus Typ und Kennung ab', () => {
       expect(rueckwegPfad(E, 'person', 42)).toBe(personDetailPfad(E, 42));
       expect(rueckwegPfad(E, 'schaden', 7)).toBe(schadenDetailPfad(E, 7));
-      expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungPfad(E, { stelle: 3 }));
+      expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungsstellePfad(E, 3));
       expect(rueckwegPfad(E, 'bereitstellungsraum', 9)).toBe(bereitstellungsraumDetailPfad(E, 9));
       expect(rueckwegPfad(E, 'tier', 4)).toBe(tiereDetailPfad(E, 4));
     });
@@ -504,17 +506,26 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(betreuungPfad(E, {})).toBe('/einsaetze/5/betreuung');
   });
 
-  it('betreuungPfad selektiert Bezirk bzw. Stelle per Query-Param — Round-Trip (LFH-639)', () => {
-    // Query-Param statt Item-Route: das Modul hat keine Detailseite (LFH-25, design.md D7).
-    const bezirk = betreuungPfad(E, { bezirk: 12 });
-    expect(bezirk.split('?')[0]).toBe('/einsaetze/5/betreuung');
-    const pb = new URLSearchParams(bezirk.split('?')[1]);
-    expect(pb.get('bezirk')).toBe('12');
-    expect(pb.has('stelle')).toBe(false);
+  it('betreuungsstellePfad: Item-Route unter dem Modul Betreuung (LLH-1044)', () => {
+    expect(betreuungsstellePfad(E, 4)).toBe('/einsaetze/5/betreuung/4');
+    // Der Modulwächter liest das Modul aus dem dritten Segment — die Detailseite gehört dazu.
+    expect(betreuungsstellePfad(E, 4).split('/')[3]).toBe('betreuung');
+  });
 
-    const stelle = new URLSearchParams(betreuungPfad(E, { stelle: 4 }).split('?')[1]);
-    expect(stelle.get('stelle')).toBe('4');
-    expect(stelle.has('bezirk')).toBe(false);
+  it('betreuungPfad trägt `?stelle=` weiter als Altadresse — Round-Trip (LFH-639, LLH-1044)', () => {
+    // Die Betreuungsseite leitet sie auf die Detailseite um.
+    const stelle = betreuungPfad(E, { stelle: 4 });
+    expect(stelle.split('?')[0]).toBe('/einsaetze/5/betreuung');
+    const ps = new URLSearchParams(stelle.split('?')[1]);
+    expect(ps.get('stelle')).toBe('4');
+    expect(ps.has('bezirk')).toBe(false);
+  });
+
+  it('evakuierungPfad trifft die Registry-Route und selektiert den Bezirk (LLH-1034)', () => {
+    expect(evakuierungPfad(E)).toBe('/einsaetze/5/evakuierung');
+    const bezirk = evakuierungPfad(E, { bezirk: 12 });
+    expect(bezirk.split('?')[0]).toBe('/einsaetze/5/evakuierung');
+    expect(new URLSearchParams(bezirk.split('?')[1]).get('bezirk')).toBe('12');
   });
 
   it('wetterPegelPfad (LFH-633)', () => {

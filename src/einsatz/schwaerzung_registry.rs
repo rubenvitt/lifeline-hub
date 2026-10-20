@@ -1400,6 +1400,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status", G_ENUM),
             scrub("standort", Strategie::NullSetzen, Z_EINSATZ),
             scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
+            // Leitung (ein Name) und Erreichbarkeit (eine Rufnummer) der Stelle (LLH-1044), wie
+            // `medienkontakt.kontakt_name`/`kontakt_erreichbarkeit`.
+            scrub("leitung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             // Koordinate auf der Lagekarte — Geo-Skelett wie `uhs.lat/lon`.
             retain("lat", G_GEO),
             retain("lon", G_GEO),

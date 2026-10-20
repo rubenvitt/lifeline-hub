@@ -212,8 +212,8 @@ struct SnapshotDaten {
     /// Betreuungsstellen mit Koordinate (Marker im Rückblick); am Modul Betreuung gegatet
     /// (`REDIGIERBARE_MODUL_FELDER`).
     betreuungsstellen: Vec<crate::betreuung::BetreuungsstelleAnzeige>,
-    /// Evakuierungsbezirke — beschriften die Bezirksflächen in `zonen`; ebenfalls am Modul
-    /// Betreuung gegatet.
+    /// Evakuierungsbezirke — beschriften die Bezirksflächen in `zonen`; am Modul Evakuierung
+    /// gegatet (LLH-1034).
     evakuierungsbezirke: Vec<crate::betreuung::EvakuierungsbezirkAnzeige>,
     /// Bereitstellungsräume (ohne stornierte) mit Koordinate, Status, Kennzahlen der Belegung und
     /// Einheiten im Raum, wie die Liste des Moduls ohne Gerätefilter (LLH-1107, design.md D10);
@@ -252,7 +252,19 @@ pub async fn erzeuge(
 
     // Eine Abfrage für beide Betreuungsfelder, wie die Modulseite: nur nicht stornierte Stellen und
     // Bezirke.
-    let betreuung = crate::betreuung::repo::uebersicht(pool, einsatz_id).await?;
+    // Leitung und Erreichbarkeit (LLH-1044) friert der Stand nicht ein: das Lagebild braucht sie
+    // nicht, und ein Name im Dokument bräuchte einen eigenen Schwärzungspfad (wie der
+    // Einsatzleiter unten, LLH-1168).
+    let betreuungsstellen = crate::betreuung::repo::stellen(pool, einsatz_id)
+        .await?
+        .into_iter()
+        .map(|s| crate::betreuung::BetreuungsstelleAnzeige {
+            leitung: None,
+            erreichbarkeit: None,
+            ..s
+        })
+        .collect();
+    let evakuierungsbezirke = crate::betreuung::repo::bezirke(pool, einsatz_id).await?;
 
     let daten = SnapshotDaten {
         version: 1,
@@ -296,8 +308,8 @@ pub async fn erzeuge(
         gefahrengebiete: crate::gefahr::repo::gebiete_liste(pool, einsatz_id).await?,
         lagemeldungen: crate::meldung::repo::liste_lage_meldungen(pool, einsatz_id).await?,
         bilder: crate::karte_hintergrundbild::repo::liste(pool, einsatz_id, None).await?,
-        betreuungsstellen: betreuung.stellen,
-        evakuierungsbezirke: betreuung.bezirke,
+        betreuungsstellen,
+        evakuierungsbezirke,
         bereitstellungsraeume: crate::bereitstellungsraum::repo::list_eintraege(
             pool,
             einsatz_id,

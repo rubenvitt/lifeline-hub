@@ -156,10 +156,10 @@ interface Daten {
    * Abrufen ändern. Vorgabe: die des Fixtures (`['pegel']`).
    */
   lagekennzahlen?: string[];
-  /** Evakuierungsbezirke der Betreuungs-Übersicht und ein erzwungener Fehlerstatus. */
+  /** Evakuierungsbezirke der Evakuierungs-Übersicht und ein erzwungener Fehlerstatus. */
   bezirke?: unknown[];
   betreuungStatus?: number;
-  /** Zählt die Abrufe der Betreuungs-Übersicht (ohne Modulrecht: keiner). */
+  /** Zählt die Abrufe der Evakuierungs-Übersicht (ohne Modulrecht: keiner). */
   betreuungAbrufe?: { n: number };
   /** Freigaben-Abruf hängt bzw. scheitert (Freigaben unbekannt). */
   freigabenLaedt?: boolean;
@@ -224,11 +224,11 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/pegel', () =>
       d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
     ),
-    http.get('/api/einsaetze/1/betreuung', () => {
+    http.get('/api/einsaetze/1/evakuierung', () => {
       if (d.betreuungAbrufe) d.betreuungAbrufe.n += 1;
       return d.betreuungStatus
         ? new HttpResponse(null, { status: d.betreuungStatus })
-        : HttpResponse.json({ bezirke: d.bezirke ?? [], stellen: [] });
+        : HttpResponse.json({ bezirke: d.bezirke ?? [] });
     }),
     // Ohne diesen Handler scheiterte die Abfrage in jedem Test, und die href-Aussagen belegten nur
     // den Fehlerpfad.
@@ -735,7 +735,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       );
       // `toHaveTextContent` faltet das schmale Leerzeichen zu einem normalen — deshalb roh.
       expect(zelle.textContent).toContain(`von 1${T}850 geplant`);
-      expect(zelle).toHaveAttribute('href', '/einsaetze/1/betreuung');
+      expect(zelle).toHaveAttribute('href', '/einsaetze/1/evakuierung');
       expect(zelle.getAttribute('data-ton')).toBe('neutral');
     });
 
@@ -747,7 +747,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')?.textContent).toBe('—');
     });
 
-    it('FEHLER SIEHT NICHT AUS WIE LEER: ein gescheiterter Betreuungsabruf zeigt „?", Nachbarn bleiben lesbar', async () => {
+    it('FEHLER SIEHT NICHT AUS WIE LEER: ein gescheiterter Evakuierungsabruf zeigt „?", Nachbarn bleiben lesbar', async () => {
       mockEndpunkte({
         lagekennzahlen: ['evakuiert'],
         personen: [person('sk1')],
@@ -761,7 +761,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       expect(kennzahl('Betroffene')).not.toHaveTextContent('Stand unbekannt');
     });
 
-    it('Modul Betreuung ausgeblendet: der Platz bleibt „Evakuiert", ohne Zahl, ohne Link, ohne Abruf', async () => {
+    it('Modul Evakuierung ausgeblendet: der Platz bleibt „Evakuiert", ohne Zahl, ohne Link, ohne Abruf', async () => {
       const betreuungAbrufe = { n: 0 };
       const freigabenGeliefert = { n: 0 };
       mockEndpunkte({
@@ -769,13 +769,13 @@ describe('LageDashboardPage — Kennzahlenband', () => {
         bezirke: [bezirk(640, 600)],
         betreuungAbrufe,
         freigabenGeliefert,
-        freigaben: { betreuung: { sichtbar: false } },
+        freigaben: { evakuierung: { sichtbar: false } },
       });
       render();
       await kennzahlGeladen('Betroffene');
       await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
       await waitFor(() =>
-        expect(kennzahl('Evakuiert')).toHaveTextContent('Modul Betreuung nicht freigegeben'),
+        expect(kennzahl('Evakuiert')).toHaveTextContent('Modul Evakuierung nicht freigegeben'),
       );
       const zelle = kennzahl('Evakuiert');
       expect(etiketten()[2]).toBe('Evakuiert');
@@ -1235,7 +1235,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
-      http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+      http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
       http.get('/api/einsaetze/2/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
@@ -1271,7 +1271,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
-      http.get('/api/einsaetze/2/betreuung', () => HttpResponse.json({ bezirke: [], stellen: [] })),
+      http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
       http.get('/api/einsaetze/2/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),

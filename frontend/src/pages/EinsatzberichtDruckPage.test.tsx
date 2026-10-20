@@ -73,6 +73,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     }),
     json('/personen', 'personen'),
     json('/schaeden', 'schaeden'),
+    json('/evakuierung', 'evakuierung'),
     json('/betreuung', 'betreuung'),
     json('/verpflegung', 'verpflegung'),
     json('/etb/zaehler', 'etbZaehler'),
