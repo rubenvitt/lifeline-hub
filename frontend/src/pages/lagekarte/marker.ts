@@ -61,6 +61,12 @@ export type MarkerTyp =
    */
   | 'bereitstellungsraum'
   /**
+   * Tier (`buildTierMarker` in `tierMarker.ts`, LLH-1123): läuft wie der Bereitstellungsraum in
+   * `alleVerortet` und „Nicht verortet", nur bei Lesezugriff auf das Modul Tiere (`tierEbene.ts`).
+   * Kreis mit Kurzzeichen „T", kein `tz`.
+   */
+  | 'tier'
+  /**
    * Betroffene, nur aus `personenMarker` — auf der Betroffenen-Seite und als Ebene „Betroffene" der
    * Lagekarte. Dort laufen sie als eigene Liste `personenVerortet` neben `alleVerortet` und
    * clustern in eigener Quelle (`PERSONEN_CLUSTER_QUELLE`).
@@ -145,7 +151,8 @@ export interface NichtVerortet {
     | 'fuehrung'
     | 'abschnitt'
     | 'betreuungsstelle'
-    | 'bereitstellungsraum';
+    | 'bereitstellungsraum'
+    | 'tier';
   id: number;
   label: string;
 }

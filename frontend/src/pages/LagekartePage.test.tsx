@@ -1683,6 +1683,29 @@ describe('LagekartePage', () => {
     expect(platzierModusAn()).toBe(false);
   });
 
+  it('Deeplink ?platzieren=tier: startet den Platzier-Modus und räumt (LLH-1123)', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=tier:4&zurueck=1');
+    await waitFor(() => expect(platzierModusAn()).toBe(true));
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(screen.getByTestId('location-search')).not.toHaveTextContent('zurueck');
+  });
+
+  it('Deeplink ?platzieren=tier: ohne Modul Tiere kein Platziermodus, der Auftrag wird geräumt (LLH-1123)', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ tiere: { zugriff: false } })),
+      ),
+    ]);
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=tier:4');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('platzieren'),
+    );
+    expect(platzierModusAn()).toBe(false);
+  });
+
   it('Deeplink ?platzieren=person: startet den Platzier-Modus und räumt (LFH-670)', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?platzieren=person:5');

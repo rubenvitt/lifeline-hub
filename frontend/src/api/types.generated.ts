@@ -5671,6 +5671,14 @@ export interface components {
             abschluss_ziel?: string | null;
             /** Format: int64 */
             alter_geschaetzt?: number | null;
+            /**
+             * Format: double
+             * @description Koordinate des Fundorts (LLH-1123), nur als Paar; fehlt, solange das Tier nicht verortet
+             *     ist.
+             */
+            antreff_lat?: number | null;
+            /** Format: double */
+            antreff_lon?: number | null;
             antreff_ort?: string | null;
             /** Format: int64 */
             einsatz_id: number;

@@ -140,6 +140,7 @@ describe('MarkerSuche — kein Name aus gesperrten Modulen (LFH-716)', () => {
         personenEbeneAn: true,
         betreuungZugriff: 'frei',
         brZugriff: 'frei',
+        tierZugriff: 'frei',
       }),
     });
     expect(screen.getByRole('button', { name: 'Turnhalle Mitte' })).toBeInTheDocument();
@@ -157,6 +158,7 @@ describe('MarkerSuche — kein Name aus gesperrten Modulen (LFH-716)', () => {
         personenEbeneAn: true,
         betreuungZugriff: 'gesperrt',
         brZugriff: 'gesperrt',
+        tierZugriff: 'gesperrt',
       }),
     });
     expect(screen.queryByText('Turnhalle Mitte')).toBeNull();

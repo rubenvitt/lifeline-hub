@@ -1,4 +1,4 @@
-use super::TierAnzeige;
+use super::{TierAnzeige, TierKarte};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -8,7 +8,8 @@ const SELECT_ALLE: &str = "\
     SELECT t.id, t.einsatz_id, t.registrier_nr, t.status, t.spezies, \
            t.rasse_beschreibung, t.rufname, t.geschlecht, t.alter_geschaetzt, \
            t.farbe_beschreibung, t.kennzeichnung, t.groesse_gewicht, \
-           t.halter_person_id, t.halter_kontakt, t.antreff_ort, t.notiz, \
+           t.halter_person_id, t.halter_kontakt, t.antreff_ort, \
+           t.antreff_lat, t.antreff_lon, t.notiz, \
            t.abschluss_grund, t.abschluss_ziel, t.erfasst_at, t.erfasst_von, \
            t.geaendert_at, t.geaendert_von, t.storniert_at, \
            hp.registrier_nr AS halter_registrier_nr, \
@@ -32,6 +33,9 @@ pub struct NeueDaten<'a> {
     pub halter_person_id: Option<i64>,
     pub halter_kontakt: Option<&'a str>,
     pub antreff_ort: Option<&'a str>,
+    /// Koordinate des Fundorts (LLH-1123); das Paar prüft die Route.
+    pub antreff_lat: Option<f64>,
+    pub antreff_lon: Option<f64>,
     pub notiz: Option<&'a str>,
 }
 
@@ -52,6 +56,10 @@ pub struct PatchDaten<'a> {
     pub kennzeichnung: Option<Option<&'a str>>,
     pub groesse_gewicht: Option<Option<&'a str>>,
     pub antreff_ort: Option<Option<&'a str>>,
+    /// Koordinate des Fundorts (LLH-1123), tri-state wie die übrigen Felder; das Paar prüft die
+    /// Route gegen den wirksamen Zustand.
+    pub antreff_lat: Option<Option<f64>>,
+    pub antreff_lon: Option<Option<f64>>,
     pub notiz: Option<Option<&'a str>>,
     /// `Some(Some(id))` = setzen, `Some(None)` = auf NULL, `None` = unverändert.
     pub halter_person_id: Option<Option<i64>>,
@@ -81,6 +89,21 @@ pub async fn liste(
         .bind(halter_person_id)
         .fetch_all(pool)
         .await?)
+}
+
+/// Die Tiere der Lagekarte für den Lage-Snapshot (LLH-1123, design.md D3): offen oder vermisst,
+/// nicht storniert, mit und ohne Koordinate; abgeschlossene zeigt die Karte nicht. Sortierung wie
+/// [`liste`].
+pub async fn karte_liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<TierKarte>, AppError> {
+    Ok(sqlx::query_as::<_, TierKarte>(
+        "SELECT id, registrier_nr, status, spezies, rufname, antreff_ort, antreff_lat, antreff_lon \
+         FROM einsatz_tier \
+         WHERE einsatz_id = ? AND storniert_at IS NULL AND status IN ('aktiv', 'vermisst') \
+         ORDER BY registrier_nr DESC",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?)
 }
 
 /// Lädt ein Tier (auch storniertes) eines Einsatzes; `NotFound`, falls es nicht
@@ -135,9 +158,9 @@ pub async fn anlegen_tx(
             (einsatz_id, registrier_nr, status, spezies, rasse_beschreibung, rufname, \
              geschlecht, alter_geschaetzt, farbe_beschreibung, kennzeichnung, \
              groesse_gewicht, halter_person_id, halter_kontakt, antreff_ort, notiz, \
-             erfasst_von, geaendert_von) \
+             erfasst_von, geaendert_von, antreff_lat, antreff_lon) \
          SELECT ?1, COALESCE(MAX(registrier_nr), 0) + 1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, \
-                ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15 \
+                ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15, ?16, ?17 \
          FROM einsatz_tier WHERE einsatz_id = ?1 \
          RETURNING id, registrier_nr",
     )
@@ -156,6 +179,8 @@ pub async fn anlegen_tx(
     .bind(daten.antreff_ort)
     .bind(daten.notiz)
     .bind(erfasser_id)
+    .bind(daten.antreff_lat)
+    .bind(daten.antreff_lon)
     .fetch_one(&mut *conn)
     .await?;
     Ok(row)
@@ -216,12 +241,16 @@ pub async fn aktualisiere(
             notiz = CASE WHEN ?17 IS NULL THEN notiz ELSE ?18 END, \
             halter_person_id = CASE WHEN ?19 THEN ?20 ELSE halter_person_id END, \
             halter_kontakt   = CASE WHEN ?21 THEN ?22 ELSE halter_kontakt END, \
+            antreff_lat = CASE WHEN ?26 IS NULL THEN antreff_lat ELSE ?27 END, \
+            antreff_lon = CASE WHEN ?28 IS NULL THEN antreff_lon ELSE ?29 END, \
             geaendert_at = strftime('%Y-%m-%d %H:%M:%S','now'), \
             geaendert_von = ?23 \
          WHERE id = ?24 AND einsatz_id = ?25",
     );
+    // Die Koordinate (LLH-1123) hängt mit ?26…?29 hinten an, damit die bestehende Nummernkette
+    // unverändert bleibt; das CAS-Suffix rückt dafür auf ?30.
     if erwartet_geaendert_at.is_some() {
-        sql.push_str(" AND geaendert_at = ?26");
+        sql.push_str(" AND geaendert_at = ?30");
     }
     let mut q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.rasse_beschreibung.map(|_| 1_i64))
@@ -248,7 +277,11 @@ pub async fn aktualisiere(
         .bind(daten.halter_kontakt.flatten()) // Wert (oder NULL bei Some(None))
         .bind(geaendert_von)
         .bind(tier_id)
-        .bind(einsatz_id);
+        .bind(einsatz_id)
+        .bind(daten.antreff_lat.map(|_| 1_i64))
+        .bind(daten.antreff_lat.and_then(|v| v))
+        .bind(daten.antreff_lon.map(|_| 1_i64))
+        .bind(daten.antreff_lon.and_then(|v| v));
     if let Some(stand) = erwartet_geaendert_at {
         q = q.bind(stand);
     }
@@ -406,6 +439,8 @@ mod tests {
             halter_person_id: None,
             halter_kontakt: None,
             antreff_ort: None,
+            antreff_lat: None,
+            antreff_lon: None,
             notiz: None,
         }
     }
@@ -629,6 +664,131 @@ mod tests {
             Some(AbschlussGrund::UebergabeTierarzt),
             "Abschluss-Grund bleibt als Audit-Spur erhalten"
         );
+    }
+
+    /// LLH-1123: Koordinate des Fundorts beim Anlegen, Setzen und Entfernen über den Patch; ein
+    /// Patch ohne Koordinate lässt sie stehen.
+    #[tokio::test]
+    async fn antreff_koordinate_anlegen_setzen_und_entfernen() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let t = anlegen(
+            &pool,
+            e,
+            b,
+            "aktiv",
+            NeueDaten {
+                antreff_lat: Some(52.25),
+                antreff_lon: Some(9.125),
+                ..hund()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!((t.antreff_lat, t.antreff_lon), (Some(52.25), Some(9.125)));
+
+        let ohne = aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            None,
+            PatchDaten {
+                notiz: Some(Some("Weide")),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (ohne.antreff_lat, ohne.antreff_lon),
+            (Some(52.25), Some(9.125)),
+            "ein Patch ohne Koordinate lässt sie stehen"
+        );
+
+        let versetzt = aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            None,
+            PatchDaten {
+                antreff_lat: Some(Some(51.5)),
+                antreff_lon: Some(Some(8.75)),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (versetzt.antreff_lat, versetzt.antreff_lon),
+            (Some(51.5), Some(8.75))
+        );
+        assert_eq!(
+            versetzt.notiz.as_deref(),
+            Some("Weide"),
+            "nur das Paar geändert"
+        );
+
+        let entfernt = aktualisiere(
+            &pool,
+            e,
+            t.id,
+            b,
+            None,
+            PatchDaten {
+                antreff_lat: Some(None),
+                antreff_lon: Some(None),
+                ..PatchDaten::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!((entfernt.antreff_lat, entfernt.antreff_lon), (None, None));
+    }
+
+    /// LLH-1123: die Kartenform friert nur offene und vermisste, nicht stornierte Tiere ein, mit
+    /// und ohne Koordinate, neueste oben.
+    #[tokio::test]
+    async fn karte_liste_nur_offene_und_vermisste() {
+        let pool = test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let offen = anlegen(
+            &pool,
+            e,
+            b,
+            "aktiv",
+            NeueDaten {
+                antreff_lat: Some(52.0),
+                antreff_lon: Some(9.0),
+                ..hund()
+            },
+        )
+        .await
+        .unwrap();
+        let vermisst = anlegen(&pool, e, b, "vermisst", hund()).await.unwrap();
+        let abgeschlossen = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
+        setze_status(
+            &pool,
+            e,
+            abgeschlossen.id,
+            "abgeschlossen",
+            Some("verstorben"),
+            None,
+            b,
+        )
+        .await
+        .unwrap();
+        let storniert = anlegen(&pool, e, b, "aktiv", hund()).await.unwrap();
+        storniere_tx(&mut *pool.acquire().await.unwrap(), e, storniert.id, b)
+            .await
+            .unwrap();
+
+        let karte = karte_liste(&pool, e).await.unwrap();
+        let ids: Vec<i64> = karte.iter().map(|t| t.id).collect();
+        assert_eq!(ids, vec![vermisst.id, offen.id]);
+        assert_eq!(karte[1].antreff_lat, Some(52.0));
+        assert_eq!(karte[0].status, TierStatus::Vermisst);
     }
 
     #[tokio::test]

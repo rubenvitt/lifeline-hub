@@ -381,7 +381,7 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
     expect(parsePlatzierenAuftrag('schaden:abc')).toBeNull();
     expect(parsePlatzierenAuftrag('schaden:0')).toBeNull();
     expect(parsePlatzierenAuftrag('schaden:-1')).toBeNull();
-    expect(parsePlatzierenAuftrag('tier:7')).toBeNull();
+    expect(parsePlatzierenAuftrag('katze:7')).toBeNull();
     expect(parsePlatzierenAuftrag('person:x')).toBeNull();
     // Kein Prototyp-Schlüssel schlüpft als Typ durch.
     expect(parsePlatzierenAuftrag('toString:7')).toBeNull();
@@ -433,13 +433,22 @@ describe('deeplinks — Listen mit Query-Selektion / Schnellerfassung', () => {
       expect(rueckwegPfad(E, 'schaden', 7)).toBe(schadenDetailPfad(E, 7));
       expect(rueckwegPfad(E, 'betreuungsstelle', 3)).toBe(betreuungsstellePfad(E, 3));
       expect(rueckwegPfad(E, 'bereitstellungsraum', 9)).toBe(bereitstellungsraumDetailPfad(E, 9));
+      expect(rueckwegPfad(E, 'tier', 4)).toBe(tiereDetailPfad(E, 4));
     });
     it('rueckwegPfad: die UHS hat keinen äußeren Einstieg, ein unbekannter Typ kein Ziel', () => {
       expect(rueckwegPfad(E, 'uhs', 2)).toBeNull();
       // Ein Typ von außerhalb der Union (etwa aus einer manipulierten URL) findet kein Ziel.
-      expect(rueckwegPfad(E, 'tier' as never, 2)).toBeNull();
+      expect(rueckwegPfad(E, 'katze' as never, 2)).toBeNull();
       expect(rueckwegPfad(E, 'toString' as never, 2)).toBeNull();
     });
+  });
+  it('der Platzier-Auftrag „tier“ überlebt den Weg durch die URL (LLH-1123)', () => {
+    const pfad = lagekartePfad(E, { platzieren: { typ: 'tier', id: 4, zurueck: true } });
+    const url = new URL(pfad, 'http://x');
+    expect(url.searchParams.get('platzieren')).toBe('tier:4');
+    expect(url.searchParams.get('zurueck')).toBe('1');
+    expect(parsePlatzierenAuftrag('tier:4')).toEqual({ typ: 'tier', id: 4 });
+    expect(parsePlatzierenAuftrag('tier:abc')).toBeNull();
   });
   it('lagekartePfad trägt ?evakuierungsbezirk= (LFH-673)', () => {
     const pfad = lagekartePfad(E, { evakuierungsbezirk: 5 });

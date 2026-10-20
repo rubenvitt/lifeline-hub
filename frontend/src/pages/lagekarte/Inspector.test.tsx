@@ -853,3 +853,59 @@ describe('Inspector: „Abschnitt fokussieren“ (LLH-1057)', () => {
     expect(screen.queryByRole('button', { name: 'Abschnitt fokussieren' })).toBeNull();
   });
 });
+
+describe('Inspector für Tiere (LLH-1123)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  const tierMarker = {
+    schluessel: 'tier-4',
+    typ: 'tier',
+    id: 4,
+    lat: 50.05,
+    lon: 8.55,
+    label: 'T-004 (Hund)',
+    farbe: '#faad14',
+    kurzzeichen: 'T',
+    beschriftungZusatz: 'vermisst',
+  } as KarteMarker;
+
+  it('Kennung, Objektart und der Sprung zur Tier-Detailseite', () => {
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={tierMarker}
+        darfSchreiben={false}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />,
+    );
+    expect(screen.getByText('T-004 (Hund)')).toBeInTheDocument();
+    expect(screen.getByText('Tier')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Im Fachmodul öffnen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/tiere/4',
+    );
+    expect(screen.queryByRole('button', { name: /Verortung löschen/ })).toBeNull();
+  });
+
+  it('mit Schreibrecht: „Verortung löschen" ohne Rückfrage (umkehrbar)', () => {
+    const geloescht: KarteMarker[] = [];
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={tierMarker}
+        darfSchreiben
+        onSchliessen={() => {}}
+        onVerortungLoeschen={(m) => geloescht.push(m)}
+      />,
+    );
+    screen.getByRole('button', { name: /Verortung löschen/ }).click();
+    expect(geloescht.map((m) => m.schluessel)).toEqual(['tier-4']);
+  });
+});

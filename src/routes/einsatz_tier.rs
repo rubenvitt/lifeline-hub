@@ -8,7 +8,7 @@ use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::person::repo as person_repo; // Org-Isolation der Halter-FK (404 bei fremder Person)
 use crate::routes::support::{
-    deserialize_optional_field, parse_enum, parse_enum_opt, trimme, trimme_tri,
+    deserialize_optional_field, parse_enum, parse_enum_opt, pruefe_koordinate, trimme, trimme_tri,
 };
 use crate::tier::{
     darf_uebergehen, registrier_anzeige, repo as tier_repo, AbschlussGrund, Spezies, TierAnzeige,
@@ -83,6 +83,9 @@ pub struct AnlegenBody {
     pub halter_person_id: Option<i64>,
     pub halter_kontakt: Option<String>,
     pub antreff_ort: Option<String>,
+    /// Koordinate des Fundorts (WGS84), nur als Paar (LLH-1123); halbes Paar → 422.
+    pub antreff_lat: Option<f64>,
+    pub antreff_lon: Option<f64>,
     pub notiz: Option<String>,
 }
 
@@ -118,6 +121,12 @@ pub async fn anlegen(
             "Halter-FK und Halter-Freitext schließen sich aus".into(),
         ));
     }
+    pruefe_koordinate(
+        body.antreff_lat,
+        body.antreff_lon,
+        "antreff_lat",
+        "antreff_lon",
+    )?;
     // Org-Isolation: gesetzte Halter-Person muss zu DIESEM Einsatz gehören (404 sonst).
     // Mustergleich zu `einsatz_uhs::platz_verfuegbarkeit` (Reservierungs-Ziel).
     if let Some(hp) = body.halter_person_id {
@@ -155,6 +164,8 @@ pub async fn anlegen(
                 halter_person_id: body.halter_person_id,
                 halter_kontakt: halter_kontakt.as_deref(),
                 antreff_ort: antreff.as_deref(),
+                antreff_lat: body.antreff_lat,
+                antreff_lon: body.antreff_lon,
                 notiz: notiz.as_deref(),
             },
         )
@@ -214,6 +225,12 @@ pub struct PatchBody {
     pub groesse_gewicht: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub antreff_ort: Option<Option<String>>,
+    /// Koordinate des Fundorts (LLH-1123): nur als Paar setzen oder leeren; der
+    /// wirksame Zustand nach dem Patch wird geprüft (halbes Paar → 422).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub antreff_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub antreff_lon: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub notiz: Option<Option<String>>,
     /// `Some(null)` = explizit löschen; absent = unverändert.
@@ -273,6 +290,14 @@ pub async fn aktualisieren(
             "Halter-FK und Halter-Freitext schließen sich aus".into(),
         ));
     }
+    // Koordinate: wirksames Paar nach dem Patch prüfen (wie Schaden/UHS). Ein einzelnes
+    // `antreff_lat: null` an einem verorteten Tier ergäbe ein halbes Paar → 422.
+    pruefe_koordinate(
+        body.antreff_lat.unwrap_or(vorher.antreff_lat),
+        body.antreff_lon.unwrap_or(vorher.antreff_lon),
+        "antreff_lat",
+        "antreff_lon",
+    )?;
     // Org-Isolation: ein gesetzter Halter-FK muss zu DIESEM Einsatz gehören (404 sonst).
     if let Some(Some(hp)) = body.halter_person_id {
         person_repo::laden(&state.pool, einsatz_id, hp).await?;
@@ -302,6 +327,8 @@ pub async fn aktualisieren(
             kennzeichnung: kennzeichnung.as_ref().map(|o| o.as_deref()),
             groesse_gewicht: groesse.as_ref().map(|o| o.as_deref()),
             antreff_ort: antreff.as_ref().map(|o| o.as_deref()),
+            antreff_lat: body.antreff_lat,
+            antreff_lon: body.antreff_lon,
             notiz: notiz.as_ref().map(|o| o.as_deref()),
             halter_person_id: body.halter_person_id,
             halter_kontakt: kontakt_norm.as_ref().map(|o| o.as_deref()),

@@ -1025,7 +1025,7 @@ export function parseKartenzentrum(wert: string | null | undefined): Kartenzentr
  * `pages/LagekartePage.tsx` mit.
  */
 export type PlatzierenZielTyp =
-  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum';
+  'schaden' | 'uhs' | 'person' | 'betreuungsstelle' | 'bereitstellungsraum' | 'tier';
 
 /** Exhaustiv: ein neuer Zieltyp bricht den Typcheck, statt im Parser still zu fehlen. */
 const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
@@ -1037,6 +1037,8 @@ const PLATZIEREN_ZIEL_ERLAUBT: Record<PlatzierenZielTyp, true> = {
   betreuungsstelle: true,
   // Bereitstellungsraum („Auf Karte verorten" der BR-Detailseite, LLH-1107).
   bereitstellungsraum: true,
+  // Fundort eines Tiers („Auf Karte verorten" der Tier-Detailseite, LLH-1123).
+  tier: true,
 };
 
 /**
@@ -1064,14 +1066,15 @@ export function parseZurueck(wert: string | null | undefined): boolean {
 
 /**
  * Rückweg nach dem Verorten: die Seite, von der der Auftrag kam, allein aus Typ und Kennung
- * (LLH-1125, Spec `lagekarte-verortungsauftrag`). Exhaustiv: ein neuer Zieltyp (etwa `tier`,
- * LFH-1263) bricht den Typcheck, bis er hier sein Ziel bekommt.
+ * (LLH-1125, Spec `lagekarte-verortungsauftrag`). Exhaustiv: ein neuer Zieltyp bricht den
+ * Typcheck, bis er hier sein Ziel bekommt.
  */
 const RUECKWEG: Record<PlatzierenZielTyp, ((einsatzId: number, id: number) => string) | null> = {
   person: personDetailPfad,
   schaden: schadenDetailPfad,
   betreuungsstelle: betreuungsstellePfad,
   bereitstellungsraum: bereitstellungsraumDetailPfad,
+  tier: tiereDetailPfad,
   // Die UHS hat keinen äußeren Verortungseinstieg: sie wird auf der Karte über „Nicht verortet“
   // verortet, es gibt keine Seite, zu der man zurückwollte.
   uhs: null,
