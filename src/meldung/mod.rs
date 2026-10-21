@@ -104,8 +104,8 @@ pub struct MeldungKennzahlen {
     pub erledigt: i64,
 }
 
-/// Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,
-/// `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
+/// Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN, `ist_offen` für
+/// Posteingang-Filter). Ob sie in der Lage steht, sagt `lagerelevant` (LLH-1031).
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct MeldungAnzeige {
     pub id: i64,
@@ -141,8 +141,6 @@ pub struct MeldungAnzeige {
     pub is_auftrag_aufgehoben: bool,
     pub erfasst_von_id: i64,
     pub erstellt_at: String,
-    /// Abgeleitet: id des erzeugten Lageobjekts (LFH-95), falls übergeben.
-    pub lage_meldung_id: Option<i64>,
     /// Abgeleitet: status != 'erledigt' (Posteingang = offene Meldungen).
     pub ist_offen: bool,
     /// Erledigt-Zeitpunkt (UTC), first-write-wins beim Übergang nach 'erledigt' (LFH-113);
@@ -213,19 +211,24 @@ pub struct RueckmeldungenAnzeige {
     pub abschnitte: Vec<LetzteRueckmeldung>,
 }
 
-/// Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)
-/// per JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.
+/// Eine Lagemeldung: eine lagerelevante Meldung in der Sicht der Lage (LFH-95; seit LLH-1031 ohne
+/// eigenes Lageobjekt, LLH-1027 D1/D6). Die Drahtform bleibt die, die alte Lage-Stände
+/// (`lage_snapshot.daten`) tragen: dort ist `id` noch die Kennung des früheren Lageobjekts, heute
+/// gilt `id == meldung_id`. Die Felder ab `meldungsart` fehlen in alten Ständen.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
 pub struct LageMeldungAnzeige {
+    /// Kennung der Lagemeldung = Kennung der Meldung (`lagemeldung:<id>` im Client).
     pub id: i64,
     pub einsatz_id: i64,
     pub meldung_id: i64,
+    /// Eigener Lage-Text der Übernahme, sonst der Wortlaut der Meldung.
     pub text: String,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
+    /// Wer sie in die Lage übernommen hat; bei einer Lagemeldung ihr Erfasser.
     pub erstellt_von_id: i64,
     /// Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es
-    /// geschah.
+    /// geschah. Bei einer Lagemeldung ihr Eingang.
     pub erstellt_at: String,
     /// Ereigniszeit der Quellmeldung (UTC, `meldung.ereigniszeit`, LLH-1039): Zeit, Tag,
     /// Zeitfenster und Ordnung der Zeitachse. Gleicher Name wie an der Meldung.
@@ -244,6 +247,20 @@ pub struct LageMeldungAnzeige {
     /// Abgeleitet: Anzeigename zu `gesehen_von_id` (JOIN benutzer).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gesehen_von_name: Option<String>,
+    /// Meldungsart (LLH-1031): `lagemeldung` oder die Art einer übernommenen Meldung.
+    #[sqlx(try_from = "String")]
+    pub meldungsart: Meldungsart,
+    /// Priorität der Meldung, gleicher Name wie an der Meldung.
+    #[sqlx(try_from = "String")]
+    pub prioritaet: Prioritaet,
+    /// Bearbeitungsstand der Meldung im Meldungseingang — nicht die Kenntnisnahme (`is_neu`).
+    #[sqlx(try_from = "String")]
+    pub meldung_status: MeldungStatus,
+    /// Richtung intern/extern (eine Lagemeldung an die übergeordnete Stelle ist `extern`).
+    #[sqlx(try_from = "String")]
+    pub richtung: Richtung,
+    /// Abgeleitet: erfasst von einem gekoppelten Gerät (Erfasser ist ein Gerätekonto).
+    pub is_von_geraet: bool,
 }
 
 // ── Nach dem Commit: Live-Bündel, Benachrichtigung, Auto-Frist (aus `routes/meldung.rs`

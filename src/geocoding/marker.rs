@@ -9,7 +9,7 @@ use sqlx::SqlitePool;
 /// Alle verorteten Marker des Einsatzes (Einsatzort, UHS, Schaden, Einheit, Fahrzeug,
 /// Personal/Führung, Lagemeldung). Stornierte UHS/Schäden werden ausgeblendet. Eine Lagemeldung
 /// heißt nach der Nummer ihrer Meldung („Lagemeldung #3“, LLH-1039), damit der Ortsbezug sagt,
-/// welche.
+/// welche; sie ist eine verortete lagerelevante Meldung, ihre Kennung die der Meldung (LLH-1031).
 pub async fn lade_marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Marker>, AppError> {
     let marker = sqlx::query_as::<_, Marker>(
         "SELECT 'einsatzort' AS typ, id, COALESCE(NULLIF(einsatzort, ''), bezeichnung) AS label, \
@@ -32,9 +32,8 @@ pub async fn lade_marker(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<Marke
          SELECT 'personal', id, snap_name, lat, lon FROM einsatz_personal \
           WHERE einsatz_id = ?1 AND lat IS NOT NULL AND lon IS NOT NULL AND beendet_at IS NULL \
          UNION ALL \
-         SELECT 'lagemeldung', lm.id, 'Lagemeldung #' || m.lfd_nr, lm.lat, lm.lon \
-           FROM lage_meldung lm JOIN meldung m ON m.id = lm.meldung_id \
-          WHERE lm.einsatz_id = ?1 AND lm.lat IS NOT NULL AND lm.lon IS NOT NULL",
+         SELECT 'lagemeldung', id, 'Lagemeldung #' || lfd_nr, lat, lon FROM meldung \
+          WHERE einsatz_id = ?1 AND lagerelevant = 1 AND lat IS NOT NULL AND lon IS NOT NULL",
     )
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -148,7 +147,8 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (bid, eid) = fixture(&pool).await;
         // Zwei Meldungen; nur die mit lfd_nr 7 wird verortet übergeben, die andere unverortet.
-        let mut lage_ids = Vec::new();
+        // Eine dritte trägt eine Koordinate, steht aber nicht in der Lage.
+        let mut mids = Vec::new();
         for (nr, geo) in [(3_i64, None), (7, Some((51.4, 10.4)))] {
             let mid: i64 = sqlx::query_scalar(
                 "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, \
@@ -162,11 +162,22 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-            let lid = crate::meldung::repo::als_lagerelevant(&pool, eid, mid, bid, "X", geo)
+            crate::meldung::repo::als_lagerelevant(&pool, eid, mid, bid, "X", geo)
                 .await
                 .unwrap();
-            lage_ids.push(lid);
+            mids.push(mid);
         }
+        sqlx::query(
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, \
+                                  eingang_at, erfasst_von_id, lat, lon) \
+             VALUES (?, 9, 'Florian Nord 1', 'funk', 'X', '2026-06-12 09:00:00', \
+                     '2026-06-12 09:00:00', ?, 51.5, 10.5)",
+        )
+        .bind(eid)
+        .bind(bid)
+        .execute(&pool)
+        .await
+        .unwrap();
         let lage: Vec<_> = lade_marker(&pool, eid)
             .await
             .unwrap()
@@ -174,8 +185,8 @@ mod tests {
             .filter(|m| m.typ == "lagemeldung")
             .map(|m| (m.id, m.label))
             .collect();
-        // Etikett mit der Nummer der MELDUNG, die id bleibt die der Lagemeldung.
-        assert_eq!(lage, [(lage_ids[1], "Lagemeldung #7".to_string())]);
+        // Etikett und Kennung sind die der Meldung (LLH-1031); nicht in der Lage = kein Marker.
+        assert_eq!(lage, [(mids[1], "Lagemeldung #7".to_string())]);
     }
 
     #[tokio::test]
