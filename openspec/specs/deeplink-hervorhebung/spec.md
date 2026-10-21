@@ -12,7 +12,7 @@ Statustönungen, ohne den Kontrastboden des Zeilentexts zu unterschreiten.
 ### Requirement: Hervorhebung aus vorhandenen Rollen
 
 Die Markierung einer per Deeplink angesteuerten Zeile oder Karte einer Datensicht, eines
-Zeitachseneintrags oder einer Kommunikationskarte (Meldung, Auftrag, Einsatzbefehl) MUST ihre Farben
+Zeitachseneintrags oder einer Kommunikationskarte (Meldung, Auftrag, Einsatzbefehl, Nachforderung) MUST ihre Farben
 ausschließlich aus vorhandenen Farbrollen beziehen. Sie MUST NOT eine Statusrolle (`achtung`,
 `alarm`, `normal`) oder eine Statustönung einer Zeile verwenden, weil die angesprungene Zeile
 kein Zustand ist.
@@ -26,7 +26,7 @@ kein Zustand ist.
 - **THEN** fügt die Markierung weder die Achtung- noch die Alarmfläche, noch eine Lücken-, Problem- oder Berichtigungstönung hinzu
 
 #### Scenario: Kommunikationskarte
-- **WHEN** im Tag- oder Nachtmodus eine nicht alarmierte Meldung per `?meldung=`, ein nicht alarmierter Auftrag per `?auftrag=` oder ein Einsatzbefehl per `?befehl=` angesprungen wird
+- **WHEN** im Tag- oder Nachtmodus eine nicht alarmierte Meldung per `?meldung=`, ein nicht alarmierter Auftrag per `?auftrag=`, ein Einsatzbefehl per `?befehl=` oder eine nicht abgelehnte Nachforderung per `?nachforderung=` angesprungen wird
 - **THEN** trägt die Karte die Fläche und die Linie der Bedienrollen des Modus, wie die Tabellenzeile
 
 #### Scenario: Schichtkarte der Ablösung
@@ -93,6 +93,10 @@ und nur die Linie oben und unten hinzufügen. Die Linie MUST gegen die Gefahrfl�
 #### Scenario: Alarmierte Karte angesprungen
 - **WHEN** im Tag- oder Nachtmodus ein überfälliger Auftrag per `?auftrag=` angesprungen wird
 - **THEN** steht die Karte weiter auf der Alarmfläche mit Alarmkante links und trägt die Linie oben und unten in `bedien`
+
+#### Scenario: Abgelehnte Nachforderung angesprungen
+- **WHEN** eine abgelehnte Nachforderung per `?nachforderung=` angesprungen wird, etwa über ihren Verweis im ETB
+- **THEN** steht ihre Karte weiter auf der Alarmfläche mit Alarmkante links und trägt die Linie oben und unten
 
 #### Scenario: Linie auf der Alarmfläche
 - **WHEN** eine alarmierte Karte per Deeplink angesprungen wird

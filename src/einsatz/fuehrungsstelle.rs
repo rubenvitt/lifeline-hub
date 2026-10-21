@@ -285,6 +285,51 @@ struct Zeile {
     einsatzleiter: EinsatzleiterSpalten,
 }
 
+/// Absender eines Eintrags, mit dem die Führung nach außen geht, etwa einer Nachforderung
+/// (LLH-1104 D5): der Rufname der eigenen Führungsstelle, sonst ihre Bezeichnung. Ist keine
+/// gepflegt, der ETB-Vorschlag des Erstellers (`anVorbelegung`, `frontend/src/fuehrung/AGENTS.md`):
+/// seine Führungsstelle aus der Mitgliedschaft, sonst sein erstes Sachgebiet als Kürzel. `None`,
+/// wenn nichts davon bekannt ist; dann setzt `etb::repo` die Systemkennung (LFH-894).
+pub async fn absender_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    benutzer_id: i64,
+) -> Result<Option<String>, AppError> {
+    let stelle: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT COALESCE(NULLIF(TRIM(rufname), ''), NULLIF(TRIM(bezeichnung), '')) \
+         FROM einsatz_fuehrungsstelle WHERE einsatz_id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(Some(s)) = stelle {
+        return Ok(Some(s));
+    }
+    let mitglied: Option<(Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT fuehrungsfunktion, fuehrungsstelle FROM einsatz_mitgliedschaft \
+         WHERE einsatz_id = ? AND benutzer_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(benutzer_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some((code, text)) = mitglied {
+        let karte = crate::fuehrung::repo::labelkarte_fuer_einsatz(&mut *conn, einsatz_id).await?;
+        let vorschlag = super::repo::vorbelegung(&karte, code.as_deref(), text)
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        if vorschlag.is_some() {
+            return Ok(vorschlag);
+        }
+    }
+    let sachgebiete =
+        crate::stab::repo::sachgebiete_von_conn(&mut *conn, einsatz_id, benutzer_id).await?;
+    Ok(sachgebiete
+        .into_iter()
+        .min()
+        .map(|sg| sg.as_str().to_uppercase()))
+}
+
 /// Lädt die Führungsstelle; ohne Zeile alle Angaben leer.
 pub async fn load(pool: &SqlitePool, einsatz_id: i64) -> Result<FuehrungsstelleAnzeige, AppError> {
     let mut conn = pool.acquire().await?;

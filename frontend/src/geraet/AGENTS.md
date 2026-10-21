@@ -164,3 +164,20 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Einsatzleiter am Einsatzkopf bekommt keine Gerätesitzung (LLH-1168, `src/routes/einsatz.rs::detail`).
   Einsatzweite Zähler für Meldungen und Personen bekommt kein Gerät, auch ohne Stelle
   (`modul_zaehler.rs`).
+
+**Meldungsmodell (LLH-1027, Entscheidung 21.10.2026) — Zielbild, gilt ab LLH-1031 bzw. LLH-1066;
+bis dahin gilt das Bestehende**
+
+Begriffe und Datenfluss: `docs/design/2026-10-21-meldungsmodell/README.md`. Das Ticket, das einen
+Punkt baut, schreibt die Regeln oben fort und streicht ihn hier.
+
+- **Lagemeldung vom Gerät (LLH-1031):** `geraet/GeraetMeldungen.tsx` bleibt der einzige Weg;
+  neben der Priorität steht eine `Segmentleiste` „Meldung · Lagemeldung“, Lagemeldung setzt
+  `meldungsart = 'lagemeldung'` (Sofort bleibt `sofortmeldung`). Der Server macht sie
+  lagerelevant wie jede Lagemeldung; das Gerät bekommt dafür keine neue Route, keine Liste der
+  Lagemeldungen, keine Kenntnisnahme und keinen Zähler. Server-Test in
+  `tests/geraet_kopplung.rs`: Gerätelagemeldung ist lagerelevant und in der Liste der Führung als
+  Meldung eines Geräts erkennbar. Der Rest des Geräteflusses (Eigene Meldungen mit
+  Bearbeitungsstand, vormerken ohne Netz) bleibt.
+- **Keine Korrektur am Gerät (LLH-1066):** der PATCH einer Meldung steht in keiner Routenliste;
+  Art, Priorität, Bezug und Lage-Angaben korrigiert nur die Führung.

@@ -195,6 +195,7 @@ function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
     lon: null,
     erstellt_von_id: 1,
     erstellt_at: '',
+    ereigniszeit: '',
     meldung_lfd_nr: 5,
     meldung_absender: 'Florian Nord 1',
     is_neu: false,

@@ -241,6 +241,18 @@ pub struct EtbEintragAnzeige {
     pub auftrag_id: Option<i64>,
     /// Gesetzt, wenn dieser Eintrag der Freigabe-Snapshot eines Befehls ist (LFH-64). Sonst `None`.
     pub befehl_id: Option<i64>,
+    /// Rückverweis auf die Meldung, zu der dieser Eintrag gehört (Auto-ETB der Meldung,
+    /// Übergabe an die Lage; LLH-1104 D1). Fehlt ohne Kopplung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meldung_id: Option<i64>,
+    /// Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet
+    /// per Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meldung_lfd_nr: Option<i64>,
+    /// Rückverweis auf die Nachforderung, deren Anlage oder Stufe dieser Eintrag protokolliert
+    /// (LLH-1104 D1/D6). Fehlt ohne Kopplung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nachforderung_id: Option<i64>,
     /// Aufträge, die AUS diesem Eintrag erteilt wurden (LFH-636) — die Vorwärtsrichtung zu
     /// `auftrag.quell_etb_eintrag_id` (LFH-112), nicht zu verwechseln mit `auftrag_id` oben
     /// (Eintrag wurde VON einem Auftrag erzeugt). Aufsteigend nach `lfd_nr`, leer statt
