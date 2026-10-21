@@ -39,6 +39,7 @@ import { baueZeichenRegistry, kartenPixelRatio, ZEICHEN_KARTEN_PX } from './mark
 import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, donutBild, setzeHuelleDurchlaessig } from './clusterDonut';
 import { nimmKartenbildAuf, type KartenAufnahme } from './kartenAufnahme';
+import { KARTE_NICHT_DARSTELLBAR, wennDarstellbar } from './kartenGrafik';
 import type { GeoJsonPolygon, GeoJsonGeometry, GeoPunkt } from './geo';
 import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
@@ -374,6 +375,11 @@ export interface KartenHandle {
    */
   nimmBildAuf(): Promise<KartenAufnahme | null>;
   /**
+   * Kann die Fläche zeichnen? Falsch nur, wenn das Gerät keine Kartengrafik hat (LLH-1353,
+   * `kartenGrafik.ts`): dann steht an Stelle der Karte ihr Zustand, und ein Lageplan nennt ihn.
+   */
+  isDarstellbar(): boolean;
+  /**
    * Fokus auf einen Abschnitt (LLH-1057): den Rahmen einpassen (Bedienung, verbraucht die
    * Startansicht wie `flyToZiel`). Gibt die Kamera davor zurück, ohne Karte `null`.
    */
@@ -457,6 +463,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
+  // Ohne Kartengrafik entsteht keine Karte (LLH-1353): der Zustand ersetzt sie, der Handle liest
+  // den Ref (stabil, ohne Neuaufbau des Handles).
+  const [nichtDarstellbar, setNichtDarstellbar] = useState(false);
+  const nichtDarstellbarRef = useRef(false);
   // Namensplaketten der Marker in den Rollen des aktiven Modus — dieselbe Plakette wie an den
   // Zonen. `rollen` ist eine Paletten-Konstante, also stabil.
   const { rollen, token } = useRollen();
@@ -689,6 +699,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
           }),
         );
       },
+      isDarstellbar() {
+        return !nichtDarstellbarRef.current;
+      },
       fokussiere(rahmen) {
         const map = mapRef.current;
         if (!map) return null;
@@ -712,7 +725,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       (window as unknown as { __lfhKartenAnfragen?: KartenAnfrage[] }).__lfhKartenAnfragen = [];
       (window as unknown as { __lfhKartenFehler?: string[] }).__lfhKartenFehler = [];
     }
-    const map = new maplibregl.Map({
+    const optionen: maplibregl.MapOptions = {
       container: containerRef.current,
       style,
       center: [10.45, 51.16], // Mitte DE als neutraler Start
@@ -734,7 +747,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       // schließt die übrigen Wege (Umschalt+↑), ohne das Drehen abzuschalten.
       touchPitch: false,
       maxPitch: 0,
-    });
+    };
+    // Ohne WebGL2 wirft der Konstruktor (LLH-1353): `wennDarstellbar` fängt nur diesen Wurf.
+    const map = wennDarstellbar(() => new maplibregl.Map(optionen));
+    if (!map) {
+      // Die Fläche zeigt den Zustand, die übrige Seite bleibt; alle Effekte und der Handle kommen
+      // ohne Karte aus.
+      nichtDarstellbarRef.current = true;
+      setNichtDarstellbar(true);
+      return;
+    }
     // Kein `NavigationControl`: Zoom, Nordung und Zeichnen stehen im Knopfblock der Überlagerung.
     //
     // Das Fenster der Basemap-Abstufung schließt bei 'style.load', nicht bei 'load': 'load' wartet
@@ -1854,6 +1876,27 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         style={{ width: '100%', height: '100%' }}
         data-testid="kartenflaeche"
       />
+      {nichtDarstellbar && (
+        // Zustand statt Karte (LLH-1353), Form des Leerzustands (`SeitenLeer`, der aber einen
+        // Router braucht). Kein Wort über die Technik: das steht im Anwenderkapitel (LFH-1078).
+        <div
+          role="status"
+          data-lfh="karte-nicht-darstellbar"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: token.padding,
+            textAlign: 'center',
+            color: token.colorTextSecondary,
+            fontSize: token.fontSize,
+          }}
+        >
+          {KARTE_NICHT_DARSTELLBAR}
+        </div>
+      )}
       <FlaechenwahlMenue
         key={offeneWahl?.nr}
         wahl={

@@ -111,6 +111,15 @@ diese Zusage.
   Eigenpositions-Anflug); Wächter `kamera.guard.test.ts`. Daran entfällt der erste Anflug der
   Eigenposition nach einer Bedienung.
 - **Die Karte kippt nicht** (`touchPitch: false` **und** `maxPitch: 0` in `Kartenflaeche.tsx`).
+- **Karte ohne Grafik** (LLH-1353, Spec `lagekarte-kartengrundlage`): ohne WebGL2 wirft maplibres
+  Konstruktor `GPUInitializationError`. Der Karten-Effekt baut die Karte nur über
+  `wennDarstellbar` (`lagekarte/kartenGrafik.ts`), das genau diesen Wurf fängt (am `name`, die
+  Test-Nachbauten exportieren die Klasse nicht); jeder andere fliegt weiter. Dann bleibt `mapRef`
+  `null`, die Fläche zeigt `KARTE_NICHT_DARSTELLBAR` (`data-lfh="karte-nicht-darstellbar"`), die
+  übrige Seite bleibt bedienbar; jeder Effekt und jede Handle-Methode prüft deshalb auf `null`.
+  `KartenHandle.isDarstellbar()` gibt den Grund an den Lageplan (`useLageplan`: Druck und Anlage
+  nennen ihn). Kein Wort über WebGL2 in der Oberfläche, das steht im Anwenderkapitel. Nachweis
+  `e2e/lagekarte-ohne-grafik.spec.ts` (Chromium per Init-Skript, Firefox ohne Nachbau).
 - **Fachebenen nennen ihr Alter** (LFH-591,
   `openspec/changes/archive/2026-09-30-lfh-591-fachebenen-datenalter/design.md`): `abgerufen` im
   Umschlag ist der Abruf durch den Server, `stand` bleibt der Datenstand der Quelle (KRITIS,
