@@ -289,6 +289,17 @@ diese Zusage.
   (`parseKreisVorbelegung`) und räumt alle drei. Esc: Figur = Mitte. Eine neue Geometrie per PATCH
   löscht die Kreisangaben. Mit Bezug (`evakuierungsbezirk:kreis&bezirk=<id>`) trägt der Kreis ihn
   wie die Fläche: POST mit `kreis`, `label` und `evakuierungsbezirk_id`, keine Serie, Art fest.
+- **Zone bearbeiten** (LLH-1344, Spec `lagekarte-zeichnen`): Einstieg nur im `ZonenInspector`
+  („Punkte bearbeiten“, an einer Kreiszone „Mitte verschieben“), nie im Werkzeugmenü. Punktweise
+  ist ein eigener exklusiver Modus `bearbeiten` (Stand rein in `zonenBearbeitung.ts`, Karte in
+  `zonenBearbeitungKarte.ts`: Ebenen `td-zone-bearbeiten-*`, keine Klickebene, Griffe als Marker
+  ≥ 44 px, gedrängte Griffe per `sichtbareGriffe` weg, Abbau vor `map.remove()`), kein
+  terra-draw-Auswahlmodus (Entfernen nur per Rechtsklick). Die Mitte ist der Kreis-Modus mit
+  `entwurf.bearbeiten` (Art fest, keine Serie; Mittengriff in `kreisVorschau.ts`, nur mit
+  Radius). „Übernehmen“ = genau EIN PATCH (`geometrie` bzw. nur die geänderten
+  `kreis_mitte_lat/lon`, `kreis_radius_m`); das Polygon rechnet der Server. Esc: Figur = Abweichung
+  vom Gespeicherten. Die bearbeitete Zone fehlt in der Zonenebene (`zonenKarte` der Seite); nach
+  Übernehmen/Abbrechen ist sie wieder gewählt.
 - **Werkzeugmenü an der Karte** (LLH-1038, Spec `lagekarte-zeichnen`): der Knopf
   „Zeichenwerkzeuge“ (nur mit Schreibrecht) klappt `Werkzeugmenue.tsx` auf, das im `KartenFuss`
   steht (Zustand in der Seite, Knopf mit `aria-expanded`/`aria-controls`). Kein Popover am Knopf,
