@@ -6908,6 +6908,30 @@
               }
             ]
           },
+          "meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückverweis auf die Meldung, zu der dieser Eintrag gehört (Auto-ETB der Meldung,\nÜbergabe an die Lage; LLH-1104 D1). Fehlt ohne Kopplung."
+          },
+          "meldung_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet\nper Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`."
+          },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückverweis auf die Nachforderung, deren Anlage oder Stufe dieser Eintrag protokolliert\n(LLH-1104 D1/D6). Fehlt ohne Kopplung."
+          },
           "received_at": {
             "type": "string"
           },

@@ -2,7 +2,7 @@
 titel: Nachforderung
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -118,8 +118,17 @@ Wer das Modul „Nachforderung“ nicht sehen darf, bekommt keinen Hinweis.
 ### Nachforderungen im Einsatztagebuch
 
 Jede abgesetzte Nachforderung schreibt einen ETB-Eintrag vom Typ „Meldung“ mit dem Inhalt
-„Nachforderung: … × Art — Bezeichnung“, die Begründung als Veranlassung. Dieser Eintrag entsteht
-immer, unabhängig von „Automatische ETB-Einträge“ (siehe [Einsatztagebuch](einsatztagebuch.md)).
+„Nachforderung: … × Art — Bezeichnung“, die Begründung als Veranlassung. Absender ist die eigene
+Führungsstelle des Einsatzes mit ihrem Rufnamen, sonst ihrer Bezeichnung; ist keine gepflegt,
+die Führungsstelle oder das erste Sachgebiet der Person, die anfordert. Empfänger ist der
+Adressat, etwa „Leitstelle (ILS Nord)“.
+
+Auch jede weitere Stufe steht als Systemeintrag im ETB, etwa „Nachforderung 2× RTW: zugesagt“,
+„…: unterwegs“, „…: eingetroffen“ oder „…: abgelehnt (keine Reserven)“. Ein „Rückgängig“ löscht
+nichts, sondern schreibt einen weiteren Eintrag, etwa „Nachforderung 2× RTW: zurückgesetzt auf
+angefordert“. Alle diese Einträge entstehen immer, unabhängig von „Automatische ETB-Einträge“
+(siehe [Einsatztagebuch](einsatztagebuch.md)). Jeder trägt den Verweis „Nachforderung ↗“; er
+öffnet die Nachforderungen mit der Karte hervorgehoben.
 
 ### Zuständige Leitstelle als Vorgabe
 

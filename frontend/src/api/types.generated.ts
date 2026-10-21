@@ -2721,6 +2721,24 @@ export interface components {
             /** Format: int64 */
             lfd_nr: number;
             meldeweg?: components["schemas"]["MeldeWeg"] | null;
+            /**
+             * Format: int64
+             * @description Rückverweis auf die Meldung, zu der dieser Eintrag gehört (Auto-ETB der Meldung,
+             *     Übergabe an die Lage; LLH-1104 D1). Fehlt ohne Kopplung.
+             */
+            meldung_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet
+             *     per Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`.
+             */
+            meldung_lfd_nr?: number | null;
+            /**
+             * Format: int64
+             * @description Rückverweis auf die Nachforderung, deren Anlage oder Stufe dieser Eintrag protokolliert
+             *     (LLH-1104 D1/D6). Fehlt ohne Kopplung.
+             */
+            nachforderung_id?: number | null;
             received_at: string;
             typ: components["schemas"]["EtbTyp"];
             veranlassung?: string | null;
