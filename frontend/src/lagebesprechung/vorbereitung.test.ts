@@ -81,6 +81,10 @@ function quellen(over: Partial<VorbereitungsQuellen> = {}): VorbereitungsQuellen
     zustand: alleDa,
     auftraege: { zustand: 'daten', zahl: { offen: 5, in_arbeit: 2, ueberfaellig: 1 } },
     meldungen: { zustand: 'daten', zahl: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 } },
+    nachforderungen: {
+      zustand: 'daten',
+      zahl: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 },
+    },
     besprechung,
     ...over,
   };
@@ -121,6 +125,25 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
     expect(zeile(zeilen, 'meldungen')).toMatchObject({ wert: '3', notiz: '1 neu' });
   });
 
+  // LLH-1078: die offenen Nachforderungen, je Stufe als Notiz.
+  it('Nachforderungen offen aus dem Modulzähler, je Stufe als Notiz', () => {
+    const zeilen = vorbereitungsZeilen(quellen(), BERLIN);
+    expect(zeile(zeilen, 'nachforderungen')).toMatchObject({
+      titel: 'Nachforderungen offen',
+      wert: '5',
+      notiz: '1 angefordert · 2 zugesagt · 2 unterwegs',
+      quelle: 'Nachforderungen',
+    });
+    const gesperrt = vorbereitungsZeilen(
+      quellen({ nachforderungen: { zustand: 'gesperrt' } }),
+      BERLIN,
+    );
+    expect(zeile(gesperrt, 'nachforderungen')).toMatchObject({
+      wert: '—',
+      notiz: 'nicht freigegeben',
+    });
+  });
+
   it('feste Reihenfolge wie das Dashboard, jede Zeile mit Quelle', () => {
     const zeilen = vorbereitungsZeilen(quellen(), BERLIN);
     expect(zeilen.map((z) => z.schluessel)).toEqual([
@@ -131,6 +154,7 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
       'warnstufe',
       'auftraege',
       'meldungen',
+      'nachforderungen',
       'lagebericht',
       'besprechung',
       'termin',
@@ -143,6 +167,7 @@ describe('vorbereitungsZeilen (LFH-550)', () => {
       'Gefahren',
       'Aufträge/Befehle',
       'Meldungen (eingehend)',
+      'Nachforderungen',
       'Lageberichte',
       'Lagebesprechung',
       'Lagebesprechung',

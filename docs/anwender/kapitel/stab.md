@@ -86,10 +86,10 @@ Ist das Modul eines Werkzeugs ausgeblendet, fehlt das Werkzeug; ist es gesperrt,
 
 **Zahlen an den Werkzeugen:** Eine Zahl steht nur, wo die App sie schon an anderer Stelle führt:
 bei Modulen mit Zähler im Modulmenü dieselbe Zahl (offene Aufträge, offene Meldungen, Einträge im
-Einsatztagebuch, Einheiten, Einsatzabschnitte), bei „Pressearbeit“ die offenen Presseanfragen,
-beim „Funkplan“ die Zahl seiner Lücken. Überfällige Aufträge färben die Zahl als Achtung und stehen
-als „… überfällig“ darunter. Nachforderungen, Lagemeldungen, Verpflegung und Material zeigen keine
-Zahl. Ist die Quelle einer Zahl nicht freigegeben, steht „—“ mit dem Grund; kann sie nicht geladen
+Einsatztagebuch, Einheiten, Einsatzabschnitte, neue Lagemeldungen, offene Nachforderungen mit
+„… unterwegs“ darunter), bei „Pressearbeit“ die offenen Presseanfragen, beim „Funkplan“ die Zahl
+seiner Lücken. Überfällige Aufträge färben die Zahl als Achtung und stehen als „… überfällig“
+darunter. Verpflegung und Material zeigen keine Zahl. Ist die Quelle einer Zahl nicht freigegeben, steht „—“ mit dem Grund; kann sie nicht geladen
 werden, auch ohne Netz, steht „?“ mit „nicht geladen“. Eine fehlende Zahl ist nie „0“.
 
 Eine Besetzung wird überschrieben; die App führt keine Historie, der Verlauf steht im

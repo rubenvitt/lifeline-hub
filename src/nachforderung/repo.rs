@@ -155,6 +155,31 @@ pub async fn list(
     query.fetch_all(pool).await.map_err(Into::into)
 }
 
+/// Zählt die Nachforderungen eines Einsatzes je Status (LLH-1078, Modulzähler): EINE Abfrage ohne
+/// Listenspalten (LFH-935), gezählt wird darüber mit [`crate::einsatz::zaehler::zaehle_nachforderungen_gewichtet`].
+pub async fn zaehlen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+) -> Result<crate::einsatz::zaehler::NachforderungsZaehler, AppError> {
+    let zeilen: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT n.status, COUNT(*) FROM nachforderung n WHERE n.einsatz_id = ? GROUP BY n.status",
+    )
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let gruppen = zeilen
+        .into_iter()
+        .map(|(status, anzahl)| {
+            super::NachforderungStatus::parse(&status)
+                .map(|s| (s, anzahl))
+                .ok_or_else(|| AppError::Internal(format!("Unbekannter Status: {status}")))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(crate::einsatz::zaehler::zaehle_nachforderungen_gewichtet(
+        gruppen,
+    ))
+}
+
 /// Cross-Einsatz-Schutz: gehört die Nachforderung zum Einsatz?
 pub async fn belongs_to_einsatz(
     pool: &SqlitePool,

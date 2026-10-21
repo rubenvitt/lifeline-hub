@@ -26,6 +26,7 @@ pub const MODUL_KEYS: [&str; 34] = [
     "material",
     "verpflegung",
     "bereitstellungsraeume",
+    "nachforderungen",
     "abloesung",
     // Erfassung
     "etb",
@@ -47,7 +48,6 @@ pub const MODUL_KEYS: [&str; 34] = [
     "chat",
     "erinnerungen",
     "meldungen",
-    "nachforderungen",
     "fernmeldewesen",
     // Einstellungen
     "einsatz-einstellungen",

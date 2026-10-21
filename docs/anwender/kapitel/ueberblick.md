@@ -2,15 +2,15 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
 ---
 
 ## Überblick
 
 Der Überblick ist die Startseite eines Einsatzes im Bereich „Führung“. Er fasst auf einer Seite
 zusammen, was die Führung zuerst wissen muss: die Lage in Zahlen, den Stand der
-Einsatzabschnitte, offene Aufträge, die Entscheidungen der letzten Stunde und die nächsten
-Fristen. Er rechnet nur aus Daten, die in den Modulen schon erfasst sind; erfasst wird in den
+Einsatzabschnitte, offene Aufträge und Nachforderungen, die Entscheidungen der letzten Stunde und
+die nächsten Fristen. Er rechnet nur aus Daten, die in den Modulen schon erfasst sind; erfasst wird in den
 Modulen selbst.
 
 ## Abläufe
@@ -27,8 +27,8 @@ Modulen selbst.
 
    ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Aufträgen, Entscheidungen der letzten Stunde und nächsten Marken](../bilder/ueberblick/ueberblick.png)
 
-4. Rechts daneben „Offene Aufträge“ und darunter „Nächste Marken“ lesen: Was zuerst fällig ist,
-   steht oben.
+4. Rechts daneben „Offene Aufträge“ und darunter „Nachforderungen“ lesen, dann „Nächste Marken“:
+   Was zuerst fällig ist, steht oben.
 5. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
    Entscheidungen.
 
@@ -51,6 +51,9 @@ Modulen selbst.
 - **Offene Aufträge** nennt dieselbe Zahl wie das Modul „Aufträge/Befehle“ und dazu, wie viele
   über ihrer Frist sind. Das Paneel zeigt höchstens acht, die überfälligen zuerst; alle weiteren
   erreicht „alle … offenen Aufträge ↗“.
+- **Nachforderungen** nennt die offenen je Stufe (angefordert, zugesagt, unterwegs), dieselben
+  Zahlen wie das Modul „Nachforderungen“, und darunter die zwei, die am längsten warten, mit ihrem
+  Alter. Ein Klick auf eine Zeile öffnet ihre Karte (Kapitel [Nachforderungen](nachforderung.md)).
 - **Entscheidungen der letzten Stunde:** Gab es in der letzten Stunde keine, heißt das Paneel
   „Letzte Entscheidungen“ und zeigt die jüngsten fünf mit dem Hinweis „keine in der letzten
   Stunde“.

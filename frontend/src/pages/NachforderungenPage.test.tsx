@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -14,6 +14,25 @@ import type { EinsatzMaterial, Nachforderung } from '../api/types';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
+import { setzeViewportBreite } from '../test/viewport';
+
+/*
+ * Die Uhr steht auf dem Einsatztag (nur `Date`): „Eingetroffen“ zeigt die letzten 12 h, die
+ * Zeitpunkte der Fixtures liegen am 12.06.2026 vormittags (UTC).
+ */
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-06-12T12:00:00Z'));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/** Die Spalte (bzw. am Handy das Feld) einer Stufe im Board. */
+const spalte = (stufe: string) =>
+  document.querySelector<HTMLElement>(`[data-lfh="board-spalte"][data-stufe="${stufe}"]`);
+const stufeVon = (text: string) =>
+  screen.getByText(text).closest('[data-lfh="board-spalte"]')?.getAttribute('data-stufe');
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
@@ -105,13 +124,33 @@ describe('NachforderungenPage', () => {
     ladeModulFreigaben.mockResolvedValue(freigabenFixture());
   });
 
-  it('zeigt offene Nachforderungen', async () => {
+  it('zeigt offene Nachforderungen in der Spalte ihrer Stufe', async () => {
     renderPage();
     expect(await screen.findByText('2 RTW zur Verstärkung')).toBeInTheDocument();
+    expect(stufeVon('2 RTW zur Verstärkung')).toBe('angefordert');
+    // Die Stufe nennt der Spaltenkopf, nicht die Karte.
     expect(
-      screen.getByText('Angefordert', { selector: '[data-lfh="status-chip"] span' }),
-    ).toBeInTheDocument();
+      screen.queryByText('Angefordert', { selector: '[data-lfh="status-chip"] span' }),
+    ).toBeNull();
     expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+  });
+
+  it('der Seitenkopf liest den Server-Zähler: offen und davon unterwegs', async () => {
+    server.use(
+      http.get('/api/einsaetze/:einsatzId/modul-zaehler', () =>
+        HttpResponse.json({
+          nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 },
+        }),
+      ),
+    );
+    renderPage();
+    expect(await screen.findByText('5 offen · 2 unterwegs')).toBeInTheDocument();
+  });
+
+  it('ohne Server-Zahl steht keine Zahl im Kopf', async () => {
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    expect(screen.queryByText(/\d+ offen/)).toBeNull();
   });
 
   it('setzt eine Nachforderung ab', async () => {
@@ -175,28 +214,133 @@ describe('NachforderungenPage', () => {
     await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledWith(1, 1, 'keine Reserven'));
   });
 
-  it('trennt Offen und Abgeschlossen clientseitig', async () => {
-    // Eine offene + eine eingetroffene Nachforderung in einer Antwort (kein Status-Filter).
+  it('ordnet jede Nachforderung in die Spalte ihrer Stufe; Abgelehnt ist eingeklappt', async () => {
     listeNachforderungen.mockResolvedValue([
-      nf({ id: 1, bezeichnung: '2 RTW zur Verstärkung', status: 'angefordert', ist_offen: true }),
+      nf({ id: 1, bezeichnung: 'Bedarf angefordert' }),
+      nf({ id: 2, bezeichnung: 'Bedarf zugesagt', status: 'zugesagt' }),
+      nf({ id: 3, bezeichnung: 'Bedarf unterwegs', status: 'unterwegs' }),
       nf({
-        id: 2,
-        bezeichnung: 'Eingetroffene SEG',
+        id: 4,
+        bezeichnung: 'Bedarf eingetroffen',
         status: 'eingetroffen',
         ist_offen: false,
         eingetroffen_at: '2026-06-12 10:00:00',
       }),
+      nf({
+        id: 5,
+        bezeichnung: 'Bedarf abgelehnt',
+        status: 'abgelehnt',
+        ist_offen: false,
+        abgelehnt_at: '2026-06-12 10:00:00',
+      }),
     ]);
     renderPage();
-    // Default = Offen: nur die offene ist sichtbar.
-    expect(await screen.findByText('2 RTW zur Verstärkung')).toBeInTheDocument();
-    expect(screen.queryByText('Eingetroffene SEG')).not.toBeInTheDocument();
-    // Page lädt alle (ohne Status-Filter).
+    await screen.findByText('Bedarf angefordert');
+    // Alle laden (ohne Status-Filter), getrennt wird im Board.
     expect(listeNachforderungen).toHaveBeenCalledWith(1, {});
-    // Auf Abgeschlossen wechseln → eingetroffene erscheint, offene verschwindet.
-    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
-    expect(await screen.findByText('Eingetroffene SEG')).toBeInTheDocument();
-    expect(screen.queryByText('2 RTW zur Verstärkung')).not.toBeInTheDocument();
+    expect(stufeVon('Bedarf angefordert')).toBe('angefordert');
+    expect(stufeVon('Bedarf zugesagt')).toBe('zugesagt');
+    expect(stufeVon('Bedarf unterwegs')).toBe('unterwegs');
+    expect(stufeVon('Bedarf eingetroffen')).toBe('eingetroffen');
+    expect(within(spalte('eingetroffen')!).getByText(/letzte 12 h/)).toBeInTheDocument();
+    expect(screen.queryByText('Bedarf abgelehnt')).toBeNull();
+    const zu = within(spalte('abgelehnt')!).getByRole('button', { name: /Abgelehnt/ });
+    expect(zu).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(zu);
+    expect(stufeVon('Bedarf abgelehnt')).toBe('abgelehnt');
+  });
+
+  it('Eingetroffene älter als 12 h stehen gesammelt unter „Ältere eingetroffen“', async () => {
+    listeNachforderungen.mockResolvedValue([
+      nf({
+        id: 4,
+        bezeichnung: 'Gestern eingetroffen',
+        status: 'eingetroffen',
+        ist_offen: false,
+        eingetroffen_at: '2026-06-11 20:00:00',
+      }),
+    ]);
+    renderPage();
+    const knopf = await screen.findByRole('button', { name: 'Ältere eingetroffen (1)' });
+    expect(screen.queryByText('Gestern eingetroffen')).toBeNull();
+    await userEvent.click(knopf);
+    expect(stufeVon('Gestern eingetroffen')).toBe('eingetroffen');
+  });
+
+  it('am Handy eine Segmentleiste der Stufen mit Zahl, Vorgabe die erste offene Stufe mit Karten', async () => {
+    setzeViewportBreite(390);
+    listeNachforderungen.mockResolvedValue([
+      nf({ id: 2, bezeichnung: 'Bedarf zugesagt', status: 'zugesagt' }),
+      nf({ id: 3, bezeichnung: 'Bedarf unterwegs', status: 'unterwegs' }),
+    ]);
+    renderPage();
+    const leiste = await screen.findByRole('tablist', { name: 'Stufe' });
+    expect(within(leiste).getByRole('tab', { name: 'Zugesagt 1' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(screen.getByText('Bedarf zugesagt')).toBeInTheDocument();
+    expect(screen.queryByText('Bedarf unterwegs')).toBeNull();
+    await userEvent.click(within(leiste).getByRole('tab', { name: 'Unterwegs 1' }));
+    expect(screen.getByText('Bedarf unterwegs')).toBeInTheDocument();
+    expect(screen.queryByText('Bedarf zugesagt')).toBeNull();
+  });
+
+  /**
+   * Die eigene Fortschaltung trägt die Karte sofort in ihre neue Spalte, ohne Sprung der übrigen:
+   * die Schleuse gibt den neuen Stand als Benutzeraktion frei, der Fokus folgt der Karte.
+   */
+  it('Fortschalten trägt die Karte in die nächste Spalte und den Fokus mit', async () => {
+    listeNachforderungen.mockResolvedValue([
+      nf({ id: 1, bezeichnung: 'Bedarf eins' }),
+      nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+    ]);
+    setzeNachforderungStatus.mockImplementation(() => {
+      listeNachforderungen.mockResolvedValue([
+        nf({ id: 1, bezeichnung: 'Bedarf eins', status: 'zugesagt' }),
+        nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+      ]);
+      return Promise.resolve(nf({ id: 1, status: 'zugesagt' }));
+    });
+    renderPage();
+    await screen.findByText('Bedarf eins');
+    const eins = screen.getByText('Bedarf eins').closest('[data-lfh="komm-karte"]') as HTMLElement;
+    await userEvent.click(within(eins).getByRole('button', { name: 'Zusage erfassen' }));
+    await waitFor(() => expect(stufeVon('Bedarf eins')).toBe('zugesagt'));
+    expect(stufeVon('Bedarf zwei')).toBe('angefordert');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(document.querySelector('[data-nachforderung-id="1"]')),
+    );
+    expect(document.querySelector('[data-lfh="sammelbanner"]')).toBeNull();
+  });
+
+  /** Fremde Änderungen rücken nicht unter dem Fokus: der Sammelbanner nennt sie. */
+  it('eine fremde Fortschaltung wartet hinter dem Sammelbanner, solange der Fokus im Board ist', async () => {
+    listeNachforderungen.mockResolvedValue([
+      nf({ id: 1, bezeichnung: 'Bedarf eins' }),
+      nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+    ]);
+    renderPage();
+    await screen.findByText('Bedarf eins');
+    const zwei = screen.getByText('Bedarf zwei').closest('[data-lfh="komm-karte"]') as HTMLElement;
+    act(() => within(zwei).getByRole('button', { name: 'Zusage erfassen' }).focus());
+    act(() => {
+      zuletztClient!.setQueryData(einsatzKeys.nachforderungen(1), [
+        nf({ id: 1, bezeichnung: 'Bedarf eins', status: 'unterwegs' }),
+        nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+        nf({ id: 3, bezeichnung: 'Bedarf drei' }),
+      ]);
+    });
+    const banner = await screen.findByText('1 neue Nachforderung · 1 in anderer Stufe');
+    expect(stufeVon('Bedarf eins')).toBe('angefordert');
+    expect(screen.queryByText('Bedarf drei')).toBeNull();
+    await userEvent.click(
+      within(banner.closest('[data-lfh="sammelbanner"]') as HTMLElement).getByRole('button', {
+        name: 'anzeigen',
+      }),
+    );
+    expect(stufeVon('Bedarf eins')).toBe('unterwegs');
+    expect(screen.getByText('Bedarf drei')).toBeInTheDocument();
   });
 
   it('eingetroffene Nachforderung zeigt nur noch die Übernahme als Material (LLH-1226)', async () => {
@@ -204,8 +348,6 @@ describe('NachforderungenPage', () => {
       nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
     ]);
     renderPage();
-    // Eingetroffen landet in der Abgeschlossen-Ansicht → dorthin wechseln.
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await screen.findByText('2 RTW zur Verstärkung');
     expect(screen.queryByRole('button', { name: 'Ablehnen' })).not.toBeInTheDocument();
     const karte = screen.getByText('2 RTW zur Verstärkung').closest('[data-lfh="komm-karte"]');
@@ -214,9 +356,7 @@ describe('NachforderungenPage', () => {
         .getAllByRole('button')
         .map((b) => b.textContent),
     ).toEqual(['Als Material übernehmen']);
-    expect(
-      screen.getByText('Eingetroffen', { selector: '[data-lfh="status-chip"] span' }),
-    ).toBeInTheDocument();
+    expect(stufeVon('2 RTW zur Verstärkung')).toBe('eingetroffen');
   });
 
   describe('Vorbelegung per Deeplink (LFH-634)', () => {
@@ -482,10 +622,10 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   /**
    * Nach der Ablehnung lädt die Seite neu (optimistische Sperre, 422): hat ein anderer Arbeitsplatz
-   * das Eintreffen schon gemeldet, wandert die Karte nach „Abgeschlossen“ und mit ihr ihr Grund.
-   * Solange sie in der gezeigten Liste fehlt, steht er im Seitenhinweis.
+   * das Eintreffen schon gemeldet, ist die Karte weiter. Solange der Fokus im Board ist, hält die
+   * Schleuse sie in ihrer Spalte, mit ihrer neuen Stufe und dem Grund an der Karte.
    */
-  it('Fortschalten: wandert die Karte aus der gezeigten Liste, steht ihr Grund im Seitenhinweis', async () => {
+  const schonEingetroffen = () => {
     const unterwegs = nf({ status: 'unterwegs', unterwegs_at: '2026-06-12 09:30:00' });
     listeNachforderungen.mockResolvedValue([unterwegs]);
     setzeNachforderungStatus.mockImplementation(() => {
@@ -494,9 +634,45 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
       ]);
       return Promise.reject(new ApiError(422, 'Bereits eingetroffen gemeldet'));
     });
+  };
+  const zeigeNeueOrdnung = async () => {
+    const banner = await screen.findByText(/in anderer Stufe/);
+    await userEvent.click(
+      within(banner.closest('[data-lfh="sammelbanner"]') as HTMLElement).getByRole('button', {
+        name: 'anzeigen',
+      }),
+    );
+  };
+
+  it('Fortschalten abgelehnt, weil schon weiter: die gehaltene Karte nennt ihre Stufe und den Grund', async () => {
+    schonEingetroffen();
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: 'Eintreffen melden' }));
+
+    const k = karte('2 RTW zur Verstärkung');
+    expect(await within(k).findByText('Bereits eingetroffen gemeldet')).toHaveAttribute(
+      'data-fehler',
+    );
+    expect(stufeVon('2 RTW zur Verstärkung')).toBe('unterwegs');
+    expect(within(k).getByText('Eingetroffen', { selector: '[data-lfh="status-chip"] span' }));
+    // Die neue Ordnung bietet der Sammelbanner an; danach steht die Karte mit ihrem Grund dort.
+    await zeigeNeueOrdnung();
+    expect(stufeVon('2 RTW zur Verstärkung')).toBe('eingetroffen');
+    expect(
+      within(karte('2 RTW zur Verstärkung')).getByText('Bereits eingetroffen gemeldet'),
+    ).toHaveAttribute('data-fehler');
+    expect(document.querySelector('[data-lfh="seiten-beschreibung"] [role="alert"]')).toBeNull();
+  });
+
+  /** Am Handy kann die Karte aus der gezeigten Stufe wandern: dann steht ihr Grund oben. */
+  it('Fortschalten: steht die Karte in einer anderen Stufe als der gezeigten, steht ihr Grund im Seitenhinweis', async () => {
+    setzeViewportBreite(390);
+    schonEingetroffen();
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Eintreffen melden' }));
+    await zeigeNeueOrdnung();
 
     await waitFor(() => expect(screen.queryByText('2 RTW zur Verstärkung')).toBeNull());
     const hinweis = await seitenHinweis();
@@ -506,8 +682,8 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     expect(grund).toHaveTextContent('Status von „2 RTW zur Verstärkung“ nicht geändert');
     expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
 
-    // In der Ansicht, die die Karte zeigt, steht der Grund wieder an ihr, nicht doppelt oben.
-    await userEvent.click(screen.getByText(/Abgeschlossen \(/));
+    // In der Stufe, die die Karte zeigt, steht der Grund wieder an ihr, nicht doppelt oben.
+    await userEvent.click(screen.getByRole('tab', { name: 'Eingetroffen 1' }));
     expect(
       await within(karte('2 RTW zur Verstärkung')).findByText('Bereits eingetroffen gemeldet'),
     ).toHaveAttribute('data-fehler');
@@ -688,7 +864,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     listeNachforderungen.mockResolvedValue([sandsaecke()]);
     const { koerper } = materialServer(() => []);
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toHaveTextContent('„Sandsäcke“ als Material übernehmen');
@@ -731,7 +906,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
       },
     );
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
     const dialog = await screen.findByRole('dialog');
     await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('2000'));
@@ -754,7 +928,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
     materialServer(() => [posten()]);
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     expect(await screen.findByText('Sandsäcke · 1200 · ohne Ort')).toBeInTheDocument();
     expect(screen.getByText('übernommen 1200 von 2000')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeInTheDocument();
@@ -765,7 +938,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
     const { abrufe } = materialServer(() => [posten()]);
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     const knopf = await screen.findByRole('button', { name: 'Weiteren Posten übernehmen' });
     await waitFor(() => expect(knopf).toBeDisabled());
     expect(screen.getByText('Keine Berechtigung')).toBeInTheDocument();
@@ -812,7 +984,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     listeNachforderungen.mockResolvedValue([sandsaecke({ material_ids: [7] })]);
     const { abrufe } = materialServer(() => [posten()]);
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     const knopf = await screen.findByRole('button', { name: 'Weiteren Posten übernehmen' });
     await freigabenAufgeloest();
     expect(knopf).toBeDisabled();
@@ -827,7 +998,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     listeNachforderungen.mockResolvedValue([sandsaecke()]);
     materialServer(() => []);
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await screen.findByText('Sandsäcke Deich Nord');
     expect(screen.queryByRole('button', { name: 'Als Material übernehmen' })).toBeNull();
     expect(screen.queryByText('Keine Berechtigung')).toBeNull();
@@ -844,7 +1014,6 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
         ),
     );
     renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await userEvent.click(await screen.findByRole('button', { name: 'Als Material übernehmen' }));
     const dialog = await screen.findByRole('dialog');
     await waitFor(() => expect(within(dialog).getByLabelText('Menge')).toHaveValue('2000'));
@@ -858,7 +1027,7 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();
   });
 
-  it('?nachforderung= wählt die Ansicht der Nachforderung, hebt ihre Karte hervor und räumt den Parameter', async () => {
+  it('?nachforderung= zeigt die Stufe der Nachforderung, hebt ihre Karte hervor und räumt den Parameter', async () => {
     listeNachforderungen.mockResolvedValue([nf(), sandsaecke()]);
     materialServer(() => []);
     renderPage(nachforderungenPfad(1, { nachforderung: 4 }));
@@ -868,9 +1037,36 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
       return k as HTMLElement;
     });
     expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
-    expect(screen.getByRole('radio', { name: /Abgeschlossen/ })).toBeChecked();
+    expect(karte.closest('[data-lfh="board-spalte"]')).toHaveAttribute(
+      'data-stufe',
+      'eingetroffen',
+    );
     await waitFor(() =>
       expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
+    );
+  });
+
+  it('?nachforderung= auf eine abgelehnte klappt Abgelehnt auf, am Handy wählt es ihre Stufe', async () => {
+    setzeViewportBreite(390);
+    listeNachforderungen.mockResolvedValue([
+      nf(),
+      sandsaecke({
+        status: 'abgelehnt',
+        eingetroffen_at: null,
+        abgelehnt_at: '2026-06-12 10:00:00',
+      }),
+    ]);
+    materialServer(() => []);
+    renderPage(nachforderungenPfad(1, { nachforderung: 4 }));
+    const karte = await waitFor(() => {
+      const k = document.querySelector('[data-nachforderung-id="4"]');
+      expect(k).not.toBeNull();
+      return k as HTMLElement;
+    });
+    expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+    expect(screen.getByRole('tab', { name: 'Abgelehnt 1' })).toHaveAttribute(
+      'aria-selected',
+      'true',
     );
   });
 
@@ -882,7 +1078,7 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     await waitFor(() =>
       expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
     );
-    expect(screen.getByRole('radio', { name: /Offen/ })).toBeChecked();
+    expect(spalte('abgelehnt')!.querySelector('[aria-expanded="false"]')).not.toBeNull();
     expect(document.querySelector('[data-hervorgehoben="true"]')).toBeNull();
   });
 
@@ -1032,12 +1228,13 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
     );
   });
 
-  it('?stelle= filtert Liste und Ansichtszähler, nennt den Filter und setzt ihn zurück', async () => {
+  it('?stelle= filtert Board und Spaltenzahlen, nennt den Filter und setzt ihn zurück', async () => {
     renderPage('/einsaetze/1/nachforderungen?stelle=8');
     await screen.findByText('Feldbetten für die Nacht');
     expect(screen.queryByText('Decken Stadion')).toBeNull();
     expect(screen.queryByText('2 RTW zur Verstärkung')).toBeNull();
-    expect(screen.getByText('Offen (1)')).toBeInTheDocument();
+    // Die Spaltenzahl zählt im Filter; der Seitenkopf liest den Server-Zähler.
+    expect(within(spalte('angefordert')!).getByText('1', { selector: '[data-lfh="board-zahl"]' }));
     expect(
       await screen.findByText(/Betreuungsstelle Turnhalle Ost/, { selector: 'span' }),
     ).toBeInTheDocument();

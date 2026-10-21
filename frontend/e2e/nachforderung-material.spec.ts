@@ -52,8 +52,9 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
 }) => {
   const { einsatzId, nfId } = await seed(page);
   await page.goto(`/einsaetze/${einsatzId}/nachforderungen`);
-  await page.getByRole('radio', { name: /Abgeschlossen/ }).click();
-  const karte = page.locator(`[data-nachforderung-id="${nfId}"]`);
+  // Das Board (LLH-1078) zeigt die eingetroffene Karte in ihrer Spalte, ohne Umschalten.
+  const eingetroffen = page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"]');
+  const karte = eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`);
   await expect(karte).toContainText(BEDARF);
 
   // Erste Übernahme: vorbelegt mit Menge 3 als Verbrauchsgut; die Person führt ein Gerät.
@@ -97,8 +98,7 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
   await expect(verweis).toHaveCount(2);
   await verweis.first().click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/nachforderungen$`));
-  await expect(page.getByRole('radio', { name: /Abgeschlossen/ })).toBeChecked();
-  await expect(page.locator(`[data-nachforderung-id="${nfId}"]`)).toHaveAttribute(
+  await expect(eingetroffen.locator(`[data-nachforderung-id="${nfId}"]`)).toHaveAttribute(
     'data-hervorgehoben',
     'true',
   );

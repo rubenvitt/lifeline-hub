@@ -6,6 +6,7 @@ import {
   auftragsStand,
   meldungenNotiz,
   meldungsStand,
+  nachforderungsStand,
   type ZaehlerAbfrage,
 } from './fuehrungsZahlen';
 
@@ -30,6 +31,15 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
       zustand: 'daten',
       zahl: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 2 },
     });
+  });
+
+  it('liest die Nachforderungen je Stufe aus der Serverantwort (LLH-1078)', () => {
+    const zahl = { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 };
+    expect(nachforderungsStand(daten({ nachforderungen: zahl }))).toEqual({
+      zustand: 'daten',
+      zahl,
+    });
+    expect(nachforderungsStand(daten({}))).toEqual({ zustand: 'gesperrt' });
   });
 
   it('ein fehlendes Modul ist „gesperrt“, nie 0', () => {

@@ -60,7 +60,8 @@ export type ServerZaehlerQuelle =
   | 'erinnerungen'
   | 'chat'
   | 'dokumente'
-  | 'lagemeldungen';
+  | 'lagemeldungen'
+  | 'nachforderungen';
 /**
  * Module, deren Zähler der BROWSER aus der eigenen Modulliste rechnet: `abloesung` hängt an der
  * Uhr (Vorwarnzeit), `evakuierung` teilt sich die Übersicht mit Seite und Kennzahl, `betreuung`
@@ -295,6 +296,20 @@ export const modulRegistry: ModulEintrag[] = [
     beschreibung: 'Bereitgestellte Einheiten und Fahrzeuge',
   },
   {
+    // LLH-1078: aus „Kommunikation“ hierher, dort sucht die Führung Kräfte. Schlüssel und Route
+    // bleiben (Deeplinks, gespeicherte Standard-Module, Freigaben). Die Beschreibung trägt
+    // „Anforderung“ vorn, damit die Sprungpalette das Modul auch darunter findet. Der Zähler nennt
+    // die offenen (angefordert, zugesagt, unterwegs).
+    key: 'nachforderungen',
+    kategorie: 'kraefte',
+    label: 'Nachforderungen',
+    icon: IconKistenstapel,
+    route: 'nachforderungen',
+    status: 'fertig',
+    beschreibung: 'Anforderung, Zusage, Eintreffen',
+    zaehlerQuelle: 'nachforderungen',
+  },
+  {
     // Schichten und fällige Ablösungen. Der Zähler nennt die Schichten in der Vorwarnzeit oder
     // überfällig — was Handlung braucht.
     key: 'abloesung',
@@ -467,15 +482,6 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     beschreibung: 'Eingang, Bearbeitung',
     zaehlerQuelle: 'meldungen',
-  },
-  {
-    key: 'nachforderungen',
-    kategorie: 'kommunikation',
-    label: 'Nachforderung',
-    icon: IconKistenstapel,
-    route: 'nachforderungen',
-    status: 'fertig',
-    beschreibung: 'Kräfte und Mittel, Leitstelle',
   },
   // LLH-1180: S6 als eigenes Modul, unabhängig von der Stab-Freigabe (ELW 1 ohne Stab). Die
   // Beschreibung trägt „Funkplan“ vorn, damit „Funk“ in der Palette trifft (40 Zeichen, D1).

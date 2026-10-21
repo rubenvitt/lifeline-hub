@@ -8,8 +8,9 @@ import {
   StatusBadge,
 } from '../kommunikation';
 import KommKarte from '../kommunikation/KommKarte';
-import ZeitAnzeige from '../anzeige/ZeitAnzeige';
+import { formatVor } from '../anzeige/abstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { monoStil, useRollen } from '../components/instrument';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import { KennungsLink } from '../components/kennungsLink';
@@ -18,6 +19,7 @@ import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
 import { materialPfad } from '../routing/deeplinks';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
+import { kartenZeiten } from './nachforderungStufen';
 
 const { Text } = Typography;
 
@@ -101,8 +103,13 @@ function UebernommenePosten({
 
 interface NachforderungKarteProps {
   nachforderung: Nachforderung;
-  /** Steuert die Übergangs-Zeitstempel/Grund-Zeilen in der Abgeschlossen-Ansicht. */
-  ansicht?: 'offen' | 'abgeschlossen';
+  /**
+   * Die Stufe der Spalte, in der die Karte steht (LLH-1078). Weicht der Status ab, weil die
+   * Zuflussschleuse die Karte an ihrem Ort hält, nennt die Karte ihren Status selbst.
+   */
+  spaltenStufe?: NachforderungStatus;
+  /** Takt der Seite in ms für das Alter „vor 42 min“ (primitiv, `memo` bleibt wirksam). */
+  jetzt?: number;
   darfSchreiben?: boolean;
   onStatus?: (id: number, status: NachforderungStatus) => void;
   onAblehnen?: (id: number) => void;
@@ -120,6 +127,8 @@ interface NachforderungKarteProps {
   onMaterialUebernehmen?: (id: number) => void;
   /** Deeplink-Hervorhebung `?nachforderung=` (LLH-1226 D10, Spec `deeplink-hervorhebung`). */
   hervorgehoben?: boolean;
+  /** Die Fortschaltung dieser Karte läuft: der Knopf zeigt es sofort (Kriterium 3). */
+  laeuft?: boolean;
   /**
    * Bekannte Betreuungsstellen je Kennung (LLH-1082, design.md D7), stabil über den Datenstand
    * der Seite. `null`/fehlend: Modul Betreuung nicht freigegeben oder Übersicht nicht da — dann
@@ -148,15 +157,18 @@ function StellenBezug({ verweis }: { verweis: StellenVerweis | undefined }) {
 }
 
 /**
- * Nachforderungs-Karte: Kopf mit Prio + Status, Titel „Anzahl× Art → Adressat",
- * Bezeichnung/Begründung, Übergangs-Timeline.
+ * Karte einer Nachforderung im Board (LLH-1078, Spec `nachforderungen-board`): kompakt —
+ * Priorität und Alter seit der Anforderung, „Menge × Art“, Adressat, Bedarf, Zeitzeilen
+ * (`kartenZeiten`, Einhängepunkt für das erwartete Eintreffen aus LLH-1097), übernommenes
+ * Material, Grund einer Ablehnung. Genau eine Primäraktion: die Fortschaltung um eine Stufe.
  */
 export default memo(NachforderungKarte);
 
 /** `memo` (LFH-949, D7): ein Live-Ereignis mit einer geänderten Nachforderung rendert eine Karte. */
 function NachforderungKarte({
   nachforderung: n,
-  ansicht = 'offen',
+  spaltenStufe,
+  jetzt,
   darfSchreiben,
   onStatus,
   onAblehnen,
@@ -165,25 +177,31 @@ function NachforderungKarte({
   materialGesperrt = false,
   onMaterialUebernehmen,
   hervorgehoben = false,
+  laeuft = false,
   stellenJeId,
 }: NachforderungKarteProps) {
   const { formatZeit } = useAnzeigeKonventionen();
+  const { token, rollen } = useRollen();
   const sperrgrundId = useId();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
-  const istAbg = ansicht === 'abgeschlossen';
   const abgelehnt = n.status === 'abgelehnt';
   const menge = n.anzahl != null ? `${n.anzahl}× ` : '';
   const adressat = `${ADRESSAT_LABEL[n.adressat_kategorie] ?? n.adressat_kategorie}${n.adressat_bezeichnung ? ` (${n.adressat_bezeichnung})` : ''}`;
+  // Im Board nennt die Stufe der Spaltenkopf bzw. das gewählte Segment; eine gehaltene Karte, die
+  // inzwischen weiter ist, trägt ihre neue Stufe selbst. Ohne Spalte steht sie immer.
+  const statusZeigen = spaltenStufe !== n.status;
+  const zeiten = kartenZeiten(n, formatZeit);
 
   const aktionen: ReactNode[] =
     darfSchreiben && n.ist_offen
       ? [
           // Fortschaltung mit EINEM Klick; der Rückweg steht im Rückgängig-Toast, und
           // `uebergang_erlaubt` nimmt die Rücknahme um genau eine Stufe an. Der Knopf nennt die
-          // Handlung („Zusage erfassen"), nicht den Zielstatus (LFH-959).
+          // Handlung („Zusage erfassen"), nicht den Zielstatus (LFH-959). Umrandet, nicht gefüllt:
+          // gefüllt ist nur die Primäraktion im Seitenkopf, sonst stünde das Board voller Blau.
           next && onStatus ? (
-            <Button key="next" onClick={() => onStatus(n.id, next)}>
+            <Button key="next" loading={laeuft} onClick={() => onStatus(n.id, next)}>
               {NACHFORDERUNG_HANDLUNG[next]}
             </Button>
           ) : null,
@@ -204,7 +222,7 @@ function NachforderungKarte({
     const etikett = isErgaenzen(n) ? 'Weiteren Posten übernehmen' : 'Als Material übernehmen';
     aktionen.push(
       materialGesperrt ? (
-        <Space key="material" size={8}>
+        <Space key="material" size={8} wrap>
           <Button disabled title={KEINE_BERECHTIGUNG} aria-describedby={sperrgrundId}>
             {etikett}
           </Button>
@@ -222,59 +240,55 @@ function NachforderungKarte({
   const posten = materialJeId ? uebernommenePosten(n, [...materialJeId.values()]) : [];
 
   return (
-    // Die Anforderungszeit führt links in Mono; abgelehnt trägt den Alarmrand.
+    // Abgelehnt trägt den Alarmrand. Ziel des Fokus, wenn die eigene Fortschaltung die Karte in
+    // eine andere Spalte trägt (`tabIndex -1`, nicht in der Tab-Folge).
     <KommKarte
       alarm={abgelehnt}
       hervorgehoben={hervorgehoben}
       data-nachforderung-id={n.id}
-      zeit={<ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />}
+      data-status={n.status}
+      tabIndex={-1}
     >
-      <Flex justify="space-between" align="center" style={{ marginBottom: 6 }} gap={8} wrap>
+      <Flex justify="space-between" align="center" style={{ marginBottom: 4 }} gap={8} wrap>
         <Space size={6} wrap>
           <PrioBadge prio={n.prioritaet} />
-          <StatusBadge phase={status.phase} label={status.label} />
+          {statusZeigen && <StatusBadge phase={status.phase} label={status.label} />}
         </Space>
+        {jetzt != null && (
+          <span
+            data-lfh="nachforderung-alter"
+            style={{ ...monoStil(token.fontSizeSM), color: rollen.gedaempft }}
+          >
+            {formatVor(n.angefordert_at, jetzt)}
+          </span>
+        )}
       </Flex>
 
-      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block', marginBottom: 4 }}>
+      <Text strong style={{ fontSize: 15, lineHeight: 1.4, display: 'block' }}>
         {menge}
-        {n.art}{' '}
-        <Text type="secondary" style={{ fontWeight: 400 }}>
-          → {adressat}
-        </Text>
+        {n.art}
+      </Text>
+      <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
+        an {adressat}
       </Text>
 
-      <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 8 }}>
-        <Text>{n.bezeichnung}</Text>
+      <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 4 }}>
+        <Text style={{ overflowWrap: 'anywhere' }}>{n.bezeichnung}</Text>
         {n.betreuungsstelle_id != null && (
           <StellenBezug verweis={stellenJeId?.get(n.betreuungsstelle_id)} />
         )}
         {n.begruendung && <Text type="secondary">{n.begruendung}</Text>}
-        <Text type="secondary" style={{ fontSize: 13 }}>
-          Angefordert: {formatZeit(n.angefordert_at)}
-          {n.erstellt_von_name ? ` · ${n.erstellt_von_name}` : ''}
-        </Text>
-        {/* Übergangs-Zeitstempel: in der Abgeschlossen-Ansicht vollständig,
-            in der Offen-Ansicht ab „unterwegs" (Zwischenstände sichtbar machen). */}
-        {(istAbg || n.status === 'unterwegs') && (
-          <Space orientation="vertical" size={0}>
-            {n.zugesagt_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                Zugesagt: {formatZeit(n.zugesagt_at)}
-              </Text>
-            )}
-            {n.unterwegs_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                Unterwegs: {formatZeit(n.unterwegs_at)}
-              </Text>
-            )}
-            {n.eingetroffen_at && (
-              <Text type="secondary" style={{ fontSize: 13 }}>
-                Eingetroffen: {formatZeit(n.eingetroffen_at)}
-              </Text>
-            )}
-          </Space>
-        )}
+        <Space orientation="vertical" size={0} data-lfh="nachforderung-zeiten">
+          {zeiten.map((z) => (
+            <Text
+              key={z.schluessel}
+              type={z.ton === 'achtung' ? 'warning' : 'secondary'}
+              style={{ fontSize: 13 }}
+            >
+              {z.text}
+            </Text>
+          ))}
+        </Space>
         {/* Übernommenes Material (D10): mit Freigabe je Posten, sonst nur die Zahl. */}
         {posten.length > 0 ? (
           <UebernommenePosten nachforderung={n} posten={posten} />
@@ -303,11 +317,7 @@ function NachforderungKarte({
       {/* `<Space size="middle">`: „Ablehnen" ist `danger` und braucht Abstand zur Fortschaltung
          (gepinnt in `components/aktionsabstand.guard.test.ts`). */}
       {aktionen.length > 0 && (
-        <Space
-          size="middle"
-          wrap
-          style={{ marginTop: 8, width: '100%', justifyContent: 'flex-end' }}
-        >
+        <Space size="middle" wrap style={{ marginTop: 8, width: '100%' }}>
           {aktionen}
         </Space>
       )}

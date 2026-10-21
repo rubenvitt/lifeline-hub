@@ -25,8 +25,15 @@ static STATEMENTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 const MESSPUNKT: &str = "SELECT 'messpunkt-lfh-935'";
 
 /// Was die Listen laden und eine Zählung nie braucht: Meldungstext, Text der Lagemeldung,
-/// Erinnerungstitel, Kanalname, die gebündelten Auftragsempfänger.
-const LISTENSPALTEN: [&str; 5] = ["m.inhalt", "lm.text", "e.titel", "k.name", "json_each"];
+/// Erinnerungstitel, Kanalname, die gebündelten Auftragsempfänger, Bedarf einer Nachforderung.
+const LISTENSPALTEN: [&str; 6] = [
+    "m.inhalt",
+    "lm.text",
+    "e.titel",
+    "k.name",
+    "json_each",
+    "n.bezeichnung",
+];
 
 /// Sammelt die Statements von sqlx (volles SQL, sonst die Zusammenfassung), ohne den Messpunkt.
 struct StatementSammler;
@@ -89,6 +96,7 @@ async fn statements_von_berechne(
         "chat",
         "dokumente",
         "lagemeldungen",
+        "nachforderungen",
     ]
     .into_iter()
     .collect();
@@ -120,9 +128,9 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         .unwrap();
     let basis = format!("/api/einsaetze/{einsatz}");
 
-    // Zehn Module, je genau eine Abfrage. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
+    // Elf Module, je genau eine Abfrage. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
     let leer = statements_von_berechne(&pool, einsatz, &admin).await.len();
-    assert_eq!(leer, 10, "leerer Einsatz: {leer} Statements");
+    assert_eq!(leer, 11, "leerer Einsatz: {leer} Statements");
 
     // Bestand: Aufträge mit je drei Empfängern (der frühere Listenpfad lud sie mit), Meldungen,
     // Erinnerungen und Chat-Nachrichten eines anderen Benutzers.
@@ -179,6 +187,30 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         )
         .await;
     }
+    // Nachforderungen in allen Stufen (LLH-1078): die Liste lädt Bedarf und Materialposten.
+    for i in 0..60 {
+        let body = json!({
+            "art": "RTW", "bezeichnung": format!("Bedarf {i}"), "anzahl": 1,
+            "adressat_kategorie": "leitstelle"
+        });
+        let nf = post(
+            &app,
+            &cookie,
+            &format!("{basis}/nachforderungen"),
+            &body.to_string(),
+        )
+        .await;
+        let nid = nf["id"].as_i64().unwrap();
+        for status in ["zugesagt", "unterwegs", "eingetroffen"].iter().take(i % 4) {
+            post(
+                &app,
+                &cookie,
+                &format!("{basis}/nachforderungen/{nid}/status"),
+                &json!({ "status": status }).to_string(),
+            )
+            .await;
+        }
+    }
     let (_, kanaele) = anfrage(&app, "GET", &format!("{basis}/chat/kanaele"), &cookie, None).await;
     let kid = kanaele[0]["id"].as_i64().unwrap();
     // Nachrichten eines anderen Autors, damit sie für den Admin ungelesen sind.
@@ -219,9 +251,15 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         &pool,
         einsatz,
         &admin,
-        &["auftraege", "meldungen", "erinnerungen", "chat"]
-            .into_iter()
-            .collect(),
+        &[
+            "auftraege",
+            "meldungen",
+            "erinnerungen",
+            "chat",
+            "nachforderungen",
+        ]
+        .into_iter()
+        .collect(),
         "2026-06-12 12:00:00",
     )
     .await
@@ -237,4 +275,10 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
     assert!(faellig >= 50, "{faellig}");
     assert_eq!(z.erinnerungen.unwrap().faellig, faellig);
     assert_eq!(z.chat.unwrap().ungelesen, 100);
+    // 60 Nachforderungen, je 15 in einer der vier ersten Stufen; eingetroffen ist nicht offen.
+    let nf = z.nachforderungen.unwrap();
+    assert_eq!(
+        (nf.offen, nf.angefordert, nf.zugesagt, nf.unterwegs),
+        (45, 15, 15, 15)
+    );
 }

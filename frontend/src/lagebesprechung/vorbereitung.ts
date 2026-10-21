@@ -13,6 +13,7 @@ import {
   type Zaehlstand,
 } from '../pages/lage-dashboard/fuehrungsZahlen';
 import type { KennzahlEtikett, Lagebild } from '../pages/lage-dashboard/lagebild';
+import { stufenText } from '../nachforderungen/nachforderungStufen';
 import { SK_WORT } from '../personen/personMeta';
 import { sichtung as SK_META, warnstufeKennzahl } from '../theme/statusFarben';
 import { md, ZUSTAND_GRUND } from '../stab/funkplan';
@@ -34,6 +35,7 @@ import { md, ZUSTAND_GRUND } from '../stab/funkplan';
 
 type AuftragsZaehler = NonNullable<ModulZaehler['auftraege']>;
 type MeldungsZaehler = NonNullable<ModulZaehler['meldungen']>;
+type NachforderungsZaehler = NonNullable<ModulZaehler['nachforderungen']>;
 
 export interface VorbereitungsZeile {
   schluessel: string;
@@ -58,6 +60,8 @@ export interface VorbereitungsQuellen {
   };
   auftraege: Zaehlstand<AuftragsZaehler>;
   meldungen: Zaehlstand<MeldungsZaehler>;
+  /** LLH-1078: offene Nachforderungen je Stufe, aus dem Modulzähler. */
+  nachforderungen: Zaehlstand<NachforderungsZaehler>;
   besprechung: LagebesprechungStand | undefined;
 }
 
@@ -166,6 +170,7 @@ export function vorbereitungsZeilen(
 
   const auftraege = ausZaehler(q.auftraege, (z) => String(z.offen), auftraegeNotiz);
   const meldungen = ausZaehler(q.meldungen, (z) => String(z.offen), meldungenNotiz);
+  const nachforderungen = ausZaehler(q.nachforderungen, (z) => String(z.offen), stufenText);
   const letzte = q.besprechung?.letzte_lagebesprechung;
 
   return [
@@ -194,6 +199,12 @@ export function vorbereitungsZeilen(
       titel: 'Meldungen offen',
       quelle: quelle('meldungen'),
       ...(lb ? meldungen : { ...fehlt('laden'), zustand: 'laden' as const }),
+    },
+    {
+      schluessel: 'nachforderungen',
+      titel: 'Nachforderungen offen',
+      quelle: quelle('nachforderungen'),
+      ...(lb ? nachforderungen : { ...fehlt('laden'), zustand: 'laden' as const }),
     },
     zeile('lagebericht', 'Letzter Lagebericht', 'lageberichte', q.zustand.lageberichte, (l) =>
       l.fuehrung.bericht

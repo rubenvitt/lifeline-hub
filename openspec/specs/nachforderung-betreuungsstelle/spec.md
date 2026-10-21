@@ -90,7 +90,7 @@ Stelle und gefiltert auf sie. Das Paneel MUST keine Summe bilden.
 
 Die Nachforderungsseite SHALL `?neu=1&betreuungsstelle=<id>` als Auftrag lesen: die Erfassung
 öffnet mit dem Bezug, der Parameter wird geräumt, Schließen räumt den Bezug. `?stelle=<id>`
-SHALL als Filter in der Adresse stehen bleiben und Liste und Ansichtszähler auf die
+SHALL als Filter in der Adresse stehen bleiben und das Board mit seinen Spaltenzahlen auf die
 Nachforderungen der Stelle beschränken; ein Filterhinweis MUST den Filter nennen und ihn
 zurücksetzen können. Mit Freigabe Betreuung MUST eine Auswahl „Für Stelle“ die Stellen mit
 Nachforderungen anbieten, und jede Karte mit Bezug MUST „Für Betreuungsstelle <Name>“ mit Sprung

@@ -10784,6 +10784,16 @@
               }
             ]
           },
+          "nachforderungen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NachforderungsZaehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "personen": {
             "oneOf": [
               {
@@ -10942,6 +10952,37 @@
           "eingetroffen",
           "abgelehnt"
         ]
+      },
+      "NachforderungsZaehler": {
+        "type": "object",
+        "description": "Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.\nEingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an\nder Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.",
+        "required": [
+          "offen",
+          "angefordert",
+          "zugesagt",
+          "unterwegs"
+        ],
+        "properties": {
+          "angefordert": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon im Status „angefordert“ (noch keine Zusage)."
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unterwegs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon „unterwegs“."
+          },
+          "zugesagt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon „zugesagt“."
+          }
+        }
       },
       "NotizAnzeige": {
         "type": "object",

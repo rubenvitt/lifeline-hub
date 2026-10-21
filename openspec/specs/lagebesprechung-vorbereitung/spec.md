@@ -16,6 +16,8 @@ zeigen. Es enthält den Lagestand für die nächste Besprechung:
 - höchste Warnstufe mit Zahl der Gebiete;
 - Aufträge offen mit überfälligen;
 - Meldungen offen mit neuen und mit überfälliger Bestätigung;
+- Nachforderungen offen mit der Zahl je Stufe (angefordert, zugesagt, unterwegs), aus dem
+  Modulzähler wie Modulmenü und Führungsüberblick;
 - der jüngste Lagebericht mit Stand und Status;
 - die letzte Lagebesprechung mit Nummer und Zeit, und der nächste Termin.
 
@@ -29,6 +31,12 @@ tragen.
 - **WHEN** das Lage-Dashboard 248 Betroffene, davon 3 vermisst, und 5 offene Aufträge, davon 1
   überfällig, zeigt
 - **THEN** zeigt die Vorbereitung dieselben Werte
+
+#### Scenario: Offene Nachforderungen
+- **WHEN** eine Nachforderung angefordert, zwei zugesagt und zwei unterwegs sind
+- **THEN** zeigt die Zeile „Nachforderungen offen“ „5“ mit „1 angefordert · 2 zugesagt · 2
+  unterwegs“ und der Quelle „Nachforderungen“; ohne Freigabe der Nachforderungen „—“ mit „nicht
+  freigegeben“
 
 #### Scenario: Neue Meldung während der Vorbereitung
 - **WHEN** eine andere Person eine Meldung erfasst, während die Seite Lagebesprechung offen ist
