@@ -9,6 +9,7 @@ import {
   imZeitfenster,
   tagesEtikett,
   tagesSchluessel,
+  uebergabeZeit,
 } from './zeitachse';
 
 dayjs.extend(utc);
@@ -56,9 +57,9 @@ describe('zeitachse', () => {
     expect(imZeitfenster('2026-06-12 21:30:00', 'heute', jetztBerlin, berlin)).toBe(false);
   });
 
-  const eintrag = (erstellt_at: string, text: string, lat: number | null = null) => ({
+  const eintrag = (ereigniszeit: string, text: string, lat: number | null = null) => ({
     text,
-    erstellt_at,
+    ereigniszeit,
     lat,
     lon: lat,
     meldung_lfd_nr: 5,
@@ -103,6 +104,69 @@ describe('zeitachse', () => {
     expect(texte({ suche: '  DEICH ' })).toEqual(['Deich hält']);
     expect(texte({ suche: 'florian' })).toHaveLength(3);
     expect(texte({ suche: 'nichts' })).toEqual([]);
+  });
+
+  /**
+   * LLH-1039: Die Zeitachse liest die Ereigniszeit der Quellmeldung, nicht die Übergabe. Eine um
+   * 13:14 eingegangene, um 15:05 übergebene Meldung steht unter 13:14 und unter der um 14:41.
+   */
+  const uebergeben = (ereigniszeit: string, erstellt_at: string, text: string) => ({
+    ...eintrag(ereigniszeit, text),
+    erstellt_at,
+  });
+
+  it('ordnet nach Ereigniszeit, nicht nach Übergabe', () => {
+    const berlin = { zeitzone: 'Europe/Berlin' };
+    const jetzt = dayjs.utc('2026-06-12 14:00:00').tz('Europe/Berlin');
+    // Server-Wire in UTC: 11:14 / 12:41 UTC = 13:14 / 14:41 in Berlin; zuletzt übergeben die frühe.
+    const gruppen = gruppiereNachTag(
+      [
+        uebergeben('2026-06-12 11:14:00', '2026-06-12 13:05:00', 'Brücke gesperrt'),
+        uebergeben('2026-06-12 12:41:00', '2026-06-12 12:50:00', 'Pegel steigt'),
+      ],
+      berlin,
+      jetzt,
+    );
+    expect(gruppen).toHaveLength(1);
+    expect(gruppen[0].zeilen.map((z) => z.text)).toEqual(['Pegel steigt', 'Brücke gesperrt']);
+  });
+
+  it('bildet den Tag aus der Ereigniszeit, auch wenn erst am nächsten Tag übergeben', () => {
+    const berlin = { zeitzone: 'Europe/Berlin' };
+    const jetzt = dayjs.utc('2026-06-13 10:00:00').tz('Europe/Berlin');
+    const gruppen = gruppiereNachTag(
+      [uebergeben('2026-06-12 20:00:00', '2026-06-13 06:00:00', 'Nachgereicht')],
+      berlin,
+      jetzt,
+    );
+    expect(gruppen.map((g) => g.etikett)).toEqual(['Gestern']);
+  });
+
+  it('Zeitfenster „Letzte Stunde“ filtert nach Ereigniszeit', () => {
+    const jetzt = dayjs.utc('2026-06-12 13:10:00').local();
+    const menge = [
+      // Vor zwei Stunden geschehen, eben erst übergeben: nicht in der letzten Stunde.
+      uebergeben('2026-06-12 11:14:00', '2026-06-12 13:05:00', 'Nachgereicht'),
+      // Vor 30 Minuten geschehen, schon vor 25 Minuten übergeben: drin.
+      uebergeben('2026-06-12 12:40:00', '2026-06-12 12:45:00', 'Frisch'),
+    ];
+    const texte = filtereLagemeldungen(
+      menge,
+      { ...LEERER_FILTER, fenster: 'stunde' },
+      undefined,
+      jetzt,
+    ).map((l) => l.text);
+    expect(texte).toEqual(['Frisch']);
+  });
+
+  it('nennt die Übergabe als Uhrzeit, an einem anderen Tag mit Datum', () => {
+    const berlin = { zeitzone: 'Europe/Berlin' };
+    // Am selben Tag (Berlin) genügt die Uhrzeit — der Tag steht im Kopf.
+    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 13:05:00', berlin)).toBe('15:05');
+    // 22:30 UTC am 12. ist in Berlin schon der 13.: anderer Tag als die Ereigniszeit.
+    expect(uebergabeZeit('2026-06-12 11:14:00', '2026-06-12 22:30:00', berlin)).toBe(
+      '13.06. 00:30',
+    );
   });
 
   it('unterscheidet ungefiltert von gefiltert (Leerzustand „weggefiltert")', () => {

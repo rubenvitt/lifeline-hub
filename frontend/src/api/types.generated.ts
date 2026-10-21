@@ -3534,6 +3534,15 @@ export interface components {
         LageMeldungAnzeige: {
             /** Format: int64 */
             einsatz_id: number;
+            /**
+             * @description Ereigniszeit der Quellmeldung (UTC, `meldung.ereigniszeit`, LLH-1039): Zeit, Tag,
+             *     Zeitfenster und Ordnung der Zeitachse. Gleicher Name wie an der Meldung.
+             */
+            ereigniszeit: string;
+            /**
+             * @description Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es
+             *     geschah.
+             */
             erstellt_at: string;
             /** Format: int64 */
             erstellt_von_id: number;
