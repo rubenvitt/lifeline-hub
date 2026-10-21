@@ -51,7 +51,7 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  * `PW_PROJEKTE` in `scripts/check-all.sh` eine Teilmenge.
  */
 const DRUCK_SPECS =
-  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck|hilfe-druck|einsatzbericht-deckel-druck|koerperschema-druck)\.spec\.ts$/;
+  /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck|hilfe-druck|einsatzbericht-deckel-druck|koerperschema-druck|gefahren-druck)\.spec\.ts$/;
 /*
  * Druck-Specs, die eine Lagekarte zeichnen (LLH-1051): nur Chromium und WebKit. Die Karte braucht
  * WebGL2 (maplibre), und der headless Firefox hat keines, weder in der CI noch in der Cloud-Sitzung

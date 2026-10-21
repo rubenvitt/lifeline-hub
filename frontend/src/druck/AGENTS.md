@@ -12,7 +12,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   nur Eigenheiten. Nachweis `druck/druck.test.ts` und die Specs aus `DRUCK_SPECS` (`playwright.config.ts`:
   `druck-fluss`, `etb-druck`, `fernmeldeskizze-druck`, `meldebild-druck`, `funkplan-druck`,
   `fuehrungsorganisation-druck`, `dokument-anlage-druck`, `hilfe-druck`,
-  `einsatzbericht-deckel-druck`, `koerperschema-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
+  `einsatzbericht-deckel-druck`, `koerperschema-druck`, `gefahren-druck`) in Chromium, Firefox und WebKit (LFH-729, LFH-915: Mechanik unter
   Druckmedium). Druck-Specs mit Lagekarte (`lagekarte-druck`) stehen in `KARTEN_DRUCK_SPECS`:
   Chromium und WebKit, denn der headless Firefox hat kein WebGL2 (LLH-1051).
   Seitenzählung und Logo belegt das Chromium-PDF (`e2e/pdf-kern.ts`). Den echten Umbruch in
@@ -125,6 +125,16 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   (`personen/PersonDruckBlatt.tsx`) zeichnet das Körperschema mit `modus="druck"` ohne Fläche in
   `currentColor`: Sternchen und Liste unterscheiden sich durch Nummer und Form, nie durch Farbe
   (Nachweis `e2e/koerperschema-druck.spec.ts`, schwarz-weiß).
+- **Gefahrenseite** (LLH-1364, Spec `gefahrenmatrix`, „Die Gefahrenseite druckt das gewählte
+  Gebiet“): die Seite druckt sich selbst (`gefahren-print-root`, Nebenweg
+  „Drucken / als PDF“ erst mit geladener Matrix, auch ohne Schreibrecht), das gewählte Gebiet mit
+  Legende, Matrix und Liste „Erläuterungen“. Gebiet, Warnstufe und Beurteilung stehen im
+  Druckkopf; Gebietsliste, Gebietskopf, Beurteilungszeile und Hinweise tragen
+  `gefahren-no-print`. Die Matrix lässt im Druck ihre stehende Kopfzeile fallen
+  (`useDruckModus`). Stufen trägt auf Papier das Kürzel, die Marke „mit Erläuterung“ ist ein Rand
+  in `currentColor` und steht damit schwarz ohne Hintergrunddruck; die Schraffur „nicht anwendbar“
+  setzt `pages/gefahren/gefahrenPrint.css` schwarz mit `print-color-adjust: exact`. Nachweis
+  `e2e/gefahren-druck.spec.ts`.
 - **Einsatzbericht** (LFH-726, `pages/EinsatzberichtDruckPage.tsx`, `druck/einsatzbericht/`,
   `openspec/changes/archive/2026-10-01-lfh-726-einsatzbericht/design.md`): Route `einsatzdaten/bericht` (erbt die
   nie gesperrten Einsatzdaten), Einstieg sekundär auf der Einsatzdaten-Seite und in der Palette.

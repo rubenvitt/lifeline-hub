@@ -26,6 +26,7 @@ import { MIT_ERLAEUTERUNG, hatErlaeuterung, zellTitel } from './erlaeuterungen';
 import { ErlaeuterungsMarke, ErlaeuterungsZeichen } from './ErlaeuterungsMarke';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import { useRahmenOben } from '../../components/rahmenOben';
+import { useDruckModus } from '../../components/druck/useDruckModus';
 import './gefahrenMatrix.css';
 
 /**
@@ -220,6 +221,9 @@ export default function GefahrenMatrix({
   const tabelleRef = useRef<TableRef>(null);
   useKopfFreiraum(tabelleRef);
   const rahmenOben = useRahmenOben();
+  // Im Druck ohne stehende Kopfzeile (LLH-1364, wie `KatalogTabelle`): mit `sticky` läge der Kopf
+  // in einer eigenen Tabelle, die keine Druckregel wieder mit dem Körper zusammenführt.
+  const druckt = useDruckModus();
   // Freiraum neben der fixierten Spalte beim Tabben nach links.
   useSpaltenFreiraum(tabelleRef);
   // Erste Zeile rückwärts getabbt: nicht unter der Kopfzeile stehen lassen.
@@ -453,7 +457,7 @@ export default function GefahrenMatrix({
         pagination={false}
         // Stehende Kopfzeile — Restposten der Ausnahme in `katalogTabelle.guard.test.ts`; sie steht
         // unter dem klebenden Rahmen (LFH-952, `frontend/AGENTS.md`, Rahmen).
-        sticky={{ offsetHeader: rahmenOben }}
+        sticky={druckt ? false : { offsetHeader: rahmenOben }}
         scroll={{ x: 'max-content' }}
         ref={tabelleRef}
         className="gefahren-matrix"

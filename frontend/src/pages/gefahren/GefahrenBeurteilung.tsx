@@ -14,6 +14,8 @@ export interface GefahrenBeurteilungProps {
   /** Grund eines abgelehnten Bestätigens; steht hier, nicht als Toast (LFH-966). */
   fehler?: unknown;
   onBestaetigen: () => void;
+  /** Klasse der Hülle, etwa `gefahren-no-print` (LLH-1364: auf Papier steht sie im Druckkopf). */
+  className?: string;
 }
 
 /**
@@ -29,12 +31,14 @@ export default function GefahrenBeurteilung({
   laeuft,
   fehler,
   onBestaetigen,
+  className,
 }: GefahrenBeurteilungProps) {
   const { token } = useRollen();
   const { formatZeit } = useAnzeigeKonventionen();
   return (
     <div
       data-lfh="gefahrengebiet-beurteilung"
+      className={className}
       style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, marginBottom: 12 }}
     >
       <div

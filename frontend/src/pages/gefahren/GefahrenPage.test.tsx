@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes, useLocation } from 'react-router';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -192,7 +192,9 @@ describe('GefahrenPage', () => {
   it('zeigt die höchste Warnstufe als Etikett, nicht als Flächenfarbe (LFH-368)', async () => {
     server.use(...handlers());
     renderPage();
-    const tag = await screen.findByText('hoch');
+    // In der Gebietsliste: „hoch“ steht auch im Druckkopf (nur auf Papier, LLH-1364).
+    const liste = await screen.findByRole('region', { name: 'Gefahrengebiete' });
+    const tag = await within(liste).findByText('hoch');
     // Signatur des Fehlgriffs: `warnstufeFarbe('hoch')` = '#ffa39e' als `color=` am `<Tag>`. antd
     // rechnet den Hex-Wert in `rgb(...)` um und trägt ihn als Textfarbe — geprüft wird deshalb die
     // Abwesenheit des umgerechneten Werts. Den neuen Wert positiv zu pinnen prüfte nur antds
@@ -577,6 +579,112 @@ describe('GefahrenPage', () => {
  * Trefflächenboden der Gebietszeile — die reine Funktion gegen die Dichtestufen. Die Böden stehen
  * als Literale da; aus dem Token zurückgelesen prüften sie den Token gegen sich selbst.
  */
+/**
+ * Druck der Gefahrenseite (LLH-1364, Spec `gefahrenmatrix`, „Die Gefahrenseite druckt das gewählte
+ * Gebiet“): die Seite druckt sich selbst. Was auf Papier wegfällt, entscheidet `gefahrenPrint.css`
+ * (Form in `gefahrenPrint.test.ts`); hier steht, was in der Wurzel steht und was die Klassen trägt.
+ * Die Wirkung unter Druckmedium misst `e2e/gefahren-druck.spec.ts`.
+ */
+describe('GefahrenPage · Druck (LLH-1364)', () => {
+  const beurteilt = {
+    ...gebiet,
+    beurteilt_at: '2026-10-20 13:15:00',
+    beurteilt_von: 2,
+    beurteilt_von_name: 'Einsatzleitung',
+  };
+  const mitErlaeuterung = {
+    id: 1,
+    gefahrengebiet_id: 7,
+    gefahrentyp: 'elektrizitaet',
+    schutzobjekt: 'menschen',
+    warnstufe: 'hoch',
+    beschreibung: 'Kellerverteilung unter Wasser',
+    gemeldet_von: 'Rettungsstaffel',
+    aktualisiert_von: 2,
+    aktualisiert_von_name: 'Einsatzleitung',
+    erstellt_at: '2026-10-20 13:00:00',
+    geaendert_at: '2026-10-20 13:10:00',
+  };
+  let drucke: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    drucke = vi.spyOn(window, 'print').mockImplementation(() => {});
+    setzeViewportBreite(1280);
+  });
+  afterEach(() => drucke.mockRestore());
+
+  const wurzel = () => document.querySelector<HTMLElement>('[data-lfh="druckwurzel"]');
+
+  it('trägt Druckkopf, Matrix und Erläuterungen des gewählten Gebiets in der Druckwurzel', async () => {
+    server.use(...handlers([beurteilt], [mitErlaeuterung]));
+    renderPage();
+    await screen.findByRole('button', { name: 'Drucken / als PDF' });
+    const w = wurzel();
+    expect(w).not.toBeNull();
+    expect(w).toHaveClass('gefahren-print-root');
+    const kopf = w!.querySelector<HTMLElement>('[data-lfh="druckkopf"]');
+    expect(kopf).not.toBeNull();
+    expect(kopf).toHaveTextContent('Gefahrenbewertung – Nord');
+    expect(kopf).toHaveTextContent(/Warnstufe\s*hoch/);
+    expect(kopf).toHaveTextContent(/Beurteilung\s*beurteilt \d{6}[A-Z]{3}\d{4} · Einsatzleitung/);
+    const liste = w!.querySelector<HTMLElement>('[data-lfh="gefahren-erlaeuterungen"]');
+    expect(liste).not.toBeNull();
+    expect(liste).toHaveTextContent('Elektrizität × Menschen');
+    expect(liste).toHaveTextContent('Kellerverteilung unter Wasser');
+    expect(liste).toHaveTextContent('gemeldet von Rettungsstaffel');
+    expect(w!.querySelector('[data-lfh="erlaeuterung-marke"]')).not.toBeNull();
+  });
+
+  it('nennt ein nie bestätigtes Gebiet im Druckkopf „nicht beurteilt“', async () => {
+    server.use(...handlers([gebiet], []));
+    renderPage();
+    await screen.findByRole('button', { name: 'Drucken / als PDF' });
+    expect(wurzel()!.querySelector('[data-lfh="druckkopf"]')).toHaveTextContent(
+      /Beurteilung\s*nicht beurteilt/,
+    );
+  });
+
+  it('ohne Erläuterung steht der Teil auch im Druck nicht', async () => {
+    const ohne = { ...mitErlaeuterung, beschreibung: '  ', gemeldet_von: null };
+    server.use(...handlers([beurteilt], [ohne]));
+    renderPage();
+    await screen.findByRole('button', { name: 'Drucken / als PDF' });
+    expect(wurzel()!.querySelector('[data-lfh="gefahren-erlaeuterungen"]')).toBeNull();
+    expect(wurzel()).not.toHaveTextContent('Erläuterungen');
+  });
+
+  it('markiert Gebietsliste, Gebietskopf, Beurteilungszeile und Hinweise als Bildschirmteil', async () => {
+    server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
+    renderPage();
+    await screen.findByRole('button', { name: 'Drucken / als PDF' });
+    const keinDruck = (el: Element | null) =>
+      expect(el?.closest('.gefahren-no-print')).toBeTruthy();
+    keinDruck(screen.getByRole('region', { name: 'Gefahrengebiete' }));
+    keinDruck(document.querySelector('[data-lfh="gefahrengebiet-kopf"]'));
+    keinDruck(document.querySelector('[data-lfh="gefahrengebiet-beurteilung"]'));
+    keinDruck(screen.getByText('Nur Ansicht'));
+    // Die Matrix bleibt auf Papier.
+    expect(document.querySelector('.gefahren-matrix')?.closest('.gefahren-no-print')).toBeNull();
+  });
+
+  it('druckt auch ohne Schreibrecht, über den Nebenweg im Seitenkopf', async () => {
+    server.use(...handlers([gebiet], [], einsatzFixture({ meine_rolle: 'beobachter' })));
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Drucken / als PDF' }));
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+  });
+
+  it('bietet keinen Druck an, solange die Matrix lädt', async () => {
+    server.use(
+      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([gebiet])),
+      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => new Promise<never>(() => {})),
+    );
+    renderPage();
+    expect(await screen.findByText('Bewertungen laden …')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Drucken / als PDF' })).toBeNull();
+  });
+});
+
 describe('GefahrenPage: Bedienziel-Boden der Gebietsliste', () => {
   const tokenFuer = (stufe: keyof typeof dichten) => ({
     controlHeight: dichten[stufe].zeilenhoehe,

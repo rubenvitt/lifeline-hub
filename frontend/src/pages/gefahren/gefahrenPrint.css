@@ -1,0 +1,39 @@
+@media print {
+  /* Eigenheiten der Gefahrenseite im Druck (LLH-1364). Die Mechanik (Ausblenden des Rahmens, Fluss,
+     Papierfarben, Umbruch, Tabellen-Neutralisierer) liegt in `druck/druck.css`;
+     `.gefahren-print-root` trägt dafür `data-lfh="druckwurzel"`. Gedruckt wird das gewählte Gebiet:
+     Legende, Matrix und Liste „Erläuterungen“. Wirkung: `e2e/gefahren-druck.spec.ts`. */
+
+  /* Bedienung: Gebietsliste, Gebietskopf (Umbenennen, Sprung zur Karte), Beurteilungszeile,
+     Rechte- und Fehlerhinweise. Gebiet, Warnstufe und Beurteilung stehen im Druckkopf. */
+  .gefahren-no-print {
+    display: none !important;
+  }
+
+  /* Der Seitenkopf (`EinsatzSeite`) ist Bedienung; Titel und Stand trägt der Druckkopf. Wie in
+     `funkplanPrint.css`. */
+  .gefahren-print-root [data-lfh='seitenkopf'] {
+    display: none !important;
+  }
+
+  /* „nicht anwendbar“ ist am Schirm eine Schraffur als Hintergrundbild (`schraffurStil`).
+     `druck.css` nimmt jeder Fläche in der Wurzel den Hintergrund (Papier ist hell); ohne diese
+     Regel stünde die Zelle leer, kaum von „–“ zu trennen. Schwarz, und `exact`, damit sie auch
+     ohne „Hintergründe drucken“ steht. Der Selektor schlägt die Regel der Wurzel über die
+     Seitenklasse. */
+  .gefahren-print-root [data-lfh='nicht-anwendbar'],
+  .gefahren-print-root [data-lfh='legende-schraffur'] {
+    background-image: repeating-linear-gradient(
+      135deg,
+      black 0 1px,
+      transparent 1px 6px
+    ) !important;
+    print-color-adjust: exact;
+  }
+
+  /* Ein Eintrag der Liste „Erläuterungen“ (Titel, Stufe, Text, gemeldet/geändert) bleibt auf
+     einem Blatt. */
+  .gefahren-print-root [data-lfh='gefahren-erlaeuterungen'] .listen-eintrag {
+    break-inside: avoid;
+  }
+}
