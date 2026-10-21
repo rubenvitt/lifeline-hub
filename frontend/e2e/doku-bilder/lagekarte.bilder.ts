@@ -4,7 +4,7 @@ import {
   kartenConfigBeantworten,
   vektorStilBeantworten,
 } from '../kartenFixture';
-import { zeigeLeistenAnsicht } from '../leisten-kern';
+import { objektListe, objektZeile, oeffneObjektGruppe, zeigeLeistenAnsicht } from '../leisten-kern';
 import {
   anmelden,
   demoEinsatz,
@@ -26,6 +26,8 @@ import {
  *                          frontend/src/pages/lagekarte/Ebenenbaum.tsx,
  *                          frontend/src/pages/lagekarte/KartenUeberlagerung.tsx,
  *                          frontend/src/pages/lagekarte/markerLayer.ts (Raumzeichen, LLH-1107)
+ *   objektliste.png        frontend/src/pages/lagekarte/MarkerSuche.tsx (Ansicht „Objekte“),
+ *                          frontend/src/pages/lagekarte/objektsuche.ts
  *   taktisches-zeichen.png frontend/src/pages/lagekarte/Sidebar.tsx (Paneel „Zeichnen“),
  *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx,
  *                          frontend/src/pages/lagekarte/zeichenWahl.ts
@@ -140,12 +142,13 @@ test.describe(KAPITEL, () => {
     await expect(zonen).toHaveAttribute('aria-checked', 'false');
     await zonen.click();
     await expect(zonen).toHaveAttribute('aria-checked', 'true');
-    await zeigeLeistenAnsicht(page, 'Objekte');
-    await page
-      .getByRole('listitem')
-      .filter({ hasText: 'UHS: Turnhalle Musterstadt' })
-      .getByRole('button', { name: 'Platzieren' })
-      .click();
+    // Die Objektliste: Marke „Nicht verortet“, Einsatzort, die Einheiten aufgeklappt.
+    await oeffneObjektGruppe(page, 'einheit');
+    await page.mouse.move(0, 0);
+    await fotografiere(objektListe(page), KAPITEL, 'objektliste');
+    // Suchen, dann „Platzieren“ in der Zeile.
+    const zeile = await objektZeile(page, 'Turnhalle Musterstadt');
+    await zeile.getByRole('button', { name: 'Platzieren' }).click();
     await tippe(page, canvas, 160, 120);
     await expect(page.getByText('Objekt verortet')).toBeVisible();
     // Die Kartengrundlage wechseln und zurück.

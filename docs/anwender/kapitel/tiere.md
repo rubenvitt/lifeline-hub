@@ -74,7 +74,7 @@ Tiere zeigt den Halter dann mit seiner Registriernummer.
    (Hund) verortet“.
 4. „Zurück zu T-003 (Hund)“ wählen: Die Seite des Tiers zeigt die neue Koordinate.
 
-Ein Tier ohne Koordinate lässt sich auch auf der Lagekarte unter „Nicht verortet“ platzieren
+Ein Tier ohne Koordinate lässt sich auch auf der Lagekarte in der Leiste unter „Objekte“ platzieren
 (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Unter „Bearbeiten“ lässt sich die
 Koordinate eintippen oder leeren.
 
