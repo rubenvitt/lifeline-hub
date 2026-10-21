@@ -253,7 +253,11 @@ Erfassungsmodule teilen den Block `components/erfassungsAnhaenge/ErfassungsAnhae
   Verdichtet (LLH-1102): die ganze Zelle ist das Ziel (Polsterung 0, Knopf 100 %, Zeile =
   `controlHeight`, Ring nach innen). Wer Gefahrentypen listet, ordnet sie über
   `sortGefahrenAlphabetisch` bzw. `GEFAHRENTYPEN_ALPHABETISCH` (`gefahrenSchema.ts`), nie in
-  der Katalogfolge `GEFAHRENTYPEN`.
+  der Katalogfolge `GEFAHRENTYPEN`. Erläuterungen (LLH-1110): eine Zelle mit Text trägt die
+  Marke (Dreieck oben rechts, `currentColor`, Name „· mit Erläuterung“), unter der Matrix
+  steht die Liste „Erläuterungen“. Welche Zellen etwas sagen und in welcher Folge, entscheidet
+  nur `pages/gefahren/erlaeuterungen.ts` (`zellenMitErlaeuterung`, `gesetzteGefahren`) — für
+  Matrix, Lagekarte und Lagevortrag.
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
   SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
   als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem

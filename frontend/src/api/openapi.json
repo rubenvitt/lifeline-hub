@@ -7869,6 +7869,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "aktualisiert_von_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename von `aktualisiert_von` zur Lesezeit (LLH-1110); fehlt bei entferntem Konto."
+          },
           "beschreibung": {
             "type": [
               "string",

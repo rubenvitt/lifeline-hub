@@ -3120,6 +3120,8 @@ export interface components {
         GefahrBewertungAnzeige: {
             /** Format: int64 */
             aktualisiert_von: number;
+            /** @description Anzeigename von `aktualisiert_von` zur Lesezeit (LLH-1110); fehlt bei entferntem Konto. */
+            aktualisiert_von_name?: string | null;
             beschreibung?: string | null;
             erstellt_at: string;
             geaendert_at: string;

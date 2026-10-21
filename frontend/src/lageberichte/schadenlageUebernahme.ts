@@ -1,5 +1,13 @@
 import type { AbrufZustand } from '../api/abrufZustand';
-import type { ModulFreigaben, PegelAnzeige, WetterAnzeige, WetterWarnung } from '../api/types';
+import { gefahrengebietName, ladeMatrix } from '../api/gefahren';
+import type {
+  GefahrBewertung,
+  Gefahrengebiet,
+  ModulFreigaben,
+  PegelAnzeige,
+  WetterAnzeige,
+  WetterWarnung,
+} from '../api/types';
 import { wetterAbfrage } from '../api/wetter';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
@@ -8,7 +16,14 @@ import { ladeLagebasis, type GeladeneLagebasis } from '../pages/lage-dashboard/u
 import { pegelZeile, wasserstandMeter } from '../pegel/pegelKennzahl';
 import { ZUSTAND_GRUND, md } from '../stab/funkplan';
 import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/vorbereitung';
-import { dwdWarnstufe } from '../theme/statusFarben';
+import { NICHT_BEURTEILT, istBeurteilt } from '../pages/gefahren/beurteilung';
+import {
+  erlaeuterungEinzeilig,
+  gesetzteGefahren,
+  zellTitel,
+} from '../pages/gefahren/erlaeuterungen';
+import { gefahrenMatrixAbfrage } from '../pages/gefahren/gefahrenMatrixAbfrage';
+import { dwdWarnstufe, warnstufeFlaeche } from '../theme/statusFarben';
 import {
   messStand,
   teilStand,
@@ -174,10 +189,39 @@ function pegelZeilen(pegel: readonly PegelAnzeige[], jetzt: number, dtg: (iso: s
 }
 
 /**
+ * Je Gefahrengebiet seine gesetzten Gefahren mit Stufe und Erläuterung (LLH-1110, Spec
+ * `lagevortrag-uebernahme`, „Inhalt der Gefahren-/Schadenlage“). Welche Zellen zählen und in
+ * welcher Folge, sagt `gesetzteGefahren` (dieselbe Regel wie der Inspector der Lagekarte). Die
+ * Erläuterung ist die Beurteilung der eigenen Führung und steht im Text; „gemeldet von“ nennt
+ * Dritte und bleibt draußen (Fortschreibung LFH-869, `frontend/src/entwurf/AGENTS.md`).
+ */
+function gebietZeilen(gebiet: Gefahrengebiet, matrix: Geladen<GefahrBewertung[]>): string[] {
+  const name = md(gefahrengebietName(gebiet.label, gebiet.id));
+  const kopf = istBeurteilt(gebiet) ? `- ${name}` : `- ${name} (${NICHT_BEURTEILT})`;
+  if (matrix.zustand !== 'daten') {
+    return [`${kopf}: ${grund(matrix.zustand === 'gesperrt' ? 'gesperrt' : 'fehler')}`];
+  }
+  const gefahren = gesetzteGefahren(matrix.daten);
+  if (gefahren.length === 0) return [`${kopf}: keine Gefahr über „keine“`];
+  return [
+    kopf,
+    ...gefahren.map((z) => {
+      const text = erlaeuterungEinzeilig(z);
+      return (
+        `  - ${zellTitel(z.gefahrentyp, z.schutzobjekt)}: ${warnstufeFlaeche[z.warnstufe].label}` +
+        (text ? ` · ${md(text)}` : '')
+      );
+    }),
+  ];
+}
+
+/**
  * „Aus dem Lagebild übernehmen“ im Abschnitt „Gefahren-/Schadenlage“ (LFH-872, Spec
  * `lagevortrag-uebernahme`). Betroffene, Sichtung, Schäden und Warnstufe aus `baueLagebild` über
  * `ladeLagebasis` (dieselbe Zusammenstellung wie Dashboard und Vorbereitung), im Wortlaut der
- * Vorbereitung. Keine Personen- oder Schadensfelder, nur Zahlen.
+ * Vorbereitung. Keine Personen- oder Schadensfelder, nur Zahlen. Je Gefahrengebiet die gesetzten
+ * Gefahren mit Erläuterung (LLH-1110), die Matrizen beim Klick über denselben Key wie die
+ * Gefahrenseite.
  */
 export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
   knopf: 'Aus dem Lagebild übernehmen',
@@ -206,6 +250,18 @@ export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
         ? ladeListe<WetterAnzeige | null>(qc, abfrage.queryKey, abfrage.queryFn, null)
         : Promise.resolve(gesperrt<WetterAnzeige | null>(null)),
     ]);
+    // Die Matrizen erst nach der Gebietsliste: ohne Gebiete gibt es nichts zu fragen, und eine
+    // gesperrte Quelle wird gar nicht erst gefragt (die Liste steht dann als `gesperrt`).
+    const gebiete: Gefahrengebiet[] =
+      lage.basis && lage.zustand.gefahren === 'daten' ? lage.basis.gefahren : [];
+    const matrizen = await Promise.all(
+      gebiete.map((g) => {
+        // Key aus derselben Abfrage wie die Gefahrenseite; `ladeMatrix` hier direkt, weil
+        // `queryOptions` die Abruffunktion als optional führt.
+        const { queryKey } = gefahrenMatrixAbfrage(einsatzId, g.id);
+        return ladeListe<GefahrBewertung[]>(qc, queryKey, () => ladeMatrix(einsatzId, g.id), []);
+      }),
+    );
     const jetzt = Date.now();
     const lb = lage.basis
       ? baueLagebild(
@@ -229,6 +285,13 @@ export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
       ]),
       ...lagebildZeilen(lb, zustand('gefahren'), [['Höchste Warnstufe', warnstufeAngabe]]),
     ];
+    const gebieteZustand = zustand('gefahren');
+    const gebieteTeil =
+      gebieteZustand !== 'daten'
+        ? [`- ${grund(gebieteZustand)}`]
+        : gebiete.length === 0
+          ? ['- keine Gefahrengebiete']
+          : gebiete.flatMap((g, i) => gebietZeilen(g, matrizen[i]));
     const wetterTeil =
       wetter.zustand === 'daten' && wetter.daten
         ? wetterZeilen(wetter.daten, jetzt, dtg)
@@ -243,7 +306,12 @@ export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
         ? pegelZeilen(lage.basis.pegel, jetzt, dtg)
         : [`- ${grund(pegelZustand === 'daten' ? 'laden' : pegelZustand)}`];
 
-    const stand = gemeinsamerDatenstand(lage.stand ?? 0, wetter.stand ?? 0) || jetzt;
+    const stand =
+      gemeinsamerDatenstand(
+        lage.stand ?? 0,
+        wetter.stand ?? 0,
+        ...matrizen.map((m) => m.stand ?? 0),
+      ) || jetzt;
 
     return [
       `**Stand:** ${dtg(new Date(stand).toISOString())}`,
@@ -253,6 +321,9 @@ export const SCHADENLAGE_QUELLE: UebernahmeQuelle = {
       '',
       '**Schäden und Gefahren**',
       ...schaeden,
+      '',
+      '**Gefahrengebiete**',
+      ...gebieteTeil,
       '',
       '**Wetter**',
       ...wetterTeil,

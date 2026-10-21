@@ -1,9 +1,11 @@
-import { type Mock, describe, expect, it, vi } from 'vitest';
+import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/server';
 import { offeneRueckfrage } from '../../test/rueckfrage';
 import { renderMitProviders } from '../../test/utils';
-import type { Gefahrengebiet, LageZone } from '../../api/types';
+import type { GefahrBewertung, Gefahrengebiet, LageZone } from '../../api/types';
 import ZonenInspector, { type ZonenInspectorProps } from './ZonenInspector';
 import { FREIE_SKIZZE_VORGABEFARBE, zoneStil } from './zonenStil';
 
@@ -43,6 +45,8 @@ function renderInspector(opts: {
   onLoeschen?: Mock<ZonenInspectorProps['onLoeschen']>;
   onMatrixOeffnen?: Mock<ZonenInspectorProps['onMatrixOeffnen']>;
   matrixGesperrt?: boolean;
+  /** Adresse der Seite, etwa `/?snapshot=3` für den Historien-Modus. */
+  route?: string;
 }) {
   const onAendern = opts.onAendern ?? vi.fn<ZonenInspectorProps['onAendern']>();
   const onLoeschen = opts.onLoeschen ?? vi.fn<ZonenInspectorProps['onLoeschen']>();
@@ -59,6 +63,7 @@ function renderInspector(opts: {
   } satisfies Omit<ZonenInspectorProps, 'zone'>;
   const ergebnis = renderMitProviders(
     <ZonenInspector zone={opts.zone ?? basisZone} {...gemeinsameProps} />,
+    { route: opts.route },
   );
   return {
     onAendern,
@@ -69,6 +74,23 @@ function renderInspector(opts: {
       ergebnis.rerender(<ZonenInspector zone={zone} {...gemeinsameProps} />),
   };
 }
+
+/** Matrix-Abrufe des Inspectors (LLH-1110): je Test zählbar, Vorgabe leer. */
+let matrixAbrufe: string[] = [];
+function matrixAntwort(matrix: GefahrBewertung[] | 'fehler') {
+  server.use(
+    http.get('/api/einsaetze/:eid/gefahrengebiete/:gid/matrix', ({ request }) => {
+      matrixAbrufe.push(new URL(request.url).pathname);
+      return matrix === 'fehler'
+        ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+        : HttpResponse.json(matrix);
+    }),
+  );
+}
+beforeEach(() => {
+  matrixAbrufe = [];
+  matrixAntwort([]);
+});
 
 describe('ZonenInspector — Gefahrengebiet-Gruppe', () => {
   it('hält Eingaben kontrolliert und quittiert den laufenden Speichervorgang sichtbar', async () => {
@@ -600,5 +622,133 @@ describe('ZonenInspector — Kreiszone (LLH-1043)', () => {
     expect(screen.queryByRole('spinbutton', { name: 'Radius in Metern' })).toBeNull();
     rerenderZone({ ...kreisZone, id: 2, kreis_radius_m: null });
     expect(screen.queryByText('Radius')).toBeNull();
+  });
+});
+
+describe('ZonenInspector — Gefahren und Erläuterungen des Gebiets (LLH-1110)', () => {
+  const bewertung = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
+    id: 1,
+    gefahrengebiet_id: 10,
+    gefahrentyp: 'brand',
+    schutzobjekt: 'menschen',
+    warnstufe: 'keine',
+    beschreibung: null,
+    gemeldet_von: null,
+    aktualisiert_von: 1,
+    erstellt_at: '',
+    geaendert_at: '',
+    ...over,
+  });
+  const MATRIX = [
+    bewertung({
+      id: 1,
+      gefahrentyp: 'elektrizitaet',
+      warnstufe: 'hoch',
+      beschreibung: 'Stromführende Kellerverteilungen\nunter Wasser',
+      gemeldet_von: 'Rettungsstaffel',
+    }),
+    bewertung({ id: 2, gefahrentyp: 'absturz', beschreibung: 'Hangkante gesichert' }),
+    bewertung({
+      id: 3,
+      gefahrentyp: 'ertrinken',
+      schutzobjekt: 'einsatzkraefte',
+      warnstufe: 'mittel',
+    }),
+    // „keine“ ohne Text sagt nichts und steht nicht da.
+    bewertung({ id: 4, gefahrentyp: 'einsturz' }),
+  ];
+
+  it('zeigt die gesetzten Gefahren mit Stufe und Erläuterung, alphabetisch', async () => {
+    matrixAntwort(MATRIX);
+    renderInspector({ gebiete: [gebietMitWarnstufe] });
+    const abschnitt = await screen.findByRole('region', { name: 'Gefahren' });
+    const zeilen = await within(abschnitt).findAllByRole('listitem');
+    expect(zeilen.map((z) => within(z).getByText(/ × /).textContent)).toEqual([
+      'Absturz × Menschen',
+      'Elektrizität × Menschen',
+      'Ertrinken × Einsatzkräfte',
+    ]);
+    expect(within(zeilen[1]).getByText('hoch')).toBeInTheDocument();
+    expect(
+      within(zeilen[1]).getByText('Stromführende Kellerverteilungen unter Wasser'),
+    ).toBeInTheDocument();
+    expect(within(zeilen[0]).getByText('keine')).toBeInTheDocument();
+    expect(within(zeilen[0]).getByText('Hangkante gesichert')).toBeInTheDocument();
+    // Kompakt: kein Meldeweg auf der Karte, und unter fünf Zeilen kein Sprung.
+    expect(abschnitt).not.toHaveTextContent('Rettungsstaffel');
+    expect(within(abschnitt).queryByRole('link', { name: /alle in Gefahren/ })).toBeNull();
+    expect(matrixAbrufe).toEqual(['/api/einsaetze/1/gefahrengebiete/10/matrix']);
+  });
+
+  it('zeigt höchstens fünf Zeilen, darunter „alle in Gefahren ↗“', async () => {
+    const typen = [
+      'absturz',
+      'brand',
+      'einsturz',
+      'elektrizitaet',
+      'ertrinken',
+      'explosion',
+    ] as const;
+    matrixAntwort(
+      typen.map((t, i) => bewertung({ id: i + 1, gefahrentyp: t, warnstufe: 'niedrig' })),
+    );
+    renderInspector({});
+    const abschnitt = await screen.findByRole('region', { name: 'Gefahren' });
+    expect(await within(abschnitt).findAllByRole('listitem')).toHaveLength(5);
+    expect(abschnitt).not.toHaveTextContent('Explosion');
+    const sprung = within(abschnitt).getByRole('link', { name: /alle in Gefahren/ });
+    expect(sprung).toHaveAttribute('href', '/einsaetze/1/gefahren?gefahrengebiet=10');
+    expect(sprung.closest('[data-lfh="inspector-sprung"]')).not.toBeNull();
+  });
+
+  it('sagt ohne gesetzte Gefahr genau das, ohne Liste', async () => {
+    matrixAntwort([bewertung({ gefahrentyp: 'einsturz' })]);
+    renderInspector({});
+    const abschnitt = await screen.findByRole('region', { name: 'Gefahren' });
+    expect(await within(abschnitt).findByText('keine Gefahr über „keine“')).toBeInTheDocument();
+    expect(within(abschnitt).queryByRole('listitem')).toBeNull();
+  });
+
+  it('nennt einen gescheiterten Abruf, statt „keine“ zu behaupten', async () => {
+    matrixAntwort('fehler');
+    renderInspector({});
+    const abschnitt = await screen.findByRole('region', { name: 'Gefahren' });
+    expect(await within(abschnitt).findByText('Gefahren nicht geladen')).toBeInTheDocument();
+    expect(abschnitt).not.toHaveTextContent('keine Gefahr');
+  });
+
+  it('Modul Gefahren gesperrt: kein Abruf, kein Abschnitt (LFH-669)', async () => {
+    matrixAntwort(MATRIX);
+    renderInspector({ matrixGesperrt: true });
+    // Ein Takt für einen etwaigen Abruf.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Gefahrenmatrix bearbeiten/ })).toBeDisabled(),
+    );
+    expect(screen.queryByRole('region', { name: 'Gefahren' })).toBeNull();
+    expect(matrixAbrufe).toEqual([]);
+  });
+
+  it('ohne Gebiet in der Liste (keine Freigabe) kein Abruf, kein Abschnitt', async () => {
+    matrixAntwort(MATRIX);
+    renderInspector({ gebiete: [] });
+    await act(async () => {});
+    expect(screen.queryByRole('region', { name: 'Gefahren' })).toBeNull();
+    expect(matrixAbrufe).toEqual([]);
+  });
+
+  it('im Historien-Modus keine heutige Matrix neben dem alten Stand', async () => {
+    matrixAntwort(MATRIX);
+    renderInspector({ route: '/?snapshot=3' });
+    await act(async () => {});
+    expect(screen.queryByRole('region', { name: 'Gefahren' })).toBeNull();
+    expect(matrixAbrufe).toEqual([]);
+  });
+
+  it('eine andere Zonenart zeigt keine Gefahren', async () => {
+    matrixAntwort(MATRIX);
+    renderInspector({ zone: { ...basisZone, typ: 'freie_skizze', gefahrengebiet_id: null } });
+    await act(async () => {});
+    expect(screen.queryByRole('region', { name: 'Gefahren' })).toBeNull();
+    expect(matrixAbrufe).toEqual([]);
   });
 });
