@@ -7,11 +7,13 @@
 use lifeline_hub::auftrag::AuftragBearbeitungsstatus;
 use lifeline_hub::einheit::repo::kumuliere;
 use lifeline_hub::einsatz::zaehler::{
-    count_kraefte, zaehle_auftraege, zaehle_meldungen, AuftragsMerkmale, AuftragsZaehler,
-    KraefteZaehler, KraftMerkmale, MeldungsMerkmale, MeldungsZaehler,
+    count_kraefte, zaehle_auftraege, zaehle_meldungen, zaehle_nachforderungen, AuftragsMerkmale,
+    AuftragsZaehler, KraefteZaehler, KraftMerkmale, MeldungsMerkmale, MeldungsZaehler,
+    NachforderungsZaehler,
 };
 use lifeline_hub::entlassung::BeendetAls;
 use lifeline_hub::meldung::MeldungStatus;
+use lifeline_hub::nachforderung::NachforderungStatus;
 use lifeline_hub::person::{
     versorgung_von, zaehle_lage_sichtung, PersonStatus, Sichtungskategorie, TransportDurch,
     VerbleibArt, VerbleibStatus, Versorgung,
@@ -118,6 +120,37 @@ fn meldungen_zaehlen_wie_das_fixture() {
             offen: zahl(&e["offen"]),
             ungesehen: zahl(&e["ungesehen"]),
             bestaetigung_ueberfaellig: zahl(&e["bestaetigung_ueberfaellig"]),
+        }
+    );
+}
+
+/// Modulzähler `nachforderungen` (LLH-1078): dieselben Fälle zählt das Board im Browser
+/// (`nachforderungen/nachforderungStufen.ts:zaehleNachforderungen`).
+#[test]
+fn nachforderungen_zaehlen_wie_das_fixture() {
+    let fx = fixture();
+    let faelle = fx["nachforderungen"]["faelle"].as_array().unwrap();
+    let status = |f: &Value| {
+        NachforderungStatus::parse(f["status"].as_str().unwrap()).expect("bekannter Status")
+    };
+
+    // Je Fall: allein gezählt, ist er genau dann offen, wenn das Fixture es sagt.
+    for f in faelle {
+        let z = zaehle_nachforderungen(&[status(f)]);
+        let name = f["name"].as_str().unwrap();
+        assert_eq!(z.offen == 1, flag(f, "offen"), "offen: {name}");
+        assert_eq!(status(f).ist_offen(), flag(f, "offen"), "ist_offen: {name}");
+    }
+
+    let alle: Vec<_> = faelle.iter().map(status).collect();
+    let e = &fx["nachforderungen"]["erwartet"];
+    assert_eq!(
+        zaehle_nachforderungen(&alle),
+        NachforderungsZaehler {
+            offen: zahl(&e["offen"]),
+            angefordert: zahl(&e["angefordert"]),
+            zugesagt: zahl(&e["zugesagt"]),
+            unterwegs: zahl(&e["unterwegs"]),
         }
     );
 }

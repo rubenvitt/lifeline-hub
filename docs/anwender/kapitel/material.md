@@ -281,7 +281,7 @@ in einer eigenen Gruppe am Ende.
 ### Material aus einer Nachforderung
 
 Material, das auf eine Nachforderung hin eingetroffen ist, legt man an ihrer Karte mit „Als
-Material übernehmen“ an (Kapitel [Nachforderung](nachforderung.md)). Es steht dann als
+Material übernehmen“ an (Kapitel [Nachforderungen](nachforderung.md)). Es steht dann als
 Ad-hoc-Posten in der Liste und trägt unter der Bezeichnung den Verweis „aus Nachforderung: 3
 Tauchpumpen für Keller Hauptstraße“. Der Verweis öffnet die Nachforderungen in der Ansicht
 „Abgeschlossen“ und hebt die Karte hervor. Wer das Modul Nachforderungen nicht sieht, liest nur

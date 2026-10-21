@@ -4283,6 +4283,7 @@ export interface components {
             etb?: components["schemas"]["MengenZaehler"] | null;
             lagemeldungen?: components["schemas"]["LagemeldungsZaehler"] | null;
             meldungen?: components["schemas"]["MeldungsZaehler"] | null;
+            nachforderungen?: components["schemas"]["NachforderungsZaehler"] | null;
             personen?: components["schemas"]["MengenZaehler"] | null;
         };
         /**
@@ -4338,6 +4339,30 @@ export interface components {
          * @enum {string}
          */
         NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt";
+        /**
+         * @description Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.
+         *     Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an
+         *     der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.
+         */
+        NachforderungsZaehler: {
+            /**
+             * Format: int64
+             * @description Davon im Status „angefordert“ (noch keine Zusage).
+             */
+            angefordert: number;
+            /** Format: int64 */
+            offen: number;
+            /**
+             * Format: int64
+             * @description Davon „unterwegs“.
+             */
+            unterwegs: number;
+            /**
+             * Format: int64
+             * @description Davon „zugesagt“.
+             */
+            zugesagt: number;
+        };
         /** @description Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`). */
         NotizAnzeige: {
             /**

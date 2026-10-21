@@ -43,7 +43,7 @@ describe('NachforderungKarte — Zeiten in der Anzeigezone (LFH-913)', () => {
   function zeige(n: Nachforderung) {
     render(
       <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
-        <NachforderungKarte nachforderung={n} ansicht="abgeschlossen" />
+        <NachforderungKarte nachforderung={n} />
       </AnzeigeKonventionenProvider>,
     );
   }
@@ -103,9 +103,7 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
       ),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     );
-    return renderMitProviders(
-      <NachforderungKarte nachforderung={eingetroffen()} ansicht="abgeschlossen" {...props} />,
-    );
+    return renderMitProviders(<NachforderungKarte nachforderung={eingetroffen()} {...props} />);
   }
 
   it('an der eingetroffenen Karte „Als Material übernehmen“, der Klick meldet die Nachforderung', async () => {
@@ -202,7 +200,7 @@ describe('NachforderungKarte — Stellenbezug (LLH-1082)', () => {
     renderMitProviders(
       <NachforderungKarte
         nachforderung={nf({ betreuungsstelle_id: 8 })}
-        ansicht="offen"
+
         stellenJeId={stellen}
       />,
     );
@@ -214,17 +212,52 @@ describe('NachforderungKarte — Stellenbezug (LLH-1082)', () => {
   });
 
   it('unbekannte Stelle (Betreuung nicht freigegeben): ohne Namen und Sprung', () => {
-    renderMitProviders(
-      <NachforderungKarte nachforderung={nf({ betreuungsstelle_id: 9 })} ansicht="offen" />,
-    );
+    renderMitProviders(<NachforderungKarte nachforderung={nf({ betreuungsstelle_id: 9 })} />);
     expect(screen.getByText('Für eine Betreuungsstelle')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Betreuungsstelle/ })).toBeNull();
   });
 
   it('ohne Bezug keine Zeile', () => {
-    renderMitProviders(
-      <NachforderungKarte nachforderung={nf()} ansicht="offen" stellenJeId={stellen} />,
-    );
+    renderMitProviders(<NachforderungKarte nachforderung={nf()} stellenJeId={stellen} />);
     expect(screen.queryByText(/Betreuungsstelle/)).toBeNull();
+  });
+});
+
+/** LLH-1078: die kompakte Karte im Board. */
+describe('NachforderungKarte — im Board (LLH-1078)', () => {
+  it('in ihrer Spalte ohne Statusetikett, mit Alter und der Handlung als Knopf', async () => {
+    const onStatus = vi.fn();
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({ angefordert_at: '2026-06-12 09:00:00' })}
+        spaltenStufe="angefordert"
+        jetzt={Date.UTC(2026, 5, 12, 9, 25)}
+        darfSchreiben
+        onStatus={onStatus}
+        onAblehnen={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Angefordert', { exact: true })).toBeNull();
+    expect(screen.getByText('vor 25 min')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    expect(onStatus).toHaveBeenCalledWith(1, 'zugesagt');
+    expect(screen.getByRole('button', { name: 'Ablehnen' })).toBeInTheDocument();
+  });
+
+  it('eine gehaltene Karte, die schon weiter ist, nennt ihre neue Stufe', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({ status: 'zugesagt', zugesagt_at: '2026-06-12 09:10:00' })}
+        spaltenStufe="angefordert"
+      />,
+    );
+    expect(screen.getByText('Zugesagt', { exact: true })).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht keine Knöpfe', () => {
+    renderMitProviders(
+      <NachforderungKarte nachforderung={nf()} spaltenStufe="angefordert" onStatus={vi.fn()} />,
+    );
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });

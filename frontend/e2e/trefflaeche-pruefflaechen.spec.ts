@@ -89,6 +89,12 @@ const knopf = (name: string | RegExp) => (page: Page) =>
 /** Ein Nebenweg des Seitenkopfs mit Ziel ist ab `md` ein Link in Knopfgestalt (LFH-963). */
 const nebenweg = (name: RegExp) => (page: Page) =>
   page.locator('[data-lfh="seitenkopf-aktionen"]').getByRole('link', { name });
+/** Kopfknopf der eingeklappten Spalte „Abgelehnt“ im Nachforderungen-Board. */
+const abgelehntSpalte = {
+  sorte: 'Board Abgelehnt',
+  ziele: (page: Page) => inMain(page).getByRole('button', { name: /^Abgelehnt \d+$/ }),
+  mindestens: 1,
+};
 /** Ein Segment der `Segmentleiste` ist ein `<button role="radio">` (bzw. `tab`). */
 const segment =
   (name: RegExp, rolle: 'radio' | 'tab' = 'radio') =>
@@ -418,6 +424,7 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
           ziele: knopf(/^(Zusage erfassen|Ablehnen)$/),
           mindestens: 2,
         },
+        abgelehntSpalte,
       ],
     },
     {
@@ -515,7 +522,9 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
       pfad: `${R}/nachforderungen`,
       anker: (page) => inMain(page).getByText('RTW').first(),
       fehlt: knopf('Nachforderung anlegen'),
-      ziele: [filter],
+      // Das Board hat keinen Statusfilter mehr; ohne Schreibrecht bleibt der Spaltenknopf
+      // „Abgelehnt“ (Spec `nachforderungen-board`).
+      ziele: [abgelehntSpalte],
     },
     {
       pfad: `${R}/auftraege`,

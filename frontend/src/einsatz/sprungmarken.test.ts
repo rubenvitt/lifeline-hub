@@ -84,7 +84,6 @@ describe('Sprungmarken (LFH-620)', () => {
       'chat',
       'erinnerungen',
       'meldungen',
-      'nachforderungen',
       'fernmeldewesen',
       '↗fernmeldeskizze',
       '↗kommunikationsplan',
@@ -111,6 +110,7 @@ describe('Sprungmarken (LFH-620)', () => {
       'material',
       'verpflegung',
       'bereitstellungsraeume',
+      'nachforderungen',
       'abloesung',
     ]);
   });

@@ -69,7 +69,7 @@ Was eine Stelle braucht (Feldbetten, Decken, Hygieneartikel, Personal), wird als
    Klick öffnet sie. „Alle Nachforderungen der Stelle“ zeigt auch die eingetroffenen und die
    abgelehnten.
 
-Ohne Zugriff auf „Nachforderung“ steht dort „Bedarf · Keine Berechtigung“.
+Ohne Zugriff auf „Nachforderungen“ steht dort „Bedarf · Keine Berechtigung“.
 
 ### Eine Betreuungsstelle anlegen und ihre Belegung melden
 

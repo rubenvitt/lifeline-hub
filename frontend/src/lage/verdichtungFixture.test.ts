@@ -8,6 +8,7 @@ import type {
   Einsatzabschnitt,
   EinsatzPersonal,
   Meldung,
+  NachforderungStatus,
   Person,
   Sichtungskategorie,
 } from '../api/types';
@@ -16,6 +17,10 @@ import { baueKraeftebild, verdichte, type MeldebildZeile } from '../kraefte/krae
 import { istAlarmiert } from '../meldungen/meldungKennzahlen';
 import { istOffen } from '../pages/fuehrung/ueberblickDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
+import {
+  istOffen as nachforderungOffen,
+  zaehleNachforderungen,
+} from '../nachforderungen/nachforderungStufen';
 import { ohneAbgeschlossene, sichtungsbild, versorgungsBilanz } from '../personen/personenBilanz';
 
 /**
@@ -76,6 +81,10 @@ interface Fixture {
       > & { name: string; bestaetigung_ueberfaellig: boolean }
     >;
     erwartet: { offen: number; ungesehen: number; bestaetigung_ueberfaellig: number };
+  };
+  nachforderungen: {
+    faelle: Array<{ name: string; status: NachforderungStatus; offen: boolean; stufe: string }>;
+    erwartet: { offen: number; angefordert: number; zugesagt: number; unterwegs: number };
   };
   staerke: {
     einheiten: Array<{
@@ -146,6 +155,20 @@ describe('Fixture: Meldungen', () => {
       ungesehen: offen.filter((m) => m.status === 'neu').length,
       bestaetigung_ueberfaellig: faelle.filter((m) => istAlarmiert(m as unknown as Meldung)).length,
     }).toEqual(erwartet);
+  });
+});
+
+describe('Fixture: Nachforderungen (LLH-1078)', () => {
+  const { faelle, erwartet } = fixture.nachforderungen;
+
+  it.each(faelle.map((f) => [f.name, f] as const))('%s', (_name, f) => {
+    expect(nachforderungOffen(f.status)).toBe(f.offen);
+    // Die Spalte des Boards ist die Stufe selbst.
+    expect(f.stufe).toBe(f.status);
+  });
+
+  it('Summen wie der Modulzähler', () => {
+    expect(zaehleNachforderungen(faelle)).toEqual(erwartet);
   });
 });
 

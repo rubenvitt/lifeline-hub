@@ -20,10 +20,11 @@ Das System SHALL unter `GET /api/einsaetze/{id}/modul-zaehler` für die folgende
 | `chat` | `ungelesen`: für den anfragenden Benutzer ungelesene Nachrichten über alle Kanäle |
 | `dokumente` | `gesamt`: alle nicht gelöschten Dokumente der Dokumentenablage des Einsatzes |
 | `lagemeldungen` | `neu`: Lagemeldungen, die noch niemand als gesehen gekennzeichnet hat |
+| `nachforderungen` | `offen`: Nachforderungen mit Status „angefordert“, „zugesagt“ oder „unterwegs“; `angefordert`, `zugesagt`, `unterwegs`: davon je Status |
 
 Für andere Module MUST die Antwort keinen Zähler enthalten.
 
-Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig“, „ungelesen“ und „neu“ MUST mit den gleichnamigen Angaben der jeweiligen Listen-Endpunkte übereinstimmen. `dokumente.gesamt` MUST der Zahl der Einträge entsprechen, die der Listen-Endpunkt der Dokumente liefert. `lagemeldungen.neu` MUST der Zahl der Einträge mit `is_neu = true` entsprechen, die der Listen-Endpunkt der Lagemeldungen liefert.
+Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig“, „ungelesen“ und „neu“ MUST mit den gleichnamigen Angaben der jeweiligen Listen-Endpunkte übereinstimmen. `dokumente.gesamt` MUST der Zahl der Einträge entsprechen, die der Listen-Endpunkt der Dokumente liefert. `lagemeldungen.neu` MUST der Zahl der Einträge mit `is_neu = true` entsprechen, die der Listen-Endpunkt der Lagemeldungen liefert. `nachforderungen.offen` MUST der Zahl der Einträge mit `ist_offen = true` entsprechen, die der Listen-Endpunkt der Nachforderungen liefert, und `offen` MUST die Summe aus `angefordert`, `zugesagt` und `unterwegs` sein. Eingetroffene und abgelehnte Nachforderungen zählt der Zähler nicht.
 
 #### Scenario: Zähler eines Einsatzes
 - **WHEN** ein Mitglied mit Zugriff auf alle Module den Endpunkt aufruft und der Einsatz 4 Betroffene hat, davon 1 storniert
@@ -53,6 +54,10 @@ Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig�
 - **WHEN** der Einsatz 3 Lagemeldungen hat und eine davon als gesehen gekennzeichnet ist
 - **THEN** ist `lagemeldungen.neu: 2`, für jeden anfragenden Benutzer gleich, und die Liste der Lagemeldungen liefert 2 Einträge mit `is_neu = true`
 
+#### Scenario: Offene Nachforderungen
+- **WHEN** der Einsatz zwei angeforderte, eine zugesagte, eine unterwegs befindliche, eine eingetroffene und eine abgelehnte Nachforderung hat
+- **THEN** ist `nachforderungen` gleich `{ offen: 4, angefordert: 2, zugesagt: 1, unterwegs: 1 }`, und die Nachforderungsliste liefert 4 Einträge mit `ist_offen = true`
+
 #### Scenario: Leerer Einsatz
 - **WHEN** ein Modul erlaubt ist, aber keine Datensätze hat
 - **THEN** ist sein Zähler vorhanden und steht auf 0
@@ -61,6 +66,7 @@ Die Bedeutung von „offen“, „in Arbeit“, „überfällig“, „fällig�
 Der Endpunkt MUST Lesezugriff auf den Einsatz verlangen und gehört selbst keinem Modul. Ein Zähler MUST nur für Module enthalten sein, auf die der Benutzer nach denselben Regeln zugreifen darf wie auf den Listen-Endpunkt des Moduls: Sichtbarkeit, Rollensperre aus dem Einsatz-Override, sonst aus der Org-Vorgabe, und die Ausnahme für System-Admins.
 - Ein nicht erlaubtes Modul MUST in der Antwort **fehlen**. Es DARF NICHT als 0 erscheinen.
 - Für einen unbekannten Einsatz antwortet das System mit HTTP 404, ohne Lesezugriff mit HTTP 403.
+- Ein gekoppeltes Gerät MUST den Zähler `nachforderungen` nicht erhalten: er zählt den ganzen Einsatz.
 
 #### Scenario: Ausgeblendetes Modul
 - **WHEN** das Modul `meldungen` für den Einsatz ausgeblendet ist und ein Mitglied ohne Admin-Rechte anfragt
@@ -79,7 +85,7 @@ Der Endpunkt MUST Lesezugriff auf den Einsatz verlangen und gehört selbst keine
 - **THEN** antwortet das System mit HTTP 403
 
 ### Requirement: Der Navigationsrahmen zeigt die Modulzähler
-Der Navigationsrahmen des Einsatzes (Modulpanel und Akkordeon) SHALL die Zähler dieses Endpunkts an den Modulen ETB, Betroffene, Einheiten, Einsatzabschnitte, Meldungen, Aufträge, Erinnerungen, Chat, Dokumente und Lagemeldungen anzeigen.
+Der Navigationsrahmen des Einsatzes (Modulpanel und Akkordeon) SHALL die Zähler dieses Endpunkts an den Modulen ETB, Betroffene, Einheiten, Einsatzabschnitte, Meldungen, Aufträge, Erinnerungen, Chat, Dokumente, Lagemeldungen und Nachforderungen anzeigen.
 - Die Werte kommen aus **einer** Abfrage. Der Rahmen lädt dafür keine Modullisten.
 - Jeder Zähler MUST seine Bedeutung als zweiten Kanal tragen: Tooltip und zugänglichen Namen des Modulziels. Für die vier Kommunikationsmodule und die Dokumente bleibt der bisherige Wortlaut erhalten.
 - Ein Zähler von 0 und ein fehlender Zähler werden nicht angezeigt.
@@ -101,13 +107,17 @@ Der Navigationsrahmen des Einsatzes (Modulpanel und Akkordeon) SHALL die Zähler
 - **WHEN** der Endpunkt `lagemeldungen.neu: 2` liefert
 - **THEN** zeigt das Modul „Lagemeldungen“ die Zahl 2 mit der Beschreibung „2 neue Lagemeldungen“, und das Werkzeug „Lagemeldungen“ der Kachel S2 auf der Stab-Seite zeigt dieselbe Zahl
 
+#### Scenario: Wortlaut der Nachforderungen
+- **WHEN** der Endpunkt `nachforderungen.offen: 5` und `nachforderungen.unterwegs: 2` liefert
+- **THEN** zeigt das Modul „Nachforderungen“ die Zahl 5 mit der Beschreibung „5 offene Nachforderungen, davon 2 unterwegs“, und die Werkzeuge „Nachforderungen“ der Kacheln S1 und S4 auf der Stab-Seite zeigen dieselbe Zahl
+
 #### Scenario: Keine Listenabfragen
-- **WHEN** der Navigationsrahmen eines Einsatzes angezeigt wird, ohne dass ein Kommunikationsmodul, die Dokumentenablage oder die Lagemeldungen geöffnet sind
-- **THEN** stellt er keine Anfrage an die Listen-Endpunkte von Meldungen, Aufträgen, Erinnerungen, Chat-Kanälen, Dokumenten oder Lagemeldungen
+- **WHEN** der Navigationsrahmen eines Einsatzes angezeigt wird, ohne dass ein Kommunikationsmodul, die Dokumentenablage, die Lagemeldungen oder die Nachforderungen geöffnet sind
+- **THEN** stellt er keine Anfrage an die Listen-Endpunkte von Meldungen, Aufträgen, Erinnerungen, Chat-Kanälen, Dokumenten, Lagemeldungen oder Nachforderungen
 
 ### Requirement: Die Modulzähler aktualisieren sich live
 Die Modulzähler SHALL sich aktualisieren, sobald sich die gezählte Menge eines der Module ändert:
-- über den Live-Feed des Einsatzes für ETB, Betroffene, Einheiten, Einsatzabschnitte, Meldungen, Aufträge, Erinnerungen, Chat, Dokumente und Lagemeldungen;
+- über den Live-Feed des Einsatzes für ETB, Betroffene, Einheiten, Einsatzabschnitte, Meldungen, Aufträge, Erinnerungen, Chat, Dokumente, Lagemeldungen und Nachforderungen;
 - für den Chat außerdem, sobald der Benutzer selbst einen Kanal als gelesen markiert.
 
 Live-Ereignisse frischen die Modulzähler gebündelt auf: Ein Tab MUST NOT die Zähler öfter als einmal je Sammelfenster von 1 s neu abrufen, gleich wie viele Ereignisse darin eintreffen. Das Markieren eines Kanals als gelesen wirkt ohne dieses Fenster.
@@ -124,6 +134,10 @@ Live-Ereignisse frischen die Modulzähler gebündelt auf: Ein Tab MUST NOT die Z
 - **WHEN** ein anderer Benutzer eine neue Lagemeldung als gesehen kennzeichnet
 - **THEN** sinkt der Zähler „Lagemeldungen“ im Modulpanel, ohne dass die Seite neu geladen wird
 
+#### Scenario: Nachforderung fortgeschaltet
+- **WHEN** ein anderer Benutzer eine zugesagte Nachforderung als unterwegs meldet
+- **THEN** ändert sich die Beschreibung des Zählers „Nachforderungen“ im Modulpanel, ohne dass die Seite neu geladen wird
+
 #### Scenario: Kanal gelesen
 - **WHEN** der Benutzer einen Chat-Kanal mit ungelesenen Nachrichten öffnet und dieser als gelesen markiert wird
 - **THEN** sinkt der Chat-Zähler entsprechend
@@ -133,11 +147,11 @@ Live-Ereignisse frischen die Modulzähler gebündelt auf: Ein Tab MUST NOT die Z
 - **THEN** ruft er die Modulzähler genau einmal neu ab, und die betroffenen Listen laden weiter im Sammelfenster der Listen nach
 
 ### Requirement: Der Zählerabruf lädt keine Listen
-Das System SHALL die Zähler eines Abrufs mit einer festen Zahl an Datenbankabfragen bilden: höchstens eine je erlaubtem Modul, unabhängig davon, wie viele Meldungen, Lagemeldungen, Aufträge, Auftragsempfänger, Erinnerungen oder Chat-Nachrichten der Einsatz hat. Der Abruf MUST NOT dafür Inhalte der gezählten Datensätze laden, insbesondere keine Meldungstexte, keine Texte von Lagemeldungen und keine Auftragsempfänger.
+Das System SHALL die Zähler eines Abrufs mit einer festen Zahl an Datenbankabfragen bilden: höchstens eine je erlaubtem Modul, unabhängig davon, wie viele Meldungen, Lagemeldungen, Aufträge, Auftragsempfänger, Erinnerungen, Nachforderungen oder Chat-Nachrichten der Einsatz hat. Der Abruf MUST NOT dafür Inhalte der gezählten Datensätze laden, insbesondere keine Meldungstexte, keine Texte von Lagemeldungen, keine Bezeichnungen von Nachforderungen und keine Auftragsempfänger.
 
 #### Scenario: Großer Bestand
 - **WHEN** ein Einsatz 200 Aufträge mit je drei Empfängern hat und ein Mitglied mit Zugriff auf alle Module die Zähler abruft
-- **THEN** stellt der Server dafür höchstens zehn Datenbankabfragen, so viele wie bei einem leeren Einsatz
+- **THEN** stellt der Server dafür höchstens elf Datenbankabfragen, so viele wie bei einem leeren Einsatz
 
 #### Scenario: Werte wie bisher
 - **WHEN** derselbe Bestand vor und nach dieser Änderung gezählt wird

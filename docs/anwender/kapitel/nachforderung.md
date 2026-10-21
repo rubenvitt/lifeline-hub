@@ -1,16 +1,18 @@
 ---
-titel: Nachforderung
+titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
 
 Reichen die eigenen Kräfte und Mittel nicht, fordert die Führung nach: Rettungswagen, eine
-Einsatzeinheit, Sandsäcke. Das Modul „Nachforderung“ hält jede Anforderung fest und verfolgt sie
-über die Stufen **Angefordert**, **Zugesagt**, **Unterwegs** und **Eingetroffen**. Eine
-Anforderung kann auch abgelehnt werden.
+Einsatzeinheit, Sandsäcke. Das Modul „Nachforderungen“ unter „Kräfte & Mittel“ hält jede
+Anforderung fest und verfolgt sie über die Stufen **Angefordert**, **Zugesagt**, **Unterwegs** und
+**Eingetroffen**. Eine Anforderung kann auch abgelehnt werden. Die Seite zeigt die Nachforderungen
+als Board: je Stufe eine Spalte, oben die Zahl der offenen und davon unterwegs, etwa „5 offen · 2
+unterwegs“. In der Sprungpalette findet „Anforderung“ das Modul ebenso.
 
 Lesen dürfen alle mit Zugang zum Einsatz. Nachfordern und den Stand fortschreiben dürfen
 Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
@@ -22,7 +24,7 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Im Einsatz „Nachforderung“ öffnen und „Nachforderung anlegen“ wählen.
+1. Im Einsatz „Nachforderungen“ öffnen und „Nachforderung anlegen“ wählen.
 2. Im Formular „Neue Nachforderung“ unter „Art (Kräfte/Mittel)“ angeben, was gebraucht wird, und
    unter „Anzahl“, wie viel.
 
@@ -42,23 +44,34 @@ Häkchen „Werte behalten“ bleiben Adressat, Adressat-Bezeichnung und Priorit
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Ansicht „Offen“ die Karte der Nachforderung suchen. Sie zeigt Priorität, Stufe, Menge,
-   Art, Adressat und die bisherigen Zeitpunkte.
+1. Im Board die Karte der Nachforderung in der Spalte ihrer Stufe suchen. Sie zeigt Priorität,
+   Menge, Art, Adressat, wie lange die Anforderung schon steht, und die bisherigen Zeitpunkte.
 
-   ![Drei offene Nachforderungen in den Stufen Zugesagt, Angefordert und Unterwegs, je mit dem nächsten Schritt und „Ablehnen“](../bilder/nachforderung/nachforderungen-liste.png)
+   ![Board mit den Spalten Angefordert, Zugesagt, Unterwegs und Eingetroffen, je mit Zahl im Kopf, daneben eingeklappt „Abgelehnt“; an den offenen Karten der nächste Schritt und „Ablehnen“](../bilder/nachforderung/nachforderungen-board.png)
 
 2. Den nächsten Schritt wählen: „Zusage erfassen“, sobald die Stelle zusagt, „Abfahrt melden“,
    sobald die Kräfte unterwegs sind, „Eintreffen melden“, sobald sie da sind.
 
-Ein Hinweis bietet nach jedem Schritt sechs Sekunden lang „Rückgängig“. Eine eingetroffene
-Nachforderung steht in der Ansicht „Abgeschlossen“.
+Die Karte wandert in die Spalte der neuen Stufe, die übrigen Karten bleiben stehen. Ein Hinweis
+bietet nach jedem Schritt sechs Sekunden lang „Rückgängig“.
+
+### Abgeschlossene und ältere ansehen
+
+Für alle mit Zugang zum Einsatz:
+
+1. „Eingetroffen“ zeigt die Nachforderungen der letzten 12 Stunden. Ältere stehen gesammelt unter
+   „Ältere eingetroffen“; ein Klick klappt sie auf.
+2. „Abgelehnt“ steht eingeklappt neben den Spalten, mit der Zahl der abgelehnten. Ein Klick klappt
+   die Spalte auf.
+
+Am Handy steht statt der Spalten eine Leiste der fünf Stufen mit ihrer Zahl, darunter die Karten
+der gewählten Stufe. Vorgewählt ist die erste offene Stufe, in der etwas steht.
 
 ### Eingetroffenes Material übernehmen
 
 Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
 
-1. In der Ansicht „Abgeschlossen“ an der Karte der eingetroffenen Nachforderung „Als Material
-   übernehmen“ wählen.
+1. In der Spalte „Eingetroffen“ an der Karte der Nachforderung „Als Material übernehmen“ wählen.
 2. Der Dialog nennt im Titel die Art der Nachforderung, etwa „„Tauchpumpe“ als Material
    übernehmen“, darunter den Bedarf. Unter „Art“ „Gerät“ oder „Verbrauchsgut“ wählen.
 
@@ -107,13 +120,13 @@ Wechselt eine Nachforderung auf „Zugesagt“, „Unterwegs“, „Eingetroffen
 die Person, die sie angelegt hat, und die Personen, die S4 besetzen (laut Stab-Besetzung, sonst
 laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa „Nachforderung
 eingetroffen“ mit „2× an Leitstelle“. Art, Bezeichnung, Adressat-Bezeichnung und Ablehnungsgrund
-stehen nie im Hinweis; er führt in das Modul „Nachforderung“. Auch ein „Rückgängig“ zurück auf
+stehen nie im Hinweis; er führt in das Modul „Nachforderungen“. Auch ein „Rückgängig“ zurück auf
 „Zugesagt“ oder „Unterwegs“ meldet die neue Stufe, eines zurück auf „Angefordert“ meldet nichts.
 Das Absetzen selbst meldet nichts.
 
 Eigene Aktionen bleiben still: Wer den Stand selbst fortschreibt oder ablehnt, bekommt dazu
 nichts. Wer die Nachforderung angelegt hat und zugleich S4 besetzt, erhält den Hinweis einmal.
-Wer das Modul „Nachforderung“ nicht sehen darf, bekommt keinen Hinweis.
+Wer das Modul „Nachforderungen“ nicht sehen darf, bekommt keinen Hinweis.
 
 ### Nachforderungen im Einsatztagebuch
 
@@ -150,12 +163,29 @@ Die Felder bleiben vor dem Absetzen änderbar.
 „Bedarf anfordern“ auf der Seite einer Betreuungsstelle öffnet dieses Formular mit
 „Für Betreuungsstelle …“ und der Stelle in der Begründung ([Betreuung](betreuung.md)). Die
 Nachforderung gehört dann zu dieser Stelle: ihre Karte nennt die Stelle, ein Klick auf den Namen
-öffnet sie. Mit „Für Stelle“ über der Liste stehen nur die Nachforderungen einer Stelle da;
+öffnet sie. Mit „Für Stelle“ über dem Board stehen nur die Nachforderungen einer Stelle da;
 „Filter zurücksetzen“ zeigt wieder alle. Ohne Zugriff auf „Betreuung“ steht an der Karte nur
 „Für eine Betreuungsstelle“.
 
 Wird die Stelle storniert, bleibt die Nachforderung mit ihrem Stand bestehen und verweist auf
 keine Stelle mehr; die Begründung bleibt, wie sie ist.
+
+### Zahlen der offenen Nachforderungen
+
+Offen ist eine Nachforderung, solange sie angefordert, zugesagt oder unterwegs ist. Die Zahl der
+offenen zählt der Server; dieselbe Zahl steht im Seitenkopf, am Modul im Menü (etwa „5 offene
+Nachforderungen, davon 2 unterwegs“), im Paneel „Nachforderungen“ des
+[Führungsüberblicks](ueberblick.md), an den Werkzeugen S1 und S4 der [Stab-Seite](stab.md) und in
+der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene und abgelehnte zählen
+nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
+innerhalb eines Filters „Für Stelle“.
+
+### Das Board hält still
+
+Solange der Mauszeiger oder der Fokus im Board liegt oder ein Dialog offen ist, rückt keine Karte:
+Was ein anderer Arbeitsplatz anlegt oder fortschreibt, nennt ein Hinweis über dem Board, etwa
+„1 neue Nachforderung · 1 in anderer Stufe“. „anzeigen“ zeigt den neuen Stand. Eine Karte, die
+inzwischen weiter ist, trägt bis dahin ihre neue Stufe an sich.
 
 ### Ablauf der Stufen
 
@@ -165,7 +195,7 @@ die Zusage zurück auf „Angefordert“. Der Zeitpunkt der zurückgenommenen St
 erneut meldet, setzt einen neuen.
 Ablehnen geht aus jeder Stufe vor „Eingetroffen“; was eingetroffen ist, wird nicht mehr
 abgelehnt. Ist aus einer Nachforderung Material übernommen, lässt sich „Eingetroffen“ nicht mehr
-zurücknehmen; die App nennt den Grund über der Liste. Wer versehentlich übernommen hat, storniert
+zurücknehmen; die App nennt den Grund an der Karte. Wer versehentlich übernommen hat, storniert
 zuerst den Posten in der [Materialliste](material.md) und nimmt dann zurück.
 
 ### Übernommenes Material

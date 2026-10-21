@@ -36,6 +36,17 @@ das Modul im h1 nennen und den Reiter darunter, nicht umgekehrt.
   ihm steht der Reiter „Kommunikationsplan“ als gewählt, und die Zeile unter dem Menüeintrag lautet
   „Funkplan, Skizze, Kommunikationsplan“
 
+#### Scenario: Nachforderungen
+
+- **WHEN** eine Person die Kategorie Kräfte & Mittel öffnet
+- **THEN** steht dort „Nachforderungen“ mit der Zeile „Anforderung, Zusage, Eintreffen“, das h1
+  der Seite lautet „Nachforderungen“, und die Kategorie Kommunikation führt das Modul nicht mehr
+
+#### Scenario: Nachforderungen in der Sprungpalette
+
+- **WHEN** eine Person in der Sprungpalette „Anforderung“ sucht
+- **THEN** findet sie das Modul „Nachforderungen“, und es öffnet unter der bisherigen Adresse
+
 ### Requirement: Modulbeschreibung als zweite Zeile
 
 Jedes Modul der Registry SHALL eine Beschreibung aus wenigen Fachwörtern tragen, ohne Satz, ohne

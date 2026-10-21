@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
@@ -11,7 +11,6 @@ import type { Nachforderung } from '../api/types';
 import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
-import userEvent from '@testing-library/user-event';
 
 /**
  * Gemerktes Rendern der Nachforderungen (LFH-949, D7): ein Live-Ereignis mit einer geänderten
@@ -96,6 +95,14 @@ function renderPage() {
 }
 
 describe('NachforderungenPage rendert gemerkt (LFH-949)', () => {
+  // „Eingetroffen“ zeigt die letzten 12 h: die Uhr steht auf dem Einsatztag (nur `Date`).
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-06-12T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -155,7 +162,6 @@ describe('NachforderungenPage rendert gemerkt (LFH-949)', () => {
     );
     listeNachforderungen.mockResolvedValue(zehn);
     const client = renderPage();
-    await userEvent.click(await screen.findByText(/Abgeschlossen \(/));
     await screen.findByText('Sandsäcke · 1200 · ohne Ort');
     gezeichnet.mockClear();
     act(() => {

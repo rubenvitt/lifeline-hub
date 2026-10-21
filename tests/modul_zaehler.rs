@@ -536,6 +536,72 @@ async fn dokumente_zaehlen_wie_die_liste_ohne_geloeschte() {
     );
 }
 
+/// Nachforderungen (LLH-1078): offen und je Stufe wie die Liste — die Erwartung kommt aus dem
+/// Listen-Endpunkt (`ist_offen`, `status`), nicht nur aus den handgesetzten Zahlen.
+#[tokio::test]
+async fn nachforderungen_zaehlen_wie_die_liste() {
+    let (app, admin, einsatz) = aufbau().await;
+    let pfad = format!("/api/einsaetze/{einsatz}/nachforderungen");
+    // Je Fall die Stufen, die nach dem Anlegen geschaltet werden.
+    let faelle: [&[&str]; 6] = [
+        &[],
+        &[],
+        &["zugesagt"],
+        &["zugesagt", "unterwegs"],
+        &["zugesagt", "unterwegs", "eingetroffen"],
+        &["abgelehnt"],
+    ];
+    for (i, schritte) in faelle.iter().enumerate() {
+        let body = json!({
+            "art": "RTW", "bezeichnung": format!("Bedarf {i}"), "adressat_kategorie": "leitstelle"
+        });
+        let nf = post(&app, &admin, &pfad, &body.to_string()).await;
+        let nid = nf["id"].as_i64().unwrap();
+        for schritt in *schritte {
+            let (ziel, body) = if *schritt == "abgelehnt" {
+                (format!("{pfad}/{nid}/ablehnen"), json!({}))
+            } else {
+                (format!("{pfad}/{nid}/status"), json!({ "status": schritt }))
+            };
+            post(&app, &admin, &ziel, &body.to_string()).await;
+        }
+    }
+
+    let liste = get(&app, &admin, &pfad).await;
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(
+        v["nachforderungen"],
+        json!({ "offen": 4, "angefordert": 2, "zugesagt": 1, "unterwegs": 1 }),
+        "{v:?}"
+    );
+    let stufe = |s: &'static str| move |x: &Value| x["status"] == s;
+    assert_eq!(
+        v["nachforderungen"]["offen"].as_i64(),
+        Some(anzahl(&liste, |x| x["ist_offen"] == true))
+    );
+    for s in ["angefordert", "zugesagt", "unterwegs"] {
+        assert_eq!(
+            v["nachforderungen"][s].as_i64(),
+            Some(anzahl(&liste, stufe(s))),
+            "{s}"
+        );
+    }
+
+    // Ausgeblendet fehlt der Zähler, statt 0 zu zeigen.
+    let erika = erika(&app, &admin, einsatz).await;
+    assert!(zaehler(&app, &erika, einsatz)
+        .await
+        .as_object()
+        .unwrap()
+        .contains_key("nachforderungen"));
+    modul_ausblenden(&app, &admin, einsatz, "nachforderungen").await;
+    let v = zaehler(&app, &erika, einsatz).await;
+    assert!(
+        !v.as_object().unwrap().contains_key("nachforderungen"),
+        "{v:?}"
+    );
+}
+
 #[tokio::test]
 async fn erlaubtes_leeres_modul_steht_auf_null() {
     let (app, admin, einsatz) = aufbau().await;
@@ -543,6 +609,11 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
     assert_eq!(v["personen"], json!({ "gesamt": 0 }), "{v:?}");
     assert_eq!(v["dokumente"], json!({ "gesamt": 0 }), "{v:?}");
     assert_eq!(v["lagemeldungen"], json!({ "neu": 0 }), "{v:?}");
+    assert_eq!(
+        v["nachforderungen"],
+        json!({ "offen": 0, "angefordert": 0, "zugesagt": 0, "unterwegs": 0 }),
+        "{v:?}"
+    );
     assert_eq!(
         v["meldungen"],
         json!({ "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0 }),
@@ -563,6 +634,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
             "etb",
             "lagemeldungen",
             "meldungen",
+            "nachforderungen",
             "personen"
         ]
     );

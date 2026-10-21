@@ -66,6 +66,21 @@ describe('Modul-Zähler', () => {
     expect(bildeZaehler({ etb: { gesamt: 4 } })).not.toHaveProperty('lagemeldungen');
   });
 
+  // LLH-1078: die offenen (angefordert, zugesagt, unterwegs), davon unterwegs im Wortlaut.
+  it('bildet die offenen Nachforderungen ab', () => {
+    expect(
+      bildeZaehler({ nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 } }),
+    ).toEqual({
+      nachforderungen: { wert: 5, beschreibung: '5 offene Nachforderungen, davon 2 unterwegs' },
+    });
+    expect(
+      bildeZaehler({ nachforderungen: { offen: 1, angefordert: 1, zugesagt: 0, unterwegs: 0 } }),
+    ).toEqual({
+      nachforderungen: { wert: 1, beschreibung: '1 offene Nachforderung, davon 0 unterwegs' },
+    });
+    expect(bildeZaehler({ etb: { gesamt: 4 } })).not.toHaveProperty('nachforderungen');
+  });
+
   it('zählt Ablösungen in der Vorwarnzeit oder überfällig (LFH-635)', () => {
     const schicht = (id: number, faellig_at: string) => ({
       id,

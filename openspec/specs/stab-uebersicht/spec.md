@@ -109,9 +109,13 @@ Grund (auch ohne Netz, wenn die Quelle nicht vorgehalten wird), im Laden den Lad
 - **WHEN** zwei Aufträge offen sind, einer davon überfällig
 - **THEN** zeigt „Aufträge“ in der Kachel S3 „2“ als Achtung und nennt „1 überfällig“
 
+#### Scenario: Nachforderungen aus dem Modulzähler
+- **WHEN** drei Nachforderungen offen sind, eine davon unterwegs
+- **THEN** zeigt „Nachforderungen“ bei S1 und bei S4 „3“ und nennt „1 unterwegs“
+
 #### Scenario: Ohne Quelle keine Zahl
-- **WHEN** drei Nachforderungen offen sind
-- **THEN** zeigt „Nachforderungen“ keine Zahl, weder bei S1 noch bei S4
+- **WHEN** die Kachel S5 das Informationstelefon führt
+- **THEN** zeigt „Informationstelefon“ keine Zahl
 
 #### Scenario: Quelle nicht geladen
 - **WHEN** der Abruf der Modulzähler scheitert

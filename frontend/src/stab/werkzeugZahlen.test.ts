@@ -73,8 +73,26 @@ describe('werkzeugZahl (design.md D4)', () => {
     });
   });
 
+  // LLH-1078: die offenen Nachforderungen aus dem Server-Zähler, davon unterwegs als Notiz.
+  it('Nachforderungen zeigen die offenen wie das Modulmenü, davon unterwegs', () => {
+    const z = {
+      ...ZAEHLER,
+      nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 },
+    };
+    expect(
+      werkzeugZahl(werkzeug('nachforderungen'), quellen({ zaehler: abfrage(z) })),
+    ).toMatchObject({
+      zustand: 'daten',
+      wert: '5',
+      notiz: '2 unterwegs',
+      beschreibung: '5 offene Nachforderungen, davon 2 unterwegs',
+      ton: 'neutral',
+    });
+    // Fehlt das Feld (ausgeblendet), steht „—“ statt 0.
+    expect(werkzeugZahl(werkzeug('nachforderungen'), quellen())).toMatchObject({ wert: '—' });
+  });
+
   it('ein Modul ohne Zähler zeigt keine Zahl', () => {
-    expect(werkzeugZahl(werkzeug('nachforderungen'), quellen())).toBeNull();
     expect(werkzeugZahl(werkzeug('infotelefon', 'stab'), quellen())).toBeNull();
   });
 

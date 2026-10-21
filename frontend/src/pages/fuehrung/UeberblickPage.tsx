@@ -2,7 +2,7 @@ import { IconBericht, IconPlus } from '../../icons';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { Breadcrumb, Button, Skeleton } from 'antd';
+import { Breadcrumb, Button } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { RechteHinweis } from '../../components/SpeicherHinweis';
@@ -39,11 +39,16 @@ import { listeEinheiten } from '../../api/einheiten';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { ladeGefahrengebiete } from '../../api/gefahren';
 import { listeAuftraege } from '../../api/auftraege';
+import { listeNachforderungen } from '../../api/nachforderungen';
 import { listeOffeneErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
 import { holeRueckmeldungen } from '../../api/meldungen';
 import { ladeModulZaehler } from '../../api/modulZaehler';
-import { NICHT_FREIGEGEBEN, auftragsStand } from '../lage-dashboard/fuehrungsZahlen';
+import {
+  NICHT_FREIGEGEBEN,
+  auftragsStand,
+  nachforderungsStand,
+} from '../lage-dashboard/fuehrungsZahlen';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
 import { unwetterLage } from '../../wetter/unwetter';
@@ -89,6 +94,8 @@ import {
   type Marke,
 } from './ueberblickDaten';
 import { MARKEN_BREITE, rasterStil, zeilenzielStil } from './ueberblickStil';
+import Zustandsfeld from './Zustandsfeld';
+import NachforderungenPaneel, { aeltesteOffene } from './NachforderungenPaneel';
 import './ueberblick.css';
 
 /**
@@ -198,82 +205,6 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Lade-, Fehler- und Leerzustand eines Paneels. `leer` gilt nur im Zustand `daten`: „lädt" und
- * „Stand unbekannt" sind kein Befund.
- */
-function Zustandsfeld({
-  zustand,
-  leer,
-  leerText,
-  leerAktion,
-  onNeuladen,
-  children,
-}: {
-  zustand: Zustand;
-  leer: boolean;
-  leerText: string;
-  leerAktion?: { text: string; ziel: string };
-  onNeuladen: () => void;
-  children: ReactNode;
-}) {
-  const { token, rollen } = useRollen();
-  const { waehle } = useModulWahl();
-  const polster = { padding: token.padding } as const;
-  if (zustand === 'laden') {
-    // Die Form des Leerzustands (LFH-629): Satzzeile und, wo „leer“ eine Aktion trägt, ihr Platz
-    // in Knopfhöhe. Nur der Satz allein war auf dem Handschirm 38 px niedriger als „leer“, und die
-    // drei gestapelten Paneele schoben das letzte um über 100 px. Ob die Aktion kommt, steht beim
-    // Rendern fest: der Körper der Seite wartet auf den Einsatz und damit auf das Schreibrecht.
-    return (
-      <div
-        aria-busy="true"
-        style={{ ...polster, display: 'flex', flexDirection: 'column', gap: 8 }}
-      >
-        <span style={{ fontSize: 12, color: rollen.gedaempft }}>wird abgerufen</span>
-        {leerAktion && (
-          <span>
-            <Skeleton.Button active />
-          </span>
-        )}
-      </div>
-    );
-  }
-  if (zustand === 'gesperrt') {
-    // Kein Ausfall (kein `alert`, kein Neuladen) und kein Leerzustand: der Grund steht da.
-    return (
-      <div style={{ ...polster, fontSize: 12, color: rollen.gedaempft }}>
-        Modul nicht freigegeben.
-      </div>
-    );
-  }
-  if (zustand === 'fehler') {
-    return (
-      <div role="alert" style={{ ...polster, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{ fontSize: 12, color: rollen.text2 }}>
-          Stand unbekannt — Daten nicht abrufbar. Nicht als Lage melden.
-        </span>
-        <span>
-          <Button onClick={onNeuladen}>Erneut abrufen</Button>
-        </span>
-      </div>
-    );
-  }
-  if (leer) {
-    return (
-      <div style={{ ...polster, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <span style={{ fontSize: 12, color: rollen.gedaempft }}>{leerText}</span>
-        {leerAktion && (
-          <span>
-            <Button onClick={() => waehle(leerAktion.ziel)}>{leerAktion.text}</Button>
-          </span>
-        )}
-      </div>
-    );
-  }
-  return <>{children}</>;
-}
-
 /** „1 Einheit“, „2 Einheiten“ — Zahl vor Wort, Einzahl und Mehrzahl richtig (LFH-973). */
 function anzahlWort(anzahl: number, einzahl: string, mehrzahl: string): string {
   return `${anzahl} ${anzahl === 1 ? einzahl : mehrzahl}`;
@@ -311,6 +242,7 @@ export default function UeberblickPage() {
   const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigaben);
   const gefahrenFrei = istKeyFreigegeben('gefahrenzonen', freigaben);
   const auftraegeFrei = istKeyFreigegeben('auftraege', freigaben);
+  const nachforderungenFrei = istKeyFreigegeben('nachforderungen', freigaben);
   const erinnerungenFrei = istKeyFreigegeben('erinnerungen', freigaben);
   const etbFrei = istKeyFreigegeben('etb', freigaben);
   const rueckmeldungenFrei = istKeyFreigegeben('meldungen', freigaben);
@@ -360,6 +292,13 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.auftraege(einsatzId),
     queryFn: () => listeAuftraege(einsatzId),
     enabled: auftraegeFrei,
+  });
+  // Paneel „Nachforderungen“ (LLH-1078): dasselbe Fach wie die Modulseite; die Zahlen kommen aus
+  // dem Modulzähler, die Liste nennt nur die am längsten wartenden.
+  const nachforderungenQ = useQuery({
+    queryKey: einsatzKeys.nachforderungen(einsatzId),
+    queryFn: () => listeNachforderungen(einsatzId, {}),
+    enabled: nachforderungenFrei,
   });
   // Die Kennzahl „Offene Aufträge" zählt der Server (LFH-550): derselbe Cache wie das Modulpanel.
   // Die Liste darüber speist nur das Paneel und die Fristen.
@@ -440,6 +379,9 @@ export default function UeberblickPage() {
   const auftragszahl =
     auftragsstand.zustand === 'daten' ? auftraegeKennzahl(auftragsstand.zahl) : null;
   const offene = useMemo(() => offeneAuftraege(auftraege ?? []), [auftraege]);
+  const nachforderungsstand = nachforderungsStand(zaehlerQ);
+  const nachforderungen = nachforderungenFrei ? nachforderungenQ.data : undefined;
+  const aelteste = useMemo(() => aeltesteOffene(nachforderungen ?? []), [nachforderungen]);
   const zeilen = useMemo(
     () =>
       abschnittZeilen({
@@ -495,6 +437,7 @@ export default function UeberblickPage() {
   const qAuftraege: Quelle = { q: auftraegeQ, frei: auftraegeFrei };
   const qErinnerungen: Quelle = { q: erinnerungenQ, frei: erinnerungenFrei };
   const qEtb: Quelle = { q: etbQ, frei: etbFrei };
+  const qNachforderungen: Quelle = { q: nachforderungenQ, frei: nachforderungenFrei };
   /** Beiwerk entfällt still, wenn sein Modul gesperrt ist; unbekannt bleibt es unbestimmt. */
   const ohneGesperrte = (...quellen: Quelle[]) =>
     quellen.filter((x) => x.frei || freigabenStand !== 'da');
@@ -517,6 +460,11 @@ export default function UeberblickPage() {
     { key: 'material', frei: materialFrei },
   ]);
   const zEntscheidungen = zustandVon(freigabenStand, qEtb);
+  // Zahl aus dem Zähler, Liste aus dem Modul: der schlechtere Zustand gilt fürs Paneel.
+  const zNachforderungen = schlechtesterZustand(
+    zustandVon(freigabenStand, qNachforderungen),
+    nachforderungsstand.zustand,
+  );
   // Die Marken sammeln Fristen aus mehreren Quellen; eine gesperrte trägt nichts bei, die
   // Lagebesprechung bleibt. Was fehlt, nennt der Hinweis — sonst läse sich die Liste vollständig.
   const zMarken = zustandVon(freigabenStand, qEinsatz, ...ohneGesperrte(qAuftraege, qErinnerungen));
@@ -793,78 +741,108 @@ export default function UeberblickPage() {
                 </Zustandsfeld>
               </Paneel>
 
-              <Paneel titel="Offene Aufträge" meta={ueberfaelligMeta}>
-                <Zustandsfeld
-                  zustand={zAuftraege}
-                  leer={offene.length === 0}
-                  leerText="Keine offenen Aufträge."
-                  leerAktion={{ text: 'Zu den Aufträgen', ziel: auftraegePfad(einsatzId) }}
-                  onNeuladen={() => nachladen(qAuftraege)}
-                >
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                    {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
-                      const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
-                      return (
-                        <li key={a.id}>
-                          <Link
-                            to={auftraegePfad(einsatzId, { auftrag: a.id })}
-                            data-lfh="ueberblick-auftrag"
-                            style={zeile}
-                          >
-                            <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
-                              {uhrzeit(a.erteilt_at)}
-                            </span>
-                            <span
-                              style={{
-                                flex: '1 1 auto',
-                                minWidth: 0,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 4,
-                              }}
+              {/* Rechte Spalte: Aufträge, darunter die Nachforderungen (LLH-1078). */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: token.marginLG,
+                  minWidth: 0,
+                }}
+              >
+                <Paneel titel="Offene Aufträge" meta={ueberfaelligMeta}>
+                  <Zustandsfeld
+                    zustand={zAuftraege}
+                    leer={offene.length === 0}
+                    leerText="Keine offenen Aufträge."
+                    leerAktion={{ text: 'Zu den Aufträgen', ziel: auftraegePfad(einsatzId) }}
+                    onNeuladen={() => nachladen(qAuftraege)}
+                  >
+                    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                      {offene.slice(0, AUFTRAEGE_MAX).map((a) => {
+                        const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
+                        return (
+                          <li key={a.id}>
+                            <Link
+                              to={auftraegePfad(einsatzId, { auftrag: a.id })}
+                              data-lfh="ueberblick-auftrag"
+                              style={zeile}
                             >
+                              <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
+                                {uhrzeit(a.erteilt_at)}
+                              </span>
                               <span
                                 style={{
-                                  fontSize: 12,
-                                  lineHeight: 1.45,
-                                  color: rollen.text2,
-                                  overflowWrap: 'anywhere',
+                                  flex: '1 1 auto',
+                                  minWidth: 0,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 4,
                                 }}
                               >
-                                {a.auftrag_text}
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    lineHeight: 1.45,
+                                    color: rollen.text2,
+                                    overflowWrap: 'anywhere',
+                                  }}
+                                >
+                                  {a.auftrag_text}
+                                </span>
+                                <span style={{ ...monoStil(10), color: rollen.schwach }}>
+                                  {[
+                                    empfaengerText(a)
+                                      ? `an ${empfaengerText(a)}`
+                                      : 'ohne Empfänger',
+                                    a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
+                                  ].join(' · ')}
+                                </span>
                               </span>
-                              <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                                {[
-                                  empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
-                                  a.frist_at ? `Frist ${frist(a.frist_at)}` : 'ohne Frist',
-                                ].join(' · ')}
+                              <span
+                                style={{
+                                  ...monoStil(10),
+                                  letterSpacing: '0.06em',
+                                  color: farbe,
+                                  flex: '0 0 auto',
+                                }}
+                              >
+                                {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
                               </span>
-                            </span>
-                            <span
-                              style={{
-                                ...monoStil(10),
-                                letterSpacing: '0.06em',
-                                color: farbe,
-                                flex: '0 0 auto',
-                              }}
-                            >
-                              {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
-                            </span>
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {offene.length > AUFTRAEGE_MAX && (
-                    <Link
-                      to={auftraegePfad(einsatzId)}
-                      style={{ ...zeile, ...monoStil(11), color: rollen.bedien, borderBlockEnd: 0 }}
-                    >
-                      alle {offene.length} offenen Aufträge ↗
-                    </Link>
-                  )}
-                </Zustandsfeld>
-              </Paneel>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {offene.length > AUFTRAEGE_MAX && (
+                      <Link
+                        to={auftraegePfad(einsatzId)}
+                        style={{
+                          ...zeile,
+                          ...monoStil(11),
+                          color: rollen.bedien,
+                          borderBlockEnd: 0,
+                        }}
+                      >
+                        alle {offene.length} offenen Aufträge ↗
+                      </Link>
+                    )}
+                  </Zustandsfeld>
+                </Paneel>
+
+                <NachforderungenPaneel
+                  einsatzId={einsatzId}
+                  zustand={zNachforderungen}
+                  zahlen={nachforderungsstand.zustand === 'daten' ? nachforderungsstand.zahl : null}
+                  aelteste={aelteste}
+                  jetzt={jetzt.valueOf()}
+                  darfSchreiben={darfSchreiben}
+                  onNeuladen={() => {
+                    nachladen(qNachforderungen);
+                    void zaehlerQ.refetch();
+                  }}
+                />
+              </div>
 
               <div
                 style={{

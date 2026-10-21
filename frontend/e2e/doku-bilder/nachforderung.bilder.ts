@@ -12,11 +12,12 @@ import {
 } from './kern';
 
 /**
- * Bilder des Kapitels „Nachforderung“ (`docs/anwender/kapitel/nachforderung.md`).
+ * Bilder des Kapitels „Nachforderungen“ (`docs/anwender/kapitel/nachforderung.md`).
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep nachforderung`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   nachforderungen-liste.png    frontend/src/pages/NachforderungenPage.tsx,
+ *   nachforderungen-board.png    frontend/src/pages/NachforderungenPage.tsx,
+ *                                frontend/src/nachforderungen/NachforderungBoard.tsx,
  *                                frontend/src/nachforderungen/NachforderungKarte.tsx
  *   nachforderung-absetzen.png   frontend/src/nachforderungen/NachforderungFormular.tsx
  *   nachforderung-ablehnen.png   frontend/src/pages/NachforderungenPage.tsx (Ablehnen)
@@ -128,10 +129,13 @@ test.describe(KAPITEL, () => {
     await api.dispose();
   });
 
-  test('Offene Nachforderungen in drei Stufen', async ({ page }) => {
+  test('Board der Nachforderungen nach Stufe', async ({ page }) => {
     await nachforderungenOeffnen(page);
     await expect(page.getByRole('button', { name: 'Eintreffen melden' })).toBeVisible();
-    await fotografiere(page, KAPITEL, 'nachforderungen-liste');
+    await expect(
+      page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"] [data-nachforderung-id]'),
+    ).toHaveCount(2);
+    await fotografiere(page, KAPITEL, 'nachforderungen-board');
   });
 
   test('Formular „Neue Nachforderung“', async ({ page }) => {
@@ -163,7 +167,6 @@ test.describe(KAPITEL, () => {
 
   test('Dialog „Als Material übernehmen“', async ({ page }) => {
     await nachforderungenOeffnen(page);
-    await page.getByRole('radio', { name: /Abgeschlossen/ }).click();
     const karte = page.locator('[data-nachforderung-id]', {
       hasText: '3 Tauchpumpen für Keller Hauptstraße',
     });
@@ -173,14 +176,16 @@ test.describe(KAPITEL, () => {
     await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
     await dialog.getByRole('radio', { name: 'Gerät' }).click();
     await expect(dialog.getByRole('spinbutton', { name: 'Menge' })).toHaveValue('1');
-    await waehleIn(dialog.getByRole('combobox', { name: 'Ort' }), 'Rettungsstaffel');
+    await waehleIn(
+      dialog.getByRole('combobox', { name: 'Ort' }),
+      'Sanitätszug Musterstadt › Rettungsstaffel',
+    );
     await fokusWeg(page);
     await fotografiere(dialog, KAPITEL, 'nachforderung-material-uebernehmen');
   });
 
   test('Karte mit übernommenem Posten', async ({ page }) => {
     await nachforderungenOeffnen(page);
-    await page.getByRole('radio', { name: /Abgeschlossen/ }).click();
     const karte = page.locator('[data-nachforderung-id]', { hasText: 'Sandsäcke für Deich Nord' });
     await expect(karte).toContainText('übernommen 1200 von 2000');
     await expect(karte.getByRole('button', { name: 'Weiteren Posten übernehmen' })).toBeVisible();
