@@ -1540,6 +1540,170 @@ async fn radius_patch_rechnet_neu_und_schreibt_etb() {
     );
 }
 
+/// Mitte verschieben (LLH-1344, design.md D1): neues Polygon um die neue Mitte, der Radius bleibt;
+/// ETB „Mitte um … versetzt“. Mitte und Radius zugleich schreiben EINE Zeile.
+#[tokio::test]
+async fn mitte_patch_rechnet_neu_radius_bleibt() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let z = kreiszone(&app, &admin, e, "absperrbereich", 300.0).await;
+    let zid = z["id"].as_i64().unwrap();
+    let pfad = format!("/api/einsaetze/{e}/zonen/{zid}");
+    // 0,001° Breite ≈ 111 m nach Norden.
+    let (s, neu) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({"kreis_mitte_lat": 54.001, "kreis_mitte_lon": 9.5}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{neu:?}");
+    assert_eq!(neu["kreis_mitte_lat"], 54.001);
+    assert_eq!(neu["kreis_mitte_lon"], 9.5);
+    assert_eq!(neu["kreis_radius_m"], 300.0, "Radius bleibt");
+    assert_eq!(
+        neu["geometrie"].as_str().unwrap(),
+        lifeline_hub::lage_zone::kreis_polygon(54.001, 9.5, 300.0),
+        "Polygon um die neue Mitte neu gerechnet"
+    );
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .any(|i| i == "Absperrbereich «Nord»: Mitte um 111 m versetzt"),
+        "ETB: {etb:?}"
+    );
+
+    // Dieselbe Mitte: nichts neu, kein zweiter Eintrag.
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({"kreis_mitte_lat": 54.001, "kreis_mitte_lon": 9.5}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert_eq!(
+        etb.iter().filter(|i| i.contains("Mitte")).count(),
+        1,
+        "ETB: {etb:?}"
+    );
+
+    // Mitte und Radius zugleich: ein Kreis, eine Zeile.
+    let (s, neu) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(
+            &json!({"kreis_mitte_lat": 54.0, "kreis_mitte_lon": 9.5, "kreis_radius_m": 500.0})
+                .to_string(),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{neu:?}");
+    assert_eq!(neu["kreis_radius_m"], 500.0);
+    assert_eq!(
+        neu["geometrie"].as_str().unwrap(),
+        lifeline_hub::lage_zone::kreis_polygon(54.0, 9.5, 500.0)
+    );
+    let etb = system_etb_inhalte(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .any(|i| i == "Absperrbereich «Nord»: Radius 300 m → 500 m · Mitte um 111 m versetzt"),
+        "ETB: {etb:?}"
+    );
+    assert_eq!(
+        etb.iter().filter(|i| i.contains("Radius 300 m")).count(),
+        1,
+        "keine zweite Radiuszeile: {etb:?}"
+    );
+}
+
+/// Statuscodes der Mitte (design.md D1): Feld für sich 400, Zusammenhang 422.
+#[tokio::test]
+async fn mitte_patch_grenzen_400_und_422() {
+    let (app, _live) = setup_mit_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let z = kreiszone(&app, &admin, e, "absperrbereich", 300.0).await;
+    let zid = z["id"].as_i64().unwrap();
+    let (_, frei) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        Some(
+            &json!({"typ":"absperrbereich","geometrie_typ":"Polygon","geometrie":POLY}).to_string(),
+        ),
+    )
+    .await;
+    let frei_id = frei["id"].as_i64().unwrap();
+    let faelle = [
+        (
+            zid,
+            json!({"kreis_mitte_lat": 54.1}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            zid,
+            json!({"kreis_mitte_lon": 9.6}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            zid,
+            json!({"kreis_mitte_lat": 91.0, "kreis_mitte_lon": 9.5}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            zid,
+            json!({"kreis_mitte_lat": 54.1, "kreis_mitte_lon": 181.0}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            zid,
+            json!({"kreis_mitte_lat": 54.1, "kreis_mitte_lon": 9.5, "geometrie": POLY}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            frei_id,
+            json!({"kreis_mitte_lat": 54.1, "kreis_mitte_lon": 9.5}),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ];
+    for (id, body, erwartet) in faelle {
+        let (s, j) = anfrage(
+            &app,
+            "PATCH",
+            &format!("/api/einsaetze/{e}/zonen/{id}"),
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, erwartet, "{body} → {j:?}");
+    }
+    // Nichts davon hat den Kreis berührt.
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/zonen"),
+        &admin,
+        None,
+    )
+    .await;
+    let k = liste
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|x| x["id"] == zid)
+        .unwrap();
+    assert_eq!(k["kreis_mitte_lat"], 54.0);
+    assert_eq!(k["geometrie"], z["geometrie"]);
+}
+
 /// Radius an einer Zone ohne Kreis → 422; Geometrie und Radius zugleich → 422; eine neue
 /// Geometrie (punktweise Bearbeitung) löscht die Kreisangaben.
 #[tokio::test]
