@@ -1,3 +1,40 @@
+## [1.0.0-alpha.147](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.146...v1.0.0-alpha.147) (2026-10-21)
+
+### Lagekarte
+
+- **Kartenleiste mit zwei Ansichten:** Die Leiste ist in die Ansichten „Ebenen“ und „Objekte“ geteilt. Das Gerät merkt sich, welche Ansicht zuletzt gewählt war. Ist noch keine gewählt, steht „Ebenen“ vorn. Unter „Objekte“ liegen die bisherigen Paneele, auch das Zeichnen.
+- **Ebenenbaum:** Die Ebenen stehen in Gruppen, die sich einklappen lassen: Kräfte, Lage, Betroffene & Versorgung (mit der Tiere-Ebene), Fachebenen mit vier Untergruppen und Hintergrund.
+  - Eigene Ebenen und Fachebenen sehen gleich aus. Ein Tipp auf die Zeile schaltet die Ebene ein oder aus.
+  - Jede Gruppe hat einen eigenen Schalter. Er zeigt „teilweise“, wenn nur ein Teil der Ebenen sichtbar ist.
+  - Mit „Ebene suchen“ lässt sich der Baum filtern. Die Kartenansicht wählt man jetzt im Kopf der Leiste.
+- **Modus-Band:** Auf breiten Bildschirmen sitzt die Bedienung der Leistenmodi in einem Band unter der Ansichtswahl, darunter auch die Koordinateneingabe. Zeilen und Paneele zeigen nur noch den Zustand.
+- **Gefahrengebiete im Inspector:** Ein Gefahrengebiet nennt bis zu fünf gesetzte Gefahren mit Stufe und Erläuterung. Von dort springt man zu den übrigen.
+- Auf großen Bildschirmen ist die Leiste mit einer offenen Gruppe so kurz, dass man nicht rollen muss. Im Handschuhmodus bleiben alle Zeilen und Schalter gut zu treffen.
+
+### Gefahren
+
+- **Kompaktere Matrix:** Die ganze Zelle reagiert jetzt auf den Tipp, auch ihre Ecken. Die Zeilen sind so hoch wie die Bedienelemente der gewählten Dichte, deshalb passen bei 1440 × 900 dreizehn Zeilen auf den Schirm.
+- **Gefahren alphabetisch:** Die Gefahren stehen jetzt in alphabetischer Reihenfolge, und zwar überall: in der Matrix, im Lagebild, in der Sprungpalette und in der Gefahrenauswahl bei den Schäden.
+- **Gebietsliste mit Aussage:** Jedes Gebiet zeigt jetzt seine Bewertung, etwa „3 Gefahren · hoch“, oder „nicht beurteilt“. Die Zahl der Zonen steht am Sprung „Auf Karte zeigen ↗ · 1 Zone“.
+- **Erläuterungen sichtbar:**
+  - Zellen mit Erläuterung tragen eine Marke, die in der Legende erklärt ist.
+  - Unter der Matrix steht die Liste „Erläuterungen“ mit Datum, Uhrzeit und Namen der letzten Änderung. Ein Tipp auf einen Eintrag öffnet mit Schreibrecht den Dialog, ohne Schreibrecht hebt er die Zelle hervor.
+  - Die Schaltfläche „Details …“ heißt jetzt „Erläuterung …“.
+- Behoben: Wer mit der Tastatur rückwärts durch die Matrix ging, sah die erste Zeile nicht, weil sie unter der stehenden Kopfzeile lag.
+
+### Lageberichte
+
+- **Neuer Lagevortrag startet mit dem Lagebild:** „Neuer Lagevortrag“ füllt fünf Abschnitte gleich beim Anlegen mit dem aktuellen Stand: Gefahren-/Schadenlage, Eigene Lage, Lageentwicklung, Besondere (Führungs-)Probleme und Medienlage.
+  - Ist eine Quelle gesperrt oder nicht abrufbar, bleibt der Abschnitt nicht leer. Er zeigt dann „— (Grund)“.
+  - Über den Pfeil am Knopf gibt es weiterhin einen „Leeren Lagevortrag“.
+- **Leere Abschnitte nachfüllen:** Im Entwurf füllt „Leere Abschnitte aus dem Lagebild füllen“ nur die Abschnitte, die noch leer sind. Bereits geschriebener Text bleibt unberührt.
+- **Gefahrengebiete im Lagevortrag:** Die Übernahme „Gefahren-/Schadenlage“ enthält jetzt den Teil „Gefahrengebiete“ mit Stufe und Erläuterung zu jeder Zelle.
+
+### Betrieb und Installation
+
+- Zwei Bibliotheken zur Zertifikatsprüfung sind auf Versionen aktualisiert, die bekannte Sicherheitslücken schließen.
+- Die Anwenderdokumentation zu Lagekarte, Gefahren und Lageberichten ist nachgezogen, die Bilder sind neu erzeugt.
+
 ## [1.0.0-alpha.146](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.145...v1.0.0-alpha.146) (2026-10-21)
 
 ### Wichtige Änderungen
