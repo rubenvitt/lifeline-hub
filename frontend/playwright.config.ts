@@ -61,6 +61,13 @@ const DRUCK_SPECS =
  * headless.
  */
 const KARTEN_DRUCK_SPECS = /\/(lagekarte-druck)\.spec\.ts$/;
+/*
+ * Specs, die das Verhalten OHNE WebGL2 prüfen (LLH-1353): Chromium schaltet es per Init-Skript ab,
+ * Firefox headless hat es ohnehin nicht. Dort belegen sie, dass die Lagekarte ohne Kartengrafik
+ * bedienbar bleibt, statt in die Fehlerseite der App zu fallen. Einzige Ausnahme von „Firefox
+ * fährt nur Druck-Specs“ oben.
+ */
+const OHNE_WEBGL_SPECS = /\/(lagekarte-ohne-grafik)\.spec\.ts$/;
 
 /*
  * ANTEILE NACH LAUFZEIT (LFH-1117): `PW_SHARD=k/n` wählt die Spec-Dateien des Anteils k, verteilt
@@ -79,7 +86,7 @@ if (anteil && !vorbelegt && process.argv.some((a) => a.startsWith('--shard'))) {
 }
 const projektMuster: Record<string, RegExp | undefined> = {
   chromium: undefined,
-  firefox: DRUCK_SPECS,
+  firefox: new RegExp(`${DRUCK_SPECS.source}|${OHNE_WEBGL_SPECS.source}`),
   webkit: new RegExp(`${DRUCK_SPECS.source}|${KARTEN_DRUCK_SPECS.source}`),
 };
 const anteilDateien: Record<string, string[]> | undefined = anteil
