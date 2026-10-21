@@ -4,7 +4,8 @@
 
 Legt fest, wie sich die Lagekarte beim Wechsel der Kartengrundlage und bei einer nicht ladbaren
 Grundlage verhält: das Lagebild bleibt vollständig, und eine gescheiterte Grundlage stuft nur die
-Anzeige ab, nicht die Wahl der Nutzerin oder des Nutzers.
+Anzeige ab, nicht die Wahl der Nutzerin oder des Nutzers. Auf einem Gerät ohne Kartengrafik
+bleibt die Seite bedienbar (LLH-1353).
 
 ## Requirements
 
@@ -50,3 +51,18 @@ NOT abstufen.
 
 - **WHEN** der Style einer Online-Karte lädt, aber einzelne Kacheln mit Fehler antworten
 - **THEN** bleibt die Online-Grundlage angezeigt
+
+### Requirement: Gerät ohne Kartengrafik behält die Seite
+
+Kann das Gerät die Karte nicht zeichnen (kein WebGL2), MUST die Kartenfläche an Stelle der Karte
+den Zustand „Karte auf diesem Gerät nicht darstellbar“ zeigen und MUST NOT die Seite in die
+Fehlerseite der App fallen lassen. Leiste, Objektliste und Seitenkopf SHALL bedienbar bleiben. Der
+Zustand MUST NOT die Technik nennen. Ein anderer Fehler beim Aufbau der Karte MUST weiter als
+Fehler gelten.
+
+#### Scenario: Browser ohne WebGL2
+
+- **WHEN** eine Person die Lagekarte in einem Browser ohne WebGL2 öffnet
+- **THEN** steht in der Kartenfläche „Karte auf diesem Gerät nicht darstellbar“
+- **AND** die Objektliste zeigt die Objekte, und ein Tipp auf eine Zeile wählt das Objekt aus
+- **AND** es erscheint keine Fehlerseite der App

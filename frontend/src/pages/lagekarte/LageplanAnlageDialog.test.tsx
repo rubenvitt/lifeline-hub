@@ -9,7 +9,8 @@ import * as berichteApi from '../../api/lageberichte';
 import type { BefehlKopf, LageberichtKopf } from '../../api/types';
 import { renderMitProviders } from '../../test/utils';
 import LageplanAnlageDialog, { anlageSperrGrund } from './LageplanAnlageDialog';
-import type { LageplanAnlage } from './useLageplan';
+import { KARTE_NICHT_DARSTELLBAR } from './kartenGrafik';
+import { KARTENBILD_FEHLT, KeinKartenbild, type LageplanAnlage } from './useLageplan';
 
 vi.mock('../../api/dokumentAnlagen', async (original) => ({
   ...(await original<typeof import('../../api/dokumentAnlagen')>()),
@@ -40,7 +41,7 @@ function Ort() {
 function zeige({
   lageberichteFrei = true,
   befehleFrei = true,
-  erstelleAnlage = vi.fn((): Promise<LageplanAnlage | null> =>
+  erstelleAnlage = vi.fn((): Promise<LageplanAnlage> =>
     Promise.resolve({ datei: BILD, standAt: STAND }),
   ),
   onSchliessen = vi.fn(),
@@ -164,15 +165,19 @@ describe('LageplanAnlageDialog', () => {
     expect(onSchliessen).not.toHaveBeenCalled();
   });
 
-  it('ohne Kartenbild: Grund im Dialog, nichts abgelegt', async () => {
-    zeige({ erstelleAnlage: vi.fn(() => Promise.resolve(null)) });
-    await userEvent.click(
-      await screen.findByRole('radio', { name: 'Lagebericht · Lageüberblick 1100' }),
-    );
-    await userEvent.click(screen.getByRole('button', { name: 'Anfügen' }));
-    expect(await screen.findByText('Kartenbild nicht aufgenommen')).toBeInTheDocument();
-    expect(anlagenApi.legeDokumentAnlageAb).not.toHaveBeenCalled();
-  });
+  it.each([KARTENBILD_FEHLT, KARTE_NICHT_DARSTELLBAR])(
+    'ohne Kartenbild: Grund „%s“ im Dialog, nichts abgelegt',
+    async (grund) => {
+      zeige({ erstelleAnlage: vi.fn(() => Promise.reject(new KeinKartenbild(grund))) });
+      await userEvent.click(
+        await screen.findByRole('radio', { name: 'Lagebericht · Lageüberblick 1100' }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Anfügen' }));
+      expect(await screen.findByText('Lageplan nicht angefügt')).toBeInTheDocument();
+      expect(screen.getByText(grund)).toBeInTheDocument();
+      expect(anlagenApi.legeDokumentAnlageAb).not.toHaveBeenCalled();
+    },
+  );
 
   it('sperrt Abbrechen, solange abgelegt wird', async () => {
     let fertig: () => void = () => {};
