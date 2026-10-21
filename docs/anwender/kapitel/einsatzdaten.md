@@ -175,7 +175,9 @@ Für die Einsatzleitung:
 - Der Kartenausschnitt nimmt die Kartengrundlage nach der Vorgabe der Lagekarte: die
   Online-Karte, wenn eine eingerichtet ist (Kacheln kommen über den Kachelspeicher des Servers),
   sonst die installierten Offline-Karten, sonst eine Karte ohne Kacheln mit der Nadel. Ohne
-  Koordinate steht dort „Nicht verortet“.
+  Koordinate steht dort „Nicht verortet“. Kann der Browser keine Karte zeichnen (Voraussetzung
+  wie bei der [Lagekarte](lagekarte.md)), steht dort „Karte auf diesem Gerät nicht darstellbar“;
+  Adresse, Koordinate und „Auf Lagekarte zeigen“ bleiben.
 
 ### Meldende Stelle und Katalog
 

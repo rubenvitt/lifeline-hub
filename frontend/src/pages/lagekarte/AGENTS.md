@@ -119,7 +119,11 @@ diese Zusage.
   übrige Seite bleibt bedienbar; jeder Effekt und jede Handle-Methode prüft deshalb auf `null`.
   `KartenHandle.isDarstellbar()` gibt den Grund an den Lageplan (`useLageplan`: Druck und Anlage
   nennen ihn). Kein Wort über WebGL2 in der Oberfläche, das steht im Anwenderkapitel. Nachweis
-  `e2e/lagekarte-ohne-grafik.spec.ts` (Chromium per Init-Skript, Firefox ohne Nachbau).
+  `e2e/lagekarte-ohne-grafik.spec.ts` (Chromium per Init-Skript, Firefox ohne Nachbau). **Jede
+  andere maplibre-Karte** baut ebenso über `wennDarstellbar` und zeigt an ihrer Stelle
+  `KarteNichtDarstellbar` (`anzeige/Kartenausschnitt.tsx`, LLH-1370): der Ausschnitt des
+  Einsatzorts und `betreuung/BezirkKartenbild.tsx`; Nachweis
+  `e2e/kartenausschnitt-ohne-grafik.spec.ts`.
 - **Fachebenen nennen ihr Alter** (LFH-591,
   `openspec/changes/archive/2026-09-30-lfh-591-fachebenen-datenalter/design.md`): `abgerufen` im
   Umschlag ist der Abruf durch den Server, `stand` bleibt der Datenstand der Quelle (KRITIS,

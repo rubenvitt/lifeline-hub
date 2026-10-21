@@ -2,7 +2,7 @@
 titel: Einsatz auswählen und Oberfläche
 gruppen: [alle]
 reihenfolge: 50
-quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
+quellen: [frontend/src/pages/EinsaetzePage.tsx, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/einsatz/EinsatzLayout.tsx, frontend/src/einsatz/EinsatzSwitcher.tsx, frontend/src/einsatz/IconRail.tsx, frontend/src/einsatz/ModulPanel.tsx, frontend/src/einsatz/modulRegistry.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/AppLayout.tsx, frontend/src/components/Kopfleiste.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/components/BenutzerMenu.tsx, frontend/src/command-palette/, frontend/src/theme/darstellungOptionen.ts, frontend/src/theme/dichte.ts, frontend/src/theme/helligkeit.ts, frontend/src/einsatz/aktiveWarnung.ts, frontend/src/anzeige/koordinatenSystemStore.ts, frontend/src/anzeige/ZeitpunktEingabe.tsx, frontend/src/anzeige/zeitParser.ts, frontend/src/anzeige/zeitSchnellwahl.ts, frontend/src/live/LiveStatusBanner.tsx, src/routes/einsatz.rs, src/benachrichtigung/text.rs, frontend/src/alarm/, frontend/src/pages/BenachrichtigungenPage.tsx, src/benachrichtigung/]
 ---
 
 ## Überblick
@@ -49,8 +49,10 @@ Für System-Admins und Führungskräfte der Organisation:
 2. Im Dialog „Neuen Einsatz anlegen“ die „Bezeichnung“ eintragen, dazu „Stichwort“,
    „Einsatzart“ und „Alarmzeit“. Die Alarmzeit ist mit dem jetzigen Zeitpunkt vorbelegt.
 3. Wenn bekannt, den „Einsatzort“ eintippen und mit Enter oder „Ort suchen“ suchen, dann einen
-   der Treffer wählen. Ein kleiner Kartenausschnitt zeigt den gewählten Ort. Freier Text ohne
-   Suche geht auch; dann fehlt die Koordinate, bis sie in den Einsatzdaten nachgetragen wird.
+   der Treffer wählen. Ein kleiner Kartenausschnitt zeigt den gewählten Ort; kann der Browser
+   keine Karte zeichnen, steht dort „Karte auf diesem Gerät nicht darstellbar“, und der Ort wird
+   trotzdem übernommen. Freier Text ohne Suche geht auch; dann fehlt die Koordinate, bis sie in
+   den Einsatzdaten nachgetragen wird.
 4. „Anlegen“ wählen. Die App öffnet den neuen Einsatz.
 
 ### Zwischen Einsätzen wechseln

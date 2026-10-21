@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../pages/lagekarte/maplibreWorker';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
@@ -11,6 +11,7 @@ import {
   baueBasemapStyle,
   defaultModus,
 } from '../pages/lagekarte/basemapStil';
+import { KARTE_NICHT_DARSTELLBAR, wennDarstellbar } from '../pages/lagekarte/kartenGrafik';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
 import type { LatLon } from './koordinaten';
 
@@ -31,12 +32,17 @@ export interface KartenausschnittProps {
  * Ort“): MapLibre ohne Bedienung, Kartengrundlage wie die Lagekarte (online, Offline-Karten oder
  * Blindstil, `pages/lagekarte/basemapStil.ts`), Nadel als DOM-Marker. Ohne Punkt keine Karte,
  * sondern „Nicht verortet“. Muster: `geraet/LagemonitorKarte.tsx` (mehrere Punkte, Monitormaße).
+ *
+ * Ohne Kartengrafik (LLH-1370, wie die Lagekarte seit LLH-1353, `pages/lagekarte/kartenGrafik.ts`)
+ * steht an Stelle der Karte {@link KarteNichtDarstellbar}; die Seite drumherum bleibt.
  */
 export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: KartenausschnittProps) {
   const { token, rollen, dunkel } = useRollen();
   const container = useRef<HTMLDivElement>(null);
   const karte = useRef<maplibregl.Map | null>(null);
   const nadel = useRef<maplibregl.Marker | null>(null);
+  // Ein Gerät ohne Kartengrafik bekommt sie nicht nachträglich: der Zustand bleibt.
+  const [darstellbar, setDarstellbar] = useState(true);
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const config = configQuery.data;
   const verortet = punkt !== null;
@@ -46,7 +52,8 @@ export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: Kart
   // Karte je Stil einmal bauen; der Stil hängt an Konfiguration und Tag/Nacht.
   useEffect(() => {
     if (!container.current || !config || !verortet) return;
-    const map = new maplibregl.Map({
+    // Ohne WebGL2 wirft der Konstruktor: `wennDarstellbar` fängt nur diesen Wurf.
+    const optionen: maplibregl.MapOptions = {
       container: container.current,
       style: baueBasemapStyle(
         defaultModus(config),
@@ -59,7 +66,12 @@ export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: Kart
       interactive: false,
       attributionControl: false,
       transformRequest: absolutiereProxyAnfrage,
-    });
+    };
+    const map = wennDarstellbar(() => new maplibregl.Map(optionen));
+    if (!map) {
+      setDarstellbar(false);
+      return;
+    }
     karte.current = map;
     return () => {
       nadel.current = null;
@@ -102,6 +114,7 @@ export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: Kart
       </div>
     );
   }
+  if (!darstellbar) return <KarteNichtDarstellbar hoehe={hoehe} />;
   return (
     <div
       ref={container}
@@ -116,5 +129,31 @@ export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: Kart
         marginBlockStart: token.marginXXS,
       }}
     />
+  );
+}
+
+/**
+ * Zustand an Stelle einer kleinen Karte, wenn das Gerät keine Kartengrafik hat (LLH-1370): Form
+ * wie „Nicht verortet“, Wortlaut und Kennung wie in der Kartenfläche der Lagekarte. Kein Wort über
+ * die Technik (das steht im Anwenderkapitel). Auch für `betreuung/BezirkKartenbild.tsx`.
+ */
+export function KarteNichtDarstellbar({ hoehe }: { hoehe: number }) {
+  const { token, rollen } = useRollen();
+  return (
+    <div
+      role="status"
+      data-lfh="karte-nicht-darstellbar"
+      style={{
+        height: hoehe,
+        display: 'grid',
+        placeItems: 'center',
+        padding: token.paddingSM,
+        textAlign: 'center',
+        color: rollen.text2,
+        border: `1px dashed ${rollen.linie}`,
+      }}
+    >
+      {KARTE_NICHT_DARSTELLBAR}
+    </div>
   );
 }

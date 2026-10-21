@@ -2,7 +2,7 @@
 titel: Evakuierung
 gruppen: [alle, fuehrung]
 reihenfolge: 525
-quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/EvakuierungPage.tsx, frontend/src/pages/EvakuierungsbezirkPage.tsx, frontend/src/betreuung/BezirkTabelle.tsx, frontend/src/betreuung/BezirkKennzahlen.tsx, frontend/src/betreuung/BezirkStammdaten.tsx, frontend/src/betreuung/BezirkGebiet.tsx, frontend/src/betreuung/BezirkKartenbild.tsx, frontend/src/betreuung/BezirkStandlinie.tsx, frontend/src/betreuung/raeumungSchritte.ts, frontend/src/betreuung/EvakuierungKennzahlen.tsx, frontend/src/betreuung/useBezirkHandlungen.tsx, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/gebietZeichnen.ts, frontend/src/betreuung/GebietZeichnenKnopf.tsx, frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/bezirkZeichnen.ts, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/betreuung/evakuierungKennzahl.ts, frontend/src/theme/statusFarben.ts, src/routes/evakuierung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -47,7 +47,9 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
 4. „Gebiet“ zeigt die zugeordneten Flächen der Lagekarte als kleinen Ausschnitt. „Auf Lagekarte
    öffnen“ führt auf die Karte, mit einer Fläche des Bezirks ausgewählt. Ohne Fläche steht „Kein
    Gebiet auf der Lagekarte“. „Gebiet zeichnen“ (ohne Fläche) und „Weitere Teilfläche zeichnen“
-   (mit Fläche) öffnen die Lagekarte zum Zeichnen einer Fläche für diesen Bezirk.
+   (mit Fläche) öffnen die Lagekarte zum Zeichnen einer Fläche für diesen Bezirk. Kann der
+   Browser keine Karte zeichnen (Voraussetzung wie bei der [Lagekarte](lagekarte.md)), steht an
+   Stelle des Ausschnitts „Karte auf diesem Gerät nicht darstellbar“; der Sprung bleibt.
 5. „Standverlauf“ zeigt ab zwei Meldungen eine Linie des Stands über die Zeit, die Plangröße
    gestrichelt, darunter alle Meldungen.
 
