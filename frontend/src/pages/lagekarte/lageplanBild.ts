@@ -1,3 +1,4 @@
+import { GEDAEMPFT_DECKKRAFT } from './abschnittFokus';
 import type { KartenAufnahme, KartenBuendel } from './kartenAufnahme';
 import {
   massstabLeiste,
@@ -74,25 +75,38 @@ function alsPng(leinwand: HTMLCanvasElement): Promise<Blob | null> {
   });
 }
 
-/** Ein Bündel-Donut wie `baueClusterDonut`: Ring in Anteilen, weißer Kern, Zahl, Kürzel. */
-function zeichneBuendel(ctx: CanvasRenderingContext2D, b: KartenBuendel, s: number, dy: number) {
+/**
+ * Ein Bündel-Donut wie `baueClusterDonut`: Ring in Anteilen, weißer Kern, Zahl, Kürzel. Ein Bündel
+ * nur aus fremden Kräften im Abschnittsfokus zeichnet mit `GEDAEMPFT_DECKKRAFT` wie auf der Karte
+ * (LLH-1349); die Segmente sind deshalb Ringstücke, die den Kern nicht überdecken — durchscheinend
+ * übereinander gemalt, färbten sie ihn.
+ */
+export function zeichneBuendel(
+  ctx: CanvasRenderingContext2D,
+  b: KartenBuendel,
+  s: number,
+  dy: number,
+) {
   const x = b.x * s;
   const y = b.y * s + dy;
   const r = (b.durchmesser / 2) * s;
+  const innen = r - b.ring * s;
+  ctx.save();
+  if (b.gedaempft) ctx.globalAlpha = GEDAEMPFT_DECKKRAFT;
   let winkel = -Math.PI / 2;
   const segmente = b.segmente.length > 0 ? b.segmente : [{ farbe: b.neutral, anteil: 1 }];
   for (const seg of segmente) {
     const bis = winkel + seg.anteil * Math.PI * 2;
     ctx.beginPath();
-    ctx.moveTo(x, y);
     ctx.arc(x, y, r, winkel, bis);
+    ctx.arc(x, y, innen, bis, winkel, true);
     ctx.closePath();
     ctx.fillStyle = seg.farbe;
     ctx.fill();
     winkel = bis;
   }
   ctx.beginPath();
-  ctx.arc(x, y, r - b.ring * s, 0, Math.PI * 2);
+  ctx.arc(x, y, innen, 0, Math.PI * 2);
   ctx.fillStyle = 'white';
   ctx.fill();
   ctx.fillStyle = 'black';
@@ -104,6 +118,7 @@ function zeichneBuendel(ctx: CanvasRenderingContext2D, b: KartenBuendel, s: numb
     ctx.font = `${Math.round(10 * s)}px ${SCHRIFT}`;
     ctx.fillText(b.kurz, x, y + 7 * s);
   }
+  ctx.restore();
 }
 
 /** Zeichnet Ausschnitt und Bündel ab `dy`; liefert die Höhe in Bildpunkten. */

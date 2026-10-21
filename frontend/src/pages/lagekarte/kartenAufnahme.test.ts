@@ -41,6 +41,7 @@ describe('nimmKartenbildAuf', () => {
       neutral: '#999',
       zahl: '3',
       kurz: null,
+      gedaempft: false,
     };
     const aussen = { ...imBild, x: 900 };
     const aufnahme = await nimmKartenbildAuf(k, () => [imBild, aussen]);
