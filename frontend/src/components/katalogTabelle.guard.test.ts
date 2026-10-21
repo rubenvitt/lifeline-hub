@@ -578,7 +578,8 @@ describe('Freistellungen tragen ihre Begründung (LFH-368 · B5h)', () => {
      * erklärender Kommentar steht (Grenze 8).
      */
     const quelle = ohneKommentare(KORPUS['/src/pages/gefahren/GefahrenMatrix.tsx'] ?? '');
-    expect(quelle).toMatch(/^\s*sticky=\{\{\s*offsetHeader:/m);
+    // Im Druck fällt sie weg (LLH-1364, `useDruckModus` wie die `KatalogTabelle`).
+    expect(quelle).toMatch(/^\s*sticky=\{druckt \? false : \{\s*offsetHeader:/m);
   });
 });
 
