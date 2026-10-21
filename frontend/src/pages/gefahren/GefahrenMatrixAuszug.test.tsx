@@ -94,6 +94,79 @@ describe('GefahrenMatrixAuszug (LFH-664, Entscheidung 5a)', () => {
     }
   });
 
+  /** LLH-1365: dieselbe Marke wie die Matrix, derselbe Namenszusatz. */
+  describe('Erläuterungen (LLH-1365)', () => {
+    it('erkennt eine Zelle mit Erläuterung an Marke und Name, eine ohne an keinem von beiden', () => {
+      const { container } = renderMitProviders(
+        <GefahrenMatrixAuszug
+          matrix={[
+            bewertung({
+              gefahrentyp: 'elektrizitaet',
+              schutzobjekt: 'menschen',
+              warnstufe: 'mittel',
+              beschreibung: 'Stromführende Kellerverteilungen unter Wasser.',
+            }),
+            bewertung({ gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' }),
+            // Leerraum allein ist keine Erläuterung (`hatErlaeuterung`).
+            bewertung({
+              gefahrentyp: 'brand',
+              schutzobjekt: 'tiere',
+              warnstufe: 'niedrig',
+              beschreibung: '   ',
+            }),
+          ]}
+        />,
+      );
+
+      const mit = screen.getByRole('cell', {
+        name: 'Elektrizität × Menschen: mittel · mit Erläuterung',
+      });
+      expect(mit).toHaveTextContent('M');
+      const marke = mit.querySelector<HTMLElement>('[data-lfh="erlaeuterung-marke"]');
+      expect(marke, 'die Zelle trägt die Marke der Matrix').not.toBeNull();
+      expect(marke).toHaveAttribute('aria-hidden', 'true');
+      expect(marke!.style.borderBlockStart).toMatch(/currentcolor/i);
+      // Die Marke sitzt in der Ecke der Zelle: die Zelle ist ihr Bezug.
+      expect(mit.style.position).toBe('relative');
+
+      const ohne = screen.getByRole('cell', { name: 'Brand × Menschen: hoch' });
+      expect(ohne.querySelector('[data-lfh="erlaeuterung-marke"]')).toBeNull();
+      expect(screen.getByRole('cell', { name: 'Brand × Tiere: niedrig' })).toBeInTheDocument();
+      // Genau eine Zelle + das Zeichen der Legende.
+      expect(container.querySelectorAll('[data-lfh="erlaeuterung-marke"]')).toHaveLength(2);
+      expect(screen.getByText('mit Erläuterung')).toBeInTheDocument();
+    });
+
+    it('zeigt eine Gefahr, deren einzige Aussage eine Erläuterung zu „keine“ ist', () => {
+      renderMitProviders(
+        <GefahrenMatrixAuszug
+          matrix={[
+            bewertung({
+              gefahrentyp: 'elektrizitaet',
+              schutzobjekt: 'menschen',
+              warnstufe: 'keine',
+              beschreibung: 'Geprüft, kein Strom im Keller.',
+            }),
+          ]}
+        />,
+      );
+
+      expect(screen.queryByText('Keine Gefahr über Stufe „keine“.')).toBeNull();
+      expect(screen.getAllByRole('rowheader').map((k) => k.textContent)).toEqual(['Elektrizität']);
+      expect(
+        screen.getByRole('cell', { name: 'Elektrizität × Menschen: keine · mit Erläuterung' }),
+      ).toHaveTextContent('–');
+    });
+
+    it('ohne Erläuterung keine Marke und kein Legendeneintrag', () => {
+      const { container } = renderMitProviders(
+        <GefahrenMatrixAuszug matrix={[bewertung({ warnstufe: 'hoch' })]} />,
+      );
+      expect(container.querySelector('[data-lfh="erlaeuterung-marke"]')).toBeNull();
+      expect(screen.queryByText('mit Erläuterung')).toBeNull();
+    });
+  });
+
   it('liest nur: kein Knopf, kein Auswahlfeld', () => {
     renderMitProviders(<GefahrenMatrixAuszug matrix={[bewertung({ warnstufe: 'hoch' })]} />);
 

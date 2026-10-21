@@ -322,7 +322,6 @@ const AbschnittBlock = memo(function AbschnittBlock({
         style={{ marginBottom: 0 }}
       >
         <MarkdownEditor
-          layout="toggle"
           umschalterAussen
           vorschauOffen={false}
           druckfassung

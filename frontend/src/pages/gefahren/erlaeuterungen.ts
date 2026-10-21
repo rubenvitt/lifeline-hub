@@ -4,10 +4,17 @@ import { GEFAHRENTYPEN_ALPHABETISCH, SCHUTZOBJEKTE, kombinationGueltig } from '.
 /**
  * Erläuterungen der Gefahrenbewertung (LLH-1110, Spec `gefahrenmatrix`, „Erläuterungen sind
  * sichtbar“): EINE Stelle für die Frage, welche Zellen etwas zu sagen haben, und für ihre Folge.
- * Abnehmer: Marke und Liste der Gefahrenseite, der Inspector eines Gefahrengebiets auf der
- * Lagekarte und die Übernahme „Gefahren-/Schadenlage“ in den Lagevortrag. Die Erläuterung ist das
+ * Abnehmer: Marke und Liste der Gefahrenseite, das Paneel „Gefahrenmatrix“ im Lagebild und der
+ * Matrixauszug der Sprungpalette (LLH-1365), der Inspector eines Gefahrengebiets auf der Lagekarte
+ * und die Übernahme „Gefahren-/Schadenlage“ in den Lagevortrag. Die Erläuterung ist das
  * Wire-Feld `beschreibung`.
  */
+
+/**
+ * Zusatz am zugänglichen Namen einer Zelle mit Erläuterung — die Marke selbst ist für Hilfstechnik
+ * verborgen (`ErlaeuterungsMarke.tsx`). Eine Schreibweise für Matrix, Paneel und Auszug.
+ */
+export const MIT_ERLAEUTERUNG = ' · mit Erläuterung';
 
 /** Trägt die Zelle eine Erläuterung? Leerraum allein ist keine. */
 export function hatErlaeuterung(zelle: Pick<GefahrBewertung, 'beschreibung'>): boolean {
@@ -37,9 +44,10 @@ export function zellenMitErlaeuterung(matrix: readonly GefahrBewertung[]): Gefah
 }
 
 /**
- * Was ein Gebiet an Gefahren zu sagen hat (Karte, Lagevortrag): jede gültige Zelle über „keine“
- * UND jede mit Erläuterung, auch zu „keine“ — „geprüft, kein Strom im Keller“ ist eine
- * Beurteilung (design.md E5). Folge wie die Matrix.
+ * Was ein Gebiet an Gefahren zu sagen hat (Lagebild-Paneel und Palettenauszug: welche Zeilen,
+ * LLH-1365; Karte, Lagevortrag): jede gültige Zelle über „keine“ UND jede mit Erläuterung, auch
+ * zu „keine“ — „geprüft, kein Strom im Keller“ ist eine Beurteilung (LLH-1110 design.md E5).
+ * Folge wie die Matrix.
  */
 export function gesetzteGefahren(matrix: readonly GefahrBewertung[]): GefahrBewertung[] {
   return ordneZellen(matrix.filter((z) => z.warnstufe !== 'keine' || hatErlaeuterung(z)));

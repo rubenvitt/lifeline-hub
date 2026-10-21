@@ -500,12 +500,12 @@ test('Lagebericht (Entwurf, Bearbeiten) druckt jeden Abschnitt vollständig als 
   const id = await lageberichtSaeen(page, einsatzId, false);
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-  // Vorbedingung: die Vorgabe steht — Bearbeiten mit Toggle-Editoren.
+  // Vorbedingung: die Vorgabe steht — Bearbeiten mit Editoren.
   await expect(page.getByRole('tab', { name: 'Bearbeiten' })).toHaveAttribute(
     'aria-selected',
     'true',
   );
-  await expect(page.locator('.markdown-editor--toggle').first()).toBeAttached();
+  await expect(page.locator('.markdown-editor').first()).toBeAttached();
   // Eine echte schwebende Ebene: der Erfolgs-Toast nach dem Speichern.
   await page.getByRole('button', { name: 'Entwurf speichern' }).click();
   await expect(page.locator('.ant-message-notice')).toBeVisible();
@@ -814,7 +814,7 @@ test.describe('Lagebericht-Entwurf druckt die Lesefassung (LFH-498)', () => {
     const id = await lagebeurteilungSaeen(page, einsatzId);
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(`/einsaetze/${einsatzId}/lageberichte/${id}`);
-    await expect(page.locator('.markdown-editor--toggle')).toHaveCount(8);
+    await expect(page.locator('.markdown-editor')).toHaveCount(8);
     await expect(page.locator('.markdown-editor__druck')).toHaveCount(8);
     await pruefeBildschirm(page, 'Bearbeiten');
     await pruefeLesefassung(page, 'Bearbeiten');

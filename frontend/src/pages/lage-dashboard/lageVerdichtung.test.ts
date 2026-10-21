@@ -321,8 +321,8 @@ describe('verdichteGefahrenmatrix', () => {
       b('ertrinken', 'mittel', 2),
     ]);
     expect(zeilen).toEqual([
-      { typ: 'brand', label: 'Brand', stufe: 'akut' },
-      { typ: 'ertrinken', label: 'Ertrinken', stufe: 'mittel' },
+      { typ: 'brand', label: 'Brand', stufe: 'akut', mitErlaeuterung: false },
+      { typ: 'ertrinken', label: 'Ertrinken', stufe: 'mittel', mitErlaeuterung: false },
     ]);
   });
 
@@ -341,8 +341,33 @@ describe('verdichteGefahrenmatrix', () => {
   it('„keine“ ergibt keine Zeile, auch ausdrücklich gesetzt', () => {
     expect(verdichteGefahrenmatrix([b('brand', 'keine')])).toEqual({ zeilen: [] });
     expect(verdichteGefahrenmatrix([b('brand', 'keine', 1), b('brand', 'niedrig', 2)])).toEqual({
-      zeilen: [{ typ: 'brand', label: 'Brand', stufe: 'niedrig' }],
+      zeilen: [{ typ: 'brand', label: 'Brand', stufe: 'niedrig', mitErlaeuterung: false }],
     });
+  });
+
+  /**
+   * LLH-1365: Zeilen wie `gesetzteGefahren` (`pages/gefahren/erlaeuterungen.ts`) — über „keine“
+   * ODER mit Erläuterung. Die Marke trägt eine Zeile, sobald irgendeine Zelle des Typs in
+   * irgendeinem Gebiet eine Erläuterung hat.
+   */
+  it('markiert Gefahren mit Erläuterung und zeigt eine Erläuterung zu „keine“ als Zeile', () => {
+    const mit = (z: GefahrBewertung, beschreibung: string): GefahrBewertung => ({
+      ...z,
+      beschreibung,
+    });
+    const { zeilen } = verdichteGefahrenmatrix([
+      b('brand', 'hoch', 1),
+      mit(b('brand', 'niedrig', 2), 'Schwelbrand im Keller'),
+      mit(b('elektrizitaet', 'keine', 1), 'Geprüft, kein Strom im Keller.'),
+      b('ertrinken', 'mittel', 1),
+      // Leerraum allein ist keine Erläuterung, „keine“ ohne Text keine Zeile.
+      mit(b('explosion', 'keine', 1), '  '),
+    ]);
+    expect(zeilen).toEqual([
+      { typ: 'brand', label: 'Brand', stufe: 'hoch', mitErlaeuterung: true },
+      { typ: 'elektrizitaet', label: 'Elektrizität', stufe: 'keine', mitErlaeuterung: true },
+      { typ: 'ertrinken', label: 'Ertrinken', stufe: 'mittel', mitErlaeuterung: false },
+    ]);
   });
 });
 

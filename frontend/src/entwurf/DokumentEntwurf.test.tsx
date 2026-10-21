@@ -207,9 +207,9 @@ describe('DokumentEntwurf — Kopf der Gliederung (LLH-1081)', () => {
 });
 
 describe('DokumentEntwurf — Druck-Struktur (LFH-1008, M86)', () => {
-  it('trägt je Abschnitt Toggle-Editor mit Druckfassung und Papiertitel', () => {
+  it('trägt je Abschnitt einen Editor mit Druckfassung und Papiertitel', () => {
     const { container } = render(<Pruefling start={{ [erster.schluessel]: 'Text' }} />);
-    expect(container.querySelectorAll('.markdown-editor--toggle')).toHaveLength(8);
+    expect(container.querySelectorAll('.markdown-editor')).toHaveLength(8);
     const titel = [
       ...container.querySelectorAll('.markdown-editor__druck .markdown-editor__titel'),
     ];
