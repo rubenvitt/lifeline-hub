@@ -2,7 +2,7 @@
 titel: Gefahren
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/gefahren/GefahrenMatrixAuszug.tsx, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/gefahren/GefahrenMatrixAuszug.tsx, frontend/src/pages/gefahren/gefahrenPrint.css, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -68,6 +68,13 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 2. Eine Zeile wählen. Mit Schreibrecht öffnet sich der Dialog der Zelle, ohne Schreibrecht hebt
    die Matrix die Zelle mit einem Rahmen hervor.
 
+### Ein Gefahrengebiet drucken
+
+1. Das Gebiet in der Liste wählen und warten, bis seine Matrix steht.
+2. Im Kopf der Seite „Drucken / als PDF“ wählen, auf dem Handy unter „Weitere“.
+3. Im Druckdialog des Browsers drucken oder als PDF speichern (siehe
+   [Drucken und Export](drucken-export.md)).
+
 ### Ein Gefahrengebiet umbenennen
 
 1. Das Gebiet in der Liste wählen.
@@ -102,6 +109,19 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
   [Lagebild](lagebild.md)). Den Text der Erläuterung zeigen beide nicht.
 - Die höchste Stufe aller Zellen ist die Warnstufe des Gebiets. Sie steht in der Liste, als Text
   an der Fläche auf der Lagekarte und, über alle Gebiete, im Überblick und im Lagebild.
+
+### Das gedruckte Blatt
+
+- Gedruckt wird das gewählte Gebiet. Der Druckkopf nennt es mit der Warnstufe und der
+  Beurteilung („beurteilt“ mit Zeit und Person oder „nicht beurteilt“). Darunter stehen die
+  Legende, die Matrix und die Liste „Erläuterungen“ in derselben Folge wie am Schirm, mit Stufe,
+  Text, „gemeldet von“ und „geändert“. Ohne Erläuterung im Gebiet fehlt die Liste auch auf dem
+  Blatt.
+- Das Blatt ist schwarz auf weiß: die Stufe steht als Kürzel in der Zelle, das Dreieck „mit
+  Erläuterung“ schwarz in der Ecke, nicht anwendbare Paare schraffiert. Die Farbflächen der
+  Stufen druckt die App nicht.
+- Gebietsliste, „Umbenennen“, „Auf Karte zeigen ↗“ und „Beurteilung bestätigen“ stehen nicht auf
+  dem Blatt. Drucken kann jede Person, die die Seite lesen kann, auch ohne Schreibrecht.
 
 ### Beurteilung
 
