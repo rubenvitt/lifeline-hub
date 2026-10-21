@@ -124,6 +124,12 @@ und dessen Funktion am Eintrag erkennbar.
 - **WHEN** jemand einen Auftrag an „EA-Süd“ erteilt und dabei ein ETB-Eintrag entsteht
 - **THEN** trägt der Eintrag Von „System“ und An „EA-Süd“
 
+#### Scenario: Nachforderung
+- **WHEN** jemand eine Nachforderung an die Leitstelle „ILS Nord“ absetzt und die Führungsstelle
+  den Rufnamen „Florian Musterstadt 10/1“ trägt
+- **THEN** trägt der Eintrag Von „Florian Musterstadt 10/1“ und An „Leitstelle (ILS Nord)“
+  (Regel im Einzelnen: Spec `etb-vorgaenge`)
+
 #### Scenario: Ohne bekannte Seite
 - **WHEN** jemand eine Ablösung vollzieht und dabei ein ETB-Eintrag entsteht
 - **THEN** trägt der Eintrag Von „System“ und An „System“

@@ -372,6 +372,9 @@ describe('hatVerknuepfung (LFH-636)', () => {
     expect(hatVerknuepfung(e({ lagebericht_id: 1 }))).toBe(true);
     expect(hatVerknuepfung(e({ auftrag_id: 1 }))).toBe(true);
     expect(hatVerknuepfung(e({ folgeauftraege: [{ id: 3, lfd_nr: 1 }] }))).toBe(true);
+    // LLH-1104: Meldung und Nachforderung sind Kopplungen wie Befehl und Auftrag.
+    expect(hatVerknuepfung(e({ meldung_id: 4, meldung_lfd_nr: 12 }))).toBe(true);
+    expect(hatVerknuepfung(e({ nachforderung_id: 7 }))).toBe(true);
   });
 });
 
