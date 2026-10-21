@@ -827,7 +827,11 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
         // Die Objekte tragen die Platzier-Aktionen; in „Ebenen“ wäre ihre Abwesenheit geschenkt.
         await zeigeLeistenAnsicht(page, 'Objekte');
         // Positiver Nachbar: ohne ihn wäre eine zugeklappte oder leere Leiste „aktionslos".
-        await expect(leiste.locator('section[data-paneel="verortet"]')).toBeVisible();
+        await expect(leiste.locator('[data-paneel="objekte"]')).toBeVisible();
+        // Der unverortete Einsatzort steht als erste Zeile, ohne Schreibrecht ohne Aktion.
+        await expect(leiste.locator('[data-paneel="objekte-einsatzort"]')).toContainText(
+          'nicht verortet',
+        );
         await expect(
           leiste.locator('section[data-paneel="zeichnen"]'),
           `${lauf}: Vorbedingung: ohne Schreibrecht kein Zeichnen-Paneel`,

@@ -1,12 +1,15 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
- * Wege in die Kartenleiste der Lagekarte (LLH-1028): die Leiste gliedert sich in die Ansichten
- * „Ebenen“ und „Objekte“ (Tabliste über ihrem Inhalt); die Ebenen stehen als Baum in einklappbaren
- * Gruppen. Ohne gemerkte Wahl steht „Ebenen“ vorn, Kräfte und Lage sind offen.
+ * Wege in die Kartenleiste der Lagekarte (LLH-1028, LLH-1033): die Leiste gliedert sich in die
+ * Ansichten „Ebenen“, „Objekte“ und — solange etwas ausgewählt ist — „Auswahl“ (Tabliste über
+ * ihrem Inhalt); die Ebenen stehen als Baum in einklappbaren Gruppen, die Objekte als eine Liste
+ * mit Gruppen je Art (ohne Suchbegriff zugeklappt). Ohne gemerkte Wahl steht „Ebenen“ vorn, Kräfte
+ * und Lage sind offen. Eine neue Auswahl steht vorn; ein Tipp auf „Ebenen“/„Objekte“ lässt sie
+ * bestehen.
  */
 
-export type LeistenAnsicht = 'Ebenen' | 'Objekte';
+export type LeistenAnsicht = 'Ebenen' | 'Objekte' | 'Auswahl';
 
 /** Holt die Ansicht nach vorn — wie ein Tipp aufs Segment (gemerkt je Gerät). */
 export async function zeigeLeistenAnsicht(page: Page, ansicht: LeistenAnsicht) {
@@ -63,3 +66,33 @@ export const FACHEBENEN_OFFEN = JSON.stringify({
   umwelt: true,
   verkehr: true,
 });
+
+/** Klappzustand der Objektliste (LLH-1033), je Art: `{ einheit: true, … }`. */
+export const OBJEKTE_SCHLUESSEL = 'lfh:lagekarte:objekte-gruppen';
+
+/** Die Objektliste der Ansicht „Objekte“. */
+export const objektListe = (page: Page) => page.locator('[data-paneel="objekte"]');
+
+/**
+ * Sucht in der Objektliste nach `begriff` (Gruppen mit Treffern stehen dann offen) und gibt die
+ * Zeile mit diesem Namen zurück — samt Zeilenaktion („Platzieren“, „Fläche zeichnen“, …).
+ */
+export async function objektZeile(page: Page, begriff: string, name = begriff): Promise<Locator> {
+  await zeigeLeistenAnsicht(page, 'Objekte');
+  await page.getByRole('textbox', { name: 'Kartenobjekte suchen' }).fill(begriff);
+  const zeile = objektListe(page).locator('.listen-eintrag').filter({ hasText: name }).first();
+  await expect(zeile).toBeVisible();
+  return zeile;
+}
+
+/** Öffnet eine Gruppe der Objektliste (`section[data-paneel="objekte-<typ>"]`, z. B. `einheit`). */
+export async function oeffneObjektGruppe(page: Page, typ: string) {
+  await zeigeLeistenAnsicht(page, 'Objekte');
+  const kopf = page.locator(`section[data-paneel="objekte-${typ}"] button[aria-expanded]`).first();
+  await expect(kopf).toBeVisible();
+  if ((await kopf.getAttribute('aria-expanded')) !== 'true') await kopf.click();
+  await expect(kopf).toHaveAttribute('aria-expanded', 'true');
+}
+
+/** Die Fläche der Ansicht „Auswahl“ (Inspectors). */
+export const auswahlAnsicht = (page: Page) => page.locator('[data-paneel="ausgewaehlt"]');

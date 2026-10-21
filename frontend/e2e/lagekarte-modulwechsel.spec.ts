@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { zeigeLeistenAnsicht } from './leisten-kern';
+import { objektZeile, zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
  * Modulwechsel mit laufendem Werkzeug (LFH-943, Spec `lagekarte-ressourcen`): Wer misst oder
@@ -129,8 +129,9 @@ test.describe('Lagekarte: Modulwechsel mit laufendem Werkzeug (LFH-943)', () => 
     expect(angelegt.ok(), `Abschnitt: ${angelegt.status()}`).toBe(true);
     const canvas = await lagekarteOeffnen(page, einsatzId);
 
-    await zeigeLeistenAnsicht(page, 'Objekte');
-    await page.getByRole('button', { name: 'Fläche zeichnen' }).click();
+    // Objektliste (LLH-1033): der Abschnitt ohne Fläche trägt „Fläche zeichnen“ in seiner Zeile.
+    const zeile = await objektZeile(page, 'EA Modulwechsel');
+    await zeile.getByRole('button', { name: 'Fläche zeichnen' }).click();
     await setzePunkt(page, canvas, -100, -120);
     await expect(page.locator('[data-lfh="zeichnen-punkte"]')).toHaveText('1 Punkt');
 

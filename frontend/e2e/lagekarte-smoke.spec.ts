@@ -213,6 +213,38 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
  * verbraucht. Dazu: die ausgeklappte Zeitachse steht mit einem gesicherten Stand in einer Reihe,
  * und die Auswahl „Stand“ wechselt in den historischen Stand und zurück.
  */
+// LLH-1033: die Objektliste ist per Tastatur bedienbar — Tab erreicht die Zeile des Einsatzorts,
+// Enter wählt ihn und zeigt „Auswahl“, Esc hebt die Auswahl auf und zeigt wieder „Objekte“.
+test('Lagekarte: Objektliste per Tastatur — Enter wählt, Esc führt zurück', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await anmelden(page);
+  const eid = await einsatzAnlegenUndOeffnen(page);
+  await einsatzortSetzen(page, eid, { lat: 49.3519, lon: 9.1457 });
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+    1,
+  );
+  await zeigeLeistenAnsicht(page, 'Objekte');
+  // Alles verortet: die Marke ist ein Wort, kein Knopf — Tab geht vom Feld zur ersten Zeile.
+  await expect(page.locator('[data-lfh="objekte-marke"]')).toHaveText('Alles verortet');
+  await page.getByRole('textbox', { name: 'Kartenobjekte suchen' }).focus();
+  await page.keyboard.press('Tab');
+  const zeile = page.locator('[data-paneel="objekte-einsatzort"] button.lfh-objektzeile');
+  await expect(zeile).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  const auswahl = page.getByRole('tab', { name: 'Auswahl' });
+  await expect(auswahl).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-paneel="ausgewaehlt"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Zurück zu Objekte' })).toHaveAttribute(
+    'aria-keyshortcuts',
+    'Escape',
+  );
+  await page.keyboard.press('Escape');
+  await expect(auswahl).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Objekte' })).toHaveAttribute('aria-selected', 'true');
+});
+
 test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht zu', async ({
   page,
 }) => {

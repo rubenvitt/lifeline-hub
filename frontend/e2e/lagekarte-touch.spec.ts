@@ -1,5 +1,5 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
-import { oeffneEbenenGruppe, zeigeLeistenAnsicht } from './leisten-kern';
+import { auswahlAnsicht, objektListe, objektZeile, oeffneEbenenGruppe } from './leisten-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 // Die Lagekarte unter Touch, auf Handschirm (390 px) und Führungs-Tablet (1024 px).
@@ -438,9 +438,9 @@ for (const viewport of [
         await tippe(page, p);
         await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible({ timeout: 1_000 });
       }).toPass({ timeout: 20_000 });
-      await page.keyboard.press('Escape');
       // Die Auswahl kann die Karte bewegen, und jede Bewegung klappte einen Spider zu. Also
-      // zurück auf den Blickpunkt und erst tippen, wenn die Karte steht.
+      // zurück auf den Blickpunkt und erst tippen, wenn die Karte steht. Die Auswahl bleibt offen:
+      // an ihr hängt die Esc-Reihenfolge unten.
       await springe(page, ZWISCHEN, ZOOM);
 
       // Cluster: ein DOM-Donut. GENAU EINMAL tippen — ein zweiter Tipp klappt den Spider zu.
@@ -469,6 +469,27 @@ for (const viewport of [
       await expect
         .poll(async () => new Set((await leaves()).map((p) => p.schluessel)).size, {
           message: 'Tipp auf den Donut fächert den Cluster auf',
+        })
+        .toBe(3);
+
+      // Esc-Reihenfolge (LLH-1033): erst das Bündel, dann die Auswahl — eine Taste, eine Stufe.
+      await page.keyboard.press('Escape');
+      await expect
+        .poll(async () => (await leaves()).length, { message: 'Esc klappt das Bündel ein' })
+        .toBe(0);
+      await expect(ausgewaehlt(page).getByText('Pumpe Ost')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(ausgewaehlt(page)).toHaveCount(0);
+      // Wieder auffächern, mit Abstand zum ersten Tipp (kein Doppeltipp-Zoom). Ohne Auswahl kann
+      // die Leiste anders stehen und die Karte ihre Größe ändern: Blickpunkt und Donut neu.
+      await page.waitForTimeout(600);
+      await springe(page, ZWISCHEN, ZOOM);
+      await expect(donut).toHaveCount(1);
+      const box2 = (await donut.boundingBox())!;
+      await tippe(page, { x: box2.x + box2.width / 2, y: box2.y + box2.height / 2 });
+      await expect
+        .poll(async () => new Set((await leaves()).map((p) => p.schluessel)).size, {
+          message: 'erneuter Tipp fächert wieder auf',
         })
         .toBe(3);
       // … und ein aufgefächertes Zeichen ist per Tipp anwählbar. Der Punkt kommt aus der
@@ -932,7 +953,7 @@ test.describe('Lagekarte am Führungs-Tablet (LFH-764)', () => {
 // ist die Leiste per Vorgabe offen, dort belegt der Block die Wiederherstellung nach dem Modus. Jede
 // Bedienung wird GETIPPT, jede Wirkung am Serverstand oder am Messwert gelesen.
 
-/** Unverortete Einheiten: sechs, damit „Nicht verortet" sein Suchfeld auch nach einem Treffer hält. */
+/** Unverortete Einheiten: sechs, die Objektliste trägt sie in der Gruppe „Einheiten“. */
 const RESERVE = ['Reserve 1', 'Reserve 2', 'Reserve 3', 'Reserve 4', 'Reserve 5', 'Reserve 6'];
 const BILDNAME = 'Lageplan Fingerprobe';
 /** 1 × 1-PNG, wie in `lagekarte-leiste-dichte.spec.ts`. */
@@ -1035,19 +1056,15 @@ for (const viewport of [
       await zeitachseAus(page);
     }
 
-    test('Platzieren aus „Nicht verortet": Tipp verortet, danach Leiste samt Suche zurück', async ({
+    test('Platzieren aus der Objektliste: Tipp verortet, danach Leiste samt Suche zurück', async ({
       page,
     }) => {
       await oeffneKarte(page);
       if (!vorgabeOffen) await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
       await leisteOffen(page);
-      await zeigeLeistenAnsicht(page, 'Objekte');
-      const suche = page.getByRole('textbox', { name: 'Nicht verortete Objekte durchsuchen' });
-      await suche.fill('Reserve 3');
-      await page
-        .locator('[data-paneel="nichtVerortet"]')
-        .getByRole('button', { name: 'Platzieren' })
-        .tap();
+      const zeile = await objektZeile(page, 'Reserve 3');
+      const suche = page.getByRole('textbox', { name: 'Kartenobjekte suchen' });
+      await zeile.getByRole('button', { name: 'Platzieren' }).tap();
 
       // Die Leiste weicht, die Bedienung steht über der Karte.
       await leisteZu(page);
@@ -1078,6 +1095,34 @@ for (const viewport of [
       await expect(band(page)).toHaveCount(0);
       await leisteOffen(page);
       await expect(suche).toHaveValue('Reserve 3');
+    });
+
+    // LLH-1033: eine Zeile wählt aus, die Leiste zeigt „Auswahl“; „← Objekte“ hebt die Auswahl
+    // auf und führt mit Suchbegriff zurück. Getippt, auf jeder Breite dieses Blocks.
+    test('Auswahl aus der Objektliste: Tipp wählt, „← Objekte“ führt mit Suchbegriff zurück', async ({
+      page,
+    }) => {
+      await oeffneKarte(page);
+      if (!vorgabeOffen) await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
+      await leisteOffen(page);
+      await objektZeile(page, 'Pumpe Ost');
+      await objektListe(page).getByRole('button', { name: 'Pumpe Ost', exact: true }).tap();
+
+      const auswahlTab = page.getByRole('tab', { name: 'Auswahl' });
+      await expect(auswahlTab).toHaveAttribute('aria-selected', 'true');
+      // Die Ansicht steht oben: Rückweg und Name des Objekts ohne Rollen im Bild.
+      await expect(page.getByRole('button', { name: 'Zurück zu Objekte' })).toBeInViewport();
+      await expect(auswahlAnsicht(page).getByText('Pumpe Ost').first()).toBeInViewport();
+
+      await page.getByRole('button', { name: 'Zurück zu Objekte' }).tap();
+      await expect(auswahlTab).toHaveCount(0);
+      await expect(page.getByRole('tab', { name: 'Objekte' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      await expect(page.getByRole('textbox', { name: 'Kartenobjekte suchen' })).toHaveValue(
+        'Pumpe Ost',
+      );
     });
 
     test('Verortungsauftrag per Adresse: Leiste zu, „Abbrechen" im Band beendet', async ({
@@ -1133,7 +1178,7 @@ for (const viewport of [
       await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).tap();
       const zeichnenPaneel = page.locator('[data-paneel="zeichnen"]');
       await zeichnenPaneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).tap();
-      // Im Paneel: „Nicht verortet" trägt eigene „Platzieren"-Knöpfe.
+      // Im Paneel: die Objektliste trägt eigene „Platzieren"-Knöpfe.
       await zeichnenPaneel.getByRole('button', { name: 'Platzieren', exact: true }).tap();
 
       await leisteZu(page);
