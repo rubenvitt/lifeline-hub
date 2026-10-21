@@ -296,10 +296,16 @@ pub async fn stelle_stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let g = crate::write_retry!(&state.pool, |conn| {
+    let (g, geloest) = crate::write_retry!(&state.pool, |conn| {
         repo::stelle_stornieren_tx(conn, einsatz_id, sid, benutzer_id, startwert).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids, g.id);
+    // Gelöste Stellenbezüge (LLH-1082, design.md D3): die Nachforderungsliste lädt neu.
+    if !geloest.is_empty() {
+        state
+            .live
+            .publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Nachforderung);
+    }
     Ok(Json(
         repo::stelle_laden(&state.pool, einsatz_id, g.id).await?,
     ))

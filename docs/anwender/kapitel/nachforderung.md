@@ -2,7 +2,7 @@
 titel: Nachforderung
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -135,6 +135,18 @@ Formular mit vorbelegten Feldern ([Verpflegung](verpflegung.md)). An einer Unfal
 „Fehlmenge melden“ im Bereich „Material“ das Formular mit der Art „Material“ und der Stelle in der
 Begründung ([Unfallhilfsstellen](unfallhilfsstellen.md)); Bezeichnung und Anzahl bleiben dort leer.
 Die Felder bleiben vor dem Absetzen änderbar.
+
+### Nachforderungen für eine Betreuungsstelle
+
+„Bedarf anfordern“ auf der Seite einer Betreuungsstelle öffnet dieses Formular mit
+„Für Betreuungsstelle …“ und der Stelle in der Begründung ([Betreuung](betreuung.md)). Die
+Nachforderung gehört dann zu dieser Stelle: ihre Karte nennt die Stelle, ein Klick auf den Namen
+öffnet sie. Mit „Für Stelle“ über der Liste stehen nur die Nachforderungen einer Stelle da;
+„Filter zurücksetzen“ zeigt wieder alle. Ohne Zugriff auf „Betreuung“ steht an der Karte nur
+„Für eine Betreuungsstelle“.
+
+Wird die Stelle storniert, bleibt die Nachforderung mit ihrem Stand bestehen und verweist auf
+keine Stelle mehr; die Begründung bleibt, wie sie ist.
 
 ### Ablauf der Stufen
 

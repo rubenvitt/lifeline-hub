@@ -1471,14 +1471,15 @@ pub async fn stelle_aendern_tx(
     })
 }
 
-/// Storniert eine Stelle (Fehlanlage). Bereits storniert → 409.
+/// Storniert eine Stelle (Fehlanlage). Bereits storniert → 409. Liefert neben dem Ergebnis die
+/// Nachforderungen, deren Bezug auf die Stelle gelöst wurde (LLH-1082), für das Live-Ereignis.
 pub async fn stelle_stornieren_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     id: i64,
     benutzer_id: i64,
     startwert: i64,
-) -> Result<Geschrieben, AppError> {
+) -> Result<(Geschrieben, Vec<i64>), AppError> {
     let roh = stelle_roh_tx(conn, einsatz_id, id).await?;
     stelle_lebt(&roh)?;
     sqlx::query(
@@ -1489,6 +1490,12 @@ pub async fn stelle_stornieren_tx(
     .bind(id)
     .execute(&mut *conn)
     .await?;
+    // LLH-1082 (design.md D3): Nachforderungen für die Stelle verlieren ihren Bezug im SELBEN
+    // Vorgang und bleiben sonst unverändert — wie die Flächen eines stornierten Bezirks (LFH-673
+    // D6). Eine stornierte Stelle hat keine Seite und steht in keiner Übersicht; ein stehender
+    // Verweis müsste an jeder Leseseite herausgefiltert werden. Kein eigener ETB-Eintrag.
+    let geloest =
+        crate::nachforderung::repo::loese_betreuungsstelle_tx(conn, einsatz_id, id).await?;
     let etb_id = crate::etb::system_audit_tx(
         conn,
         einsatz_id,
@@ -1497,11 +1504,14 @@ pub async fn stelle_stornieren_tx(
         &etb_text::stelle_storniert(&roh.bezeichnung),
     )
     .await?;
-    Ok(Geschrieben {
-        id,
-        etb_ids: vec![etb_id],
-        still_geaendert: false,
-    })
+    Ok((
+        Geschrieben {
+            id,
+            etb_ids: vec![etb_id],
+            still_geaendert: false,
+        },
+        geloest,
+    ))
 }
 
 /// Meldet eine Belegung. Geschlossene Stelle → 422, stornierte → 409. Die Anzahl darf die

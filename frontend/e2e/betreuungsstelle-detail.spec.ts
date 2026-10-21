@@ -76,3 +76,47 @@ test('Übersicht → Detailseite → Belegung melden: die Kennzahl folgt, Stammd
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/betreuung/${stelleId}$`));
   await expect(band).toContainText('Belegt115');
 });
+
+/**
+ * Bedarf einer Stelle (LLH-1082): „Bedarf anfordern“ öffnet die Erfassung der Nachforderungen mit
+ * Stellenbezug und vorbelegter Begründung; zurück auf der Stelle steht die Nachforderung im Paneel
+ * „Bedarf“, und ihre Karte führt auf die Stelle.
+ */
+test('Detailseite → Bedarf anfordern → Nachforderung mit Stellenbezug steht im Paneel „Bedarf“', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const { einsatzId, stelleId } = await saeStelle(page);
+
+  await page.goto(`/einsaetze/${einsatzId}/betreuung/${stelleId}`);
+  const bedarf = page.getByRole('region', { name: 'Bedarf', exact: true });
+  await expect(bedarf).toContainText('Kein offener Bedarf angefordert');
+  await bedarf.getByRole('link', { name: /Bedarf anfordern/ }).click();
+
+  await expect(page).toHaveURL(
+    new RegExp(`/einsaetze/${einsatzId}/nachforderungen\\?stelle=${stelleId}$`),
+  );
+  await expect(page.locator('[data-lfh="nachforderung-bezug"]')).toContainText(
+    `Für Betreuungsstelle ${STELLE}`,
+  );
+  await expect(page.getByLabel('Begründung / Lagebezug')).toHaveValue(
+    `Für Betreuungsstelle ${STELLE}`,
+  );
+  await page.getByLabel('Art', { exact: true }).fill('Feldbetten');
+  await page.getByLabel('Anzahl', { exact: true }).fill('40');
+  await page.getByLabel('Bezeichnung', { exact: true }).fill('Feldbetten für die Nacht');
+  await page.getByRole('button', { name: 'Nachforderung absetzen', exact: true }).click();
+
+  // Gefiltert auf die Stelle; die Karte nennt sie und führt zurück.
+  const karte = page
+    .locator('[data-nachforderung-id]')
+    .filter({ hasText: 'Feldbetten für die Nacht' });
+  await expect(karte).toContainText(`Für Betreuungsstelle ${STELLE}`);
+  await expect(page.getByText('Gefiltert', { exact: true })).toBeVisible();
+  await karte.getByRole('link', { name: new RegExp(STELLE) }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/betreuung/${stelleId}$`));
+  await expect(bedarf.getByRole('link', { name: '40× Feldbetten', exact: true })).toBeVisible();
+  await expect(bedarf).toContainText('Angefordert');
+  await expect(bedarf).toContainText('1 offen');
+});

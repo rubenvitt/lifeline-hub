@@ -51,6 +51,11 @@ dabei nicht ändern.
 - **WHEN** eine Verpflegungsausgabe auf eine Nachforderung verweist
 - **THEN** bleibt der Status der Nachforderung unverändert
 
+#### Scenario: Bedarf einer Betreuungsstelle
+- **WHEN** für die Betreuungsstelle „Turnhalle Ost“ 40 Feldbetten angefordert werden
+- **THEN** steht die Menge nur in der Nachforderung mit Bezug auf die Stelle; die Stelle selbst
+  trägt keine Bedarfsmenge
+
 ### Requirement: Betriebsstoffe als Nachforderung mit freier Art
 
 Ein Bedarf an Betriebsstoffen oder Verbrauchsgütern (z. B. Kraftstoff, Atemschutz, Löschmittel,

@@ -55,6 +55,10 @@ test('Bezirk mit Fläche anlegen: zeichnen, zuordnen, zurück zum Bezirk', async
   await expect(page.getByText(`Bezirk ${BEZIRK} · Fläche`)).toBeVisible();
   // Eine Fläche je Auftrag: keine Serie.
   await expect(page.getByRole('switch', { name: 'Weitere zeichnen' })).toHaveCount(0);
+  // Erst zeichnen, wenn terra-draw bereit ist: sonst gehen die ersten Klicks an die Karte.
+  await expect(page.locator('[data-lfh="zeichnen-punkte"]')).toHaveText('0 Punkte');
+  await expect(canvas).toHaveCSS('cursor', 'crosshair');
+  await expect(page).not.toHaveURL(/zeichnen=/);
 
   // Alle Punkte über der Mitte: darunter liegt die Zeichnen-Steuerung im Kartenfuß.
   const box = (await canvas.boundingBox())!;

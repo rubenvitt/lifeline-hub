@@ -3,7 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { useContext, useState, type ReactNode } from 'react';
+import { Route, Routes, UNSAFE_LocationContext, useLocation, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -2998,6 +2999,51 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Zurück zu Bezirk Uferstraße 12–40' }));
     expect(await screen.findByTestId('bezirk-ziel')).toBeInTheDocument();
+  });
+
+  /**
+   * Das Räumen der Adresse ist eine Navigation, und bis sie gerendert ist, sehen weitere Renders
+   * noch den Auftrag. Hier bleibt die Adresse stehen, und nach dem Speichern kommt die Bezirksliste
+   * neu (Live-Ereignis): Der Auftrag ist verbraucht und startet den Modus nicht noch einmal.
+   */
+  it('eine noch nicht gerenderte Räumung startet den Modus nicht neu', async () => {
+    let flaechen = 0;
+    basisHandler([
+      http.get('/api/einsaetze/1/evakuierung', () =>
+        HttpResponse.json({ bezirke: [{ ...UFER, flaechen }] }),
+      ),
+      http.post('/api/einsaetze/1/zonen', () => {
+        flaechen += 1;
+        return HttpResponse.json({ id: 9 });
+      }),
+    ]);
+    function AdresseSteht({ children }: { children: ReactNode }) {
+      const aktuell = useContext(UNSAFE_LocationContext);
+      const [fest] = useState(aktuell);
+      return (
+        <UNSAFE_LocationContext.Provider value={fest}>{children}</UNSAFE_LocationContext.Provider>
+      );
+    }
+    const user = userEvent.setup();
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5' },
+    );
+    expect(await screen.findByText('Bezirk Uferstraße 12–40 · Fläche')).toBeInTheDocument();
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
+    ).toBeInTheDocument();
+
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz-evakuierung', 1] }));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.getByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
+    expect(screen.queryByText('Bezirk Uferstraße 12–40 · Fläche')).not.toBeInTheDocument();
   });
 
   it('„Auf der Karte bleiben“ schließt die Rückmeldung', async () => {

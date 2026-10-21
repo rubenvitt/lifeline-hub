@@ -7717,6 +7717,100 @@ mod tests {
         assert_eq!(rest, 0);
     }
 
+    /// LLH-1082, design.md D1: `nachforderung.betreuungsstelle_id` per ADD COLUMN, `ON DELETE SET
+    /// NULL`, Teilindex; der Bestand bleibt ohne Bezug, und weder das Löschen einer Stelle noch das
+    /// des Einsatzes bleibt am Bezug hängen.
+    #[tokio::test]
+    async fn migration_0231_haengt_betreuungsstelle_an_nachforderung() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 226).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let nachforderung = |bez: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
+                         angefordert_at, erstellt_von_id) \
+                     VALUES (?, 'Feldbetten', ?, 'leitstelle', '2026-10-20 08:00:00', ?) \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(bez)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let alt = nachforderung("40 Feldbetten").await;
+
+        migriere_bis(&pool, 231).await;
+
+        let bezug: Option<i64> =
+            sqlx::query_scalar("SELECT betreuungsstelle_id FROM nachforderung WHERE id = ?")
+                .bind(alt)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bezug, None, "der Bestand bleibt ohne Bezug");
+        let fk: Vec<(String, String)> = sqlx::query_as(
+            "SELECT \"table\", on_delete FROM pragma_foreign_key_list('nachforderung') \
+             WHERE \"from\" = 'betreuungsstelle_id'",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            fk,
+            vec![("betreuungsstelle".to_string(), "SET NULL".to_string())]
+        );
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' \
+             AND name = 'idx_nachforderung_betreuungsstelle'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        let index = index.expect("Teilindex angelegt");
+        assert!(
+            index.contains("WHERE betreuungsstelle_id IS NOT NULL"),
+            "{index}"
+        );
+
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Turnhalle Ost', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let neu = nachforderung("Decken").await;
+        sqlx::query("UPDATE nachforderung SET betreuungsstelle_id = ? WHERE id = ?")
+            .bind(stelle)
+            .bind(neu)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM betreuungsstelle WHERE id = ?")
+            .bind(stelle)
+            .execute(&pool)
+            .await
+            .expect("der Bezug hält das Löschen der Stelle nicht auf");
+        let bezug: Option<i64> =
+            sqlx::query_scalar("SELECT betreuungsstelle_id FROM nachforderung WHERE id = ?")
+                .bind(neu)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(bezug, None, "ON DELETE SET NULL");
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Nachforderungen und Stellen mit");
+    }
+
     // ── LLH-1040: Verpflegungsstelle (0206) ─────────────────────────────────────────────────
 
     /// Ein Zeitfenster mit einer Ausgabe auf einer Alt-DB vor 0206; liefert (zeitfenster, ausgabe).

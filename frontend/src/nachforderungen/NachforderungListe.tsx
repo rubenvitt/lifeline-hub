@@ -1,6 +1,9 @@
 import { SeitenLeer } from '../components/SeitenZustand';
 import type { Nachforderung, NachforderungStatus } from '../api/types';
-import NachforderungKarte, { type UebernahmePosten } from './NachforderungKarte';
+import NachforderungKarte, {
+  type StellenVerweis,
+  type UebernahmePosten,
+} from './NachforderungKarte';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface NachforderungListeProps {
@@ -22,6 +25,8 @@ interface NachforderungListeProps {
   onMaterialUebernehmen?: (id: number) => void;
   /** Deeplink-Hervorhebung `?nachforderung=` (LLH-1226 D10). */
   hervorgehobenId?: number | null;
+  /** Betreuungsstellen je Kennung für die Zeile „Für Betreuungsstelle“ (LLH-1082); stabil halten. */
+  stellenJeId?: ReadonlyMap<number, StellenVerweis> | null;
 }
 
 /** Kartenboard der Nachforderungen; Darstellung und Logik liegen in der Karte. */
@@ -36,6 +41,7 @@ export default function NachforderungListe({
   materialGesperrt,
   onMaterialUebernehmen,
   hervorgehobenId,
+  stellenJeId,
 }: NachforderungListeProps) {
   if (nachforderungen.length === 0) return <SeitenLeer titel="Keine Nachforderungen" />;
   return (
@@ -53,6 +59,7 @@ export default function NachforderungListe({
           materialGesperrt={materialGesperrt}
           onMaterialUebernehmen={onMaterialUebernehmen}
           hervorgehoben={n.id === hervorgehobenId}
+          stellenJeId={stellenJeId}
         />
       ))}
     </>
