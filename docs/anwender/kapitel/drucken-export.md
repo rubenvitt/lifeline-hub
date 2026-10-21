@@ -85,6 +85,17 @@ Export sofort und meldet das an der Seite.
 
 Meldebild, Funkplan und Organigramm klappen zum Drucken alle Zweige auf.
 
+### Den Lageplan drucken
+
+1. In der „Lagekarte“ den Ausschnitt so einstellen, wie er auf dem Blatt stehen soll (siehe
+   [Lagekarte, Zeichnen und Messen](lagekarte.md)).
+2. Im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen steht der Punkt unter
+   „Weitere“. Gedruckt wird ein Blatt A4 quer mit dem Ausschnitt als Bild.
+
+   ![Druckblatt „Lageplan“ mit Druckkopf (Organisation, Einsatz, Stand, Ansicht, Kartengrundlage, gedruckt von und am), dem Kartenausschnitt, Maßstabsleiste, „Maßstab ca. 1 : …“, Nordpfeil und der Legende mit Ebenen und Zonen](../bilder/drucken-export/lageplan-druckblatt.png)
+
+3. Im Druckdialog des Browsers drucken oder als PDF speichern.
+
 ### Den Organisationskopf einrichten
 
 Für System-Admins:

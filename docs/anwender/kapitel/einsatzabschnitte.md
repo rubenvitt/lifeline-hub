@@ -26,6 +26,8 @@ Führungspersonal.
    ![Gliederung mit dem gewählten Abschnitt Sanitätsdienst, seinen Angaben und der Stufenleiste des Lagezustands](../bilder/einsatzabschnitte/gliederung.png)
 
 3. „Zu den Einheiten ↗“ führt zur Seite der Einheiten.
+4. „Auf Karte zeigen ↗“ oben rechts bei den Angaben öffnet die [Lagekarte](lagekarte.md) mit dem
+   Fokus auf diesen Abschnitt: Kräfte anderer Abschnitte erscheinen dort blass.
 
 ### Einen Abschnitt anlegen
 
@@ -119,7 +121,9 @@ Für Einsatzleitung und Führungspersonal:
 Abschnitte anlegen, ändern und auflösen dürfen Einsatzleitung und Führungspersonal, solange der
 Einsatz läuft. „In Lagebericht übernehmen“ erscheint nur für sie und nur, wenn das Modul
 Lageberichte freigegeben ist. Den Stab zeigt das Organigramm nur, wenn das Modul Stab freigegeben
-ist. Einzelheiten stehen in [Rechte im Einsatz](rechte-im-einsatz.md).
+ist. „Auf Karte zeigen ↗“ steht für alle, die den Abschnitt lesen; ohne Zugriff auf die Lagekarte
+lautet er „Auf Karte zeigen (Keine Berechtigung)“ und ist gesperrt. Einzelheiten stehen in
+[Rechte im Einsatz](rechte-im-einsatz.md).
 
 ### Was ins Einsatztagebuch geht
 
