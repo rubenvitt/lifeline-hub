@@ -209,7 +209,7 @@ export default function MeldungFormular({
     wortlautRef.current?.focus();
   };
 
-  /** Fast-Path: Lagemeldung an übergeordnete Führung (extern). */
+  /** Fast-Path: Lagemeldung an die übergeordnete Stelle (Art Lagemeldung, Richtung extern). */
   const lagemeldungVorbelegen = () => {
     form.setFieldsValue({ meldungsart: 'lagemeldung', richtung: 'extern' });
     wortlautRef.current?.focus();
@@ -324,7 +324,7 @@ export default function MeldungFormular({
             Sofortmeldung
           </Button>
           <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>
-            Lagemeldung (extern)
+            Lagemeldung an übergeordnete Stelle
           </Button>
         </Space>
       )}

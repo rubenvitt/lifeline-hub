@@ -199,9 +199,11 @@ function MeldungKarte({
               },
             ]
           : []),
-        // Lage-Übergabe und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung selbst.
+        // Übernahme in die Lage und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung
+        // selbst. Ein Wort für den Vorgang: „In die Lage übernehmen“, Etikett „In der Lage ✓“
+        // (LLH-1046, `frontend/AGENTS.md`, Begriffe).
         ...(!m.lagerelevant && onLagerelevant
-          ? [{ key: 'lr', label: 'An Lage übergeben', onClick: () => onLagerelevant(m.id) }]
+          ? [{ key: 'lr', label: 'In die Lage übernehmen', onClick: () => onLagerelevant(m.id) }]
           : []),
         // Ein aufgehobener Auftrag gilt nicht mehr: die Meldung lässt sich erneut überführen, der
         // Server stellt den Rückverweis dann auf den neuen Auftrag um (LLH-1177).
@@ -246,7 +248,7 @@ function MeldungKarte({
             unbearbeitet={!!status.unbearbeitet}
           />
           {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
-          {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
+          {m.lagerelevant && <StatusChip ton="bedien" wort="In der Lage ✓" />}
           {m.auftrag_id != null &&
             darf('fremde-module') &&
             (m.is_auftrag_aufgehoben ? (

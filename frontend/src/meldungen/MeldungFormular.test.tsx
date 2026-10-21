@@ -79,7 +79,9 @@ describe('MeldungFormular', () => {
 
   it('Lagemeldung-Fast-Path belegt meldungsart + richtung extern vor', async () => {
     const onAnlegen = renderFormular();
-    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
     await fuellePflichtfelder('S3', 'Lage: ...');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     expect(onAnlegen).toHaveBeenCalledWith(
@@ -296,7 +298,9 @@ describe('MeldungFormular — Art vorgegeben (LLH-1031)', () => {
     renderFormular();
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     expect(screen.queryByPlaceholderText('Koordinate eingeben')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
     expect(screen.getByPlaceholderText('Koordinate eingeben')).toBeInTheDocument();
   });
 });
@@ -539,10 +543,12 @@ describe('MeldungFormular — Feldbudget und Fokus (LFH-974)', () => {
     expect(klappkopf()).toHaveTextContent('Bestätigung');
   });
 
-  it('„Lagemeldung (extern)" setzt den Fokus in den Wortlaut und nennt Art und Richtung', async () => {
+  it('„Lagemeldung an übergeordnete Stelle" setzt den Fokus in den Wortlaut und nennt Art und Richtung', async () => {
     renderFormular();
     await userEvent.click(screen.getByLabelText('Absender'));
-    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
     await waitFor(() => expect(wortlaut()).toHaveFocus());
     expect(klappkopf()).toHaveTextContent('Lagemeldung');
     expect(klappkopf()).toHaveTextContent('Extern');

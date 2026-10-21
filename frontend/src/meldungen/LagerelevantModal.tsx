@@ -32,7 +32,7 @@ interface FormWerte {
 }
 
 /**
- * An die Lage übergeben: optionaler Lage-Text und optionale Verortung. Ohne Koordinate bleibt
+ * In die Lage übernehmen: optionaler Lage-Text und optionale Verortung. Ohne Koordinate bleibt
  * die Meldung ein Listen-Lageobjekt, verortet erscheint sie zusätzlich als Marker. Die Aktion
  * ist einmalig (MeldungListe blendet sie danach aus).
  */
@@ -77,7 +77,7 @@ export default function LagerelevantModal({
   return (
     <Modal
       open={offen}
-      title="An die Lage übergeben"
+      title="In die Lage übernehmen"
       footer={null}
       onCancel={abbrechen}
       closable={sperrt ? { disabled: true } : true}
@@ -99,7 +99,7 @@ export default function LagerelevantModal({
         />
         {speicherung?.error != null && (
           <div style={{ marginBottom: 12 }}>
-            <SpeicherFehler fehler={speicherung.error} titel="Nicht übergeben" />
+            <SpeicherFehler fehler={speicherung.error} titel="Nicht übernommen" />
           </div>
         )}
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
@@ -107,7 +107,7 @@ export default function LagerelevantModal({
             Abbrechen
           </Button>
           <Button type="primary" htmlType="submit" loading={senden}>
-            Übergeben
+            Übernehmen
           </Button>
         </Space>
       </Form>

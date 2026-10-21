@@ -500,6 +500,13 @@ anwendbar), „nicht geprüft" ist keins.
   gilt; kein „Leer = …“-Satz daneben (LFH-1078). Bausteine in `components/vorgabeText.ts`
   („… (Vorgabe)“, „Vorgabe der Organisation: …“), Wächter `components/vorgabe.guard.test.ts` mit Ausnahmeliste
   für Eigennamen („Standard-Rufname“, „Standardansicht“).
+- **Meldung und Lage** (LLH-1046, Spec `bedien-wortlaut`; Begriffe in
+  `docs/design/2026-10-21-meldungsmodell/README.md`): das Modul heißt „Meldungen“ (Eingang und
+  Ausgang), „Lagemeldungen“ ist die Sicht auf die lagerelevanten Meldungen. Eine Meldung anderer
+  Art wird „In die Lage übernommen“ (Aktion und Dialog „In die Lage übernehmen“, Rückmeldung,
+  Hinweis, ETB-Eintrag), ihr Etikett ist „In der Lage ✓“; „übergeben“ steht dafür nie. Der
+  ETB-Typ „Lage“ heißt in der Mehrzahl „Lagefeststellungen“, nie „Lagemeldungen“. Das Paneel des
+  Lagebilds mit ETB-Einträgen heißt „Jüngste ETB-Einträge“.
 
 **Aktionen**
 
