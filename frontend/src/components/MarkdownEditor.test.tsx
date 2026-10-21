@@ -19,16 +19,14 @@ describe('MarkdownEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith('x');
   });
 
-  it('split-Layout rendert die Vorschau live (formatiert, kein Rohtext)', () => {
+  // LLH-1354: alle Aufrufer nutzen `toggle`, deshalb ist es der Default.
+  it('rendert ohne `layout` das toggle-Layout, die Vorschau erst auf Klick', async () => {
     const { container } = render(
-      <MarkdownEditor
-        unterEbene={3}
-        value="Lage **kritisch**"
-        onChange={() => {}}
-        layout="split"
-      />,
+      <MarkdownEditor unterEbene={3} value="Lage **kritisch**" onChange={() => {}} />,
     );
-    // Vorschau ist im split-Layout dauerhaft sichtbar.
+    expect(container.querySelectorAll('.markdown-editor--toggle')).toHaveLength(1);
+    expect(container.querySelector('.markdown')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
     expect(container.querySelector('.markdown strong')).toHaveTextContent('kritisch');
   });
 
@@ -42,9 +40,10 @@ describe('MarkdownEditor', () => {
     expect(container.querySelectorAll('.markdown li')).toHaveLength(2);
   });
 
-  it('zeigt bei leerem Inhalt einen dezenten Vorschau-Hinweis statt eines leeren Kastens', () => {
-    render(<MarkdownEditor unterEbene={3} value="" onChange={() => {}} layout="split" />);
-    expect(screen.getByText(/vorschau/i)).toBeInTheDocument();
+  it('zeigt bei leerem Inhalt einen dezenten Vorschau-Hinweis statt eines leeren Kastens', async () => {
+    render(<MarkdownEditor unterEbene={3} value="" onChange={() => {}} />);
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
+    expect(screen.getByText('Noch nichts zu zeigen.')).toBeInTheDocument();
   });
 
   it('reicht placeholder an das Textfeld durch', () => {
@@ -70,15 +69,17 @@ describe('MarkdownEditor', () => {
     // Extern gesetztes value (z.B. Baustein-Einsetzen via Form) muss in der Komponente ankommen.
     await userEvent.click(screen.getByText('baustein'));
     expect(screen.getByRole('textbox')).toHaveValue('**fett**');
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
     expect(container.querySelector('.markdown strong')).toHaveTextContent('fett');
   });
 
-  it('spiegelt fortlaufende Eingabe in der split-Vorschau (gesteuert von außen)', async () => {
+  it('spiegelt fortlaufende Eingabe in der offenen Vorschau (gesteuert von außen)', async () => {
     function Wrapper() {
       const [v, setV] = useState('');
-      return <MarkdownEditor unterEbene={3} value={v} onChange={setV} layout="split" />;
+      return <MarkdownEditor unterEbene={3} value={v} onChange={setV} />;
     }
     const { container } = render(<Wrapper />);
+    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
     await userEvent.type(screen.getByRole('textbox'), '# Titel');
     // `#` rendert unter `unterEbene` 3 als h4, mit der Quellstufe als Klasse (`Markdown.tsx`).
     expect(container.querySelector('.markdown .md-h1')).toHaveTextContent('Titel');
@@ -107,25 +108,18 @@ describe('MarkdownEditor – toggle-Variante', () => {
 
   /**
    * Die Voraussetzung der Druckregeln aus `entwurf/dokumentEntwurf.css` (LFH-350/M86), als
-   * DOM-Messung: `split` wickelt sein Textfeld in `.markdown-editor__eingabe`, `toggle` NICHT. Eine
-   * Druckregel darauf kann einen Toggle-Abschnitt nicht leer drucken, und eine Regel auf
-   * `textarea` braucht eine gerenderte Fassung daneben (offene Vorschau oder `druckfassung`).
-   * Fällt diese Behauptung, ist die Begründung der Druckregeln hinfällig.
+   * DOM-Messung: das Textfeld steht in `.markdown-editor--toggle`, und bei geschlossener Vorschau
+   * ist es der einzige Träger des Textes. Eine Regel auf `textarea` braucht deshalb eine
+   * gerenderte Fassung daneben (offene Vorschau oder `druckfassung`). Fällt diese Behauptung, ist
+   * die Begründung der Druckregeln hinfällig.
    */
-  it('wickelt sein Textfeld NICHT in die Eingabespalte (anders als split)', () => {
-    const { container: zu } = renderMitProviders(
+  it('trägt bei geschlossener Vorschau den Text allein im Textfeld', () => {
+    const { container } = renderMitProviders(
       <MarkdownEditor unterEbene={3} layout="toggle" value="**fett**" onChange={() => {}} />,
     );
-    expect(zu.querySelectorAll('.markdown-editor--toggle textarea')).toHaveLength(1);
-    expect(zu.querySelector('.markdown-editor__eingabe')).toBeNull();
-    // Und bei geschlossener Vorschau ist das Textfeld der einzige Träger des Textes.
-    expect(zu.querySelector('.markdown-editor__vorschau')).toBeNull();
-
-    const { container: gespalten } = renderMitProviders(
-      <MarkdownEditor unterEbene={3} layout="split" value="**fett**" onChange={() => {}} />,
-    );
-    expect(gespalten.querySelectorAll('.markdown-editor__eingabe textarea')).toHaveLength(1);
-    expect(gespalten.querySelector('.markdown-editor__vorschau')).not.toBeNull();
+    expect(container.querySelectorAll('.markdown-editor--toggle textarea')).toHaveLength(1);
+    expect(container.querySelector('.markdown-editor__vorschau')).toBeNull();
+    expect(container.querySelector('.markdown')).toBeNull();
   });
 
   /**
@@ -230,7 +224,13 @@ describe('MarkdownEditor – toggle-Variante', () => {
 
   it('rendert ohne `druckTitel` keinen Titel', () => {
     const { container } = renderMitProviders(
-      <MarkdownEditor unterEbene={1} layout="split" value="Text" onChange={() => {}} />,
+      <MarkdownEditor
+        unterEbene={1}
+        layout="toggle"
+        druckfassung
+        value="Text"
+        onChange={() => {}}
+      />,
     );
     expect(container.querySelector('.markdown-editor__titel')).toBeNull();
   });
