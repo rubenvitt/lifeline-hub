@@ -33,6 +33,8 @@ export const MODULE_PERSONAL_FAHRZEUGE_GESPERRT = 'Module Personal und Fahrzeuge
 export const MODUL_EINHEITEN_GESPERRT = 'Modul Einheiten gesperrt';
 export const MODUL_ABSCHNITTE_GESPERRT = 'Modul Einsatzabschnitte gesperrt';
 export const MODUL_AUFTRAEGE_GESPERRT = 'Modul Aufträge gesperrt';
+/** Lagemeldung erfassen (LLH-1031): jede Lagemeldung ist eine Meldung, das Modul Meldungen schreibt sie. */
+export const MODUL_MELDUNGEN_GESPERRT = 'Modul Meldungen gesperrt';
 
 /** Grund für Module, in denen Einsatzleitung und Führungspersonal schreiben. */
 export function einsatzRechteGrund(einsatzStatus: EinsatzStatus): string {

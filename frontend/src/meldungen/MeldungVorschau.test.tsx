@@ -30,7 +30,6 @@ const meldung = (over: Partial<Meldung> = {}): Meldung => ({
   is_auftrag_aufgehoben: false,
   erfasst_von_id: 1,
   erstellt_at: '2026-06-12 09:05:00',
-  lage_meldung_id: null,
   ist_offen: true,
   erledigt_at: null,
   bestaetigung_pflicht: false,

@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
   LEERER_FILTER,
+  type Herkunftsfilter,
   filterAktiv,
   filtereLagemeldungen,
   gruppiereNachTag,
@@ -106,6 +107,32 @@ describe('zeitachse', () => {
     expect(texte({ suche: 'nichts' })).toEqual([]);
   });
 
+  it('filtert nach Herkunft: Gerät, übernommen; ein alter Lage-Stand ohne Art nur unter „Alle“', () => {
+    const menge = [
+      {
+        ...eintrag('2026-06-13 09:30:00', 'Vom Tablet'),
+        meldungsart: 'lagemeldung',
+        is_von_geraet: true,
+      },
+      {
+        ...eintrag('2026-06-13 09:00:00', 'Erfasst'),
+        meldungsart: 'lagemeldung',
+        is_von_geraet: false,
+      },
+      {
+        ...eintrag('2026-06-13 08:00:00', 'Rückmeldung'),
+        meldungsart: 'rueckmeldung',
+        is_von_geraet: false,
+      },
+      eintrag('2026-06-13 07:00:00', 'Alter Stand'),
+    ];
+    const texte = (herkunft: Herkunftsfilter) =>
+      filtereLagemeldungen(menge, { ...LEERER_FILTER, herkunft }).map((l) => l.text);
+    expect(texte('alle')).toHaveLength(4);
+    expect(texte('geraet')).toEqual(['Vom Tablet']);
+    expect(texte('uebernommen')).toEqual(['Rückmeldung']);
+  });
+
   /**
    * LLH-1039: Die Zeitachse liest die Ereigniszeit der Quellmeldung, nicht die Übergabe. Eine um
    * 13:14 eingegangene, um 15:05 übergebene Meldung steht unter 13:14 und unter der um 14:41.
@@ -174,5 +201,6 @@ describe('zeitachse', () => {
     expect(filterAktiv({ ...LEERER_FILTER, suche: '   ' })).toBe(false);
     expect(filterAktiv({ ...LEERER_FILTER, ort: 'mit' })).toBe(true);
     expect(filterAktiv({ ...LEERER_FILTER, fenster: 'heute' })).toBe(true);
+    expect(filterAktiv({ ...LEERER_FILTER, herkunft: 'geraet' })).toBe(true);
   });
 });
