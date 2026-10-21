@@ -13,7 +13,10 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   bewertung-details.png frontend/src/pages/gefahren/GefahrenZelleDetails.tsx
  *
  * Die Demo bewertet je Gefahrengebiet nur eine Zelle; für ein lesbares Bild ergänzt der Lauf
- * einige Bewertungen der „Überflutung Unterstadt“ über die API.
+ * einige Bewertungen der „Überflutung Unterstadt“ über die API. Für `gefahren.png` bestätigt er
+ * die Beurteilung des „Hangrutsch Kirchberg“, damit die Liste beide Zusätze zeigt („1 Gefahr ·
+ * …“ und „nicht beurteilt“, LLH-1102); die „Überflutung Unterstadt“ bleibt für den Ablauf
+ * „Beurteilung bestätigen“ offen.
  */
 
 const KAPITEL = 'gefahren';
@@ -57,7 +60,16 @@ async function oeffneGefahren(page: Page) {
 
 test.describe(KAPITEL, () => {
   test('Gefahrengebiete und Matrix der Bewertung', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    const gebiete = (await (
+      await page.request.get(`/api/einsaetze/${demo.id}/gefahrengebiete`)
+    ).json()) as { id: number; label: string | null }[];
+    const hang = gebiete.find((g) => g.label === 'Hangrutsch Kirchberg');
+    expect(hang, 'Demo-Gefahrengebiet „Hangrutsch Kirchberg“ fehlt').toBeTruthy();
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/gefahrengebiete/${hang!.id}/beurteilung`);
     await oeffneGefahren(page);
+    await expect(page.getByText(/^1 Gefahr · /)).toBeVisible();
     await fotografiere(page, KAPITEL, 'gefahren');
     // Ablauf weiter: das Gebiet auf der Lagekarte zeigen.
     await page.getByRole('link', { name: /^Auf Karte zeigen/ }).click();

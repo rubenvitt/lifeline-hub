@@ -62,6 +62,43 @@ function useSpaltenFreiraum(tabelle: RefObject<TableRef | null>): void {
   }, [tabelle]);
 }
 
+/**
+ * Wie weit die Seite nach oben rollen muss, damit ein fokussiertes Ziel nicht unter der stehenden
+ * Kopfzeile liegt (negativ = nach oben), oder 0. Rein, damit die Regel ohne Layout prüfbar ist.
+ */
+export function kopfUeberdeckung(
+  ziel: Pick<DOMRect, 'top' | 'bottom'>,
+  kopf: Pick<DOMRect, 'top' | 'bottom'>,
+): number {
+  return ziel.top < kopf.bottom && ziel.bottom > kopf.top ? ziel.top - kopf.bottom : 0;
+}
+
+/**
+ * Rückwärts in die ERSTE Zeile getabbt, rollt der Browser die Seite nicht (LLH-1102): Chromium
+ * beschneidet den Fokusrand (`scroll-margin-top`, `gefahrenMatrix.css`) an der Oberkante des
+ * waagerechten Scrollcontainers `.ant-table-body`, und die erste Zeile beginnt genau dort. Die
+ * Zelle zählt damit als sichtbar und blieb unter der stehenden Kopfzeile (`e2e/fokus-verdeckung`,
+ * 1024 × 768 Handschuh; bei 390 px schon vorher). Solange der Knopf in einer gepolsterten Zelle
+ * saß, ragte er nur halb darunter. Nach jedem Fokuswechsel in den Zellen wird deshalb gemessen
+ * und die Seite um die Überdeckung zurückgerollt.
+ */
+function useFokusUnterKopf(tabelle: RefObject<TableRef | null>): void {
+  useEffect(() => {
+    const wurzel = tabelle.current?.nativeElement;
+    if (!wurzel) return;
+    const beiFokus = (e: FocusEvent) => {
+      const ziel = e.target as HTMLElement;
+      if (!ziel.closest('.ant-table-tbody')) return;
+      const kopf = wurzel.querySelector('.ant-table-sticky-holder, .ant-table-header');
+      if (!kopf) return;
+      const versatz = kopfUeberdeckung(ziel.getBoundingClientRect(), kopf.getBoundingClientRect());
+      if (versatz < 0) window.scrollBy({ top: versatz, behavior: 'instant' });
+    };
+    wurzel.addEventListener('focusin', beiFokus);
+    return () => wurzel.removeEventListener('focusin', beiFokus);
+  }, [tabelle]);
+}
+
 interface ZeilenDaten {
   typ: Gefahrentyp;
   label: string;
@@ -199,6 +236,8 @@ export default function GefahrenMatrix({
   const rahmenOben = useRahmenOben();
   // Freiraum neben der fixierten Spalte beim Tabben nach links.
   useSpaltenFreiraum(tabelleRef);
+  // Erste Zeile rückwärts getabbt: nicht unter der Kopfzeile stehen lassen.
+  useFokusUnterKopf(tabelleRef);
   /**
    * Im Zustand steht die Kennung der Zelle, nicht ihr Datensatz. Eine Momentaufnahme vom Menüklick
    * würde von keinem Nachladen erreicht; der Detail-PUT schickt aber `warnstufe` mit und drehte
