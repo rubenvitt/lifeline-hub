@@ -67,6 +67,10 @@ describe('Katalog der Benachrichtigungsarten', () => {
         '/einsaetze/4/abloesung?schicht=9',
       );
     }
+    // Eine Meldung springt zu sich, mit Hervorhebung (LLH-1052).
+    expect(
+      ersatzPfad({ art: 'sofortmeldung', bezug_typ: 'meldung', bezug_id: 7, einsatz_id: 4 }),
+    ).toBe('/einsaetze/4/meldungen?meldung=7');
     // Sonst das Modul des Bezugs, Org-Arten der Einsatz.
     expect(
       ersatzPfad({ art: 'auftrag_erteilt', bezug_typ: 'auftrag', bezug_id: 3, einsatz_id: 4 }),
