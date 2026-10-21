@@ -1,5 +1,5 @@
 import { IconAuge } from '../icons';
-import { Button, Input, Tabs, Typography } from 'antd';
+import { Button, Input, Typography } from 'antd';
 import type { GetRef } from 'antd';
 import {
   forwardRef,
@@ -16,7 +16,6 @@ import './MarkdownEditor.css';
 /** Ref-Typ des inneren antd Input.TextArea (hat `resizableTextArea.textArea`). */
 export type TextAreaRef = GetRef<typeof Input.TextArea>;
 
-type Layout = 'tabs' | 'toggle';
 type Variante = 'kompakt' | 'dokument';
 
 interface Props {
@@ -24,13 +23,6 @@ interface Props {
   value?: string;
   /** Liefert den neuen Markdown-Text als reinen String. */
   onChange?: (value: string) => void;
-  /**
-   * `toggle` (Default, LLH-1354): schlankes Feld + dezenter Vorschau-Button; so schreiben die
-   * Entwurfsseite (`entwurf/DokumentEntwurf.tsx`) und mit {@link umschalterAussen} die
-   * ETB-Schnellerfassung.
-   * `tabs`: kompakter Schreiben/Vorschau-Umschalter.
-   */
-  layout?: Layout;
   /** Darstellung der Vorschau — soll der späteren Anzeige entsprechen. */
   variante?: Variante;
   /**
@@ -57,7 +49,7 @@ interface Props {
    */
   readOnly?: boolean;
   /**
-   * Nur `toggle`: rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die nur
+   * Rendert bei geschlossener Vorschau zusätzlich eine gerenderte Fassung, die nur
    * der Druck zeigt (`.markdown-editor__druck`, sichtbar gemacht von `entwurf/dokumentEntwurf.css`).
    * Sonst trüge auf Papier eine `<textarea>` mit abgeschnittenem Rohtext (LFH-71). Opt-in, weil sie
    * einen Markdown-Render je Anschlag kostet.
@@ -71,7 +63,7 @@ interface Props {
    */
   druckTitel?: string;
   /**
-   * Nur `toggle`: der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373); der eigene Knopf
+   * Der Aufrufer führt den Vorschau-Umschalter selbst (LFH-373); der eigene Knopf
    * unter dem Feld entfällt, die Vorschau folgt {@link vorschauOffen}. Für die ETB-Erfassung, wo
    * eine eigene Knopfzeile im Handschuh-Betrieb eine volle Steuerhöhe der angepinnten Leiste
    * kostete.
@@ -93,7 +85,9 @@ interface Props {
 }
 
 /**
- * Eingabefeld, das den getippten Markdown direkt als Vorschau spiegelt.
+ * Eingabefeld mit zuschaltbarer Markdown-Vorschau: schlankes Feld und dezenter Vorschau-Knopf
+ * darunter (oder ein Umschalter des Aufrufers, {@link Props.umschalterAussen}). So schreiben die
+ * Entwurfsseite (`entwurf/DokumentEntwurf.tsx`) und die ETB-Schnellerfassung.
  *
  * Bewusst KEIN WYSIWYG: gespeichert wird exakt der getippte Markdown-String, und als
  * controlled `value`/`onChange`-Komponente bleibt sie mit extern gesetztem `value` (z. B.
@@ -103,7 +97,6 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   {
     value = '',
     onChange,
-    layout = 'toggle',
     variante = 'dokument',
     unterEbene,
     placeholder,
@@ -123,7 +116,6 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   },
   ref,
 ) {
-  const [aktiv, setAktiv] = useState<'schreiben' | 'vorschau'>('schreiben');
   const [vorschauOffen, setVorschauOffen] = useState(false);
 
   const textfeld = (
@@ -174,32 +166,9 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>,
   );
 
-  if (layout === 'tabs') {
-    return (
-      <div className="markdown-editor markdown-editor--tabs">
-        <Tabs
-          activeKey={aktiv}
-          onChange={(k) => setAktiv(k as 'schreiben' | 'vorschau')}
-          items={[
-            { key: 'schreiben', label: 'Schreiben', children: textfeld },
-            {
-              key: 'vorschau',
-              label: 'Vorschau',
-              children: (
-                <div className="markdown-editor__vorschau">
-                  {aktiv === 'vorschau' ? vorschau : null}
-                </div>
-              ),
-            },
-          ]}
-        />
-      </div>
-    );
-  }
-
   const offen = umschalterAussen ? vorschauOffenAussen : vorschauOffen;
   return (
-    <div className="markdown-editor markdown-editor--toggle">
+    <div className="markdown-editor">
       {textfeld}
       {!umschalterAussen && (
         <div style={{ marginTop: 4 }}>
