@@ -22,6 +22,7 @@ import {
   zielVon,
 } from './benachrichtigungKatalog';
 import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
+import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
 import { schliessePushMeldungen } from './webPush';
 
@@ -62,17 +63,24 @@ function ersatzAnzeige(e: BenachrichtigungEreignis): BenachrichtigungAnzeige {
   };
 }
 
+/**
+ * Der Toast einer Benachrichtigung. `inhalt` (LLH-1052, `meldungInhalt.ts`) ersetzt Titel und
+ * Detailzeile des Servers durch Absender und Wortlautanfang der Meldung; was fehlt, bleibt beim
+ * Server.
+ */
 function eintragVon(
   a: BenachrichtigungAnzeige,
-  opts: { uhrzeit: string | null; desktop: boolean },
+  opts: { uhrzeit: string | null; desktop: boolean; inhalt?: MeldungInhalt | null },
 ): AlarmToastEintrag {
   const schluessel = toastSchluessel({ ...a, benachrichtigung_id: a.id });
-  const beschreibung = [a.detail, opts.uhrzeit].filter(Boolean).join(' · ') || undefined;
+  const anfang = opts.inhalt?.anfang ?? null;
+  const beschreibung = [anfang ?? a.detail, opts.uhrzeit].filter(Boolean).join(' · ') || undefined;
   return {
     schluessel,
     art: a.stufe === 'alarm' ? 'warning' : 'info',
-    titel: a.titel,
+    titel: opts.inhalt?.titel ?? a.titel,
     beschreibung,
+    beschreibungVoll: anfang ? (opts.inhalt?.wortlaut ?? undefined) : undefined,
     pfad: a.pfad,
     ziel: zielVon(a),
     gruppe: sammelGruppeVon(a.art),
@@ -125,17 +133,23 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
       }
       if (!unbekannt(id)) return;
       inArbeit.add(id);
+      // Der Inhalt der Meldung (LLH-1052) kommt parallel und mit eigener Frist; er wirft nie.
+      const inhaltZusage = ladeMeldungInhalt(e);
       let anzeige: BenachrichtigungAnzeige;
+      let inhalt: MeldungInhalt | null;
       try {
-        anzeige = await ladeBenachrichtigung(id);
-      } catch (fehler) {
-        if (fehler instanceof ApiError && fehler.status < 500) return;
-        anzeige = ersatzAnzeige(e);
+        try {
+          anzeige = await ladeBenachrichtigung(id);
+        } catch (fehler) {
+          if (fehler instanceof ApiError && fehler.status < 500) return;
+          anzeige = ersatzAnzeige(e);
+        }
+        inhalt = await inhaltZusage;
       } finally {
         inArbeit.delete(id);
       }
       if (!aktiv || quittiert.has(id) || anzeige.quittiert_at) return;
-      const ergebnis = toasts.melde(eintragVon(anzeige, { uhrzeit: null, desktop: true }));
+      const ergebnis = toasts.melde(eintragVon(anzeige, { uhrzeit: null, desktop: true, inhalt }));
       if (ergebnis === 'inaktiv') return;
       gezeigt.add(id);
       if (ergebnis === 'neu') spieleAlarmTon(e.stufe === 'alarm' ? 'alarm' : 'dezent');
@@ -160,15 +174,23 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
             return;
           }
           if (!aktiv) return;
-          let ton = false;
           // Der Server liefert jüngste zuerst.
-          for (const a of [...liste].reverse()) {
-            if (a.quittiert_at || !passt(a, einsatzId) || !unbekannt(a.id)) continue;
+          const offen = [...liste]
+            .reverse()
+            .filter((a) => !a.quittiert_at && passt(a, einsatzId) && unbekannt(a.id));
+          // Die Inhalte (LLH-1052) zusammen holen, je mit Frist: ein Abruf je offenem Alarm.
+          const inhalte = await Promise.all(offen.map((a) => ladeMeldungInhalt(a)));
+          if (!aktiv) return;
+          let ton = false;
+          for (const [i, a] of offen.entries()) {
+            // Während der Inhalte kann sie live gekommen oder quittiert worden sein.
+            if (!unbekannt(a.id)) continue;
             const wiederholt = gezeigt.has(a.id);
             const ergebnis = toasts.melde(
               eintragVon(a, {
                 uhrzeit: uhrzeitVon(a),
                 desktop: !wiederholt && a.stufe === 'alarm',
+                inhalt: inhalte[i],
               }),
             );
             if (ergebnis === 'inaktiv') return;

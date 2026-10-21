@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
 ---
 
 ## Überblick
@@ -65,12 +65,19 @@ Abschnitt“, Absender, Meldeweg, Empfängerfunktion und Empfänger stehen.
 
 Für Einsatzleitung und Führungspersonal:
 
-1. Beim Eingang einer Sofortmeldung erscheint der Alarm „Sofortmeldung eingegangen“ mit
-   „Meldung #…“; „Öffnen“ führt zur Meldung.
+1. Beim Eingang einer Sofortmeldung erscheint ein Alarm mit Absender und Anfang des Wortlauts,
+   etwa „Sofortmeldung · Rettungsstaffel“ und darunter „Kellerabgang Mühlbachweg 34: eine schwer
+   verletzte Person …“. Den ganzen Wortlaut zeigt der Zeiger über der Zeile. „Öffnen“ führt zur
+   Meldung und hebt ihre Karte hervor, ebenso ein Klick auf die Meldung des Betriebssystems.
 2. Die Karte der Sofortmeldung trägt „Bestätigung offen bis …“. An ihr „Bestätigen“ wählen und
    die Rückfrage „Sofortmeldung bestätigen?“ mit „Bestätigen“ beantworten.
 
-Die Karte zeigt danach, wer wann quittiert hat.
+Die Karte zeigt danach, wer wann quittiert hat. Wer bestätigt, hat die Meldung gesehen: eine
+neue Meldung steht danach auf „Gesichtet“ und zählt nicht mehr unter „Unbearbeitet“. Eine
+Meldung, die schon gesichtet, in Bearbeitung oder erledigt ist, behält ihre Stufe.
+
+Kommt die Meldung nicht schnell genug vom Server, steht der Alarm ohne Inhalt da:
+„Sofortmeldung eingegangen“ mit „Meldung #…“.
 
 ### Eine Meldung an die Lage übergeben
 
@@ -128,12 +135,13 @@ Minuten.
 Mit der Sofortmeldung legt die App eine automatische Erinnerung „Sofortmeldung #… unbestätigt“
 an. Läuft die Frist ab, ohne dass jemand bestätigt, wird die Meldung eskaliert: Sie rückt
 innerhalb ihrer Priorität nach oben und zählt unter „Bestätigung überfällig“, und es erscheint der
-Alarm „Bestätigung ausstehend“ mit „Meldung #…“. Mit der Bestätigung schließt die Erinnerung
+Alarm „Bestätigung ausstehend“, wie beim Eingang mit Absender und Anfang des Wortlauts. Mit
+der Bestätigung schließt die Erinnerung
 (Kapitel [Erinnerungen](erinnerungen.md)).
 
 ### Wer den Alarm bekommt
 
-Den Alarm „Sofortmeldung eingegangen“ bekommen alle, die das Modul Meldungen sehen, außer der
+Den Alarm einer neuen Sofortmeldung bekommen alle, die das Modul Meldungen sehen, außer der
 Person, die die Sofortmeldung erfasst hat. „Bestätigung ausstehend“ bekommen alle mit dem Modul,
 auch die erfassende Person. Beide kommen mit Ton und lassen sich unter „Benachrichtigungen“ nicht
 abschalten (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Eine gewöhnliche

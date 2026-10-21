@@ -101,11 +101,45 @@ Scheduler MUST erneut alarmieren, dann auch den Erfasser.
 
 #### Scenario: Neue Sofortmeldung
 - **WHEN** eine Sofortmeldung erfasst wird
-- **THEN** erhalten alle mit dem Modul Meldungen außer dem Erfasser einen Alarm „Sofortmeldung eingegangen“
+- **THEN** erhalten alle mit dem Modul Meldungen außer dem Erfasser einen Alarm; die Benachrichtigung trägt den Titel „Sofortmeldung eingegangen“
 
 #### Scenario: Eskalation
 - **WHEN** eine Sofortmeldung unbestätigt bleibt und der Scheduler sie eskaliert
 - **THEN** erhalten alle mit dem Modul Meldungen einschließlich des Erfassers einen Alarm „Bestätigung ausstehend“
+
+### Requirement: Der Sofortalarm nennt die Meldung und springt zu ihr
+
+Beide Alarme einer Sofortmeldung SHALL Absender und Anfang des Wortlauts der Meldung nennen;
+beides MUST das Frontend über die Abfrage der Meldung holen, nie über das Live-Ereignis oder den
+Text der Benachrichtigung. Antwortet die Abfrage nicht rechtzeitig, MUST der Alarm mit dem Text
+der Benachrichtigung erscheinen. „Öffnen“ und der Klick auf die OS-Meldung MUST zur Meldung
+springen und sie hervorheben.
+
+#### Scenario: Inhalt im Alarm
+- **WHEN** die Rettungsstaffel per Sofortmeldung „Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen“ meldet
+- **THEN** heißt der Alarm „Sofortmeldung · Rettungsstaffel“ und zeigt den Anfang des Wortlauts, höchstens 120 Zeichen, den ganzen Wortlaut im Titel-Attribut
+
+#### Scenario: Meldung nicht abrufbar
+- **WHEN** die Abfrage der Meldung scheitert oder nicht rechtzeitig antwortet
+- **THEN** erscheint der Alarm „Sofortmeldung eingegangen“ mit „Meldung #‹Nummer›“
+
+#### Scenario: Öffnen
+- **WHEN** eine Person im Alarm „Öffnen“ wählt oder die OS-Meldung anklickt
+- **THEN** steht die Meldungsseite mit `?meldung=‹id›` offen und die Karte der Meldung ist hervorgehoben
+
+### Requirement: Bestätigen sichtet die Sofortmeldung
+
+Bestätigt eine Person eine Meldung mit Bestätigungspflicht, SHALL die Meldung in derselben
+Transaktion vom Status Neu auf Gesichtet gehen: wer den Empfang bestätigt, hat sie gesehen. Ein
+späterer Status (Gesichtet, In Bearbeitung, Erledigt) MUST unverändert bleiben.
+
+#### Scenario: Neue Sofortmeldung bestätigt
+- **WHEN** eine Sofortmeldung im Status Neu bestätigt wird
+- **THEN** steht sie auf Gesichtet, trägt die Quittung und zählt nicht mehr als unbearbeitet
+
+#### Scenario: Schon in Bearbeitung
+- **WHEN** eine Sofortmeldung im Status In Bearbeitung bestätigt wird
+- **THEN** bleibt sie In Bearbeitung
 
 ### Requirement: Überfälliger Auftrag alarmiert Auftraggeber und Empfänger
 
