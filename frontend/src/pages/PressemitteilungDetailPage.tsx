@@ -22,6 +22,7 @@ import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
+import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
@@ -45,7 +46,7 @@ import './lageberichtPrint.css';
  * `openspec/changes/archive/2026-09-30-lfh-554-presse-medienarbeit-s5/design.md` (D4).
  *
  * Zwilling von `LageberichtDetailPage` und `BefehlDetailPage` (dasselbe Muster: Verlustschutz,
- * Einstiegsfokus, Freigabedialog; die Schreibfläche ist `entwurf/DokumentEntwurf`, LLH-1074). Eine
+ * Rückfrage vor dem Verlassen, Einstiegsfokus, Freigabedialog; die Schreibfläche ist `entwurf/DokumentEntwurf`, LLH-1074). Eine
  * gemeinsame Hülle der ganzen Seite ist ein eigener Umbau; die Begründungen der einzelnen Riegel
  * stehen dort.
  *
@@ -211,6 +212,23 @@ function PressemitteilungDetail() {
 
   return (
     <div className="lagebericht-print-root" data-lfh="druckwurzel">
+      {/* Rückfrage vor dem Verlassen mit ungespeicherter Fassung — wie in `LageberichtDetailPage`
+          und `BefehlDetailPage` (LLH-1367). Eine Quelle für „speichert": `speichertGerade` deckt
+          Autosave und Knopf ab. Der Grund eines Fehlschlags gehört in den Dialog, hinter seiner
+          Maske ist die Seite unbedienbar. Pflichtfeld ist nur der Titel. */}
+      <EntwurfNavigationSchutz
+        ungespeichert={schutz.ungespeichert && schreibtEntwurf}
+        speichert={schutz.speichertGerade}
+        speicherFehler={schutz.speicherFehler}
+        speichern={async () => {
+          try {
+            await form.validateFields();
+          } catch {
+            return; // Feldfehler bleiben am Formular; der Wechsel bleibt angehalten.
+          }
+          schutz.autosaveJetzt();
+        }}
+      />
       <FreigabeDialog
         offen={freigabeWerte !== null}
         titel="Pressemitteilung freigeben?"
