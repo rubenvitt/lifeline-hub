@@ -14,12 +14,41 @@ import { abstandM, kreisPolygon, radiusPunkt, type GeoPunkt } from './geo';
 import { griffStil, type GriffKontext } from './bildGriffe';
 import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
 
-export const KREIS_VORSCHAU_QUELLE = 'td-zone-kreis';
-export const KREIS_VORSCHAU_LAYER = [
-  'td-zone-kreis-flaeche',
-  'td-zone-kreis-linie',
-  'td-zone-kreis-mitte',
-] as const;
+/**
+ * Quelle und Ebenen einer Kreis-Vorschau. Zwei Sätze teilen dieselbe Zeichnung: der Kreis um einen
+ * Punkt (Zone) und der Vorschaukreis der Messform „Radius“ (LLH-1345). Getrennte Ebenen, damit der
+ * Abbau der einen die andere nie trifft.
+ */
+export interface KreisEbenen {
+  quelle: string;
+  flaeche: string;
+  linie: string;
+  /** Punkt in der Mitte; ohne ihn keine Mittel-Ebene (die Messung zeichnet ihre Punkte selbst). */
+  mitte?: string;
+  /**
+   * Die Ebenen liegen unter der ersten fremden Ebene mit diesem Präfix (die Zeichnung von
+   * terra-draw bleibt oben); ohne ihn oder ohne solche Ebene oben auf.
+   */
+  unterPraefix?: string;
+}
+
+export const KREIS_VORSCHAU_EBENEN: KreisEbenen = {
+  quelle: 'td-zone-kreis',
+  flaeche: 'td-zone-kreis-flaeche',
+  linie: 'td-zone-kreis-linie',
+  mitte: 'td-zone-kreis-mitte',
+};
+
+/** Vorschaukreis der Messung (LLH-1345), unter Linie und Punkten der Mess-Zeichnung (`td-mess`). */
+export const MESS_KREIS_EBENEN: KreisEbenen = {
+  quelle: 'td-mess-kreis',
+  flaeche: 'td-mess-kreis-flaeche',
+  linie: 'td-mess-kreis-linie',
+  unterPraefix: 'td-mess-',
+};
+
+const ebenenIds = (e: KreisEbenen): string[] =>
+  e.mitte ? [e.flaeche, e.linie, e.mitte] : [e.flaeche, e.linie];
 
 /** Was die Vorschau zeigt: Mitte und Radius, beide offen; Farbe der Zonenart. */
 export interface KreisVorschau {
@@ -61,25 +90,37 @@ export function kreisVorschauDaten(v: Pick<KreisVorschau, 'mitte' | 'radiusM'> |
  * Quelle und Ebenen idempotent anlegen und die Daten einspielen. Ohne Kreis und ohne angelegte
  * Quelle bleibt die Karte unberührt. Gestrichelt: ein Entwurf, noch keine Zone.
  */
-export function sorgeFuerKreisVorschau(map: MapLibreMap, v: KreisVorschau | null): void {
+export function sorgeFuerKreisVorschau(
+  map: MapLibreMap,
+  v: KreisVorschau | null,
+  ebenen: KreisEbenen = KREIS_VORSCHAU_EBENEN,
+): void {
   const daten = kreisVorschauDaten(v);
-  const quelle = map.getSource(KREIS_VORSCHAU_QUELLE) as GeoJSONSource | undefined;
+  const quelle = map.getSource(ebenen.quelle) as GeoJSONSource | undefined;
   if (!quelle && daten.features.length === 0) return;
   if (quelle) quelle.setData(daten as never);
-  else map.addSource(KREIS_VORSCHAU_QUELLE, { type: 'geojson', data: daten as never });
+  else map.addSource(ebenen.quelle, { type: 'geojson', data: daten as never });
   const farbe = v?.farbe ?? '#000';
-  const layer: Record<(typeof KREIS_VORSCHAU_LAYER)[number], object> = {
-    'td-zone-kreis-flaeche': {
-      type: 'fill',
-      filter: ['==', ['get', 'teil'], 'kreis'],
-      paint: { 'fill-color': farbe, 'fill-opacity': 0.15 },
-    },
-    'td-zone-kreis-linie': {
-      type: 'line',
-      filter: ['==', ['get', 'teil'], 'kreis'],
-      paint: { 'line-color': farbe, 'line-width': 3, 'line-dasharray': [2, 1] },
-    },
-    'td-zone-kreis-mitte': {
+  const layer = new Map<string, { type: string; filter: unknown; paint: object }>([
+    [
+      ebenen.flaeche,
+      {
+        type: 'fill',
+        filter: ['==', ['get', 'teil'], 'kreis'],
+        paint: { 'fill-color': farbe, 'fill-opacity': 0.15 },
+      },
+    ],
+    [
+      ebenen.linie,
+      {
+        type: 'line',
+        filter: ['==', ['get', 'teil'], 'kreis'],
+        paint: { 'line-color': farbe, 'line-width': 3, 'line-dasharray': [2, 1] },
+      },
+    ],
+  ]);
+  if (ebenen.mitte)
+    layer.set(ebenen.mitte, {
       type: 'circle',
       filter: ['==', ['get', 'teil'], 'mitte'],
       paint: {
@@ -88,25 +129,34 @@ export function sorgeFuerKreisVorschau(map: MapLibreMap, v: KreisVorschau | null
         'circle-stroke-color': '#fff',
         'circle-stroke-width': 2,
       },
-    },
-  };
-  for (const id of KREIS_VORSCHAU_LAYER) {
+    });
+  const ids = ebenenIds(ebenen);
+  // Nur beim Anlegen gesucht: `getStyle()` serialisiert den ganzen Stil.
+  const vor = (): string | undefined =>
+    ebenen.unterPraefix
+      ? map
+          .getStyle()
+          ?.layers?.find((l) => l.id.startsWith(ebenen.unterPraefix!) && !ids.includes(l.id))?.id
+      : undefined;
+  for (const [id, def] of layer) {
     if (map.getLayer(id)) {
       // Die Farbe folgt der Zonenart, die im Band wechseln kann.
-      const art = (layer[id] as { type: string }).type;
       const eigenschaft =
-        art === 'fill' ? 'fill-color' : art === 'line' ? 'line-color' : 'circle-color';
+        def.type === 'fill' ? 'fill-color' : def.type === 'line' ? 'line-color' : 'circle-color';
       map.setPaintProperty(id, eigenschaft, farbe);
     } else {
-      map.addLayer({ id, source: KREIS_VORSCHAU_QUELLE, ...layer[id] } as never);
+      map.addLayer({ id, source: ebenen.quelle, ...def } as never, vor());
     }
   }
 }
 
 /** Ebenen und Quelle entfernen (Modusende). */
-export function entferneKreisVorschau(map: MapLibreMap): void {
-  for (const id of KREIS_VORSCHAU_LAYER) if (map.getLayer(id)) map.removeLayer(id);
-  if (map.getSource(KREIS_VORSCHAU_QUELLE)) map.removeSource(KREIS_VORSCHAU_QUELLE);
+export function entferneKreisVorschau(
+  map: MapLibreMap,
+  ebenen: KreisEbenen = KREIS_VORSCHAU_EBENEN,
+): void {
+  for (const id of ebenenIds(ebenen)) if (map.getLayer(id)) map.removeLayer(id);
+  if (map.getSource(ebenen.quelle)) map.removeSource(ebenen.quelle);
 }
 
 /**

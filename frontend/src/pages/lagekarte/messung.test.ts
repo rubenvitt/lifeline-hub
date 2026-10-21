@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { messErgebnis } from './messung';
+import { messErgebnis, radiusMessung } from './messung';
 
 // 0,001° Breite ≈ 111,19 m (Kugelmodell von `geo.ts`), gleich am Äquator in Länge.
 const A = [9, 52];
@@ -82,5 +82,21 @@ describe('messErgebnis Radius (LLH-1043)', () => {
     expect(
       messErgebnis('radius', { type: 'Polygon', coordinates: [[A, B, [9.001, 52], A]] }),
     ).toEqual({ haupt: '—' });
+  });
+});
+
+describe('radiusMessung (LLH-1345)', () => {
+  it('Mitte und Radius aus den ersten beiden verschiedenen Punkten, wie die Anzeige', () => {
+    expect(radiusMessung(null)).toBeNull();
+    expect(radiusMessung({ type: 'LineString', coordinates: [A] })).toBeNull();
+    // terra-draw wiederholt im Entwurf den ersten Punkt: noch kein Rand.
+    expect(radiusMessung({ type: 'LineString', coordinates: [A, A] })).toBeNull();
+    const r = radiusMessung({ type: 'LineString', coordinates: [A, A, B, [9, 52.01]] });
+    expect(r?.mitte).toEqual({ lon: 9, lat: 52 });
+    expect(r?.radiusM).toBeCloseTo(111.19, 1);
+  });
+
+  it('eine Fläche ist kein Radius', () => {
+    expect(radiusMessung({ type: 'Polygon', coordinates: [[A, B, [9.001, 52], A]] })).toBeNull();
   });
 });

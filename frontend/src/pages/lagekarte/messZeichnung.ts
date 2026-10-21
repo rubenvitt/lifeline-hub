@@ -1,7 +1,8 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { TerraDraw, TerraDrawLineStringMode, TerraDrawPolygonMode } from 'terra-draw';
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
-import type { MessForm, MessGeometrie } from './messung';
+import { radiusMessung, type MessForm, type MessGeometrie } from './messung';
+import { entferneKreisVorschau, MESS_KREIS_EBENEN, sorgeFuerKreisVorschau } from './kreisVorschau';
 
 /** App-Form → terra-draw-Modusname. */
 // Der Radius (LLH-1043) ist ein Linienzug Mitte → Rand; gerechnet wird in `messung.ts`.
@@ -35,13 +36,19 @@ export interface MessZeichnung {
  * 2. Es steht höchstens eine Messung da: terra-draw bleibt nach dem Abschluss im Modus, und die
  *    abgeschlossene Figur wird beim nächsten Klick entfernt statt gestapelt. Gespeichert wird
  *    nichts.
+ * 3. In der Form „Radius“ steht der Kreis mit (LLH-1345): eigene Ebenen `td-mess-kreis-*`
+ *    (`MESS_KREIS_EBENEN`) unter der Zeichnung, aus derselben Mitte und demselben Rand wie die
+ *    Anzeige (`radiusMessung`). Er lebt mit jeder Meldung und geht mit `starten`, `stoppen` und
+ *    `zerstoeren` — also auch vor `setStyle` und vor `map.remove()`.
  *
  * terra-draw legt seine Layer nach `setStyle` nicht neu an; den Kartenwechsel fängt `Kartenflaeche`
  * ab (Messung räumen, Stil setzen, nach `style.load` neu beginnen).
  */
 export function createMessung(
   map: MapLibreMap,
-  onMessung: (g: MessGeometrie | null, fertig: boolean) => void,
+  onMessungAussen: (g: MessGeometrie | null, fertig: boolean) => void,
+  /** Farbe des Vorschaukreises; gelesen bei jedem Nachzeichnen (Moduswechsel hell/dunkel). */
+  kreisFarbe: () => string = () => '#000',
 ): MessZeichnung {
   const draw = new TerraDraw({
     // Eigener Präfix — Begründung am Parameter `praefix` von `createZeichnung`.
@@ -55,6 +62,26 @@ export function createMessung(
   let form: MessForm = 'strecke';
   /** Eigenes Entfernen löst selbst `change` aus — das darf keine Meldung erzeugen. */
   let raeumt = false;
+  /** Steht der Vorschaukreis auf der Karte? Ohne ihn fasst der Abbau den Stil nicht an. */
+  let kreisSteht = false;
+
+  const kreisWeg = () => {
+    if (!kreisSteht) return;
+    kreisSteht = false;
+    entferneKreisVorschau(map, MESS_KREIS_EBENEN);
+  };
+
+  /** Jede Meldung zeichnet den Vorschaukreis nach, dann geht sie hinaus. */
+  const onMessung = (g: MessGeometrie | null, fertig: boolean) => {
+    const kreis = form === 'radius' ? radiusMessung(g) : null;
+    if (kreis) {
+      sorgeFuerKreisVorschau(map, { ...kreis, farbe: kreisFarbe() }, MESS_KREIS_EBENEN);
+      kreisSteht = true;
+    } else {
+      kreisWeg();
+    }
+    onMessungAussen(g, fertig);
+  };
 
   const geometrie = (id: string | number): MessGeometrie | null => {
     const f = draw.getSnapshotFeature(id);
@@ -134,6 +161,11 @@ export function createMessung(
       // (`lagekarte/AGENTS.md`, „Zeichnen und Messen“, LFH-943).
       try {
         if (draw.enabled) draw.stop();
+      } catch {
+        /* Karte schon entfernt */
+      }
+      try {
+        kreisWeg();
       } catch {
         /* Karte schon entfernt */
       }
