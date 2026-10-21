@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, benutzerAnlegen, wechsleZu, wechsleZuRolle } from './rollen-kern';
 import { rechteHinweis as rechteHinweisZeile } from './trefflaeche-kern';
 import { einsatzAnlegen } from './einsatz-kern';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 import { FOTO_JPEG } from './bildFixture';
 import { seedeVorlage, type GesaeteVorlage } from './vorlage-kern';
 
@@ -935,7 +936,9 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       // Gemessen mit OFFENER Leiste (unter `lg` unter der Karte, auf dem Handschirm per
       // Vorgabe zu), weil das der breitere Rahmen ist. Die Zeile misst den RAHMEN: die Leiste
       // trägt `overflowY: 'auto'` (damit auch `overflow-x: auto`), ein zu breiter Eintrag
-      // liefe in ihrem eigenen Bildlauf über. Der Datenanker belegt nur, dass sie offen steht.
+      // liefe in ihrem eigenen Bildlauf über. Der Datenanker belegt, dass sie offen steht UND
+      // die Ansicht „Objekte“ vorn ist: nur sie trägt den gesäten langen Einheitsnamen; per
+      // Vorgabe steht „Ebenen“ vorn, die Objekte sind dann montiert, aber verborgen.
       pfad: `/einsaetze/${einsatzId}/lagekarte`,
       vorbereiten: async (p: Page) => {
         await expect(
@@ -943,6 +946,7 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
         ).toHaveCount(1);
         const einblenden = p.getByRole('button', { name: 'Leiste einblenden' });
         if ((await einblenden.count()) > 0) await einblenden.click();
+        await zeigeLeistenAnsicht(p, 'Objekte');
       },
       anker: (p: Page) =>
         p
