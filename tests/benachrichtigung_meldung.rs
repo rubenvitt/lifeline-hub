@@ -718,21 +718,15 @@ async fn gesehen_raeumt_die_uebernahme() {
     let zwei = w.erfassen(&w.admin, json!({})).await["id"]
         .as_i64()
         .unwrap();
-    let lage_eins = uebernehmen(&w, &bert, eins).await["lage_meldung_id"]
-        .as_i64()
-        .unwrap();
-    let lage_zwei = uebernehmen(&w, &bert, zwei).await["lage_meldung_id"]
-        .as_i64()
-        .unwrap();
+    // Die Kennung der Lagemeldung ist die der Meldung (LLH-1031).
+    uebernehmen(&w, &bert, eins).await;
+    uebernehmen(&w, &bert, zwei).await;
     assert_eq!(w.offen("meldung", "lage_uebernahme", eins).await, 1);
 
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!(
-            "/api/einsaetze/{}/lage/meldungen/{lage_eins}/gesehen",
-            w.einsatz
-        ),
+        &format!("/api/einsaetze/{}/meldungen/{eins}/lage-gesehen", w.einsatz),
         &w.admin,
         None,
     )
@@ -744,9 +738,9 @@ async fn gesehen_raeumt_die_uebernahme() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/lage/meldungen/gesehen", w.einsatz),
+        &format!("/api/einsaetze/{}/lage/gesehen", w.einsatz),
         &w.admin,
-        Some(&json!({ "bis_id": lage_zwei }).to_string()),
+        Some(&json!({ "meldung_ids": [zwei] }).to_string()),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");

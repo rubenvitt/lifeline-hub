@@ -152,13 +152,12 @@ pub async fn status_geaendert(pool: &SqlitePool, live: &LiveHub, meldung: &Meldu
 }
 
 /// Was die Übernahme-Hinweise eines Einsatzes zu Lagemeldungen sind, die inzwischen jemand als
-/// gesehen gekennzeichnet hat (Spec `lagemeldung-kenntnisnahme`). Die Lage-Sicht liest heute
-/// `lage_meldung`; mit LLH-1031 wandert die Kenntnisnahme an die Meldung, dann zieht diese
-/// Abfrage mit.
+/// gesehen gekennzeichnet hat (Spec `lagemeldung-kenntnisnahme`). Die Kenntnisnahme steht an
+/// der Meldung (`lage_gesehen_at`, Migration 0233).
 const GESEHENE_UEBERNAHMEN_SQL: &str = "SELECT b.bezug_id FROM benachrichtigung b \
-     JOIN lage_meldung l ON l.meldung_id = b.bezug_id AND l.einsatz_id = b.einsatz_id \
+     JOIN meldung m ON m.id = b.bezug_id AND m.einsatz_id = b.einsatz_id \
      WHERE b.einsatz_id = ? AND b.art = 'meldung' AND b.bezug_typ = 'lage_uebernahme' \
-       AND b.quittiert_at IS NULL AND l.gesehen_at IS NOT NULL";
+       AND b.quittiert_at IS NULL AND m.lage_gesehen_at IS NOT NULL";
 
 /// Nach einer Kenntnisnahme in der Lage-Sicht (einzeln oder alle): die Übernahme-Hinweise der
 /// gesehenen Lagemeldungen sind für alle erledigt (design.md E6).
