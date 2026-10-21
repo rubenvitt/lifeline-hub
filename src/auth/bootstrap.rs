@@ -177,7 +177,7 @@ pub async fn bootstrap_admin(
         .await?;
     }
 
-    // LLH-1375: Startliste der Einsatz-Vorlagen (gleiche Werte wie Migration 0233).
+    // LLH-1375: Startliste der Einsatz-Vorlagen (gleiche Werte wie Migration 0234).
     crate::einsatz_vorlage::repo::seed_startliste_tx(&mut tx, org_id).await?;
 
     tx.commit().await?;

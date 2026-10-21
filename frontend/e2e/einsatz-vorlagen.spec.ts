@@ -5,7 +5,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 
 /**
  * LLH-1375, Spec `einsatz-vorlagen`: Einsatz-Vorlagen der Organisation. Die Startliste bringt
- * jede Organisation mit (Migration 0233, `bootstrap_admin`); „MANV“ blendet unter anderem „Stab“
+ * jede Organisation mit (Migration 0234, `bootstrap_admin`); „MANV“ blendet unter anderem „Stab“
  * aus und zeigt „Unfallhilfsstellen“.
  *
  * Gegen den echten Server: die Ausblendung schreibt `anlegen_tx` als eigene Einsatzwerte, das
