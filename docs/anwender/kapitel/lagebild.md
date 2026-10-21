@@ -2,7 +2,7 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -65,11 +65,16 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
 
 ### Was die Paneele verdichten
 
-- **Gefahrenmatrix:** je Gefahrentyp mit einer Stufe über „keine“ die höchste Warnstufe über
-  alle Gefahrengebiete und Schutzobjekte; ohne solche Stufe steht „Keine Gefahr über Stufe
-  „keine“.“ Darunter stehen die Gebiete, deren Matrix noch nicht beurteilt ist, etwa
-  „Hangrutsch Kirchberg: nicht beurteilt“, bei mehr als zwei nur ihre Zahl. Bewertet und
-  beurteilt wird im Kapitel [Gefahren](gefahren.md).
+- **Gefahrenmatrix:** je Gefahrentyp mit einer Stufe über „keine“ oder einer Erläuterung die
+  höchste Warnstufe über alle Gefahrengebiete und Schutzobjekte; ohne beides steht „Keine Gefahr
+  über Stufe „keine“.“ Trägt irgendeine Zelle des Gefahrentyps eine Erläuterung, steht hinter
+  seinem Namen dasselbe Dreieck wie in der Matrix, und unter der Legende „mit Erläuterung“; ein
+  Screenreader liest „… · mit Erläuterung“. Eine Gefahr, zu der nur eine Erläuterung bei „keine“
+  vorliegt, steht mit leerem Balken und „keine“ da. Den Text der Erläuterung zeigt das Paneel
+  nicht; er steht auf der Seite „Gefahren“ unter der Matrix. Darunter stehen die
+  Gebiete, deren Matrix noch nicht beurteilt ist, etwa „Hangrutsch Kirchberg: nicht beurteilt“,
+  bei mehr als zwei nur ihre Zahl. Bewertet und beurteilt wird im Kapitel
+  [Gefahren](gefahren.md).
 - **Sichtung:** die Betroffenen in Versorgung je Sichtungskategorie, dazu „Ohne Sichtung“ und
   „Unterwegs / offen / abgeschlossen“: unterwegs im Eigentransport, ohne Verbleib, abgeschlossen
   (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner

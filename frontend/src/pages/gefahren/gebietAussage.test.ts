@@ -26,6 +26,16 @@ describe('gebietAussage (LLH-1102)', () => {
     ).toBe('3 Gefahren · hoch');
   });
 
+  /** LLH-1365: das Lagebild zeigt eine Erläuterung zu „keine“ als Zeile, die Zählung nicht. */
+  it('zählt eine Erläuterung zu „keine“ nicht als Gefahr', () => {
+    const geprueft = {
+      ...b('elektrizitaet', 'keine'),
+      beschreibung: 'Geprüft, kein Strom im Keller.',
+    };
+    expect(gebietAussage(beurteilt, [geprueft])).toBe('0 Gefahren');
+    expect(gebietAussage(beurteilt, [geprueft, b('brand', 'mittel')])).toBe('1 Gefahr · mittel');
+  });
+
   it('Einzahl bei einer Gefahr', () => {
     expect(gebietAussage(beurteilt, [b('brand', 'akut')])).toBe('1 Gefahr · akut');
   });

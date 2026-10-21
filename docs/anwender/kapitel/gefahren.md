@@ -2,7 +2,7 @@
 titel: Gefahren
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/gefahren/GefahrenMatrixAuszug.tsx, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -94,8 +94,12 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
   wie die Matrix, alphabetisch nach Gefahr, darin nach Schutzobjekt. Ohne Erläuterung im Gebiet
   fehlt sie ganz.
 - Eine Erläuterung zu „–“ (keine) wird gespeichert und zählt als Aussage, etwa „geprüft, kein
-  Strom im Keller“: Lagekarte und Lagevortrag nennen sie mit. Die Warnstufe des Gebiets und die
-  Zahl seiner Gefahren ändert sie nicht.
+  Strom im Keller“: Lagekarte und Lagevortrag nennen sie mit, Lagebild und Vorschau der
+  Sprungpalette zeigen die Gefahr mit dem Dreieck. Die Warnstufe des Gebiets und die Zahl seiner
+  Gefahren ändert sie nicht.
+- Dasselbe Dreieck tragen die Zellen der Matrix in der Vorschau eines Gefahrengebiets in der
+  Sprungpalette und die Gefahren im Paneel „Gefahrenmatrix“ des Lagebilds (Kapitel
+  [Lagebild](lagebild.md)). Den Text der Erläuterung zeigen beide nicht.
 - Die höchste Stufe aller Zellen ist die Warnstufe des Gebiets. Sie steht in der Liste, als Text
   an der Fläche auf der Lagekarte und, über alle Gebiete, im Überblick und im Lagebild.
 
