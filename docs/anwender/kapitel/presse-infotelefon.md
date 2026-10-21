@@ -2,7 +2,7 @@
 titel: Presse und Infotelefon
 gruppen: [fuehrung]
 reihenfolge: 450
-quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
+quellen: [frontend/src/pages/PressePage.tsx, frontend/src/pages/PressemitteilungDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/entwurf/EntwurfNavigationSchutz.tsx, frontend/src/presse/, frontend/src/stab/medienlage.ts, frontend/src/stab/MedienlageUebernahme.tsx, frontend/src/pages/InfotelefonPage.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/infotelefon/, frontend/src/stab/unterseiten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/presse.rs, src/presse/, src/routes/infotelefon.rs, src/infotelefon/, src/einsatz/schwaerzung_registry.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/]
 ---
 
 ## Überblick
@@ -85,6 +85,21 @@ Einsatz läuft. **Freigeben darf nur die Einsatzleitung**; das Führungspersonal
 gesperrt mit dem Hinweis „nur Einsatzleitung“. Einzelheiten stehen in
 [Rechte im Einsatz](rechte-im-einsatz.md). Ist das Modul Stab nicht freigegeben, sind beide Seiten
 gesperrt.
+
+### Entwurf speichern und verlassen
+
+Ein Entwurf speichert sich alle 30 Sekunden und beim Verlassen eines Feldes von selbst. Oben steht,
+ob „ungespeicherte Änderungen“ vorliegen oder wann „zuletzt gespeichert“ wurde.
+
+Wer den Entwurf mit ungespeicherten Änderungen verlässt, etwa über „Pressearbeit“ oder den
+Zurück-Knopf des Browsers, bekommt die Rückfrage „Ungespeicherte Änderungen“, wie beim Lagebericht
+und beim Einsatzbefehl:
+
+- „Bleiben“ kehrt in den Entwurf zurück, die Eingaben bleiben stehen.
+- „Verwerfen“ verlässt den Entwurf ohne die ungespeicherten Änderungen.
+- „Speichern und weiter“ speichert zuerst und verlässt den Entwurf danach. Ist der „Titel“ leer,
+  steht der Hinweis am Feld, und der Entwurf bleibt offen. Gelingt das Speichern nicht, steht der
+  Grund in der Rückfrage, und der Entwurf bleibt ebenfalls offen.
 
 ### Freigabe und Einsatztagebuch
 

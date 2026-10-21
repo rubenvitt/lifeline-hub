@@ -1044,7 +1044,6 @@ export default function Schnellerfassung({
           <MarkdownEditor
             ref={textRef}
             unterEbene={1}
-            layout="toggle"
             variante="kompakt"
             placeholder={PLATZHALTER}
             autoSize={{ minRows: 1, maxRows: 4 }}

@@ -55,9 +55,9 @@ describe('dokumentEntwurf.css — Druck', () => {
     }
   });
 
-  it('nimmt dem Toggle-Editor das Textfeld und zeigt Druckfassung und Papiertitel (M86, LFH-1008)', () => {
+  it('nimmt dem Editor das Textfeld und zeigt Druckfassung und Papiertitel (M86, LFH-1008)', () => {
     const textfeld = druck.filter(
-      (r) => r.selektor.includes('.markdown-editor--toggle textarea') && versteckt(r),
+      (r) => r.selektor.includes('.markdown-editor textarea') && versteckt(r),
     );
     expect(textfeld, 'Rohtext in Schirmhöhe käme aufs Papier').toHaveLength(1);
     const sichtbar = druck.find(
@@ -66,11 +66,11 @@ describe('dokumentEntwurf.css — Druck', () => {
     expect(sichtbar, 'Druckfassung oder Titel bleiben am Papier verborgen').toBeDefined();
     expect(sichtbar!.koerper).toMatch(/display:\s*block\s*!important/);
     // Ohne `druckfassung` druckte ein Abschnitt leer, ohne `druckTitel` ohne Namen.
-    expect(baustein).toMatch(/<MarkdownEditor[\s\S]*?layout="toggle"[\s\S]*?\bdruckfassung\b/);
+    expect(baustein).toMatch(/<MarkdownEditor\b[^>]*?\bdruckfassung\b/);
     expect(baustein).toMatch(/druckTitel=\{a\.label\}/);
     // Und der Editor wird nie als GANZES versteckt (das träfe die Druckfassung mit).
     for (const r of druck.filter(versteckt)) {
-      expect(/\.markdown-editor(--\w+)?$/.test(r.selektor), r.selektor).toBe(false);
+      expect(/\.markdown-editor$/.test(r.selektor), r.selektor).toBe(false);
     }
   });
 

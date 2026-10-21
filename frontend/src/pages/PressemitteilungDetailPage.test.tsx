@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router';
-import { renderMitProviders } from '../test/utils';
+import { createMemoryRouter, Route, RouterProvider, Routes } from 'react-router';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { App as AntApp } from 'antd';
+import { neuerQueryClient, renderMitProviders } from '../test/utils';
+import { AuthProvider } from '../auth/AuthContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
@@ -58,7 +61,8 @@ function setup() {
         element={<PressemitteilungDetailPage />}
       />
     </Routes>,
-    { route: '/einsaetze/1/stab/presse/mitteilungen/4' },
+    // Data Router: der Verlassen-Schutz des Entwurfs hängt an `useBlocker` (LLH-1367).
+    { route: '/einsaetze/1/stab/presse/mitteilungen/4', datenRouter: true },
   );
 }
 
@@ -212,7 +216,7 @@ describe('PressemitteilungDetailPage — Zeitstand in der Anzeigezone (LFH-692)'
           />
         </Routes>
       </AnzeigeKonventionenProvider>,
-      { route: '/einsaetze/1/stab/presse/mitteilungen/4' },
+      { route: '/einsaetze/1/stab/presse/mitteilungen/4', datenRouter: true },
     );
     const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
     // 12:00 UTC → 14:00 in Berlin (Sommerzeit).
@@ -282,4 +286,169 @@ describe('PressemitteilungDetailPage — Nebenwege im Kopf (LFH-1079)', () => {
     expect(within(kopf()).getByRole('button', { name: 'Drucken / als PDF' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: WEITERE })).toBeNull();
   });
+});
+
+/**
+ * ── Verlassen-Schutz (LLH-1367) ──
+ *
+ * Zwilling des Blocks „Verlassen-Schutz (LLH-1351)“ in `LageberichtDetailPage.test.tsx`: derselbe
+ * Baustein (`entwurf/EntwurfNavigationSchutz.tsx`), dieselben Antworten. Die Mechanik selbst prüft
+ * der Befehl; hier steht, dass die Pressemitteilung sie eingehängt hat und richtig speist.
+ */
+describe('PressemitteilungDetailPage — Verlassen-Schutz (LLH-1367)', () => {
+  const DETAIL = '/einsaetze/1/stab/presse/mitteilungen/4';
+
+  /** Die Presseseite steht als Eintrag VOR der Mitteilung, damit Browser-Zurück ein Ziel hat. */
+  function renderMitListe() {
+    const router = createMemoryRouter(
+      [
+        { path: '/einsaetze/:id/stab/presse', element: <div>PRESSE-LISTE</div> },
+        {
+          path: '/einsaetze/:id/stab/presse/mitteilungen/:mitteilungId',
+          element: <PressemitteilungDetailPage />,
+        },
+      ],
+      { initialEntries: ['/einsaetze/1/stab/presse', DETAIL] },
+    );
+    render(
+      <QueryClientProvider client={neuerQueryClient()}>
+        <AntApp>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    return router;
+  }
+
+  function halteSpeichernAn() {
+    let resolve!: (wert: Pressemitteilung) => void;
+    let reject!: (fehler: Error) => void;
+    vi.mocked(aktualisierePressemitteilung).mockImplementation(
+      () =>
+        new Promise((ja, nein) => {
+          resolve = ja;
+          reject = nein;
+        }),
+    );
+    return {
+      erfolg: () =>
+        act(async () => {
+          resolve(ENTWURF);
+        }),
+      ablehnen: (e: Error) =>
+        act(async () => {
+          reject(e);
+        }),
+    };
+  }
+
+  async function oeffneRueckfrage() {
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await userEvent.click(screen.getByRole('link', { name: 'Pressearbeit' }));
+    return within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+  }
+
+  it('hält die Brotkrume an; Verwerfen setzt genau diesen Wechsel fort', async () => {
+    halteSpeichernAn();
+    renderMitListe();
+    const dialog = await oeffneRueckfrage();
+    expect(screen.queryByText('PRESSE-LISTE')).toBeNull();
+    // Dieselben drei Antworten wie in Befehl und Lagebericht.
+    expect(dialog.getByRole('button', { name: /Speichern und weiter$/ })).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('PRESSE-LISTE')).toBeInTheDocument();
+    expect(aktualisierePressemitteilung).toHaveBeenCalledTimes(1); // nur der Blur
+  });
+
+  it('Bleiben hält die Fassung und die Mitteilung, auch wenn der Autosave danach gelingt', async () => {
+    const save = halteSpeichernAn();
+    const router = renderMitListe();
+    const dialog = await oeffneRueckfrage();
+    await userEvent.click(dialog.getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByLabelText('Titel')).toHaveValue('Warnung Deich neu');
+    await save.erfolg();
+    expect(router.state.location.pathname).toBe(DETAIL);
+    expect(screen.queryByText('PRESSE-LISTE')).toBeNull();
+  });
+
+  it('holt den angehaltenen Wechsel nach, sobald der Autosave die Fassung gesichert hat', async () => {
+    const save = halteSpeichernAn();
+    renderMitListe();
+    await oeffneRueckfrage();
+    await save.erfolg();
+    expect(await screen.findByText('PRESSE-LISTE')).toBeInTheDocument();
+  });
+
+  it('Speichern und weiter: der Grund eines Fehlschlags steht IM Dialog, der Erfolg geht weiter', async () => {
+    const save = halteSpeichernAn();
+    renderMitListe();
+    const dialog = await oeffneRueckfrage();
+    await save.ablehnen(new ApiError(503, 'Speichern vorübergehend nicht möglich'));
+    expect(await dialog.findByText('Speichern vorübergehend nicht möglich')).toBeInTheDocument();
+    expect(screen.queryByText('PRESSE-LISTE')).toBeNull();
+
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await waitFor(() => expect(aktualisierePressemitteilung).toHaveBeenCalledTimes(2));
+    expect(aktualisierePressemitteilung).toHaveBeenLastCalledWith(
+      1,
+      4,
+      expect.objectContaining({ titel: 'Warnung Deich neu' }),
+    );
+    expect(screen.queryByText('PRESSE-LISTE')).toBeNull();
+    await erneut.erfolg();
+    expect(await screen.findByText('PRESSE-LISTE')).toBeInTheDocument();
+    expect(screen.queryByText('Speichern vorübergehend nicht möglich')).toBeNull();
+  });
+
+  it('schützt auch Browser-Zurück', async () => {
+    halteSpeichernAn();
+    const router = renderMitListe();
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    expect(router.state.location.pathname).toBe(DETAIL);
+  });
+
+  it('lässt Query-/Hash-Wechsel in derselben Mitteilung ohne Dialog zu', async () => {
+    const router = renderMitListe();
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await act(async () => {
+      await router.navigate('?ansicht=test#gefahr');
+    });
+    expect(screen.getByLabelText('Titel')).toHaveValue('Warnung Deich neu');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  // Der Titel ist das einzige Pflichtfeld: Zeitstand nicht löschbar, Abschnitte ohne Pflicht.
+  it('verlangt beim ausdrücklichen Speichern einen gültigen Titel', async () => {
+    halteSpeichernAn();
+    renderMitListe();
+    await userEvent.clear(await screen.findByLabelText('Titel'));
+    // Ohne Blur: prüft den Dialogweg unabhängig vom Autosave.
+    fireEvent.click(screen.getByRole('link', { name: 'Pressearbeit' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Speichern und weiter' }));
+    await screen.findByText(/titel.*required/i);
+    expect(screen.queryByText('PRESSE-LISTE')).toBeNull();
+  });
+
+  // Gegenaussage: ohne offene Fassung, auch in der freigegebenen Mitteilung, geht der Wechsel ohne
+  // Rückfrage.
+  it.each(['entwurf', 'freigegeben'] as const)(
+    'lässt die unveränderte Fassung %s direkt gehen',
+    async (status) => {
+      vi.mocked(ladePressemitteilung).mockResolvedValue({ ...ENTWURF, status });
+      renderMitListe();
+      await userEvent.click(await screen.findByRole('link', { name: 'Pressearbeit' }));
+      expect(await screen.findByText('PRESSE-LISTE')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    },
+  );
 });
