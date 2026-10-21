@@ -172,3 +172,76 @@ describe('NachforderungFormular — Adressat aus dem Katalog „Externe Stellen�
     expect(adressat()).toHaveValue('');
   });
 });
+
+/** LLH-1082 (design.md D7): Bedarf einer Betreuungsstelle — Bezug fest, Begründung vorbelegt. */
+describe('NachforderungFormular — Stellenbezug (LLH-1082)', () => {
+  const BEZUG = {
+    betreuungsstelleId: 8,
+    name: 'Turnhalle Ost',
+    pfad: '/einsaetze/1/betreuung/8',
+  };
+
+  it('zeigt den Bezug, belegt die Begründung vor und sendet die Kennung der Stelle', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(
+      <NachforderungFormular card={false} senden={false} onAnlegen={onAnlegen} bezug={BEZUG} />,
+    );
+    expect(screen.getByRole('link', { name: /Turnhalle Ost/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/betreuung/8',
+    );
+    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue(
+      'Für Betreuungsstelle Turnhalle Ost',
+    );
+
+    await userEvent.type(screen.getByLabelText('Art'), 'Feldbetten');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Feldbetten für die Nacht');
+    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(
+        expect.objectContaining({
+          art: 'Feldbetten',
+          betreuungsstelle_id: 8,
+          begruendung: 'Für Betreuungsstelle Turnhalle Ost',
+        }),
+      ),
+    );
+    // In der Serie für dieselbe Stelle steht die Begründung wieder da, Art ist leer.
+    await waitFor(() => expect(screen.getByLabelText('Art')).toHaveValue(''));
+    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue(
+      'Für Betreuungsstelle Turnhalle Ost',
+    );
+  });
+
+  it('der Name kommt später: vorbelegt, solange die Begründung leer ist; eigene Eingabe bleibt', async () => {
+    const { rerender } = renderMitProviders(
+      <NachforderungFormular
+        card={false}
+        senden={false}
+        onAnlegen={vi.fn()}
+        bezug={{ betreuungsstelleId: 8 }}
+      />,
+    );
+    expect(screen.getByText('Für eine Betreuungsstelle')).toBeInTheDocument();
+    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue('');
+    rerender(
+      <NachforderungFormular card={false} senden={false} onAnlegen={vi.fn()} bezug={BEZUG} />,
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue(
+        'Für Betreuungsstelle Turnhalle Ost',
+      ),
+    );
+  });
+
+  it('ohne Bezug keine Zeile und keine Kennung', async () => {
+    const onAnlegen = vi.fn().mockResolvedValue({});
+    renderMitProviders(<NachforderungFormular card={false} senden={false} onAnlegen={onAnlegen} />);
+    expect(screen.queryByText(/Betreuungsstelle/)).toBeNull();
+    await userEvent.type(screen.getByLabelText('Art'), 'RTW');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Zwei RTW');
+    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalled());
+    expect(onAnlegen.mock.calls[0][0].betreuungsstelle_id).toBeUndefined();
+  });
+});

@@ -3,6 +3,7 @@ import { Alert, App, Breadcrumb, Button, Input, Modal, Spin } from 'antd';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ladeBetreuung } from '../api/betreuung';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
@@ -27,7 +28,10 @@ import type {
 import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungListe from '../nachforderungen/NachforderungListe';
-import NachforderungFormular from '../nachforderungen/NachforderungFormular';
+import NachforderungFormular, {
+  type NachforderungBezug,
+} from '../nachforderungen/NachforderungFormular';
+import type { StellenVerweis } from '../nachforderungen/NachforderungKarte';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
 import {
   isErgaenzen,
@@ -40,11 +44,16 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import {
+  NACHFORDERUNG_BEZUG_PARAM,
   NACHFORDERUNG_VORBELEGUNG_PARAMS,
+  betreuungsstellePfad,
+  parseNachforderungBezug,
+  parseNachforderungStelle,
   parseNachforderungVorbelegung,
   type NachforderungVorbelegung,
 } from '../routing/deeplinks';
-import { Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { Filterhinweis, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { Select } from '../components/Select';
 
 /** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
 function abschlussZeit(n: Nachforderung): string {
@@ -64,10 +73,22 @@ export default function NachforderungenPage() {
   // Vorbelegung aus `?neu=1&art=…`. Lebt nur, solange die Erfassung offen ist: wer schließt und neu
   // öffnet, bekommt die leere Maske.
   const [vorbelegung, setVorbelegung] = useState<NachforderungVorbelegung | null>(null);
+  // Stellenbezug aus `?neu=1&betreuungsstelle=<id>` (LLH-1082, design.md D7): gilt, solange die
+  // Erfassung offen ist, auch über eine Serie; Schließen räumt ihn.
+  const [bezugId, setBezugId] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  // Filter „für Stelle“ (`?stelle=<id>`): Zustand in der Adresse.
+  const stelleFilter = parseNachforderungStelle(searchParams);
+  const setzeStelleFilter = (stelleId: number | null) => {
+    const naechste = new URLSearchParams(searchParams);
+    if (stelleId == null) naechste.delete('stelle');
+    else naechste.set('stelle', String(stelleId));
+    setSearchParams(naechste, { replace: true });
+  };
   const schliesseFormular = () => {
     setFormOffen(false);
     setVorbelegung(null);
+    setBezugId(null);
   };
   // Grund einer abgelehnten Rücknahme aus dem Rückgängig-Toast: die Karte ist dann oft gewandert,
   // der Grund steht im Hinweis der Seite (LFH-1077).
@@ -125,6 +146,45 @@ export default function NachforderungenPage() {
     queryFn: () => listEntlassenesMaterial(einsatzId),
     enabled: materialFrei && needsMaterial,
   });
+  /*
+   * Namen der Betreuungsstellen für Bezug, Kartenzeile und Filter (LLH-1082, design.md D4/D7): die
+   * Nachforderung trägt nur die Kennung. Gelesen aus der Betreuungsübersicht (derselbe Cache wie
+   * deren Seiten), nur mit Freigabe Betreuung und nur, wenn ein Bezug oder Filter sie braucht.
+   */
+  const betreuungFrei = istKeyFreigegeben('betreuung', freigaben);
+  const needsStellen =
+    bezugId != null ||
+    stelleFilter != null ||
+    (nfQuery.data ?? []).some((n) => n.betreuungsstelle_id != null);
+  const betreuungQuery = useQuery({
+    queryKey: einsatzKeys.betreuung(einsatzId),
+    queryFn: () => ladeBetreuung(einsatzId),
+    enabled: betreuungFrei && needsStellen,
+  });
+  // Gemerkt über den Datenstand (LFH-949): die Karten sind `memo`.
+  const stellenJeId = useMemo<ReadonlyMap<number, StellenVerweis> | null>(
+    () =>
+      betreuungFrei && betreuungQuery.data
+        ? new Map(
+            betreuungQuery.data.stellen.map((st) => [
+              st.id,
+              { name: st.bezeichnung, pfad: betreuungsstellePfad(einsatzId, st.id) },
+            ]),
+          )
+        : null,
+    [betreuungFrei, betreuungQuery.data, einsatzId],
+  );
+  const bezug = useMemo<NachforderungBezug | null>(
+    () =>
+      bezugId == null
+        ? null
+        : {
+            betreuungsstelleId: bezugId,
+            name: stellenJeId?.get(bezugId)?.name,
+            pfad: stellenJeId?.get(bezugId)?.pfad,
+          },
+    [bezugId, stellenJeId],
+  );
   const materialListe = useMemo<EinsatzMaterial[]>(
     () => [...(materialQuery.data ?? []), ...(entlasseneQuery.data ?? [])],
     [materialQuery.data, entlasseneQuery.data],
@@ -269,15 +329,18 @@ export default function NachforderungenPage() {
   useEffect(() => {
     const neu = searchParams.get('neu') === '1';
     const hatVorbelegung = NACHFORDERUNG_VORBELEGUNG_PARAMS.some((k) => searchParams.has(k));
-    if (!neu && !hatVorbelegung) return;
+    const hatBezug = searchParams.has(NACHFORDERUNG_BEZUG_PARAM);
+    if (!neu && !hatVorbelegung && !hatBezug) return;
     if (einsatzQuery.isLoading) return;
     if (darfSchreibenRoh) {
       setVorbelegung(parseNachforderungVorbelegung(searchParams));
+      setBezugId(parseNachforderungBezug(searchParams));
       setFormOffen(true);
     }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('neu');
     for (const k of NACHFORDERUNG_VORBELEGUNG_PARAMS) naechste.delete(k);
+    naechste.delete(NACHFORDERUNG_BEZUG_PARAM);
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, einsatzQuery.isLoading, darfSchreibenRoh]);
 
@@ -286,7 +349,15 @@ export default function NachforderungenPage() {
    * `memo`, und je Render neue Listen oder Pfeile machten jede Karte neu. Steht vor den frühen
    * Rücksprüngen, wie jeder Hook.
    */
-  const { offene, abgeschlossene, offeneSortiert, abgeschlosseneSortiert } = useMemo(() => {
+  const {
+    offene,
+    abgeschlossene,
+    offeneGefiltert,
+    abgeschlosseneGefiltert,
+    offeneSortiert,
+    abgeschlosseneSortiert,
+    stellenMitBezug,
+  } = useMemo(() => {
     const alle = nfQuery.data ?? [];
     // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik (eingetroffen und
     // abgelehnt zählen als „abgeschlossen").
@@ -294,20 +365,33 @@ export default function NachforderungenPage() {
       istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
     const offene = alle.filter((n) => !istAbg(n));
     const abgeschlossene = alle.filter(istAbg);
+    // Filter „für Stelle“ (LLH-1082): Liste und Ansichtszähler, nicht der Seitenkopf.
+    const imFilter = (n: Nachforderung) =>
+      stelleFilter == null || n.betreuungsstelle_id === stelleFilter;
+    const offeneGefiltert = offene.filter(imFilter);
+    const abgeschlosseneGefiltert = abgeschlossene.filter(imFilter);
     return {
       offene,
       abgeschlossene,
+      offeneGefiltert,
+      abgeschlosseneGefiltert,
+      // Stellen, für die es Nachforderungen gibt — die Wahl des Filters.
+      stellenMitBezug: [
+        ...new Set(
+          alle.flatMap((n) => (n.betreuungsstelle_id != null ? [n.betreuungsstelle_id] : [])),
+        ),
+      ],
       // Offen-Ansicht: nach Priorität (sofort→dringend→normal), dann angefordert_at absteigend.
-      offeneSortiert: [...offene].sort((a, b) => {
+      offeneSortiert: [...offeneGefiltert].sort((a, b) => {
         const rang = prioRang(a.prioritaet) - prioRang(b.prioritaet);
         return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
       }),
       // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
-      abgeschlosseneSortiert: [...abgeschlossene].sort((a, b) =>
+      abgeschlosseneSortiert: [...abgeschlosseneGefiltert].sort((a, b) =>
         abschlussZeit(b).localeCompare(abschlussZeit(a)),
       ),
     };
-  }, [nfQuery.data]);
+  }, [nfQuery.data, stelleFilter]);
   const stand = useRef({ alle: nfQuery.data, statusMutation });
   useLayoutEffect(() => {
     stand.current = { alle: nfQuery.data, statusMutation };
@@ -399,7 +483,17 @@ export default function NachforderungenPage() {
     materialGesperrt,
     onMaterialUebernehmen: freigabenBekannt ? onMaterialUebernehmen : undefined,
     hervorgehobenId,
+    stellenJeId,
   };
+  // Filterwahl nur mit Namen (Freigabe Betreuung) und sobald es Bezüge gibt (design.md D7).
+  const stellenOptionen =
+    stellenJeId != null
+      ? stellenMitBezug.flatMap((id) => {
+          const name = stellenJeId.get(id)?.name;
+          return name ? [{ value: id, label: name }] : [];
+        })
+      : [];
+  const filterName = stelleFilter != null ? stellenJeId?.get(stelleFilter)?.name : undefined;
   // Der Dialog liest die Nachforderung im aktuellen Stand (Posten, Rest der Anzahl).
   const uebernahmeN = uebernahme
     ? (nfQuery.data?.find((n) => n.id === uebernahme.n.id) ?? uebernahme.n)
@@ -488,6 +582,7 @@ export default function NachforderungenPage() {
           <NachforderungFormular
             card={false}
             vorbelegung={vorbelegung}
+            bezug={bezug}
             senden={anlegenMutation.isPending}
             // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die Nachforderung
             // angekommen ist.
@@ -520,11 +615,33 @@ export default function NachforderungenPage() {
           wert={ansicht}
           onWechsel={setAnsicht}
           optionen={[
-            { wert: 'offen', label: `Offen (${offene.length})` },
-            { wert: 'abgeschlossen', label: `Abgeschlossen (${abgeschlossene.length})` },
+            { wert: 'offen', label: `Offen (${offeneGefiltert.length})` },
+            {
+              wert: 'abgeschlossen',
+              label: `Abgeschlossen (${abgeschlosseneGefiltert.length})`,
+            },
           ]}
         />
+        {stellenOptionen.length > 0 && (
+          <Select<number>
+            aria-label="Für Stelle"
+            allowClear
+            placeholder="Für Stelle"
+            style={{ minWidth: 200 }}
+            value={stelleFilter ?? undefined}
+            options={stellenOptionen}
+            onChange={(id) => setzeStelleFilter(id ?? null)}
+          />
+        )}
       </div>
+      {stelleFilter != null && (
+        <div style={{ marginBottom: token.marginSM }}>
+          <Filterhinweis
+            merkmale={[filterName ? `Betreuungsstelle ${filterName}` : 'eine Betreuungsstelle']}
+            onZuruecksetzen={() => setzeStelleFilter(null)}
+          />
+        </div>
+      )}
       {ansicht === 'offen' ? (
         <NachforderungListe nachforderungen={offeneSortiert} ansicht="offen" {...listenProps} />
       ) : (

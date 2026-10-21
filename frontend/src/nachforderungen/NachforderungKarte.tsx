@@ -50,6 +50,12 @@ export type UebernahmePosten = Pick<
   | 'beendet_at'
 >;
 
+/** Eine Betreuungsstelle, wie die Karte ihren Bezug zeigt (LLH-1082): Name und Sprung dorthin. */
+export interface StellenVerweis {
+  name: string;
+  pfad: string;
+}
+
 /** Zustand eines aus dem Einsatz genommenen Postens, Wortlaut der Materialliste (LLH-1093). */
 const AUS_DEM_EINSATZ = 'aus dem Einsatz genommen';
 
@@ -114,6 +120,31 @@ interface NachforderungKarteProps {
   onMaterialUebernehmen?: (id: number) => void;
   /** Deeplink-Hervorhebung `?nachforderung=` (LLH-1226 D10, Spec `deeplink-hervorhebung`). */
   hervorgehoben?: boolean;
+  /**
+   * Bekannte Betreuungsstellen je Kennung (LLH-1082, design.md D7), stabil über den Datenstand
+   * der Seite. `null`/fehlend: Modul Betreuung nicht freigegeben oder Übersicht nicht da — dann
+   * „Für eine Betreuungsstelle“ ohne Namen und Sprung.
+   */
+  stellenJeId?: ReadonlyMap<number, StellenVerweis> | null;
+}
+
+/** Zeile „Für Betreuungsstelle …“ einer Nachforderung mit Stellenbezug (LLH-1082). */
+function StellenBezug({ verweis }: { verweis: StellenVerweis | undefined }) {
+  if (!verweis) {
+    return (
+      <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-stelle">
+        Für eine Betreuungsstelle
+      </Text>
+    );
+  }
+  return (
+    <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-stelle">
+      Für Betreuungsstelle{' '}
+      <KennungsLink to={verweis.pfad}>
+        {verweis.name} <span aria-hidden="true">↗</span>
+      </KennungsLink>
+    </Text>
+  );
 }
 
 /**
@@ -134,6 +165,7 @@ function NachforderungKarte({
   materialGesperrt = false,
   onMaterialUebernehmen,
   hervorgehoben = false,
+  stellenJeId,
 }: NachforderungKarteProps) {
   const { formatZeit } = useAnzeigeKonventionen();
   const sperrgrundId = useId();
@@ -214,6 +246,9 @@ function NachforderungKarte({
 
       <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 8 }}>
         <Text>{n.bezeichnung}</Text>
+        {n.betreuungsstelle_id != null && (
+          <StellenBezug verweis={stellenJeId?.get(n.betreuungsstelle_id)} />
+        )}
         {n.begruendung && <Text type="secondary">{n.begruendung}</Text>}
         <Text type="secondary" style={{ fontSize: 13 }}>
           Angefordert: {formatZeit(n.angefordert_at)}

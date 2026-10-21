@@ -1402,6 +1402,89 @@ mod tests {
             .all(|s| s.belegung.as_ref().map(|m| m.belegt) == Some(89)));
     }
 
+    /// LLH-1082, design.md D5: die Schwärzung leert Begründung und Adressat einer Nachforderung
+    /// und setzt Art und Bezeichnung auf Platzhalter; der Verweis auf die Betreuungsstelle bleibt
+    /// als Skelett, ebenso Anzahl und Status. Die Stelle trägt danach ihren Platzhalter.
+    #[tokio::test]
+    async fn schwaerzung_behaelt_den_stellenbezug_der_nachforderung() {
+        let pool = crate::db::test_pool().await;
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let nutzer: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1,'Leit','leit','h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status, abgeschlossen_at, abgeschlossen_von, \
+                retention_bis, geloescht_at) \
+             VALUES (1,'Hochwasser','abgeschlossen','2026-01-01 00:00:00', ?, \
+                '2026-02-01 00:00:00','2026-02-15 00:00:00') RETURNING id",
+        )
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Turnhalle Ost', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(nutzer)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let mut tx = pool.begin().await.unwrap();
+        let n = crate::nachforderung::repo::create_tx(
+            &mut tx,
+            e,
+            nutzer,
+            1,
+            &crate::nachforderung::repo::NachforderungDaten {
+                art: "Dolmetscher",
+                bezeichnung: "Dolmetscher Ukrainisch für Familie Kowalenko",
+                anzahl: Some(2),
+                adressat_kategorie: crate::nachforderung::ADRESSAT_LEITSTELLE,
+                adressat_bezeichnung: Some("Leitstelle Nord"),
+                begruendung: Some("Für Betreuungsstelle Turnhalle Ost"),
+                prioritaet: crate::nachforderung::PRIO_NORMAL,
+                angefordert_at: "2026-01-01 09:00:00",
+                betreuungsstelle_id: Some(stelle),
+            },
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        assert!(
+            super::repo::schwaerze_einsatz(&pool, e, "2026-06-01 12:00:00")
+                .await
+                .unwrap()
+        );
+
+        let nachher = crate::nachforderung::repo::load(&pool, n).await.unwrap();
+        assert_eq!(nachher.betreuungsstelle_id, Some(stelle), "Verweis bleibt");
+        assert_eq!(nachher.anzahl, Some(2));
+        assert_eq!(
+            nachher.status,
+            crate::nachforderung::NachforderungStatus::Angefordert
+        );
+        assert_eq!(nachher.begruendung, None);
+        assert_eq!(nachher.adressat_bezeichnung, None);
+        assert!(!nachher.bezeichnung.contains("Kowalenko"));
+        let stellenname: String =
+            sqlx::query_scalar("SELECT bezeichnung FROM betreuungsstelle WHERE id = ?")
+                .bind(stelle)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_ne!(stellenname, "Turnhalle Ost");
+    }
+
     /// LFH-634, Spec-Szenario „Einsatz schwärzen“: Ort und Bemerkung der Ausgabe leer; Menge,
     /// Sonderkost, Zeitpunkt, Nachforderungsverweis und das Zeitfenster samt Bezeichnung und
     /// Bedarf unverändert. LLH-1040, Spec-Szenario „Stelle schwärzen“: der Standort der Stelle

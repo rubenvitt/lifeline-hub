@@ -73,6 +73,8 @@ import {
   meldungenPfad,
   chatPfad,
   nachforderungenPfad,
+  parseNachforderungBezug,
+  parseNachforderungStelle,
   parseNachforderungVorbelegung,
   auftraegePfad,
   parseAuftraegeReiter,
@@ -1049,6 +1051,23 @@ describe('deeplinks — Nachforderung mit Vorbelegung (LFH-634)', () => {
   it('nachforderungenPfad ohne Optionen ist der bare Modulpfad', () => {
     expect(nachforderungenPfad(E)).toBe('/einsaetze/5/nachforderungen');
     expect(nachforderungenPfad(E, { neu: true })).toBe('/einsaetze/5/nachforderungen?neu=1');
+  });
+
+  it('Stellenbezug setzt neu=1 und betreuungsstelle, der Filter stelle bleibt Zustand (LLH-1082)', () => {
+    const pfad = nachforderungenPfad(E, { bezugStelle: 7, stelle: 7 });
+    expect(pfad).toBe('/einsaetze/5/nachforderungen?neu=1&betreuungsstelle=7&stelle=7');
+    const p = params(pfad);
+    expect(parseNachforderungBezug(p)).toBe(7);
+    expect(parseNachforderungStelle(p)).toBe(7);
+    // Ohne Art keine Vorbelegung: der Bezug steht für sich.
+    expect(parseNachforderungVorbelegung(p)).toBeNull();
+    expect(nachforderungenPfad(E, { stelle: 3 })).toBe('/einsaetze/5/nachforderungen?stelle=3');
+  });
+
+  it.each(['0', '-1', 'abc', '1.5', ''])('unlesbarer Stellenbezug %j heißt kein Bezug', (wert) => {
+    const p = new URLSearchParams({ betreuungsstelle: wert, stelle: wert });
+    expect(parseNachforderungBezug(p)).toBeNull();
+    expect(parseNachforderungStelle(p)).toBeNull();
   });
 
   it('?nachforderung= steuert eine Nachforderung an und übersteht den Round-Trip (LLH-1226 D10)', () => {

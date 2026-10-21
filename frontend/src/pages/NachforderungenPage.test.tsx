@@ -944,3 +944,144 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     );
   });
 });
+
+/** LLH-1082 (design.md D7): Bedarf einer Betreuungsstelle — Bezug per Deeplink, Filter „für Stelle“. */
+describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
+  const turnhalle = {
+    id: 8,
+    einsatz_id: 1,
+    bezeichnung: 'Turnhalle Ost',
+    art: 'notunterkunft',
+    status: 'in_betrieb',
+    angelegt_at: '2026-06-12 08:00:00',
+  };
+  const stadion = { ...turnhalle, id: 9, bezeichnung: 'Weserstadion' };
+  const FELDBETTEN = nf({
+    id: 1,
+    art: 'Feldbetten',
+    bezeichnung: 'Feldbetten für die Nacht',
+    anzahl: 40,
+    betreuungsstelle_id: 8,
+  });
+  const DECKEN = nf({
+    id: 2,
+    art: 'Decken',
+    bezeichnung: 'Decken Stadion',
+    betreuungsstelle_id: 9,
+  });
+  const RTW = nf({ id: 3 });
+
+  let betreuungAbrufe: number;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    betreuungAbrufe = 0;
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+    listeNachforderungen.mockResolvedValue([FELDBETTEN, DECKEN, RTW]);
+    server.use(
+      http.get('/api/einsaetze/1/betreuung', () => {
+        betreuungAbrufe += 1;
+        return HttpResponse.json({ stellen: [turnhalle, stadion], namentlich: [] });
+      }),
+    );
+  });
+
+  it('?neu=1&betreuungsstelle= öffnet die Erfassung mit Bezug, räumt den Parameter und sendet die Kennung', async () => {
+    legeNachforderungAn.mockResolvedValue(FELDBETTEN);
+    renderPage('/einsaetze/1/nachforderungen?neu=1&betreuungsstelle=8&stelle=8');
+    expect(await screen.findByLabelText('Art')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/nachforderungen?stelle=8'),
+    );
+    const bezug = document.querySelector('[data-lfh="nachforderung-bezug"]') as HTMLElement;
+    await waitFor(() => expect(bezug).toHaveTextContent('Für Betreuungsstelle Turnhalle Ost'));
+    await waitFor(() =>
+      expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue(
+        'Für Betreuungsstelle Turnhalle Ost',
+      ),
+    );
+
+    await userEvent.type(screen.getByLabelText('Art'), 'Decken');
+    await userEvent.type(screen.getByLabelText('Bezeichnung'), '100 Wolldecken');
+    await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
+    await waitFor(() =>
+      expect(legeNachforderungAn).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ art: 'Decken', betreuungsstelle_id: 8 }),
+      ),
+    );
+  });
+
+  it('Schließen räumt den Bezug: die nächste Erfassung ist ohne Stelle', async () => {
+    legeNachforderungAn.mockResolvedValue(RTW);
+    renderPage('/einsaetze/1/nachforderungen?neu=1&betreuungsstelle=8');
+    await screen.findByLabelText('Art');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Formular schließen' })[0]);
+    await waitFor(() => expect(screen.queryByLabelText('Art')).toBeNull());
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    await screen.findByLabelText('Art');
+    expect(document.querySelector('[data-lfh="nachforderung-bezug"]')).toBeNull();
+    expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue('');
+  });
+
+  it('die Karte nennt ihre Stelle mit Sprung', async () => {
+    renderPage();
+    await screen.findByText('Feldbetten für die Nacht');
+    expect(await screen.findByRole('link', { name: /Turnhalle Ost/ })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/betreuung/8',
+    );
+  });
+
+  it('?stelle= filtert Liste und Ansichtszähler, nennt den Filter und setzt ihn zurück', async () => {
+    renderPage('/einsaetze/1/nachforderungen?stelle=8');
+    await screen.findByText('Feldbetten für die Nacht');
+    expect(screen.queryByText('Decken Stadion')).toBeNull();
+    expect(screen.queryByText('2 RTW zur Verstärkung')).toBeNull();
+    expect(screen.getByText('Offen (1)')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Betreuungsstelle Turnhalle Ost/, { selector: 'span' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(await screen.findByText('Decken Stadion')).toBeInTheDocument();
+    expect(screen.getByText('2 RTW zur Verstärkung')).toBeInTheDocument();
+    expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/);
+  });
+
+  it('die Wahl „Für Stelle“ bietet die Stellen mit Bezug und setzt den Filter in die Adresse', async () => {
+    renderPage();
+    await screen.findByText('Decken Stadion');
+    const wahl = await screen.findByRole('combobox', { name: 'Für Stelle' });
+    await userEvent.click(wahl);
+    await userEvent.click(
+      document.querySelector(
+        '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="Weserstadion"]',
+      ) as HTMLElement,
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/nachforderungen?stelle=9'),
+    );
+    expect(screen.queryByText('Feldbetten für die Nacht')).toBeNull();
+    expect(screen.getByText('Decken Stadion')).toBeInTheDocument();
+  });
+
+  it('ohne Freigabe Betreuung: kein Abruf der Stellen, keine Wahl, die Karte sagt „Für eine Betreuungsstelle“', async () => {
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture({ betreuung: { zugriff: false } }));
+    renderPage();
+    await screen.findByText('Feldbetten für die Nacht');
+    expect(screen.getAllByText('Für eine Betreuungsstelle')).toHaveLength(2);
+    expect(screen.queryByRole('combobox', { name: 'Für Stelle' })).toBeNull();
+    expect(betreuungAbrufe).toBe(0);
+  });
+
+  it('ohne Bezüge ruft die Seite die Betreuungsübersicht nicht ab', async () => {
+    listeNachforderungen.mockResolvedValue([RTW]);
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(betreuungAbrufe).toBe(0);
+    expect(screen.queryByRole('combobox', { name: 'Für Stelle' })).toBeNull();
+  });
+});

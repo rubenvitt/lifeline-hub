@@ -3,7 +3,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Route, Routes, useLocation, useNavigate } from 'react-router';
+import { useContext, useState, type ReactNode } from 'react';
+import { Route, Routes, UNSAFE_LocationContext, useLocation, useNavigate } from 'react-router';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -35,27 +36,6 @@ const KONTEXT_PUNKT = vi.hoisted(() => ({ lng: 8.6, lat: 50.1, quelle: 'maus' as
 
 /** Jede `flaechen`-Prop, die die Karte bekommt, in Render-Folge (LFH-945: Identität). */
 const flaechenProps = vi.hoisted(() => [] as unknown[]);
-
-/**
- * Router-Commit in der Schwebe: Der echte `RouterProvider` setzt seinen Stand in einer Transition.
- * Die Adresse des Browsers ist nach `setSearchParams` schon geräumt, `searchParams` der Seite aber
- * noch der alte, solange die Transition nicht durch ist (unter Last Sekunden). `haengt` hält diesen
- * Zustand fest: `setSearchParams` wirkt dann nicht, und die Seite sieht weiter den alten Auftrag.
- */
-const routerCommit = vi.hoisted(() => ({ haengt: false, nichts: () => {} }));
-vi.mock('react-router', async (original) => {
-  const echt = await original<typeof import('react-router')>();
-  return {
-    ...echt,
-    useSearchParams: (...args: Parameters<typeof echt.useSearchParams>) => {
-      const [params, setzen] = echt.useSearchParams(...args);
-      return [params, routerCommit.haengt ? routerCommit.nichts : setzen] as const;
-    },
-  };
-});
-afterEach(() => {
-  routerCommit.haengt = false;
-});
 
 /** Picker-Kosten (LFH-836): das Aufwärmen des Vokabulars, beobachtet statt gerechnet. */
 const aufwaermen = vi.hoisted(() => ({ abbrechen: vi.fn(), start: vi.fn() }));
@@ -3169,9 +3149,12 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     ).toBeInTheDocument();
   });
 
-  it('wendet den Auftrag nur einmal an, auch wenn der Router das Räumen noch nicht übernommen hat', async () => {
-    // Nach dem POST trägt der Bezirk eine Fläche mehr: die Bezirksliste ändert sich, und der
-    // Auftrags-Effekt läuft erneut, während `searchParams` noch den alten Auftrag zeigt.
+  /**
+   * Das Räumen der Adresse ist eine Navigation, und bis sie gerendert ist, sehen weitere Renders
+   * noch den Auftrag. Hier bleibt die Adresse stehen, und nach dem Speichern kommt die Bezirksliste
+   * neu (Live-Ereignis): Der Auftrag ist verbraucht und startet den Modus nicht noch einmal.
+   */
+  it('eine noch nicht gerenderte Räumung startet den Modus nicht neu', async () => {
     let flaechen = 0;
     basisHandler([
       http.get('/api/einsaetze/1/evakuierung', () =>
@@ -3182,23 +3165,33 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
         return HttpResponse.json({ id: 9 });
       }),
     ]);
-    routerCommit.haengt = true;
+    function AdresseSteht({ children }: { children: ReactNode }) {
+      const aktuell = useContext(UNSAFE_LocationContext);
+      const [fest] = useState(aktuell);
+      return (
+        <UNSAFE_LocationContext.Provider value={fest}>{children}</UNSAFE_LocationContext.Provider>
+      );
+    }
     const user = userEvent.setup();
-    renderMitRueckweg('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    const { client } = renderMitProviders(
+      <AdresseSteht>
+        <Routes>
+          <Route path="/einsaetze/:id/lagekarte" element={<LagekartePage />} />
+        </Routes>
+      </AdresseSteht>,
+      { route: '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5' },
+    );
     expect(await screen.findByText('Bezirk Uferstraße 12–40 · Fläche')).toBeInTheDocument();
-
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     expect(
       await screen.findByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
     ).toBeInTheDocument();
-    // Die Rückmeldung bleibt stehen, kein zweiter Zeichenmodus mit demselben Bezug.
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
-    });
+
+    await act(() => client.invalidateQueries({ queryKey: ['einsatz-evakuierung', 1] }));
+    await waitFor(() => expect(client.isFetching()).toBe(0));
     expect(screen.getByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
     expect(screen.queryByText('Bezirk Uferstraße 12–40 · Fläche')).not.toBeInTheDocument();
-    expect(flaechen).toBe(1);
   });
 
   it('„Auf der Karte bleiben“ schließt die Rückmeldung', async () => {

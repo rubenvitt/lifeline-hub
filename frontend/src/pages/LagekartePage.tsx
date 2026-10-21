@@ -167,8 +167,7 @@ export default function LagekartePage() {
   const { effektiv } = useThemeMode();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Schlüssel des Verlaufseintrags, dessen Adresse `searchParams` gerade zeigt (s. Zeichnen-Auftrag).
-  const { key: adressSchluessel } = useLocation();
+  const { key: adresseSchluessel } = useLocation();
 
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
@@ -975,8 +974,6 @@ export default function LagekartePage() {
     tierZugriff,
   ]);
 
-  /** Verlaufseintrag, dessen Zeichnen-Auftrag schon angewandt und geräumt ist. */
-  const zeichnenAngewandtRef = useRef<string | null>(null);
   /**
    * Zeichnen-Auftrag von außen (LFH-825): `?zeichnen=gefahrengebiet` betritt den Zonen-Zeichenmodus
    * wie der Knopf im Paneel (Schnellaktion „Gefahrengebiet zeichnen“ der Sprungpalette). Gleiches
@@ -990,17 +987,19 @@ export default function LagekartePage() {
    * Evakuierungsbezirk. Der Auftrag wartet zusätzlich auf Modulfreigaben und Bezirksliste und
    * startet nur mit freiem Modul Evakuierung für einen Bezirk der Liste; sonst wird er wie jeder
    * ungültige Auftrag nur geräumt — beide Parameter, auch ein `bezirk` ohne `zeichnen`.
+   *
+   * Ein Auftrag gilt einmal je Adresse (`location.key`): Das Räumen ist eine Navigation, und bis sie
+   * gerendert ist, zeigen weitere Renders noch die alte Adresse mit Auftrag. Ändert sich in der Zeit
+   * eine Abhängigkeit (die Bezirksliste nach dem Speichern), liefe der Auftrag sonst noch einmal und
+   * startete den Modus neu: gezeichnete Punkte weg, statt der Rückmeldung ein leerer Zeichenmodus.
    */
+  const zeichenAuftragVerbraucht = useRef<string | null>(null);
   useEffect(() => {
     const roh = searchParams.get('zeichnen');
     const rohBezirk = searchParams.get('bezirk');
     if (roh === null && rohBezirk === null) return;
+    if (zeichenAuftragVerbraucht.current === adresseSchluessel) return;
     if (ladt) return;
-    // Schon angewandt: Der Router übernimmt das Räumen in einer Transition, die Adresse des Browsers
-    // ist dann schon leer, `searchParams` aber noch der alte Eintrag. Ändert sich bis dahin eine
-    // andere Abhängigkeit (nach dem Speichern die Bezirksliste), liefe derselbe Auftrag ein zweites
-    // Mal und startete den Modus über der Rückmeldung neu. Ein neuer Link ist ein neuer Eintrag.
-    if (zeichnenAngewandtRef.current === adressSchluessel) return;
     const auftrag = parseZeichnenBezug(parseZeichnenAuftrag(roh), rohBezirk);
     // Kreis (LLH-1043, D9): Radius und Mitte belegen nur mit `:kreis` vor; ein unbrauchbarer
     // Teil fällt einzeln weg, der Modus startet trotzdem.
@@ -1015,8 +1014,8 @@ export default function LagekartePage() {
       if (!bezirkAuftragEntschieden({ rechteBekannt, evakuierungFrei, bezirkeGeladen })) return;
       entwurf = bezirkZeichnenEntwurf(entwurf, auftrag.bezirk, { evakuierungFrei, bezirke });
     }
-    zeichnenAngewandtRef.current = adressSchluessel;
     if (entwurf) onZoneZeichnenStart(entwurf);
+    zeichenAuftragVerbraucht.current = adresseSchluessel;
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('zeichnen');
     naechste.delete('radius');
@@ -1025,7 +1024,7 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [
     searchParams,
-    adressSchluessel,
+    adresseSchluessel,
     setSearchParams,
     ladt,
     darfSchreiben,
