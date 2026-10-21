@@ -2,7 +2,7 @@ import { abrufZustand, type AbrufZustand } from '../../api/abrufZustand';
 import type { ModulZaehler } from '../../api/types';
 
 /**
- * Die Handlungsmengen des Führungsstands — Aufträge und Meldungen — aus dem Modulzähler des
+ * Die Handlungsmengen des Führungsstands — Aufträge, Meldungen und Nachforderungen — aus dem Modulzähler des
  * Servers (`GET …/modul-zaehler`, `src/einsatz/zaehler.rs`).
  *
  * **Eine Heimat je Zahl (LFH-550):** Lage-Dashboard, Führungsüberblick und die Vorbereitung der
@@ -15,6 +15,7 @@ import type { ModulZaehler } from '../../api/types';
 
 type AuftragsZaehler = NonNullable<ModulZaehler['auftraege']>;
 type MeldungsZaehler = NonNullable<ModulZaehler['meldungen']>;
+type NachforderungsZaehler = NonNullable<ModulZaehler['nachforderungen']>;
 
 /** Was an der Zähler-Abfrage gelesen wird (Teilmenge von `UseQueryResult`). */
 export interface ZaehlerAbfrage {
@@ -43,6 +44,11 @@ export function auftragsStand(q: ZaehlerAbfrage): Zaehlstand<AuftragsZaehler> {
 
 export function meldungsStand(q: ZaehlerAbfrage): Zaehlstand<MeldungsZaehler> {
   return stand(q, (z) => z.meldungen);
+}
+
+/** LLH-1078: die offenen Nachforderungen je Stufe (Überblick, Vorbereitung der Lagebesprechung). */
+export function nachforderungsStand(q: ZaehlerAbfrage): Zaehlstand<NachforderungsZaehler> {
+  return stand(q, (z) => z.nachforderungen);
 }
 
 /** Wortlaut für ein Modul, das die Person nicht sehen darf. */

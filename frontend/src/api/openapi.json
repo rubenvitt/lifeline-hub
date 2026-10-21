@@ -8987,7 +8987,7 @@
       },
       "LageGesehenAnzeige": {
         "type": "object",
-        "description": "Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden.",
+        "description": "Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.",
         "required": [
           "gesehen"
         ],
@@ -9001,7 +9001,7 @@
       },
       "LageMeldungAnzeige": {
         "type": "object",
-        "description": "Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)\nper JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.",
+        "description": "Eine Lagemeldung: eine lagerelevante Meldung in der Sicht der Lage (LFH-95; seit LLH-1031 ohne\neigenes Lageobjekt, LLH-1027 D1/D6). Die Drahtform bleibt die, die alte Lage-Stände\n(`lage_snapshot.daten`) tragen: dort ist `id` noch die Kennung des früheren Lageobjekts, heute\ngilt `id == meldung_id`. Die Felder ab `meldungsart` fehlen in alten Ständen.",
         "required": [
           "id",
           "einsatz_id",
@@ -9012,7 +9012,12 @@
           "ereigniszeit",
           "meldung_lfd_nr",
           "meldung_absender",
-          "is_neu"
+          "is_neu",
+          "meldungsart",
+          "prioritaet",
+          "meldung_status",
+          "richtung",
+          "is_von_geraet"
         ],
         "properties": {
           "einsatz_id": {
@@ -9025,11 +9030,12 @@
           },
           "erstellt_at": {
             "type": "string",
-            "description": "Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es\ngeschah."
+            "description": "Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es\ngeschah. Bei einer Lagemeldung ihr Eingang."
           },
           "erstellt_von_id": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Wer sie in die Lage übernommen hat; bei einer Lagemeldung ihr Erfasser."
           },
           "gesehen_at": {
             "type": [
@@ -9055,11 +9061,16 @@
           },
           "id": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Kennung der Lagemeldung = Kennung der Meldung (`lagemeldung:<id>` im Client)."
           },
           "is_neu": {
             "type": "boolean",
             "description": "Abgeleitet: noch niemand hat die Lagemeldung als gesehen gekennzeichnet (LLH-1206). Gilt\nfür alle Benutzer gleich; Liste und Modulzähler lesen dasselbe Prädikat (`is_neu_sql`)."
+          },
+          "is_von_geraet": {
+            "type": "boolean",
+            "description": "Abgeleitet: erfasst von einem gekoppelten Gerät (Erfasser ist ein Gerätekonto)."
           },
           "lat": {
             "type": [
@@ -9086,8 +9097,25 @@
             "type": "integer",
             "format": "int64"
           },
+          "meldung_status": {
+            "$ref": "#/components/schemas/MeldungStatus",
+            "description": "Bearbeitungsstand der Meldung im Meldungseingang — nicht die Kenntnisnahme (`is_neu`)."
+          },
+          "meldungsart": {
+            "$ref": "#/components/schemas/Meldungsart",
+            "description": "Meldungsart (LLH-1031): `lagemeldung` oder die Art einer übernommenen Meldung."
+          },
+          "prioritaet": {
+            "$ref": "#/components/schemas/Prioritaet",
+            "description": "Priorität der Meldung, gleicher Name wie an der Meldung."
+          },
+          "richtung": {
+            "$ref": "#/components/schemas/Richtung",
+            "description": "Richtung intern/extern (eine Lagemeldung an die übergeordnete Stelle ist `extern`)."
+          },
           "text": {
-            "type": "string"
+            "type": "string",
+            "description": "Eigener Lage-Text der Übernahme, sonst der Wortlaut der Meldung."
           }
         }
       },
@@ -10343,7 +10371,7 @@
       },
       "MeldungAnzeige": {
         "type": "object",
-        "description": "Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,\n`lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).",
+        "description": "Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN, `ist_offen` für\nPosteingang-Filter). Ob sie in der Lage steht, sagt `lagerelevant` (LLH-1031).",
         "required": [
           "id",
           "einsatz_id",
@@ -10514,14 +10542,6 @@
           "ist_ueberfaellig": {
             "type": "boolean",
             "description": "Abgeleitet: pflichtig, unbestätigt und Frist <= jetzt."
-          },
-          "lage_meldung_id": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "format": "int64",
-            "description": "Abgeleitet: id des erzeugten Lageobjekts (LFH-95), falls übergeben."
           },
           "lagerelevant": {
             "type": "boolean"
@@ -10822,6 +10842,16 @@
               }
             ]
           },
+          "nachforderungen": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NachforderungsZaehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "personen": {
             "oneOf": [
               {
@@ -10980,6 +11010,37 @@
           "eingetroffen",
           "abgelehnt"
         ]
+      },
+      "NachforderungsZaehler": {
+        "type": "object",
+        "description": "Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.\nEingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an\nder Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.",
+        "required": [
+          "offen",
+          "angefordert",
+          "zugesagt",
+          "unterwegs"
+        ],
+        "properties": {
+          "angefordert": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon im Status „angefordert“ (noch keine Zusage)."
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unterwegs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon „unterwegs“."
+          },
+          "zugesagt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon „zugesagt“."
+          }
+        }
       },
       "NotizAnzeige": {
         "type": "object",

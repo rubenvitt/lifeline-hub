@@ -2,8 +2,8 @@
 //!
 //! Gezählt wird nur, wo die Bedeutung belegt ist: die Gesamtmengen von ETB, Betroffenen,
 //! Einheiten, Einsatzabschnitten und Dokumenten (LFH-666), die Handlungsmengen der vier
-//! Kommunikationsmodule und die neuen Lagemeldungen (LLH-1206). Ein weiteres Modul braucht eine
-//! eigene Entscheidung.
+//! Kommunikationsmodule, die neuen Lagemeldungen (LLH-1206) und die offenen Nachforderungen je
+//! Stufe (LLH-1078). Ein weiteres Modul braucht eine eigene Entscheidung.
 //!
 //! **Fehlt ≠ 0.** Jedes Feld fehlt, wenn der Benutzer das Modul nicht sehen darf
 //! ([`crate::einsatz::berechtigung::erlaubte_module`]); eine 0 wäre eine Auskunft über ein
@@ -15,12 +15,13 @@
 //! daraus zusammen, ein zweites Prädikat gibt es nicht. Gezählt wird je Modul mit EINER Abfrage
 //! ohne Listen zu laden (`meldung::repo::zaehlen`, `auftrag::repo::zaehlen`,
 //! `erinnerung::repo::faellige_offene`, `chat::repo::ungelesen_gesamt`,
-//! `meldung::repo::count_lage_neu`): Meldungen und Aufträge
-//! gruppiert nach ihren Merkmalen, gezählt mit den reinen Regeln unten.
+//! `meldung::repo::count_lage_neu`, `nachforderung::repo::zaehlen`): Meldungen, Aufträge und
+//! Nachforderungen gruppiert nach ihren Merkmalen, gezählt mit den reinen Regeln unten.
 //!
 //! **Eine Heimat je Zahl (LFH-550):** Lage-Dashboard und Führungsüberblick zeigen Aufträge und
 //! Meldungen aus diesem Zähler, nicht aus eigener Zählung. Die Zählregeln über den Zeilen stehen
-//! als reine Funktionen ([`zaehle_auftraege`], [`zaehle_meldungen`]); das gemeinsame Fixture
+//! als reine Funktionen ([`zaehle_auftraege`], [`zaehle_meldungen`],
+//! [`zaehle_nachforderungen`]); das gemeinsame Fixture
 //! `tests/fixtures/verdichtung/regeln.json` bindet sie an die Client-Regeln
 //! (`tests/verdichtung_fixture.rs` und `frontend/src/lage/verdichtungFixture.test.ts`).
 
@@ -28,6 +29,7 @@ use crate::auftrag::AuftragBearbeitungsstatus;
 use crate::auth::Benutzer;
 use crate::error::AppError;
 use crate::meldung::MeldungStatus;
+use crate::nachforderung::NachforderungStatus;
 use crate::staerke::{Staerke, StaerkePosition};
 use serde::Serialize;
 use sqlx::SqlitePool;
@@ -60,6 +62,20 @@ pub struct AuftragsZaehler {
     /// Davon überfällig — nur unter den offenen: ein vollzogener Auftrag mit Quittungslücke
     /// zählt nicht (LFH-550).
     pub ueberfaellig: i64,
+}
+
+/// Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.
+/// Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an
+/// der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct NachforderungsZaehler {
+    pub offen: i64,
+    /// Davon im Status „angefordert“ (noch keine Zusage).
+    pub angefordert: i64,
+    /// Davon „zugesagt“.
+    pub zugesagt: i64,
+    /// Davon „unterwegs“.
+    pub unterwegs: i64,
 }
 
 /// Was an einem Auftrag gezählt wird. Die Flags kommen aus denselben SQL-Fragmenten wie in der
@@ -144,6 +160,39 @@ pub fn zaehle_meldungen_gewichtet(
     z
 }
 
+/// Zählregel der Nachforderungen: offen nach [`NachforderungStatus::ist_offen`], davon je Stufe.
+/// Dieselbe Regel kennt das Board im Browser (`zaehleNachforderungen` in
+/// `frontend/src/nachforderungen/nachforderungStufen.ts`); das Fixture hält beide gleich.
+pub fn zaehle_nachforderungen(status: &[NachforderungStatus]) -> NachforderungsZaehler {
+    zaehle_nachforderungen_gewichtet(status.iter().map(|s| (*s, 1)))
+}
+
+/// [`zaehle_nachforderungen`] über Gruppen gleichen Status mit ihrer Anzahl
+/// (`nachforderung::repo::zaehlen`, `GROUP BY status`).
+pub fn zaehle_nachforderungen_gewichtet(
+    gruppen: impl IntoIterator<Item = (NachforderungStatus, i64)>,
+) -> NachforderungsZaehler {
+    let mut z = NachforderungsZaehler {
+        offen: 0,
+        angefordert: 0,
+        zugesagt: 0,
+        unterwegs: 0,
+    };
+    for (s, n) in gruppen {
+        if !s.ist_offen() {
+            continue;
+        }
+        z.offen += n;
+        match s {
+            NachforderungStatus::Angefordert => z.angefordert += n,
+            NachforderungStatus::Zugesagt => z.zugesagt += n,
+            NachforderungStatus::Unterwegs => z.unterwegs += n,
+            NachforderungStatus::Eingetroffen | NachforderungStatus::Abgelehnt => {}
+        }
+    }
+    z
+}
+
 /// Was an einer Dispositionszeile Personal gezählt wird (LLH-1079, design.md D9): die
 /// aufgelöste Stärkeposition (Dispo-Override vor Stamm-Default) und ob die Kraft beendet ist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -215,6 +264,8 @@ pub struct ModulZaehlerAnzeige {
     pub dokumente: Option<MengenZaehler>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lagemeldungen: Option<LagemeldungsZaehler>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nachforderungen: Option<NachforderungsZaehler>,
 }
 
 /// Zählt eine Tabelle je Einsatz. `sql` ist ein festes Literal (kein Nutzereingang).
@@ -318,6 +369,9 @@ pub async fn berechne(
             neu: crate::meldung::repo::count_lage_neu(pool, einsatz_id).await?,
         });
     }
+    if erlaubt.contains("nachforderungen") {
+        z.nachforderungen = Some(crate::nachforderung::repo::zaehlen(pool, einsatz_id).await?);
+    }
     Ok(z)
 }
 
@@ -347,10 +401,16 @@ mod tests {
             chat: Some(ChatZaehler { ungelesen: 1 }),
             dokumente: Some(MengenZaehler { gesamt: 1 }),
             lagemeldungen: Some(LagemeldungsZaehler { neu: 1 }),
+            nachforderungen: Some(NachforderungsZaehler {
+                offen: 1,
+                angefordert: 1,
+                zugesagt: 0,
+                unterwegs: 0,
+            }),
         };
         let v = serde_json::to_value(&voll).unwrap();
         let felder = v.as_object().unwrap();
-        assert_eq!(felder.len(), 10, "{v:?}");
+        assert_eq!(felder.len(), 11, "{v:?}");
         for feld in felder.keys() {
             assert!(
                 MODUL_KEYS.contains(&feld.as_str()),
@@ -427,6 +487,47 @@ mod tests {
         assert_eq!(
             zaehle_meldungen_gewichtet(m_gruppen),
             zaehle_meldungen(&m_zeilen)
+        );
+
+        use NachforderungStatus as N;
+        let stati = [
+            N::Angefordert,
+            N::Zugesagt,
+            N::Unterwegs,
+            N::Eingetroffen,
+            N::Abgelehnt,
+        ];
+        let n_zeilen: Vec<_> = stati
+            .iter()
+            .enumerate()
+            .flat_map(|(i, s)| std::iter::repeat_n(*s, ausgeschrieben(gewicht(i))))
+            .collect();
+        let n_gruppen = stati.iter().enumerate().map(|(i, s)| (*s, gewicht(i)));
+        assert_eq!(
+            zaehle_nachforderungen_gewichtet(n_gruppen),
+            zaehle_nachforderungen(&n_zeilen)
+        );
+    }
+
+    #[test]
+    fn nachforderungen_offen_ist_die_summe_der_drei_stufen() {
+        use NachforderungStatus as N;
+        let z = zaehle_nachforderungen(&[
+            N::Angefordert,
+            N::Zugesagt,
+            N::Zugesagt,
+            N::Unterwegs,
+            N::Eingetroffen,
+            N::Abgelehnt,
+        ]);
+        assert_eq!(
+            z,
+            NachforderungsZaehler {
+                offen: 4,
+                angefordert: 1,
+                zugesagt: 2,
+                unterwegs: 1,
+            }
         );
     }
 

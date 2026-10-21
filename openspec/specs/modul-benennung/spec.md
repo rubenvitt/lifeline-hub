@@ -36,6 +36,17 @@ das Modul im h1 nennen und den Reiter darunter, nicht umgekehrt.
   ihm steht der Reiter „Kommunikationsplan“ als gewählt, und die Zeile unter dem Menüeintrag lautet
   „Funkplan, Skizze, Kommunikationsplan“
 
+#### Scenario: Nachforderungen
+
+- **WHEN** eine Person die Kategorie Kräfte & Mittel öffnet
+- **THEN** steht dort „Nachforderungen“ mit der Zeile „Anforderung, Zusage, Eintreffen“, das h1
+  der Seite lautet „Nachforderungen“, und die Kategorie Kommunikation führt das Modul nicht mehr
+
+#### Scenario: Nachforderungen in der Sprungpalette
+
+- **WHEN** eine Person in der Sprungpalette „Anforderung“ sucht
+- **THEN** findet sie das Modul „Nachforderungen“, und es öffnet unter der bisherigen Adresse
+
 ### Requirement: Modulbeschreibung als zweite Zeile
 
 Jedes Modul der Registry SHALL eine Beschreibung aus wenigen Fachwörtern tragen, ohne Satz, ohne
@@ -53,15 +64,16 @@ zweite Zeile unter dem Modulnamen zeigen, bei Platzmangel mit Auslassung und vol
 - **WHEN** eine Person bei 390 px Breite das Modulmenü öffnet
 - **THEN** stehen die Beschreibungen ohne waagrechten Überlauf
 
-### Requirement: Leere Lagemeldungen führen zu den Meldungen
+### Requirement: Leere Lagemeldungen bieten das Erfassen an
 
-Ist noch keine Meldung an die Lage übergeben, SHALL die Seite Lagemeldungen einen Knopf „Zu den
-Meldungen“ zeigen, der zur Meldungsliste führt, und keinen Erklärsatz.
+Steht noch keine Lagemeldung in der Lage, SHALL die Seite Lagemeldungen „Lagemeldung erfassen“
+zeigen und keinen Erklärsatz. Ohne Schreibrecht im Modul Meldungen SHALL sie stattdessen „Nur
+Ansicht“ mit Grund zeigen.
 
 #### Scenario: Neuer Einsatz
 
-- **WHEN** eine Person in einem neuen Einsatz die Lagemeldungen öffnet
-- **THEN** führt „Zu den Meldungen“ sie zu „Meldungen (eingehend)“
+- **WHEN** eine Person mit Schreibrecht in einem neuen Einsatz die Lagemeldungen öffnet
+- **THEN** steht unter „Noch keine Lagemeldungen“ der Knopf „Lagemeldung erfassen“, und er öffnet das Meldungsformular mit der Art „Lagemeldung“
 
 ### Requirement: Lagemeldungen und eingehende Meldungen unterscheiden sich im Symbol
 

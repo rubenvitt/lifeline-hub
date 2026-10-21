@@ -89,6 +89,12 @@ const knopf = (name: string | RegExp) => (page: Page) =>
 /** Ein Nebenweg des Seitenkopfs mit Ziel ist ab `md` ein Link in Knopfgestalt (LFH-963). */
 const nebenweg = (name: RegExp) => (page: Page) =>
   page.locator('[data-lfh="seitenkopf-aktionen"]').getByRole('link', { name });
+/** Kopfknopf der eingeklappten Spalte „Abgelehnt“ im Nachforderungen-Board. */
+const abgelehntSpalte = {
+  sorte: 'Board Abgelehnt',
+  ziele: (page: Page) => inMain(page).getByRole('button', { name: /^Abgelehnt \d+$/ }),
+  mindestens: 1,
+};
 /** Ein Segment der `Segmentleiste` ist ein `<button role="radio">` (bzw. `tab`). */
 const segment =
   (name: RegExp, rolle: 'radio' | 'tab' = 'radio') =>
@@ -418,6 +424,7 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
           ziele: knopf(/^(Zusage erfassen|Ablehnen)$/),
           mindestens: 2,
         },
+        abgelehntSpalte,
       ],
     },
     {
@@ -515,7 +522,9 @@ test('C8 · Kommunikation (Beobachter): Schreibaktionen fehlen, was bleibt, häl
       pfad: `${R}/nachforderungen`,
       anker: (page) => inMain(page).getByText('RTW').first(),
       fehlt: knopf('Nachforderung anlegen'),
-      ziele: [filter],
+      // Das Board hat keinen Statusfilter mehr; ohne Schreibrecht bleibt der Spaltenknopf
+      // „Abgelehnt“ (Spec `nachforderungen-board`).
+      ziele: [abgelehntSpalte],
     },
     {
       pfad: `${R}/auftraege`,
@@ -1109,9 +1118,9 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
         {
           sorte: 'Lagemeldungen Filter',
           ziele: segment(
-            /^(Alle|Letzte Stunde|Letzte 4 Stunden|Heute|Alle Orte|Mit Koordinaten|Ohne Koordinaten)$/,
+            /^(Alle|Letzte Stunde|Letzte 4 Stunden|Heute|Alle Orte|Mit Koordinaten|Ohne Koordinaten|Gerät|Übernommen)$/,
           ),
-          mindestens: 7,
+          mindestens: 10,
         },
         {
           sorte: 'Lagemeldungen Suche',
@@ -1122,7 +1131,7 @@ function lageFlaechen(einsatzId: string, berichtId: number): Flaeche[] {
           // Der Deeplink zur Quellmeldung maß nackt 13 px (LFH-908). Der Deckel ist die
           // Steuerhöhe: eine eigene Polsterung höbe die Metazeile über ihre Nachbarn.
           sorte: 'Lagemeldungen Quellmeldung-Link',
-          ziele: (page) => inMain(page).getByRole('link', { name: /^Meldung #\d+$/ }),
+          ziele: (page) => inMain(page).getByRole('link', { name: /^Meldung #\d+/ }),
           mindestens: 1,
           deckel: { kompakt: 30, handschuh: 72 },
         },

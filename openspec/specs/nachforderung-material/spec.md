@@ -105,7 +105,7 @@ Nachforderung nur die Kennung tragen.
 
 #### Scenario: Verweis folgen
 - **WHEN** die Einsatzleitung an einem übernommenen Posten „aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße“ wählt
-- **THEN** öffnet die Nachforderungsliste in der Ansicht „Abgeschlossen“, und die Karte dieser Nachforderung ist hervorgehoben
+- **THEN** öffnet das Board der Nachforderungen mit der Karte dieser Nachforderung in ihrer Stufe (eingetroffen, auch wenn das länger als 12 h her ist), und die Karte ist hervorgehoben
 
 #### Scenario: Ohne Zugang zu Nachforderungen
 - **WHEN** eine Person ohne Freigabe für Nachforderungen die Materialliste öffnet

@@ -30,8 +30,8 @@ und Führungspersonal.
 
 1. Auf der Seite „Lagebesprechung“ das Paneel „Vorbereitung“ lesen. Es stellt die Kennzahlen für
    die Besprechung zusammen: Betroffene, Vermisste, Sichtung, Kräfte, höchste Warnstufe, offene
-   Aufträge und Meldungen, letzter Lagebericht, letzte Lagebesprechung und nächster Termin, jede
-   Zeile mit ihrer Quelle.
+   Aufträge und Meldungen, offene Nachforderungen je Stufe, letzter Lagebericht, letzte
+   Lagebesprechung und nächster Termin, jede Zeile mit ihrer Quelle.
 
    ![Paneel „Vorbereitung“ mit Kennzahlen und Quellen je Zeile](../bilder/lagebesprechung/vorbereitung.png)
 

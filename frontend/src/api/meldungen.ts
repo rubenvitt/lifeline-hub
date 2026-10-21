@@ -1,6 +1,7 @@
 import { apiGet, apiSend, type ApiSendOptionen, mitParametern } from './client';
 import type {
   LageGesehen,
+  LageGesehenBody,
   LageMeldung,
   Meldung,
   MeldungKennzahlen,
@@ -156,23 +157,31 @@ export function erteileAuftragAusMeldung(
   );
 }
 
-/** Lageobjekte (aus lagerelevanten Meldungen) listen (LFH-95, Lage-Kategorie). */
+/** Lagemeldungen listen: lagerelevante Meldungen in der Sicht der Lage (LFH-95, LLH-1031). */
 export function listeLageMeldungen(einsatzId: number): Promise<LageMeldung[]> {
   return apiGet<LageMeldung[]>(`/api/einsaetze/${einsatzId}/lage/meldungen`);
 }
 
-/** Eine Lagemeldung als gesehen kennzeichnen (LLH-1206); für alle gleich, die erste gewinnt. */
-export function markLageMeldungGesehen(einsatzId: number, lageId: number): Promise<LageMeldung> {
+/** Eine Lagemeldung als gesehen kennzeichnen (LLH-1206); für alle gleich, die erste gewinnt.
+ *  Kennung ist die Meldung (LLH-1031). */
+export function markLageMeldungGesehen(einsatzId: number, meldungId: number): Promise<LageMeldung> {
   return apiSend<LageMeldung>(
-    `/api/einsaetze/${einsatzId}/lage/meldungen/${lageId}/gesehen`,
+    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lage-gesehen`,
     'POST',
     {},
   );
 }
 
-/** Alle neuen Lagemeldungen bis einschließlich `bisId` als gesehen kennzeichnen (LLH-1206). */
-export function markLageMeldungenGesehen(einsatzId: number, bisId: number): Promise<LageGesehen> {
-  return apiSend<LageGesehen>(`/api/einsaetze/${einsatzId}/lage/meldungen/gesehen`, 'POST', {
-    bis_id: bisId,
-  });
+/** Höchstens so viele Kennungen nimmt „Alle als gesehen markieren“ je Aufruf an (Backend 400). */
+export const LAGE_GESEHEN_MAX = 500;
+
+/** Die angezeigten neuen Lagemeldungen als gesehen kennzeichnen (LLH-1206, LLH-1031): nur diese
+ *  Kennungen, eine inzwischen eingegangene bleibt neu. */
+export function markLageMeldungenGesehen(
+  einsatzId: number,
+  meldungIds: number[],
+): Promise<LageGesehen> {
+  return apiSend<LageGesehen>(`/api/einsaetze/${einsatzId}/lage/gesehen`, 'POST', {
+    meldung_ids: meldungIds,
+  } satisfies LageGesehenBody);
 }

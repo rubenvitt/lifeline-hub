@@ -344,7 +344,7 @@ Dichte mindestens 72 px groß.
 
 Eine Ausgabe wird nicht bearbeitet, sondern zurückgenommen und neu erfasst. Ihr Zeitpunkt darf
 außerhalb des Zeitfensters liegen, etwa bei einer Anlieferung vor Beginn. Beschafft wird über das
-Modul Nachforderungen ([Nachforderung](nachforderung.md)); eine Ausgabe kann auf eine Nachforderung verweisen,
+Modul [Nachforderungen](nachforderung.md); eine Ausgabe kann auf eine Nachforderung verweisen,
 ohne deren Status zu ändern. „Nachfordern“ steht nur bereit, wenn etwas fehlt und das Modul
 Nachforderungen bedient werden kann.
 

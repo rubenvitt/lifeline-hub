@@ -10,14 +10,27 @@ import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { setzeOnline } from '../test/utils';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
+vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
 const ladeEinsatz = vi.fn();
+const ladeModulFreigaben = vi.fn();
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: (...a: unknown[]) => ladeEinsatz(...a),
+  ladeModulFreigaben: (...a: unknown[]) => ladeModulFreigaben(...a),
+}));
+vi.mock('../api/einheiten', () => ({ listeEinheiten: () => Promise.resolve([]) }));
+vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: () => Promise.resolve([]) }));
+vi.mock('../fuehrung/useFunktionsVorschlaege', () => ({
+  useFunktionsVorschlaege: () => ({ katalog: [], besetzung: new Map() }),
+}));
+const erfasseMeldungOfflineFaehig = vi.fn();
+vi.mock('../offline/schreiben', () => ({
+  erfasseMeldungOfflineFaehig: (...a: unknown[]) => erfasseMeldungOfflineFaehig(...a),
 }));
 const listeLageMeldungen = vi.fn();
 const markLageMeldungGesehen = vi.fn();
 const markLageMeldungenGesehen = vi.fn();
 vi.mock('../api/meldungen', () => ({
+  LAGE_GESEHEN_MAX: 500,
   listeLageMeldungen: (...a: unknown[]) => listeLageMeldungen(...a),
   markLageMeldungGesehen: (...a: unknown[]) => markLageMeldungGesehen(...a),
   markLageMeldungenGesehen: (...a: unknown[]) => markLageMeldungenGesehen(...a),
@@ -43,6 +56,11 @@ const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
   meldung_lfd_nr: 5,
   meldung_absender: 'Florian Nord 1',
   is_neu: false,
+  meldungsart: 'lagemeldung',
+  prioritaet: 'normal',
+  meldung_status: 'neu',
+  richtung: 'intern',
+  is_von_geraet: false,
   ...over,
 });
 
@@ -66,6 +84,7 @@ describe('LagemeldungenPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ladeEinsatz.mockResolvedValue(einsatz('beobachter'));
+    ladeModulFreigaben.mockResolvedValue({});
     listeLageMeldungen.mockResolvedValue([lage()]);
   });
   afterEach(() => setzeOnline(true));
@@ -76,7 +95,7 @@ describe('LagemeldungenPage', () => {
     // Zeitachse (Neuentwurf): Herkunft im Meta der Zeile, der Absender als Verfasser rechts.
     const sicht = screen.getByRole('region', { name: 'Lagemeldungen' });
     const zeile = sicht.querySelector('li[data-lfh-eintrag="zeitachse"]') as HTMLElement;
-    expect(zeile).toHaveTextContent('aus Meldung #5');
+    expect(zeile).toHaveTextContent('Meldung #5');
     expect(zeile).toHaveTextContent('Florian Nord 1');
     // Typkante + Typwort des ETB-Typs „Lage" — kein Etikett, keine zweite Farbe.
     expect(zeile).toHaveAttribute('data-typ', 'lage');
@@ -206,8 +225,9 @@ describe('LagemeldungenPage', () => {
     expect(screen.queryByText('Vortag')).toBeNull();
   });
 
-  /** Leer führt der Knopf in die Meldungen, wo eine Lagemeldung entsteht (LFH-965). */
-  it('zeigt Leerzustand ohne Lageobjekte mit dem Weg in die Meldungen', async () => {
+  /** Leer öffnet der Knopf das Erfassen (LFH-965, LLH-1031). */
+  it('zeigt Leerzustand ohne Lagemeldungen mit dem Erfassen', async () => {
+    ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
     listeLageMeldungen.mockResolvedValue([]);
     const { container } = renderPage();
     expect(await screen.findByText('Noch keine Lagemeldungen')).toBeInTheDocument();
@@ -216,16 +236,130 @@ describe('LagemeldungenPage', () => {
     expect(screen.queryByText(/Meldungsliste/)).toBeNull();
     // Ohne Menge keine Filterleiste: sie filterte nichts.
     expect(screen.queryByRole('search', { name: 'Lagemeldungen filtern' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu den Meldungen' }));
-    expect(await screen.findByText('MELDUNGEN-MODUL')).toBeInTheDocument();
+    const leer = screen.getByText('Noch keine Lagemeldungen').parentElement!.parentElement!;
+    await userEvent.click(within(leer).getByRole('button', { name: 'Lagemeldung erfassen' }));
+    expect(await screen.findByRole('textbox', { name: 'Inhalt / Wortlaut' })).toBeInTheDocument();
+  });
+
+  it('ohne Recht ist der Leerzustand nur der Titel', async () => {
+    listeLageMeldungen.mockResolvedValue([]);
+    renderPage();
+    expect(await screen.findByText('Noch keine Lagemeldungen')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Lagemeldung erfassen' })).toBeNull();
   });
 
   it('Fehler ist nicht leer: Fehlermeldung mit Wiederholen, kein Leerzustand', async () => {
     listeLageMeldungen.mockRejectedValue(new Error('500'));
     renderPage();
-    expect(await screen.findByText('Lageobjekte konnten nicht geladen werden')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Lagemeldungen konnten nicht geladen werden'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut laden' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine lagerelevanten Meldungen übergeben')).toBeNull();
+  });
+
+  describe('Lagemeldung als Meldungsart (LLH-1031)', () => {
+    it('erfasst eine Lagemeldung im Paneel über der Zeitachse und schließt es danach', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      erfasseMeldungOfflineFaehig.mockResolvedValue({
+        zustand: 'gesendet',
+        daten: { id: 12, lfd_nr: 6 },
+      });
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+      const paneel = await screen.findByRole('region', { name: 'Lagemeldung erfassen' });
+      await userEvent.type(
+        within(paneel).getByRole('textbox', { name: 'Inhalt / Wortlaut' }),
+        'Pegel steigt',
+      );
+      await userEvent.type(within(paneel).getByRole('textbox', { name: 'Absender' }), 'Pegel Süd');
+      // Die Vorbelegungsknöpfe wechselten die Art: hier entfallen sie.
+      expect(within(paneel).queryByRole('button', { name: /Sofortmeldung/ })).toBeNull();
+      await userEvent.click(within(paneel).getByRole('button', { name: 'Lagemeldung erfassen' }));
+      expect(erfasseMeldungOfflineFaehig).toHaveBeenCalledWith(
+        1,
+        1,
+        expect.objectContaining({
+          meldungsart: 'lagemeldung',
+          inhalt: 'Pegel steigt',
+          absender: 'Pegel Süd',
+        }),
+      );
+      expect(erfasseMeldungOfflineFaehig.mock.calls[0][2]).not.toHaveProperty('lat');
+      await vi.waitFor(() =>
+        expect(screen.queryByRole('region', { name: 'Lagemeldung erfassen' })).toBeNull(),
+      );
+      expect(listeLageMeldungen.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('ohne Schreibrecht: Nur Ansicht mit Grund, kein Erfassen', async () => {
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      expect(screen.getByText('Nur Ansicht')).toBeInTheDocument();
+      expect(screen.getByText('nur Einsatzleitung und Führungspersonal')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Lagemeldung erfassen' })).toBeNull();
+    });
+
+    it('ohne Modul Meldungen: Nur Ansicht, die Kenntnisnahme bleibt', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      ladeModulFreigaben.mockResolvedValue({ meldungen: { sichtbar: true, zugriff: false } });
+      listeLageMeldungen.mockResolvedValue([lage({ is_neu: true })]);
+      renderPage();
+      expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Lagemeldung erfassen' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Als gesehen markieren' })).toBeInTheDocument();
+    });
+
+    it('zeigt an der Zeile Art, Priorität, Richtung, Gerät und den Stand der Meldung', async () => {
+      listeLageMeldungen.mockResolvedValue([
+        lage({
+          meldungsart: 'rueckmeldung',
+          prioritaet: 'sofort',
+          richtung: 'extern',
+          meldung_status: 'in_bearbeitung',
+          is_von_geraet: true,
+        }),
+      ]);
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      const zeile = screen
+        .getByText('Brücke gesperrt')
+        .closest('li[data-lfh-eintrag="zeitachse"]') as HTMLElement;
+      expect(zeile).toHaveAttribute('data-typ', 'lage');
+      expect(within(zeile).getByText('Rückmeldung')).toBeInTheDocument();
+      expect(within(zeile).getByText('Sofort')).toBeInTheDocument();
+      expect(within(zeile).getByText('Extern')).toBeInTheDocument();
+      expect(
+        within(zeile).getByRole('link', { name: 'Meldung #5 · In Bearbeitung' }),
+      ).toBeInTheDocument();
+      expect(zeile).toHaveTextContent('Florian Nord 1 · Gerät');
+    });
+
+    it('eine neue Meldung zeigt weder Normal-Priorität noch ihren Status', async () => {
+      renderPage();
+      const link = await screen.findByRole('link', { name: 'Meldung #5' });
+      const zeile = link.closest('li') as HTMLElement;
+      expect(within(zeile).queryByText('Normal')).toBeNull();
+      expect(within(zeile).queryByText('Extern')).toBeNull();
+    });
+
+    it('zählt Lagemeldungen im Kopf und filtert nach Herkunft', async () => {
+      listeLageMeldungen.mockResolvedValue([
+        lage({ id: 1, text: 'Vom Tablet', is_von_geraet: true }),
+        lage({ id: 2, text: 'Übernommen', meldungsart: 'rueckmeldung' }),
+      ]);
+      renderPage();
+      await screen.findByText('Vom Tablet');
+      expect(screen.getByText('2 Lagemeldungen')).toBeInTheDocument();
+      const herkunft = screen.getByRole('radiogroup', { name: 'Herkunft' });
+      await userEvent.click(within(herkunft).getByRole('radio', { name: 'Übernommen' }));
+      expect(screen.queryByText('Vom Tablet')).toBeNull();
+      expect(screen.getByText('Übernommen', { selector: 'li *' })).toBeInTheDocument();
+      expect(screen.getByText('1 von 2 Lagemeldungen')).toBeInTheDocument();
+      await userEvent.click(within(herkunft).getByRole('radio', { name: 'Gerät' }));
+      expect(screen.getByText('Vom Tablet')).toBeInTheDocument();
+    });
   });
 
   describe('neu und gesehen (LLH-1206)', () => {
@@ -272,19 +406,22 @@ describe('LagemeldungenPage', () => {
       expect(markLageMeldungGesehen).toHaveBeenCalledWith(1, 7);
     });
 
-    it('markiert alle bis zur jüngsten angezeigten als gesehen', async () => {
+    it('markiert die angezeigten neuen als gesehen, weggefilterte bleiben neu', async () => {
       ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
       listeLageMeldungen.mockResolvedValue([
-        // Zuletzt übergeben (höchste id), aber früher geschehen: steht weiter unten.
         lage({ id: 4, text: 'Ältere', is_neu: true, ereigniszeit: '2026-06-12 08:45:00' }),
-        lage({ id: 9, text: 'Jüngste', is_neu: true }),
+        lage({ id: 9, text: 'Jüngste', is_neu: true, lat: 50.1, lon: 8.6 }),
         lage({ id: 2, text: 'Gesehene', gesehen_at: '2026-06-12 09:30:00' }),
       ]);
-      markLageMeldungenGesehen.mockResolvedValue({ gesehen: 2 });
+      markLageMeldungenGesehen.mockResolvedValue({ gesehen: 1 });
       renderPage();
       await screen.findByText('Jüngste');
       await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
-      expect(markLageMeldungenGesehen).toHaveBeenCalledWith(1, 9);
+      expect(markLageMeldungenGesehen).toHaveBeenLastCalledWith(1, [4, 9]);
+      const ort = screen.getByRole('radiogroup', { name: 'Ort' });
+      await userEvent.click(within(ort).getByRole('radio', { name: 'Mit Koordinaten' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Alle als gesehen markieren' }));
+      expect(markLageMeldungenGesehen).toHaveBeenLastCalledWith(1, [9]);
     });
 
     it('ohne neue Zeile kein Sammelknopf', async () => {

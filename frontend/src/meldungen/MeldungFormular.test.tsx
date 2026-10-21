@@ -248,6 +248,59 @@ describe('MeldungFormular', () => {
 });
 
 /** LLH-1214 (design.md D8): Empfängerfunktion aus dem Katalog, füllt den freien Empfänger vor. */
+describe('MeldungFormular — Art vorgegeben (LLH-1031)', () => {
+  function renderLage(onAnlegen = anlegenMock(), onFertig = vi.fn()) {
+    render(
+      <AntApp>
+        <MeldungFormular
+          senden={false}
+          onAnlegen={onAnlegen}
+          artVorgabe="lagemeldung"
+          serie={false}
+          onFertig={onFertig}
+        />
+      </AntApp>,
+    );
+    return { onAnlegen, onFertig };
+  }
+
+  it('sendet die Art Lagemeldung, ohne Vorbelegungsknöpfe und ohne Serie', async () => {
+    const { onAnlegen, onFertig } = renderLage();
+    expect(screen.queryByRole('button', { name: /Sofortmeldung/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Speichern und nächste' })).toBeNull();
+    // Die vorgegebene Art ist keine Abweichung im Kopf.
+    expect(screen.getByRole('button', { name: /Weitere Angaben/ })).toHaveTextContent(
+      /^Weitere Angaben$/,
+    );
+    await fuellePflichtfelder('Pegel Süd', 'Pegel steigt');
+    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    expect(onAnlegen).toHaveBeenCalledWith(
+      expect.objectContaining({ meldungsart: 'lagemeldung', inhalt: 'Pegel steigt' }),
+    );
+    expect(onAnlegen.mock.calls[0][0]).not.toHaveProperty('lat');
+    await waitFor(() => expect(onFertig).toHaveBeenCalledTimes(1));
+  });
+
+  it('verortet eine Lagemeldung beim Erfassen', async () => {
+    const { onAnlegen } = renderLage();
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(screen.getByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
+    await fuellePflichtfelder('Pegel Süd', 'Pegel steigt');
+    await userEvent.click(screen.getByRole('button', { name: 'Lagemeldung erfassen' }));
+    await waitFor(() =>
+      expect(onAnlegen).toHaveBeenCalledWith(expect.objectContaining({ lat: 50.1, lon: 8.6 })),
+    );
+  });
+
+  it('eine andere Art zeigt keine Verortung', async () => {
+    renderFormular();
+    await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    expect(screen.queryByPlaceholderText('Koordinate eingeben')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    expect(screen.getByPlaceholderText('Koordinate eingeben')).toBeInTheDocument();
+  });
+});
+
 describe('MeldungFormular — Empfängerfunktion', () => {
   function renderMitKatalog(onAnlegen = anlegenMock()) {
     render(

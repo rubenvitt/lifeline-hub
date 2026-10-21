@@ -69,7 +69,7 @@ function ohneZahl(zustand: Exclude<AbrufZustand, 'daten'>): WerkzeugZahl {
  * Zahl“). Die Seite zählt nichts selbst:
  * - ein Modul mit Server-Zähler: Zahl und Wortlaut aus `bildeZaehler` wie im Modulmenü; Aufträge
  *   und Meldungen mit der Notiz des Führungsstands (`fuehrungsZahlen.ts`), überfällige Aufträge
- *   als Achtung;
+ *   als Achtung; Nachforderungen mit „n unterwegs“;
  * - „Pressearbeit“: die offenen Anfragen des Presse-Logs;
  * - „Funkplan“: die Zahl der Lücken (`countLuecken`).
  *
@@ -131,6 +131,10 @@ export function werkzeugZahl(
   }
   if (quelle === 'meldungen' && quellen.zaehler.data.meldungen) {
     return { ...basis, notiz: meldungenNotiz(quellen.zaehler.data.meldungen) };
+  }
+  // LLH-1078: die offenen, davon unterwegs — dieselbe Notiz wie im Seitenkopf der Nachforderungen.
+  if (quelle === 'nachforderungen' && quellen.zaehler.data.nachforderungen) {
+    return { ...basis, notiz: `${quellen.zaehler.data.nachforderungen.unterwegs} unterwegs` };
   }
   return basis;
 }

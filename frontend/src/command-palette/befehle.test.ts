@@ -1018,6 +1018,8 @@ describe('baueBefehle — Ansichten (LLH-1127)', () => {
     expect(suche(k, 'Kommunikationsplan')[0]).toBe('Kommunikationsplan');
     expect(suche(k, 'presse')).toContain('Pressearbeit');
     expect(suche(k, 'entscheid')).toContain('Entscheidungen');
+    // LLH-1078: wer „Anforderung“ sucht, findet die Nachforderungen über ihre Beschreibung.
+    expect(suche(k, 'Anforderung')).toContain('Nachforderungen');
   });
 
   it('steht direkt hinter „Module“ und ist merkbar', () => {

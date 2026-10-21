@@ -49,6 +49,15 @@ wire_enum! {
     try_from = |s| format!("Ungültiger NachforderungStatus: {s}");
 }
 
+impl NachforderungStatus {
+    /// Noch nicht eingetroffen und nicht abgelehnt — dieselbe Regel wie die Spalte `ist_offen`
+    /// der Liste (`repo::ANZEIGE_SELECT`); der Modulzähler zählt damit (LLH-1078), und
+    /// `tests/modul_zaehler.rs` hält Liste und Zähler gleich.
+    pub fn ist_offen(self) -> bool {
+        !matches!(self, Self::Eingetroffen | Self::Abgelehnt)
+    }
+}
+
 pub fn prioritaet_gueltig(p: &str) -> bool {
     Prioritaet::parse(p).is_some()
 }
@@ -153,6 +162,16 @@ mod tests {
         assert!(!prioritaet_gueltig("ultra"));
         assert!(adressat_kategorie_gueltig(ADRESSAT_LEITSTELLE));
         assert!(!adressat_kategorie_gueltig("nachbar"));
+    }
+
+    #[test]
+    fn offen_sind_die_drei_stufen_vor_dem_abschluss() {
+        use NachforderungStatus as S;
+        assert!(S::Angefordert.ist_offen());
+        assert!(S::Zugesagt.ist_offen());
+        assert!(S::Unterwegs.ist_offen());
+        assert!(!S::Eingetroffen.ist_offen());
+        assert!(!S::Abgelehnt.ist_offen());
     }
 
     #[test]

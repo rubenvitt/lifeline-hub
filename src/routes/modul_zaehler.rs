@@ -36,6 +36,9 @@ pub async fn liste(
         // stellengebundenes Gerät sieht nur seine Stelle (Stellenbindung).
         erlaubt.remove("personen");
         erlaubt.remove("meldungen");
+        // Nachforderungen zählt der Server einsatzweit (LLH-1078); heute sieht keine Ansicht das
+        // Modul, und wenn eine es bekommt, dann für ihre Stelle, nicht für den ganzen Einsatz.
+        erlaubt.remove("nachforderungen");
         if crate::geraet::stelle::ist_gebunden(Some(g)) {
             erlaubt.remove("betreuung");
             // Ein Abschnittsgerät sieht nur seinen Teilbaum (LFH-1043); die einsatzweiten
