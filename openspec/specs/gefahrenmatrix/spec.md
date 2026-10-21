@@ -6,6 +6,8 @@ des Gebiets. Eine Zelle ohne Bewertung zeigt die Vorgabe „keine“. Ob jemand 
 hat, zeigt die Beurteilung am Gebiet: „beurteilt <DTG> · <Name>“ oder „nicht beurteilt“. Das
 schreibt die Entscheidung fort, dass eine offene Beurteilung nicht wie eine Entwarnung aussehen
 darf: diese Aussage trägt jetzt „nicht beurteilt“ am Gebiet, nicht mehr eine leere Zelle.
+Verdichtet (LLH-1102): die ganze Zelle ist das Bedienziel, die Zeilen stehen alphabetisch, und
+die Gebietsliste nennt Gefahren und höchste Stufe.
 
 ## Requirements
 
@@ -84,3 +86,49 @@ null ist.
 #### Scenario: Alles beurteilt
 - **WHEN** alle Gefahrengebiete beurteilt sind
 - **THEN** trägt der Fuß des Paneels keinen Hinweis auf die Beurteilung
+
+### Requirement: Die ganze Zelle ist das Bedienziel
+Jede gültige Zelle der Gefahrenmatrix SHALL in ihrer ganzen Fläche das Bedienziel sein: ein
+Tipp oder Klick irgendwo in der Zelle MUST das Stufenmenü öffnen, nicht nur ein Tipp auf das
+Kürzel. Die Zeilenhöhe der Matrix MUST der Steuerhöhe der Dichtestufe entsprechen (30 / 48 /
+72 px), ohne zusätzliche senkrechte Tabellenpolsterung, und jede Zelle MUST in jeder Stufe auf
+beiden Achsen mindestens die Steuerhöhe messen. Der Fokusring MUST an der Zelle stehen.
+
+#### Scenario: Tipp in die Zellecke
+- **WHEN** auf einem Touch-Gerät jemand mit Schreibrecht in die Ecke einer gültigen Zelle tippt
+- **THEN** öffnet sich das Stufenmenü dieser Zelle
+
+#### Scenario: Fükw kompakt
+- **WHEN** die Matrix bei 1440 × 900 in der Stufe kompakt angezeigt wird
+- **THEN** stehen alle 13 Zeilen ohne Bildlauf im Fenster
+
+### Requirement: Gefahren stehen alphabetisch
+Jede Anzeige, die Gefahrentypen listet, SHALL sie alphabetisch nach dem Anzeigenamen in
+deutscher Kollation ordnen: die Matrix, das Paneel „Gefahrenmatrix“ im Lagebild, der
+Matrixauszug der Sprungpalette und die Gefahrenauswahl der Schäden. Die Folge MUST aus EINER
+Sortierfunktion kommen; die Reihenfolge des Backend-Katalogs MUST unverändert bleiben. Einen
+Schalter für die Sortierung MUST es nicht geben.
+
+#### Scenario: Reihenfolge der Matrix
+- **WHEN** die Matrix eines Gefahrengebiets angezeigt wird
+- **THEN** stehen die Zeilen in der Folge Absturz, Angstreaktion, Atemgifte, Atomare Strahlung, Ausbreitung, Brand, Chemische Stoffe, Durchbruch, Einsturz, Elektrizität, Erkrankung/Verletzung, Ertrinken, Explosion
+
+#### Scenario: Lagebild
+- **WHEN** im Lagebild mehrere Gefahren über „keine“ stehen
+- **THEN** stehen sie in derselben alphabetischen Folge wie in der Matrix
+
+### Requirement: Die Gebietsliste sagt, was im Gebiet los ist
+Jede Zeile der Gebietsliste SHALL neben Warnstufe und Namen bei einem beurteilten Gebiet die
+Zahl seiner Gefahren über „keine“ (Gefahrentypen, nicht Zellen) und deren höchste Stufe zeigen
+(„3 Gefahren · hoch“, „1 Gefahr · akut“, „0 Gefahren“), bei einem nicht beurteilten Gebiet
+„nicht beurteilt“. Solange die Matrix eines Gebiets nicht geladen ist, MUST die Zeile keine
+Zahl zeigen. Die Zahl der Zonen MUST beim Sprung zur Karte stehen („Auf Karte zeigen ↗ ·
+1 Zone“), nicht in der Liste.
+
+#### Scenario: Beurteiltes Gebiet mit Gefahren
+- **WHEN** ein beurteiltes Gebiet Bewertungen über „keine“ für Brand (hoch und mittel) und Ertrinken (niedrig) trägt
+- **THEN** zeigt seine Zeile „2 Gefahren · hoch“
+
+#### Scenario: Nicht beurteiltes Gebiet
+- **WHEN** ein Gebiet nicht beurteilt ist
+- **THEN** zeigt seine Zeile „nicht beurteilt“ und keine Zahl

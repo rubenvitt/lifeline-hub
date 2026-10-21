@@ -6,12 +6,14 @@ import { renderMitProviders } from '../../test/utils';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, {
   SPALTEN_FREIRAUM,
+  kopfUeberdeckung,
   schraffurStil,
   setzeSpaltenFreiraum,
   type GefahrenMatrixProps,
   zellBalkenStil,
 } from './GefahrenMatrix';
 import type { GefahrBewertung } from '../../api/types';
+import { GEFAHRENTYPEN_ALPHABETISCH } from './gefahrenSchema';
 
 const zelle = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
   id: 1,
@@ -373,6 +375,60 @@ describe('GefahrenMatrix — die kurze Achse des Zell-Auslösers folgt der Dicht
   });
 });
 
+/** Die Matrix unter der Staffel einer Dichtestufe (nicht `renderMitProviders`, siehe oben). */
+function rendereInDichte(dichte: Dichte) {
+  return render(
+    <ConfigProvider theme={{ token: antdToken(farbenHell, dichte) }}>
+      {matrixElement()}
+    </ConfigProvider>,
+  );
+}
+
+describe('GefahrenMatrix — verdichtet (LLH-1102)', () => {
+  it('ordnet die Zeilen alphabetisch, nicht nach dem Katalog', () => {
+    const { container } = rendereInDichte('kompakt');
+    const zeilen = Array.from(
+      container.querySelectorAll<HTMLTableRowElement>('.ant-table-tbody tr.ant-table-row'),
+    ).map((tr) => tr.cells[0].textContent);
+    expect(zeilen).toEqual(GEFAHRENTYPEN_ALPHABETISCH.map((g) => g.label));
+    expect(zeilen[0]).toBe('Absturz');
+  });
+
+  /**
+   * Die ganze Zelle ist das Bedienziel: ohne Polsterung, der Auslöser füllt sie. Vorher stand ein
+   * Knopf in Steuerhöhe mittig in einer gepolsterten Zelle, und ein Tipp daneben traf nichts.
+   * Die Staffel als Literale; das Pixel misst `e2e/gefahren-matrix-zelle.spec.ts`.
+   */
+  it.each([
+    ['kompakt', 30],
+    ['komfortabel', 48],
+    ['handschuh', 72],
+  ] as const)('füllt in %s die Zelle mit dem Auslöser, Zeilenhöhe %i px', (dichte, hoehe) => {
+    const { container } = rendereInDichte(dichte);
+    const knopf = container.querySelector<HTMLElement>(
+      'button[aria-label="Bewertung Brand × Menschen: keine"]',
+    )!;
+    const zelle = knopf.closest('td')!;
+    expect(zelle.style.padding).toBe('0px');
+    expect(knopf.style.width).toBe('100%');
+    expect(knopf.style.height).toBe(`${hoehe}px`);
+    expect(parseFloat(knopf.style.minWidth)).toBe(hoehe);
+    expect(knopf.classList).toContain('gefahren-zelle');
+    // Die Spalte „Gefahr“ polstert nur waagerecht: sie bestimmte sonst die Zeilenhöhe.
+    const kennung = zelle.closest('tr')!.cells[0];
+    expect(kennung.style.paddingBlock).toBe('0px');
+    expect(kennung.style.height).toBe(`${hoehe}px`);
+  });
+
+  it('die schraffierte Kachel füllt ihre Zelle ebenso', () => {
+    const { container } = rendereInDichte('handschuh');
+    const kachel = container.querySelector<HTMLElement>('[data-lfh="nicht-anwendbar"]')!;
+    expect(kachel.closest('td')!.style.padding).toBe('0px');
+    expect(kachel.style.width).toBe('100%');
+    expect(kachel.style.height).toBe('72px');
+  });
+});
+
 describe('GefahrenMatrix — Warnstufenbalken (Neuentwurf)', () => {
   it('zellBalkenStil: ohne Farbe kein Balken, sonst 3 px unten als Innenschatten', () => {
     expect(zellBalkenStil(null)).toEqual({});
@@ -441,5 +497,32 @@ describe('GefahrenMatrix — Fokusabstand zur fixierten Spalte (LFH-373)', () =>
     const wurzel = container.querySelector<HTMLElement>('.ant-table-wrapper.gefahren-matrix');
     expect(wurzel).not.toBeNull();
     expect(wurzel!.style.getPropertyValue('--lfh-tabellenkopf-hoehe')).toMatch(/^\d+px$/);
+  });
+});
+
+describe('GefahrenMatrix — erste Zeile nicht unter der Kopfzeile (LLH-1102)', () => {
+  it('kopfUeberdeckung: unter der Kopfzeile → um die Überdeckung zurück, sonst 0', () => {
+    const kopf = { top: 145, bottom: 221 };
+    // Ganz darunter (gemessen 1024 × 768 Handschuh): 76 px zurück.
+    expect(kopfUeberdeckung({ top: 145, bottom: 217 }, kopf)).toBe(-76);
+    // Halb darunter: so weit, dass die Zelle an der Kopfzeile beginnt.
+    expect(kopfUeberdeckung({ top: 200, bottom: 272 }, kopf)).toBe(-21);
+    // Frei darunter oder darüber: nichts.
+    expect(kopfUeberdeckung({ top: 221, bottom: 293 }, kopf)).toBe(0);
+    expect(kopfUeberdeckung({ top: 40, bottom: 112 }, kopf)).toBe(0);
+  });
+
+  it('rollt nach einem Fokus in eine verdeckte Zelle zurück', () => {
+    const rollen = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    const { container } = rendereInDichte('handschuh');
+    const kopf = container.querySelector<HTMLElement>(
+      '.ant-table-sticky-holder, .ant-table-header',
+    )!;
+    const knopf = container.querySelector<HTMLElement>('button[aria-label^="Bewertung Absturz"]')!;
+    vi.spyOn(kopf, 'getBoundingClientRect').mockReturnValue({ top: 145, bottom: 221 } as DOMRect);
+    vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top: 145, bottom: 217 } as DOMRect);
+    knopf.focus();
+    expect(rollen).toHaveBeenCalledWith({ top: -76, behavior: 'instant' });
+    rollen.mockRestore();
   });
 });

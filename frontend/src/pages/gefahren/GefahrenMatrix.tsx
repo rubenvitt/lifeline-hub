@@ -13,7 +13,13 @@ import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../.
 import { monoStil, useRollen } from '../../components/instrument';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, WARNSTUFEN, kombinationGueltig } from './gefahrenSchema';
+import {
+  GEFAHRENTYPEN,
+  GEFAHRENTYPEN_ALPHABETISCH,
+  SCHUTZOBJEKTE,
+  WARNSTUFEN,
+  kombinationGueltig,
+} from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import { useRahmenOben } from '../../components/rahmenOben';
@@ -53,6 +59,43 @@ function useSpaltenFreiraum(tabelle: RefObject<TableRef | null>): void {
     const kopfzelle = wurzel.querySelector('th.ant-table-cell-fix-start');
     if (kopfzelle) beobachter.observe(kopfzelle);
     return () => beobachter.disconnect();
+  }, [tabelle]);
+}
+
+/**
+ * Wie weit die Seite nach oben rollen muss, damit ein fokussiertes Ziel nicht unter der stehenden
+ * Kopfzeile liegt (negativ = nach oben), oder 0. Rein, damit die Regel ohne Layout prüfbar ist.
+ */
+export function kopfUeberdeckung(
+  ziel: Pick<DOMRect, 'top' | 'bottom'>,
+  kopf: Pick<DOMRect, 'top' | 'bottom'>,
+): number {
+  return ziel.top < kopf.bottom && ziel.bottom > kopf.top ? ziel.top - kopf.bottom : 0;
+}
+
+/**
+ * Rückwärts in die ERSTE Zeile getabbt, rollt der Browser die Seite nicht (LLH-1102): Chromium
+ * beschneidet den Fokusrand (`scroll-margin-top`, `gefahrenMatrix.css`) an der Oberkante des
+ * waagerechten Scrollcontainers `.ant-table-body`, und die erste Zeile beginnt genau dort. Die
+ * Zelle zählt damit als sichtbar und blieb unter der stehenden Kopfzeile (`e2e/fokus-verdeckung`,
+ * 1024 × 768 Handschuh; bei 390 px schon vorher). Solange der Knopf in einer gepolsterten Zelle
+ * saß, ragte er nur halb darunter. Nach jedem Fokuswechsel in den Zellen wird deshalb gemessen
+ * und die Seite um die Überdeckung zurückgerollt.
+ */
+function useFokusUnterKopf(tabelle: RefObject<TableRef | null>): void {
+  useEffect(() => {
+    const wurzel = tabelle.current?.nativeElement;
+    if (!wurzel) return;
+    const beiFokus = (e: FocusEvent) => {
+      const ziel = e.target as HTMLElement;
+      if (!ziel.closest('.ant-table-tbody')) return;
+      const kopf = wurzel.querySelector('.ant-table-sticky-holder, .ant-table-header');
+      if (!kopf) return;
+      const versatz = kopfUeberdeckung(ziel.getBoundingClientRect(), kopf.getBoundingClientRect());
+      if (versatz < 0) window.scrollBy({ top: versatz, behavior: 'instant' });
+    };
+    wurzel.addEventListener('focusin', beiFokus);
+    return () => wurzel.removeEventListener('focusin', beiFokus);
   }, [tabelle]);
 }
 
@@ -172,7 +215,10 @@ export interface GefahrenMatrixProps {
   onDetailsSchliessen?: () => void;
 }
 
-/** Das 13×5-Raster eines Gefahrengebiets. */
+/**
+ * Das 13×5-Raster eines Gefahrengebiets, verdichtet (LLH-1102, Spec `gefahrenmatrix`): Zeilen
+ * alphabetisch, Zeilenhöhe = Steuerhöhe der Stufe, die ganze Zelle ist das Bedienziel.
+ */
 export default function GefahrenMatrix({
   matrix,
   darfSchreiben,
@@ -190,6 +236,8 @@ export default function GefahrenMatrix({
   const rahmenOben = useRahmenOben();
   // Freiraum neben der fixierten Spalte beim Tabben nach links.
   useSpaltenFreiraum(tabelleRef);
+  // Erste Zeile rückwärts getabbt: nicht unter der Kopfzeile stehen lassen.
+  useFokusUnterKopf(tabelleRef);
   /**
    * Im Zustand steht die Kennung der Zelle, nicht ihr Datensatz. Eine Momentaufnahme vom Menüklick
    * würde von keinem Nachladen erreicht; der Detail-PUT schickt aber `warnstufe` mit und drehte
@@ -208,6 +256,9 @@ export default function GefahrenMatrix({
       key: 'label',
       fixed: 'left',
       width: GEFAHR_SPALTE_BREITE,
+      // Dichte Zeilen (LLH-1102): die Zeile ist so hoch wie die Steuerhöhe der Stufe. Senkrecht
+      // keine Polsterung, sonst bestimmte die Kennungsspalte die Zeilenhöhe; waagerecht bleibt sie.
+      onCell: () => ({ style: { paddingBlock: 0, height: token.controlHeight } }),
     },
     ...SCHUTZOBJEKTE.map((obj) => {
       const { icon: Icon, kurz } = SPALTENKOPF[obj.wert];
@@ -232,14 +283,17 @@ export default function GefahrenMatrix({
             'data-warnstufe': stufe,
             style: {
               ...(stufe ? zellFlaechenStil(stufe, token) : {}),
+              // Die ganze Zelle ist das Bedienziel (LLH-1102): keine Polsterung, der Auslöser
+              // füllt sie. Fläche und Balken bleiben an der Zelle, der Knopf ist durchsichtig.
+              padding: 0,
               textAlign: 'center' as const,
             },
           };
         },
         render: (_: unknown, zeile: ZeilenDaten) => {
           if (!kombinationGueltig(zeile.typ, obj.wert)) {
-            // Muster statt Wort, kein Knopf; die Kachel hat die Höhe der Zellknöpfe, damit das
-            // Raster ruhig bleibt (LLH-1090).
+            // Muster statt Wort, kein Knopf; die Kachel füllt die Zelle wie die Zellknöpfe, damit
+            // das Raster ruhig bleibt (LLH-1090, LLH-1102).
             return (
               <span
                 role="img"
@@ -247,6 +301,7 @@ export default function GefahrenMatrix({
                 aria-label={`${zeile.label} × ${obj.label}: ${ZELLE_NICHT_ANWENDBAR.label}`}
                 style={{
                   display: 'block',
+                  width: '100%',
                   minWidth: token.controlHeight,
                   height: token.controlHeight,
                   ...schraffurStil(rollen.steuerRahmen),
@@ -294,11 +349,21 @@ export default function GefahrenMatrix({
             >
               <Button
                 type="text"
+                className="gefahren-zelle"
                 // Der Name trägt Zeilenkennung und Stufe: 58 gleichnamige Knöpfe wären unbrauchbar.
                 aria-label={`Bewertung ${zeile.label} × ${obj.label}: ${anzeige.label}`}
-                // Keine Größen-Prop: die Trefffläche kommt vom ConfigProvider. `minWidth` = Höhe
-                // hält die Zelle quadratisch und die Matrix im Breitenbudget.
-                style={{ minWidth: token.controlHeight }}
+                // Keine Größen-Prop: die Höhe kommt aus der Staffel des ConfigProviders. Der Knopf
+                // füllt die Zelle (LLH-1102): ein Tipp irgendwo in ihr trifft, auch neben das
+                // Kürzel. `minWidth` = Höhe hält die kurze Achse, wenn die Spalte schmal wird;
+                // Radius 0, damit die Fläche bis in die Ecken Ziel ist. Den Fokusring trägt
+                // `gefahrenMatrix.css` nach innen.
+                style={{
+                  display: 'flex',
+                  width: '100%',
+                  minWidth: token.controlHeight,
+                  height: token.controlHeight,
+                  borderRadius: 0,
+                }}
               >
                 {anzeige.kuerzel}
               </Button>
@@ -308,7 +373,11 @@ export default function GefahrenMatrix({
       };
     }),
   ];
-  const zeilen: ZeilenDaten[] = GEFAHRENTYPEN.map((g) => ({ typ: g.wert, label: g.label }));
+  // Alphabetisch (LLH-1102): dieselbe Folge wie Lagebild, Palettenauszug und Schäden.
+  const zeilen: ZeilenDaten[] = GEFAHRENTYPEN_ALPHABETISCH.map((g) => ({
+    typ: g.wert,
+    label: g.label,
+  }));
 
   // Je Render frisch aus `matrix` abgeleitet — so erreicht ein Nachladen den offenen Dialog.
   const detailZelle = detailKennung

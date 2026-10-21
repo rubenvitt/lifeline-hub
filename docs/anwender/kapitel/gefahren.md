@@ -2,7 +2,7 @@
 titel: Gefahren
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -17,7 +17,9 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 ### Gefahrengebiete ansehen
 
 1. Im Bereich „Lage“ „Gefahren“ öffnen. Links stehen unter „Gefahrengebiete“ alle Gebiete mit
-   ihrer höchsten Warnstufe und der Zahl ihrer Zonen.
+   ihrer höchsten Warnstufe. Darunter steht bei einem beurteilten Gebiet, wie viele Gefahren es
+   trägt und wie hoch die höchste ist, etwa „3 Gefahren · hoch“, bei einem anderen
+   „nicht beurteilt“.
 2. Ein Gebiet in der Liste wählen. Rechts unter „Bewertung“ steht seine Matrix: je Zeile ein
    Gefahrentyp, je Spalte ein Schutzobjekt, in der Zelle das Kürzel der Warnstufe. Darüber steht,
    ob die Matrix beurteilt ist: „beurteilt“ mit Zeit und Person oder „nicht beurteilt“.
@@ -25,13 +27,13 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
    ![Seite „Gefahren“ mit zwei Gefahrengebieten und der Matrix der Überflutung Unterstadt](../bilder/gefahren/gefahren.png)
 
 3. Um das Gebiet auf der Karte zu sehen, „Auf Karte zeigen ↗“ wählen. Die Lagekarte öffnet sich
-   und zeigt das Gebiet.
+   und zeigt das Gebiet. Daneben steht, aus wie vielen Zonen es besteht („· 1 Zone“).
 
 ### Eine Gefahr bewerten
 
 1. Das Gebiet wählen.
 2. In der Matrix die Zelle der Gefahr und des Schutzobjekts wählen, etwa „Elektrizität“ in der
-   Spalte „Mensch“.
+   Spalte „Mensch“. Die ganze Zelle ist die Schaltfläche, nicht nur das Kürzel in ihrer Mitte.
 
    ![Geöffnetes Menü einer Zelle mit den Stufen „– · Keine“ bis „A · Akut“ und „Details …“](../bilder/gefahren/bewertung-waehlen.png)
 
@@ -67,9 +69,12 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 
 ### Matrix und Warnstufe
 
-- Die Zeilen sind die 13 Gefahrentypen von „Atemgifte“ bis „Ertrinken“, die Spalten die
-  Schutzobjekte Menschen, Tiere, Umwelt, Sachwerte und Einsatzkräfte („Mensch“, „Tier“,
-  „Umwelt“, „Sache“, „Kraft“).
+- Die Zeilen sind die 13 Gefahrentypen, alphabetisch von „Absturz“ bis „Explosion“, die Spalten
+  die Schutzobjekte Menschen, Tiere, Umwelt, Sachwerte und Einsatzkräfte („Mensch“, „Tier“,
+  „Umwelt“, „Sache“, „Kraft“). In derselben Folge stehen die Gefahren im Lagebild, in der
+  Vorschau der Sprungpalette und in der Gefahrenauswahl eines Schadens.
+- Jede Zeile ist so hoch wie eine Schaltfläche der eingestellten Bediendichte. Am Arbeitsplatz
+  im Führungsfahrzeug (kompakt) steht die ganze Matrix ohne Bildlauf auf dem Schirm.
 - Jede Zelle zeigt „–“ (keine), bis eine andere Stufe gesetzt ist. Eine Zelle, die nie gewählt
   wurde, und eine Zelle auf „– · Keine“ sagen dasselbe.
 - Schraffierte Zellen sind Paare, die nicht anwendbar sind; sie lassen sich nicht bewerten. Die
@@ -82,6 +87,9 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 - Ob jemand die Matrix angesehen hat, zeigt nicht die Zelle, sondern das Gebiet: „nicht
   beurteilt“, bis jemand „Beurteilung bestätigen“ wählt, danach „beurteilt“ mit Zeit und Person.
   Ein neues Gebiet ist nicht beurteilt.
+- In der Gebietsliste zählt ein beurteiltes Gebiet seine Gefahren: jede Gefahr mit mindestens
+  einer Zelle über „keine“ zählt einmal, gleich für wie viele Schutzobjekte. Daneben steht die
+  höchste Stufe. Ein beurteiltes Gebiet ohne Gefahr zeigt „0 Gefahren“.
 - Ändert in einem beurteilten Gebiet jemand eine Zelle, nennt die Beurteilung danach die Zeit
   dieser Änderung und diese Person. In einem nicht beurteilten Gebiet ändert eine Zelle daran
   nichts: Eine gesetzte Zelle sagt nichts über die übrigen.

@@ -4428,7 +4428,16 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
     const zellen = page.getByRole('button', { name: /^Bewertung / });
     await expect(zellen).toHaveCount(58);
     const zelle = await kurzeAchseHaelt(zellen, soll, `Matrixzelle (${dichte})`, 58);
-    if (dichte === 'kompakt') groesstesKompakt = zelle.groesstes;
+    // Seit LLH-1102 füllt der Auslöser die Zelle: die Breite ist die der Spalte, die Höhe die
+    // der Zeile. Die Obergrenze unten gilt deshalb der Höhe.
+    if (dichte === 'kompakt') {
+      for (let i = 0; i < 58; i += 1) {
+        groesstesKompakt = Math.max(
+          groesstesKompakt,
+          (await zellen.nth(i).boundingBox())?.height ?? Number.POSITIVE_INFINITY,
+        );
+      }
+    }
 
     let gebiet = Number.POSITIVE_INFINITY;
     for (const label of gebiete) {
@@ -4486,11 +4495,11 @@ test('Gefahrenmatrix (LFH-373): 58 Zellen halten die kurze Achse, die Gebietszei
 
   for (const sorte of ['Matrixzelle', 'Gebietszeile', 'Umbenennen', 'Sprung', 'Beurteilung'])
     gegenprobe(je, sorte);
-  // Obergrenze: in `kompakt` ist keine Zelle ≥ 48 px — sonst stünde sie auch ohne Staffel auf
-  // komfortabel-Maß, und die Messung oben bewiese nichts.
+  // Obergrenze: in `kompakt` ist keine Zelle ≥ 48 px hoch — sonst stünde sie auch ohne Staffel
+  // auf komfortabel-Maß, und die Messung oben bewiese nichts.
   expect(
     groesstesKompakt,
-    `Matrixzelle in kompakt: größtes Maß ${groesstesKompakt} px, Soll < 48`,
+    `Matrixzelle in kompakt: größte Höhe ${groesstesKompakt} px, Soll < 48`,
   ).toBeLessThan(48);
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });

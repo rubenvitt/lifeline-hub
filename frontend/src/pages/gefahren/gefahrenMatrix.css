@@ -29,3 +29,13 @@
 .gefahren-matrix .ant-table-tbody * {
   scroll-margin-top: var(--lfh-tabellenkopf-hoehe, 0px);
 }
+
+/* LLH-1102 — die ganze Zelle ist das Bedienziel (`GefahrenMatrix.tsx`, Knopf mit 100 % Breite in
+   einer Zelle ohne Polsterung). Der Fokusring liegt deshalb an der Zelle, 2 px `bedien` nach
+   innen versetzt wie `lfh-segment` (`theme/sprache.css`): ein äußerer Ring läge unter den
+   Nachbarzellen oder der fixierten Spalte. Vier Klassen tief, damit antds gekapselte
+   Knopf-Fokusregel (`:where(…).ant-btn:not(:disabled):focus-visible`) unterliegt. */
+.gefahren-matrix .ant-table-tbody .gefahren-zelle.ant-btn:focus-visible {
+  outline: 2px solid var(--lfh-bedien);
+  outline-offset: -2px;
+}
