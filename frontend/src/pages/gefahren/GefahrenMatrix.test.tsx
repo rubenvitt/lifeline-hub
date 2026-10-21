@@ -6,7 +6,6 @@ import { renderMitProviders } from '../../test/utils';
 import { antdToken, farbenHell, type Dichte } from '../../theme/tokens';
 import GefahrenMatrix, {
   SPALTEN_FREIRAUM,
-  kopfUeberdeckung,
   schraffurStil,
   setzeSpaltenFreiraum,
   type GefahrenMatrixProps,
@@ -508,17 +507,6 @@ describe('GefahrenMatrix — Fokusabstand zur fixierten Spalte (LFH-373)', () =>
 });
 
 describe('GefahrenMatrix — erste Zeile nicht unter der Kopfzeile (LLH-1102)', () => {
-  it('kopfUeberdeckung: unter der Kopfzeile → um die Überdeckung zurück, sonst 0', () => {
-    const kopf = { top: 145, bottom: 221 };
-    // Ganz darunter (gemessen 1024 × 768 Handschuh): 76 px zurück.
-    expect(kopfUeberdeckung({ top: 145, bottom: 217 }, kopf)).toBe(-76);
-    // Halb darunter: so weit, dass die Zelle an der Kopfzeile beginnt.
-    expect(kopfUeberdeckung({ top: 200, bottom: 272 }, kopf)).toBe(-21);
-    // Frei darunter oder darüber: nichts.
-    expect(kopfUeberdeckung({ top: 221, bottom: 293 }, kopf)).toBe(0);
-    expect(kopfUeberdeckung({ top: 40, bottom: 112 }, kopf)).toBe(0);
-  });
-
   it('rollt nach einem Fokus in eine verdeckte Zelle zurück', () => {
     const rollen = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
     const { container } = rendereInDichte('handschuh');
