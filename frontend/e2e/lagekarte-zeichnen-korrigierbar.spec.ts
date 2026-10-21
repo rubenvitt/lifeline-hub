@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
  * Korrigierbares Zeichnen und Eigenposition an der echten Karte. Vitest belegt Adapter und
@@ -49,6 +50,8 @@ async function lagekarteOeffnen(page: Page, suche = '') {
   const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toBeVisible();
+  // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
+  await zeigeLeistenAnsicht(page, 'Objekte');
   return { eid, canvas };
 }
 

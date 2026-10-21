@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { FUEKW, SUBPIXEL, anmelden, einsatzAnlegen, stelleDichte } from './trefflaeche-kern';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
  * Beschrifteter Optionsknopf (LFH-1048): antd baut `label.ant-radio-wrapper` wie das Label des
@@ -27,8 +28,8 @@ const OPTIONEN = ['Auf allen Ansichten sichtbar machen (empfohlen)', 'Mitlösche
 const zehntel = (n: number) => Math.round(n * 10) / 10;
 
 async function oeffneLoeschDialog(page: Page) {
-  const kopf = page.locator('section[data-paneel="ansicht"] button[aria-expanded]').first();
-  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  // Die Kartenansicht steht fest im Kopf der Ansicht „Ebenen“ (LLH-1028).
+  await zeigeLeistenAnsicht(page, 'Ebenen');
   await page.getByRole('button', { name: 'Ansichts-Aktionen' }).click();
   await page.getByRole('menuitem', { name: /Löschen/ }).click();
   const dialog = page.getByRole('dialog', { name: /^Ansicht „Optionsknopf. löschen$/ });

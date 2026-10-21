@@ -455,6 +455,20 @@ function basisHandler(
   );
 }
 
+/**
+ * Die Leiste mit der Ansicht „Objekte“ vorn (LLH-1028) — gemerkt wie nach einem Tipp aufs Segment.
+ * Ohne gemerkte Wahl steht „Ebenen“ vorn; Nicht verortet, Verortet und Zeichnen liegen in
+ * „Objekte“.
+ */
+function objekteVorn() {
+  localStorage.setItem('lfh:lagekarte:leiste-ansicht', 'objekte');
+}
+
+/** Die Gruppe „Betroffene & Versorgung“ des Ebenenbaums offen (Vorgabe: zu). */
+function betroffeneOffen() {
+  localStorage.setItem('lfh:lagekarte:ebenen-gruppen', JSON.stringify({ betroffene: true }));
+}
+
 function renderSeite(route = '/einsaetze/1/lagekarte') {
   return renderMitProviders(
     <Routes>
@@ -527,6 +541,7 @@ describe('quellenMeldung', () => {
 describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
   it('zeigt bei vollständig geladenem Lagebild KEIN Warn-Overlay', async () => {
     basisHandler();
+    objekteVorn();
     renderSeite();
     expect(await screen.findByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
     expect(screen.queryByTestId('lagebild-unvollstaendig')).not.toBeInTheDocument();
@@ -595,6 +610,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
     // Derselbe 500er wie im Overlay-Test: `Sidebar.test.tsx` reicht den Slot als Prop herein und
     // sieht nicht, ob die Seite ihn füllt.
     basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
+    objekteVorn();
     renderSeite();
     expect(
       await screen.findByText('Objektlisten konnten nicht geladen werden'),
@@ -633,6 +649,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
 
   it('ohne Fehler trägt die Sidebar keinen der drei Slots', async () => {
     basisHandler();
+    objekteVorn();
     renderSeite();
     expect(await screen.findByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
     expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
@@ -660,6 +677,7 @@ describe('LagekartePage', () => {
 
   it('zeigt die Nicht-verortet-Liste mit Anzahl im Paneelkopf', async () => {
     basisHandler();
+    objekteVorn();
     renderSeite();
     // Die Anzahl steht als Mono-Meta im Klappkopf und ist Teil seines zugänglichen Namens — gezielt
     // diesen Knopf treffen.
@@ -708,6 +726,7 @@ describe('LagekartePage', () => {
         ]);
       }),
     ]);
+    objekteVorn();
     renderSeite();
     // Die Marker-Quellen sind da (die Liste steht) — die Ansichten noch nicht.
     expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
@@ -727,6 +746,7 @@ describe('LagekartePage', () => {
     // Das EinsatzLayout besitzt die eine Verbindung pro Einsatz (HTTP/1.1-Limit von 6); die Seite
     // darf keine eigene öffnen.
     basisHandler();
+    objekteVorn();
     renderSeite();
     expect(await screen.findByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
     expect(eventSourceUrls).toHaveLength(0);
@@ -741,6 +761,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('karte-klick'));
@@ -756,6 +777,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     // Einsatzort ist verortet → Knopf „Verschieben".
     await user.click(await screen.findByRole('button', { name: 'Verschieben' }));
@@ -847,6 +869,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('marker-schaden-9'));
@@ -1100,6 +1123,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     // Mehrere „Platzieren"-Knöpfe (UHS BHP 50 + Einheit Zug 1) → über das List-Item der Einheit
     // eindeutig treffen.
@@ -1124,6 +1148,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Fläche zeichnen' }));
     // Der Stub blendet "flaeche-fertig" nur im aktiven Zeichenmodus ein.
@@ -1211,6 +1236,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
@@ -1242,6 +1268,7 @@ describe('LagekartePage', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
@@ -1535,6 +1562,7 @@ describe('LagekartePage', () => {
   it('Ortssuche in der Leiste: Koordinate tippen, Treffer wählen → Anflug und Nadel; eine neue ersetzt die alte, Neuladen räumt (LFH-638)', async () => {
     basisHandler();
     const user = userEvent.setup();
+    objekteVorn();
     const { unmount } = renderSeite();
     const feld = await screen.findByLabelText('Kartenobjekte suchen');
     await user.type(feld, '52.52194, 13.41321');
@@ -1577,6 +1605,8 @@ describe('LagekartePage', () => {
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?ort=Hauptstra%C3%9Fe%2012');
     expect(await screen.findByRole('button', { name: 'Hauptstraße 12, B' })).toBeInTheDocument();
+    // Das Suchfeld steht in „Objekte“: der Link holt die Ansicht nach vorn (LLH-1028).
+    expect(screen.getByRole('tab', { name: 'Objekte' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByLabelText('Kartenobjekte suchen')).toHaveValue('Hauptstraße 12');
     expect(screen.getByRole('heading', { name: 'Adresse' })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Kartenleiste' })).toBeVisible();
@@ -1976,8 +2006,10 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // Meldung.
     expect(await screen.findByTestId('bbox-callback')).toHaveTextContent('aus');
 
-    // Das Fachebenen-Paneel startet eingeklappt — erst aufklappen, dann liegt der Schalter im Baum.
-    await user.click(await screen.findByRole('button', { name: 'Fachebenen (extern)' }));
+    // Fachebenen und ihre Untergruppe starten zugeklappt — erst aufklappen, dann liegt der Schalter
+    // im Baum.
+    await user.click(await screen.findByRole('button', { name: /^Fachebenen/ }));
+    await user.click(await screen.findByRole('button', { name: /^Verkehr & Infrastruktur/ }));
     await user.click(await screen.findByRole('switch', { name: 'Energieanlagen' }));
 
     // Die tragende Aussage: der Ausschnitt hängt nicht an KRITIS allein.
@@ -1990,6 +2022,8 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
 });
 
 describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
+  beforeEach(objekteVorn);
+
   it('Zone zeichnen → Overlay „zeichnen" sichtbar', async () => {
     basisHandler();
     const user = userEvent.setup();
@@ -2134,10 +2168,30 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(
       screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
     ).not.toBeInTheDocument();
+    // Ohne gemerkte Wahl stehen die Ebenen vorn; das Paneel „Zeichnen“ liegt in „Objekte“.
+    expect(screen.getByRole('tab', { name: 'Ebenen' })).toHaveAttribute('aria-selected', 'true');
     await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
     expect(
       await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
     ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Objekte' })).toHaveAttribute('aria-selected', 'true');
+    // Gemerkt wie ein Tipp aufs Segment (LLH-1028).
+    expect(localStorage.getItem('lfh:lagekarte:leiste-ansicht')).toBe('objekte');
+  });
+
+  it('die Ansicht der Leiste wechselt per Segment und bleibt nach dem Neuladen (LLH-1028)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    const { unmount } = renderSeite();
+    await user.click(await screen.findByRole('tab', { name: 'Objekte' }));
+    expect(screen.getByRole('button', { name: /^Nicht verortet/ })).toBeVisible();
+    expect(screen.queryByRole('switch', { name: 'Schäden' })).not.toBeInTheDocument();
+    unmount();
+    renderSeite();
+    expect(await screen.findByRole('tab', { name: 'Objekte' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 
   // Bei 390 px halbierte die offene Leiste die Karte, und der Fuß deckte den Rest — es blieb keine
@@ -2179,6 +2233,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
     setzeViewportBreite(768);
     basisHandler();
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await screen.findByText('marker-schaden-9');
     await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
@@ -2284,16 +2339,19 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
       ANSICHT_BETROFFENE_AN,
       http.get('/api/einsaetze/1/personen', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
+    objekteVorn();
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^R-042 · / })).toBeInTheDocument();
   });
 
   it('403 trotz eingeschalteter Ebene: die Objektsuche führt keine Person (LFH-716)', async () => {
+    betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
       http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
     ]);
+    objekteVorn();
     renderSeite();
     expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument();
     // Gegenprobe, dass die Suche gefüllt ist — sonst wäre die Abwesenheit trivial.
@@ -2302,10 +2360,12 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   });
 
   it('403 trotz eingeschalteter Ebene: kein Personen-Marker und KEIN Ausfallhinweis', async () => {
+    betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
       http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 403 })),
     ]);
+    objekteVorn();
     renderSeite();
     expect(await screen.findByText('marker-schaden-9')).toBeInTheDocument();
     // Die Zeile kippt erst nach der Antwort auf „gesperrt" — sonst wäre die Negativaussage vor dem
@@ -2336,6 +2396,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   });
 
   it('Benutzer ohne Zugriff speichert die geteilte Ansicht: „Betroffene" bleibt eingeschaltet', async () => {
+    betroffeneOffen();
     // Das Flag gehört der geteilten Ansicht. Würde es für Benutzer ohne Recht auf `false`
     // „bereinigt", überschriebe das Speichern die Wahl der Führungskraft.
     let body: Record<string, unknown> | null = null;
@@ -2360,6 +2421,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   });
 
   it('Ausfall der Personenliste (500): Hinweis nennt „Betroffene", Kopfzahl und Objektlisten bleiben', async () => {
+    betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
       http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
@@ -2451,6 +2513,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
   }
 
   it('zeichnet die Betroffenen bei ausgeschalteter Ebene, ohne Schalter und Ansicht zu ändern', async () => {
+    betroffeneOffen();
     auftragsHandler();
     const user = userEvent.setup();
     renderMitDetail('/einsaetze/1/lagekarte?platzieren=person:11&zurueck=1');
@@ -2592,6 +2655,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
   beforeEach(() => {
     kartenHandle.punktZurueck.mockClear();
     kartenHandle.zeichnungVerwerfen.mockClear();
+    objekteVorn();
   });
 
   it('Knopf und Zähler folgen dem gemeldeten Stand; der Klick geht an die Karte', async () => {
@@ -2840,6 +2904,8 @@ describe('LFH-712: Eigenposition', () => {
  * `?platzieren=`, mit demselben Lade-Riegel.
  */
 describe('LFH-825: Zeichnen per Link', () => {
+  beforeEach(objekteVorn);
+
   it('startet das Gefahrengebiet als Fläche und räumt den Param', async () => {
     basisHandler();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=gefahrengebiet');
@@ -3020,6 +3086,7 @@ describe('LLH-1043: Kreis', () => {
 
   it('das Paneel startet den Kreis je Flächentyp, die Absperrgrenze hat keinen', async () => {
     basisHandler();
+    objekteVorn();
     const user = userEvent.setup();
     renderSeite();
     expect(
@@ -3219,6 +3286,8 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     ['Bezug ohne Auftrag', 'bezirk=5'],
   ])('%s: kein Zeichenmodus, beide Parameter geräumt', async (_fall, query) => {
     basisHandler([mitBezirken()]);
+    // „Gefahrengebiet zeichnen“ steht in der Ansicht „Objekte“ (LLH-1028).
+    objekteVorn();
     renderSeiteMitSonde(`/einsaetze/1/lagekarte?${query}`);
     await geraeumt();
     expect(
@@ -3248,6 +3317,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
         HttpResponse.json(freigabenFixture({ evakuierung: { sichtbar: false, zugriff: false } })),
       ),
     ]);
+    objekteVorn();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
     await geraeumt();
     expect(
@@ -3268,6 +3338,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
         return HttpResponse.json({ bezirke: [UFER] });
       }),
     ]);
+    objekteVorn();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
     expect(
       await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
@@ -3305,6 +3376,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
       }),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
@@ -3330,6 +3402,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
       http.patch('/api/einsaetze/1/einheiten/2/position', () => ablehnen('Einheit aufgelöst')),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     const item = (await screen.findByText('Einheit: Zug 1')).closest(
       '.listen-eintrag',
@@ -3347,6 +3420,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
       http.patch('/api/einsaetze/1/abschnitte/3/flaeche', () => ablehnen('Fläche zu groß')),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Fläche zeichnen' }));
     await user.click(await screen.findByText('flaeche-fertig'));
@@ -3594,6 +3668,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
   it('ein Grund über der Karte lässt sich schließen', async () => {
     basisHandler([http.post('/api/einsaetze/1/zonen', () => ablehnen('Geometrie ungültig'))]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
     await user.click(await screen.findByText('zone-fertig'));
@@ -3611,6 +3686,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
       http.patch('/api/einsaetze/1/einheiten/2/position', () => ablehnen('Einheit aufgelöst')),
     ]);
     const user = userEvent.setup();
+    objekteVorn();
     renderSeite();
     const item = (await screen.findByText('Einheit: Zug 1')).closest(
       '.listen-eintrag',
@@ -3658,14 +3734,36 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     ]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: /Bild-Hintergründe/ }));
+    // Die Untergruppe „Bild-Hintergründe“ steht in der Vorgabe offen, ihre Gruppe zu.
+    await user.click(await screen.findByRole('button', { name: /^Hintergrund/ }));
     await user.click(await screen.findByRole('switch', { name: 'lageplan.png' }));
     await waitFor(() => expect(hinweis()).toHaveTextContent('Keine Berechtigung'));
     expect(hinweis()).toHaveTextContent('Bild nicht geändert · lageplan.png');
     expect(toasts()).toBe(0);
   });
 
-  it('Ansicht nicht gespeichert, dann Ansicht gewechselt: kein alter Grund, Paneel klappt zu', async () => {
+  it('steht „Objekte“ vorn, wandert ein Ansichtsgrund in den Kartenhinweis — und zurück (LLH-1028)', async () => {
+    basisHandler([
+      ZWEI_ANSICHTEN,
+      http.patch('/api/einsaetze/1/karten-ansichten/1', () => ablehnen('Ansicht gesperrt')),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('switch', { name: 'Schäden' }));
+    await user.click(await screen.findByRole('button', { name: /In dieser Ansicht speichern/ }));
+    await waitFor(() => expect(paneelFehler()).toHaveTextContent('Ansicht gesperrt'));
+    expect(hinweis()).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Objekte' }));
+    // Ein Grund steht nie unsichtbar (LFH-1077): die Ebenen sind verborgen, also über der Karte.
+    expect(paneelFehler()).toBeNull();
+    expect(hinweis()).toHaveTextContent('Ansicht gesperrt');
+    await user.click(screen.getByRole('tab', { name: 'Ebenen' }));
+    expect(paneelFehler()).toHaveTextContent('Ansicht gesperrt');
+    expect(hinweis()).toBeNull();
+  });
+
+  it('Ansicht nicht gespeichert, dann Ansicht gewechselt: kein alter Grund', async () => {
     basisHandler([
       ZWEI_ANSICHTEN,
       http.patch('/api/einsaetze/1/karten-ansichten/1', () => ablehnen('Ansicht gesperrt')),
@@ -3686,9 +3784,8 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     );
     await waitFor(() => expect(paneelFehler()).toBeNull());
     expect(hinweis()).toBeNull();
-    const kopf = screen.getByRole('button', { name: /^Kartenansicht/, expanded: true });
-    await user.click(kopf);
-    expect(kopf).toHaveAttribute('aria-expanded', 'false');
+    // Die Kartenansicht steht fest im Kopf der Ebenen (LLH-1028), sie klappt nicht.
+    expect(screen.queryByRole('button', { name: /^Kartenansicht/ })).toBeNull();
   });
 
   // LFH-1140: Mutationsprobe für das Räumen am Schlüssel `standard` beim Verlassen der Ansicht.

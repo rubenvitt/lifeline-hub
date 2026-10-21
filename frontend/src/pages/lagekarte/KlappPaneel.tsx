@@ -5,9 +5,9 @@ import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * Abschnitt der rechten Kartenleiste, zwei Formen desselben Kopfes:
- * - fest (`LeistenAbschnitt`): Ebenen und Ausgewählt, nicht wegklappbar.
- * - einklappbar (`KlappPaneel`): Nicht verortet, Einsatzort, Zeichnen, Ansichten, Fachebenen,
- *   Bilder, Kartengrundlage.
+ * - fest (`LeistenAbschnitt`): Ausgewählt und der Kopf des Ebenenbaums, nicht wegklappbar.
+ * - einklappbar (`KlappPaneel`): die Paneele der Ansicht „Objekte“ (Nicht verortet, Einsatzort,
+ *   Verortet, Zeichnen) und die Gruppen des Ebenenbaums (`Ebenenbaum.tsx`).
  *
  * Kein `Paneel` aus `components/instrument`: dessen Rahmen umläuft alle vier Seiten, gestapelt
  * stünden die Linien doppelt. Kopf und Augenbraue sind dieselben (`paneelKopfStil`,
@@ -85,6 +85,15 @@ interface KlappPaneelProps extends AbschnittProps {
   onUmschalten: () => void;
   /** Körper gepolstert (Fließinhalt); Vorgabe ja. Listen/Zeilen polstern selbst. */
   polster?: boolean;
+  /** Überschriftsebene: 2 für Paneele und Gruppen, 3 für Untergruppen im Ebenenbaum. */
+  ebene?: 2 | 3;
+  /** Untergruppe: der Kopf rückt ein, damit die Gliederung ohne Linie lesbar bleibt. */
+  einzug?: boolean;
+  /**
+   * Eigenes Bedienziel rechts neben dem Klappkopf (Gruppenschalter im Ebenenbaum) — nie IM Knopf:
+   * ein Schalter in einem Schalter wäre für Tastatur und Vorleser kein Ziel.
+   */
+  zusatz?: ReactNode;
 }
 
 export function KlappPaneel({
@@ -94,34 +103,51 @@ export function KlappPaneel({
   offen,
   onUmschalten,
   polster = true,
+  ebene = 2,
+  einzug = false,
+  zusatz,
   children,
 }: KlappPaneelProps) {
   const { token, rollen } = useRollen();
   const koerperId = useId();
+  const Ueberschrift = ebene === 3 ? 'h3' : 'h2';
+  const kopf = (
+    <Ueberschrift style={{ margin: 0, flex: 1, minWidth: 0 }}>
+      <button
+        type="button"
+        aria-expanded={offen}
+        aria-controls={koerperId}
+        onClick={onUmschalten}
+        className="lfh-klappkopf"
+        style={{
+          ...klappKopfStil(token),
+          ...(einzug ? { paddingInlineStart: token.padding + token.paddingSM } : {}),
+        }}
+      >
+        <span className="lfh-augenbraue" style={augenbraueStil(rollen)}>
+          {titel}
+        </span>
+        {/* Trenner für den zugänglichen Namen („Nicht verortet 45", nicht „…verortet45");
+              als Flex-Kind ohne Breite unsichtbar. */}{' '}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
+          {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
+          <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
+            {offen ? <IconChevronRunter size={14} /> : <IconChevronRechts size={14} />}
+          </span>
+        </span>
+      </button>
+    </Ueberschrift>
+  );
   return (
     <section data-paneel={kennung} style={{ borderBlockEnd: `1px solid ${rollen.linie}` }}>
-      <h2 style={{ margin: 0 }}>
-        <button
-          type="button"
-          aria-expanded={offen}
-          aria-controls={koerperId}
-          onClick={onUmschalten}
-          className="lfh-klappkopf"
-          style={klappKopfStil(token)}
-        >
-          <span className="lfh-augenbraue" style={augenbraueStil(rollen)}>
-            {titel}
-          </span>
-          {/* Trenner für den zugänglichen Namen („Nicht verortet 45", nicht „…verortet45");
-              als Flex-Kind ohne Breite unsichtbar. */}{' '}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: token.paddingSM }}>
-            {meta != null && <span style={{ ...monoStil(11), color: rollen.schwach }}>{meta}</span>}
-            <span aria-hidden="true" style={{ display: 'inline-flex', color: rollen.schwach }}>
-              {offen ? <IconChevronRunter size={14} /> : <IconChevronRechts size={14} />}
-            </span>
-          </span>
-        </button>
-      </h2>
+      {zusatz == null ? (
+        kopf
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'stretch' }}>
+          {kopf}
+          {zusatz}
+        </div>
+      )}
       {/* Zugeklappt wird nicht gerendert: versteckte Steuerelemente im Baum wären für Tastatur
           und Vorleser Ziele ohne Sicht. */}
       {offen && (
@@ -140,29 +166,19 @@ export function KlappPaneel({
 }
 
 /** Kennungen der einklappbaren Paneele — die Vorgabe ihres Zustands steht daneben. */
-type PaneelKennung =
-  | 'nichtVerortet'
-  | 'einsatzort'
-  | 'verortet'
-  | 'zeichnen'
-  | 'ansicht'
-  | 'fachebenen'
-  | 'bilder'
-  | 'grundlage';
+type PaneelKennung = 'nichtVerortet' | 'einsatzort' | 'verortet' | 'zeichnen';
 
 /**
- * Vorgabe: offen, was im Einsatz laufend gebraucht wird (Verorten, Zeichnen, Ansicht);
- * zu, was man einmal einstellt (Fachebenen, Bild-Hintergründe, Kartengrundlage).
+ * Vorgabe: offen — alles hier wird im Einsatz laufend gebraucht (Verorten, Zeichnen). Die
+ * Einmal-Einstellungen (Fachebenen, Bild-Hintergründe, Kartengrundlage) stehen im Ebenenbaum und
+ * merken ihren Klappzustand dort (`useBaumKlapp`); ältere Einträge dieses Schlüssels übergeht
+ * `paneeleLesen`.
  */
 export const PANEEL_VORGABE: Record<PaneelKennung, boolean> = {
   nichtVerortet: true,
   einsatzort: true,
   verortet: true,
   zeichnen: true,
-  ansicht: true,
-  fachebenen: false,
-  bilder: false,
-  grundlage: false,
 };
 
 const SPEICHER_SCHLUESSEL = 'lfh:lagekarte:paneele';

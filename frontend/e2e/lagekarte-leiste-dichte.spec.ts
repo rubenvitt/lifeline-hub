@@ -2,13 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import { wechsleZuRolle } from './rollen-kern';
 import { ueberstaende } from './ueberstand-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { BAUM_SCHLUESSEL, FACHEBENEN_OFFEN } from './leisten-kern';
 
 /**
- * Die Lagekarten-Leiste trägt den mitwachsenden Kippschalter (im Handschuh 72 × 144 px, siehe
- * `switchMasse`). Die Leiste ist fest 300 px breit; die Schalterzeile bricht deshalb um
- * (`leistenZeileStil`/`namensteilStil` in `Sidebar.tsx`), statt Namen auf „…" zu kürzen oder
- * aus der Leiste zu ragen. Kompakt und komfortabel stehen mit, damit die Umbruchregel dort
- * keine Zeile bricht, die in eine passte.
+ * Die Lagekarten-Leiste ist fest 300 px breit. Die Bildzeile trägt den mitwachsenden Kippschalter
+ * (im Handschuh 72 × 144 px, siehe `switchMasse`) und bricht deshalb um
+ * (`leistenZeileStil`/`namensteilStil` in `leistenTeile.tsx`), statt Namen auf „…" zu kürzen
+ * oder aus der Leiste zu ragen; die Zeilen der Fachebenen sind selbst Schalter (`Ebenenbaum.tsx`,
+ * LLH-1028) und dürfen ebenso nicht hinausragen. Kompakt und komfortabel stehen mit, damit die
+ * Umbruchregel dort keine Zeile bricht, die in eine passte.
  *
  * Nicht gemessen: „Weitere platzieren" (nur im Platzier-Modus, `Space wrap`) — dort bricht das
  * Wort unter den Schalter.
@@ -30,6 +32,13 @@ const PNG = Buffer.from(
  * darunter bricht der Name um.
  */
 const NAMENSBODEN = 100;
+
+/** Klappzustand des Ebenenbaums: alle Fachebenen-Untergruppen und die Bild-Hintergründe offen. */
+const BAUM_OFFEN = JSON.stringify({
+  ...(JSON.parse(FACHEBENEN_OFFEN) as Record<string, boolean>),
+  hintergrund: true,
+  bilder: true,
+});
 
 async function anmelden(page: Page) {
   await page.goto('/login');
@@ -69,19 +78,17 @@ for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
     const einsatzId = await einsatzMitBild(page, `Leiste ${dichte} ${Date.now()}`);
     await page.setViewportSize(TABLET);
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
-    await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-      DICHTE_SCHLUESSEL,
-      dichte,
-    ] as const);
+    await page.evaluate(
+      ([schluessel, wert, baum, offen]) => {
+        window.localStorage.setItem(schluessel, wert);
+        // Ebenenbaum (LLH-1028): jede Fachebenen-Untergruppe und die Bild-Hintergründe offen.
+        window.localStorage.setItem(baum, offen);
+      },
+      [DICHTE_SCHLUESSEL, dichte, BAUM_SCHLUESSEL, BAUM_OFFEN] as const,
+    );
     await page.reload();
     // Wache: trennt „Zeile zu schmal" von „Stufe gar nicht angekommen".
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-
-    for (const kennung of ['fachebenen', 'bilder']) {
-      const kopf = page.locator(`section[data-paneel="${kennung}"] button[aria-expanded]`).first();
-      if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
-      await expect(kopf).toHaveAttribute('aria-expanded', 'true');
-    }
 
     // ── Fachebenen: keine Beschriftung ragt aus der Leiste ──────────────────────────
     const fachebenen = page.locator('section[data-paneel="fachebenen"]');
@@ -114,7 +121,7 @@ const SOLL = { kompakt: 30, komfortabel: 48, handschuh: 72 } as const;
 /**
  * LFH-435, Nur-Lese-Zweig der Leiste: ohne Schreibrecht trägt die Bildzeile statt des
  * Aktionsmenüs einen direkten Zentrieren-Knopf, der Name ist nicht umbenennbar, der
- * Deckkraft-Schieber gesperrt und „Bild hochladen" fehlt (`Sidebar.tsx`, `darfSchreiben`). Die
+ * Deckkraft-Schieber gesperrt und „Bild hochladen" fehlt (`BildHintergruende.tsx`, `darfSchreiben`). Die
  * Zeile ist damit anders gebaut als beim Admin: der Name bleibt lesbar, nichts ragt aus der
  * Leiste, und das verbleibende Ziel hält die Stufe.
  *
@@ -132,18 +139,16 @@ for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
     const einsatzId = await einsatzMitBild(page, `Leiste lesend ${dichte} ${Date.now()}`);
     await wechsleZuRolle(page, 'beobachter', einsatzId);
     await page.setViewportSize(TABLET);
-    await page.evaluate(([schluessel, wert]) => window.localStorage.setItem(schluessel, wert), [
-      DICHTE_SCHLUESSEL,
-      dichte,
-    ] as const);
+    await page.evaluate(
+      ([schluessel, wert, baum, offen]) => {
+        window.localStorage.setItem(schluessel, wert);
+        // Ebenenbaum (LLH-1028): jede Fachebenen-Untergruppe und die Bild-Hintergründe offen.
+        window.localStorage.setItem(baum, offen);
+      },
+      [DICHTE_SCHLUESSEL, dichte, BAUM_SCHLUESSEL, BAUM_OFFEN] as const,
+    );
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-
-    for (const kennung of ['fachebenen', 'bilder']) {
-      const kopf = page.locator(`section[data-paneel="${kennung}"] button[aria-expanded]`).first();
-      if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
-      await expect(kopf).toHaveAttribute('aria-expanded', 'true');
-    }
 
     // ── VORBEDINGUNGEN: der Nur-Lese-Zweig der Bildzeile steht. Positiver Anker zuerst.
     const bilder = page.locator('section[data-paneel="bilder"]');

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { stehendeAuswahl, waehleIn } from './auswahl-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -150,6 +151,8 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   // terra-draw setzt beim Start den Cursor über `map.getCanvas().style.cursor` — der einzige
   // DOM-Beleg, dass der Adapter die Map übernommen hat. Die Knöpfe „Abschließen"/„Abbrechen"
   // kommen aus React-State und stünden auch bei wirkungslosem Adapter da.
+  // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
+  await zeigeLeistenAnsicht(page, 'Objekte');
   await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await expect(canvas).toHaveCSS('cursor', 'crosshair');
@@ -393,6 +396,8 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
 
   // Direkt aus dem Messen ins Zeichnen: drei terra-draw-Instanzen auf EINER Karte brauchen
   // eigene Präfixe, sonst wirft MapLibre „Source … already exists".
+  // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
+  await zeigeLeistenAnsicht(page, 'Objekte');
   await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);

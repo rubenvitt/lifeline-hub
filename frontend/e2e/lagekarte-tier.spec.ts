@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { oeffneEbenenGruppe } from './leisten-kern';
 
 // Tiere auf der Lagekarte (LLH-1123) — Durchstich im echten Renderer: kommt der Platziermodus aus
 // der Tier-Detailseite an, landet das Tier als Kreis mit „T“ in der Marker-Quelle, schreibt die
@@ -166,6 +167,8 @@ test('Tier: ohne Modul Tiere keine Ebene und kein Marker', async ({ page }) => {
   await karteBereit(page);
   await springe(page, FUND_ORT, 15);
   await expect.poll(() => tierFeature(page, hund), { timeout: 30_000 }).toBeDefined();
+  // Ebenenbaum: „Tiere“ steht in „Betroffene & Versorgung“, per Vorgabe zu.
+  await oeffneEbenenGruppe(page, 'betroffene');
   await expect(page.locator('[data-ebene="tier"]')).toHaveCount(1, { timeout: 30_000 });
 
   await senden(page, 'put', `${basis}/modul-overrides/tiere`, {
@@ -177,6 +180,9 @@ test('Tier: ohne Modul Tiere keine Ebene und kein Marker', async ({ page }) => {
   await springe(page, FUND_ORT, 15);
   // Die Zeile der Einheiten steht, die der Tiere fehlt: ausgeblendet heißt keine Zeile.
   await expect(page.locator('[data-ebene="einheit"]')).toHaveCount(1, { timeout: 30_000 });
+  // Die Gruppe steht noch (Betroffene, Betreuung) und ist offen — sonst wäre die Abwesenheit geschenkt.
+  await oeffneEbenenGruppe(page, 'betroffene');
+  await expect(page.locator('[data-ebene="uhs"]')).toHaveCount(1);
   await expect(page.locator('[data-ebene="tier"]')).toHaveCount(0);
   expect(await tierFeature(page, hund)).toBeUndefined();
 });

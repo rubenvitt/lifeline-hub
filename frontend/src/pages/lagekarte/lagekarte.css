@@ -75,3 +75,19 @@
 .lfh-karte-setzen .maplibregl-canvas {
   cursor: crosshair !important;
 }
+
+/* Ansichten der Kartenleiste (LLH-1028): jedes Segment ein festes Drittel. Die Leiste belegt so
+   viele Drittel, wie es Segmente gibt; das freie Drittel bleibt leer (kein gesperrtes Segment),
+   damit kein Segment wandert, wenn die Ansicht „Auswahl“ hinzukommt oder wegfällt. */
+.lfh-leisten-ansichten {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.lfh-leisten-ansichten > .lfh-segmente {
+  display: grid;
+  grid-column: 1 / span 2;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lfh-leisten-ansichten .lfh-segment {
+  flex: 1 1 auto;
+}

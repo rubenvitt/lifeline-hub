@@ -221,9 +221,12 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
     label: 'Zeichen Wechsel',
   });
 
-  // Fachebenen-Paneel offen, damit der DWD-Schalter bedienbar ist.
+  // Fachebenen samt „Warnungen“ offen, damit der DWD-Schalter bedienbar ist (Ebenenbaum, LLH-1028).
   await page.addInitScript(() =>
-    window.localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ fachebenen: true })),
+    window.localStorage.setItem(
+      'lfh:lagekarte:ebenen-gruppen',
+      JSON.stringify({ fachebenen: true, warnungen: true }),
+    ),
   );
   await page.goto(`/einsaetze/${eid}/lagekarte`);
   await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(

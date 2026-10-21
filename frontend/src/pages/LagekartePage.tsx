@@ -44,7 +44,7 @@ import { parsePolygon, polygonZentroid, stuetzpunkte } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
-import { leisteSichtbar, useLeistenWahl } from './lagekarte/leistenWahl';
+import { leisteSichtbar, useLeistenAnsicht, useLeistenWahl } from './lagekarte/leistenWahl';
 import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
 import { suchbareMarker } from './lagekarte/objektsuche';
@@ -609,6 +609,9 @@ export default function LagekartePage() {
   // `lagekarte/leistenWahl.ts`. Der laufende Kartenmodus gibt unter `lg` die Karte frei (LFH-765).
   const leistenWahl = useLeistenWahl(breit, exklusiverModusAktiv);
   const zeigeLeiste = leistenWahl.zeige;
+  // Gezeigte Ansicht der Leiste („Ebenen“ · „Objekte“), je Gerät gemerkt (LLH-1028).
+  const leistenAnsicht = useLeistenAnsicht();
+  const wechsleLeistenAnsicht = leistenAnsicht.wechsle;
 
   // Ortssuche (LFH-638, Spec `lagekarte-ortssuche`): höchstens eine Suchnadel, nur in diesem Zustand
   // — nicht in Ansicht, Snapshot oder Speicher, nach dem Neuladen fort.
@@ -1088,11 +1091,13 @@ export default function LagekartePage() {
       ortNonceRef.current += 1;
       setOrtVorbelegung({ text, nonce: ortNonceRef.current });
       zeigeLeiste();
+      // Das Suchfeld steht in der Ansicht „Objekte“ (Paneel „Verortet“).
+      wechsleLeistenAnsicht('objekte');
     }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('ort');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, zeigeLeiste]);
+  }, [searchParams, setSearchParams, ladt, zeigeLeiste, wechsleLeistenAnsicht]);
 
   // Lageplan (LLH-1051, Spec `lagekarte-druck`): Druck und Anlage des aktuellen Ausschnitts. Kopf
   // und Legende liest der Hook erst bei der Aufnahme; die Legende nennt nur, was gezeichnet ist.
@@ -1234,9 +1239,9 @@ export default function LagekartePage() {
 
   // Eine Auswahl holt die ausgeblendete Leiste zurück — sonst wählte man ein Objekt und sähe nichts
   // davon. Ab `lg` ebenso ein Leistenmodus (Platzieren, Taktisches Zeichen, Bild): dort steht seine
-  // Bedienung in der Leiste. Unter `lg` steht sie im Fuß-Band `PlatzierSteuerung`, und der laufende
-  // Modus gibt die Karte frei (LFH-765, Vorrang in `leisteSichtbar`). Abgeleitet, nicht per Effekt:
-  // endet der Modus, gilt wieder, was vorher galt.
+  // Bedienung im Modus-Band der Leiste. Unter `lg` steht sie im Fuß-Band `PlatzierSteuerung`, und
+  // der laufende Modus gibt die Karte frei (LFH-765, Vorrang in `leisteSichtbar`). Abgeleitet, nicht
+  // per Effekt: endet der Modus, gilt wieder, was vorher galt.
   // Die Rückmeldung „… verortet“ (LLH-1125) steht ab `lg` nur in der Leiste: sie hält die Leiste
   // offen wie ein Leistenmodus, sonst hinge sie an der Auswahl, und die fehlt, solange die Liste
   // nach dem Speichern nachlädt (oder dabei scheitert).
@@ -1255,11 +1260,13 @@ export default function LagekartePage() {
     modusAktiv: exklusiverModusAktiv,
     imModus: leistenWahl.imModus,
   });
-  // Ansichtsgründe stehen im Paneel ihrer Ansicht; bei ausgeblendeter Leiste und für eine andere
-  // Ansicht (Antwort nach dem Wechsel) über der Karte (LFH-1077).
-  const ansichtGruendeImPaneel = leisteIstSichtbar
-    ? ansichtFehler.gruende.filter((g) => g.schluessel.startsWith(`ansicht:${aktiveAnsichtId}:`))
-    : [];
+  // Ansichtsgründe stehen im Kopf der Ebenen bei ihrer Kartenansicht; bei ausgeblendeter Leiste,
+  // vorn liegender Ansicht „Objekte“ (LLH-1028) und für eine andere Kartenansicht (Antwort nach dem
+  // Wechsel) über der Karte (LFH-1077) — ein Grund steht nie unsichtbar.
+  const ansichtGruendeImPaneel =
+    leisteIstSichtbar && leistenAnsicht.ansicht === 'ebenen'
+      ? ansichtFehler.gruende.filter((g) => g.schluessel.startsWith(`ansicht:${aktiveAnsichtId}:`))
+      : [];
   const kartenGruende = [
     ...kartenFehler.gruende,
     ...ansichtFehler.gruende.filter((g) => !ansichtGruendeImPaneel.includes(g)),
@@ -1389,7 +1396,7 @@ export default function LagekartePage() {
   const ohneSerie = zeichneAbschnittId != null || zoneEntwurf?.bezirk != null;
   const platzierBild =
     bildPlatzierenId != null ? bilder.find((b) => b.id === bildPlatzierenId) : undefined;
-  // Rückmeldung nach dem Verorten (LLH-1125): unter `lg` im Fuß-Band, ab `lg` oben in der Leiste.
+  // Rückmeldung nach dem Verorten (LLH-1125): unter `lg` im Fuß-Band, ab `lg` im Modus-Band der Leiste.
   const verortetRueckweg = verortetZiel ? rueckwegZiel(einsatzId, verortetZiel) : null;
   // Nach dem Gebiet eines Bezirks (LLH-1069) dieselbe Rückmeldung mit eigenem Titel; der Rückweg
   // folgt allein aus der Kennung des Bezirks, nie aus der URL, und ersetzt den Kartenschritt.
@@ -1557,6 +1564,8 @@ export default function LagekartePage() {
                 // wirkungslos und öffnete die Leiste erst nach dem Modus (LFH-765).
                 if (!breit && exklusiverModusAktiv) leistenWahl.umschalteImModus(true);
                 else leistenWahl.zeige();
+                // Das Paneel „Zeichnen“ steht in der Ansicht „Objekte“.
+                leistenAnsicht.wechsle('objekte');
                 setZeichnenAnfrage((n) => n + 1);
               }
             : undefined
@@ -1642,7 +1651,7 @@ export default function LagekartePage() {
           onFertig={ohneSerie ? undefined : onZoneZeichnenFertig}
         />
         {/* Unter `lg` trägt dieses Band die Bedienung der Leistenmodi — die Leiste ist im Modus zu
-            (LFH-765). Ab `lg` bleibt sie in der Leiste. */}
+            (LFH-765). Ab `lg` steht sie im Modus-Band der Leiste. */}
         {!breit && <PlatzierSteuerung modus={platzierModus} />}
         <MessSteuerung
           form={messForm}
@@ -1746,14 +1755,16 @@ export default function LagekartePage() {
         onZeichenSerieWechsel={setZeichenSerie}
         zeichenSerieAnzahl={zeichenSerieAnzahl}
         onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
-        modusBedienungImFuss={!breit}
+        modusBedienung={breit ? 'band' : 'fuss'}
+        platzierModus={platzierModus}
+        ansicht={leistenAnsicht.ansicht}
+        onAnsichtWechsel={leistenAnsicht.wechsle}
         onKoordinateEingeben={onKoordinateEingeben}
         einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
         onEinsatzortPlatzieren={onEinsatzortPlatzieren}
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
         eingeblendet={eingeblendet}
-        verortetMeldung={verortetMeldung}
         zonenAnzahl={zonen.length}
         personen={{
           zugriff: personenZugriff,

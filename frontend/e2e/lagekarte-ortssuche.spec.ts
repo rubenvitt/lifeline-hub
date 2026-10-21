@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 
 // Ortssuche der Lagekarte im Browser (LFH-638, Spec `lagekarte-ortssuche`): Koordinate tippen →
 // anfliegen → Suchnadel; Adresse auf Enter mit Direktflug; `?ort=` am Handschirm; und ein Tipp auf
@@ -115,6 +116,8 @@ test('Koordinate tippen → Anflug und Suchnadel; Tipp auf den Marker darunter w
   const einsatzId = await einsatzMitPumpe(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await ruhe(page);
+  // Ebenenbaum (LLH-1028): die Objektsuche liegt in der Ansicht „Objekte“.
+  await zeigeLeistenAnsicht(page, 'Objekte');
 
   const feld = page.getByLabel('Kartenobjekte suchen');
   await feld.fill('53.07750, 8.81000');
@@ -152,6 +155,8 @@ test('Adresse auf Enter: genau ein Treffer fliegt ohne Klick hin', async ({ page
   const einsatzId = await einsatzMitPumpe(page);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await ruhe(page);
+  // Ebenenbaum (LLH-1028): die Objektsuche liegt in der Ansicht „Objekte“.
+  await zeigeLeistenAnsicht(page, 'Objekte');
 
   const feld = page.getByLabel('Kartenobjekte suchen');
   await feld.fill('Rathausplatz 1');

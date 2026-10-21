@@ -111,16 +111,32 @@ const basisProps: SidebarProps = {
   onAnsichtStandard: vi.fn(),
   onAnsichtLoeschen: vi.fn(),
   ansichtBusy: false,
+  // Die meisten Blöcke prüfen Paneele der Ansicht „Objekte“; die Ebenen prüfen `ebenenProps`.
+  ansicht: 'objekte',
+  onAnsichtWechsel: vi.fn(),
 };
 
+/** Dieselbe Leiste mit der Ansicht „Ebenen“ vorn (Ebenenbaum, Fachebenen, Bilder, Grundlage). */
+const ebenenProps: SidebarProps = { ...basisProps, ansicht: 'ebenen' };
+
 /**
- * Bild-Hintergründe, Fachebenen und Kartengrundlage starten zugeklappt (`PANEEL_VORGABE`). Die
- * Blöcke hier prüfen deren Inhalt; Zuklappen und Öffnen belegt „Sidebar: Paneele" unten.
+ * Fachebenen und Hintergrund starten im Ebenenbaum zugeklappt (`BAUM_KLAPP_VORGABE`). Die Blöcke
+ * hier prüfen deren Inhalt; Zuklappen und Öffnen belegt „Sidebar: einklappbare Paneele" unten.
  */
 function paneeleOffen() {
   localStorage.setItem(
-    'lfh:lagekarte:paneele',
-    JSON.stringify({ bilder: true, fachebenen: true, grundlage: true }),
+    'lfh:lagekarte:ebenen-gruppen',
+    JSON.stringify({
+      betroffene: true,
+      fachebenen: true,
+      warnungen: true,
+      wasser: true,
+      umwelt: true,
+      verkehr: true,
+      hintergrund: true,
+      grundlage: true,
+      bilder: true,
+    }),
   );
 }
 
@@ -145,7 +161,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     const onBildToggle = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[
           {
@@ -176,7 +192,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('zeigt den Upload-Fortschritt und sperrt den Knopf, solange er läuft (LFH-1021)', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[]}
         bildUpload={{ laeuft: true, stand: { phase: 'senden', anteil: 0.4 }, fehler: null }}
@@ -190,7 +206,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('Zeitlimit nach dem letzten Byte: „Ablage unklar“, nicht „nicht abgeschickt“ (LFH-1021)', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[]}
         bildUpload={{ laeuft: false, stand: null, fehler: new AusgangUnbekannt() }}
@@ -206,7 +222,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('Abbruch vor dem letzten Byte: „Nicht abgelegt“ (LFH-1021)', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[]}
         bildUpload={{ laeuft: false, stand: null, fehler: new NetzFehler() }}
@@ -219,7 +235,7 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('ohne Schreibrecht kein Upload-Button', () => {
     renderMitProviders(
-      <Sidebar {...basisProps} darfSchreiben={false} bilder={[]} bildPlatzierenId={null} />,
+      <Sidebar {...ebenenProps} darfSchreiben={false} bilder={[]} bildPlatzierenId={null} />,
     );
     expect(screen.queryByText(/Bild hochladen/i)).not.toBeInTheDocument();
   });
@@ -245,7 +261,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     const onBildZentrieren = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben={false}
         bilder={[bildLageplan]}
         onBildZentrieren={onBildZentrieren}
@@ -258,7 +274,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   it('mit Schreibrecht liegen alle drei Aktionen im Menü — und nicht mehr in der Icon-Reihe', async () => {
-    renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} />);
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben bilder={[bildLageplan]} />);
     // Der direkte Zentrieren-Knopf ist weg — sonst wäre die Bündelung nur eine Ergänzung.
     expect(screen.queryByRole('button', { name: /Lageplan zentrieren/i })).not.toBeInTheDocument();
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
@@ -274,7 +290,7 @@ describe('Sidebar Bild-Hintergründe', () => {
    * dass er unmittelbar vor dem Entfernen sitzt.
    */
   it('der Trenner steht unmittelbar vor „Bild entfernen"', async () => {
-    renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} />);
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben bilder={[bildLageplan]} />);
     const menue = await oeffneBildMenue('Aktionen zu Lageplan');
     const trenner = menue.querySelectorAll('.ant-dropdown-menu-item-divider');
     expect(trenner).toHaveLength(1);
@@ -284,7 +300,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('der zugängliche Name trägt die Bild-Kennung — zwei Bilder, zwei unterscheidbare Auslöser', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan, { ...bildLageplan, id: 2, name: 'Übersicht' }]}
       />,
@@ -297,7 +313,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     const onBildZentrieren = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         onBildZentrieren={onBildZentrieren}
@@ -316,7 +332,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     const onBildLoeschen = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         onBildLoeschen={onBildLoeschen}
@@ -337,7 +353,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     const onBildLoeschen = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         onBildLoeschen={onBildLoeschen}
@@ -354,7 +370,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     const onBildPlatzierenFertig = vi.fn();
     const { rerender } = renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         bildPlatzierenId={null}
@@ -371,7 +387,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     // Im laufenden Modus wechselt derselbe Eintrag Beschriftung UND Wirkung.
     rerender(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         bildPlatzierenId={1}
@@ -385,104 +401,35 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(onBildPlatzieren).toHaveBeenCalledTimes(1);
   });
 
-  it('Platzier-Modus zeigt Mittelpunkt-Eingabe und beendet über „Fertig"', () => {
-    const onBildPlatzierenFertig = vi.fn();
+  it('im Einpassen zeigt die Zeile nur den Zustand — Griffwahl und „Fertig“ stehen im Band', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         bildPlatzierenId={1}
-        bildPlatzierZentrum={{ lat: 50, lon: 9 }}
-        onBildPlatzierenFertig={onBildPlatzierenFertig}
+        platzierModus={{
+          art: 'bild',
+          name: 'Lageplan',
+          griffModus: 'groesse',
+          onGriffModus: vi.fn(),
+          onFertig: vi.fn(),
+        }}
       />,
     );
-    // Griffwahl + „Mittelpunkt setzen" (ohne Entwurf gesperrt) erscheinen nur im Platzier-Modus.
-    expect(screen.getByRole('radiogroup', { name: 'Griffe auf der Karte' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /^Fertig$/i }));
-    expect(onBildPlatzierenFertig).toHaveBeenCalled();
-  });
-
-  // LFH-517: eine ungültige Eingabe ist kein Mittelpunkt — der Knopf bleibt gesperrt, der
-  // Wortlaut bleibt nach dem Fokusverlust stehen.
-  it('ungültiger Mittelpunkt sperrt „Mittelpunkt setzen" und bleibt stehen', () => {
-    const onBildMittelpunkt = vi.fn();
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        darfSchreiben
-        bilder={[bildLageplan]}
-        bildPlatzierenId={1}
-        bildPlatzierZentrum={{ lat: 50, lon: 9 }}
-        onBildMittelpunkt={onBildMittelpunkt}
-      />,
-    );
-    const feld = screen.getByPlaceholderText('Koordinate eingeben');
-    const knopf = screen.getByRole('button', { name: /Mittelpunkt setzen/i });
-    fireEvent.focus(feld);
-    fireEvent.change(feld, { target: { value: '50.2 9.1' } });
-    fireEvent.blur(feld);
-    expect(feld).toHaveValue('50.2 9.1');
-    expect(knopf).toBeDisabled();
-    fireEvent.focus(feld);
-    fireEvent.change(feld, { target: { value: '50.2, 9.1' } });
-    fireEvent.click(knopf);
-    expect(onBildMittelpunkt).toHaveBeenCalledWith(50.2, 9.1);
-  });
-
-  it('schaltet die scharfe Griffsorte um und nennt nur die Griffe, die es gibt (LFH-711)', () => {
-    const onGriffModus = vi.fn();
-    const props = {
-      ...basisProps,
-      darfSchreiben: true,
-      bilder: [bildLageplan],
-      bildPlatzierenId: 1,
-      onGriffModus,
-    };
-    const { rerender } = renderMitProviders(<Sidebar {...props} griffModus="groesse" />);
-    const gruppe = screen.getByRole('radiogroup', { name: 'Griffe auf der Karte' });
-    expect(within(gruppe).getByRole('radio', { name: 'Größe' })).toHaveAttribute(
-      'aria-checked',
-      'true',
-    );
-    fireEvent.click(within(gruppe).getByRole('radio', { name: 'Drehen' }));
-    expect(onGriffModus).toHaveBeenCalledWith('drehen');
-
-    // Wie zu ziehen ist, zeigen die Zeiger der Griffe, kein Satz (LFH-1083).
-    rerender(<Sidebar {...props} griffModus="drehen" />);
-    expect(document.querySelector('[data-lfh="bildgriff-hinweis"]')).toBeNull();
-    expect(document.body).not.toHaveTextContent(/ziehen zum|frei strecken/);
-  });
-
-  it('sagt, wenn die Karte Kantengriffe mangels Platz ausblendet (LFH-764)', () => {
-    const props = {
-      ...basisProps,
-      darfSchreiben: true,
-      bilder: [bildLageplan],
-      bildPlatzierenId: 1,
-    };
-    const { rerender } = renderMitProviders(
-      <Sidebar {...props} griffModus="groesse" griffKantenAus="alle" />,
-    );
-    const hinweis = () => document.querySelector('[data-lfh="bildgriff-hinweis"]')?.textContent;
-    expect(hinweis()).toBe('Kanten ausgeblendet · näher heranzoomen');
-    rerender(<Sidebar {...props} griffModus="groesse" griffKantenAus="keine" />);
-    expect(hinweis()).toBeUndefined();
-  });
-
-  it('zeigt den Griff-Umschalter nur im Platzier-Modus mit Schreibrecht (LFH-711)', () => {
-    renderMitProviders(
-      <Sidebar {...basisProps} darfSchreiben bilder={[bildLageplan]} bildPlatzierenId={null} />,
-    );
-    expect(screen.queryByRole('radiogroup', { name: 'Griffe auf der Karte' })).toBeNull();
+    const zeile = screen.getByRole('switch', { name: 'Lageplan' }).parentElement!.parentElement!;
+    expect(within(zeile).getByText('wird eingepasst')).toBeInTheDocument();
+    expect(within(zeile).queryByRole('button', { name: /^Fertig$/ })).toBeNull();
+    // Je Handlung genau ein Knopf: Griffwahl und „Fertig“ im Modus-Band.
+    expect(screen.getAllByRole('radiogroup', { name: 'Griffe auf der Karte' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Fertig$/ })).toHaveLength(1);
   });
 
   it('zeigt den Karten-Design-Umschalter nur im Offline-Modus und meldet die Wahl', () => {
     const onKartenThemeWechsel = vi.fn();
     const { rerender } = renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         basemap="online"
         onlineVerfuegbar
         onKartenThemeWechsel={onKartenThemeWechsel}
@@ -493,7 +440,7 @@ describe('Sidebar Bild-Hintergründe', () => {
     // Offline: Umschalter da, Klick auf „Dunkel" meldet 'dark'.
     rerender(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         basemap="offline"
         offlineVerfuegbar
         kartenTheme="auto"
@@ -506,7 +453,7 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('schaltet den „Taktische Zeichen"-Ebenen-Toggle (LFH-170)', () => {
     const onLayerToggle = vi.fn();
-    renderMitProviders(<Sidebar {...basisProps} onLayerToggle={onLayerToggle} />);
+    renderMitProviders(<Sidebar {...ebenenProps} onLayerToggle={onLayerToggle} />);
     // Die Ebenen-Zeile ist selbst der Schalter: Farbfeld · Name · Anzahl.
     const toggle = screen.getByRole('switch', { name: 'Taktische Zeichen' });
     expect(toggle).toHaveAttribute('aria-checked', 'true');
@@ -515,7 +462,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   it('nennt den Geltungsbereich der Autobahn-Ebene als sichtbare Zeile (LFH-80)', () => {
-    renderMitProviders(<Sidebar {...basisProps} />);
+    renderMitProviders(<Sidebar {...ebenenProps} />);
     // Die Einschränkung „nur BAB" steht sichtbar da, nicht erst beim Hovern (Tablet).
     expect(screen.getByText(/nur Bundesautobahnen/i)).toBeVisible();
     // Gegenaussage: keine der Bestandsebenen behauptet plötzlich eine Einschränkung.
@@ -525,14 +472,14 @@ describe('Sidebar Bild-Hintergründe', () => {
 
   it('schaltet die Autobahn-Ebene über ihren eigenen Schalter (LFH-80)', () => {
     const onFachebeneToggle = vi.fn();
-    renderMitProviders(<Sidebar {...basisProps} onFachebeneToggle={onFachebeneToggle} />);
+    renderMitProviders(<Sidebar {...ebenenProps} onFachebeneToggle={onFachebeneToggle} />);
     // Über den Namen am Schalter selbst, nicht über die antd-Hülle der Zeile.
     fireEvent.click(screen.getByRole('switch', { name: 'Autobahn-Lage (BAB)' }));
     expect(onFachebeneToggle).toHaveBeenCalledWith('autobahn', true);
   });
 
   it('gibt jedem Fachebenen-Schalter den Ebenennamen als zugänglichen Namen (LFH-631)', () => {
-    renderMitProviders(<Sidebar {...basisProps} />);
+    renderMitProviders(<Sidebar {...ebenenProps} />);
     // Jeder Schalter einer Zeile, nicht nur die, die ein Name trifft: ein namenloser Schalter
     // fiele bei `getByRole(…, { name })` sonst einfach durch.
     const schalter = [...document.querySelectorAll<HTMLElement>('[data-fachebene]')].map((zeile) =>
@@ -555,7 +502,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('zeigt den Zoom-Hinweis an der Energie-Zeile, auch wenn KRITIS aus ist (LFH-81)', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, energie: true }}
         zoomZuKlein={{ energie: true }}
       />,
@@ -569,7 +516,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('zeigt den Zoom-Hinweis an der KRITIS-Zeile weiterhin', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, kritis: true }}
         zoomZuKlein={{ kritis: true }}
       />,
@@ -586,7 +533,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       paneeleOffen();
       renderMitProviders(
         <Sidebar
-          {...basisProps}
+          {...ebenenProps}
           fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, hochwasser: true, dwd: true }}
           fachebenenStatus={{ hochwasser: 'ok', dwd: 'leer' }}
           fachebenenAbgerufen={{ hochwasser: vor(5), dwd: vor(5) }}
@@ -605,7 +552,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       paneeleOffen();
       renderMitProviders(
         <Sidebar
-          {...basisProps}
+          {...ebenenProps}
           fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, hochwasser: true }}
           fachebenenStatus={{ hochwasser: 'ok' }}
           fachebenenAbgerufen={{ hochwasser: vor(40 * 60) }}
@@ -618,7 +565,7 @@ describe('Sidebar Bild-Hintergründe', () => {
 
     it('eine ausgeschaltete Ebene zeigt keinen Stand', () => {
       paneeleOffen();
-      renderMitProviders(<Sidebar {...basisProps} fachebenenAbgerufen={{ hochwasser: vor(5) }} />);
+      renderMitProviders(<Sidebar {...ebenenProps} fachebenenAbgerufen={{ hochwasser: vor(5) }} />);
       expect(screen.queryByText(/^Stand/)).not.toBeInTheDocument();
     });
 
@@ -626,7 +573,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       paneeleOffen();
       renderMitProviders(
         <Sidebar
-          {...basisProps}
+          {...ebenenProps}
           fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
           fachebenenStatus={{ nina: 'offline' }}
           fachebenenAbgerufen={{}}
@@ -641,7 +588,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       paneeleOffen();
       renderMitProviders(
         <Sidebar
-          {...basisProps}
+          {...ebenenProps}
           fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, autobahn: true }}
           fachebenenStatus={{ autobahn: 'offline' }}
           fachebenenAbgerufen={{ autobahn: vor(90) }}
@@ -654,7 +601,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   it('eine ausgeschaltete Ebene zeigt keinen Zoom-Hinweis', () => {
-    renderMitProviders(<Sidebar {...basisProps} zoomZuKlein={{ energie: true }} />);
+    renderMitProviders(<Sidebar {...ebenenProps} zoomZuKlein={{ energie: true }} />);
     expect(screen.queryByText('näher heranzoomen')).not.toBeInTheDocument();
   });
 
@@ -662,7 +609,9 @@ describe('Sidebar Bild-Hintergründe', () => {
   // `background` der Legendenpunkte.
   const farbenIn = (el: HTMLElement) =>
     [el, ...el.querySelectorAll<HTMLElement>('*')].flatMap((e) =>
-      [e.style.color, e.style.background, e.style.backgroundColor].filter(Boolean),
+      [e.style.color, e.style.background, e.style.backgroundColor, e.style.borderColor].filter(
+        Boolean,
+      ),
     );
   const normiert = (farbe: string) => {
     const probe = document.createElement('span');
@@ -677,7 +626,7 @@ describe('Sidebar Bild-Hintergründe', () => {
       const sichtbar = { ...basisProps.fachebenenSichtbar };
       for (const k of klassig) sichtbar[k] = an;
       const { unmount } = renderMitProviders(
-        <Sidebar {...basisProps} fachebenenSichtbar={sichtbar} />,
+        <Sidebar {...ebenenProps} fachebenenSichtbar={sichtbar} />,
       );
       for (const k of klassig) {
         const zeile = document.querySelector<HTMLElement>(`[data-fachebene="${k}"]`)!;
@@ -685,8 +634,8 @@ describe('Sidebar Bild-Hintergründe', () => {
         // Rollenfarbe je Feature ein) — also steht der Ton auch im Panel nirgends.
         // Die Tests rendern ohne unser Theme, also im Tagmodus (`fachebeneFarbe`, LFH-593).
         expect(farbenIn(zeile)).not.toContain(normiert(fachebeneFarbenHell[k]));
-        // Das Quadrat steht nur als unsichtbarer Platzhalter für die Bündigkeit der Namen.
-        expect(within(zeile).getByText('■').style.visibility).toBe('hidden');
+        // Das Farbfeld steht trotzdem (Zustand an/aus, Bündigkeit der Namen), nur neutral.
+        expect(zeile.querySelector('[data-lfh="ebenen-farbfeld"]')).not.toBeNull();
       }
       unmount();
     }
@@ -695,7 +644,7 @@ describe('Sidebar Bild-Hintergründe', () => {
   it('eingeschaltete Hochwasserebene erklärt jede Meldeklasse mit Punkt und Wort (LFH-592)', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, hochwasser: true }}
       />,
     );
@@ -717,19 +666,20 @@ describe('Sidebar Bild-Hintergründe', () => {
   });
 
   it('ausgeschaltet zeigt eine klassenabhängige Ebene keine Legende — sie zeichnet ja nichts (LFH-592)', () => {
-    renderMitProviders(<Sidebar {...basisProps} />);
+    renderMitProviders(<Sidebar {...ebenenProps} />);
     expect(screen.queryByRole('list', { name: /^Legende: / })).not.toBeInTheDocument();
   });
 
   it('eine einfarbige Ebene behält ihren Ebenenpunkt in der Kartenfarbe (LFH-592)', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
       />,
     );
     const zeile = fachebenenZeile('Amtliche Warnungen (NINA)');
-    expect(within(zeile).getByText('■').style.color).toBe(normiert(fachebeneFarbenHell.nina));
+    const feld = zeile.querySelector<HTMLElement>('[data-lfh="ebenen-farbfeld"]')!;
+    expect(feld.style.borderColor).toBe(normiert(fachebeneFarbenHell.nina));
     expect(within(zeile).queryByRole('list')).not.toBeInTheDocument();
   });
 
@@ -798,63 +748,24 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(screen.queryByRole('radiogroup', { name: 'Grundzeichen' })).not.toBeInTheDocument();
   });
 
-  it('zeigt im Platzier-Modus „Abbrechen“ ohne Bediensatz und meldet es (LFH-170)', () => {
-    const onZeichenPlatzierenAbbrechen = vi.fn();
+  it('im laufenden Zeichen zeigt das Paneel nur den Zustand — bedient wird im Band', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
         zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
-        onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
       />,
     );
-    expect(document.body).not.toHaveTextContent(/Auf Karte klicken/);
-    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(onZeichenPlatzierenAbbrechen).toHaveBeenCalled();
-  });
-
-  /**
-   * Serienmodus: ein Paar mit dem Fall oben — erst nachdem vor dem ersten Zeichen „Abbrechen"
-   * steht, sagt das Auftauchen von „Fertig" etwas aus.
-   */
-  it('Serienmodus: Schalter „Weitere platzieren" meldet das Umlegen (LFH-332)', () => {
-    const onZeichenSerieWechsel = vi.fn();
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
-        zeichenSerie
-        onZeichenSerieWechsel={onZeichenSerieWechsel}
-      />,
-    );
-    const schalter = screen.getByRole('switch', { name: 'Weitere platzieren' });
-    expect(schalter).toBeChecked();
-    fireEvent.click(schalter);
-    expect(onZeichenSerieWechsel).toHaveBeenCalledWith(false, expect.anything());
-  });
-
-  it('Serienmodus: ab dem ersten gesetzten Zeichen heißt Beenden „Fertig" (LFH-332)', () => {
-    const onZeichenPlatzierenFertig = vi.fn();
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
-        zeichenSerie
-        zeichenSerieAnzahl={2}
-        onZeichenPlatzierenFertig={onZeichenPlatzierenFertig}
-      />,
-    );
-    expect(screen.getByText('2 platziert')).toBeInTheDocument();
-    // „Abbrechen" wäre hier falsch: die zwei gesetzten Zeichen bleiben stehen.
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Fertig' }));
-    expect(onZeichenPlatzierenFertig).toHaveBeenCalled();
+    const paneel = document.querySelector('section[data-paneel="zeichnen"]') as HTMLElement;
+    expect(within(paneel).getByText('wird platziert')).toBeInTheDocument();
+    expect(within(paneel).queryByRole('button', { name: 'Abbrechen' })).toBeNull();
+    expect(within(paneel).queryByRole('switch', { name: 'Weitere platzieren' })).toBeNull();
   });
 
   it('benennt ein Bild über die Inline-Bearbeitung um', () => {
     const onBildUmbenennen = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         onBildUmbenennen={onBildUmbenennen}
@@ -956,7 +867,7 @@ describe('Sidebar Fehler-Slots', () => {
   it('„Bild-Hintergründe": Fehler-Slot, der Upload bleibt bedienbar', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[]}
         sektionFehler={{
@@ -974,7 +885,7 @@ describe('Sidebar Fehler-Slots', () => {
 
   it('„Bild-Hintergründe": ohne Fehler kein Slot', () => {
     paneeleOffen();
-    renderMitProviders(<Sidebar {...basisProps} darfSchreiben bilder={[]} />);
+    renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben bilder={[]} />);
     expect(
       screen.queryByText('Bild-Hintergründe konnten nicht geladen werden'),
     ).not.toBeInTheDocument();
@@ -989,7 +900,7 @@ describe('Sidebar Fehler-Slots', () => {
     const onBildToggle = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         darfSchreiben
         bilder={[bildLageplan]}
         onBildToggle={onBildToggle}
@@ -1012,7 +923,7 @@ describe('Sidebar Fehler-Slots', () => {
     // Abruf unsichtbar.
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         ansichten={[]}
         sektionFehler={{
           ansichten: {
@@ -1026,7 +937,7 @@ describe('Sidebar Fehler-Slots', () => {
   });
 
   it('Ansichts-Switcher: ohne Fehler kein Slot', () => {
-    renderMitProviders(<Sidebar {...basisProps} ansichten={[]} />);
+    renderMitProviders(<Sidebar {...ebenenProps} ansichten={[]} />);
     expect(
       screen.queryByText('Kartenansichten konnten nicht geladen werden'),
     ).not.toBeInTheDocument();
@@ -1218,6 +1129,13 @@ describe('Sidebar: die Löschbestätigung überlebt ihr Bild nicht', () => {
  * einklappbaren Paneele.
  */
 describe('Sidebar: Paneel „Ebenen"', () => {
+  // Alle Gruppen offen: „Betroffene & Versorgung“ startet zu.
+  beforeEach(paneeleOffen);
+  /** Die schaltbaren Zeilen der eigenen Ebenen über alle Gruppen. */
+  const eigeneZeilen = () =>
+    ['Kräfte', 'Lage', 'Betroffene & Versorgung'].flatMap((g) =>
+      within(screen.getByRole('group', { name: g })).queryAllByRole('switch'),
+    );
   const uhs = (id: number) => ({
     schluessel: `uhs-${id}`,
     typ: 'uhs' as const,
@@ -1229,7 +1147,7 @@ describe('Sidebar: Paneel „Ebenen"', () => {
   });
 
   it('zeigt je Ebene Name und Anzahl der verorteten Objekte', () => {
-    renderMitProviders(<Sidebar {...basisProps} verortet={[uhs(1), uhs(2)]} zonenAnzahl={4} />);
+    renderMitProviders(<Sidebar {...ebenenProps} verortet={[uhs(1), uhs(2)]} zonenAnzahl={4} />);
     expect(screen.getByRole('switch', { name: 'UHS' })).toHaveTextContent('UHS2');
     expect(screen.getByRole('switch', { name: 'Zonen' })).toHaveTextContent('Zonen4');
     expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden0');
@@ -1238,14 +1156,12 @@ describe('Sidebar: Paneel „Ebenen"', () => {
   it('zeigt im Fehlerfall „—" statt einer Null — an jeder Zeile', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         verortet={[uhs(1)]}
         sektionFehler={{ nichtVerortet: { text: 'Objektlisten konnten nicht geladen werden' } }}
       />,
     );
-    const zeilen = within(
-      screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' }),
-    ).getAllByRole('switch');
+    const zeilen = eigeneZeilen();
     // Zehn Ebenen und die Führungsstelle (LFH-1181).
     expect(zeilen).toHaveLength(11);
     for (const z of zeilen) expect(z).toHaveTextContent('—');
@@ -1254,21 +1170,20 @@ describe('Sidebar: Paneel „Ebenen"', () => {
 
   // Ebene „Betroffene" — die Zeile folgt dem Zugriff, gepaart gegen die Vorgabe.
   it('„Betroffene" frei: zwölfte schaltbare Zeile mit Anzahl; ohne Angabe bleibt es bei elf', () => {
-    const { unmount } = renderMitProviders(<Sidebar {...basisProps} />);
-    const gruppe = () => screen.getByRole('group', { name: 'Ebenen ein- und ausblenden' });
-    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(11);
-    expect(within(gruppe()).queryByRole('switch', { name: 'Betroffene' })).toBeNull();
+    const { unmount } = renderMitProviders(<Sidebar {...ebenenProps} />);
+    expect(eigeneZeilen()).toHaveLength(11);
+    expect(screen.queryByRole('switch', { name: 'Betroffene' })).toBeNull();
     unmount();
 
     const onLayerToggle = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         onLayerToggle={onLayerToggle}
         personen={{ zugriff: 'frei', anzahl: 3 }}
       />,
     );
-    expect(within(gruppe()).getAllByRole('switch')).toHaveLength(12);
+    expect(eigeneZeilen()).toHaveLength(12);
     const zeile = screen.getByRole('switch', { name: 'Betroffene' });
     expect(zeile).toHaveTextContent('Betroffene3');
     expect(zeile).toHaveAttribute('aria-checked', 'false');
@@ -1280,7 +1195,7 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     const onLayerToggle = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         layer={{ ...basisProps.layer, person: true }}
         onLayerToggle={onLayerToggle}
         personen={{ zugriff: 'gesperrt', anzahl: 7 }}
@@ -1302,7 +1217,9 @@ describe('Sidebar: Paneel „Ebenen"', () => {
   });
 
   it('„Betroffene" im Rückblick: Grund „Nicht in gesicherten Lageständen"', () => {
-    renderMitProviders(<Sidebar {...basisProps} personen={{ zugriff: 'rueckblick', anzahl: 0 }} />);
+    renderMitProviders(
+      <Sidebar {...ebenenProps} personen={{ zugriff: 'rueckblick', anzahl: 0 }} />,
+    );
     expect(
       screen.getByRole('button', { name: 'Betroffene – Nicht in gesicherten Lageständen' }),
     ).toBeDisabled();
@@ -1310,12 +1227,12 @@ describe('Sidebar: Paneel „Ebenen"', () => {
 
   it('Sichtungslegende nur bei eingeschalteter, freier Ebene', () => {
     const { rerender } = renderMitProviders(
-      <Sidebar {...basisProps} personen={{ zugriff: 'frei', anzahl: 1 }} />,
+      <Sidebar {...ebenenProps} personen={{ zugriff: 'frei', anzahl: 1 }} />,
     );
     expect(screen.queryByRole('list', { name: 'Sichtungslegende' })).toBeNull();
     rerender(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         layer={{ ...basisProps.layer, person: true }}
         personen={{ zugriff: 'frei', anzahl: 1 }}
       />,
@@ -1327,7 +1244,7 @@ describe('Sidebar: Paneel „Ebenen"', () => {
     const onLayerToggle = vi.fn();
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         layer={{ ...basisProps.layer, schaden: false }}
         onLayerToggle={onLayerToggle}
       />,
@@ -1383,21 +1300,32 @@ describe('Sidebar: Paneel „Ausgewählt"', () => {
 });
 
 describe('Sidebar: einklappbare Paneele', () => {
+  it('Vorgabe: Kräfte und Lage offen, die übrigen Gruppen zu', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    const kopf = (name: RegExp) => screen.getByRole('button', { name });
+    expect(kopf(/^Kräfte/)).toHaveAttribute('aria-expanded', 'true');
+    expect(kopf(/^Lage/)).toHaveAttribute('aria-expanded', 'true');
+    expect(kopf(/^Betroffene & Versorgung/)).toHaveAttribute('aria-expanded', 'false');
+    expect(kopf(/^Fachebenen/)).toHaveAttribute('aria-expanded', 'false');
+    expect(kopf(/^Hintergrund/)).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('klappt Einmal-Einstellungen zu Beginn zu und öffnet sie auf Klick', () => {
-    renderMitProviders(<Sidebar {...basisProps} bilder={[bildLageplan]} />);
-    const kopf = screen.getByRole('button', { name: /^Bild-Hintergründe/ });
+    renderMitProviders(<Sidebar {...ebenenProps} bilder={[bildLageplan]} />);
+    const kopf = screen.getByRole('button', { name: /^Hintergrund/ });
     expect(kopf).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Lageplan')).not.toBeInTheDocument();
     fireEvent.click(kopf);
     expect(kopf).toHaveAttribute('aria-expanded', 'true');
+    // Die Untergruppe steht in der Vorgabe offen: ein Griff weniger.
     expect(screen.getByText('Lageplan')).toBeInTheDocument();
   });
 
   it('merkt sich die Wahl über ein Neuladen hinweg', () => {
-    const { unmount } = renderMitProviders(<Sidebar {...basisProps} />);
+    const { unmount } = renderMitProviders(<Sidebar {...ebenenProps} />);
     fireEvent.click(screen.getByRole('button', { name: /^Fachebenen/ }));
     unmount();
-    renderMitProviders(<Sidebar {...basisProps} />);
+    renderMitProviders(<Sidebar {...ebenenProps} />);
     expect(screen.getByRole('button', { name: /^Fachebenen/ })).toHaveAttribute(
       'aria-expanded',
       'true',
@@ -1405,11 +1333,19 @@ describe('Sidebar: einklappbare Paneele', () => {
   });
 
   it('hält ein Paneel mit Fehler offen — ein zugeklappter Fehler sähe aus wie „nichts da"', () => {
+    localStorage.setItem(
+      'lfh:lagekarte:ebenen-gruppen',
+      JSON.stringify({ hintergrund: false, bilder: false }),
+    );
     renderMitProviders(
       <Sidebar
-        {...basisProps}
+        {...ebenenProps}
         sektionFehler={{ bilder: { text: 'Bild-Hintergründe konnten nicht geladen werden' } }}
       />,
+    );
+    expect(screen.getByRole('button', { name: /^Hintergrund/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
     );
     expect(screen.getByRole('button', { name: /^Bild-Hintergründe/ })).toHaveAttribute(
       'aria-expanded',
@@ -1551,24 +1487,17 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
     expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(5);
   });
 
-  it('die Zeile im laufenden Platzier-Modus bleibt stehen — sie trägt das einzige „Abbrechen"', async () => {
-    const onPlatzierenAbbrechen = vi.fn();
+  it('die Zeile im laufenden Platzier-Modus bleibt stehen — sie zeigt, was platziert wird', async () => {
     renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        nichtVerortet={fuenf}
-        platzierungZiel={{ typ: 'uhs', id: 1 }}
-        onPlatzierenAbbrechen={onPlatzierenAbbrechen}
-      />,
+      <Sidebar {...basisProps} nichtVerortet={fuenf} platzierungZiel={{ typ: 'uhs', id: 1 }} />,
     );
     await userEvent.type(feld()!, 'elw');
     // Positivkontrolle: der Filter wirkt auf die übrigen Zeilen …
     expect(screen.queryByText('Einheit: 1. Zug')).not.toBeInTheDocument();
     expect(screen.getByText('Fahrzeug: ELW 1')).toBeInTheDocument();
-    // … aber die aktive Zeile steht, und aus dem Modus kommt man weiter heraus.
+    // … aber die aktive Zeile steht samt ihrem Zustand.
     expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(onPlatzierenAbbrechen).toHaveBeenCalled();
+    expect(screen.getByText('wird platziert')).toBeInTheDocument();
     // Gezählt werden nur echte Treffer: zwei Zeilen stehen, eine davon trifft.
     expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
   });
@@ -1580,7 +1509,7 @@ describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
     await userEvent.type(feld()!, 'xyz');
     expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
     expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
+    expect(screen.getByText('wird platziert')).toBeInTheDocument();
     // Eine Leermeldung neben einer stehenden Zeile widerspräche sich selbst.
     expect(screen.queryByText('Keine Treffer für „xyz"')).not.toBeInTheDocument();
   });
@@ -1627,117 +1556,313 @@ describe('filtereNichtVerortet (LFH-360)', () => {
 });
 
 /**
- * Unter `lg` trägt das Fuß-Band `PlatzierSteuerung` die Bedienung der Leistenmodi (LFH-765). Die
- * Leiste zeigt dann an deren Stelle nur den Zustand — je Breite genau ein Knopf je Handlung. Jedes
- * „fehlt" hier hat seine Gegenprobe oben in den Bestandstests (ohne Prop stehen die Knöpfe).
+ * Leistenmodi (LLH-1028, Spec „Modusbedienung ab lg im Modus-Band der Leiste“): die Bedienung steht
+ * im Band unter der Segmentleiste (ab `lg`) bzw. im Fuß-Band (unter `lg`, LFH-765); die Zeilen der
+ * Ansichten zeigen auf jeder Breite nur den Zustand. Je Breite genau ein Knopf je Handlung — auch
+ * nach einem Wechsel der Ansicht. Inhalt des Bands im Einzelnen: `ModusBand.test.tsx`.
  */
-describe('Sidebar: Modusbedienung im Kartenfuß (LFH-765)', () => {
+describe('Sidebar: Leistenmodi im Modus-Band', () => {
   const einheit: NichtVerortet = { typ: 'einheit', id: 4, label: 'Pumpe Ost' };
+  const platzieren = (onAbbrechen = vi.fn()) =>
+    ({
+      art: 'platzieren',
+      objekt: 'Einheit: Pumpe Ost',
+      onAbbrechen,
+    }) as const;
 
-  it('Platzieren aus „Nicht verortet": „wird platziert" statt „Abbrechen"', () => {
+  it('Platzieren aus „Nicht verortet": die Zeile sagt „wird platziert", das Band trägt „Abbrechen"', () => {
+    const onAbbrechen = vi.fn();
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        darfSchreiben
         nichtVerortet={[einheit]}
         platzierungZiel={{ typ: 'einheit', id: 4 }}
-        modusBedienungImFuss
+        platzierModus={platzieren(onAbbrechen)}
       />,
     );
     expect(screen.getByText('wird platziert')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
-    // Die Koordinateneingabe bleibt Leisteninhalt.
-    expect(screen.getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+    const band = document.querySelector('[data-lfh="platzieren-hinweis"]') as HTMLElement;
+    expect(band).toHaveTextContent('Platzieren · Einheit: Pumpe Ost');
+    expect(screen.getAllByRole('button', { name: 'Abbrechen' })).toHaveLength(1);
+    fireEvent.click(within(band).getByRole('button', { name: 'Abbrechen' }));
+    expect(onAbbrechen).toHaveBeenCalled();
+    expect(within(band).getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
   });
 
-  it('ungültige Koordinate sperrt „Übernehmen" (LFH-517)', () => {
-    const onKoordinateEingeben = vi.fn();
+  it('Abbrechen aus der anderen Ansicht: das Band bleibt, es gibt keinen zweiten Knopf', () => {
     renderMitProviders(
       <Sidebar
-        {...basisProps}
-        darfSchreiben
+        {...ebenenProps}
         nichtVerortet={[einheit]}
         platzierungZiel={{ typ: 'einheit', id: 4 }}
-        onKoordinateEingeben={onKoordinateEingeben}
+        platzierModus={platzieren()}
       />,
     );
-    const feld = screen.getByPlaceholderText('Koordinate eingeben');
-    const knopf = screen.getByRole('button', { name: 'Übernehmen' });
-    fireEvent.focus(feld);
-    fireEvent.change(feld, { target: { value: 'quatsch' } });
-    fireEvent.blur(feld);
-    expect(feld).toHaveValue('quatsch');
-    expect(knopf).toBeDisabled();
-    fireEvent.focus(feld);
-    fireEvent.change(feld, { target: { value: '51.5, 10.25' } });
-    fireEvent.click(knopf);
-    expect(onKoordinateEingeben).toHaveBeenCalledWith(51.5, 10.25);
-  });
-
-  it('Gegenprobe ohne Prop: dieselbe Zeile trägt „Abbrechen"', () => {
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        darfSchreiben
-        nichtVerortet={[einheit]}
-        platzierungZiel={{ typ: 'einheit', id: 4 }}
-      />,
-    );
-    expect(screen.queryByText('wird platziert')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
-  });
-
-  it('Einsatzort: „wird platziert" statt „Abbrechen"', () => {
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        darfSchreiben
-        platzierungZiel={{ typ: 'einsatzort', id: 0 }}
-        modusBedienungImFuss
-      />,
-    );
-    expect(screen.getByText('wird platziert')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
-  });
-
-  it('Taktisches Zeichen: Hinweis statt Schalter, Zähler und Beenden', () => {
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        darfSchreiben
-        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
-        zeichenSerie
-        zeichenSerieAnzahl={2}
-        modusBedienungImFuss
-      />,
-    );
-    // Kein Satz „Bedienung über der Karte“: das Band dort ist sichtbar (LFH-1083).
-    expect(document.body).not.toHaveTextContent(/Bedienung über der Karte|Auf Karte klicken/);
-    expect(screen.queryByRole('switch', { name: 'Weitere platzieren' })).not.toBeInTheDocument();
-    expect(screen.queryByText('2 platziert')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Fertig' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
-  });
-
-  it('Bild: ohne Griffwahl und „Fertig", die Mittelpunkt-Eingabe bleibt', () => {
-    paneeleOffen();
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        darfSchreiben
-        bilder={[bildLageplan]}
-        bildPlatzierenId={1}
-        bildPlatzierZentrum={{ lat: 50, lon: 9 }}
-        modusBedienungImFuss
-      />,
-    );
+    expect(screen.getAllByRole('button', { name: 'Abbrechen' })).toHaveLength(1);
     expect(
-      screen.queryByRole('radiogroup', { name: 'Griffe auf der Karte' }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Fertig$/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Mittelpunkt setzen/i })).toBeInTheDocument();
-    // Kein Satz „Bedienung über der Karte“: das Band dort ist sichtbar (LFH-1083).
-    expect(document.body).not.toHaveTextContent(/Bedienung über der Karte|Auf Karte klicken/);
+      screen.getByRole('button', { name: 'Abbrechen' }).closest('[data-modus-band]'),
+    ).not.toBeNull();
+  });
+
+  it('unter lg: Titel und Koordinate im Band, „Abbrechen" steht im Fuß', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        nichtVerortet={[einheit]}
+        platzierungZiel={{ typ: 'einheit', id: 4 }}
+        platzierModus={platzieren()}
+        modusBedienung="fuss"
+      />,
+    );
+    expect(screen.getByText('Platzieren · Einheit: Pumpe Ost')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Übernehmen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
+  });
+
+  it('Einsatzort: das Paneel sagt „wird platziert", ohne eigenes „Abbrechen"', () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        platzierungZiel={{ typ: 'einsatzort', id: 0 }}
+        platzierModus={{ art: 'platzieren', objekt: 'Einsatzort', onAbbrechen: vi.fn() }}
+      />,
+    );
+    const paneel = document.querySelector('section[data-paneel="einsatzort"]') as HTMLElement;
+    expect(within(paneel).getByText('wird platziert')).toBeInTheDocument();
+    expect(within(paneel).queryByRole('button', { name: 'Abbrechen' })).toBeNull();
+  });
+
+  it('ohne Schreibrecht steht kein Band', () => {
+    renderMitProviders(
+      <Sidebar {...basisProps} darfSchreiben={false} platzierModus={platzieren()} />,
+    );
+    expect(document.querySelector('[data-modus-band]')).toBeNull();
+  });
+});
+
+/**
+ * Ansichten der Leiste (LLH-1028, Spec „Die Leiste gliedert sich in Ansichten“): Tabliste
+ * „Ebenen“ · „Objekte“, beide Flächen montiert, nur die gewählte sichtbar.
+ */
+describe('Sidebar: Ansichten', () => {
+  it('Tabliste mit zwei Segmenten, die ihre Fläche steuern', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    const liste = screen.getByRole('tablist', { name: 'Ansicht der Leiste' });
+    const tabs = within(liste).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['Ebenen', 'Objekte']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    const flaeche = document.getElementById(tabs[0].getAttribute('aria-controls')!)!;
+    expect(flaeche).toHaveAttribute('role', 'tabpanel');
+    expect(flaeche).not.toHaveAttribute('hidden');
+    expect(document.getElementById(tabs[1].getAttribute('aria-controls')!)).toHaveAttribute(
+      'hidden',
+    );
+  });
+
+  it('ein Tipp auf „Objekte" meldet den Wechsel', () => {
+    const onAnsichtWechsel = vi.fn();
+    renderMitProviders(<Sidebar {...ebenenProps} onAnsichtWechsel={onAnsichtWechsel} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Objekte' }));
+    expect(onAnsichtWechsel).toHaveBeenCalledWith('objekte');
+  });
+
+  it('der Suchbegriff der verborgenen Ansicht überlebt den Wechsel', () => {
+    const { rerender } = renderMitProviders(<Sidebar {...ebenenProps} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ebene suchen' }), {
+      target: { value: 'pegel' },
+    });
+    rerender(<Sidebar {...basisProps} />);
+    expect(screen.queryByRole('textbox', { name: 'Ebene suchen' })).toBeNull();
+    rerender(<Sidebar {...ebenenProps} />);
+    expect(screen.getByRole('textbox', { name: 'Ebene suchen' })).toHaveValue('pegel');
+  });
+
+  it('„Ausgewählt" steht über beiden Ansichten', () => {
+    const { rerender } = renderMitProviders(<Sidebar {...ebenenProps} />);
+    expect(screen.getByRole('heading', { name: 'Ausgewählt' })).toBeInTheDocument();
+    rerender(<Sidebar {...basisProps} />);
+    expect(screen.getByRole('heading', { name: 'Ausgewählt' })).toBeInTheDocument();
+  });
+});
+
+/** Ebenenbaum (LLH-1028, Spec „Ebenenbaum“, „Gruppenschalter“, „Ebene suchen“). */
+describe('Sidebar: Ebenenbaum', () => {
+  beforeEach(paneeleOffen);
+
+  it('ordnet die eigenen Ebenen ihren Gruppen zu und zählt an/gesamt im Kopf', () => {
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        layer={{ ...basisProps.layer, fahrzeug: false }}
+        br={{ zugriff: 'frei' }}
+        betreuung={{ zugriff: 'frei' }}
+        personen={{ zugriff: 'frei', anzahl: 0 }}
+      />,
+    );
+    const namen = (g: string) =>
+      within(screen.getByRole('group', { name: g }))
+        .getAllByRole('switch')
+        .map((z) => z.getAttribute('aria-label'));
+    expect(namen('Kräfte')).toEqual([
+      'Einheiten',
+      'Fahrzeuge',
+      'Personal',
+      'Abschnitte',
+      'Bereitstellungsräume',
+    ]);
+    expect(namen('Lage')).toEqual([
+      'Einsatzort',
+      'Führungsstelle',
+      'Zonen',
+      'Schäden',
+      'Lagemeldungen',
+      'Taktische Zeichen',
+    ]);
+    expect(namen('Betroffene & Versorgung')).toEqual(['Betroffene', 'UHS', 'Betreuungsstellen']);
+    expect(screen.getByRole('button', { name: 'Kräfte 4/5' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 3, name: /^Kartengrundlage/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 3, name: /^Bild-Hintergründe/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('Gruppenschalter: „teilweise" als mixed, ein Tipp schaltet alle an', () => {
+    const onLayerToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        layer={{ ...basisProps.layer, fahrzeug: false, fuehrung: false }}
+        onLayerToggle={onLayerToggle}
+      />,
+    );
+    const schalter = screen.getByRole('checkbox', { name: 'Kräfte: alle Ebenen' });
+    expect(schalter).toHaveAttribute('aria-checked', 'mixed');
+    fireEvent.click(schalter);
+    expect(onLayerToggle.mock.calls).toEqual([
+      ['fahrzeug', true],
+      ['fuehrung', true],
+    ]);
+  });
+
+  it('Gruppenschalter: an schaltet alle aus', () => {
+    const onLayerToggle = vi.fn();
+    renderMitProviders(<Sidebar {...ebenenProps} onLayerToggle={onLayerToggle} />);
+    const schalter = screen.getByRole('checkbox', { name: 'Lage: alle Ebenen' });
+    expect(schalter).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(schalter);
+    expect(onLayerToggle).toHaveBeenCalledTimes(6);
+    expect(onLayerToggle.mock.calls.every(([, an]) => an === false)).toBe(true);
+  });
+
+  it('Gruppenschalter lässt eine gesperrte Ebene aus — sie bleibt gesperrt mit Grund', () => {
+    const onLayerToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        layer={{ ...basisProps.layer, uhs: false, betreuungsstelle: false }}
+        personen={{ zugriff: 'gesperrt', anzahl: 3 }}
+        betreuung={{ zugriff: 'frei' }}
+        onLayerToggle={onLayerToggle}
+      />,
+    );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Betroffene & Versorgung: alle Ebenen' }));
+    expect(onLayerToggle.mock.calls).toEqual([
+      ['uhs', true],
+      ['betreuungsstelle', true],
+    ]);
+    expect(screen.getByRole('button', { name: 'Betroffene – Keine Berechtigung' })).toBeDisabled();
+  });
+
+  it('keinen Gruppenschalter an „Fachebenen" als Ganzem und an „Hintergrund"', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    const namen = screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'));
+    expect(namen).toEqual([
+      'Kräfte: alle Ebenen',
+      'Lage: alle Ebenen',
+      'Betroffene & Versorgung: alle Ebenen',
+      'Warnungen: alle Ebenen',
+      'Wasser: alle Ebenen',
+      'Umwelt: alle Ebenen',
+      'Verkehr & Infrastruktur: alle Ebenen',
+    ]);
+  });
+
+  it('Untergruppe der Fachebenen schaltet ihre Quellen', () => {
+    const onFachebeneToggle = vi.fn();
+    renderMitProviders(<Sidebar {...ebenenProps} onFachebeneToggle={onFachebeneToggle} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Wasser: alle Ebenen' }));
+    expect(onFachebeneToggle.mock.calls).toEqual([
+      ['pegelonline', true],
+      ['hochwasser', true],
+    ]);
+  });
+
+  it('eine Fachebene ist eine Zeile wie jede Ebene: die Zeile ist der Schalter', () => {
+    const onFachebeneToggle = vi.fn();
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, dwd: true }}
+        fachebenenStatus={{ dwd: 'offline' }}
+        onFachebeneToggle={onFachebeneToggle}
+      />,
+    );
+    const zeile = screen.getByRole('switch', { name: FACHEBENEN.dwd.label });
+    expect(zeile.tagName).toBe('BUTTON');
+    expect(zeile).toHaveAttribute('aria-checked', 'true');
+    // Der Zustand ist Teil der Beschreibung der Zeile.
+    expect(zeile).toHaveAccessibleDescription(/offline/);
+    expect(
+      zeile.closest('[data-fachebene="dwd"]')!.querySelectorAll('[role="switch"]'),
+    ).toHaveLength(1);
+    fireEvent.click(zeile);
+    expect(onFachebeneToggle).toHaveBeenCalledWith('dwd', false);
+  });
+
+  it('„Ebene suchen" öffnet Gruppen mit Treffern, ohne den gemerkten Zustand zu ändern', () => {
+    localStorage.removeItem('lfh:lagekarte:ebenen-gruppen');
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    const feld = screen.getByRole('textbox', { name: 'Ebene suchen' });
+    fireEvent.change(feld, { target: { value: 'pegel' } });
+    expect(screen.getByRole('switch', { name: FACHEBENEN.pegelonline.label })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Wasser/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    // Nur die Treffer stehen; andere Gruppen fallen weg.
+    expect(screen.queryByRole('button', { name: /^Kräfte/ })).toBeNull();
+    fireEvent.change(feld, { target: { value: '' } });
+    expect(screen.getByRole('button', { name: /^Fachebenen/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('„Ebene suchen": ein Gruppenname lässt die ganze Gruppe stehen', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ebene suchen' }), {
+      target: { value: 'kräfte' },
+    });
+    expect(
+      within(screen.getByRole('group', { name: 'Kräfte' })).getAllByRole('switch'),
+    ).toHaveLength(4);
+  });
+
+  it('„Ebene suchen" ohne Treffer: genau ein Leerzustand mit dem Begriff', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Ebene suchen' }), {
+      target: { value: 'xyz' },
+    });
+    expect(screen.getAllByText('Keine Ebene zu „xyz“')).toHaveLength(1);
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+  });
+
+  it('die Kartenansicht steht im Kopf der Ebenen', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} ansichtDirty />);
+    const kopf = document.querySelector('section[data-paneel="ansicht"]') as HTMLElement;
+    expect(within(kopf).getByRole('button', { name: 'In dieser Ansicht speichern' })).toBeVisible();
+    // Kein Klappkopf: die Kartenansicht ist kein Abschnitt zwischen den Ebenen.
+    expect(within(kopf).queryByRole('button', { expanded: false })).toBeNull();
   });
 });
 

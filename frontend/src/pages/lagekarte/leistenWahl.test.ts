@@ -1,6 +1,16 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { LEISTE_SPEICHER_SCHLUESSEL, leisteSichtbar, useLeistenWahl } from './leistenWahl';
+import { BAUM_KLAPP_VORGABE } from './leistenDaten';
+import {
+  BAUM_KLAPP_SCHLUESSEL,
+  LEISTE_SPEICHER_SCHLUESSEL,
+  LEISTEN_ANSICHT_SCHLUESSEL,
+  leisteSichtbar,
+  leistenAnsichtLesen,
+  useBaumKlapp,
+  useLeistenAnsicht,
+  useLeistenWahl,
+} from './leistenWahl';
 
 afterEach(() => localStorage.clear());
 
@@ -230,5 +240,36 @@ describe('useLeistenWahl im Kartenmodus (LFH-765)', () => {
     rerender({ modusAktiv: true });
     rerender({ modusAktiv: false });
     expect(result.current.wahl).toBe(true);
+  });
+});
+
+describe('Ansicht der Leiste (Ebenen · Objekte)', () => {
+  it('ohne gespeicherte Wahl gilt „Ebenen“, Unbekanntes ebenso', () => {
+    expect(leistenAnsichtLesen(null)).toBe('ebenen');
+    expect(leistenAnsichtLesen('auswahl')).toBe('ebenen');
+    expect(leistenAnsichtLesen('objekte')).toBe('objekte');
+  });
+
+  it('merkt den Wechsel je Gerät und liest ihn beim nächsten Einhängen', () => {
+    const { result, unmount } = renderHook(() => useLeistenAnsicht());
+    expect(result.current.ansicht).toBe('ebenen');
+    expect(localStorage.getItem(LEISTEN_ANSICHT_SCHLUESSEL)).toBeNull();
+    act(() => result.current.wechsle('objekte'));
+    expect(result.current.ansicht).toBe('objekte');
+    expect(localStorage.getItem(LEISTEN_ANSICHT_SCHLUESSEL)).toBe('objekte');
+    unmount();
+    expect(renderHook(() => useLeistenAnsicht()).result.current.ansicht).toBe('objekte');
+  });
+});
+
+describe('Klappzustand des Ebenenbaums', () => {
+  it('startet mit der Vorgabe und merkt jedes Umschalten', () => {
+    const { result } = renderHook(() => useBaumKlapp());
+    expect(result.current.offen).toEqual(BAUM_KLAPP_VORGABE);
+    act(() => result.current.setze('fachebenen', true));
+    expect(result.current.offen.fachebenen).toBe(true);
+    expect(JSON.parse(localStorage.getItem(BAUM_KLAPP_SCHLUESSEL)!)).toMatchObject({
+      fachebenen: true,
+    });
   });
 });

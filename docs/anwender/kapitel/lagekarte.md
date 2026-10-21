@@ -2,14 +2,16 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
 ---
 
 ## Überblick
 
 Die Lagekarte zeigt, wo was ist: Einsatzort, Einheiten, Zonen, Gefahrengebiete, Stellen,
-Bereitstellungsräume, Lagemeldungen und taktische Zeichen. Rechts steht die Leiste mit den Ebenen, dem gewählten Objekt,
-den noch nicht verorteten Objekten und dem Zeichnen. Auf der Karte wird gelesen, verortet,
+Bereitstellungsräume, Lagemeldungen und taktische Zeichen. Rechts steht die Leiste mit zwei
+Ansichten: „Ebenen“ ordnet alles, was die Karte zeigen kann, in Gruppen; „Objekte“ führt die noch
+nicht verorteten und die verorteten Objekte und das Zeichnen. Darüber steht das gewählte Objekt.
+Auf der Karte wird gelesen, verortet,
 gezeichnet und gemessen. Lesen und Messen kann jede Person im Einsatz, Verorten und Zeichnen nur,
 wer im Einsatz schreiben darf.
 
@@ -19,12 +21,16 @@ wer im Einsatz schreiben darf.
 
 1. Im Bereich „Lage“ „Lagekarte“ öffnen. Oben links die Kartengrundlage wählen: eine Online-Karte
    (Name nach Einrichtung), „Offline“ oder „Ohne Karte“.
-2. In der Leiste unter „Ebenen“ eine Ebene über ihren Schalter aus- oder einblenden; die Zahl
-   daneben nennt ihre Objekte.
+2. In der Leiste unter „Ebenen“ eine Gruppe aufklappen, etwa „Kräfte“, und eine Ebene antippen,
+   um sie aus- oder einzublenden; die Zahl rechts nennt ihre Objekte. Das Kästchen am Kopf einer
+   Gruppe blendet alle ihre Ebenen auf einmal ein oder aus. „Ebene suchen“ findet eine Ebene über
+   ihren Namen oder den Namen ihrer Gruppe.
 
-   ![Lagekarte mit Zonen, Einheiten und Einsatzort, rechts die Leiste mit Ebenen und nicht verorteten Objekten](../bilder/lagekarte/lagekarte.png)
+   ![Lagekarte mit Zonen, Einheiten und Einsatzort, rechts die Leiste mit dem Ebenenbaum](../bilder/lagekarte/lagekarte.png)
 
-3. Für ein Objekt ohne Ort unter „Nicht verortet“ „Platzieren“ wählen.
+3. Für ein Objekt ohne Ort in der Leiste „Objekte“ wählen und dort unter „Nicht verortet“
+   „Platzieren“. Oben in der Leiste stehen dann das Objekt, ein Feld für die Koordinate und
+   „Abbrechen“; am Handy steht „Abbrechen“ im Band unten auf der Karte.
 4. Auf die Stelle der Karte tippen, an die das Objekt gehört. Die App meldet „Objekt verortet“.
 
 ### Ein Objekt von seiner Seite aus verorten
@@ -64,7 +70,8 @@ wer im Einsatz schreiben darf.
 
 ### Ein taktisches Zeichen setzen
 
-1. In der Leiste im Paneel „Zeichnen“ „Taktisches Zeichen platzieren“ wählen.
+1. Rechts an der Karte „Zeichenwerkzeuge“ wählen. Die Leiste zeigt „Objekte“ mit dem Paneel
+   „Zeichnen“; dort „Taktisches Zeichen platzieren“ wählen.
 2. Ein Grundzeichen wählen, bei Bedarf ein Symbol; beide Listen lassen sich durchsuchen. Ein
    Symbol ohne Grundzeichen, etwa ein Piktogramm oder einen Zustand, setzt „Kein Grundzeichen“
    und danach das Symbol. Unter „Details“ stehen Organisation, Fachaufgabe, Einheit, Farbe und
@@ -75,11 +82,13 @@ wer im Einsatz schreiben darf.
 3. „Platzieren“ wählen und auf die Stelle der Karte tippen. Die App meldet „Taktisches Zeichen
    angelegt“.
 4. Solange „Weitere platzieren“ an ist, setzt jeder weitere Tipp dasselbe Zeichen noch einmal.
-   „Fertig“ beendet das Setzen.
+   „Fertig“ beendet das Setzen. Beides steht oben in der Leiste, am Handy im Band unten auf der
+   Karte.
 
 ### Eine Zone zeichnen
 
-1. Im Paneel „Zeichnen“ unter „Zone zeichnen“ die Art wählen, etwa „Gefahrengebiet zeichnen“.
+1. Im Paneel „Zeichnen“ (Leiste, „Objekte“) unter „Zone zeichnen“ die Art wählen, etwa
+   „Gefahrengebiet zeichnen“.
    Für eine freie Skizze „Fläche“ oder „Linie“ wählen.
 2. Die Eckpunkte nacheinander auf die Karte tippen. Das Band unten zählt die Punkte;
    „Letzten Punkt zurück“ nimmt den letzten wieder weg.
@@ -113,6 +122,24 @@ wer im Einsatz schreiben darf.
    neuer Lagevortrag öffnet sich.
 
 ## Hintergrund
+
+### Die Leiste: Ebenen und Objekte
+
+Die Ansicht „Ebenen“ ordnet die Ebenen in feste Gruppen: „Kräfte“ (Einheiten, Fahrzeuge, Personal,
+Abschnitte, Bereitstellungsräume), „Lage“ (Einsatzort, Führungsstelle, Zonen, Schäden,
+Lagemeldungen, taktische Zeichen), „Betroffene & Versorgung“ (Betroffene, Unfallhilfsstellen,
+Betreuungsstellen, Tiere), „Fachebenen“ mit „Warnungen“, „Wasser“, „Umwelt“ und „Verkehr &
+Infrastruktur“ sowie „Hintergrund“ mit den Bild-Hintergründen und, am Handy, der Kartengrundlage. Der Kopf einer
+Gruppe nennt, wie viele ihrer Ebenen an sind. Eine Ebene, die eine Rolle nicht sehen darf, steht
+gesperrt mit ihrem Grund da und bleibt auch beim Kästchen der Gruppe aus. Konnte die App eine
+Quelle nicht laden, steht „—“ statt einer Zahl.
+
+Eine Fachebene nennt unter ihrem Namen, was sie zeigt, und eingeschaltet, von wann ihr Stand ist;
+„offline“, „keine Daten“ oder „näher heranzoomen“ sagen, warum sie gerade nichts zeigt.
+
+Ganz oben in „Ebenen“ steht die Kartenansicht mit „In dieser Ansicht speichern“. Welche Ansicht
+der Leiste vorn steht und welche Gruppen offen sind, merkt sich das Gerät. Zu Beginn sind
+„Kräfte“ und „Lage“ offen.
 
 ### Der Lageplan
 

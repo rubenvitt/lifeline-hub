@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kontoAnlegen } from './konto-anlegen';
+import { oeffneEbenenGruppe } from './leisten-kern';
 
 // Ebene „Betroffene" auf der Lagekarte. Ob Personen in IHRER Quelle `marker-personen` landen,
 // dort untereinander clustern statt Kräfte-Marker zu schlucken, und ob ein Personen-Donut
@@ -173,6 +174,8 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   await anmeldenAls(page, NUTZER, NUTZER_PW);
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await karteBereit(page);
+  // Ebenenbaum (LLH-1028): „Betroffene & Versorgung“ ist per Vorgabe zu.
+  await oeffneEbenenGruppe(page, 'betroffene');
   await expect(page.getByRole('switch', { name: 'Betroffene' })).toHaveAttribute(
     'aria-checked',
     'true',
@@ -258,8 +261,13 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   expect(personenIn(await features(page, 'marker-personen'))).toBe(0);
   expect(personenIn(await features(page, 'marker-cluster'))).toBe(0);
   await expect(page.getByRole('switch', { name: 'Schäden' })).toBeVisible();
+  // Steht die Gruppe noch (Betreuung), ist sie offen — sonst wäre die Abwesenheit geschenkt.
+  if (await page.locator('section[data-paneel="betroffene"]').count()) {
+    await oeffneEbenenGruppe(page, 'betroffene');
+  }
   await expect(page.getByRole('switch', { name: /Betroffene/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Betroffene/ })).toHaveCount(0);
+  // Gruppenkopf und Gruppenschalter „Betroffene & Versorgung“ sind keine Ebene.
+  await expect(page.getByRole('button', { name: /Betroffene(?! & Versorgung)/ })).toHaveCount(0);
   await expect(page.getByRole('list', { name: 'Sichtungslegende' })).toHaveCount(0);
 });
 
@@ -403,6 +411,7 @@ test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker
   await karteBereit(page);
   // Vorbedingung: der Modus läuft, die Ebene ist laut Schalter aus.
   await expect(page.locator('[data-lfh="platzieren-hinweis"]')).toBeVisible();
+  await oeffneEbenenGruppe(page, 'betroffene');
   const schalter = page.getByRole('switch', { name: 'Betroffene' });
   await expect(schalter).toHaveAttribute('aria-checked', 'false');
 

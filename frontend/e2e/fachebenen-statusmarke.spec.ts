@@ -1,11 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import { FACHEBENEN } from '../src/pages/lagekarte/fachebenen';
 import type { FachebeneQuelle } from '../src/api/fachebenen';
+import { BAUM_SCHLUESSEL, FACHEBENEN_OFFEN } from './leisten-kern';
 
 /**
  * LFH-601: Die Statusmarke einer Fachebene („offline“, „keine Daten“) steht einzeilig, auch
- * neben einer Ebene mit Geltungszeile. Ohne `whiteSpace: 'nowrap'` an der Marke (`Sidebar.tsx`,
- * Fachebenen-Paneel) nahm die Spalte aus Name und Geltungszeile ihr den Platz, und das Wort brach
+ * neben einer Ebene mit Geltungszeile. Ohne `whiteSpace: 'nowrap'` an der Marke (`Ebenenbaum.tsx`,
+ * Zeile einer Fachebene) nahm die Spalte aus Name und Geltungszeile ihr den Platz, und das Wort brach
  * als „offli / ne“ um. „offline“ ist dort der einzige Hinweis, dass die Ebene leer ist, weil die
  * Quelle fehlt — ein zerrissenes Wort liest sich schlecht. jsdom rechnet kein Layout, deshalb hier.
  *
@@ -59,8 +60,12 @@ for (const zustand of ['offline', 'leer'] as const) {
         });
       });
       await page.addInitScript(
-        ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
-        [DICHTE_SCHLUESSEL, dichte] as const,
+        ([schluessel, wert, baum, offen]) => {
+          window.localStorage.setItem(schluessel, wert);
+          // Ebenenbaum (LLH-1028): Fachebenen samt Untergruppen offen, ohne Klick.
+          window.localStorage.setItem(baum, offen);
+        },
+        [DICHTE_SCHLUESSEL, dichte, BAUM_SCHLUESSEL, FACHEBENEN_OFFEN] as const,
       );
       await anmelden(page);
       const einsatzId = await einsatz(page, `Statusmarke ${zustand} ${dichte} ${Date.now()}`);
@@ -70,9 +75,6 @@ for (const zustand of ['offline', 'leer'] as const) {
       await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
 
       const fachebenen = page.locator('section[data-paneel="fachebenen"]');
-      const kopf = fachebenen.locator('button[aria-expanded]').first();
-      if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
-      await expect(kopf).toHaveAttribute('aria-expanded', 'true');
 
       const schalter = fachebenen.getByRole('switch');
       await expect(schalter.first()).toBeVisible();
@@ -85,11 +87,11 @@ for (const zustand of ['offline', 'leer'] as const) {
       for (const key of MIT_GELTUNG) {
         const zeile = fachebenen.locator(`[data-fachebene="${key}"]`);
         await expect(
-          zeile.locator('.ant-typography', { hasText: MARKE[zustand] }),
+          zeile.locator('[data-lfh="fachebene-zustand"]', { hasText: MARKE[zustand] }),
           `Vorbedingung: ${key} zeigt „${MARKE[zustand]}“`,
         ).toBeVisible();
         await expect(
-          zeile.locator('.ant-typography', { hasText: FACHEBENEN[key].geltung }),
+          zeile.locator('[data-lfh="fachebene-geltung"]', { hasText: FACHEBENEN[key].geltung }),
           `Vorbedingung: ${key} trägt eine Geltungszeile`,
         ).toBeVisible();
       }
@@ -100,9 +102,9 @@ for (const zustand of ['offline', 'leer'] as const) {
        */
       const messung = await fachebenen.evaluate((paneel, wort) => {
         return [...paneel.querySelectorAll<HTMLElement>('[data-fachebene]')].flatMap((zeile) => {
-          const marke = [...zeile.querySelectorAll<HTMLElement>('.ant-typography')].find(
-            (el) => el.textContent?.trim() === wort,
-          );
+          const marke = [
+            ...zeile.querySelectorAll<HTMLElement>('[data-lfh="fachebene-zustand"]'),
+          ].find((el) => el.textContent?.trim() === wort);
           if (!marke) return [];
           const zeilenhoehe = parseFloat(getComputedStyle(marke).lineHeight);
           return [

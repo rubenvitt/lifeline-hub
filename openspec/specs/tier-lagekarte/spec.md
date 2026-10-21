@@ -89,9 +89,9 @@ Fundort-Freitext wie bisher leeren.
 ### Requirement: Tiere als Marker
 
 Die Lagekarte SHALL jedes verortete Tier im Status „aktiv“ (offen) oder „vermisst“ als Marker an
-seiner Koordinate zeigen. Die Marker MUST eine eigene, schaltbare Ebene „Tiere“ bilden, die nach
-den Bereitstellungsräumen mit der Anzahl ihrer Marker in der Ebenenliste steht und ohne
-gespeicherte Wahl eingeschaltet ist. Da `@einsatzzeichen` nach DV 102 kein Zeichen „Tier“ ohne
+seiner Koordinate zeigen. Die Marker MUST eine eigene, schaltbare Ebene „Tiere“ bilden, die in
+der Gruppe „Betroffene & Versorgung“ des Ebenenbaums nach den Betreuungsstellen mit der Anzahl
+ihrer Marker steht und ohne gespeicherte Wahl eingeschaltet ist. Da `@einsatzzeichen` nach DV 102 kein Zeichen „Tier“ ohne
 Zustand führt, MUST der Marker ein Kreis mit dem Kurzzeichen „T“ sein, kein eigenes Zeichen. Die
 Beschriftung MUST Registriernummer und Spezies tragen („T-007 (Hund)“), ohne Rufname. Ein
 vermisstes Tier MUST die Farbrolle „Achtung“ und in der Beschriftung das Wort „vermisst“ tragen.

@@ -32,6 +32,7 @@ import {
   ruhigeHoehe,
   stelleDichte,
 } from './trefflaeche-kern';
+import { oeffneAlleFachebenen, zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
@@ -3865,6 +3866,8 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeit
     );
 
     // „Verortet": handgebaute Zeilen. Per exaktem Namen, weil sonst auch der Klappkopf träfe.
+    // Sie stehen in der Ansicht „Objekte“ (LLH-1028).
+    await zeigeLeistenAnsicht(page, 'Objekte');
     const leiste = page.locator('[data-lfh="kartenleiste"]');
     let verortet = Number.POSITIVE_INFINITY;
     for (const name of ablagen) {
@@ -4218,9 +4221,8 @@ async function fachebenenBeantworten(page: Page) {
 /** Fachebenen-Paneel auf und jede Probe-Ebene sichtbar (die Wahl übersteht den Neuladen nicht
  *  sicher — geschaltet wird nur, was aus ist). */
 async function fachebenenAn(page: Page) {
-  const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
-  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
-  await expect(kopf).toHaveAttribute('aria-expanded', 'true');
+  // Ebenenbaum (LLH-1028): jede Fachebenen-Untergruppe aufklappen.
+  await oeffneAlleFachebenen(page);
   for (const { schalter } of FACHEBENEN_PROBE) {
     const knopf = page.getByRole('switch', { name: schalter });
     if ((await knopf.getAttribute('aria-checked')) !== 'true') await knopf.click();

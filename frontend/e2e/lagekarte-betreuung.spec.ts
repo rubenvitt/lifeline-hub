@@ -1,5 +1,6 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { kontoAnlegen } from './konto-anlegen';
+import { oeffneEbenenGruppe } from './leisten-kern';
 
 // Betreuung auf der Lagekarte — Durchstich im echten Renderer: landet eine verortete Stelle
 // in der Marker-Quelle, kommt der Platziermodus aus dem Modul an, bekommt eine zweite Karte
@@ -321,6 +322,8 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
   await page.goto(`/einsaetze/${e}/lagekarte`);
   await karteBereit(page);
   await springe(page, [9.352, 52.101], 15);
+  // Ebenenbaum (LLH-1028): „Betroffene & Versorgung“ ist per Vorgabe zu.
+  await oeffneEbenenGruppe(page, 'betroffene');
   await expect(
     page.getByRole('button', { name: 'Betreuungsstellen – Keine Berechtigung' }),
   ).toBeDisabled();

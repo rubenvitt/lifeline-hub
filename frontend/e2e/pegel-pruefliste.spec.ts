@@ -3,6 +3,7 @@ import { pruefeFokusVerdeckung } from './fokus-kern';
 import { eingeschwungen } from './kontrast-kern';
 import { wechsleZuRolle } from './rollen-kern';
 import { ueberstaende } from './ueberstand-kern';
+import { oeffneEbenenGruppe } from './leisten-kern';
 
 /**
  * Browser-Nachweise der Prüfliste für den Pegel (LFH-606): Trefflächen über die
@@ -460,8 +461,8 @@ async function inspectorOeffnen(page: Page, einsatzId: string, station: string) 
   if (!(await leiste.isVisible())) {
     await page.getByRole('button', { name: 'Leiste einblenden' }).click();
   }
-  const kopf = page.locator('section[data-paneel="fachebenen"] button[aria-expanded]').first();
-  if ((await kopf.getAttribute('aria-expanded')) === 'false') await kopf.click();
+  // Ebenenbaum (LLH-1028): Pegel stehen in „Fachebenen › Wasser“.
+  await oeffneEbenenGruppe(page, 'wasser');
   // Die Wahl der Ebene übersteht ein Neuladen nicht sicher: geschaltet wird nur, was aus ist.
   const schalter = page.getByRole('switch', { name: 'Pegel / Hochwasser' });
   if ((await schalter.getAttribute('aria-checked')) !== 'true') await schalter.click();

@@ -80,7 +80,7 @@ System MUST dabei keinen 5xx-Fehler liefern.
 
 #### Scenario: Quelle weg, kein Cache
 - **WHEN** der BfS-Dienst nicht antwortet und noch kein Stand zwischengespeichert ist
-- **THEN** antwortet die Route mit HTTP 200, `status: "offline"` und leerer Collection, und das Panel zeigt die Ebene als offline
+- **THEN** antwortet die Route mit HTTP 200, `status: "offline"` und leerer Collection, und ihre Zeile im Ebenenbaum zeigt die Ebene als offline
 
 #### Scenario: Quelle weg, alter Stand vorhanden
 - **WHEN** der BfS-Dienst nicht antwortet, aber ein früher gespeicherter Stand vorliegt
@@ -96,7 +96,7 @@ Namensnennung 2.0 nennen.
 - **THEN** erscheint die BfS-Quellennennung in der Kartenattribution
 
 ### Requirement: Sichtbarkeit der Ebene wird gespeichert
-Das Panel SHALL die ODL-Ebene als zuschaltbare Fachebene mit sichtbarem Geltungshinweis
+Der Ebenenbaum der Lagekarte SHALL die ODL-Ebene als zuschaltbare Fachebene mit sichtbarem Geltungshinweis
 anbieten (nur ortsfeste BfS-Sonden, Stundenwerte). Ihre Sichtbarkeit SHALL wie bei den
 übrigen Fachebenen gespeichert werden; ein vor dieser Änderung gespeicherter Stand ohne
 Angabe zur ODL-Ebene MUST als „aus" gelesen werden.
@@ -190,7 +190,7 @@ ersten Mal, ist gescheitert oder abgeschaltet), SHALL die Route mit HTTP 200,
 
 #### Scenario: Erster Start
 - **WHEN** die Instanz zum ersten Mal läuft und der erste Import noch nicht abgeschlossen ist
-- **THEN** zeigt das Panel die KRITIS-Ebene als offline, und sobald der Import fertig ist, erscheinen die Objekte ohne Neuladen der Seite
+- **THEN** zeigt der Ebenenbaum die KRITIS-Ebene als offline, und sobald der Import fertig ist, erscheinen die Objekte ohne Neuladen der Seite
 
 ### Requirement: KRITIS-Punkte werden auf der Karte gebündelt
 Die Lagekarte SHALL nahe beieinanderliegende KRITIS-Punkte und vom Server gelieferte
@@ -333,7 +333,7 @@ Quelle nennen, wo eine Quelle einen liefert.
 - **THEN** nennt `abgerufen` den Zeitpunkt vor 20 Stunden
 
 ### Requirement: Jede sichtbare Fachebene zeigt ihr Alter ohne Detailansicht
-Das Fachebenen-Panel der Lagekarte SHALL in der Zeile jeder zugeschalteten Fachebene mit
+Der Ebenenbaum der Lagekarte SHALL in der Zeile jeder zugeschalteten Fachebene mit
 `abgerufen` den Abrufzeitpunkt als taktische Zeitangabe in Monospace mit Tabellenziffern
 zeigen: nur die Uhrzeit, wenn der Abruf am selben Tag liegt, sonst Tag und Uhrzeit. Die
 Angabe MUST ohne Klick, Hovern oder Aufklappen lesbar sein. Die Einstufung MUST mit der Zeit
@@ -344,7 +344,7 @@ Ebene, die der Server als `offline` ohne Stand meldet, MUST keine Zeitangabe zei
 
 #### Scenario: Stand von heute
 - **WHEN** die Hochwasser-Ebene zugeschaltet ist und ihr Stand heute um 14:30 abgerufen wurde
-- **THEN** zeigt ihre Zeile im Panel „Stand 1430“
+- **THEN** zeigt ihre Zeile im Ebenenbaum „Stand 1430“
 
 #### Scenario: Stand von einem Vortag
 - **WHEN** der Stand einer zugeschalteten Ebene am 29. um 14:30 abgerufen wurde und heute der 30. ist
@@ -361,7 +361,7 @@ Ebene, die der Server als `offline` ohne Stand meldet, MUST keine Zeitangabe zei
 ### Requirement: Ein Stand jenseits der Schwelle ist als veraltet erkennbar
 Jede Fachebene SHALL eine feste Veraltungsschwelle haben, die aus dem Erneuerungstakt ihrer
 Quelle abgeleitet und in der Quellendokumentation je Ebene genannt ist. Liegt `abgerufen`
-einer zugeschalteten Ebene länger als diese Schwelle zurück, MUST ihre Zeile im Panel
+einer zugeschalteten Ebene länger als diese Schwelle zurück, MUST ihre Zeile im Ebenenbaum
 zusätzlich das Wort „veraltet“ zeigen. Die Kennzeichnung MUST einen zweiten Kanal neben der
 Farbe haben (das Wort) und MUST für Vorleser als Teil der Zeile lesbar sein. Die Ebene MUST
 dabei weiter angezeigt werden und ihren Status `ok` bzw. `leer` behalten; die Kennzeichnung
@@ -443,7 +443,7 @@ Stale-Serving ausliefern. Die übrigen Fachebenen bleiben davon unberührt.
 
 #### Scenario: Alter Warnstand, Quelle weg
 - **WHEN** der gespeicherte DWD-Stand vor 7 Stunden abgerufen wurde und der DWD nicht antwortet
-- **THEN** antwortet die Route mit HTTP 200, `status: "offline"`, leerer Collection und ohne `abgerufen`, und das Panel zeigt die Ebene als offline
+- **THEN** antwortet die Route mit HTTP 200, `status: "offline"`, leerer Collection und ohne `abgerufen`, und ihre Zeile im Ebenenbaum zeigt die Ebene als offline
 
 #### Scenario: Alter Warnstand, Quelle wieder da
 - **WHEN** der gespeicherte NINA-Stand vor 7 Stunden abgerufen wurde und die Quelle antwortet
@@ -451,7 +451,7 @@ Stale-Serving ausliefern. Die übrigen Fachebenen bleiben davon unberührt.
 
 #### Scenario: Warnstand unter der Obergrenze
 - **WHEN** der gespeicherte DWD-Stand vor 2 Stunden abgerufen wurde und der DWD nicht antwortet
-- **THEN** liefert die Route diesen Stand mit `status: "ok"` aus, und das Panel kennzeichnet ihn als veraltet
+- **THEN** liefert die Route diesen Stand mit `status: "ok"` aus, und ihre Zeile im Ebenenbaum kennzeichnet ihn als veraltet
 
 #### Scenario: Grenze genau getroffen
 - **WHEN** der gespeicherte DWD-Stand genau vor 6 Stunden abgerufen wurde
