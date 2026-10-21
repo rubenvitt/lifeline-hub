@@ -45,6 +45,8 @@ function renderInspector(opts: {
   onLoeschen?: Mock<ZonenInspectorProps['onLoeschen']>;
   onMatrixOeffnen?: Mock<ZonenInspectorProps['onMatrixOeffnen']>;
   matrixGesperrt?: boolean;
+  onPunkteBearbeiten?: () => void;
+  onMitteVerschieben?: () => void;
   /** Adresse der Seite, etwa `/?snapshot=3` für den Historien-Modus. */
   route?: string;
 }) {
@@ -60,6 +62,8 @@ function renderInspector(opts: {
     onLoeschen,
     ansichten: [],
     matrixGesperrt: opts.matrixGesperrt,
+    onPunkteBearbeiten: opts.onPunkteBearbeiten,
+    onMitteVerschieben: opts.onMitteVerschieben,
   } satisfies Omit<ZonenInspectorProps, 'zone'>;
   const ergebnis = renderMitProviders(
     <ZonenInspector zone={opts.zone ?? basisZone} {...gemeinsameProps} />,
@@ -622,6 +626,40 @@ describe('ZonenInspector — Kreiszone (LLH-1043)', () => {
     expect(screen.queryByRole('spinbutton', { name: 'Radius in Metern' })).toBeNull();
     rerenderZone({ ...kreisZone, id: 2, kreis_radius_m: null });
     expect(screen.queryByText('Radius')).toBeNull();
+  });
+
+  // LLH-1344: Bearbeiten an der Karte.
+  it('Kreiszone mit Schreibrecht: „Mitte verschieben“ und „Punkte bearbeiten“', () => {
+    const onPunkteBearbeiten = vi.fn();
+    const onMitteVerschieben = vi.fn();
+    renderInspector({ zone: kreisZone, onPunkteBearbeiten, onMitteVerschieben });
+    fireEvent.click(screen.getByRole('button', { name: 'Mitte verschieben' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Punkte bearbeiten' }));
+    expect(onMitteVerschieben).toHaveBeenCalledTimes(1);
+    expect(onPunkteBearbeiten).toHaveBeenCalledTimes(1);
+  });
+
+  it('ohne Kreis keine Mitte, ohne Schreibrecht keins von beiden', () => {
+    const { rerenderZone } = renderInspector({
+      zone: { ...kreisZone, kreis_radius_m: null },
+      onPunkteBearbeiten: vi.fn(),
+      onMitteVerschieben: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: 'Mitte verschieben' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Punkte bearbeiten' })).toBeInTheDocument();
+    rerenderZone({ ...kreisZone, id: 3 });
+    expect(screen.getByRole('button', { name: 'Mitte verschieben' })).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht steht kein Bearbeiten-Knopf', () => {
+    renderInspector({
+      zone: kreisZone,
+      darfSchreiben: false,
+      onPunkteBearbeiten: vi.fn(),
+      onMitteVerschieben: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: 'Punkte bearbeiten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mitte verschieben' })).toBeNull();
   });
 });
 

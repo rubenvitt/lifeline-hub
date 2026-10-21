@@ -120,6 +120,58 @@ verlieren; ein Radius an einer Zone ohne Kreis MUST mit 422 abgelehnt werden.
 - **WHEN** eine Kreiszone eine neue Fläche bekommt
 - **THEN** zeigt der Inspector keinen Radius mehr
 
+### Requirement: Zone punktweise bearbeiten
+Der Zonen-Inspector SHALL mit Schreibrecht „Punkte bearbeiten“ anbieten. Der Bearbeiten-Modus
+MUST die Fläche oder Linie mit Griffen an jedem Eckpunkt und an den Kantenmitten zeigen: ein
+Eckgriff MUST sich ziehen lassen und wählt beim Tipp den Punkt, ein Kantengriff MUST beim Tipp
+oder Ziehen einen neuen Punkt einfügen. „Punkt entfernen“ MUST den gewählten Punkt entfernen,
+solange die Fläche mindestens drei, die Linie mindestens zwei Punkte behält. Jeder Griff MUST
+ein Ziel von mindestens 44 px haben; die Karte bleibt außerhalb der Griffe verschiebbar.
+„Übernehmen“ MUST genau eine Änderung an den Server schicken, die neue Geometrie; das
+Einsatztagebuch MUST „<Art> «Name» geändert“ nennen. Bei einer Kreiszone MUST das Band vorher
+sagen, dass danach kein Kreis mehr besteht, und nach dem Speichern MUST sie ihre Kreisangaben
+verlieren. Für das Esc gilt die Abweichung vom Gespeicherten als angefangene Figur: das erste Esc
+verwirft alle Änderungen, ein Esc ohne Änderung beendet den Modus. Nach dem Übernehmen oder
+Abbrechen MUST die Zone wieder gewählt sein.
+
+#### Scenario: Eine Ecke verschieben
+- **WHEN** im Bearbeiten-Modus einer Fläche ein Eckgriff gezogen und „Übernehmen“ getippt wird
+- **THEN** geht genau ein PATCH mit der neuen Geometrie hinaus, das Einsatztagebuch nennt „geändert“, und der Inspector zeigt die Zone wieder
+
+#### Scenario: Kreiszone punktweise geändert
+- **WHEN** an einer Kreiszone „Punkte bearbeiten“ gewählt wird
+- **THEN** sagt das Band „Danach kein Kreis mehr“, und nach „Übernehmen“ hat die Zone keinen Radius mehr
+
+#### Scenario: Minimum einer Fläche
+- **WHEN** eine Fläche drei Punkte hat und einer gewählt ist
+- **THEN** ist „Punkt entfernen“ gesperrt
+
+#### Scenario: Esc beim Bearbeiten
+- **WHEN** ein Punkt verschoben ist und Esc gedrückt wird
+- **THEN** steht die Zone wieder in der gespeicherten Form, der Modus läuft weiter, und die Quittung „Zeichnung verworfen“ erscheint
+- **WHEN** danach noch einmal Esc gedrückt wird
+- **THEN** endet der Modus ohne Änderung an der Zone
+
+### Requirement: Mitte einer Kreiszone verschieben
+Der Zonen-Inspector einer Kreiszone SHALL mit Schreibrecht „Mitte verschieben“ anbieten. Der Modus
+MUST den gespeicherten Kreis vorbelegen und die Mitte per Tipp auf die Karte, per Griff auf der
+Mitte und aus Einsatzort oder Suchnadel setzen lassen; der Radius bleibt, bis er geändert wird.
+Die Art MUST in diesem Modus feststehen. „Übernehmen“ MUST genau eine Änderung schicken, nur mit
+den geänderten Angaben; der Server MUST das Polygon um die neue Mitte mit dem Radius neu rechnen
+und im Einsatztagebuch „<Art> «Name»: Mitte um 120 m versetzt“ schreiben (mit geändertem Radius in
+derselben Zeile „Radius 300 m → 500 m · Mitte um 120 m versetzt“). Eine Mitte ohne ihr Gegenstück
+oder außerhalb WGS84 MUST mit 400, eine Mitte an einer Zone ohne Kreis oder zusammen mit einer
+Geometrie MUST mit 422 abgelehnt werden. Für das Esc gilt die Abweichung vom gespeicherten Kreis
+als angefangene Figur.
+
+#### Scenario: Mitte nach Norden versetzt
+- **WHEN** an einer Kreiszone mit 300 m die Mitte 111 m nach Norden gesetzt und „Übernehmen“ getippt wird
+- **THEN** hat die Zone den Radius 300 m um die neue Mitte, und das Einsatztagebuch nennt „Mitte um 111 m versetzt“
+
+#### Scenario: Mitte an einer Zone ohne Kreis
+- **WHEN** eine Mitte an eine Zone ohne Kreisangaben geschickt wird
+- **THEN** lehnt der Server mit 422 ab, und die Zone bleibt unverändert
+
 ### Requirement: Messen bleibt einstufig
 Das Messwerkzeug der Lagekarte SHALL weiterhin mit einem einzigen Esc enden; die Zweistufigkeit gilt
 nur für das Zeichnen speicherbarer Figuren.

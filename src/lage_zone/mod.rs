@@ -362,15 +362,44 @@ pub fn etb_text_kreis_eingerichtet(typ: &str, label: Option<&str>, radius_m: f64
 
 /// ETB-Wortlaut einer Radiusänderung: „Absperrbereich «Nord»: Radius 300 m → 500 m“.
 pub fn etb_text_radius(typ: &str, label: Option<&str>, alt_m: f64, neu_m: f64) -> String {
+    etb_text_kreis_geaendert(typ, label, Some((alt_m, neu_m)), None)
+}
+
+/// ETB-Wortlaut einer Kreisänderung (LLH-1344, design.md D1): Radius „alt → neu“ und/oder
+/// „Mitte um 120 m versetzt“, beides in EINER Zeile („…: Radius 300 m → 500 m · Mitte um 120 m
+/// versetzt“). Ohne Label steht nur das Typwort vor dem Doppelpunkt.
+pub fn etb_text_kreis_geaendert(
+    typ: &str,
+    label: Option<&str>,
+    radius: Option<(f64, f64)>,
+    mitte_versatz_m: Option<f64>,
+) -> String {
     let wer = match label {
         Some(l) => format!("{} «{}»", typ_label(typ), l),
         None => typ_label(typ).to_string(),
     };
-    format!(
-        "{wer}: Radius {} → {}",
-        format_meter(alt_m),
-        format_meter(neu_m)
-    )
+    let mut teile = Vec::new();
+    if let Some((alt, neu)) = radius {
+        teile.push(format!(
+            "Radius {} → {}",
+            format_meter(alt),
+            format_meter(neu)
+        ));
+    }
+    if let Some(v) = mitte_versatz_m {
+        teile.push(format!("Mitte um {} versetzt", format_meter(v)));
+    }
+    format!("{wer}: {}", teile.join(" · "))
+}
+
+/// Großkreisabstand (Haversine) zweier WGS84-Punkte in Metern, auf derselben Kugel wie
+/// [`kreis_polygon`]. Trägt den Versatz der Mitte im ETB.
+pub fn grosskreis_m(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
+    let dp = (lat2 - lat1).to_radians();
+    let dl = (lon2 - lon1).to_radians();
+    let a = (dp / 2.0).sin().powi(2) + p1.cos() * p2.cos() * (dl / 2.0).sin().powi(2);
+    2.0 * ERD_RADIUS_M * a.sqrt().min(1.0).asin()
 }
 
 #[cfg(test)]
@@ -506,6 +535,23 @@ mod kreis_tests {
             etb_text_radius("gefahrengebiet", Some("Werk"), 1_000.0, 300.0),
             "Gefahrengebiet «Werk»: Radius 1.000 m → 300 m"
         );
+        // LLH-1344: Mitte allein und beides in einer Zeile.
+        assert_eq!(
+            etb_text_kreis_geaendert("absperrbereich", Some("Nord"), None, Some(120.4)),
+            "Absperrbereich «Nord»: Mitte um 120 m versetzt"
+        );
+        assert_eq!(
+            etb_text_kreis_geaendert("absperrbereich", None, Some((300.0, 500.0)), Some(1_234.0)),
+            "Absperrbereich: Radius 300 m → 500 m · Mitte um 1.234 m versetzt"
+        );
+    }
+
+    /// 0,001° Breite sind auf der Kugel R = 6 371 km rund 111,19 m.
+    #[test]
+    fn grosskreis_misst_einen_tausendstel_grad_breite() {
+        let d = grosskreis_m(54.0, 9.5, 54.001, 9.5);
+        assert!((d - 111.19).abs() < 0.01, "{d}");
+        assert_eq!(grosskreis_m(54.0, 9.5, 54.0, 9.5), 0.0);
     }
 }
 

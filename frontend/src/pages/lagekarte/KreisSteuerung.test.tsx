@@ -72,4 +72,35 @@ describe('KreisSteuerung', () => {
     rendere();
     expect(document.body).not.toHaveTextContent(/[Tt]ippen|[Kk]licken|ziehen Sie/);
   });
+
+  // LLH-1344, design.md D3: der Kreis einer bestehenden Zone.
+  it('bearbeiten: Art als Text, „Übernehmen“ erst mit Änderung, Esc-Kappe nur ohne', () => {
+    rendere({
+      bearbeiten: { geaendert: false },
+      mitte: { lat: 54, lon: 9.5 },
+      mitteText: '54,00000° N 9,50000° O',
+      radiusM: 300,
+    });
+    expect(screen.queryByRole('combobox', { name: 'Art' })).toBeNull();
+    expect(screen.getByText('Absperrbereich')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Abbrechen/ })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Escape',
+    );
+  });
+
+  it('bearbeiten mit Änderung: „Übernehmen“ frei, Esc verwirft erst', () => {
+    const p = rendere({
+      bearbeiten: { geaendert: true },
+      mitte: { lat: 54.001, lon: 9.5 },
+      mitteText: '54,00100° N 9,50000° O',
+      radiusM: 300,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    expect(p.onUebernehmen).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Abbrechen/ })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
+  });
 });

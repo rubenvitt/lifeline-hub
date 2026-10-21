@@ -164,6 +164,10 @@ export interface ZonenInspectorProps {
   bezirkPfad?: (bezirkId: number) => string;
   /** Zielmodul Gefahren gesperrt: „Gefahrenmatrix bearbeiten" steht gesperrt (LFH-888). */
   matrixGesperrt?: boolean;
+  /** „Punkte bearbeiten“ (LLH-1344): die Zone punktweise an der Karte ändern. */
+  onPunkteBearbeiten?: () => void;
+  /** „Mitte verschieben“ (LLH-1344), nur an einer Kreiszone. */
+  onMitteVerschieben?: () => void;
 }
 
 export default function ZonenInspector({
@@ -179,6 +183,8 @@ export default function ZonenInspector({
   evakuierungFrei = false,
   bezirkPfad,
   matrixGesperrt = false,
+  onPunkteBearbeiten,
+  onMitteVerschieben,
 }: ZonenInspectorProps) {
   const { token } = theme.useToken();
   const gebietId = useId();
@@ -381,6 +387,23 @@ export default function ZonenInspector({
             onBlur={radiusSpeichern}
             onPressEnter={radiusSpeichern}
           />
+        )}
+
+        {/* Bearbeiten an der Karte (LLH-1344): beide Wege starten einen Kartenmodus und schließen
+            den Inspector; danach steht die Zone wieder hier. */}
+        {darfSchreiben && (onPunkteBearbeiten || (kreis && onMitteVerschieben)) && (
+          <Space wrap data-lfh="zone-bearbeiten">
+            {kreis && onMitteVerschieben && (
+              <Button disabled={gesperrt} onClick={onMitteVerschieben}>
+                Mitte verschieben
+              </Button>
+            )}
+            {onPunkteBearbeiten && (
+              <Button disabled={gesperrt} onClick={onPunkteBearbeiten}>
+                Punkte bearbeiten
+              </Button>
+            )}
+          </Space>
         )}
 
         <Input
