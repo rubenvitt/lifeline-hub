@@ -507,7 +507,7 @@ describe('VerpflegungPage (LFH-634)', () => {
         }),
       ]);
       renderPage();
-      expect(await screen.findByText('Nachforderung: Feldküche')).toBeInTheDocument();
+      expect(await screen.findByText('Nachforderung: Verpflegung — Feldküche')).toBeInTheDocument();
     });
 
     it('Modul ausgeblendet: keine Anfrage, kein „Nachfordern", nur „Nachforderung #n"', async () => {

@@ -18,6 +18,7 @@ import NachforderungKarte, {
   type StellenVerweis,
   type UebernahmePosten,
 } from './NachforderungKarte';
+import type { ZielNamen } from './zielVorschlaege';
 import {
   EINGETROFFEN_STUNDEN,
   STUFEN,
@@ -67,6 +68,7 @@ export interface BoardKartenProps {
   /** Die Karte, deren Fortschaltung gerade läuft (Knopf im Ladezustand). */
   laeuftId?: number | null;
   stellenJeId?: ReadonlyMap<number, StellenVerweis> | null;
+  zielNamen?: ZielNamen | null;
 }
 
 interface NachforderungBoardProps {
@@ -204,6 +206,7 @@ export default function NachforderungBoard({
           hervorgehoben={n.id === karten.hervorgehobenId}
           laeuft={n.id === karten.laeuftId}
           stellenJeId={karten.stellenJeId}
+          zielNamen={karten.zielNamen}
         />
       ))}
     </div>

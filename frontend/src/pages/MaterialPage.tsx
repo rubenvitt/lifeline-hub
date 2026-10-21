@@ -74,6 +74,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import EntlassenBlock from '../kraefte/EntlassenBlock';
 import { useNewGesture } from './einsatzabschnitte/useNewGesture';
+import { nachforderungName } from '../nachforderungen/nachforderungName';
 
 /**
  * Die Farbentscheidung für den Materialstatus liegt in `theme/statusFarben.ts` (`materialStatus`).
@@ -248,7 +249,7 @@ export default function MaterialPage() {
   const nachforderungNamen = useMemo(
     () =>
       nachforderungenFrei && !nachforderungenQuery.isError
-        ? new Map((nachforderungenQuery.data ?? []).map((n) => [n.id, n.bezeichnung]))
+        ? new Map((nachforderungenQuery.data ?? []).map((n) => [n.id, nachforderungName(n)]))
         : new Map<number, string>(),
     [nachforderungenFrei, nachforderungenQuery.isError, nachforderungenQuery.data],
   );
