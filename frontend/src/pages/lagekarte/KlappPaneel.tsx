@@ -1,13 +1,14 @@
 import { IconChevronRechts, IconChevronRunter } from '../../icons';
-import { useCallback, useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { useId, type CSSProperties, type ReactNode } from 'react';
 import { augenbraueStil, monoStil, paneelKopfStil, useRollen } from '../../components/instrument';
-import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * Abschnitt der rechten Kartenleiste, zwei Formen desselben Kopfes:
  * - fest (`LeistenAbschnitt`): der Kopf des Ebenenbaums (Kartenansicht), nicht wegklappbar.
  * - einklappbar (`KlappPaneel`): die Gruppen des Ebenenbaums (`Ebenenbaum.tsx`) und der
- *   Objektliste (`MarkerSuche.tsx`) sowie das Paneel „Zeichnen“ der Ansicht „Objekte“.
+ *   Objektliste (`MarkerSuche.tsx`). Ihren Klappzustand merken sie selbst (`useBaumKlapp`,
+ *   `useObjektKlapp`); das Paneel „Zeichnen“ und sein Schlüssel `lfh:lagekarte:paneele` sind mit
+ *   dem Werkzeugmenü an der Karte entfallen (LLH-1038).
  *
  * Kein `Paneel` aus `components/instrument`: dessen Rahmen umläuft alle vier Seiten, gestapelt
  * stünden die Linien doppelt. Kopf und Augenbraue sind dieselben (`paneelKopfStil`,
@@ -163,53 +164,4 @@ export function KlappPaneel({
       )}
     </section>
   );
-}
-
-/** Kennungen der einklappbaren Paneele — die Vorgabe ihres Zustands steht daneben. */
-type PaneelKennung = 'zeichnen';
-
-/**
- * Vorgabe: offen — Zeichnen wird im Einsatz laufend gebraucht. Ebenenbaum und Objektliste merken
- * ihren Klappzustand selbst (`useBaumKlapp`, `useObjektKlapp`); ältere Einträge dieses Schlüssels
- * (die Paneele „Nicht verortet“, „Einsatzort“, „Verortet“ bis LLH-1033) übergeht `paneeleLesen`.
- */
-export const PANEEL_VORGABE: Record<PaneelKennung, boolean> = {
-  zeichnen: true,
-};
-
-const SPEICHER_SCHLUESSEL = 'lfh:lagekarte:paneele';
-
-/** Gespeicherte Wahl lesen — ungültige oder fehlende Einträge fallen auf die Vorgabe. */
-export function paneeleLesen(roh: string | null): Record<PaneelKennung, boolean> {
-  const zustand = { ...PANEEL_VORGABE };
-  if (!roh) return zustand;
-  try {
-    const gelesen = JSON.parse(roh) as Record<string, unknown>;
-    for (const k of Object.keys(PANEEL_VORGABE) as PaneelKennung[]) {
-      if (typeof gelesen[k] === 'boolean') zustand[k] = gelesen[k];
-    }
-  } catch {
-    // Kaputter Eintrag: Vorgabe. Die Leiste darf an einer Bequemlichkeit nicht scheitern.
-  }
-  return zustand;
-}
-
-/**
- * Offen/zu je Paneel, pro Gerät gemerkt — eine Bequemlichkeit, deshalb `localStorage` mit
- * abgesicherten Zugriffen.
- */
-export function usePaneelZustand() {
-  const [zustand, setZustand] = useState<Record<PaneelKennung, boolean>>(() =>
-    paneeleLesen(sicherLesen(SPEICHER_SCHLUESSEL)),
-  );
-  const setze = useCallback((kennung: PaneelKennung, offen: boolean) => {
-    setZustand((alt) => {
-      if (alt[kennung] === offen) return alt;
-      const neu = { ...alt, [kennung]: offen };
-      // Kein Speicher (privates Fenster): der Zustand gilt dann nur bis zum Neuladen.
-      sicherSchreiben(SPEICHER_SCHLUESSEL, JSON.stringify(neu));
-      return neu;
-    });
-  }, []);
-  return { zustand, setze };
 }

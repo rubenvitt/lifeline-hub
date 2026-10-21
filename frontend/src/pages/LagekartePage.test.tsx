@@ -303,6 +303,7 @@ const LAGEMELDUNG_VERORTET = {
   lon: 8.7,
   erstellt_von_id: 1,
   erstellt_at: '2026-06-12 09:00:00',
+  ereigniszeit: '2026-06-12 08:30:00',
   meldung_lfd_nr: 5,
   meldung_absender: 'Florian Nord 1',
 };
@@ -458,8 +459,8 @@ function basisHandler(
 
 /**
  * Die Leiste mit der Ansicht „Objekte“ vorn (LLH-1028) — gemerkt wie nach einem Tipp aufs Segment.
- * Ohne gemerkte Wahl steht „Ebenen“ vorn; Objektliste und Zeichnen liegen in „Objekte“. Die
- * Gruppen der Objektliste stehen ohne Begriff zu (LLH-1033); die Blöcke hier prüfen ihre Zeilen.
+ * Ohne gemerkte Wahl steht „Ebenen“ vorn; die Objektliste liegt in „Objekte“. Die Gruppen der
+ * Objektliste stehen ohne Begriff zu (LLH-1033); die Blöcke hier prüfen ihre Zeilen.
  */
 function objekteVorn() {
   localStorage.setItem('lfh:lagekarte:leiste-ansicht', 'objekte');
@@ -467,6 +468,16 @@ function objekteVorn() {
     'lfh:lagekarte:objekte-gruppen',
     JSON.stringify(Object.fromEntries(OBJEKT_GRUPPEN.map((g) => [g.typ, true]))),
   );
+}
+
+/**
+ * Startet einen Eintrag des Werkzeugmenüs an der Karte (LLH-1038): Knopf „Zeichenwerkzeuge“, dann
+ * der Eintrag (Typname für die Vorgabeform, „<Typ> als Kreis“ usw.).
+ */
+async function waehleWerkzeug(user: ReturnType<typeof userEvent.setup>, eintrag: string) {
+  await user.click(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' }));
+  const menue = await screen.findByRole('dialog', { name: 'Zeichenwerkzeuge' });
+  await user.click(within(menue).getByRole('button', { name: eintrag }));
 }
 
 /** Die Zeile der Objektliste mit diesem Namen (samt Zeilenaktion). */
@@ -479,6 +490,29 @@ async function objektZeile(name: string): Promise<HTMLElement> {
 /** Die Gruppe „Betroffene & Versorgung“ des Ebenenbaums offen (Vorgabe: zu). */
 function betroffeneOffen() {
   localStorage.setItem('lfh:lagekarte:ebenen-gruppen', JSON.stringify({ betroffene: true }));
+}
+
+/** Ein gesicherter Stand für die Auswahl „Stand“ der Zeitachse. */
+const STAND_A = {
+  id: 3,
+  einsatz_id: 1,
+  bezeichnung: 'Stand A',
+  notiz: null,
+  stand_at: '2026-07-24 08:00:00',
+  schema_version: 1,
+  erstellt_von: 1,
+  erstellt_at: '2026-07-24 08:00:00',
+};
+
+/** Option der Auswahl „Stand“ (Zeitachse) im offenen Dropdown. */
+function standOption(titel: string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const o = document.querySelector<HTMLElement>(
+      `.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option[title="${titel}"]`,
+    );
+    expect(o).not.toBeNull();
+    return o!;
+  });
 }
 
 function renderSeite(route = '/einsaetze/1/lagekarte') {
@@ -1256,7 +1290,7 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
@@ -1288,7 +1322,7 @@ describe('LagekartePage', () => {
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    await waehleWerkzeug(user, 'Absperrgrenze');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
@@ -2045,7 +2079,7 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     expect(await screen.findByText('Gefahrengebiet · Fläche')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument();
@@ -2056,7 +2090,7 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Verwerfen' })).toBeInTheDocument();
@@ -2068,7 +2102,7 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(spy.count()).toBe(1));
@@ -2080,7 +2114,7 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Verwerfen' }));
     expect(spy.count()).toBe(0);
@@ -2094,7 +2128,7 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByRole('button', { name: 'Abbrechen' }));
     expect(spy.count()).toBe(0);
     await waitFor(() =>
@@ -2109,11 +2143,11 @@ describe('LFH-145: Zeichnen-Abschluss + Bestätigung', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
 
-    await user.click(await screen.findByRole('button', { name: 'Absperrgrenze zeichnen' }));
+    await waehleWerkzeug(user, 'Absperrgrenze');
     // Zurück in Phase „zeichnen" für den neuen Entwurf, keine hängende Bestätigung.
     expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
     expect(await screen.findByText('Absperrgrenze · Linie')).toBeInTheDocument();
@@ -2242,24 +2276,140 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(screen.getByRole('button', { name: 'Zurück zu Objekte' })).toBeInTheDocument();
   });
 
-  it('der Zeichnen-Knopf über der Karte öffnet die Zeichenwerkzeuge der Leiste', async () => {
-    localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ zeichnen: false }));
+  // LLH-1038: der Knopf öffnet das Werkzeugmenü an der Karte; die Leiste bleibt, wie sie ist.
+  it('„Zeichenwerkzeuge“ öffnet das Werkzeugmenü an der Karte und lässt die Leiste stehen', async () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    expect(
-      screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).not.toBeInTheDocument();
-    // Ohne gemerkte Wahl stehen die Ebenen vorn; das Paneel „Zeichnen“ liegt in „Objekte“.
     expect(screen.getByRole('tab', { name: 'Ebenen' })).toHaveAttribute('aria-selected', 'true');
+    const knopf = screen.getByRole('button', { name: 'Zeichenwerkzeuge' });
+    await user.click(knopf);
+    const menue = await screen.findByRole('dialog', { name: 'Zeichenwerkzeuge' });
+    // Im Kartenfuß, nicht in der Leiste.
+    expect(menue.closest('[data-lfh="karten-fuss"]')).not.toBeNull();
+    expect(menue.closest('#lagekarte-leiste')).toBeNull();
+    expect(knopf).toHaveAttribute('aria-expanded', 'true');
+    expect(knopf).toHaveAttribute('aria-controls', menue.id);
+    expect(screen.getByRole('tab', { name: 'Ebenen' })).toHaveAttribute('aria-selected', 'true');
+    expect(localStorage.getItem('lfh:lagekarte:leiste-ansicht')).toBeNull();
+    // Messen steht nicht im Menü — es bleibt der eigene Knopf.
+    expect(within(menue).queryByRole('button', { name: /Mess/ })).toBeNull();
+    // Ein zweiter Tipp auf den Knopf klappt es zu.
+    await user.click(knopf);
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('ein Eintrag startet den Modus und schließt das Menü', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await waehleWerkzeug(user, 'Absperrbereich');
+    expect(await screen.findByText('Absperrbereich · Fläche')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
+  });
+
+  it('der Kreis einer Flächenart startet das Kreis-Band', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await waehleWerkzeug(user, 'Absperrbereich als Kreis');
+    expect(await screen.findByRole('spinbutton', { name: /Radius/ })).toBeInTheDocument();
+  });
+
+  // Spec `lagekarte-zeichnen`, „Das Werkzeugmenü hängt am Knopf“: Esc schließt nur das Menü.
+  it('Esc schließt das Menü und lässt den laufenden Zeichenmodus stehen', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await waehleWerkzeug(user, 'Gefahrengebiet');
+    expect(await screen.findByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
-    expect(
-      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Objekte' })).toHaveAttribute('aria-selected', 'true');
-    // Gemerkt wie ein Tipp aufs Segment (LLH-1028).
-    expect(localStorage.getItem('lfh:lagekarte:leiste-ansicht')).toBe('objekte');
+    expect(await screen.findByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
+    // Der Modus läuft weiter; erst das nächste Esc (ohne Figur) beendet ihn.
+    expect(screen.getByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('„Weitere …“ öffnet den Picker als Dialog; „Platzieren“ startet das Zeichen', async () => {
+    setzeViewportBreite(1440);
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await waehleWerkzeug(user, 'Weitere …');
+    // Die Seite trägt mehr Overlays als der Einzeltest; antd setzt dabei `aria-hidden` an Hüllen,
+    // deshalb über die Modal-Klasse statt über die Rolle (wie „Zeichen hier setzen“).
+    const dialog = await waitFor(() => {
+      const el = [...document.querySelectorAll<HTMLElement>('.ant-modal')].find((m) =>
+        m.textContent?.includes('Taktisches Zeichen'),
+      );
+      expect(el).toBeDefined();
+      return el!;
+    });
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
+    await user.click(within(dialog).getByRole('button', { name: 'Platzieren', hidden: true }));
+    await waitFor(() => expect(dialog).toHaveClass('ant-zoom-leave'));
+    // Ab `lg` steht die Bedienung des Zeichens im Modus-Band der Leiste.
+    expect(await screen.findByRole('switch', { name: 'Weitere platzieren' })).toBeInTheDocument();
+    // Das Menü zeigt danach nur den Zustand.
+    await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
+    const menue = await screen.findByRole('dialog', { name: 'Zeichenwerkzeuge' });
+    expect(within(menue).getByText('wird platziert')).toBeInTheDocument();
+    expect(within(menue).queryByRole('button', { name: 'Weitere …' })).toBeNull();
+  });
+
+  it('ohne Schreibrecht: kein Knopf „Zeichenwerkzeuge“, „Messen“ steht da', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
+      ),
+    ]);
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    expect(screen.getByRole('button', { name: 'Messen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Zeichenwerkzeuge' })).toBeNull();
+  });
+
+  it('ein gesicherter Stand schließt das Werkzeugmenü; zurück in Live bleibt es zu', async () => {
+    // Ohne `pointerdown` (nur `mouseDown`/`click`): ein Druck neben das Menü schlösse es ohnehin.
+    localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
+    basisHandler([
+      http.get('/api/einsaetze/1/lage-snapshots', () => HttpResponse.json([STAND_A])),
+      // Der Stand trägt nur den Einsatz: genug für die Zeitachse, die zurück in Live führt.
+      http.get('/api/einsaetze/1/lage-snapshots/3', () =>
+        HttpResponse.json({ ...STAND_A, daten: { einsatz: EINSATZ } }),
+      ),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await screen.findByText('marker-schaden-9');
+    await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
+    expect(screen.getByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
+
+    fireEvent.mouseDown(await screen.findByRole('combobox', { name: 'Stand' }));
+    fireEvent.click(await standOption('Stand A'));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Zeichenwerkzeuge' })).toBeNull(),
+    );
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
+
+    // Zurück per Klick: das Menü ist schon zu.
+    await user.click(await screen.findByRole('combobox', { name: 'Stand' }));
+    await user.click(await standOption('Live'));
+    const knopf = await screen.findByRole('button', { name: 'Zeichenwerkzeuge' });
+    expect(knopf).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
   });
 
   it('die Ansicht der Leiste wechselt per Segment und bleibt nach dem Neuladen (LLH-1028)', async () => {
@@ -2287,24 +2437,24 @@ describe('LagekartePage · Neuentwurf S5', () => {
     'Werkzeugwahl bei $breite px: Leiste bleibt = $leisteBleibt',
     async ({ breite, leisteBleibt }) => {
       setzeViewportBreite(breite);
+      // Unter `lg` ist die Leiste per Vorgabe zu; offen gemerkt, damit die Freigabe zu sehen ist.
+      localStorage.setItem('lfh:lagekarte:leiste-offen:unter-lg', '1');
       basisHandler();
       const user = userEvent.setup();
       renderSeite();
       await screen.findByText('marker-schaden-9');
-      await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
-      await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+      const leiste = () => screen.queryByRole('tablist', { name: 'Ansicht der Leiste' });
+      await waehleWerkzeug(user, 'Gefahrengebiet');
       // Der Zeichenmodus läuft in beiden Fällen.
       expect(await screen.findByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
       if (leisteBleibt) {
-        expect(screen.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeInTheDocument();
+        expect(leiste()).toBeInTheDocument();
       } else {
-        expect(
-          screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-        ).not.toBeInTheDocument();
+        expect(leiste()).not.toBeInTheDocument();
         // Und sie lässt sich zurückholen — eigene Wahl, kein Sperrzustand.
         await user.click(screen.getByRole('button', { name: 'Leiste einblenden' }));
         expect(
-          await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
+          await screen.findByRole('tablist', { name: 'Ansicht der Leiste' }),
         ).toBeInTheDocument();
       }
     },
@@ -2319,15 +2469,14 @@ describe('LagekartePage · Neuentwurf S5', () => {
     objekteVorn();
     renderSeite();
     await screen.findByText('marker-schaden-9');
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     expect(await screen.findByRole('button', { name: 'Abschließen' })).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: 'Ansicht der Leiste' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(
-      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Objekte' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
     expect(screen.getByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
   });
 
@@ -2345,9 +2494,9 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(await screen.findByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
   });
 
-  // Der Stift während eines Modus: holt die Leiste nur für den Modus zurück. Ein `zeige()` hier bliebe
-  // im Modus wirkungslos und öffnete die Leiste erst nach dem Modus (Review LFH-765).
-  it('Stift während Messen bei 390 px: Leiste nur für den Modus offen (LFH-765)', async () => {
+  // Der Stift während eines Modus öffnet das Menü an der Karte; die Leiste bleibt im Modus zu
+  // (LFH-765) — bis LLH-1038 holte er sie für den Modus zurück.
+  it('Stift während Messen bei 390 px: Menü an der Karte, Leiste bleibt zu (LFH-765)', async () => {
     setzeViewportBreite(390);
     basisHandler();
     const user = userEvent.setup();
@@ -2356,9 +2505,12 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(screen.getByRole('button', { name: 'Leiste einblenden' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Messen' }));
     await user.click(screen.getByRole('button', { name: 'Zeichenwerkzeuge' }));
-    expect(await screen.findByRole('button', { name: 'Leiste ausblenden' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Beenden' }));
-    expect(await screen.findByRole('button', { name: 'Leiste einblenden' })).toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leiste einblenden' })).toBeInTheDocument();
+    // Esc schließt erst das Menü; das Messen läuft weiter.
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Zeichenwerkzeuge' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Beenden' })).toBeInTheDocument();
   });
 
   it('hängt die Maßstabsleiste als Band in den Kartenfuß, nicht frei über die Karte', async () => {
@@ -2755,7 +2907,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     const zurueck = await screen.findByRole('button', { name: 'Letzten Punkt zurück' });
     expect(zurueck).toBeDisabled();
     expect(screen.getByText('0 Punkte')).toBeInTheDocument();
@@ -2774,7 +2926,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('stand-3'));
     // Fokus auf einem Knopf der Steuerung, nicht auf der Karte: die Taste wirkt trotzdem.
     screen.getByRole('button', { name: 'Letzten Punkt zurück' }).focus();
@@ -2801,7 +2953,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     expect(await screen.findByRole('button', { name: 'Speichern' })).toBeInTheDocument();
 
@@ -2817,7 +2969,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('stand-3'));
     // Ein offenes antd-Menü schließt über einen eigenen window-keydown ohne preventDefault —
     // nachgestellt als sichtbares Dropdown im Portal.
@@ -2835,7 +2987,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('stand-3'));
     fireEvent.keyDown(window, { key: 'Escape' });
     fireEvent.keyDown(window, { key: 'Escape', repeat: true });
@@ -2848,7 +3000,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('stand-3'));
     const feld = document.createElement('input');
     document.body.appendChild(feld);
@@ -2864,7 +3016,7 @@ describe('LFH-712: Letzten Punkt zurück und zweistufiges Esc', () => {
     basisHandler([spy.handler]);
     const user = userEvent.setup();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     expect(await screen.findByText('1 gespeichert')).toBeInTheDocument();
@@ -3026,10 +3178,8 @@ describe('LFH-825: Zeichnen per Link', () => {
     await waitFor(() =>
       expect(screen.getByTestId('location-search')).not.toHaveTextContent('zeichnen'),
     );
-    // Die Seite steht: das Paneel ist da, der Modus nicht.
-    expect(
-      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).toBeInTheDocument();
+    // Die Seite steht: der Knopf „Zeichenwerkzeuge“ ist da, der Modus nicht.
+    expect(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
   });
 
@@ -3177,16 +3327,17 @@ describe('LLH-1043: Kreis', () => {
     await waitFor(() => expect(document.querySelector('[data-lfh="kreis-steuerung"]')).toBeNull());
   });
 
-  it('das Paneel startet den Kreis je Flächentyp, die Absperrgrenze hat keinen', async () => {
+  it('das Werkzeugmenü startet den Kreis je Flächentyp, die Absperrgrenze hat keinen', async () => {
     basisHandler();
-    objekteVorn();
     const user = userEvent.setup();
     renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' }));
+    const menue = await screen.findByRole('dialog', { name: 'Zeichenwerkzeuge' });
     expect(
-      await screen.findByRole('button', { name: 'Absperrbereich als Kreis' }),
+      within(menue).getByRole('button', { name: 'Absperrbereich als Kreis' }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Absperrgrenze als Kreis' })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Gefahrengebiet als Kreis' }));
+    expect(within(menue).queryByRole('button', { name: 'Absperrgrenze als Kreis' })).toBeNull();
+    await user.click(within(menue).getByRole('button', { name: 'Gefahrengebiet als Kreis' }));
     await waitFor(() =>
       expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull(),
     );
@@ -3379,13 +3530,9 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     ['Bezug ohne Auftrag', 'bezirk=5'],
   ])('%s: kein Zeichenmodus, beide Parameter geräumt', async (_fall, query) => {
     basisHandler([mitBezirken()]);
-    // „Gefahrengebiet zeichnen“ steht in der Ansicht „Objekte“ (LLH-1028).
-    objekteVorn();
     renderSeiteMitSonde(`/einsaetze/1/lagekarte?${query}`);
     await geraeumt();
-    expect(
-      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
     expect(screen.queryByText(/· Fläche$/)).not.toBeInTheDocument();
   });
@@ -3413,9 +3560,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     objekteVorn();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
     await geraeumt();
-    expect(
-      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
     expect(screen.queryByText('Bezirk Uferstraße 12–40 · Fläche')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
   });
@@ -3433,9 +3578,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     ]);
     objekteVorn();
     renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
-    expect(
-      await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Zeichenwerkzeuge' })).toBeInTheDocument();
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));
     });
@@ -3471,7 +3614,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
 
@@ -3479,7 +3622,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
     expect(hinweis()).toHaveTextContent('Zone nicht angelegt');
     expect(toasts()).toBe(0);
 
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(versuch).toBe(2));
@@ -3761,7 +3904,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
-    await user.click(await screen.findByRole('button', { name: 'Gefahrengebiet zeichnen' }));
+    await waehleWerkzeug(user, 'Gefahrengebiet');
     await user.click(await screen.findByText('zone-fertig'));
     await user.click(await screen.findByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(hinweis()).toHaveTextContent('Geometrie ungültig'));

@@ -833,8 +833,8 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
           'nicht verortet',
         );
         await expect(
-          leiste.locator('section[data-paneel="zeichnen"]'),
-          `${lauf}: Vorbedingung: ohne Schreibrecht kein Zeichnen-Paneel`,
+          page.getByRole('button', { name: 'Zeichenwerkzeuge', exact: true }),
+          `${lauf}: Vorbedingung: ohne Schreibrecht kein Knopf „Zeichenwerkzeuge“`,
         ).toHaveCount(0);
         // Der Admin trägt hier „Platzieren" am unverorteten Einsatzort.
         await expect(

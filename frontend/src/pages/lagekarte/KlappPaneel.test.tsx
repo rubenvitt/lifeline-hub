@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen } from '@testing-library/react';
 import { renderMitProviders } from '../../test/utils';
 import { dichten } from '../../theme/tokens';
-import { KlappPaneel, PANEEL_VORGABE, klappKopfStil, paneeleLesen } from './KlappPaneel';
+import { KlappPaneel, klappKopfStil } from './KlappPaneel';
 
 describe('KlappPaneel', () => {
   it('trägt den Zustand als aria-expanded und rendert den Körper nur offen', () => {
@@ -77,31 +77,5 @@ describe('klappKopfStil', () => {
     expect(klappKopfStil(tokenFuer('kompakt')).minHeight).toBe(30);
     expect(klappKopfStil(tokenFuer('komfortabel')).minHeight).toBe(48);
     expect(klappKopfStil(tokenFuer('handschuh')).minHeight).toBe(72);
-  });
-});
-
-describe('paneeleLesen', () => {
-  it('fällt ohne oder bei kaputtem Eintrag auf die Vorgabe', () => {
-    expect(paneeleLesen(null)).toEqual(PANEEL_VORGABE);
-    expect(paneeleLesen('{kaputt')).toEqual(PANEEL_VORGABE);
-  });
-
-  it('übernimmt nur gültige Einträge bekannter Paneele', () => {
-    expect(paneeleLesen(JSON.stringify({ zeichnen: false })).zeichnen).toBe(false);
-    const z = paneeleLesen(JSON.stringify({ zeichnen: 'ja', fremd: true }));
-    expect(z.zeichnen).toBe(PANEEL_VORGABE.zeichnen);
-    expect('fremd' in z).toBe(false);
-  });
-
-  it('übergeht Einträge der Paneele, die in der Objektliste aufgegangen sind (LLH-1033)', () => {
-    const z = paneeleLesen(
-      JSON.stringify({ nichtVerortet: false, einsatzort: false, verortet: false }),
-    );
-    expect(z).toEqual(PANEEL_VORGABE);
-  });
-
-  it('übergeht Einträge der Paneele, die in den Ebenenbaum gezogen sind (LLH-1028)', () => {
-    const z = paneeleLesen(JSON.stringify({ bilder: true, fachebenen: true, ansicht: false }));
-    expect(z).toEqual(PANEEL_VORGABE);
   });
 });

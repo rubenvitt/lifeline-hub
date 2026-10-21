@@ -6,6 +6,7 @@ import { taktischeDtgVoll } from '../anzeige/format';
 import { useRollen } from '../components/instrument';
 import { loadAbschnittTexte } from './startinhalt';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
+import { standFeld } from './standFeld';
 
 /** Beschriftung — exportiert, damit Tests sie nicht nachschreiben. */
 export const LEERE_FUELLEN = 'Leere Abschnitte aus dem Lagebild füllen';
@@ -62,9 +63,11 @@ export default function LeereAbschnitteFuellen({
         dtg: (iso) => taktischeDtgVoll(iso, konventionen),
       });
       let gesetzt = false;
-      for (const { schluessel, text } of texte) {
+      for (const { schluessel, text, uebernommen_at } of texte) {
         if (!isLeer(form.getFieldValue(schluessel))) continue;
         form.setFieldValue(schluessel, text);
+        // Der Stand der Übernahme (LLH-1357) kommt mit dem Text aus `loadAbschnittTexte`.
+        form.setFieldValue(standFeld(schluessel), uebernommen_at);
         gesetzt = true;
       }
       if (gesetzt) onGeaendert();

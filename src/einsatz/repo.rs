@@ -304,7 +304,7 @@ pub async fn fuehrungsstelle_von(
 }
 
 /// Vorbelegungstext aus Code und Text einer Führungsstelle (LFH-549).
-fn vorbelegung(
+pub(crate) fn vorbelegung(
     karte: &crate::fuehrung::Labelkarte,
     code: Option<&str>,
     text: Option<String>,

@@ -532,3 +532,164 @@ async fn einsatzfuehrung_laesst_einsatzleitung_ohne_org_rolle_lesen_und_schreibe
     let (status, _) = anfrage(&app, "GET", &pfad, &berta, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
 }
+
+/// Der Abschnitt mit diesem Schlüssel aus einer Anzeige.
+fn abschnitt<'a>(lb: &'a Value, schluessel: &str) -> &'a Value {
+    lb["abschnitte"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|a| a["schluessel"] == schluessel)
+        .unwrap_or_else(|| panic!("Abschnitt {schluessel} fehlt: {lb:?}"))
+}
+
+/// LLH-1357: Der Stand der Übernahme reist im Abschnitt mit; der Server bringt ihn ins
+/// Wire-Format und verwirft ihn an einem leeren Abschnitt.
+#[tokio::test]
+async fn patch_speichert_den_stand_der_uebernahme_je_abschnitt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, lb) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        Some(r#"{"vorlage":"lagebericht","titel":"Lage"}"#),
+    )
+    .await;
+    let lid = lb["id"].as_i64().unwrap();
+    // Ohne Übernahme trägt kein Abschnitt einen Stand.
+    assert!(abschnitt(&lb, "eigene_lage")
+        .get("uebernommen_at")
+        .is_none());
+
+    let (s, lb) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/lageberichte/{lid}"),
+        &admin,
+        Some(
+            r#"{"abschnitte":[
+                {"schluessel":"eigene_lage","text":"Stand: 211030okt26","uebernommen_at":"2026-10-21T10:30:00Z"},
+                {"schluessel":"medienlage","text":"  ","uebernommen_at":"2026-10-21 10:31:00"},
+                {"schluessel":"auftrag","text":"Von Hand"}
+            ]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{lb:?}");
+    assert_eq!(
+        abschnitt(&lb, "eigene_lage")["uebernommen_at"],
+        "2026-10-21 10:30:00"
+    );
+    // Ein leerer Abschnitt trägt keinen Stand, ein Abschnitt von Hand keinen.
+    assert!(abschnitt(&lb, "medienlage").get("uebernommen_at").is_none());
+    assert!(abschnitt(&lb, "auftrag").get("uebernommen_at").is_none());
+
+    // Derselbe Stand nach dem Neuladen.
+    let (_, gelesen) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lageberichte/{lid}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(
+        abschnitt(&gelesen, "eigene_lage")["uebernommen_at"],
+        "2026-10-21 10:30:00"
+    );
+}
+
+#[tokio::test]
+async fn unlesbarer_stand_der_uebernahme_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/lageberichte");
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(
+            r#"{"vorlage":"lagebericht","titel":"Lage","abschnitte":[{"schluessel":"eigene_lage","text":"x","uebernommen_at":"gestern"}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (_, lb) = anfrage(
+        &app,
+        "POST",
+        &pfad,
+        &admin,
+        Some(r#"{"vorlage":"lagebericht","titel":"Lage"}"#),
+    )
+    .await;
+    let lid = lb["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("{pfad}/{lid}"),
+        &admin,
+        Some(
+            r#"{"abschnitte":[{"schluessel":"eigene_lage","text":"x","uebernommen_at":"gestern"}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+}
+
+/// LLH-1357, Akzeptanzkriterium: Fortschreiben übernimmt den Stand der Vorfassung; der Startinhalt
+/// trägt ihn vom Anlegen an.
+#[tokio::test]
+async fn fortschreiben_uebernimmt_den_stand_der_vorfassung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, lb) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte"),
+        &admin,
+        Some(
+            r#"{"vorlage":"lagebericht","titel":"Lage","abschnitte":[
+                {"schluessel":"eigene_lage","text":"Stand: 211030okt26","uebernommen_at":"2026-10-21T12:30:00+02:00"},
+                {"schluessel":"zusammenfassung","text":"Von Hand"}
+            ]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{lb:?}");
+    assert_eq!(
+        abschnitt(&lb, "eigene_lage")["uebernommen_at"],
+        "2026-10-21 10:30:00"
+    );
+    let lid = lb["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte/{lid}/freigeben"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, fort) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/lageberichte/{lid}/fortschreiben"),
+        &admin,
+        Some(r#"{}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{fort:?}");
+    assert_eq!(
+        abschnitt(&fort, "eigene_lage")["uebernommen_at"],
+        "2026-10-21 10:30:00"
+    );
+    assert!(abschnitt(&fort, "zusammenfassung")
+        .get("uebernommen_at")
+        .is_none());
+}

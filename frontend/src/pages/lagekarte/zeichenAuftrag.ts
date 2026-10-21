@@ -3,14 +3,14 @@ import type { ZoneEntwurf } from './useKartenInteraktion';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
 
 /**
- * Übersetzt einen Zeichnen-Auftrag aus `?zeichnen=` (LFH-825) in den Entwurf, den der Knopf des
- * Typs im Zeichnen-Paneel starten würde — Geometrie aus `ZONE_TYPEN`, eine Wahrheit mit dem
- * Paneel. `null` heißt: nicht zeichnen, nur räumen.
+ * Übersetzt einen Zeichnen-Auftrag aus `?zeichnen=` (LFH-825) in den Entwurf, den der Hauptknopf des
+ * Typs im Werkzeugmenü startet (`werkzeugZeilen`) — Geometrie aus `ZONE_TYPEN`, eine Wahrheit mit
+ * dem Menü. `null` heißt: nicht zeichnen, nur räumen.
  *
  * - Typ mit fester Geometrie: eine passende Form ist erlaubt, eine abweichende macht den Auftrag
  *   ungültig (eine Absperrgrenze als Fläche wird nicht still umgedeutet).
- * - Typ mit `beides`: die Form wählt, ohne Form gilt die Fläche (erster Knopf im Paneel), Farbe
- *   wie im Paneel.
+ * - Typ mit `beides`: die Form wählt, ohne Form gilt die Fläche (Hauptknopf im Menü), Farbe
+ *   wie im Menü.
  * - Form `kreis` (LLH-1043): jeder Typ mit Fläche; Radius und Mitte des Auftrags belegen den
  *   Kreis vor. Eine Linie wird kein Kreis.
  * - Typ ohne Eintrag in `ZONE_TYPEN`: `null`.

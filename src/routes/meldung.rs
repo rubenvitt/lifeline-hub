@@ -551,7 +551,7 @@ pub async fn lagerelevant(
         (None, None) => None,
         _ => return Err(AppError::Validation("lat und lon nur gemeinsam".into())),
     };
-    repo::als_lagerelevant(
+    let uebergabe = repo::als_lagerelevant(
         &state.pool,
         einsatz_id,
         meldung_id,
@@ -561,6 +561,10 @@ pub async fn lagerelevant(
     )
     .await?;
     let m = repo::laden(&state.pool, meldung_id, &jetzt()).await?;
+    // Die erste Übergabe steht im ETB (LLH-1104 D8): ihren Eintrag in den Live-Feed.
+    if let Some(etb_id) = uebergabe.etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     crate::meldung::sse(&state, einsatz_id);
     Ok(Json(m))
 }

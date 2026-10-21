@@ -2721,6 +2721,24 @@ export interface components {
             /** Format: int64 */
             lfd_nr: number;
             meldeweg?: components["schemas"]["MeldeWeg"] | null;
+            /**
+             * Format: int64
+             * @description Rückverweis auf die Meldung, zu der dieser Eintrag gehört (Auto-ETB der Meldung,
+             *     Übergabe an die Lage; LLH-1104 D1). Fehlt ohne Kopplung.
+             */
+            meldung_id?: number | null;
+            /**
+             * Format: int64
+             * @description Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet
+             *     per Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`.
+             */
+            meldung_lfd_nr?: number | null;
+            /**
+             * Format: int64
+             * @description Rückverweis auf die Nachforderung, deren Anlage oder Stufe dieser Eintrag protokolliert
+             *     (LLH-1104 D1/D6). Fehlt ohne Kopplung.
+             */
+            nachforderung_id?: number | null;
             received_at: string;
             typ: components["schemas"]["EtbTyp"];
             veranlassung?: string | null;
@@ -3534,6 +3552,15 @@ export interface components {
         LageMeldungAnzeige: {
             /** Format: int64 */
             einsatz_id: number;
+            /**
+             * @description Ereigniszeit der Quellmeldung (UTC, `meldung.ereigniszeit`, LLH-1039): Zeit, Tag,
+             *     Zeitfenster und Ordnung der Zeitachse. Gleicher Name wie an der Meldung.
+             */
+            ereigniszeit: string;
+            /**
+             * @description Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es
+             *     geschah.
+             */
             erstellt_at: string;
             /** Format: int64 */
             erstellt_von_id: number;
@@ -3650,6 +3677,14 @@ export interface components {
         LageberichtAbschnitt: {
             schluessel: string;
             text: string;
+            /**
+             * @description Stand der Übernahme (LLH-1357, Spec `lagevortrag-uebernahme`): wann der Text zuletzt aus
+             *     einer Quelle übernommen wurde, UTC ohne Zonenkennung. Setzt der Client mit der Übernahme;
+             *     das Fortschreiben trägt ihn mit dem Text in die neue Fassung. Fehlt bei Text von Hand,
+             *     an einem leeren Abschnitt und in Abschnitten von vor LLH-1357 (das Feld steht im JSON von
+             *     `lagebericht.abschnitte`, keine Spalte).
+             */
+            uebernommen_at?: string | null;
         };
         /** @description Öffentliche Anzeige eines Lageberichts (Abschnitte aus JSON geparst, Namen aufgelöst). */
         LageberichtAnzeige: {

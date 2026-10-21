@@ -1,8 +1,7 @@
-import { Button, Space, Typography } from 'antd';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Button, Typography } from 'antd';
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Segmentleiste, useRollen } from '../../components/instrument';
 import { griffHinweis, type GriffModus, type KantenAus } from './bildGriffe';
-import { KlappPaneel, usePaneelZustand } from './KlappPaneel';
 import type {
   PersonenEbenenAngabe,
   BetreuungEbenenAngabe,
@@ -17,12 +16,6 @@ import type { GezeigteAnsicht, LeistenAnsicht } from './leistenWahl';
 import './lagekarte.css';
 import type { KarteMarker, MarkerTyp, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
-import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
-import type { ZeichenModus } from './zeichnen';
-import type { ZonenForm } from './useKartenInteraktion';
-import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
-import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
-import { START_ZEICHEN_SPEC } from './zeichenWahl';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
 import EscKappe from './EscKappe';
@@ -196,10 +189,6 @@ export interface SidebarProps {
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
   onPlatzierenAbbrechen: () => void;
   onAbschnittZeichnenStart: (id: number) => void;
-  onZoneZeichnenStart: (entwurf: { typ: ZoneTyp; modus: ZonenForm; farbe?: string }) => void;
-  /** Freies taktisches Zeichen: aktive Platzierung + Start/Abbrechen. */
-  zeichenPlatzieren: FreiesZeichenUpdate | null;
-  onZeichenPlatzierenStart: (spec: FreiesZeichenUpdate) => void;
   onZeichenPlatzierenAbbrechen: () => void;
   /**
    * Serienmodus des Platzierens: an heißt, ein erfolgreicher POST beendet den Platzier-Modus nicht;
@@ -342,12 +331,6 @@ export interface SidebarProps {
    * Zeichen, Fachebene), untereinander. Ohne Auswahl gibt es die Ansicht nicht.
    */
   auswahl?: ReactNode;
-  /**
-   * Zähler, der bei jeder Erhöhung das Paneel „Zeichnen" öffnet und in den Blick holt
-   * (Zeichnen-Knopf über der Karte). Ein Zähler statt eines Booleans, damit ein zweiter Klick nach
-   * dem Zuklappen wieder greift.
-   */
-  zeichnenAnfrage?: number;
 }
 
 /**
@@ -378,43 +361,13 @@ export function bedienzielStil(token: {
 /**
  * Ansicht „Objekte“ der Kartenleiste (LLH-1033): ein Suchfeld und eine Liste aller Objekte, verortet
  * und nicht verortet (`MarkerSuche`), der Einsatzort als erste Zeile; „Nicht verortet“ ist ein
- * Filter. Darunter mit Schreibrecht „Zeichnen“ (bis zum Werkzeugmenü, Zielbild LLH-1023). Laufende
- * Modi zeigen hier nur den Zustand, bedient werden sie im Modus-Band bzw. im Fuß.
+ * Filter. Laufende Modi zeigen hier nur den Zustand, bedient werden sie im Modus-Band bzw. im Fuß.
+ * Gezeichnet wird über das Werkzeugmenü an der Karte (LLH-1038); die Leiste trägt keinen
+ * Zeichenweg, nur „Fläche zeichnen“ verortet einen Abschnitt.
  */
 function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
   const { darfSchreiben, platzierungZiel } = props;
   const sektionFehler = props.sektionFehler ?? {};
-  const { token } = useRollen();
-  const paneele = usePaneelZustand();
-  const umschalten = (k: Parameters<typeof paneele.setze>[0]) => () =>
-    paneele.setze(k, !paneele.zustand[k]);
-  // Freies-Zeichen-Schnellerfassung: der Picker erscheint erst auf Klick, der Entwurf bleibt über
-  // Platzierungen erhalten.
-  const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
-  const [zeichenEntwurf, setZeichenEntwurf] = useState<ZeichenEntwurf>({
-    zeichen_spec: START_ZEICHEN_SPEC,
-  });
-  /**
-   * Knopf „Platzieren" und Enter im Picker: der Entwurf übernimmt die Spec, damit der wieder
-   * geöffnete Picker dort weitermacht.
-   */
-  const platziereZeichen = (spec: FreiesZeichenUpdate) => {
-    setZeichenEntwurf(spec);
-    props.onZeichenPlatzierenStart(spec);
-    setZeichenPickerOffen(false);
-  };
-
-  // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. Der Effekt hängt allein am
-  // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
-  const zeichnenRef = useRef<HTMLDivElement>(null);
-  const { setze: paneelSetzen } = paneele;
-  useEffect(() => {
-    if (!props.zeichnenAnfrage) return;
-    paneelSetzen('zeichnen', true);
-    // jsdom kennt `scrollIntoView` nicht — optionaler Aufruf statt Absturz im Test.
-    requestAnimationFrame(() => zeichnenRef.current?.scrollIntoView?.({ block: 'nearest' }));
-  }, [props.zeichnenAnfrage, paneelSetzen]);
-
   const ziel = zielSchluessel(platzierungZiel);
   /**
    * Rechts in der Zeile: sekundäre (umrandete) Knöpfe — „genau eine Primäraktion" gilt auch in der
@@ -454,127 +407,6 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
           }
         />
       </div>
-
-      {darfSchreiben && (
-        <div ref={zeichnenRef}>
-          <KlappPaneel
-            titel="Zeichnen"
-            kennung="zeichnen"
-            offen={paneele.zustand.zeichnen}
-            onUmschalten={umschalten('zeichnen')}
-          >
-            <Space orientation="vertical" style={{ width: '100%' }} size="middle">
-              <Space orientation="vertical" style={{ width: '100%' }}>
-                <Typography.Text type="secondary">Zone zeichnen</Typography.Text>
-                {ZONE_TYPEN.map((t) => {
-                  if (t.geometrie === 'beides') {
-                    return (
-                      <Space key={t.typ} wrap>
-                        <Typography.Text>{t.label}</Typography.Text>
-                        {/* `farbe` ist ein persistierter Datenwert: er wandert über
-                            `onZoneZeichnenStart` in die Datenbank (Begründung an
-                            `FREIE_SKIZZE_VORGABEFARBE`). */}
-                        <Button
-                          onClick={() =>
-                            props.onZoneZeichnenStart({
-                              typ: t.typ,
-                              modus: 'polygon',
-                              farbe: FREIE_SKIZZE_VORGABEFARBE,
-                            })
-                          }
-                        >
-                          Fläche
-                        </Button>
-                        <Button
-                          onClick={() =>
-                            props.onZoneZeichnenStart({
-                              typ: t.typ,
-                              modus: 'linie',
-                              farbe: FREIE_SKIZZE_VORGABEFARBE,
-                            })
-                          }
-                        >
-                          Linie
-                        </Button>
-                        <Button
-                          aria-label={`${t.label} als Kreis`}
-                          onClick={() =>
-                            props.onZoneZeichnenStart({
-                              typ: t.typ,
-                              modus: 'kreis',
-                              farbe: FREIE_SKIZZE_VORGABEFARBE,
-                            })
-                          }
-                        >
-                          Kreis
-                        </Button>
-                      </Space>
-                    );
-                  }
-                  const modus: ZeichenModus = t.geometrie === 'LineString' ? 'linie' : 'polygon';
-                  const zeichnen = (
-                    <Button
-                      key={t.typ}
-                      block
-                      onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus })}
-                    >
-                      {t.label} zeichnen
-                    </Button>
-                  );
-                  if (modus === 'linie') return zeichnen;
-                  // Fläche auch als Kreis um einen Punkt (LLH-1043): Radius statt Stützpunkte.
-                  return (
-                    <div key={t.typ} style={{ display: 'flex', gap: token.marginXS }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>{zeichnen}</div>
-                      <Button
-                        aria-label={`${t.label} als Kreis`}
-                        onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'kreis' })}
-                      >
-                        Kreis
-                      </Button>
-                    </div>
-                  );
-                })}
-              </Space>
-              <Space orientation="vertical" style={{ width: '100%' }}>
-                <Typography.Text type="secondary">Taktisches Zeichen</Typography.Text>
-                {/* Ein laufendes Zeichen bedient das Modus-Band bzw. der Fuß (LLH-1028). */}
-                {props.zeichenPlatzieren ? (
-                  <Typography.Text type="secondary">wird platziert</Typography.Text>
-                ) : zeichenPickerOffen ? (
-                  <Space orientation="vertical" style={{ width: '100%' }}>
-                    {/* Enter im Picker nimmt denselben Weg wie der Knopf — mit der mitgebrachten
-                        Spec, weil `zeichenEntwurf` die per Enter gewählte Kachel in dieser Runde
-                        noch nicht trägt. */}
-                    <FreiesZeichenPicker
-                      wert={zeichenEntwurf}
-                      onChange={setZeichenEntwurf}
-                      onAbsenden={platziereZeichen}
-                    />
-                    <Space>
-                      {/* Ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl) gesperrt. */}
-                      <Button
-                        type="primary"
-                        disabled={!hatZeichen(zeichenEntwurf)}
-                        onClick={() => {
-                          if (hatZeichen(zeichenEntwurf)) platziereZeichen(zeichenEntwurf);
-                        }}
-                      >
-                        Platzieren
-                      </Button>
-                      <Button onClick={() => setZeichenPickerOffen(false)}>Abbrechen</Button>
-                    </Space>
-                  </Space>
-                ) : (
-                  <Button block onClick={() => setZeichenPickerOffen(true)}>
-                    Taktisches Zeichen platzieren
-                  </Button>
-                )}
-              </Space>
-            </Space>
-          </KlappPaneel>
-        </div>
-      )}
     </div>
   );
 }

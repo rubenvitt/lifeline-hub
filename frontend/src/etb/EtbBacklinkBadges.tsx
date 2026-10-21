@@ -1,7 +1,13 @@
 import { theme } from 'antd';
 import { Link } from 'react-router';
 import type { EtbEintragAnzeige } from '../api/types';
-import { befehlDetailPfad, lageberichtDetailPfad, auftraegePfad } from '../routing/deeplinks';
+import {
+  auftraegePfad,
+  befehlDetailPfad,
+  lageberichtDetailPfad,
+  meldungenPfad,
+  nachforderungenPfad,
+} from '../routing/deeplinks';
 import { hatVerknuepfung, verweisStil } from './zeitachseModell';
 
 /**
@@ -14,7 +20,10 @@ import { hatVerknuepfung, verweisStil } from './zeitachseModell';
  * behauptete eine Verwandtschaft, die es nicht gibt. Das ↗ ist Glyphe und steht
  * `aria-hidden`: der zugängliche Name ist das Wort.
  *
- * Einen Verweis auf eine Meldung gibt es nicht (kein `meldung_id` am Wire-Typ).
+ * Meldung und Nachforderung (LLH-1104, Spec `etb-vorgaenge`) adressiert der Verweis per
+ * Query-Param auf ihrer Seite (`?meldung=`, `?nachforderung=`), die die Karte hervorhebt. Die
+ * Meldung heißt nach ihrer Nummer („Meldung #12“), die Nachforderung schlicht „Nachforderung“:
+ * ihr Inhalt steht schon im Eintrag.
  *
  * **Vorwärtsrichtung (LFH-636):** je Folgeauftrag — ein Auftrag, der AUS diesem Eintrag
  * erteilt wurde — ein eigener Verweis „Folgeauftrag Nr. 12", mit eindeutigem Ziel und Namen.
@@ -30,7 +39,15 @@ export default function EtbBacklinkBadges({
   einsatzId: number;
 }) {
   const { token } = theme.useToken();
-  const { befehl_id, lagebericht_id, auftrag_id, folgeauftraege } = eintrag;
+  const {
+    befehl_id,
+    lagebericht_id,
+    auftrag_id,
+    folgeauftraege,
+    meldung_id,
+    meldung_lfd_nr,
+    nachforderung_id,
+  } = eintrag;
   if (!hatVerknuepfung(eintrag)) return null;
   const pfeil = <span aria-hidden="true"> ↗</span>;
   const stil = verweisStil(token);
@@ -49,6 +66,17 @@ export default function EtbBacklinkBadges({
       {auftrag_id != null && (
         <Link to={auftraegePfad(einsatzId, { auftrag: auftrag_id })} style={stil}>
           Auftrag{pfeil}
+        </Link>
+      )}
+      {meldung_id != null && (
+        <Link to={meldungenPfad(einsatzId, { meldung: meldung_id })} style={stil}>
+          {meldung_lfd_nr != null ? `Meldung #${meldung_lfd_nr}` : 'Meldung'}
+          {pfeil}
+        </Link>
+      )}
+      {nachforderung_id != null && (
+        <Link to={nachforderungenPfad(einsatzId, { nachforderung: nachforderung_id })} style={stil}>
+          Nachforderung{pfeil}
         </Link>
       )}
       {folgeauftraege.map((f) => (

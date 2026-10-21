@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { zeigeLeistenAnsicht } from './leisten-kern';
+import { waehleWerkzeug } from './leisten-kern';
 
 /**
  * Korrigierbares Zeichnen und Eigenposition an der echten Karte. Vitest belegt Adapter und
@@ -50,8 +50,6 @@ async function lagekarteOeffnen(page: Page, suche = '') {
   const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toBeVisible();
-  // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
-  await zeigeLeistenAnsicht(page, 'Objekte');
   return { eid, canvas };
 }
 
@@ -60,7 +58,7 @@ test('Zeichnen: Punkt zurück nimmt genau einen Punkt, Esc ist zweistufig', asyn
   page.on('pageerror', (f) => seitenFehler.push(f));
   const { eid, canvas } = await lagekarteOeffnen(page);
 
-  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await waehleWerkzeug(page, 'Gefahrengebiet');
   const zaehler = page.locator('[data-lfh="zeichnen-punkte"]');
   const zurueck = page.getByRole('button', { name: 'Letzten Punkt zurück' });
   await expect(zaehler).toHaveText('0 Punkte');
@@ -281,7 +279,7 @@ test.describe('Eigenposition: Anflug an die Genauigkeit (LFH-766)', () => {
       )
       .toBe(false);
 
-    await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+    await waehleWerkzeug(page, 'Gefahrengebiet');
     const zaehler = page.locator('[data-lfh="zeichnen-punkte"]');
     // Mitten im Genauigkeitskreis, über der Bildmitte (darunter liegt die Steuerung im Fuß).
     const box = (await canvas.boundingBox())!;

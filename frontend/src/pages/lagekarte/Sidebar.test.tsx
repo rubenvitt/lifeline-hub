@@ -18,7 +18,6 @@ import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
 import { hochwasserRadius } from './hochwasserStil';
-import { FREIE_SKIZZE_VORGABEFARBE } from './zonenStil';
 
 const basisProps: SidebarProps = {
   einsatzId: 1,
@@ -29,9 +28,6 @@ const basisProps: SidebarProps = {
   onPlatzierenStart: vi.fn(),
   onPlatzierenAbbrechen: vi.fn(),
   onAbschnittZeichnenStart: vi.fn(),
-  onZoneZeichnenStart: vi.fn(),
-  zeichenPlatzieren: null,
-  onZeichenPlatzierenStart: vi.fn(),
   onZeichenPlatzierenAbbrechen: vi.fn(),
   // Serienmodus: der Zähler steht auf 0, der Zustand vor dem ersten Zeichen, in dem Beenden noch
   // „Abbrechen" heißt. Den Gegenzustand baut der eigene Block unten auf.
@@ -691,84 +687,6 @@ describe('Sidebar Bild-Hintergründe', () => {
     expect(within(zeile).queryByRole('list')).not.toBeInTheDocument();
   });
 
-  it('öffnet den Zeichen-Picker und startet das Platzieren mit der Entwurfs-Spec (LFH-170)', () => {
-    const onZeichenPlatzierenStart = vi.fn();
-    renderMitProviders(
-      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
-    );
-    // Der Picker ist zunächst geschlossen (kein Dauer-Combobox in der Leiste).
-    expect(screen.queryByLabelText('Grundzeichen')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
-    // Jetzt ist der Picker offen …
-    expect(screen.getAllByLabelText('Grundzeichen').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Platzieren' }));
-    // Startentwurf ist die taktische Formation, gesendet als Zeichenbeschreibung (LFH-836).
-    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
-      expect.objectContaining({ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }),
-    );
-  });
-
-  it('sperrt „Platzieren“ nach „Kein Grundzeichen“, bis ein Symbol gewählt ist (LFH-836)', () => {
-    const onZeichenPlatzierenStart = vi.fn();
-    renderMitProviders(
-      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
-    fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole('radio', {
-        name: 'Kein Grundzeichen',
-      }),
-    );
-    const knopf = screen.getByRole('button', { name: 'Platzieren' });
-    expect(knopf).toBeDisabled();
-    fireEvent.click(knopf);
-    expect(onZeichenPlatzierenStart).not.toHaveBeenCalled();
-    fireEvent.click(
-      within(screen.getByRole('radiogroup', { name: 'Symbol' })).getByRole('radio', {
-        name: 'Angeschlagen',
-      }),
-    );
-    expect(knopf).toBeEnabled();
-    fireEvent.click(knopf);
-    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
-      expect.objectContaining({
-        zeichen_spec: '{"v":1,"freestanding":{"kind":"state","state":"damaged"}}',
-      }),
-    );
-  });
-
-  it('startet das Platzieren per Enter im Picker wie der Knopf und schließt den Picker (LFH-716)', () => {
-    const onZeichenPlatzierenStart = vi.fn();
-    renderMitProviders(
-      <Sidebar {...basisProps} onZeichenPlatzierenStart={onZeichenPlatzierenStart} />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }));
-    const kachel = within(screen.getByRole('radiogroup', { name: 'Grundzeichen' })).getByRole(
-      'radio',
-      { name: 'Person' },
-    );
-    kachel.focus();
-    fireEvent.keyDown(kachel, { key: 'Enter' });
-    // Die Spec der Enter-Kachel, nicht der Entwurf von vorher.
-    expect(onZeichenPlatzierenStart).toHaveBeenCalledWith(
-      expect.objectContaining({ zeichen_spec: '{"v":1,"spec":{"kind":"person"}}' }),
-    );
-    expect(screen.queryByRole('radiogroup', { name: 'Grundzeichen' })).not.toBeInTheDocument();
-  });
-
-  it('im laufenden Zeichen zeigt das Paneel nur den Zustand — bedient wird im Band', () => {
-    renderMitProviders(
-      <Sidebar
-        {...basisProps}
-        zeichenPlatzieren={{ zeichen_spec: '{"v":1,"spec":{"kind":"formation"}}' }}
-      />,
-    );
-    const paneel = document.querySelector('section[data-paneel="zeichnen"]') as HTMLElement;
-    expect(within(paneel).getByText('wird platziert')).toBeInTheDocument();
-    expect(within(paneel).queryByRole('button', { name: 'Abbrechen' })).toBeNull();
-    expect(within(paneel).queryByRole('switch', { name: 'Weitere platzieren' })).toBeNull();
-  });
-
   it('benennt ein Bild über die Inline-Bearbeitung um', () => {
     const onBildUmbenennen = vi.fn();
     renderMitProviders(
@@ -1361,32 +1279,45 @@ describe('Sidebar: einklappbare Paneele', () => {
     );
     expect(screen.getByText('Bild-Hintergründe konnten nicht geladen werden')).toBeInTheDocument();
   });
+});
 
-  it('öffnet „Zeichnen" auf Anfrage des Zeichnen-Knopfs über der Karte', () => {
-    localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ zeichnen: false }));
-    const { rerender } = renderMitProviders(<Sidebar {...basisProps} zeichnenAnfrage={0} />);
-    expect(
-      screen.queryByRole('button', { name: 'Gefahrengebiet zeichnen' }),
-    ).not.toBeInTheDocument();
-    rerender(<Sidebar {...basisProps} zeichnenAnfrage={1} />);
-    expect(screen.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeInTheDocument();
-  });
+/**
+ * Die Leiste trägt keinen Zeichenweg (LLH-1038, Spec `lagekarte-kartenleiste`): gezeichnet wird
+ * über das Werkzeugmenü an der Karte. Nur „Fläche zeichnen“ an einem nicht verorteten Abschnitt
+ * bleibt — das verortet ein Objekt.
+ */
+describe('Sidebar: kein Zeichenweg in der Leiste', () => {
+  const abschnitt = obj('abschnitt', 7, 'EA Nord', false);
+  const objekte = [abschnitt];
+  const zeichenwege = [
+    /zeichnen$/,
+    /^Taktisches Zeichen platzieren$/,
+    /als Kreis$/,
+    /^(Fläche|Linie|Kreis)$/,
+    /^Weitere …$/,
+  ];
 
-  it('startet die freie Skizze mit der gemeinsamen Vorgabefarbe (LFH-825)', () => {
-    localStorage.setItem('lfh:lagekarte:paneele', JSON.stringify({ zeichnen: true }));
-    const onZoneZeichnenStart = vi.fn();
-    renderMitProviders(<Sidebar {...basisProps} onZoneZeichnenStart={onZoneZeichnenStart} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Fläche' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Linie' }));
-    expect(onZoneZeichnenStart.mock.calls).toEqual([
-      [{ typ: 'freie_skizze', modus: 'polygon', farbe: FREIE_SKIZZE_VORGABEFARBE }],
-      [{ typ: 'freie_skizze', modus: 'linie', farbe: FREIE_SKIZZE_VORGABEFARBE }],
-    ]);
-  });
-
-  it('ohne Schreibrecht gibt es kein Paneel „Zeichnen"', () => {
-    renderMitProviders(<Sidebar {...basisProps} darfSchreiben={false} />);
-    expect(screen.queryByRole('button', { name: 'Zeichnen' })).not.toBeInTheDocument();
+  it.each([
+    ['Ebenen', 'ebenen' as const],
+    ['Objekte', 'objekte' as const],
+  ])('mit Schreibrecht in „%s“: kein Zeichenknopf und kein Paneel „Zeichnen“', (_n, ansicht) => {
+    // Alles offen: Gruppen des Ebenenbaums und der Objektliste.
+    paneeleOffen();
+    localStorage.setItem('lfh:lagekarte:objekte-gruppen', JSON.stringify({ abschnitt: true }));
+    renderMitProviders(<Sidebar {...basisProps} objekte={objekte} ansicht={ansicht} />);
+    // Gegenprobe, dass die Ansicht steht: die Zeile des Abschnitts bzw. der Ebenenbaum.
+    if (ansicht === 'objekte')
+      expect(screen.getByRole('button', { name: 'Fläche zeichnen' })).toBeInTheDocument();
+    const knoepfe = screen
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label') ?? b.textContent ?? '');
+    for (const muster of zeichenwege) {
+      // Gegenprobe: nur „Fläche zeichnen“ am Abschnitt der Objektliste.
+      const treffer = knoepfe.filter((n) => muster.test(n) && n !== 'Fläche zeichnen');
+      expect(treffer, String(muster)).toEqual([]);
+    }
+    expect(document.querySelector('[data-paneel="zeichnen"]')).toBeNull();
+    expect(screen.queryByLabelText('Grundzeichen')).toBeNull();
   });
 });
 

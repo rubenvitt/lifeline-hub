@@ -14,6 +14,9 @@ import type { UebernahmeQuelle } from './uebernahmeQuelle';
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
 const dtg = (iso: string) => `DTG(${iso})`;
+/** Feste Uhr: der Stand der Übernahme (LLH-1357) ist der Zeitpunkt, an dem der Text entsteht. */
+const JETZT = '2026-10-21T10:30:00Z';
+const STAND = '2026-10-21 10:30:00';
 let qc: QueryClient;
 const ctx = () => ({ qc, einsatzId: 7, dtg });
 
@@ -39,6 +42,8 @@ const QUELLEN = [
 ] as const;
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(JETZT));
   qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   vi.mocked(ladeModulFreigaben).mockReset();
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
@@ -46,6 +51,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('loadAbschnittTexte (LLH-1081)', () => {
@@ -54,8 +60,8 @@ describe('loadAbschnittTexte (LLH-1081)', () => {
     const b = probe('B');
     const texte = await loadAbschnittTexte({ a, b }, ['b', 'a'], ctx());
     expect(texte).toEqual([
-      { schluessel: 'b', text: '# B' },
-      { schluessel: 'a', text: '# A' },
+      { schluessel: 'b', text: '# B', uebernommen_at: STAND },
+      { schluessel: 'a', text: '# A', uebernommen_at: STAND },
     ]);
     // Dieselbe Quelle mit denselben Freigaben wie die Einzelübernahme: kein zweiter Weg.
     expect(a.erzeuge).toHaveBeenCalledWith({
@@ -80,8 +86,8 @@ describe('loadAbschnittTexte (LLH-1081)', () => {
     const s = probe('S', 'stab');
     const texte = await loadAbschnittTexte({ a, s }, ['a', 's'], ctx());
     expect(texte).toEqual([
-      { schluessel: 'a', text: '# A' },
-      { schluessel: 's', text: '— (stab nicht freigegeben)' },
+      { schluessel: 'a', text: '# A', uebernommen_at: STAND },
+      { schluessel: 's', text: '— (stab nicht freigegeben)', uebernommen_at: STAND },
     ]);
     expect(s.erzeuge).not.toHaveBeenCalled();
   });
@@ -105,15 +111,15 @@ describe('loadAbschnittTexte (LLH-1081)', () => {
     vi.mocked(a.erzeuge).mockRejectedValue(new Error('kaputt'));
     const texte = await loadAbschnittTexte({ a, b }, ['a', 'b'], ctx());
     expect(texte).toEqual([
-      { schluessel: 'a', text: '— (nicht geladen)' },
-      { schluessel: 'b', text: '# B' },
+      { schluessel: 'a', text: '— (nicht geladen)', uebernommen_at: STAND },
+      { schluessel: 'b', text: '# B', uebernommen_at: STAND },
     ]);
   });
 
   it('übergeht einen Schlüssel ohne Quelle', async () => {
     const a = probe('A');
     expect(await loadAbschnittTexte({ a }, ['auftrag', 'a'], ctx())).toEqual([
-      { schluessel: 'a', text: '# A' },
+      { schluessel: 'a', text: '# A', uebernommen_at: STAND },
     ]);
   });
 });
@@ -124,7 +130,9 @@ describe('loadStartinhalt (LLH-1081)', () => {
       vi.spyOn(quelle, 'erzeuge').mockResolvedValue(`Text ${schluessel}`);
     }
     const texte = await loadStartinhalt('lagebericht', ctx());
-    expect(texte).toEqual(QUELLEN.map(([s]) => ({ schluessel: s, text: `Text ${s}` })));
+    expect(texte).toEqual(
+      QUELLEN.map(([s]) => ({ schluessel: s, text: `Text ${s}`, uebernommen_at: STAND })),
+    );
   });
 
   it('lässt den Lagevortrag zur Entscheidung und den freien Bericht ohne Startinhalt', async () => {

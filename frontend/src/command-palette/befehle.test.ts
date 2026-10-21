@@ -213,7 +213,7 @@ describe('baueBefehle — Schnellaktionen', () => {
   );
   /**
    * „Gefahrengebiet zeichnen“ (LFH-825, Spec `sprungpalette`): Träger ist die Lagekarte, nicht
-   * das Modul Gefahren — gezeichnet wird auf der Karte, und das Paneel dort fragt die
+   * das Modul Gefahren — gezeichnet wird auf der Karte, und das Werkzeugmenü dort fragt die
    * Gefahren-Freigabe ebenfalls nicht.
    */
   describe('Gefahrengebiet zeichnen (LFH-825)', () => {

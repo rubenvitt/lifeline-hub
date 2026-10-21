@@ -38,6 +38,7 @@ import {
   type LageFilter,
   type Ortsfilter,
   type Zeitfenster,
+  uebergabeZeit,
 } from '../lagemeldungen/zeitachse';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
@@ -61,6 +62,9 @@ const ORT_OPTIONEN: SegmentOption<Ortsfilter>[] = [
  * braucht Zeit · Typkante · Text · Herkunft · Ort — das trägt der Baustein `Zeitachseneintrag`,
  * nicht der Kartenplan (Titel + drei Sekundärfelder).
  *
+ * - Zeit, Tag, Zeitfenster und Ordnung sind die Ereigniszeit der Quellmeldung (`ereigniszeit`),
+ *   nicht die Übergabe (LLH-1039); die Übergabe steht als „übergeben …“ im Meta
+ *   (`uebergabeZeit`).
  * - Tagesgruppen jüngster Tag zuerst, Tagesgrenze in der Anzeigezone (`lagemeldungen/zeitachse.ts`,
  *   `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe genügt `HH:mm` — der
  *   Tag steht im Kopf.
@@ -167,7 +171,7 @@ export default function LagemeldungenPage() {
     <Zeitachseneintrag
       key={l.id}
       als="li"
-      zeit={formatUhrzeit(l.erstellt_at, konventionen)}
+      zeit={formatUhrzeit(l.ereigniszeit, konventionen)}
       typ="lage"
       typwort={etbTyp.lage.label}
       meta={
@@ -178,6 +182,7 @@ export default function LagemeldungenPage() {
           <KennungsLink to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
             Meldung #{l.meldung_lfd_nr}
           </KennungsLink>
+          {` · übergeben ${uebergabeZeit(l.ereigniszeit, l.erstellt_at, konventionen)}`}
           {!l.is_neu && l.gesehen_at && (
             <>
               {` · gesehen ${formatUhrzeit(l.gesehen_at, konventionen)}`}

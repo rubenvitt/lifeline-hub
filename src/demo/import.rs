@@ -1259,7 +1259,11 @@ impl Ablauf<'_> {
                     &d,
                 )?
                 .into_iter()
-                .map(|(schluessel, text)| crate::lagebericht::Abschnitt { schluessel, text })
+                .map(|(schluessel, text)| crate::lagebericht::Abschnitt {
+                    schluessel,
+                    text,
+                    uebernommen_at: None,
+                })
                 .collect();
                 crate::lagebericht::repo::aktualisiere_tx(
                     conn,

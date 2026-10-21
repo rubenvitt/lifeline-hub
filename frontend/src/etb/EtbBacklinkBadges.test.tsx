@@ -126,3 +126,28 @@ describe('EtbBacklinkBadges — Folgeaufträge (LFH-636)', () => {
     expect(screen.queryByRole('link', { name: /Folgeauftrag/ })).toBeNull();
   });
 });
+
+describe('EtbBacklinkBadges — Meldung und Nachforderung (LLH-1104)', () => {
+  it('verlinkt die Meldung mit ihrer Nummer auf den Meldungseingang', () => {
+    renderBadges(eintrag({ typ: 'meldung', meldung_id: 4, meldung_lfd_nr: 12 }));
+    const link = screen.getByRole('link', { name: 'Meldung #12' });
+    expect(link).toHaveAttribute('href', '/einsaetze/3/meldungen?meldung=4');
+    expect(link.textContent).toContain('↗');
+  });
+
+  it('heißt ohne Nummer nur „Meldung“', () => {
+    renderBadges(eintrag({ typ: 'system', meldung_id: 4 }));
+    expect(screen.getByRole('link', { name: 'Meldung' })).toHaveAttribute(
+      'href',
+      '/einsaetze/3/meldungen?meldung=4',
+    );
+  });
+
+  it('verlinkt die Nachforderung auf die angesprungene Karte', () => {
+    renderBadges(eintrag({ typ: 'system', nachforderung_id: 7 }));
+    expect(screen.getByRole('link', { name: 'Nachforderung' })).toHaveAttribute(
+      'href',
+      '/einsaetze/3/nachforderungen?nachforderung=7',
+    );
+  });
+});
