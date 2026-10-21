@@ -16,7 +16,7 @@ import './MarkdownEditor.css';
 /** Ref-Typ des inneren antd Input.TextArea (hat `resizableTextArea.textArea`). */
 export type TextAreaRef = GetRef<typeof Input.TextArea>;
 
-type Layout = 'split' | 'tabs' | 'toggle';
+type Layout = 'tabs' | 'toggle';
 type Variante = 'kompakt' | 'dokument';
 
 interface Props {
@@ -25,10 +25,10 @@ interface Props {
   /** Liefert den neuen Markdown-Text als reinen String. */
   onChange?: (value: string) => void;
   /**
-   * `split` (Default): Eingabe und Live-Vorschau nebeneinander.
-   * `tabs`: kompakter Schreiben/Vorschau-Umschalter (ETB-Schnellerfassung).
-   * `toggle`: schlankes Feld + dezenter Vorschau-Button (Command-Bar-Flow); mit
-   * {@link umschalterAussen} das Feld der Entwurfsseite (`entwurf/DokumentEntwurf.tsx`).
+   * `toggle` (Default, LLH-1354): schlankes Feld + dezenter Vorschau-Button; so schreiben die
+   * Entwurfsseite (`entwurf/DokumentEntwurf.tsx`) und mit {@link umschalterAussen} die
+   * ETB-Schnellerfassung.
+   * `tabs`: kompakter Schreiben/Vorschau-Umschalter.
    */
   layout?: Layout;
   /** Darstellung der Vorschau — soll der späteren Anzeige entsprechen. */
@@ -103,7 +103,7 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
   {
     value = '',
     onChange,
-    layout = 'split',
+    layout = 'toggle',
     variante = 'dokument',
     unterEbene,
     placeholder,
@@ -174,32 +174,6 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     <Typography.Text type="secondary">Noch nichts zu zeigen.</Typography.Text>,
   );
 
-  if (layout === 'toggle') {
-    const offen = umschalterAussen ? vorschauOffenAussen : vorschauOffen;
-    return (
-      <div className="markdown-editor markdown-editor--toggle">
-        {textfeld}
-        {!umschalterAussen && (
-          <div style={{ marginTop: 4 }}>
-            <Button type="text" icon={<IconAuge />} onClick={() => setVorschauOffen((v) => !v)}>
-              Vorschau
-            </Button>
-          </div>
-        )}
-        {offen && <div className="markdown-editor__vorschau">{vorschau}</div>}
-        {/* Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
-            Leer wie im Lesezweig (`LageberichtText`): „—", kein „Noch nichts zu zeigen". */}
-        {druckfassung && !offen && (
-          // Nur Papier: `aria-hidden` sagt dem Zugänglichkeitsbaum dasselbe wie das
-          // `display: none` am Bildschirm, auch ohne geladenes CSS (Muster Druckkopf).
-          <div className="markdown-editor__druck" aria-hidden>
-            {gerendert(<Typography.Paragraph>—</Typography.Paragraph>)}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   if (layout === 'tabs') {
     return (
       <div className="markdown-editor markdown-editor--tabs">
@@ -223,13 +197,27 @@ const MarkdownEditor = forwardRef<TextAreaRef, Props>(function MarkdownEditor(
     );
   }
 
+  const offen = umschalterAussen ? vorschauOffenAussen : vorschauOffen;
   return (
-    <div className="markdown-editor markdown-editor--split">
-      <div className="markdown-editor__eingabe">{textfeld}</div>
-      <div className="markdown-editor__vorschau">
-        <div className="markdown-editor__label">Vorschau</div>
-        {vorschau}
-      </div>
+    <div className="markdown-editor markdown-editor--toggle">
+      {textfeld}
+      {!umschalterAussen && (
+        <div style={{ marginTop: 4 }}>
+          <Button type="text" icon={<IconAuge />} onClick={() => setVorschauOffen((v) => !v)}>
+            Vorschau
+          </Button>
+        </div>
+      )}
+      {offen && <div className="markdown-editor__vorschau">{vorschau}</div>}
+      {/* Genau EINE gerenderte Fassung im Baum: ist die Vorschau offen, trägt sie den Text.
+          Leer wie im Lesezweig (`LageberichtText`): „—", kein „Noch nichts zu zeigen". */}
+      {druckfassung && !offen && (
+        // Nur Papier: `aria-hidden` sagt dem Zugänglichkeitsbaum dasselbe wie das
+        // `display: none` am Bildschirm, auch ohne geladenes CSS (Muster Druckkopf).
+        <div className="markdown-editor__druck" aria-hidden>
+          {gerendert(<Typography.Paragraph>—</Typography.Paragraph>)}
+        </div>
+      )}
     </div>
   );
 });

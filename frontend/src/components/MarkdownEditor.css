@@ -1,4 +1,4 @@
-/* Eingabe mit Live-Markdown-Vorschau. Farben/Akzente erbt die Vorschau aus
+/* Eingabe mit zuschaltbarer Markdown-Vorschau. Farben/Akzente erbt die Vorschau aus
    der geteilten .markdown-Komponente; hier nur das Editor-Layout.
    Die Vorschau grenzt allein ihr Rahmen ab (`linie`, wie `Markdown.css`), sie hat keine
    eigene Fläche mehr (LFH-889): eine getönte Vorschau schluckte nachts den Code-Grund
@@ -8,17 +8,6 @@
   border-radius: var(--lfh-radius-flaeche);
   padding: 8px 12px;
   overflow: auto;
-}
-
-/* Etikett „Vorschau“ (split) als Augenbraue in der Textrolle `schwach` (LFH-1059), nicht in
-   geerbter Farbe mit `opacity: 0.55`: das lag am Tag bei rund 4 : 1, und Deckkraft lehnt der
-   Messkern ab (`frontend/AGENTS.md`, Textboden für jede Textstufe). */
-.markdown-editor__label {
-  font-size: 0.75em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--lfh-schwach);
-  margin-bottom: 6px;
 }
 
 /* Druckfassung des toggle-Layouts (Prop `druckfassung`): am Bildschirm nie sichtbar — auch
@@ -37,32 +26,6 @@
   font-weight: 600;
   line-height: 1.5;
   margin-bottom: 0.5em;
-}
-
-/* ---------- split: Eingabe links, Vorschau rechts ---------- */
-.markdown-editor--split {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-.markdown-editor--split .markdown-editor__eingabe {
-  flex: 1 1 50%;
-  min-width: 0;
-}
-.markdown-editor--split .markdown-editor__vorschau {
-  flex: 1 1 50%;
-  min-width: 0;
-}
-/* Eingabefeld füllt die gemeinsame Höhe, damit beide Spalten bündig sind. */
-.markdown-editor--split .markdown-editor__eingabe textarea {
-  height: 100%;
-}
-
-/* Auf schmalen Viewports/mobil untereinander statt nebeneinander. */
-@media (max-width: 640px) {
-  .markdown-editor--split {
-    flex-direction: column;
-  }
 }
 
 /* ---------- tabs: kompakter Schreiben/Vorschau-Umschalter ---------- */
