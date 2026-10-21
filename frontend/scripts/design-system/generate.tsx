@@ -413,7 +413,7 @@ function componentReadme(spec: PreviewSpec, agents: string): string {
         .replace(/\n {2}/g, '\n')
     : docBefore(source, spec.docAnchor);
   const rendered = spec.interact
-    ? 'dem echten Baustein gerendert (der offene Zustand nach einem Klick im jsdom), mit dem'
+    ? 'dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem'
     : 'dem echten Baustein gerendert, mit dem';
   const more = spec.moreDoc
     ? [
@@ -438,9 +438,12 @@ function componentReadme(spec: PreviewSpec, agents: string): string {
 const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-/** Die Stile der App ohne Kommentare: Rollen, Bausteine, globale Regeln (u. a. die Sperre). */
-function appCss(): string {
-  return ['theme/rollen.css', 'theme/sprache.css', 'index.css']
+/**
+ * Die Stile der App ohne Kommentare: Rollen, Bausteine, globale Regeln (u. a. die Sperre), dahinter
+ * die Stile, die ein Baustein selbst importiert (`PreviewSpec.styles`).
+ */
+function appCss(styles: readonly string[] = []): string {
+  return ['theme/rollen.css', 'theme/sprache.css', 'index.css', ...styles]
     .map((file) => read(join(SRC, file)).replace(/\/\*[\s\S]*?\*\//g, ''))
     .join('\n')
     .split('\n')
@@ -493,9 +496,9 @@ export async function generateDesignSystem(): Promise<DesignSystemFiles> {
   };
   files.set('tokens.json', `${JSON.stringify(tokens, null, 2)}\n`);
 
-  const css = appCss();
   for (const spec of PREVIEWS) {
     const { html, css: antdCss } = await renderPreview(spec);
+    const css = appCss(spec.styles);
     files.set(`components/${spec.name}/preview.html`, previewDocument(spec, html, antdCss, css));
     files.set(`components/${spec.name}/README.md`, componentReadme(spec, agents));
   }

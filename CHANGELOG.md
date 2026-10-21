@@ -1,3 +1,30 @@
+## [1.0.0-alpha.148](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.147...v1.0.0-alpha.148) (2026-10-21)
+
+### Lagekarte
+
+- **Neue Objektliste in der Kartenleiste:** Die Ansicht „Objekte“ zeigt jetzt alle Objekte in einer durchsuchbaren Liste, verortete wie nicht verortete.
+  - Oben steht ein Suchfeld. Die Marke „Nicht verortet“ dient als Filter.
+  - Der Einsatzort steht immer in der ersten Zeile.
+  - Die Objekte sind nach Art gruppiert. Jede Gruppe zeigt, wie viele ihrer Objekte schon verortet sind („verortet/gesamt“).
+  - Ohne Suchbegriff sind die Gruppen zugeklappt. Welche Gruppen offen sind, merkt sich jedes Gerät.
+- **Die Paneele „Nicht verortet“, „Verortet“ und „Einsatzort“ gibt es nicht mehr.** Ihre Inhalte stehen jetzt in der Objektliste.
+- **Neue Ansicht „Auswahl“:** Ein ausgewähltes Objekt öffnet sich in einer eigenen Ansicht. Dafür gibt es ein drittes Segment „Auswahl“, das nur bei einer aktiven Auswahl erscheint.
+  - Eine neue Auswahl wird sofort im Vordergrund angezeigt.
+  - Wer zu „Ebenen“ oder „Objekte“ wechselt, behält die Auswahl.
+  - Der Rückweg „← Ebenen“ bzw. „← Objekte“ hebt die Auswahl auf, ebenso die Esc-Taste. Ein vorher eingegebener Suchbegriff bleibt dabei erhalten.
+  - Ist ein Bündel geöffnet, schließt Esc zuerst das Bündel und hebt erst beim nächsten Druck die Auswahl auf.
+- **Abschnitte ohne Fläche** lassen sich jetzt über die Objektliste auswählen und auf der Karte in den Fokus nehmen.
+- **Korrektur:** Die Zahl „nicht verortet“ im Seitenkopf zählt wieder nur die Lageobjekte. Ein Einsatzort ohne Koordinate wird dort nicht mehr mitgezählt, er erscheint in der Objektliste und an der Marke. Vorher wurde die Zahl dadurch länger, mit drei Folgen:
+  - Auf Handgeräten brach die Kopfzeile um.
+  - Ohne Netz wurde der Kopf höher.
+  - Beim Laden sprang die Karte.
+
+### Anwenderdokumentation
+
+- Das Kapitel „Lagekarte“ beschreibt jetzt die Objektliste und die Ansicht „Auswahl“, einschließlich Rückweg und der Reihenfolge, in der Esc wirkt.
+- Die Abschnitte zu Bereitstellungsräumen und Tieren verweisen jetzt auf die Kartenleiste statt auf „Nicht verortet“.
+- Es gibt ein neues Bild der Objektliste. Die Bilder der Lagekarte und des gezeichneten Bezirks wurden neu erstellt.
+
 ## [1.0.0-alpha.147](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.146...v1.0.0-alpha.147) (2026-10-21)
 
 ### Lagekarte

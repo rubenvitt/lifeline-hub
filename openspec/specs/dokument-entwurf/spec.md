@@ -70,6 +70,45 @@ MUST dabei eingehängt bleiben, damit ein Speichern aus der Lesefassung keinen A
 - **WHEN** eine Person in der Lesefassung „Entwurf speichern“ wählt
 - **THEN** schickt der eine PATCH alle Abschnitte mit ihrem Text
 
+### Requirement: Rückfrage vor dem Verlassen eines Entwurfs
+
+Hat ein Lagebericht-, Befehls- oder Pressemitteilungsentwurf eine ungespeicherte Fassung und die
+Person Schreibrecht, SHALL jeder Wechsel auf einen anderen Pfad in der App (Brotkrume, Seitenmenü,
+Link, Browser-Zurück) angehalten werden. Alle drei Seiten SHALL dieselbe Rückfrage „Ungespeicherte
+Änderungen“ mit „Verwerfen“, „Bleiben“ und „Speichern und weiter“ zeigen. „Speichern und weiter“
+MUST erst nach gelungenem Speichern wechseln. Ohne ungespeicherte Fassung MUST NOT nachgefragt
+werden.
+
+#### Scenario: Lagebericht über die Brotkrume verlassen
+- **WHEN** eine Person im Lagebericht-Entwurf den Titel ändert und vor dem Speichern
+  „Lageberichte“ in der Brotkrume wählt
+- **THEN** erscheint die Rückfrage „Ungespeicherte Änderungen“ wie im Befehl, und nach „Bleiben“
+  steht die Eingabe unverändert im Feld
+
+#### Scenario: Pressemitteilung über die Brotkrume verlassen
+- **WHEN** eine Person im Pressemitteilungs-Entwurf den Titel ändert und vor dem Speichern
+  „Pressearbeit“ in der Brotkrume wählt
+- **THEN** erscheint dieselbe Rückfrage „Ungespeicherte Änderungen“, und „Verwerfen“ öffnet die
+  Pressearbeit ohne die ungespeicherte Fassung
+
+#### Scenario: Speichern und weiter ohne Titel
+- **WHEN** der Titel des Entwurfs leer ist und in der Rückfrage „Speichern und weiter“ gewählt wird
+- **THEN** steht der Feldfehler am Titel, und die Seite bleibt beim Entwurf
+
+#### Scenario: Speichern und weiter scheitert
+- **WHEN** in der Rückfrage „Speichern und weiter“ gewählt wird und der Server das Speichern
+  ablehnt
+- **THEN** steht der Grund im Dialog, und die Seite bleibt beim Entwurf
+
+#### Scenario: Autosave während der Rückfrage
+- **WHEN** die Rückfrage offen steht und der Autosave die Fassung sichert
+- **THEN** folgt der angehaltene Wechsel ohne weiteren Klick
+
+#### Scenario: Ohne offene Fassung
+- **WHEN** ein unveränderter Entwurf oder ein freigegebenes Dokument verlassen wird, oder sich nur
+  Suchparameter oder Anker ändern
+- **THEN** erscheint keine Rückfrage
+
 ### Requirement: Aktion im Abschnittskopf
 
 Der Kopf eines Abschnitts SHALL eine Stelle für eine Aktion der Seite tragen. Der Lagebericht

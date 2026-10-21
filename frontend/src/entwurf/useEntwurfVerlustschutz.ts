@@ -76,8 +76,9 @@ interface Verlustschutz<W extends object> {
  * Der Riegel fällt nur, wenn ihn noch derselbe Auftrag hält (`auftragRef`). Die API ist bewusst
  * eng: kein öffentlicher Weg, einen zweiten Speicherpfad daneben zu bauen.
  *
- * Der Befehlsentwurf nutzt zusätzlich `EntwurfNavigationSchutz` (`useBlocker`), der denselben
- * Merker liest; dieser Hook selbst bleibt routerunabhängig.
+ * Befehls-, Lageberichts- und Pressemitteilungsentwurf nutzen zusätzlich
+ * `EntwurfNavigationSchutz` (`useBlocker`), der denselben Merker liest; dieser Hook selbst bleibt
+ * routerunabhängig.
  *
  * **(4) GESCHRIEBEN WIRD NUR INS GERENDERTE FORMULAR** (LFH-627). Die Seiten rendern ihr `<Form>`
  * nur im bearbeitbaren Entwurf, dieser Hook läuft immer. Ein `setFieldsValue` ohne `<Form>` meldet

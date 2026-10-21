@@ -12,6 +12,7 @@ import type {
 } from '../../api/types';
 import { GEFAHRENTYPEN_ALPHABETISCH } from '../gefahren/gefahrenSchema';
 import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
+import { gesetzteGefahren, hatErlaeuterung } from '../gefahren/erlaeuterungen';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ohneAbgeschlossene, sichtungsbild } from '../../personen/personenBilanz';
 
@@ -78,40 +79,48 @@ export interface GefahrenZeile {
   typ: Gefahrentyp;
   label: string;
   stufe: Warnstufe;
+  /** Irgendeine Zelle des Typs, in irgendeinem Gebiet, trägt eine Erläuterung (LLH-1365). */
+  mitErlaeuterung: boolean;
 }
 
+const GEFAHR_LABEL = new Map(GEFAHRENTYPEN_ALPHABETISCH.map((g) => [g.wert, g.label]));
+
 interface GefahrenmatrixVerdichtung {
-  /** Nur Gefahrentypen mit einer Stufe über „keine“, in Katalogreihenfolge. */
+  /** Gesetzte Gefahrentypen (`gesetzteGefahren`), in der Folge der Matrix. */
   zeilen: GefahrenZeile[];
 }
 
 /**
  * Verdichtet die Matrizen aller Gefahrengebiete eines Einsatzes.
  *
- * „keine“ ist die Vorgabe jeder Zelle (LLH-1090, Spec `gefahrenmatrix`): eine ausdrücklich auf
- * „keine“ gesetzte Zelle sagt dasselbe wie eine ohne Bewertung, deshalb steht ein Typ nur mit einer
- * Stufe darüber als Zeile da — wie im Matrixauszug der Palette. Ob überhaupt jemand hingesehen hat,
- * sagt nicht die Matrix, sondern die Beurteilung je Gebiet ({@link beurteilungHinweis}).
+ * Welche Zellen zählen und in welcher Folge, entscheidet `gesetzteGefahren`
+ * (`pages/gefahren/erlaeuterungen.ts`, LLH-1365): Stufe über „keine“ ODER mit Erläuterung, nur
+ * gültige Paare — dieselbe Menge wie Palettenauszug, Lagekarte und Lagevortrag. „keine“ ohne Text
+ * ist die Vorgabe jeder Zelle (LLH-1090, Spec `gefahrenmatrix`) und ergibt keine Zeile; eine
+ * Erläuterung zu „keine“ ist eine Beurteilung und steht mit der Stufe „keine“ da. Ob überhaupt
+ * jemand hingesehen hat, sagt nicht die Matrix, sondern die Beurteilung je Gebiet
+ * ({@link beurteilungHinweis}).
  *
- * Reihenfolge alphabetisch wie die Matrix (LLH-1102, `sortGefahrenAlphabetisch`), nicht nach
+ * Reihenfolge alphabetisch wie die Matrix (LLH-1102, aus `gesetzteGefahren`), nicht nach
  * Dringlichkeit (Prüfliste Kriterium 9): eine Gefahr steht überall an derselben Stelle.
  */
 export function verdichteGefahrenmatrix(
   bewertungen: readonly GefahrBewertung[],
 ): GefahrenmatrixVerdichtung {
-  const hoechste = new Map<Gefahrentyp, Warnstufe>();
-  for (const b of bewertungen) {
-    const bisher = hoechste.get(b.gefahrentyp);
-    if (bisher == null || WARNSTUFE_RANG[b.warnstufe] > WARNSTUFE_RANG[bisher]) {
-      hoechste.set(b.gefahrentyp, b.warnstufe);
+  // Die Map hält die Einfügefolge, also die Folge von `gesetzteGefahren`.
+  const zeilen = new Map<Gefahrentyp, GefahrenZeile>();
+  for (const b of gesetzteGefahren(bewertungen)) {
+    const bisher = zeilen.get(b.gefahrentyp);
+    const mitErlaeuterung = hatErlaeuterung(b);
+    if (bisher == null) {
+      const label = GEFAHR_LABEL.get(b.gefahrentyp) ?? b.gefahrentyp;
+      zeilen.set(b.gefahrentyp, { typ: b.gefahrentyp, label, stufe: b.warnstufe, mitErlaeuterung });
+      continue;
     }
+    if (WARNSTUFE_RANG[b.warnstufe] > WARNSTUFE_RANG[bisher.stufe]) bisher.stufe = b.warnstufe;
+    bisher.mitErlaeuterung ||= mitErlaeuterung;
   }
-  const zeilen: GefahrenZeile[] = [];
-  for (const { wert, label } of GEFAHRENTYPEN_ALPHABETISCH) {
-    const stufe = hoechste.get(wert);
-    if (stufe != null && stufe !== 'keine') zeilen.push({ typ: wert, label, stufe });
-  }
-  return { zeilen };
+  return { zeilen: [...zeilen.values()] };
 }
 
 /** Bis zu so vielen nicht beurteilten Gebieten nennt der Hinweis die Namen, darüber die Zahl. */

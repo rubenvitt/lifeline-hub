@@ -23,6 +23,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
+- **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
 
 ## Nur im Code
@@ -183,9 +184,11 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `sortGefahrenAlphabetisch` bzw. `GEFAHRENTYPEN_ALPHABETISCH` (`gefahrenSchema.ts`), nie in
   der Katalogfolge `GEFAHRENTYPEN`. Erläuterungen (LLH-1110): eine Zelle mit Text trägt die
   Marke (Dreieck oben rechts, `currentColor`, Name „· mit Erläuterung“), unter der Matrix
-  steht die Liste „Erläuterungen“. Welche Zellen etwas sagen und in welcher Folge, entscheidet
-  nur `pages/gefahren/erlaeuterungen.ts` (`zellenMitErlaeuterung`, `gesetzteGefahren`) — für
-  Matrix, Lagekarte und Lagevortrag.
+  steht die Liste „Erläuterungen“. Die Marke kommt nur aus `pages/gefahren/ErlaeuterungsMarke.tsx`
+  (auch im Lagebild-Paneel und im Palettenauszug, LLH-1365), der Namenszusatz aus
+  `MIT_ERLAEUTERUNG`. Welche Zellen etwas sagen und in welcher Folge, entscheidet nur
+  `pages/gefahren/erlaeuterungen.ts` (`zellenMitErlaeuterung`, `gesetzteGefahren`) — für
+  Matrix, Lagebild, Palettenauszug, Lagekarte und Lagevortrag.
 - **Sichtung ist eine eigene Achse nach BBK** und die Ausnahme vom Neuentwurf:
   SK I rot, II gelb, III grün, IV blau, Tote schwarz, „unverletzt" ohne Farbe. **Angezeigt** wird
   als umrandetes Farbfeld (`SichtungsTag`/`sichtungsfarben`); die Umrandung macht Gelb auf hellem
