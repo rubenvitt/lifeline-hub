@@ -170,8 +170,8 @@ for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
       'Vorbedingung: der Deckkraft-Schieber ist gesperrt',
     ).toHaveCount(1);
     await expect(
-      page.locator('section[data-paneel="zeichnen"]'),
-      'Vorbedingung: ohne Schreibrecht kein Zeichnen-Paneel',
+      page.getByRole('button', { name: 'Zeichenwerkzeuge', exact: true }),
+      'Vorbedingung: ohne Schreibrecht kein Knopf „Zeichenwerkzeuge“',
     ).toHaveCount(0);
 
     // ── Fachebenen: keine Beschriftung ragt aus der Leiste (wie beim Admin) ─────────

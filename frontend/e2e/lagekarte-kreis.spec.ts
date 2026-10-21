@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { zeigeLeistenAnsicht } from './leisten-kern';
+import { waehleWerkzeug } from './leisten-kern';
 
 /**
- * Kreis um einen Punkt am Fükw (LLH-1043, Spec `lagekarte-zeichnen`): Start im Paneel
- * „Zeichnen“, Mitte per Klick, Radius als Zahl, „Übernehmen“ legt an; der Inspector ändert den
+ * Kreis um einen Punkt am Fükw (LLH-1043, Spec `lagekarte-zeichnen`): Start im Werkzeugmenü
+ * an der Karte, Mitte per Klick, Radius als Zahl, „Übernehmen“ legt an; der Inspector ändert den
  * Radius; der Link mit `:kreis&radius&mitte` belegt vor und räumt. Vitest belegt Band, Reducer und
  * Rechnung; hier: die echte Karte (Vorschau-Ebenen `td-zone-kreis-*`) und der echte Server
  * (Polygon, Kreisangaben, ETB).
@@ -92,7 +92,7 @@ async function etb(page: Page, eid: number): Promise<string[]> {
   return ((await r.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
-test('Kreis: Paneel, Mitte per Klick, 300 m, Übernehmen; Inspector ändert den Radius', async ({
+test('Kreis: Werkzeugmenü, Mitte per Klick, 300 m, Übernehmen; Inspector ändert den Radius', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -100,9 +100,8 @@ test('Kreis: Paneel, Mitte per Klick, 300 m, Übernehmen; Inspector ändert den 
   page.on('pageerror', (f) => seitenFehler.push(f));
   const { eid, canvas } = await lagekarteOeffnen(page);
 
-  // Das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“ der Leiste (LLH-1028).
-  await zeigeLeistenAnsicht(page, 'Objekte');
-  await page.getByRole('button', { name: 'Absperrbereich als Kreis' }).click();
+  // Der Kreis ist eine Form im Werkzeugmenü an der Karte (LLH-1038).
+  await waehleWerkzeug(page, 'Absperrbereich als Kreis');
   const band = page.locator('[data-lfh="kreis-steuerung"]');
   await expect(band).toBeVisible();
   // Kein terra-draw-Zeichnen im Kreis-Modus: die Zeichnen-Steuerung fehlt.

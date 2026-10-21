@@ -166,12 +166,6 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Nur „diese Person hat hier Push gewählt“ (LLH-1223), damit ihre nächste Sitzung das Abo wieder anmeldet; das Abo selbst liegt am Server und fällt mit der Sitzung.',
   },
   {
-    ort: 'localStorage lfh:lagekarte:paneele',
-    datei: 'pages/lagekarte/KlappPaneel.tsx',
-    entscheidung: 'bleibt',
-    grund: 'Geräte-Einstellung der Lagekarte (Paneele offen/zu), ohne Personenbezug.',
-  },
-  {
     ort: 'localStorage lfh:lagekarte:zeitachse-eingeklappt',
     datei: 'pages/lagekarte/SnapshotLeiste.tsx',
     entscheidung: 'bleibt',

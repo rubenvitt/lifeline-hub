@@ -57,7 +57,7 @@ function lesen(klasse: LeistenKlasse): boolean | null {
  * unbekannt ist. Das Einhängen schreibt nichts, sonst würde die Vorgabe zur Wahl.
  *
  * `merke` ist das eigene Umschalten und wird gespeichert. `zeige` öffnet nur für die Sitzung, für
- * eine Handlung, die die Leiste braucht (Stift über der Karte) — gespeichert, öffnete ein
+ * eine Handlung, die die Leiste braucht (`?ort=`) — gespeichert, öffnete ein
  * Stiftklick die Leiste am Handschirm nach jedem Neuladen. Das nächste `merke` löst es ab.
  *
  * `umschalteImModus` ist das Umschalten während eines Kartenmodus unter `lg` (LFH-765): es gilt nur
@@ -178,7 +178,7 @@ export function useLeistenAnsicht() {
 
 export const BAUM_KLAPP_SCHLUESSEL = 'lfh:lagekarte:ebenen-gruppen';
 
-/** Offen/zu je Knoten des Ebenenbaums, je Gerät gemerkt (Muster `usePaneelZustand`). */
+/** Offen/zu je Knoten des Ebenenbaums, je Gerät gemerkt. */
 export function useBaumKlapp() {
   const [offen, setOffen] = useState<Record<BaumKnoten, boolean>>(() =>
     baumKlappLesen(sicherLesen(BAUM_KLAPP_SCHLUESSEL)),

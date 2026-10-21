@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App, Breadcrumb, Button, Typography } from 'antd';
@@ -68,6 +68,8 @@ import Kartenflaeche, {
 } from './lagekarte/Kartenflaeche';
 import { kontextEintraege, kontextMenueItems, kopiereKoordinate } from './lagekarte/kontextmenue';
 import ZeichenHierDialog from './lagekarte/ZeichenHierDialog';
+import ZeichenWahlDialog from './lagekarte/ZeichenWahlDialog';
+import Werkzeugmenue from './lagekarte/Werkzeugmenue';
 import type { GriffModus, KantenAus } from './lagekarte/bildGriffe';
 import Sidebar, { platzierObjekt } from './lagekarte/Sidebar';
 import Inspector from './lagekarte/Inspector';
@@ -108,6 +110,7 @@ import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
 import KartenUeberlagerung, {
   GrundlageHinweis,
   GrundlageLeiste,
+  ZEICHENWERKZEUGE_KNOPF,
 } from './lagekarte/KartenUeberlagerung';
 import { erzeugeZeigerQuelle } from './lagekarte/mausPosition';
 import { startAnsicht } from './lagekarte/startAnsicht';
@@ -200,8 +203,15 @@ export default function LagekartePage() {
   // Band des Kartenfußes, in das die MapLibre-Maßstabsleiste gehängt wird. State statt Ref, damit
   // `Kartenflaeche` den Effekt fährt, sobald das Band im Baum steht.
   const [massstabZiel, setMassstabZiel] = useState<HTMLDivElement | null>(null);
-  // Zeichnen-Knopf über der Karte → Paneel „Zeichnen" der Leiste öffnen (Zähler, s. Sidebar).
-  const [zeichnenAnfrage, setZeichnenAnfrage] = useState(0);
+  // Werkzeugmenü an der Karte (LLH-1038): der Knopf steht in `KartenUeberlagerung`, die Fläche im
+  // Kartenfuß — Geschwister, deshalb hält die Seite den Zustand. „Weitere …“ öffnet den Picker als
+  // Dialog; die Quelle sagt, ob er das Suchfeld fokussiert.
+  const werkzeugmenueId = useId();
+  const [werkzeugmenueOffen, setWerkzeugmenueOffen] = useState(false);
+  const [zeichenWahl, setZeichenWahl] = useState<{ offen: boolean; quelle: 'maus' | 'touch' }>({
+    offen: false,
+    quelle: 'maus',
+  });
   // Laufende Messung: die Karte meldet, nur das Mess-Band rendert mit (`messQuelle.ts`).
   const messQuelle = useMemo(() => erzeugeMessQuelle(), []);
 
@@ -289,6 +299,9 @@ export default function LagekartePage() {
     einsatz: einsatzDaten,
     abschnitteOhneFlaeche,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
+  // Fällt das Schreibrecht weg (eingefrorener Stand, Rolle), ist das Menü zu und bleibt es auch
+  // danach — im Render statt per Effekt (React: State bei Prop-Wechsel anpassen).
+  if (!darfSchreiben && werkzeugmenueOffen) setWerkzeugmenueOffen(false);
 
   // Abschnittsflächen für die Karte mit stabiler Identität: die Karte setzt sie bei neuer Liste
   // per `setData` neu, und die Seite rendert bei jedem Eigenpositions-Fix (LFH-945, D5).
@@ -1048,9 +1061,10 @@ export default function LagekartePage() {
 
   /**
    * Zeichnen-Auftrag von außen (LFH-825): `?zeichnen=gefahrengebiet` betritt den Zonen-Zeichenmodus
-   * wie der Knopf im Paneel (Schnellaktion „Gefahrengebiet zeichnen“ der Sprungpalette). Gleiches
-   * Muster wie der Platzier-Auftrag oben: Lade-Riegel vor dem Räumen, nur mit `darfSchreiben`
-   * (im Historien-Modus schon `false`), anwenden, dann räumen — auch einen ungültigen Auftrag.
+   * wie der Eintrag im Werkzeugmenü (Schnellaktion „Gefahrengebiet zeichnen“ der Sprungpalette).
+   * Gleiches Muster wie der Platzier-Auftrag oben: Lade-Riegel vor dem Räumen, nur mit
+   * `darfSchreiben` (im Historien-Modus schon `false`), anwenden, dann räumen — auch einen
+   * ungültigen Auftrag.
    *
    * Der Parameter wird als LITERAL gelesen: daran erkennt `schnellaktionen.guard.test.ts` die
    * Seite als Leser. Hinter einer Konstante wird der Guard rot.
@@ -1635,17 +1649,14 @@ export default function LagekartePage() {
               }
             : undefined
         }
-        onZeichnen={
+        // Ohne Schreibrecht (auch im eingefrorenen Stand) kein Knopf; die Leiste bleibt, wie sie
+        // ist (Spec `lagekarte-kartenleiste`).
+        zeichenwerkzeuge={
           darfSchreiben
-            ? () => {
-                // Unter `lg` im Kartenmodus gilt nur die Wahl für den Modus: `zeige()` bliebe dort
-                // wirkungslos und öffnete die Leiste erst nach dem Modus (LFH-765).
-                if (!breit && exklusiverModusAktiv) leistenWahl.umschalteImModus(true);
-                else leistenWahl.zeige();
-                // Das Paneel „Zeichnen“ steht in der Ansicht „Objekte“, auch vor einer Auswahl.
-                leistenAnsicht.wechsle('objekte');
-                verlasseAuswahl();
-                setZeichnenAnfrage((n) => n + 1);
+            ? {
+                offen: werkzeugmenueOffen,
+                steuert: werkzeugmenueId,
+                onUmschalten: () => setWerkzeugmenueOffen((offen) => !offen),
               }
             : undefined
         }
@@ -1654,6 +1665,21 @@ export default function LagekartePage() {
           einer Spalte — zwei Elemente im Fluss überlagern sich nicht. Begründung in
           `lagekarte/KartenFuss.tsx`. */}
       <KartenFuss>
+        {/* Das Werkzeugmenü steht oben im Fuß-Rahmen: neben der Knopfspalte, über allen Bändern,
+            nie darüber (LLH-1038, design.md D1). */}
+        {darfSchreiben && werkzeugmenueOffen && (
+          <Werkzeugmenue
+            id={werkzeugmenueId}
+            onSchliessen={() => setWerkzeugmenueOffen(false)}
+            onZone={onZoneZeichnenStart}
+            onZeichen={onZeichenPlatzierenStart}
+            onWeitere={(quelle) => setZeichenWahl({ offen: true, quelle })}
+            zeichenLaeuft={zeichenPlatzieren != null}
+            knopf={() =>
+              document.querySelector<HTMLElement>(`[data-lfh="${ZEICHENWERKZEUGE_KNOPF}"]`)
+            }
+          />
+        )}
         <ZeichnenSteuerung
           aktiv={
             (zoneEntwurf != null && kreisEntwurf == null) ||
@@ -1790,8 +1816,7 @@ export default function LagekartePage() {
       id="lagekarte-leiste"
       aria-label="Kartenleiste"
       // Ausgeblendet bleibt die Leiste montiert: abgehängt verlöre die Sidebar ihren Zustand
-      // (Zeichen-Entwurf, Suche, Rollposition), und ihr Effekt auf `zeichnenAnfrage` feuerte beim
-      // Wiedereinhängen erneut.
+      // (Suche, Filter, Klappzustand, Rollposition).
       hidden={!leisteIstSichtbar}
       style={
         !leisteIstSichtbar
@@ -1825,9 +1850,6 @@ export default function LagekartePage() {
         onPlatzierenStart={onPlatzierenStart}
         onPlatzierenAbbrechen={onPlatzierenAbbrechen}
         onAbschnittZeichnenStart={onAbschnittZeichnenStart}
-        onZoneZeichnenStart={onZoneZeichnenStart}
-        zeichenPlatzieren={zeichenPlatzieren}
-        onZeichenPlatzierenStart={onZeichenPlatzierenStart}
         onZeichenPlatzierenAbbrechen={onZeichenPlatzierenAbbrechen}
         zeichenSerie={zeichenSerie}
         onZeichenSerieWechsel={setZeichenSerie}
@@ -1905,7 +1927,6 @@ export default function LagekartePage() {
         ansichtBusy={ansichtBusy}
         ansichtFehler={ansichtGruendeImPaneel}
         auswahl={auswahlInhalt}
-        zeichnenAnfrage={zeichnenAnfrage}
         /* Drei Sektionen, drei Ursachen. Der Slot an der Objektliste hängt an denselben elf
            Lagebild-Quellen wie das Overlay; er trägt den erneuten Abruf — die Handlung, die das
            Overlay nicht anbietet, weil es für elf Quellen zugleich spricht. */
@@ -1993,6 +2014,18 @@ export default function LagekartePage() {
           {karte}
           {leiste}
         </div>
+        {/* „Weitere …“ im Werkzeugmenü (LLH-1038): der Picker als Dialog, Entwurf bleibt. */}
+        {darfSchreiben && (
+          <ZeichenWahlDialog
+            offen={zeichenWahl.offen}
+            quelle={zeichenWahl.quelle}
+            onPlatzieren={(spec) => {
+              setZeichenWahl((z) => ({ ...z, offen: false }));
+              onZeichenPlatzierenStart(spec);
+            }}
+            onAbbrechen={() => setZeichenWahl((z) => ({ ...z, offen: false }))}
+          />
+        )}
         {/* „Hier Zeichen setzen“ aus dem Kontextmenü (LFH-776, D7): öffnet nach dem Menü. */}
         <ZeichenHierDialog
           offen={zeichenHier != null}

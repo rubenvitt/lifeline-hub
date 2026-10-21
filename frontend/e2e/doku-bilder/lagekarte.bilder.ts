@@ -4,7 +4,13 @@ import {
   kartenConfigBeantworten,
   vektorStilBeantworten,
 } from '../kartenFixture';
-import { objektListe, objektZeile, oeffneObjektGruppe, zeigeLeistenAnsicht } from '../leisten-kern';
+import {
+  objektListe,
+  objektZeile,
+  oeffneObjektGruppe,
+  oeffneZeichenWahl,
+  waehleWerkzeug,
+} from '../leisten-kern';
 import {
   anmelden,
   demoEinsatz,
@@ -28,7 +34,7 @@ import {
  *                          frontend/src/pages/lagekarte/markerLayer.ts (Raumzeichen, LLH-1107)
  *   objektliste.png        frontend/src/pages/lagekarte/MarkerSuche.tsx (Ansicht „Objekte“),
  *                          frontend/src/pages/lagekarte/objektsuche.ts
- *   taktisches-zeichen.png frontend/src/pages/lagekarte/Sidebar.tsx (Paneel „Zeichnen“),
+ *   taktisches-zeichen.png frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx,
  *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx,
  *                          frontend/src/pages/lagekarte/zeichenWahl.ts
  *   zone-zeichnen.png      frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx
@@ -185,18 +191,17 @@ test.describe(KAPITEL, () => {
   });
 
   test('Taktisches Zeichen wählen', async ({ page }) => {
-    // Das Paneel ist mit offener Zeichenwahl höher als der Fükw; so steht es ganz im Bild.
+    // Der Dialog ist mit offener Zeichenwahl höher als der Fükw; so steht er ganz im Bild.
     await page.setViewportSize({ width: 1440, height: 1500 });
     const canvas = await oeffneKarte(page);
-    await zeigeLeistenAnsicht(page, 'Objekte');
-    const zeichnen = page.locator('section[data-paneel="zeichnen"]');
-    await zeichnen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
+    const zeichnen = await oeffneZeichenWahl(page);
     const grundzeichen = zeichnen.getByRole('radiogroup', { name: 'Grundzeichen' });
     await grundzeichen.getByRole('radio', { name: 'Landfahrzeug', exact: true }).click();
     await expect(zeichnen.getByRole('button', { name: 'Platzieren' })).toBeVisible();
     await page.mouse.move(0, 0);
-    await fotografiere(zeichnen, KAPITEL, 'taktisches-zeichen');
+    await fotografiere(page.locator('.ant-modal'), KAPITEL, 'taktisches-zeichen');
     await zeichnen.getByRole('button', { name: 'Platzieren' }).click();
+    await expect(zeichnen).toBeHidden();
     await tippe(page, canvas, 220, 40);
     await expect(page.getByText('Taktisches Zeichen angelegt')).toBeVisible();
     // „Weitere platzieren“ ist an: der Modus bleibt, bis „Fertig“ ihn beendet.
@@ -204,15 +209,12 @@ test.describe(KAPITEL, () => {
     const band = page.locator('[data-modus-band="zeichen"]');
     await expect(band.getByText('1 platziert')).toBeVisible();
     await band.getByRole('button', { name: 'Fertig' }).click();
-    await expect(
-      zeichnen.getByRole('button', { name: 'Taktisches Zeichen platzieren' }),
-    ).toBeVisible();
+    await expect(band).toHaveCount(0);
   });
 
   test('Zone zeichnen', async ({ page }) => {
     const canvas = await oeffneKarte(page);
-    await zeigeLeistenAnsicht(page, 'Objekte');
-    await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+    await waehleWerkzeug(page, 'Gefahrengebiet');
     await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
     await expect(canvas).toHaveCSS('cursor', 'crosshair');
     await tippe(page, canvas, -160, -160);
