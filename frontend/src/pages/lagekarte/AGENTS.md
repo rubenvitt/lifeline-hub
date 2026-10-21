@@ -53,7 +53,7 @@ diese Zusage.
   Ort-Vorschau kennt keine Stellen (`src/geocoding/marker.rs`); Verortung ohne ETB, live über
   `Geschrieben::still_geaendert`; Zonentyp `evakuierungsbezirk` (`lage_zone.evakuierungsbezirk_id`).
 - **Bereitstellungsräume auf der Karte** (LLH-1107, Spec `bereitstellungsraum-lagekarte`): Muster
-  der Betreuung (`alleVerortet`, „Nicht verortet“, `?platzieren=bereitstellungsraum:<id>`, Sperre
+  der Betreuung (`alleVerortet`, Objektliste, `?platzieren=bereitstellungsraum:<id>`, Sperre
   an der Datenquelle `pages/lagekarte/brEbene.ts`, Fach `einsatzKeys.br` der Modulseite). Das
   Zeichen D.2.1 hängt am Typ (`bereitstellungsraumZeichen` in `zeichen/fachobjektZeichen.ts`),
   nicht an `tz`. Die Plakette ist `label` plus `beschriftungZusatz`: Fahrzeuge nur aus `belegung`,
@@ -63,7 +63,7 @@ diese Zusage.
   Die Räume fließen über die Marker-Quelle, also ohne eigenen Schlüssel für
   `wendeKartenDatenAn` (sie gehen mit `marker`).
 - **Tiere auf der Karte** (LLH-1123, Spec `tier-lagekarte`): Muster der Bereitstellungsräume
-  (`alleVerortet`, „Nicht verortet“, `?platzieren=tier:<id>`, Sperre an der Datenquelle
+  (`alleVerortet`, Objektliste, `?platzieren=tier:<id>`, Sperre an der Datenquelle
   `pages/lagekarte/tierEbene.ts`, Fach `einsatzKeys.tiere`). Nur `aktiv` und `vermisst` stehen auf der
   Karte, abgeschlossene und stornierte nie. DV 102 kennt kein Tier ohne Zustand: der Marker bleibt
   ein Kreis mit Kurzzeichen „T“ (`tierMarker.ts`), kein Eigenbau-Zeichen; vermisst heißt Rolle
@@ -79,9 +79,10 @@ diese Zusage.
   modulgebundene Quelle bekommt dasselbe Gate; der Modul-Key folgt `PFAD_KEY` in
   `src/einsatz/modul.rs`.
 - **Objektsuche/Zeichenwahl** (LFH-716,
-  `openspec/changes/archive/2026-09-29-lfh-716-lagekarte-markersuche-zeichenpicker/design.md`): `MarkerSuche` über
-  `suchbareMarker`
-  (`pages/lagekarte/objektsuche.ts`) prüft Modulsperre **je Typ**; Enter sendet über `onAbsenden`
+  `openspec/changes/archive/2026-09-29-lfh-716-lagekarte-markersuche-zeichenpicker/design.md`): die
+  Objektliste (`MarkerSuche`) liest `objektEintraege` über `suchbareMarker`
+  (`pages/lagekarte/objektsuche.ts`); beide prüfen die Modulsperre **je Typ**, auch für die nicht
+  verorteten (nicht nur an der Datenquelle). Enter sendet über `onAbsenden`
   mit Spec; `FreiesZeichenInspector` entprellt (600 ms) mit eigenem Merker, Bezeichnung
   kontrolliert. Enter-Tests über `userEvent.keyboard`.
 - **Ortssuche im Objektsuchfeld** (LFH-638, Spec `lagekarte-ortssuche`,
@@ -154,18 +155,37 @@ diese Zusage.
   Karte bleiben“, unter `lg` im Fuß-Band, ab `lg` im Modus-Band der Leiste — je Breite genau ein
   Knopf je Handlung. Der **Rückweg** folgt allein aus Typ und Kennung (`rueckwegPfad`, exhaustiver
   `Record`; UHS ohne äußeren Einstieg `null`), nie aus der URL (kein offener Weiterleiter). Ein
-  Start in der Karte selbst („Nicht verortet“, Einsatzort) endet wie bisher mit Toast und
+  Start in der Karte selbst (Objektliste, Einsatzort) endet wie bisher mit Toast und
   Modusende (LFH-765). Nachweis `e2e/lagekarte-betroffene.spec.ts`, `e2e/lagekarte-touch.spec.ts`.
-- **Die Kartenleiste hat zwei Ansichten** (LLH-1028, Spec `lagekarte-kartenleiste`): erste Zeile
-  ist eine `Segmentleiste` (`rolle="tablist"`) „Ebenen“ · „Objekte“ auf festen Dritteln
-  (`.lfh-leisten-ansichten` in `lagekarte.css`; das dritte Drittel bleibt frei). Beide Tabpanels
-  bleiben montiert (`hidden`): Suchbegriffe, Filter, Klappzustand und Entwürfe überleben Wechsel und
-  Modus ohne eigenen Speicher. Die Ansicht hält `LagekartePage` (`useLeistenAnsicht`, je Gerät,
-  `lfh:lagekarte:leiste-ansicht`), weil die Seite entscheidet, ob ein abgelehnter
-  Ansichts-Speicherversuch im Kopf der Ebenen oder als Kartenhinweis steht (Kopf nur bei sichtbarer
-  Leiste UND „Ebenen“ vorn; LFH-1077). „Zeichenwerkzeuge“ und `?ort=` schalten auf „Objekte“ und
-  merken das wie ein Tipp. „Ausgewählt“ steht über beiden Ansichten, „Objekte“ trägt die
-  bisherigen Paneele (`ObjekteAnsicht` in `Sidebar.tsx`). e2e-Wege: `e2e/leisten-kern.ts`.
+- **Die Kartenleiste hat drei Ansichten** (LLH-1028, LLH-1033, Spec `lagekarte-kartenleiste`):
+  erste Zeile ist eine `Segmentleiste` (`rolle="tablist"`) „Ebenen“ · „Objekte“ · „Auswahl“ auf
+  festen Dritteln (`.lfh-leisten-ansichten`, mit Auswahl `--drei` in `lagekarte.css`). „Auswahl“
+  gibt es nur mit einer Auswahl; ohne sie bleibt ihr Drittel leer (kein gesperrtes Segment). Alle
+  Tabpanels bleiben montiert (`hidden`): Suchbegriffe, Filter, Klappzustand und Entwürfe überleben
+  Wechsel und Modus ohne eigenen Speicher; die Rollfläche merkt sich ihre Lage je Ansicht,
+  „Auswahl“ beginnt oben. Die gemerkte Ansicht hält `LagekartePage` (`useLeistenAnsicht`, je
+  Gerät, `lfh:lagekarte:leiste-ansicht`, nur „Ebenen“/„Objekte“), den Vorrang der Auswahl
+  `useAuswahlVorn` (Seitenzustand, nie gespeichert: eine neue Auswahl-Kennung und jeder Tipp auf
+  einen Marker oder eine Zeile holen sie nach vorn, ein Tipp auf „Ebenen“/„Objekte“ lässt sie
+  bestehen). Die Seite entscheidet daraus, ob ein abgelehnter Ansichts-Speicherversuch im Kopf der
+  Ebenen oder als Kartenhinweis steht (Kopf nur bei sichtbarer Leiste UND „Ebenen“ gezeigt;
+  LFH-1077). Rückweg „← Ebenen/Objekte“ im Kopf der Auswahl hebt alle Auswahlen auf; Esc ebenso
+  (Zuhörer der Seite, nur bei offener Auswahl, nicht bei Zeichnen/Kreis/Messen, Overlay, Feld,
+  `repeat`). Esc-Reihenfolge: offenes Bündel (`Kartenflaeche`, Capture-Phase, nimmt die Taste)
+  → Auswahl → Fokus; jede Stufe setzt `preventDefault`, jede prüft `defaultPrevented`.
+  „Zeichenwerkzeuge“ und `?ort=` schalten auf „Objekte“, merken das wie ein Tipp und lassen die
+  Auswahl bestehen. e2e-Wege: `e2e/leisten-kern.ts`.
+- **Objekte = eine Liste** (LLH-1033, Spec `lagekarte-objektsuche`, `MarkerSuche.tsx`): Suchfeld,
+  Marke „Nicht verortet“ (`SegmentUmschalter`, Filter; 0 → „Alles verortet“, Lagebild-Ausfall →
+  „—“), der Einsatzort als erste Zeile, darunter Gruppen je Art (`OBJEKT_GRUPPEN`, fester Rang,
+  Kopf „verortet/gesamt“, nur-verortete Arten nur die Zahl), ohne Begriff zu und je Gerät gemerkt
+  (`lfh:lagekarte:objekte-gruppen`, `useObjektKlapp`), mit Begriff/Filter vorläufig offen. Gruppiert
+  wird rein (`gruppiereObjekte`). Eine verortete Zeile ist ein `<button>` (anfliegen, auswählen),
+  eine nicht verortete trägt nur „Platzieren“/„Fläche zeichnen“ bzw. „nicht verortet“; das laufende
+  Ziel steht bei jedem Filter mit „wird platziert“ (Abbrechen im Modus-Band). Ein Abschnitt ohne
+  Fläche ist zusätzlich wählbar (`istWaehlbar`): Inspector mit `ohneOrt`, Marker aus
+  `abschnittOhneFlaeche` (`marker.ts`), nie in Karten- oder Wählliste. Kein Typ-Zeichen je Zeile,
+  keine `unterEbene` an der `Liste` (Auswahlliste, LFH-826).
 - **Ebenen = ein Ebenenbaum** (LLH-1028, `Ebenenbaum.tsx`, lagekarte-eigen): Gruppen und
   Untergruppen sind Daten (`EBENEN_GRUPPEN`, `FACHEBENEN_GRUPPEN` in `leistenDaten.ts`, Wächter
   „jede Ebene genau einmal“) — eine neue Ebene bekommt dort ihre Gruppe. Eine Zeilenform für eigene
@@ -277,8 +297,10 @@ diese Zusage.
 - Einstieg nur über „Abschnitt fokussieren“ im `Inspector` (Prop `onAbschnittFokussieren`), nicht
   an der Listenzeile; Band `FokusBand.tsx` im `KartenFuss`. Kamera über
   `KartenHandle.fokussiere`/`stelleKameraHer` (`fokusKamera.ts`, `BEDIENUNG`): der Stand vor dem
-  ersten Fokus bleibt beim Wechsel A → B. Esc nur bei aktivem Fokus und ohne Modus: erst die
-  Auswahl, dann der Fokus (`escZiel`). `?abschnitt=<id>` liest die Seite als Literal, wartet auf
+  ersten Fokus bleibt beim Wechsel A → B. Esc nur bei aktivem Fokus und ohne Modus: erst ein
+  offenes Bündel, dann die Auswahl, dann der Fokus (`escZiel`; der Auswahl-Zuhörer der Seite und
+  dieser nehmen die Taste, wer sie genommen sieht, tut nichts). Ein Abschnitt ohne Fläche kommt
+  über die Objektliste in den Inspector (siehe „Objekte = eine Liste“). `?abschnitt=<id>` liest die Seite als Literal, wartet auf
   `ladt` und `start`, räumt immer.
 
 **Zielgliederung der Leiste (LLH-1023, Entscheidung 20.10.2026) — Zielbild, noch nicht gebaut**
@@ -287,29 +309,13 @@ Vorgabe für jeden Umbau der Kartenleiste. Bis ein Punkt gebaut ist, gelten die 
 unverändert; das Ticket, das ihn baut, schreibt die betroffene Regel oben und die Specs fort und
 streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekarte-leiste/README.md`.
 
-- **Drittes Segment „Auswahl“** im freien Drittel der Segmentleiste (Ebenen · Objekte stehen,
-  siehe oben). „Auswahl“ gibt es nur mit einer Auswahl; ohne sie bleibt ihr Drittel leer (kein
-  gesperrtes Segment), damit die anderen nicht wandern. Die Leiste bleibt 300 px und Inhalt (Kopf,
-  LFH-557): keine Reiter am Kartenrand, kein Drawer, keine neue Breite. Ein neuer Klappzustand
-  (Objekt-Gruppen) bekommt einen Schlüssel in `GERAETESPEICHER`.
-- **Auswahl:** eine neue Auswahl schaltet auf „Auswahl“ (Inspectors wie heute, mehrere
-  untereinander). Der Rückweg im Kopf benennt das Ziel („← Ebenen“, „← Objekte“), hebt die
-  Auswahl auf und zeigt die vorige Ansicht samt Suchbegriff, Filter und Klappzustand. Esc wirkt
-  genauso, aber nur, wenn kein Modus die Taste hat (Zeichnen zweistufig, Messen), kein Overlay
-  offen ist (`escGehoertOverlay`) und der Fokus in keinem Feld steht. Ein Tipp auf „Ebenen“ oder
-  „Objekte“ lässt die Auswahl bestehen.
-- **Objekte = eine Liste** verorteter und nicht verorteter Objekte, nach Typ gruppiert
-  („verortet/gesamt“), ein Suchfeld (Objekt, Koordinate, Adresse auf Enter wie LFH-638). „Nicht
-  verortet“ ist eine Marke im Kopf, die den Filter setzt (0 → „Alles verortet“, Ausfall → „—“),
-  keine eigene Langliste. Eine verortete Zeile ist ein Ziel (anfliegen, auswählen), eine nicht
-  verortete trägt nur „Platzieren“ bzw. „Fläche zeichnen“; das laufende Ziel bleibt bei jedem
-  Filter stehen. Der Einsatzort ist die erste Zeile, kein eigenes Paneel. Keine `unterEbene` an
-  der `Liste` (Auswahlliste, LFH-826).
+- **Die Leiste bleibt 300 px** und Inhalt (Kopf, LFH-557): keine Reiter am Kartenrand, kein
+  Drawer, keine neue Breite. Ein neuer Klappzustand bekommt einen Schlüssel in `GERAETESPEICHER`.
 - **Zeichnen an der Karte:** der Knopf „Zeichenwerkzeuge“ öffnet ein Werkzeugmenü an diesem Knopf
   (Flächen und Linien, Taktisches Zeichen mit „Zuletzt verwendet“, Picker als Dialog); kein
   `PunktankerMenue`, keine Klickebene. Die Leiste trägt keinen Zeichenweg. Messen bleibt der
   eigene Knopf, seine Formen stehen in `MessSteuerung`, nicht im Menü.
-- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum — gebaut, Regeln oben; „Ausgewählt“
-  steht bis LLH-1033 über beiden Ansichten) → LLH-1033 (Objekte, Auswahl) → LLH-1038
+- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum) und LLH-1033 (Objekte, Auswahl) sind
+  gebaut (Regeln oben; das Paneel „Zeichnen“ steht bis LLH-1038 unter der Objektliste) → LLH-1038
   (Werkzeugmenü). Der Kreis (LLH-1043) kommt als Form ins Menü. „Abschnitt fokussieren“
   (LLH-1057) ist gebaut (Regel oben).

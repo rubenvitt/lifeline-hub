@@ -97,6 +97,7 @@ import type { Ecken } from '../../api/kartenbilder';
 import { BBOX_MIN_ZOOM } from './fachebenen';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import { PUNKT_ZOOM, type StartAnsicht } from './startAnsicht';
+import { escGehoertOverlay } from './zeichnenEsc';
 import { zonenPlakette } from './plakette';
 import { useRollen } from '../../components/instrument/rollenwerte';
 import { eigenpositionFc, sorgeFuerEigenpositionLayer } from './eigenpositionLayer';
@@ -1518,8 +1519,16 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     oeffneSpiderRef.current = oeffne;
     schliesseSpiderRef.current = schliesse;
 
+    // Esc klappt ein offenes Bündel ein und nimmt die Taste (LLH-1033): in der Capture-Phase am
+    // Fenster, also vor den Zuhörern der Seite — erst das Bündel, dann die Auswahl, dann der Fokus.
+    // Ohne offenes Bündel bleibt die Taste frei; ein offenes Overlay und ein Eingabefeld behalten sie.
     const aufKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') schliesse();
+      if (e.key !== 'Escape' || e.defaultPrevented || spiderOffenRef.current === null) return;
+      const ziel = e.target instanceof Element ? e.target : null;
+      if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (escGehoertOverlay(e)) return;
+      e.preventDefault();
+      schliesse();
     };
     // Karten-Klick: ein Personen-Cluster (WebGL-Layer) fächert auf, wenn der Tipp ihm gehört
     // (`klickzielAm`). Jeder andere Klick klappt ein.
@@ -1540,7 +1549,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       map.on('mouseenter', id, rein);
       map.on('mouseleave', id, raus);
     }
-    window.addEventListener('keydown', aufKey);
+    window.addEventListener('keydown', aufKey, true);
     return () => {
       map.off('movestart', schliesse);
       map.off('click', klick);
@@ -1548,7 +1557,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         map.off('mouseenter', id, rein);
         map.off('mouseleave', id, raus);
       }
-      window.removeEventListener('keydown', aufKey);
+      window.removeEventListener('keydown', aufKey, true);
       schliesse();
     };
   }, []);

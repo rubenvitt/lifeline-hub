@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { OBJEKTART } from './leistenDaten';
-import { TYP_REIHENFOLGE, gruppiereTreffer, suchbareMarker } from './objektsuche';
+import {
+  OBJEKT_GRUPPEN,
+  TYP_REIHENFOLGE,
+  gruppiereObjekte,
+  istWaehlbar,
+  objektEintraege,
+  suchbareMarker,
+  zielSchluessel,
+  type ObjektEintrag,
+} from './objektsuche';
 
 const m = (typ: MarkerTyp, id: number, label: string): KarteMarker => ({
   schluessel: `${typ}-${id}`,
@@ -100,56 +109,211 @@ describe('suchbareMarker — Modulsperren (LFH-716, D1)', () => {
   });
 });
 
-describe('gruppiereTreffer', () => {
-  it('filtert auf die Beschriftung, ohne Rücksicht auf Groß-/Kleinschreibung', () => {
-    const gruppen = gruppiereTreffer(
-      [m('einheit', 1, 'Florian Nord 1'), m('schaden', 2, 'Keller Nordstraße'), UHS],
-      'NORD',
+const e = (typ: MarkerTyp, id: number, label: string, verortet = true): ObjektEintrag => ({
+  schluessel: typ === 'einsatzort' ? 'einsatzort' : `${typ}-${id}`,
+  typ,
+  id,
+  label,
+  verortet,
+});
+
+describe('objektEintraege — eine Liste für verortet und nicht verortet (LLH-1033)', () => {
+  const basis = {
+    suchbar: [UHS, STELLE],
+    nichtVerortet: [
+      { typ: 'fahrzeug' as const, id: 7, label: 'Musterstadt 83-1' },
+      { typ: 'betreuungsstelle' as const, id: 8, label: 'AS Rathaus' },
+      { typ: 'bereitstellungsraum' as const, id: 9, label: 'BR Nord' },
+      { typ: 'tier' as const, id: 10, label: 'T-010 (Katze)' },
+    ],
+    einsatzortOhneOrt: false,
+    betreuungZugriff: 'frei' as const,
+    brZugriff: 'frei' as const,
+    tierZugriff: 'frei' as const,
+  };
+  const namen = (a: Parameters<typeof objektEintraege>[0]) =>
+    objektEintraege(a).map((x) => x.label);
+
+  it('führt verortete und nicht verortete Objekte mit Schlüssel im Markerschema', () => {
+    const liste = objektEintraege(basis);
+    expect(liste).toContainEqual(e('uhs', 1, 'UHS Süd'));
+    expect(liste).toContainEqual(e('fahrzeug', 7, 'Musterstadt 83-1', false));
+  });
+
+  it('der Einsatzort ohne Koordinate steht als nicht verortet in der Liste', () => {
+    expect(objektEintraege({ ...basis, einsatzortOhneOrt: true })).toContainEqual(
+      e('einsatzort', 0, 'Einsatzort', false),
     );
-    expect(gruppen.map((g) => `${g.label} (${g.treffer.length})`)).toEqual([
-      'Schaden (1)',
-      'Einheit (1)',
+    expect(namen(basis)).not.toContain('Einsatzort');
+  });
+
+  it.each([
+    ['betreuungZugriff', 'AS Rathaus'],
+    ['brZugriff', 'BR Nord'],
+    ['tierZugriff', 'T-010 (Katze)'],
+  ] as const)(
+    'Modulsperre je Typ auch für nicht verortete: ohne %s fehlt „%s“',
+    (schluessel, name) => {
+      for (const zugriff of ['gesperrt', 'ausgeblendet'] as const) {
+        const liste = namen({ ...basis, [schluessel]: zugriff });
+        expect(liste).not.toContain(name);
+        // Gegenaussage: gesperrt ist nur das eine Modul.
+        expect(liste).toContain('Musterstadt 83-1');
+      }
+    },
+  );
+
+  it('eine verortete Betreuungsstelle bleibt ohne Recht ebenso draußen', () => {
+    expect(namen({ ...basis, betreuungZugriff: 'gesperrt' })).not.toContain('Turnhalle Mitte');
+  });
+});
+
+describe('gruppiereObjekte (LLH-1033)', () => {
+  const ohne = { suche: '', nurNichtVerortet: false, angeheftet: null };
+  const liste = [
+    e('einsatzort', 0, 'Hauptstraße 1'),
+    e('einheit', 1, 'Florian Nord 1'),
+    e('schaden', 2, 'Keller Nordstraße'),
+    e('uhs', 3, 'UHS Süd'),
+    e('fahrzeug', 4, 'Musterstadt 83-1', false),
+    e('fahrzeug', 5, 'Musterstadt 11-1'),
+    e('abschnitt', 6, 'EA Süd', false),
+    e('person', 7, 'Müller, Anna'),
+  ];
+
+  it('ohne Begriff: Einsatzort als eigene Zeile, Gruppen in fester Reihenfolge', () => {
+    const r = gruppiereObjekte(liste, ohne);
+    expect(r.einsatzort?.label).toBe('Hauptstraße 1');
+    expect(r.gruppen.map((g) => g.typ)).toEqual([
+      'einheit',
+      'fahrzeug',
+      'abschnitt',
+      'uhs',
+      'schaden',
+      'person',
     ]);
   });
 
-  it('findet auch über die Objektart — ein unbenanntes Zeichen heißt überall gleich', () => {
-    // „(freies Zeichen)" ist unter „takt" zu finden.
-    const marker = [
-      m('freies_zeichen', 1, '(freies Zeichen)'),
-      m('fahrzeug', 2, 'Florian 11-1'),
-      UHS,
-    ];
-    expect(gruppiereTreffer(marker, 'takt').map((g) => g.typ)).toEqual(['freies_zeichen']);
-    expect(gruppiereTreffer(marker, 'fahrzeug').map((g) => g.typ)).toEqual(['fahrzeug']);
-  });
-
-  it('lässt leere Gruppen weg und zeigt bei leerer Suche alles', () => {
-    const marker = [UHS, m('einheit', 1, 'Florian 1')];
-    expect(gruppiereTreffer(marker, 'florian').map((g) => g.typ)).toEqual(['einheit']);
-    expect(
-      gruppiereTreffer(marker, '  ')
-        .map((g) => g.typ)
-        .sort(),
-    ).toEqual(['einheit', 'uhs']);
-  });
-
-  it('sortiert nach Trefferzahl absteigend', () => {
-    const gruppen = gruppiereTreffer(
-      [UHS, m('einheit', 1, 'A'), m('einheit', 2, 'B'), m('einheit', 3, 'C')],
-      '',
+  it('die feste Reihenfolge hängt nicht an der Eingabereihenfolge', () => {
+    const umgekehrt = gruppiereObjekte([...liste].reverse(), ohne);
+    expect(umgekehrt.gruppen.map((g) => g.typ)).toEqual(
+      gruppiereObjekte(liste, ohne).gruppen.map((g) => g.typ),
     );
-    expect(gruppen.map((g) => g.typ)).toEqual(['einheit', 'uhs']);
   });
 
-  it('ordnet gleich große Gruppen nach fester Reihenfolge, nicht nach Eingabereihenfolge', () => {
-    const a = gruppiereTreffer([m('fahrzeug', 1, 'F'), m('einsatzort', 0, 'E')], '');
-    const b = gruppiereTreffer([m('einsatzort', 0, 'E'), m('fahrzeug', 1, 'F')], '');
-    expect(a.map((g) => g.typ)).toEqual(['einsatzort', 'fahrzeug']);
-    expect(b.map((g) => g.typ)).toEqual(['einsatzort', 'fahrzeug']);
+  it('zählt verortet/gesamt je Gruppe und nennt Gruppen, die nur verortet geführt werden', () => {
+    const r = gruppiereObjekte(liste, ohne);
+    const fahrzeuge = r.gruppen.find((g) => g.typ === 'fahrzeug')!;
+    expect([fahrzeuge.verortet, fahrzeuge.gesamt, fahrzeuge.nurVerortet]).toEqual([1, 2, false]);
+    expect(r.gruppen.find((g) => g.typ === 'person')!.nurVerortet).toBe(true);
   });
 
-  it('beschriftet jede Gruppe mit der Objektart der Leiste', () => {
-    expect(gruppiereTreffer([STELLE], '')[0].label).toBe(OBJEKTART.betreuungsstelle);
+  it('beschriftet die Gruppen wie die Ebenen', () => {
+    const r = gruppiereObjekte(liste, ohne);
+    expect(r.gruppen.map((g) => g.label)).toEqual([
+      'Einheiten',
+      'Fahrzeuge',
+      'Abschnitte',
+      'UHS',
+      'Schäden',
+      'Betroffene',
+    ]);
+  });
+
+  it('ordnet die Zeilen einer Gruppe nach Namen, Zahlen natürlich', () => {
+    const r = gruppiereObjekte(liste, ohne);
+    expect(r.gruppen.find((g) => g.typ === 'fahrzeug')!.eintraege.map((x) => x.label)).toEqual([
+      'Musterstadt 11-1',
+      'Musterstadt 83-1',
+    ]);
+  });
+
+  it('Begriff grenzt über alle Objektarten ein, ohne Groß-/Kleinschreibung', () => {
+    const r = gruppiereObjekte(liste, { ...ohne, suche: 'NORD' });
+    expect(r.gruppen.map((g) => g.typ)).toEqual(['einheit', 'schaden']);
+    expect(r.einsatzort).toBeNull();
+  });
+
+  it('Begriff findet auch nicht verortete Objekte', () => {
+    const r = gruppiereObjekte(liste, { ...ohne, suche: '83' });
+    expect(r.gruppen).toHaveLength(1);
+    expect(r.gruppen[0].eintraege).toEqual([e('fahrzeug', 4, 'Musterstadt 83-1', false)]);
+  });
+
+  it('findet über die Objektart — ein unbenanntes Zeichen und der Gruppenname', () => {
+    const zeichen = [e('freies_zeichen', 1, '(freies Zeichen)'), ...liste];
+    expect(gruppiereObjekte(zeichen, { ...ohne, suche: 'takt' }).gruppen.map((g) => g.typ)).toEqual(
+      ['freies_zeichen'],
+    );
+    expect(
+      gruppiereObjekte(liste, { ...ohne, suche: 'fahrzeuge' }).gruppen.map((g) => g.typ),
+    ).toEqual(['fahrzeug']);
+    expect(gruppiereObjekte(liste, { ...ohne, suche: 'einsatzort' }).einsatzort).not.toBeNull();
+  });
+
+  it('mit Begriff: nach Trefferzahl absteigend, Gleichstand in fester Reihenfolge', () => {
+    const r = gruppiereObjekte(
+      [
+        e('uhs', 1, 'A Süd'),
+        e('uhs', 2, 'B Süd'),
+        e('einheit', 3, 'Süd 1'),
+        e('schaden', 4, 'Süd'),
+      ],
+      { ...ohne, suche: 'süd' },
+    );
+    expect(r.gruppen.map((g) => g.typ)).toEqual(['uhs', 'einheit', 'schaden']);
+  });
+
+  it('Filter „nur nicht verortet“ lässt nur nicht verortete stehen', () => {
+    const r = gruppiereObjekte(
+      [...liste.filter((x) => x.typ !== 'einsatzort'), e('einsatzort', 0, 'Einsatzort', false)],
+      { ...ohne, nurNichtVerortet: true },
+    );
+    expect(r.gruppen.flatMap((g) => g.eintraege.map((x) => x.label))).toEqual([
+      'Musterstadt 83-1',
+      'EA Süd',
+    ]);
+    expect(r.einsatzort?.verortet).toBe(false);
+    expect(gruppiereObjekte(liste, { ...ohne, nurNichtVerortet: true }).einsatzort).toBeNull();
+  });
+
+  it('zählt die nicht verorteten über die ganze Liste, unabhängig von Begriff und Filter', () => {
+    const mitOrt = [...liste, e('einsatzort', 0, 'Einsatzort', false)].filter(
+      (x) => x.schluessel !== 'einsatzort' || !x.verortet,
+    );
+    expect(gruppiereObjekte(mitOrt, { ...ohne, suche: 'xyz' }).nichtVerortet).toBe(3);
+  });
+
+  it('das laufende Platzierungsziel bleibt bei jedem Begriff und Filter stehen', () => {
+    const r = gruppiereObjekte(liste, {
+      suche: 'xyz',
+      nurNichtVerortet: true,
+      angeheftet: 'fahrzeug-4',
+    });
+    expect(r.gruppen.map((g) => g.typ)).toEqual(['fahrzeug']);
+    expect(r.gruppen[0].angeheftet).toBe(true);
+  });
+
+  it('der Einsatzort als Platzierungsziel bleibt ebenso stehen', () => {
+    const r = gruppiereObjekte(liste, { ...ohne, suche: 'xyz', angeheftet: 'einsatzort' });
+    expect(r.einsatzort?.label).toBe('Hauptstraße 1');
+  });
+});
+
+describe('zielSchluessel', () => {
+  it('bildet das Platzierungsziel auf den Schlüssel der Liste ab', () => {
+    expect(zielSchluessel({ typ: 'einsatzort', id: 0 })).toBe('einsatzort');
+    expect(zielSchluessel({ typ: 'fuehrung', id: 3 })).toBe('fuehrung-3');
+    expect(zielSchluessel(null)).toBeNull();
+  });
+});
+
+describe('istWaehlbar', () => {
+  it('verortete Zeilen und Abschnitte ohne Fläche sind ein Auswahlziel, andere nicht verortete nicht', () => {
+    expect(istWaehlbar(e('uhs', 1, 'U'))).toBe(true);
+    expect(istWaehlbar(e('abschnitt', 2, 'EA', false))).toBe(true);
+    expect(istWaehlbar(e('fahrzeug', 3, 'F', false))).toBe(false);
+    expect(istWaehlbar(e('einsatzort', 0, 'Einsatzort', false))).toBe(false);
   });
 });
 
@@ -158,5 +322,10 @@ describe('TYP_REIHENFOLGE', () => {
     const typen = Object.keys(OBJEKTART).sort();
     expect([...TYP_REIHENFOLGE].sort()).toEqual(typen);
     expect(new Set(TYP_REIHENFOLGE).size).toBe(TYP_REIHENFOLGE.length);
+  });
+
+  it('beginnt mit dem Einsatzort, danach die Gruppen der Liste in ihrer Reihenfolge', () => {
+    expect(TYP_REIHENFOLGE[0]).toBe('einsatzort');
+    expect(TYP_REIHENFOLGE.slice(1)).toEqual(OBJEKT_GRUPPEN.map((g) => g.typ));
   });
 });

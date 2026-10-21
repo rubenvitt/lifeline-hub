@@ -852,6 +852,26 @@ describe('Inspector: „Abschnitt fokussieren“ (LLH-1057)', () => {
     );
     expect(screen.queryByRole('button', { name: 'Abschnitt fokussieren' })).toBeNull();
   });
+
+  it('ohne Fläche (LLH-1033): Fokus und Sprung, aber weder Koordinate noch „Verortung löschen“', async () => {
+    const onFokussieren = vi.fn();
+    renderMitProviders(
+      <Inspector
+        einsatzId={1}
+        marker={abschnitt}
+        darfSchreiben
+        ohneOrt
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+        onAbschnittFokussieren={onFokussieren}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Abschnitt fokussieren' }));
+    expect(onFokussieren).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Im Fachmodul öffnen/ })).toBeInTheDocument();
+    expect(screen.queryByText('Koordinate')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verortung löschen' })).toBeNull();
+  });
 });
 
 describe('Inspector für Tiere (LLH-1123)', () => {

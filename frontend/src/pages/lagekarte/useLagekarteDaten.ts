@@ -40,6 +40,7 @@ import {
   baueFreieZeichenMarker,
   baueBetreuungMarker,
   buildBrMarker,
+  abschnittOhneFlaeche,
   baueAbschnittMarker,
 } from './marker';
 import { kreisAusZone, parsePolygon, parseGeometry, polygonZentroid } from './geo';
@@ -697,8 +698,17 @@ export function useLagekarteDaten({
     ],
     [nichtVerortet, taktisch.nichtVerortet, abschnitteRoh],
   );
+  // Abschnitte ohne Fläche als Auswahl der Objektliste (LLH-1033): Inspector ohne Ort, Fokus.
+  const abschnitteOhneFlaeche = useMemo(
+    () =>
+      (abschnitteRoh ?? [])
+        .filter((a) => !a.flaeche_geojson)
+        .map((a) => abschnittOhneFlaeche(a, orgDefault)),
+    [abschnitteRoh, orgDefault],
+  );
 
   return {
+    abschnitteOhneFlaeche,
     // Rohdaten-/Status-Durchreichungen (für Ladegate, Basemap/Fachebenen-Hooks, Panels).
     einsatz,
     darfSchreiben,

@@ -5,14 +5,13 @@ import { renderMitProviders } from '../../test/utils';
 import Sidebar, {
   bedienzielStil,
   ebenenZeileStil,
-  filtereNichtVerortet,
   leistenZeileStil,
   loeschDialogBild,
   namensteilStil,
-  NICHT_VERORTET_SUCHE_AB,
   platzierObjekt,
 } from './Sidebar';
-import type { NichtVerortet } from './marker';
+import type { MarkerTyp, NichtVerortet } from './marker';
+import type { ObjektEintrag } from './objektsuche';
 import { AusgangUnbekannt, NetzFehler } from '../../api/client';
 import type { SidebarProps } from './Sidebar';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
@@ -23,9 +22,8 @@ import { FREIE_SKIZZE_VORGABEFARBE } from './zonenStil';
 
 const basisProps: SidebarProps = {
   einsatzId: 1,
-  nichtVerortet: [],
   verortet: [],
-  suchbar: [],
+  objekte: [],
   darfSchreiben: true,
   platzierungZiel: null,
   onPlatzierenStart: vi.fn(),
@@ -42,7 +40,6 @@ const basisProps: SidebarProps = {
   zeichenSerieAnzahl: 0,
   onZeichenPlatzierenFertig: vi.fn(),
   onKoordinateEingeben: vi.fn(),
-  einsatzortVerortet: true,
   onEinsatzortPlatzieren: vi.fn(),
   layer: {
     einsatzort: true,
@@ -115,6 +112,17 @@ const basisProps: SidebarProps = {
   ansicht: 'objekte',
   onAnsichtWechsel: vi.fn(),
 };
+
+/** Ein Eintrag der Objektliste (`objektEintraege`). */
+function obj(typ: MarkerTyp, id: number, label: string, verortet = true): ObjektEintrag {
+  return {
+    schluessel: typ === 'einsatzort' ? 'einsatzort' : `${typ}-${id}`,
+    typ,
+    id,
+    label,
+    verortet,
+  };
+}
 
 /** Dieselbe Leiste mit der Ansicht „Ebenen“ vorn (Ebenenbaum, Fachebenen, Bilder, Grundlage). */
 const ebenenProps: SidebarProps = { ...basisProps, ansicht: 'ebenen' };
@@ -790,69 +798,69 @@ describe('Sidebar Bild-Hintergründe', () => {
 describe('Sidebar Fehler-Slots', () => {
   const slot = { text: 'Objektlisten konnten nicht geladen werden', onWiederholen: vi.fn() };
 
-  it('„Nicht verortet": Fehler-Slot statt der Erfolgsmeldung', () => {
+  it('Objektliste: Fehler-Slot statt „Alles verortet“', () => {
     renderMitProviders(
-      <Sidebar {...basisProps} nichtVerortet={[]} sektionFehler={{ nichtVerortet: slot }} />,
+      <Sidebar {...basisProps} objekte={[]} sektionFehler={{ nichtVerortet: slot }} />,
     );
     expect(screen.getByText('Objektlisten konnten nicht geladen werden')).toBeInTheDocument();
     // „Alles verortet" ist eine Erfolgsaussage und darf nicht stehen, wenn niemand weiß, ob
     // überhaupt etwas geladen wurde.
     expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
+    expect(screen.queryByText('Keine Kartenobjekte')).not.toBeInTheDocument();
   });
 
-  it('„Nicht verortet": ohne Fehler die Erfolgsmeldung und keinen Slot', () => {
-    const { container } = renderMitProviders(<Sidebar {...basisProps} nichtVerortet={[]} />);
+  it('Objektliste: ohne Fehler „Alles verortet“ an der Marke und kein Slot', () => {
+    const { container } = renderMitProviders(
+      <Sidebar {...basisProps} objekte={[obj('uhs', 1, 'UHS Nord')]} />,
+    );
     expect(screen.getByText('Alles verortet')).toBeInTheDocument();
     expect(screen.queryByText('Objektlisten konnten nicht geladen werden')).not.toBeInTheDocument();
-    /** „Alles verortet" ist ein Erfolgs-, kein Leerzustand: er bekommt keine Primäraktion. */
     expect(container.querySelector('.ant-empty')).toBeNull();
   });
 
   /**
-   * Ein Fehler ersetzt Inhalt nur, wenn es keinen Inhalt gibt. Die Zeilen unter „Nicht verortet"
-   * tragen die einzige Bedienung zum Verorten; fällt eine Lagebild-Quelle aus, während die übrigen
-   * Zeilen im Zwischenspeicher stehen, steht der Fehler als Banner darüber, nicht an ihrer Stelle.
+   * Ein Fehler ersetzt Inhalt nur, wenn es keinen Inhalt gibt. Die Zeilen der Objektliste tragen
+   * die Bedienung zum Verorten; fällt eine Lagebild-Quelle aus, während die übrigen Zeilen im
+   * Zwischenspeicher stehen, steht der Fehler als Banner darüber, nicht an ihrer Stelle.
    */
-  it('„Nicht verortet": mit Zeilen im Zwischenspeicher bleibt die Liste samt Bedienung stehen', () => {
+  it('Objektliste: mit Zeilen im Zwischenspeicher bleibt die Liste samt Bedienung stehen', () => {
     const onPlatzierenStart = vi.fn();
     renderMitProviders(
       <Sidebar
         {...basisProps}
         darfSchreiben
-        nichtVerortet={[{ typ: 'uhs', id: 42, label: 'UHS Nord' }]}
+        objekte={[obj('uhs', 42, 'UHS Nord', false)]}
         sektionFehler={{ nichtVerortet: slot }}
         onPlatzierenStart={onPlatzierenStart}
       />,
     );
-    // Der Fehler wird gemeldet — aber als Banner, das den Stand als alt kennzeichnet.
-    expect(screen.getByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
-    // Die Zeile aus dem Zwischenspeicher steht weiter da …
-    expect(screen.getByText(/UHS: UHS Nord/)).toBeInTheDocument();
-    // … und die einzige Bedienung zum Verorten ist bedienbar geblieben.
+    expect(screen.getByText('Objektlisten konnten nicht geladen werden')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^UHS/ }));
+    expect(screen.getByText('UHS Nord')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Platzieren' }));
     expect(onPlatzierenStart).toHaveBeenCalledWith({ typ: 'uhs', id: 42 });
   });
 
-  it('„Nicht verortet": Zeilenaktionen sind sekundär — keine Reihe gefüllter Primärknöpfe', () => {
+  it('Objektliste: Zeilenaktionen sind sekundär — keine Reihe gefüllter Primärknöpfe', async () => {
     const onPlatzierenStart = vi.fn();
     const onAbschnittZeichnenStart = vi.fn();
     renderMitProviders(
       <Sidebar
         {...basisProps}
         darfSchreiben
-        nichtVerortet={[
-          { typ: 'uhs', id: 1, label: 'UHS Nord' },
-          { typ: 'schaden', id: 2, label: 'S-004' },
-          { typ: 'abschnitt', id: 3, label: 'EA Süd' },
+        objekte={[
+          obj('uhs', 1, 'UHS Nord', false),
+          obj('schaden', 2, 'S-004', false),
+          obj('abschnitt', 3, 'EA Süd', false),
         ]}
         onPlatzierenStart={onPlatzierenStart}
         onAbschnittZeichnenStart={onAbschnittZeichnenStart}
       />,
     );
+    // Der Filter öffnet alle Gruppen mit Treffern.
+    await userEvent.click(screen.getByRole('button', { name: 'Nicht verortet' }));
     const platzieren = screen.getAllByRole('button', { name: 'Platzieren' });
     const zeichnen = screen.getByRole('button', { name: 'Fläche zeichnen' });
-    // Positivkontrolle: die Knöpfe stehen und wirken — sonst wäre die Abwesenheit unten auch grün,
-    // wenn die Zeilen gar nicht gerendert würden.
     expect(platzieren).toHaveLength(2);
     fireEvent.click(platzieren[1]);
     expect(onPlatzierenStart).toHaveBeenCalledWith({ typ: 'schaden', id: 2 });
@@ -862,6 +870,39 @@ describe('Sidebar Fehler-Slots', () => {
       expect(knopf).not.toHaveClass('ant-btn-primary');
       expect(knopf).toHaveClass('ant-btn-default');
     }
+  });
+
+  it('Objektliste: ohne Schreibrecht sagt die Zeile „nicht verortet“, ohne Knopf', async () => {
+    renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        darfSchreiben={false}
+        objekte={[obj('uhs', 1, 'UHS Nord', false)]}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^UHS/ }));
+    expect(screen.getByText('nicht verortet')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Platzieren' })).toBeNull();
+  });
+
+  it('Objektliste: der Einsatzort steht vorn, mit „Verschieben“ bzw. „Platzieren“', () => {
+    const onEinsatzortPlatzieren = vi.fn();
+    const { unmount } = renderMitProviders(
+      <Sidebar
+        {...basisProps}
+        objekte={[obj('einsatzort', 0, 'Hauptstraße 1'), obj('uhs', 1, 'UHS Nord')]}
+        onEinsatzortPlatzieren={onEinsatzortPlatzieren}
+      />,
+    );
+    const zeile = document.querySelector('[data-paneel="objekte-einsatzort"]') as HTMLElement;
+    fireEvent.click(within(zeile).getByRole('button', { name: 'Verschieben' }));
+    expect(onEinsatzortPlatzieren).toHaveBeenCalled();
+    unmount();
+    renderMitProviders(
+      <Sidebar {...basisProps} objekte={[obj('einsatzort', 0, 'Einsatzort', false)]} />,
+    );
+    const ohneOrt = document.querySelector('[data-paneel="objekte-einsatzort"]') as HTMLElement;
+    expect(within(ohneOrt).getByRole('button', { name: 'Platzieren' })).toBeInTheDocument();
   });
 
   it('„Bild-Hintergründe": Fehler-Slot, der Upload bleibt bedienbar', () => {
@@ -943,49 +984,29 @@ describe('Sidebar Fehler-Slots', () => {
     ).not.toBeInTheDocument();
   });
 
-  /**
-   * „Verortet" hat keinen eigenen Fehlerkasten, aber seine Zahlen dürfen nicht lügen: im Fehlerfall
-   * wären sie eine ungeprüfte Behauptung über die Lage.
-   */
-  const uhsNord = {
-    schluessel: 'uhs-7',
-    typ: 'uhs' as const,
-    id: 7,
-    lat: 50,
-    lon: 8,
-    label: 'UHS Nord',
-    farbe: '#1677ff',
-  };
-
-  it('„Verortet": die Zählungen zeigen im Fehlerfall keinen Wert, und die Leere wird nicht behauptet', () => {
+  it('Objektliste: im Fehlerfall „—“ statt Zahlen, und die Leere wird nicht behauptet', () => {
     const { unmount } = renderMitProviders(
-      <Sidebar {...basisProps} suchbar={[uhsNord]} sektionFehler={{ nichtVerortet: slot }} />,
+      <Sidebar
+        {...basisProps}
+        objekte={[obj('uhs', 7, 'UHS Nord')]}
+        sektionFehler={{ nichtVerortet: slot }}
+      />,
     );
-    expect(screen.getByText('Unfallhilfsstelle (—)')).toBeInTheDocument();
-    expect(screen.queryByText('Unfallhilfsstelle (1)')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^UHS/ })).toHaveTextContent('—/—');
     unmount();
-    renderMitProviders(
-      <Sidebar {...basisProps} suchbar={[]} sektionFehler={{ nichtVerortet: slot }} />,
-    );
-    expect(screen.queryByText('Nichts verortet')).not.toBeInTheDocument();
+    renderMitProviders(<Sidebar {...basisProps} objekte={[obj('uhs', 7, 'UHS Nord')]} />);
+    expect(screen.getByRole('button', { name: /^UHS/ })).toHaveTextContent('1/1');
   });
 
-  it('„Verortet": ohne Fehler zählen sie wie bisher', () => {
-    renderMitProviders(<Sidebar {...basisProps} suchbar={[uhsNord]} />);
-    expect(screen.getByText('Unfallhilfsstelle (1)')).toBeInTheDocument();
-    expect(screen.queryByText('Unfallhilfsstelle (—)')).not.toBeInTheDocument();
-  });
-
-  it('„Verortet" durchsucht die übergebene Suchquelle über alle Objektarten (LFH-716)', async () => {
+  it('Objektliste: durchsucht alle Arten und meldet die gewählte Zeile (LFH-716)', async () => {
     const onMarkerWaehlen = vi.fn();
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        // `verortet` bleibt leer: die Suche liest `suchbar`, nicht die Ebenen-Quelle.
-        suchbar={[
-          uhsNord,
-          { ...uhsNord, schluessel: 'einheit-3', typ: 'einheit', id: 3, label: 'Florian Nord 1' },
-          { ...uhsNord, schluessel: 'fahrzeug-4', typ: 'fahrzeug', id: 4, label: 'RTW Süd' },
+        objekte={[
+          obj('uhs', 7, 'UHS Nord'),
+          obj('einheit', 3, 'Florian Nord 1'),
+          obj('fahrzeug', 4, 'RTW Süd'),
         ]}
         onMarkerWaehlen={onMarkerWaehlen}
       />,
@@ -996,17 +1017,20 @@ describe('Sidebar Fehler-Slots', () => {
     expect(onMarkerWaehlen).toHaveBeenCalledWith('einheit-3');
   });
 
-  it('wählt einen verorteten Marker mit Space über die Auswahlzeile', async () => {
+  it('wählt eine verortete Zeile mit Space', async () => {
     const user = userEvent.setup();
     const onMarkerWaehlen = vi.fn();
     renderMitProviders(
-      <Sidebar {...basisProps} suchbar={[uhsNord]} onMarkerWaehlen={onMarkerWaehlen} />,
+      <Sidebar
+        {...basisProps}
+        objekte={[obj('uhs', 7, 'UHS Nord')]}
+        onMarkerWaehlen={onMarkerWaehlen}
+      />,
     );
-
+    await user.click(screen.getByRole('button', { name: /^UHS/ }));
     const zeile = screen.getByRole('button', { name: 'UHS Nord' });
     zeile.focus();
     await user.keyboard(' ');
-
     expect(onMarkerWaehlen).toHaveBeenCalledWith('uhs-7');
     expect(onMarkerWaehlen).toHaveBeenCalledTimes(1);
   });
@@ -1016,7 +1040,7 @@ describe('Sidebar Fehler-Slots', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        nichtVerortet={[]}
+        objekte={[]}
         sektionFehler={{
           nichtVerortet: { text: 'Objektlisten konnten nicht geladen werden', onWiederholen },
         }}
@@ -1283,22 +1307,6 @@ describe('Sidebar: Ebenen-Zeile als Bedienziel', () => {
   });
 });
 
-describe('Sidebar: Paneel „Ausgewählt"', () => {
-  it('sagt ohne Auswahl nur „Nichts gewählt“, keine Anleitung (LFH-1083)', () => {
-    renderMitProviders(<Sidebar {...basisProps} />);
-    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
-    expect(paneel).toHaveTextContent(/Nichts gewählt/);
-    expect(paneel).not.toHaveTextContent(/antippen|Verortet/);
-  });
-
-  it('zeigt den übergebenen Inspector-Inhalt statt des Hinweises', () => {
-    renderMitProviders(<Sidebar {...basisProps} auswahl={<div>Inspector-Inhalt</div>} />);
-    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
-    expect(within(paneel).getByText('Inspector-Inhalt')).toBeInTheDocument();
-    expect(paneel).not.toHaveTextContent(/Nichts gewählt/);
-  });
-});
-
 describe('Sidebar: einklappbare Paneele', () => {
   it('Vorgabe: Kräfte und Lage offen, die übrigen Gruppen zu', () => {
     renderMitProviders(<Sidebar {...ebenenProps} />);
@@ -1383,186 +1391,13 @@ describe('Sidebar: einklappbare Paneele', () => {
 });
 
 /**
- * Suchfeld über „Nicht verortet": in einer realen Lage ist die Liste lang, die Leiste nur 300 px
- * breit — ab fünf Einträgen ist Tippen schneller als Scrollen.
- */
-describe('Sidebar „Nicht verortet": Suche (LFH-360)', () => {
-  const fuenf: NichtVerortet[] = [
-    { typ: 'uhs', id: 1, label: 'UHS Nord' },
-    { typ: 'fahrzeug', id: 2, label: 'ELW 1' },
-    { typ: 'einheit', id: 3, label: '1. Zug' },
-    { typ: 'einheit', id: 4, label: '2. Zug' },
-    { typ: 'fuehrung', id: 5, label: 'Meyer' },
-  ];
-  const feld = () => screen.queryByRole('textbox', { name: 'Nicht verortete Objekte durchsuchen' });
-
-  it('Schwelle: ab fünf Einträgen, also bei mehr als vier', () => {
-    expect(NICHT_VERORTET_SUCHE_AB).toBe(5);
-  });
-
-  it('bei vier Einträgen kein Suchfeld — die Leiste wächst im Normalfall nicht zu', () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf.slice(0, 4)} />);
-    // Positivkontrolle: die Liste selbst steht, sonst belegte die Abwesenheit nichts.
-    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
-    expect(feld()).not.toBeInTheDocument();
-  });
-
-  it('bei fünf Einträgen steht das Suchfeld, und Tippen filtert live', async () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
-    const eingabe = feld();
-    expect(eingabe).toBeInTheDocument();
-    await userEvent.type(eingabe!, 'elw');
-    expect(screen.getByText('Fahrzeug: ELW 1')).toBeInTheDocument();
-    expect(screen.queryByText('UHS: UHS Nord')).not.toBeInTheDocument();
-    expect(screen.queryByText('Einheit: 1. Zug')).not.toBeInTheDocument();
-  });
-
-  it('das Suchfeld trägt keine kleine Stufe — die Höhe kommt aus der Dichte-Staffel', () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
-    const eingabe = feld()!;
-    // Die Klasse kann am Feld selbst oder an seiner Affix-Hülle (allowClear) sitzen.
-    expect(eingabe).not.toHaveClass('ant-input-sm');
-    expect(eingabe.closest('.ant-input-affix-wrapper')).not.toHaveClass(
-      'ant-input-affix-wrapper-sm',
-    );
-  });
-
-  it('der Knopfname „Nicht verortet N" nennt weiter die Gesamtzahl, nicht die Trefferzahl', async () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
-    await userEvent.type(feld()!, 'elw');
-    // Paar: gefiltert auf EINEN Treffer — und der Kopf sagt weiter fünf.
-    expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(1);
-    expect(screen.getByRole('button', { name: 'Nicht verortet 5' })).toBeInTheDocument();
-    // Die Trefferzahl steht als zweite, eigene Angabe im Körper.
-    expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
-  });
-
-  /**
-   * Eine Live-Region meldet nur Änderungen an Inhalt, der schon da war — erschiene sie erst mit dem
-   * ersten Treffer, hörte ein Vorleser den ersten Stand nicht.
-   */
-  it('die Trefferzeile steht mit dem Feld, ohne Suchbegriff leer', () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
-    expect(screen.getByRole('status')).toHaveTextContent(/^$/);
-  });
-
-  it('ohne Feld auch keine Trefferzeile', () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf.slice(0, 4)} />);
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-  });
-
-  it('kein Treffer: eigene Meldung, und „Alles verortet" steht NICHT da', async () => {
-    renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
-    await userEvent.type(feld()!, 'xyz');
-    expect(screen.getByText('Keine Treffer für „xyz"')).toBeInTheDocument();
-    // Auch der Vorleser erfährt es: die Fokusstelle bleibt im Feld, die Region sagt es an.
-    expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
-    expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
-    // Der Ausweg ist das Leeren am Feld — die Meldung bringt keinen eigenen Knopf mit.
-    expect(screen.queryByRole('button', { name: /Treffer/ })).not.toBeInTheDocument();
-    expect(feld()).toBeInTheDocument();
-  });
-
-  it('fällt die Liste unter die Schwelle, verschwindet der Filter mit dem Feld', async () => {
-    const { rerender } = renderMitProviders(<Sidebar {...basisProps} nichtVerortet={fuenf} />);
-    await userEvent.type(feld()!, 'elw');
-    expect(screen.queryByText('UHS: UHS Nord')).not.toBeInTheDocument();
-
-    // Das Fahrzeug ist verortet — vier bleiben, das Feld geht. Ohne Reset verschluckte ein
-    // unsichtbarer Filter alle vier.
-    const vier = fuenf.filter((o) => o.typ !== 'fahrzeug');
-    rerender(<Sidebar {...basisProps} nichtVerortet={vier} />);
-    expect(feld()).not.toBeInTheDocument();
-    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(4);
-
-    // Wächst die Liste wieder, steht das Feld LEER da — der alte Begriff kommt nicht zurück.
-    rerender(
-      <Sidebar
-        {...basisProps}
-        nichtVerortet={[...vier, { typ: 'schaden', id: 9, label: 'S-009' }]}
-      />,
-    );
-    expect(feld()).toHaveValue('');
-    expect(screen.getAllByRole('button', { name: 'Platzieren' })).toHaveLength(5);
-  });
-
-  it('die Zeile im laufenden Platzier-Modus bleibt stehen — sie zeigt, was platziert wird', async () => {
-    renderMitProviders(
-      <Sidebar {...basisProps} nichtVerortet={fuenf} platzierungZiel={{ typ: 'uhs', id: 1 }} />,
-    );
-    await userEvent.type(feld()!, 'elw');
-    // Positivkontrolle: der Filter wirkt auf die übrigen Zeilen …
-    expect(screen.queryByText('Einheit: 1. Zug')).not.toBeInTheDocument();
-    expect(screen.getByText('Fahrzeug: ELW 1')).toBeInTheDocument();
-    // … aber die aktive Zeile steht samt ihrem Zustand.
-    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
-    expect(screen.getByText('wird platziert')).toBeInTheDocument();
-    // Gezählt werden nur echte Treffer: zwei Zeilen stehen, eine davon trifft.
-    expect(screen.getByRole('status')).toHaveTextContent('1 von 5');
-  });
-
-  it('trifft nichts außer dem laufenden Ziel: „0 von N", die Zeile steht, keine Leermeldung', async () => {
-    renderMitProviders(
-      <Sidebar {...basisProps} nichtVerortet={fuenf} platzierungZiel={{ typ: 'uhs', id: 1 }} />,
-    );
-    await userEvent.type(feld()!, 'xyz');
-    expect(screen.getByRole('status')).toHaveTextContent('0 von 5');
-    expect(screen.getByText('UHS: UHS Nord')).toBeInTheDocument();
-    expect(screen.getByText('wird platziert')).toBeInTheDocument();
-    // Eine Leermeldung neben einer stehenden Zeile widerspräche sich selbst.
-    expect(screen.queryByText('Keine Treffer für „xyz"')).not.toBeInTheDocument();
-  });
-});
-
-describe('filtereNichtVerortet (LFH-360)', () => {
-  const liste: NichtVerortet[] = [
-    { typ: 'fahrzeug', id: 1, label: 'ELW 1' },
-    { typ: 'einheit', id: 2, label: '1. Zug' },
-    { typ: 'einheit', id: 3, label: '2. Zug' },
-    { typ: 'fuehrung', id: 4, label: 'Meyer' },
-    { typ: 'abschnitt', id: 5, label: 'EA Süd' },
-  ];
-  const ids = (r: NichtVerortet[]) => r.map((o) => o.id);
-
-  it('leerer oder nur aus Leerzeichen bestehender Begriff lässt alles stehen', () => {
-    expect(filtereNichtVerortet(liste, '', null)).toBe(liste);
-    expect(filtereNichtVerortet(liste, '   ', null)).toBe(liste);
-  });
-
-  it('trifft das Label als Teilstring, Groß-/Kleinschreibung egal', () => {
-    expect(ids(filtereNichtVerortet(liste, 'elw', null))).toEqual([1]);
-    expect(ids(filtereNichtVerortet(liste, 'süd', null))).toEqual([5]);
-  });
-
-  it('trifft das Typ-Präfix — „einheit" findet alle Einheiten', () => {
-    expect(ids(filtereNichtVerortet(liste, 'EINHEIT', null))).toEqual([2, 3]);
-  });
-
-  it('das Präfix ist das ANGEZEIGTE Wort: Führung heißt dort „Personal"', () => {
-    expect(ids(filtereNichtVerortet(liste, 'personal', null))).toEqual([4]);
-    expect(ids(filtereNichtVerortet(liste, 'fuehrung', null))).toEqual([]);
-  });
-
-  it('Leerzeichen am Rand zählen nicht mit', () => {
-    expect(ids(filtereNichtVerortet(liste, '  zug ', null))).toEqual([2, 3]);
-  });
-
-  it('das laufende Platzierungsziel überlebt jeden Begriff', () => {
-    expect(ids(filtereNichtVerortet(liste, 'elw', { typ: 'einheit', id: 3 }))).toEqual([1, 3]);
-    // Gleiche id, anderer Typ: kein Treffer — die Kennung ist das Paar.
-    expect(ids(filtereNichtVerortet(liste, 'elw', { typ: 'uhs', id: 3 }))).toEqual([1]);
-  });
-});
-
-/**
  * Leistenmodi (LLH-1028, Spec „Modusbedienung ab lg im Modus-Band der Leiste“): die Bedienung steht
  * im Band unter der Segmentleiste (ab `lg`) bzw. im Fuß-Band (unter `lg`, LFH-765); die Zeilen der
  * Ansichten zeigen auf jeder Breite nur den Zustand. Je Breite genau ein Knopf je Handlung — auch
  * nach einem Wechsel der Ansicht. Inhalt des Bands im Einzelnen: `ModusBand.test.tsx`.
  */
 describe('Sidebar: Leistenmodi im Modus-Band', () => {
-  const einheit: NichtVerortet = { typ: 'einheit', id: 4, label: 'Pumpe Ost' };
+  const einheit = obj('einheit', 4, 'Pumpe Ost', false);
   const platzieren = (onAbbrechen = vi.fn()) =>
     ({
       art: 'platzieren',
@@ -1570,12 +1405,12 @@ describe('Sidebar: Leistenmodi im Modus-Band', () => {
       onAbbrechen,
     }) as const;
 
-  it('Platzieren aus „Nicht verortet": die Zeile sagt „wird platziert", das Band trägt „Abbrechen"', () => {
+  it('Platzieren aus der Objektliste: die Zeile sagt „wird platziert", das Band trägt „Abbrechen"', () => {
     const onAbbrechen = vi.fn();
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        nichtVerortet={[einheit]}
+        objekte={[einheit]}
         platzierungZiel={{ typ: 'einheit', id: 4 }}
         platzierModus={platzieren(onAbbrechen)}
       />,
@@ -1593,7 +1428,7 @@ describe('Sidebar: Leistenmodi im Modus-Band', () => {
     renderMitProviders(
       <Sidebar
         {...ebenenProps}
-        nichtVerortet={[einheit]}
+        objekte={[einheit]}
         platzierungZiel={{ typ: 'einheit', id: 4 }}
         platzierModus={platzieren()}
       />,
@@ -1608,7 +1443,7 @@ describe('Sidebar: Leistenmodi im Modus-Band', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
-        nichtVerortet={[einheit]}
+        objekte={[einheit]}
         platzierungZiel={{ typ: 'einheit', id: 4 }}
         platzierModus={platzieren()}
         modusBedienung="fuss"
@@ -1619,15 +1454,16 @@ describe('Sidebar: Leistenmodi im Modus-Band', () => {
     expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument();
   });
 
-  it('Einsatzort: das Paneel sagt „wird platziert", ohne eigenes „Abbrechen"', () => {
+  it('Einsatzort: die Zeile sagt „wird platziert", ohne eigenes „Abbrechen"', () => {
     renderMitProviders(
       <Sidebar
         {...basisProps}
+        objekte={[obj('einsatzort', 0, 'Einsatzort', false)]}
         platzierungZiel={{ typ: 'einsatzort', id: 0 }}
         platzierModus={{ art: 'platzieren', objekt: 'Einsatzort', onAbbrechen: vi.fn() }}
       />,
     );
-    const paneel = document.querySelector('section[data-paneel="einsatzort"]') as HTMLElement;
+    const paneel = document.querySelector('[data-paneel="objekte-einsatzort"]') as HTMLElement;
     expect(within(paneel).getByText('wird platziert')).toBeInTheDocument();
     expect(within(paneel).queryByRole('button', { name: 'Abbrechen' })).toBeNull();
   });
@@ -1677,11 +1513,100 @@ describe('Sidebar: Ansichten', () => {
     expect(screen.getByRole('textbox', { name: 'Ebene suchen' })).toHaveValue('pegel');
   });
 
-  it('„Ausgewählt" steht über beiden Ansichten', () => {
-    const { rerender } = renderMitProviders(<Sidebar {...ebenenProps} />);
-    expect(screen.getByRole('heading', { name: 'Ausgewählt' })).toBeInTheDocument();
+  it('ohne Auswahl bleibt das dritte Drittel leer — kein Segment „Auswahl“', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    expect(screen.queryByRole('tab', { name: 'Auswahl' })).toBeNull();
+    expect(document.querySelector('[data-paneel="ausgewaehlt"]')).toBeNull();
+  });
+});
+
+/**
+ * Ansicht „Auswahl“ (LLH-1033, Spec „Die Auswahl ist eine eigene Ansicht“): drittes Segment nur
+ * mit Auswahl, vorn per Vorgabe, Rückweg benennt die gemerkte Ansicht und hebt die Auswahl auf.
+ */
+describe('Sidebar: Ansicht „Auswahl“', () => {
+  const inspector = <div>Inspector-Inhalt</div>;
+
+  it('mit Auswahl: drittes Segment, vorn, die übrigen Ansichten verborgen', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} auswahl={inspector} />);
+    const liste = screen.getByRole('tablist', { name: 'Ansicht der Leiste' });
+    const tabs = within(liste).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['Ebenen', 'Objekte', 'Auswahl']);
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
+    const flaeche = screen.getByRole('tabpanel', { name: 'Auswahl' });
+    expect(flaeche).toHaveAttribute('data-paneel', 'ausgewaehlt');
+    expect(within(flaeche).getByText('Inspector-Inhalt')).toBeVisible();
+    expect(document.getElementById(tabs[0].getAttribute('aria-controls')!)).toHaveAttribute(
+      'hidden',
+    );
+    expect(liste.closest('.lfh-leisten-ansichten--drei')).not.toBeNull();
+  });
+
+  it('ein Tipp auf „Ebenen“ meldet den Wechsel, die Auswahl bleibt als Segment', () => {
+    const onAnsichtWechsel = vi.fn();
+    const { rerender } = renderMitProviders(
+      <Sidebar {...ebenenProps} auswahl={inspector} onAnsichtWechsel={onAnsichtWechsel} />,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Ebenen' }));
+    expect(onAnsichtWechsel).toHaveBeenCalledWith('ebenen');
+    rerender(
+      <Sidebar
+        {...ebenenProps}
+        auswahl={inspector}
+        auswahlVorn={false}
+        onAnsichtWechsel={onAnsichtWechsel}
+      />,
+    );
+    expect(screen.getByRole('tab', { name: 'Ebenen' })).toHaveAttribute('aria-selected', 'true');
+    fireEvent.click(screen.getByRole('tab', { name: 'Auswahl' }));
+    expect(onAnsichtWechsel).toHaveBeenLastCalledWith('auswahl');
+  });
+
+  it('der Rückweg benennt die gemerkte Ansicht und meldet das Aufheben', () => {
+    const onAuswahlZurueck = vi.fn();
+    const { rerender } = renderMitProviders(
+      <Sidebar {...basisProps} auswahl={inspector} onAuswahlZurueck={onAuswahlZurueck} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Zurück zu Objekte' }));
+    expect(onAuswahlZurueck).toHaveBeenCalled();
+    rerender(<Sidebar {...ebenenProps} auswahl={inspector} onAuswahlZurueck={onAuswahlZurueck} />);
+    expect(screen.getByRole('button', { name: 'Zurück zu Ebenen' })).toHaveTextContent('← Ebenen');
+  });
+
+  it('trägt die Esc-Kappe nur, wenn Esc die Auswahl aufhebt', () => {
+    const { rerender } = renderMitProviders(
+      <Sidebar {...basisProps} auswahl={inspector} auswahlEsc />,
+    );
+    const rueckweg = screen.getByRole('button', { name: 'Zurück zu Objekte' });
+    expect(rueckweg).toHaveAttribute('aria-keyshortcuts', 'Escape');
+    expect(rueckweg).toHaveTextContent('Esc');
+    rerender(<Sidebar {...basisProps} auswahl={inspector} auswahlEsc={false} />);
+    expect(screen.getByRole('button', { name: 'Zurück zu Objekte' })).not.toHaveAttribute(
+      'aria-keyshortcuts',
+    );
+  });
+
+  it('Suchbegriff und Klappzustand der Objekte überleben die Auswahl', async () => {
+    const { rerender } = renderMitProviders(
+      <Sidebar {...basisProps} objekte={[obj('uhs', 1, 'UHS Nord')]} />,
+    );
+    await userEvent.type(screen.getByLabelText('Kartenobjekte suchen'), 'nord');
+    rerender(<Sidebar {...basisProps} objekte={[obj('uhs', 1, 'UHS Nord')]} auswahl={inspector} />);
+    expect(screen.getByRole('tab', { name: 'Auswahl' })).toHaveAttribute('aria-selected', 'true');
+    rerender(<Sidebar {...basisProps} objekte={[obj('uhs', 1, 'UHS Nord')]} />);
+    expect(screen.getByLabelText('Kartenobjekte suchen')).toHaveValue('nord');
+    expect(screen.getByRole('button', { name: 'UHS Nord' })).toBeVisible();
+  });
+
+  it('merkt die Rollposition je Ansicht; „Auswahl“ beginnt oben', () => {
+    const { rerender } = renderMitProviders(<Sidebar {...basisProps} />);
+    const rolle = document.querySelector('[data-lfh="leisten-rollflaeche"]') as HTMLElement;
+    rolle.scrollTop = 120;
+    fireEvent.scroll(rolle);
+    rerender(<Sidebar {...basisProps} auswahl={inspector} auswahlNr={1} />);
+    expect(rolle.scrollTop).toBe(0);
     rerender(<Sidebar {...basisProps} />);
-    expect(screen.getByRole('heading', { name: 'Ausgewählt' })).toBeInTheDocument();
+    expect(rolle.scrollTop).toBe(120);
   });
 });
 

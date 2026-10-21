@@ -7,7 +7,8 @@
    innen (in der Leiste stünde ein äusserer Ring unter dem Nachbarn). Der Ruhegrund steht HIER
    und nicht inline — ein Inline-Grund schlüge jede `:hover`-Regel. */
 .lfh-klappkopf,
-.lfh-ebenenzeile {
+.lfh-ebenenzeile,
+.lfh-objektzeile {
   background: transparent;
 }
 /* Die Zelle trägt den Grund, der Knopf rückt darin um den Zielabstand ein (LFH-865,
@@ -18,12 +19,14 @@
 }
 .lfh-klappkopf:hover,
 .lfh-ebenenzeile:hover,
+.lfh-objektzeile:hover,
 .lfh-kartenknopf:not([aria-disabled='true']):hover {
   /* `flaeche-3`, nicht `flaeche-2`: die läge am Tag bei 1,01 : 1 auf `paneel` (LFH-618). */
   background: var(--lfh-flaeche-3);
 }
 .lfh-klappkopf:focus-visible,
 .lfh-ebenenzeile:focus-visible,
+.lfh-objektzeile:focus-visible,
 .lfh-kartenknopf:focus-visible {
   outline: 2px solid var(--lfh-bedien);
   outline-offset: -2px;
@@ -76,9 +79,9 @@
   cursor: crosshair !important;
 }
 
-/* Ansichten der Kartenleiste (LLH-1028): jedes Segment ein festes Drittel. Die Leiste belegt so
-   viele Drittel, wie es Segmente gibt; das freie Drittel bleibt leer (kein gesperrtes Segment),
-   damit kein Segment wandert, wenn die Ansicht „Auswahl“ hinzukommt oder wegfällt. */
+/* Ansichten der Kartenleiste (LLH-1028, LLH-1033): jedes Segment ein festes Drittel. Die Leiste
+   belegt so viele Drittel, wie es Segmente gibt; ohne Auswahl bleibt das dritte leer (kein
+   gesperrtes Segment), damit kein Segment wandert, wenn „Auswahl“ hinzukommt oder wegfällt. */
 .lfh-leisten-ansichten {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -87,6 +90,10 @@
   display: grid;
   grid-column: 1 / span 2;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.lfh-leisten-ansichten--drei > .lfh-segmente {
+  grid-column: 1 / span 3;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .lfh-leisten-ansichten .lfh-segment {
   flex: 1 1 auto;

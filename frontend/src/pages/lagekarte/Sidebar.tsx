@@ -1,11 +1,8 @@
-import { IconLupe } from '../../icons';
-import { Button, Input, Space, Typography } from 'antd';
-import { Liste, ListenEintrag } from '../../components/Liste';
-import { SeitenLeer, SeitenStandVeraltet } from '../../components/SeitenZustand';
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { monoStil, Segmentleiste, useRollen } from '../../components/instrument';
+import { Button, Space, Typography } from 'antd';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Segmentleiste, useRollen } from '../../components/instrument';
 import { griffHinweis, type GriffModus, type KantenAus } from './bildGriffe';
-import { KlappPaneel, LeistenAbschnitt, usePaneelZustand } from './KlappPaneel';
+import { KlappPaneel, usePaneelZustand } from './KlappPaneel';
 import type {
   PersonenEbenenAngabe,
   BetreuungEbenenAngabe,
@@ -15,10 +12,10 @@ import type {
 import type { PlatzierModus } from './PlatzierSteuerung';
 import ModusBand from './ModusBand';
 import Ebenenbaum from './Ebenenbaum';
-import { FehlerSlot, type SektionFehler } from './leistenTeile';
-import type { LeistenAnsicht } from './leistenWahl';
+import { type SektionFehler } from './leistenTeile';
+import type { GezeigteAnsicht, LeistenAnsicht } from './leistenWahl';
 import './lagekarte.css';
-import type { KarteMarker, NichtVerortet } from './marker';
+import type { KarteMarker, MarkerTyp, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
@@ -28,6 +25,8 @@ import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZe
 import { START_ZEICHEN_SPEC } from './zeichenWahl';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
+import EscKappe from './EscKappe';
+import { zielSchluessel, type ObjektEintrag } from './objektsuche';
 import type { LatLon } from '../../anzeige/koordinaten';
 import type { Hintergrundbild } from '../../api/kartenbilder';
 import type { UploadFortschritt } from '../../api/client';
@@ -95,9 +94,9 @@ const NICHT_VERORTET_LABEL: Record<NichtVerortet['typ'], string> = {
 };
 
 /**
- * Was gerade platziert wird, als Text für das Fuß-Band (LFH-765) — dieselbe Schreibweise wie die
- * Zeile in „Nicht verortet". Steht das Ziel dort nicht (Verschieben eines verorteten Objekts per
- * `?platzieren=`, Betroffene), bleibt der Typname.
+ * Was gerade platziert wird, als Text für das Modus- und Fuß-Band (LFH-765): Typ und Name des nicht
+ * verorteten Objekts. Steht das Ziel nicht unter den nicht verorteten (Verschieben eines
+ * verorteten Objekts per `?platzieren=`, Betroffene), bleibt der Typname.
  */
 export function platzierObjekt(
   ziel: { typ: PlatzierenPunktTyp | 'einsatzort'; id: number },
@@ -110,34 +109,18 @@ export function platzierObjekt(
   return eintrag ? `${typName}: ${eintrag.label}` : typName;
 }
 
-/**
- * Ab wie vielen Einträgen „Nicht verortet" ein Suchfeld trägt: ab fünf beginnt die Liste in der
- * 300-px-Leiste zu scrollen, darunter ist Hinsehen schneller als Tippen.
- */
-export const NICHT_VERORTET_SUCHE_AB = 5;
-
-/**
- * Filter der Liste „Nicht verortet": Teilstring ohne Groß-/Kleinschreibung gegen die Zeile, wie sie
- * dasteht (Typ-Präfix plus Label) — „einheit" findet alle Einheiten, der Schlüssel `fuehrung`
- * nichts.
- *
- * Das laufende Platzierungsziel bleibt immer stehen: seine Zeile zeigt, was gerade platziert wird
- * („wird platziert“; bedient wird der Modus im Modus-Band bzw. im Fuß, LLH-1028). Filterte ein
- * Begriff sie weg, verschwände der Zustand aus der Liste, an der der Modus begann.
- */
-export function filtereNichtVerortet(
-  liste: NichtVerortet[],
-  suche: string,
-  ziel: { typ: string; id: number } | null,
-): NichtVerortet[] {
-  const begriff = suche.trim().toLowerCase();
-  if (!begriff) return liste;
-  return liste.filter(
-    (o) =>
-      (ziel?.typ === o.typ && ziel.id === o.id) ||
-      `${NICHT_VERORTET_LABEL[o.typ]}: ${o.label}`.toLowerCase().includes(begriff),
-  );
-}
+/** Die Typen, die „Platzieren“ als Punkt kennt — Abschnitte zeichnen eine Fläche. */
+const PUNKT_TYPEN: ReadonlySet<MarkerTyp> = new Set<PlatzierenPunktTyp>([
+  'uhs',
+  'schaden',
+  'einheit',
+  'fahrzeug',
+  'fuehrung',
+  'betreuungsstelle',
+  'bereitstellungsraum',
+  'tier',
+]);
+const istPunktTyp = (typ: MarkerTyp): typ is PlatzierenPunktTyp => PUNKT_TYPEN.has(typ);
 
 /**
  * Platzierungsziel → exclude-Tag (typ:id) für die Ort-Vorschau. Der Einsatzort-Marker trägt die
@@ -166,13 +149,12 @@ export function ortVorschauExclude(
 /**
  * Fehler-Slots je Sidebar-Sektion: gesetzt, sagt die Sektion, warum sie nichts zeigt — eine leere
  * Objektliste läse sich als „nichts da", und das ist im Einsatz eine Lagebeurteilung.
- *
- * Bewusst kein Slot an „Verortet": sie trifft keine Vollständigkeitsaussage, ihre Zahlen zählen
- * nur, und ein zweiter Fehlerkasten füllte die schmale Leiste ohne neue Tatsache. Die namentliche
- * Meldung steht am Seitenkopf.
  */
 export interface SidebarSektionFehler {
-  /** Die Lagebild-Quellen hinter „Nicht verortet" (und damit hinter „Alles verortet"). */
+  /**
+   * Die Lagebild-Quellen hinter der Objektliste (und damit hinter „Alles verortet"): der Slot steht
+   * über der Liste, Köpfe und Marke tragen „—".
+   */
   nichtVerortet?: SektionFehler;
   /** Eigene Query: `useKartenbilder`. */
   bilder?: SektionFehler;
@@ -191,19 +173,18 @@ export interface BildUploadZustand {
 
 export interface SidebarProps {
   einsatzId: number;
-  nichtVerortet: NichtVerortet[];
   verortet: KarteMarker[];
   /**
-   * Quelle der Objektsuche unter „Verortet" — `suchbareMarker` aus `objektsuche.ts`, also ohne
-   * Namen aus Modulen ohne Recht. Getrennt von `verortet`, das die Ebenen-Zeilen zählt und keine
-   * Betroffenen trägt.
+   * Die Objektliste der Ansicht „Objekte“ — `objektEintraege` aus `objektsuche.ts`: verortet und
+   * nicht verortet, ohne Namen aus Modulen ohne Recht. Getrennt von `verortet`, das die
+   * Ebenen-Zeilen zählt und keine Betroffenen trägt.
    */
-  suchbar: KarteMarker[];
-  /** Eine Quelle der Suche ist ausgefallen — dann „—" statt Zahlen, keine behauptete Leere. */
-  suchbarUnvollstaendig?: boolean;
+  objekte: ObjektEintrag[];
+  /** Eine Quelle der Liste ist ausgefallen — dann „—" statt Zahlen, keine behauptete Leere. */
+  objekteUnvollstaendig?: boolean;
   /**
    * Ortssuche im selben Feld (LFH-638): Koordinate und Adresse anspringen. Eine `vorbelegung`
-   * (`?ort=`) öffnet das Paneel „Verortet“, damit die Treffer zu sehen sind.
+   * (`?ort=`) belegt das Suchfeld der Ansicht „Objekte“; die Seite holt die Ansicht nach vorn.
    */
   ortssuche?: {
     onOrtWaehlen: (ort: GefundenerOrt) => void;
@@ -241,11 +222,22 @@ export interface SidebarProps {
    * Seite dem Fuß-Band gibt. Fehlt er, steht kein Modus-Band.
    */
   platzierModus?: PlatzierModus | null;
-  /** Gezeigte Ansicht der Leiste — die Seite hält sie (`useLeistenAnsicht`). */
+  /** Gemerkte Ansicht der Leiste — die Seite hält sie (`useLeistenAnsicht`). */
   ansicht: LeistenAnsicht;
-  onAnsichtWechsel: (ansicht: LeistenAnsicht) => void;
+  /**
+   * Steht die Ansicht „Auswahl“ vorn (`useAuswahlVorn`)? Wirkt nur mit `auswahl`; ohne Auswahl gibt
+   * es das Segment nicht.
+   */
+  auswahlVorn?: boolean;
+  /** Zählt jedes Nach-vorn-Holen der Auswahl: die Rollfläche beginnt dann oben. */
+  auswahlNr?: number;
+  /** Tipp auf ein Segment: „Ebenen“/„Objekte“ lassen die Auswahl bestehen. */
+  onAnsichtWechsel: (ansicht: GezeigteAnsicht) => void;
+  /** Rückweg „← Ebenen“/„← Objekte“: hebt die Auswahl auf. */
+  onAuswahlZurueck?: () => void;
+  /** Hebt Esc gerade die Auswahl auf? Dann trägt der Rückweg die Tastenkappe. */
+  auswahlEsc?: boolean;
   onKoordinateEingeben: (lat: number, lon: number) => void;
-  einsatzortVerortet: boolean;
   onEinsatzortPlatzieren: () => void;
   layer: LayerSichtbar;
   onLayerToggle: (key: keyof LayerSichtbar, an: boolean) => void;
@@ -346,8 +338,8 @@ export interface SidebarProps {
   /** Fehler-Slots je Sektion — siehe `SidebarSektionFehler`. */
   sektionFehler?: SidebarSektionFehler;
   /**
-   * Inhalt des Paneels „Ausgewählt" — die Inspectors der gewählten Objekte (Marker, Zone,
-   * freies Zeichen, Fachebene). Leer → Hinweis, wie man etwas wählt.
+   * Inhalt der Ansicht „Auswahl" — die Inspectors der gewählten Objekte (Marker, Zone, freies
+   * Zeichen, Fachebene), untereinander. Ohne Auswahl gibt es die Ansicht nicht.
    */
   auswahl?: ReactNode;
   /**
@@ -359,18 +351,7 @@ export interface SidebarProps {
 }
 
 /**
- * Derselbe Fehler über erhalten gebliebenen Zeilen statt an ihrer Stelle. Ohne `onWiederholen`
- * fällt der Slot auf die gewöhnliche Fehlermeldung zurück, nicht auf „kein Banner": dass der Stand
- * alt ist, bleibt die Aussage.
- */
-function VeraltetSlot({ fehler }: { fehler?: SektionFehler }) {
-  if (!fehler) return null;
-  if (!fehler.onWiederholen) return <FehlerSlot fehler={fehler} />;
-  return <SeitenStandVeraltet onWiederholen={fehler.onWiederholen} />;
-}
-
-/**
- * Trefflächenboden für ein handgebautes Bedienziel. Die Einträge unter „Verortet" sind klickbar,
+ * Trefflächenboden für ein handgebautes Bedienziel. Die Orts-Treffer der Objektsuche sind klickbar,
  * aber `ListenEintrag` legt `onClick` auf ein nacktes `<div>`, dessen Höhe nur aus der Polsterung
  * der `<Liste>` käme (Handschuh grob 54 statt 72 px). Deshalb zwei Angaben: `minHeight` aus
  * `controlHeight` plus Polsterung.
@@ -395,22 +376,18 @@ export function bedienzielStil(token: {
 }
 
 /**
- * Ansicht „Objekte“ der Kartenleiste: Nicht verortet, Einsatzort, Verortet (Objekt- und
- * Ortssuche) und mit Schreibrecht Zeichnen — die Paneele wie vor der Gliederung in Ansichten
- * (LLH-1028); ihren Umbau zur einen Objektliste trägt das Folgeticket. Laufende Modi zeigen hier
- * nur den Zustand, bedient werden sie im Modus-Band bzw. im Fuß.
+ * Ansicht „Objekte“ der Kartenleiste (LLH-1033): ein Suchfeld und eine Liste aller Objekte, verortet
+ * und nicht verortet (`MarkerSuche`), der Einsatzort als erste Zeile; „Nicht verortet“ ist ein
+ * Filter. Darunter mit Schreibrecht „Zeichnen“ (bis zum Werkzeugmenü, Zielbild LLH-1023). Laufende
+ * Modi zeigen hier nur den Zustand, bedient werden sie im Modus-Band bzw. im Fuß.
  */
 function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
-  const { nichtVerortet, darfSchreiben, platzierungZiel } = props;
+  const { darfSchreiben, platzierungZiel } = props;
   const sektionFehler = props.sektionFehler ?? {};
-  /** Eine Zählung, die im Fehlerfall keine Null behauptet. */
-  const zaehler = (n: number) => (sektionFehler.nichtVerortet ? '—' : n);
-  const { token, rollen } = useRollen();
+  const { token } = useRollen();
   const paneele = usePaneelZustand();
   const umschalten = (k: Parameters<typeof paneele.setze>[0]) => () =>
     paneele.setze(k, !paneele.zustand[k]);
-  // Ein Paneel mit Fehler-Slot steht offen, egal wie es zuletzt stand: ein zugeklappter Fehler wäre
-  // von „nichts da" nicht zu unterscheiden.
   // Freies-Zeichen-Schnellerfassung: der Picker erscheint erst auf Klick, der Entwurf bleibt über
   // Platzierungen erhalten.
   const [zeichenPickerOffen, setZeichenPickerOffen] = useState(false);
@@ -426,32 +403,11 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
     props.onZeichenPlatzierenStart(spec);
     setZeichenPickerOffen(false);
   };
-  // Suche über „Nicht verortet". Wirksam nur, solange das Feld steht: fällt die Liste unter die
-  // Schwelle, verschwindet mit dem Feld sein `allowClear` — ein weiterwirkender Filter verschluckte
-  // Einträge ohne Ausweg. Zurückgesetzt während des Renderns: React verwirft diesen Durchlauf vor
-  // dem Commit, es gibt keinen sichtbaren Zwischenstand.
-  const [nvSuche, setNvSuche] = useState('');
-  const nvSucheZeigen = nichtVerortet.length >= NICHT_VERORTET_SUCHE_AB;
-  if (!nvSucheZeigen && nvSuche !== '') setNvSuche('');
-  const nvBegriff = nvSuche.trim();
-  const nvTreffer = filtereNichtVerortet(nichtVerortet, nvBegriff, platzierungZiel);
-  // Gezählt werden nur echte Treffer: die angeheftete Zeile des laufenden Ziels steht auch ohne
-  // Treffer da.
-  const nvTrefferzahl = nvBegriff
-    ? filtereNichtVerortet(nichtVerortet, nvBegriff, null).length
-    : nichtVerortet.length;
 
   // Zeichnen-Knopf über der Karte: Paneel öffnen und in den Blick holen. Der Effekt hängt allein am
   // Zähler, damit ein Zuklappen ihn nicht erneut auslöst.
   const zeichnenRef = useRef<HTMLDivElement>(null);
   const { setze: paneelSetzen } = paneele;
-  // Ortssuche von außen (`?ort=`): das Paneel mit dem Suchfeld öffnen, je Vorbelegung einmal.
-  const vorbelegungNonce = props.ortssuche?.vorbelegung?.nonce;
-  useEffect(() => {
-    if (vorbelegungNonce == null) return;
-    paneelSetzen('verortet', true);
-  }, [vorbelegungNonce, paneelSetzen]);
-
   useEffect(() => {
     if (!props.zeichnenAnfrage) return;
     paneelSetzen('zeichnen', true);
@@ -459,156 +415,45 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
     requestAnimationFrame(() => zeichnenRef.current?.scrollIntoView?.({ block: 'nearest' }));
   }, [props.zeichnenAnfrage, paneelSetzen]);
 
-  // Die kleine Größe steht in dieser Datei nur noch an `Liste` (Abstandsmaß); interaktive Elemente
-  // erben ihre Höhe vom `ConfigProvider`. Die anklickbaren Einträge tragen `bedienzielStil`.
-  //
-  // Die Prop-Schreibweise steht bewusst nicht ausgeschrieben: Gate 4 zählt ihr Literal repo-weit.
+  const ziel = zielSchluessel(platzierungZiel);
+  /**
+   * Rechts in der Zeile: sekundäre (umrandete) Knöpfe — „genau eine Primäraktion" gilt auch in der
+   * Leiste. Das laufende Ziel zeigt nur „wird platziert“: „Abbrechen“ steht im Modus-Band bzw. im
+   * Fuß (LLH-1028), je Breite ein Knopf je Handlung.
+   */
+  const zeilenAktion = (e: ObjektEintrag): ReactNode => {
+    if (!darfSchreiben) return null;
+    if (e.schluessel === ziel)
+      return <Typography.Text type="secondary">wird platziert</Typography.Text>;
+    if (e.typ === 'einsatzort')
+      return (
+        <Button onClick={props.onEinsatzortPlatzieren}>
+          {e.verortet ? 'Verschieben' : 'Platzieren'}
+        </Button>
+      );
+    if (e.verortet) return null;
+    if (e.typ === 'abschnitt')
+      return <Button onClick={() => props.onAbschnittZeichnenStart(e.id)}>Fläche zeichnen</Button>;
+    const typ = e.typ;
+    if (!istPunktTyp(typ)) return null;
+    return <Button onClick={() => props.onPlatzierenStart({ typ, id: e.id })}>Platzieren</Button>;
+  };
+
   return (
     <div role="tabpanel" id={props.id} aria-label="Objekte" hidden={props.hidden}>
-      <KlappPaneel
-        titel="Nicht verortet"
-        kennung="nichtVerortet"
-        meta={zaehler(nichtVerortet.length)}
-        offen={paneele.zustand.nichtVerortet || sektionFehler.nichtVerortet != null}
-        onUmschalten={umschalten('nichtVerortet')}
-      >
-        {/* Ein Fehler ersetzt Inhalt nur, wenn es keinen gibt (`anzahl === 0`): stehen noch
-            Zeilen im Zwischenspeicher, wird der Fehler zum Banner darüber, und die Liste — die
-            einzige Bedienung zum Verorten — bleibt bedienbar. „Alles verortet" darf nicht
-            stehen, solange unklar ist, ob etwas geladen wurde. */}
-        {sektionFehler.nichtVerortet && nichtVerortet.length === 0 ? (
-          <FehlerSlot fehler={sektionFehler.nichtVerortet} />
-        ) : nichtVerortet.length === 0 ? (
-          <SeitenLeer titel="Alles verortet" />
-        ) : (
-          <>
-            <VeraltetSlot fehler={sektionFehler.nichtVerortet} />
-            {nvSucheZeigen && (
-              <div style={{ marginBlockEnd: token.marginXS }}>
-                {/* Schlichtes Eingabefeld statt Suchvariante: gefiltert wird live, deren
-                    Suchknopf wäre ein Tab-Ziel ohne Wirkung. Das Icon in `aria-hidden`-Hülle
-                    (sonst ein englisches „search"). */}
-                <Input
-                  aria-label="Nicht verortete Objekte durchsuchen"
-                  placeholder="Name oder Typ"
-                  allowClear
-                  prefix={
-                    <span aria-hidden="true" style={{ color: rollen.schwach }}>
-                      <IconLupe />
-                    </span>
-                  }
-                  value={nvSuche}
-                  onChange={(ev) => setNvSuche(ev.target.value)}
-                />
-                {/* Die Trefferzahl ist die zweite Angabe: der Kopf zählt weiter alle nicht
-                    verorteten Objekte. Die Region steht mit dem Feld, auch wenn sie schweigt
-                    (eine Live-Region meldet nur Änderungen), und trägt auch „0 von N" — sonst
-                    hörte ein Vorleser nie, dass alles weggefiltert ist. */}
-                <div
-                  role="status"
-                  style={{
-                    ...monoStil(11),
-                    color: rollen.gedaempft,
-                    ...(nvBegriff ? { marginBlockStart: token.marginXXS } : {}),
-                  }}
-                >
-                  {nvBegriff ? `${nvTrefferzahl} von ${nichtVerortet.length}` : ''}
-                </div>
-              </div>
-            )}
-            {/* Dritter Zustand: die Suche hat alles weggefiltert. Eigener Wortlaut, weil „Alles
-                verortet" eine falsche Lagebeurteilung wäre; der Ausweg ist das Leeren am Feld.
-                Steht das laufende Ziel als einzige Zeile da, entfällt die Leermeldung. */}
-            {nvTreffer.length === 0 ? (
-              <SeitenLeer titel={`Keine Treffer für „${nvBegriff}"`} />
-            ) : (
-              <Liste
-                size="small"
-                dataSource={nvTreffer}
-                rowKey={(o) => `${o.typ}-${o.id}`}
-                renderItem={(o) => {
-                  const aktiv = platzierungZiel?.typ === o.typ && platzierungZiel?.id === o.id;
-                  let action: React.ReactNode = null;
-                  // Zeilenaktionen sind sekundär (umrandet) — „genau eine Primäraktion" gilt auch
-                  // in der Leiste. Gefüllt ist nur, was einen laufenden Modus abschließt.
-                  if (darfSchreiben) {
-                    if (o.typ === 'abschnitt') {
-                      action = (
-                        <Button onClick={() => props.onAbschnittZeichnenStart(o.id)}>
-                          Fläche zeichnen
-                        </Button>
-                      );
-                    } else if (aktiv) {
-                      action = <Typography.Text type="secondary">wird platziert</Typography.Text>;
-                    } else {
-                      // o.typ ist hier auf die Punkt-Typen verengt (abschnitt oben behandelt).
-                      const punktTyp = o.typ;
-                      action = (
-                        <Button
-                          onClick={() => props.onPlatzierenStart({ typ: punktTyp, id: o.id })}
-                        >
-                          Platzieren
-                        </Button>
-                      );
-                    }
-                  }
-                  return (
-                    <ListenEintrag actions={action ? [action] : []}>
-                      <Typography.Text>
-                        {NICHT_VERORTET_LABEL[o.typ]}: {o.label}
-                      </Typography.Text>
-                    </ListenEintrag>
-                  );
-                }}
-              />
-            )}
-          </>
-        )}
-      </KlappPaneel>
-
-      <KlappPaneel
-        titel="Einsatzort"
-        kennung="einsatzort"
-        offen={paneele.zustand.einsatzort}
-        onUmschalten={umschalten('einsatzort')}
-      >
-        <Space style={{ justifyContent: 'space-between', width: '100%' }}>
-          <Typography.Text type={props.einsatzortVerortet ? undefined : 'warning'}>
-            {props.einsatzortVerortet ? 'verortet' : 'nicht verortet'}
-          </Typography.Text>
-          {darfSchreiben &&
-            (platzierungZiel?.typ === 'einsatzort' ? (
-              <Typography.Text type="secondary">wird platziert</Typography.Text>
-            ) : (
-              <Button
-                type={props.einsatzortVerortet ? 'default' : 'primary'}
-                onClick={props.onEinsatzortPlatzieren}
-              >
-                {props.einsatzortVerortet ? 'Verschieben' : 'Platzieren'}
-              </Button>
-            ))}
-        </Space>
-      </KlappPaneel>
-
-      <KlappPaneel
-        titel="Verortet"
-        kennung="verortet"
-        offen={paneele.zustand.verortet}
-        onUmschalten={umschalten('verortet')}
-      >
-        {/* Kein eigener Fehlerkasten (siehe `SidebarSektionFehler`), aber im Fehlerfall weder
-            Zahlen noch behauptete Leere (`zaehlerUnbekannt`). */}
+      <div data-paneel="objekte">
         <MarkerSuche
-          marker={props.suchbar}
+          eintraege={props.objekte}
           onMarkerWaehlen={props.onMarkerWaehlen}
-          zaehlerUnbekannt={
-            sektionFehler.nichtVerortet != null || props.suchbarUnvollstaendig === true
-          }
+          fehler={sektionFehler.nichtVerortet}
+          zaehlerUnbekannt={props.objekteUnvollstaendig === true}
+          angeheftet={ziel}
+          zeilenAktion={zeilenAktion}
           ortssuche={
             props.ortssuche ? { einsatzId: props.einsatzId, ...props.ortssuche } : undefined
           }
         />
-      </KlappPaneel>
+      </div>
 
       {darfSchreiben && (
         <div ref={zeichnenRef}>
@@ -734,24 +579,34 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
   );
 }
 
+const ANSICHT_NAME: Record<LeistenAnsicht, string> = { ebenen: 'Ebenen', objekte: 'Objekte' };
+
 /**
- * Rechte Leiste der Lagekarte, 300 px ab `lg` (LLH-1028, Zielgliederung LLH-1023). Von oben:
- * 1. Segmentleiste „Ebenen“ · „Objekte“ (Tabliste, jedes Segment ein festes Drittel — das dritte
- *    bleibt bis zur Ansicht „Auswahl“ leer, damit kein Segment wandert);
+ * Rechte Leiste der Lagekarte, 300 px ab `lg` (LLH-1028, LLH-1033, Zielgliederung LLH-1023). Von
+ * oben:
+ * 1. Segmentleiste „Ebenen“ · „Objekte“ · „Auswahl“ (Tabliste, jedes Segment ein festes Drittel —
+ *    „Auswahl“ gibt es nur mit einer Auswahl, ohne sie bleibt ihr Drittel leer, damit kein Segment
+ *    wandert);
  * 2. das Modus-Band des laufenden Leistenmodus (`ModusBand`);
- * 3. die Rollfläche: „Ausgewählt“ (übergangsweise über beiden Ansichten), dann die Ansicht.
+ * 3. die Rollfläche mit der gezeigten Ansicht.
  *
- * Beide Ansichten bleiben montiert und werden nur verborgen: Suchbegriffe, Zeichen-Entwurf und
- * Klappzustand überleben so jeden Wechsel und jeden Kartenmodus. Die gezeigte Ansicht hält die
- * Seite (`useLeistenAnsicht`), weil sie wissen muss, ob der Kopf der Ebenen zu sehen ist.
+ * Alle Ansichten bleiben montiert und werden nur verborgen: Suchbegriffe, Filter, Zeichen-Entwurf
+ * und Klappzustand überleben so jeden Wechsel und jeden Kartenmodus. Die Rollfläche merkt sich ihre
+ * Lage je Ansicht; „Auswahl“ beginnt bei jeder neuen Auswahl oben. Welche Ansicht vorn steht, hält
+ * die Seite (`useLeistenAnsicht`, `useAuswahlVorn`), weil sie wissen muss, ob der Kopf der Ebenen zu
+ * sehen ist.
  */
 export default function Sidebar(props: SidebarProps) {
   const { token, rollen } = useRollen();
   const ebenenId = useId();
   const objekteId = useId();
+  const auswahlId = useId();
   const modus = props.platzierModus ?? null;
   const bedienung = (props.modusBedienung ?? 'band') === 'band';
   const ziel = props.platzierungZiel;
+  const auswahlOffen = props.auswahl != null;
+  const gezeigt: GezeigteAnsicht =
+    auswahlOffen && props.auswahlVorn !== false ? 'auswahl' : props.ansicht;
   // Je Ziel ein neues Band: ein Koordinaten- oder Mittelpunkt-Entwurf wandert nicht ins nächste.
   const bandSchluessel =
     modus == null
@@ -761,6 +616,20 @@ export default function Sidebar(props: SidebarProps) {
         : modus.art === 'bild'
           ? `bild:${props.bildPlatzierenId ?? ''}`
           : modus.art;
+
+  // Rollposition je Ansicht: die Rollfläche ist eine für alle drei. Gemerkt wird beim Rollen,
+  // gesetzt beim Wechsel (vor dem Malen, `useLayoutEffect`); „Auswahl“ beginnt oben.
+  const rollRef = useRef<HTMLDivElement>(null);
+  const rollLage = useRef<Partial<Record<GezeigteAnsicht, number>>>({});
+  const gezeigtRef = useRef(gezeigt);
+  gezeigtRef.current = gezeigt;
+  const auswahlNr = props.auswahlNr ?? 0;
+  useLayoutEffect(() => {
+    const flaeche = rollRef.current;
+    if (!flaeche) return;
+    flaeche.scrollTop = gezeigt === 'auswahl' ? 0 : (rollLage.current[gezeigt] ?? 0);
+  }, [gezeigt, auswahlNr]);
+
   return (
     <div
       data-lfh="kartenleiste"
@@ -773,17 +642,24 @@ export default function Sidebar(props: SidebarProps) {
       }}
     >
       <div
-        className="lfh-leisten-ansichten"
+        className={
+          auswahlOffen
+            ? 'lfh-leisten-ansichten lfh-leisten-ansichten--drei'
+            : 'lfh-leisten-ansichten'
+        }
         style={{ padding: token.paddingXS, borderBlockEnd: `1px solid ${rollen.linie}` }}
       >
-        <Segmentleiste<LeistenAnsicht>
+        <Segmentleiste<GezeigteAnsicht>
           rolle="tablist"
           beschriftung="Ansicht der Leiste"
-          wert={props.ansicht}
+          wert={gezeigt}
           onWechsel={props.onAnsichtWechsel}
           optionen={[
             { wert: 'ebenen', label: 'Ebenen', steuert: ebenenId },
             { wert: 'objekte', label: 'Objekte', steuert: objekteId },
+            ...(auswahlOffen
+              ? [{ wert: 'auswahl' as const, label: 'Auswahl', steuert: auswahlId }]
+              : []),
           ]}
         />
       </div>
@@ -809,25 +685,44 @@ export default function Sidebar(props: SidebarProps) {
           }}
         />
       )}
-      <div data-lfh="leisten-rollflaeche" style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-        <LeistenAbschnitt titel="Ausgewählt" kennung="ausgewaehlt">
-          {props.auswahl ?? (
-            <p
-              style={{
-                margin: 0,
-                padding: token.padding,
-                fontSize: 12,
-                color: rollen.gedaempft,
-              }}
-            >
-              Nichts gewählt
-            </p>
-          )}
-        </LeistenAbschnitt>
-        <div role="tabpanel" id={ebenenId} aria-label="Ebenen" hidden={props.ansicht !== 'ebenen'}>
+      <div
+        ref={rollRef}
+        data-lfh="leisten-rollflaeche"
+        onScroll={(ev) => {
+          rollLage.current[gezeigtRef.current] = ev.currentTarget.scrollTop;
+        }}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+      >
+        <div role="tabpanel" id={ebenenId} aria-label="Ebenen" hidden={gezeigt !== 'ebenen'}>
           <Ebenenbaum {...props} />
         </div>
-        <ObjekteAnsicht {...props} id={objekteId} hidden={props.ansicht !== 'objekte'} />
+        <ObjekteAnsicht {...props} id={objekteId} hidden={gezeigt !== 'objekte'} />
+        {auswahlOffen && (
+          <section
+            role="tabpanel"
+            id={auswahlId}
+            aria-label="Auswahl"
+            data-paneel="ausgewaehlt"
+            hidden={gezeigt !== 'auswahl'}
+          >
+            <div
+              data-lfh="auswahl-kopf"
+              style={{ padding: token.paddingXS, borderBlockEnd: `1px solid ${rollen.linie}` }}
+            >
+              {/* Der Rückweg benennt sein Ziel; er hebt die Auswahl auf (LLH-1023 D1). */}
+              <Button
+                type="text"
+                onClick={props.onAuswahlZurueck}
+                aria-label={`Zurück zu ${ANSICHT_NAME[props.ansicht]}`}
+                aria-keyshortcuts={props.auswahlEsc ? 'Escape' : undefined}
+              >
+                <span aria-hidden="true">←</span> {ANSICHT_NAME[props.ansicht]}
+                {props.auswahlEsc && <EscKappe />}
+              </Button>
+            </div>
+            {props.auswahl}
+          </section>
+        )}
       </div>
     </div>
   );
