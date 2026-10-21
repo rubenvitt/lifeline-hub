@@ -52,3 +52,12 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   drei und mehr aufeinanderfolgende Systemeinträge stehen als eine Bündelzeile, ihr Text ist
   nicht im DOM. Nach dem Laden des ETB `systemBuendelAufklappen(page)` aus `e2e/etb-kern.ts`;
   sonst bestünde auch eine `toHaveCount(0)`-Prüfung nur, weil der Text zugeklappt ist.
+- **Wer in WebKit Seitenfehler sammelt, navigiert nicht über laufende Abrufe** (LLH-1051): ein
+  `goto`, das eine noch ladende Seite verlässt (Einsatzliste direkt nach der Anmeldung über das
+  Formular, Org-Strom, Sitzungsprobe), bricht deren Abrufe ab. WebKit meldet jeden davon als
+  Konsolenfehler „… due to access control checks.“, und Playwright reicht ihn in WebKit als
+  `pageerror` weiter; die App hat keinen Fehler. Anmelden über die API und als erste Seite die
+  geprüfte laden (`anmeldenOhneStartseite` in `e2e/lageplan-kern.ts`), nicht die Meldung filtern.
+- **Specs mit Lagekarte laufen nicht in Firefox** (LLH-1051): der headless Firefox hat hier und in
+  der CI kein WebGL2, die Karte (maplibre) entsteht nicht. Druck-Specs mit Karte stehen deshalb in
+  `KARTEN_DRUCK_SPECS` (`playwright.config.ts`, Chromium und WebKit), nicht in `DRUCK_SPECS`.
