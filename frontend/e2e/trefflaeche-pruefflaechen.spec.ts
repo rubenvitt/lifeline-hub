@@ -1485,3 +1485,68 @@ test('Körperschema: jede Region und jedes Sternchen hält die Stufe, Hand, Fuß
   }
   expect(hand.kompakt.height, 'Gegenprobe: in kompakt kleiner').toBeLessThan(hand.handschuh.height);
 });
+
+/**
+ * Gefahrenmatrix (LLH-1102, Spec `gefahrenmatrix`, „Die ganze Zelle ist das Bedienziel“): der
+ * Auslöser füllt die Zelle, und die Zeile ist so hoch wie die Steuerhöhe. Gemessen in ALLEN drei
+ * Stufen auf beiden Achsen (die Zelle ist das Ziel, nicht mehr ein Knopf in ihr), dazu die
+ * Gegenprobe kompakt < handschuh und die Deckung von Knopf und Zelle: ein Knopf, der kleiner als
+ * seine Zelle bliebe, ließe einen Tipp daneben wieder ins Leere gehen.
+ */
+test('Gefahrenmatrix: jede Zelle ist ganz Ziel und hält die Stufe in allen drei Dichten', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize(FUEKW);
+  await anmelden(page);
+  const einsatzId = await einsatzAnlegen(page, `E2E 1102 Matrix ${Date.now()}`);
+  await anlegen(
+    page,
+    einsatzId,
+    'zonen',
+    {
+      typ: 'gefahrengebiet',
+      geometrie_typ: 'Polygon',
+      geometrie: JSON.stringify({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [10, 50],
+            [10.01, 50],
+            [10.01, 50.01],
+            [10, 50.01],
+            [10, 50],
+          ],
+        ],
+      }),
+      label: 'Sektor Zelle',
+    },
+    'Gefahrengebiet Sektor Zelle',
+  );
+
+  const je = new Map<string, number>();
+  const notiz: string[] = [];
+  for (const { dichte, soll } of STAFFEL) {
+    await page.goto(`/einsaetze/${einsatzId}/gefahren`);
+    await stelleDichte(page, dichte);
+    const zellen = inMain(page).getByRole('button', { name: /^Bewertung / });
+    await expect(zellen).toHaveCount(58);
+    // Beide Achsen gegen die volle Stufe: die Zelle ist quadratisch oder breiter.
+    let kleinstes = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < 58; i += 1) {
+      const knopf = (await zellen.nth(i).boundingBox())!;
+      const zelle = (await zellen.nth(i).locator('xpath=ancestor::td[1]').boundingBox())!;
+      const name = `Matrixzelle #${i + 1} (${dichte})`;
+      expect(knopf.height + SUBPIXEL, `${name}: Höhe`).toBeGreaterThanOrEqual(soll);
+      expect(knopf.width + SUBPIXEL, `${name}: Breite`).toBeGreaterThanOrEqual(soll);
+      // Deckung: der Knopf füllt die Zelle bis auf ihre 1-px-Linie.
+      expect(zelle.width - knopf.width, `${name}: Breite deckt die Zelle`).toBeLessThanOrEqual(2);
+      expect(zelle.height - knopf.height, `${name}: Höhe deckt die Zelle`).toBeLessThanOrEqual(2);
+      kleinstes = Math.min(kleinstes, knopf.height, knopf.width);
+    }
+    je.set(`${dichte} Matrixzelle`, kleinstes);
+    notiz.push(`${dichte}: kurze Achse ${kleinstes}`);
+  }
+  gegenprobe(je, 'Matrixzelle');
+  test.info().annotations.push({ type: 'messwert', description: notiz.join(' | ') });
+});

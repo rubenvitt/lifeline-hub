@@ -10,6 +10,8 @@ import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte, schreibeLageberichtFort } from '../api/lageberichte';
 import type { LageberichtAbschnitt, LageberichtVorlageKey } from '../api/types';
 import { anzahl } from '../anzeige/anzahl';
+import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
+import { taktischeDtgVoll } from '../anzeige/format';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import {
@@ -23,6 +25,7 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import { modulName } from '../einsatz/modulRegistry';
 import NeuerLagevortragKnopf, { VORGABE_VORLAGE } from '../lageberichte/NeuerLagevortragKnopf';
 import LageberichtUebersicht from '../lageberichte/LageberichtUebersicht';
+import { loadStartinhalt } from '../lageberichte/startinhalt';
 import { hatNachfolger, teileUebersicht, titelVorschlag } from '../lageberichte/uebersicht';
 
 /**
@@ -36,13 +39,18 @@ import { hatNachfolger, teileUebersicht, titelVorschlag } from '../lageberichte/
  * Titel und Zeitstand ändert man dort. Der Pfeil am Knopf wählt eine andere Vorlage. Abgelehnt
  * steht der Grund im Seitenhinweis (LFH-1077), es wird nicht navigiert, und der Server legt nichts
  * an. `abschnitte` reicht einen Startinhalt in denselben POST (Spec `dokument-uebernahme`).
+ *
+ * Mit Lagebild (LLH-1081, Spec `lagevortrag-uebernahme`): der Klick lädt die Quellen der Vorlage
+ * (`lageberichte/startinhalt.ts`) und schickt ihre Texte als Startinhalt im EINEN POST. Laden und
+ * Anlegen sind eine Mutation: `loading` und der Riegel decken beides. „Leerer Lagevortrag“ lädt
+ * nichts.
  */
 
 interface Anlegen {
   einsatzId: number;
   vorlage: LageberichtVorlageKey;
-  /** Startinhalt; fehlt er, legt der Server das leere Skelett der Vorlage an. */
-  abschnitte?: LageberichtAbschnitt[];
+  /** Startinhalt aus den Quellen der Vorlage laden; ohne ihn legt der Server das leere Skelett an. */
+  ausLagebild: boolean;
 }
 
 export default function LageberichtePage() {
@@ -51,6 +59,7 @@ export default function LageberichtePage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { formatiere } = useZeitEingabe();
+  const { konventionen } = useAnzeigeKonventionen();
 
   // Der Einsatz, in dem die Seite gerade steht: eine Antwort aus einem verlassenen Einsatz
   // navigiert nicht und meldet nicht am neuen Ort (`frontend/AGENTS.md`, „Rückwege und Fehler“).
@@ -94,13 +103,23 @@ export default function LageberichtePage() {
 
   // Kein `onError`: der Grund steht im Seitenhinweis, bis zum nächsten Versuch.
   const anlegenMutation = useMutation({
-    mutationFn: (a: Anlegen) =>
-      legeLageberichtAn(a.einsatzId, {
+    mutationFn: async (a: Anlegen) => {
+      const titel = titelVorschlag(a.vorlage, dayjs(), formatiere);
+      // Scheitert nicht: was fehlt, steht als „— (Grund)“ im Abschnitt.
+      const abschnitte: LageberichtAbschnitt[] | undefined = a.ausLagebild
+        ? await loadStartinhalt(a.vorlage, {
+            qc,
+            einsatzId: a.einsatzId,
+            dtg: (iso) => taktischeDtgVoll(iso, konventionen),
+          })
+        : undefined;
+      return legeLageberichtAn(a.einsatzId, {
         vorlage: a.vorlage,
-        titel: titelVorschlag(a.vorlage, dayjs(), formatiere),
+        titel,
         // Kein Zeitstand: der Server setzt jetzt (`routes/vorlagendokument.rs`).
-        ...(a.abschnitte ? { abschnitte: a.abschnitte } : {}),
-      }),
+        ...(abschnitte ? { abschnitte } : {}),
+      });
+    },
     onSuccess: (neu, vars) => oeffne(vars, neu.id),
   });
   const fortschreibenMutation = useMutation({
@@ -109,11 +128,11 @@ export default function LageberichtePage() {
     onSuccess: (neu, vars) => oeffne(vars, neu.id),
   });
 
-  const lege = (vorlage: LageberichtVorlageKey) => {
+  const lege = (vorlage: LageberichtVorlageKey, ausLagebild: boolean) => {
     if (sendetRef.current) return;
     sendetRef.current = true;
     fortschreibenMutation.reset();
-    anlegenMutation.mutate({ einsatzId, vorlage }, { onError: loese });
+    anlegenMutation.mutate({ einsatzId, vorlage, ausLagebild }, { onError: loese });
   };
   const schreibeFort = (berichtId: number) => {
     if (sendetRef.current) return;
@@ -172,7 +191,7 @@ export default function LageberichtePage() {
           titel="Noch keine Lageberichte"
           aktion={
             darfSchreiben
-              ? { label: 'Neuer Lagevortrag', onClick: () => lege(VORGABE_VORLAGE) }
+              ? { label: 'Neuer Lagevortrag', onClick: () => lege(VORGABE_VORLAGE, true) }
               : undefined
           }
         />

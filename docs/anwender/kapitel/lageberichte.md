@@ -2,15 +2,16 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
 
 Ein Lagebericht hält die Lage zu einem Zeitstand in gegliederter Form fest, etwa als Lagevortrag.
 Er entsteht als Entwurf, wird gemeinsam geschrieben und mit der Freigabe endgültig: Dann steht er
-im Einsatztagebuch. Eine spätere Fassung entsteht durch Fortschreiben. Im Lagevortrag zur
-Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen.
+im Einsatztagebuch. Eine spätere Fassung entsteht durch Fortschreiben. Ein neuer Lagevortrag zur
+Information startet mit Zahlen und Ständen aus den Modulen; der Vortragende prüft und ergänzt
+sie.
 
 ## Abläufe
 
@@ -30,9 +31,12 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 ### Einen Lagevortrag anlegen
 
 1. In den Lageberichten „Neuer Lagevortrag“ wählen. Es entsteht sofort ein Entwurf
-   „Lagevortrag zur Information“, und er öffnet sich.
-2. Für eine andere Vorlage stattdessen den Pfeil neben dem Knopf wählen und „Lagevortrag zur
-   Entscheidung“ oder „Freier Bericht“ wählen.
+   „Lagevortrag zur Information“, und er öffnet sich. Gefahren-/Schadenlage, Eigene Lage,
+   Lageentwicklung, Besondere (Führungs-)Probleme und Medienlage sind schon aus den Modulen
+   gefüllt (Tabelle unter „Übernahmen im Lagevortrag zur Information“).
+2. Für einen Lagevortrag ohne diese Inhalte stattdessen den Pfeil neben dem Knopf und „Leerer
+   Lagevortrag“ wählen; für eine andere Vorlage dort „Lagevortrag zur Entscheidung“ oder „Freier
+   Bericht“.
 3. Im Entwurf den vorgeschlagenen „Titel“ übernehmen oder ändern; er nennt die Uhrzeit, etwa
    „Lageüberblick 1410“. Der „Zeitstand“ ist der Zeitpunkt des Anlegens und lässt sich dort
    ebenfalls ändern.
@@ -51,9 +55,10 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
    hinzufügen“ dazu.
 4. Den Text in die Abschnitte schreiben. Im Lagevortrag zur Information steht im Kopf eines
    Abschnitts ein Knopf, der Inhalte übernimmt, etwa „Aus Meldebild und Führungsorganisation
-   übernehmen“ in „Eigene Lage“.
+   übernehmen“ in „Eigene Lage“. Sind dort Abschnitte leer, füllt „Leere Abschnitte aus dem
+   Lagebild füllen“ über der Gliederung alle auf einmal; gefüllte bleiben, wie sie sind.
 
-   ![Entwurf mit Gliederung links, Titel, Zeitstand und Verteiler und den offenen Abschnitten, darin „Eigene Lage“ mit übernommenem Kräftemeldebild](../bilder/lageberichte/entwurf.png)
+   ![Entwurf mit Gliederung links und „Leere Abschnitte aus dem Lagebild füllen“ darüber, Titel, Zeitstand und Verteiler und den offenen Abschnitten, darin „Eigene Lage“ mit übernommenem Kräftemeldebild](../bilder/lageberichte/entwurf.png)
 
 5. „Lesefassung“ oben im Entwurf zeigt den ganzen Bericht gesetzt, so wie er gedruckt wird;
    „Bearbeiten“ führt zu den Textfeldern zurück. Gedruckt wird, was gerade steht.
@@ -91,7 +96,12 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
 | Medienlage | „Aus S5 übernehmen“ | Presse-Log, Pressemitteilungen, Infotelefon, ohne Personenbezug |
 
-- Jeder übernommene Text nennt seinen Stand als Datum-Zeit-Gruppe.
+- Jeder übernommene Text nennt seinen Stand als Datum-Zeit-Gruppe. Eine Fortschreibung übernimmt
+  den Text mit diesem Stand; neue Zahlen bringt erst eine neue Übernahme in den Abschnitt.
+- Beim Anlegen und mit „Leere Abschnitte aus dem Lagebild füllen“ steht derselbe Text wie mit dem
+  Knopf im Abschnitt. Die App lädt die Daten erst mit diesem Klick.
+- Ist eine Quelle für die Person ganz gesperrt, steht im Abschnitt „—“ mit Grund, etwa
+  „— (Stab nicht freigegeben)“ in der Medienlage; diese Quelle fragt die App dann gar nicht an.
 - Die Abschnitte „Auftrag“, „Anträge und Vorschläge“ und „Zusammenfassung“ und der ganze
   Lagevortrag zur Entscheidung bleiben von Hand.
 - Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme übernehmen nur Zahlen,
@@ -103,7 +113,8 @@ Information übernimmt die App auf Knopfdruck Zahlen und Stände aus den Modulen
   steht vor dem Pegel.
 - Gab es noch keine Lagebesprechung, zählt die Lageentwicklung seit Einsatzbeginn.
 - Steht im Abschnitt schon Text, fragt die App vor der Übernahme „… ersetzen?“; „Ersetzen“
-  überschreibt ihn.
+  überschreibt ihn. „Leere Abschnitte aus dem Lagebild füllen“ fragt nicht, denn es ersetzt
+  nichts: Was beim Eintreffen der Daten schon Text trägt, bleibt.
 
 ### Speichern
 

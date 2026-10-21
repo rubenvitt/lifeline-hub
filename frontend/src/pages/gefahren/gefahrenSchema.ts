@@ -22,6 +22,22 @@ export const GEFAHRENTYPEN: Katalogeintrag<Gefahrentyp>[] = [
   { wert: 'ertrinken', label: 'Ertrinken' },
 ];
 
+/**
+ * Gefahren in Anzeigefolge: alphabetisch nach Anzeigename, deutsche Kollation (LLH-1102, Spec
+ * `gefahrenmatrix`). EINE Funktion für jede Stelle, die Gefahrentypen listet (Matrix, Lagebild,
+ * Palettenauszug, Schäden), damit eine Gefahr überall an derselben Stelle steht. Der Katalog
+ * {@link GEFAHRENTYPEN} bleibt die Backend-Folge; sortiert wird nur in der Anzeige.
+ */
+export function sortGefahrenAlphabetisch<T extends { label: string }>(
+  eintraege: readonly T[],
+): T[] {
+  return [...eintraege].sort((a, b) => a.label.localeCompare(b.label, 'de'));
+}
+
+/** Die 13 Gefahrentypen in Anzeigefolge ({@link sortGefahrenAlphabetisch}). */
+export const GEFAHRENTYPEN_ALPHABETISCH: readonly Katalogeintrag<Gefahrentyp>[] =
+  sortGefahrenAlphabetisch(GEFAHRENTYPEN);
+
 /** 5 Schutzobjekte (Spalten der Matrix). */
 export const SCHUTZOBJEKTE: Katalogeintrag<Schutzobjekt>[] = [
   { wert: 'menschen', label: 'Menschen' },

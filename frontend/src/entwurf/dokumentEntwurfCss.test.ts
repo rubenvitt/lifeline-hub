@@ -77,12 +77,18 @@ describe('dokumentEntwurf.css — Druck', () => {
   it('lässt die Bedienung weg: Gliederung, Kopfblock, Abschnittsköpfe, Paneelkopf', () => {
     const weg = druck.filter(versteckt).map((r) => r.selektor);
     const alle = weg.join(' ');
-    for (const marke of ['gliederung', 'entwurf-kopf', 'abschnitt-kopf']) {
+    for (const marke of ['gliederung', 'gliederung-kopf', 'entwurf-kopf', 'abschnitt-kopf']) {
       expect(alle, marke).toContain(`[data-lfh='${marke}']`);
     }
     expect(weg).toContain("[data-lfh='dokument-entwurf'] > [data-lfh='paneel'] > :first-child");
     // Die Marken stehen im Baustein (sonst träfe die Regel nichts).
-    for (const marke of ['gliederung', 'entwurf-kopf', 'abschnitt-kopf', 'dokument-entwurf']) {
+    for (const marke of [
+      'gliederung',
+      'gliederung-kopf',
+      'entwurf-kopf',
+      'abschnitt-kopf',
+      'dokument-entwurf',
+    ]) {
       expect(baustein).toContain(`data-lfh="${marke}"`);
     }
   });

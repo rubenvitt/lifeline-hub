@@ -3,7 +3,7 @@ import { Typography } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt } from '../../api/types';
 import { monoStil, useRollen } from '../../components/instrument';
 import { warnstufeFlaeche } from '../../theme/statusFarben';
-import { GEFAHRENTYPEN, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
+import { GEFAHRENTYPEN_ALPHABETISCH, SCHUTZOBJEKTE, kombinationGueltig } from './gefahrenSchema';
 import {
   SPALTENKOPF,
   ZELLE_NICHT_ANWENDBAR,
@@ -29,7 +29,8 @@ export default function GefahrenMatrixAuszug({ matrix }: { matrix: GefahrBewertu
 
   const zelleVon = (typ: Gefahrentyp, objekt: Schutzobjekt) =>
     matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
-  const zeilen = GEFAHRENTYPEN.filter((g) =>
+  // Alphabetisch wie die Matrix (LLH-1102).
+  const zeilen = GEFAHRENTYPEN_ALPHABETISCH.filter((g) =>
     matrix.some(
       (m) =>
         m.gefahrentyp === g.wert &&

@@ -10,7 +10,7 @@ import type {
   Uhs,
   Warnstufe,
 } from '../../api/types';
-import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
+import { GEFAHRENTYPEN_ALPHABETISCH } from '../gefahren/gefahrenSchema';
 import { NICHT_BEURTEILT, istBeurteilt } from '../gefahren/beurteilung';
 import { gefahrengebietName } from '../../api/gefahren';
 import { ohneAbgeschlossene, sichtungsbild } from '../../personen/personenBilanz';
@@ -93,7 +93,8 @@ interface GefahrenmatrixVerdichtung {
  * Stufe darüber als Zeile da — wie im Matrixauszug der Palette. Ob überhaupt jemand hingesehen hat,
  * sagt nicht die Matrix, sondern die Beurteilung je Gebiet ({@link beurteilungHinweis}).
  *
- * Reihenfolge des Katalogs, nicht der Dringlichkeit (Prüfliste Kriterium 9).
+ * Reihenfolge alphabetisch wie die Matrix (LLH-1102, `sortGefahrenAlphabetisch`), nicht nach
+ * Dringlichkeit (Prüfliste Kriterium 9): eine Gefahr steht überall an derselben Stelle.
  */
 export function verdichteGefahrenmatrix(
   bewertungen: readonly GefahrBewertung[],
@@ -106,7 +107,7 @@ export function verdichteGefahrenmatrix(
     }
   }
   const zeilen: GefahrenZeile[] = [];
-  for (const { wert, label } of GEFAHRENTYPEN) {
+  for (const { wert, label } of GEFAHRENTYPEN_ALPHABETISCH) {
     const stufe = hoechste.get(wert);
     if (stufe != null && stufe !== 'keine') zeilen.push({ typ: wert, label, stufe });
   }

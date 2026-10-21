@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { KEINE_BERECHTIGUNG, modulName } from '../../einsatz/modulRegistry';
 import { useSprungSperre } from '../../einsatz/useSprungSperre';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Input, Space, Spin, Typography, theme } from 'antd';
 import type { BewertungEingabe } from '../../api/gefahren';
 import { einsatzKeys } from '../../api/queryKeys';
@@ -23,7 +23,8 @@ import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import GefahrenBeurteilung from './GefahrenBeurteilung';
-import { NICHT_BEURTEILT, istBeurteilt } from './beurteilung';
+import { istBeurteilt } from './beurteilung';
+import { gebietAussage } from './gebietAussage';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
@@ -108,6 +109,16 @@ export default function GefahrenPage() {
     // Dieselben Optionen wie die Gefahrengebiet-Vorschau der Sprungpalette.
     ...gefahrenMatrixAbfrage(einsatzId, gewaehlt),
     enabled: gewaehlt != null,
+  });
+  // Die Matrix jedes beurteilten Gebiets für den Zusatz der Gebietszeile („3 Gefahren · hoch“,
+  // LLH-1102). Derselbe Schlüssel wie Lagebild und Matrix oben: Cache geteilt, das Live-Ereignis
+  // `gefahr` invalidiert alle. Ein nicht beurteiltes Gebiet heißt „nicht beurteilt“ und braucht
+  // keinen Abruf.
+  const gebietsMatrizen = useQueries({
+    queries: gebiete.map((g) => ({
+      ...gefahrenMatrixAbfrage(einsatzId, g.id),
+      enabled: istBeurteilt(g),
+    })),
   });
 
   // Kein `onError`-Toast (LFH-966, „Speicherfehler an die Seite“): ein abgelehnter Stufenwechsel
@@ -212,6 +223,8 @@ export default function GefahrenPage() {
   }
 
   const aktuell = gebiete.find((g) => g.id === gewaehlt);
+  // Zusatz je Gebietszeile, in der Reihenfolge von `gebiete` wie `gebietsMatrizen`.
+  const aussagen = gebiete.map((g, i) => gebietAussage(g, gebietsMatrizen[i]?.data));
 
   return seite(
     <div
@@ -235,7 +248,7 @@ export default function GefahrenPage() {
         <Liste
           size="small"
           dataSource={gebiete}
-          renderItem={(g) => (
+          renderItem={(g, i) => (
             <ListenEintrag
               onClick={() => setGewaehlt(g.id)}
               style={{
@@ -248,23 +261,20 @@ export default function GefahrenPage() {
               }}
             >
               {/* `wrap`: in der 240-px-Spalte bricht die Zeile zwischen den Angaben um, nicht in
-                  einem Wort („1 Zon e“). */}
+                  einem Wort. */}
               <Space wrap>
                 {/* Etikett über `StatusTag`, nicht `color`-Prop: für einen Nicht-Preset rechnet
                     antd ein statisches Farbpaar, der Modus erreichte es nicht. */}
                 <StatusTag darstellung={warnstufeKarte[g.hoechste_warnstufe]} />
                 <span>{gefahrengebietName(g.label, g.id)}</span>
-                {/* Zahl vor Wort, mit Einheit (LFH-971): „(1)" las sich als Rang oder Meldung. */}
-                <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
-                  <span>{g.zonen_ids.length === 1 ? '1 Zone' : `${g.zonen_ids.length} Zonen`}</span>
-                  {/* Die offene Beurteilung als Wort (LLH-1090): hier wählt man, was zu tun ist. */}
-                  {!istBeurteilt(g) && (
-                    <>
-                      {' · '}
-                      <span>{NICHT_BEURTEILT}</span>
-                    </>
-                  )}
-                </Typography.Text>
+                {/* Was im Gebiet los ist (LLH-1102): „3 Gefahren · hoch“, offen „nicht beurteilt“
+                    (LLH-1090) — hier wählt man, was zu tun ist. Die Zonenzahl steht am Sprung zur
+                    Karte. Ohne geladene Matrix kein Zusatz statt einer erfundenen Zahl. */}
+                {aussagen[i] != null && (
+                  <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
+                    {aussagen[i]}
+                  </Typography.Text>
+                )}
               </Space>
             </ListenEintrag>
           )}
@@ -348,15 +358,25 @@ export default function GefahrenPage() {
               {/* Reverse-Deeplink zur Lagekarte (LFH-155): selektiert das Gebiet + fliegt es an.
                   Ein Sprung ist keine Handlung (LFH-616): EIN Link mit „↗", kein Knopf darin
                   (LFH-969). `KennungsLink` trägt den Boden, ein `<a>` erbt keine Steuerhöhe. */}
-              {karteGesperrt ? (
-                <Button disabled title={KEINE_BERECHTIGUNG}>
-                  Auf Karte zeigen
-                </Button>
-              ) : (
-                <KennungsLink to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
-                  Auf Karte zeigen <span aria-hidden="true">↗</span>
-                </KennungsLink>
-              )}
+              {/* Die Zonenzahl steht beim Sprung (LLH-1102), außerhalb des Links: sein Name bleibt
+                  die Handlung. Zahl vor Wort, mit Einheit (LFH-971). */}
+              <span
+                data-lfh="karte-zonen"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXXS }}
+              >
+                {karteGesperrt ? (
+                  <Button disabled title={KEINE_BERECHTIGUNG}>
+                    Auf Karte zeigen
+                  </Button>
+                ) : (
+                  <KennungsLink to={lagekartePfad(einsatzId, { gefahrengebiet: aktuell.id })}>
+                    Auf Karte zeigen <span aria-hidden="true">↗</span>
+                  </KennungsLink>
+                )}
+                <Typography.Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
+                  {`· ${aktuell.zonen_ids.length === 1 ? '1 Zone' : `${aktuell.zonen_ids.length} Zonen`}`}
+                </Typography.Text>
+              </span>
             </div>
           </div>
         )}

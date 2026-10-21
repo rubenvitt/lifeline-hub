@@ -2,8 +2,8 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { Schaden } from '../../api/types';
 import { renderMitProviders } from '../../test/utils';
-import { GEFAHR_LABEL, gefahrText, geschaedigtAnzeige } from './schadenHelfer';
-import { GEFAHRENTYPEN } from '../gefahren/gefahrenSchema';
+import { GEFAHR_LABEL, GEFAHRENARTEN, gefahrText, geschaedigtAnzeige } from './schadenHelfer';
+import { GEFAHRENTYPEN, GEFAHRENTYPEN_ALPHABETISCH } from '../gefahren/gefahrenSchema';
 
 describe('geschaedigtAnzeige', () => {
   /**
@@ -37,5 +37,9 @@ describe('gefahrText (LLH-1115)', () => {
 
   it('benennt jede Gefahr wie das Gefahrengebiet', () => {
     for (const g of GEFAHRENTYPEN) expect(GEFAHR_LABEL[g.wert]).toBe(g.label);
+  });
+
+  it('listet die Gefahren in der Folge der Gefahrenmatrix, alphabetisch (LLH-1102)', () => {
+    expect(GEFAHRENARTEN).toEqual(GEFAHRENTYPEN_ALPHABETISCH.map((g) => g.wert));
   });
 });

@@ -34,7 +34,9 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   es gedruckt wird; die Editoren bleiben dabei eingehängt (`hidden`).
   - Der Kopf eines Abschnitts trägt Name (h3), Hilfetext (`aria-describedby`) und die
     `aktion`-Render-Prop der Seite: dort setzt der Lagebericht `AbschnittUebernahme`. Neue
-    Füllwege setzen an derselben Stelle an, der Baustein kennt keine Quelle.
+    Füllwege setzen an derselben Stelle an, der Baustein kennt keine Quelle. Eine Aktion für das
+    ganze Dokument steht im Steckplatz `gliederungKopf` über der Sprungleiste, nie in der
+    Landmarke „Gliederung“ (LLH-1081: `LeereAbschnitteFuellen`).
   - Tippen rendert nur das eigene `Form.Item`: die Seite beobachtet nur die Felder des
     Druckkopfs, nie `useWatch([])`; der Baustein liest die Leer-Kette über `Form.useWatch` mit
     Selektor (`dokumentEntwurfKern.ts`). `AbschnittBlock` ist `memo`, alle Props
@@ -48,8 +50,8 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   Zeitstand) · „In Arbeit“ · „Verlauf“, Teilung nur in `lageberichte/uebersicht.ts`, jeder Bericht
   genau einmal. Text, Füllstand („5/8 Abschnitte“) und „zuletzt gespeichert“ aus dem Einzelabruf
   (Spec `listen-projektion`), nie als Feld der Liste. „Neuer Lagevortrag“ legt ohne Dialog mit
-  EINEM POST an und öffnet den Entwurf (`lageberichte/NeuerLagevortragKnopf.tsx`, Pfeil für die
-  übrigen Vorlagen); ein Startinhalt geht in denselben POST.
+  EINEM POST an und öffnet den Entwurf (`lageberichte/NeuerLagevortragKnopf.tsx`, Pfeil für
+  „Leerer Lagevortrag“ und die übrigen Vorlagen); der Startinhalt geht in denselben POST.
 - **Übernahme in Abschnitte des Lagevortrags** (LFH-870,
   `openspec/changes/archive/2026-10-04-lfh-870-eigene-lage-uebernahme/design.md`, Spec
   `lagevortrag-uebernahme`): ein Baustein `lageberichte/AbschnittUebernahme.tsx` (Knopf nur im
@@ -60,6 +62,13 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   Vortragsschema als Datenmodell (LFH-46 §2.3). Texte kommen aus den Renderern der
   Einzelübernahmen, nie aus einer zweiten Verdichtung; was fehlt, steht als „—“ mit Grund, nie 0.
   Der Lagevortrag zur Entscheidung bleibt von Hand.
+- **Mehrere Abschnitte in einem Schritt** (LLH-1081, Spec `lagevortrag-uebernahme`): „Neuer
+  Lagevortrag“ lädt beim Klick alle Quellen der Vorlage und legt mit ihren Texten als Startinhalt
+  an; im Entwurf füllt „Leere Abschnitte aus dem Lagebild füllen“ nur, was leer ist und beim
+  Eintreffen noch leer ist, ohne Rückfrage, mit `onGeaendert`. Beide nur über
+  `lageberichte/startinhalt.ts`, das je Abschnitt `erzeuge` der Quelle ruft (kein zweiter
+  Wortlaut); nicht freie Quelle, unbekannte Freigaben oder ein Wurf stehen als „— (Grund)“ im
+  Abschnitt, ohne Abruf der gesperrten Quelle.
 - **Weitere Quellen im Lagevortrag zur Information** (LFH-869,
   `openspec/changes/archive/2026-10-04-lfh-869-lagevortrag-weitere-abschnitte/design.md`, Spec
   `lagevortrag-uebernahme`):
