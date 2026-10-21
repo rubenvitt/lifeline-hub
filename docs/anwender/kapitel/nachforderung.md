@@ -25,20 +25,40 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
 Für Einsatzleitung und Führungspersonal:
 
 1. Im Einsatz „Nachforderungen“ öffnen und „Nachforderung anlegen“ wählen.
-2. Im Formular „Neue Nachforderung“ unter „Art (Kräfte/Mittel)“ angeben, was gebraucht wird, und
-   unter „Anzahl“, wie viel.
+2. Unter „Was“ angeben, was gebraucht wird. Die Knöpfe der Schnellwahl darüber setzen die
+   häufigsten Arten dieses Einsatzes mit einem Klick, in einem neuen Einsatz RTW, KTW, NEF, LF 10,
+   HLF 20 und DLK 23-12. Beim Tippen schlägt die App frühere Arten dieses Einsatzes, die
+   Einheitstypen der Organisation und gängige Kräfte und Mittel vor.
+3. Unter „Anzahl“ angeben, wie viel (vorbelegt 1). Nach einem Klick in der Schnellwahl steht der
+   Cursor dort, die Ziffer ersetzt die 1.
+4. Unter „Wohin“ den Meldeort angeben: einen Bereitstellungsraum, einen Einsatzabschnitt oder einen
+   freien Ort. Gibt es genau einen aktiven Bereitstellungsraum, steht er schon da.
 
-   ![Formular „Neue Nachforderung“ mit Art „Tauchpumpe“, Anzahl 3, Bezeichnung, Adressat „Leitstelle“, Priorität und Begründung](../bilder/nachforderung/nachforderung-absetzen.png)
+   ![Formular „Neue Nachforderung“ mit der Schnellwahl, Was „Tauchpumpe“, Anzahl 3, Wohin „Keller Hauptstraße 12“ und eingeklappt „Weitere Angaben“](../bilder/nachforderung/nachforderung-absetzen.png)
 
-3. Unter „Bezeichnung / Bedarf“ den Bedarf genauer beschreiben.
-4. Den „Adressat“ wählen: „Leitstelle“ (vorbelegt), „Nachbar-Einsatzabschnitt“, „Übergeordnete
-   Führung“ oder „Andere BOS“. Bei Bedarf unter „Adressat-Bezeichnung“ die Stelle genauer nennen;
-   beim Tippen schlägt die App die externen Stellen aus den Stammdaten vor.
-5. „Priorität“ setzen und unter „Begründung / Lagebezug“ den Grund eintragen.
-6. „Nachforderung absetzen“ wählen.
+5. Enter drücken oder „Nachforderung absetzen“ wählen.
+
+Alles Weitere steht eingeklappt unter „Weitere Angaben“, mit Vorgaben; der Kopf nennt, was davon
+abweicht:
+
+- „Details / Zweck“: den Bedarf genauer beschreiben, etwa „Transport aus UHS Turnhalle“.
+- „Adressat“: „Leitstelle“ (vorbelegt), „Nachbar-Einsatzabschnitt“, „Übergeordnete Führung“ oder
+  „Andere BOS“. Unter „Adressat-Bezeichnung“ die Stelle genauer nennen; beim Tippen schlägt die App
+  die externen Stellen aus den Stammdaten vor.
+- „Priorität“: „Normal“ (vorbelegt), „Dringend“ oder „Sofort“.
+- „Benötigt bis“: bis wann es da sein muss. Leer heißt sofort.
+- „Begründung / Lagebezug“: den Grund.
+
+Ist ein eingeklappter Wert ungültig, etwa eine zu lange Begründung, klappt der Teil beim Absetzen
+auf.
 
 „Speichern und nächste“ (Strg+Enter, am Mac ⌘+Enter) setzt ab und leert das Formular. Mit dem
-Häkchen „Werte behalten“ bleiben Adressat, Adressat-Bezeichnung und Priorität stehen.
+Häkchen „Werte behalten“ bleiben Wohin, Adressat, Adressat-Bezeichnung und Priorität stehen.
+
+Die Karte zeigt das Ziel als „→ BR Nord“ und die Bedarfszeit als „Benötigt bis: …“. Ohne Zugang zum
+Modul „Bereitstellungsräume“ bzw. „Einsatzabschnitte“ steht nur „→ Bereitstellungsraum“ bzw.
+„→ Einsatzabschnitt“; ohne dieses Recht lässt sich ein Raum oder Abschnitt auch nicht als Ziel
+wählen, ein freier Ort schon. Ein aufgelöster Bereitstellungsraum ist kein Ziel mehr.
 
 ### Den Stand fortschreiben
 
@@ -119,7 +139,7 @@ Eine abgelehnte Nachforderung ist abgeschlossen und lässt sich nicht wieder öf
 Wechselt eine Nachforderung auf „Zugesagt“, „Unterwegs“, „Eingetroffen“ oder „Abgelehnt“, erhalten
 die Person, die sie angelegt hat, und die Personen, die S4 besetzen (laut Stab-Besetzung, sonst
 laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa „Nachforderung
-eingetroffen“ mit „2× an Leitstelle“. Art, Bezeichnung, Adressat-Bezeichnung und Ablehnungsgrund
+eingetroffen“ mit „2× an Leitstelle“. Art, Details, Ziel, Adressat-Bezeichnung und Ablehnungsgrund
 stehen nie im Hinweis; er führt in das Modul „Nachforderungen“. Auch ein „Rückgängig“ zurück auf
 „Zugesagt“ oder „Unterwegs“ meldet die neue Stufe, eines zurück auf „Angefordert“ meldet nichts.
 Das Absetzen selbst meldet nichts.
@@ -131,7 +151,9 @@ Wer das Modul „Nachforderungen“ nicht sehen darf, bekommt keinen Hinweis.
 ### Nachforderungen im Einsatztagebuch
 
 Jede abgesetzte Nachforderung schreibt einen ETB-Eintrag vom Typ „Meldung“ mit dem Inhalt
-„Nachforderung: … × Art — Bezeichnung“, die Begründung als Veranlassung. Absender ist die eigene
+„Nachforderung: 2× RTW → BR Nord, benötigt bis 21.10. 15:30 — Transport aus UHS Turnhalle“;
+Ziel, Bedarfszeit (in der Zeitzone des Einsatzes) und Details stehen nur, wenn angegeben. Die
+Begründung steht als Veranlassung. Absender ist die eigene
 Führungsstelle des Einsatzes mit ihrem Rufnamen, sonst ihrer Bezeichnung; ist keine gepflegt,
 die Führungsstelle oder das erste Sachgebiet der Person, die anfordert. Empfänger ist der
 Adressat, etwa „Leitstelle (ILS Nord)“.
@@ -155,7 +177,7 @@ der Text.
 Fehlt in einem Zeitfenster der Verpflegung etwas, öffnet „Nachfordern“ an dessen Karte dieses
 Formular mit vorbelegten Feldern ([Verpflegung](verpflegung.md)). An einer Unfallhilfsstelle öffnet
 „Fehlmenge melden“ im Bereich „Material“ das Formular mit der Art „Material“ und der Stelle in der
-Begründung ([Unfallhilfsstellen](unfallhilfsstellen.md)); Bezeichnung und Anzahl bleiben dort leer.
+Begründung ([Unfallhilfsstellen](unfallhilfsstellen.md)); Details und Anzahl bleiben dort leer.
 Die Felder bleiben vor dem Absetzen änderbar.
 
 ### Nachforderungen für eine Betreuungsstelle
