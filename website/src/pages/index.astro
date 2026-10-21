@@ -17,9 +17,9 @@ const leitsaetze = [
     text: 'Die Lagekarte liest ihre Kacheln aus einer lokalen Datei. ETB, Meldebild, Betroffene und Aufträge bleiben lesbar, neue Einträge werden vorgemerkt und nachgereicht.',
   },
   {
-    titel: 'Eine Datei',
-    kennung: 'BINARY',
-    text: 'Backend, Oberfläche, SQLite und OpenSSL stecken in einer ausführbaren Datei. Auf dem Zielrechner wird nichts installiert: kopieren, starten.',
+    titel: 'Nach Führungslogik',
+    kennung: 'ETB · STÄRKE · S1–S6',
+    text: 'Das ETB lässt sich nicht ändern, nur berichtigen. Stärken stehen als F/UF/M//Ges, Betroffene mit Sichtungskategorie, der Stab in S1 bis S6. Funkplan und Fernmeldeskizze nennen ihre Lücken.',
   },
   {
     titel: 'Bedienbar unter Stress',
@@ -27,9 +27,14 @@ const leitsaetze = [
     text: 'Drei Dichten bis 72 px je Zeile, Nachtbetrieb als Vorgabe, Helligkeit stufenlos. Zahlen, Zeiten und Funkrufnamen stehen immer in Mono.',
   },
   {
+    titel: 'Datenschutz eingebaut',
+    kennung: 'FRIST · SCHWÄRZUNG',
+    text: 'Rechte hängen an der Rolle im Einsatz. Nach Ablauf der Aufbewahrungsfrist schwärzt der Server die Personendaten, das ETB bleibt im Wortlaut.',
+  },
+  {
     titel: 'Geräte koppeln',
     kennung: 'TABLET · GROSSBILD',
-    text: 'Ein Tablet bedient genau eine Unfallhilfsstelle oder die Aufnahme. Der Lagemonitor zeigt das Lagebild auf dem Großbild, ohne Namen.',
+    text: 'Ein Tablet bedient genau eine Unfallhilfsstelle oder die Aufnahme, ohne persönliches Konto. Der Lagemonitor zeigt das Lagebild auf dem Großbild, ohne Namen.',
   },
   {
     titel: 'Auf Papier',
@@ -40,6 +45,11 @@ const leitsaetze = [
     titel: 'Zugriff geschützt',
     kennung: 'PASSKEY · TOTP · OIDC',
     text: 'Anmeldung mit Passkey, zweitem Faktor oder dem Verzeichnis der Organisation. Rechte je Modul, Verwaltungszugriffe werden protokolliert.',
+  },
+  {
+    titel: 'Einfach zu betreiben',
+    kennung: 'CONTAINER · DIREKT',
+    text: 'Als Container auf dem eigenen Server oder direkt auf einem Rechner vor Ort. Oberfläche, SQLite und OpenSSL sind eingebaut, daneben läuft keine Datenbank und kein Webserver.',
   },
 ];
 
@@ -53,7 +63,7 @@ const meldebild = [
 
 <Grundriss
   titel="Lifeline Hub · Führungsunterstützung für Einsatzlagen"
-  beschreibung="Einsatztagebuch, Lagekarte, Meldebild, Betroffene und Aufträge in einer Anwendung, die im Einsatzleitwagen ohne Internet läuft."
+  beschreibung="Einsatztagebuch, Lagekarte, Meldebild, Betroffene und Aufträge in einer Anwendung, die weiterarbeitet, wenn das Netz ausfällt."
 >
   <!-- ── Einstieg ────────────────────────────────────────────────────────── -->
   <section class="einstieg" aria-labelledby="titel">
@@ -63,8 +73,9 @@ const meldebild = [
         <h1 id="titel">Die Lage im Blick. Auch wenn das Netz fehlt.</h1>
         <p class="einleitung">
           Lifeline Hub bündelt Einsatztagebuch, Lagekarte, Meldebild, Betroffenen- und
-          Schadenserfassung, Meldungen und Aufträge in einer Anwendung. Sie läuft als eine Datei
-          im Einsatzleitwagen oder auf einem Mini-PC, ohne Internetverbindung.
+          Schadenserfassung, Meldungen und Aufträge in einer Anwendung. Sie arbeitet weiter, wenn
+          das Netz ausfällt, folgt der Führungslogik vom Einsatztagebuch bis zum Stab und bleibt
+          mit Handschuhen bedienbar.
         </p>
         <div class="aktionen">
           <Knopf href="#funktionen">Module ansehen</Knopf>
@@ -101,10 +112,10 @@ const meldebild = [
   <!-- ── Eckdaten ───────────────────────────────────────────────────────── -->
   <section class="abschnitt eckdaten-abschnitt" aria-label="Eckdaten">
     <div class="fugenraster eckdaten">
-      <Kennzahl augenbraue="Datei" zahl="1" gross notiz="Backend, Oberfläche, SQLite und OpenSSL in einem Binary" />
-      <Kennzahl augenbraue="Dienste" zahl="0" gross notiz="Kein Node.js, kein Webserver, keine Datenbank auf dem Zielrechner" />
       <Kennzahl augenbraue="Module" zahl={String(modulAnzahl)} gross notiz="In fünf Bereichen von Führung bis Kommunikation" />
+      <Kennzahl augenbraue="Sachgebiete" zahl="6" gross notiz="S1 bis S6, je mit den Werkzeugen des Stabs" />
       <Kennzahl augenbraue="Dichten" zahl="3" gross notiz="Kompakt, komfortabel, Handschuh" />
+      <Kennzahl augenbraue="Namen" zahl="0" gross notiz="Auf dem Lagemonitor: Das Großbild zeigt Zahlen und Karte, keine Personendaten" />
     </div>
   </section>
 
@@ -678,7 +689,9 @@ const meldebild = [
     .zweispaltig {
       grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
     }
-    .leitsaetze,
+    .leitsaetze {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
     .stand-raster {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }

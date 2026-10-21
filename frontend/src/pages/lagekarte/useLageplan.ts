@@ -3,6 +3,7 @@ import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext
 import { taktischeDtgVoll } from '../../anzeige/format';
 import type { KartenAufnahme } from './kartenAufnahme';
 import type { KartenHandle } from './Kartenflaeche';
+import { KARTE_NICHT_DARSTELLBAR } from './kartenGrafik';
 import { lageplanLegende, type LageplanLegende, type LegendenQuellen } from './lageplan';
 import { setzeKartenbild, setzeLageplanAnlage } from './lageplanBild';
 import type { BeginneKartenHandlung } from './useKartenFehler';
@@ -39,6 +40,9 @@ export type LageplanQuellen = Omit<LegendenQuellen, 'jetztMs'>;
 
 /** Gründe ohne Servermeldung, im Hinweis über der Karte bzw. im Dialog. */
 export const KARTENBILD_FEHLT = 'Kartenbild nicht aufgenommen';
+
+/** Die Anlage entstand ohne Bild; `message` ist der Grund, den der Dialog nennt. */
+export class KeinKartenbild extends Error {}
 
 function kopfZeilen(kopf: LageplanKopf, stand: string, dtg: (iso: string) => string) {
   return [
@@ -112,12 +116,20 @@ export function useLageplan({
     return { aufnahme, stand, legende, zeilen, einsatz: k.einsatz };
   }, [kartenRef]);
 
+  // Ohne Kartengrafik kann kein Bild entstehen (LLH-1353): der Grund nennt den Zustand der Fläche.
+  const grundOhneBild = useCallback(
+    () =>
+      kartenRef.current?.isDarstellbar() === false ? KARTE_NICHT_DARSTELLBAR : KARTENBILD_FEHLT,
+    [kartenRef],
+  );
+
   const vorbereitenDruck = useCallback(async (): Promise<boolean> => {
-    const melde = beginneHandlung('lageplan-druck', 'Lageplan nicht gedruckt', KARTENBILD_FEHLT);
+    const grund = grundOhneBild();
+    const melde = beginneHandlung('lageplan-druck', 'Lageplan nicht gedruckt', grund);
     const auf = await nimmAuf();
     const bild = auf ? await setzeKartenbild(auf.aufnahme) : null;
     if (!auf || !bild) {
-      melde(new Error(KARTENBILD_FEHLT));
+      melde(new Error(grund));
       return false;
     }
     const bildUrl = URL.createObjectURL(bild);
@@ -130,19 +142,22 @@ export function useLageplan({
       legende: auf.legende,
     });
     return true;
-  }, [beginneHandlung, nimmAuf]);
+  }, [beginneHandlung, nimmAuf, grundOhneBild]);
 
-  const erstelleAnlage = useCallback(async (): Promise<LageplanAnlage | null> => {
+  /** Scheitert ohne Bild mit `KeinKartenbild`, dessen Text der Dialog als Grund zeigt. */
+  const erstelleAnlage = useCallback(async (): Promise<LageplanAnlage> => {
+    const grund = grundOhneBild();
     const auf = await nimmAuf();
-    if (!auf) return null;
+    if (!auf) throw new KeinKartenbild(grund);
     const datei = await setzeLageplanAnlage({
       aufnahme: auf.aufnahme,
       titel: anlagenTitel(auf.einsatz),
       zeilen: auf.zeilen.map((z) => (z.etikett === 'Stand' ? `Stand ${z.wert}` : z.wert)),
       legende: auf.legende,
     });
-    return datei ? { datei, standAt: auf.stand } : null;
-  }, [nimmAuf]);
+    if (!datei) throw new KeinKartenbild(grund);
+    return { datei, standAt: auf.stand };
+  }, [nimmAuf, grundOhneBild]);
 
   return { blatt, vorbereitenDruck, erstelleAnlage };
 }

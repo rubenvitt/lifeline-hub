@@ -24,7 +24,7 @@ import { useZeitEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { lageberichtDetailPfad } from '../../routing/deeplinks';
-import { KARTENBILD_FEHLT, type LageplanAnlage } from './useLageplan';
+import { KeinKartenbild, type LageplanAnlage } from './useLageplan';
 
 /** Wortlaut des Nebenwegs. */
 export const ALS_ANLAGE = 'Als Anlage an …';
@@ -66,15 +66,14 @@ type Ziel =
 
 const NEU: Ziel = { art: 'neu', schluessel: 'neu' };
 
-class KeinKartenbild extends Error {}
-
 interface Props {
   offen: boolean;
   einsatzId: number;
   /** Modulfreigaben: welche Entwürfe der Dialog anbietet. */
   lageberichteFrei: boolean;
   befehleFrei: boolean;
-  erstelleAnlage: () => Promise<LageplanAnlage | null>;
+  /** Scheitert ohne Bild mit `KeinKartenbild` (Grund im Text). */
+  erstelleAnlage: () => Promise<LageplanAnlage>;
   onSchliessen: () => void;
 }
 
@@ -131,7 +130,6 @@ export default function LageplanAnlageDialog({
   const ablegen = useMutation({
     mutationFn: async (ziel: Ziel) => {
       const anlage = await erstelleAnlage();
-      if (!anlage) throw new KeinKartenbild(KARTENBILD_FEHLT);
       let dokument: AnlagenDokument;
       let id: number;
       let titel: string;
@@ -257,7 +255,9 @@ export default function LageplanAnlageDialog({
             fehler={ablegen.error}
             titel="Lageplan nicht angefügt"
             fallback={
-              ablegen.error instanceof KeinKartenbild ? KARTENBILD_FEHLT : 'Anfügen fehlgeschlagen'
+              ablegen.error instanceof KeinKartenbild
+                ? ablegen.error.message
+                : 'Anfügen fehlgeschlagen'
             }
           />
         </div>

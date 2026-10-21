@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
 ---
 
 ## Überblick
@@ -136,6 +136,8 @@ wer im Einsatz schreiben darf.
    „Neuer Lagevortrag“ wählen und „Anfügen“ wählen. Die App meldet „Lageplan an … angefügt“; ein
    neuer Lagevortrag öffnet sich.
 
+   ![Dialog „Lageplan als Anlage“ mit den Entwürfen „Lagebericht · Lage 1400“ (gewählt) und „Befehl · Verlegung Behandlungsplatz“, darunter „Neuer Lagevortrag“ und die Knöpfe „Abbrechen“ und „Anfügen“](../bilder/lagekarte/lageplan-anlage.png)
+
 ## Hintergrund
 
 ### Die Leiste: Ebenen, Objekte und Auswahl
@@ -189,6 +191,16 @@ oder Befehl als „Lageplan“ unter den Anlagen (Kapitel [Lageberichte](lageber
 Anhängen braucht das Schreibrecht im Einsatz und eine Verbindung; angeboten werden nur Entwürfe
 der Module, die die eigene Rolle sieht. Fehlt etwas davon, steht „Als Anlage an …“ gesperrt und
 nennt den Grund.
+
+### Voraussetzung im Browser
+
+Die Karte zeichnet der Browser über die Grafikschnittstelle WebGL2. Aktuelle Browser auf Fükw,
+Tablet und Handy bringen sie mit; fehlen kann sie etwa, wenn die Hardwarebeschleunigung des
+Browsers abgeschaltet ist oder der Browser ohne Grafikausgabe läuft. Dann steht an Stelle der
+Karte „Karte auf diesem Gerät nicht darstellbar“. Leiste, Objektliste und Auswahl bleiben
+bedienbar, nur die Karte selbst fehlt. Ein Lageplan entsteht so nicht: „Drucken / als PDF“
+meldet „Lageplan nicht gedruckt“, „Als Anlage an …“ meldet „Lageplan nicht angefügt“, beide mit
+demselben Grund.
 
 ### Tippen auf der Karte
 
