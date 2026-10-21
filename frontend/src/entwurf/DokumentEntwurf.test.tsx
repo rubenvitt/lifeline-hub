@@ -21,11 +21,19 @@ interface PrueflingProps {
   start?: Record<string, string>;
   aktion?: AbschnittAktion;
   kopf?: ReactNode;
+  gliederungKopf?: ReactNode;
   einstieg?: string;
 }
 
 /** Der Baustein steht wie auf der Seite IN einem `<Form>` mit dessen Instanz. */
-function Pruefling({ abschnitte = acht, start, aktion, kopf, einstieg }: PrueflingProps) {
+function Pruefling({
+  abschnitte = acht,
+  start,
+  aktion,
+  kopf,
+  gliederungKopf,
+  einstieg,
+}: PrueflingProps) {
   const [form] = Form.useForm();
   return (
     <Form form={form} layout="vertical" initialValues={start}>
@@ -34,6 +42,7 @@ function Pruefling({ abschnitte = acht, start, aktion, kopf, einstieg }: Pruefli
         abschnitte={abschnitte}
         aktion={aktion}
         kopf={kopf}
+        gliederungKopf={gliederungKopf}
         einstieg={einstieg}
       />
     </Form>
@@ -173,6 +182,27 @@ describe('DokumentEntwurf — Lesefassung', () => {
     const ziel = scrollIntoView.mock.instances[0] as unknown as HTMLElement;
     expect(screen.getByRole('tabpanel', { name: 'Lesefassung' })).toContainElement(ziel);
     expect(ziel).toHaveTextContent(acht[3].label);
+  });
+});
+
+describe('DokumentEntwurf — Kopf der Gliederung (LLH-1081)', () => {
+  it('setzt die Aktion der Seite über die Sprungleiste, außerhalb der Navigation', () => {
+    render(<Pruefling gliederungKopf={<button type="button">Füllen</button>} />);
+    const knopf = screen.getByRole('button', { name: 'Füllen' });
+    const kopf = knopf.closest('[data-lfh="gliederung-kopf"]');
+    expect(kopf).not.toBeNull();
+    // Keine Aktion IN der Landmarke „Gliederung“: die trägt nur Sprünge.
+    expect(within(gliederung()).queryByRole('button', { name: 'Füllen' })).toBeNull();
+    // In derselben Spalte, davor (ab `xl` klebt beides gemeinsam).
+    expect(kopf!.parentElement).toBe(gliederung().parentElement);
+    expect(kopf!.compareDocumentPosition(gliederung()) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
+  it('lässt den Kopf ohne Aktion weg', () => {
+    const { container } = render(<Pruefling />);
+    expect(container.querySelector('[data-lfh="gliederung-kopf"]')).toBeNull();
   });
 });
 

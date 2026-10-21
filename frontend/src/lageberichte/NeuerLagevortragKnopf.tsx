@@ -9,9 +9,19 @@ export const VORGABE_VORLAGE: LageberichtVorlageKey = 'lagebericht';
 /** Zugänglicher Name des Pfeils — exportiert, damit Tests ihn nicht nachschreiben. */
 export const ANDERE_VORLAGE = 'Andere Vorlage wählen';
 
+/** Menüeintrag für die Vorgabe-Vorlage ohne Startinhalt (LLH-1081). */
+export const LEERER_LAGEVORTRAG = 'Leerer Lagevortrag';
+
+/** Menüschlüssel des leeren Lagevortrags; keine Vorlage heißt so. */
+const LEER_KEY = 'leer';
+
 interface Props {
-  /** Ein Aufruf legt an und öffnet; der Riegel gegen Doppelklick liegt beim Aufrufer. */
-  onAnlegen: (vorlage: LageberichtVorlageKey) => void;
+  /**
+   * Ein Aufruf legt an und öffnet; der Riegel gegen Doppelklick liegt beim Aufrufer.
+   * `ausLagebild`: mit Startinhalt aus den Quellen der Vorlage (LLH-1081); nur „Leerer
+   * Lagevortrag“ verzichtet darauf.
+   */
+  onAnlegen: (vorlage: LageberichtVorlageKey, ausLagebild: boolean) => void;
   laeuft: boolean;
   /** Ohne Schreibrecht: sichtbar gesperrt, der Grund steht im Seitenhinweis (M16). */
   gesperrt: boolean;
@@ -19,8 +29,9 @@ interface Props {
 
 /**
  * „Neuer Lagevortrag“ als geteilter Knopf (LLH-1064): der Primärteil legt sofort einen
- * „Lagevortrag zur Information“ an, der Pfeil daneben bietet die übrigen Vorlagen. Kein Dialog:
- * Titel und Zeitstand ändert man im Entwurf.
+ * „Lagevortrag zur Information“ an, gefüllt aus dem Lagebild (LLH-1081), der Pfeil daneben bietet
+ * „Leerer Lagevortrag“ und die übrigen Vorlagen. Kein Dialog: Titel und Zeitstand ändert man im
+ * Entwurf.
  *
  * Kein `size`: beide Teile tragen die Steuerhöhe der Dichte, der Pfeil als Knopf ohne Text den
  * Boden `controlHeightSM` in der Breite (`antdKnopf`), die Menüeinträge die Steuerhöhe des
@@ -40,7 +51,7 @@ export default function NeuerLagevortragKnopf({ onAnlegen, laeuft, gesperrt }: P
           aria-label="Neuer Lagevortrag"
           loading={laeuft}
           disabled={gesperrt}
-          onClick={() => onAnlegen(VORGABE_VORLAGE)}
+          onClick={() => onAnlegen(VORGABE_VORLAGE, true)}
         >
           Neuer Lagevortrag
         </Button>
@@ -50,8 +61,14 @@ export default function NeuerLagevortragKnopf({ onAnlegen, laeuft, gesperrt }: P
           autoFocus
           disabled={gesperrt || laeuft}
           menu={{
-            items: andere.map((v) => ({ key: v.schluessel, label: v.label })),
-            onClick: ({ key }) => onAnlegen(key as LageberichtVorlageKey),
+            items: [
+              { key: LEER_KEY, label: LEERER_LAGEVORTRAG },
+              ...andere.map((v) => ({ key: v.schluessel, label: v.label })),
+            ],
+            onClick: ({ key }) =>
+              key === LEER_KEY
+                ? onAnlegen(VORGABE_VORLAGE, false)
+                : onAnlegen(key as LageberichtVorlageKey, true),
           }}
         >
           <Button

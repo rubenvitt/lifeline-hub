@@ -21,6 +21,7 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+/* Die Spalte trägt den Kopf der Gliederung (`gliederungKopf`) und die Sprungleiste. */
 .dokument-entwurf__gliederung {
   min-width: 0;
 }
@@ -71,13 +72,18 @@
 
    Gedruckt wird, was steht (LLH-1074): im Bearbeiten die Druckfassung je Editor, in der
    Lesefassung die Lesefassung (das jeweils andere Paneel ist `hidden`). Bedienung weicht:
-   Paneelkopf mit Umschalter, Gliederung, Kopfblock (den Titel trägt der Druckkopf der Seite) und
+   Paneelkopf mit Umschalter, Gliederung samt Kopf, Kopfblock (den Titel trägt der Druckkopf der Seite) und
    die Abschnittsköpfe — den Abschnittstitel trägt auf Papier der Titel der Druckfassung im selben
    Titelblock wie der erste Absatz (`MarkdownEditor druckTitel`, LFH-1008); ein Kopf daneben bliebe
    in Firefox allein am Seitenende stehen. */
 @media print {
   [data-lfh='dokument-entwurf']
-    :is([data-lfh='gliederung'], [data-lfh='entwurf-kopf'], [data-lfh='abschnitt-kopf']) {
+    :is(
+      [data-lfh='gliederung'],
+      [data-lfh='gliederung-kopf'],
+      [data-lfh='entwurf-kopf'],
+      [data-lfh='abschnitt-kopf']
+    ) {
     display: none !important;
   }
 

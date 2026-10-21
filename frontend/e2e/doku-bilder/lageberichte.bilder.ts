@@ -13,6 +13,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                          frontend/src/entwurf/VerteilerField.tsx,
  *                          frontend/src/entwurf/DokumentEntwurf.tsx,
  *                          frontend/src/lageberichte/AbschnittUebernahme.tsx,
+ *                          frontend/src/lageberichte/LeereAbschnitteFuellen.tsx,
  *                          frontend/src/lageberichte/eigeneLageUebernahme.ts
  *   freigeben.png          frontend/src/pages/LageberichtDetailPage.tsx (FreigabeDialog)
  *   freigegeben.png        frontend/src/pages/LageberichtDetailPage.tsx (Lesezweig)
