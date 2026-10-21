@@ -65,7 +65,8 @@ Geräts selbst steht in [Gerät bedienen](geraet-bedienen.md).
 ### Meldung an die Einsatzleitung
 
 1. Unten „Melden“ wählen.
-2. Den „Inhalt“ eingeben und die „Priorität“ (normal, dringend, sofort) wählen.
+2. Den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die „Priorität“ (normal,
+   dringend, sofort) wählen. Eine Lagemeldung steht bei der Führung gleich in den Lagemeldungen.
 3. „Meldung senden“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; die Meldung steht
    danach unter „Eigene Meldungen“.
 
