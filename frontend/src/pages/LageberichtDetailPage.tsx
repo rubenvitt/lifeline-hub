@@ -22,6 +22,13 @@ import { useEntwurfVerlustschutz } from '../entwurf/useEntwurfVerlustschutz';
 import FormularEingehaengt from '../components/FormularEingehaengt';
 import AbschnittUebernahme from '../lageberichte/AbschnittUebernahme';
 import LeereAbschnitteFuellen from '../lageberichte/LeereAbschnitteFuellen';
+import UebernahmeStand from '../lageberichte/UebernahmeStand';
+import {
+  UEBERNOMMEN_FIELD,
+  standFeld,
+  verwerfeStandGeleerter,
+  type Staende,
+} from '../lageberichte/uebernahmeStand';
 import { UEBERNAHMEN, uebernahmeFuer } from '../lageberichte/uebernahmen';
 import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
@@ -53,15 +60,17 @@ import './lageberichtPrint.css';
 
 /**
  * Formularwerte des Entwurfs: Titel, Zeitstand (Zeitpunkt, die Anzeigezone nur im Feld, UTC erst
- * beim Senden — `anzeige/zeitEingabe.ts`), je Abschnitt der Markdown-Text unter seinem Schlüssel
- * und der Verteiler (LLH-1172). Kein Abschnitt heißt `titel` oder `verteiler`
- * (`entwurf/verteilerField.guard.test.ts`).
+ * beim Senden — `anzeige/zeitEingabe.ts`), je Abschnitt der Markdown-Text unter seinem Schlüssel,
+ * der Verteiler (LLH-1172) und je Abschnitt mit Quelle der Stand der Übernahme (LLH-1357). Kein
+ * Abschnitt heißt `titel`, `verteiler` oder `uebernommen_at` (`entwurf/verteilerField.guard.test.ts`,
+ * `lageberichte/uebernahmeStand.test.ts`).
  */
 type FormWerte = {
   titel: string;
   zeitstand?: Dayjs;
   [VERTEILER_FIELD]?: VerteilerFormValues;
-} & Record<string, string | Dayjs | VerteilerFormValues | undefined>;
+  [UEBERNOMMEN_FIELD]?: Staende;
+} & Record<string, string | Dayjs | VerteilerFormValues | Staende | undefined>;
 
 export default function LageberichtDetailPage() {
   const { lbId } = useParams();
@@ -102,6 +111,11 @@ function LageberichtDetail() {
   // Als Primitiv für die Übernahme im Abschnittskopf (Zuordnung je Vorlage, LFH-870), vor den
   // frühen Rückgaben (Hook-Reihenfolge).
   const vorlageKey = berichtQuery.data?.vorlage;
+  // Ab hier gilt ein Stand der Übernahme als „aus der Vorfassung“ (LLH-1357,
+  // `lageberichte/uebernahmeStand.ts:isAusVorfassung`): das Anlegen der Fortschreibung. Primitiv
+  // für die `aktion` (Render-Zähler-Gate).
+  const standGrenze =
+    berichtQuery.data?.vorgaenger_id != null ? berichtQuery.data.erstellt_at : undefined;
   // Nebenwege des Kopfes (LFH-1079), als Hooks vor den frühen Rückgaben. Der Sprung nur am
   // freigegebenen Bericht: ein Entwurf hat noch keinen ETB-Eintrag.
   const etbSprung = useZumEtbEintrag(
@@ -126,9 +140,16 @@ function LageberichtDetail() {
   // und dem Freigabe-Flow.
   const speichern = (werte: FormWerte) => {
     const v = vorlage(berichtQuery.data!.vorlage)!;
+    const staende = werte[UEBERNOMMEN_FIELD];
     const abschnitte: LageberichtAbschnitt[] = v.abschnitte.map((a) => {
       const text = werte[a.schluessel];
-      return { schluessel: a.schluessel, text: typeof text === 'string' ? text : '' };
+      const stand = staende?.[a.schluessel];
+      return {
+        schluessel: a.schluessel,
+        text: typeof text === 'string' ? text : '',
+        // Der Stand der Übernahme reist im Abschnitt (LLH-1357); fehlt er, war es Text von Hand.
+        ...(stand ? { uebernommen_at: stand } : {}),
+      };
     });
     // Der Verteiler nur bei einer Änderung und innerhalb der Grenzen (`useVerteilerSync`, LLH-1172).
     const { verteiler, settle } = verteilerSync.forPatch(
@@ -172,7 +193,14 @@ function LageberichtDetail() {
           form.getFieldValue(VERTEILER_FIELD),
         ),
       };
-      for (const a of b.abschnitte) werte[a.schluessel] = a.text;
+      // Jeder Schlüssel ausdrücklich, auch ohne Stand: `setFieldsValue` mischt verschachtelte
+      // Werte, ein fehlender Schlüssel ließe einen alten Stand im Formular stehen.
+      const staende: Staende = {};
+      for (const a of b.abschnitte) {
+        werte[a.schluessel] = a.text;
+        staende[a.schluessel] = a.uebernommen_at ?? undefined;
+      }
+      werte[UEBERNOMMEN_FIELD] = staende;
       return werte;
     },
     speichern,
@@ -184,7 +212,9 @@ function LageberichtDetail() {
   /**
    * Die Aktion im Kopf eines Abschnitts (LFH-870): Abschnitte des Lagevortrags aus vorhandenen
    * Lagedaten (Medienlage seit LFH-554, Eigene Lage, LFH-869). Der Baustein prüft die Freigabe
-   * seiner Quelle selbst; er steht nur im Schreibzweig, denn nur dort gibt es den Editor.
+   * seiner Quelle selbst; er steht nur im Schreibzweig, denn nur dort gibt es den Editor. Darunter
+   * der Stand der Übernahme (LLH-1357): nur an Abschnitten mit Quelle, als Feld eingehängt, damit
+   * er mitgespeichert wird.
    * `useCallback`, nicht inline: eine neue Funktionsidentität je Render höbe die `memo`-Sperre
    * jedes Abschnitts auf — ohne Fehlerbild, nur langsam (Render-Zähler in
    * `entwurf/DokumentEntwurf.test.tsx`).
@@ -193,16 +223,21 @@ function LageberichtDetail() {
     (a) => {
       const quelle = vorlageKey ? uebernahmeFuer(vorlageKey, a.schluessel) : undefined;
       return quelle ? (
-        <AbschnittUebernahme
-          quelle={quelle}
-          einsatzId={einsatzId}
-          form={form}
-          feld={a.schluessel}
-          onGeaendert={markiereGeaendert}
-        />
+        <>
+          <AbschnittUebernahme
+            quelle={quelle}
+            einsatzId={einsatzId}
+            form={form}
+            feld={a.schluessel}
+            onGeaendert={markiereGeaendert}
+          />
+          <Form.Item name={standFeld(a.schluessel)} noStyle>
+            <UebernahmeStand grenze={standGrenze} />
+          </Form.Item>
+        </>
       ) : null;
     },
-    [einsatzId, form, markiereGeaendert, vorlageKey],
+    [einsatzId, form, markiereGeaendert, vorlageKey, standGrenze],
   );
 
   /**
@@ -489,7 +524,11 @@ function LageberichtDetail() {
           <Form
             form={form}
             layout="vertical"
-            onValuesChange={schutz.markiereGeaendert}
+            onValuesChange={(geaendert: Record<string, unknown>) => {
+              // Ein ganz geleerter Abschnitt verliert seinen Stand der Übernahme (LLH-1357).
+              verwerfeStandGeleerter(form, geaendert);
+              markiereGeaendert();
+            }}
             // Zweiter Auslöser neben der Frist: ein verlassenes Feld. `onBlur` steigt aus den
             // Feldern auf.
             onBlur={schutz.autosaveJetzt}

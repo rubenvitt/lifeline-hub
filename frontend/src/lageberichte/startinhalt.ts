@@ -4,6 +4,7 @@ import type { LageberichtAbschnitt, LageberichtVorlageKey, ModulFreigaben } from
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import type { UebernahmeKontext, UebernahmeQuelle } from './uebernahmeQuelle';
 import { UEBERNAHMEN } from './uebernahmen';
+import { standJetzt } from './uebernahmeStand';
 import { vorlage } from './vorlagen';
 
 /**
@@ -54,8 +55,9 @@ async function textAus(
 }
 
 /**
- * Lädt die Texte der genannten Abschnitte parallel, in der Reihenfolge von `schluessel`. Ein
- * Schlüssel ohne Quelle fällt heraus. Lädt erst hier, beim Klick (Regel LFH-870).
+ * Lädt die Texte der genannten Abschnitte parallel, in der Reihenfolge von `schluessel`, je mit
+ * dem Stand der Übernahme (`uebernommen_at`, LLH-1357). Ein Schlüssel ohne Quelle fällt heraus.
+ * Lädt erst hier, beim Klick (Regel LFH-870).
  */
 export async function loadAbschnittTexte(
   quellen: Readonly<Record<string, UebernahmeQuelle>>,
@@ -66,10 +68,11 @@ export async function loadAbschnittTexte(
   if (mitQuelle.length === 0) return [];
   const freigaben = await loadFreigaben(ctx);
   return Promise.all(
-    mitQuelle.map(async (s) => ({
-      schluessel: s,
-      text: await textAus(quellen[s], freigaben, ctx),
-    })),
+    mitQuelle.map(async (s) => {
+      const text = await textAus(quellen[s], freigaben, ctx);
+      // Der Stand der Übernahme (LLH-1357): wann dieser Text entstand, auch bei „— (Grund)“.
+      return { schluessel: s, text, uebernommen_at: standJetzt() };
+    }),
   );
 }
 

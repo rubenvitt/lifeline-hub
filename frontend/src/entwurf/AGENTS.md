@@ -69,6 +69,13 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   `lageberichte/startinhalt.ts`, das je Abschnitt `erzeuge` der Quelle ruft (kein zweiter
   Wortlaut); nicht freie Quelle, unbekannte Freigaben oder ein Wurf stehen als „— (Grund)“ im
   Abschnitt, ohne Abruf der gesperrten Quelle.
+- **Stand der Übernahme** (LLH-1357, Spec `lagevortrag-uebernahme`): Jeder dieser Füllwege setzt
+  mit dem Text `uebernommen_at` am Abschnitt (Wire-Format, nur über
+  `lageberichte/uebernahmeStand.ts`); er steht im JSON der Abschnitte, keine Spalte, und das
+  Fortschreiben trägt ihn mit. Im Formular unter `['uebernommen_at', <schlüssel>]`, eingehängt als
+  `Form.Item` um die Marke `lageberichte/UebernahmeStand.tsx` an der `aktion` (nur Abschnitte mit
+  Quelle); ein geleerter Abschnitt verliert ihn (`onValuesChange`, Server ebenso). Auffällig „aus
+  der Vorfassung“, wenn er vor `erstellt_at` einer Fortschreibung liegt.
 - **Weitere Quellen im Lagevortrag zur Information** (LFH-869,
   `openspec/changes/archive/2026-10-04-lfh-869-lagevortrag-weitere-abschnitte/design.md`, Spec
   `lagevortrag-uebernahme`):

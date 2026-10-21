@@ -8,6 +8,7 @@ import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useRollen } from '../components/instrument';
 import type { UebernahmeQuelle, Verfuegbarkeit } from './uebernahmeQuelle';
+import { standFeld, standJetzt } from './uebernahmeStand';
 
 /**
  * Übernahme-Knopf über einem Abschnitt eines Lagevortrag-Entwurfs (LFH-870, Spec
@@ -22,7 +23,8 @@ import type { UebernahmeQuelle, Verfuegbarkeit } from './uebernahmeQuelle';
  *   Ersetzen ist unumkehrbar (der Entwurf speichert danach von selbst), deshalb Rückfrage statt
  *   Rückgängig.
  * - Ändert nur das Formular und meldet die Änderung an den Verlustschutz (`onGeaendert`);
- *   gespeichert wird mit dem nächsten Speichern bzw. Autosave.
+ *   gespeichert wird mit dem nächsten Speichern bzw. Autosave. Mit dem Text setzt sie den Stand
+ *   der Übernahme (`lageberichte/uebernahmeStand.ts`, LLH-1357).
  *
  * Die Seite rendert den Baustein nur im Schreibzweig (Entwurf und Schreibrecht).
  */
@@ -69,8 +71,10 @@ export default function AbschnittUebernahme({
     );
   }
 
+  // Mit dem Text der Stand der Übernahme (LLH-1357), auch nach „Ersetzen“.
   const einsetzen = (text: string) => {
     form.setFieldValue(feld, text);
+    form.setFieldValue(standFeld(feld), standJetzt());
     onGeaendert();
   };
 
