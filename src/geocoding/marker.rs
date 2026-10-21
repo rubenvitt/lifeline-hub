@@ -164,7 +164,8 @@ mod tests {
             .unwrap();
             let lid = crate::meldung::repo::als_lagerelevant(&pool, eid, mid, bid, "X", geo)
                 .await
-                .unwrap();
+                .unwrap()
+                .lage_id;
             lage_ids.push(lid);
         }
         let lage: Vec<_> = lade_marker(&pool, eid)
