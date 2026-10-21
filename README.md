@@ -3,9 +3,9 @@
 [![Gate](https://github.com/rubenvitt/lifeline-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/rubenvitt/lifeline-hub/actions/workflows/ci.yml)
 
 Führungsunterstützung für Einsatzlagen im Bevölkerungsschutz: Einsatztagebuch, Lagekarte,
-Kräfteübersicht, Betroffenen- und Schadenserfassung, Meldungen und Aufträge — als **eine
-ausführbare Datei**, die im Einsatzleitwagen oder auf einem Mini-PC ohne Internetverbindung
-läuft.
+Kräfteübersicht, Betroffenen- und Schadenserfassung, Meldungen und Aufträge in einer
+Anwendung, die weiterarbeitet, wenn das Netz ausfällt, und der Führungslogik folgt, nach der
+Einsatzleitung und Stab ohnehin arbeiten.
 
 > **Stand: frühe Alpha.** Es gibt noch kein Release. Schnittstellen, Datenmodell und
 > Bedienung ändern sich laufend, Migrationspfade zwischen Ständen sind nicht zugesichert.
@@ -22,16 +22,28 @@ Beiträge von außen werden derzeit nicht angenommen. Fehlerberichte sind willko
 
 ## Warum überhaupt
 
-Einsatzführung findet an Orten statt, an denen Netz nicht vorausgesetzt werden darf. Die
-tragenden Entscheidungen folgen daraus:
+Einsatzführung findet an Orten statt, an denen Netz nicht vorausgesetzt werden darf, unter
+Zeitdruck und mit Daten über Menschen. Daraus folgt, worauf es ankommt:
 
-- **Eine Datei, keine Laufzeitabhängigkeiten.** Backend, eingebettetes Frontend, SQLite und
-  OpenSSL stecken im Binary. Auf dem Zielrechner werden weder Node.js noch ein Webserver
-  noch eine Datenbank installiert — bauen, Datei kopieren, starten.
-- **Offline-fähige Lagekarte.** Kartenkacheln liegen als lokale MBTiles-Datei vor, Schriften
-  und Symbole sind eingebettet. Ohne Netz fehlt der Kartenhintergrund, nicht die Funktion.
-- **Bedienbar unter Einsatzbedingungen.** Trefflächen, Dichte und Farbrollen folgen einer
-  ausformulierten Leitlinie (Handschuhbetrieb, Tageslicht, Nachtmodus) statt dem Zufall.
+- **Arbeitet weiter, wenn das Netz ausfällt.** Der Server kann vor Ort laufen und braucht für
+  die Arbeit im lokalen Netz kein Internet; Kartenkacheln, Schriften und Zeichen bringt er mit.
+  Reißt die Verbindung eines Geräts ab, bleibt die Lage mit dem Stand der letzten Verbindung
+  lesbar. Neue Einträge werden vorgemerkt und gehen von selbst hinaus, sobald wieder Netz da
+  ist ([Ohne Netz arbeiten](docs/anwender/kapitel/ohne-netz.md)).
+- **Folgt der Führungslogik.** Das Einsatztagebuch lässt sich nicht ändern, nur berichtigen:
+  Die Berichtigung steht als eigener Eintrag neben dem alten. Stärken stehen als F/UF/M//Ges,
+  Betroffene mit ihrer Sichtungskategorie, der Stab arbeitet in den Sachgebieten S1 bis S6,
+  und Funkplan und Fernmeldeskizze nennen ihre Lücken. Fehlt ein Wert, steht „—“, nie 0.
+- **Bedienbar unter Stress.** Trefflächen, Dichte und Farbrollen folgen einer ausformulierten
+  Bedienleitlinie statt dem Zufall: drei Dichtestufen bis zum Handschuhbetrieb, Nachtbetrieb als
+  Vorgabe, Farbe als Signal und nie als Dekoration.
+- **Datenschutz eingebaut.** Rechte hängen an der Rolle im einzelnen Einsatz. Nach Ablauf der
+  Aufbewahrungsfrist schwärzt der Server die Personendaten, das Einsatztagebuch bleibt im
+  Wortlaut. Gekoppelte Geräte wie das Tablet einer Unfallhilfsstelle arbeiten ohne persönliches
+  Konto, der Lagemonitor auf dem Großbild zeigt keine Namen.
+- **Einfach zu betreiben.** Als Container auf dem eigenen Server oder direkt als Programm auf
+  einem Rechner vor Ort. Oberfläche, SQLite und OpenSSL sind eingebaut, daneben laufen weder
+  Datenbank noch Webserver (siehe [Starten](#starten)).
 
 ## Bauen
 
@@ -53,6 +65,18 @@ Für eine andere Zielplattform:
 ```
 
 ## Starten
+
+Zwei Wege, dieselbe Anwendung. **Als Container:** Zu jedem Vorabstand gibt es ein Abbild für
+amd64 und arm64, getaggt mit der Version ohne `v` (etwa `1.0.0-alpha.99`). Datenbank und
+Offline-Karten liegen im Volume `/data`.
+
+```bash
+docker run -d -p 8080:8080 -v lifeline-daten:/data ghcr.io/rubenvitt/lifeline-hub:<version>
+```
+
+**Direkt:** Das Ergebnis von „Bauen“ ist eine einzelne ausführbare Datei. Backend, eingebettete
+Oberfläche, SQLite und OpenSSL stecken darin; auf dem Zielrechner wird weder Node.js noch ein
+Webserver noch eine Datenbank installiert. Datei kopieren, starten:
 
 ```bash
 ./target/release/lifeline-hub --db-path lifeline.db --bind 0.0.0.0:8080
