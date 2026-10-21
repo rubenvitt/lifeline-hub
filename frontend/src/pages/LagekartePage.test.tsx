@@ -12,6 +12,7 @@ import { formatiere } from '../anzeige/koordinaten';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import type { KarteServerConfig } from '../api/karte';
 import type { KartenflaecheProps } from './lagekarte/Kartenflaeche';
+import { OBJEKT_GRUPPEN } from './lagekarte/objektsuche';
 import LagekartePage, { kopfMeta, quellenMeldung } from './LagekartePage';
 import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 
@@ -457,11 +458,22 @@ function basisHandler(
 
 /**
  * Die Leiste mit der Ansicht „Objekte“ vorn (LLH-1028) — gemerkt wie nach einem Tipp aufs Segment.
- * Ohne gemerkte Wahl steht „Ebenen“ vorn; Nicht verortet, Verortet und Zeichnen liegen in
- * „Objekte“.
+ * Ohne gemerkte Wahl steht „Ebenen“ vorn; Objektliste und Zeichnen liegen in „Objekte“. Die
+ * Gruppen der Objektliste stehen ohne Begriff zu (LLH-1033); die Blöcke hier prüfen ihre Zeilen.
  */
 function objekteVorn() {
   localStorage.setItem('lfh:lagekarte:leiste-ansicht', 'objekte');
+  localStorage.setItem(
+    'lfh:lagekarte:objekte-gruppen',
+    JSON.stringify(Object.fromEntries(OBJEKT_GRUPPEN.map((g) => [g.typ, true]))),
+  );
+}
+
+/** Die Zeile der Objektliste mit diesem Namen (samt Zeilenaktion). */
+async function objektZeile(name: string): Promise<HTMLElement> {
+  return (await screen.findByText(name, { selector: 'span' })).closest(
+    '.listen-eintrag',
+  ) as HTMLElement;
 }
 
 /** Die Gruppe „Betroffene & Versorgung“ des Ebenenbaums offen (Vorgabe: zu). */
@@ -606,7 +618,7 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
  * leerer Liste nichts.
  */
 describe('LagekartePage · Fehler-Slots der Sidebar', () => {
-  it('verdrahtet den Slot an „Nicht verortet" mit denselben Lagebild-Quellen wie das Overlay', async () => {
+  it('verdrahtet den Slot der Objektliste mit denselben Lagebild-Quellen wie das Overlay', async () => {
     // Derselbe 500er wie im Overlay-Test: `Sidebar.test.tsx` reicht den Slot als Prop herein und
     // sieht nicht, ob die Seite ihn füllt.
     basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
@@ -615,11 +627,10 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
     expect(
       await screen.findByText('Objektlisten konnten nicht geladen werden'),
     ).toBeInTheDocument();
-    // Die unterscheidende Zusicherung: ohne Verdrahtung wäre `nichtVerortet` leer und die Sektion
-    // behauptete „Alles verortet" über ungeladene Daten.
+    // Die unterscheidende Zusicherung: ohne Verdrahtung behauptete die Marke „Alles verortet“ über
+    // ungeladene Daten; mit ihr steht sie mit „—“.
     expect(screen.queryByText('Alles verortet')).not.toBeInTheDocument();
-    // Sektionslokal, nicht seitenweit: der Sektionskopf steht weiter da.
-    expect(screen.getByRole('button', { name: /^Nicht verortet/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Nicht verortet' })).toHaveTextContent('—');
   });
 
   it('meldet die gescheiterte Bilder-Query in ihrer Sektion', async () => {
@@ -675,13 +686,14 @@ describe('LagekartePage', () => {
     expect(aufwaermen.abbrechen).toHaveBeenCalledTimes(1);
   });
 
-  it('zeigt die Nicht-verortet-Liste mit Anzahl im Paneelkopf', async () => {
+  it('zeigt die Objektliste mit der Zahl der nicht verorteten an der Marke', async () => {
     basisHandler();
     objekteVorn();
     renderSeite();
-    // Die Anzahl steht als Mono-Meta im Klappkopf und ist Teil seines zugänglichen Namens — gezielt
-    // diesen Knopf treffen.
-    expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
+    // Die Zahl steht als Mono-Ziffer an der Marke und ist ihre Beschreibung (der Name bleibt fest).
+    expect(
+      await screen.findByRole('button', { name: 'Nicht verortet', description: '1' }),
+    ).toBeInTheDocument();
     expect(await screen.findByText(/BHP 50/)).toBeInTheDocument();
   });
 
@@ -729,7 +741,9 @@ describe('LagekartePage', () => {
     objekteVorn();
     renderSeite();
     // Die Marker-Quellen sind da (die Liste steht) — die Ansichten noch nicht.
-    expect(await screen.findByRole('button', { name: 'Nicht verortet 1' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Nicht verortet', description: '1' }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId('startansicht')).toHaveTextContent('offen');
     freigeben();
     await waitFor(() =>
@@ -1029,14 +1043,20 @@ describe('LagekartePage', () => {
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
       http.get('/api/organisation', () => HttpResponse.json(ORG_DRK)),
     ]);
+    objekteVorn();
+    localStorage.removeItem('lfh:lagekarte:leiste-ansicht');
     renderSeite();
     // Layer-Switch-Labels vorhanden (taktische Ebenen).
     expect(await screen.findByText('Einheiten')).toBeInTheDocument();
     expect(screen.getByText('Fahrzeuge')).toBeInTheDocument();
     expect(screen.getByText('Personal')).toBeInTheDocument();
     expect(screen.getByText('Abschnitte')).toBeInTheDocument();
-    // Nicht-verortete Einheit erscheint mit korrektem Label in der Nicht-verortet-Liste.
-    expect(await screen.findByText('Einheit: Zug 1')).toBeInTheDocument();
+    // Nicht-verortete Einheit erscheint mit ihrem Namen in der Gruppe „Einheiten“ der Objektliste.
+    const zeile = await objektZeile('Zug 1');
+    expect(zeile.closest('[data-paneel="objekte-einheit"]')).not.toBeNull();
+    expect(
+      within(zeile).getByRole('button', { name: 'Platzieren', hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it('LFH-616: Messen über den Kartenknopf — Wert im Fuß, Escape beendet', async () => {
@@ -1127,9 +1147,7 @@ describe('LagekartePage', () => {
     renderSeite();
     // Mehrere „Platzieren"-Knöpfe (UHS BHP 50 + Einheit Zug 1) → über das List-Item der Einheit
     // eindeutig treffen.
-    const item = (await screen.findByText('Einheit: Zug 1')).closest(
-      '.listen-eintrag',
-    ) as HTMLElement;
+    const item = await objektZeile('Zug 1');
     await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('karte-klick'));
     await waitFor(() => expect(body).toMatchObject({ lat: 50.1, lon: 8.6 }));
@@ -1616,7 +1634,7 @@ describe('LagekartePage', () => {
     );
   });
 
-  it('Deeplink ?ort= mit genau einem Treffer: Zu- und Aufklappen von „Verortet“ fliegt nicht erneut (LFH-638)', async () => {
+  it('Deeplink ?ort= mit genau einem Treffer: ein Wechsel der Ansicht fliegt nicht erneut (LFH-638)', async () => {
     let anfragen = 0;
     basisHandler([
       http.get('/api/einsaetze/1/karte/ort-suche', () => {
@@ -1637,11 +1655,10 @@ describe('LagekartePage', () => {
     await user.clear(feld);
     await user.type(feld, '48.13743, 11.57549');
     await user.click(screen.getByRole('button', { name: formatiere(48.13743, 11.57549, 'wgs84') }));
-    // … und klappt „Verortet“ zu und wieder auf: die Suche hängt neu ein.
-    const kopf = screen.getByRole('button', { name: /^Verortet/ });
-    await user.click(kopf);
-    await user.click(kopf);
-    expect(await screen.findByLabelText('Kartenobjekte suchen')).toHaveValue('');
+    // … und wechselt die Ansicht hin und zurück: die Suche bleibt montiert und behält ihren Begriff.
+    await user.click(screen.getByRole('tab', { name: 'Ebenen' }));
+    await user.click(screen.getByRole('tab', { name: 'Objekte' }));
+    expect(screen.getByLabelText('Kartenobjekte suchen')).toHaveValue('48.13743, 11.57549');
     expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":11.57549,"lat":48.13743}');
     expect(anfragen).toBe(1);
   });
@@ -2127,6 +2144,23 @@ describe('LagekartePage · Neuentwurf S5', () => {
     await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
   });
 
+  // LLH-1033: den Einsatzort ohne Koordinate führt die Objektliste (Zeile, Marke), die Kopfzahl
+  // nicht — sonst hinge sie an einer zweiten Quelle, und die Kopfzeile bräche am Handschirm um.
+  it('Kopfzahl zählt den Einsatzort ohne Koordinate nicht mit', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
+      ),
+    ]);
+    renderSeite();
+    // Vorbedingung: der Einsatz ist geladen, die Objektliste führt den Einsatzort ohne Ort.
+    await waitFor(() =>
+      expect(document.querySelector('[data-paneel="objekte-einsatzort"]')).toBeInTheDocument(),
+    );
+    const meta = document.querySelector('[data-lfh="seitenkopf-meta"]') as HTMLElement;
+    await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
+  });
+
   // LFH-723: die Karte führt ihren Datenstand wie jede Seite des Lagebilds — ohne Verbindung
   // mit „offline", damit ein vorgehaltener Stand nicht als aktueller gelesen wird.
   it('führt im Seitenkopf den Datenstand, ohne Verbindung mit „offline"', async () => {
@@ -2145,18 +2179,67 @@ describe('LagekartePage · Neuentwurf S5', () => {
     window.dispatchEvent(new Event('online'));
   });
 
-  it('Marker-Klick füllt das Paneel „Ausgewählt" der Leiste, nicht eine Karte über der Karte', async () => {
+  it('Marker-Klick füllt die Ansicht „Auswahl“ der Leiste, nicht eine Karte über der Karte', async () => {
     basisHandler();
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-schaden-9'));
-    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    const paneel = screen.getByRole('tabpanel', { name: 'Auswahl' });
     expect(
       await within(paneel).findByRole('link', { name: /Im Fachmodul öffnen/ }),
     ).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
-    // Schließen führt zurück zum Hinweis.
+    expect(screen.getByRole('tab', { name: 'Auswahl' })).toHaveAttribute('aria-selected', 'true');
+    // Schließen hebt die Auswahl auf: das Segment geht, die gemerkte Ansicht steht wieder vorn.
     await user.click(within(paneel).getByRole('button', { name: 'Schließen' }));
-    expect(paneel).toHaveTextContent(/Nichts gewählt/);
+    expect(screen.queryByRole('tab', { name: 'Auswahl' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Ebenen' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('„Ebenen“ lässt die Auswahl bestehen; Rückweg und Esc heben sie auf (LLH-1033)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('marker-schaden-9'));
+    await user.click(screen.getByRole('tab', { name: 'Ebenen' }));
+    expect(screen.getByRole('tab', { name: 'Ebenen' })).toHaveAttribute('aria-selected', 'true');
+    // Die Auswahl bleibt als Segment, ihr Inhalt verborgen.
+    await user.click(screen.getByRole('tab', { name: 'Auswahl' }));
+    expect(screen.getByRole('tabpanel', { name: 'Auswahl' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Zurück zu Ebenen' }));
+    expect(screen.queryByRole('tab', { name: 'Auswahl' })).toBeNull();
+    // Esc: dieselbe Wirkung wie der Rückweg.
+    await user.click(screen.getByText('marker-schaden-9'));
+    expect(screen.getByRole('tab', { name: 'Auswahl' })).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('tab', { name: 'Auswahl' })).toBeNull();
+  });
+
+  it('Esc im Suchfeld hebt die Auswahl nicht auf (LLH-1033)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    objekteVorn();
+    renderSeite();
+    await user.click(await screen.findByText('marker-schaden-9'));
+    await user.click(screen.getByRole('tab', { name: 'Objekte' }));
+    await user.click(screen.getByLabelText('Kartenobjekte suchen'));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('tab', { name: 'Auswahl' })).toBeInTheDocument();
+  });
+
+  it('eine Zeile der Objektliste holt die Auswahl nach vorn (LLH-1033)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    objekteVorn();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: 'S-003' }));
+    expect(screen.getByRole('tab', { name: 'Auswahl' })).toHaveAttribute('aria-selected', 'true');
+    expect(
+      await within(screen.getByRole('tabpanel', { name: 'Auswahl' })).findByRole('link', {
+        name: /Im Fachmodul öffnen/,
+      }),
+    ).toHaveAttribute('href', '/einsaetze/1/schaeden/9');
+    // Der Rückweg benennt die gemerkte Ansicht.
+    expect(screen.getByRole('button', { name: 'Zurück zu Objekte' })).toBeInTheDocument();
   });
 
   it('der Zeichnen-Knopf über der Karte öffnet die Zeichenwerkzeuge der Leiste', async () => {
@@ -2184,7 +2267,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
     const user = userEvent.setup();
     const { unmount } = renderSeite();
     await user.click(await screen.findByRole('tab', { name: 'Objekte' }));
-    expect(screen.getByRole('button', { name: /^Nicht verortet/ })).toBeVisible();
+    expect(screen.getByLabelText('Kartenobjekte suchen')).toBeVisible();
     expect(screen.queryByRole('switch', { name: 'Schäden' })).not.toBeInTheDocument();
     unmount();
     renderSeite();
@@ -2342,7 +2425,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     objekteVorn();
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^R-042 · / })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^R-042 · / })).toBeInTheDocument();
   });
 
   it('403 trotz eingeschalteter Ebene: die Objektsuche führt keine Person (LFH-716)', async () => {
@@ -2354,9 +2437,10 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     objekteVorn();
     renderSeite();
     expect(await screen.findByText('Keine Berechtigung')).toBeInTheDocument();
-    // Gegenprobe, dass die Suche gefüllt ist — sonst wäre die Abwesenheit trivial.
-    expect(screen.getByText(/^Schaden \(\d+\)$/)).toBeInTheDocument();
+    // Gegenprobe, dass die Liste gefüllt ist — sonst wäre die Abwesenheit trivial.
+    expect(screen.getByRole('button', { name: 'S-003' })).toBeInTheDocument();
     expect(screen.queryByText(/^R-042/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Betroffene \d/ })).not.toBeInTheDocument();
   });
 
   it('403 trotz eingeschalteter Ebene: kein Personen-Marker und KEIN Ausfallhinweis', async () => {
@@ -2434,9 +2518,15 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     expect(screen.getByText('1 verortet · 1 nicht verortet')).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Schäden' })).toHaveTextContent('Schäden1');
     expect(screen.getByRole('switch', { name: 'Betroffene' })).toHaveTextContent('Betroffene—');
-    // Die Objektsuche führt Betroffene bei eingeschalteter Ebene — ohne ihre Liste ist sie
-    // unvollständig und darf keine Zahl behaupten.
-    expect(screen.getByText('Schaden (—)')).toBeInTheDocument();
+    // Die Objektliste führt Betroffene bei eingeschalteter Ebene — ohne ihre Liste ist sie
+    // unvollständig, kein Gruppenkopf behauptet eine Zahl. Die Marke zählt Personen nicht.
+    const objekte = document.querySelector('[data-paneel="objekte"]') as HTMLElement;
+    expect(
+      within(objekte).getByRole('button', { name: /^Schäden/, hidden: true }),
+    ).toHaveTextContent('Schäden —/—');
+    expect(
+      within(objekte).getByRole('button', { name: 'Nicht verortet', hidden: true }),
+    ).toHaveTextContent('Nicht verortet1');
   });
 
   it('ohne eingeschaltete Ebene macht ein Ausfall der Personenliste die Suche nicht unvollständig', async () => {
@@ -2444,7 +2534,8 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
       http.get('/api/einsaetze/1/personen', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
-    expect(await screen.findByText('Schaden (1)')).toBeInTheDocument();
+    const kopf = await screen.findByRole('button', { name: /^Schäden/, hidden: true });
+    expect(kopf).toHaveTextContent('Schäden 1/1');
   });
 
   it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {
@@ -2466,8 +2557,8 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-person-11'));
-    // Im Paneel „Ausgewählt" — dieselbe Beschriftung steht auch in der Objektsuche.
-    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    // In der Ansicht „Auswahl“ — dieselbe Beschriftung steht auch in der Objektliste.
+    const paneel = screen.getByRole('tabpanel', { name: 'Auswahl' });
     expect(await within(paneel).findByText('R-042 · SK II')).toBeInTheDocument();
     expect(screen.queryByText(/Kowalski|Anna/)).not.toBeInTheDocument();
     // Item-Route, nicht die Einsatzdaten des `default`-Zweigs.
@@ -2524,6 +2615,8 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     await user.click(screen.getByText('karte-klick'));
 
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
+    // Die verortete Person steht als Auswahl vorn; „Ebenen“ lässt sie bestehen.
+    await user.click(screen.getByRole('tab', { name: 'Ebenen' }));
     // Der Schalter steht weiter auf aus und sagt, dass die Ebene nur eingeblendet ist.
     const schalter = screen.getByRole('switch', { name: 'Betroffene' });
     expect(schalter).toHaveAttribute('aria-checked', 'false');
@@ -2546,7 +2639,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     // Kein Toast mehr: die Rückmeldung steht am Ort.
     expect(screen.queryByText('Objekt verortet')).not.toBeInTheDocument();
     // Hervorgehoben über die vorhandene Auswahl, angeflogen.
-    const paneel = screen.getByRole('region', { name: 'Ausgewählt' });
+    const paneel = screen.getByRole('tabpanel', { name: 'Auswahl' });
     expect(await within(paneel).findByText('R-042 · SK II')).toBeInTheDocument();
     expect(screen.getByTestId('flyto')).toHaveTextContent('{"lng":8.6,"lat":50.1}');
     // Je Breite genau ein Knopf je Handlung: ab `lg` steht kein Fuß-Band.
@@ -2607,7 +2700,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     await waitFor(() => expect(platzierModusAn()).toBe(true));
     await user.click(screen.getByText('karte-klick'));
     expect(await screen.findByText('R-042 verortet')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Zurück/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Zurück zu R-042/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Auf der Karte bleiben' })).toBeInTheDocument();
   });
 
@@ -3404,9 +3497,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
-    const item = (await screen.findByText('Einheit: Zug 1')).closest(
-      '.listen-eintrag',
-    ) as HTMLElement;
+    const item = await objektZeile('Zug 1');
     await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('karte-klick'));
     await waitFor(() => expect(hinweis()).toHaveTextContent('Einheit aufgelöst'));
@@ -3688,9 +3779,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
-    const item = (await screen.findByText('Einheit: Zug 1')).closest(
-      '.listen-eintrag',
-    ) as HTMLElement;
+    const item = await objektZeile('Zug 1');
     await user.click(within(item).getByRole('button', { name: 'Platzieren' }));
     await user.click(await screen.findByText('karte-klick'));
     await waitFor(() => expect(hinweis()).toHaveTextContent('Einheit aufgelöst'));

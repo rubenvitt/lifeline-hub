@@ -4,7 +4,7 @@
 Ein Tier hat einen Fundort. Neben dem Freitext trägt es eine optionale Koordinate, die ohne
 Tagebucheintrag gesetzt und live verteilt wird und im Lage-Snapshot erscheint, ohne die
 Modulfreigabe zu umgehen; die Schwärzung behält sie als Geo-Skelett. Die Lagekarte zeigt offene
-und vermisste Tiere als eigene Ebene, verortet sie aus der Detailseite oder aus „Nicht verortet“
+und vermisste Tiere als eigene Ebene, verortet sie aus der Detailseite oder aus der Objektliste
 und führt zurück zur Detailseite (Gegenstück zu `bereitstellungsraum-lagekarte`).
 
 ## Requirements
@@ -122,19 +122,20 @@ der aktiven Dichtestufe tragen. Die Ort-Vorschau MUST Tiere nicht als Bezugspunk
 
 ### Requirement: Nicht verortete Tiere platzieren
 
-Die Lagekarte SHALL offene und vermisste Tiere ohne Koordinate in der Liste „Nicht verortet“
-führen. Eine Person mit Schreibrecht MUST ein solches Tier von dort aus durch einen Klick in die
-Karte verorten können. Die Adresse `/einsaetze/<id>/lagekarte?platzieren=tier:<tier-id>` MUST die
-Karte in den Platziermodus für dieses Tier schicken und den Parameter danach aus der Adresse
-entfernen; ohne Schreibrecht oder ohne Lesezugriff auf das Modul Tiere MUST der Platziermodus
-nicht betreten werden. Die Detailseite eines Tiers MUST ein Feld „Verortung“ zeigen, mit der
-Koordinate oder „nicht verortet“, und daneben einen Einstieg zu dieser Adresse, „Auf Karte
-verorten“ bzw. bei einem verorteten Tier „Auf Karte versetzen“, sofern die Person schreiben darf
-und das Tier weder storniert noch abgeschlossen ist; ist die Lagekarte für sie gesperrt, MUST der
-Einstieg gesperrt mit Grund im sichtbaren Text stehen. Im Bearbeiten-Modus der Detailseite MUST
-sich die Koordinate eingeben und leeren lassen; eine unlesbare Eingabe MUST das Speichern mit
-Meldung am Feld sperren. Das Verorten MUST keinen ETB-Eintrag schreiben. „Verortung löschen“ am
-ausgewählten Marker MUST die Koordinate ohne Rückfrage entfernen.
+Die Lagekarte SHALL offene und vermisste Tiere ohne Koordinate in der Objektliste als nicht verortet
+führen (Filter „Nicht verortet“, Spec `lagekarte-kartenleiste`). Eine Person mit Schreibrecht MUST
+ein solches Tier von dort aus durch einen Klick in die Karte verorten können. Die Adresse
+`/einsaetze/<id>/lagekarte?platzieren=tier:<tier-id>` MUST die Karte in den Platziermodus für dieses
+Tier schicken und den Parameter danach aus der Adresse entfernen; ohne Schreibrecht oder ohne
+Lesezugriff auf das Modul Tiere MUST der Platziermodus nicht betreten werden. Die Detailseite eines
+Tiers MUST ein Feld „Verortung“ zeigen, mit der Koordinate oder „nicht verortet“, und daneben einen
+Einstieg zu dieser Adresse, „Auf Karte verorten“ bzw. bei einem verorteten Tier „Auf Karte
+versetzen“, sofern die Person schreiben darf und das Tier weder storniert noch abgeschlossen ist;
+ist die Lagekarte für sie gesperrt, MUST der Einstieg gesperrt mit Grund im sichtbaren Text stehen.
+Im Bearbeiten-Modus der Detailseite MUST sich die Koordinate eingeben und leeren lassen; eine
+unlesbare Eingabe MUST das Speichern mit Meldung am Feld sperren. Das Verorten MUST keinen
+ETB-Eintrag schreiben. „Verortung löschen“ am ausgewählten Marker MUST die Koordinate ohne Rückfrage
+entfernen.
 
 #### Scenario: Aus der Detailseite verorten
 - **WHEN** eine Person mit Schreibrecht an T-001 „Auf Karte verorten“ wählt und in die Karte klickt
@@ -143,8 +144,8 @@ ausgewählten Marker MUST die Koordinate ohne Rückfrage entfernen.
 - **AND** „Zurück zu T-001 (Hund)“ führt auf die Detailseite, die nun „Auf Karte versetzen“ anbietet
 
 #### Scenario: Aus der Liste platzieren
-- **WHEN** eine Person mit Schreibrecht in „Nicht verortet“ das Tier „T-004 (Hund)“ wählt und in die Karte klickt
-- **THEN** trägt das Tier die Koordinate des Klickpunkts und steht nicht mehr in „Nicht verortet“
+- **WHEN** eine Person mit Schreibrecht in der Objektliste am nicht verorteten Tier „T-004 (Hund)“ „Platzieren“ wählt und in die Karte klickt
+- **THEN** trägt das Tier die Koordinate des Klickpunkts und zählt nicht mehr als nicht verortet
 
 #### Scenario: Ohne Modulrecht
 - **WHEN** eine Person ohne Lesezugriff auf das Modul Tiere die Platzieren-Adresse aufruft
@@ -156,7 +157,7 @@ ausgewählten Marker MUST die Koordinate ohne Rückfrage entfernen.
 
 #### Scenario: Verortung entfernen
 - **WHEN** eine Person mit Schreibrecht am ausgewählten Marker „Verortung löschen“ wählt
-- **THEN** verliert das Tier seine Koordinate und steht wieder in „Nicht verortet“
+- **THEN** verliert das Tier seine Koordinate und steht in der Objektliste wieder als nicht verortet
 
 ### Requirement: Modulfreigabe, gesicherter Stand und Betrieb ohne Netz
 

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Gliedert die Kartenleiste der Lagekarte in die Ansichten „Ebenen“ und „Objekte“, führt alles, was
-die Karte zeigt, in einem gruppierten Ebenenbaum und gibt jedem Leistenmodus eine feste Stelle für
-seine Bedienung. Hält die Lagekarte auf schmalen Breiten (Handschirm, Tablet hochkant) in jedem
+Gliedert die Kartenleiste der Lagekarte in die Ansichten „Ebenen“, „Objekte“ und — solange etwas
+ausgewählt ist — „Auswahl“, führt alles, was die Karte zeigt, in einem gruppierten Ebenenbaum, alle
+Objekte in einer Objektliste und gibt jedem Leistenmodus eine feste Stelle für seine Bedienung. Hält die Lagekarte auf schmalen Breiten (Handschirm, Tablet hochkant) in jedem
 Kartenmodus mit Tipp auf die Karte bedienbar: Die Kartenleiste weicht dem Modus und kommt danach im
 vorherigen Zustand zurück.
 
@@ -18,8 +18,8 @@ den Verortungsauftrag per Adresse (`?platzieren=`) und für Messen über den Kar
 Auswahl (Inspector) MUST die Leiste weiterhin öffnen, auch während eines Modus. Ab `lg` bleibt das
 bisherige Verhalten unverändert.
 
-#### Scenario: Platzieren aus „Nicht verortet“ bei 390 px
-- **WHEN** bei 390 px die Leiste offen ist und in „Nicht verortet“ bei einer Einheit „Platzieren“ getippt wird
+#### Scenario: Platzieren aus der Objektliste bei 390 px
+- **WHEN** bei 390 px die Leiste offen ist und in der Objektliste bei einer nicht verorteten Einheit „Platzieren“ getippt wird
 - **THEN** schließt die Leiste, der Kopf bietet „Leiste einblenden“, und ein Tipp auf die freie Karte verortet die Einheit an dieser Stelle
 
 #### Scenario: Verortungsauftrag per Adresse
@@ -37,13 +37,13 @@ bisherige Verhalten unverändert.
 ### Requirement: Leiste bekommt nach dem Modus ihren vorherigen Zustand zurück
 Endet ein Kartenmodus unter `lg` (abgeschlossen, abgebrochen oder durch einen erfolgreichen Tipp
 beendet), SHALL die Leiste den Zustand annehmen, den sie unmittelbar vor dem Modus hatte. Die
-gewählte Ansicht, Suchbegriffe, der Filter „Ebene suchen“ sowie aufgeklappte Paneele und Gruppen
-der Leiste MUST dabei erhalten bleiben. Wechselt ein Modus direkt in einen anderen, gilt das als
-ein durchgehender Modus.
+gewählte Ansicht, Suchbegriffe, die Filter „Ebene suchen“ und „Nicht verortet“ sowie aufgeklappte
+Paneele und Gruppen der Leiste MUST dabei erhalten bleiben. Wechselt ein Modus direkt in einen
+anderen, gilt das als ein durchgehender Modus.
 
 #### Scenario: Vorgabe „offen“ bei 768 px kehrt zurück
-- **WHEN** bei 768 px in „Nicht verortet“ ein Suchbegriff steht, dort „Platzieren“ getippt und dann die Karte angetippt wird
-- **THEN** ist die Leiste nach dem Verorten wieder offen, und der Suchbegriff steht noch im Feld
+- **WHEN** bei 768 px in der Objekte-Ansicht ein Suchbegriff steht, an einem Treffer „Platzieren“ getippt und dann die Karte angetippt wird
+- **THEN** ist die Leiste nach dem Verorten wieder offen, die Objekte-Ansicht ist gewählt, und der Suchbegriff steht noch im Feld
 
 #### Scenario: Ansicht und Filter überstehen den Modus
 - **WHEN** bei 390 px in der Ansicht „Ebenen“ „Lage“ im Filter steht, über den Kartenknopf ein Taktisches Zeichen platziert und der Modus beendet wird
@@ -89,28 +89,29 @@ und per Tipp bedienbar sein.
 - **WHEN** bei 390 px während eines Platzierens die Leiste eingeblendet wird
 - **THEN** gibt es genau einen Knopf „Abbrechen“ für diesen Modus, und zwar im Band
 
-### Requirement: Die Kartenleiste hat die Ansichten „Ebenen“ und „Objekte“
+### Requirement: Die Kartenleiste hat die Ansichten „Ebenen“, „Objekte“ und „Auswahl“
 Die erste Zeile der Kartenleiste SHALL eine Segmentleiste mit den Segmenten „Ebenen“ und „Objekte“
-sein (Tabliste, jedes Segment steuert seine Fläche). Jedes Segment MUST ein festes Drittel der
-Leistenbreite einnehmen; das dritte Drittel bleibt frei. Die Segmentleiste und das Modus-Band MUST
-beim Rollen der Leiste stehen bleiben. „Ebenen“ zeigt den Ebenenbaum, „Objekte“ die Paneele
-„Nicht verortet“, „Einsatzort“, „Verortet“ und (mit Schreibrecht) „Zeichnen“. „Ausgewählt“ steht
-über beiden Ansichten. Die gewählte Ansicht SHALL je Gerät gemerkt werden, Vorgabe „Ebenen“. Die
-gerade nicht gezeigte Ansicht MUST ihren Zustand (Suchbegriffe, Filter, Klappzustand, Entwürfe)
-behalten. Der Kartenknopf „Zeichenwerkzeuge“ und ein Sprung zu einem Ort (`?ort=`) MUST auf
-„Objekte“ wechseln.
+sein, solange etwas ausgewählt ist dazu „Auswahl“ (Tabliste, jedes Segment steuert seine Fläche).
+Jedes Segment MUST ein festes Drittel der Leistenbreite einnehmen; ohne Auswahl bleibt das dritte
+Drittel frei. Die Segmentleiste und das Modus-Band MUST beim Rollen der Leiste stehen bleiben.
+„Ebenen“ zeigt den Ebenenbaum, „Objekte“ die Objektliste und (mit Schreibrecht) „Zeichnen“,
+„Auswahl“ die Inspectors. Die gewählte Ansicht „Ebenen“ oder „Objekte“ SHALL je Gerät gemerkt
+werden, Vorgabe „Ebenen“. Die gerade nicht gezeigten Ansichten MUST ihren Zustand (Suchbegriffe,
+Filter, Klappzustand, Entwürfe) und ihre Rollposition behalten. Der Kartenknopf
+„Zeichenwerkzeuge“ und ein Sprung zu einem Ort (`?ort=`) MUST auf „Objekte“ wechseln; eine offene
+Auswahl bleibt dabei bestehen.
 
 #### Scenario: Wahl übersteht das Neuladen
 - **WHEN** die Ansicht „Objekte“ gewählt und die Seite neu geladen wird
 - **THEN** zeigt die Leiste die Ansicht „Objekte“
 
 #### Scenario: Suchbegriff übersteht den Ansichtswechsel
-- **WHEN** in „Nicht verortet“ ein Suchbegriff steht und auf „Ebenen“ und zurück auf „Objekte“ gewechselt wird
+- **WHEN** in „Objekte“ ein Suchbegriff steht und auf „Ebenen“ und zurück auf „Objekte“ gewechselt wird
 - **THEN** steht der Suchbegriff noch im Feld
 
 #### Scenario: Segmente im Handschuh
-- **WHEN** bei 1280 px die Dichtestufe `handschuh` gewählt ist
-- **THEN** stehen beide Segmente in einer Zeile der 300 px breiten Leiste und sind mindestens 72 px hoch und breit
+- **WHEN** bei 1280 px die Dichtestufe `handschuh` gewählt und ein Objekt ausgewählt ist
+- **THEN** stehen alle drei Segmente in einer Zeile der 300 px breiten Leiste und sind mindestens 72 px hoch und breit
 
 ### Requirement: Ebenen stehen in einem gruppierten, einklappbaren Ebenenbaum
 Die Ansicht „Ebenen“ SHALL jede Ebene der Karte in einer festen Gruppe führen: Kräfte (Einheiten,
@@ -196,14 +197,71 @@ ausgeblendet, MUST ein abgelehnter Speicherversuch seine Gründe als Kartenhinwe
 Ab `lg` SHALL ein Modus-Band direkt unter der Segmentleiste die ganze Bedienung des laufenden
 Leistenmodus tragen: Platzieren (Titel, Koordinate, „Übernehmen“, „Abbrechen“), Taktisches Zeichen
 („Weitere platzieren“, Zähler, „Fertig“ bzw. „Abbrechen“), Bild einpassen (Griffwahl, Mittelpunkt,
-„Fertig“) und die Rückmeldung nach dem Verorten. Das Band MUST in beiden Ansichten gleich stehen.
+„Fertig“) und die Rückmeldung nach dem Verorten. Das Band MUST in allen Ansichten gleich stehen.
 Die Zeile des Ziels in den Ansichten MUST nur den Zustand zeigen („wird platziert“, „wird
 eingepasst“). Je Breite MUST es genau einen Knopf je Handlung geben.
 
 #### Scenario: Abbrechen aus der anderen Ansicht
-- **WHEN** bei 1440 px aus „Nicht verortet“ ein Platzieren gestartet und auf „Ebenen“ gewechselt wird
+- **WHEN** bei 1440 px aus der Objektliste ein Platzieren gestartet und auf „Ebenen“ gewechselt wird
 - **THEN** steht genau ein „Abbrechen“ im Modus-Band, und ein Tipp darauf beendet das Platzieren
 
 #### Scenario: Bild einpassen ab lg
 - **WHEN** bei 1440 px ein Bild eingepasst wird
 - **THEN** stehen Griffwahl, Mittelpunkt und „Fertig“ im Modus-Band, und die Bildzeile zeigt „wird eingepasst“
+
+### Requirement: Auswahl als eigene Ansicht
+Solange auf der Karte etwas ausgewählt ist, SHALL die Segmentleiste ein drittes Segment „Auswahl“
+im freien Drittel tragen; ohne Auswahl MUST es fehlen, ohne dass „Ebenen“ und „Objekte“ ihre Lage
+ändern. Eine neue Auswahl (Marker, Listenzeile, Zone, Fachebenen-Objekt) SHALL die Leiste auf
+„Auswahl“ schalten und die Inspectors von oben zeigen; unter `lg` MUST sie die Leiste öffnen, auch
+im Kartenmodus. Wählt die Person bei bestehender Auswahl „Ebenen“ oder „Objekte“, MUST die Auswahl
+bestehen bleiben; das Segment „Auswahl“ führt zu ihr zurück. Die Ansicht „Auswahl“ MUST nie
+gemerkt werden: nach dem Neuladen gibt es keine Auswahl und kein Segment.
+
+#### Scenario: Marker gewählt
+- **WHEN** bei 1440 px die Ansicht „Ebenen“ offen ist und die Person einen Einheiten-Marker antippt
+- **THEN** zeigt die Leiste die Ansicht „Auswahl“ mit dem Inspector der Einheit und oben „← Ebenen“
+
+#### Scenario: Ebene neben der Auswahl schalten
+- **WHEN** eine Einheit ausgewählt ist und die Person „Ebenen“ wählt und dort „Zonen“ ausschaltet
+- **THEN** bleibt die Einheit ausgewählt, und das Segment „Auswahl“ führt zu ihrem Inspector zurück
+
+#### Scenario: Auswahl am Handschirm
+- **WHEN** bei 390 px die Leiste geschlossen ist und die Person einen Marker antippt
+- **THEN** ist die Leiste offen, und der Inspector steht ohne Rollen sichtbar oben in der Leiste
+
+### Requirement: Rückweg aus der Auswahl
+Der Kopf der Ansicht „Auswahl“ SHALL einen Rückweg tragen, der die gemerkte Ansicht benennt
+(„← Ebenen“ bzw. „← Objekte“); er MUST die Auswahl aufheben und diese Ansicht mit Suchbegriff,
+Filter, Klappzustand und Rollposition zeigen. Esc MUST genauso wirken, außer ein Kartenmodus mit
+eigener Esc-Stufe läuft (Zone oder Fläche zeichnen, Kreis, Messen), ein Menü oder Dialog ist offen
+oder der Fokus steht in einem Eingabefeld; dann trägt der Rückweg auch keine Tastenkappe. Ist ein
+Bündel der Karte aufgefächert, MUST Esc zuerst das Bündel einklappen, erst die nächste Taste die
+Auswahl aufheben. Eine Taste MUST genau eine Stufe wirken.
+
+#### Scenario: Rückweg mit Suchbegriff
+- **WHEN** in „Objekte“ der Begriff „83“ steht, die Person einen Treffer wählt und dann „← Objekte“ tippt
+- **THEN** ist nichts mehr ausgewählt, und die Objekte-Ansicht zeigt den Begriff „83“ mit seinen Treffern
+
+#### Scenario: Esc beim Zeichnen
+- **WHEN** eine Zone gezeichnet wird, ein Marker ausgewählt ist und Esc gedrückt wird
+- **THEN** greift die erste Esc-Stufe des Zeichnens, und die Auswahl bleibt
+
+#### Scenario: Esc mit offenem Bündel
+- **WHEN** eine Einheit ausgewählt und ein Bündel aufgefächert ist und Esc zweimal gedrückt wird
+- **THEN** klappt die erste Taste das Bündel ein, die zweite hebt die Auswahl auf
+
+### Requirement: „Nicht verortet“ ist ein Filter der Objektliste
+Die Liste „Nicht verortet“ SHALL die Objektliste der Ansicht „Objekte“ mit gesetztem Filter
+„nur nicht verortet“ sein; eine eigene Liste daneben MUST es nicht geben. Die Marke „Nicht
+verortet“ unter dem Suchfeld SHALL die Zahl der nicht verorteten Objekte nennen (der Einsatzort
+ohne Koordinate eingeschlossen) und den Filter setzen und aufheben; bei 0 MUST „Alles verortet“
+stehen, bei ausgefallener Lagebild-Quelle „—“ statt einer Zahl.
+
+#### Scenario: Marke setzt den Filter
+- **WHEN** im Demo-Einsatz 26 Objekte nicht verortet sind und die Person die Marke „Nicht verortet 26“ tippt
+- **THEN** zeigt die Liste nur die 26 nicht verorteten Objekte, und die Marke ist als gedrückt ausgewiesen
+
+#### Scenario: Quelle ausgefallen
+- **WHEN** eine Lagebild-Quelle nicht geladen werden konnte
+- **THEN** zeigt die Marke „—“ statt einer Zahl, und nirgends steht „Alles verortet“

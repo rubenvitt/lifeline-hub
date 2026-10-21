@@ -44,10 +44,16 @@ import { parsePolygon, polygonZentroid, stuetzpunkte } from './lagekarte/geo';
 import { useThemeMode } from '../theme/ThemeModeProvider';
 import { useKartenbilder } from './lagekarte/useKartenbilder';
 import { useBasemap } from './lagekarte/useBasemap';
-import { leisteSichtbar, useLeistenAnsicht, useLeistenWahl } from './lagekarte/leistenWahl';
+import {
+  gezeigteAnsicht,
+  leisteSichtbar,
+  useAuswahlVorn,
+  useLeistenAnsicht,
+  useLeistenWahl,
+} from './lagekarte/leistenWahl';
 import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
-import { suchbareMarker } from './lagekarte/objektsuche';
+import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
@@ -260,7 +266,6 @@ export default function LagekartePage() {
     bezirkeGeladen,
     fehlerhafteQuellen,
     neuLaden,
-    verortet,
     flaechen,
     zonenFeatures,
     alleVerortet,
@@ -281,6 +286,8 @@ export default function LagekartePage() {
     brZugriff,
     tierZugriff,
     datenstand,
+    einsatz: einsatzDaten,
+    abschnitteOhneFlaeche,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
 
   // Abschnittsflächen für die Karte mit stabiler Identität: die Karte setzt sie bei neuer Liste
@@ -603,6 +610,23 @@ export default function LagekartePage() {
       tierZugriff,
     ],
   );
+  // Die Objektliste der Ansicht „Objekte“ (LLH-1033): verortet und nicht verortet in einer Liste,
+  // der Einsatzort ohne Koordinate eingeschlossen; Modulsperre je Typ in `objektEintraege`.
+  const einsatzortOhneOrt =
+    einsatzDaten != null &&
+    (einsatzDaten.einsatzort_lat == null || einsatzDaten.einsatzort_lon == null);
+  const objekte = useMemo(
+    () =>
+      objektEintraege({
+        suchbar,
+        nichtVerortet: nichtVerortetAlle,
+        einsatzortOhneOrt,
+        betreuungZugriff,
+        brZugriff,
+        tierZugriff,
+      }),
+    [suchbar, nichtVerortetAlle, einsatzortOhneOrt, betreuungZugriff, brZugriff, tierZugriff],
+  );
 
   // Unter `lg` liegt die Leiste unter der Karte, ab `lg` rechts daneben. Auf jeder Breite lässt sie
   // sich ausblenden, die Wahl bleibt je Breitenklasse gemerkt; Vorgabe und Vorrang in
@@ -710,7 +734,14 @@ export default function LagekartePage() {
     () => (startOffen ? undefined : startAnsicht(alleVerortet, aktiveAnsicht)),
     [startOffen, alleVerortet, aktiveAnsicht],
   );
-  const aktiverMarker = waehlbar.find((m) => m.schluessel === auswahl) ?? null;
+  // Ein Abschnitt ohne Fläche ist kein Kartenobjekt, lässt sich aber über die Objektliste wählen
+  // (LLH-1033): Inspector ohne Ort, mit „Abschnitt fokussieren“. Hat er eine Fläche, gilt der Marker.
+  const aktiverMarker =
+    waehlbar.find((m) => m.schluessel === auswahl) ??
+    abschnitteOhneFlaeche.find((m) => m.schluessel === auswahl) ??
+    null;
+  const aktiverMarkerOhneOrt =
+    aktiverMarker != null && !waehlbar.some((m) => m.schluessel === aktiverMarker.schluessel);
   // Freies taktisches Zeichen zur Marker-Auswahl: der Inspector editiert den rohen Record, nicht
   // die gestrippte Marker-tz (sonst verlöre der Editor gestrippte Overlays).
   const ausgewaehltesZeichen =
@@ -722,12 +753,30 @@ export default function LagekartePage() {
 
   // Fokus auf einen Einsatzabschnitt (LLH-1057, `lagekarte/useAbschnittFokus.ts`): reine
   // Darstellung. Die Kräfte fremder Abschnitte werden gedämpft, nie entfernt; Ebenen, Zähler und
-  // Suche sehen den Fokus nicht. Esc gehört erst der Auswahl („Ausgewählt“), dann dem Fokus.
+  // Suche sehen den Fokus nicht. Esc gehört erst einem offenen Bündel (`Kartenflaeche`), dann der
+  // Auswahl, dann dem Fokus.
   const auswahlOffen =
     (aktiverMarker != null && aktiverMarker.typ !== 'freies_zeichen') ||
     ausgewaehltesZeichen != null ||
     fachebeneAuswahl != null ||
     ausgewaehlteZone != null;
+  // Eine Auswahl (Marker, Zone oder Fachebenen-Objekt) — die drei schließen einander aus.
+  const hebeAuswahlAuf = () => {
+    setAuswahl(null);
+    setZoneAuswahl(null);
+    setFachebeneAuswahl(null);
+  };
+  // Ansicht „Auswahl“ der Leiste (LLH-1033): eine neue Auswahl steht vorn, ein Tipp auf
+  // „Ebenen“/„Objekte“ lässt sie bestehen. Seitenzustand, nie gespeichert (`leistenWahl.ts`).
+  const auswahlVorn = useAuswahlVorn(
+    auswahl ?? (zoneAuswahl != null ? `zone-${zoneAuswahl}` : fachebeneAuswahl),
+  );
+  const zeigeAuswahl = auswahlVorn.zeige;
+  const verlasseAuswahl = auswahlVorn.verlasse;
+  const waehleObjekt = (schluessel: string) => {
+    onMarkerWaehlen(schluessel);
+    zeigeAuswahl();
+  };
   const fokusQuelle = useMemo(
     () => ({
       abschnitte: rohdaten.abschnitte,
@@ -743,11 +792,7 @@ export default function LagekartePage() {
     marker: alleVerortet,
     kartenRef,
     auswahlOffen,
-    onAuswahlAufheben: () => {
-      setAuswahl(null);
-      setZoneAuswahl(null);
-      setFachebeneAuswahl(null);
-    },
+    onAuswahlAufheben: hebeAuswahlAuf,
     modusAktiv: exklusiverModusAktiv,
   });
   const fokusSicht = abschnittFokus.sicht;
@@ -859,6 +904,30 @@ export default function LagekartePage() {
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [zeichenmodusAktiv]);
+
+  /**
+   * Esc hebt eine offene Auswahl auf wie der Rückweg „← Ebenen/Objekte“ (LLH-1033) — außer ein
+   * Modus mit eigener Esc-Stufe läuft (Zeichnen samt Kreis, Messen), ein Overlay ist offen oder
+   * jemand schreibt. Ein offenes Bündel nimmt die Taste vorher (`Kartenflaeche`, Capture-Phase);
+   * im Fokus sieht der Fokus-Zuhörer die genommene Taste (`useAbschnittFokus`): eine Taste, eine
+   * Stufe.
+   */
+  const auswahlEsc = auswahlOffen && !zeichenmodusAktiv && messForm == null;
+  const auswahlAufhebenRef = useRef(hebeAuswahlAuf);
+  auswahlAufhebenRef.current = hebeAuswahlAuf;
+  useEffect(() => {
+    if (!auswahlEsc) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || e.repeat) return;
+      const ziel = e.target instanceof Element ? e.target : null;
+      if (ziel?.closest('input, textarea, [contenteditable="true"]')) return;
+      if (escGehoertOverlay(e)) return;
+      e.preventDefault();
+      auswahlAufhebenRef.current();
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [auswahlEsc]);
 
   useEffect(() => {
     const ziel = parseRouteId(searchParams.get('gefahrengebiet') ?? undefined);
@@ -1091,13 +1160,14 @@ export default function LagekartePage() {
       ortNonceRef.current += 1;
       setOrtVorbelegung({ text, nonce: ortNonceRef.current });
       zeigeLeiste();
-      // Das Suchfeld steht in der Ansicht „Objekte“ (Paneel „Verortet“).
+      // Das Suchfeld steht in der Ansicht „Objekte“, auch vor einer offenen Auswahl.
       wechsleLeistenAnsicht('objekte');
+      verlasseAuswahl();
     }
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('ort');
     setSearchParams(naechste, { replace: true });
-  }, [searchParams, setSearchParams, ladt, zeigeLeiste, wechsleLeistenAnsicht]);
+  }, [searchParams, setSearchParams, ladt, zeigeLeiste, wechsleLeistenAnsicht, verlasseAuswahl]);
 
   // Lageplan (LLH-1051, Spec `lagekarte-druck`): Druck und Anlage des aktuellen Ausschnitts. Kopf
   // und Legende liest der Hook erst bei der Aufnahme; die Legende nennt nur, was gezeichnet ist.
@@ -1171,8 +1241,7 @@ export default function LagekartePage() {
   // dort keine Zahl zu „—" machen. Der Hinweis nennt sie trotzdem.
   const lagebildFehler = fehlerhafteQuellen.some((q) => q !== QUELLE_BETROFFENE);
 
-  // „Ausgewählt": die Inspectors stehen in der rechten Leiste. Mehrere gleichzeitig (Marker und
-  // Zone) bleiben möglich.
+  // Ansicht „Auswahl“ der Leiste: die Inspectors stehen in der rechten Leiste (LLH-1033).
   const auswahlInhalt =
     (aktiverMarker && aktiverMarker.typ !== 'freies_zeichen') ||
     ausgewaehltesZeichen ||
@@ -1188,6 +1257,7 @@ export default function LagekartePage() {
             onVerortungLoeschen={loescheVerortung}
             onSymbolAendern={aendereSymbol}
             roh={rohdaten}
+            ohneOrt={aktiverMarkerOhneOrt}
             onAbschnittFokussieren={
               aktiverMarker.typ === 'abschnitt' && fokusSicht?.abschnittId !== aktiverMarker.id
                 ? () => fokussiereAbschnitt(aktiverMarker.id)
@@ -1261,10 +1331,15 @@ export default function LagekartePage() {
     imModus: leistenWahl.imModus,
   });
   // Ansichtsgründe stehen im Kopf der Ebenen bei ihrer Kartenansicht; bei ausgeblendeter Leiste,
-  // vorn liegender Ansicht „Objekte“ (LLH-1028) und für eine andere Kartenansicht (Antwort nach dem
+  // vorn liegender Ansicht „Objekte“ oder „Auswahl“ (LLH-1028, LLH-1033) und für eine andere Kartenansicht (Antwort nach dem
   // Wechsel) über der Karte (LFH-1077) — ein Grund steht nie unsichtbar.
+  const gezeigteLeistenAnsicht = gezeigteAnsicht(
+    leistenAnsicht.ansicht,
+    auswahlInhalt != null,
+    auswahlVorn.vorn,
+  );
   const ansichtGruendeImPaneel =
-    leisteIstSichtbar && leistenAnsicht.ansicht === 'ebenen'
+    leisteIstSichtbar && gezeigteLeistenAnsicht === 'ebenen'
       ? ansichtFehler.gruende.filter((g) => g.schluessel.startsWith(`ansicht:${aktiveAnsichtId}:`))
       : [];
   const kartenGruende = [
@@ -1354,6 +1429,9 @@ export default function LagekartePage() {
         </Typography.Title>
         <EinsatzstatusMarke einsatz={rahmenEinsatz} />
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
+          {/* Die Kopfzahl zählt nur die Lageobjekte, nicht den Einsatzort ohne Koordinate: sie
+              hängt dann an einer Quelle, und die Kopfzeile bricht am Handschirm nicht um (LFH-723,
+              LFH-373). Den Einsatzort führt die Objektliste als erste Zeile. */}
           {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
         {/* Datenstand wie im Kopf jeder Lagebild-Seite; ohne Verbindung mit „offline"
@@ -1471,7 +1549,7 @@ export default function LagekartePage() {
         // Ein Marker-Klick während eines exklusiven Modus öffnet kein Panel. Nur der Kartenpfad ist
         // gegatet, die Leisten-Selektion bleibt frei.
         onMarkerKlick={(schluessel) => {
-          if (!exklusiverModusAktiv) onMarkerWaehlen(schluessel);
+          if (!exklusiverModusAktiv) waehleObjekt(schluessel);
         }}
         flyToZiel={flyToZiel}
         startAnsicht={start}
@@ -1564,8 +1642,9 @@ export default function LagekartePage() {
                 // wirkungslos und öffnete die Leiste erst nach dem Modus (LFH-765).
                 if (!breit && exklusiverModusAktiv) leistenWahl.umschalteImModus(true);
                 else leistenWahl.zeige();
-                // Das Paneel „Zeichnen“ steht in der Ansicht „Objekte“.
+                // Das Paneel „Zeichnen“ steht in der Ansicht „Objekte“, auch vor einer Auswahl.
                 leistenAnsicht.wechsle('objekte');
+                verlasseAuswahl();
                 setZeichnenAnfrage((n) => n + 1);
               }
             : undefined
@@ -1735,12 +1814,11 @@ export default function LagekartePage() {
     >
       <Sidebar
         einsatzId={einsatzId}
-        nichtVerortet={nichtVerortetAlle}
         verortet={alleVerortet}
-        suchbar={suchbar}
+        objekte={objekte}
         // Betroffene zählen nicht zum Lagebild-Fehler, gehören aber bei eingeschalteter Ebene zur
-        // Suche — ihr Ausfall macht sie unvollständig.
-        suchbarUnvollstaendig={lagebildFehler || (personenFehler && layerEffektiv.person)}
+        // Liste — ihr Ausfall macht sie unvollständig.
+        objekteUnvollstaendig={lagebildFehler || (personenFehler && layerEffektiv.person)}
         ortssuche={ortssuche}
         darfSchreiben={!!darfSchreiben}
         platzierungZiel={platzierungZiel}
@@ -1758,9 +1836,18 @@ export default function LagekartePage() {
         modusBedienung={breit ? 'band' : 'fuss'}
         platzierModus={platzierModus}
         ansicht={leistenAnsicht.ansicht}
-        onAnsichtWechsel={leistenAnsicht.wechsle}
+        auswahlVorn={auswahlVorn.vorn}
+        auswahlNr={auswahlVorn.nr}
+        onAnsichtWechsel={(a) => {
+          if (a === 'auswahl') zeigeAuswahl();
+          else {
+            leistenAnsicht.wechsle(a);
+            verlasseAuswahl();
+          }
+        }}
+        onAuswahlZurueck={hebeAuswahlAuf}
+        auswahlEsc={auswahlEsc}
         onKoordinateEingeben={onKoordinateEingeben}
-        einsatzortVerortet={verortet.some((m) => m.typ === 'einsatzort')}
         onEinsatzortPlatzieren={onEinsatzortPlatzieren}
         layer={layer}
         onLayerToggle={(k, an) => setLayer((l) => ({ ...l, [k]: an }))}
@@ -1777,7 +1864,7 @@ export default function LagekartePage() {
         tier={{ zugriff: tierZugriff }}
         basemap={basemap}
         grundlageWahl={istSchmal ? grundlageWahl : undefined}
-        onMarkerWaehlen={onMarkerWaehlen}
+        onMarkerWaehlen={waehleObjekt}
         onlineVerfuegbar={onlineStyles.length > 0}
         offlineVerfuegbar={!!config?.offline_verfuegbar}
         kartenTheme={kartenTheme}
@@ -1819,7 +1906,7 @@ export default function LagekartePage() {
         ansichtFehler={ansichtGruendeImPaneel}
         auswahl={auswahlInhalt}
         zeichnenAnfrage={zeichnenAnfrage}
-        /* Drei Sektionen, drei Ursachen. Der Slot an „Nicht verortet" hängt an denselben elf
+        /* Drei Sektionen, drei Ursachen. Der Slot an der Objektliste hängt an denselben elf
            Lagebild-Quellen wie das Overlay; er trägt den erneuten Abruf — die Handlung, die das
            Overlay nicht anbietet, weil es für elf Quellen zugleich spricht. */
         sektionFehler={{

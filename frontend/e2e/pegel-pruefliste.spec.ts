@@ -552,6 +552,23 @@ function abstandZumNaechstenZiel(ziel: Locator) {
   });
 }
 
+/**
+ * Blendet den Knopf der TanStack-Query-Devtools aus: er steht nur im DEV-Build, gegen den die
+ * Suite fährt, als `position: fixed` unten rechts — ein Nachbar, den es im Betrieb nicht gibt (wie
+ * `fokus-verdeckung.spec.ts`, `dialoge-handy.spec.ts`). Seit der Inspector in der Ansicht
+ * „Auswahl“ unter dem Rückweg steht (LLH-1033), endet „Festlegen“ im Handschuh-Betrieb bei 1366 px
+ * nahe am unteren Rand, wo der Knopf liegt. Per Init-Skript, weil `stelleDichte` neu lädt.
+ */
+async function ohneDevtoolsKnopf(page: Page) {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const stil = document.createElement('style');
+      stil.textContent = '[class*="tsqd-open-btn"] { display: none !important; }';
+      document.head.append(stil);
+    });
+  });
+}
+
 // Überstand des Inspectors: `ueberstaende` aus `ueberstand-kern.ts` (Elemente und Textzeilen).
 // Der Inspector steht mit `minWidth: 0` im Fluss der Leiste, ein zu breiter Inhalt weitet ihn
 // nicht, sondern ragt hinaus.
@@ -560,6 +577,7 @@ test('Fachebenen-Inspector: Trefflächen über die Staffel, Abstand im Handschuh
   page,
 }) => {
   test.setTimeout(300_000);
+  await ohneDevtoolsKnopf(page);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Pegel Inspector ${Date.now()}`);
   await stellePegel(page, einsatzId, pegelListe(10));

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { kontoAnlegen } from './konto-anlegen';
-import { oeffneEbenenGruppe } from './leisten-kern';
+import { oeffneEbenenGruppe, zeigeLeistenAnsicht } from './leisten-kern';
 
 // Ebene „Betroffene" auf der Lagekarte. Ob Personen in IHRER Quelle `marker-personen` landen,
 // dort untereinander clustern statt Kräfte-Marker zu schlucken, und ob ein Personen-Donut
@@ -418,7 +418,7 @@ test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker
   await springe(page, MITTE, 13);
   await klickeAuf(page, MITTE);
 
-  // Rückmeldung am Ort, Marker in der Personenquelle, gewählt im Paneel „Ausgewählt“.
+  // Rückmeldung am Ort, Marker in der Personenquelle, gewählt in der Ansicht „Auswahl“.
   const leiste = page.locator('[data-lfh="kartenleiste"]');
   await expect(leiste.getByText(`${kennung} verortet`)).toBeVisible();
   await expect
@@ -431,7 +431,9 @@ test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker
     )
     .toBe(true);
   await expect(page.locator('[data-paneel="ausgewaehlt"]').getByText(kennung)).toBeVisible();
-  // Der Schalter steht weiter auf aus und sagt, dass die Ebene nur eingeblendet ist.
+  // Der Schalter steht weiter auf aus und sagt, dass die Ebene nur eingeblendet ist. Die neue
+  // Auswahl steht vorn (LLH-1033); „Ebenen“ holt den Baum zurück, die Auswahl bleibt.
+  await zeigeLeistenAnsicht(page, 'Ebenen');
   await expect(schalter).toHaveAttribute('aria-checked', 'false');
   await expect(schalter).toContainText('eingeblendet');
   await expect(page.getByRole('button', { name: /In dieser Ansicht speichern/ })).toHaveCount(0);

@@ -11,6 +11,7 @@ import {
   baueLageMeldungMarker,
   baueFreieZeichenMarker,
   FREIES_ZEICHEN_TINTE,
+  abschnittOhneFlaeche,
   baueAbschnittMarker,
   type TaktischeQuelle,
 } from './marker';
@@ -706,5 +707,22 @@ describe('buildBrMarker (LLH-1107)', () => {
     );
     expect(verortet).toEqual([]);
     expect(nichtVerortet).toEqual([{ typ: 'bereitstellungsraum', id: 8, label: 'BR Nord' }]);
+  });
+});
+
+describe('abschnittOhneFlaeche (LLH-1033)', () => {
+  it('trägt Schlüssel, Namen und Zeichen wie der Flächen-Abschnitt, aber keine Geometrie', () => {
+    const m = abschnittOhneFlaeche(
+      { id: 5, name: 'EA Süd', tz_fachaufgabe: null, tz_organisation: null },
+      null,
+    );
+    expect(m).toMatchObject({
+      schluessel: 'abschnitt-5',
+      typ: 'abschnitt',
+      id: 5,
+      label: 'EA Süd',
+    });
+    expect(m.geometrie).toBeUndefined();
+    expect(m.tz).toBeDefined();
   });
 });

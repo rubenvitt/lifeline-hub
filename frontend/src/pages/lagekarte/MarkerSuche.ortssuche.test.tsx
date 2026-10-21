@@ -6,7 +6,8 @@ import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { formatiere } from '../../anzeige/koordinaten';
 import MarkerSuche from './MarkerSuche';
-import type { KarteMarker, MarkerTyp } from './marker';
+import type { MarkerTyp } from './marker';
+import type { ObjektEintrag } from './objektsuche';
 
 /**
  * Ortssuche im Suchfeld der Kartenleiste (LFH-638, Spec `lagekarte-ortssuche`): Koordinate beim
@@ -16,8 +17,8 @@ import type { KarteMarker, MarkerTyp } from './marker';
 const PFAD = '/api/einsaetze/7/karte/ort-suche';
 const BERLIN = { lat: 52.52194, lon: 13.41321 };
 
-function marker(typ: MarkerTyp, id: number, label: string): KarteMarker {
-  return { schluessel: `${typ}-${id}`, typ, id, lat: 50.1, lon: 8.6, label, farbe: '#333333' };
+function marker(typ: MarkerTyp, id: number, label: string): ObjektEintrag {
+  return { schluessel: `${typ}-${id}`, typ, id, label, verortet: true };
 }
 
 /** Fängt jede Adresssuche ab, antwortet mit `antwort` und zählt die Suchtexte mit. */
@@ -37,7 +38,7 @@ function geocoder(antwort: JsonBodyType | (() => Response)) {
 function zeige(props: Partial<React.ComponentProps<typeof MarkerSuche>> = {}) {
   const onOrtWaehlen = vi.fn();
   const alle: React.ComponentProps<typeof MarkerSuche> = {
-    marker: [marker('uhs', 1, 'BHP Nord')],
+    eintraege: [marker('uhs', 1, 'BHP Nord')],
     onMarkerWaehlen: vi.fn(),
     ortssuche: { einsatzId: 7, onOrtWaehlen },
     ...props,
@@ -52,7 +53,7 @@ const kopf = (name: string) => screen.queryByRole('heading', { name });
 describe('MarkerSuche — Koordinate (LFH-638)', () => {
   it('bietet eine getippte Dezimalgrad-Koordinate als Gruppe „Koordinate“ über den Objekten an', async () => {
     const anfragen = geocoder({ zustand: 'ok', treffer: [] });
-    const { onOrtWaehlen } = zeige({ marker: [marker('uhs', 1, '52 Grad Nord')] });
+    const { onOrtWaehlen } = zeige({ eintraege: [marker('uhs', 1, '52 Grad Nord')] });
     await userEvent.type(suchfeld(), '52.52194, 13.41321');
     const koepfe = screen.getAllByRole('heading').map((k) => k.textContent);
     expect(koepfe[0]).toBe('Koordinate');
@@ -134,7 +135,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
 
   it('Enter sucht; die Treffer stehen in der Gruppe „Adresse“ vor den Objekten und fliegen an', async () => {
     const anfragen = geocoder(ZWEI);
-    const { onOrtWaehlen } = zeige({ marker: [marker('uhs', 1, 'Hauptstraße Wache')] });
+    const { onOrtWaehlen } = zeige({ eintraege: [marker('uhs', 1, 'Hauptstraße Wache')] });
     await userEvent.type(suchfeld(), '  Hauptstraße 12 {Enter}');
     const knopf = await screen.findByRole('button', { name: 'Hauptstraße 12, Anderswo' });
     expect(anfragen).toEqual(['Hauptstraße 12']);
@@ -168,13 +169,13 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
 
   it('ein neu gerenderter Aufrufer (neuer Callback) löst keinen zweiten Direktflug aus', async () => {
     geocoder({ zustand: 'ok', treffer: [{ lat: 51.1604, lon: 10.4514, name: 'Rathaus' }] });
-    const { onOrtWaehlen, rerender, marker: m, onMarkerWaehlen } = zeige();
+    const { onOrtWaehlen, rerender, eintraege: m, onMarkerWaehlen } = zeige();
     await userEvent.type(suchfeld(), 'Rathaus{Enter}');
     await waitFor(() => expect(onOrtWaehlen).toHaveBeenCalledTimes(1));
     const neu = vi.fn();
     rerender(
       <MarkerSuche
-        marker={m}
+        eintraege={m}
         onMarkerWaehlen={onMarkerWaehlen}
         ortssuche={{ einsatzId: 7, onOrtWaehlen: neu }}
       />,
@@ -270,7 +271,7 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
 
   it('nicht erreichbar — Objekte bleiben darunter stehen', async () => {
     geocoder({ zustand: 'nicht_erreichbar', treffer: [] });
-    zeige({ marker: [marker('uhs', 1, 'Hauptwache')] });
+    zeige({ eintraege: [marker('uhs', 1, 'Hauptwache')] });
     await userEvent.type(suchfeld(), 'Hauptwache{Enter}');
     expect(await screen.findByText('Adresssuche nicht erreichbar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hauptwache' })).toBeInTheDocument();

@@ -32,7 +32,7 @@ import {
   ruhigeHoehe,
   stelleDichte,
 } from './trefflaeche-kern';
-import { oeffneAlleFachebenen, zeigeLeistenAnsicht } from './leisten-kern';
+import { oeffneAlleFachebenen, oeffneObjektGruppe } from './leisten-kern';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
@@ -3826,7 +3826,7 @@ test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dic
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeitachse folgen der Dichte-Staffel, Knöpfe und Grundlage halten den Zielabstand', async ({
+test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Kartengrundlage und Zeitachse folgen der Dichte-Staffel, Knöpfe und Grundlage halten den Zielabstand', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -3865,18 +3865,23 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeit
       { timeout: 60_000 },
     );
 
-    // „Verortet": handgebaute Zeilen. Per exaktem Namen, weil sonst auch der Klappkopf träfe.
-    // Sie stehen in der Ansicht „Objekte“ (LLH-1028).
-    await zeigeLeistenAnsicht(page, 'Objekte');
+    // Objektliste (LLH-1033): handgebaute Zeilen in der Gruppe „UHS“ (ohne Begriff zu, also
+    // öffnen) und die Marke „Nicht verortet“ (der Einsatzort hat keine Koordinate). Per exaktem
+    // Namen, weil sonst auch der Klappkopf träfe.
+    await oeffneObjektGruppe(page, 'uhs');
     const leiste = page.locator('[data-lfh="kartenleiste"]');
-    let verortet = Number.POSITIVE_INFINITY;
+    let verortet = await haeltStufe(
+      leiste.getByRole('button', { name: 'Nicht verortet', exact: true }),
+      soll,
+      `Marke Nicht verortet (${dichte})`,
+    );
     for (const name of ablagen) {
       verortet = Math.min(
         verortet,
         await haeltStufe(
           leiste.getByRole('button', { name, exact: true }),
           soll,
-          `Verortet ${name} (${dichte})`,
+          `Objektzeile ${name} (${dichte})`,
         ),
       );
     }
@@ -3928,17 +3933,17 @@ test('Lagekarte (LFH-373): „Verortet", Kartenknöpfe, Kartengrundlage und Zeit
     });
     const zeitSymbol = await kurzeAchseHaelt(symbole, soll, `Zeitachse Symbol (${dichte})`, 3);
 
-    je.set(`${dichte} Verortet`, verortet);
+    je.set(`${dichte} Objektliste`, verortet);
     je.set(`${dichte} Kartenknopf`, karte.kleinstes);
     je.set(`${dichte} Zeitachse`, zeitBeschriftet);
     gemessen.push(
-      `${dichte}: Verortet ${verortet}, Kartenknopf ${karte.kleinstes} (Abstand ${knopfAbstand}), ` +
+      `${dichte}: Objektliste ${verortet}, Kartenknopf ${karte.kleinstes} (Abstand ${knopfAbstand}), ` +
         `Grundlage ${grundHoehe} (Abstand ${grundAbstand}), ` +
         `Zeitachse ${zeitBeschriftet}, Zeitachse Symbol ${zeitSymbol.kleinstes}`,
     );
   }
 
-  for (const sorte of ['Verortet', 'Kartenknopf', 'Zeitachse']) gegenprobe(je, sorte);
+  for (const sorte of ['Objektliste', 'Kartenknopf', 'Zeitachse']) gegenprobe(je, sorte);
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 

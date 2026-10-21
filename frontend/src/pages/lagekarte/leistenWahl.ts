@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 import { baumKlappLesen, type BaumKnoten } from './leistenDaten';
+import type { MarkerTyp } from './marker';
+import { OBJEKT_GRUPPEN } from './objektsuche';
 
 /**
  * Ein-/Ausblenden der rechten Kartenleiste. Per Vorgabe offen, auf jeder Breite ausblendbar (am
@@ -102,8 +104,53 @@ export function useLeistenWahl(breit: boolean, modusAktiv = false) {
   };
 }
 
-/** Die Ansichten der Leiste, getragen von der Segmentleiste über ihrem Inhalt. */
+/**
+ * Die gemerkten Ansichten der Leiste, getragen von der Segmentleiste über ihrem Inhalt. Die dritte,
+ * „Auswahl“, gibt es nur mit einer Auswahl und nie gespeichert ({@link GezeigteAnsicht}).
+ */
 export type LeistenAnsicht = 'ebenen' | 'objekte';
+
+/** Was die Leiste gerade zeigt: eine gemerkte Ansicht oder die Auswahl (LLH-1033). */
+export type GezeigteAnsicht = LeistenAnsicht | 'auswahl';
+
+/**
+ * „Auswahl“ steht vorn, wenn eine Auswahl offen ist UND sie vorn steht; sonst die gemerkte
+ * Ansicht. Endet die Auswahl, zeigt die Leiste so ohne eigenen Schritt die vorige Ansicht.
+ */
+export function gezeigteAnsicht(
+  ansicht: LeistenAnsicht,
+  auswahlOffen: boolean,
+  auswahlVorn: boolean,
+): GezeigteAnsicht {
+  return auswahlOffen && auswahlVorn ? 'auswahl' : ansicht;
+}
+
+/**
+ * Steht die Auswahl vorn? Seitenzustand, nie gespeichert: eine Auswahl überlebt das Neuladen
+ * nicht. `kennung` ist die Identität der Auswahl (Marker-Schlüssel, Zone, Fachebenen-Objekt);
+ * wechselt sie auf eine neue, kommt „Auswahl“ nach vorn — im Render statt per Effekt (React:
+ * State bei Prop-Wechsel anpassen). `verlasse` ist der Tipp auf „Ebenen“/„Objekte“ (die Auswahl
+ * bleibt), `zeige` der Tipp auf das Segment „Auswahl“ oder erneut auf dasselbe Objekt. `nr` zählt
+ * jedes Nach-vorn-Holen: die Leiste rollt dann an den Anfang.
+ */
+export function useAuswahlVorn(kennung: unknown) {
+  const [vorn, setVorn] = useState(kennung != null);
+  const [nr, setNr] = useState(0);
+  const [gesehen, setGesehen] = useState<unknown>(kennung);
+  if (gesehen !== kennung) {
+    setGesehen(kennung);
+    if (kennung != null) {
+      setVorn(true);
+      setNr((n) => n + 1);
+    }
+  }
+  const zeige = useCallback(() => {
+    setVorn(true);
+    setNr((n) => n + 1);
+  }, []);
+  const verlasse = useCallback(() => setVorn(false), []);
+  return { vorn, nr, zeige, verlasse };
+}
 
 export const LEISTEN_ANSICHT_SCHLUESSEL = 'lfh:lagekarte:leiste-ansicht';
 
@@ -141,6 +188,45 @@ export function useBaumKlapp() {
       if (alt[knoten] === wert) return alt;
       const neu = { ...alt, [knoten]: wert };
       sicherSchreiben(BAUM_KLAPP_SCHLUESSEL, JSON.stringify(neu));
+      return neu;
+    });
+  }, []);
+  return { offen, setze };
+}
+
+export const OBJEKT_KLAPP_SCHLUESSEL = 'lfh:lagekarte:objekte-gruppen';
+
+const OBJEKT_GRUPPEN_TYPEN = new Set<string>(OBJEKT_GRUPPEN.map((g) => g.typ));
+
+/**
+ * Gespeicherten Klappzustand der Objektliste lesen. Vorgabe: jede Gruppe zu (fehlender Eintrag),
+ * damit die Liste ohne Suchbegriff eine Übersicht nach Art ist (LLH-1033). Unbekanntes fällt weg.
+ */
+export function objektKlappLesen(roh: string | null): Partial<Record<MarkerTyp, boolean>> {
+  const zustand: Partial<Record<MarkerTyp, boolean>> = {};
+  if (!roh) return zustand;
+  try {
+    const gelesen = JSON.parse(roh) as Record<string, unknown>;
+    if (!gelesen || typeof gelesen !== 'object') return zustand;
+    for (const [k, v] of Object.entries(gelesen)) {
+      if (OBJEKT_GRUPPEN_TYPEN.has(k) && typeof v === 'boolean') zustand[k as MarkerTyp] = v;
+    }
+  } catch {
+    // Kaputter Eintrag: Vorgabe — eine Bequemlichkeit darf die Leiste nicht brechen.
+  }
+  return zustand;
+}
+
+/** Offen/zu je Gruppe der Objektliste, je Gerät gemerkt (Muster {@link useBaumKlapp}). */
+export function useObjektKlapp() {
+  const [offen, setOffen] = useState<Partial<Record<MarkerTyp, boolean>>>(() =>
+    objektKlappLesen(sicherLesen(OBJEKT_KLAPP_SCHLUESSEL)),
+  );
+  const setze = useCallback((typ: MarkerTyp, wert: boolean) => {
+    setOffen((alt) => {
+      if ((alt[typ] ?? false) === wert) return alt;
+      const neu = { ...alt, [typ]: wert };
+      sicherSchreiben(OBJEKT_KLAPP_SCHLUESSEL, JSON.stringify(neu));
       return neu;
     });
   }, []);

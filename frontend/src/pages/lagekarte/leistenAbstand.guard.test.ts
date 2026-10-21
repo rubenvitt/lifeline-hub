@@ -34,14 +34,15 @@ import { describe, expect, it } from 'vitest';
 const hier = dirname(fileURLToPath(import.meta.url));
 
 /** Die Leiste selbst und was sie unmittelbar als Abschnittsinhalt einhängt (seit LLH-1028 auch
- *  Ebenenbaum, Bild-Hintergründe und Modus-Band) — seit LFH-703 auch die Inspectors im Abschnitt
- *  „Ausgewählt“ und die Bausteine über der Karte (Detailkarte, Überlagerung, Snapshot-Band im
+ *  Ebenenbaum, Bild-Hintergründe und Modus-Band, seit LLH-1033 die Objektliste) — seit LFH-703
+ *  auch die Inspectors der Ansicht „Auswahl“ und die Bausteine über der Karte (Detailkarte, Überlagerung, Snapshot-Band im
  *  Fuß). */
 const DATEIEN = [
   'Sidebar.tsx',
   'Ebenenbaum.tsx',
   'BildHintergruende.tsx',
   'ModusBand.tsx',
+  'MarkerSuche.tsx',
   'leistenTeile.tsx',
   'KlappPaneel.tsx',
   'AnsichtSwitcher.tsx',

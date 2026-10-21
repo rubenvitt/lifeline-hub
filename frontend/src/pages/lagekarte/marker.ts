@@ -559,3 +559,29 @@ export function baueAbschnittMarker(
     trefferDurchmesser: token.controlHeight,
   };
 }
+
+/**
+ * Abschnitt ohne Fläche als Auswahl (LLH-1033): die Objektliste wählt ihn, damit „Abschnitt
+ * fokussieren“ einen Ort hat. Kein Kartenobjekt — `lat`/`lon` sind Platzhalter, die nur der
+ * Inspector mit `ohneOrt` sieht; nie in eine Karten- oder Wählliste geben.
+ */
+export function abschnittOhneFlaeche(
+  a: Pick<Einsatzabschnitt, 'id' | 'name' | 'tz_fachaufgabe' | 'tz_organisation'>,
+  orgDefault: string | null,
+): KarteMarker {
+  return {
+    schluessel: `abschnitt-${a.id}`,
+    typ: 'abschnitt',
+    id: a.id,
+    lon: 0,
+    lat: 0,
+    label: a.name,
+    farbe: ABSCHNITT_FARBE,
+    tz: baueTzProps({
+      objekttyp: 'abschnitt',
+      fachaufgabe: a.tz_fachaufgabe,
+      organisation: a.tz_organisation,
+      orgDefault,
+    }),
+  };
+}

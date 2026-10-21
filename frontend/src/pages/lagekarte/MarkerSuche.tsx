@@ -1,11 +1,11 @@
 import { IconLupe } from '../../icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MutableRefObject, ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, MutableRefObject, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Input, Typography, theme } from 'antd';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
-import { monoStil } from '../../components/instrument';
+import { monoStil, SegmentUmschalter, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { erkenneKoordinate } from '../../anzeige/koordinatenErkennung';
 import { adressAussage, adressBegriff, type GefundenerOrt } from '../../anzeige/ortssuche';
@@ -18,16 +18,29 @@ import { sucheOrt } from '../../api/karteOrtSuche';
  * `Sidebar` eine Konstante auf Modulebene ableitet, bricht das.
  */
 import { bedienzielStil } from './Sidebar';
-import type { KarteMarker } from './marker';
-import { gruppiereTreffer } from './objektsuche';
+import type { MarkerTyp } from './marker';
+import { KlappPaneel } from './KlappPaneel';
+import { OBJEKTART } from './leistenDaten';
+import { ebenenZeileStil, FehlerSlot, type SektionFehler } from './leistenTeile';
+import { useObjektKlapp } from './leistenWahl';
+import {
+  gruppiereObjekte,
+  istWaehlbar,
+  type ObjektEintrag,
+  type ObjektGruppe,
+} from './objektsuche';
 
 /**
- * Suchfeld über die wählbaren verorteten Kartenobjekte — eine Liste, keine Tabelle (hier wird
- * gesucht und angesprungen, nicht verglichen).
+ * Ansicht „Objekte“ der Kartenleiste (LLH-1033, Spec `lagekarte-objektsuche`): EIN Suchfeld und
+ * EINE Liste aller Objekte, verortet und nicht verortet — eine Liste, keine Tabelle (hier wird
+ * gesucht und angesprungen, nicht verglichen; keine `unterEbene`, LFH-826).
  *
- * Leere Gruppen fallen weg, der Leerzustand steht einmal (`Liste` baute sonst je Gruppe einen).
- * Welche Objekte hier stehen, entscheidet der Aufrufer über `suchbareMarker` (`objektsuche.ts`),
- * dort sitzen die Modulsperren. Keine Entprellung: gefiltert wird lokal.
+ * Welche Objekte hier stehen, entscheidet der Aufrufer über `objektEintraege` (`objektsuche.ts`),
+ * dort sitzen die Modulsperren je Typ. Gruppiert wird rein (`gruppiereObjekte`): der Einsatzort
+ * als erste Zeile, dann die Arten in fester Reihenfolge, ohne Suchbegriff und Filter zugeklappt
+ * (je Gerät gemerkt, `useObjektKlapp`). Mit Begriff oder Filter stehen Gruppen mit Treffern offen,
+ * ohne den gemerkten Zustand zu schreiben. Die Marke „Nicht verortet“ setzt den Filter. Keine
+ * Entprellung: gefiltert wird lokal.
  *
  * ORTSSUCHE (LFH-638, Spec `lagekarte-ortssuche`, design.md D1/D2): mit `ortssuche` stehen über
  * den Objekten bis zu zwei Gruppen. „Koordinate“ entsteht beim Tippen aus der Form der Eingabe,
@@ -45,19 +58,37 @@ interface Ortssuche {
   vorbelegung?: { text: string; nonce: number } | null;
   /**
    * Die Vorbelegung mit dieser Nonce ist übernommen. Der Aufrufer räumt sie dann: sonst übernähme
-   * eine neu eingehängte Suche (Paneel „Verortet“ zu und wieder auf) sie ein zweites Mal und flöge
-   * erneut.
+   * eine neu eingehängte Suche sie ein zweites Mal und flöge erneut.
    */
   onVorbelegungVerbraucht?: (nonce: number) => void;
 }
 
 interface MarkerSucheProps {
-  marker: KarteMarker[];
+  /** `objektEintraege` — verortet und nicht verortet, ohne Namen aus Modulen ohne Recht. */
+  eintraege: ObjektEintrag[];
+  /** Eine wählbare Zeile ist getippt (`istWaehlbar`): Schlüssel im Schema der Marker. */
   onMarkerWaehlen: (schluessel: string) => void;
-  /** Eine Lagebild-Quelle ist ausgefallen — dann steht „—" statt einer Zahl und keine Leere. */
+  /**
+   * Eine Lagebild-Quelle ist ausgefallen: der Fehler steht über der Liste, Gruppenköpfe und Marke
+   * tragen „—“, und keine Leere wird behauptet.
+   */
+  fehler?: SektionFehler;
+  /**
+   * Eine Quelle der Liste ist ausgefallen, auch die Personenliste: die Gruppenköpfe tragen „—“ (die
+   * Liste ist unvollständig), und eine leere Liste sagt das. Die Marke „Nicht verortet“ hängt nur an
+   * `fehler` — Personen zählen dort nicht mit.
+   */
   zaehlerUnbekannt?: boolean;
   /** Fehlt sie (kein Einsatz-Kontext), bleibt das Feld reine Objektsuche. */
   ortssuche?: Ortssuche;
+  /** Schlüssel des laufenden Platzierungsziels — seine Zeile bleibt bei jedem Filter stehen. */
+  angeheftet?: string | null;
+  /**
+   * Was rechts in einer Zeile steht (Platzieren, Fläche zeichnen, Verschieben, „wird platziert“)
+   * — die Leiste kennt Rechte und Modus. `null`: nichts; eine nicht verortete Zeile sagt dann
+   * „nicht verortet“.
+   */
+  zeilenAktion?: (eintrag: ObjektEintrag) => ReactNode;
 }
 
 /** Eine Enter-Suche: der Begriff und ihre laufende Nummer (je Enter eine neue). */
@@ -72,18 +103,63 @@ interface AdressAnfrage {
  */
 const ADRESSE_FRISCH_MS = 10 * 60_000;
 
+/**
+ * Stil der Auswahlzeile — ein handgebautes Bedienziel (`<button>`): `minHeight` aus
+ * `controlHeight` plus Polsterung, die ganze Zeilenbreite (`ebenenZeileStil`). Grund, Hover und
+ * Fokusring trägt die Klasse `lfh-objektzeile` (`lagekarte.css`).
+ */
+export function objektZeileStil(token: {
+  controlHeight: number;
+  paddingSM: number;
+  padding: number;
+  marginSM: number;
+}): CSSProperties {
+  return { ...ebenenZeileStil(token), color: 'inherit', font: 'inherit' };
+}
+
 export default function MarkerSuche({
-  marker,
+  eintraege,
   onMarkerWaehlen,
+  fehler,
   zaehlerUnbekannt,
   ortssuche,
+  angeheftet = null,
+  zeilenAktion,
 }: MarkerSucheProps) {
-  const { token } = theme.useToken();
+  const { token, rollen } = useRollen();
   const [suche, setSuche] = useState('');
+  const [nurNichtVerortet, setNurNichtVerortet] = useState(false);
   const [anfrage, setAnfrage] = useState<AdressAnfrage | null>(null);
-  const gruppen = useMemo(() => gruppiereTreffer(marker, suche), [marker, suche]);
   const begriff = suche.trim();
-  const zaehler = (n: number) => (zaehlerUnbekannt ? '—' : String(n));
+  const liste = useMemo(
+    () => gruppiereObjekte(eintraege, { suche, nurNichtVerortet, angeheftet }),
+    [eintraege, suche, nurNichtVerortet, angeheftet],
+  );
+  const zahl = (n: number, unbekannt = fehler != null) => (unbekannt ? '—' : String(n));
+  // Ist nichts mehr nicht verortet, steht statt der Marke „Alles verortet“ — ein gesetzter Filter
+  // fiele sonst ohne Ausweg auf eine leere Liste. Zurückgesetzt im Render (React verwirft den
+  // Durchlauf vor dem Commit).
+  const allesVerortet = fehler == null && liste.nichtVerortet === 0;
+  if (allesVerortet && nurNichtVerortet) setNurNichtVerortet(false);
+
+  // Klappzustand: gemerkt je Gerät, solange weder Begriff noch Filter gelten. Mit Begriff, Filter
+  // oder laufendem Ziel gilt ein vorläufiger Zustand bis zum nächsten Begriff — er schreibt nichts.
+  const klapp = useObjektKlapp();
+  const kontext = `${begriff.toLocaleLowerCase()}|${nurNichtVerortet}|${angeheftet ?? ''}`;
+  const [vorlaeufig, setVorlaeufig] = useState<{
+    kontext: string;
+    offen: Partial<Record<MarkerTyp, boolean>>;
+  }>({ kontext, offen: {} });
+  if (vorlaeufig.kontext !== kontext) setVorlaeufig({ kontext, offen: {} });
+  const suchModus = begriff !== '' || nurNichtVerortet;
+  const istOffen = (g: ObjektGruppe) =>
+    vorlaeufig.offen[g.typ] ?? (suchModus || g.angeheftet ? true : (klapp.offen[g.typ] ?? false));
+  const umschalten = (g: ObjektGruppe) => {
+    const neu = !istOffen(g);
+    if (suchModus || g.angeheftet)
+      setVorlaeufig((v) => ({ kontext: v.kontext, offen: { ...v.offen, [g.typ]: neu } }));
+    else klapp.setze(g.typ, neu);
+  };
 
   // Vorbelegung von außen, im Render statt per Effekt (React: State bei Prop-Wechsel anpassen).
   const vorbelegung = ortssuche?.vorbelegung ?? null;
@@ -136,33 +212,72 @@ export default function MarkerSuche({
     </ListenEintrag>
   );
 
+  // Fehlt eine Quelle (auch die Personenliste), behauptet kein Gruppenkopf eine Zahl.
+  const gruppenZahl = (g: ObjektGruppe) => {
+    const unbekannt = fehler != null || zaehlerUnbekannt === true;
+    return g.nurVerortet
+      ? zahl(g.gesamt, unbekannt)
+      : `${zahl(g.verortet, unbekannt)}/${zahl(g.gesamt, unbekannt)}`;
+  };
+  const zeile = (e: ObjektEintrag) => (
+    <ObjektZeile eintrag={e} aktion={zeilenAktion?.(e) ?? null} onWaehlen={onMarkerWaehlen} />
+  );
+  const leer = liste.einsatzort == null && liste.gruppen.length === 0;
+  const markeBeschreibungId = useId();
+
   return (
     <div>
-      <Input
-        // Eigener Name: `allowClear` hängt einen zweiten Knopf in denselben Wrapper, eine Abfrage
-        // über den Platzhalter wäre mehrdeutig.
-        aria-label="Kartenobjekte suchen"
-        placeholder="Kartenobjekte suchen"
-        allowClear
-        value={suche}
-        onChange={(e) => setSuche(e.target.value)}
-        onPressEnter={sucheAdresse}
-        // Die Hülle nimmt dem Icon sein englisches `aria-label` („search").
-        prefix={
-          <span aria-hidden="true">
-            <IconLupe />
-          </span>
-        }
-        style={{ marginBottom: token.marginXS }}
-      />
+      <div data-lfh="objekte-kopf" style={{ padding: token.padding }}>
+        <Input
+          // Eigener Name: `allowClear` hängt einen zweiten Knopf in denselben Wrapper, eine Abfrage
+          // über den Platzhalter wäre mehrdeutig.
+          aria-label="Kartenobjekte suchen"
+          placeholder="Kartenobjekte suchen"
+          allowClear
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+          onPressEnter={sucheAdresse}
+          // Die Hülle nimmt dem Icon sein englisches `aria-label` („search").
+          prefix={
+            <span aria-hidden="true">
+              <IconLupe />
+            </span>
+          }
+        />
+        <div data-lfh="objekte-marke" style={{ marginBlockStart: token.marginXS }}>
+          {allesVerortet ? (
+            <span style={{ color: rollen.gedaempft }}>Alles verortet</span>
+          ) : (
+            <>
+              {/* Fester Name, die Zahl als Beschreibung: ein wechselnder Name würde bei jeder
+                  Änderung neu angesagt. */}
+              <SegmentUmschalter
+                an={nurNichtVerortet}
+                onWechsel={setNurNichtVerortet}
+                zugaenglicherName="Nicht verortet"
+                label="Nicht verortet"
+                zahl={zahl(liste.nichtVerortet)}
+                beschreibungId={markeBeschreibungId}
+                style={{ display: 'inline-flex' }}
+              />
+              <span id={markeBeschreibungId} hidden>
+                {zahl(liste.nichtVerortet)}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Der Fehler steht über der Liste, nie an ihrer Stelle: die geladenen Zeilen — die
+          Bedienung zum Verorten — bleiben bedienbar, und er nennt, dass Objekte fehlen können. */}
+      <FehlerSlot fehler={fehler} />
 
       {koordinate && (
         <Liste
           size="small"
-          kopf={{ inhalt: 'Koordinate', unterEbene: 2 }}
+          kopf={{ inhalt: 'Koordinate', unterEbene: 1 }}
           dataSource={[koordinate]}
           rowKey={(o) => `${o.lat},${o.lon}`}
-          style={{ marginBottom: token.marginXS }}
           renderItem={ortEintrag}
         />
       )}
@@ -177,54 +292,127 @@ export default function MarkerSuche({
         />
       )}
 
-      {gruppen.length === 0 && ortsGruppen ? (
-        // Über den Objekten steht schon ein Ort: kein Leerzustand der ganzen Fläche, nur der knappe
-        // Hinweis (MODIFIED `lagekarte-objektsuche`). Im Fehlerfall sagt er, dass die Liste
-        // unvollständig ist, statt Leere zu behaupten.
-        <Typography.Text type="secondary" style={{ display: 'block', padding: token.paddingXS }}>
-          {zaehlerUnbekannt
-            ? 'Verortete Objekte konnten nicht vollständig geladen werden'
-            : `Kein Kartenobjekt zu „${begriff}“`}
-        </Typography.Text>
-      ) : gruppen.length === 0 ? (
-        // Der Fehlerzweig steht vorn: „Nichts verortet" wäre eine Aussage über die Lage, die im
-        // Fehlerfall niemand geprüft hat.
-        <SeitenLeer
-          titel={
-            zaehlerUnbekannt
-              ? 'Verortete Objekte konnten nicht vollständig geladen werden'
-              : begriff !== ''
-                ? `Kein Kartenobjekt zu „${begriff}“`
-                : 'Nichts verortet'
-          }
-        />
-      ) : (
-        gruppen.map((g) => (
+      {liste.einsatzort && (
+        <section data-paneel="objekte-einsatzort" aria-label="Einsatzort">
           <Liste
-            key={g.typ}
             size="small"
-            kopf={{
-              // Template-Literal, damit die Zeile EIN Textknoten bleibt.
-              inhalt: `${g.label} (${zaehler(g.treffer.length)})`,
-              // Einziger Einbauort ist das Paneel „Verortet" in `Sidebar`, dessen Kopf ein `<h2>`
-              // ist (`KlappPaneel`).
-              unterEbene: 2,
-            }}
-            dataSource={g.treffer}
-            rowKey={(m) => m.schluessel}
-            style={{ marginBottom: token.marginXS }}
-            renderItem={(m) => (
-              <ListenEintrag
-                style={bedienzielStil(token)}
-                onClick={() => onMarkerWaehlen(m.schluessel)}
-              >
-                {m.label}
-              </ListenEintrag>
-            )}
+            dataSource={[liste.einsatzort]}
+            rowKey={(e) => e.schluessel}
+            renderItem={zeile}
           />
-        ))
+        </section>
       )}
+
+      {liste.gruppen.map((g) => (
+        <KlappPaneel
+          key={g.typ}
+          titel={g.label}
+          kennung={`objekte-${g.typ}`}
+          meta={gruppenZahl(g)}
+          offen={istOffen(g)}
+          onUmschalten={() => umschalten(g)}
+          polster={false}
+        >
+          <Liste
+            size="small"
+            dataSource={g.eintraege}
+            rowKey={(e) => e.schluessel}
+            renderItem={zeile}
+          />
+        </KlappPaneel>
+      ))}
+
+      {/* Genau ein Leerzustand für die ganze Fläche. Der Fehlerzweig steht vorn: ist eine Quelle
+          ausgefallen, sagt der Fehler oben genug, und „Alles verortet“ wäre eine Lagebeurteilung,
+          die niemand geprüft hat. */}
+      {leer &&
+        fehler == null &&
+        (ortsGruppen ? (
+          // Über den Objekten steht schon ein Ort: nur der knappe Hinweis.
+          <Typography.Text type="secondary" style={{ display: 'block', padding: token.paddingXS }}>
+            {zaehlerUnbekannt
+              ? 'Objekte konnten nicht vollständig geladen werden'
+              : `Kein Kartenobjekt zu „${begriff}“`}
+          </Typography.Text>
+        ) : (
+          <SeitenLeer
+            titel={
+              zaehlerUnbekannt
+                ? 'Objekte konnten nicht vollständig geladen werden'
+                : begriff !== ''
+                  ? `Kein Kartenobjekt zu „${begriff}“`
+                  : nurNichtVerortet
+                    ? 'Alles verortet'
+                    : 'Keine Kartenobjekte'
+            }
+          />
+        ))}
     </div>
+  );
+}
+
+/**
+ * Eine Zeile der Objektliste. Wählbar (`istWaehlbar`): der Name ist ein `<button>` über die ganze
+ * Zeile (Tab, Enter, Leertaste), daneben höchstens eine Zeilenaktion — nie ein Knopf im Knopf.
+ * Nicht wählbar: Name und rechts die Aktion bzw. „nicht verortet“.
+ */
+function ObjektZeile({
+  eintrag,
+  aktion,
+  onWaehlen,
+}: {
+  eintrag: ObjektEintrag;
+  aktion: ReactNode;
+  onWaehlen: (schluessel: string) => void;
+}) {
+  const { token, rollen } = useRollen();
+  const istEinsatzort = eintrag.typ === 'einsatzort';
+  const name = (
+    <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+      {istEinsatzort ? (
+        <>
+          {OBJEKTART.einsatzort}
+          {eintrag.verortet && eintrag.label !== OBJEKTART.einsatzort && (
+            <span style={{ display: 'block', fontSize: token.fontSizeSM, color: rollen.text2 }}>
+              {eintrag.label}
+            </span>
+          )}
+        </>
+      ) : eintrag.typ === 'fahrzeug' ? (
+        // Funkrufnamen immer Mono (Gestaltungssprache).
+        <span style={monoStil(token.fontSize)}>{eintrag.label}</span>
+      ) : (
+        eintrag.label
+      )}
+    </span>
+  );
+  const rechts =
+    aktion ??
+    (eintrag.verortet ? null : (
+      <span style={{ color: rollen.gedaempft, whiteSpace: 'nowrap' }}>nicht verortet</span>
+    ));
+  return (
+    <ListenEintrag
+      actions={rechts != null ? [rechts] : []}
+      style={{
+        paddingBlock: 0,
+        paddingInlineStart: 0,
+        paddingInlineEnd: rechts != null ? token.padding : 0,
+      }}
+    >
+      {istWaehlbar(eintrag) ? (
+        <button
+          type="button"
+          className="lfh-objektzeile"
+          style={objektZeileStil(token)}
+          onClick={() => onWaehlen(eintrag.schluessel)}
+        >
+          {name}
+        </button>
+      ) : (
+        <div style={{ ...objektZeileStil(token), cursor: 'default' }}>{name}</div>
+      )}
+    </ListenEintrag>
   );
 }
 
@@ -292,7 +480,7 @@ function AdressGruppe({
   return (
     <Liste
       size="small"
-      kopf={{ inhalt: 'Adresse', unterEbene: 2 }}
+      kopf={{ inhalt: 'Adresse', unterEbene: 1 }}
       dataSource={orte}
       rowKey={(o, i) => `${i}:${o.lat},${o.lon}`}
       loading={adresse.isPending}

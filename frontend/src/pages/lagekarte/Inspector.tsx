@@ -51,6 +51,11 @@ interface InspectorProps {
    * Darstellung, kein Schreiben: auch ohne Schreibrecht und im Historien-Modus.
    */
   onAbschnittFokussieren?: () => void;
+  /**
+   * Objekt ohne Ort (LLH-1033): ein Abschnitt ohne Fläche, gewählt über die Objektliste. Ohne
+   * Koordinate und ohne „Verortung löschen“ — es gibt keine; Fokus und Sprünge bleiben.
+   */
+  ohneOrt?: boolean;
 }
 
 const TAKTISCHE_TYPEN: MarkerTyp[] = ['einheit', 'fahrzeug', 'fuehrung', 'abschnitt'];
@@ -153,6 +158,7 @@ export default function Inspector({
   onSymbolAendern,
   roh = LEERE_ROHDATEN,
   onAbschnittFokussieren,
+  ohneOrt = false,
 }: InspectorProps) {
   const { token, rollen } = useRollen();
   const { formatZeitKurz } = useAnzeigeKonventionen();
@@ -227,19 +233,21 @@ export default function Inspector({
           {marker.lageMeldung.inhalt}
         </Typography.Paragraph>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-        <Augenbraue>Koordinate</Augenbraue>
-        {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
+      {!ohneOrt && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
+          <Augenbraue>Koordinate</Augenbraue>
+          {/* Drei Zeilen statt der vollen Adresse, die die 300-px-Leiste sonst füllte. Nicht zwei:
             der Tooltip mit dem vollen Wortlaut hängt an Hover/Fokus, und auf Touch muss das
             Sichtbare tragen. Die Koordinate darüber bleibt ungekürzt. */}
-        <KoordinatenAnzeige
-          lat={marker.lat}
-          lon={marker.lon}
-          einsatzId={einsatzId}
-          exclude={inspectorExclude(marker, einsatzId)}
-          maxOrtZeilen={3}
-        />
-      </div>
+          <KoordinatenAnzeige
+            lat={marker.lat}
+            lon={marker.lon}
+            einsatzId={einsatzId}
+            exclude={inspectorExclude(marker, einsatzId)}
+            maxOrtZeilen={3}
+          />
+        </div>
+      )}
       {/* `GeoKennzahlen` rendert ohne Kennzahlen nichts — also kein Wrapper mit Abstand. */}
       {kennzahlen && <GeoKennzahlen kennzahlen={kennzahlen} />}
       {symbolAuswahl && (
@@ -323,6 +331,7 @@ export default function Inspector({
         {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. Die
             Führungsstelle ebenso: sie wird in den Einsatzdaten gepflegt (LFH-1181). */}
         {darfSchreiben &&
+          !ohneOrt &&
           marker.typ !== 'einsatzort' &&
           marker.typ !== 'fuehrungsstelle' &&
           marker.typ !== 'lagemeldung' &&

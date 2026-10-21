@@ -2,17 +2,17 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
 ---
 
 ## Überblick
 
 Die Lagekarte zeigt, wo was ist: Einsatzort, Einheiten, Zonen, Gefahrengebiete, Stellen,
-Bereitstellungsräume, Lagemeldungen und taktische Zeichen. Rechts steht die Leiste mit zwei
-Ansichten: „Ebenen“ ordnet alles, was die Karte zeigen kann, in Gruppen; „Objekte“ führt die noch
-nicht verorteten und die verorteten Objekte und das Zeichnen. Darüber steht das gewählte Objekt.
-Auf der Karte wird gelesen, verortet,
-gezeichnet und gemessen. Lesen und Messen kann jede Person im Einsatz, Verorten und Zeichnen nur,
+Bereitstellungsräume, Lagemeldungen und taktische Zeichen. Rechts steht die Leiste mit den
+Ansichten „Ebenen“ und „Objekte“: „Ebenen“ ordnet alles, was die Karte zeigen kann, in Gruppen;
+„Objekte“ führt alle Objekte des Einsatzes in einer durchsuchbaren Liste, verortet oder nicht, und
+das Zeichnen. Solange ein Objekt gewählt ist, kommt die Ansicht „Auswahl“ dazu. Auf der Karte wird
+gelesen, verortet, gezeichnet und gemessen. Lesen und Messen kann jede Person im Einsatz, Verorten und Zeichnen nur,
 wer im Einsatz schreiben darf.
 
 ## Abläufe
@@ -28,10 +28,24 @@ wer im Einsatz schreiben darf.
 
    ![Lagekarte mit Zonen, Einheiten und Einsatzort, rechts die Leiste mit dem Ebenenbaum](../bilder/lagekarte/lagekarte.png)
 
-3. Für ein Objekt ohne Ort in der Leiste „Objekte“ wählen und dort unter „Nicht verortet“
-   „Platzieren“. Oben in der Leiste stehen dann das Objekt, ein Feld für die Koordinate und
-   „Abbrechen“; am Handy steht „Abbrechen“ im Band unten auf der Karte.
+3. In der Leiste „Objekte“ wählen und unter „Kartenobjekte suchen“ den Namen eintippen, etwa
+   „Turnhalle“; „Nicht verortet“ zeigt nur die Objekte ohne Ort. In der Zeile des Objekts
+   „Platzieren“ wählen. Die Zeile sagt dann „wird platziert“; oben in der Leiste stehen das Objekt,
+   ein Feld für die Koordinate und „Abbrechen“, am Handy steht „Abbrechen“ im Band unten auf der
+   Karte.
 4. Auf die Stelle der Karte tippen, an die das Objekt gehört. Die App meldet „Objekt verortet“.
+
+### Ein Objekt wählen
+
+1. Auf der Karte einen Marker antippen oder in der Leiste unter „Objekte“ eine Zeile wählen. Die
+   Leiste zeigt die Ansicht „Auswahl“ mit Angaben und Aktionen des Objekts; ein verortetes Objekt
+   fliegt die Karte an.
+
+   ![Objektliste mit Suchfeld, „Nicht verortet 26“, dem Einsatzort und der aufgeklappten Gruppe „Einheiten 4/5“](../bilder/lagekarte/objektliste.png)
+
+2. Mit „Ebenen“ oder „Objekte“ bleibt das Objekt gewählt, „Auswahl“ holt es zurück.
+3. „Zurück zu Objekte“ (oder „Zurück zu Ebenen“) wählen oder Esc drücken: Die Auswahl ist
+   aufgehoben, die Leiste steht wieder dort, wo sie vorher stand.
 
 ### Ein Objekt von seiner Seite aus verorten
 
@@ -39,7 +53,7 @@ wer im Einsatz schreiben darf.
    Bereitstellungsraums oder Tiers „Auf Karte verorten“, für eine Betreuungsstelle „Auf Karte
    verorten“ in ihrem Menü. Die Lagekarte öffnet sich zum Platzieren dieses Objekts.
 2. Auf die Stelle der Karte tippen, an die das Objekt gehört. Die Karte fliegt den neuen Marker
-   an und zeigt ihn unter „Ausgewählt“. Oben in der Leiste, am Handy im Band unten auf der Karte,
+   an und zeigt ihn unter „Auswahl“. Oben in der Leiste, am Handy im Band unten auf der Karte,
    steht die Kennung mit „verortet“, etwa „R-005 verortet“.
 3. „Zurück zu R-005“ wählen: Die Seite des Objekts öffnet sich wieder und zeigt die neue
    Koordinate. Wer weiter auf der Karte arbeitet, wählt „Auf der Karte bleiben“.
@@ -47,12 +61,12 @@ wer im Einsatz schreiben darf.
 ### Einen Abschnitt fokussieren
 
 1. Auf der Karte die Fläche oder das Zeichen eines Einsatzabschnitts antippen. Er erscheint unter
-   „Ausgewählt“.
+   „Auswahl“. Ein Abschnitt ohne Fläche wird in der Leiste unter „Objekte“ gewählt.
 2. „Abschnitt fokussieren“ wählen. Die Karte zeigt die Fläche des Abschnitts, Kräfte anderer
    Abschnitte erscheinen blass. Unten auf der Karte steht ein Band mit „Fokus“ und dem Namen des
    Abschnitts.
-3. „Fokus aufheben“ wählen oder Esc drücken. Steht noch ein Objekt unter „Ausgewählt“, schließt
-   das erste Esc dieses, das zweite hebt den Fokus auf. Die Karte kehrt zum Ausschnitt vor dem
+3. „Fokus aufheben“ wählen oder Esc drücken. Ist noch ein Objekt gewählt, hebt das erste Esc die
+   Auswahl auf, das zweite den Fokus. Die Karte kehrt zum Ausschnitt vor dem
    Fokus zurück.
 
 ### Eine Strecke, Fläche oder einen Radius messen
@@ -123,7 +137,7 @@ wer im Einsatz schreiben darf.
 
 ## Hintergrund
 
-### Die Leiste: Ebenen und Objekte
+### Die Leiste: Ebenen, Objekte und Auswahl
 
 Die Ansicht „Ebenen“ ordnet die Ebenen in feste Gruppen: „Kräfte“ (Einheiten, Fahrzeuge, Personal,
 Abschnitte, Bereitstellungsräume), „Lage“ (Einsatzort, Führungsstelle, Zonen, Schäden,
@@ -140,6 +154,21 @@ Eine Fachebene nennt unter ihrem Namen, was sie zeigt, und eingeschaltet, von wa
 Ganz oben in „Ebenen“ steht die Kartenansicht mit „In dieser Ansicht speichern“. Welche Ansicht
 der Leiste vorn steht und welche Gruppen offen sind, merkt sich das Gerät. Zu Beginn sind
 „Kräfte“ und „Lage“ offen.
+
+Die Ansicht „Objekte“ führt den Einsatzort als erste Zeile, darunter die Objekte in Gruppen je
+Art: Einheiten, Fahrzeuge, Führungskräfte, Abschnitte, Bereitstellungsräume, Unfallhilfsstellen,
+Betreuungsstellen, Tiere, Schäden, dazu Führungsstelle, Lagemeldungen, taktische Zeichen und
+Betroffene, soweit sie verortet sind. Der Kopf einer Gruppe nennt, wie viele ihrer Objekte
+verortet sind und wie viele es gibt, etwa „Einheiten 3/5“; ohne Suchbegriff sind die Gruppen zu,
+mit Suchbegriff stehen die Gruppen mit Treffern offen. „Nicht verortet“ zeigt nur die Objekte ohne
+Ort und nennt ihre Zahl. Eine Zeile trägt, was mit dem Objekt auf der Karte geht: „Platzieren“
+für ein Objekt ohne Ort, „Fläche zeichnen“ für einen Abschnitt ohne Fläche. Objekte eines Moduls,
+das eine Rolle nicht sehen darf, fehlen in der Liste. Konnte die App eine Liste nicht laden, steht
+das über der Liste und „—“ statt der Zahl.
+
+Die Ansicht „Auswahl“ gibt es nur, solange ein Objekt gewählt ist; eine neue Auswahl holt sie nach
+vorn. Esc schließt zuerst ein aufgefächertes Bündel von Markern, dann die Auswahl, dann den Fokus
+auf einen Abschnitt. Während gezeichnet oder gemessen wird, gilt Esc dem Werkzeug.
 
 ### Der Lageplan
 
@@ -221,8 +250,8 @@ bis die Lagekarte verlassen wird. Betroffene zeigt die Karte auch so nur mit Zug
 „Personen“.
 
 „Zurück zu …“ steht nur, wenn die Karte von der Seite des Objekts geöffnet wurde. Eine
-Unfallhilfsstelle wird über „Nicht verortet“ verortet und hat deshalb keinen Rückweg. Ein Objekt,
-das über „Nicht verortet“ platziert wird, meldet sich wie bisher mit „Objekt verortet“.
+Unfallhilfsstelle wird in der Leiste unter „Objekte“ verortet und hat deshalb keinen Rückweg. Ein
+Objekt, das aus der Leiste platziert wird, meldet sich wie bisher mit „Objekt verortet“.
 
 ### Fokus auf einen Abschnitt
 
@@ -267,7 +296,7 @@ Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht f
 Die Ebene „Bereitstellungsräume“ zeigt jeden verorteten Raum mit dem Zeichen „Bereitstellungsraum“
 nach DV 102, beschriftet mit Bezeichnung, Stärke und Zahl der Fahrzeuge. Ein geplanter Raum trägt
 einen gestrichelten Ring und „geplant“, ein aufgelöster fehlt. Verortet wird ein Raum aus seiner
-Seite heraus oder unter „Nicht verortet“ (Kapitel [Bereitstellungsräume](bereitstellungsraeume.md)).
+Seite heraus oder in der Leiste unter „Objekte“ (Kapitel [Bereitstellungsräume](bereitstellungsraeume.md)).
 Wer das Modul Bereitstellungsräume nicht sehen darf, sieht die Ebene gesperrt mit „Keine
 Berechtigung“ und findet keinen Raum in der Suche.
 
@@ -277,7 +306,7 @@ Die Ebene „Tiere“ zeigt offene und vermisste Tiere mit Koordinate als Kreis 
 mit Registriernummer und Spezies, etwa „T-003 (Hund)“; ein vermisstes Tier trägt zusätzlich
 „vermisst“. Ein abgeschlossenes Tier fehlt. Ausgewählt zeigt die Karte Status, Spezies, Rufname
 und Fundort und springt mit „Im Fachmodul öffnen“ zur Seite des Tiers. Verortet wird ein Tier aus
-seiner Seite heraus oder unter „Nicht verortet“ (Kapitel [Tiere](tiere.md)). Wer das Modul Tiere
+seiner Seite heraus oder in der Leiste unter „Objekte“ (Kapitel [Tiere](tiere.md)). Wer das Modul Tiere
 nicht sehen darf, sieht die Ebene gesperrt mit „Keine Berechtigung“ und findet kein Tier in der
 Suche.
 

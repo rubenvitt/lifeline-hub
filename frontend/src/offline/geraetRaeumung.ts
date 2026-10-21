@@ -178,11 +178,11 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     grund: 'Geräte-Einstellung der Lagekarte (Zeitachse), ohne Personenbezug.',
   },
   {
-    ort: 'localStorage lfh:lagekarte:leiste-offen:*; lfh:lagekarte:leiste-ansicht; lfh:lagekarte:ebenen-gruppen',
+    ort: 'localStorage lfh:lagekarte:leiste-offen:*; lfh:lagekarte:leiste-ansicht; lfh:lagekarte:ebenen-gruppen; lfh:lagekarte:objekte-gruppen',
     datei: 'pages/lagekarte/leistenWahl.ts',
     entscheidung: 'bleibt',
     grund:
-      'Geräte-Einstellung der Lagekarte (Leiste offen, zuletzt gewählte Ansicht, Gruppen des Ebenenbaums offen/zu), ohne Personenbezug.',
+      'Geräte-Einstellung der Lagekarte (Leiste offen, zuletzt gewählte Ansicht, Gruppen des Ebenenbaums und der Objektliste offen/zu), ohne Personenbezug.',
   },
   {
     ort: 'localStorage lfh:lagekarte:zeichen-zuletzt-v2; lfh:lagekarte:zeichen-zuletzt (Altschlüssel)',

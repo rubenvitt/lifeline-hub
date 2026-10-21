@@ -227,8 +227,10 @@ describe('Tag aus Vorlage anlegen (LLH-1058) — Browser UTC, Anzeigezone Berlin
     renderSeite();
     await fenster('Frühstück');
     await user.click(anlegenKnopf());
-    expect(await screen.findAllByText('Bitte eine Anzahl angeben — 0, wenn niemand')).toHaveLength(
-      3,
+    // Die Pflichtmeldungen der drei Felder erscheinen nacheinander; `findAllByText` löste schon
+    // bei der ersten auf.
+    await waitFor(() =>
+      expect(screen.getAllByText('Bitte eine Anzahl angeben — 0, wenn niemand')).toHaveLength(3),
     );
     // Abgewählt ist die Nacht kein Pflichtfeld mehr.
     const nacht = await fenster('Nachtverpflegung');

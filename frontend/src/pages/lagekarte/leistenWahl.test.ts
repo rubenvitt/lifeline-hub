@@ -5,9 +5,14 @@ import {
   BAUM_KLAPP_SCHLUESSEL,
   LEISTE_SPEICHER_SCHLUESSEL,
   LEISTEN_ANSICHT_SCHLUESSEL,
+  OBJEKT_KLAPP_SCHLUESSEL,
+  gezeigteAnsicht,
   leisteSichtbar,
   leistenAnsichtLesen,
+  objektKlappLesen,
+  useAuswahlVorn,
   useBaumKlapp,
+  useObjektKlapp,
   useLeistenAnsicht,
   useLeistenWahl,
 } from './leistenWahl';
@@ -271,5 +276,74 @@ describe('Klappzustand des Ebenenbaums', () => {
     expect(JSON.parse(localStorage.getItem(BAUM_KLAPP_SCHLUESSEL)!)).toMatchObject({
       fachebenen: true,
     });
+  });
+});
+
+describe('Klappzustand der Objektliste (LLH-1033)', () => {
+  it('Vorgabe: alle Gruppen zu; Kaputtes und Fremdes fällt auf die Vorgabe', () => {
+    expect(objektKlappLesen(null)).toEqual({});
+    expect(objektKlappLesen('kaputt')).toEqual({});
+    expect(
+      objektKlappLesen(JSON.stringify({ einheit: true, unbekannt: true, fahrzeug: 'ja' })),
+    ).toEqual({ einheit: true });
+  });
+
+  it('merkt jedes Umschalten je Gerät', () => {
+    const { result, unmount } = renderHook(() => useObjektKlapp());
+    expect(result.current.offen.einheit).toBeUndefined();
+    act(() => result.current.setze('einheit', true));
+    expect(result.current.offen.einheit).toBe(true);
+    expect(JSON.parse(localStorage.getItem(OBJEKT_KLAPP_SCHLUESSEL)!)).toEqual({ einheit: true });
+    unmount();
+    expect(renderHook(() => useObjektKlapp()).result.current.offen.einheit).toBe(true);
+  });
+});
+
+describe('Auswahl vorn (LLH-1033)', () => {
+  it('eine neue Auswahl holt „Auswahl“ nach vorn und zählt hoch', () => {
+    const { result, rerender } = renderHook(({ k }) => useAuswahlVorn(k), {
+      initialProps: { k: null as unknown },
+    });
+    expect(result.current.vorn).toBe(false);
+    rerender({ k: 'einheit-1' });
+    expect(result.current.vorn).toBe(true);
+    const nr = result.current.nr;
+    rerender({ k: 'einheit-2' });
+    expect(result.current.nr).toBe(nr + 1);
+  });
+
+  it('„Ebenen“ oder „Objekte“ nimmt sie nach hinten, dieselbe Auswahl holt sie nicht zurück', () => {
+    const { result, rerender } = renderHook(({ k }) => useAuswahlVorn(k), {
+      initialProps: { k: 'einheit-1' as unknown },
+    });
+    expect(result.current.vorn).toBe(true);
+    act(() => result.current.verlasse());
+    rerender({ k: 'einheit-1' });
+    expect(result.current.vorn).toBe(false);
+  });
+
+  it('`zeige` holt sie zurück — der Tipp auf dasselbe Objekt oder auf das Segment', () => {
+    const { result } = renderHook(() => useAuswahlVorn('einheit-1'));
+    act(() => result.current.verlasse());
+    const nr = result.current.nr;
+    act(() => result.current.zeige());
+    expect(result.current.vorn).toBe(true);
+    expect(result.current.nr).toBe(nr + 1);
+  });
+
+  it('endet die Auswahl, kommt die nächste wieder nach vorn', () => {
+    const { result, rerender } = renderHook(({ k }) => useAuswahlVorn(k), {
+      initialProps: { k: 'zone:3' as unknown },
+    });
+    act(() => result.current.verlasse());
+    rerender({ k: null });
+    rerender({ k: 'zone:3' });
+    expect(result.current.vorn).toBe(true);
+  });
+
+  it('gezeigt wird „Auswahl“ nur mit offener Auswahl, die vorn steht', () => {
+    expect(gezeigteAnsicht('objekte', true, true)).toBe('auswahl');
+    expect(gezeigteAnsicht('objekte', true, false)).toBe('objekte');
+    expect(gezeigteAnsicht('ebenen', false, true)).toBe('ebenen');
   });
 });

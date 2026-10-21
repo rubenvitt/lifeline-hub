@@ -70,7 +70,7 @@ Für Einsatzleitung und Führungspersonal, solange der Raum geplant oder aktiv i
    verortet“; „Zurück zu …“ führt auf die Seite des Raums zurück.
 3. Der Raum steht danach mit dem Zeichen „Bereitstellungsraum“ auf der Karte, beschriftet mit
    Bezeichnung, Stärke und Zahl der Fahrzeuge, etwa „Parkplatz Stadion Nord · 0/1/5//6 · 3 Fz“.
-4. Ein Tipp auf das Zeichen zeigt unter „Ausgewählt“ Status, Stärke, Fahrzeuge, Einheiten, „Wartet
+4. Ein Tipp auf das Zeichen zeigt unter „Auswahl“ Status, Stärke, Fahrzeuge, Einheiten, „Wartet
    seit“ und Abschnitt. „Im Fachmodul öffnen“ führt zurück zum Raum.
 
 ### Eintreffen buchen
@@ -332,7 +332,7 @@ anderen nicht.
 
 Fahrzeuge und Einheiten zählt die Karte wie der Raum selbst. Die Stärke rechnet sie aus der
 Einheitenliste; fehlt das Recht auf das Modul Einheiten, steht sie nicht in der Beschriftung, und
-unter „Ausgewählt“ steht „—“. Eine Änderung an Ort, Status oder Belegung erreicht jede offene
+unter „Auswahl“ steht „—“. Eine Änderung an Ort, Status oder Belegung erreicht jede offene
 Karte ohne Neuladen. Ein gesicherter Lagestand zeigt die Räume so, wie sie beim Sichern waren.
 Verorten kann nur, wer den Raum ändern darf; am gekoppelten Tablet eines Raums fehlt der Knopf.
 Ist die Lagekarte gesperrt, steht „Auf Karte verorten (Keine Berechtigung)“ gesperrt da.

@@ -87,10 +87,17 @@ describe('paneeleLesen', () => {
   });
 
   it('übernimmt nur gültige Einträge bekannter Paneele', () => {
-    const z = paneeleLesen(JSON.stringify({ verortet: false, zeichnen: 'ja', fremd: true }));
-    expect(z.verortet).toBe(false);
+    expect(paneeleLesen(JSON.stringify({ zeichnen: false })).zeichnen).toBe(false);
+    const z = paneeleLesen(JSON.stringify({ zeichnen: 'ja', fremd: true }));
     expect(z.zeichnen).toBe(PANEEL_VORGABE.zeichnen);
     expect('fremd' in z).toBe(false);
+  });
+
+  it('übergeht Einträge der Paneele, die in der Objektliste aufgegangen sind (LLH-1033)', () => {
+    const z = paneeleLesen(
+      JSON.stringify({ nichtVerortet: false, einsatzort: false, verortet: false }),
+    );
+    expect(z).toEqual(PANEEL_VORGABE);
   });
 
   it('übergeht Einträge der Paneele, die in den Ebenenbaum gezogen sind (LLH-1028)', () => {

@@ -5,9 +5,9 @@ import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 
 /**
  * Abschnitt der rechten Kartenleiste, zwei Formen desselben Kopfes:
- * - fest (`LeistenAbschnitt`): Ausgewählt und der Kopf des Ebenenbaums, nicht wegklappbar.
- * - einklappbar (`KlappPaneel`): die Paneele der Ansicht „Objekte“ (Nicht verortet, Einsatzort,
- *   Verortet, Zeichnen) und die Gruppen des Ebenenbaums (`Ebenenbaum.tsx`).
+ * - fest (`LeistenAbschnitt`): der Kopf des Ebenenbaums (Kartenansicht), nicht wegklappbar.
+ * - einklappbar (`KlappPaneel`): die Gruppen des Ebenenbaums (`Ebenenbaum.tsx`) und der
+ *   Objektliste (`MarkerSuche.tsx`) sowie das Paneel „Zeichnen“ der Ansicht „Objekte“.
  *
  * Kein `Paneel` aus `components/instrument`: dessen Rahmen umläuft alle vier Seiten, gestapelt
  * stünden die Linien doppelt. Kopf und Augenbraue sind dieselben (`paneelKopfStil`,
@@ -166,18 +166,14 @@ export function KlappPaneel({
 }
 
 /** Kennungen der einklappbaren Paneele — die Vorgabe ihres Zustands steht daneben. */
-type PaneelKennung = 'nichtVerortet' | 'einsatzort' | 'verortet' | 'zeichnen';
+type PaneelKennung = 'zeichnen';
 
 /**
- * Vorgabe: offen — alles hier wird im Einsatz laufend gebraucht (Verorten, Zeichnen). Die
- * Einmal-Einstellungen (Fachebenen, Bild-Hintergründe, Kartengrundlage) stehen im Ebenenbaum und
- * merken ihren Klappzustand dort (`useBaumKlapp`); ältere Einträge dieses Schlüssels übergeht
- * `paneeleLesen`.
+ * Vorgabe: offen — Zeichnen wird im Einsatz laufend gebraucht. Ebenenbaum und Objektliste merken
+ * ihren Klappzustand selbst (`useBaumKlapp`, `useObjektKlapp`); ältere Einträge dieses Schlüssels
+ * (die Paneele „Nicht verortet“, „Einsatzort“, „Verortet“ bis LLH-1033) übergeht `paneeleLesen`.
  */
 export const PANEEL_VORGABE: Record<PaneelKennung, boolean> = {
-  nichtVerortet: true,
-  einsatzort: true,
-  verortet: true,
   zeichnen: true,
 };
 

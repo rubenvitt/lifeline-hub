@@ -6,8 +6,8 @@ import { ANSICHT_SCHLUESSEL, BAUM_SCHLUESSEL } from './leisten-kern';
  * Ebenenbaum der Kartenleiste (LLH-1028), gemessen im echten Layout:
  *
  * 1. Bei 1440 × 900 ist die Leiste ohne Rollen bedienbar, wenn alle Gruppen bis auf eine zu sind —
- *    je Gruppe einzeln geprüft, samt Kopf (Kartenansicht, „Ebene suchen“) und „Ausgewählt“. Das
- *    Gegenstück „alle offen rollt“ belegt, dass die Messung eine Rollfläche überhaupt erkennt.
+ *    je Gruppe einzeln geprüft, samt Kopf (Kartenansicht, „Ebene suchen“). Das Gegenstück „alle
+ *    offen rollt“ belegt, dass die Messung eine Rollfläche überhaupt erkennt.
  * 2. Im Handschuh (1280 px, Leiste 300 px) stehen die Segmente „Ebenen · Objekte“ in einer Zeile
  *    und sind ≥ 72 px; Baumzeilen, Gruppenköpfe und Gruppenschalter halten die Stufe.
  *
