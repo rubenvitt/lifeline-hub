@@ -407,17 +407,6 @@ pub const NACHFORDERUNG_SPALTEN: &[(&str, &str)] = &[
 pub const NACHFORDERUNG_SQL: &str =
     "SELECT anzahl, adressat_kategorie FROM nachforderung WHERE id = ? AND einsatz_id = ?";
 
-/// Anzeigelabel der Adressat-Kategorie, wie die Karte der Nachforderung es zeigt
-/// (`ADRESSAT_LABEL` in `frontend/src/nachforderungen/NachforderungKarte.tsx`).
-const fn adressat_label(k: AdressatKategorie) -> &'static str {
-    match k {
-        AdressatKategorie::Leitstelle => "Leitstelle",
-        AdressatKategorie::NachbarEa => "Nachbar-EA",
-        AdressatKategorie::Uebergeordnet => "Übergeordnete Führung",
-        AdressatKategorie::AndereBos => "Andere BOS",
-    }
-}
-
 /// Text zu einem Nachforderungs-Status: Titel „Nachforderung eingetroffen“ mit dem Status aus
 /// dem Bezug, Detail „2× an Leitstelle“. Eine gelöschte Nachforderung lässt das Detail weg.
 async fn nachforderung_text(
@@ -433,7 +422,7 @@ async fn nachforderung_text(
         .await?;
     let detail = zeile.map(|(anzahl, kategorie)| {
         let an = match AdressatKategorie::parse(&kategorie) {
-            Some(k) => adressat_label(k).to_string(),
+            Some(k) => k.label().to_string(),
             None => kategorie,
         };
         match anzahl {

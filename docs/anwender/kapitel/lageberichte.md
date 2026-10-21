@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 260
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/stab/medienlageQuelle.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -82,7 +82,9 @@ sie.
 
 2. „Fortschreiben“ wählen. Es öffnet sich eine neue Fassung als Entwurf mit dem Text und den
    Anlagen und dem Verteiler der freigegebenen; sie wird wie jeder Entwurf geschrieben und
-   freigegeben.
+   freigegeben. Übernommene Abschnitte, die noch aus der Vorfassung stammen, zeigen ihren
+   „Stand der Übernahme“ mit ⧖ und „aus der Vorfassung“; eine neue Übernahme im Abschnitt bringt
+   die aktuellen Zahlen.
 
 ## Hintergrund
 
@@ -98,6 +100,11 @@ sie.
 
 - Jeder übernommene Text nennt seinen Stand als Datum-Zeit-Gruppe. Eine Fortschreibung übernimmt
   den Text mit diesem Stand; neue Zahlen bringt erst eine neue Übernahme in den Abschnitt.
+- Im Entwurf zeigt jeder Abschnitt mit Übernahme über dem Text „Stand der Übernahme“ mit der
+  Datum-Zeit-Gruppe, wann sein Text zuletzt übernommen wurde. Die Fortschreibung trägt diesen
+  Stand mit; liegt er vor dem Fortschreiben, steht er hervorgehoben mit „aus der Vorfassung“.
+  Wer den Text eines Abschnitts ganz löscht, löscht auch den Stand; ein von Hand ergänzter Text
+  behält ihn. Abschnitte ohne Übernahme zeigen keinen Stand, auf Papier steht er nicht.
 - Beim Anlegen und mit „Leere Abschnitte aus dem Lagebild füllen“ steht derselbe Text wie mit dem
   Knopf im Abschnitt. Die App lädt die Daten erst mit diesem Klick.
 - Ist eine Quelle für die Person ganz gesperrt, steht im Abschnitt „—“ mit Grund, etwa

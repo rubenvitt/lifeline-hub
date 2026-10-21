@@ -7,7 +7,9 @@ Gilt für `frontend/src/etb/`, `pages/EtbPage.tsx`, `pages/EtbDruckPage.tsx`,
 Ableitungen in `etb/zeitachseModell.ts`)
 
 - Keine Sortierung/Spaltenfilter/-auswahl; Ordnung = Zeit (Server). Ebenso Lagemeldungen
-  (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`).
+  (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`);
+  ihre Zeit ist die Ereigniszeit der Quellmeldung (`ereigniszeit`), nicht die Übergabe, die nur
+  im Meta steht (LLH-1039).
 - **Funkprotokoll-Ordnung** (LLH-1149, Entscheidung Ruben 10.10./17.10.2026, Specs
   `etb-zeitachse-darstellung`, `etb-zeitachse-fenster`, Herleitung
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste
@@ -149,3 +151,31 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   Absenden ein. `@`, `/von`, `/an` überschreiben ihn für den einen Eintrag. Ohne Standard fragt
   die Erfassung inline (`etb/RufnameAbfrage.tsx`, kein Modal), erst wenn das Fach gelesen ist;
   in der Berichtigung wird nicht gefragt.
+
+**Meldungsmodell (LLH-1027, Entscheidung 21.10.2026) — Zielbild, gilt ab dem jeweiligen
+Folgeticket; bis dahin gilt das Bestehende**
+
+Das Ticket, das einen Punkt baut, schreibt die Regeln oben und die Specs fort und streicht den
+Punkt hier. Begriffe, Datenfluss und Zustände: `docs/design/2026-10-21-meldungsmodell/README.md`;
+Entscheidung und Herleitung: `/mnt/project-files/llh-1021/llh-1027/design.md`.
+
+- **Eine Quelle (LLH-1031):** Jede Lagemeldung ist eine Meldung. Die Lagemeldungen
+  (`pages/LagemeldungenPage.tsx`) lesen die lagerelevanten Meldungen, kein eigenes Lageobjekt;
+  Kennung einer Zeile ist die Meldung (`lagemeldung:<meldung-id>`, Sprung „Meldung #n ↗“).
+  „Lagemeldung erfassen“ steht im Seitenkopf und im Leerzustand und öffnet dasselbe
+  `meldungen/MeldungFormular.tsx` mit Art „Lagemeldung“ (kein zweites Formular); ohne
+  Schreibrecht im Modul Meldungen fehlt es, der Kopf zeigt „Nur Ansicht“ mit Grund. Die Zeile
+  trägt genau eine Marke „Neu“ (Kenntnisnahme, LLH-1206); der Bearbeitungsstand der Meldung steht
+  am Sprung („Meldung #12 · In Bearbeitung ↗“) und fehlt, solange sie „neu“ ist. Zeitachse,
+  Ordnung nach Ereigniszeit (LLH-1039), neueste zuerst und Tagesgrenze bleiben wie oben.
+- **ETB-Typ „Meldung“ und „Lage“ gehen in den Meldungseingang (LLH-1037):** Die Erfassung zeigt
+  bei diesen Typen in der Hinweiszeile den Schalter „Nur protokollieren“ (Vorgabe aus). Aus legt
+  der Server in einer Transaktion Eintrag und Meldung an (Typ „Lage“ → Art „Lagemeldung“, Typ
+  „Meldung“ → Art „Sonstige“; Von/An werden Absender/Empfänger). Der Schalter springt nach jedem
+  Erfassen auf aus zurück, auch mit „Werte behalten“, und lebt im Entwurf. Ohne Schreibrecht oder
+  Freigabe im Modul Meldungen steht er an und gesperrt mit Grund. Er bricht weder die Feldbreite
+  (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Der Client sendet `in_meldungseingang`
+  immer ausdrücklich, auch über die Warteschlange (`offline/useEtbErfassung.ts`).
+- **Ein Eintrag je Meldung:** Das automatische ETB einer Lagemeldung trägt Typ „Lage“, jede
+  andere Art Typ „Meldung“; eine aus dem ETB angelegte Meldung bekommt keinen zweiten Eintrag.
+  Die Mehrzahl von „Lage“ bleibt „Lagefeststellungen“; „Lagemeldungen“ ist nur das Modul.

@@ -68,6 +68,20 @@ wire_enum! {
     }
 }
 
+impl AdressatKategorie {
+    /// Anzeigelabel wie an der Karte der Nachforderung (`ADRESSAT_LABEL` in
+    /// `frontend/src/nachforderungen/NachforderungKarte.tsx`); eine Quelle für den Hinweis
+    /// (`benachrichtigung::text`) und das An des ETB-Eintrags (`nachforderung::repo`).
+    pub const fn label(self) -> &'static str {
+        match self {
+            AdressatKategorie::Leitstelle => "Leitstelle",
+            AdressatKategorie::NachbarEa => "Nachbar-EA",
+            AdressatKategorie::Uebergeordnet => "Übergeordnete Führung",
+            AdressatKategorie::AndereBos => "Andere BOS",
+        }
+    }
+}
+
 // Nullable Spalte in `AuftragEmpfaengerAnzeige.extern_kategorie`, non-null in
 // `NachforderungAnzeige.adressat_kategorie` — einheitlicher Decode-Mechanismus über
 // beide Verwendungen (Type/Decode direkt auf dem Enum, statt gemischt mit

@@ -9,7 +9,7 @@ import { setzeViewportBreite } from '../test/viewport';
 import EinsatzabschnittePage from './EinsatzabschnittePage';
 import { einsatzKeys } from '../api/queryKeys';
 import { formatiereDatenstand } from '../components/Datenstand';
-import { einsatzFixture } from '../test/fixtures';
+import { einsatzFixture, freigabenFixture } from '../test/fixtures';
 
 const tmoSprechgruppe = {
   id: 7,
@@ -730,6 +730,56 @@ describe('EinsatzabschnittePage', () => {
     const sprung = await screen.findByRole('link', { name: /Zu den Einheiten/ });
     expect(sprung).toHaveAttribute('href', '/einsaetze/1/einheiten');
     expect(screen.queryByText(/Abschnitts-Zuordnung einer Einheit/)).not.toBeInTheDocument();
+  });
+
+  describe('Sprung auf die Lagekarte (LLH-1349)', () => {
+    it('„Auf Karte zeigen ↗“ im Kopf des Abschnitts öffnet die Karte im Fokus auf ihn', async () => {
+      server.use(
+        ...handlers('einsatzleitung', 'aktiv', [
+          { ...funkAbschnitt, id: 5, name: 'Nord' },
+          { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1 },
+        ]),
+      );
+      renderPage();
+      const nord = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+      const sprung = await within(nord).findByRole('link', { name: 'Auf Karte zeigen' });
+      expect(sprung).toHaveAttribute('href', '/einsaetze/1/lagekarte?abschnitt=5');
+      expect(sprung).toHaveTextContent('Auf Karte zeigen ↗');
+      // Das Ziel folgt dem gewählten Abschnitt.
+      await userEvent.click(await findInTree('Süd'));
+      const sued = await screen.findByRole('region', { name: 'Abschnitt: Süd' });
+      expect(within(sued).getByRole('link', { name: 'Auf Karte zeigen' })).toHaveAttribute(
+        'href',
+        '/einsaetze/1/lagekarte?abschnitt=6',
+      );
+    });
+
+    it('steht auch ohne Schreibrecht: der Fokus ändert nichts', async () => {
+      server.use(...handlers('beobachter', 'aktiv', [funkAbschnitt]));
+      renderPage();
+      const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+      expect(await within(detail).findByRole('link', { name: 'Auf Karte zeigen' })).toHaveAttribute(
+        'href',
+        '/einsaetze/1/lagekarte?abschnitt=5',
+      );
+      expect(screen.queryByRole('button', { name: /Weitere Aktionen/ })).not.toBeInTheDocument();
+    });
+
+    it('ohne Freigabe der Lagekarte gesperrt mit Grund, kein Link', async () => {
+      server.use(
+        ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
+        http.get('/api/einsaetze/1/modul-freigaben', () =>
+          HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
+        ),
+      );
+      renderPage();
+      const detail = await screen.findByRole('region', { name: 'Abschnitt: Nord' });
+      const gesperrt = await within(detail).findByRole('button', {
+        name: 'Auf Karte zeigen (Keine Berechtigung)',
+      });
+      expect(gesperrt).toBeDisabled();
+      expect(within(detail).queryByRole('link', { name: /Auf Karte zeigen/ })).toBeNull();
+    });
   });
 
   it('die Kurzbezeichnung ist je Einsatz eindeutig, ohne Groß-/Kleinschreibung', async () => {

@@ -6908,6 +6908,30 @@
               }
             ]
           },
+          "meldung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückverweis auf die Meldung, zu der dieser Eintrag gehört (Auto-ETB der Meldung,\nÜbergabe an die Lage; LLH-1104 D1). Fehlt ohne Kopplung."
+          },
+          "meldung_lfd_nr": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Laufende Nummer dieser Meldung für den Namen des Verweises („Meldung #12“); abgeleitet\nper Unterabfrage, nie gespeichert. Fehlt mit `meldung_id`."
+          },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Rückverweis auf die Nachforderung, deren Anlage oder Stufe dieser Eintrag protokolliert\n(LLH-1104 D1/D6). Fehlt ohne Kopplung."
+          },
           "received_at": {
             "type": "string"
           },
@@ -8984,6 +9008,7 @@
           "text",
           "erstellt_von_id",
           "erstellt_at",
+          "ereigniszeit",
           "meldung_lfd_nr",
           "meldung_absender",
           "is_neu"
@@ -8993,8 +9018,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "ereigniszeit": {
+            "type": "string",
+            "description": "Ereigniszeit der Quellmeldung (UTC, `meldung.ereigniszeit`, LLH-1039): Zeit, Tag,\nZeitfenster und Ordnung der Zeitachse. Gleicher Name wie an der Meldung."
+          },
           "erstellt_at": {
-            "type": "string"
+            "type": "string",
+            "description": "Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es\ngeschah."
           },
           "erstellt_von_id": {
             "type": "integer",
@@ -9291,6 +9321,13 @@
           },
           "text": {
             "type": "string"
+          },
+          "uebernommen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Stand der Übernahme (LLH-1357, Spec `lagevortrag-uebernahme`): wann der Text zuletzt aus\neiner Quelle übernommen wurde, UTC ohne Zonenkennung. Setzt der Client mit der Übernahme;\ndas Fortschreiben trägt ihn mit dem Text in die neue Fassung. Fehlt bei Text von Hand,\nan einem leeren Abschnitt und in Abschnitten von vor LLH-1357 (das Feld steht im JSON von\n`lagebericht.abschnitte`, keine Spalte)."
           }
         }
       },

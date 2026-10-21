@@ -998,6 +998,29 @@ describe('KatalogTabelle — Freiraum unter der stehenden Kopfzeile', () => {
       /\.ant-table-wrapper\.lfh-katalog \.ant-table-tbody \*\s*\{[^}]*scroll-margin-top:\s*var\(--lfh-tabellenkopf-hoehe/,
     );
   });
+
+  it('erste Zeile rückwärts getabbt: rollt um die Überdeckung durch die Kopfzeile zurück (LLH-1358)', () => {
+    // `scroll-margin-top` greift in der ersten Zeile nicht (Chromium beschneidet ihn am
+    // Scrollcontainer, `components/fokusUnterKopf.ts`); die Wirkung misst `e2e/fokus-verdeckung`.
+    const rollen = vi.spyOn(window, 'scrollBy').mockImplementation(() => {});
+    const { container } = renderMitProviders(
+      <KatalogTabelle<Zeile>
+        rowKey="id"
+        columns={[
+          ...SPALTEN.slice(0, 2),
+          { title: 'Aktionen', key: 'aktionen', render: () => <button>Bearbeiten</button> },
+        ]}
+        dataSource={ZEILEN}
+      />,
+    );
+    const kopf = container.querySelector<HTMLElement>('.ant-table-sticky-holder')!;
+    const knopf = screen.getByRole('button', { name: 'Bearbeiten' });
+    vi.spyOn(kopf, 'getBoundingClientRect').mockReturnValue({ top: 53, bottom: 88 } as DOMRect);
+    vi.spyOn(knopf, 'getBoundingClientRect').mockReturnValue({ top: 66, bottom: 96 } as DOMRect);
+    knopf.focus();
+    expect(rollen).toHaveBeenCalledWith({ top: -22, behavior: 'instant' });
+    rollen.mockRestore();
+  });
 });
 
 /**

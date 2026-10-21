@@ -379,7 +379,11 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                 let schluessel: Vec<&str> = v.abschnitte.iter().map(|a| a.schluessel).collect();
                 let abschnitte: Vec<crate::lagebericht::Abschnitt> = befuellt(&schluessel, &d)
                     .into_iter()
-                    .map(|(schluessel, text)| crate::lagebericht::Abschnitt { schluessel, text })
+                    .map(|(schluessel, text)| crate::lagebericht::Abschnitt {
+                        schluessel,
+                        text,
+                        uebernommen_at: None,
+                    })
                     .collect();
                 eintrag(
                     "lage",

@@ -37,7 +37,9 @@ const lage = (over: Partial<LageMeldung> = {}): LageMeldung => ({
   lat: null,
   lon: null,
   erstellt_von_id: 1,
+  // Übergeben eine halbe Stunde nach dem Ereignis: Zeitachse und Meta lesen verschiedene Felder.
   erstellt_at: '2026-06-12 09:00:00',
+  ereigniszeit: '2026-06-12 08:30:00',
   meldung_lfd_nr: 5,
   meldung_absender: 'Florian Nord 1',
   is_neu: false,
@@ -91,16 +93,44 @@ describe('LagemeldungenPage', () => {
     const link = await screen.findByRole('link', { name: 'Meldung #5' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=3');
     // In der Tagesgruppe genügt `HH:mm` in Ortszeit — der Tag steht im Kopf darüber.
-    const ort = alsOrtszeit('2026-06-12 09:00:00')!;
+    const ort = alsOrtszeit('2026-06-12 08:30:00')!;
     expect(screen.getByText(ort.format('HH:mm'))).toBeInTheDocument();
     expect(screen.getByRole('group', { name: ort.format('DD.MM.YYYY') })).toBeInTheDocument();
-    expect(screen.queryByText('2026-06-12 09:00:00')).toBeNull();
+    expect(screen.queryByText('2026-06-12 08:30:00')).toBeNull();
+  });
+
+  /** LLH-1039: Zeit der Zeile ist die Ereigniszeit, die Übergabe steht im Meta. */
+  it('zeigt die Ereigniszeit als Zeit der Zeile und die Übergabe im Meta', async () => {
+    listeLageMeldungen.mockResolvedValue([
+      lage({
+        id: 2,
+        text: 'Nachgereicht',
+        ereigniszeit: '2026-06-12 11:14:00',
+        erstellt_at: '2026-06-12 13:05:00',
+      }),
+      lage({
+        id: 1,
+        text: 'Pegel steigt',
+        ereigniszeit: '2026-06-12 12:41:00',
+        erstellt_at: '2026-06-12 12:50:00',
+      }),
+    ]);
+    renderPage();
+    const sicht = await screen.findByRole('region', { name: 'Lagemeldungen' });
+    await within(sicht).findByText('Nachgereicht');
+    const hhmm = (s: string) => alsOrtszeit(s)!.format('HH:mm');
+    const zeile = within(sicht).getByText('Nachgereicht').closest('li') as HTMLElement;
+    expect(within(zeile).getByText(hhmm('2026-06-12 11:14:00'))).toBeInTheDocument();
+    expect(zeile).toHaveTextContent(`übergeben ${hhmm('2026-06-12 13:05:00')}`);
+    // Später geschehen steht oben, auch wenn früher übergeben.
+    const text = sicht.textContent ?? '';
+    expect(text.indexOf('Pegel steigt')).toBeLessThan(text.indexOf('Nachgereicht'));
   });
 
   it('gruppiert nach Tag, jüngste zuerst', async () => {
     listeLageMeldungen.mockResolvedValue([
-      lage({ id: 1, erstellt_at: '2026-06-12 09:00:00', text: 'Alt' }),
-      lage({ id: 2, erstellt_at: '2026-06-13 07:00:00', text: 'Neu' }),
+      lage({ id: 1, ereigniszeit: '2026-06-12 09:00:00', text: 'Alt' }),
+      lage({ id: 2, ereigniszeit: '2026-06-13 07:00:00', text: 'Neu' }),
     ]);
     renderPage();
     const sicht = await screen.findByRole('region', { name: 'Lagemeldungen' });
@@ -159,9 +189,10 @@ describe('LagemeldungenPage', () => {
       return d.toISOString().replace('T', ' ').slice(0, 19);
     };
     listeLageMeldungen.mockResolvedValue([
-      lage({ id: 1, text: 'Frisch', erstellt_at: vorMinuten(10) }),
-      lage({ id: 2, text: 'Vorhin', erstellt_at: vorMinuten(180) }),
-      lage({ id: 3, text: 'Vortag', erstellt_at: vorMinuten(60 * 30) }),
+      lage({ id: 1, text: 'Frisch', ereigniszeit: vorMinuten(10), erstellt_at: vorMinuten(5) }),
+      // Eben übergeben, aber vor drei Stunden geschehen: zählt nach der Ereigniszeit.
+      lage({ id: 2, text: 'Vorhin', ereigniszeit: vorMinuten(180), erstellt_at: vorMinuten(1) }),
+      lage({ id: 3, text: 'Vortag', ereigniszeit: vorMinuten(60 * 30) }),
     ]);
     renderPage();
     await screen.findByText('Vortag');
@@ -244,8 +275,9 @@ describe('LagemeldungenPage', () => {
     it('markiert alle bis zur jüngsten angezeigten als gesehen', async () => {
       ladeEinsatz.mockResolvedValue(einsatz('einsatzleitung'));
       listeLageMeldungen.mockResolvedValue([
+        // Zuletzt übergeben (höchste id), aber früher geschehen: steht weiter unten.
+        lage({ id: 4, text: 'Ältere', is_neu: true, ereigniszeit: '2026-06-12 08:45:00' }),
         lage({ id: 9, text: 'Jüngste', is_neu: true }),
-        lage({ id: 4, text: 'Ältere', is_neu: true }),
         lage({ id: 2, text: 'Gesehene', gesehen_at: '2026-06-12 09:30:00' }),
       ]);
       markLageMeldungenGesehen.mockResolvedValue({ gesehen: 2 });

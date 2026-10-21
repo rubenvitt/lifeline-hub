@@ -26,6 +26,7 @@ import { MIT_ERLAEUTERUNG, hatErlaeuterung, zellTitel } from './erlaeuterungen';
 import { ErlaeuterungsMarke, ErlaeuterungsZeichen } from './ErlaeuterungsMarke';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import { useRahmenOben } from '../../components/rahmenOben';
+import { useFokusUnterKopf } from '../../components/fokusUnterKopf';
 import { useDruckModus } from '../../components/druck/useDruckModus';
 import './gefahrenMatrix.css';
 
@@ -63,43 +64,6 @@ function useSpaltenFreiraum(tabelle: RefObject<TableRef | null>): void {
     const kopfzelle = wurzel.querySelector('th.ant-table-cell-fix-start');
     if (kopfzelle) beobachter.observe(kopfzelle);
     return () => beobachter.disconnect();
-  }, [tabelle]);
-}
-
-/**
- * Wie weit die Seite nach oben rollen muss, damit ein fokussiertes Ziel nicht unter der stehenden
- * Kopfzeile liegt (negativ = nach oben), oder 0. Rein, damit die Regel ohne Layout prüfbar ist.
- */
-export function kopfUeberdeckung(
-  ziel: Pick<DOMRect, 'top' | 'bottom'>,
-  kopf: Pick<DOMRect, 'top' | 'bottom'>,
-): number {
-  return ziel.top < kopf.bottom && ziel.bottom > kopf.top ? ziel.top - kopf.bottom : 0;
-}
-
-/**
- * Rückwärts in die ERSTE Zeile getabbt, rollt der Browser die Seite nicht (LLH-1102): Chromium
- * beschneidet den Fokusrand (`scroll-margin-top`, `gefahrenMatrix.css`) an der Oberkante des
- * waagerechten Scrollcontainers `.ant-table-body`, und die erste Zeile beginnt genau dort. Die
- * Zelle zählt damit als sichtbar und blieb unter der stehenden Kopfzeile (`e2e/fokus-verdeckung`,
- * 1024 × 768 Handschuh; bei 390 px schon vorher). Solange der Knopf in einer gepolsterten Zelle
- * saß, ragte er nur halb darunter. Nach jedem Fokuswechsel in den Zellen wird deshalb gemessen
- * und die Seite um die Überdeckung zurückgerollt.
- */
-function useFokusUnterKopf(tabelle: RefObject<TableRef | null>): void {
-  useEffect(() => {
-    const wurzel = tabelle.current?.nativeElement;
-    if (!wurzel) return;
-    const beiFokus = (e: FocusEvent) => {
-      const ziel = e.target as HTMLElement;
-      if (!ziel.closest('.ant-table-tbody')) return;
-      const kopf = wurzel.querySelector('.ant-table-sticky-holder, .ant-table-header');
-      if (!kopf) return;
-      const versatz = kopfUeberdeckung(ziel.getBoundingClientRect(), kopf.getBoundingClientRect());
-      if (versatz < 0) window.scrollBy({ top: versatz, behavior: 'instant' });
-    };
-    wurzel.addEventListener('focusin', beiFokus);
-    return () => wurzel.removeEventListener('focusin', beiFokus);
   }, [tabelle]);
 }
 

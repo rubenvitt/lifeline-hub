@@ -2,7 +2,7 @@
 titel: Lagemeldungen
 gruppen: [fuehrung]
 reihenfolge: 250
-quellen: [frontend/src/pages/LagemeldungenPage.tsx, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -30,13 +30,14 @@ als Marker auf der Lagekarte.
 ### Lagemeldungen lesen und filtern
 
 1. Im Bereich „Lage“ „Lagemeldungen“ öffnen. Je Tag, der jüngste zuerst, stehen die übergebenen
-   Meldungen mit Zeit, Herkunft („aus Meldung #…“ und Absender), Lage-Text und, falls verortet,
-   der Koordinate.
+   Meldungen mit ihrer Ereigniszeit, Herkunft („aus Meldung #…“, „übergeben …“ und Absender),
+   Lage-Text und, falls verortet, der Koordinate.
 
    ![Zeitachse „Lagemeldungen“ mit vier übergebenen Meldungen, zwei davon verortet](../bilder/lagemeldungen/lagemeldungen.png)
 
 2. Zum Eingrenzen im Suchfeld nach Meldungstext, Absender oder Nummer suchen oder ein Zeitfenster
-   wählen: „Letzte Stunde“, „Letzte 4 Stunden“ oder „Heute“.
+   wählen: „Letzte Stunde“, „Letzte 4 Stunden“ oder „Heute“. Das Zeitfenster gilt für die
+   Ereigniszeit.
 3. Nach dem Ort filtern: „Mit Koordinaten“ oder „Ohne Koordinaten“. Der Kopf nennt dann „… von …
    übergeben“.
 4. Um zur ursprünglichen Meldung zu springen, „Meldung #…“ in der Zeile wählen.
@@ -62,6 +63,16 @@ Für Einsatzleitung und Führungspersonal:
   steht die Lagemeldung nur in der Zeitachse, mit Koordinate auch auf der Lagekarte in der Ebene
   „Lagemeldungen“ (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)).
 - Die Meldung selbst bleibt im Modul „Meldungen (eingehend)“ und wird dort weiter bearbeitet.
+
+### Ereigniszeit und Übergabe
+
+- Die Zeitachse ordnet nach der Ereigniszeit der Meldung, also wann es geschah, nicht wann die
+  Meldung an die Lage übergeben wurde. Eine um 13:14 eingegangene und erst um 15:05 übergebene
+  Meldung steht unter 13:14, unterhalb einer um 14:41 eingegangenen.
+- Wann die Meldung übergeben wurde, steht in der Zeile als „übergeben …“; an einem anderen Tag als
+  die Ereigniszeit mit Datum.
+- Liegt eine verortete Lagemeldung in der Nähe, nennt der Ortsbezug unter der Koordinate sie mit
+  der Nummer ihrer Meldung, etwa „496 m NO von Lagemeldung #3“.
 
 ### Neu und gesehen
 

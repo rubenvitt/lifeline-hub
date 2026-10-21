@@ -2,6 +2,7 @@ import type { Sichtungskategorie } from '../../api/types';
 import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { sichtung } from '../../theme/statusFarben';
 import { sichtungsfarben } from '../../theme/tokens';
+import { GEDAEMPFT_DECKKRAFT } from './abschnittFokus';
 import type { MarkerTyp } from './marker';
 
 type ClusterTyp = Exclude<MarkerTyp, 'einsatzort' | 'fuehrungsstelle'>;
@@ -90,7 +91,19 @@ export function clusterTypProperties(): Record<string, unknown> {
   // Größte Trefferzone der Blätter: der Donut ist mindestens so groß anklickbar wie seine Marker.
   // Ohne `treffer` (Lagekarte) 0.
   props.treffer = ['max', ['coalesce', ['get', 'treffer'], 0]];
+  // Blätter, die der Abschnittsfokus NICHT dämpft (LLH-1349): 0 heißt, das Bündel enthält nur
+  // Kräfte fremder Abschnitte ({@link buendelGedaempft}).
+  props.ungedaempft = ['+', ['case', ['==', ['get', 'gedaempft'], true], 0, 1]];
   return props;
+}
+
+/**
+ * Tritt das Bündel im Abschnittsfokus zurück (LLH-1349, Spec `lagekarte-abschnitt-fokus`)? Nur,
+ * wenn jedes Blatt gedämpft ist: ein gemischtes Bündel enthält etwas, das voll stehen muss
+ * (eigene Kräfte, Kräfte ohne Abschnitt, Schäden …). Ohne die Zahl `ungedaempft` bleibt es voll.
+ */
+export function buendelGedaempft(props: Record<string, unknown>): boolean {
+  return props.ungedaempft != null && Number(props.ungedaempft) === 0;
 }
 
 interface DonutSegment {
@@ -154,6 +167,8 @@ export interface DonutBild {
   zahl: string;
   /** Kürzel der dringlichsten Sichtung eines Personen-Clusters. */
   kurz: string | null;
+  /** Nur fremde Kräfte im Abschnittsfokus: gezeichnet mit `GEDAEMPFT_DECKKRAFT`. */
+  gedaempft: boolean;
 }
 
 /**
@@ -172,6 +187,7 @@ export function donutBild(props: Record<string, unknown>): DonutBild {
     neutral: DONUT_NEUTRAL,
     zahl: zahlLabel(gesamt),
     kurz: dringlichst ? SK_KURZZEICHEN[dringlichst] : null,
+    gedaempft: buendelGedaempft(props),
   };
 }
 
@@ -185,6 +201,9 @@ export function donutBild(props: Record<string, unknown>): DonutBild {
  *
  * Liegt `treffer` über dem gezeichneten Durchmesser, hüllt eine durchsichtige Fläche den Ring und
  * ist das Klickziel.
+ *
+ * Ein Bündel nur aus fremden Kräften ({@link buendelGedaempft}) zeichnet den Ring mit der Deckkraft
+ * der gedämpften Layer; Klickziel und Auffächern bleiben.
  */
 export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement {
   const gesamt = Number(props.point_count ?? 0);
@@ -214,6 +233,10 @@ export function baueClusterDonut(props: Record<string, unknown>): HTMLDivElement
     'box-shadow:0 4px 14px rgba(15,23,42,.28),0 1px 3px rgba(15,23,42,.22)',
     `background:${stops.length ? `conic-gradient(${stops.join(',')})` : DONUT_NEUTRAL}`,
   ].join(';');
+  if (buendelGedaempft(props)) {
+    ring.style.opacity = String(GEDAEMPFT_DECKKRAFT);
+    ring.dataset.gedaempft = 'true';
+  }
 
   const kern = document.createElement('div');
   kern.style.cssText = [
