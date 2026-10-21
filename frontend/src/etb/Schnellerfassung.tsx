@@ -67,6 +67,7 @@ import { serverJetzt } from '../offline/serveruhr';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { lageberichtePfad } from '../routing/deeplinks';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { MODUL_MELDUNGEN_GESPERRT } from '../components/nurAnsicht';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -345,6 +346,14 @@ export default function Schnellerfassung({
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
+  /**
+   * „Nur protokollieren“ (LLH-1037, Spec `etb-schnellerfassung-tastatur`): aus heißt, ein Eintrag
+   * vom Typ Meldung oder Lage legt den Vorgang im Meldungseingang an. Lebt im Entwurf und springt
+   * nach jedem Erfassen auf aus zurück, auch mit „Werte behalten“ (LLH-1027 D2).
+   */
+  const [nurProtokollieren, setNurProtokollieren] = useState(
+    initialWerte?.nurProtokollieren ?? false,
+  );
   // `metadaten` hält NUR, was die Person ausdrücklich gesetzt hat. Von/An aus dem
   // Standard-Rufnamen kommen erst über `wirksam` hinzu (LFH-894, design.md D2): so überlebt der
   // Standard das Leeren nach dem Absenden, und kein Entwurf trägt einen veralteten Wert. Die
@@ -358,6 +367,8 @@ export default function Schnellerfassung({
   const [pflichtHinweis, setPflichtHinweis] = useState<'von' | 'an' | null>(null);
   /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
   const anhangGrundId = useId();
+  /** Kennung des Grunds neben einem gesperrten „Nur protokollieren“ (LLH-1037). */
+  const protokollGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
   /** Unlesbare Angabe hinter `/zeit` (LLH-1088): der Grund steht in der Hinweiszeile. */
@@ -403,7 +414,11 @@ export default function Schnellerfassung({
   const funkrufnamen = useFunkrufnamen(einsatz.id);
   const funktionen = useFunktionsVorschlaege(einsatz.id);
   // Ohne Zugriff auf Lageberichte entfällt der Sprung dorthin (LFH-888, `frontend/AGENTS.md`).
-  const lageberichteGesperrt = useSprungSperre(einsatz.id)('lageberichte');
+  const sprungSperre = useSprungSperre(einsatz.id);
+  const lageberichteGesperrt = sprungSperre('lageberichte');
+  // Ohne Freigabe der Meldungen wird nur protokolliert (LLH-1037, design.md D8): Einsatz-Schreibrecht
+  // hat, wer hier erfasst; es fehlt allein das Modul. Unbekannt heißt offen, der Server prüft.
+  const meldungenGesperrt = sprungSperre('meldungen');
   // „Von“/„An“: Funkrufnamen plus Sachgebiete (LFH-545/549) — der Stabsvorschlag tritt neben die
   // Funkrufnamen, er ersetzt sie nicht.
   const vonAnOptionen = useMemo(
@@ -425,8 +440,8 @@ export default function Schnellerfassung({
       ersterRender.current = false;
       return; // kein Write beim Mount/initialem Laden
     }
-    onWerteChangeRef.current?.({ inhalt, typ, metadaten });
-  }, [inhalt, typ, metadaten]);
+    onWerteChangeRef.current?.({ inhalt, typ, metadaten, nurProtokollieren });
+  }, [inhalt, typ, metadaten, nurProtokollieren]);
 
   // Fokus beim Mount. State-Reset bei Tab-/Modus-Wechsel erfolgt über key-basiertes
   // Remounting im Container (EtbEntwurfsTabs / EtbPage-Berichtigung).
@@ -478,6 +493,10 @@ export default function Schnellerfassung({
   // wirkende Übernahme wäre für den Erfasser nicht erklärbar.
   const zeigeSchalter = !berichtigungZu && onWerteBehaltenChange != null;
   const uebernahmeAktiv = zeigeSchalter && werteBehalten;
+  /** Typ Meldung oder Lage, nicht in der Berichtigung: nur dann gibt es den Weg in den Eingang. */
+  const eingangMoeglich = !berichtigungZu && (typ === 'meldung' || typ === 'lage');
+  /** Geht dieser Eintrag in den Meldungseingang? Der Client sendet es immer ausdrücklich. */
+  const inMeldungseingang = eingangMoeglich && !meldungenGesperrt && !nurProtokollieren;
 
   function fokusInsFeld() {
     requestAnimationFrame(() => textRef.current?.focus());
@@ -722,6 +741,7 @@ export default function Schnellerfassung({
         }),
         client_id: clientId ?? eigeneClientId.current,
         ...(anhangIds.length > 0 ? { anhang_ids: anhangIds } : {}),
+        in_meldungseingang: inMeldungseingang,
       };
       try {
         await erfassen(eintrag);
@@ -753,6 +773,9 @@ export default function Schnellerfassung({
       setMetadaten((m) => (uebernahmeAktiv ? nurUebernahme(m) : {}));
       // Der Typ bleibt mit „Werte behalten“ stehen (LLH-1112), sonst beginnt es als Meldung.
       if (!uebernahmeAktiv) setTyp('meldung');
+      // „Nur protokollieren“ springt immer zurück, auch mit „Werte behalten“ (LLH-1027 D2): ein
+      // vergessener Schalter ließe sonst eine Serie am Meldungseingang vorbeilaufen.
+      setNurProtokollieren(false);
       setEditFeld(null);
       setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
@@ -830,6 +853,34 @@ export default function Schnellerfassung({
     </Checkbox>
   ) : null;
 
+  // „Nur protokollieren“ (LLH-1037, design.md D7/D8): neben „Werte behalten“, ab `md` in der
+  // Chip-Zeile, darunter in der Hinweiszeile ohne Kästchen-Boden (wie oben). Ohne Freigabe der
+  // Meldungen an und gesperrt, der Grund steht daneben (Wort statt Satz, LFH-1078).
+  const protokollSchalter = eingangMoeglich ? (
+    <span
+      style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS, flexShrink: 0 }}
+    >
+      <Checkbox
+        checked={meldungenGesperrt || nurProtokollieren}
+        disabled={sendet || meldungenGesperrt}
+        aria-describedby={meldungenGesperrt ? protokollGrundId : undefined}
+        onChange={(e) => setNurProtokollieren(e.target.checked)}
+        style={istSchmal ? { minHeight: 0 } : undefined}
+      >
+        <Typography.Text type="secondary">Nur protokollieren</Typography.Text>
+      </Checkbox>
+      {meldungenGesperrt && (
+        <span
+          id={protokollGrundId}
+          data-lfh="etb-protokoll-grund"
+          style={{ color: rollen.text2, whiteSpace: 'nowrap' }}
+        >
+          {MODUL_MELDUNGEN_GESPERRT}
+        </span>
+      )}
+    </span>
+  ) : null;
+
   // Zeichengrenze (LFH-937, D8): Zähler und Hinweis stehen in der Hinweiszeile, nicht unter dem
   // Feld — eine weitere Zeile risse das Höhenbudget der angepinnten Leiste. Der Zähler erscheint
   // erst ab 80 % der Grenze; der Hinweis trägt neben der Farbe ein Zeichen und Worte (WCAG 1.4.1).
@@ -874,12 +925,24 @@ export default function Schnellerfassung({
       <Zeichenzaehler wert={inhalt} max={ETB_INHALT_MAX} />
     </>
   );
-  const schalterInZeile = istSchmal && schalter != null;
+  const schalterInZeile = istSchmal && (schalter != null || protokollSchalter != null);
   const hinweiszeile =
     grenzSichtbar || schalterInZeile ? (
       <>
         {grenzTeil}
-        {schalterInZeile && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
+        {schalterInZeile && (
+          <span
+            style={{
+              marginInlineStart: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: token.marginSM,
+            }}
+          >
+            {protokollSchalter}
+            {schalter}
+          </span>
+        )}
       </>
     ) : undefined;
 
@@ -1152,8 +1215,19 @@ export default function Schnellerfassung({
               </Button>
             )}
           </Space>
-          {!istSchmal && zeigeSchalter && (
-            <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
+          {!istSchmal && (zeigeSchalter || protokollSchalter != null) && (
+            <div
+              style={{
+                marginInlineStart: 'auto',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: token.marginSM,
+              }}
+            >
+              {protokollSchalter}
+              {schalter}
+            </div>
           )}
         </div>
       )}

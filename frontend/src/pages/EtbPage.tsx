@@ -466,14 +466,25 @@ export default function EtbPage() {
     erneutFehler.leere();
   }
 
-  async function abgelehntErneutSenden(puffer: AbgelehnterEintrag) {
+  /**
+   * `nurProtokollieren`: derselbe Eintrag ohne Meldung (LLH-1037, design.md D9), der Weg hinaus,
+   * wenn er beim Abspielen am gesperrten Modul Meldungen scheiterte.
+   */
+  async function abgelehntErneutSenden(
+    puffer: AbgelehnterEintrag,
+    { nurProtokollieren = false }: { nurProtokollieren?: boolean } = {},
+  ) {
     const schluessel = `${einsatzId}:${abgelehntSchluessel(puffer)}`;
     erneutFehler.beginne(schluessel);
     try {
       // Mit neuer client_id: ein abgelehnter Eintrag ist nie erfasst worden, ein neuer Schlüssel
       // legt also keine Dublette an. Mit dem alten liefe ein client_id-Konflikt (409) endlos in
       // dieselbe Ablehnung.
-      await erfassen({ ...puffer.eintrag, client_id: neueClientId() });
+      await erfassen({
+        ...puffer.eintrag,
+        client_id: neueClientId(),
+        ...(nurProtokollieren ? { in_meldungseingang: false } : {}),
+      });
       if (puffer.id != null) await abgelehntVerwerfen(puffer.id);
     } catch (err) {
       erneutFehler.melde(schluessel, err, 'Erneut senden fehlgeschlagen');
@@ -1105,6 +1116,9 @@ export default function EtbPage() {
               onAuftragErteilen={darfSchreiben ? (e) => setAuftragZu(e) : undefined}
               auftragGesperrt={auftragGesperrt}
               onErneutSenden={(p) => void abgelehntErneutSenden(p)}
+              onNurProtokollieren={(p) =>
+                void abgelehntErneutSenden(p, { nurProtokollieren: true })
+              }
               zeilenFehler={(s) => erneutFehler.grund(`${einsatzId}:${s}`)}
               onVerwerfen={(p) => {
                 if (p.id != null) void abgelehntVerwerfen(p.id);
