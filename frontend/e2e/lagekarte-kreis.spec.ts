@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { zeigeLeistenAnsicht } from './leisten-kern';
 
 /**
  * Kreis um einen Punkt am Fükw (LLH-1043, Spec `lagekarte-zeichnen`): Start im Paneel
@@ -99,6 +100,8 @@ test('Kreis: Paneel, Mitte per Klick, 300 m, Übernehmen; Inspector ändert den 
   page.on('pageerror', (f) => seitenFehler.push(f));
   const { eid, canvas } = await lagekarteOeffnen(page);
 
+  // Das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“ der Leiste (LLH-1028).
+  await zeigeLeistenAnsicht(page, 'Objekte');
   await page.getByRole('button', { name: 'Absperrbereich als Kreis' }).click();
   const band = page.locator('[data-lfh="kreis-steuerung"]');
   await expect(band).toBeVisible();

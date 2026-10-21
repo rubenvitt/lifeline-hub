@@ -3086,6 +3086,7 @@ describe('LLH-1043: Kreis', () => {
 
   it('das Paneel startet den Kreis je Flächentyp, die Absperrgrenze hat keinen', async () => {
     basisHandler();
+    objekteVorn();
     const user = userEvent.setup();
     renderSeite();
     expect(
