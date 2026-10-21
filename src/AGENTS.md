@@ -359,6 +359,10 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
 - Ein Fehler in `melden` lässt die committete Anfrage nicht scheitern (geloggt). Aufräumen
   (quittiert nach 24 h, offen nach 12 h) läuft im Erinnerungs-Scheduler; mit dem Einsatz fallen
   die Zeilen per `ON DELETE CASCADE`. Nachweis `tests/benachrichtigung.rs`.
+- **Für alle erledigt nur über `benachrichtigung::erledigen`** (LLH-1062): ist der Anlass selbst
+  vorbei (eine gesichtete Meldung, eine gesehene Lagemeldung), quittiert es die offenen Zeilen
+  ALLER Empfänger zu diesem Bezug und stellt jedem sein Quittier-Ereignis zu. Ein Alarm wird so
+  nie erledigt; ihn quittiert jeder selbst.
 - **Web Push (LLH-1223, Spec `web-push`) nur aus `melden`:** nach `zustellen` dieselben
   Ereignisse an die Abos der Empfänger (`web_push::WebPush::versenden`), nebenläufig, nie
   abgewartet. Die Nutzlast ist das Live-Ereignis (nur Kennungen), verschlüsselt nach RFC 8291;

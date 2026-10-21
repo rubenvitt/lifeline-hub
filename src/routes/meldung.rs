@@ -458,6 +458,7 @@ pub async fn status(
     repo::setze_status(&state.pool, meldung_id, status, &jetzt).await?;
     let m = repo::laden(&state.pool, meldung_id, &jetzt).await?;
     crate::meldung::sse(&state, einsatz_id);
+    crate::meldung::benachrichtigung::status_geaendert(&state.pool, &state.live, &m).await;
     Ok(Json(m))
 }
 
@@ -488,6 +489,8 @@ pub async fn bestaetigen(
     }
     let m = repo::laden(&state.pool, meldung_id, &now).await?;
     crate::meldung::sse(&state, einsatz_id);
+    // Bestätigen sichtet (LLH-1052): damit ist auch ein Eingang erledigt (LLH-1062).
+    crate::meldung::benachrichtigung::status_geaendert(&state.pool, &state.live, &m).await;
     Ok(Json(m))
 }
 
@@ -545,7 +548,7 @@ pub async fn lagerelevant(
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map(str::to_string)
-        .unwrap_or(aktuell.inhalt);
+        .unwrap_or_else(|| aktuell.inhalt.clone());
     let geo = match (req.lat, req.lon) {
         (Some(a), Some(o)) => Some((a, o)),
         (None, None) => None,
@@ -566,6 +569,14 @@ pub async fn lagerelevant(
         state.live.publiziere(einsatz_id, etb_id);
     }
     crate::meldung::sse(&state, einsatz_id);
+    // Die erste Übernahme einer anderen Art meldet S2 und der Einsatzleitung (LLH-1062).
+    crate::meldung::benachrichtigung::uebernommen(
+        &state.pool,
+        &state.live,
+        &aktuell,
+        ctx.benutzer.id,
+    )
+    .await;
     Ok(Json(m))
 }
 
@@ -677,6 +688,7 @@ pub async fn lage_gesehen(
         .await?
         .ok_or(AppError::NotFound)?;
     crate::meldung::sse(&state, einsatz_id);
+    crate::meldung::benachrichtigung::lage_gesehen(&state.pool, &state.live, einsatz_id).await;
     Ok(Json(l))
 }
 
@@ -710,6 +722,7 @@ pub async fn lage_alle_gesehen(
     .await?;
     if gesehen > 0 {
         crate::meldung::sse(&state, einsatz_id);
+        crate::meldung::benachrichtigung::lage_gesehen(&state.pool, &state.live, einsatz_id).await;
     }
     Ok(Json(LageGesehenAnzeige { gesehen }))
 }
