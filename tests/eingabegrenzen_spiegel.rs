@@ -70,6 +70,7 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("EINSATZORT_MAX", einsatz::EINSATZORT_MAX),
         ("SCHADEN_BESCHREIBUNG_MAX", schaden::BESCHREIBUNG_MAX),
         ("GEOMETRIE_STUETZPUNKTE_MAX", lage_zone::STUETZPUNKTE_MAX),
+        ("KREIS_RADIUS_M_MAX", lage_zone::KREIS_RADIUS_M_MAX),
         ("SPRECHGRUPPE_BEDINGUNG_MAX", sprechgruppe::BEDINGUNG_MAX),
         (
             "FUEHRUNGSSTELLE_BEZEICHNUNG_MAX",

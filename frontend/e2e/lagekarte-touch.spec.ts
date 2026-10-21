@@ -36,6 +36,7 @@ interface MapHaken {
   unproject(p: [number, number]): { lng: number; lat: number };
   getCanvas(): HTMLCanvasElement;
   querySourceFeatures(quelle: string): { properties: Record<string, unknown> | null }[];
+  getStyle(): { layers?: { id: string }[] } | undefined;
 }
 
 interface Punkt {
@@ -1685,6 +1686,7 @@ for (const { viewport, dichte } of [
         'Koordinate kopieren',
         'Messen ab hier',
         'Hier Zeichen setzen',
+        'Kreis hier …',
       ]);
       // Anker an der Druckstelle (Pixel relativ zur Kartenhülle).
       const anker = await page.locator('[data-lfh="kontextmenue-anker"]').boundingBox();
@@ -1755,6 +1757,85 @@ for (const { viewport, dichte } of [
       await page.keyboard.press('Escape');
       await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
 
+      expect(seitenFehler).toEqual([]);
+    });
+
+    // Kreis um die Druckstelle (LLH-1043): Band mit Schnellwahl, „Übernehmen“ legt an.
+    test('Kreis hier: Absperrbereich mit 100 m um die Druckstelle', async ({ page }) => {
+      test.setTimeout(150_000);
+      const seitenFehler: Error[] = [];
+      page.on('pageerror', (f) => seitenFehler.push(f));
+      if (dichte)
+        await page.addInitScript(
+          ([schluessel, wert]) => window.localStorage.setItem(schluessel, wert),
+          [DICHTE_SCHLUESSEL, dichte] as const,
+        );
+      await anmelden(page);
+      const saat = await einsatzFuerKontext(page);
+      await page.goto(`/einsaetze/${saat.einsatzId}/lagekarte`);
+      await ruhe(page);
+      const cdp = await page.context().newCDPSession(page);
+      const menue = kontextMenue(page);
+      const frei = await stelleAufKarte(page, saat.frei, 'freie Stelle (Kreis)');
+      const druckLl = await geoAm(page, frei);
+      await langerDruck(page, cdp, frei);
+      await expect(menue).toBeVisible();
+      await menue.getByRole('menuitem').filter({ hasText: 'Kreis hier …' }).tap();
+      const band = page.locator('[data-lfh="kreis-steuerung"]');
+      await expect(band).toBeVisible();
+      const uebernehmen = band.getByRole('button', { name: 'Übernehmen' });
+      await expect(uebernehmen).toBeDisabled();
+      await band.getByRole('button', { name: '100 m' }).tap();
+      // Die Vorschau steht als `td-`-Ebene auf der Karte.
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            Boolean(
+              (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte
+                .getStyle()
+                ?.layers?.some((l) => l.id === 'td-zone-kreis-flaeche'),
+            ),
+          ),
+        )
+        .toBe(true);
+      // Handschuhtauglich: die Schnellwahl hält die Treffläche des Bandes.
+      const knopf = (await band.getByRole('button', { name: '100 m' }).boundingBox())!;
+      expect(knopf.height).toBeGreaterThanOrEqual(dichte === 'handschuh' ? 44 : 24);
+      await uebernehmen.tap();
+      await expect
+        .poll(
+          async () =>
+            (await (await page.request.get(`/api/einsaetze/${saat.einsatzId}/zonen`)).json()) as {
+              typ: string;
+              kreis_radius_m?: number;
+              kreis_mitte_lat?: number;
+            }[],
+          { message: 'Kreis an der Druckstelle gespeichert' },
+        )
+        .toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              typ: 'absperrbereich',
+              kreis_radius_m: 100,
+              kreis_mitte_lat: expect.closeTo(druckLl.lat, 4),
+              kreis_mitte_lon: expect.closeTo(druckLl.lng, 4),
+            }),
+          ]),
+        );
+      // Serie (Vorgabe an): nächster Kreis ohne Mitte; „Fertig“ beendet.
+      await expect(band).toContainText('1 gespeichert');
+      await band.getByRole('button', { name: /Fertig/ }).tap();
+      await expect(band).toHaveCount(0);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () =>
+              (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte
+                .getStyle()
+                ?.layers?.some((l) => l.id.startsWith('td-zone-kreis')) ?? false,
+          ),
+        )
+        .toBe(false);
       expect(seitenFehler).toEqual([]);
     });
 

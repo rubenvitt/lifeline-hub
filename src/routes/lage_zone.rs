@@ -90,10 +90,15 @@ pub async fn liste(
 #[derive(Debug, Deserialize)]
 pub struct ZoneBody {
     pub typ: String,
-    pub geometrie_typ: String,
+    /// Pflicht ohne `kreis`; mit `kreis` optional und dann nur `Polygon` (LLH-1043).
+    pub geometrie_typ: Option<String>,
     /// GeoJSON-Geometry als String (Hausmuster wie FlaecheBody.flaeche_geojson —
-    /// das FE sendet JSON.stringify(g), die DB-Spalte ist TEXT).
-    pub geometrie: String,
+    /// das FE sendet JSON.stringify(g), die DB-Spalte ist TEXT). Pflicht ohne `kreis`; mit
+    /// `kreis` verboten: die Kreisnäherung rechnet der Server (LLH-1043, design.md D2).
+    pub geometrie: Option<String>,
+    /// Kreis um einen Punkt (LLH-1043): Mitte und Radius in Metern; der Server rechnet daraus
+    /// das Polygon ([`lage_zone::kreis_polygon`]) und speichert die Angaben an der Zone.
+    pub kreis: Option<lage_zone::Kreis>,
     pub label: Option<String>,
     pub farbe: Option<String>,
     pub notiz: Option<String>,
@@ -107,11 +112,35 @@ pub struct ZoneBody {
 
 /// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500) über
 /// [`lage_zone::validiere_neu`], die reine Prüfung im Fachmodul (LFH-690: der Demo-Import
-/// ruft dieselbe). Liefert die zu speichernde Geometrie-String-Form zurück (= der validierte
-/// Eingabe-String).
-fn validiere_neu(body: &ZoneBody) -> Result<String, AppError> {
-    lage_zone::validiere_neu(&body.typ, &body.geometrie_typ, &body.geometrie)?;
-    Ok(body.geometrie.clone())
+/// ruft dieselbe), bzw. einen Kreis über [`lage_zone::validiere_kreis_neu`] (LLH-1043). Liefert
+/// Geometrieklasse und die zu speichernde Geometrie: den validierten Eingabe-String oder die
+/// Kreisnäherung des Servers.
+fn validiere_neu(body: &ZoneBody) -> Result<(&'static str, String), AppError> {
+    if let Some(k) = &body.kreis {
+        lage_zone::validiere_kreis_neu(&body.typ, body.geometrie_typ.as_deref(), k)?;
+        // Zusammenhang, nicht Feld: zwei Geometriequellen für eine Zone (Statuscode-Konvention).
+        if body.geometrie.is_some() {
+            return Err(AppError::UnprocessableEntity(
+                "Kreis und Geometrie schließen sich aus: die Kreisfläche rechnet der Server".into(),
+            ));
+        }
+        return Ok((
+            "Polygon",
+            lage_zone::kreis_polygon(k.mitte_lat, k.mitte_lon, k.radius_m),
+        ));
+    }
+    let (Some(geometrie_typ), Some(geometrie)) = (&body.geometrie_typ, &body.geometrie) else {
+        return Err(AppError::Validation(
+            "geometrie_typ und geometrie fehlen (oder kreis angeben)".into(),
+        ));
+    };
+    lage_zone::validiere_neu(&body.typ, geometrie_typ, geometrie)?;
+    let klasse = if geometrie_typ == "Polygon" {
+        "Polygon"
+    } else {
+        "LineString"
+    };
+    Ok((klasse, geometrie.clone()))
 }
 
 /// POST /api/einsaetze/{id}/zonen — anlegen. Schreibrecht + aktiv. ETB „eingerichtet".
@@ -121,7 +150,7 @@ pub async fn anlegen(
     JsonBody(body): JsonBody<ZoneBody>,
 ) -> Result<(StatusCode, Json<LageZoneAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let geometrie = validiere_neu(&body)?;
+    let (geometrie_typ, geometrie) = validiere_neu(&body)?;
     // Ansicht muss zu diesem Einsatz gehören (LFH-738), sonst 404.
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
         .await?;
@@ -148,26 +177,27 @@ pub async fn anlegen(
             einsatz_id,
             ZoneNeu {
                 typ: &body.typ,
-                geometrie_typ: &body.geometrie_typ,
+                geometrie_typ,
                 geometrie: &geometrie,
                 label: label.as_deref(),
                 farbe: farbe.as_deref(),
                 notiz: notiz.as_deref(),
                 ansicht_id: body.ansicht_id,
                 evakuierungsbezirk_id: body.evakuierungsbezirk_id,
+                kreis: body.kreis,
                 erstellt_von: ctx.benutzer.id,
             },
         )
         .await?;
         let z = zone_repo::laden_tx(conn, einsatz_id, id).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
-        )
-        .await?;
+        // Eine Kreiszone nennt ihren Radius schon beim Einrichten (LLH-1043, design.md D4).
+        let text = match z.kreis_radius_m {
+            Some(r) => {
+                lage_zone::etb_text_kreis_eingerichtet(z.typ.as_str(), z.label.as_deref(), r)
+            }
+            None => etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
+        };
+        crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text).await?;
         Ok(z)
     })?;
     sse_zone(&state, einsatz_id, z.id);
@@ -211,10 +241,32 @@ pub struct ZonePatchBody {
     /// Bezirks-Zuordnung (LFH-673): absent = unverändert, `null` = lösen, Zahl = zuordnen.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub evakuierungsbezirk_id: Option<Option<i64>>,
+    /// Neuer Radius einer Kreiszone in Metern (LLH-1043): der Server rechnet das Polygon um
+    /// dieselbe Mitte neu. An einer Zone ohne Kreis 422.
+    pub kreis_radius_m: Option<f64>,
+    /// Neue Geometrie (GeoJSON-String) derselben Klasse — eine punktweise Bearbeitung. Nimmt der
+    /// Zone die Kreisangaben (LLH-1043, design.md D3).
+    pub geometrie: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz. Geometrie NICHT änderbar.
-/// ETB „geändert" NUR wenn effektiver typ oder label sich gegenüber vorher unterscheidet.
+/// Prüft eine neue Geometrie aus dem PATCH gegen die gespeicherte Klasse: Größe und Struktur
+/// sind Feldfehler (400), kaputtes JSON und eine andere Klasse der Zusammenhang (422) — dieselbe
+/// Trennung wie beim Anlegen.
+fn pruefe_neue_geometrie(geometrie: &str, gespeichert: &str) -> Result<(), AppError> {
+    lage_zone::pruefe_geometrie_groesse(geometrie, "geometrie")?;
+    let v: serde_json::Value = serde_json::from_str(geometrie)
+        .map_err(|_| AppError::UnprocessableEntity("geometrie ist kein gültiges JSON".into()))?;
+    if v.get("type").and_then(|t| t.as_str()) != Some(gespeichert) {
+        return Err(AppError::UnprocessableEntity(format!(
+            "geometrie.type passt nicht zur vorhandenen Geometrie ({gespeichert})"
+        )));
+    }
+    lage_zone::pruefe_geometrie_struktur(&v, "geometrie")
+}
+
+/// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz, dazu Radius einer Kreiszone
+/// oder eine neue Geometrie (LLH-1043). ETB „geändert" NUR wenn effektiver typ, label oder die
+/// Geometrie sich unterscheidet; eine Radiusänderung schreibt „Radius alt → neu“.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -223,6 +275,54 @@ pub async fn aktualisieren(
 ) -> Result<Json<LageZoneAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
+
+    // Geometrie (LLH-1043): Radius einer Kreiszone ODER frei — beides zugleich ist ein
+    // Widerspruch (422). Felder für sich zuerst (400), dann der Zusammenhang (422).
+    if let Some(r) = body.kreis_radius_m {
+        lage_zone::pruefe_radius(r)?;
+    }
+    if let Some(g) = &body.geometrie {
+        lage_zone::pruefe_geometrie_groesse(g, "geometrie")?;
+    }
+    if body.kreis_radius_m.is_some() && body.geometrie.is_some() {
+        return Err(AppError::UnprocessableEntity(
+            "Radius und Geometrie schließen sich aus".into(),
+        ));
+    }
+    let vorher_kreis = match (
+        vorher.kreis_mitte_lat,
+        vorher.kreis_mitte_lon,
+        vorher.kreis_radius_m,
+    ) {
+        (Some(mitte_lat), Some(mitte_lon), Some(radius_m)) => Some(lage_zone::Kreis {
+            mitte_lat,
+            mitte_lon,
+            radius_m,
+        }),
+        _ => None,
+    };
+    // Ein unveränderter Radius rechnet nichts neu und schreibt keinen ETB.
+    let neuer_kreis = match (body.kreis_radius_m, vorher_kreis) {
+        (Some(_), None) => {
+            return Err(AppError::UnprocessableEntity(
+                "Die Zone ist kein Kreis; ein Radius lässt sich nicht setzen".into(),
+            ))
+        }
+        (Some(r), Some(k)) if r != k.radius_m => Some(lage_zone::Kreis { radius_m: r, ..k }),
+        _ => None,
+    };
+    if let Some(g) = &body.geometrie {
+        pruefe_neue_geometrie(g, &vorher.geometrie_typ)?;
+    }
+    let kreis_geometrie =
+        neuer_kreis.map(|k| lage_zone::kreis_polygon(k.mitte_lat, k.mitte_lon, k.radius_m));
+    let geometrie_patch = match (&body.geometrie, neuer_kreis, &kreis_geometrie) {
+        (Some(g), _, _) => Some(zone_repo::GeometriePatch::Frei(g)),
+        (None, Some(kreis), Some(geometrie)) => {
+            Some(zone_repo::GeometriePatch::Kreis { geometrie, kreis })
+        }
+        _ => None,
+    };
 
     // Effektiver neuer typ; wenn geändert: gültig + passt zur *gespeicherten* Geometrie.
     let neuer_typ = match &body.typ {
@@ -306,19 +406,38 @@ pub async fn aktualisieren(
             gefahrengebiet_id: gebiet_patch,
             ansicht_id: body.ansicht_id,
             evakuierungsbezirk_id: body.evakuierungsbezirk_id,
+            geometrie: geometrie_patch,
         },
     )
     .await?;
 
-    // Sinntragende Änderung? typ oder label effektiv geändert.
+    // Sinntragende Änderung? typ, label oder die Geometrie (punktweise) effektiv geändert.
     let typ_geaendert = neuer_typ != vorher.typ.as_str();
     let label_geaendert = neues_label != vorher.label;
-    if typ_geaendert || label_geaendert {
+    let geometrie_geaendert = body
+        .geometrie
+        .as_deref()
+        .is_some_and(|g| g != vorher.geometrie);
+    if typ_geaendert || label_geaendert || geometrie_geaendert {
         super::etb_system_degradiert(
             &state,
             einsatz_id,
             ctx.benutzer.id,
             &etb_text(z.typ.as_str(), z.label.as_deref(), "geändert"),
+        )
+        .await;
+    }
+    if let (Some(alt), Some(neu)) = (vorher_kreis, neuer_kreis) {
+        super::etb_system_degradiert(
+            &state,
+            einsatz_id,
+            ctx.benutzer.id,
+            &lage_zone::etb_text_radius(
+                z.typ.as_str(),
+                z.label.as_deref(),
+                alt.radius_m,
+                neu.radius_m,
+            ),
         )
         .await;
     }

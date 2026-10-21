@@ -3,12 +3,13 @@
  * `openspec/changes/archive/2026-10-03-lfh-776-lagekarte-kontextmenue/design.md` D4). Rein, ohne Karte prüfbar.
  *
  * Der Rechte-Riegel sitzt HIER, an der Ableitung (`frontend/AGENTS.md`, „Aktionen“): ohne
- * Schreibrecht (auch im Snapshot) fehlt „Hier Zeichen setzen“, statt gesperrt zu stehen. Die
- * antd-Items baut `menueEintraege()` aus dem Baustein der gebündelten Aktionen (LFH-365).
+ * Schreibrecht (auch im Snapshot) fehlen „Hier Zeichen setzen“ und „Kreis hier …“, statt
+ * gesperrt zu stehen. Die antd-Items baut `menueEintraege()` aus dem Baustein der gebündelten
+ * Aktionen (LFH-365).
  */
 import { menueEintraege, type MenueEintrag } from '../../components/MenueAusloeser';
 
-export type KontextAktion = 'kopieren' | 'messen' | 'zeichen';
+export type KontextAktion = 'kopieren' | 'messen' | 'zeichen' | 'kreis';
 
 export function kontextEintraege({
   darfSchreiben,
@@ -18,7 +19,13 @@ export function kontextEintraege({
   return [
     { key: 'kopieren', label: 'Koordinate kopieren' },
     { key: 'messen', label: 'Messen ab hier' },
-    ...(darfSchreiben ? [{ key: 'zeichen' as const, label: 'Hier Zeichen setzen' }] : []),
+    // „Kreis hier …“ (LLH-1043): Absperr-/Gefahrenbereich mit Radius um die Druckstelle.
+    ...(darfSchreiben
+      ? [
+          { key: 'zeichen' as const, label: 'Hier Zeichen setzen' },
+          { key: 'kreis' as const, label: 'Kreis hier …' },
+        ]
+      : []),
   ];
 }
 

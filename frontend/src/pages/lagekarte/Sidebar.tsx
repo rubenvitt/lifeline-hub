@@ -22,6 +22,7 @@ import type { KarteMarker, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import type { ZeichenModus } from './zeichnen';
+import type { ZonenForm } from './useKartenInteraktion';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
 import FreiesZeichenPicker, { hatZeichen, type ZeichenEntwurf } from './FreiesZeichenPicker';
 import { START_ZEICHEN_SPEC } from './zeichenWahl';
@@ -214,7 +215,7 @@ export interface SidebarProps {
   onPlatzierenStart: (ziel: { typ: PlatzierenPunktTyp; id: number }) => void;
   onPlatzierenAbbrechen: () => void;
   onAbschnittZeichnenStart: (id: number) => void;
-  onZoneZeichnenStart: (entwurf: { typ: ZoneTyp; modus: ZeichenModus; farbe?: string }) => void;
+  onZoneZeichnenStart: (entwurf: { typ: ZoneTyp; modus: ZonenForm; farbe?: string }) => void;
   /** Freies taktisches Zeichen: aktive Platzierung + Start/Abbrechen. */
   zeichenPlatzieren: FreiesZeichenUpdate | null;
   onZeichenPlatzierenStart: (spec: FreiesZeichenUpdate) => void;
@@ -650,11 +651,23 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
                         >
                           Linie
                         </Button>
+                        <Button
+                          aria-label={`${t.label} als Kreis`}
+                          onClick={() =>
+                            props.onZoneZeichnenStart({
+                              typ: t.typ,
+                              modus: 'kreis',
+                              farbe: FREIE_SKIZZE_VORGABEFARBE,
+                            })
+                          }
+                        >
+                          Kreis
+                        </Button>
                       </Space>
                     );
                   }
                   const modus: ZeichenModus = t.geometrie === 'LineString' ? 'linie' : 'polygon';
-                  return (
+                  const zeichnen = (
                     <Button
                       key={t.typ}
                       block
@@ -662,6 +675,19 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
                     >
                       {t.label} zeichnen
                     </Button>
+                  );
+                  if (modus === 'linie') return zeichnen;
+                  // Fläche auch als Kreis um einen Punkt (LLH-1043): Radius statt Stützpunkte.
+                  return (
+                    <div key={t.typ} style={{ display: 'flex', gap: token.marginXS }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>{zeichnen}</div>
+                      <Button
+                        aria-label={`${t.label} als Kreis`}
+                        onClick={() => props.onZoneZeichnenStart({ typ: t.typ, modus: 'kreis' })}
+                      >
+                        Kreis
+                      </Button>
+                    </div>
                   );
                 })}
               </Space>

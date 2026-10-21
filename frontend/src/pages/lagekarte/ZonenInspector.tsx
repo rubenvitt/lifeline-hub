@@ -1,4 +1,4 @@
-import { Button, Input, Popconfirm, Space, Typography, theme } from 'antd';
+import { Button, Input, InputNumber, Popconfirm, Space, Typography, theme } from 'antd';
 import { Link } from 'react-router';
 import { Select } from '../../components/Select';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -15,9 +15,10 @@ import { gefahrengebietName } from '../../api/gefahren';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import StatusTag from '../../components/StatusTag';
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
-import { Datenfeld, Datenraster } from '../../components/instrument';
+import { Datenfeld, Datenraster, monoStil } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
-import { parseGeometry, geoKennzahlen } from './geo';
+import { formatRadius, kreisAusZone, parseGeometry, geoKennzahlen, radiusGueltig } from './geo';
+import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
 import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
@@ -42,6 +43,8 @@ export interface ZonenInspectorProps {
     gefahrengebiet_id?: number | null;
     ansicht_id?: number | null;
     evakuierungsbezirk_id?: number | null;
+    /** Nur an einer Kreiszone (LLH-1043): der Server rechnet das Polygon um dieselbe Mitte neu. */
+    kreis_radius_m?: number;
   }) => Promise<void>;
   onMatrixOeffnen: (gefahrengebietId: number) => void;
   onLoeschen: () => void;
@@ -90,6 +93,22 @@ export default function ZonenInspector({
   >('idle');
   const speicherLauf = useRef(0);
   const entwurfZoneId = useRef(zone.id);
+  // Kreiszone (LLH-1043, design.md D10): Radius als Kennzahl und als Zahl änderbar.
+  const kreis = kreisAusZone(zone);
+  const gespeicherterRadius = kreis?.radiusM ?? null;
+  const [radiusEntwurf, setRadiusEntwurf] = useState<number | null>(gespeicherterRadius);
+  // Der gespeicherte Radius ist die Wahrheit: nach dem eigenen PATCH, über SSE und beim
+  // Zonenwechsel steht er wieder im Feld.
+  useEffect(() => setRadiusEntwurf(gespeicherterRadius), [zone.id, gespeicherterRadius]);
+  const radiusSpeichern = () => {
+    if (gespeicherterRadius == null) return;
+    if (!radiusGueltig(radiusEntwurf)) {
+      setRadiusEntwurf(gespeicherterRadius);
+      return;
+    }
+    if (Math.round(radiusEntwurf) !== Math.round(gespeicherterRadius))
+      void speichern({ kreis_radius_m: Math.round(radiusEntwurf) });
+  };
 
   useEffect(() => {
     // Same-ID-Updates können jederzeit über SSE/Refetch eintreffen; der kontrollierte Entwurf darf
@@ -160,10 +179,15 @@ export default function ZonenInspector({
     void speichern({ gefahrengebiet_id });
   };
 
-  // Nicht-Geo-Zeilen im selben Raster (Warnstufe, Zonen-Anzahl) — null, wenn keine anfallen.
+  // Nicht-Geo-Zeilen im selben Raster (Radius, Warnstufe, Zonen-Anzahl) — null, wenn keine
+  // anfallen.
+  const radiusZeile = kreis ? (
+    <KennzahlZeile label="Radius" wert={formatRadius(kreis.radiusM)} />
+  ) : null;
   const zusatzZeilen =
     entwurf.typ === 'gefahrengebiet' && aktuellesGebiet ? (
       <>
+        {radiusZeile}
         {aktuellHatWarnstufen && (
           <KennzahlZeile
             label="Höchste Warnstufe"
@@ -175,7 +199,9 @@ export default function ZonenInspector({
         )}
         <KennzahlZeile label="Zonen" wert={String(aktuellesGebiet.zonen_ids.length)} />
       </>
-    ) : null;
+    ) : (
+      radiusZeile
+    );
 
   const titel = entwurf.label.trim() ? entwurf.label : zoneTypLabel(entwurf.typ);
 
@@ -209,6 +235,23 @@ export default function ZonenInspector({
             rendert, in ein `.ant-space-item` — ohne Kennzahlen gäbe das eine leere Lücke. */}
         {(kennzahlen || zusatzZeilen) && (
           <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
+        )}
+
+        {kreis && darfSchreiben && (
+          <InputNumber<number>
+            aria-label="Radius in Metern"
+            value={radiusEntwurf}
+            min={1}
+            max={KREIS_RADIUS_M_MAX}
+            precision={0}
+            suffix="m"
+            inputMode="numeric"
+            disabled={gesperrt}
+            style={{ width: '100%', ...monoStil(token.fontSize) }}
+            onChange={(v) => setRadiusEntwurf(typeof v === 'number' ? v : null)}
+            onBlur={radiusSpeichern}
+            onPressEnter={radiusSpeichern}
+          />
         )}
 
         <Input

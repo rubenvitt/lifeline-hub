@@ -75,6 +75,51 @@ hat. Die Zeichnen-Steuerung SHALL beide Stufen als Hinweis nennen.
 - **WHEN** in einer Zonen-Serie schon eine Zone gespeichert ist, keine Figur angefangen ist und Esc gedrückt wird
 - **THEN** endet der Zeichenmodus und die gespeicherte Zone bleibt erhalten
 
+### Requirement: Kreis um einen Punkt
+Jede Zonenart mit Fläche SHALL sich als Kreis zeichnen lassen; eine Absperrgrenze (Linie) MUST
+NOT. Der Radius in Metern MUST als Zahl eingebbar sein, mit Schnellwahl 50, 100, 300, 500 und
+1000 m, größer als 0 und höchstens 50 000 m. Die Mitte MUST per Tipp auf die Karte setzbar sein
+und, wenn vorhanden, aus Einsatzort oder Suchnadel übernehmbar. Ein Griff am Kreisrand MUST den
+Radius durch Ziehen setzen; die Karte bleibt außerhalb des Griffs verschiebbar.
+
+#### Scenario: Linie ist kein Kreis
+- **WHEN** das Zeichnen-Paneel offen ist
+- **THEN** bietet die Absperrgrenze keinen Knopf „Kreis“
+
+### Requirement: Kreis anlegen
+„Übernehmen“ SHALL einen Kreis sofort als Zone anlegen, ohne zweite Bestätigung. Gespeichert MUST
+eine Fläche mit 64 Ecken werden, die der Server aus Mitte und Radius rechnet, dazu Mitte und Radius;
+die Abweichung vom Kreis MUST höchstens 1 % betragen. Der Einsatztagebuch-Eintrag MUST den Radius
+nennen („Absperrbereich «Nord» eingerichtet · Kreis r = 300 m“). Für das Esc gilt die Mitte als
+angefangene Figur.
+
+#### Scenario: Absperrbereich mit 300 m
+- **WHEN** der Mensch im Zeichnen-Paneel beim Absperrbereich „Kreis“ wählt, auf die Karte tippt, „300 m“ wählt und „Übernehmen“ tippt
+- **THEN** steht ein Absperrbereich als Kreis mit Radius 300 m um die getippte Stelle, und das Einsatztagebuch nennt „Kreis r = 300 m“
+
+#### Scenario: Radius über der Grenze
+- **WHEN** ein Radius über 50 000 m an den Server geht
+- **THEN** lehnt der Server mit 400 ab, und es entsteht keine Zone
+
+#### Scenario: Esc mit gesetzter Mitte
+- **WHEN** beim Kreis die Mitte gesetzt ist und Esc gedrückt wird
+- **THEN** ist die Mitte verworfen, der Radius bleibt eingetragen, und das Zeichnen läuft weiter
+
+### Requirement: Radius einer Kreiszone ändern
+Der Zonen-Inspector SHALL bei einer Kreiszone den Radius zeigen und mit Schreibrecht änderbar
+machen. Eine Änderung MUST die Fläche um dieselbe Mitte neu rechnen und im Einsatztagebuch
+„<Art> «Name»: Radius 300 m → 500 m“ schreiben. Die Karte MUST eine Kreiszone mit dem Radius
+beschriften („Nord · r = 300 m“). Eine punktweise geänderte Fläche MUST ihre Kreisangaben
+verlieren; ein Radius an einer Zone ohne Kreis MUST mit 422 abgelehnt werden.
+
+#### Scenario: Radius von 300 auf 500 m
+- **WHEN** im Inspector einer Kreiszone der Radius auf 500 m gesetzt und das Feld verlassen wird
+- **THEN** ist der Kreis um dieselbe Mitte 500 m groß, und das Einsatztagebuch nennt „Radius 300 m → 500 m“
+
+#### Scenario: Punktweise geändert
+- **WHEN** eine Kreiszone eine neue Fläche bekommt
+- **THEN** zeigt der Inspector keinen Radius mehr
+
 ### Requirement: Messen bleibt einstufig
 Das Messwerkzeug der Lagekarte SHALL weiterhin mit einem einzigen Esc enden; die Zweistufigkeit gilt
 nur für das Zeichnen speicherbarer Figuren.
@@ -82,6 +127,15 @@ nur für das Zeichnen speicherbarer Figuren.
 #### Scenario: Esc beim Messen
 - **WHEN** eine Strecke gemessen wird und Esc gedrückt wird
 - **THEN** endet das Messwerkzeug
+
+### Requirement: Radius messen
+Das Messwerkzeug SHALL neben Strecke und Fläche die Form „Radius“ anbieten: der erste Punkt ist
+die Mitte, der zweite der Rand. Angezeigt MUST der Radius („r = 300 m“) und daneben die Fläche des
+Kreises werden. Gespeichert MUST nichts werden.
+
+#### Scenario: Radius zwischen zwei Punkten
+- **WHEN** in der Form „Radius“ eine Mitte und ein Rand im Abstand von 300 m gesetzt sind
+- **THEN** zeigt das Messwerkzeug „r = 300 m“ und die Kreisfläche von 28,3 ha
 
 ### Requirement: Zeichnen per Link
 Die Lagekarte SHALL einen Link mit dem Auftrag `zeichnen=<zonentyp>` annehmen und dann den
@@ -145,6 +199,31 @@ werden, auch allein.
 #### Scenario: Esc nach dem Link
 - **WHEN** der Zeichenmodus per Link gestartet ist, noch kein Punkt gesetzt ist und Esc gedrückt wird
 - **THEN** endet der Zeichenmodus
+
+### Requirement: Kreis per Link
+Für jeden Zonentyp mit Fläche SHALL der Zeichnen-Auftrag die Form `:kreis` annehmen und das
+Zeichnen eines Kreises starten. Die Adresse ist ein stabiler Vertrag für andere Module:
+`zeichnen=<zonentyp>:kreis[&radius=<meter>][&mitte=<breite>,<länge>]`. `radius` MUST eine Zahl in
+Metern sein, größer als 0 und höchstens 50 000; `mitte` MUST wie `zentrum=` geschrieben sein
+(WGS84, Breite vor Länge). Beide belegen nur vor; angelegt MUST erst nach „Übernehmen“ werden.
+
+#### Scenario: Evakuierungsbezirk als Kreis mit Vorbelegung
+- **WHEN** eine Person mit Schreibrecht die Lagekarte mit `zeichnen=evakuierungsbezirk:kreis&radius=300&mitte=54.1,9.5` öffnet
+- **THEN** steht das Kreis-Band für einen Evakuierungsbezirk mit Radius 300 m und der Mitte 54,1° N 9,5° O, es ist noch keine Zone angelegt, und `zeichnen`, `radius` und `mitte` sind aus der Adresse verschwunden
+
+### Requirement: Teile des Kreis-Links fallen einzeln weg
+Ein unbrauchbarer `radius` oder eine unbrauchbare `mitte` SHALL einzeln wegfallen, ohne den
+Auftrag ungültig zu machen. Ohne `:kreis` MUST `radius` und `mitte` wirkungslos bleiben. Die Seite
+MUST `zeichnen`, `radius` und `mitte` gemeinsam aus der Adresse entfernen, auch bei einem
+ungültigen Auftrag.
+
+#### Scenario: Unbrauchbarer Radius im Link
+- **WHEN** der Auftrag `zeichnen=absperrbereich:kreis&radius=80000` lautet
+- **THEN** startet das Kreis-Band für einen Absperrbereich ohne vorbelegten Radius
+
+#### Scenario: Linie als Kreis
+- **WHEN** der Auftrag `zeichnen=absperrgrenze:kreis` lautet
+- **THEN** startet kein Zeichenmodus, und `zeichnen`, `radius` und `mitte` sind aus der Adresse verschwunden
 
 ### Requirement: Vorgabefarbe einer freien Skizze
 

@@ -246,6 +246,17 @@ diese Zusage.
   der Kartenliste (`lagekarte/bezirkZeichnen.ts`) und räumt `zeichnen` und `bezirk` zusammen. Der
   Entwurf trägt `bezirk`: POST mit `label` und `evakuierungsbezirk_id`, keine Serie, danach der
   Modus `gebietGezeichnet` (Rückmeldung wie `verortet`, Rückweg nur aus der Kennung).
+- **Kreis um einen Punkt** (LLH-1043, Spec `lagekarte-zeichnen`): Zonen-Form `kreis` ohne
+  terra-draw (dessen Kreis-Modus sperrt im Zieh-Zug das Verschieben und geht am Touchschirm im
+  Klick-Zug nicht). Band `KreisSteuerung.tsx` (Zahl + Schnellwahl als Hauptweg), Vorschau und
+  Radius-Griff in `kreisVorschau.ts` (Ebenen `td-zone-kreis-*`, keine Klickebene, Griff vor
+  `map.remove()` abbauen). **Das Polygon rechnet der Server** (`lage_zone::kreis_polygon`, 64
+  Ecken); `geo.ts` `kreisPolygon` ist nur Vorschau, beide pinnen ≤ 1 % bei 54° N. Grenze
+  `KREIS_RADIUS_M_MAX` gespiegelt. Link `?zeichnen=<typ>:kreis&radius=<m>&mitte=<lat>,<lon>` ist
+  ein stabiler Vertrag: `radius`/`mitte` liest `LagekartePage` als Literal, verwirft sie einzeln
+  (`parseKreisVorbelegung`) und räumt alle drei. Esc: Figur = Mitte. Eine neue Geometrie per PATCH
+  löscht die Kreisangaben. Mit Bezug (`evakuierungsbezirk:kreis&bezirk=<id>`) trägt der Kreis ihn
+  wie die Fläche: POST mit `kreis`, `label` und `evakuierungsbezirk_id`, keine Serie, Art fest.
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe
   aus `lagekarte/zeichnenEsc.ts`, **ein** `keydown`-Zuhörer der Seite, terra-draw-Modi mit

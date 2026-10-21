@@ -58,3 +58,29 @@ describe('messErgebnis (LFH-616)', () => {
     ).toEqual({ haupt: '—' });
   });
 });
+
+describe('messErgebnis Radius (LLH-1043)', () => {
+  it('Radius aus Mitte und Rand, daneben die Kreisfläche', () => {
+    expect(messErgebnis('radius', { type: 'LineString', coordinates: [A] })).toEqual({
+      haupt: '—',
+    });
+    // π · 111,19² ≈ 38 841 m² → 3,9 ha.
+    expect(messErgebnis('radius', { type: 'LineString', coordinates: [A, B] })).toEqual({
+      haupt: 'r = 111 m',
+      neben: 'Fläche 3,9 ha',
+    });
+  });
+
+  it('zählt nur die ersten beiden verschiedenen Punkte: ein dritter Klick ändert nichts', () => {
+    const C = [9, 52.01];
+    expect(messErgebnis('radius', { type: 'LineString', coordinates: [A, A, B, C] }).haupt).toBe(
+      'r = 111 m',
+    );
+  });
+
+  it('eine Fläche ist kein Radius', () => {
+    expect(
+      messErgebnis('radius', { type: 'Polygon', coordinates: [[A, B, [9.001, 52], A]] }),
+    ).toEqual({ haupt: '—' });
+  });
+});

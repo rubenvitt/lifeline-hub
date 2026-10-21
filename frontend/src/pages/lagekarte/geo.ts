@@ -1,4 +1,4 @@
-import { GEOMETRIE_STUETZPUNKTE_MAX } from '../../api/eingabegrenzen';
+import { GEOMETRIE_STUETZPUNKTE_MAX, KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
 import { grenzeText } from '../../components/zeichenGrenze';
 
 export interface GeoJsonPolygon {
@@ -80,6 +80,79 @@ function haversineM([lon1, lat1]: number[], [lon2, lat2]: number[]): number {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
   return 2 * ERD_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/** Ein WGS84-Punkt mit Breite und Länge in Grad. */
+export interface GeoPunkt {
+  lat: number;
+  lon: number;
+}
+
+/** Großkreisabstand (Haversine) in Metern zwischen zwei Punkten. */
+export function abstandM(a: GeoPunkt, b: GeoPunkt): number {
+  return haversineM([a.lon, a.lat], [b.lon, b.lat]);
+}
+
+// --- Kreis um einen Punkt (LLH-1043) ---
+// Dieselbe Näherung wie der Server (`lage_zone::kreis_polygon`): gespeichert wird dessen Polygon,
+// diese Rechnung trägt nur die Vorschau. Zwei Rechenwege mit derselben Formel und Eckenzahl.
+
+/** Ecken der Polygon-Näherung (ohne Schlusspunkt). Spiegel: `lage_zone::KREIS_ECKEN`. */
+export const KREIS_ECKEN = 64;
+
+/** Zielpunkt in `abstand` Metern unter der Peilung `peilungRad` (von Nord im Uhrzeigersinn). */
+function zielpunkt(mitte: GeoPunkt, abstand: number, peilungRad: number): GeoPunkt {
+  const phi1 = toRad(mitte.lat);
+  const lambda1 = toRad(mitte.lon);
+  const delta = abstand / ERD_RADIUS_M;
+  const phi2 = Math.asin(
+    Math.sin(phi1) * Math.cos(delta) + Math.cos(phi1) * Math.sin(delta) * Math.cos(peilungRad),
+  );
+  const lambda2 =
+    lambda1 +
+    Math.atan2(
+      Math.sin(peilungRad) * Math.sin(delta) * Math.cos(phi1),
+      Math.cos(delta) - Math.sin(phi1) * Math.sin(phi2),
+    );
+  const lon = ((((lambda2 * 180) / Math.PI + 540) % 360) + 360) % 360;
+  return { lat: (phi2 * 180) / Math.PI, lon: lon - 180 };
+}
+
+/** Geodätische Kreisnäherung: 64 Ecken, Ring gegen den Uhrzeigersinn, geschlossen. */
+export function kreisPolygon(mitte: GeoPunkt, radiusM: number): GeoJsonPolygon {
+  const ring: number[][] = [];
+  for (let i = 0; i < KREIS_ECKEN; i++) {
+    const p = zielpunkt(mitte, radiusM, (-i * 2 * Math.PI) / KREIS_ECKEN);
+    ring.push([p.lon, p.lat]);
+  }
+  ring.push([...ring[0]]);
+  return { type: 'Polygon', coordinates: [ring] };
+}
+
+/** Der Punkt auf dem Kreisrand genau östlich der Mitte — dort sitzt der Radius-Griff. */
+export function radiusPunkt(mitte: GeoPunkt, radiusM: number): GeoPunkt {
+  return zielpunkt(mitte, radiusM, Math.PI / 2);
+}
+
+/** Radius als ganze Meter mit Tausenderpunkt („1.500 m“), wie im ETB (`lage_zone::format_meter`). */
+export function formatRadius(m: number): string {
+  return `${new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0, useGrouping: true }).format(Math.round(m))} m`;
+}
+
+/** Ist ein Radius übernehmbar (größer 0, höchstens die Grenze des Servers)? */
+export function radiusGueltig(r: number | null | undefined): r is number {
+  return r != null && Number.isFinite(r) && r > 0 && r <= KREIS_RADIUS_M_MAX;
+}
+
+/** Kreisangaben einer Zone; `null`, wenn eine fehlt (dann ist es kein Kreis). */
+export function kreisAusZone(z: {
+  kreis_mitte_lat?: number | null;
+  kreis_mitte_lon?: number | null;
+  kreis_radius_m?: number | null;
+}): { mitte: GeoPunkt; radiusM: number } | null {
+  if (z.kreis_mitte_lat == null || z.kreis_mitte_lon == null || z.kreis_radius_m == null)
+    return null;
+  return { mitte: { lat: z.kreis_mitte_lat, lon: z.kreis_mitte_lon }, radiusM: z.kreis_radius_m };
 }
 
 /** Aufsummierte Länge eines Koordinaten-Zugs (Haversine) in Metern. */

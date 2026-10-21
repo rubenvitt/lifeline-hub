@@ -1,4 +1,4 @@
-use super::{LageZoneAnzeige, LageZoneTyp};
+use super::{Kreis, LageZoneAnzeige, LageZoneTyp};
 use crate::error::AppError;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -16,7 +16,18 @@ pub struct ZoneNeu<'a> {
     /// Zugeordneter Evakuierungsbezirk. Typ, Einsatz, Lebenszyklus und Modulrecht hat der Handler
     /// geprüft; hier wird nur geschrieben.
     pub evakuierungsbezirk_id: Option<i64>,
+    /// Kreisangaben (LLH-1043); dann ist `geometrie` die Kreisnäherung des Servers.
+    pub kreis: Option<Kreis>,
     pub erstellt_von: i64,
+}
+
+/// Neue Geometrie einer Zone (LLH-1043). Geprüft hat der Handler.
+#[derive(Debug, Clone, Copy)]
+pub enum GeometriePatch<'a> {
+    /// Punktweise Bearbeitung: die Geometrie ersetzt die alte, die Kreisangaben fallen weg.
+    Frei(&'a str),
+    /// Kreis neu gerechnet (Radius geändert): Geometrie und Kreisangaben zusammen.
+    Kreis { geometrie: &'a str, kreis: Kreis },
 }
 
 /// `None` = unverändert; `Some(None)` = auf NULL/abspalten; `Some(Some(x))` = setzen.
@@ -34,12 +45,14 @@ pub struct ZonePatch<'a> {
     /// Wechselt die Zone weg vom Typ `evakuierungsbezirk`, fällt die Zuordnung ohnehin (wie beim
     /// Gefahrengebiet).
     pub evakuierungsbezirk_id: Option<Option<i64>>,
+    /// Geometrie ersetzen (LLH-1043): `None` = unverändert.
+    pub geometrie: Option<GeometriePatch<'a>>,
 }
 
 const SELECT_ALLE: &str = "\
     SELECT id, einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, \
-           gefahrengebiet_id, ansicht_id, evakuierungsbezirk_id, erstellt_von, erstellt_at, \
-           geaendert_at \
+           gefahrengebiet_id, ansicht_id, evakuierungsbezirk_id, kreis_mitte_lat, kreis_mitte_lon, \
+           kreis_radius_m, erstellt_von, erstellt_at, geaendert_at \
     FROM lage_zone";
 
 #[derive(sqlx::FromRow)]
@@ -56,6 +69,9 @@ struct Row {
     gefahrengebiet_id: Option<i64>,
     ansicht_id: Option<i64>,
     evakuierungsbezirk_id: Option<i64>,
+    kreis_mitte_lat: Option<f64>,
+    kreis_mitte_lon: Option<f64>,
+    kreis_radius_m: Option<f64>,
     erstellt_von: i64,
     erstellt_at: String,
     geaendert_at: String,
@@ -74,6 +90,9 @@ fn zu_anzeige(r: Row) -> LageZoneAnzeige {
         gefahrengebiet_id: r.gefahrengebiet_id,
         ansicht_id: r.ansicht_id,
         evakuierungsbezirk_id: r.evakuierungsbezirk_id,
+        kreis_mitte_lat: r.kreis_mitte_lat,
+        kreis_mitte_lon: r.kreis_mitte_lon,
+        kreis_radius_m: r.kreis_radius_m,
         erstellt_von: r.erstellt_von,
         erstellt_at: r.erstellt_at,
         geaendert_at: r.geaendert_at,
@@ -169,8 +188,8 @@ pub async fn anlegen_tx(
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO lage_zone \
             (einsatz_id, typ, geometrie_typ, geometrie, label, farbe, notiz, gefahrengebiet_id, ansicht_id, \
-             evakuierungsbezirk_id, erstellt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             evakuierungsbezirk_id, kreis_mitte_lat, kreis_mitte_lon, kreis_radius_m, erstellt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id).bind(daten.typ).bind(daten.geometrie_typ).bind(daten.geometrie)
     .bind(daten.label).bind(daten.farbe).bind(daten.notiz).bind(gebiet_id)
@@ -178,6 +197,9 @@ pub async fn anlegen_tx(
     .bind(daten.ansicht_id)
     // Nur an Bezirksflächen; an jedem anderen Typ bleibt die Spalte leer.
     .bind(bezirk_id)
+    .bind(daten.kreis.map(|k| k.mitte_lat))
+    .bind(daten.kreis.map(|k| k.mitte_lon))
+    .bind(daten.kreis.map(|k| k.radius_m))
     .bind(daten.erstellt_von)
     .fetch_one(&mut *conn).await?;
     Ok(id)
@@ -222,7 +244,8 @@ pub async fn anlegen(
 }
 
 /// Partial-Update gegen den Effektivzustand (nur gesendete Felder), `geaendert_at` stets neu.
-/// Die Geometrie ist nicht änderbar. `NotFound`, falls fremd.
+/// Die Geometrie ändert sich nur über [`GeometriePatch`]: frei gesetzt fallen die Kreisangaben weg,
+/// ein neu gerechneter Kreis schreibt sie mit (LLH-1043). `NotFound`, falls fremd.
 pub async fn aktualisiere(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -280,6 +303,13 @@ pub async fn aktualisiere(
         }
     }
 
+    // Geometrie und Kreisangaben gehen zusammen: eine frei gesetzte Geometrie nullt den Kreis.
+    let (geometrie_neu, kreis_neu): (Option<&str>, Option<Kreis>) = match daten.geometrie {
+        None => (None, None),
+        Some(GeometriePatch::Frei(g)) => (Some(g), None),
+        Some(GeometriePatch::Kreis { geometrie, kreis }) => (Some(geometrie), Some(kreis)),
+    };
+
     let betroffen = sqlx::query(
         "UPDATE lage_zone SET \
             typ   = CASE WHEN ? THEN ? ELSE typ END, \
@@ -290,6 +320,10 @@ pub async fn aktualisiere(
             ansicht_id = CASE WHEN ? THEN ? ELSE ansicht_id END, \
             evakuierungsbezirk_id = CASE WHEN ? THEN NULL WHEN ? THEN ? \
                                          ELSE evakuierungsbezirk_id END, \
+            geometrie = CASE WHEN ? THEN ? ELSE geometrie END, \
+            kreis_mitte_lat = CASE WHEN ? THEN ? ELSE kreis_mitte_lat END, \
+            kreis_mitte_lon = CASE WHEN ? THEN ? ELSE kreis_mitte_lon END, \
+            kreis_radius_m = CASE WHEN ? THEN ? ELSE kreis_radius_m END, \
             geaendert_at = datetime('now') \
          WHERE id = ? AND einsatz_id = ?",
     )
@@ -308,6 +342,14 @@ pub async fn aktualisiere(
     .bind(bezirk_weg)
     .bind(daten.evakuierungsbezirk_id.is_some())
     .bind(daten.evakuierungsbezirk_id.flatten())
+    .bind(geometrie_neu.is_some())
+    .bind(geometrie_neu)
+    .bind(daten.geometrie.is_some())
+    .bind(kreis_neu.map(|k| k.mitte_lat))
+    .bind(daten.geometrie.is_some())
+    .bind(kreis_neu.map(|k| k.mitte_lon))
+    .bind(daten.geometrie.is_some())
+    .bind(kreis_neu.map(|k| k.radius_m))
     .bind(id)
     .bind(einsatz_id)
     .execute(&mut *tx)
@@ -420,6 +462,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -449,6 +492,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -473,6 +517,7 @@ mod tests {
                 notiz: Some("Notiz bleibt"),
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -514,6 +559,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -531,6 +577,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -574,6 +621,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -602,6 +650,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -642,6 +691,7 @@ mod tests {
                 notiz: None,
                 ansicht_id: None,
                 evakuierungsbezirk_id: None,
+                kreis: None,
                 erstellt_von: von,
             },
         )
@@ -691,6 +741,7 @@ mod tests {
             notiz: None,
             ansicht_id: None,
             evakuierungsbezirk_id: bezirk,
+            kreis: None,
             erstellt_von: von,
         }
     }
