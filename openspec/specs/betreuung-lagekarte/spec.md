@@ -90,19 +90,19 @@ als Marker noch in einer Liste der Karte erscheinen.
 
 ### Requirement: Nicht verortete Stellen platzieren
 
-Die Lagekarte SHALL nicht stornierte Betreuungsstellen ohne Koordinate in der Liste „Nicht
-verortet“ führen. Eine Person mit Schreibrecht MUST eine solche Stelle von dort aus durch
-einen Klick in die Karte verorten können. Die Adresse
-`/einsaetze/<id>/lagekarte?platzieren=betreuungsstelle:<stellen-id>` MUST die Karte in den
-Platziermodus für diese Stelle schicken und den Parameter danach aus der Adresse entfernen.
-Ohne Schreibrecht MUST der Platziermodus nicht betreten werden. Die Betreuungsseite und die
-Detailseite einer Stelle MUST an jeder nicht verorteten Stelle einen Einstieg „Auf Karte
-verorten“ anbieten, der zu dieser Adresse führt, sofern die Person Schreibrecht hat.
+Die Lagekarte SHALL nicht stornierte Betreuungsstellen ohne Koordinate in der Objektliste als nicht
+verortet führen (Filter „Nicht verortet“, Spec `lagekarte-kartenleiste`). Eine Person mit
+Schreibrecht MUST eine solche Stelle von dort aus durch einen Klick in die Karte verorten können.
+Die Adresse `/einsaetze/<id>/lagekarte?platzieren=betreuungsstelle:<stellen-id>` MUST die Karte in
+den Platziermodus für diese Stelle schicken und den Parameter danach aus der Adresse entfernen. Ohne
+Schreibrecht MUST der Platziermodus nicht betreten werden. Die Betreuungsseite und die Detailseite
+einer Stelle MUST an jeder nicht verorteten Stelle einen Einstieg „Auf Karte verorten“ anbieten, der
+zu dieser Adresse führt, sofern die Person Schreibrecht hat.
 
 #### Scenario: Aus der Liste platzieren
-- **WHEN** eine Person mit Schreibrecht in „Nicht verortet“ die Stelle „AS Rathaus“ wählt und in die Karte klickt
+- **WHEN** eine Person mit Schreibrecht in der Objektliste an der nicht verorteten Stelle „AS Rathaus“ „Platzieren“ wählt und in die Karte klickt
 - **THEN** trägt die Stelle die Koordinate des Klickpunkts und erscheint als Marker
-- **AND** sie steht nicht mehr in „Nicht verortet“
+- **AND** sie zählt nicht mehr als nicht verortet
 
 #### Scenario: Deeplink aus dem Modul
 - **WHEN** auf der Betreuungsseite an einer nicht verorteten Stelle „Auf Karte verorten“ gewählt wird
@@ -118,7 +118,7 @@ verorten“ anbieten, der zu dieser Adresse führt, sofern die Person Schreibrec
 
 #### Scenario: Verortung entfernen
 - **WHEN** eine Person mit Schreibrecht am ausgewählten Marker „Verortung löschen“ wählt
-- **THEN** verliert die Stelle ihre Koordinate und steht wieder in „Nicht verortet“
+- **THEN** verliert die Stelle ihre Koordinate und steht in der Objektliste wieder als nicht verortet
 
 ### Requirement: Modulfreigabe auf der Karte
 

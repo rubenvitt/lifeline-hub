@@ -24,8 +24,9 @@ Ziele dort tragen die kleine Steuerhöhe (24 / 48 / 72) auf beiden Achsen.
 - ETB: Zeilen des Slash-Menüs, Auslöser „Aktionen zu Eintrag N“ und die Einträge seines
   Menüs, dazu Textfeld und Knopf „Erfassen“ der Schnellerfassung, der Entwurfstab und sein
   Schließen-Kreuz.
-- Lagekarte: die Segmente „Ebenen“ und „Objekte“ der Kartenleiste, im Ebenenbaum die Zeilen,
-  die Gruppenköpfe und die Gruppenschalter, Einträge der Leistenkarte „Verortet“, die fünf
+- Lagekarte: die Segmente „Ebenen“, „Objekte“ und „Auswahl“ der Kartenleiste, im Ebenenbaum
+  die Zeilen, die Gruppenköpfe und die Gruppenschalter, in der Objektliste die Marke „Nicht
+  verortet“, die Gruppenköpfe, die Zeilen und ihre Knöpfe, der Rückweg der Auswahl, die fünf
   Kartenknöpfe (Hineinzoomen, Herauszoomen, Nach Norden ausrichten, Messen, Zeichenwerkzeuge) und
   die Knöpfe der ausgeklappten Zeitachse, einschließlich „Abspielen“.
 - Gefahrenmatrix: alle 58 Zell-Auslöser und die Gebietszeilen.

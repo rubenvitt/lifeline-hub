@@ -126,7 +126,7 @@ zugänglich, MUST die Legende fehlen.
 - **THEN** ist keine Sichtungslegende zu sehen
 
 ### Requirement: Inspector für Personen
-Wird ein Personen-Marker ausgewählt, MUST das Paneel „Ausgewählt“ die Person als
+Wird ein Personen-Marker ausgewählt, MUST die Ansicht „Auswahl“ der Kartenleiste die Person als
 „Person“ ausweisen und einen Link „Im Fachmodul öffnen“ auf die Personen-Detailseite
 dieser Person anbieten. Für schreibberechtigte Benutzer MUST „Verortung löschen“ die
 Fundort-Koordinate der Person entfernen; danach MUST der Marker verschwinden und die Person

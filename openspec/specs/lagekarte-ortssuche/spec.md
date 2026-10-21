@@ -125,8 +125,9 @@ das dort ohne Suchnadel getroffen würde.
 
 ### Requirement: Lagekarte nimmt Ort und Zentrum per Link an
 Die Lagekarte SHALL `?zentrum=<lat>,<lon>` anfliegen und dort die Suchnadel mit der Koordinate
-setzen. Sie SHALL `?ort=<Text>` in das Suchfeld übernehmen, die Adresssuche auslösen und die Treffer
-in der Kartenleiste zeigen, am Handschirm auch bei zugeklappter Leiste. Beide Parameter MUST nach
+setzen. Sie SHALL `?ort=<Text>` in das Suchfeld der Ansicht „Objekte“ übernehmen, die Adresssuche
+auslösen und die Treffer in der Kartenleiste zeigen, mit gewählter Ansicht „Objekte“ (auch vor
+einer offenen Auswahl), am Handschirm auch bei zugeklappter Leiste. Beide Parameter MUST nach
 der Übernahme aus der Adresse verschwinden.
 
 #### Scenario: Koordinatensprung setzt die Nadel
@@ -135,7 +136,11 @@ der Übernahme aus der Adresse verschwinden.
 
 #### Scenario: Adresse per Link am Handschirm
 - **WHEN** die Lagekarte bei 390 px Breite mit `?ort=Hauptstraße 12` öffnet
-- **THEN** steht der Text im Suchfeld, die Leiste ist offen und zeigt die Gruppe „Adresse“
+- **THEN** steht der Text im Suchfeld, die Leiste ist offen, die Ansicht „Objekte“ ist gewählt und zeigt die Gruppe „Adresse“
+
+#### Scenario: Adresse per Link bei gewählten Ebenen
+- **WHEN** zuletzt die Ansicht „Ebenen“ gewählt war und die Lagekarte mit `?ort=Hauptstraße 12` öffnet
+- **THEN** zeigt die Leiste die Ansicht „Objekte“ mit der Gruppe „Adresse“
 
 ### Requirement: Adresssuche über den Server mit Grenzen
 Die Adressauflösung SHALL über den Server laufen, an den Geocoder der Organisation (ohne Einstellung

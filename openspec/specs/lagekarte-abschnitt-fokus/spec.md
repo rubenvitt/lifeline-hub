@@ -15,7 +15,9 @@ mit diesem Fokus.
 Die Lagekarte SHALL den Fokus über die Handlung „Abschnitt fokussieren“ im Inspector eines
 ausgewählten Einsatzabschnitts anbieten. Die Handlung MUST ohne Schreibrecht stehen, weil der
 Fokus nichts ändert. Sie MUST fehlen, solange genau dieser Abschnitt fokussiert ist. Die Zeilen
-der Objektliste MUST keine eigene Fokus-Handlung tragen.
+der Objektliste MUST keine eigene Fokus-Handlung tragen. Ein Abschnitt ohne Fläche hat keinen
+Marker; seine Zeile in der Objektliste MUST ihn auswählen, und sein Inspector MUST ohne
+Koordinate und ohne „Verortung löschen“ stehen und „Abschnitt fokussieren“ tragen.
 
 #### Scenario: Abschnitt aus dem Inspector fokussieren
 
@@ -26,6 +28,11 @@ der Objektliste MUST keine eigene Fokus-Handlung tragen.
 
 - **WHEN** „EA Süd“ fokussiert ist und eine Person ihn erneut wählt
 - **THEN** trägt sein Inspector die Handlung „Abschnitt fokussieren“ nicht
+
+#### Scenario: Abschnitt ohne Fläche aus der Objektliste
+
+- **WHEN** „EA Ost“ keine Fläche hat und eine Person in der Objektliste seine Zeile tippt und dann „Abschnitt fokussieren“ betätigt
+- **THEN** steht der Fokus auf „EA Ost“, und sein Inspector zeigte keine Koordinate
 
 ### Requirement: Ausschnitt auf den Abschnitt
 
@@ -98,9 +105,10 @@ Einsatzwechsel MUST den Fokus beenden.
 
 ### Requirement: Esc im Fokus
 
-Esc MUST bei offener Auswahl erst die Auswahl schließen und erst danach den Fokus aufheben.
-Während eines exklusiven Kartenmodus, in einem Eingabefeld und bei offenem Menü oder Dialog MUST
-Esc den Fokus stehen lassen.
+Esc MUST bei offener Auswahl erst die Auswahl schließen und erst danach den Fokus aufheben. Ist
+ein Bündel der Karte aufgefächert, MUST Esc vorher das Bündel einklappen. Eine Taste MUST genau
+eine Stufe wirken. Während eines exklusiven Kartenmodus, in einem Eingabefeld und bei offenem
+Menü oder Dialog MUST Esc den Fokus stehen lassen.
 
 #### Scenario: Esc mit offener Auswahl
 
@@ -111,6 +119,11 @@ Esc den Fokus stehen lassen.
 
 - **WHEN** ein Abschnitt fokussiert ist, keine Auswahl offen steht und eine Person Esc drückt
 - **THEN** ist der Fokus aufgehoben, und die Kamera fährt zurück
+
+#### Scenario: Esc mit Bündel, Auswahl und Fokus
+
+- **WHEN** ein Abschnitt fokussiert ist, eine Auswahl offen steht, ein Bündel aufgefächert ist und eine Person dreimal Esc drückt
+- **THEN** klappt die erste Taste das Bündel ein, die zweite schließt die Auswahl, die dritte hebt den Fokus auf
 
 #### Scenario: Esc beim Messen
 

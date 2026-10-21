@@ -5,7 +5,7 @@ Ein Bereitstellungsraum ist ein Ort. Er trägt eine optionale Koordinate, die oh
 Tagebucheintrag gesetzt und live verteilt wird, und erscheint im Lage-Snapshot samt Belegung,
 ohne die Modulfreigabe zu umgehen; die Schwärzung behält seine Lage als Geo-Skelett. Die
 Lagekarte zeigt den Raum als eigene Ebene mit dem Raumzeichen nach DV 102 und seiner Belegung,
-verortet ihn aus der Detailseite oder aus „Nicht verortet“ und führt zurück zur Detailseite
+verortet ihn aus der Detailseite oder aus der Objektliste und führt zurück zur Detailseite
 (Gegenstück zu `betreuung-lagekarte`).
 
 ## Requirements
@@ -134,17 +134,16 @@ tragen.
 
 ### Requirement: Nicht verortete Räume platzieren
 
-Die Lagekarte SHALL Räume im Status „geplant“ oder „aktiv“ ohne Koordinate in der Liste „Nicht
-verortet“ führen. Eine Person mit Schreibrecht MUST einen solchen Raum von dort aus durch einen
-Klick in die Karte verorten können. Die Adresse
-`/einsaetze/<id>/lagekarte?platzieren=bereitstellungsraum:<raum-id>` MUST die Karte in den
-Platziermodus für diesen Raum schicken und den Parameter danach aus der Adresse entfernen; ohne
-Schreibrecht oder ohne Lesezugriff auf das Modul Bereitstellungsräume MUST der Platziermodus
-nicht betreten werden. Die Detailseite eines Raums MUST an den Raumdaten einen Einstieg zu dieser
-Adresse anbieten, „Auf Karte verorten“ bzw. bei einem verorteten Raum „Auf Karte versetzen“,
-sofern die Person den Raum bearbeiten darf; ist die Lagekarte für sie gesperrt, MUST der
-Einstieg gesperrt mit Grund im sichtbaren Text stehen. Das Verorten MUST keinen ETB-Eintrag
-schreiben.
+Die Lagekarte SHALL Räume im Status „geplant“ oder „aktiv“ ohne Koordinate in der Objektliste als
+nicht verortet führen (Filter „Nicht verortet“, Spec `lagekarte-kartenleiste`). Eine Person mit
+Schreibrecht MUST einen solchen Raum von dort aus durch einen Klick in die Karte verorten können.
+Die Adresse `/einsaetze/<id>/lagekarte?platzieren=bereitstellungsraum:<raum-id>` MUST die Karte in
+den Platziermodus für diesen Raum schicken und den Parameter danach aus der Adresse entfernen; ohne
+Schreibrecht oder ohne Lesezugriff auf das Modul Bereitstellungsräume MUST der Platziermodus nicht
+betreten werden. Die Detailseite eines Raums MUST an den Raumdaten einen Einstieg zu dieser Adresse
+anbieten, „Auf Karte verorten“ bzw. bei einem verorteten Raum „Auf Karte versetzen“, sofern die
+Person den Raum bearbeiten darf; ist die Lagekarte für sie gesperrt, MUST der Einstieg gesperrt mit
+Grund im sichtbaren Text stehen. Das Verorten MUST keinen ETB-Eintrag schreiben.
 
 #### Scenario: Aus der Detailseite verorten
 - **WHEN** eine Person mit Schreibrecht an den Raumdaten von „BR Sportplatz“ „Auf Karte verorten“ wählt und in die Karte klickt
@@ -152,8 +151,8 @@ schreiben.
 - **AND** es entsteht kein ETB-Eintrag
 
 #### Scenario: Aus der Liste platzieren
-- **WHEN** eine Person mit Schreibrecht in „Nicht verortet“ den Raum „BR Nord“ wählt und in die Karte klickt
-- **THEN** trägt der Raum die Koordinate des Klickpunkts und steht nicht mehr in „Nicht verortet“
+- **WHEN** eine Person mit Schreibrecht in der Objektliste am nicht verorteten Raum „BR Nord“ „Platzieren“ wählt und in die Karte klickt
+- **THEN** trägt der Raum die Koordinate des Klickpunkts und zählt nicht mehr als nicht verortet
 
 #### Scenario: Ohne Modulrecht
 - **WHEN** eine Person ohne Lesezugriff auf das Modul Bereitstellungsräume die Platzieren-Adresse aufruft
@@ -165,7 +164,7 @@ schreiben.
 
 #### Scenario: Verortung entfernen
 - **WHEN** eine Person mit Schreibrecht am ausgewählten Marker „Verortung löschen“ wählt
-- **THEN** verliert der Raum seine Koordinate und steht wieder in „Nicht verortet“
+- **THEN** verliert der Raum seine Koordinate und steht in der Objektliste wieder als nicht verortet
 
 ### Requirement: Modulfreigabe und gesicherter Stand auf der Karte
 
