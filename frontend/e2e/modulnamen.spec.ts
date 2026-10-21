@@ -113,8 +113,8 @@ test('1366 × 768: die Kräfte stehen mit Beschreibung ganz im Modulpanel', asyn
   const panel = page.locator('#modul-panel');
   await expect(panel).toBeVisible();
   const zeilen = panel.locator('button:has([data-lfh="modul-beschreibung"])');
-  // Acht Kräfte-Module, jedes mit Beschreibung.
-  await expect(zeilen).toHaveCount(8);
+  // Neun Kräfte-Module (mit Nachforderungen), jedes mit Beschreibung.
+  await expect(zeilen).toHaveCount(9);
   await beschreibungenImRahmen(panel, '1366 px, Kräfte');
   await expect(zeilen.last()).toBeInViewport({ ratio: 1 });
 });
