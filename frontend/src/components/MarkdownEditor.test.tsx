@@ -19,27 +19,6 @@ describe('MarkdownEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith('x');
   });
 
-  // LLH-1354: alle Aufrufer nutzen `toggle`, deshalb ist es der Default.
-  it('rendert ohne `layout` das toggle-Layout, die Vorschau erst auf Klick', async () => {
-    const { container } = render(
-      <MarkdownEditor unterEbene={3} value="Lage **kritisch**" onChange={() => {}} />,
-    );
-    expect(container.querySelectorAll('.markdown-editor--toggle')).toHaveLength(1);
-    expect(container.querySelector('.markdown')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
-    expect(container.querySelector('.markdown strong')).toHaveTextContent('kritisch');
-  });
-
-  it('tabs-Layout zeigt zunächst das Textfeld, die Vorschau erst nach Umschalten', async () => {
-    const { container } = render(
-      <MarkdownEditor unterEbene={3} value={'- a\n- b'} onChange={() => {}} layout="tabs" />,
-    );
-    // Vor dem Umschalten: keine gerenderte Markdown-Vorschau.
-    expect(container.querySelector('.markdown')).toBeNull();
-    await userEvent.click(screen.getByRole('tab', { name: /vorschau/i }));
-    expect(container.querySelectorAll('.markdown li')).toHaveLength(2);
-  });
-
   it('zeigt bei leerem Inhalt einen dezenten Vorschau-Hinweis statt eines leeren Kastens', async () => {
     render(<MarkdownEditor unterEbene={3} value="" onChange={() => {}} />);
     await userEvent.click(screen.getByRole('button', { name: /vorschau/i }));
@@ -86,13 +65,12 @@ describe('MarkdownEditor', () => {
   });
 });
 
-describe('MarkdownEditor – toggle-Variante', () => {
+describe('MarkdownEditor – Vorschau-Umschalter', () => {
   it('zeigt Eingabe; Vorschau-Toggle blendet formatierten Markdown ein', async () => {
     function Wrap() {
       return (
         <MarkdownEditor
           unterEbene={3}
-          layout="toggle"
           variante="kompakt"
           placeholder="Inhalt …"
           value="**fett**"
@@ -108,35 +86,29 @@ describe('MarkdownEditor – toggle-Variante', () => {
 
   /**
    * Die Voraussetzung der Druckregeln aus `entwurf/dokumentEntwurf.css` (LFH-350/M86), als
-   * DOM-Messung: das Textfeld steht in `.markdown-editor--toggle`, und bei geschlossener Vorschau
+   * DOM-Messung: das Textfeld steht in `.markdown-editor`, und bei geschlossener Vorschau
    * ist es der einzige Träger des Textes. Eine Regel auf `textarea` braucht deshalb eine
    * gerenderte Fassung daneben (offene Vorschau oder `druckfassung`). Fällt diese Behauptung, ist
    * die Begründung der Druckregeln hinfällig.
    */
   it('trägt bei geschlossener Vorschau den Text allein im Textfeld', () => {
     const { container } = renderMitProviders(
-      <MarkdownEditor unterEbene={3} layout="toggle" value="**fett**" onChange={() => {}} />,
+      <MarkdownEditor unterEbene={3} value="**fett**" onChange={() => {}} />,
     );
-    expect(container.querySelectorAll('.markdown-editor--toggle textarea')).toHaveLength(1);
+    expect(container.querySelectorAll('.markdown-editor textarea')).toHaveLength(1);
     expect(container.querySelector('.markdown-editor__vorschau')).toBeNull();
     expect(container.querySelector('.markdown')).toBeNull();
   });
 
   /**
-   * Druckfassung (LFH-71): bei geschlossener Vorschau trüge im Toggle-Layout nur das Textfeld den
+   * Druckfassung (LFH-71): bei geschlossener Vorschau trüge nur das Textfeld den
    * Abschnitt — auf Papier eine `<textarea>` mit abgeschnittenem Rohtext. Mit `druckfassung`
    * steht daneben eine gerenderte Fassung, die nur der Druck zeigt. Genau EINE gerenderte Fassung
    * im Baum: ist die Vorschau offen, trägt sie den Text.
    */
   it('rendert mit `druckfassung` bei geschlossener Vorschau eine gerenderte Druckfassung', async () => {
     const { container } = renderMitProviders(
-      <MarkdownEditor
-        unterEbene={1}
-        layout="toggle"
-        druckfassung
-        value={'**fett**\n\nENDE'}
-        onChange={() => {}}
-      />,
+      <MarkdownEditor unterEbene={1} druckfassung value={'**fett**\n\nENDE'} onChange={() => {}} />,
     );
     const druck = container.querySelector('.markdown-editor__druck');
     expect(druck, 'keine Druckfassung').not.toBeNull();
@@ -154,7 +126,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
 
   it('setzt einen leeren Abschnitt in der Druckfassung als „—" wie der Lesezweig', () => {
     const { container } = renderMitProviders(
-      <MarkdownEditor unterEbene={1} layout="toggle" druckfassung value="  " onChange={() => {}} />,
+      <MarkdownEditor unterEbene={1} druckfassung value="  " onChange={() => {}} />,
     );
     expect(container.querySelector('.markdown-editor__druck')).toHaveTextContent(/^—$/);
   });
@@ -168,7 +140,6 @@ describe('MarkdownEditor – toggle-Variante', () => {
     const { container } = renderMitProviders(
       <MarkdownEditor
         unterEbene={1}
-        layout="toggle"
         druckfassung
         druckTitel="Eigene Lage"
         value={'Erster Absatz\n\nZweiter'}
@@ -193,7 +164,6 @@ describe('MarkdownEditor – toggle-Variante', () => {
     const { container } = renderMitProviders(
       <MarkdownEditor
         unterEbene={1}
-        layout="toggle"
         druckfassung
         druckTitel="Medienlage"
         value=""
@@ -211,7 +181,6 @@ describe('MarkdownEditor – toggle-Variante', () => {
         <span id="hilfe">a. Eigene Absicht</span>
         <MarkdownEditor
           unterEbene={3}
-          layout="toggle"
           umschalterAussen
           aria-describedby="hilfe"
           value=""
@@ -224,13 +193,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
 
   it('rendert ohne `druckTitel` keinen Titel', () => {
     const { container } = renderMitProviders(
-      <MarkdownEditor
-        unterEbene={1}
-        layout="toggle"
-        druckfassung
-        value="Text"
-        onChange={() => {}}
-      />,
+      <MarkdownEditor unterEbene={1} druckfassung value="Text" onChange={() => {}} />,
     );
     expect(container.querySelector('.markdown-editor__titel')).toBeNull();
   });
@@ -239,25 +202,12 @@ describe('MarkdownEditor – toggle-Variante', () => {
   it('rendert die Druckfassung im readOnly-Zustand unverändert', () => {
     const wert = '**fett**\n\nENDE';
     const frei = renderMitProviders(
-      <MarkdownEditor
-        unterEbene={1}
-        layout="toggle"
-        druckfassung
-        value={wert}
-        onChange={() => {}}
-      />,
+      <MarkdownEditor unterEbene={1} druckfassung value={wert} onChange={() => {}} />,
     );
     const erwartet = frei.container.querySelector('.markdown-editor__druck')!.innerHTML;
     frei.unmount();
     const { container } = renderMitProviders(
-      <MarkdownEditor
-        unterEbene={1}
-        layout="toggle"
-        druckfassung
-        readOnly
-        value={wert}
-        onChange={() => {}}
-      />,
+      <MarkdownEditor unterEbene={1} druckfassung readOnly value={wert} onChange={() => {}} />,
     );
     expect(container.querySelector('.markdown-editor__druck')!.innerHTML).toBe(erwartet);
     expect(screen.getByRole('textbox')).toHaveAttribute('readonly');
@@ -266,7 +216,7 @@ describe('MarkdownEditor – toggle-Variante', () => {
 
   it('rendert ohne `druckfassung` keine Druckfassung (ETB-Schnellerfassung: Tipp-Pfad)', () => {
     const { container } = renderMitProviders(
-      <MarkdownEditor unterEbene={1} layout="toggle" value="**fett**" onChange={() => {}} />,
+      <MarkdownEditor unterEbene={1} value="**fett**" onChange={() => {}} />,
     );
     expect(container.querySelector('.markdown-editor__druck')).toBeNull();
   });
@@ -279,7 +229,6 @@ describe('MarkdownEditor – toggle-Variante', () => {
     const { container, rerender } = renderMitProviders(
       <MarkdownEditor
         unterEbene={3}
-        layout="toggle"
         value="**fett**"
         onChange={() => {}}
         umschalterAussen
@@ -291,7 +240,6 @@ describe('MarkdownEditor – toggle-Variante', () => {
     rerender(
       <MarkdownEditor
         unterEbene={3}
-        layout="toggle"
         value="**fett**"
         onChange={() => {}}
         umschalterAussen
@@ -306,7 +254,6 @@ describe('MarkdownEditor – toggle-Variante', () => {
     renderMitProviders(
       <MarkdownEditor
         unterEbene={3}
-        layout="toggle"
         placeholder="Inhalt …"
         value=""
         onChange={() => {}}
@@ -324,7 +271,6 @@ describe('MarkdownEditor — Zeichengrenze (LFH-937)', () => {
     return (
       <MarkdownEditor
         unterEbene={3}
-        layout="toggle"
         value={wert}
         onChange={setWert}
         maxLength={10}

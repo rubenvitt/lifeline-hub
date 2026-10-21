@@ -107,7 +107,7 @@
   /* Das Textfeld weicht IMMER, daneben steht die Druckfassung (`druckfassung`, am Schirm
      `display: none` aus `MarkdownEditor.css`): sonst käme Rohtext in Schirmhöhe aufs Papier,
      langer Text abgeschnitten (M86). */
-  [data-lfh='dokument-entwurf'] .markdown-editor--toggle textarea {
+  [data-lfh='dokument-entwurf'] .markdown-editor textarea {
     display: none !important;
   }
 

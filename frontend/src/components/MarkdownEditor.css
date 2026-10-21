@@ -10,7 +10,7 @@
   overflow: auto;
 }
 
-/* Druckfassung des toggle-Layouts (Prop `druckfassung`): am Bildschirm nie sichtbar — auch
+/* Druckfassung (Prop `druckfassung`): am Bildschirm nie sichtbar — auch
    nicht beim Druck ohne Druckwurzel. Sichtbar macht sie allein das Druck-Stylesheet der
    Entwurfsseite (`entwurf/dokumentEntwurf.css`), das dort das Textfeld ausblendet. */
 .markdown-editor__druck {
@@ -26,9 +26,4 @@
   font-weight: 600;
   line-height: 1.5;
   margin-bottom: 0.5em;
-}
-
-/* ---------- tabs: kompakter Schreiben/Vorschau-Umschalter ---------- */
-.markdown-editor--tabs .markdown-editor__vorschau {
-  min-height: 40px;
 }
