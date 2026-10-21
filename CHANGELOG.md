@@ -1,3 +1,102 @@
+## [1.0.0-alpha.146](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.145...v1.0.0-alpha.146) (2026-10-21)
+
+### Wichtige Änderungen
+
+- **Evakuierung ist jetzt ein eigenes Modul.** Die Evakuierungsbezirke haben eigene Rechte und einen eigenen Zähler. Ihre Schnittstellen liegen nicht mehr unter Betreuung, sondern unter `/api/einsaetze/{id}/evakuierung/…`. Die alten Adressen gibt es nicht mehr. Externe Anbindungen müssen umgestellt werden. Für Live-Aktualisierungen gibt es das neue Ereignis `evakuierung`.
+- **Rechte werden übernommen.** Beim Update erhält das Modul Evakuierung dieselben Rollen- und Sichtbarkeitsvorgaben, die bisher für Betreuung galten.
+- **Alte Links funktionieren weiter.** Links auf `…/betreuung?bezirk=` leiten auf die neue Seite um. Standmeldungen, die ohne Netz vorgemerkt wurden, gehen nach dem Update an die neue Stelle.
+- **Mehrere Datenbank-Migrationen.** Neu sind:
+  - Gefahr und Schadensgrad am Schaden
+  - Rechte für das Modul Evakuierung
+  - Fundort-Koordinate an Tieren
+  - Leitung und Erreichbarkeit an Betreuungsstellen
+  - Beurteilung je Gefahrengebiet
+  - Anlagen-Art „Lageplan“ für Lagebericht und Befehl
+  - Bezug einer Nachforderung auf eine Betreuungsstelle
+  - Zonen als Kreis
+
+  Die Migrationen laufen beim Start automatisch.
+- **Zwei Dialoge entfallen.** „Bearbeiten (Status, Kapazität)“ in der Betreuungsübersicht und „Plangröße fortschreiben“ bei Evakuierungsbezirken sind weg. Beides wird jetzt auf den neuen Detailseiten bearbeitet.
+
+### Lagekarte
+
+- **Absperr- und Gefahrenbereich als Kreis:** Kreise lassen sich über das Paneel „Zeichnen“ oder im Kontextmenü mit „Kreis hier …“ anlegen.
+  - Die Mitte wird per Tipp, über den Einsatzort oder über die Suchnadel gesetzt.
+  - Der Radius wird eingetippt, per Schnellwahl (50 bis 1000 m) gewählt oder am Rand gezogen.
+  - Die Karte zeigt den Radius an der Zone an. Im Inspector lässt er sich ändern, die Änderung steht im ETB.
+  - Das Messwerkzeug kann jetzt auch Radien messen.
+  - Kreise lassen sich auch per Link vorbelegen.
+- **Lageplan drucken und anhängen:** „Drucken / als PDF“ druckt den aktuellen Ausschnitt auf ein A4-Blatt quer. Das Blatt hat Druckkopf, Maßstab, Nordpfeil und eine Legende, die nur das Gezeichnete enthält. Mit „Als Anlage an …“ kommt der Lageplan an einen offenen Entwurf oder an einen neuen Lagevortrag. Der Lageplan passt auch mit Organisationslogo und langer Legende auf ein Blatt.
+- **Einsatzabschnitt fokussieren:** Die Karte zoomt auf den Abschnitt und blendet Fremdes gedämpft weiter ein. Ein Band im Kartenfuß beendet den Fokus, Esc ebenso. Es wird nichts gespeichert. Der Fokus lässt sich auch per Link öffnen.
+- **Ebene „Tiere“:** Offene und vermisste Tiere stehen als Kreis mit „T“ auf der Karte, vermisste deutlich markiert. Unverortete Tiere lassen sich platzieren. Ohne Freigabe des Moduls Tiere bleibt die Ebene gesperrt, ohne Netz bleibt sie leer.
+- **Gefahrenzeichen bei Schäden:** Das Zeichen zeigt jetzt auch den Gefahrenhinweis nach DV 102 und den Schadensgrad als Schraffur.
+- **Behoben:** Ein Zeichenauftrag per Link wurde in manchen Fällen ein zweites Mal ausgeführt und verdrängte die Rückmeldung „Gebiet gespeichert“.
+
+### Evakuierung
+
+- **Eigene Seite:** Das neue Modul steht direkt vor „Betreuung“. Die Seite zeigt ein Kennzahlenband „Räumung in Zahlen“ und die Bezirkstabelle. Im Lagebild gibt es die neue Kennzahl „Evakuiert“.
+- **Detailseite je Bezirk:**
+  - Kopf mit „Stand melden“ und den Räumungsschritten als Knöpfe; „Anordnung aufheben“ fragt vorher nach.
+  - Kennzahlen und ein Kartenausschnitt mit Sprung auf die Lagekarte.
+  - Stammdaten, die direkt auf der Seite bearbeitet werden.
+  - Der Standverlauf.
+
+  Die Detailseite öffnet sich aus der Tabelle und aus der Lagekarte.
+- **Bezirk mit Gebiet anlegen:** Beim Anlegen lässt sich direkt eine Fläche zeichnen. Die Lagekarte öffnet dann im Zeichenmodus für den neuen Bezirk und bietet danach „Zurück zu Bezirk …“ an. Weitere Teilflächen lassen sich später von der Detailseite aus zeichnen.
+
+### Betreuung
+
+- **Übersicht als Lagebild der Unterbringung:** Das Band „Unterbringung in Zahlen“ zeigt:
+  - In Betreuung
+  - Kapazität
+  - Frei
+  - Stellen in Betrieb
+  - Voll/überbelegt
+  - mit Personenrecht zusätzlich „Davon namentlich“
+
+  Ein Klick auf eine Zeile öffnet die Stelle. Gibt es noch keine Stelle, führt die Seite direkt zu „Betreuungsstelle anlegen“.
+- **Detailseite je Betreuungsstelle:**
+  - Belegung melden und Status ändern (In Betrieb nehmen, Schließen, Wieder öffnen).
+  - Stammdaten mit den neuen Feldern Leitung und Erreichbarkeit.
+  - Meldeverlauf.
+  - „Betroffene hier“ (nur mit Personenrecht).
+- **Bedarf als Nachforderung:** Das Paneel „Bedarf“ zeigt die offenen Nachforderungen der Stelle. „Bedarf anfordern“ legt eine Nachforderung mit Bezug zur Stelle an. In der Nachforderungsliste lässt sich nach Stelle filtern.
+
+### Schäden und Gefahren
+
+- **Gefahr und Schadensgrad am Schaden:** Beide Angaben lassen sich erfassen, auf der Detailseite ändern und in der Liste filtern. Das ETB nennt sie beim Anlegen.
+- **CSV-Export der Schadensliste:** Der Export enthält keine Angaben zu Geschädigten.
+- **Gefahrenmatrix:**
+  - Jede gültige Zelle zeigt „–“ (keine), bis eine Stufe gesetzt wird.
+  - Nicht anwendbare Felder sind schraffiert.
+  - Je Gefahrengebiet steht „beurteilt <Zeit> · Name“ oder „nicht beurteilt“.
+  - Mit „Beurteilung bestätigen“ wird die Beurteilung im ETB festgehalten.
+- **Lagebild und Überblick:** Das Lagebild zeigt nur Gefahren über „keine“ und nennt nicht beurteilte Gebiete.
+
+### Tiere
+
+- **Neues Feld „Verortung“ auf der Detailseite:** „Auf Karte verorten“ bzw. „Auf Karte versetzen“ öffnet die Lagekarte. Die Koordinate lässt sich auch eintippen. Das Verorten erzeugt keinen ETB-Eintrag.
+
+### Lageberichte und Dokumente
+
+- **„Neuer Lagevortrag“ ohne Dialog:** Der Knopf öffnet sofort einen Entwurf. Über den Pfeil am Knopf lassen sich „Lagevortrag zur Entscheidung“ und „Freier Bericht“ wählen.
+- **Neue Übersicht:** Paneele „Aktueller Lagevortrag“, „In Arbeit“ (mit Füllstand) und „Verlauf“.
+- **Einheitliches Dokumentmuster für Lagebericht, Befehl und Pressemitteilung:**
+  - Alle Abschnitte sind offen.
+  - Die Eingabefelder wachsen mit dem Inhalt.
+  - Eine Gliederung zum Springen markiert leere Abschnitte.
+  - Ein Umschalter „Bearbeiten | Lesefassung“ gilt für das ganze Dokument.
+- **Teil „Pegel“:** Ein übernommener Lagevortrag enthält den Teil „Pegel“ nur noch, wenn am Einsatz ein Pegel festgelegt ist.
+
+### Lagebild, Wetter und Pegel
+
+- **DWD-Warnung im Kopf des Lagebilds:** Gilt eine amtliche Warnung oder ist eine angekündigt, zeigt das Lagebild sie mit Stufe, Ereignis und Zeitraum an. Die Anzeige führt auf „Wetter & Pegel“.
+- **„Wetter & Pegel“:** Die Seite zeigt zuerst die Warnungen. Der Pegel steht nur weiter oben, wenn einer festgelegt ist. „Pegel festlegen“ ist jetzt ein Nebenweg im Kopf.
+
+### Betrieb und Installation
+
+- **Sicherheitsupdate:** Zwei Komponenten für TLS-Verbindungen sind aktualisiert und schließen die Sicherheitslücken RUSTSEC-2026-0382 und RUSTSEC-2026-0383.
+
 ## [1.0.0-alpha.145](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.144...v1.0.0-alpha.145) (2026-10-20)
 
 ### Betroffene: Tiere
