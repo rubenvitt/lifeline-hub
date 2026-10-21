@@ -1083,6 +1083,69 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     expect(within(box).getByText('Gebiet 1: nicht beurteilt')).toBeInTheDocument();
   });
 
+  /**
+   * LLH-1365: dieselbe Marke wie die Matrix der Gefahrenseite, am Gefahrennamen der Zeile; der
+   * Name der Zeile endet auf „· mit Erläuterung“. Welche Zeilen stehen, entscheidet
+   * `gesetzteGefahren`: auch eine Erläuterung zu „keine“ ist eine Aussage.
+   */
+  it('erkennt eine Gefahr mit Erläuterung an Marke und Namen, auch zu „keine“', async () => {
+    mockEndpunkte({
+      gefahren: [gebiet(1, 'hoch'), gebiet(2, 'mittel')],
+      matrix: {
+        1: [
+          bewertung(1, 'brand', 'hoch'),
+          {
+            ...bewertung(1, 'elektrizitaet', 'keine'),
+            beschreibung: 'Geprüft, kein Strom im Keller.',
+          },
+        ],
+        2: [
+          { ...bewertung(2, 'ertrinken', 'mittel'), beschreibung: 'Strömung in der Hauptstraße' },
+        ],
+      },
+    });
+    render();
+    const box = paneel('Gefahrenmatrix');
+    await waitFor(() => expect(box.querySelectorAll('[data-lfh="gefahrenzeile"]')).toHaveLength(3));
+
+    const ertrinken = within(box).getByRole('listitem', {
+      name: 'Ertrinken: mittel · mit Erläuterung',
+    });
+    const marke = ertrinken.querySelector<HTMLElement>('[data-lfh="erlaeuterung-marke"]');
+    expect(marke, 'die Zeile trägt die Marke der Matrix').not.toBeNull();
+    expect(marke).toHaveAttribute('aria-hidden', 'true');
+    expect(marke!.style.borderBlockStart).toMatch(/currentcolor/i);
+    // Das Zeichen steht am Gefahrennamen, nicht im Stufenwort.
+    expect(ertrinken.firstChild).toContainElement(marke);
+
+    const elektrizitaet = within(box).getByRole('listitem', {
+      name: 'Elektrizität: keine · mit Erläuterung',
+    });
+    expect(elektrizitaet).toHaveAttribute('data-stufe', 'keine');
+    expect(elektrizitaet.querySelectorAll('[data-voll="ja"]')).toHaveLength(0);
+
+    // Gegenprobe: ohne Erläuterung weder Marke noch Zusatz.
+    const brand = within(box).getByRole('listitem', { name: 'Brand: hoch' });
+    expect(brand.querySelector('[data-lfh="erlaeuterung-marke"]')).toBeNull();
+
+    // Die Legende nennt das Zeichen mit seinem Wort.
+    const legende = box.querySelector<HTMLElement>('[data-lfh="gefahrenlegende-erlaeuterung"]');
+    expect(legende).toHaveTextContent('mit Erläuterung');
+    expect(legende!.querySelector('[data-lfh="erlaeuterung-marke"]')).not.toBeNull();
+  });
+
+  it('ohne Erläuterung steht keine Marke und kein Legendeneintrag', async () => {
+    mockEndpunkte({
+      gefahren: [gebiet(1, 'hoch')],
+      matrix: { 1: [bewertung(1, 'brand', 'hoch')] },
+    });
+    render();
+    const box = paneel('Gefahrenmatrix');
+    expect(await within(box).findByRole('listitem', { name: 'Brand: hoch' })).toBeInTheDocument();
+    expect(box.querySelector('[data-lfh="erlaeuterung-marke"]')).toBeNull();
+    expect(box.querySelector('[data-lfh="gefahrenlegende-erlaeuterung"]')).toBeNull();
+  });
+
   it('ein gescheiterter Matrix-Abruf ist ein Fehler, kein Leerzustand', async () => {
     mockEndpunkte({ gefahren: [gebiet(1, 'hoch')], matrixStatus: 500 });
     render();
