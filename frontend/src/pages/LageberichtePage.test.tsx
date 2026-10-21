@@ -96,7 +96,7 @@ function setupDetail(lb: LageberichtAnzeige) {
     <Routes>
       <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
     </Routes>,
-    { route: `/einsaetze/7/lageberichte/${lb.id}` },
+    { route: `/einsaetze/7/lageberichte/${lb.id}`, datenRouter: true },
   );
 }
 
@@ -157,7 +157,7 @@ describe('LageberichtDetailPage', () => {
       <Routes>
         <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
       </Routes>,
-      { route: '/einsaetze/7/lageberichte/12' },
+      { route: '/einsaetze/7/lageberichte/12', datenRouter: true },
     );
 
     const auftrag = await screen.findByLabelText('Auftrag');
@@ -318,7 +318,7 @@ function setupLebend(start: LageberichtAnzeige) {
     <Routes>
       <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
     </Routes>,
-    { route: `/einsaetze/7/lageberichte/${start.id}` },
+    { route: `/einsaetze/7/lageberichte/${start.id}`, datenRouter: true },
   );
   return {
     patches,
@@ -458,7 +458,7 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
           <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
         </Routes>
       </>,
-      { route: '/einsaetze/7/lageberichte/12' },
+      { route: '/einsaetze/7/lageberichte/12', datenRouter: true },
     );
     await userEvent.type(await screen.findByLabelText('Auftrag'), 'offen');
     await userEvent.click(screen.getByRole('button', { name: 'weiter' }));
@@ -602,7 +602,7 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
           <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
         </Routes>
       </>,
-      { route: '/einsaetze/7/lageberichte/12' },
+      { route: '/einsaetze/7/lageberichte/12', datenRouter: true },
     );
     expect(await screen.findByLabelText('Eigene Lage')).toHaveFocus();
     await userEvent.click(screen.getByRole('tab', { name: 'Lesefassung' }));
@@ -640,7 +640,7 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
       <Routes>
         <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
       </Routes>,
-      { route: `/einsaetze/7/lageberichte/${start.id}` },
+      { route: `/einsaetze/7/lageberichte/${start.id}`, datenRouter: true },
     );
     return zustand;
   }

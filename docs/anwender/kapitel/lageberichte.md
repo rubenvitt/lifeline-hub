@@ -125,6 +125,15 @@ sie.
 Ein Entwurf speichert sich alle 30 Sekunden und beim Verlassen eines Feldes von selbst. Oben steht,
 ob „ungespeicherte Änderungen“ vorliegen oder wann „zuletzt gespeichert“ wurde.
 
+Wer den Entwurf mit ungespeicherten Änderungen verlässt, etwa über „Lageberichte“ oder den
+Zurück-Knopf des Browsers, bekommt die Rückfrage „Ungespeicherte Änderungen“, wie beim
+Einsatzbefehl:
+
+- „Bleiben“ kehrt in den Entwurf zurück, die Eingaben bleiben stehen.
+- „Verwerfen“ verlässt den Entwurf ohne die ungespeicherten Änderungen.
+- „Speichern und weiter“ speichert zuerst und verlässt den Entwurf danach. Gelingt das Speichern
+  nicht, steht der Grund in der Rückfrage, und der Entwurf bleibt offen.
+
 ### Freigabe und Fassungen
 
 Die Freigabe ist endgültig: Der Text geht ins Einsatztagebuch, eine Korrektur gibt es nur als

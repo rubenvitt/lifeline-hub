@@ -25,6 +25,7 @@ import LeereAbschnitteFuellen from '../lageberichte/LeereAbschnitteFuellen';
 import { UEBERNAHMEN, uebernahmeFuer } from '../lageberichte/uebernahmen';
 import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
+import EntwurfNavigationSchutz from '../entwurf/EntwurfNavigationSchutz';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
@@ -332,6 +333,23 @@ function LageberichtDetail() {
 
   return (
     <div className="lagebericht-print-root" data-lfh="druckwurzel">
+      {/* Rückfrage vor dem Verlassen mit ungespeicherter Fassung — Zwilling in `BefehlDetailPage`
+          (LLH-1351). Eine Quelle für „speichert": `speichertGerade` deckt Autosave und Knopf ab.
+          Der Grund eines Fehlschlags gehört in den Dialog, hinter seiner Maske ist die Seite
+          unbedienbar. */}
+      <EntwurfNavigationSchutz
+        ungespeichert={schutz.ungespeichert && schreibtEntwurf}
+        speichert={schutz.speichertGerade}
+        speicherFehler={schutz.speicherFehler}
+        speichern={async () => {
+          try {
+            await form.validateFields();
+          } catch {
+            return; // Feldfehler bleiben am Formular; der Wechsel bleibt angehalten.
+          }
+          schutz.autosaveJetzt();
+        }}
+      />
       <FreigabeDialog
         offen={freigabeWerte !== null}
         titel="Lagebericht freigeben?"

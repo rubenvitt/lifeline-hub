@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import LageberichtDetailPage from './LageberichtDetailPage';
@@ -42,22 +42,29 @@ function bericht(over: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * Data Router statt `MemoryRouter`: der Verlassen-Schutz des Entwurfs hängt an `useBlocker`, das
+ * ohne ihn wirft. Die Liste steht als Eintrag VOR dem Bericht, damit Browser-Zurück ein Ziel hat.
+ */
 function renderBei(route: string) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  const router = createMemoryRouter(
+    [
+      { path: '/einsaetze/:id/lageberichte', element: <div>LB-LISTE</div> },
+      { path: '/einsaetze/:id/lageberichte/:lbId', element: <LageberichtDetailPage /> },
+    ],
+    { initialEntries: ['/einsaetze/1/lageberichte', route] },
+  );
+  const ergebnis = render(
     <QueryClientProvider client={qc}>
       <AntApp>
         <AuthProvider>
-          <MemoryRouter initialEntries={[route]}>
-            <Routes>
-              <Route path="/einsaetze/:id/lageberichte" element={<div>LB-LISTE</div>} />
-              <Route path="/einsaetze/:id/lageberichte/:lbId" element={<LageberichtDetailPage />} />
-            </Routes>
-          </MemoryRouter>
+          <RouterProvider router={router} />
         </AuthProvider>
       </AntApp>
     </QueryClientProvider>,
   );
+  return { ...ergebnis, router };
 }
 
 describe('LageberichtDetailPage — Deeplink-Robustheit (LFH-25)', () => {
@@ -166,14 +173,12 @@ function renderMitZone(route: string) {
       <AntApp>
         <AuthProvider>
           <EinsatzAnzeigeProvider einsatzId={1}>
-            <MemoryRouter initialEntries={[route]}>
-              <Routes>
-                <Route
-                  path="/einsaetze/:id/lageberichte/:lbId"
-                  element={<LageberichtDetailPage />}
-                />
-              </Routes>
-            </MemoryRouter>
+            <RouterProvider
+              router={createMemoryRouter(
+                [{ path: '/einsaetze/:id/lageberichte/:lbId', element: <LageberichtDetailPage /> }],
+                { initialEntries: [route] },
+              )}
+            />
           </EinsatzAnzeigeProvider>
         </AuthProvider>
       </AntApp>
@@ -722,4 +727,159 @@ describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
     expect(screen.queryByText('Verteiler')).toBeNull();
     expect(within(druckkopf()).queryByText('Verteiler')).toBeNull();
   });
+});
+
+/**
+ * ── Verlassen-Schutz (LLH-1351) ──
+ *
+ * Zwilling des Blocks „Router-Blocker (LFH-462)“ in `BefehlDetailPage.test.tsx`: derselbe Baustein
+ * (`entwurf/EntwurfNavigationSchutz.tsx`), dieselben Antworten. Die Mechanik selbst (Riegel,
+ * Reihenfolge der PATCHes) prüft der Befehl; hier steht, dass der Lagebericht sie eingehängt hat
+ * und richtig speist.
+ */
+describe('LageberichtDetailPage — Verlassen-Schutz (LLH-1351)', () => {
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
+    );
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockReset();
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockResolvedValue(
+      bericht({ status: 'entwurf' }) as never,
+    );
+  });
+
+  function halteSpeichernAn() {
+    let resolve!: (wert: never) => void;
+    let reject!: (fehler: Error) => void;
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockImplementation(
+      () =>
+        new Promise((ja, nein) => {
+          resolve = ja;
+          reject = nein;
+        }),
+    );
+    return {
+      erfolg: () =>
+        act(async () => {
+          resolve(bericht({ status: 'entwurf' }) as never);
+        }),
+      ablehnen: (e: Error) =>
+        act(async () => {
+          reject(e);
+        }),
+    };
+  }
+
+  async function oeffneRueckfrage() {
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await userEvent.click(screen.getByRole('link', { name: 'Lageberichte' }));
+    return within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+  }
+
+  it('hält die Brotkrume an; Verwerfen setzt genau diesen Wechsel fort', async () => {
+    halteSpeichernAn();
+    renderBei('/einsaetze/1/lageberichte/9');
+    const dialog = await oeffneRueckfrage();
+    expect(screen.queryByText('LB-LISTE')).toBeNull();
+    // Dieselben drei Antworten wie im Befehl.
+    expect(dialog.getByRole('button', { name: /Speichern und weiter$/ })).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Verwerfen' }));
+    expect(await screen.findByText('LB-LISTE')).toBeInTheDocument();
+    expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(1); // nur der Blur
+  });
+
+  it('Bleiben hält die Fassung und den Bericht, auch wenn der Autosave danach gelingt', async () => {
+    const save = halteSpeichernAn();
+    const { router } = renderBei('/einsaetze/1/lageberichte/9');
+    const dialog = await oeffneRueckfrage();
+    await userEvent.click(dialog.getByRole('button', { name: 'Bleiben' }));
+    expect(screen.getByLabelText('Titel')).toHaveValue('Lage 1 neu');
+    await save.erfolg();
+    expect(router.state.location.pathname).toBe('/einsaetze/1/lageberichte/9');
+    expect(screen.queryByText('LB-LISTE')).toBeNull();
+  });
+
+  it('holt den angehaltenen Wechsel nach, sobald der Autosave die Fassung gesichert hat', async () => {
+    const save = halteSpeichernAn();
+    renderBei('/einsaetze/1/lageberichte/9');
+    await oeffneRueckfrage();
+    await save.erfolg();
+    expect(await screen.findByText('LB-LISTE')).toBeInTheDocument();
+  });
+
+  it('Speichern und weiter: der Grund eines Fehlschlags steht IM Dialog, der Erfolg geht weiter', async () => {
+    const save = halteSpeichernAn();
+    renderBei('/einsaetze/1/lageberichte/9');
+    const dialog = await oeffneRueckfrage();
+    await save.ablehnen(new ApiError(503, 'Speichern vorübergehend nicht möglich'));
+    expect(await dialog.findByText('Speichern vorübergehend nicht möglich')).toBeInTheDocument();
+    expect(screen.queryByText('LB-LISTE')).toBeNull();
+
+    const erneut = halteSpeichernAn();
+    const weiter = dialog.getByRole('button', { name: /Speichern und weiter/ });
+    await waitFor(() => expect(weiter).not.toHaveClass('ant-btn-loading'));
+    await userEvent.click(weiter);
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalledTimes(2));
+    expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenLastCalledWith(
+      1,
+      9,
+      expect.objectContaining({ titel: 'Lage 1 neu' }),
+    );
+    expect(screen.queryByText('LB-LISTE')).toBeNull();
+    await erneut.erfolg();
+    expect(await screen.findByText('LB-LISTE')).toBeInTheDocument();
+    expect(screen.queryByText('Speichern vorübergehend nicht möglich')).toBeNull();
+  });
+
+  it('schützt auch Browser-Zurück', async () => {
+    halteSpeichernAn();
+    const { router } = renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' });
+    expect(router.state.location.pathname).toBe('/einsaetze/1/lageberichte/9');
+  });
+
+  it('lässt Query-/Hash-Wechsel im selben Bericht ohne Dialog zu', async () => {
+    const { router } = renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.type(await screen.findByLabelText('Titel'), ' neu');
+    await act(async () => {
+      await router.navigate('?ansicht=test#lage');
+    });
+    expect(screen.getByLabelText('Titel')).toHaveValue('Lage 1 neu');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('verlangt beim ausdrücklichen Speichern einen gültigen Titel', async () => {
+    halteSpeichernAn();
+    renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.clear(await screen.findByLabelText('Titel'));
+    // Ohne Blur: prüft den Dialogweg unabhängig vom Autosave.
+    fireEvent.click(screen.getByRole('link', { name: 'Lageberichte' }));
+    const dialog = within(await screen.findByRole('dialog', { name: 'Ungespeicherte Änderungen' }));
+    await userEvent.click(dialog.getByRole('button', { name: 'Speichern und weiter' }));
+    await screen.findByText(/titel.*required/i);
+    expect(screen.queryByText('LB-LISTE')).toBeNull();
+  });
+
+  // Gegenaussage: ohne offene Fassung, auch im freigegebenen Bericht, geht der Wechsel ohne
+  // Rückfrage.
+  it.each(['entwurf', 'freigegeben'] as const)(
+    'lässt die unveränderte Fassung %s direkt gehen',
+    async (status) => {
+      vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht({ status }) as never);
+      renderBei('/einsaetze/1/lageberichte/9');
+      await userEvent.click(await screen.findByRole('link', { name: 'Lageberichte' }));
+      expect(await screen.findByText('LB-LISTE')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    },
+  );
 });
