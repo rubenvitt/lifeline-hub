@@ -1,18 +1,28 @@
 # lagemeldung-kenntnisnahme Specification
 
 ## Purpose
-Eine an die Lage übergebene Meldung bleibt „neu“, bis jemand mit Schreibrecht sie als gesehen kennzeichnet. Der Stand gilt für alle Benutzer gleich und speist den Modulzähler der Lagemeldungen (LLH-1206).
+Eine Lagemeldung (erfasst oder in die Lage übernommen) bleibt „neu“, bis jemand mit Schreibrecht sie als gesehen kennzeichnet. Der Stand gilt für alle Benutzer gleich und speist den Modulzähler der Lagemeldungen (LLH-1206).
 
 ## Requirements
 
 ### Requirement: Eine übergebene Lagemeldung ist neu, bis sie gesehen ist
-Eine Lagemeldung SHALL als „neu“ gelten, solange niemand sie als gesehen gekennzeichnet hat. Das
-Merkmal gilt für alle Benutzer des Einsatzes gleich. Die Antwort von `GET …/lage/meldungen` MUST
-je Lagemeldung `is_neu`, `gesehen_at`, `gesehen_von_id` und `gesehen_von_name` enthalten.
+Eine Lagemeldung SHALL als „neu“ gelten, solange niemand sie als gesehen gekennzeichnet hat, gleich
+ob sie als Lagemeldung erfasst oder in die Lage übernommen wurde. Das Merkmal gilt für alle
+Benutzer des Einsatzes gleich und ist vom Bearbeitungsstand der Meldung (neu, gesichtet, in
+Bearbeitung, erledigt) unabhängig. Die Antwort von `GET …/lage/meldungen` MUST je Lagemeldung
+`is_neu`, `gesehen_at`, `gesehen_von_id` und `gesehen_von_name` enthalten.
 
 #### Scenario: Frisch übergeben
 - **WHEN** eine Meldung an die Lage übergeben wird
 - **THEN** liefert die Liste der Lagemeldungen sie mit `is_neu: true` und ohne `gesehen_at`
+
+#### Scenario: Frisch erfasst
+- **WHEN** eine Meldung der Art „Lagemeldung“ erfasst wird
+- **THEN** liefert die Liste der Lagemeldungen sie mit `is_neu: true` und ohne `gesehen_at`
+
+#### Scenario: Gesichtet ist nicht gesehen
+- **WHEN** jemand im Meldungseingang eine neue Lagemeldung auf „gesichtet“ setzt
+- **THEN** bleibt sie in der Liste der Lagemeldungen `is_neu: true`
 
 #### Scenario: Gleicher Stand für alle
 - **WHEN** Benutzer A eine Lagemeldung als gesehen kennzeichnet
@@ -20,10 +30,11 @@ je Lagemeldung `is_neu`, `gesehen_at`, `gesehen_von_id` und `gesehen_von_name` e
 
 ### Requirement: Kenntnisnahme nur mit Schreibrecht
 Das System SHALL zwei Wege anbieten, Lagemeldungen als gesehen zu kennzeichnen: eine einzelne
-(`POST …/lage/meldungen/{lid}/gesehen`) und alle neuen bis einschließlich einer gegebenen
-(`POST …/lage/meldungen/gesehen` mit `bis_id`). Beide MUST Schreibzugriff auf das Modul
-`lagemeldungen` verlangen. Die erste Kenntnisnahme MUST gewinnen; eine zweite ändert Zeitpunkt und
-Person nicht.
+(`POST …/meldungen/{mid}/lage-gesehen`, `{mid}` ist die Kennung der Meldung) und alle angezeigten
+neuen (`POST …/lage/gesehen` mit `meldung_ids`, höchstens 500). Beide MUST Schreibzugriff auf das
+Modul `lagemeldungen` verlangen. Die erste Kenntnisnahme MUST gewinnen; eine zweite ändert
+Zeitpunkt und Person nicht. Eine Kennung, die keine lagerelevante Meldung des Einsatzes ist, MUST
+im Sammelweg unberührt bleiben.
 
 #### Scenario: Einzeln gesehen
 - **WHEN** ein Benutzer mit Schreibrecht eine neue Lagemeldung als gesehen kennzeichnet
@@ -35,9 +46,8 @@ Person nicht.
 - **THEN** antwortet das System mit HTTP 200, und Zeitpunkt und Person bleiben die des ersten
 
 #### Scenario: Alle bis zur angezeigten
-- **WHEN** der Einsatz die neuen Lagemeldungen 4, 5 und 7 hat und ein Benutzer alle bis `bis_id`
-  6 als gesehen kennzeichnet
-- **THEN** sind 4 und 5 gesehen, 7 bleibt neu, und die Antwort nennt `gesehen: 2`
+- **WHEN** die Seite die neuen Lagemeldungen 4 und 5 zeigt, während des Klicks Meldung 3 in die Lage übernommen wird und ein Benutzer alle angezeigten als gesehen kennzeichnet
+- **THEN** sind 4 und 5 gesehen, 3 bleibt neu, und die Antwort nennt `gesehen: 2`
 
 #### Scenario: Nur lesen
 - **WHEN** ein Benutzer, der das Modul nur lesen darf, eine Lagemeldung als gesehen kennzeichnen
@@ -45,7 +55,11 @@ Person nicht.
 - **THEN** antwortet das System mit HTTP 403, und die Lagemeldung bleibt neu
 
 #### Scenario: Fremder Einsatz
-- **WHEN** die Lagemeldung zu einem anderen Einsatz gehört als der im Pfad
+- **WHEN** die Meldung zu einem anderen Einsatz gehört als der im Pfad
+- **THEN** antwortet das System mit HTTP 404
+
+#### Scenario: Nicht in der Lage
+- **WHEN** ein Benutzer eine Meldung als gesehen kennzeichnen will, die nicht lagerelevant ist
 - **THEN** antwortet das System mit HTTP 404
 
 ### Requirement: Geänderter Text macht die Lagemeldung wieder neu
@@ -62,7 +76,7 @@ wieder als neu gelten. Eine erneute Übergabe mit gleichem Text MUST den Stand u
 
 ### Requirement: Die Seite Lagemeldungen zeigt und setzt den Stand
 Die Seite Lagemeldungen SHALL jede neue Lagemeldung mit der Marke „Neu“ kennzeichnen und, mit
-Schreibrecht, je Zeile „Als gesehen markieren“ und im Kopf „Alle als gesehen markieren“ anbieten. Eine gesehene Zeile MUST
+Schreibrecht, je Zeile „Als gesehen markieren“ und im Kopf „Alle als gesehen markieren“ für die angezeigten neuen anbieten. Eine gesehene Zeile MUST
 Zeitpunkt und Person der Kenntnisnahme nennen, sofern bekannt. Ohne Schreibrecht MUST beide Knöpfe
 fehlen.
 

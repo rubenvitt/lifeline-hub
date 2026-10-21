@@ -57,6 +57,10 @@ Für Einsatzleitung und Führungspersonal:
    der Bestätigung setzen.
 5. „Meldung erfassen“ wählen.
 
+Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, ohne Übergabe; bei
+dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)“ (Kapitel
+[Lagemeldungen](lagemeldungen.md)).
+
 Für mehrere Meldungen hintereinander speichert „Speichern und nächste“ (Strg+Enter, am Mac
 ⌘+Enter) und leert das Formular. Mit dem Häkchen „Werte behalten“ bleiben dabei „Von Einheit /
 Abschnitt“, Absender, Meldeweg, Empfängerfunktion und Empfänger stehen.
@@ -91,7 +95,8 @@ Für Einsatzleitung und Führungspersonal:
 4. „Übergeben“ wählen.
 
 Die Meldung trägt danach „Lagerelevant ✓“ und erscheint in den Lagemeldungen (Kapitel
-[Lagemeldungen](lagemeldungen.md)); verortet auch auf der Lagekarte.
+[Lagemeldungen](lagemeldungen.md)); verortet auch auf der Lagekarte. Eine Lagemeldung trägt
+„Lagerelevant ✓“ von Anfang an und bietet „An Lage übergeben“ nicht an.
 
 ### Aus einer Meldung einen Auftrag erteilen
 

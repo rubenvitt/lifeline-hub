@@ -2,17 +2,38 @@
 titel: Lagemeldungen
 gruppen: [fuehrung]
 reihenfolge: 250
-quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
 
-Nicht jede eingehende Meldung betrifft die Lage. Was die Lage betrifft, übergibt die Führung aus
+Jede Lagemeldung ist eine Meldung. Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in
+der Lage, gleich ob sie im Meldungsformular, auf der Seite „Lagemeldungen“ oder an einem
+gekoppelten Gerät entsteht. Meldungen anderer Art, die die Lage betreffen, übergibt die Führung aus
 dem Modul „Meldungen (eingehend)“ an die Lage, auf Wunsch mit eigenem Lage-Text und Ort. Das Modul
-„Lagemeldungen“ zeigt diese übergebenen Meldungen als Zeitachse; verortete erscheinen zusätzlich
-als Marker auf der Lagekarte.
+„Lagemeldungen“ zeigt beide als Zeitachse; verortete erscheinen zusätzlich als Marker auf der
+Lagekarte.
 
 ## Abläufe
+
+### Eine Lagemeldung erfassen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Im Bereich „Lage“ „Lagemeldungen“ öffnen und im Seitenkopf „Lagemeldung erfassen“ wählen.
+   Steht noch keine Lagemeldung da, steht der Knopf auch in der leeren Ansicht.
+2. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ eingeben. Die Meldungsart ist
+   „Lagemeldung“.
+
+   ![Paneel „Lagemeldung erfassen“ mit Wortlaut und Absender](../bilder/lagemeldungen/lagemeldung-erfassen.png)
+
+3. Ist der Ort bekannt, unter „Weitere Angaben“ bei „Verortung (optional)“ die Koordinate
+   eingeben. Dort stehen auch Richtung, Priorität und Ereigniszeit.
+4. „Lagemeldung erfassen“ wählen. Das Paneel schließt, die neue Lagemeldung steht mit der Marke
+   „Neu“ oben in der Zeitachse.
+
+Dieselbe Lagemeldung lässt sich auch im Modul „Meldungen (eingehend)“ erfassen, mit der Meldungsart
+„Lagemeldung“ (Kapitel [Meldungen](meldungen.md)).
 
 ### Eine Meldung an die Lage übergeben
 
@@ -29,18 +50,22 @@ als Marker auf der Lagekarte.
 
 ### Lagemeldungen lesen und filtern
 
-1. Im Bereich „Lage“ „Lagemeldungen“ öffnen. Je Tag, der jüngste zuerst, stehen die übergebenen
-   Meldungen mit ihrer Ereigniszeit, Herkunft („aus Meldung #…“, „übergeben …“ und Absender),
-   Lage-Text und, falls verortet, der Koordinate.
+1. Im Bereich „Lage“ „Lagemeldungen“ öffnen. Je Tag, der jüngste zuerst, stehen die
+   Lagemeldungen mit ihrer Ereigniszeit, Lage-Text und, falls verortet, der Koordinate. Die Zeile
+   nennt vorn „Lage“, bei einer übergebenen Meldung anderer Art deren Art (etwa „Rückmeldung“),
+   dazu „Sofort“ oder „Dringend“, „Extern“, die Meldung („Meldung #…“, ab „Gesichtet“ mit ihrem
+   Stand), „übergeben …“ und den Absender; kam sie von einem gekoppelten Gerät, steht „· Gerät“
+   dahinter. Der Kopf nennt die Zahl der Lagemeldungen.
 
-   ![Zeitachse „Lagemeldungen“ mit vier übergebenen Meldungen, zwei davon verortet](../bilder/lagemeldungen/lagemeldungen.png)
+   ![Zeitachse „Lagemeldungen“ mit zwei Lagemeldungen der Demo und vier übergebenen Meldungen, zwei davon verortet](../bilder/lagemeldungen/lagemeldungen.png)
 
 2. Zum Eingrenzen im Suchfeld nach Meldungstext, Absender oder Nummer suchen oder ein Zeitfenster
    wählen: „Letzte Stunde“, „Letzte 4 Stunden“ oder „Heute“. Das Zeitfenster gilt für die
    Ereigniszeit.
-3. Nach dem Ort filtern: „Mit Koordinaten“ oder „Ohne Koordinaten“. Der Kopf nennt dann „… von …
-   übergeben“.
-4. Um zur ursprünglichen Meldung zu springen, „Meldung #…“ in der Zeile wählen.
+3. Nach dem Ort filtern: „Mit Koordinaten“ oder „Ohne Koordinaten“; nach der Herkunft: „Gerät“
+   (von einem gekoppelten Gerät erfasst) oder „Übernommen“ (Meldungen anderer Art, die an die Lage
+   übergeben wurden). Der Kopf nennt dann „… von … Lagemeldungen“.
+4. Um zur Meldung zu springen, „Meldung #…“ in der Zeile wählen.
 
 ### Lagemeldungen als gesehen markieren
 
@@ -51,13 +76,25 @@ Für Einsatzleitung und Führungspersonal:
 2. An einer Zeile „Als gesehen markieren“ wählen. Die Marke verschwindet, die Zeile nennt danach
    „gesehen“ mit Uhrzeit und Namen.
 3. Um alle angezeigten auf einmal abzuhaken, über der Zeitachse „Alle als gesehen markieren“
-   wählen.
+   wählen. Ist ein Filter gesetzt, gilt das nur für die angezeigten.
 
 ## Hintergrund
 
+### Lagemeldung und Meldung
+
+- Eine Lagemeldung ist eine Meldung mit der Meldungsart „Lagemeldung“; sie steht nur einmal in
+  der App. Im Modul „Meldungen (eingehend)“ wird sie wie jede Meldung gesichtet und bearbeitet;
+  ihr Stand steht in der Zeile der Lagemeldungen an „Meldung #…“.
+- „Neu“ in den Lagemeldungen heißt: noch niemand hat sie in der Lage zur Kenntnis genommen. Das ist
+  unabhängig davon, ob die Meldung schon gesichtet oder bearbeitet ist.
+- Eine Lagemeldung trägt im Einsatztagebuch den Typ „Lage“, sofern automatische Einträge an sind.
+- Verortet wird beim Erfassen nur eine Lagemeldung; eine andere Meldung bekommt ihren Ort beim
+  Übergeben.
+
 ### Was die Übergabe bewirkt
 
-- Eine Meldung wird genau einmal übergeben; danach fehlt „An Lage übergeben“ in ihrem Menü.
+- Eine Meldung wird genau einmal übergeben; danach fehlt „An Lage übergeben“ in ihrem Menü. Eine
+  Lagemeldung steht schon in der Lage, ihr fehlt der Punkt von Anfang an.
 - Ohne eigenen Lage-Text gilt der Inhalt der Meldung.
 - Die Verortung lässt sich später nicht mehr ändern („Später nicht änderbar“). Ohne Koordinate
   steht die Lagemeldung nur in der Zeitachse, mit Koordinate auch auf der Lagekarte in der Ebene
@@ -85,17 +122,22 @@ Für Einsatzleitung und Führungspersonal:
   Eine, die in diesem Moment eingeht, bleibt neu.
 - Wird eine schon gesehene Meldung mit geändertem Lage-Text erneut übergeben, ist die
   Lagemeldung wieder neu.
-- Lagemeldungen, die vor dieser Funktion übergeben wurden, gelten als gesehen, ohne Namen.
+- Lagemeldungen, die vor dieser Funktion übergeben wurden, gelten als gesehen, ohne Namen. Ebenso
+  Meldungen der Art „Lagemeldung“, die vor der Zusammenführung erfasst und nie übergeben wurden.
 
 ### Leere Ansicht
 
-Ist noch nichts übergeben, steht „Noch keine Lagemeldungen“ mit dem Knopf „Zu den Meldungen“.
+Steht noch keine Lagemeldung da, steht „Noch keine Lagemeldungen“ mit dem Knopf „Lagemeldung
+erfassen“; wer nicht erfassen darf, sieht nur den Titel.
 Passt nichts zum Filter, steht „Keine Lagemeldung passt zum Filter“ mit „Filter zurücksetzen“.
 
 ### Rechte und ohne Netz
 
-Übergeben dürfen alle, die im Modul „Meldungen (eingehend)“ schreiben dürfen: Einsatzleitung und
-Führungspersonal eines laufenden Einsatzes (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
+Erfassen und übergeben dürfen alle, die im Modul „Meldungen (eingehend)“ schreiben dürfen:
+Einsatzleitung und Führungspersonal eines laufenden Einsatzes (Kapitel
+[Rechte im Einsatz](rechte-im-einsatz.md)). Fehlt das Recht, steht im Seitenkopf „Nur Ansicht“
+mit dem Grund, etwa „Modul Meldungen gesperrt“. Ohne Netz merkt die App eine erfasste Lagemeldung
+vor und sendet sie, sobald die Verbindung zurück ist.
 Als gesehen markieren dürfen alle, die im Modul „Lagemeldungen“ schreiben dürfen; wer nur liest,
 sieht die Marke „Neu“, aber keinen Knopf. Die Lagemeldungen hält die App für die Arbeit ohne Netz
 vor (Kapitel [Arbeiten ohne Netz](ohne-netz.md)); als gesehen markieren geht nur mit Verbindung,

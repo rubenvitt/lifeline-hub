@@ -1004,26 +1004,6 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
         ],
     },
-    TabellenRegel {
-        tabelle: "lage_meldung",
-        scoping: Scoping::EinsatzId,
-        zeilenfilter: None,
-        person_bezug: None,
-        spalten: &[
-            retain("id", G_PK),
-            retain("einsatz_id", G_SCOPE),
-            retain("meldung_id", G_FK),
-            // text ist NOT NULL → Platzhalter.
-            scrub("text", Strategie::Platzhalter, Z_EINSATZ),
-            retain("lat", G_GEO),
-            retain("lon", G_GEO),
-            retain("erstellt_von_id", G_FK),
-            retain("erstellt_at", G_ZEIT),
-            // Kenntnisnahme (LLH-1206): Zeitpunkt und Benutzer-FK, kein Freitext.
-            retain("gesehen_at", G_ZEIT),
-            retain("gesehen_von_id", G_FK),
-        ],
-    },
     // ---------- Operative Struktur: Abschnitte / Einheiten / Räume / UHS / Funk ----------
     // Bezeichnungen operativer Objekte sind Skelett (RETAIN). Nullable Freitext-Zettel
     // (notiz/bemerkung/hinweis/standort/erreichbarkeit/abschnittsauftrag) können Betroffenen-PII
@@ -2116,6 +2096,16 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erledigt_at", G_ZEIT),
             retain("einheit_id", G_FK),
             retain("abschnitt_id", G_FK),
+            // Lage-Angaben (LLH-1031, vorher Tabelle `lage_meldung`): der eigene Lage-Text ist
+            // Freitext wie der Wortlaut und geht; Verortung, Zeiten und Benutzer bleiben Skelett.
+            scrub("lage_text", Strategie::NullSetzen, Z_EINSATZ),
+            retain("lat", G_GEO),
+            retain("lon", G_GEO),
+            retain("lage_uebergeben_at", G_ZEIT),
+            retain("lage_uebergeben_von_id", G_FK),
+            // Kenntnisnahme (LLH-1206): Zeitpunkt und Benutzer-FK, kein Freitext.
+            retain("lage_gesehen_at", G_ZEIT),
+            retain("lage_gesehen_von_id", G_FK),
         ],
     },
     TabellenRegel {

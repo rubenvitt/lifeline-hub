@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { abstandM } from './geo';
-import { griffLage, kreisVorschauDaten, radiusAusGriff } from './kreisVorschau';
+import { griffLage, kreisVorschauDaten, mittenGriffSteht, radiusAusGriff } from './kreisVorschau';
 import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
 
 const MITTE = { lat: 54, lon: 9.5 };
@@ -29,5 +29,14 @@ describe('Radius-Griff (D6)', () => {
     expect(radiusAusGriff(MITTE, griffLage(MITTE, 300))).toBe(300);
     expect(radiusAusGriff(MITTE, MITTE)).toBe(1);
     expect(radiusAusGriff(MITTE, { lat: 56, lon: 9.5 })).toBe(KREIS_RADIUS_M_MAX);
+  });
+});
+
+describe('Mittengriff (LLH-1344, D3)', () => {
+  it('steht nur mit Mitte und Radius — ohne Radius sitzt dort der Randgriff', () => {
+    expect(mittenGriffSteht(null, 300)).toBe(false);
+    expect(mittenGriffSteht(MITTE, null)).toBe(false);
+    expect(mittenGriffSteht(MITTE, 0)).toBe(false);
+    expect(mittenGriffSteht(MITTE, 300)).toBe(true);
   });
 });

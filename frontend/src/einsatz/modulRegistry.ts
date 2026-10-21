@@ -450,7 +450,7 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     // Neue, für alle gleich: noch von niemandem als gesehen gekennzeichnet (LLH-1206).
     zaehlerQuelle: 'lagemeldungen',
-    beschreibung: 'An die Lage übergebene Meldungen',
+    beschreibung: 'Lage aus dem Meldungseingang',
   },
   // Kommunikation
   {

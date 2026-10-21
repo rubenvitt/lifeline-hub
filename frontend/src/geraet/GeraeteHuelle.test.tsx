@@ -636,7 +636,6 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
     is_auftrag_aufgehoben: false,
     erfasst_von_id: 50,
     erstellt_at: '2026-10-04 09:30:00',
-    lage_meldung_id: null,
     ist_offen: true,
     erledigt_at: null,
     bestaetigung_pflicht: false,
@@ -733,6 +732,34 @@ describe('UHS-Laptop — Grundriss bearbeiten und Bereich „UHS“', () => {
       prioritaet: 'dringend',
     });
     await waitFor(() => expect(screen.getByLabelText('Inhalt')).toHaveValue(''));
+  });
+
+  /** LLH-1031: Die Stelle wählt Meldung oder Lagemeldung; nach dem Senden wieder „Meldung“. */
+  it('Art: eine Lagemeldung bleibt es auch mit sofort, eine Meldung mit sofort ist Sofortmeldung', async () => {
+    vi.useRealTimers();
+    const { gesendet } = laptopBereit();
+    renderApp('/geraet/7/stelle');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Meldungen' }));
+    const art = () => screen.getByRole('radiogroup', { name: 'Art' });
+    await screen.findByRole('radiogroup', { name: 'Art' });
+    expect(within(art()).getByRole('radio', { name: 'Meldung' })).toBeChecked();
+
+    await user.type(screen.getByLabelText('Inhalt'), 'Lage ruhig');
+    await user.click(within(art()).getByRole('radio', { name: 'Lagemeldung' }));
+    await user.click(screen.getByRole('radio', { name: 'sofort' }));
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ meldungsart: 'lagemeldung', prioritaet: 'sofort' });
+    await waitFor(() =>
+      expect(within(art()).getByRole('radio', { name: 'Meldung' })).toBeChecked(),
+    );
+
+    await user.type(screen.getByLabelText('Inhalt'), 'Patient kritisch');
+    await user.click(screen.getByRole('radio', { name: 'sofort' }));
+    await user.click(screen.getByRole('button', { name: 'Meldung senden' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[1]).toMatchObject({ meldungsart: 'sofortmeldung', prioritaet: 'sofort' });
   });
 
   /**

@@ -779,7 +779,7 @@ mod tests {
     /// der Registry mit-geschwärzt; ETB-Wortlaut + operatives Skelett bleiben, der Meldungs-Freitext
     /// geht seit LFH-701 mit (die Führungsdokumentation ist das ETB).
     /// Exerziert zugleich alle Generator-Pfade: SelbstId (Kopf), EinsatzId (NullSetzen),
-    /// Platzhalter (lage_meldung.text NOT NULL), ZeileLoeschen (Linker), UeberParent
+    /// Platzhalter (meldung.inhalt NOT NULL), ZeileLoeschen (Linker), UeberParent
     /// (gefahr_bewertung über gefahrengebiet).
     #[tokio::test]
     async fn phase_b_schwaerzt_neue_luecken_und_haelt_fuehrungsdoku() {
@@ -852,25 +852,20 @@ mod tests {
         .await
         .unwrap();
 
-        // Meldung (Freitext Scrub, LFH-701) + daraus abgeleitetes lage_meldung (text NOT NULL → Platzhalter).
+        // Meldung in der Lage (Freitext Scrub, LFH-701; Lage-Spalten seit LLH-1031): Wortlaut
+        // NOT NULL → Platzhalter, eigener Lage-Text → NULL, Verortung bleibt.
         let meldung: i64 = sqlx::query_scalar(
-            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, eingang_at, erfasst_von_id) \
+            "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, ereigniszeit, \
+                eingang_at, erfasst_von_id, lagerelevant, lage_text, lat, lon, \
+                lage_uebergeben_at, lage_uebergeben_von_id) \
              VALUES (?, 1, 'Florian 1', 'funk', 'Lagemeldung Wortlaut (nur im ETB erhalten)', \
-                '2026-01-01 09:00:00', '2026-01-01 09:01:00', ?) RETURNING id",
+                '2026-01-01 09:00:00', '2026-01-01 09:01:00', ?, 1, 'Lage-Freitext mit PII', \
+                51.4, 10.4, '2026-01-01 09:02:00', ?) RETURNING id",
         )
         .bind(e)
+        .bind(b)
         .bind(b)
         .fetch_one(&pool)
-        .await
-        .unwrap();
-        sqlx::query(
-            "INSERT INTO lage_meldung (einsatz_id, meldung_id, text, erstellt_von_id) \
-             VALUES (?, ?, 'Lageobjekt-Freitext mit PII', ?)",
-        )
-        .bind(e)
-        .bind(meldung)
-        .bind(b)
-        .execute(&pool)
         .await
         .unwrap();
 
@@ -966,14 +961,16 @@ mod tests {
             "Gefahren-Beschreibung (unstrukturierter Freitext-PII) gescrubbt"
         );
 
-        // (d) lage_meldung.text (NOT NULL) → Platzhalter.
-        let lm_text: String =
-            sqlx::query_scalar("SELECT text FROM lage_meldung WHERE einsatz_id = ?")
-                .bind(e)
+        // (d) Lage-Angaben der Meldung: der eigene Lage-Text geht, die Verortung bleibt. Den
+        // Platzhalter-Pfad (NOT NULL) übt `meldung.inhalt` unter (f).
+        let (lage_text, lat): (Option<String>, Option<f64>) =
+            sqlx::query_as("SELECT lage_text, lat FROM meldung WHERE id = ?")
+                .bind(meldung)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(lm_text, super::repo::SCHWAERZUNG_PLATZHALTER);
+        assert_eq!(lage_text, None, "eigener Lage-Text gescrubbt");
+        assert_eq!(lat, Some(51.4), "Verortung bleibt Skelett");
 
         // (e) Operativer Freitext-Zettel genullt; Struktur-Label bleibt.
         let (ea_name, ea_bem): (String, Option<String>) =

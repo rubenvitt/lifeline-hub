@@ -864,12 +864,14 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/lage/meldungen",
             get(routes::meldung::lage_liste),
         )
+        // Kenntnisnahme über die Kennung der Meldung (LLH-1031); die alten Pfade mit der Kennung
+        // des Lageobjekts gibt es nicht mehr.
         .route(
-            "/api/einsaetze/{id}/lage/meldungen/gesehen",
-            post(routes::meldung::lage_alle_gesehen),
+            "/api/einsaetze/{id}/lage/gesehen",
+            post(routes::meldung::lage_angezeigte_gesehen),
         )
         .route(
-            "/api/einsaetze/{id}/lage/meldungen/{lid}/gesehen",
+            "/api/einsaetze/{id}/meldungen/{mid}/lage-gesehen",
             post(routes::meldung::lage_gesehen),
         )
         .route(

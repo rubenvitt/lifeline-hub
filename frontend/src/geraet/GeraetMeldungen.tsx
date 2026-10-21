@@ -19,12 +19,39 @@ const PRIORITAETEN: readonly { wert: MeldungPrioritaet; label: string }[] = [
   { wert: 'sofort', label: 'sofort' },
 ];
 
+/** Art einer Gerätemeldung (LLH-1031): eine Lagemeldung steht ab dem Senden in der Lage. */
+type GeraetArt = 'meldung' | 'lagemeldung';
+
+const ARTEN: readonly { wert: GeraetArt; label: string }[] = [
+  { wert: 'meldung', label: 'Meldung' },
+  { wert: 'lagemeldung', label: 'Lagemeldung' },
+];
+
 interface MeldungWerte {
   inhalt: string;
+  art: GeraetArt;
   prioritaet: MeldungPrioritaet;
 }
 
-const MELDUNG_START: MeldungWerte = { inhalt: '', prioritaet: 'normal' };
+const MELDUNG_START: MeldungWerte = { inhalt: '', art: 'meldung', prioritaet: 'normal' };
+
+/** Segmentleiste der Art als Formularfeld. */
+function ArtFeld({
+  value = 'meldung',
+  onChange,
+}: {
+  value?: GeraetArt;
+  onChange?: (wert: GeraetArt) => void;
+}) {
+  return (
+    <Segmentleiste
+      beschriftung="Art"
+      wert={value}
+      onWechsel={(w) => onChange?.(w)}
+      optionen={ARTEN}
+    />
+  );
+}
 
 /** Segmentleiste als Formularfeld (`value`/`onChange` von `Form.Item`). */
 function PrioritaetFeld({
@@ -46,8 +73,11 @@ function PrioritaetFeld({
 
 /**
  * Meldung an die Einsatzleitung und die eigenen Meldungen eines Geräts (Scope-Matrix: anlegen,
- * eigene lesen; UHS-Laptop und Abschnittsgerät). Absender ist die Stelle; Meldeweg, Art und
- * Ereigniszeit setzt das Gerät, denn dort gibt es keinen Funkspruch abzuschreiben. Den
+ * eigene lesen; UHS-Laptop und Abschnittsgerät). Absender ist die Stelle; Meldeweg und
+ * Ereigniszeit setzt das Gerät, denn dort gibt es keinen Funkspruch abzuschreiben. Die Art wählt
+ * die Stelle nur zwischen Meldung und Lagemeldung (LLH-1031); eine Lagemeldung bleibt es auch mit
+ * Priorität sofort (die Priorität alarmiert ohnehin), eine Meldung mit sofort ist eine
+ * Sofortmeldung. Nach dem Senden steht die Art wieder auf „Meldung“. Den
  * strukturierten Absender setzt beim Abschnittsgerät der Server. Ohne Netz merkt die
  * Warteschlange die Meldung vor.
  *
@@ -109,7 +139,12 @@ export default function GeraetMeldungen({
       absender,
       empfaenger: 'Einsatzleitung',
       meldeweg: 'sonstige',
-      meldungsart: w.prioritaet === 'sofort' ? 'sofortmeldung' : 'sonstige',
+      meldungsart:
+        w.art === 'lagemeldung'
+          ? 'lagemeldung'
+          : w.prioritaet === 'sofort'
+            ? 'sofortmeldung'
+            : 'sonstige',
       prioritaet: w.prioritaet,
       inhalt: w.inhalt.trim(),
       ereigniszeit: alsBackendZeit(serverJetzt()),
@@ -141,6 +176,9 @@ export default function GeraetMeldungen({
               rules={[{ required: true, whitespace: true, message: 'Bitte den Inhalt eingeben' }]}
             >
               <Input.TextArea autoSize={{ minRows: 3, maxRows: 8 }} maxLength={ETB_INHALT_MAX} />
+            </Form.Item>
+            <Form.Item<MeldungWerte> name="art" label="Art">
+              <ArtFeld />
             </Form.Item>
             <Form.Item<MeldungWerte> name="prioritaet" label="Priorität">
               <PrioritaetFeld />

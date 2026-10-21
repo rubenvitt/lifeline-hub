@@ -105,8 +105,9 @@ Für den UHS-Laptop:
 
    ![Bereich „UHS“ am Laptop mit dem Reiter „Kräfte“, der Stärke und den Kräften der UHS](../bilder/geraet-uhs/laptop-uhs.png)
 
-4. Unter „Meldungen“ den „Inhalt“ eingeben, die „Priorität“ (normal, dringend, sofort) wählen und
-   „Meldung senden“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
+4. Unter „Meldungen“ den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die
+   „Priorität“ (normal, dringend, sofort) wählen und „Meldung senden“ wählen. Eine Lagemeldung steht
+   bei der Führung gleich in den Lagemeldungen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
    „Eigenen Meldungen“.
 
 ## Hintergrund

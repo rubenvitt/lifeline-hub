@@ -10084,6 +10084,203 @@ mod tests {
         assert_eq!(geo, poly, "Geometrie bleibt");
     }
 
+    // --- LLH-1031: Lagemeldungen werden Spalten der Meldung (0233) ---
+
+    /// Je Meldung der Stand der Lage-Sicht nach 0233: (id, lagerelevant, lage_text, lat, lon,
+    /// übergeben_at, übergeben_von, gesehen_at, gesehen_von).
+    type LageStand = (
+        i64,
+        bool,
+        Option<String>,
+        Option<f64>,
+        Option<f64>,
+        Option<String>,
+        Option<i64>,
+        Option<String>,
+        Option<i64>,
+    );
+
+    /// Vorher übergebene Lagemeldungen bleiben je Zeile unverändert (Text, Ort, Übergabe,
+    /// Kenntnisnahme); dazu kommen genau die nie übergebenen Meldungen der Art „Lagemeldung“, als
+    /// gesehen. Ein Flag ohne Lageobjekt fällt, `lage_meldung` ist weg (LLH-1027 D5).
+    #[tokio::test]
+    async fn migration_0233_haengt_lagemeldungen_an_die_meldung_und_loest_lage_meldung_auf() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 232).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let b2: i64 = sqlx::query_scalar(
+            "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+             VALUES (1, 'S2', 's2', 'h') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let meldung = |nr: i64, art: &'static str, inhalt: &'static str, flag: bool| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO meldung (einsatz_id, lfd_nr, absender, meldeweg, inhalt, \
+                        meldungsart, lagerelevant, ereigniszeit, eingang_at, erfasst_von_id) \
+                     VALUES (?, ?, 'Florian 1', 'funk', ?, ?, ?, '2026-06-12 09:00:00', \
+                             '2026-06-12 09:01:00', ?) RETURNING id",
+                )
+                .bind(e)
+                .bind(nr)
+                .bind(inhalt)
+                .bind(art)
+                .bind(flag)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        // Übergeben mit gleichem Text, gesehen, verortet.
+        let gesehen = meldung(1, "rueckmeldung", "Brücke gesperrt", true).await;
+        // Übergeben mit eigenem Lage-Text, neu, ohne Ort.
+        let eigen = meldung(2, "sonstige", "Pegel 3,20 m", true).await;
+        // Art Lagemeldung, übergeben: bleibt, wie sie war (neu).
+        let lm_uebergeben = meldung(3, "lagemeldung", "Lage ruhig", true).await;
+        // Art Lagemeldung, nie übergeben: kommt dazu, als gesehen.
+        let lm_nie = meldung(4, "lagemeldung", "Lage unverändert", false).await;
+        // Andere Art, nie übergeben: bleibt draußen.
+        let anders = meldung(5, "anfrage", "Wo ist ELW 2?", false).await;
+        // Flag ohne Lageobjekt (nur per Handeingriff möglich): fällt.
+        let verwaist = meldung(6, "sonstige", "verwaist", true).await;
+
+        for (mid, text, lat, lon, von, at, g_at, g_von) in [
+            (
+                gesehen,
+                "Brücke gesperrt",
+                Some(51.4),
+                Some(10.4),
+                b2,
+                "2026-06-12 09:05:00",
+                Some("2026-06-12 09:07:00"),
+                Some(b),
+            ),
+            (
+                eigen,
+                "Pegel steigt",
+                None,
+                None,
+                b,
+                "2026-06-12 09:06:00",
+                None,
+                None,
+            ),
+            (
+                lm_uebergeben,
+                "Lage ruhig",
+                None,
+                None,
+                b2,
+                "2026-06-12 09:08:00",
+                None,
+                None,
+            ),
+        ] {
+            sqlx::query(
+                "INSERT INTO lage_meldung (einsatz_id, meldung_id, text, lat, lon, \
+                    erstellt_von_id, erstellt_at, gesehen_at, gesehen_von_id) \
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(e)
+            .bind(mid)
+            .bind(text)
+            .bind(lat)
+            .bind(lon)
+            .bind(von)
+            .bind(at)
+            .bind(g_at)
+            .bind(g_von)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        migriere_bis(&pool, 233).await;
+
+        let stand: Vec<LageStand> = sqlx::query_as(
+            "SELECT id, lagerelevant, lage_text, lat, lon, lage_uebergeben_at, \
+                    lage_uebergeben_von_id, lage_gesehen_at, lage_gesehen_von_id \
+             FROM meldung ORDER BY lfd_nr",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let s = |t: &str| Some(t.to_string());
+        assert_eq!(
+            stand,
+            vec![
+                (
+                    gesehen,
+                    true,
+                    None,
+                    Some(51.4),
+                    Some(10.4),
+                    s("2026-06-12 09:05:00"),
+                    Some(b2),
+                    s("2026-06-12 09:07:00"),
+                    Some(b),
+                ),
+                (
+                    eigen,
+                    true,
+                    s("Pegel steigt"),
+                    None,
+                    None,
+                    s("2026-06-12 09:06:00"),
+                    Some(b),
+                    None,
+                    None,
+                ),
+                (
+                    lm_uebergeben,
+                    true,
+                    None,
+                    None,
+                    None,
+                    s("2026-06-12 09:08:00"),
+                    Some(b2),
+                    None,
+                    None,
+                ),
+                (
+                    lm_nie,
+                    true,
+                    None,
+                    None,
+                    None,
+                    s("2026-06-12 09:01:00"),
+                    Some(b),
+                    s("2026-06-12 09:01:00"),
+                    None,
+                ),
+                (anders, false, None, None, None, None, None, None, None),
+                (verwaist, false, None, None, None, None, None, None, None),
+            ],
+            "gleicher Text heißt NULL (der Wortlaut gilt); nachgezogene Lagemeldung gilt als gesehen"
+        );
+
+        let tabelle: Option<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'lage_meldung'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert_eq!(tabelle, None, "kein Altbestand");
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_meldung_lage'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert!(
+            index.is_some_and(|sql| sql.contains("einsatz_id, lagerelevant")),
+            "Index der Lage-Sicht"
+        );
+    }
+
     // --- LLH-1089: Ziel und Bedarfszeit an der Nachforderung (0235) ---
 
     /// Neubau ohne `NOT NULL` an `bezeichnung` (design.md D7): der Bestand bleibt mit seiner id,

@@ -622,6 +622,7 @@ async fn unangemeldet_tx(
             bestaetigung_frist_at: frist_at.as_deref(),
             einheit_id: Some(einheit_id),
             abschnitt_id: None,
+            geo: None,
         },
     )
     .await?;

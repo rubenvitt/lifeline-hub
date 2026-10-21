@@ -359,6 +359,10 @@ fn erwartete_etb() -> Vec<(String, String, String)> {
                 );
                 stellen.insert(stelle, (bez, kap, Some(belegt)));
             }
+            // Eine Lagemeldung schreibt ihren ETB-Eintrag als Typ „Lage“ (Meldungseingang).
+            Vorgang::Meldung(v) if v.meldungsart == crate::meldung::ART_LAGEMELDUNG => {
+                eintrag("lage", v.inhalt.to_string())
+            }
             Vorgang::Meldung(v) => eintrag("meldung", v.inhalt.to_string()),
             Vorgang::Auftrag(v) => eintrag("anordnung", v.text.to_string()),
             Vorgang::AuftragVollzug { meldung, .. } => eintrag("meldung", meldung.to_string()),
@@ -812,12 +816,12 @@ async fn etb_folgt_dem_drehbuch_mit_system_eintraegen_je_vorgang() {
     );
 
     let je_typ = |typ: &str| ist.iter().filter(|e| e.1 == typ).count();
-    // Alle fünf Pflicht-Typen der Spec: Lage 5 + Lagebericht; Entscheidung 5 + Bezirk
-    // angeordnet; Meldung 8 Meldungen + 3 Vollzüge + 2 Stand- + 2 Belegungsmeldungen;
+    // Alle fünf Pflicht-Typen der Spec: Lage 5 + Lagebericht + 2 Lagemeldungen; Entscheidung 5
+    // + Bezirk angeordnet; Meldung 6 Meldungen + 3 Vollzüge + 2 Stand- + 2 Belegungsmeldungen;
     // Anordnung 5 Aufträge + Befehl; System aus den Vorgängen.
-    assert_eq!(je_typ("lage"), 6);
+    assert_eq!(je_typ("lage"), 8);
     assert_eq!(je_typ("entscheidung"), 6);
-    assert_eq!(je_typ("meldung"), 15);
+    assert_eq!(je_typ("meldung"), 13);
     assert_eq!(je_typ("anordnung"), 6);
     assert_eq!(je_typ("system"), 111);
 
