@@ -24,6 +24,8 @@ import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
 import { MATRIX_KLASSE } from './matrixGeometrie';
 import './gefahrenmatrix.css';
 import { modulName } from '../../einsatz/modulRegistry';
+import { MIT_ERLAEUTERUNG } from '../gefahren/erlaeuterungen';
+import { ErlaeuterungsZeichen } from '../gefahren/ErlaeuterungsMarke';
 
 /** Im Fugenraster trägt das Raster die Linien — ein eigener Paneelrahmen verdoppelte sie. */
 const IM_RASTER: CSSProperties = { border: 'none', minHeight: 0 };
@@ -93,11 +95,15 @@ export function GefahrenmatrixPaneel({
                   key={z.typ}
                   data-lfh="gefahrenzeile"
                   data-stufe={z.stufe}
+                  // Name wie die Zelle des Palettenauszugs; mit Erläuterung endet er auf
+                  // „· mit Erläuterung“ (LLH-1365), das Zeichen ist für Hilfstechnik verborgen.
+                  aria-label={`${z.label}: ${z.stufe}${z.mitErlaeuterung ? MIT_ERLAEUTERUNG : ''}`}
                   className={MATRIX_KLASSE.zeile}
                   style={{ gap: token.paddingSM }}
                 >
                   {/* Silbentrennung statt Bruch an beliebiger Stelle (`lang="de"` steht in
-                      index.html). */}
+                      index.html). Das Zeichen „mit Erläuterung“ steht am Namen: die Spalte des
+                      Stufenworts trägt „niedrig“ knapp, dort deckte es das Wort. */}
                   <span
                     style={{
                       fontSize: 12,
@@ -107,6 +113,12 @@ export function GefahrenmatrixPaneel({
                     }}
                   >
                     {z.label}
+                    {z.mitErlaeuterung && (
+                      <>
+                        {' '}
+                        <ErlaeuterungsZeichen lfh="gefahrenzeile-erlaeuterung" />
+                      </>
+                    )}
                   </span>
                   {/* Dekoration neben dem Wort — der zweite Kanal ist das Stufenwort rechts. */}
                   <span
@@ -168,6 +180,16 @@ export function GefahrenmatrixPaneel({
             </span>
             <span className={MATRIX_KLASSE.fueller} />
           </div>
+          {/* Das Zeichen der Matrix mit seinem Wort (LLH-1365), nur wenn eine Zeile es trägt. */}
+          {zeilen.some((z) => z.mitErlaeuterung) && (
+            <div
+              aria-hidden="true"
+              data-lfh="gefahrenlegende-erlaeuterung"
+              style={{ ...monoStil(10), color: rollen.schwach }}
+            >
+              <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
+            </div>
+          )}
         </div>
       </PaneelZustand>
     </Paneel>

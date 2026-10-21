@@ -73,8 +73,8 @@ beurteilten Gebiet MUST das Gebiet nicht beurteilen.
 - **THEN** bleibt das Gebiet „nicht beurteilt“
 
 ### Requirement: Lagebild und Überblick nennen nicht beurteilte Gebiete
-Das Paneel „Gefahren“ im Lagebild SHALL je Gefahr die höchste Stufe über „keine“ zeigen und in
-seinem Fuß die nicht beurteilten Gebiete nennen: bis zwei mit Namen („<Gebiet>: nicht
+Das Paneel „Gefahren“ im Lagebild SHALL je gesetzter Gefahr (Stufe über „keine“ oder mit
+Erläuterung) die höchste Stufe zeigen und in seinem Fuß die nicht beurteilten Gebiete nennen: bis zwei mit Namen („<Gebiet>: nicht
 beurteilt“), mehr als zwei als Zahl („<n> Gebiete nicht beurteilt“). Die Kennzahl „Warnstufe“ im
 Überblick SHALL in ihrer Notiz die Zahl nicht beurteilter Gebiete nennen, wenn sie größer als
 null ist.
@@ -142,6 +142,30 @@ Zelle erreichbar sein, auch an einer Zelle ohne Stufe.
 #### Scenario: Marke an einer Zelle mit Erläuterung
 - **WHEN** die Zelle Elektrizität × Menschen die Stufe „mittel“ und eine Erläuterung trägt
 - **THEN** zeigt sie eine Marke in der Ecke und heißt „Bewertung Elektrizität × Menschen: mittel · mit Erläuterung“, und eine Zelle ohne Erläuterung trägt weder Marke noch Zusatz
+
+### Requirement: Lagebild und Palettenauszug zeigen die Marke
+Das Paneel „Gefahrenmatrix“ im Lagebild und der Matrixauszug der Sprungpalette SHALL dieselbe
+Marke wie die Matrix tragen, mit dem Namenszusatz „· mit Erläuterung“, und ihre Zeilen aus den
+gesetzten Gefahren bilden wie Lagekarte und Lagevortrag (Stufe über „keine“ oder mit
+Erläuterung). Steht eine Marke, MUST darunter die Marke mit dem Wort „mit Erläuterung“ stehen.
+Den Text der Erläuterung MUST keines von beiden zeigen. Die Gebietsliste MUST eine Erläuterung
+zu „keine“ nicht als Gefahr zählen.
+
+#### Scenario: Paneel mit Erläuterung
+- **WHEN** im Lagebild Ertrinken × Menschen „mittel“ mit Erläuterung und Brand × Menschen „hoch“ ohne Erläuterung stehen
+- **THEN** trägt die Zeile Ertrinken die Marke am Gefahrennamen und heißt „Ertrinken: mittel · mit Erläuterung“, die Zeile Brand trägt weder Marke noch Zusatz, und unter der Legende steht „mit Erläuterung“
+
+#### Scenario: Paneel über mehrere Gebiete
+- **WHEN** Brand in einem Gebiet „hoch“ ohne Erläuterung und in einem anderen „niedrig“ mit Erläuterung trägt
+- **THEN** zeigt das Paneel eine Zeile Brand mit „hoch“ und der Marke
+
+#### Scenario: Erläuterung zu „keine“
+- **WHEN** die einzige Aussage zu Elektrizität eine Erläuterung bei Stufe „keine“ ist
+- **THEN** stehen Paneel und Auszug mit einer Zeile Elektrizität und der Marke, und die Gebietsliste zählt Elektrizität nicht als Gefahr
+
+#### Scenario: Auszug mit Erläuterung
+- **WHEN** die Vorschau eines Gefahrengebiets geöffnet ist, dessen Zelle Elektrizität × Menschen „mittel“ mit Erläuterung trägt
+- **THEN** trägt diese Zelle die Marke in der Ecke und heißt „Elektrizität × Menschen: mittel · mit Erläuterung“
 
 ### Requirement: Liste der Erläuterungen unter der Matrix
 Unter der Matrix SHALL eine Liste „Erläuterungen“ je Zelle mit Erläuterung eine Zeile zeigen:
