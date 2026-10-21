@@ -96,3 +96,44 @@ export async function oeffneObjektGruppe(page: Page, typ: string) {
 
 /** Die Fläche der Ansicht „Auswahl“ (Inspectors). */
 export const auswahlAnsicht = (page: Page) => page.locator('[data-paneel="ausgewaehlt"]');
+
+/** Knopf „Zeichenwerkzeuge“ an der Karte (LLH-1038) — ein Disclosure, kein Leistenschalter. */
+export const zeichenwerkzeugeKnopf = (page: Page) =>
+  page.getByRole('button', { name: 'Zeichenwerkzeuge', exact: true });
+
+/** Das Werkzeugmenü an der Karte (`Werkzeugmenue.tsx`), offen über dem Kartenfuß. */
+export const werkzeugmenue = (page: Page) =>
+  page.getByRole('dialog', { name: 'Zeichenwerkzeuge', exact: true });
+
+/** Öffnet das Werkzeugmenü (bleibt offen, wenn es schon offen ist) und gibt es zurück. */
+export async function oeffneWerkzeugmenue(page: Page, tippen = false): Promise<Locator> {
+  const knopf = zeichenwerkzeugeKnopf(page);
+  if ((await knopf.getAttribute('aria-expanded')) !== 'true') {
+    await (tippen ? knopf.tap() : knopf.click());
+  }
+  await expect(knopf).toHaveAttribute('aria-expanded', 'true');
+  const menue = werkzeugmenue(page);
+  await expect(menue).toBeVisible();
+  return menue;
+}
+
+/**
+ * Wählt einen Eintrag des Werkzeugmenüs — Name wie im Menü: „Gefahrengebiet“,
+ * „Absperrbereich als Kreis“, „Freie Skizze als Linie“, „Weitere …“. Das Menü schließt dabei.
+ */
+export async function waehleWerkzeug(page: Page, eintrag: string, tippen = false) {
+  const menue = await oeffneWerkzeugmenue(page, tippen);
+  const ziel = menue.getByRole('button', { name: eintrag, exact: true });
+  await (tippen ? ziel.tap() : ziel.click());
+  await expect(menue).toHaveCount(0);
+}
+
+/** „Weitere …“: der Zeichen-Picker als Dialog „Taktisches Zeichen“ (`ZeichenWahlDialog`). */
+export async function oeffneZeichenWahl(page: Page, tippen = false): Promise<Locator> {
+  await waehleWerkzeug(page, 'Weitere …', tippen);
+  const dialog = page.getByRole('dialog', { name: 'Taktisches Zeichen', exact: true });
+  await expect(dialog).toBeVisible();
+  // Erst nach dem Aufzoomen messen: während der Animation skaliert `transform` jeden Kasten.
+  await expect(page.locator('.ant-zoom-appear, .ant-zoom-enter')).toHaveCount(0);
+  return dialog;
+}

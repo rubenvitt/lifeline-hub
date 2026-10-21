@@ -1,5 +1,13 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
-import { auswahlAnsicht, objektListe, objektZeile, oeffneEbenenGruppe } from './leisten-kern';
+import {
+  auswahlAnsicht,
+  objektListe,
+  objektZeile,
+  oeffneEbenenGruppe,
+  oeffneZeichenWahl,
+  waehleWerkzeug,
+  werkzeugmenue,
+} from './leisten-kern';
 import { wechsleZuRolle } from './rollen-kern';
 
 // Die Lagekarte unter Touch, auf Handschirm (390 px) und Führungs-Tablet (1024 px).
@@ -530,11 +538,8 @@ for (const viewport of [
       await page.getByRole('button', { name: 'Zeitachse einblenden' }).tap();
       await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
 
-      // „Zeichenwerkzeuge" auf der Karte öffnet die Leiste mit dem Paneel „Zeichnen".
-      const zeichnen = async () => {
-        await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).tap();
-        await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).tap();
-      };
+      // „Zeichenwerkzeuge" an der Karte öffnet das Werkzeugmenü (LLH-1038).
+      const zeichnen = () => waehleWerkzeug(page, 'Gefahrengebiet', true);
       const abschliessen = page.getByRole('button', { name: 'Abschließen' });
 
       // ── Abbrechen wird GETIPPT, nicht nur gesehen ───────────────────────────────────────
@@ -549,9 +554,9 @@ for (const viewport of [
       const schmal = viewport.width < 992; // unter `lg` liegt die Leiste unter der Karte
       const canvas = page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas');
       if (schmal) {
-        // Die Werkzeugwahl gibt die Karte frei: die Leiste schließt, die Karte hat volle Höhe.
+        // Die Werkzeugwahl gibt die Karte frei: Leiste und Menü sind zu, die Karte hat volle Höhe.
         await expect(page.getByRole('button', { name: 'Leiste einblenden' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toHaveCount(0);
+        await expect(werkzeugmenue(page)).toHaveCount(0);
       }
       // Die Box erst jetzt holen: die Werkzeugwahl ändert Kartenhöhe und Fuß.
       const m = await kartenMitte(page);
@@ -599,7 +604,7 @@ for (const viewport of [
         // genau diesen Knopf ist der Beleg.
         await expect(abschliessen).toBeVisible();
         await page.getByRole('button', { name: 'Leiste einblenden' }).tap();
-        await expect(page.getByRole('button', { name: 'Gefahrengebiet zeichnen' })).toBeVisible();
+        await expect(page.locator('#lagekarte-leiste')).toBeVisible();
         const karte = (await canvas.boundingBox())!;
         const steuerung = (await page
           .locator('[data-lfh="karten-fuss"] > .ant-card')
@@ -1175,11 +1180,10 @@ for (const viewport of [
 
     test('Taktisches Zeichen: Tipp setzt, „Fertig" im Band beendet', async ({ page }) => {
       await oeffneKarte(page);
-      await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).tap();
-      const zeichnenPaneel = page.locator('[data-paneel="zeichnen"]');
-      await zeichnenPaneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).tap();
-      // Im Paneel: die Objektliste trägt eigene „Platzieren"-Knöpfe.
-      await zeichnenPaneel.getByRole('button', { name: 'Platzieren', exact: true }).tap();
+      // „Weitere …" im Werkzeugmenü öffnet den Zeichen-Picker als Dialog (LLH-1038).
+      const wahl = await oeffneZeichenWahl(page, true);
+      await wahl.getByRole('button', { name: 'Platzieren', exact: true }).tap();
+      await expect(wahl).toBeHidden();
 
       await leisteZu(page);
       await expect(band(page)).toContainText('Taktisches Zeichen');
@@ -1199,8 +1203,9 @@ for (const viewport of [
       await expect(band(page)).toContainText('1 platziert');
       await band(page).getByRole('button', { name: 'Fertig' }).tap();
       await expect(band(page)).toHaveCount(0);
-      // „Zeichenwerkzeuge" hatte die Leiste geöffnet — das war der Zustand vor dem Modus.
-      await leisteOffen(page);
+      // Zurück im Zustand vor dem Modus: „Zeichenwerkzeuge" ändert die Leiste nicht (LLH-1038).
+      if (vorgabeOffen) await leisteOffen(page);
+      else await leisteZu(page);
     });
 
     test('Bild einpassen: Griff liegt frei, ein Zug verschiebt das Bild', async ({ page }) => {

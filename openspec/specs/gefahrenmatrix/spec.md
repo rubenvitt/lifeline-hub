@@ -186,6 +186,25 @@ der Matrix hervorheben.
 - **WHEN** eine Person ohne Schreibrecht eine Zeile der Liste „Erläuterungen“ antippt
 - **THEN** wird die Zelle in der Matrix hervorgehoben, und kein Dialog öffnet sich
 
+### Requirement: Die Gefahrenseite druckt das gewählte Gebiet
+Die Gefahrenseite SHALL das gewählte Gebiet drucken („Drucken / als PDF“, auch ohne Schreibrecht,
+mit geladener Matrix): Druckkopf mit Gebiet, Warnstufe und Beurteilung, Legende, Matrix und die
+Liste „Erläuterungen“ wie am Schirm. Ohne Erläuterung MUST der Teil auch im Druck entfallen. Die
+Marke „mit Erläuterung“ MUST schwarz-weiß erkennbar sein. Gebietsliste und Bedienung MUST auf dem
+Blatt fehlen.
+
+#### Scenario: Druck mit Erläuterungen
+- **WHEN** ein Gebiet gedruckt wird, dessen Zellen Brand × Sachwerte („keine“) und Elektrizität × Menschen („hoch“) eine Erläuterung tragen
+- **THEN** stehen auf dem Blatt die Matrix mit schwarzer Marke an beiden Zellen und darunter „Erläuterungen“ mit erst Brand × Sachwerte, dann Elektrizität × Menschen, je mit Stufe, Text und „geändert <DTG> · <Name>“
+
+#### Scenario: Druck ohne Erläuterung
+- **WHEN** ein Gebiet ohne Erläuterung gedruckt wird
+- **THEN** steht auf dem Blatt die Matrix, aber kein Teil „Erläuterungen“
+
+#### Scenario: Druck ohne Schreibrecht
+- **WHEN** eine Person ohne Schreibrecht die Gefahrenseite eines Gebiets mit geladener Matrix öffnet
+- **THEN** steht „Drucken / als PDF“ zur Wahl, und das Blatt zeigt weder Gebietsliste noch „Umbenennen“ oder „Beurteilung bestätigen“
+
 ### Requirement: Gefahren eines Gebiets auf der Lagekarte
 Der Inspector einer Zone vom Typ Gefahrengebiet SHALL die gesetzten Gefahren seines Gebiets zeigen
 (Stufe über „keine“ oder mit Erläuterung), je mit Stufe, Gefahr × Schutzobjekt und Erläuterung, in

@@ -35,7 +35,7 @@ const STILE: Record<Exclude<ZoneTyp, 'freie_skizze'>, ZoneStil> = {
 };
 
 /**
- * Vorgabefarbe der freien Skizze: mit ihr startet das Zeichnen (Paneel und Zeichnen-Deeplink,
+ * Vorgabefarbe der freien Skizze: mit ihr startet das Zeichnen (Werkzeugmenü und Zeichnen-Deeplink,
  * LFH-825), eine Skizze ohne gespeicherte Farbe wird in ihr gezeigt, und das Farbfeld im
  * `ZonenInspector` vergleicht gegen sie (LFH-797, Spec `lagekarte-zeichnen`: EINE Quelle, sonst
  * löste ein bloßer Blur ein PATCH aus). Ein persistierter Datenwert, kein Laufzeit-Token — sonst
@@ -52,7 +52,7 @@ export function zoneStil(typ: ZoneTyp, farbe: string | null | undefined): ZoneSt
   return STILE[typ];
 }
 
-interface ZoneTypInfo {
+export interface ZoneTypInfo {
   typ: ZoneTyp;
   label: string;
   /** Geometrie, die der Typ erzwingt; `beides` = Nutzer wählt Fläche/Linie. */

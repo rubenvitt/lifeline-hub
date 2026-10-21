@@ -71,6 +71,15 @@ describe('escGehoertOverlay (LFH-712, Review)', () => {
     expect(escGehoertOverlay(taste())).toBe(false);
   });
 
+  // LLH-1038: das Werkzeugmenü an der Karte ist kein antd-Overlay; es nimmt die Taste auch dann,
+  // wenn der Fokus auf der Karte oder am Knopf steht — Esc schließt nur das Menü.
+  it('das offene Werkzeugmenü nimmt die Taste, egal wo der Fokus steht', () => {
+    const menue = document.createElement('div');
+    menue.dataset.lfh = 'werkzeugmenue';
+    document.body.appendChild(menue);
+    expect(escGehoertOverlay(taste())).toBe(true);
+  });
+
   it('ein ausgeblendeter Dialog-Rahmen nimmt sie nicht', () => {
     const el = document.createElement('div');
     el.className = 'ant-modal-wrap';

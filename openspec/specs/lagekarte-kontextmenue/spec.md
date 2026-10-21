@@ -134,7 +134,7 @@ solange gespeichert wird, MUST sich der Dialog nicht schließen lassen.
 ### Requirement: Kreis hier
 Die Wahl von „Kreis hier …“ SHALL das Zeichnen eines Kreises um einen Punkt starten, mit der
 Druckstelle als Mitte und dem Absperrbereich als vorgewählter Art. Art und Radius MUST danach im
-Kreis-Band wählbar sein, wie bei einem Start über das Zeichnen-Paneel; angelegt MUST erst mit
+Kreis-Band wählbar sein, wie bei einem Start über das Werkzeugmenü; angelegt MUST erst mit
 „Übernehmen“ werden.
 
 #### Scenario: Absperrbereich um die Druckstelle
