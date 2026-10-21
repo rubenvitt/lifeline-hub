@@ -1762,6 +1762,208 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
+// ── LLH-1358: erste Zeile rückwärts unter der stehenden Kopfzeile ─────────────────────────────
+//
+// Nachzug aus LLH-1102 (Gefahrenmatrix): Chromium beschneidet den Fokusrand
+// (`scroll-margin-top`) an der Oberkante des Scrollcontainers `.ant-table-body`, den jede Tabelle
+// mit waagerechtem Scrollen (`scroll.x`) trägt. Die erste Zeile beginnt genau dort; rückwärts in
+// sie getabbt, rollt der Browser die Seite nur bis an den Rahmen, und ein Ziel außerhalb der
+// fixierten Kennung bleibt unter der Kopfzeile (vor der Korrektur gemessen, Handschuh: Aktionsmenü
+// der Benutzerliste in der rechts fixierten Spalte 57 von 72 px bei 390 px, Ziele der
+// Personenliste 38 von 72 px bei 1024 px, beide mit dem Mittelpunkt). Die Kennung links rollt der
+// Browser richtig (Einheiten: bündig unter der Kopfzeile).
+//
+// Gemessen wird schärfer als der Kern: das Ziel muss GANZ unter der Kopfzeile stehen
+// (`useFokusUnterKopf`, `components/fokusUnterKopf.ts`, rollt genau so weit).
+
+interface ErsteZeileBefund {
+  /** Wie weit die erste Zeile beim letzten Stopp davor unter der Kopfzeile lag (px). */
+  vorher: number | null;
+  /** Je Stopp in der ersten Zeile: Name, ob in der fixierten Kennung, Überdeckung in px. */
+  stopps: { name: string; kennung: boolean; ueberdeckt: number }[];
+}
+
+/**
+ * Läuft rückwärts, bis der Fokus die erste Zeile wieder verlässt, und misst jeden Stopp in ihr
+ * gegen die stehende Kopfzeile. Start: das letzte Ziel der letzten Zeile (vom Aufrufer gesetzt).
+ */
+async function ersteZeileRueckwaerts(page: Page, schritte: number): Promise<ErsteZeileBefund> {
+  const befund: ErsteZeileBefund = { vorher: null, stopps: [] };
+  for (let i = 0; i < schritte; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const s = await page.evaluate(() => {
+      const f = document.activeElement as HTMLElement | null;
+      const kopf = document.querySelector('.ant-table-sticky-holder');
+      const erste = document.querySelector('.ant-table-tbody tr.ant-table-row');
+      if (!f || !kopf || !erste) return null;
+      const k = kopf.getBoundingClientRect();
+      const r = f.getBoundingClientRect();
+      return {
+        inErster: erste.contains(f),
+        inKoerper: f.closest('.ant-table-tbody') != null,
+        kennung: f.closest('.ant-table-cell-fix-start') != null,
+        name: (f.getAttribute('aria-label') ?? f.textContent ?? '').trim().slice(0, 30),
+        ueberdeckt: Math.max(0, Math.min(r.bottom, k.bottom) - Math.max(r.top, k.top)),
+        ersteUnterKopf: k.bottom - erste.getBoundingClientRect().top,
+      };
+    });
+    if (s == null) continue;
+    if (s.inErster) {
+      befund.stopps.push({ name: s.name, kennung: s.kennung, ueberdeckt: s.ueberdeckt });
+    } else if (befund.stopps.length > 0) {
+      break;
+    } else if (s.inKoerper) {
+      befund.vorher = s.ersteUnterKopf;
+    }
+  }
+  return befund;
+}
+
+/** Vorbedingungen und Urteil für einen Lauf; liefert die Messzeile. */
+async function pruefeErsteZeile(page: Page, lauf: string, schritte: number): Promise<string> {
+  const kopf = page.locator('.ant-table-sticky-holder');
+  await expect(kopf, `${lauf}: Vorbedingung — die Kopfzeile steht`).toHaveCSS('position', 'sticky');
+  // Der Fall entsteht am Scrollcontainer des waagerechten Scrollens, nicht erst beim Überlauf.
+  await expect(
+    page.locator('.ant-table-body'),
+    `${lauf}: Vorbedingung — waagerechtes Scrollen (Scrollcontainer)`,
+  ).toHaveCSS('overflow-x', /auto|scroll/);
+  const befund = await ersteZeileRueckwaerts(page, schritte);
+  expect(
+    befund.vorher ?? 0,
+    `${lauf}: Vorbedingung — die erste Zeile lag vor dem Sprung unter der Kopfzeile`,
+  ).toBeGreaterThan(0);
+  expect(
+    befund.stopps.length,
+    `${lauf}: Vorbedingung — Stopps in der ersten Zeile`,
+  ).toBeGreaterThan(0);
+  // 1 px Spiel: der Browser rollt auf ganze Pixel, die Kopfzeile endet gebrochen.
+  const unterKopf = befund.stopps
+    .filter((s) => s.ueberdeckt > 1)
+    .map((s) => `${s.name}${s.kennung ? ' (Kennung)' : ''}: ${s.ueberdeckt.toFixed(1)} px`);
+  expect(unterKopf, `${lauf}: Ziele der ersten Zeile unter der Kopfzeile`).toEqual([]);
+  return (
+    `${lauf}: erste Zeile vorher ${Math.round(befund.vorher!)} px unter dem Kopf, ` +
+    `${befund.stopps.length} Stopps (${befund.stopps.filter((s) => s.kennung).length} in der Kennung)`
+  );
+}
+
+const ERSTE_ZEILE_FLAECHEN = [
+  { width: 390, height: 400 },
+  { width: 1024, height: 600 },
+];
+
+/** Katalogtabelle direkt: Aktionsmenü in der rechts fixierten Spalte. */
+test('Erste Zeile (LLH-1358): Benutzerliste — rückwärts steht kein Ziel unter der Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const LAUF = Date.now();
+  const ANZAHL = 12;
+  for (let i = 0; i < ANZAHL; i += 1) {
+    const antwort = await page.request.post('/api/benutzer', {
+      data: {
+        anzeigename: `Erste Zeile ${LAUF} ${String(i).padStart(2, '0')}`,
+        benutzername: `e2e-erste-${LAUF}-${i}`,
+        passwort: 'e2e-fokus-pw-123',
+      },
+    });
+    expect(antwort.ok(), `Seeding Benutzer ${i}: ${await antwort.text()}`).toBeTruthy();
+  }
+  const gemessen: string[] = [];
+  for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
+    const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
+    await page.setViewportSize(flaeche);
+    await page.goto('/admin/benutzer');
+    await stelleDichte(page, 'handschuh');
+    // Die Liste ist global und blättert ab 50 Zeilen: auf die gesäten Zeilen verengen.
+    await page.getByPlaceholder('Name oder Benutzername').fill(`Erste Zeile ${LAUF}`);
+    const zeilen = page.locator('tr.ant-table-row');
+    await expect(zeilen).toHaveCount(ANZAHL);
+    await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+    gemessen.push(await pruefeErsteZeile(page, lauf, ANZAHL * 4));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/** Tabellenzweig der `Datensicht` (ab `md`; darunter stehen Karten). */
+test('Erste Zeile (LLH-1358): Personenliste — rückwärts steht kein Ziel unter der Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Erste Zeile Personen ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 14;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+      data: { name: `Person ${String(n).padStart(2, '0')}` },
+    });
+    expect(person.ok(), await person.text()).toBeTruthy();
+  }
+  const gemessen: string[] = [];
+  for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
+    const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
+    await page.setViewportSize(flaeche);
+    await page.goto(`/einsaetze/${einsatzId}/personen`);
+    await stelleDichte(page, 'handschuh');
+    if (flaeche.width < 768) {
+      // Unter `md` Karten statt Tabelle: keine stehende Kopfzeile, kein Fall.
+      await expect(page.locator('[data-lfh="datensicht-karte"]').first()).toBeVisible();
+      await expect(page.locator('.ant-table')).toHaveCount(0);
+      gemessen.push(`${lauf}: Karten, keine Tabelle`);
+      continue;
+    }
+    const zeilen = page.locator('tr.ant-table-row');
+    await expect(zeilen).toHaveCount(ANZAHL);
+    await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+    gemessen.push(await pruefeErsteZeile(page, lauf, ANZAHL * 6));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
+/**
+ * `Datensicht` mit `form="tabelle"` in jeder Breite (Baum). Einziges Ziel der Zeile ist die
+ * Kennung in der links fixierten Spalte, die der Browser schon richtig rollt: ein Beleg, kein Fund.
+ */
+test('Erste Zeile (LLH-1358): Einheiten — rückwärts steht kein Ziel unter der Kopfzeile', async ({
+  page,
+}) => {
+  test.setTimeout(180_000);
+  await ohneDevtoolsKnopf(page);
+  await anmelden(page);
+  const antwort = await page.request.post('/api/einsaetze', {
+    data: { bezeichnung: `Erste Zeile Einheiten ${Date.now()}` },
+  });
+  expect(antwort.ok(), await antwort.text()).toBeTruthy();
+  const { id: einsatzId } = (await antwort.json()) as { id: number };
+  const ANZAHL = 14;
+  for (let n = 1; n <= ANZAHL; n += 1) {
+    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+      data: { name: `Einheit ${String(n).padStart(2, '0')}` },
+    });
+    expect(einheit.ok(), await einheit.text()).toBeTruthy();
+  }
+  const gemessen: string[] = [];
+  for (const flaeche of ERSTE_ZEILE_FLAECHEN) {
+    const lauf = `${flaeche.width}×${flaeche.height}/handschuh`;
+    await page.setViewportSize(flaeche);
+    await page.goto(`/einsaetze/${einsatzId}/einheiten`);
+    await stelleDichte(page, 'handschuh');
+    const zeilen = page.locator('tr.ant-table-row');
+    await expect(zeilen).toHaveCount(ANZAHL);
+    await zeilen.last().locator('a, button, [tabindex="0"]').last().focus();
+    gemessen.push(await pruefeErsteZeile(page, lauf, ANZAHL * 4));
+  }
+  test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
+});
+
 // ── LFH-811: Fokus in jedem Kartenmodus unter `lg` ────────────────────────────────────────────
 //
 // Unter `lg` trägt während eines Kartenmodus ein Band im Kartenfuß die Bedienung

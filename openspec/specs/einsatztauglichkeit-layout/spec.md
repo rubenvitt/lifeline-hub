@@ -173,6 +173,9 @@ Bildlauf hat.
 - Lagekarte und Personenkarte: Knopfblock, Überlagerung links und die Bänder des
   Kartenfußes gegenüber allen Zielen der Kartenspalte.
 - Personenliste: die stehende Kopfzeile der Tabelle.
+- Tabellen mit stehender Kopfzeile und waagerechtem Scrollen (Katalogtabelle, Tabellenzweig der
+  Datensicht, Gefahrenmatrix): rückwärts in die erste Zeile getabbt, MUST das Ziel ganz unter
+  der Kopfzeile stehen, auch wo der Browser den Fokusabstand am Scrollcontainer beschneidet.
 - Rahmen: die klebende Kopfleiste gegenüber den Zielen von Seitenkopf und Inhalt; ein Fokus in
   der Kopfleiste selbst MUST die Seite nicht rollen.
 
@@ -183,6 +186,10 @@ Bildlauf hat.
 #### Scenario: Zeilenwechsel in der Gefahrenmatrix
 - **WHEN** der Fokus mit Tab von der letzten Zelle einer Zeile zur ersten Zelle der nächsten wechselt und die Tabelle waagerecht überläuft
 - **THEN** liegt die neue Zelle nicht vollständig hinter der Spalte „Gefahr“, und alle 58 Zellen werden im Durchlauf besucht
+
+#### Scenario: Erste Zeile rückwärts unter der stehenden Kopfzeile
+- **WHEN** der Fokus in Benutzerliste, Personenliste (ab `md`) oder Einheitenliste bei 390 × 400 und 1024 × 600 in `handschuh` mit Shift+Tab von der letzten Zeile in die erste läuft und die erste Zeile dabei unter der Kopfzeile liegt
+- **THEN** steht jedes Ziel der ersten Zeile ganz unter der Kopfzeile, auch eines außerhalb der fixierten Spalte
 
 #### Scenario: Kartenknöpfe über dem Fuß
 - **WHEN** auf der Lagekarte bei 390 × 844 und 1024 × 768 in `handschuh` die Zeitachse ausgeklappt ist
