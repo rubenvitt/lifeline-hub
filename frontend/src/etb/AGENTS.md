@@ -7,7 +7,9 @@ Gilt für `frontend/src/etb/`, `pages/EtbPage.tsx`, `pages/EtbDruckPage.tsx`,
 Ableitungen in `etb/zeitachseModell.ts`)
 
 - Keine Sortierung/Spaltenfilter/-auswahl; Ordnung = Zeit (Server). Ebenso Lagemeldungen
-  (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`).
+  (`pages/LagemeldungenPage.tsx`, Tagesgrenze in der Anzeigezone, `lagemeldungen/zeitachse.ts`);
+  ihre Zeit ist die Ereigniszeit der Quellmeldung (`ereigniszeit`), nicht die Übergabe, die nur
+  im Meta steht (LLH-1039).
 - **Funkprotokoll-Ordnung** (LLH-1149, Entscheidung Ruben 10.10./17.10.2026, Specs
   `etb-zeitachse-darstellung`, `etb-zeitachse-fenster`, Herleitung
   `openspec/changes/archive/2026-10-17-gonnp1g8-etb-ux-durchgang/design.md` D1–D3): älteste Zeile oben, neueste

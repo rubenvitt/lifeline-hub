@@ -303,6 +303,7 @@ const LAGEMELDUNG_VERORTET = {
   lon: 8.7,
   erstellt_von_id: 1,
   erstellt_at: '2026-06-12 09:00:00',
+  ereigniszeit: '2026-06-12 08:30:00',
   meldung_lfd_nr: 5,
   meldung_absender: 'Florian Nord 1',
 };

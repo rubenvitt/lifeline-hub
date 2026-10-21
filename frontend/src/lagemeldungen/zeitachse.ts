@@ -4,6 +4,11 @@ import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzei
 /**
  * Zeitachse der Lagemeldungen: Tagesgruppen und Zeitfenster, rein und ohne React.
  *
+ * Maßgeblich ist die **Ereigniszeit** der Quellmeldung (`ereigniszeit`), nicht der Zeitpunkt der
+ * Übergabe an die Lage (LLH-1039): eine nachgereichte Meldung steht dort, wo sie geschah. Das Feld
+ * heißt wie an der Meldung selbst, damit eine Sicht, die Meldungen direkt liest, dieselben
+ * Funktionen nutzt.
+ *
  * Der Wire-String ist UTC OHNE Zonenkennung; `dayjs(s)` läse ihn als Ortszeit und verschöbe
  * die Tagesgrenze. Deshalb läuft alles über `inZone` — dieselbe Zone, in der `ZeitAnzeige`
  * die Uhrzeit rendert.
@@ -93,7 +98,8 @@ export function filterAktiv(f: LageFilter): boolean {
 /** Die Felder, die ein Lageobjekt für Filter und Gruppen braucht (Teil von `LageMeldung`). */
 interface LageEintragKern {
   text: string;
-  erstellt_at: string;
+  /** Ereigniszeit der Quellmeldung (UTC-Wire) — Zeit, Tag, Fenster und Ordnung. */
+  ereigniszeit: string;
   lat?: number | null;
   lon?: number | null;
   meldung_lfd_nr: number;
@@ -109,7 +115,7 @@ export function filtereLagemeldungen<T extends LageEintragKern>(
 ): T[] {
   const nadel = f.suche.trim().toLowerCase();
   return eintraege.filter((l) => {
-    if (f.fenster !== 'alle' && !imZeitfenster(l.erstellt_at, f.fenster, jetzt, konv)) {
+    if (f.fenster !== 'alle' && !imZeitfenster(l.ereigniszeit, f.fenster, jetzt, konv)) {
       return false;
     }
     if (f.ort !== 'alle' && (l.lat != null && l.lon != null) !== (f.ort === 'mit')) return false;
@@ -128,8 +134,10 @@ interface Tagesgruppe<T> {
 }
 
 /**
- * Tagesgruppen, jüngster Tag und jüngster Eintrag zuerst (der Server liefert aufsteigend).
- * Sortiert wird über den Wire-String: `YYYY-MM-DD HH:mm:ss` ist als Text chronologisch.
+ * Tagesgruppen, jüngster Tag und jüngster Eintrag zuerst, nach Ereigniszeit. Der Server liefert
+ * schon so; sortiert wird trotzdem, damit die Ordnung nicht an der Quelle hängt. Über den
+ * Wire-String: `YYYY-MM-DD HH:mm:ss` ist als Text chronologisch. Gleichstand behält die
+ * Eingangsreihenfolge (stabile Sortierung, beim Server: zuletzt übergeben zuerst).
  */
 export function gruppiereNachTag<T extends LageEintragKern>(
   eintraege: readonly T[],
@@ -137,14 +145,30 @@ export function gruppiereNachTag<T extends LageEintragKern>(
   jetzt: Dayjs = dayjs(),
 ): Tagesgruppe<T>[] {
   const sortiert = [...eintraege].sort((a, b) =>
-    a.erstellt_at < b.erstellt_at ? 1 : a.erstellt_at > b.erstellt_at ? -1 : 0,
+    a.ereigniszeit < b.ereigniszeit ? 1 : a.ereigniszeit > b.ereigniszeit ? -1 : 0,
   );
   const gruppen: Tagesgruppe<T>[] = [];
   for (const l of sortiert) {
-    const schluessel = tagesSchluessel(l.erstellt_at, konv);
+    const schluessel = tagesSchluessel(l.ereigniszeit, konv);
     const letzte = gruppen[gruppen.length - 1];
     if (letzte?.schluessel === schluessel) letzte.zeilen.push(l);
     else gruppen.push({ schluessel, etikett: tagesEtikett(schluessel, konv, jetzt), zeilen: [l] });
   }
   return gruppen;
+}
+
+/**
+ * Zeit der Übergabe an die Lage für das Meta der Zeile: `HH:mm`, solange sie am Tag der
+ * Ereigniszeit liegt (der steht im Tageskopf), sonst `DD.MM. HH:mm` — sonst läse sich eine am
+ * Folgetag nachgereichte Übergabe als Uhrzeit des Ereignistags. Beides in der Anzeigezone.
+ */
+export function uebergabeZeit(
+  ereigniszeit: string,
+  uebergabe: string,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): string {
+  const d = inZone(uebergabe, konv);
+  return tagesSchluessel(ereigniszeit, konv) === d.format('YYYY-MM-DD')
+    ? d.format('HH:mm')
+    : d.format('DD.MM. HH:mm');
 }

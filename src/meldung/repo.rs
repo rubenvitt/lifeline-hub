@@ -886,7 +886,7 @@ macro_rules! lage_anzeige_select {
     () => {
         concat!(
             "SELECT lm.id, lm.einsatz_id, lm.meldung_id, lm.text, lm.lat, lm.lon, \
-                    lm.erstellt_von_id, lm.erstellt_at, \
+                    lm.erstellt_von_id, lm.erstellt_at, m.ereigniszeit, \
                     m.lfd_nr AS meldung_lfd_nr, m.absender AS meldung_absender, ",
             is_neu_sql!(),
             " AS is_neu, lm.gesehen_at, lm.gesehen_von_id, g.anzeigename AS gesehen_von_name \
@@ -896,14 +896,16 @@ macro_rules! lage_anzeige_select {
     };
 }
 
-/// Listet Lageobjekte eines Einsatzes inkl. Herkunft (Quell-Meldung). Neueste zuerst.
+/// Listet Lageobjekte eines Einsatzes inkl. Herkunft (Quell-Meldung). Jüngste Ereigniszeit der
+/// Meldung zuerst, nicht die jüngste Übergabe (LLH-1039); bei gleicher Ereigniszeit die zuletzt
+/// übergebene.
 pub async fn liste_lage_meldungen(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<LageMeldungAnzeige>, AppError> {
     sqlx::query_as::<_, LageMeldungAnzeige>(concat!(
         lage_anzeige_select!(),
-        " WHERE lm.einsatz_id = ? ORDER BY lm.id DESC"
+        " WHERE lm.einsatz_id = ? ORDER BY m.ereigniszeit DESC, lm.id DESC"
     ))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -1678,6 +1680,94 @@ mod tests {
             .unwrap();
         assert_eq!(id1, id2, "UNIQUE meldung_id → ein Lageobjekt");
         assert_eq!(liste_lage_meldungen(&pool, e).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn liste_ordnet_nach_ereigniszeit_der_meldung_nicht_nach_uebergabe() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let spaet = anlegen(
+            &pool,
+            e,
+            b,
+            daten("Pegel steigt", "2026-06-12 14:41:00", "2026-06-12 14:42:00"),
+        )
+        .await
+        .unwrap();
+        let frueh = anlegen(
+            &pool,
+            e,
+            b,
+            daten(
+                "Brücke gesperrt",
+                "2026-06-12 13:14:00",
+                "2026-06-12 13:15:00",
+            ),
+        )
+        .await
+        .unwrap();
+        // Die frühere Meldung wird ZULETZT übergeben: höhere id, jüngere Übergabe.
+        let lid_spaet = als_lagerelevant(&pool, e, spaet.id, b, "Pegel steigt", None)
+            .await
+            .unwrap();
+        let lid_frueh = als_lagerelevant(&pool, e, frueh.id, b, "Brücke gesperrt", None)
+            .await
+            .unwrap();
+        for (lid, uebergabe) in [
+            (lid_spaet, "2026-06-12 14:50:00"),
+            (lid_frueh, "2026-06-12 15:05:00"),
+        ] {
+            sqlx::query("UPDATE lage_meldung SET erstellt_at = ? WHERE id = ?")
+                .bind(uebergabe)
+                .bind(lid)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+        let liste = liste_lage_meldungen(&pool, e).await.unwrap();
+        let folge: Vec<_> = liste
+            .iter()
+            .map(|l| {
+                (
+                    l.text.as_str(),
+                    l.ereigniszeit.as_str(),
+                    l.erstellt_at.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            folge,
+            [
+                ("Pegel steigt", "2026-06-12 14:41:00", "2026-06-12 14:50:00"),
+                (
+                    "Brücke gesperrt",
+                    "2026-06-12 13:14:00",
+                    "2026-06-12 15:05:00"
+                ),
+            ],
+            "jüngste Ereigniszeit zuerst; die Übergabezeit bleibt am Objekt"
+        );
+        // Einzeln geladen trägt sie dieselbe Ereigniszeit.
+        let einzeln = load_lage_meldung(&pool, e, lid_frueh)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(einzeln.ereigniszeit, "2026-06-12 13:14:00");
+    }
+
+    #[tokio::test]
+    async fn liste_gleiche_ereigniszeit_zuletzt_uebergebene_zuerst() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let erste = uebergeben(&pool, e, b, "erste").await;
+        let zweite = uebergeben(&pool, e, b, "zweite").await;
+        let ids: Vec<_> = liste_lage_meldungen(&pool, e)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|l| l.id)
+            .collect();
+        assert_eq!(ids, [zweite, erste]);
     }
 
     /// Legt eine Meldung an und übergibt sie mit `text` an die Lage; liefert die Lagemeldung-id.
