@@ -285,10 +285,6 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
   });
   const basis = `/api/einsaetze/${einsatzId}`;
   const ort: [number, number] = [8.4, 52.0];
-  // Einsatzort weit weg verortet: ein Einsatzort ohne Ort zählte im Seitenkopf als „nicht
-  // verortet“ (LLH-1033), die längere Kopfzeile bräche im Handschuh um und die Karte würde so
-  // niedrig, dass das Fuß-Band die Clustermitte deckte.
-  await senden(page, 'patch', basis, { einsatzort_lat: ort[1], einsatzort_lon: ort[0] + 1 });
   for (let i = 0; i < 3; i++) {
     await senden(page, 'post', `${basis}/personen`, {
       antreff_lat: ort[1] + i * 0.0002,

@@ -1429,11 +1429,10 @@ export default function LagekartePage() {
         </Typography.Title>
         <EinsatzstatusMarke einsatz={rahmenEinsatz} />
         <span data-lfh="seitenkopf-meta" style={seitenMetaStil(farben)}>
-          {kopfMeta(
-            verortetAnzahl(alleVerortet),
-            nichtVerortetAlle.length + (einsatzortOhneOrt ? 1 : 0),
-            lagebildFehler,
-          )}
+          {/* Die Kopfzahl zählt nur die Lageobjekte, nicht den Einsatzort ohne Koordinate: sie
+              hängt dann an einer Quelle, und die Kopfzeile bricht am Handschirm nicht um (LFH-723,
+              LFH-373). Den Einsatzort führt die Objektliste als erste Zeile. */}
+          {kopfMeta(verortetAnzahl(alleVerortet), nichtVerortetAlle.length, lagebildFehler)}
         </span>
         {/* Datenstand wie im Kopf jeder Lagebild-Seite; ohne Verbindung mit „offline"
             (LFH-723, design.md D7). Platz vor dem ersten Abruf gehalten (LFH-373). */}

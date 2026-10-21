@@ -2144,6 +2144,23 @@ describe('LagekartePage · Neuentwurf S5', () => {
     await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
   });
 
+  // LLH-1033: den Einsatzort ohne Koordinate führt die Objektliste (Zeile, Marke), die Kopfzahl
+  // nicht — sonst hinge sie an einer zweiten Quelle, und die Kopfzeile bräche am Handschirm um.
+  it('Kopfzahl zählt den Einsatzort ohne Koordinate nicht mit', async () => {
+    basisHandler([
+      http.get('/api/einsaetze/1', () =>
+        HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
+      ),
+    ]);
+    renderSeite();
+    // Vorbedingung: der Einsatz ist geladen, die Objektliste führt den Einsatzort ohne Ort.
+    await waitFor(() =>
+      expect(document.querySelector('[data-paneel="objekte-einsatzort"]')).toBeInTheDocument(),
+    );
+    const meta = document.querySelector('[data-lfh="seitenkopf-meta"]') as HTMLElement;
+    await waitFor(() => expect(meta).toHaveTextContent('verortet · 1 nicht verortet'));
+  });
+
   // LFH-723: die Karte führt ihren Datenstand wie jede Seite des Lagebilds — ohne Verbindung
   // mit „offline", damit ein vorgehaltener Stand nicht als aktueller gelesen wird.
   it('führt im Seitenkopf den Datenstand, ohne Verbindung mit „offline"', async () => {
