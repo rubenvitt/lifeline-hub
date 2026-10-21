@@ -34,11 +34,14 @@ import './lagekarte.css';
 
 /**
  * Überlagerungen der Kartenfläche: oben links Kartengrundlage und Zeigerkoordinate, oben rechts der
- * Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichnen, ab `lg` der Leisten-Umschalter).
+ * Knopfblock (Zoom, Nordung, Eigenposition, Messen, Zeichenwerkzeuge, ab `lg` der Leisten-Umschalter).
  *
  * Kein aufspannender Rahmen: jeder Block ist einzeln positioniert, sonst schluckte ein Elternteil
  * über der ganzen Karte jedes Ziehen (vgl. `KartenFuss`).
  */
+
+/** `data-lfh` des Knopfs „Zeichenwerkzeuge“ (LLH-1038). */
+export const ZEICHENWERKZEUGE_KNOPF = 'zeichenwerkzeuge-knopf';
 
 /** Abstand der Überlagerungen zum Kartenrand — derselbe wie der des Kartenfusses. */
 export const UEBERLAGERUNG_RAND = 12;
@@ -335,6 +338,7 @@ function Kartenknopf({
   gedrueckt,
   ausgeklappt,
   steuert,
+  kennung,
   sperrGrund,
   children,
 }: {
@@ -347,6 +351,8 @@ function Kartenknopf({
   /** Gesetzt = Auf-/Zu-Schalter einer Fläche (`aria-expanded`), die `steuert` benennt. */
   ausgeklappt?: boolean;
   steuert?: string;
+  /** `data-lfh` des Knopfs (Fokus-Rückgabe und Außenklick des Werkzeugmenüs, e2e). */
+  kennung?: string;
   /**
    * Gesetzt = gesperrt. `aria-disabled` statt `disabled`: der Knopf bleibt in der Tab-Folge und
    * nimmt den Klick — der zeigt den Grund als Text am Knopf (auf Touch der einzige Weg, ein `title`
@@ -364,6 +370,7 @@ function Kartenknopf({
       aria-pressed={gedrueckt}
       aria-expanded={ausgeklappt}
       aria-controls={steuert}
+      data-lfh={kennung}
       aria-disabled={sperrGrund != null ? true : undefined}
       aria-describedby={sperrGrund != null ? grundId : undefined}
       title={sperrGrund ?? beschriftung}
@@ -418,8 +425,11 @@ interface KartenUeberlagerungProps {
   onZoomRein: () => void;
   onZoomRaus: () => void;
   onNorden: () => void;
-  /** Öffnet die Zeichenwerkzeuge der Leiste; ohne Schreibrecht nicht gesetzt → kein Knopf. */
-  onZeichnen?: () => void;
+  /**
+   * Knopf „Zeichenwerkzeuge“ (LLH-1038): klappt das Werkzeugmenü an der Karte auf und zu
+   * (`Werkzeugmenue.tsx`, die Seite hält den Zustand). Ohne Schreibrecht nicht gesetzt → kein Knopf.
+   */
+  zeichenwerkzeuge?: { offen: boolean; steuert: string; onUmschalten: () => void };
   /**
    * Messwerkzeug an/aus. Steht auch ohne Schreibrecht da: gemessen wird nur, gespeichert nichts.
    * Nicht gesetzt (z. B. `personen/BetroffeneKarte.tsx`) → kein Knopf.
@@ -543,12 +553,16 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
             <IconLineal size={16} />
           </Kartenknopf>
         )}
-        {props.onZeichnen && (
+        {props.zeichenwerkzeuge && (
           <Kartenknopf
             beschriftung="Zeichenwerkzeuge"
-            onClick={props.onZeichnen}
+            onClick={props.zeichenwerkzeuge.onUmschalten}
             kante={kante}
             farbe={rollen.bedien}
+            ausgeklappt={props.zeichenwerkzeuge.offen}
+            // Zugeklappt steht das Menü nicht im Baum — dann verweist der Knopf auf nichts.
+            steuert={props.zeichenwerkzeuge.offen ? props.zeichenwerkzeuge.steuert : undefined}
+            kennung={ZEICHENWERKZEUGE_KNOPF}
           >
             <IconStift size={16} />
           </Kartenknopf>

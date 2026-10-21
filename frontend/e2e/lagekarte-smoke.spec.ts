@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { stehendeAuswahl, waehleIn } from './auswahl-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { zeigeLeistenAnsicht } from './leisten-kern';
+import { oeffneZeichenWahl, waehleWerkzeug, zeigeLeistenAnsicht } from './leisten-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -151,9 +151,8 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   // terra-draw setzt beim Start den Cursor über `map.getCanvas().style.cursor` — der einzige
   // DOM-Beleg, dass der Adapter die Map übernommen hat. Die Knöpfe „Abschließen"/„Abbrechen"
   // kommen aus React-State und stünden auch bei wirkungslosem Adapter da.
-  // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
-  await zeigeLeistenAnsicht(page, 'Objekte');
-  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  // Gezeichnet wird über das Werkzeugmenü an der Karte (LLH-1038).
+  await waehleWerkzeug(page, 'Gefahrengebiet');
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await expect(canvas).toHaveCSS('cursor', 'crosshair');
 
@@ -166,13 +165,13 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
   // Führungs-Tablet 1024 × 768: ab `lg` steht die Leiste noch rechts neben der Karte; die
-  // Zeichenwerkzeuge liegen im Paneel „Zeichnen" (für Schreibende vorgabemäßig offen).
+  // Zeichenwerkzeuge stehen an der Karte.
   await page.setViewportSize({ width: 1024, height: 768 });
   // Unter `xl` startet die Zeitachse ohne gemerkte Wahl eingeklappt; die Messung braucht sie
   // ausgeklappt, also bewusst einblenden.
   await page.getByRole('button', { name: 'Zeitachse einblenden' }).click();
   await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
-  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await waehleWerkzeug(page, 'Gefahrengebiet');
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await ohneUeberdeckung(page, 'Tablet 1024 px');
   await page.getByRole('button', { name: 'Abbrechen' }).click();
@@ -184,8 +183,8 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await page.setViewportSize({ width: 390, height: 844 });
   // VORBEDINGUNG: die Zeitachse steht ausgeklappt (die Wahl bei 1024 px ist gemerkt).
   await expect(page.getByRole('button', { name: 'Zeitachse ausblenden' })).toBeVisible();
-  await page.getByRole('button', { name: 'Leiste einblenden' }).click();
-  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  // Das Werkzeugmenü steht an der Karte; die Leiste bleibt zu (LLH-1038).
+  await waehleWerkzeug(page, 'Gefahrengebiet');
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await expect(page.locator('#lagekarte-leiste')).toBeHidden();
   await ohneUeberdeckung(page, 'Handschirm 390 px');
@@ -428,9 +427,7 @@ test('Lagekarte: Messwerkzeug misst Strecke und Fläche und schließt mit Escape
 
   // Direkt aus dem Messen ins Zeichnen: drei terra-draw-Instanzen auf EINER Karte brauchen
   // eigene Präfixe, sonst wirft MapLibre „Source … already exists".
-  // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
-  await zeigeLeistenAnsicht(page, 'Objekte');
-  await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+  await waehleWerkzeug(page, 'Gefahrengebiet');
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeVisible();
   await expect(page.locator('[data-lfh="mess-steuerung"]')).toHaveCount(0);
   await expect(knopf).toHaveAttribute('aria-pressed', 'false');
@@ -704,9 +701,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
     await expect(flaeche.locator('canvas.maplibregl-canvas')).toHaveCount(1);
 
     // Über die Oberfläche: Grundzeichen „Gefahr“, Farbe Rot aus der Palette, platzieren.
-    await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
-    const paneel = page.locator('[data-paneel="zeichnen"]');
-    await paneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
+    const paneel = await oeffneZeichenWahl(page);
     await paneel
       .getByRole('radiogroup', { name: 'Grundzeichen' })
       .getByRole('radio', { name: 'Gefahr', exact: true })
@@ -715,6 +710,8 @@ test.describe('Lagekarte: freie Zeichen', () => {
     await paneel.getByLabel('Farbe').click();
     await page.locator('.ant-select-dropdown:visible').getByTitle('Rot', { exact: true }).click();
     await paneel.getByRole('button', { name: 'Platzieren', exact: true }).click();
+    // Der Dialog ist zu, bevor die Karte den Tipp bekommt (sonst träfe er die Maske).
+    await expect(paneel).toBeHidden();
     // Neben den Einsatzort, damit kein Cluster entsteht (clusterRadius 45 px).
     const box = (await flaeche.locator('canvas.maplibregl-canvas').boundingBox())!;
     await page.mouse.click(box.x + box.width / 2 + 120, box.y + box.height / 2 - 80);
@@ -770,9 +767,7 @@ test('Lagekarte: das Grundzeichen-Raster schneidet keine Kachelreihe an', async 
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
   await page.goto(`/einsaetze/${eid}/lagekarte`);
-  await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
-  const paneel = page.locator('[data-paneel="zeichnen"]');
-  await paneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
+  const paneel = await oeffneZeichenWahl(page);
   for (const name of ['Grundzeichen', 'Symbol']) {
     const raster = paneel.getByRole('radiogroup', { name });
     await expect(raster.getByRole('radio').first()).toBeVisible();

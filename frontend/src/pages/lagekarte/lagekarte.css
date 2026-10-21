@@ -34,7 +34,10 @@
 /* Umschalter (Messen, LFH-616): eingerastet = tiefere Fläche plus blaue Innenkante. Die
    Farbe allein wäre ein Ein-Kanal-Zustand; die Kante ist der zweite, `aria-pressed` der
    dritte für Vorlesende. */
-.lfh-kartenknopf[aria-pressed='true'] {
+/* Aufgeklappt (Werkzeugmenü, LLH-1038) sieht aus wie eingerastet; `aria-expanded` trägt den
+   Zustand für Vorlesende. Nur dieser Knopf: der Leisten-Umschalter meldet `aria-expanded` auch. */
+.lfh-kartenknopf[aria-pressed='true'],
+.lfh-kartenknopf[data-lfh='zeichenwerkzeuge-knopf'][aria-expanded='true'] {
   background: var(--lfh-flaeche-3);
   box-shadow: inset 2px 0 0 var(--lfh-bedien);
 }

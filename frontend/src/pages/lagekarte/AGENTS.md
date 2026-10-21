@@ -97,7 +97,9 @@ diese Zusage.
 - **Schwebende Bänder werden gestapelt, nicht per `zIndex` gestaffelt** (LFH-355,
   `pages/lagekarte/KartenFuss.tsx`): ein Rahmen (`pointerEvents: 'none'`), Bänder als
   Flow-Geschwister mit `bandStil(…)` (`'auto'`, nie `position: 'absolute'`). Der Fuß endet vor der
-  Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen.
+  Knopfspalte (`fussStil(knopfKante)`) und oben an der Karte; kein `overflow` am Rahmen. Das
+  Werkzeugmenü ist das oberste Kind (`marginBlockEnd: 'auto'`, rollt in sich) und überdeckt so
+  weder Knopfblock noch Bänder.
 - **Das Zeitachsen-Band hat höchstens zwei Reihen** (LFH-899, Spec `lagekarte-zeitachse`,
   `openspec/changes/archive/2026-10-04-lfh-899-zeitachse-band-flacher/design.md`): zwei Gruppen,
   die nicht in sich umbrechen (Wiedergabe: Ausblenden, Abspielen, Schieber · Stand: Auswahl
@@ -171,10 +173,11 @@ diese Zusage.
   Ebenen oder als Kartenhinweis steht (Kopf nur bei sichtbarer Leiste UND „Ebenen“ gezeigt;
   LFH-1077). Rückweg „← Ebenen/Objekte“ im Kopf der Auswahl hebt alle Auswahlen auf; Esc ebenso
   (Zuhörer der Seite, nur bei offener Auswahl, nicht bei Zeichnen/Kreis/Messen, Overlay, Feld,
-  `repeat`). Esc-Reihenfolge: offenes Bündel (`Kartenflaeche`, Capture-Phase, nimmt die Taste)
-  → Auswahl → Fokus; jede Stufe setzt `preventDefault`, jede prüft `defaultPrevented`.
-  „Zeichenwerkzeuge“ und `?ort=` schalten auf „Objekte“, merken das wie ein Tipp und lassen die
-  Auswahl bestehen. e2e-Wege: `e2e/leisten-kern.ts`.
+  `repeat`). Esc-Reihenfolge: offenes Werkzeugmenü (eigener Zuhörer, nimmt die Taste) → offenes
+  Bündel (`Kartenflaeche`, Capture-Phase, nimmt die Taste) → Auswahl → Fokus; jede Stufe setzt
+  `preventDefault`, jede prüft `defaultPrevented`. `?ort=` schaltet auf „Objekte“, merkt das wie
+  ein Tipp und lässt die Auswahl bestehen; „Zeichenwerkzeuge“ ändert weder Ansicht noch
+  Sichtbarkeit der Leiste (LLH-1038). e2e-Wege: `e2e/leisten-kern.ts`.
 - **Objekte = eine Liste** (LLH-1033, Spec `lagekarte-objektsuche`, `MarkerSuche.tsx`): Suchfeld,
   Marke „Nicht verortet“ (`SegmentUmschalter`, Filter; 0 → „Alles verortet“, Lagebild-Ausfall →
   „—“), der Einsatzort als erste Zeile, darunter Gruppen je Art (`OBJEKT_GRUPPEN`, fester Rang,
@@ -257,7 +260,7 @@ diese Zusage.
   mit `darfSchreiben` über `onZoneZeichnenStart` (stabil per `useCallback`) und räumt immer.
   Typ und Form prüft `parseZeichnenAuftrag` (`routing/deeplinks.ts`), die Geometrie
   `zeichenAuftragZuEntwurf` über `ZONE_TYPEN`; die Farbe der freien Skizze ist
-  `FREIE_SKIZZE_VORGABEFARBE`, für Paneel und Link dieselbe. Das Zonen-Zeichnen startet in
+  `FREIE_SKIZZE_VORGABEFARBE`, für Werkzeugmenü und Link dieselbe. Das Zonen-Zeichnen startet in
   `Kartenflaeche` erst mit angewandtem Style-JSON (Merker ab `style.load`, nie
   `isStyleLoaded()` — das wartet auf Kacheln) und beginnt nach `setStyle` neu wie die Messung.
   **Bezug `&bezirk=<id>`** (LLH-1069, Spec `betreuung-lagekarte`): nur am Typ
@@ -277,6 +280,18 @@ diese Zusage.
   (`parseKreisVorbelegung`) und räumt alle drei. Esc: Figur = Mitte. Eine neue Geometrie per PATCH
   löscht die Kreisangaben. Mit Bezug (`evakuierungsbezirk:kreis&bezirk=<id>`) trägt der Kreis ihn
   wie die Fläche: POST mit `kreis`, `label` und `evakuierungsbezirk_id`, keine Serie, Art fest.
+- **Werkzeugmenü an der Karte** (LLH-1038, Spec `lagekarte-zeichnen`): der Knopf
+  „Zeichenwerkzeuge“ (nur mit Schreibrecht) klappt `Werkzeugmenue.tsx` auf, das im `KartenFuss`
+  steht (Zustand in der Seite, Knopf mit `aria-expanded`/`aria-controls`). Kein Popover am Knopf,
+  kein `PunktankerMenue`, keine Klickebene, kein `contextmenu`. Einträge nur aus `werkzeugZeilen`
+  (`werkzeugZeilen.ts`, rein über `ZONE_TYPEN`: Hauptknopf = Vorgabeform des Links, daneben
+  „Linie“/„Kreis“). Taktisches Zeichen: „Zuletzt verwendet“ startet direkt, „Weitere …“ öffnet
+  `ZeichenWahlDialog` (der Entwurf lebt dort), ein laufendes Zeichen zeigt nur „wird platziert“.
+  Offen nimmt es Esc (eigener Zuhörer mit `preventDefault`; `escGehoertOverlay` kennt
+  `[data-lfh="werkzeugmenue"]`), ein Druck außerhalb von Menü und Knopf schließt es, jeder Eintrag
+  gibt den Fokus an den Knopf. Messen ist kein Eintrag (eigener Knopf, Formen in
+  `MessSteuerung`). Die Leiste trägt keinen Zeichenweg; nur „Fläche zeichnen“ an einem nicht
+  verorteten Abschnitt verortet ein Objekt.
 - **Esc beim Zeichnen ist zweistufig** (LFH-712, Entscheidung 28.09.2026): erstes Esc verwirft
   die Figur mit Quittung, der Modus bleibt; Esc ohne Figur beendet ihn (Messen: ein Esc). Stufe
   aus `lagekarte/zeichnenEsc.ts`, **ein** `keydown`-Zuhörer der Seite, terra-draw-Modi mit
@@ -311,11 +326,6 @@ streicht den Punkt hier. Zustände und Entwurf: `docs/design/2026-10-20-lagekart
 
 - **Die Leiste bleibt 300 px** und Inhalt (Kopf, LFH-557): keine Reiter am Kartenrand, kein
   Drawer, keine neue Breite. Ein neuer Klappzustand bekommt einen Schlüssel in `GERAETESPEICHER`.
-- **Zeichnen an der Karte:** der Knopf „Zeichenwerkzeuge“ öffnet ein Werkzeugmenü an diesem Knopf
-  (Flächen und Linien, Taktisches Zeichen mit „Zuletzt verwendet“, Picker als Dialog); kein
-  `PunktankerMenue`, keine Klickebene. Die Leiste trägt keinen Zeichenweg. Messen bleibt der
-  eigene Knopf, seine Formen stehen in `MessSteuerung`, nicht im Menü.
-- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum) und LLH-1033 (Objekte, Auswahl) sind
-  gebaut (Regeln oben; das Paneel „Zeichnen“ steht bis LLH-1038 unter der Objektliste) → LLH-1038
-  (Werkzeugmenü). Der Kreis (LLH-1043) kommt als Form ins Menü. „Abschnitt fokussieren“
-  (LLH-1057) ist gebaut (Regel oben).
+- **Reihenfolge:** LLH-1028 (Gerüst, Modus-Band, Ebenenbaum), LLH-1033 (Objekte, Auswahl),
+  LLH-1038 (Werkzeugmenü samt Kreis als Form) und „Abschnitt fokussieren“ (LLH-1057) sind gebaut
+  (Regeln oben).

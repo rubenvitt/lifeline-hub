@@ -1,3 +1,5 @@
+import { WERKZEUGMENUE_KENNUNG } from './werkzeugZeilen';
+
 /**
  * Zweistufiges Esc beim Zeichnen (LFH-712): je öfter Esc, desto mehr Richtung view-only. Rein und
  * exportiert, damit jede Zeile der Stufentafel ohne Karte prüfbar ist; die Seite führt nur aus.
@@ -46,8 +48,12 @@ export const QUITTUNG_VERWORFEN = 'Zeichnung verworfen';
  *
  * Gefragt wird nach dem sichtbaren Overlay, nicht nach dem Fokus: Esc soll sonst unabhängig vom
  * Fokus wirken. Ein Dialog-Rahmen, den antd nach dem Schließen stehen lässt, trägt `display: none`.
+ * Das Werkzeugmenü an der Karte (LLH-1038, `Werkzeugmenue.tsx`) ist kein antd-Overlay, steht nur
+ * offen im Baum und schließt per Esc über einen eigenen Zuhörer — Esc darf daneben keinen Modus
+ * ändern.
  */
 const OFFENE_OVERLAYS = [
+  `[data-lfh="${WERKZEUGMENUE_KENNUNG}"]`,
   '.ant-dropdown:not(.ant-dropdown-hidden)',
   '.ant-select-dropdown:not(.ant-select-dropdown-hidden)',
   '.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)',

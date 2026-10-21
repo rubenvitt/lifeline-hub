@@ -32,7 +32,7 @@ import {
   ruhigeHoehe,
   stelleDichte,
 } from './trefflaeche-kern';
-import { oeffneAlleFachebenen, oeffneObjektGruppe } from './leisten-kern';
+import { oeffneAlleFachebenen, oeffneObjektGruppe, oeffneWerkzeugmenue } from './leisten-kern';
 
 /**
  * Gate 3 der Bedien-Leitlinie: Trefflächen gegen die Dichte-Staffel auf Lage-Dashboard,
@@ -3826,7 +3826,7 @@ test('ETB (LFH-373): Slash-Menü, Zeilenauslöser und Zeilenmenü folgen der Dic
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Kartengrundlage und Zeitachse folgen der Dichte-Staffel, Knöpfe und Grundlage halten den Zielabstand', async ({
+test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Werkzeugmenü, Kartengrundlage und Zeitachse folgen der Dichte-Staffel, Knöpfe und Grundlage halten den Zielabstand', async ({
   page,
 }) => {
   test.setTimeout(240_000);
@@ -3903,6 +3903,18 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Kartengrundlage und Zeita
       5,
     );
 
+    // Werkzeugmenü an der Karte (LLH-1038): jeder Eintrag hält die Stufe, auch wo ein Name
+    // umbricht. Sechs Zonentypen, sechs Zusatzformen (Linie, Kreis) und „Weitere …“.
+    const menue = await oeffneWerkzeugmenue(page);
+    const werkzeug = await alleHaltenStufe(
+      menue.getByRole('button'),
+      soll,
+      `Werkzeugmenü (${dichte})`,
+      13,
+    );
+    await page.keyboard.press('Escape');
+    await expect(menue).toHaveCount(0);
+
     // Kartengrundlage über der Karte (ab `md`): Segmente der lokalen Leiste, dieselbe Zelle.
     const grundlage = page.locator('[data-lfh="grundlage-leiste"]');
     // Online-Stile je nach e2e-Konfiguration, dazu immer Offline und „Ohne Karte“: mindestens drei.
@@ -3936,14 +3948,18 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Kartengrundlage und Zeita
     je.set(`${dichte} Objektliste`, verortet);
     je.set(`${dichte} Kartenknopf`, karte.kleinstes);
     je.set(`${dichte} Zeitachse`, zeitBeschriftet);
+    je.set(`${dichte} Werkzeugmenü`, werkzeug);
     gemessen.push(
       `${dichte}: Objektliste ${verortet}, Kartenknopf ${karte.kleinstes} (Abstand ${knopfAbstand}), ` +
+        `Werkzeugmenü ${werkzeug}, ` +
         `Grundlage ${grundHoehe} (Abstand ${grundAbstand}), ` +
         `Zeitachse ${zeitBeschriftet}, Zeitachse Symbol ${zeitSymbol.kleinstes}`,
     );
   }
 
-  for (const sorte of ['Objektliste', 'Kartenknopf', 'Zeitachse']) gegenprobe(je, sorte);
+  for (const sorte of ['Objektliste', 'Kartenknopf', 'Zeitachse', 'Werkzeugmenü']) {
+    gegenprobe(je, sorte);
+  }
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 

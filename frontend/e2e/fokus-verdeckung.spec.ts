@@ -11,6 +11,7 @@ import {
 import { pruefeFokusVerdeckung, type Verdeckungsbefund } from './fokus-kern';
 import { einsatzAnlegen } from './einsatz-kern';
 import { seedeVorlage } from './vorlage-kern';
+import { oeffneZeichenWahl, waehleWerkzeug } from './leisten-kern';
 
 /**
  * Prüflisten-Zeile Z13 der Bedien-Leitlinie — WCAG 2.4.11 „Focus Not Obscured (Minimum)":
@@ -1808,8 +1809,7 @@ const KARTENMODI: Kartenmodus[] = [
   {
     name: 'Zone',
     betreten: async (page) => {
-      await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
-      await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+      await waehleWerkzeug(page, 'Gefahrengebiet');
     },
   },
   {
@@ -1819,10 +1819,9 @@ const KARTENMODI: Kartenmodus[] = [
   {
     name: 'Taktisches Zeichen',
     betreten: async (page) => {
-      await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
-      const paneel = page.locator('[data-paneel="zeichnen"]');
-      await paneel.getByRole('button', { name: 'Taktisches Zeichen platzieren' }).click();
-      await paneel.getByRole('button', { name: 'Platzieren', exact: true }).click();
+      const wahl = await oeffneZeichenWahl(page);
+      await wahl.getByRole('button', { name: 'Platzieren', exact: true }).click();
+      await expect(wahl).toBeHidden();
     },
   },
   {
