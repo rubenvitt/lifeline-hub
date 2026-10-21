@@ -758,7 +758,7 @@ async fn statuswechsel_erhaelt_zuweisung() {
 }
 
 #[tokio::test]
-async fn lagerelevant_erzeugt_lageobjekt_und_ist_idempotent() {
+async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
@@ -782,9 +782,10 @@ async fn lagerelevant_erzeugt_lageobjekt_und_ist_idempotent() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["lagerelevant"], true);
-    assert!(json["lage_meldung_id"].is_i64(), "Lageobjekt wird erzeugt");
+    // Kein Rückverweis auf ein Lageobjekt mehr: die Meldung IST die Lagemeldung (LLH-1031).
+    assert!(json.get("lage_meldung_id").is_none(), "{json:?}");
 
-    // Zweiter Aufruf ist idempotent (UNIQUE meldung_id → kein zweites Lageobjekt).
+    // Zweiter Aufruf ist idempotent (eine Lagemeldung je Meldung).
     let (status, _) = anfrage(
         &app,
         "POST",
@@ -806,7 +807,9 @@ async fn lagerelevant_erzeugt_lageobjekt_und_ist_idempotent() {
     .await;
     assert_eq!(status, StatusCode::OK);
     let lage = json.as_array().unwrap();
-    assert_eq!(lage.len(), 1, "idempotent: kein zweites Lageobjekt");
+    assert_eq!(lage.len(), 1, "idempotent: keine zweite Lagemeldung");
+    assert_eq!(lage[0]["id"], mid, "Kennung ist die Meldung");
+    assert_eq!(lage[0]["meldung_id"], mid);
     assert_eq!(lage[0]["meldung_lfd_nr"], 1);
     assert_eq!(lage[0]["meldung_absender"], "Florian Nord 1");
     assert_eq!(lage[0]["text"], "Brücke gesperrt");

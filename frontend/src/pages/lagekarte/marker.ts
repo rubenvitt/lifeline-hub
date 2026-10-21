@@ -10,7 +10,7 @@ import type {
   FreiesZeichen,
   FuehrungskraftKarte,
   Fuehrungsstelle,
-  LageMeldung,
+  LageMeldungStand,
   SchadenMarker,
   Sichtungskategorie,
   Uhs,
@@ -357,7 +357,7 @@ const LAGEMELDUNG_FARBE = '#d48806';
  * nicht auf der Karte.
  */
 export function baueLageMeldungMarker(
-  lagemeldungen: LageMeldung[],
+  lagemeldungen: LageMeldungStand[],
   token: Pick<GlobalToken, 'controlHeight'>,
 ): KarteMarker[] {
   const verortet: KarteMarker[] = [];

@@ -10,8 +10,9 @@ use crate::extract::PfadParam;
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::live::LiveEvent;
 use crate::meldung::{
-    meldung_bestaetigung_frist_min_ableiten, repo, MeldungAnzeige, ART_SOFORTMELDUNG, ART_SONSTIGE,
-    BESTAETIGUNG_FRIST_DEFAULT_MIN, PRIO_NORMAL, PRIO_SOFORT, RICHTUNG_INTERN,
+    meldung_bestaetigung_frist_min_ableiten, repo, MeldungAnzeige, ART_LAGEMELDUNG,
+    ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN, PRIO_NORMAL, PRIO_SOFORT,
+    RICHTUNG_INTERN,
 };
 use crate::routes::support::{hoechstens, parse_enum, pflicht_max};
 use crate::zeit::jetzt;
@@ -164,6 +165,10 @@ pub struct NeueMeldung {
     pub einheit_id: Option<i64>,
     /// Strukturierter Absender (LFH-610): Einsatzabschnitt dieses Einsatzes.
     pub abschnitt_id: Option<i64>,
+    /// Verortung einer Lagemeldung (LLH-1031): nur gemeinsam und nur bei Art `lagemeldung`
+    /// (sonst 422); andere Arten werden mit Ort in die Lage übernommen (`…/lagerelevant`).
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
 }
 
 /// Löst den strukturierten Absender auf (LFH-610). Beide gesetzt ist ein
@@ -333,6 +338,13 @@ pub async fn anlegen(
     if !crate::meldung::richtung_gueltig(richtung) {
         return Err(AppError::Validation("Ungültige Richtung".into()));
     }
+    crate::routes::support::pruefe_koordinate(req.lat, req.lon, "lat", "lon")?;
+    let geo = req.lat.zip(req.lon);
+    if geo.is_some() && meldungsart != ART_LAGEMELDUNG {
+        return Err(AppError::UnprocessableEntity(
+            "Verortet wird beim Erfassen nur eine Lagemeldung".into(),
+        ));
+    }
     // Der Request-Wert hat dieselben Grenzen wie die Default-Fristen der Einstellungen
     // (LFH-1060: ein riesiger Wert ließ die Fristrechnung panicken → 500 statt 400).
     if let Some(v) = req.bestaetigung_frist_min {
@@ -409,6 +421,7 @@ pub async fn anlegen(
             bestaetigung_frist_at: frist_at.as_deref(),
             einheit_id,
             abschnitt_id,
+            geo,
         },
     )
     .await?;
@@ -529,7 +542,9 @@ pub struct LagerelevantReq {
     pub lon: Option<f64>,
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/lagerelevant — an die Lage übergeben (LFH-95).
+/// POST /api/einsaetze/{id}/meldungen/{mid}/lagerelevant — in die Lage übernehmen (LFH-95). Für
+/// eine Lagemeldung, die schon ab Anlage in der Lage steht (LLH-1031), ändert sie nur Lage-Text
+/// und eine noch fehlende Verortung.
 pub async fn lagerelevant(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
@@ -655,7 +670,8 @@ fn faellig_at(ereigniszeit: &str, frist_min: i64) -> String {
     crate::zeit::plus_minuten(ereigniszeit, frist_min).unwrap_or_else(|| ereigniszeit.to_string())
 }
 
-/// GET /api/einsaetze/{id}/lage/meldungen — Lageobjekte aus Meldungen (Lese-Oberfläche, LFH-95).
+/// GET /api/einsaetze/{id}/lage/meldungen — die Lagemeldungen: alle lagerelevanten Meldungen
+/// (LFH-95, LLH-1031, Spec `meldungseingang`).
 pub async fn lage_liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagemeldungen>,
@@ -665,45 +681,63 @@ pub async fn lage_liste(
     ))
 }
 
-/// POST /api/einsaetze/{id}/lage/meldungen/{lid}/gesehen — eine Lagemeldung als gesehen
-/// kennzeichnen (LLH-1206, Spec `lagemeldung-kenntnisnahme`). Für alle gleich; die erste
-/// Kenntnisnahme gewinnt, eine zweite antwortet 200 mit dem unveränderten Stand.
+/// POST /api/einsaetze/{id}/meldungen/{mid}/lage-gesehen — eine Lagemeldung als gesehen
+/// kennzeichnen (LLH-1206, Spec `lagemeldung-kenntnisnahme`). `{mid}` ist die Kennung der Meldung
+/// (LLH-1031: der frühere Pfad mit der Kennung des Lageobjekts entfällt, ein altes Bundle träfe
+/// sonst eine fremde Meldung). Für alle gleich; die erste Kenntnisnahme gewinnt, eine zweite
+/// antwortet 200 mit dem unveränderten Stand. Fremd oder nicht in der Lage → 404.
 pub async fn lage_gesehen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagemeldungen>,
-    PfadParam((einsatz_id, lage_id)): PfadParam<(i64, i64)>,
+    PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<crate::meldung::LageMeldungAnzeige>, AppError> {
-    let l = repo::mark_lage_gesehen(&state.pool, einsatz_id, lage_id, ctx.benutzer.id, &jetzt())
-        .await?
-        .ok_or(AppError::NotFound)?;
+    let l = repo::mark_lage_gesehen(
+        &state.pool,
+        einsatz_id,
+        meldung_id,
+        ctx.benutzer.id,
+        &jetzt(),
+    )
+    .await?
+    .ok_or(AppError::NotFound)?;
     crate::meldung::sse(&state, einsatz_id);
     Ok(Json(l))
 }
 
+/// Höchstzahl der Kennungen in einem Sammelweg der Kenntnisnahme (Eingabegrenze, LFH-937).
+pub const LAGE_GESEHEN_MAX: usize = 500;
+
 #[derive(Debug, Deserialize)]
-pub struct LageAlleGesehenReq {
-    /// Die jüngste angezeigte Lagemeldung: neuere, die währenddessen eingehen, bleiben neu.
-    pub bis_id: i64,
+pub struct LageGesehenReq {
+    /// Die angezeigten neuen Lagemeldungen (Kennungen der Meldungen, höchstens 500). Eine, die
+    /// währenddessen in die Lage kommt, steht nicht darin und bleibt neu.
+    pub meldung_ids: Vec<i64>,
 }
 
-/// Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden.
+/// Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LageGesehenAnzeige {
     pub gesehen: u64,
 }
 
-/// POST /api/einsaetze/{id}/lage/meldungen/gesehen — alle neuen Lagemeldungen bis einschließlich
-/// `bis_id` als gesehen kennzeichnen (LLH-1206, D2).
-pub async fn lage_alle_gesehen(
+/// POST /api/einsaetze/{id}/lage/gesehen — die angezeigten neuen Lagemeldungen als gesehen
+/// kennzeichnen (LLH-1206, LLH-1031). Kennungen, die keine lagerelevante Meldung des Einsatzes
+/// sind, bleiben unberührt.
+pub async fn lage_angezeigte_gesehen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagemeldungen>,
-    JsonBody(req): JsonBody<LageAlleGesehenReq>,
+    JsonBody(req): JsonBody<LageGesehenReq>,
 ) -> Result<Json<LageGesehenAnzeige>, AppError> {
+    if req.meldung_ids.len() > LAGE_GESEHEN_MAX {
+        return Err(AppError::Validation(format!(
+            "Höchstens {LAGE_GESEHEN_MAX} Lagemeldungen auf einmal"
+        )));
+    }
     let einsatz_id = ctx.einsatz.id;
-    let gesehen = repo::mark_lage_alle_gesehen(
+    let gesehen = repo::mark_lage_angezeigte_gesehen(
         &state.pool,
         einsatz_id,
-        req.bis_id,
+        &req.meldung_ids,
         ctx.benutzer.id,
         &jetzt(),
     )

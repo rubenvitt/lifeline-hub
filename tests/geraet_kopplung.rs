@@ -1094,6 +1094,110 @@ async fn abschnittsgeraet_meldet_mit_eigenem_absender() {
     let _ = l.zug_nord;
 }
 
+/// Spec `meldungseingang`, „Lagemeldung vom Gerät“ (LLH-1031): UHS-Laptop und Abschnittsgerät
+/// senden über dieselbe Meldungsroute eine Lagemeldung. Der Server macht sie lagerelevant; die
+/// Führung sieht sie in der Liste der Lagemeldungen als Meldung eines Geräts. Das Gerät bekommt
+/// dafür keine Route: weder die Liste noch die Kenntnisnahme.
+#[tokio::test]
+async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let l = abschnittslage(&app, &admin).await;
+    let (_, abschnitt) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
+    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let lagemeldung = |absender: &str, inhalt: &str, prioritaet: &str| {
+        json!({
+            "absender": absender,
+            "empfaenger": "Einsatzleitung",
+            "meldeweg": "sonstige",
+            "meldungsart": "lagemeldung",
+            "prioritaet": prioritaet,
+            "inhalt": inhalt,
+            "ereigniszeit": "2026-10-08 10:00:00",
+        })
+    };
+    let (s, ea) = anfrage_json(
+        &app,
+        "POST",
+        &meldungen,
+        &abschnitt,
+        Some(&lagemeldung("EA Nord", "Deich hält", "dringend")),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{ea}");
+    assert_eq!(ea["lagerelevant"], true, "{ea}");
+
+    let (einsatz_uhs, nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let uhs = laptop(&app, &admin, einsatz_uhs, nord).await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz_uhs}/meldungen"),
+        &uhs,
+        Some(&lagemeldung(
+            "UHS Nord · Laptop 1",
+            "Platz 4 belegt",
+            "normal",
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["lagerelevant"], true, "{v}");
+
+    for (einsatz, mid, absender, prioritaet) in [
+        (l.einsatz, ea["id"].clone(), "EA Nord", "dringend"),
+        (
+            einsatz_uhs,
+            v["id"].clone(),
+            "UHS Nord · Laptop 1",
+            "normal",
+        ),
+    ] {
+        let (s, liste) = anfrage(
+            &app,
+            "GET",
+            &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+            &admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{liste}");
+        let liste = liste.as_array().unwrap();
+        assert_eq!(liste.len(), 1, "{liste:?}");
+        let z = &liste[0];
+        assert_eq!(z["id"], mid);
+        assert_eq!(z["meldung_absender"], absender);
+        assert_eq!(z["meldungsart"], "lagemeldung");
+        assert_eq!(z["prioritaet"], prioritaet);
+        assert_eq!(z["meldung_status"], "neu");
+        assert_eq!(z["is_von_geraet"], true, "{z}");
+        assert_eq!(z["is_neu"], true);
+    }
+
+    // Keine Lage-Routen am Gerät.
+    let mid = ea["id"].as_i64().unwrap();
+    for (methode, pfad, body) in [
+        (
+            "GET",
+            format!("/api/einsaetze/{}/lage/meldungen", l.einsatz),
+            None,
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{}/meldungen/{mid}/lage-gesehen", l.einsatz),
+            Some("{}".to_string()),
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{}/lage/gesehen", l.einsatz),
+            Some(json!({ "meldung_ids": [mid] }).to_string()),
+        ),
+    ] {
+        let (s, _) = anfrage(&app, methode, &pfad, &abschnitt, body.as_deref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "Gerät {methode} {pfad}");
+    }
+}
+
 #[tokio::test]
 async fn abschnittsgeraet_sieht_gefahrenzonen_aber_keine_bezirke() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
