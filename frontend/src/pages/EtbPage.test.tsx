@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Link, Route, Routes, useLocation } from 'react-router';
-import { act, type ReactElement } from 'react';
+import { act, useEffect, type ReactElement } from 'react';
 import { meHandler, server } from '../test/server';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
@@ -117,9 +117,19 @@ function zaehlung(jeTyp: Partial<Record<EtbEintragAnzeige['typ'], number>>) {
   return http.get('/api/einsaetze/7/etb/zaehler', () => HttpResponse.json({ gesamt, je_typ }));
 }
 
+/**
+ * Jeder Search-String, den die Seite je getragen hat. Ein Deeplink-Param wie `?eintrag=` räumt
+ * die Seite nach dem Sprung selbst wieder ab; wann, hängt an der Last. Wer den Sprung prüft,
+ * sucht ihn hier statt im Momentbild von `ort-suche`.
+ */
+const besuchteSuchen: string[] = [];
+
 /** Zeigt den aktuellen Search-String im DOM — ermöglicht Param-Bereinigung zu prüfen. */
 function OrtSpy() {
   const ort = useLocation();
+  useEffect(() => {
+    besuchteSuchen.push(ort.search);
+  }, [ort.search]);
   return <div data-testid="ort-suche">{ort.search}</div>;
 }
 
@@ -2143,8 +2153,10 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     await waitFor(() =>
       expect(band()).toHaveTextContent(/Nr\. 135 erfasst – außerhalb des Filters · anzeigen/),
     );
+    besuchteSuchen.length = 0;
     await userEvent.click(within(band()).getByRole('button', { name: 'anzeigen' }));
-    await waitFor(() => expect(screen.getByTestId('ort-suche')).toHaveTextContent('?eintrag=2'));
+    await waitFor(() => expect(besuchteSuchen).toContain('?eintrag=2'));
+    expect(screen.getByTestId('ort-suche').textContent).not.toContain('typ=');
   });
 
   it('nennt Nachträge vor der Lagebesprechung unter „seit LB“', async () => {
