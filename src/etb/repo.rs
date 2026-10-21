@@ -117,29 +117,36 @@ pub const ANHANG_UNBEKANNT: &str = "Anhang unbekannt oder nicht mehr vorhanden";
 pub const CLIENT_ID_KONFLIKT: &str = "client_id bereits für einen anderen Eintrag verwendet: \
      dieser Wortlaut ist nicht erfasst. Erneut senden legt ihn als eigenen Eintrag an.";
 
+/// Stand eines Eintrags, gegen den eine Wiederholung derselben `client_id` geprüft wird
+/// ([`ist_derselbe_eintrag`]): Typ, Inhalt, gebundene Anhänge und ob er eine Meldung angelegt hat.
+#[derive(Debug, Clone, Copy)]
+pub struct EintragStand<'a> {
+    pub typ: &'a str,
+    pub inhalt: &'a str,
+    pub anhaenge: &'a [i64],
+    /// Der Eintrag ist mit einer Meldung gekoppelt (LLH-1037, `in_meldungseingang`).
+    pub mit_meldung: bool,
+}
+
 /// Ob ein Wiederholversuch derselben `client_id` wirklich DERSELBE Eintrag ist (Review C1):
-/// gleicher Typ, gleicher Inhalt (getrimmt) und dieselben Anhänge als Menge. Zeitstempel
-/// zählen nicht — `erfasst_lokal_at` entsteht je Absenden neu. Die Anhänge zählen, weil ein
-/// zweiter Tab mit demselben Wortlaut, aber weiteren Fotos sonst still seine Fotos verlöre;
-/// ein echter Wiederholversuch trägt immer dieselben IDs (die Queue speichert sie, der Client
-/// hält hochgeladene Dateien je `File` fest). Reihenfolge und Dubletten zählen nicht.
-pub fn ist_derselbe_eintrag(
-    typ_bestand: &str,
-    inhalt_bestand: &str,
-    anhaenge_bestand: &[i64],
-    typ: &str,
-    inhalt: &str,
-    anhang_ids: &[i64],
-) -> bool {
+/// gleicher Typ, gleicher Inhalt (getrimmt), dieselben Anhänge als Menge und dieselbe Kopplung
+/// an eine Meldung (LLH-1037, design.md D5). Zeitstempel zählen nicht — `erfasst_lokal_at`
+/// entsteht je Absenden neu. Die Anhänge zählen, weil ein zweiter Tab mit demselben Wortlaut,
+/// aber weiteren Fotos sonst still seine Fotos verlöre; ein echter Wiederholversuch trägt immer
+/// dieselben IDs (die Queue speichert sie, der Client hält hochgeladene Dateien je `File` fest).
+/// Reihenfolge und Dubletten zählen nicht. Die Kopplung zählt, weil ein gewollter Vorgang sonst
+/// still nicht im Meldungseingang stünde (oder ungewollt doch).
+pub fn ist_derselbe_eintrag(bestand: EintragStand<'_>, neu: EintragStand<'_>) -> bool {
     let menge = |ids: &[i64]| {
         let mut v = ids.to_vec();
         v.sort_unstable();
         v.dedup();
         v
     };
-    typ_bestand == typ
-        && inhalt_bestand.trim() == inhalt.trim()
-        && menge(anhaenge_bestand) == menge(anhang_ids)
+    bestand.typ == neu.typ
+        && bestand.inhalt.trim() == neu.inhalt.trim()
+        && menge(bestand.anhaenge) == menge(neu.anhaenge)
+        && bestand.mit_meldung == neu.mit_meldung
 }
 
 /// Legt einen client-erfassten ETB-Eintrag idempotent an (F03/LFH-261), optional mit
@@ -169,6 +176,8 @@ pub fn ist_derselbe_eintrag(
 ///
 /// Im Body steht ausschließlich Connection-Arbeit: der Test-Pool hat EINE Verbindung, ein
 /// Pool-Aufruf in der offenen Transaktion wartete auf sich selbst.
+///
+/// Mit Meldung: [`anlegen_idempotent_mit_meldung`].
 pub async fn anlegen_idempotent(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -177,17 +186,44 @@ pub async fn anlegen_idempotent(
     anhang_ids: &[i64],
     daten: EintragDaten<'_>,
 ) -> Result<(EtbEintragAnzeige, bool), AppError> {
+    anlegen_idempotent_mit_meldung(
+        pool,
+        einsatz_id,
+        erfasser_id,
+        client_id,
+        anhang_ids,
+        daten,
+        None,
+    )
+    .await
+}
+
+/// [`anlegen_idempotent`] mit dem Weg in den Meldungseingang (LLH-1037, `in_meldungseingang`,
+/// Spec `meldungseingang`): mit `meldung` legt Schritt 5 in DERSELBEN Transaktion die Meldung zum
+/// Eintrag an ([`crate::meldung::repo::anlegen_zu_etb_tx`]: beidseitiger Backlink, kein zweiter
+/// Eintrag, dieselbe `client_id`). Scheitert sie, entsteht auch der Eintrag nicht. Eine
+/// Wiederholung mit anderer Kopplung ist 409 ([`ist_derselbe_eintrag`]).
+pub async fn anlegen_idempotent_mit_meldung(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    anhang_ids: &[i64],
+    daten: EintragDaten<'_>,
+    meldung: Option<&crate::meldung::repo::MeldungDaten<'_>>,
+) -> Result<(EtbEintragAnzeige, bool), AppError> {
     let startwert = etb_startwert(pool, einsatz_id).await?;
     let (id, war_neu) = crate::write_retry!(pool, |conn| {
         if let Some(cid) = client_id {
             if let Some(id) = bestehende_client_id(&mut *conn, einsatz_id, cid).await? {
                 // Die Route prüft das schon vor der Transaktion; hier hält es das Rennen
                 // zweier Tabs, die beide an der frühen Prüfung vorbeikamen.
-                let (typ, inhalt): (String, String) =
-                    sqlx::query_as("SELECT typ, inhalt FROM etb_eintrag WHERE id = ?")
-                        .bind(id)
-                        .fetch_one(&mut *conn)
-                        .await?;
+                let (typ, inhalt, mit_meldung): (String, String, bool) = sqlx::query_as(
+                    "SELECT typ, inhalt, meldung_id IS NOT NULL FROM etb_eintrag WHERE id = ?",
+                )
+                .bind(id)
+                .fetch_one(&mut *conn)
+                .await?;
                 let gebunden: Vec<i64> = sqlx::query_scalar(
                     "SELECT anhang_id FROM etb_eintrag_anhang WHERE eintrag_id = ?",
                 )
@@ -195,12 +231,18 @@ pub async fn anlegen_idempotent(
                 .fetch_all(&mut *conn)
                 .await?;
                 if !ist_derselbe_eintrag(
-                    &typ,
-                    &inhalt,
-                    &gebunden,
-                    daten.typ,
-                    daten.inhalt,
-                    anhang_ids,
+                    EintragStand {
+                        typ: &typ,
+                        inhalt: &inhalt,
+                        anhaenge: &gebunden,
+                        mit_meldung,
+                    },
+                    EintragStand {
+                        typ: daten.typ,
+                        inhalt: daten.inhalt,
+                        anhaenge: anhang_ids,
+                        mit_meldung: meldung.is_some(),
+                    },
                 ) {
                     return Err(AppError::Conflict(CLIENT_ID_KONFLIKT.into()));
                 }
@@ -223,6 +265,17 @@ pub async fn anlegen_idempotent(
                 .bind(aid)
                 .execute(&mut *conn)
                 .await?;
+        }
+        if let Some(m) = meldung {
+            crate::meldung::repo::anlegen_zu_etb_tx(
+                &mut *conn,
+                einsatz_id,
+                erfasser_id,
+                client_id,
+                id,
+                m,
+            )
+            .await?;
         }
         Ok((id, true))
     })?;
@@ -904,6 +957,122 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(count, 1, "kein doppelter Eintrag trotz zweitem Aufruf");
+    }
+
+    fn meldung_daten(art: &str) -> crate::meldung::repo::MeldungDaten<'_> {
+        crate::meldung::repo::MeldungDaten {
+            absender: "Florian 3",
+            empfaenger: Some("ELW 1"),
+            empfaenger_funktion: None,
+            meldeweg: "funk",
+            inhalt: "Lage",
+            meldungsart: art,
+            prioritaet: "normal",
+            richtung: "intern",
+            ereigniszeit: "2026-05-23 10:00:00",
+            eingang_at: "2026-05-23 10:01:00",
+            bestaetigung_pflicht: false,
+            bestaetigung_frist_at: None,
+            einheit_id: None,
+            abschnitt_id: None,
+            geo: None,
+        }
+    }
+
+    async fn zahl(pool: &SqlitePool, tabelle: &str, einsatz: i64) -> i64 {
+        sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+            "SELECT COUNT(*) FROM {tabelle} WHERE einsatz_id = ?"
+        )))
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn mit_meldung_entsteht_ein_eintrag_und_eine_verlinkte_lagemeldung() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = meldung_daten("lagemeldung");
+        let (e, neu) = anlegen_idempotent_mit_meldung(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("c-m"),
+            &[],
+            EintragDaten {
+                typ: "lage",
+                ..daten("Lage")
+            },
+            Some(&m),
+        )
+        .await
+        .unwrap();
+        assert!(neu);
+        let mid = e.meldung_id.expect("Verweis auf die Meldung");
+        let (etb_id, lagerelevant, cid): (i64, bool, String) = sqlx::query_as(
+            "SELECT etb_meldung_id, lagerelevant, client_id FROM meldung WHERE id = ?",
+        )
+        .bind(mid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(etb_id, e.id, "Backlink der Meldung");
+        assert!(lagerelevant, "Invariante Art Lagemeldung ⇒ lagerelevant");
+        assert_eq!(cid, "c-m", "dieselbe client_id");
+        assert_eq!(
+            zahl(&pool, "etb_eintrag", einsatz).await,
+            1,
+            "kein Auto-ETB"
+        );
+    }
+
+    #[tokio::test]
+    async fn scheitert_die_meldung_entsteht_auch_kein_eintrag() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let m = meldung_daten("brieftaube");
+        let err = anlegen_idempotent_mit_meldung(
+            &pool,
+            einsatz,
+            benutzer,
+            None,
+            &[],
+            daten("x"),
+            Some(&m),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
+        assert_eq!(
+            zahl(&pool, "etb_eintrag", einsatz).await,
+            0,
+            "eine Transaktion"
+        );
+        assert_eq!(zahl(&pool, "meldung", einsatz).await, 0);
+    }
+
+    #[tokio::test]
+    async fn wiederholung_mit_anderer_kopplung_ist_konflikt() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        anlegen_idempotent(&pool, einsatz, benutzer, Some("c-k"), &[], daten("A"))
+            .await
+            .unwrap();
+        let m = meldung_daten("sonstige");
+        let err = anlegen_idempotent_mit_meldung(
+            &pool,
+            einsatz,
+            benutzer,
+            Some("c-k"),
+            &[],
+            daten("A"),
+            Some(&m),
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, AppError::Conflict(_)), "{err:?}");
+        assert_eq!(zahl(&pool, "meldung", einsatz).await, 0);
     }
 
     #[tokio::test]
