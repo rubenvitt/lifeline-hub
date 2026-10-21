@@ -36,6 +36,27 @@ const KONTEXT_PUNKT = vi.hoisted(() => ({ lng: 8.6, lat: 50.1, quelle: 'maus' as
 /** Jede `flaechen`-Prop, die die Karte bekommt, in Render-Folge (LFH-945: Identität). */
 const flaechenProps = vi.hoisted(() => [] as unknown[]);
 
+/**
+ * Router-Commit in der Schwebe: Der echte `RouterProvider` setzt seinen Stand in einer Transition.
+ * Die Adresse des Browsers ist nach `setSearchParams` schon geräumt, `searchParams` der Seite aber
+ * noch der alte, solange die Transition nicht durch ist (unter Last Sekunden). `haengt` hält diesen
+ * Zustand fest: `setSearchParams` wirkt dann nicht, und die Seite sieht weiter den alten Auftrag.
+ */
+const routerCommit = vi.hoisted(() => ({ haengt: false, nichts: () => {} }));
+vi.mock('react-router', async (original) => {
+  const echt = await original<typeof import('react-router')>();
+  return {
+    ...echt,
+    useSearchParams: (...args: Parameters<typeof echt.useSearchParams>) => {
+      const [params, setzen] = echt.useSearchParams(...args);
+      return [params, routerCommit.haengt ? routerCommit.nichts : setzen] as const;
+    },
+  };
+});
+afterEach(() => {
+  routerCommit.haengt = false;
+});
+
 /** Picker-Kosten (LFH-836): das Aufwärmen des Vokabulars, beobachtet statt gerechnet. */
 const aufwaermen = vi.hoisted(() => ({ abbrechen: vi.fn(), start: vi.fn() }));
 vi.mock('./lagekarte/zeichenWahl', async (original) => ({
@@ -3146,6 +3167,38 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     expect(
       await screen.findByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
     ).toBeInTheDocument();
+  });
+
+  it('wendet den Auftrag nur einmal an, auch wenn der Router das Räumen noch nicht übernommen hat', async () => {
+    // Nach dem POST trägt der Bezirk eine Fläche mehr: die Bezirksliste ändert sich, und der
+    // Auftrags-Effekt läuft erneut, während `searchParams` noch den alten Auftrag zeigt.
+    let flaechen = 0;
+    basisHandler([
+      http.get('/api/einsaetze/1/evakuierung', () =>
+        HttpResponse.json({ bezirke: [{ ...UFER, flaechen }] }),
+      ),
+      http.post('/api/einsaetze/1/zonen', () => {
+        flaechen += 1;
+        return HttpResponse.json({ id: 9 });
+      }),
+    ]);
+    routerCommit.haengt = true;
+    const user = userEvent.setup();
+    renderMitRueckweg('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
+    expect(await screen.findByText('Bezirk Uferstraße 12–40 · Fläche')).toBeInTheDocument();
+
+    await user.click(await screen.findByText('zone-fertig'));
+    await user.click(await screen.findByRole('button', { name: 'Speichern' }));
+    expect(
+      await screen.findByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
+    ).toBeInTheDocument();
+    // Die Rückmeldung bleibt stehen, kein zweiter Zeichenmodus mit demselben Bezug.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(screen.getByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
+    expect(screen.queryByText('Bezirk Uferstraße 12–40 · Fläche')).not.toBeInTheDocument();
+    expect(flaechen).toBe(1);
   });
 
   it('„Auf der Karte bleiben“ schließt die Rückmeldung', async () => {

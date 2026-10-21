@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App, Breadcrumb, Button, Typography } from 'antd';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
@@ -167,6 +167,8 @@ export default function LagekartePage() {
   const { effektiv } = useThemeMode();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Schlüssel des Verlaufseintrags, dessen Adresse `searchParams` gerade zeigt (s. Zeichnen-Auftrag).
+  const { key: adressSchluessel } = useLocation();
 
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
@@ -973,6 +975,8 @@ export default function LagekartePage() {
     tierZugriff,
   ]);
 
+  /** Verlaufseintrag, dessen Zeichnen-Auftrag schon angewandt und geräumt ist. */
+  const zeichnenAngewandtRef = useRef<string | null>(null);
   /**
    * Zeichnen-Auftrag von außen (LFH-825): `?zeichnen=gefahrengebiet` betritt den Zonen-Zeichenmodus
    * wie der Knopf im Paneel (Schnellaktion „Gefahrengebiet zeichnen“ der Sprungpalette). Gleiches
@@ -992,6 +996,11 @@ export default function LagekartePage() {
     const rohBezirk = searchParams.get('bezirk');
     if (roh === null && rohBezirk === null) return;
     if (ladt) return;
+    // Schon angewandt: Der Router übernimmt das Räumen in einer Transition, die Adresse des Browsers
+    // ist dann schon leer, `searchParams` aber noch der alte Eintrag. Ändert sich bis dahin eine
+    // andere Abhängigkeit (nach dem Speichern die Bezirksliste), liefe derselbe Auftrag ein zweites
+    // Mal und startete den Modus über der Rückmeldung neu. Ein neuer Link ist ein neuer Eintrag.
+    if (zeichnenAngewandtRef.current === adressSchluessel) return;
     const auftrag = parseZeichnenBezug(parseZeichnenAuftrag(roh), rohBezirk);
     // Kreis (LLH-1043, D9): Radius und Mitte belegen nur mit `:kreis` vor; ein unbrauchbarer
     // Teil fällt einzeln weg, der Modus startet trotzdem.
@@ -1006,6 +1015,7 @@ export default function LagekartePage() {
       if (!bezirkAuftragEntschieden({ rechteBekannt, evakuierungFrei, bezirkeGeladen })) return;
       entwurf = bezirkZeichnenEntwurf(entwurf, auftrag.bezirk, { evakuierungFrei, bezirke });
     }
+    zeichnenAngewandtRef.current = adressSchluessel;
     if (entwurf) onZoneZeichnenStart(entwurf);
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('zeichnen');
@@ -1015,6 +1025,7 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [
     searchParams,
+    adressSchluessel,
     setSearchParams,
     ladt,
     darfSchreiben,
