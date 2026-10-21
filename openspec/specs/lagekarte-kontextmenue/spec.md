@@ -72,17 +72,18 @@ Modus bei offenem Menü, MUST das Menü schließen.
 
 ### Requirement: Einträge des Kontextmenüs
 Das Menü SHALL anbieten, in dieser Reihenfolge: „Koordinate kopieren“, „Messen ab hier“ und,
-nur mit Schreibrecht im Einsatz, „Hier Zeichen setzen“. Ohne Schreibrecht (auch in der
-Snapshot-Ansicht) MUST „Hier Zeichen setzen“ fehlen, nicht gesperrt stehen. Über den Einträgen
+nur mit Schreibrecht im Einsatz, „Hier Zeichen setzen“ und „Kreis hier …“. Ohne Schreibrecht
+(auch in der Snapshot-Ansicht) MUST „Hier Zeichen setzen“ und „Kreis hier …“ fehlen, nicht
+gesperrt stehen. Über den Einträgen
 MUST das Menü die Koordinate der Stelle im aktiven Koordinatensystem als Kopf zeigen.
 
 #### Scenario: Ohne Schreibrecht
 - **WHEN** der Mensch ohne Schreibrecht lange auf die Karte drückt
-- **THEN** zeigt das Menü „Koordinate kopieren“ und „Messen ab hier“, aber nicht „Hier Zeichen setzen“
+- **THEN** zeigt das Menü „Koordinate kopieren“ und „Messen ab hier“, aber weder „Hier Zeichen setzen“ noch „Kreis hier …“
 
 #### Scenario: Mit Schreibrecht
 - **WHEN** der Mensch mit Schreibrecht rechts auf die Karte klickt
-- **THEN** zeigt das Menü „Koordinate kopieren“, „Messen ab hier“ und „Hier Zeichen setzen“ in dieser Reihenfolge
+- **THEN** zeigt das Menü „Koordinate kopieren“, „Messen ab hier“, „Hier Zeichen setzen“ und „Kreis hier …“ in dieser Reihenfolge
 
 #### Scenario: Koordinate als Kopf
 - **WHEN** als Koordinatensystem UTM eingestellt ist und das Menü offen ist
@@ -129,6 +130,20 @@ solange gespeichert wird, MUST sich der Dialog nicht schließen lassen.
 #### Scenario: Abbrechen legt nichts an
 - **WHEN** der Mensch den Dialog „Hier Zeichen setzen“ mit „Abbrechen“ schließt
 - **THEN** ist kein Zeichen angelegt
+
+### Requirement: Kreis hier
+Die Wahl von „Kreis hier …“ SHALL das Zeichnen eines Kreises um einen Punkt starten, mit der
+Druckstelle als Mitte und dem Absperrbereich als vorgewählter Art. Art und Radius MUST danach im
+Kreis-Band wählbar sein, wie bei einem Start über das Zeichnen-Paneel; angelegt MUST erst mit
+„Übernehmen“ werden.
+
+#### Scenario: Absperrbereich um die Druckstelle
+- **WHEN** der Mensch „Kreis hier …“ wählt, im Band 300 m wählt und „Übernehmen“ tippt
+- **THEN** steht ein Absperrbereich als Kreis mit Radius 300 m um die Druckstelle auf der Karte
+
+#### Scenario: Abbrechen legt nichts an
+- **WHEN** der Mensch nach „Kreis hier …“ im Band „Abbrechen“ tippt
+- **THEN** ist keine Zone angelegt
 
 ### Requirement: Bedienung des Kontextmenüs
 Jeder Eintrag MUST die Trefferhöhe der eingestellten Dichtestufe haben. Das Menü MUST per

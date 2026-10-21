@@ -4,9 +4,18 @@ import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter';
 import type { MessForm, MessGeometrie } from './messung';
 
 /** App-Form → terra-draw-Modusname. */
-const MODUS_NAME: Record<MessForm, string> = { strecke: 'linestring', flaeche: 'polygon' };
+// Der Radius (LLH-1043) ist ein Linienzug Mitte → Rand; gerechnet wird in `messung.ts`.
+const MODUS_NAME: Record<MessForm, string> = {
+  strecke: 'linestring',
+  flaeche: 'polygon',
+  radius: 'linestring',
+};
 /** App-Form → GeoJSON-Typ der Figur, die terra-draw in diesem Modus zeichnet. */
-const GEOMETRIE: Record<MessForm, string> = { strecke: 'LineString', flaeche: 'Polygon' };
+const GEOMETRIE: Record<MessForm, string> = {
+  strecke: 'LineString',
+  flaeche: 'Polygon',
+  radius: 'LineString',
+};
 
 export interface MessZeichnung {
   starten: (form: MessForm) => void;
@@ -133,7 +142,7 @@ export function createMessung(
       if (!aktiv || laufend == null) return false;
       // Der laufende Entwurf enthält den Vorschaupunkt; auf dem Touchschirm liegt er auf dem
       // letzten Punkt und zählt nicht doppelt.
-      if (punkteZahl(geometrie(laufend)) < (form === 'strecke' ? 2 : 3)) return false;
+      if (punkteZahl(geometrie(laufend)) < (form === 'flaeche' ? 3 : 2)) return false;
       // Keine öffentliche finish()-API — dieselbe Geste wie in `zeichnen.ts`.
       canvas.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       canvas.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));

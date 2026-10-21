@@ -6,15 +6,16 @@ import { kontextEintraege, kontextMenueItems, kopiereKoordinate } from './kontex
  * nur mit Schreibrecht — fehlt, statt gesperrt zu stehen (Rechte-Riegel an der Ableitung).
  */
 describe('kontextEintraege', () => {
-  it('mit Schreibrecht: kopieren, messen, zeichen in dieser Reihenfolge', () => {
+  it('mit Schreibrecht: kopieren, messen, zeichen, kreis in dieser Reihenfolge', () => {
     expect(kontextEintraege({ darfSchreiben: true }).map((e) => [e.key, e.label])).toEqual([
       ['kopieren', 'Koordinate kopieren'],
       ['messen', 'Messen ab hier'],
       ['zeichen', 'Hier Zeichen setzen'],
+      ['kreis', 'Kreis hier …'],
     ]);
   });
 
-  it('ohne Schreibrecht fehlt „Hier Zeichen setzen“, auch nicht gesperrt', () => {
+  it('ohne Schreibrecht fehlen „Hier Zeichen setzen“ und „Kreis hier …“, auch nicht gesperrt', () => {
     const eintraege = kontextEintraege({ darfSchreiben: false });
     expect(eintraege.map((e) => e.key)).toEqual(['kopieren', 'messen']);
     expect(eintraege.some((e) => e.gesperrt)).toBe(false);
@@ -32,6 +33,7 @@ describe('kontextMenueItems', () => {
       { key: 'kopieren', label: 'Koordinate kopieren' },
       { key: 'messen', label: 'Messen ab hier' },
       { key: 'zeichen', label: 'Hier Zeichen setzen' },
+      { key: 'kreis', label: 'Kreis hier …' },
     ]);
   });
 });

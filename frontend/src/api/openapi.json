@@ -9220,6 +9220,28 @@
             "type": "integer",
             "format": "int64"
           },
+          "kreis_mitte_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Kreis um einen Punkt (LLH-1043): Mitte (WGS84) und Radius in Metern. Alle drei gesetzt =\ndie Geometrie ist die Kreisnäherung des Servers (64 Ecken); alle drei fehlen =\nfreie Fläche oder Linie. Eine punktweise Bearbeitung der Geometrie entfernt sie."
+          },
+          "kreis_mitte_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "kreis_radius_m": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "label": {
             "type": [
               "string",

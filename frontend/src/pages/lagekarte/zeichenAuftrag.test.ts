@@ -51,3 +51,35 @@ describe('zeichenAuftragZuEntwurf (LFH-825)', () => {
     expect(zeichenAuftragZuEntwurf({ typ: 'unbekannt' as unknown as 'gefahrengebiet' })).toBeNull();
   });
 });
+
+describe('zeichenAuftragZuEntwurf mit der Form kreis (LLH-1043)', () => {
+  it('startet jeden Flächentyp als Kreis, mit Vorbelegung', () => {
+    for (const t of ZONE_TYPEN.filter((x) => x.geometrie !== 'LineString')) {
+      expect(
+        zeichenAuftragZuEntwurf({
+          typ: t.typ,
+          form: 'kreis',
+          radius: 300,
+          mitte: { lat: 54, lon: 9.5 },
+        }),
+      ).toEqual({
+        typ: t.typ,
+        modus: 'kreis',
+        ...(t.geometrie === 'beides' ? { farbe: FREIE_SKIZZE_VORGABEFARBE } : {}),
+        kreis: { mitte: { lat: 54, lon: 9.5 }, radiusM: 300 },
+      });
+    }
+  });
+
+  it('ohne Vorbelegung bleiben Mitte und Radius leer', () => {
+    expect(zeichenAuftragZuEntwurf({ typ: 'absperrbereich', form: 'kreis' })).toEqual({
+      typ: 'absperrbereich',
+      modus: 'kreis',
+      kreis: { mitte: null, radiusM: null },
+    });
+  });
+
+  it('eine Linie wird kein Kreis', () => {
+    expect(zeichenAuftragZuEntwurf({ typ: 'absperrgrenze', form: 'kreis' })).toBeNull();
+  });
+});

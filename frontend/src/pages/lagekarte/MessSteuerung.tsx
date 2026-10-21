@@ -19,6 +19,7 @@ interface MessSteuerungProps {
 const FORMEN = [
   { wert: 'strecke', label: 'Strecke' },
   { wert: 'flaeche', label: 'Fläche' },
+  { wert: 'radius', label: 'Radius' },
 ] as const;
 
 /**

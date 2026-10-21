@@ -106,6 +106,8 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
               Strecke von ~111 m meldet wie terra-draw beim Doppelklick. */}
           <div data-testid="messen">{props.messen ?? 'aus'}</div>
           <div data-testid="flaechenwahl">{props.flaechenwahl ? 'an' : 'aus'}</div>
+          {/* Kreis (LLH-1043): Vorschau, wie die Karte sie bekommt. */}
+          <div data-testid="kreis">{JSON.stringify(props.kreis ?? null)}</div>
           {/* Kontextmenü (LFH-776): an/aus, die Einträge an einer festen Stelle und ihre Wahl. */}
           <div data-testid="kontextmenue">
             {props.kontextmenue
@@ -115,7 +117,7 @@ vi.mock('./lagekarte/Kartenflaeche', async () => {
               : 'aus'}
           </div>
           {props.kontextmenue &&
-            ['kopieren', 'messen', 'zeichen'].map((key) => (
+            ['kopieren', 'messen', 'zeichen', 'kreis'].map((key) => (
               <button key={key} onClick={() => props.kontextmenue?.onWaehlen(key, KONTEXT_PUNKT)}>
                 kontext-{key}
               </button>
@@ -1057,7 +1059,7 @@ describe('LagekartePage', () => {
     renderSeite();
     await waitFor(() =>
       expect(screen.getByTestId('kontextmenue')).toHaveTextContent(
-        'Koordinate kopieren|Messen ab hier|Hier Zeichen setzen',
+        'Koordinate kopieren|Messen ab hier|Hier Zeichen setzen|Kreis hier …',
       ),
     );
 
@@ -2926,6 +2928,118 @@ describe('LFH-825: Zeichnen per Link', () => {
 });
 
 /**
+ * Kreis um einen Punkt (LLH-1043, Spec `lagekarte-zeichnen`): Link mit Vorbelegung,
+ * Kontextmenü „Kreis hier …“, „Übernehmen“ sendet Mitte und Radius statt einer Geometrie.
+ */
+describe('LLH-1043: Kreis', () => {
+  it('Link mit :kreis belegt Radius und Mitte vor und räumt alle drei Parameter', async () => {
+    basisHandler();
+    renderSeiteMitSonde(
+      '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk%3Akreis&radius=300&mitte=54.1%2C9.5',
+    );
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull(),
+    );
+    expect(screen.getByRole('spinbutton', { name: 'Radius in Metern' })).toHaveValue('300');
+    expect(JSON.parse(screen.getByTestId('kreis').textContent!)).toMatchObject({
+      mitte: { lat: 54.1, lon: 9.5 },
+      radiusM: 300,
+    });
+    await waitFor(() => {
+      const such = screen.getByTestId('location-search').textContent ?? '';
+      expect(such).not.toMatch(/zeichnen|radius|mitte/);
+    });
+    // Kein terra-draw-Zeichnen und keine Zeichnen-Steuerung im Kreis-Modus.
+    expect(screen.queryByText('zone-fertig')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Abschließen' })).not.toBeInTheDocument();
+  });
+
+  it('ein unbrauchbarer Radius fällt einzeln weg, der Kreis-Modus startet', async () => {
+    basisHandler();
+    renderSeiteMitSonde('/einsaetze/1/lagekarte?zeichnen=absperrbereich%3Akreis&radius=80000');
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull(),
+    );
+    expect(screen.getByRole('spinbutton', { name: 'Radius in Metern' })).toHaveValue('');
+    await waitFor(() =>
+      expect(screen.getByTestId('location-search')).not.toHaveTextContent('radius'),
+    );
+  });
+
+  it('„Kreis hier …“ setzt die Mitte, „Übernehmen“ sendet den Kreis', async () => {
+    let body: Record<string, unknown> | null = null;
+    basisHandler([
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({
+          id: 5,
+          einsatz_id: 1,
+          typ: body.typ,
+          geometrie_typ: 'Polygon',
+          geometrie: '{"type":"Polygon","coordinates":[]}',
+          label: null,
+          farbe: null,
+          notiz: null,
+          erstellt_von: 1,
+          erstellt_at: '',
+          geaendert_at: '',
+        });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('kontext-kreis'));
+    const uebernehmen = await screen.findByRole('button', { name: 'Übernehmen' });
+    // Ohne Radius ist nichts zu übernehmen.
+    expect(uebernehmen).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: '300 m' }));
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      typ: 'absperrbereich',
+      kreis: { mitte_lat: KONTEXT_PUNKT.lat, mitte_lon: KONTEXT_PUNKT.lng, radius_m: 300 },
+    });
+    expect(body!.geometrie).toBeUndefined();
+  });
+
+  it('Esc verwirft erst die Mitte, dann endet der Modus (D7)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByText('kontext-kreis'));
+    await screen.findByRole('button', { name: 'Übernehmen' });
+    expect(JSON.parse(screen.getByTestId('kreis').textContent!).mitte).not.toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('kreis').textContent!).mitte).toBeNull(),
+    );
+    expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull();
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(document.querySelector('[data-lfh="kreis-steuerung"]')).toBeNull());
+  });
+
+  it('das Paneel startet den Kreis je Flächentyp, die Absperrgrenze hat keinen', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    expect(
+      await screen.findByRole('button', { name: 'Absperrbereich als Kreis' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Absperrgrenze als Kreis' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Gefahrengebiet als Kreis' }));
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull(),
+    );
+    // Tipp auf die Karte setzt die Mitte.
+    await user.click(screen.getByText('karte-klick'));
+    expect(JSON.parse(screen.getByTestId('kreis').textContent!).mitte).toEqual({
+      lat: 50.1,
+      lon: 8.6,
+    });
+  });
+});
+
+/**
  * Zeichnen mit Bezirk (LLH-1069, Spec `betreuung-lagekarte`): `?zeichnen=evakuierungsbezirk&bezirk=<id>`
  * aus dem Modul Evakuierung. Die Karte prüft den Bezirk gegen ihre Bezirksliste, belegt Bezeichnung
  * und Zuordnung vor, legt die Zone in EINEM POST an und bietet danach „Zurück zu Bezirk …“ an.
@@ -2999,6 +3113,40 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Zurück zu Bezirk Uferstraße 12–40' }));
     expect(await screen.findByTestId('bezirk-ziel')).toBeInTheDocument();
+  });
+
+  it('ein Kreis mit Bezug (LLH-1043) sendet Kreis, Bezeichnung und Zuordnung, ohne Serie', async () => {
+    let body: Record<string, unknown> | null = null;
+    basisHandler([
+      mitBezirken(),
+      http.post('/api/einsaetze/1/zonen', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 9, ...body });
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderMitRueckweg(
+      '/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk%3Akreis&bezirk=5&radius=300&mitte=54.1%2C9.5',
+    );
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kreis-steuerung"]')).not.toBeNull(),
+    );
+    await geraeumt();
+    expect(ort()).not.toHaveTextContent(/radius|mitte/);
+    expect(screen.queryByRole('switch', { name: 'Weitere zeichnen' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      typ: 'evakuierungsbezirk',
+      kreis: { mitte_lat: 54.1, mitte_lon: 9.5, radius_m: 300 },
+      label: 'Uferstraße 12–40',
+      evakuierungsbezirk_id: 5,
+    });
+    expect(body!.geometrie).toBeUndefined();
+    expect(
+      await screen.findByText('Gebiet für Bezirk Uferstraße 12–40 gespeichert'),
+    ).toBeInTheDocument();
   });
 
   /**

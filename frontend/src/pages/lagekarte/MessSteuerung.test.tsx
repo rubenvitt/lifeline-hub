@@ -5,7 +5,7 @@ import { renderMitProviders } from '../../test/utils';
 import MessSteuerung from './MessSteuerung';
 import { erzeugeMessQuelle } from './messQuelle';
 
-function rendere(form: 'strecke' | 'flaeche' | null = 'strecke') {
+function rendere(form: 'strecke' | 'flaeche' | 'radius' | null = 'strecke') {
   const quelle = erzeugeMessQuelle();
   const p = {
     form,
@@ -84,5 +84,19 @@ describe('MessSteuerung (LFH-616)', () => {
       }),
     );
     expect(document.querySelector('[data-lfh="messwert"]')).toHaveTextContent(/m².*Umfang/);
+  });
+
+  it('Radius (LLH-1043): dritte Form, zeigt r und die Kreisfläche', () => {
+    const p = rendere('strecke');
+    fireEvent.click(screen.getByRole('radio', { name: 'Radius' }));
+    expect(p.onForm).toHaveBeenCalledWith('radius');
+  });
+
+  it('Radius: der Messwert heißt „r = …“ mit Fläche daneben', () => {
+    const p = rendere('radius');
+    act(() => p.quelle.melde({ geometrie: STRECKE, fertig: false }));
+    expect(document.querySelector('[data-lfh="messwert"]')).toHaveTextContent(
+      /r = 111 m.*Fläche 3,9 ha/,
+    );
   });
 });
