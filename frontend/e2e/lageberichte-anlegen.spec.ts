@@ -23,7 +23,7 @@ async function anmelden(page: Page) {
 
 interface AnlegenBody {
   vorlage: string;
-  abschnitte?: { schluessel: string; text: string }[];
+  abschnitte?: { schluessel: string; text: string; uebernommen_at?: string }[];
 }
 
 /** Zählt die POSTs, die einen Lagebericht anlegen (nicht Fortschreiben, nicht PATCH). */
@@ -75,9 +75,16 @@ test('„Neuer Lagevortrag“ legt mit einem POST an und öffnet den Entwurf', a
   await expect(page.getByRole('dialog')).toHaveCount(0);
   // Startinhalt aus dem Lagebild im selben POST (LLH-1081), der Server hat ihn angenommen.
   expect(posts.bodies[0].abschnitte?.map((a) => a.schluessel)).toEqual(MIT_QUELLE);
-  for (const a of posts.bodies[0].abschnitte ?? [])
+  for (const a of posts.bodies[0].abschnitte ?? []) {
     expect(a.text.trim(), a.schluessel).not.toBe('');
+    // Jeder übernommene Abschnitt trägt den Stand seiner Übernahme (LLH-1357).
+    expect(a.uebernommen_at, a.schluessel).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+  }
   await expect(page.getByRole('textbox', { name: 'Eigene Lage' })).toHaveValue(/Kräftemeldebild/);
+  // Die Marke steht an den fünf Abschnitten mit Quelle, in Fassung 1 nicht auffällig.
+  const marken = page.locator('[data-lfh="uebernahme-stand"]');
+  await expect(marken).toHaveCount(MIT_QUELLE.length);
+  await expect(marken.first()).toHaveText(/^Stand der Übernahme \d{6}[A-ZÄ]{3}\d{4}$/);
   await expect(page.getByRole('textbox', { name: 'Auftrag' })).toHaveValue('');
   // Nichts mehr leer, was eine Quelle hat: kein Sammelknopf.
   await expect(
@@ -161,7 +168,15 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
     data: {
       vorlage: 'lagebericht',
       titel: 'Lageüberblick 0900',
-      abschnitte: [{ schluessel: 'zusammenfassung', text: 'Lage in der Unterstadt angespannt.' }],
+      abschnitte: [
+        { schluessel: 'zusammenfassung', text: 'Lage in der Unterstadt angespannt.' },
+        // Übernommen vor der Freigabe (LLH-1357): die Fortschreibung zeigt ihn als Vorfassung.
+        {
+          schluessel: 'eigene_lage',
+          text: 'Kräftemeldebild',
+          uebernommen_at: '2026-01-01 08:00:00',
+        },
+      ],
     },
   });
   expect(angelegt.ok(), await angelegt.text()).toBe(true);
@@ -181,4 +196,8 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
   await expect(page).not.toHaveURL(new RegExp(`/lageberichte/${id}$`));
   await expect(page.getByRole('button', { name: 'Freigeben' })).toBeVisible();
+  // Der Stand der Übernahme kommt mit und ist auffällig: er stammt aus der Vorfassung.
+  const marke = page.locator('[data-lfh="uebernahme-stand"]');
+  await expect(marke).toHaveCount(1);
+  await expect(marke).toHaveText(/Stand der Übernahme 01\d{4}JAN2026 · aus der Vorfassung/);
 });

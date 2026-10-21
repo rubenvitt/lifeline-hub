@@ -38,6 +38,11 @@ pub trait Abschnittsart:
     fn neu(schluessel: String, text: String) -> Self;
     fn schluessel(&self) -> &str;
     fn text(&self) -> &str;
+    /// Prüft und vereinheitlicht ein Element vor dem Schreiben (Anlegen und PATCH); Vorgabe:
+    /// nichts. Der Lagebericht bringt hier den Stand der Übernahme ins Wire-Format (LLH-1357).
+    fn normalisiere(&mut self) -> Result<(), AppError> {
+        Ok(())
+    }
 }
 
 /// Was eine Dokumentart vom gemeinsamen Kern unterscheidet.
@@ -92,18 +97,18 @@ pub fn leere_abschnitte<A: Abschnittsart>(v: &VorlageDef) -> Vec<A> {
 }
 
 /// Abschnitts-Skelett gemäß Vorlage, gefüllt mit einem Startinhalt (LFH-548): Reihenfolge und
-/// Schlüsselmenge der Vorlage, der Text aus dem Startinhalt, sonst leer. Die Schlüssel prüft der
-/// Handler vorher (`pruefe_abschnitts_schluessel`); ein fremder Schlüssel fiele hier still weg.
+/// Schlüsselmenge der Vorlage, das Element aus dem Startinhalt (Text und, beim Lagebericht, der
+/// Stand der Übernahme, LLH-1357), sonst leer. Die Schlüssel prüft der Handler vorher
+/// (`pruefe_abschnitts_schluessel`); ein fremder Schlüssel fiele hier still weg.
 pub fn gefuellte_abschnitte<A: Abschnittsart>(v: &VorlageDef, startinhalt: &[A]) -> Vec<A> {
     v.abschnitte
         .iter()
         .map(|d| {
-            let text = startinhalt
+            startinhalt
                 .iter()
                 .find(|a| a.schluessel() == d.schluessel)
-                .map(|a| a.text().to_string())
-                .unwrap_or_default();
-            A::neu(d.schluessel.to_string(), text)
+                .cloned()
+                .unwrap_or_else(|| A::neu(d.schluessel.to_string(), String::new()))
         })
         .collect()
 }

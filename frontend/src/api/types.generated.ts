@@ -3650,6 +3650,14 @@ export interface components {
         LageberichtAbschnitt: {
             schluessel: string;
             text: string;
+            /**
+             * @description Stand der Übernahme (LLH-1357, Spec `lagevortrag-uebernahme`): wann der Text zuletzt aus
+             *     einer Quelle übernommen wurde, UTC ohne Zonenkennung. Setzt der Client mit der Übernahme;
+             *     das Fortschreiben trägt ihn mit dem Text in die neue Fassung. Fehlt bei Text von Hand,
+             *     an einem leeren Abschnitt und in Abschnitten von vor LLH-1357 (das Feld steht im JSON von
+             *     `lagebericht.abschnitte`, keine Spalte).
+             */
+            uebernommen_at?: string | null;
         };
         /** @description Öffentliche Anzeige eines Lageberichts (Abschnitte aus JSON geparst, Namen aufgelöst). */
         LageberichtAnzeige: {

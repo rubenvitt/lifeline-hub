@@ -279,3 +279,45 @@ gespeichert wird mit dem nächsten Speichern oder Autosave.
 - **WHEN** die Person „Leere Abschnitte aus dem Lagebild füllen“ wählt und mindestens ein
   Abschnitt gefüllt wird
 - **THEN** zeigt der Entwurf „ungespeicherte Änderungen“
+
+### Requirement: Stand der Übernahme je Abschnitt
+Wird der Text eines Abschnitts aus einer Quelle übernommen (Übernahme im Abschnitt, „Leere
+Abschnitte aus dem Lagebild füllen“ oder Startinhalt von „Neuer Lagevortrag“), SHALL der Abschnitt
+den Zeitpunkt dieser Übernahme speichern; eine neue Übernahme MUST ihn ersetzen. Das Fortschreiben
+MUST ihn mit dem Text in die neue Fassung übernehmen. Ein Abschnitt ohne Text MUST keinen Stand
+tragen.
+
+#### Scenario: Fortschreiben übernimmt den Stand
+- **WHEN** „Eigene Lage“ in der freigegebenen Fassung um 1155 übernommen wurde und die Person sie
+  fortschreibt
+- **THEN** trägt „Eigene Lage“ in der neuen Fassung den Stand der Übernahme 1155
+
+#### Scenario: Neue Übernahme setzt den Stand neu
+- **WHEN** die Person in der Fortschreibung „Eigene Lage“ erneut übernimmt
+- **THEN** trägt der Abschnitt den Zeitpunkt dieser Übernahme
+
+#### Scenario: Geleerter Abschnitt
+- **WHEN** die Person den ganzen Text eines übernommenen Abschnitts löscht
+- **THEN** zeigt der Abschnitt keinen Stand der Übernahme mehr, und gespeichert wird keiner
+
+### Requirement: Marke „Stand der Übernahme“ im Entwurf
+Im Entwurf SHALL jeder Abschnitt mit Quelle, der einen Stand trägt, im Abschnittskopf „Stand der
+Übernahme“ mit der taktischen DTG zeigen; Abschnitte ohne Quelle MUST keinen Stand zeigen. Liegt
+der Stand vor dem Anlegen einer Fortschreibung, MUST die Marke auffällig sein, mit Zeichen und den
+Wörtern „aus der Vorfassung“ neben der Farbe. Auf Papier MUST die Marke fehlen.
+
+#### Scenario: Stand aus der Vorfassung
+- **WHEN** ein fortgeschriebener Entwurf geöffnet wird, dessen „Eigene Lage“ noch in der
+  Vorfassung übernommen wurde
+- **THEN** zeigt „Eigene Lage“ „Stand der Übernahme“ mit der DTG und „aus der Vorfassung“,
+  auffällig
+
+#### Scenario: In dieser Fassung übernommen
+- **WHEN** die Person in der Fortschreibung „Eigene Lage“ erneut übernimmt
+- **THEN** zeigt der Abschnitt „Stand der Übernahme“ mit der DTG dieser Übernahme, ohne „aus der
+  Vorfassung“
+
+#### Scenario: Abschnitt ohne Quelle
+- **WHEN** ein Entwurf des Lagevortrags zur Information geöffnet wird
+- **THEN** zeigen „Auftrag“, „Anträge und Vorschläge“ und „Zusammenfassung“ keinen Stand der
+  Übernahme

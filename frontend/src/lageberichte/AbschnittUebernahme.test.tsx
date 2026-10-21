@@ -1,13 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Form, Input } from 'antd';
+import { Form, Input, type FormInstance } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import AbschnittUebernahme from './AbschnittUebernahme';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
+import { standFeld } from './standFeld';
 
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
@@ -25,16 +26,22 @@ const PROBE_QUELLE: UebernahmeQuelle = {
   erzeuge,
 };
 
+/** Das Formular der Probe, für den Stand der Übernahme (LLH-1357). */
+let formular: FormInstance;
+
 function Probe({
   start = '',
+  stand,
   quelle = PROBE_QUELLE,
 }: {
   start?: string;
+  stand?: string;
   quelle?: UebernahmeQuelle;
 }) {
   const [form] = Form.useForm();
+  formular = form;
   return (
-    <Form form={form} initialValues={{ probe: start }}>
+    <Form form={form} initialValues={{ probe: start, uebernommen_at: { probe: stand } }}>
       <AbschnittUebernahme
         quelle={quelle}
         einsatzId={1}
@@ -59,7 +66,33 @@ beforeEach(() => {
   vi.mocked(ladeModulFreigaben).mockResolvedValue(freigabenFixture());
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('AbschnittUebernahme (LFH-870)', () => {
+  it('setzt mit dem Text den Stand der Übernahme, auch nach „Ersetzen“ (LLH-1357)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-10-21T10:30:00Z'));
+    renderMitProviders(<Probe start="Eigener Text" stand="2026-10-20 08:00:00" />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Aus Probe übernehmen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Probe ersetzen?' });
+    // Vor der Bestätigung bleibt der alte Stand.
+    expect(formular.getFieldValue(standFeld('probe'))).toBe('2026-10-20 08:00:00');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ersetzen' }));
+    await waitFor(() => expect(feld().value).toBe('# Übernommen'));
+    expect(formular.getFieldValue(standFeld('probe'))).toMatch(/^2026-10-21 10:30:\d{2}$/);
+  });
+
+  it('„Abbrechen“ lässt auch den Stand der Übernahme stehen (LLH-1357)', async () => {
+    renderMitProviders(<Probe start="Eigener Text" stand="2026-10-20 08:00:00" />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Aus Probe übernehmen' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Abbrechen' }),
+    );
+    expect(formular.getFieldValue(standFeld('probe'))).toBe('2026-10-20 08:00:00');
+  });
+
   it('lädt erst beim Klick und füllt einen leeren Abschnitt ohne Rückfrage', async () => {
     renderMitProviders(<Probe />);
     const knopf = await screen.findByRole('button', { name: 'Aus Probe übernehmen' });

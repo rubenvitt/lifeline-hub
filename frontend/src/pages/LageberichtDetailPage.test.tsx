@@ -883,3 +883,107 @@ describe('LageberichtDetailPage — Verlassen-Schutz (LLH-1351)', () => {
     },
   );
 });
+
+/**
+ * Stand der Übernahme je Abschnitt mit Quelle (LLH-1357, Spec `lagevortrag-uebernahme`): Marke im
+ * Abschnittskopf, auffällig aus der Vorfassung, mitgespeichert im Abschnitt.
+ */
+describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
+  /** Fortschreibung, angelegt 12:00 UTC: Eigene Lage aus der Vorfassung, Medienlage frisch. */
+  const fortgeschrieben = () =>
+    bericht({
+      status: 'entwurf',
+      version: 2,
+      vorgaenger_id: 8,
+      erstellt_at: '2026-06-02 12:00:00',
+      freigegeben_von_id: null,
+      freigegeben_von_name: null,
+      freigegeben_at: null,
+      etb_eintrag_id: null,
+      abschnitte: [
+        // Ein Stand an einem Abschnitt ohne Quelle zeigt sich nicht.
+        { schluessel: 'auftrag', text: 'Von Hand', uebernommen_at: '2026-06-02 09:00:00' },
+        { schluessel: 'gefahren_schadenlage', text: '' },
+        {
+          schluessel: 'eigene_lage',
+          text: 'Stand: 021155jun26',
+          uebernommen_at: '2026-06-02 09:55:00',
+        },
+        { schluessel: 'lageentwicklung', text: '' },
+        { schluessel: 'fuehrungsprobleme', text: '' },
+        { schluessel: 'antraege_vorschlaege', text: '' },
+        { schluessel: 'medienlage', text: 'Presse ruhig', uebernommen_at: '2026-06-02 12:05:00' },
+        { schluessel: 'zusammenfassung', text: '' },
+      ],
+    });
+
+  beforeEach(() => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: 'einsatzleitung',
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(einsaetzeApi.ladeModulFreigaben).mockResolvedValue(freigabenFixture());
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(fortgeschrieben() as never);
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockReset();
+    vi.mocked(lageberichteApi.aktualisiereLagebericht).mockResolvedValue(
+      fortgeschrieben() as never,
+    );
+  });
+
+  const abschnitt = (name: string) =>
+    screen.getByRole('heading', { name, level: 3 }).closest('section') as HTMLElement;
+  const marke = (name: string) =>
+    abschnitt(name).querySelector<HTMLElement>('[data-lfh="uebernahme-stand"]');
+
+  it('zeigt den Stand an Abschnitten mit Quelle, auffällig nur den aus der Vorfassung', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await screen.findByRole('heading', { name: 'Eigene Lage', level: 3 });
+    // Anzeigezone Europe/Berlin (MESZ): 09:55 UTC → 1155.
+    await waitFor(() =>
+      expect(marke('Eigene Lage')).toHaveTextContent(
+        'Stand der Übernahme 021155JUN2026 · aus der Vorfassung',
+      ),
+    );
+    expect(marke('Medienlage')).toHaveTextContent('Stand der Übernahme 021405JUN2026');
+    expect(marke('Medienlage')).not.toHaveTextContent('aus der Vorfassung');
+    expect(marke('Auftrag')).toBeNull();
+    expect(marke('Lageentwicklung')).toBeNull();
+    expect(document.querySelectorAll('[data-lfh="uebernahme-stand"]')).toHaveLength(2);
+  });
+
+  it('speichert den Stand im Abschnitt mit und keinen am Abschnitt ohne Quelle', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await screen.findByRole('heading', { name: 'Eigene Lage', level: 3 });
+    await userEvent.click(await screen.findByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalled());
+    const body = vi.mocked(lageberichteApi.aktualisiereLagebericht).mock.calls[0][2];
+    expect(body.abschnitte).toEqual(
+      expect.arrayContaining([
+        {
+          schluessel: 'eigene_lage',
+          text: 'Stand: 021155jun26',
+          uebernommen_at: '2026-06-02 09:55:00',
+        },
+        { schluessel: 'medienlage', text: 'Presse ruhig', uebernommen_at: '2026-06-02 12:05:00' },
+        { schluessel: 'auftrag', text: 'Von Hand' },
+        { schluessel: 'lageentwicklung', text: '' },
+      ]),
+    );
+  });
+
+  it('ein ganz geleerter Abschnitt verliert seinen Stand', async () => {
+    renderBei('/einsaetze/1/lageberichte/9');
+    await waitFor(() => expect(marke('Eigene Lage')).not.toBeNull());
+    await userEvent.clear(screen.getByRole('textbox', { name: 'Eigene Lage' }));
+    expect(marke('Eigene Lage')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await waitFor(() => expect(lageberichteApi.aktualisiereLagebericht).toHaveBeenCalled());
+    const aufrufe = vi.mocked(lageberichteApi.aktualisiereLagebericht).mock.calls;
+    const body = aufrufe[aufrufe.length - 1][2];
+    expect(body.abschnitte).toEqual(
+      expect.arrayContaining([{ schluessel: 'eigene_lage', text: '' }]),
+    );
+  });
+});
