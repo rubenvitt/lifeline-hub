@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Alert, App, Breadcrumb, Button, Typography } from 'antd';
 import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
@@ -165,6 +165,7 @@ export default function LagekartePage() {
   const { effektiv } = useThemeMode();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { key: adresseSchluessel } = useLocation();
 
   // Imperative Karten-API (Upload-Platzierung in Viewport-Mitte, Auf-Bild-Zentrieren,
   // Abschnitt-/Zone-Zeichnen abschließen).
@@ -972,11 +973,18 @@ export default function LagekartePage() {
    * Evakuierungsbezirk. Der Auftrag wartet zusätzlich auf Modulfreigaben und Bezirksliste und
    * startet nur mit freiem Modul Evakuierung für einen Bezirk der Liste; sonst wird er wie jeder
    * ungültige Auftrag nur geräumt — beide Parameter, auch ein `bezirk` ohne `zeichnen`.
+   *
+   * Ein Auftrag gilt einmal je Adresse (`location.key`): Das Räumen ist eine Navigation, und bis sie
+   * gerendert ist, zeigen weitere Renders noch die alte Adresse mit Auftrag. Ändert sich in der Zeit
+   * eine Abhängigkeit (die Bezirksliste nach dem Speichern), liefe der Auftrag sonst noch einmal und
+   * startete den Modus neu: gezeichnete Punkte weg, statt der Rückmeldung ein leerer Zeichenmodus.
    */
+  const zeichenAuftragVerbraucht = useRef<string | null>(null);
   useEffect(() => {
     const roh = searchParams.get('zeichnen');
     const rohBezirk = searchParams.get('bezirk');
     if (roh === null && rohBezirk === null) return;
+    if (zeichenAuftragVerbraucht.current === adresseSchluessel) return;
     if (ladt) return;
     const auftrag = parseZeichnenBezug(parseZeichnenAuftrag(roh), rohBezirk);
     let entwurf = darfSchreiben && auftrag ? zeichenAuftragZuEntwurf(auftrag) : null;
@@ -986,12 +994,14 @@ export default function LagekartePage() {
       entwurf = bezirkZeichnenEntwurf(entwurf, auftrag.bezirk, { evakuierungFrei, bezirke });
     }
     if (entwurf) onZoneZeichnenStart(entwurf);
+    zeichenAuftragVerbraucht.current = adresseSchluessel;
     const naechste = new URLSearchParams(searchParams);
     naechste.delete('zeichnen');
     naechste.delete('bezirk');
     setSearchParams(naechste, { replace: true });
   }, [
     searchParams,
+    adresseSchluessel,
     setSearchParams,
     ladt,
     darfSchreiben,

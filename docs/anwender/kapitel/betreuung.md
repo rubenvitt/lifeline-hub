@@ -2,7 +2,7 @@
 titel: Betreuung
 gruppen: [alle, fuehrung]
 reihenfolge: 530
-quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs]
+quellen: [frontend/src/pages/BetreuungPage.tsx, frontend/src/pages/BetreuungsstelleDetailPage.tsx, frontend/src/betreuung/StellenBlock.tsx, frontend/src/betreuung/UnterbringungKennzahlen.tsx, frontend/src/betreuung/unterbringungKennzahl.ts, frontend/src/betreuung/StelleBelegung.tsx, frontend/src/betreuung/StelleBetroffene.tsx, frontend/src/betreuung/StelleBedarf.tsx, frontend/src/betreuung/stelleStatus.ts, frontend/src/betreuung/BetreuungDialoge.tsx, frontend/src/betreuung/MeldeVerlauf.tsx, frontend/src/betreuung/betreuungText.ts, frontend/src/theme/statusFarben.ts, src/routes/betreuung.rs, src/betreuung/repo.rs]
 ---
 
 ## Überblick
@@ -55,6 +55,21 @@ anlegen“.
    Berechtigung“.
 5. Unter „Verpflegung“ steht, wie viele der Personen „in Betreuung“ in dieser Stelle
    untergebracht sind; „Zur Verpflegung“ öffnet das Modul.
+
+### Bedarf einer Stelle anfordern
+
+Was eine Stelle braucht (Feldbetten, Decken, Hygieneartikel, Personal), wird als
+[Nachforderung](nachforderung.md) für diese Stelle angefordert:
+
+1. Auf der Seite der Stelle unter „Bedarf“ „Bedarf anfordern“ wählen.
+2. Das Formular „Neue Nachforderung“ öffnet sich mit „Für Betreuungsstelle …“ und der
+   vorbelegten Begründung. Art, Anzahl und Bezeichnung eintragen und „Nachforderung absetzen“
+   wählen.
+3. Zurück auf der Seite der Stelle steht die Nachforderung unter „Bedarf“ mit ihrem Stand; ein
+   Klick öffnet sie. „Alle Nachforderungen der Stelle“ zeigt auch die eingetroffenen und die
+   abgelehnten.
+
+Ohne Zugriff auf „Nachforderung“ steht dort „Bedarf · Keine Berechtigung“.
 
 ### Eine Betreuungsstelle anlegen und ihre Belegung melden
 
@@ -124,7 +139,8 @@ geschlossenen Stelle lassen sich keine Belegungen melden und keine Meldungen zur
 
 „Stornieren“ steht im Menü der Stelle, in der Tabelle wie auf ihrer Seite. Es ist nur für
 Fehlanlagen gedacht und nicht umkehrbar. Der Dialog bietet stattdessen das Schließen an. Der
-Nachweis im Einsatztagebuch bleibt.
+Nachweis im Einsatztagebuch bleibt. Nachforderungen für eine stornierte Stelle bleiben bestehen, verweisen aber auf
+keine Stelle mehr.
 
 ### Einsatztagebuch
 

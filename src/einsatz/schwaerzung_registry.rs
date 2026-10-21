@@ -2386,6 +2386,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("etb_nachforderung_id", G_FK),
             retain("erstellt_von_id", G_FK),
             retain("erstellt_at", G_ZEIT),
+            // Betreuungsstelle, für die angefordert wurde (LLH-1082): Verweis als Skelett; die
+            // Stelle selbst trägt nach der Schwärzung ihren Platzhalter.
+            retain("betreuungsstelle_id", G_FK),
         ],
     },
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------

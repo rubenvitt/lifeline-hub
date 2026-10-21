@@ -14,6 +14,9 @@ pub struct NachforderungDaten<'a> {
     pub begruendung: Option<&'a str>,
     pub prioritaet: &'a str,
     pub angefordert_at: &'a str,
+    /// Betreuungsstelle, für die angefordert wird (LLH-1082); Einsatz und Lebenszyklus hat die
+    /// Route geprüft.
+    pub betreuungsstelle_id: Option<i64>,
 }
 
 /// SELECT-Projektion inkl. Ersteller-Name (LEFT JOIN benutzer), abgeleitetem `ist_offen` und den
@@ -29,7 +32,8 @@ const ANZEIGE_SELECT: &str =
             (n.status NOT IN ('eingetroffen', 'abgelehnt')) AS ist_offen, \
             (SELECT json_group_array(em.id ORDER BY em.id) FROM einsatz_material em \
              WHERE em.nachforderung_id = n.id AND em.beendet_als IS NOT 'storniert') \
-              AS material_ids \
+              AS material_ids, \
+            n.betreuungsstelle_id \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
@@ -59,8 +63,8 @@ pub async fn create_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO nachforderung \
            (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, adressat_bezeichnung, \
-            begruendung, prioritaet, angefordert_at, erstellt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            begruendung, prioritaet, angefordert_at, erstellt_von_id, betreuungsstelle_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.art)
@@ -72,6 +76,7 @@ pub async fn create_tx(
     .bind(daten.prioritaet)
     .bind(daten.angefordert_at)
     .bind(ersteller_id)
+    .bind(daten.betreuungsstelle_id)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -163,6 +168,26 @@ pub async fn belongs_to_einsatz(
             .fetch_optional(pool)
             .await?;
     Ok(treffer.is_some())
+}
+
+/// Löst den Bezug aller Nachforderungen auf eine stornierte Betreuungsstelle (LLH-1082,
+/// design.md D3), in der Transaktion des Stornos. Die Nachforderungen bleiben sonst unverändert.
+/// Liefert die Kennungen der gelösten, damit der Aufrufer nach dem Commit das Live-Ereignis
+/// sendet.
+pub async fn loese_betreuungsstelle_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    betreuungsstelle_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    sqlx::query_scalar(
+        "UPDATE nachforderung SET betreuungsstelle_id = NULL \
+         WHERE einsatz_id = ? AND betreuungsstelle_id = ? RETURNING id",
+    )
+    .bind(einsatz_id)
+    .bind(betreuungsstelle_id)
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(Into::into)
 }
 
 /// Trägt die Nachforderung mindestens einen übernommenen, nicht stornierten Materialposten
@@ -328,6 +353,7 @@ mod tests {
             begruendung: None,
             prioritaet: PRIO_NORMAL,
             angefordert_at: "2026-06-12 09:00:00",
+            betreuungsstelle_id: None,
         }
     }
 

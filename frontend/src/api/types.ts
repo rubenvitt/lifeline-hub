@@ -1245,6 +1245,8 @@ export interface NeueNachforderung {
   prioritaet?: NachforderungPrioritaet;
   /** Ereigniszeit der Anforderung (UTC); leer = jetzt. */
   angefordert_at?: string;
+  /** Betreuungsstelle, für die angefordert wird (LLH-1082); fehlt = einsatzweit. */
+  betreuungsstelle_id?: number;
 }
 
 // ============================== Zugangsprotokoll (LFH-1097) ==============================
