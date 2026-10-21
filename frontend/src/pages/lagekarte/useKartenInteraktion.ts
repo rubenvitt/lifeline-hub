@@ -19,18 +19,27 @@ import {
   verschiebeFreiesZeichen,
 } from '../../api/freieZeichen';
 import { einsatzKeys } from '../../api/queryKeys';
-import type { ZoneTyp, FreiesZeichenPatch, FreiesZeichenUpdate } from '../../api/types';
+import type { LageZone, ZoneTyp, FreiesZeichenPatch, FreiesZeichenUpdate } from '../../api/types';
 import type { FachebeneQuelle } from '../../api/fachebenen';
 import type { KarteMarker } from './marker';
 import {
   ZU_VIELE_STUETZPUNKTE,
+  kreisAusZone,
   kreisPolygon,
+  parseGeometry,
   radiusGueltig,
   zuVieleStuetzpunkte,
   type GeoJsonGeometry,
   type GeoJsonPolygon,
   type GeoPunkt,
 } from './geo';
+import {
+  istGeaendert,
+  starteBearbeitung,
+  wendeAn,
+  type BearbeitungsAktion,
+  type BearbeitungsStand,
+} from './zonenBearbeitung';
 import type { ZeichenModus } from './zeichnen';
 import type { MessForm } from './messung';
 import type { PlatzierenPunktTyp } from './Sidebar';
@@ -52,6 +61,23 @@ const KEIN_KREIS: KreisEntwurf = { mitte: null, radiusM: null };
 /** Der Bezirk, dem eine per Link bestellte Fläche gehört (LLH-1069). */
 export type ZeichenBezirk = { id: number; bezeichnung: string };
 /**
+ * Kreis einer bestehenden Zone im Kreis-Modus (LLH-1344, design.md D3): Kennung und der
+ * gespeicherte Stand. „Übernehmen“ schreibt dann einen PATCH statt einer neuen Zone.
+ */
+export interface KreisBearbeitung {
+  zoneId: number;
+  mitte: GeoPunkt;
+  radiusM: number;
+}
+/** Weicht der laufende Kreis vom gespeicherten ab? */
+export function kreisGeaendert(kreis: KreisEntwurf, b: KreisBearbeitung): boolean {
+  return (
+    kreis.mitte?.lat !== b.mitte.lat ||
+    kreis.mitte?.lon !== b.mitte.lon ||
+    kreis.radiusM !== b.radiusM
+  );
+}
+/**
  * `kreis`: Vorbelegung beim Start (Link, Kontextmenü); nur mit `modus: 'kreis'`.
  * `bezirk`: die Fläche gehört diesem Evakuierungsbezirk (`?zeichnen=evakuierungsbezirk&bezirk=<id>`,
  * LLH-1069) — sie geht mit seiner Bezeichnung und Zuordnung hinaus, ohne Serie.
@@ -62,7 +88,20 @@ export type ZoneEntwurf = {
   farbe?: string;
   kreis?: KreisEntwurf;
   bezirk?: ZeichenBezirk;
+  /** Nur mit `modus: 'kreis'`: der Kreis einer bestehenden Zone wird bearbeitet (LLH-1344). */
+  bearbeiten?: KreisBearbeitung;
 };
+/**
+ * Punktweise Bearbeitung einer bestehenden Zone (LLH-1344, design.md D2). `kreis`: die Zone ist
+ * eine Kreiszone — nach dem Speichern ist sie es nicht mehr (Hinweis im Band).
+ */
+export interface ZonenBearbeitung {
+  zoneId: number;
+  typ: ZoneTyp;
+  kreis: boolean;
+  stand: BearbeitungsStand;
+  speichern: boolean;
+}
 
 type PlatzierZiel = { typ: PlatzierenPunktTyp | 'einsatzort'; id: number };
 /**
@@ -111,6 +150,8 @@ type KartenModus =
   | { art: 'gebietGezeichnet'; bezirk: ZeichenBezirk }
   | { art: 'bild'; id: number }
   | { art: 'zeichen'; spec: FreiesZeichenUpdate }
+  /** Punktweise Bearbeitung einer bestehenden Zone (LLH-1344). */
+  | ({ art: 'bearbeiten' } & ZonenBearbeitung)
   /**
    * Messen ist exklusiv wie die anderen Modi (ein Klick darf weder ein Panel öffnen noch verorten),
    * braucht aber kein Schreibrecht: gespeichert wird nichts.
@@ -137,6 +178,16 @@ type ModusAktion =
   | { t: 'zoneTyp'; typ: ZoneTyp; farbe?: string }
   /** Erfolg des Speicherns einer Fläche mit Bezirk; läuft kein Zonen-Modus mit Bezug mehr, No-op. */
   | { t: 'gebietGezeichnet' }
+  /** Punktweise Bearbeitung starten (LLH-1344). */
+  | { t: 'bearbeiten'; zoneId: number; typ: ZoneTyp; kreis: boolean; geometrie: GeoJsonGeometry }
+  /** Eine Bearbeitungsaktion (Griff, Band); während des Speicherns wirkungslos. */
+  | { t: 'bearbeitung'; aktion: BearbeitungsAktion }
+  | { t: 'bearbeitenSpeichernStart' }
+  /**
+   * Der Server hat eine Bearbeitung abgelehnt: die Marke `speichern` fällt, der Modus und die
+   * ungespeicherte Änderung bleiben (ein zweiter Versuch verliert nichts).
+   */
+  | { t: 'speichernAbgelehnt' }
   /** Beenden nur, wenn der laufende Modus einer der genannten ist (sonst No-op). */
   | { t: 'beenden'; arten: KartenModus['art'][] };
 
@@ -189,11 +240,13 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
         ? { ...state, kreis: { ...state.kreis, ...a.kreis } }
         : state;
     case 'zoneTyp':
-      // Ein Auftrag mit Bezirk (LLH-1069) bleibt beim Typ `evakuierungsbezirk`.
+      // Ein Auftrag mit Bezirk (LLH-1069) bleibt beim Typ `evakuierungsbezirk`; ein bearbeiteter
+      // Kreis (LLH-1344) behält seine Art, die ändert der Inspector.
       return state.art === 'zone' &&
         state.entwurf.modus === 'kreis' &&
         !state.speichern &&
-        !state.entwurf.bezirk
+        !state.entwurf.bezirk &&
+        !state.entwurf.bearbeiten
         ? { ...state, entwurf: { ...state.entwurf, typ: a.typ, farbe: a.farbe } }
         : state;
     case 'zoneGezeichnet':
@@ -206,6 +259,26 @@ function modusReducer(state: KartenModus, a: ModusAktion): KartenModus {
     case 'gebietGezeichnet':
       return state.art === 'zone' && state.entwurf.bezirk
         ? { art: 'gebietGezeichnet', bezirk: state.entwurf.bezirk }
+        : state;
+    case 'bearbeiten':
+      return {
+        art: 'bearbeiten',
+        zoneId: a.zoneId,
+        typ: a.typ,
+        kreis: a.kreis,
+        stand: starteBearbeitung(a.geometrie),
+        speichern: false,
+      };
+    case 'bearbeitung': {
+      if (state.art !== 'bearbeiten' || state.speichern) return state;
+      const stand = wendeAn(state.stand, a.aktion);
+      return stand === state.stand ? state : { ...state, stand };
+    }
+    case 'bearbeitenSpeichernStart':
+      return state.art === 'bearbeiten' ? { ...state, speichern: true } : state;
+    case 'speichernAbgelehnt':
+      return (state.art === 'bearbeiten' || state.art === 'zone') && state.speichern
+        ? { ...state, speichern: false }
         : state;
     case 'beenden':
       return a.arten.includes(state.art) ? { art: 'idle' } : state;
@@ -342,6 +415,30 @@ export function useKartenInteraktion({
   const zoneSpeichern = modus.art === 'zone' ? modus.speichern : false;
   // Der laufende Kreis (LLH-1043); `null` außerhalb des Kreis-Modus.
   const kreisEntwurf = modus.art === 'zone' && modus.entwurf.modus === 'kreis' ? modus.kreis : null;
+  // Punktweise Bearbeitung (LLH-1344); `null` außerhalb.
+  const zonenBearbeitung: ZonenBearbeitung | null =
+    modus.art === 'bearbeiten'
+      ? {
+          zoneId: modus.zoneId,
+          typ: modus.typ,
+          kreis: modus.kreis,
+          stand: modus.stand,
+          speichern: modus.speichern,
+        }
+      : null;
+  // Die Zone, die gerade bearbeitet wird (punktweise oder ihr Kreis): die Seite blendet sie in der
+  // Zonenebene aus, solange die Vorschau sie zeigt.
+  const bearbeiteteZoneId =
+    modus.art === 'bearbeiten'
+      ? modus.zoneId
+      : modus.art === 'zone'
+        ? (modus.entwurf.bearbeiten?.zoneId ?? null)
+        : null;
+  // Bearbeiteter Kreis weicht vom gespeicherten ab (Esc-Stufe, „Übernehmen“ frei).
+  const kreisBearbeitungGeaendert =
+    modus.art === 'zone' && modus.entwurf.bearbeiten
+      ? kreisGeaendert(modus.kreis, modus.entwurf.bearbeiten)
+      : false;
   const bildPlatzierenId = modus.art === 'bild' ? modus.id : null;
   const zeichenPlatzieren = modus.art === 'zeichen' ? modus.spec : null;
   const messForm = modus.art === 'messen' ? modus.form : null;
@@ -533,6 +630,11 @@ export function useKartenInteraktion({
 
   function onKarteKlick(lngLat: { lng: number; lat: number }) {
     if (!darfSchreiben) return;
+    // Punktweise Bearbeitung (LLH-1344): ein Tipp neben die Griffe hebt nur die Wahl auf.
+    if (modusRef.current.art === 'bearbeiten') {
+      dispatch({ t: 'bearbeitung', aktion: { art: 'waehlen', punkt: null } });
+      return;
+    }
     // Kreis-Modus (LLH-1043): ein Tipp setzt oder versetzt die Mitte; der Radius bleibt.
     if (modusRef.current.art === 'zone' && modusRef.current.entwurf.modus === 'kreis') {
       dispatch({ t: 'kreis', kreis: { mitte: { lat: lngLat.lat, lon: lngLat.lng } } });
@@ -715,6 +817,10 @@ export function useKartenInteraktion({
     if (m.art !== 'zone' || m.entwurf.modus !== 'kreis' || m.speichern) return;
     const { mitte, radiusM } = m.kreis;
     if (!mitte || !radiusGueltig(radiusM)) return;
+    if (m.entwurf.bearbeiten) {
+      speichereKreisBearbeitung(m.entwurf.bearbeiten, { mitte, radiusM });
+      return;
+    }
     speichereZone(
       { ...m.entwurf, geometrie: kreisPolygon(mitte, radiusM) },
       { mitte_lat: mitte.lat, mitte_lon: mitte.lon, radius_m: radiusM },
@@ -797,6 +903,91 @@ export function useKartenInteraktion({
           // Beendet Zeichnen → Kartenflaeche-Effekt ruft stoppen() → clear().
           dispatch({ t: 'beenden', arten: ['zone'] });
         }
+      });
+  };
+  /**
+   * „Übernehmen“ am Kreis einer bestehenden Zone (LLH-1344, design.md D3): EIN PATCH nur mit den
+   * geänderten Angaben; das Polygon rechnet der Server. Danach steht die Zone wieder im Inspector.
+   * Eine Ablehnung lässt den Modus samt Änderung stehen.
+   */
+  const speichereKreisBearbeitung = (
+    b: KreisBearbeitung,
+    neu: { mitte: GeoPunkt; radiusM: number },
+  ) => {
+    const patch: ZonePatch = {};
+    if (neu.mitte.lat !== b.mitte.lat || neu.mitte.lon !== b.mitte.lon) {
+      patch.kreis_mitte_lat = neu.mitte.lat;
+      patch.kreis_mitte_lon = neu.mitte.lon;
+    }
+    if (neu.radiusM !== b.radiusM) patch.kreis_radius_m = neu.radiusM;
+    if (Object.keys(patch).length === 0) return;
+    dispatch({ t: 'zoneSpeichernStart' });
+    speichereBearbeitung(
+      b.zoneId,
+      patch,
+      () => {
+        const m = modusRef.current;
+        return m.art === 'zone' && m.speichern && m.entwurf.bearbeiten?.zoneId === b.zoneId;
+      },
+      ['zone'],
+    );
+  };
+  /**
+   * „Übernehmen“ der punktweisen Bearbeitung (LLH-1344, design.md D2): genau ein PATCH mit der
+   * neuen Geometrie. Der Server nimmt einer Kreiszone dabei die Kreisangaben und schreibt
+   * „<Art> «Name» geändert“ ins Einsatztagebuch.
+   */
+  const bearbeitungUebernehmen = () => {
+    const m = modusRef.current;
+    if (m.art !== 'bearbeiten' || m.speichern || !istGeaendert(m.stand)) return;
+    if (zuVieleStuetzpunkte(m.stand.geometrie)) {
+      warnung?.(ZU_VIELE_STUETZPUNKTE);
+      return;
+    }
+    dispatch({ t: 'bearbeitenSpeichernStart' });
+    const zoneId = m.zoneId;
+    speichereBearbeitung(
+      zoneId,
+      { geometrie: JSON.stringify(m.stand.geometrie) },
+      () => {
+        const jetzt = modusRef.current;
+        return jetzt.art === 'bearbeiten' && jetzt.speichern && jetzt.zoneId === zoneId;
+      },
+      ['bearbeiten'],
+    );
+  };
+  /**
+   * Gemeinsamer Schreibweg beider Bearbeitungen: Quittung, beide Fächer frisch, dann — nur wenn
+   * dieser Zug noch läuft — Modusende und die Zone wieder gewählt. Der Grund einer Ablehnung steht
+   * unter dem Schlüssel der Zone über der Karte, wie bei den Feldern des Inspectors.
+   */
+  const speichereBearbeitung = (
+    zoneId: number,
+    patch: ZonePatch,
+    nochUnserZug: () => boolean,
+    arten: KartenModus['art'][],
+  ) => {
+    const melde = beginneHandlung(`zone:${zoneId}`, 'Zone nicht gespeichert');
+    aktualisiereZone(einsatzId, zoneId, patch)
+      .then(() => {
+        erfolg('Zone gespeichert');
+        return Promise.all([
+          qc.invalidateQueries({ queryKey: einsatzKeys.zonen(einsatzId) }),
+          qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) }),
+        ]).then(() => true);
+      })
+      .catch((e) => {
+        melde(e);
+        return false;
+      })
+      .then((ok) => {
+        if (!nochUnserZug()) return;
+        if (!ok) {
+          dispatch({ t: 'speichernAbgelehnt' });
+          return;
+        }
+        dispatch({ t: 'beenden', arten });
+        setSelektion({ art: 'zone', id: zoneId });
       });
   };
   /**
@@ -892,8 +1083,60 @@ export function useKartenInteraktion({
   const onKreisMitte = (mitte: GeoPunkt) => dispatch({ t: 'kreis', kreis: { mitte } });
   const onKreisRadius = (radiusM: number | null) => dispatch({ t: 'kreis', kreis: { radiusM } });
   const onKreisTyp = (typ: ZoneTyp, farbe?: string) => dispatch({ t: 'zoneTyp', typ, farbe });
-  /** Erste Esc-Stufe im Kreis-Modus (D7): die Mitte geht, der Radius bleibt als Eingabe. */
-  const onKreisVerwerfen = () => dispatch({ t: 'kreis', kreis: { mitte: null } });
+  /**
+   * Erste Esc-Stufe im Kreis-Modus (D7): die Mitte geht, der Radius bleibt als Eingabe. Am Kreis
+   * einer bestehenden Zone (LLH-1344) gehen stattdessen alle Änderungen: zurück auf den
+   * gespeicherten Kreis.
+   */
+  const onKreisVerwerfen = () => {
+    const m = modusRef.current;
+    const b = m.art === 'zone' ? m.entwurf.bearbeiten : undefined;
+    dispatch({
+      t: 'kreis',
+      kreis: b ? { mitte: b.mitte, radiusM: b.radiusM } : { mitte: null },
+    });
+  };
+  /**
+   * „Mitte verschieben“ im Inspector einer Kreiszone (LLH-1344, design.md D3): der Kreis-Modus mit
+   * dem gespeicherten Kreis vorbelegt; „Übernehmen“ ändert die Zone statt eine neue anzulegen.
+   */
+  const onMitteVerschieben = (zone: LageZone) => {
+    const kreis = kreisAusZone(zone);
+    if (!darfSchreiben || !kreis) return;
+    onZoneZeichnenStart({
+      typ: zone.typ,
+      modus: 'kreis',
+      farbe: zone.farbe ?? undefined,
+      kreis: { mitte: kreis.mitte, radiusM: kreis.radiusM },
+      bearbeiten: { zoneId: zone.id, mitte: kreis.mitte, radiusM: kreis.radiusM },
+    });
+  };
+  /** „Punkte bearbeiten“ im Inspector (LLH-1344, design.md D2): die Zone in den Bearbeiten-Modus. */
+  const onPunkteBearbeiten = (zone: LageZone) => {
+    const geometrie = parseGeometry(zone.geometrie);
+    if (!darfSchreiben || !geometrie) return;
+    dispatch({
+      t: 'bearbeiten',
+      zoneId: zone.id,
+      typ: zone.typ,
+      kreis: kreisAusZone(zone) != null,
+      geometrie,
+    });
+    setSelektion({ art: 'keine' });
+  };
+  const onBearbeitung = (aktion: BearbeitungsAktion) => dispatch({ t: 'bearbeitung', aktion });
+  /**
+   * Beendet die punktweise Bearbeitung ohne Speichern (Abbrechen, Esc ohne Änderung): die Zone ist
+   * wieder gewählt, der Grund einer gescheiterten Speicherung geht mit. Während des Speicherns
+   * wirkungslos.
+   */
+  const onBearbeitenAbbrechen = () => {
+    const m = modusRef.current;
+    if (m.art !== 'bearbeiten' || m.speichern) return;
+    verwirfHandlung(`zone:${m.zoneId}`);
+    dispatch({ t: 'beenden', arten: ['bearbeiten'] });
+    setSelektion({ art: 'zone', id: m.zoneId });
+  };
   /**
    * „Kreis hier …“ aus dem Kontextmenü (D8): Kreis-Modus mit der Druckstelle als Mitte, Art
    * Absperrbereich als Vorgabe (änderbar im Band).
@@ -989,10 +1232,15 @@ export function useKartenInteraktion({
     if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
     setSelektion({ art: 'fachebene', wert: { quelle, properties, geometrie } });
   };
-  // ZeichnenSteuerung „Abbrechen" (Phase zeichnen): Entwurf + Abschnitt-Zeichnen verwerfen.
+  // ZeichnenSteuerung „Abbrechen" (Phase zeichnen): Entwurf + Abschnitt-Zeichnen verwerfen. Am
+  // Kreis einer bestehenden Zone (LLH-1344) ist die Zone danach wieder gewählt.
   const onZeichnenAbbrechen = () => {
-    if (modusRef.current.art === 'zone') verwirfHandlung('zone-anlegen');
+    const m = modusRef.current;
+    const bearbeitet = m.art === 'zone' ? m.entwurf.bearbeiten?.zoneId : undefined;
+    if (m.art === 'zone')
+      verwirfHandlung(bearbeitet != null ? `zone:${bearbeitet}` : 'zone-anlegen');
     dispatch({ t: 'beenden', arten: ['zone', 'abschnitt'] });
+    if (bearbeitet != null) setSelektion({ art: 'zone', id: bearbeitet });
   };
 
   // Zonen-Inspector-CRUD. Ändern und Aufheben teilen den Schlüssel der Zone, der letzte zählt.
@@ -1079,6 +1327,10 @@ export function useKartenInteraktion({
     zoneBestaetigung,
     zoneSpeichern,
     kreisEntwurf,
+    kreisBearbeitung: zoneEntwurf?.bearbeiten ?? null,
+    kreisBearbeitungGeaendert,
+    zonenBearbeitung,
+    bearbeiteteZoneId,
     zoneZeichnenNonce,
     zoneAuswahl,
     auswahl,
@@ -1117,6 +1369,11 @@ export function useKartenInteraktion({
     aendereSymbol,
     bestaetigungSpeichern,
     kreisUebernehmen,
+    onMitteVerschieben,
+    onPunkteBearbeiten,
+    onBearbeitung,
+    bearbeitungUebernehmen,
+    onBearbeitenAbbrechen,
     onKreisMitte,
     onKreisRadius,
     onKreisTyp,

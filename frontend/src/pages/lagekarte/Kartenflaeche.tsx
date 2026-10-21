@@ -39,7 +39,7 @@ import { baueZeichenRegistry, kartenPixelRatio, ZEICHEN_KARTEN_PX } from './mark
 import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
 import { baueClusterDonut, donutBild, setzeHuelleDurchlaessig } from './clusterDonut';
 import { nimmKartenbildAuf, type KartenAufnahme } from './kartenAufnahme';
-import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
+import type { GeoJsonPolygon, GeoJsonGeometry, GeoPunkt } from './geo';
 import { werteFachebenenKlickAus } from './geo';
 import { createZeichnung, type Zeichnung, type ZeichenModus, type ZeichenStand } from './zeichnen';
 import { createMessung, type MessZeichnung } from './messZeichnung';
@@ -50,6 +50,14 @@ import {
   type KreisGriff,
   type KreisVorschau,
 } from './kreisVorschau';
+import {
+  entferneBearbeitungsVorschau,
+  erzeugeBearbeitungsGriffe,
+  sorgeFuerBearbeitungsVorschau,
+  type BearbeitungsGriffe,
+  type BearbeitungsVorschau,
+} from './zonenBearbeitungKarte';
+import type { BearbeitungsAktion } from './zonenBearbeitung';
 import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { absolutiereProxyAnfrage } from './basemapStil';
@@ -255,6 +263,15 @@ export interface KartenflaecheProps {
   kreis?: KreisVorschau | null;
   /** Radius aus dem Griff, laufend (`fertig = false`) und am Ende des Zugs. */
   onKreisRadius?: (radiusM: number, fertig: boolean) => void;
+  /** Mitte aus dem Mittengriff (LLH-1344), laufend und am Ende des Zugs; ohne ihn kein Mittengriff. */
+  onKreisMitte?: (mitte: GeoPunkt, fertig: boolean) => void;
+  /**
+   * Punktweise Bearbeitung einer Zone (LLH-1344): Vorschau samt Griffen; `null` = keine
+   * Bearbeitung. Gezeichnet ohne terra-draw (`zonenBearbeitungKarte.ts`).
+   */
+  bearbeitung?: BearbeitungsVorschau | null;
+  /** Aktion eines Griffs (verschieben, einfügen, wählen). */
+  onBearbeitung?: (a: BearbeitungsAktion) => void;
   /** Messwerkzeug: aktive Form oder `null`. */
   messen?: MessForm | null;
   /**
@@ -414,6 +431,9 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     messStart = null,
     kreis = null,
     onKreisRadius,
+    onKreisMitte,
+    bearbeitung = null,
+    onBearbeitung,
     kontextmenue = null,
     onMessung,
     onZeichnenStandAenderung,
@@ -581,6 +601,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   kreisRef.current = kreis;
   const onKreisRadiusRef = useRef(onKreisRadius);
   onKreisRadiusRef.current = onKreisRadius;
+  const onKreisMitteRef = useRef(onKreisMitte);
+  onKreisMitteRef.current = onKreisMitte;
+  // Griffe der punktweisen Bearbeitung (LLH-1344); abgebaut wie der Kreisgriff vor `map.remove()`.
+  const bearbeitungRef = useRef<BearbeitungsGriffe | null>(null);
+  const bearbeitungVorschauRef = useRef<BearbeitungsVorschau | null>(bearbeitung);
+  bearbeitungVorschauRef.current = bearbeitung;
+  const onBearbeitungRef = useRef(onBearbeitung);
+  onBearbeitungRef.current = onBearbeitung;
   // Bild-Manipulationsgriffe (Ecken/Drehen/Verschieben) im Platzier-Modus. Hier oben, weil der
   // Karten-Effekt sie vor `map.remove()` abbaut (LFH-943).
   const handlesRef = useRef<BildHandles | null>(null);
@@ -771,6 +799,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       handlesRef.current = null;
       kreisGriffRef.current?.zerstoeren();
       kreisGriffRef.current = null;
+      bearbeitungRef.current?.zerstoeren();
+      bearbeitungRef.current = null;
       map.remove(); // zerstört auch die AttributionControl
       mapRef.current = null;
       // Die Merker gehören zu DIESER Karte: eine neue (Remount, Fast Refresh) lädt ihren Style
@@ -846,6 +876,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     );
     // Die Kreis-Vorschau (LLH-1043) überlebt `setStyle` nicht; neu aus dem Ref.
     wendeKartenDatenAn(map, 'kreis-vorschau', () => sorgeFuerKreisVorschau(map, kreisRef.current));
+    // Ebenso die Vorschau der punktweisen Bearbeitung (LLH-1344).
+    wendeKartenDatenAn(map, 'zone-bearbeiten', () =>
+      sorgeFuerBearbeitungsVorschau(map, bearbeitungVorschauRef.current),
+    );
     // Zuletzt angemeldet → dieser Eintrag läuft zuletzt, der Punkt liegt oben.
     wendeKartenDatenAn(map, 'eigenposition', () =>
       sorgeFuerEigenpositionLayer(
@@ -1305,8 +1339,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
     wendeKartenDatenAn(map, 'kreis-vorschau', () => sorgeFuerKreisVorschau(map, kreisRef.current));
     if (!kreisGriffRef.current) {
-      kreisGriffRef.current = erzeugeKreisGriff(map, griffKontextRef.current, (r, fertig) =>
-        onKreisRadiusRef.current?.(r, fertig),
+      kreisGriffRef.current = erzeugeKreisGriff(
+        map,
+        griffKontextRef.current,
+        (r, fertig) => onKreisRadiusRef.current?.(r, fertig),
+        // Der Mittengriff (LLH-1344) steht nur, wenn die Seite die Mitte annimmt.
+        onKreisMitteRef.current ? (m, fertig) => onKreisMitteRef.current?.(m, fertig) : undefined,
       );
     }
     const mitte =
@@ -1315,6 +1353,30 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         : null;
     kreisGriffRef.current.setze(mitte, kreisRadius);
   }, [kreisAktiv, kreisMitteLat, kreisMitteLon, kreisRadius, kreisFarbe]);
+
+  // Punktweise Bearbeitung nachführen (LLH-1344, design.md D2): Vorschau und Griffe folgen dem
+  // Stand der Seite; jede Änderung kommt als neue Geometrie (Identität aus dem Reducer).
+  const bearbeitungAktiv = bearbeitung != null;
+  const bearbeitungGeometrie = bearbeitung?.geometrie ?? null;
+  const bearbeitungGewaehlt = bearbeitung?.gewaehlt ?? null;
+  const bearbeitungFarbe = bearbeitung?.farbe ?? null;
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!bearbeitungAktiv) {
+      bearbeitungRef.current?.zerstoeren();
+      bearbeitungRef.current = null;
+      wendeKartenDatenAn(map, 'zone-bearbeiten', () => entferneBearbeitungsVorschau(map));
+      return;
+    }
+    if (!bearbeitungRef.current) {
+      bearbeitungRef.current = erzeugeBearbeitungsGriffe(map, griffKontextRef.current, (a) =>
+        onBearbeitungRef.current?.(a),
+      );
+    }
+    const griffe = bearbeitungRef.current;
+    wendeKartenDatenAn(map, 'zone-bearbeiten', () => griffe.setze(bearbeitungVorschauRef.current));
+  }, [bearbeitungAktiv, bearbeitungGeometrie, bearbeitungGewaehlt, bearbeitungFarbe]);
 
   // Eigenposition nachführen. Nach dem Marker-Effekt registriert, damit sie über den Markern liegt.
   useEffect(() => {
