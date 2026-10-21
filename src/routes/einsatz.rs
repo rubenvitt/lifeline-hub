@@ -65,6 +65,10 @@ pub struct NeuerEinsatz {
     pub einsatzort_lat: Option<Option<f64>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     pub einsatzort_lon: Option<Option<f64>>,
+    /// Einsatz-Vorlage der eigenen Organisation (LLH-1375, Spec `einsatz-vorlagen`). Absent oder
+    /// `null` → keine Modulwerte. Fremd oder unbekannt → **400**, ohne dass ein Einsatz entsteht.
+    #[serde(default)]
+    pub vorlage_id: Option<i64>,
 }
 
 /// Prüft die Koordinate des Einsatzorts im Tri-State von Anlegen und PATCH (LFH-1175, Spec
@@ -142,6 +146,7 @@ pub async fn anlegen(
                 adresse: adresse.as_deref(),
                 koordinate,
             },
+            vorlage_id: req.vorlage_id,
         },
         benutzer.id,
     )

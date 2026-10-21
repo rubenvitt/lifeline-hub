@@ -93,6 +93,7 @@ pub(super) async fn einsatz_anlegen(
         einsatzart: None,
         begonnen_at: None,
         ort: Default::default(),
+        vorlage_id: None,
     };
     crate::write_retry!(pool, |conn| {
         crate::einsatz::repo::anlegen_tx(conn, &daten, ersteller_id, chrono::Utc::now()).await

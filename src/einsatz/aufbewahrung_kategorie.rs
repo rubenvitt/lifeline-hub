@@ -726,6 +726,7 @@ mod tests {
                 einsatzart: None,
                 begonnen_at: None,
                 ort: Default::default(),
+                vorlage_id: None,
             },
             leit,
         )

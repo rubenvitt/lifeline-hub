@@ -8,12 +8,17 @@ use utoipa::ToSchema;
 pub struct StichwortVorschlag {
     pub id: i64,
     pub text: String,
+    /// Gekoppelte Einsatz-Vorlage derselben Organisation (LLH-1375): wählt der Anlegedialog
+    /// dieses Stichwort, stellt sich die Vorlage ein, solange niemand sie von Hand gewählt hat.
+    /// Fehlt ohne Kopplung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vorlage_id: Option<i64>,
 }
 
 /// Alle Vorschläge einer Organisation, sortiert nach `sortier`, dann `text`.
 pub async fn liste(pool: &SqlitePool, org_id: i64) -> Result<Vec<StichwortVorschlag>, AppError> {
     sqlx::query_as::<_, StichwortVorschlag>(
-        "SELECT id, text FROM einsatz_stichwort_vorschlag \
+        "SELECT id, text, vorlage_id FROM einsatz_stichwort_vorschlag \
          WHERE org_id = ? ORDER BY sortier, text",
     )
     .bind(org_id)
@@ -47,6 +52,42 @@ pub async fn anlegen(
     Ok(StichwortVorschlag {
         id,
         text: text.to_string(),
+        vorlage_id: None,
+    })
+}
+
+/// Koppelt einen Vorschlag der Organisation an eine Einsatz-Vorlage oder löst die Kopplung
+/// (`None`). Fremder oder unbekannter Vorschlag → `NotFound`; eine Vorlage, die nicht zur
+/// Organisation gehört, ist ein Feldfehler (400).
+pub async fn set_vorlage(
+    pool: &SqlitePool,
+    org_id: i64,
+    id: i64,
+    vorlage_id: Option<i64>,
+) -> Result<StichwortVorschlag, AppError> {
+    crate::write_retry!(pool, |conn| {
+        if let Some(vid) = vorlage_id {
+            let eigen: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM einsatz_vorlage WHERE id = ? AND org_id = ?)",
+            )
+            .bind(vid)
+            .bind(org_id)
+            .fetch_one(&mut *conn)
+            .await?;
+            if !eigen {
+                return Err(AppError::Validation("Unbekannte Einsatz-Vorlage".into()));
+            }
+        }
+        sqlx::query_as::<_, StichwortVorschlag>(
+            "UPDATE einsatz_stichwort_vorschlag SET vorlage_id = ? \
+             WHERE id = ? AND org_id = ? RETURNING id, text, vorlage_id",
+        )
+        .bind(vorlage_id)
+        .bind(id)
+        .bind(org_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)
     })
 }
 

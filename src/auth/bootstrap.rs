@@ -177,6 +177,9 @@ pub async fn bootstrap_admin(
         .await?;
     }
 
+    // LLH-1375: Startliste der Einsatz-Vorlagen (gleiche Werte wie Migration 0233).
+    crate::einsatz_vorlage::repo::seed_startliste_tx(&mut tx, org_id).await?;
+
     tx.commit().await?;
 
     Ok(BootstrapErgebnis {
@@ -396,6 +399,43 @@ mod tests {
                 .unwrap();
         assert_eq!(labels.len(), 5, "fünf Default-Bausteine erwartet");
         assert_eq!(labels.first().map(String::as_str), Some("Lage unverändert"));
+    }
+
+    #[tokio::test]
+    async fn seedet_einsatz_vorlagen_ohne_stichwort_kopplung_fuer_neue_org() {
+        let pool = crate::db::test_pool().await;
+        bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+            .await
+            .unwrap();
+        let org_id: i64 = sqlx::query_scalar("SELECT id FROM organisation")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let liste = crate::einsatz_vorlage::repo::list(&pool, org_id)
+            .await
+            .unwrap();
+        let bezeichnungen: Vec<&str> = liste.iter().map(|v| v.bezeichnung.as_str()).collect();
+        assert_eq!(
+            bezeichnungen,
+            [
+                "Kleinlage",
+                "Sanitätsdienst",
+                "MANV",
+                "Personensuche",
+                "Evakuierung und Betreuung",
+                "Unwetter"
+            ]
+        );
+        let manv = liste.iter().find(|v| v.bezeichnung == "MANV").unwrap();
+        assert!(manv.ausgeblendet.iter().any(|k| k == "stab"));
+        assert!(manv.ausgeblendet.iter().any(|k| k == "tiere"));
+        let gekoppelt: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_stichwort_vorschlag WHERE vorlage_id IS NOT NULL",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(gekoppelt, 0, "keine mitgelieferte Stichwort-Kopplung");
     }
 
     #[tokio::test]

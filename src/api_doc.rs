@@ -127,6 +127,7 @@ use utoipa::OpenApi;
         crate::einheit_vorlage::EinheitVorlage,
         crate::einheit_vorlage::EinheitVorlageFahrzeug,
         crate::einheit_vorlage::EinheitVorlagePersonal,
+        crate::einsatz_vorlage::EinsatzVorlage,
         crate::einsatz::EinsatzAnzeige,
         crate::einsatz::EinsatzRolle,
         crate::einsatz::EinsatzStatus,

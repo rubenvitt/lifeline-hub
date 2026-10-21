@@ -3283,6 +3283,10 @@ mod tests {
             // Schichtmodelle (LLH-1122): Org-Stammdatum; der Einsatz hält eine Kopie ohne
             // Verweis. Ein künftiger Verweis aus dem Einsatz zöge sie sonst in die Hülle.
             "schichtmodell",
+            // Einsatz-Vorlagen (LLH-1375): Org-Stammdatum; der Einsatz merkt sich die Vorlage
+            // nicht, ihre Wirkung sind eigene Zeilen in `einsatz_modul_override`.
+            "einsatz_vorlage",
+            "einsatz_vorlage_modul_aus",
             "qualifikation",
             "karte_registry",
             // Logo der Organisation: hängt an der Org, nicht am Einsatz. Ein späterer FK Richtung

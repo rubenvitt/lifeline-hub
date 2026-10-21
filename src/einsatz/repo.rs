@@ -25,6 +25,10 @@ pub struct NeuerEinsatzDaten<'a> {
     pub begonnen_at: Option<&'a str>,
     /// Einsatzort beim Anlegen (LFH-1175). Leer → ohne Ort.
     pub ort: NeuerEinsatzort<'a>,
+    /// Einsatz-Vorlage (LLH-1375): jedes ausgeblendete Modul wird ein eigener Einsatzwert
+    /// `sichtbar = 0`. Fremd oder unbekannt → 400, ohne dass ein Einsatz entsteht. `None` →
+    /// keine Modulwerte.
+    pub vorlage_id: Option<i64>,
 }
 
 /// Einsatzort beim Anlegen: Adresse und Koordinate, beide optional. Die Koordinate ist ein Paar
@@ -101,6 +105,13 @@ pub(crate) async fn anlegen_tx(
     .fetch_optional(&mut *conn)
     .await?
     .unwrap_or((None, None));
+    // LLH-1375: die Vorlage vor jedem Schreiben prüfen; fremd oder unbekannt ist ein Feldfehler.
+    let vorlage_aus = match daten.vorlage_id {
+        Some(vid) => {
+            crate::einsatz_vorlage::repo::load_ausgeblendet_tx(&mut *conn, org_id, vid).await?
+        }
+        None => Vec::new(),
+    };
     let jahr = super::nummer::jahr_in_zone(jetzt, zeitzone.as_deref());
     // Das Löschprotokoll zählt mit (LFH-750, design.md D5): die Nummer eines endgültig
     // gelöschten Einsatzes kommt nicht wieder.
@@ -188,7 +199,41 @@ pub(crate) async fn anlegen_tx(
     // LLH-1122: die Vorgabe der Organisation wird als Kopie die Vorgabe des Einsatzes, damit die
     // Ablösung vom ersten Eintreffen an rechnen kann; ohne Org-Vorgabe keine.
     crate::schichtmodell::repo::copy_org_vorgabe_tx(conn, einsatz_id, org_id, ersteller_id).await?;
+    write_vorlage_overrides_tx(conn, einsatz_id, &vorlage_aus, ersteller_id).await?;
     Ok(einsatz_id)
+}
+
+/// Schreibt je ausgeblendetem Modul einer Einsatz-Vorlage einen eigenen Einsatzwert
+/// `sichtbar = 0` (LLH-1375, design.md D2), so als hätte die Einsatzleitung den Schalter selbst
+/// umgelegt; die Rolle bleibt NULL (erbt). Andere Module bekommen keine Zeile und erben die
+/// Org-Vorgabe. Ein nicht (mehr) bekannter oder nicht ausblendbarer Schlüssel fällt weg.
+async fn write_vorlage_overrides_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ausgeblendet: &[String],
+    ersteller_id: i64,
+) -> Result<(), AppError> {
+    let keys: Vec<&str> = ausgeblendet
+        .iter()
+        .map(String::as_str)
+        .filter(|k| super::modul::ist_gueltiger_modul_key(k) && super::modul::ist_ausblendbar(k))
+        .collect();
+    if keys.is_empty() {
+        return Ok(());
+    }
+    let json = serde_json::to_string(&keys)
+        .map_err(|e| AppError::Internal(format!("Modulschlüssel serialisieren: {e}")))?;
+    sqlx::query(
+        "INSERT INTO einsatz_modul_override \
+            (einsatz_id, modul_key, sichtbar, benoetigte_rolle, geaendert_at, geaendert_von) \
+         SELECT ?, value, 0, NULL, datetime('now'), ? FROM json_each(?)",
+    )
+    .bind(einsatz_id)
+    .bind(ersteller_id)
+    .bind(json)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Schwärzungsstand eines Einsatzes `e` als Spalte `teilschwaerzungen` (LFH-996, design.md D1):
@@ -1475,6 +1520,7 @@ mod tests {
                 einsatzart: None,
                 begonnen_at: None,
                 ort: Default::default(),
+                vorlage_id: None,
             },
             ersteller_id,
         )
@@ -3871,6 +3917,7 @@ mod tests {
                 einsatzart: None,
                 begonnen_at: None,
                 ort: Default::default(),
+                vorlage_id: None,
             },
             leit,
             Utc::now(),
@@ -4055,6 +4102,7 @@ mod tests {
             einsatzart: None,
             begonnen_at: None,
             ort: Default::default(),
+            vorlage_id: None,
         };
 
         // Ohne Einstellung: Europe/Berlin.

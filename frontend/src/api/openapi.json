@@ -5882,6 +5882,46 @@
           }
         }
       },
+      "EinsatzVorlage": {
+        "type": "object",
+        "description": "Eine Einsatz-Vorlage der Organisation. `ausgeblendet` sind die Modulschlüssel, die ein mit ihr\nangelegter Einsatz als eigenen Wert ausblendet, in der Reihenfolge von `MODUL_KEYS`.",
+        "required": [
+          "id",
+          "bezeichnung",
+          "ausgeblendet",
+          "sortier"
+        ],
+        "properties": {
+          "ausgeblendet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bezeichnung": {
+            "type": "string"
+          },
+          "einsatzart": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Einsatzart",
+                "description": "Einsatzart, die der Anlegedialog vorbelegt; fehlt, wenn die Vorlage keine vorgibt."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sortier": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "EinsatzabschnittAnzeige": {
         "type": "object",
         "description": "Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über\n`ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.",
@@ -14505,6 +14545,14 @@
           },
           "text": {
             "type": "string"
+          },
+          "vorlage_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gekoppelte Einsatz-Vorlage derselben Organisation (LLH-1375): wählt der Anlegedialog\ndieses Stichwort, stellt sich die Vorlage ein, solange niemand sie von Hand gewählt hat.\nFehlt ohne Kopplung."
           }
         }
       },
