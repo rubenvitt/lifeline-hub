@@ -404,12 +404,22 @@ export function verweisStil(token: { controlHeight: number }): CSSProperties {
  * aus der Zeitachse fallen.
  */
 export function hatVerknuepfung(
-  e: Pick<EtbEintragAnzeige, 'befehl_id' | 'lagebericht_id' | 'auftrag_id' | 'folgeauftraege'>,
+  e: Pick<
+    EtbEintragAnzeige,
+    | 'befehl_id'
+    | 'lagebericht_id'
+    | 'auftrag_id'
+    | 'folgeauftraege'
+    | 'meldung_id'
+    | 'nachforderung_id'
+  >,
 ): boolean {
   return (
     e.befehl_id != null ||
     e.lagebericht_id != null ||
     e.auftrag_id != null ||
+    e.meldung_id != null ||
+    e.nachforderung_id != null ||
     e.folgeauftraege.length > 0
   );
 }

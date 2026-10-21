@@ -2,6 +2,67 @@ use crate::error::AppError;
 use sqlx::SqlitePool;
 
 use super::{adressat_kategorie_gueltig, prioritaet_gueltig, NachforderungAnzeige};
+use crate::kommunikation::AdressatKategorie;
+
+/// Kurzname einer Nachforderung im ETB: „2× RTW“, ohne Anzahl nur die Art.
+fn kurzname(anzahl: Option<i64>, art: &str) -> String {
+    match anzahl {
+        Some(a) => format!("{a}× {art}"),
+        None => art.to_string(),
+    }
+}
+
+/// An des ETB-Eintrags einer Nachforderung (LLH-1104 D5): Kategorie und Bezeichnung wie die
+/// Karte, „Leitstelle (ILS Nord)“. Nennt die Bezeichnung die Kategorie schon („Leitstelle
+/// Nord“), steht sie allein; ohne Bezeichnung steht die Kategorie allein.
+pub fn adressat_text(kategorie: AdressatKategorie, bezeichnung: Option<&str>) -> String {
+    let label = kategorie.label();
+    match bezeichnung.map(str::trim).filter(|b| !b.is_empty()) {
+        None => label.to_string(),
+        Some(b) if b.to_lowercase().contains(&label.to_lowercase()) => b.to_string(),
+        Some(b) => format!("{label} ({b})"),
+    }
+}
+
+/// Inhalt des Systemeintrags einer Stufe (LLH-1104 D6): „Nachforderung 2× RTW: zugesagt“, eine
+/// Rücknahme „…: zurückgesetzt auf angefordert“, eine Ablehnung mit Grund in Klammern.
+fn stufen_text(kurz: &str, neu: &str, rueckwaerts: bool, grund: Option<&str>) -> String {
+    match (rueckwaerts, grund) {
+        (true, _) => format!("Nachforderung {kurz}: zurückgesetzt auf {neu}"),
+        (false, Some(g)) => format!("Nachforderung {kurz}: {neu} ({g})"),
+        (false, None) => format!("Nachforderung {kurz}: {neu}"),
+    }
+}
+
+/// Schreibt den Systemeintrag einer vollzogenen Stufe in der laufenden Transaktion und setzt
+/// seinen Verweis auf die Nachforderung (LLH-1104 D6). Liefert die Kennung des Eintrags.
+async fn stufe_protokollieren_tx(
+    conn: &mut sqlx::SqliteConnection,
+    id: i64,
+    erfasser_id: i64,
+    neu: &str,
+    rueckwaerts: bool,
+    grund: Option<&str>,
+) -> Result<i64, AppError> {
+    let (einsatz_id, art, anzahl): (i64, String, Option<i64>) =
+        sqlx::query_as("SELECT einsatz_id, art, anzahl FROM nachforderung WHERE id = ?")
+            .bind(id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
+        .await?
+        .etb_startwert();
+    let inhalt = stufen_text(&kurzname(anzahl, &art), neu, rueckwaerts, grund);
+    let etb_id =
+        crate::etb::system_audit_tx(&mut *conn, einsatz_id, erfasser_id, startwert, &inhalt)
+            .await?;
+    sqlx::query("UPDATE etb_eintrag SET nachforderung_id = ? WHERE id = ?")
+        .bind(id)
+        .bind(etb_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(etb_id)
+}
 
 /// Validierte Eingabe für eine neue Nachforderung (Handler hat getrimmt/normalisiert).
 #[derive(Debug)]
@@ -80,12 +141,19 @@ pub async fn create_tx(
     .fetch_one(&mut *tx)
     .await?;
 
-    // ETB-Meldung (Pattern B): die Anforderung erscheint regulär im ETB.
-    let menge = daten.anzahl.map(|a| format!("{a}× ")).unwrap_or_default();
+    // ETB-Meldung (Pattern B): die Anforderung erscheint regulär im ETB, immer — unabhängig von
+    // „Automatische ETB-Einträge“ (LLH-1104 D4: Führungsvorgang mit Außenwirkung). Von ist die
+    // eigene Führungsstelle, An der Adressat (D5).
     let inhalt = format!(
-        "Nachforderung: {menge}{} — {}",
-        daten.art, daten.bezeichnung
+        "Nachforderung: {} — {}",
+        kurzname(daten.anzahl, daten.art),
+        daten.bezeichnung
     );
+    let von =
+        crate::einsatz::fuehrungsstelle::absender_tx(&mut *tx, einsatz_id, ersteller_id).await?;
+    let kategorie = AdressatKategorie::parse(daten.adressat_kategorie)
+        .ok_or_else(|| AppError::Validation("Ungültige Adressat-Kategorie".into()))?;
+    let an = adressat_text(kategorie, daten.adressat_bezeichnung);
     let etb_id = crate::etb::repo::anlegen_tx(
         &mut *tx,
         einsatz_id,
@@ -94,8 +162,8 @@ pub async fn create_tx(
         crate::etb::repo::EintragDaten {
             typ: crate::etb::TYP_MELDUNG,
             inhalt: &inhalt,
-            von: None,
-            an: daten.adressat_bezeichnung,
+            von: von.as_deref(),
+            an: Some(&an),
             meldeweg: None,
             veranlassung: daten.begruendung,
             ereigniszeit: Some(daten.angefordert_at),
@@ -256,18 +324,22 @@ fn stufe(status: &str) -> Option<(u8, Option<&'static str>)> {
 /// COALESCE); die Rücknahme leert den der verlassenen Stufe (LLH-1247), damit die nächste
 /// Meldung ihren eigenen Zeitpunkt trägt und keine Karte einen zurückgenommenen zeigt.
 /// `erwartet` ist der vom Handler geprüfte Bestandsstatus: das UPDATE greift NUR, wenn er
-/// unverändert ist (optimistische Sperre gegen TOCTOU). Liefert `true`, wenn eine Zeile geändert
-/// wurde; `false` = Status zwischenzeitlich geändert. `abgelehnt` läuft über [`lehne_ab`]. Die
+/// unverändert ist (optimistische Sperre gegen TOCTOU). `abgelehnt` läuft über [`lehne_ab`]. Die
 /// Rücknahme aus `eingetroffen` greift zusätzlich nur ohne zählenden Materialposten (LLH-1226,
 /// design.md D9), damit eine gleichzeitige Übernahme keine zurückgenommene Nachforderung mit
 /// Posten hinterlässt; die verständliche 422 prüft der Handler vorher über [`has_material`].
+///
+/// Ein vollzogener Wechsel schreibt in DERSELBEN Transaktion genau einen Systemeintrag ins ETB,
+/// auch die Rücknahme (LLH-1104 D6; das ETB löscht nie). Liefert dessen Kennung für das
+/// Live-Ereignis; `None` = Status zwischenzeitlich geändert, dann ist nichts geschrieben.
 pub async fn update_status(
     pool: &SqlitePool,
     id: i64,
+    erfasser_id: i64,
     neuer_status: &str,
     erwartet: &str,
     jetzt: &str,
-) -> Result<bool, AppError> {
+) -> Result<Option<i64>, AppError> {
     let ungueltig = || AppError::Validation("Ungültiger Zielstatus".into());
     let (neu_stufe, neu_spalte) = stufe(neuer_status).ok_or_else(ungueltig)?;
     let (alt_stufe, alt_spalte) = stufe(erwartet).ok_or_else(ungueltig)?;
@@ -287,34 +359,50 @@ pub async fn update_status(
     let sql = format!(
         "UPDATE nachforderung SET status = ?, {stempel} WHERE id = ? AND status = ?{ohne_posten}"
     );
-    let query = sqlx::query(sqlx::AssertSqlSafe(&*sql)).bind(neuer_status);
-    let query = if vorwaerts { query.bind(jetzt) } else { query };
-    let r = query.bind(id).bind(erwartet).execute(pool).await?;
-    Ok(r.rows_affected() > 0)
+    crate::write_retry!(pool, |conn| {
+        let query = sqlx::query(sqlx::AssertSqlSafe(&*sql)).bind(neuer_status);
+        let query = if vorwaerts { query.bind(jetzt) } else { query };
+        let r = query.bind(id).bind(erwartet).execute(&mut *conn).await?;
+        if r.rows_affected() == 0 {
+            return Ok(None);
+        }
+        stufe_protokollieren_tx(conn, id, erfasser_id, neuer_status, !vorwaerts, None)
+            .await
+            .map(Some)
+    })
 }
 
 /// Lehnt eine Nachforderung ab (Abzweig): setzt status='abgelehnt', Zeitstempel und Grund —
-/// nur wenn der Bestandsstatus `erwartet` unverändert ist (optimistische Sperre). Liefert
-/// `true` bei erfolgter Änderung.
+/// nur wenn der Bestandsstatus `erwartet` unverändert ist (optimistische Sperre). Schreibt in
+/// derselben Transaktion den Systemeintrag mit Grund (LLH-1104 D6) und liefert dessen
+/// Kennung; `None` = nichts geändert.
 pub async fn lehne_ab(
     pool: &SqlitePool,
     id: i64,
+    erfasser_id: i64,
     grund: Option<&str>,
     erwartet: &str,
     jetzt: &str,
-) -> Result<bool, AppError> {
-    let r = sqlx::query(
-        "UPDATE nachforderung SET status = ?, abgelehnt_at = COALESCE(abgelehnt_at, ?), \
-         abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ? AND status = ?",
-    )
-    .bind(super::STATUS_ABGELEHNT)
-    .bind(jetzt)
-    .bind(grund)
-    .bind(id)
-    .bind(erwartet)
-    .execute(pool)
-    .await?;
-    Ok(r.rows_affected() > 0)
+) -> Result<Option<i64>, AppError> {
+    crate::write_retry!(pool, |conn| {
+        let r = sqlx::query(
+            "UPDATE nachforderung SET status = ?, abgelehnt_at = COALESCE(abgelehnt_at, ?), \
+             abgelehnt_grund = COALESCE(abgelehnt_grund, ?) WHERE id = ? AND status = ?",
+        )
+        .bind(super::STATUS_ABGELEHNT)
+        .bind(jetzt)
+        .bind(grund)
+        .bind(id)
+        .bind(erwartet)
+        .execute(&mut *conn)
+        .await?;
+        if r.rows_affected() == 0 {
+            return Ok(None);
+        }
+        stufe_protokollieren_tx(conn, id, erfasser_id, super::STATUS_ABGELEHNT, false, grund)
+            .await
+            .map(Some)
+    })
 }
 
 #[cfg(test)]
@@ -380,6 +468,292 @@ mod tests {
         assert_eq!(backlink, n.id);
     }
 
+    /// Von und An eines ETB-Eintrags, dazu Typ, Inhalt und der Verweis auf die Nachforderung.
+    async fn etb_zeile(
+        pool: &SqlitePool,
+        id: i64,
+    ) -> (String, String, String, String, Option<i64>) {
+        sqlx::query_as(
+            "SELECT typ, inhalt, von, an, nachforderung_id FROM etb_eintrag WHERE id = ?",
+        )
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    /// Alle ETB-Einträge, die auf die Nachforderung `n` zeigen, in Anlagefolge.
+    async fn etb_der_nachforderung(pool: &SqlitePool, n: i64) -> Vec<(String, String)> {
+        sqlx::query_as(
+            "SELECT typ, inhalt FROM etb_eintrag WHERE nachforderung_id = ? ORDER BY lfd_nr",
+        )
+        .bind(n)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    /// LLH-1104 D5: Absender ist die eigene Führungsstelle des Einsatzes (Rufname vor
+    /// Bezeichnung), nicht „System“; Empfänger ist der Adressat mit Kategorie.
+    #[tokio::test]
+    async fn anlage_traegt_fuehrungsstelle_als_absender_und_adressat_als_empfaenger() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        sqlx::query(
+            "INSERT INTO einsatz_fuehrungsstelle (einsatz_id, rufname, bezeichnung) \
+             VALUES (?, 'Florian Musterstadt 10/1', 'ELW 2 Musterstadt')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                adressat_bezeichnung: Some("ILS Nord"),
+                ..daten("RTW", "2 RTW zur Verstärkung")
+            },
+        )
+        .await
+        .unwrap();
+        let (typ, inhalt, von, an, verweis) =
+            etb_zeile(&pool, n.etb_nachforderung_id.unwrap()).await;
+        assert_eq!(typ, "meldung");
+        assert_eq!(inhalt, "Nachforderung: 2× RTW — 2 RTW zur Verstärkung");
+        assert_eq!(von, "Florian Musterstadt 10/1");
+        assert_eq!(an, "Leitstelle (ILS Nord)");
+        assert_eq!(verweis, Some(n.id));
+
+        // Ohne Rufname gilt die Bezeichnung der Führungsstelle.
+        sqlx::query("UPDATE einsatz_fuehrungsstelle SET rufname = '  ' WHERE einsatz_id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        let (_, _, von, an, _) = etb_zeile(&pool, n.etb_nachforderung_id.unwrap()).await;
+        assert_eq!(von, "ELW 2 Musterstadt");
+        // Die Bezeichnung nennt die Kategorie schon: kein „Leitstelle (Leitstelle Nord)“.
+        assert_eq!(an, "Leitstelle Nord");
+    }
+
+    /// LLH-1104 D5: Ohne gepflegte Führungsstelle gilt der ETB-Vorschlag des Erstellers —
+    /// seine Führungsstelle aus der Mitgliedschaft, sonst sein erstes Sachgebiet.
+    #[tokio::test]
+    async fn anlage_ohne_fuehrungsstelle_nimmt_den_etb_vorschlag_des_erstellers() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        sqlx::query(
+            "INSERT INTO einsatz_mitgliedschaft (einsatz_id, benutzer_id, einsatz_rolle, \
+             fuehrungsstelle) VALUES (?, ?, 'einsatzleitung', 'TEL Rathaus')",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let ohne_bez = NachforderungDaten {
+            adressat_kategorie: crate::nachforderung::ADRESSAT_ANDERE_BOS,
+            adressat_bezeichnung: None,
+            ..daten("SEG", "SEG Betreuung")
+        };
+        let n = create(&pool, e, b, ohne_bez).await.unwrap();
+        let (_, _, von, an, _) = etb_zeile(&pool, n.etb_nachforderung_id.unwrap()).await;
+        assert_eq!(von, "TEL Rathaus");
+        assert_eq!(an, "Andere BOS");
+
+        // Ganz ohne Angabe bleibt die Systemkennung (LFH-894).
+        sqlx::query(
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsstelle = NULL WHERE einsatz_id = ?",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        let (_, _, von, _, _) = etb_zeile(&pool, n.etb_nachforderung_id.unwrap()).await;
+        assert_eq!(von, crate::etb::SYSTEM_RUFNAME);
+    }
+
+    /// LLH-1104 D6: Jede vollzogene Stufe schreibt genau einen Systemeintrag mit Verweis, die
+    /// Rücknahme einen weiteren (nichts wird gelöscht); ein veraltetes `erwartet` schreibt nichts.
+    #[tokio::test]
+    async fn jede_stufe_schreibt_genau_einen_etb_eintrag_mit_verweis() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "2 RTW")).await.unwrap();
+        assert_eq!(
+            etb_der_nachforderung(&pool, n.id).await.len(),
+            1,
+            "nur die Anlage"
+        );
+
+        let etb = update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_ZUGESAGT,
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap()
+        .expect("Stufe vollzogen");
+        let (typ, inhalt, _, _, verweis) = etb_zeile(&pool, etb).await;
+        assert_eq!(typ, "system");
+        assert_eq!(inhalt, "Nachforderung 2× RTW: zugesagt");
+        assert_eq!(verweis, Some(n.id));
+
+        // Veraltet: greift nicht, schreibt nichts.
+        assert_eq!(
+            update_status(
+                &pool,
+                n.id,
+                b,
+                STATUS_ZUGESAGT,
+                STATUS_ANGEFORDERT,
+                "2026-06-12 09:06:00"
+            )
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(etb_der_nachforderung(&pool, n.id).await.len(), 2);
+
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_UNTERWEGS,
+            STATUS_ZUGESAGT,
+            "2026-06-12 09:10:00",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_EINGETROFFEN,
+            STATUS_UNTERWEGS,
+            "2026-06-12 09:30:00",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        // Rückgängig: ein weiterer Eintrag, der vorige bleibt.
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_UNTERWEGS,
+            STATUS_EINGETROFFEN,
+            "2026-06-12 09:31:00",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let inhalte: Vec<String> = etb_der_nachforderung(&pool, n.id)
+            .await
+            .into_iter()
+            .map(|(_, i)| i)
+            .collect();
+        assert_eq!(
+            inhalte,
+            [
+                "Nachforderung: 2× RTW — 2 RTW",
+                "Nachforderung 2× RTW: zugesagt",
+                "Nachforderung 2× RTW: unterwegs",
+                "Nachforderung 2× RTW: eingetroffen",
+                "Nachforderung 2× RTW: zurückgesetzt auf unterwegs",
+            ]
+        );
+    }
+
+    /// LLH-1104 D6: Die Ablehnung protokolliert ihren Grund; ohne Anzahl fehlt die Menge.
+    #[tokio::test]
+    async fn ablehnung_schreibt_grund_ins_etb() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                anzahl: None,
+                ..daten("SEG", "x")
+            },
+        )
+        .await
+        .unwrap();
+        let etb = lehne_ab(
+            &pool,
+            n.id,
+            b,
+            Some("keine Reserven"),
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap()
+        .expect("abgelehnt");
+        let (typ, inhalt, _, _, verweis) = etb_zeile(&pool, etb).await;
+        assert_eq!(typ, "system");
+        assert_eq!(inhalt, "Nachforderung SEG: abgelehnt (keine Reserven)");
+        assert_eq!(verweis, Some(n.id));
+        // Schon abgelehnt: kein zweiter Eintrag.
+        assert_eq!(
+            lehne_ab(
+                &pool,
+                n.id,
+                b,
+                None,
+                STATUS_ANGEFORDERT,
+                "2026-06-12 09:06:00"
+            )
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(etb_der_nachforderung(&pool, n.id).await.len(), 2);
+    }
+
+    /// LLH-1104 D4: Nachforderungen und ihre Stufen gehen immer ins ETB, auch mit
+    /// abgeschalteten automatischen ETB-Einträgen.
+    #[tokio::test]
+    async fn nachforderung_schreibt_auch_ohne_auto_etb() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        crate::einsatz::einstellungen::speichern(
+            &pool,
+            e,
+            b,
+            crate::einsatz::einstellungen::EinstellungenDaten {
+                auto_etb_eintraege: Some(0),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let n = create(&pool, e, b, daten("RTW", "x")).await.unwrap();
+        assert!(n.etb_nachforderung_id.is_some());
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_ZUGESAGT,
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(etb_der_nachforderung(&pool, n.id).await.len(), 2);
+    }
+
     #[tokio::test]
     async fn liste_sortiert_nach_prio_und_filtert_status() {
         let pool = crate::db::test_pool().await;
@@ -409,21 +783,25 @@ mod tests {
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_ZUGESAGT,
             STATUS_ANGEFORDERT,
             "2026-06-12 09:05:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_UNTERWEGS,
             STATUS_ZUGESAGT,
             "2026-06-12 09:10:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Unterwegs);
         assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 09:05:00"));
@@ -433,23 +811,27 @@ mod tests {
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_EINGETROFFEN,
             STATUS_UNTERWEGS,
             "2026-06-12 09:30:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         assert!(!load(&pool, n.id).await.unwrap().ist_offen);
         // Optimistische Sperre: erneuter Übergang mit veraltetem `erwartet` greift nicht.
         assert!(!update_status(
             &pool,
             n.id,
+            b,
             STATUS_ZUGESAGT,
             STATUS_ANGEFORDERT,
             "2026-06-12 09:40:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
     }
 
     /// LLH-1247: Die Rücknahme um eine Stufe (LFH-343 · C8) greift auf jeder Stufe, auch zurück
@@ -465,18 +847,23 @@ mod tests {
             (STATUS_UNTERWEGS, STATUS_ZUGESAGT, "2026-06-12 09:10:00"),
             (STATUS_EINGETROFFEN, STATUS_UNTERWEGS, "2026-06-12 09:30:00"),
         ] {
-            assert!(update_status(&pool, n.id, neu, alt, jetzt).await.unwrap());
+            assert!(update_status(&pool, n.id, b, neu, alt, jetzt)
+                .await
+                .unwrap()
+                .is_some());
         }
 
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_UNTERWEGS,
             STATUS_EINGETROFFEN,
             "2026-06-12 09:31:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Unterwegs);
         assert_eq!(nach.eingetroffen_at, None);
@@ -485,21 +872,25 @@ mod tests {
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_ZUGESAGT,
             STATUS_UNTERWEGS,
             "2026-06-12 09:32:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_ANGEFORDERT,
             STATUS_ZUGESAGT,
             "2026-06-12 09:33:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Angefordert);
         assert_eq!(nach.zugesagt_at, None);
@@ -510,12 +901,14 @@ mod tests {
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_ZUGESAGT,
             STATUS_ANGEFORDERT,
             "2026-06-12 10:00:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 10:00:00"));
     }
@@ -533,7 +926,7 @@ mod tests {
             (STATUS_ANGEFORDERT, STATUS_ANGEFORDERT),
         ] {
             assert!(matches!(
-                update_status(&pool, n.id, neu, alt, "2026-06-12 09:05:00").await,
+                update_status(&pool, n.id, b, neu, alt, "2026-06-12 09:05:00").await,
                 Err(AppError::Validation(_))
             ));
         }
@@ -547,12 +940,14 @@ mod tests {
         assert!(lehne_ab(
             &pool,
             n.id,
+            b,
             Some("keine Reserven"),
             STATUS_ANGEFORDERT,
             "2026-06-12 09:05:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         let nach = load(&pool, n.id).await.unwrap();
         assert_eq!(nach.status, NachforderungStatus::Abgelehnt);
         assert_eq!(nach.abgelehnt_grund.as_deref(), Some("keine Reserven"));
@@ -643,21 +1038,26 @@ mod tests {
             (STATUS_UNTERWEGS, STATUS_ZUGESAGT),
             (STATUS_EINGETROFFEN, STATUS_UNTERWEGS),
         ] {
-            assert!(update_status(&pool, n.id, neu, alt, "2026-10-15 09:00:00")
-                .await
-                .unwrap());
+            assert!(
+                update_status(&pool, n.id, b, neu, alt, "2026-10-15 09:00:00")
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
         }
         let p = posten(&pool, e, n.id, None).await;
         assert!(has_material(&pool, n.id).await.unwrap());
         assert!(!update_status(
             &pool,
             n.id,
+            b,
             STATUS_UNTERWEGS,
             STATUS_EINGETROFFEN,
             "2026-10-15 09:10:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
         assert_eq!(
             load(&pool, n.id).await.unwrap().status,
             NachforderungStatus::Eingetroffen
@@ -674,11 +1074,13 @@ mod tests {
         assert!(update_status(
             &pool,
             n.id,
+            b,
             STATUS_UNTERWEGS,
             STATUS_EINGETROFFEN,
             "2026-10-15 09:10:00"
         )
         .await
-        .unwrap());
+        .unwrap()
+        .is_some());
     }
 }

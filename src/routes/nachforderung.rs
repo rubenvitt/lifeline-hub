@@ -223,20 +223,23 @@ pub async fn status(
         ));
     }
     // Optimistische Sperre gegen TOCTOU: UPDATE greift nur bei unverändertem Bestandsstatus.
-    if !repo::update_status(
+    // Der Wechsel schreibt im selben Commit seinen ETB-Eintrag (LLH-1104 D6).
+    let Some(etb_id) = repo::update_status(
         &state.pool,
         nachforderung_id,
+        ctx.benutzer.id,
         neu,
         aktuell.status.as_str(),
         &jetzt(),
     )
     .await?
-    {
+    else {
         return Err(AppError::UnprocessableEntity(
             "Status wurde zwischenzeitlich geändert".into(),
         ));
-    }
+    };
     let n = repo::load(&state.pool, nachforderung_id).await?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse(&state, einsatz_id);
     // Das UPDATE hat den Status geändert (sonst 422 oben): Ersteller und S4 erfahren den Status,
     // den DIESE Anfrage gesetzt hat, nicht den inzwischen gelesenen.
@@ -275,20 +278,22 @@ pub async fn ablehnen(
             "Nachforderung kann in diesem Zustand nicht abgelehnt werden".into(),
         ));
     }
-    if !repo::lehne_ab(
+    let Some(etb_id) = repo::lehne_ab(
         &state.pool,
         nachforderung_id,
+        ctx.benutzer.id,
         trimme(&req.grund),
         aktuell.status.as_str(),
         &jetzt(),
     )
     .await?
-    {
+    else {
         return Err(AppError::UnprocessableEntity(
             "Status wurde zwischenzeitlich geändert".into(),
         ));
-    }
+    };
     let n = repo::load(&state.pool, nachforderung_id).await?;
+    state.live.publiziere(einsatz_id, etb_id);
     sse(&state, einsatz_id);
     crate::nachforderung::benachrichtigung::status_gewechselt(
         &state.pool,

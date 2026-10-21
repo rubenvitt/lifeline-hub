@@ -813,6 +813,31 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     assert_eq!(lage[0]["meldung_lfd_nr"], 1);
     assert_eq!(lage[0]["meldung_absender"], "Florian Nord 1");
     assert_eq!(lage[0]["text"], "Brücke gesperrt");
+
+    // LLH-1104 D8: die erste Übergabe steht einmal im ETB, mit Verweis auf die Meldung; der
+    // Auto-ETB-Eintrag der Meldung trägt denselben Verweis samt Nummer.
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let mit_verweis: Vec<&serde_json::Value> = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["meldung_id"] == mid)
+        .collect();
+    assert_eq!(mit_verweis.len(), 2, "{mit_verweis:?}");
+    assert!(mit_verweis.iter().all(|x| x["meldung_lfd_nr"] == 1));
+    let uebernahmen: Vec<&&serde_json::Value> = mit_verweis
+        .iter()
+        .filter(|x| x["inhalt"] == "Meldung #1 an die Lage übergeben")
+        .collect();
+    assert_eq!(uebernahmen.len(), 1);
+    assert_eq!(uebernahmen[0]["typ"], "system");
 }
 
 /// Sofortmeldungs-Body (Priorität sofort → implizit bestätigungspflichtig).

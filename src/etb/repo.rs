@@ -361,7 +361,9 @@ pub async fn laden(pool: &SqlitePool, id: i64) -> Result<EtbEintragAnzeige, AppE
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
-                e.befehl_id \
+                e.befehl_id, e.meldung_id, \
+                (SELECT m.lfd_nr FROM meldung m WHERE m.id = e.meldung_id) AS meldung_lfd_nr, \
+                e.nachforderung_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id \
          WHERE e.id = ?",
     )
@@ -720,7 +722,9 @@ pub async fn abfrage(
         "SELECT e.id, e.lfd_nr, e.typ, e.inhalt, e.von, e.an, e.meldeweg, e.veranlassung, \
                 e.erfasser_id, b.anzeigename AS erfasser_name, e.erfasser_funktion, e.ereigniszeit, e.received_at, \
                 e.erfasst_lokal_at, e.berichtigt_eintrag_id, e.lagebericht_id, e.auftrag_id, \
-                e.befehl_id \
+                e.befehl_id, e.meldung_id, \
+                (SELECT m.lfd_nr FROM meldung m WHERE m.id = e.meldung_id) AS meldung_lfd_nr, \
+                e.nachforderung_id \
          FROM etb_eintrag e JOIN benutzer b ON b.id = e.erfasser_id",
     );
     filter_bedingung(&mut qb, einsatz_id, &filter.merkmale());
@@ -1671,6 +1675,79 @@ mod tests {
 
         assert_eq!(a.lagebericht_id, None);
         assert_eq!(a.auftrag_id, None);
+        assert_eq!(a.meldung_id, None);
+        assert_eq!(a.meldung_lfd_nr, None);
+        assert_eq!(a.nachforderung_id, None);
+        // Ehrlich optional (LFH-265): ohne Kopplung fehlen die Felder auf dem Draht.
+        let json = serde_json::to_value(&a).unwrap();
+        for feld in ["meldung_id", "meldung_lfd_nr", "nachforderung_id"] {
+            assert!(!json.as_object().unwrap().contains_key(feld), "{feld}");
+        }
+    }
+
+    /// LLH-1104 (D1): Liste und Einzelladen tragen den Verweis auf Meldung (mit ihrer Nummer)
+    /// und Nachforderung, damit die Zeitachse dorthin springen kann.
+    #[tokio::test]
+    async fn eintrag_traegt_verweis_auf_meldung_und_nachforderung() {
+        let pool = crate::db::test_pool().await;
+        let (benutzer, einsatz) = setup(&pool).await;
+        let meldung = crate::meldung::repo::anlegen(
+            &pool,
+            einsatz,
+            benutzer,
+            crate::meldung::repo::MeldungDaten {
+                absender: "Florian Nord 1",
+                empfaenger: Some("ELW 1"),
+                empfaenger_funktion: None,
+                meldeweg: "funk",
+                inhalt: "Brücke gesperrt",
+                meldungsart: crate::meldung::ART_SONSTIGE,
+                prioritaet: crate::meldung::PRIO_NORMAL,
+                richtung: "intern",
+                ereigniszeit: "2026-05-23 10:00:00",
+                eingang_at: "2026-05-23 10:00:00",
+                bestaetigung_pflicht: false,
+                bestaetigung_frist_at: None,
+                einheit_id: None,
+                abschnitt_id: None,
+                geo: None,
+            },
+        )
+        .await
+        .unwrap();
+        let etb_meldung = meldung.etb_meldung_id.expect("ETB-Eintrag der Meldung");
+        let nf = crate::nachforderung::repo::create(
+            &pool,
+            einsatz,
+            benutzer,
+            crate::nachforderung::repo::NachforderungDaten {
+                art: "RTW",
+                bezeichnung: "2 RTW",
+                anzahl: Some(2),
+                adressat_kategorie: crate::nachforderung::ADRESSAT_LEITSTELLE,
+                adressat_bezeichnung: None,
+                begruendung: None,
+                prioritaet: crate::nachforderung::PRIO_NORMAL,
+                angefordert_at: "2026-05-23 10:05:00",
+                betreuungsstelle_id: None,
+            },
+        )
+        .await
+        .unwrap();
+        let etb_nf = nf
+            .etb_nachforderung_id
+            .expect("ETB-Eintrag der Nachforderung");
+
+        let einzeln = laden(&pool, etb_meldung).await.unwrap();
+        assert_eq!(einzeln.meldung_id, Some(meldung.id));
+        assert_eq!(einzeln.meldung_lfd_nr, Some(meldung.lfd_nr));
+        assert_eq!(einzeln.nachforderung_id, None);
+
+        let liste = abfrage(&pool, einsatz, &filter()).await.unwrap();
+        let aus_liste = |id: i64| liste.iter().find(|e| e.id == id).unwrap();
+        assert_eq!(aus_liste(etb_meldung).meldung_lfd_nr, Some(meldung.lfd_nr));
+        assert_eq!(aus_liste(etb_nf).nachforderung_id, Some(nf.id));
+        assert_eq!(aus_liste(etb_nf).meldung_id, None);
     }
 
     // ── Folgeaufträge (LFH-636) ─────────────────────────────────────────────────────

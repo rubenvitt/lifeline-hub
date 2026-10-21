@@ -339,3 +339,27 @@ async fn ersteller_der_s4_besetzt_bekommt_einen_hinweis() {
     assert_eq!(w.status(&w.admin, nf, "zugesagt").await, StatusCode::OK);
     assert_eq!(w.empfaenger("nachforderung_zugesagt").await, vec![w.anna]);
 }
+
+/// LLH-1104 (design.md D7): Der ETB-Eintrag einer Stufe löst keinen zweiten Hinweis aus — je
+/// Wechsel bleibt es bei einer Zeile je Empfänger, und alle Zeilen sind `nachforderung_status`.
+#[tokio::test]
+async fn etb_eintrag_der_stufe_benachrichtigt_nicht_doppelt() {
+    let w = welt().await;
+    w.s4_besetzen(w.bert).await;
+    let nf = w.anfordern(&w.cookie("annika").await).await;
+    assert_eq!(w.status(&w.admin, nf, "zugesagt").await, StatusCode::OK);
+    let stufen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM etb_eintrag WHERE nachforderung_id = ? AND typ = 'system'",
+    )
+    .bind(nf)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert_eq!(stufen, 1, "die Stufe steht im ETB");
+    let zeilen = w.zeilen().await;
+    assert_eq!(zeilen.len(), 2, "Ersteller und S4, je einmal: {zeilen:?}");
+    assert!(
+        zeilen.iter().all(|z| z.1 == "nachforderung_status"),
+        "{zeilen:?}"
+    );
+}

@@ -813,13 +813,27 @@ pub async fn setze_eskaliert(
     Ok(rows.rows_affected() > 0)
 }
 
+/// Ergebnis von [`als_lagerelevant`]: die Lagemeldung (seit LLH-1031 die Meldungs-id selbst,
+/// LLH-1027 D6) und, bei der ersten Übergabe einer Meldung, die keine Lagemeldung ist, der
+/// Systemeintrag im ETB (für das Live-Ereignis).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LageUebergabe {
+    pub lage_id: i64,
+    pub etb_id: Option<i64>,
+}
+
 /// Übernimmt eine Meldung in die Lage (LFH-95; seit LLH-1031 Spalten der Meldung, LLH-1027 D5):
 /// setzt `lagerelevant = 1`, beim ersten Mal Zeitpunkt und Person der Übernahme. `text` ist der
 /// Lage-Text (Vorgabe des Handlers: der Wortlaut); gleich dem Wortlaut wird er als NULL
 /// gespeichert, der Wortlaut gilt. Verortet wird nur, solange keine Verortung besteht
 /// („Später nicht änderbar“). Idempotent: eine erneute Übernahme legt nichts Neues an; ändert sie
-/// den Lage-Text, ist die Lagemeldung wieder neu (LLH-1206, D3). Alle Ausdrücke lesen den Stand
-/// VOR dem Update (SQLite). `NotFound`, wenn die Meldung nicht zum Einsatz gehört.
+/// den Lage-Text, ist die Lagemeldung wieder neu (LLH-1206, D3). Alle Ausdrücke des Updates lesen
+/// den Stand VOR dem Update (SQLite). `NotFound`, wenn die Meldung nicht zum Einsatz gehört.
+///
+/// Die ERSTE Übergabe schreibt „Meldung #12 an die Lage übergeben“ als Systemeintrag mit
+/// Verweis auf die Meldung (LLH-1104 D8), unabhängig vom Auto-ETB-Schalter; nicht für die Art
+/// „Lagemeldung“, die ab der Anlage in der Lage steht und ihren Lage-Eintrag über das Auto-ETB
+/// trägt (LLH-1027 D3). Atomar (Tx): ein Teilfehler rollt Übernahme und ETB-Eintrag zurück.
 pub async fn als_lagerelevant(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -827,33 +841,61 @@ pub async fn als_lagerelevant(
     von_id: i64,
     text: &str,
     geo: Option<(f64, f64)>,
-) -> Result<(), AppError> {
-    let rows = sqlx::query(
-        "UPDATE meldung SET \
-           lage_gesehen_at = CASE WHEN lagerelevant = 1 AND COALESCE(lage_text, inhalt) = ?1 \
-                                  THEN lage_gesehen_at END, \
-           lage_gesehen_von_id = CASE WHEN lagerelevant = 1 AND COALESCE(lage_text, inhalt) = ?1 \
-                                      THEN lage_gesehen_von_id END, \
-           lage_text = NULLIF(?1, inhalt), \
-           lat = CASE WHEN lat IS NULL AND lon IS NULL THEN ?2 ELSE lat END, \
-           lon = CASE WHEN lat IS NULL AND lon IS NULL THEN ?3 ELSE lon END, \
-           lage_uebergeben_at = COALESCE(lage_uebergeben_at, datetime('now')), \
-           lage_uebergeben_von_id = COALESCE(lage_uebergeben_von_id, ?4), \
-           lagerelevant = 1 \
-         WHERE id = ?5 AND einsatz_id = ?6",
-    )
-    .bind(text)
-    .bind(geo.map(|(lat, _)| lat))
-    .bind(geo.map(|(_, lon)| lon))
-    .bind(von_id)
-    .bind(meldung_id)
-    .bind(einsatz_id)
-    .execute(pool)
-    .await?;
-    if rows.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+) -> Result<LageUebergabe, AppError> {
+    crate::write_retry!(pool, |conn| {
+        let (lfd_nr, meldungsart, schon_in_der_lage): (i64, String, bool) = sqlx::query_as(
+            "SELECT lfd_nr, meldungsart, lagerelevant = 1 FROM meldung \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(meldung_id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+        sqlx::query(
+            "UPDATE meldung SET \
+               lage_gesehen_at = CASE WHEN lagerelevant = 1 AND COALESCE(lage_text, inhalt) = ?1 \
+                                      THEN lage_gesehen_at END, \
+               lage_gesehen_von_id = CASE WHEN lagerelevant = 1 \
+                                           AND COALESCE(lage_text, inhalt) = ?1 \
+                                          THEN lage_gesehen_von_id END, \
+               lage_text = NULLIF(?1, inhalt), \
+               lat = CASE WHEN lat IS NULL AND lon IS NULL THEN ?2 ELSE lat END, \
+               lon = CASE WHEN lat IS NULL AND lon IS NULL THEN ?3 ELSE lon END, \
+               lage_uebergeben_at = COALESCE(lage_uebergeben_at, datetime('now')), \
+               lage_uebergeben_von_id = COALESCE(lage_uebergeben_von_id, ?4), \
+               lagerelevant = 1 \
+             WHERE id = ?5",
+        )
+        .bind(text)
+        .bind(geo.map(|(lat, _)| lat))
+        .bind(geo.map(|(_, lon)| lon))
+        .bind(von_id)
+        .bind(meldung_id)
+        .execute(&mut *conn)
+        .await?;
+        if schon_in_der_lage || meldungsart == super::ART_LAGEMELDUNG {
+            return Ok(LageUebergabe {
+                lage_id: meldung_id,
+                etb_id: None,
+            });
+        }
+        let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
+            .await?
+            .etb_startwert();
+        let inhalt = format!("Meldung #{lfd_nr} an die Lage übergeben");
+        let etb_id =
+            crate::etb::system_audit_tx(&mut *conn, einsatz_id, von_id, startwert, &inhalt).await?;
+        sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
+            .bind(meldung_id)
+            .bind(etb_id)
+            .execute(&mut *conn)
+            .await?;
+        Ok(LageUebergabe {
+            lage_id: meldung_id,
+            etb_id: Some(etb_id),
+        })
+    })
 }
 
 /// Erteilt aus einer eingegangenen Meldung einen Auftrag (LFH-113) — in EINEM Commit:
@@ -1841,9 +1883,10 @@ mod tests {
         )
         .await
         .unwrap();
-        als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None)
+        let uebergabe = als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None)
             .await
             .unwrap();
+        assert_eq!(uebergabe.lage_id, m.id);
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert!(nach.lagerelevant);
         let liste = liste_lage_meldungen(&pool, e).await.unwrap();
@@ -1852,6 +1895,78 @@ mod tests {
         assert_eq!(liste[0].meldung_lfd_nr, m.lfd_nr);
         assert_eq!(liste[0].meldung_absender, "Florian Nord 1");
         assert_eq!(liste[0].text, "Brücke gesperrt");
+    }
+
+    /// LLH-1104 D8: Die erste Übergabe in die Lage steht als Systemeintrag mit Verweis auf die
+    /// Meldung im ETB; eine erneute Übergabe schreibt nichts mehr.
+    #[tokio::test]
+    async fn uebergabe_in_die_lage_steht_einmal_im_etb() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten(
+                "Brücke gesperrt",
+                "2026-06-12 09:00:00",
+                "2026-06-12 09:00:00",
+            ),
+        )
+        .await
+        .unwrap();
+        let erste = als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None)
+            .await
+            .unwrap();
+        let etb_id = erste.etb_id.expect("Systemeintrag der Übergabe");
+        let (typ, inhalt, verweis): (String, String, Option<i64>) =
+            sqlx::query_as("SELECT typ, inhalt, meldung_id FROM etb_eintrag WHERE id = ?")
+                .bind(etb_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(typ, "system");
+        assert_eq!(
+            inhalt,
+            format!("Meldung #{} an die Lage übergeben", m.lfd_nr)
+        );
+        assert_eq!(verweis, Some(m.id));
+
+        let zweite = als_lagerelevant(&pool, e, m.id, b, "Brücke wieder frei", None)
+            .await
+            .unwrap();
+        assert_eq!(zweite.etb_id, None, "erneute Übergabe schreibt nicht");
+        let system: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system'",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(system, 1);
+    }
+
+    /// LLH-1104 D8 (Schnittkante LLH-1027 D3): eine Lagemeldung hat ihren Lage-Eintrag schon über
+    /// das Auto-ETB; ihre Übergabe schreibt keinen zweiten.
+    #[tokio::test]
+    async fn uebergabe_einer_lagemeldung_schreibt_kein_etb() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            MeldungDaten {
+                meldungsart: crate::meldung::ART_LAGEMELDUNG,
+                ..daten("Lage ruhig", "2026-06-12 09:00:00", "2026-06-12 09:00:00")
+            },
+        )
+        .await
+        .unwrap();
+        let ergebnis = als_lagerelevant(&pool, e, m.id, b, "Lage ruhig", None)
+            .await
+            .unwrap();
+        assert_eq!(ergebnis.etb_id, None);
     }
 
     /// Spec `meldungseingang`, „Rückmeldung mit Lageinhalt“: eigener Lage-Text und Ort, der
@@ -1919,9 +2034,10 @@ mod tests {
             .await
             .unwrap();
         let erst = liste_lage_meldungen(&pool, e).await.unwrap();
-        als_lagerelevant(&pool, e, m.id, b, "zweite", None)
+        let zweite = als_lagerelevant(&pool, e, m.id, b, "zweite", None)
             .await
             .unwrap();
+        assert_eq!(zweite.lage_id, m.id, "Kennung ist die Meldung");
         let zweit = liste_lage_meldungen(&pool, e).await.unwrap();
         assert_eq!(zweit.len(), 1, "eine Lagemeldung je Meldung");
         assert_eq!(
