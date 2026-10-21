@@ -28,7 +28,7 @@ import {
   standFeld,
   verwerfeStandGeleerter,
   type Staende,
-} from '../lageberichte/uebernahmeStand';
+} from '../lageberichte/standFeld';
 import { UEBERNAHMEN, uebernahmeFuer } from '../lageberichte/uebernahmen';
 import { einstiegsAbschnitt } from '../entwurf/Einstiegsfokus';
 import FreigabeDialog from '../entwurf/FreigabeDialog';
@@ -63,7 +63,7 @@ import './lageberichtPrint.css';
  * beim Senden — `anzeige/zeitEingabe.ts`), je Abschnitt der Markdown-Text unter seinem Schlüssel,
  * der Verteiler (LLH-1172) und je Abschnitt mit Quelle der Stand der Übernahme (LLH-1357). Kein
  * Abschnitt heißt `titel`, `verteiler` oder `uebernommen_at` (`entwurf/verteilerField.guard.test.ts`,
- * `lageberichte/uebernahmeStand.test.ts`).
+ * `lageberichte/standFeld.test.ts`).
  */
 type FormWerte = {
   titel: string;
@@ -112,7 +112,7 @@ function LageberichtDetail() {
   // frühen Rückgaben (Hook-Reihenfolge).
   const vorlageKey = berichtQuery.data?.vorlage;
   // Ab hier gilt ein Stand der Übernahme als „aus der Vorfassung“ (LLH-1357,
-  // `lageberichte/uebernahmeStand.ts:isAusVorfassung`): das Anlegen der Fortschreibung. Primitiv
+  // `lageberichte/standFeld.ts:isAusVorfassung`): das Anlegen der Fortschreibung. Primitiv
   // für die `aktion` (Render-Zähler-Gate).
   const standGrenze =
     berichtQuery.data?.vorgaenger_id != null ? berichtQuery.data.erstellt_at : undefined;

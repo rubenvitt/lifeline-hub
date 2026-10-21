@@ -12,7 +12,7 @@ import { alsBackendZeit } from '../anzeige/zeitEingabe';
 
 /**
  * Formularfeld der Stände: `['uebernommen_at', <schlüssel>]`, neben den Abschnitten als Feldern der
- * obersten Ebene. Kein Abschnitt einer Vorlage heißt so (`uebernahmeStand.test.ts`).
+ * obersten Ebene. Kein Abschnitt einer Vorlage heißt so (`standFeld.test.ts`).
  */
 export const UEBERNOMMEN_FIELD = 'uebernommen_at';
 

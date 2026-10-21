@@ -7,7 +7,7 @@ import {
   standFeld,
   standJetzt,
   verwerfeStandGeleerter,
-} from './uebernahmeStand';
+} from './standFeld';
 
 afterEach(() => {
   vi.useRealTimers();

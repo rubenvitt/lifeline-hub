@@ -71,7 +71,7 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   Abschnitt, ohne Abruf der gesperrten Quelle.
 - **Stand der Übernahme** (LLH-1357, Spec `lagevortrag-uebernahme`): Jeder dieser Füllwege setzt
   mit dem Text `uebernommen_at` am Abschnitt (Wire-Format, nur über
-  `lageberichte/uebernahmeStand.ts`); er steht im JSON der Abschnitte, keine Spalte, und das
+  `lageberichte/standFeld.ts`); er steht im JSON der Abschnitte, keine Spalte, und das
   Fortschreiben trägt ihn mit. Im Formular unter `['uebernommen_at', <schlüssel>]`, eingehängt als
   `Form.Item` um die Marke `lageberichte/UebernahmeStand.tsx` an der `aktion` (nur Abschnitte mit
   Quelle); ein geleerter Abschnitt verliert ihn (`onValuesChange`, Server ebenso). Auffällig „aus

@@ -8,7 +8,7 @@ import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useRollen } from '../components/instrument';
 import type { UebernahmeQuelle, Verfuegbarkeit } from './uebernahmeQuelle';
-import { standFeld, standJetzt } from './uebernahmeStand';
+import { standFeld, standJetzt } from './standFeld';
 
 /**
  * Übernahme-Knopf über einem Abschnitt eines Lagevortrag-Entwurfs (LFH-870, Spec
@@ -24,7 +24,7 @@ import { standFeld, standJetzt } from './uebernahmeStand';
  *   Rückgängig.
  * - Ändert nur das Formular und meldet die Änderung an den Verlustschutz (`onGeaendert`);
  *   gespeichert wird mit dem nächsten Speichern bzw. Autosave. Mit dem Text setzt sie den Stand
- *   der Übernahme (`lageberichte/uebernahmeStand.ts`, LLH-1357).
+ *   der Übernahme (`lageberichte/standFeld.ts`, LLH-1357).
  *
  * Die Seite rendert den Baustein nur im Schreibzweig (Entwurf und Schreibrecht).
  */

@@ -4,7 +4,7 @@ import type { LageberichtAbschnitt, LageberichtVorlageKey, ModulFreigaben } from
 import { ZUSTAND_GRUND } from '../stab/funkplan';
 import type { UebernahmeKontext, UebernahmeQuelle } from './uebernahmeQuelle';
 import { UEBERNAHMEN } from './uebernahmen';
-import { standJetzt } from './uebernahmeStand';
+import { standJetzt } from './standFeld';
 import { vorlage } from './vorlagen';
 
 /**

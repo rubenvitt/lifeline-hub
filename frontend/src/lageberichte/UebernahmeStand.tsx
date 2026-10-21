@@ -1,7 +1,7 @@
 import { Typography } from 'antd';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { useRollen } from '../components/instrument';
-import { isAusVorfassung } from './uebernahmeStand';
+import { isAusVorfassung } from './standFeld';
 
 /** Wortlaut — exportiert, damit Tests ihn nicht nachschreiben. */
 export const STAND_DER_UEBERNAHME = 'Stand der Übernahme';
@@ -13,7 +13,7 @@ export const AUS_DER_VORFASSUNG = 'aus der Vorfassung';
  * so ist das Feld eingehängt und wird mitgespeichert, und nur die Marke rendert, wenn ihr Stand
  * wechselt. Ohne Stand steht nichts.
  *
- * Stammt der Stand aus der Vorfassung (`lageberichte/uebernahmeStand.ts:isAusVorfassung`), ist er
+ * Stammt der Stand aus der Vorfassung (`lageberichte/standFeld.ts:isAusVorfassung`), ist er
  * auffällig: Achtungsfarbe, halbfett, und als zweiter Kanal Zeichen und Wörter „aus der
  * Vorfassung“ (WCAG 1.4.1). Nicht auf Papier: dort trägt der Text seinen Stand selbst.
  */

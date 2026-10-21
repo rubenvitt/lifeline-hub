@@ -6,7 +6,7 @@ import { taktischeDtgVoll } from '../anzeige/format';
 import { useRollen } from '../components/instrument';
 import { loadAbschnittTexte } from './startinhalt';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
-import { standFeld } from './uebernahmeStand';
+import { standFeld } from './standFeld';
 
 /** Beschriftung — exportiert, damit Tests sie nicht nachschreiben. */
 export const LEERE_FUELLEN = 'Leere Abschnitte aus dem Lagebild füllen';

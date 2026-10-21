@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react';
 import { Form } from 'antd';
 import { renderMitProviders } from '../test/utils';
 import UebernahmeStand, { AUS_DER_VORFASSUNG, STAND_DER_UEBERNAHME } from './UebernahmeStand';
-import { UEBERNOMMEN_FIELD, standFeld } from './uebernahmeStand';
+import { UEBERNOMMEN_FIELD, standFeld } from './standFeld';
 
 function Probe({ stand, grenze }: { stand?: string; grenze?: string }) {
   const [form] = Form.useForm();

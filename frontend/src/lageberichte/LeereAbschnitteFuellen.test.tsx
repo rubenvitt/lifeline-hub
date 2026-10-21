@@ -7,7 +7,7 @@ import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import LeereAbschnitteFuellen, { LEERE_FUELLEN } from './LeereAbschnitteFuellen';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
-import { standFeld } from './uebernahmeStand';
+import { standFeld } from './standFeld';
 
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 

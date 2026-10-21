@@ -8,7 +8,7 @@ import { freigabenFixture } from '../test/fixtures';
 import AbschnittUebernahme from './AbschnittUebernahme';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
-import { standFeld } from './uebernahmeStand';
+import { standFeld } from './standFeld';
 
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
