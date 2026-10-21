@@ -7,11 +7,11 @@ quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPa
 
 ## Überblick
 
-Das Modul „Meldungen (eingehend)“ sammelt, was von außen oder aus den eigenen Einheiten an die
-Führung kommt: Funksprüche, Anrufe, persönliche Meldungen. Jede Meldung hat einen Wortlaut, einen
-Absender, auf Wunsch einen Empfänger und eine Empfängerfunktion, eine Meldungsart und eine
-Priorität. Sie durchläuft die
-Stufen **Neu**, **Gesichtet**, **In Bearbeitung** und **Erledigt**.
+Das Modul „Meldungen“ sammelt, was von außen oder aus den eigenen Einheiten an die Führung kommt:
+Funksprüche, Anrufe, persönliche Meldungen. Auch was die Führung nach außen meldet, etwa eine
+Lagemeldung an die übergeordnete Stelle, steht hier, mit der Richtung „Extern“. Jede Meldung hat
+einen Wortlaut, einen Absender, auf Wunsch einen Empfänger und eine Empfängerfunktion, eine
+Meldungsart und eine Priorität. Sie durchläuft die Stufen **Neu**, **Gesichtet**, **In Bearbeitung** und **Erledigt**.
 
 Eine **Sofortmeldung** verlangt eine Bestätigung. Bleibt sie über die Frist hinaus unbestätigt,
 schlägt die App Alarm.
@@ -23,7 +23,7 @@ Führungspersonal, solange der Einsatz läuft (siehe [Rechte im Einsatz](rechte-
 
 ### Meldungen sichten und abarbeiten
 
-1. Im Einsatz das Modul „Meldungen (eingehend)“ öffnen. Oben stehen die Kennzahlen
+1. Im Einsatz das Modul „Meldungen“ öffnen. Oben stehen die Kennzahlen
    „Unbearbeitet“, „In Arbeit“, „Bestätigung überfällig“ und „Erledigt“.
 
    ![Meldungen mit Kennzahlen, den Ansichten „Offen“ und „Abgeschlossen“ und offenen Meldungskarten mit „Sichten“ und „Bearbeiter zuweisen“](../bilder/meldungen/meldungen-liste.png)
@@ -43,8 +43,8 @@ Für Einsatzleitung und Führungspersonal:
 
 1. „Meldung erfassen“ wählen. Das Formular „Neue Meldung erfassen“ öffnet sich über der Liste.
 2. Für eine eilige Meldung „Sofortmeldung“ wählen; das setzt Meldungsart und Priorität auf
-   „Sofort“ und schaltet die Bestätigung ein. „Lagemeldung (extern)“ belegt die Meldungsart
-   „Lagemeldung“ und die Richtung „Extern“ vor.
+   „Sofort“ und schaltet die Bestätigung ein. „Lagemeldung an übergeordnete Stelle“ belegt die
+   Meldungsart „Lagemeldung“ und die Richtung „Extern“ vor.
 
    ![Formular „Neue Meldung erfassen“ als Sofortmeldung mit Wortlaut, Absender, Empfängerfunktion, Empfänger und aufgeklappten weiteren Angaben samt Bestätigungsschalter](../bilder/meldungen/meldung-erfassen.png)
 
@@ -57,7 +57,7 @@ Für Einsatzleitung und Führungspersonal:
    der Bestätigung setzen.
 5. „Meldung erfassen“ wählen.
 
-Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, ohne Übergabe; bei
+Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, auch nach außen; bei
 dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)“ (Kapitel
 [Lagemeldungen](lagemeldungen.md)).
 
@@ -83,20 +83,20 @@ Meldung, die schon gesichtet, in Bearbeitung oder erledigt ist, behält ihre Stu
 Kommt die Meldung nicht schnell genug vom Server, steht der Alarm ohne Inhalt da:
 „Sofortmeldung eingegangen“ mit „Meldung #…“.
 
-### Eine Meldung an die Lage übergeben
+### Eine Meldung in die Lage übernehmen
 
 Für Einsatzleitung und Führungspersonal:
 
-1. An der Karte „An Lage übergeben“ wählen. Hat die Karte viele Aktionen, steht der Punkt in
+1. An der Karte „In die Lage übernehmen“ wählen. Hat die Karte viele Aktionen, steht der Punkt in
    ihrem Menü.
-2. Im Dialog „An die Lage übergeben“ den „Lage-Text“ prüfen; leer bleibt der Wortlaut der
+2. Im Dialog „In die Lage übernehmen“ den „Lage-Text“ prüfen; leer bleibt der Wortlaut der
    Meldung.
 3. Bei Bedarf unter „Verortung (optional)“ einen Ort setzen. Er ist später nicht änderbar.
-4. „Übergeben“ wählen.
+4. „Übernehmen“ wählen. Die App meldet „In die Lage übernommen“.
 
-Die Meldung trägt danach „Lagerelevant ✓“ und erscheint in den Lagemeldungen (Kapitel
+Die Meldung trägt danach „In der Lage ✓“ und erscheint in den Lagemeldungen (Kapitel
 [Lagemeldungen](lagemeldungen.md)); verortet auch auf der Lagekarte. Eine Lagemeldung trägt
-„Lagerelevant ✓“ von Anfang an und bietet „An Lage übergeben“ nicht an.
+„In der Lage ✓“ von Anfang an und bietet „In die Lage übernehmen“ nicht an.
 
 ### Aus einer Meldung einen Auftrag erteilen
 
@@ -158,7 +158,7 @@ Trägt eine Meldung eine Empfängerfunktion, erhalten beim Erfassen die Personen
 den Hinweis **„Neue Meldung“** mit der Nummer der Meldung, etwa „Meldung #12“, und einem Sprung
 zu ihr. Wer eine Funktion besetzt, steht in der Stab-Besetzung; ist die Funktion dort nicht
 besetzt oder ihr Personal mit keinem Konto verknüpft, gilt die Funktion in der Mitgliedschaft
-des Einsatzes. Wer das Modul „Meldungen (eingehend)“ nicht sehen darf, bekommt keinen Hinweis.
+des Einsatzes. Wer das Modul „Meldungen“ nicht sehen darf, bekommt keinen Hinweis.
 
 - Ohne Empfängerfunktion bleibt die Meldung still, auch wenn im freien Empfänger „S2“ steht.
 - Eine Sofortmeldung an eine Funktion löst nur ihren Alarm aus, keinen zweiten Hinweis.
@@ -172,13 +172,14 @@ Empfängerfunktion einer Meldung; für sie bleibt der freie Empfänger.
 
 ### Meldungen im Einsatztagebuch
 
-Jede erfasste Meldung schreibt einen ETB-Eintrag vom Typ „Meldung“ mit Absender und Empfänger,
-solange „Automatische ETB-Einträge“ nicht ausgeschaltet ist (siehe
-[Einsatztagebuch](einsatztagebuch.md)). Der Eintrag trägt den Verweis „Meldung #12 ↗“ zurück auf
+Jede erfasste Meldung schreibt einen ETB-Eintrag mit Absender und Empfänger, eine Lagemeldung
+vom Typ „Lage“, jede andere vom Typ „Meldung“, solange „Automatische ETB-Einträge“ nicht
+ausgeschaltet ist (siehe [Einsatztagebuch](einsatztagebuch.md)). Der Eintrag trägt den Verweis „Meldung #12 ↗“ zurück auf
 die Meldung.
 
-Die erste Übergabe an die Lage schreibt immer den Systemeintrag „Meldung #12 an die Lage
-übergeben“; eine erneute Übergabe und die Übergabe einer Lagemeldung schreiben keinen.
+Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12 in die Lage
+übernommen“; eine erneute Übernahme schreibt keinen, eine Lagemeldung ebenfalls nicht. Einträge
+aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 
 ### Ohne Netz
 
