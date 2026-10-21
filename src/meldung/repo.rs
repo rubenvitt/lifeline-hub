@@ -692,8 +692,11 @@ pub async fn weise_bearbeiter(
 /// objekt_typ='meldung') **atomar einmalig** und schließt eine etwaige offene Auto-Frist-
 /// Erinnerung des Bezugs (stoppt Nachfass/Eskalation). Liefert `true`, wenn DIESER Aufruf
 /// bestätigt hat; `false`, wenn bereits bestätigt war (→ Handler antwortet 422, ohne TOCTOU).
-/// Der Triage-`status` bleibt unangetastet (eigene Achse, vgl. patch-xor-effektivzustand);
-/// ein etwaiges `eskaliert`-Flag wird mit der Bestätigung zurückgesetzt (Daten-Hygiene + Sortierung).
+/// Der Triage-`status` ist eine eigene Achse (vgl. patch-xor-effektivzustand) mit einer
+/// Ausnahme: eine Meldung im Status `neu` geht auf `gesichtet` — wer den Empfang bestätigt,
+/// hat sie gesehen (LLH-1052, Spec `benachrichtigungen`, „Bestätigen sichtet die
+/// Sofortmeldung“). Spätere Status bleiben. Ein etwaiges `eskaliert`-Flag wird mit der
+/// Bestätigung zurückgesetzt (Daten-Hygiene + Sortierung).
 pub async fn bestaetige(
     pool: &SqlitePool,
     org_id: i64,
@@ -740,11 +743,18 @@ pub async fn bestaetige_tx(
     )
     .await?;
     // Eskalations-Residuum loeschen: nach Bestaetigung ist die Meldung nicht mehr
-    // `eskaliert`. Quittung, Reminder-Abschluss und dieses Flag teilen einen Commit.
-    sqlx::query("UPDATE meldung SET eskaliert = 0 WHERE id = ?")
-        .bind(meldung_id)
-        .execute(&mut *conn)
-        .await?;
+    // `eskaliert`. Aus `neu` wird `gesichtet`, jeder spätere Status bleibt. Quittung,
+    // Reminder-Abschluss, Flag und Status teilen einen Commit.
+    sqlx::query(
+        "UPDATE meldung SET eskaliert = 0, \
+         status = CASE WHEN status = ? THEN ? ELSE status END \
+         WHERE id = ?",
+    )
+    .bind(super::STATUS_NEU)
+    .bind(super::STATUS_GESICHTET)
+    .bind(meldung_id)
+    .execute(&mut *conn)
+    .await?;
     Ok(true)
 }
 
@@ -1912,6 +1922,59 @@ mod tests {
             "Triage-Status bleibt unberührt"
         );
         assert_eq!(nach.bearbeiter_id, Some(b), "Zuweisung bleibt erhalten");
+    }
+
+    /// Wer den Empfang bestätigt, hat die Meldung gesehen (LLH-1052, Spec `benachrichtigungen`,
+    /// „Bestätigen sichtet die Sofortmeldung“): aus `neu` wird `gesichtet`, im selben Commit.
+    #[tokio::test]
+    async fn bestaetige_hebt_neu_auf_gesichtet() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten_pflicht("Sofort", "2026-06-12 09:00:00", "2026-06-12 09:05:00"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(m.status, MeldungStatus::Neu);
+
+        assert!(bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:01:00")
+            .await
+            .unwrap());
+        let nach = laden(&pool, m.id, "2026-06-12 09:02:00").await.unwrap();
+        assert!(nach.ist_bestaetigt);
+        assert_eq!(nach.status, MeldungStatus::Gesichtet);
+        assert_eq!(nach.erledigt_at, None, "Sichten ist kein Erledigen");
+    }
+
+    /// Eine schon gesichtete oder erledigte Meldung behält beim Bestätigen ihren Status.
+    #[tokio::test]
+    async fn bestaetige_laesst_spaetere_status_stehen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        for status in [
+            crate::meldung::STATUS_GESICHTET,
+            crate::meldung::STATUS_ERLEDIGT,
+        ] {
+            let m = anlegen(
+                &pool,
+                e,
+                b,
+                daten_pflicht(status, "2026-06-12 09:00:00", "2026-06-12 09:05:00"),
+            )
+            .await
+            .unwrap();
+            setze_status(&pool, m.id, status, "2026-06-12 09:00:30")
+                .await
+                .unwrap();
+            assert!(bestaetige(&pool, 1, e, m.id, b, "2026-06-12 09:01:00")
+                .await
+                .unwrap());
+            let nach = laden(&pool, m.id, "2026-06-12 09:02:00").await.unwrap();
+            assert_eq!(nach.status.as_str(), status);
+        }
     }
 
     #[tokio::test]

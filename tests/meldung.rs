@@ -1170,6 +1170,8 @@ async fn bestaetigen_setzt_quittung_und_doppelt_ist_422() {
     assert_eq!(json["ist_bestaetigt"], true);
     assert!(json["bestaetigt_at"].is_string());
     assert_eq!(json["bestaetigt_von_name"], "Administrator");
+    // Wer den Empfang bestätigt, hat sie gesehen (LLH-1052): aus „neu“ wird „gesichtet“.
+    assert_eq!(json["status"], "gesichtet");
 
     // Nachfass-Erinnerung ist nach Bestätigung nicht mehr offen.
     let (_, erinn) = anfrage(
