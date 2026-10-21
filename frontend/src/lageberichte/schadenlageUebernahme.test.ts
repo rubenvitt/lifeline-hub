@@ -3,10 +3,17 @@ import { QueryClient } from '@tanstack/react-query';
 import { ladeEinsatz } from '../api/einsaetze';
 import { listePersonen } from '../api/einsatzPerson';
 import { listeSchadenMarker } from '../api/einsatzSchaden';
-import { ladeGefahrengebiete } from '../api/gefahren';
+import { ladeGefahrengebiete, ladeMatrix } from '../api/gefahren';
 import { listePegel } from '../api/pegel';
 import { einsatzKeys } from '../api/queryKeys';
-import type { EinsatzAnzeige, PegelAnzeige, Person, Schaden, WetterAnzeige } from '../api/types';
+import type {
+  EinsatzAnzeige,
+  GefahrBewertung,
+  PegelAnzeige,
+  Person,
+  Schaden,
+  WetterAnzeige,
+} from '../api/types';
 import { ladeWetter } from '../api/wetter';
 import { baueLagebild, kennzahlReihe, type Rohdaten } from '../pages/lage-dashboard/lagebild';
 import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/vorbereitung';
@@ -16,7 +23,11 @@ import { SCHADENLAGE_QUELLE } from './schadenlageUebernahme';
 vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
 vi.mock('../api/einsatzPerson', () => ({ listePersonen: vi.fn() }));
 vi.mock('../api/einsatzSchaden', () => ({ listeSchadenMarker: vi.fn() }));
-vi.mock('../api/gefahren', () => ({ ladeGefahrengebiete: vi.fn() }));
+vi.mock('../api/gefahren', async (original) => ({
+  ...(await original<typeof import('../api/gefahren')>()),
+  ladeGefahrengebiete: vi.fn(),
+  ladeMatrix: vi.fn(),
+}));
 vi.mock('../api/pegel', async () => {
   const { einsatzKeys } = await import('../api/queryKeys');
   const listePegel = vi.fn();
@@ -77,10 +88,42 @@ const SCHAEDEN = [
   { id: 3, status: 'abgeschlossen' },
 ] as unknown as Schaden[];
 const GEFAHREN = [
-  { id: 1, name: 'Zone A', hoechste_warnstufe: 'hoch' },
-  { id: 2, name: 'Zone B', hoechste_warnstufe: 'niedrig' },
-  { id: 3, name: 'Zone C', hoechste_warnstufe: 'keine' },
+  { id: 1, label: 'Zone A', hoechste_warnstufe: 'hoch', beurteilt_at: '2026-10-04 08:00:00' },
+  { id: 2, label: 'Zone B', hoechste_warnstufe: 'niedrig' },
+  { id: 3, label: null, hoechste_warnstufe: 'keine', beurteilt_at: '2026-10-04 08:00:00' },
 ] as unknown as Rohdaten['gefahren'];
+
+const bewertung = (over: Partial<GefahrBewertung>): GefahrBewertung => ({
+  id: 1,
+  gefahrengebiet_id: 1,
+  gefahrentyp: 'brand',
+  schutzobjekt: 'menschen',
+  warnstufe: 'keine',
+  beschreibung: null,
+  gemeldet_von: null,
+  aktualisiert_von: 1,
+  aktualisiert_von_name: 'Erika Muster',
+  erstellt_at: '',
+  geaendert_at: '',
+  ...over,
+});
+
+/** Matrizen je Gebiet: Zone A mit Erläuterungen, Zone B nur eine Stufe, Gebiet 3 leer. */
+const MATRIZEN: Record<number, GefahrBewertung[]> = {
+  1: [
+    bewertung({
+      id: 11,
+      gefahrentyp: 'elektrizitaet',
+      warnstufe: 'hoch',
+      beschreibung: 'Stromführende Kellerverteilungen\nunter *Wasser*',
+      gemeldet_von: 'Herr Schmidt',
+    }),
+    bewertung({ id: 12, gefahrentyp: 'absturz', beschreibung: 'Hangkante geprüft' }),
+    bewertung({ id: 13, gefahrentyp: 'einsturz' }),
+  ],
+  2: [bewertung({ id: 21, gefahrengebiet_id: 2, gefahrentyp: 'ertrinken', warnstufe: 'niedrig' })],
+  3: [],
+};
 
 const PEGEL = [
   {
@@ -191,6 +234,9 @@ beforeEach(() => {
   vi.mocked(listePersonen).mockReset().mockResolvedValue(PERSONEN);
   vi.mocked(listeSchadenMarker).mockReset().mockResolvedValue(SCHAEDEN);
   vi.mocked(ladeGefahrengebiete).mockReset().mockResolvedValue(GEFAHREN);
+  vi.mocked(ladeMatrix)
+    .mockReset()
+    .mockImplementation(async (_e, gid) => MATRIZEN[gid] ?? []);
   vi.mocked(listePegel).mockReset().mockResolvedValue(PEGEL);
   vi.mocked(ladeWetter).mockReset().mockResolvedValue(WETTER);
 });
@@ -348,8 +394,11 @@ describe('Gefahren-/Schadenlage (LFH-872)', () => {
 
   it('übernimmt keine Personen- oder Schadensfelder', async () => {
     const text = await erzeuge();
+    // „Herr Schmidt“ steht auch als „gemeldet von“ an einer Bewertung: Dritte bleiben draußen.
     for (const f of FREITEXT) expect(text).not.toContain(f);
-    expect(text).not.toContain('Zone A');
+    expect(text).not.toContain('gemeldet von');
+    // Ebenso der Name der letzten Änderung.
+    expect(text).not.toContain('Erika');
   });
 
   it('der Stand ist der älteste Abruf der gelesenen Quellen, nicht der Klick', async () => {
@@ -358,6 +407,68 @@ describe('Gefahren-/Schadenlage (LFH-872)', () => {
     qc.setQueryData(einsatzKeys.personen(1), PERSONEN, { updatedAt: alt });
     const text = await erzeuge(freigabenFixture(), qc);
     expect(text.split('\n')[0]).toBe(`**Stand:** DTG(${new Date(alt).toISOString()})`);
+  });
+
+  describe('Gefahrengebiete mit Erläuterungen (LLH-1110)', () => {
+    it('nennt je Gebiet die gesetzten Gefahren mit Stufe und Erläuterung, alphabetisch', async () => {
+      const text = await erzeuge();
+      expect(text).toContain(
+        '**Gefahrengebiete**\n' +
+          '- Zone A\n' +
+          '  - Absturz × Menschen: keine · Hangkante geprüft\n' +
+          '  - Elektrizität × Menschen: hoch · Stromführende Kellerverteilungen unter \\*Wasser\\*\n' +
+          '- Zone B (nicht beurteilt)\n' +
+          '  - Ertrinken × Menschen: niedrig\n' +
+          '- Gefahrengebiet #3: keine Gefahr über „keine“\n',
+      );
+      // „keine“ ohne Erläuterung sagt nichts.
+      expect(text).not.toContain('Einsturz');
+    });
+
+    it('steht nach „Schäden und Gefahren“ und vor dem Wetter', async () => {
+      const text = await erzeuge();
+      expect(text.indexOf('**Schäden und Gefahren**')).toBeLessThan(
+        text.indexOf('**Gefahrengebiete**'),
+      );
+      expect(text.indexOf('**Gefahrengebiete**')).toBeLessThan(text.indexOf('**Wetter**'));
+    });
+
+    it('Gefahren gesperrt: „— (nicht freigegeben)“ ohne Abruf von Gebieten und Matrizen', async () => {
+      const text = await erzeuge(freigabenFixture({ gefahrenzonen: { zugriff: false } }));
+      expect(ladeGefahrengebiete).not.toHaveBeenCalled();
+      expect(ladeMatrix).not.toHaveBeenCalled();
+      expect(text).toContain('**Gefahrengebiete**\n- — (nicht freigegeben)\n');
+    });
+
+    it('eine gescheiterte Matrix steht mit Grund am Gebiet, die übrigen tragen ihre Werte', async () => {
+      vi.mocked(ladeMatrix).mockImplementation(async (_e, gid) => {
+        if (gid === 2) throw new Error('500');
+        return MATRIZEN[gid] ?? [];
+      });
+      const text = await erzeuge();
+      expect(text).toContain('- Zone B (nicht beurteilt): — (nicht geladen)\n');
+      expect(text).toContain('  - Elektrizität × Menschen: hoch');
+    });
+
+    it('eine gescheiterte Gebietsliste fragt keine Matrix und nennt den Grund', async () => {
+      vi.mocked(ladeGefahrengebiete).mockRejectedValue(new Error('500'));
+      const text = await erzeuge();
+      expect(ladeMatrix).not.toHaveBeenCalled();
+      expect(text).toContain('**Gefahrengebiete**\n- — (nicht geladen)\n');
+    });
+
+    it('ohne Gebiete: „keine Gefahrengebiete“', async () => {
+      vi.mocked(ladeGefahrengebiete).mockResolvedValue([]);
+      expect(await erzeuge()).toContain('**Gefahrengebiete**\n- keine Gefahrengebiete\n');
+    });
+
+    it('der Stand berücksichtigt auch den Abruf der Matrizen', async () => {
+      const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
+      const alt = JETZT - 20 * 60_000;
+      qc.setQueryData(einsatzKeys.gefahrenmatrix(1, 2), MATRIZEN[2], { updatedAt: alt });
+      const text = await erzeuge(freigabenFixture(), qc);
+      expect(text.split('\n')[0]).toBe(`**Stand:** DTG(${new Date(alt).toISOString()})`);
+    });
   });
 
   describe('verfuegbar', () => {

@@ -42,7 +42,7 @@ describe('GefahrenZelleDetails', () => {
     const { rerender } = renderMitProviders(
       dialog({ zelle: zelle({ beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW' }) }),
     );
-    expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
+    expect(await screen.findByLabelText('Erläuterung')).toHaveValue('Dachstuhl');
 
     rerender(
       dialog({
@@ -56,7 +56,7 @@ describe('GefahrenZelleDetails', () => {
         }),
       }),
     );
-    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Weidezaun');
+    expect(screen.getByLabelText('Erläuterung')).toHaveValue('Weidezaun');
     expect(screen.getByLabelText('Gemeldet von')).toHaveValue('');
   });
 
@@ -69,6 +69,6 @@ describe('GefahrenZelleDetails', () => {
       dialog({ zelle: zelle({ beschreibung: 'Dachstuhl' }) }),
     );
     rerender(dialog({ zelle: zelle({ beschreibung: 'vom Server' }) }));
-    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
+    expect(screen.getByLabelText('Erläuterung')).toHaveValue('Dachstuhl');
   });
 });

@@ -243,6 +243,13 @@ Lagekarte kann einen Abschnitt mitbringen; die Karte öffnet dann mit diesem Fok
 Ein gezeichnetes Gefahrengebiet erscheint im Kapitel [Gefahren](gefahren.md) und wird dort
 bewertet und benannt. Auf der Karte trägt es seinen Namen und die höchste Warnstufe als Text.
 
+Ist eine Zone eines Gefahrengebiets gewählt, nennt der Inspector unter „Gefahren“ die gesetzten
+Gefahren des Gebiets: jede Zelle der Matrix über „keine“ und jede mit Erläuterung, mit Stufe,
+Gefahr × Schutzobjekt und dem Anfang der Erläuterung, in der Folge der Matrix. Er zeigt höchstens
+fünf; bei mehr führt „alle in Gefahren ↗“ zur Matrix des Gebiets. Ohne gesetzte Gefahr steht dort
+„keine Gefahr über „keine““. Ohne Freigabe für das Modul Gefahren und in einem früheren Lagestand
+fehlt der Abschnitt.
+
 Ein neu gezeichnetes Gefahrengebiet meldet die App allen im Einsatz, die die Lagekarte lesen,
 als Hinweis „Neue Gefahr“ mit Sprung zum Gebiet auf der Karte. Wer das Gebiet zeichnet, bekommt
 keinen Hinweis, gekoppelte Geräte ebenso wenig. Ändern, Umbenennen und Bewerten eines bestehenden

@@ -13,10 +13,14 @@ pub struct BewertungDaten<'a> {
     pub aktualisiert_von: i64,
 }
 
+/// Mit dem Namen der letzten Änderung zur Lesezeit (LLH-1110, wie `beurteilt_von_name`): ein
+/// entferntes Konto liefert keinen Namen. Spalten der Bewertung tragen das Kürzel `gb`, weil
+/// `benutzer` ebenfalls `id` hat.
 const SELECT_ALLE: &str = "\
-    SELECT id, gefahrengebiet_id, gefahrentyp, schutzobjekt, warnstufe, beschreibung, \
-           gemeldet_von, aktualisiert_von, erstellt_at, geaendert_at \
-    FROM gefahr_bewertung";
+    SELECT gb.id, gb.gefahrengebiet_id, gb.gefahrentyp, gb.schutzobjekt, gb.warnstufe, \
+           gb.beschreibung, gb.gemeldet_von, gb.aktualisiert_von, \
+           b.anzeigename AS aktualisiert_von_name, gb.erstellt_at, gb.geaendert_at \
+    FROM gefahr_bewertung gb LEFT JOIN benutzer b ON b.id = gb.aktualisiert_von";
 
 #[derive(sqlx::FromRow)]
 struct Row {
@@ -31,6 +35,7 @@ struct Row {
     beschreibung: Option<String>,
     gemeldet_von: Option<String>,
     aktualisiert_von: i64,
+    aktualisiert_von_name: Option<String>,
     erstellt_at: String,
     geaendert_at: String,
 }
@@ -45,6 +50,7 @@ fn zu_anzeige(r: Row) -> GefahrBewertungAnzeige {
         beschreibung: r.beschreibung,
         gemeldet_von: r.gemeldet_von,
         aktualisiert_von: r.aktualisiert_von,
+        aktualisiert_von_name: r.aktualisiert_von_name,
         erstellt_at: r.erstellt_at,
         geaendert_at: r.geaendert_at,
     }
@@ -58,7 +64,7 @@ pub async fn liste(
     gefahrengebiet_id: i64,
 ) -> Result<Vec<GefahrBewertungAnzeige>, AppError> {
     let rows = sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
-        "{SELECT_ALLE} WHERE gefahrengebiet_id = ? ORDER BY gefahrentyp, schutzobjekt"
+        "{SELECT_ALLE} WHERE gb.gefahrengebiet_id = ? ORDER BY gb.gefahrentyp, gb.schutzobjekt"
     )))
     .bind(gefahrengebiet_id)
     .fetch_all(pool)
@@ -127,12 +133,14 @@ async fn laden_tx(
     conn: &mut SqliteConnection,
     id: i64,
 ) -> Result<GefahrBewertungAnzeige, AppError> {
-    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!("{SELECT_ALLE} WHERE id = ?")))
-        .bind(id)
-        .fetch_optional(&mut *conn)
-        .await?
-        .map(zu_anzeige)
-        .ok_or(AppError::NotFound)
+    sqlx::query_as::<_, Row>(sqlx::AssertSqlSafe(format!(
+        "{SELECT_ALLE} WHERE gb.id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .map(zu_anzeige)
+    .ok_or(AppError::NotFound)
 }
 
 /// Legt ein leeres Gefahrengebiet an und liefert seine id. Executor-generisch, damit
@@ -396,6 +404,34 @@ mod tests {
         assert_eq!(z2.id, z.id);
         assert_eq!(z2.warnstufe, Warnstufe::Akut);
         assert_eq!(liste(&pool, gid).await.unwrap().len(), 1);
+    }
+
+    /// LLH-1110: die Liste nennt, wer die Bewertung zuletzt geändert hat, mit Namen (Lesezeit,
+    /// wie `beurteilt_von_name`); das Upsert-Ergebnis ebenso.
+    #[tokio::test]
+    async fn liste_nennt_den_namen_der_letzten_aenderung() {
+        let pool = crate::db::test_pool().await;
+        let (gid, bid) = setup(&pool).await;
+        let z = upsert_bewertung_tx(
+            &mut *pool.acquire().await.unwrap(),
+            gid,
+            BewertungDaten {
+                beschreibung: Some("Keller unter Wasser"),
+                ..daten("elektrizitaet", "menschen", "keine", bid)
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(z.aktualisiert_von_name.as_deref(), Some("A"));
+        let zellen = liste(&pool, gid).await.unwrap();
+        assert_eq!(zellen.len(), 1);
+        assert_eq!(zellen[0].aktualisiert_von, bid);
+        assert_eq!(zellen[0].aktualisiert_von_name.as_deref(), Some("A"));
+        assert_eq!(
+            zellen[0].beschreibung.as_deref(),
+            Some("Keller unter Wasser"),
+            "eine Erläuterung zu „keine“ bleibt gespeichert"
+        );
     }
 
     #[tokio::test]

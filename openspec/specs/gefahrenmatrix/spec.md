@@ -23,8 +23,8 @@ ein Strich vor dem Laden wäre eine ungeprüfte Entwarnung.
 - **WHEN** ein Gefahrengebiet ohne jede Bewertung geöffnet ist und die Bewertungen geladen sind
 - **THEN** zeigen alle 58 gültigen Zellen „–“ mit dem Namen „…: keine“, und über der Matrix steht keine Zahl unbewerteter Felder
 
-#### Scenario: Details an einer Zelle ohne Bewertung
-- **WHEN** eine Person mit Schreibrecht an einer Zelle ohne gespeicherte Bewertung „Details …“ wählt und eine Erläuterung speichert
+#### Scenario: Erläuterung an einer Zelle ohne Bewertung
+- **WHEN** eine Person mit Schreibrecht an einer Zelle ohne gespeicherte Bewertung „Erläuterung …“ wählt und eine Erläuterung speichert
 - **THEN** wird die Zelle mit der Stufe „keine“ und der Erläuterung gespeichert
 
 #### Scenario: Bewertungen laden noch
@@ -132,3 +132,51 @@ Zahl zeigen. Die Zahl der Zonen MUST beim Sprung zur Karte stehen („Auf Karte 
 #### Scenario: Nicht beurteiltes Gebiet
 - **WHEN** ein Gebiet nicht beurteilt ist
 - **THEN** zeigt seine Zeile „nicht beurteilt“ und keine Zahl
+
+### Requirement: Eine Zelle mit Erläuterung ist erkennbar
+Eine gültige Zelle mit Erläuterung SHALL ohne Öffnen als solche erkennbar sein: eine Marke in der
+Zellecke als Zeichen (nicht nur Farbe) und ein zugänglicher Name, der auf „· mit Erläuterung“
+endet. Die Legende MUST die Marke mit ihrem Wort nennen. „Erläuterung …“ MUST an jeder gültigen
+Zelle erreichbar sein, auch an einer Zelle ohne Stufe.
+
+#### Scenario: Marke an einer Zelle mit Erläuterung
+- **WHEN** die Zelle Elektrizität × Menschen die Stufe „mittel“ und eine Erläuterung trägt
+- **THEN** zeigt sie eine Marke in der Ecke und heißt „Bewertung Elektrizität × Menschen: mittel · mit Erläuterung“, und eine Zelle ohne Erläuterung trägt weder Marke noch Zusatz
+
+### Requirement: Liste der Erläuterungen unter der Matrix
+Unter der Matrix SHALL eine Liste „Erläuterungen“ je Zelle mit Erläuterung eine Zeile zeigen:
+Gefahr × Schutzobjekt, Stufe, Erläuterung, „gemeldet von …“ (wenn gesetzt) und „geändert <DTG> ·
+<Name>“, in der Folge der Matrix. Ohne Erläuterung MUST die Liste ganz entfallen. Ein Tipp auf
+eine Zeile SHALL mit Schreibrecht den Dialog der Zelle öffnen und ohne Schreibrecht die Zelle in
+der Matrix hervorheben.
+
+#### Scenario: Liste der Erläuterungen
+- **WHEN** zwei Zellen eines Gebiets eine Erläuterung tragen
+- **THEN** stehen unter der Matrix genau diese zwei in der Folge der Matrix, je mit Stufe, Text und „geändert <DTG> · <Name>“
+
+#### Scenario: Keine Erläuterung
+- **WHEN** keine Zelle eines Gebiets eine Erläuterung trägt
+- **THEN** steht unter der Matrix keine Liste „Erläuterungen“
+
+#### Scenario: Tipp ohne Schreibrecht
+- **WHEN** eine Person ohne Schreibrecht eine Zeile der Liste „Erläuterungen“ antippt
+- **THEN** wird die Zelle in der Matrix hervorgehoben, und kein Dialog öffnet sich
+
+### Requirement: Gefahren eines Gebiets auf der Lagekarte
+Der Inspector einer Zone vom Typ Gefahrengebiet SHALL die gesetzten Gefahren seines Gebiets zeigen
+(Stufe über „keine“ oder mit Erläuterung), je mit Stufe, Gefahr × Schutzobjekt und Erläuterung, in
+der Folge der Matrix, höchstens fünf und darunter den Sprung „alle in Gefahren ↗“. Bei gesperrtem
+Modul Gefahren oder gesichertem Stand MUST der Abschnitt fehlen und die Matrix ungefragt bleiben;
+eine nicht ladbare Matrix MUST der Abschnitt nennen.
+
+#### Scenario: Gebiet mit Gefahren
+- **WHEN** eine Person mit Freigabe Gefahren eine Zone eines Gebiets wählt, dessen Matrix Elektrizität × Menschen „hoch“ mit Erläuterung trägt
+- **THEN** nennt der Inspector unter „Gefahren“ diese Zelle mit „hoch“ und der Erläuterung
+
+#### Scenario: Gefahren gesperrt
+- **WHEN** das Modul Gefahren für die Person gesperrt ist und sie eine Zone vom Typ Gefahrengebiet wählt
+- **THEN** zeigt der Inspector keinen Abschnitt „Gefahren“, und die Matrix wird nicht abgefragt
+
+#### Scenario: Mehr als fünf
+- **WHEN** ein Gebiet sechs gesetzte Gefahren trägt
+- **THEN** zeigt der Inspector fünf davon und den Sprung „alle in Gefahren ↗“ zur Gefahrenseite des Gebiets

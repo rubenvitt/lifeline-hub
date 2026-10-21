@@ -2,7 +2,7 @@
 titel: Gefahren
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/pages/gefahren/GefahrenMatrix.tsx, frontend/src/pages/gefahren/GefahrenBeurteilung.tsx, frontend/src/pages/gefahren/beurteilung.ts, frontend/src/pages/gefahren/gebietAussage.ts, frontend/src/pages/gefahren/GefahrenZelleDetails.tsx, frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/gefahrenSchema.ts, src/gefahr/mod.rs, src/gefahr/repo.rs, src/routes/gefahr.rs, frontend/src/api/gefahren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -24,7 +24,7 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
    Gefahrentyp, je Spalte ein Schutzobjekt, in der Zelle das Kürzel der Warnstufe. Darüber steht,
    ob die Matrix beurteilt ist: „beurteilt“ mit Zeit und Person oder „nicht beurteilt“.
 
-   ![Seite „Gefahren“ mit zwei Gefahrengebieten und der Matrix der Überflutung Unterstadt](../bilder/gefahren/gefahren.png)
+   ![Seite „Gefahren“ mit zwei Gefahrengebieten, der Matrix der Überflutung Unterstadt und darunter der Liste „Erläuterungen“](../bilder/gefahren/gefahren.png)
 
 3. Um das Gebiet auf der Karte zu sehen, „Auf Karte zeigen ↗“ wählen. Die Lagekarte öffnet sich
    und zeigt das Gebiet. Daneben steht, aus wie vielen Zonen es besteht („· 1 Zone“).
@@ -35,7 +35,7 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 2. In der Matrix die Zelle der Gefahr und des Schutzobjekts wählen, etwa „Elektrizität“ in der
    Spalte „Mensch“. Die ganze Zelle ist die Schaltfläche, nicht nur das Kürzel in ihrer Mitte.
 
-   ![Geöffnetes Menü einer Zelle mit den Stufen „– · Keine“ bis „A · Akut“ und „Details …“](../bilder/gefahren/bewertung-waehlen.png)
+   ![Geöffnetes Menü einer Zelle mit den Stufen „– · Keine“ bis „A · Akut“ und „Erläuterung …“](../bilder/gefahren/bewertung-waehlen.png)
 
 3. Im Menü die Stufe wählen: „N · Niedrig“, „M · Mittel“, „H · Hoch“ oder „A · Akut“. Die Zelle
    zeigt sofort das Kürzel.
@@ -48,15 +48,25 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 3. „Beurteilung bestätigen“ wählen. Über der Matrix steht danach „beurteilt“ mit Zeit und dem
    eigenen Namen, und in der Gebietsliste entfällt „nicht beurteilt“.
 
-### Eine Bewertung beschreiben
+### Eine Bewertung erläutern
 
-1. Eine Zelle wählen und im Menü „Details …“ wählen.
-2. Unter „Beschreibung“ festhalten, worin die Gefahr besteht, und unter „Gemeldet von“, wer sie
-   gemeldet hat.
+1. Eine Zelle wählen und im Menü „Erläuterung …“ wählen. Das geht an jeder Zelle, auch an einer
+   auf „–“.
+2. Unter „Erläuterung“ festhalten, worin die Gefahr besteht oder warum sie nicht besteht, und
+   unter „Gemeldet von“, wer sie gemeldet hat.
 
-   ![Dialog „Details Elektrizität × Menschen“ mit Beschreibung und „Gemeldet von“](../bilder/gefahren/bewertung-details.png)
+   ![Dialog „Erläuterung Elektrizität × Menschen“ mit Erläuterung und „Gemeldet von“](../bilder/gefahren/bewertung-details.png)
 
-3. „Speichern“ wählen.
+3. „Speichern“ wählen. Die Zelle trägt danach oben rechts ein kleines Dreieck, und unter der
+   Matrix steht sie in der Liste „Erläuterungen“.
+
+### Erläuterungen lesen
+
+1. Das Gebiet wählen. Unter der Matrix stehen unter „Erläuterungen“ alle Zellen mit Erläuterung:
+   Gefahr und Schutzobjekt, die Stufe, der Text, wer sie gemeldet hat und wann und von wem sie
+   zuletzt geändert wurde.
+2. Eine Zeile wählen. Mit Schreibrecht öffnet sich der Dialog der Zelle, ohne Schreibrecht hebt
+   die Matrix die Zelle mit einem Rahmen hervor.
 
 ### Ein Gefahrengebiet umbenennen
 
@@ -78,7 +88,14 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
 - Jede Zelle zeigt „–“ (keine), bis eine andere Stufe gesetzt ist. Eine Zelle, die nie gewählt
   wurde, und eine Zelle auf „– · Keine“ sagen dasselbe.
 - Schraffierte Zellen sind Paare, die nicht anwendbar sind; sie lassen sich nicht bewerten. Die
-  Legende unter der Matrix nennt die Kürzel und die Schraffur.
+  Legende unter der Matrix nennt die Kürzel, die Schraffur und das Dreieck „mit Erläuterung“.
+- Eine Zelle mit Erläuterung trägt oben rechts ein Dreieck in der Farbe ihres Kürzels; ein
+  Screenreader liest „… · mit Erläuterung“. Die Liste „Erläuterungen“ steht in derselben Folge
+  wie die Matrix, alphabetisch nach Gefahr, darin nach Schutzobjekt. Ohne Erläuterung im Gebiet
+  fehlt sie ganz.
+- Eine Erläuterung zu „–“ (keine) wird gespeichert und zählt als Aussage, etwa „geprüft, kein
+  Strom im Keller“: Lagekarte und Lagevortrag nennen sie mit. Die Warnstufe des Gebiets und die
+  Zahl seiner Gefahren ändert sie nicht.
 - Die höchste Stufe aller Zellen ist die Warnstufe des Gebiets. Sie steht in der Liste, als Text
   an der Fläche auf der Lagekarte und, über alle Gebiete, im Überblick und im Lagebild.
 
@@ -95,6 +112,10 @@ selbst entstehen auf der Lagekarte; bewertet und benannt werden sie hier.
   nichts: Eine gesetzte Zelle sagt nichts über die übrigen.
 - Nicht beurteilte Gebiete nennt auch das Lagebild unter dem Paneel „Gefahrenmatrix“ und die
   Kennzahl „Warnstufe“ im Überblick.
+- Die Gefahren eines Gebiets mit Stufe und Erläuterung zeigt auch die Lagekarte, wenn eine Zone
+  des Gebiets gewählt ist (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)), und die
+  Übernahme „Gefahren-/Schadenlage“ in den Lagevortrag (Kapitel [Lageberichte](lageberichte.md)).
+  „Gemeldet von“ übernimmt der Lagevortrag nicht.
 
 ### Einsatztagebuch
 
@@ -114,11 +135,12 @@ Ein Gefahrengebiet entsteht durch Zeichnen auf der Lagekarte, mit „Gefahrengeb
 
 ### Rechte und ohne Netz
 
-Lesen kann jede Person im Einsatz. Bewerten, beschreiben, die Beurteilung bestätigen und
+Lesen kann jede Person im Einsatz. Bewerten, erläutern, die Beurteilung bestätigen und
 umbenennen brauchen das Schreibrecht:
 Einsatzleitung oder Führungspersonal in einem laufenden Einsatz (Kapitel
 [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht steht über der Matrix der Grund,
-„Umbenennen“ und „Beurteilung bestätigen“ fehlen, und die Zellen lassen sich nicht wählen.
+„Umbenennen“ und „Beurteilung bestätigen“ fehlen, und die Zellen lassen sich nicht wählen; die
+Liste „Erläuterungen“ bleibt lesbar.
 
 Die Gefahrengebiete hält die App für die Arbeit ohne Netz vor, die Matrix nicht (Kapitel
 [Arbeiten ohne Netz](ohne-netz.md)).

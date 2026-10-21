@@ -90,7 +90,7 @@ sie.
 
 | Abschnitt | Knopf | Was übernommen wird |
 | --- | --- | --- |
-| Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel (nur bei festgelegtem Pegel) |
+| Gefahren-/Schadenlage | „Aus dem Lagebild übernehmen“ | Betroffene, Vermisste, Sichtung, offene Schäden, höchste Warnstufe, Gefahren je Gebiet mit Stufe und Erläuterung, Wetterwarnungen, Bedingungen am Einsatzort, Stand und Trend der Pegel (nur bei festgelegtem Pegel) |
 | Eigene Lage | „Aus Meldebild und Führungsorganisation übernehmen“ | Kräftemeldebild und Führungsorganisation des ganzen Einsatzes |
 | Lageentwicklung | „Aus dem ETB übernehmen“ | neue Einträge seit der letzten Lagebesprechung je Typ, neue Entscheidungen mit Nummer und Zeit |
 | Besondere (Führungs-)Probleme | „Aus dem Führungsstand übernehmen“ | überfällige Aufträge, Meldungen mit überfälliger Bestätigung, ungesichtete Meldungen, Lücken im Funkplan |
@@ -107,6 +107,10 @@ sie.
 - Gefahren-/Schadenlage, Lageentwicklung und Besondere (Führungs-)Probleme übernehmen nur Zahlen,
   Nummern, Arten und Zeiten, keinen Freitext aus Aufträgen, Meldungen, Einsatztagebuch,
   Betroffenen oder Schäden.
+- Der Teil „Gefahrengebiete“ der Gefahren-/Schadenlage nennt je Gebiet den Namen, bei einem
+  nicht beurteilten „(nicht beurteilt)“, und darunter jede gesetzte Gefahr mit Stufe und
+  Erläuterung (Kapitel [Gefahren](gefahren.md)). Name und Erläuterung sind Beurteilung der eigenen
+  Führung; „gemeldet von“ und wer zuletzt geändert hat, übernimmt der Text nicht.
 - Eine gesperrte oder nicht geladene Quelle steht als „—“ mit Grund, nie als 0.
 - Den Teil „Pegel“ übernimmt die Gefahren-/Schadenlage nur, wenn am Einsatz ein maßgeblicher Pegel
   festgelegt ist (Kapitel [Wetter und Pegel](wetter-pegel.md)); sonst entfällt er ganz. Das Wetter

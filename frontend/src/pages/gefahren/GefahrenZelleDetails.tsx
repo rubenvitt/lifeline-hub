@@ -31,7 +31,7 @@ export interface GefahrenZelleDetailsProps {
 }
 
 /**
- * Beschreibung und Meldeweg einer Matrixzelle auf `ErfassungsModal` (zwei Felder, Feldbudget Modal
+ * Erläuterung und Meldeweg einer Matrixzelle auf `ErfassungsModal` (zwei Felder, Feldbudget Modal
  * ≤ ~3). Vorbelegen zum Bearbeiten ist kein Reset: `setFieldsValue` beim Öffnen macht der Effekt
  * unten, das Leeren übernimmt die Hülle auf jedem Weg hinaus.
  */
@@ -72,7 +72,7 @@ export default function GefahrenZelleDetails({
   return (
     <ErfassungsModal
       offen={offen}
-      titel={`Details ${titel}`}
+      titel={`Erläuterung ${titel}`}
       form={form}
       laeuft={laeuft}
       erfassenText="Speichern"
@@ -82,7 +82,7 @@ export default function GefahrenZelleDetails({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      <Form.Item name="beschreibung" label="Beschreibung">
+      <Form.Item name="beschreibung" label="Erläuterung">
         <Input.TextArea rows={3} />
       </Form.Item>
       <Form.Item name="gemeldet_von" label="Gemeldet von">

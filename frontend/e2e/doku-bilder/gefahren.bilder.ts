@@ -8,9 +8,12 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  * (`pnpm doku:bilder --grep gefahren`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   gefahren.png          frontend/src/pages/gefahren/GefahrenPage.tsx,
  *                         frontend/src/pages/gefahren/GefahrenMatrix.tsx,
- *                         frontend/src/pages/gefahren/GefahrenBeurteilung.tsx
+ *                         frontend/src/pages/gefahren/GefahrenBeurteilung.tsx,
+ *                         frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx (die Demo
+ *                         erläutert Ertrinken × Menschen)
  *   bewertung-waehlen.png frontend/src/pages/gefahren/GefahrenMatrix.tsx (Menü einer Zelle)
- *   bewertung-details.png frontend/src/pages/gefahren/GefahrenZelleDetails.tsx
+ *   bewertung-details.png frontend/src/pages/gefahren/GefahrenZelleDetails.tsx (Dialog
+ *                         „Erläuterung …“)
  *
  * Die Demo bewertet je Gefahrengebiet nur eine Zelle; für ein lesbares Bild ergänzt der Lauf
  * einige Bewertungen der „Überflutung Unterstadt“ über die API. Für `gefahren.png` bestätigt er
@@ -82,7 +85,7 @@ test.describe(KAPITEL, () => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await oeffneGefahren(page);
     await page.getByRole('button', { name: /^Bewertung Elektrizität × Menschen:/ }).click();
-    await expect(page.getByRole('menuitem', { name: 'Details …' })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Erläuterung …' })).toBeVisible();
     // Zeiger auf die Stufe, die gilt: sonst stünde die Hervorhebung auf „Keine“.
     await page.getByRole('menuitem', { name: 'M · Mittel' }).hover();
     await fotografiere(
@@ -107,17 +110,27 @@ test.describe(KAPITEL, () => {
     );
   });
 
-  test('Details einer Bewertung', async ({ page }) => {
+  test('Erläuterung einer Bewertung', async ({ page }) => {
     await oeffneGefahren(page);
     await page.getByRole('button', { name: /^Bewertung Elektrizität × Menschen:/ }).click();
-    await page.getByRole('menuitem', { name: 'Details …' }).click();
-    const dialog = page.getByRole('dialog', { name: 'Details Elektrizität × Menschen' });
-    await dialog.getByLabel('Beschreibung').fill('Stromführende Kellerverteilungen unter Wasser.');
+    await page.getByRole('menuitem', { name: 'Erläuterung …' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Erläuterung Elektrizität × Menschen' });
+    await dialog.getByLabel('Erläuterung').fill('Stromführende Kellerverteilungen unter Wasser.');
     await dialog.getByLabel('Gemeldet von').fill('Rettungsstaffel');
     await dialog.getByLabel('Gemeldet von').blur();
     await fotografiere(dialog, KAPITEL, 'bewertung-details');
     await dialog.getByRole('button', { name: 'Speichern' }).click();
     await expect(dialog).toBeHidden();
+    // Ablauf „Erläuterungen lesen“ (ohne eigenes Bild): Marke und Liste unter der Matrix.
+    await expect(
+      page.getByRole('button', {
+        name: /^Bewertung Elektrizität × Menschen: \S+ · mit Erläuterung$/,
+      }),
+    ).toBeVisible();
+    const liste = page.locator('[data-lfh="gefahren-erlaeuterungen"]');
+    await expect(liste).toContainText('Stromführende Kellerverteilungen unter Wasser.');
+    await liste.getByRole('button', { name: /Elektrizität × Menschen/ }).click();
+    await expect(dialog).toBeVisible();
   });
 
   test('Gefahrengebiet umbenennen', async ({ page }) => {

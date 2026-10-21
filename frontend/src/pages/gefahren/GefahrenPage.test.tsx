@@ -702,9 +702,11 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
       await userEvent.click(
         await screen.findByRole('button', { name: /^Bewertung Brand × Menschen: hoch/ }),
       );
-      await userEvent.click(within(offenesMenue()).getByRole('menuitem', { name: 'Details …' }));
+      await userEvent.click(
+        within(offenesMenue()).getByRole('menuitem', { name: 'Erläuterung …' }),
+      );
       const dialog = await screen.findByRole('dialog');
-      await userEvent.type(within(dialog).getByLabelText('Beschreibung'), 'Rauch');
+      await userEvent.type(within(dialog).getByLabelText('Erläuterung'), 'Rauch');
       await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
       expect(await within(dialog).findByText('Details abgelehnt')).toBeInTheDocument();
       expect(document.querySelector('[data-fehler]')).toBeNull();

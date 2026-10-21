@@ -1,11 +1,13 @@
 import { Button, Input, InputNumber, Popconfirm, Space, Typography, theme } from 'antd';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { Select } from '../../components/Select';
 import { useEffect, useId, useRef, useState } from 'react';
 import FeldLabel from '../../components/FeldLabel';
 import GeoKennzahlen, { KennzahlZeile } from '../../components/GeoKennzahlen';
 import type {
   Evakuierungsbezirk,
+  GefahrBewertung,
   Gefahrengebiet,
   KartenAnsicht,
   LageZone,
@@ -15,7 +17,7 @@ import { gefahrengebietName } from '../../api/gefahren';
 import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel, zoneStil } from './zonenStil';
 import StatusTag from '../../components/StatusTag';
 import { raeumungszustand, warnstufeKarte } from '../../theme/statusFarben';
-import { Datenfeld, Datenraster, monoStil } from '../../components/instrument';
+import { Augenbraue, Datenfeld, Datenraster, monoStil } from '../../components/instrument';
 import { evakuiertText } from '../../betreuung/betreuungText';
 import { formatRadius, kreisAusZone, parseGeometry, geoKennzahlen, radiusGueltig } from './geo';
 import { KREIS_RADIUS_M_MAX } from '../../api/eingabegrenzen';
@@ -23,6 +25,108 @@ import KartenDetailCard from './KartenDetailCard';
 import AnsichtZuordnung from './AnsichtZuordnung';
 import { KEINE_BERECHTIGUNG } from '../../einsatz/modulRegistry';
 import { sprungGesperrtText } from '../../components/Sprung';
+import { gefahrenPfad } from '../../routing/deeplinks';
+import { gefahrenMatrixAbfrage } from '../gefahren/gefahrenMatrixAbfrage';
+import GefahrenStufe from '../gefahren/GefahrenStufe';
+import { erlaeuterungEinzeilig, gesetzteGefahren, zellTitel } from '../gefahren/erlaeuterungen';
+
+/** So viele Gefahren zeigt der Inspector, danach „alle in Gefahren ↗“ (LLH-1110). */
+export const GEFAHREN_IM_INSPECTOR = 5;
+
+/**
+ * Gefahren eines Gefahrengebiets im Inspector (LLH-1110, Spec `gefahrenmatrix`, „Erläuterungen
+ * sind sichtbar“): die gesetzten Gefahren (`gesetzteGefahren`: Stufe über „keine“ oder mit
+ * Erläuterung) in der Folge der Matrix, kompakt bis {@link GEFAHREN_IM_INSPECTOR}, dann der Sprung
+ * zur Gefahrenseite. Die Erläuterung steht zweizeilig, länger endet mit „…“ und steht ganz im
+ * `title`. „Gemeldet von“ und „geändert“ trägt die Liste der Gefahrenseite, nicht die Karte.
+ * Lädt die Matrix noch, steht nichts: keine Aussage, die niemand geprüft hat.
+ */
+function GefahrenImGebiet({
+  matrix,
+  fehler,
+  einsatzId,
+  gebietId,
+}: {
+  matrix: readonly GefahrBewertung[] | undefined;
+  fehler: boolean;
+  einsatzId: number;
+  gebietId: number;
+}) {
+  const { token } = theme.useToken();
+  const titelId = useId();
+  const gefahren = matrix ? gesetzteGefahren(matrix) : [];
+  return (
+    <section
+      aria-labelledby={titelId}
+      data-lfh="inspector-gefahren"
+      style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}
+    >
+      {/* h4 unter dem h3 des Inspectors (`KartenDetailCard`). */}
+      <Augenbraue als="h4" id={titelId}>
+        Gefahren
+      </Augenbraue>
+      {fehler ? (
+        <Typography.Text type="danger">Gefahren nicht geladen</Typography.Text>
+      ) : matrix == null ? null : gefahren.length === 0 ? (
+        <Typography.Text type="secondary">keine Gefahr über „keine“</Typography.Text>
+      ) : (
+        <>
+          <ul
+            style={{
+              margin: 0,
+              padding: 0,
+              listStyle: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: token.marginXS,
+            }}
+          >
+            {gefahren.slice(0, GEFAHREN_IM_INSPECTOR).map((z) => {
+              const text = erlaeuterungEinzeilig(z);
+              return (
+                <li key={z.id} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                  <span
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'baseline',
+                      gap: token.marginXS,
+                    }}
+                  >
+                    <GefahrenStufe stufe={z.warnstufe} />
+                    <span>{zellTitel(z.gefahrentyp, z.schutzobjekt)}</span>
+                  </span>
+                  {text && (
+                    <Typography.Text
+                      type="secondary"
+                      title={text}
+                      style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {text}
+                    </Typography.Text>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {gefahren.length > GEFAHREN_IM_INSPECTOR && (
+            // Ein Sprung ist keine Handlung (LFH-616): eigene Zeile, das ↗ ohne Vorlesen.
+            <div data-lfh="inspector-sprung">
+              <Link to={gefahrenPfad(einsatzId, { gefahrengebiet: gebietId })}>
+                alle in Gefahren <span aria-hidden="true">↗</span>
+              </Link>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
 
 /** Sentinel im Dropdown für „in neues Gefahrengebiet abspalten". */
 const NEU = -1;
@@ -158,6 +262,22 @@ export default function ZonenInspector({
   );
   const aktuellesGebiet = gebiete.find((g) => g.id === entwurf.gefahrengebiet_id) ?? null;
   const aktuellHatWarnstufen = (aktuellesGebiet?.hoechste_warnstufe ?? 'keine') !== 'keine';
+  // Gefahren des Gebiets (LLH-1110): nur mit Freigabe Gefahren (die Gebietsliste kommt nur mit
+  // ihr, LFH-669; gesperrt heißt `matrixGesperrt`, LFH-888) und nicht im Historien-Modus — dort
+  // zeigt die Karte einen eingefrorenen Stand, die Matrix wäre die heutige. Abruf über dieselbe
+  // Abfrage wie die Gefahrenseite: gemeinsamer Cache, live über das Ereignis `gefahr`.
+  const [suchParameter] = useSearchParams();
+  const matrixGebietId =
+    entwurf.typ === 'gefahrengebiet' &&
+    aktuellesGebiet != null &&
+    !matrixGesperrt &&
+    !suchParameter.has('snapshot')
+      ? aktuellesGebiet.id
+      : null;
+  const matrixQuery = useQuery({
+    ...gefahrenMatrixAbfrage(zone.einsatz_id, matrixGebietId),
+    enabled: matrixGebietId != null,
+  });
   // Geometrie-Kennzahlen rein clientseitig aus der GeoJSON-Geometrie.
   const kennzahlen = geoKennzahlen(parseGeometry(zone.geometrie));
 
@@ -235,6 +355,15 @@ export default function ZonenInspector({
             rendert, in ein `.ant-space-item` — ohne Kennzahlen gäbe das eine leere Lücke. */}
         {(kennzahlen || zusatzZeilen) && (
           <GeoKennzahlen kennzahlen={kennzahlen} zusatz={zusatzZeilen} />
+        )}
+
+        {matrixGebietId != null && (
+          <GefahrenImGebiet
+            matrix={matrixQuery.data}
+            fehler={matrixQuery.isError}
+            einsatzId={zone.einsatz_id}
+            gebietId={matrixGebietId}
+          />
         )}
 
         {kreis && darfSchreiben && (

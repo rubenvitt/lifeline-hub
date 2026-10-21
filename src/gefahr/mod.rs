@@ -96,6 +96,9 @@ pub struct GefahrBewertungAnzeige {
     pub beschreibung: Option<String>,
     pub gemeldet_von: Option<String>,
     pub aktualisiert_von: i64,
+    /// Anzeigename von `aktualisiert_von` zur Lesezeit (LLH-1110); fehlt bei entferntem Konto.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aktualisiert_von_name: Option<String>,
     pub erstellt_at: String,
     pub geaendert_at: String,
 }

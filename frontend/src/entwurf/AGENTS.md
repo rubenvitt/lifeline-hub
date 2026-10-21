@@ -80,3 +80,7 @@ Gilt für `frontend/src/entwurf/`, `frontend/src/lageberichte/`, `pages/BefehlDe
   (Dritte), nur Zahlen, Nummern, Arten und Zeiten als DTG. Die Lageentwicklung zählt ab dem
   ETB-Eintrag der letzten Lagebesprechung nach `lfd_nr`, ohne `system` und freigegebene
   Lagevorträge, und legt keinen Freitext in den Zwischenspeicher (er wird offline gesichert).
+  Fortschreibung (LLH-1110): Die Gefahren-/Schadenlage nennt je Gefahrengebiet Name, Stufe und
+  **Erläuterung** der gesetzten Zellen (`gesetzteGefahren` in `pages/gefahren/erlaeuterungen.ts`).
+  Das ist Beurteilung der eigenen Führung, kein Freitext Dritter; „gemeldet von“ bleibt draußen.
+  Freitext geht nur durch `md()`.
