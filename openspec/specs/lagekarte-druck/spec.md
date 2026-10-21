@@ -30,13 +30,21 @@ Das System SHALL den Ausschnitt im nächsten Render der Karte als PNG aufnehmen 
 den Zeichenpuffer der Karte dauerhaft erhalten (`preserveDrawingBuffer`). Grundlage,
 Bild-Hintergründe, Zonen, Marker, Bündel und Fachebenen SHALL auf dem Bild stehen. Fehlende
 Kacheln MUST als leere Fläche erscheinen, nicht als Fehler. Gibt die Leinwand kein Bild her, MUST
-das System den Grund über der Karte nennen und nicht drucken.
+das System den Grund über der Karte nennen und nicht drucken. Kann das Gerät die Karte gar nicht
+zeichnen, MUST der Grund beim Drucken und beim Anfügen „Karte auf diesem Gerät nicht darstellbar“
+lauten.
 
 #### Scenario: Kacheln fehlen
 
 - **WHEN** die Kacheln der Grundlage nicht geladen sind und gedruckt wird
 - **THEN** steht das Blatt mit Kopf, Bild und Legende da
 - **AND** es erscheint kein Fehler
+
+#### Scenario: Gerät ohne Kartengrafik
+
+- **WHEN** eine Person auf einem Gerät ohne WebGL2 „Drucken / als PDF“ wählt
+- **THEN** steht über der Karte „Lageplan nicht gedruckt“ mit „Karte auf diesem Gerät nicht darstellbar“
+- **AND** es öffnet sich kein Druckdialog, und kein Blatt steht im Ausdruck
 
 ### Requirement: Blatt A4 quer mit Kopf, Maßstab, Nordpfeil und Legende
 
