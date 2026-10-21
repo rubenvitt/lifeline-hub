@@ -1,3 +1,19 @@
+## [1.0.0-alpha.149](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.148...v1.0.0-alpha.149) (2026-10-21)
+
+### Lageberichte, Befehle und Pressemitteilungen
+
+- **Rückfrage beim Verlassen eines Entwurfs:** Wer einen Lagebericht oder eine Pressemitteilung bearbeitet und die Seite verlassen will, ohne zu speichern, wird jetzt gefragt. Das gilt wie schon beim Befehl für Brotkrume, Seitenmenü und die Zurück-Taste des Browsers. Zur Wahl stehen „Verwerfen“, „Bleiben“ und „Speichern und weiter“. Ungespeicherte Änderungen gehen so nicht mehr versehentlich verloren.
+- Bei der Pressemitteilung prüft „Speichern und weiter“ vor dem Speichern, ob ein Titel eingetragen ist. Der Titel ist das einzige Pflichtfeld.
+
+### Lagebild und Gefahren
+
+- Das Paneel „Gefahrenmatrix“ im Lagebild und der Matrixauszug in der Sprungpalette markieren Gefahren mit Erläuterung jetzt genauso wie die Matrix auf der Gefahrenseite. Sie zeigen ein Dreieck und den Zusatz „· mit Erläuterung“. Den Text der Erläuterung zeigen Paneel und Auszug nicht.
+- Paneel und Auszug führen jetzt auch Gefahren der Stufe „keine“, wenn eine Erläuterung dazu erfasst ist, wie schon Lagekarte und Lagevortrag. Die Gebietsliste zählt solche Einträge weiterhin nicht als Gefahr.
+
+### Anwenderdokumentation
+
+- Die Kapitel Lagebild, Gefahren, Lageberichte und Presse beschreiben die neuen Abläufe. Das Bild des Lagebilds zeigt die neue Markierung „mit Erläuterung“.
+
 ## [1.0.0-alpha.148](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.147...v1.0.0-alpha.148) (2026-10-21)
 
 ### Lagekarte
