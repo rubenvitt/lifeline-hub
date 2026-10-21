@@ -249,14 +249,14 @@ describe('Lagebild-Sitzung', () => {
       aktuelle_sichtung: 'sk2',
       aktuelle_uhs_id: 5,
       herkunft_adresse: 'Hauptstraße 1',
-      melder_kontakt: '0170 123',
+      melder_kontakt: '0170 4711',
       notiz: 'Diabetikerin',
       zustand: 'unterkühlt',
       antreff_ort: 'Keller',
       antreff_lat: 53.07,
       antreff_lon: 8.8,
     };
-    const FREITEXTE = ['Hauptstraße', '0170', 'Diabetikerin', 'unterkühlt', 'Keller', '53.07'];
+    const FREITEXTE = ['Hauptstraße', '0170 4711', 'Diabetikerin', 'unterkühlt', 'Keller', '53.07'];
 
     /** Die Platte, roh gelesen (eigene Verbindung, `test/rohIdb.ts`). */
     const roh = async () => JSON.stringify(await rohLesen(LAGEBILD_DB, 'stand'));
