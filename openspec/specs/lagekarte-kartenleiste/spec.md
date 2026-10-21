@@ -46,8 +46,8 @@ anderen, gilt das als ein durchgehender Modus.
 - **THEN** ist die Leiste nach dem Verorten wieder offen, die Objekte-Ansicht ist gewählt, und der Suchbegriff steht noch im Feld
 
 #### Scenario: Ansicht und Filter überstehen den Modus
-- **WHEN** bei 390 px in der Ansicht „Ebenen“ „Lage“ im Filter steht, über den Kartenknopf ein Taktisches Zeichen platziert und der Modus beendet wird
-- **THEN** zeigt die eingeblendete Leiste die Ansicht, die der Kartenknopf gewählt hat („Objekte“), und ein Wechsel zurück auf „Ebenen“ zeigt den Filter „Lage“ unverändert
+- **WHEN** bei 390 px in der Ansicht „Ebenen“ „Lage“ im Filter steht, über das Werkzeugmenü ein Taktisches Zeichen platziert und der Modus beendet wird
+- **THEN** zeigt die eingeblendete Leiste die Ansicht „Ebenen“ mit dem Filter „Lage“ unverändert
 
 #### Scenario: Geschlossene Leiste bleibt geschlossen
 - **WHEN** bei 390 px die Leiste geschlossen ist und Messen gestartet und wieder beendet wird
@@ -94,12 +94,12 @@ Die erste Zeile der Kartenleiste SHALL eine Segmentleiste mit den Segmenten „E
 sein, solange etwas ausgewählt ist dazu „Auswahl“ (Tabliste, jedes Segment steuert seine Fläche).
 Jedes Segment MUST ein festes Drittel der Leistenbreite einnehmen; ohne Auswahl bleibt das dritte
 Drittel frei. Die Segmentleiste und das Modus-Band MUST beim Rollen der Leiste stehen bleiben.
-„Ebenen“ zeigt den Ebenenbaum, „Objekte“ die Objektliste und (mit Schreibrecht) „Zeichnen“,
-„Auswahl“ die Inspectors. Die gewählte Ansicht „Ebenen“ oder „Objekte“ SHALL je Gerät gemerkt
-werden, Vorgabe „Ebenen“. Die gerade nicht gezeigten Ansichten MUST ihren Zustand (Suchbegriffe,
-Filter, Klappzustand, Entwürfe) und ihre Rollposition behalten. Der Kartenknopf
-„Zeichenwerkzeuge“ und ein Sprung zu einem Ort (`?ort=`) MUST auf „Objekte“ wechseln; eine offene
-Auswahl bleibt dabei bestehen.
+„Ebenen“ zeigt den Ebenenbaum, „Objekte“ die Objektliste, „Auswahl“ die Inspectors. Die gewählte
+Ansicht „Ebenen“ oder „Objekte“ SHALL je Gerät gemerkt werden, Vorgabe „Ebenen“. Die gerade nicht
+gezeigten Ansichten MUST ihren Zustand (Suchbegriffe, Filter, Klappzustand, Entwürfe) und ihre
+Rollposition behalten. Ein Sprung zu einem Ort (`?ort=`) MUST auf „Objekte“ wechseln; eine offene
+Auswahl bleibt dabei bestehen. Der Kartenknopf „Zeichenwerkzeuge“ MUST weder die Ansicht noch die
+Sichtbarkeit der Leiste ändern.
 
 #### Scenario: Wahl übersteht das Neuladen
 - **WHEN** die Ansicht „Objekte“ gewählt und die Seite neu geladen wird
@@ -112,6 +112,10 @@ Auswahl bleibt dabei bestehen.
 #### Scenario: Segmente im Handschuh
 - **WHEN** bei 1280 px die Dichtestufe `handschuh` gewählt und ein Objekt ausgewählt ist
 - **THEN** stehen alle drei Segmente in einer Zeile der 300 px breiten Leiste und sind mindestens 72 px hoch und breit
+
+#### Scenario: Zeichenwerkzeuge lassen die Leiste stehen
+- **WHEN** bei 1440 px die Ansicht „Ebenen“ vorn steht und „Zeichenwerkzeuge“ getippt wird
+- **THEN** steht das Werkzeugmenü an der Karte, und die Leiste zeigt weiter „Ebenen“
 
 ### Requirement: Ebenen stehen in einem gruppierten, einklappbaren Ebenenbaum
 Die Ansicht „Ebenen“ SHALL jede Ebene der Karte in einer festen Gruppe führen: Kräfte (Einheiten,
@@ -265,3 +269,18 @@ stehen, bei ausgefallener Lagebild-Quelle „—“ statt einer Zahl.
 #### Scenario: Quelle ausgefallen
 - **WHEN** eine Lagebild-Quelle nicht geladen werden konnte
 - **THEN** zeigt die Marke „—“ statt einer Zahl, und nirgends steht „Alles verortet“
+
+### Requirement: Die Leiste trägt keinen Zeichenweg
+Die Kartenleiste MUST keinen Start für Zonen, Linien, freie Skizzen oder Taktische Zeichen
+tragen; gezeichnet wird über das Werkzeugmenü an der Karte (Spec `lagekarte-zeichnen`). Ausnahme
+ist „Fläche zeichnen“ an einem nicht verorteten Abschnitt der Objektliste: das verortet ein
+Objekt, es zeichnet keine neue Figur. Die Modusbedienung eines laufenden Taktischen Zeichens
+bleibt ab `lg` im Modus-Band der Leiste.
+
+#### Scenario: Keine Zeichenknöpfe in der Leiste
+- **WHEN** eine Person mit Schreibrecht die Leiste in jeder Ansicht durchsieht
+- **THEN** findet sie keinen Knopf „Gefahrengebiet“ oder „Gefahrengebiet zeichnen“, keinen Knopf „Taktisches Zeichen platzieren“ und kein Paneel „Zeichnen“
+
+#### Scenario: Taktisches Zeichen ab lg
+- **WHEN** bei 1440 px über das Werkzeugmenü ein Taktisches Zeichen gewählt wird
+- **THEN** steht seine Bedienung („Weitere platzieren“, Zähler, „Fertig“ bzw. „Abbrechen“) im Modus-Band der Leiste und nirgends sonst

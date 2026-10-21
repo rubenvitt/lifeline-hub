@@ -83,8 +83,8 @@ und, wenn vorhanden, aus Einsatzort oder Suchnadel übernehmbar. Ein Griff am Kr
 Radius durch Ziehen setzen; die Karte bleibt außerhalb des Griffs verschiebbar.
 
 #### Scenario: Linie ist kein Kreis
-- **WHEN** das Zeichnen-Paneel offen ist
-- **THEN** bietet die Absperrgrenze keinen Knopf „Kreis“
+- **WHEN** das Werkzeugmenü offen ist
+- **THEN** bietet die Absperrgrenze keinen Eintrag „Kreis“
 
 ### Requirement: Kreis anlegen
 „Übernehmen“ SHALL einen Kreis sofort als Zone anlegen, ohne zweite Bestätigung. Gespeichert MUST
@@ -94,7 +94,7 @@ nennen („Absperrbereich «Nord» eingerichtet · Kreis r = 300 m“). Für das
 angefangene Figur.
 
 #### Scenario: Absperrbereich mit 300 m
-- **WHEN** der Mensch im Zeichnen-Paneel beim Absperrbereich „Kreis“ wählt, auf die Karte tippt, „300 m“ wählt und „Übernehmen“ tippt
+- **WHEN** der Mensch im Werkzeugmenü beim Absperrbereich „Kreis“ wählt, auf die Karte tippt, „300 m“ wählt und „Übernehmen“ tippt
 - **THEN** steht ein Absperrbereich als Kreis mit Radius 300 m um die getippte Stelle, und das Einsatztagebuch nennt „Kreis r = 300 m“
 
 #### Scenario: Radius über der Grenze
@@ -139,8 +139,8 @@ Kreises werden. Gespeichert MUST nichts werden.
 
 ### Requirement: Zeichnen per Link
 Die Lagekarte SHALL einen Link mit dem Auftrag `zeichnen=<zonentyp>` annehmen und dann den
-Zeichenmodus dieses Zonentyps betreten, genau so, als wäre der Knopf des Typs im Zeichnen-Paneel
-gedrückt worden. Angenommen MUST jeder Zonentyp werden, den das Zeichnen-Paneel anbietet. Für einen
+Zeichenmodus dieses Zonentyps betreten, genau so, als wäre der Eintrag des Typs im Werkzeugmenü
+gewählt worden. Angenommen MUST jeder Zonentyp werden, den das Werkzeugmenü anbietet. Für einen
 Typ, der Fläche und Linie erlaubt, MUST der Auftrag die Form als `:flaeche` oder `:linie`
 annehmen; fehlt sie, MUST die Fläche gelten. Für einen Typ mit fester Geometrie MUST eine abweichende Form den
 Auftrag ungültig machen.
@@ -149,8 +149,8 @@ Der Modus MUST nur betreten werden, wenn die Person im Einsatz schreiben darf un
 eingefrorenen Stand zeigt. Solange Einsatz und Rechte noch laden, MUST der Auftrag stehen bleiben.
 Danach MUST der Auftrag aus der Adresse entfernt werden, auch wenn er ungültig war oder mangels
 Schreibrecht nicht ausgeführt wurde, damit ein Neuladen die Karte nicht erneut in den Modus schickt.
-Das Zeichnen per Link MUST denselben Regeln folgen wie das Zeichnen über das Paneel, insbesondere
-dem zweistufigen Esc.
+Das Zeichnen per Link MUST denselben Regeln folgen wie das Zeichnen über das Werkzeugmenü,
+insbesondere dem zweistufigen Esc.
 
 Ein Auftrag MAY einen Bezug `bezirk=<id>` tragen (LLH-1069). Er MUST nur am Typ
 `evakuierungsbezirk` gelten; an einem anderen Typ oder mit unbrauchbarer Kennung MUST der ganze
@@ -177,7 +177,7 @@ werden, auch allein.
 - **THEN** startet kein Zeichenmodus, und der Auftrag ist aus der Adresse verschwunden
 
 #### Scenario: Unbekannter Typ
-- **WHEN** der Auftrag einen Typ nennt, den das Zeichnen-Paneel nicht kennt
+- **WHEN** der Auftrag einen Typ nennt, den das Werkzeugmenü nicht kennt
 - **THEN** startet kein Zeichenmodus, und der Auftrag ist aus der Adresse verschwunden
 
 #### Scenario: Ohne Schreibrecht
@@ -243,3 +243,69 @@ mit dem Hell-/Nachtmodus wechseln.
 #### Scenario: Moduswechsel
 - **WHEN** zwischen Hell- und Nachtmodus gewechselt wird
 - **THEN** behalten bestehende und neue freie Skizzen ihre Farbe
+
+### Requirement: Werkzeugmenü an der Karte
+Der Kartenknopf „Zeichenwerkzeuge“ SHALL für Personen mit Schreibrecht ein Werkzeugmenü öffnen,
+nicht bei eingefrorenem Stand. Es MUST die Gruppen „Flächen und Linien“ und „Taktisches Zeichen“
+tragen. Ein Eintrag MUST denselben Modus starten wie der Zeichnen-Auftrag per Link und das Menü
+schließen. Messen MUST NOT im Menü stehen; es bleibt der eigene Kartenknopf „Messen“ mit seinen
+Formen in der Mess-Steuerung.
+
+#### Scenario: Absperrbereich aus dem Menü
+- **WHEN** eine Person mit Schreibrecht „Zeichenwerkzeuge“ und dann „Absperrbereich“ wählt
+- **THEN** steht die Karte im Zeichenmodus für einen Absperrbereich als Fläche, und das Menü ist zu
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** eine Person ohne Schreibrecht die Lagekarte öffnet
+- **THEN** gibt es keinen Knopf „Zeichenwerkzeuge“, und der Knopf „Messen“ steht da
+
+#### Scenario: Kein Messen im Menü
+- **WHEN** das Menü offen ist
+- **THEN** trägt es keinen Eintrag zum Messen
+
+### Requirement: Flächen und Linien im Werkzeugmenü
+Die Gruppe „Flächen und Linien“ SHALL jeden Zonentyp in jeder erlaubten Form anbieten. Der
+Eintrag mit dem Namen des Typs MUST seine Vorgabeform starten (Fläche, bei einer Linienart die
+Linie); daneben MUST jede weitere Form stehen: „Linie“ bei einem Typ mit Fläche und Linie,
+„Kreis“ bei jeder Flächenart.
+
+#### Scenario: Freie Skizze als Linie
+- **WHEN** die Person im Menü bei „Freie Skizze“ die Form „Linie“ wählt
+- **THEN** startet das Zeichnen einer freien Skizze als Linie in der Vorgabefarbe
+
+#### Scenario: Kreis je Flächenart
+- **WHEN** das Menü offen ist
+- **THEN** trägt jede Flächenart einen Eintrag „Kreis“ und die Absperrgrenze keinen
+
+### Requirement: Taktisches Zeichen im Werkzeugmenü
+Die Gruppe „Taktisches Zeichen“ SHALL die zuletzt verwendeten Zeichen zum direkten Platzieren
+tragen und „Weitere …“, das den Zeichen-Picker als Dialog öffnet. Läuft schon ein Taktisches
+Zeichen, MUST die Gruppe nur den Zustand zeigen; bedient wird der Modus im Modus-Band bzw. im
+Fuß-Band.
+
+#### Scenario: Zuletzt verwendetes Zeichen
+- **WHEN** die Person im Menü das zuletzt verwendete Zeichen „Löschfahrzeug“ tippt und dann die Karte
+- **THEN** ist das Zeichen dort gesetzt, ohne dass der Picker offen war
+
+#### Scenario: Weitere Zeichen
+- **WHEN** die Person im Menü „Weitere …“ wählt
+- **THEN** ist das Menü zu, und der Zeichen-Picker steht als Dialog mit „Platzieren“ und „Abbrechen“
+
+### Requirement: Das Werkzeugmenü hängt am Knopf
+Das Werkzeugmenü SHALL allein über den Knopf „Zeichenwerkzeuge“ aufgehen, neben der Knopfspalte
+stehen und vom Knopf als auf- und zugeklappt gemeldet werden. Es MUST kein Kontextmenü an einer
+Kartenstelle sein (keine Klickebene, kein `contextmenu`). Es MUST per Esc und bei einem Tipp
+außerhalb von Menü und Knopf schließen, ohne einen laufenden Modus zu ändern.
+
+#### Scenario: Esc schließt nur das Menü
+- **WHEN** das Menü während des Zeichnens eines Gefahrengebiets mit einem gesetzten Punkt offen ist und Esc gedrückt wird
+- **THEN** ist das Menü zu, der Punkt bleibt, und der Zeichenmodus läuft weiter
+
+### Requirement: Das Werkzeugmenü verdeckt keine Bedienung
+Das Werkzeugmenü MUST bei 390 px und 768 px weder den Knopfblock noch ein Band des Kartenfußes
+verdecken; passt es nicht, rollt es in sich. Jeder Eintrag MUST in jeder Dichtestufe mindestens
+die kleine Steuerhöhe erreichen (24 / 48 / 72 px).
+
+#### Scenario: Handschuh bei 390 px
+- **WHEN** bei 390 px in der Dichte „Handschuh“ das Menü offen ist
+- **THEN** ist jeder Eintrag mindestens 72 px hoch, und Knopfblock und Fuß-Bänder bleiben antippbar

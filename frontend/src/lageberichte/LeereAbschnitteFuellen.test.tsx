@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Form, Input } from 'antd';
+import { Form, Input, type FormInstance } from 'antd';
 import { ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import LeereAbschnitteFuellen, { LEERE_FUELLEN } from './LeereAbschnitteFuellen';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
+import { standFeld } from './standFeld';
 
 vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
@@ -25,8 +26,11 @@ function probe(text: string): UebernahmeQuelle {
 let QUELLEN: Record<string, UebernahmeQuelle>;
 
 /** Drei Abschnitte mit Quelle und einer ohne („auftrag“), wie im Lagevortrag zur Information. */
-function Probe({ start = {} }: { start?: Record<string, string> }) {
+let formular: FormInstance;
+
+function Probe({ start = {} }: { start?: Record<string, unknown> }) {
   const [form] = Form.useForm();
+  formular = form;
   return (
     <Form form={form} initialValues={start}>
       <LeereAbschnitteFuellen quellen={QUELLEN} einsatzId={1} form={form} onGeaendert={geaendert} />
@@ -62,6 +66,20 @@ describe('LeereAbschnitteFuellen (LLH-1081)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     // Einmal an den Verlustschutz, nicht je Abschnitt.
     expect(geaendert).toHaveBeenCalledTimes(1);
+  });
+
+  it('setzt den Stand der Übernahme nur an den gefüllten Abschnitten (LLH-1357)', async () => {
+    renderMitProviders(
+      <Probe start={{ a: 'Eigener Text', uebernommen_at: { a: '2026-10-20 08:00:00' } }} />,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: LEERE_FUELLEN }));
+    await waitFor(() => expect(feld('C').value).toBe('# C'));
+    const stand = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+    expect(formular.getFieldValue(standFeld('b'))).toMatch(stand);
+    expect(formular.getFieldValue(standFeld('c'))).toMatch(stand);
+    // Der gefüllte behält seinen, der ohne Quelle bekommt keinen.
+    expect(formular.getFieldValue(standFeld('a'))).toBe('2026-10-20 08:00:00');
+    expect(formular.getFieldValue(standFeld('auftrag'))).toBeUndefined();
   });
 
   it('lässt Text stehen, der während des Ladens geschrieben wurde', async () => {

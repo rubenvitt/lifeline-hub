@@ -224,7 +224,12 @@ pub struct LageMeldungAnzeige {
     pub lat: Option<f64>,
     pub lon: Option<f64>,
     pub erstellt_von_id: i64,
+    /// Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es
+    /// geschah.
     pub erstellt_at: String,
+    /// Ereigniszeit der Quellmeldung (UTC, `meldung.ereigniszeit`, LLH-1039): Zeit, Tag,
+    /// Zeitfenster und Ordnung der Zeitachse. Gleicher Name wie an der Meldung.
+    pub ereigniszeit: String,
     pub meldung_lfd_nr: i64,
     pub meldung_absender: String,
     /// Abgeleitet: noch niemand hat die Lagemeldung als gesehen gekennzeichnet (LLH-1206). Gilt

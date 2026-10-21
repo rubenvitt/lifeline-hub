@@ -366,6 +366,32 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   Abo ein SSRF-Weg. Das Abo hängt per CASCADE an `session`; ohne `--web-push` ist
   `LiveHub::web_push()` `None` und die Routen antworten 404. Nachweis `tests/web_push.rs`.
 
+## Backend — Meldungsmodell (LLH-1027, Zielbild)
+
+Entscheidung 21.10.2026; gilt ab dem jeweiligen Folgeticket, bis dahin gilt das Bestehende
+(`lage_meldung` als Lageobjekt, „An Lage übergeben“). Wer einen Punkt baut, schreibt die
+betroffene Regel fort und streicht ihn hier. Begriffe, Datenfluss, Migrations-SQL und
+Folgestellen: `docs/design/2026-10-21-meldungsmodell/README.md`.
+- **Eine Quelle `meldung` (LLH-1031):** „Lagemeldung“ ist eine Meldungsart, „lagerelevant“ ein
+  Merkmal. `lage_meldung` wird in derselben Migration aufgelöst, die ihre Angaben an `meldung`
+  hängt (`lage_text` NULL = Wortlaut gilt, `lat`/`lon`, `lage_uebergeben_*`, `lage_gesehen_*`);
+  kein Altbestand, keine zweite Kennung. Liste, Modulzähler, Marker
+  (`geocoding/marker.rs`) und Kenntnisnahme lesen `meldung WHERE lagerelevant = 1`. Die
+  Drahtform von `LageMeldungAnzeige` bleibt lesbar für alte Lage-Stände (`id = meldung_id`).
+- **Invariante „Art Lagemeldung ⇒ lagerelevant“** hält eine Repo-Funktion in `meldung/repo.rs`,
+  die jeder Schreibweg ruft (Meldungsroute, Gerät, Eintreffen am Bereitstellungsraum,
+  ETB-Erfassung, Korrektur); kein Handler setzt das Flag selbst. Zurücknehmen bei Art
+  Lagemeldung ist 422.
+- **Auto-ETB:** Art Lagemeldung schreibt `etb::TYP_LAGE`, jede andere Art `TYP_MELDUNG`.
+- **ETB → Meldung (LLH-1037):** `routes/etb.rs::erfassen` legt bei `in_meldungseingang: true`
+  (nur Typ `meldung`/`lage`, sonst 422) Eintrag und Meldung in **einer** Transaktion an, mit
+  beidseitigem Backlink und ohne zweiten ETB-Eintrag; dieselbe `client_id` dedupliziert beide.
+  Fehlt das Feld, wird nur protokolliert (ältere Clients und Warteschlangen-Zeilen). Ohne
+  Schreibrecht oder Freigabe im Modul Meldungen 403, nie stilles Herunterstufen.
+- **Schwärzung:** die Lage-Spalten sind Teil der Regel `meldung` (`lage_text` NullSetzen,
+  `lat`/`lon` behalten, Zeiten und Benutzer-FKs behalten); die Regel `lage_meldung` entfällt mit
+  der Tabelle.
+
 ## Backend — Bereitstellungsraum (LLH-1085, LLH-1107)
 
 Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;

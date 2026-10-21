@@ -10,7 +10,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *                         frontend/src/pages/gefahren/GefahrenMatrix.tsx,
  *                         frontend/src/pages/gefahren/GefahrenBeurteilung.tsx,
  *                         frontend/src/pages/gefahren/GefahrenErlaeuterungen.tsx (die Demo
- *                         erläutert Ertrinken × Menschen)
+ *                         erläutert Ertrinken × Menschen); im Seitenkopf der Nebenweg
+ *                         „Drucken / als PDF“ (LLH-1364)
  *   bewertung-waehlen.png frontend/src/pages/gefahren/GefahrenMatrix.tsx (Menü einer Zelle)
  *   bewertung-details.png frontend/src/pages/gefahren/GefahrenZelleDetails.tsx (Dialog
  *                         „Erläuterung …“)

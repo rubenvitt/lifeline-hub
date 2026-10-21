@@ -179,19 +179,28 @@ fn pruefe_abschnitts_schluessel<A: Abschnittsart>(
     Ok(())
 }
 
+/// Jedes Element prüft und vereinheitlicht sich selbst ([`Abschnittsart::normalisiere`],
+/// LLH-1357: Stand der Übernahme am Lagebericht). Unlesbares → 400.
+fn normalisiere_abschnitte<A: Abschnittsart>(abschnitte: &mut [A]) -> Result<(), AppError> {
+    abschnitte
+        .iter_mut()
+        .try_for_each(Abschnittsart::normalisiere)
+}
+
 pub async fn anlegen<T: DokumentRoute>(
     state: &AppState,
     benutzer: &Benutzer,
     einsatz_id: i64,
-    body: AnlegenBody<T::Abschnitt>,
+    mut body: AnlegenBody<T::Abschnitt>,
 ) -> Result<(StatusCode, Json<T::Anzeige>), AppError> {
     fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
 
     let Some(v) = vorlage::<T>(&body.vorlage) else {
         return Err(AppError::Validation("Unbekannte Vorlage".into()));
     };
-    if let Some(abs) = &body.abschnitte {
+    if let Some(abs) = &mut body.abschnitte {
         pruefe_abschnitts_schluessel(v, abs)?;
+        normalisiere_abschnitte(abs)?;
     }
     let titel = pflicht(&body.titel, "Titel")?;
     let zeitstand = match body.zeitstand.as_deref() {
@@ -228,7 +237,7 @@ pub async fn aktualisieren<T: DokumentRoute>(
     benutzer: &Benutzer,
     einsatz_id: i64,
     id: i64,
-    body: PatchBody<T::Abschnitt>,
+    mut body: PatchBody<T::Abschnitt>,
 ) -> Result<Json<T::Anzeige>, AppError> {
     fordere_schreiben::<T>(state, benutzer, einsatz_id).await?;
 
@@ -254,10 +263,11 @@ pub async fn aktualisieren<T: DokumentRoute>(
         Some(z) => Some(normalisiere_zeit(z)?),
         None => None,
     };
-    if let Some(abs) = &body.abschnitte {
+    if let Some(abs) = &mut body.abschnitte {
         let v = vorlage::<T>(&vorher.vorlage)
             .ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
         pruefe_abschnitts_schluessel(v, abs)?;
+        normalisiere_abschnitte(abs)?;
     }
 
     let dok = dok_repo::aktualisiere::<T>(

@@ -42,6 +42,7 @@ import AbschnittAnlegenModal from './einsatzabschnitte/AbschnittAnlegenModal';
 import { abrufZustand } from '../api/abrufZustand';
 import {
   einheitenPfad,
+  lagekartePfad,
   parseAbschnitteAnsicht,
   type AbschnitteAnsicht,
 } from '../routing/deeplinks';
@@ -779,6 +780,19 @@ export default function EinsatzabschnittePage() {
               style={{ flex: 1, width: breit ? undefined : '100%' }}
               koerperPolster
               titel={aktuell ? `Abschnitt: ${aktuell.name}` : 'Kein Abschnitt gewählt'}
+              // Sprung in die Lagekarte mit Fokus auf diesen Abschnitt (LLH-1349): kein Eintrag im
+              // Menü der Handlungen (LFH-616), steht auch ohne Schreibrecht; ohne Freigabe der
+              // Lagekarte gesperrt mit Grund (LFH-888). Die Karte fokussiert und räumt `?abschnitt=`.
+              aktion={
+                aktuell ? (
+                  <SprungKnopf
+                    to={lagekartePfad(einsatzId, { abschnitt: aktuell.id })}
+                    gesperrt={istGesperrt('lagekarte')}
+                  >
+                    Auf Karte zeigen
+                  </SprungKnopf>
+                ) : undefined
+              }
             >
               {/* Ohne Abschnitt (leere Gliederung, Ladefehler) trägt der Titel den Zustand; den
                 Weg hinaus zeigt der Leerzustand der Gliederung. */}

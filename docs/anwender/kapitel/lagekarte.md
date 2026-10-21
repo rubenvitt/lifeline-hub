@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
 ---
 
 ## Überblick
@@ -10,8 +10,8 @@ quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sid
 Die Lagekarte zeigt, wo was ist: Einsatzort, Einheiten, Zonen, Gefahrengebiete, Stellen,
 Bereitstellungsräume, Lagemeldungen und taktische Zeichen. Rechts steht die Leiste mit den
 Ansichten „Ebenen“ und „Objekte“: „Ebenen“ ordnet alles, was die Karte zeigen kann, in Gruppen;
-„Objekte“ führt alle Objekte des Einsatzes in einer durchsuchbaren Liste, verortet oder nicht, und
-das Zeichnen. Solange ein Objekt gewählt ist, kommt die Ansicht „Auswahl“ dazu. Auf der Karte wird
+„Objekte“ führt alle Objekte des Einsatzes in einer durchsuchbaren Liste, verortet oder nicht.
+Gezeichnet wird über den Knopf „Zeichenwerkzeuge“ rechts an der Karte. Solange ein Objekt gewählt ist, kommt die Ansicht „Auswahl“ dazu. Auf der Karte wird
 gelesen, verortet, gezeichnet und gemessen. Lesen und Messen kann jede Person im Einsatz, Verorten und Zeichnen nur,
 wer im Einsatz schreiben darf.
 
@@ -84,8 +84,9 @@ wer im Einsatz schreiben darf.
 
 ### Ein taktisches Zeichen setzen
 
-1. Rechts an der Karte „Zeichenwerkzeuge“ wählen. Die Leiste zeigt „Objekte“ mit dem Paneel
-   „Zeichnen“; dort „Taktisches Zeichen platzieren“ wählen.
+1. Rechts an der Karte „Zeichenwerkzeuge“ wählen. Unter „Taktisches Zeichen“ stehen die zuletzt
+   verwendeten Zeichen. Ein Tipp auf eines davon wählt es ohne Zeichenwahl; dann gleich auf die
+   Stelle der Karte tippen wie in Schritt 3. Für ein anderes Zeichen „Weitere …“ wählen.
 2. Ein Grundzeichen wählen, bei Bedarf ein Symbol; beide Listen lassen sich durchsuchen. Ein
    Symbol ohne Grundzeichen, etwa ein Piktogramm oder einen Zustand, setzt „Kein Grundzeichen“
    und danach das Symbol. Unter „Details“ stehen Organisation, Fachaufgabe, Einheit, Farbe und
@@ -101,9 +102,9 @@ wer im Einsatz schreiben darf.
 
 ### Eine Zone zeichnen
 
-1. Im Paneel „Zeichnen“ (Leiste, „Objekte“) unter „Zone zeichnen“ die Art wählen, etwa
-   „Gefahrengebiet zeichnen“.
-   Für eine freie Skizze „Fläche“ oder „Linie“ wählen.
+1. Rechts an der Karte „Zeichenwerkzeuge“ wählen und unter „Flächen und Linien“ die Art, etwa
+   „Gefahrengebiet“. Eine freie Skizze entsteht mit „Freie Skizze“ als Fläche oder mit „Linie“
+   daneben als Linie. Esc oder ein Tipp neben das Menü schließt es, ohne zu zeichnen.
 2. Die Eckpunkte nacheinander auf die Karte tippen. Das Band unten zählt die Punkte;
    „Letzten Punkt zurück“ nimmt den letzten wieder weg.
 
@@ -114,7 +115,7 @@ wer im Einsatz schreiben darf.
 
 ### Einen Absperr- oder Gefahrenbereich als Kreis zeichnen
 
-1. Im Paneel „Zeichnen“ neben der Art, etwa „Absperrbereich zeichnen“, „Kreis“ wählen. Mit
+1. Unter „Zeichenwerkzeuge“ neben der Art, etwa „Absperrbereich“, „Kreis“ wählen. Mit
    Schreibrecht geht es auch über einen Rechtsklick oder langen Druck auf die Karte und „Kreis
    hier …“; die Stelle ist dann schon die Mitte.
 2. Im Band unten unter „Art“ bei Bedarf eine andere Art wählen.
@@ -260,12 +261,17 @@ lassen sich weiter antippen, sie erscheinen nur blass: Einheiten, Fahrzeuge, Abs
 Flächen. Eine Einheit ohne eigenen Abschnitt zählt zum Abschnitt der Einheit, unter der sie steht,
 ein Fahrzeug zum Abschnitt seiner Einheit. Unterabschnitte gehören zum fokussierten Abschnitt und
 bleiben voll. Kräfte ohne Abschnitt, Personal, Schäden, Zonen und alles Übrige bleiben ebenfalls
-voll. Ebenen, Zahlen und Listen der Leiste ändern sich nicht.
+voll. Ebenen, Zahlen und Listen der Leiste ändern sich nicht. Ein Bündel mehrerer Marker erscheint
+nur dann blass, wenn es ausschließlich Kräfte anderer Abschnitte enthält; ist auch nur ein Marker
+dabei, der voll bleibt, bleibt das ganze Bündel voll. Ein blasses Bündel fächert beim Antippen auf
+wie jedes andere. Der Lageplan zeigt die Bündel so wie die Karte.
 
 Hat der Abschnitt keine Fläche, zeigt die Karte seine Unterabschnitte und seine verorteten
 Kräfte; gibt es auch die nicht, bleibt der Ausschnitt, wie er ist. Der Fokus wird nicht
 gespeichert: Nach dem Neuladen und in einem anderen Einsatz ist er aufgehoben. Ein Link auf die
-Lagekarte kann einen Abschnitt mitbringen; die Karte öffnet dann mit diesem Fokus.
+Lagekarte kann einen Abschnitt mitbringen; die Karte öffnet dann mit diesem Fokus. So öffnet
+„Auf Karte zeigen ↗“ beim gewählten Abschnitt auf der Seite
+[Einsatzabschnitte](einsatzabschnitte.md) die Karte.
 
 ### Gefahrengebiete
 
@@ -288,8 +294,8 @@ Gebiets bleiben still.
 
 Lesen, Ebenen schalten und Messen gehen mit jeder Rolle. Verorten, Zeichnen und Zeichen setzen
 brauchen das Schreibrecht im Einsatz: Einsatzleitung oder Führungspersonal in einem laufenden
-Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt das Paneel
-„Zeichnen“.
+Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt der Knopf
+„Zeichenwerkzeuge“.
 
 ### Bereitstellungsräume
 

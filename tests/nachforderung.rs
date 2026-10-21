@@ -181,6 +181,85 @@ async fn status_workflow_und_ungueltiger_uebergang_ist_422() {
     assert_eq!(j.as_array().unwrap()[0]["ist_offen"], false);
 }
 
+/// LLH-1104 (Spec `etb-vorgaenge`): die ETB-Liste trägt am Anlage-Eintrag und an jeder Stufe den
+/// Verweis `nachforderung_id`; Absender ist die Führungsstelle, nicht „System“.
+#[tokio::test]
+async fn stufen_stehen_mit_verweis_in_der_etb_liste() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{e}/fuehrungsstelle"),
+        &admin,
+        Some(r#"{"rufname":"Florian Musterstadt 10/1"}"#),
+    )
+    .await;
+    assert!(s.is_success(), "Führungsstelle: {s}");
+    let (_, n) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &admin,
+        Some(&body()),
+    )
+    .await;
+    let nid = n["id"].as_i64().unwrap();
+    for ziel in ["zugesagt", "angefordert"] {
+        let (status, j) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+            &admin,
+            Some(&format!(r#"{{"status":"{ziel}"}}"#)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{j:?}");
+    }
+    let (status, j) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/ablehnen"),
+        &admin,
+        Some(r#"{"grund":"keine Reserven"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{j:?}");
+
+    let (_, etb) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/etb"),
+        &admin,
+        None,
+    )
+    .await;
+    let mut eigene: Vec<&serde_json::Value> = etb
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["nachforderung_id"] == nid)
+        .collect();
+    eigene.sort_by_key(|x| x["lfd_nr"].as_i64());
+    let inhalte: Vec<&str> = eigene
+        .iter()
+        .map(|x| x["inhalt"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        inhalte,
+        [
+            "Nachforderung: 2× RTW — 2 RTW zur Verstärkung",
+            "Nachforderung 2× RTW: zugesagt",
+            "Nachforderung 2× RTW: zurückgesetzt auf angefordert",
+            "Nachforderung 2× RTW: abgelehnt (keine Reserven)",
+        ]
+    );
+    assert_eq!(eigene[0]["von"], "Florian Musterstadt 10/1");
+    assert_eq!(eigene[0]["an"], "Leitstelle Nord");
+    assert!(eigene[1..].iter().all(|x| x["typ"] == "system"));
+}
+
 #[tokio::test]
 async fn status_abgelehnt_ueber_status_endpoint_ist_422() {
     let app = setup().await;

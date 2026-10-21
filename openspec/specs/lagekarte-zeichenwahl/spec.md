@@ -45,15 +45,16 @@ nur dort zur Wahl, wo das Zeichen eine Füllung trägt.
 - **THEN** stehen nur die Farben der Palette zur Wahl, keine freie Farbeingabe
 
 ### Requirement: Enter platziert
-In der Kartenleiste SHALL Enter im Picker das Platzieren starten wie der Knopf „Platzieren“,
-mit der gerade sichtbaren Spec. Das gilt auf einer Kachel, in einem Suchfeld und in der
-Bezeichnung. Enter in einem Suchfeld mit Treffern MUST vorher den ersten Treffer wählen, sofern
-die Auswahl nicht schon unter den Treffern steht. Die Bezeichnung MUST dabei mit dem gerade
-getippten Wortlaut übernommen werden. Das bloße Verlassen eines Feldes MUST NOT platzieren.
+Im Zeichen-Picker (Dialog aus dem Werkzeugmenü „Weitere …“) SHALL Enter das Platzieren starten
+wie der Knopf „Platzieren“, mit der gerade sichtbaren Spec, und den Dialog schließen. Das gilt auf
+einer Kachel, in einem Suchfeld und in der Bezeichnung. Enter in einem Suchfeld mit Treffern MUST
+vorher den ersten Treffer wählen, sofern die Auswahl nicht schon unter den Treffern steht. Die
+Bezeichnung MUST dabei mit dem gerade getippten Wortlaut übernommen werden. Das bloße Verlassen
+eines Feldes MUST NOT platzieren.
 
 #### Scenario: Enter auf einer Kachel
 - **WHEN** die Kachel „Person“ den Fokus hat und die Person Enter drückt
-- **THEN** geht die Karte in den Platzier-Modus mit dem Grundzeichen „Person“
+- **THEN** geht die Karte in den Platzier-Modus mit dem Grundzeichen „Person“, und der Dialog ist zu
 
 #### Scenario: Enter mit frisch getippter Bezeichnung
 - **WHEN** die Person in „Bezeichnung“ „EA Nord“ tippt und Enter drückt

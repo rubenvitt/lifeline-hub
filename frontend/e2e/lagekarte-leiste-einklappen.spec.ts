@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { oeffneWerkzeugmenue } from './leisten-kern';
 
 /**
  * Die Kartenleiste lässt sich auch am Fükw ausblenden, und die Wahl bleibt gemerkt. Bei
@@ -117,7 +118,7 @@ test('Die Wahl ist je Breitenklasse gemerkt: lg und darunter getrennt', async ({
   await expect(leiste(page)).toHaveCount(0);
 });
 
-test('Der Stift öffnet die ausgeblendete Leiste samt „Zeichnen“, aber nur für die Sitzung', async ({
+test('„Zeichenwerkzeuge“ öffnet das Menü an der Karte, die ausgeblendete Leiste bleibt zu', async ({
   page,
 }) => {
   await anmelden(page);
@@ -128,13 +129,11 @@ test('Der Stift öffnet die ausgeblendete Leiste samt „Zeichnen“, aber nur f
   await page.getByRole('button', { name: 'Leiste ausblenden' }).click();
   await expect(leiste(page)).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Zeichenwerkzeuge' }).click();
-  await expect(leiste(page)).toBeVisible();
-  await expect(
-    leiste(page).locator('[data-paneel="zeichnen"] button[aria-expanded]').first(),
-  ).toHaveAttribute('aria-expanded', 'true');
+  // LLH-1038: gezeichnet wird an der Karte; die Leiste trägt keinen Zeichenweg.
+  await oeffneWerkzeugmenue(page);
+  await expect(leiste(page)).toHaveCount(0);
 
-  // Nicht gespeichert: nach dem Neuladen gilt wieder das eigene Ausblenden.
+  // Auch nach dem Neuladen gilt das eigene Ausblenden.
   await page.reload();
   await karteBereit(page);
   await expect(leiste(page)).toHaveCount(0);

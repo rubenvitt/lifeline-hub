@@ -21,7 +21,7 @@ function basis(over: Partial<Parameters<typeof KartenUeberlagerung>[0]> = {}) {
     onZoomRein: vi.fn(),
     onZoomRaus: vi.fn(),
     onNorden: vi.fn(),
-    onZeichnen: vi.fn(),
+    zeichenwerkzeuge: { offen: false, steuert: 'werkzeugmenue', onUmschalten: vi.fn() },
     onMessen: vi.fn(),
     messenAktiv: false,
     ...over,
@@ -39,16 +39,31 @@ describe('KartenUeberlagerung — Knopfblock', () => {
     expect(p.onZoomRein).toHaveBeenCalledTimes(1);
     expect(p.onZoomRaus).toHaveBeenCalledTimes(1);
     expect(p.onNorden).toHaveBeenCalledTimes(1);
-    expect(p.onZeichnen).toHaveBeenCalledTimes(1);
+    expect(p.zeichenwerkzeuge.onUmschalten).toHaveBeenCalledTimes(1);
   });
 
-  it('ohne Schreibrecht (kein onZeichnen) gibt es keinen Zeichnen-Knopf', () => {
-    renderMitProviders(<KartenUeberlagerung {...basis({ onZeichnen: undefined })} />);
+  it('ohne Schreibrecht (keine Zeichenwerkzeuge) gibt es keinen Zeichnen-Knopf', () => {
+    renderMitProviders(<KartenUeberlagerung {...basis({ zeichenwerkzeuge: undefined })} />);
     expect(screen.queryByRole('button', { name: 'Zeichenwerkzeuge' })).not.toBeInTheDocument();
   });
 
+  // LLH-1038: der Knopf steuert das Werkzeugmenü an der Karte, nicht die Leiste.
+  it('„Zeichenwerkzeuge“ meldet das Werkzeugmenü auf- und zugeklappt', () => {
+    const p = basis();
+    const { rerender } = renderMitProviders(<KartenUeberlagerung {...p} />);
+    const zu = screen.getByRole('button', { name: 'Zeichenwerkzeuge' });
+    expect(zu).toHaveAttribute('aria-expanded', 'false');
+    expect(zu).not.toHaveAttribute('aria-controls');
+    rerender(
+      <KartenUeberlagerung {...p} zeichenwerkzeuge={{ ...p.zeichenwerkzeuge, offen: true }} />,
+    );
+    const offen = screen.getByRole('button', { name: 'Zeichenwerkzeuge' });
+    expect(offen).toHaveAttribute('aria-expanded', 'true');
+    expect(offen).toHaveAttribute('aria-controls', 'werkzeugmenue');
+  });
+
   it('LFH-616: Messen ist ein Umschalter und steht auch ohne Schreibrecht da', () => {
-    const p = basis({ onZeichnen: undefined });
+    const p = basis({ zeichenwerkzeuge: undefined });
     const { rerender } = renderMitProviders(<KartenUeberlagerung {...p} />);
     const knopf = screen.getByRole('button', { name: 'Messen' });
     expect(knopf).toHaveAttribute('aria-pressed', 'false');

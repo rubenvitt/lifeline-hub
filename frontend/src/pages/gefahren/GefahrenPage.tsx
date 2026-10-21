@@ -18,22 +18,26 @@ import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad } from '../../routing/deeplinks';
 import { useQueryParamSelektion } from '../../routing/useQueryParamSelektion';
-import { warnstufeKarte } from '../../theme/statusFarben';
+import { warnstufeFlaeche, warnstufeKarte } from '../../theme/statusFarben';
 import { gefahrenMatrixAbfrage } from './gefahrenMatrixAbfrage';
 import StatusTag from '../../components/StatusTag';
 import GefahrenMatrix, { zellSchluessel } from './GefahrenMatrix';
 import GefahrenBeurteilung from './GefahrenBeurteilung';
-import { istBeurteilt } from './beurteilung';
+import { beurteilungText, istBeurteilt } from './beurteilung';
 import { gebietAussage } from './gebietAussage';
 import { Liste, ListenEintrag } from '../../components/Liste';
 import { SeitenLeer } from '../../components/SeitenZustand';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
-import EinsatzSeite from '../../components/EinsatzSeite';
+import EinsatzSeite, { type SeitenNebenwege } from '../../components/EinsatzSeite';
 import { Paneel } from '../../components/instrument';
 import { InlineAngabe } from '../../components/InlineAngabe';
 import { KennungsLink } from '../../components/kennungsLink';
 import { einsatzRechteGrund } from '../../components/nurAnsicht';
 import { RechteHinweis, SpeicherFehler } from '../../components/SpeicherHinweis';
+import Druckkopf from '../../components/druck/Druckkopf';
+import { useDruckNebenwege } from '../../components/druck/useDruckNebenwege';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
+import './gefahrenPrint.css';
 
 /**
  * Trefflächenboden der Gebietszeile. Sie ist ein handgebautes Bedienziel (`ListenEintrag` legt
@@ -73,6 +77,9 @@ export default function GefahrenPage() {
   const [searchParams] = useSearchParams();
   const { abBreite } = useViewport();
   const breit = abBreite('lg');
+  // Druck des gewählten Gebiets (LLH-1364): „Drucken / als PDF“ als Nebenweg des Seitenkopfs.
+  const druckWege = useDruckNebenwege();
+  const { formatZeit } = useAnzeigeKonventionen();
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -166,9 +173,10 @@ export default function GefahrenPage() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
 
   // Seitenkopf für alle Zweige unterhalb des Einsatzes (Laden, Fehler, leer, Matrix).
-  const seite = (inhalt: ReactNode, dataUpdatedAt?: number) => (
+  const seite = (inhalt: ReactNode, dataUpdatedAt?: number, weitere?: SeitenNebenwege) => (
     <EinsatzSeite
       titel={modulName('gefahrenzonen')}
+      weitere={weitere}
 
       meta={gebieteQuery.isSuccess ? `${gebiete.length} Gefahrengebiete` : undefined}
       dataUpdatedAt={dataUpdatedAt}
@@ -225,8 +233,11 @@ export default function GefahrenPage() {
   const aktuell = gebiete.find((g) => g.id === gewaehlt);
   // Zusatz je Gebietszeile, in der Reihenfolge von `gebiete` wie `gebietsMatrizen`.
   const aussagen = gebiete.map((g, i) => gebietAussage(g, gebietsMatrizen[i]?.data));
+  // Gedruckt wird nur ein Gebiet mit geladener Matrix: vorher stünde eine Matrix ohne Aussage auf
+  // dem Blatt (LLH-1364). Lesen genügt, wie bei jedem Druck.
+  const druckbar = aktuell != null && matrixQuery.data !== undefined;
 
-  return seite(
+  const blatt = seite(
     <div
       data-gefahren-rahmen
       style={{
@@ -243,6 +254,7 @@ export default function GefahrenPage() {
       <Paneel
         titel="Gefahrengebiete"
         meta={String(gebiete.length)}
+        className="gefahren-no-print"
         style={breit ? { width: 240, flexShrink: 0 } : { width: '100%' }}
       >
         <Liste
@@ -288,6 +300,7 @@ export default function GefahrenPage() {
         {aktuell && (
           <div
             data-lfh="gefahrengebiet-kopf"
+            className="gefahren-no-print"
             style={{
               display: 'flex',
               flexWrap: 'wrap',
@@ -384,6 +397,8 @@ export default function GefahrenPage() {
           <GefahrenBeurteilung
             // Je Gebiet ein eigener Zustand: nichts wandert ins nächste.
             key={aktuell.id}
+            // Auf Papier steht die Beurteilung im Druckkopf (`gefahrenPrint.css`).
+            className="gefahren-no-print"
             gebiet={aktuell}
             darfSchreiben={darfSchreiben}
             matrixLaedt={matrixQuery.isPending}
@@ -393,12 +408,12 @@ export default function GefahrenPage() {
           />
         )}
         {!darfSchreiben && (
-          <div style={{ marginBottom: 12 }}>
+          <div className="gefahren-no-print" style={{ marginBottom: 12 }}>
             <RechteHinweis sichtbar text={einsatzRechteGrund(einsatz.status)} />
           </div>
         )}
         {setzen.isError && (
-          <div data-fehler style={{ marginBottom: 12 }}>
+          <div data-fehler className="gefahren-no-print" style={{ marginBottom: 12 }}>
             <SpeicherFehler fehler={setzen.error} titel="Bewertung nicht gespeichert" />
           </div>
         )}
@@ -429,5 +444,28 @@ export default function GefahrenPage() {
       </Paneel>
     </div>,
     gemeinsamerDatenstand(gebieteQuery.dataUpdatedAt, matrixQuery.dataUpdatedAt),
+    { name: 'Weitere Aktionen zu den Gefahren', eintraege: druckbar ? druckWege : [] },
+  );
+
+  // Druckwurzel (LLH-1364): Mechanik in `druck/druck.css`, Eigenheiten in `gefahrenPrint.css`.
+  // Gedruckt wird das gewählte Gebiet: Legende, Matrix und Liste „Erläuterungen“.
+  return (
+    <div className="gefahren-print-root" data-lfh="druckwurzel">
+      {/* Nur auf Papier: Gebiet, Warnstufe und Beurteilung stehen am Schirm in Gebietsliste und
+          Gebietskopf, die auf Papier wegfallen. */}
+      {aktuell && (
+        <Druckkopf
+          dokumentart="Gefahrenbewertung"
+          titel={gefahrengebietName(aktuell.label, aktuell.id)}
+          einsatz={einsatz}
+          sichtbarkeit="druck"
+          zeilen={[
+            { etikett: 'Warnstufe', wert: warnstufeFlaeche[aktuell.hoechste_warnstufe].label },
+            { etikett: 'Beurteilung', wert: beurteilungText(aktuell, formatZeit) },
+          ]}
+        />
+      )}
+      {blatt}
+    </div>
   );
 }

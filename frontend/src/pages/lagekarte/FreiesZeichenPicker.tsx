@@ -80,7 +80,7 @@ const DETAIL_ACHSEN: { achse: Exclude<DetailAchse, 'farbe'>; label: string }[] =
 
 /** Kantenlänge der Zeichnung in einer Kachel. Ab 40 px bleibt die DV-102-Binnenzeichnung
  *  (Fachaufgabe im Grundzeichen) unterscheidbar. */
-const KACHEL_BILD = 40;
+export const KACHEL_BILD = 40;
 const VORSCHAU_BILD = 56;
 
 /** Die Vorschau ohne Zeichen („Kein Grundzeichen“ vor der Symbolwahl). */

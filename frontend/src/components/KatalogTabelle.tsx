@@ -21,6 +21,7 @@ import type { Farbrollen } from '../theme/tokens';
 import { useRollen } from './instrument/rollenwerte';
 import { useDruckModus } from './druck/useDruckModus';
 import { useRahmenObenFuer } from './rahmenOben';
+import { useFokusUnterKopf } from './fokusUnterKopf';
 // Kopfzellen-Typografie und Mono-Spalten liegen als Klassen in der Gestaltungssprache
 // (`.lfh-katalog …`). Der Import gehört HIERHER: nicht jeder Konsument montiert `EinsatzSeite`.
 import '../theme/sprache.css';
@@ -558,6 +559,8 @@ export default function KatalogTabelle<T extends object>({
   // Der Kopf steht unter dem klebenden Rahmen, in Drawer und Modal an deren Oberkante (LFH-952).
   const rahmenOben = useRahmenObenFuer(useCallback(() => tabelleRef.current?.nativeElement, []));
   useKopfFreiraum(tabelleRef);
+  // Erste Zeile rückwärts getabbt: dort greift `scroll-margin-top` nicht (LLH-1358).
+  useFokusUnterKopf(tabelleRef);
   useFilterTastatur(tabelleRef);
   useSlashKuerzel(suche != null, () => feldRef.current?.focus());
 

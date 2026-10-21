@@ -717,7 +717,13 @@ const QUELLEN: ReadonlyArray<readonly [string, UebernahmeQuelle]> = [
 ];
 
 /** Der Startinhalt, den die gestubbten Quellen liefern (`zaehlePosts`). */
-const STARTINHALT = QUELLEN.map(([s]) => ({ schluessel: s, text: `Text ${s}` }));
+/** Jeder Text des Startinhalts trägt den Stand seiner Übernahme (LLH-1357), UTC ohne Zone. */
+const STAND = expect.stringMatching(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/) as unknown as string;
+const STARTINHALT = QUELLEN.map(([s]) => ({
+  schluessel: s,
+  text: `Text ${s}`,
+  uebernommen_at: STAND,
+}));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -860,7 +866,7 @@ describe('LageberichtePage — Anlegen ohne Dialog (LLH-1064)', () => {
     expect(posts).toHaveLength(1);
     expect(posts[0].abschnitte).toEqual([
       ...STARTINHALT.slice(0, 4),
-      { schluessel: 'medienlage', text: '— (Stab nicht freigegeben)' },
+      { schluessel: 'medienlage', text: '— (Stab nicht freigegeben)', uebernommen_at: STAND },
     ]);
     expect(posts.erzeuge.medienlage).not.toHaveBeenCalled();
   });

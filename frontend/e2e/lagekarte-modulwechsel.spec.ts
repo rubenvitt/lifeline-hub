@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
-import { objektZeile, zeigeLeistenAnsicht } from './leisten-kern';
+import { objektZeile, waehleWerkzeug } from './leisten-kern';
 
 /**
  * Modulwechsel mit laufendem Werkzeug (LFH-943, Spec `lagekarte-ressourcen`): Wer misst oder
@@ -109,9 +109,8 @@ test.describe('Lagekarte: Modulwechsel mit laufendem Werkzeug (LFH-943)', () => 
     await anmeldenAlsAdmin(page);
     const canvas = await lagekarteOeffnen(page, await einsatzAnlegen(page));
 
-    // Ebenenbaum (LLH-1028): das Paneel „Zeichnen“ liegt in der Ansicht „Objekte“.
-    await zeigeLeistenAnsicht(page, 'Objekte');
-    await page.getByRole('button', { name: 'Gefahrengebiet zeichnen' }).click();
+    // Gezeichnet wird über das Werkzeugmenü an der Karte (LLH-1038).
+    await waehleWerkzeug(page, 'Gefahrengebiet');
     await setzePunkt(page, canvas, -100, -120);
     await expect(page.locator('[data-lfh="zeichnen-punkte"]')).toHaveText('1 Punkt');
 
@@ -154,10 +153,12 @@ for (const [name, viewport] of [
       const einsatzId = await einsatzAnlegen(page);
       await wechsleZuRolle(page, 'beobachter', einsatzId);
       const canvas = await lagekarteOeffnen(page, einsatzId);
-      // Vorbedingung des Rollenzweigs: der Beobachter darf nicht zeichnen. Gezählt im DOM, denn
-      // das Paneel „Zeichnen“ stünde in der Ansicht „Objekte“, die verborgen sein kann.
-      await expect(page.locator('[data-lfh="kartenleiste"]')).toHaveCount(1);
-      await expect(page.locator('section[data-paneel="zeichnen"]')).toHaveCount(0);
+      // Vorbedingung des Rollenzweigs: der Beobachter darf nicht zeichnen — kein Knopf
+      // „Zeichenwerkzeuge“ an der Karte, deren Knopfblock steht (LLH-1038).
+      await expect(page.getByRole('button', { name: 'Messen' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Zeichenwerkzeuge', exact: true })).toHaveCount(
+        0,
+      );
 
       await page.getByRole('button', { name: 'Messen' }).click();
       await expect(page.locator('[data-lfh="mess-steuerung"]')).toBeVisible();
