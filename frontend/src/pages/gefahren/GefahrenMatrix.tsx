@@ -8,19 +8,21 @@ import {
 } from '../../icons';
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 import { Button, Dropdown, Space, Table, Tooltip, Typography } from 'antd';
-import type { GlobalToken, TableColumnsType, TableRef } from 'antd';
+import type { TableColumnsType, TableRef } from 'antd';
 import type { GefahrBewertung, Gefahrentyp, Schutzobjekt, Warnstufe } from '../../api/types';
 import { monoStil, useRollen } from '../../components/instrument';
 import type { BewertungEingabe } from '../../api/gefahren';
-import { flaechenFarbe, warnstufeBalkenFarbe, warnstufeFlaeche } from '../../theme/statusFarben';
+import { warnstufeFlaeche } from '../../theme/statusFarben';
+import { zellFlaechenStil } from './zellStil';
 import {
-  GEFAHRENTYPEN,
   GEFAHRENTYPEN_ALPHABETISCH,
   SCHUTZOBJEKTE,
   WARNSTUFEN,
   kombinationGueltig,
 } from './gefahrenSchema';
 import GefahrenZelleDetails from './GefahrenZelleDetails';
+import GefahrenErlaeuterungen from './GefahrenErlaeuterungen';
+import { hatErlaeuterung, zellTitel } from './erlaeuterungen';
 import { useKopfFreiraum } from '../../components/KatalogTabelle';
 import { useRahmenOben } from '../../components/rahmenOben';
 import './gefahrenMatrix.css';
@@ -125,26 +127,9 @@ export const SPALTENKOPF: Record<Schutzobjekt, { icon: Icon; kurz: string }> = {
   einsatzkraefte: { icon: IconSchild, kurz: 'Kraft' },
 };
 
-/** Balken einer Matrixzelle — rein; ohne Warnstufe kein Balken. */
-export function zellBalkenStil(farbe: string | null): { boxShadow?: string } {
-  return farbe == null ? {} : { boxShadow: `inset 0 -3px 0 0 ${farbe}` };
-}
-
-/**
- * Fläche + Balken einer Matrixzelle zur Warnstufe — eine Stelle für Matrix und Palettenauszug. Der
- * Balken sitzt 3 px unten als Innenschatten (kein Layout, die Zeilenhöhe springt beim Umbewerten
- * nicht) und trägt die Skala niedrig → akut; die Fläche darunter die zwei Intensitäten aus dem
- * Flächenvertrag. Zweiter Kanal bleibt das Kürzel.
- */
-export function zellFlaechenStil(
-  stufe: Warnstufe,
-  token: GlobalToken,
-): { backgroundColor: string; boxShadow?: string } {
-  return {
-    backgroundColor: flaechenFarbe(stufe, token),
-    ...zellBalkenStil(warnstufeBalkenFarbe(stufe, token)),
-  };
-}
+// Fläche und Balken einer Zelle stehen in `zellStil.ts` (LLH-1110: auch das Stufen-Etikett
+// außerhalb der Matrix liest sie, ohne die Matrix zu importieren).
+export { zellBalkenStil, zellFlaechenStil } from './zellStil';
 
 /**
  * Zellzustände ohne gesetzte Stufe — EINE Quelle für Matrix, Auszug und Legende, damit dieselbe
@@ -186,6 +171,34 @@ export function schraffurStil(farbe: string): CSSProperties {
 /** Die eine Schreibweise der Zell-Identität — auch für den Schlüssel der laufenden Mutation. */
 export function zellSchluessel(typ: Gefahrentyp, objekt: Schutzobjekt): string {
   return `${typ}×${objekt}`;
+}
+
+/**
+ * Marke einer Zelle mit Erläuterung (LLH-1110, Spec `gefahrenmatrix`): ein Dreieck in der Ecke oben
+ * rechts. Zweiter Kanal ist die Form, nicht die Farbe (WCAG 1.4.1); die Farbe ist die des Kürzels
+ * (`currentColor`), die auf jeder Stufenfläche den Textboden hält. Für Hilfstechnik verborgen, den
+ * Hinweis trägt der Name der Zelle. Sie nimmt keine Zeigerereignisse an: die ganze Zelle bleibt
+ * das Ziel (LLH-1102).
+ */
+export const ERLAEUTERUNG_MARKE_KANTE = 8;
+
+function ErlaeuterungsMarke() {
+  return (
+    <span
+      aria-hidden="true"
+      data-lfh="erlaeuterung-marke"
+      style={{
+        position: 'absolute',
+        insetBlockStart: 0,
+        insetInlineEnd: 0,
+        width: 0,
+        height: 0,
+        borderInlineStart: `${ERLAEUTERUNG_MARKE_KANTE}px solid transparent`,
+        borderBlockStart: `${ERLAEUTERUNG_MARKE_KANTE}px solid currentColor`,
+        pointerEvents: 'none',
+      }}
+    />
+  );
 }
 
 export interface GefahrenMatrixProps {
@@ -242,9 +255,22 @@ export default function GefahrenMatrix({
    * Im Zustand steht die Kennung der Zelle, nicht ihr Datensatz. Eine Momentaufnahme vom Menüklick
    * würde von keinem Nachladen erreicht; der Detail-PUT schickt aber `warnstufe` mit und drehte
    * eine inzwischen gesetzte Stufe still zurück (zweiter Bediener, oder Stufe setzen und sofort
-   * „Details …" öffnen).
+   * „Erläuterung …" öffnen).
    */
   const [detailKennung, setDetailKennung] = useState<Zellkennung | null>(null);
+  /**
+   * Die Zelle, die ein Tipp in der Liste „Erläuterungen“ ohne Schreibrecht hervorhebt (LLH-1110),
+   * als `zellSchluessel`. Bleibt bis zur nächsten Wahl stehen: kein Blinken, kein Zeitgeber.
+   */
+  const [hervorgehoben, setHervorgehoben] = useState<string | null>(null);
+
+  // Die hervorgehobene Zelle in den Blick holen; „nearest“ rollt nur, wenn sie verdeckt ist.
+  useEffect(() => {
+    if (hervorgehoben == null) return;
+    tabelleRef.current?.nativeElement
+      ?.querySelector<HTMLElement>('[data-hervorgehoben="true"]')
+      ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [hervorgehoben]);
 
   const zelleVon = (typ: Gefahrentyp, objekt: Schutzobjekt) =>
     matrix.find((m) => m.gefahrentyp === typ && m.schutzobjekt === objekt);
@@ -279,10 +305,21 @@ export default function GefahrenMatrix({
             !kombinationGueltig(zeile.typ, obj.wert) || (!zelle && laedt)
               ? undefined
               : zellStufe(zelle);
+          const flaeche: { backgroundColor?: string; boxShadow?: string } = stufe
+            ? zellFlaechenStil(stufe, token)
+            : {};
+          // Hervorgehoben (LLH-1110): Ring 2 px `bedien` nach innen, zusammen mit dem Stufenbalken
+          // — die Fläche bleibt die der Stufe.
+          const ring =
+            hervorgehoben === zellSchluessel(zeile.typ, obj.wert)
+              ? `inset 0 0 0 2px ${rollen.bedien}`
+              : null;
           return {
             'data-warnstufe': stufe,
+            'data-hervorgehoben': ring ? 'true' : undefined,
             style: {
-              ...(stufe ? zellFlaechenStil(stufe, token) : {}),
+              ...flaeche,
+              ...(ring ? { boxShadow: [ring, flaeche.boxShadow].filter(Boolean).join(', ') } : {}),
               // Die ganze Zelle ist das Bedienziel (LLH-1102): keine Polsterung, der Auslöser
               // füllt sie. Fläche und Balken bleiben an der Zelle, der Knopf ist durchsichtig.
               padding: 0,
@@ -313,14 +350,16 @@ export default function GefahrenMatrix({
           // Ohne Zeile gilt „keine“ (LLH-1090); nur vor dem Laden ist nichts bekannt.
           const anzeige = !zelle && laedt ? ZELLE_LAEDT : warnstufeFlaeche[zellStufe(zelle)];
           const schluessel = zellSchluessel(zeile.typ, obj.wert);
-          // „Details …“ an jeder gültigen Zelle: ob sie eine Zeile hat, sieht man nicht mehr.
+          const mitErlaeuterung = zelle != null && hatErlaeuterung(zelle);
+          // „Erläuterung …“ an jeder gültigen Zelle (LLH-1090/LLH-1110): eine Erläuterung zu
+          // „keine“ ist gültig, der Dialog legt die Bewertung dann mit „keine“ an.
           const items = [
             ...WARNSTUFEN.map((w) => ({
               key: w.wert,
               label: `${warnstufeFlaeche[w.wert].kuerzel} · ${w.label}`,
             })),
             { type: 'divider' as const },
-            { key: 'details', label: 'Details …' },
+            { key: 'details', label: 'Erläuterung …' },
           ];
           return (
             <Dropdown
@@ -351,7 +390,11 @@ export default function GefahrenMatrix({
                 type="text"
                 className="gefahren-zelle"
                 // Der Name trägt Zeilenkennung und Stufe: 58 gleichnamige Knöpfe wären unbrauchbar.
-                aria-label={`Bewertung ${zeile.label} × ${obj.label}: ${anzeige.label}`}
+                // Mit Erläuterung endet er auf „· mit Erläuterung“ (LLH-1110), die Marke ist für
+                // Hilfstechnik verborgen.
+                aria-label={`Bewertung ${zeile.label} × ${obj.label}: ${anzeige.label}${
+                  mitErlaeuterung ? ' · mit Erläuterung' : ''
+                }`}
                 // Keine Größen-Prop: die Höhe kommt aus der Staffel des ConfigProviders. Der Knopf
                 // füllt die Zelle (LLH-1102): ein Tipp irgendwo in ihr trifft, auch neben das
                 // Kürzel. `minWidth` = Höhe hält die kurze Achse, wenn die Spalte schmal wird;
@@ -363,9 +406,11 @@ export default function GefahrenMatrix({
                   minWidth: token.controlHeight,
                   height: token.controlHeight,
                   borderRadius: 0,
+                  position: 'relative',
                 }}
               >
                 {anzeige.kuerzel}
+                {mitErlaeuterung && <ErlaeuterungsMarke />}
               </Button>
             </Dropdown>
           );
@@ -386,10 +431,7 @@ export default function GefahrenMatrix({
   const detailSchluessel = detailKennung
     ? zellSchluessel(detailKennung.typ, detailKennung.objekt)
     : null;
-  const detailTitel = detailKennung
-    ? `${GEFAHRENTYPEN.find((g) => g.wert === detailKennung.typ)?.label ?? detailKennung.typ}` +
-      ` × ${SCHUTZOBJEKTE.find((s) => s.wert === detailKennung.objekt)?.label ?? detailKennung.objekt}`
-    : '';
+  const detailTitel = detailKennung ? zellTitel(detailKennung.typ, detailKennung.objekt) : '';
 
   return (
     <>
@@ -423,6 +465,22 @@ export default function GefahrenMatrix({
             }}
           />{' '}
           {ZELLE_NICHT_ANWENDBAR.label}
+          {/* Die Marke einer Zelle mit Erläuterung (LLH-1110), als Zeichen mit ihrem Wort. */}
+          {' · '}
+          <span
+            aria-hidden="true"
+            data-lfh="legende-erlaeuterung"
+            style={{
+              position: 'relative',
+              display: 'inline-block',
+              width: '1em',
+              height: '1em',
+              verticalAlign: '-0.15em',
+            }}
+          >
+            <ErlaeuterungsMarke />
+          </span>{' '}
+          mit Erläuterung
         </Typography.Text>
         {laedt && (
           <Typography.Text style={monoStil(token.fontSize)}>Bewertungen laden …</Typography.Text>
@@ -440,6 +498,16 @@ export default function GefahrenMatrix({
         ref={tabelleRef}
         className="gefahren-matrix"
       />
+      {!laedt && (
+        <GefahrenErlaeuterungen
+          matrix={matrix}
+          onWaehlen={(z) => {
+            // Mit Schreibrecht ist die Erläuterung zu bearbeiten, ohne zu finden (LLH-1110).
+            if (darfSchreiben) setDetailKennung({ typ: z.gefahrentyp, objekt: z.schutzobjekt });
+            else setHervorgehoben(zellSchluessel(z.gefahrentyp, z.schutzobjekt));
+          }}
+        />
+      )}
       <GefahrenZelleDetails
         offen={detailKennung !== null}
         // Die stabile Kennung trennt „anderer Datensatz" von „derselbe, frisch geladen"; nur

@@ -70,13 +70,18 @@ function rendereMatrix(over: Partial<GefahrenMatrixProps> = {}) {
   return renderMitProviders(matrixElement(over));
 }
 
-/** Öffnet den Detail-Dialog einer Zelle der Zeile Brand und wartet, bis er steht. */
+/**
+ * Öffnet den Detail-Dialog einer Zelle der Zeile Brand und wartet, bis er steht. Eine Zelle mit
+ * Erläuterung heißt „… · mit Erläuterung“ (LLH-1110).
+ */
 async function oeffneDetails(stufe: string, spalte = 'Menschen') {
   await userEvent.click(
-    screen.getByRole('button', { name: `Bewertung Brand × ${spalte}: ${stufe}` }),
+    screen.getByRole('button', {
+      name: new RegExp(`^Bewertung Brand × ${spalte}: ${stufe}( · mit Erläuterung)?$`),
+    }),
   );
-  await userEvent.click(imMenue().getByRole('menuitem', { name: 'Details …' }));
-  return screen.findByLabelText('Beschreibung');
+  await userEvent.click(imMenue().getByRole('menuitem', { name: 'Erläuterung …' }));
+  return screen.findByLabelText('Erläuterung');
 }
 
 describe('GefahrenMatrix', () => {
@@ -150,7 +155,9 @@ describe('GefahrenMatrix', () => {
     const onSetzen = vi.fn();
     const matrix = [zelle({ warnstufe: 'hoch', beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW' })];
     rendereMatrix({ matrix, onSetzen });
-    await userEvent.click(screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch · mit Erläuterung' }),
+    );
     await userEvent.click(imMenue().getByRole('menuitem', { name: /akut/i }));
     await waitFor(() =>
       expect(onSetzen).toHaveBeenCalledWith({
@@ -213,7 +220,7 @@ describe('GefahrenMatrix', () => {
     expect(screen.queryByText(/Felder? unbewertet|Alle Felder bewertet/)).toBeNull();
   });
 
-  it('bietet „Details …“ auch an einer Zelle ohne Bewertung und speichert sie als „keine“', async () => {
+  it('bietet „Erläuterung …“ auch an einer Zelle ohne Bewertung und speichert sie als „keine“', async () => {
     const onDetailsSpeichern = vi.fn().mockResolvedValue(undefined);
     rendereMatrix({ onDetailsSpeichern });
     const feld = await oeffneDetails('keine');
@@ -248,7 +255,7 @@ describe('GefahrenMatrix', () => {
     await waitFor(() => expect(onDetailsSpeichern).toHaveBeenCalled());
     // Zugesichert ist nur: nicht geleert. „Nicht geschlossen" ist in jsdom nicht beobachtbar
     // (`.ant-modal-wrap` bleibt auch nach erfolgreichem Speichern im Baum).
-    expect(await screen.findByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
+    expect(await screen.findByLabelText('Erläuterung')).toHaveValue('Dachstuhl brennt');
   });
 
   /**
@@ -262,7 +269,7 @@ describe('GefahrenMatrix', () => {
       matrix: [zelle({ warnstufe: 'hoch', beschreibung: 'Dachstuhl', gemeldet_von: 'KdoW' })],
     });
     await oeffneDetails('hoch');
-    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
+    expect(screen.getByLabelText('Erläuterung')).toHaveValue('Dachstuhl');
     expect(screen.getByLabelText('Gemeldet von')).toHaveValue('KdoW');
   });
 
@@ -279,10 +286,10 @@ describe('GefahrenMatrix', () => {
       ],
     });
     await oeffneDetails('hoch');
-    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl');
+    expect(screen.getByLabelText('Erläuterung')).toHaveValue('Dachstuhl');
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     await oeffneDetails('mittel', 'Tiere');
-    expect(screen.getByLabelText('Beschreibung')).toHaveValue('');
+    expect(screen.getByLabelText('Erläuterung')).toHaveValue('');
     expect(screen.getByLabelText('Gemeldet von')).toHaveValue('');
   });
 
@@ -327,7 +334,7 @@ describe('GefahrenMatrix', () => {
         matrix: [zelle({ warnstufe: 'akut', beschreibung: 'vom Server' })],
       }),
     );
-    expect(screen.getByLabelText('Beschreibung')).toHaveValue('Dachstuhl brennt');
+    expect(screen.getByLabelText('Erläuterung')).toHaveValue('Dachstuhl brennt');
   });
 });
 
@@ -524,5 +531,118 @@ describe('GefahrenMatrix — erste Zeile nicht unter der Kopfzeile (LLH-1102)', 
     knopf.focus();
     expect(rollen).toHaveBeenCalledWith({ top: -76, behavior: 'instant' });
     rollen.mockRestore();
+  });
+});
+
+describe('GefahrenMatrix — Erläuterungen sichtbar (LLH-1110)', () => {
+  const mitText = [
+    zelle({
+      id: 11,
+      gefahrentyp: 'elektrizitaet',
+      schutzobjekt: 'menschen',
+      warnstufe: 'mittel',
+      beschreibung: 'Stromführende Kellerverteilungen unter Wasser',
+      gemeldet_von: 'Rettungsstaffel',
+      geaendert_at: '2026-10-10 13:12:00',
+      aktualisiert_von_name: 'Erika Beispiel',
+    }),
+    zelle({
+      id: 12,
+      gefahrentyp: 'absturz',
+      schutzobjekt: 'einsatzkraefte',
+      warnstufe: 'keine',
+      beschreibung: 'Hangkante gesichert',
+      geaendert_at: '2026-10-10 13:20:00',
+    }),
+    zelle({ id: 13, gefahrentyp: 'brand', schutzobjekt: 'menschen', warnstufe: 'hoch' }),
+  ];
+
+  it('erkennt eine Zelle mit Erläuterung ohne Öffnen: Marke und Name', () => {
+    const { container } = rendereMatrix({ matrix: mitText });
+    const knopf = screen.getByRole('button', {
+      name: 'Bewertung Elektrizität × Menschen: mittel · mit Erläuterung',
+    });
+    const marke = knopf.querySelector<HTMLElement>('[data-lfh="erlaeuterung-marke"]');
+    expect(marke, 'die Zelle trägt die Marke').not.toBeNull();
+    expect(marke).toHaveAttribute('aria-hidden', 'true');
+    // Zweiter Kanal ist die Form (Dreieck aus Rändern), nicht eine Fläche.
+    expect(marke!.style.borderBlockStart).toMatch(/currentcolor/i);
+    // Auch zu „keine“: die Erläuterung ist die Aussage.
+    expect(
+      screen.getByRole('button', {
+        name: 'Bewertung Absturz × Einsatzkräfte: keine · mit Erläuterung',
+      }),
+    ).toBeInTheDocument();
+    // Gegenprobe: eine Zelle ohne Text trägt weder Marke noch Namenszusatz.
+    const ohne = screen.getByRole('button', { name: 'Bewertung Brand × Menschen: hoch' });
+    expect(ohne.querySelector('[data-lfh="erlaeuterung-marke"]')).toBeNull();
+    expect(container.querySelectorAll('[data-lfh="erlaeuterung-marke"]')).toHaveLength(
+      // zwei Zellen + das Zeichen in der Legende
+      3,
+    );
+  });
+
+  it('nennt die Marke in der Legende mit ihrem Wort', () => {
+    rendereMatrix();
+    const legende = screen.getByRole('note', { name: 'Legende der Matrix' });
+    expect(legende).toHaveTextContent(/nicht anwendbar · mit Erläuterung$/);
+    expect(legende.querySelector('[data-lfh="erlaeuterung-marke"]')).not.toBeNull();
+  });
+
+  it('listet unter der Matrix jede Zelle mit Text in der Folge der Matrix', () => {
+    rendereMatrix({ matrix: mitText });
+    const liste = screen.getByRole('list', { name: 'Erläuterungen' });
+    const zeilen = within(liste).getAllByRole('button');
+    expect(zeilen).toHaveLength(2);
+    // Alphabetisch wie die Matrix: Absturz vor Elektrizität.
+    expect(zeilen[0]).toHaveTextContent('Absturz × Einsatzkräfte');
+    expect(zeilen[0]).toHaveTextContent('Hangkante gesichert');
+    expect(zeilen[1]).toHaveTextContent('Elektrizität × Menschen');
+    expect(
+      within(zeilen[1]).getByText('mittel').closest('[data-lfh="gefahren-stufe"]'),
+    ).toHaveAttribute('data-warnstufe', 'mittel');
+    expect(zeilen[1]).toHaveTextContent('Stromführende Kellerverteilungen unter Wasser');
+    expect(zeilen[1]).toHaveTextContent(
+      /gemeldet von Rettungsstaffel · geändert .+ · Erika Beispiel/,
+    );
+    // Ohne Namen nur die Zeit, ohne Meldeweg kein „gemeldet von“.
+    expect(zeilen[0]).not.toHaveTextContent('gemeldet von');
+    expect(zeilen[0]).toHaveTextContent(/geändert \S+$/);
+  });
+
+  it('ohne Erläuterung entfällt die Liste ganz, auch der Kopf', () => {
+    rendereMatrix({ matrix: [zelle({ warnstufe: 'hoch', beschreibung: '  ' })] });
+    expect(screen.queryByRole('list', { name: 'Erläuterungen' })).toBeNull();
+    expect(screen.queryByText('Erläuterungen')).toBeNull();
+  });
+
+  it('zeigt die Liste nicht, solange die Matrix lädt', () => {
+    rendereMatrix({ matrix: mitText, laedt: true });
+    expect(screen.queryByRole('list', { name: 'Erläuterungen' })).toBeNull();
+  });
+
+  it('mit Schreibrecht öffnet ein Tipp auf die Zeile den Dialog der Zelle', async () => {
+    rendereMatrix({ matrix: mitText });
+    const liste = screen.getByRole('list', { name: 'Erläuterungen' });
+    await userEvent.click(within(liste).getAllByRole('button')[1]);
+    expect(await screen.findByLabelText('Erläuterung')).toHaveValue(
+      'Stromführende Kellerverteilungen unter Wasser',
+    );
+    expect(screen.getByText('Erläuterung Elektrizität × Menschen')).toBeInTheDocument();
+  });
+
+  it('ohne Schreibrecht hebt ein Tipp die Zelle hervor und öffnet nichts', async () => {
+    const { container } = rendereMatrix({ matrix: mitText, darfSchreiben: false });
+    expect(container.querySelector('[data-hervorgehoben]')).toBeNull();
+    const liste = screen.getByRole('list', { name: 'Erläuterungen' });
+    await userEvent.click(within(liste).getAllByRole('button')[1]);
+    const zelleTd = screen
+      .getByRole('button', { name: 'Bewertung Elektrizität × Menschen: mittel · mit Erläuterung' })
+      .closest('td')!;
+    expect(zelleTd).toHaveAttribute('data-hervorgehoben', 'true');
+    // Der Ring kommt zum Stufenbalken hinzu, die Stufe bleibt lesbar.
+    expect(zelleTd.style.boxShadow).toMatch(/inset 0(px)? 0(px)? 0(px)? 2px .+, inset 0(px)? -3px/);
+    expect(container.querySelectorAll('[data-hervorgehoben]')).toHaveLength(1);
+    expect(screen.queryByLabelText('Erläuterung')).toBeNull();
   });
 });
