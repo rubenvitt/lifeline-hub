@@ -80,6 +80,23 @@ Führungskräfte und alle übrigen Objekte MUST ungedämpft bleiben.
 - **WHEN** ein Abschnitt fokussiert ist
 - **THEN** zeichnet die Karte Schadenstellen voll
 
+### Requirement: Bündel im Fokus
+
+Im Fokus MUST die Karte ein Bündel von Markern, dessen Marker alle gedämpft sind, mit derselben
+verringerten Deckkraft zeichnen, und das Bündel MUST sich weiter auffächern lassen. Ein Bündel mit
+mindestens einem ungedämpften Marker MUST voll bleiben. Der Lageplan MUST ein Bündel so zeichnen
+wie die Karte.
+
+#### Scenario: Bündel nur aus fremden Kräften
+
+- **WHEN** „EA Nord“ fokussiert ist und drei Einheiten von „EA Süd“ zu einem Bündel zusammenstehen
+- **THEN** zeichnet die Karte das Bündel gedämpft, und es fächert beim Antippen auf
+
+#### Scenario: Gemischtes Bündel
+
+- **WHEN** „EA Nord“ fokussiert ist und ein Bündel eine Einheit von „EA Süd“ und eine Schadenstelle enthält
+- **THEN** zeichnet die Karte das Bündel voll
+
 ### Requirement: Fokus als reine Darstellung
 
 Der Fokus SHALL nur die Darstellung der Karte ändern. Ebenenschalter, Gruppenzähler, Objektliste
@@ -129,6 +146,23 @@ Menü oder Dialog MUST Esc den Fokus stehen lassen.
 
 - **WHEN** ein Abschnitt fokussiert ist, das Messen läuft und eine Person Esc drückt
 - **THEN** endet das Messen, und der Fokus bleibt
+
+### Requirement: Sprung von der Abschnittsseite
+
+Die Seite „Einsatzabschnitte“ SHALL im Detail des gewählten Abschnitts den Sprung „Auf Karte
+zeigen ↗“ anbieten, der die Lagekarte mit `?abschnitt=<id>` dieses Abschnitts öffnet. Der Sprung
+MUST ohne Schreibrecht stehen und MUST kein Eintrag im Menü der Handlungen sein. Ohne Freigabe des
+Moduls Lagekarte MUST er gesperrt stehen und seinen Grund im sichtbaren Text nennen.
+
+#### Scenario: Von der Abschnittsseite auf die Karte
+
+- **WHEN** eine Person auf der Seite „Einsatzabschnitte“ „EA Süd“ wählt und „Auf Karte zeigen ↗“ betätigt
+- **THEN** öffnet die Lagekarte mit dem Fokus auf „EA Süd“, und die Adresse trägt den Parameter nicht mehr
+
+#### Scenario: Lagekarte gesperrt
+
+- **WHEN** die Person das Modul Lagekarte nicht nutzen darf
+- **THEN** steht „Auf Karte zeigen“ gesperrt mit „Keine Berechtigung“, und es gibt keinen Link
 
 ### Requirement: Fokus per Link
 
