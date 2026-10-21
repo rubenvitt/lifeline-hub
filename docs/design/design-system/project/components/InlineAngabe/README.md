@@ -50,4 +50,4 @@ optionale Props dazu; ohne sie verhält sich die Angabe wie zuvor.
   Fehler: etwa wenn eine Rückfrage ohne Entscheidung geschlossen wurde (Escape).
 
 Quelle: `frontend/src/components/InlineAngabe.tsx` im Repo `rubenvitt/lifeline-hub`. Die Vorschau ist aus
-dem echten Baustein gerendert (der offene Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
+dem echten Baustein gerendert (der Zustand nach einem Klick im jsdom), mit dem antd-Theme der App, Nacht und Tag, Dichte `kompakt`.
