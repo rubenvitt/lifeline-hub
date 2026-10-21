@@ -50,7 +50,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Leitung und Erreichbarkeit (Migration 0226, je 200 Zeichen) sind personenbezogen: im ETB nur
   „weitere Angaben“, Schwärzung leert sie, der gesicherte Lagestand friert sie nicht ein.
 - **Bedarf einer Stelle** (LLH-1082, Spec `nachforderung-betreuungsstelle`): nur als
-  Nachforderung mit `nachforderung.betreuungsstelle_id` (Migration 0230, nur die Kennung im DTO),
+  Nachforderung mit `nachforderung.betreuungsstelle_id` (Migration 0231, nur die Kennung im DTO),
   nie als Feld der Stelle (Mengenwahrheit, Spec `stab-versorgung`). Paneel `betreuung/StelleBedarf.tsx`
   liest `einsatzKeys.nachforderungen` nur mit Freigabe Nachforderungen; „Bedarf anfordern“ führt
   über `nachforderungenPfad(…, { bezugStelle, stelle })` ins Formular der Nachforderungsseite.
