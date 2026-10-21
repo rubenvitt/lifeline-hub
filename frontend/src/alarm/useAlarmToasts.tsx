@@ -27,6 +27,11 @@ export type AlarmToastEintrag = {
   art: 'warning' | 'info';
   titel: string;
   beschreibung?: string;
+  /**
+   * Ganzer Text hinter einer gekürzten Beschreibung, im `title` der Beschreibung (der Wortlaut
+   * einer Meldung, LLH-1052). Die OS-Meldung trägt nur die Beschreibung.
+   */
+  beschreibungVoll?: string;
   /** Ziel von „Öffnen“ und vom Klick auf die OS-Meldung. */
   pfad: string;
   /** Sprung im Sammeltoast. */
@@ -231,7 +236,11 @@ export function useAlarmToasts(
       notification[eintrag.art]({
         key: eintrag.key,
         title: eintrag.titel,
-        description: eintrag.beschreibung,
+        description: eintrag.beschreibungVoll ? (
+          <span title={eintrag.beschreibungVoll}>{eintrag.beschreibung}</span>
+        ) : (
+          eintrag.beschreibung
+        ),
         duration: 0,
         actions: (
           <Button type="primary" onClick={oeffnen}>

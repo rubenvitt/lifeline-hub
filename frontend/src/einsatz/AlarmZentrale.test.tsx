@@ -26,13 +26,25 @@ import { server } from '../test/server';
  * und Pfad bildet der Server (`src/benachrichtigung/text.rs`).
  */
 const bekannt = new Map<number, BenachrichtigungAnzeige>();
+/**
+ * Was `GET /api/einsaetze/{e}/meldungen/{id}` liefert (LLH-1052): Absender und Wortlaut holt die
+ * Zentrale über die Meldung selbst. Ohne Eintrag 404, dann bleibt der Text des Servers.
+ */
+const meldungen = new Map<number, { absender: string; inhalt: string }>();
 beforeEach(() => {
   bekannt.clear();
+  meldungen.clear();
   server.use(
     http.get('/api/benachrichtigungen/:id', ({ params }) => {
       const b = bekannt.get(Number(params.id));
       return b
         ? HttpResponse.json(b)
+        : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
+    }),
+    http.get('/api/einsaetze/:einsatzId/meldungen/:id', ({ params }) => {
+      const m = meldungen.get(Number(params.id));
+      return m
+        ? HttpResponse.json({ id: Number(params.id), einsatz_id: Number(params.einsatzId), ...m })
         : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
     }),
     http.post(
@@ -258,6 +270,45 @@ describe('AlarmZentrale', () => {
     expect(screen.getByText('Meldung #3')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
     expect(screen.queryByText(/bitte sichten/i)).not.toBeInTheDocument();
+  });
+
+  it('nennt Absender und Wortlautanfang der Sofortmeldung, den ganzen Wortlaut im title (LLH-1052)', async () => {
+    const wortlaut =
+      'Kellerabgang Mühlbachweg 34: eine schwer verletzte Person geborgen, Transport in die UHS ' +
+      'Turnhalle. Zweite Person wird noch vermisst, Suche mit Wärmebildkamera läuft im Keller.';
+    meldungen.set(3, { absender: 'Rettungsstaffel', inhalt: wortlaut });
+    renderAlarm();
+    sofortmeldung(3);
+    const titel = await screen.findByText('Sofortmeldung · Rettungsstaffel');
+    const notice = titel.closest<HTMLElement>('.ant-notification-notice')!;
+    const anfang = within(notice).getByText(/^Kellerabgang Mühlbachweg 34: .* …$/);
+    expect(Array.from(anfang.textContent ?? '').length).toBeLessThanOrEqual(120);
+    expect(anfang).toHaveAttribute('title', wortlaut);
+    // Der Inhalt ersetzt die Detailzeile des Servers.
+    expect(within(notice).queryByText('Meldung #3')).not.toBeInTheDocument();
+  });
+
+  it('„Öffnen“ springt zur Meldung und hebt sie über ?meldung= hervor', async () => {
+    meldungen.set(3, { absender: 'Rettungsstaffel', inhalt: 'Kellerabgang Mühlbachweg 34' });
+    renderAlarm({ initialEntry: '/einsaetze/1/etb' });
+    sofortmeldung(3);
+    await screen.findByText('Sofortmeldung · Rettungsstaffel');
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
+  });
+
+  it('ohne Text des Servers springt der Ersatz ebenfalls zur Meldung', async () => {
+    meldungen.set(3, { absender: 'Rettungsstaffel', inhalt: 'Kellerabgang Mühlbachweg 34' });
+    server.use(
+      http.get('/api/benachrichtigungen/:id', () =>
+        HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
+      ),
+    );
+    renderAlarm({ initialEntry: '/einsaetze/1/etb' });
+    sofortmeldung(3);
+    await screen.findByText('Sofortmeldung · Rettungsstaffel');
+    await userEvent.click(screen.getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
   });
 
   it('zeigt eine fällige Erinnerung ohne Detailzeile', async () => {
@@ -1017,6 +1068,22 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     expect(offeneDesktopAlarme()).toBe(0);
     // Der Toast trägt den Alarm weiter.
     expect(screen.getByText('Sofortmeldung eingegangen')).toBeInTheDocument();
+  });
+
+  it('die OS-Meldung nennt Absender und Wortlaut, ihr Klick springt zur Meldung (LLH-1052)', async () => {
+    stubAudioReady();
+    const { meldungen: os } = stubMeldungen();
+    setzeHidden(true);
+    meldungen.set(3, { absender: 'Rettungsstaffel', inhalt: 'Kellerabgang Mühlbachweg 34' });
+    renderAlarm({ initialEntry: '/einsaetze/1/etb' });
+    sofortmeldung(3);
+    await waitFor(() => expect(os).toHaveLength(1));
+    expect([os[0].titel, os[0].body]).toEqual([
+      'Sofortmeldung · Rettungsstaffel',
+      'Kellerabgang Mühlbachweg 34',
+    ]);
+    act(() => os[0].onclick?.());
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
   });
 
   it('dieselbe Benachrichtigung erneut (Replay) zeigt keine zweite Desktop-Meldung', async () => {

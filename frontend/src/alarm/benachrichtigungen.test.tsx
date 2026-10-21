@@ -90,11 +90,22 @@ function live(b: BenachrichtigungAnzeige, quittiert = false) {
 }
 
 /** Der Server kennt diese Benachrichtigungen; `quittiert` sammelt die Quittungen. */
-function serverMit(liste: BenachrichtigungAnzeige[], offen: BenachrichtigungAnzeige[] = []) {
+function serverMit(
+  liste: BenachrichtigungAnzeige[],
+  offen: BenachrichtigungAnzeige[] = [],
+  meldungen: Record<number, { absender: string; inhalt: string }> = {},
+) {
   const quittiert: number[] = [];
   const abgerufen: number[] = [];
   const offeneAbrufe = { anzahl: 0 };
   server.use(
+    // Absender und Wortlaut einer Sofortmeldung holt die Zentrale über die Meldung (LLH-1052).
+    http.get('/api/einsaetze/:einsatzId/meldungen/:id', ({ params }) => {
+      const m = meldungen[Number(params.id)];
+      return m
+        ? HttpResponse.json({ id: Number(params.id), ...m })
+        : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
+    }),
     http.get('/api/benachrichtigungen/:id', ({ params }) => {
       const id = Number(params.id);
       abgerufen.push(id);
@@ -485,6 +496,22 @@ describe('Nachreichen (tasks.md 2.3)', () => {
       within(notice('Auftrag überfällig')).getByText('Auftrag #7 · 14:05'),
     ).toBeInTheDocument();
     expect(within(notice('Neuer Auftrag')).getByText('Auftrag #8 · 14:07')).toBeInTheDocument();
+    expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
+  });
+
+  it('eine nachgereichte Sofortmeldung nennt Absender und Wortlaut mit ihrer Uhrzeit (LLH-1052)', async () => {
+    const sofort = benachrichtigung(47, 'sofortmeldung', 'meldung', 5, {
+      titel: 'Sofortmeldung eingegangen',
+      detail: 'Meldung #5',
+      pfad: '/einsaetze/1/meldungen?meldung=5',
+    });
+    serverMit([], [sofort], { 5: { absender: 'RTW 2', inhalt: 'Patient übergeben' } });
+    renderZentrale();
+
+    expect(await screen.findByText('Sofortmeldung · RTW 2')).toBeInTheDocument();
+    expect(
+      within(notice('Sofortmeldung · RTW 2')).getByText('Patient übergeben · 14:05'),
+    ).toBeInTheDocument();
     expect(ton).toHaveBeenCalledExactlyOnceWith('dezent');
   });
 
