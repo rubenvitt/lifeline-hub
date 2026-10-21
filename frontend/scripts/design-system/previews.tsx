@@ -52,6 +52,8 @@ import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
 import { InlineAngabe } from '../../src/components/InlineAngabe';
 import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
+import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
+import { VORLAGEN } from '../../src/befehle/vorlagen';
 
 /** Die Vorschauen zeigen die Stufe des Fükw, des primären Kontexts. */
 const DICHTE: Dichte = 'kompakt';
@@ -75,6 +77,11 @@ export interface PreviewSpec {
   ruleHead?: string;
   /** Weitere Quelle (relativ zu `frontend/src/`), deren erster JSDoc-Absatz die README ergänzt. */
   moreDoc?: string;
+  /**
+   * Stile, die der Baustein selbst importiert (relativ zu `frontend/src/`): der Rahmen trägt sonst
+   * nur `theme/rollen.css`, `theme/sprache.css` und `index.css` (`generate.tsx`, `appCss`).
+   */
+  styles?: readonly string[];
   content: () => ReactNode;
   /** Bedienung nach dem Render; macht die Vorschau zu einem Client-Render im jsdom. */
   interact?: (container: HTMLElement) => Promise<void>;
@@ -130,6 +137,31 @@ function SegmentedBeispiel() {
       ]}
       defaultValue="liste"
     />
+  );
+}
+
+/** Gliederung der echten Vorlage „Befehl LAD (vereinfacht)“: Lage, Auftrag, Durchführung. */
+const BEFEHL_LAD = VORLAGEN.find((v) => v.schluessel === 'befehl_lad')!.abschnitte;
+
+/** Lage und Durchführung gefüllt, Auftrag leer: Füllstand, Leer-Marke und Haken in einem Bild. */
+const BEFEHL_WERTE = {
+  lage:
+    'Brand eines landwirtschaftlichen Anwesens, Scheune im Vollbrand. ' +
+    'Wohnhaus **nicht** betroffen, Wasserversorgung über Hydrant und offenes Gewässer.',
+  auftrag: '',
+  durchfuehrung:
+    '- EA 1: Brandbekämpfung Scheune, Riegelstellung zum Wohnhaus\n' +
+    '- EA 2: Wasserversorgung vom Löschteich',
+};
+
+/** Eigener Formularname je Instanz: die Feld-IDs (`<name>_lage`) stehen sonst viermal im Dokument. */
+function DokumentEntwurfBeispiel() {
+  const [form] = Form.useForm();
+  const name = useId();
+  return (
+    <Form form={form} name={name} layout="vertical" initialValues={BEFEHL_WERTE}>
+      <DokumentEntwurf form={form} abschnitte={BEFEHL_LAD} einstieg={undefined} />
+    </Form>
   );
 }
 
@@ -313,6 +345,52 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,
+  },
+  {
+    name: 'DokumentEntwurf',
+    title: 'DokumentEntwurf (Bearbeiten und Lesefassung)',
+    group: 'Formular',
+    height: 1610,
+    source: 'entwurf/DokumentEntwurf.tsx',
+    docAnchor: 'export default function DokumentEntwurf',
+    styles: [
+      'entwurf/dokumentEntwurf.css',
+      'components/MarkdownEditor.css',
+      'components/Markdown.css',
+    ],
+    content: () => (
+      <div className="ds-stapel">
+        <DokumentEntwurfBeispiel />
+        <DokumentEntwurfBeispiel />
+      </div>
+    ),
+    // Die Ansicht ist innerer Zustand des Bausteins: die zweite Instanz je Thema in die Lesefassung.
+    interact: async (container) => {
+      const umschalter = [...container.querySelectorAll('[data-lfh="dokument-entwurf"]')]
+        .filter((_, i) => i % 2 === 1)
+        .map((entwurf) =>
+          [...entwurf.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
+            (tab) => tab.textContent === 'Lesefassung',
+          ),
+        );
+      if (umschalter.length !== 2 || umschalter.some((tab) => !tab)) {
+        throw new Error('Design System: Umschalter „Lesefassung“ nicht gefunden');
+      }
+      for (const tab of umschalter) await act(async () => tab!.click());
+      const lesen = container.querySelectorAll('[data-lfh="entwurf-lesefassung"]:not([hidden])');
+      const bearbeiten = container.querySelectorAll(
+        '[data-lfh="entwurf-abschnitte"]:not([hidden])',
+      );
+      if (lesen.length !== 2 || bearbeiten.length !== 2) {
+        throw new Error('Design System: DokumentEntwurf zeigt nicht je Thema beide Ansichten');
+      }
+      // Das mitwachsende Feld (`autoSize`) misst seine Höhe; jsdom hat kein Layout und setzt
+      // `height: 0px`. Statt der Messung wächst das Feld im Browser mit dem Inhalt, wie in der App.
+      for (const feld of container.querySelectorAll('textarea')) {
+        feld.style.removeProperty('height');
+        feld.style.setProperty('field-sizing', 'content');
+      }
+    },
   },
   {
     name: 'Gesperrt',
