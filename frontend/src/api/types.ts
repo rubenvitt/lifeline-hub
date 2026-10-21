@@ -1237,7 +1237,8 @@ export type Nachforderung = S['NachforderungAnzeige'];
 /** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueNachforderung {
   art: string;
-  bezeichnung: string;
+  /** Details/Zweck, optional (LLH-1089). */
+  bezeichnung?: string;
   anzahl?: number;
   adressat_kategorie: AdressatKategorie;
   adressat_bezeichnung?: string;
@@ -1247,6 +1248,12 @@ export interface NeueNachforderung {
   angefordert_at?: string;
   /** Betreuungsstelle, für die angefordert wird (LLH-1082); fehlt = einsatzweit. */
   betreuungsstelle_id?: number;
+  /** Ziel (Meldeort, LLH-1089): höchstens eines von Raum, Abschnitt und Freitext. */
+  ziel_br_id?: number;
+  ziel_abschnitt_id?: number;
+  ziel_text?: string;
+  /** Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort. */
+  benoetigt_bis?: string;
 }
 
 // ============================== Zugangsprotokoll (LFH-1097) ==============================

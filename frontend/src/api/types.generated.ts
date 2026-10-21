@@ -4300,6 +4300,8 @@ export interface components {
             anzahl?: number | null;
             art: string;
             begruendung?: string | null;
+            /** @description Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort (LLH-1089 design.md D6). */
+            benoetigt_bis?: string | null;
             /**
              * Format: int64
              * @description Betreuungsstelle, für die angefordert wurde (LLH-1082, design.md D1/D4). Nur die Kennung:
@@ -4307,7 +4309,8 @@ export interface components {
              *     Betreuung nicht lesen darf. Fehlt ohne Bezug; der Storno der Stelle löst ihn (D3).
              */
             betreuungsstelle_id?: number | null;
-            bezeichnung: string;
+            /** @description Details/Zweck; fehlt ohne Angabe (LLH-1089 design.md D10). */
+            bezeichnung?: string | null;
             eingetroffen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
@@ -4331,6 +4334,16 @@ export interface components {
             prioritaet: components["schemas"]["Prioritaet"];
             status: components["schemas"]["NachforderungStatus"];
             unterwegs_at?: string | null;
+            /** Format: int64 */
+            ziel_abschnitt_id?: number | null;
+            /**
+             * Format: int64
+             * @description Ziel (Meldeort, LLH-1089 design.md D5/D10): höchstens eines von Raum, Abschnitt und
+             *     Freitext. Von Raum und Abschnitt nur die Kennung; den Namen liest die Oberfläche aus deren
+             *     Modul, wie bei der Betreuungsstelle. Fehlt ohne Ziel; das Löschen des Abschnitts löst ihn.
+             */
+            ziel_br_id?: number | null;
+            ziel_text?: string | null;
             zugesagt_at?: string | null;
         };
         /**

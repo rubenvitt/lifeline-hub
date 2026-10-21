@@ -48,19 +48,19 @@ async fn anlegen_erzeugt_nachforderung_und_etb() {
 }
 
 #[tokio::test]
-async fn anlegen_ohne_bezeichnung_ist_400() {
+async fn leere_bezeichnung_ist_ohne_details_und_leere_art_ist_400() {
+    // LLH-1089: Die Bezeichnung („Details / Zweck“) ist optional; Leerraum zählt als fehlend.
+    // Pflicht bleibt die Art.
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
+    let url = format!("/api/einsaetze/{e}/nachforderungen");
     let b = serde_json::json!({ "art": "RTW", "bezeichnung": "  ", "adressat_kategorie": "leitstelle" }).to_string();
-    let (status, _) = anfrage(
-        &app,
-        "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
-        &admin,
-        Some(&b),
-    )
-    .await;
+    let (status, n) = anfrage(&app, "POST", &url, &admin, Some(&b)).await;
+    assert_eq!(status, StatusCode::CREATED, "{n:?}");
+    assert!(n.get("bezeichnung").is_none(), "{n:?}");
+    let b = serde_json::json!({ "art": "  ", "adressat_kategorie": "leitstelle" }).to_string();
+    let (status, _) = anfrage(&app, "POST", &url, &admin, Some(&b)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 

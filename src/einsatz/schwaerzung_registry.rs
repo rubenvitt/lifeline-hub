@@ -2375,7 +2375,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("art", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL, Freitext („RTW“, „Dolmetscher“)
             // Führungs-Freitexte (LFH-701, Linie A): Art, Bezeichnung, Adressat und Begründung
             // stehen im ETB-Wortlaut der Anforderung; der Ablehnungsgrund gelangt nie ins ETB.
-            scrub("bezeichnung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            // Die Bezeichnung (Details) ist seit LLH-1089 optional.
+            scrub("bezeichnung", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
             retain("anzahl", G_ZAEHLER),
             retain("adressat_kategorie", G_ENUM),
             scrub("adressat_bezeichnung", Strategie::NullSetzen, Z_EINSATZ),
@@ -2394,6 +2395,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Betreuungsstelle, für die angefordert wurde (LLH-1082): Verweis als Skelett; die
             // Stelle selbst trägt nach der Schwärzung ihren Platzhalter.
             retain("betreuungsstelle_id", G_FK),
+            // Ziel (LLH-1089): Raum und Abschnitt sind Lagestruktur und bleiben als Verweis; ein
+            // Ort als Freitext geht wie die übrigen Freitexte. Die Bedarfszeit ist eine Zeit.
+            retain("ziel_br_id", G_FK),
+            retain("ziel_abschnitt_id", G_FK),
+            scrub("ziel_text", Strategie::NullSetzen, Z_EINSATZ),
+            retain("benoetigt_bis", G_ZEIT),
         ],
     },
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------
