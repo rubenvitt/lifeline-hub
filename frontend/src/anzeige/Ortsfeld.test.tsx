@@ -166,6 +166,7 @@ describe('Ortsfeld', () => {
     expect(wert()).toEqual({
       text: 'Bahnhofstraße 1, 12345 Musterstadt',
       koordinate: { lat: 51.1, lon: 10.4 },
+      quelle: 'adresse',
     });
     expect(screen.queryByRole('list', { name: 'Treffer' })).not.toBeInTheDocument();
 
@@ -176,6 +177,7 @@ describe('Ortsfeld', () => {
     expect(wert()).toEqual({
       text: 'Bahnhofstraße 1, Anderswo',
       koordinate: { lat: 48.1, lon: 11.5 },
+      quelle: 'adresse',
     });
   });
 

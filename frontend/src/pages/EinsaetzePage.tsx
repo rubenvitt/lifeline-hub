@@ -7,7 +7,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
 import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { sucheOrtInOrg } from '../api/ortSuche';
-import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { fetchSchichtmodelle } from '../api/schichtmodelle';
@@ -69,19 +68,8 @@ interface AnlegeWerte {
 /** Einsatzart, mit der der Anlegedialog öffnet; auch die Vorbelegung ohne Vorlage. */
 const START_EINSATZART: Einsatzart = 'realeinsatz';
 
-/** Höhe des Kartenausschnitts im Anlegedialog: klein, er bestätigt nur die Wahl. */
+/** Höhe der Kartenvorschau im Anlegedialog: klein, sie bestätigt nur die Wahl. */
 const AUSSCHNITT_ANLEGEN_PX = 120;
-
-/**
- * Kartenausschnitt des gewählten Einsatzorts im Anlegedialog. Eigene Komponente IM Formular:
- * `Form.useWatch` außerhalb (Dialog zu, `destroyOnHidden`) meldete eine Instanz ohne Formular.
- */
-function GewaehlterOrt() {
-  const form = Form.useFormInstance<AnlegeWerte>();
-  const punkt = Form.useWatch('einsatzort', form)?.koordinate ?? null;
-  if (!punkt) return null;
-  return <Kartenausschnitt punkt={punkt} etikett="Einsatzort" hoehe={AUSSCHNITT_ANLEGEN_PX} />;
-}
 
 /** Einsatzort-Felder des Anlegerumpfs; ein leeres Feld schickt keines (Spec `ortsfeld`). */
 function einsatzortFelder(ort: OrtsfeldWert | undefined): {
@@ -675,9 +663,12 @@ function EinsaetzeInhalt() {
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item label="Einsatzort" name="einsatzort">
-          <Ortsfeld suchen={sucheOrtInOrg} suchSchluessel={globalKeys.orgOrtSuche} />
+          <Ortsfeld
+            suchen={sucheOrtInOrg}
+            suchSchluessel={globalKeys.orgOrtSuche}
+            karte={{ etikett: 'Einsatzort', hoehe: AUSSCHNITT_ANLEGEN_PX }}
+          />
         </Form.Item>
-        <GewaehlterOrt />
         {/* Gedämpfte Zeile unter den Feldern (design.md D3): Vorlage als kompakte Auswahl ohne
             Rahmen, daneben, was der Einsatz von der Organisation bekommt (LLH-1122). */}
         {(vorlagen.length > 0 || orgSchichtmodell) && (

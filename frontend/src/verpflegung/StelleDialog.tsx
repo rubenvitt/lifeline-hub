@@ -25,9 +25,10 @@ import { STELLE_ART_LABEL } from './verpflegungText';
  * FELDBUDGET: drei sichtbare Felder (Bezeichnung, Art, Standort); der Abschnitt liegt im Klappteil
  * „Weitere Angaben“, dessen Kopf die Wahl nennt. Ohne Abschnitte im Einsatz gibt es ihn nicht.
  *
- * STANDORT: über das Ortsfeld (Spec `ortsfeld`): ein Treffer setzt Text und Koordinate, jede
- * Textänderung nimmt die Koordinate weg. Hinaus gehen `standort`, `lat` und `lon` deshalb immer
- * zusammen; ein geänderter Text ohne Treffer leert beim Bearbeiten die alte Koordinate.
+ * STANDORT: über das Ortsfeld (Spec `ortsfeld`): ein Treffer setzt Text und Koordinate, eine
+ * getippte Koordinate wird erkannt, jede andere Textänderung nimmt die Koordinate weg. Hinaus gehen
+ * `standort`, `lat` und `lon` deshalb immer zusammen; ein geänderter Text ohne Treffer leert beim
+ * Bearbeiten die alte Koordinate.
  *
  * PATCH: nur Geändertes gegen den Stand beim Öffnen; `null` leert Standort, Koordinate und
  * Abschnitt. Ein leerer PATCH wird nicht gesendet. Gründe des Servers (409 doppelte Bezeichnung,

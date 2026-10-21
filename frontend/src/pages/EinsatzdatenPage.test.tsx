@@ -35,10 +35,22 @@ const MONATE = ['jan', 'feb', 'mrz', 'apr', 'mai', 'jun', 'jul', 'aug', 'sep', '
 const dtgLokal = (d: dayjs.Dayjs) => `${d.format('DDHHmm')}${MONATE[d.month()]}${d.format('YY')}`;
 
 // MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+// Mit `onVerschieben` (Vorschau im Ortsfeld, LLH-1108) steht ein Knopf für das Ziehen der Nadel.
 vi.mock('../anzeige/Kartenausschnitt', () => ({
-  Kartenausschnitt: ({ punkt }: { punkt: { lat: number; lon: number } | null }) => (
+  Kartenausschnitt: ({
+    punkt,
+    onVerschieben,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    onVerschieben?: (p: { lat: number; lon: number }) => void;
+  }) => (
     <div data-testid="kartenausschnitt">
       {punkt ? `Karte ${punkt.lat}, ${punkt.lon}` : 'Nicht verortet'}
+      {onVerschieben && (
+        <button type="button" onClick={() => onVerschieben({ lat: 52.5, lon: 13.4 })}>
+          Nadel ziehen
+        </button>
+      )}
     </div>
   ),
 }));
@@ -1968,6 +1980,53 @@ describe('EinsatzdatenPage · Paneel Einsatzort (LFH-1175)', () => {
     await waitFor(() => expect(bodies).toEqual([{ einsatzort: 'Deich Süd, Abschnitt 2' }]));
     expect(begriffe).toEqual([]);
     expect(screen.getByText('Karte 48.1, 11.6')).toBeInTheDocument();
+  });
+
+  it('Nadel ziehen in der Bearbeitung schickt Adresse und neue Koordinate (LLH-1108)', async () => {
+    const stand = { einsatzort: 'Deich Süd', einsatzort_lat: 48.1, einsatzort_lon: 11.6 };
+    setup({ einsatz: stand });
+    const bodies = patchMitschnitt(stand);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    // Die Bearbeitung zeigt den gespeicherten Punkt in der Vorschau, die Nadel berichtigt ihn.
+    expect(screen.getAllByText('Karte 48.1, 11.6')).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Nadel ziehen' }));
+    expect(screen.getByRole('textbox', { name: 'Adresse' })).toHaveValue('Deich Süd');
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { einsatzort: 'Deich Süd', einsatzort_lat: 52.5, einsatzort_lon: 13.4 },
+      ]),
+    );
+  });
+
+  it('unverändert gespeichert sendet nichts, auch mit gespeicherter Koordinate', async () => {
+    const stand = { einsatzort: 'Deich Süd', einsatzort_lat: 48.1, einsatzort_lon: 11.6 };
+    setup({ einsatz: stand });
+    const bodies = patchMitschnitt(stand);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse bearbeiten' }));
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('textbox', { name: 'Adresse' })).not.toBeInTheDocument(),
+    );
+    expect(bodies).toEqual([]);
+  });
+
+  it('eine getippte Koordinate geht mit der Adresse hinaus (LLH-1108)', async () => {
+    setup({ einsatz: { einsatzort: null } });
+    const bodies = patchMitschnitt({ einsatzort: null });
+    const begriffe = geocoder();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Adresse eintragen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Adresse' }), '51.16040, 10.45140');
+    await user.click(screen.getByRole('button', { name: 'Adresse speichern' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([
+        { einsatzort: '51.16040, 10.45140', einsatzort_lat: 51.1604, einsatzort_lon: 10.4514 },
+      ]),
+    );
+    expect(begriffe).toEqual([]);
   });
 
   it('die Zeile Koordinate sendet das Paar, geleert als Paar aus null', async () => {

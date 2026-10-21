@@ -49,10 +49,11 @@ Für System-Admins und Führungskräfte der Organisation:
 2. Im Dialog „Neuen Einsatz anlegen“ die „Bezeichnung“ eintragen, dazu „Stichwort“,
    „Einsatzart“ und „Alarmzeit“. Die Alarmzeit ist mit dem jetzigen Zeitpunkt vorbelegt.
 3. Wenn bekannt, den „Einsatzort“ eintippen und mit Enter oder „Ort suchen“ suchen, dann einen
-   der Treffer wählen. Ein kleiner Kartenausschnitt zeigt den gewählten Ort; kann der Browser
-   keine Karte zeichnen, steht dort „Karte auf diesem Gerät nicht darstellbar“, und der Ort wird
-   trotzdem übernommen. Freier Text ohne Suche geht auch; dann fehlt die Koordinate, bis sie in
-   den Einsatzdaten nachgetragen wird.
+   der Treffer wählen. Ein kleiner Kartenausschnitt zeigt den gewählten Ort; die Nadel lässt sich
+   ziehen. Kann der Browser keine Karte zeichnen, steht dort „Karte auf diesem Gerät nicht
+   darstellbar“, und der Ort wird trotzdem übernommen. Freier Text ohne Suche geht auch; den Punkt
+   dazu setzt „Auf Karte wählen“, oder er wird später in den Einsatzdaten nachgetragen. Eine
+   getippte Koordinate gilt gleich als Punkt.
 4. Nach Bedarf unter den Feldern bei „Module:“ statt „Alle Module“ eine Einsatz-Vorlage wählen,
    etwa „MANV“. Ist das Stichwort mit einer Vorlage gekoppelt, steht sie dort schon. Gibt die
    Vorlage eine Einsatzart vor, steht sie unter „Einsatzart“, solange diese nicht von Hand

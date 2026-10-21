@@ -584,11 +584,17 @@ anwendbar), „nicht geprüft" ist keins.
   schickt genau ihr Feld (`patcheEinheit`; die Soll-Stärke ihre drei, das taktische Zeichen ein
   `tz_*`-Feld über `patchEinheitZeichen`), kein Formular, keine Speichern-Leiste. Der Inhalt
   hängt an `key={einheitId}`, damit kein Grund und keine offene Zeile zur nächsten Einheit wandert.
-- **Ortsangaben mit Suche nehmen `anzeige/Ortsfeld.tsx`** (LFH-1175, Spec `ortsfeld`): Suche nur
-  auf Enter oder „Ort suchen“, nie beim Tippen (Nominatim-Regeln, ein Takt für alle); Enter im
-  Feld sendet das umgebende Formular nicht ab. Die Suche wird hineingereicht (im Einsatz
-  `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide ohne Lagekarten-Recht; den Punkt zeigt
-  `anzeige/Kartenausschnitt.tsx`. Personenadressen bekommen keine Suche (folgt mit LFH-1248).
+- **Jede Ortsangabe nimmt `anzeige/Ortsfeld.tsx`** (LFH-1175, LLH-1108, Spec `ortsfeld`; Ausrollen
+  auf die übrigen Felder LLH-1114): Suche nur auf Enter oder „Ort suchen“, nie beim Tippen
+  (Nominatim-Regeln, ein Takt für alle); Enter im Feld sendet das umgebende Formular nicht ab. Die
+  Suche wird hineingereicht (im Einsatz `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide
+  ohne Lagekarten-Recht. Eine getippte Koordinate erkennt das Feld selbst. Speichert das Ziel eine
+  Koordinate, bekommt das Feld `karte` (Vorschau mit ziehbarer Nadel, im Einsatz Ort-Zeile mit
+  `exclude` des Objekts, „Auf Karte wählen“); `quelle` im Wert sagt, ob die Koordinate am Text
+  hängt (`adresse`, `koordinate`) oder auf der Karte gesetzt ist (`karte`). **Personenbezogene
+  Adressen nie an den Geocoder:** `ohneSuche="personenbezogen"` (reiner Text, auch keine
+  Ort-Vorschau); so „Herkunft / Adresse“ der Person. Den gespeicherten Punkt ohne Bearbeitung zeigt
+  `anzeige/Kartenausschnitt.tsx`.
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel

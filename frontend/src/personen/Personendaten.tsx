@@ -15,6 +15,7 @@ import { PERSON_ANGABE_MAX, PERSON_NAME_MAX, PERSON_NOTIZ_MAX } from '../api/ein
 import { einsatzKeys } from '../api/queryKeys';
 import type { Person, PersonDetail } from '../api/types';
 import { formatKalenderdatum, parseKalenderdatum } from '../anzeige/kalenderdatum';
+import { Ortsfeld } from '../anzeige/Ortsfeld';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt, heuteInZone } from '../anzeige/zeitEingabe';
@@ -392,6 +393,15 @@ function PersonendatenInhalt({
                 autoSize={{ minRows: 2 }}
                 count={zeichenGrenze(max)}
                 onChange={(e) => onChange(e.target.value)}
+              />
+            ) : feld === 'herkunft_adresse' ? (
+              // Personenbezogen: nie an den Geocoder (`frontend/AGENTS.md`, Ortsangaben).
+              <Ortsfeld
+                {...f}
+                ohneSuche="personenbezogen"
+                value={{ text: value, koordinate: null }}
+                count={zeichenGrenze(max)}
+                onChange={(w) => onChange(w.text)}
               />
             ) : (
               <Input

@@ -47,8 +47,9 @@ Seite weder zeigen noch bearbeiten; er gehört dem Modul Lagebesprechung.
 Das Speichern einer Zeile SHALL nur die Felder ihrer Angabe an `PATCH /api/einsaetze/{id}`
 senden. Eine Zeile trägt genau ein Feld, mit zwei Ausnahmen: Die Zeile „Koordinate“ sendet
 `einsatzort_lat` und `einsatzort_lon` als Paar. Die Zeile „Adresse“ des Einsatzorts sendet mit
-einem gewählten Treffer der Ortssuche `einsatzort`, `einsatzort_lat` und `einsatzort_lon` in einer
-Anfrage; ohne gewählten Treffer sendet sie nur `einsatzort`, und die Koordinate bleibt. Ist der
+einer neuen Koordinate (gewählter Treffer der Ortssuche, gezogene Nadel, auf der Karte gewählter
+Punkt, getippte Koordinate) `einsatzort`, `einsatzort_lat` und `einsatzort_lon` in einer
+Anfrage; ohne neue Koordinate sendet sie nur `einsatzort`, und die Koordinate bleibt. Ist der
 neue Wert gleich dem bisherigen, MUST keine Anfrage gesendet werden. Eine leer gespeicherte
 optionale Angabe MUST als `null` gesendet werden, die geleerte Koordinate als beide Felder
 `null`.
@@ -76,6 +77,10 @@ optionale Angabe MUST als `null` gesendet werden, die geleerte Koordinate als be
 #### Scenario: Treffer speichert Adresse und Koordinate
 - **WHEN** eine Person an der Zeile „Adresse“ nach „Bahnhofstraße 1“ sucht, den Treffer bei 51.1, 10.4 wählt und speichert
 - **THEN** geht genau eine Anfrage mit `einsatzort`, `einsatzort_lat: 51.1` und `einsatzort_lon: 10.4` hinaus
+
+#### Scenario: Nadel gezogen
+- **WHEN** eine Person an der Zeile „Adresse“ die Nadel der Vorschau zieht und speichert
+- **THEN** geht genau eine Anfrage mit dem unveränderten `einsatzort` und der neuen Koordinate hinaus
 
 #### Scenario: Nur die Adresse geändert
 - **WHEN** eine Person an der Zeile „Adresse“ den Text ändert, ohne einen Treffer zu wählen, und speichert

@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, src/routes/ort_suche.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs]
 ---
 
 ## Überblick
@@ -40,16 +40,24 @@ Ein eigenes Formular für alle Angaben gibt es nicht. Den Einsatzort ändert das
 1. Im Paneel „Einsatzort“ an der Zeile „Adresse“ den Wert wählen oder „Adresse eintragen“.
 2. Die Adresse eintippen, etwa „Bahnhofstraße 1, Musterstadt“, und Enter drücken oder „Ort
    suchen“ wählen. Die Suche braucht mindestens drei Zeichen.
-3. Aus der Liste „Treffer“ den passenden Ort wählen. Der Text des Treffers steht dann im Feld.
+3. Aus der Liste „Treffer“ den passenden Ort wählen. Der Text des Treffers steht dann im Feld,
+   darunter eine kleine Karte mit einer Nadel und eine Zeile mit Ortsname und Entfernung zum
+   nächsten Objekt auf der Lagekarte.
 
    ![Paneel „Einsatzort“ mit der Adresse im Suchfeld und der Liste der Treffer](../bilder/einsatzdaten/einsatzort.png)
 
-4. „Speichern“ wählen. Adresse und Koordinate werden zusammen gespeichert, der Kartenausschnitt
+4. Liegt die Nadel nicht genau richtig, sie mit der Maus oder dem Finger an die richtige Stelle
+   ziehen; mit der Tastatur verschieben die Pfeiltasten die Nadel, mit Umschalt in großen
+   Schritten. Der Text bleibt dabei stehen.
+5. „Speichern“ wählen. Adresse und Koordinate werden zusammen gespeichert, der Kartenausschnitt
    zeigt den Ort mit einer Nadel.
 
-Ein Ort ohne Adresse (Waldweg, Autobahn-Kilometer) wird als freier Text eingetragen und ohne
-Suche gespeichert. Die Koordinate dazu trägt die Zeile „Koordinate“ ein, in jedem Format, das
-„Koordinatenformat“ anbietet. „Auf Lagekarte zeigen“ öffnet die Lagekarte um den Einsatzort.
+Ein Ort ohne Adresse (Waldweg, Autobahn-Kilometer) wird als freier Text eingetragen. Den Punkt
+dazu setzt „Auf Karte wählen“: in der großen Karte an die Stelle tippen, die Nadel bei Bedarf
+ziehen und „Übernehmen“ wählen. Das geht auch ohne Netz, mit den installierten Offline-Karten.
+Wer eine Koordinate kennt, tippt sie gleich ins Adressfeld, in jedem Format, das
+„Koordinatenformat“ anbietet; die Zeile „Koordinate“ geht ebenso. „Auf Lagekarte zeigen“ öffnet
+die Lagekarte um den Einsatzort.
 
 Bei „Meldende Stelle“ schlägt die App beim Tippen die externen Stellen aus den
 [Stammdaten](stammdaten.md) vor, nach Art gruppiert. Ein Vorschlag lässt sich wählen oder ein
@@ -161,6 +169,11 @@ Für die Einsatzleitung:
   geändert, gilt er als freie Adresse: gespeichert wird nur der Text, die bisherige Koordinate
   bleibt. Unter der Koordinate steht der Ortsname, den die Koordinate ergibt; weicht er von der
   Adresse ab, passen beide nicht zusammen.
+- Ein Punkt, der auf der Karte gesetzt wurde (Nadel gezogen, „Auf Karte wählen“), bleibt, auch
+  wenn der Text danach geändert wird. Ergibt der Punkt einen anderen Ortsnamen als den Text, bietet
+  das Feld „Als Adresse übernehmen“ an; von sich aus überschreibt es den Text nie.
+- Eine Koordinate im Adressfeld erkennt die App beim Tippen, ohne Anfrage an den Server. „Ort
+  suchen“ bleibt dann gesperrt.
 - Die Suche fragt den Geocoder der Organisation (ohne Einstellung den öffentlichen Nominatim)
   und bevorzugt Orte in der Umgebung des bisherigen Einsatzorts. Sie sucht erst auf Enter oder
   „Ort suchen“, nie beim Tippen. Für alle Nutzer zusammen geht höchstens eine Anfrage je Sekunde

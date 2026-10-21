@@ -2,8 +2,10 @@
 
 ## Purpose
 Erfasst eine Ortsangabe als Adresse und Koordinate zugleich: Adresssuche über den Geocoder der
-Organisation, Wahl eines Treffers, Zustände der Suche und ein Kartenausschnitt, der zeigt, wo der
-Ort liegt. Regelt die Such-Einstiege, die dafür kein Recht auf die Lagekarte brauchen.
+Organisation, Wahl eines Treffers, Zustände der Suche, eine getippte Koordinate, eine
+Kartenvorschau mit ziehbarer Nadel und die Wahl auf einer großen Karte, damit man sieht und
+berichtigt, wo der Ort liegt. Personenbezogene Adressen gehen nie an den Geocoder. Regelt die
+Such-Einstiege, die dafür kein Recht auf die Lagekarte brauchen.
 
 ## Requirements
 
@@ -35,7 +37,9 @@ absenden.
 Wählt die Person einen Treffer, SHALL das Ortsfeld als Text die Kurzadresse des Treffers
 übernehmen (ohne Kurzadresse die Beschriftung des Geocoders) und die Koordinate des Treffers
 mitführen. Ändert die Person den Text danach, MUST das Feld die Koordinate des Treffers wieder
-fallen lassen: der Wert ist dann reiner Text. Freitext ohne Treffer SHALL erlaubt bleiben.
+fallen lassen: der Wert ist dann reiner Text. Eine auf der Karte gesetzte Koordinate (Nadel
+gezogen, auf der Karte gewählt, Ortsname übernommen) MUST eine Textänderung überstehen. Freitext
+ohne Treffer SHALL erlaubt bleiben.
 
 #### Scenario: Treffer wählen
 - **WHEN** die Person nach „Bahnhofstraße 1“ sucht und den Treffer „Bahnhofstraße 1, 12345 Musterstadt“ wählt
@@ -48,6 +52,24 @@ fallen lassen: der Wert ist dann reiner Text. Freitext ohne Treffer SHALL erlaub
 #### Scenario: Freitext ohne Suche
 - **WHEN** die Person „BAB 7 km 123“ tippt, ohne zu suchen
 - **THEN** ist der Wert dieser Text ohne Koordinate
+
+#### Scenario: Text nach Kartenwahl geändert
+- **WHEN** die Person die Nadel gezogen hat und danach „ links“ an den Text anhängt
+- **THEN** trägt der Wert weiter die Koordinate der Nadel
+
+### Requirement: Koordinate im Feld
+Tippt die Person eine Koordinate in das Ortsfeld, SHALL das Feld sie beim Tippen erkennen, in jeder
+Form, die der Koordinatensprung der Sprungpalette erkennt, und als Koordinate des Werts führen,
+ohne Anfrage an den Server und auch ohne Netz. Der Text bleibt, wie getippt. „Ort suchen“ MUST
+für eine Koordinate gesperrt bleiben. Was keine Koordinate ist („12 34“), MUST reiner Text bleiben.
+
+#### Scenario: MGRS getippt
+- **WHEN** die Person eine gültige MGRS-Angabe in das Ortsfeld tippt
+- **THEN** trägt der Wert deren Koordinate, und es ging keine Anfrage an die Ortssuche
+
+#### Scenario: Hausnummer
+- **WHEN** die Person „12 34“ tippt
+- **THEN** trägt der Wert keine Koordinate
 
 ### Requirement: Zustände der Ortssuche am Feld
 Das Ortsfeld SHALL während der Suche einen Ladezustand zeigen und danach genau eine Aussage am
@@ -75,6 +97,8 @@ Kacheln). Ohne Koordinate MUST statt der Karte „Nicht verortet“ stehen. Kann
 nicht zeichnen (kein WebGL2), MUST an Stelle der Karte „Karte auf diesem Gerät nicht darstellbar“
 stehen, ohne die Technik zu nennen, und die Seite MUST NOT in die Fehlerseite der App fallen; ein
 anderer Fehler beim Aufbau der Karte MUST weiter als Fehler gelten.
+Einziges mögliches Bedienziel des Ausschnitts ist die ziehbare Nadel der Kartenvorschau am
+Ortsfeld; die Karte selbst lässt sich weder verschieben noch zoomen.
 
 #### Scenario: Verorteter Ort
 - **WHEN** der Ort die Koordinate 51.16040, 10.45140 trägt
@@ -179,3 +203,77 @@ werden.
 #### Scenario: Paar leeren
 - **WHEN** eine Anfrage `einsatzort_lat: null` und `einsatzort_lon: null` sendet
 - **THEN** ist der Einsatzort danach nicht verortet
+
+### Requirement: Kartenvorschau am Ortsfeld
+Ein Ortsfeld mit Kartenvorschau SHALL unter dem Feld zu einer Koordinate einen Kartenausschnitt
+mit Nadel zeigen und ohne Koordinate „Nicht verortet“, in beiden Fällen mit dem Knopf „Auf Karte
+wählen“. Im Einsatz SHALL unter dem Ausschnitt die Ort-Zeile stehen: Ortsname und Peilung zum
+nächsten verorteten Objekt, nie zum Objekt selbst. Die Vorschau MUST bei 390 px Breite in der
+Seite bleiben.
+
+#### Scenario: Treffer im Einsatz
+- **WHEN** die Person in den Einsatzdaten einen Treffer der Ortssuche wählt
+- **THEN** stehen unter dem Feld der Ausschnitt mit der Nadel und die Ort-Zeile „<Ortsname> · <Distanz> <Richtung> von <Objekt>“
+
+#### Scenario: Ohne Koordinate
+- **WHEN** der Wert keine Koordinate trägt
+- **THEN** steht unter dem Feld „Nicht verortet“ mit „Auf Karte wählen“ und keine Karte
+
+#### Scenario: Ohne Einsatz
+- **WHEN** im Dialog „Einsatz anlegen“ ein Treffer gewählt ist
+- **THEN** steht der Ausschnitt mit Nadel da, ohne Ort-Zeile und ohne Anfrage an die Ort-Vorschau
+
+### Requirement: Nadel verschieben
+Die Nadel der Kartenvorschau SHALL sich mit Maus, Finger und Pfeiltasten verschieben lassen (mit
+Umschalt in großen Schritten). Das Verschieben MUST die Koordinate des Werts ändern und den Text
+stehen lassen. Die Nadel MUST ein Bedienziel mit der Steuerhöhe der aktiven Dichtestufe im
+Quadrat sein.
+
+#### Scenario: Gezogen
+- **WHEN** die Person die Nadel eines gewählten Treffers 60 px nach Osten zieht
+- **THEN** trägt der Wert eine Koordinate weiter östlich, und der Text ist unverändert
+
+#### Scenario: Pfeiltaste
+- **WHEN** die Nadel den Fokus hat und die Person die Pfeiltaste rechts drückt
+- **THEN** rückt die Nadel nach Osten, und der Wert trägt den neuen Punkt
+
+### Requirement: Ortsname als Vorschlag
+Stammt die Koordinate nicht aus einem Treffer (getippt oder auf der Karte gesetzt) und weicht der
+Ortsname der Ort-Zeile vom Text ab, SHALL das Feld „Als Adresse übernehmen“ anbieten; das setzt
+den Ortsnamen als Text und behält die Koordinate. Den getippten Text MUST das Feld nie von sich
+aus überschreiben.
+
+#### Scenario: Nach dem Ziehen
+- **WHEN** die Person die Nadel gezogen hat und der Ortsname der neuen Stelle „Marktplatz 3, 12345 Musterstadt“ lautet
+- **THEN** bleibt der Text, und „Als Adresse übernehmen“ setzt „Marktplatz 3, 12345 Musterstadt“
+
+#### Scenario: Treffer gewählt
+- **WHEN** die Koordinate aus einem gewählten Treffer stammt
+- **THEN** steht kein „Als Adresse übernehmen“
+
+### Requirement: Auf Karte wählen
+„Auf Karte wählen“ SHALL einen Dialog mit einer großen Karte mit Bedienung öffnen, an der
+Koordinate des Felds mit Nadel, sonst an der Umgebung (meist der Einsatzort), sonst über
+Deutschland. Ein Klick in die Karte SHALL die Nadel setzen, die Nadel ist ziehbar. „Übernehmen“
+MUST bis zur ersten Nadel gesperrt sein und setzt die Koordinate, ohne den Text zu ändern;
+„Abbrechen“ lässt den Wert. Die Kartengrundlage folgt dem Kartenausschnitt; ohne Netz MUST der
+Dialog mit Offline-Karten oder ohne Kacheln weiter gehen. Kann das Gerät keine Karte zeichnen,
+MUST im Dialog „Karte auf diesem Gerät nicht darstellbar“ stehen, und „Abbrechen“ MUST gehen.
+
+#### Scenario: Ohne Netz
+- **WHEN** das Gerät offline ist und die Person „Auf Karte wählen“ öffnet, in die Karte klickt und übernimmt
+- **THEN** trägt der Wert die Koordinate des Klicks, und der Text ist unverändert
+
+#### Scenario: Abbrechen
+- **WHEN** die Person im Dialog einen Punkt setzt und „Abbrechen“ wählt
+- **THEN** ist der Wert unverändert
+
+### Requirement: Ortsfeld ohne Suche
+Eine personenbezogene Ortsangabe (Herkunft / Adresse einer Person) SHALL das Ortsfeld ohne Suche
+nehmen: reiner Text ohne „Ort suchen“, ohne Erkennung einer Koordinate, ohne Kartenvorschau und
+ohne Ort-Zeile. Ihr Text MUST den Browser nie Richtung Geocoder verlassen, weder über die
+Ortssuche noch über die Ort-Vorschau. Enter verhält sich wie in jedem Textfeld.
+
+#### Scenario: Personenadresse
+- **WHEN** die Person an einer betroffenen Person „Hauptstraße 12, Musterstadt“ als Herkunft / Adresse einträgt und mit Enter speichert
+- **THEN** geht nur der PATCH der Person hinaus und keine Anfrage an Ortssuche oder Ort-Vorschau
