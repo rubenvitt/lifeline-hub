@@ -136,6 +136,8 @@ wer im Einsatz schreiben darf.
    „Neuer Lagevortrag“ wählen und „Anfügen“ wählen. Die App meldet „Lageplan an … angefügt“; ein
    neuer Lagevortrag öffnet sich.
 
+   ![Dialog „Lageplan als Anlage“ mit den Entwürfen „Lagebericht · Lage 1400“ (gewählt) und „Befehl · Verlegung Behandlungsplatz“, darunter „Neuer Lagevortrag“ und die Knöpfe „Abbrechen“ und „Anfügen“](../bilder/lagekarte/lageplan-anlage.png)
+
 ## Hintergrund
 
 ### Die Leiste: Ebenen, Objekte und Auswahl
