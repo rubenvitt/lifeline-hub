@@ -328,7 +328,7 @@ export interface components {
          * @description Art einer Anlage. Neue Art = neue Variante plus CHECK-Rebuild der beiden Linker.
          * @enum {string}
          */
-        AnlageArt: "fernmeldeskizze";
+        AnlageArt: "fernmeldeskizze" | "lageplan";
         /** @description Eine Zeile der Anmeldespur, wie die Verwaltung sie liest (LFH-1097). */
         AnmeldeEintragAnzeige: {
             /** Format: int64 */
