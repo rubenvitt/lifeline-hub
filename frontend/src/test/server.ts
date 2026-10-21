@@ -105,6 +105,11 @@ export const server = setupServer(
    */
   http.get('/api/schichtmodelle', () => HttpResponse.json([])),
   /**
+   * Einsatz-Vorlagen der Organisation (LLH-1375) — keine als Default. Anlegedialog und
+   * Stichwort-Katalog fragen sie ab; Tests mit Vorlagen überschreiben per `server.use()`.
+   */
+  http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+  /**
    * Dokumentenablage — leere Liste als Default (LFH-743). Die ETB-Seite fragt sie mit Freigabe
    * `dokumente` beim Mount ab, um Dokumente mit ETB-Bezug am Eintrag zu zeigen; `[]` ist ein
    * echter Serverzustand. Tests mit Dokumenten überschreiben per `server.use()`.

@@ -138,6 +138,8 @@ export const VERPFLEGUNG_AUS_VORLAGE_MAX = 24;
 export const VERPFLEGUNG_EP_MAX = 100_000;
 /** Bezeichnung eines Schichtmodells (LLH-1122). */
 export const SCHICHTMODELL_BEZEICHNUNG_MAX = 100;
+/** Bezeichnung einer Einsatz-Vorlage (LLH-1375). */
+export const EINSATZ_VORLAGE_BEZEICHNUNG_MAX = 100;
 /** Wechselzeiten je Schichtmodell, gezählt vor dem Entdoppeln. */
 export const SCHICHTMODELL_WECHSELZEITEN_MAX = 24;
 /** Mindestdauer bei Wechselzeiten in Minuten: ein Tag. */

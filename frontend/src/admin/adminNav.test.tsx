@@ -44,13 +44,13 @@ describe('adminNav — Registry', () => {
   /**
    * „Demo-Daten“, „Aufbewahrung“ und „Zugangsprotokoll“ sind Sonder-Einträge neben „Benutzer“, NICHT in
    * `adminGruppen`: die Gruppen kennen kein Rollenprädikat, eine Sektion dort sähe jede
-   * Führungskraft. Die Zahl 20 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
+   * Führungskraft. Die Zahl 22 ist deshalb eine Aussage. Die Sonder-Einträge sind einzeln
    * gepinnt, samt Eindeutigkeit gegenüber den Gruppen-Keys (gleiche Ebene `/admin/<key>`).
    */
-  it('drei Gruppen mit 21 Sektionen gesamt (Stammdaten 16), dazu vier Sonder-Einträge', () => {
+  it('drei Gruppen mit 22 Sektionen gesamt (Stammdaten 17), dazu vier Sonder-Einträge', () => {
     expect(adminGruppen.map((g) => g.key)).toEqual(['stammdaten', 'einstellungen', 'karten']);
-    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(21);
-    expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(16);
+    expect(adminGruppen.flatMap((g) => g.sektionen).length).toBe(22);
+    expect(adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen.length).toBe(17);
     expect(adminBenutzer.key).toBe('benutzer');
     expect(adminDemoDaten).toEqual({ key: 'demo-daten', label: 'Demo-Daten' });
     // Voreingestellte Werte heißen „Vorgabe“ (LFH-944), auch im Menü.
@@ -87,7 +87,7 @@ describe('adminNav — Registry', () => {
 /**
  * Titel-Drift: der Titel steht als `label` in der Registry (Menü) UND als `titel` in der
  * Sektion (Seitenkopf). Driftet einer, zeigt die Sidebar einen anderen Namen als die Seite.
- * Gescopt auf die sechzehn Stammdaten-Sektionen; alle übrigen zögen die Queries der Karten- und
+ * Gescopt auf die siebzehn Stammdaten-Sektionen; alle übrigen zögen die Queries der Karten- und
  * Einstellungssektionen herein und färbten den Test aus Mock-Gründen rot.
  */
 const admin = adminFixture();
@@ -115,6 +115,7 @@ function stammdatenHandler() {
     http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
     http.get('/api/verpflegung-vorlagen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
     http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
@@ -128,9 +129,9 @@ function stammdatenHandler() {
 const STAMMDATEN = adminGruppen.find((g) => g.key === 'stammdaten')!.sektionen;
 
 describe('adminNav — Seitenkopf trägt den Registry-Titel', () => {
-  it('deckt alle sechzehn Stammdaten-Sektionen ab', () => {
+  it('deckt alle siebzehn Stammdaten-Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei leerer Menge grün.
-    expect(STAMMDATEN).toHaveLength(16);
+    expect(STAMMDATEN).toHaveLength(17);
   });
 
   it.each(STAMMDATEN.map((s) => [s.label, s.element] as const))(

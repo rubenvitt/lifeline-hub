@@ -779,6 +779,8 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'verpflegung-vorlagen',
         'etb-bausteine',
         'stichwort-vorschlaege',
+        // Einsatz-Vorlagen (LLH-1375).
+        'einsatz-vorlagen',
         'externe-stellen',
         'fuehrungsfunktionen',
         'schichtmodelle',

@@ -8,6 +8,7 @@ import StichworteTab from './StichworteTab';
 import { adminFixture } from '../test/fixtures';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import { keinStehenderFehler, stehenderFehler } from '../test/stehenderFehler';
+import { waehle } from '../test/auswahlListe';
 
 // Deckt das Admin-Gating der Stichwort-Sektion ab.
 
@@ -164,7 +165,7 @@ describe('StichworteTab', () => {
 
     const feld = container.querySelector<HTMLInputElement>('input[type="search"]');
     expect(feld, 'die Stichwort-Tabelle muss ein Suchfeld tragen').not.toBeNull();
-    expect(feld!.placeholder).toBe('Stichwort');
+    expect(feld!.placeholder).toBe('Stichwort oder Vorlage');
 
     await userEvent.type(feld!, 'B2');
     expect(zeilen()).toHaveLength(1);
@@ -247,5 +248,88 @@ describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () =>
       within(await offeneRueckfrage()).getByRole('button', { name: 'Stichwort löschen' }),
     );
     await keinStehenderFehler('Stichwort gibt es schon');
+  });
+});
+
+/**
+ * Kopplung an eine Einsatz-Vorlage (LLH-1375, Spec `einsatz-vorlagen`, „Ein Stichwort-Vorschlag
+ * kann auf eine Vorlage zeigen“): je Zeile eine Auswahl, sofort gespeichert, nur für den Admin.
+ */
+describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
+  const VORLAGEN = [
+    { id: 3, bezeichnung: 'MANV', einsatzart: 'realeinsatz', ausgeblendet: ['stab'], sortier: 30 },
+    { id: 4, bezeichnung: 'Kleinlage', ausgeblendet: [], sortier: 10 },
+  ];
+
+  function mitVorlagen(benutzer: typeof admin, vorschlaege: object[]) {
+    const anfragen: { pfad: string; rumpf: unknown }[] = [];
+    server.use(
+      meHandler(benutzer),
+      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
+      http.get('/api/einsatz-vorlagen', () => HttpResponse.json(VORLAGEN)),
+      http.put('/api/stichwort-vorschlaege/:id/vorlage', async ({ request, params }) => {
+        const rumpf = (await request.json()) as { vorlage_id: number | null };
+        anfragen.push({ pfad: new URL(request.url).pathname, rumpf });
+        return HttpResponse.json({ id: Number(params.id), text: 'MANV15', ...rumpf });
+      }),
+    );
+    renderMitProviders(<StichworteTab />);
+    return anfragen;
+  }
+
+  it('Admin wählt eine Vorlage, sie wird sofort gespeichert', async () => {
+    const anfragen = mitVorlagen(admin, [{ id: 5, text: 'MANV15' }]);
+    await screen.findByText('MANV15');
+    await waehle('Vorlage zu MANV15', 'MANV');
+    await waitFor(() =>
+      expect(anfragen).toEqual([
+        { pfad: '/api/stichwort-vorschlaege/5/vorlage', rumpf: { vorlage_id: 3 } },
+      ]),
+    );
+    const feld = screen.getByRole('combobox', { name: 'Vorlage zu MANV15' });
+    await waitFor(() => expect(feld.closest('.ant-select')?.textContent).toBe('MANV'));
+  });
+
+  it('„keine“ löst die Kopplung (`vorlage_id: null`)', async () => {
+    const anfragen = mitVorlagen(admin, [{ id: 5, text: 'MANV15', vorlage_id: 3 }]);
+    await screen.findByText('MANV15');
+    const feld = screen.getByRole('combobox', { name: 'Vorlage zu MANV15' });
+    await waitFor(() => expect(feld.closest('.ant-select')?.textContent).toBe('MANV'));
+    await waehle('Vorlage zu MANV15', 'keine');
+    await waitFor(() =>
+      expect(anfragen).toEqual([
+        { pfad: '/api/stichwort-vorschlaege/5/vorlage', rumpf: { vorlage_id: null } },
+      ]),
+    );
+    await waitFor(() => expect(feld.closest('.ant-select')?.textContent).toBe('keine'));
+  });
+
+  it('eine Ablehnung steht an der Zeile, der Serverstand kehrt zurück', async () => {
+    mitVorlagen(admin, [{ id: 5, text: 'MANV15' }]);
+    let abgelehnt = false;
+    server.use(
+      http.put('/api/stichwort-vorschlaege/:id/vorlage', () => {
+        abgelehnt = true;
+        return HttpResponse.json({ error: 'Vorlage unbekannt' }, { status: 400 });
+      }),
+    );
+    await screen.findByText('MANV15');
+    await waehle('Vorlage zu MANV15', 'Kleinlage');
+    await waitFor(() => expect(abgelehnt).toBe(true));
+    const zeile = screen.getByText('MANV15').closest('tr')!;
+    expect(await within(zeile).findByText('Vorlage unbekannt')).toBeInTheDocument();
+    const feld = screen.getByRole('combobox', { name: 'Vorlage zu MANV15' });
+    await waitFor(() => expect(feld.closest('.ant-select')?.textContent).toBe('keine'));
+  });
+
+  it('Nicht-Admin liest den Namen der Vorlage, ohne Auswahl', async () => {
+    mitVorlagen(nichtAdmin, [
+      { id: 5, text: 'MANV15', vorlage_id: 3 },
+      { id: 6, text: 'H1' },
+    ]);
+    const zeile = (await screen.findByText('MANV15')).closest('tr')!;
+    expect(await within(zeile).findByText('MANV')).toBeInTheDocument();
+    expect(within(screen.getByText('H1').closest('tr')!).getByText('—')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Vorlage zu/ })).toBeNull();
   });
 });

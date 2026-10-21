@@ -5,6 +5,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import StichworteTab from './StichworteTab';
+import EinsatzVorlagenTab from './EinsatzVorlagenTab';
 import ExterneStellenTab from './ExterneStellenTab';
 import FahrzeugeTab from './FahrzeugeTab';
 import MaterialTab from './MaterialTab';
@@ -59,6 +60,7 @@ function handler(benutzer: typeof admin) {
     http.get('/api/einheit-typen', () => HttpResponse.json([])),
     http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
     http.get('/api/stichwort-vorschlaege', () => HttpResponse.json([])),
+    http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
     http.get('/api/externe-stellen', () => HttpResponse.json([])),
     http.get('/api/sprechgruppen', () => HttpResponse.json([])),
     http.get('/api/schichtmodelle', () => HttpResponse.json([])),
@@ -89,12 +91,13 @@ const SEKTIONEN = [
   { name: 'Sprechgruppen', Komp: SprechgruppenTab, aktion: 'Sprechgruppe anlegen' },
   { name: 'Externe Stellen', Komp: ExterneStellenTab, aktion: 'Externe Stelle anlegen' },
   { name: 'Schichtmodelle', Komp: SchichtmodelleTab, aktion: 'Schichtmodell anlegen' },
+  { name: 'Einsatz-Vorlagen', Komp: EinsatzVorlagenTab, aktion: 'Einsatz-Vorlage anlegen' },
 ];
 
 describe('Stammdaten — fehlende Berechtigung wird erklärt', () => {
-  it('deckt alle vierzehn Sektionen ab', () => {
+  it('deckt alle fünfzehn Sektionen ab', () => {
     // Ohne diese Zahl wäre die Schleife darunter auch bei halber Menge grün.
-    expect(SEKTIONEN).toHaveLength(14);
+    expect(SEKTIONEN).toHaveLength(15);
   });
 
   it.each(SEKTIONEN)('$name nennt ohne Admin-Recht den Grund', async ({ Komp }) => {

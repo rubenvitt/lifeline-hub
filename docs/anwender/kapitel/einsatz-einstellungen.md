@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -145,6 +145,12 @@ setzt einen eigenen Wert: Das Modul bleibt in diesem Einsatz sichtbar, bis jeman
 übernehmen“ wählt. Eine geänderte Rolle ändert die Sichtbarkeit nicht.
 „Einsatzdaten“ und „Einstellungen“ sind „immer sichtbar, nicht ausblendbar“, damit sich niemand
 selbst aussperrt.
+
+Wurde der Einsatz mit einer Einsatz-Vorlage angelegt (Kapitel [Stammdaten](stammdaten.md)),
+stehen die Module, die sie ausblendet, als eigene Werte des Einsatzes aus: der Schalter ist aus,
+und in der Zeile steht „Vorgabe übernehmen“. Einschalten setzt den eigenen Wert auf sichtbar;
+„Vorgabe übernehmen“ nimmt ihn zurück, und das Modul folgt wieder der Organisation. Ein Modul, das
+die Organisation selbst ausblendet, bleibt auch mit Vorlage ausgeblendet.
 
 ### Wer was darf
 
