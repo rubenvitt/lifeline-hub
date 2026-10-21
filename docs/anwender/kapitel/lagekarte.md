@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs]
 ---
 
 ## Überblick
@@ -96,6 +96,15 @@ wer im Einsatz schreiben darf.
 3. Soll nur diese eine Zone entstehen, den Schalter „Weitere zeichnen“ ausschalten.
 4. „Abschließen“ und danach „Speichern“ wählen. Die App meldet „Zone angelegt“.
 
+### Den Lageplan drucken oder anhängen
+
+1. Den Ausschnitt so einstellen, wie er auf dem Blatt stehen soll: Ebenen, Zoom und Drehung.
+2. Zum Drucken im Kopf der Seite „Drucken / als PDF“ wählen; auf schmalen Bildschirmen steht der
+   Punkt unter „Weitere“. Im Druckdialog des Browsers drucken oder als PDF speichern.
+3. Zum Anhängen „Als Anlage an …“ wählen, im Dialog einen offenen Lagebericht oder Befehl oder
+   „Neuer Lagevortrag“ wählen und „Anfügen“ wählen. Die App meldet „Lageplan an … angefügt“; ein
+   neuer Lagevortrag öffnet sich.
+
 ## Hintergrund
 
 ### Die Leiste: Ebenen und Objekte
@@ -115,6 +124,25 @@ Eine Fachebene nennt unter ihrem Namen, was sie zeigt, und eingeschaltet, von wa
 Ganz oben in „Ebenen“ steht die Kartenansicht mit „In dieser Ansicht speichern“. Welche Ansicht
 der Leiste vorn steht und welche Gruppen offen sind, merkt sich das Gerät. Zu Beginn sind
 „Kräfte“ und „Lage“ offen.
+
+### Der Lageplan
+
+Gedruckt und angehängt wird der Ausschnitt, der gerade zu sehen ist, als Bild: auf einem Blatt A4
+quer mit Druckkopf (Stand, Ansicht, Kartengrundlage), Maßstabsleiste, „Maßstab ca. 1 : …“,
+Nordpfeil und einer Legende. Alles steht auf einem Blatt: Trägt der Kopf ein Logo oder ist die
+Legende lang, wird das Bild kleiner gedruckt, Maßstabsleiste und „Maßstab ca. 1 : …“ gelten für
+das gedruckte Bild. Die Legende nennt nur, was auf dem Bild steht: Ebenen mit Anzahl,
+jede Zone mit ihrer Beschriftung samt Warnstufe, Fachebenen mit Stand und sichtbare
+Bild-Hintergründe. Eine Ebene, die die eigene Rolle nicht sehen darf, steht weder auf dem Bild
+noch in der Legende. Ist eine Fachebene veraltet, steht das über der Legende. Kacheln, die noch
+nicht geladen sind, bleiben leere Fläche. In einem früheren Lagestand trägt das Blatt dessen
+Stand.
+
+Die Anlage ist ein PNG mit Kopf, Karte, Maßstab, Nordpfeil und Legende und steht im Lagebericht
+oder Befehl als „Lageplan“ unter den Anlagen (Kapitel [Lageberichte](lageberichte.md)).
+Anhängen braucht das Schreibrecht im Einsatz und eine Verbindung; angeboten werden nur Entwürfe
+der Module, die die eigene Rolle sieht. Fehlt etwas davon, steht „Als Anlage an …“ gesperrt und
+nennt den Grund.
 
 ### Tippen auf der Karte
 

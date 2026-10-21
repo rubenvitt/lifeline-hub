@@ -9036,6 +9036,172 @@ mod tests {
         assert_eq!(rest, 0, "die Zeilen fallen weiter mit dem Einsatz");
     }
 
+    /// LLH-1051: beide Anlagen-Linker bekommen die Art `lageplan`. Zeilen samt ids, Spalten,
+    /// Schlüssel und Indizes bleiben; die DDL unterscheidet sich nur in der `art`-Liste, die neue
+    /// Art geht durch, eine unbekannte nicht, und die Kaskade an der Datei hält.
+    #[tokio::test]
+    async fn migration_0230_baut_die_anlagen_linker_mit_der_art_lageplan_neu() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 229).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let anhang = |name: &'static str| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO anhang (einsatz_id, dateiname, mime, groesse, sha256, daten, \
+                        hochgeladen_von) VALUES (?, ?, 'image/png', 3, 'x', X'010203', ?) \
+                     RETURNING id",
+                )
+                .bind(e)
+                .bind(name)
+                .bind(b)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+            }
+        };
+        let lb: i64 = sqlx::query_scalar(
+            "INSERT INTO lagebericht (einsatz_id, vorlage, titel, zeitstand, abschnitte, \
+                ersteller_id) VALUES (?, 'lagebericht', 'LB', '2026-10-20 08:00:00', '[]', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let bf: i64 = sqlx::query_scalar(
+            "INSERT INTO befehl (einsatz_id, vorlage, titel, zeitstand, abschnitte, \
+                ersteller_id) VALUES (?, 'befehl_lad', 'B', '2026-10-20 08:00:00', '[]', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let (a1, a2, a3) = (
+            anhang("a.png").await,
+            anhang("b.png").await,
+            anhang("c.png").await,
+        );
+        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO lagebericht_anlage (id, einsatz_id, lagebericht_id, anhang_id, art, \
+                titel, stand_at, reihenfolge, abgelegt_von_id, abgelegt_at) VALUES \
+             (4, {e}, {lb}, {a1}, 'fernmeldeskizze', 'Fernmeldeskizze', '2026-10-20 08:01:00', \
+              1, {b}, '2026-10-20 08:02:00'); \
+             INSERT INTO befehl_anlage (id, einsatz_id, befehl_id, anhang_id, art, titel, \
+                stand_at, reihenfolge, abgelegt_von_id, abgelegt_at) VALUES \
+             (7, {e}, {bf}, {a2}, 'fernmeldeskizze', 'Skizze', '2026-10-20 08:03:00', 1, {b}, \
+              '2026-10-20 08:04:00');"
+        )))
+        .execute(&pool)
+        .await
+        .unwrap();
+        type Zeile = (i64, i64, i64, i64, String, String, String, i64, i64, String);
+        let mut vorher = Vec::new();
+        for (tabelle, spalte) in [
+            ("lagebericht_anlage", "lagebericht_id"),
+            ("befehl_anlage", "befehl_id"),
+        ] {
+            let alle = format!(
+                "SELECT id, einsatz_id, {spalte}, anhang_id, art, titel, stand_at, reihenfolge, \
+                    abgelegt_von_id, abgelegt_at FROM {tabelle} ORDER BY id"
+            );
+            let zeilen: Vec<Zeile> = sqlx::query_as(sqlx::AssertSqlSafe(alle.clone()))
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+            vorher.push((
+                tabelle,
+                alle,
+                zeilen,
+                schema_von(&pool, tabelle).await,
+                ddl_ohne_namen(&pool, tabelle).await,
+            ));
+        }
+        let lageplan_an = |tabelle: &'static str, spalte: &'static str, dokument: i64| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query(sqlx::AssertSqlSafe(format!(
+                    "INSERT INTO {tabelle} (einsatz_id, {spalte}, anhang_id, art, titel, \
+                        stand_at, reihenfolge, abgelegt_von_id) \
+                     VALUES (?, ?, ?, 'lageplan', 'Lageplan', '2026-10-20 09:00:00', 2, ?)"
+                )))
+                .bind(e)
+                .bind(dokument)
+                .bind(a3)
+                .bind(b)
+                .execute(&pool)
+                .await
+            }
+        };
+        assert!(
+            lageplan_an("lagebericht_anlage", "lagebericht_id", lb)
+                .await
+                .is_err(),
+            "vor 0230 kennt der CHECK den Lageplan nicht"
+        );
+
+        migriere_bis(&pool, 230).await;
+
+        for (tabelle, alle, zeilen, schema, ddl) in &vorher {
+            let nachher: Vec<Zeile> = sqlx::query_as(sqlx::AssertSqlSafe(alle.clone()))
+                .fetch_all(&pool)
+                .await
+                .unwrap();
+            assert_eq!(
+                &nachher, zeilen,
+                "{tabelle}: jede Zeile bleibt mit ihrer id"
+            );
+            assert_eq!(
+                &schema_von(&pool, tabelle).await,
+                schema,
+                "{tabelle}: Schema"
+            );
+            assert_eq!(
+                &ddl_ohne_namen(&pool, tabelle)
+                    .await
+                    .replacen(", 'lageplan'", "", 1),
+                ddl,
+                "{tabelle}: die DDL unterscheidet sich ausschließlich im art-CHECK"
+            );
+            let reste: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_master WHERE name = ? || '_neu'")
+                    .bind(tabelle)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(reste, 0, "{tabelle}: keine Reste der Zwischentabelle");
+        }
+        lageplan_an("lagebericht_anlage", "lagebericht_id", lb)
+            .await
+            .expect("Lageplan am Lagebericht");
+        sqlx::query(
+            "INSERT INTO befehl_anlage (einsatz_id, befehl_id, anhang_id, art, titel, stand_at, \
+                reihenfolge, abgelegt_von_id) \
+             VALUES (?, ?, ?, 'erfunden', 'X', '2026-10-20 09:00:00', 2, ?)",
+        )
+        .bind(e)
+        .bind(bf)
+        .bind(anhang("d.png").await)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .expect_err("eine unbekannte Art bleibt abgewiesen");
+        sqlx::query("DELETE FROM anhang WHERE id = ?")
+            .bind(a3)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let rest: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM lagebericht_anlage WHERE anhang_id = ?")
+                .bind(a3)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(rest, 0, "der Linker fällt weiter mit seiner Datei");
+    }
+
     // ── LLH-1048: Verpflegungsgerät an einer Verpflegungsstelle (0213) ─────────────────────
 
     /// Der Rebuild von `geraet_kopplung` (Muster 0159) hält Codes, Ereignisse und

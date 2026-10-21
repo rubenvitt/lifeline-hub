@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Nebenweg } from '../EinsatzSeite';
 import { useDrucken } from './useDrucken';
 
@@ -12,9 +13,16 @@ export const DRUCKEN = 'Drucken / als PDF';
  * Kann die Organisation nicht geladen werden, steht der Druck GESPERRT da und nennt den Grund im
  * Text (nicht versteckt, LFH-345 · M16); „Organisation erneut laden“ folgt als eigener Eintrag,
  * damit der Weg zurück auch unter `md` erreichbar bleibt.
+ *
+ * `vorbereiten` (Lageplan, LLH-1051): baut das Druckstück erst auf Wahl, etwa das Bild der Karte.
+ * Der Druck folgt, wenn es `true` meldet; bis dahin läuft der Eintrag. Meldet es `false`, hat der
+ * Aufrufer den Grund schon an seinen Ort gegeben.
  */
-export function useDruckNebenwege(): Nebenweg[] {
+export function useDruckNebenwege({
+  vorbereiten,
+}: { vorbereiten?: () => Promise<boolean> } = {}): Nebenweg[] {
   const { drucken, zustand, wiederholen } = useDrucken();
+  const [bereitetVor, setBereitetVor] = useState(false);
   if (zustand === 'fehler') {
     return [
       {
@@ -26,5 +34,22 @@ export function useDruckNebenwege(): Nebenweg[] {
       { key: 'organisation-laden', label: 'Organisation erneut laden', onWahl: wiederholen },
     ];
   }
-  return [{ key: 'druck', label: DRUCKEN, onWahl: drucken }];
+  if (!vorbereiten) return [{ key: 'druck', label: DRUCKEN, onWahl: drucken }];
+  return [
+    {
+      key: 'druck',
+      label: DRUCKEN,
+      laeuft: bereitetVor,
+      onWahl: () => {
+        if (bereitetVor) return;
+        setBereitetVor(true);
+        void vorbereiten()
+          .then((bereit) => {
+            if (bereit) drucken();
+          })
+          .catch(() => undefined)
+          .finally(() => setBereitetVor(false));
+      },
+    },
+  ];
 }

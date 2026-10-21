@@ -6,12 +6,24 @@ import { SeitenSkeleton } from '../components/SeitenZustand';
 import FensterRahmen from '../components/FensterRahmen';
 import {
   EinsatzstatusMarke,
+  NebenwegeImKopf,
   Ortspfad,
+  type Nebenweg,
   seitenkopfStil,
   seitenMetaStil,
   seitentitelStil,
 } from '../components/EinsatzSeite';
 import { useEinsatzRahmen } from '../einsatz/EinsatzRahmenKontext';
+import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
+import { useModulFreigabe, type ModulFreigabe } from '../einsatz/useModulFreigabe';
+import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
+import { useOhneVerbindung } from '../offline/verbindung';
+import { useLageplan } from './lagekarte/useLageplan';
+import LageplanDruck from './lagekarte/LageplanDruck';
+import LageplanAnlageDialog, {
+  ALS_ANLAGE,
+  anlageSperrGrund,
+} from './lagekarte/LageplanAnlageDialog';
 import { useModusFarben } from '../components/rahmenStil';
 import { useViewport } from '../components/useViewport';
 import { useRollen } from '../components/instrument';
@@ -138,6 +150,11 @@ export function kopfMeta(verortet: number, nichtVerortet: number, fehler: boolea
   return nichtVerortet > 0
     ? `${verortet} verortet · ${nichtVerortet} nicht verortet`
     : `${verortet} verortet`;
+}
+
+/** Freigabe eines Moduls für den Nebenweg „Als Anlage an …“. */
+function freigabeStand(f: ModulFreigabe): 'frei' | 'gesperrt' | 'offen' {
+  return f.zustand === 'frei' ? 'frei' : f.zustand === 'gesperrt' ? 'gesperrt' : 'offen';
 }
 
 export default function LagekartePage() {
@@ -1046,6 +1063,50 @@ export default function LagekartePage() {
     setSearchParams(naechste, { replace: true });
   }, [searchParams, setSearchParams, ladt, zeigeLeiste, wechsleLeistenAnsicht]);
 
+  // Lageplan (LLH-1051, Spec `lagekarte-druck`): Druck und Anlage des aktuellen Ausschnitts. Kopf
+  // und Legende liest der Hook erst bei der Aufnahme; die Legende nennt nur, was gezeichnet ist.
+  const { formatZeitKurz } = useAnzeigeKonventionen();
+  const lageplanStile = config?.online_styles ?? [];
+  const lageplan = useLageplan({
+    kartenRef,
+    kopf: rahmenEinsatz
+      ? {
+          einsatz: rahmenEinsatz,
+          ansicht: aktiveAnsicht?.name ?? null,
+          grundlage:
+            grundlageOptionen(lageplanStile, !!config?.offline_verfuegbar).find(
+              (o) => o.wert === grundlageWert(basemap, onlineStilName, lageplanStile),
+            )?.label ?? null,
+          // Gesicherter Stand bzw. Datenstand; ohne beides der Zeitpunkt der Aufnahme.
+          stand:
+            snapshotParam != null
+              ? (aktiverSnapshot?.stand_at ?? null)
+              : datenstand
+                ? new Date(datenstand).toISOString()
+                : null,
+        }
+      : null,
+    quellen: {
+      marker: sichtbareMarker,
+      abschnitte: kartenFlaechen.length,
+      zonen: zonenFeatures,
+      fachebenen: aktiveFachebenen,
+      abgerufen: fachebenenAbgerufen,
+      bilder: bildOverlays
+        .filter((o) => o.sichtbar && o.opazitaet > 0)
+        .flatMap((o) => {
+          const b = bilder.find((x) => x.id === o.id);
+          return b ? [{ id: b.id, name: b.name }] : [];
+        }),
+      formatZeitKurz,
+    },
+    beginneHandlung: kartenFehler.beginne,
+  });
+  const druckNebenwege = useDruckNebenwege({ vorbereiten: lageplan.vorbereitenDruck });
+  const lageberichteFreigabe = useModulFreigabe(einsatzId, 'lageberichte');
+  const befehleFreigabe = useModulFreigabe(einsatzId, 'auftraege');
+  const ohneVerbindung = useOhneVerbindung();
+  const [anlageOffen, setAnlageOffen] = useState(false);
   /**
    * Abschnittsfokus per Link: `?abschnitt=<id>` (LLH-1057) — fokussieren, dann räumen; der Fokus
    * wird nie gespeichert. Erst mit geladener Seite und entschiedener Startansicht: vorher fehlt die
@@ -1199,6 +1260,33 @@ export default function LagekartePage() {
     />
   );
 
+  // Nebenwege des Kopfes (LFH-963): Drucken und „Als Anlage an …“, gesperrt mit Grund im Label.
+  const anlageGrund = rahmenEinsatz
+    ? anlageSperrGrund({
+        einsatz: rahmenEinsatz,
+        darfSchreiben: darfImEinsatzSchreiben(rahmenEinsatz),
+        ohneVerbindung,
+        lageberichte: freigabeStand(lageberichteFreigabe),
+        befehle: freigabeStand(befehleFreigabe),
+      })
+    : null;
+  const nebenwege: Nebenweg[] = [
+    ...druckNebenwege,
+    ...(rahmenEinsatz
+      ? [
+          {
+            key: 'anlage',
+            label: anlageGrund ? `${ALS_ANLAGE} (${anlageGrund})` : ALS_ANLAGE,
+            ...(anlageGrund ? { gesperrt: true as const } : {}),
+            onWahl: () => setAnlageOffen(true),
+          },
+        ]
+      : []),
+  ];
+  const nebenwegeImKopf = (
+    <NebenwegeImKopf name="Weitere Aktionen zur Lagekarte" eintraege={nebenwege} />
+  );
+
   const kopf = (
     <div data-lfh="seitenkopf" style={{ ...seitenkopfStil(token, farben, true), marginBottom: 0 }}>
       <div
@@ -1240,9 +1328,14 @@ export default function LagekartePage() {
           </span>
         )}
       </div>
-      {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). */}
-      {!breit && (
-        <div data-lfh="seitenkopf-aktionen">
+      {/* Ab `lg` sitzt der Umschalter im Knopfblock der Karte (s. `KartenUeberlagerung`). Die
+          Nebenwege wie in `EinsatzSeite`: unter `md` der Auslöser „Weitere“ vorn, sonst hinten. */}
+      <div
+        data-lfh="seitenkopf-aktionen"
+        style={{ minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: token.marginSM }}
+      >
+        {istSchmal && nebenwegeImKopf}
+        {!breit && (
           <Button
             aria-expanded={leisteIstSichtbar}
             aria-controls="lagekarte-leiste"
@@ -1258,8 +1351,9 @@ export default function LagekartePage() {
           >
             {leisteIstSichtbar ? 'Leiste ausblenden' : 'Leiste einblenden'}
           </Button>
-        </div>
-      )}
+        )}
+        {!istSchmal && nebenwegeImKopf}
+      </div>
     </div>
   );
 
@@ -1756,7 +1850,17 @@ export default function LagekartePage() {
           }}
           onAbbrechen={() => setZeichenHier(null)}
         />
+        <LageplanAnlageDialog
+          offen={anlageOffen}
+          einsatzId={einsatzId}
+          lageberichteFrei={lageberichteFreigabe.zustand === 'frei'}
+          befehleFrei={befehleFreigabe.zustand === 'frei'}
+          erstelleAnlage={lageplan.erstelleAnlage}
+          onSchliessen={() => setAnlageOffen(false)}
+        />
       </div>
+      {/* Das Druckblatt hängt nur vom Knopf bis `afterprint` (LLH-1051). */}
+      {lageplan.blatt && <LageplanDruck blatt={lageplan.blatt} />}
     </FensterRahmen>
   );
 }

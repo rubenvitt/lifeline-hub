@@ -1,10 +1,11 @@
 //! Bild-Anlagen an Lagebericht und Befehl (LFH-1028, Spec `dokument-anlagen`).
 //!
-//! Eine Anlage ist ein fester Stand neben dem Text, als erstes die Fernmeldeskizze: der Browser
-//! zeichnet ihre Druckform als PNG, der Server legt es über die gewöhnliche Anhang-Kette ab
-//! (Endung, Größe, Virenscan, Bereinigung, Vorschau). Die Bytes liegen in `anhang`, die
-//! Verknüpfung in einem Linker je Dokumentart ([`AnlagenTabelle`], Migration
-//! `0157_dokument_anlage.sql`), registriert in `anhang::repo::MODUL_LINKER`.
+//! Eine Anlage ist ein fester Stand neben dem Text, als erstes die Fernmeldeskizze, seit LLH-1051
+//! auch der Lageplan der Lagekarte: der Browser zeichnet die Druckform als PNG, der Server legt es
+//! über die gewöhnliche Anhang-Kette ab (Endung, Größe, Virenscan, Bereinigung, Vorschau). Die
+//! Bytes liegen in `anhang`, die Verknüpfung in einem Linker je Dokumentart ([`AnlagenTabelle`],
+//! Migration `0157_dokument_anlage.sql`, Art `lageplan` aus `0230_dokument_anlage_lageplan.sql`),
+//! registriert in `anhang::repo::MODUL_LINKER`.
 //!
 //! Anfügen und Entfernen gelingen nur im Entwurf; geprüft wird der Status im selben
 //! Schreibvorgang, der die Anlage ändert. Entfernen löscht Datei und Linker hart: ein Entwurf
@@ -24,7 +25,7 @@ use utoipa::ToSchema;
 /// Höchstzahl der Anlagen eines Dokuments (Spec: die elfte ist 409).
 pub const MAX_ANLAGEN: i64 = 10;
 
-/// Erlaubte Dateitypen einer Anlage. Der einzige Anwender (Fernmeldeskizze) erzeugt PNG; ein
+/// Erlaubte Dateitypen einer Anlage. Beide Anwender (Fernmeldeskizze, Lageplan) erzeugen PNG; ein
 /// späterer Anwender erweitert die Liste. SVG bleibt draußen (Skripte, externe Verweise, und
 /// `anhang::metadaten` kann es nicht bereinigen).
 pub const ERLAUBTE_MIME_ANLAGE: &[&str] = &["image/png"];
@@ -44,6 +45,8 @@ wire_enum! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AnlageArt {
         Fernmeldeskizze => "fernmeldeskizze",
+        /// Ausschnitt der Lagekarte mit Maßstab, Nordpfeil und Legende (LLH-1051, Migration 0230).
+        Lageplan => "lageplan",
     }
     try_from = |s| format!("Unbekannte Anlagen-Art «{s}»");
 }
@@ -532,6 +535,47 @@ mod tests {
     async fn anfuegen_und_entfernen_im_entwurf() {
         anfuegen_im_entwurf_fall::<Lagebericht>().await;
         anfuegen_im_entwurf_fall::<Befehl>().await;
+    }
+
+    /// LLH-1051: der Lageplan der Lagekarte liegt als eigene Art neben der Fernmeldeskizze.
+    async fn lageplan_fall<T: Dokumentart>() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, benutzer) = setup(&pool).await;
+        let d = entwurf::<T>(&pool, einsatz, benutzer).await;
+        ablegen::<T>(&pool, einsatz, d, benutzer, &skizze("2026-10-20 08:00:00"))
+            .await
+            .unwrap();
+        let plan = ablegen::<T>(
+            &pool,
+            einsatz,
+            d,
+            benutzer,
+            &NeueAnlage {
+                art: AnlageArt::Lageplan,
+                titel: "Lageplan",
+                stand_at: "2026-10-20 08:05:00",
+                dateiname: "lageplan.png",
+                mime: "image/png",
+                daten: PNG,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!((plan.nummer, plan.art), (2, AnlageArt::Lageplan));
+        let arten: Vec<AnlageArt> = liste::<T>(&pool, einsatz, d)
+            .await
+            .unwrap()
+            .iter()
+            .map(|a| a.art)
+            .collect();
+        assert_eq!(arten, vec![AnlageArt::Fernmeldeskizze, AnlageArt::Lageplan]);
+        assert_eq!(AnlageArt::parse("lageplan"), Some(AnlageArt::Lageplan));
+    }
+
+    #[tokio::test]
+    async fn lageplan_ist_eine_eigene_anlagen_art() {
+        lageplan_fall::<Lagebericht>().await;
+        lageplan_fall::<Befehl>().await;
     }
 
     async fn nach_freigabe_unveraenderlich_fall<T: Dokumentart>() {
