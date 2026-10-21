@@ -119,3 +119,42 @@ for (const dichte of DICHTEN) {
     });
   });
 }
+
+/**
+ * Sprung auf die Lagekarte (LLH-1349, Spec `lagekarte-abschnitt-fokus`, „Sprung von der
+ * Abschnittsseite“): „Auf Karte zeigen ↗“ im Detail öffnet die Karte im Fokus auf den Abschnitt,
+ * und die Karte räumt `?abschnitt=` aus der Adresse. Einmal, am Fükw-Schirm in `kompakt`.
+ */
+test.describe('Einsatzabschnitt auf der Karte zeigen', () => {
+  test.use({ viewport: FUEKW });
+
+  test('„Auf Karte zeigen ↗“ öffnet die Lagekarte im Fokus, der Parameter wird geräumt', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, `E2E 1349 Karte ${Date.now()}`);
+    await anlegen(page, einsatzId, 'abschnitte', { name: 'Abschnitt Nord' }, 'Abschnitt');
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+      data: { name: 'Abschnitt Süd' },
+    });
+    expect(antwort.ok(), await antwort.text()).toBeTruthy();
+    const sued = ((await antwort.json()) as { id: number }).id;
+    await page.goto(`/einsaetze/${einsatzId}/einsatzabschnitte`);
+    await page.getByRole('region', { name: 'Gliederung' }).getByText('Abschnitt Süd').click();
+    const detail = page.getByRole('region', { name: 'Abschnitt: Abschnitt Süd' });
+    const sprung = detail.getByRole('link', { name: 'Auf Karte zeigen' });
+    await expect(sprung).toHaveAttribute(
+      'href',
+      `/einsaetze/${einsatzId}/lagekarte?abschnitt=${sued}`,
+    );
+
+    await sprung.click();
+    await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+      1,
+      { timeout: 60_000 },
+    );
+    await expect(page.locator('[data-lfh="fokus-band"]')).toContainText('Abschnitt Süd');
+    await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte$`));
+  });
+});

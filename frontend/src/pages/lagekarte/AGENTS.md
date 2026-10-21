@@ -308,9 +308,13 @@ diese Zusage.
   `gedaempft: true` (`daempfeMarker`/`daempfeFlaechen` in `abschnittFokus.ts`); die Layer lesen
   es datengetrieben über `deckkraftImFokus` (`markerLayer.ts`). Nie aus der Liste filtern —
   Ebenenbaum, Zähler, Suche und Klickziele sehen den Fokus nicht. Ohne Fokus kommt dieselbe Liste
-  zurück (Identität, LFH-945). Bündel-Donuts bleiben ungedämpft.
-- Einstieg nur über „Abschnitt fokussieren“ im `Inspector` (Prop `onAbschnittFokussieren`), nicht
-  an der Listenzeile; Band `FokusBand.tsx` im `KartenFuss`. Kamera über
+  zurück (Identität, LFH-945). Ein Bündel tritt nur zurück, wenn alle Blätter gedämpft sind
+  (LLH-1349): die Cluster-Aggregation zählt `ungedaempft` (`clusterTypProperties`), 0 heißt
+  gedämpft (`buendelGedaempft`, Donut und `donutBild` für den Lageplan); ein gemischtes bleibt voll.
+- Einstieg in der Karte nur über „Abschnitt fokussieren“ im `Inspector` (Prop
+  `onAbschnittFokussieren`), nicht an der Listenzeile; von außen über den Sprung „Auf Karte
+  zeigen ↗“ im Detail der Seite Einsatzabschnitte (LLH-1349, `SprungKnopf`, gesperrt ohne Freigabe
+  Lagekarte). Band `FokusBand.tsx` im `KartenFuss`. Kamera über
   `KartenHandle.fokussiere`/`stelleKameraHer` (`fokusKamera.ts`, `BEDIENUNG`): der Stand vor dem
   ersten Fokus bleibt beim Wechsel A → B. Esc nur bei aktivem Fokus und ohne Modus: erst ein
   offenes Bündel, dann die Auswahl, dann der Fokus (`escZiel`; der Auswahl-Zuhörer der Seite und
