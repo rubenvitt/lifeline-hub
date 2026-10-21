@@ -1825,10 +1825,12 @@ mod tests {
         // Die frühere Meldung wird ZULETZT übergeben: höhere id, jüngere Übergabe.
         let lid_spaet = als_lagerelevant(&pool, e, spaet.id, b, "Pegel steigt", None)
             .await
-            .unwrap();
+            .unwrap()
+            .lage_id;
         let lid_frueh = als_lagerelevant(&pool, e, frueh.id, b, "Brücke gesperrt", None)
             .await
-            .unwrap();
+            .unwrap()
+            .lage_id;
         for (lid, uebergabe) in [
             (lid_spaet, "2026-06-12 14:50:00"),
             (lid_frueh, "2026-06-12 15:05:00"),
