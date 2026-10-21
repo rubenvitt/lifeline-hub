@@ -764,13 +764,6 @@ main:has([data-lfh='zaehltasten']) {
   padding: 8px 12px;
   overflow: auto;
 }
-.markdown-editor__label {
-  font-size: 0.75em;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--lfh-schwach);
-  margin-bottom: 6px;
-}
 .markdown-editor__druck {
   display: none;
 }
@@ -780,27 +773,6 @@ main:has([data-lfh='zaehltasten']) {
   font-weight: 600;
   line-height: 1.5;
   margin-bottom: 0.5em;
-}
-.markdown-editor--split {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-.markdown-editor--split .markdown-editor__eingabe {
-  flex: 1 1 50%;
-  min-width: 0;
-}
-.markdown-editor--split .markdown-editor__vorschau {
-  flex: 1 1 50%;
-  min-width: 0;
-}
-.markdown-editor--split .markdown-editor__eingabe textarea {
-  height: 100%;
-}
-@media (max-width: 640px) {
-  .markdown-editor--split {
-    flex-direction: column;
-  }
 }
 .markdown-editor--tabs .markdown-editor__vorschau {
   min-height: 40px;
