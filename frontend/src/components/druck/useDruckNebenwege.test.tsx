@@ -80,3 +80,47 @@ describe('useDruckNebenwege', () => {
     expect(drucke).not.toHaveBeenCalled();
   });
 });
+
+describe('useDruckNebenwege mit Vorbereitung', () => {
+  function VorbereiteteSeite({ vorbereiten }: { vorbereiten: () => Promise<boolean> }) {
+    return (
+      <EinsatzSeite
+        titel="Karte"
+        weitere={{ name: NAME, eintraege: useDruckNebenwege({ vorbereiten }) }}
+      >
+        <div>Inhalt</div>
+      </EinsatzSeite>
+    );
+  }
+
+  it('druckt erst, wenn das Druckstück bereit ist', async () => {
+    setzeViewportBreite(1180);
+    let melde: (bereit: boolean) => void = () => {};
+    const vorbereiten = vi.fn(
+      () =>
+        new Promise<boolean>((fertig) => {
+          melde = fertig;
+        }),
+    );
+    renderMitProviders(<VorbereiteteSeite vorbereiten={vorbereiten} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+    expect(vorbereiten).toHaveBeenCalledTimes(1);
+    expect(drucke).not.toHaveBeenCalled();
+    melde(true);
+    await waitFor(() => expect(drucke).toHaveBeenCalledTimes(1));
+  });
+
+  it('meldet die Vorbereitung `false`, bleibt der Dialog zu', async () => {
+    setzeViewportBreite(1180);
+    const vorbereiten = vi.fn(() => Promise.resolve(false));
+    renderMitProviders(<VorbereiteteSeite vorbereiten={vorbereiten} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Drucken / als PDF' }));
+    await waitFor(() => expect(vorbereiten).toHaveBeenCalledTimes(1));
+    // Der Eintrag läuft nicht weiter: eine zweite Wahl bereitet erneut vor. (Das Ladesymbol
+    // klingt in jsdom nie aus, deshalb am Verhalten statt am Namen geprüft.)
+    await userEvent.click(screen.getByRole('button', { name: /Drucken \/ als PDF/ }));
+    await waitFor(() => expect(vorbereiten).toHaveBeenCalledTimes(2));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(drucke).not.toHaveBeenCalled();
+  });
+});

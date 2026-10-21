@@ -165,7 +165,9 @@ nach Fassung-, Linker- und Original-Prüfung und VOR `anhang_antwort` eine Zeile
 Bytes. Liste ohne Audit. Die Detailseite zeigt deshalb kein Vorschaubild (`vorschau: false`).
 
 **Dokument-Anlagen (LFH-1028)**: `lagebericht_anlage` und `befehl_anlage` im Register, eine
-Umsetzung für beide Dokumentarten (`vorlagendokument::anlage`, `Dokumentart::ANLAGEN`). Nur PNG
+Umsetzung für beide Dokumentarten (`vorlagendokument::anlage`, `Dokumentart::ANLAGEN`). Arten
+`fernmeldeskizze` und `lageplan` (LLH-1051); eine neue Art braucht Variante UND CHECK-Neubau
+beider Linker (Muster `0230_dokument_anlage_lageplan.sql`). Nur PNG
 (`ERLAUBTE_MIME_ANLAGE`), höchstens zehn je Dokument; Ablegen und Entfernen nur im Entwurf, in der
 Transaktion geprüft (422). Entfernen löscht die Bytes (der Entwurf steht nicht im ETB); die
 Freigabe schreibt den Abschnitt „Anlagen“ in denselben ETB-Snapshot, das Fortschreiben kopiert

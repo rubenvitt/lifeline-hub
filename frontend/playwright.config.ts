@@ -52,6 +52,15 @@ const lauf: { backendPort: number; frontendPort: number; datenbank: string } = v
  */
 const DRUCK_SPECS =
   /\/(druck-fluss|etb-druck|fernmeldeskizze-druck|meldebild-druck|funkplan-druck|fuehrungsorganisation-druck|dokument-anlage-druck|hilfe-druck|einsatzbericht-deckel-druck|koerperschema-druck)\.spec\.ts$/;
+/*
+ * Druck-Specs, die eine Lagekarte zeichnen (LLH-1051): nur Chromium und WebKit. Die Karte braucht
+ * WebGL2 (maplibre), und der headless Firefox hat keines, weder in der CI noch in der Cloud-Sitzung
+ * (`getContext('webgl2')` und `'webgl'` liefern `null`, auch mit `webgl.force-enabled`): die
+ * Lagekarte entsteht dort gar nicht (Fehlerseite der App), gemessen würde nur der fehlende
+ * Grafiktreiber. Die übrigen Karten-Specs laufen ohnehin nur in Chromium; WebKit zeichnet die Karte
+ * headless.
+ */
+const KARTEN_DRUCK_SPECS = /\/(lagekarte-druck)\.spec\.ts$/;
 
 /*
  * ANTEILE NACH LAUFZEIT (LFH-1117): `PW_SHARD=k/n` wählt die Spec-Dateien des Anteils k, verteilt
@@ -71,7 +80,7 @@ if (anteil && !vorbelegt && process.argv.some((a) => a.startsWith('--shard'))) {
 const projektMuster: Record<string, RegExp | undefined> = {
   chromium: undefined,
   firefox: DRUCK_SPECS,
-  webkit: DRUCK_SPECS,
+  webkit: new RegExp(`${DRUCK_SPECS.source}|${KARTEN_DRUCK_SPECS.source}`),
 };
 const anteilDateien: Record<string, string[]> | undefined = anteil
   ? (() => {
