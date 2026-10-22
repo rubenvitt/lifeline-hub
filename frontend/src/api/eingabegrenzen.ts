@@ -54,6 +54,10 @@ export const PERSONAL_BEMERKUNG_MAX = 2_000;
 export const MATERIAL_ADHOC_TEXT_MAX = 200;
 /** Bemerkung zu einem Material-Posten im Einsatz (LLH-1093). */
 export const MATERIAL_BEMERKUNG_MAX = 2_000;
+/** Bezeichnung, Kategorie, Bestandsnummer, Träger und Standort eines Materials im Stamm (LLH-1258). */
+export const MATERIAL_STAMM_TEXT_MAX = 200;
+/** Bemerkung eines Materials im Stamm (LLH-1258). */
+export const MATERIAL_STAMM_BEMERKUNG_MAX = 2_000;
 /** Funkrufname, Typ, Kennzeichen, Träger und OPTA eines Ad-hoc-Fahrzeugs (LLH-1073). */
 export const FAHRZEUG_ADHOC_TEXT_MAX = 200;
 /** Bemerkung zu einem Fahrzeug im Einsatz (LLH-1073). */
@@ -70,6 +74,8 @@ export const NACHFORDERUNG_ZUSAGE_RUFNAME_MAX = 100;
 export const NACHFORDERUNG_ZUSAGE_RUFNAMEN_MAX = 20;
 /** Grund beim Zurückziehen einer Nachforderung (LLH-1097; landet im ETB-Inhalt). */
 export const NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX = 200;
+/** Grund beim Ablehnen einer Nachforderung (LLH-1385; landet im ETB-Inhalt). */
+export const NACHFORDERUNG_ABLEHNEN_GRUND_MAX = 200;
 /** Höchstzahl der Einheiten einer Übernahme aus einer Nachforderung (LLH-1383). */
 export const NACHFORDERUNG_UEBERNAHME_EINHEITEN_MAX = 20;
 /** Notiz eines Anrufs am Infotelefon. */

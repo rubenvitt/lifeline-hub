@@ -2,7 +2,7 @@
 titel: Lagemeldungen
 gruppen: [fuehrung]
 reihenfolge: 250
-quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts, frontend/src/meldungen/LageAngabenBearbeiten.tsx, frontend/src/pages/lagekarte/Inspector.tsx, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs]
+quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts, frontend/src/meldungen/LageAngabenBearbeiten.tsx, frontend/src/pages/lagekarte/Inspector.tsx, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx]
 ---
 
 ## Überblick
@@ -110,6 +110,10 @@ Mit Koordinate steht die Lagemeldung danach auf der Lagekarte, ohne nicht mehr.
 - Eine Meldung wird genau einmal übernommen; danach fehlt „In die Lage übernehmen“ in ihrem Menü.
   Eine Lagemeldung steht schon in der Lage, ihr fehlt der Punkt von Anfang an.
 - Ohne eigenen Lage-Text gilt der Inhalt der Meldung.
+- Wird der Eintrag der Meldung im Einsatztagebuch berichtigt, trägt die Zeile die Marke
+  „berichtigt“ und „→ ETB Nr. …“ als Sprung zur jüngsten Berichtigung. Der Text der Zeile bleibt
+  der Lage-Text oder der Wortlaut; soll die Lage die Berichtigung wiedergeben, wird der Lage-Text
+  angepasst (Ablauf „Lage-Text und Ort einer Lagemeldung ändern“).
 - Ohne Koordinate steht die Lagemeldung nur in der Zeitachse, mit Koordinate auch auf der
   Lagekarte in der Ebene „Lagemeldungen“ (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)).
   Lage-Text und Ort lassen sich danach ändern (Ablauf oben).

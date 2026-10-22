@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 mod common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen, setup,
+    setup_mit_pool_und_live,
 };
 
 /// Erfasst eine Meldung (Vorgabe: Art „Sonstige“, Priorität „normal“, ohne Bezug); `extra`
@@ -484,25 +485,100 @@ async fn eingang_bleibt_unveraenderlich_und_unbekanntes_feld_ist_400() {
     assert!(systemtexte(&etb_zur_meldung(&app, &admin, e, mid).await).is_empty());
 }
 
+/// Empfänger des Sofortalarms zu einer Meldung, aufsteigend.
+async fn sofortalarm_an(pool: &sqlx::SqlitePool, mid: i64) -> Vec<i64> {
+    sqlx::query_scalar(
+        "SELECT benutzer_id FROM benachrichtigung \
+         WHERE art = 'sofortmeldung' AND bezug_typ = 'meldung' AND bezug_id = ? \
+         ORDER BY benutzer_id",
+    )
+    .bind(mid)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// LLH-1380: Heraufstufen zur Sofortmeldung ist 200 und alarmiert dieselben Empfänger wie das
+/// Erfassen einer Sofortmeldung (alle mit dem Modul Meldungen außer dem Auslöser); die Meldung
+/// wird bestätigungspflichtig samt Auto-Frist-Erinnerung. Herab- und erneutes Heraufstufen
+/// alarmiert nicht noch einmal.
 #[tokio::test]
-async fn zur_sofortmeldung_heraufstufen_ist_422_herabstufen_geht() {
-    let app = setup().await;
+async fn zur_sofortmeldung_heraufstufen_alarmiert_wie_beim_erfassen_und_nur_einmal() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let normal = melden(&app, &admin, e, json!({})).await["id"]
+    for name in ["annika", "bertram"] {
+        let b = benutzer_anlegen(&app, &admin, name, "keine").await;
+        rolle_setzen(&app, &admin, e, b, "fuehrungspersonal").await;
+    }
+
+    // Vergleich: wer beim Erfassen einer Sofortmeldung alarmiert wird.
+    let erfasst = melden(&app, &admin, e, json!({ "prioritaet": "sofort" })).await["id"]
         .as_i64()
         .unwrap();
-    let (s, _) = korrigieren(&app, &admin, e, normal, json!({ "prioritaet": "sofort" })).await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s, _) = korrigieren(
+    let beim_erfassen = sofortalarm_an(&pool, erfasst).await;
+    assert_eq!(beim_erfassen.len(), 2, "annika und bertram");
+
+    let mid = melden(&app, &admin, e, json!({})).await["id"]
+        .as_i64()
+        .unwrap();
+    assert!(sofortalarm_an(&pool, mid).await.is_empty());
+    let (s, v) = korrigieren(&app, &admin, e, mid, json!({ "prioritaet": "sofort" })).await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["prioritaet"], "sofort");
+    assert_eq!(v["bestaetigung_pflicht"], true);
+    assert!(v["bestaetigung_frist_at"].is_string(), "{v:?}");
+    assert_eq!(sofortalarm_an(&pool, mid).await, beim_erfassen);
+    let erinnerungen: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM erinnerung WHERE quelle = 'auto_frist' AND bezug_typ = 'meldung' \
+           AND bezug_id = ? AND titel LIKE 'Sofortmeldung #% unbestätigt'",
+    )
+    .bind(mid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(erinnerungen, 1);
+
+    // Herab- und wieder heraufstufen, auch über die Art: kein zweiter Alarm.
+    let (s, _) = korrigieren(&app, &admin, e, mid, json!({ "prioritaet": "normal" })).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = korrigieren(
         &app,
         &admin,
         e,
-        normal,
+        mid,
         json!({ "meldungsart": "sofortmeldung" }),
     )
     .await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(sofortalarm_an(&pool, mid).await, beim_erfassen);
+
+    let lfd = v["lfd_nr"].as_i64().unwrap();
+    assert_eq!(
+        systemtexte(&etb_zur_meldung(&app, &admin, e, mid).await),
+        [
+            format!(
+                "Meldung #{lfd}: zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst; \
+                 Priorität Normal → Sofort"
+            ),
+            format!("Meldung #{lfd}: Priorität Sofort → Normal"),
+            format!(
+                "Meldung #{lfd}: zur Sofortmeldung heraufgestuft, Sofortalarm war schon \
+                 ausgelöst; Art Sonstige → Sofortmeldung"
+            ),
+        ]
+    );
+}
+
+/// Eine als Sofortmeldung erfasste Meldung hatte ihren Alarm beim Erfassen: herabgestuft und
+/// wieder heraufgestuft alarmiert sie nicht noch einmal. Die Bestätigungspflicht bleibt.
+#[tokio::test]
+async fn erfasste_sofortmeldung_herab_und_heraufgestuft_alarmiert_nicht_doppelt() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let b = benutzer_anlegen(&app, &admin, "annika", "keine").await;
+    rolle_setzen(&app, &admin, e, b, "fuehrungspersonal").await;
 
     let sofort = melden(
         &app,
@@ -512,6 +588,7 @@ async fn zur_sofortmeldung_heraufstufen_ist_422_herabstufen_geht() {
     )
     .await;
     let sid = sofort["id"].as_i64().unwrap();
+    assert_eq!(sofortalarm_an(&pool, sid).await, [b]);
     let (s, v) = korrigieren(
         &app,
         &admin,
@@ -524,6 +601,15 @@ async fn zur_sofortmeldung_heraufstufen_ist_422_herabstufen_geht() {
     assert_eq!(v["meldungsart"], "lagemeldung");
     // Die Bestätigungspflicht aus dem Eingang bleibt.
     assert_eq!(v["bestaetigung_pflicht"], true);
+
+    // Der Aufräumlauf hat die Zeile inzwischen entfernt: der Merker an der Meldung trägt.
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, v) = korrigieren(&app, &admin, e, sid, json!({ "prioritaet": "sofort" })).await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert!(sofortalarm_an(&pool, sid).await.is_empty());
 }
 
 #[tokio::test]

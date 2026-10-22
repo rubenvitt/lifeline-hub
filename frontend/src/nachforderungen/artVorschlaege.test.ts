@@ -41,6 +41,28 @@ describe('schnellwahlArten', () => {
       'HLF 20',
     ]);
   });
+
+  it('füllt nach dem Einsatz mit den üblichen Arten der Organisation, dann der festen Liste (LLH-1379)', () => {
+    expect(schnellwahlArten(['Feldbetten'], ['Sandsäcke', 'feldbetten', 'Tauchpumpe'])).toEqual([
+      'Feldbetten',
+      'Sandsäcke',
+      'Tauchpumpe',
+      'RTW',
+      'KTW',
+      'NEF',
+    ]);
+  });
+
+  it('ein neuer Einsatz zeigt die in der Organisation üblichen Arten', () => {
+    expect(schnellwahlArten([], ['Sandsäcke', 'Tauchpumpe'])).toEqual([
+      'Sandsäcke',
+      'Tauchpumpe',
+      'RTW',
+      'KTW',
+      'NEF',
+      'LF 10',
+    ]);
+  });
 });
 
 describe('artOptionen', () => {
@@ -63,6 +85,21 @@ describe('artOptionen', () => {
     expect(gruppen[2].options.map((o) => o.value)).toEqual(
       GAENGIGE_ARTEN.filter((a) => a !== 'Sandsäcke'),
     );
+  });
+
+  it('stellt die üblichen Arten der Organisation hinter den Einsatz (LLH-1379)', () => {
+    const gruppen = artOptionen(
+      ['Feldbetten'],
+      [{ label: 'Zug', sortier: 1 }],
+      ['feldbetten', 'Notstromaggregat'],
+    );
+    expect(gruppen.map((g) => g.label)).toEqual([
+      'In diesem Einsatz',
+      'In der Organisation',
+      'Einheitstypen',
+      'Kräfte und Mittel',
+    ]);
+    expect(gruppen[1].options.map((o) => o.value)).toEqual(['Notstromaggregat']);
   });
 
   it('lässt leere Gruppen weg', () => {

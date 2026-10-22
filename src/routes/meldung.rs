@@ -10,7 +10,7 @@ use crate::extract::PfadParam;
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::live::LiveEvent;
 use crate::meldung::{
-    meldung_bestaetigung_frist_min_ableiten, repo, MeldungAnzeige, ART_LAGEMELDUNG,
+    meldung_bestaetigung_frist_min_ableiten, repo, titel_sofort, MeldungAnzeige, ART_LAGEMELDUNG,
     ART_SOFORTMELDUNG, ART_SONSTIGE, BESTAETIGUNG_FRIST_DEFAULT_MIN, PRIO_NORMAL, PRIO_SOFORT,
     RICHTUNG_INTERN,
 };
@@ -246,12 +246,6 @@ async fn empfaenger_funktion_pruefen(
             .s7_aktiv
     };
     Ok(crate::fuehrung::pruefe_funktion(Some(code), None, s7_aktiv)?.funktion)
-}
-
-/// Titel der Auto-Frist-Erinnerung einer über die Meldungsroute erfassten Meldung (Wortlaut seit
-/// LFH-97; für jede pflichtige Meldung „Sofortmeldung“, Folgeaufgabe aus LLH-1075).
-fn titel_sofort(meldung: &MeldungAnzeige) -> String {
-    format!("Sofortmeldung #{} unbestätigt", meldung.lfd_nr)
 }
 
 /// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Schreibrecht + aktiv).

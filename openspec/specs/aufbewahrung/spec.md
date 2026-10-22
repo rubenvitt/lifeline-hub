@@ -452,9 +452,11 @@ Schwärzung nirgends mehr stehen.
 - **AND** tragen sie weiter laufende Nummer, Meldeweg, Status und Zeitpunkte
 - **AND** steht der Meldungsinhalt weiter im Wortlaut des zugehörigen ETB-Eintrags
 
-#### Scenario: Freitext ohne ETB-Kopie
-- **WHEN** eine Nachforderung abgelehnt wurde und der Einsatz später geschwärzt wird
-- **THEN** steht der Ablehnungsgrund weder in der Nachforderung noch im ETB
+#### Scenario: Ablehnungsgrund und Ziel der Nachforderung
+- **WHEN** eine Nachforderung mit einem Ziel als Freitext („Wohnung Fam. Yilmaz“) mit Grund
+  abgelehnt wurde und der Einsatz später geschwärzt wird
+- **THEN** trägt die Nachforderung weder Ablehnungsgrund noch Ziel-Freitext
+- **AND** stehen beide weiter im Wortlaut der ETB-Einträge von Anforderung und Ablehnung
 
 #### Scenario: Lagebericht nach der Schwärzung
 - **WHEN** ein Einsatz mit einem freigegebenen Lagebericht und einem Entwurf geschwärzt wird

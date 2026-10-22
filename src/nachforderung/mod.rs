@@ -3,6 +3,7 @@
 //! nach dem Auftrags-Template (LFH-52); ETB-Kopplung Pattern B. Bewusst KEIN
 //! `kommunikation_status` — der lineare Bedarfsfluss passt nicht auf dessen zwei Achsen
 //! (vgl. Meldungs-Triage).
+pub mod arten;
 pub mod benachrichtigung;
 pub mod repo;
 
@@ -26,6 +27,9 @@ pub const ZUSAGE_RUFNAME_MAX: usize = 100;
 pub const ZUSAGE_RUFNAMEN_MAX: usize = 20;
 /// Höchstlänge des Grunds beim Zurückziehen (D8); landet im ETB-Inhalt.
 pub const ZURUECKZIEHEN_GRUND_MAX: usize = 200;
+/// Höchstlänge des Grunds beim Ablehnen (LLH-1385, wie beim Zurückziehen); landet im ETB-Inhalt.
+/// Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const ABLEHNEN_GRUND_MAX: usize = 200;
 /// Höchstzahl der Einheiten einer Übernahme aus einer Nachforderung, gezählt vor dem Entdoppeln
 /// (LLH-1383 design.md D2; so viele wie Rufnamen einer Zusage). Spiegel:
 /// `frontend/src/api/eingabegrenzen.ts`.

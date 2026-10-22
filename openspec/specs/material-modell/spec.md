@@ -42,6 +42,28 @@ mit 422 abgelehnt werden, ohne etwas zu schreiben.
 - **WHEN** die Menge eines Geräts auf 2 geändert werden soll
 - **THEN** antwortet der Server mit 422, und die Menge bleibt 1
 
+### Requirement: Gerät mit Bestandsnummer einmal im Einsatz
+
+Ein Stamm-Gerät mit Bestandsnummer ist ein bestimmtes Stück und SHALL höchstens einmal aktiv im
+selben Einsatz stehen. Eine zweite Disposition desselben Stamm-Geräts und das Wiederaufnehmen einer
+früheren Zeile, solange eine andere aktiv ist, MUST mit 409 und einem Grund abgelehnt werden, ohne
+etwas zu schreiben. Maßgeblich sind Art und Bestandsnummer des Stamms. Ein Gerät ohne Bestandsnummer
+und ein Verbrauchsgut bleiben mehrfach disponierbar. Die Auswahl „Material disponieren“ MUST ein
+schon aktives Stück gesperrt und mit dem Grund „schon im Einsatz“ zeigen.
+
+#### Scenario: Zweite Disposition
+- **WHEN** der Stromerzeuger mit Bestandsnummer „SE-1“ schon aktiv im Einsatz steht und noch einmal
+  disponiert werden soll
+- **THEN** antwortet der Server mit 409 und nennt den Grund, und kein Posten entsteht
+
+#### Scenario: Nach dem Herausnehmen
+- **WHEN** der Stromerzeuger „SE-1“ aus dem Einsatz genommen und dann wieder disponiert wird
+- **THEN** entsteht ein neuer aktiver Posten
+
+#### Scenario: Auswahl
+- **WHEN** jemand „Material disponieren“ öffnet, während „SE-1“ aktiv im Einsatz steht
+- **THEN** steht „SE-1“ gesperrt mit „schon im Einsatz“ in der Auswahl
+
 ### Requirement: Status je Art
 
 Ein Gerät SHALL jeden Materialstatus annehmen können. Ein Verbrauchsgut MUST NOT die Status

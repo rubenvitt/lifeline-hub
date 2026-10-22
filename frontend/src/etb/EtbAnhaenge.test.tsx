@@ -33,14 +33,14 @@ describe('EtbAnhaenge (LFH-117)', () => {
     expect(links).toHaveLength(2);
     expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
     expect(links[0]).toHaveAttribute('download');
-    expect(links[0]).toHaveTextContent('IMG_0412.HEIC · 3.1 MB');
-    expect(links[1]).toHaveTextContent('fax.pdf · 2.0 KB');
+    expect(links[0]).toHaveTextContent('IMG_0412.HEIC · 3,1 MB');
+    expect(links[1]).toHaveTextContent('fax.pdf · 2,0 KB');
   });
 
   it('nennt im zugänglichen Namen die Nummer des Eintrags und die Handlung', () => {
     render(<EtbAnhaenge einsatzId={5} eintrag={{ id: 40, lfd_nr: 42, anhaenge: [anhang()] }} />);
     expect(
-      screen.getByRole('link', { name: 'IMG_0412.HEIC, 3.1 MB, Anhang zu Nr. 42 herunterladen' }),
+      screen.getByRole('link', { name: 'IMG_0412.HEIC, 3,1 MB, Anhang zu Nr. 42 herunterladen' }),
     ).toBeInTheDocument();
   });
 

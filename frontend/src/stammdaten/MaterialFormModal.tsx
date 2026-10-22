@@ -9,6 +9,8 @@ import { globalKeys } from '../api/queryKeys';
 import { leerZuNull } from '../api/patchTriState';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { ART_OPTIONEN } from '../kraefte/materialPosten';
+import { MATERIAL_STAMM_BEMERKUNG_MAX, MATERIAL_STAMM_TEXT_MAX } from '../api/eingabegrenzen';
+import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
 
 interface FormWerte {
   bezeichnung: string;
@@ -19,6 +21,13 @@ interface FormWerte {
   standort?: string;
   bemerkung?: string;
 }
+
+/**
+ * Grenze eines kurzen Felds wie beim Server (Spec `eingabegrenzen`, LLH-1258): `maxLength` beim
+ * Tippen, die Regel für einen vorbelegten Wert, der schon darüber steht — er wird nie gekürzt
+ * (`frontend/AGENTS.md`, „Freitext nie länger als der Server erlaubt“).
+ */
+const kurzRegel = (feld: string) => zeichenRegel(MATERIAL_STAMM_TEXT_MAX, feld);
 
 /** Vorgabe der Art: ein einzeln verfolgtes Gerät (D1). */
 const ART_VORGABE: MaterialArt = 'geraet';
@@ -124,25 +133,32 @@ export default function MaterialFormModal({
       <Form.Item
         label="Bezeichnung"
         name="bezeichnung"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' }]}
+        rules={[
+          { required: true, whitespace: true, message: 'Bezeichnung darf nicht leer sein' },
+          kurzRegel('Bezeichnung'),
+        ]}
       >
-        <Input placeholder="z. B. Wolldecke, Stromerzeuger 5 kVA" />
+        <Input
+          placeholder="z. B. Wolldecke, Stromerzeuger 5 kVA"
+          maxLength={MATERIAL_STAMM_TEXT_MAX}
+        />
       </Form.Item>
       {/* Die Art entscheidet, wie der Posten im Einsatz steht (LLH-1224 D1/D16): sie gilt für neue
           Dispositionen, nie rückwirkend. Ohne das Feld ließe sich kein Verbrauchsgut anlegen. */}
       <Form.Item label="Art" name="art">
         <ArtFeld />
       </Form.Item>
-      <Form.Item label="Kategorie" name="kategorie">
+      <Form.Item label="Kategorie" name="kategorie" rules={[kurzRegel('Kategorie')]}>
         <AutoComplete
           options={kategorien.map((k) => ({ value: k }))}
           allowClear
+          maxLength={MATERIAL_STAMM_TEXT_MAX}
           placeholder="z. B. Betreuung, Sanität, Hochwasser"
           showSearch={teilwortSuche}
         />
       </Form.Item>
-      <Form.Item label="Bestandsnummer" name="bestandsnummer">
-        <Input placeholder="Inventarnr. (optional)" />
+      <Form.Item label="Bestandsnummer" name="bestandsnummer" rules={[kurzRegel('Bestandsnummer')]}>
+        <Input placeholder="Inventarnr. (optional)" maxLength={MATERIAL_STAMM_TEXT_MAX} />
       </Form.Item>
       {/* FELDBUDGET: vier sichtbare Felder (mit der Art, LLH-1224), drei eingeklappt. Pflicht ist allein die Bezeichnung,
          und die steht oben — kein Pflichtfeld wandert hinter den Collapse (LFH-343).
@@ -163,14 +179,22 @@ export default function MaterialFormModal({
             label: 'Weitere Angaben',
             children: (
               <>
-                <Form.Item label="Trägerorganisation" name="traegerorganisation">
-                  <Input />
+                <Form.Item
+                  label="Trägerorganisation"
+                  name="traegerorganisation"
+                  rules={[kurzRegel('Trägerorganisation')]}
+                >
+                  <Input maxLength={MATERIAL_STAMM_TEXT_MAX} />
                 </Form.Item>
-                <Form.Item label="Standort" name="standort">
-                  <Input placeholder="z. B. Lagerhalle 2" />
+                <Form.Item label="Standort" name="standort" rules={[kurzRegel('Standort')]}>
+                  <Input placeholder="z. B. Lagerhalle 2" maxLength={MATERIAL_STAMM_TEXT_MAX} />
                 </Form.Item>
-                <Form.Item label="Bemerkung" name="bemerkung">
-                  <Input.TextArea rows={2} />
+                <Form.Item
+                  label="Bemerkung"
+                  name="bemerkung"
+                  rules={[zeichenRegel(MATERIAL_STAMM_BEMERKUNG_MAX, 'Bemerkung')]}
+                >
+                  <Input.TextArea rows={2} count={zeichenGrenze(MATERIAL_STAMM_BEMERKUNG_MAX)} />
                 </Form.Item>
               </>
             ),

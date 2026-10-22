@@ -7,6 +7,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import type { EinheitenSystem, Koordinatenformat, Zeitformat } from '../api/types';
 import { formatiere } from './koordinaten';
+import { zahlText } from './zahl';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -192,14 +193,14 @@ export function formatKoordinate(
   return formatiere(lat, lon, konv.koordinatenformat ?? 'wgs84');
 }
 
-/** Distanz in Metern → Anzeige-String je Einheiten-System (Default: metrisch). */
+/** Distanz in Metern → Anzeige-String je Einheiten-System (Default: metrisch), mit Dezimalkomma. */
 export function formatDistanz(
   meter: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
   if (konv.einheiten === 'imperial') {
     const feet = meter * 3.28084;
-    return feet >= 5280 ? `${(feet / 5280).toFixed(2)} mi` : `${Math.round(feet)} ft`;
+    return feet >= 5280 ? `${zahlText(feet / 5280, { stellen: 2 })} mi` : `${zahlText(feet)} ft`;
   }
-  return meter >= 1000 ? `${(meter / 1000).toFixed(2)} km` : `${Math.round(meter)} m`;
+  return meter >= 1000 ? `${zahlText(meter / 1000, { stellen: 2 })} km` : `${zahlText(meter)} m`;
 }

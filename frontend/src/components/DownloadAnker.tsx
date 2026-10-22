@@ -52,7 +52,7 @@ interface Props {
   /** Zweite Zeile, z. B. „abgelegt von · Zeit“. */
   zusatz?: ReactNode;
   /**
-   * Zugänglicher Name mit Zeilenkennung („dach.jpg, 2.0 MB, Datei von Schaden S-003
+   * Zugänglicher Name mit Zeilenkennung („dach.jpg, 2,0 MB, Datei von Schaden S-003
    * herunterladen“) — n Zeilen liefern sonst n gleich klingende Verweise.
    */
   zugaenglicherName?: string;

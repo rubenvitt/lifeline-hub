@@ -1649,7 +1649,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
       }),
     ]);
     const verweis = await within(await waitFor(zeileEins)).findByRole('link', {
-      name: 'Dokument „Lageplan Nord“, 2.0 KB, zu Nr. 1 herunterladen',
+      name: 'Dokument „Lageplan Nord“, 2,0 KB, zu Nr. 1 herunterladen',
     });
     expect(verweis).toHaveAttribute('href', '/api/einsaetze/7/dokumente/3/datei');
     expect(screen.queryByRole('link', { name: /Ohne Bezug/ })).toBeNull();

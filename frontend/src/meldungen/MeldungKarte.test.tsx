@@ -125,6 +125,30 @@ describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
   });
 });
 
+// LLH-1382: Der Wortlaut bleibt, eine ETB-Berichtigung seines Eintrags steht als Marke daneben.
+describe('MeldungKarte — berichtigter ETB-Eintrag (LLH-1382)', () => {
+  it('zeigt die Marke „berichtigt“ mit Sprung zur Berichtigung und behält den Wortlaut', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({ etb_berichtigung_id: 41, etb_berichtigung_lfd_nr: 9 })}
+        einsatzId={7}
+      />,
+    );
+    expect(screen.getByText('berichtigt')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Berichtigung im ETB, Nr. 9' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/etb?eintrag=41',
+    );
+    expect(screen.getByText('Deich instabil')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Berichtigung keine Marke', () => {
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} />);
+    expect(screen.queryByText('berichtigt')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Berichtigung/ })).toBeNull();
+  });
+});
+
 describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
   it('zeigt im Worst-Case höchstens zwei Aktionen im Kartenkörper, den Rest hinter einem Trigger', async () => {
     const cb = alleCallbacks();
@@ -559,15 +583,25 @@ describe('MeldungKarte — nachträglich korrigieren (LLH-1066)', () => {
     expect(onKorrigieren).not.toHaveBeenCalled();
   });
 
-  it('bietet „Sofort“ nur einer Meldung an, die schon sofort ist', async () => {
+  it('bietet „Sofort“ an und nennt vor dem Speichern den Sofortalarm (LLH-1380)', async () => {
+    const onKorrigieren = vi.fn().mockResolvedValue(undefined);
     renderKarte(
-      <MeldungKarte meldung={korrigierbar()} einsatzId={7} darfSchreiben onKorrigieren={vi.fn()} />,
+      <MeldungKarte
+        meldung={korrigierbar()}
+        einsatzId={7}
+        darfSchreiben
+        onKorrigieren={onKorrigieren}
+      />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
-    await oeffne('Priorität');
-    expect(optionenVon('Priorität')).toEqual(['Dringend', 'Normal']);
     await oeffne('Meldungsart');
-    expect(optionenVon('Meldungsart')).not.toContain('Sofortmeldung');
+    expect(optionenVon('Meldungsart')).toContain('Sofortmeldung');
+    const form = screen.getByRole('form', { name: 'Meldung #1 korrigieren' });
+    expect(form).not.toHaveTextContent('Sofortalarm');
+    await waehle('Priorität', 'Sofort');
+    expect(form).toHaveTextContent('Speichern löst den Sofortalarm aus');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(onKorrigieren).toHaveBeenCalledWith(1, { prioritaet: 'sofort' });
   });
 
   it('nimmt eine übernommene Meldung erst nach der Rückfrage aus der Lage', async () => {

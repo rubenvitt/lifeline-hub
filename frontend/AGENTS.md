@@ -606,6 +606,12 @@ anwendbar), „nicht geprüft" ist keins.
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
   kommt erst nach dem Sweep.
+- **Dezimalzahlen nehmen `components/DezimalFeld.tsx`, Anzeigen den Zahlenkern `anzeige/zahl.ts`**
+  (LLH-1146): „1.20 km“ liest eine Einsatzkraft als 1.200. Das Feld zeigt das Komma und nimmt Komma
+  wie Punkt an (Pflichtname `beschriftung`, Pflicht `stellen`, ohne Stufenknöpfe); Anzeigen
+  schreiben `zahlText(wert, { stellen })` (de-DE, echtes „−“), nie `toFixed`. Koordinaten und
+  Wire-/URL-Werte bleiben mit Punkt. Guard `anzeige/zahl.guard.test.ts`: `toFixed` nur an den dort
+  bewerteten Stellen, kein Dezimal-`InputNumber` außerhalb des Bausteins.
 - **Zeiteingabe in der Anzeigezone** (LFH-692, Spec `zeiteingabe`,
   `openspec/changes/archive/2026-10-01-lfh-692-zeiteingabe-anzeigezone/design.md`): jede Zeiteingabe nimmt
   `anzeige/ZeitpunktEingabe.tsx` (`ZeitpunktEingabe`, `ZeitraumEingabe`), nie antds `DatePicker`

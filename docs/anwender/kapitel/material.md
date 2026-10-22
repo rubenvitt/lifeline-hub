@@ -46,6 +46,8 @@ Für Einsatzleitung und Führungspersonal:
 1. „Material disponieren“ wählen.
 2. Unter „Material“ einen Posten wählen und bei einem Verbrauchsgut die „Menge“ eingeben. Bei
    einem Gerät steht die Menge fest auf 1, mit dem Hinweis „Ein Gerät steht je Stück im Einsatz“.
+   Ein Gerät mit Bestandsnummer, das schon im Einsatz steht, ist gesperrt und trägt den Zusatz
+   „schon im Einsatz“.
 3. Unter „Ort“ eine Einheit, ein Fahrzeug, eine UHS oder einen Bereitstellungsraum wählen, oder
    „ohne Ort“ stehen lassen.
 
@@ -186,7 +188,8 @@ Für Einsatzleitung und Führungspersonal, wenn ein Posten den Einsatz verlässt
 
    ![Aufgeklappter Block „Aus dem Einsatz genommen (1)“ unter der Materialliste mit einem Posten, seiner Menge, dem Zeitpunkt und dem Knopf „Erneut disponieren“](../bilder/material/aus-dem-einsatz.png)
 
-4. Kommt der Posten zurück, „Erneut disponieren“ wählen.
+4. Kommt der Posten zurück, „Erneut disponieren“ wählen. Ein Gerät mit Bestandsnummer, das
+   inzwischen wieder disponiert ist, kommt so nicht zurück: die Meldung nennt den Grund.
 
 ### Eine Fehldisposition stornieren
 
@@ -208,7 +211,9 @@ auf den Posten über; eine spätere Änderung am Stamm ändert disponierte Poste
 Ad-hoc-Posten bekommt die Art aus dem Dialog und wechselt sie über das Zeilenmenü.
 
 - **Gerät:** steht je Stück im Einsatz, mit Menge 1 und einem der fünf Status. Wer zwei Tragen
-  braucht, disponiert sie zweimal.
+  braucht, disponiert sie zweimal. Ein Gerät mit Bestandsnummer ist ein bestimmtes Stück und
+  steht höchstens einmal im Einsatz; erst wenn es aus dem Einsatz genommen ist, lässt es sich
+  wieder disponieren.
 - **Verbrauchsgut:** steht mit seiner Menge im Einsatz und kennt nur einsatzbereit, im Einsatz und
   defekt. Was davon ausgegeben ist, zeigt die Mengenzelle als Rest, etwa „30 von 50 übrig“;
   ohne Ausgabe steht nur die Menge. Ist

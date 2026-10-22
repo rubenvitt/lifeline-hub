@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx]
 ---
 
 ## Überblick
@@ -173,7 +173,8 @@ der Bestätigung schließt die Erinnerung
 ### Wer den Alarm bekommt
 
 Den Alarm einer neuen Sofortmeldung bekommen alle, die das Modul Meldungen sehen, außer der
-Person, die die Sofortmeldung erfasst hat. „Bestätigung ausstehend“ bekommen alle mit dem Modul,
+Person, die die Sofortmeldung erfasst hat; bei einer nachträglich heraufgestuften Meldung außer
+der Person, die sie korrigiert hat. „Bestätigung ausstehend“ bekommen alle mit dem Modul,
 auch die erfassende Person. Beide kommen mit Ton und lassen sich unter „Benachrichtigungen“ nicht
 abschalten (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Eine gewöhnliche
 Meldung löst keinen Alarm aus.
@@ -241,6 +242,12 @@ Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12
 übernommen“; eine erneute Übernahme schreibt keinen, eine Lagemeldung ebenfalls nicht. Einträge
 aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 
+Der Wortlaut einer Meldung bleibt, wie er einging; die Korrektur über „Bearbeiten“ ändert ihn
+nicht. Ist er falsch, wird im Einsatztagebuch der Eintrag der Meldung berichtigt. Die Karte zeigt
+dann die Marke „berichtigt“ und daneben „→ ETB Nr. …“, den Sprung auf die jüngste Berichtigung;
+der Wortlaut auf der Karte bleibt der ursprüngliche. Auf einem gekoppelten Gerät fehlt die Marke,
+weil es das Einsatztagebuch nicht zeigt.
+
 ### Was eine Korrektur bewirkt
 
 - Jede gespeicherte Korrektur schreibt einen Systemeintrag ins Einsatztagebuch mit Verweis auf die
@@ -251,9 +258,15 @@ aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 - Wird die Art auf „Lagemeldung“ gesetzt, steht die Meldung ab dann in den Lagemeldungen, mit der
   Marke „Neu“. Wird die Art einer Lagemeldung geändert, bleibt sie in der Lage, bis jemand sie
   herausnimmt.
-- Zur Sofortmeldung wird eine Meldung nur beim Erfassen: „Sofort“ und „Sofortmeldung“ stehen in der
-  Korrektur nur an einer Meldung, die schon eine ist. Eine bestehende Bestätigungspflicht bleibt,
-  auch wenn die Priorität sinkt.
+- Wird eine Meldung über „Priorität“ „Sofort“ oder über „Meldungsart“ „Sofortmeldung“ erst zur
+  Sofortmeldung, steht vor dem Speichern „Speichern löst den Sofortalarm aus, wenn die Meldung noch
+  keinen hatte.“ Nach dem Speichern geht der Alarm wie beim Erfassen an alle mit dem Modul
+  Meldungen außer der Person, die korrigiert hat. Die Meldung verlangt ab dann eine Bestätigung,
+  die Frist läuft ab dem Speichern, und die Erinnerung „Sofortmeldung #… unbestätigt“ entsteht.
+  Der Systemeintrag beginnt mit „zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst“.
+- Jede Meldung alarmiert höchstens einmal: wer eine Sofortmeldung herab- und wieder heraufstuft,
+  löst keinen zweiten Alarm aus; der Systemeintrag nennt dann „Sofortalarm war schon ausgelöst“.
+  Eine bestehende Bestätigungspflicht bleibt, auch wenn die Priorität sinkt.
 - Ein nachgetragenes „Von Einheit / Abschnitt“ zählt als Rückmeldung dieser Einheit oder dieses
   Abschnitts; der Absender bleibt der Name aus dem Eingang.
 - „Aus der Lage nehmen“ verwirft Lage-Text, Ort und Kenntnisnahme. Eine erneute Übernahme beginnt

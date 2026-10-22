@@ -171,6 +171,14 @@ pub struct MeldungAnzeige {
     /// Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    /// Abgeleitet (LLH-1382): die jüngste ETB-Berichtigung des Eintrags `etb_meldung_id`, für die
+    /// Marke „berichtigt“ und den Sprung ins ETB. Der Wortlaut `inhalt` bleibt, wie er einging.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_id: Option<i64>,
+    /// Abgeleitet: laufende Nummer dieser Berichtigung im ETB, gesetzt genau mit
+    /// `etb_berichtigung_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_lfd_nr: Option<i64>,
 }
 
 impl MeldungAnzeige {
@@ -262,6 +270,13 @@ pub struct LageMeldungAnzeige {
     pub richtung: Richtung,
     /// Abgeleitet: erfasst von einem gekoppelten Gerät (Erfasser ist ein Gerätekonto).
     pub is_von_geraet: bool,
+    /// Abgeleitet (LLH-1382): jüngste ETB-Berichtigung des Eintrags der Meldung, wie an der
+    /// Meldung. `text` bleibt Lage-Text oder Wortlaut (design.md D1). Fehlt in alten Ständen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_id: Option<i64>,
+    /// Abgeleitet: laufende Nummer dieser Berichtigung im ETB.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_lfd_nr: Option<i64>,
 }
 
 // ── Nach dem Commit: Live-Bündel, Benachrichtigung, Auto-Frist (aus `routes/meldung.rs`
@@ -332,9 +347,6 @@ pub(crate) async fn live_publikation_sicherstellen(
     state: &crate::app::AppState,
     meldung: &MeldungAnzeige,
 ) -> Result<(), crate::error::AppError> {
-    use crate::benachrichtigung::{
-        self as hinweis, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
-    };
     let einsatz_id = meldung.einsatz_id;
     let meldung_id = meldung.id;
     let etb_id = meldung.etb_meldung_id;
@@ -353,22 +365,56 @@ pub(crate) async fn live_publikation_sicherstellen(
         .await?;
     if zugestellt {
         if ist_sofort {
-            hinweis::melden(
-                &state.pool,
-                &state.live,
-                Anlass::neu(
-                    einsatz_id,
-                    BenachrichtigungArt::Sofortmeldung,
-                    Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung_id),
-                )
-                .von(meldung.erfasst_von_id)
-                .an(Adressat::ModulLeser("meldungen")),
-            )
-            .await;
+            sofortalarm_melden(state, meldung, meldung.erfasst_von_id).await;
         }
         benachrichtigung::erfasst(&state.pool, &state.live, meldung).await;
     }
     Ok(())
+}
+
+/// Der Sofortalarm als Benachrichtigung (Spec `benachrichtigungen`, „Sofortmeldung alarmiert“):
+/// alle mit dem Modul Meldungen außer dem Auslöser. Beim Erfassen ist das der Erfasser, beim
+/// Heraufstufen der Korrigierende (LLH-1380).
+async fn sofortalarm_melden(
+    state: &crate::app::AppState,
+    meldung: &MeldungAnzeige,
+    ausloeser_id: i64,
+) {
+    use crate::benachrichtigung::{
+        melden, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+    };
+    melden(
+        &state.pool,
+        &state.live,
+        Anlass::neu(
+            meldung.einsatz_id,
+            BenachrichtigungArt::Sofortmeldung,
+            Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung.id),
+        )
+        .von(ausloeser_id)
+        .an(Adressat::ModulLeser("meldungen")),
+    )
+    .await;
+}
+
+/// Titel der Auto-Frist-Erinnerung einer Sofortmeldung (Wortlaut seit LFH-97; für jede pflichtige
+/// Meldung der Meldungsroute „Sofortmeldung“, Folgeaufgabe aus LLH-1075).
+pub(crate) fn titel_sofort(meldung: &MeldungAnzeige) -> String {
+    format!("Sofortmeldung #{} unbestätigt", meldung.lfd_nr)
+}
+
+/// Nach dem Commit einer Korrektur, die eine Meldung erst zur Sofortmeldung machte und ihren
+/// Sofortalarm auslöst (`korrektur::Ergebnis::sofortalarm`, LLH-1380): Sofort-Highlight mit Ton,
+/// Alarm an die Leser des Moduls und die Auto-Frist-Erinnerung, wie beim Erfassen. Einmal je
+/// Meldung trägt der Merker `sofortalarm_at`, den die Korrektur in ihrer Transaktion setzt.
+pub(crate) async fn sofortalarm_nach_heraufstufung(
+    state: &crate::app::AppState,
+    meldung: &MeldungAnzeige,
+    ausloeser_id: i64,
+) -> Result<(), crate::error::AppError> {
+    sse_sofort(state, meldung.einsatz_id, meldung.id);
+    sofortalarm_melden(state, meldung, ausloeser_id).await;
+    auto_frist_erinnerung_sicherstellen(state, meldung, &titel_sofort(meldung)).await
 }
 
 #[cfg(test)]

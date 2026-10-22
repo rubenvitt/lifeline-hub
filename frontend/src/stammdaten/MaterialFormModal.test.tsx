@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { Material } from '../api/types';
+import { MATERIAL_STAMM_BEMERKUNG_MAX, MATERIAL_STAMM_TEXT_MAX } from '../api/eingabegrenzen';
 import MaterialFormModal from './MaterialFormModal';
 
 /**
@@ -357,5 +358,47 @@ describe('MaterialFormModal — Hülle (LFH-346/A6)', () => {
 
     await nutzer.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
     await waitFor(() => expect(dialog.querySelectorAll('.ant-form-item')).toHaveLength(7));
+  });
+  /**
+   * Spec `eingabegrenzen`, „Freitexte des Material-Stamms sind begrenzt“ (LLH-1258): die kurzen
+   * Felder tragen die Grenze des Servers als `maxLength`, die Bemerkung den Zähler. Mutationsprobe:
+   * ohne `maxLength` an einem Feld fällt die erste Prüfung, ohne `zeichenRegel` die zweite.
+   */
+  it('Grenzen: kurze Felder mit maxLength wie der Server', async () => {
+    handler();
+    const nutzer = userEvent.setup();
+    renderMitProviders(<Harness />);
+    const max = String(MATERIAL_STAMM_TEXT_MAX);
+    expect(await screen.findByLabelText('Bezeichnung')).toHaveAttribute('maxlength', max);
+    expect(screen.getByLabelText('Kategorie')).toHaveAttribute('maxlength', max);
+    expect(screen.getByLabelText('Bestandsnummer')).toHaveAttribute('maxlength', max);
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    expect(await screen.findByLabelText('Trägerorganisation')).toHaveAttribute('maxlength', max);
+    expect(screen.getByLabelText('Standort')).toHaveAttribute('maxlength', max);
+  });
+
+  it('Grenzen: eine zu lange Bemerkung nennt die Überlänge, kürzt nicht und sendet nichts', async () => {
+    let gesendet = false;
+    server.use(
+      http.patch('/api/material/3', () => {
+        gesendet = true;
+        return HttpResponse.json(material);
+      }),
+    );
+    const nutzer = userEvent.setup();
+    const zuLang = 'x'.repeat(MATERIAL_STAMM_BEMERKUNG_MAX + 1);
+    renderMitProviders(<Harness bestand={{ ...material, bemerkung: zuLang }} />);
+    await screen.findByLabelText('Bezeichnung');
+    await nutzer.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+    const bemerkung = await screen.findByLabelText('Bemerkung');
+    expect(bemerkung).toHaveValue(zuLang);
+    await nutzer.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    expect(
+      await screen.findByText('Bemerkung darf höchstens 2.000 Zeichen lang sein'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/2\.001 \/ 2\.000 · zu lang/)).toBeInTheDocument();
+    expect(bemerkung).toHaveValue(zuLang);
+    expect(gesendet).toBe(false);
   });
 });

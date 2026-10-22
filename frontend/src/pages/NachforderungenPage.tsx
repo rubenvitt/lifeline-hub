@@ -23,6 +23,7 @@ import {
   legeNachforderungAn,
   lehneNachforderungAb,
   listeNachforderungen,
+  listeUeblicheArten,
   patcheNachforderung,
   setzeNachforderungStatus,
   zieheNachforderungZurueck,
@@ -35,7 +36,11 @@ import type {
   NeueNachforderung,
   PatchNachforderung,
 } from '../api/types';
-import { NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX } from '../api/eingabegrenzen';
+import {
+  NACHFORDERUNG_ABLEHNEN_GRUND_MAX,
+  NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
+} from '../api/eingabegrenzen';
+import { istZuLang, zeichenGrenze } from '../components/zeichenGrenze';
 import { NACHFORDERUNG_STATUS } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungBoard, {
@@ -455,6 +460,18 @@ export default function NachforderungenPage() {
     onError: invalidiere,
   });
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
+  // Übliche Arten der Organisation (LLH-1379): nur, solange das Formular offen ist und angelegt
+  // werden darf. Ein Fehler lässt die Schnellwahl still auf der festen Liste.
+  const orgArtenQuery = useQuery({
+    queryKey: einsatzKeys.nachforderungArten(einsatzId),
+    queryFn: () => listeUeblicheArten(einsatzId),
+    enabled: formOffen && darfSchreibenRoh,
+    staleTime: 5 * 60_000,
+  });
+  const orgArten = useMemo(
+    () => (orgArtenQuery.data ?? []).map((a) => a.art),
+    [orgArtenQuery.data],
+  );
 
   /*
    * Übernehmen (D1): ein Material-POST mit Bezug. Ablehnungen stehen im Dialog (`speicherung`).
@@ -698,8 +715,10 @@ export default function NachforderungenPage() {
     },
     [raeumeZurueckziehen],
   );
+  // Über der Grenze sperrt der Knopf; gekürzt wird nie (LFH-937, `components/zeichenGrenze.tsx`).
+  const zurueckziehenZuLang = istZuLang(zurueckziehenGrund, NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX);
   const zurueckziehenBestaetigen = () => {
-    if (zurueckziehenId == null) return;
+    if (zurueckziehenId == null || zurueckziehenZuLang) return;
     zurueckziehenMutation.mutate({
       nfId: zurueckziehenId,
       grund: zurueckziehenGrund.trim() || undefined,
@@ -707,8 +726,9 @@ export default function NachforderungenPage() {
   };
   const zieht = zurueckziehenMutation.isPending;
 
+  const ablehnenZuLang = istZuLang(ablehnenGrund, NACHFORDERUNG_ABLEHNEN_GRUND_MAX);
   const ablehnenBestaetigen = () => {
-    if (ablehnenId == null) return;
+    if (ablehnenId == null || ablehnenZuLang) return;
     ablehnenMutation.mutate({ nfId: ablehnenId, grund: ablehnenGrund.trim() || undefined });
   };
   // Solange abgelehnt wird, sind alle Auswege gesperrt: der Dialog bleibt bis zur Antwort offen.
@@ -875,6 +895,7 @@ export default function NachforderungenPage() {
             vorbelegung={vorbelegung}
             bezug={bezug}
             fruehereArten={arten}
+            orgArten={orgArten}
             raeume={raeume}
             abschnitte={abschnitte}
             senden={anlegenMutation.isPending}
@@ -972,7 +993,7 @@ export default function NachforderungenPage() {
         title="Nachforderung ablehnen"
         okText="Ablehnen"
         cancelText="Abbrechen"
-        okButtonProps={{ danger: true }}
+        okButtonProps={{ danger: true, disabled: ablehnenZuLang }}
         confirmLoading={lehntAb}
         cancelButtonProps={{ disabled: lehntAb }}
         closable={lehntAb ? { disabled: true } : true}
@@ -990,6 +1011,7 @@ export default function NachforderungenPage() {
           value={ablehnenGrund}
           onChange={(e) => setAblehnenGrund(e.target.value)}
           placeholder="Grund (optional), z. B. keine Reserven verfügbar"
+          count={zeichenGrenze(NACHFORDERUNG_ABLEHNEN_GRUND_MAX)}
           rows={3}
         />
         {ablehnenMutation.error != null && (
@@ -1007,7 +1029,7 @@ export default function NachforderungenPage() {
         title="Nachforderung zurückziehen"
         okText="Zurückziehen"
         cancelText="Abbrechen"
-        okButtonProps={{ danger: true }}
+        okButtonProps={{ danger: true, disabled: zurueckziehenZuLang }}
         confirmLoading={zieht}
         cancelButtonProps={{ disabled: zieht }}
         closable={zieht ? { disabled: true } : true}
@@ -1025,7 +1047,7 @@ export default function NachforderungenPage() {
           value={zurueckziehenGrund}
           onChange={(e) => setZurueckziehenGrund(e.target.value)}
           placeholder="Grund (optional), z. B. nicht mehr benötigt"
-          maxLength={NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX}
+          count={zeichenGrenze(NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX)}
           rows={3}
         />
         {zurueckziehenMutation.error != null && (

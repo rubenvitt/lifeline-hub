@@ -284,7 +284,7 @@ describe('EtbDruckPage', () => {
       within(liste)
         .getAllByRole('listitem')
         .map((li) => li.textContent),
-    ).toEqual(['Lageskizze.pdf · 1.5 KB', 'IMG_0001.jpg · 2.0 MB']);
+    ).toEqual(['Lageskizze.pdf · 1,5 KB', 'IMG_0001.jpg · 2,0 MB']);
     expect(within(zeileNr(2)).getByText('Anhänge')).toBeInTheDocument();
     expect(within(zeileNr(3)).getByText('Anhang')).toBeInTheDocument();
     expect(within(zeileNr(3)).getByRole('listitem')).toHaveTextContent('Funkspruch.txt · 512 B');

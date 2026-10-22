@@ -73,6 +73,17 @@ Benachrichtigung auslösen.
 - **THEN** steht sie unter „Zurückgezogen“ mit ihrem Grund, und das ETB nennt
   „Nachforderung 2× RTW: zurückgezogen (nicht mehr benötigt)“
 
+### Requirement: Grund der Ablehnung ist begrenzt
+Der optionale Grund beim Ablehnen MUST wie der Grund des Zurückziehens höchstens 200 Zeichen lang
+sein (nach dem Trimmen); ein längerer MUST mit 400 abgelehnt werden, ohne dass sich die
+Nachforderung ändert. Beide Dialoge MUST einen zu langen Grund stehen lassen und das Absenden
+sperren, bis er gekürzt ist.
+
+#### Scenario: Zu langer Ablehnungsgrund
+- **WHEN** eine angeforderte Nachforderung mit einem Grund von 201 Zeichen abgelehnt werden soll
+- **THEN** antwortet der Server mit 400
+- **AND** bleibt die Nachforderung angefordert
+
 ### Requirement: Bearbeiten einer offenen Nachforderung
 „Bearbeiten“ im ⋮-Menü SHALL an der Karte ein Formular öffnen: Anzahl, Wohin, Priorität und
 Details, bei zugesagt oder unterwegs dazu Wer und Eintreffen. Die Art MUST bleiben. Gesendet wird

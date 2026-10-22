@@ -17,6 +17,16 @@ pub const ADHOC_TEXT_MAX: usize = 200;
 /// Bemerkung zu einem Material-Posten im Einsatz (LLH-1093); wie `personal::BEMERKUNG_MAX`.
 pub const BEMERKUNG_MAX: usize = 2_000;
 
+/// Bezeichnung, Kategorie, Bestandsnummer, Trägerorganisation und Standort eines Materials im
+/// Stamm (LLH-1258, `POST/PATCH /api/material`), Zeichen nach dem Trimmen. So weit wie
+/// [`ADHOC_TEXT_MAX`]: Bezeichnung, Kategorie, Bestandsnummer und Träger gehen beim Disponieren
+/// als Snapshot in denselben Posten wie ein Ad-hoc-Eintrag. Spiegel: `MATERIAL_STAMM_TEXT_MAX`.
+pub const STAMM_TEXT_MAX: usize = 200;
+
+/// Bemerkung eines Materials im Stamm (LLH-1258); wie [`BEMERKUNG_MAX`]. Spiegel:
+/// `MATERIAL_STAMM_BEMERKUNG_MAX`.
+pub const STAMM_BEMERKUNG_MAX: usize = 2_000;
+
 /// Interner Material-Stamm-Datensatz (alle Spalten von `material`).
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct Material {

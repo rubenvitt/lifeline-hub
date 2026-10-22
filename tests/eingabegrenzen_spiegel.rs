@@ -54,6 +54,11 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("PERSONAL_BEMERKUNG_MAX", personal::BEMERKUNG_MAX),
         ("MATERIAL_ADHOC_TEXT_MAX", material::ADHOC_TEXT_MAX),
         ("MATERIAL_BEMERKUNG_MAX", material::BEMERKUNG_MAX),
+        ("MATERIAL_STAMM_TEXT_MAX", material::STAMM_TEXT_MAX),
+        (
+            "MATERIAL_STAMM_BEMERKUNG_MAX",
+            material::STAMM_BEMERKUNG_MAX,
+        ),
         ("FAHRZEUG_ADHOC_TEXT_MAX", fahrzeug::ADHOC_TEXT_MAX),
         ("FAHRZEUG_BEMERKUNG_MAX", fahrzeug::BEMERKUNG_MAX),
         (
@@ -73,6 +78,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
         (
             "NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX",
             nachforderung::ZURUECKZIEHEN_GRUND_MAX,
+        ),
+        (
+            "NACHFORDERUNG_ABLEHNEN_GRUND_MAX",
+            nachforderung::ABLEHNEN_GRUND_MAX,
         ),
         (
             "NACHFORDERUNG_UEBERNAHME_EINHEITEN_MAX",

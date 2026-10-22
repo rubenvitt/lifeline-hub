@@ -60,6 +60,24 @@ pub async fn liste(
     Ok(Json(repo::list(&state.pool, einsatz_id, status).await?))
 }
 
+/// GET /api/einsaetze/{id}/nachforderungen/arten — übliche Arten der Organisation für
+/// Schnellwahl und Vorschläge (LLH-1379, design.md D1–D6). Dieselbe Tür wie die Liste; gezählt
+/// wird nur über andere Einsätze der Einsatz-Org, deren Nachforderungen der Benutzer selbst lesen
+/// darf. Keine Geräteroute (D3).
+pub async fn arten(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Nachforderungen>,
+) -> Result<Json<Vec<crate::nachforderung::arten::NachforderungArtUeblich>>, AppError> {
+    if ctx.geraet.is_some() {
+        // Netz unter der Routenschranke: ein Gerät hat in anderen Einsätzen keine Rolle.
+        return Err(AppError::Forbidden);
+    }
+    Ok(Json(
+        crate::nachforderung::arten::uebliche_arten(&state.pool, &ctx.benutzer, &ctx.einsatz)
+            .await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct NeueNachforderung {
     pub art: String,
@@ -358,6 +376,8 @@ pub async fn ablehnen(
     JsonBody(req): JsonBody<AblehnenReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Der Grund steht im ETB-Wortlaut der Ablehnung; begrenzt wie beim Zurückziehen (LLH-1385).
+    let grund = optional_max(req.grund, "Grund", crate::nachforderung::ABLEHNEN_GRUND_MAX)?;
     fordere_bearbeitbar(&state, einsatz_id, nachforderung_id).await?;
     let aktuell = repo::load(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), STATUS_ABGELEHNT) {
@@ -369,7 +389,7 @@ pub async fn ablehnen(
         &state.pool,
         nachforderung_id,
         ctx.benutzer.id,
-        trimme(&req.grund),
+        grund.as_deref(),
         aktuell.status.as_str(),
         &jetzt(),
     )

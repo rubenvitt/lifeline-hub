@@ -16,6 +16,10 @@ import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 import { waehleMenueEintrag } from '../test/menue';
+import {
+  NACHFORDERUNG_ABLEHNEN_GRUND_MAX,
+  NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
+} from '../api/eingabegrenzen';
 
 /*
  * Die Uhr steht auf dem Einsatztag (nur `Date`): „Eingetroffen“ zeigt die letzten 12 h, die
@@ -65,6 +69,7 @@ vi.mock('../api/einsaetze', () => ({
 const ladeModulFreigaben = vi.fn();
 
 const listeNachforderungen = vi.fn();
+const listeUeblicheArten = vi.fn();
 const legeNachforderungAn = vi.fn();
 const setzeNachforderungStatus = vi.fn();
 const lehneNachforderungAb = vi.fn();
@@ -76,6 +81,8 @@ vi.mock('../api/nachforderungen', () => ({
   zieheNachforderungZurueck: (...a: unknown[]) => zieheNachforderungZurueck(...a),
   patcheNachforderung: (...a: unknown[]) => patcheNachforderung(...a),
   listeNachforderungen: (...a: unknown[]) => listeNachforderungen(...a),
+  // Übliche Arten der Organisation (LLH-1379): ohne eigene Vorgabe leer.
+  listeUeblicheArten: (...a: unknown[]) => listeUeblicheArten(...a) ?? Promise.resolve([]),
   legeNachforderungAn: (...a: unknown[]) => legeNachforderungAn(...a),
   setzeNachforderungStatus: (...a: unknown[]) => setzeNachforderungStatus(...a),
   lehneNachforderungAb: (...a: unknown[]) => lehneNachforderungAb(...a),
@@ -178,6 +185,21 @@ describe('NachforderungenPage', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     expect(screen.queryByText(/\d+ offen/)).toBeNull();
+  });
+
+  it('die Schnellwahl füllt mit den üblichen Arten der Organisation (LLH-1379)', async () => {
+    listeUeblicheArten.mockResolvedValueOnce([{ art: 'Sandsäcke', einsaetze: 3 }]);
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    expect(listeUeblicheArten).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    const gruppe = await screen.findByRole('group', { name: 'Schnellwahl' });
+    await waitFor(() =>
+      expect(
+        Array.from(gruppe.querySelectorAll('button')).map((b) => b.textContent?.trim()),
+      ).toEqual(['RTW', 'Sandsäcke', 'KTW', 'NEF', 'LF 10', 'HLF 20']),
+    );
+    expect(listeUeblicheArten).toHaveBeenCalledWith(1);
   });
 
   it('setzt eine Nachforderung ab', async () => {
@@ -294,6 +316,44 @@ describe('NachforderungenPage', () => {
     );
     expect(await screen.findByText('Nachforderung zurückgezogen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+  });
+
+  /**
+   * LLH-1385: beide Gründe tragen die Grenze des Servers als Zähler (`zeichenGrenze`), ohne zu
+   * kürzen; über der Grenze sperrt der Knopf, und nichts geht an den Server.
+   */
+  it.each([
+    {
+      eintrag: 'Ablehnen',
+      titel: 'Nachforderung ablehnen',
+      feld: 'Ablehnungsgrund',
+      max: NACHFORDERUNG_ABLEHNEN_GRUND_MAX,
+      aufruf: () => lehneNachforderungAb,
+    },
+    {
+      eintrag: 'Zurückziehen',
+      titel: 'Nachforderung zurückziehen',
+      feld: 'Grund des Zurückziehens',
+      max: NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
+      aufruf: () => zieheNachforderungZurueck,
+    },
+  ])('$eintrag: ein zu langer Grund bleibt stehen und sperrt das Senden', async (fall) => {
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue(fall.eintrag);
+    const dialog = await screen.findByRole('dialog', { name: fall.titel });
+    const grund = within(dialog).getByLabelText(fall.feld);
+    await userEvent.click(grund);
+    await userEvent.paste('x'.repeat(fall.max + 1));
+    expect(grund).toHaveValue('x'.repeat(fall.max + 1));
+    expect(within(dialog).getByText(/zu lang/)).toBeInTheDocument();
+    const knopf = within(dialog).getByRole('button', { name: fall.eintrag });
+    expect(knopf).toBeDisabled();
+    await userEvent.click(knopf);
+    expect(fall.aufruf()).not.toHaveBeenCalled();
+
+    await userEvent.type(grund, '{Backspace}');
+    expect(knopf).toBeEnabled();
   });
 
   /** LLH-1097 D9: Bearbeiten im ⋮-Menü sendet nur Geändertes. */

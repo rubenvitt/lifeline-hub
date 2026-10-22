@@ -63,8 +63,12 @@ Priorität, Richtung, Empfänger und der Bezug auf Einheit oder Abschnitt änder
 Transaktion einen Systemeintrag im ETB mit Verweis auf die Meldung schreiben, der die Änderung
 nennt; eine Korrektur ohne wirksame Änderung MUST nichts schreiben. Ohne Schreibrecht MUST das
 System mit HTTP 403 antworten, für eine Meldung eines anderen Einsatzes mit HTTP 404. Gekoppelte
-Geräte MUST NOT korrigieren. Eine Korrektur, die eine Meldung erst zur Sofortmeldung macht, MUST
-mit HTTP 422 abgelehnt werden.
+Geräte MUST NOT korrigieren. Eine Korrektur, die eine Meldung erst zur Sofortmeldung macht
+(LLH-1380), SHALL gelingen und MUST nach dem Commit den Sofortalarm auslösen wie das Erfassen
+(Spec `benachrichtigungen`, „Sofortmeldung alarmiert“; Auslöser ist der Korrigierende), höchstens
+einmal je Meldung: eine Meldung, die als Sofortmeldung erfasst wurde oder schon einmal
+heraufgestuft wurde, MUST NOT erneut alarmieren. War sie nicht bestätigungspflichtig, MUST sie es
+mit der Frist ab der Korrektur werden. Der Systemeintrag MUST das Heraufstufen nennen.
 
 #### Scenario: Priorität berichtigt
 - **WHEN** eine Person die Priorität von Meldung #3 von „normal“ auf „dringend“ ändert
@@ -83,8 +87,12 @@ mit HTTP 422 abgelehnt werden.
 - **THEN** antwortet das System mit HTTP 403
 
 #### Scenario: Zur Sofortmeldung heraufstufen
-- **WHEN** eine Person eine Meldung der Priorität „normal“ auf „sofort“ setzen will
-- **THEN** antwortet das System mit HTTP 422, und die Meldung bleibt unverändert
+- **WHEN** eine Person Meldung #3 der Priorität „normal“ auf „sofort“ setzt
+- **THEN** antwortet das System mit HTTP 200, alle mit dem Modul Meldungen außer ihr erhalten den Sofortalarm, die Meldung ist bestätigungspflichtig, und das ETB enthält „Meldung #3: zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst; Priorität Normal → Sofort“
+
+#### Scenario: Erneut heraufstufen
+- **WHEN** eine Person eine Sofortmeldung herab- und danach wieder heraufstuft
+- **THEN** antwortet das System mit HTTP 200, es entsteht kein zweiter Sofortalarm, und der Systemeintrag nennt „Sofortalarm war schon ausgelöst“
 
 ### Requirement: Der Eingang bleibt unverändert
 Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang einer Meldung SHALL unveränderlich bleiben;
@@ -254,3 +262,31 @@ Wiederholung.
 #### Scenario: Live-Ereignisse
 - **WHEN** eine Person im ETB einen Eintrag vom Typ „Meldung“ ohne „Nur protokollieren“ erfasst
 - **THEN** erhalten die verbundenen Clients des Einsatzes das ETB-Ereignis des Eintrags und das Ereignis „meldung“
+
+### Requirement: Eine berichtigte Meldung zeigt die Berichtigung
+Der Wortlaut einer Meldung bleibt unverändert; eine inhaltliche Korrektur ist nur als
+ETB-Berichtigung ihres Eintrags möglich (LLH-1382). Meldung und Lagemeldung SHALL dann id und
+laufende Nummer der jüngsten Berichtigung tragen, die direkt auf den ETB-Eintrag der Meldung zeigt
+(`etb_berichtigung_id`, `etb_berichtigung_lfd_nr`); ohne Berichtigung MUST beide Felder fehlen.
+Eine Berichtigung aus einem anderen Einsatz MUST NOT zählen. Meldungskarte und Zeile der
+Lagemeldungen SHALL die Marke „berichtigt“ mit einem Sprung auf diese Berichtigung im ETB zeigen
+(`?eintrag=`); ohne Berichtigung MUST keine Marke stehen. Die Lage MUST weiter den Lage-Text bzw.
+den Wortlaut zeigen, nicht den Text der Berichtigung. Ein gekoppeltes Gerät MUST NOT die Marke
+zeigen, denn es hat kein ETB. Das Erfassen einer Berichtigung des Eintrags einer Meldung MUST
+zusätzlich zum ETB-Ereignis das Ereignis „meldung“ auslösen.
+
+#### Scenario: Berichtigter Eintrag einer Meldung
+- **WHEN** eine Person im ETB den Eintrag von Meldung #3 zweimal berichtigt, zuletzt mit ETB-Nr. 9
+- **THEN** trägt Meldung #3 die Nummer 9 und die id dieser Berichtigung, ihre Karte zeigt „berichtigt“ mit dem Sprung „→ ETB Nr. 9“, und ihr Wortlaut bleibt
+
+#### Scenario: Lagemeldung berichtigt
+- **WHEN** der ETB-Eintrag einer Lagemeldung berichtigt wird
+- **THEN** zeigt ihre Zeile in den Lagemeldungen die Marke „berichtigt“ mit dem Sprung ins ETB, und ihr Text bleibt Lage-Text oder Wortlaut
+
+#### Scenario: Ohne Berichtigung
+- **WHEN** der ETB-Eintrag einer Meldung nicht berichtigt ist
+- **THEN** fehlen beide Felder, und Karte und Zeile zeigen keine Marke
+
+#### Scenario: Berichtigung live
+- **WHEN** eine Person den ETB-Eintrag einer Meldung berichtigt
+- **THEN** erhalten die verbundenen Clients des Einsatzes das ETB-Ereignis und das Ereignis „meldung“
