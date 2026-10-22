@@ -59,9 +59,7 @@ test('Lage aus dem ETB wird Lagemeldung, der Verweis öffnet sie hervorgehoben',
 
   await verweis.click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatz}/meldungen(\\?|$)`));
-  await expect(page.locator('[data-hervorgehoben="true"]')).toContainText(
-    'Wasser im Keller sinkt',
-  );
+  await expect(page.locator('[data-hervorgehoben="true"]')).toContainText('Wasser im Keller sinkt');
 });
 
 test('mit „Nur protokollieren“ entsteht keine Meldung', async ({ page }) => {
