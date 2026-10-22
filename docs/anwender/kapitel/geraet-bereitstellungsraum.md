@@ -2,7 +2,7 @@
 titel: Bereitstellungsraum am Gerät
 gruppen: [geraete]
 reihenfolge: 740
-quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, src/geraet/mod.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/offline/schreiben.ts, frontend/src/offline/useOfflineSync.ts, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
+quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/pages/bereitstellungsraum/KraefteOhneBrSidebar.tsx, frontend/src/pages/bereitstellungsraum/BrVerlauf.tsx, frontend/src/bereitstellungsraum/brZahlen.ts, frontend/src/geraet/GeraeteLayout.tsx, frontend/src/geraet/GeraetMeldungenPage.tsx, frontend/src/geraet/GeraetMeldungen.tsx, frontend/src/geraet/geraetSicht.ts, frontend/src/kraefte/MaterialAmOrt.tsx, src/routes/einsatz_material.rs, src/geraet/mod.rs, frontend/src/pages/bereitstellungsraum/EintreffenDialog.tsx, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, src/bereitstellungsraum/eintreffen.rs, frontend/src/pages/bereitstellungsraum/eintreffenKern.ts, frontend/src/offline/schreiben.ts, frontend/src/offline/useOfflineSync.ts, frontend/src/pages/bereitstellungsraum/abrufKern.ts, src/bereitstellungsraum/abruf.rs]
 ---
 
 ## Überblick
@@ -10,7 +10,8 @@ quellen: [frontend/src/pages/bereitstellungsraum/BrDetailPage.tsx, frontend/src/
 Ein Tablet am **Bereitstellungsraum** führt die Kräfte, die dort bereitstehen: Es bucht
 eintreffende Einheiten und Fahrzeuge ein, auch solche, die im Einsatz noch niemand kennt, zeigt,
 welche Kräfte die Einsatzleitung abgerufen hat, bucht ihr Ausrücken, trägt Kräfte aus, nimmt
-einen geplanten Raum in Betrieb und schickt Meldungen an die Einsatzleitung. Es ist an genau einen Bereitstellungsraum gekoppelt (siehe
+einen geplanten Raum in Betrieb, zeigt das Material des Raums und schickt Meldungen an die
+Einsatzleitung. Es ist an genau einen Bereitstellungsraum gekoppelt (siehe
 [Geräte koppeln](geraete-koppeln.md)) und zeigt nur diesen.
 
 Die Navigation unten führt zu „Raum“ und „Melden“. Die Bedienung des Geräts selbst steht in
@@ -103,6 +104,15 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
    einem anderen Raum gewechselt ist und wann ein Abruf zurückgenommen wurde. Ein Wechsel nennt den
    anderen Raum mit seiner Bezeichnung, ein Abruf und das Ausrücken danach das Ziel.
 
+### Material des Raums ansehen
+
+1. „Raum“ öffnen. Unter der Belegung steht „Material“ mit der Zahl der Posten und, falls vorhanden,
+   dem Ausfall.
+2. Je Posten stehen Bezeichnung, Menge (etwa „6 von 10 übrig“) und Status. Liegt nichts im Raum,
+   steht dort „Kein Material“.
+
+Die Sektion fehlt, wenn das Modul Material im Einsatz nicht freigegeben ist.
+
 ### Meldung an die Einsatzleitung
 
 1. Unten „Melden“ wählen.
@@ -124,6 +134,10 @@ storniert ihn nicht; das bleibt der Einsatzleitung. Auch an den Einheiten und Fa
 mit einer Ausnahme: „Unangemeldet buchen“ legt eine neue Einheit mit ihren Fahrzeugen an. Ob sie
 bleibt, entscheidet die Einsatzleitung; Übernehmen und Abweisen gibt es am Tablet nicht (Kapitel
 [Einheiten](einheiten.md)). Die Suche findet nur Kräfte des Einsatzes, keine aus den Stammdaten.
+
+Material zeigt das Tablet nur an, und nur das Material des eigenen Raums. Zuordnen, Lösen,
+Ausgeben, Erfassen und den Status ändern bleibt der Führungsstelle (Kapitel
+[Material](material.md)); fehlt am Raum etwas, geht das als Meldung an die Einsatzleitung.
 
 Abrufen ist eine Entscheidung der Einsatzleitung: am Tablet gibt es weder „Abrufen“ noch „Abruf
 zurücknehmen“. Das Tablet zeigt den Abruf und bucht das Ausrücken. Bis dahin zählt die abgerufene

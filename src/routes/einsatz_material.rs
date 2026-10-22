@@ -6,6 +6,7 @@ use crate::einsatz::modul::{Material, Nachforderungen};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::geraet::{stelle, Bindungsart};
 use crate::live::LiveEvent;
 use crate::material::disposition_repo::{self, AdhocDaten, MaterialPatch};
 use crate::material::ort::{self, MaterialOrt, OrtPatch};
@@ -75,13 +76,18 @@ pub async fn liste(
 ) -> Result<Json<Vec<EinsatzMaterialAnzeige>>, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let aktiv = ctx.einsatz.ist_aktiv();
-    Ok(Json(
-        if parse_flag(params.entlassene.as_deref(), "entlassene")? {
-            disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
-        } else {
-            disposition_repo::list(&state.pool, einsatz_id, aktiv).await?
-        },
-    ))
+    let mut liste = if parse_flag(params.entlassene.as_deref(), "entlassene")? {
+        disposition_repo::list_entlassene(&state.pool, einsatz_id, aktiv).await?
+    } else {
+        disposition_repo::list(&state.pool, einsatz_id, aktiv).await?
+    };
+    // Stellenbindung (LLH-1252): ein Gerät liest nur das Material seines Bereitstellungsraums,
+    // jedes andere Gerät keins (`frontend/src/geraet/AGENTS.md`, „Stellenbindung je Art“).
+    if let Some(geraet) = ctx.geraet.as_ref() {
+        let sicht = stelle::sicht(Some(geraet), Bindungsart::Bereitstellungsraum);
+        liste.retain(|em| em.br_id.is_some_and(|br| sicht.sieht(br)));
+    }
+    Ok(Json(liste))
 }
 
 #[derive(Debug, Deserialize)]

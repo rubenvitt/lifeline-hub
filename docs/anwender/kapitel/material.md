@@ -245,7 +245,9 @@ Schritt diesem Ort zu. Jeder dieser Wege speichert genauso wie die Liste. An ein
 „Fehlmenge melden“ fehlendes Material als Nachforderung (Kapitel
 [Nachforderungen](nachforderung.md)). Zuordnen, Erfassen, Status, Lösen und Ausgeben verlangen Schreibrecht im Einsatz und die Freigabe des Moduls Material; das
 Recht auf das Modul des Orts, etwa Einheiten, genügt dafür nicht. Einheit und UHS zeigen ihr
-Material auch ohne diese Freigabe, Fahrzeugliste und Bereitstellungsraum nicht.
+Material auch ohne diese Freigabe, Fahrzeugliste und Bereitstellungsraum nicht. Das Tablet eines
+Bereitstellungsraums zeigt das Material seines Raums nur an (Kapitel [Bereitstellungsraum am
+Gerät](geraet-bereitstellungsraum.md)), ein UHS-Laptop das seiner UHS.
 
 Endet ein Ort, bleibt der Posten im Einsatz:
 

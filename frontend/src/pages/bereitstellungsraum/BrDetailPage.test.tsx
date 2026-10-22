@@ -1321,7 +1321,7 @@ describe('BrDetailPage — Raumdaten bearbeiten (LFH-1147)', () => {
 /**
  * Sektion „Material“ unter der Belegung (LLH-1225 Teil II, design.md D13): der Baustein für Material
  * am Ort mit Ort Bereitstellungsraum. Die Posten kommen aus der Materialliste (`br_id`), abgefragt
- * nur mit Freigabe Material und nie am Gerät (D9). Bedienbar auch im Zustand `geplant`.
+ * nur mit Freigabe Material; am BR-Gerät nur lesend (LLH-1252). Bedienbar auch im Zustand `geplant`.
  */
 describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
   const posten = (p: Record<string, unknown>) => ({
@@ -1506,9 +1506,25 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
     expect(abrufe).toEqual([]);
   });
 
-  it('am BR-Gerät: keine Sektion und kein Abruf der Materialliste', async () => {
+  it('am BR-Gerät: die Posten des eigenen Raums nur lesend (LLH-1252)', async () => {
     server.use(http.get('/api/auth/me', () => HttpResponse.json(GERAET_BR_ME)));
     const { abrufe } = seite(brDetail());
+    expect(
+      await within(await screen.findByTestId('br-material')).findByText('Lichtmast'),
+    ).toBeInTheDocument();
+    expect(sektion()).toHaveTextContent('1 Posten · 1 Ausfall');
+    expect(zeile('Lichtmast')).toHaveTextContent('defekt');
+    expect(within(sektion()).queryByText('Trage')).toBeNull();
+    expect(within(sektion()).queryByText('Stromerzeuger')).toBeNull();
+    // Nur lesen (Entscheidung 22.10.2026): kein Zuordnen, Lösen, Erfassen und keine Statuswahl.
+    expect(within(sektion()).queryByRole('combobox')).toBeNull();
+    expect(within(sektion()).queryByRole('button')).toBeNull();
+    expect(abrufe).toContain('material');
+  });
+
+  it('am BR-Gerät ohne Freigabe Material: keine Sektion und kein Abruf', async () => {
+    server.use(http.get('/api/auth/me', () => HttpResponse.json(GERAET_BR_ME)));
+    const { abrufe } = seite(brDetail(), { freigaben: { material: { zugriff: false } } });
     expect(await screen.findByText('Bereitgestellte Einheiten')).toBeInTheDocument();
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.queryByTestId('br-material')).toBeNull();
