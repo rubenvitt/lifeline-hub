@@ -166,7 +166,8 @@ test('Einsatz anlegen: Nadel ziehen schlägt den Ortsnamen vor, ohne Einsatz und
   await anmeldenAlsAdmin(page);
   const dialog = await einsatzDialogOeffnen(page);
   await dialog.getByLabel('Bezeichnung').fill(`E2E Anlegen Nadel ${Date.now()}`);
-  const feld = dialog.getByLabel('Einsatzort');
+  // Nach der Wahl heißen auch Karte und Nadel „Einsatzort“: das Feld über seine Rolle.
+  const feld = dialog.getByRole('textbox', { name: 'Einsatzort' });
   await feld.fill('Bahnhofstraße 1');
   await feld.press('Enter');
   await dialog
