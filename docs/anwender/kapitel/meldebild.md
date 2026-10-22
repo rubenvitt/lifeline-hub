@@ -2,7 +2,7 @@
 titel: Meldebild und Kräfte-Zeitachse
 gruppen: [fuehrung]
 reihenfolge: 300
-quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts]
+quellen: [frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/kraefte/KraeftebaumZelle.tsx, frontend/src/kraefte/meldebildRaster.ts, frontend/src/kraefte/NichtUebernommenMarke.tsx, frontend/src/kraefte/Statusband.tsx, frontend/src/kraefte/kraeftebild.ts, frontend/src/kraefte/materialPosten.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/KraftZeitachse.tsx, frontend/src/kraefte/zeitachse.ts, frontend/src/meldungen/rueckmeldung.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/zeitachse/, src/routes/zeitachse.rs, src/meldung/mod.rs, src/einsatz/effektiv.rs, src/auth/bootstrap.rs, frontend/src/kraefte/entlassene.ts, frontend/src/kraefte/zulauf.ts]
 ---
 
 ## Überblick
@@ -28,7 +28,11 @@ setzen Status, tragen nach und streichen.
 2. Im Statusband die Zahl unter „Einheiten“ ablesen; der Balken darunter gliedert sie nach
    FMS-Status, die Legende nennt Code und Zahl, etwa „S3 2 · S4 1“. Daneben steht „Personal“ mit
    der Gliederung nach Kategorie. „Rückmeldung“ mit dem Wort „keine Rückmeldung“ erscheint nur,
-   wenn sich eine Einheit noch nie zurückgemeldet hat, und zählt diese Einheiten.
+   wenn sich eine Einheit noch nie zurückgemeldet hat, und zählt diese Einheiten. „Zulauf“
+   erscheint, solange eine Nachforderung angefordert, zugesagt oder unterwegs ist: die Zahl nennt,
+   was zugesagt oder unterwegs ist, darunter steht je Art, wann es eintreffen soll, etwa „+2 RTW,
+   Eintreffen 15:30 · +1 GW-San unterwegs, Eintreffen 16:10 · 1 NEF angefordert“. Ein Klick darauf
+   öffnet die Nachforderungen.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
    nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.
@@ -141,6 +145,16 @@ unter ihrer Einheit, auch wenn sie selbst keinen oder einen anderen Abschnitt tr
 zählt beim Abschnitt der Einheit ihres Fahrzeugs; Material an einer UHS oder in einem
 Bereitstellungsraum fällt bei einem gewählten Abschnitt heraus.
 
+### Zulauf aus Nachforderungen
+
+Der Zulauf zählt nicht in die Stärke, die Einheiten oder das Personal: zugesagte Kräfte sind
+angekündigt, nicht da. Angeforderte stehen nur im Text, nicht in der Zahl. Eingetroffene,
+abgelehnte und zurückgezogene Nachforderungen fallen heraus; eingetroffene Kräfte erscheinen im
+Raster, sobald sie als Einheit übernommen sind (Kapitel [Nachforderungen](nachforderung.md)).
+Ohne Anzahl zählt eine Nachforderung als 1. Ist das erwartete Eintreffen verstrichen, steht
+„überfällig“ dahinter, und die Kennzahl ist hervorgehoben, ohne Ton oder Meldung. Bei einem
+gesetzten Filter entfällt der Zulauf, weil er zu keiner Auswahl gehört.
+
 ### Rückmeldung und Frist
 
 Als Rückmeldung zählt jede Meldung, die an die Einheit gebunden ist, gleich welcher Art. Ist die
@@ -182,7 +196,8 @@ zeigt sie nicht.
 
 ### Rechte
 
-Lesen darf, wer die Module Einheiten und Personal sieht. Status setzen, nachtragen, streichen und in
+Lesen darf, wer die Module Einheiten und Personal sieht. Den Zulauf sieht nur, wer auch das Modul
+Nachforderungen lesen darf; sonst fehlt die Kennzahl ganz. Status setzen, nachtragen, streichen und in
 den Lagebericht übernehmen dürfen Einsatzleitung und Führungspersonal, solange der Einsatz läuft
 (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)).
 

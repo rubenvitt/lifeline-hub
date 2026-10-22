@@ -27,6 +27,7 @@ import { ApiError } from '../api/client';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { holeRueckmeldungen } from '../api/meldungen';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';
+import { listeNachforderungen } from '../api/nachforderungen';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { legeLageberichtAn, aktualisiereLagebericht } from '../api/lageberichte';
@@ -38,6 +39,7 @@ import type {
   EinsatzPersonal,
   FahrzeugStatus,
   LetzteRueckmeldung,
+  Nachforderung,
   Rueckmeldungen,
 } from '../api/types';
 
@@ -62,6 +64,7 @@ vi.mock('../api/auftraege', () => ({ listeOffeneAuftraege: vi.fn() }));
 vi.mock('../api/fahrzeugStatus', () => ({ listeFahrzeugStatus: vi.fn() }));
 vi.mock('../api/meldungen', () => ({ holeRueckmeldungen: vi.fn() }));
 vi.mock('../api/kraefteZeitachse', () => ({ listeEinheitenPerioden: vi.fn() }));
+vi.mock('../api/nachforderungen', () => ({ listeNachforderungen: vi.fn() }));
 vi.mock('../api/lageberichte', () => ({
   legeLageberichtAn: vi.fn(() => Promise.resolve({ id: 99 })),
   aktualisiereLagebericht: vi.fn(() => Promise.resolve({})),
@@ -235,6 +238,7 @@ beforeEach(() => {
   vi.mocked(listeFahrzeugStatus).mockResolvedValue(KATALOG);
   vi.mocked(holeRueckmeldungen).mockResolvedValue(KEINE_RUECKMELDUNGEN);
   vi.mocked(listeEinheitenPerioden).mockResolvedValue([]);
+  vi.mocked(listeNachforderungen).mockResolvedValue([]);
 });
 
 /**
@@ -436,6 +440,103 @@ describe('KraefteuebersichtPage — Statusband', () => {
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new Error('kaputt'));
     setup();
     expect((await screen.findAllByText('Stand unbekannt')).length).toBeGreaterThan(0);
+  });
+});
+
+/** Eine Nachforderung, wie die Liste sie liefert; nur die Felder, die der Zulauf liest, zählen. */
+function nachforderung(teil: Partial<Nachforderung>): Nachforderung {
+  return {
+    id: 1,
+    einsatz_id: 1,
+    art: 'RTW',
+    anzahl: 2,
+    adressat_kategorie: 'leitstelle',
+    adressat_bezeichnung: null,
+    begruendung: null,
+    prioritaet: 'normal',
+    status: 'zugesagt',
+    zugesagt_at: null,
+    unterwegs_at: null,
+    eingetroffen_at: null,
+    abgelehnt_at: null,
+    abgelehnt_grund: null,
+    angefordert_at: '2026-06-12 12:00:00',
+    etb_nachforderung_id: null,
+    erstellt_von_id: 1,
+    erstellt_at: '2026-06-12 12:00:00',
+    erstellt_von_name: null,
+    ist_offen: true,
+    material_ids: [],
+    zusage_rufnamen: [],
+    einheit_ids: [],
+    ...teil,
+  } as Nachforderung;
+}
+
+describe('KraefteuebersichtPage — Zulauf aus Nachforderungen (LLH-1384)', () => {
+  /** Eintreffen in 90 Minuten: nicht überfällig, Uhrzeit heute oder mit Tag. */
+  const eintreffen = () => wire(dayjs().add(90, 'minute'));
+
+  it('2× RTW zugesagt mit Eintreffen → „+2 RTW, Eintreffen …“, nicht in der Stärke', async () => {
+    mitEinheit();
+    vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
+    vi.mocked(listeNachforderungen).mockResolvedValue([
+      nachforderung({ eintreffen_erwartet_at: eintreffen() }),
+      nachforderung({ id: 2, art: 'KTW', status: 'eingetroffen', ist_offen: false }),
+    ]);
+    setup();
+    const gruppe = await screen.findByRole('region', { name: 'Zulauf aus Nachforderungen' });
+    const k = gruppe.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
+    expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^2$/);
+    expect(k).toHaveTextContent(/\+2 RTW, Eintreffen (\d{2}\. )?\d{2}:\d{2}$/);
+    // Eingetroffenes zählt nicht zum Zulauf.
+    expect(k).not.toHaveTextContent('KTW');
+    // Der Zulauf führt aufs Board.
+    expect(within(gruppe).getByRole('link')).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen',
+    );
+    // Die Stärke bleibt die der Kräfte im Einsatz (D3).
+    expect(
+      await (await seitenkopf()).findByText('1 Einheit · Stärke 0/0/1//1'),
+    ).toBeInTheDocument();
+  });
+
+  it('ohne Freigabe Nachforderungen: kein Abruf, keine Kennzahl (D7)', async () => {
+    mitEinheit();
+    vi.mocked(ladeModulFreigaben).mockResolvedValue(
+      freigabenFixture({ nachforderungen: { zugriff: false } }),
+    );
+    vi.mocked(listeNachforderungen).mockResolvedValue([
+      nachforderung({ eintreffen_erwartet_at: eintreffen() }),
+    ]);
+    setup();
+    await screen.findByRole('region', { name: 'Einheiten je Status' });
+    await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
+    expect(listeNachforderungen).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull();
+  });
+
+  it('bei gesetztem Filter entfällt der Zulauf (D8)', async () => {
+    mitEinheit();
+    vi.mocked(listeNachforderungen).mockResolvedValue([
+      nachforderung({ eintreffen_erwartet_at: eintreffen() }),
+    ]);
+    setup();
+    await screen.findByRole('region', { name: 'Zulauf aus Nachforderungen' });
+    fireEvent.change(screen.getByPlaceholderText('Suche...'), { target: { value: 'xyz' } });
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull(),
+    );
+  });
+
+  it('ein gescheiterter Abruf (etwa 403) nimmt nur die Kennzahl, nicht das Band', async () => {
+    mitEinheit();
+    vi.mocked(listeNachforderungen).mockRejectedValue(new ApiError(403, 'verboten'));
+    setup();
+    await screen.findByRole('region', { name: 'Einheiten je Status' });
+    await waitFor(() => expect(listeNachforderungen).toHaveBeenCalled());
+    expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull();
   });
 });
 

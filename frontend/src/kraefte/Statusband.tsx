@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { Kennzahl, Kennzahlenband, useRollen } from '../components/instrument';
 import type { BandZelle } from './meldebildRaster';
 import { bandSegmente } from './statusbandStil';
+import type { ZulaufZelle } from './zulauf';
 
 /**
  * Das Statusband des Meldebilds (LLH-1025, Spec `kraeftebaum`, „Statusband ohne Füllkacheln“):
@@ -17,6 +18,13 @@ import { bandSegmente } from './statusbandStil';
  * „Keine Rückmeldung“ ist eine EIGENE Kennzahl: es ist kein FMS-Status, in der Aufgliederung
  * stünde die Einheit doppelt, und ein Vorleser hörte eine Statusstufe. Ob sie erscheint,
  * entscheidet die Seite (nur bei mindestens einer Einheit ohne Rückmeldung, LFH-610).
+ *
+ * „Zulauf“ (LLH-1384, Spec `kraeftebaum`, „Zulauf aus Nachforderungen“) ist ebenfalls eine EIGENE
+ * Kennzahl: was zugesagt oder unterwegs ist, zählt nicht in Einheiten, Personal oder Stärke. Die
+ * Zahl ist die Menge im Zulauf, die Notiz nennt die Einträge je Art mit Eintreffen
+ * (`kraefte/zulauf.ts`), das Ziel ist das Board der Nachforderungen. Ob sie erscheint (Freigabe,
+ * Filter, Daten), entscheidet die Seite. Sie steht auch neben „keine Einheiten gebildet“: gerade
+ * am Anfang eines Einsatzes ist noch nichts da, aber schon etwas unterwegs.
  *
  * Jede Kennzahl steht in einer benannten Region („Einheiten je Status“ …): Prüfanker der Seite
  * und der e2e-Suite, und ein Vorleser springt so gezielt in die Gruppe.
@@ -46,6 +54,27 @@ interface StatusbandProps {
   zustand: 'daten' | 'laden' | 'fehler';
   /** Kennzahl „keine Rückmeldung" — `null`/fehlend, wenn es nichts zu melden gibt oder nichts lesbar ist. */
   rueckmeldung?: BandZelle | null;
+  /** Kennzahl „Zulauf“ aus Nachforderungen — `null`/fehlend ohne Zulauf, Freigabe oder bei Filter. */
+  zulauf?: ZulaufZelle | null;
+  /** Ziel der Kennzahl „Zulauf“ (Board der Nachforderungen); fehlt, ist sie nicht klickbar. */
+  zulaufZiel?: string;
+}
+
+/** Die Kennzahl „Zulauf“ in ihrer Region. */
+function ZulaufGruppe({ zulauf, ziel }: { zulauf: ZulaufZelle; ziel?: string }) {
+  return (
+    <Gruppe name="Zulauf aus Nachforderungen" lfh="meldebild-zulauf">
+      <Kennzahl
+        titel="Zulauf"
+        wert={zulauf.wert}
+        notiz={zulauf.notiz}
+        groesse="klein"
+        ton={zulauf.ton}
+        // Ohne eigene Beschriftung: der Link heißt nach Zahl und Notiz, nicht nur „öffnen“.
+        ziel={ziel}
+      />
+    </Gruppe>
+  );
 }
 
 export default function Statusband({
@@ -54,6 +83,8 @@ export default function Statusband({
   personal,
   zustand,
   rueckmeldung = null,
+  zulauf = null,
+  zulaufZiel,
 }: StatusbandProps) {
   const { rollen } = useRollen();
   if (zustand !== 'daten') {
@@ -68,6 +99,7 @@ export default function Statusband({
     return (
       <Kennzahlenband beschriftung="Statusband">
         <Kennzahl titel="Einheiten" wert={0} notiz="keine Einheiten gebildet" groesse="klein" />
+        {zulauf && <ZulaufGruppe zulauf={zulauf} ziel={zulaufZiel} />}
       </Kennzahlenband>
     );
   }
@@ -117,6 +149,7 @@ export default function Statusband({
             />
           </Gruppe>
         )}
+        {zulauf && <ZulaufGruppe zulauf={zulauf} ziel={zulaufZiel} />}
       </Kennzahlenband>
     </div>
   );
