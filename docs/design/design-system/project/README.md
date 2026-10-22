@@ -125,7 +125,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   (LFH-606), Rückmeldung (LFH-610), ETB-Zählung (LFH-612).
 - **Kennzahlenband** (LFH-640): immer sechs Plätze (vier Kern, zwei Lage), jede Kennzahl ein
   Heimatplatz; Lageplätze nur per Entscheidung am Einsatz (`EinsatzAnzeige.lagekennzahlen`), nie
-  per Messwert; Neuzuschnitt während der Betrachtung als Sammelbanner
+  per Messwert — eine Kennzahl ohne Fachentscheidung wird gewählt (Einstellungen › Kennzahlen,
+  LLH-1371); Neuzuschnitt während der Betrachtung als Sammelbanner
   (`docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`). Die Fuge
   zeichnet die Zelle, nicht der Rastergrund: Grund `flaeche`, Umriss je Zelle über
   `[data-fugenraster]` (`components/instrument/fugenraster.ts`), damit eine leere Restspur keine
