@@ -372,6 +372,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
             erstellt_at: '2026-09-23 09:00:00',
             ist_offen: true,
             material_ids: [],
+            zusage_rufnamen: [],
             betreuungsstelle_id: 8,
           },
           {
@@ -387,6 +388,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
             erstellt_at: '2026-09-23 09:00:00',
             ist_offen: true,
             material_ids: [],
+            zusage_rufnamen: [],
             betreuungsstelle_id: 9,
           },
         ]),

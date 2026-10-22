@@ -17,17 +17,23 @@ import {
   listEntlassenesMaterial,
 } from '../api/einsatzMaterial';
 import {
+  erfasseZusage,
   legeNachforderungAn,
   lehneNachforderungAb,
   listeNachforderungen,
+  patcheNachforderung,
   setzeNachforderungStatus,
+  zieheNachforderungZurueck,
 } from '../api/nachforderungen';
 import type {
   EinsatzMaterial,
   Nachforderung,
   NachforderungStatus,
+  NachforderungZusageEingabe,
   NeueNachforderung,
+  PatchNachforderung,
 } from '../api/types';
+import { NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX } from '../api/eingabegrenzen';
 import { NACHFORDERUNG_STATUS } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import NachforderungBoard, {
@@ -39,7 +45,7 @@ import { boardGruppe, offenText, vorgabeStufe } from '../nachforderungen/nachfor
 import NachforderungFormular, {
   type NachforderungBezug,
 } from '../nachforderungen/NachforderungFormular';
-import type { StellenVerweis } from '../nachforderungen/NachforderungKarte';
+import type { KartenFormular, StellenVerweis } from '../nachforderungen/NachforderungKarte';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
 import {
   isErgaenzen,
@@ -85,6 +91,7 @@ export default function NachforderungenPage() {
    */
   const [gewaehlteStufe, setGewaehlteStufe] = useState<NachforderungStatus | null>(null);
   const [abgelehntOffen, setAbgelehntOffen] = useState(false);
+  const [zurueckgezogenOffen, setZurueckgezogenOffen] = useState(false);
   const [aeltereOffen, setAeltereOffen] = useState(false);
   const zufluss = useZuflussSteuerung<Nachforderung>();
   // Nach der eigenen Fortschaltung bekommt die gewanderte Karte den Fokus (der Knopf ist weg).
@@ -117,6 +124,14 @@ export default function NachforderungenPage() {
   // Ablehnen-Dialog: Grund (optional) wird erhoben, bevor abgelehnt wird.
   const [ablehnenId, setAblehnenId] = useState<number | null>(null);
   const [ablehnenGrund, setAblehnenGrund] = useState('');
+  // Zurückziehen-Dialog (LLH-1097 D8): wie Ablehnen, Grund optional, kein Rückgängig.
+  const [zurueckziehenId, setZurueckziehenId] = useState<number | null>(null);
+  const [zurueckziehenGrund, setZurueckziehenGrund] = useState('');
+  /*
+   * Das Formular an einer Karte (LLH-1097 D10): „Zusage erfassen“ oder „Bearbeiten“, höchstens
+   * eines je Seite. Solange es offen ist, hält das Board still.
+   */
+  const [formular, setFormular] = useState<{ id: number; art: KartenFormular } | null>(null);
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -218,18 +233,20 @@ export default function NachforderungenPage() {
    * Erfassung offen ist oder eine Karte ein Ziel nennt.
    */
   const raeumeFrei = istKeyFreigegeben('bereitstellungsraeume', freigaben);
+  // Bearbeiten an einer Karte braucht dieselben Listen für „Wohin“ (LLH-1097 D9).
+  const bearbeitet = formular?.art === 'bearbeiten';
   const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigaben);
   const kartenMitRaum = (nfQuery.data ?? []).some((n) => n.ziel_br_id != null);
   const kartenMitAbschnitt = (nfQuery.data ?? []).some((n) => n.ziel_abschnitt_id != null);
   const raeumeQuery = useQuery({
     queryKey: einsatzKeys.br(einsatzId),
     queryFn: () => listeBr(einsatzId),
-    enabled: raeumeFrei && (formOffen || kartenMitRaum),
+    enabled: raeumeFrei && (formOffen || bearbeitet || kartenMitRaum),
   });
   const abschnitteQuery = useQuery({
     queryKey: einsatzKeys.abschnitte(einsatzId),
     queryFn: () => listeAbschnitte(einsatzId),
-    enabled: abschnitteFrei && (formOffen || kartenMitAbschnitt),
+    enabled: abschnitteFrei && (formOffen || bearbeitet || kartenMitAbschnitt),
   });
   const raeume = raeumeFrei ? raeumeQuery.data : undefined;
   const abschnitte = abschnitteFrei ? abschnitteQuery.data : undefined;
@@ -353,6 +370,43 @@ export default function NachforderungenPage() {
     },
     onError: invalidiere,
   });
+  const zurueckziehenMutation = useMutation({
+    mutationFn: ({ nfId, grund }: { nfId: number; grund?: string }) =>
+      zieheNachforderungZurueck(einsatzId, nfId, grund),
+    // Wie Ablehnen: der Dialog schließt erst nach der Antwort, eine Ablehnung steht im Dialog.
+    onSuccess: (_daten, { nfId }) => {
+      message.success('Nachforderung zurückgezogen');
+      setZurueckziehenId(null);
+      setZurueckziehenGrund('');
+      return zeigeEigeneHandlung(nfId);
+    },
+    onError: invalidiere,
+  });
+  /*
+   * Zusage über das Formular an der Karte (LLH-1097 D4/D10): danach der Rückgängig-Toast wie bei
+   * der Fortschaltung; die Rücknahme leert die Zusage, eine Teilung bleibt (D6). Die Ablehnung
+   * steht im Formular (`speicherung`).
+   */
+  const zusageMutation = useMutation({
+    mutationFn: ({ nfId, zusage }: { nfId: number; zusage: NachforderungZusageEingabe }) =>
+      erfasseZusage(einsatzId, nfId, zusage),
+    onSuccess: (_daten, { nfId }) => {
+      zeigeRueckgaengig(message, `Status: ${NACHFORDERUNG_STATUS.zugesagt.label}`, () =>
+        ruecknahmeMutation.mutate({ nfId, status: 'angefordert' }),
+      );
+      return zeigeEigeneHandlung(nfId);
+    },
+    onError: invalidiere,
+  });
+  const bearbeitenMutation = useMutation({
+    mutationFn: ({ nfId, aenderung }: { nfId: number; aenderung: PatchNachforderung }) =>
+      patcheNachforderung(einsatzId, nfId, aenderung),
+    onSuccess: (_daten, { nfId }) => {
+      message.success('Änderung gespeichert');
+      return zeigeEigeneHandlung(nfId);
+    },
+    onError: invalidiere,
+  });
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
 
   /*
@@ -455,17 +509,33 @@ export default function NachforderungenPage() {
   const ansicht: BoardAnsicht = {
     stufe: gewaehlteStufe ?? vorgabe,
     abgelehntOffen,
+    zurueckgezogenOffen,
     aeltereOffen,
   };
   const setzeAnsicht = useCallback((a: BoardAnsicht) => {
     setGewaehlteStufe(a.stufe);
     setAbgelehntOffen(a.abgelehntOffen);
+    setZurueckgezogenOffen(a.zurueckgezogenOffen);
     setAeltereOffen(a.aeltereOffen);
   }, []);
-  const stand = useRef({ alle: nfQuery.data, statusMutation });
+  const stand = useRef({ alle: nfQuery.data, statusMutation, zusageMutation, bearbeitenMutation });
   useLayoutEffect(() => {
-    stand.current = { alle: nfQuery.data, statusMutation };
+    stand.current = { alle: nfQuery.data, statusMutation, zusageMutation, bearbeitenMutation };
   });
+  // Öffnen ersetzt ein anderes offenes Formular; Schließen schließt nur das eigene.
+  const onFormular = useCallback((nfId: number, art: KartenFormular | null) => {
+    setFormular((f) => (art ? { id: nfId, art } : f?.id === nfId ? null : f));
+  }, []);
+  const onZusage = useCallback(
+    (nfId: number, zusage: NachforderungZusageEingabe) =>
+      stand.current.zusageMutation.mutateAsync({ nfId, zusage }),
+    [],
+  );
+  const onBearbeiten = useCallback(
+    (nfId: number, aenderung: PatchNachforderung) =>
+      stand.current.bearbeitenMutation.mutateAsync({ nfId, aenderung }),
+    [],
+  );
   const onStatus = useCallback((nfId: number, status: NachforderungStatus) => {
     const vorher = stand.current.alle?.find((n) => n.id === nfId)?.status;
     stand.current.statusMutation.mutate({ nfId, status, vorher });
@@ -496,6 +566,7 @@ export default function NachforderungenPage() {
     const gruppe = boardGruppe(n, jetzt);
     setGewaehlteStufe(gruppe === 'eingetroffen-aelter' ? 'eingetroffen' : gruppe);
     if (gruppe === 'abgelehnt') setAbgelehntOffen(true);
+    if (gruppe === 'zurueckgezogen') setZurueckgezogenOffen(true);
     if (gruppe === 'eingetroffen-aelter') setAeltereOffen(true);
     setHervorgehobenId(nfId);
     setScrollZiel(nfId);
@@ -534,6 +605,30 @@ export default function NachforderungenPage() {
     [raeumeAblehnen],
   );
 
+  // Zurückziehen wie Ablehnen: Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung.
+  const zurueckziehenRef = useRef(zurueckziehenMutation);
+  zurueckziehenRef.current = zurueckziehenMutation;
+  const raeumeZurueckziehen = useCallback(() => {
+    const m = zurueckziehenRef.current;
+    if (!m.isPending && m.error != null) m.reset();
+  }, []);
+  const onZurueckziehen = useCallback(
+    (nfId: number) => {
+      raeumeZurueckziehen();
+      setZurueckziehenId(nfId);
+      setZurueckziehenGrund('');
+    },
+    [raeumeZurueckziehen],
+  );
+  const zurueckziehenBestaetigen = () => {
+    if (zurueckziehenId == null) return;
+    zurueckziehenMutation.mutate({
+      nfId: zurueckziehenId,
+      grund: zurueckziehenGrund.trim() || undefined,
+    });
+  };
+  const zieht = zurueckziehenMutation.isPending;
+
   const ablehnenBestaetigen = () => {
     if (ablehnenId == null) return;
     ablehnenMutation.mutate({ nfId: ablehnenId, grund: ablehnenGrund.trim() || undefined });
@@ -553,10 +648,30 @@ export default function NachforderungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
+  /*
+   * Das Formular gilt nur, solange seine Karte es tragen kann: offen und bei der Zusage noch
+   * angefordert. Wandert sie durch einen anderen Arbeitsplatz weiter, ist es weg — sonst hielte
+   * das Board für ein unsichtbares Formular still.
+   */
+  const formularN = formular ? nfQuery.data?.find((n) => n.id === formular.id) : undefined;
+  const wirksamesFormular =
+    formular &&
+    formularN?.ist_offen &&
+    (formular.art === 'bearbeiten' || formularN.status === 'angefordert')
+      ? formular
+      : null;
   const kartenProps = {
     darfSchreiben,
     onStatus,
     onAblehnen,
+    onZurueckziehen,
+    offenesFormular: wirksamesFormular,
+    onFormular,
+    onZusage,
+    onBearbeiten,
+    formularSpeicherung: wirksamesFormular?.art === 'zusage' ? zusageMutation : bearbeitenMutation,
+    raeume,
+    abschnitte,
     kartenFehler: kartenFehler.grund,
     materialJeId,
     materialGesperrt,
@@ -718,7 +833,13 @@ export default function NachforderungenPage() {
           jetzt={jetzt}
           zufluss={zufluss}
           // Ein Dialog der Seite liegt im Portal: Fokus und Zeiger zählen dort nicht.
-          halten={ablehnenId != null || uebernahme != null}
+          // Ebenso ein Formular an einer Karte (LLH-1097 D10).
+          halten={
+            ablehnenId != null ||
+            zurueckziehenId != null ||
+            uebernahme != null ||
+            wirksamesFormular != null
+          }
           ansicht={ansicht}
           onAnsicht={setzeAnsicht}
           karten={kartenProps}
@@ -773,6 +894,42 @@ export default function NachforderungenPage() {
               fehler={ablehnenMutation.error}
               titel="Nicht abgelehnt"
               fallback="Ablehnen fehlgeschlagen"
+            />
+          </div>
+        )}
+      </Modal>
+      <Modal
+        open={zurueckziehenId != null}
+        title="Nachforderung zurückziehen"
+        okText="Zurückziehen"
+        cancelText="Abbrechen"
+        okButtonProps={{ danger: true }}
+        confirmLoading={zieht}
+        cancelButtonProps={{ disabled: zieht }}
+        closable={zieht ? { disabled: true } : true}
+        mask={{ closable: !zieht }}
+        keyboard={!zieht}
+        onOk={zurueckziehenBestaetigen}
+        onCancel={() => {
+          raeumeZurueckziehen();
+          setZurueckziehenId(null);
+          setZurueckziehenGrund('');
+        }}
+      >
+        <Input.TextArea
+          aria-label="Grund des Zurückziehens"
+          value={zurueckziehenGrund}
+          onChange={(e) => setZurueckziehenGrund(e.target.value)}
+          placeholder="Grund (optional), z. B. nicht mehr benötigt"
+          maxLength={NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX}
+          rows={3}
+        />
+        {zurueckziehenMutation.error != null && (
+          <div style={{ marginTop: token.marginSM }}>
+            <SpeicherFehler
+              fehler={zurueckziehenMutation.error}
+              titel="Nicht zurückgezogen"
+              fallback="Zurückziehen fehlgeschlagen"
             />
           </div>
         )}

@@ -4312,6 +4312,11 @@ export interface components {
             angefordert_at: string;
             /** Format: int64 */
             anzahl?: number | null;
+            /**
+             * Format: int64
+             * @description Bei einer Teilzusage die Anzahl vor der Teilung („1 von 2 zugesagt“, D1); fehlt ohne.
+             */
+            anzahl_angefordert?: number | null;
             art: string;
             begruendung?: string | null;
             /** @description Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort (LLH-1089 design.md D6). */
@@ -4328,6 +4333,8 @@ export interface components {
             eingetroffen_at?: string | null;
             /** Format: int64 */
             einsatz_id: number;
+            /** @description Voraussichtliches Eintreffen laut Zusage (UTC, D3); fehlt ohne Angabe. */
+            eintreffen_erwartet_at?: string | null;
             erstellt_at: string;
             /** Format: int64 */
             erstellt_von_id: number;
@@ -4337,7 +4344,7 @@ export interface components {
             etb_nachforderung_id?: number | null;
             /** Format: int64 */
             id: number;
-            /** @description Abgeleitet: status NOT IN ('eingetroffen','abgelehnt'). */
+            /** @description Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen'). */
             ist_offen: boolean;
             /**
              * @description Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
@@ -4347,6 +4354,11 @@ export interface components {
             material_ids: number[];
             prioritaet: components["schemas"]["Prioritaet"];
             status: components["schemas"]["NachforderungStatus"];
+            /**
+             * Format: int64
+             * @description Restposition einer Teilzusage: die Nachforderung, aus der sie abgeteilt wurde (D1).
+             */
+            teilung_aus_id?: number | null;
             unterwegs_at?: string | null;
             /** Format: int64 */
             ziel_abschnitt_id?: number | null;
@@ -4359,13 +4371,21 @@ export interface components {
             ziel_br_id?: number | null;
             ziel_text?: string | null;
             zugesagt_at?: string | null;
+            /** @description Zurückgezogen durch die eigene Führung (D8): Zeitpunkt und optionaler Grund. */
+            zurueckgezogen_at?: string | null;
+            zurueckgezogen_grund?: string | null;
+            /**
+             * @description „Wer“ der Zusage: Rufnamen oder freie Angaben in Eingabefolge, leer ohne Angabe
+             *     (LLH-1097 design.md D2). Teil (b) legt je Eintrag eine Einheit an.
+             */
+            zusage_rufnamen: string[];
         };
         /**
          * @description Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `status`.
          * @enum {string}
          */
-        NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt";
+        NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt" | "zurueckgezogen";
         /**
          * @description Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.
          *     Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an

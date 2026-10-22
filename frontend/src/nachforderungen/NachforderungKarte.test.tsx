@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ComponentProps } from 'react';
-import { render, screen } from '@testing-library/react';
+import { useState, type ComponentProps } from 'react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { renderMitProviders } from '../test/utils';
@@ -8,7 +8,10 @@ import { server } from '../test/server';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import type { Nachforderung } from '../api/types';
-import NachforderungKarte, { type UebernahmePosten } from './NachforderungKarte';
+import NachforderungKarte, {
+  type KartenFormular,
+  type UebernahmePosten,
+} from './NachforderungKarte';
 
 const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   id: 1,
@@ -33,6 +36,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_von_name: null,
   ist_offen: true,
   material_ids: [],
+  zusage_rufnamen: [],
   ...over,
 });
 
@@ -241,7 +245,13 @@ describe('NachforderungKarte — im Board (LLH-1078)', () => {
     expect(screen.getByText('vor 25 min')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
     expect(onStatus).toHaveBeenCalledWith(1, 'zugesagt');
-    expect(screen.getByRole('button', { name: 'Ablehnen' })).toBeInTheDocument();
+    // Ablehnen steht im ⋮-Menü (LLH-1097 D10), nicht in der Reihe.
+    expect(screen.queryByRole('button', { name: 'Ablehnen' })).toBeNull();
+    expect(
+      screen.getByRole('button', {
+        name: 'Aktionen zu Nachforderung 2× RTW — 2 RTW zur Verstärkung',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('eine gehaltene Karte, die schon weiter ist, nennt ihre neue Stufe', () => {
@@ -304,5 +314,197 @@ describe('NachforderungKarte — Ziel und Bedarfszeit (LLH-1089)', () => {
     expect(screen.getByText('2× RTW')).toBeInTheDocument();
     expect(screen.queryByText('2 RTW zur Verstärkung')).toBeNull();
     expect(screen.getByText(/^Benötigt bis: /)).toBeInTheDocument();
+  });
+});
+
+/** LLH-1097 (Teil a): Zusage, Anzeige, ⋮-Menü und Bearbeiten an der Karte. */
+describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
+  /** Die Karte mit dem Formularzustand, wie die Seite ihn hält. */
+  function MitFormular(props: Omit<ComponentProps<typeof NachforderungKarte>, 'formular'>) {
+    const [formular, setFormular] = useState<KartenFormular | null>(null);
+    return (
+      <NachforderungKarte
+        {...props}
+        formular={formular}
+        onFormular={(_id, art) => setFormular(art)}
+      />
+    );
+  }
+
+  it('„Zusage erfassen“ öffnet das Formular an der Karte, Vorgabe die angeforderte Menge', async () => {
+    const onZusage = vi.fn().mockResolvedValue(undefined);
+    const onStatus = vi.fn();
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf()}
+        spaltenStufe="angefordert"
+        darfSchreiben
+        onStatus={onStatus}
+        onZusage={onZusage}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    const formular = screen.getByRole('region', {
+      name: 'Zusage zu 2× RTW — 2 RTW zur Verstärkung',
+    });
+    expect(within(formular).getByRole('spinbutton', { name: 'Zugesagt' })).toHaveValue('2');
+    // Der Öffner ist weg: genau ein Knopf dieses Namens, der Absendeknopf.
+    expect(screen.getAllByRole('button', { name: 'Zusage erfassen' })).toHaveLength(1);
+    const menge = within(formular).getByRole('spinbutton', { name: 'Zugesagt' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '1');
+    await userEvent.type(within(formular).getByRole('combobox', { name: 'Wer' }), '83-1{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    expect(onZusage).toHaveBeenCalledWith(1, { anzahl: 1, rufnamen: ['83-1'] });
+    expect(onStatus).not.toHaveBeenCalled();
+    // Nach dem Erfassen schließt das Formular.
+    expect(await screen.findByRole('button', { name: 'Zusage erfassen' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /^Zusage zu/ })).toBeNull();
+  });
+
+  it('Enter im Mengenfeld sendet die Zusage ohne weitere Angaben', async () => {
+    const onZusage = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf()}
+        spaltenStufe="angefordert"
+        darfSchreiben
+        onZusage={onZusage}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Zugesagt' }), '{Enter}');
+    expect(onZusage).toHaveBeenCalledWith(1, { anzahl: 2 });
+  });
+
+  it('mehr zugesagt als angefordert sendet nicht', async () => {
+    const onZusage = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf()}
+        spaltenStufe="angefordert"
+        darfSchreiben
+        onZusage={onZusage}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    const menge = screen.getByRole('spinbutton', { name: 'Zugesagt' });
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    expect(await screen.findByText('Höchstens 2 angefordert')).toBeInTheDocument();
+    expect(onZusage).not.toHaveBeenCalled();
+  });
+
+  it('zeigt Teilung, Wer, das erwartete Eintreffen und „überfällig“', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({
+          status: 'zugesagt',
+          anzahl: 1,
+          anzahl_angefordert: 2,
+          zusage_rufnamen: ['83-1'],
+          zugesagt_at: '2026-06-12 09:10:00',
+          eintreffen_erwartet_at: '2026-06-12 09:30:00',
+        })}
+        spaltenStufe="zugesagt"
+        jetzt={Date.UTC(2026, 5, 12, 9, 45)}
+      />,
+    );
+    expect(screen.getByText('1 von 2 zugesagt')).toBeInTheDocument();
+    expect(screen.getByText('Wer: 83-1')).toBeInTheDocument();
+    expect(screen.getByText(/^Eintreffen erwartet: /)).toBeInTheDocument();
+    const chip = screen.getByText('überfällig').closest('[data-lfh="status-chip"]');
+    expect(chip).toHaveAttribute('data-ton', 'achtung');
+  });
+
+  it('vor dem erwarteten Eintreffen kein „überfällig“; die Restposition nennt sich', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({
+          status: 'zugesagt',
+          teilung_aus_id: 3,
+          eintreffen_erwartet_at: '2026-06-12 10:30:00',
+        })}
+        spaltenStufe="zugesagt"
+        jetzt={Date.UTC(2026, 5, 12, 9, 45)}
+      />,
+    );
+    expect(screen.queryByText('überfällig')).toBeNull();
+    expect(screen.getByText('Rest einer Teilzusage')).toBeInTheDocument();
+  });
+
+  it('das ⋮-Menü: Bearbeiten, dann Zurückziehen und Ablehnen hinter dem Trenner', async () => {
+    const onZurueckziehen = vi.fn();
+    const onAblehnen = vi.fn();
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf({ bezeichnung: null })}
+        spaltenStufe="angefordert"
+        darfSchreiben
+        onStatus={vi.fn()}
+        onZusage={vi.fn()}
+        onBearbeiten={vi.fn()}
+        onZurueckziehen={onZurueckziehen}
+        onAblehnen={onAblehnen}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Nachforderung 2× RTW' }));
+    const eintraege = (await screen.findAllByRole('menuitem')).map((e) => e.textContent);
+    expect(eintraege).toEqual(['Bearbeiten', 'Zurückziehen', 'Ablehnen']);
+    expect(document.querySelectorAll('.ant-dropdown-menu-item-danger')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Zurückziehen' }));
+    expect(onZurueckziehen).toHaveBeenCalledWith(1);
+  });
+
+  it('Bearbeiten sendet nur Geändertes; unverändert schließt ohne Anfrage', async () => {
+    const onBearbeiten = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <MitFormular
+        nachforderung={nf({ bezeichnung: null })}
+        spaltenStufe="angefordert"
+        darfSchreiben
+        onBearbeiten={onBearbeiten}
+      />,
+    );
+    const oeffne = async () => {
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Aktionen zu Nachforderung 2× RTW' }),
+      );
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Bearbeiten' }));
+    };
+    await oeffne();
+    const formular = screen.getByRole('region', { name: '2× RTW bearbeiten' });
+    // Wer und Eintreffen gehören zur Zusage: in angefordert nicht da.
+    expect(within(formular).queryByRole('combobox', { name: 'Wer' })).toBeNull();
+    await userEvent.click(within(formular).getByRole('button', { name: 'Änderung speichern' }));
+    expect(onBearbeiten).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: '2× RTW bearbeiten' })).toBeNull();
+
+    await oeffne();
+    const anzahl = screen.getByRole('spinbutton', { name: 'Anzahl' });
+    await userEvent.clear(anzahl);
+    await userEvent.type(anzahl, '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Änderung speichern' }));
+    expect(onBearbeiten).toHaveBeenCalledWith(1, { anzahl: 3 });
+  });
+
+  it('zurückgezogen: neutral, ohne Alarmrand, mit Grund und ohne Aktionen', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({
+          status: 'zurueckgezogen',
+          ist_offen: false,
+          zurueckgezogen_grund: 'nicht mehr benötigt',
+        })}
+        darfSchreiben
+        onStatus={vi.fn()}
+        onZurueckziehen={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Zurückgezogen: nicht mehr benötigt')).toBeInTheDocument();
+    const chip = screen.getByText('Zurückgezogen', { exact: true }).closest('[data-ton]');
+    expect(chip).toHaveAttribute('data-ton', 'neutral');
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });

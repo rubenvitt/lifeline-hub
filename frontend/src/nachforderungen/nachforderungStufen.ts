@@ -16,8 +16,9 @@ dayjs.extend(utc);
  *   des Boards zählen mit dieser Regel über die Karten, die sie zeigen.
  * - **Spalten** {@link boardSpalten}: eine je Stufe in fester Folge; „Eingetroffen“ zeigt die
  *   letzten {@link EINGETROFFEN_STUNDEN} h, ältere stehen darunter gesammelt.
- * - **Zeitzeilen** {@link kartenZeiten}: die Stelle, an der LLH-1097 das erwartete Eintreffen und
- *   „überfällig“ (Ton `achtung` mit Wort) einhängt.
+ * - **Zeitzeilen** {@link kartenZeiten}: dazu das erwartete Eintreffen einer Zusage (LLH-1097 D7),
+ *   im Ton `achtung`, sobald es verstrichen ist ({@link istUeberfaellig}) oder nach „benötigt bis“
+ *   liegt. „überfällig“ zählt nur der Client, ohne Alarm ({@link zaehleUeberfaellig}).
  */
 
 /** Die Stufen in der Folge der Spalten. */
@@ -27,6 +28,7 @@ export const STUFEN = [
   'unterwegs',
   'eingetroffen',
   'abgelehnt',
+  'zurueckgezogen',
 ] as const satisfies readonly NachforderungStatus[];
 
 /** Die offenen Stufen; die übrigen sind abgeschlossen. */
@@ -39,9 +41,13 @@ const EINGETROFFEN_FENSTER_MS = EINGETROFFEN_STUNDEN * 60 * 60 * 1000;
 /** Was der Server zählt (`ModulZaehler.nachforderungen`), dieselben Felder. */
 export type NachforderungsZahlen = NonNullable<ModulZaehler['nachforderungen']>;
 
-/** Noch nicht eingetroffen und nicht abgelehnt — wie `ist_offen` der Liste. */
+/** Die abgeschlossenen Stufen ohne Eintreffen: eingeklappte Spalten neben dem Board. */
+export const EINGEKLAPPTE_STUFEN = ['abgelehnt', 'zurueckgezogen'] as const;
+export type EingeklappteStufe = (typeof EINGEKLAPPTE_STUFEN)[number];
+
+/** Weder eingetroffen noch abgelehnt noch zurückgezogen — wie `ist_offen` der Liste. */
 export function istOffen(status: NachforderungStatus): boolean {
-  return status !== 'eingetroffen' && status !== 'abgelehnt';
+  return status !== 'eingetroffen' && status !== 'abgelehnt' && status !== 'zurueckgezogen';
 }
 
 /** Die Zählregel der offenen Nachforderungen je Stufe (Parität mit dem Server, Fixture). */
@@ -94,7 +100,38 @@ export function boardGruppe(n: Nachforderung, jetzt: number): BoardGruppe {
 }
 
 function abschluss(n: Nachforderung): string {
-  return n.eingetroffen_at ?? n.abgelehnt_at ?? n.angefordert_at;
+  return n.eingetroffen_at ?? n.abgelehnt_at ?? n.zurueckgezogen_at ?? n.angefordert_at;
+}
+
+/**
+ * Eine Zusage, deren erwartetes Eintreffen verstrichen ist (LLH-1097 D7): zugesagt oder unterwegs,
+ * mit Eintreffen vor `jetzt` (Minutentakt der Seite). Kein Alarm: Etikett und Zähler im Board.
+ */
+export function istUeberfaellig(
+  n: Pick<Nachforderung, 'status' | 'eintreffen_erwartet_at'>,
+  jetzt: number,
+): boolean {
+  if (n.status !== 'zugesagt' && n.status !== 'unterwegs') return false;
+  return !!n.eintreffen_erwartet_at && ms(n.eintreffen_erwartet_at) < jetzt;
+}
+
+/** Wie viele der Karten überfällig sind — der Zähler über dem Board. */
+export function zaehleUeberfaellig(
+  liste: ReadonlyArray<Pick<Nachforderung, 'status' | 'eintreffen_erwartet_at'>>,
+  jetzt: number,
+): number {
+  return liste.filter((n) => istUeberfaellig(n, jetzt)).length;
+}
+
+/** Das erwartete Eintreffen liegt nach der Bedarfszeit (LLH-1089 „Wo LLH-1097 einhängt“). */
+export function istNachBedarfszeit(
+  n: Pick<Nachforderung, 'eintreffen_erwartet_at' | 'benoetigt_bis'>,
+): boolean {
+  return (
+    !!n.eintreffen_erwartet_at &&
+    !!n.benoetigt_bis &&
+    ms(n.eintreffen_erwartet_at) > ms(n.benoetigt_bis)
+  );
 }
 
 /**
@@ -149,7 +186,7 @@ export function vorgabeStufe(spalten: readonly BoardSpalte[]): NachforderungStat
   );
 }
 
-/** Eine Zeitzeile der Karte. `ton` bleibt bis LLH-1097 leer (ETA überschritten = „überfällig“). */
+/** Eine Zeitzeile der Karte; `achtung` trägt das erwartete Eintreffen, wenn es nicht mehr passt. */
 export interface KartenZeit {
   schluessel: string;
   text: string;
@@ -158,21 +195,25 @@ export interface KartenZeit {
 
 /**
  * Die Zeitzeilen einer Karte: angefordert (mit Person), benötigt bis (LLH-1089), zugesagt,
- * unterwegs, eingetroffen — jede nur, wenn ihr Zeitpunkt da ist (keine erfundenen Daten). Hier
- * hängt LLH-1097 das erwartete Eintreffen ein (und den Vergleich mit „benötigt bis“); bis dahin
- * gibt es keine Zeile dafür.
+ * erwartetes Eintreffen (LLH-1097 D7/D11), unterwegs, eingetroffen — jede nur, wenn ihr Zeitpunkt
+ * da ist (keine erfundenen Daten). Das erwartete Eintreffen steht nur, solange die Zusage läuft
+ * (zugesagt, unterwegs), im Ton `achtung`, wenn es verstrichen ist (`jetzt`) oder nach der
+ * Bedarfszeit liegt; dann mit „· nach Bedarfszeit“.
  */
 export function kartenZeiten(
   n: Pick<
     Nachforderung,
+    | 'status'
     | 'angefordert_at'
     | 'erstellt_von_name'
     | 'benoetigt_bis'
     | 'zugesagt_at'
+    | 'eintreffen_erwartet_at'
     | 'unterwegs_at'
     | 'eingetroffen_at'
   >,
   formatZeit: (zeit: string) => string,
+  jetzt?: number,
 ): KartenZeit[] {
   const zeilen: KartenZeit[] = [
     {
@@ -185,6 +226,15 @@ export function kartenZeiten(
   }
   if (n.zugesagt_at) {
     zeilen.push({ schluessel: 'zugesagt', text: `Zugesagt: ${formatZeit(n.zugesagt_at)}` });
+  }
+  if (n.eintreffen_erwartet_at && (n.status === 'zugesagt' || n.status === 'unterwegs')) {
+    const nachBedarf = istNachBedarfszeit(n);
+    const verstrichen = jetzt != null && istUeberfaellig(n, jetzt);
+    zeilen.push({
+      schluessel: 'erwartet',
+      text: `Eintreffen erwartet: ${formatZeit(n.eintreffen_erwartet_at)}${nachBedarf ? ' · nach Bedarfszeit' : ''}`,
+      ...(nachBedarf || verstrichen ? { ton: 'achtung' as const } : {}),
+    });
   }
   if (n.unterwegs_at) {
     zeilen.push({ schluessel: 'unterwegs', text: `Unterwegs: ${formatZeit(n.unterwegs_at)}` });

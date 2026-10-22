@@ -64,6 +64,12 @@ export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
 export const NACHFORDERUNG_ART_MAX = 200;
 /** Ziel einer Nachforderung als Freitext (Meldeort, LLH-1089; landet im ETB-Inhalt). */
 export const NACHFORDERUNG_ZIEL_TEXT_MAX = 200;
+/** Ein Rufname bzw. eine freie Angabe unter „Wer“ einer Zusage (LLH-1097). */
+export const NACHFORDERUNG_ZUSAGE_RUFNAME_MAX = 100;
+/** Höchstzahl der Einträge unter „Wer“ einer Zusage (LLH-1097). */
+export const NACHFORDERUNG_ZUSAGE_RUFNAMEN_MAX = 20;
+/** Grund beim Zurückziehen einer Nachforderung (LLH-1097; landet im ETB-Inhalt). */
+export const NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX = 200;
 /** Notiz eines Anrufs am Infotelefon. */
 export const INFOTELEFON_NOTIZ_MAX = 2_000;
 /** Kurzfelder des Infotelefons (anrufer_name, rueckruf). */

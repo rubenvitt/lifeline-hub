@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import type { Nachforderung } from '../api/types';
 import { useZuflussSteuerung } from '../components/useZuflussSchleuse';
@@ -32,6 +33,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_von_name: null,
   ist_offen: true,
   material_ids: [],
+  zusage_rufnamen: [],
   ...over,
 });
 
@@ -41,6 +43,7 @@ function Board({ liste }: { liste: Nachforderung[] }) {
   const [ansicht, setAnsicht] = useState<BoardAnsicht>({
     stufe: 'angefordert',
     abgelehntOffen: false,
+    zurueckgezogenOffen: false,
     aeltereOffen: false,
   });
   return (
@@ -67,7 +70,7 @@ describe('NachforderungBoard (LLH-1078)', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
-  it('ab md vier Spalten mit Kopf und Zahl, Abgelehnt eingeklappt daneben', () => {
+  it('ab md vier Spalten mit Kopf und Zahl, Abgelehnt und Zurückgezogen eingeklappt daneben', () => {
     renderMitProviders(
       <Board
         liste={[
@@ -75,6 +78,7 @@ describe('NachforderungBoard (LLH-1078)', () => {
           nf({ id: 2, bezeichnung: 'Zwei' }),
           nf({ id: 3, bezeichnung: 'Drei', status: 'unterwegs' }),
           nf({ id: 4, bezeichnung: 'Vier', status: 'abgelehnt', ist_offen: false }),
+          nf({ id: 5, bezeichnung: 'Fünf', status: 'zurueckgezogen', ist_offen: false }),
         ]}
       />,
     );
@@ -87,13 +91,59 @@ describe('NachforderungBoard (LLH-1078)', () => {
       'Unterwegs1',
       'Eingetroffen · letzte 12 h0',
       'Abgelehnt 1',
+      'Zurückgezogen 1',
     ]);
     const zugesagt = document.querySelector<HTMLElement>('[data-stufe="zugesagt"]')!;
     expect(within(zugesagt).getByText('keine')).toBeInTheDocument();
     expect(screen.queryByText('Vier')).toBeNull();
+    expect(screen.queryByText('Fünf')).toBeNull();
   });
 
-  it('unter md die Segmentleiste der fünf Stufen mit Zahl, darunter nur die gewählte', () => {
+  it('Zurückgezogen klappt auf, die Karte ohne Alarmrand mit Grund (LLH-1097 D8)', async () => {
+    renderMitProviders(
+      <Board
+        liste={[
+          nf({
+            id: 5,
+            bezeichnung: 'Fünf',
+            status: 'zurueckgezogen',
+            ist_offen: false,
+            zurueckgezogen_grund: 'nicht mehr benötigt',
+          }),
+        ]}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^Zurückgezogen/ }));
+    expect(screen.getByText('Fünf')).toBeInTheDocument();
+    expect(screen.getByText('Zurückgezogen: nicht mehr benötigt')).toBeInTheDocument();
+  });
+
+  it('über den Spalten „n überfällig“, nur bei verpasstem Eintreffen (LLH-1097 D7)', () => {
+    const { unmount } = renderMitProviders(
+      <Board
+        liste={[
+          nf({ id: 1, status: 'zugesagt', eintreffen_erwartet_at: '2026-06-12 08:00:00' }),
+          nf({ id: 2, status: 'unterwegs', eintreffen_erwartet_at: '2026-06-12 08:30:00' }),
+          nf({ id: 3, status: 'zugesagt', eintreffen_erwartet_at: '2099-01-01 08:00:00' }),
+        ]}
+      />,
+    );
+    const zaehler = document.querySelector<HTMLElement>('[data-lfh="board-ueberfaellig"]')!;
+    expect(zaehler).toHaveTextContent('2überfällig');
+    expect(within(zaehler).getByText('überfällig').closest('[data-ton]')).toHaveAttribute(
+      'data-ton',
+      'achtung',
+    );
+    unmount();
+    renderMitProviders(
+      <Board
+        liste={[nf({ id: 3, status: 'zugesagt', eintreffen_erwartet_at: '2099-01-01 08:00:00' })]}
+      />,
+    );
+    expect(document.querySelector('[data-lfh="board-ueberfaellig"]')).toBeNull();
+  });
+
+  it('unter md die Segmentleiste der sechs Stufen mit Zahl, darunter nur die gewählte', () => {
     setzeViewportBreite(390);
     renderMitProviders(
       <Board
@@ -112,6 +162,7 @@ describe('NachforderungBoard (LLH-1078)', () => {
       'Unterwegs 1',
       'Eingetroffen 0',
       'Abgelehnt 0',
+      'Zurückgezogen 0',
     ]);
     expect(screen.getByRole('tabpanel')).toHaveAttribute('data-stufe', 'angefordert');
     expect(screen.getByText('Eins')).toBeInTheDocument();

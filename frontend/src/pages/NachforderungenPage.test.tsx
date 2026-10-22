@@ -39,6 +39,14 @@ const spalte = (stufe: string) =>
   document.querySelector<HTMLElement>(`[data-lfh="board-spalte"][data-stufe="${stufe}"]`);
 const stufeVon = (text: string) =>
   screen.getByText(text).closest('[data-lfh="board-spalte"]')?.getAttribute('data-stufe');
+/** Ein Eintrag im ⋮-Menü einer Karte (LLH-1097 D10); ohne Karte die erste. */
+async function waehleImMenue(eintrag: string, karte?: HTMLElement) {
+  const ort = karte ? within(karte) : screen;
+  await userEvent.click(ort.getAllByRole('button', { name: /^Aktionen zu Nachforderung / })[0]);
+  const eintraege = await screen.findAllByRole('menuitem', { name: eintrag });
+  // Ein früher geöffnetes Menü bleibt in jsdom im Dokument; das zuletzt geöffnete gilt.
+  await userEvent.click(eintraege[eintraege.length - 1]);
+}
 
 vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
@@ -55,7 +63,13 @@ const listeNachforderungen = vi.fn();
 const legeNachforderungAn = vi.fn();
 const setzeNachforderungStatus = vi.fn();
 const lehneNachforderungAb = vi.fn();
+const erfasseZusage = vi.fn();
+const zieheNachforderungZurueck = vi.fn();
+const patcheNachforderung = vi.fn();
 vi.mock('../api/nachforderungen', () => ({
+  erfasseZusage: (...a: unknown[]) => erfasseZusage(...a),
+  zieheNachforderungZurueck: (...a: unknown[]) => zieheNachforderungZurueck(...a),
+  patcheNachforderung: (...a: unknown[]) => patcheNachforderung(...a),
   listeNachforderungen: (...a: unknown[]) => listeNachforderungen(...a),
   legeNachforderungAn: (...a: unknown[]) => legeNachforderungAn(...a),
   setzeNachforderungStatus: (...a: unknown[]) => setzeNachforderungStatus(...a),
@@ -85,6 +99,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_von_name: 'Leit',
   ist_offen: true,
   material_ids: [],
+  zusage_rufnamen: [],
   ...over,
 });
 
@@ -185,25 +200,27 @@ describe('NachforderungenPage', () => {
    * (`uebergang_erlaubt` nimmt die Rücknahme um eine Stufe an).
    */
   it('schaltet den Status mit EINEM Klick linear weiter', async () => {
-    setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
+    listeNachforderungen.mockResolvedValue([nf({ status: 'zugesagt' })]);
+    setzeNachforderungStatus.mockResolvedValue(nf({ status: 'unterwegs' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
-    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'zugesagt'));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'unterwegs'));
     expect(document.querySelector('.ant-popconfirm')).toBeNull();
   });
 
   it('bietet den Rückweg als Rückgängig-Knopf an und nimmt genau eine Stufe zurück', async () => {
-    setzeNachforderungStatus.mockResolvedValue(nf({ status: 'zugesagt' }));
+    listeNachforderungen.mockResolvedValue([nf({ status: 'zugesagt' })]);
+    setzeNachforderungStatus.mockResolvedValue(nf({ status: 'unterwegs' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(1));
 
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     // Zurück auf den Zustand vor dem Klick — nicht auf den Anfang der Kette.
     await waitFor(() =>
-      expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'angefordert'),
+      expect(setzeNachforderungStatus).toHaveBeenLastCalledWith(1, 1, 'zugesagt'),
     );
   });
 
@@ -211,13 +228,84 @@ describe('NachforderungenPage', () => {
     lehneNachforderungAb.mockResolvedValue(nf({ status: 'abgelehnt' }));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    // Listen-Aktion „Ablehnen" (link-button) öffnet das Modal.
-    await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
-    // „Ablehnen" existiert doppelt (Listen-Aktion + Modal-OK) → im Dialog scopen.
+    // „Ablehnen“ im ⋮-Menü der Karte öffnet das Modal (LLH-1097 D10).
+    await waehleImMenue('Ablehnen');
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), 'keine Reserven');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
     await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledWith(1, 1, 'keine Reserven'));
+  });
+
+  /** LLH-1097 D10: die Zusage über das Formular an der Karte, danach der Rückweg im Toast. */
+  it('erfasst eine Teilzusage über das Formular an der Karte und bietet den Rückweg an', async () => {
+    erfasseZusage.mockResolvedValue(nf({ status: 'zugesagt', anzahl: 1 }));
+    setzeNachforderungStatus.mockResolvedValue(nf());
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    const menge = await screen.findByRole('spinbutton', { name: 'Zugesagt' });
+    expect(menge).toHaveValue('2');
+    await userEvent.clear(menge);
+    await userEvent.type(menge, '1');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Wer' }), '83-1{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await waitFor(() =>
+      expect(erfasseZusage).toHaveBeenCalledWith(1, 1, { anzahl: 1, rufnamen: ['83-1'] }),
+    );
+    expect(setzeNachforderungStatus).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
+    await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledWith(1, 1, 'angefordert'));
+  });
+
+  it('eine abgelehnte Zusage steht im Formular, die Eingabe bleibt', async () => {
+    erfasseZusage.mockRejectedValue(new ApiError(422, 'Mehr Rufnamen als zugesagt'));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.type(await screen.findByRole('combobox', { name: 'Wer' }), '83-1{Enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    const formular = screen.getByRole('region', { name: /^Zusage zu / });
+    expect(await within(formular).findByText('Mehr Rufnamen als zugesagt')).toBeInTheDocument();
+    expect(within(formular).getByText('83-1')).toBeInTheDocument();
+    expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
+  });
+
+  /** LLH-1097 D8: Zurückziehen im ⋮-Menü, Rückfrage mit Grund im Dialog, kein Rückgängig. */
+  it('zieht eine Nachforderung mit Grund zurück (über Dialog)', async () => {
+    zieheNachforderungZurueck.mockResolvedValue(nf({ status: 'zurueckgezogen', ist_offen: false }));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue('Zurückziehen');
+    const dialog = await screen.findByRole('dialog', { name: 'Nachforderung zurückziehen' });
+    await userEvent.type(
+      within(dialog).getByLabelText('Grund des Zurückziehens'),
+      'nicht mehr benötigt',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zurückziehen' }));
+    await waitFor(() =>
+      expect(zieheNachforderungZurueck).toHaveBeenCalledWith(1, 1, 'nicht mehr benötigt'),
+    );
+    expect(await screen.findByText('Nachforderung zurückgezogen')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+  });
+
+  /** LLH-1097 D9: Bearbeiten im ⋮-Menü sendet nur Geändertes. */
+  it('bearbeitet eine offene Nachforderung an der Karte (PATCH nur mit Geändertem)', async () => {
+    patcheNachforderung.mockResolvedValue(nf({ prioritaet: 'sofort' }));
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue('Bearbeiten');
+    const formular = await screen.findByRole('region', { name: /bearbeiten$/ });
+    const details = within(formular).getByRole('textbox', { name: 'Details / Zweck' });
+    await userEvent.clear(details);
+    await userEvent.type(details, 'Transport aus der UHS');
+    await userEvent.click(within(formular).getByRole('button', { name: 'Änderung speichern' }));
+    await waitFor(() =>
+      expect(patcheNachforderung).toHaveBeenCalledWith(1, 1, {
+        bezeichnung: 'Transport aus der UHS',
+      }),
+    );
+    expect(await screen.findByText('Änderung gespeichert')).toBeInTheDocument();
   });
 
   it('ordnet jede Nachforderung in die Spalte ihrer Stufe; Abgelehnt ist eingeklappt', async () => {
@@ -298,22 +386,22 @@ describe('NachforderungenPage', () => {
    */
   it('Fortschalten trägt die Karte in die nächste Spalte und den Fokus mit', async () => {
     listeNachforderungen.mockResolvedValue([
-      nf({ id: 1, bezeichnung: 'Bedarf eins' }),
-      nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+      nf({ id: 1, bezeichnung: 'Bedarf eins', status: 'zugesagt' }),
+      nf({ id: 2, bezeichnung: 'Bedarf zwei', status: 'zugesagt' }),
     ]);
     setzeNachforderungStatus.mockImplementation(() => {
       listeNachforderungen.mockResolvedValue([
-        nf({ id: 1, bezeichnung: 'Bedarf eins', status: 'zugesagt' }),
-        nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+        nf({ id: 1, bezeichnung: 'Bedarf eins', status: 'unterwegs' }),
+        nf({ id: 2, bezeichnung: 'Bedarf zwei', status: 'zugesagt' }),
       ]);
-      return Promise.resolve(nf({ id: 1, status: 'zugesagt' }));
+      return Promise.resolve(nf({ id: 1, status: 'unterwegs' }));
     });
     renderPage();
     await screen.findByText('Bedarf eins');
     const eins = screen.getByText('Bedarf eins').closest('[data-lfh="komm-karte"]') as HTMLElement;
-    await userEvent.click(within(eins).getByRole('button', { name: 'Zusage erfassen' }));
-    await waitFor(() => expect(stufeVon('Bedarf eins')).toBe('zugesagt'));
-    expect(stufeVon('Bedarf zwei')).toBe('angefordert');
+    await userEvent.click(within(eins).getByRole('button', { name: 'Abfahrt melden' }));
+    await waitFor(() => expect(stufeVon('Bedarf eins')).toBe('unterwegs'));
+    expect(stufeVon('Bedarf zwei')).toBe('zugesagt');
     await waitFor(() =>
       expect(document.activeElement).toBe(document.querySelector('[data-nachforderung-id="1"]')),
     );
@@ -502,10 +590,11 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   const karte = (bezeichnung: string) =>
     screen.getByText(bezeichnung).closest('[data-lfh="komm-karte"]') as HTMLElement;
+  // Zugesagt: die Fortschaltung „Abfahrt melden“ ist ein Klick (die Zusage hat ihr Formular).
   const zweiNachforderungen = () =>
     listeNachforderungen.mockResolvedValue([
-      nf({ id: 1, bezeichnung: 'Bedarf eins' }),
-      nf({ id: 2, bezeichnung: 'Bedarf zwei' }),
+      nf({ id: 1, bezeichnung: 'Bedarf eins', status: 'zugesagt' }),
+      nf({ id: 2, bezeichnung: 'Bedarf zwei', status: 'zugesagt' }),
     ]);
   const seitenHinweis = () =>
     waitFor(() => {
@@ -570,7 +659,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('Bedarf zwei');
     await userEvent.click(
-      within(karte('Bedarf eins')).getByRole('button', { name: 'Zusage erfassen' }),
+      within(karte('Bedarf eins')).getByRole('button', { name: 'Abfahrt melden' }),
     );
 
     expect(await within(karte('Bedarf eins')).findByText('Übergang nicht erlaubt')).toHaveAttribute(
@@ -590,15 +679,15 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     setzeNachforderungStatus.mockImplementation((_e: number, nfId: number) =>
       nfId === 1
         ? new Promise((_r, reject) => (lehneAb = reject))
-        : Promise.resolve(nf({ id: 2, status: 'zugesagt' })),
+        : Promise.resolve(nf({ id: 2, status: 'unterwegs' })),
     );
     renderPage();
     await screen.findByText('Bedarf zwei');
     await userEvent.click(
-      within(karte('Bedarf eins')).getByRole('button', { name: 'Zusage erfassen' }),
+      within(karte('Bedarf eins')).getByRole('button', { name: 'Abfahrt melden' }),
     );
     await userEvent.click(
-      within(karte('Bedarf zwei')).getByRole('button', { name: 'Zusage erfassen' }),
+      within(karte('Bedarf zwei')).getByRole('button', { name: 'Abfahrt melden' }),
     );
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(2));
     await act(async () => lehneAb(new ApiError(409, 'Zwischenzeitlich geändert')));
@@ -612,15 +701,16 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
   });
 
   it('Fortschalten: die nächste Aktion an derselben Karte räumt den Grund', async () => {
+    listeNachforderungen.mockResolvedValue([nf({ status: 'zugesagt' })]);
     setzeNachforderungStatus
       .mockRejectedValueOnce(new ApiError(422, 'Übergang nicht erlaubt'))
       .mockImplementationOnce(() => new Promise(() => {}));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
     await screen.findByText('Übergang nicht erlaubt');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
     await waitFor(() =>
       expect(screen.queryByText('Übergang nicht erlaubt')).not.toBeInTheDocument(),
     );
@@ -698,12 +788,13 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   /** Rückgängig kommt aus dem Toast; die Karte ist dann oft gewandert. */
   it('Rückgängig: eine abgelehnte Rücknahme steht im Seitenhinweis, nicht an der Karte', async () => {
+    listeNachforderungen.mockResolvedValue([nf({ status: 'zugesagt' })]);
     setzeNachforderungStatus
-      .mockResolvedValueOnce(nf({ status: 'zugesagt' }))
+      .mockResolvedValueOnce(nf({ status: 'unterwegs' }))
       .mockRejectedValueOnce(new ApiError(422, 'Rücknahme nicht erlaubt'));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
 
     const hinweis = await seitenHinweis();
@@ -713,18 +804,19 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
   });
 
   it('Rückgängig: die nächste Rücknahme räumt den Seitenhinweis', async () => {
+    listeNachforderungen.mockResolvedValue([nf({ status: 'zugesagt' })]);
     setzeNachforderungStatus
-      .mockResolvedValueOnce(nf({ status: 'zugesagt' }))
+      .mockResolvedValueOnce(nf({ status: 'unterwegs' }))
       .mockRejectedValueOnce(new ApiError(422, 'Rücknahme nicht erlaubt'))
-      .mockResolvedValueOnce(nf({ status: 'zugesagt' }))
+      .mockResolvedValueOnce(nf({ status: 'unterwegs' }))
       .mockImplementationOnce(() => new Promise(() => {}));
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Rückgängig' }));
     await screen.findByText('Rücknahme nicht erlaubt');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Zusage erfassen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Abfahrt melden' }));
     await waitFor(() => expect(setzeNachforderungStatus).toHaveBeenCalledTimes(3));
     const rueckgaengig = await screen.findAllByRole('button', { name: 'Rückgängig' });
     await userEvent.click(rueckgaengig[rueckgaengig.length - 1]);
@@ -735,7 +827,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
   });
 
   async function lehneAbImDialog(grund = 'keine Reserven') {
-    await userEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+    await waehleImMenue('Ablehnen');
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), grund);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
@@ -795,7 +887,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     // Kein Warten auf das Verschwinden: rc-dialog friert den Inhalt eines schließenden Dialogs
     // ein, und jsdom beendet die Animation nie.
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
-    await userEvent.click(screen.getAllByRole('button', { name: 'Ablehnen' })[0]);
+    await waehleImMenue('Ablehnen');
     const wieder = await waitFor(() => {
       const offen = screen.getAllByRole('dialog').find((d) => d.closest('.ant-zoom-leave') == null);
       expect(offen).toBeDefined();

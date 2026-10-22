@@ -900,6 +900,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::nachforderung::ablehnen),
         )
         .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}/zusage",
+            post(routes::nachforderung::zusage),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}/zurueckziehen",
+            post(routes::nachforderung::zurueckziehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}",
+            patch(routes::nachforderung::bearbeiten),
+        )
+        .route(
             "/api/einsaetze/{id}/fahrzeuge",
             get(routes::einsatz_fahrzeug::liste),
         )

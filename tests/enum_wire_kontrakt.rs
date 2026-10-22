@@ -459,6 +459,7 @@ fn serde_wire_gleich_as_str() {
         Unterwegs,
         Eingetroffen,
         Abgelehnt,
+        Zurueckgezogen,
     });
 
     // einsatzabschnitt

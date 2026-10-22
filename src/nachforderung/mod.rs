@@ -19,6 +19,13 @@ pub const BEZEICHNUNG_MAX: usize = 200;
 pub const ART_MAX: usize = 200;
 /// Höchstlänge des Ziels als Freitext (Meldeort, LLH-1089 design.md D8); landet im ETB-Inhalt.
 pub const ZIEL_TEXT_MAX: usize = 200;
+/// Höchstlänge eines zugesagten Rufnamens („Wer“ der Zusage, LLH-1097 design.md D2); landet im
+/// ETB-Inhalt. Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+pub const ZUSAGE_RUFNAME_MAX: usize = 100;
+/// Höchstzahl der Rufnamen einer Zusage, gezählt vor dem Entdoppeln (D2).
+pub const ZUSAGE_RUFNAMEN_MAX: usize = 20;
+/// Höchstlänge des Grunds beim Zurückziehen (D8); landet im ETB-Inhalt.
+pub const ZURUECKZIEHEN_GRUND_MAX: usize = 200;
 
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
@@ -37,6 +44,7 @@ pub const STATUS_ZUGESAGT: &str = NachforderungStatus::Zugesagt.as_str();
 pub const STATUS_UNTERWEGS: &str = NachforderungStatus::Unterwegs.as_str();
 pub const STATUS_EINGETROFFEN: &str = NachforderungStatus::Eingetroffen.as_str();
 pub const STATUS_ABGELEHNT: &str = NachforderungStatus::Abgelehnt.as_str();
+pub const STATUS_ZURUECKGEZOGEN: &str = NachforderungStatus::Zurueckgezogen.as_str();
 
 wire_enum! {
     /// Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -48,16 +56,22 @@ wire_enum! {
         Unterwegs => "unterwegs",
         Eingetroffen => "eingetroffen",
         Abgelehnt => "abgelehnt",
+        /// Von der eigenen Führung zurückgezogen („nicht mehr benötigt“, LLH-1097 design.md D8);
+        /// terminal wie `abgelehnt`, das die Absage der angeforderten Stelle ist.
+        Zurueckgezogen => "zurueckgezogen",
     }
     try_from = |s| format!("Ungültiger NachforderungStatus: {s}");
 }
 
 impl NachforderungStatus {
-    /// Noch nicht eingetroffen und nicht abgelehnt — dieselbe Regel wie die Spalte `ist_offen`
-    /// der Liste (`repo::ANZEIGE_SELECT`); der Modulzähler zählt damit (LLH-1078), und
+    /// Noch nicht eingetroffen, abgelehnt oder zurückgezogen — dieselbe Regel wie die Spalte
+    /// `ist_offen` der Liste (`repo::ANZEIGE_SELECT`); der Modulzähler zählt damit (LLH-1078), und
     /// `tests/modul_zaehler.rs` hält Liste und Zähler gleich.
     pub fn ist_offen(self) -> bool {
-        !matches!(self, Self::Eingetroffen | Self::Abgelehnt)
+        !matches!(
+            self,
+            Self::Eingetroffen | Self::Abgelehnt | Self::Zurueckgezogen
+        )
     }
 }
 
@@ -74,27 +88,30 @@ pub fn status_gueltig(s: &str) -> bool {
 }
 
 /// Erlaubter Status-Übergang: linear vorwärts (angefordert→zugesagt→unterwegs→eingetroffen)
-/// und Abzweig „abgelehnt" aus jedem nicht-terminalen Zustand. `eingetroffen`/`abgelehnt`
-/// sind terminal (kein weiterer Übergang).
+/// und die Abzweige „abgelehnt" und „zurückgezogen" (LLH-1097 design.md D8) aus jedem offenen
+/// Zustand. `abgelehnt`/`zurueckgezogen` sind terminal, `eingetroffen` kennt nur den Rückweg.
 pub fn uebergang_erlaubt(von: &str, nach: &str) -> bool {
     match von {
-        STATUS_ANGEFORDERT => matches!(nach, STATUS_ZUGESAGT | STATUS_ABGELEHNT),
+        STATUS_ANGEFORDERT => matches!(
+            nach,
+            STATUS_ZUGESAGT | STATUS_ABGELEHNT | STATUS_ZURUECKGEZOGEN
+        ),
         // Die Rücknahme um genau eine Stufe (LFH-343 · C8) ist der Gegenweg zur
         // Direktaktion ohne Rückfrage: die Fortschaltung kostet seither einen Klick
         // statt zweier, und der Rückgängig-Toast braucht einen Weg, den der Server
         // annimmt. Zwei Stufen zurück bleiben zu — sonst wäre die Kette keine.
         STATUS_ZUGESAGT => matches!(
             nach,
-            STATUS_UNTERWEGS | STATUS_ABGELEHNT | STATUS_ANGEFORDERT
+            STATUS_UNTERWEGS | STATUS_ABGELEHNT | STATUS_ANGEFORDERT | STATUS_ZURUECKGEZOGEN
         ),
         STATUS_UNTERWEGS => matches!(
             nach,
-            STATUS_EINGETROFFEN | STATUS_ABGELEHNT | STATUS_ZUGESAGT
+            STATUS_EINGETROFFEN | STATUS_ABGELEHNT | STATUS_ZUGESAGT | STATUS_ZURUECKGEZOGEN
         ),
-        // `eingetroffen` bekommt NUR den Rückweg, nicht den Abzweig auf `abgelehnt`:
-        // was da ist, wird nicht nachträglich abgelehnt.
+        // `eingetroffen` bekommt NUR den Rückweg, nicht die Abzweige auf `abgelehnt` oder
+        // `zurueckgezogen`: was da ist, wird nicht nachträglich abgelehnt oder zurückgezogen.
         STATUS_EINGETROFFEN => matches!(nach, STATUS_UNTERWEGS),
-        // `abgelehnt` bleibt terminal.
+        // `abgelehnt` und `zurueckgezogen` bleiben terminal.
         _ => false,
     }
 }
@@ -128,7 +145,7 @@ pub struct NachforderungAnzeige {
     pub erstellt_at: String,
     /// Abgeleitet: Ersteller-Anzeigename (LEFT JOIN benutzer).
     pub erstellt_von_name: Option<String>,
-    /// Abgeleitet: status NOT IN ('eingetroffen','abgelehnt').
+    /// Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen').
     pub ist_offen: bool,
     /// Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen, nicht stornierten
     /// Materialposten, aufsteigend; leer ohne Übernahme (LLH-1226, design.md D8). Nur Kennungen:
@@ -153,6 +170,39 @@ pub struct NachforderungAnzeige {
     /// Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort (LLH-1089 design.md D6).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub benoetigt_bis: Option<String>,
+    /// „Wer“ der Zusage: Rufnamen oder freie Angaben in Eingabefolge, leer ohne Angabe
+    /// (LLH-1097 design.md D2). Teil (b) legt je Eintrag eine Einheit an.
+    #[sqlx(try_from = "String")]
+    #[schema(value_type = Vec<String>)]
+    pub zusage_rufnamen: ZusageRufnamen,
+    /// Voraussichtliches Eintreffen laut Zusage (UTC, D3); fehlt ohne Angabe.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eintreffen_erwartet_at: Option<String>,
+    /// Bei einer Teilzusage die Anzahl vor der Teilung („1 von 2 zugesagt“, D1); fehlt ohne.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub anzahl_angefordert: Option<i64>,
+    /// Restposition einer Teilzusage: die Nachforderung, aus der sie abgeteilt wurde (D1).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub teilung_aus_id: Option<i64>,
+    /// Zurückgezogen durch die eigene Führung (D8): Zeitpunkt und optionaler Grund.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgezogen_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zurueckgezogen_grund: Option<String>,
+}
+
+/// Rufnamen einer Zusage, gelesen aus dem JSON-Array der Spalte `zusage_rufnamen` (NULL → `[]` im
+/// SELECT); auf dem Draht ein Array von Zeichenketten.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct ZusageRufnamen(pub Vec<String>);
+
+impl TryFrom<String> for ZusageRufnamen {
+    type Error = serde_json::Error;
+
+    fn try_from(json: String) -> Result<Self, Self::Error> {
+        serde_json::from_str(&json).map(ZusageRufnamen)
+    }
 }
 
 /// Kennungen übernommener Materialposten, gelesen aus dem JSON-Array der Unterabfrage in
@@ -189,6 +239,31 @@ mod tests {
         assert!(S::Unterwegs.ist_offen());
         assert!(!S::Eingetroffen.ist_offen());
         assert!(!S::Abgelehnt.ist_offen());
+        assert!(!S::Zurueckgezogen.ist_offen());
+    }
+
+    /// LLH-1097 D8: die eigene Führung zieht nur Offenes zurück; danach geht nichts mehr.
+    #[test]
+    fn zurueckziehen_nur_aus_offenen_stufen_und_terminal() {
+        assert!(uebergang_erlaubt(STATUS_ANGEFORDERT, STATUS_ZURUECKGEZOGEN));
+        assert!(uebergang_erlaubt(STATUS_ZUGESAGT, STATUS_ZURUECKGEZOGEN));
+        assert!(uebergang_erlaubt(STATUS_UNTERWEGS, STATUS_ZURUECKGEZOGEN));
+        assert!(!uebergang_erlaubt(
+            STATUS_EINGETROFFEN,
+            STATUS_ZURUECKGEZOGEN
+        ));
+        assert!(!uebergang_erlaubt(STATUS_ABGELEHNT, STATUS_ZURUECKGEZOGEN));
+        for nach in NachforderungStatus::ALLE {
+            assert!(
+                !uebergang_erlaubt(STATUS_ZURUECKGEZOGEN, nach.as_str()),
+                "zurückgezogen → {}",
+                nach.as_str()
+            );
+        }
+        assert!(!uebergang_erlaubt(
+            STATUS_ZURUECKGEZOGEN,
+            STATUS_ZURUECKGEZOGEN
+        ));
     }
 
     #[test]
