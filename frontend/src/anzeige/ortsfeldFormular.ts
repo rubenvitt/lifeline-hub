@@ -54,3 +54,19 @@ export function ortRegeln(max: number, feld: string, pflicht?: { meldung: string
     },
   ];
 }
+
+/**
+ * Ortsangabe für den Rumpf eines POST (LLH-1114): wie [`ortFelder`], aber ohne Angabe fehlt das
+ * Feld statt `null` zu sein — ein neuer Datensatz braucht keine „leeren“ Werte.
+ */
+export function ortEingabe(w: OrtsfeldWert | null | undefined): {
+  text?: string;
+  lat?: number;
+  lon?: number;
+} {
+  const { text, lat, lon } = ortFelder(w);
+  return {
+    ...(text != null ? { text } : {}),
+    ...(lat != null && lon != null ? { lat, lon } : {}),
+  };
+}
