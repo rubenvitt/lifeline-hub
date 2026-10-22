@@ -26,7 +26,7 @@ import {
 import { defaultAdminPfad } from '../admin/adminNav';
 import { OrgAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { ZeitraumEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import { useAuth } from '../auth/AuthContext';
 import AdminPage from '../components/AdminPage';
@@ -252,17 +252,16 @@ function Filterleiste({
 
   return (
     <Space wrap data-lfh="zugangsprotokoll-filter" style={{ marginBottom: token.marginSM }}>
-      <ZeitpunktEingabe
-        placeholder="von"
-        aria-label="von"
-        value={alsZeitpunkt(filter.von) ?? null}
-        onChange={(d) => onChange({ von: d ? alsBackendZeit(d) : undefined })}
-      />
-      <ZeitpunktEingabe
-        placeholder="bis"
-        aria-label="bis"
-        value={alsZeitpunkt(filter.bis) ?? null}
-        onChange={(d) => onChange({ bis: d ? alsBackendZeit(d) : undefined })}
+      {/* Ein Zeitraum (LLH-1077): ein „bis“ ohne Tag liegt am Tag von „von“. Filter ohne Feldart. */}
+      <ZeitraumEingabe
+        placeholder={['von', 'bis']}
+        value={[alsZeitpunkt(filter.von) ?? null, alsZeitpunkt(filter.bis) ?? null]}
+        onChange={(z) =>
+          onChange({
+            von: z?.[0] ? alsBackendZeit(z[0]) : undefined,
+            bis: z?.[1] ? alsBackendZeit(z[1]) : undefined,
+          })
+        }
       />
       <AutoComplete
         aria-label="Konto"

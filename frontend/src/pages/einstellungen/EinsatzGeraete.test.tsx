@@ -1,10 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import dayjs from 'dayjs';
+import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
+import { tippeZeit } from '../../test/zeitEingabe';
 import EinsatzGeraete from './EinsatzGeraete';
 
 /** Sektion „Geräte“ (LFH-892, Spec `geraete-kopplung`). */
@@ -414,5 +416,36 @@ describe('EinsatzGeraete (LFH-892)', () => {
         screen.queryByRole('button', { name: 'Aktionen zu Gerät UHS Nord · Tablet 1' }),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it('LLH-1077: Verlängern nimmt „1430“ + Enter als neues Ende', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 10:00 Ortszeit: das Ende 14:30 liegt heute vor uns.
+    vi.setSystemTime(dayjs('2026-10-04 10:00').toDate());
+    try {
+      let body: Record<string, unknown> | null = null;
+      stelleBereit();
+      server.use(
+        http.post('/api/einsaetze/1/geraete/1/verlaengern', async ({ request }) => {
+          body = (await request.json()) as Record<string, unknown>;
+          return HttpResponse.json(kopplung(1, 'aktiv', { laeuft_ab_at: body.laeuft_ab_at }));
+        }),
+      );
+      rendern();
+      await screen.findByText('UHS Nord · Tablet 1');
+      await zeilenaktion('UHS Nord · Tablet 1', /Verlängern/);
+      const dialog = await screen.findByRole('dialog', { name: /Verlängern/ });
+      await tippeZeit(
+        userEvent.setup(),
+        within(dialog).getByRole('textbox', { name: 'Neues Ende' }),
+        '1430',
+      );
+      await waitFor(() => expect(body).not.toBeNull());
+      expect(body!.laeuft_ab_at).toBe(
+        dayjs('2026-10-04 14:30').utc().format('YYYY-MM-DD HH:mm:ss'),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
