@@ -4514,6 +4514,14 @@
               "$ref": "#/components/schemas/EinheitMitgliedMaterial"
             }
           },
+          "nachforderung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Herkunft: aus dieser Nachforderung übernommen (LLH-1383, design.md D7). Nur die Kennung:\nden Kurznamen liest die Oberfläche aus dem Modul Nachforderungen. Fehlt ohne Herkunft."
+          },
           "name": {
             "type": "string"
           },
@@ -10919,7 +10927,8 @@
           "erstellt_at",
           "ist_offen",
           "material_ids",
-          "zusage_rufnamen"
+          "zusage_rufnamen",
+          "einheit_ids"
         ],
         "properties": {
           "abgelehnt_at": {
@@ -10997,6 +11006,14 @@
               "string",
               "null"
             ]
+          },
+          "einheit_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen Einheiten, aufsteigend, auch\naufgelöste; leer ohne Übernahme (LLH-1383, design.md D7). Nur Kennungen: Namen liest die\nOberfläche aus dem Modul Einheiten."
           },
           "einsatz_id": {
             "type": "integer",

@@ -40,6 +40,7 @@ export default function BearbeitenFormular({
   zielNamen,
   raeume = KEINE_RAEUME,
   abschnitte = KEINE_ABSCHNITTE,
+  werVorschlaege,
   onSpeichern,
   onSchliessen,
   speicherung,
@@ -48,6 +49,8 @@ export default function BearbeitenFormular({
   zielNamen?: ZielNamen | null;
   raeume?: readonly ZielRaum[];
   abschnitte?: readonly ZielAbschnitt[];
+  /** Vorschläge für „Wer“ aus den Einheiten des Einsatzes (LLH-1383 D10). */
+  werVorschlaege?: readonly string[];
   /** **Muss bei Ablehnung ablehnen** (`mutateAsync`). */
   onSpeichern: (aenderung: PatchNachforderung) => Promise<unknown>;
   onSchliessen: () => void;
@@ -110,7 +113,7 @@ export default function BearbeitenFormular({
         {mitZusage && (
           <>
             <Form.Item name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
-              <WerFeld aria-label="Wer" />
+              <WerFeld aria-label="Wer" vorschlaege={werVorschlaege} />
             </Form.Item>
             <Form.Item name="eintreffen" label="Eintreffen erwartet">
               <ZeitpunktEingabe

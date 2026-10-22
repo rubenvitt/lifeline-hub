@@ -36,6 +36,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_von_name: null,
   ist_offen: true,
   material_ids: [],
+  einheit_ids: [],
   zusage_rufnamen: [],
   ...over,
 });
@@ -193,6 +194,97 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
     const { container } = zeigeKarte({ hervorgehoben: true });
     const karte = container.querySelector('[data-nachforderung-id="1"]');
     expect(karte).toHaveAttribute('data-hervorgehoben', 'true');
+  });
+});
+
+describe('NachforderungKarte — Als Einheit übernehmen (LLH-1383 D9)', () => {
+  const rtw = (over: Partial<Nachforderung> = {}) =>
+    nf({
+      art: 'RTW',
+      anzahl: 2,
+      status: 'eingetroffen',
+      ist_offen: false,
+      eingetroffen_at: '2026-06-12 09:30:00',
+      ...over,
+    });
+  const zeige = (props: Partial<ComponentProps<typeof NachforderungKarte>>) =>
+    renderMitProviders(<NachforderungKarte nachforderung={rtw()} {...props} />);
+
+  it('an der eingetroffenen Karte neben dem Material, der Klick meldet die Nachforderung', async () => {
+    const onEinheitUebernehmen = vi.fn();
+    zeige({ darfSchreiben: true, onEinheitUebernehmen, onMaterialUebernehmen: vi.fn() });
+    expect(screen.getByRole('button', { name: 'Als Material übernehmen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Als Einheit übernehmen' }));
+    expect(onEinheitUebernehmen).toHaveBeenCalledWith(1);
+  });
+
+  it('Material und Einheit schließen sich aus', () => {
+    const { unmount } = zeige({
+      nachforderung: rtw({ anzahl: 3, einheit_ids: [11] }),
+      darfSchreiben: true,
+      onEinheitUebernehmen: vi.fn(),
+      onMaterialUebernehmen: vi.fn(),
+    });
+    expect(screen.getByRole('button', { name: 'Weitere Einheit übernehmen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Material|Posten/ })).toBeNull();
+    unmount();
+    zeige({
+      nachforderung: rtw({ material_ids: [7] }),
+      darfSchreiben: true,
+      onEinheitUebernehmen: vi.fn(),
+      onMaterialUebernehmen: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: /Einheit/ })).toBeNull();
+  });
+
+  it('ausgeschöpfte Anzahl: kein Knopf mehr', () => {
+    zeige({
+      nachforderung: rtw({ einheit_ids: [11, 12] }),
+      darfSchreiben: true,
+      onEinheitUebernehmen: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: /Einheit/ })).toBeNull();
+  });
+
+  it('gesperrt mit „Keine Berechtigung“ daneben', () => {
+    zeige({ darfSchreiben: true, einheitGesperrt: true, onEinheitUebernehmen: vi.fn() });
+    const knopf = screen.getByRole('button', { name: 'Als Einheit übernehmen' });
+    expect(knopf).toBeDisabled();
+    expect(knopf).toHaveAccessibleDescription('Keine Berechtigung');
+  });
+
+  it('nennt die übernommenen Einheiten mit Sprung, unbekannte zählen als „weitere“', () => {
+    zeige({
+      nachforderung: rtw({ anzahl: 3, einheit_ids: [11, 12, 13] }),
+      einheitenJeId: new Map([
+        [11, { id: 11, name: 'Rettung', funkrufname: '83-1' }],
+        [12, { id: 12, name: '83-2', funkrufname: null }],
+      ]),
+    });
+    const zeile = screen.getByText(/Als Einheit übernommen/);
+    expect(zeile).toHaveTextContent('Als Einheit übernommen: 83-1 ↗, 83-2 ↗, 1 weitere');
+    expect(within(zeile).getByRole('link', { name: '83-1' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/11',
+    );
+  });
+
+  it('„Wer“ der Zusage schlägt die Einheiten des Einsatzes vor (D10)', async () => {
+    zeige({
+      nachforderung: nf(),
+      darfSchreiben: true,
+      formular: 'zusage',
+      onFormular: vi.fn(),
+      onZusage: vi.fn().mockResolvedValue(undefined),
+      werVorschlaege: ['Florian 2', 'Florian 10'],
+    });
+    await userEvent.click(screen.getByRole('combobox', { name: 'Wer' }));
+    expect(await screen.findByRole('option', { name: 'Florian 10' })).toBeInTheDocument();
+  });
+
+  it('ohne bekannte Einheiten nur die Zahl', () => {
+    zeige({ nachforderung: rtw({ einheit_ids: [11, 12] }), einheitenJeId: null });
+    expect(screen.getByText('2 Einheiten übernommen')).toBeInTheDocument();
   });
 });
 

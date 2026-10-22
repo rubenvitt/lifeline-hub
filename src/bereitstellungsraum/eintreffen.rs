@@ -358,6 +358,65 @@ async fn aktive_fahrzeuge_tx(
     .await?)
 }
 
+/// Was [`eintritt_einheit_tx`] für eine Einheit gebucht hat: die Belegungszeile, die Wirkung in
+/// der Zeitachse und, was nach dem Commit gemeldet wird.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Eintritt {
+    pub belegung_id: i64,
+    pub zeitachse: EintreffenZeitachse,
+    /// Personen aus dem Fan-out des Eintreffens (für `sse_personal`).
+    pub personen: Vec<i64>,
+    /// ETB-Einträge der Kopplung an die Ablösung (LLH-1128), siehe [`Gebucht::abloesung`].
+    pub abloesung: Vec<i64>,
+    /// Hinweise zur ablösenden Einheit (LLH-1131), siehe [`Gebucht::hinweise`].
+    pub hinweise: Vec<crate::benachrichtigung::Anlass>,
+}
+
+/// Eintritt einer schon geführten Einheit in den Raum `r.br_id` OHNE ETB-Eintrag (LLH-1383,
+/// design.md D5): Belegung (`belege_tx` prüft fremd 404, aufgelöst 409, schon in einem Raum 409),
+/// Eintreffen in der Zeitachse (Quelle `bereitstellungsraum`; `Ausgelassen` ist kein Fehler) und
+/// die Hinweise zur ablösenden Einheit. Das Eintreffen am Raum ([`eintreffen_tx`]) und die
+/// Übernahme aus einer Nachforderung (`einheit::aus_nachforderung`) teilen ihn; jeder Aufrufer
+/// schreibt seinen einen ETB-Satz selbst.
+pub async fn eintritt_einheit_tx(
+    conn: &mut SqliteConnection,
+    r: &Rahmen<'_>,
+    einheit_id: i64,
+) -> Result<Eintritt, AppError> {
+    let belegung_id = belegung_repo::belege_tx(
+        &mut *conn,
+        r.einsatz_id,
+        r.br_id,
+        ObjektTyp::Einheit,
+        einheit_id,
+        &buchung(r),
+        r.benutzer_id,
+    )
+    .await?
+    .ereignis;
+    let (zeitachse, beruehrt) = eintreffen_zeitachse_tx(conn, r, einheit_id).await?;
+    // Ist die Einheit als ablösende geplant, ist ihr Eintreffen am Raum ein Hinweis (LLH-1131),
+    // auch wenn die Zeitachse es auslässt, weil die Einheit schon eingetroffen war.
+    let mut hinweise = beruehrt.hinweise;
+    hinweise.extend(
+        crate::abloesung::hinweis::anlaesse_tx(
+            conn,
+            r.einsatz_id,
+            einheit_id,
+            crate::benachrichtigung::BenachrichtigungBezugTyp::AbloeserBrEingetroffen,
+            r.benutzer_id,
+        )
+        .await?,
+    );
+    Ok(Eintritt {
+        belegung_id,
+        zeitachse,
+        personen: beruehrt.personen,
+        abloesung: beruehrt.abloesung,
+        hinweise,
+    })
+}
+
 async fn bekannt_tx(
     conn: &mut SqliteConnection,
     r: &Rahmen<'_>,
@@ -366,64 +425,63 @@ async fn bekannt_tx(
     objekt_id: i64,
 ) -> Result<Gebucht, AppError> {
     // 2./3. Kraft prüfen (fremd 404, beendet 409, Fahrzeug einer Einheit 409, schon in einem
-    // Raum 409) und Eintritt: `belege_tx` prüft genau das.
-    let belegung_id = belegung_repo::belege_tx(
-        &mut *conn,
-        r.einsatz_id,
-        r.br_id,
-        typ,
-        objekt_id,
-        &buchung(r),
-        r.benutzer_id,
-    )
-    .await?
-    .ereignis;
-    let (einheit_id, fahrzeug_ids, zeitachse, beruehrt, name) = match typ {
-        ObjektTyp::Einheit => {
-            // 4. Zeitachse; `Ausgelassen` ist kein Fehler.
-            let (zeitachse, beruehrt) = eintreffen_zeitachse_tx(conn, r, objekt_id).await?;
-            let name: String = sqlx::query_scalar(
-                "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(objekt_id)
-            .bind(r.einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
-            let fahrzeuge = aktive_fahrzeuge_tx(conn, r.einsatz_id, objekt_id).await?;
-            (Some(objekt_id), fahrzeuge, zeitachse, beruehrt, name)
-        }
-        ObjektTyp::Fahrzeug => {
-            let name: String = sqlx::query_scalar(
-                "SELECT snap_funkrufname FROM einsatz_fahrzeug WHERE id = ? AND einsatz_id = ?",
-            )
-            .bind(objekt_id)
-            .bind(r.einsatz_id)
-            .fetch_one(&mut *conn)
-            .await?;
-            (
-                None,
-                vec![objekt_id],
-                EintreffenZeitachse::Keine,
-                zeitachse_repo::Beruehrt::default(),
-                name,
-            )
-        }
-    };
-    // Ist die Einheit als ablösende geplant, ist ihr Eintreffen am Raum ein Hinweis (LLH-1131),
-    // auch wenn die Zeitachse es auslässt, weil die Einheit schon eingetroffen war.
-    let mut hinweise = beruehrt.hinweise;
-    if let Some(e) = einheit_id {
-        hinweise.extend(
-            crate::abloesung::hinweis::anlaesse_tx(
-                conn,
-                r.einsatz_id,
-                e,
-                crate::benachrichtigung::BenachrichtigungBezugTyp::AbloeserBrEingetroffen,
-                r.benutzer_id,
-            )
-            .await?,
-        );
-    }
+    // Raum 409) und Eintritt: `belege_tx` prüft genau das; bei einer Einheit samt Zeitachse (4.)
+    // über `eintritt_einheit_tx`.
+    let (belegung_id, einheit_id, fahrzeug_ids, zeitachse, personen, abloesung, hinweise, name) =
+        match typ {
+            ObjektTyp::Einheit => {
+                let e = eintritt_einheit_tx(conn, r, objekt_id).await?;
+                let name: String = sqlx::query_scalar(
+                    "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+                )
+                .bind(objekt_id)
+                .bind(r.einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?;
+                let fahrzeuge = aktive_fahrzeuge_tx(conn, r.einsatz_id, objekt_id).await?;
+                (
+                    e.belegung_id,
+                    Some(objekt_id),
+                    fahrzeuge,
+                    e.zeitachse,
+                    e.personen,
+                    e.abloesung,
+                    e.hinweise,
+                    name,
+                )
+            }
+            ObjektTyp::Fahrzeug => {
+                let belegung_id = belegung_repo::belege_tx(
+                    &mut *conn,
+                    r.einsatz_id,
+                    r.br_id,
+                    typ,
+                    objekt_id,
+                    &buchung(r),
+                    r.benutzer_id,
+                )
+                .await?
+                .ereignis;
+                let name: String = sqlx::query_scalar(
+                    "SELECT snap_funkrufname FROM einsatz_fahrzeug \
+                     WHERE id = ? AND einsatz_id = ?",
+                )
+                .bind(objekt_id)
+                .bind(r.einsatz_id)
+                .fetch_one(&mut *conn)
+                .await?;
+                (
+                    belegung_id,
+                    None,
+                    vec![objekt_id],
+                    EintreffenZeitachse::Keine,
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    name,
+                )
+            }
+        };
     // 6. Genau ein ETB-Eintrag (D5): „eingetroffen“ nur, wenn die Zeitachse es trägt.
     let text = match zeitachse {
         EintreffenZeitachse::Geschrieben => super::etb_text_eingetroffen(&name, br_bezeichnung),
@@ -446,8 +504,8 @@ async fn bekannt_tx(
         zeitachse,
         meldung_id: None,
         etb_id,
-        personen: beruehrt.personen,
-        abloesung: beruehrt.abloesung,
+        personen,
+        abloesung,
         hinweise,
     })
 }
@@ -458,6 +516,18 @@ async fn check_doppelbuchung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     fahrzeuge: &[NeuesFahrzeug],
+) -> Result<(), AppError> {
+    let namen: Vec<&str> = fahrzeuge.iter().map(|f| f.funkrufname.as_str()).collect();
+    check_namen_frei_tx(conn, einsatz_id, &namen).await
+}
+
+/// Doppelbuchung über Namen (D9, auch für die Übernahme aus einer Nachforderung, LLH-1383
+/// design.md D3): ein Name, der nach [`normalize`] dem Namen oder Funkrufnamen einer aktiven
+/// Einheit oder dem Funkrufnamen eines aktiven Fahrzeugs des Einsatzes gleicht → 422 mit Namen.
+pub async fn check_namen_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    namen: &[&str],
 ) -> Result<(), AppError> {
     let bestand: Vec<(String, String, Option<String>)> = sqlx::query_as(
         "SELECT 'Einheit', name, funkrufname FROM einsatz_einheit \
@@ -470,8 +540,8 @@ async fn check_doppelbuchung_tx(
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
     .await?;
-    for neu in fahrzeuge {
-        let schluessel = normalize(&neu.funkrufname);
+    for neu in namen {
+        let schluessel = normalize(neu);
         for (art, name, funkrufname) in &bestand {
             let trifft = normalize(name) == schluessel
                 || funkrufname
@@ -479,8 +549,7 @@ async fn check_doppelbuchung_tx(
                     .is_some_and(|f| normalize(f) == schluessel);
             if trifft {
                 return Err(AppError::UnprocessableEntity(format!(
-                    "{} ist schon im Einsatz ({art} «{name}»)",
-                    neu.funkrufname
+                    "{neu} ist schon im Einsatz ({art} «{name}»)"
                 )));
             }
         }

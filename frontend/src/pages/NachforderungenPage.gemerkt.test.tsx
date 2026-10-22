@@ -73,6 +73,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_von_name: 'Leit',
   ist_offen: true,
   material_ids: [],
+  einheit_ids: [],
   zusage_rufnamen: [],
   ...over,
 });

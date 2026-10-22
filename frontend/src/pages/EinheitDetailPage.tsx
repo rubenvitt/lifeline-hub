@@ -27,7 +27,8 @@ import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { Einheit, EinsatzAnzeige } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { einheitenPfad, parseRouteId } from '../routing/deeplinks';
+import { einheitenPfad, nachforderungenPfad, parseRouteId } from '../routing/deeplinks';
+import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../components/SeitenZustand';
 import { buildEinheitRechte } from './einheit/einheitAnsichtKern';
 import EinheitKopf from './einheit/EinheitKopf';
@@ -295,6 +296,11 @@ function EinheitAnsicht({
           orgDefault={orgDefault}
           onPatch={(etikett, p) => patch.mutateAsync({ etikett, patch: p })}
           onSetHandStatus={(statusId) => handStatus.mutateAsync(statusId)}
+          nachforderungPfad={
+            aktuell.nachforderung_id != null && istKeyFreigegeben('nachforderungen', freigaben)
+              ? nachforderungenPfad(einsatzId, { nachforderung: aktuell.nachforderung_id })
+              : null
+          }
         />
 
         {/* Offene Übernahme (LLH-1075, D14): direkt unter dem Kopf, nur mit Recht Einheiten;

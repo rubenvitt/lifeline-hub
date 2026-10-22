@@ -2,6 +2,8 @@ import type {
   AusVorlageEingabe,
   AusVorlageErgebnis,
   Einheit,
+  EinheitenAusNachforderungEingabe,
+  Nachforderung,
   UebernahmeBody,
   VorlageVorschau,
 } from './types';
@@ -89,6 +91,22 @@ export function patchEinheitZeichen(
 
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {
   return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/einheiten`, 'POST', daten);
+}
+
+/**
+ * Eine eingetroffene Nachforderung als Einheit übernehmen (LLH-1383, Spec
+ * `nachforderung-einheit`): neue Einheiten anlegen oder bestehende verknüpfen, auf Wunsch in den
+ * Bereitstellungsraum des Ziels buchen. Antwortet mit der Nachforderung (trägt `einheit_ids`).
+ */
+export function uebernehmeAusNachforderung(
+  einsatzId: number,
+  eingabe: EinheitenAusNachforderungEingabe,
+): Promise<Nachforderung> {
+  return apiSend<Nachforderung>(
+    `/api/einsaetze/${einsatzId}/einheiten/aus-nachforderung`,
+    'POST',
+    eingabe,
+  );
 }
 
 /**

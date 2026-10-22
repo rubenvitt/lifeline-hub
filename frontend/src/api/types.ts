@@ -1331,6 +1331,19 @@ export interface PatchNachforderung {
   rufnamen?: string[];
 }
 
+/**
+ * Body von `POST …/einheiten/aus-nachforderung` (LLH-1383 D2), FE-lokal. Je Zeile genau eines:
+ * `name` legt eine neue Einheit an, `einheit_id` verknüpft eine schon geführte (D3).
+ */
+export interface EinheitenAusNachforderungEingabe {
+  nachforderung_id: number;
+  einheiten: ({ name: string } | { einheit_id: number })[];
+  /** Einheitstyp der neuen Einheiten. */
+  typ_id?: number;
+  /** In den Bereitstellungsraum des Ziels buchen (D5). */
+  in_bereitstellungsraum?: boolean;
+}
+
 // ============================== Zugangsprotokoll (LFH-1097) ==============================
 /** Ereignis der Anmeldespur (`auth_audit`). */
 export type AnmeldeEreignis = S['Ereignis'];

@@ -3993,6 +3993,79 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
     assert!(v["personen"].is_null(), "{v}");
 }
 
+/// LLH-1383 design.md D11: eine Nachforderung mit Ziel = eigener Raum bleibt der Führung. Das
+/// BR-Gerät liest sie nicht, meldet ihr Eintreffen nicht und übernimmt sie nicht als Einheit; das
+/// Eintreffen am Raum bucht es weiter über „Eintreffen buchen“.
+#[tokio::test]
+async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nord = br_anlegen(&app, &admin, einsatz, "BR Nord", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, nord).await;
+    let (s, n) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &admin,
+        Some(
+            &json!({"art": "RTW", "anzahl": 1, "adressat_kategorie": "leitstelle",
+                     "ziel_br_id": nord}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{n}");
+    let nid = n["id"].as_i64().unwrap();
+    for stufe in ["zugesagt", "unterwegs"] {
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/nachforderungen/{nid}/status"),
+            &admin,
+            Some(&json!({"status": stufe})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{stufe}: {v}");
+    }
+
+    for (m, pfad, body) in [
+        (
+            "GET",
+            format!("/api/einsaetze/{einsatz}/nachforderungen"),
+            None,
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/nachforderungen/{nid}/status"),
+            Some(json!({"status": "eingetroffen"})),
+        ),
+        (
+            "POST",
+            format!("/api/einsaetze/{einsatz}/einheiten/aus-nachforderung"),
+            Some(
+                json!({"nachforderung_id": nid, "einheiten": [{"name": "83-1"}],
+                        "in_bereitstellungsraum": true}),
+            ),
+        ),
+    ] {
+        let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
+    }
+    let (s, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v[0]["status"], "unterwegs",
+        "das Gerät hat nichts geschaltet"
+    );
+}
+
 /// Meldungen an die Einsatzleitung wie am UHS-Laptop: anlegen und nur die eigenen lesen.
 #[tokio::test]
 async fn br_geraet_meldet_und_liest_nur_eigene_meldungen() {

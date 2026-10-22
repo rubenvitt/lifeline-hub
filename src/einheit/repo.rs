@@ -70,6 +70,7 @@ struct Row {
     aufgeloest_von: Option<i64>,
     nicht_uebernommen_seit: Option<String>,
     unangemeldet: bool,
+    nachforderung_id: Option<i64>,
 }
 
 impl Row {
@@ -210,7 +211,8 @@ const SELECT_AUFGELOEST: &str = "\
            CASE WHEN e.uebernahme_offen_seit IS NOT NULL AND e.uebernommen_at IS NULL \
               AND e.aufgeloest_at IS NULL THEN e.uebernahme_offen_seit END \
              AS nicht_uebernommen_seit, \
-           (e.uebernahme_offen_seit IS NOT NULL) AS unangemeldet \
+           (e.uebernahme_offen_seit IS NOT NULL) AS unangemeldet, \
+           e.nachforderung_id \
     FROM einsatz_einheit e \
     LEFT JOIN einheit_typ t ON t.id = e.typ_id \
     LEFT JOIN fahrzeug_status hs ON hs.id = e.status_id \
@@ -397,6 +399,7 @@ async fn zu_anzeige_batch(
             aufgeloest_von: row.aufgeloest_von,
             nicht_uebernommen_seit: row.nicht_uebernommen_seit,
             unangemeldet: row.unangemeldet,
+            nachforderung_id: row.nachforderung_id,
         });
     }
     Ok(out)

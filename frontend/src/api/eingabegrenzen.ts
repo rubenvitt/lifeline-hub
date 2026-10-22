@@ -70,6 +70,8 @@ export const NACHFORDERUNG_ZUSAGE_RUFNAME_MAX = 100;
 export const NACHFORDERUNG_ZUSAGE_RUFNAMEN_MAX = 20;
 /** Grund beim Zurückziehen einer Nachforderung (LLH-1097; landet im ETB-Inhalt). */
 export const NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX = 200;
+/** Höchstzahl der Einheiten einer Übernahme aus einer Nachforderung (LLH-1383). */
+export const NACHFORDERUNG_UEBERNAHME_EINHEITEN_MAX = 20;
 /** Notiz eines Anrufs am Infotelefon. */
 export const INFOTELEFON_NOTIZ_MAX = 2_000;
 /** Kurzfelder des Infotelefons (anrufer_name, rueckruf). */

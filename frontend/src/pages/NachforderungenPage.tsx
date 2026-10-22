@@ -4,12 +4,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeBetreuung } from '../api/betreuung';
+import { listeEinheiten, uebernehmeAusNachforderung } from '../api/einheiten';
+import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { einsatzKeys } from '../api/queryKeys';
+import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { istKonflikt } from '../api/client';
 import {
   disponiereAdhoc,
@@ -47,6 +49,12 @@ import NachforderungFormular, {
 } from '../nachforderungen/NachforderungFormular';
 import type { KartenFormular, StellenVerweis } from '../nachforderungen/NachforderungKarte';
 import MaterialUebernahmeModal from '../nachforderungen/MaterialUebernahmeModal';
+import EinheitUebernahmeModal from '../nachforderungen/EinheitUebernahmeModal';
+import {
+  einheitenBody,
+  einheitVorschlaege,
+  type EinheitUebernahmeWerte,
+} from '../nachforderungen/einheitUebernahme';
 import {
   isErgaenzen,
   uebernahmeBody,
@@ -74,6 +82,10 @@ import {
 } from '../routing/deeplinks';
 import { Filterhinweis, Paneel, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
+
+/** Stabile Leerlisten für den Dialog (`memo`, Muster der Karten). */
+const KEINE_EINHEITEN: never[] = [];
+const KEINE_TYPEN: never[] = [];
 
 export default function NachforderungenPage() {
   const { id } = useParams();
@@ -188,6 +200,41 @@ export default function NachforderungenPage() {
     queryFn: () => listEntlassenesMaterial(einsatzId),
     enabled: materialFrei && needsMaterial,
   });
+  /*
+   * Übernahme als Einheit (LLH-1383, design.md D9, D10): Knopf, Abruf und Vorschläge hängen an der
+   * Freigabe Einheiten wie beim Material. Die Einheiten liest die Seite nur, wenn eine Karte
+   * übernommene Einheiten zeigt, übernommen wird oder ein Formular „Wer“ anbietet; derselbe
+   * Schlüssel wie die Einheitenliste, live über `einheit`.
+   */
+  const [einheitUebernahme, setEinheitUebernahme] = useState<Nachforderung | null>(null);
+  const einheitenFrei = istKeyFreigegeben('einheiten', freigaben);
+  const einheitGesperrt = freigabenBekannt && !einheitenFrei;
+  const needsEinheiten =
+    einheitUebernahme != null ||
+    formular != null ||
+    (nfQuery.data ?? []).some((n) => n.einheit_ids.length > 0);
+  const einheitenQuery = useQuery({
+    queryKey: einsatzKeys.einheiten(einsatzId),
+    queryFn: () => listeEinheiten(einsatzId),
+    enabled: einheitenFrei && needsEinheiten,
+  });
+  const typenQuery = useQuery({
+    queryKey: globalKeys.einheitTypen(),
+    queryFn: listeEinheitTypen,
+    enabled: einheitenFrei && einheitUebernahme != null,
+  });
+  // Nur, wenn die Seite sie braucht: liest ein anderer Teil der Seite (Ort eines Postens) dieselbe
+  // Liste, zeichnete ihr Eintreffen sonst alle Karten neu (LFH-949).
+  const einheitenListe = einheitenFrei && needsEinheiten ? einheitenQuery.data : undefined;
+  // Gemerkt über den Datenstand (LFH-949): die Karten sind `memo`.
+  const einheitenJeId = useMemo(
+    () => (einheitenListe ? new Map(einheitenListe.map((e) => [e.id, e])) : null),
+    [einheitenListe],
+  );
+  const werVorschlaege = useMemo(
+    () => (einheitenListe ? einheitVorschlaege(einheitenListe) : undefined),
+    [einheitenListe],
+  );
   /*
    * Namen der Betreuungsstellen für Bezug, Kartenzeile und Filter (LLH-1082, design.md D4/D7): die
    * Nachforderung trägt nur die Kennung. Gelesen aus der Betreuungsübersicht (derselbe Cache wie
@@ -448,6 +495,28 @@ export default function NachforderungenPage() {
     },
   });
 
+  /*
+   * Als Einheit übernehmen (LLH-1383 D2): ein POST, der die Einheiten anlegt oder verknüpft und
+   * im Raum bucht. Ablehnungen stehen im Dialog (`speicherung`); jede lädt Nachforderungen und
+   * Einheiten neu, damit „wird verknüpft“ und der Rest aus dem frischen Stand kommen.
+   */
+  const einheitMutation = useMutation({
+    mutationFn: ({ n, werte }: { n: Nachforderung; werte: EinheitUebernahmeWerte }) =>
+      uebernehmeAusNachforderung(einsatzId, einheitenBody(n, werte, einheitenQuery.data ?? [])),
+    onSuccess: (_d, { werte }) => {
+      message.success(werte.einheiten.length > 1 ? 'Einheiten übernommen' : 'Einheit übernommen');
+      void qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.br(einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+      return invalidiere();
+    },
+    onError: () =>
+      Promise.all([
+        invalidiere(),
+        qc.invalidateQueries({ queryKey: einsatzKeys.einheiten(einsatzId) }),
+      ]),
+  });
+
   /**
    * Erfassung per Deeplink: `?neu=1` öffnet sie, eine Vorbelegung
    * (`art`/`bezeichnung`/`anzahl`/`begruendung`) füllt sie. Apply-then-clean wie der
@@ -549,6 +618,15 @@ export default function NachforderungenPage() {
     const m = uebernahmeRef.current;
     if (!m.isPending && m.error != null) m.reset();
     setUebernahme({ n, ergaenzen: isErgaenzen(n) });
+  }, []);
+  const einheitMutationRef = useRef(einheitMutation);
+  einheitMutationRef.current = einheitMutation;
+  const onEinheitUebernehmen = useCallback((nfId: number) => {
+    const n = stand.current.alle?.find((x) => x.id === nfId);
+    if (!n) return;
+    const m = einheitMutationRef.current;
+    if (!m.isPending && m.error != null) m.reset();
+    setEinheitUebernahme(n);
   }, []);
 
   /*
@@ -676,6 +754,10 @@ export default function NachforderungenPage() {
     materialJeId,
     materialGesperrt,
     onMaterialUebernehmen: freigabenBekannt ? onMaterialUebernehmen : undefined,
+    einheitenJeId,
+    einheitGesperrt,
+    onEinheitUebernehmen: freigabenBekannt ? onEinheitUebernehmen : undefined,
+    werVorschlaege,
     hervorgehobenId,
     laeuftId: statusMutation.isPending ? statusMutation.variables?.nfId : null,
     stellenJeId,
@@ -694,6 +776,13 @@ export default function NachforderungenPage() {
   const uebernahmeN = uebernahme
     ? (nfQuery.data?.find((n) => n.id === uebernahme.n.id) ?? uebernahme.n)
     : null;
+  const einheitN = einheitUebernahme
+    ? (nfQuery.data?.find((n) => n.id === einheitUebernahme.id) ?? einheitUebernahme)
+    : null;
+  const einheitRaumName =
+    einheitN?.ziel_br_id != null
+      ? raeume?.find((r) => r.id === einheitN.ziel_br_id)?.bezeichnung
+      : undefined;
   /*
    * Nach einer Ablehnung lädt `onError` neu; die Karte kann dabei in die andere Ansicht wandern
    * (ein anderer Arbeitsplatz hat schon fortgeschaltet) oder in einer Stufe stehen, die gerade
@@ -838,6 +927,7 @@ export default function NachforderungenPage() {
             ablehnenId != null ||
             zurueckziehenId != null ||
             uebernahme != null ||
+            einheitUebernahme != null ||
             wirksamesFormular != null
           }
           ansicht={ansicht}
@@ -862,6 +952,20 @@ export default function NachforderungenPage() {
           });
         }}
         onSchliessen={() => setUebernahme(null)}
+      />
+      <EinheitUebernahmeModal
+        nachforderung={darfSchreiben && einheitenFrei ? einheitN : null}
+        einheiten={einheitenListe ?? KEINE_EINHEITEN}
+        typen={typenQuery.data ?? KEINE_TYPEN}
+        raumName={einheitRaumName}
+        raumGesperrt={!raeumeFrei}
+        laeuft={einheitMutation.isPending}
+        speicherung={einheitMutation}
+        onUebernehmen={(werte) => {
+          if (!einheitN) return Promise.resolve();
+          return einheitMutation.mutateAsync({ n: einheitN, werte });
+        }}
+        onSchliessen={() => setEinheitUebernahme(null)}
       />
       <Modal
         open={ablehnenId != null}

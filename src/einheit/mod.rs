@@ -23,6 +23,7 @@ macro_rules! unangemeldet_sql {
 }
 pub(crate) use unangemeldet_sql;
 
+pub mod aus_nachforderung;
 pub mod aus_vorlage;
 pub mod mitglied_repo;
 pub mod repo;
@@ -241,6 +242,10 @@ pub struct EinheitAnzeige {
     pub nicht_uebernommen_seit: Option<String>,
     /// Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3).
     pub unangemeldet: bool,
+    /// Herkunft: aus dieser Nachforderung übernommen (LLH-1383, design.md D7). Nur die Kennung:
+    /// den Kurznamen liest die Oberfläche aus dem Modul Nachforderungen. Fehlt ohne Herkunft.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nachforderung_id: Option<i64>,
 }
 
 #[cfg(test)]

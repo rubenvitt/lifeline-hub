@@ -301,6 +301,14 @@ pub async fn status(
             "Aus der Nachforderung ist Material übernommen".into(),
         ));
     }
+    // Ebenso mit übernommenen Einheiten (LLH-1383, design.md D8).
+    if aktuell.status.as_str() == STATUS_EINGETROFFEN
+        && repo::has_einheiten(&state.pool, nachforderung_id).await?
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Aus der Nachforderung sind Einheiten übernommen".into(),
+        ));
+    }
     // Optimistische Sperre gegen TOCTOU: UPDATE greift nur bei unverändertem Bestandsstatus.
     // Der Wechsel schreibt im selben Commit seinen ETB-Eintrag (LLH-1104 D6).
     let Some(etb_id) = repo::update_status(

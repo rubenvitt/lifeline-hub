@@ -10732,4 +10732,91 @@ mod tests {
             .unwrap();
         assert_eq!(uebrig, 0);
     }
+
+    /// LLH-1383 D7: die Einheit trägt ihre Nachforderung als Fremdschlüssel; der Bestand bleibt
+    /// ohne Verweis, das Löschen der Nachforderung leert ihn, und das Löschen des Einsatzes nimmt
+    /// beides mit.
+    #[tokio::test]
+    async fn migration_0239_einheit_verweist_auf_nachforderung() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 237).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '83-1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, 239).await;
+
+        let leer: Option<i64> =
+            sqlx::query_scalar("SELECT nachforderung_id FROM einsatz_einheit WHERE id = ?")
+                .bind(alt)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(leer, None, "Bestand ohne Herkunft");
+
+        let n: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, anzahl, adressat_kategorie, \
+                angefordert_at, erstellt_von_id, status) \
+             VALUES (?, 'RTW', 2, 'leitstelle', '2026-10-22 08:00:00', ?, 'eingetroffen') \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let neu: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, nachforderung_id) \
+             VALUES (?, '83-2', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(n)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO einsatz_einheit (einsatz_id, name, nachforderung_id) VALUES (?, 'x', 999999)")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect_err("nachforderung_id ist ein Fremdschlüssel");
+
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' \
+               AND name = 'idx_einsatz_einheit_nachforderung'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert!(
+            index.is_some_and(|i| i.contains("WHERE nachforderung_id IS NOT NULL")),
+            "Teilindex"
+        );
+        let verletzt: Vec<(String,)> = sqlx::query_as("PRAGMA foreign_key_check(einsatz_einheit)")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(verletzt.is_empty());
+
+        sqlx::query("DELETE FROM nachforderung WHERE id = ?")
+            .bind(n)
+            .execute(&pool)
+            .await
+            .expect("der Verweis hält das Löschen nicht auf");
+        let geleert: Option<i64> =
+            sqlx::query_scalar("SELECT nachforderung_id FROM einsatz_einheit WHERE id = ?")
+                .bind(neu)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(geleert, None, "ON DELETE SET NULL");
+
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt die Einheiten mit");
+    }
 }
