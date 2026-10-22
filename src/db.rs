@@ -10524,13 +10524,13 @@ mod tests {
             .expect("das Löschen des Einsatzes nimmt die Nachforderungen mit");
     }
 
-    // --- LLH-1097: Zusage, Teilzusage und Zurückziehen an der Nachforderung (0236) ---
+    // --- LLH-1097: Zusage, Teilzusage und Zurückziehen an der Nachforderung (0237) ---
 
     /// Nur ADD COLUMN (design.md D12): der Bestand bleibt mit leeren Zusage-Spalten, eine
     /// Restposition verweist auf ihre zugesagte, `zurueckgezogen` braucht keinen CHECK, und das
     /// Löschen des Einsatzes nimmt beide mit, ohne am Selbstbezug hängenzubleiben.
     #[tokio::test]
-    async fn migration_0236_zusage_spalten_teilung_und_status() {
+    async fn migration_0237_zusage_spalten_teilung_und_status() {
         let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 235).await;
         let (e, b) = bild_grundlage(&pool).await;
         let alt: i64 = sqlx::query_scalar(
@@ -10543,7 +10543,7 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        migriere_bis(&pool, 236).await;
+        migriere_bis(&pool, 237).await;
 
         let leer: (
             Option<String>,

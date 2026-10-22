@@ -11,7 +11,7 @@
 -- teilung_aus_id         Restposition einer Teilzusage → die zugesagte Nachforderung. SET NULL wie
 --                        die übrigen Bezüge; Nachforderungen gehen nur mit dem Einsatz.
 -- zurueckgezogen_at/_grund  Zurückziehen durch die eigene Führung (terminal).
--- Abgesichert von db::tests::migration_0236_*.
+-- Abgesichert von db::tests::migration_0237_*.
 
 ALTER TABLE nachforderung ADD COLUMN zusage_rufnamen TEXT;
 ALTER TABLE nachforderung ADD COLUMN eintreffen_erwartet_at TEXT;
