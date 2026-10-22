@@ -10,7 +10,11 @@ import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { setzeOnline } from '../test/utils';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
-vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
+// `useAuthOptional`: die Marke „berichtigt“ fragt, ob ein Gerät angemeldet ist (LLH-1382).
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({ benutzer: { id: 1 } }),
+  useAuthOptional: () => null,
+}));
 const ladeEinsatz = vi.fn();
 const ladeModulFreigaben = vi.fn();
 vi.mock('../api/einsaetze', () => ({
@@ -118,6 +122,26 @@ describe('LagemeldungenPage', () => {
     expect(screen.getByText(ort.format('HH:mm'))).toBeInTheDocument();
     expect(screen.getByRole('group', { name: ort.format('DD.MM.YYYY') })).toBeInTheDocument();
     expect(screen.queryByText('2026-06-12 08:30:00')).toBeNull();
+  });
+
+  /** LLH-1382, design.md D1: der Text bleibt, die Berichtigung steht als Marke mit Sprung. */
+  it('zeigt an einer berichtigten Lagemeldung die Marke mit Sprung ins ETB', async () => {
+    listeLageMeldungen.mockResolvedValue([
+      lage({ etb_berichtigung_id: 41, etb_berichtigung_lfd_nr: 9 }),
+    ]);
+    renderPage();
+    expect(await screen.findByText('Brücke gesperrt')).toBeInTheDocument();
+    expect(screen.getByText('berichtigt')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Berichtigung im ETB, Nr. 9' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/etb?eintrag=41',
+    );
+  });
+
+  it('zeigt ohne Berichtigung keine Marke', async () => {
+    renderPage();
+    expect(await screen.findByText('Brücke gesperrt')).toBeInTheDocument();
+    expect(screen.queryByText('berichtigt')).toBeNull();
   });
 
   /** LLH-1039: Zeit der Zeile ist die Ereigniszeit, die Übergabe steht im Meta. */
