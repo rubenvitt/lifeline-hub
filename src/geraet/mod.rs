@@ -711,6 +711,18 @@ mod tests {
         }
     }
 
+    /// Die üblichen Arten der Organisation (LLH-1379, design.md D3) zählen über andere Einsätze:
+    /// keine Ansicht darf sie, auch die nicht, die Nachforderungen absetzt.
+    #[test]
+    fn kein_geraet_liest_die_ueblichen_arten_der_organisation() {
+        for a in Funktionsansicht::ALLE {
+            assert!(
+                !darf_route(a, "GET", "/api/einsaetze/{id}/nachforderungen/arten"),
+                "{a:?} darf die üblichen Arten nicht lesen"
+            );
+        }
+    }
+
     /// Abrufen und Zurücknehmen eines Abrufs sind Führungshandlungen (LLH-1085, design.md D2):
     /// keine Ansicht darf sie, auch nicht der Bereitstellungsraum, der das Ausrücken als Austritt
     /// bucht.

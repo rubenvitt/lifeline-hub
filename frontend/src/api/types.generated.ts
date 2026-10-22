@@ -4421,6 +4421,15 @@ export interface components {
             zusage_rufnamen: string[];
         };
         /**
+         * @description Eine übliche Art der Organisation: Wortlaut der jüngsten Anforderung und die Zahl der
+         *     Einsätze, in denen sie vorkam. Bewusst ohne Einsatz-Kennung, Zeit oder Namen (D4).
+         */
+        NachforderungArtUeblich: {
+            art: string;
+            /** Format: int64 */
+            einsaetze: number;
+        };
+        /**
          * @description Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).
          *     Wire == `status`.
          * @enum {string}

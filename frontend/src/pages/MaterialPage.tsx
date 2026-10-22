@@ -53,6 +53,8 @@ import {
   ortPostFields,
   ortText,
   ortVon,
+  STUECK_IM_EINSATZ,
+  stueckeImEinsatz,
   type MaterialOrtRef,
 } from '../kraefte/materialPosten';
 import MaterialAngabenModal from '../kraefte/MaterialAngabenModal';
@@ -65,7 +67,7 @@ import type { MenueEintrag } from '../components/MenueAusloeser';
 import StatusWahl, { type StatusOption } from '../components/StatusWahl';
 import { materialStatus } from '../theme/statusFarben';
 import DemoMarke from '../components/DemoMarke';
-import { demoGroupedOptions } from '../stammdaten/demoAuswahl';
+import { demoGroupedOptions, type AuswahlOption } from '../stammdaten/demoAuswahl';
 import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useOptimistischesZeilenUpdate } from '../kraefte/useOptimistischesZeilenUpdate';
 import { istKeyFreigegeben, modulName } from '../einsatz/modulRegistry';
@@ -610,12 +612,19 @@ export default function MaterialPage() {
   const standVeraltet = emQuery.isError && ems.length > 0;
 
   // Kein Dedup wie bei Fahrzeugen: dieselbe Material-Art darf mehrfach als getrennte Position
-  // disponiert werden (Mengen-Splitting auf Einheiten).
+  // disponiert werden (Mengen-Splitting auf Einheiten). Ausnahme ist ein Gerät mit Bestandsnummer,
+  // ein bestimmtes Stück (LLH-1256): steht es schon aktiv im Einsatz, bleibt es sichtbar, ist aber
+  // gesperrt und nennt den Grund — der Server lehnte es mit 409 ab.
   // LFH-733: Demo-Stammdaten bleiben wählbar, stehen aber als Gruppe hinter den echten.
+  const imEinsatz = stueckeImEinsatz(poolQuery.data ?? [], ems);
+  const sperre = (o: AuswahlOption) => (imEinsatz.has(o.value) ? { ...o, disabled: true } : o);
   const poolOptionen = demoGroupedOptions(
     poolQuery.data ?? [],
-    (m) => `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}`,
-  );
+    (m) =>
+      `${m.bezeichnung}${m.kategorie ? ` (${m.kategorie})` : ''}${
+        imEinsatz.has(m.id) ? ` · ${STUECK_IM_EINSATZ}` : ''
+      }`,
+  ).map((e) => ('options' in e ? { ...e, options: e.options.map(sperre) } : sperre(e)));
 
   /**
    * Was ein leeres Auswahlfeld bedeutet, hängt daran, ob die Liste ankam. Scheitert der Abruf,

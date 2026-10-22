@@ -27,7 +27,7 @@ const em = {
   ist_adhoc: false,
   bezeichnung: 'Wolldecke',
   kategorie: 'Betreuung',
-  bestandsnummer: null,
+  bestandsnummer: null as string | null,
   traegerorganisation: null,
   menge: 50,
   status: 'einsatzbereit',
@@ -1216,6 +1216,35 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
     expect(
       within(neu).getByRole('combobox', { name: 'Ort' }).closest('.ant-select'),
     ).toHaveTextContent('ohne Ort');
+  });
+
+  /**
+   * LLH-1256 (Spec `material-modell`, „Gerät mit Bestandsnummer einmal im Einsatz“): die Trage mit
+   * Bestandsnummer steht schon aktiv im Einsatz, also ist sie in der Auswahl gesperrt und nennt den
+   * Grund; die Wolldecke (Verbrauchsgut) daneben bleibt wählbar, auch wenn sie schon disponiert ist.
+   */
+  it('ein schon aktives Gerät mit Bestandsnummer ist gesperrt und nennt den Grund', async () => {
+    const trage = {
+      ...em,
+      id: 11,
+      material_id: 6,
+      bezeichnung: 'Trage',
+      kategorie: 'Sanität',
+      bestandsnummer: 'T-1',
+      menge: 1,
+      art: 'geraet',
+    };
+    zeige([em, trage]);
+    await screen.findByText('Trage');
+    await openMaterialAuswahl();
+    const gesperrt = await screen.findByRole('option', {
+      name: 'Trage (Sanität) · schon im Einsatz',
+    });
+    expect(gesperrt).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('option', { name: 'Wolldecke (Betreuung)' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
   });
 
   it('das Mengenfeld im Dialog nennt sich; keine englischen Stufentexte auf der Seite', async () => {
