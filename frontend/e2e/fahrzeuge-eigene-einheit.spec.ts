@@ -122,7 +122,7 @@ test('Personal der Einheit übernehmen: vorgewählt bis zum Soll, danach zeigt d
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge?ansicht=liste`);
   const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
   await expect(region.getByText(funkrufname, { exact: true })).toBeVisible();
-  await region.getByRole('button', { name: `Besatzung zu ${funkrufname}` }).click();
+  await region.getByRole('button', { name: `Details zu ${funkrufname}` }).click();
   const urteil = page.locator('[data-lfh="besatzung-block"] [data-lfh="besatzung-urteil"]');
   await expect(urteil).toHaveAttribute('data-urteil', 'nicht_erfasst');
 
@@ -176,7 +176,7 @@ for (const { dichte, hoehe, abstand } of [
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
     await expect(page.locator('html')).toHaveAttribute('data-dichte', dichte);
-    await page.getByRole('button', { name: `Besatzung zu ${funkrufname}` }).click();
+    await page.getByRole('button', { name: `Details zu ${funkrufname}` }).click();
     await page.getByRole('button', { name: 'Personal der Einheit übernehmen' }).click();
     const kaestchen = page.getByRole('dialog').locator('label.ant-checkbox-wrapper');
     await expect(kaestchen).toHaveCount(3);

@@ -937,7 +937,11 @@ export default function BrDetailPage() {
               dem Zeiger (D13). Bedienbar auch im Zustand „geplant“, anders als das Belegen. */}
           {materialFrei && (
             <div data-testid="br-material" style={{ marginTop: abstand.lg }}>
-              <SektionHeader titel="Material" extra={materialKopfzahl(materialAmBr)} />
+              {/* Leer sagt der Baustein „Kein Material“; „0 Posten“ daneben wäre doppelt (LLH-1255). */}
+              <SektionHeader
+                titel="Material"
+                extra={materialAmBr.length > 0 ? materialKopfzahl(materialAmBr) : undefined}
+              />
               <MaterialAmOrt
                 einsatzId={einsatzId}
                 ort={{ art: 'bereitstellungsraum', id: br.id }}

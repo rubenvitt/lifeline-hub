@@ -509,9 +509,9 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
 
     // Besatzung ist standardmäßig eingeklappt → über den beschrifteten Auslöser aufklappen.
-    const ausloeser = screen.getByRole('button', { name: 'Besatzung zu Florian 1' });
+    const ausloeser = screen.getByRole('button', { name: 'Details zu Florian 1' });
     expect(ausloeser).toHaveAttribute('aria-expanded', 'false');
-    expect(ausloeser).toHaveTextContent('Besatzung');
+    expect(ausloeser).toHaveTextContent('Details');
     await userEvent.click(ausloeser);
     expect(ausloeser).toHaveAttribute('aria-expanded', 'true');
 
@@ -584,10 +584,10 @@ describe('FahrzeugePage', () => {
     await screen.findByText('Florian 1');
     expect(container.querySelector('.ant-table'), 'unter md steht keine Tabelle').toBeNull();
 
-    const ausloeser = screen.getByRole('button', { name: 'Besatzung zu Florian 1' });
+    const ausloeser = screen.getByRole('button', { name: 'Details zu Florian 1' });
     await userEvent.click(ausloeser);
     // Der Bereich ist als Region nach seinem Auslöser benannt und trägt den Besatzungsblock.
-    const bereich = screen.getByRole('region', { name: 'Besatzung zu Florian 1' });
+    const bereich = screen.getByRole('region', { name: 'Details zu Florian 1' });
     expect(within(bereich).getByText(/Anna Crew/)).toBeInTheDocument();
     expect(within(bereich).getByText('Kraft zur Besatzung …')).toBeInTheDocument();
   });
@@ -1746,7 +1746,7 @@ async function oeffneStammAuswahl() {
 
 /** Klappt die Zeile von „Florian 1" auf — dort hängt der Besatzungsblock. */
 async function klappeZeileAuf(container: HTMLElement) {
-  await userEvent.click(within(container).getByRole('button', { name: 'Besatzung zu Florian 1' }));
+  await userEvent.click(within(container).getByRole('button', { name: 'Details zu Florian 1' }));
 }
 
 /**
@@ -1915,7 +1915,7 @@ describe('FahrzeugePage · Personal der Einheit übernehmen (LLH-1073 Teil II, d
   const KNOPF = 'Personal der Einheit übernehmen';
   async function aufklappen() {
     await screen.findByText('Florian 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Besatzung zu Florian 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Details zu Florian 1' }));
   }
 
   it('fehlt ohne Einheit des Fahrzeugs', async () => {
@@ -1995,7 +1995,7 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
   ];
   async function aufklappen() {
     await screen.findByText('Florian 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Besatzung zu Florian 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Details zu Florian 1' }));
   }
   const block = () =>
     document.querySelector<HTMLElement>('[data-lfh="beladung-block"]') as HTMLElement;
@@ -2064,7 +2064,7 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
     render(einsatz(), [], ef, [], [], { material: MATERIAL });
     await aufklappen();
     // Unter md ist der Bereich als Region nach seinem Auslöser benannt (LFH-697).
-    const bereich = screen.getByRole('region', { name: 'Besatzung zu Florian 1' });
+    const bereich = screen.getByRole('region', { name: 'Details zu Florian 1' });
     expect(await within(bereich).findByText('Stromerzeuger')).toBeInTheDocument();
   });
 });

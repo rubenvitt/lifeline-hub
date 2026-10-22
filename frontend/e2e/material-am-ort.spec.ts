@@ -120,7 +120,7 @@ test('Fahrzeug: Stromerzeuger laden – Block „Beladung“ und Meldebild „Be
 }) => {
   const s = await seed(page);
   await page.goto(`/einsaetze/${s.einsatzId}/fahrzeuge`);
-  await page.getByRole('button', { name: 'Besatzung zu Florian 1' }).click();
+  await page.getByRole('button', { name: 'Details zu Florian 1' }).click();
   const block = page.locator('[data-lfh="beladung-block"]');
   await expect(block.getByText('Keine Beladung')).toBeVisible();
   await zuordnen(block, page, 'Stromerzeuger · 1');
