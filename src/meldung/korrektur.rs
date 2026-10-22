@@ -1,10 +1,11 @@
 //! Nachträgliche Korrektur einer Meldung (LLH-1066, Spec `meldungseingang`): Art, Priorität,
-//! Richtung, Von-Bezug, Empfänger und die Lage-Angaben. Wortlaut, Absender, Meldeweg,
+//! Richtung, Von-Bezug, Empfänger, Empfängerfunktion (LLH-1381) und die Lage-Angaben. Wortlaut, Absender, Meldeweg,
 //! Ereigniszeit und Eingang bleiben, wie die Meldung einging (das prüft der Handler,
 //! `routes::meldung_korrektur`). Jede wirksame Korrektur schreibt in derselben Transaktion EINEN
 //! Systemeintrag mit Verweis auf die Meldung ins ETB; der ETB-Eintrag der Meldung behält seinen
 //! Typ. Herleitung: `llh-1021/llh-1066/design.md` (Projektablage), D2–D8.
 use crate::error::AppError;
+use crate::fuehrung::Fuehrungsfunktion;
 use crate::kommunikation::{Prioritaet, Richtung};
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -21,6 +22,9 @@ pub struct Aenderung {
     pub bezug: Option<(Option<i64>, Option<i64>)>,
     /// Empfänger als Freitext, getrimmt; `Some(None)` leert.
     pub empfaenger: Option<Option<String>>,
+    /// Empfängerfunktion aus dem Katalog, vom Handler geprüft wie beim Erfassen; `Some(None)`
+    /// leert (LLH-1381).
+    pub empfaenger_funktion: Option<Option<Fuehrungsfunktion>>,
     /// In die Lage übernehmen (`true`) oder aus der Lage nehmen (`false`, D5).
     pub lagerelevant: Option<bool>,
     /// Lage-Text; `Some(None)` (leer) lässt den Wortlaut gelten (D6).
@@ -54,6 +58,8 @@ struct Stand {
     einheit_id: Option<i64>,
     abschnitt_id: Option<i64>,
     empfaenger: Option<String>,
+    /// Katalogcode (CHECK in der Datenbank); [`Stand::funktion`] liest ihn.
+    empfaenger_funktion: Option<String>,
     inhalt: String,
     lagerelevant: bool,
     lage_text: Option<String>,
@@ -68,6 +74,12 @@ impl Stand {
 
     fn geo(&self) -> Option<(f64, f64)> {
         self.lat.zip(self.lon)
+    }
+
+    fn funktion(&self) -> Option<Fuehrungsfunktion> {
+        self.empfaenger_funktion
+            .as_deref()
+            .and_then(Fuehrungsfunktion::parse)
     }
 
     /// Der Text, den die Lage zeigt: eigener Lage-Text oder der Wortlaut.
@@ -103,6 +115,14 @@ fn richtung_label(r: Richtung) -> &'static str {
     }
 }
 
+/// Die Empfängerfunktion im Systemeintrag (LLH-1381): ihr Kürzel wie in der ETB-Vorbelegung, ohne
+/// Funktion „keine“. Eine Meldung trägt nur Funktionen mit Kürzel (der Handler prüft das).
+fn funktion_label(f: Option<Fuehrungsfunktion>) -> &'static str {
+    f.map_or("keine", |f| {
+        f.kuerzel().unwrap_or_else(|| f.standard_label())
+    })
+}
+
 /// Der Stand nach der Korrektur, abgeleitet aus Stand und Änderung (D3–D6), samt der Prüfung des
 /// Zusammenhangs (422). Ohne Datenbank, damit die Regeln für sich testbar sind.
 #[derive(Debug, Clone, PartialEq)]
@@ -113,6 +133,7 @@ struct Ziel {
     einheit_id: Option<i64>,
     abschnitt_id: Option<i64>,
     empfaenger: Option<String>,
+    empfaenger_funktion: Option<Fuehrungsfunktion>,
     lagerelevant: bool,
     lage_text: Option<String>,
     geo: Option<(f64, f64)>,
@@ -176,6 +197,7 @@ fn ziel(alt: &Stand, a: &Aenderung) -> Result<Ziel, AppError> {
             .empfaenger
             .clone()
             .unwrap_or_else(|| alt.empfaenger.clone()),
+        empfaenger_funktion: a.empfaenger_funktion.unwrap_or_else(|| alt.funktion()),
         lagerelevant,
         lage_text,
         geo,
@@ -224,6 +246,13 @@ fn etb_teile(alt: &Stand, neu: &Ziel, von_alt: &str, von_neu: &str) -> Vec<Strin
     }
     if neu.empfaenger != alt.empfaenger {
         teile.push("Empfänger geändert".to_string());
+    }
+    if neu.empfaenger_funktion != alt.funktion() {
+        teile.push(format!(
+            "Empfängerfunktion {} → {}",
+            funktion_label(alt.funktion()),
+            funktion_label(neu.empfaenger_funktion)
+        ));
     }
     if neu.lagerelevant {
         let text_vorher = if alt.lagerelevant {
@@ -313,6 +342,7 @@ pub async fn korrigieren(
     crate::write_retry!(pool, |conn| {
         let alt: Stand = sqlx::query_as(
             "SELECT lfd_nr, meldungsart, prioritaet, richtung, einheit_id, abschnitt_id, \
+                    empfaenger_funktion, \
                     empfaenger, inhalt, lagerelevant = 1 AS lagerelevant, lage_text, lat, lon \
              FROM meldung WHERE id = ? AND einsatz_id = ?",
         )
@@ -388,6 +418,14 @@ pub async fn korrigieren(
         .bind(meldung_id)
         .execute(&mut *conn)
         .await?;
+        // Eigene Anweisung, damit die Platzhalter oben stehen bleiben (LLH-1381).
+        if neu.empfaenger_funktion != alt.funktion() {
+            sqlx::query("UPDATE meldung SET empfaenger_funktion = ? WHERE id = ?")
+                .bind(neu.empfaenger_funktion.map(|f| f.as_str()))
+                .bind(meldung_id)
+                .execute(&mut *conn)
+                .await?;
+        }
         super::repo::apply_lage_invariante_tx(&mut *conn, meldung_id).await?;
 
         let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
@@ -420,6 +458,7 @@ mod tests {
             einheit_id: None,
             abschnitt_id: None,
             empfaenger: None,
+            empfaenger_funktion: Some("s3".into()),
             inhalt: "Brücke gesperrt".into(),
             lagerelevant: false,
             lage_text: None,
@@ -625,5 +664,47 @@ mod tests {
         assert_eq!(bezug_name(Some("Florian Nord 1"), None), "Florian Nord 1");
         assert_eq!(bezug_name(None, Some("EA Nord")), "EA Nord");
         assert_eq!(bezug_name(None, None), "ohne Zuordnung");
+    }
+
+    #[test]
+    fn empfaengerfunktion_nennt_alt_und_neu() {
+        let funktion = |f| Aenderung {
+            empfaenger_funktion: Some(f),
+            ..Default::default()
+        };
+        assert_eq!(
+            teile(&stand(), &funktion(Some(Fuehrungsfunktion::S2))),
+            ["Empfängerfunktion S3 → S2"]
+        );
+        assert_eq!(
+            teile(&stand(), &funktion(None)),
+            ["Empfängerfunktion S3 → keine"]
+        );
+        let ohne = Stand {
+            empfaenger_funktion: None,
+            ..stand()
+        };
+        assert_eq!(
+            teile(&ohne, &funktion(Some(Fuehrungsfunktion::El))),
+            ["Empfängerfunktion keine → EL"]
+        );
+        // Gleiche Funktion oder keine Angabe: nichts.
+        assert!(teile(&stand(), &funktion(Some(Fuehrungsfunktion::S3))).is_empty());
+        assert_eq!(
+            ziel(&stand(), &Aenderung::default())
+                .unwrap()
+                .empfaenger_funktion,
+            Some(Fuehrungsfunktion::S3)
+        );
+        // Neben dem Freitext-Empfänger, in dieser Folge.
+        let beide = Aenderung {
+            empfaenger: Some(Some("Leitstelle".into())),
+            empfaenger_funktion: Some(Some(Fuehrungsfunktion::S2)),
+            ..Default::default()
+        };
+        assert_eq!(
+            teile(&stand(), &beide),
+            ["Empfänger geändert", "Empfängerfunktion S3 → S2"]
+        );
     }
 }

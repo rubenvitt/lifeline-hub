@@ -1,4 +1,5 @@
 import type {
+  Fuehrungsfunktion,
   Meldung,
   MeldungKorrekturPatch,
   MeldungPrioritaet,
@@ -18,6 +19,8 @@ export interface KorrekturWerte {
   richtung: Richtung;
   von?: string;
   empfaenger?: string;
+  /** Empfängerfunktion aus dem Katalog (LLH-1381); leer = keine. */
+  empfaenger_funktion?: Fuehrungsfunktion;
 }
 
 /** Der Von-Bezug einer Meldung als Auswahlwert, `undefined` ohne Bezug. */
@@ -34,6 +37,7 @@ export function korrekturStartwerte(m: Meldung): KorrekturWerte {
     richtung: m.richtung,
     von: vonWert(m),
     empfaenger: m.empfaenger ?? '',
+    empfaenger_funktion: m.empfaenger_funktion ?? undefined,
   };
 }
 
@@ -63,6 +67,8 @@ export function korrekturAenderung(m: Meldung, w: KorrekturWerte): MeldungKorrek
   if ((w.von ?? undefined) !== vonWert(m)) Object.assign(a, vonPaar(w.von));
   const empfaenger = w.empfaenger?.trim() ?? '';
   if (empfaenger !== (m.empfaenger ?? '')) a.empfaenger = empfaenger === '' ? null : empfaenger;
+  const funktion = w.empfaenger_funktion ?? null;
+  if (funktion !== (m.empfaenger_funktion ?? null)) a.empfaenger_funktion = funktion;
   return a;
 }
 

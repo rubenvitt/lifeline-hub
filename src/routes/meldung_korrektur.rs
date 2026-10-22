@@ -33,6 +33,10 @@ pub struct MeldungAenderung {
     /// Empfänger als Freitext; `null` oder leer leert.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub empfaenger: Option<Option<String>>,
+    /// Empfängerfunktion aus dem Katalog (LLH-1381), geprüft wie beim Erfassen; `null` oder leer
+    /// leert.
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub empfaenger_funktion: Option<Option<String>>,
     /// `true` übernimmt in die Lage, `false` nimmt aus der Lage.
     pub lagerelevant: Option<bool>,
     /// Lage-Text; `null`, leer oder gleich dem Wortlaut: der Wortlaut gilt.
@@ -108,6 +112,8 @@ impl MeldungAenderung {
             richtung,
             bezug,
             empfaenger,
+            // Der Katalog hängt an der Org (S7): der Handler prüft und setzt (LLH-1381).
+            empfaenger_funktion: None,
             lagerelevant: self.lagerelevant,
             lage_text,
             geo,
@@ -115,17 +121,28 @@ impl MeldungAenderung {
     }
 }
 
-/// PATCH /api/einsaetze/{id}/meldungen/{mid} — Art, Priorität, Richtung, Von-Bezug, Empfänger
-/// und Lage-Angaben korrigieren (Schreibrecht, Freigabe Meldungen, aktiver Einsatz). Fremde
+/// PATCH /api/einsaetze/{id}/meldungen/{mid} — Art, Priorität, Richtung, Von-Bezug, Empfänger,
+/// Empfängerfunktion und Lage-Angaben korrigieren (Schreibrecht, Freigabe Meldungen, aktiver Einsatz). Fremde
 /// Meldung 404. Gekoppelte Geräte erreichen die Route nicht (keine Routenliste, D10). Antwortet
 /// mit dem Stand; ohne wirksame Änderung ohne ETB-Eintrag und ohne Live-Ereignis.
 pub async fn korrigieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
     PfadParam((einsatz_id, meldung_id)): PfadParam<(i64, i64)>,
-    JsonBody(req): JsonBody<MeldungAenderung>,
+    JsonBody(mut req): JsonBody<MeldungAenderung>,
 ) -> Result<Json<MeldungAnzeige>, AppError> {
-    let aenderung = req.pruefen()?;
+    let funktion = req.empfaenger_funktion.take();
+    let mut aenderung = req.pruefen()?;
+    if let Some(code) = funktion {
+        aenderung.empfaenger_funktion = Some(
+            crate::routes::meldung::empfaenger_funktion_pruefen(
+                &state,
+                ctx.einsatz.org_id,
+                code.as_deref(),
+            )
+            .await?,
+        );
+    }
     let jetzt = jetzt();
     let vorher =
         repo::laden_im_einsatz(&state.pool, ctx.einsatz.id, meldung_id, None, &jetzt).await?;
@@ -155,6 +172,17 @@ pub async fn korrigieren(
         .await;
     } else if vorher.lagerelevant && !m.lagerelevant {
         crate::meldung::benachrichtigung::aus_der_lage(&state.pool, &state.live, &m).await;
+    }
+    // Andere Empfängerfunktion: die Hinweise der Meldung folgen ihr, solange sie neu ist
+    // (LLH-1381). Wiederholt (zwei gleiche Korrekturen zugleich) meldet es nichts doppelt.
+    if m.empfaenger_funktion != vorher.empfaenger_funktion {
+        crate::meldung::benachrichtigung::empfaengerfunktion_korrigiert(
+            &state.pool,
+            &state.live,
+            &m,
+            ctx.benutzer.id,
+        )
+        .await;
     }
     Ok(Json(m))
 }

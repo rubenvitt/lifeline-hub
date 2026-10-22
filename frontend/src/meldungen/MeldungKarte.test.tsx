@@ -615,3 +615,44 @@ describe('MeldungKarte — nachträglich korrigieren (LLH-1066)', () => {
     expect(screen.queryByRole('button', { name: 'Aus der Lage nehmen' })).toBeNull();
   });
 });
+
+describe('MeldungKarte — Empfängerfunktion korrigieren (LLH-1381)', () => {
+  const korrigierbar = (over: Partial<Meldung> = {}) =>
+    meldung({ meldungsart: 'sonstige', status: 'erledigt', ...over });
+  const FUNKTIONEN = [
+    { value: 'el' as const, label: 'Einsatzleitung' },
+    { value: 's2' as const, label: 'S2 – Lage' },
+    { value: 's3' as const, label: 'S3 – Einsatz' },
+  ];
+
+  it('bietet die Empfängerfunktion an und sendet nur sie', async () => {
+    const onKorrigieren = vi.fn().mockResolvedValue(undefined);
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar({ empfaenger_funktion: 's3' })}
+        einsatzId={7}
+        darfSchreiben
+        onKorrigieren={onKorrigieren}
+        funktionsOptionen={FUNKTIONEN}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await oeffne('Empfängerfunktion');
+    expect(optionenVon('Empfängerfunktion')).toEqual([
+      'Einsatzleitung',
+      'S2 – Lage',
+      'S3 – Einsatz',
+    ]);
+    await waehle('Empfängerfunktion', 'S2 – Lage');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(onKorrigieren).toHaveBeenCalledWith(1, { empfaenger_funktion: 's2' });
+  });
+
+  it('lässt das Feld ohne Katalog weg', async () => {
+    renderKarte(
+      <MeldungKarte meldung={korrigierbar()} einsatzId={7} darfSchreiben onKorrigieren={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    expect(screen.queryByRole('combobox', { name: 'Empfängerfunktion' })).toBeNull();
+  });
+});

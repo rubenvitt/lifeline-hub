@@ -85,3 +85,20 @@ describe('meldungKorrekturKern', () => {
     ).toEqual({ lat: 1, lon: 2 });
   });
 });
+
+describe('meldungKorrekturKern — Empfängerfunktion (LLH-1381)', () => {
+  it('sendet eine geänderte Funktion und leert mit null', () => {
+    const m = meldung({ empfaenger_funktion: 's3' });
+    const w = korrekturStartwerte(m);
+    expect(w.empfaenger_funktion).toBe('s3');
+    expect(istLeer(korrekturAenderung(m, w))).toBe(true);
+    expect(korrekturAenderung(m, { ...w, empfaenger_funktion: 's2' })).toEqual({
+      empfaenger_funktion: 's2',
+    });
+    expect(korrekturAenderung(m, { ...w, empfaenger_funktion: undefined })).toEqual({
+      empfaenger_funktion: null,
+    });
+    const ohne = meldung();
+    expect(istLeer(korrekturAenderung(ohne, korrekturStartwerte(ohne)))).toBe(true);
+  });
+});

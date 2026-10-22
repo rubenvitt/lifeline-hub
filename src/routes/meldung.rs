@@ -220,7 +220,7 @@ async fn absender_bezug_aufloesen(
 /// außerhalb des Katalogs ist ein unbekannter Enum-Wert (400). Führungshilfspersonal und
 /// Fachberater brauchen eine Bezeichnung, die die Meldung nicht trägt, und S7 gilt nur mit
 /// Org-Schalter: beides ist ein Fehler des Zusammenhangs (422). Leer = keine Funktion.
-async fn empfaenger_funktion_pruefen(
+pub(crate) async fn empfaenger_funktion_pruefen(
     state: &AppState,
     org_id: i64,
     code: Option<&str>,

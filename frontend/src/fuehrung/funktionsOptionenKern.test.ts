@@ -9,6 +9,7 @@ import {
   dekodiere,
   funktionsOptionen,
   kodiere,
+  meldungsFunktionsOptionen,
   optionsWert,
   type FunktionsVorschlaege,
 } from './funktionsOptionenKern';
@@ -159,5 +160,15 @@ describe('mitBesetzung', () => {
     );
     expect(mitBesetzung('S3', undefined)).toBe('S3');
     expect(mitBesetzung('S3 Einsatz', null)).toBe('S3 Einsatz');
+  });
+});
+
+describe('meldungsFunktionsOptionen (LLH-1214, LLH-1381)', () => {
+  it('nur EL und Sachgebiete, Wert ist der Code, mit Besetzung im Label', () => {
+    expect(meldungsFunktionsOptionen(MIT_MUELLER)).toEqual([
+      { value: 'el', label: 'Einsatzleitung' },
+      { value: 's2', label: 'S2 – Lage (Müller)' },
+      { value: 's3', label: 'S3 – Einsatz' },
+    ]);
   });
 });

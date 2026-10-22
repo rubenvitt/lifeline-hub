@@ -119,8 +119,8 @@ aufgehobene bleibt in den Aufträgen unter „Abgeschlossen“ und im Einsatztag
 Für Einsatzleitung und Führungspersonal:
 
 1. An der Karte „Bearbeiten“ wählen, bei vielen Aktionen im Menü der Karte. Die Karte zeigt an
-   Ort und Stelle „Meldungsart“, „Priorität“, „Richtung“, „Von Einheit / Abschnitt“ und
-   „Empfänger / Adressat“.
+   Ort und Stelle „Meldungsart“, „Priorität“, „Richtung“, „Von Einheit / Abschnitt“,
+   „Empfängerfunktion“ und „Empfänger / Adressat“.
 2. Die falsche Angabe berichtigen.
 3. „Speichern“ wählen. Die App meldet „Meldung #… korrigiert“. „Abbrechen“ oder Escape lässt alles,
    wie es war.
@@ -218,6 +218,10 @@ Hinweise und Alarme, und sein Ton kommt höchstens alle zwei Minuten.
 - Eine Sofortmeldung löst nur ihren Alarm aus, keinen zweiten Hinweis.
 - Jede Meldung meldet sich einmal; eine ohne Netz erfasste Meldung, die beim Wiederverbinden noch
   einmal gesendet wird, löst keinen zweiten Hinweis aus.
+- Wird die Empfängerfunktion einer Meldung korrigiert, solange sie „Neu“ ist, bekommen die Personen
+  der neuen Funktion den Hinweis, bei denen der alten verschwindet er. Wer ihn schon hatte, etwa die
+  Einsatzleitung, bekommt keinen zweiten, und wer korrigiert, bekommt keinen. Eine schon gesichtete
+  Meldung meldet sich nach der Korrektur nicht noch einmal.
 - Die Hinweise lassen sich unter „Benachrichtigungen“ als „Neue Meldung und Lagemeldung“
   abschalten; der Ton folgt der Glocke in der Kopfleiste.
 
@@ -258,6 +262,10 @@ aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
   Abschnitts; der Absender bleibt der Name aus dem Eingang.
 - „Aus der Lage nehmen“ verwirft Lage-Text, Ort und Kenntnisnahme. Eine erneute Übernahme beginnt
   ohne sie.
+- Eine andere „Empfängerfunktion“ steht im Systemeintrag mit altem und neuem Wert, etwa „Meldung
+  #12: Empfängerfunktion S3 → S2“; geleert heißt sie dort „keine“. Ist die Meldung noch „Neu“,
+  geht ihr Hinweis ab dann an die neue Funktion (siehe „Hinweise auf neue Meldungen“). Der
+  freie Empfänger bleibt dabei, wie er ist.
 - Speichern zwei Personen zugleich, gilt die zuletzt gespeicherte Korrektur; beide stehen im
   Einsatztagebuch.
 
