@@ -2,7 +2,7 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
 ---
 
 ## Überblick
@@ -18,19 +18,23 @@ Modulen selbst.
 ### Die Lage auf einen Blick lesen
 
 1. Im Bereich „Führung“ „Überblick“ öffnen.
-2. Im Kennzahlenband oben die Zahlen lesen: „Betroffene“ mit dem Zuwachs der letzten 60 Minuten,
-   „Kräfte im Einsatz“ in der Stärke F/UF/M//Σ, die höchste „Warnstufe“ der Gefahrengebiete,
-   „Offene Aufträge“ und die Zahl der „Einsatzabschnitte“.
-3. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
+2. Im Seitenkopf neben dem Datenstand lesen: Ab „Warnstufe mittel“ steht dort die höchste
+   Warnstufe der Gefahrengebiete, daneben, wie viele Gebiete „nicht beurteilt“ sind, und der
+   Stand eines festgelegten Pegels.
+3. Im Kennzahlenband die sechs Zahlen lesen: „Betroffene“ mit dem Zuwachs der letzten 60 Minuten,
+   „Kräfte im Einsatz“ in der Stärke F/UF/M//Σ, „Offene Aufträge“, „Meldungen offen“, die Zahl der
+   „Einsatzabschnitte“ und die „Einsatzdauer“.
+4. Im Paneel „Einsatzabschnitte“ je Abschnitt den Lagezustand („planmäßig“, „angespannt“,
    „kritisch“), den festen Auftrag, bei Aufträgen an den Abschnitt die Zahl der erledigten, die
-   letzte Rückmeldung und die Einheiten nach Status lesen.
+   letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „Ausfall“ mit Zahl und
+   Balken) lesen.
 
    ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Aufträgen, Entscheidungen der letzten Stunde und nächsten Marken](../bilder/ueberblick/ueberblick.png)
 
-4. Rechts daneben „Offene Aufträge“ und darunter „Nachforderungen“ lesen, dann „Nächste Marken“:
-   Was zuerst fällig ist, steht oben.
-5. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
-   Entscheidungen.
+5. Daneben „Offene Aufträge“ und „Entscheidungen der letzten Stunde“ lesen, darunter „Nächste
+   Marken“ und „Nachforderungen“: Was zuerst fällig ist, steht oben.
+6. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
+   Entscheidungen. Jedes Paneel führt so über den Verweis oben rechts in sein Modul.
 
 ### Vom Überblick weiterarbeiten
 
@@ -44,13 +48,17 @@ Modulen selbst.
 ### Was die Zahlen bedeuten
 
 - **Kräfte im Einsatz** zählt nur das Personal, nicht Fahrzeuge oder Material.
-- **Warnstufe** ist die höchste Stufe aller Gefahrengebiete; darunter steht, wie viele Gebiete
-  eine Warnstufe tragen und, falls es welche gibt, wie viele „nicht beurteilt“ sind (Kapitel
-  [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort
-  auch sein Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
+- **Warnstufe** ist die höchste Stufe aller Gefahrengebiete; sie steht wie im Lagebild im
+  Seitenkopf, nur ab „mittel“, und daneben, falls es welche gibt, wie viele Gebiete „nicht
+  beurteilt“ sind (Kapitel [Gefahren](gefahren.md)). Ist ein Pegel festgelegt, steht dort auch sein
+  Stand (Kapitel [Wetter und Pegel](wetter-pegel.md)).
+- **Meldungen offen** nennt dieselbe Zahl wie das Modul „Meldungen“, darunter die neuen; ist eine
+  Bestätigung überfällig, steht die Zahl in Rot.
+- **Einsatzdauer** rechnet ab dem Beginn des Einsatzes, bei einem abgeschlossenen bis zum
+  Abschluss.
 - **Offene Aufträge** nennt dieselbe Zahl wie das Modul „Aufträge/Befehle“ und dazu, wie viele
   über ihrer Frist sind. Das Paneel zeigt höchstens acht, die überfälligen zuerst; alle weiteren
-  erreicht „alle … offenen Aufträge ↗“.
+  erreicht „… weitere ↗“.
 - **Nachforderungen** nennt die offenen je Stufe (angefordert, zugesagt, unterwegs), dieselben
   Zahlen wie das Modul „Nachforderungen“, und darunter die zwei, die am längsten warten, mit ihrem
   Alter. Ein Klick auf eine Zeile öffnet ihre Karte (Kapitel [Nachforderungen](nachforderung.md)).

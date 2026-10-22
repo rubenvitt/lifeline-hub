@@ -225,6 +225,25 @@ export function einsatzdauer(beginn: string, jetzt: number, ende?: string | null
   return `${Math.floor(minuten / 60)}:${String(minuten % 60).padStart(2, '0')}`;
 }
 
+/**
+ * Die Kennzahl „Einsatzdauer“ (Wert, Einheit, Notiz) — eine Heimat für Lagebild und Überblick
+ * (LFH-550, LLH-1140). Rein.
+ */
+export function einsatzdauerKennzahl(
+  einsatz: Pick<EinsatzAnzeige, 'begonnen_at'> & { abgeschlossen_at?: string | null },
+  jetzt: number,
+  konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
+): { wert: string; einheit: 'h'; notiz: string } {
+  const abgeschlossen = einsatz.abgeschlossen_at ?? null;
+  return {
+    wert: einsatzdauer(einsatz.begonnen_at, jetzt, abgeschlossen),
+    einheit: 'h',
+    notiz: abgeschlossen
+      ? `beendet ${formatUhrzeitMitTag(abgeschlossen, konv)}`
+      : `seit ${formatUhrzeitMitTag(einsatz.begonnen_at, konv)}`,
+  };
+}
+
 /** „Lagebild 21.09. 14:22" — der Zeitpunkt in der Anzeigezone. Rein. */
 export function lagebildZeit(
   jetzt: number,
@@ -398,7 +417,6 @@ export function baueLagebild(
   const schaeden = verdichteSchaeden(r.schaeden);
   const gefahren = verdichteGefahrengebiete(r.gefahren);
   const bericht = neuesterLagebericht(r.lageberichte);
-  const abgeschlossen = r.einsatz.abgeschlossen_at ?? null;
   const pegel = pegelKennzahl(r.pegel, jetzt, konv);
   const versorgung = versorgungsBilanz(r.personen);
 
@@ -479,11 +497,7 @@ export function baueLagebild(
     },
     Einsatzdauer: {
       etikett: 'Einsatzdauer',
-      wert: einsatzdauer(r.einsatz.begonnen_at, jetzt, abgeschlossen),
-      einheit: 'h',
-      notiz: abgeschlossen
-        ? `beendet ${formatUhrzeitMitTag(abgeschlossen, konv)}`
-        : `seit ${formatUhrzeitMitTag(r.einsatz.begonnen_at, konv)}`,
+      ...einsatzdauerKennzahl(r.einsatz, jetzt, konv),
       ton: 'neutral',
       route: 'einsatzdaten',
     },

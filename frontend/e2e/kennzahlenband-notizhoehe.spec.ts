@@ -198,7 +198,8 @@ for (const breite of BREITEN) {
     await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
     await geladen(page);
     const notizen = band(page).locator('[data-lfh="kennzahl-notiz"]');
-    await expect(notizen).toHaveCount(5);
+    // Sechs Plätze wie im Lagebild (LLH-1140).
+    await expect(notizen).toHaveCount(6);
     const hoehen = await notizen.evaluateAll((els) =>
       els.map((el) => el.getBoundingClientRect().height),
     );
