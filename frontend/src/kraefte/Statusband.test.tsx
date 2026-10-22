@@ -101,6 +101,52 @@ describe('Statusband (Kennzahl mit Aufgliederung, LLH-1025)', () => {
     );
   });
 
+  it('Zulauf aus Nachforderungen als eigene Kennzahl mit Ziel Board, nur wenn es ihn gibt (LLH-1384)', () => {
+    const { rerender } = renderMitProviders(
+      <Statusband
+        einheiten={[zelle('s4', 'achtung', 3)]}
+        personal={[]}
+        zulauf={{
+          wert: 2,
+          notiz: '+2 RTW, Eintreffen 15:30',
+          ton: 'neutral',
+          eintraege: [],
+        }}
+        zulaufZiel="/einsaetze/1/nachforderungen"
+        zustand="daten"
+      />,
+      { route: '/einsaetze/1/kraefteuebersicht' },
+    );
+    const k = kennzahl('Zulauf aus Nachforderungen');
+    expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^2$/);
+    expect(k).toHaveTextContent('+2 RTW, Eintreffen 15:30');
+    expect(k.closest('a') ?? k.querySelector('a')).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen',
+    );
+    rerender(<Statusband einheiten={[zelle('s4', 'achtung', 3)]} personal={[]} zustand="daten" />);
+    expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull();
+  });
+
+  it('überfälliger Zulauf tönt achtung, das Wort steht in der Notiz', () => {
+    renderMitProviders(
+      <Statusband
+        einheiten={[]}
+        personal={[]}
+        zulauf={{
+          wert: 2,
+          notiz: '+2 RTW, Eintreffen 13:30 überfällig',
+          ton: 'achtung',
+          eintraege: [],
+        }}
+        zustand="daten"
+      />,
+    );
+    const k = kennzahl('Zulauf aus Nachforderungen');
+    expect(k).toHaveAttribute('data-ton', 'achtung');
+    expect(k).toHaveTextContent('überfällig');
+  });
+
   it('laden und Fehler: Platzhalter statt einer Null', () => {
     renderMitProviders(<Statusband einheiten={[]} personal={[]} zustand="fehler" />);
     expect(screen.getAllByText('Stand unbekannt').length).toBeGreaterThan(0);
