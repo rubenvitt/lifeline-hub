@@ -192,9 +192,11 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
           }))}
         />
       </Form.Item>
+      {/* `required` zeigt das Pflichtzeichen; geprüft wird über die Regel am Text des Werts. */}
       <Form.Item
         label="Ort"
         name="ort"
+        required
         rules={ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort ist Pflicht' })}
       >
         <EinsatzOrtsfeld
