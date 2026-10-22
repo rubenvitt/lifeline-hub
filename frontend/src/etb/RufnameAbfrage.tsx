@@ -1,8 +1,9 @@
-import { Alert, AutoComplete, Button, Checkbox, Space } from 'antd';
+import { Alert, Button, Checkbox, Space } from 'antd';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { useId, useState } from 'react';
 import { useRollen } from '../components/instrument';
-import { teilwortSuche } from '../components/teilwortSuche';
+import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
+import { KONTEXT_FUNKRUFNAME, merkeZuletzt } from '../stammdaten/zuletztVerwendet';
 import {
   anWieVon as leiteAnWieVonAb,
   standardRufnameWert,
@@ -10,8 +11,8 @@ import {
 } from './standardRufname';
 
 interface Props {
-  /** Funkrufnamen und Sachgebiete wie an den Von/An-Chips (Freitext bleibt erlaubt). */
-  optionen: readonly (string | { value: string; label: string })[];
+  /** Vorschlagsquellen wie an den Von/An-Chips (LLH-1144; Freitext bleibt erlaubt). */
+  quellen: readonly Vorschlagsquelle[];
   /** Der gesetzte Standard beim Ändern, sonst `null` (erste Abfrage). */
   standard: StandardRufname | null;
   /**
@@ -37,7 +38,7 @@ interface Props {
  * Chip-Menü (`MetaChip`), `@`, `/von`, `/an` bleiben ein Beschleuniger ohne Anleitung.
  */
 export default function RufnameAbfrage({
-  optionen,
+  quellen,
   standard,
   vorschlag,
   onUebernehmen,
@@ -52,8 +53,6 @@ export default function RufnameAbfrage({
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
-  const auswahl = optionen.map((o) => (typeof o === 'string' ? { value: o } : o));
-
   async function uebernehmen() {
     if (laeuft) return;
     const wert = standardRufnameWert(von, an, gleich);
@@ -65,6 +64,7 @@ export default function RufnameAbfrage({
     setFehler(null);
     try {
       await onUebernehmen(wert);
+      merkeZuletzt(KONTEXT_FUNKRUFNAME, von, gleich ? undefined : an);
     } catch (e) {
       setFehler(
         `Nicht gespeichert: ${e instanceof Error && e.message ? e.message : 'unbekannter Fehler'}`,
@@ -74,14 +74,13 @@ export default function RufnameAbfrage({
     }
   }
 
-  /** Enter im Feld übernimmt; ein offener Vorschlag nimmt Enter selbst (`onSelect`). */
-  function beiTaste(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.defaultPrevented) void uebernehmen();
-    if (e.key === 'Escape' && onAbbrechen) onAbbrechen();
-  }
-
+  /**
+   * Enter im Feld übernimmt; ein markierter Vorschlag nimmt Enter selbst (`onWahl`), Escape bei
+   * offener Liste schließt nur die Liste (`components/StammdatenFeld.tsx`).
+   */
   const feld = (id: string, wert: string, setze: (v: string) => void, name: string) => (
-    <AutoComplete
+    <StammdatenFeld
+      nurText
       id={id}
       aria-label={name}
       value={wert}
@@ -89,11 +88,11 @@ export default function RufnameAbfrage({
         setze(v);
         setFehler(null);
       }}
-      options={auswahl}
-      showSearch={teilwortSuche}
+      quellen={quellen}
       // Grenze des Servers für Von/An (LFH-937).
       maxLength={ETB_PARTEI_MAX}
-      onKeyDown={beiTaste}
+      onEnter={() => void uebernehmen()}
+      onEscape={onAbbrechen}
       disabled={laeuft}
       style={{ minWidth: 200, flex: '1 1 200px', maxWidth: 320 }}
     />

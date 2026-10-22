@@ -3,6 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../test/utils';
 import RufnameAbfrage from './RufnameAbfrage';
+import type { Vorschlagsquelle } from '../components/StammdatenFeld';
+
+/** Vorschläge als eine Quelle „Im Einsatz“ (`components/StammdatenFeld.tsx`, LLH-1144). */
+const quellenAus = (werte: readonly string[]): Vorschlagsquelle[] => [
+  { id: 'test', gruppe: 'einsatz', eintraege: werte.map((w) => ({ label: w, wert: w })) },
+];
 
 /** Die Abfrage des Standard-Rufnamens (LFH-894, design.md D4). */
 
@@ -15,7 +21,7 @@ describe('RufnameAbfrage', () => {
     const onUebernehmen = uebernehmen();
     renderMitProviders(
       <RufnameAbfrage
-        optionen={[]}
+        quellen={quellenAus([])}
         standard={null}
         vorschlag="Florian Leitung"
         onUebernehmen={onUebernehmen}
@@ -41,7 +47,11 @@ describe('RufnameAbfrage', () => {
   it('nimmt Freitext und übernimmt mit Enter', async () => {
     const onUebernehmen = uebernehmen();
     renderMitProviders(
-      <RufnameAbfrage optionen={['Florian 1']} standard={null} onUebernehmen={onUebernehmen} />,
+      <RufnameAbfrage
+        quellen={quellenAus(['Florian 1'])}
+        standard={null}
+        onUebernehmen={onUebernehmen}
+      />,
     );
     await userEvent.type(
       screen.getByRole('combobox', { name: 'Rufname für Von und An' }),
@@ -53,7 +63,7 @@ describe('RufnameAbfrage', () => {
   it('schreibt getrennte Seiten, wenn „Empfänger wie Absender“ aus ist', async () => {
     const onUebernehmen = uebernehmen();
     renderMitProviders(
-      <RufnameAbfrage optionen={[]} standard={null} onUebernehmen={onUebernehmen} />,
+      <RufnameAbfrage quellen={quellenAus([])} standard={null} onUebernehmen={onUebernehmen} />,
     );
     await userEvent.type(screen.getByRole('combobox', { name: 'Rufname für Von und An' }), 'ELW 1');
     await userEvent.click(screen.getByRole('checkbox', { name: 'Empfänger wie Absender' }));
@@ -73,7 +83,7 @@ describe('RufnameAbfrage', () => {
   it('verweigert einen leeren Rufnamen', async () => {
     const onUebernehmen = uebernehmen();
     renderMitProviders(
-      <RufnameAbfrage optionen={[]} standard={null} onUebernehmen={onUebernehmen} />,
+      <RufnameAbfrage quellen={quellenAus([])} standard={null} onUebernehmen={onUebernehmen} />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     expect(await screen.findByText('Rufname fehlt.')).toBeInTheDocument();
@@ -85,7 +95,7 @@ describe('RufnameAbfrage', () => {
       .fn<(wert: string) => Promise<void>>()
       .mockRejectedValue(new Error('Server nicht erreichbar'));
     renderMitProviders(
-      <RufnameAbfrage optionen={[]} standard={null} onUebernehmen={onUebernehmen} />,
+      <RufnameAbfrage quellen={quellenAus([])} standard={null} onUebernehmen={onUebernehmen} />,
     );
     const feld = screen.getByRole('combobox', { name: 'Rufname für Von und An' });
     await userEvent.type(feld, 'ELW 1');
@@ -100,7 +110,7 @@ describe('RufnameAbfrage', () => {
     const onAbbrechen = vi.fn();
     renderMitProviders(
       <RufnameAbfrage
-        optionen={[]}
+        quellen={quellenAus([])}
         standard={{ von: 'ELW 1', an: 'Einsatzleitung' }}
         vorschlag="Florian Leitung"
         onUebernehmen={uebernehmen()}
@@ -118,7 +128,7 @@ describe('RufnameAbfrage', () => {
 
   it('LFH-937: der Rufname nimmt höchstens 500 Zeichen an', () => {
     renderMitProviders(
-      <RufnameAbfrage optionen={[]} standard={null} onUebernehmen={uebernehmen()} />,
+      <RufnameAbfrage quellen={quellenAus([])} standard={null} onUebernehmen={uebernehmen()} />,
     );
     expect(screen.getByRole('combobox', { name: 'Rufname für Von und An' })).toHaveAttribute(
       'maxlength',

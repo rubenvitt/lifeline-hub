@@ -119,7 +119,7 @@ describe('MeldungFormular', () => {
 
   it('übernimmt Absender, Meldeweg und Empfänger in die nächste Meldung', async () => {
     const onAnlegen = renderFormular();
-    await userEvent.type(screen.getByPlaceholderText('z. B. ELW 1, S3'), 'ELW 1');
+    await userEvent.type(screen.getByLabelText('Empfänger / Adressat'), 'ELW 1');
     // Meldeweg vom Default (Funk) wegdrehen, damit die Übernahme beweisbar ist.
     await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Meldeweg' }));
@@ -132,7 +132,7 @@ describe('MeldungFormular', () => {
 
     // Die drei Wiederholfelder stehen noch im Formular …
     expect(screen.getByLabelText('Absender')).toHaveValue('RTW 2');
-    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveValue('ELW 1');
+    expect(screen.getByLabelText('Empfänger / Adressat')).toHaveValue('ELW 1');
     // … und gehen unverändert in die zweite Meldung, ohne erneute Eingabe.
     await userEvent.type(screen.getByLabelText('Inhalt / Wortlaut'), 'Zweite Meldung');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
@@ -147,13 +147,13 @@ describe('MeldungFormular', () => {
 
   it('leert ohne den Schalter auch die Wiederholfelder', async () => {
     const onAnlegen = renderFormular();
-    await userEvent.type(screen.getByPlaceholderText('z. B. ELW 1, S3'), 'ELW 1');
+    await userEvent.type(screen.getByLabelText('Empfänger / Adressat'), 'ELW 1');
     await fuellePflichtfelder('RTW 2', 'Erste Meldung');
     // Kein Klick auf „Werte behalten": das ist der unangetastete Vorgabezustand.
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText('Absender')).toHaveValue('');
-    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveValue('');
+    expect(screen.getByLabelText('Empfänger / Adressat')).toHaveValue('');
     expect(screen.getByLabelText('Inhalt / Wortlaut')).toHaveValue('');
   });
 
@@ -348,7 +348,7 @@ describe('MeldungFormular — Empfängerfunktion', () => {
   it('sendet die gewählte Funktion und füllt den leeren Empfänger mit ihrem Kürzel vor', async () => {
     const onAnlegen = renderMitKatalog();
     await waehleFunktion('S2 – Lage (Müller)');
-    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveValue('S2');
+    expect(screen.getByLabelText('Empfänger / Adressat')).toHaveValue('S2');
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
@@ -360,9 +360,9 @@ describe('MeldungFormular — Empfängerfunktion', () => {
 
   it('lässt einen schon eingetragenen Empfänger stehen', async () => {
     const onAnlegen = renderMitKatalog();
-    await userEvent.type(screen.getByPlaceholderText('z. B. ELW 1, S3'), 'ELW 1');
+    await userEvent.type(screen.getByLabelText('Empfänger / Adressat'), 'ELW 1');
     await waehleFunktion('S3 – Einsatz');
-    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveValue('ELW 1');
+    expect(screen.getByLabelText('Empfänger / Adressat')).toHaveValue('ELW 1');
     await fuellePflichtfelder('RTW 2', 'Lage ruhig');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
@@ -516,7 +516,7 @@ describe('MeldungFormular — Eingabegrenzen (LFH-937)', () => {
   it('begrenzt Absender und Empfänger nativ auf 500 Zeichen', () => {
     renderFormular();
     expect(screen.getByLabelText('Absender')).toHaveAttribute('maxlength', '500');
-    expect(screen.getByPlaceholderText('z. B. ELW 1, S3')).toHaveAttribute('maxlength', '500');
+    expect(screen.getByLabelText('Empfänger / Adressat')).toHaveAttribute('maxlength', '500');
   });
 
   it('zählt den Wortlaut ab 80 %; über 20 000 Zeichen bleibt er ganz stehen und sperrt', async () => {

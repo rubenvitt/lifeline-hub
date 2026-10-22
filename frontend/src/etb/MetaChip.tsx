@@ -1,4 +1,4 @@
-import { AutoComplete, Input, Space, Tag } from 'antd';
+import { Input, Space, Tag } from 'antd';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
@@ -9,7 +9,7 @@ import { useState } from 'react';
 import type { MeldeWeg } from '../api/types';
 import { MELDEWEG_OPTIONEN, METADATEN_FELDER, type MetaFeld } from './schnellerfassungModell';
 import BuchstabierHilfe from './BuchstabierHilfe';
-import { teilwortSuche } from '../components/teilwortSuche';
+import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
 import { useRollen } from '../components/instrument';
 
 type Wert = string | dayjs.Dayjs | MeldeWeg | undefined;
@@ -39,10 +39,12 @@ interface Props {
   feld: MetaFeld;
   editing: boolean;
   wert: Wert;
-  /** Optionale Vorschläge (z. B. Funkrufnamen für von/an) → AutoComplete statt Input.
-   *  Freitext bleibt erlaubt (AC#1). Ein Objekt trägt ein eigenes Label; eingesetzt wird der
-   *  Wert (Sachgebiet „S2 – Lage (Müller)“ → „S2“, LFH-549). */
-  optionen?: readonly (string | { value: string; label: string })[];
+  /**
+   * Vorschlagsquellen (Von/An, LLH-1144) → `StammdatenFeld` statt `Input`. Freitext bleibt
+   * erlaubt und trägt „frei“; eingesetzt wird der Wert eines Vorschlags (Sachgebiet
+   * „S2 – Lage (Müller)“ → „S2“, LFH-549).
+   */
+  quellen?: readonly Vorschlagsquelle[];
   onCommit: (feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) => void;
   onCancel: (feld: MetaFeld) => void;
   onRemove: (feld: MetaFeld) => void;
@@ -108,7 +110,7 @@ export default function MetaChip({
   feld,
   editing,
   wert,
-  optionen,
+  quellen,
   onCommit,
   onCancel,
   onRemove,
@@ -126,28 +128,24 @@ export default function MetaChip({
   if (editing) {
     if (d.editor === 'text') {
       const editor =
-        optionen && optionen.length > 0 ? (
-          <AutoComplete
+        quellen != null ? (
+          <StammdatenFeld
+            nurText
             ref={fokusOhneRollen}
             aria-label={d.label}
             disabled={gesperrt}
-            style={{ width: 200 }}
+            style={{ width: 240 }}
             // Grenze des Servers (LFH-937); natives `maxLength` zählt UTF-16 und ist damit nie
             // großzügiger als er.
             maxLength={ETB_PARTEI_MAX}
+            quellen={quellen}
             value={text}
-            onChange={(v) => setText(v)}
-            // Klick auf Vorschlag feuert nur onChange → onSelect committet sofort.
-            onSelect={(v) => onCommit(feld, v)}
-            options={optionen.map((o) => (typeof o === 'string' ? { value: o } : o))}
-            showSearch={teilwortSuche}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (text.trim()) onCommit(feld, text.trim());
-                else onCancel(feld);
-              }
-              if (e.key === 'Escape') onCancel(feld);
-            }}
+            onChange={setText}
+            // Ein Vorschlag (Klick oder Enter auf dem markierten) übernimmt sofort.
+            onWahl={(v) => onCommit(feld, v.wert)}
+            onEnter={(t) => (t.trim() ? onCommit(feld, t.trim()) : onCancel(feld))}
+            // Escape bei offener Liste schließt nur die Liste (Spec `stammdaten-feld`).
+            onEscape={() => onCancel(feld)}
           />
         ) : (
           <Input

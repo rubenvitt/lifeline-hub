@@ -1,32 +1,13 @@
-import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
-import { listeEinheiten } from '../api/einheiten';
-import { einsatzKeys } from '../api/queryKeys';
+import { useFunkrufnamenEinsatz } from '../stammdaten/vorschlagsquellen';
 
 /**
- * Funkrufnamen-Vorschläge für die ETB-Absender/Empfänger-Auswahl: im aktuellen
- * Einsatz disponierte Fahrzeuge (Funkrufname, OPTA in Klammern) + Einheiten (Name).
- * Reine Eingabehilfe — Freitext bleibt erlaubt (AC#1).
+ * Funkrufnamen des aktuellen Einsatzes als Text: disponierte Fahrzeuge (Funkrufname, OPTA in
+ * Klammern) + Einheiten (Name), alphabetisch. Für das `@`-Menü der Schnellerfassung; die Von/An-
+ * Felder nehmen die Quellen des Vorschlagsfelds (`stammdaten/vorschlagsquellen.ts`, LLH-1144),
+ * aus derselben Abbildung.
  */
 export function useFunkrufnamen(einsatzId: number): string[] {
-  const fahrzeuge = useQuery({
-    queryKey: einsatzKeys.fahrzeuge(einsatzId),
-    queryFn: () => listeEinsatzFahrzeuge(einsatzId),
-  });
-  const einheiten = useQuery({
-    queryKey: einsatzKeys.einheiten(einsatzId),
-    queryFn: () => listeEinheiten(einsatzId),
-  });
-
-  return useMemo(() => {
-    const namen = new Set<string>();
-    for (const f of fahrzeuge.data ?? []) {
-      namen.add(f.opta ? `${f.funkrufname} (${f.opta})` : f.funkrufname);
-    }
-    for (const e of einheiten.data ?? []) {
-      namen.add(e.name);
-    }
-    return [...namen].sort((a, b) => a.localeCompare(b, 'de'));
-  }, [fahrzeuge.data, einheiten.data]);
+  const vorschlaege = useFunkrufnamenEinsatz(einsatzId);
+  return useMemo(() => vorschlaege.map((v) => v.wert), [vorschlaege]);
 }

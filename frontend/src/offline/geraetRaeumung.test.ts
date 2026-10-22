@@ -8,6 +8,7 @@ import {
 import { entwuerfeLeerenFuerTests, entwurfSpeichern } from '../etb/entwuerfe/entwurfStore';
 import type { EtbEntwurf } from '../etb/entwuerfe/entwurfModell';
 import { rohLesen } from '../test/rohIdb';
+import { ladeZuletzt, merkeZuletzt } from '../stammdaten/zuletztVerwendet';
 import { loadGemerkteStelle, saveGemerkteStelle } from '../verpflegung/stellenGedaechtnis';
 import { geraetFuerBenutzerRaeumen, geraetRaeumen } from './geraetRaeumung';
 import {
@@ -53,6 +54,7 @@ async function geraetBefuellen(): Promise<void> {
   schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
   saveGemerkteStelle(7, 21);
   sessionStorage.setItem('lfh:liste:personen:7', 'q=Meier');
+  merkeZuletzt('funkrufname', 'Polizei vor Ort');
   await queueEinreihen(A, 7, { typ: 'meldung', inhalt: 'offline vorgemerkt', client_id: 'etb-a' });
 }
 
@@ -80,6 +82,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(loadGemerkteStelle(7)).toBeNull();
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
+    expect(ladeZuletzt('funkrufname')).toEqual([]);
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 
@@ -94,6 +97,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(loadGemerkteStelle(7)).toBeNull();
     expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
+    expect(ladeZuletzt('funkrufname')).toEqual([]);
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 

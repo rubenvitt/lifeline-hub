@@ -60,6 +60,7 @@ import {
 } from '../lagemeldungen/zeitachse';
 import { KennungsLink } from '../components/kennungsLink';
 import { modulName } from '../einsatz/modulRegistry';
+import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 
 const FENSTER_OPTIONEN: SegmentOption<Zeitfenster | 'alle'>[] = [
   { wert: 'alle', label: 'Alle' },
@@ -153,6 +154,13 @@ export default function LagemeldungenPage() {
     enabled: formOffen,
   });
   const funktionsVorschlaege = useFunktionsVorschlaege(formOffen ? einsatzId : undefined);
+  // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
+  const vorschlagsquellen = useFunkrufnamenQuellen({
+    einsatzId,
+    funktionen: funktionsVorschlaege,
+    uebernahme: true,
+    aktiv: formOffen,
+  });
 
   const neuAbgleichen = () => {
     void queryClient.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(einsatzId) });
@@ -466,6 +474,7 @@ export default function LagemeldungenPage() {
             einheiten={einheitenQuery.data}
             abschnitte={abschnitteQuery.data}
             funktionsVorschlaege={funktionsVorschlaege}
+            vorschlagsquellen={vorschlagsquellen}
           />
         </Paneel>
       )}

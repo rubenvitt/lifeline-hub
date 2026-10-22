@@ -1041,6 +1041,16 @@ Spec `bedien-arbeitsplatz`).
 - **Der Tastaturvertrag steht am Knopf, nie im Text** (LFH-1078): Tastenkappe ↵ an „Erfassen“
   nur bei feinem Zeiger und ab `lg`, Kürzel in `aria-keyshortcuts`; keine Hinweiszeile, kein Kürzel im
   Platzhalter (`etb/Schnellerfassung.tsx`).
+- **Ein Freitext, für den es Stammdaten oder Einsatzdaten gibt, nimmt `components/StammdatenFeld.tsx`**
+  (LLH-1144, Spec `stammdaten-feld`); Freitext bleibt erlaubt und als „frei“ erkennbar (Wort, keine
+  Farbe allein), ein gewählter Wert trägt seine Herkunft. Quellen sind Adapter in
+  `stammdaten/vorschlagsquellen.ts` (Gruppen „Im Einsatz“, „Stammdaten“, „Zuletzt verwendet“, Demo
+  dahinter); eine neue Quelle ändert das Feld nicht. Wertform `{ text, ref? }`, `nurText` wo nur Text
+  gespeichert wird. **Enter bei offener Liste sendet nie** (übernimmt den mit ↓/↑ markierten
+  Vorschlag, sonst den Freitext), bei geschlossener gilt die Norm oben. „In Stammdaten übernehmen“
+  nur über einen bestehenden Katalog mit reiner Textanlage (heute „Externe Stellen“), ohne
+  Stammdaten-Recht gesperrt mit Grund; nicht in der ETB-Leiste. Eingebaut: ETB Von/An (Chips und
+  Rufname-Abfrage), Meldung Absender/Empfänger.
 - **Ein-/Zweifeld-Kataloge nehmen `components/SchnellAnlegen.tsx`** (bewusst kein `<Form>`).
 - **Feldbudget** (LFH-19): Modal ≤ ~3, Schnellerfassung ≤ ~4 sichtbare Felder, Rest eingeklappt.
   Zählen nur mit `forceRender`, immer mit Gegenprobe „Aufklappen → Zahl steigt". Ausnahme

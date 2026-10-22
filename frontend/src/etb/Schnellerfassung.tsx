@@ -1,15 +1,7 @@
 import { IconAuge, IconBueroklammer, IconKreuz, IconPlus, IconWarndreieck } from '../icons';
 import { Alert, Button, Checkbox, Dropdown, Space, Typography, type GlobalToken } from 'antd';
 import dayjs from 'dayjs';
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-} from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
@@ -38,7 +30,12 @@ import { Schnellerfassungszeile, monoStil, useRollen } from '../components/instr
 import { useViewport } from '../components/useViewport';
 import MetaChip from './MetaChip';
 import { useFunkrufnamen } from './funkrufnamen';
-import { anVorbelegung, etbStabVorschlaege } from '../fuehrung/funktionsOptionenKern';
+import { anVorbelegung } from '../fuehrung/funktionsOptionenKern';
+import {
+  KONTEXT_FUNKRUFNAME,
+  merkeZuletzt,
+  useFunkrufnamenQuellen,
+} from '../stammdaten/vorschlagsquellen';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import SlashMenu, { type SlashMenuHandle } from './SlashMenu';
 import RufnameAbfrage from './RufnameAbfrage';
@@ -429,12 +426,14 @@ export default function Schnellerfassung({
   // Ohne Freigabe der Meldungen wird nur protokolliert (LLH-1037, design.md D8): Einsatz-Schreibrecht
   // hat, wer hier erfasst; es fehlt allein das Modul. Unbekannt heißt offen, der Server prüft.
   const meldungenGesperrt = sprungSperre('meldungen');
-  // „Von“/„An“: Funkrufnamen plus Sachgebiete (LFH-545/549) — der Stabsvorschlag tritt neben die
-  // Funkrufnamen, er ersetzt sie nicht.
-  const vonAnOptionen = useMemo(
-    () => [...funkrufnamen, ...etbStabVorschlaege(funktionen)],
-    [funkrufnamen, funktionen],
-  );
+  // „Von“/„An“ über das Vorschlagsfeld (LLH-1144, Spec `stammdaten-feld`): im Einsatz Funkrufnamen
+  // plus Sachgebiete (LFH-545/549), dazu Stammdaten und „Zuletzt verwendet“. Ohne „In Stammdaten
+  // übernehmen“: die Leiste hat dafür kein Höhenbudget (LFH-955, design.md D4).
+  const vonAnQuellen = useFunkrufnamenQuellen({
+    einsatzId: einsatz.id,
+    funktionen,
+    uebernahme: false,
+  });
 
   // onWerteChange in einer Ref: der Autosave-Effekt feuert NUR auf echte Wertänderungen.
   // In den Deps triggerte jede neue Callback-Referenz des Containers den Effekt erneut
@@ -600,6 +599,10 @@ export default function Schnellerfassung({
   function commitFeld(feld: MetaFeld, wert: string | dayjs.Dayjs | MeldeWeg) {
     if (sendet) return;
     if (feld === 'ereigniszeit') setZukunftsGrund(null);
+    // Ein übernommenes Von/An merkt sich das Gerät für „Zuletzt verwendet“ (LLH-1144, D5).
+    if ((feld === 'von' || feld === 'an') && typeof wert === 'string') {
+      merkeZuletzt(KONTEXT_FUNKRUFNAME, wert);
+    }
     setMetadaten((m) => ({ ...m, [feld]: wert }));
     setEditFeld(null);
     fokusInsFeld();
@@ -1078,7 +1081,7 @@ export default function Schnellerfassung({
           // Neu montiert beim Wechsel zwischen erster Abfrage und Ändern: die Felder starten
           // dann mit dem jeweils richtigen Wert.
           key={rufname.standard ? 'aendern' : 'erste'}
-          optionen={vonAnOptionen}
+          quellen={vonAnQuellen}
           standard={rufname.standard}
           vorschlag={anVorbelegung(einsatz)}
           onUebernehmen={async (wert) => {
@@ -1198,7 +1201,7 @@ export default function Schnellerfassung({
                 onStandardAendern={
                   berichtigungZu || sendet ? undefined : () => setRufnameAendern(true)
                 }
-                optionen={feld === 'von' || feld === 'an' ? vonAnOptionen : undefined}
+                quellen={feld === 'von' || feld === 'an' ? vonAnQuellen : undefined}
                 onCommit={commitFeld}
                 onCancel={() => {
                   setEditFeld(null);
@@ -1222,7 +1225,7 @@ export default function Schnellerfassung({
                 feld={editFeld}
                 editing
                 wert={undefined}
-                optionen={editFeld === 'von' || editFeld === 'an' ? vonAnOptionen : undefined}
+                quellen={editFeld === 'von' || editFeld === 'an' ? vonAnQuellen : undefined}
                 onCommit={commitFeld}
                 onCancel={() => {
                   setEditFeld(null);

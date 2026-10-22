@@ -47,7 +47,7 @@ test.describe(KAPITEL, () => {
       .getByLabel('Inhalt / Wortlaut')
       .fill('Gasgeruch im Keller Lindenstraße 6, Bewohner verlassen das Haus.');
     await paneel.getByLabel('Absender').fill('Florian Musterstadt 2/1');
-    await paneel.getByPlaceholder('z. B. ELW 1, S3').fill('ELW 1');
+    await paneel.getByLabel('Empfänger / Adressat').fill('ELW 1');
     await paneel.getByRole('button', { name: /^Weitere Angaben/ }).click();
     await expect(paneel.getByLabel('Bestätigungsfrist in Minuten')).toBeVisible();
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());

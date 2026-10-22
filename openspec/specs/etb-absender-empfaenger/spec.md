@@ -31,7 +31,11 @@ Wer im ETB eines laufenden Einsatzes schreiben darf und keinen Standard hat, SHA
 Erfassung nach dem Rufnamen gefragt werden. Die Abfrage MUST das Lesen des ETB nicht
 blockieren. Ist ein Standard gesetzt, SHALL er in der Erfassung sichtbar stehen und dort
 änderbar sein. Die Auswahl MUST Funkrufnamen und Sachgebiete vorschlagen und Freitext erlauben;
-„Empfänger wie Absender“ MUST wählbar und die Vorgabe sein.
+„Empfänger wie Absender“ MUST wählbar und die Vorgabe sein. Abfrage und Von/An-Chips SHALL das
+Vorschlagsfeld der Spec `stammdaten-feld` nehmen: im Einsatz disponierte Fahrzeuge, Einheiten und
+Sachgebiete unter „Im Einsatz“, Fahrzeuge im Dienst und externe Stellen unter „Stammdaten“, dazu
+„Zuletzt verwendet“; ein freier Rufname trägt „frei“. In der Erfassung MUST kein „In Stammdaten
+übernehmen“ stehen.
 
 #### Scenario: Erster Besuch
 - **WHEN** eine Person ohne Standard das ETB eines laufenden Einsatzes mit Schreibrecht öffnet
@@ -49,6 +53,11 @@ blockieren. Ist ein Standard gesetzt, SHALL er in der Erfassung sichtbar stehen 
 #### Scenario: Freitext
 - **WHEN** eine Person in der Abfrage „Abschnitt Nord“ tippt, das in keinem Vorschlag steht
 - **THEN** wird „Abschnitt Nord“ als Standard übernommen
+
+#### Scenario: Vorschläge in Gruppen
+- **WHEN** eine Person im Chip „Von“ „Flo“ tippt und „Florian 1“ im Einsatz disponiert ist
+- **THEN** steht „Florian 1“ unter „Im Einsatz“; Enter übernimmt „Flo“ als freien Rufnamen, ↓ und
+  Enter übernehmen „Florian 1“
 
 #### Scenario: Ändern
 - **WHEN** eine Person mit dem Standard „ELW 1“ in der Erfassung ihren Standard auf „ELW 2“

@@ -133,8 +133,8 @@ test.describe(KAPITEL, () => {
     await paneel
       .getByRole('textbox', { name: 'Inhalt / Wortlaut' })
       .fill('Pegel Mühlbach 2,40 m, steigt weiter. Deich an der Unterstadt hält.');
-    await paneel.getByRole('textbox', { name: 'Absender' }).fill('EA Unterstadt');
-    await paneel.getByRole('textbox', { name: 'Absender' }).blur();
+    await paneel.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
+    await paneel.getByRole('combobox', { name: 'Absender' }).blur();
     await fotografiere(paneel, KAPITEL, 'lagemeldung-erfassen');
     // Ablauf weiter: erfassen; die neue steht in der Zeitachse.
     await paneel.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
