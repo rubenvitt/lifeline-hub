@@ -1890,7 +1890,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     nachforderungen(() => HttpResponse.json([nachforderung]));
     render(einsatzAktiv, [uebernommen as unknown as typeof em]);
     const link = await screen.findByRole('link', {
-      name: 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße',
+      name: 'aus Nachforderung: Tauchpumpe — 3 Tauchpumpen für Keller Hauptstraße',
     });
     expect(link).toHaveAttribute('href', '/einsaetze/1/nachforderungen?nachforderung=4');
   });
@@ -1898,7 +1898,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
   it('ein langer Bedarf steht in höchstens zwei Zeilen, der Volltext im title (Prüfliste)', async () => {
     nachforderungen(() => HttpResponse.json([nachforderung]));
     render(einsatzAktiv, [uebernommen as unknown as typeof em]);
-    const text = 'aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße';
+    const text = 'aus Nachforderung: Tauchpumpe — 3 Tauchpumpen für Keller Hauptstraße';
     const link = await screen.findByRole('link', { name: text });
     expect(link).toHaveAttribute('title', text);
     // Der innerste Span mit dem Text trägt die Auslassung (der äußere ist der Boden des Links).
@@ -1912,7 +1912,9 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     const { container } = render(einsatzAktiv, [uebernommen as unknown as typeof em]);
     const karte = await waitFor(() => {
       const k = container.querySelector<HTMLElement>('[data-lfh="datensicht-karte"]');
-      expect(k).toHaveTextContent('aus Nachforderung: 3 Tauchpumpen für Keller Hauptstraße');
+      expect(k).toHaveTextContent(
+        'aus Nachforderung: Tauchpumpe — 3 Tauchpumpen für Keller Hauptstraße',
+      );
       return k as HTMLElement;
     });
     const herkunft = karte.querySelector<HTMLElement>('[data-lfh="material-herkunft"]');

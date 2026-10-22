@@ -120,4 +120,16 @@ describe('kartenZeiten (LLH-1078, Einhängepunkt LLH-1097)', () => {
     expect(zeiten.map((z) => z.text)).toEqual(['Angefordert: 09:00 · Erika', 'Zugesagt: 09:10']);
     expect(zeiten.every((z) => z.ton === undefined)).toBe(true);
   });
+
+  it('die Bedarfszeit steht nach der Anforderung (LLH-1089)', () => {
+    const zeiten = kartenZeiten(
+      nf({ benoetigt_bis: '2026-06-12 13:30:00', zugesagt_at: '2026-06-12 09:10:00' }),
+      (z) => z.slice(11, 16),
+    );
+    expect(zeiten.map((z) => z.text)).toEqual([
+      'Angefordert: 09:00',
+      'Benötigt bis: 13:30',
+      'Zugesagt: 09:10',
+    ]);
+  });
 });

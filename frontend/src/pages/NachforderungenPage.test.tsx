@@ -23,6 +23,12 @@ import { setzeViewportBreite } from '../test/viewport';
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-06-12T12:00:00Z'));
+  // Vorschläge und Ziele der Erfassung (LLH-1089): leer, wenn ein Test nichts anderes setzt.
+  server.use(
+    http.get('/api/einheit-typen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+  );
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -159,8 +165,8 @@ describe('NachforderungenPage', () => {
     await screen.findByText('2 RTW zur Verstärkung');
     // Das Formular liegt hinter dem Kopf-Toggle → erst aufklappen.
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
     await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
     await waitFor(() =>
       expect(legeNachforderungAn).toHaveBeenCalledWith(
@@ -384,14 +390,14 @@ describe('NachforderungenPage', () => {
       begruendung: string;
     }) =>
       waitFor(() => {
-        expect(screen.getByLabelText('Art')).toHaveValue(w.art);
-        expect(screen.getByLabelText('Bezeichnung')).toHaveValue(w.bezeichnung);
+        expect(screen.getByLabelText('Was')).toHaveValue(w.art);
+        expect(screen.getByLabelText('Details / Zweck')).toHaveValue(w.bezeichnung);
         expect(screen.getByLabelText('Anzahl')).toHaveValue(w.anzahl);
         expect(begruendungFeld()).toHaveValue(w.begruendung);
       });
     const erwarteVorbelegt = () => erwarteMaske({ ...vorbelegung, anzahl: '20' });
     const erwarteLeer = () =>
-      erwarteMaske({ art: '', bezeichnung: '', anzahl: '', begruendung: '' });
+      erwarteMaske({ art: '', bezeichnung: '', anzahl: '1', begruendung: '' });
 
     it('öffnet die Erfassung vorbelegt und räumt die Adresse', async () => {
       renderPage(deeplink);
@@ -403,14 +409,14 @@ describe('NachforderungenPage', () => {
 
     it('ein Neuladen mit der geräumten Adresse öffnet nichts', async () => {
       const erster = renderPage(deeplink);
-      await screen.findByLabelText('Art');
+      await screen.findByLabelText('Was');
       await waitFor(() => expect(screen.getByTestId('ort').textContent).not.toContain('?'));
       const geraeumt = screen.getByTestId('ort').textContent ?? '';
       erster.unmount();
 
       renderPage(geraeumt);
       await screen.findByText('2 RTW zur Verstärkung');
-      expect(screen.queryByLabelText('Art')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Was')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Nachforderung anlegen/ })).toBeInTheDocument();
     });
 
@@ -461,7 +467,7 @@ describe('NachforderungenPage', () => {
       const schliessen = screen.getAllByRole('button', { name: 'Formular schließen' });
       expect(schliessen).toHaveLength(2);
       await userEvent.click(schliessen[0]);
-      await waitFor(() => expect(screen.queryByLabelText('Art')).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByLabelText('Was')).not.toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
       await erwarteLeer();
     });
@@ -478,7 +484,7 @@ describe('NachforderungenPage', () => {
       await waitFor(() =>
         expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/),
       );
-      expect(screen.queryByLabelText('Art')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Was')).not.toBeInTheDocument();
     });
   });
 });
@@ -517,12 +523,12 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
     await setzeAb();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Art unbekannt');
-    expect(screen.getByLabelText('Art')).toHaveValue('SEG');
+    expect(screen.getByLabelText('Was')).toHaveValue('SEG');
     expect(document.querySelectorAll('.ant-message-notice')).toHaveLength(0);
   });
 
@@ -533,8 +539,8 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
     await setzeAb();
     await screen.findByText('Art unbekannt');
 
@@ -547,14 +553,14 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await userEvent.type(screen.getByLabelText('Art'), 'SEG');
-    await userEvent.type(screen.getByLabelText('Bezeichnung'), 'Eine SEG');
+    await userEvent.type(screen.getByLabelText('Was'), 'SEG');
+    await userEvent.type(screen.getByLabelText('Details / Zweck'), 'Eine SEG');
     await setzeAb();
     await screen.findByText('Art unbekannt');
 
     await userEvent.click(screen.getAllByRole('button', { name: 'Formular schließen' })[0]);
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await screen.findByLabelText('Art');
+    await screen.findByLabelText('Was');
     expect(screen.queryByText('Art unbekannt')).not.toBeInTheDocument();
   });
 
@@ -679,7 +685,7 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
     const grund = await within(hinweis).findByRole('alert');
     expect(grund).toHaveTextContent('Bereits eingetroffen gemeldet');
     // Der Titel nennt die Nachforderung: oben steht nicht mehr, welche Karte gemeint ist.
-    expect(grund).toHaveTextContent('Status von „2 RTW zur Verstärkung“ nicht geändert');
+    expect(grund).toHaveTextContent('Status von „2× RTW — 2 RTW zur Verstärkung“ nicht geändert');
     expect(document.querySelectorAll('.ant-message-error')).toHaveLength(0);
 
     // In der Stufe, die die Karte zeigt, steht der Grund wieder an ihr, nicht doppelt oben.
@@ -1184,7 +1190,7 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
   it('?neu=1&betreuungsstelle= öffnet die Erfassung mit Bezug, räumt den Parameter und sendet die Kennung', async () => {
     legeNachforderungAn.mockResolvedValue(FELDBETTEN);
     renderPage('/einsaetze/1/nachforderungen?neu=1&betreuungsstelle=8&stelle=8');
-    expect(await screen.findByLabelText('Art')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Was')).toBeInTheDocument();
     await waitFor(() =>
       expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/nachforderungen?stelle=8'),
     );
@@ -1196,8 +1202,8 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
       ),
     );
 
-    await userEvent.type(screen.getByLabelText('Art'), 'Decken');
-    await userEvent.type(screen.getByLabelText('Bezeichnung'), '100 Wolldecken');
+    await userEvent.type(screen.getByLabelText('Was'), 'Decken');
+    await userEvent.type(screen.getByLabelText('Details / Zweck'), '100 Wolldecken');
     await userEvent.click(screen.getByRole('button', { name: 'Nachforderung absetzen' }));
     await waitFor(() =>
       expect(legeNachforderungAn).toHaveBeenCalledWith(
@@ -1210,11 +1216,11 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
   it('Schließen räumt den Bezug: die nächste Erfassung ist ohne Stelle', async () => {
     legeNachforderungAn.mockResolvedValue(RTW);
     renderPage('/einsaetze/1/nachforderungen?neu=1&betreuungsstelle=8');
-    await screen.findByLabelText('Art');
+    await screen.findByLabelText('Was');
     await userEvent.click(screen.getAllByRole('button', { name: 'Formular schließen' })[0]);
-    await waitFor(() => expect(screen.queryByLabelText('Art')).toBeNull());
+    await waitFor(() => expect(screen.queryByLabelText('Was')).toBeNull());
     await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
-    await screen.findByLabelText('Art');
+    await screen.findByLabelText('Was');
     expect(document.querySelector('[data-lfh="nachforderung-bezug"]')).toBeNull();
     expect(screen.getByLabelText('Begründung / Lagebezug')).toHaveValue('');
   });

@@ -10280,4 +10280,247 @@ mod tests {
             "Index der Lage-Sicht"
         );
     }
+
+    // --- LLH-1089: Ziel und Bedarfszeit an der Nachforderung (0235) ---
+
+    /// Neubau ohne `NOT NULL` an `bezeichnung` (design.md D7): der Bestand bleibt mit seiner id,
+    /// alle drei Kinder (ETB, Material, Verpflegungsausgabe) bleiben verbunden, die Kaskade des
+    /// DROP läuft nicht, und die Fremdschlüssel sind danach wieder an.
+    #[tokio::test]
+    async fn migration_0235_baut_nachforderung_um_und_erhaelt_bestand_und_kinder() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 232).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let stelle: i64 = sqlx::query_scalar(
+            "INSERT INTO betreuungsstelle (einsatz_id, bezeichnung, art, angelegt_von_id) \
+             VALUES (?, 'Turnhalle Ost', 'notunterkunft', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let n: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, \
+                adressat_bezeichnung, begruendung, prioritaet, status, zugesagt_at, \
+                angefordert_at, erstellt_von_id, erstellt_at, betreuungsstelle_id) \
+             VALUES (?, 'RTW', 'Transport aus der UHS', 2, 'leitstelle', 'ILS Nord', 'Lage', \
+                'sofort', 'zugesagt', '2026-10-21 08:05:00', '2026-10-21 08:00:00', ?, \
+                '2026-10-21 08:00:01', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(stelle)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let etb: i64 = sqlx::query_scalar(
+            "INSERT INTO etb_eintrag (einsatz_id, lfd_nr, typ, inhalt, erfasser_id, ereigniszeit, \
+                nachforderung_id) \
+             VALUES (?, 1, 'meldung', 'Nachforderung: 2× RTW', ?, '2026-10-21 08:00:00', ?) \
+             RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(n)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE nachforderung SET etb_nachforderung_id = ? WHERE id = ?")
+            .bind(etb)
+            .bind(n)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let posten: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_material (einsatz_id, snap_bezeichnung, art, nachforderung_id) \
+             VALUES (?, 'Trage', 'geraet', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(n)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let (_zf, ausgabe) = verpflegung_bestand(&pool, e, b).await;
+        sqlx::query("UPDATE verpflegung_ausgabe SET nachforderung_id = ? WHERE id = ?")
+            .bind(n)
+            .bind(ausgabe)
+            .execute(&pool)
+            .await
+            .unwrap();
+        type Zeile = (
+            i64,
+            String,
+            Option<String>,
+            Option<i64>,
+            String,
+            Option<String>,
+            String,
+            Option<String>,
+            String,
+            Option<i64>,
+            String,
+            Option<i64>,
+        );
+        // Zwölf Spalten, mehr trägt ein Tupel für `assert_eq!` nicht; die übrigen kopiert dieselbe
+        // Spaltenliste des INSERT … SELECT.
+        const BESTAND: &str = "SELECT id, art, bezeichnung, anzahl, adressat_kategorie, \
+            adressat_bezeichnung, status, zugesagt_at, angefordert_at, \
+            etb_nachforderung_id, erstellt_at, betreuungsstelle_id FROM nachforderung ORDER BY id";
+        let vorher: Vec<Zeile> = sqlx::query_as(BESTAND).fetch_all(&pool).await.unwrap();
+
+        migriere_bis(&pool, 235).await;
+
+        let nachher: Vec<Zeile> = sqlx::query_as(BESTAND).fetch_all(&pool).await.unwrap();
+        assert_eq!(nachher, vorher, "Bestand 1:1 mit id");
+        let neu: (Option<i64>, Option<i64>, Option<String>, Option<String>) = sqlx::query_as(
+            "SELECT ziel_br_id, ziel_abschnitt_id, ziel_text, benoetigt_bis FROM nachforderung \
+             WHERE id = ?",
+        )
+        .bind(n)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(neu, (None, None, None, None), "der Bestand hat kein Ziel");
+        for (tabelle, id) in [
+            ("etb_eintrag", etb),
+            ("einsatz_material", posten),
+            ("verpflegung_ausgabe", ausgabe),
+        ] {
+            let bezug: Option<i64> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+                "SELECT nachforderung_id FROM {tabelle} WHERE id = ?"
+            )))
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                bezug,
+                Some(n),
+                "{tabelle}: das DROP hat die Kaskade nicht ausgelöst"
+            );
+        }
+        let verletzt: Vec<(String, i64, String, i64)> = sqlx::query_as("PRAGMA foreign_key_check")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(verletzt.is_empty(), "{verletzt:?}");
+        let fk: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(fk, 1, "Fremdschlüssel wieder an");
+        let mut indizes: Vec<String> = sqlx::query_scalar(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'nachforderung' \
+             AND sql IS NOT NULL ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        indizes.sort();
+        assert_eq!(
+            indizes,
+            [
+                "idx_nachforderung_betreuungsstelle",
+                "idx_nachforderung_einsatz",
+                "idx_nachforderung_ziel_abschnitt",
+                "idx_nachforderung_ziel_br",
+            ]
+        );
+        let tabellen: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'nachforderung_neu'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(tabellen, 0);
+    }
+
+    /// Nach 0235: ohne Bezeichnung gültig, höchstens ein Ziel (CHECK), und das Löschen eines
+    /// Raums oder Abschnitts löst den Bezug, statt aufgehalten zu werden.
+    #[tokio::test]
+    async fn migration_0235_ziel_regeln() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 235).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'BR Nord', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'EA Deich') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let anlegen = |br: Option<i64>, abschnitt: Option<i64>, text: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO nachforderung (einsatz_id, art, adressat_kategorie, \
+                        angefordert_at, erstellt_von_id, ziel_br_id, ziel_abschnitt_id, \
+                        ziel_text, benoetigt_bis) \
+                     VALUES (?, 'RTW', 'leitstelle', '2026-10-21 08:00:00', ?, ?, ?, ?, \
+                        '2026-10-21 09:30:00') RETURNING id",
+                )
+                .bind(e)
+                .bind(b)
+                .bind(br)
+                .bind(abschnitt)
+                .bind(text)
+                .fetch_one(&pool)
+                .await
+            }
+        };
+        let zum_br = anlegen(Some(br), None, None)
+            .await
+            .expect("ohne Bezeichnung, mit Ziel BR");
+        let zum_abschnitt = anlegen(None, Some(abschnitt), None).await.unwrap();
+        anlegen(None, None, Some("Lotsenpunkt Feuerwache"))
+            .await
+            .expect("Freitext-Ziel");
+        anlegen(None, None, None).await.expect("ohne Ziel");
+        let fehler = anlegen(Some(br), None, Some("Zufahrt Süd"))
+            .await
+            .expect_err("zwei Ziele");
+        assert!(fehler.to_string().contains("CHECK"), "{fehler}");
+        anlegen(Some(br), Some(abschnitt), None)
+            .await
+            .expect_err("Raum und Abschnitt");
+
+        sqlx::query("DELETE FROM bereitstellungsraum WHERE id = ?")
+            .bind(br)
+            .execute(&pool)
+            .await
+            .expect("der Bezug hält das Löschen des Raums nicht auf");
+        sqlx::query("DELETE FROM einsatzabschnitt WHERE id = ?")
+            .bind(abschnitt)
+            .execute(&pool)
+            .await
+            .expect("der Bezug hält das Auflösen des Abschnitts nicht auf");
+        let ziele: Vec<(Option<i64>, Option<i64>)> = sqlx::query_as(
+            "SELECT ziel_br_id, ziel_abschnitt_id FROM nachforderung WHERE id IN (?, ?) \
+             ORDER BY id",
+        )
+        .bind(zum_br)
+        .bind(zum_abschnitt)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            ziele,
+            vec![(None, None), (None, None)],
+            "ON DELETE SET NULL"
+        );
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt die Nachforderungen mit");
+    }
 }
