@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../test/utils';
-import { ZEICHEN_UNTERLAGE } from '../zeichen/EinsatzZeichen';
+import { ZEICHEN_UNTERLAGE } from '../zeichen/unterlage';
 import EinheitZeichen, { FahrzeugZeichen } from './EinheitZeichen';
 
 // Die Spalte „TZ“ im Meldebild (LFH-835): @einsatzzeichen, und ein gespeicherter Unsinnswert

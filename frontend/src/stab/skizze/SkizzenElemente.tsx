@@ -15,7 +15,8 @@
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useRollen } from '../../components/instrument';
-import EinsatzZeichen, { FunktionsZeichen, ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
+import EinsatzZeichen, { FunktionsZeichen } from '../../zeichen/EinsatzZeichen';
+import { ZEICHEN_UNTERLAGE } from '../../zeichen/unterlage';
 import type {
   AusstattungsZeichen,
   NetzBereich,
@@ -69,7 +70,7 @@ const TZ_PX = TZ_HOEHE;
 
 /**
  * Helle Unterlage hinter jedem taktischen Zeichen am Schirm (LFH-1107): dieselbe Farbe wie der
- * Baustein `ZEICHEN_UNTERLAGE` (`zeichen/EinsatzZeichen.tsx`, Begründung dort). In der Skizze
+ * Baustein `ZEICHEN_UNTERLAGE` (`zeichen/unterlage.ts`, Begründung dort). In der Skizze
  * steht das Zeichen als inneres `svg` im SVG der Fläche, das keinen Hintergrund malt; deshalb
  * trägt hier ein `rect` die Unterlage. Im Druck und in der Anlage steht keine (`unterlage` aus
  * der Fläche, dazu `skizzeDruck.css`). Gemessen in beiden Modi im e2e „Zeichenkontrast“

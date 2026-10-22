@@ -21,7 +21,7 @@ import Organigramm, { OrganigrammBild } from './Organigramm';
 import { baumZielStil } from '../../components/organigramm/HaengenderBaum';
 import { dichten } from '../../theme/tokens';
 import { baueFuehrungsorganisation } from './fuehrungsorganisation';
-import { ZEICHEN_UNTERLAGE } from '../../zeichen/EinsatzZeichen';
+import { ZEICHEN_UNTERLAGE } from '../../zeichen/unterlage';
 
 vi.mock('../../api/einsaetze', () => ({
   ladeModulFreigaben: vi.fn(),
