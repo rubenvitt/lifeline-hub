@@ -357,8 +357,19 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
 - **Lesen prüft das Recht erneut** (`aufloesung::Leserecht`): fremd, unbekannt oder ohne Recht am
   Einsatz bzw. am Modul des Bezugs ist 404, nie 403.
 - Ein Fehler in `melden` lässt die committete Anfrage nicht scheitern (geloggt). Aufräumen
-  (quittiert nach 24 h, offen nach 12 h) läuft im Erinnerungs-Scheduler; mit dem Einsatz fallen
-  die Zeilen per `ON DELETE CASCADE`. Nachweis `tests/benachrichtigung.rs`.
+  (quittiert 24 h nach der Quittung, offen 24 h nach dem Entstehen; nachgereicht wird nur 12 h)
+  läuft im Erinnerungs-Scheduler; mit dem Einsatz fallen die Zeilen per `ON DELETE CASCADE`.
+  Nachweis `tests/benachrichtigung.rs`.
+- **Drei Stufen, still ist eine gelesene Zeile** (LLH-1143, Entwurf
+  `/mnt/project-files/llh-1022/llh-1143/design.md`, D1–D4): `hinweis` ist die Stufe Eingang.
+  Wer eine Art abgeschaltet hat, bekommt in `aufloesung::empfaenger` eine Zeile der Stufe
+  `still` (`Aufgeloest::still_ids`), die `repo::anlegen` mit `quittiert_at = erstellt_at`
+  schreibt: im Verlauf, nie gezählt, nie nachgereicht, kein Push; `melden` liefert nur die
+  Lauten. Die Tabelle ist zugleich Protokoll und Gelesen-Stand je Person; es gibt keine zweite.
+  Verlauf `GET …/einsaetze/{id}/benachrichtigungen` (≤ 200, `ungelesen` = unquittierte Eingänge
+  nach der Rechteprüfung), „alle gelesen“ `POST …/benachrichtigungen/gelesen` nur über
+  `benachrichtigung::gelesen_bis`: nie Alarme, EIN Quittier-Ereignis mit `gelesen_bis`, nie eines
+  je Zeile.
 - **Für alle erledigt nur über `benachrichtigung::erledigen`** (LLH-1062): ist der Anlass selbst
   vorbei (eine gesichtete Meldung, eine gesehene Lagemeldung), quittiert es die offenen Zeilen
   ALLER Empfänger zu diesem Bezug und stellt jedem sein Quittier-Ereignis zu. Ein Alarm wird so

@@ -2677,6 +2677,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "gelesen_bis": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "„Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes\nbis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von\n`POST …/benachrichtigungen/gelesen`; die übrigen Felder nennen die jüngste davon, ein\nälterer Client liest es als deren Einzelquittung."
+          },
           "quittiert": {
             "type": "boolean",
             "description": "`true`: der Empfänger hat sie quittiert, ihre Toasts auf seinen anderen Verbindungen\nverschwinden (Spec „Quittieren gilt für alle Verbindungen des Nutzers“)."
@@ -2688,11 +2696,34 @@
       },
       "BenachrichtigungStufe": {
         "type": "string",
-        "description": "Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“). Die dritte Stufe, *still*, erzeugt\nkeine Benachrichtigung und hat deshalb keinen Wert.",
+        "description": "Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142\nE1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);\n*still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe\nseiner Rolle sie still stellt ([`aufloesung`]).",
         "enum": [
           "alarm",
-          "hinweis"
+          "hinweis",
+          "still"
         ]
+      },
+      "BenachrichtigungVerlauf": {
+        "type": "object",
+        "description": "Der Verlauf eines Einsatzes für den Knopf „Eingänge“ (LLH-1143, design.md D3): die jüngsten\neigenen Benachrichtigungen samt Text und die Zahl der ungelesenen Eingänge darunter.",
+        "required": [
+          "eintraege",
+          "ungelesen"
+        ],
+        "properties": {
+          "eintraege": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenachrichtigungAnzeige"
+            },
+            "description": "Jüngste zuerst, höchstens [`repo::LISTE_MAX`]; ohne die, deren Modul der Nutzer nicht\n(mehr) lesen darf."
+          },
+          "ungelesen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Ungelesene Eingänge (Stufe `hinweis`, unquittiert) unter `eintraege`; Alarme und Stilles\nzählen nie."
+          }
+        }
       },
       "BenutzerAnzeige": {
         "type": "object",
@@ -8090,6 +8121,21 @@
           "durchbruch",
           "ertrinken"
         ]
+      },
+      "GelesenEingabe": {
+        "type": "object",
+        "description": "Body von `POST …/benachrichtigungen/gelesen`.",
+        "required": [
+          "bis_id"
+        ],
+        "properties": {
+          "bis_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Die jüngste gelesene Benachrichtigung: alles bis einschließlich ihr gilt als gelesen."
+          }
+        },
+        "additionalProperties": false
       },
       "GeoJsonFeature": {
         "type": "object",

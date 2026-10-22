@@ -4,6 +4,9 @@
 //!                                                    nur unquittierte, `?einsatz_id=`)
 //! GET  /api/benachrichtigungen/{id}               — eine eigene samt Text
 //! POST /api/benachrichtigungen/{id}/quittieren    — quittieren, Ereignis an die eigenen Tabs
+//! GET  /api/einsaetze/{id}/benachrichtigungen     — Verlauf samt Zahl der ungelesenen Eingänge
+//!                                                    (LLH-1143, design.md D3)
+//! POST /api/einsaetze/{id}/benachrichtigungen/gelesen — „alle gelesen“ bis `bis_id` (D4)
 //!
 //! **Berechtigung ist die Empfängerzeile:** die `benutzer_id` stammt aus der Sitzung; eine
 //! fremde oder unbekannte Benachrichtigung ist 404, nie 403 (kein Hinweis, dass es sie gibt).
@@ -16,15 +19,20 @@ use crate::auth::session::CurrentUser;
 use crate::auth::Benutzer;
 use crate::benachrichtigung::aufloesung::Leserecht;
 use crate::benachrichtigung::repo::{self, Zeile};
-use crate::benachrichtigung::{text, BenachrichtigungAnzeige, BenachrichtigungEreignis, Bezug};
+use crate::benachrichtigung::{
+    text, BenachrichtigungAnzeige, BenachrichtigungEreignis, BenachrichtigungStufe,
+    BenachrichtigungVerlauf, Bezug,
+};
+use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::error::AppError;
-use crate::extract::PfadParam;
+use crate::extract::{JsonBody, PfadParam};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 /// Filter der Liste.
 #[derive(Debug, Deserialize)]
@@ -161,11 +169,71 @@ pub async fn quittieren(
                             bezug_typ: z.bezug_typ,
                             bezug_id: z.bezug_id,
                             quittiert: true,
+                            gelesen_bis: None,
                         },
                     )],
                 );
             }
         }
     }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/einsaetze/{id}/benachrichtigungen — der Verlauf des Nutzers in diesem Einsatz
+/// (LLH-1143, design.md D3): seine jüngsten Benachrichtigungen samt Text und die Zahl der
+/// ungelesenen Eingänge darunter. Nur wer den Einsatz lesen darf (sonst 404); ein Eintrag, dessen
+/// Modul der Nutzer nicht (mehr) lesen darf, fehlt und zählt nicht.
+pub async fn verlauf(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff,
+) -> Result<Json<BenachrichtigungVerlauf>, AppError> {
+    let ctx = ctx.0;
+    let zeilen = repo::verlauf(&state.pool, ctx.benutzer.id, ctx.einsatz.id).await?;
+    let mut eintraege = Vec::with_capacity(zeilen.len());
+    if !zeilen.is_empty() {
+        let recht = Leserecht::laden(&state.pool, ctx.einsatz.id).await?;
+        for z in zeilen {
+            if let Some(a) = anzeige(&state.pool, &recht, &ctx.benutzer, z).await? {
+                eintraege.push(a);
+            }
+        }
+    }
+    let ungelesen = eintraege
+        .iter()
+        .filter(|a| a.stufe == BenachrichtigungStufe::Hinweis && a.quittiert_at.is_none())
+        .count() as i64;
+    Ok(Json(BenachrichtigungVerlauf {
+        eintraege,
+        ungelesen,
+    }))
+}
+
+/// Body von `POST …/benachrichtigungen/gelesen`.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct GelesenEingabe {
+    /// Die jüngste gelesene Benachrichtigung: alles bis einschließlich ihr gilt als gelesen.
+    pub bis_id: i64,
+}
+
+/// POST /api/einsaetze/{id}/benachrichtigungen/gelesen — „alle gelesen“ (LLH-1143, design.md
+/// D4): quittiert die eigenen Eingänge (und Stilles) dieses Einsatzes bis `bis_id`, nie einen
+/// Alarm, und meldet es den eigenen Verbindungen mit einem Ereignis. Idempotent, 204. Ein
+/// persönlicher Lesestand, deshalb Lese- statt Schreibrecht und auch am abgeschlossenen Einsatz.
+pub async fn gelesen(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff,
+    JsonBody(eingabe): JsonBody<GelesenEingabe>,
+) -> Result<StatusCode, AppError> {
+    let ctx = ctx.0;
+    crate::benachrichtigung::gelesen_bis(
+        &state.pool,
+        &state.live,
+        ctx.einsatz.org_id,
+        ctx.einsatz.id,
+        ctx.benutzer.id,
+        eingabe.bis_id,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }

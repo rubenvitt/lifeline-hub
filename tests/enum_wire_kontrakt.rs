@@ -1321,6 +1321,7 @@ fn benachrichtigung_wire() {
     enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungStufe {
         Alarm => "alarm",
         Hinweis => "hinweis",
+        Still => "still",
     } in lifeline_hub::benachrichtigung::BenachrichtigungStufe::ALLE);
     enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungArt {
         Sofortmeldung => "sofortmeldung",
