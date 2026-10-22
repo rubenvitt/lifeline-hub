@@ -140,14 +140,20 @@ Fehlerseite der App fallen.
 ### Requirement: Stammdaten des Bezirks in der Ansicht bearbeiten
 
 Die Detailseite SHALL Bezeichnung, Plangröße mit Erhebung, Einsatzabschnitt, Sammelstelle und
-Notiz in der Ansicht bearbeitbar machen. Ein Speichern MUST nur die Felder senden, die die
-Person geändert hat und die der aktuelle Stand noch nicht trägt, und ohne solche Felder nichts
-senden. Prüffehler MUST am Feld stehen. Mit ungespeicherter Änderung MUST ein Wechsel der Seite
+Notiz in der Ansicht bearbeitbar machen; die Sammelstelle über das Ortsfeld (Spec `ortsfeld`).
+Eine verortete Sammelstelle SHALL im Lesemodus neben dem Text die Koordinate mit Ort-Zeile
+zeigen. Ein Speichern MUST nur die Felder senden, die die Person geändert hat und die der
+aktuelle Stand noch nicht trägt, und ohne solche Felder nichts senden; die Koordinate der
+Sammelstelle zählt dabei als ein Feld. Prüffehler MUST am Feld stehen. Mit ungespeicherter Änderung MUST ein Wechsel der Seite
 nachfragen.
 
 #### Scenario: Plangröße bearbeiten, während jemand die Notiz ändert
 - **WHEN** eine Person die Plangröße auf 820 ändert und währenddessen eine andere die Notiz schreibt
 - **THEN** sendet das Speichern nur `plan_personen: 820`, und die fremde Notiz bleibt
+
+#### Scenario: Sammelstelle verorten
+- **WHEN** eine Person die Sammelstelle über die Ortssuche auf „Schulweg 2, 12345 Musterstadt“ setzt und speichert
+- **THEN** sendet das Speichern Text und Koordinate, und der Lesemodus zeigt die Koordinate mit Ort-Zeile
 
 #### Scenario: Verlassen mit offener Änderung
 - **WHEN** während der Bearbeitung die Brotkrume „Evakuierung“ gewählt wird
@@ -257,6 +263,32 @@ erzeugen.
 #### Scenario: Stornierter Bezirk
 - **WHEN** ein stornierter Bezirk geändert werden soll
 - **THEN** antwortet das System mit 409
+
+### Requirement: Koordinate der Sammelstelle
+
+Das System SHALL an der Sammelstelle eines Bezirks optional eine Koordinate führen
+(`sammelstelle_lat`, `sammelstelle_lon`), beim Anlegen und beim Fortschreiben. Beide Werte MUST
+gemeinsam gesetzt oder gemeinsam leer sein, und die Breite MUST zwischen −90 und 90, die Länge
+zwischen −180 und 180 liegen; sonst MUST das System mit 422 antworten. Fehlt die Koordinate in
+einer Änderung, bleibt sie; `null` entfernt sie. Eine Änderung, die nur die Koordinate verändert,
+MUST keinen ETB-Eintrag schreiben, aber live verteilt werden. Die Anzeige eines Bezirks MUST die
+Koordinate tragen, wenn eine gesetzt ist, und die Felder sonst weglassen.
+
+#### Scenario: Sammelstelle mit Koordinate anlegen
+- **WHEN** ein Bezirk mit Sammelstelle „Schulhof“, `sammelstelle_lat` 52,3 und `sammelstelle_lon` 9,7 angelegt wird
+- **THEN** trägt der Bezirk diese Koordinate, und der Anlege-Eintrag im ETB nennt sie nicht
+
+#### Scenario: Halbes Paar
+- **WHEN** eine Änderung nur `sammelstelle_lat` setzt und der Bezirk bisher keine Koordinate der Sammelstelle hat
+- **THEN** antwortet das System mit 422 und ändert nichts
+
+#### Scenario: Außerhalb des Bereichs
+- **WHEN** ein Bezirk mit `sammelstelle_lat` 91 und `sammelstelle_lon` 9 angelegt wird
+- **THEN** antwortet das System mit 422 und legt nichts an
+
+#### Scenario: Nur die Koordinate geändert
+- **WHEN** eine Änderung ausschließlich die Koordinate der Sammelstelle setzt
+- **THEN** entsteht kein ETB-Eintrag, und andere Ansichten des Bezirks erhalten die Änderung live
 
 ### Requirement: Bezirk stornieren
 
@@ -607,12 +639,14 @@ Primäraktion gesperrt stehen lassen.
 Beim Schwärzen eines Einsatzes MUST das System Freitexte mit möglichem Personen- oder
 Adressbezug entfernen: Bezeichnungen von Bezirken und Stellen durch Platzhalter ersetzen,
 Sammelstelle, Standort, Notiz sowie Leitung und Erreichbarkeit einer Stelle leeren. Anzahlen, Plangrößen, Kapazitäten, Zustände,
-Arten und Zeitpunkte MUST erhalten bleiben.
+Arten und Zeitpunkte MUST erhalten bleiben, ebenso die Koordinaten von Stellen und Sammelstellen
+(operatives Geo-Skelett ohne Personenbezug).
 
 #### Scenario: Einsatz schwärzen
 - **WHEN** ein Einsatz mit Bezirk „Uferstraße 12–40“ und Stelle „Turnhalle Ost, Ostring 5“ geschwärzt wird
 - **THEN** tragen Bezirk und Stelle Platzhalter-Bezeichnungen, Sammelstelle, Standort, Notiz, Leitung und Erreichbarkeit sind leer
 - **AND** Plangröße, Stände, Kapazität und Belegungen sind unverändert
+- **AND** die Koordinate der Sammelstelle bleibt erhalten
 
 ### Requirement: Offline-Erfassung von Stand- und Belegungsmeldungen
 

@@ -1,4 +1,6 @@
 import { App, Breadcrumb, Button, Form, Input, InputNumber, Space, Tag, Typography } from 'antd';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   useCallback,
@@ -97,7 +99,9 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
     art: s.art,
     kapazitaet_personen: s.kapazitaet_personen ?? undefined,
     abschnitt_id: s.abschnitt_id ?? undefined,
-    standort: s.standort ?? undefined,
+    // Eine gespeicherte Koordinate steht als Kartenpunkt im Feld: eine Textkorrektur behält sie
+    // (LLH-1121, design.md D3).
+    standort: ortsfeldAusGespeichert(s.standort, s.lat, s.lon),
     leitung: s.leitung ?? undefined,
     erreichbarkeit: s.erreichbarkeit ?? undefined,
     notiz: s.notiz ?? undefined,
@@ -403,8 +407,19 @@ function StelleInhalt({ einsatzId, stelleId }: { einsatzId: number; stelleId: nu
         />,
         s.abschnitt_name ?? leer,
       )}
-      {zelle('standort', 'Standort', <Input />, s.standort ?? leer)}
-      {/* Die Koordinate setzt die Lagekarte („Auf Karte verorten“), nicht das Formular. */}
+      {/* Ortsfeld mit Vorschau (LLH-1121): ein Treffer, eine getippte Koordinate oder ein Punkt auf
+          der Karte verortet die Stelle; beim Bearbeiten zeigt die Vorschau den Punkt. */}
+      {zelle(
+        'standort',
+        'Standort',
+        <EinsatzOrtsfeld
+          einsatzId={einsatzId}
+          etikett="Standort"
+          exclude={`betreuungsstelle:${s.id}`}
+        />,
+        s.standort ?? leer,
+        { breit: bearbeiten },
+      )}
       {!bearbeiten && (
         <Datenfeld label="Koordinate">
           {verortet ? (

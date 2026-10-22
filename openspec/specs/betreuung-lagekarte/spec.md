@@ -13,14 +13,23 @@ Gebiete geräumt werden, ohne die Modulfreigabe zu umgehen.
 Das System SHALL an einer Betreuungsstelle optional eine Koordinate führen, bestehend aus
 Breite `lat` und Länge `lon`. Beide Werte MUST gemeinsam gesetzt oder gemeinsam leer sein.
 Die Breite MUST zwischen −90 und 90 liegen, die Länge zwischen −180 und 180. Eine
-Koordinate MUST über denselben Änderungsweg gesetzt, geändert und entfernt werden können
-wie die übrigen Angaben der Stelle. Fehlt die Koordinate in einer Änderung, bleibt sie
+Koordinate MUST beim Anlegen mitgegeben und über denselben Änderungsweg gesetzt, geändert und
+entfernt werden können wie die übrigen Angaben der Stelle; beim Anlegen gelten dieselben Regeln.
+Eine Koordinate MUST weder beim Anlegen noch beim Ändern im Tagebuch stehen. Fehlt die Koordinate in einer Änderung, bleibt sie
 unverändert. Ist sie `null`, wird sie entfernt. Die Anzeige einer Stelle MUST die
 Koordinate tragen, wenn eine gesetzt ist, und das Feld sonst weglassen.
 
 #### Scenario: Stelle verorten
 - **WHEN** eine Person mit Schreibrecht an der Stelle „NU Turnhalle Nord“ `lat` 51,93 und `lon` 8,87 setzt
 - **THEN** trägt die Stelle diese Koordinate, und eine erneute Abfrage liefert sie
+
+#### Scenario: Stelle mit Koordinate anlegen
+- **WHEN** eine Person die Stelle „NU Sporthalle“ mit Standort „Sportplatzweg 3“, `lat` 52,105 und `lon` 9,36 anlegt
+- **THEN** trägt die neue Stelle diese Koordinate, und der Anlege-Eintrag im ETB nennt sie nicht
+
+#### Scenario: Anlegen mit halbem Paar
+- **WHEN** eine Stelle mit `lat`, aber ohne `lon` angelegt wird
+- **THEN** antwortet das System mit 422 und legt nichts an
 
 #### Scenario: Nur ein Wert des Paares
 - **WHEN** eine Änderung nur `lat` setzt und die Stelle bisher keine Koordinate hat

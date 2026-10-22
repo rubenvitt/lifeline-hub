@@ -1199,6 +1199,9 @@ mod tests {
                     plan_personen: plan,
                     plan_erhebung: Erhebung::Geschaetzt,
                     sammelstelle: Some("Parkplatz bei Familie Müller".into()),
+                    // LLH-1121: die Koordinate der Sammelstelle ist Geo-Skelett und bleibt.
+                    sammelstelle_lat: Some(52.1),
+                    sammelstelle_lon: Some(9.35),
                     notiz: Some("Frau Schulz, Rollstuhl".into()),
                 },
             )
@@ -1236,6 +1239,8 @@ mod tests {
                     // LLH-1044: Name und Rufnummer der Leitung gehen mit dem Einsatz.
                     leitung: Some("Frau Schulz".into()),
                     erreichbarkeit: Some("0171 2345678".into()),
+                    lat: None,
+                    lon: None,
                 },
             )
             .await
@@ -1317,6 +1322,19 @@ mod tests {
             assert_eq!(raeumung, "angeordnet");
             bezeichnungen.insert(bez.clone());
         }
+        let sammel_koordinaten: Vec<(Option<f64>, Option<f64>)> = sqlx::query_as(
+            "SELECT sammelstelle_lat, sammelstelle_lon FROM evakuierungsbezirk \
+             WHERE einsatz_id = ? ORDER BY id",
+        )
+        .bind(e)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            sammel_koordinaten,
+            vec![(Some(52.1), Some(9.35)); 2],
+            "Koordinate der Sammelstelle bleibt als Geo-Skelett (LLH-1121)"
+        );
         for (bez, standort, notiz, kap, art, status) in &stellen_zeilen {
             assert!(
                 bez.starts_with(super::repo::SCHWAERZUNG_PLATZHALTER),

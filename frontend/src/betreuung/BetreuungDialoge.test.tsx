@@ -2,13 +2,15 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { mitProzessZone } from '../test/prozessZone';
 import { ApiError } from '../api/client';
 import type { Betreuungsstelle, Evakuierungsbezirk } from '../api/types';
 import { alsOrtszeit } from '../anzeige/zeitEingabe';
 import { renderMitProviders } from '../test/utils';
+import { server } from '../test/server';
 import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveruhr';
 import {
   BelegungMeldenDialog,
@@ -27,6 +29,49 @@ import {
 } from './BetreuungDialoge';
 
 dayjs.extend(utc);
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
+}));
+
+/** Einsatzkopf (Umgebung „Auf Karte wählen“), Ort-Zeile und Ortssuche der Ortsfelder (LLH-1121). */
+beforeEach(() => {
+  server.use(
+    http.get('/api/einsaetze/1', () =>
+      HttpResponse.json({ id: 1, einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
+    ),
+    http.get('/api/einsaetze/1/ort-vorschau', () =>
+      HttpResponse.json({ ortsname: null, peilung: null }),
+    ),
+    http.get('/api/einsaetze/1/ort-suche', () =>
+      HttpResponse.json({
+        zustand: 'ok',
+        treffer: [
+          {
+            name: 'Sportplatzweg 3, 12345 Musterstadt',
+            kurz: 'Sportplatzweg 3',
+            lat: 52.3,
+            lon: 9.7,
+          },
+        ],
+      }),
+    ),
+  );
+});
+
+/** Ortsfeld-Wert aus reinem Text (ohne Koordinate). */
+const ort = (text: string) => ({ text, koordinate: null });
 
 const bezirk = (over: Partial<Evakuierungsbezirk> = {}): Evakuierungsbezirk => ({
   id: 5,
@@ -126,7 +171,7 @@ describe('PATCH nur mit geänderten Schlüsseln', () => {
         plan_personen: 640,
         plan_erhebung: 'geschaetzt',
         abschnitt_id: 3,
-        sammelstelle: 'Schulhof',
+        sammelstelle: ort('Schulhof'),
         notiz: '',
       }),
     ).toStrictEqual({});
@@ -136,7 +181,7 @@ describe('PATCH nur mit geänderten Schlüsseln', () => {
         plan_personen: 820,
         plan_erhebung: 'gezaehlt',
         abschnitt_id: undefined,
-        sammelstelle: '  ',
+        sammelstelle: ort('  '),
         notiz: 'Zufahrt über Nordtor',
       }),
     ).toStrictEqual({
@@ -164,7 +209,7 @@ describe('PATCH nur mit geänderten Schlüsseln', () => {
         kapazitaet_personen: undefined,
         art: 'notunterkunft',
         bezeichnung: 'Turnhalle Ost',
-        standort: '',
+        standort: ort(''),
       }),
     ).toStrictEqual({ status: 'geschlossen' });
   });
@@ -298,6 +343,7 @@ describe('Obergrenze der Personenzahlen (LFH-680)', () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <StelleAnlegenDialog
+        einsatzId={1}
         abschnitte={ABSCHNITTE}
         laeuft={false}
         fehler={null}
@@ -330,6 +376,7 @@ describe('BezirkAnlegenDialog', () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <BezirkAnlegenDialog
+        einsatzId={1}
         abschnitte={ABSCHNITTE}
         karteGesperrt={false}
         laeuft={false}
@@ -346,7 +393,8 @@ describe('BezirkAnlegenDialog', () => {
     const knopf = pruefeFormStruktur(dialog, 'Anlegen');
     await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Uferstraße 12–40');
     await userEvent.type(within(dialog).getByLabelText('Plangröße (Personen)'), '640');
-    await userEvent.type(within(dialog).getByLabelText('Sammelstelle'), 'Schulhof');
+    // Getippte Koordinate: das Ortsfeld erkennt sie (LLH-1121), die Sammelstelle ist verortet.
+    await userEvent.type(within(dialog).getByLabelText('Sammelstelle'), '52.512, 13.401');
     await userEvent.click(knopf);
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith(
@@ -354,7 +402,9 @@ describe('BezirkAnlegenDialog', () => {
           bezeichnung: 'Uferstraße 12–40',
           plan_personen: 640,
           plan_erhebung: 'geschaetzt',
-          sammelstelle: 'Schulhof',
+          sammelstelle: '52.512, 13.401',
+          sammelstelle_lat: 52.512,
+          sammelstelle_lon: 13.401,
         },
         'flaeche',
       ),
@@ -365,6 +415,7 @@ describe('BezirkAnlegenDialog', () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <BezirkAnlegenDialog
+        einsatzId={1}
         abschnitte={ABSCHNITTE}
         karteGesperrt={false}
         laeuft={false}
@@ -395,6 +446,7 @@ describe('BezirkAnlegenDialog', () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <BezirkAnlegenDialog
+        einsatzId={1}
         abschnitte={ABSCHNITTE}
         karteGesperrt
         laeuft={false}
@@ -553,6 +605,7 @@ describe('StelleAnlegenDialog', () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <StelleAnlegenDialog
+        einsatzId={1}
         abschnitte={ABSCHNITTE}
         laeuft={false}
         fehler={null}
@@ -580,6 +633,7 @@ describe('StelleAnlegenDialog', () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <StelleAnlegenDialog
+        einsatzId={1}
         abschnitte={ABSCHNITTE}
         laeuft={false}
         fehler={null}
@@ -863,5 +917,134 @@ describe('Betreuung — „Jetzt“ auf einem nachgehenden Gerät (LFH-895)', ()
       `${(onErfassen.mock.calls[0][0] as { zeitpunkt_at: string }).zeitpunkt_at.replace(' ', 'T')}Z`,
     );
     expect(Math.abs(gesendet - server)).toBeLessThanOrEqual(5_000);
+  });
+});
+
+/**
+ * Standort und Sammelstelle über das Ortsfeld (LLH-1121, design.md D2/D3): Text und Koordinate
+ * gehen gemeinsam hinaus, das Paar nur bei Änderung; eine gespeicherte Koordinate steht als
+ * Kartenpunkt im Feld und überlebt eine Textkorrektur.
+ */
+describe('Ortsangaben über das Ortsfeld (LLH-1121)', () => {
+  const punkt = (text: string, lat: number, lon: number, quelle: 'adresse' | 'karte' = 'adresse') =>
+    ({ text, koordinate: { lat, lon }, quelle }) as const;
+
+  it('Bezirk: ein Treffer setzt Text und Paar; eine Textkorrektur am Kartenpunkt schickt kein Paar', () => {
+    const basis = {
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 640,
+      plan_erhebung: 'geschaetzt' as const,
+    };
+    expect(bezirkPatch(bezirk(), { ...basis, sammelstelle: punkt('Schulhof', 52.3, 9.7) })).toEqual(
+      { sammelstelle: 'Schulhof', sammelstelle_lat: 52.3, sammelstelle_lon: 9.7 },
+    );
+    const verortet = bezirk({
+      sammelstelle: 'Schulhof',
+      sammelstelle_lat: 52.3,
+      sammelstelle_lon: 9.7,
+    });
+    expect(
+      bezirkPatch(verortet, { ...basis, sammelstelle: punkt('Schulhof Nord', 52.3, 9.7, 'karte') }),
+    ).toEqual({ sammelstelle: 'Schulhof Nord' });
+    // Geleerter Text leert beide.
+    expect(bezirkPatch(verortet, { ...basis, sammelstelle: ort('') })).toEqual({
+      sammelstelle: null,
+      sammelstelle_lat: null,
+      sammelstelle_lon: null,
+    });
+  });
+
+  it('Bezirk dreiseitig: ein fremd gesetzter Punkt bleibt, wenn die Person die Sammelstelle nicht berührt', () => {
+    const beimOeffnen = bezirk({ sammelstelle: 'Schulhof' });
+    const aktuell = bezirk({
+      sammelstelle: 'Schulhof',
+      sammelstelle_lat: 52.3,
+      sammelstelle_lon: 9.7,
+    });
+    const w = {
+      bezeichnung: 'Uferstraße 12–40',
+      plan_personen: 820,
+      plan_erhebung: 'geschaetzt' as const,
+      sammelstelle: ort('Schulhof'),
+    };
+    expect(bezirkPatchDreiseitig(beimOeffnen, aktuell, w)).toEqual({ plan_personen: 820 });
+  });
+
+  it('Stelle: ein Treffer setzt Text und Paar; geleert leert beide', () => {
+    const basis = {
+      bezeichnung: 'Turnhalle Ost',
+      art: 'notunterkunft' as const,
+      kapazitaet_personen: 150,
+    };
+    expect(
+      stellePatch(stelle(), { ...basis, standort: punkt('Sportplatzweg 3', 52.3, 9.7) }),
+    ).toEqual({ standort: 'Sportplatzweg 3', lat: 52.3, lon: 9.7 });
+    const verortet = stelle({ standort: 'Sportplatzweg 3', lat: 52.3, lon: 9.7 });
+    expect(
+      stellePatch(verortet, { ...basis, standort: punkt('Sportplatzweg 3a', 52.3, 9.7, 'karte') }),
+    ).toEqual({ standort: 'Sportplatzweg 3a' });
+    expect(stellePatch(verortet, { ...basis, standort: ort(' ') })).toEqual({
+      standort: null,
+      lat: null,
+      lon: null,
+    });
+  });
+
+  it('Stelle anlegen: ein gewählter Standort verortet die Stelle', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <StelleAnlegenDialog
+        einsatzId={1}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Turnhalle Ost');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Standort'), 'Sportplatzweg{Enter}');
+    await userEvent.click(await within(dialog).findByRole('button', { name: /Sportplatzweg 3/ }));
+    expect(within(dialog).getByRole('group', { name: 'Karte: Standort' })).toHaveTextContent(
+      '52.3,9.7',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        bezeichnung: 'Turnhalle Ost',
+        art: 'betreuungsstelle',
+        standort: 'Sportplatzweg 3',
+        lat: 52.3,
+        lon: 9.7,
+      }),
+    );
+  });
+
+  it('Stelle anlegen: ohne Auswahl bleibt die Stelle nicht verortet', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <StelleAnlegenDialog
+        einsatzId={1}
+        abschnitte={ABSCHNITTE}
+        laeuft={false}
+        fehler={null}
+        onErfassen={onErfassen}
+        onSchliessen={() => {}}
+      />,
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Betreuungsstelle anlegen' });
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Turnhalle Ost');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Weitere Angaben/ }));
+    await userEvent.type(within(dialog).getByLabelText('Standort'), 'Sportplatzweg 3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(onErfassen).toHaveBeenCalledWith({
+        bezeichnung: 'Turnhalle Ost',
+        art: 'betreuungsstelle',
+        standort: 'Sportplatzweg 3',
+      }),
+    );
   });
 });

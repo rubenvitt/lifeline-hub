@@ -871,6 +871,9 @@ export interface EvakuierungsbezirkEingabe {
   plan_erhebung: Erhebung;
   abschnitt_id?: number;
   sammelstelle?: string;
+  /** Koordinate der Sammelstelle (LLH-1121): nur als Paar, sonst 422. */
+  sammelstelle_lat?: number;
+  sammelstelle_lon?: number;
   notiz?: string;
 }
 
@@ -886,6 +889,9 @@ export interface EvakuierungsbezirkPatch {
   plan_erhebung?: Erhebung;
   raeumung?: Raeumungszustand;
   sammelstelle?: string | null;
+  /** Koordinate der Sammelstelle: als Paar senden; `null`/`null` entfernt die Verortung. */
+  sammelstelle_lat?: number | null;
+  sammelstelle_lon?: number | null;
   notiz?: string | null;
 }
 
@@ -913,6 +919,9 @@ export interface BetreuungsstelleEingabe {
   /** Ganzzahlig ≥ 1, sonst 400. */
   kapazitaet_personen?: number;
   standort?: string;
+  /** Koordinate des Standorts (LLH-1121): nur als Paar, sonst 422. */
+  lat?: number;
+  lon?: number;
   notiz?: string;
   /** Wer die Stelle leitet (LLH-1044), höchstens `BETREUUNG_LEITUNG_MAX` Zeichen. */
   leitung?: string;

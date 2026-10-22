@@ -1,6 +1,9 @@
 import { Alert, Button, Checkbox, Collapse, Form, Input, InputNumber, Modal, Radio } from 'antd';
 import { Typography } from 'antd';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortFelder } from '../anzeige/ortsfeldFormular';
 import { serverJetzt } from '../offline/serveruhr';
 import type { Dayjs } from 'dayjs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -48,6 +51,10 @@ import {
  *
  * PATCH: nur geänderte Schlüssel. `null` bedeutet „leeren" und entsteht nur, wo vorher ein
  * Wert stand.
+ *
+ * ORT: Standort und Sammelstelle sind Ortsfelder (LLH-1121, Spec `ortsfeld`). Text und
+ * Koordinate gehen gemeinsam hinaus (`ortFelder`); das Paar nur, wenn es sich ändert, und immer
+ * als Paar (der Server nimmt `lat` und `lon` nur zusammen, sonst 422).
  *
  * AKTUELLER STAND: die Bearbeiten-Dialoge bekommen den Datensatz, wie er JETZT im Cache steht
  * (Live-Refetch bei offenem Dialog); die Formularwerte frieren beim Öffnen ein.
@@ -122,17 +129,21 @@ export interface BezirkWerte {
   /** Nur im Anlegedialog; die Bearbeitung kennt keine Gebietswahl. */
   gebiet?: GebietWahl;
   abschnitt_id?: number | null;
-  sammelstelle?: string | null;
+  sammelstelle?: OrtsfeldWert | null;
   notiz?: string | null;
 }
 
 function bezirkAnlegenBody(w: BezirkWerte): EvakuierungsbezirkEingabe {
+  const ort = ortFelder(w.sammelstelle);
   return {
     bezeichnung: w.bezeichnung.trim(),
     plan_personen: w.plan_personen,
     plan_erhebung: w.plan_erhebung,
     ...(w.abschnitt_id != null ? { abschnitt_id: w.abschnitt_id } : {}),
-    ...optionaleTexte({ sammelstelle: w.sammelstelle, notiz: w.notiz }),
+    ...optionaleTexte({ sammelstelle: ort.text, notiz: w.notiz }),
+    ...(ort.lat != null && ort.lon != null
+      ? { sammelstelle_lat: ort.lat, sammelstelle_lon: ort.lon }
+      : {}),
   };
 }
 
@@ -157,7 +168,15 @@ export function bezirkPatch(vorher: Evakuierungsbezirk, w: BezirkWerte): Evakuie
   wennGeaendert(patch, 'plan_personen', vorher.plan_personen, w.plan_personen);
   wennGeaendert(patch, 'plan_erhebung', vorher.plan_erhebung, w.plan_erhebung);
   wennGeaendert(patch, 'abschnitt_id', vorher.abschnitt_id, w.abschnitt_id);
-  wennGeaendert(patch, 'sammelstelle', vorher.sammelstelle, text(w.sammelstelle));
+  const ort = ortFelder(w.sammelstelle);
+  wennGeaendert(patch, 'sammelstelle', vorher.sammelstelle, ort.text);
+  if (
+    ort.lat !== (vorher.sammelstelle_lat ?? null) ||
+    ort.lon !== (vorher.sammelstelle_lon ?? null)
+  ) {
+    patch.sammelstelle_lat = ort.lat;
+    patch.sammelstelle_lon = ort.lon;
+  }
   wennGeaendert(patch, 'notiz', vorher.notiz, text(w.notiz));
   return patch;
 }
@@ -168,20 +187,22 @@ export interface StelleWerte {
   status?: BetreuungsstelleStatus;
   kapazitaet_personen?: number | null;
   abschnitt_id?: number | null;
-  standort?: string | null;
+  standort?: OrtsfeldWert | null;
   notiz?: string | null;
   leitung?: string | null;
   erreichbarkeit?: string | null;
 }
 
 function stelleAnlegenBody(w: StelleWerte): BetreuungsstelleEingabe {
+  const ort = ortFelder(w.standort);
   return {
     bezeichnung: w.bezeichnung.trim(),
     art: w.art,
     ...(w.kapazitaet_personen != null ? { kapazitaet_personen: w.kapazitaet_personen } : {}),
     ...(w.abschnitt_id != null ? { abschnitt_id: w.abschnitt_id } : {}),
+    ...(ort.lat != null && ort.lon != null ? { lat: ort.lat, lon: ort.lon } : {}),
     ...optionaleTexte({
-      standort: w.standort,
+      standort: ort.text,
       notiz: w.notiz,
       leitung: w.leitung,
       erreichbarkeit: w.erreichbarkeit,
@@ -198,7 +219,12 @@ export function stellePatch(vorher: Betreuungsstelle, w: StelleWerte): Betreuung
   // `null` heißt hier „keine Kapazität" — und damit auch keine Zahl freier Plätze.
   wennGeaendert(patch, 'kapazitaet_personen', vorher.kapazitaet_personen, w.kapazitaet_personen);
   wennGeaendert(patch, 'abschnitt_id', vorher.abschnitt_id, w.abschnitt_id);
-  wennGeaendert(patch, 'standort', vorher.standort, text(w.standort));
+  const ort = ortFelder(w.standort);
+  wennGeaendert(patch, 'standort', vorher.standort, ort.text);
+  if (ort.lat !== (vorher.lat ?? null) || ort.lon !== (vorher.lon ?? null)) {
+    patch.lat = ort.lat;
+    patch.lon = ort.lon;
+  }
   wennGeaendert(patch, 'notiz', vorher.notiz, text(w.notiz));
   // Nur Felder, die das Formular trägt: fehlt der Schlüssel in den Werten, bleibt er unberührt.
   if ('leitung' in w) wennGeaendert(patch, 'leitung', vorher.leitung, text(w.leitung));
@@ -388,6 +414,7 @@ function GebietFeld({
 }
 
 export function BezirkAnlegenDialog({
+  einsatzId,
   abschnitte,
   karteGesperrt,
   laeuft,
@@ -395,6 +422,7 @@ export function BezirkAnlegenDialog({
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
+  einsatzId: number;
   abschnitte: readonly AbschnittOption[];
   /** Modul Lagekarte für diese Person gesperrt (`useSprungSperre`): kein Zeichnen danach. */
   karteGesperrt: boolean;
@@ -434,7 +462,7 @@ export function BezirkAnlegenDialog({
         <>
           {abschnittFeld(abschnitte)}
           <Form.Item name="sammelstelle" label="Sammelstelle">
-            <Input />
+            <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Sammelstelle" />
           </Form.Item>
           <Form.Item name="notiz" label="Notiz" style={{ marginBottom: 0 }}>
             <Input.TextArea autoSize={{ minRows: 2 }} />
@@ -540,12 +568,14 @@ export function StandMeldenDialog({
 // ── Betreuungsstelle ────────────────────────────────────────────────────────────────────
 
 export function StelleAnlegenDialog({
+  einsatzId,
   abschnitte,
   laeuft,
   fehler,
   onErfassen,
   onSchliessen,
 }: DialogBasis & {
+  einsatzId: number;
   abschnitte: readonly AbschnittOption[];
   onErfassen: (body: BetreuungsstelleEingabe) => Promise<unknown>;
 }) {
@@ -580,7 +610,7 @@ export function StelleAnlegenDialog({
         <>
           {abschnittFeld(abschnitte)}
           <Form.Item name="standort" label="Standort">
-            <Input />
+            <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Standort" />
           </Form.Item>
           <Form.Item
             name="leitung"

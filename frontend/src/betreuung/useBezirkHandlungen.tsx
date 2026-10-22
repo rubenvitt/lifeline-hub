@@ -290,6 +290,7 @@ export function useBezirkHandlungen({
     <>
       {dialog?.art === 'anlegen' && (
         <BezirkAnlegenDialog
+          einsatzId={einsatzId}
           abschnitte={abschnitte}
           karteGesperrt={karteGesperrt}
           laeuft={anlegenMut.isPending}

@@ -34,18 +34,22 @@ und einen Ort, bei Bedarf eine Gefahr und einen Schadensgrad. Er ist „offen“
 
 1. „Schaden erfassen“ wählen. Es öffnet sich der gleichnamige Dialog.
 2. „Typ“, „Ausmaß“ („gering“, „mittel“, „groß“, „katastrophal“) und „Ort“ angeben; die drei
-   Felder sind Pflicht. Bei Bedarf die „Gefahr“ wählen, etwa „Elektrizität“ oder „Brand“. Neben
+   Felder sind Pflicht. Den Ort eintippen und mit Enter oder „Ort suchen“ suchen, dann einen
+   Treffer wählen: der Schaden ist damit verortet, der Kartenausschnitt unter dem Feld zeigt die
+   Stelle. Ohne Treffer bleibt der Ort freier Text, und der Schaden ist „nicht verortet“. Eine
+   bekannte Koordinate lässt sich gleich ins Feld tippen; „Auf Karte wählen“ setzt den Punkt auf
+   einer großen Karte. Bei Bedarf die „Gefahr“ wählen, etwa „Elektrizität“ oder „Brand“. Neben
    jeder Gefahr steht das Zeichen, das der Schaden damit auf der Lagekarte bekommt.
 
    ![Dialog „Schaden erfassen“ mit Typ, Ausmaß, Ort und Gefahr](../bilder/schaeden/erfassen.png)
 
 3. Unter „Weitere Angaben“ bei Bedarf eine „Beschreibung“, den „Schadensgrad“ („angeschlagen“,
    „teilzerstört“, „total zerstört“), „Geschädigt“ (eine betroffene Person, eine Einsatzkraft,
-   die eigene Organisation oder ein freier Kontakt) und die „Koordinate“ eintragen.
+   die eigene Organisation oder ein freier Kontakt) eintragen.
 4. „Anlegen“ wählen. Der Schaden steht als „offen“ in der Liste.
 
 Mehrere Schäden am selben Ort: „Speichern und nächste“ hält den Dialog offen, mit „Werte
-behalten“ bleibt der Ort stehen.
+behalten“ bleibt der Ort samt Koordinate stehen.
 
 ### Einen Schaden übergeben
 
@@ -81,7 +85,8 @@ behalten“ bleibt der Ort stehen.
 3. Nach dem Tipp auf die Karte meldet sie „S-… verortet“. „Zurück zu S-…“ führt auf die Seite
    des Schadens zurück.
 
-Wer die Koordinate schon beim Erfassen kennt, trägt sie unter „Weitere Angaben“ ein.
+Schneller geht es über das Feld „Ort“ beim Erfassen oder unter „Bearbeiten“: ein Treffer der
+Ortssuche, eine getippte Koordinate oder „Auf Karte wählen“ verortet den Schaden gleich mit.
 
 ## Hintergrund
 
@@ -112,6 +117,16 @@ oder mit einer Beschreibung über 8.000 Zeichen speichert die Seite nicht; der G
 dem Feld („Ort ist Pflicht“), und das Feld hat den Fokus. Wer die Seite mit ungespeicherten
 Eingaben verlassen will, bekommt die Rückfrage „Ungespeicherte Änderungen“: „Bleiben“ behält die
 Eingaben, „Verwerfen“ verlässt die Seite ohne sie.
+
+### Ort und Koordinate
+
+Beim Bearbeiten zeigt das Feld „Ort“ einen verorteten Schaden mit Kartenausschnitt und Nadel.
+Eine Korrektur am Text („Hauptstr. 17“ → „Hauptstr. 17a“) behält den Punkt; ein neuer Treffer
+ersetzt ihn, die gezogene Nadel berichtigt ihn. Unter dem Ausschnitt stehen Ortsname und Peilung
+zum nächsten verorteten Objekt. Wie die Ortssuche arbeitet und was sie an den Geocoder schickt,
+steht unter [Einsatzdaten](einsatzdaten.md), „Adresse und Koordinate des Einsatzorts“. Ohne Netz
+bleibt „Ort suchen“ gesperrt; Freitext, getippte Koordinate und „Auf Karte wählen“ mit
+Offline-Karten gehen weiter.
 
 ### Einsatztagebuch
 

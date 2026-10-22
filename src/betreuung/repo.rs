@@ -34,6 +34,9 @@ pub struct BezirkEingabe {
     pub plan_personen: i64,
     pub plan_erhebung: Erhebung,
     pub sammelstelle: Option<String>,
+    /// Koordinate der Sammelstelle (LLH-1121); als Paar gegen den Bereich geprüft (422).
+    pub sammelstelle_lat: Option<f64>,
+    pub sammelstelle_lon: Option<f64>,
     pub notiz: Option<String>,
 }
 
@@ -46,6 +49,10 @@ pub struct BezirkAenderung {
     pub plan_erhebung: Option<Erhebung>,
     pub raeumung: Option<Raeumungszustand>,
     pub sammelstelle: Option<Option<String>>,
+    /// Koordinate der Sammelstelle (LLH-1121), tri-state je Wert; gegen den Bestand als Paar
+    /// geprüft wie die Koordinate einer Stelle.
+    pub sammelstelle_lat: Option<Option<f64>>,
+    pub sammelstelle_lon: Option<Option<f64>>,
     pub notiz: Option<Option<String>>,
 }
 
@@ -61,6 +68,10 @@ pub struct StelleEingabe {
     /// Leitung und Erreichbarkeit (LLH-1044); die Route hat getrimmt und die Grenze geprüft.
     pub leitung: Option<String>,
     pub erreichbarkeit: Option<String>,
+    /// Koordinate (LLH-1121: schon beim Anlegen, aus dem Ortsfeld des Standorts); als Paar
+    /// gegen den Bereich geprüft (422) wie beim Ändern.
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
 }
 
 /// Eingabe „Stelle ändern“ — tri-state wie [`BezirkAenderung`].
@@ -153,7 +164,8 @@ macro_rules! meldereihenfolge {
 macro_rules! bezirk_select {
     () => {
         "SELECT b.id, b.einsatz_id, b.abschnitt_id, a.name AS abschnitt_name, b.bezeichnung, \
-                b.plan_personen, b.plan_erhebung, b.raeumung, b.sammelstelle, b.notiz, \
+                b.plan_personen, b.plan_erhebung, b.raeumung, b.sammelstelle, \
+                b.sammelstelle_lat, b.sammelstelle_lon, b.notiz, \
                 (SELECT COUNT(*) FROM lage_zone z WHERE z.evakuierungsbezirk_id = b.id) \
                     AS flaechen, \
                 st.id AS stand_id, st.evakuiert AS stand_evakuiert, \
@@ -193,6 +205,8 @@ struct BezirkZeile {
     plan_erhebung: String,
     raeumung: String,
     sammelstelle: Option<String>,
+    sammelstelle_lat: Option<f64>,
+    sammelstelle_lon: Option<f64>,
     notiz: Option<String>,
     flaechen: i64,
     stand_id: Option<i64>,
@@ -234,6 +248,8 @@ impl TryFrom<BezirkZeile> for EvakuierungsbezirkAnzeige {
             plan_erhebung: aus_db(z.plan_erhebung)?,
             raeumung: aus_db(z.raeumung)?,
             sammelstelle: z.sammelstelle,
+            sammelstelle_lat: z.sammelstelle_lat,
+            sammelstelle_lon: z.sammelstelle_lon,
             notiz: z.notiz,
             flaechen: z.flaechen,
             stand,
@@ -732,6 +748,8 @@ struct BezirkRoh {
     #[sqlx(try_from = "String")]
     raeumung: Raeumungszustand,
     sammelstelle: Option<String>,
+    sammelstelle_lat: Option<f64>,
+    sammelstelle_lon: Option<f64>,
     notiz: Option<String>,
     /// Der Zeiger auf die aktuelle Meldung und deren Anzahl und Zeitpunkt. Der Zeitpunkt
     /// trennt Fortschreibung von Nachtragung, BEVOR das ETB geschrieben wird (D5).
@@ -748,7 +766,8 @@ async fn bezirk_roh_tx(
 ) -> Result<BezirkRoh, AppError> {
     sqlx::query_as(
         "SELECT b.bezeichnung, b.abschnitt_id, b.plan_personen, b.plan_erhebung, b.raeumung, \
-                b.sammelstelle, b.notiz, b.stand_id, st.evakuiert AS stand_evakuiert, \
+                b.sammelstelle, b.sammelstelle_lat, b.sammelstelle_lon, b.notiz, b.stand_id, \
+                st.evakuiert AS stand_evakuiert, \
                 st.zeitpunkt_at AS stand_zeitpunkt_at, b.storniert_at \
          FROM evakuierungsbezirk b LEFT JOIN evakuierung_stand st ON st.id = b.stand_id \
          WHERE b.id = ? AND b.einsatz_id = ?",
@@ -892,13 +911,19 @@ pub async fn bezirk_anlegen_tx(
 ) -> Result<Geschrieben, AppError> {
     let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
     plan_pruefen(eingabe.plan_personen)?;
+    pruefe_koordinate(
+        eingabe.sammelstelle_lat,
+        eingabe.sammelstelle_lon,
+        "sammelstelle_lat",
+        "sammelstelle_lon",
+    )?;
     abschnitt_pruefen_tx(conn, einsatz_id, eingabe.abschnitt_id).await?;
     bezeichnung_frei_tx(conn, Objekt::Bezirk, einsatz_id, &bezeichnung, None).await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO evakuierungsbezirk \
             (einsatz_id, abschnitt_id, bezeichnung, plan_personen, plan_erhebung, \
-             sammelstelle, notiz, angelegt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             sammelstelle, sammelstelle_lat, sammelstelle_lon, notiz, angelegt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(eingabe.abschnitt_id)
@@ -906,6 +931,8 @@ pub async fn bezirk_anlegen_tx(
     .bind(eingabe.plan_personen)
     .bind(eingabe.plan_erhebung.as_str())
     .bind(text_opt(eingabe.sammelstelle.as_deref()))
+    .bind(eingabe.sammelstelle_lat)
+    .bind(eingabe.sammelstelle_lon)
     .bind(text_opt(eingabe.notiz.as_deref()))
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
@@ -958,6 +985,16 @@ pub async fn bezirk_aendern_tx(
         Some(v) => text_opt(v.as_deref()),
         None => roh.notiz.clone(),
     };
+    // Koordinate der Sammelstelle (LLH-1121) wie die einer Stelle: Effektivpaar gegen den
+    // Rohstand DIESER Transaktion, 422 bei halbem Paar oder außer Bereich.
+    let sammelstelle_lat = eingabe.sammelstelle_lat.unwrap_or(roh.sammelstelle_lat);
+    let sammelstelle_lon = eingabe.sammelstelle_lon.unwrap_or(roh.sammelstelle_lon);
+    pruefe_koordinate(
+        sammelstelle_lat,
+        sammelstelle_lon,
+        "sammelstelle_lat",
+        "sammelstelle_lon",
+    )?;
 
     let stammdaten = etb_text::BezirkStammdaten {
         bezeichnung_vorher: (bezeichnung != roh.bezeichnung).then_some(roh.bezeichnung.as_str()),
@@ -966,7 +1003,11 @@ pub async fn bezirk_aendern_tx(
     };
     let plan_neu = plan != roh.plan_personen || erhebung != roh.plan_erhebung;
     let raeumung_neu = raeumung != roh.raeumung;
-    if stammdaten.leer() && !plan_neu && !raeumung_neu {
+    // Eigene Achse wie die Verortung einer Stelle (LFH-673 D3): der ETB-Text nennt nie einen
+    // Ort; ohne sie schnitte der Leerlauf-Riegel eine reine Verortung still ab.
+    let verortung_neu =
+        sammelstelle_lat != roh.sammelstelle_lat || sammelstelle_lon != roh.sammelstelle_lon;
+    if stammdaten.leer() && !plan_neu && !raeumung_neu && !verortung_neu {
         return Ok(Geschrieben {
             id,
             etb_ids: Vec::new(),
@@ -982,8 +1023,8 @@ pub async fn bezirk_aendern_tx(
 
     sqlx::query(
         "UPDATE evakuierungsbezirk SET bezeichnung = ?, abschnitt_id = ?, plan_personen = ?, \
-            plan_erhebung = ?, raeumung = ?, sammelstelle = ?, notiz = ?, \
-            geaendert_at = datetime('now') \
+            plan_erhebung = ?, raeumung = ?, sammelstelle = ?, sammelstelle_lat = ?, \
+            sammelstelle_lon = ?, notiz = ?, geaendert_at = datetime('now') \
          WHERE id = ?",
     )
     .bind(&bezeichnung)
@@ -992,6 +1033,8 @@ pub async fn bezirk_aendern_tx(
     .bind(erhebung.as_str())
     .bind(raeumung.as_str())
     .bind(&sammelstelle)
+    .bind(sammelstelle_lat)
+    .bind(sammelstelle_lon)
     .bind(&notiz)
     .bind(id)
     .execute(&mut *conn)
@@ -1038,7 +1081,7 @@ pub async fn bezirk_aendern_tx(
     Ok(Geschrieben {
         id,
         etb_ids,
-        still_geaendert: false,
+        still_geaendert: verortung_neu,
     })
 }
 
@@ -1304,13 +1347,15 @@ pub async fn stelle_anlegen_tx(
 ) -> Result<Geschrieben, AppError> {
     let bezeichnung = pflicht(&eingabe.bezeichnung, "bezeichnung")?;
     kapazitaet_pruefen(eingabe.kapazitaet_personen)?;
+    // Koordinate aus dem Ortsfeld des Standorts (LLH-1121): dieselbe Prüfung wie beim Ändern.
+    pruefe_koordinate(eingabe.lat, eingabe.lon, "lat", "lon")?;
     abschnitt_pruefen_tx(conn, einsatz_id, eingabe.abschnitt_id).await?;
     bezeichnung_frei_tx(conn, Objekt::Stelle, einsatz_id, &bezeichnung, None).await?;
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO betreuungsstelle \
             (einsatz_id, abschnitt_id, bezeichnung, art, kapazitaet_personen, standort, notiz, \
-             leitung, erreichbarkeit, angelegt_von_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+             leitung, erreichbarkeit, lat, lon, angelegt_von_id) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(eingabe.abschnitt_id)
@@ -1321,6 +1366,8 @@ pub async fn stelle_anlegen_tx(
     .bind(text_opt(eingabe.notiz.as_deref()))
     .bind(text_opt(eingabe.leitung.as_deref()))
     .bind(text_opt(eingabe.erreichbarkeit.as_deref()))
+    .bind(eingabe.lat)
+    .bind(eingabe.lon)
     .bind(benutzer_id)
     .fetch_one(&mut *conn)
     .await?;

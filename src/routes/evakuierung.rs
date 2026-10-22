@@ -13,8 +13,8 @@
 //!
 //! **Statuscodes** wie im Modul Betreuung (`routes/betreuung.rs`, src/AGENTS.md
 //! „Statuscode-Konvention“): 400 Feld, 404 fremd/unbekannt, 409 Lebenszyklus (storniert) und
-//! doppelte Bezeichnung, 422 Rücknahme einer zurückgenommenen Meldung und `client_id` eines
-//! anderen Bezirks.
+//! doppelte Bezeichnung, 422 Rücknahme einer zurückgenommenen Meldung, `client_id` eines
+//! anderen Bezirks und eine halbe oder unmögliche Koordinate der Sammelstelle (LLH-1121).
 //!
 //! **Live** nach dem Commit: jeder ETB-Eintrag als ETB-Kurzruf, danach `LiveEvent::Evakuierung`
 //! mit Kennungen only (`{einsatz_id, bezirk_id}`). Ein PATCH ohne wirksame Änderung publiziert
@@ -120,6 +120,13 @@ pub struct BezirkAnlegen {
     plan_erhebung: String,
     #[serde(default)]
     sammelstelle: Option<String>,
+    /// Koordinate der Sammelstelle (LLH-1121), aus dem Ortsfeld. Halbes Paar oder Wert außerhalb
+    /// des Bereichs → **422**, wie bei der Koordinate einer Betreuungsstelle (LFH-673): das Paar
+    /// ist ein Zusammenhang zweier Felder.
+    #[serde(default)]
+    sammelstelle_lat: Option<f64>,
+    #[serde(default)]
+    sammelstelle_lon: Option<f64>,
     #[serde(default)]
     notiz: Option<String>,
 }
@@ -137,6 +144,8 @@ pub async fn bezirk_anlegen(
         plan_personen: req.plan_personen,
         plan_erhebung: enum_wert(&req.plan_erhebung)?,
         sammelstelle: req.sammelstelle,
+        sammelstelle_lat: req.sammelstelle_lat,
+        sammelstelle_lon: req.sammelstelle_lon,
         notiz: req.notiz,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
@@ -170,6 +179,12 @@ pub struct BezirkAendern {
     /// Tri-State: fehlt = unverändert, `null` = leeren.
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     sammelstelle: Option<Option<String>>,
+    /// Tri-State je Wert (LLH-1121): fehlt = unverändert, `null` = entfernen; gegen den Bestand
+    /// als Paar geprüft (422).
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    sammelstelle_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "support::deserialize_optional_field")]
+    sammelstelle_lon: Option<Option<f64>>,
     #[serde(default, deserialize_with = "support::deserialize_optional_field")]
     notiz: Option<Option<String>>,
 }
@@ -189,6 +204,8 @@ pub async fn bezirk_aendern(
         plan_erhebung: enum_opt(req.plan_erhebung)?,
         raeumung: enum_opt(req.raeumung)?,
         sammelstelle: req.sammelstelle,
+        sammelstelle_lat: req.sammelstelle_lat,
+        sammelstelle_lon: req.sammelstelle_lon,
         notiz: req.notiz,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;

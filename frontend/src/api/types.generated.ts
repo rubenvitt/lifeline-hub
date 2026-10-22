@@ -2853,6 +2853,14 @@ export interface components {
             plan_personen: number;
             raeumung: components["schemas"]["Raeumungszustand"];
             sammelstelle?: string | null;
+            /**
+             * Format: double
+             * @description Koordinate der Sammelstelle (LLH-1121). Beide fehlen = nicht verortet; die App hält sie
+             *     als Paar.
+             */
+            sammelstelle_lat?: number | null;
+            /** Format: double */
+            sammelstelle_lon?: number | null;
             stand?: components["schemas"]["EvakuierungsstandAnzeige"] | null;
             storniert_at?: string | null;
         };

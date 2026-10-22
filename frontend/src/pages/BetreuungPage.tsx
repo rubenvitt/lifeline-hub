@@ -336,6 +336,7 @@ function BetreuungInhalt({ einsatzId }: { einsatzId: number }) {
           Speicher von rc-field-form überlebt sonst ein Schließen. */}
       {dialog?.art === 'stelleAnlegen' && (
         <StelleAnlegenDialog
+          einsatzId={einsatzId}
           abschnitte={abschnitte}
           laeuft={stelleAnlegenMut.isPending}
           fehler={stelleAnlegenMut.error}

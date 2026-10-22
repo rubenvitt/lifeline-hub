@@ -10819,4 +10819,76 @@ mod tests {
             .await
             .expect("das Löschen des Einsatzes nimmt die Einheiten mit");
     }
+
+    /// LLH-1121, design.md D7: `sammelstelle_lat`/`sammelstelle_lon` am Evakuierungsbezirk. Ein
+    /// Bezirk von vorher behält jeden Wert und bleibt unverortet; beide Spalten sind `REAL` und
+    /// nullable, ohne CHECK (das Paar sichert die App wie bei 0034/0118).
+    #[tokio::test]
+    async fn migration_0240_sammelstelle_koordinate() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 239).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::query(
+            "INSERT INTO evakuierungsbezirk \
+                (id, einsatz_id, bezeichnung, plan_personen, plan_erhebung, raeumung, \
+                 sammelstelle, notiz, angelegt_von_id) \
+             VALUES (3, ?, 'Uferstraße 12–40', 640, 'geschaetzt', 'laeuft', 'Kirchplatz', \
+                     'Zufahrt Nord', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+        type Zeile = (
+            i64,
+            String,
+            i64,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+        );
+        let lies = |pool: SqlitePool| async move {
+            sqlx::query_as::<_, Zeile>(
+                "SELECT id, bezeichnung, plan_personen, plan_erhebung, raeumung, sammelstelle, \
+                        notiz FROM evakuierungsbezirk ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        };
+        let vorher = lies(pool.clone()).await;
+
+        migriere_bis(&pool, 240).await;
+
+        assert_eq!(lies(pool.clone()).await, vorher, "Bestand unverändert");
+        let koordinate: (Option<f64>, Option<f64>) = sqlx::query_as(
+            "SELECT sammelstelle_lat, sammelstelle_lon FROM evakuierungsbezirk WHERE id = 3",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(koordinate, (None, None), "der Bestand ist nicht verortet");
+        let spalten: Vec<(String, String, i64)> = sqlx::query_as(
+            "SELECT name, type, \"notnull\" FROM pragma_table_info('evakuierungsbezirk') \
+             WHERE name IN ('sammelstelle_lat', 'sammelstelle_lon') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                ("sammelstelle_lat".to_string(), "REAL".to_string(), 0),
+                ("sammelstelle_lon".to_string(), "REAL".to_string(), 0)
+            ]
+        );
+        sqlx::query(
+            "UPDATE evakuierungsbezirk SET sammelstelle_lat = 52.1, sammelstelle_lon = 9.35 \
+             WHERE id = 3",
+        )
+        .execute(&pool)
+        .await
+        .expect("ein Paar lässt sich speichern");
+    }
 }

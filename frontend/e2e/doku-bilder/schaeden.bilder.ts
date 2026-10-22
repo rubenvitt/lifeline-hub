@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { waehleIn } from '../auswahl-kern';
+import { waehleIn, waehleStehend, zeigtWahl } from '../auswahl-kern';
 import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
@@ -91,7 +91,13 @@ test.describe(KAPITEL, () => {
     await waehleIn(dialog.getByRole('combobox', { name: 'Typ' }), 'Sachschaden');
     await waehleIn(dialog.getByRole('combobox', { name: 'Ausmaß' }), 'mittel');
     await dialog.getByLabel('Ort').fill('Mühlbachweg 18');
-    await waehleIn(dialog.getByRole('combobox', { name: 'Gefahr' }), 'Elektrizität');
+    // Gesucht statt geblättert: unter dem Ortsfeld (LLH-1121) bleibt der Liste weniger Höhe, und
+    // die virtuelle Liste rendert „Elektrizität“ erst nach dem Scrollen.
+    const gefahr = dialog.getByRole('combobox', { name: 'Gefahr' });
+    await gefahr.click();
+    await gefahr.fill('Elektri');
+    await waehleStehend(page, 'Elektrizität');
+    await zeigtWahl(gefahr, 'Elektrizität');
     await dialog.getByLabel('Ort').blur();
     await page.mouse.move(0, 0);
     await fotografiere(dialog, KAPITEL, 'erfassen');

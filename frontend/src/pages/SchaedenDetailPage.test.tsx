@@ -11,6 +11,21 @@ import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
 
 beforeEach(() => vi.stubGlobal('EventSource', FakeEventSource));
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
+}));
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; dass die Systemrolle
@@ -675,12 +690,25 @@ describe('SchaedenDetailPage — Eingabegrenzen (LFH-937)', () => {
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     expect(await screen.findByText('8.001 / 8.000 · zu lang')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('z. B. Hauptstr. 17 oder L 235 km 12,5')).toHaveAttribute(
-      'maxlength',
-      '500',
-    );
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await new Promise((r) => setTimeout(r, 50));
+    expect(gepatcht).toBe(false);
+  });
+
+  it('ein Ort über 500 Zeichen steht ganz und sperrt mit der Grenze am Feld', async () => {
+    let gepatcht = false;
+    render(einsatzAktiv, basisSchaden(), [
+      http.patch('/api/einsaetze/1/schaeden/10', () => {
+        gepatcht = true;
+        return HttpResponse.json(basisSchaden());
+      }),
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const ort = await screen.findByLabelText('Ort');
+    fireEvent.change(ort, { target: { value: 'o'.repeat(501) } });
+    expect(ort).toHaveValue('o'.repeat(501));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(await screen.findByText('Ort darf höchstens 500 Zeichen lang sein')).toBeInTheDocument();
     expect(gepatcht).toBe(false);
   });
 
@@ -1101,5 +1129,66 @@ describe('SchaedenDetailPage — stehende Leiste (LLH-1101)', () => {
     expect(leiste).not.toBeNull();
     expect(leiste!.closest('form')).not.toBeNull();
     expect(within(leiste as HTMLElement).getByRole('button', { name: 'Abbrechen' })).toBeEnabled();
+  });
+});
+
+/**
+ * Schadensort beim Bearbeiten über das Ortsfeld (LLH-1121, design.md D3/D5): eine gespeicherte
+ * Koordinate steht als Kartenpunkt im Feld, eine Textkorrektur behält ihn; ein Treffer schickt Text
+ * und Paar. Die Anzeige „Verortung“ entfällt während der Bearbeitung (die Vorschau zeigt den Punkt).
+ */
+describe('SchaedenDetailPage — Schadensort über die Ortssuche (LLH-1121)', () => {
+  function mitPatch(schaden: Record<string, unknown>) {
+    const koerper: Array<Record<string, unknown>> = [];
+    render(einsatzAktiv, schaden, [
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({ ortsname: null, peilung: null }),
+      ),
+      http.get('/api/einsaetze/1/ort-suche', () =>
+        HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            {
+              name: 'Bahnhofstraße 3, 12345 Musterstadt',
+              kurz: 'Bahnhofstraße 3',
+              lat: 52.3,
+              lon: 9.7,
+            },
+          ],
+        }),
+      ),
+      http.patch('/api/einsaetze/1/schaeden/10', async ({ request }) => {
+        koerper.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(schaden);
+      }),
+    ]);
+    return koerper;
+  }
+
+  it('eine Textkorrektur behält den gespeicherten Punkt und schickt kein Paar', async () => {
+    const koerper = mitPatch(basisSchaden({ lat: 52.1, lon: 8.5 }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const ort = await screen.findByLabelText('Ort');
+    expect(screen.getByRole('group', { name: 'Karte: Schadensort' })).toHaveTextContent('52.1,8.5');
+    expect(screen.queryByText('Verortung')).toBeNull();
+    await userEvent.type(ort, 'a');
+    expect(screen.getByRole('group', { name: 'Karte: Schadensort' })).toHaveTextContent('52.1,8.5');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0].ort).toBe('Hauptstr. 17a');
+    expect(koerper[0]).not.toHaveProperty('lat');
+    expect(koerper[0]).not.toHaveProperty('lon');
+  });
+
+  it('ein gewählter Treffer schickt Text und Koordinate', async () => {
+    const koerper = mitPatch(basisSchaden());
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const ort = await screen.findByLabelText('Ort');
+    await userEvent.clear(ort);
+    await userEvent.type(ort, 'Bahnhofstr. 3{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: /Bahnhofstraße 3/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(koerper).toHaveLength(1));
+    expect(koerper[0]).toMatchObject({ ort: 'Bahnhofstraße 3', lat: 52.3, lon: 9.7 });
   });
 });

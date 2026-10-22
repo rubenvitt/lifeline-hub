@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import type { InputRef } from 'antd';
+import { createRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OrtSucheAntwort } from '../api/karteOrtSuche';
 import { einsatzKeys } from '../api/queryKeys';
@@ -271,5 +272,32 @@ describe('Ortsfeld', () => {
     expect(await screen.findByText('Sucht …')).toBeInTheDocument();
     act(() => erfuellen(TREFFER));
     await waitFor(() => expect(screen.queryByText('Sucht …')).not.toBeInTheDocument());
+  });
+});
+
+/**
+ * Fokus über den `ref` (LLH-1121, design.md D11): antds `scrollToFirstError={{ focus: true }}`
+ * fokussiert ein Feld über den `ref`, den `Form.Item` hineinreicht — ohne ihn stünde nach „Ort ist
+ * Pflicht“ der Fokus nicht im Feld. Mutationsprobe: `ref` nicht ans Eingabefeld gereicht → rot.
+ */
+describe('Ortsfeld · ref', () => {
+  it('fokussiert über den ref das Eingabefeld, mit und ohne Suche', () => {
+    const mitSuche = createRef<InputRef>();
+    const ohneSuche = createRef<InputRef>();
+    renderMitProviders(
+      <>
+        <Ortsfeld
+          ref={mitSuche}
+          aria-label="Mit Suche"
+          suchen={vi.fn()}
+          suchSchluessel={(b) => einsatzKeys.einsatzortSuche(7, b)}
+        />
+        <Ortsfeld ref={ohneSuche} aria-label="Ohne Suche" ohneSuche="personenbezogen" />
+      </>,
+    );
+    act(() => mitSuche.current?.focus());
+    expect(screen.getByRole('textbox', { name: 'Mit Suche' })).toHaveFocus();
+    act(() => ohneSuche.current?.focus());
+    expect(screen.getByRole('textbox', { name: 'Ohne Suche' })).toHaveFocus();
   });
 });

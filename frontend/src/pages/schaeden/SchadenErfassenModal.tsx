@@ -10,12 +10,9 @@ import type { Ausmass, SchadenTyp } from '../../api/types';
 import { ErfassungsModal, type Speicherung } from '../../components/Erfassung';
 import FormularEingehaengt from '../../components/FormularEingehaengt';
 import { useFormularEingehaengt } from '../../components/useFormularEingehaengt';
-import KoordinatenFeld from '../../anzeige/KoordinatenFeld';
-import {
-  alsLatLon,
-  istUngueltigeKoordinate,
-  type KoordinatenWert,
-} from '../../anzeige/koordinatenWert';
+import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../../anzeige/Ortsfeld';
+import { ortFelder, ortRegeln } from '../../anzeige/ortsfeldFormular';
 import {
   liesErfassungsSitzungswert,
   schreibeErfassungsSitzungswert,
@@ -34,18 +31,37 @@ interface Props {
   orgName: string;
 }
 
-type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon'> & {
-  koordinaten?: KoordinatenWert;
+type SchadenFormular = Omit<SchadenEingabe, 'lat' | 'lon' | 'ort'> & {
+  ort?: OrtsfeldWert;
 };
+
+/** Sitzungsfeld der Koordinate neben dem Ort, als `"lat,lon"` (die Sitzung hält nur Strings). */
+const ORT_KOORDINATE = 'ort_koordinate';
+
+/** Gemerkter Ort der Sitzung; die Koordinate hängt am Text wie ein gewählter Treffer. */
+function gemerkterOrt(einsatzId: number): OrtsfeldWert | undefined {
+  const text = liesErfassungsSitzungswert(einsatzId, 'schaden', 'ort');
+  if (text === undefined) return undefined;
+  const [lat, lon] = (liesErfassungsSitzungswert(einsatzId, 'schaden', ORT_KOORDINATE) ?? '')
+    .split(',')
+    .map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lon) && text.trim() !== ''
+    ? { text, koordinate: { lat, lon }, quelle: 'adresse' }
+    : { text, koordinate: null };
+}
 
 /**
  * Schnellerfassungs-Modal für Schäden. Die Seite hält nur `open`; Formular, Geschädigt-Auswahl und
  * Mutation liegen hier. Vier Kernfelder sichtbar: Typ, Ausmaß, Ort und Gefahr, weil die Gefahr das
- * Kartenzeichen bestimmt (LLH-1115, design.md D4). Beschreibung, Schadensgrad, Geschädigt und
- * Koordinate liegen unter „Weitere Angaben“.
+ * Kartenzeichen bestimmt (LLH-1115, design.md D4). Beschreibung, Schadensgrad und Geschädigt
+ * liegen unter „Weitere Angaben“.
  *
- * Serienmodus: der Ort überlebt als `uebernahme` ein Serien-Speichern und wird sitzungsweit
- * gemerkt; beim nächsten Öffnen wird er per Formularwert eingesetzt, nicht als `initialValues`,
+ * Der Ort ist ein Ortsfeld (LLH-1121, Spec `ortsfeld`): ein gewählter Treffer, eine getippte
+ * Koordinate oder ein Punkt auf der Karte verortet den Schaden; Text und Koordinate gehen gemeinsam
+ * hinaus. Ohne Auswahl bleibt er nicht verortet.
+ *
+ * Serienmodus: der Ort (Text und Koordinate) überlebt als `uebernahme` ein Serien-Speichern und
+ * wird sitzungsweit gemerkt; beim nächsten Öffnen wird er per Formularwert eingesetzt, nicht als `initialValues`,
  * damit ein Serien-Reset bei ausgeschaltetem „Werte behalten" leer bleibt. Die Felder leert die
  * Hülle; nur „Geschädigt" liegt in lokalem State und wird hier geleert.
  */
@@ -74,8 +90,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
     if (!formular.da) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
-    const ort = liesErfassungsSitzungswert(einsatzId, 'schaden', 'ort');
-    form.setFieldValue('ort', ort);
+    form.setFieldValue('ort', gemerkterOrt(einsatzId));
   }, [einsatzId, form, formular.da, formular.jeDa, open]);
 
   const anlegenMutation = useMutation({
@@ -106,7 +121,7 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
    * nie, der Wert wanderte sonst still auf den nächsten Schaden.
    */
   async function onErfassen(daten: SchadenFormular) {
-    const koord = alsLatLon(daten.koordinaten);
+    const ort = ortFelder(daten.ort);
     await anlegenMutation.mutateAsync({
       einsatzId,
       daten: {
@@ -114,17 +129,24 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
         ausmass: daten.ausmass,
         gefahrenart: daten.gefahrenart ?? null,
         schadensgrad: daten.schadensgrad ?? null,
-        ort: daten.ort,
+        ort: ort.text ?? '',
         beschreibung: daten.beschreibung ?? null,
-        lat: koord?.lat ?? null,
-        lon: koord?.lon ?? null,
+        lat: ort.lat,
+        lon: ort.lon,
         ...geschaedigtFelder(geschaedigt, orgId),
       },
     });
   }
 
   function onErfasst(daten: SchadenFormular) {
-    schreibeErfassungsSitzungswert(einsatzId, 'schaden', 'ort', daten.ort);
+    const ort = ortFelder(daten.ort);
+    schreibeErfassungsSitzungswert(einsatzId, 'schaden', 'ort', daten.ort?.text ?? '');
+    schreibeErfassungsSitzungswert(
+      einsatzId,
+      'schaden',
+      ORT_KOORDINATE,
+      ort.lat != null && ort.lon != null ? `${ort.lat},${ort.lon}` : '',
+    );
     setGeschaedigt(null);
   }
 
@@ -170,8 +192,18 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
           }))}
         />
       </Form.Item>
-      <Form.Item label="Ort" name="ort" rules={[{ required: true, message: 'Ort ist Pflicht' }]}>
-        <Input placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5" maxLength={SCHADEN_ORT_MAX} />
+      {/* `required` zeigt das Pflichtzeichen; geprüft wird über die Regel am Text des Werts. */}
+      <Form.Item
+        label="Ort"
+        name="ort"
+        required
+        rules={ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort ist Pflicht' })}
+      >
+        <EinsatzOrtsfeld
+          einsatzId={einsatzId}
+          etikett="Schadensort"
+          count={zeichenGrenze(SCHADEN_ORT_MAX)}
+        />
       </Form.Item>
       {/* Mit Zeichenvorschau in Ausmaßfarbe und gewähltem Schadensgrad (LLH-1115): die Vorschau
           zeigt das Zeichen, das der Schaden auf der Karte bekommt. */}
@@ -197,15 +229,14 @@ export default function SchadenErfassenModal({ open, onClose, einsatzId, orgId, 
             onChange={setGeschaedigt}
           />
         </Form.Item>
-        <KoordinatenFeld label="Koordinate" name="koordinaten" />
       </WeitereAngaben>
     </ErfassungsModal>
   );
 }
 
 /**
- * „Weitere Angaben“ unter den Kernfeldern. Eine ungültige Koordinate sperrt das Anlegen
- * (LFH-517), eine zu lange Beschreibung ebenso (LFH-937); der Abschnitt lässt sich dann nicht
+ * „Weitere Angaben“ unter den Kernfeldern. Eine zu lange Beschreibung sperrt das Anlegen
+ * (LFH-937); der Abschnitt lässt sich dann nicht
  * zuklappen, sonst schlüge das Anlegen an einem verborgenen Feld fehl (Erfassungs-Norm: was eine
  * Ablehnung auslöst, bleibt sichtbar). Der Zustand liegt hier, im Dialoginhalt, damit er wie zuvor
  * mit dem Dialog neu beginnt.
@@ -219,8 +250,7 @@ function WeitereAngaben({ children }: { children: ReactNode }) {
       onChange={(keys) => {
         if (
           keys.length === 0 &&
-          (istUngueltigeKoordinate(form.getFieldValue('koordinaten')) ||
-            istZuLang(form.getFieldValue('beschreibung'), SCHADEN_BESCHREIBUNG_MAX))
+          istZuLang(form.getFieldValue('beschreibung'), SCHADEN_BESCHREIBUNG_MAX)
         ) {
           return;
         }

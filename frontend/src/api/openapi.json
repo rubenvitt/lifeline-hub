@@ -7195,6 +7195,21 @@
               "null"
             ]
           },
+          "sammelstelle_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate der Sammelstelle (LLH-1121). Beide fehlen = nicht verortet; die App hält sie\nals Paar."
+          },
+          "sammelstelle_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "stand": {
             "oneOf": [
               {
