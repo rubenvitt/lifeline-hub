@@ -19,6 +19,7 @@
 
 pub mod cache;
 pub mod marker;
+pub mod offline;
 pub mod peilung;
 pub mod suche;
 

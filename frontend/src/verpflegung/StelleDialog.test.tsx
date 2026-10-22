@@ -34,6 +34,7 @@ const TREFFER: OrtSucheAntwort = {
       lon: 13.41,
       name: 'Sportplatz am Deich, Musterstadt, Deutschland',
       kurz: 'Sportplatz am Deich, Musterstadt',
+      quelle: 'geocoder',
     },
   ],
 };

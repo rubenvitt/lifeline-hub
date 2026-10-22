@@ -303,6 +303,10 @@ pub fn download_client() -> reqwest::Client {
 pub async fn entferne_download_dateien(karten_dir: &Path, id: i64) {
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles"))).await;
     let _ = tokio::fs::remove_file(karten_dir.join(format!("karte-{id}.mbtiles.part"))).await;
+    // LLH-1119: der Adressindex gehört zur Karte und geht mit ihr.
+    let index = crate::karte::adressindex::dateiname(id);
+    let _ = tokio::fs::remove_file(karten_dir.join(&index)).await;
+    let _ = tokio::fs::remove_file(karten_dir.join(format!("{index}.part"))).await;
 }
 
 /// Crash-Recovery beim Start: hängende Downloads (`laedt`) auf `fehler` setzen, danach jede
@@ -341,10 +345,15 @@ pub fn raeume_teildateien(karten_dir: &Path) -> usize {
     geloescht
 }
 
-/// `karte-<ziffern>.mbtiles.part`, der Name, unter dem der Download-Manager lädt.
+/// `karte-<ziffern>.mbtiles.part` bzw. `karte-<ziffern>.adressen.sqlite.part` (LLH-1119), die
+/// Namen, unter denen der Download-Manager lädt.
 fn ist_download_teildatei(name: &str) -> bool {
+    let index_part = format!("{}.part", karten_katalog::adressindex::ADRESSINDEX_ENDUNG);
     name.strip_prefix("karte-")
-        .and_then(|r| r.strip_suffix(".mbtiles.part"))
+        .and_then(|r| {
+            r.strip_suffix(".mbtiles.part")
+                .or_else(|| r.strip_suffix(index_part.as_str()))
+        })
         .is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
 }
 
@@ -473,6 +482,9 @@ mod tests {
         for name in [
             "karte-1.mbtiles.part",
             "karte-27.mbtiles.part",
+            "karte-27.adressen.sqlite.part",
+            "karte-27.adressen.sqlite",
+            "eigene.adressen.sqlite.part",
             "karte-1.mbtiles",
             "welt-uebersicht.mbtiles",
             "eigene.mbtiles.part",
@@ -485,7 +497,7 @@ mod tests {
         // Ein Verzeichnis mit passendem Namen ist keine Teildatei.
         std::fs::create_dir(p.join("karte-5.mbtiles.part")).unwrap();
 
-        assert_eq!(raeume_teildateien(p), 2);
+        assert_eq!(raeume_teildateien(p), 3);
 
         let mut rest: Vec<String> = std::fs::read_dir(p)
             .unwrap()
@@ -495,9 +507,11 @@ mod tests {
         assert_eq!(
             rest,
             [
+                "eigene.adressen.sqlite.part",
                 "eigene.mbtiles.part",
                 "karte-.mbtiles.part",
                 "karte-1.mbtiles",
+                "karte-27.adressen.sqlite",
                 "karte-5.mbtiles.part",
                 "karte-x.mbtiles.part",
                 "tile-cache.db",
@@ -875,6 +889,9 @@ mod tests {
         let dir = tmp.path();
         std::fs::write(dir.join("karte-7.mbtiles"), b"final").unwrap();
         std::fs::write(dir.join("karte-7.mbtiles.part"), b"rest").unwrap();
+        std::fs::write(dir.join("karte-7.adressen.sqlite"), b"index").unwrap();
+        std::fs::write(dir.join("karte-7.adressen.sqlite.part"), b"rest").unwrap();
+        std::fs::write(dir.join("karte-70.adressen.sqlite"), b"andere").unwrap();
         // Extern registrierte Fremddatei mit beliebigem Namen — darf NICHT angefasst werden.
         std::fs::write(dir.join("fremd.mbtiles"), b"extern").unwrap();
 
@@ -885,6 +902,15 @@ mod tests {
             "finale Datei entfernt"
         );
         assert!(!dir.join("karte-7.mbtiles.part").exists(), ".part entfernt");
+        assert!(
+            !dir.join("karte-7.adressen.sqlite").exists(),
+            "Adressindex entfernt"
+        );
+        assert!(!dir.join("karte-7.adressen.sqlite.part").exists());
+        assert!(
+            dir.join("karte-70.adressen.sqlite").exists(),
+            "fremde id bleibt"
+        );
         assert!(
             dir.join("fremd.mbtiles").exists(),
             "Fremddatei unangetastet"

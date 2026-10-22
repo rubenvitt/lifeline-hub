@@ -8,7 +8,12 @@ import { SeitenLeer } from '../../components/SeitenZustand';
 import { monoStil, SegmentUmschalter, useRollen } from '../../components/instrument';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { erkenneKoordinate } from '../../anzeige/koordinatenErkennung';
-import { adressAussage, adressBegriff, type GefundenerOrt } from '../../anzeige/ortssuche';
+import {
+  adressAussage,
+  adressBegriff,
+  OFFLINE_KARTE_ZUSATZ,
+  type GefundenerOrt,
+} from '../../anzeige/ortssuche';
 import { einsatzKeys } from '../../api/queryKeys';
 import { sucheOrt } from '../../api/karteOrtSuche';
 /*
@@ -206,6 +211,13 @@ export default function MarkerSuche({
     <ListenEintrag style={bedienzielStil(token)} onClick={() => ortssuche?.onOrtWaehlen(ort)}>
       {ort.art === 'koordinate' ? (
         <span style={monoStil(token.fontSize)}>{ort.beschriftung}</span>
+      ) : ort.ausOfflineKarte ? (
+        <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <span style={{ overflowWrap: 'anywhere' }}>{ort.beschriftung}</span>
+          <span style={{ fontSize: token.fontSizeSM, color: rollen.text2 }}>
+            {OFFLINE_KARTE_ZUSATZ}
+          </span>
+        </span>
       ) : (
         ort.beschriftung
       )}
@@ -460,6 +472,7 @@ function AdressGruppe({
             lon: t.lon,
             beschriftung: t.name,
             art: 'adresse' as const,
+            ...(t.quelle === 'offline_karte' && { ausOfflineKarte: true }),
           }))
         : [],
     [adresse.data],

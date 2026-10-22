@@ -11,18 +11,22 @@
 //! Ein Ausfall oder das erschöpfte Rate-Limit kommen als `zustand` mit 200, nie als Fehlerstatus.
 //! 400 gibt es nur für den Suchtext selbst (`src/AGENTS.md`, Statuscode-Konvention). Takt und
 //! Cache sind prozessweit und gelten für alle Einstiege zusammen (`geocoding::suche`).
+//!
+//! Zuerst fragt die Suche die Adressindizes der Offline-Karten (LLH-1119, `geocoding::offline`),
+//! dann den Geocoder für die übrigen Plätze; lokale Treffer stehen vorn und tragen ihre Quelle.
 
 use crate::app::AppState;
 use crate::auth::session::CurrentUser;
 use crate::einsatz::kontext::EinsatzVerwaltungszugriff;
 use crate::error::AppError;
-use crate::geocoding::{self, suche};
+use crate::geocoding::{self, offline, suche};
 use crate::org::einstellungen as org_einst;
 use crate::wire_enum::wire_enum;
 use axum::extract::{Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use std::path::Path;
 use utoipa::ToSchema;
 
 /// Länge des getrimmten Suchtexts in Zeichen.
@@ -47,15 +51,27 @@ wire_enum! {
     }
 }
 
+wire_enum! {
+    /// Woher ein Treffer der Ortssuche stammt (LLH-1119).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum OrtTrefferQuelle {
+        /// Adressindex einer Offline-Karte auf diesem Server.
+        OfflineKarte => "offline_karte",
+        /// Geocoder der Organisation.
+        Geocoder => "geocoder",
+    }
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct OrtTreffer {
     pub lat: f64,
     pub lon: f64,
-    /// Anzeigename des Geocoders (bei Nominatim `display_name`).
+    /// Anzeigename des Geocoders (bei Nominatim `display_name`) bzw. der Offline-Karte.
     pub name: String,
     /// Kurzadresse „Straße Nr, PLZ Ort“, wenn der Geocoder die Teile liefert (LFH-1175).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kurz: Option<String>,
+    pub quelle: OrtTrefferQuelle,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -77,20 +93,30 @@ pub(crate) fn pruefe_suchtext(q: Option<String>) -> Result<String, AppError> {
     Ok(q.to_string())
 }
 
-/// Sucht `q` (ungeprüft) beim Geocoder der Organisation `org_id`, mit bevorzugtem Ausschnitt.
+/// Sucht `q` (ungeprüft) zuerst in den Adressindizes unter `karten_dir`, dann beim Geocoder der
+/// Organisation `org_id`, beides mit bevorzugtem Ausschnitt. Füllen die lokalen Treffer schon alle
+/// Plätze, wird der Geocoder nicht gefragt: der Suchtext bleibt dann auf dem Server.
 pub(crate) async fn suchen(
     pool: &SqlitePool,
+    karten_dir: &Path,
     org_id: i64,
     q: Option<String>,
     ausschnitt: Option<suche::Ausschnitt>,
 ) -> Result<OrtSucheAntwort, AppError> {
     let q = pruefe_suchtext(q)?;
+    let lokal = offline::suche(karten_dir, &q, ausschnitt).await;
+    if lokal.len() >= offline::TREFFER_MAX {
+        return Ok(antwort_aus(&lokal, None));
+    }
     let org = org_einst::laden_oder_default(pool, org_id).await?;
     let base = org
         .geocoder_url
         .as_deref()
         .unwrap_or(geocoding::NOMINATIM_DEFAULT);
-    Ok(antwort_aus(geocoding::suche(base, &q, ausschnitt).await))
+    Ok(antwort_aus(
+        &lokal,
+        Some(geocoding::suche(base, &q, ausschnitt).await),
+    ))
 }
 
 /// Ausschnitt um den Einsatzort, falls verortet. Nur der Einsatzort, kein weiteres Objekt: mehr
@@ -112,7 +138,14 @@ pub async fn im_einsatz(
 ) -> Result<Json<OrtSucheAntwort>, AppError> {
     let ausschnitt = ausschnitt_um(ctx.einsatz.einsatzort_lat, ctx.einsatz.einsatzort_lon);
     Ok(Json(
-        suchen(&state.pool, ctx.einsatz.org_id, params.q, ausschnitt).await?,
+        suchen(
+            &state.pool,
+            &state.karten_dir,
+            ctx.einsatz.org_id,
+            params.q,
+            ausschnitt,
+        )
+        .await?,
     ))
 }
 
@@ -128,34 +161,47 @@ pub async fn in_org(
         return Err(AppError::Forbidden);
     }
     Ok(Json(
-        suchen(&state.pool, benutzer.org_id, params.q, None).await?,
+        suchen(
+            &state.pool,
+            &state.karten_dir,
+            benutzer.org_id,
+            params.q,
+            None,
+        )
+        .await?,
     ))
 }
 
-/// Ergebnis des Geocoders → Antwort. Rein und ohne `Result`: kein Ausgang des Geocoders wird zum
-/// Fehlerstatus, das schließt schon der Typ aus.
-fn antwort_aus(ergebnis: suche::SuchErgebnis) -> OrtSucheAntwort {
-    match ergebnis {
-        suche::SuchErgebnis::Ok(treffer) => OrtSucheAntwort {
-            zustand: OrtSucheZustand::Ok,
-            treffer: treffer
-                .into_iter()
-                .map(|t| OrtTreffer {
-                    lat: t.lat,
-                    lon: t.lon,
-                    name: t.name,
-                    kurz: t.kurz,
-                })
-                .collect(),
-        },
-        suche::SuchErgebnis::Ausgelastet => OrtSucheAntwort {
-            zustand: OrtSucheZustand::Ausgelastet,
-            treffer: vec![],
-        },
-        suche::SuchErgebnis::NichtErreichbar => OrtSucheAntwort {
-            zustand: OrtSucheZustand::NichtErreichbar,
-            treffer: vec![],
-        },
+/// Lokale Treffer und Ergebnis des Geocoders (`None`: nicht gefragt) → Antwort. Rein und ohne
+/// `Result`: kein Ausgang des Geocoders wird zum Fehlerstatus, das schließt schon der Typ aus. Gibt
+/// es lokale Treffer, ist die Antwort `ok`, auch wenn der Geocoder ausfiel oder ausgelastet war:
+/// die Treffer sind die Aussage (Spec `lagekarte-ortssuche`, „Adresssuche aus der Offline-Karte“).
+fn antwort_aus(
+    lokal: &[offline::LokalerTreffer],
+    geocoder: Option<suche::SuchErgebnis>,
+) -> OrtSucheAntwort {
+    let (zustand, vom_geocoder) = match geocoder {
+        None => (OrtSucheZustand::Ok, vec![]),
+        Some(suche::SuchErgebnis::Ok(t)) => (OrtSucheZustand::Ok, t),
+        Some(_) if !lokal.is_empty() => (OrtSucheZustand::Ok, vec![]),
+        Some(suche::SuchErgebnis::Ausgelastet) => (OrtSucheZustand::Ausgelastet, vec![]),
+        Some(suche::SuchErgebnis::NichtErreichbar) => (OrtSucheZustand::NichtErreichbar, vec![]),
+    };
+    OrtSucheAntwort {
+        zustand,
+        treffer: offline::fuehre_zusammen(lokal, vom_geocoder)
+            .into_iter()
+            .map(|t| OrtTreffer {
+                lat: t.ort.lat,
+                lon: t.ort.lon,
+                name: t.ort.name,
+                kurz: t.ort.kurz,
+                quelle: match t.quelle {
+                    offline::Quelle::OfflineKarte => OrtTrefferQuelle::OfflineKarte,
+                    offline::Quelle::Geocoder => OrtTrefferQuelle::Geocoder,
+                },
+            })
+            .collect(),
     }
 }
 
@@ -174,15 +220,55 @@ mod tests {
         assert!(pruefe_suchtext(Some("x".repeat(201))).is_err());
     }
 
+    /// LLH-1119: Mit lokalen Treffern ist jede Antwort `ok`, auch wenn der Geocoder ausfiel,
+    /// ausgelastet war oder nicht gefragt wurde; lokale Treffer stehen vorn.
+    #[test]
+    fn lokale_treffer_machen_die_antwort_ok() {
+        let lokal = [offline::LokalerTreffer::fuer_test(
+            52.62,
+            13.78,
+            "Hauptstraße 12, 12345 Musterstadt",
+        )];
+        for geocoder in [
+            None,
+            Some(suche::SuchErgebnis::Ausgelastet),
+            Some(suche::SuchErgebnis::NichtErreichbar),
+        ] {
+            let a = antwort_aus(&lokal, geocoder.clone());
+            assert_eq!(a.zustand, OrtSucheZustand::Ok, "{geocoder:?}");
+            assert_eq!(a.treffer.len(), 1);
+            assert_eq!(a.treffer[0].quelle, OrtTrefferQuelle::OfflineKarte);
+            assert_eq!(a.treffer[0].kurz, None, "Kurzadresse gleich Name entfällt");
+        }
+        let mit = antwort_aus(
+            &lokal,
+            Some(suche::SuchErgebnis::Ok(vec![suche::OrtTreffer {
+                lat: 51.0,
+                lon: 10.0,
+                name: "Rathaus".into(),
+                kurz: None,
+            }])),
+        );
+        let quellen: Vec<_> = mit.treffer.iter().map(|t| t.quelle).collect();
+        assert_eq!(
+            quellen,
+            [OrtTrefferQuelle::OfflineKarte, OrtTrefferQuelle::Geocoder]
+        );
+    }
+
     #[test]
     fn jeder_ausgang_des_geocoders_wird_ein_zustand() {
-        let ok = antwort_aus(suche::SuchErgebnis::Ok(vec![suche::OrtTreffer {
-            lat: 51.0,
-            lon: 10.0,
-            name: "Rathaus".into(),
-            kurz: None,
-        }]));
+        let ok = antwort_aus(
+            &[],
+            Some(suche::SuchErgebnis::Ok(vec![suche::OrtTreffer {
+                lat: 51.0,
+                lon: 10.0,
+                name: "Rathaus".into(),
+                kurz: None,
+            }])),
+        );
         assert_eq!(ok.zustand, OrtSucheZustand::Ok);
+        assert_eq!(ok.treffer[0].quelle, OrtTrefferQuelle::Geocoder);
         assert_eq!(ok.treffer.len(), 1);
         assert_eq!(
             (
@@ -193,16 +279,16 @@ mod tests {
             (51.0, 10.0, "Rathaus")
         );
 
-        let leer = antwort_aus(suche::SuchErgebnis::Ok(vec![]));
+        let leer = antwort_aus(&[], Some(suche::SuchErgebnis::Ok(vec![])));
         assert_eq!((leer.zustand, leer.treffer.len()), (OrtSucheZustand::Ok, 0));
 
-        let ausgelastet = antwort_aus(suche::SuchErgebnis::Ausgelastet);
+        let ausgelastet = antwort_aus(&[], Some(suche::SuchErgebnis::Ausgelastet));
         assert_eq!(
             (ausgelastet.zustand, ausgelastet.treffer.len()),
             (OrtSucheZustand::Ausgelastet, 0)
         );
 
-        let tot = antwort_aus(suche::SuchErgebnis::NichtErreichbar);
+        let tot = antwort_aus(&[], Some(suche::SuchErgebnis::NichtErreichbar));
         assert_eq!(
             (tot.zustand, tot.treffer.len()),
             (OrtSucheZustand::NichtErreichbar, 0)

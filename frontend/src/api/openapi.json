@@ -584,6 +584,29 @@
           "andere_bos"
         ]
       },
+      "AdressindexEintrag": {
+        "type": "object",
+        "description": "Der Adressindex einer Region im Manifest (`OfflineKatalogEintrag::adressindex`).",
+        "required": [
+          "url",
+          "groesse",
+          "sha256"
+        ],
+        "properties": {
+          "groesse": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dateigröße in Bytes."
+          },
+          "sha256": {
+            "type": "string",
+            "description": "SHA256 (hex, lowercase); der Hub prüft den Download dagegen."
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
       "AktualisierungsPhase": {
         "type": "string",
         "description": "Laufende Phase einer Karte in der Verwaltung.",
@@ -11571,6 +11594,17 @@
           "quelle"
         ],
         "properties": {
+          "adressindex": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AdressindexEintrag",
+                "description": "Offline-Adressindex der Region (LLH-1119), aus demselben OSM-Extrakt gebaut. Fehlt bei\nälteren Manifesten und wenn der Index-Bau scheiterte; der Hub lädt ihn mit der Karte."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "groesse": {
             "type": "integer",
             "format": "int64"
@@ -12112,7 +12146,8 @@
         "required": [
           "lat",
           "lon",
-          "name"
+          "name",
+          "quelle"
         ],
         "properties": {
           "kurz": {
@@ -12132,9 +12167,20 @@
           },
           "name": {
             "type": "string",
-            "description": "Anzeigename des Geocoders (bei Nominatim `display_name`)."
+            "description": "Anzeigename des Geocoders (bei Nominatim `display_name`) bzw. der Offline-Karte."
+          },
+          "quelle": {
+            "$ref": "#/components/schemas/OrtTrefferQuelle"
           }
         }
+      },
+      "OrtTrefferQuelle": {
+        "type": "string",
+        "description": "Woher ein Treffer der Ortssuche stammt (LLH-1119).",
+        "enum": [
+          "offline_karte",
+          "geocoder"
+        ]
       },
       "OrtVorschauAntwort": {
         "type": "object",

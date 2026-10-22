@@ -644,6 +644,11 @@ fn orphan_enums_wire() {
         Ausgelastet => "ausgelastet",
         NichtErreichbar => "nicht_erreichbar",
     });
+    // Quelle eines Treffers der Ortssuche (LLH-1119)
+    enum_wire!(lifeline_hub::routes::ort_suche::OrtTrefferQuelle {
+        OfflineKarte => "offline_karte",
+        Geocoder => "geocoder",
+    });
 
     // einsatz::einstellungen
     enum_wire!(lifeline_hub::einsatz::einstellungen::BasemapModus {

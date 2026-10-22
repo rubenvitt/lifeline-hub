@@ -320,6 +320,7 @@ use utoipa::OpenApi;
         crate::routes::karte::VorhandeneKarte,
         crate::routes::ort_suche::OrtSucheAntwort,
         crate::routes::ort_suche::OrtSucheZustand,
+        crate::routes::ort_suche::OrtTrefferQuelle,
         crate::routes::ort_suche::OrtTreffer,
         crate::routes::organisation::OrganisationAnzeige,
         crate::org::logo::OrgLogoAnzeige,

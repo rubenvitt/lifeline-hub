@@ -21,8 +21,9 @@ const TREFFER: OrtSucheAntwort = {
       lon: 10.4,
       name: 'Bahnhofstraße 1, Musterstadt, Landkreis X, Niedersachsen, 12345, Deutschland',
       kurz: 'Bahnhofstraße 1, 12345 Musterstadt',
+      quelle: 'geocoder',
     },
-    { lat: 48.1, lon: 11.5, name: 'Bahnhofstraße 1, Anderswo' },
+    { lat: 48.1, lon: 11.5, name: 'Bahnhofstraße 1, Anderswo', quelle: 'geocoder' },
   ],
 };
 
@@ -104,6 +105,30 @@ describe('Ortsfeld', () => {
     expect(suchen).not.toHaveBeenCalled();
     await userEvent.type(screen.getByRole('textbox', { name: 'Einsatzort' }), 'u');
     expect(screen.getByRole('button', { name: 'Ort suchen' })).toBeEnabled();
+  });
+
+  it('ein Treffer aus der Offline-Karte trägt den Zusatz „aus Offline-Karte“ (LLH-1119)', async () => {
+    const suchen = vi.fn().mockResolvedValue({
+      zustand: 'ok',
+      treffer: [
+        {
+          lat: 52.62,
+          lon: 13.78,
+          name: 'Hauptstraße 12, 12345 Musterstadt',
+          quelle: 'offline_karte',
+        },
+        { lat: 48.1, lon: 11.5, name: 'Hauptstraße 12, Anderswo', quelle: 'geocoder' },
+      ],
+    } satisfies OrtSucheAntwort);
+    renderMitProviders(<Aufbau suchen={suchen} />);
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Einsatzort' }),
+      'Hauptstraße 12{Enter}',
+    );
+    const liste = await screen.findByRole('list', { name: 'Treffer' });
+    const [lokal, entfernt] = within(liste).getAllByRole('button');
+    expect(lokal).toHaveTextContent('aus Offline-Karte');
+    expect(entfernt).not.toHaveTextContent('aus Offline-Karte');
   });
 
   it('gibt den Fokus nach der Wahl eines Treffers ans Feld zurück', async () => {

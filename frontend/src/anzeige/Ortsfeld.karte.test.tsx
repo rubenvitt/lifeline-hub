@@ -85,7 +85,13 @@ vi.mock('./KarteWaehlen', () => ({
 const TREFFER: OrtSucheAntwort = {
   zustand: 'ok',
   treffer: [
-    { lat: 51.1, lon: 10.4, name: 'Bahnhofstraße 1, Musterstadt', kurz: 'Bahnhofstraße 1' },
+    {
+      lat: 51.1,
+      lon: 10.4,
+      name: 'Bahnhofstraße 1, Musterstadt',
+      kurz: 'Bahnhofstraße 1',
+      quelle: 'geocoder',
+    },
   ],
 };
 

@@ -151,6 +151,33 @@ describe('MarkerSuche — Adresse auf Enter (LFH-638)', () => {
     });
   });
 
+  it('ein Treffer aus der Offline-Karte trägt den Zusatz „aus Offline-Karte“ (LLH-1119)', async () => {
+    geocoder({
+      zustand: 'ok',
+      treffer: [
+        {
+          lat: 52.62,
+          lon: 13.78,
+          name: 'Hauptstraße 12, 12345 Musterstadt',
+          quelle: 'offline_karte',
+        },
+        { lat: 48.1, lon: 11.5, name: 'Hauptstraße 12, Anderswo', quelle: 'geocoder' },
+      ],
+    });
+    const { onOrtWaehlen } = zeige();
+    await userEvent.type(suchfeld(), 'Hauptstraße 12{Enter}');
+    const lokal = await screen.findByRole('button', { name: /Musterstadt/ });
+    expect(lokal).toHaveTextContent('aus Offline-Karte');
+    expect(screen.getByRole('button', { name: /Anderswo/ })).not.toHaveTextContent(
+      'aus Offline-Karte',
+    );
+    // Die Suchnadel trägt nur die Adresse, nicht den Zusatz.
+    await userEvent.click(lokal);
+    expect(onOrtWaehlen).toHaveBeenCalledWith(
+      expect.objectContaining({ beschriftung: 'Hauptstraße 12, 12345 Musterstadt' }),
+    );
+  });
+
   it('genau ein Treffer fliegt ohne weiteren Klick hin — einmal je Enter', async () => {
     geocoder({ zustand: 'ok', treffer: [{ lat: 51.1604, lon: 10.4514, name: 'Rathaus' }] });
     const { onOrtWaehlen } = zeige();

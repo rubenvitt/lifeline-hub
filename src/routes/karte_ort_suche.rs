@@ -20,6 +20,13 @@ pub async fn ort_suche(
 ) -> Result<Json<OrtSucheAntwort>, AppError> {
     let ausschnitt = ausschnitt_um(ctx.einsatz.einsatzort_lat, ctx.einsatz.einsatzort_lon);
     Ok(Json(
-        suchen(&state.pool, ctx.einsatz.org_id, params.q, ausschnitt).await?,
+        suchen(
+            &state.pool,
+            &state.karten_dir,
+            ctx.einsatz.org_id,
+            params.q,
+            ausschnitt,
+        )
+        .await?,
     ))
 }
