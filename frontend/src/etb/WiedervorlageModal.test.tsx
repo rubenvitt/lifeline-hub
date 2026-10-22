@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
+import { tippeZeit } from '../test/zeitEingabe';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { renderMitProviders } from '../test/utils';
 import type { EtbEintragAnzeige } from '../api/types';
@@ -343,6 +344,21 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
     expect(faelligFeld()).toHaveValue('211517aug26');
     await nutzer.click(screen.getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 13:17:43'));
+  });
+
+  it('LLH-1077: „1430“ + Enter im Fälligkeitsfeld übernimmt die Frist und sendet ab', async () => {
+    let gesendet: Record<string, unknown> | undefined;
+    server.use(
+      http.post('/api/einsaetze/7/erinnerungen', async ({ request }) => {
+        gesendet = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ id: 1 });
+      }),
+    );
+    const nutzer = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    zeigeBerlin();
+    // 12:00 Berliner Zeit: 14:30 liegt heute noch vor uns, also heute.
+    await tippeZeit(nutzer, faelligFeld(), '1430');
+    await waitFor(() => expect(gesendet?.faellig_at).toBe('2026-08-21 12:30:00'));
   });
 });
 
