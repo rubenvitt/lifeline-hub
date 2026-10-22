@@ -1710,6 +1710,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Ortssuche ohne Einsatz, für „Einsatz anlegen“ (LFH-1175).
         .route("/api/ort-suche", get(routes::ort_suche::in_org))
+        // Ortsname ohne Einsatz, für das Ortsfeld beim Anlegen (LLH-1376).
+        .route("/api/ort-vorschau", get(routes::ort_vorschau::in_org))
         .route(
             "/api/externe-stellen",
             get(routes::externe_stelle::list).post(routes::externe_stelle::create),

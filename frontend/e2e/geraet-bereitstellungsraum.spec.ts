@@ -135,6 +135,83 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
 });
 
 /**
+ * LLH-1252 (Entscheidung Ruben 22.10.2026; Specs `funktionsansichten`, „Ansicht
+ * Bereitstellungsraum“, und `material-am-ort`, „Material am Ort auf Geräten“): das Tablet zeigt
+ * in der Sektion „Material“ die Posten seines Raums mit Menge und Status, nur lesend: ohne
+ * Auswahl, Lösen, Ausgeben, Erfassen und Statuswahl. Posten anderer Räume und ohne Ort fehlen,
+ * weil der Server die Materialliste für das Gerät zuschneidet.
+ *
+ * Mutationsprobe: im Handler `routes/einsatz_material.rs::liste` den Gerätezuschnitt entfernen →
+ * die Sektion zeigt weiter nur den eigenen Raum (der Client filtert auf `br_id`), aber
+ * `tests/geraet_kopplung.rs` wird rot; `darfSchreiben` am Gerät auf `true` → der Schritt „kein
+ * Lösen“ wird rot.
+ */
+test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
+  page,
+  browser,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const e = (
+    await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR Material ${Date.now()}` })
+  ).id;
+  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+    bezeichnung: 'BR Sportplatz',
+  });
+  const schule = await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume`, {
+    bezeichnung: 'BR Schule',
+  });
+  await anlegen(page, `/api/einsaetze/${e}/material`, {
+    adhoc: { bezeichnung: 'Rettungsdecke' },
+    art: 'verbrauchsgut',
+    menge: 10,
+    br_id: sportplatz.id,
+  });
+  await anlegen(page, `/api/einsaetze/${e}/material`, {
+    adhoc: { bezeichnung: 'Trage' },
+    br_id: schule.id,
+  });
+  await anlegen(page, `/api/einsaetze/${e}/material`, { adhoc: { bezeichnung: 'Stromerzeuger' } });
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+    ansicht: 'bereitstellungsraum',
+    stelle_id: sportplatz.id,
+    bezeichnung: 'Tablet BR',
+  });
+
+  const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
+  const tablet = await kontext.newPage();
+  try {
+    await tablet.goto(`/koppeln#${kopplung.code.code}`);
+    await tablet.getByRole('button', { name: 'Gerät koppeln' }).click();
+    await expect(tablet).toHaveURL(new RegExp(`/geraet/${e}/br/${sportplatz.id}$`));
+
+    const sektion = tablet.getByTestId('br-material');
+    await expect(sektion.getByText('Rettungsdecke', { exact: true })).toBeVisible();
+    await expect(sektion).toContainText('1 Posten');
+    await expect(sektion).toContainText('10');
+    await expect(sektion.getByText('Trage', { exact: true })).toHaveCount(0);
+    await expect(sektion.getByText('Stromerzeuger', { exact: true })).toHaveCount(0);
+    // Nur lesen: kein Zuordnen, Lösen, Ausgeben, Erfassen und keine Statuswahl.
+    await expect(sektion.getByRole('combobox')).toHaveCount(0);
+    await expect(sektion.getByRole('button')).toHaveCount(0);
+
+    // Ordnet die Führung einen Posten zu, steht er live am Tablet.
+    const strom = (await (await page.request.get(`/api/einsaetze/${e}/material`)).json()) as {
+      id: number;
+      bezeichnung: string;
+    }[];
+    const id = strom.find((m) => m.bezeichnung === 'Stromerzeuger')!.id;
+    const zugeordnet = await page.request.patch(`/api/einsaetze/${e}/material/${id}`, {
+      data: { br_id: sportplatz.id },
+    });
+    expect(zugeordnet.ok(), `${zugeordnet.status()} ${await zugeordnet.text()}`).toBeTruthy();
+    await expect(sektion.getByText('Stromerzeuger', { exact: true })).toBeVisible();
+    await expect(sektion).toContainText('2 Posten');
+  } finally {
+    await kontext.close();
+  }
+});
+
+/**
  * LLH-1075 Teil II (Spec `bereitstellungsraum-belegung`, „Eintreffen buchen in der Oberfläche“):
  * der Einweiser am Tablet (`handschuh`) bucht eine erwartete Einheit mit einem Tipp und ein
  * unangemeldetes Fahrzeug; die Führung am Desktop (`kompakt`) sieht die Meldung, das Kennzeichen

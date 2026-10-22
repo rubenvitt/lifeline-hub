@@ -2,23 +2,12 @@ import { Einsatzzeichen } from '@einsatzzeichen/react';
 import type { Drawing } from '@einsatzzeichen/schema';
 import { useId, type CSSProperties } from 'react';
 import type { TzProps } from '../pages/lagekarte/taktischesZeichen';
-import { farbenHell } from '../theme/tokens';
 import {
   fachobjektZeichen,
   funktionsZeichen,
   type FunktionsZeichenEingabe,
 } from './fachobjektZeichen';
-
-/**
- * Helle Unterlage hinter einem taktischen Zeichen am Schirm (LFH-1107, als Baustein LFH-1120):
- * Zeichen ohne Organisation zeichnet die Bibliothek mit schwarzem Umriss ohne Fläche, auf dem
- * Grund des Nachtbetriebs hielt er nur rund 1,1 : 1. Die Unterlage ist Papier
- * (`farbenHell.flaeche`), das Zeichen steht darauf wie im Druck, seine Farben nach DV 102 bleiben
- * unverfälscht; am Tag hebt sie sich vom Weiß kaum ab, von getönten Flächen als helles Quadrat.
- * Gemessen in beiden Modi im e2e „Zeichenkontrast“ (`fernmeldeskizze-ausstattung.spec.ts`,
- * `zeichen-kontrast.spec.ts`).
- */
-export const ZEICHEN_UNTERLAGE = farbenHell.flaeche;
+import { ZEICHEN_UNTERLAGE } from './unterlage';
 
 /**
  * Das taktische Zeichen eines Fachobjekts als Inline-SVG über @einsatzzeichen (LFH-835). Übersetzt

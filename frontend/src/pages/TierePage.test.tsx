@@ -673,6 +673,32 @@ describe('TierePage', () => {
     expect(wortlaute[1].rufname ?? '').toBe('');
   });
 
+  it('Fundort als Ortsfeld: eine getippte Koordinate geht als Paar mit und wird gemerkt (LLH-1114)', async () => {
+    const rumpfe: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+      http.post('/api/einsaetze/1/tiere', async ({ request }) => {
+        rumpfe.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ ...tierBasis, id: 99 }, { status: 201 });
+      }),
+    );
+    render(einsatzAktiv, []);
+    await userEvent.click(await screen.findByRole('button', { name: 'Tier erfassen' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Fundort' }), '51.50000, 8.25000');
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    expect(rumpfe[0]).toMatchObject({
+      antreff_ort: '51.50000, 8.25000',
+      antreff_lat: 51.5,
+      antreff_lon: 8.25,
+    });
+    await waitFor(() =>
+      expect(sessionStorage.getItem('lfh:erfassung:1:tier:antreff_koordinate')).toBe('51.5,8.25'),
+    );
+  });
+
   it('merkt einen erfolgreichen Fundort für das Wiederöffnen dieser Tiermaske', async () => {
     let versuche = 0;
     server.use(

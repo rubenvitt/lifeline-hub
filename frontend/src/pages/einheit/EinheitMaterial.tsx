@@ -41,8 +41,13 @@ export default function EinheitMaterial({
     id: m.em_id,
     kategorie: kategorie.get(m.em_id) ?? null,
   }));
+  // Leer sagt der Baustein „Kein Material“; „0 Posten“ daneben wäre doppelt (LLH-1255).
   return (
-    <Paneel titel="Material" meta={materialKopfzahl(posten)} koerperPolster>
+    <Paneel
+      titel="Material"
+      meta={posten.length > 0 ? materialKopfzahl(posten) : undefined}
+      koerperPolster
+    >
       <MaterialAmOrt
         einsatzId={einsatzId}
         ort={{ art: 'einheit', id: einheit.id }}

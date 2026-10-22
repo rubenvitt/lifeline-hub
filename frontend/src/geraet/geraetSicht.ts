@@ -40,6 +40,12 @@ export type GeraetFaehigkeit =
    */
   | 'br-eintreffen'
   /**
+   * Material des eigenen Raums lesen (LLH-1252, Entscheidung 22.10.2026): nur lesen, der Server
+   * schneidet die Materialliste auf den Raum. Zuordnen und Lösen bleiben der Führungsstelle;
+   * kämen sie dazu, als eigene Fähigkeit mit eigenem Eintrag in der Routenliste.
+   */
+  | 'br-material'
+  /**
    * Kräfte aus dem Raum abrufen und einen Abruf zurücknehmen (LLH-1085): eine Entscheidung der
    * Führung, kein Gerät (Routenliste ohne `…/abruf`). Das Ausrücken bucht das Gerät als Austritt.
    */
@@ -63,6 +69,7 @@ export function geraetDarf(geraet: GeraetAnzeige | null, faehigkeit: GeraetFaehi
     case 'person-behandlung':
       return geraet.ansicht === 'uhs-tablet' || geraet.ansicht === 'uhs-laptop';
     case 'br-eintreffen':
+    case 'br-material':
       return geraet.ansicht === 'bereitstellungsraum';
     case 'uhs-verwalten':
     case 'br-verwalten':

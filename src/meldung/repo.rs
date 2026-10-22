@@ -2978,6 +2978,7 @@ mod tests {
             absicht: None,
             lage: None,
             ort: None,
+            ort_punkt: None,
             zeit: None,
             mittel: None,
             verbindung: None,

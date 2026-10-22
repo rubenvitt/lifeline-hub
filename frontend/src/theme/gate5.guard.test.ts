@@ -64,20 +64,10 @@ const ROLLENWERT =
 
 /**
  * Benannte Ausnahmen: Datei + Wert, jeweils mit Grund, ohne Zeilennummer. Ein Eintrag, der
- * nichts mehr trifft, färbt den Guard rot (unten geprüft).
+ * nichts mehr trifft, färbt den Guard rot (unten geprüft). Leer seit LLH-1141: die Schadenfarben
+ * stehen als `schadenAusmassFarben` in `theme/tokens.ts`.
  */
-const AUSNAHMEN: readonly { pfad: string; wert: string; grund: string }[] = [
-  {
-    pfad: '/src/pages/lagekarte/taktischesZeichen.ts',
-    wert: '52c41a',
-    grund:
-      '`AUSMASS_FARBE.gering` — Kartenfarbe des Schadenszeichens (DV 102), eine Reihe mit den ' +
-      'antd-Presets #faad14/#fa8c16/#f5222d daneben. Der Wert ist antds green-6 und fiel ' +
-      'mit dem Neuentwurf zufällig mit `farbenDunkel.normal` zusammen; die Zeichenfarbe ' +
-      'ist modusunabhängig und darf der Rolle NICHT folgen. Eine Umstellung auf eine ' +
-      'eigene Kartenpalette ist ein Nachzug außerhalb des Fundament-Schritts.',
-  },
-];
+const AUSNAHMEN: readonly { pfad: string; wert: string; grund: string }[] = [];
 
 function istAusnahme(pfad: string, zeile: string): boolean {
   const treffer = [...zeile.matchAll(new RegExp(ROLLENWERT.source, 'gi'))].map((m) =>

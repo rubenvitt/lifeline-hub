@@ -7,7 +7,6 @@ import * as maplibregl from 'maplibre-gl';
 import type { LngLatLike, StyleSpecification, GeoJSONSource } from 'maplibre-gl';
 // Worker-URL vor der ersten Map (Begründung in `maplibreWorker.ts`).
 import './maplibreWorker';
-import { addSymbolImage } from '@einsatzzeichen/maplibre';
 import type { Drawing } from '@einsatzzeichen/schema';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -36,7 +35,7 @@ import {
   type SpiderProjektor,
 } from './spiderfy';
 import { baueZeichenRegistry, kartenPixelRatio, ZEICHEN_KARTEN_PX } from './markerIcons';
-import { beobachtePixeldichte, rastereZeichenNeu } from './zeichenDichte';
+import { beobachtePixeldichte, rastereZeichenNeu, zeichneKartenZeichen } from './zeichenDichte';
 import { baueClusterDonut, donutBild, setzeHuelleDurchlaessig } from './clusterDonut';
 import { nimmKartenbildAuf, type KartenAufnahme } from './kartenAufnahme';
 import { KARTE_NICHT_DARSTELLBAR, wennDarstellbar } from './kartenGrafik';
@@ -61,7 +60,7 @@ import {
 import type { BearbeitungsAktion } from './zonenBearbeitung';
 import type { MessForm, MessGeometrie } from './messung';
 import { wendeKartenDatenAn } from './kartenDaten';
-import { absolutiereProxyAnfrage } from './basemapStil';
+import { absolutiereProxyAnfrage, type KartenTheme } from './basemapStil';
 import { neuerStilFehlerWaechter } from './stilFehlerWaechter';
 import { kartenbildResolver } from './kartenbildResolver';
 import {
@@ -219,6 +218,11 @@ export interface KartenflaecheProps {
    * (`eigenpositionAnflug`) verbraucht sie ebenfalls.
    */
   startAnsicht?: StartAnsicht | null;
+  /**
+   * Aufgelöstes Thema der Kartengrundlage (`loeseKartenTheme`). Nachts tragen alle Zeichen die
+   * Hinterlegung des Render-Themes `dark` (LLH-1141, `markerIconKey`); ohne Angabe Tag.
+   */
+  kartenTheme?: KartenTheme;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
   onStyleFehler?: () => void;
   /** Config-autoritative Pflicht-Attribution des aktiven Online-Views (null = keine). */
@@ -458,6 +462,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onSpiderOffen,
     massstabZiel,
     startAnsicht,
+    kartenTheme = 'light',
   },
   ref,
 ) {
@@ -779,12 +784,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Alle Kartenbilder (Plaketten, Fachobjekte, freie Zeichen) über den Resolver, NICHT über
     // `styleimagemissing` (LFH-841, Begründung in kartenbildResolver.ts). Zeichen synchron über
     // Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in markerLayer.ts ist auf
-    // ZEICHEN_KARTEN_PX abgestimmt); freie Zeichen seit LFH-836 auf demselben Weg.
+    // ZEICHEN_KARTEN_PX abgestimmt); freie Zeichen seit LFH-836 auf demselben Weg. Ob ein Bild mit
+    // dem Render-Theme `dark` entsteht, sagt sein Schlüssel (LLH-1141, `zeichneKartenZeichen`).
     map.setMissingStyleImageResolver(
       kartenbildResolver(map, {
         zeichen: () => zeichenRegistryRef.current,
         zeichneEz: (id, drawing) =>
-          addSymbolImage(map, id, drawing, {
+          zeichneKartenZeichen(map, id, drawing, {
             size: ZEICHEN_KARTEN_PX,
             pixelRatio: kartenPixelRatio(window.devicePixelRatio),
           }),
@@ -1281,8 +1287,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const marker = baueMarkerFc(markers, markerPlakette);
-    const einsatzort = baueEinsatzortFc(markers, markerPlakette);
+    // Das Kartenthema steht im Bildschlüssel (LLH-1141): ein Wechsel Nacht ↔ Tag gibt jedem Zeichen
+    // ein anderes Bild, das der Resolver neu rastert — ohne Neuladen.
+    const marker = baueMarkerFc(markers, markerPlakette, kartenTheme);
+    const einsatzort = baueEinsatzortFc(markers, markerPlakette, kartenTheme);
     // Nur der Inhalt anders (Sichtung, Status, Beschriftung)? Dann bildet die Quelle dieselben
     // Bündel, und ein offener Spider bleibt stehen (LFH-668, D5).
     const nurInhalt = nurInhaltGeaendert(markerDatenRef.current, marker);
@@ -1290,7 +1298,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     einsatzortDatenRef.current = einsatzort;
     // Registry des Bild-Resolvers (Key → Zeichenquelle). `markerIconKey` ist die eine Quelle der
     // Key-Bildung, identisch zum icon-Property aus `baueMarkerFc`.
-    zeichenRegistryRef.current = baueZeichenRegistry(markers);
+    zeichenRegistryRef.current = baueZeichenRegistry(markers, kartenTheme);
     // Cluster-Zusammensetzung kann sich geändert haben → DOM-Donuts verwerfen; ein
     // wiederverwendeter `cluster_id` zeigte sonst veraltete Segmente. Der Donut des offenen
     // Spiders entsteht im `render`-Abgleich neu, mit durchlässiger Hülle.
@@ -1323,7 +1331,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Ändern sich Menge, Folge oder Lage, hielte ein offener Spider einen veralteten
     // `getClusterLeaves`-Stand → einklappen. Ein reiner Inhaltswechsel klappt nichts zu.
     if (!nurInhalt) schliesseSpiderRef.current?.();
-  }, [markers, markerPlakette]);
+  }, [markers, markerPlakette, kartenTheme]);
 
   // Suchnadel nachführen (LFH-638): über den Markern, unter der Eigenposition (`suchnadelLayer.ts`).
   useEffect(() => {

@@ -9,7 +9,9 @@ use crate::auftrag::{
     RICHTUNG_INTERN,
 };
 use crate::error::AppError;
-use crate::routes::support::{deserialize_optional_field, hoechstens, pflicht_max};
+use crate::routes::support::{
+    deserialize_optional_field, hoechstens, pflicht_max, pruefe_koordinate,
+};
 use std::collections::HashSet;
 
 use serde::Deserialize;
@@ -74,6 +76,11 @@ pub struct NeuerAuftrag {
     pub absicht: Option<String>,
     pub lage: Option<String>,
     pub ort: Option<String>,
+    /// Koordinate des Ziels (LLH-1114), aus dem Ortsfeld: nur als Paar und nur neben `ort` (422).
+    #[serde(default)]
+    pub ort_lat: Option<f64>,
+    #[serde(default)]
+    pub ort_lon: Option<f64>,
     pub zeit: Option<String>,
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
@@ -359,6 +366,7 @@ pub struct ValidierterAuftrag {
     absicht: Option<String>,
     lage: Option<String>,
     ort: Option<String>,
+    ort_punkt: Option<(f64, f64)>,
     zeit: Option<String>,
     mittel: Option<String>,
     verbindung: Option<String>,
@@ -378,6 +386,7 @@ impl ValidierterAuftrag {
             absicht: self.absicht.as_deref(),
             lage: self.lage.as_deref(),
             ort: self.ort.as_deref(),
+            ort_punkt: self.ort_punkt,
             zeit: self.zeit.as_deref(),
             mittel: self.mittel.as_deref(),
             verbindung: self.verbindung.as_deref(),
@@ -447,6 +456,9 @@ pub async fn validate_neuer_auftrag(
         None => default_quittierung_frist_min.and_then(|min| frist_aus_minuten(&erteilt, min)),
     };
 
+    // Nach allen Feldfehlern (400): Koordinate des Ziels als Zusammenhang (422).
+    let ort_punkt = ziel_punkt(ort.as_deref(), req.ort_lat, req.ort_lon)?;
+
     let empfaenger = validate_empfaenger_liste(pool, einsatz_id, &req.empfaenger, &[]).await?;
 
     Ok(ValidierterAuftrag {
@@ -454,6 +466,7 @@ pub async fn validate_neuer_auftrag(
         absicht,
         lage,
         ort,
+        ort_punkt,
         zeit,
         mittel,
         verbindung,
@@ -465,6 +478,23 @@ pub async fn validate_neuer_auftrag(
         erteilt_at: erteilt,
         empfaenger,
     })
+}
+
+/// Koordinate des Ziels (LLH-1114, design.md D3): ein Paar im gültigen Bereich und nur neben einem
+/// Text „Ziel/Ort“ — ein Punkt ohne Wort ist im Befehlsschema nicht vorlesbar. Sonst 422.
+pub(crate) fn ziel_punkt(
+    ort: Option<&str>,
+    lat: Option<f64>,
+    lon: Option<f64>,
+) -> Result<Option<(f64, f64)>, AppError> {
+    pruefe_koordinate(lat, lon, "ort_lat", "ort_lon")?;
+    match (lat, lon) {
+        (Some(_), Some(_)) if ort.is_none() => Err(AppError::UnprocessableEntity(
+            "Eine Koordinate des Ziels braucht einen Text „Ziel/Ort“".into(),
+        )),
+        (Some(la), Some(lo)) => Ok(Some((la, lo))),
+        _ => Ok(None),
+    }
 }
 
 /// Body von `PATCH …/auftraege/{aid}` (LLH-1098, design.md D6): Teil-Patch. Ein fehlendes Feld
@@ -485,6 +515,12 @@ pub struct AuftragPatch {
     pub lage: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub ort: Option<Option<String>>,
+    /// Koordinate des Ziels (LLH-1114): nur beide zusammen, `null` für beide entfernt den Punkt.
+    /// Ein geleerter `ort` leert ihn mit (design.md D3).
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ort_lat: Option<Option<f64>>,
+    #[serde(default, deserialize_with = "deserialize_optional_field")]
+    pub ort_lon: Option<Option<f64>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub zeit: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
@@ -520,6 +556,9 @@ pub struct ValidierteBerichtigung {
     pub prioritaet: Option<String>,
     pub frist_at: Option<Option<String>>,
     pub schema: [Option<Option<String>>; 8],
+    /// Koordinate des Ziels: `None` = unverändert, `Some(None)` = entfernen. Gegen den Text prüft
+    /// erst die Transaktion (der Text kann unverändert bleiben).
+    pub ort_punkt: Option<Option<(f64, f64)>>,
 }
 
 /// Prüft einen Teil-Patch mit denselben Regeln wie das Erteilen (Spec `eingabegrenzen`): alle
@@ -570,6 +609,18 @@ pub async fn validate_berichtigung(
             None => None,
         }),
     };
+    let ort_punkt = match (req.ort_lat, req.ort_lon) {
+        (None, None) => None,
+        (Some(la), Some(lo)) => {
+            pruefe_koordinate(la, lo, "ort_lat", "ort_lon")?;
+            Some(la.zip(lo))
+        }
+        _ => {
+            return Err(AppError::UnprocessableEntity(
+                "ort_lat und ort_lon müssen gemeinsam gesetzt oder gemeinsam leer sein".into(),
+            ))
+        }
+    };
     let empfaenger = match &req.empfaenger {
         Some(liste) => {
             let bestand = repo::empfaenger_bestand(pool, auftrag_id).await?;
@@ -583,5 +634,6 @@ pub async fn validate_berichtigung(
         prioritaet,
         frist_at,
         schema,
+        ort_punkt,
     })
 }

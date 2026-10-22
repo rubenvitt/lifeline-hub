@@ -45,6 +45,29 @@ import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import { EINSATZ_ABGESCHLOSSEN } from '../components/nurAnsicht';
 import { modulName } from '../einsatz/modulRegistry';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortEingabe } from '../anzeige/ortsfeldFormular';
+
+/** Formularwerte: der Fundort ist ein Ortsfeld mit Text und Koordinate (LLH-1114). */
+type TierFormular = Omit<TierEingabe, 'antreff_ort' | 'antreff_lat' | 'antreff_lon'> & {
+  antreff_ort?: OrtsfeldWert;
+};
+
+/** Sitzungsfeld der Koordinate neben dem Fundort, als `"lat,lon"` (die Sitzung hält nur Strings). */
+const FUNDORT_KOORDINATE = 'antreff_koordinate';
+
+/** Gemerkter Fundort der Sitzung; die Koordinate hängt am Text wie ein gewählter Treffer. */
+function gemerkterFundort(einsatzId: number): OrtsfeldWert | undefined {
+  const text = liesErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort');
+  if (text === undefined) return undefined;
+  const [lat, lon] = (liesErfassungsSitzungswert(einsatzId, 'tier', FUNDORT_KOORDINATE) ?? '')
+    .split(',')
+    .map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lon) && text.trim() !== ''
+    ? { text, koordinate: { lat, lon }, quelle: 'adresse' }
+    : { text, koordinate: null };
+}
 
 const STATUS_META = TIER_STATUS;
 
@@ -198,7 +221,7 @@ export default function TierePage() {
     wert: 'erfassen' | 'vermisst';
   } | null>(null);
   const aktuellerModus = modus?.einsatzId === einsatzId ? modus.wert : null;
-  const [form] = Form.useForm<TierEingabe>();
+  const [form] = Form.useForm<TierFormular>();
   const geladeneOeffnung = useRef<string | null>(null);
   const formularEinsatzId = useRef(einsatzId);
   /** Hängt das `<Form>` des Dialogs (LFH-627, `components/useFormularEingehaengt.ts`)? */
@@ -219,8 +242,7 @@ export default function TierePage() {
     if (!formular.da) return;
     if (geladeneOeffnung.current === oeffnung) return;
     geladeneOeffnung.current = oeffnung;
-    const ort = liesErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort');
-    form.setFieldValue('antreff_ort', ort);
+    form.setFieldValue('antreff_ort', gemerkterFundort(einsatzId));
   }, [aktuellerModus, einsatzId, form, formular.da, formular.jeDa]);
 
   // Schnellaktion: ?neu=1 öffnet „Tier erfassen" (Sprungpalette, LFH-506). Warten bis der
@@ -465,7 +487,7 @@ export default function TierePage() {
 
           `status` steht nicht im Formular: er kommt aus dem Modus, mit dem der Dialog geöffnet
           wurde; die Ableitung sitzt in `onErfassen`. */}
-      <ErfassungsModal<TierEingabe>
+      <ErfassungsModal<TierFormular>
         offen={aktuellerModus !== null}
         titel={aktuellerModus === 'vermisst' ? 'Vermisst melden' : 'Tier erfassen'}
         form={form}
@@ -476,21 +498,38 @@ export default function TierePage() {
         initialValues={{ spezies: 'hund' }}
         serie
         uebernahme={['spezies', 'antreff_ort']}
-        onErfassen={async (daten) => {
+        onErfassen={async ({ antreff_ort, ...daten }) => {
+          const fundort = ortEingabe(antreff_ort);
           // `mutateAsync`, nicht `mutate`: nur eine abgelehnte Zusage hält die Felder stehen.
           await anlegenMutation.mutateAsync({
             einsatzId,
             daten: {
               ...daten,
+              ...(fundort.text != null ? { antreff_ort: fundort.text } : {}),
+              ...(fundort.lat != null
+                ? { antreff_lat: fundort.lat, antreff_lon: fundort.lon }
+                : {}),
               status: aktuellerModus === 'vermisst' ? 'vermisst' : 'aktiv',
             },
           });
         }}
         onErfasst={(daten) => {
           // Erst die zentrale Post-Acceptance-Stufe darf den Sitzungswert ändern: ein Abbruch
-          // während des POST besteht die Generation davor nicht.
-          if (typeof daten.antreff_ort === 'string') {
-            schreibeErfassungsSitzungswert(einsatzId, 'tier', 'antreff_ort', daten.antreff_ort);
+          // während des POST besteht die Generation davor nicht. Die Koordinate hängt am Text.
+          if (daten.antreff_ort !== undefined) {
+            const fundort = ortEingabe(daten.antreff_ort);
+            schreibeErfassungsSitzungswert(
+              einsatzId,
+              'tier',
+              'antreff_ort',
+              daten.antreff_ort.text,
+            );
+            schreibeErfassungsSitzungswert(
+              einsatzId,
+              'tier',
+              FUNDORT_KOORDINATE,
+              fundort.lat != null ? `${fundort.lat},${fundort.lon}` : '',
+            );
           }
         }}
         onFertig={() => setModus((alt) => (alt?.einsatzId === einsatzId ? null : alt))}
@@ -507,8 +546,9 @@ export default function TierePage() {
         <Form.Item label="Rufname" name="rufname">
           <Input />
         </Form.Item>
+        {/* Ortsfeld (LLH-1114): Suche, getippte Koordinate, Vorschau mit Nadel. */}
         <Form.Item label="Fundort" name="antreff_ort">
-          <Input placeholder="z. B. Weide, Sammelstelle" />
+          <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Fundort" />
         </Form.Item>
         {/* FELDBUDGET (LFH-963, `frontend/AGENTS.md`, Feldbudget): drei sichtbare Felder in
             beiden Modi, der Rest eingeklappt. `forceRender` ist TRAGEND: ohne ihn fehlten die

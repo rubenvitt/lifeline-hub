@@ -334,7 +334,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
       ],
     });
     await screen.findByText('Florian 1');
-    await userEvent.click(screen.getByRole('button', { name: 'Besatzung zu Florian 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Details zu Florian 1' }));
     const block = () => container.querySelector<HTMLElement>('[data-lfh="besatzung-block"]')!;
     await within(block()).findByText(/Anna Crew/);
 

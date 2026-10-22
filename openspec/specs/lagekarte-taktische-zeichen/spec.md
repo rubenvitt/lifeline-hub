@@ -165,6 +165,30 @@ erscheinen.
 - **WHEN** die Person ein freies Zeichen platziert
 - **THEN** trägt der Marker sein Zeichen sofort, ohne auf ein weiteres Neu-Layout der Karte zu warten
 
+### Requirement: Kartenzeichen im Nachtbetrieb hell hinterlegt
+Steht die Kartengrundlage dunkel (Nachtbetrieb oder Karten-Design „Dunkel“), SHALL die Lagekarte
+jedes Fachobjekt-Zeichen und jedes freie Zeichen mit dem Render-Theme `dark` von @einsatzzeichen
+zeichnen: eine helle Hinterlegung folgt eng der Kontur des Zeichens, Kopfmarken und Fahrwerk stehen
+hell auf dem Grund. Eine rechteckige Fläche hinter dem Zeichen MUST NOT entstehen. Kontur gegen
+Hinterlegung und Hinterlegung gegen Kartengrund MUST je mindestens 3 : 1 halten. Der Hub MUST die
+Zeichen weder einfärben noch umkehren; schwarze Schrift auf hellen Körpern bleibt schwarz. Auf
+heller Kartengrundlage MUST das Zeichen wie bisher ohne Hinterlegung stehen. Ein Wechsel zwischen
+dunkler und heller Kartengrundlage MUST die Zeichen ohne Neuladen der Seite neu zeichnen. Die
+Symbolkachel eines Fachobjekts im Inspector SHALL auf dunklem Paneel dasselbe Theme nehmen.
+
+#### Scenario: Einsatzort im Nachtbetrieb
+- **WHEN** im Nachtbetrieb der Einsatzort auf der Lagekarte steht
+- **THEN** ist sein schwarzer Umriss hell hinterlegt, ohne Rechteck dahinter, und Umriss gegen
+  Hinterlegung sowie Hinterlegung gegen Kartengrund halten mindestens 3 : 1
+
+#### Scenario: Tagbetrieb
+- **WHEN** die Kartengrundlage hell ist
+- **THEN** trägt kein Zeichen eine Hinterlegung
+
+#### Scenario: Wechsel des Karten-Designs
+- **WHEN** die Person das Karten-Design von „Hell“ auf „Dunkel“ stellt
+- **THEN** sind alle Zeichen hell hinterlegt, ohne dass die Seite neu lädt
+
 ### Requirement: Symbolkachel eines farblosen freien Zeichens bleibt lesbar
 
 Die Symbolkachel im Inspector der Lagekarte SHALL das freie Zeichen so zeigen, wie die

@@ -542,7 +542,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
 
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'kein @einsatzzeichen-Bild auf der Karte' })
-      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
+      .toEqual([{ id: 'ez|dark|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
 
     // Ein Grundkarten-/Themenwechsel setzt den Stil neu (`diff: false`) und wirft alle Bilder weg.
     await page.evaluate(() => {
@@ -551,7 +551,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     });
     await expect
       .poll(zeichenBilder, { timeout: 15_000, message: 'Zeichen nach Stilwechsel nicht zurück' })
-      .toEqual([{ id: 'ez|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
+      .toEqual([{ id: 'ez|dark|{"v":1,"spec":{"kind":"event"}}', breite: 68, gezeichnet: 1 }]);
   });
 
   // LFH-842: Wandert das Fenster auf einen Monitor anderer Dichte (oder ändert sich der Zoom),
@@ -583,7 +583,8 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
     await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
       1,
     );
-    const id = 'ez|{"v":1,"spec":{"kind":"event"}}';
+    // Nachtbetrieb ist die e2e-Vorgabe: dunkles Render-Theme, eigener Schlüssel (LLH-1141).
+    const id = 'ez|dark|{"v":1,"spec":{"kind":"event"}}';
     await expect
       .poll(() => einsatzortZeichen(page), { timeout: 15_000 })
       .toEqual([{ id, breite: 68, gezeichnet: 1 }]);
@@ -728,7 +729,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
 
     // „Sofort“: ohne weitere Bedienung, kein Neu-Layout von außen.
     await expect
-      .poll(() => freieZeichen(page, `ez|${spec}`), {
+      .poll(() => freieZeichen(page, `ez|dark|${spec}`), {
         timeout: 5_000,
         message: 'freies Zeichen nicht sofort als `ez|`-Bild gezeichnet',
       })
@@ -736,7 +737,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
 
     await stilwechsel(page);
     await expect
-      .poll(() => freieZeichen(page, `ez|${spec}`), {
+      .poll(() => freieZeichen(page, `ez|dark|${spec}`), {
         timeout: 15_000,
         message: 'freies Zeichen nach dem Stilwechsel nicht zurück',
       })

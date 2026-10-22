@@ -34,6 +34,16 @@ describe('geraetDarf', () => {
     });
   });
 
+  describe('br-material (LLH-1252): nur der Bereitstellungsraum liest sein Material', () => {
+    it.each(ANSICHTEN)('Ansicht %s', (ansicht) => {
+      expect(geraetDarf(geraet(ansicht), 'br-material')).toBe(ansicht === 'bereitstellungsraum');
+    });
+
+    it('eine Person liest es mit ihren Rechten', () => {
+      expect(geraetDarf(null, 'br-material')).toBe(true);
+    });
+  });
+
   describe('br-eintreffen (LLH-1075, design.md D14)', () => {
     it.each(ANSICHTEN)('Ansicht %s', (ansicht) => {
       expect(geraetDarf(geraet(ansicht), 'br-eintreffen')).toBe(ansicht === 'bereitstellungsraum');

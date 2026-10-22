@@ -25,7 +25,8 @@ import {
 } from './kraeftebaumKern';
 import type { BeendeteKraft, MeldebildNachweis } from './entlassene';
 import { funktionText } from './einsatzfunktionKern';
-import { AUFGEBRAUCHT, isAufgebraucht, ortVon } from './materialPosten';
+import { AUFGEBRAUCHT, isAufgebraucht, materialDarstellung, ortVon } from './materialPosten';
+import { materialStatus as materialStatusVertrag } from '../theme/statusFarben';
 import { materialAusfall } from './materialVerdichtungKern';
 
 export interface StaerkeSumme {
@@ -259,7 +260,8 @@ function materialGruppe(
       mittelArt: 'material' as const,
       bezeichnung: em.bezeichnung,
       detail: null,
-      statusLabel: isAufgebraucht(em) ? AUFGEBRAUCHT : em.status,
+      // Das Wort aus dem Vertrag `materialStatus`, nicht der Wire-Wert (LLH-1257).
+      statusLabel: materialDarstellung(em).label,
       menge: em.menge,
     })),
   };
@@ -591,6 +593,12 @@ function nachweisBlock(
   return zeilen.length === 0 ? [] : [`## ${titel}`, '', ...zeilen, ''];
 }
 
+/** Folge der Statuszählung im Lagebild: die Status des Vertrags, dann „aufgebraucht“. */
+const MATERIAL_STATUS_FOLGE = [
+  ...(Object.keys(materialStatusVertrag) as MaterialStatus[]),
+  AUFGEBRAUCHT,
+] as const;
+
 /**
  * Rendert ein Kraeftebild als Markdown. Deterministisch — `stand` kommt von außen. Beendete
  * Kräfte stehen als Nachweis darunter (LLH-1079, LLH-1235): „Entlassen“ für Personen und
@@ -619,18 +627,11 @@ export function rendereMeldebildMarkdown(
   );
   let material = `- **Material (Positionen):** ${v.anzahlMaterialPositionen}`;
   if (v.anzahlMaterialPositionen > 0) {
-    const matTeile: string[] = [];
-    if (v.materialStatus.einsatzbereit > 0)
-      matTeile.push(`einsatzbereit: ${v.materialStatus.einsatzbereit}`);
-    if (v.materialStatus.im_einsatz > 0)
-      matTeile.push(`im Einsatz: ${v.materialStatus.im_einsatz}`);
-    if (v.materialStatus.defekt > 0) matTeile.push(`defekt: ${v.materialStatus.defekt}`);
-    if (v.materialStatus.verbraucht > 0)
-      matTeile.push(`verbraucht: ${v.materialStatus.verbraucht}`);
-    if (v.materialStatus.desinfektion_noetig > 0)
-      matTeile.push(`Desinfektion nötig: ${v.materialStatus.desinfektion_noetig}`);
-    if (v.materialStatus.aufgebraucht > 0)
-      matTeile.push(`${AUFGEBRAUCHT}: ${v.materialStatus.aufgebraucht}`);
+    // Wörter aus dem Vertrag `materialStatus` (LLH-1257), Folge wie dort, „aufgebraucht“ zuletzt.
+    const matTeile = MATERIAL_STATUS_FOLGE.filter((s) => v.materialStatus[s] > 0).map(
+      (s) =>
+        `${s === AUFGEBRAUCHT ? AUFGEBRAUCHT : materialStatusVertrag[s].label}: ${v.materialStatus[s]}`,
+    );
     if (matTeile.length > 0) material += ` (${matTeile.join(', ')})`;
   }
   zeilen.push(material);

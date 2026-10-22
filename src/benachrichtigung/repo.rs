@@ -1,8 +1,9 @@
 //! Speicher der Benachrichtigungen (design.md D1): eine Zeile je Empfänger, ohne Text.
 //!
-//! Jede Lese- und Schreibfunktion außer [`anlegen`], [`quittieren_fuer_bezug`] und
-//! [`aufraeumen`] ist an EINEN Empfänger gebunden, dessen Kennung die Route aus der Sitzung
-//! nimmt: eine fremde Zeile ist so unerreichbar (404), nicht nur verboten.
+//! Jede Lese- und Schreibfunktion außer [`anlegen`], [`quittieren_fuer_bezug`],
+//! [`empfaenger_des_bezugs`], [`quittieren_fuer_bezug_ausser`] und [`aufraeumen`] ist an EINEN
+//! Empfänger gebunden, dessen Kennung die Route aus der Sitzung nimmt: eine fremde Zeile ist so
+//! unerreichbar (404), nicht nur verboten.
 
 use super::{Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, BenachrichtigungStufe};
 use crate::error::AppError;
@@ -193,6 +194,60 @@ pub async fn quittieren_fuer_bezug(
         .bind(art.as_str())
         .bind(typ.as_str())
         .bind(serde_json::to_string(ids).expect("ID-Liste serialisierbar"))
+        .fetch_all(pool)
+        .await?;
+    let mut zeilen: Vec<Zeile> = roh.into_iter().filter_map(aus_roh).collect();
+    zeilen.sort_by_key(|z| z.id);
+    Ok(zeilen)
+}
+
+/// Alle, die zum Bezug `typ`/`id` der Art `art` im Einsatz eine Zeile haben, offen oder
+/// quittiert, aufsteigend (LLH-1381: wer den Hinweis schon hatte, bekommt ihn nicht noch einmal).
+pub async fn empfaenger_des_bezugs(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    typ: BenachrichtigungBezugTyp,
+    id: i64,
+) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT DISTINCT benutzer_id FROM benachrichtigung \
+         WHERE einsatz_id = ? AND art = ? AND bezug_typ = ? AND bezug_id = ? \
+         ORDER BY benutzer_id",
+    )
+    .bind(einsatz_id)
+    .bind(art.as_str())
+    .bind(typ.as_str())
+    .bind(id)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Wie [`quittieren_fuer_bezug`] für EINEN Bezug, aber nur die Zeilen der Empfänger außerhalb
+/// von `behalten` (LLH-1381: neu adressiert, die übrigen Empfänger behalten ihren Hinweis).
+/// Liefert die jetzt quittierten Zeilen.
+pub async fn quittieren_fuer_bezug_ausser(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    typ: BenachrichtigungBezugTyp,
+    id: i64,
+    behalten: &[i64],
+) -> Result<Vec<Zeile>, AppError> {
+    let sql = format!(
+        "UPDATE benachrichtigung SET quittiert_at = ? \
+         WHERE einsatz_id = ? AND art = ? AND bezug_typ = ? AND bezug_id = ? \
+           AND quittiert_at IS NULL \
+           AND benutzer_id NOT IN (SELECT value FROM json_each(?)) \
+         RETURNING {SPALTEN}"
+    );
+    let roh = sqlx::query_as::<_, RohZeile>(sqlx::AssertSqlSafe(sql))
+        .bind(crate::zeit::jetzt())
+        .bind(einsatz_id)
+        .bind(art.as_str())
+        .bind(typ.as_str())
+        .bind(id)
+        .bind(serde_json::to_string(behalten).expect("ID-Liste serialisierbar"))
         .fetch_all(pool)
         .await?;
     let mut zeilen: Vec<Zeile> = roh.into_iter().filter_map(aus_roh).collect();

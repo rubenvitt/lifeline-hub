@@ -530,6 +530,8 @@ mod tests {
             e,
             b,
             uhs_repo::NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "behandlungsplatz",
                 bezeichnung: "BHP 50",
                 abschnitt_id: None,
@@ -547,6 +549,8 @@ mod tests {
             e,
             b,
             uhs_repo::NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "patientenablage",
                 bezeichnung: "PA 1",
                 abschnitt_id: None,

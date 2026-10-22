@@ -2067,6 +2067,41 @@ async fn ausgabe_schreibt_den_rest_ins_etb_und_prueft_die_zeile() {
     assert!(neu[2].contains("defekt"), "Status zuletzt: {neu:?}");
 }
 
+/// LLH-1257: der ETB-Eintrag eines Statuswechsels nennt je Status das Wort der Oberfläche, nie den
+/// Wire-Wert („im Einsatz“, nicht `im_einsatz`).
+#[tokio::test]
+async fn statuswechsel_nennt_im_etb_je_status_das_label() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    let folge = [
+        ("im_einsatz", "einsatzbereit", "im Einsatz"),
+        ("defekt", "im Einsatz", "defekt"),
+        ("desinfektion_noetig", "defekt", "Desinfektion nötig"),
+        ("verbraucht", "Desinfektion nötig", "verbraucht"),
+        ("einsatzbereit", "verbraucht", "einsatzbereit"),
+    ];
+    for (wire, vorher_wort, nachher_wort) in folge {
+        let vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+        let (s, json) = material_patch(
+            &app,
+            &admin,
+            einsatz,
+            em,
+            &format!(r#"{{"status":"{wire}"}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{json}");
+        assert_eq!(
+            neue_etb(&app, &admin, einsatz, vorher).await,
+            [format!(
+                "Material «Trage»: Status «{vorher_wort}» → «{nachher_wort}»"
+            )]
+        );
+    }
+}
+
 /// design.md D10: die Art einer Zeile lässt sich korrigieren; der ETB nennt beide Arten.
 #[tokio::test]
 async fn art_wechsel_schreibt_etb() {

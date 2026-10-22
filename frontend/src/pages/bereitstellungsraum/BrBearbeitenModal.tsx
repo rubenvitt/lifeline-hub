@@ -1,4 +1,7 @@
 import { App, Form, Input } from 'antd';
+import { EinsatzOrtsfeld } from '../../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../../anzeige/Ortsfeld';
+import { ortFelder, ortsfeldAusGespeichert } from '../../anzeige/ortsfeldFormular';
 import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ErfassungsModal } from '../../components/Erfassung';
@@ -9,7 +12,8 @@ import type { Bereitstellungsraum } from '../../api/types';
 
 interface FormWerte {
   bezeichnung: string;
-  standort?: string;
+  /** Ortsfeld (LLH-1114): Text und Koordinate des Standorts. */
+  standort?: OrtsfeldWert;
   notiz?: string;
 }
 
@@ -17,14 +21,19 @@ interface FormWerte {
  * Nur die geänderten Felder (LFH-1147), gemessen am Stand beim ÖFFNEN (`basis`): der PATCH ist ein
  * Teil-Patch, fehlender Key = unverändert. Wer nur die Notiz ändert, überschreibt so nicht den
  * Standort, den ein anderer Arbeitsplatz inzwischen gesetzt hat. Leer heißt löschen (`null`); der
- * Server trimmt ebenso.
+ * Server trimmt ebenso. Die Koordinate des Standorts (LLH-1114) geht nur als Paar und nur bei einer
+ * Änderung hinaus; ein geleerter Standort leert sie mit (`ortFelder`).
  */
 export function brPatchAus(basis: Bereitstellungsraum, werte: FormWerte): BrPatch {
   const patch: BrPatch = {};
   const bezeichnung = werte.bezeichnung.trim();
   if (bezeichnung !== basis.bezeichnung) patch.bezeichnung = bezeichnung;
-  const standort = leerZuNull(werte.standort);
-  if (standort !== (basis.standort ?? null)) patch.standort = standort;
+  const ort = ortFelder(werte.standort);
+  if (ort.text !== (basis.standort ?? null)) patch.standort = ort.text;
+  if (ort.lat !== (basis.lat ?? null) || ort.lon !== (basis.lon ?? null)) {
+    patch.lat = ort.lat;
+    patch.lon = ort.lon;
+  }
   const notiz = leerZuNull(werte.notiz);
   if (notiz !== (basis.notiz ?? null)) patch.notiz = notiz;
   return patch;
@@ -65,7 +74,7 @@ export default function BrBearbeitenModal({
     basis.current = br;
     form.setFieldsValue({
       bezeichnung: br.bezeichnung,
-      standort: br.standort ?? undefined,
+      standort: ortsfeldAusGespeichert(br.standort, br.lat, br.lon),
       notiz: br.notiz ?? undefined,
     });
   }, [offen, br, form]);
@@ -107,7 +116,7 @@ export default function BrBearbeitenModal({
         <Input placeholder="z. B. BR Ost" />
       </Form.Item>
       <Form.Item label="Standort (optional)" name="standort">
-        <Input placeholder="Adresse / Hinweis" />
+        <EinsatzOrtsfeld einsatzId={einsatzId} etikett="Standort" />
       </Form.Item>
       <Form.Item label="Notiz (optional)" name="notiz">
         <Input.TextArea rows={3} />

@@ -4,8 +4,14 @@
 //! Die Peilung (nächster verorteter Marker) wird bedingungslos berechnet; `ortsname`
 //! wird via Reverse-Geocoding gefüllt (org-konfigurierbarer Geocoder, Cache, Rate-Limit).
 //! Auth/Scope wie andere /api/einsaetze/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
+//!
+//! GET /api/ort-vorschau?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname als Vorschlag“): derselbe
+//! Ortsname ohne Einsatz, etwa beim Anlegen ([`in_org`]). Nur wer Einsätze anlegen darf, wie die
+//! Ortssuche der Organisation; keine Peilung, denn ohne Einsatz gibt es keinen Bezugspunkt.
+//! Ausgelastet oder nicht erreichbar heißt in beiden Einstiegen: 200 ohne `ortsname`.
 
 use crate::app::AppState;
+use crate::auth::session::CurrentUser;
 use crate::einsatz::kontext::EinsatzLesezugriff;
 use crate::error::AppError;
 use crate::geocoding::{self, marker, peilung};
@@ -13,6 +19,8 @@ use crate::org::einstellungen as org_einst;
 use axum::extract::{Query, State};
 use axum::Json;
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
+use std::path::Path;
 use utoipa::ToSchema;
 
 #[derive(Debug, Deserialize)]
@@ -54,13 +62,7 @@ pub async fn vorschau(
     Query(params): Query<OrtVorschauParams>,
 ) -> Result<Json<OrtVorschauAntwort>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-
-    // Koordinaten-Plausibilität (400 bei out-of-range).
-    if !(-90.0..=90.0).contains(&params.lat) || !(-180.0..=180.0).contains(&params.lon) {
-        return Err(AppError::Validation(
-            "lat/lon außerhalb des gültigen Bereichs".into(),
-        ));
-    }
+    pruefe_koordinate(params.lat, params.lon)?;
 
     // Peilung: bedingungslos.
     let marker = marker::lade_marker(&state.pool, einsatz_id).await?;
@@ -77,19 +79,78 @@ pub async fn vorschau(
         bezug_label: p.bezug_label,
     });
 
-    // Org-Einstellungen laden (DB-Fehler hier = echter 500; das `?` ist KEIN Geocoder-Fehlerpfad).
-    let org = org_einst::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
+    let ortsname = ortsname(
+        &state.pool,
+        &state.karten_dir,
+        ctx.einsatz.org_id,
+        params.lat,
+        params.lon,
+    )
+    .await?;
+
+    Ok(Json(OrtVorschauAntwort { peilung, ortsname }))
+}
+
+/// Parameter des Einstiegs ohne Einsatz: kein `exclude`, es gibt keine Marker.
+#[derive(Debug, Deserialize)]
+pub struct OrtVorschauOrgParams {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+/// GET /api/ort-vorschau?lat=&lon= — Ortsname ohne Einsatz (LLH-1376), Geocoder der eigenen
+/// Organisation. Das Recht wird vor der Koordinate geprüft: ohne Recht 403, nie 400.
+pub async fn in_org(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    Query(params): Query<OrtVorschauOrgParams>,
+) -> Result<Json<OrtVorschauAntwort>, AppError> {
+    if !benutzer.darf_einsatz_anlegen() {
+        return Err(AppError::Forbidden);
+    }
+    pruefe_koordinate(params.lat, params.lon)?;
+    let ortsname = ortsname(
+        &state.pool,
+        &state.karten_dir,
+        benutzer.org_id,
+        params.lat,
+        params.lon,
+    )
+    .await?;
+    Ok(Json(OrtVorschauAntwort {
+        peilung: None,
+        ortsname,
+    }))
+}
+
+/// Koordinaten-Plausibilität (400 bei out-of-range).
+fn pruefe_koordinate(lat: f64, lon: f64) -> Result<(), AppError> {
+    if !(-90.0..=90.0).contains(&lat) || !(-180.0..=180.0).contains(&lon) {
+        return Err(AppError::Validation(
+            "lat/lon außerhalb des gültigen Bereichs".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Ortsname best-effort beim Geocoder der Organisation `org_id`: `reverse()` liefert bei
+/// offline/Timeout/Rate-Limit `None`, der Request wird nie wegen eines Geocoder-Fehlers
+/// abgebrochen. Ein `Err` kommt nur aus den Org-Einstellungen (DB-Fehler = echter 500).
+/// Der Reverse-Geocoding-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz um
+/// den operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
+async fn ortsname(
+    pool: &SqlitePool,
+    karten_dir: &Path,
+    org_id: i64,
+    lat: f64,
+    lon: f64,
+) -> Result<Option<String>, AppError> {
+    let org = org_einst::laden_oder_default(pool, org_id).await?;
     let base = org
         .geocoder_url
         .as_deref()
         .unwrap_or(geocoding::NOMINATIM_DEFAULT);
-    // Ortsname best-effort: reverse() liefert bei offline/Timeout/Rate-Limit None — die Peilung
-    // steht trotzdem, der Request wird nie wegen eines Geocoder-Fehlers abgebrochen.
-    // Der Reverse-Geocoding-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz
-    // um den operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
-    let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
-    let cache_pool = cache.as_ref().unwrap_or(&state.pool);
-    let ortsname = geocoding::reverse(cache_pool, base, params.lat, params.lon).await;
-
-    Ok(Json(OrtVorschauAntwort { peilung, ortsname }))
+    let cache = crate::cache_db::cache_pool(karten_dir).await;
+    let cache_pool = cache.as_ref().unwrap_or(pool);
+    Ok(geocoding::reverse(cache_pool, base, lat, lon).await)
 }

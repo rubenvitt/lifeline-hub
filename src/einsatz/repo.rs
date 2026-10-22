@@ -2048,6 +2048,8 @@ mod tests {
             einsatz.id,
             leit,
             crate::uhs::repo::NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "behandlungsplatz",
                 bezeichnung: "BHP 50",
                 abschnitt_id: None,
@@ -2119,6 +2121,8 @@ mod tests {
             einsatz.id,
             leit,
             crate::uhs::repo::NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "behandlungsplatz",
                 bezeichnung: "BHP 50",
                 abschnitt_id: None,

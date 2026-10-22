@@ -31,7 +31,8 @@ Halter zuordnen.
 
 1. „Tier erfassen“ wählen.
 2. Die „Spezies“ wählen („Hund“, „Katze“, „Großtier“, „Nutzgeflügel“, „Kleintier“, „Wildtier“,
-   „Sonstige“), dazu „Rufname“ und „Fundort“, soweit bekannt.
+   „Sonstige“), dazu „Rufname“ und „Fundort“, soweit bekannt. Den Fundort mit Enter oder „Ort
+   suchen“ suchen und einen Treffer wählen, dann ist das Tier gleich verortet.
 3. Unter „Weitere Angaben“ bei Bedarf „Rasse / Beschreibung“ und „Notiz“ ergänzen.
 
    ![Dialog „Tier erfassen“ mit Spezies Katze, Rufname, Fundort, Rasse und Notiz](../bilder/tiere/erfassen.png)
@@ -75,8 +76,9 @@ Tiere zeigt den Halter dann mit seiner Registriernummer.
 4. „Zurück zu T-003 (Hund)“ wählen: Die Seite des Tiers zeigt die neue Koordinate.
 
 Ein Tier ohne Koordinate lässt sich auch auf der Lagekarte in der Leiste unter „Objekte“ platzieren
-(Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Unter „Bearbeiten“ lässt sich die
-Koordinate eintippen oder leeren.
+(Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Unter „Bearbeiten“ nimmt das Feld
+„Fundort“ einen Treffer der Ortssuche, eine getippte Koordinate oder einen Punkt über „Auf Karte
+wählen“; ein geleerter Fundort löscht auch die Koordinate.
 
 ### Den Verbleib eines Tiers erfassen
 

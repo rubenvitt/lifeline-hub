@@ -202,9 +202,9 @@ export default function BrDetailPage() {
     queryFn: () => listeEinsatzFahrzeuge(einsatzId),
   });
   // Sektion „Material“ (LLH-1225, design.md D13): Posten aus der Materialliste (`br_id`), nur mit
-  // Freigabe Material. Das BR-Gerät liest das Modul Material nicht (D9): bis `/me` feststeht und am
-  // Gerät weder Sektion noch Abruf.
-  const canLoadMaterial = !authLaedt && geraet == null;
+  // Freigabe Material. Das BR-Gerät liest sie mit, vom Server auf den eigenen Raum geschnitten,
+  // und bedient nichts (LLH-1252, Entscheidung 22.10.2026); bis `/me` feststeht kein Abruf.
+  const canLoadMaterial = !authLaedt && (geraet == null || darf('br-material'));
   const freigabenQuery = useQuery({
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
@@ -937,13 +937,18 @@ export default function BrDetailPage() {
               dem Zeiger (D13). Bedienbar auch im Zustand „geplant“, anders als das Belegen. */}
           {materialFrei && (
             <div data-testid="br-material" style={{ marginTop: abstand.lg }}>
-              <SektionHeader titel="Material" extra={materialKopfzahl(materialAmBr)} />
+              {/* Leer sagt der Baustein „Kein Material“; „0 Posten“ daneben wäre doppelt (LLH-1255). */}
+              <SektionHeader
+                titel="Material"
+                extra={materialAmBr.length > 0 ? materialKopfzahl(materialAmBr) : undefined}
+              />
               <MaterialAmOrt
                 einsatzId={einsatzId}
                 ort={{ art: 'bereitstellungsraum', id: br.id }}
                 posten={materialAmBr}
                 angebot={materialQuery}
-                darfSchreiben={darfImEinsatzSchreiben(einsatz)}
+                // Am Gerät nur lesen: Zuordnen und Lösen bleiben der Führungsstelle (LLH-1252).
+                darfSchreiben={geraet == null && darfImEinsatzSchreiben(einsatz)}
                 materialFrei={materialFrei}
                 loesenText="Lösen"
                 sperrgrund={

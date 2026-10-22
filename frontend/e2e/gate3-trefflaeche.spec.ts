@@ -1111,7 +1111,7 @@ async function messeBesatzungsAusloeser(
       await stelleDichte(page, dichte);
 
       // Datenanker: beide gesäten Fahrzeuge tragen ihren Auslöser.
-      const ausloeser = page.getByRole('button', { name: /^Besatzung zu Florian Musterstadt 3\// });
+      const ausloeser = page.getByRole('button', { name: /^Details zu Florian Musterstadt 3\// });
       await expect(ausloeser).toHaveCount(BESATZUNG_FAHRZEUGE.length);
       // Vorbedingung: der erwartete Zweig steht.
       if (zweig === 'tabelle') {
@@ -1131,7 +1131,7 @@ async function messeBesatzungsAusloeser(
       );
 
       const erster = page.getByRole('button', {
-        name: `Besatzung zu ${BESATZUNG_FAHRZEUGE[0]}`,
+        name: `Details zu ${BESATZUNG_FAHRZEUGE[0]}`,
         exact: true,
       });
       await expect(erster).toHaveAttribute('aria-expanded', 'false');
@@ -1181,7 +1181,7 @@ test('Fahrzeuge (Beobachter): der Besatzungs-Auslöser folgt der Staffel, der Fr
   // Datenanker vor der Abwesenheit: die Seite trägt ihre Fahrzeuge.
   await page.goto(`/einsaetze/${einsatzId}/fahrzeuge`);
   await expect(
-    page.getByRole('button', { name: /^Besatzung zu Florian Musterstadt 3\// }),
+    page.getByRole('button', { name: /^Details zu Florian Musterstadt 3\// }),
   ).toHaveCount(BESATZUNG_FAHRZEUGE.length);
   await expect(
     page.getByRole('button', { name: 'Ad-hoc-Fahrzeug', exact: true }),

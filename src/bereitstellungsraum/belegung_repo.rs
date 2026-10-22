@@ -1989,6 +1989,7 @@ mod tests {
             absicht: None,
             lage: None,
             ort: Some("EA Deich"),
+            ort_punkt: None,
             zeit: None,
             mittel: None,
             verbindung: None,

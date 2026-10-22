@@ -7,6 +7,7 @@ import {
   buildOrtOptions,
   buildZuordnenOptions,
   ortFilter,
+  zuordnenLeerText,
   type OrtOption,
   type OrtOptionGruppe,
   type OrtWahlQuellen,
@@ -237,5 +238,34 @@ describe('buildZuordnenOptions (LLH-1225 D8)', () => {
     expect(flach(buildZuordnenOptions([em({ id: 2 })], { art: 'uhs', id: 7 }, {}))).toEqual([
       'Ohne Ort: Posten · 1',
     ]);
+  });
+});
+
+describe('zuordnenLeerText (LLH-1255)', () => {
+  const em = (p: Partial<EinsatzMaterial>): EinsatzMaterial =>
+    ({
+      id: 0,
+      bezeichnung: 'Posten',
+      art: 'geraet',
+      menge: 1,
+      ausgegeben: 0,
+      status: 'einsatzbereit',
+      einheit_id: null,
+      einsatz_fahrzeug_id: null,
+      uhs_id: null,
+      br_id: null,
+      beendet_at: null,
+      ...p,
+    }) as EinsatzMaterial;
+
+  it('alles laufende Material liegt hier: „Kein anderes Material“', () => {
+    expect(zuordnenLeerText([em({ id: 1, uhs_id: 7 })])).toBe('Kein anderes Material');
+  });
+
+  it('kein laufendes Material im Einsatz: „Kein Material im Einsatz“, nie „ohne Ort“', () => {
+    expect(zuordnenLeerText([])).toBe('Kein Material im Einsatz');
+    expect(zuordnenLeerText([em({ id: 2, beendet_at: '2026-10-20 10:00:00' })])).toBe(
+      'Kein Material im Einsatz',
+    );
   });
 });

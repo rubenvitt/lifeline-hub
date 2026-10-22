@@ -69,6 +69,20 @@ export function optionsLabel(
 }
 
 /**
+ * Die Empfängerfunktionen einer Meldung (LLH-1214): nur Einträge ohne Pflicht-Bezeichnung, denn
+ * Führungshilfspersonal und Fachberater nimmt eine Meldung nicht an (der Server antwortet 422);
+ * S7 steht nur im Katalog, wenn eingeschaltet. Wert ist der Code. Erfassen und Korrektur (LLH-1381)
+ * bieten dieselbe Auswahl.
+ */
+export function meldungsFunktionsOptionen(
+  vorschlaege: FunktionsVorschlaege,
+): { value: Fuehrungsfunktion; label: string }[] {
+  return vorschlaege.katalog
+    .filter((e) => !e.bezeichnung_pflicht)
+    .map((e) => ({ value: e.funktion, label: optionsLabel(e, vorschlaege.besetzung) }));
+}
+
+/**
  * Die Optionen eines Empfängerfelds. Ohne Tipptext nur die Einträge ohne Pflicht-Bezeichnung;
  * mit Tipptext zusätzlich „Führungshilfspersonal: <Text>“ und „Fachberater: <Text>“.
  */
