@@ -8,6 +8,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import MeldungFormular, { vonZuBezug } from './MeldungFormular';
 import type { Einheit, Einsatzabschnitt } from '../api/types';
 import { TEST_VORSCHLAEGE } from '../test/fuehrungsfunktionen';
+import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
 
 /** `onAnlegen` gibt eine Zusage zurück, auf die die Erfassungshülle wartet — wie `mutateAsync`. */
 function anlegenMock() {
@@ -439,6 +440,32 @@ describe('MeldungFormular — Ereigniszeit in der Anzeigezone (LFH-692)', () => 
         expect.objectContaining({ ereigniszeit: '2026-09-24 11:00:00' }),
       ),
     );
+  });
+
+  it('LLH-1077: „1430“ + Enter in der Ereigniszeit gilt heute 14:30 Berliner Zeit', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 15:00 Berliner Zeit: 14:30 ist eben vorbei, also heute.
+    vi.setSystemTime(new Date('2026-09-24T13:00:00Z'));
+    try {
+      const onAnlegen = anlegenMock();
+      render(
+        <AntApp>
+          <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+            <MeldungFormular senden={false} onAnlegen={onAnlegen} />
+          </AnzeigeKonventionenProvider>
+        </AntApp>,
+      );
+      await fuellePflichtfelder('RTW 2', 'MANV');
+      await userEvent.click(screen.getByRole('button', { name: /Weitere Angaben/ }));
+      await tippeZeit(userEvent.setup(), zeitFeld('Zeitpunkt des Ereignisses'), '1430');
+      await waitFor(() =>
+        expect(onAnlegen).toHaveBeenCalledWith(
+          expect.objectContaining({ ereigniszeit: '2026-09-24 12:30:00' }),
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
