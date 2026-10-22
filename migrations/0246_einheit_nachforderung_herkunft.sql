@@ -6,7 +6,7 @@
 --
 -- Nur ADD COLUMN: NOT NULL mit Vorgabe und REFERENCES ohne Vorgabe sind erlaubt. Bestand aus
 -- LLH-1383 bleibt 0/NULL (der Storno löst dort nur den Verweis).
--- Abgesichert von db::tests::migration_0242_*.
+-- Abgesichert von db::tests::migration_0246_*.
 
 ALTER TABLE einsatz_einheit ADD COLUMN nachforderung_angelegt INTEGER NOT NULL DEFAULT 0
     CHECK (nachforderung_angelegt IN (0, 1));
