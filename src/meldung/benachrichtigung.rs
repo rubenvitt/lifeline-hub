@@ -134,6 +134,20 @@ pub async fn uebernommen(
     }
 }
 
+/// Nach „Aus der Lage nehmen“ (Korrektur, LLH-1066): der Übernahme-Hinweis der Meldung ist
+/// für alle erledigt, denn sie steht nicht mehr in der Lage.
+pub async fn aus_der_lage(pool: &SqlitePool, live: &LiveHub, meldung: &MeldungAnzeige) {
+    erledigen(
+        pool,
+        live,
+        meldung.einsatz_id,
+        BenachrichtigungArt::Meldung,
+        BenachrichtigungBezugTyp::LageUebernahme,
+        &[meldung.id],
+    )
+    .await;
+}
+
 /// Nach einem Statuswechsel (design.md E6): steht die Meldung nicht mehr auf „Neu“, ist ihr
 /// Eingang für alle erledigt. Der Sofortalarm bleibt unberührt; ihn quittiert jeder selbst.
 pub async fn status_geaendert(pool: &SqlitePool, live: &LiveHub, meldung: &MeldungAnzeige) {

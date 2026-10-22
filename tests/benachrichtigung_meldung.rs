@@ -746,3 +746,44 @@ async fn gesehen_raeumt_die_uebernahme() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(w.offen("meldung", "lage_uebernahme", zwei).await, 0);
 }
+
+/// Die Korrektur (LLH-1066) wirkt wie die Übergabe: kommt die Meldung über sie in die Lage,
+/// bekommen S2 und die Einsatzleitung „In die Lage übernommen“; nimmt sie sie wieder heraus,
+/// ist der Hinweis für alle erledigt.
+#[tokio::test]
+async fn korrektur_in_und_aus_der_lage_meldet_und_raeumt_die_uebernahme() {
+    let w = welt().await;
+    w.mitgliedschaft_funktion(w.carla, "el").await;
+    let bert = w.cookie("bertram").await;
+    let id = w.erfassen(&w.admin, json!({})).await["id"]
+        .as_i64()
+        .unwrap();
+    let korrigieren = |body: Value| {
+        let (app, cookie, einsatz) = (w.app.clone(), bert.clone(), w.einsatz);
+        async move {
+            let (s, v) = anfrage(
+                &app,
+                "PATCH",
+                &format!("/api/einsaetze/{einsatz}/meldungen/{id}"),
+                &cookie,
+                Some(&body.to_string()),
+            )
+            .await;
+            assert_eq!(s, StatusCode::OK, "{v}");
+        }
+    };
+
+    korrigieren(json!({ "lagerelevant": true })).await;
+    assert_eq!(
+        w.empfaenger("lage_uebernahme", id).await,
+        vec![w.anna, w.carla]
+    );
+    assert_eq!(w.offen("meldung", "lage_uebernahme", id).await, 2);
+
+    // Eine Korrektur in der Lage meldet nicht noch einmal.
+    korrigieren(json!({ "lage_text": "Deich gesichert" })).await;
+    assert_eq!(w.empfaenger("lage_uebernahme", id).await.len(), 2);
+
+    korrigieren(json!({ "lagerelevant": false })).await;
+    assert_eq!(w.offen("meldung", "lage_uebernahme", id).await, 0);
+}

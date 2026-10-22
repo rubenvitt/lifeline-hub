@@ -127,6 +127,8 @@ pub async fn korrigieren(
 ) -> Result<Json<MeldungAnzeige>, AppError> {
     let aenderung = req.pruefen()?;
     let jetzt = jetzt();
+    let vorher =
+        repo::laden_im_einsatz(&state.pool, ctx.einsatz.id, meldung_id, None, &jetzt).await?;
     let ergebnis = korrektur::korrigieren(
         &state.pool,
         ctx.einsatz.id,
@@ -140,6 +142,19 @@ pub async fn korrigieren(
     if let Some(etb_id) = ergebnis.etb_id {
         state.live.publiziere(einsatz_id, etb_id);
         crate::meldung::sse(&state, einsatz_id);
+    }
+    // Kommt die Meldung neu in die Lage, meldet das S2 und der Einsatzleitung wie die Übergabe
+    // (LLH-1062); verlässt sie die Lage, ist ihr Übernahme-Hinweis erledigt.
+    if m.lagerelevant && !vorher.lagerelevant {
+        crate::meldung::benachrichtigung::uebernommen(
+            &state.pool,
+            &state.live,
+            &vorher,
+            ctx.benutzer.id,
+        )
+        .await;
+    } else if vorher.lagerelevant && !m.lagerelevant {
+        crate::meldung::benachrichtigung::aus_der_lage(&state.pool, &state.live, &m).await;
     }
     Ok(Json(m))
 }
