@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import { Component, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
@@ -11,6 +12,8 @@ import { Kartenausschnitt } from './Kartenausschnitt';
  */
 
 const karte = vi.hoisted(() => ({
+  /** Setzt ein Fall ihn, wirft der Konstruktor wie maplibre (LLH-1370). */
+  wurf: null as null | (() => Error),
   optionen: [] as Record<string, unknown>[],
   spruenge: [] as unknown[],
   nadeln: [] as { element: HTMLElement; lngLat: [number, number] | null }[],
@@ -19,6 +22,7 @@ const karte = vi.hoisted(() => ({
 vi.mock('maplibre-gl', () => {
   class Map {
     constructor(o: Record<string, unknown>) {
+      if (karte.wurf) throw karte.wurf();
       karte.optionen.push(o);
     }
     jumpTo(z: unknown) {
@@ -47,7 +51,19 @@ vi.mock('maplibre-gl', () => {
 });
 vi.mock('../pages/lagekarte/maplibreWorker', () => ({}));
 
+/** Fehlergrenze wie die der Route: zeigt den gefangenen Fehler statt der Seite. */
+class Grenze extends Component<{ children: ReactNode }, { fehler: Error | null }> {
+  state = { fehler: null as Error | null };
+  static getDerivedStateFromError(fehler: Error) {
+    return { fehler };
+  }
+  render() {
+    return this.state.fehler ? `gefangen: ${this.state.fehler.message}` : this.props.children;
+  }
+}
+
 beforeEach(() => {
+  karte.wurf = null;
   karte.optionen.length = 0;
   karte.spruenge.length = 0;
   karte.nadeln.length = 0;
@@ -86,5 +102,41 @@ describe('Kartenausschnitt', () => {
     expect(karte.nadeln[0].lngLat).toEqual([10.4514, 51.1604]);
     expect(karte.nadeln[0].element.getAttribute('aria-label')).toBe('Einsatzort');
     expect(karte.spruenge[karte.spruenge.length - 1]).toMatchObject({ center: [10.4514, 51.1604] });
+  });
+
+  it('zeigt ohne Kartengrafik den Zustand statt der Karte und wirft nicht (LLH-1370)', async () => {
+    karte.wurf = () => {
+      const f = new Error('WebGL2 is required to display this map.');
+      f.name = 'GPUInitializationError';
+      return f;
+    };
+    renderMitProviders(
+      <Kartenausschnitt punkt={{ lat: 51.1604, lon: 10.4514 }} etikett="Einsatzort" />,
+    );
+    const zustand = await screen.findByRole('status');
+    expect(zustand).toHaveTextContent('Karte auf diesem Gerät nicht darstellbar');
+    expect(zustand).toHaveAttribute('data-lfh', 'karte-nicht-darstellbar');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.queryByText(/webgl/i)).toBeNull();
+    expect(karte.nadeln).toHaveLength(0);
+  });
+});
+
+/**
+ * Jeder andere Wurf beim Aufbau bleibt ein Fehler (LLH-1370): eine Fehlergrenze fängt ihn, der
+ * Zustand erscheint nicht. Mutationsprobe: Fang ohne `isGrafikFehler` (alles fangen) → rot.
+ */
+describe('Kartenausschnitt: anderer Fehler', () => {
+  it('fliegt weiter', async () => {
+    karte.wurf = () => new Error('kaputt');
+    const fehler = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderMitProviders(
+      <Grenze>
+        <Kartenausschnitt punkt={{ lat: 51.1604, lon: 10.4514 }} etikett="Einsatzort" />
+      </Grenze>,
+    );
+    expect(await screen.findByText('gefangen: kaputt')).toBeInTheDocument();
+    expect(screen.queryByText('Karte auf diesem Gerät nicht darstellbar')).toBeNull();
+    fehler.mockRestore();
   });
 });

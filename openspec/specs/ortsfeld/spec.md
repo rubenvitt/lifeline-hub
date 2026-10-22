@@ -71,7 +71,10 @@ Freitext bleibt möglich. Eine leere Trefferliste ohne Aussage MUST NOT vorkomme
 ### Requirement: Kartenausschnitt zeigt den Ort
 Zu einem Ort mit Koordinate SHALL ein kleiner Kartenausschnitt ohne Bedienung den Punkt mit einer
 Nadel zeigen, auf derselben Kartengrundlage wie die Lagekarte (online, Offline-Karten oder ohne
-Kacheln). Ohne Koordinate MUST statt der Karte „Nicht verortet“ stehen.
+Kacheln). Ohne Koordinate MUST statt der Karte „Nicht verortet“ stehen. Kann das Gerät die Karte
+nicht zeichnen (kein WebGL2), MUST an Stelle der Karte „Karte auf diesem Gerät nicht darstellbar“
+stehen, ohne die Technik zu nennen, und die Seite MUST NOT in die Fehlerseite der App fallen; ein
+anderer Fehler beim Aufbau der Karte MUST weiter als Fehler gelten.
 
 #### Scenario: Verorteter Ort
 - **WHEN** der Ort die Koordinate 51.16040, 10.45140 trägt
@@ -80,6 +83,11 @@ Kacheln). Ohne Koordinate MUST statt der Karte „Nicht verortet“ stehen.
 #### Scenario: Ohne Koordinate
 - **WHEN** der Ort nur eine Adresse trägt
 - **THEN** zeigt der Ausschnitt „Nicht verortet“ und keine Karte
+
+#### Scenario: Gerät ohne Kartengrafik
+- **WHEN** der Einsatzort eine Koordinate trägt und der Browser kein WebGL2 hat
+- **THEN** zeigen die Einsatzdaten und der Anlegedialog an Stelle des Ausschnitts „Karte auf diesem Gerät nicht darstellbar“
+- **AND** es erscheint keine Fehlerseite der App, und das Paneel bzw. der Dialog bleibt bedienbar
 
 ### Requirement: Ortssuche im Einsatz ohne Lagekarten-Recht
 Der Server SHALL eine Ortssuche im Einsatz anbieten, die das Recht verlangt, die Einsatzdaten zu

@@ -25,8 +25,9 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   (gleicht mit dem Live-Stand ab, „aufgehoben“ nur nach Rückfrage). Stammdaten in der Ansicht
   (`BezirkStammdaten.tsx`): PATCH nur dreiseitig (`bezirkPatchDreiseitig`, der Bezirk hat keinen
   CAS), Sitzung je Öffnen frisch montiert. Gebiet (`BezirkGebiet.tsx`): Zonen nur bei Fläche und
-  freier Lagekarte abrufen; der Ausschnitt `BezirkKartenbild.tsx` ist nicht bedienbar und baut
-  seine Karte im Cleanup ab. Die Stufenlinie (`standlinieKern.ts`) teilt die Abfrage mit
+  freier Lagekarte abrufen; der Ausschnitt `BezirkKartenbild.tsx` ist nicht bedienbar, baut
+  seine Karte im Cleanup ab und ohne Kartengrafik gar nicht (`pages/lagekarte/AGENTS.md`, „Karte
+  ohne Grafik“). Die Stufenlinie (`standlinieKern.ts`) teilt die Abfrage mit
   `MeldeVerlauf`, ohne Diagrammpaket und ohne Interpolation.
 - **Gebiet beim Anlegen und am Bezirk** (LLH-1069, Spec `betreuung-lagekarte`): die Gebietswahl
   „Keins“ · „Fläche zeichnen“ steht sichtbar im Anlegedialog (Vorgabe Fläche nur bei freier

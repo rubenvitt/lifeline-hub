@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import '../pages/lagekarte/maplibreWorker';
+import { KarteNichtDarstellbar } from '../anzeige/Kartenausschnitt';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import { useRollen } from '../components/instrument';
@@ -12,6 +13,7 @@ import {
   defaultModus,
 } from '../pages/lagekarte/basemapStil';
 import { wendeKartenDatenAn } from '../pages/lagekarte/kartenDaten';
+import { wennDarstellbar } from '../pages/lagekarte/kartenGrafik';
 import { sorgeFuerZonenLayer } from '../pages/lagekarte/kartenLayer';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
 import type { BezirkFlaechen } from './bezirkFlaechen';
@@ -28,6 +30,9 @@ const HOEHE = 240;
  * Ressourcen (`pages/lagekarte/AGENTS.md`, Ressourcenabbau): EINE Karte je Stil, `map.remove()` im
  * Cleanup; Daten nur über `wendeKartenDatenAn`, das auf den angewandten Stil wartet. Kein Zeichnen,
  * keine Auswahl, keine Werkzeuge. Den Weg auf die Lagekarte trägt das Paneel daneben.
+ *
+ * Ohne Kartengrafik (LLH-1370, `pages/lagekarte/kartenGrafik.ts`) steht an Stelle der Karte
+ * `KarteNichtDarstellbar`; Paneel und Sprung bleiben.
  */
 export default function BezirkKartenbild({
   flaechen,
@@ -40,6 +45,8 @@ export default function BezirkKartenbild({
   const { rollen, dunkel } = useRollen();
   const container = useRef<HTMLDivElement>(null);
   const karte = useRef<maplibregl.Map | null>(null);
+  // Ein Gerät ohne Kartengrafik bekommt sie nicht nachträglich: der Zustand bleibt.
+  const [darstellbar, setDarstellbar] = useState(true);
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const config = configQuery.data;
   const ausschnitt = flaechen.ausschnitt;
@@ -49,7 +56,8 @@ export default function BezirkKartenbild({
   // Karte je Stil einmal bauen; der Stil hängt an Konfiguration und Tag/Nacht.
   useEffect(() => {
     if (!container.current || !config || !hatAusschnitt) return;
-    const map = new maplibregl.Map({
+    // Ohne WebGL2 wirft der Konstruktor: `wennDarstellbar` fängt nur diesen Wurf.
+    const optionen: maplibregl.MapOptions = {
       container: container.current,
       style: baueBasemapStyle(
         defaultModus(config),
@@ -62,7 +70,12 @@ export default function BezirkKartenbild({
       interactive: false,
       attributionControl: false,
       transformRequest: absolutiereProxyAnfrage,
-    });
+    };
+    const map = wennDarstellbar(() => new maplibregl.Map(optionen));
+    if (!map) {
+      setDarstellbar(false);
+      return;
+    }
     karte.current = map;
     return () => {
       karte.current = null;
@@ -100,6 +113,7 @@ export default function BezirkKartenbild({
     });
   }, [flaechen, config, dunkel, hatAusschnitt]);
 
+  if (!darstellbar) return <KarteNichtDarstellbar hoehe={HOEHE} />;
   return (
     <div
       ref={container}

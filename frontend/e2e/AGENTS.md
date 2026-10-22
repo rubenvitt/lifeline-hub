@@ -61,6 +61,6 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
 - **Specs mit Lagekarte laufen nicht in Firefox** (LLH-1051): der headless Firefox hat hier und in
   der CI kein WebGL2, die Karte (maplibre) entsteht nicht. Druck-Specs mit Karte stehen deshalb in
   `KARTEN_DRUCK_SPECS` (`playwright.config.ts`, Chromium und WebKit), nicht in `DRUCK_SPECS`.
-  Umgekehrt prüfen Specs in `OHNE_WEBGL_SPECS` die Lagekarte OHNE Kartengrafik (LLH-1353): in
-  Firefox wie sie ist, in Chromium mit einem Init-Skript, das `getContext('webgl2')` `null`
-  liefern lässt.
+  Umgekehrt prüfen Specs in `OHNE_WEBGL_SPECS` die Karten OHNE Kartengrafik (LLH-1353,
+  LLH-1370): in Firefox wie sie sind, in Chromium mit dem Init-Skript `ohneWebgl2`
+  (`e2e/kartenFixture.ts`), das `getContext('webgl2')` `null` liefern lässt.

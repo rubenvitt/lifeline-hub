@@ -153,3 +153,22 @@ export async function kachelnBeantworten(
   });
   return anfragen;
 }
+
+/**
+ * Gerät ohne Kartengrafik (LLH-1353, LLH-1370): `getContext('webgl2')` liefert `null`, so wie im
+ * headless Firefox hier und in der CI. maplibres Konstruktor wirft dann `GPUInitializationError`.
+ * Vor dem ersten `goto` aufrufen (Init-Skript).
+ */
+export async function ohneWebgl2(page: Page) {
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (
+      this: HTMLCanvasElement,
+      art: string,
+      ...rest: unknown[]
+    ) {
+      if (art === 'webgl2') return null;
+      return (original as (...a: unknown[]) => RenderingContext | null).call(this, art, ...rest);
+    } as typeof original;
+  });
+}
