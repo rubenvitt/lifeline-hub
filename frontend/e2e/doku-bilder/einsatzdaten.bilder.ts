@@ -134,8 +134,7 @@ test.describe(KAPITEL, () => {
       const elw = fahrzeuge.find((f) => f.funkrufname === 'Musterstadt 11-1') ?? fahrzeuge[0];
       await fuelle(api, 'patch', `/api/einsaetze/${id}/fuehrungsstelle`, {
         rufname: 'Florian Musterstadt 11-1',
-        kommunikationsmittel: 'digitalfunk',
-        erreichbarkeit: '0561 123 4567',
+        verbindungen: [{ mittel: 'festnetz', wert: '0561 123 4567' }],
         sprechgruppe_ids: [sg1.id, sg2.id],
         fahrzeug_ids: elw ? [elw.id] : [],
       });
