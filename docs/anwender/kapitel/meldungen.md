@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md]
 ---
 
 ## Überblick
@@ -176,6 +176,11 @@ Jede erfasste Meldung schreibt einen ETB-Eintrag vom Typ „Meldung“ mit Absen
 solange „Automatische ETB-Einträge“ nicht ausgeschaltet ist (siehe
 [Einsatztagebuch](einsatztagebuch.md)). Der Eintrag trägt den Verweis „Meldung #12 ↗“ zurück auf
 die Meldung.
+
+Umgekehrt legt ein im ETB erfasster Eintrag vom Typ „Meldung“ oder „Lage“ die Meldung selbst an,
+als Art „Sonstige“ beziehungsweise „Lagemeldung“, mit „Von“ als Absender und „An“ als Empfänger.
+Sie steht im Meldungseingang wie jede erfasste Meldung und bekommt keinen zweiten ETB-Eintrag. Mit
+„Nur protokollieren“ entsteht keine Meldung.
 
 Die erste Übergabe an die Lage schreibt immer den Systemeintrag „Meldung #12 an die Lage
 übergeben“; eine erneute Übergabe und die Übergabe einer Lagemeldung schreiben keinen.

@@ -163,6 +163,20 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   Absenden ein. `@`, `/von`, `/an` überschreiben ihn für den einen Eintrag. Ohne Standard fragt
   die Erfassung inline (`etb/RufnameAbfrage.tsx`, kein Modal), erst wenn das Fach gelesen ist;
   in der Berichtigung wird nicht gefragt.
+- **Meldung und Lage gehen in den Meldungseingang** (LLH-1037, Specs `meldungseingang`,
+  `etb-schnellerfassung-tastatur`): bei diesen Typen (nicht in der Berichtigung) zeigt
+  `Schnellerfassung.tsx` den Schalter „Nur protokollieren“, Vorgabe aus; aus legt der Server
+  Eintrag und Meldung an (Typ „Lage“ → Art „Lagemeldung“, Typ „Meldung“ → Art „Sonstige“). Ab `md`
+  steht er in der Chip-Zeile neben „Werte behalten“, darunter in der Hinweiszeile; er bricht
+  weder die Feldbreite (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Er springt nach jedem
+  Erfassen auf aus zurück, auch mit „Werte behalten“, und lebt im Entwurf (`nur_protokollieren`,
+  optional, kein Versionssprung). Ist das Modul Meldungen gesperrt (`useSprungSperre`), steht er
+  an und gesperrt mit dem Grund `MODUL_MELDUNGEN_GESPERRT`. Der Client sendet
+  `in_meldungseingang` immer ausdrücklich, auch über die Warteschlange
+  (`offline/useEtbErfassung.ts` reicht es durch). Eine beim Abspielen abgelehnte Zeile mit
+  Kopplung bietet „Nur protokollieren“ an (`EtbZeitachse` → `EtbPage.abgelehntErneutSenden`, mit
+  neuer `client_id`, sonst 409). Eine aus dem ETB angelegte Meldung bekommt keinen zweiten
+  Eintrag; der Verweis „Meldung #n“ kommt aus `meldung_id`/`meldung_lfd_nr` (LLH-1104).
 
 **Meldungsmodell (LLH-1027, Entscheidung 21.10.2026) — Zielbild, gilt ab dem jeweiligen
 Folgeticket; bis dahin gilt das Bestehende**
@@ -171,14 +185,4 @@ Das Ticket, das einen Punkt baut, schreibt die Regeln oben und die Specs fort un
 Punkt hier. Begriffe, Datenfluss und Zustände: `docs/design/2026-10-21-meldungsmodell/README.md`;
 Entscheidung und Herleitung: `/mnt/project-files/llh-1021/llh-1027/design.md`.
 
-- **ETB-Typ „Meldung“ und „Lage“ gehen in den Meldungseingang (LLH-1037):** Die Erfassung zeigt
-  bei diesen Typen in der Hinweiszeile den Schalter „Nur protokollieren“ (Vorgabe aus). Aus legt
-  der Server in einer Transaktion Eintrag und Meldung an (Typ „Lage“ → Art „Lagemeldung“, Typ
-  „Meldung“ → Art „Sonstige“; Von/An werden Absender/Empfänger). Der Schalter springt nach jedem
-  Erfassen auf aus zurück, auch mit „Werte behalten“, und lebt im Entwurf. Ohne Schreibrecht oder
-  Freigabe im Modul Meldungen steht er an und gesperrt mit Grund. Er bricht weder die Feldbreite
-  (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Der Client sendet `in_meldungseingang`
-  immer ausdrücklich, auch über die Warteschlange (`offline/useEtbErfassung.ts`).
-- **Ein Eintrag je Meldung:** eine aus dem ETB angelegte Meldung bekommt keinen zweiten Eintrag
-  (das automatische ETB einer Lagemeldung trägt seit LLH-1031 Typ „Lage“, siehe oben).
-  Die Mehrzahl von „Lage“ bleibt „Lagefeststellungen“; „Lagemeldungen“ ist nur das Modul.
+- **Wortlaut:** Die Mehrzahl von „Lage“ bleibt „Lagefeststellungen“; „Lagemeldungen“ ist nur das Modul.
