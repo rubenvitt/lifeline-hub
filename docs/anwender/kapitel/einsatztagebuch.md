@@ -2,7 +2,7 @@
 titel: Einsatztagebuch
 gruppen: [alle, fuehrung]
 reihenfolge: 100
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, src/nachforderung/repo.rs, src/meldung/repo.rs, frontend/src/pages/EtbPage.tsx, frontend/src/etb/Schnellerfassung.tsx, frontend/src/etb/MetaChip.tsx, frontend/src/etb/schnellerfassungModell.ts, frontend/src/etb/zeitachseModell.ts, frontend/src/anzeige/zeitParser.ts, frontend/src/etb/RufnameAbfrage.tsx, frontend/src/etb/EtbZeitachse.tsx, frontend/src/components/useFunkprotokollLauf.ts, frontend/src/etb/nachOben.ts, frontend/src/components/instrument/Schnellerfassungszeile.tsx, frontend/src/etb/EtbFilterleiste.tsx, frontend/src/etb/EtbZeitraumWahl.tsx, frontend/src/components/instrument/Filterhinweis.tsx, frontend/src/etb/filterMerkmale.ts, frontend/src/anzeige/zeitfenster.ts, frontend/src/etb/EtbBilanz.tsx, frontend/src/etb/EtbLesemarkeBanner.tsx, frontend/src/etb/EtbEintragVorschau.tsx, frontend/src/etb/WiedervorlageModal.tsx, frontend/src/etb/AuftragAusEtbModal.tsx, frontend/src/etb/entwuerfe/EtbEntwurfsTabs.tsx, frontend/src/etb/BuchstabierHilfe.tsx, frontend/src/etb/buchstabieren.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/etb.rs, src/etb/mod.rs, openspec/specs/etb-anhaenge/spec.md, openspec/specs/etb-berichtigung/spec.md, openspec/specs/etb-volltextsuche/spec.md, openspec/specs/meldungseingang/spec.md, openspec/specs/etb-schnellerfassung-tastatur/spec.md]
 ---
 
 ## Überblick
@@ -52,7 +52,7 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Erfassungsleiste am Fuß der Seite den Text in das Feld „Inhalt …“ schreiben.
 
-   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ „Meldung“ mit Rahmen in der Typfarbe, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
+   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“ und rechts daneben den Häkchen „Nur protokollieren“ und „Werte behalten“, Typ „Meldung“ mit Rahmen in der Typfarbe, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
 
 2. Den Typ prüfen: Der Knopf links zeigt ihn als Wort, zum Beispiel „Meldung“, und die Leiste
    trägt seine Farbe als Rahmen, links als Kante wie die Zeitachse (eine Anordnung etwa orange). Ein Klick darauf wechselt den Typ. Schneller
@@ -87,6 +87,26 @@ erscheinen wird.
 Die Chips „Von“ und „An“ bieten eine Buchstabierhilfe mit den Tafeln „Deutsch“ und „NATO“. Bei
 Typ „Lage“ führt der Verweis „Als strukturierten Lagebericht erfassen →“ zu den Lageberichten
 ([Lageberichte](lageberichte.md)).
+
+### Meldung und Lage gehen in den Meldungseingang
+
+Ein Eintrag vom Typ „Meldung“ oder „Lage“ legt beim Erfassen zugleich eine Meldung im
+Meldungseingang an: Typ „Lage“ als Lagemeldung, die auch auf der Seite Lagemeldungen steht, Typ
+„Meldung“ als Meldung der Art „Sonstige“. „Von“ wird Absender, „An“ Empfänger; Meldeweg, Inhalt
+und Ereigniszeit gehen mit. Der Eintrag trägt danach den Verweis „Meldung #12 ↗“, der die Meldung
+hervorgehoben öffnet ([Meldungen](meldungen.md)). Einen zweiten, automatischen Eintrag gibt es
+dafür nicht.
+
+Für eine reine Mitschrift ohne Meldung:
+
+1. Bei Typ „Meldung“ oder „Lage“ das Häkchen „Nur protokollieren“ setzen. Es steht mit „Werte
+   behalten“ rechts neben dem Entwurfsreiter, auf einem schmalen Bildschirm unter dem Feld.
+2. Den Eintrag erfassen. Er steht nur im ETB.
+
+„Nur protokollieren“ gilt für einen Eintrag und ist danach wieder aus, auch mit „Werte behalten“;
+ein Entwurf merkt es sich bis zum Senden. Ist das Modul Meldungen für die Person gesperrt, ist das
+Häkchen gesetzt und nicht änderbar, daneben steht „Modul Meldungen gesperrt“: dann wird nur
+protokolliert. Bei den anderen Typen und in einer Berichtigung fehlt das Häkchen.
 
 ### Eine Datei anhängen
 
@@ -236,7 +256,10 @@ Taucht der Entwurf nach dem Neuladen wieder auf, lässt er sich erneut verwerfen
 
 Ohne Verbindung nimmt das ETB Einträge weiter an und merkt sie als „offline vorgemerkt“ vor. Sie
 gehen raus, sobald das Netz zurück ist. Lehnt der Server einen vorgemerkten Eintrag ab, steht er
-mit „Erneut senden“ und „Verwerfen“ in der Zeitachse. Anhänge gehen nur mit Verbindung. Mehr dazu im
+mit „Erneut senden“ und „Verwerfen“ in der Zeitachse. Ein vorgemerkter Eintrag vom Typ „Meldung“
+oder „Lage“ legt seine Meldung erst beim Senden an; wird er abgelehnt, etwa weil das Modul
+Meldungen inzwischen gesperrt ist, bietet seine Zeile zusätzlich „Nur protokollieren“, und er geht
+ohne Meldung hinaus. Anhänge gehen nur mit Verbindung. Mehr dazu im
 Kapitel [Arbeiten ohne Netz](ohne-netz.md).
 
 ### Abgeschlossener Einsatz

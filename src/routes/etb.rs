@@ -1,6 +1,6 @@
 use crate::app::AppState;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibfreigabe, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Auftraege, Etb};
+use crate::einsatz::modul::{Auftraege, Etb, Meldungen};
 use crate::error::AppError;
 use crate::etb::lesemarke::{self, EtbLesemarkeAnzeige};
 use crate::etb::zaehler::EtbZaehlerAnzeige;
@@ -43,6 +43,12 @@ pub struct NeuerEintrag {
     /// Fehlt das Feld (ältere Clients, Queue-Zeilen vor LFH-117), trägt der Eintrag keine.
     #[serde(default)]
     pub anhang_ids: Vec<i64>,
+    /// Weg in den Meldungseingang (LLH-1037, Spec `meldungseingang`): `true` legt zum Eintrag in
+    /// derselben Transaktion eine Meldung an, nur bei Typ `meldung`/`lage` (sonst 422) und nur
+    /// mit Freigabe des Moduls Meldungen (sonst 403). Fehlt das Feld (ältere Clients,
+    /// Warteschlangen-Zeilen vor LLH-1037) oder ist es `false`, wird nur protokolliert.
+    #[serde(default)]
+    pub in_meldungseingang: Option<bool>,
 }
 
 /// Höchstzahl verschiedener Anhänge je Eintrag (LFH-117, design.md D4; vom Auftraggeber am
@@ -71,6 +77,7 @@ pub async fn erfassen(
     // ein bereits committeter Offline-Eintrag bleibt im abgeschlossenen Einsatz abrufbar,
     // solange der Einsatz für den Benutzer lesbar ist (LFH-769, `EinsatzSchreibfreigabe`).
     // Der Lookup ist durch `einsatz_id` gegen Cross-Einsatz-Treffer geschützt.
+    let in_meldungseingang = req.in_meldungseingang.unwrap_or(false);
     let client_id = bereinige(req.client_id);
     if let Some(cid) = &client_id {
         if cid.chars().count() > 64 {
@@ -82,16 +89,28 @@ pub async fn erfassen(
             // Nur DERSELBE Eintrag ist ein Replay (Review C1): zwei Tabs mit demselben Entwurf
             // senden sonst unter einer client_id verschiedenen Wortlaut, und der zweite bekäme
             // still den ersten als Erfolg zurück. Abweichung → 409, der Client behält den Text.
+            // Dazu zählt die Kopplung an eine Meldung (LLH-1037, design.md D5).
             let gebunden: Vec<i64> = anzeige.anhaenge.iter().map(|a| a.id).collect();
             if !repo::ist_derselbe_eintrag(
-                anzeige.typ.as_str(),
-                &anzeige.inhalt,
-                &gebunden,
-                &req.typ,
-                &req.inhalt,
-                &req.anhang_ids,
+                repo::EintragStand {
+                    typ: anzeige.typ.as_str(),
+                    inhalt: &anzeige.inhalt,
+                    anhaenge: &gebunden,
+                    mit_meldung: anzeige.meldung_id.is_some(),
+                },
+                repo::EintragStand {
+                    typ: &req.typ,
+                    inhalt: &req.inhalt,
+                    anhaenge: &req.anhang_ids,
+                    mit_meldung: in_meldungseingang,
+                },
             ) {
                 return Err(AppError::Conflict(repo::CLIENT_ID_KONFLIKT.into()));
+            }
+            // Ein Abbruch zwischen Commit und Publish wird hier nachgeholt, ohne Dublette
+            // (Marker `live_published_at`, wie die Meldungsroute).
+            if in_meldungseingang {
+                meldung_publizieren(&state, &anzeige).await?;
             }
             return Ok((StatusCode::CREATED, Json(anzeige)));
         }
@@ -168,7 +187,48 @@ pub async fn erfassen(
 
     let veranlassung = optional_max(req.veranlassung, "Veranlassung", crate::etb::PARTEI_MAX)?;
 
-    let (anzeige, war_neu) = repo::anlegen_idempotent(
+    // Weg in den Meldungseingang (LLH-1037, design.md D1–D4): nach allen Feldprüfungen erst der
+    // Zusammenhang (422), dann das Recht am Zielmodul (403). Nie still herunterstufen: ohne
+    // Freigabe entsteht gar nichts, der Client behält den Text.
+    let meldungsart = match (in_meldungseingang, typ) {
+        (false, _) => None,
+        (true, EtbTyp::Lage) => Some(crate::meldung::ART_LAGEMELDUNG),
+        (true, EtbTyp::Meldung) => Some(crate::meldung::ART_SONSTIGE),
+        (true, _) => {
+            return Err(AppError::UnprocessableEntity(
+                "In den Meldungseingang gehen nur Einträge vom Typ Meldung oder Lage".into(),
+            ))
+        }
+    };
+    if meldungsart.is_some() {
+        ctx.fordere_zielmodul::<Meldungen>(&state.pool).await?;
+    }
+    // Eine Zeit für Eintrag und Meldung: ohne Angabe „jetzt“ nach der Serveruhr, sonst trüge nur
+    // der Eintrag den Spaltenvorgabewert (design.md D4).
+    let eingang = jetzt();
+    let ereigniszeit = match (&meldungsart, ereigniszeit) {
+        (Some(_), None) => Some(eingang.clone()),
+        (_, zeit) => zeit,
+    };
+    let meldung = meldungsart.map(|art| crate::meldung::repo::MeldungDaten {
+        absender: &von,
+        empfaenger: Some(&an),
+        empfaenger_funktion: None,
+        meldeweg: meldeweg.as_deref().unwrap_or(MeldeWeg::Sonstige.as_str()),
+        inhalt: &inhalt,
+        meldungsart: art,
+        prioritaet: crate::meldung::PRIO_NORMAL,
+        richtung: crate::meldung::RICHTUNG_INTERN,
+        ereigniszeit: ereigniszeit.as_deref().unwrap_or(&eingang),
+        eingang_at: &eingang,
+        bestaetigung_pflicht: false,
+        bestaetigung_frist_at: None,
+        einheit_id: None,
+        abschnitt_id: None,
+        geo: None,
+    });
+
+    let (anzeige, war_neu) = repo::anlegen_idempotent_mit_meldung(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -185,19 +245,39 @@ pub async fn erfassen(
             erfasst_lokal_at: erfasst_lokal_at.as_deref(),
             berichtigt_eintrag_id: req.berichtigt_eintrag_id,
         },
+        meldung.as_ref(),
     )
     .await?;
 
-    // Live an alle SSE-Abonnenten dieses Einsatzes pushen — aber NUR bei einem echt neuen
-    // Eintrag. Ein idempotenter Replay (war_neu=false) hat den Eintrag beim ersten Mal
-    // bereits publiziert; ein zweites Signal würde eine Geister-Aktualisierung auslösen.
-    // Seit F01/LFH-227 geht nur die ID über den Kanal — damit entfällt auch der frühere
-    // Serialisierungs-Fehlerpfad (der Volltext wird gar nicht mehr gebaut).
-    if war_neu {
+    // Mit Meldung publiziert der Weg der Meldung den Eintrag mit (über `etb_meldung_id`), dazu
+    // `meldung` und die Benachrichtigungen, genau einmal (design.md D6).
+    if anzeige.meldung_id.is_some() {
+        meldung_publizieren(&state, &anzeige).await?;
+    } else if war_neu {
+        // Live an alle SSE-Abonnenten dieses Einsatzes pushen — aber NUR bei einem echt neuen
+        // Eintrag. Ein idempotenter Replay (war_neu=false) hat den Eintrag beim ersten Mal
+        // bereits publiziert; ein zweites Signal würde eine Geister-Aktualisierung auslösen.
+        // Seit F01/LFH-227 geht nur die ID über den Kanal — damit entfällt auch der frühere
+        // Serialisierungs-Fehlerpfad (der Volltext wird gar nicht mehr gebaut).
         state.live.publiziere(einsatz_id, anzeige.id);
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+/// Live-Bündel und Benachrichtigungen der Meldung, die ein Eintrag im Meldungseingang angelegt
+/// hat (LLH-1037, design.md D6): derselbe Weg wie bei einer im Formular erfassten Meldung
+/// (`meldung::live_publikation_sicherstellen`), at-least-once und ohne Dublette. Er publiziert
+/// auch den Eintrag selbst, denn der ist ihr ETB-Eintrag.
+async fn meldung_publizieren(
+    state: &AppState,
+    anzeige: &EtbEintragAnzeige,
+) -> Result<(), AppError> {
+    let Some(meldung_id) = anzeige.meldung_id else {
+        return Ok(());
+    };
+    let meldung = crate::meldung::repo::laden(&state.pool, meldung_id, &jetzt()).await?;
+    crate::meldung::live_publikation_sicherstellen(state, &meldung).await
 }
 
 /// POST /api/einsaetze/{id}/etb/anhaenge — Datei für einen ETB-Eintrag hochladen (LFH-117).

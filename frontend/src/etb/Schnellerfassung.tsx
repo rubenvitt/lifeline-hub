@@ -10,6 +10,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
@@ -67,6 +68,7 @@ import { serverJetzt } from '../offline/serveruhr';
 import { useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { lageberichtePfad } from '../routing/deeplinks';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { MODUL_MELDUNGEN_GESPERRT } from '../components/nurAnsicht';
 
 interface Props {
   erfassen: (eintrag: NeuerEintrag) => Promise<void>;
@@ -126,6 +128,14 @@ interface Props {
    * Bildschirmtastatur über der Zeitachse.
    */
   startFokus?: boolean;
+  /**
+   * Platz für die Einstellungen „Nur protokollieren“ und „Werte behalten“ ab `md` (LLH-1037
+   * D12): `EtbEntwurfsTabs` reicht ihn im Reiterband, dort stehen sie ohne eigene Zeile. Fehlt
+   * die Angabe, stehen sie rechts in der Chip-Zeile (Berichtigung, Einzelaufrufer); `null` heißt,
+   * der Platz kommt noch (Callback-Ref) — bis dahin stehen sie nirgends statt kurz in der
+   * Chip-Zeile. Unter `md` gilt immer die Hinweiszeile.
+   */
+  einstellungenZiel?: HTMLElement | null;
 }
 
 /** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
@@ -301,6 +311,7 @@ export default function Schnellerfassung({
   onVersandChange,
   eingeklappt = false,
   startFokus = true,
+  einstellungenZiel,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -345,6 +356,14 @@ export default function Schnellerfassung({
 
   const [inhalt, setInhalt] = useState(initialWerte?.inhalt ?? '');
   const [typ, setTyp] = useState<EtbTyp>(initialWerte?.typ ?? 'meldung');
+  /**
+   * „Nur protokollieren“ (LLH-1037, Spec `etb-schnellerfassung-tastatur`): aus heißt, ein Eintrag
+   * vom Typ Meldung oder Lage legt den Vorgang im Meldungseingang an. Lebt im Entwurf und springt
+   * nach jedem Erfassen auf aus zurück, auch mit „Werte behalten“ (LLH-1027 D2).
+   */
+  const [nurProtokollieren, setNurProtokollieren] = useState(
+    initialWerte?.nurProtokollieren ?? false,
+  );
   // `metadaten` hält NUR, was die Person ausdrücklich gesetzt hat. Von/An aus dem
   // Standard-Rufnamen kommen erst über `wirksam` hinzu (LFH-894, design.md D2): so überlebt der
   // Standard das Leeren nach dem Absenden, und kein Entwurf trägt einen veralteten Wert. Die
@@ -358,6 +377,8 @@ export default function Schnellerfassung({
   const [pflichtHinweis, setPflichtHinweis] = useState<'von' | 'an' | null>(null);
   /** Kennung des Kurzgrunds neben „Anhang“ (`aria-describedby`, LFH-1078). */
   const anhangGrundId = useId();
+  /** Kennung des Grunds neben einem gesperrten „Nur protokollieren“ (LLH-1037). */
+  const protokollGrundId = useId();
   /** Grund, warum ein Absenden an einer Zeichengrenze scheiterte (LFH-937, D8); wie oben. */
   const [laengenHinweis, setLaengenHinweis] = useState<string | null>(null);
   /** Unlesbare Angabe hinter `/zeit` (LLH-1088): der Grund steht in der Hinweiszeile. */
@@ -403,7 +424,11 @@ export default function Schnellerfassung({
   const funkrufnamen = useFunkrufnamen(einsatz.id);
   const funktionen = useFunktionsVorschlaege(einsatz.id);
   // Ohne Zugriff auf Lageberichte entfällt der Sprung dorthin (LFH-888, `frontend/AGENTS.md`).
-  const lageberichteGesperrt = useSprungSperre(einsatz.id)('lageberichte');
+  const sprungSperre = useSprungSperre(einsatz.id);
+  const lageberichteGesperrt = sprungSperre('lageberichte');
+  // Ohne Freigabe der Meldungen wird nur protokolliert (LLH-1037, design.md D8): Einsatz-Schreibrecht
+  // hat, wer hier erfasst; es fehlt allein das Modul. Unbekannt heißt offen, der Server prüft.
+  const meldungenGesperrt = sprungSperre('meldungen');
   // „Von“/„An“: Funkrufnamen plus Sachgebiete (LFH-545/549) — der Stabsvorschlag tritt neben die
   // Funkrufnamen, er ersetzt sie nicht.
   const vonAnOptionen = useMemo(
@@ -425,8 +450,8 @@ export default function Schnellerfassung({
       ersterRender.current = false;
       return; // kein Write beim Mount/initialem Laden
     }
-    onWerteChangeRef.current?.({ inhalt, typ, metadaten });
-  }, [inhalt, typ, metadaten]);
+    onWerteChangeRef.current?.({ inhalt, typ, metadaten, nurProtokollieren });
+  }, [inhalt, typ, metadaten, nurProtokollieren]);
 
   // Fokus beim Mount. State-Reset bei Tab-/Modus-Wechsel erfolgt über key-basiertes
   // Remounting im Container (EtbEntwurfsTabs / EtbPage-Berichtigung).
@@ -478,6 +503,10 @@ export default function Schnellerfassung({
   // wirkende Übernahme wäre für den Erfasser nicht erklärbar.
   const zeigeSchalter = !berichtigungZu && onWerteBehaltenChange != null;
   const uebernahmeAktiv = zeigeSchalter && werteBehalten;
+  /** Typ Meldung oder Lage, nicht in der Berichtigung: nur dann gibt es den Weg in den Eingang. */
+  const eingangMoeglich = !berichtigungZu && (typ === 'meldung' || typ === 'lage');
+  /** Geht dieser Eintrag in den Meldungseingang? Der Client sendet es immer ausdrücklich. */
+  const inMeldungseingang = eingangMoeglich && !meldungenGesperrt && !nurProtokollieren;
 
   function fokusInsFeld() {
     requestAnimationFrame(() => textRef.current?.focus());
@@ -722,6 +751,7 @@ export default function Schnellerfassung({
         }),
         client_id: clientId ?? eigeneClientId.current,
         ...(anhangIds.length > 0 ? { anhang_ids: anhangIds } : {}),
+        in_meldungseingang: inMeldungseingang,
       };
       try {
         await erfassen(eintrag);
@@ -753,6 +783,9 @@ export default function Schnellerfassung({
       setMetadaten((m) => (uebernahmeAktiv ? nurUebernahme(m) : {}));
       // Der Typ bleibt mit „Werte behalten“ stehen (LLH-1112), sonst beginnt es als Meldung.
       if (!uebernahmeAktiv) setTyp('meldung');
+      // „Nur protokollieren“ springt immer zurück, auch mit „Werte behalten“ (LLH-1027 D2): ein
+      // vergessener Schalter ließe sonst eine Serie am Meldungseingang vorbeilaufen.
+      setNurProtokollieren(false);
       setEditFeld(null);
       setMenuOffen(false);
       if (berichtigungZu) onBerichtigungAbbrechen();
@@ -812,8 +845,9 @@ export default function Schnellerfassung({
    * Sendetaste steht als Kappe an „Erfassen“, Typ und Felder zeigen Präfix-Knopf und „Feld“. Sie
    * bleibt für Zeichengrenze und, unter `md`, „Werte behalten“ — und entfällt, wenn beides fehlt.
    */
-  // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile — in der
-  // einzeilig rollenden Chip-Zeile läge er sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
+  // „Werte behalten": ab `md` bei den Einstellungen (`einstellungenAbMd`: Reiterband oder rechts in
+  // der Chip-Zeile), darunter in der Hinweiszeile — in der einzeilig rollenden Chip-Zeile läge er
+  // sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
   // Kästchen-Boden (`antdKaestchen`, LFH-907): im Handschuh-Betrieb höbe er die Zeile von 36 auf
   // 72 px, und die angepinnte Leiste risse auf dem Handschirm den Deckel der halben Fensterhöhe
   // (`e2e/leisten-flaeche.spec.ts`, 451 statt höchstens 422 px). Benannte Ausnahme.
@@ -828,6 +862,34 @@ export default function Schnellerfassung({
     >
       <Typography.Text type="secondary">Werte behalten</Typography.Text>
     </Checkbox>
+  ) : null;
+
+  // „Nur protokollieren“ (LLH-1037, design.md D7/D8/D12): neben „Werte behalten“, ab `md` bei den
+  // Einstellungen, darunter in der Hinweiszeile ohne Kästchen-Boden (wie oben). Ohne Freigabe der
+  // Meldungen an und gesperrt, der Grund steht daneben (Wort statt Satz, LFH-1078).
+  const protokollSchalter = eingangMoeglich ? (
+    <span
+      style={{ display: 'inline-flex', alignItems: 'center', gap: token.marginXS, flexShrink: 0 }}
+    >
+      <Checkbox
+        checked={meldungenGesperrt || nurProtokollieren}
+        disabled={sendet || meldungenGesperrt}
+        aria-describedby={meldungenGesperrt ? protokollGrundId : undefined}
+        onChange={(e) => setNurProtokollieren(e.target.checked)}
+        style={istSchmal ? { minHeight: 0 } : undefined}
+      >
+        <Typography.Text type="secondary">Nur protokollieren</Typography.Text>
+      </Checkbox>
+      {meldungenGesperrt && (
+        <span
+          id={protokollGrundId}
+          data-lfh="etb-protokoll-grund"
+          style={{ color: rollen.text2, whiteSpace: 'nowrap' }}
+        >
+          {MODUL_MELDUNGEN_GESPERRT}
+        </span>
+      )}
+    </span>
   ) : null;
 
   // Zeichengrenze (LFH-937, D8): Zähler und Hinweis stehen in der Hinweiszeile, nicht unter dem
@@ -874,14 +936,48 @@ export default function Schnellerfassung({
       <Zeichenzaehler wert={inhalt} max={ETB_INHALT_MAX} />
     </>
   );
-  const schalterInZeile = istSchmal && schalter != null;
+  const schalterInZeile = istSchmal && (schalter != null || protokollSchalter != null);
   const hinweiszeile =
     grenzSichtbar || schalterInZeile ? (
       <>
         {grenzTeil}
-        {schalterInZeile && <span style={{ marginInlineStart: 'auto' }}>{schalter}</span>}
+        {schalterInZeile && (
+          <span
+            style={{
+              marginInlineStart: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: token.marginSM,
+            }}
+          >
+            {protokollSchalter}
+            {schalter}
+          </span>
+        )}
       </>
     ) : undefined;
+
+  // Ab `md` stehen beide Einstellungen beisammen und abgesetzt von den Aktionen: im Reiterband,
+  // wenn der Aufrufer dort Platz reicht (LLH-1037 D12), sonst rechts in der Chip-Zeile. In der
+  // Chip-Zeile brach die Gruppe im Handschuh-Betrieb auf dem Fükw um (733 px Karte, 507 px Chips,
+  // 331 px Gruppe), die angepinnte Leiste wuchs um eine Kästchenhöhe. Mit Kästchen-Boden: die
+  // Trefffläche ist dort geprüft (`e2e/trefflaeche-pruefflaechen.spec.ts`).
+  const einstellungenAbMd =
+    !istSchmal && (zeigeSchalter || protokollSchalter != null) ? (
+      <div
+        data-lfh="etb-einstellungen"
+        style={{
+          marginInlineStart: 'auto',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: token.marginSM,
+        }}
+      >
+        {protokollSchalter}
+        {schalter}
+      </div>
+    ) : null;
 
   const einheitenTreffer =
     menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
@@ -1076,8 +1172,8 @@ export default function Schnellerfassung({
       </div>
 
       {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt, die
-         EINSTELLUNG „Werte behalten". Nicht neben „Erfassen" und nicht zwischen Aktionen: ein
-         Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
+         EINSTELLUNGEN, wenn kein Reiterband sie aufnimmt. Nicht neben „Erfassen" und nicht zwischen
+         Aktionen: ein Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
       {!eingeklappt && (
         <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
           {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
@@ -1152,11 +1248,13 @@ export default function Schnellerfassung({
               </Button>
             )}
           </Space>
-          {!istSchmal && zeigeSchalter && (
-            <div style={{ marginInlineStart: 'auto', flexShrink: 0 }}>{schalter}</div>
-          )}
+          {einstellungenAbMd != null && einstellungenZiel === undefined && einstellungenAbMd}
         </div>
       )}
+      {einstellungenAbMd != null &&
+        einstellungenZiel != null &&
+        !eingeklappt &&
+        createPortal(einstellungenAbMd, einstellungenZiel)}
 
       {dateien.length > 0 && (
         <ul

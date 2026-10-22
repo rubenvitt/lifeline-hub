@@ -100,6 +100,12 @@ export interface NeuerEintrag {
   /** Zuvor über {@link ladeEtbAnhangHoch} hochgeladene Dateien. Fährt in der Offline-Queue mit:
    *  nur der UPLOAD braucht Netz. */
   anhang_ids?: number[];
+  /**
+   * Weg in den Meldungseingang (LLH-1037, Spec `meldungseingang`): `true` legt zum Eintrag eine
+   * Meldung an (nur Typ Meldung und Lage, Modul Meldungen frei). Die Erfassung sendet es immer
+   * ausdrücklich; fehlt es (Warteschlangen-Zeilen von vor LLH-1037), wird nur protokolliert.
+   */
+  in_meldungseingang?: boolean;
 }
 
 /**

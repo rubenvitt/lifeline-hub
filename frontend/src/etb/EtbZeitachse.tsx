@@ -131,6 +131,11 @@ interface Props {
   /** Abgelehnten Eintrag endgültig verwerfen. */
   onVerwerfen?: (puffer: AbgelehnterEintrag) => void;
   /**
+   * Abgelehnten Eintrag, der in den Meldungseingang sollte, ohne Meldung erneut senden (LLH-1037,
+   * design.md D9): der Weg hinaus, wenn das Modul Meldungen inzwischen gesperrt ist.
+   */
+  onNurProtokollieren?: (puffer: AbgelehnterEintrag) => void;
+  /**
    * Grund, aus dem „Erneut senden“ an dieser Zeile scheiterte, je Zeilenschlüssel (LFH-1077,
    * `components/useZeilenFehler.ts`). Er steht an der Zeile, nicht im Toast.
    */
@@ -259,6 +264,7 @@ export default function EtbZeitachse({
   auftragGesperrt = false,
   onErneutSenden,
   onVerwerfen,
+  onNurProtokollieren,
   zeilenFehler,
   ladend,
   fehler,
@@ -410,6 +416,7 @@ export default function EtbZeitachse({
     onAuftragErteilen,
     onErneutSenden,
     onVerwerfen,
+    onNurProtokollieren,
   });
   useLayoutEffect(() => {
     handler.current = {
@@ -418,6 +425,7 @@ export default function EtbZeitachse({
       onAuftragErteilen,
       onErneutSenden,
       onVerwerfen,
+      onNurProtokollieren,
     };
   });
   const aufrufe = useMemo<ZeilenAufrufe>(
@@ -427,6 +435,9 @@ export default function EtbZeitachse({
       auftragErteilen: (e) => handler.current.onAuftragErteilen?.(e),
       erneutSenden: (p) => handler.current.onErneutSenden?.(p),
       verwerfen: (p) => handler.current.onVerwerfen?.(p),
+      nurProtokollieren: handler.current.onNurProtokollieren
+        ? (p) => handler.current.onNurProtokollieren?.(p)
+        : undefined,
     }),
     [],
   );
@@ -615,6 +626,8 @@ interface ZeilenAufrufe {
   auftragErteilen: (e: EtbEintragAnzeige) => void;
   erneutSenden: (p: AbgelehnterEintrag) => void;
   verwerfen: (p: AbgelehnterEintrag) => void;
+  /** Fehlt, wenn die Seite den Weg nicht anbietet. */
+  nurProtokollieren?: (p: AbgelehnterEintrag) => void;
 }
 
 interface ZeilenProps {
@@ -667,6 +680,11 @@ const EtbZeitachsenZeile = memo(function EtbZeitachsenZeile({
       return (
         <Space size="middle" wrap style={{ justifyContent: 'flex-end' }}>
           <Button onClick={() => aufrufe.erneutSenden(z.puffer)}>Erneut senden</Button>
+          {z.puffer.eintrag.in_meldungseingang === true && aufrufe.nurProtokollieren && (
+            <Button onClick={() => aufrufe.nurProtokollieren?.(z.puffer)}>
+              Nur protokollieren
+            </Button>
+          )}
           <Button danger onClick={() => aufrufe.verwerfen(z.puffer)}>
             Verwerfen
           </Button>

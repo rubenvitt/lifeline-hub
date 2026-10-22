@@ -101,3 +101,54 @@ Meldeweg auch den Eintragstyp übernehmen. Ist der Schalter aus, MUST der Folgee
 #### Scenario: Schalter aus
 - **WHEN** „Werte behalten“ aus ist und eine Anordnung erfasst wird
 - **THEN** beginnt der nächste Entwurf als Meldung
+
+### Requirement: Nur protokollieren
+Bei den Typen „Meldung“ und „Lage“ SHALL die ETB-Erfassung den Schalter „Nur protokollieren“
+zeigen, Vorgabe aus; aus heißt, der Eintrag legt den Vorgang im Meldungseingang an. Der Schalter
+MUST nach jedem erfolgreichen Erfassen wieder auf aus stehen, auch wenn „Werte behalten“ an ist,
+und MUST im Entwurf erhalten bleiben, bis dieser gesendet ist. Bei anderen Typen MUST er fehlen.
+
+#### Scenario: Vorgabe
+- **WHEN** eine Person im ETB den Typ „Lage“ wählt
+- **THEN** steht „Nur protokollieren“ aus
+
+#### Scenario: Zurück nach dem Erfassen
+- **WHEN** „Werte behalten“ an ist und eine Person einen Eintrag vom Typ „Meldung“ mit „Nur protokollieren“ erfasst
+- **THEN** beginnt der nächste Entwurf als „Meldung“ mit „Nur protokollieren“ aus
+
+#### Scenario: Anordnung
+- **WHEN** eine Person den Typ „Anordnung“ wählt
+- **THEN** fehlt der Schalter
+
+### Requirement: Einstellungen der Erfassung kosten keine Zeile
+Ab `md` SHALL „Nur protokollieren“ zusammen mit „Werte behalten“ rechts im Reiterband der
+Entwürfe stehen, abgesetzt von den Aktionen; unter `md` SHALL beides in der Hinweiszeile unter dem
+Feld stehen. Die Einstellungen MUST die angepinnte Erfassungsleiste nicht um eine Zeile erhöhen und
+MUST im Handschuh-Betrieb die Trefffläche der Dichtestufe halten.
+
+#### Scenario: Fükw im Handschuh-Betrieb
+- **WHEN** die Erfassung bei 1366 × 768 im Handschuh-Betrieb mit Typ „Meldung“, Von und An steht
+- **THEN** stehen „Nur protokollieren“ und „Werte behalten“ neben dem Entwurfsreiter, und die Leiste ist so hoch wie ohne „Nur protokollieren“
+
+### Requirement: Nur protokollieren ohne Recht der Meldungen
+Ist das Modul Meldungen für die Person nicht freigegeben, SHALL der Schalter „Nur protokollieren“
+an und gesperrt stehen, den Grund nennen und der Eintrag nur protokolliert werden. Der Schalter MUST die
+Feldbreite der Erfassung (ab `md` mindestens 60 % der Zeile) in keinem Fall verringern.
+
+#### Scenario: Ohne Recht für Meldungen
+- **WHEN** eine Person im ETB schreiben darf, das Modul Meldungen für sie aber gesperrt ist, und sie den Typ „Meldung“ wählt
+- **THEN** steht „Nur protokollieren“ an und gesperrt mit dem Grund „Modul Meldungen gesperrt“, und das Erfassen legt keine Meldung an
+
+#### Scenario: Feldbreite
+- **WHEN** der Typ „Lage“ gewählt ist und die Erfassung bei 1440 × 900 steht
+- **THEN** nimmt das Eingabefeld mindestens 60 % der Zeile ein
+
+### Requirement: Abgelehnt beim Abspielen, dann nur protokollieren
+Lehnt der Server einen ohne Netz vorgemerkten Eintrag ab, der in den Meldungseingang gehen sollte,
+SHALL seine Zeile neben „Erneut senden“ und „Verwerfen“ den Knopf „Nur protokollieren“ tragen,
+der denselben Eintrag ohne Meldung erneut sendet. Einer Zeile ohne diese Kopplung MUST der Knopf
+fehlen.
+
+#### Scenario: Freigabe inzwischen entzogen
+- **WHEN** ein vorgemerkter Eintrag vom Typ „Lage“ beim Abspielen mit „Modul Meldungen gesperrt“ abgelehnt wird und die Person „Nur protokollieren“ wählt
+- **THEN** entsteht der ETB-Eintrag ohne Meldung, und die abgelehnte Zeile verschwindet

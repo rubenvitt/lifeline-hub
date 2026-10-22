@@ -457,6 +457,23 @@ describe('EtbZeitachse – gepufferte Einträge', () => {
     await userEvent.click(within(z).getByRole('button', { name: 'Verwerfen' }));
     expect(onErneutSenden).toHaveBeenCalledTimes(1);
     expect(onVerwerfen).toHaveBeenCalledTimes(1);
+    // Ohne Kopplung an den Meldungseingang gibt es keinen dritten Weg (LLH-1037).
+    expect(within(z).queryByRole('button', { name: 'Nur protokollieren' })).toBeNull();
+  });
+
+  it('bietet an einer abgelehnten Zeile für den Meldungseingang „Nur protokollieren“ an (LLH-1037)', async () => {
+    const onNurProtokollieren = vi.fn();
+    const zeile = abgelehnt({ grund: 'Modul Meldungen gesperrt' });
+    zeile.eintrag = { ...zeile.eintrag, typ: 'lage', in_meldungseingang: true };
+    const { container } = renderZeitachse({
+      zeilen: baueZeilen({ eintraege: [], ausstehend: [], abgelehnt: [zeile] }),
+      onErneutSenden: vi.fn(),
+      onVerwerfen: vi.fn(),
+      onNurProtokollieren,
+    });
+    const z = zeileVon(container, 'abgelehnt-1');
+    await userEvent.click(within(z).getByRole('button', { name: 'Nur protokollieren' }));
+    expect(onNurProtokollieren).toHaveBeenCalledWith(zeile);
   });
 });
 

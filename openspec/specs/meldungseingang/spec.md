@@ -1,7 +1,7 @@
 # meldungseingang Specification
 
 ## Purpose
-Ein Meldungsmodell (LLH-1027): Jede Lagemeldung ist eine Meldung. „Lagemeldung“ ist eine Meldungsart, „lagerelevant“ ein Merkmal der Meldung; die Lage-Sicht liest aus dem Meldungseingang, und die Seite Lagemeldungen erfasst dort direkt (LLH-1031).
+Ein Meldungsmodell (LLH-1027): Jede Lagemeldung ist eine Meldung. „Lagemeldung“ ist eine Meldungsart, „lagerelevant“ ein Merkmal der Meldung; die Lage-Sicht liest aus dem Meldungseingang, und die Seite Lagemeldungen erfasst dort direkt (LLH-1031). Meldung und Lage aus der ETB-Erfassung legen den Vorgang dort an, sofern nicht „Nur protokollieren“ gewählt ist (LLH-1037).
 
 ## Requirements
 
@@ -175,3 +175,82 @@ werden.
 #### Scenario: Ohne Netz erfasst
 - **WHEN** eine Person ohne Netz auf der Seite eine Lagemeldung erfasst und das Netz zurückkehrt
 - **THEN** legt der Server genau eine Meldung der Art „Lagemeldung“ an, und sie steht in der Zeitachse
+
+### Requirement: ETB-Erfassung von Meldung und Lage legt den Vorgang im Meldungseingang an
+Erfasst eine Person im ETB einen Eintrag vom Typ „Meldung“ oder „Lage“ mit
+`in_meldungseingang: true`, SHALL das System in einer Transaktion den ETB-Eintrag und eine Meldung
+anlegen, Art „Lagemeldung“ beim Typ „Lage“ und „Sonstige“ beim Typ „Meldung“. Eintrag und Meldung
+MUST aufeinander verweisen, und es MUST kein zweiter ETB-Eintrag zur Meldung entstehen.
+
+#### Scenario: Lage aus dem ETB
+- **WHEN** eine Person im ETB einen Eintrag vom Typ „Lage“ mit Von „Florian 3“ und An „ELW 1“ erfasst, ohne „Nur protokollieren“
+- **THEN** gibt es genau einen ETB-Eintrag und eine Meldung der Art „Lagemeldung“ mit Absender „Florian 3“ und Status „neu“, beide verweisen aufeinander, und die Meldung steht in der Liste der Lagemeldungen
+
+#### Scenario: Meldung aus dem ETB
+- **WHEN** eine Person im ETB einen Eintrag vom Typ „Meldung“ ohne „Nur protokollieren“ erfasst
+- **THEN** steht eine Meldung der Art „Sonstige“ im Meldungseingang, und der Zähler „Meldungen offen“ steigt um eins
+
+### Requirement: Die Meldung übernimmt die Angaben des Eintrags
+Die aus dem ETB angelegte Meldung SHALL Von als Absender, An als Empfänger und Meldeweg, Wortlaut
+und Ereigniszeit des Eintrags tragen (ohne Meldeweg „sonstige“), Status „neu“ und Priorität
+„normal“; erfasst hat sie, wer den Eintrag erfasst hat. Ohne Ereigniszeit tragen Eintrag und
+Meldung denselben Zeitpunkt der Erfassung. Ein automatischer ETB-Eintrag der Meldung MUST auf
+diesem Weg nicht entstehen, gleich wie „Automatische ETB-Einträge“ steht.
+
+#### Scenario: Angaben übernommen
+- **WHEN** eine Person im ETB einen Eintrag vom Typ „Meldung“ mit Von „Florian 3“, An „ELW 1“, Meldeweg Funk und Ereigniszeit 14:30 erfasst, ohne „Nur protokollieren“
+- **THEN** trägt die Meldung den Absender „Florian 3“, den Empfänger „ELW 1“, den Meldeweg Funk und die Ereigniszeit 14:30
+
+### Requirement: Ohne Angabe wird nur protokolliert
+Fehlt im ETB-Eintrag das Feld `in_meldungseingang` oder ist es `false`, SHALL nur der ETB-Eintrag
+entstehen. `in_meldungseingang: true` bei einem anderen Typ als „Meldung“ oder „Lage“ MUST mit
+HTTP 422 abgelehnt werden.
+
+#### Scenario: Nur protokolliert
+- **WHEN** eine Person einen Eintrag vom Typ „Lage“ mit „Nur protokollieren“ erfasst
+- **THEN** entsteht nur der ETB-Eintrag, keine Meldung
+
+#### Scenario: Älterer Client
+- **WHEN** ein Eintrag vom Typ „Meldung“ ohne das Feld `in_meldungseingang` eingeht
+- **THEN** entsteht nur der ETB-Eintrag
+
+#### Scenario: Anordnung
+- **WHEN** ein Eintrag vom Typ „Anordnung“ mit `in_meldungseingang: true` eingeht
+- **THEN** antwortet das System mit HTTP 422, und es entsteht weder Eintrag noch Meldung
+
+### Requirement: Der Weg in den Meldungseingang verlangt das Recht der Meldungen
+`in_meldungseingang: true` SHALL zusätzlich zum Schreibrecht im ETB die Freigabe des Moduls
+Meldungen verlangen; fehlt sie, MUST das System mit HTTP 403 antworten und weder Eintrag
+noch Meldung anlegen. Das System MUST NOT stillschweigend nur protokollieren.
+
+#### Scenario: Ohne Recht für Meldungen
+- **WHEN** eine Person, die im ETB schreiben darf, für die das Modul Meldungen aber gesperrt ist, einen Eintrag mit `in_meldungseingang: true` sendet
+- **THEN** antwortet das System mit HTTP 403, und weder Eintrag noch Meldung entstehen
+
+### Requirement: Wiederholtes Senden erzeugt nichts doppelt
+Die `client_id` eines ETB-Eintrags SHALL auch für die mit ihm angelegte Meldung gelten. Ein
+erneutes Senden derselben `client_id` MUST weder einen zweiten ETB-Eintrag noch eine zweite Meldung
+anlegen und MUST denselben Eintrag mit demselben Verweis liefern. Ein ohne Netz vorgemerkter
+Eintrag MUST beim Abspielen seine Meldung anlegen. Eine Wiederholung derselben `client_id` mit
+anderer Kopplung (mit statt ohne Meldung oder umgekehrt) MUST mit HTTP 409 abgelehnt werden.
+
+#### Scenario: Replay nach verlorener Antwort
+- **WHEN** derselbe Eintrag mit derselben `client_id` und `in_meldungseingang: true` zweimal eingeht
+- **THEN** gibt es genau einen ETB-Eintrag und genau eine Meldung
+
+#### Scenario: Wiederholung mit anderer Kopplung
+- **WHEN** ein Eintrag mit „Nur protokollieren“ erfasst ist und dieselbe `client_id` mit `in_meldungseingang: true` erneut eingeht
+- **THEN** antwortet das System mit HTTP 409, und es entsteht keine Meldung
+
+#### Scenario: Ohne Netz erfasst
+- **WHEN** eine Person ohne Netz einen Eintrag vom Typ „Lage“ erfasst und das Netz zurückkehrt
+- **THEN** entsteht beim Abspielen die Meldung der Art „Lagemeldung“, und sie steht in der Liste der Lagemeldungen
+
+### Requirement: Die Meldung aus dem ETB verhält sich wie eine erfasste
+Die aus dem ETB angelegte Meldung SHALL dieselben Live-Ereignisse und Benachrichtigungen auslösen
+wie eine im Meldungsformular erfasste Meldung, genau einmal je Meldung, auch bei einer
+Wiederholung.
+
+#### Scenario: Live-Ereignisse
+- **WHEN** eine Person im ETB einen Eintrag vom Typ „Meldung“ ohne „Nur protokollieren“ erfasst
+- **THEN** erhalten die verbundenen Clients des Einsatzes das ETB-Ereignis des Eintrags und das Ereignis „meldung“
