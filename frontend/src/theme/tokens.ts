@@ -154,7 +154,8 @@ export interface Farbrollen {
   /** Platte unter einem taktischen Zeichen in Picker- und Inspector-Kacheln (LFH-836): die
    *  Bibliothek zeichnet mit schwarzer Tinte, nachts trüge das dunkle Paneel sie nicht. Am Tag
    *  durchsichtig (die Kachel sieht aus wie zuvor), nachts hell: Tinte ≥ 7 : 1, gegen `paneel`
-   *  und `flaeche3` ≥ 3 : 1 (`tokens.test.ts`). Die Karte bleibt ohne Platte (LFH-833). */
+   *  und `flaeche3` ≥ 3 : 1 (`tokens.test.ts`). Die Karte trägt keine Platte (LFH-833), sondern
+   *  auf dunkler Grundlage die Unterlage `ZEICHEN_UNTERLAGE` (`zeichen/unterlage.ts`, LLH-1141). */
   zeichenPlatte: string;
 }
 
@@ -511,6 +512,31 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
   autobahn: '#f759ab',
   kritis: '#9254de',
   energie: '#fadb14',
+};
+
+/**
+ * Ausmaß eines Schadens (LLH-1141), gespiegelt aus `Ausmass` der API plus `unbekannt` für einen
+ * Schaden ohne Ausmaß, damit diese Datei keine API-Typen zieht (wie {@link FachebeneTon}). Die
+ * Abbildung steht exhaustiv in `pages/lagekarte/taktischesZeichen.ts` (`AUSMASS_FARBE`).
+ */
+export type SchadenAusmassTon = 'gering' | 'mittel' | 'gross' | 'katastrophal' | 'unbekannt';
+
+/**
+ * Kartenfarbe des Schadenszeichens je Ausmaß (LLH-1141, vorher als Literale in
+ * `pages/lagekarte/taktischesZeichen.ts`): Akzent der Inspector-Kachel und Kreis, falls das
+ * Zeichen nicht darstellbar ist; das Zeichen selbst färbt die Bibliothek aus ihrer Palette nach
+ * DV 102 (`zeichen/fachobjektZeichen.ts` bildet den Wert aufs Palettentoken ab). Modusunabhängig wie
+ * die Zeichenfarben und keine `Farbrolle`; das Ausmaß trägt zusätzlich das Wort im Inspector
+ * (zweiter Kanal). Nachts ≥ 3 : 1 gegen die Kartengrundlage und das Paneel
+ * (`theme/schadenFarben.test.ts`). Die Werte sind antds Presets green-6, gold-6, orange-6, red-6 und
+ * grey-6; `gering` fällt zufällig mit `farbenDunkel.normal` zusammen und folgt der Rolle nicht.
+ */
+export const schadenAusmassFarben: Record<SchadenAusmassTon, string> = {
+  gering: '#52c41a',
+  mittel: '#faad14',
+  gross: '#fa8c16',
+  katastrophal: '#f5222d',
+  unbekannt: '#8c8c8c',
 };
 
 /** Abstandsraster einer Dichtestufe. Komponenten importieren diese Werte, statt Pixel zu
