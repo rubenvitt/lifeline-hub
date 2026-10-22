@@ -450,7 +450,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     await waitFor(() => expect(zeile(p, 'auftraege')).toHaveTextContent('5'));
     expect(zeile(p, 'auftraege')).toHaveTextContent('1 überfällig');
     expect(zeile(p, 'meldungen')).toHaveTextContent('3');
-    expect(zeile(p, 'meldungen')).toHaveTextContent('Quelle: Meldungen (eingehend)');
+    expect(zeile(p, 'meldungen')).toHaveTextContent('Quelle: Meldungen');
   });
 
   it('„Letzte Lagebesprechung“ und „Nächster Termin“ kommen aus dem Modul Lagebesprechung', async () => {

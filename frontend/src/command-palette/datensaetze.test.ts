@@ -839,7 +839,7 @@ describe('baueDatensatzTreffer — Deckel, Beschriftung, Leerfall', () => {
     };
     expect(labels(baueDatensatzTreffer(kontext({ suche: '42', quellen }))).sort()).toEqual([
       'Betroffene · R-042 · Müller',
-      'Meldungen (eingehend) · #42 · Leitstelle',
+      'Meldungen · #42 · Leitstelle',
     ]);
     expect(labels(baueDatensatzTreffer(kontext({ suche: 'bhp', quellen })))).toEqual([
       'Unfallhilfsstellen · BHP Nord (behandlungsplatz)',

@@ -6,13 +6,13 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep lagemeldungen`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   an-lage-uebergeben.png     frontend/src/meldungen/LagerelevantModal.tsx
- *   lagemeldungen.png          frontend/src/pages/LagemeldungenPage.tsx
- *   lagemeldung-erfassen.png   frontend/src/pages/LagemeldungenPage.tsx (Paneel „Lagemeldung
- *                              erfassen“, frontend/src/meldungen/MeldungFormular.tsx)
+ *   in-die-lage-uebernehmen.png  frontend/src/meldungen/LagerelevantModal.tsx
+ *   lagemeldungen.png            frontend/src/pages/LagemeldungenPage.tsx
+ *   lagemeldung-erfassen.png     frontend/src/pages/LagemeldungenPage.tsx (Paneel „Lagemeldung
+ *                                erfassen“, frontend/src/meldungen/MeldungFormular.tsx)
  *
  * Die Demo enthält zwei Meldungen der Art Lagemeldung; sie stehen ab der Anlage in der Lage. Der
- * Dialog-Test übergibt eine weitere, verortete über die Oberfläche, der Zeitleisten-Test drei
+ * Dialog-Test übernimmt eine weitere, verortete über die Oberfläche, der Zeitleisten-Test drei
  * weitere über `POST …/meldungen/{mid}/lagerelevant`, eine davon verortet. Bei der verorteten blendet der Lauf
  * den Ortsnamen aus (externer Geocoder, nicht deterministisch); die Peilung bleibt.
  */
@@ -28,7 +28,7 @@ interface Meldung {
 }
 
 /**
- * Offene Meldungen der Demo, die noch nicht an die Lage übergeben sind: Lagemeldungen zuerst, dann
+ * Offene Meldungen der Demo, die noch nicht in der Lage stehen: Lagemeldungen zuerst, dann
  * nach laufender Nummer.
  */
 async function offeneMeldungen(page: Page, einsatzId: number): Promise<Meldung[]> {
@@ -47,26 +47,26 @@ async function offeneMeldungen(page: Page, einsatzId: number): Promise<Meldung[]
 }
 
 test.describe(KAPITEL, () => {
-  test('Dialog „An die Lage übergeben“', async ({ page }) => {
+  test('Dialog „In die Lage übernehmen“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
-    // Eine noch nicht übergebene: die Lagemeldungen der Demo stehen schon in der Lage.
+    // Eine noch nicht übernommene: die Lagemeldungen der Demo stehen schon in der Lage.
     const [ziel] = await offeneMeldungen(page, demo.id);
     await page.goto(`/einsaetze/${demo.id}/meldungen`);
     // Ab drei Aktionen bündelt die Karte sie in einem Menü; eine neue Meldung hat mehr als drei.
     await page.getByRole('button', { name: `Aktionen zu Meldung ${ziel.lfd_nr}` }).click();
-    await page.getByRole('menuitem', { name: 'An Lage übergeben' }).click();
-    const dialog = page.getByRole('dialog', { name: 'An die Lage übergeben' });
+    await page.getByRole('menuitem', { name: 'In die Lage übernehmen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'In die Lage übernehmen' });
     // Vorbelegt mit dem Inhalt der Meldung.
     await expect(dialog.getByLabel('Lage-Text')).not.toHaveValue('');
     await dialog.getByLabel('Lage-Text').blur();
-    await fotografiere(dialog, KAPITEL, 'an-lage-uebergeben');
-    // Ablauf weiter: verorten (im Gebiet des Demo-Szenarios) und übergeben.
+    await fotografiere(dialog, KAPITEL, 'in-die-lage-uebernehmen');
+    // Ablauf weiter: verorten (im Gebiet des Demo-Szenarios) und übernehmen.
     await dialog.getByPlaceholder('Koordinate eingeben').fill('50.9558, 10.2497');
-    await dialog.getByRole('button', { name: 'Übergeben' }).click();
+    await dialog.getByRole('button', { name: 'Übernehmen' }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.locator('.ant-message').getByText('An die Lage übergeben')).toBeVisible();
+    await expect(page.locator('.ant-message').getByText('In die Lage übernommen')).toBeVisible();
   });
 
   test('Zeitleiste der Lagemeldungen', async ({ page }) => {

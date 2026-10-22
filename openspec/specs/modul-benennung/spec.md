@@ -75,11 +75,19 @@ Ansicht“ mit Grund zeigen.
 - **WHEN** eine Person mit Schreibrecht in einem neuen Einsatz die Lagemeldungen öffnet
 - **THEN** steht unter „Noch keine Lagemeldungen“ der Knopf „Lagemeldung erfassen“, und er öffnet das Meldungsformular mit der Art „Lagemeldung“
 
-### Requirement: Lagemeldungen und eingehende Meldungen unterscheiden sich im Symbol
+### Requirement: Lagemeldungen und Meldungen unterscheiden sich im Symbol
 
-Die Module Lagemeldungen und „Meldungen (eingehend)“ SHALL verschiedene Symbole tragen.
+Die Module Lagemeldungen und Meldungen SHALL verschiedene Symbole tragen. Das Modul Meldungen
+SHALL „Meldungen“ heißen, ohne Zusatz zur Richtung, und die Beschreibung „Eingang, Ausgang,
+Bearbeitung“ tragen; das Modul Lagemeldungen behält seinen Namen und trägt die Beschreibung
+„Lagerelevante Meldungen“.
 
 #### Scenario: Sprungpalette
 
 - **WHEN** eine Person in der Sprungpalette „Meldungen“ sucht
-- **THEN** tragen die beiden Treffer verschiedene Symbole
+- **THEN** tragen die beiden Treffer verschiedene Symbole, und sie heißen „Meldungen“ und „Lagemeldungen“
+
+#### Scenario: Menü Kommunikation
+
+- **WHEN** eine Person die Kategorie Kommunikation öffnet
+- **THEN** steht dort „Meldungen“ mit der Zeile „Eingang, Ausgang, Bearbeitung“, und das h1 der Seite lautet „Meldungen“

@@ -39,6 +39,7 @@ export const bereiche: Bereich[] = [
       { name: 'Material', beschreibung: 'Material, Verbrauchsgüter' },
       { name: 'Verpflegung', beschreibung: 'Portionen, Sonderkost, Ausgabe' },
       { name: 'Bereitstellungsräume', beschreibung: 'Bereitgestellte Einheiten und Fahrzeuge' },
+      { name: 'Nachforderungen', beschreibung: 'Anforderung, Zusage, Eintreffen' },
       { name: 'Ablösung', beschreibung: 'Schichten, fällige Ablösungen' },
     ],
   },
@@ -56,12 +57,12 @@ export const bereiche: Bereich[] = [
   {
     name: 'Lage',
     module: [
-      { name: 'Lagebild', beschreibung: 'Lage in Zahlen, Meldungsstrom' },
+      { name: 'Lagebild', beschreibung: 'Lage in Zahlen, jüngste ETB-Einträge' },
       { name: 'Lagekarte', beschreibung: 'Einsatzort, Objekte, Gefahrengebiete' },
       { name: 'Lageberichte', beschreibung: 'Gegliederte Lageberichte' },
       { name: 'Gefahren', beschreibung: 'Gefahrenmatrix, Warnstufen' },
       { name: 'Wetter & Pegel', beschreibung: 'Pegel, DWD-Warnungen, Vorhersage' },
-      { name: 'Lagemeldungen', beschreibung: 'An die Lage übergebene Meldungen' },
+      { name: 'Lagemeldungen', beschreibung: 'Lagerelevante Meldungen' },
     ],
   },
   {
@@ -69,8 +70,7 @@ export const bereiche: Bereich[] = [
     module: [
       { name: 'Chat', beschreibung: 'Nachrichten im Einsatz' },
       { name: 'Erinnerungen', beschreibung: 'Termine, Fristen' },
-      { name: 'Meldungen (eingehend)', beschreibung: 'Eingang, Bearbeitung' },
-      { name: 'Nachforderung', beschreibung: 'Kräfte und Mittel, Leitstelle' },
+      { name: 'Meldungen', beschreibung: 'Eingang, Ausgang, Bearbeitung' },
     ],
   },
 ];

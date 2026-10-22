@@ -1,5 +1,6 @@
 /**
- * Die drei Paneele des Lage-Dashboards: Gefahrenmatrix · Sichtung · Meldungsstrom. Rein darstellend
+ * Die drei Paneele des Lage-Dashboards: Gefahrenmatrix · Sichtung · Jüngste ETB-Einträge (im Code
+ * „Meldungsstrom“). Rein darstellend
  * — Abfragen, Zustände und Wassermarke hält `LageDashboardPage.tsx`, die Ableitungen liegen in
  * `lageVerdichtung.ts` und `meldungsstrom.ts`.
  */
@@ -380,6 +381,12 @@ const VERBINDUNG: Record<LiveVerbindungsStatus, string> = {
  */
 const VERBINDUNG_BREITE = `${Math.max(...Object.values(VERBINDUNG).map((w) => w.length))}ch`;
 
+/**
+ * Das Paneel zeigt ETB-Einträge aller Typen, keine Meldungen; daher nicht „Meldungsstrom“
+ * (LLH-1046). Kurz, damit der Kopf neben Verbindungswort und „ETB“ im Dreierraster nicht umbricht.
+ */
+const STROM_TITEL = 'Jüngste ETB-Einträge';
+
 export function MeldungsstromPaneel({
   zustand,
   sichtbar,
@@ -416,7 +423,7 @@ export function MeldungsstromPaneel({
         : rollen.schwach;
   return (
     <Paneel
-      titel="Meldungsstrom"
+      titel={STROM_TITEL}
       meta={
         <span
           data-lfh="strom-live"
@@ -435,7 +442,7 @@ export function MeldungsstromPaneel({
     >
       <PaneelZustand
         zustand={gesperrt ? 'leer' : zustand}
-        titel="Meldungsstrom"
+        titel={STROM_TITEL}
         leerText={
           gesperrt ? 'Modul ETB nicht freigegeben.' : 'Noch keine Einträge im Einsatztagebuch.'
         }

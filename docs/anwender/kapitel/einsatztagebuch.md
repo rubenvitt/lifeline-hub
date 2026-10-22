@@ -42,7 +42,9 @@ Einsatzleitung und Führungspersonal, solange der Einsatz läuft (siehe
    unten „3 neue Einträge“; „anzeigen“ fügt sie ein und rollt ans Ende.
 
 Die Seitenleiste „Bilanz“ zählt die Einträge nach Typ und nennt die jüngsten Berichtigungen; ist
-ein Filter gesetzt, heißt sie „Bilanz im Filter“.
+ein Filter gesetzt, heißt sie „Bilanz im Filter“. Einträge vom Typ „Lage“ zählt sie als
+„Lagefeststellungen“; „Lagemeldungen“ ist das eigene Modul der lagerelevanten Meldungen
+(Kapitel [Lagemeldungen](lagemeldungen.md)).
 
 ### Einen Eintrag erfassen
 
@@ -221,8 +223,9 @@ Weitere Module schreiben selbst ins ETB:
 - ein erteilter Auftrag als „Anordnung“, sein Vollzug immer als „Meldung“,
 - ein freigegebener Befehl als „Anordnung“ mit dem Befehlstext,
 - eine Nachforderung immer als „Meldung“, jede ihrer Stufen als Systemeintrag,
-- die erste Übergabe einer Meldung an die Lage als Systemeintrag „Meldung #12 an die Lage
-  übergeben“ (nicht bei einer Lagemeldung).
+- eine Lagemeldung als „Lage“,
+- die erste Übernahme einer Meldung in die Lage als Systemeintrag „Meldung #12 in die Lage
+  übernommen“ (nicht bei einer Lagemeldung; ältere Einträge lauten „… an die Lage übergeben“).
 
 Ob Meldungen und erteilte Aufträge einen Eintrag erzeugen, legt in den Einstellungen des
 Einsatzes unter „Verhalten & Automatik“ das Feld „Automatische ETB-Einträge“ fest; ohne Angabe gilt die Vorgabe

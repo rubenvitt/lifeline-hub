@@ -713,6 +713,16 @@ describe('ETB-Typfarben als Kante + Typwort (Neuentwurf, 21.09.2026)', () => {
   it('lässt den Wortlaut beim Vertrag — die Typfarbe trägt keinen zweiten Kanal selbst', () => {
     for (const t of TYPEN) expect(sf.etbTyp[t].label.trim()).not.toBe('');
   });
+
+  it('nennt den Typ „Lage“ nie „Lagemeldungen“ — das ist nur das Modul (LLH-1046)', () => {
+    expect(sf.etbTyp.lage.label).toBe('Lage');
+    expect(sf.etbTypMehrzahl.lage).toBe('Lagefeststellungen');
+    const woerter = [
+      ...Object.values(sf.etbTyp).map((d) => d.label),
+      ...Object.values(sf.etbTypMehrzahl),
+    ];
+    expect(woerter.filter((w) => /lagemeldung/i.test(w))).toEqual([]);
+  });
 });
 
 describe('Warnstufen-Balken (Neuentwurf, 21.09.2026)', () => {

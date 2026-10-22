@@ -147,7 +147,7 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     ).toEqual([
       'Bearbeitung beginnen',
       'Als erledigt melden',
-      'An Lage übergeben',
+      'In die Lage übernehmen',
       'Auftrag erteilen',
     ]);
   });
@@ -199,12 +199,12 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
     expect(cb.onStatus).toHaveBeenCalledWith(1, 'erledigt');
   });
 
-  it('löst „An Lage übergeben" und „Auftrag erteilen" aus dem Menü aus', async () => {
+  it('löst „In die Lage übernehmen" und „Auftrag erteilen" aus dem Menü aus', async () => {
     const cb = alleCallbacks();
     const m = schlimmstenfalls();
     const { unmount } = renderKarte(<MeldungKarte meldung={m} einsatzId={7} {...cb} />);
     await userEvent.click(
-      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /In die Lage übernehmen/ }),
     );
     expect(cb.onLagerelevant).toHaveBeenCalledWith(1);
     unmount();
@@ -300,7 +300,7 @@ describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
       />,
     );
     expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'An Lage übergeben' }));
+    await userEvent.click(screen.getByRole('button', { name: 'In die Lage übernehmen' }));
     expect(cb.onLagerelevant).toHaveBeenCalledWith(1);
     expect(screen.getByRole('button', { name: 'Auftrag erteilen' })).toBeInTheDocument();
   });

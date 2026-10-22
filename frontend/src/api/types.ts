@@ -1187,7 +1187,7 @@ export interface AuftragAufhebenBody {
   grund: string;
 }
 
-// --- Meldungen (eingehend) ---
+// --- Meldungen ---
 export type MeldungPrioritaet = S['Prioritaet'];
 export type MeldungStatus = S['MeldungStatus'];
 export type Meldungsart = S['Meldungsart'];
