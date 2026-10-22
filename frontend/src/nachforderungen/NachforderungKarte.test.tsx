@@ -153,6 +153,42 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
     expect(onMaterialUebernehmen).not.toHaveBeenCalled();
   });
 
+  // LLH-1259 D5: neben der Übernahme der zweite Weg für schon von Hand erfasstes Material.
+  it('„Erfassten Posten zuordnen …“ neben der Übernahme, der Klick meldet die Nachforderung', async () => {
+    const onPostenZuordnen = vi.fn();
+    const { unmount } = zeigeKarte({
+      darfSchreiben: true,
+      onMaterialUebernehmen: vi.fn(),
+      onPostenZuordnen,
+    });
+    expect(screen.getByRole('button', { name: 'Als Material übernehmen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erfassten Posten zuordnen …' }));
+    expect(onPostenZuordnen).toHaveBeenCalledWith(1);
+    unmount();
+    // Auch mit übernommenem Posten (dann als Ergänzung), nie ohne Schreibrecht oder bei Sperre.
+    const zweite = zeigeKarte({
+      nachforderung: eingetroffen({ material_ids: [7] }),
+      darfSchreiben: true,
+      onPostenZuordnen: vi.fn(),
+    });
+    expect(screen.getByRole('button', { name: 'Erfassten Posten zuordnen …' })).toBeInTheDocument();
+    zweite.unmount();
+    const dritte = zeigeKarte({ onPostenZuordnen: vi.fn() });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+    dritte.unmount();
+    zeigeKarte({ darfSchreiben: true, materialGesperrt: true, onPostenZuordnen: vi.fn() });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+  });
+
+  it('keine Zuordnung, sobald eine Einheit übernommen ist (Material und Einheit schließen sich aus)', () => {
+    zeigeKarte({
+      nachforderung: eingetroffen({ einheit_ids: [11] }),
+      darfSchreiben: true,
+      onPostenZuordnen: vi.fn(),
+    });
+    expect(screen.queryByRole('button', { name: /zuordnen/ })).toBeNull();
+  });
+
   it('zeigt je Posten Bezeichnung, Menge und Ort, die übernommene Menge und den Sprung', async () => {
     zeigeKarte({
       nachforderung: eingetroffen({ material_ids: [7, 8] }),

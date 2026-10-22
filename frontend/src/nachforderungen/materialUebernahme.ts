@@ -48,6 +48,24 @@ export function isErgaenzen(n: Pick<Nachforderung, 'material_ids'>): boolean {
   return n.material_ids.length > 0;
 }
 
+/**
+ * Posten, die „Erfassten Posten zuordnen …“ anbietet (LLH-1259, design.md D5): aktiv und ohne
+ * Bezug, denn der Server hängt keinen Posten um und verknüpft keinen beendeten. Posten, deren
+ * Bezeichnung die Art der Nachforderung enthält, stehen vorn; sonst alphabetisch.
+ */
+export function zuordenbarePosten<
+  P extends Pick<EinsatzMaterial, 'bezeichnung' | 'nachforderung_id' | 'beendet_at'>,
+>(n: Pick<Nachforderung, 'art'>, material: readonly P[]): P[] {
+  const art = n.art.trim().toLocaleLowerCase('de');
+  const passt = (p: P) => art !== '' && p.bezeichnung.toLocaleLowerCase('de').includes(art);
+  return material
+    .filter((p) => p.nachforderung_id == null && p.beendet_at == null)
+    .sort(
+      (a, b) =>
+        Number(passt(b)) - Number(passt(a)) || a.bezeichnung.localeCompare(b.bezeichnung, 'de'),
+    );
+}
+
 /** Die Bezeichnung des Postens ist die Art der Nachforderung („Tauchpumpe“), nicht ihr Bedarf. */
 export function uebernahmeBezeichnung(n: Pick<Nachforderung, 'art'>): string {
   return n.art.trim();

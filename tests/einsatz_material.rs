@@ -3241,3 +3241,333 @@ async fn stamm_geraet_mit_bestandsnummer_nur_einmal_aktiv() {
         assert_eq!(s, StatusCode::CREATED, "Gerät ohne Bestandsnummer: {json}");
     }
 }
+
+// ── Vorhandenen Posten mit einer Nachforderung verknüpfen (LLH-1259) ─────────────────────
+
+/// `POST …/material/{em}/nachforderung` mit rohem Body.
+async fn verknuepfen_roh(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    em: i64,
+    body: &str,
+) -> (StatusCode, Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/material/{em}/nachforderung"),
+        cookie,
+        Some(body),
+    )
+    .await
+}
+
+async fn verknuepfen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    em: i64,
+    nid: i64,
+) -> (StatusCode, Value) {
+    verknuepfen_roh(
+        app,
+        cookie,
+        einsatz,
+        em,
+        &format!(r#"{{"nachforderung_id":{nid}}}"#),
+    )
+    .await
+}
+
+/// LLH-1259 D3/D4: ein von Hand erfasster Posten bekommt den Bezug; genau ein ETB-Eintrag nennt
+/// Posten und Nachforderung, die Nachforderung zählt ihn und lässt sich nicht mehr zurücknehmen.
+/// Der Posten selbst bleibt, wie er war (Menge, Ort, Status).
+#[tokio::test]
+async fn verknuepfen_setzt_bezug_schreibt_einen_etb_eintrag_und_sperrt_die_ruecknahme() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Feldbetten", 20).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Feldbetten",
+        "20 Feldbetten für die Notunterkunft",
+        20,
+        "eingetroffen",
+    )
+    .await;
+    let vorher = material_zeile(&app, &admin, einsatz, em).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    let system_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["id"], em);
+    assert_eq!(json["nachforderung_id"], nid);
+    let nachher = material_zeile(&app, &admin, einsatz, em).await;
+    assert_eq!(nachher["nachforderung_id"], nid);
+    for feld in ["menge", "status", "art", "bezeichnung", "einheit_id"] {
+        assert_eq!(nachher[feld], vorher[feld], "{feld} unverändert");
+    }
+
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher + 1);
+    assert_eq!(
+        neue_etb(&app, &admin, einsatz, system_vorher).await,
+        [
+            "Material «Feldbetten» (×20) mit Nachforderung «20 Feldbetten für die Notunterkunft» \
+          verknüpft"
+        ]
+    );
+    assert_eq!(
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
+        vec![em]
+    );
+    let (s, json) = nachforderung_status(&app, &admin, einsatz, nid, "unterwegs").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
+    assert_eq!(
+        json["error"],
+        "Aus der Nachforderung ist Material übernommen"
+    );
+}
+
+/// LLH-1259 D2, Feldprüfung: fehlende oder kaputte Kennung und ein `ergaenzen`, das kein
+/// Wahrheitswert ist, sind 400, vor jedem Lesen; nichts wird geschrieben.
+#[tokio::test]
+async fn verknuepfen_ohne_gueltige_felder_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    let nid = nachforderung_bis(&app, &admin, einsatz, "Trage", "Trage", 1, "eingetroffen").await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    for body in [
+        "{}".to_string(),
+        r#"{"nachforderung_id":null}"#.to_string(),
+        r#"{"nachforderung_id":"vier"}"#.to_string(),
+        format!(r#"{{"nachforderung_id":{nid},"ergaenzen":"ja"}}"#),
+    ] {
+        let (s, json) = verknuepfen_roh(&app, &admin, einsatz, em, &body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {json}");
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await).is_empty());
+}
+
+/// LLH-1259 D2, Freigabe: wer Material schreiben darf, die Nachforderungen aber nicht sieht,
+/// bekommt 403, gleich ob es die Nachforderung gibt (sonst verriete 404 gegen 200 ihre Existenz).
+#[tokio::test]
+async fn verknuepfen_ohne_freigabe_der_nachforderungen_ist_403() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    let nid = nachforderung_bis(&app, &admin, einsatz, "Trage", "Trage", 1, "eingetroffen").await;
+    let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, frieda_id, "fuehrungspersonal").await;
+    let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/nachforderungen"),
+        &admin,
+        Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    for n in [nid, 999_999] {
+        let (s, json) = verknuepfen(&app, &frieda, einsatz, em, n).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{n}: {json}");
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await).is_empty());
+}
+
+/// LLH-1259 D2, Posten: ein unbekannter oder fremder Posten ist 404, ein stornierter oder aus dem
+/// Einsatz genommener 409 (Lebenszyklus), ein Posten mit Bezug 409 (er wird nicht umgehängt).
+#[tokio::test]
+async fn verknuepfen_prueft_den_posten() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Feldbetten",
+        "Feldbetten",
+        20,
+        "eingetroffen",
+    )
+    .await;
+    let andere_nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Tauchpumpe",
+        "Tauchpumpe",
+        1,
+        "eingetroffen",
+    )
+    .await;
+    let fremd = adhoc_disponieren(&app, &admin, anderer, "Trage", 1).await;
+    let storniert = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, storniert, "stornieren")
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+    let entlassen = adhoc_disponieren(&app, &admin, einsatz, "Decke", 1).await;
+    assert_eq!(
+        aktion(&app, &admin, einsatz, entlassen, "entlassen")
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let (_, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Tauchpumpe", 1, andere_nid, ""),
+    )
+    .await;
+    let mit_bezug = json["id"].as_i64().unwrap();
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+
+    for (em, erwartet, grund) in [
+        (999_999, StatusCode::NOT_FOUND, None),
+        (fremd, StatusCode::NOT_FOUND, None),
+        (
+            storniert,
+            StatusCode::CONFLICT,
+            Some("Das Material ist storniert; erst erneut disponieren"),
+        ),
+        (
+            entlassen,
+            StatusCode::CONFLICT,
+            Some("Das Material ist aus dem Einsatz genommen; erst erneut disponieren"),
+        ),
+        (
+            mit_bezug,
+            StatusCode::CONFLICT,
+            Some("«Tauchpumpe» ist schon aus einer Nachforderung übernommen"),
+        ),
+    ] {
+        let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+        assert_eq!(s, erwartet, "{em}: {json}");
+        if let Some(grund) = grund {
+            assert_eq!(json["error"], grund, "{em}");
+        }
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await).is_empty());
+    assert_eq!(
+        material_zeile(&app, &admin, einsatz, mit_bezug).await["nachforderung_id"],
+        andere_nid
+    );
+}
+
+/// LLH-1259 D2, Nachforderung — dieselben Prüfungen wie die Übernahme: fremd oder unbekannt 404,
+/// nicht eingetroffen 422.
+#[tokio::test]
+async fn verknuepfen_prueft_die_nachforderung_wie_die_uebernahme() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Sandsäcke", 500).await;
+    let unterwegs = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Sandsäcke",
+        "Deich",
+        500,
+        "unterwegs",
+    )
+    .await;
+    let fremd = nachforderung_bis(
+        &app,
+        &admin,
+        anderer,
+        "Sandsäcke",
+        "fremd",
+        500,
+        "eingetroffen",
+    )
+    .await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+    for (nid, erwartet, grund) in [
+        (fremd, StatusCode::NOT_FOUND, None),
+        (999_999, StatusCode::NOT_FOUND, None),
+        (
+            unterwegs,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Some("Material wird erst nach dem Eintreffen übernommen"),
+        ),
+    ] {
+        let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+        assert_eq!(s, erwartet, "{nid}: {json}");
+        if let Some(grund) = grund {
+            assert_eq!(json["error"], grund, "{nid}");
+        }
+    }
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+    assert!(material_zeile(&app, &admin, einsatz, em).await["nachforderung_id"].is_null());
+}
+
+/// LLH-1259 D2, „Weitere Posten nur bewusst“: trägt die Nachforderung schon einen Posten, ist
+/// das Verknüpfen ohne `ergaenzen` 409 und schreibt nichts; mit `ergaenzen` zählt sie beide.
+#[tokio::test]
+async fn verknuepfen_mit_vorhandenem_posten_braucht_ergaenzen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nid = nachforderung_bis(
+        &app,
+        &admin,
+        einsatz,
+        "Sandsäcke",
+        "2 000 Sandsäcke",
+        2000,
+        "eingetroffen",
+    )
+    .await;
+    let (_, json) = disponieren_roh(
+        &app,
+        &admin,
+        einsatz,
+        &uebernahme("Sandsäcke", 1200, nid, ""),
+    )
+    .await;
+    let erste = json["id"].as_i64().unwrap();
+    let em = adhoc_disponieren(&app, &admin, einsatz, "Sandsäcke", 800).await;
+    let etb_vorher = etb_count(&app, &admin, einsatz).await;
+
+    let (s, json) = verknuepfen(&app, &admin, einsatz, em, nid).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        json["error"],
+        "Aus dieser Nachforderung ist schon Material übernommen"
+    );
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher);
+
+    let (s, json) = verknuepfen_roh(
+        &app,
+        &admin,
+        einsatz,
+        em,
+        &format!(r#"{{"nachforderung_id":{nid},"ergaenzen":true}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(etb_count(&app, &admin, einsatz).await, etb_vorher + 1);
+    assert_eq!(
+        material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
+        vec![erste, em]
+    );
+}
