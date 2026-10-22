@@ -103,6 +103,20 @@ wire_enum! {
     try_from = |s| format!("Ungültige MaterialArt: {s}");
 }
 
+impl MaterialStatus {
+    /// Anzeigewort im ETB („Status «einsatzbereit» → «im Einsatz»“, LLH-1257), gleich dem Wort der
+    /// Oberfläche (`materialStatus` in `frontend/src/theme/statusFarben.ts`).
+    pub fn label(self) -> &'static str {
+        match self {
+            MaterialStatus::Einsatzbereit => "einsatzbereit",
+            MaterialStatus::ImEinsatz => "im Einsatz",
+            MaterialStatus::Defekt => "defekt",
+            MaterialStatus::Verbraucht => "verbraucht",
+            MaterialStatus::DesinfektionNoetig => "Desinfektion nötig",
+        }
+    }
+}
+
 impl MaterialArt {
     /// Anzeigewort im ETB („Art Gerät → Verbrauchsgut“).
     pub fn label(self) -> &'static str {
@@ -225,11 +239,10 @@ pub fn check_zeile(
             MaterialStatus::Verbraucht | MaterialStatus::DesinfektionNoetig
         )
     {
-        let wort = match status {
-            MaterialStatus::Verbraucht => "verbraucht",
-            _ => "Desinfektion nötig",
-        };
-        return Err(U(format!("Status «{wort}» gibt es nur für Geräte")));
+        return Err(U(format!(
+            "Status «{}» gibt es nur für Geräte",
+            status.label()
+        )));
     }
     Ok(())
 }
@@ -307,6 +320,31 @@ mod tests {
         assert_eq!(MaterialArt::Verbrauchsgut.label(), "Verbrauchsgut");
     }
 
+    /// LLH-1257: der ETB-Wortlaut eines Statuswechsels nennt je Status das Anzeigewort der
+    /// Oberfläche (`materialStatus` in `frontend/src/theme/statusFarben.ts`), nie den Wire-Wert.
+    #[test]
+    fn etb_wortlaut_des_statuswechsels_nennt_je_status_das_label() {
+        use MaterialStatus::*;
+        let faelle = [
+            (Einsatzbereit, "einsatzbereit"),
+            (ImEinsatz, "im Einsatz"),
+            (Defekt, "defekt"),
+            (Verbraucht, "verbraucht"),
+            (DesinfektionNoetig, "Desinfektion nötig"),
+        ];
+        for (status, wort) in faelle {
+            assert_eq!(status.label(), wort);
+            assert_eq!(
+                etb_text_status_wechsel("Trage", Einsatzbereit, status),
+                format!("Material «Trage»: Status «einsatzbereit» → «{wort}»")
+            );
+            assert_eq!(
+                etb_text_status_wechsel("Trage", status, Defekt),
+                format!("Material «Trage»: Status «{wort}» → «defekt»")
+            );
+        }
+    }
+
     #[test]
     fn anzeige_ohne_org_id() {
         let m = Material {
@@ -361,7 +399,8 @@ pub fn etb_text_ort_gewechselt(
     format!("Material «{bezeichnung}» (×{menge}): {vorher} → {nachher}")
 }
 
-/// System-ETB bei einem Statuswechsel eines Postens, mit den Wire-Werten des Status.
+/// System-ETB bei einem Statuswechsel eines Postens, mit den Anzeigewörtern des Status
+/// ([`MaterialStatus::label`], LLH-1257), nicht den Wire-Werten.
 pub fn etb_text_status_wechsel(
     bezeichnung: &str,
     vorher: MaterialStatus,
@@ -369,8 +408,8 @@ pub fn etb_text_status_wechsel(
 ) -> String {
     format!(
         "Material «{bezeichnung}»: Status «{}» → «{}»",
-        vorher.as_str(),
-        nachher.as_str()
+        vorher.label(),
+        nachher.label()
     )
 }
 
