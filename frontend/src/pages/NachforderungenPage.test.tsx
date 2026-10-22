@@ -15,6 +15,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
+import { waehleMenueEintrag } from '../test/menue';
 
 /*
  * Die Uhr steht auf dem Einsatztag (nur `Date`): „Eingetroffen“ zeigt die letzten 12 h, die
@@ -39,13 +40,17 @@ const spalte = (stufe: string) =>
   document.querySelector<HTMLElement>(`[data-lfh="board-spalte"][data-stufe="${stufe}"]`);
 const stufeVon = (text: string) =>
   screen.getByText(text).closest('[data-lfh="board-spalte"]')?.getAttribute('data-stufe');
-/** Ein Eintrag im ⋮-Menü einer Karte (LLH-1097 D10); ohne Karte die erste. */
+/**
+ * Ein Eintrag im ⋮-Menü einer Karte (LLH-1097 D10); ohne Karte die erste. Gewählt wird erst, wenn
+ * das Menü seinen Fokus hat (`test/menue.ts`): sonst zieht ihn der späte `autoFocus` des Menüs aus
+ * dem danach geöffneten Dialog, und der getippte Grund ginge verloren (LLH-1390).
+ */
 async function waehleImMenue(eintrag: string, karte?: HTMLElement) {
   const ort = karte ? within(karte) : screen;
-  await userEvent.click(ort.getAllByRole('button', { name: /^Aktionen zu Nachforderung / })[0]);
-  const eintraege = await screen.findAllByRole('menuitem', { name: eintrag });
-  // Ein früher geöffnetes Menü bleibt in jsdom im Dokument; das zuletzt geöffnete gilt.
-  await userEvent.click(eintraege[eintraege.length - 1]);
+  await waehleMenueEintrag(
+    ort.getAllByRole('button', { name: /^Aktionen zu Nachforderung / })[0],
+    eintrag,
+  );
 }
 
 vi.mock('../api/einsaetze', () => ({
@@ -231,7 +236,9 @@ describe('NachforderungenPage', () => {
     // „Ablehnen“ im ⋮-Menü der Karte öffnet das Modal (LLH-1097 D10).
     await waehleImMenue('Ablehnen');
     const dialog = await screen.findByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), 'keine Reserven');
+    const grund = within(dialog).getByLabelText('Ablehnungsgrund');
+    await userEvent.type(grund, 'keine Reserven');
+    expect(grund).toHaveValue('keine Reserven');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
     await waitFor(() => expect(lehneNachforderungAb).toHaveBeenCalledWith(1, 1, 'keine Reserven'));
   });
@@ -277,10 +284,9 @@ describe('NachforderungenPage', () => {
     await screen.findByText('2 RTW zur Verstärkung');
     await waehleImMenue('Zurückziehen');
     const dialog = await screen.findByRole('dialog', { name: 'Nachforderung zurückziehen' });
-    await userEvent.type(
-      within(dialog).getByLabelText('Grund des Zurückziehens'),
-      'nicht mehr benötigt',
-    );
+    const grund = within(dialog).getByLabelText('Grund des Zurückziehens');
+    await userEvent.type(grund, 'nicht mehr benötigt');
+    expect(grund).toHaveValue('nicht mehr benötigt');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Zurückziehen' }));
     await waitFor(() =>
       expect(zieheNachforderungZurueck).toHaveBeenCalledWith(1, 1, 'nicht mehr benötigt'),
@@ -829,7 +835,9 @@ describe('NachforderungenPage — Speicherfehler am Ort (LFH-1077)', () => {
   async function lehneAbImDialog(grund = 'keine Reserven') {
     await waehleImMenue('Ablehnen');
     const dialog = await screen.findByRole('dialog');
-    await userEvent.type(within(dialog).getByLabelText('Ablehnungsgrund'), grund);
+    const feld = within(dialog).getByLabelText('Ablehnungsgrund');
+    await userEvent.type(feld, grund);
+    expect(feld).toHaveValue(grund);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ablehnen' }));
     return dialog;
   }
