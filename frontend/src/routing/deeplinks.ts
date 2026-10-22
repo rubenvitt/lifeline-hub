@@ -1253,6 +1253,7 @@ export type EinstellungenSektion =
   | 'aufbewahrung'
   | 'module'
   | 'pegel'
+  | 'kennzahlen'
   | 'abloesung'
   | 'geraete'
   | 'zugriff';
@@ -1269,6 +1270,9 @@ export const EINSTELLUNGEN_SEKTIONEN: readonly { key: EinstellungenSektion; labe
   { key: 'module', label: 'Module' },
   // Hinten angehängt: die erste Sektion ist das Redirect-Ziel.
   { key: 'pegel', label: 'Pegel' },
+  // Wahl der Lagekennzahlen im Kennzahlenband (LLH-1371): neben dem Pegel, der die andere
+  // Lageplatz-Entscheidung in den Einstellungen ist.
+  { key: 'kennzahlen', label: 'Kennzahlen' },
   // Vorgabe des Einsatzes für die Ablösung (LLH-1122): Schichtmodell, Rechte wie die
   // Abschnittsvorgabe.
   { key: 'abloesung', label: 'Ablösung' },

@@ -3,7 +3,8 @@
 ## Purpose
 Die lagebezogene Kennzahlreihe des Lage-Dashboards: sechs feste Plätze, deren zwei Lageplätze
 durch bewusste Entscheidungen am Einsatz belegt werden. Diese Fähigkeit beschreibt hier die
-Lagekennzahl „Evakuiert“ auf Lageplatz B.
+Lagekennzahl „Evakuiert“ auf Lageplatz B und die wählbare Lagekennzahl „Nachforderungen offen“
+auf demselben Platz (LLH-1371).
 
 ## Requirements
 
@@ -129,3 +130,88 @@ damit der Rückweg zum Dashboard den neuen Zuschnitt ohne Banner zeigt.
 #### Scenario: Eigene Anordnung
 - **WHEN** eine Person auf der Modulseite Evakuierung einen Bezirk anlegt
 - **THEN** wird der Einsatz neu abgerufen
+
+### Requirement: Wahl von „Nachforderungen offen“ am Einsatz
+
+Das System SHALL „Nachforderungen offen“ als wählbare Lagekennzahl führen: Die Wahl ist ein
+eigener Datensatz am Einsatz und erscheint als `nachforderungen` in `lagekennzahlen` von
+Einzelabruf und Liste, genau solange sie besteht. Der Auslöser MUST die Wahl sein, nie die Zahl
+der offenen Nachforderungen. `PUT /api/einsaetze/{id}/lagekennzahl-wahl` mit
+`{"gewaehlt": [...]}` MUST die Wahl vollständig ersetzen und den gespeicherten Stand als
+`{"gewaehlt": [...]}` liefern. Schreiben MUST das Schreibrecht im Einsatz verlangen und am
+abgeschlossenen Einsatz scheitern; Lesen der Wahl MUST jedem Leser des Einsatzes möglich sein.
+Eine nicht wählbare (`pegel`, `evakuiert`) oder unbekannte Kennzahl und eine Liste mit mehr als
+acht Einträgen MUST mit 400 abgewiesen werden, ohne etwas zu schreiben. Doppelte Einträge MUST
+zusammengefasst werden. Ändert die Wahl die aktiven Lagekennzahlen, MUST der Einsatzkopf live
+gemeldet werden; eine gleichbleibende Wahl MUST nichts melden.
+
+#### Scenario: Wählen und abwählen
+- **WHEN** die Einsatzleitung `{"gewaehlt":["nachforderungen"]}` sendet
+- **THEN** enthält `lagekennzahlen` im Einzelabruf und in der Liste `nachforderungen`, und nach `{"gewaehlt":[]}` nicht mehr
+
+#### Scenario: Null offene Nachforderungen
+- **WHEN** „Nachforderungen offen“ gewählt ist und keine Nachforderung offen ist
+- **THEN** bleibt `nachforderungen` in `lagekennzahlen`
+
+#### Scenario: Nicht wählbare Kennzahl
+- **WHEN** jemand `{"gewaehlt":["evakuiert"]}` sendet
+- **THEN** antwortet das System mit 400, und `lagekennzahlen` bleibt unverändert
+
+#### Scenario: Ohne Schreibrecht
+- **WHEN** ein Beobachter die Wahl ändern will
+- **THEN** antwortet das System mit 403, und der Beobachter liest die Wahl der Einsatzleitung im Einsatzkopf
+
+#### Scenario: Live nur beim Umschalten
+- **WHEN** dieselbe Wahl zweimal gesendet wird
+- **THEN** meldet nur die erste den Einsatzkopf
+
+### Requirement: Heimatplatz von „Nachforderungen offen“
+
+Das Lage-Dashboard SHALL „Nachforderungen offen“ ausschließlich auf Platz 3 (Lageplatz B)
+zeigen, wenn der Einsatz `nachforderungen` trägt und nicht `evakuiert`. Trägt er beide, MUST
+Platz 3 „Evakuiert“ zeigen. Die Wahl MUST höchstens Platz 3 ändern und die Reihe MUST sechs
+Plätze behalten.
+
+#### Scenario: Gewählt ohne Evakuierung
+- **WHEN** der Einsatz nur `nachforderungen` trägt
+- **THEN** lautet die Reihe Verbleib offen · Betroffene · Nachforderungen offen · Kräfte · Vermisste · Einsatzdauer
+
+#### Scenario: Evakuierung geht vor
+- **WHEN** der Einsatz `evakuiert` und `nachforderungen` trägt
+- **THEN** zeigt Platz 3 „Evakuiert“
+
+#### Scenario: Evakuierung kommt zur Wahl hinzu
+- **WHEN** zu `nachforderungen` der Auslöser `evakuiert` hinzukommt
+- **THEN** unterscheidet sich die neue Reihe von der alten genau an Platz 3, und das Banner lautet „Evakuiert statt Nachforderungen offen“
+
+### Requirement: Wert und Leserechte von „Nachforderungen offen“
+
+Die Zelle „Nachforderungen offen“ SHALL als Wert die offenen Nachforderungen (angefordert,
+zugesagt, unterwegs) und als Notiz „n unterwegs“ zeigen, beides aus dem Modulzähler des Servers
+— dieselbe Zahl wie Modulmenü und Werkzeugkachel (eine Heimat je Zahl). Die Zelle MUST zur
+Modulseite Nachforderungen führen und MUST keinen Warnton tragen. Darf die Person das Modul
+Nachforderungen nicht sehen, MUST die Zelle auf Platz 3 bleiben, „—“ mit „nicht freigegeben“
+zeigen, ohne Ziel, und nie eine andere Kennzahl oder eine 0 zeigen.
+
+#### Scenario: Zahl aus dem Modulzähler
+- **WHEN** der Modulzähler 4 offene Nachforderungen meldet, davon 2 unterwegs
+- **THEN** zeigt die Zelle den Wert „4“ und die Notiz „2 unterwegs“ und führt auf die Seite Nachforderungen
+
+#### Scenario: Modul für die Person gesperrt
+- **WHEN** der Einsatz `nachforderungen` trägt und der Modulzähler kein Feld `nachforderungen` liefert
+- **THEN** steht auf Platz 3 „Nachforderungen offen“ mit „—“ und „nicht freigegeben“, ohne Link
+
+### Requirement: Wahl in den Einstellungen
+
+Die Einsatz-Einstellungen SHALL einen Reiter „Kennzahlen“ mit dem Schalter „Nachforderungen
+offen auf Platz 3“ führen, der sofort speichert. Nach dem Speichern MUST der Einsatz neu
+abgerufen werden. Ohne Schreibrecht oder am abgeschlossenen Einsatz MUST der Schalter gesperrt
+sein. Trägt der Einsatz `evakuiert`, MUST der Reiter den Vorrang von „Evakuiert“ nennen.
+
+#### Scenario: Einschalten
+- **WHEN** die Einsatzleitung den Schalter einschaltet
+- **THEN** wird `{"gewaehlt":["nachforderungen"]}` gesendet und der Einsatz neu abgerufen
+
+#### Scenario: Evakuierung angeordnet
+- **WHEN** der Einsatz `evakuiert` trägt
+- **THEN** steht unter dem Schalter „Platz 3 zeigt „Evakuiert“, solange eine Evakuierung angeordnet ist.“

@@ -135,6 +135,7 @@ use utoipa::OpenApi;
         crate::einsatz::MitgliedAnzeige,
         crate::einsatz::MitgliedAuswahl,
         crate::einsatz::lagekennzahl::Lagekennzahl,
+        crate::routes::lagekennzahl_wahl::LagekennzahlWahl,
         crate::einsatz::retention::AufbewahrungZustand,
         crate::einsatz::retention::Datenkategorie,
         crate::einsatz::aufbewahrung_kategorie::KategorieAufbewahrungAnzeige,

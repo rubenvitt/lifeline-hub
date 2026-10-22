@@ -24,7 +24,8 @@
  * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`): Kern auf
  * 2/4/5/6 (Betroffene, Kräfte, Vermisste, Einsatzdauer), Lageplätze 1 und 3. Platz 1 zeigt den
  * Pegel, wenn einer festgelegt ist, sonst „Verbleib offen"; Platz 3 „Evakuiert", wenn eine
- * Evakuierung angeordnet ist, sonst „Schäden offen". Wer die Plätze belegt, steht am Einsatz
+ * Evakuierung angeordnet ist, sonst „Nachforderungen offen", wenn am Einsatz gewählt (LLH-1371,
+ * Zahl aus dem Modulzähler wie Modulmenü und Board), sonst „Schäden offen". Wer die Plätze belegt, steht am Einsatz
  * (`lagekennzahlen`), nicht an den Fachabfragen — sonst stünde beim Laden kurz eine andere Kennzahl
  * da. Kommt während der Betrachtung ein neuer Zuschnitt, bietet ein Sammelbanner ihn an, statt die
  * Reihe zu tauschen.
@@ -112,6 +113,7 @@ import {
   auftragsStand,
   meldungenNotiz,
   meldungsStand,
+  nachforderungsStand,
   type Zaehlstand,
 } from './fuehrungsZahlen';
 import { kraefteZustand, useLagebild } from './useLagebild';
@@ -223,6 +225,20 @@ export default function LageDashboardPage() {
     wetterFrei && wetterQuery.isSuccess ? wetterQuery.data.warnungen : undefined;
 
   const einsatz = einsatzQuery.data;
+  // „Nachforderungen offen" (LLH-1371) aus dem Modulzähler — dieselbe Zahl wie Modulmenü und Board
+  // (LFH-550). Fehlt das Feld (Modul nicht frei), ist der Stand `gesperrt`: die Zelle bleibt auf
+  // Platz 3 und nennt den Grund, wie jede gesperrte Kennzahl.
+  const { data: zData, error: zError, isError: zIsError, isPending: zIsPending } = zaehlerQuery;
+  const nachforderungen = useMemo(
+    () =>
+      nachforderungsStand({
+        data: zData,
+        error: zError,
+        isError: zIsError,
+        isPending: zIsPending,
+      }),
+    [zData, zError, zIsError, zIsPending],
+  );
 
   // ── Kennzahlreihe: gehaltener Zuschnitt ── Die Reihe des Einsatzes laut Server, als
   // Schlüssel-String, damit ein Refetch mit gleichem Inhalt keine neue Identität erzeugt.
@@ -259,8 +275,13 @@ export default function LageDashboardPage() {
 
   const lagebild = useMemo(() => {
     if (!basis || !reihe) return null;
-    return baueLagebild({ ...basis, pegelZiel, evakuierung, evakuierungZiel }, jetzt, konv, reihe);
-  }, [basis, reihe, jetzt, konv, pegelZiel, evakuierung, evakuierungZiel]);
+    return baueLagebild(
+      { ...basis, pegelZiel, evakuierung, evakuierungZiel, nachforderungen },
+      jetzt,
+      konv,
+      reihe,
+    );
+  }, [basis, reihe, jetzt, konv, pegelZiel, evakuierung, evakuierungZiel, nachforderungen]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben ──
   const [angezeigtBis, setAngezeigtBis] = useState<number | null>(null);
@@ -315,6 +336,7 @@ export default function LageDashboardPage() {
     Kräfte: zKraefte,
     Vermisste: zBetroffene,
     Evakuiert: evakuierungDatenzustand(evakuierung),
+    'Nachforderungen offen': nachforderungen.zustand,
     'Schäden offen': quellZustand.schaeden,
     Einsatzdauer: zustandVon(einsatzQuery),
   };

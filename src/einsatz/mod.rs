@@ -147,6 +147,9 @@ pub struct Einsatz {
     /// Read-only abgeleitet (LFH-607): mindestens ein aktiver Evakuierungsbezirk. Auslöser
     /// der Lagekennzahl `evakuiert`, siehe [`lagekennzahl::ableiten`].
     pub evakuierung_angeordnet: bool,
+    /// Read-only abgeleitet (LLH-1371): „Nachforderungen offen“ ist am Einsatz gewählt
+    /// (`einsatz_lagekennzahl_wahl`). Auslöser der Lagekennzahl `nachforderungen`.
+    pub nachforderungen_gewaehlt: bool,
     /// Read-only abgeleitet (LFH-996): Schwärzungsstand, `None` bei 0. Siehe
     /// [`EinsatzAnzeige::teilschwaerzungen`] und `teilschwaerzungen_spalte!` in `repo`.
     pub teilschwaerzungen: Option<i64>,
@@ -206,6 +209,7 @@ impl Einsatz {
             lagekennzahlen: lagekennzahl::ableiten(
                 self.pegel_festgelegt,
                 self.evakuierung_angeordnet,
+                self.nachforderungen_gewaehlt,
             ),
             teilschwaerzungen: self.teilschwaerzungen,
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
@@ -264,7 +268,7 @@ pub struct EinsatzAnzeige {
     pub meine_funktion: Option<String>,
     /// Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
     /// Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,
-    /// Evakuierung angeordnet), nie durch Messwerte.
+    /// Evakuierung angeordnet, gewählt per `lagekennzahl::waehlen`), nie durch Messwerte.
     ///
     /// **Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb
     /// `#[schema(required)]` und kein `skip_serializing_if`.
@@ -359,6 +363,7 @@ mod tests {
             org_name: "Orga".into(),
             pegel_festgelegt: false,
             evakuierung_angeordnet: false,
+            nachforderungen_gewaehlt: false,
             teilschwaerzungen: None,
             bezeichnung: "Lage".into(),
             stichwort: None,

@@ -1751,6 +1751,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("prognose_gesetzt_at", G_ZEIT),
         ],
     },
+    // Gewählte Lagekennzahlen (LLH-1371): eine Darstellungsentscheidung, kein Personenbezug.
+    TabellenRegel {
+        tabelle: "einsatz_lagekennzahl_wahl",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("kennzahl", G_ENUM),
+            retain("gewaehlt_von_id", G_FK),
+            retain("gewaehlt_at", G_ZEIT),
+        ],
+    },
     TabellenRegel {
         tabelle: "einsatz_einstellungen",
         scoping: Scoping::EinsatzId,

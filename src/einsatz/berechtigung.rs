@@ -460,6 +460,7 @@ mod tests {
             pegel_festgelegt: false,
             teilschwaerzungen: None,
             evakuierung_angeordnet: false,
+            nachforderungen_gewaehlt: false,
             bezeichnung: "Lage".into(),
             stichwort: None,
             status,

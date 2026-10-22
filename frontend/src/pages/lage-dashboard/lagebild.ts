@@ -41,6 +41,11 @@ import type { EvakuierungKennzahl } from '../../betreuung/evakuierungKennzahl';
 import type { EvakuierungKennzahlZustand } from '../../betreuung/useEvakuierungKennzahl';
 import { kennzahlTeile } from '../../betreuung/betreuungText';
 import {
+  nachforderungenNotiz,
+  type NachforderungsZaehler,
+  type Zaehlstand,
+} from './fuehrungsZahlen';
+import {
   neuesterLagebericht,
   verdichteGefahrengebiete,
   verdichtePersonen,
@@ -71,6 +76,7 @@ export const KENNZAHL_ETIKETTEN = [
   'Verbleib offen',
   'Betroffene',
   'Evakuiert',
+  'Nachforderungen offen',
   'Schäden offen',
   'Kräfte',
   'Vermisste',
@@ -96,7 +102,9 @@ type Lageplatz = 'A' | 'B';
  * Build bei einer neuen `Lagekennzahl`-Variante.
  *
  * „Evakuiert" ist aktiv, sobald eine Evakuierung angeordnet ist (`src/einsatz/lagekennzahl.rs`),
- * nie abhängig von der Zahl der Evakuierten.
+ * nie abhängig von der Zahl der Evakuierten. „Nachforderungen offen" ist aktiv, solange es am
+ * Einsatz gewählt ist (LLH-1371, Einstellungen › Kennzahlen), nie abhängig von der Zahl; eine
+ * angeordnete Evakuierung geht ihm auf Platz B vor (Rang).
  */
 const LAGEKENNZAHL: Record<
   Lagekennzahl,
@@ -104,6 +112,7 @@ const LAGEKENNZAHL: Record<
 > = {
   pegel: { etikett: 'Pegel', platz: 'A', rang: 0 },
   evakuiert: { etikett: 'Evakuiert', platz: 'B', rang: 0 },
+  nachforderungen: { etikett: 'Nachforderungen offen', platz: 'B', rang: 1 },
 };
 
 /**
@@ -324,6 +333,14 @@ function evakuiertZelle(e: EvakuierungStand): Pick<Kennzahl, 'wert' | 'notiz'> {
   }
 }
 
+/** Wert und Notiz der Zelle „Nachforderungen offen" aus dem Zählerstand. Rein. */
+function nachforderungenZelle(
+  z: Zaehlstand<NachforderungsZaehler> | undefined,
+): Pick<Kennzahl, 'wert' | 'notiz'> {
+  if (z?.zustand !== 'daten') return { wert: '', notiz: '' };
+  return { wert: String(z.zahl.offen), notiz: nachforderungenNotiz(z.zahl) };
+}
+
 export interface Rohdaten {
   einsatz: EinsatzAnzeige;
   personen: Person[];
@@ -350,6 +367,12 @@ export interface Rohdaten {
    * Ohne Angabe führt die Zelle nirgends hin, auch beim Laden.
    */
   evakuierungZiel?: string;
+  /**
+   * Offene Nachforderungen aus dem Modulzähler (`fuehrungsZahlen.ts:nachforderungsStand`) für die
+   * Zelle „Nachforderungen offen" (LLH-1371) — dieselbe Zahl wie Modulmenü und Board (LFH-550).
+   * Ohne Angabe keine Zahl; den Zustand der Zelle (auch `gesperrt`) entscheidet die Seite.
+   */
+  nachforderungen?: Zaehlstand<NachforderungsZaehler>;
 }
 
 /**
@@ -438,6 +461,14 @@ export function baueLagebild(
       route: 'evakuierung',
       zielPfad: r.evakuierungZiel,
       ohneZiel: r.evakuierungZiel == null,
+    },
+    'Nachforderungen offen': {
+      // Kein Ton: offene Nachforderungen warten meist auf Dritte, eine Schwelle gibt es nicht
+      // (LLH-1371 D7). Wert und Notiz wie die Werkzeugkachel des Boards.
+      etikett: 'Nachforderungen offen',
+      ...nachforderungenZelle(r.nachforderungen),
+      ton: 'neutral',
+      route: 'nachforderungen',
     },
     'Schäden offen': {
       etikett: 'Schäden offen',

@@ -6,6 +6,7 @@ import {
   auftragsStand,
   meldungenNotiz,
   meldungsStand,
+  nachforderungenNotiz,
   nachforderungsStand,
   type ZaehlerAbfrage,
 } from './fuehrungsZahlen';
@@ -76,6 +77,12 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
     expect(meldungenNotiz({ offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 })).toBe('1 neu');
     expect(meldungenNotiz({ offen: 3, ungesehen: 0, bestaetigung_ueberfaellig: 2 })).toBe(
       '0 neu · 2 Bestätigung überfällig',
+    );
+  });
+
+  it('Notiz der Nachforderungen: „davon unterwegs“ — Band und Werkzeugkachel (LLH-1371)', () => {
+    expect(nachforderungenNotiz({ offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2 })).toBe(
+      '2 unterwegs',
     );
   });
 });
