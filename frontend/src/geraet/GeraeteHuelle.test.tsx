@@ -27,6 +27,12 @@ import { formatiereDatenstand } from '../components/Datenstand';
 import { kopplungEndetBald } from './GeraeteKopf';
 import { ortInDerUhs } from './GeraetPatientenPage';
 import { queueLeerenFuerTests } from '../offline/queue';
+// Die Hilfe ist ein eigener Chunk (`App.tsx`, `lazy`) und lädt eager alle Kapiteltexte
+// (`?raw`), rund 450 Bildadressen (`?url`) und react-markdown. Im Test übersetzt Vite das erst,
+// wenn die Route rendert: allein rund 2,7 s, unter acht parallelen Läufen mehr als die 5 s von
+// `findBy*` (LLH-1299). Hier vorab geladen, wartet „Hilfe aus dem Gerätemenü“ nur noch auf die
+// Navigation, die es prüft; `lazy` löst danach aus dem Modulcache auf.
+import '../hilfe/HilfePage';
 
 /**
  * Die Gerätehülle im echten Routenbaum (LFH-892, Spec `feldgeraet-bedienung`): Startseite,
@@ -328,8 +334,10 @@ describe('Gerätehülle — Startseite und Navigation', () => {
       .map((r) => /R-\d+/.exec(r.textContent ?? '')?.[0])
       .filter(Boolean);
     expect(reihen).toEqual(['R-005', 'R-006', 'R-004', 'R-003', 'R-002']);
-    // Der Zustand steht in einer Zeile, Längeres endet mit „…“. Die Klasse setzt antd erst nach
-    // seiner Layout-Messung, unter Last also einen Durchlauf nach der ersten Zeile.
+    // Der Zustand steht in einer Zeile, Längeres endet mit „…“. antd setzt die Klasse über das
+    // `useLayoutEffect` von @rc-component/util, das unter `NODE_ENV=test` ein `useEffect` ist:
+    // Die Zelle erscheint erst ohne Klasse und bekommt sie einen Effektdurchlauf später. Ob der
+    // vor dieser Prüfung lief, hing an der Last (LLH-1299); gewartet wird auf den Endzustand.
     await waitFor(() =>
       expect(
         screen.getByText('gehfähig, unterkühlt').closest('.ant-typography-ellipsis-single-line'),
@@ -840,26 +848,36 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     fahrzeuge: [],
     belegung: { einheiten: 1, fahrzeuge: 0 },
   };
-  const einheit = (id: number, name: string, br: number | null) =>
-    ({
-      id,
-      einsatz_id: 7,
-      abschnitt_id: null,
-      ueber_einheit_id: null,
-      typ_label: null,
-      name,
-      ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
-      ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
-      aktueller_br_id: br,
-    }) as unknown as Einheit;
+  const einheit = (id: number, name: string, br: number | null): Einheit => ({
+    id,
+    einsatz_id: 7,
+    abschnitt_id: null,
+    ueber_einheit_id: null,
+    typ_label: null,
+    name,
+    sortier: id,
+    status: { quelle: 'ohne', verteilung: [] },
+    unangemeldet: false,
+    ist: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+    ist_kumuliert: { fuehrer: 0, unterfuehrer: 1, mannschaft: 1 },
+    fahrzeug_mitglieder: [],
+    personal_mitglieder: [],
+    material_mitglieder: [],
+    sprechgruppen: [],
+    aktueller_br_id: br,
+  });
 
   function brBereit(detail: BrDetail = raum) {
     stelleBereit(brGeraet);
     const belegt: unknown[] = [];
     const status: unknown[] = [];
     const brListe = vi.fn();
+    const raumAbruf = vi.fn();
     server.use(
-      http.get('/api/einsaetze/7/bereitstellungsraeume/4', () => HttpResponse.json(detail)),
+      http.get('/api/einsaetze/7/bereitstellungsraeume/4', () => {
+        raumAbruf();
+        return HttpResponse.json(detail);
+      }),
       http.get('/api/einsaetze/7/bereitstellungsraeume', () => {
         brListe();
         return HttpResponse.json([detail]);
@@ -878,7 +896,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
         return HttpResponse.json({ ...detail, status: 'aktiv' });
       }),
     );
-    return { belegt, status, brListe };
+    return { belegt, status, brListe, raumAbruf };
   }
 
   it('Start am BR-Gerät: der eigene Raum, Navigation „Raum“ und „Melden“', async () => {
@@ -972,7 +990,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
         }
       },
     );
-    brBereit();
+    const { raumAbruf } = brBereit();
     const gesendet: unknown[] = [];
     server.use(
       http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
@@ -983,6 +1001,10 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     renderApp('/geraet/7/meldungen');
     const kopf = await screen.findByRole('banner');
     expect(await within(kopf).findByText('BR Sportplatz')).toBeVisible();
+    // Den alten Namen nennt schon die Sitzung (`/me`). Erst wenn der Raum einmal abgefragt ist,
+    // kann der neue Name nur noch über das Ereignis kommen; sonst hinge der Weg an der Last, ob
+    // der erste Abruf vor oder nach der Umbenennung läuft (LLH-1299).
+    await waitFor(() => expect(raumAbruf).toHaveBeenCalled());
 
     // Die Einsatzleitung benennt den Raum um; die Sitzung (`/me`) nennt weiter den alten Namen.
     server.use(

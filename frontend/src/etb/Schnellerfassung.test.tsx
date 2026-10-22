@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
 import type { EtbBaustein, EtbEintragAnzeige } from '../api/types';
 import { server } from '../test/server';
@@ -1004,6 +1004,43 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
     expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
   });
 
+  /**
+   * Ab `md` stehen die Einstellungen im Reiterband, wenn der Aufrufer einen Platz reicht
+   * (LLH-1037 D12): in der Chip-Zeile brach die Gruppe im Handschuh-Betrieb um, und die Leiste
+   * wuchs um eine Kästchenhöhe. Solange der Platz fehlt (`null`), stehen sie nirgends, statt kurz
+   * in der Chip-Zeile aufzublitzen; unter `md` bleibt die Hinweiszeile.
+   */
+  it.each([
+    [1366, 'ziel'],
+    [1366, 'noch-nicht'],
+    [390, 'ziel'],
+  ] as const)('bei %i px mit Platz im Reiterband (%s)', (breite, fall) => {
+    setzeViewportBreite(breite);
+    const ziel = document.createElement('div');
+    document.body.append(ziel);
+    onTestFinished(() => ziel.remove());
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })}
+        einstellungenZiel={fall === 'ziel' ? ziel : null}
+      />,
+    );
+    for (const name of ['Werte behalten', 'Nur protokollieren']) {
+      const kaestchen = screen.queryByRole('checkbox', { name });
+      if (breite < 768) {
+        // Unter `md` unverändert in der Hinweiszeile, ohne Kästchen-Boden.
+        expect(kaestchen?.closest('[data-lfh="schnellerfassung"]'), name).not.toBeNull();
+        expect(kaestchen != null && ziel.contains(kaestchen), name).toBe(false);
+      } else if (fall === 'ziel') {
+        expect(kaestchen != null && ziel.contains(kaestchen), name).toBe(true);
+        // Der Boden bleibt: dort ist die Trefffläche im Handschuh-Betrieb geprüft.
+        expect(kaestchen!.closest<HTMLElement>('label')!.style.minHeight, name).toBe('');
+      } else {
+        expect(kaestchen, name).toBeNull();
+      }
+    }
+  });
+
   it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {
     const zeile = document.createElement('div');
     const ziel = document.createElement('input');
@@ -1364,5 +1401,110 @@ describe('Schnellerfassung – Startfokus', () => {
     } finally {
       aufraeumen();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// „Nur protokollieren“ (LLH-1037, Spec `etb-schnellerfassung-tastatur`)
+// ---------------------------------------------------------------------------
+
+describe('Nur protokollieren', () => {
+  const gesendet = (p: ReturnType<typeof props>, n = 0) =>
+    (p.erfassen as ReturnType<typeof vi.fn>).mock.calls[n][0] as NeuerEintrag;
+
+  async function waehleTyp(von: string, nach: string) {
+    await userEvent.click(screen.getByRole('button', { name: `Eintragstyp ${von} ändern` }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: nach }));
+  }
+
+  it('steht bei „Meldung“ aus, und der Eintrag geht in den Meldungseingang', async () => {
+    const p = props();
+    renderMitProviders(<Schnellerfassung {...p} />);
+    expect(screen.getByRole('checkbox', { name: 'Nur protokollieren' })).not.toBeChecked();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Pegel steigt{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)).toMatchObject({ typ: 'meldung', in_meldungseingang: true });
+  });
+
+  it('an: nur protokolliert; danach wieder aus, auch mit „Werte behalten“', async () => {
+    const p = props({ werteBehalten: true, onWerteBehaltenChange: vi.fn() });
+    renderMitProviders(<Schnellerfassung {...p} />);
+    await waehleTyp('Meldung', 'Lage');
+    const schalter = screen.getByRole('checkbox', { name: 'Nur protokollieren' });
+    await userEvent.click(schalter);
+    expect(schalter).toBeChecked();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Mitschrift{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)).toMatchObject({ typ: 'lage', in_meldungseingang: false });
+    // Der Typ bleibt (Werte behalten), der Schalter springt zurück.
+    expect(screen.getByRole('button', { name: 'Eintragstyp Lage ändern' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: 'Nur protokollieren' })).not.toBeChecked(),
+    );
+  });
+
+  it('fehlt bei „Anordnung“ und in der Berichtigung; gesendet wird ausdrücklich false', async () => {
+    const p = props();
+    const { unmount } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waehleTyp('Meldung', 'Anordnung');
+    expect(screen.queryByRole('checkbox', { name: 'Nur protokollieren' })).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Abmarsch{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)).toMatchObject({ typ: 'anordnung', in_meldungseingang: false });
+    unmount();
+
+    const b = props({ berichtigungZu: original() });
+    renderMitProviders(<Schnellerfassung {...b} />);
+    expect(screen.queryByRole('checkbox', { name: 'Nur protokollieren' })).toBeNull();
+  });
+
+  it('ohne Freigabe der Meldungen an und gesperrt mit Grund; sendet false', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
+      ),
+    );
+    const p = props();
+    const { client } = renderMitProviders(<Schnellerfassung {...p} />);
+    await waitFor(() =>
+      expect(client.getQueryData(einsatzKeys.modulFreigaben(einsatz.id))).toBeDefined(),
+    );
+    const schalter = await screen.findByRole('checkbox', { name: 'Nur protokollieren' });
+    expect(schalter).toBeChecked();
+    expect(schalter).toBeDisabled();
+    expect(schalter).toHaveAccessibleDescription('Modul Meldungen gesperrt');
+    await userEvent.type(screen.getByPlaceholderText(/Inhalt/), 'Lage ruhig{Enter}');
+    await waitFor(() => expect(p.erfassen).toHaveBeenCalledTimes(1));
+    expect(gesendet(p)).toMatchObject({ in_meldungseingang: false });
+  });
+
+  it('lebt im Entwurf: Startwert aus dem Entwurf, Umlegen geht an den Aufrufer', async () => {
+    const onWerteChange = vi.fn();
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({
+          initialWerte: { inhalt: 'X', typ: 'lage', metadaten: {}, nurProtokollieren: true },
+          onWerteChange,
+        })}
+      />,
+    );
+    const schalter = screen.getByRole('checkbox', { name: 'Nur protokollieren' });
+    expect(schalter).toBeChecked();
+    await userEvent.click(schalter);
+    expect(onWerteChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ typ: 'lage', nurProtokollieren: false }),
+    );
+  });
+
+  it.each([
+    [390, true],
+    [1366, false],
+  ])('bei %i px steht er in der Hinweiszeile: %s', (breite, inHinweiszeile) => {
+    setzeViewportBreite(breite);
+    renderMitProviders(<Schnellerfassung {...props()} />);
+    const schalter = screen.getByRole('checkbox', { name: 'Nur protokollieren' });
+    expect(schalter.closest('[data-lfh="schnellerfassung"]') != null).toBe(inHinweiszeile);
+    const label = schalter.closest<HTMLElement>('label.ant-checkbox-wrapper')!;
+    expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
   });
 });

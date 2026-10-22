@@ -116,7 +116,9 @@ Leerzustand in Worten stehen, ohne Sprung. Personen mit Schreibrecht MUST das Ge
 „Gebiet zeichnen“ und mit Fläche „Weitere Teilfläche zeichnen“ anbieten (LLH-1069); beides öffnet
 die Lagekarte im Zeichenmodus für eine Fläche dieses Bezirks. Ohne Lesezugriff auf das Modul
 Lagekarte MUST die Seite die Flächen nicht abrufen, ihre Zahl nennen und den Sprung wie das Zeichnen
-gesperrt mit Grund zeigen.
+gesperrt mit Grund zeigen. Kann das Gerät die Karte nicht zeichnen (kein WebGL2), MUST an Stelle des
+Ausschnitts „Karte auf diesem Gerät nicht darstellbar“ stehen und die Seite MUST NOT in die
+Fehlerseite der App fallen.
 
 #### Scenario: Bezirk ohne Fläche
 - **WHEN** der Bezirk keine zugeordnete Zone hat
@@ -129,6 +131,11 @@ gesperrt mit Grund zeigen.
 #### Scenario: Lagekarte gesperrt
 - **WHEN** der Bezirk zwei Flächen hat und die Person die Lagekarte nicht lesen darf
 - **THEN** steht „2 Flächen auf der Lagekarte“, und „Auf Lagekarte öffnen“ ist gesperrt mit Grund
+
+#### Scenario: Gerät ohne Kartengrafik
+- **WHEN** der Bezirk eine Fläche hat und der Browser kein WebGL2 hat
+- **THEN** steht im Gebiet „Karte auf diesem Gerät nicht darstellbar“, und „Auf Lagekarte öffnen“ bleibt
+- **AND** es erscheint keine Fehlerseite der App
 
 ### Requirement: Stammdaten des Bezirks in der Ansicht bearbeiten
 

@@ -383,12 +383,24 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   `LageMeldungAnzeige` bleibt die alter Lage-Stände (`id = meldung_id`, neue Felder kommen nur
   hinzu); ein neues Feld dort ist im Client in `LageMeldungStand` optional.
 - **Invariante „Art Lagemeldung ⇒ lagerelevant“** hält `repo::apply_lage_invariante_tx`, gerufen
-  in `repo::anlegen` (also jeder Anlegeweg: Meldungsroute, Gerät, Eintreffen am
-  Bereitstellungsraum, Demo); kein Handler setzt das Flag selbst. Übernahme anderer Arten nur über
+  in `repo::einfuegen_tx` (also jeder Anlegeweg über `anlegen` oder `anlegen_zu_etb_tx`:
+  Meldungsroute, Gerät, Eintreffen am Bereitstellungsraum, Demo, ETB); kein Handler setzt das
+  Flag selbst. Übernahme anderer Arten nur über
   `repo::als_lagerelevant` (idempotent, Ort nur solange keiner besteht, erste Übergabe schreibt den
   ETB-Systemeintrag mit Verweis, LLH-1104). Verortet wird beim Anlegen nur eine Lagemeldung
   (sonst 422).
 - **Auto-ETB:** Art Lagemeldung schreibt `etb::TYP_LAGE`, jede andere Art `TYP_MELDUNG`.
+- **ETB → Meldung (LLH-1037):** `routes/etb.rs::erfassen` legt bei `in_meldungseingang: true`
+  (nur Typ `meldung`/`lage`, sonst 422; Art `lagemeldung` bzw. `sonstige`) Eintrag und Meldung in
+  **einer** Transaktion an: `etb::repo::anlegen_idempotent_mit_meldung` ruft
+  `meldung::repo::anlegen_zu_etb_tx` (Validierung und Invariante wie `anlegen`, beidseitiger
+  Backlink, **kein** Auto-ETB). Von/An werden Absender/Empfänger, eine Zeit `jetzt()` gilt für
+  Eingang und Eintrag. Dieselbe `client_id` dedupliziert beide; eine Wiederholung mit anderer
+  Kopplung ist 409 (`ist_derselbe_eintrag` vergleicht `mit_meldung`). Fehlt das Feld, wird nur
+  protokolliert (ältere Clients und Warteschlangen-Zeilen). Ohne Freigabe im Modul Meldungen 403
+  (`fordere_zielmodul::<Meldungen>`), nie stilles Herunterstufen. Live-Ereignisse und Hinweis
+  laufen über `meldung::live_publikation_sicherstellen`, auch im Replay-Pfad; die Meldung verhält
+  sich danach wie eine erfasste. Nachweis `tests/etb_meldungseingang.rs`.
 - **Kenntnisnahme über die Meldung:** `POST …/meldungen/{mid}/lage-gesehen` und
   `POST …/lage/gesehen` mit `meldung_ids` (höchstens `LAGE_GESEHEN_MAX`); beide stehen in
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.
@@ -405,16 +417,6 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   Heraufstufen zu sofort 422 (kein Alarm, keine Frist). Ein Systemeintrag je wirksamer Korrektur
   mit Verweis auf die Meldung; Empfänger und Lage-Text stehen darin ohne Wert (Scrub). Geräte
   erreichen die Route nicht (keine Routenliste).
-
-**Zielbild (Entscheidung 21.10.2026), gilt ab dem jeweiligen Folgeticket; bis dahin gilt das
-Bestehende.** Wer einen Punkt baut, schreibt die Regel oben fort und streicht ihn hier.
-- **Weitere Schreibwege rufen die Invariante:** ETB-Erfassung (LLH-1037) geht über dieselbe
-  Repo-Funktion (die Korrektur tut es schon, siehe oben).
-- **ETB → Meldung (LLH-1037):** `routes/etb.rs::erfassen` legt bei `in_meldungseingang: true`
-  (nur Typ `meldung`/`lage`, sonst 422) Eintrag und Meldung in **einer** Transaktion an, mit
-  beidseitigem Backlink und ohne zweiten ETB-Eintrag; dieselbe `client_id` dedupliziert beide.
-  Fehlt das Feld, wird nur protokolliert (ältere Clients und Warteschlangen-Zeilen). Ohne
-  Schreibrecht oder Freigabe im Modul Meldungen 403, nie stilles Herunterstufen.
 
 ## Backend — Bereitstellungsraum (LLH-1085, LLH-1107)
 

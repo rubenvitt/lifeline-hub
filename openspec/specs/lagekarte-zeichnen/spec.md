@@ -183,11 +183,22 @@ nur für das Zeichnen speicherbarer Figuren.
 ### Requirement: Radius messen
 Das Messwerkzeug SHALL neben Strecke und Fläche die Form „Radius“ anbieten: der erste Punkt ist
 die Mitte, der zweite der Rand. Angezeigt MUST der Radius („r = 300 m“) und daneben die Fläche des
-Kreises werden. Gespeichert MUST nichts werden.
+Kreises werden. Solange Mitte und Rand (oder der Zeiger als Rand) stehen, MUST der Kreis
+gestrichelt als Vorschau auf der Karte stehen, auf eigenen Vorschau-Ebenen der Messung; mit dem
+Ende des Messens, einer neuen Messung oder einer anderen Form MUST er verschwinden. Gespeichert
+MUST nichts werden.
 
 #### Scenario: Radius zwischen zwei Punkten
 - **WHEN** in der Form „Radius“ eine Mitte und ein Rand im Abstand von 300 m gesetzt sind
 - **THEN** zeigt das Messwerkzeug „r = 300 m“ und die Kreisfläche von 28,3 ha
+
+#### Scenario: Vorschaukreis beim Radius-Messen
+- **WHEN** in der Form „Radius“ Mitte und Rand gesetzt sind
+- **THEN** steht der Kreis um die Mitte durch den Rand auf der Karte
+
+#### Scenario: Vorschaukreis endet mit dem Messen
+- **WHEN** beim Radius-Messen mit stehendem Kreis „Beenden“ gewählt wird
+- **THEN** steht kein Vorschaukreis mehr auf der Karte
 
 ### Requirement: Zeichnen per Link
 Die Lagekarte SHALL einen Link mit dem Auftrag `zeichnen=<zonentyp>` annehmen und dann den

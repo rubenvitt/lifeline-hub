@@ -1798,7 +1798,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     if (!map) return;
     if (messen) {
       if (!messRef.current) {
-        messRef.current = createMessung(map, (g, fertig) => onMessungRef.current?.(g, fertig));
+        // Der Vorschaukreis der Form „Radius“ (LLH-1345) in der Bedienrolle, gelesen je Zeichnung.
+        messRef.current = createMessung(
+          map,
+          (g, fertig) => onMessungRef.current?.(g, fertig),
+          () => griffKontextRef.current.bedien,
+        );
       }
       messRef.current.starten(messen);
     } else if (messRef.current) {

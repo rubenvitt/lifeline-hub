@@ -5,6 +5,7 @@ import {
   lineLaengeM,
   polygonFlaecheM2,
   polygonUmfangM,
+  type GeoPunkt,
 } from './geo';
 
 /**
@@ -48,6 +49,22 @@ function ersteVerschiedene(punkte: number[][], n: number): number[][] {
   return out;
 }
 
+/**
+ * Mitte und Radius der Messform „Radius“ — für die Anzeige und den Vorschaukreis auf der Karte
+ * (LLH-1345), damit beide denselben Kreis meinen. Mitte und Rand sind die ersten beiden
+ * verschiedenen Punkte des Linienzugs; was danach kommt (Vorschaupunkt nach dem zweiten Klick),
+ * ändert den Radius nicht mehr. `null`, solange kein Rand steht.
+ */
+export function radiusMessung(
+  g: MessGeometrie | null,
+): { mitte: GeoPunkt; radiusM: number } | null {
+  if (!g || g.type !== 'LineString') return null;
+  const [mitte, rand] = ersteVerschiedene(g.coordinates as number[][], 2);
+  if (!rand) return null;
+  const m = { lon: mitte[0], lat: mitte[1] };
+  return { mitte: m, radiusM: abstandM(m, { lon: rand[0], lat: rand[1] }) };
+}
+
 export function messErgebnis(form: MessForm, g: MessGeometrie | null): MessErgebnis {
   if (!g) return OHNE;
   if (form === 'strecke') {
@@ -57,12 +74,9 @@ export function messErgebnis(form: MessForm, g: MessGeometrie | null): MessErgeb
     return { haupt: formatLaenge(lineLaengeM({ type: 'LineString', coordinates: punkte })) };
   }
   if (form === 'radius') {
-    // Mitte und Rand sind die ersten beiden verschiedenen Punkte des Linienzugs; was danach
-    // kommt (Vorschaupunkt nach dem zweiten Klick), ändert den Radius nicht mehr.
-    if (g.type !== 'LineString') return OHNE;
-    const [mitte, rand] = ersteVerschiedene(g.coordinates as number[][], 2);
-    if (!rand) return OHNE;
-    const r = abstandM({ lon: mitte[0], lat: mitte[1] }, { lon: rand[0], lat: rand[1] });
+    const kreis = radiusMessung(g);
+    if (!kreis) return OHNE;
+    const r = kreis.radiusM;
     return { haupt: `r = ${formatLaenge(r)}`, neben: `Fläche ${formatFlaeche(Math.PI * r * r)}` };
   }
   if (g.type !== 'Polygon') return OHNE;

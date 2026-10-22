@@ -339,9 +339,8 @@ async fn anlegen_mit_client_id(
     laden(pool, meldung_id, daten.eingang_at).await
 }
 
-/// Rumpf der Meldungsanlage auf einer offenen Verbindung/Transaktion: Validierung,
-/// Einstellungen (über dieselbe Verbindung), Insert mit atomarer `lfd_nr` und — bei
-/// aktivem Auto-ETB — der gekoppelte ETB-Eintrag mit beidseitigem Backlink. Liefert die
+/// Rumpf der Meldungsanlage auf einer offenen Verbindung/Transaktion: [`einfuegen_tx`] und —
+/// bei aktivem Auto-ETB — der gekoppelte ETB-Eintrag mit beidseitigem Backlink. Liefert die
 /// neue `meldung_id`.
 async fn anlegen_mit_client_id_tx(
     conn: &mut SqliteConnection,
@@ -350,6 +349,63 @@ async fn anlegen_mit_client_id_tx(
     client_id: Option<&str>,
     daten: &MeldungDaten<'_>,
 ) -> Result<i64, AppError> {
+    let (meldung_id, einst, org_einst) =
+        einfuegen_tx(&mut *conn, einsatz_id, erfasser_id, client_id, daten).await?;
+    let etb_startwert = einst.etb_startwert();
+
+    // ETB-Meldung (Pattern B) im selben Commit. Nachrichtenvordruck-Felder mappen
+    // direkt: von=absender, an=empfaenger, meldeweg, inhalt, ereigniszeit.
+    // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish entsteht kein
+    // ETB-Folgeeintrag; etb_meldung_id bleibt NULL. Eine Lagemeldung protokolliert als Lage
+    // (LLH-1031, LLH-1027 D3), jede andere Art als Meldung.
+    if crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst) {
+        let typ = if daten.meldungsart == super::ART_LAGEMELDUNG {
+            crate::etb::TYP_LAGE
+        } else {
+            crate::etb::TYP_MELDUNG
+        };
+        let etb_id = crate::etb::repo::anlegen_tx(
+            &mut *conn,
+            einsatz_id,
+            erfasser_id,
+            etb_startwert,
+            crate::etb::repo::EintragDaten {
+                typ,
+                inhalt: daten.inhalt,
+                von: Some(daten.absender),
+                an: daten.empfaenger,
+                meldeweg: Some(daten.meldeweg),
+                veranlassung: None,
+                ereigniszeit: Some(daten.ereigniszeit),
+                erfasst_lokal_at: None,
+                berichtigt_eintrag_id: None,
+            },
+        )
+        .await?;
+        verlinke_tx(&mut *conn, meldung_id, etb_id).await?;
+    }
+
+    Ok(meldung_id)
+}
+
+/// Der EINE INSERT in `meldung` samt Validierung, Einstellungen (über dieselbe Verbindung),
+/// atomarer `lfd_nr` und der Invariante „Art Lagemeldung ⇒ lagerelevant“. Ohne ETB: den
+/// Eintrag schreibt der Aufrufer (Auto-ETB in [`anlegen_mit_client_id_tx`]) oder es gibt ihn
+/// schon ([`anlegen_zu_etb_tx`]). Liefert die neue `meldung_id` und die gelesenen Einstellungen.
+async fn einfuegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    daten: &MeldungDaten<'_>,
+) -> Result<
+    (
+        i64,
+        crate::einsatz::einstellungen::EinsatzEinstellungen,
+        crate::org::einstellungen::OrgEinstellungen,
+    ),
+    AppError,
+> {
     // Enum-Invariante auch im Release durchsetzen (LFH-259/F34): debug_assert wäre
     // wegkompiliert → ein interner Aufrufer könnte still ungültige Werte persistieren.
     if !prioritaet_gueltig(daten.prioritaet) {
@@ -368,7 +424,6 @@ async fn anlegen_mit_client_id_tx(
         .await?;
     let org_einst =
         crate::org::einstellungen::laden_oder_default(&mut *conn, org_id.unwrap_or(0)).await?;
-    let etb_startwert = einst.etb_startwert();
     let meldung_startwert = einst.meldung_startwert();
 
     // lfd_nr atomar je Einsatz (Muster etb/repo.rs); erste Nummer = Startwert aus Einstellungen.
@@ -405,49 +460,45 @@ async fn anlegen_mit_client_id_tx(
     .fetch_one(&mut *conn)
     .await?;
     apply_lage_invariante_tx(&mut *conn, meldung_id).await?;
+    Ok((meldung_id, einst, org_einst))
+}
 
-    // ETB-Meldung (Pattern B) im selben Commit. Nachrichtenvordruck-Felder mappen
-    // direkt: von=absender, an=empfaenger, meldeweg, inhalt, ereigniszeit.
-    // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish entsteht kein
-    // ETB-Folgeeintrag; etb_meldung_id bleibt NULL. Eine Lagemeldung protokolliert als Lage
-    // (LLH-1031, LLH-1027 D3), jede andere Art als Meldung.
-    if crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst) {
-        let typ = if daten.meldungsart == super::ART_LAGEMELDUNG {
-            crate::etb::TYP_LAGE
-        } else {
-            crate::etb::TYP_MELDUNG
-        };
-        let etb_id = crate::etb::repo::anlegen_tx(
-            &mut *conn,
-            einsatz_id,
-            erfasser_id,
-            etb_startwert,
-            crate::etb::repo::EintragDaten {
-                typ,
-                inhalt: daten.inhalt,
-                von: Some(daten.absender),
-                an: daten.empfaenger,
-                meldeweg: Some(daten.meldeweg),
-                veranlassung: None,
-                ereigniszeit: Some(daten.ereigniszeit),
-                erfasst_lokal_at: None,
-                berichtigt_eintrag_id: None,
-            },
-        )
-        .await?;
-        sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
-            .bind(meldung_id)
-            .bind(etb_id)
-            .execute(&mut *conn)
-            .await?;
-        sqlx::query("UPDATE meldung SET etb_meldung_id = ? WHERE id = ?")
-            .bind(etb_id)
-            .bind(meldung_id)
-            .execute(&mut *conn)
-            .await?;
-    }
-
+/// Legt zu einem gerade in DERSELBEN Transaktion angelegten ETB-Eintrag die Meldung an (LLH-1037,
+/// Spec `meldungseingang`, „ETB-Erfassung von Meldung und Lage …“): Pattern B umgekehrt. Kein
+/// Auto-ETB, gleich wie „Automatische ETB-Einträge“ steht — der Eintrag ist ihr Eintrag; die
+/// Backlinks stehen beidseitig. `client_id` ist die des Eintrags (dedupliziert wird über ihn).
+/// Die Invariante „Art Lagemeldung ⇒ lagerelevant“ läuft über [`einfuegen_tx`].
+pub async fn anlegen_zu_etb_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    erfasser_id: i64,
+    client_id: Option<&str>,
+    etb_id: i64,
+    daten: &MeldungDaten<'_>,
+) -> Result<i64, AppError> {
+    let (meldung_id, _, _) =
+        einfuegen_tx(&mut *conn, einsatz_id, erfasser_id, client_id, daten).await?;
+    verlinke_tx(&mut *conn, meldung_id, etb_id).await?;
     Ok(meldung_id)
+}
+
+/// Beidseitiger Backlink Meldung ↔ ETB-Eintrag (Pattern B, beide Richtungen).
+async fn verlinke_tx(
+    conn: &mut SqliteConnection,
+    meldung_id: i64,
+    etb_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
+        .bind(meldung_id)
+        .bind(etb_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query("UPDATE meldung SET etb_meldung_id = ? WHERE id = ?")
+        .bind(etb_id)
+        .bind(meldung_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
 }
 
 /// Invariante „Art Lagemeldung ⇒ lagerelevant“ (LLH-1031, LLH-1027 D3): eine Meldung der Art

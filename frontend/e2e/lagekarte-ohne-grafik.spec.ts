@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ohneWebgl2 } from './kartenFixture';
 import { anmeldenOhneStartseite, einsatzMitLage, grundlageOhneNetz } from './lageplan-kern';
 import { auswahlAnsicht, objektZeile } from './leisten-kern';
 import { ADMIN, ADMIN_PW } from './rollen-kern';
@@ -9,7 +10,7 @@ import { ADMIN, ADMIN_PW } from './rollen-kern';
  * „Karte auf diesem Gerät nicht darstellbar“; Leiste, Objektliste und Seitenkopf bleiben bedienbar,
  * und der Lageplan nennt den Grund, statt zu drucken oder anzufügen.
  *
- * Chromium hat WebGL2; ein Init-Skript lässt `getContext('webgl2')` `null` liefern, so wie es der
+ * Chromium hat WebGL2; ein Init-Skript (`ohneWebgl2`) lässt `getContext('webgl2')` `null` liefern, so wie es der
  * headless Firefox hier und in der CI ohnehin tut. Deshalb läuft die Spec auch in Firefox
  * (`OHNE_WEBGL_SPECS` in `playwright.config.ts`): dort belegt sie das Verhalten ohne Nachbau.
  *
@@ -26,17 +27,7 @@ test('ohne WebGL2: Zustand in der Kartenfläche, Leiste bedienbar, Lageplan nenn
   test.setTimeout(90_000);
   const seitenFehler: Error[] = [];
   page.on('pageerror', (f) => seitenFehler.push(f));
-  await page.addInitScript(() => {
-    const original = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function (
-      this: HTMLCanvasElement,
-      art: string,
-      ...rest: unknown[]
-    ) {
-      if (art === 'webgl2') return null;
-      return (original as (...a: unknown[]) => RenderingContext | null).call(this, art, ...rest);
-    } as typeof original;
-  });
+  await ohneWebgl2(page);
   await page.setViewportSize(FUEKW);
   await grundlageOhneNetz(page);
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
