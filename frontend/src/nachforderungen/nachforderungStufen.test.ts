@@ -47,18 +47,34 @@ const JETZT = Date.UTC(2026, 5, 12, 22, 0);
 
 describe('zaehleNachforderungen (LLH-1078)', () => {
   it('offen ist die Summe der drei offenen Stufen; eingetroffen und abgelehnt zählen nicht', () => {
-    const z = zaehleNachforderungen([
-      { status: 'angefordert' },
-      { status: 'angefordert' },
-      { status: 'zugesagt' },
-      { status: 'unterwegs' },
-      { status: 'eingetroffen' },
-      { status: 'abgelehnt' },
-      { status: 'zurueckgezogen' },
-    ]);
-    expect(z).toEqual({ offen: 4, angefordert: 2, zugesagt: 1, unterwegs: 1 });
+    const ohne = { eintreffen_erwartet_at: null };
+    const z = zaehleNachforderungen(
+      [
+        { status: 'angefordert', ...ohne },
+        { status: 'angefordert', ...ohne },
+        { status: 'zugesagt', ...ohne },
+        { status: 'unterwegs', ...ohne },
+        { status: 'eingetroffen', ...ohne },
+        { status: 'abgelehnt', ...ohne },
+        { status: 'zurueckgezogen', ...ohne },
+      ],
+      JETZT,
+    );
+    expect(z).toEqual({ offen: 4, angefordert: 2, zugesagt: 1, unterwegs: 1, ueberfaellig: 0 });
     expect(offenText(z)).toBe('4 offen · 1 unterwegs');
     expect(stufenText(z)).toBe('2 angefordert · 1 zugesagt · 1 unterwegs');
+  });
+
+  it('überfällig zählt die offenen mit verstrichenem Eintreffen (LLH-1145)', () => {
+    const z = zaehleNachforderungen(
+      [
+        { status: 'zugesagt', eintreffen_erwartet_at: '2026-06-12 21:59:00' },
+        { status: 'unterwegs', eintreffen_erwartet_at: '2026-06-12 22:00:00' },
+        { status: 'eingetroffen', eintreffen_erwartet_at: '2026-06-12 20:00:00' },
+      ],
+      JETZT,
+    );
+    expect(z.ueberfaellig).toBe(1);
   });
 });
 

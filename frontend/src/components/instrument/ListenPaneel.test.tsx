@@ -2,7 +2,7 @@ import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
 import { dichten, farbenDunkel } from '../../theme/tokens';
-import ListenPaneel, { listenZeileStil } from './ListenPaneel';
+import ListenPaneel, { ListenAbschnitt, listenZeileStil } from './ListenPaneel';
 
 const EINTRAEGE = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, text: `Auftrag ${i + 1}` }));
 
@@ -79,5 +79,72 @@ describe('listenZeileStil — handgebautes Bedienziel (LFH-365: zwei Angaben)', 
     const h = listenZeileStil(farbenDunkel, tokenFuer('handschuh'));
     expect(k.paddingBlock).toBeLessThan(h.paddingBlock as number);
     expect(k.paddingInline).toBeLessThan(h.paddingInline as number);
+  });
+});
+
+// LLH-1145: ein Abschnitt eines Paneels („Offene Vorgänge“).
+describe('ListenAbschnitt', () => {
+  function abschnitt(
+    props: Partial<Parameters<typeof ListenAbschnitt<(typeof EINTRAEGE)[number]>>[0]> = {},
+  ) {
+    return renderMitProviders(
+      <ListenAbschnitt
+        titel="Aufträge"
+        zahl={12}
+        notiz="2 überfällig"
+        zustand="daten"
+        eintraege={EINTRAEGE}
+        schluessel={(e) => e.id}
+        zeile={(e) => <span>{e.text}</span>}
+        sprung={{ ziel: '/auftraege', name: 'Aufträge' }}
+        gesperrtText="nicht freigegeben"
+        onNeuladen={vi.fn()}
+        {...props}
+      />,
+    );
+  }
+
+  it('Kopf als Überschrift mit Zahl und „alle ↗“, darunter höchstens drei Einträge', () => {
+    abschnitt();
+    expect(screen.getByRole('heading', { level: 3, name: 'Aufträge' })).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByRole('link', { name: 'alle Aufträge' })).toHaveAttribute(
+      'href',
+      '/auftraege',
+    );
+  });
+
+  it('leer ist eine Zeile „keine“, keine leere Fläche', () => {
+    abschnitt({ eintraege: [] });
+    expect(screen.getByText('keine')).toBeInTheDocument();
+    expect(screen.queryByRole('list')).toBeNull();
+  });
+
+  it('gesperrt: „—“ mit Grund, ohne Liste und ohne Sprung', () => {
+    abschnitt({ zustand: 'gesperrt', zahl: null });
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('nicht freigegeben')).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('die Zahl steht auch, wenn die Liste fehlt; ohne Netz nie „keine“', () => {
+    abschnitt({ zustand: 'offline', eintraege: [] });
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.getByText('ohne Netz nicht geladen')).toBeInTheDocument();
+    expect(screen.queryByText('keine')).toBeNull();
+  });
+
+  it('Laden und Fehler sind kein „keine“; der Fehler bietet „Erneut abrufen“', async () => {
+    const onNeuladen = vi.fn();
+    const { unmount } = abschnitt({ zustand: 'laden', eintraege: [], zahl: null });
+    expect(screen.queryByText('keine')).toBeNull();
+    expect(screen.getByText('—')).toBeInTheDocument();
+    unmount();
+    abschnitt({ zustand: 'fehler', eintraege: [], onNeuladen });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Erneut abrufen' }).click();
+    expect(onNeuladen).toHaveBeenCalled();
   });
 });

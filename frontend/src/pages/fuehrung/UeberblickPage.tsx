@@ -1,6 +1,6 @@
 import { IconBericht, IconPlus } from '../../icons';
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { Breadcrumb, Button } from 'antd';
 import dayjs, { type Dayjs } from 'dayjs';
@@ -54,14 +54,14 @@ import { listeAuftraege } from '../../api/auftraege';
 import { listeNachforderungen } from '../../api/nachforderungen';
 import { listeOffeneErinnerungen } from '../../api/erinnerungen';
 import { listeEtb } from '../../api/etb';
-import { holeRueckmeldungen } from '../../api/meldungen';
+import { holeRueckmeldungen, listeOffeneMeldungen } from '../../api/meldungen';
+import { useAuth } from '../../auth/AuthContext';
 import { ladeModulZaehler } from '../../api/modulZaehler';
 import {
   NICHT_FREIGEGEBEN,
   auftragsStand,
   meldungenNotiz,
   meldungsStand,
-  nachforderungsStand,
 } from '../lage-dashboard/fuehrungsZahlen';
 import { einsatzdauerKennzahl } from '../lage-dashboard/lagebild';
 import { NICHT_BEURTEILT } from '../gefahren/beurteilung';
@@ -97,18 +97,22 @@ import {
   abschnittZeilen,
   auftraegeKennzahl,
   betroffeneKennzahl,
-  empfaengerText,
   entscheidungenAuswahl,
   folgeText,
   kraefteKennzahl,
   naechsteMarken,
-  offeneAuftraege,
   warnstufeKennzahlVon,
   ueberblickRechteText,
   type AbschnittZeile,
   type Marke,
 } from './ueberblickDaten';
-import NachforderungenPaneel, { aeltesteOffene } from './NachforderungenPaneel';
+import OffeneVorgaengePaneel from './OffeneVorgaengePaneel';
+import {
+  VORGANGS_SICHT_PARAM,
+  meineStelle,
+  sichtAusUrl,
+  type VorgangsSicht,
+} from './offeneVorgaenge';
 import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
@@ -148,8 +152,6 @@ import { leereUhrzeit, zeitKurz } from '../../anzeige/zeitDarstellung';
 /** Der Entscheidungsabruf: nur Typ „Entscheidung", ein Deckel, der die letzte Stunde
  *  eines Großeinsatzes sicher trägt. Konstante, damit der Query-Key stabil bleibt. */
 const ETB_ENTSCHEIDUNGEN = { typ: 'entscheidung' as const, limit: 50 };
-/** Wie viele offene Aufträge das Paneel zeigt; der Rest steht im Modul. */
-const AUFTRAEGE_MAX = 8;
 
 /** `gesperrt`: das Modul der Quelle ist für die Person nicht freigegeben (LFH-669). */
 type Zustand = AbrufZustand;
@@ -231,6 +233,20 @@ export default function UeberblickPage() {
   const { abBreite } = useViewport();
   const { konventionen } = useAnzeigeKonventionen();
   const jetzt = useJetzt();
+  const { benutzer } = useAuth();
+  // „Offene Vorgänge“ für alle oder meine Stelle (LLH-1145 D5): die Wahl steht in der URL.
+  const [suche, setSuche] = useSearchParams();
+  const sicht = sichtAusUrl(suche.get(VORGANGS_SICHT_PARAM));
+  const waehleSicht = (neu: VorgangsSicht) =>
+    setSuche(
+      (alt) => {
+        const naechste = new URLSearchParams(alt);
+        if (neu === 'meine') naechste.set(VORGANGS_SICHT_PARAM, 'meine');
+        else naechste.delete(VORGANGS_SICHT_PARAM);
+        return naechste;
+      },
+      { replace: true },
+    );
 
   const einsatzQ = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -305,8 +321,8 @@ export default function UeberblickPage() {
     queryFn: () => listeAuftraege(einsatzId),
     enabled: auftraegeFrei,
   });
-  // Paneel „Nachforderungen“ (LLH-1078): dasselbe Fach wie die Modulseite; die Zahlen kommen aus
-  // dem Modulzähler, die Liste nennt nur die am längsten wartenden.
+  // Abschnitt „Nachforderungen“ der offenen Vorgänge (LLH-1078, LLH-1145): dasselbe Fach wie die
+  // Modulseite; die Zahlen kommen aus dem Modulzähler, die Liste nennt nur die dringendsten.
   const nachforderungenQ = useQuery({
     queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
@@ -341,6 +357,13 @@ export default function UeberblickPage() {
     queryKey: einsatzKeys.etbListe(einsatzId, ETB_ENTSCHEIDUNGEN),
     queryFn: () => listeEtb(einsatzId, ETB_ENTSCHEIDUNGEN),
     enabled: etbFrei,
+  });
+  // Abschnitt „Meldungen“ der offenen Vorgänge (LLH-1145): dasselbe Fach wie die offene Liste der
+  // Meldungsseite (alle Richtungen). Nicht auf der Platte (LFH-940): ohne Netz „nicht geladen“.
+  const meldungenOffenQ = useQuery({
+    queryKey: einsatzKeys.meldungenPhase(einsatzId, 'offen', 'alle'),
+    queryFn: () => listeOffeneMeldungen(einsatzId),
+    enabled: rueckmeldungenFrei,
   });
   const rueckmeldungenQ = useQuery({
     queryKey: einsatzKeys.meldungenRueckmeldungen(einsatzId),
@@ -390,10 +413,7 @@ export default function UeberblickPage() {
   const auftragsstand = auftragsStand(zaehlerQ);
   const auftragszahl =
     auftragsstand.zustand === 'daten' ? auftraegeKennzahl(auftragsstand.zahl) : null;
-  const offene = useMemo(() => offeneAuftraege(auftraege ?? []), [auftraege]);
-  const nachforderungsstand = nachforderungsStand(zaehlerQ);
-  const nachforderungen = nachforderungenFrei ? nachforderungenQ.data : undefined;
-  const aelteste = useMemo(() => aeltesteOffene(nachforderungen ?? []), [nachforderungen]);
+  const stelle = useMemo(() => meineStelle(einsatz, benutzer?.id), [einsatz, benutzer?.id]);
   const zeilen = useMemo(
     () =>
       abschnittZeilen({
@@ -449,7 +469,6 @@ export default function UeberblickPage() {
   const qAuftraege: Quelle = { q: auftraegeQ, frei: auftraegeFrei };
   const qErinnerungen: Quelle = { q: erinnerungenQ, frei: erinnerungenFrei };
   const qEtb: Quelle = { q: etbQ, frei: etbFrei };
-  const qNachforderungen: Quelle = { q: nachforderungenQ, frei: nachforderungenFrei };
   /** Beiwerk entfällt still, wenn sein Modul gesperrt ist; unbekannt bleibt es unbestimmt. */
   const ohneGesperrte = (...quellen: Quelle[]) =>
     quellen.filter((x) => x.frei || freigabenStand !== 'da');
@@ -457,7 +476,6 @@ export default function UeberblickPage() {
   const zBetroffene = zustandVon(freigabenStand, qPersonen);
   const zKraefte = zustandVon(freigabenStand, qPersonal);
   const zWarnstufe = zustandVon(freigabenStand, qGefahren);
-  const zAuftraege = zustandVon(freigabenStand, qAuftraege);
   const zAbschnitteZahl = zustandVon(freigabenStand, qAbschnitte);
   const zAbschnitte = zustandVon(
     freigabenStand,
@@ -472,11 +490,8 @@ export default function UeberblickPage() {
     { key: 'material', frei: materialFrei },
   ]);
   const zEntscheidungen = zustandVon(freigabenStand, qEtb);
-  // Zahl aus dem Zähler, Liste aus dem Modul: der schlechtere Zustand gilt fürs Paneel.
-  const zNachforderungen = schlechtesterZustand(
-    zustandVon(freigabenStand, qNachforderungen),
-    nachforderungsstand.zustand,
-  );
+  // Die offenen Vorgänge tragen ihre Stände je Abschnitt; das Paneel selbst nur die Freigaben.
+  const zVorgaenge = freigabenStand === 'da' ? 'daten' : freigabenStand;
   // Die Marken sammeln Fristen aus mehreren Quellen; eine gesperrte trägt nichts bei, die
   // Lagebesprechung bleibt. Was fehlt, nennt der Hinweis — sonst läse sich die Liste vollständig.
   const zMarken = zustandVon(freigabenStand, qEinsatz, ...ohneGesperrte(qAuftraege, qErinnerungen));
@@ -515,26 +530,6 @@ export default function UeberblickPage() {
                 : lagebesprechungPfad(einsatzId);
   const markenFarbe = (m: Marke) =>
     m.ton === 'alarm' ? rollen.alarmText : m.ton === 'achtung' ? rollen.achtungText : rollen.text;
-
-  // Beim Laden hält ein unsichtbares Meta seinen Platz wie bei „Einsatzabschnitte“: auf 390 px
-  // bricht der Kopf mit dem Meta um (79 → 94 px), erst mit den Daten schöbe das die Paneele
-  // darunter (Seiten-CLS 0,021–0,031, LLH-1053).
-  const ueberfaelligMeta =
-    zAuftraege === 'daten' && auftragszahl ? (
-      <span
-        style={{
-          color: auftragszahl.ueberfaellig > 0 ? rollen.achtungText : rollen.schwach,
-        }}
-      >
-        {auftragszahl.ueberfaellig > 0
-          ? `${auftragszahl.ueberfaellig} überfällig`
-          : 'keine überfällig'}
-      </span>
-    ) : zAuftraege === 'laden' ? (
-      <span data-lfh="paneel-meta-platzhalter" aria-hidden="true" style={{ visibility: 'hidden' }}>
-        keine überfällig
-      </span>
-    ) : undefined;
 
   const entscheidungTitel =
     entscheidungen.modus === 'stunde'
@@ -794,71 +789,83 @@ export default function UeberblickPage() {
                 zeilen={zeilen.map((z) => abschnittGliederung(z, einsatzId, kurz, token, rollen))}
               />
 
+              <OffeneVorgaengePaneel
+                einsatzId={einsatzId}
+                jetzt={jetzt.valueOf()}
+                zustand={zVorgaenge}
+                zaehler={zaehlerQ}
+                meldungen={{ q: meldungenOffenQ, frei: rueckmeldungenFrei }}
+                auftraege={{ q: auftraegeQ, frei: auftraegeFrei }}
+                nachforderungen={{ q: nachforderungenQ, frei: nachforderungenFrei }}
+                erinnerungen={{ q: erinnerungenQ, frei: erinnerungenFrei }}
+                abloesungen={{ q: abloesungenQ, frei: abloesungSichtbar }}
+                stelle={stelle}
+                sicht={sicht}
+                onSicht={waehleSicht}
+                onNeuladen={() => void freigabenQ.refetch()}
+              />
+            </PaneelReihe>
+
+            <PaneelReihe kennung="ueberblick-paneele-fristen">
               <ListenPaneel
-                titel="Offene Aufträge"
-                zustand={zAuftraege}
-                meta={ueberfaelligMeta}
-                sprung={{
-                  label: modulName('auftraege'),
-                  onKlick: () => waehle(auftraegePfad(einsatzId)),
-                }}
-                leerText="Keine offenen Aufträge."
+                titel="Nächste Marken"
+                zustand={zMarken}
+                // Die Marken kommen aus mehreren Modulen: kein Sprung, die Zahl der weiteren als
+                // Meta (`naechsteMarken` kürzt selbst).
+                meta={
+                  zMarken === 'daten' && marken.weitere > 0
+                    ? `+${marken.weitere} weitere`
+                    : undefined
+                }
+                fuss={
+                  // Im Leerzustand steht der Hinweis im Leertext.
+                  zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
+                    <span style={{ fontSize: 12, color: rollen.gedaempft }}>{markenHinweis}</span>
+                  ) : undefined
+                }
+                leerText={
+                  markenHinweis
+                    ? `Keine sichtbaren Fristen. ${markenHinweis}`
+                    : 'Keine anstehenden Fristen.'
+                }
                 gesperrtText={GESPERRT}
-                onNeuladen={() => nachladen(qAuftraege)}
-                eintraege={offene}
-                max={AUFTRAEGE_MAX}
-                schluessel={(a) => a.id}
-                weitere={{ ziel: auftraegePfad(einsatzId), name: 'offene Aufträge' }}
-                zeile={(a) => {
-                  const farbe = a.ist_ueberfaellig ? rollen.alarmText : rollen.gedaempft;
-                  return (
-                    <Link
-                      to={auftraegePfad(einsatzId, { auftrag: a.id })}
-                      data-lfh="ueberblick-auftrag"
-                      style={zeile}
+                onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
+                eintraege={marken.marken}
+                max={marken.marken.length}
+                schluessel={(m) => m.key}
+                zeile={(m) => (
+                  <MarkenZeile
+                    ziel={markenZiel(m)}
+                    ton={m.ton}
+                    style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
+                  >
+                    <span
+                      style={{
+                        flex: '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        minWidth: 52,
+                      }}
                     >
-                      <span style={{ ...monoStil(11), color: farbe, flex: '0 0 40px' }}>
-                        {kurz(a.erteilt_at)}
+                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>
+                        {kurz(m.zeit)}
                       </span>
-                      <span
-                        style={{
-                          flex: '1 1 auto',
-                          minWidth: 0,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 4,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: 12,
-                            lineHeight: 1.45,
-                            color: rollen.text2,
-                            overflowWrap: 'anywhere',
-                          }}
-                        >
-                          {a.auftrag_text}
-                        </span>
-                        <span style={{ ...monoStil(10), color: rollen.schwach }}>
-                          {[
-                            empfaengerText(a) ? `an ${empfaengerText(a)}` : 'ohne Empfänger',
-                            a.frist_at ? `Frist ${kurz(a.frist_at)}` : 'ohne Frist',
-                          ].join(' · ')}
-                        </span>
-                      </span>
-                      <span
-                        style={{
-                          ...monoStil(10),
-                          letterSpacing: '0.06em',
-                          color: farbe,
-                          flex: '0 0 auto',
-                        }}
-                      >
-                        {a.ist_ueberfaellig ? 'überfällig' : 'läuft'}
-                      </span>
-                    </Link>
-                  );
-                }}
+                      <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
+                    </span>
+                    <span
+                      style={{
+                        flex: '1 1 auto',
+                        minWidth: 0,
+                        fontSize: 12,
+                        lineHeight: 1.4,
+                        color: rollen.gedaempft,
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {m.text}
+                    </span>
+                  </MarkenZeile>
+                )}
               />
 
               <StromPaneel
@@ -926,80 +933,6 @@ export default function UeberblickPage() {
                   );
                 })}
               </StromPaneel>
-            </PaneelReihe>
-
-            <PaneelReihe kennung="ueberblick-paneele-fristen">
-              <ListenPaneel
-                titel="Nächste Marken"
-                zustand={zMarken}
-                // Die Marken kommen aus mehreren Modulen: kein Sprung, die Zahl der weiteren als
-                // Meta (`naechsteMarken` kürzt selbst).
-                meta={
-                  zMarken === 'daten' && marken.weitere > 0
-                    ? `+${marken.weitere} weitere`
-                    : undefined
-                }
-                fuss={
-                  // Im Leerzustand steht der Hinweis im Leertext.
-                  zMarken === 'daten' && marken.marken.length > 0 && markenHinweis ? (
-                    <span style={{ fontSize: 12, color: rollen.gedaempft }}>{markenHinweis}</span>
-                  ) : undefined
-                }
-                leerText={
-                  markenHinweis
-                    ? `Keine sichtbaren Fristen. ${markenHinweis}`
-                    : 'Keine anstehenden Fristen.'
-                }
-                gesperrtText={GESPERRT}
-                onNeuladen={() => nachladen(qEinsatz, qAuftraege, qErinnerungen)}
-                eintraege={marken.marken}
-                max={marken.marken.length}
-                schluessel={(m) => m.key}
-                zeile={(m) => (
-                  <MarkenZeile
-                    ziel={markenZiel(m)}
-                    ton={m.ton}
-                    style={{ ...zeile, alignItems: 'baseline', borderBlockEnd: 0 }}
-                  >
-                    <span
-                      style={{
-                        flex: '0 0 auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minWidth: 52,
-                      }}
-                    >
-                      <span style={{ ...monoStil(13), color: markenFarbe(m) }}>{kurz(m.zeit)}</span>
-                      <span style={{ ...monoStil(10), color: markenFarbe(m) }}>{m.wort}</span>
-                    </span>
-                    <span
-                      style={{
-                        flex: '1 1 auto',
-                        minWidth: 0,
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        color: rollen.gedaempft,
-                        overflowWrap: 'anywhere',
-                      }}
-                    >
-                      {m.text}
-                    </span>
-                  </MarkenZeile>
-                )}
-              />
-
-              <NachforderungenPaneel
-                einsatzId={einsatzId}
-                zustand={zNachforderungen}
-                zahlen={nachforderungsstand.zustand === 'daten' ? nachforderungsstand.zahl : null}
-                aelteste={aelteste}
-                jetzt={jetzt.valueOf()}
-                darfSchreiben={darfSchreiben}
-                onNeuladen={() => {
-                  nachladen(qNachforderungen);
-                  void zaehlerQ.refetch();
-                }}
-              />
             </PaneelReihe>
           </DashboardFlaeche>
         )}

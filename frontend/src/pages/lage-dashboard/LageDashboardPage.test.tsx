@@ -847,7 +847,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
     const ZAEHLER = {
       auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
       meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
-      nachforderungen: { offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2 },
+      nachforderungen: { offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2, ueberfaellig: 0 },
     };
 
     it('gewählt: Platz 3 zeigt die Zahl des Modulzählers mit „n unterwegs", Ziel Modulseite', async () => {

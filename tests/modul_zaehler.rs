@@ -571,7 +571,7 @@ async fn nachforderungen_zaehlen_wie_die_liste() {
     let v = zaehler(&app, &admin, einsatz).await;
     assert_eq!(
         v["nachforderungen"],
-        json!({ "offen": 4, "angefordert": 2, "zugesagt": 1, "unterwegs": 1 }),
+        json!({ "offen": 4, "angefordert": 2, "zugesagt": 1, "unterwegs": 1, "ueberfaellig": 0 }),
         "{v:?}"
     );
     let stufe = |s: &'static str| move |x: &Value| x["status"] == s;
@@ -602,6 +602,87 @@ async fn nachforderungen_zaehlen_wie_die_liste() {
     );
 }
 
+/// Überfällige Nachforderungen (LLH-1145): zugesagt oder unterwegs mit verstrichenem erwartetem
+/// Eintreffen, wie das Board (`istUeberfaellig`). Die Erwartung kommt aus `status` und
+/// `eintreffen_erwartet_at` der Liste gegen den Abrufzeitpunkt; ein eingetroffener mit
+/// verstrichenem Eintreffen zählt nicht, einer ohne Eintreffen auch nicht.
+#[tokio::test]
+async fn nachforderungen_ueberfaellig_wie_das_board() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/nachforderungen");
+    // Je Fall: Stufen nach der Zusage, Eintreffen verstrichen?
+    let faelle: [(&[&str], Option<bool>); 6] = [
+        (&[], None),                                  // angefordert
+        (&[], Some(true)),                            // zugesagt, verstrichen
+        (&[], Some(false)),                           // zugesagt, später
+        (&["unterwegs"], Some(true)),                 // unterwegs, verstrichen
+        (&["unterwegs", "eingetroffen"], Some(true)), // eingetroffen
+        (&["unterwegs"], None),                       // unterwegs ohne Eintreffen
+    ];
+    for (i, (schritte, verstrichen)) in faelle.iter().enumerate() {
+        let body = json!({
+            "art": "RTW", "bezeichnung": format!("Bedarf {i}"), "adressat_kategorie": "leitstelle"
+        });
+        let nf = post(&app, &admin, &pfad, &body.to_string()).await;
+        let nid = nf["id"].as_i64().unwrap();
+        if verstrichen.is_some() || !schritte.is_empty() {
+            // Zusage in der Zukunft; das Eintreffen setzt die Datenbank danach zurück, weil die
+            // Route kein Eintreffen vor der Anforderung annimmt.
+            let zusage = json!({ "eintreffen_erwartet_at": "2099-01-01 12:00:00" });
+            let zusage = if verstrichen.is_some() {
+                zusage
+            } else {
+                json!({})
+            };
+            post(
+                &app,
+                &admin,
+                &format!("{pfad}/{nid}/zusage"),
+                &zusage.to_string(),
+            )
+            .await;
+        }
+        for schritt in *schritte {
+            let body = json!({ "status": schritt });
+            post(
+                &app,
+                &admin,
+                &format!("{pfad}/{nid}/status"),
+                &body.to_string(),
+            )
+            .await;
+        }
+        if *verstrichen == Some(true) {
+            sqlx::query(
+                "UPDATE nachforderung SET eintreffen_erwartet_at = '2000-01-01 00:00:00' \
+                 WHERE id = ?",
+            )
+            .bind(nid)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+    }
+
+    let liste = get(&app, &admin, &pfad).await;
+    let v = zaehler(&app, &admin, einsatz).await;
+    let jetzt = lifeline_hub::zeit::jetzt();
+    let erwartet = anzahl(&liste, |x| {
+        (x["status"] == "zugesagt" || x["status"] == "unterwegs")
+            && x["eintreffen_erwartet_at"]
+                .as_str()
+                .is_some_and(|e| e < jetzt.as_str())
+    });
+    assert_eq!(erwartet, 2, "{liste:?}");
+    assert_eq!(
+        v["nachforderungen"]["ueberfaellig"].as_i64(),
+        Some(erwartet),
+        "{v:?}"
+    );
+}
+
 #[tokio::test]
 async fn erlaubtes_leeres_modul_steht_auf_null() {
     let (app, admin, einsatz) = aufbau().await;
@@ -611,7 +692,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
     assert_eq!(v["lagemeldungen"], json!({ "neu": 0 }), "{v:?}");
     assert_eq!(
         v["nachforderungen"],
-        json!({ "offen": 0, "angefordert": 0, "zugesagt": 0, "unterwegs": 0 }),
+        json!({ "offen": 0, "angefordert": 0, "zugesagt": 0, "unterwegs": 0, "ueberfaellig": 0 }),
         "{v:?}"
     );
     assert_eq!(

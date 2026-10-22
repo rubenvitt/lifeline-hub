@@ -83,7 +83,7 @@ function quellen(over: Partial<VorbereitungsQuellen> = {}): VorbereitungsQuellen
     meldungen: { zustand: 'daten', zahl: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 0 } },
     nachforderungen: {
       zustand: 'daten',
-      zahl: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 },
+      zahl: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },
     },
     besprechung,
     ...over,

@@ -2,15 +2,15 @@
 titel: Überblick
 gruppen: [fuehrung]
 reihenfolge: 200
-quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
+quellen: [frontend/src/pages/fuehrung/UeberblickPage.tsx, frontend/src/components/instrument/, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, frontend/src/pages/fuehrung/offeneVorgaenge.ts, frontend/src/pages/fuehrung/ueberblickDaten.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/wetter/unwetter.ts, frontend/src/pages/EtbPage.tsx]
 ---
 
 ## Überblick
 
 Der Überblick ist die Startseite eines Einsatzes im Bereich „Führung“. Er fasst auf einer Seite
 zusammen, was die Führung zuerst wissen muss: die Lage in Zahlen, den Stand der
-Einsatzabschnitte, offene Aufträge und Nachforderungen, die Entscheidungen der letzten Stunde und
-die nächsten Fristen. Er rechnet nur aus Daten, die in den Modulen schon erfasst sind; erfasst wird in den
+Einsatzabschnitte, die offenen Vorgänge, die Entscheidungen der letzten Stunde und die nächsten
+Fristen. Er rechnet nur aus Daten, die in den Modulen schon erfasst sind; erfasst wird in den
 Modulen selbst.
 
 ## Abläufe
@@ -29,12 +29,21 @@ Modulen selbst.
    letzte Rückmeldung und die Einheiten nach Status („bereit“, „gebunden“, „Ausfall“ mit Zahl und
    Balken) lesen.
 
-   ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Aufträgen, Entscheidungen der letzten Stunde und nächsten Marken](../bilder/ueberblick/ueberblick.png)
+   ![Überblick mit Kennzahlenband, Einsatzabschnitten, offenen Vorgängen, nächsten Marken und Entscheidungen der letzten Stunde](../bilder/ueberblick/ueberblick.png)
 
-5. Daneben „Offene Aufträge“ und „Entscheidungen der letzten Stunde“ lesen, darunter „Nächste
-   Marken“ und „Nachforderungen“: Was zuerst fällig ist, steht oben.
+5. Daneben „Offene Vorgänge“ lesen: Meldungen, Aufträge, Nachforderungen, Erinnerungen und
+   Ablösungen, je mit ihrer Zahl und den drei dringendsten. Darunter stehen „Nächste Marken“ und
+   „Entscheidungen der letzten Stunde“. Was zuerst fällig ist, steht oben.
 6. Im Paneel „Entscheidungen der letzten Stunde“ „ETB ↗“ wählen: Das Einsatztagebuch zeigt alle
    Entscheidungen. Jedes Paneel führt so über den Verweis oben rechts in sein Modul.
+
+### Nur die eigenen Vorgänge sehen
+
+1. Im Paneel „Offene Vorgänge“ oben rechts „meine Stelle“ wählen: Es bleiben die Vorgänge, die an
+   eine eigene Funktion gehen oder selbst angelegt wurden. Die Zahl bleibt die des Einsatzes
+   und heißt jetzt „im Einsatz“.
+2. Einen Eintrag wählen: Das Modul öffnet sich und hebt den Vorgang hervor.
+3. „alle“ wählen, um wieder alle Vorgänge zu sehen.
 
 ### Vom Überblick weiterarbeiten
 
@@ -57,16 +66,36 @@ Modulen selbst.
 - **Einsatzdauer** rechnet ab dem Beginn des Einsatzes, bei einem abgeschlossenen bis zum
   Abschluss.
 - **Offene Aufträge** nennt dieselbe Zahl wie das Modul „Aufträge/Befehle“ und dazu, wie viele
-  über ihrer Frist sind. Das Paneel zeigt höchstens acht, die überfälligen zuerst; alle weiteren
-  erreicht „… weitere ↗“.
-- **Nachforderungen** nennt die offenen je Stufe (angefordert, zugesagt, unterwegs), dieselben
-  Zahlen wie das Modul „Nachforderungen“, und darunter die zwei, die am längsten warten, mit ihrem
-  Alter. Ein Klick auf eine Zeile öffnet ihre Karte (Kapitel [Nachforderungen](nachforderung.md)).
+  über ihrer Frist sind.
 - **Entscheidungen der letzten Stunde:** Gab es in der letzten Stunde keine, heißt das Paneel
   „Letzte Entscheidungen“ und zeigt die jüngsten fünf mit dem Hinweis „keine in der letzten
   Stunde“.
 - Die Zahlen eines Abschnitts schließen seine Unterabschnitte ein; zusammen ergeben die Zeilen
   die Einsatzstärke. Kräfte ohne Abschnitt stehen in der Zeile „Ohne Abschnitt“ am Ende.
+
+### Offene Vorgänge
+
+Das Paneel hat fünf Abschnitte, immer in dieser Folge: Meldungen, Aufträge, Nachforderungen,
+Erinnerungen und Ablösungen. Die Zahl jedes Abschnitts ist dieselbe wie im Modul:
+
+- **Meldungen**: die offenen, daneben die neuen, wie viele auf eine Bestätigung warten (in Rot)
+  und wie viele Lagemeldungen neu sind.
+- **Aufträge**: die offenen, daneben die überfälligen (in Rot) und die in Arbeit.
+- **Nachforderungen**: die offenen, daneben die überfälligen und die unterwegs. Überfällig ist eine
+  zugesagte oder unterwegs gemeldete Nachforderung, deren erwartetes Eintreffen verstrichen ist
+  (Kapitel [Nachforderungen](nachforderung.md)).
+- **Erinnerungen**: die fälligen; aufgeführt sind die fälligen und die in den nächsten 30 Minuten.
+- **Ablösungen**: die überfälligen und die bald fälligen Schichten.
+
+Jeder Abschnitt zeigt höchstens drei Einträge, das Überfällige zuerst; ein überfälliger Eintrag
+trägt dazu einen roten Rand links und das Wort „überfällig“. Ein Klick auf einen Eintrag öffnet
+ihn im Modul, hervorgehoben; eine Erinnerung öffnet die Liste der Erinnerungen. Alle weiteren
+erreicht „alle ↗“. Steht „keine“, gibt es nichts Offenes. Steht „ohne Netz nicht geladen“, war
+die Liste ohne Verbindung noch nie geladen; das heißt nicht, dass nichts offen ist.
+
+„meine Stelle“ zeigt die Vorgänge, die an eine eigene Funktion gehen (die besetzten Sachgebiete,
+als Einsatzleitung ohne Sachgebiet „EL“) oder selbst angelegt wurden; bei Nachforderungen nur die
+selbst angelegten. Ablösungen gehören zu keiner Stelle und bleiben vollständig stehen („alle Stellen“).
 
 ### Nächste Marken
 

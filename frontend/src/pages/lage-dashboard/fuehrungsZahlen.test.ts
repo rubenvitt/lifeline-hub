@@ -35,7 +35,7 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
   });
 
   it('liest die Nachforderungen je Stufe aus der Serverantwort (LLH-1078)', () => {
-    const zahl = { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 };
+    const zahl = { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 };
     expect(nachforderungsStand(daten({ nachforderungen: zahl }))).toEqual({
       zustand: 'daten',
       zahl,
@@ -81,8 +81,14 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
   });
 
   it('Notiz der Nachforderungen: „davon unterwegs“ — Band und Werkzeugkachel (LLH-1371)', () => {
-    expect(nachforderungenNotiz({ offen: 4, angefordert: 1, zugesagt: 1, unterwegs: 2 })).toBe(
-      '2 unterwegs',
-    );
+    expect(
+      nachforderungenNotiz({
+        offen: 4,
+        angefordert: 1,
+        zugesagt: 1,
+        unterwegs: 2,
+        ueberfaellig: 0,
+      }),
+    ).toBe('2 unterwegs');
   });
 });

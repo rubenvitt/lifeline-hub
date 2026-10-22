@@ -183,7 +183,9 @@ const volleDaten = {
   zaehler: {
     auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
     meldungen: { offen: 4, ungesehen: 2, bestaetigung_ueberfaellig: 0 },
-    nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1 },
+    nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1, ueberfaellig: 0 },
+    erinnerungen: { faellig: 0 },
+    lagemeldungen: { neu: 0 },
   } as object,
   /** Nachforderungen (LLH-1078): drei offene und eine eingetroffene, passend zum Zähler. */
   nachforderungen: [
@@ -249,6 +251,8 @@ type Daten = Omit<typeof volleDaten, 'zaehler' | 'nachforderungen'> & {
   rueckmeldungen?: object;
   zaehler?: object;
   nachforderungen?: object[];
+  /** Offene Meldungen (`?phase=offen`) für „Offene Vorgänge“ (LLH-1145). */
+  meldungen?: object[];
 };
 const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
@@ -281,11 +285,14 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
           meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
-          nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 },
+          nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0, ueberfaellig: 0 },
+          erinnerungen: { faellig: 0 },
+          lagemeldungen: { neu: 0 },
         },
       ),
     ),
     http.get('/api/einsaetze/1/nachforderungen', json(d.nachforderungen ?? [])),
+    http.get('/api/einsaetze/1/meldungen', json(d.meldungen ?? [])),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
     http.get(
       '/api/einsaetze/1/meldungen/rueckmeldungen',
@@ -326,6 +333,11 @@ const bandDa = () => screen.findByRole('group', { name: 'Lage in Zahlen' });
 const paneel = (name: string | RegExp) => screen.getByRole('region', { name });
 /** Die Warnstufe steht im Seitenkopf wie im Lagebild (LLH-1140), nicht mehr im Band. */
 const kopfLage = () => document.querySelector<HTMLElement>('[data-lfh="ueberblick-lage-kopf"]');
+/** Paneel „Offene Vorgänge“ (LLH-1145) und einer seiner fünf Abschnitte. */
+const vorgaenge = () => paneel('Offene Vorgänge');
+const abschnitt = (name: string) => within(vorgaenge()).getByRole('region', { name });
+const abschnittZahl = (name: string) =>
+  abschnitt(name).querySelector('[data-lfh="abschnitt-zahl"]') as HTMLElement;
 
 describe('UeberblickPage', () => {
   it('Seitenkopf: Ortspfad mit Einsatzname, Titel und genau eine Primäraktion', async () => {
@@ -388,7 +400,7 @@ describe('UeberblickPage', () => {
       zaehler: {
         auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
         meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 1 },
-        nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 },
+        nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0, ueberfaellig: 0 },
       },
     });
     rendern();
@@ -618,42 +630,273 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('0/1 Aufträge erledigt');
   });
 
-  it('Offene Aufträge: überfällige zuerst, Status-Wort, Empfänger und Frist, Deeplink', async () => {
+  /*
+   * „Offene Vorgänge“ (LLH-1145, Spec `ueberblick-offene-vorgaenge`): fünf Abschnitte in fester
+   * Folge, die Zahl aus dem Modulzähler, je die drei dringendsten Einträge mit Deeplink.
+   */
+  it('Offene Vorgänge: fünf Abschnitte in fester Folge, je mit „alle ↗“ ins Modul', async () => {
     stelleBereit(volleDaten);
     rendern();
-    const p = await waitFor(() => paneel('Offene Aufträge'));
-    await within(p).findByText('1 überfällig');
-    const zeilen = within(p).getAllByRole('link');
+    const p = await waitFor(() => vorgaenge());
+    const koepfe = within(p).getAllByRole('heading', { level: 3 });
+    expect(koepfe.map((k) => k.textContent)).toEqual([
+      'Meldungen',
+      'Aufträge',
+      'Nachforderungen',
+      'Erinnerungen',
+      'Ablösungen',
+    ]);
+    expect(within(p).getByRole('link', { name: 'alle Nachforderungen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen',
+    );
+    expect(within(p).getByRole('link', { name: 'alle Aufträge' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/auftraege',
+    );
+  });
+
+  it('Offene Vorgänge · Aufträge: Zahl aus dem Zähler, überfällige zuerst mit Kante und Wort', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    await waitFor(() => vorgaenge());
+    const a = abschnitt('Aufträge');
+    await within(a).findByText('1 überfällig');
+    expect(abschnittZahl('Aufträge')).toHaveTextContent(/^2$/);
+    expect(a).toHaveTextContent('0 in Arbeit');
+    const zeilen = within(a)
+      .getAllByRole('link')
+      .filter((l) => l.dataset.lfh === 'vorgang-auftrag');
     expect(zeilen.map((z) => z.getAttribute('href'))).toEqual([
       '/einsaetze/1/auftraege?auftrag=22',
       '/einsaetze/1/auftraege?auftrag=21',
     ]);
+    expect(zeilen[0]).toHaveAttribute('data-alarm', 'true');
     expect(zeilen[0]).toHaveTextContent('überfällig');
     expect(zeilen[0]).toHaveTextContent('an EA-Nord · Frist');
-    expect(zeilen[1]).toHaveTextContent('läuft');
+    expect(zeilen[1]).not.toHaveAttribute('data-alarm');
+    expect(zeilen[1]).toHaveTextContent('offen');
     expect(zeilen[1]).toHaveTextContent('ohne Empfänger · Frist');
     expect(zeilen[1]).not.toHaveTextContent('an ohne');
   });
 
-  // LLH-1078: Zahlen aus dem Modulzähler, die Liste nennt nur die am längsten wartenden.
-  it('Nachforderungen: offen je Stufe aus dem Zähler, die zwei ältesten offenen mit Alter, Deeplink', async () => {
+  // LLH-1078 → LLH-1145: Nachforderungen sind ein Abschnitt; Zahl aus dem Modulzähler.
+  it('Offene Vorgänge · Nachforderungen: Zahl aus dem Zähler, Bedarfsfolge, Alter, Deeplink', async () => {
     stelleBereit(volleDaten);
     rendern();
-    const p = await waitFor(() => paneel('Nachforderungen'));
-    expect(await within(p).findByText('3 offen · 1 unterwegs')).toBeInTheDocument();
-    const stufen = p.querySelector('[data-lfh="nachforderung-stufen"]') as HTMLElement;
-    expect(stufen).toHaveTextContent('Angefordert1Zugesagt1Unterwegs1');
-    const zeilen = await within(p).findAllByRole('link', { name: /vor/ });
+    await waitFor(() => vorgaenge());
+    const n = abschnitt('Nachforderungen');
+    const zeilen = await within(n).findAllByRole('link', { name: /vor/ });
+    expect(abschnittZahl('Nachforderungen')).toHaveTextContent(/^3$/);
+    expect(n).toHaveTextContent('1 unterwegs');
+    // Keine überfällig → ohne Bedarfszeit die älteste Anforderung zuerst; die eingetroffene fehlt.
     expect(zeilen.map((z) => z.getAttribute('href'))).toEqual([
       '/einsaetze/1/nachforderungen?nachforderung=32',
       '/einsaetze/1/nachforderungen?nachforderung=33',
+      '/einsaetze/1/nachforderungen?nachforderung=31',
     ]);
     expect(zeilen[0]).toHaveTextContent('vor 1 h 35 min');
     expect(zeilen[0]).toHaveTextContent('2000× Sandsäcke — Deich Nord');
-    expect(zeilen[0]).toHaveTextContent('Unterwegs');
-    // Sprung „Nachforderungen ↗“ im Paneelkopf (Dashboard-Baukasten, LLH-1140).
-    await userEvent.click(within(p).getByRole('button', { name: 'Nachforderungen' }));
-    expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/);
+    expect(zeilen[0]).toHaveTextContent('an Leitstelle');
+    expect(zeilen[0]).toHaveTextContent('unterwegs');
+  });
+
+  it('Offene Vorgänge · Nachforderungen: überfällig aus dem Zähler, Eintrag im Ton „achtung“, ohne Alarmkante', async () => {
+    stelleBereit({
+      ...volleDaten,
+      zaehler: {
+        ...volleDaten.zaehler,
+        nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1, ueberfaellig: 1 },
+      },
+      nachforderungen: [
+        ...volleDaten.nachforderungen.filter((x) => (x as { id: number }).id !== 33),
+        nachforderung({
+          id: 33,
+          art: 'SEG',
+          bezeichnung: 'Betreuung',
+          status: 'zugesagt',
+          angefordert_at: vor(50),
+          eintreffen_erwartet_at: vor(5),
+        }),
+      ],
+    });
+    rendern();
+    await waitFor(() => vorgaenge());
+    const n = abschnitt('Nachforderungen');
+    await within(n).findByText('1 überfällig');
+    const zeilen = within(n).getAllByRole('link', { name: /vor/ });
+    expect(zeilen[0]).toHaveAttribute('href', '/einsaetze/1/nachforderungen?nachforderung=33');
+    expect(zeilen[0]).toHaveTextContent('überfällig');
+    expect(zeilen[0]).not.toHaveAttribute('data-alarm');
+  });
+
+  it('Offene Vorgänge · Meldungen: Bestätigung überfällig zuerst mit Wort, Lagemeldungen in der Notiz', async () => {
+    const meldung = (over: Record<string, unknown>) => ({
+      einsatz_id: 1,
+      inhalt: 'Meldung',
+      status: 'gesichtet',
+      ist_offen: true,
+      bestaetigung_pflicht: false,
+      ist_bestaetigt: false,
+      ist_ueberfaellig: false,
+      eskaliert: false,
+      eingang_at: vor(30),
+      erfasst_von_id: 1,
+      empfaenger_funktion: null,
+      ...over,
+    });
+    stelleBereit({
+      ...volleDaten,
+      zaehler: {
+        ...volleDaten.zaehler,
+        meldungen: { offen: 4, ungesehen: 2, bestaetigung_ueberfaellig: 1 },
+        lagemeldungen: { neu: 3 },
+      },
+      meldungen: [
+        meldung({ id: 51, inhalt: 'Alt', eingang_at: vor(90) }),
+        meldung({ id: 52, inhalt: 'Neu jung', status: 'neu', eingang_at: vor(5) }),
+        meldung({
+          id: 53,
+          inhalt: 'Wasser steigt',
+          bestaetigung_pflicht: true,
+          ist_ueberfaellig: true,
+          eingang_at: vor(2),
+        }),
+        meldung({ id: 54, inhalt: 'Neu alt', status: 'neu', eingang_at: vor(40) }),
+      ],
+    });
+    rendern();
+    await waitFor(() => vorgaenge());
+    const m = abschnitt('Meldungen');
+    const zeilen = await within(m).findAllByRole('link', { name: /Wasser steigt|Neu/ });
+    expect(abschnittZahl('Meldungen')).toHaveTextContent(/^4$/);
+    expect(m).toHaveTextContent('2 neu · 1 Bestätigung überfällig · 3 Lagemeldungen neu');
+    // Nur drei Einträge: der vierte (älteste gesichtete) steht im Modul.
+    const alle = within(m)
+      .getAllByRole('link')
+      .filter((l) => l.dataset.lfh === 'vorgang-meldung');
+    expect(alle.map((z) => z.getAttribute('href'))).toEqual([
+      '/einsaetze/1/meldungen?meldung=53',
+      '/einsaetze/1/meldungen?meldung=54',
+      '/einsaetze/1/meldungen?meldung=52',
+    ]);
+    expect(zeilen[0]).toHaveAttribute('data-alarm', 'true');
+    expect(zeilen[0]).toHaveTextContent('Bestätigung überfällig');
+  });
+
+  it('Offene Vorgänge · Erinnerungen und Ablösungen: fällige und baldige, Zahl aus ihrer Quelle', async () => {
+    const schicht = (id: number, faellig_at: string) => ({
+      id,
+      einsatz_id: 1,
+      einheit_id: 100 + id,
+      einheit_name: `Florian ${id}`,
+      abschnitt_id: 5,
+      abschnitt_name: 'Deichwache Nord',
+      beginn_at: vor(300),
+      rhythmus_minuten: 360,
+      vorwarnung_minuten: 30,
+      rhythmus_quelle: 'abschnitt',
+      faellig_at,
+      status: 'laufend',
+      ruecknehmbar: false,
+      angelegt_at: vor(300),
+    });
+    stelleBereit(volleDaten, [
+      http.get('/api/einsaetze/1/abloesungen', () =>
+        HttpResponse.json([schicht(1, vor(10)), schicht(2, nach(20)), schicht(3, nach(120))]),
+      ),
+    ]);
+    rendern();
+    await waitFor(() => vorgaenge());
+    const e = abschnitt('Erinnerungen');
+    const erinnerung = await within(e).findByRole('link', { name: /Lagebericht an Kreisstab/ });
+    expect(erinnerung).toHaveAttribute('href', '/einsaetze/1/erinnerungen');
+    expect(erinnerung).toHaveTextContent('bald');
+    expect(abschnittZahl('Erinnerungen')).toHaveTextContent(/^0$/);
+
+    const ab = abschnitt('Ablösungen');
+    const zeilen = await within(ab).findAllByRole('link', { name: /Florian/ });
+    expect(zeilen.map((z) => z.getAttribute('href'))).toEqual([
+      '/einsaetze/1/abloesung?schicht=1',
+      '/einsaetze/1/abloesung?schicht=2',
+    ]);
+    expect(zeilen[0]).toHaveAttribute('data-alarm', 'true');
+    expect(zeilen[0]).toHaveTextContent('überfällig');
+    expect(zeilen[1]).toHaveTextContent('bald fällig');
+    expect(abschnittZahl('Ablösungen')).toHaveTextContent(/^2$/);
+  });
+
+  describe('Offene Vorgänge · meine Stelle (LLH-1145 D5)', () => {
+    const fuerS2 = () => {
+      server.use(meHandler(benutzerFixture({ id: 9 }) as never));
+      stelleBereit(volleDaten, [
+        http.get('/api/einsaetze/1', () =>
+          HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s2'] }),
+        ),
+        http.get('/api/einsaetze/1/auftraege', () =>
+          HttpResponse.json([
+            ...volleDaten.auftraege,
+            auftrag({
+              id: 25,
+              auftrag_text: 'Lagekarte führen',
+              empfaenger: [
+                {
+                  id: 2,
+                  auftrag_id: 25,
+                  empfaenger_typ: 'funktion',
+                  funktion: 's2',
+                  snap_anzeige: 'S2',
+                },
+              ],
+            }),
+          ]),
+        ),
+      ]);
+    };
+
+    it('„meine Stelle“ filtert die Einträge, die Zahl bleibt die des Einsatzes', async () => {
+      fuerS2();
+      rendern();
+      await waitFor(() => vorgaenge());
+      await within(abschnitt('Aufträge')).findAllByRole('link', { name: /Trupps verlegen/ });
+      const leiste = within(vorgaenge()).getByRole('radiogroup', {
+        name: 'Offene Vorgänge zeigen für',
+      });
+      await userEvent.click(within(leiste).getByRole('radio', { name: 'meine Stelle' }));
+      expect(within(leiste).getByRole('radio', { name: 'meine Stelle' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      const a = abschnitt('Aufträge');
+      const zeilen = within(a)
+        .getAllByRole('link')
+        .filter((l) => l.dataset.lfh === 'vorgang-auftrag');
+      expect(zeilen.map((z) => z.getAttribute('href'))).toEqual([
+        '/einsaetze/1/auftraege?auftrag=25',
+      ]);
+      expect(abschnittZahl('Aufträge')).toHaveTextContent('im Einsatz');
+      expect(abschnitt('Nachforderungen')).toHaveTextContent('keine für meine Stelle');
+      expect(abschnitt('Ablösungen')).toHaveTextContent('alle Stellen');
+    });
+
+    it('die Sicht steht in der URL und wird von dort gelesen', async () => {
+      fuerS2();
+      renderMitProviders(
+        <Routes>
+          <Route path="/einsaetze/:id/ueberblick" element={<UeberblickPage />} />
+        </Routes>,
+        { route: '/einsaetze/1/ueberblick?vorgaenge=meine' },
+      );
+      await waitFor(() => vorgaenge());
+      expect(screen.getByRole('radio', { name: 'meine Stelle' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+      await within(abschnitt('Aufträge')).findByRole('link', { name: /Lagekarte führen/ });
+      expect(
+        within(abschnitt('Aufträge')).queryByRole('link', { name: /Trupps verlegen/ }),
+      ).toBeNull();
+    });
   });
 
   it('Entscheidungen: Zeitachseneintrag mit Typwort, Folgeaufträge gezählt, ETB-Link mit Filter', async () => {
@@ -895,8 +1138,11 @@ describe('UeberblickPage', () => {
       ),
     );
     rendern();
-    expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
-    expect(await screen.findByText('Keine offenen Nachforderungen.')).toBeInTheDocument();
+    // „Offene Vorgänge“: jeder der fünf Abschnitte sagt „keine“, keiner fällt weg (LLH-1145).
+    await waitFor(() =>
+      expect(vorgaenge().querySelectorAll('[data-lfh="abschnitt-keine"]')).toHaveLength(5),
+    );
+    expect(within(vorgaenge()).getAllByText('keine')).toHaveLength(5);
     expect(
       await screen.findByText('Noch keine Entscheidung im Einsatztagebuch.'),
     ).toBeInTheDocument();
@@ -961,9 +1207,7 @@ describe('UeberblickPage', () => {
     expect(screen.queryByRole('button', { name: 'Eintrag erfassen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).toBeNull();
     // Reine Navigation bleibt: sie schreibt nichts (Sprung im Paneelkopf, LLH-1140).
-    expect(
-      within(paneel('Offene Aufträge')).getByRole('button', { name: 'Aufträge/Befehle' }),
-    ).toBeInTheDocument();
+    expect(within(vorgaenge()).getByRole('link', { name: 'alle Aufträge' })).toBeInTheDocument();
   });
 
   it('abgeschlossener Einsatz: der Grund nennt den Abschluss, nicht die Rolle', async () => {
@@ -988,10 +1232,12 @@ describe('UeberblickPage', () => {
       ),
     ]);
     rendern();
-    const p = await waitFor(() => paneel('Offene Aufträge'));
+    await waitFor(() => vorgaenge());
+    const p = abschnitt('Aufträge');
     expect(await within(p).findByRole('alert')).toHaveTextContent('Stand unbekannt');
     expect(within(p).getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
-    expect(within(p).queryByText('Keine offenen Aufträge.')).toBeNull();
+    expect(within(p).queryByText('keine')).toBeNull();
+    expect(abschnittZahl('Aufträge')).toHaveTextContent('—');
     const auftragsZahl = within(band()).getByRole('link', { name: /Offene Aufträge/ });
     expect(auftragsZahl).toHaveTextContent('?');
     // Die Betroffenenzahl hängt an ihrer eigenen Quelle und bleibt lesbar.
@@ -1029,7 +1275,7 @@ describe('UeberblickPage', () => {
     const betroffene = await within(await bandDa()).findByRole('link', { name: /Betroffene/ });
     expect(betroffene).toHaveTextContent('wird abgerufen');
     expect(betroffene.querySelector('[aria-busy="true"]')).not.toBeNull();
-    const p = paneel('Offene Aufträge');
+    const p = abschnitt('Aufträge');
     expect(within(p).getByText('wird abgerufen').closest('[aria-busy="true"]')).not.toBeNull();
     // Eine unabhängige Quelle lädt trotzdem durch.
     await waitFor(() =>
@@ -1050,27 +1296,20 @@ describe('UeberblickPage', () => {
       return HttpResponse.json([]);
     };
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1/nachforderungen', haengt),
+      http.get('/api/einsaetze/1/abschnitte', haengt),
       http.get('/api/einsaetze/1/auftraege', haengt),
     ]);
     rendern();
     await bandDa();
-    // „Nachforderungen" trägt leer „Nachforderung anlegen" — im Laden steht ihr Platz, kein Knopf.
-    const nachforderungen = paneel('Nachforderungen');
-    const laden = within(nachforderungen)
-      .getByText('wird abgerufen')
-      .closest('[aria-busy="true"]')!;
+    // „Einsatzabschnitte" trägt leer „Abschnitt anlegen" — im Laden steht ihr Platz, kein Knopf.
+    const abschnitte = paneel('Einsatzabschnitte');
+    const laden = within(abschnitte).getByText('wird abgerufen').closest('[aria-busy="true"]')!;
     expect(laden.querySelectorAll('.ant-skeleton-button')).toHaveLength(1);
-    expect(within(nachforderungen).queryByRole('button', { name: /anlegen/ })).toBeNull();
-    // „Offene Aufträge" trägt leer keine Aktion (der Sprung steht im Kopf), also kein Platz.
-    const auftraege = paneel('Offene Aufträge');
+    expect(within(abschnitte).queryByRole('button', { name: /anlegen/ })).toBeNull();
+    // Der Aufträge-Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
+    const auftraege = abschnitt('Aufträge');
     expect(within(auftraege).getByText('wird abgerufen')).toBeInTheDocument();
-    expect(auftraege.querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
-    // Das Meta „keine überfällig“ hält im Laden unsichtbar seinen Platz: auf 390 px bricht der
-    // Kopf mit ihm um (79 → 94 px), und erst mit den Daten schöbe das alles darunter (LLH-1053).
-    const metaPlatz = auftraege.querySelector('[data-lfh="paneel-meta-platzhalter"]');
-    expect(metaPlatz).toHaveTextContent('keine überfällig');
-    expect(metaPlatz).toHaveAttribute('aria-hidden', 'true');
+    expect(vorgaenge().querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
   });
 
   it('Körper erst mit dem Einsatz: davor weder Band noch Paneele noch Rechtehinweis (LFH-629)', async () => {
@@ -1202,6 +1441,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     '/api/einsaetze/1/gefahrengebiete',
     '/api/einsaetze/1/auftraege',
     '/api/einsaetze/1/nachforderungen',
+    '/api/einsaetze/1/meldungen',
     '/api/einsaetze/1/erinnerungen',
     '/api/einsaetze/1/etb',
     '/api/einsaetze/1/meldungen/rueckmeldungen',
@@ -1264,19 +1504,20 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     expect(betroffene.closest('a')).toBeNull();
     expect(betroffene).not.toHaveTextContent('Stand unbekannt');
 
-    // Paneele des gesperrten Moduls: Grund statt „keine" und statt Ausfall.
-    const auftraege = paneel('Offene Aufträge');
-    expect(within(auftraege).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
-    expect(within(auftraege).queryByText('Keine offenen Aufträge.')).toBeNull();
+    // Abschnitte des gesperrten Moduls: „—“ mit Grund statt „keine" und statt Ausfall, kein Link.
+    for (const name of ['Meldungen', 'Aufträge', 'Nachforderungen']) {
+      const a = abschnitt(name);
+      expect(within(a).getByText('nicht freigegeben')).toBeInTheDocument();
+      expect(within(a).queryByText('keine')).toBeNull();
+      expect(within(a).queryByRole('link')).toBeNull();
+      expect(abschnittZahl(name)).toHaveTextContent(/^—$/);
+    }
+    expect(aufrufe['/api/einsaetze/1/meldungen']).toBeUndefined();
     const entscheidungen = paneel(/Entscheidungen/);
     expect(within(entscheidungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
     expect(within(entscheidungen).queryByText(/Noch keine Entscheidung/)).toBeNull();
-    const nachforderungen = paneel('Nachforderungen');
-    expect(within(nachforderungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
-    expect(within(nachforderungen).queryByRole('link')).toBeNull();
-    // Kein Sprung ins gesperrte ETB, keiner in die gesperrten Nachforderungen.
+    // Kein Sprung ins gesperrte ETB.
     expect(within(entscheidungen).queryByRole('button', { name: 'ETB' })).toBeNull();
-    expect(within(nachforderungen).queryByRole('button', { name: 'Nachforderungen' })).toBeNull();
 
     // Abschnittszeile ohne Rückmeldung und ohne Aufträge, aber ohne Ausfall.
     const zeile = await within(paneel('Einsatzabschnitte')).findByRole('link', {
@@ -1296,7 +1537,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       ...volleDaten,
       zaehler: {
         auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
-        nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1 },
+        nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1, ueberfaellig: 0 },
       },
     });
     rendern();
@@ -1335,16 +1576,16 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     });
     for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
     expect(zelle('Betroffene')).toHaveTextContent('wird abgerufen');
-    expect(within(paneel('Offene Aufträge')).getByText('wird abgerufen')).toBeInTheDocument();
+    expect(within(vorgaenge()).getByText('wird abgerufen')).toBeInTheDocument();
   });
 
   it('scheitern die Freigaben, steht „Stand unbekannt" — und nichts Gebundenes wird geladen', async () => {
     const aufrufe = mitFreigaben('fehler');
     rendern();
-    const auftraege = await waitFor(() => paneel('Offene Aufträge'));
-    expect(await within(auftraege).findByRole('alert')).toHaveTextContent('Stand unbekannt');
+    const p = await waitFor(() => vorgaenge());
+    expect(await within(p).findByRole('alert')).toHaveTextContent('Stand unbekannt');
     // Kein still leeres, ruhiges Bild.
-    expect(within(auftraege).queryByText('Keine offenen Aufträge.')).toBeNull();
+    expect(within(p).queryByText('keine')).toBeNull();
     expect(zelle('Betroffene')).toHaveTextContent('Stand unbekannt');
     for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
   });
@@ -1360,9 +1601,9 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       }),
     ]);
     rendern();
-    const auftraege = await waitFor(() => paneel('Offene Aufträge'));
-    await userEvent.click(await within(auftraege).findByRole('button', { name: 'Erneut abrufen' }));
-    expect(await within(auftraege).findByText('Modul nicht freigegeben.')).toBeInTheDocument();
+    const p = await waitFor(() => vorgaenge());
+    await userEvent.click(await within(p).findByRole('button', { name: 'Erneut abrufen' }));
+    expect(await within(abschnitt('Aufträge')).findByText('nicht freigegeben')).toBeInTheDocument();
     expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
   });
 

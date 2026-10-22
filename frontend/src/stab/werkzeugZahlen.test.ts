@@ -77,7 +77,7 @@ describe('werkzeugZahl (design.md D4)', () => {
   it('Nachforderungen zeigen die offenen wie das Modulmenü, davon unterwegs', () => {
     const z = {
       ...ZAEHLER,
-      nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 },
+      nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },
     };
     expect(
       werkzeugZahl(werkzeug('nachforderungen'), quellen({ zaehler: abfrage(z) })),

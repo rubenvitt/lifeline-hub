@@ -29,6 +29,26 @@ test.describe(KAPITEL, () => {
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/etb\\?.*typ=entscheidung`));
   });
 
+  // Ablauf „Nur die eigenen Vorgänge sehen“ (LLH-1145): die Sicht steht in der Adresse.
+  test('Offene Vorgänge: meine Stelle', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/ueberblick`);
+    const vorgaenge = page.locator('[data-lfh="offene-vorgaenge"]');
+    await expect(vorgaenge.getByRole('heading', { level: 3 })).toHaveText([
+      'Meldungen',
+      'Aufträge',
+      'Nachforderungen',
+      'Erinnerungen',
+      'Ablösungen',
+    ]);
+    await page.getByRole('radio', { name: 'meine Stelle' }).click();
+    await expect(page).toHaveURL(/[?&]vorgaenge=meine/);
+    await page.getByRole('radio', { name: 'alle', exact: true }).click();
+    await expect(page).not.toHaveURL(/vorgaenge=/);
+  });
+
   test('Vom Überblick zur Erfassung und zum Lagebericht', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);

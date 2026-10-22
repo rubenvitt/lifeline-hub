@@ -9,7 +9,7 @@ use lifeline_hub::einheit::repo::kumuliere;
 use lifeline_hub::einsatz::zaehler::{
     count_kraefte, zaehle_auftraege, zaehle_meldungen, zaehle_nachforderungen, AuftragsMerkmale,
     AuftragsZaehler, KraefteZaehler, KraftMerkmale, MeldungsMerkmale, MeldungsZaehler,
-    NachforderungsZaehler,
+    NachforderungsMerkmale, NachforderungsZaehler,
 };
 use lifeline_hub::entlassung::BeendetAls;
 use lifeline_hub::meldung::MeldungStatus;
@@ -124,25 +124,38 @@ fn meldungen_zaehlen_wie_das_fixture() {
     );
 }
 
-/// Modulzähler `nachforderungen` (LLH-1078): dieselben Fälle zählt das Board im Browser
-/// (`nachforderungen/nachforderungStufen.ts:zaehleNachforderungen`).
+/// Modulzähler `nachforderungen` (LLH-1078, „überfällig“ LLH-1145): dieselben Fälle zählt das
+/// Board im Browser (`nachforderungen/nachforderungStufen.ts:zaehleNachforderungen`). Das Flag
+/// `ist_ueberfaellig` liefert im Server das SQL-Fragment (`tests/modul_zaehler.rs` prüft es gegen
+/// die Liste); der Browser rechnet es aus `eintreffen_erwartet_at` und `jetzt` nach.
 #[test]
 fn nachforderungen_zaehlen_wie_das_fixture() {
     let fx = fixture();
     let faelle = fx["nachforderungen"]["faelle"].as_array().unwrap();
-    let status = |f: &Value| {
-        NachforderungStatus::parse(f["status"].as_str().unwrap()).expect("bekannter Status")
+    let merkmale = |f: &Value| NachforderungsMerkmale {
+        status: NachforderungStatus::parse(f["status"].as_str().unwrap())
+            .expect("bekannter Status"),
+        ist_ueberfaellig: flag(f, "ist_ueberfaellig"),
     };
 
     // Je Fall: allein gezählt, ist er genau dann offen, wenn das Fixture es sagt.
     for f in faelle {
-        let z = zaehle_nachforderungen(&[status(f)]);
+        let z = zaehle_nachforderungen(&[merkmale(f)]);
         let name = f["name"].as_str().unwrap();
         assert_eq!(z.offen == 1, flag(f, "offen"), "offen: {name}");
-        assert_eq!(status(f).ist_offen(), flag(f, "offen"), "ist_offen: {name}");
+        assert_eq!(
+            merkmale(f).status.ist_offen(),
+            flag(f, "offen"),
+            "ist_offen: {name}"
+        );
+        assert_eq!(
+            z.ueberfaellig == 1,
+            flag(f, "ist_ueberfaellig"),
+            "überfällig: {name}"
+        );
     }
 
-    let alle: Vec<_> = faelle.iter().map(status).collect();
+    let alle: Vec<_> = faelle.iter().map(merkmale).collect();
     let e = &fx["nachforderungen"]["erwartet"];
     assert_eq!(
         zaehle_nachforderungen(&alle),
@@ -151,6 +164,7 @@ fn nachforderungen_zaehlen_wie_das_fixture() {
             angefordert: zahl(&e["angefordert"]),
             zugesagt: zahl(&e["zugesagt"]),
             unterwegs: zahl(&e["unterwegs"]),
+            ueberfaellig: zahl(&e["ueberfaellig"]),
         }
     );
 }

@@ -19,6 +19,7 @@ import { istOffen } from '../pages/fuehrung/ueberblickDaten';
 import { abschnittStaerken } from '../pages/einsatzabschnitte/abschnittStaerke';
 import {
   istOffen as nachforderungOffen,
+  istUeberfaellig,
   zaehleNachforderungen,
 } from '../nachforderungen/nachforderungStufen';
 import { ohneAbgeschlossene, sichtungsbild, versorgungsBilanz } from '../personen/personenBilanz';
@@ -83,8 +84,22 @@ interface Fixture {
     erwartet: { offen: number; ungesehen: number; bestaetigung_ueberfaellig: number };
   };
   nachforderungen: {
-    faelle: Array<{ name: string; status: NachforderungStatus; offen: boolean; stufe: string }>;
-    erwartet: { offen: number; angefordert: number; zugesagt: number; unterwegs: number };
+    jetzt: string;
+    faelle: Array<{
+      name: string;
+      status: NachforderungStatus;
+      eintreffen_erwartet_at?: string;
+      offen: boolean;
+      stufe: string;
+      ist_ueberfaellig: boolean;
+    }>;
+    erwartet: {
+      offen: number;
+      angefordert: number;
+      zugesagt: number;
+      unterwegs: number;
+      ueberfaellig: number;
+    };
   };
   staerke: {
     einheiten: Array<{
@@ -158,17 +173,30 @@ describe('Fixture: Meldungen', () => {
   });
 });
 
-describe('Fixture: Nachforderungen (LLH-1078)', () => {
+describe('Fixture: Nachforderungen (LLH-1078, überfällig LLH-1145)', () => {
   const { faelle, erwartet } = fixture.nachforderungen;
+  // Wire-Zeit ohne Zone ist UTC (wie `istUeberfaellig` sie liest).
+  const jetzt = Date.parse(`${fixture.nachforderungen.jetzt.replace(' ', 'T')}Z`);
+  const liste = faelle.map((f) => ({
+    status: f.status,
+    eintreffen_erwartet_at: f.eintreffen_erwartet_at ?? null,
+  }));
 
   it.each(faelle.map((f) => [f.name, f] as const))('%s', (_name, f) => {
     expect(nachforderungOffen(f.status)).toBe(f.offen);
     // Die Spalte des Boards ist die Stufe selbst.
     expect(f.stufe).toBe(f.status);
+    // Der Server liest das Flag aus dem SQL-Fragment, der Browser rechnet es nach.
+    expect(
+      istUeberfaellig(
+        { status: f.status, eintreffen_erwartet_at: f.eintreffen_erwartet_at ?? null },
+        jetzt,
+      ),
+    ).toBe(f.ist_ueberfaellig);
   });
 
   it('Summen wie der Modulzähler', () => {
-    expect(zaehleNachforderungen(faelle)).toEqual(erwartet);
+    expect(zaehleNachforderungen(liste, jetzt)).toEqual(erwartet);
   });
 });
 

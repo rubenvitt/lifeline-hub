@@ -174,7 +174,7 @@ describe('NachforderungenPage', () => {
     server.use(
       http.get('/api/einsaetze/:einsatzId/modul-zaehler', () =>
         HttpResponse.json({
-          nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 },
+          nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },
         }),
       ),
     );

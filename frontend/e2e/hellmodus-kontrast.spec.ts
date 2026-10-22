@@ -151,7 +151,7 @@ for (const modus of ['light', 'dark'] as const) {
       [
         'paneel',
         'ueberblick',
-        page.locator('[data-lfh="paneel"] .lfh-augenbraue').filter({ hasText: 'Offene Aufträge' }),
+        page.locator('[data-lfh="paneel"] .lfh-augenbraue').filter({ hasText: 'Offene Vorgänge' }),
       ],
       [
         'flaeche',

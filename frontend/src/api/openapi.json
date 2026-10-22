@@ -11339,12 +11339,13 @@
       },
       "NachforderungsZaehler": {
         "type": "object",
-        "description": "Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.\nEingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an\nder Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.",
+        "description": "Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs), davon je Stufe und davon\nüberfällig (LLH-1145). Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den\nletzten 12 h“ hinge an der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen. „Überfällig“\nhängt ebenso an der Uhr wie bei den Aufträgen: der Stand des letzten Abrufs.",
         "required": [
           "offen",
           "angefordert",
           "zugesagt",
-          "unterwegs"
+          "unterwegs",
+          "ueberfaellig"
         ],
         "properties": {
           "angefordert": {
@@ -11355,6 +11356,11 @@
           "offen": {
             "type": "integer",
             "format": "int64"
+          },
+          "ueberfaellig": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Davon überfällig (LLH-1145): zugesagt oder unterwegs, erwartetes Eintreffen verstrichen —\ndieselbe Regel wie das Board (`istUeberfaellig` in\n`frontend/src/nachforderungen/nachforderungStufen.ts`)."
           },
           "unterwegs": {
             "type": "integer",

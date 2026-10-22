@@ -124,14 +124,18 @@ unterwegs); ein gemeinsames Fixture MUST beide Seiten gleich halten.
 - **WHEN** der Modulzähler `{ offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 }` liefert
 - **THEN** lautet der Kopf „5 offen · 2 unterwegs“
 
-### Requirement: Paneel „Nachforderungen“ im Führungsüberblick
-Der Führungsüberblick SHALL ein Paneel „Nachforderungen“ tragen: die offenen je Stufe aus dem
-Modulzähler, darunter die zwei am längsten wartenden offenen mit ihrem Alter und einem Sprung auf
-ihre Karte, und einen Sprung ins Modul. Ohne offene MUST es „Keine offenen Nachforderungen.“
-zeigen, mit Schreibrecht mit „Nachforderung anlegen“. Ist das Modul nicht frei, MUST es „Modul
-nicht freigegeben.“ zeigen, ohne Sprung und ohne Abruf der Liste.
+### Requirement: Nachforderungen in den „Offenen Vorgängen“ des Führungsüberblicks
+Der Führungsüberblick SHALL die Nachforderungen als Abschnitt des Paneels „Offene Vorgänge“
+tragen (Spec `ueberblick-offene-vorgaenge`): die offenen aus dem Modulzähler, daneben „n
+überfällig“ im Ton „achtung“ und „n unterwegs“, darunter die drei dringendsten offenen
+(überfällig, dann nach „Benötigt bis“, dann die älteste Anforderung) mit Alter, Adressat und
+einem Sprung auf ihre Karte, und „alle ↗“ ins Modul. Ohne offene MUST der Abschnitt „keine“
+zeigen. Ist das Modul nicht frei, MUST er „—“ und „nicht freigegeben“ zeigen, ohne Sprung und
+ohne Abruf der Liste. Eine überfällige Nachforderung trägt dort das Wort „überfällig“ im Ton
+„achtung“, nie die Alarmkante.
 
 #### Scenario: Überblick
-- **WHEN** drei Nachforderungen offen sind, die älteste seit 95 min unterwegs
-- **THEN** zeigt das Paneel „Angefordert“, „Zugesagt“ und „Unterwegs“ mit ihrer Zahl, und die
-  erste Zeile nennt „vor 1 h 35 min“ und führt auf die Karte dieser Nachforderung
+- **WHEN** drei Nachforderungen offen sind, die älteste seit 95 min unterwegs, keine überfällig
+  und keine mit „Benötigt bis“
+- **THEN** zeigt der Abschnitt die Zahl 3 und „1 unterwegs“, und die erste Zeile nennt „vor 1 h
+  35 min“ und „an Leitstelle“ und führt auf die Karte dieser Nachforderung
