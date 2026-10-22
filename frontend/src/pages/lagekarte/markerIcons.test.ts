@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { serializeAnySpec } from '@einsatzzeichen/core';
 import { freiesZeichen } from '../../zeichen/freiesZeichen';
-import { baueZeichenRegistry, kartenPixelRatio, markerIconKey, markerZeichen } from './markerIcons';
+import {
+  baueZeichenRegistry,
+  bildMitUnterlage,
+  kartenPixelRatio,
+  markerIconKey,
+  markerZeichen,
+} from './markerIcons';
 
 // LFH-835/LFH-836 (design.md D8): Fachobjekte und freie Zeichen zeichnet @einsatzzeichen (`ez|`).
 // Der Schlüssel entsteht aus der WIRKSAMEN Spec; gleiche Spec heißt gleicher Schlüssel, auch über
@@ -111,6 +117,40 @@ describe('baueZeichenRegistry', () => {
       'ez|{"v":1,"spec":{"kind":"person"}}',
     ]);
     expect(reg.get('ez|{"v":1,"spec":{"kind":"person"}}')).toBe(freiesZeichen(person).drawing);
+  });
+});
+
+// LLH-1141: auf dunkler Kartengrundlage trägt jedes Zeichen die helle Unterlage. Das Thema steht
+// im Bildschlüssel: ein Wechsel Nacht ↔ Tag gibt jedem Marker ein anderes Bild, das der Resolver
+// neu rastert, ohne dass die Seite neu lädt. Am Tag bleibt der Schlüssel, wie er war.
+describe('Bildschlüssel nach Kartenthema (LLH-1141)', () => {
+  const einheit = { typ: 'einheit', tz: { grundzeichen: 'taktische-formation' } } as const;
+  const frei = { typ: 'freies_zeichen', freiesZeichen: { grundzeichen: 'anlass' } } as const;
+
+  it('lässt den Schlüssel am Tag unverändert (ohne Unterlage)', () => {
+    expect(markerIconKey(einheit, 'light')).toBe(markerIconKey(einheit));
+    expect(markerIconKey(einheit, 'light')).toBe(markerZeichen(einheit)?.schluessel);
+    expect(bildMitUnterlage(markerIconKey(einheit, 'light')!)).toBe(false);
+  });
+
+  it('gibt nachts jedem Zeichen, auch einem freien, einen eigenen Schlüssel mit Unterlage', () => {
+    for (const mk of [einheit, frei, { typ: 'bereitstellungsraum' } as const]) {
+      const nacht = markerIconKey(mk, 'dark')!;
+      expect(nacht).not.toBe(markerIconKey(mk, 'light'));
+      expect(nacht.startsWith('ez|')).toBe(true);
+      expect(bildMitUnterlage(nacht)).toBe(true);
+    }
+  });
+
+  it('baut die Registry nachts unter denselben Schlüsseln wie die Feature-Property', () => {
+    const reg = baueZeichenRegistry([einheit, frei, { typ: 'lagemeldung' }], 'dark');
+    expect([...reg.keys()]).toEqual([markerIconKey(einheit, 'dark'), markerIconKey(frei, 'dark')]);
+    expect(reg.get(markerIconKey(einheit, 'dark')!)).toBe(markerZeichen(einheit)?.drawing);
+  });
+
+  it('kennt nur die eigenen Schlüssel als Bilder mit Unterlage', () => {
+    expect(bildMitUnterlage('plakette|x')).toBe(false);
+    expect(bildMitUnterlage('ez|{"v":1,"spec":{"kind":"event"}}')).toBe(false);
   });
 });
 

@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { beobachtePixeldichte, rastereZeichenNeu, type ZeichenKarte } from './zeichenDichte';
+import { legeAufUnterlage } from '../../zeichen/unterlage';
+import {
+  beobachtePixeldichte,
+  rastereZeichenNeu,
+  zeichneKartenZeichen,
+  type ZeichenKarte,
+} from './zeichenDichte';
 
 /** Ein Fenster, dessen Pixeldichte der Test von Hand wechselt — wie ein Monitor- oder Zoomwechsel. */
 function testFenster(start: number) {
@@ -136,5 +142,43 @@ describe('rastereZeichenNeu', () => {
     // Das kaputte Bild fehlt jetzt; der Resolver versucht es beim nächsten Layout erneut.
     expect(t.bilder.has('ez|a')).toBe(false);
     expect(t.bilder.has('ez|b')).toBe(true);
+  });
+});
+
+// LLH-1141: welches Bild die Unterlage trägt, sagt allein der Schlüssel (`markerIconKey`). Der
+// Resolver und das Neu-Rastern bei Dichtewechsel zeichnen beide über diesen einen Weg.
+describe('zeichneKartenZeichen', () => {
+  const roh = { width: 1, height: 1, data: new Uint8ClampedArray([0, 0, 0, 0]) };
+  const raster = vi.fn(() => roh);
+
+  function karte(belegt: string[] = []) {
+    const angelegt: { id: string; bild: unknown; optionen: unknown }[] = [];
+    const k = {
+      hasImage: (id: string) => belegt.includes(id),
+      addImage: (id: string, bild: unknown, optionen: unknown) => {
+        angelegt.push({ id, bild, optionen });
+      },
+    };
+    return { k, angelegt };
+  }
+
+  it('legt ein Bild mit Unterlage-Schlüssel auf die Unterlage', () => {
+    const { k, angelegt } = karte();
+    zeichneKartenZeichen(k, 'ez|unterlage|x', ZEICHNUNG, { size: 34, pixelRatio: 2 }, raster);
+    expect(raster).toHaveBeenCalledWith(ZEICHNUNG, { size: 34, pixelRatio: 2 });
+    expect(angelegt).toEqual([
+      { id: 'ez|unterlage|x', bild: legeAufUnterlage(roh), optionen: { pixelRatio: 2 } },
+    ]);
+  });
+
+  it('legt ein Bild ohne Unterlage-Schlüssel unverändert an (Tag)', () => {
+    const { k, angelegt } = karte();
+    zeichneKartenZeichen(k, 'ez|x', ZEICHNUNG, { size: 34, pixelRatio: 1 }, raster);
+    expect(angelegt).toEqual([{ id: 'ez|x', bild: roh, optionen: { pixelRatio: 1 } }]);
+  });
+
+  it('wirft auf eine belegte ID wie addSymbolImage (der Aufrufer fängt)', () => {
+    const { k } = karte(['ez|x']);
+    expect(() => zeichneKartenZeichen(k, 'ez|x', ZEICHNUNG, { size: 34 }, raster)).toThrow();
   });
 });

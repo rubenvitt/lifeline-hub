@@ -202,7 +202,15 @@ export default function Inspector({
           <img
             src={bild}
             alt=""
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            // Nachts auf der hellen Zeichenplatte wie die Kachel eines freien Zeichens (LFH-836,
+            // LLH-1141): Zeichen ohne Organisation zeichnet die Bibliothek nur als schwarzen Umriss.
+            // Am Tag ist die Platte durchsichtig.
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+              backgroundColor: rollen.zeichenPlatte,
+            }}
           />
         ) : undefined
       }

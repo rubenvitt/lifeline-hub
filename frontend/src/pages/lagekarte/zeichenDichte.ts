@@ -1,6 +1,12 @@
-import { addSymbolImage, type MapLike, type SymbolImageOptions } from '@einsatzzeichen/maplibre';
+import {
+  createStyleImage,
+  type MapLike,
+  type StyleImageData,
+  type SymbolImageOptions,
+} from '@einsatzzeichen/maplibre';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { ZEICHEN_KARTEN_PX } from './markerIcons';
+import { legeAufUnterlage } from '../../zeichen/unterlage';
+import { bildMitUnterlage, ZEICHEN_KARTEN_PX } from './markerIcons';
 
 /**
  * Die Zeichen (Fachobjekte und freie Zeichen) folgen der Pixeldichte des Bildschirms (LFH-842). Der Resolver in
@@ -49,6 +55,27 @@ export interface ZeichenKarte extends MapLike {
   removeImage(id: string): void;
 }
 
+/**
+ * Der eine Weg, auf dem die Lagekarte ein Zeichen als Kartenbild anlegt, für den Resolver
+ * (`kartenbildResolver.ts`) und {@link rastereZeichenNeu}. Wie `addSymbolImage`
+ * (@einsatzzeichen/maplibre), nur legt es ein Bild, dessen Schlüssel die Unterlage trägt
+ * (`bildMitUnterlage`, nachts, LLH-1141), vor dem Anlegen auf die helle Unterlage. Eine belegte ID
+ * ist ein Fehler wie dort; beide Aufrufer fangen ihn.
+ */
+export function zeichneKartenZeichen(
+  karte: MapLike,
+  id: string,
+  drawing: Drawing,
+  optionen: SymbolImageOptions,
+  raster: (drawing: Drawing, optionen: SymbolImageOptions) => StyleImageData = createStyleImage,
+): void {
+  if (karte.hasImage(id)) throw new Error(`Die Karte hat bereits ein Bild mit der ID "${id}".`);
+  const roh = raster(drawing, optionen);
+  karte.addImage(id, bildMitUnterlage(id) ? legeAufUnterlage(roh) : roh, {
+    pixelRatio: optionen.pixelRatio ?? 1,
+  });
+}
+
 type Zeichne = (
   karte: ZeichenKarte,
   id: string,
@@ -67,7 +94,7 @@ export function rastereZeichenNeu(
   karte: ZeichenKarte,
   registry: ReadonlyMap<string, Drawing>,
   pixelRatio: number,
-  zeichne: Zeichne = addSymbolImage,
+  zeichne: Zeichne = zeichneKartenZeichen,
 ): void {
   let ids: string[];
   try {

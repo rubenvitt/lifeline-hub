@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import { ConfigProvider, theme } from 'antd';
+import { antdToken, farbenDunkel } from '../../theme/tokens';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -761,6 +763,31 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
     expect(bild).not.toBeNull();
     const svg = decodeURIComponent(bild!.src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
     expect(svg).toBe(renderSvg(fachobjektZeichen(tz)!.drawing, KACHEL_SVG_OPTIONEN));
+  });
+
+  // LLH-1141: wie die Kachel eines freien Zeichens (LFH-836) steht das Zeichen nachts auf der
+  // hellen Zeichenplatte; am Tag ist die Platte durchsichtig, die Kachel bleibt, wie sie war.
+  it('legt das Zeichen nachts auf die Zeichenplatte, am Tag nicht', () => {
+    const tz = { grundzeichen: 'taktische-formation' } as const;
+    const probe = document.createElement('div');
+    probe.style.backgroundColor = farbenDunkel.zeichenPlatte;
+    renderMitProviders(
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
+        <Inspector
+          einsatzId={1}
+          marker={{ ...marker, schluessel: 'einheit-7', typ: 'einheit', id: 7, tz }}
+          darfSchreiben={false}
+          onSchliessen={() => {}}
+          onVerortungLoeschen={() => {}}
+        />
+      </ConfigProvider>,
+    );
+    const nacht = document.querySelector<HTMLElement>('[data-lfh="auswahl-kachel"] img')!;
+    expect(nacht.style.backgroundColor).toBe(probe.style.backgroundColor);
+    cleanup();
+
+    const tag = kachelMit(tz).querySelector<HTMLElement>('img')!;
+    expect(tag.style.backgroundColor).toBe('transparent');
   });
 
   it('zeigt bei nicht darstellbarem Zeichen das Kürzel statt abzustürzen', () => {

@@ -15,7 +15,7 @@ export interface KartenbildZiel {
 export interface KartenbildQuellen {
   /** Bildschlüssel → Zeichnung der aktuellen Marker (`baueZeichenRegistry`). */
   zeichen: () => ReadonlyMap<string, Drawing>;
-  /** Zeichen synchron anlegen (`addSymbolImage`). */
+  /** Zeichen synchron anlegen (`zeichneKartenZeichen`, nachts auf der Unterlage). */
   zeichneEz: (id: string, drawing: Drawing) => void;
 }
 

@@ -165,6 +165,26 @@ erscheinen.
 - **WHEN** die Person ein freies Zeichen platziert
 - **THEN** trägt der Marker sein Zeichen sofort, ohne auf ein weiteres Neu-Layout der Karte zu warten
 
+### Requirement: Kartenzeichen im Nachtbetrieb auf heller Unterlage
+Steht die Kartengrundlage dunkel (Nachtbetrieb oder Karten-Design „Dunkel“), SHALL die Lagekarte
+jedes Fachobjekt-Zeichen und jedes freie Zeichen auf einer hellen Unterlage zeichnen, die genau die
+Fläche des Zeichens deckt. Umriss gegen Unterlage und Unterlage gegen Kartengrund MUST je
+mindestens 3 : 1 halten. Die Farben der Zeichen nach DV 102 MUST unverändert bleiben (kein
+Einfärben, keine Umkehrung). Auf heller Kartengrundlage MUST die Unterlage fehlen. Ein Wechsel
+zwischen dunkler und heller Kartengrundlage MUST die Zeichen ohne Neuladen der Seite neu zeichnen.
+
+#### Scenario: Einsatzort im Nachtbetrieb
+- **WHEN** im Nachtbetrieb der Einsatzort auf der Lagekarte steht
+- **THEN** steht sein schwarzer Umriss auf der hellen Unterlage, und beide halten mindestens 3 : 1
+
+#### Scenario: Tagbetrieb
+- **WHEN** die Kartengrundlage hell ist
+- **THEN** trägt kein Zeichen eine Unterlage
+
+#### Scenario: Wechsel des Karten-Designs
+- **WHEN** die Person das Karten-Design von „Hell“ auf „Dunkel“ stellt
+- **THEN** tragen alle Zeichen die Unterlage, ohne dass die Seite neu lädt
+
 ### Requirement: Symbolkachel eines farblosen freien Zeichens bleibt lesbar
 
 Die Symbolkachel im Inspector der Lagekarte SHALL das freie Zeichen so zeigen, wie die

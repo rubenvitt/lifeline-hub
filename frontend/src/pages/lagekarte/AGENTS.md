@@ -225,6 +225,16 @@ diese Zusage.
   selbst keinen (`getSource` vor `isSourceLoaded`).
   Browser-Nachweis mit der Fixture-Basemap (`e2e/kartenFixture.ts`, „gelesen“ = dekodiert):
   `e2e/lagekarte-kartengrundlage.spec.ts`, `e2e/lagekarte-kachelpfad.spec.ts`.
+- **Zeichen auf dunkler Grundlage tragen die Unterlage** (LLH-1141, Spec
+  `lagekarte-taktische-zeichen`): ist das aufgelöste Kartenthema `dark` (`loeseKartenTheme`, Prop
+  `kartenTheme` der `Kartenflaeche`), rastert jedes Zeichen (Fachobjekt und freies Zeichen) auf
+  `ZEICHEN_UNTERLAGE` (`zeichen/unterlage.ts`, `legeAufUnterlage`), am Tag ohne. Das Thema steht im
+  Bildschlüssel (`ez|unterlage|…`, nur `markerIconKey`/`baueZeichenRegistry` bilden ihn): ein Wechsel
+  gibt jedem Marker ein neues Bild, kein Neuladen. Gezeichnet wird nur über `zeichneKartenZeichen`
+  (`zeichenDichte.ts`), nie direkt über `addSymbolImage`. DV-102-Farben werden nicht eingefärbt
+  oder invertiert. Der Lageplan zeigt die Karte, wie sie steht (dunkel mit Unterlage). Die
+  Inspector-Kachel nimmt die Zeichenplatte (`zeichenPlatte`) wie das freie Zeichen. Nachweis
+  `e2e/lagekarte-zeichen-kontrast.spec.ts` (Pixel, ≥ 3 : 1).
 - **Vertagte Kartendaten tragen einen Schlüssel** (LFH-943, D2/D3 in
   `openspec/changes/archive/2026-10-05-lfh-943-945-lagekarte-ressourcen/design.md`):
   `wendeKartenDatenAn(map, schluessel, anwenden)` hält je Karte und Schlüssel höchstens eine

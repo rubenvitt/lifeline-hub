@@ -15,6 +15,8 @@ const karte = vi.hoisted(() => ({
   entfernt: false,
   setDataAbschnitte: 0,
   ereignisse: [] as string[],
+  /** Zuletzt per `setData` eingespielte Daten je Quelle. */
+  daten: {} as Record<string, unknown>,
 }));
 
 vi.mock('maplibre-gl', () => {
@@ -29,10 +31,12 @@ vi.mock('maplibre-gl', () => {
           return karte.entfernt ? undefined : { _loaded: true };
         },
         getSource: (id: string) => quellen.get(id),
-        addSource: (id: string) => {
+        addSource: (id: string, spec?: { data?: unknown }) => {
+          karte.daten[id] = spec?.data;
           quellen.set(id, {
-            setData: () => {
+            setData: (d?: unknown) => {
               if (id === 'abschnitte') karte.setDataAbschnitte += 1;
+              karte.daten[id] = d;
             },
           });
         },
@@ -119,6 +123,8 @@ vi.mock('./zeichnen', async (original) => ({
 }));
 
 import Kartenflaeche, { type KartenflaecheProps } from './Kartenflaeche';
+import { MARKER_CLUSTER_QUELLE } from './markerLayer';
+import { bildMitUnterlage, markerIconKey } from './markerIcons';
 
 const STIL: StyleSpecification = { version: 8, sources: {}, layers: [] };
 const polygon = (x: number): GeoJsonPolygon => ({
@@ -146,6 +152,7 @@ function zeige(props: Partial<KartenflaecheProps> = {}) {
 beforeEach(() => {
   karte.setDataAbschnitte = 0;
   karte.ereignisse = [];
+  karte.daten = {};
 });
 afterEach(() => {
   vi.clearAllMocks();
@@ -203,5 +210,40 @@ describe('Kartenflaeche: Abschnittsflächen nur bei Änderung (LFH-945)', () => 
     expect(karte.setDataAbschnitte).toBe(nachStart + 1);
     neu({ flaechen: [{ id: 1, label: 'Abschnitt Süd', polygon: polygon(9) }] });
     expect(karte.setDataAbschnitte).toBe(nachStart + 2);
+  });
+});
+
+describe('Kartenflaeche: Zeichen nach Kartenthema (LLH-1141)', () => {
+  const einheit = {
+    schluessel: 'einheit-1',
+    typ: 'einheit' as const,
+    id: 1,
+    lat: 50,
+    lon: 8,
+    label: 'Gruppe 1',
+    farbe: '#000000',
+    tz: { grundzeichen: 'taktische-formation' as const },
+  };
+  const icons = () =>
+    (
+      karte.daten[MARKER_CLUSTER_QUELLE] as
+        { features: { properties: { icon?: string } }[] } | undefined
+    )?.features.map((f) => f.properties.icon);
+
+  it('wechselt beim Themawechsel den Bildschlüssel, ohne die Karte neu zu bauen', () => {
+    const { neu } = zeige({ markers: [einheit], kartenTheme: 'light' });
+    const instanz = karte.instanz;
+    const tag = icons();
+    expect(tag).toEqual([markerIconKey(einheit, 'light')]);
+
+    neu({ markers: [einheit], kartenTheme: 'dark' });
+    expect(icons()).toEqual([markerIconKey(einheit, 'dark')]);
+    expect(bildMitUnterlage(icons()![0]!)).toBe(true);
+
+    neu({ markers: [einheit], kartenTheme: 'light' });
+    expect(icons()).toEqual(tag);
+    // Dieselbe Karte: kein Neuaufbau, kein Neuladen.
+    expect(karte.instanz).toBe(instanz);
+    expect(karte.ereignisse).not.toContain('map.remove');
   });
 });
