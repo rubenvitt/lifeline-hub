@@ -76,8 +76,13 @@ test.describe('Schadenliste seitenweise', () => {
     const { einsatzId, schwerNr } = await einsatzMitSchaeden(page);
     await pruefeSchaeden(page, einsatzId, schwerNr);
 
-    // „Ältere laden“ in der Vorgabesicht.
+    // „Ältere laden“ in der Vorgabesicht. Der Rückweg ohne Parameter bringt den Stand der Sitzung
+    // mit (LLH-1086, Spec `tabellen-sortieren-filtern`): erst „Filter zurücksetzen“.
     await page.goto(`/einsaetze/${einsatzId}/schaeden`);
+    await expect(
+      page.getByRole('button', { name: 'Filter Ausmaß: katastrophal entfernen' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Filter zurücksetzen' }).click();
     await expect(page.getByText(`100 von ${SCHAEDEN} geladen`)).toBeVisible();
     await page.getByRole('button', { name: 'Ältere laden' }).click();
     await expect(page.getByText(`200 von ${SCHAEDEN} geladen`)).toBeVisible();
