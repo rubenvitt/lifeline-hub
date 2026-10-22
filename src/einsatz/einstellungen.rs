@@ -41,7 +41,7 @@ wire_enum! {
     /// Zeitdarstellung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitdarstellung`.
     /// `None` am Einsatz bzw. an der Organisation heißt Vorgabe, also taktisch; am Gerät kann
     /// man sie übersteuern, der Druck nie (LLH-1053, Spec `zeitdarstellung`). Löst das tote
-    /// 24h/12h-„Zeitformat" ab (Migration 0243).
+    /// 24h/12h-„Zeitformat" ab (Migration `zeitdarstellung`).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum Zeitdarstellung {
         Taktisch => "taktisch",
