@@ -42,6 +42,7 @@ import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
+import { meldungsFunktionsOptionen } from '../fuehrung/funktionsOptionenKern';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
 import { vonOptionenAus } from '../meldungen/MeldungKorrektur';
@@ -511,6 +512,10 @@ export default function MeldungenPage() {
     () => vonOptionenAus(einheitenQuery.data, abschnitteQuery.data),
     [einheitenQuery.data, abschnitteQuery.data],
   );
+  const funktionsOptionen = useMemo(
+    () => meldungsFunktionsOptionen(funktionsVorschlaege),
+    [funktionsVorschlaege],
+  );
   const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
   // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
   const sprungGesperrt = useSprungSperre(einsatzId);
@@ -596,6 +601,7 @@ export default function MeldungenPage() {
     onAuftragErteilen,
     onKorrigieren,
     vonOptionen,
+    funktionsOptionen,
     onAusDerLage,
     auftragGesperrt,
     kartenFehler: kartenFehler.grund,

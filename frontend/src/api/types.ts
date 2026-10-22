@@ -1277,6 +1277,8 @@ export interface MeldungKorrekturPatch {
   einheit_id?: number | null;
   abschnitt_id?: number | null;
   empfaenger?: string | null;
+  /** Empfängerfunktion aus dem Katalog wie beim Erfassen (LLH-1381); `null` leert. */
+  empfaenger_funktion?: Fuehrungsfunktion | null;
   /** `true` übernimmt in die Lage, `false` nimmt aus der Lage (nicht bei einer Lagemeldung). */
   lagerelevant?: boolean;
   /** Leer oder `null`: der Wortlaut gilt. */

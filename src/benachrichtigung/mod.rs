@@ -373,10 +373,30 @@ async fn melden_mit_fehler(
         return Ok(Vec::new());
     }
     let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
-    if aufgeloest.benutzer_ids.is_empty() {
-        return Ok(Vec::new());
+    ausliefern(
+        pool,
+        live,
+        anlass,
+        aufgeloest.org_id,
+        &aufgeloest.benutzer_ids,
+    )
+    .await?;
+    Ok(aufgeloest.benutzer_ids)
+}
+
+/// Schreibt je aufgelöstem Empfänger eine Zeile und stellt sie zu (Live, Web Push). Nur für
+/// Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert hat.
+async fn ausliefern(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    anlass: &Anlass,
+    org_id: i64,
+    benutzer_ids: &[i64],
+) -> Result<(), crate::error::AppError> {
+    if benutzer_ids.is_empty() {
+        return Ok(());
     }
-    let zeilen = repo::anlegen(pool, anlass, &aufgeloest.benutzer_ids).await?;
+    let zeilen = repo::anlegen(pool, anlass, benutzer_ids).await?;
     let ereignisse: Vec<(i64, BenachrichtigungEreignis)> = zeilen
         .into_iter()
         .map(|(benutzer_id, id)| {
@@ -394,13 +414,7 @@ async fn melden_mit_fehler(
             )
         })
         .collect();
-    zustellen(
-        live,
-        aufgeloest.org_id,
-        anlass.einsatz_id,
-        anlass.art,
-        &ereignisse,
-    );
+    zustellen(live, org_id, anlass.einsatz_id, anlass.art, &ereignisse);
     // Web Push an die Geräte der Empfänger (LLH-1223, Spec `web-push`): dieselbe Nutzlast wie
     // das Live-Ereignis, in einem eigenen Task; ohne `--web-push` nichts.
     if let Some(web_push) = live.web_push() {
@@ -416,7 +430,7 @@ async fn melden_mit_fehler(
                 .collect(),
         );
     }
-    Ok(aufgeloest.benutzer_ids)
+    Ok(())
 }
 
 /// Erledigt die offenen Benachrichtigungen der Art `art` zu den Bezügen `typ`/`ids` für ALLE
@@ -442,8 +456,21 @@ pub async fn erledigen(
             return 0;
         }
     };
+    quittiert_zustellen(pool, live, einsatz_id, art, &zeilen).await;
+    zeilen.len()
+}
+
+/// Stellt jedem Empfänger der gerade quittierten `zeilen` sein Quittier-Ereignis zu, wie beim
+/// eigenen Quittieren.
+async fn quittiert_zustellen(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    zeilen: &[repo::Zeile],
+) {
     if zeilen.is_empty() {
-        return 0;
+        return;
     }
     let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
         .bind(einsatz_id)
@@ -470,7 +497,60 @@ pub async fn erledigen(
             .collect();
         zustellen(live, org_id, einsatz_id, art, &ereignisse);
     }
-    zeilen.len()
+}
+
+/// Richtet die Benachrichtigungen eines Bezugs neu aus, wenn sich sein Adressat ändert (LLH-1381:
+/// korrigierte Empfängerfunktion einer Meldung). `neu` ist der Anlass nach dem neuen Stand,
+/// `None`, wenn er keinen mehr hat; Art und Bezug stehen in `art`/`bezug`. Wer nach
+/// [`aufloesung::empfaenger`] nicht mehr gemeint ist, dessen offene Zeile ist erledigt (mit
+/// Quittier-Ereignis); wer gemeint ist und zu diesem Bezug noch nie eine Zeile hatte, bekommt eine.
+/// Wer schon eine hat, offen oder selbst quittiert, behält sie und bekommt keine zweite: je Person
+/// höchstens ein Hinweis zum Bezug. Wie [`melden`] lässt ein Fehler die committete Anfrage nicht
+/// scheitern.
+pub async fn umadressieren(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    bezug: Bezug,
+    neu: Option<Anlass>,
+) {
+    if let Err(e) = umadressieren_mit_fehler(pool, live, einsatz_id, art, bezug, neu).await {
+        tracing::warn!(einsatz_id, art = art.as_str(), fehler = %e, "Benachrichtigungen nicht umadressiert");
+    }
+}
+
+async fn umadressieren_mit_fehler(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    bezug: Bezug,
+    neu: Option<Anlass>,
+) -> Result<(), crate::error::AppError> {
+    debug_assert!(neu
+        .as_ref()
+        .is_none_or(|a| a.einsatz_id == einsatz_id && a.art == art && a.bezug == bezug));
+    let aufgeloest = match &neu {
+        Some(anlass) => Some(aufloesung::empfaenger(pool, anlass).await?),
+        None => None,
+    };
+    let gemeint: &[i64] = aufgeloest.as_ref().map_or(&[], |a| &a.benutzer_ids);
+    let erledigt =
+        repo::quittieren_fuer_bezug_ausser(pool, einsatz_id, art, bezug.typ, bezug.id, gemeint)
+            .await?;
+    quittiert_zustellen(pool, live, einsatz_id, art, &erledigt).await;
+    let (Some(anlass), Some(aufgeloest)) = (neu, aufgeloest) else {
+        return Ok(());
+    };
+    let hatten = repo::empfaenger_des_bezugs(pool, einsatz_id, art, bezug.typ, bezug.id).await?;
+    let dazu: Vec<i64> = aufgeloest
+        .benutzer_ids
+        .iter()
+        .copied()
+        .filter(|id| !hatten.contains(id))
+        .collect();
+    ausliefern(pool, live, &anlass, aufgeloest.org_id, &dazu).await
 }
 
 /// Stellt die Ereignisse einer Art und eines Einsatzes zu, je `(benutzer_id, Ereignis)` genau

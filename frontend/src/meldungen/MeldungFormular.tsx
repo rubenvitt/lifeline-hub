@@ -15,7 +15,7 @@ import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
 import {
   KEINE_VORSCHLAEGE,
-  optionsLabel,
+  meldungsFunktionsOptionen,
   type FunktionsVorschlaege,
 } from '../fuehrung/funktionsOptionenKern';
 import type {
@@ -260,18 +260,12 @@ export default function MeldungFormular({
     if (name) form.setFieldValue('absender', name);
   };
 
-  // Nur Funktionen ohne Pflicht-Bezeichnung: Führungshilfspersonal und Fachberater nimmt eine
-  // Meldung nicht an (der Server antwortet 422). S7 steht nur im Katalog, wenn eingeschaltet.
-  const funktionsKatalog = funktionsVorschlaege.katalog.filter((e) => !e.bezeichnung_pflicht);
-  const funktionsOptionen = funktionsKatalog.map((e) => ({
-    value: e.funktion,
-    label: optionsLabel(e, funktionsVorschlaege.besetzung),
-  }));
+  const funktionsOptionen = meldungsFunktionsOptionen(funktionsVorschlaege);
 
   // Eine Lagemeldung geht vorgabemäßig an S2 (LLH-1062): die Funktion wird vorgeschlagen, solange
   // sie leer ist und niemand sie angefasst hat. Der freie Empfänger bleibt, wie er ist; eine
   // Lagemeldung nach außen hat dort ihren eigentlichen Adressaten.
-  const s2Verfuegbar = funktionsKatalog.some((e) => e.funktion === 's2');
+  const s2Verfuegbar = funktionsOptionen.some((o) => o.value === 's2');
   useEffect(() => {
     if (meldungsart !== 'lagemeldung' || !s2Verfuegbar) return;
     if (form.getFieldValue('empfaenger_funktion') || form.isFieldTouched('empfaenger_funktion')) {
@@ -282,7 +276,7 @@ export default function MeldungFormular({
 
   /** Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8). */
   const funktionGewaehlt = (funktion: Fuehrungsfunktion | undefined) => {
-    const eintrag = funktionsKatalog.find((e) => e.funktion === funktion);
+    const eintrag = funktionsVorschlaege.katalog.find((e) => e.funktion === funktion);
     if (!eintrag || form.getFieldValue('empfaenger')?.trim()) return;
     form.setFieldValue('empfaenger', eintrag.kuerzel ?? eintrag.label);
   };

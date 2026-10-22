@@ -175,6 +175,53 @@ async fn mehrere_felder_ein_systemeintrag_und_gleiche_werte_zaehlen_nicht() {
     );
 }
 
+/// Die Empfängerfunktion lässt sich korrigieren (LLH-1381): der Systemeintrag nennt alt → neu,
+/// `null` leert sie; ein unbekannter Code ist 400, eine Funktion mit Pflicht-Bezeichnung 422 wie
+/// beim Erfassen.
+#[tokio::test]
+async fn empfaengerfunktion_korrigiert_nennt_alt_und_neu() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let mid = melden(&app, &admin, e, json!({ "empfaenger_funktion": "s3" })).await["id"]
+        .as_i64()
+        .unwrap();
+
+    let (s, neu) = korrigieren(&app, &admin, e, mid, json!({ "empfaenger_funktion": "s2" })).await;
+    assert_eq!(s, StatusCode::OK, "{neu:?}");
+    assert_eq!(neu["empfaenger_funktion"], "s2");
+    assert_eq!(neu["empfaenger"], "ELW 1", "der Freitext bleibt");
+    let (s, neu) = korrigieren(&app, &admin, e, mid, json!({ "empfaenger_funktion": null })).await;
+    assert_eq!(s, StatusCode::OK, "{neu:?}");
+    assert!(
+        !neu.as_object().unwrap().contains_key("empfaenger_funktion"),
+        "{neu}"
+    );
+    let (s, _) = korrigieren(&app, &admin, e, mid, json!({ "empfaenger_funktion": "el" })).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        systemtexte(&etb_zur_meldung(&app, &admin, e, mid).await),
+        vec![
+            "Meldung #1: Empfängerfunktion S3 → S2".to_string(),
+            "Meldung #1: Empfängerfunktion S2 → keine".to_string(),
+            "Meldung #1: Empfängerfunktion keine → EL".to_string(),
+        ]
+    );
+
+    let (s, _) = korrigieren(&app, &admin, e, mid, json!({ "empfaenger_funktion": "s9" })).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    for code in ["fachberater", "s7"] {
+        let (s, v) =
+            korrigieren(&app, &admin, e, mid, json!({ "empfaenger_funktion": code })).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{code}: {v:?}");
+    }
+    assert_eq!(
+        systemtexte(&etb_zur_meldung(&app, &admin, e, mid).await).len(),
+        3,
+        "Ablehnungen schreiben nichts"
+    );
+}
+
 #[tokio::test]
 async fn von_bezug_nachgetragen_aktualisiert_die_rueckmeldung() {
     let app = setup().await;

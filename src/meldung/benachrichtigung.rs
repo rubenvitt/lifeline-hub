@@ -11,7 +11,8 @@
 
 use super::{MeldungAnzeige, MeldungStatus, Meldungsart};
 use crate::benachrichtigung::{
-    erledigen, melden, Adressat, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug,
+    erledigen, melden, umadressieren, Adressat, Anlass, BenachrichtigungArt,
+    BenachrichtigungBezugTyp, Bezug,
 };
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::kommunikation::Prioritaet;
@@ -100,6 +101,34 @@ pub async fn erfasst(pool: &SqlitePool, live: &LiveHub, meldung: &MeldungAnzeige
     if let Some(anlass) = anlass(meldung, quelle) {
         melden(pool, live, anlass).await;
     }
+}
+
+/// Nach einer Korrektur der Empfängerfunktion (LLH-1381): die Hinweise der Meldung folgen der
+/// Regel aus [`anlass`] mit dem neuen Stand, ausgelöst vom Korrigierenden. Wer nicht mehr gemeint
+/// ist, dessen offener Hinweis ist erledigt; wer neu gemeint ist, bekommt ihn, je Person höchstens
+/// einmal ([`umadressieren`]). Nur solange die Meldung „Neu“ ist: eine gesichtete hat keine
+/// offenen Hinweise mehr ([`status_geaendert`]) und bekommt keine neuen.
+pub async fn empfaengerfunktion_korrigiert(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    meldung: &MeldungAnzeige,
+    benutzer_id: i64,
+) {
+    if meldung.status != MeldungStatus::Neu {
+        return;
+    }
+    let quelle = MeldungQuelle::von(pool, meldung)
+        .await
+        .unwrap_or(MeldungQuelle::Hand);
+    umadressieren(
+        pool,
+        live,
+        meldung.einsatz_id,
+        BenachrichtigungArt::Meldung,
+        Bezug::neu(BenachrichtigungBezugTyp::Meldung, meldung.id),
+        anlass(meldung, quelle).map(|a| a.von(benutzer_id)),
+    )
+    .await;
 }
 
 /// Der Anlass der Übernahme einer Meldung in die Lage (design.md E5): „In die Lage übernommen“

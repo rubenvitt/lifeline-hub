@@ -23,7 +23,7 @@ import { KennungsLink } from '../components/kennungsLink';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
-import MeldungKorrektur, { type VonGruppe } from './MeldungKorrektur';
+import MeldungKorrektur, { type FunktionsAuswahl, type VonGruppe } from './MeldungKorrektur';
 
 const { Text } = Typography;
 
@@ -71,6 +71,8 @@ interface MeldungKarteProps {
   onKorrigieren?: (meldungId: number, aenderung: MeldungKorrekturPatch) => Promise<unknown>;
   /** Auswahl des Von-Bezugs für „Bearbeiten“; stabil übergeben, die Karte ist `memo`. */
   vonOptionen?: VonGruppe[];
+  /** Auswahl der Empfängerfunktion für „Bearbeiten“ (LLH-1381); stabil übergeben. */
+  funktionsOptionen?: FunktionsAuswahl;
   /** „Aus der Lage nehmen“ an einer übernommenen Meldung, die keine Lagemeldung ist (LLH-1066). */
   onAusDerLage?: (meldungId: number) => void;
   /**
@@ -144,6 +146,7 @@ function MeldungKarte({
   onAuftragErteilen,
   onKorrigieren,
   vonOptionen,
+  funktionsOptionen,
   onAusDerLage,
   auftragGesperrt = false,
   fehlerGrund,
@@ -347,6 +350,7 @@ function MeldungKarte({
         <MeldungKorrektur
           meldung={m}
           vonOptionen={vonOptionen}
+          funktionsOptionen={funktionsOptionen}
           onSpeichern={(aenderung) => onKorrigieren(m.id, aenderung)}
           onFertig={() => setBearbeiten(false)}
         />
