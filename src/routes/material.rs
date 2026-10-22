@@ -4,8 +4,10 @@ use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
 use crate::material::repo::{self, MaterialDaten, MaterialPatch};
-use crate::material::{MaterialAnzeige, MaterialArt};
-use crate::routes::support::{deserialize_optional_field, pflicht, trimme, trimme_tri};
+use crate::material::{MaterialAnzeige, MaterialArt, STAMM_BEMERKUNG_MAX, STAMM_TEXT_MAX};
+use crate::routes::support::{
+    deserialize_optional_field, optional_max, optional_max_tri, pflicht_max, pflicht_max_tri,
+};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -55,15 +57,20 @@ impl Normalisiert {
     }
 }
 
+/// Freitexte mit Grenze (LLH-1258, `src/AGENTS.md`, „Eingabegrenzen“): 400 vor jedem Schreiben.
 fn normalisiere(body: MaterialBody) -> Result<Normalisiert, AppError> {
-    let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
+    let bezeichnung = pflicht_max(&body.bezeichnung, "Bezeichnung", STAMM_TEXT_MAX)?;
     Ok(Normalisiert {
         bezeichnung,
-        kategorie: trimme(body.kategorie),
-        bestandsnummer: trimme(body.bestandsnummer),
-        traegerorganisation: trimme(body.traegerorganisation),
-        standort: trimme(body.standort),
-        bemerkung: trimme(body.bemerkung),
+        kategorie: optional_max(body.kategorie, "Kategorie", STAMM_TEXT_MAX)?,
+        bestandsnummer: optional_max(body.bestandsnummer, "Bestandsnummer", STAMM_TEXT_MAX)?,
+        traegerorganisation: optional_max(
+            body.traegerorganisation,
+            "Trägerorganisation",
+            STAMM_TEXT_MAX,
+        )?,
+        standort: optional_max(body.standort, "Standort", STAMM_TEXT_MAX)?,
+        bemerkung: optional_max(body.bemerkung, "Bemerkung", STAMM_BEMERKUNG_MAX)?,
         art: body
             .art
             .as_deref()
@@ -125,20 +132,18 @@ impl PatchNormalisiert {
 /// (Statuscode-Konvention LFH-305), ein absentes ist schlicht kein Wunsch — die Prüfung darf
 /// nicht auf den Absent-Zweig durchschlagen, sonst wäre jeder Teil-Patch abgelehnt.
 fn normalisiere_patch(body: PatchMaterial) -> Result<PatchNormalisiert, AppError> {
-    let bezeichnung = match body.bezeichnung {
-        Some(b) => {
-            let b = pflicht(&b, "Bezeichnung")?;
-            Some(b)
-        }
-        None => None,
-    };
+    let bezeichnung = pflicht_max_tri(body.bezeichnung.as_deref(), "Bezeichnung", STAMM_TEXT_MAX)?;
     Ok(PatchNormalisiert {
         bezeichnung,
-        kategorie: trimme_tri(body.kategorie),
-        bestandsnummer: trimme_tri(body.bestandsnummer),
-        traegerorganisation: trimme_tri(body.traegerorganisation),
-        standort: trimme_tri(body.standort),
-        bemerkung: trimme_tri(body.bemerkung),
+        kategorie: optional_max_tri(body.kategorie, "Kategorie", STAMM_TEXT_MAX)?,
+        bestandsnummer: optional_max_tri(body.bestandsnummer, "Bestandsnummer", STAMM_TEXT_MAX)?,
+        traegerorganisation: optional_max_tri(
+            body.traegerorganisation,
+            "Trägerorganisation",
+            STAMM_TEXT_MAX,
+        )?,
+        standort: optional_max_tri(body.standort, "Standort", STAMM_TEXT_MAX)?,
+        bemerkung: optional_max_tri(body.bemerkung, "Bemerkung", STAMM_BEMERKUNG_MAX)?,
         art: match body.art {
             None => None,
             Some(None) => return Err(AppError::Validation("Art darf nicht leer sein".into())),

@@ -445,3 +445,98 @@ async fn art_am_stamm_vorgabe_geraet_und_grenzen() {
         "Liste trägt die Art; kein Fass angelegt"
     );
 }
+
+/// Spec `eingabegrenzen`, „Freitexte des Material-Stamms sind begrenzt“ (LLH-1258): jeder Freitext
+/// über der Grenze ist beim Anlegen und beim Ändern 400 mit Feldnamen und Grenze, bevor etwas
+/// geschrieben wird; genau an der Grenze wird gespeichert. Gezählt wird nach dem Trimmen.
+#[tokio::test]
+async fn stamm_freitexte_ueber_der_grenze_sind_400_und_schreiben_nichts() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (status, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Stromerzeuger"}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let pfad = format!("/api/material/{}", json["id"].as_i64().unwrap());
+    let anzahl = |app: axum::Router, admin: String| async move {
+        let (_, liste) = anfrage(&app, "GET", "/api/material", &admin, None).await;
+        liste.as_array().unwrap().len()
+    };
+
+    let mut angelegt = 1;
+    for (feld, etikett, max) in [
+        ("bezeichnung", "Bezeichnung", 200),
+        ("kategorie", "Kategorie", 200),
+        ("bestandsnummer", "Bestandsnummer", 200),
+        ("traegerorganisation", "Trägerorganisation", 200),
+        ("standort", "Standort", 200),
+        ("bemerkung", "Bemerkung", 2_000),
+    ] {
+        let zu_lang = "Z".repeat(max + 1);
+        let mut body = serde_json::json!({ "bezeichnung": "Neu", feld: zu_lang });
+        let (s, json) = anfrage(
+            &app,
+            "POST",
+            "/api/material",
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "POST {feld}: {json}");
+        assert!(
+            json["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("{etikett} darf höchstens {max} Zeichen lang sein")),
+            "POST {feld}: {json}"
+        );
+        assert_eq!(
+            anzahl(app.clone(), admin.clone()).await,
+            angelegt,
+            "POST {feld} hat angelegt"
+        );
+
+        let patch = serde_json::json!({ feld: zu_lang }).to_string();
+        let (s, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(&patch)).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "PATCH {feld}: {json}");
+        assert!(
+            json["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("{etikett} darf höchstens {max} Zeichen lang sein")),
+            "PATCH {feld}: {json}"
+        );
+
+        // Genau an der Grenze (umgebende Leerzeichen zählen nicht): PATCH und POST speichern.
+        let genau = "Y".repeat(max);
+        let patch = serde_json::json!({ feld: format!("  {genau}  ") }).to_string();
+        let (s, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(&patch)).await;
+        assert_eq!(s, StatusCode::OK, "PATCH {feld} an der Grenze: {json}");
+        assert_eq!(json[feld], genau);
+        let zurueck = if feld == "bezeichnung" {
+            serde_json::json!({ feld: "Stromerzeuger" })
+        } else {
+            serde_json::json!({ feld: null })
+        };
+        let (s, _) = anfrage(&app, "PATCH", &pfad, &admin, Some(&zurueck.to_string())).await;
+        assert_eq!(s, StatusCode::OK);
+
+        body[feld] = serde_json::Value::String(genau.clone());
+        let (s, json) = anfrage(
+            &app,
+            "POST",
+            "/api/material",
+            &admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "POST {feld} an der Grenze: {json}");
+        assert_eq!(json[feld], genau);
+        angelegt += 1;
+    }
+}
