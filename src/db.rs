@@ -838,10 +838,10 @@ mod tests {
         assert_eq!(betreuung, 3);
     }
 
-    /// LLH-1053 (`0242`): Aus „Zeitformat“ wird „Zeitdarstellung“. 24h/12h hatte nie Wirkung,
+    /// LLH-1053 (`0243`): Aus „Zeitformat“ wird „Zeitdarstellung“. 24h/12h hatte nie Wirkung,
     /// deshalb fallen die Altwerte an Einsatz und Organisation auf NULL (= Vorgabe, taktisch).
     #[tokio::test]
-    async fn migration_0242_setzt_altes_zeitformat_auf_vorgabe() {
+    async fn migration_0243_setzt_altes_zeitformat_auf_vorgabe() {
         use sqlx::migrate::Migrator;
         use std::borrow::Cow;
 
@@ -856,7 +856,7 @@ mod tests {
             .unwrap();
         let vorher: Vec<_> = sqlx::migrate!("./migrations")
             .iter()
-            .filter(|m| m.version < 242)
+            .filter(|m| m.version < 243)
             .cloned()
             .collect();
         Migrator {
@@ -865,7 +865,7 @@ mod tests {
         }
         .run(&pool)
         .await
-        .expect("Migrationen vor 0242");
+        .expect("Migrationen vor 0243");
         sqlx::query("PRAGMA foreign_keys = OFF")
             .execute(&pool)
             .await
@@ -882,7 +882,7 @@ mod tests {
             .await
             .unwrap();
 
-        migrate(&pool).await.expect("0242 läuft durch");
+        migrate(&pool).await.expect("0243 läuft durch");
 
         let einsatz: Vec<(i64, Option<String>, Option<String>)> = sqlx::query_as(
             "SELECT einsatz_id, zeitdarstellung, zeitzone FROM einsatz_einstellungen \

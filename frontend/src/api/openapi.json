@@ -17244,7 +17244,7 @@
       },
       "Zeitdarstellung": {
         "type": "string",
-        "description": "Zeitdarstellung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitdarstellung`.\n`None` am Einsatz bzw. an der Organisation heißt Vorgabe, also taktisch; am Gerät kann\nman sie übersteuern, der Druck nie (LLH-1053, Spec `zeitdarstellung`). Löst das tote\n24h/12h-„Zeitformat\" ab (Migration 0242).",
+        "description": "Zeitdarstellung (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `zeitdarstellung`.\n`None` am Einsatz bzw. an der Organisation heißt Vorgabe, also taktisch; am Gerät kann\nman sie übersteuern, der Druck nie (LLH-1053, Spec `zeitdarstellung`). Löst das tote\n24h/12h-„Zeitformat\" ab (Migration 0243).",
         "enum": [
           "taktisch",
           "datum_uhrzeit"
