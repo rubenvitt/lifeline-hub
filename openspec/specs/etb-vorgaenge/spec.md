@@ -77,10 +77,15 @@ ohne Bezeichnung nur die Kategorie.
 
 ### Requirement: Jede Stufe einer Nachforderung steht im ETB
 Jeder Wechsel des Bedarfs-Status, den der Server vollzieht (zugesagt, unterwegs, eingetroffen,
-abgelehnt, Rücknahme um eine Stufe), SHALL in derselben Transaktion genau einen Systemeintrag
-mit Verweis auf die Nachforderung schreiben, unabhängig von „Automatische ETB-Einträge“. Der
-Inhalt MUST Anzahl, Art und Stufe nennen („Nachforderung 2× RTW: zugesagt“), eine Ablehnung
-MUST ihren Grund in Klammern tragen, eine Rücknahme MUST „zurückgesetzt auf <Stufe>“ lauten. Eine
+abgelehnt, zurückgezogen, Rücknahme um eine Stufe), und jede wirksame Änderung einer offenen
+Nachforderung SHALL in derselben Transaktion genau einen Systemeintrag mit Verweis auf die
+Nachforderung schreiben, unabhängig von „Automatische ETB-Einträge“. Der Inhalt MUST Anzahl, Art
+und Stufe nennen („Nachforderung 2× RTW: zugesagt“), eine Ablehnung und ein Zurückziehen MUST
+ihren Grund in Klammern tragen, eine Rücknahme MUST „zurückgesetzt auf <Stufe>“ lauten. Eine
+Zusage MUST ihre Angaben nennen („zugesagt (83-1, 83-2), Eintreffen erwartet 22.10. 15:30“), eine
+Teilzusage dazu den Rest („1 zugesagt (83-1); 1× RTW weiter angefordert“); eine Änderung MUST
+„geändert: …“ mit den neuen Werten lauten. Eine Änderung ohne neuen Wert MUST NOT einen Eintrag
+schreiben. Eine
 Rücknahme MUST NOT einen Eintrag löschen oder ändern. Ein Wechsel, der wegen eines
 zwischenzeitlich geänderten Status nicht greift, MUST NOT einen Eintrag schreiben. Der Eintrag
 MUST NOT eine weitere Benachrichtigung auslösen; es bleibt bei der aus „Status einer
@@ -97,6 +102,19 @@ Nachforderung“ (Spec `benachrichtigungen`).
 #### Scenario: Ablehnung mit Grund
 - **WHEN** eine Nachforderung mit dem Grund „keine Reserven“ abgelehnt wird
 - **THEN** steht „Nachforderung 2× RTW: abgelehnt (keine Reserven)“ im ETB
+
+#### Scenario: Teilzusage
+- **WHEN** von „2× RTW“ eine mit „83-1“ zugesagt wird
+- **THEN** steht genau ein Eintrag „Nachforderung 2× RTW: 1 zugesagt (83-1); 1× RTW weiter
+  angefordert“ im ETB
+
+#### Scenario: Zurückgezogen mit Grund
+- **WHEN** eine Nachforderung mit dem Grund „nicht mehr benötigt“ zurückgezogen wird
+- **THEN** steht „Nachforderung 2× RTW: zurückgezogen (nicht mehr benötigt)“ im ETB
+
+#### Scenario: Geändert
+- **WHEN** an „2× RTW“ Anzahl 3 und Priorität „Sofort“ gespeichert werden
+- **THEN** steht „Nachforderung 2× RTW geändert: Anzahl 3; Priorität sofort“ im ETB
 
 #### Scenario: Veralteter Stand
 - **WHEN** zwei Personen dieselbe Nachforderung gleichzeitig auf zugesagt schalten

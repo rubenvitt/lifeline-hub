@@ -20,6 +20,8 @@ import {
  *                                frontend/src/nachforderungen/NachforderungBoard.tsx,
  *                                frontend/src/nachforderungen/NachforderungKarte.tsx
  *   nachforderung-absetzen.png   frontend/src/nachforderungen/NachforderungFormular.tsx
+ *                                (Zusage mit Wer, Teilzusage, „überfällig“, LLH-1097)
+ *   nachforderung-zusage.png     frontend/src/nachforderungen/ZusageFormular.tsx
  *   nachforderung-ablehnen.png   frontend/src/pages/NachforderungenPage.tsx (Ablehnen)
  *   nachforderung-material-uebernehmen.png
  *                                frontend/src/nachforderungen/MaterialUebernahmeModal.tsx
@@ -32,7 +34,8 @@ const KAPITEL = 'nachforderung';
 
 /**
  * Demo-Lücke (D3): der Demo-Einsatz hat keine Nachforderung. Drei kommen über die API dazu, in
- * den Stufen Angefordert, Zugesagt und Unterwegs.
+ * den Stufen Angefordert, Zugesagt und Unterwegs. Von den RTW ist einer zugesagt, mit Rufname und
+ * einem schon verstrichenen Eintreffen (LLH-1097): das Board zeigt „überfällig“ und den Rest.
  */
 async function nachforderungenFuellen(api: APIRequestContext) {
   const demo = await demoEinsatz(api);
@@ -49,14 +52,21 @@ async function nachforderungenFuellen(api: APIRequestContext) {
     begruendung: 'Wasser steigt, Keller Lindenstraße 4 bis 8 gefährdet.',
     prioritaet: 'dringend',
   });
+  const draht = (vorMinuten: number) =>
+    new Date(Date.now() - vorMinuten * 60_000).toISOString().slice(0, 19).replace('T', ' ');
   const rtw = await anlegen({
     art: 'RTW',
     anzahl: 2,
     bezeichnung: 'Transport aus der UHS Turnhalle',
     adressat_kategorie: 'leitstelle',
     prioritaet: 'sofort',
+    angefordert_at: draht(40),
   });
-  await fuelle(api, 'post', `${basis}/${rtw.id}/status`, { status: 'zugesagt' });
+  await fuelle(api, 'post', `${basis}/${rtw.id}/zusage`, {
+    anzahl: 1,
+    rufnamen: ['Rotkreuz Musterstadt 83-1'],
+    eintreffen_erwartet_at: draht(10),
+  });
   const seg = await anlegen({
     art: 'SEG Verpflegung',
     anzahl: 1,
@@ -133,6 +143,7 @@ test.describe(KAPITEL, () => {
   test('Board der Nachforderungen nach Stufe', async ({ page }) => {
     await nachforderungenOeffnen(page);
     await expect(page.getByRole('button', { name: 'Eintreffen melden' })).toBeVisible();
+    await expect(page.locator('[data-lfh="board-ueberfaellig"]')).toContainText('1');
     await expect(
       page.locator('[data-lfh="board-spalte"][data-stufe="eingetroffen"] [data-nachforderung-id]'),
     ).toHaveCount(2);
@@ -152,9 +163,27 @@ test.describe(KAPITEL, () => {
     await fotografiere(paneel, KAPITEL, 'nachforderung-absetzen');
   });
 
+  test('Formular „Zusage erfassen“ an der Karte', async ({ page }) => {
+    await nachforderungenOeffnen(page);
+    const karte = page.locator('[data-nachforderung-id]', {
+      hasText: 'Sandsäcke gefüllt für Unterführung Lindenstraße',
+    });
+    await karte.getByRole('button', { name: 'Zusage erfassen' }).click();
+    const formular = karte.getByRole('region', { name: /^Zusage zu / });
+    await formular.getByRole('spinbutton', { name: 'Zugesagt' }).fill('300');
+    await formular.getByRole('combobox', { name: 'Wer' }).fill('THW OV Musterstadt');
+    await formular.getByRole('combobox', { name: 'Wer' }).press('Enter');
+    await fokusWeg(page);
+    await fotografiere(karte, KAPITEL, 'nachforderung-zusage');
+  });
+
   test('Dialog „Nachforderung ablehnen“', async ({ page }) => {
     await nachforderungenOeffnen(page);
-    await page.getByRole('button', { name: 'Ablehnen' }).first().click();
+    await page
+      .getByRole('button', { name: /^Aktionen zu Nachforderung / })
+      .first()
+      .click();
+    await page.getByRole('menuitem', { name: 'Ablehnen' }).click();
     const dialog = page.getByRole('dialog', { name: 'Nachforderung ablehnen' });
     await dialog
       .getByRole('textbox')

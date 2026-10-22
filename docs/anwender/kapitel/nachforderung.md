@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0236_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
 ---
 
 ## Überblick
@@ -10,7 +10,8 @@ quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx
 Reichen die eigenen Kräfte und Mittel nicht, fordert die Führung nach: Rettungswagen, eine
 Einsatzeinheit, Sandsäcke. Das Modul „Nachforderungen“ unter „Kräfte & Mittel“ hält jede
 Anforderung fest und verfolgt sie über die Stufen **Angefordert**, **Zugesagt**, **Unterwegs** und
-**Eingetroffen**. Eine Anforderung kann auch abgelehnt werden. Die Seite zeigt die Nachforderungen
+**Eingetroffen**. Eine Anforderung kann auch abgelehnt oder von der eigenen Führung zurückgezogen
+werden. Die Seite zeigt die Nachforderungen
 als Board: je Stufe eine Spalte, oben die Zahl der offenen und davon unterwegs, etwa „5 offen · 2
 unterwegs“. In der Sprungpalette findet „Anforderung“ das Modul ebenso.
 
@@ -67,13 +68,37 @@ Für Einsatzleitung und Führungspersonal:
 1. Im Board die Karte der Nachforderung in der Spalte ihrer Stufe suchen. Sie zeigt Priorität,
    Menge, Art, Adressat, wie lange die Anforderung schon steht, und die bisherigen Zeitpunkte.
 
-   ![Board mit den Spalten Angefordert, Zugesagt, Unterwegs und Eingetroffen, je mit Zahl im Kopf, daneben eingeklappt „Abgelehnt“; an den offenen Karten der nächste Schritt und „Ablehnen“](../bilder/nachforderung/nachforderungen-board.png)
+   ![Board mit „1 überfällig“ über den Spalten Angefordert, Zugesagt, Unterwegs und Eingetroffen, je mit Zahl im Kopf, daneben eingeklappt untereinander „Abgelehnt“ und „Zurückgezogen“; an den offenen Karten der nächste Schritt und das Menü ⋮](../bilder/nachforderung/nachforderungen-board.png)
 
-2. Den nächsten Schritt wählen: „Zusage erfassen“, sobald die Stelle zusagt, „Abfahrt melden“,
-   sobald die Kräfte unterwegs sind, „Eintreffen melden“, sobald sie da sind.
+2. Den nächsten Schritt wählen: „Zusage erfassen“, sobald die Stelle zusagt (siehe unten),
+   „Abfahrt melden“, sobald die Kräfte unterwegs sind, „Eintreffen melden“, sobald sie da sind.
 
 Die Karte wandert in die Spalte der neuen Stufe, die übrigen Karten bleiben stehen. Ein Hinweis
 bietet nach jedem Schritt sechs Sekunden lang „Rückgängig“.
+
+### Eine Zusage erfassen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. An der Karte einer angeforderten Nachforderung „Zusage erfassen“ wählen. Unter der Karte
+   öffnet sich ein kurzes Formular.
+2. Unter „Zugesagt“ die zugesagte Menge prüfen. Vorbelegt ist die angeforderte Anzahl.
+3. Unter „Wer“ bei Bedarf die Rufnamen oder eine freie Angabe eintragen, etwa „83-1“; Enter oder
+   ein Komma schließt einen Eintrag ab. Es passen höchstens so viele Einträge, wie zugesagt sind.
+4. Unter „Eintreffen erwartet“ bei Bedarf den Zeitpunkt eintragen, den die Stelle nennt.
+   ![Karte „500× Sandsäcke“ mit dem Formular darunter: Zugesagt 300, Wer „THW OV Musterstadt“, Eintreffen erwartet leer, und den Knöpfen „Zusage erfassen“ und „Abbrechen“](../bilder/nachforderung/nachforderung-zusage.png)
+
+5. Enter drücken oder „Zusage erfassen“ wählen.
+
+Ohne weitere Angaben genügen „Zusage erfassen“ und Enter. Die Karte zeigt danach „Wer: 83-1“ und
+„Eintreffen erwartet: …“. „Rückgängig“ setzt die Zusage auf „Angefordert“ zurück und leert Wer und
+Eintreffen.
+
+Sagt die Stelle weniger zu als angefordert, etwa einen von zwei RTW, unter „Zugesagt“ die kleinere
+Zahl eintragen. Die App teilt die Nachforderung: „1× RTW“ steht in „Zugesagt“ mit „1 von 2
+zugesagt“, der Rest „1× RTW“ steht als eigene Karte in „Angefordert“ mit „Rest einer Teilzusage“
+und denselben Angaben. Mehr als angefordert lässt sich nicht zusagen; dann die Nachforderung
+zuerst bearbeiten.
 
 ### Abgeschlossene und ältere ansehen
 
@@ -81,10 +106,10 @@ Für alle mit Zugang zum Einsatz:
 
 1. „Eingetroffen“ zeigt die Nachforderungen der letzten 12 Stunden. Ältere stehen gesammelt unter
    „Ältere eingetroffen“; ein Klick klappt sie auf.
-2. „Abgelehnt“ steht eingeklappt neben den Spalten, mit der Zahl der abgelehnten. Ein Klick klappt
-   die Spalte auf.
+2. „Abgelehnt“ und „Zurückgezogen“ stehen eingeklappt untereinander neben den Spalten, mit der Zahl ihrer
+   Karten. Ein Klick klappt die Spalte auf.
 
-Am Handy steht statt der Spalten eine Leiste der fünf Stufen mit ihrer Zahl, darunter die Karten
+Am Handy steht statt der Spalten eine Leiste der sechs Stufen mit ihrer Zahl, darunter die Karten
 der gewählten Stufe. Vorgewählt ist die erste offene Stufe, in der etwas steht.
 
 ### Eingetroffenes Material übernehmen
@@ -119,11 +144,37 @@ nächste Fuhre Sandsäcke:
    vorbelegt.
 3. „Weiteren Posten übernehmen“ wählen.
 
+### Eine Nachforderung bearbeiten
+
+Für Einsatzleitung und Führungspersonal, solange die Nachforderung offen ist:
+
+1. An der Karte das Menü ⋮ öffnen und „Bearbeiten“ wählen.
+2. Anzahl, Wohin, Priorität oder Details ändern. Bei einer zugesagten oder unterwegs gemeldeten
+   Nachforderung lassen sich auch Wer und Eintreffen ändern, etwa eine neue Zeit der Leitstelle.
+3. Enter drücken oder „Änderung speichern“ wählen.
+
+Die Art bleibt; eine andere Art ist eine neue Nachforderung. Ohne Änderung schließt das Formular,
+ohne dass etwas gespeichert wird.
+
+### Eine Nachforderung zurückziehen
+
+Für Einsatzleitung und Führungspersonal, wenn der Bedarf entfällt:
+
+1. An der Karte das Menü ⋮ öffnen und „Zurückziehen“ wählen.
+2. Im Dialog „Nachforderung zurückziehen“ bei Bedarf den Grund eintragen, etwa „nicht mehr
+   benötigt“.
+3. „Zurückziehen“ wählen.
+
+Zurückziehen geht, solange die Nachforderung angefordert, zugesagt oder unterwegs ist. Eine
+zurückgezogene Nachforderung ist abgeschlossen, steht unter „Zurückgezogen“ mit ihrem Grund und
+lässt sich nicht wieder öffnen; es gibt dafür kein „Rückgängig“. Ablehnen heißt dagegen: die
+angeforderte Stelle sagt ab.
+
 ### Eine Nachforderung ablehnen
 
 Für Einsatzleitung und Führungspersonal:
 
-1. An der Karte „Ablehnen“ wählen.
+1. An der Karte das Menü ⋮ öffnen und „Ablehnen“ wählen.
 2. Im Dialog „Nachforderung ablehnen“ bei Bedarf den Grund eintragen.
 
    ![Dialog „Nachforderung ablehnen“ mit einem Ablehnungsgrund und den Knöpfen „Abbrechen“ und „Ablehnen“](../bilder/nachforderung/nachforderung-ablehnen.png)
@@ -142,7 +193,7 @@ laut Funktion in der Mitgliedschaft), einen Hinweis mit der neuen Stufe, etwa �
 eingetroffen“ mit „2× an Leitstelle“. Art, Details, Ziel, Adressat-Bezeichnung und Ablehnungsgrund
 stehen nie im Hinweis; er führt in das Modul „Nachforderungen“. Auch ein „Rückgängig“ zurück auf
 „Zugesagt“ oder „Unterwegs“ meldet die neue Stufe, eines zurück auf „Angefordert“ meldet nichts.
-Das Absetzen selbst meldet nichts.
+Das Absetzen selbst meldet nichts, ebenso wenig ein Zurückziehen oder Bearbeiten.
 
 Eigene Aktionen bleiben still: Wer den Stand selbst fortschreibt oder ablehnt, bekommt dazu
 nichts. Wer die Nachforderung angelegt hat und zugleich S4 besetzt, erhält den Hinweis einmal.
@@ -159,7 +210,11 @@ die Führungsstelle oder das erste Sachgebiet der Person, die anfordert. Empfän
 Adressat, etwa „Leitstelle (ILS Nord)“.
 
 Auch jede weitere Stufe steht als Systemeintrag im ETB, etwa „Nachforderung 2× RTW: zugesagt“,
-„…: unterwegs“, „…: eingetroffen“ oder „…: abgelehnt (keine Reserven)“. Ein „Rückgängig“ löscht
+„…: unterwegs“, „…: eingetroffen“, „…: abgelehnt (keine Reserven)“ oder „…: zurückgezogen (nicht
+mehr benötigt)“. Eine Zusage nennt ihre Angaben, etwa „Nachforderung 2× RTW: zugesagt (83-1,
+83-2), Eintreffen erwartet 22.10. 15:30“, eine Teilzusage auch den Rest: „…: 1 zugesagt (83-1);
+1× RTW weiter angefordert“. Eine Änderung schreibt „Nachforderung 2× RTW geändert: Anzahl 3;
+Priorität sofort“. Ein „Rückgängig“ löscht
 nichts, sondern schreibt einen weiteren Eintrag, etwa „Nachforderung 2× RTW: zurückgesetzt auf
 angefordert“. Alle diese Einträge entstehen immer, unabhängig von „Automatische ETB-Einträge“
 (siehe [Einsatztagebuch](einsatztagebuch.md)). Jeder trägt den Verweis „Nachforderung ↗“; er
@@ -192,19 +247,28 @@ Nachforderung gehört dann zu dieser Stelle: ihre Karte nennt die Stelle, ein Kl
 Wird die Stelle storniert, bleibt die Nachforderung mit ihrem Stand bestehen und verweist auf
 keine Stelle mehr; die Begründung bleibt, wie sie ist.
 
+### Überfälliges Eintreffen
+
+Ist das erwartete Eintreffen einer zugesagten oder unterwegs gemeldeten Nachforderung verstrichen,
+trägt ihre Karte „überfällig“, und über den Spalten steht die Zahl, etwa „1 überfällig“. Liegt das
+erwartete Eintreffen nach „Benötigt bis“, steht an der Zeile „· nach Bedarfszeit“. Die App gibt
+dabei keinen Ton und keinen Hinweis; nachfragen und eine neue Zeit eintragen (siehe „Eine
+Nachforderung bearbeiten“) bleibt Sache der Führung.
+
 ### Zahlen der offenen Nachforderungen
 
 Offen ist eine Nachforderung, solange sie angefordert, zugesagt oder unterwegs ist. Die Zahl der
 offenen zählt der Server; dieselbe Zahl steht im Seitenkopf, am Modul im Menü (etwa „5 offene
 Nachforderungen, davon 2 unterwegs“), im Paneel „Nachforderungen“ des
 [Führungsüberblicks](ueberblick.md), an den Werkzeugen S1 und S4 der [Stab-Seite](stab.md) und in
-der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene und abgelehnte zählen
-nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
+der Vorbereitung der [Lagebesprechung](lagebesprechung.md). Eingetroffene, abgelehnte und
+zurückgezogene zählen nicht. Die Zahlen in den Spaltenköpfen zählen die Karten, die das Board gerade zeigt, also auch
 innerhalb eines Filters „Für Stelle“.
 
 ### Das Board hält still
 
-Solange der Mauszeiger oder der Fokus im Board liegt oder ein Dialog offen ist, rückt keine Karte:
+Solange der Mauszeiger oder der Fokus im Board liegt, ein Dialog oder ein Formular an einer Karte
+offen ist, rückt keine Karte:
 Was ein anderer Arbeitsplatz anlegt oder fortschreibt, nennt ein Hinweis über dem Board, etwa
 „1 neue Nachforderung · 1 in anderer Stufe“. „anzeigen“ zeigt den neuen Stand. Eine Karte, die
 inzwischen weiter ist, trägt bis dahin ihre neue Stufe an sich.
@@ -215,8 +279,9 @@ Die Stufen laufen vorwärts, jeweils um eine: Angefordert, Zugesagt, Unterwegs, 
 „Rückgängig“ nimmt den letzten Schritt um genau eine Stufe zurück, solange der Hinweis steht, auch
 die Zusage zurück auf „Angefordert“. Der Zeitpunkt der zurückgenommenen Stufe entfällt; wer sie
 erneut meldet, setzt einen neuen.
-Ablehnen geht aus jeder Stufe vor „Eingetroffen“; was eingetroffen ist, wird nicht mehr
-abgelehnt. Ist aus einer Nachforderung Material übernommen, lässt sich „Eingetroffen“ nicht mehr
+Ablehnen und Zurückziehen gehen aus jeder Stufe vor „Eingetroffen“; was eingetroffen ist, wird
+weder abgelehnt noch zurückgezogen. Eine zurückgenommene Zusage leert Wer und Eintreffen; eine
+Teilung bleibt dabei bestehen, der Rest bleibt eine eigene Karte. Ist aus einer Nachforderung Material übernommen, lässt sich „Eingetroffen“ nicht mehr
 zurücknehmen; die App nennt den Grund an der Karte. Wer versehentlich übernommen hat, storniert
 zuerst den Posten in der [Materialliste](material.md) und nimmt dann zurück.
 
