@@ -1,5 +1,11 @@
 import { ladeMeldung } from '../api/meldungen';
-import type { BenachrichtigungArt, BenachrichtigungEreignis, Meldung } from '../api/types';
+import type {
+  BenachrichtigungArt,
+  BenachrichtigungBezugTyp,
+  BenachrichtigungEreignis,
+  Meldung,
+  MeldungStatus,
+} from '../api/types';
 
 /**
  * Inhalt einer Meldung im Hinweis (LLH-1052, Spec `benachrichtigungen`, „Sofortmeldung
@@ -24,18 +30,42 @@ export const INHALT_FRIST_MS = 1500;
 /**
  * Arten, deren Hinweis den Inhalt der Meldung nennt, mit dem Titelwort vor dem Absender. Eine
  * Art ohne Eintrag bleibt beim Text des Servers. Die Eskalation ist derselbe Alarm ein zweites
- * Mal; ohne Inhalt wüsste man wieder nicht, welche Meldung offen ist.
+ * Mal; ohne Inhalt wüsste man wieder nicht, welche Meldung offen ist. Der Eingang einer Meldung
+ * (LLH-1062) nennt ihn ebenso.
  */
 export const INHALT_TITEL: Partial<Record<BenachrichtigungArt, string>> = {
   sofortmeldung: 'Sofortmeldung',
   sofortmeldung_eskaliert: 'Bestätigung ausstehend',
+  meldung: 'Neue Meldung',
 };
+
+/**
+ * Bezüge, deren Kennung eine Meldung ist, mit dem Titelwort, das ihr Ereignis trägt (`null`:
+ * das der Art). Die Übernahme in die Lage (LLH-1062) hat keine eigene Art, ihr Bezug sagt es.
+ */
+const MELDUNG_BEZUG: Partial<Record<BenachrichtigungBezugTyp, string | null>> = {
+  meldung: null,
+  lage_uebernahme: 'In die Lage übernommen',
+};
+
+/** Titelwort eines Hinweises zu einer Meldung; `null`, wenn er keinen Inhalt nennt. */
+export function inhaltTitelWort(
+  art: BenachrichtigungArt,
+  bezugTyp: BenachrichtigungBezugTyp = 'meldung',
+): string | null {
+  if (!(bezugTyp in MELDUNG_BEZUG) || !INHALT_TITEL[art]) return null;
+  return MELDUNG_BEZUG[bezugTyp] ?? INHALT_TITEL[art] ?? null;
+}
 
 /** Was ein Hinweis aus der Meldung übernimmt; `null` je Feld heißt: Text des Servers. */
 export type MeldungInhalt = {
   titel: string | null;
   anfang: string | null;
   wortlaut: string | null;
+  /** Absender allein, für die Zeilen des Eingangshinweises. */
+  absender: string | null;
+  /** Triage-Status beim Abruf: „Sichten“ gibt es nur für eine neue Meldung. */
+  status: MeldungStatus | null;
 };
 
 const AUSLASSUNG = ' …';
@@ -57,12 +87,16 @@ export function wortlautAnfang(text: string, max = WORTLAUT_ANFANG_MAX): string 
   return `${schnitt.replace(/[\s,;:.–-]+$/u, '')}${AUSLASSUNG}`;
 }
 
-/** Der Inhalt, den ein Hinweis der Art `art` aus der Meldung zeigt; `null` für andere Arten. */
+/**
+ * Der Inhalt, den ein Hinweis der Art `art` zum Bezug `bezugTyp` aus der Meldung zeigt; `null`
+ * für andere Arten und Bezüge.
+ */
 export function meldungInhaltVon(
   art: BenachrichtigungArt,
-  m: Pick<Meldung, 'absender' | 'inhalt'>,
+  m: Pick<Meldung, 'absender' | 'inhalt'> & Partial<Pick<Meldung, 'status'>>,
+  bezugTyp: BenachrichtigungBezugTyp = 'meldung',
 ): MeldungInhalt | null {
-  const titelWort = INHALT_TITEL[art];
+  const titelWort = inhaltTitelWort(art, bezugTyp);
   if (!titelWort) return null;
   const absender = m.absender?.trim() ?? '';
   const wortlaut = m.inhalt?.trim() ?? '';
@@ -70,6 +104,8 @@ export function meldungInhaltVon(
     titel: absender ? `${titelWort} · ${absender}` : null,
     anfang: wortlaut ? wortlautAnfang(wortlaut) : null,
     wortlaut: wortlaut || null,
+    absender: absender || null,
+    status: m.status ?? null,
   };
 }
 
@@ -80,9 +116,9 @@ export function meldungInhaltVon(
 export function ladeMeldungInhalt(
   e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ' | 'bezug_id' | 'einsatz_id'>,
 ): Promise<MeldungInhalt | null> {
-  if (e.bezug_typ !== 'meldung' || !INHALT_TITEL[e.art]) return Promise.resolve(null);
+  if (!inhaltTitelWort(e.art, e.bezug_typ)) return Promise.resolve(null);
   const abruf = ladeMeldung(e.einsatz_id, e.bezug_id).then(
-    (m) => meldungInhaltVon(e.art, m),
+    (m) => meldungInhaltVon(e.art, m, e.bezug_typ),
     () => null,
   );
   let uhr: ReturnType<typeof setTimeout> | undefined;

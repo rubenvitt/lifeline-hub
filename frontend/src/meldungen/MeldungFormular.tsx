@@ -268,6 +268,18 @@ export default function MeldungFormular({
     label: optionsLabel(e, funktionsVorschlaege.besetzung),
   }));
 
+  // Eine Lagemeldung geht vorgabemäßig an S2 (LLH-1062): die Funktion wird vorgeschlagen, solange
+  // sie leer ist und niemand sie angefasst hat. Der freie Empfänger bleibt, wie er ist; eine
+  // Lagemeldung nach außen hat dort ihren eigentlichen Adressaten.
+  const s2Verfuegbar = funktionsKatalog.some((e) => e.funktion === 's2');
+  useEffect(() => {
+    if (meldungsart !== 'lagemeldung' || !s2Verfuegbar) return;
+    if (form.getFieldValue('empfaenger_funktion') || form.isFieldTouched('empfaenger_funktion')) {
+      return;
+    }
+    form.setFieldValue('empfaenger_funktion', 's2');
+  }, [meldungsart, s2Verfuegbar, form]);
+
   /** Eine gewählte Funktion füllt den freien Empfänger vor, solange er leer ist (design.md D8). */
   const funktionGewaehlt = (funktion: Fuehrungsfunktion | undefined) => {
     const eintrag = funktionsKatalog.find((e) => e.funktion === funktion);

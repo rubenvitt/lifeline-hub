@@ -19,7 +19,7 @@ import {
   type ModulEintrag,
 } from './modulRegistry';
 import ModulGesperrt from './ModulGesperrt';
-import { darfModuleVerwalten } from './schreibrecht';
+import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
 import IconRail from './IconRail';
@@ -60,7 +60,8 @@ import {
 } from '../routing/deeplinks';
 import { useEinsatzLiveStream } from '../live/useEinsatzLiveStream';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
-import { useModulZaehler } from './useModulZaehler';
+import { useModulZaehler, useUnbearbeiteteMeldungen } from './useModulZaehler';
+import { setzeAppBadge } from '../alarm/appBadge';
 import { einsatzKennung } from './einsatzKennung';
 import UnwetterHinweis from '../wetter/UnwetterHinweis';
 import { useAktiveWarnung } from './useAktiveWarnung';
@@ -248,11 +249,6 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
   });
   const einsatz = einsatzQuery.data;
 
-  // Tab-Titel aus dem Menünamen (LFH-954, Entscheidung 3: „Seite · Einsatz · lifeline-hub“). Hier
-  // im Rahmen, nicht je Seite: so tragen auch Unterrouten und die Lagekarte ohne `EinsatzSeite`
-  // einen Titel, und der Name kommt aus derselben Quelle wie das Menü.
-  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung]);
-
   // Modulfreigaben des Servers für die Navigation (LFH-669); derselbe Key wie in jeder Seite,
   // die Daten eines fremden Moduls lädt.
   const modulFreigabenQuery = useQuery({
@@ -260,6 +256,15 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
     queryFn: () => ladeModulFreigaben(einsatzId),
   });
   const modulFreigaben = modulFreigabenQuery.data;
+  // Tab-Titel aus dem Menünamen (LFH-954, Entscheidung 3: „Seite · Einsatz · lifeline-hub“). Hier
+  // im Rahmen, nicht je Seite: so tragen auch Unterrouten und die Lagekarte ohne `EinsatzSeite`
+  // einen Titel, und der Name kommt aus derselben Quelle wie das Menü. Davor die Zahl der
+  // unbearbeiteten Meldungen, auch am App-Badge (LLH-1062): so steht ein stiller Eingang im
+  // Hintergrund-Tab und an der installierten App.
+  const unbearbeitet = useUnbearbeiteteMeldungen({ einsatzId, freigaben: modulFreigaben });
+  useDokumentTitel([aktuellesModul?.label, einsatz?.bezeichnung], unbearbeitet);
+  useEffect(() => setzeAppBadge(unbearbeitet), [unbearbeitet]);
+  useEffect(() => () => setzeAppBadge(0), []);
   // Der letzte Ort für den Rückweg von Profil und Verwaltung (LFH-954, `letzterOrt.ts`): jede
   // Ankunft zählt, auch ein Deep-Link. Nur der Pfad, keine Suche: dort stehen Freitextfilter, und
   // die gehören nicht für eine Schicht in den Browserspeicher. Nicht gemerkt wird ohne Benutzer
@@ -473,7 +478,7 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             {/* Eigener Provider (geteilter Query-Key, kein zweiter Abruf): der Kopf liegt außerhalb
                des Inhalts-Providers, und der Ablösungshinweis nennt eine Uhrzeit (LFH-692). */}
             <EinsatzAnzeigeProvider einsatzId={einsatzId}>
-              <AlarmZentrale einsatzId={einsatzId} />
+              <AlarmZentrale einsatzId={einsatzId} darfSichten={darfImEinsatzSchreiben(einsatz)} />
             </EinsatzAnzeigeProvider>
           </div>
           <SyncAnzeige

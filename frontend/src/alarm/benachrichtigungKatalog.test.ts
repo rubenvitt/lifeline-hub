@@ -71,6 +71,10 @@ describe('Katalog der Benachrichtigungsarten', () => {
     expect(
       ersatzPfad({ art: 'sofortmeldung', bezug_typ: 'meldung', bezug_id: 7, einsatz_id: 4 }),
     ).toBe('/einsaetze/4/meldungen?meldung=7');
+    // Die Übernahme in die Lage springt in die Lage-Sicht (LLH-1062), wie der Server-Pfad.
+    expect(
+      ersatzPfad({ art: 'meldung', bezug_typ: 'lage_uebernahme', bezug_id: 7, einsatz_id: 4 }),
+    ).toBe('/einsaetze/4/lagemeldungen');
     // Sonst das Modul des Bezugs, Org-Arten der Einsatz.
     expect(
       ersatzPfad({ art: 'auftrag_erteilt', bezug_typ: 'auftrag', bezug_id: 3, einsatz_id: 4 }),
