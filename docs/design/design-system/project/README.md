@@ -23,6 +23,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
 - **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
+- **BearbeitbaresPaneel (offen und gesperrt)** (`components/BearbeitbaresPaneel/`, Gruppe Formular)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)
 - **Frei und gesperrt** (`components/Gesperrt/`, Gruppe Bedienung)
@@ -70,6 +71,8 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   `Schnellerfassungszeile` · `Datenraster`/`Datenfeld` (statt `Descriptions`) ·
   `DatenfeldEingabe` (Zelle im Bearbeiten-Modus: Etikett benennt die Eingabe, `Form.Item` ohne
   `noStyle`, der Prüffehler steht darunter, LLH-1101; nie `Form.Item noStyle` im `Datenfeld`) ·
+  `BearbeitbaresPaneel` (Bearbeiten in der Ansicht, Paneel oder ganze Ansicht, LLH-1139; der
+  einzige Baustein dafür, siehe „UI-Form-Leitlinie“) ·
   `FeldFehler` (Fehlerzeile unter einer Eingabe ohne `Form.Item`: `alarmText`, `data-fehler`, Ziel
   von `aria-describedby`; dieselbe Optik wie antds Formularmeldung) · `rollenwerte`/`useRollen` ·
   Dashboard-Baukasten (unten).

@@ -37,6 +37,12 @@ export { default as Schnellerfassungszeile } from './Schnellerfassungszeile';
 export { rollenwerte, useRollen, monoStil } from './rollenwerte';
 export { default as Datenraster, Datenfeld } from './Datenraster';
 export { default as DatenfeldEingabe, type DatenfeldEingabeProps } from './DatenfeldEingabe';
+export {
+  default as BearbeitbaresPaneel,
+  bearbeitetePatch,
+  type BearbeitbaresFeld,
+  type BearbeitbaresPaneelProps,
+} from './BearbeitbaresPaneel';
 export { default as FeldFehler, feldFehlerStil } from './FeldFehler';
 export { zielEinzug } from './zielEinzug';
 export { default as PaneelZustand, PaneelLink, type PaneelDatenzustand } from './PaneelZustand';
