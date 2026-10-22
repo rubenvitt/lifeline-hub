@@ -2606,6 +2606,7 @@
         "enum": [
           "einsatz",
           "meldung",
+          "lage_uebernahme",
           "auftrag",
           "auftrag_empfaenger",
           "befehl",
@@ -10910,7 +10911,6 @@
           "id",
           "einsatz_id",
           "art",
-          "bezeichnung",
           "adressat_kategorie",
           "prioritaet",
           "status",
@@ -10961,6 +10961,13 @@
               "null"
             ]
           },
+          "benoetigt_bis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort (LLH-1089 design.md D6)."
+          },
           "betreuungsstelle_id": {
             "type": [
               "integer",
@@ -10970,7 +10977,11 @@
             "description": "Betreuungsstelle, für die angefordert wurde (LLH-1082, design.md D1/D4). Nur die Kennung:\nden Namen liest die Oberfläche aus dem Modul Betreuung, sonst sähe ihn auch, wer\nBetreuung nicht lesen darf. Fehlt ohne Bezug; der Storno der Stelle löst ihn (D3)."
           },
           "bezeichnung": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Details/Zweck; fehlt ohne Angabe (LLH-1089 design.md D10)."
           },
           "eingetroffen_at": {
             "type": [
@@ -11026,6 +11037,27 @@
             "$ref": "#/components/schemas/NachforderungStatus"
           },
           "unterwegs_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ziel_abschnitt_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "ziel_br_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ziel (Meldeort, LLH-1089 design.md D5/D10): höchstens eines von Raum, Abschnitt und\nFreitext. Von Raum und Abschnitt nur die Kennung; den Namen liest die Oberfläche aus deren\nModul, wie bei der Betreuungsstelle. Fehlt ohne Ziel; das Löschen des Abschnitts löst ihn."
+          },
+          "ziel_text": {
             "type": [
               "string",
               "null"

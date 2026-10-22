@@ -9,7 +9,7 @@ use crate::nachforderung::{
     repo, NachforderungAnzeige, NachforderungStatus, PRIO_NORMAL, STATUS_ABGELEHNT,
     STATUS_EINGETROFFEN,
 };
-use crate::routes::support::{hoechstens, pflicht_max};
+use crate::routes::support::{hoechstens, optional_max, pflicht_max};
 use crate::zeit::jetzt;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -63,7 +63,9 @@ pub async fn liste(
 #[derive(Debug, Deserialize)]
 pub struct NeueNachforderung {
     pub art: String,
-    pub bezeichnung: String,
+    /// Details/Zweck, optional (LLH-1089 design.md D1); leer = ohne.
+    #[serde(default)]
+    pub bezeichnung: Option<String>,
     pub anzahl: Option<i64>,
     pub adressat_kategorie: String,
     pub adressat_bezeichnung: Option<String>,
@@ -74,6 +76,48 @@ pub struct NeueNachforderung {
     /// Betreuungsstelle, für die angefordert wird (LLH-1082); fehlt = einsatzweit.
     #[serde(default)]
     pub betreuungsstelle_id: Option<i64>,
+    /// Ziel (Meldeort, LLH-1089 design.md D5): höchstens eines der drei.
+    #[serde(default)]
+    pub ziel_br_id: Option<i64>,
+    #[serde(default)]
+    pub ziel_abschnitt_id: Option<i64>,
+    #[serde(default)]
+    pub ziel_text: Option<String>,
+    /// Bedarfszeit „benötigt bis“ (UTC); leer = sofort.
+    #[serde(default)]
+    pub benoetigt_bis: Option<String>,
+}
+
+/// LLH-1089 (design.md D8): ein Ziel aus Raum oder Abschnitt wird wie die Betreuungsstelle
+/// geprüft — 403 ohne Lesezugriff auf das Modul des Ziels (VOR jedem Lesen), 404 bei fremdem oder
+/// unbekanntem Ziel, 409 bei aufgelöstem oder storniertem Raum. Ein Freitext braucht nichts.
+/// Für einen späteren PATCH (LLH-1097) wiederverwendbar.
+pub(crate) async fn pruefe_ziel(
+    state: &AppState,
+    ctx: &EinsatzSchreibzugriff<Nachforderungen>,
+    ziel_br_id: Option<i64>,
+    ziel_abschnitt_id: Option<i64>,
+) -> Result<(), AppError> {
+    if let Some(br_id) = ziel_br_id {
+        ctx.fordere_zielmodul::<crate::einsatz::modul::Bereitstellungsraeume>(&state.pool)
+            .await?;
+        let br =
+            crate::bereitstellungsraum::repo::laden(&state.pool, ctx.einsatz.id, br_id).await?;
+        if br.storniert_at.is_some()
+            || br.status == crate::bereitstellungsraum::BrStatus::Aufgeloest
+        {
+            return Err(AppError::Conflict(
+                "Der Bereitstellungsraum ist aufgelöst".into(),
+            ));
+        }
+    }
+    if let Some(abschnitt_id) = ziel_abschnitt_id {
+        ctx.fordere_zielmodul::<crate::einsatz::modul::Einsatzabschnitte>(&state.pool)
+            .await?;
+        crate::einsatzabschnitt::repo::check_im_einsatz(&state.pool, ctx.einsatz.id, abschnitt_id)
+            .await?;
+    }
+    Ok(())
 }
 
 /// LLH-1082 (design.md D2): ein Bezug auf eine Betreuungsstelle wird in fester Reihenfolge
@@ -109,10 +153,15 @@ pub async fn anlegen(
 ) -> Result<(StatusCode, Json<NachforderungAnzeige>), AppError> {
     let einsatz_id = ctx.einsatz.id;
     let art = pflicht_max(&req.art, "Art", crate::nachforderung::ART_MAX)?;
-    let bezeichnung = pflicht_max(
-        &req.bezeichnung,
-        "Bezeichnung",
+    let bezeichnung = optional_max(
+        req.bezeichnung.clone(),
+        "Details",
         crate::nachforderung::BEZEICHNUNG_MAX,
+    )?;
+    let ziel_text = optional_max(
+        req.ziel_text.clone(),
+        "Ziel",
+        crate::nachforderung::ZIEL_TEXT_MAX,
     )?;
     // Adressat und Begründung werden An und Veranlassung des ETB-Eintrags (LFH-937, D2).
     if let Some(a) = trimme(&req.adressat_bezeichnung) {
@@ -143,9 +192,29 @@ pub async fn anlegen(
         Some(a) => parse_zeit(a)?,
         None => jetzt(),
     };
+    let benoetigt_bis = trimme(&req.benoetigt_bis).map(parse_zeit).transpose()?;
+    // Der Zusammenhang (422) nach allen Feldprüfungen (400).
+    let ziele = usize::from(req.ziel_br_id.is_some())
+        + usize::from(req.ziel_abschnitt_id.is_some())
+        + usize::from(ziel_text.is_some());
+    if ziele > 1 {
+        return Err(AppError::UnprocessableEntity(
+            "Höchstens ein Ziel: Bereitstellungsraum, Einsatzabschnitt oder Ort".into(),
+        ));
+    }
+    // Beide Zeiten sind normalisiert ('YYYY-MM-DD HH:MM:SS', UTC): der Textvergleich ordnet sie.
+    if benoetigt_bis
+        .as_deref()
+        .is_some_and(|b| b < angefordert.as_str())
+    {
+        return Err(AppError::UnprocessableEntity(
+            "„Benötigt bis“ liegt vor der Anforderung".into(),
+        ));
+    }
     if let Some(stelle_id) = req.betreuungsstelle_id {
         pruefe_betreuungsstelle(&state, &ctx, stelle_id).await?;
     }
+    pruefe_ziel(&state, &ctx, req.ziel_br_id, req.ziel_abschnitt_id).await?;
 
     let n = repo::create(
         &state.pool,
@@ -153,7 +222,7 @@ pub async fn anlegen(
         ctx.benutzer.id,
         repo::NachforderungDaten {
             art: &art,
-            bezeichnung: &bezeichnung,
+            bezeichnung: bezeichnung.as_deref(),
             anzahl: req.anzahl,
             adressat_kategorie: adressat,
             adressat_bezeichnung: trimme(&req.adressat_bezeichnung),
@@ -161,6 +230,10 @@ pub async fn anlegen(
             prioritaet,
             angefordert_at: &angefordert,
             betreuungsstelle_id: req.betreuungsstelle_id,
+            ziel_br_id: req.ziel_br_id,
+            ziel_abschnitt_id: req.ziel_abschnitt_id,
+            ziel_text: ziel_text.as_deref(),
+            benoetigt_bis: benoetigt_bis.as_deref(),
         },
     )
     .await?;

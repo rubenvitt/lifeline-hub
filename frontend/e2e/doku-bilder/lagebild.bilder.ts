@@ -9,7 +9,8 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   lagebild.png          frontend/src/pages/lage-dashboard/LageDashboardPage.tsx,
  *                         frontend/src/pages/lage-dashboard/LagePaneele.tsx,
  *                         frontend/src/wetter/WetterKopfMarke.tsx (Wettermarke im Kopf, LLH-1117)
- *   meldungsstrom-neu.png frontend/src/pages/lage-dashboard/LagePaneele.tsx (MeldungsstromPaneel)
+ *   etb-eintraege-neu.png frontend/src/pages/lage-dashboard/LagePaneele.tsx (MeldungsstromPaneel,
+ *                         Paneel „Jüngste ETB-Einträge“)
  */
 
 const KAPITEL = 'lagebild';
@@ -69,12 +70,12 @@ test.describe(KAPITEL, () => {
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/gefahren`));
   });
 
-  test('Meldungsstrom mit Sammelbanner für neue Einträge', async ({ page }) => {
+  test('Jüngste ETB-Einträge mit Sammelbanner für neue Einträge', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/lage-dashboard`);
-    const strom = page.getByRole('region', { name: 'Meldungsstrom' });
+    const strom = page.getByRole('region', { name: 'Jüngste ETB-Einträge' });
     await expect(page.getByRole('list', { name: 'Jüngste Einträge' })).toBeVisible();
     // Zwei neue Einträge, während die Seite offen ist: der Strom schiebt sie nicht ein, sondern
     // kündigt sie an.
@@ -91,7 +92,7 @@ test.describe(KAPITEL, () => {
       });
     }
     await expect(page.getByText('2 neue Einträge')).toBeVisible();
-    await fotografiere(strom, KAPITEL, 'meldungsstrom-neu');
+    await fotografiere(strom, KAPITEL, 'etb-eintraege-neu');
     await strom.getByRole('button', { name: 'anzeigen' }).click();
     await expect(page.getByText('2 neue Einträge')).toBeHidden();
     await expect(

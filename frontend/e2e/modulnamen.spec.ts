@@ -73,7 +73,7 @@ for (const breite of [
     const lageKopf = nav.getByRole('button', { name: 'Lage', exact: true });
     if ((await lageKopf.getAttribute('aria-expanded')) !== 'true') await lageKopf.click();
     const lagebild = nav.getByRole('button', { name: 'Lagebild', exact: true });
-    await expect(lagebild).toHaveAccessibleDescription('Lage in Zahlen, Meldungsstrom');
+    await expect(lagebild).toHaveAccessibleDescription('Lage in Zahlen, jüngste ETB-Einträge');
     await lagebild.click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lage-dashboard`));
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Lagebild');

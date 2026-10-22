@@ -500,6 +500,13 @@ anwendbar), „nicht geprüft" ist keins.
   gilt; kein „Leer = …“-Satz daneben (LFH-1078). Bausteine in `components/vorgabeText.ts`
   („… (Vorgabe)“, „Vorgabe der Organisation: …“), Wächter `components/vorgabe.guard.test.ts` mit Ausnahmeliste
   für Eigennamen („Standard-Rufname“, „Standardansicht“).
+- **Meldung und Lage** (LLH-1046, Spec `bedien-wortlaut`; Begriffe in
+  `docs/design/2026-10-21-meldungsmodell/README.md`): das Modul heißt „Meldungen“ (Eingang und
+  Ausgang), „Lagemeldungen“ ist die Sicht auf die lagerelevanten Meldungen. Eine Meldung anderer
+  Art wird „In die Lage übernommen“ (Aktion und Dialog „In die Lage übernehmen“, Rückmeldung,
+  Hinweis, ETB-Eintrag), ihr Etikett ist „In der Lage ✓“; „übergeben“ steht dafür nie. Der
+  ETB-Typ „Lage“ heißt in der Mehrzahl „Lagefeststellungen“, nie „Lagemeldungen“. Das Paneel des
+  Lagebilds mit ETB-Einträgen heißt „Jüngste ETB-Einträge“.
 
 **Aktionen**
 
@@ -830,6 +837,11 @@ und `pages/personen/`.
 - **Live-Updates springen nicht unter dem Cursor:** Sammelbanner statt Einschieben (CLS ≤ 0,1,
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.**
+- **Ein Eingang ist Information, kein Alarm** (LLH-1062, Spec `benachrichtigungen`,
+  „Eingangshinweis“): neue Meldungen stehen gebündelt in EINEM eigenen Platz neben den drei
+  Toastplätzen (`alarm/useEingangshinweis.tsx`) und verbrauchen weder Budget noch Alarmton; der
+  dezente Ton höchstens 1 je 2 min, kein neuer Eintrag während einer Eingabe (erst beim Verlassen
+  des Feldes), keiner auf der Seite, deren Sammelbanner ihn trägt. Kein eigener Zeitgeber.
 
 ## Frontend — Keine Arbeitsplatzachse (LFH-456)
 

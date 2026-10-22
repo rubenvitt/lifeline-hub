@@ -328,9 +328,13 @@ describe('Gerätehülle — Startseite und Navigation', () => {
       .map((r) => /R-\d+/.exec(r.textContent ?? '')?.[0])
       .filter(Boolean);
     expect(reihen).toEqual(['R-005', 'R-006', 'R-004', 'R-003', 'R-002']);
-    // Der Zustand steht in einer Zeile, Längeres endet mit „…“.
-    const zustand = screen.getByText('gehfähig, unterkühlt');
-    expect(zustand.closest('.ant-typography-ellipsis-single-line')).not.toBeNull();
+    // Der Zustand steht in einer Zeile, Längeres endet mit „…“. Die Klasse setzt antd erst nach
+    // seiner Layout-Messung, unter Last also einen Durchlauf nach der ersten Zeile.
+    await waitFor(() =>
+      expect(
+        screen.getByText('gehfähig, unterkühlt').closest('.ant-typography-ellipsis-single-line'),
+      ).not.toBeNull(),
+    );
   });
 
   it('UHS-Tablet: Nachsichtung aus der Zeile, kein Zeilenmenü und kein Verorten (LLH-1130)', async () => {

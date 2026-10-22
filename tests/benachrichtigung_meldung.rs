@@ -364,3 +364,385 @@ async fn wiederholung_mit_client_id_meldet_nicht_doppelt() {
         )]
     );
 }
+
+// ───────────────────────── Eingang (LLH-1062) ─────────────────────────
+//
+// Spec `benachrichtigungen`, „Eingang einer Meldung“: eine dringende Meldung, jede Lagemeldung und
+// jede Meldung von einem gekoppelten Gerät gehen als Hinweis „Neue Meldung“ an alle mit
+// Schreibrecht im Modul Meldungen, mit Empfängerfunktion an deren Nutzer und die
+// Einsatzleitung. Eine normale Meldung von Hand bleibt still.
+
+impl Welt {
+    /// Nimmt „doris“ als Beobachterin in den Einsatz auf.
+    async fn beobachterin(&self) -> i64 {
+        let doris = benutzer_anlegen(&self.app, &self.admin, "doris", "keine").await;
+        rolle_setzen(&self.app, &self.admin, self.einsatz, doris, "beobachter").await;
+        sqlx::query("DELETE FROM benachrichtigung")
+            .execute(&self.pool)
+            .await
+            .unwrap();
+        doris
+    }
+
+    /// Gibt `benutzer_id` in seiner Mitgliedschaft die Funktion `funktion`.
+    async fn mitgliedschaft_funktion(&self, benutzer_id: i64, funktion: &str) {
+        sqlx::query(
+            "UPDATE einsatz_mitgliedschaft SET fuehrungsfunktion = ? \
+             WHERE einsatz_id = ? AND benutzer_id = ?",
+        )
+        .bind(funktion)
+        .bind(self.einsatz)
+        .bind(benutzer_id)
+        .execute(&self.pool)
+        .await
+        .unwrap();
+    }
+
+    /// Die Empfänger der Art `meldung` zu Bezug `typ`/`id`, aufsteigend.
+    async fn empfaenger(&self, typ: &str, id: i64) -> Vec<i64> {
+        let mut an: Vec<i64> = self
+            .zeilen_der_art("meldung")
+            .await
+            .into_iter()
+            .filter(|z| z.2 == typ && z.3 == id)
+            .map(|z| z.0)
+            .collect();
+        an.sort_unstable();
+        an
+    }
+
+    /// Wie viele Benachrichtigungen der Art `art` zum Bezug noch offen sind.
+    async fn offen(&self, art: &str, typ: &str, id: i64) -> i64 {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM benachrichtigung \
+             WHERE art = ? AND bezug_typ = ? AND bezug_id = ? AND quittiert_at IS NULL",
+        )
+        .bind(art)
+        .bind(typ)
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap()
+    }
+
+    async fn admin_id(&self) -> i64 {
+        sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
+            .fetch_one(&self.pool)
+            .await
+            .unwrap()
+    }
+
+    /// Koppelt einen UHS-Laptop an eine neue, aktive UHS; liefert das Geräte-Cookie und das
+    /// Gerätekonto.
+    async fn geraet(&self) -> (String, i64) {
+        let e = self.einsatz;
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &format!("/api/einsaetze/{e}/uhs"),
+            &self.admin,
+            Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "UHS Nord"}).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        let uhs = v["id"].as_i64().unwrap();
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+            &self.admin,
+            Some(&json!({"status": "aktiv"}).to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &format!("/api/einsaetze/{e}/geraete"),
+            &self.admin,
+            Some(
+                &json!({"ansicht": "uhs-laptop", "uhs_id": uhs, "bezeichnung": "Laptop 1"})
+                    .to_string(),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        let kopplung = v["kopplung"]["id"].as_i64().unwrap();
+        let code = v["code"]["code"].as_str().unwrap().to_string();
+        let resp = tower::ServiceExt::oneshot(
+            self.app.clone(),
+            axum::http::Request::builder()
+                .method("POST")
+                .uri("/api/geraete/koppeln")
+                .header(axum::http::header::CONTENT_TYPE, "application/json")
+                .body(axum::body::Body::from(json!({ "code": code }).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let cookie = resp.headers()[axum::http::header::SET_COOKIE]
+            .to_str()
+            .unwrap()
+            .split(';')
+            .next()
+            .unwrap()
+            .to_string();
+        let konto: i64 = sqlx::query_scalar("SELECT benutzer_id FROM geraet_kopplung WHERE id = ?")
+            .bind(kopplung)
+            .fetch_one(&self.pool)
+            .await
+            .unwrap();
+        (cookie, konto)
+    }
+}
+
+/// Spec-Szenarien „Dringende Meldung“ und „Lagemeldung“: ohne Empfängerfunktion erreichen sie
+/// alle mit Schreibrecht im Modul Meldungen, nie den Erfasser und nie eine Beobachterin.
+#[tokio::test]
+async fn dringende_meldung_und_lagemeldung_erreichen_alle_schreiber_ausser_erfasser() {
+    let w = welt().await;
+    let doris = w.beobachterin().await;
+    let admin = w.admin_id().await;
+    let anna = w.cookie("annika").await;
+    for zusatz in [
+        json!({ "prioritaet": "dringend" }),
+        json!({ "meldungsart": "lagemeldung" }),
+    ] {
+        let m = w.erfassen(&anna, zusatz.clone()).await;
+        let an = w.empfaenger("meldung", m["id"].as_i64().unwrap()).await;
+        let mut erwartet = vec![admin, w.bert, w.carla];
+        erwartet.sort_unstable();
+        assert_eq!(an, erwartet, "{zusatz}");
+        assert!(!an.contains(&doris), "Beobachterin: {zusatz}");
+        assert!(!an.contains(&w.anna), "Erfasserin: {zusatz}");
+    }
+    let gelesen = w.lesen(&w.cookie("bertram").await).await;
+    assert_eq!(gelesen[0]["titel"], "Neue Meldung");
+    assert_eq!(gelesen[0]["stufe"], "hinweis");
+}
+
+/// Spec-Szenario „Normale Meldung von Hand“: still, auch mit Beobachterin im Einsatz.
+#[tokio::test]
+async fn normale_meldung_von_hand_bleibt_still() {
+    let w = welt().await;
+    w.beobachterin().await;
+    w.erfassen(&w.cookie("annika").await, json!({ "prioritaet": "normal" }))
+        .await;
+    assert!(w.zeilen().await.is_empty());
+}
+
+/// Spec-Szenario „Eingang mit Empfängerfunktion“: die Nutzer der Funktion und die Einsatzleitung
+/// bekommen den Hinweis, die übrigen Schreiber nicht.
+#[tokio::test]
+async fn eingang_mit_funktion_erreicht_funktion_und_einsatzleitung() {
+    let w = welt().await;
+    w.mitgliedschaft_funktion(w.carla, "el").await;
+    let m = w
+        .erfassen(
+            &w.admin,
+            json!({ "meldungsart": "lagemeldung", "empfaenger_funktion": "s2" }),
+        )
+        .await;
+    assert_eq!(
+        w.empfaenger("meldung", m["id"].as_i64().unwrap()).await,
+        vec![w.anna, w.carla]
+    );
+}
+
+/// Spec-Szenario „Meldung von einem gekoppelten Gerät“: auch eine normale Meldung vom Gerät ist
+/// Eingang; das Gerät selbst bekommt nichts.
+#[tokio::test]
+async fn meldung_vom_geraet_erreicht_alle_schreiber() {
+    let w = welt().await;
+    let (geraet, konto) = w.geraet().await;
+    sqlx::query("DELETE FROM benachrichtigung")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let m = w
+        .erfassen(
+            &geraet,
+            json!({ "absender": "UHS Nord", "meldeweg": "persoenlich" }),
+        )
+        .await;
+    let an = w.empfaenger("meldung", m["id"].as_i64().unwrap()).await;
+    let mut erwartet = vec![w.admin_id().await, w.anna, w.bert, w.carla];
+    erwartet.sort_unstable();
+    assert_eq!(an, erwartet);
+    assert!(!an.contains(&konto));
+}
+
+/// Spec-Szenario „Sichten räumt den Hinweis bei allen“: geht die Meldung aus „Neu“, sind die
+/// Hinweise aller Empfänger quittiert. Ein Sofortalarm bleibt davon unberührt.
+#[tokio::test]
+async fn sichten_raeumt_den_eingang_bei_allen_nicht_den_sofortalarm() {
+    let w = welt().await;
+    let m = w
+        .erfassen(&w.admin, json!({ "prioritaet": "dringend" }))
+        .await;
+    let id = m["id"].as_i64().unwrap();
+    assert_eq!(w.offen("meldung", "meldung", id).await, 3);
+    let (s, v) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{id}/status", w.einsatz),
+        &w.cookie("carla").await,
+        Some(&json!({ "status": "gesichtet" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(w.offen("meldung", "meldung", id).await, 0);
+    assert!(w
+        .lesen(&w.cookie("annika").await)
+        .await
+        .iter()
+        .all(|b| b["quittiert_at"].is_string()));
+
+    let sofort = w
+        .erfassen(
+            &w.cookie("annika").await,
+            json!({ "meldungsart": "sofortmeldung" }),
+        )
+        .await;
+    let sid = sofort["id"].as_i64().unwrap();
+    let vorher = w.offen("sofortmeldung", "meldung", sid).await;
+    assert!(vorher > 0);
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{sid}/status", w.einsatz),
+        &w.admin,
+        Some(&json!({ "status": "in_bearbeitung" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(w.offen("sofortmeldung", "meldung", sid).await, vorher);
+}
+
+/// Bestätigen hebt Neu auf Gesichtet (LLH-1052) und räumt damit auch den Eingang einer
+/// bestätigungspflichtigen Lagemeldung.
+#[tokio::test]
+async fn bestaetigen_raeumt_den_eingang() {
+    let w = welt().await;
+    let m = w
+        .erfassen(
+            &w.admin,
+            json!({ "meldungsart": "lagemeldung", "bestaetigung_pflicht": true }),
+        )
+        .await;
+    let id = m["id"].as_i64().unwrap();
+    assert_eq!(w.offen("meldung", "meldung", id).await, 3);
+    let (s, v) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{id}/bestaetigen", w.einsatz),
+        &w.cookie("bertram").await,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(w.offen("meldung", "meldung", id).await, 0);
+}
+
+// ───────────────────────── In die Lage übernommen ─────────────────────────
+
+async fn uebernehmen(w: &Welt, cookie: &str, id: i64) -> Value {
+    let (s, v) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{id}/lagerelevant", w.einsatz),
+        cookie,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+/// Spec-Szenario „Übernahme in die Lage“: S2 und die Einsatzleitung bekommen „In die Lage
+/// übernommen“ mit Sprung zu den Lagemeldungen, der Übernehmende nicht; eine zweite Übergabe und
+/// eine Meldung der Art Lagemeldung lösen keinen weiteren Hinweis aus.
+#[tokio::test]
+async fn uebernahme_in_die_lage_erreicht_s2_und_einsatzleitung() {
+    let w = welt().await;
+    w.mitgliedschaft_funktion(w.carla, "el").await;
+    let m = w.erfassen(&w.admin, json!({})).await;
+    let id = m["id"].as_i64().unwrap();
+    let bert = w.cookie("bertram").await;
+    uebernehmen(&w, &bert, id).await;
+    assert_eq!(
+        w.empfaenger("lage_uebernahme", id).await,
+        vec![w.anna, w.carla]
+    );
+    let gelesen = w.lesen(&w.cookie("annika").await).await;
+    assert_eq!(gelesen.len(), 1, "{gelesen:?}");
+    assert_eq!(gelesen[0]["titel"], "In die Lage übernommen");
+    assert_eq!(gelesen[0]["bezug_typ"], "lage_uebernahme");
+    assert_eq!(gelesen[0]["detail"], format!("Meldung #{}", m["lfd_nr"]));
+    assert_eq!(
+        gelesen[0]["pfad"],
+        format!("/einsaetze/{}/lagemeldungen", w.einsatz)
+    );
+
+    // Zweite Übergabe mit neuem Text: kein weiterer Hinweis.
+    let (s, _) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{id}/lagerelevant", w.einsatz),
+        &bert,
+        Some(&json!({ "text": "Deich gesichert" }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(w.empfaenger("lage_uebernahme", id).await.len(), 2);
+
+    // Art Lagemeldung: hatte ihren Eingang, die Übergabe meldet nicht noch einmal.
+    let lage = w
+        .erfassen(&w.admin, json!({ "meldungsart": "lagemeldung" }))
+        .await;
+    let lid = lage["id"].as_i64().unwrap();
+    uebernehmen(&w, &bert, lid).await;
+    assert!(w.empfaenger("lage_uebernahme", lid).await.is_empty());
+}
+
+/// Spec-Szenario „Kenntnisnahme räumt die Übernahme“: als gesehen gekennzeichnet (einzeln oder
+/// alle) quittiert die Übernahme-Hinweise aller Empfänger.
+#[tokio::test]
+async fn gesehen_raeumt_die_uebernahme() {
+    let w = welt().await;
+    let bert = w.cookie("bertram").await;
+    let eins = w.erfassen(&w.admin, json!({})).await["id"]
+        .as_i64()
+        .unwrap();
+    let zwei = w.erfassen(&w.admin, json!({})).await["id"]
+        .as_i64()
+        .unwrap();
+    // Die Kennung der Lagemeldung ist die der Meldung (LLH-1031).
+    uebernehmen(&w, &bert, eins).await;
+    uebernehmen(&w, &bert, zwei).await;
+    assert_eq!(w.offen("meldung", "lage_uebernahme", eins).await, 1);
+
+    let (s, v) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/meldungen/{eins}/lage-gesehen", w.einsatz),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(w.offen("meldung", "lage_uebernahme", eins).await, 0);
+    assert_eq!(w.offen("meldung", "lage_uebernahme", zwei).await, 1);
+
+    let (s, v) = anfrage(
+        &w.app,
+        "POST",
+        &format!("/api/einsaetze/{}/lage/gesehen", w.einsatz),
+        &w.admin,
+        Some(&json!({ "meldung_ids": [zwei] }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(w.offen("meldung", "lage_uebernahme", zwei).await, 0);
+}

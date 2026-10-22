@@ -45,6 +45,26 @@ describe('modulName (LFH-965)', () => {
     expect(() => modulName('gibt-es-nicht')).toThrow(/gibt-es-nicht/);
   });
 
+  it('Meldungen ohne Richtungszusatz, Lagemeldungen mit eigenem Symbol (LLH-1046)', () => {
+    const meldungen = modulRegistry.find((m) => m.key === 'meldungen');
+    const lage = modulRegistry.find((m) => m.key === 'lagemeldungen');
+    expect(meldungen).toMatchObject({
+      label: 'Meldungen',
+      route: 'meldungen',
+      beschreibung: 'Eingang, Ausgang, Bearbeitung',
+    });
+    expect(lage).toMatchObject({
+      label: 'Lagemeldungen',
+      route: 'lagemeldungen',
+      beschreibung: 'Lagerelevante Meldungen',
+    });
+    expect(meldungen?.icon).not.toBe(lage?.icon);
+    // Das Paneel des Lagebilds zeigt ETB-Einträge, keine Meldungen.
+    expect(modulRegistry.find((m) => m.key === 'lage-dashboard')?.beschreibung).toBe(
+      'Lage in Zahlen, jüngste ETB-Einträge',
+    );
+  });
+
   it('kein Modulname ist englisch', () => {
     const englisch = /\b(Dashboard|Settings|Home|Overview)\b/;
     expect(modulRegistry.filter((m) => englisch.test(m.label)).map((m) => m.label)).toEqual([]);

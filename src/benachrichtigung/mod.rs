@@ -144,6 +144,11 @@ wire_enum! {
         /// Der Einsatz selbst (Org-Arten); `bezug_id` ist die Einsatzkennung.
         Einsatz => "einsatz",
         Meldung => "meldung",
+        /// Eine Meldung (`meldung.id`), die gerade in die Lage übernommen wurde (LLH-1062). Wie bei
+        /// der Ablösung steckt das Ereignis im Bezug, damit die Übernahme ohne neue Art (und ohne
+        /// Tabellenumbau) einen eigenen Titel und Sprung hat. Die Kennung ist die Meldung, nicht
+        /// das Lageobjekt.
+        LageUebernahme => "lage_uebernahme",
         Auftrag => "auftrag",
         /// Eine Empfänger-Zeile eines Auftrags (`auftrag_empfaenger.id`), für die Quittung: die
         /// Detailzeile nennt den quittierenden Empfänger, der Sprung führt zum Auftrag.
@@ -196,6 +201,7 @@ impl BenachrichtigungBezugTyp {
         match self {
             BenachrichtigungBezugTyp::Einsatz => None,
             BenachrichtigungBezugTyp::Meldung => Some("meldungen"),
+            BenachrichtigungBezugTyp::LageUebernahme => Some("lagemeldungen"),
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             BenachrichtigungBezugTyp::Auftrag
             | BenachrichtigungBezugTyp::AuftragEmpfaenger
@@ -252,6 +258,9 @@ pub enum Adressat {
     Nutzer(i64),
     /// Alle Mitglieder des Einsatzes, die dieses Modul lesen dürfen.
     ModulLeser(&'static str),
+    /// Alle Mitglieder des Einsatzes mit Schreibrecht (Einsatzleitung, Führungspersonal), die
+    /// dieses Modul erreichen: wer eine Meldung bearbeiten kann, nie ein Beobachter (LLH-1062).
+    ModulSchreiber(&'static str),
     /// Die Führungskräfte und Admins der Einsatz-Organisation, die den Einsatz ohne
     /// Mitgliedschaft lesen dürfen (für `einsatz_neu`).
     Fuehrungskraefte,
@@ -408,6 +417,60 @@ async fn melden_mit_fehler(
         );
     }
     Ok(aufgeloest.benutzer_ids)
+}
+
+/// Erledigt die offenen Benachrichtigungen der Art `art` zu den Bezügen `typ`/`ids` für ALLE
+/// Empfänger: der Anlass ist für jeden erledigt, etwa eine gesichtete Meldung (LLH-1062, Spec
+/// „Sichten räumt den Hinweis bei allen“). Jeder Empfänger bekommt sein Quittier-Ereignis wie beim
+/// eigenen Quittieren, auf allen Verbindungen. Wie [`melden`] lässt ein Fehler die committete
+/// Anfrage nicht scheitern. Liefert die Zahl der erledigten Zeilen.
+pub async fn erledigen(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    einsatz_id: i64,
+    art: BenachrichtigungArt,
+    typ: BenachrichtigungBezugTyp,
+    ids: &[i64],
+) -> usize {
+    if ids.is_empty() {
+        return 0;
+    }
+    let zeilen = match repo::quittieren_fuer_bezug(pool, einsatz_id, art, typ, ids).await {
+        Ok(z) => z,
+        Err(e) => {
+            tracing::warn!(einsatz_id, art = art.as_str(), fehler = %e, "Benachrichtigungen nicht erledigt");
+            return 0;
+        }
+    };
+    if zeilen.is_empty() {
+        return 0;
+    }
+    let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+    if let Some(org_id) = org_id {
+        let ereignisse: Vec<(i64, BenachrichtigungEreignis)> = zeilen
+            .iter()
+            .map(|z| {
+                (
+                    z.benutzer_id,
+                    BenachrichtigungEreignis {
+                        einsatz_id: z.einsatz_id,
+                        benachrichtigung_id: z.id,
+                        art: z.art,
+                        stufe: z.stufe,
+                        bezug_typ: z.bezug_typ,
+                        bezug_id: z.bezug_id,
+                        quittiert: true,
+                    },
+                )
+            })
+            .collect();
+        zustellen(live, org_id, einsatz_id, art, &ereignisse);
+    }
+    zeilen.len()
 }
 
 /// Stellt die Ereignisse einer Art und eines Einsatzes zu, je `(benutzer_id, Ereignis)` genau

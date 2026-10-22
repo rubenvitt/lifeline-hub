@@ -200,6 +200,28 @@ export function darfZaehlerZeigen(quelle: ModulZaehlerQuelle, freigaben?: ModulF
 }
 
 /**
+ * Unbearbeitete Meldungen (Status Neu, Feld `ungesehen`) für Tab-Titel und App-Badge (LLH-1062,
+ * Spec `benachrichtigungen`, „Unbearbeitete Meldungen im Tab-Titel“); 0, wo das Modul nicht
+ * sichtbar und frei ist oder der Zähler fehlt. Rein und exportiert.
+ */
+export function unbearbeiteteMeldungen(
+  antwort: ModulZaehler | undefined,
+  freigaben?: ModulFreigaben,
+): number {
+  if (!antwort || !darfZaehlerZeigen('meldungen', freigaben)) return 0;
+  return antwort.meldungen?.ungesehen ?? 0;
+}
+
+/** {@link unbearbeiteteMeldungen} aus derselben Abfrage wie die Modulzähler (ein Cache-Fach). */
+export function useUnbearbeiteteMeldungen({ einsatzId, freigaben }: Args): number {
+  const zaehler = useQuery({
+    queryKey: einsatzKeys.modulZaehler(einsatzId),
+    queryFn: () => ladeModulZaehler(einsatzId),
+  });
+  return unbearbeiteteMeldungen(zaehler.data, freigaben);
+}
+
+/**
  * Die Zähler des Einsatz-Navigationsrahmens: EINE Serverabfrage für die Serverquellen, dazu die
  * Browser-Zähler aus ihren eigenen Modullisten.
  */

@@ -86,7 +86,7 @@ const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
  * nicht der Kartenplan (Titel + drei Sekundärfelder).
  *
  * - Zeit, Tag, Zeitfenster und Ordnung sind die Ereigniszeit der Quellmeldung (`ereigniszeit`),
- *   nicht die Übergabe (LLH-1039); die Übergabe steht als „übergeben …“ im Meta
+ *   nicht die Übergabe (LLH-1039); die Übernahme steht als „übernommen …“ im Meta
  *   (`uebergabeZeit`).
  * - Tagesgruppen jüngster Tag zuerst, Tagesgrenze in der Anzeigezone (`lagemeldungen/zeitachse.ts`,
  *   `gruppiereNachTag` über `tagesSchluessel`/`tagesEtikett`). In der Gruppe genügt `HH:mm` — der
@@ -279,7 +279,7 @@ export default function LagemeldungenPage() {
             {l.meldung_status !== 'neu' &&
               ` · ${MELDUNG_STATUS[l.meldung_status]?.label ?? l.meldung_status}`}
           </KennungsLink>
-          {` · übergeben ${uebergabeZeit(l.ereigniszeit, l.erstellt_at, konventionen)}`}
+          {` · übernommen ${uebergabeZeit(l.ereigniszeit, l.erstellt_at, konventionen)}`}
           {!l.is_neu && l.gesehen_at && (
             <>
               {` · gesehen ${formatUhrzeit(l.gesehen_at, konventionen)}`}

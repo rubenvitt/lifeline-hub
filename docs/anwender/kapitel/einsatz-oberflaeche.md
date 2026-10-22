@@ -181,7 +181,7 @@ Von links nach rechts:
 - **Alarmzentrale**: „Benachrichtigung …“ zeigt, ob der Browser Benachrichtigungen zeigen darf,
   „Ton …“, ob Alarmtöne zu hören sind. „Ton stumm“ und „Ton blockiert“ stehen auffällig da: Eine
   Sofortmeldung oder eine fällige Erinnerung bliebe dann ohne Ton. Stummschalten gilt für alle
-  Alarmtöne auf diesem Gerät, in jedem Einsatz.
+  Töne auf diesem Gerät, in jedem Einsatz, auch für den Ton bei neuen Meldungen.
 - **Verbindung**: „SYNC“ heißt, die Live-Verbindung steht. „VERBINDE“, „GETRENNT“, „OFFLINE“,
   „WARTET“ (vorgemerkte Einträge) und „PRÜFEN“ (abgelehnte Einträge) melden eine Störung; was
   dann gilt, steht in [Arbeiten ohne Netz](ohne-netz.md).
@@ -281,6 +281,19 @@ den Toast, und die Meldung des Betriebssystems entfällt. Quittiert die Person a
 Gerät, geht die Meldung auf diesem Gerät nicht in jedem Fall von selbst weg; sie lässt sich dann
 wegwischen. Ohne Verbindung zum Server, etwa ohne VPN, zeigt die Meldung nur „Alarm“ oder „Neue
 Benachrichtigung“; den Inhalt zeigt die App nach dem Öffnen.
+
+Neue Meldungen und Lagemeldungen, die eine Person bearbeiten soll, stehen in einem **eigenen
+Hinweis** neben den drei Toasts und nehmen ihnen keinen Platz. Er bündelt alle neuen Meldungen
+dieses Einsatzes, zeigt die beiden jüngsten mit Absender und Wortlautanfang und darunter „+ n
+weitere“. Sein Ton klingt höchstens alle zwei Minuten, auch wenn in der Zeit zehn Meldungen kommen.
+Wer gerade in ein Feld schreibt, behält den Fokus: Der Hinweis erscheint erst, wenn das Feld
+verlassen ist. Auf der Seite „Meldungen“ bleibt er aus, denn dort steht die Meldung schon in der
+Liste; eine Übernahme in die Lage bleibt ebenso auf „Lagemeldungen“ aus. Was genau ihn auslöst
+und wer ihn bekommt, steht in [Meldungen](meldungen.md).
+
+Solange im Einsatz unbearbeitete Meldungen offen sind, steht ihre Zahl vorn im Titel des Tabs,
+etwa „(3) Lagekarte · …“. Ist die App installiert, trägt auch ihr Symbol die Zahl, wo das
+Betriebssystem das zeigt.
 
 Gekoppelte Geräte bekommen keine Benachrichtigungen.
 

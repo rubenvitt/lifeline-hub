@@ -224,6 +224,8 @@ fn pfade_folgen_den_deeplinks() {
     let p = |typ, id| text::pfad(7, Bezug::neu(typ, id));
     assert_eq!(p(B::Einsatz, 7), "/einsaetze/7");
     assert_eq!(p(B::Meldung, 3), "/einsaetze/7/meldungen?meldung=3");
+    // Die Übernahme in die Lage springt in die Lage-Sicht (LLH-1062).
+    assert_eq!(p(B::LageUebernahme, 3), "/einsaetze/7/lagemeldungen");
     assert_eq!(p(B::Auftrag, 4), "/einsaetze/7/auftraege?auftrag=4");
     // Ohne gelesene Zeile die Liste; `bilden` setzt den Auftrag ein.
     assert_eq!(p(B::AuftragEmpfaenger, 4), "/einsaetze/7/auftraege");
@@ -253,6 +255,23 @@ fn pfade_folgen_den_deeplinks() {
     }
     for typ in BenachrichtigungBezugTyp::ALLE {
         assert!(p(typ, 1).starts_with("/einsaetze/7"), "{}", typ.as_str());
+    }
+}
+
+/// Die Übernahme in die Lage hat keine eigene Art, aber ihren Titel aus dem Bezug (LLH-1062,
+/// design.md E2); jeder andere Bezug behält den Titel seiner Art.
+#[test]
+fn uebernahme_in_die_lage_traegt_ihren_titel_im_bezug() {
+    use BenachrichtigungBezugTyp as B;
+    assert_eq!(
+        text::bezug_titel(B::LageUebernahme),
+        Some("In die Lage übernommen")
+    );
+    assert_eq!(B::LageUebernahme.modul(), Some("lagemeldungen"));
+    for typ in BenachrichtigungBezugTyp::ALLE {
+        if typ != B::LageUebernahme {
+            assert_eq!(text::bezug_titel(typ), None, "{}", typ.as_str());
+        }
     }
 }
 

@@ -604,7 +604,7 @@ describe('UeberblickPage', () => {
       '/einsaetze/1/nachforderungen?nachforderung=33',
     ]);
     expect(zeilen[0]).toHaveTextContent('vor 1 h 35 min');
-    expect(zeilen[0]).toHaveTextContent('2000× Sandsäcke · Deich Nord');
+    expect(zeilen[0]).toHaveTextContent('2000× Sandsäcke — Deich Nord');
     expect(zeilen[0]).toHaveTextContent('Unterwegs');
     expect(within(p).getByRole('link', { name: 'Nachforderungen öffnen' })).toHaveAttribute(
       'href',

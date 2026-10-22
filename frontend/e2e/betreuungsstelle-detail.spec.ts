@@ -102,9 +102,11 @@ test('Detailseite → Bedarf anfordern → Nachforderung mit Stellenbezug steht 
   await expect(page.getByLabel('Begründung / Lagebezug')).toHaveValue(
     `Für Betreuungsstelle ${STELLE}`,
   );
-  await page.getByLabel('Art', { exact: true }).fill('Feldbetten');
+  await page.getByRole('combobox', { name: 'Was' }).fill('Feldbetten');
   await page.getByLabel('Anzahl', { exact: true }).fill('40');
-  await page.getByLabel('Bezeichnung', { exact: true }).fill('Feldbetten für die Nacht');
+  // Details stehen unter „Weitere Angaben“ (LLH-1089).
+  await page.getByRole('button', { name: /^Weitere Angaben/ }).click();
+  await page.getByLabel('Details / Zweck', { exact: true }).fill('Feldbetten für die Nacht');
   await page.getByRole('button', { name: 'Nachforderung absetzen', exact: true }).click();
 
   // Gefiltert auf die Stelle; die Karte nennt sie und führt zurück.

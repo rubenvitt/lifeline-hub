@@ -207,7 +207,7 @@ export const etbTyp: Record<EtbTyp, StatusDarstellung> = {
 /**
  * Mehrzahl je Eintragstyp: „5 Meldungen“ (ETB-Bilanz, Lageentwicklung im Lagevortrag). `lage`
  * heißt „Lagefeststellungen“ (FwDV 100, Phase Lagefeststellung; LLH-1065): „Lagemeldungen“ ist
- * das eigene Modul der an die Lage übergebenen Meldungen.
+ * das Modul der lagerelevanten Meldungen.
  */
 export const etbTypMehrzahl: Record<EtbTyp, string> = {
   meldung: 'Meldungen',
