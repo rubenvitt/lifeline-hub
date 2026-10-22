@@ -20,6 +20,7 @@ import type {
 import { einsatzFixture, freigabenFixture } from '../../test/fixtures';
 import { einsatzKeys } from '../../api/queryKeys';
 import { setzeOnline } from '../../test/utils';
+import { mitProzessZone } from '../../test/prozessZone';
 import {
   queueLeerenFuerTests,
   schreibaktionEinreihen,
@@ -1513,8 +1514,13 @@ const JETZT = new Date('2026-10-15T14:30:00+02:00');
 /**
  * Nur `Date` und das Intervall der Uhr sind gefälscht: MSW, react-query und antd laufen auf echten
  * Timern (`setTimeout`), die Wartezeit rückt mit `vi.advanceTimersByTime` vor.
+ *
+ * Die Zone ist festgenagelt (LLH-1397): ohne Anzeigezone formatiert die Seite „seit …“ in der
+ * Browserzone, die Erwartungen („seit 1342“ aus `11:42` UTC) sind Berliner Wanduhr. Ohne
+ * `mitProzessZone` hinge das Ergebnis an der Zone des Rechners (`TZ=UTC` im Container).
  */
 function mitUhr() {
+  mitProzessZone('Europe/Berlin');
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
     vi.setSystemTime(JETZT);
