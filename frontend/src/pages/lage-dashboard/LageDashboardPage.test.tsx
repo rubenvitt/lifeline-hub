@@ -1017,7 +1017,7 @@ describe('LageDashboardPage — Gefahrenmatrix', () => {
     expect(within(box).getByText('2 Gebiete')).toBeInTheDocument();
 
     // Legende bündig unter den Segmenten: dieselbe Zeilenklasse UND dasselbe Vier-Stufen-
-    // Raster wie die Balken (die Geometrie steht in `gefahrenmatrix.css`, geprüft in
+    // Raster wie die Balken (die Geometrie steht in `components/instrument/matrixPaneel.css`, geprüft in
     // `matrixGeometrie.test.ts`; jsdom rechnet weder Layout noch Container-Abfragen).
     const legende = box.querySelector<HTMLElement>('[data-lfh="gefahrenlegende"]')!;
     const balken = zeilen[0].querySelector<HTMLElement>('[data-lfh="gefahrenbalken"]')!;
@@ -1172,7 +1172,7 @@ describe('LageDashboardPage — Sichtung', () => {
       z.querySelector<HTMLElement>('[data-lfh="sichtung-anteil"]')?.style.width;
     expect(zeilen.map(breite)).toEqual(['25%', '0%', '75%', '0%']);
     // Die BBK-Farbe steht im Farbfeld, das Kürzel ist der zweite Kanal.
-    expect(zeilen[0].querySelector('[data-lfh="sichtungsfeld"]')).not.toBeNull();
+    expect(zeilen[0].querySelector('[data-lfh="sichtung-feld"]')).not.toBeNull();
     expect(zeilen[0]).toHaveTextContent('SK I');
     expect(within(box).getByText('Ohne Sichtung')).toBeInTheDocument();
     // Ohne jeden Verbleib: niemand unterwegs, alle fünf angetroffen und offen.

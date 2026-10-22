@@ -40,3 +40,27 @@ export { default as DatenfeldEingabe, type DatenfeldEingabeProps } from './Daten
 export { default as FeldFehler, feldFehlerStil } from './FeldFehler';
 export { zielEinzug } from './zielEinzug';
 export { default as PaneelZustand, PaneelLink, type PaneelDatenzustand } from './PaneelZustand';
+export {
+  default as DashboardPaneel,
+  IM_RASTER,
+  type DashboardAktion,
+  type DashboardPaneelBasis,
+  type DashboardZustand,
+} from './DashboardPaneel';
+export { DashboardFlaeche, PaneelReihe, paneelReiheSpalten } from './DashboardFlaeche';
+export {
+  default as VerteilungsPaneel,
+  Verteilungsliste,
+  anteilProzent,
+  type Verteilungszeile,
+} from './VerteilungsPaneel';
+export { default as MatrixPaneel, type Matrixzeile } from './MatrixPaneel';
+export { MATRIX_KLASSE } from './matrixGeometrie';
+export { default as StromPaneel } from './StromPaneel';
+export { default as ListenPaneel, listenZeileStil } from './ListenPaneel';
+export {
+  default as GliederungsPaneel,
+  GLIEDERUNG_KLASSE,
+  type Gliederungszeile,
+} from './GliederungsPaneel';
+export { default as WarnstufenHinweis } from './WarnstufenHinweis';

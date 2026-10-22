@@ -2,6 +2,9 @@
  * Lage-Dashboard — die ganze Lage auf einem Schirm (Neuentwurf S3,
  * `docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`).
  *
+ * Vorbild des Dashboard-Baukastens (`frontend/AGENTS.md`, LLH-1140): Fläche, Paneelreihe, Paneele
+ * und Warnstufen-Hinweis kommen aus `components/instrument`.
+ *
  * Aufbau: Seitenkopf mit „Lagebild <TT.MM. HH:MM>", rechts Alter des Datenstands und — nur wenn die
  * höchste Warnstufe ein Alarmbeitrag ist — der Warnstufen-Hinweis. Darunter im Fugenraster:
  * 1. Kennzahlenband, sechs Plätze (vier Kern-, zwei Lageplätze, siehe unten).
@@ -40,7 +43,6 @@
  * freigegebenes Modul (LFH-669, `useLagebild`) wird nicht angefragt und steht als „—" bzw. Satz mit
  * Grund da, nie als Ausfall und nie als 0.
  */
-import { IconWarndreieck } from '../../icons';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -77,9 +79,12 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { useViewport } from '../../components/useViewport';
 import {
+  DashboardFlaeche,
   Kennzahl,
   Kennzahlenband,
+  PaneelReihe,
   Sammelbanner,
+  WarnstufenHinweis,
   monoStil,
   useRollen,
   type KennzahlZustand,
@@ -337,7 +342,6 @@ export default function LageDashboardPage() {
   const warnTon =
     zGefahren === 'daten' && lagebild ? warnstufeTon(lagebild.hoechsteWarnstufe) : 'neutral';
   const dwdWarnung = kopfWarnung(wetterWarnungen, jetzt, konv);
-  const breit = abBreite('lg');
   const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
   const fuehrung = lagebild?.fuehrung;
   const zFuehrung = (z: Quellzustand): KennzahlZustand =>
@@ -385,20 +389,9 @@ export default function LageDashboardPage() {
           >
             <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
             {warnTon !== 'neutral' && lagebild && (
-              <span
-                data-lfh="warnstufe-hinweis"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: warnTon === 'alarm' ? rollen.alarmText : rollen.achtungText,
-                }}
-              >
-                <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                  <IconWarndreieck size={14} />
-                </span>
+              <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
                 Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
-              </span>
+              </WarnstufenHinweis>
             )}
             {dwdWarnung && (
               <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
@@ -406,16 +399,7 @@ export default function LageDashboardPage() {
           </span>
         }
       >
-        <div
-          data-lfh="lagebild"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1,
-            background: rollen.linie,
-            border: `1px solid ${rollen.linie}`,
-          }}
-        >
+        <DashboardFlaeche kennung="lagebild">
           {wechsel && (
             <Sammelbanner
               aktion={{
@@ -479,16 +463,7 @@ export default function LageDashboardPage() {
                 })}
           </Kennzahlenband>
 
-          <div
-            data-lfh="lagebild-paneele"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: breit
-                ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)'
-                : 'minmax(0, 1fr)',
-              gap: 1,
-            }}
-          >
+          <PaneelReihe kennung="lagebild-paneele">
             <GefahrenmatrixPaneel
               zustand={zMatrix}
               zeilen={matrix.zeilen}
@@ -529,7 +504,7 @@ export default function LageDashboardPage() {
               onEtb={() => waehle(etbPfad(einsatzId))}
               onErfassen={() => waehle(etbPfad(einsatzId, { neu: true }))}
             />
-          </div>
+          </PaneelReihe>
 
           {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
             behalten ihren Ton. */}
@@ -632,7 +607,7 @@ export default function LageDashboardPage() {
               ziel={uhsGesperrt ? undefined : unfallhilfsstellenListePfad(einsatzId)}
             />
           </Kennzahlenband>
-        </div>
+        </DashboardFlaeche>
       </EinsatzSeite>
     </div>
   );

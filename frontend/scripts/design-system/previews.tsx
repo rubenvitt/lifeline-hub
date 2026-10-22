@@ -31,22 +31,26 @@ import {
   antdThema,
   type Dichte,
 } from '../../src/theme/tokens';
-import { statusKategorie } from '../../src/theme/statusFarben';
+import { rollenFarbe, statusKategorie, warnstufeBalkenFarbe } from '../../src/theme/statusFarben';
 import type { Sichtungskategorie } from '../../src/api/types';
 import {
   Augenbraue,
+  DashboardFlaeche,
   Datenfeld,
   DatenfeldEingabe,
   Datenraster,
   FeldFehler,
   Kennzahl,
   Kennzahlenband,
+  MatrixPaneel,
   Paneel,
   PaneelZeile,
   Sammelbanner,
   Segmentleiste,
   StatusChip,
   StatusZelle,
+  VerteilungsPaneel,
+  useRollen,
 } from '../../src/components/instrument';
 import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
@@ -165,6 +169,70 @@ function DokumentEntwurfBeispiel() {
   );
 }
 
+/**
+ * Zwei Paneeltypen des Dashboard-Baukastens in ihrer Fläche: eine Verteilung (Einheiten nach
+ * Status, eine Kategorie mit Ausfall „—“) und eine Stufenmatrix. Farben aus dem Vertrag, aufgelöst
+ * im Thema der Karte.
+ */
+function DashboardBeispiel() {
+  const { token, rollen } = useRollen();
+  const verteilung = [
+    { schluessel: 'frei', wort: 'frei', rolle: 'normal', wert: 12 },
+    { schluessel: 'unterwegs', wort: 'unterwegs', rolle: 'bedien', wert: 9 },
+    { schluessel: 'am-ort', wort: 'am Einsatzort', rolle: 'bedien', wert: 8 },
+    { schluessel: 'ausser-dienst', wort: 'außer Dienst', rolle: 'alarm', wert: null },
+  ] as const;
+  return (
+    <DashboardFlaeche>
+      <VerteilungsPaneel
+        titel="Einheiten nach FMS-Status"
+        ueberschrift="h3"
+        kennung="fms"
+        zustand="daten"
+        meta="29 Einheiten"
+        sprung={{ label: 'Meldebild', onKlick: nichts }}
+        leerText="Keine Einheiten im Einsatz."
+        gesperrtText="Modul Einheiten nicht freigegeben."
+        onNeuladen={nichts}
+        zeilen={verteilung.map((z) => ({
+          schluessel: z.schluessel,
+          wort: z.wort,
+          wert: z.wert,
+          anteil: (z.wert ?? 0) / 29,
+          balkenFarbe: rollenFarbe(z.rolle, token),
+        }))}
+      />
+      <MatrixPaneel
+        titel="Gefahrenmatrix"
+        ueberschrift="h3"
+        kennung="gefahren"
+        zustand="daten"
+        meta="2 Gebiete"
+        sprung={{ label: 'Gefahren', onKlick: nichts }}
+        leerText="Keine Gefahr über Stufe „keine“."
+        gesperrtText="Modul Gefahren nicht freigegeben."
+        onNeuladen={nichts}
+        stufen={['niedrig', 'mittel', 'hoch', 'akut']}
+        zeilen={(
+          [
+            ['Brand', 'hoch', 3, 'alarm'],
+            ['Einsturz', 'mittel', 2, 'achtung'],
+            ['Gas', 'niedrig', 1, 'neutral'],
+          ] as const
+        ).map(([name, stufe, rang, ton]) => ({
+          schluessel: name,
+          name,
+          beschriftung: `${name}: ${stufe}`,
+          rang,
+          farbe: warnstufeBalkenFarbe(stufe, token) ?? rollen.gedaempft,
+          stufenwort: stufe,
+          ton,
+        }))}
+      />
+    </DashboardFlaeche>
+  );
+}
+
 const SICHTUNGEN: Sichtungskategorie[] = ['sk1', 'sk2', 'sk3', 'sk4', 'tot', 'unverletzt'];
 
 /** Die feste Liste der vorgestellten Bausteine (design.md D4), in Kartenreihenfolge. */
@@ -183,6 +251,16 @@ export const PREVIEWS: readonly PreviewSpec[] = [
         <PaneelZeile>EA 3 Bereitstellung</PaneelZeile>
       </Paneel>
     ),
+  },
+  {
+    name: 'Dashboard',
+    title: 'Dashboard-Baukasten (Verteilung und Matrix)',
+    group: 'Flächen',
+    height: 976,
+    source: 'components/instrument/DashboardPaneel.tsx',
+    ruleHead: 'Dashboard-Baukasten',
+    styles: ['components/instrument/matrixPaneel.css'],
+    content: () => <DashboardBeispiel />,
   },
   {
     name: 'Datenraster',
