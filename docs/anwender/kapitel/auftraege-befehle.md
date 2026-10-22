@@ -38,7 +38,9 @@ Für Einsatzleitung und Führungspersonal:
 3. Unter „Auftrag / Was“ den Auftrag formulieren.
 4. „Priorität“ und bei Bedarf „Frist (Quittung/Vollzug)“ setzen.
 5. Bei Bedarf „Ausführung: Mittel, Ziel, Weg, Zeit“ aufklappen und „Mittel / Womit“, „Ziel / Ort“,
-   „Weg“ und „Zeit / Wann“ eintragen.
+   „Weg“ und „Zeit / Wann“ eintragen. Im „Ziel / Ort“ mit Enter oder „Ort suchen“ suchen und einen
+   Treffer wählen: das Ziel ist damit verortet, der Kartenausschnitt unter dem Feld zeigt es. Enter
+   erteilt dort den Auftrag nicht. Ohne Treffer bleibt das Ziel freier Text.
 6. Bei Bedarf „Weitere Angaben“ aufklappen: „Lage“, „Absicht“, „Verbindung / Meldewege“,
    „Sicherheit / Besonderes“, „Richtung“ (Intern oder Extern) und „Erteilt am (optional)“, bei
    extern dazu „Externe Stelle“ und „Bezeichnung der Stelle“. Steht die Richtung auf extern,

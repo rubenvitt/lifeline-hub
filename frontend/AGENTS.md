@@ -599,8 +599,10 @@ anwendbar), „nicht geprüft" ist keins.
   Abbildungen aus `anzeige/ortsfeldFormular.ts` (LLH-1121): `ortFelder` (Text und Koordinate
   gehen gemeinsam hinaus, die Koordinate nur mit Text), `ortsfeldAusGespeichert` (beim Bearbeiten
   steht eine gespeicherte Koordinate als `quelle: 'karte'`, eine Textkorrektur behält sie),
-  `ortRegeln` (Pflicht und Länge am Text). Eingebaut in Einsatzort, Schaden, Standort der
-  Betreuungs- und Verpflegungsstelle und Sammelstelle des Bezirks.
+  `ortRegeln` (Pflicht und Länge am Text), `ortEingabe` (für einen POST: ohne Angabe fehlt das Feld).
+  Eingebaut in Einsatzort, Schaden, Standort der Betreuungs- und Verpflegungsstelle, Sammelstelle
+  des Bezirks, Standort von UHS (Anlegen) und Bereitstellungsraum, Fundort eines Tiers und Ziel
+  eines Auftrags (LLH-1114).
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel
