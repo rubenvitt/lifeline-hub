@@ -4,7 +4,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import { Select } from '../components/Select';
 import { memo, useState, type ReactNode } from 'react';
 import { auftraegePfad } from '../routing/deeplinks';
-import type { Meldung, MeldungStatus } from '../api/types';
+import type { Meldung, MeldungKorrekturPatch, MeldungStatus } from '../api/types';
 import {
   MELDUNG_HANDLUNG,
   MELDUNG_STATUS,
@@ -22,6 +22,7 @@ import { KennungsLink } from '../components/kennungsLink';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
+import MeldungKorrektur, { type VonGruppe } from './MeldungKorrektur';
 
 const { Text } = Typography;
 
@@ -62,12 +63,22 @@ interface MeldungKarteProps {
   /** Öffnet das Auftrags-Formular zur Meldung → Auftrag-Erteilung. */
   onAuftragErteilen?: (m: Meldung) => void;
   /**
+   * Korrektur an der Karte (LLH-1066): „Bearbeiten“ öffnet Art, Priorität, Richtung, Von und
+   * Empfänger an Ort und Stelle. **Muss bei Ablehnung ablehnen** (`mutateAsync`), dann bleibt die
+   * Bearbeitung offen und der Grund steht an der Karte (`fehlerGrund`).
+   */
+  onKorrigieren?: (meldungId: number, aenderung: MeldungKorrekturPatch) => Promise<unknown>;
+  /** Auswahl des Von-Bezugs für „Bearbeiten“; stabil übergeben, die Karte ist `memo`. */
+  vonOptionen?: VonGruppe[];
+  /** „Aus der Lage nehmen“ an einer übernommenen Meldung, die keine Lagemeldung ist (LLH-1066). */
+  onAusDerLage?: (meldungId: number) => void;
+  /**
    * Aufträge ohne Freigabe (LFH-1051, Spec `modul-freigabe`): „Auftrag erteilen“ steht gesperrt
    * mit Grund, wie „Zu Auftrag“ im Chat.
    */
   auftragGesperrt?: boolean;
   /**
-   * Grund der zuletzt abgelehnten Karten-Aktion (Status, Bearbeiter, Bestätigen), aus
+   * Grund der zuletzt abgelehnten Karten-Aktion (Status, Bearbeiter, Bestätigen, Korrektur), aus
    * `components/useZeilenFehler.ts`. Ein stabiles Objekt je Grund, die Karte bleibt `memo`.
    */
   fehlerGrund?: ZeilenGrund | null;
@@ -130,6 +141,9 @@ function MeldungKarte({
   onLagerelevant,
   onBestaetigen,
   onAuftragErteilen,
+  onKorrigieren,
+  vonOptionen,
+  onAusDerLage,
   auftragGesperrt = false,
   fehlerGrund,
   uebernahme = null,
@@ -157,6 +171,10 @@ function MeldungKarte({
   //    eigenem State, kein `Popconfirm`, und derselbe Pfad, ob sichtbar oder im Menü.
   //  • „Bestätigen" behält seinen `Popconfirm` (sichtbarer Knopf, einmalig).
   const [erledigtOffen, setErledigtOffen] = useState(false);
+  //  • „Aus der Lage nehmen" mit — Lage-Text und Verortung gehen dabei verloren (LLH-1066, D5).
+  const [ausLageOffen, setAusLageOffen] = useState(false);
+  // Korrektur an Ort und Stelle (Kartenmuster bis zum Baustein „Bearbeiten in der Ansicht“).
+  const [bearbeiten, setBearbeiten] = useState(false);
 
   const kannBestaetigen = !!(
     darfSchreiben &&
@@ -199,11 +217,19 @@ function MeldungKarte({
               },
             ]
           : []),
+        ...(onKorrigieren
+          ? [{ key: 'bk', label: 'Bearbeiten', onClick: () => setBearbeiten(true) }]
+          : []),
         // Übernahme in die Lage und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung
         // selbst. Ein Wort für den Vorgang: „In die Lage übernehmen“, Etikett „In der Lage ✓“
         // (LLH-1046, `frontend/AGENTS.md`, Begriffe).
         ...(!m.lagerelevant && onLagerelevant
           ? [{ key: 'lr', label: 'In die Lage übernehmen', onClick: () => onLagerelevant(m.id) }]
+          : []),
+        // Eine Lagemeldung steht immer in der Lage (LLH-1031); jede andere Art lässt sich wieder
+        // herausnehmen.
+        ...(m.lagerelevant && m.meldungsart !== 'lagemeldung' && onAusDerLage
+          ? [{ key: 'al', label: 'Aus der Lage nehmen', onClick: () => setAusLageOffen(true) }]
           : []),
         // Ein aufgehobener Auftrag gilt nicht mehr: die Meldung lässt sich erneut überführen, der
         // Server stellt den Rückverweis dann auf den neuen Auftrag um (LLH-1177).
@@ -310,7 +336,15 @@ function MeldungKarte({
          bricht die Auswahl in eine eigene Zeile. „Bestätigen" ist der Primärknopf, nicht `danger`
          (LFH-962): die Kenntnisnahme löscht nichts, und Rot bedient nichts. Der weite Abstand
          bleibt als Trennung der Handschuh-Ziele. */}
-      {(zuweisbar || gesamt > 0) && (
+      {bearbeiten && onKorrigieren && (
+        <MeldungKorrektur
+          meldung={m}
+          vonOptionen={vonOptionen}
+          onSpeichern={(aenderung) => onKorrigieren(m.id, aenderung)}
+          onFertig={() => setBearbeiten(false)}
+        />
+      )}
+      {!bearbeiten && (zuweisbar || gesamt > 0) && (
         <Flex
           justify="space-between"
           align="center"
@@ -391,6 +425,20 @@ function MeldungKarte({
         }}
         onCancel={() => setErledigtOffen(false)}
       />
+      <Modal
+        open={ausLageOffen}
+        title={`Meldung #${m.lfd_nr} aus der Lage nehmen?`}
+        okText="Aus der Lage nehmen"
+        okButtonProps={{ danger: true }}
+        cancelText="Abbrechen"
+        onOk={() => {
+          setAusLageOffen(false);
+          onAusDerLage?.(m.id);
+        }}
+        onCancel={() => setAusLageOffen(false)}
+      >
+        Lage-Text und Verortung gehen verloren, der Wortlaut bleibt.
+      </Modal>
     </KommKarte>
   );
 }

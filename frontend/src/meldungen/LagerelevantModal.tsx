@@ -90,13 +90,7 @@ export default function LagerelevantModal({
         <Form.Item name="text" label="Lage-Text">
           <Input.TextArea rows={3} placeholder="Kurzbeschreibung für die Lage" />
         </Form.Item>
-        {/* Die Folge sichtbar am Feld (LFH-1078): verortet wird nur hier, die Karte ändert es nicht. */}
-        <KoordinatenFeld
-          name="koord"
-          label="Verortung (optional)"
-          extra="Später nicht änderbar"
-          einsatzId={einsatzId}
-        />
+        <KoordinatenFeld name="koord" label="Verortung (optional)" einsatzId={einsatzId} />
         {speicherung?.error != null && (
           <div style={{ marginBottom: 12 }}>
             <SpeicherFehler fehler={speicherung.error} titel="Nicht übernommen" />

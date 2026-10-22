@@ -1238,6 +1238,24 @@ export type LageGesehen = S['LageGesehenAnzeige'];
 export interface LageGesehenBody {
   meldung_ids: number[];
 }
+/** Korrektur einer Meldung (`PATCH …/meldungen/{mid}`, LLH-1066): nur die geänderten Felder.
+ * Wortlaut, Absender, Meldeweg und Ereigniszeit bleiben, wie die Meldung einging (422). */
+export interface MeldungKorrekturPatch {
+  meldungsart?: Meldungsart;
+  prioritaet?: MeldungPrioritaet;
+  richtung?: Richtung;
+  /** Von-Bezug als Paar: steht eines, ersetzt es den Bezug; `null` löst ihn. */
+  einheit_id?: number | null;
+  abschnitt_id?: number | null;
+  empfaenger?: string | null;
+  /** `true` übernimmt in die Lage, `false` nimmt aus der Lage (nicht bei einer Lagemeldung). */
+  lagerelevant?: boolean;
+  /** Leer oder `null`: der Wortlaut gilt. */
+  lage_text?: string | null;
+  /** Nur gemeinsam; beide `null` entfernt die Verortung. */
+  lat?: number | null;
+  lon?: number | null;
+}
 /** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt. */
 export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
 export type LetzteRueckmeldung = S['LetzteRueckmeldung'];

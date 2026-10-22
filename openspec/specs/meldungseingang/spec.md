@@ -56,6 +56,95 @@ der Meldung unverändert lassen und MUST idempotent sein: eine zweite Übernahme
 - **WHEN** eine Rückmeldung mit Lage-Text „Brand unter Kontrolle“ und einer Koordinate in die Lage übernommen wird
 - **THEN** steht sie in der Liste der Lagemeldungen mit diesem Lage-Text und als Marker auf der Lagekarte, und ihr Wortlaut ist unverändert
 
+### Requirement: Eine Meldung lässt sich nachträglich korrigieren
+Mit Schreibrecht am Modul Meldungen SHALL sich an einer Meldung nachträglich Meldungsart,
+Priorität, Richtung, Empfänger und der Bezug auf Einheit oder Abschnitt ändern lassen
+(`PATCH /api/einsaetze/{id}/meldungen/{mid}`). Jede wirksame Korrektur MUST in derselben
+Transaktion einen Systemeintrag im ETB mit Verweis auf die Meldung schreiben, der die Änderung
+nennt; eine Korrektur ohne wirksame Änderung MUST nichts schreiben. Ohne Schreibrecht MUST das
+System mit HTTP 403 antworten, für eine Meldung eines anderen Einsatzes mit HTTP 404. Gekoppelte
+Geräte MUST NOT korrigieren. Eine Korrektur, die eine Meldung erst zur Sofortmeldung macht, MUST
+mit HTTP 422 abgelehnt werden.
+
+#### Scenario: Priorität berichtigt
+- **WHEN** eine Person die Priorität von Meldung #3 von „normal“ auf „dringend“ ändert
+- **THEN** trägt die Meldung die Priorität „dringend“, und das ETB enthält einen Systemeintrag „Meldung #3: Priorität Normal → Dringend“ mit Verweis auf die Meldung
+
+#### Scenario: Von-Bezug nachgetragen
+- **WHEN** eine Person einer ohne Bezug erfassten Meldung die Einheit „Florian Nord 1“ zuordnet
+- **THEN** nennt die letzte Rückmeldung dieser Einheit die Meldung
+
+#### Scenario: Einheit eines anderen Einsatzes
+- **WHEN** eine Person einer Meldung eine Einheit eines anderen Einsatzes zuordnen will
+- **THEN** antwortet das System mit HTTP 422, und der Bezug bleibt
+
+#### Scenario: Gerät korrigiert
+- **WHEN** ein gekoppeltes Gerät die Art seiner eigenen Meldung ändern will
+- **THEN** antwortet das System mit HTTP 403
+
+#### Scenario: Zur Sofortmeldung heraufstufen
+- **WHEN** eine Person eine Meldung der Priorität „normal“ auf „sofort“ setzen will
+- **THEN** antwortet das System mit HTTP 422, und die Meldung bleibt unverändert
+
+### Requirement: Der Eingang bleibt unverändert
+Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang einer Meldung SHALL unveränderlich bleiben;
+ein PATCH, der eines davon ändern will, MUST mit HTTP 422 abgelehnt werden. Der ETB-Eintrag der
+Meldung MUST seinen Typ behalten; die Korrektur steht als eigener Systemeintrag im ETB.
+
+#### Scenario: Wortlaut ändern
+- **WHEN** eine Person den Wortlaut einer Meldung per PATCH ändern will
+- **THEN** antwortet das System mit HTTP 422, und der Wortlaut bleibt
+
+#### Scenario: Typ des ETB-Eintrags
+- **WHEN** eine Person die Art einer Meldung von „Sonstige“ auf „Lagemeldung“ ändert
+- **THEN** behält ihr ETB-Eintrag den Typ „Meldung“, und ein Systemeintrag nennt die Änderung
+
+### Requirement: Eine Korrektur der Art hält die Lagerelevanz
+Ändert eine Person die Art einer Meldung nachträglich auf „Lagemeldung“, SHALL die Meldung im
+selben Schritt lagerelevant werden, mit dem Zeitpunkt der Änderung als Übernahme und neu für die
+Kenntnisnahme. Ändert sie die Art von „Lagemeldung“ weg, MUST die Lagerelevanz bestehen bleiben,
+bis sie ausdrücklich zurückgenommen wird. Die Lagerelevanz einer Meldung der Art „Lagemeldung“
+zurückzunehmen MUST mit HTTP 422 abgelehnt werden.
+
+#### Scenario: Sonstige wird Lagemeldung
+- **WHEN** eine Person die Art einer Meldung von „Sonstige“ auf „Lagemeldung“ ändert
+- **THEN** steht die Meldung in der Liste der Lagemeldungen als neu
+
+#### Scenario: Lagemeldung wird Rückmeldung
+- **WHEN** eine Person die Art einer Lagemeldung auf „Rückmeldung“ ändert
+- **THEN** bleibt die Meldung in der Liste der Lagemeldungen, mit der Art „Rückmeldung“
+
+#### Scenario: Lagemeldung zurücknehmen
+- **WHEN** eine Person für eine Meldung der Art „Lagemeldung“ die Lagerelevanz zurücknehmen will
+- **THEN** antwortet das System mit HTTP 422, und die Meldung bleibt in der Lage
+
+### Requirement: Eine übernommene Meldung lässt sich aus der Lage nehmen
+Eine in die Lage übernommene Meldung einer anderen Art als „Lagemeldung“ SHALL sich mit
+Schreibrecht am Modul Meldungen aus der Lage nehmen lassen. Danach MUST sie in der Liste der
+Lagemeldungen und auf der Lagekarte fehlen, ihr Lage-Text, ihre Verortung, ihre Übernahme und ihre
+Kenntnisnahme MUST leer sein, und der Wortlaut MUST bleiben. Das ETB MUST die Rücknahme als
+Systemeintrag nennen. Die Karte der Meldung SHALL dafür „Aus der Lage nehmen“ mit Rückfrage anbieten.
+
+#### Scenario: Übernommene Rückmeldung aus der Lage nehmen
+- **WHEN** eine Person an einer übernommenen, verorteten Rückmeldung „Aus der Lage nehmen“ wählt und bestätigt
+- **THEN** fehlt sie in der Liste der Lagemeldungen und auf der Lagekarte, und das ETB nennt „aus der Lage genommen“
+
+### Requirement: Lage-Angaben sind korrigierbar
+Lage-Text und Verortung einer lagerelevanten Meldung SHALL sich mit Schreibrecht am Modul Meldungen
+nachträglich setzen, ändern und leeren lassen, in der Zeile der Seite Lagemeldungen und im
+Inspector der Lagekarte. Ein geänderter Lage-Text MUST die Lagemeldung wieder neu machen; eine
+neue oder geänderte Verortung MUST den Marker der Lagekarte setzen oder versetzen. Lage-Angaben an
+einer Meldung, die nicht in der Lage steht, MUST mit HTTP 422 abgelehnt werden. Der Dialog „In die
+Lage übernehmen“ MUST NOT mehr sagen, dass die Verortung später nicht änderbar ist.
+
+#### Scenario: Verortung nachgetragen
+- **WHEN** eine Person für eine lagerelevante Meldung ohne Ort eine Koordinate setzt
+- **THEN** steht sie als Marker in der Ebene „Lagemeldungen“ der Lagekarte
+
+#### Scenario: Lage-Text geändert
+- **WHEN** eine Person den Lage-Text einer schon gesehenen Lagemeldung ändert
+- **THEN** steht sie mit dem neuen Text und der Marke „Neu“ in der Liste der Lagemeldungen
+
 ### Requirement: Eine Lagemeldung protokolliert als Lage
 Schreibt das System zu einer Meldung automatisch einen ETB-Eintrag, SHALL dieser bei der Art
 „Lagemeldung“ den Typ „Lage“ tragen, bei jeder anderen Art den Typ „Meldung“.

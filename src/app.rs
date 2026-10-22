@@ -834,7 +834,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/meldungen/{mid}",
-            get(routes::meldung::detail),
+            get(routes::meldung::detail).patch(routes::meldung_korrektur::korrigieren),
         )
         .route(
             "/api/einsaetze/{id}/meldungen",

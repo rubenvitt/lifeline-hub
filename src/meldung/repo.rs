@@ -835,9 +835,9 @@ pub struct LageUebergabe {
 /// Übernimmt eine Meldung in die Lage (LFH-95; seit LLH-1031 Spalten der Meldung, LLH-1027 D5):
 /// setzt `lagerelevant = 1`, beim ersten Mal Zeitpunkt und Person der Übernahme. `text` ist der
 /// Lage-Text (Vorgabe des Handlers: der Wortlaut); gleich dem Wortlaut wird er als NULL
-/// gespeichert, der Wortlaut gilt. Verortet wird nur, solange keine Verortung besteht
-/// („Später nicht änderbar“). Idempotent: eine erneute Übernahme legt nichts Neues an; ändert sie
-/// den Lage-Text, ist die Lagemeldung wieder neu (LLH-1206, D3). Alle Ausdrücke des Updates lesen
+/// gespeichert, der Wortlaut gilt. Verortet wird nur, solange keine Verortung besteht (ändern
+/// lässt sie sich danach nur über die Korrektur, LLH-1066). Idempotent: eine erneute Übernahme
+/// legt nichts Neues an; ändert sie den Lage-Text, ist die Lagemeldung wieder neu (LLH-1206, D3). Alle Ausdrücke des Updates lesen
 /// den Stand VOR dem Update (SQLite). `NotFound`, wenn die Meldung nicht zum Einsatz gehört.
 ///
 /// Die ERSTE Übernahme schreibt „Meldung #12 in die Lage übernommen“ als Systemeintrag mit

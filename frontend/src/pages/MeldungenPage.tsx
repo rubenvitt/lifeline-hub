@@ -14,6 +14,7 @@ import {
   abschlussCursor,
   bestaetigeMeldung,
   erteileAuftragAusMeldung,
+  korrigiereMeldung,
   ladeMeldung,
   ladeMeldungKennzahlen,
   listeAbgeschlosseneMeldungen,
@@ -24,7 +25,14 @@ import {
 } from '../api/meldungen';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
-import type { Einheit, Meldung, MeldungStatus, NeueMeldung, NeuerAuftrag } from '../api/types';
+import type {
+  Einheit,
+  Meldung,
+  MeldungKorrekturPatch,
+  MeldungStatus,
+  NeueMeldung,
+  NeuerAuftrag,
+} from '../api/types';
 import EinheitUebernahme from './einheit/EinheitUebernahme';
 import { KennungsLink } from '../components/kennungsLink';
 import { einheitDetailPfad } from '../routing/deeplinks';
@@ -36,6 +44,7 @@ import MeldungFormular from '../meldungen/MeldungFormular';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import AuftragErteilenModal from '../meldungen/AuftragErteilenModal';
 import LagerelevantModal, { type LagerelevantDaten } from '../meldungen/LagerelevantModal';
+import { vonOptionenAus } from '../meldungen/MeldungKorrektur';
 import EinsatzSeite from '../components/EinsatzSeite';
 import {
   Augenbraue,
@@ -264,8 +273,8 @@ export default function MeldungenPage() {
 
   /*
    * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
-   * „Rückwege und Fehler“): Erfassen im Paneel, Status, Bearbeiter und Bestätigen an der Karte
-   * (ein Speicher, die zuletzt begonnene Aktion zählt), Lage-Übergabe und Auftrag im Dialog,
+   * „Rückwege und Fehler“): Erfassen im Paneel, Status, Bearbeiter, Bestätigen und Korrektur an
+   * der Karte (ein Speicher, die zuletzt begonnene Aktion zählt), Lage-Übergabe und Auftrag im Dialog,
    * Rückgängig im Seitenhinweis. Jede Aktion trägt ihren Einsatz: die Route hat keinen `key`, eine
    * Antwort nach einem Einsatzwechsel meldet nicht am neuen Ort.
    */
@@ -418,6 +427,25 @@ export default function MeldungenPage() {
       message.success('Auftrag aus Meldung erteilt');
     },
   });
+  /**
+   * Korrektur an der Karte und „Aus der Lage nehmen“ (LLH-1066): Grund an der Karte wie Status und
+   * Bestätigen. Die Lage liest dieselben Spalten, ihre Liste lädt mit.
+   */
+  const korrekturMutation = useMutation({
+    mutationFn: (v: { einsatzId: number; meldungId: number; aenderung: MeldungKorrekturPatch }) =>
+      korrigiereMeldung(v.einsatzId, v.meldungId, v.aenderung),
+    onMutate: (v) => beginneKarte(v.meldungId),
+    onSuccess: (m, v) => {
+      invalidiere(v.einsatzId);
+      qc.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(v.einsatzId) });
+      message.success(
+        v.aenderung.lagerelevant === false && Object.keys(v.aenderung).length === 1
+          ? 'Aus der Lage genommen'
+          : `Meldung #${m.lfd_nr} korrigiert`,
+      );
+    },
+    onError: (e, v) => meldeAnKarte(v.einsatzId, v.meldungId, e, 'Korrektur fehlgeschlagen'),
+  });
   /** Nur die Mutation DIESES Einsatzes gehört in seine Dialoge. */
   const imEinsatz = (m: {
     variables?: { einsatzId: number };
@@ -438,6 +466,7 @@ export default function MeldungenPage() {
   const { mutate: statusSetzen } = statusMutation;
   const { mutate: zuweisen } = zuweisenMutation;
   const { mutate: bestaetigen } = bestaetigenMutation;
+  const { mutate: korrigieren, mutateAsync: korrigierenAsync } = korrekturMutation;
   const onStatus = useCallback(
     (meldungId: number, status: MeldungStatus) =>
       statusSetzen({
@@ -467,6 +496,20 @@ export default function MeldungenPage() {
   const onBestaetigen = useCallback(
     (meldungId: number) => bestaetigen({ einsatzId, meldungId }),
     [bestaetigen, einsatzId],
+  );
+  const onKorrigieren = useCallback(
+    (meldungId: number, aenderung: MeldungKorrekturPatch) =>
+      korrigierenAsync({ einsatzId, meldungId, aenderung }),
+    [korrigierenAsync, einsatzId],
+  );
+  const onAusDerLage = useCallback(
+    (meldungId: number) =>
+      korrigieren({ einsatzId, meldungId, aenderung: { lagerelevant: false } }),
+    [korrigieren, einsatzId],
+  );
+  const vonOptionen = useMemo(
+    () => vonOptionenAus(einheitenQuery.data, abschnitteQuery.data),
+    [einheitenQuery.data, abschnitteQuery.data],
   );
   const mitglieder = mitgliederQuery.data ?? KEINE_MITGLIEDER;
   // „Auftrag erteilen“ schreibt in die Aufträge: ohne deren Freigabe gesperrt sichtbar (LFH-1051).
@@ -551,6 +594,9 @@ export default function MeldungenPage() {
     onLagerelevant,
     onBestaetigen,
     onAuftragErteilen,
+    onKorrigieren,
+    vonOptionen,
+    onAusDerLage,
     auftragGesperrt,
     kartenFehler: kartenFehler.grund,
     uebernahme,

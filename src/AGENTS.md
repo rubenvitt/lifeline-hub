@@ -394,11 +394,22 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.
 - **Schwärzung:** die Lage-Spalten sind Teil der Regel `meldung` (`lage_text` NullSetzen,
   `lat`/`lon` behalten, Zeiten und Benutzer-FKs behalten).
+- **Korrektur (LLH-1066):** `PATCH …/meldungen/{mid}` (`routes/meldung_korrektur.rs`, Schreiben
+  in `meldung/korrektur.rs`, eine Transaktion) ändert Art, Priorität, Richtung, Von-Bezug (als
+  Paar; eine id außerhalb des Einsatzes 422, anders als beim Erfassen), Empfänger und die
+  Lage-Angaben. Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang → 422, ein unbekanntes Feld
+  400. Art → Lagemeldung übernimmt jetzt durch den Ändernden (neu für die Kenntnisnahme), danach
+  `apply_lage_invariante_tx`; weg von Lagemeldung bleibt die Lagerelevanz. `lagerelevant: false`
+  ist bei Art Lagemeldung 422, sonst leert die Rücknahme Lage-Text, Ort, Übernahme und
+  Kenntnisnahme. Versetzen und Entfernen des Orts gehen nur hier, nicht über `als_lagerelevant`.
+  Heraufstufen zu sofort 422 (kein Alarm, keine Frist). Ein Systemeintrag je wirksamer Korrektur
+  mit Verweis auf die Meldung; Empfänger und Lage-Text stehen darin ohne Wert (Scrub). Geräte
+  erreichen die Route nicht (keine Routenliste).
 
 **Zielbild (Entscheidung 21.10.2026), gilt ab dem jeweiligen Folgeticket; bis dahin gilt das
 Bestehende.** Wer einen Punkt baut, schreibt die Regel oben fort und streicht ihn hier.
-- **Weitere Schreibwege rufen die Invariante:** ETB-Erfassung (LLH-1037) und Korrektur
-  (LLH-1066) gehen über dieselbe Repo-Funktion. Zurücknehmen bei Art Lagemeldung ist 422.
+- **Weitere Schreibwege rufen die Invariante:** ETB-Erfassung (LLH-1037) geht über dieselbe
+  Repo-Funktion (die Korrektur tut es schon, siehe oben).
 - **ETB → Meldung (LLH-1037):** `routes/etb.rs::erfassen` legt bei `in_meldungseingang: true`
   (nur Typ `meldung`/`lage`, sonst 422) Eintrag und Meldung in **einer** Transaktion an, mit
   beidseitigem Backlink und ohne zweiten ETB-Eintrag; dieselbe `client_id` dedupliziert beide.
