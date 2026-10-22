@@ -19,3 +19,11 @@ export function ladeOrtVorschau(
     mitParametern(`/api/einsaetze/${einsatzId}/ort-vorschau`, { lat, lon, exclude }),
   );
 }
+
+/**
+ * Ort-Vorschau ohne Einsatz, GET /api/ort-vorschau (LLH-1376), etwa beim Anlegen: nur der
+ * Ortsname, nie eine Peilung (kein Bezugspunkt). Nur wer Einsätze anlegen darf.
+ */
+export function ladeOrtVorschauInOrg(lat: number, lon: number): Promise<OrtVorschau> {
+  return apiGet<OrtVorschau>(mitParametern('/api/ort-vorschau', { lat, lon }));
+}

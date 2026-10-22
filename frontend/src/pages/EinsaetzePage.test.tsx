@@ -1068,6 +1068,10 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
           ],
         });
       }),
+      // Ort-Vorschau ohne Einsatz (LLH-1376): nur der Ortsname.
+      http.get('/api/ort-vorschau', () =>
+        HttpResponse.json({ ortsname: 'Marktplatz 3, 12345 Musterstadt' }),
+      ),
     );
     renderMitProviders(
       <Routes>
@@ -1126,6 +1130,22 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
       einsatzort_lon: 10.4514,
     });
     expect(begriffe).toEqual([]);
+  });
+
+  it('zu einer getippten Koordinate kommt der Ortsname als Vorschlag (LLH-1376)', async () => {
+    const { rumpfe } = aufbau();
+    await dialogOeffnen();
+    await userEvent.type(screen.getByLabelText('Einsatzort'), '51.16040, 10.45140');
+    expect(await screen.findByText('Marktplatz 3, 12345 Musterstadt')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Als Adresse übernehmen' }));
+    expect(screen.getByLabelText('Einsatzort')).toHaveValue('Marktplatz 3, 12345 Musterstadt');
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    expect(rumpfe[0]).toMatchObject({
+      einsatzort: 'Marktplatz 3, 12345 Musterstadt',
+      einsatzort_lat: 51.1604,
+      einsatzort_lon: 10.4514,
+    });
   });
 
   it('leer schickt keinen Einsatzort', async () => {

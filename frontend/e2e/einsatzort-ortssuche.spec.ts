@@ -8,6 +8,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * LFH-1175, Spec `ortsfeld` und `einsatzdaten-bearbeitung`: den Einsatzort über die Ortssuche
  * erfassen — in den Einsatzdaten (Paneel „Einsatzort“) und im Dialog „Neuen Einsatz anlegen“.
  * LLH-1108: Vorschau mit Nadel und Ort-Zeile am Feld, Nadel ziehen, „Auf Karte wählen“ ohne Netz.
+ * LLH-1376: Ortsname als Vorschlag auch beim Anlegen, über die Ort-Vorschau der Organisation.
  *
  * Der Geocoder wird nie gefragt: `page.route` fängt die Ortssuche am Frontend ab (Muster
  * `lagekarte-ortssuche.spec.ts`). Gespeichert wird echt, über das e2e-Backend; der Kartenausschnitt
@@ -44,7 +45,23 @@ async function geocoder(page: Page) {
       },
     }),
   );
+  // Ohne Einsatz (LLH-1376): nur der Ortsname, keine Peilung.
+  await page.route(/\/api\/ort-vorschau\?/, (route) =>
+    route.fulfill({ json: { ortsname: ORTSNAME } }),
+  );
   return anfragen;
+}
+
+/** Zieht die Nadel mit der Maus 60 px nach rechts (schrittweise, ein `dragTo` zöge nicht). */
+async function nadelZiehen(page: Page, nadel: Locator) {
+  const kasten = (await nadel.boundingBox())!;
+  const x = kasten.x + kasten.width / 2;
+  const y = kasten.y + kasten.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 30, y, { steps: 5 });
+  await page.mouse.move(x + 60, y, { steps: 5 });
+  await page.mouse.up();
 }
 
 async function einsatzAnlegenApi(page: Page, ort: Record<string, unknown> = {}): Promise<number> {
@@ -142,6 +159,41 @@ test('Einsatz anlegen: Einsatzort mit Treffer — Ausschnitt im Dialog, Koordina
   );
 });
 
+test('Einsatz anlegen: Nadel ziehen schlägt den Ortsnamen vor, ohne Einsatz und ohne Peilung', async ({
+  page,
+}) => {
+  await geocoder(page);
+  await anmeldenAlsAdmin(page);
+  const dialog = await einsatzDialogOeffnen(page);
+  await dialog.getByLabel('Bezeichnung').fill(`E2E Anlegen Nadel ${Date.now()}`);
+  const feld = dialog.getByLabel('Einsatzort');
+  await feld.fill('Bahnhofstraße 1');
+  await feld.press('Enter');
+  await dialog
+    .getByRole('list', { name: 'Treffer' })
+    .getByRole('button', { name: /Bahnhofstraße 1, 12345/ })
+    .click();
+  const nadel = dialog
+    .getByRole('group', { name: 'Karte: Einsatzort' })
+    .getByRole('button', { name: 'Einsatzort' });
+  await expect(nadel).toBeVisible();
+  // Der Text stammt aus dem Treffer: noch kein Vorschlag.
+  await expect(dialog.getByRole('button', { name: 'Als Adresse übernehmen' })).toHaveCount(0);
+
+  await nadelZiehen(page, nadel);
+  await expect(feld).toHaveValue(TREFFER.kurz);
+  await expect(dialog.getByText(ORTSNAME, { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Als Adresse übernehmen' }).click();
+  await expect(feld).toHaveValue(ORTSNAME);
+
+  await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
+  await expect(page).toHaveURL(/\/einsaetze\/\d+/);
+  const id = Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
+  const e = await einsatzLesen(page, id);
+  expect(e.einsatzort).toBe(ORTSNAME);
+  expect(e.einsatzort_lon!).toBeGreaterThan(TREFFER.lon);
+});
+
 test('Einsatzdaten: Nadel ziehen berichtigt die Koordinate, der Ortsname kommt als Vorschlag', async ({
   page,
 }) => {
@@ -158,15 +210,7 @@ test('Einsatzdaten: Nadel ziehen berichtigt die Koordinate, der Ortsname kommt a
   const nadel = vorschau.getByRole('button', { name: 'Einsatzort' });
   await expect(nadel).toBeVisible();
 
-  // Mit der Maus 60 px nach rechts ziehen.
-  const kasten = (await nadel.boundingBox())!;
-  const x = kasten.x + kasten.width / 2;
-  const y = kasten.y + kasten.height / 2;
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + 30, y, { steps: 5 });
-  await page.mouse.move(x + 60, y, { steps: 5 });
-  await page.mouse.up();
+  await nadelZiehen(page, nadel);
 
   // Der Text bleibt; der Ortsname der neuen Stelle steht als Vorschlag da.
   await expect(paneel(page).getByRole('textbox', { name: 'Adresse' })).toHaveValue(

@@ -59,7 +59,10 @@ export interface OrtsfeldKarte {
   etikett: string;
   /**
    * Im Einsatz: Ort-Zeile (Ortsname, Peilung zum nächsten Marker) und „Als Adresse übernehmen“
-   * über die Ort-Vorschau des Einsatzes. Ohne Einsatz gibt es beides nicht.
+   * über die Ort-Vorschau des Einsatzes. Ohne Einsatz (LLH-1376) fragt das Feld die Ort-Vorschau
+   * der Organisation, und nur für einen Punkt, der nicht aus einem Treffer stammt: dann stehen
+   * Ortsname und „Als Adresse übernehmen“ da, ohne Peilung. Diesen Einstieg darf nur, wer
+   * Einsätze anlegen darf.
    */
   einsatzId?: number;
   /** `typ:id` der bearbeiteten Sache, damit die Peilung nicht auf sie selbst zeigt. */
@@ -143,8 +146,8 @@ const TREFFER_FRISCH_MS = 10 * 60_000;
  * über dessen Knopf.
  *
  * Freitext bleibt erlaubt. Eine getippte Koordinate (jede Form der Sprungpalette) wird ohne Server
- * erkannt (LLH-1108). Mit `karte` stehen darunter die Vorschau mit ziehbarer Nadel, im Einsatz die
- * Ort-Zeile und „Auf Karte wählen“; mit `ohneSuche` ist das Feld reiner Text (Personenadressen).
+ * erkannt (LLH-1108). Mit `karte` stehen darunter die Vorschau mit ziehbarer Nadel, die Ort-Zeile
+ * (Peilung nur im Einsatz) und „Auf Karte wählen“; mit `ohneSuche` ist das Feld reiner Text.
  */
 export function Ortsfeld(props: OrtsfeldProps) {
   if (props.ohneSuche !== undefined) {
@@ -326,9 +329,9 @@ function OrtsfeldVorschau({
           onVerschieben={ausKarte}
         />
       )}
-      {punkt && karte.einsatzId != null && (
+      {punkt && (karte.einsatzId != null || value.quelle !== 'adresse') && (
         <OrtVorschlag
-          einsatzId={karte.einsatzId}
+          einsatzId={karte.einsatzId ?? null}
           exclude={karte.exclude}
           wert={{ ...value, koordinate: punkt }}
           onUebernehmen={(ortsname) =>
@@ -356,8 +359,8 @@ function OrtsfeldVorschau({
 }
 
 /**
- * Ort-Zeile (Ortsname, Peilung) und, wenn der Punkt nicht aus einem Treffer stammt, der Ortsname
- * als Vorschlag für den Text. Übernommen wird nur auf Knopfdruck; der getippte Text bleibt sonst.
+ * Ort-Zeile (Ortsname, im Einsatz mit Peilung) und, wenn der Punkt nicht aus einem Treffer stammt,
+ * der Ortsname als Vorschlag für den Text. Übernommen wird nur auf Knopfdruck; der getippte Text bleibt sonst.
  */
 function OrtVorschlag({
   einsatzId,
@@ -365,7 +368,8 @@ function OrtVorschlag({
   wert,
   onUebernehmen,
 }: {
-  einsatzId: number;
+  /** `null`: ohne Einsatz, Ort-Vorschau der Organisation (nur der Ortsname). */
+  einsatzId: number | null;
   exclude?: string;
   wert: OrtsfeldWert & { koordinate: LatLon };
   onUebernehmen: (ortsname: string) => void;

@@ -279,14 +279,42 @@ describe('Ortsfeld — Kartenvorschau', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('ohne Einsatz keine Ort-Zeile und keine Anfrage an die Ort-Vorschau', async () => {
+  it('ohne Einsatz: Nadel ziehen fragt die Ort-Vorschau der Organisation und schlägt den Ortsnamen vor', async () => {
+    const abfragen: URL[] = [];
+    server.use(
+      http.get('/api/ort-vorschau', ({ request }) => {
+        abfragen.push(new URL(request.url));
+        return HttpResponse.json({ ortsname: 'Lindenweg 2, 12345 Musterdorf' });
+      }),
+    );
+    renderMitProviders(
+      <Aufbau
+        start={{ text: 'Feldweg', koordinate: { lat: 51.1, lon: 10.4 }, quelle: 'adresse' }}
+        kartenProp={{ etikett: 'Einsatzort' }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Nadel ziehen' }));
+    expect(await screen.findByText('Lindenweg 2, 12345 Musterdorf')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Als Adresse übernehmen' }));
+    expect(wert()).toEqual({
+      text: 'Lindenweg 2, 12345 Musterdorf',
+      koordinate: { lat: 52.5, lon: 13.4 },
+      quelle: 'karte',
+    });
+    expect(abfragen).toHaveLength(1);
+    expect(abfragen[0].searchParams.get('lat')).toBe('52.5');
+    expect(abfragen[0].searchParams.get('lon')).toBe('13.4');
+    expect(abfragen[0].searchParams.has('exclude')).toBe(false);
+  });
+
+  it('ohne Einsatz: ein gewählter Treffer fragt die Ort-Vorschau nicht', async () => {
     const anfragen: string[] = [];
     const merken = ({ request }: { request: Request }) => anfragen.push(request.url);
     server.events.on('request:start', merken);
     try {
       renderMitProviders(
         <Aufbau
-          start={{ text: 'X', koordinate: { lat: 51.1, lon: 10.4 }, quelle: 'karte' }}
+          start={{ text: 'X', koordinate: { lat: 51.1, lon: 10.4 }, quelle: 'adresse' }}
           kartenProp={{ etikett: 'Einsatzort' }}
         />,
       );

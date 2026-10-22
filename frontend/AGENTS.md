@@ -590,7 +590,8 @@ anwendbar), „nicht geprüft" ist keins.
   Suche wird hineingereicht (im Einsatz `sucheOrtImEinsatz`, ohne Einsatz `sucheOrtInOrg`), beide
   ohne Lagekarten-Recht. Eine getippte Koordinate erkennt das Feld selbst. Speichert das Ziel eine
   Koordinate, bekommt das Feld `karte` (Vorschau mit ziehbarer Nadel, im Einsatz Ort-Zeile mit
-  `exclude` des Objekts, „Auf Karte wählen“); `quelle` im Wert sagt, ob die Koordinate am Text
+  `exclude` des Objekts, ohne Einsatz nur der Ortsname eines Kartenpunkts über die Ort-Vorschau der
+  Organisation, LLH-1376; „Auf Karte wählen“); `quelle` im Wert sagt, ob die Koordinate am Text
   hängt (`adresse`, `koordinate`) oder auf der Karte gesetzt ist (`karte`). **Personenbezogene
   Adressen nie an den Geocoder:** `ohneSuche="personenbezogen"` (reiner Text, auch keine
   Ort-Vorschau); so „Herkunft / Adresse“ der Person. Den gespeicherten Punkt ohne Bearbeitung zeigt
