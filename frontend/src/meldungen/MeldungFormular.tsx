@@ -87,7 +87,7 @@ const MELDEWEG_OPTIONEN: { value: MeldungMeldeweg; label: string }[] = [
   { value: 'persoenlich', label: 'Persönlich' },
   { value: 'sonstige', label: 'Sonstige' },
 ];
-const MELDUNGSART_OPTIONEN: { value: Meldungsart; label: string }[] = [
+export const MELDUNGSART_OPTIONEN: { value: Meldungsart; label: string }[] = [
   { value: 'lagemeldung', label: 'Lagemeldung' },
   { value: 'sofortmeldung', label: 'Sofortmeldung' },
   { value: 'rueckmeldung', label: 'Rückmeldung' },
@@ -95,12 +95,12 @@ const MELDUNGSART_OPTIONEN: { value: Meldungsart; label: string }[] = [
   { value: 'anfrage', label: 'Anfrage' },
   { value: 'sonstige', label: 'Sonstige' },
 ];
-const PRIORITAET_OPTIONEN: { value: MeldungPrioritaet; label: string }[] = [
+export const PRIORITAET_OPTIONEN: { value: MeldungPrioritaet; label: string }[] = [
   { value: 'sofort', label: 'Sofort' },
   { value: 'dringend', label: 'Dringend' },
   { value: 'normal', label: 'Normal' },
 ];
-const RICHTUNG_OPTIONEN: { value: Richtung; label: string }[] = [
+export const RICHTUNG_OPTIONEN: { value: Richtung; label: string }[] = [
   { value: 'intern', label: 'Intern' },
   { value: 'extern', label: 'Extern' },
 ];
@@ -432,13 +432,12 @@ export default function MeldungFormular({
                     </Form.Item>
                   </Col>
                 </Row>
-                {/* Eine Lagemeldung steht mit Ort auf der Lagekarte (LLH-1031); die Folge sichtbar
-                    am Feld wie bei der Übernahme in die Lage. */}
+                {/* Eine Lagemeldung steht mit Ort auf der Lagekarte (LLH-1031); versetzen lässt sie
+                    sich danach in der Lage (LLH-1066). */}
                 {istLagemeldung && (
                   <KoordinatenFeld
                     name="koord"
                     label="Verortung (optional)"
-                    extra="Später nicht änderbar"
                     einsatzId={einsatzId}
                   />
                 )}

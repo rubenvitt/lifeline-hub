@@ -1,5 +1,5 @@
 import { IconChevronHoch, IconKreuz, IconPlus } from '../icons';
-import { Alert, App, Breadcrumb, Button, Flex, Input, Spin } from 'antd';
+import { Alert, App, Breadcrumb, Button, Flex, Input, Space, Spin } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,6 +39,7 @@ import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { MELDUNG_STATUS } from '../kommunikation';
 import PrioBadge from '../kommunikation/PrioBadge';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
 import { MELDUNGSART_LABEL } from '../meldungen/meldungKennzahlen';
 import { erfasseMeldungOfflineFaehig } from '../offline/schreiben';
 import { useOhneVerbindung } from '../offline/verbindung';
@@ -108,6 +109,10 @@ const HERKUNFT_OPTIONEN: SegmentOption<Herkunftsfilter>[] = [
  * neuen (nach Filter, über ihre Kennungen). Der Stand gilt für alle; dieselbe Zahl zeigt der Modulzähler. Eine Ablehnung
  * steht an der Zeile bzw. im Seitenhinweis, nie im Toast (`frontend/AGENTS.md`, „Rückwege und
  * Fehler“).
+ *
+ * Lage-Text und Verortung (LLH-1066): „Bearbeiten“ an der Zeile öffnet sie an Ort und Stelle
+ * (`LageAngabenBearbeiten`), mit denselben Rechten wie das Erfassen. Später auf den Baustein
+ * „Bearbeiten in der Ansicht“ umstellen.
  */
 const GESEHEN_FEHLER = 'Konnte nicht als gesehen markiert werden';
 
@@ -120,6 +125,8 @@ export default function LagemeldungenPage() {
   const ohneVerbindung = useOhneVerbindung();
   const [filter, setFilter] = useState<LageFilter>(LEERER_FILTER);
   const [formOffen, setFormOffen] = useState(false);
+  // Die Zeile, deren Lage-Angaben gerade bearbeitet werden (Kennung der Meldung).
+  const [bearbeitetId, setBearbeitetId] = useState<number | null>(null);
   const { benutzer } = useAuth();
   const { message } = App.useApp();
   const meldungenGesperrt = useSprungSperre(einsatzId)('meldungen');
@@ -194,6 +201,7 @@ export default function LagemeldungenPage() {
     leere();
     alleGesehenReset();
     setFormOffen(false);
+    setBearbeitetId(null);
   }, [einsatzId, leere, alleGesehenReset]);
 
   const eintraege = useMemo(() => lageQuery.data ?? [], [lageQuery.data]);
@@ -231,6 +239,15 @@ export default function LagemeldungenPage() {
   const zahlWort = (n: number) => (n === 1 ? 'Lagemeldung' : 'Lagemeldungen');
 
   const zeilenHinweis = (l: LageMeldung) => {
+    if (darfErfassen && bearbeitetId === l.meldung_id) {
+      return (
+        <LageAngabenBearbeiten
+          einsatzId={einsatzId}
+          lage={l}
+          onFertig={() => setBearbeitetId(null)}
+        />
+      );
+    }
     const ort =
       l.lat != null && l.lon != null ? (
         <KoordinatenAnzeige
@@ -289,14 +306,27 @@ export default function LagemeldungenPage() {
         </>
       }
       aktionen={
-        l.is_neu && darfSchreiben ? (
-          <Button
-            disabled={ohneVerbindung}
-            loading={gesehenMutation.isPending && gesehenMutation.variables === l.id}
-            onClick={() => gesehenMutation.mutate(l.id)}
-          >
-            Als gesehen markieren
-          </Button>
+        (l.is_neu && darfSchreiben) || (darfErfassen && bearbeitetId !== l.meldung_id) ? (
+          <Space wrap>
+            {l.is_neu && darfSchreiben && (
+              <Button
+                disabled={ohneVerbindung}
+                loading={gesehenMutation.isPending && gesehenMutation.variables === l.id}
+                onClick={() => gesehenMutation.mutate(l.id)}
+              >
+                Als gesehen markieren
+              </Button>
+            )}
+            {darfErfassen && bearbeitetId !== l.meldung_id && (
+              <Button
+                disabled={ohneVerbindung}
+                aria-label={`Lage-Angaben zu Meldung #${l.meldung_lfd_nr} bearbeiten`}
+                onClick={() => setBearbeitetId(l.meldung_id)}
+              >
+                Bearbeiten
+              </Button>
+            )}
+          </Space>
         ) : undefined
       }
       hinweis={zeilenHinweis(l)}

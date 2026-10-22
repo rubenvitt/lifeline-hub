@@ -6,6 +6,7 @@ import MeldungKarte from './MeldungKarte';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { formatZeit, DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import { mitProzessZone } from '../test/prozessZone';
+import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import type { Meldung } from '../api/types';
 
 const meldung = (over: Partial<Meldung> = {}): Meldung => ({
@@ -489,5 +490,128 @@ describe('MeldungKarte — Wortlaut vor Verwaltung (LFH-974)', () => {
     renderKarte(<MeldungKarte meldung={mitBearbeiter()} einsatzId={7} />);
     expect(screen.getByText('Bearbeiter: Anna Berg')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+});
+
+// LLH-1066: Korrektur an der Karte und „Aus der Lage nehmen“.
+describe('MeldungKarte — nachträglich korrigieren (LLH-1066)', () => {
+  const korrigierbar = (over: Partial<Meldung> = {}) =>
+    meldung({ meldungsart: 'sonstige', status: 'erledigt', ...over });
+
+  it('bietet „Bearbeiten“ an und sendet nur die geänderten Felder', async () => {
+    const onKorrigieren = vi.fn().mockResolvedValue(undefined);
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar()}
+        einsatzId={7}
+        darfSchreiben
+        onKorrigieren={onKorrigieren}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    const formular = screen.getByRole('form', { name: 'Meldung #1 korrigieren' });
+    // Der Eingang bleibt: kein Feld für Wortlaut, Absender, Meldeweg oder Ereigniszeit.
+    expect(within(formular).queryByRole('textbox', { name: /Wortlaut|Absender/ })).toBeNull();
+    await waehle('Priorität', 'Dringend');
+    await userEvent.clear(within(formular).getByRole('textbox', { name: 'Empfänger / Adressat' }));
+    await userEvent.click(within(formular).getByRole('button', { name: 'Speichern' }));
+    expect(onKorrigieren).toHaveBeenCalledWith(1, { prioritaet: 'dringend', empfaenger: null });
+    // Gespeichert: die Bearbeitung schließt, die Aktionszeile kommt zurück.
+    expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Meldung #1 korrigieren' })).toBeNull();
+  });
+
+  it('bleibt bei einer Ablehnung offen', async () => {
+    const onKorrigieren = vi.fn().mockRejectedValue(new Error('422'));
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar()}
+        einsatzId={7}
+        darfSchreiben
+        onKorrigieren={onKorrigieren}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await waehle('Richtung', 'Extern');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(onKorrigieren).toHaveBeenCalledWith(1, { richtung: 'extern' });
+    expect(screen.getByRole('form', { name: 'Meldung #1 korrigieren' })).toBeInTheDocument();
+  });
+
+  it('schließt ohne Änderung, ohne zu senden; Escape bricht ab', async () => {
+    const onKorrigieren = vi.fn();
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar()}
+        einsatzId={7}
+        darfSchreiben
+        onKorrigieren={onKorrigieren}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(screen.queryByRole('form')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Empfänger / Adressat' }), {
+      key: 'Escape',
+    });
+    expect(screen.queryByRole('form')).toBeNull();
+    expect(onKorrigieren).not.toHaveBeenCalled();
+  });
+
+  it('bietet „Sofort“ nur einer Meldung an, die schon sofort ist', async () => {
+    renderKarte(
+      <MeldungKarte meldung={korrigierbar()} einsatzId={7} darfSchreiben onKorrigieren={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await oeffne('Priorität');
+    expect(optionenVon('Priorität')).toEqual(['Dringend', 'Normal']);
+    await oeffne('Meldungsart');
+    expect(optionenVon('Meldungsart')).not.toContain('Sofortmeldung');
+  });
+
+  it('nimmt eine übernommene Meldung erst nach der Rückfrage aus der Lage', async () => {
+    const onAusDerLage = vi.fn();
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar({ lagerelevant: true })}
+        einsatzId={7}
+        darfSchreiben
+        onAusDerLage={onAusDerLage}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Aus der Lage nehmen' }));
+    expect(onAusDerLage).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Lage-Text und Verortung gehen verloren');
+    const knopf = within(dialog).getByRole('button', { name: 'Aus der Lage nehmen' });
+    expect(knopf).toHaveClass('ant-btn-dangerous');
+    await userEvent.click(knopf);
+    expect(onAusDerLage).toHaveBeenCalledWith(1);
+  });
+
+  it('bietet „Aus der Lage nehmen“ einer Lagemeldung nicht an', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar({ lagerelevant: true, meldungsart: 'lagemeldung' })}
+        einsatzId={7}
+        darfSchreiben
+        onAusDerLage={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Aus der Lage nehmen' })).toBeNull();
+  });
+
+  it('bietet ohne Schreibrecht weder „Bearbeiten“ noch „Aus der Lage nehmen“ an', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={korrigierbar({ lagerelevant: true })}
+        einsatzId={7}
+        onKorrigieren={vi.fn()}
+        onAusDerLage={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Aus der Lage nehmen' })).toBeNull();
   });
 });

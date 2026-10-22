@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { SeitenLeer } from '../components/SeitenZustand';
-import type { Meldung, MeldungStatus } from '../api/types';
+import type { Meldung, MeldungKorrekturPatch, MeldungStatus } from '../api/types';
 import MeldungKarte from './MeldungKarte';
+import type { VonGruppe } from './MeldungKorrektur';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 
 interface BearbeiterOption {
@@ -25,6 +26,12 @@ interface MeldungListeProps {
   onBestaetigen?: (meldungId: number) => void;
   /** Öffnet das Auftrags-Formular zur Meldung → Auftrag-Erteilung. */
   onAuftragErteilen?: (m: Meldung) => void;
+  /** Korrektur an der Karte (LLH-1066); lehnt bei Ablehnung ab (`mutateAsync`). */
+  onKorrigieren?: (meldungId: number, aenderung: MeldungKorrekturPatch) => Promise<unknown>;
+  /** Von-Auswahl der Korrektur. */
+  vonOptionen?: VonGruppe[];
+  /** „Aus der Lage nehmen“ (LLH-1066). */
+  onAusDerLage?: (meldungId: number) => void;
   /** Aufträge ohne Freigabe: „Auftrag erteilen“ steht gesperrt mit Grund. */
   auftragGesperrt?: boolean;
   /**
@@ -49,6 +56,9 @@ export default function MeldungListe({
   onLagerelevant,
   onBestaetigen,
   onAuftragErteilen,
+  onKorrigieren,
+  vonOptionen,
+  onAusDerLage,
   auftragGesperrt,
   kartenFehler,
   uebernahme,
@@ -70,6 +80,9 @@ export default function MeldungListe({
           onLagerelevant={onLagerelevant}
           onBestaetigen={onBestaetigen}
           onAuftragErteilen={onAuftragErteilen}
+          onKorrigieren={onKorrigieren}
+          vonOptionen={vonOptionen}
+          onAusDerLage={onAusDerLage}
           auftragGesperrt={auftragGesperrt}
           fehlerGrund={kartenFehler?.(m.id) ?? null}
           uebernahme={uebernahme?.(m) ?? null}

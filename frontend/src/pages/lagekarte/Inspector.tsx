@@ -1,7 +1,7 @@
 import { Button, Popconfirm, Space, Typography } from 'antd';
 import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
-import { useId, useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { renderSvg } from '@einsatzzeichen/core';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
@@ -32,6 +32,7 @@ import {
   type RasterFeld,
 } from './leistenDaten';
 import { FACHAUFGABE_OPTIONS, ORGANISATION_OPTIONS } from './taktischesZeichen';
+import LageAngabenBearbeiten from '../../meldungen/LageAngabenBearbeiten';
 
 interface InspectorProps {
   einsatzId: number;
@@ -179,6 +180,16 @@ export default function Inspector({
   const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);
+  // Lage-Text und Verortung einer Lagemeldung (LLH-1066): schreibt in die Meldung, also mit deren
+  // Freigabe; im Historien-Modus ist `darfSchreiben` aus. Der Schlüssel des Markers hält den
+  // offenen Zustand an genau dieser Lagemeldung.
+  const lageBearbeitbar =
+    darfSchreiben &&
+    marker.typ === 'lagemeldung' &&
+    marker.lageMeldung != null &&
+    !istSprungGesperrt('meldungen', freigaben);
+  const [lageOffenFuer, setLageOffenFuer] = useState<string | null>(null);
+  const lageOffen = lageBearbeitbar && lageOffenFuer === marker.schluessel;
 
   return (
     <KartenDetailCard
@@ -228,10 +239,23 @@ export default function Inspector({
           <span style={{ ...monoStil(10), color: rollen.schwach }}>{letzte.meta}</span>
         </section>
       )}
-      {marker.typ === 'lagemeldung' && marker.lageMeldung && (
+      {marker.typ === 'lagemeldung' && marker.lageMeldung && !lageOffen && (
         <Typography.Paragraph style={{ margin: 0, fontSize: 12, color: rollen.text2 }}>
           {marker.lageMeldung.inhalt}
         </Typography.Paragraph>
+      )}
+      {lageOffen && marker.lageMeldung && (
+        <LageAngabenBearbeiten
+          einsatzId={einsatzId}
+          lage={{
+            meldung_id: marker.lageMeldung.meldungId,
+            meldung_lfd_nr: marker.lageMeldung.meldungLfdNr,
+            text: marker.lageMeldung.inhalt,
+            lat: marker.lat,
+            lon: marker.lon,
+          }}
+          onFertig={() => setLageOffenFuer(null)}
+        />
       )}
       {!ohneOrt && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
@@ -328,8 +352,14 @@ export default function Inspector({
             </Link>
           )}
         </div>
-        {/* Lagemeldungen sind auf der Karte read-only: verortet wird nur beim Übergeben. Die
-            Führungsstelle ebenso: sie wird in den Einsatzdaten gepflegt (LFH-1181). */}
+        {lageBearbeitbar && !lageOffen && (
+          <Button block onClick={() => setLageOffenFuer(marker.schluessel)}>
+            Lage-Angaben bearbeiten
+          </Button>
+        )}
+        {/* Eine Lagemeldung verliert ihren Ort über „Lage-Angaben bearbeiten“ (LLH-1066), nicht
+            über „Verortung löschen“. Die Führungsstelle wird in den Einsatzdaten gepflegt
+            (LFH-1181). */}
         {darfSchreiben &&
           !ohneOrt &&
           marker.typ !== 'einsatzort' &&

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { anmeldenAlsAdmin } from './rollen-kern';
+import { waehleIn } from './auswahl-kern';
 
 /**
  * Lagemeldung als Meldungsart (LLH-1031, Spec `meldungseingang`): auf der Seite „Lagemeldungen“
@@ -80,5 +81,71 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
   await expect(page.locator(`[data-meldung-id="${lage.id}"]`)).toHaveAttribute(
     'data-hervorgehoben',
     'true',
+  );
+});
+
+test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenommen (LLH-1066)', async ({
+  page,
+}) => {
+  const { id } = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Korrektur ${Date.now()}`,
+  });
+  const m = await post<{ id: number; lfd_nr: number }>(page, `/api/einsaetze/${id}/meldungen`, {
+    absender: 'Florian Nord 1',
+    meldeweg: 'funk',
+    inhalt: 'Brücke Nord gesperrt',
+    ereigniszeit: new Date(Date.now() - 5 * 60_000).toISOString(),
+  });
+
+  // Art an der Karte berichtigen: aus „Sonstige“ wird eine Rückmeldung, dann in die Lage.
+  await page.goto(`/einsaetze/${id}/meldungen`);
+  const karte = page.locator(`[data-meldung-id="${m.id}"]`);
+  await karte.getByRole('button', { name: `Aktionen zu Meldung ${m.lfd_nr}` }).click();
+  await page.getByRole('menuitem', { name: 'Bearbeiten' }).click();
+  const formular = karte.getByRole('form', { name: `Meldung #${m.lfd_nr} korrigieren` });
+  await waehleIn(formular.getByRole('combobox', { name: 'Meldungsart' }), 'Rückmeldung');
+  await formular.getByRole('button', { name: 'Speichern' }).click();
+  await expect(page.getByText(`Meldung #${m.lfd_nr} korrigiert`)).toBeVisible();
+  await expect(formular).toBeHidden();
+  await expect(karte).toContainText('Rückmeldung');
+  await post(page, `/api/einsaetze/${id}/meldungen/${m.id}/lagerelevant`, {});
+
+  // In der Lage: Lage-Text und Ort nachtragen.
+  await page.goto(`/einsaetze/${id}/lagemeldungen`);
+  const zeile = page.getByRole('region', { name: 'Lagemeldungen' }).getByRole('listitem');
+  await zeile
+    .getByRole('button', { name: `Lage-Angaben zu Meldung #${m.lfd_nr} bearbeiten` })
+    .click();
+  const lage = zeile.getByRole('form', { name: `Lage-Angaben zu Meldung #${m.lfd_nr}` });
+  await lage.getByRole('textbox', { name: 'Lage-Text' }).fill('Brücke Nord für alle gesperrt');
+  await lage.getByRole('button', { name: 'Speichern' }).click();
+  await expect(lage).toBeHidden();
+  await expect(zeile).toContainText('Brücke Nord für alle gesperrt');
+  await expect(zeile).toContainText('Neu');
+
+  // Aus der Lage nehmen: nach der Rückfrage fehlt sie in der Zeitachse.
+  await page.goto(`/einsaetze/${id}/meldungen`);
+  await karte.getByRole('button', { name: `Aktionen zu Meldung ${m.lfd_nr}` }).click();
+  await page.getByRole('menuitem', { name: 'Aus der Lage nehmen' }).click();
+  const rueckfrage = page.getByRole('dialog', {
+    name: `Meldung #${m.lfd_nr} aus der Lage nehmen?`,
+  });
+  await rueckfrage.getByRole('button', { name: 'Aus der Lage nehmen' }).click();
+  await expect(page.getByText('Aus der Lage genommen')).toBeVisible();
+  await page.goto(`/einsaetze/${id}/lagemeldungen`);
+  await expect(page.getByText('Noch keine Lagemeldungen')).toBeVisible();
+
+  // Das ETB nennt jede Korrektur mit Verweis auf die Meldung.
+  const etb = (await (await page.request.get(`/api/einsaetze/${id}/etb`)).json()) as {
+    inhalt: string;
+    meldung_id?: number;
+  }[];
+  const texte = etb.filter((e) => e.meldung_id === m.id).map((e) => e.inhalt);
+  expect(texte).toEqual(
+    expect.arrayContaining([
+      `Meldung #${m.lfd_nr}: Art Sonstige → Rückmeldung`,
+      `Meldung #${m.lfd_nr}: Lage-Text geändert`,
+      `Meldung #${m.lfd_nr}: aus der Lage genommen`,
+    ]),
   );
 });
