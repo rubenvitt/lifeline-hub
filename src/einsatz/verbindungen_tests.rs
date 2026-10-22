@@ -191,7 +191,7 @@ async fn bezug_und_spalte_passen_zusammen() {
     }
 }
 
-/// Akzeptanzkriterium LLH-1134: die Migration 0243 überführt `erreichbarkeit` verlustfrei — je
+/// Akzeptanzkriterium LLH-1134: die Migration 0244 überführt `erreichbarkeit` verlustfrei — je
 /// nach `kommunikationsmittel` zu Mobil bzw. Festnetz, sonst (Digitalfunk, leer, Altwert) zu
 /// Sonstiges; Digitalfunk ohne Nummer und eine leere Erreichbarkeit ergeben keine Verbindung.
 #[tokio::test]
@@ -211,7 +211,7 @@ async fn ueberfuehrung_erreichbarkeit_zu_verbindungen() {
         .unwrap();
     let alle = sqlx::migrate!("./migrations");
     let vorher = Migrator {
-        migrations: Cow::Owned(alle.iter().filter(|m| m.version < 243).cloned().collect()),
+        migrations: Cow::Owned(alle.iter().filter(|m| m.version < 244).cloned().collect()),
         ..Migrator::DEFAULT
     };
     vorher.run(&pool).await.unwrap();

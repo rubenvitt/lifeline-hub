@@ -1612,7 +1612,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
     // Verbindungen an Abschnitt, Einheit und eigener Führungsstelle (LLH-1134): wie die
     // Verbindungen des Kommunikationsplans. Der Wert ist eine Rufnummer oder Adresse (NOT NULL →
     // Platzhalter), der Hinweis Freitext; Bezug, Mittel und Reihenfolge sind Skelett. Die alten
-    // Spalten `erreichbarkeit` an den drei Tabellen bleiben Scrub (Altbestand vor 0243).
+    // Spalten `erreichbarkeit` an den drei Tabellen bleiben Scrub (Altbestand vor 0244).
     TabellenRegel {
         tabelle: "einsatz_verbindung",
         scoping: Scoping::EinsatzId,

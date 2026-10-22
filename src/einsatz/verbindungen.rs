@@ -3,7 +3,7 @@
 //! (`stab::kommunikation`, Mittel festnetz | mobil | fax | email | messenger | melder |
 //! sonstiges, Wert, Hinweis). Funk zeigt sich am Datensatz über Rufname und Sprechgruppen.
 //!
-//! Eine Tabelle `einsatz_verbindung` (Migration 0243) mit typisiertem Bezug und echten
+//! Eine Tabelle `einsatz_verbindung` (Migration 0244) mit typisiertem Bezug und echten
 //! Fremdschlüsseln: das Löschen eines Abschnitts oder einer Einheit räumt per Kaskade mit. Der
 //! Schreibweg ist eine Ersatzliste im PATCH bzw. POST des Datensatzes (`verbindungen`, wie
 //! `sprechgruppe_ids`); Live-Ereignis und Rechte folgen dem Datensatz.
