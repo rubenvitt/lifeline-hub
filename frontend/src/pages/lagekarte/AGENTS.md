@@ -122,8 +122,9 @@ diese Zusage.
   `e2e/lagekarte-ohne-grafik.spec.ts` (Chromium per Init-Skript, Firefox ohne Nachbau). **Jede
   andere maplibre-Karte** baut ebenso über `wennDarstellbar` und zeigt an ihrer Stelle
   `KarteNichtDarstellbar` (`anzeige/Kartenausschnitt.tsx`, LLH-1370): der Ausschnitt des
-  Einsatzorts und `betreuung/BezirkKartenbild.tsx`; Nachweis
-  `e2e/kartenausschnitt-ohne-grafik.spec.ts`.
+  Einsatzorts, `betreuung/BezirkKartenbild.tsx` und die Karte des Lagemonitors
+  (`geraet/LagemonitorKarte.tsx`, LLH-1377, Großbild über `hoehe`/`schrift`); Nachweis
+  `e2e/kartenausschnitt-ohne-grafik.spec.ts`, `e2e/geraet-lagemonitor-ohne-grafik.spec.ts`.
 - **Fachebenen nennen ihr Alter** (LFH-591,
   `openspec/changes/archive/2026-09-30-lfh-591-fachebenen-datenalter/design.md`): `abgerufen` im
   Umschlag ist der Abruf durch den Server, `stand` bleibt der Datenstand der Quelle (KRITIS,

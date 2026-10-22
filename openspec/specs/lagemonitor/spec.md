@@ -23,6 +23,21 @@ Einsatzgebiet.
 - **WHEN** der Lagemonitor auf einem Bildschirm mit 1920 × 1080 läuft
 - **THEN** sind alle Kacheln ohne Bildlauf sichtbar
 
+### Requirement: Kartenkachel ohne Kartengrafik
+
+Kann das Gerät die Karte nicht zeichnen (kein WebGL2), SHALL die Kachel „Lagekarte“ an Stelle der
+Karte „Karte auf diesem Gerät nicht darstellbar“ zeigen, in Großbild-Schrift und ohne die Technik
+zu nennen. Die übrigen Kacheln und die Statusleiste MUST sichtbar bleiben, und der Monitor MUST
+NOT in die Fehlerseite der App fallen. Ein anderer Fehler beim Aufbau der Karte MUST weiter als
+Fehler gelten.
+
+#### Scenario: Gerät ohne Kartengrafik
+
+- **WHEN** der Einsatzort verortet ist und der Browser des Monitors kein WebGL2 hat
+- **THEN** zeigt die Kachel „Lagekarte“ „Karte auf diesem Gerät nicht darstellbar“ in mindestens 28 px
+- **AND** Betroffene, Kräfte, Belegung der Unfallhilfsstellen, Meldungen und Statusleiste bleiben sichtbar
+- **AND** es erscheint keine Fehlerseite der App
+
 ### Requirement: Keine personenbezogenen Daten
 
 Der Lagemonitor SHALL nur verdichtete Zahlen und Lagedaten ohne Personenbezug zeigen. Namen von

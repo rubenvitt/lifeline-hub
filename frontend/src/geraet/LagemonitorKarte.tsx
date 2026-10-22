@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../pages/lagekarte/maplibreWorker';
+import { KarteNichtDarstellbar } from '../anzeige/Kartenausschnitt';
 import { ladeKarteConfig } from '../api/karte';
 import { globalKeys } from '../api/queryKeys';
 import type { LagemonitorAbschnitt, LagemonitorUhs, LagemonitorZone } from '../api/types';
@@ -13,6 +14,7 @@ import {
   defaultModus,
 } from '../pages/lagekarte/basemapStil';
 import { wendeKartenDatenAn } from '../pages/lagekarte/kartenDaten';
+import { wennDarstellbar } from '../pages/lagekarte/kartenGrafik';
 import {
   ABSCHNITT_FARBE,
   sorgeFuerAbschnittLayer,
@@ -20,6 +22,12 @@ import {
 } from '../pages/lagekarte/kartenLayer';
 import { PUNKT_ZOOM } from '../pages/lagekarte/startAnsicht';
 import { baueMonitorFlaechen } from './lagemonitorFlaechen';
+
+/**
+ * Textgröße der Kartenkachel: Großbild-Regel, jeder Text mindestens 28 px (`geraet/AGENTS.md`,
+ * wie `GROSS.text` in `LagemonitorPage.tsx`; nicht von dort importiert, die Seite bindet diese Datei).
+ */
+const GROSS_TEXT = 28;
 
 /**
  * Ein Punkt, den die Karte zeigen muss: der Einsatzort, jede verortete UHS und jeder Stützpunkt
@@ -58,6 +66,10 @@ export function monitorAusschnitt(
  * mit Einsatzort, den UHS samt Belegung, den Gefahrenzonen und den Flächen der Einsatzabschnitte
  * (LLH-1153), **ohne jede Bedienung** (`interactive: false`): kein Verschieben, kein Zoomen, kein
  * Klick. Keine personenbezogene Ebene.
+ *
+ * Ohne Kartengrafik (LLH-1377, wie die Lagekarte seit LLH-1353, `pages/lagekarte/kartenGrafik.ts`)
+ * steht an Stelle der Karte {@link KarteNichtDarstellbar} in Großbild-Schrift; die übrigen Kacheln
+ * des Monitors bleiben.
  */
 export default function LagemonitorKarte({
   einsatzort,
@@ -74,6 +86,8 @@ export default function LagemonitorKarte({
   const container = useRef<HTMLDivElement>(null);
   const karte = useRef<maplibregl.Map | null>(null);
   const marker = useRef<maplibregl.Marker[]>([]);
+  // Ein Gerät ohne Kartengrafik bekommt sie nicht nachträglich: der Zustand bleibt.
+  const [darstellbar, setDarstellbar] = useState(true);
   const configQuery = useQuery({ queryKey: globalKeys.karteConfig(), queryFn: ladeKarteConfig });
   const config = configQuery.data;
 
@@ -103,7 +117,8 @@ export default function LagemonitorKarte({
       config,
       config.online_styles[0],
     );
-    const map = new maplibregl.Map({
+    // Ohne WebGL2 wirft der Konstruktor: `wennDarstellbar` fängt nur diesen Wurf.
+    const optionen: maplibregl.MapOptions = {
       container: container.current,
       style,
       center: [10.45, 51.16],
@@ -111,7 +126,12 @@ export default function LagemonitorKarte({
       interactive: false,
       attributionControl: false,
       transformRequest: absolutiereProxyAnfrage,
-    });
+    };
+    const map = wennDarstellbar(() => new maplibregl.Map(optionen));
+    if (!map) {
+      setDarstellbar(false);
+      return;
+    }
     karte.current = map;
     // Testhaken wie auf der Lagekarte (e2e/geraet-lagemonitor.spec.ts liest die gezeichneten
     // Flächen); im Prod-Build ist die Zeile weg.
@@ -220,7 +240,7 @@ export default function LagemonitorKarte({
           height: '100%',
           display: 'grid',
           placeItems: 'center',
-          fontSize: 28,
+          fontSize: GROSS_TEXT,
           color: rollen.gedaempft,
         }}
       >
@@ -228,6 +248,7 @@ export default function LagemonitorKarte({
       </div>
     );
   }
+  if (!darstellbar) return <KarteNichtDarstellbar hoehe="100%" schrift={GROSS_TEXT} />;
   return (
     <div
       ref={container}

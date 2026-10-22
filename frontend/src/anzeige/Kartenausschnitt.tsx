@@ -135,16 +135,30 @@ export function Kartenausschnitt({ punkt, etikett, hoehe = HOEHE_VORGABE }: Kart
 /**
  * Zustand an Stelle einer kleinen Karte, wenn das Gerät keine Kartengrafik hat (LLH-1370): Form
  * wie „Nicht verortet“, Wortlaut und Kennung wie in der Kartenfläche der Lagekarte. Kein Wort über
- * die Technik (das steht im Anwenderkapitel). Auch für `betreuung/BezirkKartenbild.tsx`.
+ * die Technik (das steht im Anwenderkapitel). Auch für `betreuung/BezirkKartenbild.tsx` und die
+ * Karte des Lagemonitors (`geraet/LagemonitorKarte.tsx`, LLH-1377): dort füllt er die Kachel
+ * (`hoehe="100%"`) und hält die Großbild-Schrift (`schrift`).
  */
-export function KarteNichtDarstellbar({ hoehe }: { hoehe: number }) {
+export function KarteNichtDarstellbar({
+  hoehe,
+  schrift,
+}: {
+  /** Höhe der Karte, die er ersetzt: Pixel oder ein CSS-Wert wie `'100%'`. */
+  hoehe: number | string;
+  /** Schriftgröße in Pixeln; ohne Angabe die des Umfelds. */
+  schrift?: number;
+}) {
   const { token, rollen } = useRollen();
   return (
     <div
       role="status"
       data-lfh="karte-nicht-darstellbar"
       style={{
+        // Genau so hoch wie die Karte, die er ersetzt; mit `'100%'` liefe er sonst um Polsterung
+        // und Rand über die Kachel hinaus.
         height: hoehe,
+        boxSizing: 'border-box',
+        ...(schrift !== undefined && { fontSize: schrift }),
         display: 'grid',
         placeItems: 'center',
         padding: token.paddingSM,
