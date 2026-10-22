@@ -28,7 +28,6 @@ import {
   zeitfenster,
 } from '../test/verpflegungDaten';
 import type { Bedarfsvorschlag, BedarfsvorschlagArgs } from './useBedarfsvorschlag';
-import { uhrzeitenText } from './verpflegungText';
 import { tippeZeit } from '../test/zeitEingabe';
 
 dayjs.extend(utc);
@@ -141,7 +140,7 @@ const wire = (ortszeit: string) => dayjs(ortszeit).utc().format('YYYY-MM-DD HH:m
 function zeigeAnlegen(onErfassen = vi.fn().mockResolvedValue(undefined), onSchliessen = vi.fn()) {
   renderMitProviders(
     <ZeitfensterDialog
-      modus={{ art: 'anlegen', onErfassen }}
+      onErfassen={onErfassen}
       einsatzId={1}
       freigaben={FREIGABEN}
       jetzt={JETZT}
@@ -365,7 +364,7 @@ describe('ZeitfensterDialog — anlegen', () => {
       betreute: LEER,
     });
     const props = {
-      modus: { art: 'anlegen' as const, onErfassen: vi.fn() },
+      onErfassen: vi.fn(),
       einsatzId: 1,
       freigaben: FREIGABEN,
       laeuft: false,
@@ -393,7 +392,7 @@ describe('ZeitfensterDialog — anlegen', () => {
         laeuft={false}
         fehler={null}
         onSchliessen={vi.fn()}
-        modus={{ art: 'anlegen', onErfassen }}
+        onErfassen={onErfassen}
       />,
     );
     const dialog = await screen.findByRole('dialog');
@@ -418,7 +417,7 @@ describe('ZeitfensterDialog — anlegen', () => {
       jetzt: JETZT,
       laeuft: false,
       onSchliessen,
-      modus: { art: 'anlegen' as const, onErfassen },
+      onErfassen,
     };
     const { rerender } = renderMitProviders(<ZeitfensterDialog {...props} fehler={null} />);
     const dialog = await screen.findByRole('dialog');
@@ -434,62 +433,6 @@ describe('ZeitfensterDialog — anlegen', () => {
     ).toBeInTheDocument();
     expect(within(dialog).getByLabelText('Bezeichnung')).toHaveValue('Mittag');
     expect(onSchliessen).not.toHaveBeenCalled();
-  });
-});
-
-describe('ZeitfensterDialog — bearbeiten', () => {
-  function zeigeBearbeiten(onErfassen = vi.fn().mockResolvedValue(undefined)) {
-    const onSchliessen = vi.fn();
-    renderMitProviders(
-      <ZeitfensterDialog
-        modus={{ art: 'bearbeiten', zeitfenster: zeitfenster(), onErfassen }}
-        einsatzId={1}
-        freigaben={FREIGABEN}
-        jetzt={JETZT}
-        laeuft={false}
-        fehler={null}
-        onSchliessen={onSchliessen}
-      />,
-    );
-    return { onErfassen, onSchliessen };
-  }
-
-  it('zeigt den Vorschlag als Hinweis und überschreibt den gespeicherten Bedarf nicht', async () => {
-    vorschlag.liefere = () => ({
-      kraefte: { wert: 186, hinweis: K_HINWEIS },
-      betreute: { wert: 90, hinweis: 'Vorschlag: in Betreuung zum Beginn' },
-    });
-    zeigeBearbeiten();
-    const dialog = await screen.findByRole('dialog', { name: 'Bedarf bearbeiten: Mittag' });
-    expect(await within(dialog).findByText(`Aktuell 186 — ${K_HINWEIS}`)).toBeInTheDocument();
-    expect(
-      within(dialog).getByText('Aktuell 90 — Vorschlag: in Betreuung zum Beginn'),
-    ).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Einsatzkräfte (EP)')).toHaveValue('180');
-    expect(within(dialog).getByLabelText('Betreute (EP)')).toHaveValue('70');
-    // Der Beginn geht schon im ersten Render als Wire in den Hook, sonst ginge eine
-    // Kopfzahl-Anfrage „jetzt" hinaus.
-    expect(vorschlag.aufrufe.map((x) => x.vonAt)).not.toContain(undefined);
-    expect(letzterAufruf().vonAt).toBe('2026-09-24 10:00:00');
-  });
-
-  it('schickt nur die Änderung; unverändert wird nichts gesendet und der Dialog schließt', async () => {
-    const { onErfassen, onSchliessen } = zeigeBearbeiten();
-    const dialog = await screen.findByRole('dialog');
-    await budgetUndAufklappen(dialog, 4, /Weitere Personen und Sonderkost/);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
-    expect(onErfassen).not.toHaveBeenCalled();
-  });
-
-  it('Betreute 70 → 90 schickt genau diesen Schlüssel', async () => {
-    const { onErfassen } = zeigeBearbeiten();
-    const dialog = await screen.findByRole('dialog');
-    const betreute = within(dialog).getByLabelText('Betreute (EP)');
-    await userEvent.clear(betreute);
-    await userEvent.type(betreute, '90');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ bedarf_betreute: 90 }));
   });
 });
 
@@ -820,51 +763,15 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
   mitProzessZone('UTC');
   const BERLIN = { zeitzone: 'Europe/Berlin' };
 
-  function zeigeBearbeitenBerlin(onErfassen = vi.fn().mockResolvedValue(undefined)) {
-    renderMitProviders(
-      <AnzeigeKonventionenProvider konventionen={BERLIN}>
-        <ZeitfensterDialog
-          modus={{ art: 'bearbeiten', zeitfenster: zeitfenster(), onErfassen }}
-          einsatzId={1}
-          freigaben={FREIGABEN}
-          jetzt={JETZT}
-          laeuft={false}
-          fehler={null}
-          onSchliessen={vi.fn()}
-        />
-      </AnzeigeKonventionenProvider>,
-    );
-    return { onErfassen };
-  }
-
-  it('der Bearbeiten-Dialog zeigt dieselben Uhrzeiten wie die Karte', async () => {
-    zeigeBearbeitenBerlin();
-    const dialog = await screen.findByRole('dialog');
-    expect(uhrzeitenText(zeitfenster(), BERLIN)).toBe('12:00–13:30');
-    expect(within(dialog).getByRole('textbox', { name: 'Beginn' })).toHaveValue('241200sep26');
-    expect(within(dialog).getByRole('textbox', { name: 'Ende' })).toHaveValue('241330sep26');
-    expect(within(dialog).getAllByText('Europe/Berlin').length).toBeGreaterThan(0);
-  });
-
-  it('Speichern mit nur geändertem Bedarf schickt keinen Zeitraum', async () => {
-    const { onErfassen } = zeigeBearbeitenBerlin();
-    const dialog = await screen.findByRole('dialog');
-    const betreute = within(dialog).getByLabelText('Betreute (EP)');
-    await userEvent.clear(betreute);
-    await userEvent.type(betreute, '90');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-    await waitFor(() => expect(onErfassen).toHaveBeenCalledWith({ bedarf_betreute: 90 }));
-  });
-
   // Über das Anlegen (früher ein Rückweg um antds RangePicker, der in jsdom eine Korrektur an einem
-  // SCHON belegten Zeitraum nicht übernahm). Die Wandlung ist dieselbe; die Anzeige beim Bearbeiten
-  // pinnt der erste Fall.
+  // SCHON belegten Zeitraum nicht übernahm). Die Anzeige beim Bearbeiten pinnt
+  // `ZeitfensterBearbeiten.test.tsx` (LLH-1139).
   it('ein eingegebenes Fenster 13:00–14:30 Berliner Zeit geht als 11:00–12:30 UTC hinaus', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={BERLIN}>
         <ZeitfensterDialog
-          modus={{ art: 'anlegen', onErfassen }}
+          onErfassen={onErfassen}
           einsatzId={1}
           freigaben={FREIGABEN}
           jetzt={JETZT}
@@ -956,15 +863,11 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
     stelle({ id: 31, bezeichnung: 'Ausgabe Halle Süd', status: 'aufgeloest' }),
   ];
 
-  function zeigeZf(modus: 'anlegen' | { zf: ReturnType<typeof zeitfenster> }, stellen = STELLEN) {
+  function zeigeZf(stellen = STELLEN) {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <ZeitfensterDialog
-        modus={
-          modus === 'anlegen'
-            ? { art: 'anlegen', onErfassen }
-            : { art: 'bearbeiten', zeitfenster: modus.zf, onErfassen }
-        }
+        onErfassen={onErfassen}
         einsatzId={1}
         freigaben={FREIGABEN}
         jetzt={JETZT}
@@ -977,17 +880,9 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
     return { onErfassen };
   }
 
-  /** Leert eine Auswahl über ihr Löschkreuz (antd `allowClear`). */
-  async function leere(feld: string) {
-    const auswahl = screen.getByRole('combobox', { name: feld }).closest('.ant-select')!;
-    const kreuz = auswahl.querySelector<HTMLElement>('.ant-select-clear');
-    expect(kreuz).not.toBeNull();
-    await userEvent.click(kreuz!);
-  }
-
   describe('Zeitfensterdialog', () => {
     it('ohne Stellen im Einsatz nur „Art“, eingeklappt; die Art geht in den Body', async () => {
-      const { onErfassen } = zeigeZf('anlegen', []);
+      const { onErfassen } = zeigeZf([]);
       const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
       expect(sichtbareFelder(dialog)).toBe(4);
       await userEvent.click(within(dialog).getByRole('button', { name: /^Art$/ }));
@@ -1008,7 +903,7 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
     });
 
     it('mit Stellen: Mehrfachwahl der nicht aufgelösten, Kopf nennt die Wahl, Body trägt `stelle_ids`', async () => {
-      const { onErfassen } = zeigeZf('anlegen');
+      const { onErfassen } = zeigeZf();
       const dialog = await screen.findByRole('dialog', { name: 'Zeitfenster anlegen' });
       await userEvent.click(within(dialog).getByRole('button', { name: /^Art und Stellen/ }));
       await oeffne('Stellen');
@@ -1029,40 +924,6 @@ describe('Stellen und Verpflegungsart (LLH-1040, D13 Punkte 5–6)', () => {
       await waitFor(() => expect(onErfassen).toHaveBeenCalled());
       expect([...onErfassen.mock.calls[0][0].stelle_ids].sort()).toEqual([FELDKUECHE, TURNHALLE]);
       expect(onErfassen.mock.calls[0][0]).not.toHaveProperty('verpflegungsart');
-    });
-
-    it('bearbeiten: eine schon zugeordnete aufgelöste Stelle bleibt sichtbar, andere aufgelöste nicht', async () => {
-      zeigeZf({ zf: zeitfenster({ stelle_ids: [TURNHALLE, 30], verpflegungsart: 'kalt' }) });
-      const dialog = await screen.findByRole('dialog', { name: 'Bedarf bearbeiten: Mittag' });
-      expect(
-        within(dialog).getByRole('button', { name: /^Art und Stellen · kalt · 2 Stellen$/ }),
-      ).toBeInTheDocument();
-      await userEvent.click(within(dialog).getByRole('button', { name: /^Art und Stellen/ }));
-      await oeffne('Stellen');
-      const optionen = optionenVon('Stellen');
-      expect(optionen).toContain('Ausgabe Schule (aufgelöst)');
-      expect(optionen).not.toContain('Ausgabe Halle Süd (aufgelöst)');
-      expect(optionenVon('Stellen', '-selected')).toEqual([
-        'Ausgabe Turnhalle Nord',
-        'Ausgabe Schule (aufgelöst)',
-      ]);
-    });
-
-    it('bearbeiten: Leeren der Art schickt `null`, eine abgewählte Stelle die neue Zuordnung', async () => {
-      const { onErfassen } = zeigeZf({
-        zf: zeitfenster({ stelle_ids: [TURNHALLE, FELDKUECHE], verpflegungsart: 'warm' }),
-      });
-      const dialog = await screen.findByRole('dialog', { name: 'Bedarf bearbeiten: Mittag' });
-      await userEvent.click(within(dialog).getByRole('button', { name: /^Art und Stellen/ }));
-      await leere('Art');
-      await waehle('Stellen', 'Feldküche BR Sportplatz');
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern' }));
-      await waitFor(() =>
-        expect(onErfassen).toHaveBeenCalledWith({
-          verpflegungsart: null,
-          stelle_ids: [TURNHALLE],
-        }),
-      );
     });
 
     it('Patch: gleiche Stellen in anderer Reihenfolge und gleiche Art schicken nichts', () => {
