@@ -38,6 +38,21 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('../api/betreuung', () => api);
 
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
+}));
+
 const stelle = (over: Partial<Betreuungsstelle> & { id: number }): Betreuungsstelle => ({
   einsatz_id: 1,
   bezeichnung: `Stelle ${over.id}`,
@@ -225,6 +240,66 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
       await screen.findByText('Betreuungsstelle Turnhalle Ost gespeichert'),
     ).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByLabelText('Kapazität (Personen)')).toBeNull());
+  });
+
+  /** Standort über das Ortsfeld (LLH-1121, design.md D3/D6). */
+  it('Bearbeiten: ein gewählter Standort verortet die Stelle, Text und Paar gehen hinaus', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/ort-suche', () =>
+        HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            {
+              name: 'Am Sportplatz 5, 12345 Musterstadt',
+              kurz: 'Am Sportplatz 5',
+              lat: 52.3,
+              lon: 9.7,
+            },
+          ],
+        }),
+      ),
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({ ortsname: null, peilung: null }),
+      ),
+    );
+    api.aendereStelle.mockResolvedValue({ ...TURNHALLE, standort: 'Am Sportplatz 5' });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const standort = await screen.findByLabelText('Standort');
+    expect(standort).toHaveValue('Am Sportplatz 3');
+    await userEvent.clear(standort);
+    await userEvent.type(standort, 'Am Sportplatz 5{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: /Am Sportplatz 5,/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, {
+        standort: 'Am Sportplatz 5',
+        lat: 52.3,
+        lon: 9.7,
+      }),
+    );
+  });
+
+  it('Bearbeiten: eine Textkorrektur am verorteten Standort behält den Punkt', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/ort-vorschau', () =>
+        HttpResponse.json({ ortsname: null, peilung: null }),
+      ),
+    );
+    api.ladeBetreuung.mockResolvedValue({
+      ...MIT_DATEN,
+      stellen: [{ ...TURNHALLE, lat: 52.1, lon: 8.6 }, STADION],
+    });
+    api.aendereStelle.mockResolvedValue({ ...TURNHALLE, standort: 'Am Sportplatz 3a' });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+    const standort = await screen.findByLabelText('Standort');
+    expect(screen.getByRole('group', { name: 'Karte: Standort' })).toHaveTextContent('52.1,8.6');
+    await userEvent.type(standort, 'a');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(api.aendereStelle).toHaveBeenCalledWith(1, 8, { standort: 'Am Sportplatz 3a' }),
+    );
   });
 
   it('Bearbeiten: Prüffehler stehen am Feld, nichts wird gesendet', async () => {

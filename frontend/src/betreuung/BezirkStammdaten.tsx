@@ -1,4 +1,7 @@
-import { Button, Form, Input, InputNumber, type FormRule } from 'antd';
+import { Button, Form, Input, InputNumber, Space, type FormRule } from 'antd';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import KoordinatenAnzeige from '../anzeige/KoordinatenAnzeige';
+import { ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import type { ReactElement, ReactNode } from 'react';
 import type { Erhebung, Evakuierungsbezirk, EvakuierungsbezirkPatch } from '../api/types';
 import { Select } from '../components/Select';
@@ -49,6 +52,10 @@ const leer = '—';
  *
  * Verlassen-Schutz (`frontend/AGENTS.md`, „Formularseiten“): aktiv, solange die Sitzung offen
  * ist; der Schlüssel hängt an der Sitzung.
+ *
+ * Sammelstelle über das Ortsfeld (LLH-1121, Spec `betreuung-evakuierung`): ein Treffer, eine
+ * getippte Koordinate oder ein Punkt auf der Karte verortet sie; verortet zeigt der Lesemodus die
+ * Koordinate mit Ort-Zeile.
  */
 export default function BezirkStammdaten({
   bezirk,
@@ -131,7 +138,13 @@ export default function BezirkStammdaten({
         />,
         bezirk.abschnitt_name ?? leer,
       )}
-      {zelle('sammelstelle', 'Sammelstelle', <Input />, bezirk.sammelstelle ?? leer)}
+      {zelle(
+        'sammelstelle',
+        'Sammelstelle',
+        <EinsatzOrtsfeld einsatzId={bezirk.einsatz_id} etikett="Sammelstelle" />,
+        <Sammelstelle bezirk={bezirk} />,
+        { breit: bearbeiten },
+      )}
       {zelle('notiz', 'Notiz', <Input.TextArea autoSize={{ minRows: 2 }} />, bezirk.notiz ?? leer, {
         breit: true,
       })}
@@ -149,7 +162,13 @@ export default function BezirkStammdaten({
             plan_personen: beimOeffnen.plan_personen,
             plan_erhebung: beimOeffnen.plan_erhebung,
             abschnitt_id: beimOeffnen.abschnitt_id ?? undefined,
-            sammelstelle: beimOeffnen.sammelstelle ?? undefined,
+            // Eine gespeicherte Koordinate steht als Kartenpunkt im Feld: eine Textkorrektur behält
+            // sie (LLH-1121, design.md D3).
+            sammelstelle: ortsfeldAusGespeichert(
+              beimOeffnen.sammelstelle,
+              beimOeffnen.sammelstelle_lat,
+              beimOeffnen.sammelstelle_lon,
+            ),
             notiz: beimOeffnen.notiz ?? undefined,
           }}
           onValuesChange={schutz.geaendert}
@@ -192,5 +211,17 @@ export default function BezirkStammdaten({
         raster
       )}
     </Paneel>
+  );
+}
+
+/** Sammelstelle im Lesemodus: der Text und, wenn verortet, die Koordinate mit Ort-Zeile. */
+function Sammelstelle({ bezirk }: { bezirk: Evakuierungsbezirk }) {
+  const { sammelstelle, sammelstelle_lat: lat, sammelstelle_lon: lon } = bezirk;
+  if (lat == null || lon == null) return <>{sammelstelle ?? leer}</>;
+  return (
+    <Space orientation="vertical" size={0}>
+      {sammelstelle && <span>{sammelstelle}</span>}
+      <KoordinatenAnzeige lat={lat} lon={lon} einsatzId={bezirk.einsatz_id} />
+    </Space>
   );
 }

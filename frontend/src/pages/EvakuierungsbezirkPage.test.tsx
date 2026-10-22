@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router';
 import EvakuierungsbezirkPage from './EvakuierungsbezirkPage';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EvakuierungUebersicht, Evakuierungsbezirk, LageZone } from '../api/types';
+import { http, HttpResponse } from 'msw';
 import { meHandler, server } from '../test/server';
 import { benutzerFixture, freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
@@ -35,6 +36,19 @@ vi.mock('../api/evakuierung', () => api);
 // MapLibre bleibt draußen: das Kartenbild ist hier nur sein zugänglicher Name.
 vi.mock('../betreuung/BezirkKartenbild', () => ({
   default: ({ etikett }: { etikett: string }) => <div role="img" aria-label={etikett} />,
+}));
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
 }));
 
 const bezirk = (over: Partial<Evakuierungsbezirk> & { id: number }): Evakuierungsbezirk => ({
@@ -375,6 +389,64 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
       expect(await screen.findByText('Bezirk Uferstraße 12–40 gespeichert')).toBeInTheDocument();
       // Zurück im Lesemodus mit dem Kopf.
       expect(await screen.findByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+    });
+
+    /** Sammelstelle über das Ortsfeld (LLH-1121, design.md D7). */
+    it('eine verortete Sammelstelle zeigt Text, Koordinate und Ort-Zeile', async () => {
+      server.use(
+        http.get('/api/einsaetze/1/ort-vorschau', () =>
+          HttpResponse.json({ ortsname: 'Schulstraße 1, Musterstadt', peilung: null }),
+        ),
+      );
+      api.ladeEvakuierung.mockResolvedValue({
+        bezirke: [{ ...UFER, sammelstelle_lat: 52.1, sammelstelle_lon: 8.6 }, HAFEN],
+      } satisfies EvakuierungUebersicht);
+      renderSeite();
+      await titel();
+      const raster = document.querySelector(
+        'dl[aria-label="Stammdaten Bezirk Uferstraße 12–40"]',
+      ) as HTMLElement;
+      expect(raster).toHaveTextContent('Turnhalle Süd');
+      expect(await within(raster).findByText(/Schulstraße 1, Musterstadt/)).toBeInTheDocument();
+    });
+
+    it('Bearbeiten: ein gewählter Treffer setzt Sammelstelle und Koordinate', async () => {
+      server.use(
+        http.get('/api/einsaetze/1/ort-suche', () =>
+          HttpResponse.json({
+            zustand: 'ok',
+            treffer: [
+              {
+                name: 'Turnhalle Süd, Schulweg 2, 12345 Musterstadt',
+                kurz: 'Schulweg 2, 12345 Musterstadt',
+                lat: 52.3,
+                lon: 9.7,
+              },
+            ],
+          }),
+        ),
+        http.get('/api/einsaetze/1/ort-vorschau', () =>
+          HttpResponse.json({ ortsname: null, peilung: null }),
+        ),
+      );
+      api.aendereBezirk.mockResolvedValue(UFER);
+      renderSeite();
+      await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
+      const feld = await screen.findByLabelText('Sammelstelle');
+      await userEvent.clear(feld);
+      await userEvent.type(feld, 'Schulweg 2{Enter}');
+      await userEvent.click(await screen.findByRole('button', { name: /Schulweg 2, 12345/ }));
+      expect(screen.getByRole('group', { name: 'Karte: Sammelstelle' })).toHaveTextContent(
+        '52.3,9.7',
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      await waitFor(() =>
+        expect(api.aendereBezirk).toHaveBeenCalledWith(1, 5, {
+          sammelstelle: 'Schulweg 2, 12345 Musterstadt',
+          sammelstelle_lat: 52.3,
+          sammelstelle_lon: 9.7,
+        }),
+      );
     });
 
     it('ohne Änderung schließt Speichern die Sitzung, ohne zu senden', async () => {
