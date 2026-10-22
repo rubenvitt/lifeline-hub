@@ -85,6 +85,9 @@ null, endet sie vorzeitig.
 Der Monitor zeigt nur Zahlen und die Karte, keine Personendaten und keine Namen. Er schreibt
 nichts: Er ist ein reiner Beobachter des Einsatzes. Hat der Einsatz keinen verorteten Einsatzort,
 keine verortete UHS und keine Fläche, zeigt die Kartenkachel „Kein Einsatzort verortet“.
+Kann der Browser des Monitors keine Karte zeichnen (Voraussetzung wie bei der
+[Lagekarte](lagekarte.md)), steht in der Kartenkachel „Karte auf diesem Gerät nicht darstellbar“;
+alle übrigen Kacheln und die Statusleiste laufen weiter.
 
 Auf der Karte fehlen Evakuierungsbezirke und freie Skizzen, außerdem Beschriftung und Notiz der
 Gefahrenzonen sowie Leitung und Bemerkung der Abschnitte: Freitexte können Personen nennen.

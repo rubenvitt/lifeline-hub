@@ -62,12 +62,14 @@ const DRUCK_SPECS =
  */
 const KARTEN_DRUCK_SPECS = /\/(lagekarte-druck)\.spec\.ts$/;
 /*
- * Specs, die das Verhalten OHNE WebGL2 prüfen (LLH-1353, LLH-1370): Chromium schaltet es per
- * Init-Skript ab, Firefox headless hat es ohnehin nicht. Dort belegen sie, dass Lagekarte und
- * kleine Kartenausschnitte ohne Kartengrafik bedienbar bleiben, statt in die Fehlerseite der App
- * zu fallen. Einzige Ausnahme von „Firefox fährt nur Druck-Specs“ oben.
+ * Specs, die das Verhalten OHNE WebGL2 prüfen (LLH-1353, LLH-1370, LLH-1377): Chromium schaltet
+ * es per Init-Skript ab, Firefox headless hat es ohnehin nicht. Dort belegen sie, dass Lagekarte,
+ * kleine Kartenausschnitte und der Lagemonitor ohne Kartengrafik bedienbar bzw. sichtbar bleiben,
+ * statt in die Fehlerseite der App zu fallen. Einzige Ausnahme von „Firefox fährt nur Druck-Specs“
+ * oben.
  */
-const OHNE_WEBGL_SPECS = /\/(lagekarte-ohne-grafik|kartenausschnitt-ohne-grafik)\.spec\.ts$/;
+const OHNE_WEBGL_SPECS =
+  /\/(lagekarte-ohne-grafik|kartenausschnitt-ohne-grafik|geraet-lagemonitor-ohne-grafik)\.spec\.ts$/;
 
 /*
  * ANTEILE NACH LAUFZEIT (LFH-1117): `PW_SHARD=k/n` wählt die Spec-Dateien des Anteils k, verteilt

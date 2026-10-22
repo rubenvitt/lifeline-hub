@@ -102,7 +102,9 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   oder SK I gegenüber dem letzten Stand, hebt `useAnstieg` sie 60 s mit Farbe und Wort hervor,
   ohne Ton und Blinken. Personen-Ereignisse erreichen ihn nicht, deshalb holt
   `geraet/LagemonitorPage.tsx` zusätzlich im Takt (design.md D11). Keine Kachel schneidet ihren
-  Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`).
+  Inhalt ab (Nachweis `e2e/geraet-lagemonitor.spec.ts`). Ohne Kartengrafik steht in der Kachel
+  „Lagekarte“ nur der Zustand, der Rest des Monitors läuft weiter (LLH-1377, Regel in
+  `pages/lagekarte/AGENTS.md`, „Karte ohne Grafik“).
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
   `BrDetailPage` unter `/geraet/:id/br/:brId` (`GeraetBr` hält die Kennung beim eigenen); ohne
   `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Den Verlauf
