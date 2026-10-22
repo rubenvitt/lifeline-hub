@@ -891,6 +891,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/nachforderungen",
             post(routes::nachforderung::anlegen),
         )
+        // Übliche Arten der Organisation (LLH-1379): Lesetür der Liste, keine Geräteroute.
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/arten",
+            get(routes::nachforderung::arten),
+        )
         .route(
             "/api/einsaetze/{id}/nachforderungen/{nid}/status",
             post(routes::nachforderung::status),

@@ -118,6 +118,7 @@ export default function NachforderungFormular({
   bezug,
   speicherung,
   fruehereArten = KEINE_ARTEN,
+  orgArten = KEINE_ARTEN,
   raeume = KEINE_RAEUME,
   abschnitte = KEINE_ABSCHNITTE,
 }: {
@@ -153,6 +154,11 @@ export default function NachforderungFormular({
    * erste Vorschlagsgruppe für „Was“.
    */
   fruehereArten?: readonly string[];
+  /**
+   * Übliche Arten der Organisation aus Einsätzen, die der Benutzer lesen darf (LLH-1379): füllen
+   * die Schnellwahl nach den Arten des Einsatzes und bilden die zweite Vorschlagsgruppe.
+   */
+  orgArten?: readonly string[];
   /** Bereitstellungsräume des Einsatzes für „Wohin“; leer ohne Freigabe des Moduls. */
   raeume?: readonly ZielRaum[];
   /** Einsatzabschnitte für „Wohin“; leer ohne Freigabe des Moduls. */
@@ -162,12 +168,15 @@ export default function NachforderungFormular({
   const { formatiere } = useZeitEingabe();
   const [weitereOffen, setWeitereOffen] = useState(false);
   const anzahlRef = useRef<HTMLDivElement>(null);
-  // Einheitstypen der Organisation (aktive, Folge `sortier`) als zweite Vorschlagsgruppe.
+  // Einheitstypen der Organisation (aktive, Folge `sortier`) als dritte Vorschlagsgruppe.
   const typen = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen }).data;
-  const schnellwahl = useMemo(() => schnellwahlArten(fruehereArten), [fruehereArten]);
+  const schnellwahl = useMemo(
+    () => schnellwahlArten(fruehereArten, orgArten),
+    [fruehereArten, orgArten],
+  );
   const artVorschlaege = useMemo(
-    () => artOptionen(fruehereArten, typen ?? []),
-    [fruehereArten, typen],
+    () => artOptionen(fruehereArten, typen ?? [], orgArten),
+    [fruehereArten, typen, orgArten],
   );
   const wohinOptionen = useMemo(() => zielOptionen(raeume, abschnitte), [raeume, abschnitte]);
   const wohinVorgabe = zielVorgabe(raeume);

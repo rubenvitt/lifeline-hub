@@ -745,6 +745,32 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
     );
   });
 
+  it('Höchststand mit Dezimalkomma; getippt „7.5“ gilt wie „7,5“ (LLH-1146)', async () => {
+    stelleBereit();
+    const aufrufe = prognoseRouten([HMUE], 'ja');
+    rendern();
+    await waitFor(() => expect(zeilentitel()).toHaveLength(1));
+    await zeilenaktion('HANN. MÜNDEN', /Prognose erfassen/);
+
+    const vorschlag = await waitFor(() => {
+      const v = document.querySelector<HTMLElement>('[data-lfh="pegel-vorhersage"]');
+      expect(v).not.toBeNull();
+      return v!;
+    });
+    await userEvent.click(within(vorschlag).getByRole('button', { name: 'Übernehmen' }));
+    const feld = screen.getByRole('spinbutton', { name: 'Erwarteter Höchststand (m)' });
+    await waitFor(() => expect(feld).toHaveValue('7,23'));
+
+    await userEvent.clear(feld);
+    await userEvent.type(feld, '7.5');
+    fireEvent.blur(feld);
+    expect(feld).toHaveValue('7,50');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(aufrufe).toHaveLength(1));
+    expect(aufrufe[0].body).toMatchObject({ hoechststand_cm: 750 });
+  });
+
   it('ohne Reihe und bei unerreichbarer Quelle bleibt der Dialog bedienbar, mit Hinweis', async () => {
     stelleBereit();
     prognoseRouten([HMUE], 'nein');

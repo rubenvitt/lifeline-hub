@@ -319,6 +319,22 @@ describe('NachforderungFormular — Schnellwahl, Vorschläge, Ziel und Bedarfsze
     );
   });
 
+  it('die Schnellwahl füllt nach dem Einsatz mit den üblichen Arten der Organisation (LLH-1379)', () => {
+    renderMitProviders(
+      <NachforderungFormular
+        card={false}
+        senden={false}
+        onAnlegen={vi.fn()}
+        fruehereArten={['Feldbetten']}
+        orgArten={['Sandsäcke', 'Feldbetten']}
+      />,
+    );
+    const gruppe = screen.getByRole('group', { name: 'Schnellwahl' });
+    expect(Array.from(gruppe.querySelectorAll('button')).map((b) => b.textContent?.trim())).toEqual(
+      ['Feldbetten', 'Sandsäcke', 'RTW', 'KTW', 'NEF', 'LF 10'],
+    );
+  });
+
   it('„Was“ schlägt Arten des Einsatzes, Einheitstypen und die feste Liste vor', async () => {
     typen([{ id: 1, label: 'Wasserrettungszug', sortier: 1 }]);
     renderMitProviders(

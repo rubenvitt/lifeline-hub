@@ -63,8 +63,8 @@ interface GeoKennzahlenProps {
  *
  * **Formatiert wird über `pages/lagekarte/geo.ts`** (`formatFlaeche`/`formatLaenge`, Intl
  * de-DE, hart metrisch). Die Vereinheitlichung mit `anzeige/format.ts:formatDistanz`
- * (`toFixed`, respektiert das Einheitensystem) ist **verboten** — beide Formate sind gepinnt,
- * die Zusammenführung ist ein eigenes Ticket.
+ * (zwei feste Nachkommastellen, respektiert das Einheitensystem) ist **verboten** — beide
+ * Formate sind gepinnt, die Zusammenführung ist ein eigenes Ticket.
  *
  * Ohne Kennzahlen und ohne Zusatz rendert die Komponente nichts.
  */

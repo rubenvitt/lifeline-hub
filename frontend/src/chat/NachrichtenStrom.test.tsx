@@ -568,7 +568,7 @@ describe('NachrichtenStrom', () => {
     );
     // Der Name trägt den Nachrichtenbezug: n Anhänge klingen sonst gleich (LFH-782).
     const link = screen.getByRole('link', {
-      name: 'lage.pdf, 2.0 KB, Anhang der Nachricht von Max herunterladen',
+      name: 'lage.pdf, 2,0 KB, Anhang der Nachricht von Max herunterladen',
     });
     expect(link).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/42');
     // Nativer Download statt neuem Tab: `target="_blank"` läuft in der Desktop-Hülle ins Leere,
@@ -576,7 +576,7 @@ describe('NachrichtenStrom', () => {
     expect(link).toHaveAttribute('download', 'lage.pdf');
     expect(link).not.toHaveAttribute('target');
     expect(within(link).getByText('lage.pdf')).toBeInTheDocument();
-    expect(within(link).getByText(/2\.0 KB/)).toBeInTheDocument();
+    expect(within(link).getByText(/2,0 KB/)).toBeInTheDocument();
   });
 
   describe('Original-Verweis (LFH-747)', () => {

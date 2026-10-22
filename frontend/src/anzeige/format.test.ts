@@ -164,12 +164,13 @@ describe('formatUhrzeitMitTag', () => {
 describe('formatDistanz', () => {
   it('metrisch (Default): m bzw. km', () => {
     expect(formatDistanz(450)).toBe('450 m');
-    expect(formatDistanz(1500)).toBe('1.50 km');
+    expect(formatDistanz(1500)).toBe('1,50 km');
+    expect(formatDistanz(1200)).toBe('1,20 km');
   });
 
   it('imperial: ft bzw. mi', () => {
     expect(formatDistanz(100, { einheiten: 'imperial' })).toBe('328 ft');
-    expect(formatDistanz(5000, { einheiten: 'imperial' })).toBe('3.11 mi');
+    expect(formatDistanz(5000, { einheiten: 'imperial' })).toBe('3,11 mi');
   });
 });
 

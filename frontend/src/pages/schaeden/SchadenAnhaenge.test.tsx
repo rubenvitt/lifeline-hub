@@ -83,7 +83,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
   it('listet Dateien mit Download-Anker auf die Schadensroute und eindeutigem Namen', async () => {
     rendere([anhang(5, 'dach.jpg'), anhang(6, 'gutachten.pdf', 'application/pdf')]);
     const dach = await screen.findByRole('link', {
-      name: 'dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen',
+      name: 'dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen',
     });
     expect(dach).toHaveAttribute('href', '/api/einsaetze/1/schaeden/10/anhaenge/5/datei');
     expect(dach).toHaveAttribute('download', 'dach.jpg');
@@ -299,7 +299,7 @@ describe('SchadenAnhaenge — Original (LFH-747)', () => {
   it.each(['fuehrungspersonal', 'beobachter'] as const)('verbirgt ihn vor %s', async (rolle) => {
     rendereAls(rolle);
     await screen.findByRole('link', {
-      name: 'dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen',
+      name: 'dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen',
     });
     expect(screen.queryByText(ORIGINAL_TEXT)).toBeNull();
   });
@@ -317,7 +317,7 @@ describe('SchadenAnhaenge — Vorschau (LFH-759)', () => {
     expect(within(paneel()).getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
     expect(
       within(paneel()).getByRole('link', {
-        name: 'gutachten.pdf, 2.0 MB, Datei von Schaden S-003 herunterladen',
+        name: 'gutachten.pdf, 2,0 MB, Datei von Schaden S-003 herunterladen',
       }),
     ).toHaveAttribute('href', `${PFAD}/6/datei`);
   });

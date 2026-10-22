@@ -260,6 +260,15 @@ pub async fn erfassen(
         // Seit F01/LFH-227 geht nur die ID über den Kanal — damit entfällt auch der frühere
         // Serialisierungs-Fehlerpfad (der Volltext wird gar nicht mehr gebaut).
         state.live.publiziere(einsatz_id, anzeige.id);
+        // Eine Berichtigung des Eintrags einer Meldung ändert deren Marke „berichtigt“ an Karte
+        // und Lagemeldung (LLH-1382, design.md D5): die Meldungen erfahren es live wie das ETB.
+        if let Some(grund) = anzeige.berichtigt_eintrag_id {
+            if crate::meldung::repo::is_etb_eintrag_einer_meldung(&state.pool, einsatz_id, grund)
+                .await?
+            {
+                crate::meldung::sse(&state, einsatz_id);
+            }
+        }
     }
 
     Ok((StatusCode::CREATED, Json(anzeige)))

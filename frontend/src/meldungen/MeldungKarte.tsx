@@ -18,6 +18,7 @@ import { StatusChip, monoStil, useRollen } from '../components/instrument';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
+import BerichtigtMarke from './BerichtigtMarke';
 import { KennungsLink } from '../components/kennungsLink';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
@@ -287,6 +288,12 @@ function MeldungKarte({
                 ↗ Auftrag
               </KennungsLink>
             ))}
+          {/* Eine ETB-Berichtigung des Eintrags dieser Meldung (LLH-1382): der Wortlaut unten bleibt. */}
+          <BerichtigtMarke
+            einsatzId={einsatzId}
+            berichtigungId={m.etb_berichtigung_id}
+            berichtigungLfdNr={m.etb_berichtigung_lfd_nr}
+          />
         </Space>
         <Space size={10} wrap>
           {bestaetigungsAchse(m, formatZeit)}

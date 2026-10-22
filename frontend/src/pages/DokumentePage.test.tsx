@@ -148,7 +148,7 @@ describe('DokumentePage', () => {
     const zeile = screen.getByRole('row', { name: /Lageplan Nord/ });
     expect(within(zeile).getByText('Lagekarte/Plan')).toBeInTheDocument();
     expect(within(zeile).getByText('EA Nord')).toBeInTheDocument();
-    expect(within(zeile).getByText(/lageplan-nord\.pdf · 2\.0 KB/)).toBeInTheDocument();
+    expect(within(zeile).getByText(/lageplan-nord\.pdf · 2,0 KB/)).toBeInTheDocument();
     expect(within(zeile).getByText(/Anna Meier/)).toBeInTheDocument();
     expect(within(zeile).getByText(/\d{6}SEP2026/)).toBeInTheDocument();
     const zweite = screen.getByRole('row', { name: /Foto Einsatzstelle/ });
