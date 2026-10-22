@@ -75,6 +75,7 @@ vi.mock('terra-draw', () => ({
 }));
 
 import { createMessung } from './messZeichnung';
+import { stilKarteAttrappe } from '../../test/stilKarteAttrappe';
 
 function karte(): MapLibreMap {
   const canvas = document.createElement('canvas');
@@ -272,5 +273,131 @@ describe('createMessung: setzeStartpunkt (LFH-776)', () => {
     m.stoppen();
     m.setzeStartpunkt({ lng: 11.5, lat: 53.6 });
     expect(ereignisse).toEqual([]);
+  });
+});
+
+/**
+ * Vorschaukreis der Messform „Radius“ (LLH-1345, Spec `lagekarte-zeichnen`, „Radius messen“):
+ * eigene Ebenen `td-mess-kreis-*`, gezeichnet aus derselben Mitte und demselben Rand wie die
+ * Anzeige, abgebaut mit jeder neuen Messung und dem Ende des Messens.
+ */
+describe('createMessung: Vorschaukreis beim Radius (LLH-1345)', () => {
+  const MESS_EBENEN = ['td-mess-kreis-flaeche', 'td-mess-kreis-linie'];
+  const kreisEbenen = (ids: string[]) => ids.filter((id) => id.startsWith('td-mess-kreis'));
+
+  function setup() {
+    const k = stilKarteAttrappe(['grund']);
+    const m = createMessung(
+      k.map,
+      () => {},
+      () => '#0055aa',
+    );
+    return { k, m, draw: td.instanz! };
+  }
+
+  /** Teil `kreis` der Vorschau-Quelle oder `undefined`. */
+  function kreisFeature(quellen: Map<string, unknown>) {
+    const fc = quellen.get('td-mess-kreis') as
+      | { features: { properties: { teil: string }; geometry: { coordinates: number[][][] } }[] }
+      | undefined;
+    return fc?.features.find((f) => f.properties.teil === 'kreis');
+  }
+
+  it('steht ab Mitte und Rand, folgt dem Rand und trägt die Farbe der Messung', () => {
+    const { k, m, draw } = setup();
+    m.starten('radius');
+    draw.features.set(1, linie(1, [9, 52], [9, 52]));
+    draw.change([1], 'create');
+    // Nur die Mitte: noch kein Kreis.
+    expect(kreisFeature(k.quellen)).toBeUndefined();
+
+    draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    draw.change([1], 'update');
+    expect(kreisEbenen(k.ids())).toEqual(MESS_EBENEN);
+    expect(k.ebenen.find((e) => e.id === 'td-mess-kreis-linie')?.paint).toMatchObject({
+      'line-color': '#0055aa',
+    });
+    const ring = kreisFeature(k.quellen)!.geometry.coordinates[0];
+    // Der Rand liegt 0,001° nördlich (≈ 111 m): ein Ringpunkt erreicht diese Breite.
+    expect(Math.max(...ring.map(([, lat]) => lat))).toBeCloseTo(52.001, 5);
+
+    draw.features.set(1, linie(1, [9, 52], [9, 52.002]));
+    draw.change([1], 'update');
+    const weiter = kreisFeature(k.quellen)!.geometry.coordinates[0];
+    expect(Math.max(...weiter.map(([, lat]) => lat))).toBeCloseTo(52.002, 5);
+  });
+
+  it('bleibt nach dem Abschluss stehen; „Neu messen“ und eine andere Form bauen ihn ab', () => {
+    const { k, m, draw } = setup();
+    m.starten('radius');
+    draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    draw.change([1], 'create');
+    draw.finish(1, { action: 'draw' });
+    expect(kreisEbenen(k.ids())).toEqual(MESS_EBENEN);
+
+    m.starten('radius');
+    expect(kreisEbenen(k.ids())).toEqual([]);
+    expect(k.quellen.has('td-mess-kreis')).toBe(false);
+
+    draw.features.set(2, linie(2, [9, 52], [9, 52.001]));
+    draw.change([2], 'create');
+    expect(kreisEbenen(k.ids())).toEqual(MESS_EBENEN);
+    m.starten('strecke');
+    expect(kreisEbenen(k.ids())).toEqual([]);
+  });
+
+  it('eine neue Mitte nach dem Abschluss räumt den alten Kreis', () => {
+    const { k, m, draw } = setup();
+    m.starten('radius');
+    draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    draw.change([1], 'create');
+    draw.finish(1, { action: 'draw' });
+    draw.features.set(2, linie(2, [10, 53], [10, 53]));
+    draw.change([2], 'create');
+    expect(kreisFeature(k.quellen)).toBeUndefined();
+  });
+
+  it('Beenden und verworfener Entwurf bauen ihn ab', () => {
+    const { k, m, draw } = setup();
+    m.starten('radius');
+    draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    draw.change([1], 'create');
+    draw.features.delete(1);
+    draw.change([1], 'delete');
+    expect(kreisEbenen(k.ids())).toEqual([]);
+
+    draw.features.set(2, linie(2, [9, 52], [9, 52.001]));
+    draw.change([2], 'create');
+    expect(kreisEbenen(k.ids())).toEqual(MESS_EBENEN);
+    m.stoppen();
+    expect(kreisEbenen(k.ids())).toEqual([]);
+    expect(k.quellen.has('td-mess-kreis')).toBe(false);
+  });
+
+  it('Strecke und Fläche zeichnen keinen Kreis', () => {
+    const { k, m, draw } = setup();
+    m.starten('strecke');
+    draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    draw.change([1], 'create');
+    expect(kreisEbenen(k.ids())).toEqual([]);
+  });
+
+  it('zerstoeren() baut ihn ab und wirft nicht, wenn die Karte schon entfernt ist', () => {
+    const { k, m, draw } = setup();
+    m.starten('radius');
+    draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    draw.change([1], 'create');
+    m.zerstoeren();
+    expect(kreisEbenen(k.ids())).toEqual([]);
+
+    const zweite = setup();
+    zweite.m.starten('radius');
+    zweite.draw.features.set(1, linie(1, [9, 52], [9, 52.001]));
+    zweite.draw.change([1], 'create');
+    // Wie nach `map.remove()`: der Stil ist weg, jeder Zugriff wirft.
+    (zweite.k.map as unknown as { getLayer: () => never }).getLayer = () => {
+      throw new TypeError("Cannot read properties of undefined (reading 'getLayer')");
+    };
+    expect(() => zweite.m.zerstoeren()).not.toThrow();
   });
 });

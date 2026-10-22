@@ -25,6 +25,8 @@ import { GRUNDKARTE, oeffneKarte } from './lagekarte-kern';
  *                          frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx,
  *                          frontend/src/pages/lagekarte/zeichenWahl.ts
  *   zone-zeichnen.png      frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx
+ *   kreis-zeichnen.png     frontend/src/pages/lagekarte/KreisSteuerung.tsx,
+ *                          frontend/src/pages/lagekarte/kreisVorschau.ts (Vorschau, Radius-Griff)
  *   messen.png             frontend/src/pages/lagekarte/MessSteuerung.tsx
  *   lageplan-anlage.png    frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx
  *
@@ -139,6 +141,29 @@ test.describe(KAPITEL, () => {
     await page.getByRole('button', { name: 'Abschließen' }).click();
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Zone angelegt')).toBeVisible();
+  });
+
+  test('Kreis zeichnen', async ({ page }) => {
+    const canvas = await oeffneKarte(page);
+    await waehleWerkzeug(page, 'Absperrbereich als Kreis');
+    const band = page.locator('[data-lfh="kreis-steuerung"]');
+    await expect(band).toBeVisible();
+    // Die Mitte über der Kartenmitte, abseits der Marker; darunter liegt das Band.
+    await tippe(page, canvas, -60, -190);
+    await expect(band.locator('[data-lfh="kreis-mitte"]')).not.toContainText('—');
+    await band.getByRole('button', { name: '300 m' }).click();
+    await expect(band.getByRole('button', { name: '300 m' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.locator('[data-lfh="kreisgriff"]')).toHaveCount(1);
+    await page.mouse.move(0, 0);
+    await fotografiere(page.getByTestId('kartenflaeche'), KAPITEL, 'kreis-zeichnen');
+    // Ablauf weiter: „Übernehmen“ legt an, „Fertig“ beendet die Serie.
+    await band.getByRole('button', { name: 'Übernehmen' }).click();
+    await expect(band).toContainText('1 gespeichert');
+    await band.getByRole('button', { name: /Fertig/ }).click();
+    await expect(band).toHaveCount(0);
   });
 
   test('Lageplan als Anlage an einen offenen Entwurf', async ({ page }) => {
