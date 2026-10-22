@@ -1573,7 +1573,10 @@ export default function Datensicht<T extends object, const K extends string>(
             }}
             style={{
               height: token.controlHeight,
-              width: '100%',
+              // Schrumpfbar statt `width: 100%`: bei 390 px stehen Suche und „Sortieren“ in EINER
+              // Zeile, die erste Karte bleibt im ersten Bild (`betroffene-handy.spec.ts`).
+              flex: '1 1 140px',
+              minWidth: 0,
               maxWidth: 220,
               paddingInline: token.paddingSM,
               border: `1px solid ${token.colorBorder}`,
@@ -1612,7 +1615,8 @@ export default function Datensicht<T extends object, const K extends string>(
               });
             }}
             options={sortierOptionen}
-            style={{ minWidth: 200 }}
+            // Neben der Suche in derselben Zeile (siehe dort); ein langer Wert kürzt mit Auslassung.
+            style={{ flex: '1 1 160px', minWidth: 0, maxWidth: 280 }}
           />
         )}
         {/* Im Tabellenzweig sitzt der Filter im Spaltenkopf (LLH-1086); die Karte hat keinen Kopf
