@@ -21,7 +21,11 @@ import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixture
 import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 
-vi.mock('./useModulZaehler', () => ({ useModulZaehler: () => ({}) }));
+const unbearbeitet = vi.hoisted(() => ({ zahl: 0 }));
+vi.mock('./useModulZaehler', () => ({
+  useModulZaehler: () => ({}),
+  useUnbearbeiteteMeldungen: () => unbearbeitet.zahl,
+}));
 // Der Unwetter-Wächter hängt am Modulzähler-Modul und hat eigene Tests (`wetter/`, LFH-663).
 vi.mock('../wetter/UnwetterHinweis', () => ({ default: () => null }));
 
@@ -1177,6 +1181,18 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
   it('folgt dem Modul der Route', async () => {
     setup(freigabenFixture(), {}, admin, '/einsaetze/7/lagekarte');
     await waitFor(() => expect(document.title).toBe('Lagekarte · Hochwasser Nord · lifeline-hub'));
+  });
+
+  it('stellt die Zahl der unbearbeiteten Meldungen voran (LLH-1062)', async () => {
+    unbearbeitet.zahl = 3;
+    try {
+      setup(freigabenFixture(), {}, admin, '/einsaetze/7/lagekarte');
+      await waitFor(() =>
+        expect(document.title).toBe('(3) Lagekarte · Hochwasser Nord · lifeline-hub'),
+      );
+    } finally {
+      unbearbeitet.zahl = 0;
+    }
   });
 
   it('merkt den offenen Pfad als letzten Ort der Person, ohne die Suche', async () => {

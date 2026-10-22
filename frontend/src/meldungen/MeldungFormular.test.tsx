@@ -384,6 +384,30 @@ describe('MeldungFormular — Empfängerfunktion', () => {
     renderFormular();
     expect(screen.queryByRole('combobox', { name: 'Empfängerfunktion' })).not.toBeInTheDocument();
   });
+
+  // LLH-1062: eine Lagemeldung geht vorgabemäßig an S2, der freie Empfänger bleibt leer.
+  it('„Lagemeldung“ schlägt S2 als Empfängerfunktion vor', async () => {
+    const onAnlegen = renderMitKatalog();
+    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await fuellePflichtfelder('UHS Nord', 'Decken knapp');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({
+      meldungsart: 'lagemeldung',
+      empfaenger_funktion: 's2',
+      empfaenger: undefined,
+    });
+  });
+
+  it('der Vorschlag überschreibt keine gewählte Funktion', async () => {
+    const onAnlegen = renderMitKatalog();
+    await waehleFunktion('S3 – Einsatz');
+    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await fuellePflichtfelder('UHS Nord', 'Decken knapp');
+    await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
+    await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
+    expect(onAnlegen.mock.calls[0][0]).toMatchObject({ empfaenger_funktion: 's3' });
+  });
 });
 
 /** LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. */

@@ -87,7 +87,14 @@ export const BENACHRICHTIGUNG_ARTEN: Record<
   auftrag_erledigt: { name: 'Auftrag erledigt', stufe: 'hinweis', org: false, einstellbar: true },
   befehl: { name: 'Neuer Befehl', stufe: 'hinweis', org: false, einstellbar: true },
   lagebericht: { name: 'Neuer Lagebericht', stufe: 'hinweis', org: false, einstellbar: true },
-  meldung: { name: 'Neue Meldung', stufe: 'hinweis', org: false, einstellbar: true },
+  // Eine Art für den Eingang einer Meldung und die Übernahme in die Lage (LLH-1062, Bezug
+  // `lage_uebernahme`): ein Schalter für beides.
+  meldung: {
+    name: 'Neue Meldung und Lagemeldung',
+    stufe: 'hinweis',
+    org: false,
+    einstellbar: true,
+  },
   lagebesprechung_vorher: {
     name: 'Lagebesprechung in 10 Minuten',
     stufe: 'hinweis',
@@ -133,11 +140,12 @@ export function istOrgArt(art: BenachrichtigungArt): boolean {
 }
 
 /**
- * Ziel eines Sprungs im Sammeltoast. Die ersten fünf sind die der bestehenden Alarme; ihre
+ * Ziel eines Sprungs im Sammeltoast. Die ersten sind die der bestehenden Alarme; ihre
  * Reihenfolge bestimmt den Hauptknopf.
  */
 export type AlarmZiel =
   | 'meldungen'
+  | 'lagemeldungen'
   | 'auftraege'
   | 'erinnerungen'
   | 'abloesung'
@@ -157,6 +165,7 @@ export type AlarmZiel =
 /** Knopftext je Ziel, in der Reihenfolge des Sammeltoasts. */
 export const ZIEL_SPRUENGE: readonly { ziel: AlarmZiel; text: string }[] = [
   { ziel: 'meldungen', text: 'Zu Meldungen' },
+  { ziel: 'lagemeldungen', text: 'Zu Lagemeldungen' },
   { ziel: 'auftraege', text: 'Zu Aufträgen' },
   { ziel: 'erinnerungen', text: 'Zu Erinnerungen' },
   { ziel: 'abloesung', text: 'Zu Ablösungen' },
@@ -180,6 +189,8 @@ export function zielPfad(ziel: AlarmZiel, einsatzId: number | null): string {
   switch (ziel) {
     case 'meldungen':
       return meldungenPfad(einsatzId);
+    case 'lagemeldungen':
+      return einsatzModulPfad(einsatzId, 'lagemeldungen');
     case 'auftraege':
       return auftraegePfad(einsatzId);
     case 'erinnerungen':
@@ -216,6 +227,8 @@ export function zielPfad(ziel: AlarmZiel, einsatzId: number | null): string {
 const BEZUG_ZIEL: Record<BenachrichtigungBezugTyp, AlarmZiel> = {
   einsatz: 'einsatz',
   meldung: 'meldungen',
+  // Die Übernahme in die Lage (LLH-1062): Bezug ist die Meldung, das Ziel die Lage-Sicht.
+  lage_uebernahme: 'lagemeldungen',
   auftrag: 'auftraege',
   auftrag_empfaenger: 'auftraege',
   befehl: 'befehle',

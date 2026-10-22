@@ -837,6 +837,11 @@ und `pages/personen/`.
 - **Live-Updates springen nicht unter dem Cursor:** Sammelbanner statt Einschieben (CLS ≤ 0,1,
   WCAG 3.2.5); Alarmbudget EEMUA 191/ISA-18.2: 1–2 je 10 min, ≤ 3 Stufen. **Kein Blinken auf
   lesbarem Text.**
+- **Ein Eingang ist Information, kein Alarm** (LLH-1062, Spec `benachrichtigungen`,
+  „Eingangshinweis“): neue Meldungen stehen gebündelt in EINEM eigenen Platz neben den drei
+  Toastplätzen (`alarm/useEingangshinweis.tsx`) und verbrauchen weder Budget noch Alarmton; der
+  dezente Ton höchstens 1 je 2 min, kein neuer Eintrag während einer Eingabe (erst beim Verlassen
+  des Feldes), keiner auf der Seite, deren Sammelbanner ihn trägt. Kein eigener Zeitgeber.
 
 ## Frontend — Keine Arbeitsplatzachse (LFH-456)
 
