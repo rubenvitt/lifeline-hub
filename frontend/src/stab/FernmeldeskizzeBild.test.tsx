@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import dayjs from 'dayjs';
 import { ConfigProvider } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/client';
@@ -32,6 +33,7 @@ import { STRICH_HERVORGEHOBEN, schaetzeTextbreite } from './skizzenZeichen';
 import { eingepasst } from './skizze/ansicht';
 import { ZURUECK_DECKKRAFT } from './skizze/SkizzenElemente';
 import { VERSCHOBEN_MELDUNG } from './skizze/useSkizzenHandlungen';
+import { tippeZeit } from '../test/zeitEingabe';
 
 /**
  * Die Zeichenfläche als Ganzes (LFH-893, Spec-Szenarien aus `stab-fernmeldeskizze` und
@@ -284,6 +286,29 @@ describe('Fernmeldeskizze — Darstellung (2.5, 4.2)', () => {
     await waitFor(() =>
       expect(aktionen.setzeSchriftfeld).toHaveBeenCalledWith({ herausgeber: 'S6' }),
     );
+  });
+
+  it('LLH-1077: „gez. DTG“ ist eine Ereigniszeit — „1430“ + Enter am Mittag gilt gestern', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 12:00 Ortszeit (Anzeigezone = Prozesszone): gezeichnet wird nie in der Zukunft, 14:30 war
+    // also gestern; ohne Feldart fiele es auf heute.
+    vi.setSystemTime(dayjs('2026-10-04 12:00').toDate());
+    try {
+      const user = userEvent.setup();
+      const aktionen = aktionenAttrappe();
+      aktionen.setzeSchriftfeld.mockResolvedValue({ ...netz().schriftfeld! });
+      bild(netz(), aktionen);
+      await user.click(element('schriftfeld')!);
+      await user.click(within(paneel()).getByRole('button', { name: 'gez. DTG eintragen' }));
+      await tippeZeit(user, within(paneel()).getByRole('textbox', { name: 'gez. DTG' }), '1430');
+      await waitFor(() =>
+        expect(aktionen.setzeSchriftfeld).toHaveBeenCalledWith({
+          gez_at: dayjs('2026-10-03 14:30').utc().format('YYYY-MM-DD HH:mm:ss'),
+        }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('Rufname im Paneel: im Datensatz der Stelle gespeichert', async () => {
