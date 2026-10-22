@@ -268,8 +268,8 @@ Der Wortlaut einer Meldung bleibt unverändert; eine inhaltliche Korrektur ist n
 ETB-Berichtigung ihres Eintrags möglich (LLH-1382). Meldung und Lagemeldung SHALL dann id und
 laufende Nummer der jüngsten Berichtigung tragen, die direkt auf den ETB-Eintrag der Meldung zeigt
 (`etb_berichtigung_id`, `etb_berichtigung_lfd_nr`); ohne Berichtigung MUST beide Felder fehlen.
-Eine Berichtigung aus einem anderen Einsatz MUST NOT zählen. Meldungskarte und Zeile der
-Lagemeldungen SHALL die Marke „berichtigt“ mit einem Sprung auf diese Berichtigung im ETB zeigen
+Eine Berichtigung aus einem anderen Einsatz MUST NOT zählen. Meldungskarte (auch in der Vorschau
+der Sprungpalette, LLH-1402) und Zeile der Lagemeldungen SHALL die Marke „berichtigt“ mit einem Sprung auf diese Berichtigung im ETB zeigen
 (`?eintrag=`); ohne Berichtigung MUST keine Marke stehen. Die Lage MUST weiter den Lage-Text bzw.
 den Wortlaut zeigen, nicht den Text der Berichtigung. Ein gekoppeltes Gerät MUST NOT die Marke
 zeigen, denn es hat kein ETB. Das Erfassen einer Berichtigung des Eintrags einer Meldung MUST
@@ -278,6 +278,10 @@ zusätzlich zum ETB-Ereignis das Ereignis „meldung“ auslösen.
 #### Scenario: Berichtigter Eintrag einer Meldung
 - **WHEN** eine Person im ETB den Eintrag von Meldung #3 zweimal berichtigt, zuletzt mit ETB-Nr. 9
 - **THEN** trägt Meldung #3 die Nummer 9 und die id dieser Berichtigung, ihre Karte zeigt „berichtigt“ mit dem Sprung „→ ETB Nr. 9“, und ihr Wortlaut bleibt
+
+#### Scenario: Vorschau in der Sprungpalette
+- **WHEN** eine Person in der Sprungpalette eine berichtigte Meldung ansteuert
+- **THEN** zeigt die Vorschau dieselbe Marke „berichtigt“ mit dem Sprung ins ETB wie die Karte der Meldungsseite
 
 #### Scenario: Lagemeldung berichtigt
 - **WHEN** der ETB-Eintrag einer Lagemeldung berichtigt wird

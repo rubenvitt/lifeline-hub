@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx]
 ---
 
 ## Überblick
@@ -245,7 +245,8 @@ aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 Der Wortlaut einer Meldung bleibt, wie er einging; die Korrektur über „Bearbeiten“ ändert ihn
 nicht. Ist er falsch, wird im Einsatztagebuch der Eintrag der Meldung berichtigt. Die Karte zeigt
 dann die Marke „berichtigt“ und daneben „→ ETB Nr. …“, den Sprung auf die jüngste Berichtigung;
-der Wortlaut auf der Karte bleibt der ursprüngliche. Auf einem gekoppelten Gerät fehlt die Marke,
+der Wortlaut auf der Karte bleibt der ursprüngliche. Dieselbe Marke steht in der Vorschau der
+Meldung in der Sprungpalette. Auf einem gekoppelten Gerät fehlt die Marke,
 weil es das Einsatztagebuch nicht zeigt.
 
 ### Was eine Korrektur bewirkt
