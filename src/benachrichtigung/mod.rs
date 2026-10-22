@@ -410,7 +410,11 @@ fn mit_stufe(
     benutzer_ids
         .iter()
         .map(|&id| (id, anlass.art.stufe()))
-        .chain(still_ids.iter().map(|&id| (id, BenachrichtigungStufe::Still)))
+        .chain(
+            still_ids
+                .iter()
+                .map(|&id| (id, BenachrichtigungStufe::Still)),
+        )
         .collect()
 }
 

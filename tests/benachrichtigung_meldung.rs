@@ -897,7 +897,6 @@ async fn meldung_an_mich_folgt_der_korrektur_nicht_an_den_korrigierenden() {
     .await;
     assert!(w.offen_an(id).await.is_empty());
 
-    // Funktion geleert: eine normale Meldung von Hand ohne Funktion bleibt still.
     w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": "s3" }))
         .await;
     assert_eq!(
@@ -905,9 +904,11 @@ async fn meldung_an_mich_folgt_der_korrektur_nicht_an_den_korrigierenden() {
         Vec::<i64>::new(),
         "Bert hatte ihn schon"
     );
+    // Funktion geleert: eine normale Meldung von Hand ohne Funktion geht an alle mit Schreibrecht
+    // im Modul (LLH-1143, design.md D5); Bert hatte seinen Hinweis schon, der Admin löst aus.
     w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": null }))
         .await;
-    assert!(w.offen_an(id).await.is_empty());
+    assert_eq!(w.offen_an(id).await, vec![w.anna, w.carla]);
 }
 
 /// Akzeptanzkriterium LLH-1381: eine schon gesichtete Meldung löst mit der Korrektur keinen
