@@ -1,3 +1,109 @@
+## [1.0.0-alpha.150](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.149...v1.0.0-alpha.150) (2026-10-22)
+
+### Wichtige Änderungen
+
+- **Lagemeldungen sind jetzt Meldungen.** Jede Lagemeldung ist eine Meldung der Art „Lagemeldung“. Eine Datenbankmigration überträgt Lage-Text, Verortung, Übernahme in die Lage und Kenntnisnahme in die Meldungen und entfernt die bisherige eigene Tabelle für Lagemeldungen. Alte Lage-Stände bleiben auf der Karte lesbar.
+- **Schnittstelle zur Kenntnisnahme geändert:** Lagemeldungen werden jetzt über die Kennung der Meldung als gesehen markiert. Dafür gibt es neue Pfade je Meldung und für die Sammel-Kenntnisnahme. Die Sammel-Kenntnisnahme erwartet eine Liste von Meldungskennungen. Fremde Anbindungen müssen angepasst werden.
+- **Weitere Migrationen:** Nachforderungen erhalten Ziel, Bedarfszeit, Zusagedaten, den neuen Endzustand „zurückgezogen“ und eine Verknüpfung zu Einheiten; die Tabelle der Nachforderungen wird dafür neu aufgebaut. Neu sind außerdem Tabellen für Einsatz-Vorlagen. Bestehende Organisationen bekommen eine Startliste von Vorlagen.
+- **Neue Schnittstellen:**
+  - Meldungen lassen sich nachträglich korrigieren.
+  - Nachforderungen lassen sich bearbeiten und zurückziehen.
+  - Eingetroffene Nachforderungen lassen sich als Einheit übernehmen.
+  - Einsatz-Vorlagen haben eigene Endpunkte; ein Stichwort lässt sich mit einer Vorlage koppeln.
+  - Beim Anlegen eines Einsatzes kann eine Vorlage mitgegeben werden.
+  - ETB-Einträge können über ein neues Feld einen Vorgang im Meldungseingang anlegen.
+- **Geänderte Regel:** Wer eine Sofortmeldung bestätigt, sichtet sie damit auch. Sie zählt danach nicht mehr als unbearbeitet.
+- **Neue Begriffe:**
+  - Das Modul heißt jetzt „Meldungen“ statt „Meldungen (eingehend)“.
+  - Der Vorgang an der Meldung heißt überall „In die Lage übernehmen“. Neue ETB-Systemeinträge lauten „in die Lage übernommen“; bestehende Einträge bleiben unverändert.
+
+### Meldungen und Lage
+
+- **Meldungen korrigieren:** Über „Bearbeiten“ an der Meldungskarte lassen sich Art, Priorität, Richtung, Von und Empfänger nachträglich ändern.
+  - Wortlaut, Absender, Meldeweg und Zeiten bleiben unverändert.
+  - Jede Korrektur steht als Systemeintrag mit Verweis im ETB.
+  - Der Hinweis „Später nicht änderbar“ entfällt.
+- **Aus der Lage nehmen:** Mit Rückfrage. Lage-Text und Verortung lassen sich in den Lagemeldungen und im Inspector der Lagekarte setzen, ändern und leeren. Kommt eine Meldung durch eine Korrektur neu in die Lage, werden S2 und die Einsatzleitung benachrichtigt.
+- **Lagemeldung direkt erfassen:** Auf der Seite Lagemeldungen erfassen Sie eine Lagemeldung jetzt direkt. Die Zeilen zeigen Art, Priorität, Richtung, Gerät und Bearbeitungsstand. Ein Filter trennt Meldungen von Geräten und übernommene Meldungen. Am gekoppelten Gerät wählt eine Leiste zwischen Meldung und Lagemeldung.
+- **Zeitachse nach Ereigniszeit:** Die Zeitachse der Lagemeldungen ordnet jetzt nach der Ereigniszeit. Nachgereichte Meldungen stehen damit nicht mehr oben. Der Zeitpunkt der Übernahme steht zusätzlich in der Zeile.
+- **Eingangshinweis:** Neue Meldungen, die jemand bearbeiten soll, erscheinen gebündelt je Einsatz.
+  - Der Hinweis zeigt Absender und Wortlautanfang und bietet „Sichten“ an.
+  - Der Ton kommt höchstens alle zwei Minuten.
+  - Der Hinweis nimmt während einer Eingabe nicht den Fokus.
+  - Die Zahl unbearbeiteter Meldungen steht im Tab-Titel und am App-Symbol.
+- **Benachrichtigt werden:**
+  - bei dringenden Meldungen, Lagemeldungen und Meldungen von gekoppelten Geräten: alle mit Schreibrecht im Modul Meldungen, bzw. die gewählte Empfängerfunktion und die Einsatzleitung
+  - bei der ersten Übernahme in die Lage: S2 und die Einsatzleitung
+- **Sofortalarm:** Der Alarm nennt jetzt Absender und Wortlautanfang und springt direkt zur Meldung.
+- **Vorschlag S2:** Für eine Lagemeldung wird S2 als Empfängerfunktion vorgeschlagen.
+- **Neue Bezeichnungen:** Der Schnellknopf heißt „Lagemeldung an übergeordnete Stelle“, das Paneel im Lagebild „Jüngste ETB-Einträge“.
+
+### Einsatztagebuch
+
+- **Meldungseingang aus dem ETB:** ETB-Einträge vom Typ Meldung oder Lage legen beim Erfassen jetzt zugleich den Vorgang im Meldungseingang an.
+  - Der Schalter „Nur protokollieren“ hält einen Eintrag rein im ETB. Er springt nach jedem Erfassen zurück.
+  - Ohne Freigabe des Moduls Meldungen bleibt der Schalter an und gesperrt.
+  - Wird eine solche Zeile beim Abspielen nach einer Offline-Phase abgelehnt, kann sie mit „Nur protokollieren“ erneut gesendet werden.
+- **Verweise:** ETB-Einträge verweisen auf Meldungen und Nachforderungen („Meldung #n ↗“, „Nachforderung ↗“) und springen zur hervorgehobenen Karte. Jede Stufe einer Nachforderung schreibt immer einen Systemeintrag ins ETB.
+- **Erfassungsleiste:** „Nur protokollieren“ und „Werte behalten“ stehen ab mittlerer Bildschirmbreite im Reiterband der Entwürfe. Die Leiste wächst im Handschuh-Betrieb nicht mehr in eine zweite Zeile.
+
+### Kräfte und Mittel
+
+- **Status-Board für Nachforderungen:**
+  - Spalten Angefordert, Zugesagt, Unterwegs, Eingetroffen; Abgelehnt und Zurückgezogen stehen eingeklappt daneben.
+  - Fortschalten per Knopf mit Rückgängig.
+  - Auf schmalen Geräten eine Leiste der Stufen mit Zahl.
+  - Das Modul steht unter Kräfte & Mittel.
+- **Offene Nachforderungen** stehen auch im Führungsüberblick (mit den am längsten wartenden), in der Vorbereitung der Lagebesprechung und im Modulmenü.
+- **Schnellere Erfassung:**
+  - Sichtbar sind nur Was, Anzahl und Wohin; alles Weitere liegt unter „Weitere Angaben“.
+  - Eine Schnellwahl bietet die häufigsten Arten an. „2× RTW“ ist damit mit Klick, Ziffer und Enter erfasst.
+  - Ziel kann ein Bereitstellungsraum, ein Einsatzabschnitt oder Freitext sein; neu ist die Angabe „Benötigt bis“.
+- **Zusage erfassen:**
+  - mit Menge, Wer und voraussichtlichem Eintreffen
+  - Eine Teilzusage teilt die Nachforderung; der Rest bleibt angefordert.
+  - Ein verstrichenes Eintreffen wird als „überfällig“ markiert.
+- **Weitere Aktionen:** Nachforderungen lassen sich bearbeiten und mit Grund zurückziehen.
+- **Als Einheit übernehmen:**
+  - Eingetroffene Kräfte werden als Einheit angelegt oder mit einer vorhandenen Einheit verknüpft.
+  - Bei einem Bereitstellungsraum als Ziel werden Eintritt und Eintreffen automatisch gebucht.
+  - Die Einheit zeigt ihre Herkunft mit Sprung zurück zur Nachforderung.
+
+### Lagekarte
+
+- **Zeichenwerkzeuge:** Sie öffnen sich als Menü direkt an der Karte. Es bietet zuletzt verwendete taktische Zeichen zum direkten Platzieren. Das Paneel „Zeichnen“ in der Leiste entfällt.
+- **Zonen bearbeiten:** Zonen lassen sich punktweise bearbeiten: Punkte verschieben, einfügen und entfernen, mit Rückgängig. Bei Kreiszonen lässt sich die Mitte verschieben.
+- **Radius messen:** Beim Messen „Radius“ erscheint der Kreis als gestrichelte Vorschau.
+- **Abschnittsfokus:** „Auf Karte zeigen ↗“ auf der Seite Einsatzabschnitte öffnet die Lagekarte im Fokus des Abschnitts. Bündel aus ausschließlich fremden Kräften werden dabei gedämpft, auch im Lageplan.
+- **Ohne WebGL2:** Auf Geräten ohne WebGL2 erscheint „Karte auf diesem Gerät nicht darstellbar“ statt der Fehlerseite der App.
+  - Gilt für Lagekarte, Kartenausschnitt des Einsatzorts, Kartenbild des Evakuierungsbezirks und Lagemonitor.
+  - Bedienung, Listen und übrige Kacheln bleiben nutzbar.
+  - Druck und Anlage des Lageplans nennen den Grund.
+
+### Einsatz anlegen und Einsatzdaten
+
+- **Einsatz-Vorlagen je Organisation:**
+  - gepflegt in den Stammdaten, mit Einsatzart und den Modulen, die ausgeblendet werden sollen
+  - Stichworte lassen sich mit einer Vorlage koppeln.
+  - Beim Anlegen stellt das Stichwort die Vorlage ein, solange keine von Hand gewählt ist.
+  - Schreiben dürfen nur System-Admins.
+- **Ortsfeld:**
+  - zeigt eine Kartenvorschau mit verschiebbarer Nadel (Maus, Finger oder Pfeiltasten)
+  - „Auf Karte wählen“ öffnet eine interaktive Karte, auch offline.
+  - Eine getippte Koordinate wird ohne Suche erkannt.
+  - Ein auf der Karte gesetzter Punkt bleibt beim Nachtippen der Adresse erhalten.
+  - Eingebaut in „Einsatz anlegen“ und in die Einsatzdaten.
+- **Herkunftsadresse Betroffener:** Sie wird als reiner Text ohne Anfrage an einen Geocoder erfasst.
+
+### Führung und Dokumente
+
+- **Lagevortrag:** Abschnitte mit übernommenem Text zeigen den „Stand der Übernahme“. Ein Stand aus der Vorfassung wird auffällig markiert.
+- **Gefahren drucken:** Die Gefahrenseite lässt sich über „Drucken / als PDF“ ausgeben, mit Kopf, Legende, Matrix und Erläuterungen der Bewertung. Der Ausdruck ist schwarz-weiß-tauglich.
+
+### Bedienung
+
+- **Tabellen:** Wer rückwärts in die erste Tabellenzeile tabbt, landet nicht mehr unter dem stehenden Tabellenkopf. Das gilt für alle Katalogtabellen.
+
 ## [1.0.0-alpha.149](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.148...v1.0.0-alpha.149) (2026-10-21)
 
 ### Lageberichte, Befehle und Pressemitteilungen
