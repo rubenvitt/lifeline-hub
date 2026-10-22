@@ -10620,4 +10620,116 @@ mod tests {
             .await
             .expect("das Löschen des Einsatzes nimmt die Nachforderungen mit");
     }
+
+    // --- LLH-1097: Zusage, Teilzusage und Zurückziehen an der Nachforderung (0237) ---
+
+    /// Nur ADD COLUMN (design.md D12): der Bestand bleibt mit leeren Zusage-Spalten, eine
+    /// Restposition verweist auf ihre zugesagte, `zurueckgezogen` braucht keinen CHECK, und das
+    /// Löschen des Einsatzes nimmt beide mit, ohne am Selbstbezug hängenzubleiben.
+    #[tokio::test]
+    async fn migration_0237_zusage_spalten_teilung_und_status() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 235).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, anzahl, adressat_kategorie, \
+                angefordert_at, erstellt_von_id) \
+             VALUES (?, 'RTW', 2, 'leitstelle', '2026-10-22 08:00:00', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, 237).await;
+
+        let leer: (
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<i64>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT zusage_rufnamen, eintreffen_erwartet_at, anzahl_angefordert, \
+                    teilung_aus_id, zurueckgezogen_at FROM nachforderung WHERE id = ?",
+        )
+        .bind(alt)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(leer, (None, None, None, None, None), "Bestand ohne Zusage");
+
+        sqlx::query(
+            "UPDATE nachforderung SET status = 'zugesagt', anzahl = 1, anzahl_angefordert = 2, \
+                zusage_rufnamen = '[\"83-1\"]', eintreffen_erwartet_at = '2026-10-22 13:30:00' \
+             WHERE id = ?",
+        )
+        .bind(alt)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let rest: i64 = sqlx::query_scalar(
+            "INSERT INTO nachforderung (einsatz_id, art, anzahl, adressat_kategorie, \
+                angefordert_at, erstellt_von_id, teilung_aus_id) \
+             VALUES (?, 'RTW', 1, 'leitstelle', '2026-10-22 08:00:00', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(alt)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE nachforderung SET status = 'zurueckgezogen', \
+                zurueckgezogen_at = '2026-10-22 09:00:00', zurueckgezogen_grund = 'nicht mehr nötig' \
+             WHERE id = ?",
+        )
+        .bind(rest)
+        .execute(&pool)
+        .await
+        .expect("status ohne CHECK nimmt den neuen Wert");
+        let verweis: Option<i64> =
+            sqlx::query_scalar("SELECT teilung_aus_id FROM nachforderung WHERE id = ?")
+                .bind(rest)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(verweis, Some(alt));
+        sqlx::query(
+            "INSERT INTO nachforderung (einsatz_id, art, adressat_kategorie, angefordert_at, \
+                erstellt_von_id, teilung_aus_id) \
+             VALUES (?, 'RTW', 'leitstelle', '2026-10-22 08:00:00', ?, 999999)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .expect_err("teilung_aus_id ist ein Fremdschlüssel");
+
+        let index: Option<String> = sqlx::query_scalar(
+            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_nachforderung_teilung'",
+        )
+        .fetch_optional(&pool)
+        .await
+        .unwrap();
+        assert!(
+            index.is_some_and(|i| i.contains("WHERE teilung_aus_id IS NOT NULL")),
+            "Teilindex"
+        );
+        let verletzt: Vec<(String,)> = sqlx::query_as("PRAGMA foreign_key_check(nachforderung)")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(verletzt.is_empty());
+
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt zugesagte und Rest mit");
+        let uebrig: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM nachforderung")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(uebrig, 0);
+    }
 }

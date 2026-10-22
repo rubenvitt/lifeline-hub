@@ -5,6 +5,7 @@ import { formatVor } from '../../anzeige/abstand';
 import { Paneel, monoStil, useRollen } from '../../components/instrument';
 import {
   OFFENE_STUFEN,
+  istOffen,
   offenText,
   stufeWort,
   type NachforderungsZahlen,
@@ -26,7 +27,7 @@ export function aeltesteOffene(
   anzahl = NACHFORDERUNGEN_AELTESTE,
 ): Nachforderung[] {
   return liste
-    .filter((n) => n.status !== 'eingetroffen' && n.status !== 'abgelehnt')
+    .filter((n) => istOffen(n.status))
     .sort((a, b) => a.angefordert_at.localeCompare(b.angefordert_at) || a.id - b.id)
     .slice(0, anzahl);
 }

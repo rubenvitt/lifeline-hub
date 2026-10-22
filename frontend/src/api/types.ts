@@ -1252,6 +1252,24 @@ export type LageGesehen = S['LageGesehenAnzeige'];
 export interface LageGesehenBody {
   meldung_ids: number[];
 }
+/** Korrektur einer Meldung (`PATCH …/meldungen/{mid}`, LLH-1066): nur die geänderten Felder.
+ * Wortlaut, Absender, Meldeweg und Ereigniszeit bleiben, wie die Meldung einging (422). */
+export interface MeldungKorrekturPatch {
+  meldungsart?: Meldungsart;
+  prioritaet?: MeldungPrioritaet;
+  richtung?: Richtung;
+  /** Von-Bezug als Paar: steht eines, ersetzt es den Bezug; `null` löst ihn. */
+  einheit_id?: number | null;
+  abschnitt_id?: number | null;
+  empfaenger?: string | null;
+  /** `true` übernimmt in die Lage, `false` nimmt aus der Lage (nicht bei einer Lagemeldung). */
+  lagerelevant?: boolean;
+  /** Leer oder `null`: der Wortlaut gilt. */
+  lage_text?: string | null;
+  /** Nur gemeinsam; beide `null` entfernt die Verortung. */
+  lat?: number | null;
+  lon?: number | null;
+}
 /** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt. */
 export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
 export type LetzteRueckmeldung = S['LetzteRueckmeldung'];
@@ -1282,6 +1300,35 @@ export interface NeueNachforderung {
   ziel_text?: string;
   /** Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort. */
   benoetigt_bis?: string;
+}
+
+/**
+ * Body von `POST …/nachforderungen/{nid}/zusage` (LLH-1097 D4), FE-lokal. Eine Anzahl unter der
+ * angeforderten teilt den Rest als eigene Position ab (D1).
+ */
+export interface NachforderungZusageEingabe {
+  /** Zugesagte Menge; fehlt = die angeforderte. */
+  anzahl?: number;
+  /** „Wer“: Rufnamen oder freie Angaben. */
+  rufnamen?: string[];
+  /** Voraussichtliches Eintreffen (UTC); fehlt = ohne. */
+  eintreffen_erwartet_at?: string;
+}
+
+/**
+ * Body von `PATCH …/nachforderungen/{nid}` (LLH-1097 D9), FE-lokal: nur Geändertes, `null` leert.
+ * Steht ein Zielfeld im Body, ersetzt der Body das ganze Ziel. Wer und Eintreffen nur in zugesagt
+ * und unterwegs.
+ */
+export interface PatchNachforderung {
+  anzahl?: number;
+  prioritaet?: NachforderungPrioritaet;
+  bezeichnung?: string | null;
+  ziel_br_id?: number | null;
+  ziel_abschnitt_id?: number | null;
+  ziel_text?: string | null;
+  eintreffen_erwartet_at?: string | null;
+  rufnamen?: string[];
 }
 
 // ============================== Zugangsprotokoll (LFH-1097) ==============================

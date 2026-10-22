@@ -4,6 +4,7 @@ import type {
   LageGesehenBody,
   LageMeldung,
   Meldung,
+  MeldungKorrekturPatch,
   MeldungKennzahlen,
   MeldungStatus,
   NeueMeldung,
@@ -127,10 +128,9 @@ export function bestaetigeMeldung(einsatzId: number, meldungId: number): Promise
   );
 }
 
-/** Als lagerelevant an die Lage übergeben (LFH-95).
- *  Optional direkt verorten (LFH-113): lat/lon nur gemeinsam — das Backend persistiert die
- *  Koordinate beim erstmaligen Übergeben (INSERT). Re-Verorten bestehender Lageobjekte ist
- *  bewusst kein Pfad (Übergabe-Aktion ist einmalig, siehe MeldungListe). */
+/** In die Lage übernehmen (LFH-95).
+ *  Optional direkt verorten (LFH-113): lat/lon nur gemeinsam; eine bestehende Verortung bleibt.
+ *  Versetzen, entfernen und den Lage-Text ändern geht über {@link korrigiereMeldung} (LLH-1066). */
 export function markiereLagerelevant(
   einsatzId: number,
   meldungId: number,
@@ -141,6 +141,16 @@ export function markiereLagerelevant(
     'POST',
     daten,
   );
+}
+
+/** Meldung nachträglich korrigieren (LLH-1066): Art, Priorität, Richtung, Von-Bezug,
+ *  Empfänger, Lage-Angaben, aus der Lage nehmen. Nur die geänderten Felder senden. */
+export function korrigiereMeldung(
+  einsatzId: number,
+  meldungId: number,
+  aenderung: MeldungKorrekturPatch,
+): Promise<Meldung> {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}`, 'PATCH', aenderung);
 }
 
 /** Aus einer eingegangenen Meldung direkt einen Auftrag erteilen (Meldung→Auftrag, LFH-113).

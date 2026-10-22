@@ -929,3 +929,78 @@ describe('Inspector für Tiere (LLH-1123)', () => {
     expect(geloescht.map((m) => m.schluessel)).toEqual(['tier-4']);
   });
 });
+
+// LLH-1066: Lage-Text und Verortung einer Lagemeldung lassen sich im Inspector korrigieren.
+describe('Inspector für Lagemeldungen (LLH-1066)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/:id/ort-vorschau', () =>
+        HttpResponse.json({ peilung: null, ortsname: null }),
+      ),
+    );
+  });
+
+  const lageMarker = {
+    schluessel: 'lagemeldung-3',
+    typ: 'lagemeldung',
+    id: 3,
+    lat: 52,
+    lon: 9,
+    label: 'Meldung #5',
+    farbe: '#1677ff',
+    lageMeldung: { meldungId: 3, meldungLfdNr: 5, absender: 'Florian Nord 1', inhalt: 'Brücke' },
+  } as KarteMarker;
+
+  function lageInspector(darfSchreiben: boolean): ReactElement {
+    return (
+      <Inspector
+        einsatzId={1}
+        marker={lageMarker}
+        darfSchreiben={darfSchreiben}
+        onSchliessen={() => {}}
+        onVerortungLoeschen={() => {}}
+      />
+    );
+  }
+
+  it('mit Schreibrecht: „Lage-Angaben bearbeiten“ ändert den Lage-Text über die Meldung', async () => {
+    let body: unknown = null;
+    server.use(
+      http.patch('/api/einsaetze/1/meldungen/3', async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ id: 3, lfd_nr: 5 });
+      }),
+    );
+    renderMitProviders(lageInspector(true));
+    // Kein „Verortung löschen“: der Ort geht über die Lage-Angaben.
+    expect(screen.queryByRole('button', { name: /Verortung löschen/ })).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'Lage-Angaben bearbeiten' }));
+    const formular = screen.getByRole('form', { name: 'Lage-Angaben zu Meldung #5' });
+    const text = within(formular).getByRole('textbox', { name: 'Lage-Text' });
+    await userEvent.clear(text);
+    await userEvent.type(text, 'Brücke Nord');
+    await userEvent.click(within(formular).getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(body).toEqual({ lage_text: 'Brücke Nord' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('form', { name: 'Lage-Angaben zu Meldung #5' })).toBeNull(),
+    );
+  });
+
+  it('ohne Schreibrecht (auch im Historien-Modus) kein Bearbeiten', () => {
+    renderMitProviders(lageInspector(false));
+    expect(screen.queryByRole('button', { name: 'Lage-Angaben bearbeiten' })).toBeNull();
+  });
+
+  it('ohne Modul Meldungen kein Bearbeiten', async () => {
+    server.use(
+      http.get('/api/einsaetze/1/modul-freigaben', () =>
+        HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
+      ),
+    );
+    renderMitProviders(lageInspector(true));
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: /Zur Quell-Meldung/ })).toBeNull(),
+    );
+    expect(screen.queryByRole('button', { name: 'Lage-Angaben bearbeiten' })).toBeNull();
+  });
+});

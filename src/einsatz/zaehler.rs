@@ -187,7 +187,9 @@ pub fn zaehle_nachforderungen_gewichtet(
             NachforderungStatus::Angefordert => z.angefordert += n,
             NachforderungStatus::Zugesagt => z.zugesagt += n,
             NachforderungStatus::Unterwegs => z.unterwegs += n,
-            NachforderungStatus::Eingetroffen | NachforderungStatus::Abgelehnt => {}
+            NachforderungStatus::Eingetroffen
+            | NachforderungStatus::Abgelehnt
+            | NachforderungStatus::Zurueckgezogen => {}
         }
     }
     z
@@ -496,6 +498,7 @@ mod tests {
             N::Unterwegs,
             N::Eingetroffen,
             N::Abgelehnt,
+            N::Zurueckgezogen,
         ];
         let n_zeilen: Vec<_> = stati
             .iter()
@@ -519,6 +522,7 @@ mod tests {
             N::Unterwegs,
             N::Eingetroffen,
             N::Abgelehnt,
+            N::Zurueckgezogen,
         ]);
         assert_eq!(
             z,

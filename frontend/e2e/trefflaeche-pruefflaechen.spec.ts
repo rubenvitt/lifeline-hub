@@ -419,9 +419,10 @@ function kommunikationFlaechen(einsatzId: string): Flaeche[] {
       anker: (page) => inMain(page).getByText('RTW').first(),
       ziele: [
         { sorte: 'Nachforderung anlegen', ziele: knopf('Nachforderung anlegen'), mindestens: 1 },
+        // Fortschaltung und ⋮-Menü (Bearbeiten, Zurückziehen, Ablehnen; LLH-1097 D10).
         {
           sorte: 'Nachforderung Karte',
-          ziele: knopf(/^(Zusage erfassen|Ablehnen)$/),
+          ziele: knopf(/^(Zusage erfassen|Aktionen zu Nachforderung .+)$/),
           mindestens: 2,
         },
         abgelehntSpalte,

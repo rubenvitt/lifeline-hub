@@ -76,6 +76,12 @@ describe('Status-Deskriptoren', () => {
       phase: 'abgeschlossen',
     });
     expect(NACHFORDERUNG_STATUS.abgelehnt).toEqual({ label: 'Abgelehnt', phase: 'ausnahme' });
+    // LLH-1097 D8: abgeschlossen im neutralen Ton, kein Alarm.
+    expect(NACHFORDERUNG_STATUS.zurueckgezogen).toEqual({
+      label: 'Zurückgezogen',
+      phase: 'abgeschlossen',
+      ton: 'neutral',
+    });
   });
 
   it('ERINNERUNG mappt offen/erledigt/quittiert', () => {

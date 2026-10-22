@@ -834,7 +834,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route(
             "/api/einsaetze/{id}/meldungen/{mid}",
-            get(routes::meldung::detail),
+            get(routes::meldung::detail).patch(routes::meldung_korrektur::korrigieren),
         )
         .route(
             "/api/einsaetze/{id}/meldungen",
@@ -898,6 +898,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/nachforderungen/{nid}/ablehnen",
             post(routes::nachforderung::ablehnen),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}/zusage",
+            post(routes::nachforderung::zusage),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}/zurueckziehen",
+            post(routes::nachforderung::zurueckziehen),
+        )
+        .route(
+            "/api/einsaetze/{id}/nachforderungen/{nid}",
+            patch(routes::nachforderung::bearbeiten),
         )
         .route(
             "/api/einsaetze/{id}/fahrzeuge",

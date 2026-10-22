@@ -528,3 +528,310 @@ async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {
     let (s, json) = set_status(&app, &admin, e, storniert, "unterwegs").await;
     assert_eq!(s, StatusCode::OK, "{json}");
 }
+
+// ── Zusage, Zurückziehen, Bearbeiten (LLH-1097 Teil a) ─────────────────────────────────
+
+/// Setzt „2× RTW“ ab; liefert die id.
+async fn absetzen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
+    let (s, n) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        cookie,
+        Some(&body()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{n}");
+    n["id"].as_i64().unwrap()
+}
+
+async fn zusage(
+    app: &axum::Router,
+    cookie: &str,
+    e: i64,
+    nid: i64,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/zusage"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
+}
+
+async fn liste(app: &axum::Router, cookie: &str, e: i64) -> Vec<serde_json::Value> {
+    let (_, l) = anfrage(
+        app,
+        "GET",
+        &format!("/api/einsaetze/{e}/nachforderungen"),
+        cookie,
+        None,
+    )
+    .await;
+    l.as_array().unwrap().clone()
+}
+
+/// ETB-Inhalte mit Verweis auf die Nachforderung, in Folge der Liste.
+async fn etb_inhalte(app: &axum::Router, cookie: &str, e: i64, nid: i64) -> Vec<String> {
+    let (_, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    etb.as_array()
+        .unwrap()
+        .iter()
+        .filter(|x| x["nachforderung_id"] == nid)
+        .map(|x| x["inhalt"].as_str().unwrap().to_string())
+        .collect()
+}
+
+/// Akzeptanz: Zusage 1 von 2 über die Route → zwei Positionen in der Liste; „Wer“ getrimmt und
+/// entdoppelt, Eintreffen normalisiert.
+#[tokio::test]
+async fn teilzusage_ueber_die_route_ergibt_zwei_positionen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nid = absetzen(&app, &admin, e).await;
+    let (s, n) = zusage(
+        &app,
+        &admin,
+        e,
+        nid,
+        serde_json::json!({
+            "anzahl": 1,
+            "rufnamen": [" Florian Musterstadt 83-1 ", "", "Florian Musterstadt 83-1"],
+            "eintreffen_erwartet_at": "2099-01-01T12:30"
+        }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{n}");
+    assert_eq!(n["status"], "zugesagt");
+    assert_eq!(n["anzahl"], 1);
+    assert_eq!(n["anzahl_angefordert"], 2);
+    assert_eq!(
+        n["zusage_rufnamen"],
+        serde_json::json!(["Florian Musterstadt 83-1"])
+    );
+    assert_eq!(n["eintreffen_erwartet_at"], "2099-01-01 12:30:00");
+    assert!(n.get("teilung_aus_id").is_none(), "{n}");
+
+    let l = liste(&app, &admin, e).await;
+    assert_eq!(l.len(), 2);
+    let rest = l.iter().find(|x| x["id"] != nid).unwrap();
+    assert_eq!(rest["status"], "angefordert");
+    assert_eq!(rest["anzahl"], 1);
+    assert_eq!(rest["teilung_aus_id"], nid);
+    assert_eq!(rest["zusage_rufnamen"], serde_json::json!([]));
+    assert_eq!(rest["ist_offen"], true);
+
+    let etb = etb_inhalte(&app, &admin, e, nid).await;
+    assert!(
+        etb.iter().any(|i| i.starts_with(
+            "Nachforderung 2× RTW: 1 zugesagt (Florian Musterstadt 83-1), Eintreffen erwartet"
+        ) && i.ends_with("; 1× RTW weiter angefordert")),
+        "{etb:?}"
+    );
+}
+
+/// D4: erst die Felder für sich (400), dann der Zusammenhang (422), Bezug 404, Rolle 403.
+#[tokio::test]
+async fn zusage_statuscodes() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let nid = absetzen(&app, &admin, e).await;
+    let viele: Vec<String> = (0..21).map(|i| format!("83-{i}")).collect();
+    for (body, erwartet) in [
+        (serde_json::json!({ "anzahl": 0 }), StatusCode::BAD_REQUEST),
+        (
+            serde_json::json!({ "rufnamen": viele }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            serde_json::json!({ "rufnamen": ["x".repeat(101)] }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            serde_json::json!({ "eintreffen_erwartet_at": "gleich" }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            serde_json::json!({ "anzahl": 3 }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            serde_json::json!({ "anzahl": 1, "rufnamen": ["83-1", "83-2"] }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            serde_json::json!({ "eintreffen_erwartet_at": "2001-01-01 08:00:00" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let (s, j) = zusage(&app, &admin, e, nid, body.clone()).await;
+        assert_eq!(s, erwartet, "{body} → {j}");
+    }
+    let (s, _) = zusage(&app, &admin, anderer, nid, serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+
+    let erika = benutzer_anlegen(&app, &admin, "erika", "keine").await;
+    rolle_setzen(&app, &admin, e, erika, "beobachter").await;
+    let erika_c = login_cookie(&app, "erika", "erikapw1").await;
+    let (s, _) = zusage(&app, &erika_c, e, nid, serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+
+    let (s, n) = zusage(&app, &admin, e, nid, serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{n}");
+    assert_eq!(n["anzahl"], 2);
+    assert!(n.get("anzahl_angefordert").is_none(), "{n}");
+    let (s, _) = zusage(&app, &admin, e, nid, serde_json::json!({})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "schon zugesagt");
+    assert_eq!(liste(&app, &admin, e).await.len(), 1);
+}
+
+/// D8: Zurückziehen aus offenen Stufen, terminal, mit Grund und ETB; nicht über `…/status`.
+#[tokio::test]
+async fn zurueckziehen_ist_terminal_und_steht_im_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nid = absetzen(&app, &admin, e).await;
+    let url = format!("/api/einsaetze/{e}/nachforderungen/{nid}/zurueckziehen");
+
+    let (s, _) = set_status(&app, &admin, e, nid, "zurueckgezogen").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+    let lang = serde_json::json!({ "grund": "x".repeat(201) }).to_string();
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    assert_eq!(
+        set_status(&app, &admin, e, nid, "zugesagt").await.0,
+        StatusCode::OK
+    );
+    let (s, n) = anfrage(
+        &app,
+        "POST",
+        &url,
+        &admin,
+        Some(r#"{"grund":" nicht mehr benötigt "}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{n}");
+    assert_eq!(n["status"], "zurueckgezogen");
+    assert_eq!(n["ist_offen"], false);
+    assert_eq!(n["zurueckgezogen_grund"], "nicht mehr benötigt");
+    assert!(n["zurueckgezogen_at"].is_string());
+    assert!(etb_inhalte(&app, &admin, e, nid)
+        .await
+        .contains(&"Nachforderung 2× RTW: zurückgezogen (nicht mehr benötigt)".to_string()));
+
+    let (s, _) = anfrage(&app, "POST", &url, &admin, Some("{}")).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "terminal");
+    let (s, _) = set_status(&app, &admin, e, nid, "angefordert").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "kein Rückweg");
+
+    let da = eingetroffen(&app, &admin, e).await;
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen/{da}/zurueckziehen"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "was da ist, bleibt");
+}
+
+/// D9: Bearbeiten über PATCH — Felder 400, Zusammenhang 422, Ziel 404, ohne Änderung kein ETB.
+#[tokio::test]
+async fn bearbeiten_ueber_patch() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nid = absetzen(&app, &admin, e).await;
+    let url = format!("/api/einsaetze/{e}/nachforderungen/{nid}");
+    let patch = |body: serde_json::Value| {
+        let (app, admin, url) = (app.clone(), admin.clone(), url.clone());
+        async move { anfrage(&app, "PATCH", &url, &admin, Some(&body.to_string())).await }
+    };
+
+    for (body, erwartet) in [
+        (serde_json::json!({ "anzahl": 0 }), StatusCode::BAD_REQUEST),
+        (
+            serde_json::json!({ "prioritaet": "ultra" }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            serde_json::json!({ "bezeichnung": "x".repeat(201) }),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
+            serde_json::json!({ "ziel_text": "Hof", "ziel_br_id": 1 }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            serde_json::json!({ "eintreffen_erwartet_at": "2099-01-01 12:00:00" }),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+        (
+            serde_json::json!({ "ziel_br_id": 999999 }),
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let (s, j) = patch(body.clone()).await;
+        assert_eq!(s, erwartet, "{body} → {j}");
+    }
+    let vorher = etb_inhalte(&app, &admin, e, nid).await.len();
+
+    let (s, n) = patch(serde_json::json!({
+        "anzahl": 3, "prioritaet": "sofort", "ziel_text": " Hof Süd ", "bezeichnung": null
+    }))
+    .await;
+    assert_eq!(s, StatusCode::OK, "{n}");
+    assert_eq!(n["anzahl"], 3);
+    assert_eq!(n["prioritaet"], "sofort");
+    assert_eq!(n["ziel_text"], "Hof Süd");
+    assert!(n.get("bezeichnung").is_none(), "{n}");
+    assert_eq!(n["art"], "RTW");
+    let etb = etb_inhalte(&app, &admin, e, nid).await;
+    assert_eq!(etb.len(), vorher + 1);
+    assert!(etb.contains(
+        &"Nachforderung 2× RTW geändert: Anzahl 3; → Hof Süd; Priorität sofort; ohne Details"
+            .to_string()
+    ));
+
+    let (s, _) = patch(serde_json::json!({ "anzahl": 3 })).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(etb_inhalte(&app, &admin, e, nid).await.len(), vorher + 1);
+
+    // Ein Ziel im Body ersetzt das ganze Ziel: nur `ziel_br_id: null` leert auch den Ort.
+    let (s, n) = patch(serde_json::json!({ "ziel_br_id": null })).await;
+    assert_eq!(s, StatusCode::OK, "{n}");
+    assert!(n.get("ziel_text").is_none(), "{n}");
+
+    assert_eq!(
+        zusage(&app, &admin, e, nid, serde_json::json!({})).await.0,
+        StatusCode::OK
+    );
+    let (s, n) = patch(serde_json::json!({
+        "eintreffen_erwartet_at": "2099-01-01 13:00", "rufnamen": ["83-1"]
+    }))
+    .await;
+    assert_eq!(s, StatusCode::OK, "{n}");
+    assert_eq!(n["eintreffen_erwartet_at"], "2099-01-01 13:00:00");
+    assert_eq!(n["zusage_rufnamen"], serde_json::json!(["83-1"]));
+
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/zurueckziehen"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = patch(serde_json::json!({ "anzahl": 1 })).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "abgeschlossen");
+}

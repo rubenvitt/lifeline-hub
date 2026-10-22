@@ -29,8 +29,10 @@ vi.mock('../offline/schreiben', () => ({
 const listeLageMeldungen = vi.fn();
 const markLageMeldungGesehen = vi.fn();
 const markLageMeldungenGesehen = vi.fn();
+const korrigiereMeldung = vi.fn();
 vi.mock('../api/meldungen', () => ({
   LAGE_GESEHEN_MAX: 500,
+  korrigiereMeldung: (...a: unknown[]) => korrigiereMeldung(...a),
   listeLageMeldungen: (...a: unknown[]) => listeLageMeldungen(...a),
   markLageMeldungGesehen: (...a: unknown[]) => markLageMeldungGesehen(...a),
   markLageMeldungenGesehen: (...a: unknown[]) => markLageMeldungenGesehen(...a),
@@ -468,6 +470,62 @@ describe('LagemeldungenPage', () => {
       act(() => setzeOnline(false));
       expect(screen.getByRole('button', { name: 'Als gesehen markieren' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Alle als gesehen markieren' })).toBeDisabled();
+    });
+  });
+
+  // LLH-1066: Lage-Text und Verortung an der Zeile korrigieren.
+  describe('Lage-Angaben bearbeiten (LLH-1066)', () => {
+    const zeileMit = (text: string) =>
+      screen.getByText(text).closest('li[data-lfh-eintrag="zeitachse"]') as HTMLElement;
+
+    it('ändert den Lage-Text an Ort und Stelle und schließt danach', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      korrigiereMeldung.mockResolvedValue({ id: 3 });
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(
+        within(zeileMit('Brücke gesperrt')).getByRole('button', {
+          name: 'Lage-Angaben zu Meldung #5 bearbeiten',
+        }),
+      );
+      const formular = screen.getByRole('form', { name: 'Lage-Angaben zu Meldung #5' });
+      const text = within(formular).getByRole('textbox', { name: 'Lage-Text' });
+      await userEvent.clear(text);
+      await userEvent.type(text, 'Brücke Nord gesperrt');
+      await userEvent.click(within(formular).getByRole('button', { name: 'Speichern' }));
+      expect(korrigiereMeldung).toHaveBeenCalledWith(1, 3, { lage_text: 'Brücke Nord gesperrt' });
+      await vi.waitFor(() =>
+        expect(screen.queryByRole('form', { name: 'Lage-Angaben zu Meldung #5' })).toBeNull(),
+      );
+    });
+
+    it('zeigt eine Ablehnung im Formular, das offen bleibt', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      korrigiereMeldung.mockRejectedValue(new Error('Lage-Text zu lang'));
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      await userEvent.click(
+        screen.getByRole('button', { name: 'Lage-Angaben zu Meldung #5 bearbeiten' }),
+      );
+      const formular = screen.getByRole('form', { name: 'Lage-Angaben zu Meldung #5' });
+      await userEvent.clear(within(formular).getByRole('textbox', { name: 'Lage-Text' }));
+      await userEvent.click(within(formular).getByRole('button', { name: 'Speichern' }));
+      expect(await within(formular).findByText('Nicht gespeichert')).toBeInTheDocument();
+      expect(korrigiereMeldung).toHaveBeenCalledWith(1, 3, { lage_text: '' });
+    });
+
+    it('ohne Schreibrecht kein Bearbeiten', async () => {
+      renderPage();
+      await screen.findByText('Brücke gesperrt');
+      expect(screen.queryByRole('button', { name: /bearbeiten/i })).toBeNull();
+    });
+
+    it('ohne Modul Meldungen kein Bearbeiten', async () => {
+      ladeEinsatz.mockResolvedValue(einsatz('fuehrungspersonal'));
+      ladeModulFreigaben.mockResolvedValue({ meldungen: { sichtbar: true, zugriff: false } });
+      renderPage();
+      expect(await screen.findByText('Modul Meldungen gesperrt')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /bearbeiten/i })).toBeNull();
     });
   });
 });

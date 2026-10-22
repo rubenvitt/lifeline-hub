@@ -16,7 +16,8 @@ use crate::fuehrung::Fuehrungsfunktion;
 use crate::live::LiveHub;
 use sqlx::SqlitePool;
 
-/// Der Bezug, der den neuen Status trägt; `None` für „angefordert“ (kein Hinweis). Gegenstück:
+/// Der Bezug, der den neuen Status trägt; `None` für „angefordert“ und „zurückgezogen“ (kein
+/// Hinweis: die eigene Führung handelt selbst, LLH-1097 design.md D8). Gegenstück:
 /// `benachrichtigung::text::nachforderung_status`.
 pub const fn bezug_typ(status: NachforderungStatus) -> Option<BenachrichtigungBezugTyp> {
     match status {
@@ -27,6 +28,7 @@ pub const fn bezug_typ(status: NachforderungStatus) -> Option<BenachrichtigungBe
             Some(BenachrichtigungBezugTyp::NachforderungEingetroffen)
         }
         NachforderungStatus::Abgelehnt => Some(BenachrichtigungBezugTyp::NachforderungAbgelehnt),
+        NachforderungStatus::Zurueckgezogen => None,
     }
 }
 
@@ -69,7 +71,10 @@ mod tests {
         for status in NachforderungStatus::ALLE {
             match bezug_typ(status) {
                 Some(typ) => assert_eq!(nachforderung_status(typ), Some(status)),
-                None => assert_eq!(status, NachforderungStatus::Angefordert),
+                None => assert!(matches!(
+                    status,
+                    NachforderungStatus::Angefordert | NachforderungStatus::Zurueckgezogen
+                )),
             }
         }
         let mit_status = BenachrichtigungBezugTyp::ALLE

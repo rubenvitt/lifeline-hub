@@ -133,7 +133,7 @@ export default function StelleBedarf({
               <ListenEintrag
                 actions={[
                   <Space key="stand" size={8} wrap>
-                    <StatusBadge phase={status.phase} label={status.label} />
+                    <StatusBadge phase={status.phase} label={status.label} ton={status.ton} />
                     <ZeitAnzeige wert={n.angefordert_at} format="uhrzeit" />
                   </Space>,
                 ]}

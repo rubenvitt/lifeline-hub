@@ -10918,7 +10918,8 @@
           "erstellt_von_id",
           "erstellt_at",
           "ist_offen",
-          "material_ids"
+          "material_ids",
+          "zusage_rufnamen"
         ],
         "properties": {
           "abgelehnt_at": {
@@ -10951,6 +10952,14 @@
               "null"
             ],
             "format": "int64"
+          },
+          "anzahl_angefordert": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bei einer Teilzusage die Anzahl vor der Teilung („1 von 2 zugesagt“, D1); fehlt ohne."
           },
           "art": {
             "type": "string"
@@ -10993,6 +11002,13 @@
             "type": "integer",
             "format": "int64"
           },
+          "eintreffen_erwartet_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Voraussichtliches Eintreffen laut Zusage (UTC, D3); fehlt ohne Angabe."
+          },
           "erstellt_at": {
             "type": "string"
           },
@@ -11020,7 +11036,7 @@
           },
           "ist_offen": {
             "type": "boolean",
-            "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt')."
+            "description": "Abgeleitet: status NOT IN ('eingetroffen','abgelehnt','zurueckgezogen')."
           },
           "material_ids": {
             "type": "array",
@@ -11035,6 +11051,14 @@
           },
           "status": {
             "$ref": "#/components/schemas/NachforderungStatus"
+          },
+          "teilung_aus_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Restposition einer Teilzusage: die Nachforderung, aus der sie abgeteilt wurde (D1)."
           },
           "unterwegs_at": {
             "type": [
@@ -11068,6 +11092,26 @@
               "string",
               "null"
             ]
+          },
+          "zurueckgezogen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zurückgezogen durch die eigene Führung (D8): Zeitpunkt und optionaler Grund."
+          },
+          "zurueckgezogen_grund": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "zusage_rufnamen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "„Wer“ der Zusage: Rufnamen oder freie Angaben in Eingabefolge, leer ohne Angabe\n(LLH-1097 design.md D2). Teil (b) legt je Eintrag eine Einheit an."
           }
         }
       },
@@ -11079,7 +11123,8 @@
           "zugesagt",
           "unterwegs",
           "eingetroffen",
-          "abgelehnt"
+          "abgelehnt",
+          "zurueckgezogen"
         ]
       },
       "NachforderungsZaehler": {

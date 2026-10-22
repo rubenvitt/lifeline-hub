@@ -81,6 +81,9 @@ export const NACHFORDERUNG_STATUS: StatusDeskriptor = {
   unterwegs: { label: 'Unterwegs', phase: 'in_arbeit' },
   eingetroffen: { label: 'Eingetroffen', phase: 'abgeschlossen' },
   abgelehnt: { label: 'Abgelehnt', phase: 'ausnahme' },
+  // Von der eigenen Führung zurückgezogen (LLH-1097 D8): abgeschlossen, aber kein Eintreffen —
+  // neutral wie ein aufgehobener Auftrag, ohne den Alarm einer Absage.
+  zurueckgezogen: { label: 'Zurückgezogen', phase: 'abgeschlossen', ton: 'neutral' },
 };
 
 /** ERINNERUNG (status 'offen' | 'erledigt' | 'quittiert'; `quittiert` heißt „Erübrigt“). */

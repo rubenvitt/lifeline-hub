@@ -2,7 +2,7 @@
 titel: Lagemeldungen
 gruppen: [fuehrung]
 reihenfolge: 250
-quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LagemeldungenPage.tsx, src/geocoding/marker.rs, frontend/src/einsatz/useModulZaehler.ts, src/einsatz/zaehler.rs, frontend/src/lagemeldungen/zeitachse.ts, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/MeldungFormular.tsx, src/routes/meldung.rs, src/meldung/repo.rs, frontend/src/api/queryKeys.ts, frontend/src/meldungen/LageAngabenBearbeiten.tsx, frontend/src/pages/lagekarte/Inspector.tsx, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs]
 ---
 
 ## Überblick
@@ -80,6 +80,18 @@ Für Einsatzleitung und Führungspersonal:
 3. Um alle angezeigten auf einmal abzuhaken, über der Zeitachse „Alle als gesehen markieren“
    wählen. Ist ein Filter gesetzt, gilt das nur für die angezeigten.
 
+### Lage-Text und Ort einer Lagemeldung ändern
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Meldungen im Einsatz freigegeben ist:
+
+1. In der Zeile der Lagemeldung „Bearbeiten“ wählen. Auf der Lagekarte heißt der Knopf im Paneel
+   „Ausgewählt“ „Lage-Angaben bearbeiten“.
+2. Den „Lage-Text“ ändern. Leer gilt wieder der Wortlaut der Meldung.
+3. Unter „Verortung“ die Koordinate setzen, ändern oder leeren.
+4. „Speichern“ wählen. Die App meldet „Lage-Angaben zu Meldung #… gespeichert“.
+
+Mit Koordinate steht die Lagemeldung danach auf der Lagekarte, ohne nicht mehr.
+
 ## Hintergrund
 
 ### Lagemeldung und Meldung
@@ -98,9 +110,12 @@ Für Einsatzleitung und Führungspersonal:
 - Eine Meldung wird genau einmal übernommen; danach fehlt „In die Lage übernehmen“ in ihrem Menü.
   Eine Lagemeldung steht schon in der Lage, ihr fehlt der Punkt von Anfang an.
 - Ohne eigenen Lage-Text gilt der Inhalt der Meldung.
-- Die Verortung lässt sich später nicht mehr ändern („Später nicht änderbar“). Ohne Koordinate
-  steht die Lagemeldung nur in der Zeitachse, mit Koordinate auch auf der Lagekarte in der Ebene
-  „Lagemeldungen“ (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)).
+- Ohne Koordinate steht die Lagemeldung nur in der Zeitachse, mit Koordinate auch auf der
+  Lagekarte in der Ebene „Lagemeldungen“ (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)).
+  Lage-Text und Ort lassen sich danach ändern (Ablauf oben).
+- Eine übernommene Meldung anderer Art lässt sich an ihrer Karte wieder „Aus der Lage nehmen“
+  (Kapitel [Meldungen](meldungen.md)); Lage-Text und Ort gehen dabei verloren. Eine Lagemeldung
+  bleibt in der Lage, auch wenn ihre Art geändert wird.
 - Die Meldung selbst bleibt im Modul „Meldungen“ und wird dort weiter bearbeitet.
 - Die erste Übernahme steht im Einsatztagebuch als „Meldung #… in die Lage übernommen“.
 
@@ -123,8 +138,8 @@ Für Einsatzleitung und Führungspersonal:
   neue an, zeigt das Modulmenü keine Zahl.
 - „Alle als gesehen markieren“ erfasst nur die Lagemeldungen, die beim Wählen angezeigt waren.
   Eine, die in diesem Moment eingeht, bleibt neu.
-- Wird eine schon gesehene Meldung mit geändertem Lage-Text erneut übernommen, ist die
-  Lagemeldung wieder neu.
+- Wird eine schon gesehene Meldung mit geändertem Lage-Text erneut übernommen oder ihr Lage-Text
+  geändert, ist die Lagemeldung wieder neu. Ein geänderter Ort lässt sie gesehen.
 - Lagemeldungen, die vor dieser Funktion übernommen wurden, gelten als gesehen, ohne Namen. Ebenso
   Meldungen der Art „Lagemeldung“, die vor der Zusammenführung erfasst und nie übernommen wurden.
 
