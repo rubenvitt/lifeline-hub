@@ -1,5 +1,6 @@
 use super::{BuildArtefakt, BuildRunner};
 use async_trait::async_trait;
+use karten_katalog::adressindex::ADRESSINDEX_ENDUNG;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -49,10 +50,12 @@ impl BuildRunner for MakeRunner {
             }
         };
         let bounds = lies_bounds(&datei).await?;
+        let adressindex = self.baue_adressindex(geofabrik_area).await;
         Ok(BuildArtefakt {
             datei,
             sha256,
             bounds,
+            adressindex,
         })
     }
 
@@ -77,6 +80,68 @@ impl BuildRunner for MakeRunner {
             Err(e) => tracing::warn!("Aufräumen abgebrochen: {e}"),
         }
     }
+}
+
+impl MakeRunner {
+    /// Baut den Offline-Adressindex (LLH-1119) aus dem Region-Extrakt, den `make tiles` in
+    /// `out/sources/` hinterlassen hat, nach `out/result/osm.<area>.adressen.sqlite` (räumt
+    /// [`raeume_ergebnisse`] mit). Scheitert er, gibt es `None` und eine Warnung: die Karte geht
+    /// trotzdem hinaus (D5 in `/mnt/project-files/llh-1022/llh-1119/design.md`).
+    async fn baue_adressindex(&self, geofabrik_area: &str) -> Option<PathBuf> {
+        let quellen = self.karten_build_dir.join("out/sources");
+        let ziel = self
+            .karten_build_dir
+            .join("out/result")
+            .join(format!("osm.{geofabrik_area}{}", ADRESSINDEX_ENDUNG));
+        let q = quellen.clone();
+        let pbf = match tokio::task::spawn_blocking(move || waehle_region_pbf(&q)).await {
+            Ok(Some(p)) => p,
+            _ => {
+                tracing::warn!(
+                    area = geofabrik_area,
+                    "kein Region-Extrakt in {} — Adressindex entfällt",
+                    quellen.display()
+                );
+                return None;
+            }
+        };
+        match crate::adressindex::baue_adressindex(&pbf, &ziel).await {
+            Ok(n) => {
+                tracing::info!(area = geofabrik_area, adressen = n, "Adressindex gebaut");
+                Some(ziel)
+            }
+            Err(e) => {
+                tracing::warn!(area = geofabrik_area, "Adressindex nicht gebaut: {e}");
+                let _ = tokio::fs::remove_file(&ziel).await;
+                None
+            }
+        }
+    }
+}
+
+/// Der Region-Extrakt in `out/sources/`: die jüngste `*.osm.pbf` außer `renumbered.osm.pbf`
+/// (LFH-200: das Makefile räumt vor jedem Bau die Extrakte, es liegt also genau der aktuelle da);
+/// fehlt sie, die umnummerierte Fassung (dieselben Adressen, nur andere Ids).
+fn waehle_region_pbf(quellen: &Path) -> Option<PathBuf> {
+    let mut kandidaten: Vec<(std::time::SystemTime, PathBuf)> = std::fs::read_dir(quellen)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let name = e.file_name().into_string().ok()?;
+            if !name.ends_with(".osm.pbf") {
+                return None;
+            }
+            Some((e.metadata().and_then(|m| m.modified()).ok()?, e.path()))
+        })
+        .collect();
+    kandidaten.sort();
+    let ist_umnummeriert = |p: &PathBuf| p.file_name().is_some_and(|n| n == "renumbered.osm.pbf");
+    kandidaten
+        .iter()
+        .rev()
+        .find(|(_, p)| !ist_umnummeriert(p))
+        .or_else(|| kandidaten.last())
+        .map(|(_, p)| p.clone())
 }
 
 /// Name des Bau-Containers, muss zu `--name ks-$(AREA)` in `karten-build/Makefile` passen.
@@ -158,7 +223,7 @@ fn waehle_artefakt(result_dir: &Path, geofabrik_area: &str) -> anyhow::Result<Pa
 /// sha256 GESTREAMT in festen 64-KiB-Blöcken — die Multi-GB-Datei nie ganz in den RAM.
 /// (sha2/digest 0.11 implementiert kein io::Write mehr — daher manuelle Read-Schleife
 /// statt std::io::copy, aber identisches Streaming-Verhalten.)
-fn sha256_datei(p: &Path) -> anyhow::Result<String> {
+pub(crate) fn sha256_datei(p: &Path) -> anyhow::Result<String> {
     use std::io::Read;
     let mut f = std::fs::File::open(p)?;
     let mut h = Sha256::new();
@@ -312,6 +377,29 @@ mod tests {
         let makefile = include_str!("../../../karten-build/Makefile");
         assert!(makefile.contains("--name ks-$(AREA)"));
         assert!(makefile.contains("docker rm -f ks-$(AREA)"));
+    }
+
+    #[test]
+    fn region_pbf_ist_der_extrakt_nicht_die_umnummerierte_fassung() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(waehle_region_pbf(&dir.path().join("fehlt")), None);
+        assert_eq!(waehle_region_pbf(dir.path()), None);
+        lege_an(dir.path(), "renumbered.osm.pbf");
+        assert_eq!(
+            waehle_region_pbf(dir.path()).unwrap().file_name().unwrap(),
+            "renumbered.osm.pbf",
+            "ohne Extrakt die umnummerierte Fassung"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        lege_an(dir.path(), "bremen-latest.osm.pbf");
+        lege_an(dir.path(), "water-polygons.zip");
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        // Jünger, aber die umnummerierte Fassung: der Extrakt gewinnt.
+        lege_an(dir.path(), "renumbered.osm.pbf");
+        assert_eq!(
+            waehle_region_pbf(dir.path()).unwrap().file_name().unwrap(),
+            "bremen-latest.osm.pbf"
+        );
     }
 
     #[test]

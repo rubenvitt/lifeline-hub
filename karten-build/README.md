@@ -27,6 +27,18 @@ Die zugrundeliegende CLI ist `generate_tiles --area <name> --format mbtiles --ch
 Format wäre `versatiles`, deshalb `--format mbtiles` explizit). `docker run` ohne Args startet einen
 interaktiven Wizard.
 
+## Adressindex (LLH-1119)
+Zu jeder Region baut der karten-service aus demselben OSM-Extrakt einen **Offline-Adressindex**
+(`osm.<area>.adressen.sqlite`, SQLite mit FTS5 und R*-Baum: Straße, Hausnummer, PLZ, Ort, Ortsteil,
+Koordinate). Damit findet der Hub Adressen ohne Internet. Er geht neben der Karte hoch
+(`<slug>.<datum>.adressen.sqlite`) und steht mit `url`, `groesse` und `sha256` im Manifest
+(`adressindex`); der Hub lädt ihn mit der Region. Scheitert sein Bau, erscheint die Region ohne
+Index (Warnung im Log). Von Hand nach einem `make tiles`:
+
+    make adressen AREA=bremen      # braucht das karten-service-Binary im PATH (KARTEN_SERVICE=…)
+
+Format und Normalisierung: `crates/karten-katalog/src/adressindex.rs`.
+
 ## Publizieren
 Die erzeugte `out/result/osm*.mbtiles` an eine stabile HTTPS-URL / als GitHub-Release laden, dann
 in `src/config.rs::default_offline_katalog()` den Platzhalter-Eintrag ersetzen: `url` (die

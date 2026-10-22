@@ -70,6 +70,7 @@ mod tests {
                 datei: self.0.clone(),
                 sha256: "c".repeat(64),
                 bounds: Some((8.9, 47.2, 13.9, 50.6)),
+                adressindex: None,
             })
         }
     }

@@ -15,7 +15,10 @@ IMAGE  := versatiles/versatiles-planetiler:latest
 # findet nichts. Ohne Container ist beides derselbe Pfad, der Default ändert daher nichts.
 HOST_OUT ?= $(CURDIR)/$(OUT)
 
-.PHONY: tiles validate
+# LLH-1119: Binary des karten-service (Subkommando `adressindex`); im Abbild liegt es im PATH.
+KARTEN_SERVICE ?= karten-service
+
+.PHONY: tiles validate adressen
 tiles:
 	mkdir -p "$(CURDIR)/$(OUT)"
 	# LFH-200: Der geteilte sources-Cache (`out/sources/`) darf pro Build nur die AKTUELLE Region als
@@ -44,3 +47,13 @@ validate:
 	echo "Datei: $$f"; \
 	sqlite3 "$$f" "SELECT 'tiles=' || count(*) FROM tiles;"; \
 	sqlite3 "$$f" "SELECT name||'='||substr(value,1,120) FROM metadata WHERE name IN ('format','minzoom','maxzoom','json');"
+
+# LLH-1119: Offline-Adressindex aus dem Region-Extrakt, den `tiles` in out/sources/ hinterlässt
+# (nicht renumbered.osm.pbf). Der karten-service baut ihn im Regionenbau selbst mit
+# (`MakeRunner::baue_adressindex`); dieses Ziel ist der Handweg, etwa nach einem `make tiles`.
+adressen:
+	@pbf=$$(ls -t "$(CURDIR)/$(OUT)"/sources/*.osm.pbf 2>/dev/null | grep -v '/renumbered.osm.pbf$$' | head -1); \
+	if [ -z "$$pbf" ]; then pbf=$$(ls "$(CURDIR)/$(OUT)"/sources/renumbered.osm.pbf 2>/dev/null); fi; \
+	if [ -z "$$pbf" ]; then echo "kein Region-Extrakt in $(OUT)/sources/ — erst 'make tiles AREA=$(AREA)'"; exit 1; fi; \
+	mkdir -p "$(CURDIR)/$(OUT)/result"; \
+	$(KARTEN_SERVICE) adressindex --pbf "$$pbf" --out "$(CURDIR)/$(OUT)/result/osm.$(AREA).adressen.sqlite"

@@ -151,6 +151,7 @@ mod tests {
             quelle: "Eigen-Service".into(),
             sha256: Some("a".repeat(64)),
             gruppe: Some("Bundesländer".into()),
+            adressindex: None,
         };
         let mut mix = default_offline_katalog();
         mix.push(gebaut);
@@ -192,6 +193,7 @@ mod tests {
             quelle: "mirror".into(),
             sha256: Some("c".repeat(64)),
             gruppe: Some("DACH".into()),
+            adressindex: None,
         }]);
         let out = merge_mit_cache(&cache);
         let dach = out.iter().find(|e| e.name == "DACH (DE/AT/CH)").unwrap();

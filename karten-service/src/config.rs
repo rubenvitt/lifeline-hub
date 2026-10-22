@@ -38,4 +38,14 @@ pub enum Command {
         #[arg(long)]
         all: bool,
     },
+    /// Baut nur den Offline-Adressindex (LLH-1119) aus einem OSM-Extrakt, ohne Storage und ohne
+    /// Karte (`make adressen` in `karten-build/`).
+    Adressindex {
+        /// Region-Extrakt (`.osm.pbf`).
+        #[arg(long)]
+        pbf: PathBuf,
+        /// Zieldatei (`<region>.adressen.sqlite`); eine vorhandene wird ersetzt.
+        #[arg(long)]
+        out: PathBuf,
+    },
 }

@@ -998,6 +998,7 @@ mod update_check_tests {
             quelle: "t".into(),
             sha256,
             gruppe: None,
+            adressindex: None,
         }
     }
 

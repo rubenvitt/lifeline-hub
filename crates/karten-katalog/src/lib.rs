@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+pub mod adressindex;
+pub use adressindex::AdressindexEintrag;
+
 /// Ein kuratierter, herunterladbarer Offline-Karten-Vorschlag (LFH-181). `groesse` ist die
 /// UNGEFÄHRE Dateigröße in Bytes (für den Plattenplatz-Check vorab; die exakte Größe liefert
 /// die Content-Length bzw. der fertige Download). Einträge sind Shortbread-MBTiles (LFH-195)
@@ -21,6 +24,10 @@ pub struct OfflineKatalogEintrag {
     /// Optionale UX-Gruppe für die geführte Auswahl (z. B. „Deutschland", „DACH",
     /// „Bundesländer"). Rein für die Frontend-Gruppierung; `None` = ungruppiert (LFH-199).
     pub gruppe: Option<String>,
+    /// Offline-Adressindex der Region (LLH-1119), aus demselben OSM-Extrakt gebaut. Fehlt bei
+    /// älteren Manifesten und wenn der Index-Bau scheiterte; der Hub lädt ihn mit der Karte.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adressindex: Option<AdressindexEintrag>,
 }
 
 /// Adjacently-tagged Status eines karten-service-Build-Jobs (LFH-323, verschoben aus
@@ -173,6 +180,7 @@ mod tests {
             quelle: "t".into(),
             sha256: None,
             gruppe: None,
+            adressindex: None,
         };
         assert!(!remote_eintrag_ist_gueltig(&e));
     }
@@ -188,7 +196,32 @@ mod tests {
             quelle: "t".into(),
             sha256: Some("a".repeat(64)),
             gruppe: None,
+            adressindex: None,
         }
+    }
+
+    /// LLH-1119: ein Manifest ohne `adressindex` (älterer karten-service) bleibt lesbar, und ein
+    /// Eintrag ohne Index schreibt das Feld nicht.
+    #[test]
+    fn adressindex_ist_rueckwaerts_vertraeglich() {
+        let alt = r#"{"name":"X","url":"https://e/x.mbtiles","region":"X","groesse":1,
+            "lizenz":"l","kachel_schema":"shortbread","quelle":"q","sha256":null,"gruppe":null}"#;
+        let e: OfflineKatalogEintrag = serde_json::from_str(alt).unwrap();
+        assert_eq!(e.adressindex, None);
+        let js = serde_json::to_value(&e).unwrap();
+        assert!(!js.as_object().unwrap().contains_key("adressindex"), "{js}");
+
+        let mit = OfflineKatalogEintrag {
+            adressindex: Some(AdressindexEintrag {
+                url: "https://e/x.20260705.adressen.sqlite".into(),
+                groesse: 42,
+                sha256: "a".repeat(64),
+            }),
+            ..e
+        };
+        let zurueck: OfflineKatalogEintrag =
+            serde_json::from_str(&serde_json::to_string(&mit).unwrap()).unwrap();
+        assert_eq!(zurueck.adressindex, mit.adressindex);
     }
 
     #[test]

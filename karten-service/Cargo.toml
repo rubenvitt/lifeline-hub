@@ -28,6 +28,10 @@ tokio-cron-scheduler = "0.15"
 uuid = "1"
 async-trait = "0.1"
 bytes = "1"
+# LLH-1119: Adressindex aus dem Region-Extrakt. Beide liegen über den Hub schon im Lockfile;
+# `sqlite` bündelt SQLite samt FTS5 und R*-Baum (libsqlite3-sys `bundled`).
+osmpbf = "0.3"
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "sqlite"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }

@@ -1,12 +1,14 @@
 pub mod make_runner;
 pub mod validate;
 use crate::jobs::{JobStatus, Registry};
-use crate::manifest::{baue_manifest, datei_key, published_aus_eintrag, PublishedVersion};
+use crate::manifest::{
+    adressindex_key, baue_manifest, datei_key, published_aus_eintrag, PublishedVersion,
+};
 use crate::regions::Region;
 use crate::storage::Storage;
 use async_trait::async_trait;
 use chrono::NaiveDate;
-use karten_katalog::OfflineKatalogEintrag;
+use karten_katalog::{AdressindexEintrag, OfflineKatalogEintrag};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -14,6 +16,8 @@ pub struct BuildArtefakt {
     pub datei: PathBuf,
     pub sha256: String,
     pub bounds: Option<(f64, f64, f64, f64)>,
+    /// Offline-Adressindex aus demselben Extrakt (LLH-1119); `None`, wenn sein Bau scheiterte.
+    pub adressindex: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -51,6 +55,9 @@ pub async fn build_region(
         })??;
     let ergebnis = lade_hoch(reg, heute, &art, storage, bestand).await;
     entferne_artefakt(&art.datei).await;
+    if let Some(index) = &art.adressindex {
+        entferne_datei(index).await;
+    }
     ergebnis
 }
 
@@ -78,13 +85,44 @@ async fn lade_hoch(
         .filter(|v| v.slug != reg.slug)
         .cloned()
         .collect();
+    // LLH-1119 (D5): Der Adressindex geht nach der Karte hoch; scheitert er, erscheint die Region
+    // ohne Index im Manifest, die Karte wird trotzdem veröffentlicht.
+    let adressindex = match &art.adressindex {
+        Some(datei) => match lade_adressindex_hoch(reg, heute, datei, storage).await {
+            Ok(e) => Some(e),
+            Err(e) => {
+                tracing::warn!(slug = reg.slug, "Adressindex nicht veröffentlicht: {e}");
+                None
+            }
+        },
+        None => None,
+    };
     out.push(PublishedVersion {
         slug: reg.slug.into(),
         url: storage.public_url(&key),
         groesse,
         sha256: art.sha256.clone(),
+        adressindex,
     });
     Ok(out)
+}
+
+async fn lade_adressindex_hoch(
+    reg: &Region,
+    heute: NaiveDate,
+    datei: &Path,
+    storage: &dyn Storage,
+) -> anyhow::Result<AdressindexEintrag> {
+    let key = adressindex_key(reg.slug, heute);
+    let groesse = tokio::fs::metadata(datei).await?.len() as i64;
+    let d = datei.to_path_buf();
+    let sha256 = tokio::task::spawn_blocking(move || make_runner::sha256_datei(&d)).await??;
+    storage.put_datei(&key, datei).await?;
+    Ok(AdressindexEintrag {
+        url: storage.public_url(&key),
+        groesse,
+        sha256,
+    })
 }
 
 /// Löscht die Ergebnisdatei und ihre Beilagen (`.sha256` aus `--checksum`, die ungenutzte
@@ -95,11 +133,15 @@ async fn entferne_artefakt(datei: &Path) {
     pfade.push(beilage(&versatiles, ".sha256"));
     pfade.push(versatiles);
     for p in pfade {
-        match tokio::fs::remove_file(&p).await {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => tracing::warn!(pfad = %p.display(), "Ergebnisdatei nicht gelöscht: {e}"),
-        }
+        entferne_datei(&p).await;
+    }
+}
+
+async fn entferne_datei(p: &Path) {
+    match tokio::fs::remove_file(p).await {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => tracing::warn!(pfad = %p.display(), "Ergebnisdatei nicht gelöscht: {e}"),
     }
 }
 
@@ -188,6 +230,7 @@ mod tests {
                 datei: self.0.clone(),
                 sha256: "a".repeat(64),
                 bounds: Some((8.9, 47.2, 13.9, 50.6)),
+                adressindex: None,
             })
         }
     }
@@ -204,6 +247,7 @@ mod tests {
                 datei: self.0.clone(),
                 sha256: "a".repeat(64),
                 bounds: Some((9.5, 46.3, 17.2, 49.1)),
+                adressindex: None,
             })
         }
     }
@@ -240,6 +284,7 @@ mod tests {
                 datei,
                 sha256: "a".repeat(64),
                 bounds: Some(self.bounds),
+                adressindex: None,
             })
         }
     }
@@ -277,6 +322,79 @@ mod tests {
         assert!(build_region(by, d, &runner, &s, &[]).await.is_err());
         assert_eq!(dateien(dir.path()), Vec::<String>::new());
     }
+    /// LLH-1119: Der Adressindex geht neben der Karte hoch und steht mit Größe und Prüfsumme im
+    /// Bestand; danach ist er lokal weg.
+    #[tokio::test]
+    async fn adressindex_geht_mit_hoch() {
+        let dir = tempfile::tempdir().unwrap();
+        let karte = dir.path().join("osm.bayern.2026-07-05.mbtiles");
+        std::fs::write(&karte, [9; 10]).unwrap();
+        let index = dir.path().join("osm.bayern.adressen.sqlite");
+        std::fs::write(&index, b"abc").unwrap();
+        struct MitIndex(std::path::PathBuf, std::path::PathBuf);
+        #[async_trait::async_trait]
+        impl BuildRunner for MitIndex {
+            async fn baue(&self, _a: &str) -> anyhow::Result<BuildArtefakt> {
+                Ok(BuildArtefakt {
+                    datei: self.0.clone(),
+                    sha256: "a".repeat(64),
+                    bounds: Some((8.9, 47.2, 13.9, 50.6)),
+                    adressindex: Some(self.1.clone()),
+                })
+            }
+        }
+        let s = FakeStorage::neu("https://cdn.example/maps");
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 7, 5).unwrap();
+        let by = regions::finde("bayern").unwrap();
+        let neu = build_region(by, d, &MitIndex(karte, index), &s, &[])
+            .await
+            .unwrap();
+        let v = neu.iter().find(|v| v.slug == "bayern").unwrap();
+        let a = v.adressindex.as_ref().expect("Adressindex im Bestand");
+        assert_eq!(
+            a.url,
+            "https://cdn.example/maps/bayern.20260705.adressen.sqlite"
+        );
+        assert_eq!(a.groesse, 3);
+        // sha256("abc")
+        assert_eq!(
+            a.sha256,
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            s.inhalt("bayern.20260705.adressen.sqlite").as_deref(),
+            Some(&b"abc"[..])
+        );
+        assert_eq!(dateien(dir.path()), Vec::<String>::new());
+    }
+
+    /// LLH-1119 (D5): Ein unbrauchbarer Index hält die Karte nicht auf.
+    #[tokio::test]
+    async fn fehlender_adressindex_haelt_die_karte_nicht_auf() {
+        let f = tempdatei(&[9; 10]);
+        struct KaputterIndex(std::path::PathBuf);
+        #[async_trait::async_trait]
+        impl BuildRunner for KaputterIndex {
+            async fn baue(&self, _a: &str) -> anyhow::Result<BuildArtefakt> {
+                Ok(BuildArtefakt {
+                    datei: self.0.clone(),
+                    sha256: "a".repeat(64),
+                    bounds: Some((8.9, 47.2, 13.9, 50.6)),
+                    adressindex: Some("/gibt/es/nicht.adressen.sqlite".into()),
+                })
+            }
+        }
+        let s = FakeStorage::neu("https://cdn.example/maps");
+        let d = chrono::NaiveDate::from_ymd_opt(2026, 7, 5).unwrap();
+        let by = regions::finde("bayern").unwrap();
+        let neu = build_region(by, d, &KaputterIndex(f.path().into()), &s, &[])
+            .await
+            .unwrap();
+        let v = neu.iter().find(|v| v.slug == "bayern").unwrap();
+        assert!(v.adressindex.is_none());
+        assert!(s.inhalt("bayern.20260705.shortbread.mbtiles").is_some());
+    }
+
     #[tokio::test]
     async fn falschregion_bricht_ab_ohne_upload() {
         let f = tempdatei(&[9; 10]);
@@ -304,6 +422,7 @@ mod fahrt_tests {
                 datei: self.0.clone(),
                 sha256: "c".repeat(64),
                 bounds: Some((8.9, 47.2, 13.9, 50.6)),
+                adressindex: None,
             })
         }
     }
@@ -318,6 +437,7 @@ mod fahrt_tests {
             url: "https://cdn.example/maps/germany.20260101.shortbread.mbtiles".into(),
             groesse: 3,
             sha256: "d".repeat(64),
+            adressindex: None,
         }]));
         let id = {
             let r = Registry::neu(4);
