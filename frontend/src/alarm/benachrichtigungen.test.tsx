@@ -313,6 +313,16 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     expect(s.abgerufen).toEqual([]);
   });
 
+  it('Stufe still: kein Toast, kein Ton, kein Abruf — sie steht nur im Verlauf (LLH-1143)', async () => {
+    const s = serverMit([]);
+    renderZentrale();
+    live(benachrichtigung(43, 'auftrag_erteilt', 'auftrag', 12, { stufe: 'still' }));
+    await act(async () => {});
+    expect(s.abgerufen).toEqual([]);
+    expect(screen.queryByText('Neuer Auftrag')).not.toBeInTheDocument();
+    expect(ton).not.toHaveBeenCalled();
+  });
+
   it('ohne Text vom Server (Netzfehler) steht der Name der Art mit Sprung ins Modul', async () => {
     server.use(http.get('/api/benachrichtigungen/:id', () => HttpResponse.error()));
     renderZentrale();

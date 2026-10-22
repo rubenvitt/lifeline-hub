@@ -9,7 +9,6 @@ import {
   berechneUnwetterZaehler,
   bildeZaehler,
   darfZaehlerZeigen,
-  unbearbeiteteMeldungen,
   ZAEHLER_QUELLEN,
 } from './useModulZaehler';
 import { freigabenFixture } from '../test/fixtures';
@@ -172,17 +171,6 @@ describe('Modul-Zähler', () => {
     const ohneEvak = freigabenFixture({ evakuierung: { sichtbar: false, zugriff: false } });
     expect(darfZaehlerZeigen('evakuierung', ohneEvak)).toBe(false);
     expect(darfZaehlerZeigen('betreuung', ohneEvak)).toBe(true);
-  });
-
-  it('unbearbeitete Meldungen für Tab-Titel und Badge: Status Neu, nur bei freiem Modul (LLH-1062)', () => {
-    const antwort = { meldungen: { offen: 5, ungesehen: 3 } } as Parameters<
-      typeof unbearbeiteteMeldungen
-    >[0];
-    expect(unbearbeiteteMeldungen(antwort, freigabenFixture())).toBe(3);
-    const versteckt = freigabenFixture({ meldungen: { sichtbar: false, zugriff: false } });
-    expect(unbearbeiteteMeldungen(antwort, versteckt)).toBe(0);
-    expect(unbearbeiteteMeldungen(undefined, freigabenFixture())).toBe(0);
-    expect(unbearbeiteteMeldungen({} as typeof antwort, freigabenFixture())).toBe(0);
   });
 
   it('zählt Unwetterwarnungen am Einsatzort — nur schwer/extrem, nie 0 ohne Stand (LFH-663)', () => {

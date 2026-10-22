@@ -166,6 +166,8 @@ export function useBenachrichtigungen(
       // Die Push-Meldung (LLH-1223) steht unabhängig davon, welche Zentrale sie zeigen würde.
       if (e.quittiert) void schliessePushMeldungen(e.benachrichtigung_id);
       if (!passt(e, einsatzId)) return;
+      // Stufe still (LLH-1143, design.md D2): steht nur im Verlauf, kein Toast, kein Ton.
+      if (e.stufe === 'still') return;
       const id = e.benachrichtigung_id;
       if (e.quittiert) {
         quittiert.add(id);

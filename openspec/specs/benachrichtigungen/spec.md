@@ -376,16 +376,22 @@ zeigen, auf der Seite Lagemeldungen keine Übernahmen; dort trägt das Sammelban
 - **WHEN** eine dringende Meldung eingeht, während Person A die Seite Meldungen offen hat
 - **THEN** erscheint kein Hinweis und kein Ton; das Sammelbanner der Seite trägt die Meldung
 
-### Requirement: Unbearbeitete Meldungen im Tab-Titel
+### Requirement: Ungelesene Eingänge im Tab-Titel
 
-Der Tab-Titel eines Einsatzes SHALL die Zahl der Meldungen im Status Neu voranstellen, „(3)
-Lagekarte · Einsatz · lifeline-hub“, sofern das Modul Meldungen sichtbar und frei ist. Wo der
-Browser es kann, MUST dieselbe Zahl am Symbol der installierten App stehen. Ohne unbearbeitete
-Meldungen entfällt die Zahl.
+Der Tab-Titel eines Einsatzes SHALL die Zahl der ungelesenen Eingänge der angemeldeten Person
+voranstellen, „(3) Lagekarte · Einsatz · lifeline-hub“: dieselbe Zahl wie am Knopf „Eingänge“
+(Stufe Hinweis, nicht quittiert; Alarme und Stilles zählen nicht). Wo der Browser es kann, MUST
+dieselbe Zahl am Symbol der installierten App stehen. Ohne ungelesene Eingänge entfällt die Zahl.
+Der Knopf „Eingänge“ MUST die Zahl auch im zugänglichen Namen tragen („Eingänge, 3 ungelesen“),
+nie nur als Ziffer.
 
 #### Scenario: Stiller Eingang
-- **WHEN** drei Meldungen mit Priorität normal von Hand erfasst werden und noch niemand sie gesichtet hat
-- **THEN** beginnt der Tab-Titel mit „(3)“, ohne Ton und ohne Hinweis
+- **WHEN** drei Meldungen mit Priorität normal von Hand erfasst werden und Person B keine davon geöffnet hat
+- **THEN** beginnt Bs Tab-Titel mit „(3)“, und der Knopf „Eingänge“ heißt „Eingänge, 3 ungelesen“
+
+#### Scenario: Gelesen auf einem anderen Gerät
+- **WHEN** Person B auf dem Telefon „Alle gelesen“ wählt
+- **THEN** entfällt die Zahl auch im Tab-Titel ihres Laptops, ohne Neuladen
 
 ### Requirement: Lagemeldung schlägt S2 vor
 

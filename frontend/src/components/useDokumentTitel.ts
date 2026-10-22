@@ -6,7 +6,7 @@ const MARKE = 'lifeline-hub';
 /**
  * Tab-Titel aus Teilen, vom engsten zum weitesten Ort: „ETB · Starkregen Nord · lifeline-hub“.
  * Leere Teile fallen weg (der Einsatz lädt noch) — rein und exportiert. `zahl` steht vorn in
- * Klammern, „(3) ETB · …“: die unbearbeiteten Meldungen (LLH-1062), sichtbar auch im
+ * Klammern, „(3) ETB · …“: die ungelesenen Eingänge (LLH-1062, LLH-1143), sichtbar auch im
  * Hintergrund-Tab. 0 und nichts lassen sie weg.
  */
 export function dokumentTitel(
