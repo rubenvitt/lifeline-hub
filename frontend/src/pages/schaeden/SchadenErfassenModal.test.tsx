@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
@@ -7,6 +7,34 @@ import { useState } from 'react';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import SchadenErfassenModal from './SchadenErfassenModal';
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({
+    punkt,
+    etikett,
+  }: {
+    punkt: { lat: number; lon: number } | null;
+    etikett: string;
+  }) => (
+    <div role="group" aria-label={`Karte: ${etikett}`}>
+      {punkt && `${punkt.lat},${punkt.lon}`}
+    </div>
+  ),
+}));
+
+/** Einsatzkopf (Umgebung „Auf Karte wählen“) und Ort-Zeile des Schadensorts. */
+beforeEach(() => {
+  server.use(
+    http.get('/api/einsaetze/:eid', ({ params }) =>
+      HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
+    ),
+    http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+      HttpResponse.json({ ortsname: null, peilung: null }),
+    ),
+  );
+  sessionStorage.clear();
+});
 
 function oeffne() {
   server.use(
@@ -47,9 +75,21 @@ describe('SchadenErfassenModal — Eingabegrenzen (LFH-937)', () => {
     expect(kopf).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('begrenzt den Ort auf 500 Zeichen', async () => {
+  it('sperrt einen Ort über 500 Zeichen, ohne ihn zu kürzen', async () => {
+    const gesendet = vi.fn();
+    server.use(
+      http.post('/api/einsaetze/1/schaeden', () => {
+        gesendet();
+        return HttpResponse.json({ id: 1 }, { status: 201 });
+      }),
+    );
     oeffne();
-    expect(await screen.findByLabelText('Ort')).toHaveAttribute('maxlength', '500');
+    const ort = await screen.findByLabelText('Ort');
+    fireEvent.change(ort, { target: { value: 'o'.repeat(501) } });
+    expect(ort).toHaveValue('o'.repeat(501));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    expect(await screen.findByText('Ort darf höchstens 500 Zeichen lang sein')).toBeInTheDocument();
+    expect(gesendet).not.toHaveBeenCalled();
   });
 });
 
@@ -273,5 +313,166 @@ describe('SchadenErfassenModal — Gefahr und Schadensgrad (LLH-1115)', () => {
     await waitFor(() => expect(gesendet).toBeDefined());
     expect(gesendet!.gefahrenart).toBeNull();
     expect(gesendet!.schadensgrad).toBeNull();
+  });
+});
+
+/**
+ * Schadensort über das Ortsfeld (LLH-1121, Spec `ortsfeld`): ein gewählter Treffer verortet den
+ * Schaden, ohne Auswahl bleibt er nicht verortet. Die Koordinate kommt nur noch über das Ortsfeld.
+ */
+describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', () => {
+  async function waehle(dialog: HTMLElement, feld: string, eintrag: string) {
+    await userEvent.click(within(dialog).getByLabelText(feld));
+    const option = (await screen.findAllByText(eintrag)).find((el) =>
+      el.closest('.ant-select-item-option'),
+    );
+    await userEvent.click(option!);
+  }
+
+  function mitschnitt() {
+    const gesendet: Record<string, unknown>[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/ort-suche', () =>
+        HttpResponse.json({
+          zustand: 'ok',
+          treffer: [
+            {
+              name: 'Hauptstraße 17, 12345 Musterstadt, Niedersachsen, Deutschland',
+              kurz: 'Hauptstraße 17, 12345 Musterstadt',
+              lat: 52.3,
+              lon: 9.7,
+            },
+          ],
+        }),
+      ),
+      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+        gesendet.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json({ id: 1 }, { status: 201 });
+      }),
+    );
+    return gesendet;
+  }
+
+  async function pflichtfelder(dialog: HTMLElement) {
+    await waehle(dialog, 'Typ', 'Sachschaden');
+    await waehle(dialog, 'Ausmaß', 'gering');
+  }
+
+  it('ein gewählter Treffer verortet den Schaden, der Text ist die gewählte Adresse', async () => {
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await pflichtfelder(dialog);
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17{Enter}');
+    await userEvent.click(
+      await within(dialog).findByRole('button', { name: /Hauptstraße 17, 12345 Musterstadt/ }),
+    );
+    expect(within(dialog).getByLabelText('Ort')).toHaveValue('Hauptstraße 17, 12345 Musterstadt');
+    expect(within(dialog).getByRole('group', { name: 'Karte: Schadensort' })).toHaveTextContent(
+      '52.3,9.7',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({
+      ort: 'Hauptstraße 17, 12345 Musterstadt',
+      lat: 52.3,
+      lon: 9.7,
+    });
+  });
+
+  it('ohne Auswahl bleibt der Schaden nicht verortet', async () => {
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await pflichtfelder(dialog);
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17');
+    expect(within(dialog).getByText('Nicht verortet')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ ort: 'Hauptstr. 17', lat: null, lon: null });
+  });
+
+  it('übernimmt eine getippte Koordinate', async () => {
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await pflichtfelder(dialog);
+    await userEvent.type(within(dialog).getByLabelText('Ort'), '52.512, 13.401');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ ort: '52.512, 13.401', lat: 52.512, lon: 13.401 });
+  });
+
+  it('der Ort ist Pflicht', async () => {
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await pflichtfelder(dialog);
+    await userEvent.type(within(dialog).getByLabelText('Ort'), '   ');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    expect(await within(dialog).findByText('Ort ist Pflicht')).toBeInTheDocument();
+    expect(gesendet).toHaveLength(0);
+  });
+
+  it('hat unter „Weitere Angaben“ kein eigenes Koordinatenfeld mehr', async () => {
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByText('Weitere Angaben'));
+    expect(within(dialog).queryByLabelText('Koordinate')).toBeNull();
+  });
+
+  it('„Werte behalten“ übernimmt Ort und Koordinate in den nächsten Schaden', async () => {
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
+    await pflichtfelder(dialog);
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17{Enter}');
+    await userEvent.click(
+      await within(dialog).findByRole('button', { name: /Hauptstraße 17, 12345 Musterstadt/ }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    await pflichtfelder(dialog);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
+    await waitFor(() => expect(gesendet).toHaveLength(2));
+    expect(gesendet[1]).toMatchObject({
+      ort: 'Hauptstraße 17, 12345 Musterstadt',
+      lat: 52.3,
+      lon: 9.7,
+    });
+  });
+
+  it('merkt Ort und Koordinate für das nächste Öffnen in der Sitzung', async () => {
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await pflichtfelder(dialog);
+    await userEvent.type(within(dialog).getByLabelText('Ort'), 'Hauptstr. 17{Enter}');
+    await userEvent.click(
+      await within(dialog).findByRole('button', { name: /Hauptstraße 17, 12345 Musterstadt/ }),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort')).toBe(
+      'Hauptstraße 17, 12345 Musterstadt',
+    );
+    expect(sessionStorage.getItem('lfh:erfassung:1:schaden:ort_koordinate')).toBe('52.3,9.7');
+  });
+
+  it('setzt einen gemerkten Ort mit Koordinate beim Öffnen ein', async () => {
+    sessionStorage.setItem('lfh:erfassung:1:schaden:ort', 'Marktplatz');
+    sessionStorage.setItem('lfh:erfassung:1:schaden:ort_koordinate', '52.3,9.7');
+    const gesendet = mitschnitt();
+    oeffne();
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(within(dialog).getByLabelText('Ort')).toHaveValue('Marktplatz'));
+    expect(within(dialog).getByRole('group', { name: 'Karte: Schadensort' })).toHaveTextContent(
+      '52.3,9.7',
+    );
+    await pflichtfelder(dialog);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(gesendet).toHaveLength(1));
+    expect(gesendet[0]).toMatchObject({ ort: 'Marktplatz', lat: 52.3, lon: 9.7 });
   });
 });

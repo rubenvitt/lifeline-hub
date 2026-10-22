@@ -84,39 +84,42 @@ export default function SchadenDaten({
         'Schadensgrad',
         s.schadensgrad ? SCHADENSGRAD_LABEL[s.schadensgrad] : '—',
       )}
-      {zelle('ort', 'Ort', s.ort)}
+      {/* Beim Bearbeiten breit: das Ortsfeld trägt die Kartenvorschau (LLH-1121). */}
+      {zelle('ort', 'Ort', s.ort, eingabe?.ort != null)}
       {zelle('beschreibung', 'Beschreibung', s.beschreibung || '—', true)}
       {/* Verortung sichtbar machen: eine unverortete Lage, die niemand als unverortet sieht, ist
-          so gut wie nicht erfasst. Keine Koordinateneingabe hier (`SchadenEingabe` kennt kein
-          lat/lon, LFH-453), der Weg ist der Auftrag an die Karte. */}
-      <Datenfeld label="Verortung">
-        {s.lat != null && s.lon != null ? (
-          <KoordinatenAnzeige
-            lat={s.lat}
-            lon={s.lon}
-            einsatzId={ortZeile ? einsatzId : undefined}
-          />
-        ) : (
-          <Space wrap>
-            <Typography.Text type="secondary">nicht verortet</Typography.Text>
-            {verortenLink &&
-              (karteGesperrt ? (
-                <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
-                  Auf Karte verorten
-                </Button>
-              ) : (
-                // Mit Herkunft: „Zurück zu S-…“ führt danach hierher (LLH-1125).
-                <Link
-                  to={lagekartePfad(einsatzId, {
-                    platzieren: { typ: 'schaden', id: s.id, zurueck: true },
-                  })}
-                >
-                  Auf Karte verorten
-                </Link>
-              ))}
-          </Space>
-        )}
-      </Datenfeld>
+          so gut wie nicht erfasst. Beim Bearbeiten entfällt die Zelle: das Ortsfeld zeigt den
+          Punkt in seiner Vorschau (LLH-1121). */}
+      {eingabe?.ort == null && (
+        <Datenfeld label="Verortung">
+          {s.lat != null && s.lon != null ? (
+            <KoordinatenAnzeige
+              lat={s.lat}
+              lon={s.lon}
+              einsatzId={ortZeile ? einsatzId : undefined}
+            />
+          ) : (
+            <Space wrap>
+              <Typography.Text type="secondary">nicht verortet</Typography.Text>
+              {verortenLink &&
+                (karteGesperrt ? (
+                  <Button type="link" disabled title={KEINE_BERECHTIGUNG}>
+                    Auf Karte verorten
+                  </Button>
+                ) : (
+                  // Mit Herkunft: „Zurück zu S-…“ führt danach hierher (LLH-1125).
+                  <Link
+                    to={lagekartePfad(einsatzId, {
+                      platzieren: { typ: 'schaden', id: s.id, zurueck: true },
+                    })}
+                  >
+                    Auf Karte verorten
+                  </Link>
+                ))}
+            </Space>
+          )}
+        </Datenfeld>
+      )}
       {zelle('geschaedigt', 'Geschädigt', geschaedigtAnzeige(s, einsatzId), true)}
       {s.status !== 'offen' && <Datenfeld label="Übergeben an">{s.uebergeben_an || '—'}</Datenfeld>}
       {s.status === 'abgeschlossen' && (

@@ -16,7 +16,20 @@ import * as dateiSpeichern from '../components/dateiSpeichern';
 beforeEach(() => {
   vi.stubGlobal('EventSource', FakeEventSource);
   sessionStorage.clear();
+  // Ort-Zeile unter dem Schadensort (LLH-1121).
+  server.use(
+    http.get('/api/einsaetze/:eid/ort-vorschau', () =>
+      HttpResponse.json({ ortsname: null, peilung: null }),
+    ),
+  );
 });
+
+// MapLibre läuft in jsdom nicht; der Ausschnitt hat eigene Tests (`anzeige/Kartenausschnitt.test.tsx`).
+vi.mock('../anzeige/Kartenausschnitt', () => ({
+  Kartenausschnitt: ({ punkt }: { punkt: { lat: number; lon: number } | null }) => (
+    <div data-testid="kartenausschnitt">{punkt && `${punkt.lat},${punkt.lon}`}</div>
+  ),
+}));
 afterEach(() => vi.unstubAllGlobals());
 
 // Normaler Benutzer (kein System-Admin): geprüft wird die Einsatz-Rolle; dass die Systemrolle
@@ -206,7 +219,7 @@ async function oeffneWeitereAngaben(dialog: HTMLElement) {
   if (schalter.getAttribute('aria-expanded') === 'false') await userEvent.click(schalter);
   // jsdom beendet die opacity-Animation nicht selbst. Die Rolle prüft, dass der Inhalt nicht mehr
   // aus dem Zugänglichkeitsbaum verborgen ist.
-  await within(dialog).findByRole('textbox', { name: 'Koordinate' });
+  await within(dialog).findByRole('textbox', { name: 'Beschreibung' });
 }
 
 describe('SchaedenPage', () => {
@@ -294,14 +307,13 @@ describe('SchaedenPage', () => {
       render(einsatzAktiv, schaeden);
       await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
       const dialog = await modalDialog();
-      await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
-      if (mitKoordinate) {
-        await oeffneWeitereAngaben(dialog);
-        await userEvent.type(
-          within(dialog).getByPlaceholderText('Koordinate eingeben'),
-          '52.1, 8.5',
-        );
-      }
+      // Die Koordinate kommt über das Ortsfeld (LLH-1121): getippt wird sie erkannt.
+      await fuelleSchaden(
+        dialog,
+        'Sachschaden',
+        'gering',
+        mitKoordinate ? '52.100, 8.500' : 'Hauptstr. 17',
+      );
       await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
       await warteBisDialogWeg();
 
@@ -331,18 +343,18 @@ describe('SchaedenPage', () => {
         (feld) => !isInaccessible(feld),
       );
     expect(sichtbareFelder()).toHaveLength(4);
-    expect(within(dialog).queryByPlaceholderText('Koordinate eingeben')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Beschreibung' })).not.toBeInTheDocument();
 
     const weitereAngaben = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
     expect(weitereAngaben).toHaveAttribute('aria-expanded', 'false');
     await oeffneWeitereAngaben(dialog);
-    expect(within(dialog).getByRole('textbox', { name: 'Koordinate' })).toBeInTheDocument();
-    // Aufgeklappt: Beschreibung, Schadensgrad (LLH-1115), Geschädigt, Koordinate.
-    expect(sichtbareFelder()).toHaveLength(8);
-    await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
+    // Aufgeklappt: Beschreibung, Schadensgrad (LLH-1115), Geschädigt. Die Koordinate kommt über
+    // das Ortsfeld (LLH-1121).
+    expect(sichtbareFelder()).toHaveLength(7);
+    await userEvent.type(within(dialog).getByLabelText('Beschreibung'), 'Dachziegel');
 
     const panel = within(dialog)
-      .getByRole('textbox', { name: 'Koordinate' })
+      .getByRole('textbox', { name: 'Beschreibung' })
       .closest('.ant-collapse-panel')!;
     await userEvent.click(weitereAngaben);
     await waitFor(() => {
@@ -354,9 +366,7 @@ describe('SchaedenPage', () => {
       expect(sichtbareFelder()).toHaveLength(4);
     });
     await oeffneWeitereAngaben(dialog);
-    expect(within(dialog).getByPlaceholderText('Koordinate eingeben')).toHaveValue(
-      '52.10000, 8.50000',
-    );
+    expect(within(dialog).getByLabelText('Beschreibung')).toHaveValue('Dachziegel');
   });
 
   it('zeigt offene Schäden mit S-Nummer, Typ und Ausmaß', async () => {
@@ -469,7 +479,7 @@ describe('SchaedenPage', () => {
    * Beide Absendungen: nur `koerper[1] === null` wäre auch grün, wenn die Zuordnung nie angekommen
    * wäre — erst die 42 in `koerper[0]` macht daraus „geleert".
    */
-  it('Serien-Speichern trägt Geschädigten und Koordinate NICHT in den nächsten Schaden', async () => {
+  it('Serien-Speichern trägt den Geschädigten NICHT, den verorteten Ort schon in den nächsten Schaden', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(
       http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
@@ -483,11 +493,10 @@ describe('SchaedenPage', () => {
     // „Werte behalten" an: der Ort wandert mit (Übernahme), der Geschädigte nicht (lokaler State).
     // Ohne den Schalter bewiese die zweite Hälfte nichts.
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Werte behalten' }));
-    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
+    await fuelleSchaden(dialog, 'Sachschaden', 'gering', '52.100, 8.500');
     await oeffneWeitereAngaben(dialog);
     await userEvent.click(within(dialog).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('R-007 · Anna Meier');
-    await userEvent.type(within(dialog).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Speichern und nächste' }));
     await waitFor(() => expect(koerper).toHaveLength(1));
 
@@ -502,46 +511,8 @@ describe('SchaedenPage', () => {
     expect(koerper[0].geschaedigt_person_id).toBe(42);
     expect(koerper[0]).toMatchObject({ lat: 52.1, lon: 8.5 });
     expect(koerper[1].geschaedigt_person_id).toBeNull();
-    expect(koerper[1].lat).toBeNull();
-    expect(koerper[1].lon).toBeNull();
-    expect(koerper[1].ort).toBe('Hauptstr. 17');
-  });
-
-  /**
-   * LFH-517: eine ungültige Koordinate sperrt das Anlegen. Sie liegt unter „Weitere Angaben“ —
-   * der Abschnitt bleibt deshalb offen, solange sie ungültig ist; sonst schlüge das Anlegen an
-   * einem verborgenen Feld fehl.
-   */
-  it('ungültige Koordinate legt nichts an und hält „Weitere Angaben“ offen', async () => {
-    const koerper: Record<string, unknown>[] = [];
-    server.use(
-      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
-        koerper.push((await request.json()) as Record<string, unknown>);
-        return HttpResponse.json(basisSchaden(), { status: 201 });
-      }),
-    );
-    render(einsatzAktiv, []);
-    await userEvent.click(await screen.findByRole('button', { name: 'Schaden erfassen' }));
-    const dialog = await modalDialog();
-    await fuelleSchaden(dialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
-    await oeffneWeitereAngaben(dialog);
-    const feld = within(dialog).getByRole('textbox', { name: 'Koordinate' });
-    await userEvent.type(feld, '52.1 8.5');
-    const schalter = within(dialog).getByRole('button', { name: /Weitere Angaben/ });
-    await userEvent.click(schalter);
-    expect(schalter).toHaveAttribute('aria-expanded', 'true');
-
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    expect(
-      await within(dialog).findByText('Ungültige Koordinate im Format WGS84 dezimal'),
-    ).toBeInTheDocument();
-    expect(koerper).toHaveLength(0);
-
-    await userEvent.clear(feld);
-    await userEvent.type(feld, '52.1, 8.5');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
-    await waitFor(() => expect(koerper).toHaveLength(1));
-    expect(koerper[0]).toMatchObject({ lat: 52.1, lon: 8.5 });
+    // Der Ort wandert mit seiner Koordinate (LLH-1121, design.md D4).
+    expect(koerper[1]).toMatchObject({ ort: '52.100, 8.500', lat: 52.1, lon: 8.5 });
   });
 
   it('„Anlegen" schließt den Dialog', async () => {
@@ -576,10 +547,6 @@ describe('SchaedenPage', () => {
     await oeffneWeitereAngaben(ersterDialog);
     expect(within(ersterDialog).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
     await fuelleSchaden(ersterDialog, 'Sachschaden', 'gering', 'Hauptstr. 17');
-    await userEvent.type(
-      within(ersterDialog).getByPlaceholderText('Koordinate eingeben'),
-      '52.1, 8.5',
-    );
     await userEvent.click(within(ersterDialog).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(versuche).toBe(1));
     await warteBisDialogWeg();
@@ -594,7 +561,7 @@ describe('SchaedenPage', () => {
       within(zweiterDialog).getByRole('checkbox', { name: 'Werte behalten' }),
     ).not.toBeChecked();
     expect(within(zweiterDialog).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
-    expect(within(zweiterDialog).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
+    expect(within(zweiterDialog).getByText('Nicht verortet')).toBeInTheDocument();
   });
 
   it('merkt den Ort bei einem fehlgeschlagenen Schaden nicht und lässt den Wortlaut stehen', async () => {
@@ -668,6 +635,7 @@ describe('SchaedenPage', () => {
     // Gemerkt vom angemeldeten Benutzer: ungebundene Werte verwirft die Anmeldung (LFH-785).
     erfassungsSitzungBinden(nutzer.id);
     sessionStorage.setItem('lfh:erfassung:1:schaden:ort', 'Schadenort A');
+    sessionStorage.setItem('lfh:erfassung:1:schaden:ort_koordinate', '52.1,8.5');
     sessionStorage.setItem('lfh:erfassung:2:schaden:ort', 'Schadenort B');
     server.use(
       meHandler(nutzer),
@@ -708,7 +676,6 @@ describe('SchaedenPage', () => {
     await userEvent.type(within(dialogA).getByLabelText('Beschreibung'), 'Nur Einsatz A');
     await userEvent.click(within(dialogA).getAllByRole('combobox')[GESCHAEDIGT]);
     await waehleOption('R-007 · Anna Meier');
-    await userEvent.type(within(dialogA).getByPlaceholderText('Koordinate eingeben'), '52.1, 8.5');
     await userEvent.click(screen.getByRole('button', { name: 'Zu Einsatz B' }));
 
     const dialogB = await modalDialog();
@@ -718,7 +685,7 @@ describe('SchaedenPage', () => {
     await oeffneWeitereAngaben(dialogB);
     expect(within(dialogB).getByLabelText('Beschreibung')).toHaveValue('');
     expect(within(dialogB).getAllByRole('combobox')[GESCHAEDIGT]).toHaveValue('');
-    expect(within(dialogB).getByPlaceholderText('Koordinate eingeben')).toHaveValue('');
+    expect(within(dialogB).getByText('Nicht verortet')).toBeInTheDocument();
   });
 
   it('Erfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {

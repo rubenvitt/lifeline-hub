@@ -3,6 +3,9 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { Alert, App, Breadcrumb, Button, Form, Input, Modal, Space, Spin } from 'antd';
 import { SCHADEN_BESCHREIBUNG_MAX, SCHADEN_ORT_MAX } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
+import { EinsatzOrtsfeld } from '../anzeige/EinsatzOrtsfeld';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
+import { ortFelder, ortRegeln, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { StatusChip, monoStil } from '../components/instrument';
 import { MenueAusloeser } from '../components/MenueAusloeser';
@@ -54,7 +57,10 @@ const AUSMASS_OPTIONS = (Object.keys(AUSMASS_META) as Ausmass[]).map((a) => ({
   label: AUSMASS_META[a].label,
 }));
 
-type EditWerte = SchadenPatch & { geschaedigt?: GeschaedigtWert };
+type EditWerte = Omit<SchadenPatch, 'ort' | 'lat' | 'lon'> & {
+  ort?: OrtsfeldWert;
+  geschaedigt?: GeschaedigtWert;
+};
 
 /**
  * Eine ändernde Aktion der Kopfleiste (LLH-1105, Vorbild `PersonenDetailPage.tsx`). Deskriptor statt
@@ -292,14 +298,18 @@ export default function SchaedenDetailPage() {
               ausmass: { feld: <Select style={{ minWidth: 160 }} options={AUSMASS_OPTIONS} /> },
               gefahrenart: { feld: <GefahrAuswahlImFormular /> },
               schadensgrad: { feld: <SchadensgradAuswahl /> },
+              // Ortsfeld mit Vorschau (LLH-1121): ein Treffer verortet, eine Textkorrektur behält
+              // einen gespeicherten Punkt (design.md D3).
               ort: {
                 feld: (
-                  <Input
-                    placeholder="z. B. Hauptstr. 17 oder L 235 km 12,5"
-                    maxLength={SCHADEN_ORT_MAX}
+                  <EinsatzOrtsfeld
+                    einsatzId={einsatzId}
+                    etikett="Schadensort"
+                    exclude={`schaden:${s.id}`}
+                    count={zeichenGrenze(SCHADEN_ORT_MAX)}
                   />
                 ),
-                rules: [{ required: true, message: 'Ort ist Pflicht' }],
+                rules: ortRegeln(SCHADEN_ORT_MAX, 'Ort', { meldung: 'Ort ist Pflicht' }),
               },
               // Eine ältere, längere Beschreibung bleibt stehen: der Zähler nennt die Überlänge,
               // Speichern scheitert an der Regel, bis gekürzt ist (LFH-937, design.md Risiken).
@@ -364,7 +374,7 @@ export default function SchaedenDetailPage() {
                   ausmass: s.ausmass,
                   gefahrenart: s.gefahrenart ?? null,
                   schadensgrad: s.schadensgrad ?? null,
-                  ort: s.ort,
+                  ort: ortsfeldAusGespeichert(s.ort, s.lat, s.lon),
                   beschreibung: s.beschreibung,
                   geschaedigt: geschaedigtAusSchaden(s),
                 });
@@ -394,13 +404,19 @@ export default function SchaedenDetailPage() {
           // Nach gescheiterter Prüfung steht der Fokus im ersten Feld mit Meldung (LLH-1101).
           scrollToFirstError={{ focus: true }}
           onFinish={(daten) => {
+            const ort = ortFelder(daten.ort);
+            const vorher = ortFelder(sitzung.werte.ort);
             const patch: SchadenPatch = {
               typ: daten.typ,
               ausmass: daten.ausmass,
               // Leeren heißt „keine Angabe“: `null` leert am Server (PATCH dreiwertig).
               gefahrenart: daten.gefahrenart ?? null,
               schadensgrad: daten.schadensgrad ?? null,
-              ort: daten.ort,
+              ort: ort.text ?? '',
+              // Das Paar nur bei Änderung: ein „Auf Karte verorten“ von anderswo bleibt sonst stehen.
+              ...(ort.lat !== vorher.lat || ort.lon !== vorher.lon
+                ? { lat: ort.lat, lon: ort.lon }
+                : {}),
               beschreibung: daten.beschreibung,
               // Geschädigt XOR: immer alle vier Felder explizit senden (das nicht gewählte ist null).
               ...geschaedigtFelder(daten.geschaedigt ?? null, orgId),

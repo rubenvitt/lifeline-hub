@@ -73,7 +73,7 @@ export interface OrtsfeldKarte {
 /** Vorgabehöhe der Vorschau unter dem Feld: klein, sie bestätigt den Ort. */
 const VORSCHAU_HOEHE = 160;
 
-interface OrtsfeldGemeinsam {
+export interface OrtsfeldGemeinsam {
   /**
    * Das Eingabefeld (React 19: `ref` als Prop). `Form.Item` reicht ihn herein; antds
    * `scrollToFirstError={{ focus: true }}` fokussiert darüber (LLH-1121).
