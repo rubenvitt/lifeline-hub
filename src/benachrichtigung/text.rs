@@ -57,7 +57,9 @@ pub const fn titel(art: BenachrichtigungArt) -> &'static str {
 pub const fn detail_quelle(typ: BenachrichtigungBezugTyp) -> Option<(&'static str, &'static str)> {
     match typ {
         BenachrichtigungBezugTyp::Einsatz => Some(("einsatz", "bezeichnung")),
-        BenachrichtigungBezugTyp::Meldung => Some(("meldung", "lfd_nr")),
+        BenachrichtigungBezugTyp::Meldung | BenachrichtigungBezugTyp::LageUebernahme => {
+            Some(("meldung", "lfd_nr"))
+        }
         BenachrichtigungBezugTyp::Auftrag => Some(("auftrag", "lfd_nr")),
         BenachrichtigungBezugTyp::Nachforderung => Some(("nachforderung", "status")),
         BenachrichtigungBezugTyp::Person => Some(("einsatz_person", "registrier_nr")),
@@ -188,10 +190,21 @@ async fn abloeser_text(
     })
 }
 
+/// Titel eines Hinweises, der sein Ereignis im Bezug trägt, ohne eigene Art (LLH-1062): die
+/// Übernahme in die Lage ist ein Hinweis der Art `meldung`. `None` für jeden anderen Bezug.
+pub const fn bezug_titel(typ: BenachrichtigungBezugTyp) -> Option<&'static str> {
+    match typ {
+        BenachrichtigungBezugTyp::LageUebernahme => Some("In die Lage übernommen"),
+        _ => None,
+    }
+}
+
 /// Formt den gelesenen Wert zur Detailzeile.
 fn detail_formen(typ: BenachrichtigungBezugTyp, wert: String) -> String {
     match typ {
-        BenachrichtigungBezugTyp::Meldung => format!("Meldung #{wert}"),
+        BenachrichtigungBezugTyp::Meldung | BenachrichtigungBezugTyp::LageUebernahme => {
+            format!("Meldung #{wert}")
+        }
         BenachrichtigungBezugTyp::Auftrag => format!("Auftrag #{wert}"),
         BenachrichtigungBezugTyp::Befehl | BenachrichtigungBezugTyp::Lagebericht => {
             format!("Version {wert}")
@@ -213,6 +226,8 @@ pub fn pfad(einsatz_id: i64, bezug: Bezug) -> String {
     match bezug.typ {
         BenachrichtigungBezugTyp::Einsatz => basis,
         BenachrichtigungBezugTyp::Meldung => format!("{basis}/meldungen?meldung={id}"),
+        // Die Übernahme springt in die Lage-Sicht, wo die Lagemeldung als neu steht (LLH-1062).
+        BenachrichtigungBezugTyp::LageUebernahme => format!("{basis}/lagemeldungen"),
         BenachrichtigungBezugTyp::Auftrag => format!("{basis}/auftraege?auftrag={id}"),
         // Die Kennung ist die Empfänger-Zeile; den Auftrag setzt `bilden` ein, sobald es die
         // Zeile gelesen hat. Ohne Zeile bleibt die Liste.
@@ -494,7 +509,7 @@ pub async fn bilden(
         }
     }
     Ok(Text {
-        titel: titel(art).to_string(),
+        titel: bezug_titel(bezug.typ).unwrap_or(titel(art)).to_string(),
         detail,
         pfad: pfad(einsatz_id, bezug),
     })
