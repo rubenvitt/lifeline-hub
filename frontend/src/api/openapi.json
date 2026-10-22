@@ -1551,6 +1551,21 @@
               "null"
             ]
           },
+          "ort_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "description": "Koordinate des Ziels (LLH-1114), nur neben `ort`; beide fehlen ohne Punkt (LFH-265)."
+          },
+          "ort_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
           "prioritaet": {
             "$ref": "#/components/schemas/Prioritaet"
           },

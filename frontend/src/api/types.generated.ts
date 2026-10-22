@@ -591,6 +591,13 @@ export interface components {
             lfd_nr?: number | null;
             mittel?: string | null;
             ort?: string | null;
+            /**
+             * Format: double
+             * @description Koordinate des Ziels (LLH-1114), nur neben `ort`; beide fehlen ohne Punkt (LFH-265).
+             */
+            ort_lat?: number | null;
+            /** Format: double */
+            ort_lon?: number | null;
             prioritaet: components["schemas"]["Prioritaet"];
             /**
              * Format: int64
