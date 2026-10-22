@@ -54,6 +54,7 @@ pub mod lagemonitor;
 pub mod live;
 pub mod material;
 pub mod meldung;
+pub mod meldung_korrektur;
 pub mod modul_zaehler;
 pub mod nachforderung;
 pub mod org_einstellungen;

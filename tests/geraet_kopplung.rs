@@ -2725,6 +2725,42 @@ async fn laptop_meldet_und_liest_nur_eigene_meldungen() {
     assert_eq!(s, StatusCode::FORBIDDEN, "Tablet liest keine Meldungen");
 }
 
+/// LLH-1066, D10: ein Gerät korrigiert keine Meldung, auch nicht die eigene; die Route steht in
+/// keiner Routenliste.
+#[tokio::test]
+async fn laptop_korrigiert_auch_die_eigene_meldung_nicht() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (einsatz, nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
+    let geraet = laptop(&app, &admin, einsatz, nord).await;
+    let meldung = json!({
+        "absender": "UHS Nord",
+        "meldeweg": "persoenlich",
+        "inhalt": "Decken knapp",
+        "ereigniszeit": "2026-10-04 10:00:00",
+    });
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &geraet,
+        Some(&meldung),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let mid = v["id"].as_i64().unwrap();
+
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}"),
+        &geraet,
+        Some(&json!({ "meldungsart": "lagemeldung" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
 /// LFH-940, D5: die Gerätebindung steht im SQL, nicht hinter dem LIMIT. Sonst wäre die erste
 /// Seite der Abgeschlossenen für das Gerät leer, obwohl es eigene erledigte Meldungen hat.
 #[tokio::test]

@@ -3,6 +3,7 @@
 //! linearer Triage-Status, ETB-Kopplung. Baut auf dem Kommunikations-Unterbau
 //! (`MeldeWeg`-Vokabular, LFH-84) und spiegelt das Aufträge-Template (LFH-52).
 pub mod benachrichtigung;
+pub mod korrektur;
 pub mod repo;
 
 use crate::wire_enum::wire_enum;
