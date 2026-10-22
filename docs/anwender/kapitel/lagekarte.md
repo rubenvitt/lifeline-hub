@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 220
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts]
 ---
 
 ## Überblick
@@ -127,6 +127,24 @@ wer im Einsatz schreiben darf.
 5. „Übernehmen“ wählen. Die App meldet „Zone angelegt“. Solange „Weitere zeichnen“ an ist, beginnt
    danach der nächste Kreis mit demselben Radius; „Fertig“ beendet das Zeichnen.
 
+### Eine Zone punktweise ändern
+
+1. Die Zone auf der Karte wählen und in der Auswahl „Punkte bearbeiten“ wählen.
+2. An jedem Eckpunkt steht ein eckiger Griff: Ziehen verschiebt den Punkt, ein Tipp wählt ihn.
+   Ein runder Griff auf der Mitte einer Kante setzt dort einen neuen Punkt; gezogen landet er, wo
+   er losgelassen wird.
+3. „Punkt entfernen“ nimmt den gewählten Punkt weg, „Letzte Änderung zurück“ die letzte Änderung.
+4. „Übernehmen“ wählen. Die App meldet „Zone gespeichert“, und die Zone steht wieder in der
+   Auswahl. „Abbrechen“ lässt die Zone, wie sie war.
+
+### Die Mitte eines Kreises verschieben
+
+1. Den Kreis auf der Karte wählen und in der Auswahl „Mitte verschieben“ wählen.
+2. Auf die neue Mitte tippen, den Griff in der Mitte ziehen oder „Einsatzort“ oder „Suchnadel“
+   wählen. Der Radius bleibt; Zahl, Schnellwahl und der Griff am Rand ändern ihn wie beim Zeichnen.
+3. „Übernehmen“ wählen. Die App meldet „Zone gespeichert“, und der Kreis steht wieder in der
+   Auswahl.
+
 ### Den Lageplan drucken oder anhängen
 
 1. Den Ausschnitt so einstellen, wie er auf dem Blatt stehen soll: Ebenen, Zoom und Drehung.
@@ -240,6 +258,10 @@ gespeicherte Zonen bleiben, der Knopf heißt dann „Fertig“ statt „Abbreche
 Beim Kreis gilt die Mitte als angefangene Figur: Das erste Esc nimmt die Mitte weg, der Radius
 bleibt eingetragen; ein Esc ohne Mitte beendet das Zeichnen.
 
+Beim Bearbeiten einer Zone, punktweise oder an der Mitte eines Kreises, gilt jede Änderung als
+angefangene Figur: Das erste Esc stellt die gespeicherte Form wieder her, ein Esc ohne Änderung
+beendet das Bearbeiten.
+
 ### Kreise
 
 Ein Kreis wird als Fläche mit 64 Ecken gespeichert, dazu Mitte und Radius. Er gilt überall als
@@ -249,7 +271,22 @@ ihn hinter den Namen („Nord · r = 300 m“).
 
 Wer einen Kreis auf der Karte wählt, sieht unter den Kennzahlen den „Radius“. Mit Schreibrecht
 lässt er sich dort als Zahl ändern; nach dem Verlassen des Feldes rechnet die App den Kreis um
-dieselbe Mitte neu, und das Einsatztagebuch hält „Radius 300 m → 500 m“ fest.
+dieselbe Mitte neu, und das Einsatztagebuch hält „Radius 300 m → 500 m“ fest. Eine verschobene
+Mitte rechnet den Kreis mit demselben Radius neu; das Einsatztagebuch nennt den Versatz, etwa
+„Absperrbereich «Nord»: Mitte um 120 m versetzt“, mit geändertem Radius in derselben Zeile.
+
+Wer eine Kreiszone punktweise ändert, macht aus ihr eine gewöhnliche Fläche: Mitte und Radius
+entfallen, das Band sagt das vorher mit „Danach kein Kreis mehr“. Das Einsatztagebuch hält
+„Absperrbereich «Nord» geändert“ fest.
+
+### Bearbeiten an der Karte
+
+Bearbeiten braucht das Schreibrecht im Einsatz; in einem früheren Lagestand fehlen die Knöpfe.
+Solange eine Zone bearbeitet wird, steht sie gestrichelt als Vorschau auf der Karte, die
+gespeicherte Form ist ausgeblendet. Liegen Griffe auf dem Bildschirm zu dicht, etwa an den 64
+Ecken eines kleinen Kreises, fehlen einige, bis näher herangezoomt wird; der gewählte Punkt
+steht immer. Wird die Zone währenddessen an einem anderen Gerät aufgehoben, endet das Bearbeiten.
+Ändern zwei Geräte dieselbe Zone, gilt die zuletzt übernommene Form.
 
 Andere Module können die Lagekarte mit einem vorbereiteten Kreis öffnen, mit Art, Radius und
 Mitte. Angelegt wird erst, wenn der Mensch „Übernehmen“ wählt.

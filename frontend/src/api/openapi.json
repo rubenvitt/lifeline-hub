@@ -2606,6 +2606,7 @@
         "enum": [
           "einsatz",
           "meldung",
+          "lage_uebernahme",
           "auftrag",
           "auftrag_empfaenger",
           "befehl",

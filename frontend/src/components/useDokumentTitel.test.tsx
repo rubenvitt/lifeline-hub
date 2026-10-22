@@ -12,6 +12,14 @@ describe('dokumentTitel', () => {
     expect(dokumentTitel(['ETB', undefined, null, ' '])).toBe('ETB · lifeline-hub');
     expect(dokumentTitel([])).toBe('lifeline-hub');
   });
+
+  it('stellt die Zahl der unbearbeiteten Meldungen voran, 0 nicht (LLH-1062)', () => {
+    expect(dokumentTitel(['Lagekarte', 'Starkregen Nord'], 3)).toBe(
+      '(3) Lagekarte · Starkregen Nord · lifeline-hub',
+    );
+    expect(dokumentTitel(['Lagekarte'], 0)).toBe('Lagekarte · lifeline-hub');
+    expect(dokumentTitel(['Lagekarte'])).toBe('Lagekarte · lifeline-hub');
+  });
 });
 
 describe('useDokumentTitel', () => {

@@ -1345,6 +1345,7 @@ fn benachrichtigung_wire() {
     enum_wire!(lifeline_hub::benachrichtigung::BenachrichtigungBezugTyp {
         Einsatz => "einsatz",
         Meldung => "meldung",
+        LageUebernahme => "lage_uebernahme",
         Auftrag => "auftrag",
         AuftragEmpfaenger => "auftrag_empfaenger",
         Befehl => "befehl",

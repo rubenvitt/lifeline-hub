@@ -244,6 +244,12 @@ pub struct ZonePatchBody {
     /// Neuer Radius einer Kreiszone in Metern (LLH-1043): der Server rechnet das Polygon um
     /// dieselbe Mitte neu. An einer Zone ohne Kreis 422.
     pub kreis_radius_m: Option<f64>,
+    /// Neue Mitte einer Kreiszone (LLH-1344, design.md D1): nur als Paar mit
+    /// [`Self::kreis_mitte_lon`]. Der Server rechnet das Polygon um die neue Mitte mit dem
+    /// (unveränderten oder mitgeschickten) Radius neu. An einer Zone ohne Kreis 422.
+    pub kreis_mitte_lat: Option<f64>,
+    /// Länge der neuen Mitte; nur mit [`Self::kreis_mitte_lat`].
+    pub kreis_mitte_lon: Option<f64>,
     /// Neue Geometrie (GeoJSON-String) derselben Klasse — eine punktweise Bearbeitung. Nimmt der
     /// Zone die Kreisangaben (LLH-1043, design.md D3).
     pub geometrie: Option<String>,
@@ -264,9 +270,10 @@ fn pruefe_neue_geometrie(geometrie: &str, gespeichert: &str) -> Result<(), AppEr
     lage_zone::pruefe_geometrie_struktur(&v, "geometrie")
 }
 
-/// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz, dazu Radius einer Kreiszone
-/// oder eine neue Geometrie (LLH-1043). ETB „geändert" NUR wenn effektiver typ, label oder die
-/// Geometrie sich unterscheidet; eine Radiusänderung schreibt „Radius alt → neu“.
+/// PATCH /api/einsaetze/{id}/zonen/{zid} — label/typ/farbe/notiz, dazu Radius und Mitte einer
+/// Kreiszone (LLH-1043, LLH-1344) oder eine neue Geometrie. ETB „geändert" NUR wenn effektiver
+/// typ, label oder die Geometrie sich unterscheidet; eine Kreisänderung schreibt EINE Zeile
+/// „Radius alt → neu · Mitte um … versetzt“.
 pub async fn aktualisieren(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -276,17 +283,35 @@ pub async fn aktualisieren(
     let einsatz_id = ctx.einsatz.id;
     let vorher = zone_repo::laden(&state.pool, einsatz_id, zid).await?;
 
-    // Geometrie (LLH-1043): Radius einer Kreiszone ODER frei — beides zugleich ist ein
-    // Widerspruch (422). Felder für sich zuerst (400), dann der Zusammenhang (422).
+    // Geometrie (LLH-1043, LLH-1344): Radius und/oder Mitte einer Kreiszone ODER frei — beides
+    // zugleich ist ein Widerspruch (422). Felder für sich zuerst (400), dann der Zusammenhang
+    // (422).
     if let Some(r) = body.kreis_radius_m {
         lage_zone::pruefe_radius(r)?;
     }
+    let neue_mitte = match (body.kreis_mitte_lat, body.kreis_mitte_lon) {
+        (Some(lat), Some(lon)) => {
+            // Dieselbe Feldprüfung wie beim Anlegen; der Radius steht dabei nur für sich.
+            lage_zone::pruefe_kreis(&lage_zone::Kreis {
+                mitte_lat: lat,
+                mitte_lon: lon,
+                radius_m: 1.0,
+            })?;
+            Some((lat, lon))
+        }
+        (None, None) => None,
+        _ => {
+            return Err(AppError::Validation(
+                "kreis_mitte_lat und kreis_mitte_lon nur zusammen".into(),
+            ))
+        }
+    };
     if let Some(g) = &body.geometrie {
         lage_zone::pruefe_geometrie_groesse(g, "geometrie")?;
     }
-    if body.kreis_radius_m.is_some() && body.geometrie.is_some() {
+    if (body.kreis_radius_m.is_some() || neue_mitte.is_some()) && body.geometrie.is_some() {
         return Err(AppError::UnprocessableEntity(
-            "Radius und Geometrie schließen sich aus".into(),
+            "Kreisangaben und Geometrie schließen sich aus".into(),
         ));
     }
     let vorher_kreis = match (
@@ -301,14 +326,26 @@ pub async fn aktualisieren(
         }),
         _ => None,
     };
-    // Ein unveränderter Radius rechnet nichts neu und schreibt keinen ETB.
-    let neuer_kreis = match (body.kreis_radius_m, vorher_kreis) {
-        (Some(_), None) => {
+    // Ein unveränderter Kreis (gleicher Radius, gleiche Mitte) rechnet nichts neu und schreibt
+    // keinen ETB.
+    let neuer_kreis = match (
+        vorher_kreis,
+        body.kreis_radius_m.is_some() || neue_mitte.is_some(),
+    ) {
+        (None, true) => {
             return Err(AppError::UnprocessableEntity(
-                "Die Zone ist kein Kreis; ein Radius lässt sich nicht setzen".into(),
+                "Die Zone ist kein Kreis; Radius und Mitte lassen sich nicht setzen".into(),
             ))
         }
-        (Some(r), Some(k)) if r != k.radius_m => Some(lage_zone::Kreis { radius_m: r, ..k }),
+        (Some(k), true) => {
+            let (mitte_lat, mitte_lon) = neue_mitte.unwrap_or((k.mitte_lat, k.mitte_lon));
+            let neu = lage_zone::Kreis {
+                mitte_lat,
+                mitte_lon,
+                radius_m: body.kreis_radius_m.unwrap_or(k.radius_m),
+            };
+            (neu != k).then_some(neu)
+        }
         _ => None,
     };
     if let Some(g) = &body.geometrie {
@@ -428,15 +465,20 @@ pub async fn aktualisieren(
         .await;
     }
     if let (Some(alt), Some(neu)) = (vorher_kreis, neuer_kreis) {
+        let radius = (neu.radius_m != alt.radius_m).then_some((alt.radius_m, neu.radius_m));
+        let versatz =
+            (neu.mitte_lat != alt.mitte_lat || neu.mitte_lon != alt.mitte_lon).then(|| {
+                lage_zone::grosskreis_m(alt.mitte_lat, alt.mitte_lon, neu.mitte_lat, neu.mitte_lon)
+            });
         super::etb_system_degradiert(
             &state,
             einsatz_id,
             ctx.benutzer.id,
-            &lage_zone::etb_text_radius(
+            &lage_zone::etb_text_kreis_geaendert(
                 z.typ.as_str(),
                 z.label.as_deref(),
-                alt.radius_m,
-                neu.radius_m,
+                radius,
+                versatz,
             ),
         )
         .await;

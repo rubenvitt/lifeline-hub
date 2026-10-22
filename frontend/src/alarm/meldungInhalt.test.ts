@@ -49,7 +49,13 @@ describe('meldungInhaltVon', () => {
   it('Sofortmeldung: Titel mit Absender, Anfang und voller Wortlaut', () => {
     expect(
       meldungInhaltVon('sofortmeldung', { absender: ' Rettungsstaffel ', inhalt: KELLER }),
-    ).toEqual({ titel: 'Sofortmeldung · Rettungsstaffel', anfang: KELLER, wortlaut: KELLER });
+    ).toEqual({
+      titel: 'Sofortmeldung · Rettungsstaffel',
+      anfang: KELLER,
+      wortlaut: KELLER,
+      absender: 'Rettungsstaffel',
+      status: null,
+    });
   });
 
   it('die Eskalation behält ihr Titelwort', () => {
@@ -63,7 +69,29 @@ describe('meldungInhaltVon', () => {
       titel: null,
       anfang: null,
       wortlaut: null,
+      absender: null,
+      status: null,
     });
+  });
+
+  it('Eingang einer Meldung (LLH-1062): Titelwort „Neue Meldung“ und der Status', () => {
+    expect(
+      meldungInhaltVon('meldung', { absender: 'UHS Nord', inhalt: 'Decken knapp', status: 'neu' }),
+    ).toEqual({
+      titel: 'Neue Meldung · UHS Nord',
+      anfang: 'Decken knapp',
+      wortlaut: 'Decken knapp',
+      absender: 'UHS Nord',
+      status: 'neu',
+    });
+  });
+
+  it('die Übernahme in die Lage trägt ihr Titelwort im Bezug', () => {
+    expect(
+      meldungInhaltVon('meldung', { absender: 'EA Nord', inhalt: 'Deich' }, 'lage_uebernahme')
+        ?.titel,
+    ).toBe('In die Lage übernommen · EA Nord');
+    expect(meldungInhaltVon('meldung', { absender: 'A', inhalt: 'B' }, 'auftrag')).toBeNull();
   });
 
   it('andere Arten bekommen keinen Inhalt', () => {
@@ -91,6 +119,8 @@ describe('ladeMeldungInhalt', () => {
       titel: 'Sofortmeldung · Rettungsstaffel',
       anfang: KELLER,
       wortlaut: KELLER,
+      absender: 'Rettungsstaffel',
+      status: null,
     });
   });
 

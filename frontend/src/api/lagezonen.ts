@@ -40,6 +40,12 @@ export interface ZonePatch {
   /** Neuer Radius einer Kreiszone in Metern (LLH-1043); der Server rechnet das Polygon neu. */
   kreis_radius_m?: number;
   /**
+   * Neue Mitte einer Kreiszone (LLH-1344), nur als Paar mit `kreis_mitte_lon`; der Server rechnet
+   * das Polygon um die neue Mitte, der Radius bleibt (oder kommt mit `kreis_radius_m`).
+   */
+  kreis_mitte_lat?: number;
+  kreis_mitte_lon?: number;
+  /**
    * Neue Geometrie (GeoJSON-String, gleiche Klasse) — punktweise Bearbeitung; nimmt der Zone die
    * Kreisangaben (LLH-1043).
    */

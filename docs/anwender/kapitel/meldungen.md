@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md]
+quellen: [[frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md]
 ---
 
 ## Überblick
@@ -152,19 +152,48 @@ auch die erfassende Person. Beide kommen mit Ton und lassen sich unter „Benach
 abschalten (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Eine gewöhnliche
 Meldung löst keinen Alarm aus.
 
-### Benachrichtigung an die Empfängerfunktion
+### Hinweise auf neue Meldungen
 
-Trägt eine Meldung eine Empfängerfunktion, erhalten beim Erfassen die Personen dieser Funktion
-den Hinweis **„Neue Meldung“** mit der Nummer der Meldung, etwa „Meldung #12“, und einem Sprung
-zu ihr. Wer eine Funktion besetzt, steht in der Stab-Besetzung; ist die Funktion dort nicht
-besetzt oder ihr Personal mit keinem Konto verknüpft, gilt die Funktion in der Mitgliedschaft
-des Einsatzes. Wer das Modul „Meldungen (eingehend)“ nicht sehen darf, bekommt keinen Hinweis.
+Eine neue Meldung meldet sich in drei Stufen:
 
-- Ohne Empfängerfunktion bleibt die Meldung still, auch wenn im freien Empfänger „S2“ steht.
-- Eine Sofortmeldung an eine Funktion löst nur ihren Alarm aus, keinen zweiten Hinweis.
-- Eigene Aktionen bleiben still: Wer als S2 eine Meldung an S2 erfasst, bekommt dazu nichts.
+| Meldung | Was geschieht |
+|---|---|
+| Sofortmeldung | Alarm mit Ton (siehe oben) |
+| dringend, Lagemeldung oder von einem gekoppelten Gerät | Hinweis **„Neue Meldung“** mit dezentem Ton |
+| normal, von Hand erfasst | kein Ton und kein Hinweis; die Zahl der unbearbeiteten Meldungen steht vorn im Tab-Titel, etwa „(3) Lagekarte · …“, und am Symbol der installierten App |
+
+Den Hinweis bekommen alle, die im Einsatz Meldungen bearbeiten dürfen (Einsatzleitung und
+Führungspersonal), nicht Beobachter, nicht gekoppelte Geräte und nicht die Person, die die
+Meldung erfasst hat. Trägt die Meldung eine Empfängerfunktion, bekommen ihn nur die Personen
+dieser Funktion und die Einsatzleitung. Eine normale Meldung mit Empfängerfunktion bekommen die
+Personen der Funktion ebenfalls als Hinweis. Wählt man im Formular die Meldungsart
+„Lagemeldung“, steht S2 als Empfängerfunktion schon da; sie lässt sich ändern oder leeren.
+
+Wer eine Funktion besetzt, steht in der Stab-Besetzung; ist die Funktion dort nicht besetzt
+oder ihr Personal mit keinem Konto verknüpft, gilt die Funktion in der Mitgliedschaft des
+Einsatzes. Wer das Modul „Meldungen (eingehend)“ nicht sehen darf, bekommt keinen Hinweis.
+
+Wird eine Meldung, die keine Lagemeldung ist, zum ersten Mal an die Lage übergeben, bekommen S2
+und die Einsatzleitung den Hinweis **„In die Lage übernommen“** mit Sprung zu den Lagemeldungen.
+
+Alle Hinweise auf Meldungen stehen gebündelt in **einem** Hinweis, etwa „3 neue Meldungen“, mit
+Absender und Anfang des Wortlauts der jüngsten zwei. Er belegt keinen der Plätze der übrigen
+Hinweise und Alarme, und sein Ton kommt höchstens alle zwei Minuten.
+
+- **„Sichten“** an einer Meldung im Hinweis setzt sie auf „Gesichtet“. Sobald jemand eine
+  Meldung sichtet, bestätigt oder weiter bearbeitet, verschwindet ihr Hinweis bei allen. Eine
+  als gesehen gekennzeichnete Lagemeldung nimmt „In die Lage übernommen“ ebenso weg.
+- **„Öffnen“** bzw. **„Zu Meldungen“** springt zur Meldung bzw. in die Liste; das Schließen
+  nimmt den Hinweis nur für einen selbst weg.
+- Wer gerade in ein Feld schreibt, sieht den Hinweis erst, wenn er das Feld verlässt.
+- Auf der Seite „Meldungen (eingehend)“ selbst erscheint kein Hinweis; dort stehen die neuen
+  Meldungen in der Liste.
+- Ohne Empfängerfunktion entscheidet nie der freie Empfänger, auch wenn dort „S2“ steht.
+- Eine Sofortmeldung löst nur ihren Alarm aus, keinen zweiten Hinweis.
 - Jede Meldung meldet sich einmal; eine ohne Netz erfasste Meldung, die beim Wiederverbinden noch
   einmal gesendet wird, löst keinen zweiten Hinweis aus.
+- Die Hinweise lassen sich unter „Benachrichtigungen“ als „Neue Meldung und Lagemeldung“
+  abschalten; der Ton folgt der Glocke in der Kopfleiste.
 
 Als Empfängerfunktion stehen die Einsatzleitung und die Sachgebiete zur Wahl, S7 nur, wenn die
 Organisation sie eingeschaltet hat. Führungshilfspersonal und Fachberater sind keine

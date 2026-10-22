@@ -57,7 +57,7 @@ import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
-import { ZONE_TYPEN, zoneStil } from './lagekarte/zonenStil';
+import { ZONE_TYPEN, zoneStil, zoneTypLabel } from './lagekarte/zonenStil';
 import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
 import { bezirkAuftragEntschieden, bezirkZeichnenEntwurf } from './lagekarte/bezirkZeichnen';
 import Kartenflaeche, {
@@ -78,6 +78,8 @@ import ZonenInspector from './lagekarte/ZonenInspector';
 import FachebenenInspector from './lagekarte/FachebenenInspector';
 import ZeichnenSteuerung from './lagekarte/ZeichnenSteuerung';
 import KreisSteuerung from './lagekarte/KreisSteuerung';
+import BearbeitenSteuerung from './lagekarte/BearbeitenSteuerung';
+import { istGeaendert, kannEntfernen, punktZahl } from './lagekarte/zonenBearbeitung';
 import { LEERER_ZEICHENSTAND, type ZeichenStand } from './lagekarte/zeichnen';
 import { escGehoertOverlay, escStufe, QUITTUNG_VERWORFEN } from './lagekarte/zeichnenEsc';
 import {
@@ -514,6 +516,15 @@ export default function LagekartePage() {
     setZoneSerie,
     zoneSerieAnzahl,
     kreisEntwurf,
+    kreisBearbeitung,
+    kreisBearbeitungGeaendert,
+    zonenBearbeitung,
+    bearbeiteteZoneId,
+    onMitteVerschieben,
+    onPunkteBearbeiten,
+    onBearbeitung,
+    bearbeitungUebernehmen,
+    onBearbeitenAbbrechen,
     kreisUebernehmen,
     onKreisMitte,
     onKreisRadius,
@@ -763,6 +774,29 @@ export default function LagekartePage() {
     () => zonen.find((z) => z.id === zoneAuswahl) ?? null,
     [zonen, zoneAuswahl],
   );
+  // Bearbeiten einer Zone (LLH-1344, design.md D4): die Zone fehlt in der Zonenebene, solange ihre
+  // Vorschau sie zeigt; die Vorschau trägt ihre Kartenfarbe (auch die Stufe eines Gefahrengebiets).
+  const bearbeiteteZone = zonen.find((z) => z.id === bearbeiteteZoneId) ?? null;
+  const bearbeitungFarbe =
+    zonenFeatures.find((z) => z.id === bearbeiteteZoneId)?.stil.lineColor ??
+    (bearbeiteteZone ? zoneStil(bearbeiteteZone.typ, bearbeiteteZone.farbe).lineColor : '#000');
+  const zonenKarte = useMemo(
+    () =>
+      bearbeiteteZoneId == null
+        ? zonenFeatures
+        : zonenFeatures.filter((z) => z.id !== bearbeiteteZoneId),
+    [zonenFeatures, bearbeiteteZoneId],
+  );
+  // Wird die Zone woanders aufgehoben, endet ihre Bearbeitung (nur mit geladener Liste).
+  const bearbeitungVerwaist = bearbeiteteZoneId != null && zonenGeladen && !bearbeiteteZone;
+  useEffect(() => {
+    if (!bearbeitungVerwaist) return;
+    if (zonenBearbeitung) onBearbeitenAbbrechen();
+    else onZeichnenAbbrechen();
+    setZoneAuswahl(null);
+    // Nur der Wechsel zählt; die Handler sind je Render neu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bearbeitungVerwaist]);
 
   // Fokus auf einen Einsatzabschnitt (LLH-1057, `lagekarte/useAbschnittFokus.ts`): reine
   // Darstellung. Die Kräfte fremder Abschnitte werden gedämpft, nie entfernt; Ebenen, Zähler und
@@ -880,27 +914,39 @@ export default function LagekartePage() {
    * Die Ausführung liegt in einem Ref, der bei jedem Render neu gesetzt wird: die Handler sind je
    * Render neu, der Zuhörer soll nur am Modus hängen.
    */
-  const zeichenmodusAktiv = zoneEntwurf != null || zeichneAbschnittId != null;
+  const zeichenmodusAktiv =
+    zoneEntwurf != null || zeichneAbschnittId != null || zonenBearbeitung != null;
   const escAusfuehrenRef = useRef<() => void>(() => {});
   escAusfuehrenRef.current = () => {
     const stufe = escStufe({
       phase: zoneBestaetigung != null ? 'bestaetigen' : 'zeichnen',
-      speichernLaeuft: zoneSpeichern || abschnittSpeichern,
-      // Im Kreis-Modus ist die Figur die Mitte (LLH-1043, D7).
-      punkte: kreisEntwurf ? (kreisEntwurf.mitte ? 1 : 0) : zeichenStand.punkte,
-      serieGespeichert: zeichneAbschnittId != null ? 0 : zoneSerieAnzahl,
+      speichernLaeuft: zoneSpeichern || abschnittSpeichern || !!zonenBearbeitung?.speichern,
+      // Im Kreis-Modus ist die Figur die Mitte (LLH-1043, D7); beim Bearbeiten einer Zone die
+      // Abweichung vom Gespeicherten (LLH-1344, D5).
+      punkte: zonenBearbeitung
+        ? Number(istGeaendert(zonenBearbeitung.stand))
+        : kreisBearbeitung
+          ? Number(kreisBearbeitungGeaendert)
+          : kreisEntwurf
+            ? kreisEntwurf.mitte
+              ? 1
+              : 0
+            : zeichenStand.punkte,
+      serieGespeichert: zeichneAbschnittId != null || zonenBearbeitung ? 0 : zoneSerieAnzahl,
     });
     if (stufe === 'zurueckZumZeichnen') {
       onBestaetigungZurueck();
       message.info(QUITTUNG_VERWORFEN);
     } else if (stufe === 'verwerfen') {
-      if (kreisEntwurf) onKreisVerwerfen();
+      if (zonenBearbeitung) onBearbeitung({ art: 'verwerfen' });
+      else if (kreisEntwurf) onKreisVerwerfen();
       else kartenRef.current?.zeichnungVerwerfen();
       message.info(QUITTUNG_VERWORFEN);
     } else if (stufe === 'fertig') {
       onZoneZeichnenFertig();
     } else if (stufe === 'abbrechen') {
-      onZeichnenAbbrechen();
+      if (zonenBearbeitung) onBearbeitenAbbrechen();
+      else onZeichnenAbbrechen();
     }
   };
   useEffect(() => {
@@ -1311,6 +1357,8 @@ export default function LagekartePage() {
             onAendern={(patch) => zoneAendern(ausgewaehlteZone.id, patch)}
             onMatrixOeffnen={(gid) => navigate(gefahrenPfad(einsatzId, { gefahrengebiet: gid }))}
             onLoeschen={() => zoneLoeschen(ausgewaehlteZone.id)}
+            onPunkteBearbeiten={() => onPunkteBearbeiten(ausgewaehlteZone)}
+            onMitteVerschieben={() => onMitteVerschieben(ausgewaehlteZone)}
             ansichten={ansichten ?? []}
             bezirke={bezirke}
             evakuierungFrei={evakuierungZugriff === 'frei'}
@@ -1485,7 +1533,8 @@ export default function LagekartePage() {
     </div>
   );
 
-  const ohneSerie = zeichneAbschnittId != null || zoneEntwurf?.bezirk != null;
+  const ohneSerie =
+    zeichneAbschnittId != null || zoneEntwurf?.bezirk != null || kreisBearbeitung != null;
   const platzierBild =
     bildPlatzierenId != null ? bilder.find((b) => b.id === bildPlatzierenId) : undefined;
   // Rückmeldung nach dem Verorten (LLH-1125): unter `lg` im Fuß-Band, ab `lg` im Modus-Band der Leiste.
@@ -1572,7 +1621,7 @@ export default function LagekartePage() {
         zeichnen={zeichneAbschnittId != null}
         onFlaecheGezeichnet={onFlaecheGezeichnet}
         onFlaecheKlick={onFlaecheKlick}
-        zonen={zonenFeatures}
+        zonen={zonenKarte}
         // Der Kreis kommt ohne terra-draw aus: eigene Vorschau und Griff (LLH-1043, D6).
         zoneZeichnen={zoneEntwurf && zoneEntwurf.modus !== 'kreis' ? zoneEntwurf.modus : null}
         kreis={
@@ -1581,6 +1630,17 @@ export default function LagekartePage() {
             : null
         }
         onKreisRadius={(r) => onKreisRadius(r)}
+        onKreisMitte={(m) => onKreisMitte(m)}
+        bearbeitung={
+          zonenBearbeitung
+            ? {
+                geometrie: zonenBearbeitung.stand.geometrie,
+                gewaehlt: zonenBearbeitung.stand.gewaehlt,
+                farbe: bearbeitungFarbe,
+              }
+            : null
+        }
+        onBearbeitung={onBearbeitung}
         zoneZeichnenNonce={zoneZeichnenNonce}
         onZoneKlick={onZoneKlick}
         flaechenwahl={!exklusiverModusAktiv}
@@ -1754,7 +1814,25 @@ export default function LagekartePage() {
           onSerieWechsel={ohneSerie ? undefined : setZoneSerie}
           serieAnzahl={ohneSerie ? undefined : zoneSerieAnzahl}
           onFertig={ohneSerie ? undefined : onZoneZeichnenFertig}
+          bearbeiten={kreisBearbeitung ? { geaendert: kreisBearbeitungGeaendert } : undefined}
         />
+        {zonenBearbeitung && (
+          <BearbeitenSteuerung
+            aktiv
+            titel={`${bearbeiteteZone?.label ? `${zoneTypLabel(zonenBearbeitung.typ)} «${bearbeiteteZone.label}»` : zoneTypLabel(zonenBearbeitung.typ)} bearbeiten`}
+            punkte={punktZahl(zonenBearbeitung.stand)}
+            figur={zonenBearbeitung.stand.geometrie.type === 'LineString' ? 'linie' : 'flaeche'}
+            kreis={zonenBearbeitung.kreis}
+            geaendert={istGeaendert(zonenBearbeitung.stand)}
+            kannEntfernen={kannEntfernen(zonenBearbeitung.stand)}
+            kannZurueck={zonenBearbeitung.stand.verlauf.length > 0}
+            speichernLaeuft={zonenBearbeitung.speichern}
+            onEntfernen={() => onBearbeitung({ art: 'entfernen' })}
+            onZurueck={() => onBearbeitung({ art: 'zurueck' })}
+            onUebernehmen={bearbeitungUebernehmen}
+            onAbbrechen={onBearbeitenAbbrechen}
+          />
+        )}
         {/* Unter `lg` trägt dieses Band die Bedienung der Leistenmodi — die Leiste ist im Modus zu
             (LFH-765). Ab `lg` steht sie im Modus-Band der Leiste. */}
         {!breit && <PlatzierSteuerung modus={platzierModus} />}

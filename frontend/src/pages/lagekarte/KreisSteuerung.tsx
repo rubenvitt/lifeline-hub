@@ -6,7 +6,7 @@ import type { ZoneTyp } from '../../api/types';
 import EscKappe from './EscKappe';
 import { bandStil } from './KartenFuss';
 import { radiusGueltig, type GeoPunkt } from './geo';
-import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN } from './zonenStil';
+import { FREIE_SKIZZE_VORGABEFARBE, ZONE_TYPEN, zoneTypLabel } from './zonenStil';
 import './lagekarte.css';
 
 /** Schnellwahl des Radius in Metern (LLH-1043): Erstabsperrung bis Evakuierungsradius. */
@@ -36,6 +36,11 @@ interface KreisSteuerungProps {
   onSerieWechsel?: (an: boolean) => void;
   serieAnzahl?: number;
   onFertig?: () => void;
+  /**
+   * Der Kreis einer bestehenden Zone (LLH-1344, design.md D3): die Art steht fest (Text statt
+   * Auswahl), „Übernehmen“ braucht eine Änderung, und Esc beendet nur ohne Änderung.
+   */
+  bearbeiten?: { geaendert: boolean };
 }
 
 /**
@@ -51,10 +56,13 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
   const { token, rollen } = useRollen();
   if (!props.aktiv) return null;
   const sperre = !!props.speichernLaeuft;
-  const bereit = props.mitte != null && radiusGueltig(props.radiusM);
+  const bearbeiten = props.bearbeiten;
+  const bereit =
+    props.mitte != null && radiusGueltig(props.radiusM) && (!bearbeiten || bearbeiten.geaendert);
   const gespeichert = props.serieAnzahl ?? 0;
-  // Esc ohne Mitte beendet wie der Knopf (LFH-712); mit Mitte verwirft es nur die Mitte.
-  const escBeendet = props.mitte == null && !sperre;
+  // Esc ohne Mitte beendet wie der Knopf (LFH-712); mit Mitte verwirft es nur die Mitte. Am Kreis
+  // einer bestehenden Zone ist die Änderung die Figur (LLH-1344, D5).
+  const escBeendet = (bearbeiten ? !bearbeiten.geaendert : props.mitte == null) && !sperre;
   const beenden =
     gespeichert > 0 && props.onFertig ? (
       <Button onClick={props.onFertig} aria-keyshortcuts={escBeendet ? 'Escape' : undefined}>
@@ -84,16 +92,20 @@ export default function KreisSteuerung(props: KreisSteuerungProps) {
       <Space orientation="vertical" size={8} style={{ width: '100%' }}>
         <div style={zeile}>
           <Typography.Text strong>Kreis</Typography.Text>
-          <Select<ZoneTyp>
-            aria-label="Art"
-            value={props.typ}
-            disabled={sperre}
-            style={{ minWidth: 168 }}
-            options={KREIS_TYPEN.map((t) => ({ value: t.typ, label: t.label }))}
-            onChange={(typ) =>
-              props.onTyp(typ, typ === 'freie_skizze' ? FREIE_SKIZZE_VORGABEFARBE : undefined)
-            }
-          />
+          {bearbeiten ? (
+            <Typography.Text>{zoneTypLabel(props.typ)}</Typography.Text>
+          ) : (
+            <Select<ZoneTyp>
+              aria-label="Art"
+              value={props.typ}
+              disabled={sperre}
+              style={{ minWidth: 168 }}
+              options={KREIS_TYPEN.map((t) => ({ value: t.typ, label: t.label }))}
+              onChange={(typ) =>
+                props.onTyp(typ, typ === 'freie_skizze' ? FREIE_SKIZZE_VORGABEFARBE : undefined)
+              }
+            />
+          )}
         </div>
         <div style={zeile} data-lfh="kreis-mitte">
           <Typography.Text type="secondary">Mitte</Typography.Text>

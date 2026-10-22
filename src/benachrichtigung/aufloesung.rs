@@ -6,7 +6,8 @@
 //!    Einsatzleitung“ löst wie EL auf). Bringt sie keinen Nutzer, gilt
 //!    `einsatz_mitgliedschaft.fuehrungsfunktion`.
 //! 2. `Person` → `personal.benutzer_id` des Einsatzpersonals; ohne Verknüpfung niemand.
-//! 3. `ModulLeser` → Mitglieder mit Leserecht am Modul.
+//! 3. `ModulLeser` → Mitglieder mit Leserecht am Modul; `ModulSchreiber` → nur die mit
+//!    Schreibrecht im Einsatz (Einsatzleitung, Führungspersonal), ebenso mit Zugriff aufs Modul.
 //! 4. Danach entfallen: der Auslöser, Gerätekonten, inaktive Konten, wer den Einsatz nicht lesen
 //!    darf, wer das Modul des Bezugs nicht lesen darf und, bei Stufe Hinweis, wer die Art
 //!    abgeschaltet hat (D6).
@@ -114,6 +115,15 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
             Adressat::Person(ep) => (person_nutzer(pool, einsatz_id, ep).await?, None),
             Adressat::Nutzer(id) => (vec![id], None),
             Adressat::ModulLeser(m) => (recht.rollen.keys().copied().collect(), Some(m)),
+            Adressat::ModulSchreiber(m) => (
+                recht
+                    .rollen
+                    .iter()
+                    .filter(|(_, r)| r.darf_schreiben())
+                    .map(|(id, _)| *id)
+                    .collect(),
+                Some(m),
+            ),
             Adressat::Fuehrungskraefte => (
                 org_nutzer(pool, recht.einsatz.org_id)
                     .await?
