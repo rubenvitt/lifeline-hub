@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
 import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
+import { kopfFilterWaehlen, kopfFilterWerte } from '../test/kopfFilter';
 import Datensicht, {
   DATENSICHT_SCHWELLE,
   SERVER_SUCHE_ENTPRELLUNG_MS,
@@ -118,11 +118,27 @@ describe('Datensicht · Servermodus (LFH-1075)', () => {
     const s = server();
     renderMitProviders(<Sicht daten={[S(1), S(2)]} server={s} />);
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Typ' }));
-    await userEvent.click(await screen.findByTitle('Personenschaden'));
+    // Der Filter sitzt im Spaltenkopf (LLH-1086) und läuft durch denselben Zustand.
+    await kopfFilterWaehlen('Typ', ['Personenschaden']);
 
     expect(s.onFilter).toHaveBeenLastCalledWith({ typ: ['personenschaden'] });
     expect(zeilenTexte()).toEqual(['1', '2']);
+  });
+
+  it('das Kopfmenü zählt nicht: die Sicht sähe nur das geladene Fenster (LLH-1086)', async () => {
+    setzeViewportBreite(1366);
+    renderMitProviders(<Sicht daten={[S(1), S(2)]} server={server()} />);
+    expect(await kopfFilterWerte('Typ')).toEqual(['Sachschaden', 'Personenschaden']);
+  });
+
+  it('der Filterhinweis nennt die Zahlen des Servers, ohne sie selbst zu zählen (LLH-1086)', async () => {
+    setzeViewportBreite(1366);
+    const s = { ...server(), zahlen: { treffer: 12, gesamt: 48 } };
+    renderMitProviders(<Sicht daten={[S(1), S(2)]} server={s} />);
+    await kopfFilterWaehlen('Typ', ['Personenschaden']);
+    const hinweis = document.querySelector('[data-lfh="filterhinweis"]');
+    expect(hinweis).toHaveTextContent('12 von 48');
+    expect(hinweis).toHaveTextContent('Typ: Personenschaden');
   });
 
   it('ohne Treffer bei aktiver Einschränkung steht der Filter-Leerzustand und setzt zurück', async () => {

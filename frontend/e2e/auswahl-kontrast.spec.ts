@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stehendeAuswahl } from './auswahl-kern';
-import { stehend } from './kontrast-kern';
+import { flaeche, kontrast, stehend, verhaeltnis } from './kontrast-kern';
 import { anlegen, anmelden, einsatzAnlegen } from './trefflaeche-kern';
 import { einsatzDialogOeffnen } from './einsatz-kern';
 
@@ -17,6 +17,8 @@ import { einsatzDialogOeffnen } from './einsatz-kern';
  *    bewusst nicht (design.md E3), gemessen wird trotzdem beides.
  *  · Auswahlliste: die gewählte Option „Realeinsatz“ der Einsatzart im Dialog „Neuer Einsatz“,
  *    ruhend (Zeiger auf „Übung“) und aktiv (Zeiger auf ihr selbst).
+ *  · Filtermarke (LLH-1086): Linie und Trichter der gefilterten Kopfzelle der Schadenliste,
+ *    Nicht-Text-Boden 3 : 1 gegen die Kopffläche.
  *
  * Ruhe und Zeiger sehen gleich aus; deshalb sichert der Spec den Zustand vor jeder Messung als
  * Vorbedingung zu (`-active` setzt antd per JavaScript), sonst bestünde eine Zeigermessung auch
@@ -112,6 +114,57 @@ for (const modus of ['light', 'dark'] as const) {
       await gewaehlt.hover();
       await expect(gewaehlt, 'Vorbedingung Zeiger').toHaveClass(/ant-select-item-option-active/);
       await haelt(gewaehlt, modus, `${modus}/Einsatzart, gewählt und aktiv`);
+    });
+
+    // Filtermarke im Spaltenkopf (LLH-1086, Spec `tabellen-sortieren-filtern`): die 2-px-Linie
+    // in `bedien` an der Unterkante der gefilterten Kopfzelle und der gefüllte Trichter sind
+    // Nicht-Text-Marken (WCAG 1.4.11) und halten 3 : 1 gegen die Fläche des Kopfes.
+    test('Filtermarke: Linie und Trichter der gefilterten Kopfzelle halten 3 : 1', async ({
+      page,
+    }) => {
+      await anmelden(page);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
+      const einsatzId = await einsatzAnlegen(page, `E2E Filtermarke ${Date.now()} ${modus}`);
+      for (const [ausmass, ort] of [
+        ['gross', 'Deichweg 2'],
+        ['gering', 'Bachstraße 1'],
+      ]) {
+        const r = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+          data: { typ: 'sachschaden', ausmass, ort },
+        });
+        expect(r.ok(), `POST schaeden: ${r.status()}`).toBe(true);
+      }
+      await page.goto(`/einsaetze/${einsatzId}/schaeden?f.ausmass=gross`);
+      const ausloeser = page.getByRole('button', { name: 'Ausmaß filtern, gefiltert' });
+      await expect(ausloeser, 'Vorbedingung: der Filter aus der Adresse wirkt').toBeVisible();
+      await expect(page.getByText('Bachstraße 1')).toHaveCount(0);
+      const kopf = page.getByRole('columnheader', { name: /Ausmaß/ });
+      const ungefiltert = page.getByRole('columnheader', { name: /^Typ/ });
+
+      // Die Linie: genau ein innerer Schatten nach oben, ohne Weichzeichnung (die Form vorab, sonst
+      // bestünde ein unsichtbarer Schatten mit gutem Farbwert).
+      const schatten = await kopf.evaluate((el) => getComputedStyle(el).boxShadow);
+      const form = /^(rgba?\([^)]*\)) 0px -2px 0px 0px inset$/.exec(schatten);
+      expect(form, `Linienform: ${schatten}`).not.toBeNull();
+      const linie = form![1]
+        .replace(/rgba?\(|\)/g, '')
+        .split(',')
+        .map((n) => parseFloat(n));
+      expect(linie[3] ?? 1, `Linie deckend: ${schatten}`).toBe(1);
+      const grund = await flaeche(kopf);
+      const linienKontrast = verhaeltnis([linie[0], linie[1], linie[2], 1], grund);
+      expect(
+        linienKontrast,
+        `${modus}/Filtermarke Linie: ${JSON.stringify({ linie, grund })}`,
+      ).toBeGreaterThanOrEqual(3);
+      // Die Marke unterscheidet: die ungefilterte Nachbarzelle trägt keine Linie.
+      expect(await ungefiltert.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
+
+      const trichter = await kontrast(ausloeser);
+      expect(
+        trichter.verhaeltnis,
+        `${modus}/Filtermarke Trichter: ${JSON.stringify(trichter)}`,
+      ).toBeGreaterThanOrEqual(3);
     });
   });
 }

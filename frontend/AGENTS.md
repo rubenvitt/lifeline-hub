@@ -216,7 +216,8 @@ AK3b im Drawer-Spec); keine Katalogtabelle wird zu Karten.
   Kartenfußs hält die Sicht selbst (LLH-1130).
 - **Eine geblätterte Liste nimmt den Servermodus der `Datensicht`** (LFH-1075, Prop
   `serverseitig`): Suche (entprellt) und Spaltenfilter gehen an den Server, die Sortierung
-  kontrolliert; die Sicht filtert und sortiert nicht noch einmal. `stand` ist die Abfrage der
+  kontrolliert; die Sicht filtert und sortiert nicht noch einmal (auch nicht über den Kopffilter,
+  LLH-1086; seine Zahlen reicht die Seite über `serverseitig.zahlen`). `stand` ist die Abfrage der
   gezeigten Zeilen, ihr Wechsel kein Zufluss. Nachladen per „Ältere laden“ unter der Sicht,
   Zahlen aus `…/kennzahlen` (Vorbild `pages/SchaedenPage.tsx`).
   `naechste_lagebesprechung_at` = absolute Wiedervorlage-Schnellwahl, kein berechneter Rhythmus
@@ -422,6 +423,21 @@ anwendbar), „nicht geprüft" ist keins.
   in `KatalogTabelle` nur per Opt-in `spaltenSchalter={{ bezeichnung }}`, `Datensicht` setzt es
   nie. Antds `responsive`/`hidden` gesperrt (`katalogTabelle.guard.test.ts`). Das Häkchen zeigt
   die wirkliche Sichtbarkeit.
+- **Eine Vergleichstabelle ist sortier- und filterbar, im Spaltenkopf** (LLH-1086, Spec
+  `tabellen-sortieren-filtern`): Sortieren per Klick auf den Kopf, Filter über antds
+  Spaltenfilter (kontrolliert, im Clientmodus mit Zähler „Groß (3)“), je aktivem Wert ein Chip
+  (`components/tabellenFilter.tsx`) und darüber der `Filterhinweis` (Treffer von Gesamt,
+  „Filter zurücksetzen“ leert Suche und Filter, nicht die Sortierung). Die gefilterte Kopfzelle
+  trägt eine 2-px-Linie in `bedien`. Was man nicht sieht, wirkt nicht: der Filter einer
+  ausgeblendeten Spalte schneidet nichts und steht nicht als Chip da. Der Kartenzweig zeigt
+  dieselbe Menge und sortiert über „Sortieren“. Im Servermodus zählt das Kopfmenü nicht und die
+  Zahlen kommen vom Server (`serverseitig.zahlen`). Sortierung, Filter und Suche stehen in der
+  Adresse (`?sort=ort:auf&f.ausmass=gross&q=`, `routing/deeplinks.ts`), sonst gilt der Stand der
+  Sitzung; die Spaltenwahl liegt am Gerät — beides über `useListenGedaechtnis`
+  (`components/listenGedaechtnis.ts`), den die SEITE hält und als `gedaechtnis` an
+  `Datensicht`/`KatalogTabelle` reicht. Vorbild Schäden; Rollout auf alle Listen LLH-1096.
+  Nachweise `e2e/tabellen-sortieren-filtern.spec.ts`, C16 in `e2e/trefflaeche-pruefflaechen.spec.ts`,
+  Filtermarke in `e2e/auswahl-kontrast.spec.ts`.
 - **Kopfwerkzeuge der `KatalogTabelle` folgen der Dichte** (LLH-1227): Suche und Spaltenschalter
   stehen `paddingSM` auseinander, antds Spaltenfilter-Auslöser hält `controlHeightSM` und liegt
   in der Tab-Folge (Name „<Spalte> filtern“, Enter/Leertaste öffnen), beides im Primitiv, nie je
@@ -960,7 +976,10 @@ Einsatz-Pfade (`docs/superpowers/specs/2026-06-23-deeplinks-vereinheitlichen-des
   `?befehl=` wählt einen Befehl im Reiter „Einsatzbefehle“ (`auftraegePfad`), die Item-Route des
   Befehls bleibt Vollseite für Entwurf, Druck und Deeplink.
 - **Filter gehören in die URL** (`etbPfad`/`parseEtbFilter`, `mitQuery` kodiert). Unbekannter
-  Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`).
+  Enum-Wert wird ganz verworfen (exhaustiver `Record<EtbTyp, true>`). Für Tabellen gilt eine
+  gemeinsame Kodierung (LLH-1086, `listenZustandParams`/`parseListenZustand`): `sort=<spalte>:auf|ab`
+  (`aus` = bewusst unsortiert, die Vorgabe steht nicht da), `f.<spalte>=a,b`, `q=`; geschrieben
+  mit `replace`, fremde Parameter bleiben, Unbekanntes prüft `bereinigeListenZustand` weg.
 - **Zeit in der URL** ist UTC ohne Zone (`dayjs(s)` läse Ortszeit) — Umkehr in `anzeige/zeitEingabe.ts`
   mit eigenem Test. Kodierung per Round-Trip durch `URLSearchParams` prüfen.
 - Filterleiste nur bei **fremder** Änderung neu aufsetzen (nach der Navigation); entprellt wird

@@ -10,6 +10,7 @@ import { dokumentDownloadPfad } from '../api/dokumente';
 import DokumentePage from './DokumentePage';
 import { benutzerFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 
 // Gewartet wird mit RTLs `waitFor` (5 s, `test/setup.ts`), nicht mit `vi.waitFor`: dessen Budget
 // steht fest auf 1 s, und unter Last kam der Einsatz später — „?neu=1 … NICHT für Beobachter“
@@ -176,8 +177,8 @@ describe('DokumentePage', () => {
       dokument({ id: 6, titel: 'Foto Einsatzstelle', kategorie: 'foto' }),
     ]);
     await screen.findByRole('link', { name: 'Foto Einsatzstelle' });
-    await userEvent.click(screen.getByRole('combobox', { name: 'Kategorie' }));
-    await userEvent.click(await screen.findByTitle('Foto'));
+    // Der Filter sitzt im Spaltenkopf (LLH-1086), mit Zähler je Wert.
+    await kopfFilterWaehlen('Kategorie', [/^Foto \(\d+\)$/]);
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: 'Lageplan Nord' })).not.toBeInTheDocument(),
     );

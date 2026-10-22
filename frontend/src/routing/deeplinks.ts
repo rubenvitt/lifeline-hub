@@ -1449,3 +1449,84 @@ export function geraetKartePfad(einsatzId: number): string {
 
 /** Seite nach dem Ende einer Kopplung (Widerruf, Ablauf, Einsatzabschluss): statt der Anmeldung. */
 export const KOPPLUNG_BEENDET_PFAD = '/kopplung-beendet';
+
+// ── Listenzustand (LLH-1086) ─────────────────────────────────────────────────
+
+/**
+ * Sortierung, Spaltenfilter und Suchbegriff einer Liste, wie sie in der Adresse stehen (LLH-1086,
+ * Spec `tabellen-sortieren-filtern`). `sortierung`: `undefined` = Vorgabe der Seite (steht nicht in
+ * der Adresse), `null` = bewusst unsortiert (`sort=aus`). Spalten und Werte sind hier noch
+ * ungeprüfte Zeichenketten; gegen das Spaltenregister prüft `components/listenGedaechtnis.ts`.
+ */
+export interface ListenZustandAdresse {
+  sortierung: { spalte: string; richtung: 'auf' | 'ab' } | null | undefined;
+  filter: Readonly<Record<string, readonly string[]>>;
+  suche: string;
+}
+
+const SORT_PARAM = 'sort';
+const SUCHE_PARAM = 'q';
+const FILTER_PRAEFIX = 'f.';
+const SORT_AUS = 'aus';
+
+function istListenParam(name: string): boolean {
+  return name === SORT_PARAM || name === SUCHE_PARAM || name.startsWith(FILTER_PRAEFIX);
+}
+
+/** Trägt die Adresse einen Listenzustand? Sonst gilt der gemerkte Stand der Seite. */
+export function hatListenZustand(params: URLSearchParams): boolean {
+  return [...params.keys()].some(istListenParam);
+}
+
+/**
+ * Schreibt den Listenzustand in eine KOPIE von `params` (`?sort=frist:auf&f.ausmass=gross,mittel&q=…`):
+ * alte Listenparameter gehen, fremde (`?neu=1`, `?einheit=`) bleiben. Leere Filter und eine Suche
+ * aus Leerraum fallen heraus. Die Werte eines Filters stehen kommagetrennt, jeder einzeln kodiert,
+ * damit ein Komma im Wert die Liste nicht zerbricht.
+ */
+export function listenZustandParams(
+  params: URLSearchParams,
+  zustand: ListenZustandAdresse,
+): URLSearchParams {
+  const neu = new URLSearchParams();
+  for (const [name, wert] of params) if (!istListenParam(name)) neu.append(name, wert);
+  const { sortierung } = zustand;
+  if (sortierung === null) neu.set(SORT_PARAM, SORT_AUS);
+  else if (sortierung) neu.set(SORT_PARAM, `${sortierung.spalte}:${sortierung.richtung}`);
+  for (const [spalte, werte] of Object.entries(zustand.filter)) {
+    if (werte.length === 0) continue;
+    neu.set(`${FILTER_PRAEFIX}${spalte}`, werte.map(encodeURIComponent).join(','));
+  }
+  const suche = zustand.suche.trim();
+  if (suche !== '') neu.set(SUCHE_PARAM, zustand.suche);
+  return neu;
+}
+
+/**
+ * Umkehr von {@link listenZustandParams}. Eine kaputte Sortierung (ohne Richtung, unbekannte
+ * Richtung) wird GANZ verworfen und gilt als Vorgabe, wie ein unbekannter Typ bei
+ * {@link parseEtbFilter}.
+ */
+export function parseListenZustand(params: URLSearchParams): ListenZustandAdresse {
+  let sortierung: ListenZustandAdresse['sortierung'];
+  const sort = params.get(SORT_PARAM);
+  if (sort === SORT_AUS) sortierung = null;
+  else if (sort) {
+    const trenner = sort.lastIndexOf(':');
+    const spalte = sort.slice(0, trenner);
+    const richtung = sort.slice(trenner + 1);
+    if (trenner > 0 && (richtung === 'auf' || richtung === 'ab')) sortierung = { spalte, richtung };
+  }
+  const filter: Record<string, string[]> = {};
+  for (const [name, wert] of params) {
+    if (!name.startsWith(FILTER_PRAEFIX) || wert === '') continue;
+    const spalte = name.slice(FILTER_PRAEFIX.length);
+    if (spalte === '') continue;
+    try {
+      filter[spalte] = wert.split(',').map(decodeURIComponent);
+    } catch {
+      // Ein kaputtes `%` verwirft nur diesen Filter.
+    }
+  }
+  return { sortierung, filter, suche: params.get(SUCHE_PARAM) ?? '' };
+}

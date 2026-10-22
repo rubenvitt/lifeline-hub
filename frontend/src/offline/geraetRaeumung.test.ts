@@ -52,6 +52,7 @@ async function geraetBefuellen(): Promise<void> {
   await setzeOrt(ortKeyVon(51.16, 10.45), 'Hauptstr. 5, Musterstadt');
   schreibeErfassungsSitzungswert(7, 'person', 'antreff_ort', 'Sammelstelle Süd');
   saveGemerkteStelle(7, 21);
+  sessionStorage.setItem('lfh:liste:personen:7', 'q=Meier');
   await queueEinreihen(A, 7, { typ: 'meldung', inhalt: 'offline vorgemerkt', client_id: 'etb-a' });
 }
 
@@ -78,6 +79,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(loadGemerkteStelle(7)).toBeNull();
+    expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 
@@ -91,6 +93,7 @@ describe('geraetRaeumen (LFH-767)', () => {
     expect(await rohLesen('lifeline-ortcache', 'ortsnamen')).toEqual([]);
     expect(liesErfassungsSitzungswert(7, 'person', 'antreff_ort')).toBeUndefined();
     expect(loadGemerkteStelle(7)).toBeNull();
+    expect(sessionStorage.getItem('lfh:liste:personen:7')).toBeNull();
     expect(await rohLesen('lifeline-offline', 'ausstehend')).toHaveLength(1);
   });
 

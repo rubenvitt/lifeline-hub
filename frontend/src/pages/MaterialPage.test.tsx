@@ -418,7 +418,7 @@ describe('MaterialPage', () => {
     await screen.findByText('Wolldecke');
     expect(screen.getByRole('button', { name: /Spalten/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /ausgeblendet/ })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: 'Kategorie' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /^Kategorie/ })).toBeInTheDocument();
     // Steht die Spalte, trägt die Bezeichnungszelle die Kategorie nicht ein zweites Mal.
     expect(screen.getAllByText('Betreuung')).toHaveLength(1);
   });
@@ -430,7 +430,7 @@ describe('MaterialPage', () => {
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
     expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'Kategorie' })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: /^Kategorie/ })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Ort' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Aktionen' })).toBeInTheDocument();
   });
@@ -449,7 +449,7 @@ describe('MaterialPage', () => {
     // Von Hand zurückgeholt: die Spalte steht, die zweite Zeile weicht.
     await userEvent.click(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ }));
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Kategorie' }));
-    expect(await screen.findByRole('columnheader', { name: 'Kategorie' })).toBeInTheDocument();
+    expect(await screen.findByRole('columnheader', { name: /^Kategorie/ })).toBeInTheDocument();
     expect(bezeichnungsZelle()).not.toHaveTextContent('Betreuung');
     expect(screen.getAllByText('Betreuung')).toHaveLength(1);
   });
