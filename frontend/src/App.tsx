@@ -60,6 +60,7 @@ import EinsatzVerhalten from './pages/einstellungen/EinsatzVerhalten';
 import EinsatzAufbewahrung from './pages/einstellungen/EinsatzAufbewahrung';
 import EinsatzModule from './pages/einstellungen/EinsatzModule';
 import EinsatzPegel from './pages/einstellungen/EinsatzPegel';
+import EinsatzKennzahlen from './pages/einstellungen/EinsatzKennzahlen';
 import EinsatzAbloesung from './pages/einstellungen/EinsatzAbloesung';
 import EinsatzGeraete from './pages/einstellungen/EinsatzGeraete';
 import EinsatzZugriff from './pages/einstellungen/EinsatzZugriff';
@@ -217,6 +218,7 @@ const EINSTELLUNGEN_ROUTEN = (
     <Route path="aufbewahrung" element={<EinsatzAufbewahrung />} />
     <Route path="module" element={<EinsatzModule />} />
     <Route path="pegel" element={<EinsatzPegel />} />
+    <Route path="kennzahlen" element={<EinsatzKennzahlen />} />
     <Route path="abloesung" element={<EinsatzAbloesung />} />
     <Route path="geraete" element={<EinsatzGeraete />} />
     <Route path="zugriff" element={<EinsatzZugriff />} />

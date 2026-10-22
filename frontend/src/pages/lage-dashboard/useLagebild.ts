@@ -21,9 +21,12 @@ import { gesperrt, ladeListe, type Geladen } from '../../lageberichte/uebernahme
 import type { ModulFreigaben } from '../../api/types';
 import type { Rohdaten } from './lagebild';
 
-/** Was jede Ansicht des Lagebilds gleich liefert; die Seitenteile (Pegel-Ziel, Evakuierung)
- *  entscheidet die Seite selbst. */
-export type Lagebasis = Omit<Rohdaten, 'pegelZiel' | 'evakuierung' | 'evakuierungZiel'>;
+/** Was jede Ansicht des Lagebilds gleich liefert; die Seitenteile (Pegel-Ziel, Evakuierung,
+ *  Nachforderungen) entscheidet die Seite selbst. */
+export type Lagebasis = Omit<
+  Rohdaten,
+  'pegelZiel' | 'evakuierung' | 'evakuierungZiel' | 'nachforderungen'
+>;
 
 interface Optionen {
   /** Maßgebliche Pegel mitladen (5-min-Nachfrage, kein Live-Ereignis). Nur das Dashboard braucht

@@ -3,6 +3,12 @@
 //!
 //! Spec: `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`.
 //!
+//! Zwei Arten von Auslösern: abgeleitete (Pegel festgelegt, Evakuierung angeordnet — die
+//! Entscheidung fällt im Fachmodul) und **gewählte** (LLH-1371, Tabelle
+//! `einsatz_lagekennzahl_wahl`, Schreibweg [`waehlen`]): „Nachforderungen offen“ hat im Modul
+//! keinen Entscheidungs-Datensatz, also ist die Wahl selbst die Entscheidung. Herleitung
+//! `/mnt/project-files/llh-1021/llh-1371/design.md`.
+//!
 //! Eine Lagekennzahl ist aktiv, wenn eine **bewusste Entscheidung** dafür als Datensatz
 //! vorliegt — nie durch einen Messwert, der sich während der Lage ändert. Sonst würde die
 //! Reihe mit den Werten flackern (Prüfliste Kriterium 9). Das Feld steht am Einsatz statt an
@@ -29,8 +35,27 @@ wire_enum! {
         /// `aufgehoben`. Das Anlegen eines Bezirks IST die Anordnung samt Plangröße (CHECK
         /// `plan_personen >= 1`); Aufheben oder Stornieren des letzten nimmt sie zurück.
         Evakuiert => "evakuiert",
+        /// „Nachforderungen offen“ ist gewählt (LLH-1371, `einsatz_lagekennzahl_wahl`). Der
+        /// Auslöser ist die Wahl, nie die Zahl der offenen Nachforderungen.
+        Nachforderungen => "nachforderungen",
     }
 }
+
+impl Lagekennzahl {
+    /// Ob die Kennzahl per Wahl am Einsatz gesetzt wird ([`waehlen`]). Pegel und Evakuiert
+    /// entstehen aus ihren Fachentscheidungen und sind nicht wählbar. Muss zum CHECK von
+    /// `einsatz_lagekennzahl_wahl` (Migration 0245) passen.
+    pub const fn ist_waehlbar(self) -> bool {
+        match self {
+            Lagekennzahl::Pegel | Lagekennzahl::Evakuiert => false,
+            Lagekennzahl::Nachforderungen => true,
+        }
+    }
+}
+
+/// Höchstzahl der Einträge im Body der Wahl, gezählt vor dem Entdoppeln (`src/AGENTS.md`,
+/// Eingabegrenzen: Listen von außen).
+pub const WAHL_MAX: usize = 8;
 
 /// Die aktiven Lagekennzahlen aus den Auslösern — EINE Ableitung für beide Stellen, an denen
 /// `EinsatzAnzeige` entsteht (`Einsatz::anzeige`, `repo::liste_fuer`). Rein.
@@ -42,6 +67,8 @@ wire_enum! {
 ///   und `raeumung <> 'aufgehoben'`. Das Prädikat ist wortgleich zu `istAktiverBezirk` im
 ///   Frontend (`betreuung/evakuierungKennzahl.ts`) — laufen die beiden auseinander, steht
 ///   „Evakuiert" auf dem Platz, aber die Kennzahl daneben ist leer.
+/// - `nachforderungen_gewaehlt`: `EXISTS` über `einsatz_lagekennzahl_wahl` mit
+///   `kennzahl = 'nachforderungen'` (LLH-1371).
 ///
 /// Die Ausdrücke stehen in drei SQL-Literalen (Detail, Liste und [`lesen`]), nicht als geteilte
 /// Konstante: `query_as` nimmt unter sqlx 0.9 nur `&'static str`, ein `format!` bräche den
@@ -49,13 +76,20 @@ wire_enum! {
 /// (`pegel_festlegen_schaltet_die_lagekennzahl_am_einsatz`) und `tests/betreuung.rs`
 /// (`bezirk_schaltet_die_lagekennzahl_am_einsatz`); dass [`lesen`] mitzieht, die
 /// Umschalt-Tests in `tests/einsatz_live.rs`.
-pub fn ableiten(pegel_festgelegt: bool, evakuierung_angeordnet: bool) -> Vec<Lagekennzahl> {
+pub fn ableiten(
+    pegel_festgelegt: bool,
+    evakuierung_angeordnet: bool,
+    nachforderungen_gewaehlt: bool,
+) -> Vec<Lagekennzahl> {
     let mut aktiv = Vec::new();
     if pegel_festgelegt {
         aktiv.push(Lagekennzahl::Pegel);
     }
     if evakuierung_angeordnet {
         aktiv.push(Lagekennzahl::Evakuiert);
+    }
+    if nachforderungen_gewaehlt {
+        aktiv.push(Lagekennzahl::Nachforderungen);
     }
     aktiv
 }
@@ -72,16 +106,75 @@ pub async fn lesen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<Vec<Lagekennzahl>, AppError> {
-    let (pegel_festgelegt, evakuierung_angeordnet): (bool, bool) = sqlx::query_as(
-        "SELECT EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = ?), \
-                EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = ? \
-                        AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben')",
-    )
-    .bind(einsatz_id)
-    .bind(einsatz_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    Ok(ableiten(pegel_festgelegt, evakuierung_angeordnet))
+    let (pegel_festgelegt, evakuierung_angeordnet, nachforderungen_gewaehlt): (bool, bool, bool) =
+        sqlx::query_as(
+            "SELECT EXISTS (SELECT 1 FROM einsatz_pegel p WHERE p.einsatz_id = ?), \
+                    EXISTS (SELECT 1 FROM evakuierungsbezirk b WHERE b.einsatz_id = ? \
+                            AND b.storniert_at IS NULL AND b.raeumung <> 'aufgehoben'), \
+                    EXISTS (SELECT 1 FROM einsatz_lagekennzahl_wahl w WHERE w.einsatz_id = ? \
+                            AND w.kennzahl = 'nachforderungen')",
+        )
+        .bind(einsatz_id)
+        .bind(einsatz_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    Ok(ableiten(
+        pegel_festgelegt,
+        evakuierung_angeordnet,
+        nachforderungen_gewaehlt,
+    ))
+}
+
+/// Ergebnis von [`waehlen`]: die gespeicherte Wahl und ob sich die aktiven Lagekennzahlen
+/// dadurch geändert haben (dann meldet die Route den Einsatzkopf, LFH-855).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WahlErgebnis {
+    pub gewaehlt: Vec<Lagekennzahl>,
+    pub umgeschaltet: bool,
+}
+
+/// Ersetzt die gewählten Lagekennzahlen eines Einsatzes (Vollersatz, LLH-1371 D4). `gewaehlt`
+/// ist von der Route geprüft (nur wählbare) und entdoppelt. Eine bleibende Wahl behält
+/// `gewaehlt_von_id` und `gewaehlt_at`.
+pub async fn waehlen(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    gewaehlt: &[Lagekennzahl],
+) -> Result<WahlErgebnis, AppError> {
+    let wire = serde_json::to_string(&gewaehlt.iter().map(|k| k.as_str()).collect::<Vec<_>>())
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+    crate::write_retry!(pool, |conn| {
+        let vorher = lesen(conn, einsatz_id).await?;
+        sqlx::query(
+            "DELETE FROM einsatz_lagekennzahl_wahl WHERE einsatz_id = ? \
+             AND kennzahl NOT IN (SELECT value FROM json_each(?))",
+        )
+        .bind(einsatz_id)
+        .bind(&wire)
+        .execute(&mut *conn)
+        .await?;
+        sqlx::query(
+            "INSERT INTO einsatz_lagekennzahl_wahl (einsatz_id, kennzahl, gewaehlt_von_id) \
+             SELECT ?, value, ? FROM json_each(?) WHERE true \
+             ON CONFLICT(einsatz_id, kennzahl) DO NOTHING",
+        )
+        .bind(einsatz_id)
+        .bind(benutzer_id)
+        .bind(&wire)
+        .execute(&mut *conn)
+        .await?;
+        let nachher = lesen(conn, einsatz_id).await?;
+        Ok(WahlErgebnis {
+            gewaehlt: nachher
+                .iter()
+                .copied()
+                .filter(|k| k.ist_waehlbar())
+                .collect(),
+            umgeschaltet: nachher != vorher,
+        })
+    })
 }
 
 #[cfg(test)]
@@ -90,25 +183,51 @@ mod tests {
 
     #[test]
     fn ohne_ausloeser_leer() {
-        assert_eq!(ableiten(false, false), Vec::<Lagekennzahl>::new());
+        assert_eq!(ableiten(false, false, false), Vec::<Lagekennzahl>::new());
     }
 
     #[test]
     fn pegel_festgelegt_schaltet_pegel() {
-        assert_eq!(ableiten(true, false), vec![Lagekennzahl::Pegel]);
+        assert_eq!(ableiten(true, false, false), vec![Lagekennzahl::Pegel]);
     }
 
     #[test]
     fn evakuierung_angeordnet_schaltet_evakuiert() {
-        assert_eq!(ableiten(false, true), vec![Lagekennzahl::Evakuiert]);
+        assert_eq!(ableiten(false, true, false), vec![Lagekennzahl::Evakuiert]);
     }
 
     #[test]
     fn beide_in_enum_reihenfolge() {
         assert_eq!(
-            ableiten(true, true),
+            ableiten(true, true, false),
             vec![Lagekennzahl::Pegel, Lagekennzahl::Evakuiert]
         );
+    }
+
+    #[test]
+    fn gewaehlte_nachforderungen_stehen_hinter_den_abgeleiteten() {
+        assert_eq!(
+            ableiten(false, false, true),
+            vec![Lagekennzahl::Nachforderungen]
+        );
+        assert_eq!(
+            ableiten(true, true, true),
+            vec![
+                Lagekennzahl::Pegel,
+                Lagekennzahl::Evakuiert,
+                Lagekennzahl::Nachforderungen
+            ]
+        );
+    }
+
+    #[test]
+    fn nur_nachforderungen_ist_waehlbar() {
+        let waehlbar: Vec<_> = Lagekennzahl::ALLE
+            .into_iter()
+            .filter(|k| k.ist_waehlbar())
+            .collect();
+        assert_eq!(waehlbar, vec![Lagekennzahl::Nachforderungen]);
+        assert_eq!(Lagekennzahl::Nachforderungen.as_str(), "nachforderungen");
     }
 
     #[test]
@@ -204,6 +323,51 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(gelesen(&pool, einsatz).await, Vec::<Lagekennzahl>::new());
+    }
+
+    #[tokio::test]
+    async fn waehlen_ersetzt_die_wahl_und_meldet_nur_ein_umschalten() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = einsatz_mit_benutzer(&pool).await;
+        let n = [Lagekennzahl::Nachforderungen];
+
+        let leer = waehlen(&pool, einsatz, von, &[]).await.unwrap();
+        assert_eq!(
+            leer,
+            WahlErgebnis {
+                gewaehlt: vec![],
+                umgeschaltet: false
+            }
+        );
+        let an = waehlen(&pool, einsatz, von, &n).await.unwrap();
+        assert_eq!(
+            an,
+            WahlErgebnis {
+                gewaehlt: n.to_vec(),
+                umgeschaltet: true
+            }
+        );
+        assert_eq!(gelesen(&pool, einsatz).await, n.to_vec());
+        let nochmal = waehlen(&pool, einsatz, von, &n).await.unwrap();
+        assert!(!nochmal.umgeschaltet);
+        let aus = waehlen(&pool, einsatz, von, &[]).await.unwrap();
+        assert!(aus.umgeschaltet);
+        assert_eq!(gelesen(&pool, einsatz).await, Vec::<Lagekennzahl>::new());
+    }
+
+    #[tokio::test]
+    async fn die_db_nimmt_keine_nicht_waehlbare_kennzahl_an() {
+        let pool = crate::db::test_pool().await;
+        let (einsatz, von) = einsatz_mit_benutzer(&pool).await;
+        let fehler = sqlx::query(
+            "INSERT INTO einsatz_lagekennzahl_wahl (einsatz_id, kennzahl, gewaehlt_von_id) \
+             VALUES (?, 'pegel', ?)",
+        )
+        .bind(einsatz)
+        .bind(von)
+        .execute(&pool)
+        .await;
+        assert!(fehler.is_err(), "CHECK lässt nur wählbare Kennzahlen zu");
     }
 
     #[tokio::test]

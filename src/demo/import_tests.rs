@@ -1016,8 +1016,11 @@ async fn ueberblick_zeigt_evakuiert_und_keinen_pegel() {
     let e = crate::einsatz::repo::laden(&pool, erg.einsatz_id)
         .await
         .unwrap();
-    let kennzahlen =
-        crate::einsatz::lagekennzahl::ableiten(e.pegel_festgelegt, e.evakuierung_angeordnet);
+    let kennzahlen = crate::einsatz::lagekennzahl::ableiten(
+        e.pegel_festgelegt,
+        e.evakuierung_angeordnet,
+        e.nachforderungen_gewaehlt,
+    );
     assert_eq!(
         kennzahlen,
         vec![crate::einsatz::lagekennzahl::Lagekennzahl::Evakuiert]
