@@ -10905,7 +10905,7 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        migriere_bis(&pool, 241).await;
+        migriere_bis(&pool, 242).await;
 
         let (angelegt, belegung): (i64, Option<i64>) = sqlx::query_as(
             "SELECT nachforderung_angelegt, nachforderung_belegung_id FROM einsatz_einheit \
