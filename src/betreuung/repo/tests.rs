@@ -97,6 +97,8 @@ fn bezirk_eingabe(bezeichnung: &str, plan: i64, erhebung: Erhebung) -> BezirkEin
         plan_personen: plan,
         plan_erhebung: erhebung,
         sammelstelle: None,
+        sammelstelle_lat: None,
+        sammelstelle_lon: None,
         notiz: None,
     }
 }
@@ -178,6 +180,8 @@ fn stelle_eingabe(bezeichnung: &str, art: Art, kapazitaet: Option<i64>) -> Stell
         notiz: None,
         leitung: None,
         erreichbarkeit: None,
+        lat: None,
+        lon: None,
     }
 }
 
@@ -598,6 +602,8 @@ async fn unveraenderte_werte_schreiben_keinen_etb_eintrag() {
             plan_erhebung: Some(Erhebung::Geschaetzt),
             raeumung: Some(Raeumungszustand::Angeordnet),
             sammelstelle: Some(Some("Kirchplatz".into())),
+            sammelstelle_lat: Some(None),
+            sammelstelle_lon: Some(None),
             notiz: Some(None),
         },
     )
@@ -1536,6 +1542,221 @@ async fn stornierte_stelle_verorten_ist_409() {
     assert_eq!(
         status(stelle_aendern(&w, id, verortung(Some(51.93), Some(8.87))).await),
         StatusCode::CONFLICT
+    );
+}
+
+// ── LLH-1121: Koordinate beim Anlegen einer Stelle ─────────────────────────────────────────
+
+#[tokio::test]
+async fn stelle_mit_standort_und_koordinate_anlegen() {
+    let w = welt().await;
+    let mut eingabe = stelle_eingabe("NU Turnhalle Nord", Art::Notunterkunft, Some(150));
+    eingabe.standort = Some("Nordring 5, 12345 Musterstadt".into());
+    eingabe.lat = Some(51.93);
+    eingabe.lon = Some(8.87);
+    let g = stelle_anlegen(&w, eingabe).await.unwrap();
+    let s = stelle_laden(&w.pool, w.e, g.id).await.unwrap();
+    assert_eq!(s.standort.as_deref(), Some("Nordring 5, 12345 Musterstadt"));
+    assert_eq!((s.lat, s.lon), (Some(51.93), Some(8.87)));
+    // Der Anlege-Eintrag nennt weder Standort noch Koordinate (LFH-639 D5).
+    let etb = etb(&w.pool, w.e).await;
+    let text = &etb.last().unwrap().2;
+    assert!(
+        !text.contains("Nordring") && !text.contains("51") && !text.contains("8.87"),
+        "{text}"
+    );
+}
+
+#[tokio::test]
+async fn stelle_anlegen_mit_halbem_paar_oder_ausser_bereich_ist_422() {
+    let w = welt().await;
+    for (la, lo) in [
+        (Some(51.93), None),
+        (None, Some(8.87)),
+        (Some(91.0), Some(8.0)),
+        (Some(51.0), Some(-180.5)),
+    ] {
+        let mut eingabe = stelle_eingabe("NU Turnhalle Nord", Art::Notunterkunft, None);
+        eingabe.lat = la;
+        eingabe.lon = lo;
+        assert_eq!(
+            status(stelle_anlegen(&w, eingabe).await),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{la:?}/{lo:?}"
+        );
+    }
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM betreuungsstelle").await,
+        0,
+        "nichts angelegt"
+    );
+}
+
+// ── LLH-1121: Koordinate der Sammelstelle ──────────────────────────────────────────────────
+
+fn sammelstelle_verortung(lat: Option<f64>, lon: Option<f64>) -> BezirkAenderung {
+    BezirkAenderung {
+        sammelstelle_lat: Some(lat),
+        sammelstelle_lon: Some(lon),
+        ..Default::default()
+    }
+}
+
+#[tokio::test]
+async fn bezirk_mit_verorteter_sammelstelle_anlegen() {
+    let w = welt().await;
+    let mut eingabe = bezirk_eingabe("Uferstraße 12–40", 640, Erhebung::Geschaetzt);
+    eingabe.sammelstelle = Some("Kirchplatz 1, 12345 Musterstadt".into());
+    eingabe.sammelstelle_lat = Some(52.1);
+    eingabe.sammelstelle_lon = Some(9.35);
+    let id = bezirk_anlegen(&w, eingabe).await.unwrap().id;
+    let b = bezirk_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(
+        b.sammelstelle.as_deref(),
+        Some("Kirchplatz 1, 12345 Musterstadt")
+    );
+    assert_eq!(
+        (b.sammelstelle_lat, b.sammelstelle_lon),
+        (Some(52.1), Some(9.35))
+    );
+    let v = serde_json::to_value(&b).unwrap();
+    assert_eq!(v["sammelstelle_lat"], serde_json::json!(52.1));
+    assert_eq!(v["sammelstelle_lon"], serde_json::json!(9.35));
+    // Der Anlege-Eintrag nennt Bezeichnung und Plangröße, nie Sammelstelle oder Koordinate.
+    let etb = etb(&w.pool, w.e).await;
+    let text = &etb.last().unwrap().2;
+    assert!(
+        !text.contains("Kirchplatz") && !text.contains("52.1"),
+        "{text}"
+    );
+}
+
+#[tokio::test]
+async fn unverortete_sammelstelle_fehlt_auf_dem_draht() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    let v = serde_json::to_value(bezirk_laden(&w.pool, w.e, id).await.unwrap()).unwrap();
+    let o = v.as_object().unwrap();
+    assert!(
+        !o.contains_key("sammelstelle_lat") && !o.contains_key("sammelstelle_lon"),
+        "{v}"
+    );
+}
+
+#[tokio::test]
+async fn bezirk_anlegen_mit_halbem_paar_oder_ausser_bereich_ist_422() {
+    let w = welt().await;
+    for (la, lo) in [
+        (Some(52.1), None),
+        (None, Some(9.35)),
+        (Some(-90.5), Some(9.0)),
+        (Some(52.0), Some(181.0)),
+    ] {
+        let mut eingabe = bezirk_eingabe("Uferstraße", 640, Erhebung::Geschaetzt);
+        eingabe.sammelstelle_lat = la;
+        eingabe.sammelstelle_lon = lo;
+        assert_eq!(
+            status(bezirk_anlegen(&w, eingabe).await),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{la:?}/{lo:?}"
+        );
+    }
+    assert_eq!(
+        zaehle(&w.pool, "SELECT COUNT(*) FROM evakuierungsbezirk").await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn sammelstelle_verorten_schreibt_kein_etb_und_meldet_wirksam() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    let n = etb(&w.pool, w.e).await.len();
+    let g = bezirk_aendern(&w, id, sammelstelle_verortung(Some(52.1), Some(9.35)))
+        .await
+        .unwrap();
+    assert!(g.etb_ids.is_empty(), "die Koordinate steht nie im ETB");
+    assert!(g.still_geaendert, "die Verortung wird live verteilt");
+    assert_eq!(etb(&w.pool, w.e).await.len(), n);
+    let b = bezirk_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(
+        (b.sammelstelle_lat, b.sammelstelle_lon),
+        (Some(52.1), Some(9.35))
+    );
+    assert!(b.geaendert_at.is_some());
+
+    // Dieselbe Koordinate noch einmal: Leerlauf.
+    let g = bezirk_aendern(&w, id, sammelstelle_verortung(Some(52.1), Some(9.35)))
+        .await
+        .unwrap();
+    assert!(g.etb_ids.is_empty() && !g.still_geaendert);
+
+    // Entfernen.
+    let g = bezirk_aendern(&w, id, sammelstelle_verortung(None, None))
+        .await
+        .unwrap();
+    assert!(g.still_geaendert);
+    let b = bezirk_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!((b.sammelstelle_lat, b.sammelstelle_lon), (None, None));
+}
+
+#[tokio::test]
+async fn sammelstelle_text_und_koordinate_nennen_nur_weitere_angaben() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    let n = etb(&w.pool, w.e).await.len();
+    let g = bezirk_aendern(
+        &w,
+        id,
+        BezirkAenderung {
+            sammelstelle: Some(Some("Kirchplatz 1".into())),
+            sammelstelle_lat: Some(Some(52.1)),
+            sammelstelle_lon: Some(Some(9.35)),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(g.etb_ids.len(), 1);
+    let text = &etb(&w.pool, w.e).await[n].2;
+    assert!(text.contains("weitere Angaben"), "{text}");
+    assert!(
+        !text.contains("Kirchplatz") && !text.contains("52.1"),
+        "{text}"
+    );
+}
+
+#[tokio::test]
+async fn sammelstelle_halbes_paar_gegen_den_bestand_ist_422() {
+    let w = welt().await;
+    let id = bezirk(&w, "Uferstraße", 640).await;
+    let nur_lat = BezirkAenderung {
+        sammelstelle_lat: Some(Some(52.1)),
+        ..Default::default()
+    };
+    assert_eq!(
+        status(bezirk_aendern(&w, id, nur_lat).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        status(bezirk_aendern(&w, id, sammelstelle_verortung(Some(91.0), Some(9.0))).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    bezirk_aendern(&w, id, sammelstelle_verortung(Some(52.1), Some(9.35)))
+        .await
+        .unwrap();
+    let nur_lon_weg = BezirkAenderung {
+        sammelstelle_lon: Some(None),
+        ..Default::default()
+    };
+    assert_eq!(
+        status(bezirk_aendern(&w, id, nur_lon_weg).await),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let b = bezirk_laden(&w.pool, w.e, id).await.unwrap();
+    assert_eq!(
+        (b.sammelstelle_lat, b.sammelstelle_lon),
+        (Some(52.1), Some(9.35))
     );
 }
 

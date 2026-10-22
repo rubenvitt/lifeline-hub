@@ -1344,6 +1344,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("plan_erhebung", G_ENUM),
             retain("raeumung", G_ENUM),
             scrub("sammelstelle", Strategie::NullSetzen, Z_EINSATZ),
+            // Koordinate der Sammelstelle (LLH-1121) — Geo-Skelett wie `betreuungsstelle.lat/lon`;
+            // eine Sammelstelle ist ein öffentlicher Treffpunkt, keine Privatadresse.
+            retain("sammelstelle_lat", G_GEO),
+            retain("sammelstelle_lon", G_GEO),
             scrub("notiz", Strategie::NullSetzen, Z_EINSATZ),
             retain("stand_id", G_FK),
             retain("storniert_at", G_ZEIT),

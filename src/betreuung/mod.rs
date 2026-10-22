@@ -198,6 +198,12 @@ pub struct EvakuierungsbezirkAnzeige {
     pub raeumung: Raeumungszustand,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sammelstelle: Option<String>,
+    /// Koordinate der Sammelstelle (LLH-1121). Beide fehlen = nicht verortet; die App hält sie
+    /// als Paar.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sammelstelle_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sammelstelle_lon: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notiz: Option<String>,
     /// Zahl der Zonen vom Typ `evakuierungsbezirk`, die diesem Bezirk zugeordnet sind

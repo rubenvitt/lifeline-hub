@@ -189,6 +189,12 @@ pub struct StelleAnlegen {
     leitung: Option<String>,
     #[serde(default)]
     erreichbarkeit: Option<String>,
+    /// Koordinate aus dem Ortsfeld des Standorts (LLH-1121). Halbes Paar oder Wert außerhalb
+    /// des Bereichs → **422**, wie beim Ändern ([`StelleAendern::lat`]).
+    #[serde(default)]
+    lat: Option<f64>,
+    #[serde(default)]
+    lon: Option<f64>,
 }
 
 /// POST /api/einsaetze/{id}/betreuung/stellen
@@ -207,6 +213,8 @@ pub async fn stelle_anlegen(
         notiz: req.notiz,
         leitung: optional_max(req.leitung, "Leitung", LEITUNG_MAX)?,
         erreichbarkeit: optional_max(req.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?,
+        lat: req.lat,
+        lon: req.lon,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;

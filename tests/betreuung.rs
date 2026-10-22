@@ -1347,6 +1347,181 @@ async fn verortung_halbes_paar_oder_bereich_ist_422() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
 
+// ── LLH-1121: Koordinate aus dem Ortsfeld beim Anlegen und an der Sammelstelle ─────────────
+
+/// POST einer Stelle mit Standort und Koordinate (Ortsfeld): beides kommt zurück und steht in der
+/// Übersicht; die Koordinate geht nicht ins ETB.
+#[tokio::test]
+async fn stelle_mit_koordinate_anlegen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/stellen", pfad(e)),
+        &admin,
+        Some(
+            r#"{"bezeichnung":"NU Turnhalle Nord","art":"notunterkunft",
+                "standort":"Nordring 5, 12345 Musterstadt","lat":51.93,"lon":8.87}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    assert_eq!(j["standort"], "Nordring 5, 12345 Musterstadt");
+    assert_eq!(
+        (j["lat"].clone(), j["lon"].clone()),
+        (51.93.into(), 8.87.into())
+    );
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["stellen"][0]["lat"], 51.93, "{u:?}");
+    let etb = etb_eintraege(&app, &admin, e).await;
+    assert!(
+        etb.iter()
+            .all(|x| !x["inhalt"].as_str().unwrap_or("").contains("51.93")),
+        "{etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn stelle_anlegen_halbes_paar_oder_bereich_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let url = format!("{}/stellen", pfad(e));
+    for koordinate in [
+        r#""lat":51.93"#,
+        r#""lon":8.87"#,
+        r#""lat":51.93,"lon":null"#,
+        r#""lat":91,"lon":8"#,
+        r#""lat":51,"lon":-181"#,
+    ] {
+        let body = format!(r#"{{"bezeichnung":"NU Nord","art":"notunterkunft",{koordinate}}}"#);
+        let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {j:?}");
+    }
+    let (_, u) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
+    assert_eq!(u["stellen"], serde_json::json!([]), "nichts angelegt");
+}
+
+/// Sammelstelle mit Koordinate anlegen und fortschreiben: die Koordinate steht im Bezirk, ein
+/// PATCH nur mit ihr schreibt kein ETB und wird trotzdem live verteilt; `null` entfernt sie.
+#[tokio::test]
+async fn sammelstelle_mit_koordinate_anlegen_aendern_entfernen() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let (s, j) = anfrage(
+        &app,
+        "POST",
+        &format!("{}/bezirke", pfad_evak(e)),
+        &admin,
+        Some(
+            r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt",
+                "sammelstelle":"Kirchplatz 1","sammelstelle_lat":52.1,"sammelstelle_lon":9.35}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    assert_eq!(j["sammelstelle"], "Kirchplatz 1");
+    assert_eq!(j["sammelstelle_lat"], 52.1);
+    assert_eq!(j["sammelstelle_lon"], 9.35);
+    let bid = j["id"].as_i64().unwrap();
+    assert_eq!(
+        bezirke_von(&app, &admin, e).await[0]["sammelstelle_lat"],
+        52.1
+    );
+
+    let url = format!("{}/bezirke/{bid}", pfad_evak(e));
+    let vorher = etb_eintraege(&app, &admin, e).await.len();
+    let feed = live_oeffnen(&app, &admin, e).await;
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"sammelstelle_lat":52.2,"sammelstelle_lon":9.4}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    assert_eq!(
+        (j["sammelstelle_lat"].clone(), j["sammelstelle_lon"].clone()),
+        (52.2.into(), 9.4.into())
+    );
+    let gelesen = sse_anfang_lesen(feed.into_body(), 400).await;
+    assert!(
+        gelesen.contains("event: evakuierung")
+            && gelesen.contains(&format!(r#""bezirk_id":{bid}"#)),
+        "Verortung der Sammelstelle wird live verteilt: {gelesen:?}"
+    );
+    assert_eq!(
+        etb_eintraege(&app, &admin, e).await.len(),
+        vorher,
+        "kein ETB-Eintrag"
+    );
+
+    let (s, j) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"sammelstelle_lat":null,"sammelstelle_lon":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{j:?}");
+    let o = j.as_object().unwrap();
+    assert!(
+        !o.contains_key("sammelstelle_lat") && !o.contains_key("sammelstelle_lon"),
+        "{j:?}"
+    );
+}
+
+#[tokio::test]
+async fn sammelstelle_halbes_paar_oder_bereich_ist_422() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for koordinate in [
+        r#""sammelstelle_lat":52.1"#,
+        r#""sammelstelle_lat":91,"sammelstelle_lon":9"#,
+    ] {
+        let body = format!(
+            r#"{{"bezeichnung":"Uferstraße","plan_personen":640,"plan_erhebung":"geschaetzt",{koordinate}}}"#
+        );
+        let (s, j) = anfrage(
+            &app,
+            "POST",
+            &format!("{}/bezirke", pfad_evak(e)),
+            &admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {j:?}");
+    }
+    let bid = bezirk(&app, &admin, e, "Deichweg").await;
+    let url = format!("{}/bezirke/{bid}", pfad_evak(e));
+    for body in [
+        r#"{"sammelstelle_lon":9.35}"#,
+        r#"{"sammelstelle_lat":52.1,"sammelstelle_lon":-181}"#,
+    ] {
+        let (s, j) = anfrage(&app, "PATCH", &url, &admin, Some(body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {j:?}");
+    }
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &url,
+        &admin,
+        Some(r#"{"sammelstelle_lat":"x","sammelstelle_lon":9}"#),
+    )
+    .await;
+    assert_eq!(
+        s,
+        StatusCode::BAD_REQUEST,
+        "falscher Feldtyp scheitert am Feld"
+    );
+}
+
 // ── Lagekennzahl `evakuiert` am Einsatz (LFH-607) ──────────────────────────────────────────
 
 /// `lagekennzahlen` des Einsatzes aus Detail- UND Listenantwort. Das Feld wird an zwei Stellen

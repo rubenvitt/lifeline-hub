@@ -1002,6 +1002,8 @@ impl Ablauf<'_> {
                         plan_personen: v.plan_personen,
                         plan_erhebung: v.plan_erhebung,
                         sammelstelle: Some(v.sammelstelle.to_string()),
+                        sammelstelle_lat: None,
+                        sammelstelle_lon: None,
                         notiz: None,
                     },
                 )
@@ -1053,6 +1055,9 @@ impl Ablauf<'_> {
                         notiz: None,
                         leitung: None,
                         erreichbarkeit: None,
+                        // Verortet wird die Stelle mit der Inbetriebnahme (`StelleInBetrieb`).
+                        lat: None,
+                        lon: None,
                     },
                 )
                 .await?;
