@@ -51,6 +51,9 @@ import {
 import StatusTag from '../../src/components/StatusTag';
 import SichtungsTag from '../../src/components/SichtungsTag';
 import { InlineAngabe } from '../../src/components/InlineAngabe';
+import FunkUndTelefon from '../../src/components/FunkUndTelefon';
+import { VerbindungenAngabe } from '../../src/components/VerbindungenFeld';
+import type { KommunikationsVerbindung } from '../../src/api/types';
 import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
 import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
@@ -102,6 +105,24 @@ function InlineAngabeBeispiel({ etikett, wert }: { etikett: string; wert: string
         <Input {...feld} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
       onSpeichern={async (neu) => setGespeichert(neu)}
+    />
+  );
+}
+
+const BEISPIEL_VERBINDUNGEN: KommunikationsVerbindung[] = [
+  { id: 1, mittel: 'mobil', wert: '0170 1234567', hinweis: 'Zugführer' },
+  { id: 2, mittel: 'festnetz', wert: '05141 9930' },
+  { id: 3, mittel: 'email', wert: 'ea-nord@example.org' },
+];
+
+function VerbindungenBeispiel() {
+  const [liste, setListe] = useState<KommunikationsVerbindung[]>(BEISPIEL_VERBINDUNGEN);
+  return (
+    <VerbindungenAngabe
+      etikett="Telefon und weitere Verbindungen"
+      verbindungen={liste}
+      darfSchreiben
+      onSpeichern={async (neu) => setListe(neu.map((v, i) => ({ id: i + 1, ...v })))}
     />
   );
 }
@@ -310,6 +331,52 @@ export const PREVIEWS: readonly PreviewSpec[] = [
       );
       if (ausloeser.length !== 2) {
         throw new Error('Design System: Auslöser „Einsatzstichwort bearbeiten“ nicht gefunden');
+      }
+      for (const knopf of ausloeser) await act(async () => knopf.click());
+    },
+  },
+  {
+    name: 'Verbindungen',
+    title: 'Verbindungen (Funk und Telefon getrennt; Liste offen)',
+    group: 'Bedienung',
+    height: 895,
+    source: 'components/VerbindungenFeld.tsx',
+    moreDoc: 'components/FunkUndTelefon.tsx',
+    content: () => (
+      <div className="ds-stapel">
+        <Datenraster spalten={1} beschriftung="Anzeige">
+          <FunkUndTelefon
+            rufname="Florian Celle 1-46-1"
+            sprechgruppen={[
+              {
+                id: 1,
+                bezeichnung: '412_F_DRK',
+                betriebsart: 'TMO',
+                aktiv: true,
+                einsatz_lokal: false,
+                einsatz_id: null,
+                sortier: 1,
+              },
+            ]}
+            verbindungen={BEISPIEL_VERBINDUNGEN}
+          />
+        </Datenraster>
+        <Datenraster spalten={1} beschriftung="Bearbeiten">
+          <Datenfeld label="Telefon und weitere Verbindungen" breit>
+            <VerbindungenBeispiel />
+          </Datenfeld>
+        </Datenraster>
+      </div>
+    ),
+    interact: async (container) => {
+      const ausloeser = [...container.querySelectorAll('button')].filter(
+        (knopf) =>
+          knopf.getAttribute('aria-label') === 'Telefon und weitere Verbindungen bearbeiten',
+      );
+      if (ausloeser.length !== 2) {
+        throw new Error(
+          'Design System: Auslöser „Telefon und weitere Verbindungen bearbeiten“ fehlt',
+        );
       }
       for (const knopf of ausloeser) await act(async () => knopf.click());
     },

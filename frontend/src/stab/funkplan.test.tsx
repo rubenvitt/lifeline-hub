@@ -49,7 +49,15 @@ function sg(
 }
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -65,6 +73,7 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }
@@ -108,7 +117,10 @@ function quellen(p: Partial<FunkplanQuellen> = {}): FunkplanQuellen {
 }
 
 function fs(p: Partial<Fuehrungsstelle> = {}): FunkplanQuellen['fuehrungsstelle'] {
-  return { zustand: 'daten', daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p } };
+  return {
+    zustand: 'daten',
+    daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [], ...p },
+  };
 }
 
 function alleSchluessel(zeilen: FunkplanZeile[]): string[] {
@@ -240,8 +252,10 @@ describe('baueFunkplan', () => {
             name: 'Abschnitt Nord',
             kurzbezeichnung: 'EA-N',
             leiter_name: 'Anna Leiter',
-            kommunikationsmittel: 'digitalfunk',
-            erreichbarkeit: '0171 1',
+            verbindungen: [
+              { id: 1, mittel: 'mobil', wert: '0171 1', hinweis: null },
+              { id: 2, mittel: 'email', wert: 'nord@drk.de', hinweis: null },
+            ],
           }),
         ]),
         einheiten: daten([
@@ -262,8 +276,8 @@ describe('baueFunkplan', () => {
       stelle: 'Abschnitt Nord',
       rufname: 'EA-N',
       leitung: { art: 'name', namen: ['Anna Leiter'] },
-      kommunikationsmittel: 'Digitalfunk',
-      erreichbarkeit: '0171 1',
+      // Nur Festnetz und Mobil heißen „Telefon“ (LLH-1134).
+      telefon: [{ id: 1, mittel: 'mobil', wert: '0171 1', hinweis: null }],
     });
     const e = a.children![0];
     expect(e).toMatchObject({
@@ -276,11 +290,24 @@ describe('baueFunkplan', () => {
       stelle: 'Florian 1/42-1',
       stelleZusatz: 'HLF 20',
       rufname: 'FW-1-42-1',
-      kommunikationsmittel: null,
-      erreichbarkeit: null,
+      telefon: [],
       tmo: [],
       dmo: [],
     });
+  });
+
+  // LLH-1134: der Rufname der Abschnittsleitung geht vor die Kurzbezeichnung.
+  it('nimmt beim Abschnitt den Rufnamen vor der Kurzbezeichnung', () => {
+    const plan = baueFunkplan(
+      quellen({
+        abschnitte: daten([
+          abschnitt(1, { kurzbezeichnung: 'EA-N', rufname: 'Rotkreuz Musterstadt 1/10-1' }),
+          abschnitt(2, { kurzbezeichnung: 'EA-S', rufname: ' ' }),
+          abschnitt(3),
+        ]),
+      }),
+    );
+    expect(plan.map((z) => z.rufname)).toEqual(['Rotkreuz Musterstadt 1/10-1', 'EA-S', null]);
   });
 
   it('liest den Fahrzeugführer aus dem Personal mit Position Führer', () => {
@@ -339,8 +366,7 @@ describe('rendereFunkplanMarkdown', () => {
         name: 'Abschnitt Nord',
         kurzbezeichnung: 'EA-N',
         leiter_name: 'Anna Leiter',
-        kommunikationsmittel: 'digitalfunk',
-        erreichbarkeit: '0171 GEHEIM',
+        verbindungen: [{ id: 1, mittel: 'mobil', wert: '0171 GEHEIM', hinweis: 'GEHEIM' }],
         sprechgruppen: [sg(1, 'TMO', '311'), sg(2, 'DMO', '505')],
       }),
       abschnitt(2, { name: 'Abschnitt Süd' }),
@@ -350,7 +376,7 @@ describe('rendereFunkplanMarkdown', () => {
         name: '1. Zug',
         abschnitt_id: 1,
         funkrufname: 'Zug 1',
-        erreichbarkeit: '0160 GEHEIM',
+        verbindungen: [{ id: 2, mittel: 'festnetz', wert: '0160 GEHEIM', hinweis: null }],
       }),
     ]),
     fahrzeuge: daten([
@@ -373,7 +399,7 @@ describe('rendereFunkplanMarkdown', () => {
 
   it('gibt den Baum eingerückt mit allen Funkangaben wieder', () => {
     expect(md).toContain(
-      '- **Abschnitt Nord** · Rufname EA-N · Leitung Anna Leiter · TMO 311 · DMO 505 · Digitalfunk',
+      '- **Abschnitt Nord** · Rufname EA-N · Leitung Anna Leiter · TMO 311 · DMO 505\n',
     );
     expect(md).toContain('  - **1. Zug** · Rufname Zug 1');
     expect(md).toContain(
@@ -401,15 +427,19 @@ describe('rendereFunkplanMarkdown', () => {
     expect(md).toContain('## Lücken');
     expect(md).toContain('- Abschnitte ohne Sprechgruppe: 1 (Abschnitt Süd)');
     expect(md).toContain('- Einheiten ohne Sprechgruppe: 1 (1. Zug)');
-    expect(md).toContain('- Einheiten ohne Erreichbarkeit: 0');
+    expect(md).toContain('- Einheiten ohne Funkrufname: 0');
+    expect(md).toContain('- Einheiten ohne Telefon: 0');
     expect(md).toContain('- Einsatzlokale Sprechgruppen ohne Zuordnung: 1 (DMO 999)');
     expect(md).toContain('- Eigene Gegenstelle (Führungsstelle): nicht erfasst');
   });
 
-  it('nennt Verbindungen ohne gemeinsame Sprechgruppe nach den Erreichbarkeiten (LFH-625)', () => {
+  it('nennt Verbindungen ohne gemeinsame Sprechgruppe nach den Einheiten ohne Telefon (LFH-625)', () => {
     expect(md).toContain('- Verbindungen ohne gemeinsame Sprechgruppe: 0');
     expect(md.indexOf('- Verbindungen ohne gemeinsame Sprechgruppe')).toBeGreaterThan(
-      md.indexOf('- Einheiten ohne Erreichbarkeit'),
+      md.indexOf('- Einheiten ohne Telefon'),
+    );
+    expect(md.indexOf('- Einheiten ohne Telefon')).toBeGreaterThan(
+      md.indexOf('- Einheiten ohne Funkrufname'),
     );
     expect(md.indexOf('- Verbindungen ohne gemeinsame Sprechgruppe')).toBeLessThan(
       md.indexOf('- Einsatzlokale Sprechgruppen ohne Zuordnung'),
@@ -440,10 +470,12 @@ describe('rendereFunkplanMarkdown', () => {
     expect(text).toContain('- Verbindungen ohne gemeinsame Sprechgruppe: — (nicht freigegeben)');
   });
 
-  it('nimmt die Erreichbarkeit nie mit (personenbezogen)', () => {
+  it('nimmt das Telefon nie mit (personenbezogen)', () => {
     expect(md).not.toContain('GEHEIM');
-    // Die Lückenzeile „Einheiten ohne Erreichbarkeit“ ist erlaubt, die Gliederung kennt keine.
-    expect(md.slice(md.indexOf('## Gliederung'))).not.toMatch(/Erreichbar/);
+    // Die Lückenzeile „Einheiten ohne Telefon“ ist erlaubt, die Gliederung kennt kein Telefon.
+    expect(md.slice(md.indexOf('## Gliederung'), md.indexOf('## Lücken'))).not.toMatch(
+      /Telefon|Mobil|Festnetz/,
+    );
   });
 
   it('kommt ohne Piktogramme aus', () => {
@@ -568,16 +600,21 @@ describe('md (LFH-868)', () => {
 describe('fuehrungsstelleErfasst', () => {
   it('ist ohne Daten und mit leeren Angaben nicht erfasst', () => {
     expect(fuehrungsstelleErfasst(null)).toBe(false);
-    expect(fuehrungsstelleErfasst({ art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] })).toBe(
-      false,
-    );
     expect(
       fuehrungsstelleErfasst({
         art: 'mobil',
         sprechgruppen: [],
+        verbindungen: [],
+        fahrzeug_ids: [],
+      }),
+    ).toBe(false);
+    expect(
+      fuehrungsstelleErfasst({
+        art: 'mobil',
+        sprechgruppen: [],
+        verbindungen: [],
         fahrzeug_ids: [],
         rufname: '  ',
-        erreichbarkeit: null,
       }),
     ).toBe(false);
   });
@@ -585,18 +622,28 @@ describe('fuehrungsstelleErfasst', () => {
   it.each<[string, Fuehrungsstelle]>([
     [
       'Rufname',
-      { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], rufname: 'Florian Stadt 10/1' },
+      {
+        art: 'mobil',
+        sprechgruppen: [],
+        verbindungen: [],
+        fahrzeug_ids: [],
+        rufname: 'Florian Stadt 10/1',
+      },
     ],
     [
-      'Kommunikationsmittel',
-      { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], kommunikationsmittel: 'digitalfunk' },
+      'Verbindung',
+      {
+        art: 'mobil',
+        sprechgruppen: [],
+        verbindungen: [{ id: 1, mittel: 'mobil', wert: '0171 1234567', hinweis: null }],
+        fahrzeug_ids: [],
+      },
     ],
     [
-      'Erreichbarkeit',
-      { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], erreichbarkeit: '0171 1234567' },
+      'Sprechgruppe',
+      { art: 'mobil', sprechgruppen: [sg(1, 'TMO', '311')], verbindungen: [], fahrzeug_ids: [] },
     ],
-    ['Sprechgruppe', { art: 'mobil', sprechgruppen: [sg(1, 'TMO', '311')], fahrzeug_ids: [] }],
-    ['Fahrzeug', { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [41] }],
+    ['Fahrzeug', { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [41] }],
   ])('ist mit %s allein erfasst', (_, daten) => {
     expect(fuehrungsstelleErfasst(daten)).toBe(true);
   });
@@ -608,8 +655,7 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
     fuehrungsstelle: fs({
       rufname: 'Florian Stadt 10/1',
       sprechgruppen: [sg(1, 'TMO', '311'), sg(2, 'DMO', '505')],
-      kommunikationsmittel: 'digitalfunk',
-      erreichbarkeit: '0171 GEHEIM',
+      verbindungen: [{ id: 9, mittel: 'mobil', wert: '0171 GEHEIM', hinweis: null }],
     }),
   });
 
@@ -637,8 +683,7 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
       leitung: { art: 'leer' },
       tmo: ['311'],
       dmo: ['505'],
-      kommunikationsmittel: 'Digitalfunk',
-      erreichbarkeit: '0171 GEHEIM',
+      telefon: [{ id: 9, mittel: 'mobil', wert: '0171 GEHEIM', hinweis: null }],
     });
     expect(aufklappbareSchluessel(zeilen)).toEqual([]);
   });
@@ -742,11 +787,11 @@ describe('baueFunkplan · eigene Führungsstelle', () => {
     expect(alleSchluessel(baueFunkplan(q))).toContain('fz-100');
   });
 
-  it('beginnt die Gliederung im Bericht mit der Führungsstelle, ohne ihre Erreichbarkeit', () => {
+  it('beginnt die Gliederung im Bericht mit der Führungsstelle, ohne ihr Telefon', () => {
     const text = rendereFunkplanMarkdown(baueFunkplan(mitFs), 'X', funkplanLuecken(mitFs), mitFs);
     const gliederung = text.slice(text.indexOf('## Gliederung')).split('\n');
     expect(gliederung[2]).toBe(
-      '- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO 311 · DMO 505 · Digitalfunk',
+      '- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO 311 · DMO 505',
     );
     expect(gliederung[3]).toBe('- **Abschnitt Nord**');
     expect(text).not.toContain('GEHEIM');

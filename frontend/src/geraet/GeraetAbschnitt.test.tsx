@@ -55,7 +55,15 @@ function geraet(ueber: Partial<GeraetAnzeige> = {}): GeraetAnzeige {
 }
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 7, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 7,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -71,6 +79,7 @@ function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     ist: { fuehrer: 0, unterfuehrer: 0, mannschaft: 0 },
     ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 6 },
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }

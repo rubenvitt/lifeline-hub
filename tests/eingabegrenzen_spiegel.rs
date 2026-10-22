@@ -132,7 +132,15 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ("SAMMEL_MAX", kraefte_disposition::SAMMEL_MAX),
         ("EINHEIT_NAME_MAX", einheit::NAME_MAX),
         ("EINHEIT_FUNKRUFNAME_MAX", einheit::FUNKRUFNAME_MAX),
-        ("EINHEIT_ERREICHBARKEIT_MAX", einheit::ERREICHBARKEIT_MAX),
+        ("VERBINDUNGEN_MAX", einsatz::verbindungen::VERBINDUNGEN_MAX),
+        (
+            "VERBINDUNG_TEXT_MAX",
+            einsatz::verbindungen::VERBINDUNG_TEXT_MAX,
+        ),
+        (
+            "ABSCHNITT_RUFNAME_MAX",
+            einsatz::verbindungen::ABSCHNITT_RUFNAME_MAX,
+        ),
         ("ERWAEHNUNGEN_MAX", chat::erwaehnung::ERWAEHNUNGEN_MAX),
         (
             "VERPFLEGUNG_ZEITFENSTER_BEZEICHNUNG_MAX",

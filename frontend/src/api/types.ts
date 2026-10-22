@@ -360,8 +360,8 @@ export interface FuehrungsstellePatch {
   standort_lat?: number | null;
   standort_lon?: number | null;
   rufname?: string | null;
-  kommunikationsmittel?: string | null;
-  erreichbarkeit?: string | null;
+  /** LLH-1134: Telefon und weitere Verbindungen; ersetzt vollständig (`[]` leert). */
+  verbindungen?: NeueVerbindung[];
   sprechgruppe_ids?: number[];
   /** Dispositionszeilen, die die Führungsstelle tragen (LFH-1106); ersetzt vollständig. */
   fahrzeug_ids?: number[];
@@ -657,7 +657,10 @@ export interface NeueKommunikationsStelle {
   bezeichnung?: string;
 }
 
-/** Kein Backend-Schema: Eingabe-Body von `POST …/stellen/{sid}/verbindungen`, FE-lokal. */
+/**
+ * Kein Backend-Schema: Eingabe-Body von `POST …/stellen/{sid}/verbindungen`, FE-lokal; zugleich
+ * ein Eintrag der Ersatzliste `verbindungen` an Abschnitt, Einheit und Führungsstelle (LLH-1134).
+ */
 export interface NeueVerbindung {
   mittel: Verbindungsmittel;
   wert: string;

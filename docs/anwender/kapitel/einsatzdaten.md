@@ -81,8 +81,10 @@ anderer Text eintragen.
 3. „Bezeichnung“ eintragen, etwa „ELW 2 Musterstadt“ oder „TEL Rathaus“.
 4. Bei „Standort“ die Adresse und die Koordinate eintragen. „wie Einsatzort“ übernimmt beides
    vom Einsatzort; danach „Speichern“ wählen.
-5. „Rufname“, „Sprechgruppen“, „Kommunikationsmittel“, „Erreichbarkeit“ und
-   „Führungsfahrzeuge“ Zeile für Zeile eintragen und speichern wie jede andere Angabe. Bei
+5. „Rufname“, „Sprechgruppen“, „Telefon und weitere Verbindungen“ und „Führungsfahrzeuge“
+   Zeile für Zeile eintragen und speichern wie jede andere Angabe. Rufname und Sprechgruppen sind
+   der Funk; unter „Telefon und weitere Verbindungen“ fügt „Verbindung hinzufügen“ je Nummer oder
+   Adresse eine Zeile mit Mittel und Hinweis an, wie bei Abschnitt und Einheit. Bei
    „ortsfest“ stehen die Führungsfahrzeuge eingeklappt; ein Klick auf die Anzahl öffnet sie.
    Beim „Rufname“ schlägt die Liste die Funkrufnamen der Führungsfahrzeuge vor; Tippen grenzt
    sie ein, ein Eintrag übernimmt den Funkrufnamen unverändert, freier Text bleibt möglich.

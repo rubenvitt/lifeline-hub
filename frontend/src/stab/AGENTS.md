@@ -35,7 +35,7 @@ Startseite des Moduls Fernmeldewesen (`funkplanPfad`), Einstieg in der S6-Kachel
 die Freigabe des Fernmeldewesens selbst (ihre Listen hängen an anderen Modulen). Abgeleitet im Client aus
 Abschnitten, Einheiten, Fahrzeugen, Personal, Sprechgruppen (`stab/funkplan.ts`), kein Endpunkt;
 jede Liste mit eigener Weiche (`api/abrufZustand.ts`), fehlend = „—“ mit Grund. Lücken nur über
-`stab/luecken.ts`, ihre Zahl im Kopf des Paneels und an der S6-Kachel nur über `countLuecken`. Erreichbarkeit: Schirm ab `xl`, Druck immer (`useDruckModus`),
+`stab/luecken.ts`, ihre Zahl im Kopf des Paneels und an der S6-Kachel nur über `countLuecken`. Spalte Telefon (Festnetz/Mobil aus `verbindungen`, LLH-1134): Schirm ab `xl`, Druck immer (`useDruckModus`),
 Lagebericht nie. Sechste Quelle ist die eigene Führungsstelle (LFH-849, `stab/fuehrungsstelle.ts`,
 gepflegt im Paneel auf Einsatzdaten, live über `einsatz`): erfasst (`fuehrungsstelleErfasst`, die
 eine Regel) steht sie als Zeile `fs` vor den Wurzeln und an der Skizzenwurzel und ist Gegenstelle
@@ -71,7 +71,7 @@ Verbindungen, Bereiche, Schriftfeld (`src/stab/fernmeldeskizze.rs`, Bezüge poly
 Löschpfad ruft `vergiss`); Recht am Skizzeneigenen ist `fernmeldewesen` (`Rechtsquelle`). Schreibwege der Fläche nur über `stab/skizzenAktionen.ts`
 (umgesetzt in `stab/useSkizzenAktionen.ts`), Rückgängig über `stab/skizzenBefehle.ts`; Lage mit
 `version` (409 statt stillem Überschreiben). Rechte je Element nach dem Datensatz, mobil und ohne
-Schreibrecht nur lesen. Keine Erreichbarkeit, keine Rufnummern, keine Personennamen, kein Fahrzeug
+Schreibrecht nur lesen. Keine Verbindungen, keine Rufnummern, keine Personennamen, kein Fahrzeug
 als Element, kein ETB je Änderung; Druck A3/A4 quer mit Funkplan-Anlage (`stab/skizze/druckformat.ts`), Übernahme nur über
 den Funkplan (Abschnitt „Kommunikationsskizze“).
 **Ruhige Fläche** (LFH-1037): Zeiger (ohne Touch) oder Fokus in der Fläche halten, was ein anderer
@@ -132,7 +132,7 @@ ihrer Sprechgruppen und Strukturquelle (LFH-1018). Fehlt eine Strukturquelle, st
 S6-Eintrag in `stab/unterseiten.ts`, `useModulFreigabe('fernmeldewesen')` fail-closed. Gepflegt werden nur Stellen ohne eigenes Heim (Führungsfunktion aus
 dem Katalog, Leitstelle, Behörde, Verbindungsperson, sonstige) mit Verbindungen (`src/stab/kommunikation.rs`,
 zwei Tabellen, eine Funktion je Einsatz, FHP/FB je Bezeichnung); **Abschnitte und Einheiten werden
-abgeleitet** (Kommunikationsmittel/Erreichbarkeit, Zeile führt zum Datensatz, keine zweite
+abgeleitet** (alle `verbindungen` des Datensatzes, LLH-1134; Zeile führt zum Datensatz, keine zweite
 Datenhaltung). Die Besetzung ist nur Nebentext, **Kontaktangaben des Personals kommen nie vor**.
 Kern `stab/kommunikationsplan.ts`, Lücke „Leitstelle“ nur über `stab/luecken.ts`. `tel:` nur
 Festnetz/Mobil, `mailto:` nur mit `@`. **Kein Lagebericht**, Druck ja (im Druck flach, ohne
@@ -140,7 +140,7 @@ Aktionsspalte). **Offline lesbar** als einziger Unter-Key des Fernmeldewesens in
 keinen); ohne Netz Bedienung gesperrt, nicht versteckt, Besetzung „nicht geladen“, ohne Stab „—“. Schreibantworten tragen den ganzen
 Plan (`setQueryData`). **Die eigene Führungsstelle** (LFH-849, D7; LFH-1148) ist abgeleitet wie
 Abschnitte und Einheiten: erfasst (`fuehrungsstelleErfasst`, die eine Regel) erste Zeile `fs` in
-„Einsatzleitung und Stab“ (Rufname, Verbindung aus Kommunikationsmittel und Erreichbarkeit, führt zu
+„Einsatzleitung und Stab“ (Rufname, alle ihre `verbindungen`, führt zu
 Einsatzdaten; Nebentext Rufname und „Einsatzleiter …“, LLH-1168), sonst keine Zeile; fehlt ihre
 Quelle (auch ohne Netz, sie liegt nicht auf der Platte), steht die Zeile mit Grund.
 

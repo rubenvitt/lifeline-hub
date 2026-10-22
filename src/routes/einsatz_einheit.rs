@@ -5,14 +5,14 @@ use crate::app::AppState;
 use crate::benachrichtigung::{BenachrichtigungBezugTyp, Bezug};
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use crate::einheit::{
-    aus_nachforderung, aus_vorlage, mitglied_repo, EinheitAnzeige, BEMERKUNG_MAX,
-    ERREICHBARKEIT_MAX, FUNKRUFNAME_MAX,
+    aus_nachforderung, aus_vorlage, mitglied_repo, EinheitAnzeige, BEMERKUNG_MAX, FUNKRUFNAME_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::{
     Bereitstellungsraeume, Einheiten, Fahrzeuge, Nachforderungen, Personal,
 };
+use crate::einsatz::verbindungen::{self, VerbindungBody};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -21,12 +21,13 @@ use crate::live::LiveEvent;
 use crate::material::ort::{self as material_ort, MaterialOrt};
 use crate::routes::support::{
     deserialize_optional_field, optional_max, optional_max_tri, parse_flag, pflicht_max,
-    pruefe_kommunikationsmittel, pruefe_koordinate, trimme, trimme_tri,
+    pruefe_koordinate,
 };
 use crate::staerke::Staerke;
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
+use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
@@ -100,10 +101,12 @@ pub struct EinheitBody {
     pub bemerkung: Option<String>,
     /// LFH-614: eigener Funkrufname der Einheit (Freitext, leer = nicht gepflegt).
     pub funkrufname: Option<String>,
-    /// LFH-108: Funk/Kommunikation — Freitext-Schlüssel (digitalfunk/mobil/festnetz).
-    pub kommunikationsmittel: Option<String>,
-    /// LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII).
-    pub erreichbarkeit: Option<String>,
+    /// Telefon und weitere Verbindungen (LLH-1134), in Eingabefolge.
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): gesetzt → 400, nie still verworfen.
+    pub kommunikationsmittel: Option<IgnoredAny>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): gesetzt → 400, nie still verworfen.
+    pub erreichbarkeit: Option<IgnoredAny>,
     #[serde(default)]
     pub sortier: i64,
     pub sprechgruppe_ids: Option<Vec<i64>>,
@@ -151,15 +154,20 @@ pub async fn bilden(
     // Freitexte ebenso vor jedem Schreiben (LLH-1242, Spec `eingabegrenzen`).
     let bemerkung = optional_max(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
     let funkrufname = optional_max(body.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
-    let erreichbarkeit = optional_max(body.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?;
+    verbindungen::lehne_altfelder_ab(
+        body.kommunikationsmittel.is_some(),
+        body.erreichbarkeit.is_some(),
+    )?;
+    let neue_verbindungen = body
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
     Staerke::from_options(
         body.soll_fuehrer,
         body.soll_unterfuehrer,
         body.soll_mannschaft,
     )
     .map_err(AppError::Validation)?;
-    let kommunikationsmittel = trimme(body.kommunikationsmittel);
-    pruefe_kommunikationsmittel(kommunikationsmittel.as_deref())?;
     if let Some(ids) = &sprechgruppe_ids {
         crate::sprechgruppe::repo::pruefe_zuordenbar(&state.pool, org_id, einsatz_id, ids).await?;
     }
@@ -173,8 +181,6 @@ pub async fn bilden(
         soll_mannschaft: body.soll_mannschaft,
         bemerkung: bemerkung.as_deref(),
         funkrufname: funkrufname.as_deref(),
-        kommunikationsmittel: kommunikationsmittel.as_deref(),
-        erreichbarkeit: erreichbarkeit.as_deref(),
         sortier: body.sortier,
         tz_fachaufgabe: None,
         tz_organisation: None,
@@ -195,6 +201,10 @@ pub async fn bilden(
                 ids,
             )
             .await?;
+        }
+        if let Some(liste) = &neue_verbindungen {
+            verbindungen::ersetzen_tx(conn, einsatz_id, verbindungen::Bezug::Einheit(id), liste)
+                .await?;
         }
         let mut besatzung = Vec::new();
         if !fahrzeuge.is_empty() {
@@ -532,10 +542,14 @@ pub struct EinheitPatchBody {
     pub bemerkung: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_optional_field")]
     pub funkrufname: Option<Option<String>>,
+    /// Ersetzt die Verbindungen vollständig (LLH-1134); fehlt = unverändert.
+    pub verbindungen: Option<Vec<VerbindungBody>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): im Body (auch `null`) → 400.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub kommunikationsmittel: Option<Option<String>>,
+    pub kommunikationsmittel: Option<Option<IgnoredAny>>,
+    /// Abgelöst durch `verbindungen` (LLH-1134): im Body (auch `null`) → 400.
     #[serde(default, deserialize_with = "deserialize_optional_field")]
-    pub erreichbarkeit: Option<Option<String>>,
+    pub erreichbarkeit: Option<Option<IgnoredAny>>,
     pub sortier: Option<i64>,
     pub sprechgruppe_ids: Option<Vec<i64>>,
 }
@@ -563,8 +577,14 @@ pub async fn update(
     // Freitexte vor `require_aktiv` (409) und den Soll-Prüfungen (LLH-1242, Spec `eingabegrenzen`).
     let bemerkung = optional_max_tri(body.bemerkung, "Bemerkung", BEMERKUNG_MAX)?;
     let funkrufname = optional_max_tri(body.funkrufname, "Funkrufname", FUNKRUFNAME_MAX)?;
-    let erreichbarkeit =
-        optional_max_tri(body.erreichbarkeit, "Erreichbarkeit", ERREICHBARKEIT_MAX)?;
+    verbindungen::lehne_altfelder_ab(
+        body.kommunikationsmittel.is_some(),
+        body.erreichbarkeit.is_some(),
+    )?;
+    let neue_verbindungen = body
+        .verbindungen
+        .map(verbindungen::pruefe_liste)
+        .transpose()?;
 
     require_aktiv(&state, einsatz_id, eid).await?;
     let vorher = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
@@ -583,9 +603,6 @@ pub async fn update(
         effektiv(body.soll_mannschaft, bestand_soll.2),
     )
     .map_err(AppError::Validation)?;
-
-    let kommunikationsmittel = trimme_tri(body.kommunikationsmittel);
-    pruefe_kommunikationsmittel(kommunikationsmittel.as_ref().and_then(|v| v.as_deref()))?;
 
     // Führerwechsel heißt jetzt „Feld im Patch enthalten UND Wert verschieden". Ein Patch
     // OHNE `fuehrer_id` (so ruft die Einheiten-Seite an) darf keinen Führerwechsel auf
@@ -612,8 +629,6 @@ pub async fn update(
             soll_mannschaft: body.soll_mannschaft,
             bemerkung: bemerkung.as_ref().map(|v| v.as_deref()),
             funkrufname: funkrufname.as_ref().map(|v| v.as_deref()),
-            kommunikationsmittel: kommunikationsmittel.as_ref().map(|v| v.as_deref()),
-            erreichbarkeit: erreichbarkeit.as_ref().map(|v| v.as_deref()),
             sortier: body.sortier,
         },
     )
@@ -633,7 +648,16 @@ pub async fn update(
         )
         .await?;
     }
-    // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen und Sprechgruppen).
+    if let Some(liste) = &neue_verbindungen {
+        verbindungen::ersetzen(
+            &state.pool,
+            einsatz_id,
+            verbindungen::Bezug::Einheit(eid),
+            liste,
+        )
+        .await?;
+    }
+    // Endgültige Anzeige (inkl. neu aufgelöstem Führer-Namen, Sprechgruppen und Verbindungen).
     let final_anzeige = einheit_repo::laden(&state.pool, einsatz_id, eid).await?;
 
     if fuehrer_wechsel {

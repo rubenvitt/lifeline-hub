@@ -80,7 +80,7 @@ import './kommunikationsplanPrint.css';
  *   gepflegt wird dort (D4, D7). Die Besetzung ist nur Nebentext, Kontaktangaben des Personals
  *   kommen nie vor.
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche „welche Nummer hat …?“), die vier
- *   Gruppen als Baumknoten. Die Erreichbarkeit ist hier der Inhalt und immer sichtbar (D5).
+ *   Gruppen als Baumknoten. Die Verbindungen sind hier der Inhalt und immer sichtbar (D5).
  * - **Kein Lagebericht** (D6): ein Bericht wird verteilt und fortgeschrieben, Rufnummern gehören
  *   nicht hinein. Druck ja.
  * - **Ohne Netz** lesbar (Unter-Key in `LAGEBILD_OFFLINE`), die Bedienung ist gesperrt (D9).

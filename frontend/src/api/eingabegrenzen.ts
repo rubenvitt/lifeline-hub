@@ -80,7 +80,7 @@ export const INFOTELEFON_NOTIZ_MAX = 2_000;
 export const INFOTELEFON_KURZ_MAX = 200;
 /** Kurzfelder eines Medienkontakts (medium, kontakt_name, freigabe_durch). */
 export const PRESSE_KURZ_MAX = 200;
-/** Thema und Erreichbarkeit eines Medienkontakts. */
+/** Thema und Telefon / E-Mail eines Medienkontakts. */
 export const PRESSE_THEMA_MAX = 500;
 /** Antwort an ein Medium. */
 export const PRESSE_ANTWORT_MAX = 8_000;
@@ -126,8 +126,12 @@ export const EINHEIT_NAME_MAX = 200;
 export const EINHEIT_BEMERKUNG_MAX = 2_000;
 /** Funkrufname einer Einheit im Einsatz (LLH-1242). */
 export const EINHEIT_FUNKRUFNAME_MAX = 200;
-/** Erreichbarkeit / Nummer einer Einheit im Einsatz (LLH-1242). */
-export const EINHEIT_ERREICHBARKEIT_MAX = 200;
+/** Verbindungen (Telefon, E-Mail …) je Abschnitt, Einheit, Führungsstelle (LLH-1134). */
+export const VERBINDUNGEN_MAX = 10;
+/** Nummer bzw. Adresse und Hinweis einer Verbindung (LLH-1134), wie im Kommunikationsplan. */
+export const VERBINDUNG_TEXT_MAX = 200;
+/** Funkrufname der Abschnittsleitung (LLH-1134), wie der Funkrufname einer Einheit. */
+export const ABSCHNITT_RUFNAME_MAX = 200;
 /** Erwähnungen je Chat-Nachricht im Request (LLH-1220, vor dem Entdoppeln). */
 export const ERWAEHNUNGEN_MAX = 20;
 /** Bezeichnung eines Verpflegungszeitfensters (LLH-1040). */
@@ -166,5 +170,5 @@ export const ABLOESUNG_ABLOESER_MAX = 8;
 export const ABLOESUNG_BESATZUNG_MAX = 50;
 /** Leitung einer Betreuungsstelle (LLH-1044). */
 export const BETREUUNG_LEITUNG_MAX = 200;
-/** Erreichbarkeit einer Betreuungsstelle (LLH-1044). */
+/** Kontakt der Leitung einer Betreuungsstelle (LLH-1044, Spalte `erreichbarkeit`). */
 export const BETREUUNG_ERREICHBARKEIT_MAX = 200;

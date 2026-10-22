@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import { ApiError } from '../../api/client';
+import { ABSCHNITT_RUFNAME_MAX } from '../../api/eingabegrenzen';
 import type { Einsatzabschnitt } from '../../api/types';
 import AbschnittDetail, { type AbschnittPatchHandler } from './AbschnittDetail';
 import AbschnittDaten from './AbschnittDaten';
@@ -33,8 +34,8 @@ const nord = (o: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt =>
     abschnittsauftrag: null,
     bemerkung: null,
     sprechgruppen: [],
-    kommunikationsmittel: null,
-    erreichbarkeit: null,
+    rufname: null,
+    verbindungen: [],
     sortier: 0,
     ...o,
   }) as Einsatzabschnitt;
@@ -84,9 +85,9 @@ describe('AbschnittDetail (LFH-1208)', () => {
       'Abschnittsleiter',
       'Lagezustand',
       'Abschnittsauftrag',
+      'Rufname',
       'Sprechgruppen',
-      'Kommunikationsmittel',
-      'Erreichbarkeit / Nummer',
+      'Telefon und weitere Verbindungen',
       'Bemerkung',
       'Stärke (F/UF/M//Σ)',
       'Stärke inkl. Unterabschnitte (F/UF/M//Σ)',
@@ -99,9 +100,9 @@ describe('AbschnittDetail (LFH-1208)', () => {
     for (const leer of [
       'Abschnittsleiter',
       'Abschnittsauftrag',
+      'Rufname',
       'Sprechgruppen',
-      'Kommunikationsmittel',
-      'Erreichbarkeit / Nummer',
+      'Telefon und weitere Verbindungen',
       'Bemerkung',
     ]) {
       expect(screen.getByRole('button', { name: `${leer} eintragen` })).toBeInTheDocument();
@@ -154,13 +155,39 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('eine geleerte optionale Angabe geht als `null`', async () => {
     const user = userEvent.setup();
-    const { onPatch } = renderDetail(nord({ erreichbarkeit: '0151 23456' }));
-    await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }));
-    await user.clear(screen.getByRole('textbox', { name: 'Erreichbarkeit / Nummer' }));
-    await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer speichern' }));
-    await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Erreichbarkeit / Nummer', { erreichbarkeit: null }),
+    const { onPatch } = renderDetail(nord({ rufname: 'Rotkreuz Musterstadt 1/10-1' }));
+    await user.click(screen.getByRole('button', { name: 'Rufname bearbeiten' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Rufname' }));
+    await user.click(screen.getByRole('button', { name: 'Rufname speichern' }));
+    await waitFor(() => expect(onPatch).toHaveBeenCalledWith('Rufname', { rufname: null }));
+  });
+
+  // LLH-1134: Funk und Telefon getrennt, die Verbindungen als Ersatzliste.
+  it('Rufname nimmt nicht mehr Zeichen an als der Server; Verbindungen gehen als `verbindungen`', async () => {
+    const user = userEvent.setup();
+    const { onPatch } = renderDetail(
+      nord({ verbindungen: [{ id: 9, mittel: 'festnetz', wert: '0511 22', hinweis: null }] }),
     );
+    await user.click(screen.getByRole('button', { name: 'Rufname eintragen' }));
+    expect(screen.getByRole('textbox', { name: 'Rufname' })).toHaveAttribute(
+      'maxLength',
+      String(ABSCHNITT_RUFNAME_MAX),
+    );
+    await user.click(screen.getByRole('button', { name: 'Bearbeitung von Rufname abbrechen' }));
+    expect(screen.getByRole('link', { name: '0511 22' })).toHaveAttribute('href', 'tel:051122');
+    await user.click(
+      screen.getByRole('button', { name: 'Telefon und weitere Verbindungen bearbeiten' }),
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Hinweis 1' }), 'Lagedienst');
+    await user.click(
+      screen.getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
+    );
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Telefon und weitere Verbindungen', {
+        verbindungen: [{ mittel: 'festnetz', wert: '0511 22', hinweis: 'Lagedienst' }],
+      }),
+    );
+    expect(document.body.textContent).not.toMatch(/erreichbar|kommunikationsmittel/i);
   });
 
   it('Name ist Pflicht: leer gespeichert heißt keine Anfrage und ein Hinweis an der Zeile', async () => {

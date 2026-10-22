@@ -6203,7 +6203,7 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_verpflegung_ohne_etb() {
 }
 
 /// Bildet „2. Gruppe“ mit dem Einheitsführer „Adalbert Zugführer“, dem Mitglied „Mechthild
-/// Mitglied“ und einer Erreichbarkeit; liefert die Kennung der Einheit.
+/// Mitglied“ und einer Mobilnummer (LLH-1134); liefert die Kennung der Einheit.
 async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i64 {
     let gruppe = einheit_bilden(app, admin, einsatz, "2. Gruppe").await;
     let fuehrer =
@@ -6226,7 +6226,10 @@ async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i
         "PATCH",
         &format!("/api/einsaetze/{einsatz}/einheiten/{gruppe}"),
         admin,
-        Some(&json!({"fuehrer_id": fuehrer, "erreichbarkeit": "0171 4711815"})),
+        Some(&json!({
+            "fuehrer_id": fuehrer,
+            "verbindungen": [{"mittel": "mobil", "wert": "0171 4711815"}],
+        })),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -6236,7 +6239,7 @@ async fn gruppe_mit_personal(app: &axum::Router, admin: &str, einsatz: i64) -> i
 
 /// LLH-1055 D3, Spec `funktionsansichten` „Empfängerliste ohne Führernamen“ und „Keine
 /// Einheitenliste“: Das Verpflegungsgerät liest die Empfängerliste mit Einheitenname und Stärke,
-/// aber ohne Führer-, Mitgliedernamen und Erreichbarkeit; `GET …/einheiten` bleibt 403.
+/// aber ohne Führer-, Mitgliedernamen und Verbindungen; `GET …/einheiten` bleibt 403.
 #[tokio::test]
 async fn verpflegungsgeraet_liest_empfaenger_ohne_personennamen() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -6270,7 +6273,7 @@ async fn verpflegungsgeraet_liest_empfaenger_ohne_personennamen() {
     for verboten in [
         "fuehrer_id",
         "fuehrer_name",
-        "erreichbarkeit",
+        "verbindungen",
         "personal_mitglieder",
     ] {
         assert!(!alle.iter().any(|k| k == verboten), "{verboten}: {alle:?}");

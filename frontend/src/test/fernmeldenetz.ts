@@ -32,7 +32,15 @@ export function sg(
 }
 
 export function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 export function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
@@ -42,6 +50,7 @@ export function einheit(id: number, p: Partial<Einheit> = {}): Einheit {
     name: `Einheit ${id}`,
     sortier: id,
     sprechgruppen: [],
+    verbindungen: [],
     fahrzeug_mitglieder: [],
     material_mitglieder: [],
     personal_mitglieder: [],
@@ -135,7 +144,7 @@ export const daten = <T>(d: T[]): Quelle<T> => ({ zustand: 'daten', daten: d });
 
 export const fs = (p: Partial<Fuehrungsstelle> = {}): FernmeldenetzQuellen['fuehrungsstelle'] => ({
   zustand: 'daten',
-  daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [], ...p },
+  daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [], ...p },
 });
 
 /** Quellen mit leeren, geladenen Listen; `skizze` wird in die leere Skizze gemischt. */

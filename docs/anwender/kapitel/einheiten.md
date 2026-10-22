@@ -85,8 +85,13 @@ Für Einsatzleitung und Führungspersonal:
    daneben „unterbesetzt“ oder „Soll erfüllt“.
 5. Hat die Einheit kein Fahrzeug, unter „Status“ den Status wählen; „kein Status“ nimmt ihn
    zurück.
-6. Im Paneel „Funk und Kommunikation“ ebenso „Sprechgruppen“, „Kommunikationsmittel“ und
-   „Erreichbarkeit / Nummer“ ändern. Die Erreichbarkeit darf höchstens 200 Zeichen lang sein.
+6. Im Paneel „Funk“ ebenso die „Sprechgruppen“ ändern; den Funkrufnamen trägt der Kopf.
+7. Im Paneel „Telefon und weitere Verbindungen“ auf die Liste tippen. „Verbindung hinzufügen“
+   legt eine Zeile an: das Mittel wählen (Festnetz, Mobil, Fax, E-Mail, Messenger, Melder oder
+   Sonstiges), Nummer oder Adresse eintragen und bei Bedarf einen Hinweis wie „nur tagsüber“.
+   „Verbindung … entfernen“ nimmt eine Zeile heraus; „Speichern“ übernimmt die ganze Liste.
+   Höchstens zehn Verbindungen, Nummer und Hinweis je höchstens 200 Zeichen. Festnetz- und
+   Mobilnummern lassen sich danach antippen und wählen, E-Mail-Adressen öffnen das Mailprogramm.
 
 Eine Einheit, die aus einer Nachforderung übernommen ist, trägt in den Kopfdaten das Feld
 „Herkunft“ mit „aus Nachforderung #4 ↗“; es führt ins Board der

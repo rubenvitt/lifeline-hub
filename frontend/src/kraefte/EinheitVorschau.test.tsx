@@ -24,8 +24,7 @@ const einheit = (o: Partial<Einheit> = {}): Einheit =>
     ist_kumuliert: { fuehrer: 1, unterfuehrer: 2, mannschaft: 12 },
     soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 },
     status: { quelle: 'fahrzeuge', status: S2, verteilung: [] },
-    kommunikationsmittel: 'digitalfunk',
-    erreichbarkeit: '0171 1234567',
+    verbindungen: [{ id: 1, mittel: 'mobil', wert: '0171 1234567', hinweis: null }],
     sprechgruppen: [],
     fahrzeug_mitglieder: [{ ef_id: 1 }, { ef_id: 2 }],
     personal_mitglieder: [{ ep_id: 1 }, { ep_id: 2 }, { ep_id: 3 }],
@@ -53,7 +52,10 @@ describe('EinheitVorschau (LFH-664)', () => {
     expect(screen.getByText('1/3/18//22')).toBeInTheDocument();
     expect(screen.getByText('Hans Zugführer')).toBeInTheDocument();
     expect(screen.getByText('EA Nord')).toBeInTheDocument();
-    expect(screen.getByTestId('funk-erreichbarkeit')).toHaveTextContent('Digitalfunk');
+    // Funk und Telefon getrennt (LLH-1134): die Nummer steht unter „Telefon“.
+    expect(screen.getByText('Telefon', { selector: 'dt' }).parentElement).toHaveTextContent(
+      'Mobil0171 1234567',
+    );
     expect(screen.getByText('2 Fahrzeuge · 3 Personal · 0 Material')).toBeInTheDocument();
     expect(screen.getByText('Bereitstellung Nord')).toBeInTheDocument();
     expect(screen.queryByText('Nachbarzug')).not.toBeInTheDocument();
@@ -101,15 +103,15 @@ describe('EinheitVorschau (LFH-664)', () => {
     liefere([
       einheit({
         soll: null,
-        kommunikationsmittel: null,
-        erreichbarkeit: null,
+        verbindungen: [],
         sprechgruppen: [],
       }),
     ]);
     renderMitProviders(<EinheitVorschau einsatzId={5} id={3} />);
     await screen.findByText('1. Zug');
     expect(screen.queryByText(/Soll/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Funk / Erreichbarkeit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Funk', { selector: 'dt' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Telefon', { selector: 'dt' })).not.toBeInTheDocument();
   });
 
   it('nennt „gemischt" mit der Verteilung als Text, statt einen Status zu erfinden', async () => {

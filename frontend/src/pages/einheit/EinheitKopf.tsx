@@ -91,8 +91,8 @@ const isSameStaerke = (a: Staerke | null, b: Staerke | null) =>
  * Fernmeldeskizze inzwischen geändert hat.
  *
  * Funkrufname und Bemerkung stehen hier, weil sie die Einheit benennen bzw. sie ganz betreffen;
- * womit man sie erreicht, steht im Paneel „Funk und Kommunikation“ (D2). Die Einsatzdauer steht
- * nur im Paneel „Zeitachse“ (eine Heimat je Zahl).
+ * womit man sie erreicht, steht in den Paneelen „Funk“ und „Telefon und weitere Verbindungen“
+ * (D2, LLH-1134). Die Einsatzdauer steht nur im Paneel „Zeitachse“ (eine Heimat je Zahl).
  */
 export default function EinheitKopf({
   einheit: e,

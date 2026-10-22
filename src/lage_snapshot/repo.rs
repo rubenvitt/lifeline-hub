@@ -293,7 +293,17 @@ pub async fn erzeuge(
             None,
         )
         .await?,
-        einheiten: crate::einheit::repo::liste(pool, einsatz_id).await?,
+        // Telefon und weitere Verbindungen (LLH-1134) friert der Stand nicht ein, wie Leitung und
+        // Erreichbarkeit der Betreuungsstelle: die Karte braucht sie nicht, und eine Rufnummer
+        // im Dokument bräuchte einen eigenen Schwärzungspfad.
+        einheiten: crate::einheit::repo::liste(pool, einsatz_id)
+            .await?
+            .into_iter()
+            .map(|e| crate::einheit::EinheitAnzeige {
+                verbindungen: Vec::new(),
+                ..e
+            })
+            .collect(),
         // Fahrzeuge aus der einsatz-scoped Disposition, nicht aus dem org-weiten Fuhrpark.
         fahrzeuge: crate::fahrzeug::disposition_repo::liste(pool, einsatz_id, einsatz_aktiv)
             .await?,
@@ -302,7 +312,14 @@ pub async fn erzeuge(
             pool, einsatz_id,
         )
         .await?,
-        abschnitte: crate::einsatzabschnitt::repo::list(pool, einsatz_id).await?,
+        abschnitte: crate::einsatzabschnitt::repo::list(pool, einsatz_id)
+            .await?
+            .into_iter()
+            .map(|a| crate::einsatzabschnitt::EinsatzabschnittAnzeige {
+                verbindungen: Vec::new(),
+                ..a
+            })
+            .collect(),
         zonen: crate::lage_zone::repo::liste(pool, einsatz_id, None).await?,
         freie_zeichen: crate::freies_zeichen::repo::liste(pool, einsatz_id, None).await?,
         gefahrengebiete: crate::gefahr::repo::gebiete_liste(pool, einsatz_id).await?,

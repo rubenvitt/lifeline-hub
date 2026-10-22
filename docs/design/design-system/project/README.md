@@ -21,6 +21,7 @@ kompakt · komfortabel · Handschuh (Steuerhöhe 30 / 48 / 72 px); die Vorschaue
 - **Segmentleiste** (`components/Segmentleiste/`, Gruppe Bedienung)
 - **Sammelbanner** (`components/Sammelbanner/`, Gruppe Rückmeldung)
 - **InlineAngabe (geschlossen, leer, offen)** (`components/InlineAngabe/`, Gruppe Bedienung)
+- **Verbindungen (Funk und Telefon getrennt; Liste offen)** (`components/Verbindungen/`, Gruppe Bedienung)
 - **Sichtungsmarke (BBK)** (`components/Sichtung/`, Gruppe Status)
 - **Speicherleiste** (`components/Speicherleiste/`, Gruppe Formular)
 - **DokumentEntwurf (Bearbeiten und Lesefassung)** (`components/DokumentEntwurf/`, Gruppe Formular)

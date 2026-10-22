@@ -66,6 +66,7 @@ describe('ChecklistePaneel · Standort der Führungsstelle (LFH-1181)', () => {
           bezeichnung: 'ELW 2 Musterstadt',
           standort_adresse: 'Parkplatz Feuerwehrhaus Nord',
           sprechgruppen: [],
+          verbindungen: [],
           fahrzeug_ids: [],
         }),
       ),

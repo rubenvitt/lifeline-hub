@@ -1259,7 +1259,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
  * (Object-URLs, nur im Speicher, LFH-759),
  * Snapshot-Dokumente, Pegel, Wetter, Fremdquellen, Org-Einstellungs- und Admin-Keys samt der
  * Modul-Vorgaben am Einsatz (LLH-1183, nur der Editor liest sie, wie die Overrides), die eigene
- * Führungsstelle (LFH-849: Erreichbarkeit ist personenbezogen), der
+ * Führungsstelle (LFH-849: Telefon und Verbindungen sind personenbezogen), der
  * Funktionskatalog (LFH-549: Aufträge tragen Snapshot und Auflösung selbst), die externen
  * Stellen (LFH-1194: ohne Netz bleibt die meldende Stelle Freitext; Rufnummern), die
  * Schichtmodelle (LLH-1122: der Einsatz trägt seine Kopie), dazu S5

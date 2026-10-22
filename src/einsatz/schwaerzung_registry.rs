@@ -1031,19 +1031,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // `repo::tests::schwaerzung_nullt_alle_abschnitts_freitexte_und_haelt_die_labels`.
             retain("sprechgruppe_tmo", G_OP_LABEL),
             retain("sprechgruppe_dmo", G_OP_LABEL),
-            // Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz), kein Personenbezug. Die
-            // Wertemenge erzwingt `routes::support::pruefe_kommunikationsmittel` (unbekannt → 400).
+            // Kommunikationsart-Schlüssel (digitalfunk/mobil/festnetz), kein Personenbezug. Seit
+            // LLH-1134 ohne Schreibweg; der Altbestand trägt nur die drei Schlüssel.
             retain(
                 "kommunikationsmittel",
                 "Kommunikationsart-Schlüssel (digitalfunk/mobil/…), kein Personenbezug (LFH-108)",
             ),
-            // Mögliche Rufnummer der Führung → PII.
+            // Mögliche Rufnummer der Führung → PII. Seit LLH-1134 ohne Schreibweg (Altbestand,
+            // überführt nach `einsatz_verbindung`).
             scrub("erreichbarkeit", Strategie::NullSetzen, Z_EINSATZ),
             // Kürzel, Beurteilung und Einschätzung sind Führungsskelett (RETAIN). Der
             // Abschnittsauftrag
             // ist nullabler Freitext und wird, anders als `auftrag.auftrag_text`, nicht ins ETB
             // gesnapshottet.
             retain("kurzbezeichnung", G_OP_LABEL),
+            // Funkrufname der Abschnittsleitung (LLH-1134): benennt die Stelle, keine Person
+            // (wie `einsatz_einheit.funkrufname`).
+            retain("rufname", G_OP_LABEL),
             retain("lagezustand", G_ENUM),
             scrub("abschnittsauftrag", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: operativer Freitext
             // Rhythmus-Vorgabe der Ablösung in Minuten.
@@ -1603,6 +1607,27 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("sortier", G_ZAEHLER),
             retain("geaendert_von_id", G_FK),
             retain("geaendert_at", G_ZEIT),
+        ],
+    },
+    // Verbindungen an Abschnitt, Einheit und eigener Führungsstelle (LLH-1134): wie die
+    // Verbindungen des Kommunikationsplans. Der Wert ist eine Rufnummer oder Adresse (NOT NULL →
+    // Platzhalter), der Hinweis Freitext; Bezug, Mittel und Reihenfolge sind Skelett. Die alten
+    // Spalten `erreichbarkeit` an den drei Tabellen bleiben Scrub (Altbestand vor 0243).
+    TabellenRegel {
+        tabelle: "einsatz_verbindung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("bezug", G_ENUM),
+            retain("abschnitt_id", G_FK),
+            retain("einheit_id", G_FK),
+            retain("mittel", G_ENUM),
+            scrub("wert", Strategie::Platzhalter, Z_EINSATZ), // REVIEW: Rufnummer/Adresse (NOT NULL)
+            scrub("hinweis", Strategie::NullSetzen, Z_EINSATZ), // REVIEW: Freitext zur Verbindung
+            retain("sortier", G_ZAEHLER),
         ],
     },
     // Taktische Fernmeldeskizze (LFH-893, design.md D3): Namen und Hinweise gehen (eine

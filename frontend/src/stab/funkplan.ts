@@ -4,13 +4,11 @@ import type {
   EinsatzFahrzeug,
   EinsatzPersonal,
   Einsatzabschnitt,
+  KommunikationsVerbindung,
   Sprechgruppe,
 } from '../api/types';
-import {
-  kommunikationsmittelLabel,
-  mitBetriebsart,
-  teileSprechgruppen,
-} from '../components/kommunikationsmittel';
+import { mitBetriebsart, teileSprechgruppen } from '../components/kommunikationsmittel';
+import { telefonVerbindungen } from '../components/verbindungen';
 import {
   einsatzleiterDarstellung,
   einsatzleiterKurz,
@@ -24,8 +22,9 @@ import {
 } from './fuehrungsstelle';
 import {
   abschnitteOhneSprechgruppe,
-  einheitenOhneErreichbarkeit,
+  einheitenOhneFunkrufname,
   einheitenOhneSprechgruppe,
+  einheitenOhneTelefon,
   lokaleSprechgruppenOhneZuordnung,
   verbindungenOhneGemeinsameSprechgruppe,
   type KanalTeilnehmer,
@@ -67,17 +66,18 @@ export interface FunkplanZeile {
   /** Beim Fahrzeug der Fahrzeugtyp, sonst `null`. */
   stelleZusatz: string | null;
   /**
-   * Führungsstelle: Rufname · Abschnitt: Kurzbezeichnung · Einheit: Funkrufname · Fahrzeug: OPTA.
-   * Nie geraten.
+   * Führungsstelle: Rufname · Abschnitt: Rufname, sonst Kurzbezeichnung (LLH-1134) · Einheit:
+   * Funkrufname · Fahrzeug: OPTA. Nie geraten.
    */
   rufname: string | null;
   leitung: Leitung;
   tmo: string[];
   dmo: string[];
-  /** Bereits als Label. */
-  kommunikationsmittel: string | null;
-  /** Personenbezogen: nur Anzeige und Druck, nie Lagebericht (D5). */
-  erreichbarkeit: string | null;
+  /**
+   * Telefon (Festnetz, Mobil) aus den Verbindungen des Datensatzes (LLH-1134). Personenbezogen:
+   * nur Anzeige und Druck, nie Lagebericht (D5).
+   */
+  telefon: KommunikationsVerbindung[];
   children?: FunkplanZeile[];
 }
 
@@ -138,8 +138,7 @@ function fuehrungsstelleZeile(q: FuehrungsstelleQuelle): FunkplanZeile | null {
     // Organigramm; nie aus App-Rolle oder Stab-Besetzung.
     leitung: einsatzleiterLeitung(einsatzleiterDarstellung(q)),
     ...funk(fs.sprechgruppen),
-    kommunikationsmittel: kommunikationsmittelLabel(fs.kommunikationsmittel),
-    erreichbarkeit: fs.erreichbarkeit ?? null,
+    telefon: telefonVerbindungen(fs.verbindungen),
   };
 }
 
@@ -184,8 +183,7 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
     leitung: fahrzeugLeitung(ef),
     tmo: [],
     dmo: [],
-    kommunikationsmittel: null,
-    erreichbarkeit: null,
+    telefon: [],
   });
 
   // ── Einheiten: Untereinheiten unter ihrer Einheit, Fahrzeuge unter ihrer Einheit ─────────────
@@ -209,8 +207,7 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
         rufname: e.funkrufname ?? null,
         leitung: leitungAus(e.fuehrer_name),
         ...funk(e.sprechgruppen),
-        kommunikationsmittel: kommunikationsmittelLabel(e.kommunikationsmittel),
-        erreichbarkeit: e.erreichbarkeit ?? null,
+        telefon: telefonVerbindungen(e.verbindungen),
       },
       [
         ...(untereinheiten.get(e.id) ?? []).map(einheitZeile),
@@ -240,12 +237,11 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
         id: a.id,
         stelle: a.name,
         stelleZusatz: null,
-        rufname: a.kurzbezeichnung ?? null,
+        rufname: a.rufname?.trim() || a.kurzbezeichnung || null,
         leitung: leitungAus(a.leiter_name),
         // Aus den Zuordnungen (0073), nie aus `sprechgruppe_tmo/_dmo` (0047, eingefroren).
         ...funk(a.sprechgruppen),
-        kommunikationsmittel: kommunikationsmittelLabel(a.kommunikationsmittel),
-        erreichbarkeit: a.erreichbarkeit ?? null,
+        telefon: telefonVerbindungen(a.verbindungen),
       },
       [
         ...(unterabschnitte.get(a.id) ?? []).map(abschnittZeile),
@@ -282,8 +278,7 @@ export function baueFunkplan(q: FunkplanQuellen): FunkplanZeile[] {
       leitung: { art: 'leer' },
       tmo: [],
       dmo: [],
-      kommunikationsmittel: null,
-      erreichbarkeit: null,
+      telefon: [],
       children: heimatlos,
     });
   }
@@ -303,7 +298,10 @@ export function aufklappbareSchluessel(zeilen: readonly FunkplanZeile[]): string
 export interface FunkplanLuecken {
   abschnitteOhneSprechgruppe: Luecke<Einsatzabschnitt>;
   einheitenOhneSprechgruppe: Luecke<Einheit>;
-  einheitenOhneErreichbarkeit: Luecke<Einheit>;
+  /** Einheiten ohne eigenen Funkrufname (LLH-1134). */
+  einheitenOhneFunkrufname: Luecke<Einheit>;
+  /** Einheiten ohne Festnetz- oder Mobilverbindung (LLH-1134). */
+  einheitenOhneTelefon: Luecke<Einheit>;
   /** Stelle und übergeordnete Stelle ohne gemeinsame Sprechgruppe (LFH-625 D3). */
   verbindungenOhneGemeinsameSprechgruppe: Luecke<Verbindung>;
   lokaleSprechgruppenOhneZuordnung: Luecke<Sprechgruppe>;
@@ -324,7 +322,8 @@ export function funkplanLuecken(q: LueckenQuellen): FunkplanLuecken {
   return {
     abschnitteOhneSprechgruppe: abschnitteOhneSprechgruppe(q.abschnitte),
     einheitenOhneSprechgruppe: einheitenOhneSprechgruppe(q.einheiten),
-    einheitenOhneErreichbarkeit: einheitenOhneErreichbarkeit(q.einheiten),
+    einheitenOhneFunkrufname: einheitenOhneFunkrufname(q.einheiten),
+    einheitenOhneTelefon: einheitenOhneTelefon(q.einheiten),
     verbindungenOhneGemeinsameSprechgruppe: verbindungenOhneGemeinsameSprechgruppe(
       q.abschnitte,
       q.einheiten,
@@ -436,7 +435,7 @@ function zeileMarkdown(z: FunkplanZeile, tiefe: number): string[] {
     z.art === 'sammel'
       ? md(z.stelle)
       : `**${md(z.stelle)}**${z.stelleZusatz ? ` (${md(z.stelleZusatz)})` : ''}`;
-  // Die Erreichbarkeit fehlt hier mit Absicht: personenbezogen, und der Lagebericht geht bei
+  // Das Telefon fehlt hier mit Absicht: personenbezogen, und der Lagebericht geht bei
   // Freigabe ins ETB und in die Aufbewahrung (Entscheidung 30.09.2026).
   const teile = [
     kopf,
@@ -445,7 +444,6 @@ function zeileMarkdown(z: FunkplanZeile, tiefe: number): string[] {
     // „TMO 311, 312“, aber „TMO 412_F_DRK“ statt „TMO TMO …“: dieselbe Regel wie die Skizze.
     z.tmo.length > 0 ? mitBetriebsart('TMO', z.tmo.map(md).join(', ')) : null,
     z.dmo.length > 0 ? mitBetriebsart('DMO', z.dmo.map(md).join(', ')) : null,
-    z.kommunikationsmittel ? md(z.kommunikationsmittel) : null,
   ].filter((t): t is string => t != null);
   const zeile = `${'  '.repeat(tiefe)}- ${teile.join(' · ')}`;
   return [zeile, ...(z.children ?? []).flatMap((k) => zeileMarkdown(k, tiefe + 1))];
@@ -485,7 +483,8 @@ export function funkplanLueckenZeilen(
   return [
     ...zeile('Abschnitte ohne Sprechgruppe', luecken.abschnitteOhneSprechgruppe, (a) => a.name),
     ...zeile('Einheiten ohne Sprechgruppe', luecken.einheitenOhneSprechgruppe, (e) => e.name),
-    ...zeile('Einheiten ohne Erreichbarkeit', luecken.einheitenOhneErreichbarkeit, (e) => e.name),
+    ...zeile('Einheiten ohne Funkrufname', luecken.einheitenOhneFunkrufname, (e) => e.name),
+    ...zeile('Einheiten ohne Telefon', luecken.einheitenOhneTelefon, (e) => e.name),
     ...zeile(
       'Verbindungen ohne gemeinsame Sprechgruppe',
       luecken.verbindungenOhneGemeinsameSprechgruppe,
@@ -517,7 +516,7 @@ function teilnehmerMarkdown(s: NetzStelle, t: KanalTeilnehmer): string {
 /**
  * Der Abschnitt „Kommunikationsskizze“ (LFH-893 D10): „Gültig ab“, je Schiene Bedingungszeichen
  * und Teilnehmer, danach die übrigen Verbindungen mit Art, Medium und Status. Das Netz trägt
- * weder Erreichbarkeit noch Rufnummern; den Hinweis einer Verbindung (Freitext, darin könnte eine
+ * weder Telefon noch Rufnummern; den Hinweis einer Verbindung (Freitext, darin könnte eine
  * Nummer stehen) lässt der Bericht weg. Fehlen externe Stellen oder Skizzendaten, steht der Grund.
  */
 function kommunikationsskizzeMarkdown({ netz, gueltigAb }: KommunikationsskizzeAngabe): string[] {

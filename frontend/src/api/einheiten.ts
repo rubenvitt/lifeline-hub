@@ -4,6 +4,7 @@ import type {
   Einheit,
   EinheitenAusNachforderungEingabe,
   Nachforderung,
+  NeueVerbindung,
   UebernahmeBody,
   VorlageVorschau,
 } from './types';
@@ -24,10 +25,11 @@ export interface EinheitEingabe {
   sortier?: number;
   /** LFH-109: IDs der zuzuordnenden Sprechgruppen aus dem Katalog. */
   sprechgruppe_ids?: number[];
-  /** LFH-108: Funk/Kommunikation — Freitext-Schlüssel (digitalfunk/mobil/festnetz). */
-  kommunikationsmittel?: string | null;
-  /** LFH-108: Funk/Kommunikation — Rufnummer/Freitext (PII). */
-  erreichbarkeit?: string | null;
+  /**
+   * LLH-1134: Telefon und weitere Verbindungen (personenbezogen); ersetzt die Liste vollständig
+   * (`[]` leert). `kommunikationsmittel`/`erreichbarkeit` lehnt der Server mit 400 ab.
+   */
+  verbindungen?: NeueVerbindung[];
   /**
    * LLH-1073: disponierte Fahrzeuge (`EinsatzFahrzeug.id`), die der neuen Einheit angehören
    * („Als eigene Einheit führen“); ihre Besatzung ohne Einheit kommt mit. Ein schon zugeordnetes
@@ -138,7 +140,7 @@ export function createEinheitAusVorlage(
 
 /**
  * Teiländerung einer Einheit (LFH-306, Tri-State): nur die übergebenen Schlüssel gehen hinaus,
- * `null` leert. Für Einzelfelder ohne Formular, etwa Funkrufname und Kommunikationsmittel aus der
+ * `null` leert. Für Einzelfelder ohne Formular, etwa der Funkrufname aus der
  * Fernmeldeskizze (LFH-893).
  */
 export type EinheitPatch = Partial<EinheitEingabe>;

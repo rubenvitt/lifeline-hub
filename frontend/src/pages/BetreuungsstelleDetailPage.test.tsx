@@ -208,7 +208,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
     expect(band).toHaveTextContent('Davon namentlich1');
   });
 
-  it('Stammdaten im Datenraster, Leitung und Erreichbarkeit sichtbar; Koordinate fehlt benannt', async () => {
+  it('Stammdaten im Datenraster, Leitung und Kontakt sichtbar; Koordinate fehlt benannt', async () => {
     renderPage();
     await screen.findByText('Frau Schulz');
     const raster = document.querySelector<HTMLElement>('dl[aria-label="Stammdaten der Stelle"]')!;

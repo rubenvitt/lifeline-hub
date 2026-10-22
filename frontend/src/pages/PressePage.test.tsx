@@ -323,7 +323,7 @@ describe('PressePage — Eingabegrenzen (LFH-937)', () => {
       'maxlength',
       '200',
     );
-    expect(within(dialog).getByLabelText('Erreichbarkeit')).toHaveAttribute('maxlength', '500');
+    expect(within(dialog).getByLabelText('Telefon / E-Mail')).toHaveAttribute('maxlength', '500');
   });
 
   it('Antwort: Zähler ab 6.400 von 8.000, Überlänge sperrt, die Freigabeangabe endet bei 200', async () => {

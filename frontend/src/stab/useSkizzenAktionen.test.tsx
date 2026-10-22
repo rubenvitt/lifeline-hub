@@ -236,20 +236,20 @@ describe('useSkizzenAktionen — Skizzendaten', () => {
 });
 
 describe('useSkizzenAktionen — Datensatz der Stelle', () => {
-  it('schreibt Rufname und Kommunikationsmittel über den PATCH des Datensatzes', async () => {
+  it('schreibt den Rufname über den PATCH des Datensatzes (Abschnitt: `rufname`, LLH-1134)', async () => {
     vi.mocked(patcheAbschnitt).mockResolvedValue({} as never);
     vi.mocked(patcheEinheit).mockResolvedValue({} as never);
     const fs = { rufname: 'Florian Kreis 1', sprechgruppen: [] } as unknown as Fuehrungsstelle;
     vi.mocked(patcheFuehrungsstelle).mockResolvedValue(fs);
     const a = setup().current!;
     await a.setzeRufname('ab-3', 'EA N');
-    expect(patcheAbschnitt).toHaveBeenCalledWith(7, 3, { kurzbezeichnung: 'EA N' });
+    expect(patcheAbschnitt).toHaveBeenCalledWith(7, 3, { rufname: 'EA N' });
     expect(invalidiert(ABSCHNITTE_KEY)).toBe(true);
     await a.setzeRufname('eh-10', null);
     expect(patcheEinheit).toHaveBeenCalledWith(7, 10, { funkrufname: null });
-    await a.setzeKommunikationsmittel('eh-10', 'digitalfunk');
-    expect(patcheEinheit).toHaveBeenLastCalledWith(7, 10, { kommunikationsmittel: 'digitalfunk' });
     expect(invalidiert(EINHEITEN_KEY)).toBe(true);
+    // Kein Schreibweg für Kommunikationsmittel mehr (LLH-1134): Funk und Telefon getrennt.
+    expect(a).not.toHaveProperty('setzeKommunikationsmittel');
     await a.setzeRufname('fs', 'Florian Kreis 1');
     expect(patcheFuehrungsstelle).toHaveBeenCalledWith(7, { rufname: 'Florian Kreis 1' });
     expect(qc.getQueryData(FS_KEY)).toEqual(fs);

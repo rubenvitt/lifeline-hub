@@ -31,6 +31,7 @@ function einheit(
     ist_kumuliert: { fuehrer: f, unterfuehrer: uf, mannschaft: m },
     sortier: 0,
     sprechgruppen: [],
+    verbindungen: [],
     fahrzeug_mitglieder: [],
     personal_mitglieder: [],
     material_mitglieder: [],
