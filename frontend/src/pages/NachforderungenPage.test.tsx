@@ -69,6 +69,7 @@ vi.mock('../api/einsaetze', () => ({
 const ladeModulFreigaben = vi.fn();
 
 const listeNachforderungen = vi.fn();
+const listeUeblicheArten = vi.fn();
 const legeNachforderungAn = vi.fn();
 const setzeNachforderungStatus = vi.fn();
 const lehneNachforderungAb = vi.fn();
@@ -80,6 +81,8 @@ vi.mock('../api/nachforderungen', () => ({
   zieheNachforderungZurueck: (...a: unknown[]) => zieheNachforderungZurueck(...a),
   patcheNachforderung: (...a: unknown[]) => patcheNachforderung(...a),
   listeNachforderungen: (...a: unknown[]) => listeNachforderungen(...a),
+  // Übliche Arten der Organisation (LLH-1379): ohne eigene Vorgabe leer.
+  listeUeblicheArten: (...a: unknown[]) => listeUeblicheArten(...a) ?? Promise.resolve([]),
   legeNachforderungAn: (...a: unknown[]) => legeNachforderungAn(...a),
   setzeNachforderungStatus: (...a: unknown[]) => setzeNachforderungStatus(...a),
   lehneNachforderungAb: (...a: unknown[]) => lehneNachforderungAb(...a),
@@ -182,6 +185,21 @@ describe('NachforderungenPage', () => {
     renderPage();
     await screen.findByText('2 RTW zur Verstärkung');
     expect(screen.queryByText(/\d+ offen/)).toBeNull();
+  });
+
+  it('die Schnellwahl füllt mit den üblichen Arten der Organisation (LLH-1379)', async () => {
+    listeUeblicheArten.mockResolvedValueOnce([{ art: 'Sandsäcke', einsaetze: 3 }]);
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    expect(listeUeblicheArten).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /Nachforderung anlegen/ }));
+    const gruppe = await screen.findByRole('group', { name: 'Schnellwahl' });
+    await waitFor(() =>
+      expect(
+        Array.from(gruppe.querySelectorAll('button')).map((b) => b.textContent?.trim()),
+      ).toEqual(['RTW', 'Sandsäcke', 'KTW', 'NEF', 'LF 10', 'HLF 20']),
+    );
+    expect(listeUeblicheArten).toHaveBeenCalledWith(1);
   });
 
   it('setzt eine Nachforderung ab', async () => {

@@ -1,6 +1,7 @@
 import { apiGet, apiSend, mitParametern } from './client';
 import type {
   Nachforderung,
+  NachforderungArtUeblich,
   NachforderungStatus,
   NachforderungZusageEingabe,
   NeueNachforderung,
@@ -18,6 +19,14 @@ export function listeNachforderungen(
   return apiGet<Nachforderung[]>(
     mitParametern(`/api/einsaetze/${einsatzId}/nachforderungen`, { status: filter.status }),
   );
+}
+
+/**
+ * Übliche Arten der Organisation (LLH-1379): aus anderen Einsätzen der Einsatz-Org, die der
+ * Benutzer lesen darf, nach Zahl der Einsätze; ohne den laufenden.
+ */
+export function listeUeblicheArten(einsatzId: number): Promise<NachforderungArtUeblich[]> {
+  return apiGet<NachforderungArtUeblich[]>(`/api/einsaetze/${einsatzId}/nachforderungen/arten`);
 }
 
 export function legeNachforderungAn(
