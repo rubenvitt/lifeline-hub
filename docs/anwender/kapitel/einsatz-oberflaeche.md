@@ -130,12 +130,29 @@ Wer lieber wählt: „Kalender und Uhrzeit“ neben dem Feld öffnen, einen Tag 
 
 ### Auf eine Benachrichtigung reagieren
 
-1. Den Toast lesen: Oben steht die Art, etwa „Neuer Auftrag“, darunter, wo vorhanden, die
-   Kennung, etwa „Auftrag #12“.
-2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder den Toast mit ✕ schließen.
+1. Die Meldung lesen: Ein Alarm steht als Toast oben rechts, ein Eingang im Eingangsband unten.
+   Oben steht die Art, etwa „Auftrag überfällig“ oder „Neuer Auftrag“, darunter, wo vorhanden,
+   die Kennung, etwa „Auftrag #12“.
+2. „Öffnen“ wählen, um zum Gegenstand zu springen, oder mit ✕ schließen. Stehen im Eingangsband
+   mehrere Eingänge, führt der Knopf in das Modul, etwa „Zu Aufträgen“; kommen sie aus mehreren
+   Modulen, öffnet „Ansehen“ die Liste der Eingänge.
 
-Beides quittiert die Benachrichtigung: Sie verschwindet auch in anderen Tabs und auf anderen
-Geräten derselben Person.
+„Öffnen“, ein Sprung und ✕ quittieren die Benachrichtigung: Sie verschwindet auch in anderen
+Tabs und auf anderen Geräten derselben Person. „Ansehen“ quittiert nichts.
+
+### Eingänge nachlesen
+
+1. In der Kopfzeile „Eingänge“ wählen (das Zeichen des Posteingangs; die Zahl darüber nennt die
+   ungelesenen). Auf dem Handy und auf dem Tablet mit Finger trägt die Alarmzentrale die Zahl:
+   sie öffnen und „Eingänge, … ungelesen“ wählen.
+2. Unter „Neu“ stehen die ungelesenen Eingänge, unter „Früher“ die gelesenen, jeweils mit der
+   Uhrzeit, der Art und der Kennung.
+3. Einen Eintrag wählen: Die App springt zum Gegenstand, der Eintrag gilt als gelesen.
+4. Oder „Alle gelesen“ wählen: Alle Eingänge des Einsatzes gelten als gelesen, auf allen Geräten
+   der Person. Alarme bleiben, bis jemand sie selbst öffnet oder schließt.
+
+Steht nach „Alle gelesen“ „Nicht gespeichert, bitte noch einmal.“, hat der Server die Änderung
+nicht angenommen; ohne Netz geht „Alle gelesen“ nicht.
 
 ### Benachrichtigungen einstellen
 
@@ -182,6 +199,8 @@ Von links nach rechts:
 - **Statuspunkt, Einsatznummer und Name** des offenen Einsatzes; über den Namen geht der Wechsel
   in einen anderen Einsatz.
 - **Suchen** öffnet die Sprungpalette.
+- **Eingänge**: der Verlauf der eigenen Benachrichtigungen dieses Einsatzes; die Zahl darüber
+  nennt die ungelesenen Eingänge (siehe „Eingänge nachlesen“).
 - **Alarmzentrale**: „Benachrichtigung …“ zeigt, ob der Browser Benachrichtigungen zeigen darf,
   „Ton …“, ob Alarmtöne zu hören sind. „Ton stumm“ und „Ton blockiert“ stehen auffällig da: Eine
   Sofortmeldung oder eine fällige Erinnerung bliebe dann ohne Ton. Stummschalten gilt für alle
@@ -194,7 +213,8 @@ Von links nach rechts:
   den Benachrichtigungen und der Hilfe.
 
 Auf schmalen Schirmen zeigt die Kopfzeile Ruhezustände nur als Zeichen; jede Störung behält ihr
-Wort. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
+Wort. Auf dem Handy und auf dem Tablet mit Finger stehen Alarmzentrale und Eingänge in einem
+Knopf. Außerhalb eines Einsatzes führt „Verwaltung“ in die Verwaltung der Organisation. Wer dort
 keine Rechte hat, sieht den Eintrag mit Schloss und „Keine Berechtigung“.
 
 Über der Kopfzeile erscheint bei Bedarf die **Betriebszeile**: bei Störungen der Verbindung, bei
@@ -251,21 +271,26 @@ der Vorgabe des Einsatzes und der Organisation, bis eine andere Wahl getroffen w
 ### Benachrichtigungen
 
 Eine Benachrichtigung geht an die Personen, die sie betrifft, nicht an alle im Einsatz. Sie hat
-eine von zwei Stufen:
+eine von drei Stufen:
 
 - **Alarm** („Sofortmeldung“, „Sofortmeldung unbestätigt“, „Auftrag überfällig“, „Ablösung
-  fällig“): Toast in Warnfarbe und Alarmton. Alarme lassen sich nicht abschalten.
-- **Hinweis**: Toast und ein kurzer, tieferer Ton. Jede Art lässt sich unter „Benachrichtigungen“
-  abschalten. Was eine abgeschaltete Art meldet, bleibt in den Zählern und Listen der Module
-  sichtbar; es kommt nur kein Toast mehr.
+  fällig“): Toast oben rechts in Warnfarbe und Alarmton. Alarme lassen sich nicht abschalten.
+- **Eingang** (unter „Benachrichtigungen“ als „Hinweise“): Eingangsband unten und ein kurzer,
+  tieferer Ton, höchstens alle zwei Minuten. Jede Art lässt sich unter „Benachrichtigungen“
+  abschalten.
+- **Still**: Was eine abgeschaltete Art meldet, steht nur unter „Eingänge“ bei „Früher“, ohne
+  Band, Ton und Zahl. In den Zählern und Listen der Module bleibt es sichtbar.
 
 Die Schalter gehören zur **Person**, nicht zum Gerät: Sie gelten auf jedem Gerät, an dem sie sich
 anmeldet. Stummschalten in der Alarmzentrale gehört dagegen zum Gerät und gilt für alle Töne.
 
-Toasts bleiben stehen, bis sie geöffnet oder geschlossen werden. Höchstens drei stehen einzeln
-da; ab dem vierten fasst ein Sammeltoast die älteren zusammen. Er nennt ihre Zahl, bei mehreren
-Arten je Art eine Zeile wie „2 × Neuer Auftrag“, und je Bereich einen Sprung, etwa „Zu Aufträgen“
-oder „Zu Befehlen“. Ein Sprung schließt alle Toasts und quittiert sie, ebenso ✕ am Sammeltoast.
+Toasts tragen nur Alarme (dazu die Unwetterwarnung und, außerhalb eines Einsatzes, „Neuer
+Einsatz“ und „Aufnahme in einen Einsatz“). Sie bleiben stehen, bis sie geöffnet oder geschlossen
+werden. Höchstens drei stehen einzeln da; ab dem vierten fasst ein Sammeltoast die älteren
+zusammen. Er nennt ihre Zahl, bei mehreren Arten je Art eine Zeile wie „2 × Auftrag überfällig“,
+und je Bereich einen Sprung, etwa „Zu Aufträgen“ oder „Zu Meldungen“. Ein Sprung schließt alle
+Toasts und quittiert sie, ebenso ✕ am Sammeltoast. Das Eingangsband nimmt den Toasts keinen
+Platz und liegt nie über ihnen.
 
 Ist der Tab verdeckt und darf der Browser Benachrichtigungen zeigen („Benachrichtigung erlaubt“
 in der Kopfzeile), erscheint zusätzlich eine Meldung des Betriebssystems. Sie schließt, sobald der
@@ -286,18 +311,21 @@ Gerät, geht die Meldung auf diesem Gerät nicht in jedem Fall von selbst weg; s
 wegwischen. Ohne Verbindung zum Server, etwa ohne VPN, zeigt die Meldung nur „Alarm“ oder „Neue
 Benachrichtigung“; den Inhalt zeigt die App nach dem Öffnen.
 
-Neue Meldungen und Lagemeldungen, die eine Person bearbeiten soll, stehen in einem **eigenen
-Hinweis** neben den drei Toasts und nehmen ihnen keinen Platz. Er bündelt alle neuen Meldungen
-dieses Einsatzes, zeigt die beiden jüngsten mit Absender und Wortlautanfang und darunter „+ n
-weitere“. Sein Ton klingt höchstens alle zwei Minuten, auch wenn in der Zeit zehn Meldungen kommen.
-Wer gerade in ein Feld schreibt, behält den Fokus: Der Hinweis erscheint erst, wenn das Feld
-verlassen ist. Auf der Seite „Meldungen“ bleibt er aus, denn dort steht die Meldung schon in der
-Liste; eine Übernahme in die Lage bleibt ebenso auf „Lagemeldungen“ aus. Was genau ihn auslöst
-und wer ihn bekommt, steht in [Meldungen](meldungen.md).
+Alle Eingänge eines Einsatzes stehen im **Eingangsband** unten, auf dem Handy über die ganze
+Breite, sonst rechts. Es bündelt sie: „3 neue Meldungen“ oder, sind andere Eingänge dabei, „3 neue
+Eingänge“, mit den beiden jüngsten und darunter „+ n weitere“; eine Meldung nennt Absender und
+Wortlautanfang. Sein Ton klingt höchstens alle zwei Minuten, auch wenn in der Zeit zehn Eingänge
+kommen. Wer gerade in ein Feld schreibt, behält den Fokus: Das Band erscheint erst, wenn das Feld
+verlassen ist. Auf der Seite „Meldungen“ zeigt es keine Meldungen, denn dort stehen sie schon in
+der Liste; eine Übernahme in die Lage bleibt ebenso auf „Lagemeldungen“ aus. Was eine Meldung
+auslöst und wer sie bekommt, steht in [Meldungen](meldungen.md).
 
-Solange im Einsatz unbearbeitete Meldungen offen sind, steht ihre Zahl vorn im Titel des Tabs,
-etwa „(3) Lagekarte · …“. Ist die App installiert, trägt auch ihr Symbol die Zahl, wo das
-Betriebssystem das zeigt.
+Solange im Einsatz ungelesene Eingänge offen sind, steht ihre Zahl vorn im Titel des Tabs, etwa
+„(3) Lagekarte · …“, dieselbe wie über „Eingänge“. Ist die App installiert, trägt auch ihr Symbol
+die Zahl, wo das Betriebssystem das zeigt. Gelesen ist ein Eingang für die Person, nicht für das
+Gerät: Was sie am Telefon liest, zählt am Laptop nicht mehr. „Eingänge“ zeigt höchstens die jüngsten
+200 Benachrichtigungen; ein ungelesener Eintrag bleibt 24 Stunden, ein gelesener 24 Stunden ab dem
+Lesen.
 
 Gekoppelte Geräte bekommen keine Benachrichtigungen.
 
