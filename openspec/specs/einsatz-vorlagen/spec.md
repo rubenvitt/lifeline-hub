@@ -40,7 +40,7 @@ Einheiten-Vorlagen), jeweils ohne zu speichern.
 ### Requirement: Eine Startliste von Vorlagen wird mitgeliefert
 Jede Organisation MUST die Vorlagen „Kleinlage“, „Sanitätsdienst“, „MANV“, „Personensuche“,
 „Evakuierung und Betreuung“ und „Unwetter“ besitzen: bestehende Organisationen per Migration
-`0236`, neue beim Anlegen (`bootstrap_admin`). Die Modulsätze MUST `EINSATZ_VORLAGE_STARTLISTE`
+`0238`, neue beim Anlegen (`bootstrap_admin`). Die Modulsätze MUST `EINSATZ_VORLAGE_STARTLISTE`
 in `src/einsatz_vorlage/mod.rs` entsprechen (sichtbar 14, 22, 27, 25, 30 und 28 von 34 Modulen,
 `stab` in keiner; Einsatzart „Sanitätsdienst“ bei „Sanitätsdienst“, sonst „Realeinsatz“).
 Stichwort-Kopplungen MUST nicht mitgeliefert werden. Jede Organisation darf die Startliste danach

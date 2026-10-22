@@ -33,7 +33,7 @@ ALTER TABLE einsatz_stichwort_vorschlag
 -- Startliste für bestehende Organisationen. No-Op auf frischer DB (keine organisation). Neue
 -- Organisationen bekommen sie über bootstrap_admin. Gleiche Werte wie
 -- einsatz_vorlage/mod.rs EINSATZ_VORLAGE_STARTLISTE (ausgeblendet = ausblendbare Module minus
--- sichtbare) — Netz: db::tests::migration_0236_seedet_die_startliste.
+-- sichtbare) — Netz: db::tests::migration_0238_seedet_die_startliste.
 INSERT INTO einsatz_vorlage (org_id, bezeichnung, einsatzart, sortier)
 SELECT o.id, v.bezeichnung, v.einsatzart, v.sortier
 FROM organisation o
