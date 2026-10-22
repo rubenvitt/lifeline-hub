@@ -90,6 +90,11 @@ mod tests {
             "Auskunft und Schwärzung finden jede Kraft des Einsatzes, auch beendete",
         ),
         (
+            "src/einheit/aus_nachforderung.rs",
+            1,
+            "Mengenprüfung der Übernahme aus einer Nachforderung zählt jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383)",
+        ),
+        (
             "src/einheit/aus_vorlage.rs",
             2,
             "Planung der Bildung aus einer Vorlage liest auch beendete Personal- und Fahrzeugzeilen, um „entlassen“ (erneut disponieren) von „storniert“ (neu) zu unterscheiden",
@@ -108,6 +113,11 @@ mod tests {
             "src/kraefte_disposition.rs",
             2,
             "Vorprüfung der Sammel-Disposition (Personal und Fahrzeuge) liest auch beendete Zeilen, um „schon disponiert“ von „entlassen“ zu unterscheiden",
+        ),
+        (
+            "src/nachforderung/repo.rs",
+            4,
+            "Verweis auf übernommene Einheiten und Rücknahmesperre der Nachforderung zählen jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383)",
         ),
         (
             "src/personal/disposition_repo.rs",
