@@ -1113,6 +1113,21 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
     expect(rumpfe[0]).not.toHaveProperty('einsatzort_lon');
   });
 
+  it('eine getippte Koordinate geht ohne Suche mit (LLH-1108)', async () => {
+    const { rumpfe, begriffe } = aufbau();
+    await dialogOeffnen();
+    await userEvent.type(screen.getByLabelText('Einsatzort'), '51.16040, 10.45140');
+    expect(screen.getByText('Karte 51.1604, 10.4514')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() => expect(rumpfe).toHaveLength(1));
+    expect(rumpfe[0]).toMatchObject({
+      einsatzort: '51.16040, 10.45140',
+      einsatzort_lat: 51.1604,
+      einsatzort_lon: 10.4514,
+    });
+    expect(begriffe).toEqual([]);
+  });
+
   it('leer schickt keinen Einsatzort', async () => {
     const { rumpfe } = aufbau();
     await dialogOeffnen();

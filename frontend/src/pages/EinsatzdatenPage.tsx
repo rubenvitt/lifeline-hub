@@ -417,11 +417,21 @@ function useFahrzeugeQuelle(einsatzId: number): {
   };
 }
 
+/** Gleicher Ort nach Werten: Text (getrimmt) und Koordinate. */
+function gleicherOrt(a: OrtsfeldWert, b: OrtsfeldWert): boolean {
+  return (
+    a.text.trim() === b.text.trim() &&
+    a.koordinate?.lat === b.koordinate?.lat &&
+    a.koordinate?.lon === b.koordinate?.lon
+  );
+}
+
 /**
  * Paneel „Einsatzort“ (LFH-1175, Spec `einsatzdaten-bearbeitung`, „Paneel Einsatzort mit
  * Kartenausschnitt“): Adresse über das Ortsfeld mit Suche, Koordinate in allen Formaten, darunter
- * der Kartenausschnitt und der Sprung zur Lagekarte. Ein gewählter Treffer schickt Adresse und
- * Koordinate in EINEM PATCH; nur geänderter Text schickt nur die Adresse.
+ * der Kartenausschnitt und der Sprung zur Lagekarte. Ein gewählter Treffer, eine gezogene Nadel
+ * oder ein auf der Karte gewählter Punkt (LLH-1108) schickt Adresse und Koordinate in EINEM PATCH;
+ * nur geänderter Text schickt nur die Adresse.
  */
 function EinsatzortPaneel({
   einsatz,
@@ -456,17 +466,27 @@ function EinsatzortPaneel({
             wert: (
               <InlineAngabe<OrtsfeldWert>
                 etikett="Adresse"
-                wert={{ text: adresse, koordinate: null }}
+                // Die gespeicherte Koordinate steht mit in der Bearbeitung: die Vorschau zeigt
+                // sie, die Nadel berichtigt sie. Als `karte` gelöst vom Text, damit eine reine
+                // Textänderung den Punkt nicht leert (LLH-1108).
+                wert={
+                  punkt
+                    ? { text: adresse, koordinate: punkt, quelle: 'karte' }
+                    : { text: adresse, koordinate: null }
+                }
                 anzeige={adresse}
                 leer={(w) => w.text.trim() === ''}
-                // Ein gewählter Treffer ist eine Änderung, auch bei gleichem Text: er bringt die
-                // Koordinate mit.
-                gleich={(a, b) => a.text.trim() === b.text.trim() && a.koordinate === b.koordinate}
+                // Nach Werten, nicht nach Identität: ein Treffer an anderer Stelle ist eine
+                // Änderung, auch bei gleichem Text.
+                gleich={gleicherOrt}
                 darfSchreiben={darfSchreiben}
                 onSpeichern={(w) =>
                   speichern(
                     'Adresse',
-                    w.koordinate
+                    // Die Koordinate geht nur mit, wenn sie neu ist (Treffer, Nadel, getippt);
+                    // reiner Text schickt nur die Adresse (Spec `einsatzdaten-bearbeitung`).
+                    w.koordinate &&
+                      (w.koordinate.lat !== punkt?.lat || w.koordinate.lon !== punkt?.lon)
                       ? {
                           einsatzort: leerZuNull(w.text),
                           einsatzort_lat: w.koordinate.lat,
@@ -483,6 +503,13 @@ function EinsatzortPaneel({
                     onChange={onChange}
                     suchen={(begriff) => sucheOrtImEinsatz(einsatzId, begriff)}
                     suchSchluessel={(begriff) => einsatzKeys.einsatzortSuche(einsatzId, begriff)}
+                    karte={{
+                      etikett: 'Einsatzort',
+                      einsatzId,
+                      // Die Peilung zeigt nicht auf den Einsatzort selbst.
+                      exclude: `einsatzort:${einsatzId}`,
+                      umgebung: punkt,
+                    }}
                   />
                 )}
               />
@@ -811,7 +838,7 @@ function ArtAngabe({
 /**
  * Zeile „Standort“ (LFH-1181, D3/D4): Adresse als Text und Koordinate über die Koordinateneingabe
  * mit Ortsvorschau. „wie Einsatzort“ übernimmt beides einmalig in den Entwurf; gespeichert wird erst
- * mit der Zeile. Eine Adresssuche bringt erst der Ortsfeld-Baustein (LFH-1248).
+ * mit der Zeile. Das Ortsfeld mit Suche und Karte kommt mit dem Ausrollen (LLH-1114).
  */
 function StandortAngabe({
   fs,

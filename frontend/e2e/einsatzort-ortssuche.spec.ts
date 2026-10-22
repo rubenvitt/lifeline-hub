@@ -1,11 +1,13 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { einsatzdatenPfad } from '../src/routing/deeplinks';
 import { einsatzDialogOeffnen } from './einsatz-kern';
+import { kachelnBeantworten, kartenConfigBeantworten } from './kartenFixture';
 import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 
 /**
  * LFH-1175, Spec `ortsfeld` und `einsatzdaten-bearbeitung`: den Einsatzort über die Ortssuche
  * erfassen — in den Einsatzdaten (Paneel „Einsatzort“) und im Dialog „Neuen Einsatz anlegen“.
+ * LLH-1108: Vorschau mit Nadel und Ort-Zeile am Feld, Nadel ziehen, „Auf Karte wählen“ ohne Netz.
  *
  * Der Geocoder wird nie gefragt: `page.route` fängt die Ortssuche am Frontend ab (Muster
  * `lagekarte-ortssuche.spec.ts`). Gespeichert wird echt, über das e2e-Backend; der Kartenausschnitt
@@ -19,7 +21,13 @@ const TREFFER = {
   kurz: 'Bahnhofstraße 1, 12345 Musterstadt',
 };
 
-/** Fängt beide Such-Einstiege des Ortsfelds ab; zählt die Suchtexte mit. */
+/** Ortsname der Rückwärtssuche; weicht vom Treffer ab, damit ein Vorschlag sichtbar wird. */
+const ORTSNAME = 'Marktplatz 3, 12345 Musterstadt';
+
+/**
+ * Fängt beide Such-Einstiege des Ortsfelds und die Ort-Vorschau ab; zählt die Suchtexte mit.
+ * Die Ort-Vorschau rechnet die Peilung sonst echt, fragt für den Ortsnamen aber den Geocoder.
+ */
 async function geocoder(page: Page) {
   const anfragen: string[] = [];
   const antwort = async (route: Parameters<Parameters<Page['route']>[1]>[0]) => {
@@ -28,12 +36,20 @@ async function geocoder(page: Page) {
   };
   await page.route(/\/api\/einsaetze\/\d+\/ort-suche\?/, antwort);
   await page.route(/\/api\/ort-suche\?/, antwort);
+  await page.route(/\/api\/einsaetze\/\d+\/ort-vorschau\?/, (route) =>
+    route.fulfill({
+      json: {
+        ortsname: ORTSNAME,
+        peilung: { distanz_m: 1200, richtung: 'NO', bezug_label: 'UHS Nord' },
+      },
+    }),
+  );
   return anfragen;
 }
 
-async function einsatzAnlegenApi(page: Page): Promise<number> {
+async function einsatzAnlegenApi(page: Page, ort: Record<string, unknown> = {}): Promise<number> {
   const r = await page.request.post('/api/einsaetze', {
-    data: { bezeichnung: `E2E Einsatzort ${Date.now()}` },
+    data: { bezeichnung: `E2E Einsatzort ${Date.now()}`, ...ort },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
   return ((await r.json()) as { id: number }).id;
@@ -67,6 +83,12 @@ test('Einsatzdaten: Einsatzort suchen, Treffer wählen, speichern — Ausschnitt
   const treffer = paneel(page).getByRole('list', { name: 'Treffer' });
   await treffer.getByRole('button', { name: /Bahnhofstraße 1, 12345 Musterstadt/ }).click();
   expect(anfragen).toEqual(['Bahnhofstraße 1']);
+  // Vorschau am Feld (LLH-1108): Nadel und Ort-Zeile; der Text stammt aus dem Treffer, also
+  // kein Vorschlag.
+  const vorschau = paneel(page).getByRole('group', { name: 'Karte: Einsatzort' });
+  await expect(vorschau.getByRole('button', { name: 'Einsatzort' })).toBeVisible();
+  await expect(paneel(page).getByText(`${ORTSNAME} · `, { exact: false })).toBeVisible();
+  await expect(paneel(page).getByRole('button', { name: 'Als Adresse übernehmen' })).toHaveCount(0);
   await paneel(page).getByRole('button', { name: 'Adresse speichern' }).click();
 
   // Gespeichert sind Adresse und Koordinate (ein PATCH), der Ausschnitt zeigt die Nadel.
@@ -106,7 +128,7 @@ test('Einsatz anlegen: Einsatzort mit Treffer — Ausschnitt im Dialog, Koordina
     .getByRole('button', { name: /Bahnhofstraße 1, 12345/ })
     .click();
   expect(anfragen).toEqual(['Bahnhofstraße 1']);
-  await expect(dialog.getByRole('img', { name: 'Karte: Einsatzort' })).toBeVisible();
+  await expect(dialog.getByRole('group', { name: 'Karte: Einsatzort' })).toBeVisible();
 
   await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
@@ -118,6 +140,105 @@ test('Einsatz anlegen: Einsatzort mit Treffer — Ausschnitt im Dialog, Koordina
       einsatzort_lon: TREFFER.lon,
     }),
   );
+});
+
+test('Einsatzdaten: Nadel ziehen berichtigt die Koordinate, der Ortsname kommt als Vorschlag', async ({
+  page,
+}) => {
+  await geocoder(page);
+  await anmeldenAlsAdmin(page);
+  const id = await einsatzAnlegenApi(page, {
+    einsatzort: 'Hinter der Halle',
+    einsatzort_lat: TREFFER.lat,
+    einsatzort_lon: TREFFER.lon,
+  });
+  await page.goto(einsatzdatenPfad(id));
+  await paneel(page).getByRole('button', { name: 'Adresse bearbeiten' }).click();
+  const vorschau = paneel(page).getByRole('group', { name: 'Karte: Einsatzort' });
+  const nadel = vorschau.getByRole('button', { name: 'Einsatzort' });
+  await expect(nadel).toBeVisible();
+
+  // Mit der Maus 60 px nach rechts ziehen.
+  const kasten = (await nadel.boundingBox())!;
+  const x = kasten.x + kasten.width / 2;
+  const y = kasten.y + kasten.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 30, y, { steps: 5 });
+  await page.mouse.move(x + 60, y, { steps: 5 });
+  await page.mouse.up();
+
+  // Der Text bleibt; der Ortsname der neuen Stelle steht als Vorschlag da.
+  await expect(paneel(page).getByRole('textbox', { name: 'Adresse' })).toHaveValue(
+    'Hinter der Halle',
+  );
+  await paneel(page).getByRole('button', { name: 'Als Adresse übernehmen' }).click();
+  await expect(paneel(page).getByRole('textbox', { name: 'Adresse' })).toHaveValue(ORTSNAME);
+  await paneel(page).getByRole('button', { name: 'Adresse speichern' }).click();
+
+  await expect
+    .poll(async () => {
+      const e = await einsatzLesen(page, id);
+      return e.einsatzort === ORTSNAME && e.einsatzort_lon! > TREFFER.lon;
+    })
+    .toBe(true);
+  const e = await einsatzLesen(page, id);
+  // Nach rechts gezogen: Osten, gleiche Breite (bis auf Rundung des Zugs).
+  expect(e.einsatzort_lat!).toBeCloseTo(TREFFER.lat, 3);
+});
+
+test('Einsatzdaten: ohne Netz „Auf Karte wählen“ mit Offline-Karte, gespeichert wieder online', async ({
+  page,
+  context,
+}) => {
+  await geocoder(page);
+  // Kartengrundlage aus der Fixture: nur eine Offline-Region, keine Online-Karte.
+  await kartenConfigBeantworten(page, {
+    offline_regionen: [
+      {
+        karte_id: 1,
+        name: 'Fixture',
+        tiles_url: '/api/karten/1/tiles/{z}/{x}/{y}.pbf',
+        format: 'vektor',
+        maxzoom: 14,
+      },
+    ],
+  });
+  await kachelnBeantworten(page, '/api/karten/1/tiles/', 'strassen');
+  await anmeldenAlsAdmin(page);
+  const id = await einsatzAnlegenApi(page);
+  await page.goto(einsatzdatenPfad(id));
+  await paneel(page).getByRole('button', { name: 'Adresse eintragen' }).click();
+  const feld = paneel(page).getByRole('textbox', { name: 'Adresse' });
+  await feld.fill('Waldweg hinter Sportplatz');
+  await expect(paneel(page).getByRole('button', { name: 'Auf Karte wählen' })).toBeVisible();
+
+  await context.setOffline(true);
+  await expect(paneel(page).getByText('Adresssuche ohne Netz nicht verfügbar')).toBeVisible();
+  await expect(paneel(page).getByRole('button', { name: 'Ort suchen' })).toBeDisabled();
+
+  await paneel(page).getByRole('button', { name: 'Auf Karte wählen' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Einsatzort auf Karte wählen' });
+  await expect(dialog.getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
+  const karte = dialog.getByRole('application', { name: 'Karte: Einsatzort' });
+  await expect(karte.locator('canvas')).toBeVisible();
+  await karte.click({ position: { x: 120, y: 90 } });
+  await expect(karte.getByLabel('Einsatzort', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Übernehmen' }).click();
+  await expect(dialog).toBeHidden();
+
+  // Der Text bleibt, die Vorschau steht.
+  await expect(feld).toHaveValue('Waldweg hinter Sportplatz');
+  await expect(
+    paneel(page).getByRole('group', { name: 'Karte: Einsatzort' }).getByRole('button', {
+      name: 'Einsatzort',
+    }),
+  ).toBeVisible();
+
+  await context.setOffline(false);
+  await paneel(page).getByRole('button', { name: 'Adresse speichern' }).click();
+  await expect.poll(async () => (await einsatzLesen(page, id)).einsatzort_lat).not.toBeNull();
+  expect((await einsatzLesen(page, id)).einsatzort).toBe('Waldweg hinter Sportplatz');
 });
 
 test.describe('Handy 390 px', () => {
@@ -157,6 +278,20 @@ test.describe('Handy 390 px', () => {
         page,
         [paneel(page), treffer, paneel(page).getByRole('button', { name: 'Ort suchen' })],
         'Adresse mit Treffern',
+      );
+      // Nach der Wahl: Vorschau mit Nadel, Ort-Zeile und „Auf Karte wählen“ (LLH-1108).
+      await treffer.getByRole('button', { name: /Bahnhofstraße 1, 12345/ }).click();
+      const vorschau = paneel(page).getByRole('group', { name: 'Karte: Einsatzort' });
+      await expect(vorschau.getByRole('button', { name: 'Einsatzort' })).toBeVisible();
+      await keinQuerlauf(
+        page,
+        [
+          paneel(page),
+          vorschau,
+          paneel(page).getByText(`${ORTSNAME} · `, { exact: false }),
+          paneel(page).getByRole('button', { name: 'Auf Karte wählen' }),
+        ],
+        'Adresse mit Vorschau',
       );
       await paneel(page).getByRole('button', { name: 'Bearbeitung von Adresse abbrechen' }).click();
 

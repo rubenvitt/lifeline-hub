@@ -1757,6 +1757,33 @@ describe('PersonenDetailPage — Personendaten feldweise (LLH-1103)', () => {
     );
   });
 
+  it('Herkunft / Adresse ist reiner Text: keine Ortssuche, nichts an den Geocoder (LLH-1108)', async () => {
+    const { koerper, handler } = patchMitschnitt();
+    const anfragen: string[] = [];
+    const merken = ({ request }: { request: Request }) => anfragen.push(request.url);
+    server.events.on('request:start', merken);
+    try {
+      render(einsatzAktiv, detail, handler);
+      await screen.findByRole('heading', { name: /Person R-001/ });
+      const user = userEvent.setup();
+      await user.click(
+        within(ohneAngabe()).getByRole('button', { name: 'Herkunft / Adresse eintragen' }),
+      );
+      const feld = within(ohneAngabe()).getByRole('textbox', { name: 'Herkunft / Adresse' });
+      expect(screen.queryByRole('button', { name: 'Ort suchen' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Auf Karte wählen' })).not.toBeInTheDocument();
+      await user.type(feld, 'Hauptstraße 12, Musterstadt{Enter}');
+      await waitFor(() => expect(koerper).toHaveLength(1));
+      expect(koerper[0]).toEqual({
+        herkunft_adresse: 'Hauptstraße 12, Musterstadt',
+        erwartet: { herkunft_adresse: null },
+      });
+      expect(anfragen.filter((u) => /ort-suche|ort-vorschau/.test(u))).toEqual([]);
+    } finally {
+      server.events.removeListener('request:start', merken);
+    }
+  });
+
   it('Vorname ändern: nur `vorname` mit Altwert, die übrigen Felder bleiben unberührt', async () => {
     const { koerper, handler } = patchMitschnitt();
     render(einsatzAktiv, detail, handler);

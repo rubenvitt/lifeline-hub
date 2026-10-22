@@ -4,29 +4,77 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
 import { useRollen } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
+import { Kartenausschnitt } from './Kartenausschnitt';
+import { KarteWaehlen } from './KarteWaehlen';
 import type { LatLon } from './koordinaten';
+import { erkenneKoordinate } from './koordinatenErkennung';
+import { OrtZeile } from './OrtZeile';
 import { adressAussage, adressBegriff } from './ortssuche';
+import { useOrtVorschau } from './useOrtVorschau';
 
 /**
- * Wert des Ortsfelds: der Text und, solange er der eines gewählten Treffers ist, dessen
- * Koordinate. Jede Textänderung setzt `koordinate` auf `null` (Spec `ortsfeld`, „Treffer setzt
- * Adresse und Koordinate“).
+ * Woher die Koordinate eines Ortsfelds kommt (LLH-1108). `adresse` (gewählter Treffer) und
+ * `koordinate` (getippt) hängen am Text: ändert er sich, fällt die Koordinate weg bzw. wird neu
+ * erkannt. `karte` (Nadel gesetzt oder gezogen, Ortsname übernommen) ist vom Text gelöst.
+ */
+export type OrtQuelle = 'adresse' | 'koordinate' | 'karte';
+
+/**
+ * Wert des Ortsfelds: der Text und eine Koordinate mit ihrer Herkunft (Spec `ortsfeld`, „Treffer
+ * setzt Adresse und Koordinate“, „Koordinate im Feld“, „Nadel verschieben“). `quelle` steht nur
+ * neben einer Koordinate; ein Wert ohne ist reiner Text.
  */
 export interface OrtsfeldWert {
   text: string;
   koordinate: LatLon | null;
+  quelle?: OrtQuelle;
 }
 
-export interface OrtsfeldProps {
+/**
+ * Wert nach einer Textänderung: eine getippte Koordinate wird ohne Server erkannt; ein auf der
+ * Karte gesetzter Punkt bleibt; die Koordinate eines Treffers oder einer getippten Koordinate
+ * fällt weg.
+ */
+export function nachTextaenderung(vorher: OrtsfeldWert, text: string): OrtsfeldWert {
+  const getippt = erkenneKoordinate(text);
+  if (getippt) return { text, koordinate: getippt, quelle: 'koordinate' };
+  if (vorher.quelle === 'karte' && vorher.koordinate) {
+    return { text, koordinate: vorher.koordinate, quelle: 'karte' };
+  }
+  return { text, koordinate: null };
+}
+
+/**
+ * Kartenvorschau unter dem Feld (LLH-1108, Spec `ortsfeld`, „Kartenvorschau am Feld“).
+ */
+export interface OrtsfeldKarte {
+  /** Wofür der Ort steht („Einsatzort“); Name der Nadel, der Karte und des Dialogs. */
+  etikett: string;
+  /**
+   * Im Einsatz: Ort-Zeile (Ortsname, Peilung zum nächsten Marker) und „Als Adresse übernehmen“
+   * über die Ort-Vorschau des Einsatzes. Ohne Einsatz gibt es beides nicht.
+   */
+  einsatzId?: number;
+  /** `typ:id` der bearbeiteten Sache, damit die Peilung nicht auf sie selbst zeigt. */
+  exclude?: string;
+  /** Wo „Auf Karte wählen“ ohne Koordinate beginnt, meist der Einsatzort. */
+  umgebung?: LatLon | null;
+  /** Höhe der Vorschau in Pixeln. */
+  hoehe?: number;
+}
+
+/** Vorgabehöhe der Vorschau unter dem Feld: klein, sie bestätigt den Ort. */
+const VORSCHAU_HOEHE = 160;
+
+interface OrtsfeldGemeinsam {
   id?: string;
   'aria-label'?: string;
+  /** Prüffehler am Feld, wie `InlineAngabe` sie hineinreicht. */
+  'aria-invalid'?: true;
+  'aria-describedby'?: string;
   autoFocus?: boolean;
   value?: OrtsfeldWert;
   onChange?: (wert: OrtsfeldWert) => void;
-  /** Die Suche des Einstiegs (im Einsatz oder in der Organisation). */
-  suchen: (begriff: string) => Promise<OrtSucheAntwort>;
-  /** Query-Key der Suche zu einem Begriff, aus `api/queryKeys.ts`. */
-  suchSchluessel: (begriff: string) => QueryKey;
   /**
    * Meldet, ob die Trefferliste offen ist — wie das Popup einer Auswahl. `InlineAngabe` reicht es
    * über `popup` herein: dann schließt Escape zuerst die Liste und verwirft erst danach die Zeile.
@@ -38,6 +86,30 @@ export interface OrtsfeldProps {
    */
   count?: InputProps['count'];
 }
+
+interface MitSuche {
+  /** Die Suche des Einstiegs (im Einsatz oder in der Organisation). */
+  suchen: (begriff: string) => Promise<OrtSucheAntwort>;
+  /** Query-Key der Suche zu einem Begriff, aus `api/queryKeys.ts`. */
+  suchSchluessel: (begriff: string) => QueryKey;
+  /** Kartenvorschau mit ziehbarer Nadel und „Auf Karte wählen“; ohne nur das Feld. */
+  karte?: OrtsfeldKarte;
+  ohneSuche?: never;
+}
+
+interface OhneSuche {
+  /**
+   * Grund, warum nichts an den Geocoder geht (LLH-1108, Spec `ortsfeld`, „Ortsfeld ohne Suche“):
+   * eine personenbezogene Adresse verlässt den Browser nie Richtung Geocoder. Das Feld ist dann
+   * reiner Text, ohne Suche, Koordinatenerkennung und Karte.
+   */
+  ohneSuche: 'personenbezogen';
+  suchen?: never;
+  suchSchluessel?: never;
+  karte?: never;
+}
+
+export type OrtsfeldProps = OrtsfeldGemeinsam & (MitSuche | OhneSuche);
 
 /** Eine Suche: der Begriff und ihre laufende Nummer (je Enter oder Knopf eine neue). */
 interface Anfrage {
@@ -58,19 +130,53 @@ const TREFFER_FRISCH_MS = 10 * 60_000;
  * Ortssuche). Enter im Feld sucht und sendet das umgebende Formular NICHT ab; gespeichert wird
  * über dessen Knopf.
  *
- * Freitext bleibt erlaubt; eine Koordinate von Hand gehört in die Koordinateneingabe daneben.
+ * Freitext bleibt erlaubt. Eine getippte Koordinate (jede Form der Sprungpalette) wird ohne Server
+ * erkannt (LLH-1108). Mit `karte` stehen darunter die Vorschau mit ziehbarer Nadel, im Einsatz die
+ * Ort-Zeile und „Auf Karte wählen“; mit `ohneSuche` ist das Feld reiner Text (Personenadressen).
  */
-export function Ortsfeld({
+export function Ortsfeld(props: OrtsfeldProps) {
+  if (props.ohneSuche !== undefined) {
+    const {
+      id,
+      'aria-label': ariaLabel,
+      'aria-invalid': ariaInvalid,
+      'aria-describedby': ariaDescribedby,
+      autoFocus,
+      value,
+      onChange,
+      count,
+    } = props;
+    // Nur Text: kein Knopf, Enter wie in jedem Feld, keine Erkennung, keine Karte.
+    return (
+      <Input
+        id={id}
+        aria-label={ariaLabel}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedby}
+        autoFocus={autoFocus}
+        value={value?.text ?? ''}
+        count={count}
+        onChange={(e) => onChange?.({ text: e.target.value, koordinate: null })}
+      />
+    );
+  }
+  return <OrtsfeldMitSuche {...props} />;
+}
+
+function OrtsfeldMitSuche({
   id,
   'aria-label': ariaLabel,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedby,
   autoFocus,
   value = { text: '', koordinate: null },
   onChange,
   suchen,
   suchSchluessel,
+  karte,
   onOpenChange,
   count,
-}: OrtsfeldProps) {
+}: OrtsfeldGemeinsam & MitSuche) {
   const { token, rollen } = useRollen();
   const online = useOnline();
   const [anfrage, setAnfrage] = useState<Anfrage | null>(null);
@@ -117,7 +223,11 @@ export function Ortsfeld({
   }
 
   function waehlen(t: OrtTreffer) {
-    onChange?.({ text: t.kurz ?? t.name, koordinate: { lat: t.lat, lon: t.lon } });
+    onChange?.({
+      text: t.kurz ?? t.name,
+      koordinate: { lat: t.lat, lon: t.lon },
+      quelle: 'adresse',
+    });
     setAnfrage(null);
     fokusInsFeld();
   }
@@ -135,11 +245,13 @@ export function Ortsfeld({
           style={{ flex: '1 1 auto', minWidth: 0 }}
           id={id}
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedby}
           autoFocus={autoFocus}
           value={value.text}
           count={count}
           onChange={(e) => {
-            onChange?.({ text: e.target.value, koordinate: null });
+            onChange?.(nachTextaenderung(value, e.target.value));
             setAnfrage(null);
           }}
           onKeyDown={tasten}
@@ -162,6 +274,100 @@ export function Ortsfeld({
             onNeuerVersuch={fokusInsFeld}
           />
         )
+      )}
+      {karte && <OrtsfeldVorschau karte={karte} value={value} onChange={onChange} />}
+    </div>
+  );
+}
+
+/**
+ * Kartenvorschau, Ort-Zeile und „Auf Karte wählen“ unter dem Feld (LLH-1108). Jeder Punkt aus der
+ * Karte kommt mit `quelle: 'karte'` und lässt den Text stehen; einen Ortsnamen gibt es nur als
+ * Vorschlag zum Übernehmen.
+ */
+function OrtsfeldVorschau({
+  karte,
+  value,
+  onChange,
+}: {
+  karte: OrtsfeldKarte;
+  value: OrtsfeldWert;
+  onChange?: (wert: OrtsfeldWert) => void;
+}) {
+  const { token, rollen } = useRollen();
+  const [waehlen, setWaehlen] = useState(false);
+  const punkt = value.koordinate;
+  const ausKarte = (p: LatLon) => onChange?.({ text: value.text, koordinate: p, quelle: 'karte' });
+
+  return (
+    <>
+      {punkt && (
+        <Kartenausschnitt
+          punkt={punkt}
+          etikett={karte.etikett}
+          hoehe={karte.hoehe ?? VORSCHAU_HOEHE}
+          onVerschieben={ausKarte}
+        />
+      )}
+      {punkt && karte.einsatzId != null && (
+        <OrtVorschlag
+          einsatzId={karte.einsatzId}
+          exclude={karte.exclude}
+          wert={{ ...value, koordinate: punkt }}
+          onUebernehmen={(ortsname) =>
+            onChange?.({ text: ortsname, koordinate: punkt, quelle: 'karte' })
+          }
+        />
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: token.marginXS }}>
+        {!punkt && <span style={{ color: rollen.text2 }}>Nicht verortet</span>}
+        <Button onClick={() => setWaehlen(true)}>Auf Karte wählen</Button>
+      </div>
+      <KarteWaehlen
+        offen={waehlen}
+        etikett={karte.etikett}
+        punkt={punkt}
+        umgebung={karte.umgebung}
+        onUebernehmen={(p) => {
+          ausKarte(p);
+          setWaehlen(false);
+        }}
+        onAbbrechen={() => setWaehlen(false)}
+      />
+    </>
+  );
+}
+
+/**
+ * Ort-Zeile (Ortsname, Peilung) und, wenn der Punkt nicht aus einem Treffer stammt, der Ortsname
+ * als Vorschlag für den Text. Übernommen wird nur auf Knopfdruck; der getippte Text bleibt sonst.
+ */
+function OrtVorschlag({
+  einsatzId,
+  exclude,
+  wert,
+  onUebernehmen,
+}: {
+  einsatzId: number;
+  exclude?: string;
+  wert: OrtsfeldWert & { koordinate: LatLon };
+  onUebernehmen: (ortsname: string) => void;
+}) {
+  const { data } = useOrtVorschau(einsatzId, wert.koordinate, exclude);
+  const ortsname = data?.ortsname?.trim();
+  const vorschlagen =
+    (wert.quelle === 'karte' || wert.quelle === 'koordinate') &&
+    !!ortsname &&
+    ortsname !== wert.text.trim();
+  return (
+    <div
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0 }}
+    >
+      <OrtZeile einsatzId={einsatzId} koord={wert.koordinate} exclude={exclude} />
+      {vorschlagen && (
+        <Button type="link" style={{ paddingInline: 0 }} onClick={() => onUebernehmen(ortsname)}>
+          Als Adresse übernehmen
+        </Button>
       )}
     </div>
   );
