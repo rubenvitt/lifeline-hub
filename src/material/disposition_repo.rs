@@ -202,8 +202,9 @@ pub async fn load_anzeige_tx(
 /// Disponiert Stamm-Material mit Menge: prüft Org und Dienststatus, friert den
 /// Identitäts-Snapshot ein und kopiert die Art des Stamms an die Zeile (LLH-1224, design.md D1).
 /// `NotFound` bei fremdem/unbekanntem Material, `UnprocessableEntity` bei außer Dienst und bei
-/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt. `nachforderung_id` ist der
-/// vom Aufrufer geprüfte Bezug einer Übernahme (LLH-1226). Liefert die `em_id`.
+/// einem Gerät mit Menge über 1 (D2). Mehrfach-Disposition ist erlaubt, außer bei einem Gerät mit
+/// Bestandsnummer ([`check_stueck_frei_tx`], `Conflict`). `nachforderung_id` ist der vom Aufrufer
+/// geprüfte Bezug einer Übernahme (LLH-1226). Liefert die `em_id`.
 pub async fn disponiere_stamm_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -216,6 +217,16 @@ pub async fn disponiere_stamm_tx(
     let ((bezeichnung, kategorie, bestandsnummer, traeger), art) =
         stamm_snapshot_tx(conn, org_id, material_id).await?;
     check_zeile(art, menge, 0, MaterialStatus::Einsatzbereit, false)?;
+    check_stueck_frei_tx(
+        conn,
+        einsatz_id,
+        material_id,
+        None,
+        art,
+        &bezeichnung,
+        bestandsnummer.as_deref(),
+    )
+    .await?;
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO einsatz_material \
             (einsatz_id, material_id, menge, art, snap_bezeichnung, snap_kategorie, \
@@ -275,6 +286,46 @@ async fn stamm_snapshot_tx(
     }
     let art = MaterialArt::try_from(art).map_err(AppError::Internal)?;
     Ok(((bezeichnung, kategorie, bestandsnummer, traeger), art))
+}
+
+/// Ein Stamm-Gerät mit Bestandsnummer ist ein bestimmtes Stück (LLH-1256, Spec `material-modell`):
+/// es steht höchstens einmal aktiv im Einsatz. Gibt es schon eine aktive Zeile desselben Stamms
+/// (außer `ausser_em`, der Zeile, die gerade wieder aufgenommen wird), ist das `Conflict` mit Grund.
+/// Gerät ohne Bestandsnummer und Verbrauchsgut bleiben mehrfach disponierbar. Maßgeblich sind Art
+/// und Bestandsnummer des Stamms von jetzt.
+///
+/// Eine Prüfung statt eines Teilindex: bis hierhin war die Mehrfach-Disposition erlaubt, ein
+/// UNIQUE-Index scheiterte an Bestandsdaten mit zwei aktiven Zeilen desselben Geräts. Die Aufrufer
+/// schreiben unter `BEGIN IMMEDIATE` (`write_retry!`), zwischen Prüfung und INSERT schreibt also
+/// niemand dazwischen.
+async fn check_stueck_frei_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    material_id: i64,
+    ausser_em: Option<i64>,
+    art: MaterialArt,
+    bezeichnung: &str,
+    bestandsnummer: Option<&str>,
+) -> Result<(), AppError> {
+    let Some(nummer) = bestandsnummer.filter(|_| art == MaterialArt::Geraet) else {
+        return Ok(());
+    };
+    let belegt: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM einsatz_material \
+         WHERE einsatz_id = ? AND material_id = ? AND beendet_at IS NULL AND id IS NOT ?)",
+    )
+    .bind(einsatz_id)
+    .bind(material_id)
+    .bind(ausser_em)
+    .fetch_one(&mut *conn)
+    .await?;
+    if belegt {
+        return Err(AppError::Conflict(format!(
+            "Das Gerät «{bezeichnung}» ({nummer}) ist in diesem Einsatz schon disponiert; \
+             erst aus dem Einsatz nehmen"
+        )));
+    }
+    Ok(())
 }
 
 /// Pool-Wrapper um [`disponiere_stamm_tx`].
@@ -803,8 +854,19 @@ pub async fn reaktivieren_tx(
     }
     if let Some(mid) = material_id {
         // Die Art bleibt die der Zeile (design.md D1): sie gilt für die Zeile, nicht für den Stamm.
-        let ((bezeichnung, kategorie, bestandsnummer, traeger), _) =
+        // Ob das Stück schon wieder aktiv im Einsatz steht, entscheidet der Stamm (LLH-1256).
+        let ((bezeichnung, kategorie, bestandsnummer, traeger), stamm_art) =
             stamm_snapshot_tx(conn, org_id, mid).await?;
+        check_stueck_frei_tx(
+            conn,
+            einsatz_id,
+            mid,
+            Some(em_id),
+            stamm_art,
+            &bezeichnung,
+            bestandsnummer.as_deref(),
+        )
+        .await?;
         sqlx::query(
             "UPDATE einsatz_material SET snap_bezeichnung = ?, snap_kategorie = ?, \
                  snap_bestandsnummer = ?, snap_traegerorganisation = ? WHERE id = ?",

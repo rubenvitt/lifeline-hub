@@ -3141,3 +3141,68 @@ async fn reaktivieren_verlangt_eine_eingetroffene_nachforderung() {
         vec![erste, zweite]
     );
 }
+
+/// Spec `material-modell`, „Ein Stamm-Gerät mit Bestandsnummer steht höchstens einmal aktiv im
+/// Einsatz“ (LLH-1256): die zweite aktive Disposition desselben Stücks ist 409 mit Grund und
+/// schreibt nichts; nach dem Herausnehmen geht es wieder. Das Wiederaufnehmen der alten Zeile
+/// neben einer aktiven ist ebenso 409. Ein Gerät ohne Bestandsnummer und Verbrauchsgut bleiben
+/// mehrfach disponierbar.
+#[tokio::test]
+async fn stamm_geraet_mit_bestandsnummer_nur_einmal_aktiv() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, json) = anfrage(
+        &app,
+        "POST",
+        "/api/material",
+        &admin,
+        Some(r#"{"bezeichnung":"Stromerzeuger 5 kVA","bestandsnummer":"SE-1","art":"geraet"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let stueck = json["id"].as_i64().unwrap();
+    let pfad = format!("/api/einsaetze/{einsatz}/material");
+    let body = format!(r#"{{"material_id":{stueck}}}"#);
+
+    let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    let erste = json["id"].as_i64().unwrap();
+    let etb_vorher = system_etb_anzahl(&app, &admin, einsatz).await;
+
+    let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert_eq!(
+        json["error"],
+        "Das Gerät «Stromerzeuger 5 kVA» (SE-1) ist in diesem Einsatz schon disponiert; \
+         erst aus dem Einsatz nehmen"
+    );
+    let (_, liste) = anfrage(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(liste.as_array().unwrap().len(), 1, "zweite Zeile angelegt");
+    assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
+
+    // Herausgenommen: das Stück lässt sich wieder disponieren.
+    let (s, _) = aktion(&app, &admin, einsatz, erste, "entlassen").await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "nach dem Herausnehmen: {json}");
+
+    // Die alte Zeile neben der neuen wieder aufnehmen: dasselbe Stück, also 409.
+    let (s, json) = aktion(&app, &admin, einsatz, erste, "reaktivieren").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{json}");
+    assert!(
+        json["error"]
+            .as_str()
+            .unwrap()
+            .contains("ist in diesem Einsatz schon disponiert"),
+        "{json}"
+    );
+
+    // Ohne Bestandsnummer ist ein Gerät kein bestimmtes Stück: mehrfach erlaubt.
+    let ohne = stamm_anlegen(&app, &admin, "Trage", "geraet").await;
+    let body = format!(r#"{{"material_id":{ohne}}}"#);
+    for _ in 0..2 {
+        let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::CREATED, "Gerät ohne Bestandsnummer: {json}");
+    }
+}
