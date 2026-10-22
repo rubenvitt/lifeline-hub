@@ -245,6 +245,120 @@ Anforderung „Sofortmeldung alarmiert“ gelten, ohne zweite Benachrichtigung.
 - **WHEN** eine Sofortmeldung mit Empfänger S2 erfasst wird
 - **THEN** erhalten die Nutzer von S2 genau eine Benachrichtigung, den Alarm
 
+### Requirement: Eingang einer Meldung
+
+Eine dringende Meldung, jede Lagemeldung und jede Meldung von einem gekoppelten Gerät SHALL beim
+Erfassen als Hinweis „Neue Meldung“ alle Mitglieder mit Schreibrecht im Modul Meldungen
+erreichen, nie Beobachter und nie den Erfasser. Mit Empfängerfunktion MUST er stattdessen deren
+Nutzer und die Einsatzleitung erreichen. Eine normale Meldung von Hand ohne Empfängerfunktion
+MUST still bleiben; eine Sofortmeldung bleibt bei ihrem Alarm.
+
+#### Scenario: Dringende Meldung
+- **WHEN** Person A eine dringende Meldung ohne Empfängerfunktion erfasst, B und C Führungspersonal sind und D Beobachterin
+- **THEN** erhalten B und C den Hinweis „Neue Meldung“, A und D nicht
+
+#### Scenario: Lagemeldung
+- **WHEN** eine Meldung der Art Lagemeldung ohne Empfängerfunktion erfasst wird
+- **THEN** erhalten alle mit Schreibrecht im Modul Meldungen außer dem Erfasser den Hinweis
+
+#### Scenario: Meldung von einem gekoppelten Gerät
+- **WHEN** der Laptop der UHS Nord eine Meldung mit Priorität normal erfasst
+- **THEN** erhalten alle mit Schreibrecht im Modul Meldungen den Hinweis, das Gerät nicht
+
+#### Scenario: Eingang mit Empfängerfunktion
+- **WHEN** eine Lagemeldung mit Empfängerfunktion S2 erfasst wird, Person A S2 besetzt und Person C die Einsatzleitung
+- **THEN** erhalten A und C den Hinweis, das übrige Führungspersonal nicht
+
+#### Scenario: Normale Meldung von Hand
+- **WHEN** eine Meldung mit Priorität normal ohne Empfängerfunktion von Hand erfasst wird
+- **THEN** erhält niemand eine Benachrichtigung; sie zählt bei den unbearbeiteten Meldungen
+
+### Requirement: In die Lage übernommen
+
+Wird eine Meldung, die nicht die Art Lagemeldung hat, zum ersten Mal in die Lage übernommen,
+SHALL ein Hinweis „In die Lage übernommen“ die Nutzer von S2 und die Einsatzleitung erreichen,
+nicht den Übernehmenden. Der Hinweis gehört zur Art „Neue Meldung“, springt zu den Lagemeldungen
+und MUST bei einer erneuten Übergabe derselben Meldung nicht noch einmal entstehen.
+
+#### Scenario: Übernahme in die Lage
+- **WHEN** Person B eine Meldung von Florian Nord 1 in die Lage übernimmt, Person A S2 besetzt und Person C die Einsatzleitung
+- **THEN** erhalten A und C den Hinweis „In die Lage übernommen“ mit Sprung zu den Lagemeldungen, B nicht
+
+#### Scenario: Zweite Übergabe
+- **WHEN** dieselbe Meldung mit geändertem Lage-Text erneut übergeben wird
+- **THEN** entsteht kein weiterer Hinweis
+
+### Requirement: Sichten räumt den Hinweis bei allen
+
+Geht eine Meldung aus dem Status Neu heraus (Sichten, Bestätigen, In Bearbeitung, Erledigt), SHALL
+der Server ihre offenen Hinweise „Neue Meldung“ für alle Empfänger quittieren; ihre Toasts und
+OS-Meldungen MUST auf allen Verbindungen verschwinden. Ebenso MUST die Kenntnisnahme einer
+Lagemeldung die Hinweise „In die Lage übernommen“ zu ihr quittieren. Ein Alarm MUST davon
+unberührt bleiben.
+
+#### Scenario: Gesichtet in einem anderen Tab
+- **WHEN** Person C eine dringende Meldung sichtet, zu der A und B einen Hinweis haben
+- **THEN** ist der Hinweis bei A und B quittiert und verschwindet in jedem ihrer Tabs
+
+#### Scenario: Kenntnisnahme räumt die Übernahme
+- **WHEN** eine übernommene Lagemeldung als gesehen gekennzeichnet wird
+- **THEN** sind die Hinweise „In die Lage übernommen“ zu ihr quittiert
+
+#### Scenario: Sofortalarm bleibt
+- **WHEN** eine Sofortmeldung auf In Bearbeitung gesetzt wird
+- **THEN** bleiben ihre Alarme offen, bis jeder sie selbst quittiert
+
+### Requirement: Eingangshinweis
+
+Hinweise der Art „Neue Meldung“ SHALL gebündelt in einem stehenden Hinweis neben dem Budget der
+Toasts erscheinen. Ein Eintrag MUST Absender und Anfang des Wortlauts nennen (über die
+Abfrage der Meldung); mehrere MUST als „‹n› neue Meldungen“ mit den jüngsten zwei Einträgen und
+der Zahl der übrigen erscheinen. Je neue Meldung SHALL „Sichten“ bereitstehen, wenn die Person
+schreiben darf. Der dezente Ton MUST höchstens einmal je zwei Minuten spielen.
+
+#### Scenario: Zehn Meldungen in einer Minute
+- **WHEN** binnen einer Minute zehn Lagemeldungen von Geräten eingehen
+- **THEN** steht ein Hinweis „10 neue Meldungen“, und der dezente Ton spielt einmal
+
+#### Scenario: Sichten im Hinweis
+- **WHEN** Person A im Hinweis bei einer Meldung „Sichten“ wählt
+- **THEN** steht die Meldung auf Gesichtet, und der Eintrag verschwindet bei allen Empfängern
+
+### Requirement: Der Eingangshinweis stört keine Eingabe
+
+Während der Fokus in einem Eingabefeld steht, SHALL ein neuer Eintrag des Eingangshinweises
+warten, bis das Feld verlassen wird. Auf der Seite Meldungen MUST der Hinweis keine Meldungen
+zeigen, auf der Seite Lagemeldungen keine Übernahmen; dort trägt das Sammelbanner die Neuen.
+
+#### Scenario: Während einer Eingabe
+- **WHEN** eine dringende Meldung eingeht, während Person A im ETB tippt
+- **THEN** erscheint der Hinweis erst, wenn A das Feld verlässt
+
+#### Scenario: Auf der Meldungsseite
+- **WHEN** eine dringende Meldung eingeht, während Person A die Seite Meldungen offen hat
+- **THEN** erscheint kein Hinweis und kein Ton; das Sammelbanner der Seite trägt die Meldung
+
+### Requirement: Unbearbeitete Meldungen im Tab-Titel
+
+Der Tab-Titel eines Einsatzes SHALL die Zahl der Meldungen im Status Neu voranstellen, „(3)
+Lagekarte · Einsatz · lifeline-hub“, sofern das Modul Meldungen sichtbar und frei ist. Wo der
+Browser es kann, MUST dieselbe Zahl am Symbol der installierten App stehen. Ohne unbearbeitete
+Meldungen entfällt die Zahl.
+
+#### Scenario: Stiller Eingang
+- **WHEN** drei Meldungen mit Priorität normal von Hand erfasst werden und noch niemand sie gesichtet hat
+- **THEN** beginnt der Tab-Titel mit „(3)“, ohne Ton und ohne Hinweis
+
+### Requirement: Lagemeldung schlägt S2 vor
+
+Wählt eine Person im Meldungsformular die Art Lagemeldung, SHALL das Formular die
+Empfängerfunktion S2 vorschlagen, solange keine Funktion gewählt und das Feld unberührt ist. Den
+freien Empfängertext MUST der Vorschlag unverändert lassen.
+
+#### Scenario: Lagemeldung erfassen
+- **WHEN** eine Person „Lagemeldung (extern)“ wählt und erfasst
+- **THEN** geht die Meldung mit Empfängerfunktion S2 und leerem freien Empfänger hinaus
+
 ### Requirement: Lagebesprechung steht an
 
 Für den nächsten Termin der Lagebesprechung SHALL der Stab (Nutzer der besetzten Funktionen EL und
@@ -339,11 +453,16 @@ Hinweis erhalten. Wer ihn nicht lesen darf, MUST NOT von ihm erfahren.
 Alle Benachrichtigungen SHALL ein gemeinsames Budget teilen: höchstens drei einzelne Toasts sind
 sichtbar. Ab der vierten fasst ein Sammeltoast die älteren zusammen und nennt je Art die Zahl und
 einen Sprung; die jüngste bleibt einzeln stehen. Dieselbe Benachrichtigung MUST höchstens einmal
-erscheinen.
+erscheinen. Ausgenommen sind Benachrichtigungen der Art „Neue Meldung“: sie stehen im
+Eingangshinweis und MUST NOT einen Platz des Budgets belegen.
 
 #### Scenario: Fünf Hinweise
 - **WHEN** binnen kurzer Zeit zwei neue Aufträge, ein Befehl und zwei Nachforderungs-Hinweise eintreffen
 - **THEN** steht der jüngste einzeln, und ein Sammeltoast „4 weitere Hinweise“ nennt die übrigen mit je einem Sprung zu Aufträge, Befehle und Nachforderungen
+
+#### Scenario: Eingang neben drei Toasts
+- **WHEN** drei Hinweise „Neuer Auftrag“ einzeln stehen und eine dringende Meldung eingeht
+- **THEN** stehen die drei weiter einzeln, und die Meldung erscheint im Eingangshinweis
 
 ### Requirement: Quittieren gilt für alle Verbindungen des Nutzers
 

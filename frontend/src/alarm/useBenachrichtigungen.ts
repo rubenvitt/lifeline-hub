@@ -24,6 +24,12 @@ import {
 import { gezeigt, inArbeit, quittiert } from './benachrichtigungGedaechtnis';
 import { ladeMeldungInhalt, type MeldungInhalt } from './meldungInhalt';
 import type { AlarmToastEintrag, AlarmToasts } from './useAlarmToasts';
+import {
+  eingangTon,
+  merkeEingangTon,
+  type EingangEintrag,
+  type Eingangshinweis,
+} from './useEingangshinweis';
 import { schliessePushMeldungen } from './webPush';
 
 /**
@@ -92,6 +98,33 @@ function eintragVon(
   };
 }
 
+/** Gehört die Benachrichtigung in den Eingangshinweis (LLH-1062)? Die Art `meldung`. */
+function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ'>): boolean {
+  return e.art === 'meldung' && (e.bezug_typ === 'meldung' || e.bezug_typ === 'lage_uebernahme');
+}
+
+/** Der Eintrag im Eingangshinweis: Absender und Wortlaut aus der Meldung, sonst der Server. */
+function eingangVon(
+  a: BenachrichtigungAnzeige,
+  opts: { uhrzeit: string | null; inhalt: MeldungInhalt | null },
+): EingangEintrag {
+  const inhalt = opts.inhalt;
+  return {
+    benachrichtigungId: a.id,
+    einsatzId: a.einsatz_id,
+    bezug: a.bezug_typ === 'lage_uebernahme' ? 'lage_uebernahme' : 'meldung',
+    meldungId: a.bezug_id,
+    titel: inhalt?.titel ?? a.titel,
+    zeile: inhalt?.absender ?? a.detail ?? a.titel,
+    anfang: inhalt?.anfang ?? undefined,
+    wortlaut: inhalt?.wortlaut ?? undefined,
+    uhrzeit: opts.uhrzeit ?? undefined,
+    pfad: a.pfad,
+    // Ohne gelesenen Status kein „Sichten“: lieber ein Knopf zu wenig als einer ins Leere.
+    neu: inhalt?.status === 'neu',
+  };
+}
+
 /**
  * Benachrichtigungen in einer Zentrale (design.md D5). Hört auf das Live-Ereignis (über
  * `live/benachrichtigungListener.ts`), holt den Text (`GET /api/benachrichtigungen/{id}`), zeigt
@@ -103,8 +136,15 @@ function eintragVon(
  * Uhrzeit, und für alles zusammen höchstens EIN dezenter Ton. Eine OS-Meldung nur für Alarme.
  *
  * `einsatzId` `null` ist die Org-Zentrale: nur Org-Arten.
+ *
+ * Benachrichtigungen der Art `meldung` gehen in den Eingangshinweis (`eingang`, LLH-1062), nicht
+ * ins Toast-Budget; ihr Ton ist gedrosselt. Ohne `eingang` (Org-Zentrale) gibt es sie nicht.
  */
-export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToasts): void {
+export function useBenachrichtigungen(
+  einsatzId: number | null,
+  toasts: AlarmToasts,
+  eingang?: Eingangshinweis,
+): void {
   // Über eine Ref: lädt die Anzeigezone nach, soll das nicht noch einmal nachreichen.
   const zoneRef = useRef<string | null>(null);
   zoneRef.current = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
@@ -117,7 +157,8 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
       return t ? zuWanduhr(t, zoneRef.current).format('HH:mm') : null;
     };
 
-    const unbekannt = (id: number) => !quittiert.has(id) && !inArbeit.has(id) && !toasts.zeigt(id);
+    const unbekannt = (id: number) =>
+      !quittiert.has(id) && !inArbeit.has(id) && !toasts.zeigt(id) && !eingang?.zeigt(id);
 
     const beiEreignis = async (ev: Event) => {
       const e = (ev as CustomEvent<BenachrichtigungEreignis>).detail;
@@ -129,6 +170,7 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
       if (e.quittiert) {
         quittiert.add(id);
         toasts.entferneBenachrichtigung(id);
+        eingang?.entferneBenachrichtigung(id);
         return;
       }
       if (!unbekannt(id)) return;
@@ -149,6 +191,17 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
         inArbeit.delete(id);
       }
       if (!aktiv || quittiert.has(id) || anzeige.quittiert_at) return;
+      if (eingang && istEingang(anzeige)) {
+        if (
+          eingang.melde(eingangVon(anzeige, { uhrzeit: null, inhalt }), {
+            ton: true,
+            desktop: true,
+          }) === 'neu'
+        ) {
+          gezeigt.add(id);
+        }
+        return;
+      }
       const ergebnis = toasts.melde(eintragVon(anzeige, { uhrzeit: null, desktop: true, inhalt }));
       if (ergebnis === 'inaktiv') return;
       gezeigt.add(id);
@@ -182,10 +235,18 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
           const inhalte = await Promise.all(offen.map((a) => ladeMeldungInhalt(a)));
           if (!aktiv) return;
           let ton = false;
+          let eingangNeu = false;
           for (const [i, a] of offen.entries()) {
             // Während der Inhalte kann sie live gekommen oder quittiert worden sein.
             if (!unbekannt(a.id)) continue;
             const wiederholt = gezeigt.has(a.id);
+            if (eingang && istEingang(a)) {
+              const e = eingangVon(a, { uhrzeit: uhrzeitVon(a), inhalt: inhalte[i] });
+              if (eingang.melde(e, { ton: false, desktop: false }) !== 'neu') continue;
+              if (!wiederholt) eingangNeu = true;
+              gezeigt.add(a.id);
+              continue;
+            }
             const ergebnis = toasts.melde(
               eintragVon(a, {
                 uhrzeit: uhrzeitVon(a),
@@ -197,7 +258,13 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
             gezeigt.add(a.id);
             if (ergebnis === 'neu' && !wiederholt) ton = true;
           }
-          if (ton) spieleAlarmTon('dezent');
+          // Für alles zusammen höchstens EIN dezenter Ton; der Eingang zählt ihn in seine Drossel.
+          if (ton) {
+            spieleAlarmTon('dezent');
+            merkeEingangTon();
+          } else if (eingangNeu) {
+            eingangTon();
+          }
         } while (nochmal && aktiv);
       } finally {
         laeuft = false;
@@ -213,5 +280,5 @@ export function useBenachrichtigungen(einsatzId: number | null, toasts: AlarmToa
       window.removeEventListener(BENACHRICHTIGUNG_WINDOW_EVENT, beiEreignis);
       window.removeEventListener(NACHREICHEN_WINDOW_EVENT, beiNachreichen);
     };
-  }, [einsatzId, toasts]);
+  }, [einsatzId, toasts, eingang]);
 }

@@ -6,8 +6,8 @@
  * höchste Warnstufe ein Alarmbeitrag ist — der Warnstufen-Hinweis. Darunter im Fugenraster:
  * 1. Kennzahlenband, sechs Plätze (vier Kern-, zwei Lageplätze, siehe unten).
  * 2. Drei Paneele (1fr 1fr 1.1fr, unter `lg` gestapelt): Gefahrenmatrix (je Gefahrentyp über alle
- *    Gebiete verdichtet), Sichtung (BBK-Farben), Meldungsstrom (neue Einträge per Sammelbanner, nie
- *    eingeschoben).
+ *    Gebiete verdichtet), Sichtung (BBK-Farben), Jüngste ETB-Einträge (im Code „Meldungsstrom“;
+ *    neue Einträge per Sammelbanner, nie eingeschoben).
  * 3. Führungsstand: Aufträge offen, Meldungen offen, Lagebericht, UHS aktiv. Er steht hier, weil an
  *    ihm die Alarmbeiträge überfälliger Aufträge und Meldungen hängen — eine überfällige
  *    Sofortmeldung soll auf dieser Seite rot stehen. Aufträge und Meldungen kommen aus dem

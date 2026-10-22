@@ -1,11 +1,20 @@
-import { AutoComplete, Col, Form, Input, InputNumber, Row, Typography } from 'antd';
+import { AutoComplete, Button, Col, Collapse, Form, Input, Row, Space, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
+import type dayjs from 'dayjs';
 import {
   ETB_PARTEI_MAX,
   NACHFORDERUNG_ART_MAX,
   NACHFORDERUNG_BEZEICHNUNG_MAX,
+  NACHFORDERUNG_ZIEL_TEXT_MAX,
 } from '../api/eingabegrenzen';
 import { zeichenGrenze, zeichenRegel } from '../components/zeichenGrenze';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { IconPlus } from '../icons';
+import { listeEinheitTypen } from '../api/einheitTypen';
+import { globalKeys } from '../api/queryKeys';
+import { MengenFeld } from '../components/MengenFeld';
+import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
+import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
@@ -18,6 +27,14 @@ import {
 } from '../stammdaten/externeStellenVorschlaege';
 import { teilwortSuche } from '../components/teilwortSuche';
 import { KennungsLink } from '../components/kennungsLink';
+import { artOptionen, schnellwahlArten } from './artVorschlaege';
+import {
+  zielAusText,
+  zielOptionen,
+  zielVorgabe,
+  type ZielAbschnitt,
+  type ZielRaum,
+} from './zielVorschlaege';
 
 const { TextArea } = Input;
 
@@ -32,12 +49,34 @@ const ADRESSAT_OPTIONEN: { value: AdressatKategorie; label: string }[] = [
 interface FormWerte {
   art: string;
   anzahl: number | null;
+  /** Ziel/Meldeort als Name; beim Absenden Raum, Abschnitt oder Freitext ({@link zielAusText}). */
+  wohin: string;
   bezeichnung: string;
   adressatKategorie: AdressatKategorie;
   adressatBezeichnung: string;
   prioritaet: NachforderungPrioritaet;
+  benoetigtBis: dayjs.Dayjs | null;
   begruendung: string;
 }
+
+const PRIORITAET_OPTIONEN: { value: NachforderungPrioritaet; label: string }[] = [
+  { value: 'sofort', label: 'Sofort' },
+  { value: 'dringend', label: 'Dringend' },
+  { value: 'normal', label: 'Normal' },
+];
+
+/**
+ * Felder hinter „Weitere Angaben“ (LLH-1089, design.md D1). Scheitert die Prüfung an einem davon,
+ * klappt der Teil auf.
+ */
+const EINGEKLAPPT = new Set<string>([
+  'bezeichnung',
+  'adressatKategorie',
+  'adressatBezeichnung',
+  'prioritaet',
+  'benoetigtBis',
+  'begruendung',
+]);
 
 /**
  * Stellenbezug einer neuen Nachforderung (LLH-1082, design.md D7): die Betreuungsstelle, für die
@@ -57,14 +96,19 @@ export function bezugBegruendung(bezug: NachforderungBezug | null | undefined): 
 }
 
 /**
- * Wiederholfelder einer Serie: meist mehreres bei DERSELBEN Stelle; Art und Bezeichnung
- * wechseln und werden geleert.
+ * Wiederholfelder einer Serie: meist mehreres bei DERSELBEN Stelle an DENSELBEN Meldeort; Art,
+ * Anzahl, Details und Bedarfszeit wechseln und werden geleert.
  */
 const UEBERNAHME: (keyof FormWerte & string)[] = [
+  'wohin',
   'adressatKategorie',
   'adressatBezeichnung',
   'prioritaet',
 ];
+
+const KEINE_ARTEN: readonly string[] = [];
+const KEINE_RAEUME: readonly ZielRaum[] = [];
+const KEINE_ABSCHNITTE: readonly ZielAbschnitt[] = [];
 
 export default function NachforderungFormular({
   senden,
@@ -73,6 +117,9 @@ export default function NachforderungFormular({
   vorbelegung,
   bezug,
   speicherung,
+  fruehereArten = KEINE_ARTEN,
+  raeume = KEINE_RAEUME,
+  abschnitte = KEINE_ABSCHNITTE,
 }: {
   senden: boolean;
   /**
@@ -101,14 +148,40 @@ export default function NachforderungFormular({
    * Abbrechen räumen ihn (LFH-1077, `frontend/AGENTS.md`, „Rückwege und Fehler“).
    */
   speicherung?: Speicherung;
+  /**
+   * Arten der Nachforderungen dieses Einsatzes, häufigste zuerst (`fruehereArten`): Schnellwahl und
+   * erste Vorschlagsgruppe für „Was“.
+   */
+  fruehereArten?: readonly string[];
+  /** Bereitstellungsräume des Einsatzes für „Wohin“; leer ohne Freigabe des Moduls. */
+  raeume?: readonly ZielRaum[];
+  /** Einsatzabschnitte für „Wohin“; leer ohne Freigabe des Moduls. */
+  abschnitte?: readonly ZielAbschnitt[];
 }) {
   const [form] = Form.useForm<FormWerte>();
+  const { formatiere } = useZeitEingabe();
+  const [weitereOffen, setWeitereOffen] = useState(false);
+  const anzahlRef = useRef<HTMLDivElement>(null);
+  // Einheitstypen der Organisation (aktive, Folge `sortier`) als zweite Vorschlagsgruppe.
+  const typen = useQuery({ queryKey: globalKeys.einheitTypen(), queryFn: listeEinheitTypen }).data;
+  const schnellwahl = useMemo(() => schnellwahlArten(fruehereArten), [fruehereArten]);
+  const artVorschlaege = useMemo(
+    () => artOptionen(fruehereArten, typen ?? []),
+    [fruehereArten, typen],
+  );
+  const wohinOptionen = useMemo(() => zielOptionen(raeume, abschnitte), [raeume, abschnitte]);
+  const wohinVorgabe = zielVorgabe(raeume);
   // Katalog „Externe Stellen“ (LFH-1194, design.md D8): Vorschläge für die Adressat-Bezeichnung,
   // die zuständige Leitstelle als Vorgabe bei der Kategorie „Leitstelle“.
   const stellen = useExterneStellen().data;
   const stellenOptionen = externeStellenOptions(stellen ?? []);
   const vorgabeLeitstelle = zustaendigeLeitstelle(stellen ?? []) ?? '';
   const kategorie = Form.useWatch('adressatKategorie', form);
+  const adressatBezeichnung = Form.useWatch('adressatBezeichnung', form);
+  const prioritaet = Form.useWatch('prioritaet', form);
+  const benoetigtBis = Form.useWatch('benoetigtBis', form);
+  const details = Form.useWatch('bezeichnung', form);
+  const begruendung = Form.useWatch('begruendung', form);
 
   // Vorbelegen, nie überschreiben: nur bei Kategorie „Leitstelle“, leerem und unberührtem Feld.
   // Läuft, sobald die Liste da ist (sie kommt nach dem Einhängen) und bei jedem Wechsel auf
@@ -121,13 +194,22 @@ export default function NachforderungFormular({
     form.setFieldValue('adressatBezeichnung', vorgabeLeitstelle);
   }, [form, kategorie, vorgabeLeitstelle]);
 
+  // Wohin: der einzige aktive Bereitstellungsraum als Vorgabe, wie die Leitstelle oben: nur in ein
+  // leeres, unberührtes Feld, sobald die Liste da ist. Den Reset decken die Startwerte ab.
+  useEffect(() => {
+    if (!wohinVorgabe) return;
+    if (form.getFieldValue('wohin') || form.isFieldTouched('wohin')) return;
+    form.setFieldValue('wohin', wohinVorgabe);
+  }, [form, wohinVorgabe]);
+
   // Läuft nach dem Einhängen des `<Form>` und nur bei einer NEUEN Vorbelegung (die Seite hält
   // sie identitätsstabil).
   useEffect(() => {
     if (!vorbelegung) return;
     form.setFieldsValue({
       art: vorbelegung.art,
-      // Eine Teil-Vorbelegung (LLH-1133) lässt beide leer: die Person trägt sie ein.
+      // Eine Teil-Vorbelegung (LLH-1133) lässt beide leer: die Person trägt sie ein; die Vorgabe 1
+      // gilt nur für die leere Maske.
       bezeichnung: vorbelegung.bezeichnung ?? '',
       anzahl: vorbelegung.anzahl ?? null,
       begruendung: vorbelegung.begruendung ?? '',
@@ -144,12 +226,22 @@ export default function NachforderungFormular({
     form.setFieldValue('begruendung', begruendungVorgabe);
   }, [form, begruendungVorgabe]);
 
+  /** Schnellwahl: setzt „Was“ und markiert die Anzahl, sodass eine Ziffer die Vorgabe ersetzt. */
+  const waehle = (art: string) => {
+    form.setFieldValue('art', art);
+    const feld = anzahlRef.current?.querySelector('input');
+    feld?.focus();
+    feld?.select();
+  };
+
   // Das `return` ist tragend: die Hülle wartet auf diese Zusage.
   const absenden = (w: FormWerte) => {
     return onAnlegen({
       art: w.art.trim(),
-      bezeichnung: w.bezeichnung.trim(),
+      bezeichnung: w.bezeichnung?.trim() || undefined,
       anzahl: w.anzahl ?? undefined,
+      ...zielAusText(w.wohin, raeume, abschnitte),
+      benoetigt_bis: w.benoetigtBis ? alsBackendZeit(w.benoetigtBis) : undefined,
       adressat_kategorie: w.adressatKategorie,
       adressat_bezeichnung: w.adressatBezeichnung?.trim() || undefined,
       begruendung: w.begruendung?.trim() || undefined,
@@ -158,16 +250,35 @@ export default function NachforderungFormular({
     });
   };
 
+  /** Jeder Wert, der von der Vorgabe abweicht, steht im Kopf — eingeklappt bleibt nichts verborgen. */
+  const abweichungen = [
+    kategorie && kategorie !== 'leitstelle'
+      ? ADRESSAT_OPTIONEN.find((o) => o.value === kategorie)?.label
+      : undefined,
+    adressatBezeichnung?.trim() && adressatBezeichnung.trim() !== vorgabeLeitstelle
+      ? adressatBezeichnung.trim()
+      : undefined,
+    // `useWatch` liefert im ersten Render `undefined`: ohne den Riegel stünde kurz „Priorität “ da.
+    prioritaet && prioritaet !== 'normal'
+      ? `Priorität ${PRIORITAET_OPTIONEN.find((o) => o.value === prioritaet)?.label ?? ''}`
+      : undefined,
+    benoetigtBis ? `bis ${formatiere(benoetigtBis, 'DD.MM. HH:mm')}` : undefined,
+    details?.trim() ? 'Details' : undefined,
+    begruendung?.trim() && begruendung.trim() !== begruendungVorgabe ? 'Begründung' : undefined,
+  ].filter((t): t is string => !!t);
+
   const formular = (
     <ErfassungsFormular<FormWerte>
       form={form}
       initialValues={{
         art: '',
-        anzahl: null,
+        anzahl: 1,
+        wohin: wohinVorgabe,
         bezeichnung: '',
         adressatKategorie: 'leitstelle',
         adressatBezeichnung: vorgabeLeitstelle,
         prioritaet: 'normal',
+        benoetigtBis: null,
         begruendung: begruendungVorgabe,
       }}
       onErfassen={absenden}
@@ -180,6 +291,9 @@ export default function NachforderungFormular({
       erfassenText="Nachforderung absetzen"
       serie
       uebernahme={UEBERNAHME}
+      onPruefungGescheitert={(felder) => {
+        if (felder.some((f) => EINGEKLAPPT.has(f))) setWeitereOffen(true);
+      }}
     >
       {bezug && (
         // Der Bezug ist keine Eingabe: er steht fest, solange die Erfassung offen ist. Der Name ist
@@ -201,76 +315,125 @@ export default function NachforderungFormular({
           )}
         </Typography.Paragraph>
       )}
+      <Space role="group" aria-label="Schnellwahl" wrap style={{ marginBottom: 16 }}>
+        {schnellwahl.map((art) => (
+          <Button key={art} icon={<IconPlus />} onClick={() => waehle(art)}>
+            {art}
+          </Button>
+        ))}
+      </Space>
       <Row gutter={16}>
-        <Col xs={24} sm={16}>
+        <Col xs={24} sm={10}>
           <Form.Item
             name="art"
-            label="Art (Kräfte/Mittel)"
-            rules={[{ required: true, whitespace: true, message: 'Art ist erforderlich' }]}
+            label="Was"
+            rules={[{ required: true, whitespace: true, message: 'Was ist erforderlich' }]}
           >
-            <Input
-              aria-label="Art"
+            <AutoComplete
+              aria-label="Was"
+              options={artVorschlaege}
+              showSearch={teilwortSuche}
               placeholder="z. B. RTW, SEG, Sandsäcke"
               maxLength={NACHFORDERUNG_ART_MAX}
             />
           </Form.Item>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={4} ref={anzahlRef}>
           <Form.Item name="anzahl" label="Anzahl">
-            <InputNumber min={1} style={{ width: '100%' }} aria-label="Anzahl" />
+            <MengenFeld beschriftung="Anzahl" style={{ width: '100%' }} />
           </Form.Item>
         </Col>
-      </Row>
-      <Form.Item
-        name="bezeichnung"
-        label="Bezeichnung / Bedarf"
-        rules={[{ required: true, whitespace: true, message: 'Bezeichnung ist erforderlich' }]}
-      >
-        <Input aria-label="Bezeichnung" maxLength={NACHFORDERUNG_BEZEICHNUNG_MAX} />
-      </Form.Item>
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          <Form.Item name="adressatKategorie" label="Adressat">
-            <Select<AdressatKategorie> aria-label="Adressat" options={ADRESSAT_OPTIONEN} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item name="adressatBezeichnung" label="Adressat-Bezeichnung">
+        <Col xs={24} sm={10}>
+          <Form.Item name="wohin" label="Wohin">
             <AutoComplete
-              aria-label="Adressat-Bezeichnung"
-              options={stellenOptionen}
+              aria-label="Wohin"
+              options={wohinOptionen}
               showSearch={teilwortSuche}
               allowClear
-              placeholder="z. B. Leitstelle Nord"
-              maxLength={ETB_PARTEI_MAX}
+              placeholder="z. B. BR Nord"
+              maxLength={NACHFORDERUNG_ZIEL_TEXT_MAX}
             />
           </Form.Item>
         </Col>
       </Row>
-      <Row gutter={16}>
-        <Col xs={24} sm={12}>
-          <Form.Item name="prioritaet" label="Priorität">
-            <Select<NachforderungPrioritaet>
-              options={[
-                { value: 'sofort', label: 'Sofort' },
-                { value: 'dringend', label: 'Dringend' },
-                { value: 'normal', label: 'Normal' },
-              ]}
-            />
-          </Form.Item>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Form.Item
-            name="begruendung"
-            label="Begründung / Lagebezug"
-            // Eine Vorbelegung aus der Verpflegung kann länger sein: sie bleibt stehen und sperrt.
-            rules={[zeichenRegel(ETB_PARTEI_MAX, 'Begründung')]}
-          >
-            {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung ist mehrzeilig. */}
-            <TextArea autoSize={{ minRows: 1, maxRows: 4 }} count={zeichenGrenze(ETB_PARTEI_MAX)} />
-          </Form.Item>
-        </Col>
-      </Row>
+      {/* Feldbudget (LFH-974): sichtbar drei Felder. `forceRender`, damit Vorbelegung, Übernahme und
+          Prüfung die Felder auch zugeklappt erreichen. */}
+      <Collapse
+        ghost
+        style={{ marginInline: -8 }}
+        activeKey={weitereOffen ? ['weitere'] : []}
+        onChange={(k) => setWeitereOffen(k.includes('weitere'))}
+        items={[
+          {
+            key: 'weitere',
+            forceRender: true,
+            label: ['Weitere Angaben', ...abweichungen].join(' · '),
+            children: (
+              <>
+                <Form.Item name="bezeichnung" label="Details / Zweck">
+                  <Input aria-label="Details / Zweck" maxLength={NACHFORDERUNG_BEZEICHNUNG_MAX} />
+                </Form.Item>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="adressatKategorie" label="Adressat">
+                      <Select<AdressatKategorie>
+                        aria-label="Adressat"
+                        options={ADRESSAT_OPTIONEN}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="adressatBezeichnung" label="Adressat-Bezeichnung">
+                      <AutoComplete
+                        aria-label="Adressat-Bezeichnung"
+                        options={stellenOptionen}
+                        showSearch={teilwortSuche}
+                        allowClear
+                        placeholder="z. B. Leitstelle Nord"
+                        maxLength={ETB_PARTEI_MAX}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Row gutter={16}>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="prioritaet" label="Priorität">
+                      <Select<NachforderungPrioritaet>
+                        aria-label="Priorität"
+                        options={PRIORITAET_OPTIONEN}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} sm={12}>
+                    <Form.Item name="benoetigtBis" label="Benötigt bis">
+                      <ZeitpunktEingabe
+                        art="frist"
+                        aria-label="Benötigt bis"
+                        placeholder="sofort"
+                        style={{ width: '100%' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+                <Form.Item
+                  name="begruendung"
+                  label="Begründung / Lagebezug"
+                  // Eine Vorbelegung aus der Verpflegung kann länger sein: sie bleibt stehen und
+                  // sperrt.
+                  rules={[zeichenRegel(ETB_PARTEI_MAX, 'Begründung')]}
+                >
+                  {/* Wächst bis vier Zeilen: eine Vorbelegung aus der Verpflegung ist mehrzeilig. */}
+                  <TextArea
+                    aria-label="Begründung / Lagebezug"
+                    autoSize={{ minRows: 1, maxRows: 4 }}
+                    count={zeichenGrenze(ETB_PARTEI_MAX)}
+                  />
+                </Form.Item>
+              </>
+            ),
+          },
+        ]}
+      />
     </ErfassungsFormular>
   );
 

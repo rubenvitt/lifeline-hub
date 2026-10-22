@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeBetreuung } from '../api/betreuung';
+import { listeBr } from '../api/einsatzBereitstellungsraum';
+import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
@@ -52,6 +54,9 @@ import { useZeilenFehler } from '../components/useZeilenFehler';
 import { useZuflussSteuerung } from '../components/useZuflussSchleuse';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 import { useViewport } from '../components/useViewport';
+import { fruehereArten } from '../nachforderungen/artVorschlaege';
+import { nachforderungName } from '../nachforderungen/nachforderungName';
+import type { ZielNamen } from '../nachforderungen/zielVorschlaege';
 import {
   NACHFORDERUNG_BEZUG_PARAM,
   NACHFORDERUNG_VORBELEGUNG_PARAMS,
@@ -207,6 +212,46 @@ export default function NachforderungenPage() {
           },
     [bezugId, stellenJeId],
   );
+  /*
+   * Ziele (LLH-1089, design.md D5/D10): Räume und Abschnitte für „Wohin“ und die Zielzeile der
+   * Karten. Nur mit Freigabe des Moduls (`istKeyFreigegeben`, wie Betreuung) und nur, wenn die
+   * Erfassung offen ist oder eine Karte ein Ziel nennt.
+   */
+  const raeumeFrei = istKeyFreigegeben('bereitstellungsraeume', freigaben);
+  const abschnitteFrei = istKeyFreigegeben('einsatzabschnitte', freigaben);
+  const kartenMitRaum = (nfQuery.data ?? []).some((n) => n.ziel_br_id != null);
+  const kartenMitAbschnitt = (nfQuery.data ?? []).some((n) => n.ziel_abschnitt_id != null);
+  const raeumeQuery = useQuery({
+    queryKey: einsatzKeys.br(einsatzId),
+    queryFn: () => listeBr(einsatzId),
+    enabled: raeumeFrei && (formOffen || kartenMitRaum),
+  });
+  const abschnitteQuery = useQuery({
+    queryKey: einsatzKeys.abschnitte(einsatzId),
+    queryFn: () => listeAbschnitte(einsatzId),
+    enabled: abschnitteFrei && (formOffen || kartenMitAbschnitt),
+  });
+  const raeume = raeumeFrei ? raeumeQuery.data : undefined;
+  const abschnitte = abschnitteFrei ? abschnitteQuery.data : undefined;
+  // Gemerkt über den Datenstand (LFH-949): die Karten sind `memo`. Nur die Listen, die eine Karte
+  // braucht: ein Abruf aus einem anderen Teil der Seite (Ort eines Postens) zeichnete sonst alle
+  // Karten neu.
+  const kartenRaeume = kartenMitRaum ? raeume : undefined;
+  const kartenAbschnitte = kartenMitAbschnitt ? abschnitte : undefined;
+  const zielNamen = useMemo<ZielNamen | null>(
+    () =>
+      kartenRaeume || kartenAbschnitte
+        ? {
+            raeume: kartenRaeume ? new Map(kartenRaeume.map((r) => [r.id, r.bezeichnung])) : null,
+            abschnitte: kartenAbschnitte
+              ? new Map(kartenAbschnitte.map((a) => [a.id, a.name]))
+              : null,
+          }
+        : null,
+    [kartenRaeume, kartenAbschnitte],
+  );
+  // Schnellwahl und Vorschläge für „Was“: die Arten dieses Einsatzes, häufigste zuerst (D2–D4).
+  const arten = useMemo(() => fruehereArten(nfQuery.data ?? []), [nfQuery.data]);
   const materialListe = useMemo<EinsatzMaterial[]>(
     () => [...(materialQuery.data ?? []), ...(entlasseneQuery.data ?? [])],
     [materialQuery.data, entlasseneQuery.data],
@@ -519,6 +564,7 @@ export default function NachforderungenPage() {
     hervorgehobenId,
     laeuftId: statusMutation.isPending ? statusMutation.variables?.nfId : null,
     stellenJeId,
+    zielNamen,
   };
   // Filterwahl nur mit Namen (Freigabe Betreuung) und sobald es Bezüge gibt (design.md D7).
   const stellenOptionen =
@@ -542,7 +588,8 @@ export default function NachforderungenPage() {
   const gezeigt = sichtbareKarten(board.spalten, ansicht, schmal);
   const gewandertId = kartenFehler.gemeldet().find((nfId) => !gezeigt.some((n) => n.id === nfId));
   const gewandert = gewandertId != null ? kartenFehler.grund(gewandertId) : null;
-  const gewandertName = nfQuery.data?.find((n) => n.id === gewandertId)?.bezeichnung;
+  const gewandertN = nfQuery.data?.find((n) => n.id === gewandertId);
+  const gewandertName = gewandertN ? nachforderungName(gewandertN) : undefined;
   const seitenGrund =
     seitenFehler != null
       ? {
@@ -623,6 +670,9 @@ export default function NachforderungenPage() {
             card={false}
             vorbelegung={vorbelegung}
             bezug={bezug}
+            fruehereArten={arten}
+            raeume={raeume}
+            abschnitte={abschnitte}
             senden={anlegenMutation.isPending}
             // mutateAsync: die Erfassungshülle darf die Felder nur leeren, wenn die Nachforderung
             // angekommen ist.

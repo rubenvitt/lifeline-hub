@@ -25,6 +25,7 @@ import {
 } from '../alarm/desktopAlarm';
 import { useAlarmToasts } from '../alarm/useAlarmToasts';
 import { quittiereNachNutzer, useBenachrichtigungen } from '../alarm/useBenachrichtigungen';
+import { useEingangshinweis } from '../alarm/useEingangshinweis';
 import { wetterPegelPfad } from '../routing/deeplinks';
 import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
@@ -120,14 +121,25 @@ const DOPPELKLICK_MS = 500;
  * EIN globaler Mute (Per-User, localStorage) schaltet ALLE Alarmtöne. Im Layout-Kopf montiert,
  * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
  * Toasts über `App.useApp().notification` (kein statischer Import, sonst Kontext-Leak in Tests).
+ *
+ * Neben dem Budget steht der Eingangshinweis (`alarm/useEingangshinweis.tsx`, LLH-1062): neue
+ * Meldungen und Übernahmen in die Lage gebündelt an einem eigenen Platz. `darfSichten` ist das
+ * Schreibrecht im Einsatz; ohne es fehlt dort „Sichten“.
  */
-export default function AlarmZentrale({ einsatzId }: { einsatzId: number }) {
+export default function AlarmZentrale({
+  einsatzId,
+  darfSichten = false,
+}: {
+  einsatzId: number;
+  darfSichten?: boolean;
+}) {
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
   // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Benachrichtigungen und Unwetter teilen es.
   const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
-  useBenachrichtigungen(einsatzId, toasts);
+  const eingang = useEingangshinweis(einsatzId, quittiereNachNutzer, darfSichten);
+  useBenachrichtigungen(einsatzId, toasts, eingang);
   // Jede Unwetter-Auslösung bekommt einen eigenen Schlüssel.
   const zaehlerRef = useRef(0);
   /** Letzter Unwetterhinweis dieses Einsatzes: ein neuer ersetzt ihn (ein Platz im Budget). */

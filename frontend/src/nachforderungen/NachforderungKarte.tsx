@@ -20,6 +20,7 @@ import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
 import { materialPfad } from '../routing/deeplinks';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { kartenZeiten } from './nachforderungStufen';
+import { zielZeile, type ZielNamen } from './zielVorschlaege';
 
 const { Text } = Typography;
 
@@ -135,6 +136,11 @@ interface NachforderungKarteProps {
    * „Für eine Betreuungsstelle“ ohne Namen und Sprung.
    */
   stellenJeId?: ReadonlyMap<number, StellenVerweis> | null;
+  /**
+   * Namen der Ziele (LLH-1089, design.md D10), stabil über den Datenstand der Seite. Ohne Namen
+   * steht „→ Bereitstellungsraum“ bzw. „→ Einsatzabschnitt“.
+   */
+  zielNamen?: ZielNamen | null;
 }
 
 /** Zeile „Für Betreuungsstelle …“ einer Nachforderung mit Stellenbezug (LLH-1082). */
@@ -179,6 +185,7 @@ function NachforderungKarte({
   hervorgehoben = false,
   laeuft = false,
   stellenJeId,
+  zielNamen,
 }: NachforderungKarteProps) {
   const { formatZeit } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
@@ -192,6 +199,7 @@ function NachforderungKarte({
   // inzwischen weiter ist, trägt ihre neue Stufe selbst. Ohne Spalte steht sie immer.
   const statusZeigen = spaltenStufe !== n.status;
   const zeiten = kartenZeiten(n, formatZeit);
+  const ziel = zielZeile(n, zielNamen);
 
   const aktionen: ReactNode[] =
     darfSchreiben && n.ist_offen
@@ -268,12 +276,20 @@ function NachforderungKarte({
         {menge}
         {n.art}
       </Text>
+      {ziel && (
+        <Text
+          data-lfh="nachforderung-ziel"
+          style={{ display: 'block', fontSize: 13, overflowWrap: 'anywhere' }}
+        >
+          {ziel}
+        </Text>
+      )}
       <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 4 }}>
         an {adressat}
       </Text>
 
       <Space orientation="vertical" size={2} style={{ width: '100%', marginBottom: 4 }}>
-        <Text style={{ overflowWrap: 'anywhere' }}>{n.bezeichnung}</Text>
+        {n.bezeichnung && <Text style={{ overflowWrap: 'anywhere' }}>{n.bezeichnung}</Text>}
         {n.betreuungsstelle_id != null && (
           <StellenBezug verweis={stellenJeId?.get(n.betreuungsstelle_id)} />
         )}

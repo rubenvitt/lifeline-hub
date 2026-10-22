@@ -157,14 +157,20 @@ export interface KartenZeit {
 }
 
 /**
- * Die Zeitzeilen einer Karte: angefordert (mit Person), zugesagt, unterwegs, eingetroffen — jede
- * nur, wenn ihr Zeitpunkt da ist (keine erfundenen Daten). Hier hängt LLH-1097 das erwartete
- * Eintreffen ein; bis dahin gibt es keine Zeile dafür.
+ * Die Zeitzeilen einer Karte: angefordert (mit Person), benötigt bis (LLH-1089), zugesagt,
+ * unterwegs, eingetroffen — jede nur, wenn ihr Zeitpunkt da ist (keine erfundenen Daten). Hier
+ * hängt LLH-1097 das erwartete Eintreffen ein (und den Vergleich mit „benötigt bis“); bis dahin
+ * gibt es keine Zeile dafür.
  */
 export function kartenZeiten(
   n: Pick<
     Nachforderung,
-    'angefordert_at' | 'erstellt_von_name' | 'zugesagt_at' | 'unterwegs_at' | 'eingetroffen_at'
+    | 'angefordert_at'
+    | 'erstellt_von_name'
+    | 'benoetigt_bis'
+    | 'zugesagt_at'
+    | 'unterwegs_at'
+    | 'eingetroffen_at'
   >,
   formatZeit: (zeit: string) => string,
 ): KartenZeit[] {
@@ -174,6 +180,9 @@ export function kartenZeiten(
       text: `Angefordert: ${formatZeit(n.angefordert_at)}${n.erstellt_von_name ? ` · ${n.erstellt_von_name}` : ''}`,
     },
   ];
+  if (n.benoetigt_bis) {
+    zeilen.push({ schluessel: 'benoetigt', text: `Benötigt bis: ${formatZeit(n.benoetigt_bis)}` });
+  }
   if (n.zugesagt_at) {
     zeilen.push({ schluessel: 'zugesagt', text: `Zugesagt: ${formatZeit(n.zugesagt_at)}` });
   }

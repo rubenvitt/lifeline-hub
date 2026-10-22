@@ -378,7 +378,7 @@ export default function MeldungenPage() {
       invalidiere(v.einsatzId);
       qc.invalidateQueries({ queryKey: einsatzKeys.lagemeldungen(v.einsatzId) });
       setLageAuswahl(ohneDialogZu(v));
-      message.success('An die Lage übergeben');
+      message.success('In die Lage übernommen');
     },
   });
   const bestaetigenMutation = useMutation({

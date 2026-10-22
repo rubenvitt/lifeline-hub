@@ -145,7 +145,7 @@ export default function MaterialUebernahmeModal({
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
-      {nachforderung && (
+      {nachforderung?.bezeichnung && (
         <Typography.Paragraph type="secondary">{nachforderung.bezeichnung}</Typography.Paragraph>
       )}
       <Form.Item label="Art" name="art">

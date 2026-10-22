@@ -58,10 +58,12 @@ export const MATERIAL_BEMERKUNG_MAX = 2_000;
 export const FAHRZEUG_ADHOC_TEXT_MAX = 200;
 /** Bemerkung zu einem Fahrzeug im Einsatz (LLH-1073). */
 export const FAHRZEUG_BEMERKUNG_MAX = 2_000;
-/** Bezeichnung einer Nachforderung. */
+/** Details/Zweck einer Nachforderung (Wire-Name `bezeichnung`). */
 export const NACHFORDERUNG_BEZEICHNUNG_MAX = 200;
 /** Art einer Nachforderung (Freitext, landet im ETB-Inhalt). */
 export const NACHFORDERUNG_ART_MAX = 200;
+/** Ziel einer Nachforderung als Freitext (Meldeort, LLH-1089; landet im ETB-Inhalt). */
+export const NACHFORDERUNG_ZIEL_TEXT_MAX = 200;
 /** Notiz eines Anrufs am Infotelefon. */
 export const INFOTELEFON_NOTIZ_MAX = 2_000;
 /** Kurzfelder des Infotelefons (anrufer_name, rueckruf). */

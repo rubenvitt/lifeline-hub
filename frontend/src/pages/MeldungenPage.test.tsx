@@ -388,36 +388,41 @@ describe('MeldungenPage', () => {
     expect(screen.queryByRole('button', { name: /Aktionen zu Meldung/ })).not.toBeInTheDocument();
   });
 
-  // --- Lage-Übergabe ---
+  // --- Übernahme in die Lage ---
 
-  it('übergibt eine Meldung an die Lage (ohne Verortung)', async () => {
+  it('übernimmt eine Meldung in die Lage (ohne Verortung)', async () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
     await userEvent.click(
-      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /In die Lage übernehmen/ }),
     );
-    // Modal öffnet sich; ohne Koordinate direkt übergeben.
-    await userEvent.click(await screen.findByRole('button', { name: 'Übergeben' }));
+    // Modal öffnet sich; ohne Koordinate direkt übernehmen. Ein Wort für den Vorgang (LLH-1046):
+    // Menü, Dialog und Rückmeldung sagen „übernehmen“, nie „übergeben“.
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('In die Lage übernehmen')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
     const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
     expect(eid).toBe(1);
     expect(mid).toBe(1);
     expect((daten as { lat?: number }).lat).toBeUndefined();
     expect((daten as { lon?: number }).lon).toBeUndefined();
+    expect(await screen.findByText('In die Lage übernommen')).toBeInTheDocument();
+    expect(screen.queryByText(/übergeben/)).toBeNull();
   });
 
-  it('übergibt eine Meldung an die Lage MIT Verortung (lat/lon im Request)', async () => {
+  it('übernimmt eine Meldung in die Lage MIT Verortung (lat/lon im Request)', async () => {
     markiereLagerelevant.mockResolvedValue(meldung({ lagerelevant: true }));
     renderPage();
     await screen.findByText('Florian Nord 1');
     await userEvent.click(
-      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /In die Lage übernehmen/ }),
     );
     // Die formatbewusste Eingabe (KoordinatenEingabe) ist ein Feld: im WGS84-Default wird "lat,
     // lon" getippt.
     await userEvent.type(await screen.findByPlaceholderText('Koordinate eingeben'), '50.1, 8.6');
-    await userEvent.click(screen.getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(1));
     const [eid, mid, daten] = markiereLagerelevant.mock.calls[0];
     expect(eid).toBe(1);
@@ -429,14 +434,15 @@ describe('MeldungenPage', () => {
     listeMeldungen.mockResolvedValue([meldung({ lagerelevant: true })]);
     renderPage();
     await screen.findByText('Florian Nord 1');
-    expect(screen.getByText('Lagerelevant ✓')).toBeInTheDocument();
+    expect(screen.getByText('In der Lage ✓')).toBeInTheDocument();
+    expect(screen.queryByText(/Lagerelevant/)).toBeNull();
     // Die Aktion muss im geöffneten Menü fehlen. Vor dem ersten Öffnen ist
     // `queryByRole('menuitem')` immer `null` (rc-dropdown mountet lazy). Dass andere Einträge
     // dastehen, belegt, dass das Menü aufging.
     const menue = await oeffneAktionsmenue();
     expect(within(menue).getAllByRole('menuitem').length).toBeGreaterThan(0);
     expect(
-      within(menue).queryByRole('menuitem', { name: /An Lage übergeben/ }),
+      within(menue).queryByRole('menuitem', { name: /In die Lage übernehmen/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -1071,7 +1077,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
 
   async function oeffneLage() {
     await userEvent.click(
-      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /An Lage übergeben/ }),
+      within(await oeffneAktionsmenue()).getByRole('menuitem', { name: /In die Lage übernehmen/ }),
     );
     return offenerDialog();
   }
@@ -1081,10 +1087,10 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     const dialog = await oeffneLage();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
 
     const grund = await within(dialog).findByRole('alert');
-    expect(grund).toHaveTextContent('Nicht übergeben');
+    expect(grund).toHaveTextContent('Nicht übernommen');
     expect(grund).toHaveTextContent('Schon übergeben');
     expect(within(dialog).getByLabelText('Lage-Text')).toHaveValue('Deich instabil');
     expect(dialog.closest('.ant-zoom-leave')).toBeNull();
@@ -1098,10 +1104,10 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     const dialog = await oeffneLage();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
     await within(dialog).findByRole('alert');
 
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
     await waitFor(() => expect(markiereLagerelevant).toHaveBeenCalledTimes(2));
     expect(within(dialog).queryByRole('alert')).toBeNull();
     expect(within(dialog).getByRole('button', { name: 'Abbrechen' })).toBeDisabled();
@@ -1112,7 +1118,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
     renderPage();
     await screen.findByText('Florian Nord 1');
     const dialog = await oeffneLage();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
     await within(dialog).findByRole('alert');
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
@@ -1177,7 +1183,7 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
 
   /** Die Route hat keinen `key`: ein offener Dialog schriebe sonst mit der alten Meldung hierher. */
   it.each([
-    ['Lage', /An Lage übergeben/],
+    ['Lage', /In die Lage übernehmen/],
     ['Auftrag', /Auftrag erteilen/],
   ])('%s: ein Einsatzwechsel schließt den offenen Dialog', async (_name, eintrag) => {
     renderPage();
@@ -1318,13 +1324,13 @@ describe('MeldungenPage · Ablehnung am Ort (LFH-1077)', () => {
       oeffne: async (lfdNr: number) => {
         await userEvent.click(
           within(await oeffneAktionsmenue(lfdNr)).getByRole('menuitem', {
-            name: /An Lage übergeben/,
+            name: /In die Lage übernehmen/,
           }),
         );
         return offenerDialog();
       },
       sende: (dialog: HTMLElement) =>
-        userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' })),
+        userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' })),
       ergebnis: () => meldung({ lagerelevant: true }),
     },
     {

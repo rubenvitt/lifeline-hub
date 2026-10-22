@@ -11,11 +11,14 @@ use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
 
-/// Höchstlänge der Bezeichnung einer Nachforderung (LFH-937); sie steht im Inhalt des
-/// ETB-Eintrags. Spiegel: `frontend/src/api/eingabegrenzen.ts`.
+/// Höchstlänge der Bezeichnung einer Nachforderung (LFH-937; in der Oberfläche „Details /
+/// Zweck“, seit LLH-1089 optional); sie steht im Inhalt des ETB-Eintrags. Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
 pub const BEZEICHNUNG_MAX: usize = 200;
 /// Höchstlänge der Art einer Nachforderung (Freitext, landet im ETB-Inhalt; LFH-937).
 pub const ART_MAX: usize = 200;
+/// Höchstlänge des Ziels als Freitext (Meldeort, LLH-1089 design.md D8); landet im ETB-Inhalt.
+pub const ZIEL_TEXT_MAX: usize = 200;
 
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
@@ -103,7 +106,9 @@ pub struct NachforderungAnzeige {
     pub id: i64,
     pub einsatz_id: i64,
     pub art: String,
-    pub bezeichnung: String,
+    /// Details/Zweck; fehlt ohne Angabe (LLH-1089 design.md D10).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bezeichnung: Option<String>,
     pub anzahl: Option<i64>,
     pub adressat_kategorie: AdressatKategorie,
     pub adressat_bezeichnung: Option<String>,
@@ -136,6 +141,18 @@ pub struct NachforderungAnzeige {
     /// Betreuung nicht lesen darf. Fehlt ohne Bezug; der Storno der Stelle löst ihn (D3).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub betreuungsstelle_id: Option<i64>,
+    /// Ziel (Meldeort, LLH-1089 design.md D5/D10): höchstens eines von Raum, Abschnitt und
+    /// Freitext. Von Raum und Abschnitt nur die Kennung; den Namen liest die Oberfläche aus deren
+    /// Modul, wie bei der Betreuungsstelle. Fehlt ohne Ziel; das Löschen des Abschnitts löst ihn.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_br_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_abschnitt_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ziel_text: Option<String>,
+    /// Bedarfszeit „benötigt bis“ (UTC); fehlt = sofort (LLH-1089 design.md D6).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub benoetigt_bis: Option<String>,
 }
 
 /// Kennungen übernommener Materialposten, gelesen aus dem JSON-Array der Unterabfrage in

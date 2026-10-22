@@ -65,10 +65,12 @@ async fn stufe_protokollieren_tx(
 }
 
 /// Validierte Eingabe für eine neue Nachforderung (Handler hat getrimmt/normalisiert).
-#[derive(Debug)]
+/// `Default` nur für Testdaten: leere Priorität und Kategorie sind ungültig.
+#[derive(Debug, Default)]
 pub struct NachforderungDaten<'a> {
     pub art: &'a str,
-    pub bezeichnung: &'a str,
+    /// Details/Zweck, optional (LLH-1089).
+    pub bezeichnung: Option<&'a str>,
     pub anzahl: Option<i64>,
     pub adressat_kategorie: &'a str,
     pub adressat_bezeichnung: Option<&'a str>,
@@ -78,6 +80,84 @@ pub struct NachforderungDaten<'a> {
     /// Betreuungsstelle, für die angefordert wird (LLH-1082); Einsatz und Lebenszyklus hat die
     /// Route geprüft.
     pub betreuungsstelle_id: Option<i64>,
+    /// Ziel (LLH-1089 design.md D5): höchstens eines; Einsatz, Lebenszyklus und die Zahl hat die
+    /// Route geprüft (der CHECK der Tabelle hält Letztere zusätzlich).
+    pub ziel_br_id: Option<i64>,
+    pub ziel_abschnitt_id: Option<i64>,
+    pub ziel_text: Option<&'a str>,
+    /// Bedarfszeit „benötigt bis“, normalisiert (UTC); `None` = sofort.
+    pub benoetigt_bis: Option<&'a str>,
+}
+
+/// Inhalt des ETB-Eintrags der Anlage (LLH-1089 design.md D9): „Nachforderung: 2× RTW → BR Nord,
+/// benötigt bis 21.10. 15:30 — Transport aus der UHS“. Ziel, Bedarfszeit und Details stehen nur,
+/// wenn gesetzt. `bis` ist schon in der Anzeigezone formatiert.
+pub fn anlage_text(
+    kurz: &str,
+    ziel: Option<&str>,
+    bis: Option<&str>,
+    details: Option<&str>,
+) -> String {
+    let mut text = format!("Nachforderung: {kurz}");
+    if let Some(z) = ziel {
+        text.push_str(&format!(" → {z}"));
+    }
+    if let Some(b) = bis {
+        text.push_str(&format!(", benötigt bis {b}"));
+    }
+    if let Some(d) = details {
+        text.push_str(&format!(" — {d}"));
+    }
+    text
+}
+
+/// Name des Ziels für den ETB-Wortlaut, in der Transaktion der Anlage aus der Zeile gelesen
+/// (Raum: Bezeichnung, Abschnitt: Name, sonst der Freitext). `NotFound`, wenn der Bezug nicht zum
+/// Einsatz gehört — die Route hat das geprüft, die Transaktion sieht es ein zweites Mal.
+async fn ziel_name_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    daten: &NachforderungDaten<'_>,
+) -> Result<Option<String>, AppError> {
+    let (sql, id) = match (daten.ziel_br_id, daten.ziel_abschnitt_id) {
+        (Some(id), _) => (
+            "SELECT bezeichnung FROM bereitstellungsraum WHERE id = ? AND einsatz_id = ?",
+            id,
+        ),
+        (None, Some(id)) => (
+            "SELECT name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
+            id,
+        ),
+        (None, None) => return Ok(daten.ziel_text.map(str::to_string)),
+    };
+    sqlx::query_scalar::<_, String>(sql)
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .map(Some)
+        .ok_or(AppError::NotFound)
+}
+
+/// Anzeigezone des Einsatzes für ETB-Texte: Einsatz, sonst Organisation, sonst
+/// `einsatz::nummer::ZEITZONE_VORGABE` (dieselbe Folge wie `benachrichtigung::text`).
+async fn anzeigezone_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+) -> Result<chrono_tz::Tz, AppError> {
+    let zone: Option<Option<String>> = sqlx::query_scalar(
+        "SELECT COALESCE(NULLIF(TRIM(es.zeitzone), ''), oe.zeitzone) \
+         FROM einsatz e \
+         LEFT JOIN einsatz_einstellungen es ON es.einsatz_id = e.id \
+         LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id \
+         WHERE e.id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    Ok(crate::einsatz::nummer::zone_oder_vorgabe(
+        zone.flatten().as_deref(),
+    ))
 }
 
 /// SELECT-Projektion inkl. Ersteller-Name (LEFT JOIN benutzer), abgeleitetem `ist_offen` und den
@@ -94,7 +174,8 @@ const ANZEIGE_SELECT: &str =
             (SELECT json_group_array(em.id ORDER BY em.id) FROM einsatz_material em \
              WHERE em.nachforderung_id = n.id AND em.beendet_als IS NOT 'storniert') \
               AS material_ids, \
-            n.betreuungsstelle_id \
+            n.betreuungsstelle_id, n.ziel_br_id, n.ziel_abschnitt_id, n.ziel_text, \
+            n.benoetigt_bis \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
@@ -124,8 +205,9 @@ pub async fn create_tx(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO nachforderung \
            (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, adressat_bezeichnung, \
-            begruendung, prioritaet, angefordert_at, erstellt_von_id, betreuungsstelle_id) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+            begruendung, prioritaet, angefordert_at, erstellt_von_id, betreuungsstelle_id, \
+            ziel_br_id, ziel_abschnitt_id, ziel_text, benoetigt_bis) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.art)
@@ -138,16 +220,29 @@ pub async fn create_tx(
     .bind(daten.angefordert_at)
     .bind(ersteller_id)
     .bind(daten.betreuungsstelle_id)
+    .bind(daten.ziel_br_id)
+    .bind(daten.ziel_abschnitt_id)
+    .bind(daten.ziel_text)
+    .bind(daten.benoetigt_bis)
     .fetch_one(&mut *tx)
     .await?;
 
     // ETB-Meldung (Pattern B): die Anforderung erscheint regulär im ETB, immer — unabhängig von
     // „Automatische ETB-Einträge“ (LLH-1104 D4: Führungsvorgang mit Außenwirkung). Von ist die
     // eigene Führungsstelle, An der Adressat (D5).
-    let inhalt = format!(
-        "Nachforderung: {} — {}",
-        kurzname(daten.anzahl, daten.art),
-        daten.bezeichnung
+    let ziel = ziel_name_tx(&mut *tx, einsatz_id, daten).await?;
+    let bis = match daten.benoetigt_bis {
+        Some(b) => Some(crate::zeitachse::repo::zeit_text(
+            b,
+            anzeigezone_tx(&mut *tx, einsatz_id).await?,
+        )),
+        None => None,
+    };
+    let inhalt = anlage_text(
+        &kurzname(daten.anzahl, daten.art),
+        ziel.as_deref(),
+        bis.as_deref(),
+        daten.bezeichnung,
     );
     let von =
         crate::einsatz::fuehrungsstelle::absender_tx(&mut *tx, einsatz_id, ersteller_id).await?;
@@ -311,8 +406,10 @@ pub async fn check_uebernahme_tx(
     id: i64,
     ergaenzen: bool,
 ) -> Result<String, AppError> {
+    // Ohne Details (LLH-1089) nennt die Art die Nachforderung.
     let (status, bezeichnung): (String, String) = sqlx::query_as(
-        "SELECT status, bezeichnung FROM nachforderung WHERE id = ? AND einsatz_id = ?",
+        "SELECT status, COALESCE(bezeichnung, art) FROM nachforderung \
+         WHERE id = ? AND einsatz_id = ?",
     )
     .bind(id)
     .bind(einsatz_id)
@@ -459,14 +556,14 @@ mod tests {
     fn daten<'a>(art: &'a str, bez: &'a str) -> NachforderungDaten<'a> {
         NachforderungDaten {
             art,
-            bezeichnung: bez,
+            bezeichnung: Some(bez),
             anzahl: Some(2),
             adressat_kategorie: ADRESSAT_LEITSTELLE,
             adressat_bezeichnung: Some("Leitstelle Nord"),
             begruendung: None,
             prioritaet: PRIO_NORMAL,
             angefordert_at: "2026-06-12 09:00:00",
-            betreuungsstelle_id: None,
+            ..Default::default()
         }
     }
 
@@ -516,6 +613,188 @@ mod tests {
         .fetch_all(pool)
         .await
         .unwrap()
+    }
+
+    /// LLH-1089 D1/D9: ohne Details ist die Nachforderung gültig; der Eintrag nennt nur den
+    /// Kurznamen, die Anzeige hat keine Bezeichnung.
+    #[tokio::test]
+    async fn anlage_ohne_details_nennt_den_kurznamen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                bezeichnung: None,
+                ..daten("RTW", "")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.bezeichnung, None);
+        assert_eq!(
+            etb_der_nachforderung(&pool, n.id).await,
+            vec![("meldung".to_string(), "Nachforderung: 2× RTW".to_string())]
+        );
+    }
+
+    /// Ein Raum, ein Abschnitt (für die Ziel-Tests).
+    async fn raum_und_abschnitt(pool: &SqlitePool, e: i64, b: i64) -> (i64, i64) {
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, status, erfasst_von, \
+                geaendert_von) VALUES (?, 'BR Nord', 'aktiv', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        let abschnitt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatzabschnitt (einsatz_id, name) VALUES (?, 'EA Deich') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        (br, abschnitt)
+    }
+
+    /// LLH-1089 D9: Ziel und Bedarfszeit stehen im Eintrag der Anlage, die Zeit in der
+    /// Anzeigezone (ohne Einstellung Europe/Berlin, im Juni +2 h); die Anzeige trägt beide.
+    #[tokio::test]
+    async fn anlage_mit_ziel_und_bedarfszeit_schreibt_beides_ins_etb() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let (br, abschnitt) = raum_und_abschnitt(&pool, e, b).await;
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                ziel_br_id: Some(br),
+                benoetigt_bis: Some("2026-06-12 13:30:00"),
+                ..daten("RTW", "Transport aus UHS Turnhalle")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.ziel_br_id, Some(br));
+        assert_eq!(n.benoetigt_bis.as_deref(), Some("2026-06-12 13:30:00"));
+        assert_eq!(
+            etb_der_nachforderung(&pool, n.id).await[0].1,
+            "Nachforderung: 2× RTW → BR Nord, benötigt bis 12.06. 15:30 — \
+             Transport aus UHS Turnhalle"
+        );
+
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                ziel_abschnitt_id: Some(abschnitt),
+                bezeichnung: None,
+                ..daten("Sandsäcke", "")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.ziel_abschnitt_id, Some(abschnitt));
+        assert_eq!(
+            etb_der_nachforderung(&pool, n.id).await[0].1,
+            "Nachforderung: 2× Sandsäcke → EA Deich"
+        );
+
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                ziel_text: Some("Lotsenpunkt Feuerwache"),
+                bezeichnung: None,
+                anzahl: None,
+                ..daten("Tauchpumpe", "")
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(n.ziel_text.as_deref(), Some("Lotsenpunkt Feuerwache"));
+        assert_eq!(
+            etb_der_nachforderung(&pool, n.id).await[0].1,
+            "Nachforderung: Tauchpumpe → Lotsenpunkt Feuerwache"
+        );
+    }
+
+    /// Die Zeit folgt der Anzeigezone der Organisation, eine des Einsatzes geht vor.
+    #[tokio::test]
+    async fn bedarfszeit_steht_in_der_anzeigezone_des_einsatzes() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        sqlx::query("INSERT INTO org_einstellungen (org_id, zeitzone) VALUES (1, 'UTC')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let bis = |pool: SqlitePool| async move {
+            let n = create(
+                &pool,
+                e,
+                b,
+                NachforderungDaten {
+                    benoetigt_bis: Some("2026-06-12 13:30:00"),
+                    bezeichnung: None,
+                    ..daten("RTW", "")
+                },
+            )
+            .await
+            .unwrap();
+            etb_der_nachforderung(&pool, n.id).await[0].1.clone()
+        };
+        assert_eq!(
+            bis(pool.clone()).await,
+            "Nachforderung: 2× RTW, benötigt bis 12.06. 13:30"
+        );
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Europe/Berlin')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            bis(pool.clone()).await,
+            "Nachforderung: 2× RTW, benötigt bis 12.06. 15:30"
+        );
+    }
+
+    /// Material aus einer Nachforderung ohne Details nennt die Art (LLH-1089 D9).
+    #[tokio::test]
+    async fn uebernahme_ohne_details_nennt_die_art() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                bezeichnung: None,
+                ..daten("Tauchpumpe", "")
+            },
+        )
+        .await
+        .unwrap();
+        sqlx::query("UPDATE nachforderung SET status = 'eingetroffen' WHERE id = ?")
+            .bind(n.id)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        assert_eq!(
+            check_uebernahme_tx(&mut conn, e, n.id, false)
+                .await
+                .unwrap(),
+            "Tauchpumpe"
+        );
     }
 
     /// LLH-1104 D5: Absender ist die eigene Führungsstelle des Einsatzes (Rufname vor
@@ -791,7 +1070,11 @@ mod tests {
         create(&pool, e, b, sofort).await.unwrap();
         let alle = list(&pool, e, None).await.unwrap();
         assert_eq!(alle.len(), 2);
-        assert_eq!(alle[0].bezeichnung, "sofort", "sofort vor normal");
+        assert_eq!(
+            alle[0].bezeichnung.as_deref(),
+            Some("sofort"),
+            "sofort vor normal"
+        );
         let offen = list(&pool, e, Some("angefordert")).await.unwrap();
         assert_eq!(offen.len(), 2);
         assert!(list(&pool, e, Some("eingetroffen"))
