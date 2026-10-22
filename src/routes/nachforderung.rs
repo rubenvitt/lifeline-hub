@@ -358,6 +358,8 @@ pub async fn ablehnen(
     JsonBody(req): JsonBody<AblehnenReq>,
 ) -> Result<Json<NachforderungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    // Der Grund steht im ETB-Wortlaut der Ablehnung; begrenzt wie beim Zurückziehen (LLH-1385).
+    let grund = optional_max(req.grund, "Grund", crate::nachforderung::ABLEHNEN_GRUND_MAX)?;
     fordere_bearbeitbar(&state, einsatz_id, nachforderung_id).await?;
     let aktuell = repo::load(&state.pool, nachforderung_id).await?;
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), STATUS_ABGELEHNT) {
@@ -369,7 +371,7 @@ pub async fn ablehnen(
         &state.pool,
         nachforderung_id,
         ctx.benutzer.id,
-        trimme(&req.grund),
+        grund.as_deref(),
         aktuell.status.as_str(),
         &jetzt(),
     )

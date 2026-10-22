@@ -514,6 +514,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",
+        funktion: "create_tx",
+        spalte: "nachforderung.ziel_text",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Ziel als Freitext (Meldeort) im `inhalt` der Anforderung („… → …“, LLH-1089 D9)",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
         funktion: "sage_zu",
         spalte: "nachforderung.zusage_rufnamen",
         gruppe: Gruppe::Fuehrungsmodul,
@@ -528,10 +535,24 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",
+        funktion: "lehne_ab",
+        spalte: "nachforderung.abgelehnt_grund",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Grund im `inhalt` der Ablehnung („…: abgelehnt (…)“, LLH-1104 D6)",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
         funktion: "aktualisiere",
         spalte: "nachforderung.bezeichnung",
         gruppe: Gruppe::Fuehrungsmodul,
         begruendung: "Geänderte Details im `inhalt` der Änderung (LLH-1097 D9)",
+    },
+    Ausnahme {
+        datei: "src/nachforderung/repo.rs",
+        funktion: "aktualisiere",
+        spalte: "nachforderung.ziel_text",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Geändertes Ziel als Freitext im `inhalt` der Änderung („→ …“, LLH-1097 D9)",
     },
     Ausnahme {
         datei: "src/nachforderung/repo.rs",

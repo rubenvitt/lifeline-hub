@@ -313,6 +313,29 @@ async fn ablehnen_setzt_grund() {
     assert_eq!(j["abgelehnt_grund"], "keine Reserven");
 }
 
+/// LLH-1385: der Ablehnungsgrund ist wie der Grund des Zurückziehens begrenzt (er steht im
+/// ETB-Wortlaut); zu lang → 400 und die Nachforderung bleibt offen, die Grenze selbst geht.
+#[tokio::test]
+async fn ablehnen_mit_zu_langem_grund_ist_400() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nid = absetzen(&app, &admin, e).await;
+    let url = format!("/api/einsaetze/{e}/nachforderungen/{nid}/ablehnen");
+    let max = lifeline_hub::nachforderung::ABLEHNEN_GRUND_MAX;
+
+    let lang = serde_json::json!({ "grund": "x".repeat(max + 1) }).to_string();
+    let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&lang)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{j}");
+    assert_eq!(liste(&app, &admin, e).await[0]["status"], "angefordert");
+
+    // Gezählt wird nach dem Trimmen, in Zeichen (nicht Bytes).
+    let genau = serde_json::json!({ "grund": format!(" {} ", "ä".repeat(max)) }).to_string();
+    let (s, j) = anfrage(&app, "POST", &url, &admin, Some(&genau)).await;
+    assert_eq!(s, StatusCode::OK, "{j}");
+    assert_eq!(j["abgelehnt_grund"], "ä".repeat(max));
+}
+
 #[tokio::test]
 async fn beobachter_liest_aber_schreibt_nicht() {
     let app = setup().await;
