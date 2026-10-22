@@ -594,7 +594,13 @@ anwendbar), „nicht geprüft" ist keins.
   hängt (`adresse`, `koordinate`) oder auf der Karte gesetzt ist (`karte`). **Personenbezogene
   Adressen nie an den Geocoder:** `ohneSuche="personenbezogen"` (reiner Text, auch keine
   Ort-Vorschau); so „Herkunft / Adresse“ der Person. Den gespeicherten Punkt ohne Bearbeitung zeigt
-  `anzeige/Kartenausschnitt.tsx`.
+  `anzeige/Kartenausschnitt.tsx`. Im Formular einer Sache im Einsatz nimmt man
+  `anzeige/EinsatzOrtsfeld.tsx` (Suche im Einsatz, `karte` mit Einsatzort als Umgebung) und die
+  Abbildungen aus `anzeige/ortsfeldFormular.ts` (LLH-1121): `ortFelder` (Text und Koordinate
+  gehen gemeinsam hinaus, die Koordinate nur mit Text), `ortsfeldAusGespeichert` (beim Bearbeiten
+  steht eine gespeicherte Koordinate als `quelle: 'karte'`, eine Textkorrektur behält sie),
+  `ortRegeln` (Pflicht und Länge am Text). Eingebaut in Einsatzort, Schaden, Standort der
+  Betreuungs- und Verpflegungsstelle und Sammelstelle des Bezirks.
 - **Mengen nehmen `components/MengenFeld.tsx`** (LFH-983): Pflichtname (`beschriftung`, in der
   Zeile mit Kennung: „Menge zu Wolldecke“), ganze Zahlen ab 1, ohne Stufenknöpfe — rc-input-number
   benennt sie fest „Increase/Decrease Value“. Übrige nackte `InputNumber` sind Bestand; ein Riegel

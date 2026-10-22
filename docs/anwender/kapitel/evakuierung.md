@@ -44,6 +44,8 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
    „Geplant“, den „Anteil“ an der Planung mit Balken und unter „Letzte Meldung“ deren Zeit. „≈“
    kennzeichnet eine geschätzte Zahl.
 3. „Stammdaten“ nennt Bezeichnung, Plangröße, Erhebung, Einsatzabschnitt, Sammelstelle und Notiz.
+   Ist die Sammelstelle verortet, stehen darunter ihre Koordinate, der Ortsname und die Peilung
+   zum nächsten verorteten Objekt.
 4. „Gebiet“ zeigt die zugeordneten Flächen der Lagekarte als kleinen Ausschnitt. „Auf Lagekarte
    öffnen“ führt auf die Karte, mit einer Fläche des Bezirks ausgewählt. Ohne Fläche steht „Kein
    Gebiet auf der Lagekarte“. „Gebiet zeichnen“ (ohne Fläche) und „Weitere Teilfläche zeichnen“
@@ -63,6 +65,9 @@ Bezirke. Jeder Bezirk hat eine eigene Seite mit allem, was zu ihm gehört.
    werden soll. Vorgewählt ist „Fläche zeichnen“ (weiter unter „Einen Bezirk mit Gebiet
    anlegen“).
 5. Unter „Weitere Angaben“ bei Bedarf „Einsatzabschnitt“, „Sammelstelle“ und „Notiz“ ergänzen.
+   Die Sammelstelle mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist sie
+   verortet; ohne Treffer bleibt sie freier Text. Eine Koordinate lässt sich gleich ins Feld
+   tippen, „Auf Karte wählen“ setzt den Punkt auf einer großen Karte.
 
    ![Dialog „Evakuierungsbezirk anlegen“ mit Bezeichnung, Plangröße, Erhebung, Gebietswahl und Sammelstelle](../bilder/evakuierung/bezirk-anlegen.png)
 
@@ -114,6 +119,11 @@ In der Tabelle setzt „Räumung setzen“ im Menü eines Bezirks den Zustand eb
 2. Die Angaben ändern, etwa die „Plangröße (Personen)“ und ihre „Erhebung“.
 3. „Speichern“ wählen. Gespeichert wird nur, was geändert wurde; was jemand anders inzwischen
    geändert hat, bleibt stehen. „Abbrechen“ verwirft die Eingabe.
+
+Die „Sammelstelle“ zeigt beim Bearbeiten einen gespeicherten Punkt als Kartenausschnitt. Eine
+Korrektur am Text behält den Punkt; ein neuer Treffer ersetzt ihn, ein geleertes Feld nimmt Text
+und Koordinate weg. Die Koordinate der Sammelstelle steht nicht im Einsatztagebuch und nicht auf
+der Lagekarte.
 
 Wer mit ungespeicherten Änderungen die Seite verlässt, wird gefragt, ob die Änderungen verworfen
 werden sollen.

@@ -40,6 +40,11 @@ import { kontrast, randKontrast } from './kontrast-kern';
 
 const TEXT = { light: 7, dark: 5 } as const;
 const ZUSTAND = 3;
+/**
+ * Text in gesperrten Knöpfen zählt nur gegen den Gesperrt-Boden (Spec `textstufen-kontrast`,
+ * Muster `verpflegung-kontrast.spec.ts`): etwa „Ort suchen“ am leeren Ortsfeld (LLH-1121).
+ */
+const GESPERRT_BODEN = 4.5;
 
 const FUEKW = { width: 1366, height: 600 };
 const HANDSCHIRM = { width: 390, height: 844 };
@@ -329,10 +334,12 @@ for (const modus of ['light', 'dark'] as const) {
       }).toPass({ timeout: 10_000 });
       for (const { ziel, text } of knoten) {
         const m = await kontrast(ziel);
-        const kontext = `${modus}, ${flaeche}, „${text}": ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${TEXT[modus]}) ${JSON.stringify(m)}`;
-        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, ...m });
+        const gesperrt = await ziel.evaluate((el) => el.closest('button[disabled]') != null);
+        const schranke = gesperrt ? GESPERRT_BODEN : TEXT[modus];
+        const kontext = `${modus}, ${flaeche}, „${text}"${gesperrt ? ' (gesperrt)' : ''}: ${m.verhaeltnis.toFixed(2)} : 1 (Schranke ≥ ${schranke}) ${JSON.stringify(m)}`;
+        messwerte.push({ modus, flaeche, art: 'text', wortlaut: text, gesperrt, ...m });
         gemessen.push([flaeche, text]);
-        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(TEXT[modus]);
+        expect.soft(m.verhaeltnis, kontext).toBeGreaterThanOrEqual(schranke);
       }
     };
     await messeTexte(kopf, 'kopf');

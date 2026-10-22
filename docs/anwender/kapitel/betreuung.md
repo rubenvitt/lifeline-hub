@@ -75,8 +75,11 @@ Ohne Zugriff auf „Nachforderungen“ steht dort „Bedarf · Keine Berechtigun
 
 1. „Betreuungsstelle anlegen“ wählen, „Bezeichnung“ und „Art“ angeben („Anlaufstelle“,
    „Betreuungsstelle“, „Betreuungsplatz“, „Notunterkunft“), dazu „Kapazität (Personen)“ und
-   unter „Weitere Angaben“ „Standort“, „Leitung“, „Erreichbarkeit“ und „Notiz“. „Anlegen“
-   wählen. Die Stelle steht auf „vorbereitet“.
+   unter „Weitere Angaben“ „Standort“, „Leitung“, „Erreichbarkeit“ und „Notiz“. Den Standort
+   mit Enter oder „Ort suchen“ suchen und einen Treffer wählen: die Stelle ist damit verortet und
+   erscheint auf der Lagekarte. Ohne Treffer bleibt der Standort freier Text; eine Koordinate
+   lässt sich gleich ins Feld tippen, „Auf Karte wählen“ setzt den Punkt auf einer großen Karte.
+   „Anlegen“ wählen. Die Stelle steht auf „vorbereitet“.
 2. Öffnet die Stelle, ihre Bezeichnung wählen und auf ihrer Seite „In Betrieb nehmen“ wählen.
 3. An der Stelle in der Tabelle oder auf ihrer Seite „Belegung melden“ wählen.
 4. Unter „Belegt gesamt (Personen)“ die Gesamtzahl der Untergebrachten eintragen.
@@ -85,7 +88,7 @@ Ohne Zugriff auf „Nachforderungen“ steht dort „Bedarf · Keine Berechtigun
 
 5. „Melden“ wählen.
 
-Eine Stelle ohne Koordinate lässt sich über „Auf Karte verorten“ im Menü auf der Lagekarte
+Eine Stelle ohne Koordinate lässt sich auch über „Auf Karte verorten“ im Menü auf der Lagekarte
 setzen; „Zurück zu …“ führt danach auf die Seite der Stelle.
 
 ### Die Angaben einer Stelle ändern
@@ -95,9 +98,12 @@ setzen; „Zurück zu …“ führt danach auf die Seite der Stelle.
    eine Leitung mit mehr als 200 Zeichen.
 3. „Speichern“ wählen, oder „Abbrechen“, um nichts zu ändern.
 
-Gespeichert werden nur die geänderten Felder; eine Änderung, die jemand anderes inzwischen an
-einem anderen Feld gespeichert hat, bleibt erhalten. Wer die Seite mit ungespeicherten Änderungen
-verlassen will, wird gefragt.
+Der „Standort“ zeigt beim Bearbeiten den gespeicherten Punkt als Kartenausschnitt. Eine Korrektur
+am Text behält den Punkt; ein neuer Treffer der Ortssuche ersetzt ihn, die gezogene Nadel
+berichtigt ihn, ein geleertes Feld nimmt Standort und Koordinate weg. Wie die Ortssuche
+arbeitet, steht unter [Einsatzdaten](einsatzdaten.md). Gespeichert werden nur die geänderten
+Felder; eine Änderung, die jemand anderes inzwischen an einem anderen Feld gespeichert hat,
+bleibt erhalten. Wer die Seite mit ungespeicherten Änderungen verlassen will, wird gefragt.
 
 ### Eine Meldung zurücknehmen
 

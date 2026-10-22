@@ -277,3 +277,31 @@ Ortssuche noch über die Ort-Vorschau. Enter verhält sich wie in jedem Textfeld
 #### Scenario: Personenadresse
 - **WHEN** die Person an einer betroffenen Person „Hauptstraße 12, Musterstadt“ als Herkunft / Adresse einträgt und mit Enter speichert
 - **THEN** geht nur der PATCH der Person hinaus und keine Anfrage an Ortssuche oder Ort-Vorschau
+
+### Requirement: Orte in Schäden und Betreuung
+Der Ort eines Schadens, der Standort einer Betreuungsstelle und die Sammelstelle eines
+Evakuierungsbezirks SHALL beim Anlegen und Bearbeiten das Ortsfeld mit Kartenvorschau und
+Ortssuche im Einsatz nehmen; „Auf Karte wählen“ beginnt am Einsatzort. Ein gewählter Treffer,
+eine getippte Koordinate oder ein auf der Karte gesetzter Punkt MUST Text und Koordinate
+gemeinsam speichern; ohne Auswahl MUST nur der Text gespeichert werden, die Sache bleibt nicht
+verortet. Ein geleerter Text MUST auch die Koordinate leeren. Beim Bearbeiten MUST eine
+gespeicherte Koordinate als Punkt im Feld stehen und eine Textkorrektur überleben; die
+Koordinate MUST nur hinausgehen, wenn sie sich geändert hat. Der Erfassungsdialog eines
+Schadens MUST kein eigenes Koordinatenfeld mehr tragen. Ohne Netz MUST der Ort als Freitext oder
+getippte Koordinate erfassbar bleiben.
+
+#### Scenario: Schaden mit Treffer erfassen
+- **WHEN** die Person im Dialog „Schaden erfassen“ nach „Hauptstr. 17“ sucht und den Treffer „Hauptstraße 17, 12345 Musterstadt“ wählt
+- **THEN** trägt der neue Schaden diesen Text als Ort und die Koordinate des Treffers
+
+#### Scenario: Schaden ohne Auswahl
+- **WHEN** die Person „Hauptstr. 17“ einträgt, ohne einen Treffer zu wählen, und anlegt
+- **THEN** trägt der Schaden den Ort „Hauptstr. 17“ und ist nicht verortet
+
+#### Scenario: Textkorrektur am verorteten Ort
+- **WHEN** an einem verorteten Schaden der Ort von „Hauptstr. 17“ auf „Hauptstr. 17a“ berichtigt und gespeichert wird
+- **THEN** geht nur der Text hinaus, und der Schaden behält seine Koordinate
+
+#### Scenario: Betreuungsstelle mit Standort anlegen
+- **WHEN** die Person beim Anlegen einer Betreuungsstelle unter „Weitere Angaben“ einen Standort-Treffer wählt
+- **THEN** trägt die Stelle Standort und Koordinate und erscheint als Marker auf der Lagekarte
