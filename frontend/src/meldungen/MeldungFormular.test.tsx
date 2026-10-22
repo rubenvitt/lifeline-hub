@@ -388,7 +388,9 @@ describe('MeldungFormular — Empfängerfunktion', () => {
   // LLH-1062: eine Lagemeldung geht vorgabemäßig an S2, der freie Empfänger bleibt leer.
   it('„Lagemeldung“ schlägt S2 als Empfängerfunktion vor', async () => {
     const onAnlegen = renderMitKatalog();
-    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
     await fuellePflichtfelder('UHS Nord', 'Decken knapp');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
@@ -402,7 +404,9 @@ describe('MeldungFormular — Empfängerfunktion', () => {
   it('der Vorschlag überschreibt keine gewählte Funktion', async () => {
     const onAnlegen = renderMitKatalog();
     await waehleFunktion('S3 – Einsatz');
-    await userEvent.click(screen.getByRole('button', { name: /Lagemeldung \(extern\)/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: /Lagemeldung an übergeordnete Stelle/ }),
+    );
     await fuellePflichtfelder('UHS Nord', 'Decken knapp');
     await userEvent.click(screen.getByRole('button', { name: 'Meldung erfassen' }));
     await waitFor(() => expect(onAnlegen).toHaveBeenCalledTimes(1));
