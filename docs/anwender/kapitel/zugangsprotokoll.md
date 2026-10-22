@@ -120,7 +120,7 @@ in dieser Spur, und eine Anmeldung, die nur abläuft, endet still.
 - **„Quelle“**: die IP-Adresse, von der die Anfrage kam. Steht der Server hinter einem
   Reverse-Proxy, ist das nur dann die Adresse des Geräts, wenn der Betrieb den Proxy als
   vertrauenswürdig eingetragen hat; sonst steht dort die Adresse des Proxys.
-- **„Zeitpunkt“**: in Zeitzone und Zeitformat der Organisation (Verwaltung, „Anzeige“).
+- **„Zeitpunkt“**: in Zeitzone und Zeitdarstellung der Organisation (Verwaltung, „Anzeige“).
 
 ### Suchen und Filtern
 

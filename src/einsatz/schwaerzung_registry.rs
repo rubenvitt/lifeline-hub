@@ -1765,7 +1765,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("geaendert_at", G_ZEIT),
             retain("geaendert_von", G_FK),
             retain("zeitzone", G_KONFIG),
-            retain("zeitformat", G_KONFIG),
+            retain("zeitdarstellung", G_KONFIG),
             retain("einheiten", G_KONFIG),
             retain("koordinatenformat", G_KONFIG),
             retain("etb_nummer_praefix", G_KONFIG),

@@ -2,7 +2,7 @@
 titel: Profil und Sicherheit
 gruppen: [alle]
 reihenfolge: 60
-quellen: [frontend/src/pages/ProfilPage.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/PasswortAendernDialog.tsx, frontend/src/auth/TotpPasswortDialog.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/api/auth.ts, frontend/src/pages/LoginPage.tsx, src/routes/auth.rs, src/routes/sitzung.rs, src/routes/benutzer.rs, src/auth/session.rs, src/auth/totp/, src/auth/geraet_bezeichnung.rs]
+quellen: [frontend/src/pages/ProfilPage.tsx, frontend/src/anzeige/ZeitdarstellungGeraetWahl.tsx, frontend/src/pages/BenutzerPage.tsx, frontend/src/auth/PasswortAendernDialog.tsx, frontend/src/auth/TotpPasswortDialog.tsx, frontend/src/auth/SitzungsListe.tsx, frontend/src/api/auth.ts, frontend/src/pages/LoginPage.tsx, src/routes/auth.rs, src/routes/sitzung.rs, src/routes/benutzer.rs, src/auth/session.rs, src/auth/totp/, src/auth/geraet_bezeichnung.rs]
 ---
 
 ## Überblick
@@ -21,6 +21,19 @@ Betrieb der Instanz anbietet.
 2. Unter „Konto“ stehen Anzeigename, Benutzername, Systemrolle und Organisation.
 
    ![Profilseite mit den Abschnitten „Konto“, „Sicherheit“ mit Passwort und zweitem Faktor sowie „Anmeldungen“](../bilder/profil-sicherheit/profil.png)
+
+### Die Zeitdarstellung dieses Geräts wählen
+
+Zeiten stehen in der App als taktische Datum-Zeit-Gruppe („101430okt26“, in Listen „1430“ für
+heute und „091430“ für andere Tage), sofern Einsatz oder Organisation nichts anderes vorgeben.
+
+1. Im Profil unter „Darstellung auf diesem Gerät“ „Taktisch“ oder „Datum und Uhrzeit“
+   („10.10.26 14:30“) wählen. Die Wahl wirkt sofort in allen offenen Ansichten.
+2. „Vorgabe“ stellt zurück auf die Einstellung von Einsatz und Organisation.
+
+Die Wahl gilt nur auf diesem Gerät und bleibt nach dem Abmelden stehen. In der Sprungpalette
+stehen dieselben Einträge als „Zeitdarstellung: …“. Ausdrucke folgen immer Einsatz und
+Organisation, nie dieser Wahl.
 
 ### Das Passwort ändern
 

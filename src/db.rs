@@ -838,6 +838,75 @@ mod tests {
         assert_eq!(betreuung, 3);
     }
 
+    /// LLH-1053 (`0242`): Aus „Zeitformat“ wird „Zeitdarstellung“. 24h/12h hatte nie Wirkung,
+    /// deshalb fallen die Altwerte an Einsatz und Organisation auf NULL (= Vorgabe, taktisch).
+    #[tokio::test]
+    async fn migration_0242_setzt_altes_zeitformat_auf_vorgabe() {
+        use sqlx::migrate::Migrator;
+        use std::borrow::Cow;
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(
+                SqliteConnectOptions::new()
+                    .filename(":memory:")
+                    .foreign_keys(false),
+            )
+            .await
+            .unwrap();
+        let vorher: Vec<_> = sqlx::migrate!("./migrations")
+            .iter()
+            .filter(|m| m.version < 242)
+            .cloned()
+            .collect();
+        Migrator {
+            migrations: Cow::Owned(vorher),
+            ..Migrator::DEFAULT
+        }
+        .run(&pool)
+        .await
+        .expect("Migrationen vor 0242");
+        sqlx::query("PRAGMA foreign_keys = OFF")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_einstellungen (einsatz_id, zeitformat, zeitzone) \
+             VALUES (1, '12h', 'Europe/Berlin'), (2, NULL, NULL)",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query("INSERT INTO org_einstellungen (org_id, zeitformat) VALUES (1, '24h')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        migrate(&pool).await.expect("0242 läuft durch");
+
+        let einsatz: Vec<(i64, Option<String>, Option<String>)> = sqlx::query_as(
+            "SELECT einsatz_id, zeitdarstellung, zeitzone FROM einsatz_einstellungen \
+             ORDER BY einsatz_id",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            einsatz,
+            [
+                (1, None, Some("Europe/Berlin".to_string())),
+                (2, None, None)
+            ],
+            "Altwert weg, die übrigen Konventionen bleiben"
+        );
+        let org: Option<String> =
+            sqlx::query_scalar("SELECT zeitdarstellung FROM org_einstellungen WHERE org_id = 1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(org, None);
+    }
+
     /// Das Abbild in [`test_pool`] muss dieselbe Datenbank liefern wie eine frische Migration.
     /// Verglichen werden der vollständige Schema-Text (Tabellen, Indizes, Trigger, FTS-Schatten)
     /// und die Migrationsbuchhaltung.

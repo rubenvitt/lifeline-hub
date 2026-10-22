@@ -26,8 +26,9 @@ arbeitet) das Kapitel [Rechte im Einsatz](rechte-im-einsatz.md).
 
 1. Im Einsatz „Einstellungen“ öffnen; der Reiter „Allgemein“ ist gewählt.
 2. Unter „Einstiegsmodul“ das Modul wählen, mit dem sich der Einsatz öffnet.
-3. Unter „Anzeige-Konventionen“ „Zeitzone“, „Zeitformat“, „Einheiten“ und „Koordinatenformat“
-   wählen.
+3. Unter „Anzeige-Konventionen“ „Zeitzone“, „Zeitdarstellung“, „Einheiten“ und „Koordinatenformat“
+   wählen. „Zeitdarstellung“ ist „Taktisch“ (101430okt26, die Vorgabe) oder „Datum und Uhrzeit“
+   (10.10.26 14:30); sie gilt am Bildschirm und im Druck.
 
    ![Reiter „Allgemein“ mit Einstiegsmodul und Anzeige-Konventionen, alle Felder auf der Vorgabe](../bilder/einsatz-einstellungen/allgemein.png)
 

@@ -63,15 +63,15 @@ describe('NachforderungKarte — Zeiten in der Anzeigezone (LFH-913)', () => {
         eingetroffen_at: '2026-06-12 09:30:00',
       }),
     );
-    expect(screen.getByText('Angefordert: 121100JUN2026')).toBeInTheDocument();
-    expect(screen.getByText('Zugesagt: 121110JUN2026')).toBeInTheDocument();
-    expect(screen.getByText('Unterwegs: 121120JUN2026')).toBeInTheDocument();
-    expect(screen.getByText('Eingetroffen: 121130JUN2026')).toBeInTheDocument();
+    expect(screen.getByText('Angefordert: 121100jun26')).toBeInTheDocument();
+    expect(screen.getByText('Zugesagt: 121110jun26')).toBeInTheDocument();
+    expect(screen.getByText('Unterwegs: 121120jun26')).toBeInTheDocument();
+    expect(screen.getByText('Eingetroffen: 121130jun26')).toBeInTheDocument();
   });
 
   it('Ablehnung als Berliner Zeit', () => {
     zeige(nf({ status: 'abgelehnt', ist_offen: false, abgelehnt_at: '2026-06-12 09:40:00' }));
-    expect(screen.getByText('Abgelehnt (121140JUN2026)')).toBeInTheDocument();
+    expect(screen.getByText('Abgelehnt (121140jun26)')).toBeInTheDocument();
   });
 });
 

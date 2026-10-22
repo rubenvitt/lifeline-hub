@@ -471,7 +471,7 @@ describe('UeberblickPage', () => {
       return el!;
     });
     expect(rueck).toHaveTextContent('Verbau hält');
-    const uhr = dayjs.utc(zeit).local().format('HH:mm');
+    const uhr = dayjs.utc(zeit).local().format('HHmm');
     expect(rueck).toHaveTextContent(uhr);
     // Die Zeit trägt im Linknamen ihre Bedeutung, nicht als nackte Uhrzeit.
     expect(zeile).toHaveAccessibleName(new RegExp(`Letzte Rückmeldung:\\s*${uhr}\\s+Verbau hält`));

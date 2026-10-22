@@ -8,7 +8,7 @@ import { HistorienBanner } from './HistorienBanner';
 describe('HistorienBanner — Stand in der Anzeigezone (LFH-913)', () => {
   mitProzessZone('UTC');
 
-  it('ein Stand von 08:00 UTC steht als Berliner 241000JUL2026 da', () => {
+  it('ein Stand von 08:00 UTC steht als Berliner 241000jul26 da', () => {
     render(
       <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
         <HistorienBanner
@@ -18,6 +18,6 @@ describe('HistorienBanner — Stand in der Anzeigezone (LFH-913)', () => {
         />
       </AnzeigeKonventionenProvider>,
     );
-    expect(screen.getByText('Stand A · 241000JUL2026')).toBeInTheDocument();
+    expect(screen.getByText('Stand A · 241000jul26')).toBeInTheDocument();
   });
 });

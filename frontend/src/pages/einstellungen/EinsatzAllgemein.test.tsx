@@ -34,7 +34,7 @@ const BASIS = {
   karten_zoom_start: null,
   fachebenen_sichtbar: null,
   zeitzone: null,
-  zeitformat: null,
+  zeitdarstellung: null,
   einheiten: null,
   koordinatenformat: null,
   etb_nummer_praefix: null,
@@ -138,7 +138,7 @@ describe('EinsatzAllgemein', () => {
     vi.mocked(ladeEinstellungen).mockResolvedValue({
       ...BASIS,
       zeitzone: 'Europe/Berlin',
-      zeitformat: '12h',
+      zeitdarstellung: 'datum_uhrzeit',
       einheiten: 'imperial',
       koordinatenformat: 'mgrs',
     } as never);
@@ -146,7 +146,7 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(await screen.findByText('Anzeige-Konventionen')).toBeInTheDocument();
-    expect(screen.getByTitle('12 Stunden (AM/PM)')).toBeInTheDocument();
+    expect(screen.getByTitle('Datum und Uhrzeit (10.10.26 14:30)')).toBeInTheDocument();
     expect(screen.getByTitle('Imperial (ft, mi)')).toBeInTheDocument();
     expect(screen.getByTitle('MGRS')).toBeInTheDocument();
 
@@ -156,7 +156,7 @@ describe('EinsatzAllgemein', () => {
         1,
         expect.objectContaining({
           zeitzone: 'Europe/Berlin',
-          zeitformat: '12h',
+          zeitdarstellung: 'datum_uhrzeit',
           einheiten: 'imperial',
           koordinatenformat: 'mgrs',
         }),
@@ -170,7 +170,7 @@ describe('EinsatzAllgemein', () => {
       org_defaults: {
         org_id: 1,
         zeitzone: 'Europe/Berlin',
-        zeitformat: '12h',
+        zeitdarstellung: 'datum_uhrzeit',
         einheiten: 'metrisch',
         koordinatenformat: 'wgs84',
       },
@@ -179,12 +179,14 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(await screen.findByText('Vorgabe der Organisation: Europe/Berlin')).toBeInTheDocument();
-    expect(screen.getByText('Vorgabe der Organisation: 12 Stunden (AM/PM)')).toBeInTheDocument();
+    expect(
+      screen.getByText('Vorgabe der Organisation: Datum und Uhrzeit (10.10.26 14:30)'),
+    ).toBeInTheDocument();
     expect(screen.getByText('Vorgabe der Organisation: Metrisch (m, km)')).toBeInTheDocument();
     expect(screen.getByText('Vorgabe der Organisation: WGS84 dezimal')).toBeInTheDocument();
     // Der Platzhalter nennt den Wert, der leer gilt: hier die Vorgabe der Organisation (LFH-944).
     expect(screen.getByText('Europe/Berlin (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByText('12 Stunden (AM/PM) (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Datum und Uhrzeit (10.10.26 14:30) (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText('Überblick (Vorgabe)')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Standard|Default|Fallback/);
 
@@ -195,7 +197,7 @@ describe('EinsatzAllgemein', () => {
         1,
         expect.objectContaining({
           zeitzone: null,
-          zeitformat: null,
+          zeitdarstellung: null,
           einheiten: null,
           koordinatenformat: null,
         }),
@@ -213,7 +215,7 @@ describe('EinsatzAllgemein', () => {
     rendern();
 
     expect(await screen.findByText('Gerätezeit (Vorgabe)')).toBeInTheDocument();
-    expect(screen.getByText('24 Stunden (Vorgabe)')).toBeInTheDocument();
+    expect(screen.getByText('Taktisch (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText('Metrisch (Vorgabe)')).toBeInTheDocument();
     expect(screen.getByText('WGS84 dezimal (Vorgabe)')).toBeInTheDocument();
     expect(screen.queryByText(/Vorgabe der Organisation:/)).not.toBeInTheDocument();

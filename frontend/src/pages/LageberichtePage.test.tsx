@@ -1119,8 +1119,8 @@ describe('LageberichtePage — Anzeigezone (LFH-350, LFH-692)', () => {
     ]);
     // 12:00 UTC → 14:00 Sommerzeit in Berlin; der Verlauf 10:00 UTC → 1200.
     const aktuell = await screen.findByRole('region', { name: 'Aktueller Lagevortrag' });
-    expect(aktuell).toHaveTextContent('251400JUL2026');
-    expect(screen.getByRole('region', { name: 'Verlauf' })).toHaveTextContent('251200JUL2026');
+    expect(aktuell).toHaveTextContent('251400jul26');
+    expect(screen.getByRole('region', { name: 'Verlauf' })).toHaveTextContent('251200jul26');
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
 

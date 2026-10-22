@@ -73,7 +73,7 @@ describe('QuittungIndikator', () => {
   it('zeigt ✓ Quittiert mit von + taktischer DTG', () => {
     const am = '2026-06-11 09:00:00';
     const d = dayjs.utc(am).local();
-    const zeit = `${d.format('DDHHmm')}JUN${d.format('YYYY')}`; // taktische DTG (LFH-141)
+    const zeit = `${d.format('DDHHmm')}jun${d.format('YY')}`; // volle DTG (LFH-141, LLH-1053)
     render(<QuittungIndikator quittiert von="EA Nord" am={am} />);
     expect(screen.getByText(`✓ Quittiert von EA Nord ${zeit}`)).toBeInTheDocument();
   });

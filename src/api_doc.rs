@@ -150,7 +150,7 @@ use utoipa::OpenApi;
         crate::einsatz::einstellungen::EinheitenSystem,
         crate::einsatz::einstellungen::EinstellungenAnzeige,
         crate::einsatz::einstellungen::Koordinatenformat,
-        crate::einsatz::einstellungen::Zeitformat,
+        crate::einsatz::einstellungen::Zeitdarstellung,
         crate::einsatz::berechtigung::ModulFreigabe,
         crate::einsatz::modul_override::EinsatzModulOverride,
         crate::einsatzabschnitt::EinsatzabschnittAnzeige,

@@ -188,7 +188,7 @@ describe('Schicht beginnen — Beginn als Platzhalter (LFH-1078)', () => {
     expect(beginn(dialog).getAttribute('placeholder') ?? '').not.toMatch(/Eintreffen|jetzt/);
     await waehleFlorian(dialog);
     await waitFor(() =>
-      expect(beginn(dialog).getAttribute('placeholder')).toMatch(/^Eintreffen (\d{2}\. )?06:30$/),
+      expect(beginn(dialog).getAttribute('placeholder')).toMatch(/^Eintreffen (\d{2})?0630$/),
     );
   });
 

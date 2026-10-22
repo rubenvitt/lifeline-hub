@@ -18,7 +18,7 @@ pub struct OrgEinstellungen {
     pub org_id: i64,
     // Anzeige-Konventionen.
     pub zeitzone: Option<String>,
-    pub zeitformat: Option<String>,
+    pub zeitdarstellung: Option<String>,
     pub einheiten: Option<String>,
     pub koordinatenformat: Option<String>,
     // Aufbewahrung.
@@ -49,7 +49,7 @@ impl OrgEinstellungen {
         Self {
             org_id,
             zeitzone: None,
-            zeitformat: None,
+            zeitdarstellung: None,
             einheiten: None,
             koordinatenformat: None,
             retention_dauer_tage: None,
@@ -78,7 +78,7 @@ impl OrgEinstellungen {
             aufbewahrung_kategorien,
             org_id: self.org_id,
             zeitzone: self.zeitzone.clone(),
-            zeitformat: self.zeitformat.clone(),
+            zeitdarstellung: self.zeitdarstellung.clone(),
             einheiten: self.einheiten.clone(),
             koordinatenformat: self.koordinatenformat.clone(),
             retention_dauer_tage: self.retention_dauer_tage,
@@ -103,7 +103,7 @@ impl OrgEinstellungen {
         OrgEinstellungenHinweis {
             org_id: self.org_id,
             zeitzone: self.zeitzone.clone(),
-            zeitformat: self.zeitformat.clone(),
+            zeitdarstellung: self.zeitdarstellung.clone(),
             einheiten: self.einheiten.clone(),
             koordinatenformat: self.koordinatenformat.clone(),
             retention_dauer_tage: self.retention_dauer_tage,
@@ -123,8 +123,8 @@ impl OrgEinstellungen {
 pub struct OrgEinstellungenAnzeige {
     pub org_id: i64,
     pub zeitzone: Option<String>,
-    #[schema(value_type = Option<crate::einsatz::einstellungen::Zeitformat>)]
-    pub zeitformat: Option<String>,
+    #[schema(value_type = Option<crate::einsatz::einstellungen::Zeitdarstellung>)]
+    pub zeitdarstellung: Option<String>,
     #[schema(value_type = Option<crate::einsatz::einstellungen::EinheitenSystem>)]
     pub einheiten: Option<String>,
     #[schema(value_type = Option<crate::einsatz::einstellungen::Koordinatenformat>)]
@@ -157,8 +157,8 @@ pub struct OrgEinstellungenAnzeige {
 pub struct OrgEinstellungenHinweis {
     pub org_id: i64,
     pub zeitzone: Option<String>,
-    #[schema(value_type = Option<crate::einsatz::einstellungen::Zeitformat>)]
-    pub zeitformat: Option<String>,
+    #[schema(value_type = Option<crate::einsatz::einstellungen::Zeitdarstellung>)]
+    pub zeitdarstellung: Option<String>,
     #[schema(value_type = Option<crate::einsatz::einstellungen::EinheitenSystem>)]
     pub einheiten: Option<String>,
     #[schema(value_type = Option<crate::einsatz::einstellungen::Koordinatenformat>)]
@@ -179,7 +179,7 @@ pub struct OrgEinstellungenHinweis {
 #[derive(Debug, Default)]
 pub struct OrgEinstellungenDaten<'a> {
     pub zeitzone: Option<&'a str>,
-    pub zeitformat: Option<&'a str>,
+    pub zeitdarstellung: Option<&'a str>,
     pub einheiten: Option<&'a str>,
     pub koordinatenformat: Option<&'a str>,
     pub retention_dauer_tage: Option<i64>,
@@ -206,7 +206,7 @@ pub async fn laden_oder_default(
     org_id: i64,
 ) -> Result<OrgEinstellungen, AppError> {
     let row = sqlx::query_as::<_, OrgEinstellungen>(
-        "SELECT org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
+        "SELECT org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
                 retention_dauer_tage, skelett_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
                 auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
                 auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
@@ -231,7 +231,7 @@ pub async fn speichern(
     let mut tx = pool.begin().await?;
     sqlx::query(
         "INSERT INTO org_einstellungen \
-            (org_id, zeitzone, zeitformat, einheiten, koordinatenformat, \
+            (org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
              retention_dauer_tage, skelett_dauer_tage, etb_nummer_praefix, meldung_nummer_praefix, \
              auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
              auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
@@ -239,7 +239,7 @@ pub async fn speichern(
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
-             zeitformat = excluded.zeitformat, \
+             zeitdarstellung = excluded.zeitdarstellung, \
              einheiten = excluded.einheiten, \
              koordinatenformat = excluded.koordinatenformat, \
              retention_dauer_tage = excluded.retention_dauer_tage, \
@@ -258,7 +258,7 @@ pub async fn speichern(
     )
     .bind(org_id)
     .bind(daten.zeitzone)
-    .bind(daten.zeitformat)
+    .bind(daten.zeitdarstellung)
     .bind(daten.einheiten)
     .bind(daten.koordinatenformat)
     .bind(daten.retention_dauer_tage)
@@ -312,7 +312,7 @@ mod tests {
         let e = laden_oder_default(&pool, 1).await.unwrap();
         assert_eq!(e.org_id, 1);
         assert_eq!(e.zeitzone, None);
-        assert_eq!(e.zeitformat, None);
+        assert_eq!(e.zeitdarstellung, None);
         assert_eq!(e.einheiten, None);
         assert_eq!(e.koordinatenformat, None);
         assert_eq!(e.retention_dauer_tage, None);
@@ -344,7 +344,7 @@ mod tests {
             bid,
             OrgEinstellungenDaten {
                 zeitzone: Some("Europe/Berlin"),
-                zeitformat: Some("24h"),
+                zeitdarstellung: Some("taktisch"),
                 einheiten: Some("metrisch"),
                 koordinatenformat: Some("mgrs"),
                 retention_dauer_tage: Some(365),
@@ -373,7 +373,7 @@ mod tests {
             Some("A-"),
             "Nachbar nicht verrutscht"
         );
-        assert_eq!(g.zeitformat.as_deref(), Some("24h"));
+        assert_eq!(g.zeitdarstellung.as_deref(), Some("taktisch"));
         assert_eq!(g.einheiten.as_deref(), Some("metrisch"));
         assert_eq!(g.koordinatenformat.as_deref(), Some("mgrs"));
         assert_eq!(g.retention_dauer_tage, Some(365));
@@ -414,7 +414,7 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(zweite.zeitzone.as_deref(), Some("UTC"));
-        assert_eq!(zweite.zeitformat, None);
+        assert_eq!(zweite.zeitdarstellung, None);
         assert_eq!(zweite.retention_dauer_tage, None);
         assert_eq!(zweite.auto_etb_eintraege, None);
 

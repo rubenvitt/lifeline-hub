@@ -899,7 +899,7 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
       await within(zeile).findByRole('button', { name: `${FELD} bearbeiten` }),
     ).toHaveTextContent('Gruppe 1');
     expect(within(zeile).getByText('EA Nord')).toBeInTheDocument();
-    const seit = within(zeile).getByText(/11:10/).closest('td')!;
+    const seit = within(zeile).getByText(/1110/).closest('td')!;
     expect(seit).toHaveClass('lfh-zahl-spalte');
   });
 
@@ -1031,7 +1031,7 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     expect(await within(karte).findByText('Zug 1')).toBeInTheDocument();
     expect(within(karte).getByText('Einheit')).toBeInTheDocument();
     expect(within(karte).getByText('Seit')).toBeInTheDocument();
-    expect(within(karte).getByText(/11:10/)).toBeInTheDocument();
+    expect(within(karte).getByText(/1110/)).toBeInTheDocument();
   });
 });
 

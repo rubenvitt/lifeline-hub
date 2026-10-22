@@ -66,7 +66,7 @@ export type WebPushStand = S['WebPushStand'];
 
 // ============================== Karten-/Anzeige-Defaults ==============================
 export type BasemapModus = S['BasemapModus'];
-export type Zeitformat = S['Zeitformat'];
+export type Zeitdarstellung = S['Zeitdarstellung'];
 export type EinheitenSystem = S['EinheitenSystem'];
 export type Koordinatenformat = S['Koordinatenformat'];
 
@@ -104,7 +104,7 @@ export type OrgEinstellungen = S['OrgEinstellungenAnzeige'];
  *  Kein Backend-Schema, FE-lokal. */
 export interface OrgEinstellungenUpdate {
   zeitzone: string | null;
-  zeitformat: Zeitformat | null;
+  zeitdarstellung: Zeitdarstellung | null;
   einheiten: EinheitenSystem | null;
   koordinatenformat: Koordinatenformat | null;
   retention_dauer_tage: number | null;
@@ -156,7 +156,7 @@ export interface EinstellungenUpdate {
   karten_zoom_start: number | null;
   fachebenen_sichtbar: FachebenenSichtbar | null;
   zeitzone: string | null;
-  zeitformat: Zeitformat | null;
+  zeitdarstellung: Zeitdarstellung | null;
   einheiten: EinheitenSystem | null;
   koordinatenformat: Koordinatenformat | null;
   // Verhalten & Automatik.

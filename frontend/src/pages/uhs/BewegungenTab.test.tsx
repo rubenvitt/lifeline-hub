@@ -52,7 +52,7 @@ describe('BewegungenTab (LFH-25)', () => {
   it('setzt die Zeit in die Zahlenschrift', async () => {
     server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])));
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
-    const zeit = await screen.findByText(/JUN2026$/);
+    const zeit = await screen.findByText(/jun26$/);
     expect(zeit.style.fontFamily).toContain('JetBrains Mono');
     expect(zeit.style.fontVariantNumeric).toBe('tabular-nums');
   });

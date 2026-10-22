@@ -147,7 +147,7 @@ describe('ZugangsprotokollPage', () => {
     const t = await tabelle();
     // Europe/Berlin (TZ des Testlaufs): 12:13:34 UTC ist 14:13 Ortszeit.
     expect(
-      await within(t).findByText('Safari · iPadOS, angemeldet 101413OKT2026'),
+      await within(t).findByText('Safari · iPadOS, angemeldet 101413okt26'),
     ).toBeInTheDocument();
     expect(within(t).getByText('Org-Rolle: Keine → Führungskraft')).toBeInTheDocument();
     expect(within(t).getByText('System-Rolle: Benutzer, Org-Rolle: Keine')).toBeInTheDocument();

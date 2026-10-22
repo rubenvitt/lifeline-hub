@@ -115,7 +115,7 @@ describe('FmsTableau (LFH-642)', () => {
     // Code und Wort getrennt — der Chip trägt BEIDE Kanäle, der Präfix „3 – " fällt weg.
     expect(within(kachel).getByText('S3')).toBeInTheDocument();
     expect(within(kachel).getByText('Einsatz übernommen')).toBeInTheDocument();
-    expect(within(kachel).getByText(/^seit \d{2}[.:]/)).toBeInTheDocument();
+    expect(within(kachel).getByText(/^seit \d{4}/)).toBeInTheDocument();
     expect(within(kachel).getByText('Zug 1')).toBeInTheDocument();
   });
 

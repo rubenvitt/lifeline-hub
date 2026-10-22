@@ -117,9 +117,9 @@ describe('LagemeldungenPage', () => {
     renderPage();
     const link = await screen.findByRole('link', { name: 'Meldung #5' });
     expect(link).toHaveAttribute('href', '/einsaetze/1/meldungen?meldung=3');
-    // In der Tagesgruppe genügt `HH:mm` in Ortszeit — der Tag steht im Kopf darüber.
+    // In der Tagesgruppe genügt die taktische Uhrzeit in Ortszeit — der Tag steht im Kopf darüber.
     const ort = alsOrtszeit('2026-06-12 08:30:00')!;
-    expect(screen.getByText(ort.format('HH:mm'))).toBeInTheDocument();
+    expect(screen.getByText(ort.format('HHmm'))).toBeInTheDocument();
     expect(screen.getByRole('group', { name: ort.format('DD.MM.YYYY') })).toBeInTheDocument();
     expect(screen.queryByText('2026-06-12 08:30:00')).toBeNull();
   });
@@ -163,10 +163,13 @@ describe('LagemeldungenPage', () => {
     renderPage();
     const sicht = await screen.findByRole('region', { name: 'Lagemeldungen' });
     await within(sicht).findByText('Nachgereicht');
-    const hhmm = (s: string) => alsOrtszeit(s)!.format('HH:mm');
+    const hhmm = (s: string) => alsOrtszeit(s)!.format('HHmm');
     const zeile = within(sicht).getByText('Nachgereicht').closest('li') as HTMLElement;
     expect(within(zeile).getByText(hhmm('2026-06-12 11:14:00'))).toBeInTheDocument();
-    expect(zeile).toHaveTextContent(`übernommen ${hhmm('2026-06-12 13:05:00')}`);
+    // Die Übernahme formatiert noch `lagemeldungen/zeitachse.ts` selbst (Schuldmenge, LLH-1061).
+    expect(zeile).toHaveTextContent(
+      `übernommen ${alsOrtszeit('2026-06-12 13:05:00')!.format('HH:mm')}`,
+    );
     // Später geschehen steht oben, auch wenn früher übergeben.
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Pegel steigt')).toBeLessThan(text.indexOf('Nachgereicht'));
@@ -408,7 +411,7 @@ describe('LagemeldungenPage', () => {
       expect(within(zeileMit('Deich hält')).getByText('Neu')).toBeInTheDocument();
       const gesehen = zeileMit('Brücke gesperrt');
       expect(within(gesehen).queryByText('Neu')).toBeNull();
-      const ort = alsOrtszeit('2026-06-12 09:30:00')!.format('HH:mm');
+      const ort = alsOrtszeit('2026-06-12 09:30:00')!.format('HHmm');
       expect(gesehen).toHaveTextContent(`gesehen ${ort} · Erika S2`);
     });
 

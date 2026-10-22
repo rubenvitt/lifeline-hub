@@ -644,6 +644,22 @@ anwendbar), „nicht geprüft" ist keins.
   Kalenderzellen oder Format-Strings. Falle: antds `Input` baut sein Gerüst um, sobald ein Präfix
   oder Suffix kommt oder geht, und das Feld verliert mitten im Tippen den Fokus — das Suffix der
   Deutung steht deshalb immer im DOM.
+- **Zeitdarstellung** (LLH-1053, Spec `zeitdarstellung`, Entscheidungen E1–E4 aus LLH-1045): eine
+  Zeit für Menschen formatiert nur `anzeige/zeitDarstellung.ts`, in drei Rollen — `zeitpunkt`
+  (`101430okt26` bzw. `10.10.26 14:30`), `zeitKurz` (heute `1430`, sonst `091430` bzw. `14:30` /
+  `09.10. 14:30`) und `uhrzeit` (`1430` bzw. `14:30`, nur wo der Tag aus dem Zusammenhang folgt);
+  in Komponenten über `ZeitAnzeige rolle=…` oder die gebundenen Rollen aus
+  `useAnzeigeKonventionen()`. Die volle DTG schreibt Monat klein ohne Umlaut und das Jahr
+  zweistellig (FwDV/DV 810, Ausgabe 2018, Teil I 5.1.1.12). Die Darstellung (`taktisch`,
+  Vorgabe, oder `datum_uhrzeit`) steht in den Konventionen; wirksam ist Gerät vor Einsatz vor
+  Organisation vor Vorgabe (`wirksameZeitdarstellung`), die Gerätewahl liegt in
+  `anzeige/zeitDarstellungStore.ts` (Profil „Darstellung auf diesem Gerät“, Sprungpalette).
+  **Der Druck nimmt nie die Gerätewahl:** die Provider in `AnzeigeKonventionenContext.tsx` lassen
+  sie unter `useDruckModus` weg. Ausnahmen: Uhr im Kopf (Gerätezeit) und Dauern. Kein
+  `.format('…')` mit `HH`/`mm`/`DD`/`YYYY` außerhalb von `anzeige/` (Maschinenformate ab
+  `YYYY-MM-DD` ausgenommen); Wächter `anzeige/zeitDarstellung.guard.test.ts` mit Schuldmenge
+  `OFFEN`, die nur schrumpft (Abbau LLH-1061). Die alten Namen in `anzeige/format.ts`
+  (`formatZeit`, `formatUhrzeit` …) sind veraltete Weiterleitungen auf die Rollen.
 - **Statuswechsel in Kräfte-Listen**: Auslöser ist die Statusanzeige, senkrechtes Menü im Portal
   (`components/StatusWahl.tsx`, `statusBedienung`), am `status`-Slot, nie am `aktion`-Slot
   (`docs/superpowers/specs/2026-07-30-kraefte-listen-statuswechsel-zielform.md`).

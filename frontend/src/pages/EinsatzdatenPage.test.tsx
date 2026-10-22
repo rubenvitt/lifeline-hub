@@ -921,7 +921,7 @@ describe('EinsatzdatenPage — Alarmzeit in der Anzeigezone (LFH-692)', () => {
     );
     const user = userEvent.setup();
     // Leseansicht: taktische DTG in Berlin.
-    expect(await screen.findByText('141200JUL2026')).toBeInTheDocument();
+    expect(await screen.findByText('141200jul26')).toBeInTheDocument();
     await user.click(await screen.findByRole('button', { name: 'Alarmzeit bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Alarmzeit' });
     expect(feld).toHaveValue('141200jul26');

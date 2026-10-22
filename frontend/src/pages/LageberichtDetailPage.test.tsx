@@ -205,7 +205,7 @@ describe('LageberichtDetailPage — Zeitstand (LFH-350 · H60)', () => {
     renderMitZone('/einsaetze/1/lageberichte/9');
 
     // 12:00 UTC → 14:00 Sommerzeit in Berlin → DDHHmm + Monatskürzel + Jahr.
-    expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
+    expect(await screen.findByText('Zeitstand: 251400jul26')).toBeInTheDocument();
     // Gegenaussage: der Wirestring ist nirgends sichtbar.
     expect(screen.queryByText(/2026-07-25 12:00:00/)).toBeNull();
   });
@@ -265,7 +265,7 @@ describe('LageberichtDetailPage — Zeitstand im Entwurf (LFH-499)', () => {
     } as never);
     renderMitZone('/einsaetze/1/lageberichte/9');
 
-    expect(await screen.findByText('Zeitstand: 251400JUL2026')).toBeInTheDocument();
+    expect(await screen.findByText('Zeitstand: 251400jul26')).toBeInTheDocument();
     expect(screen.queryByLabelText('Zeitstand')).toBeNull();
   });
 });
@@ -531,14 +531,14 @@ describe('LageberichtDetailPage — Entwurfsdruck (LFH-731)', () => {
     renderMitZone('/einsaetze/1/lageberichte/9');
     const feld = await screen.findByRole('textbox', { name: 'Zeitstand' });
     await waitFor(() => expect(feld).toHaveValue('251400jul26'));
-    expect(within(kopf()).getByText('251400JUL2026')).toBeInTheDocument();
+    expect(within(kopf()).getByText('251400jul26')).toBeInTheDocument();
 
     // Tippen und Verlassen übernimmt ins Formular; Enter schickte es ab und speicherte.
     await userEvent.clear(feld);
     await userEvent.type(feld, '25.07.2026 16:30');
     await userEvent.tab();
     // 16:30 Ortszeit (Berlin, Sommerzeit) = 14:30 UTC → in der Anzeigezone wieder 16:30.
-    await waitFor(() => expect(within(kopf()).getByText('251630JUL2026')).toBeInTheDocument());
+    await waitFor(() => expect(within(kopf()).getByText('251630jul26')).toBeInTheDocument());
     expect(lageberichteApi.aktualisiereLagebericht).not.toHaveBeenCalled();
   });
 });
@@ -943,10 +943,10 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
     // Anzeigezone Europe/Berlin (MESZ): 09:55 UTC → 1155.
     await waitFor(() =>
       expect(marke('Eigene Lage')).toHaveTextContent(
-        'Stand der Übernahme 021155JUN2026 · aus der Vorfassung',
+        'Stand der Übernahme 021155jun26 · aus der Vorfassung',
       ),
     );
-    expect(marke('Medienlage')).toHaveTextContent('Stand der Übernahme 021405JUN2026');
+    expect(marke('Medienlage')).toHaveTextContent('Stand der Übernahme 021405jun26');
     expect(marke('Medienlage')).not.toHaveTextContent('aus der Vorfassung');
     expect(marke('Auftrag')).toBeNull();
     expect(marke('Lageentwicklung')).toBeNull();

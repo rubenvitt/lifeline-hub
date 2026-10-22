@@ -499,7 +499,7 @@ describe('nachtragText (LLH-1088)', () => {
       'nachgetragen 110020',
     );
     expect(nachtragText('2026-10-10 10:00:00', '2026-10-10 12:21:00', berlin)).toBe(
-      'nachgetragen um 14:21',
+      'nachgetragen um 1421',
     );
   });
 

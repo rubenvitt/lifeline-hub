@@ -845,7 +845,7 @@ describe('KraefteuebersichtPage — Raster', () => {
       expect(z).toHaveAttribute('data-zustand', 'aktuell');
       return z!;
     });
-    expect(c.textContent).toMatch(/\d{2}:\d{2}$/);
+    expect(c.textContent).toMatch(/\d{4}$/);
     expect(c).toHaveAttribute(
       'aria-label',
       expect.stringMatching(/^Rückmeldung in der Frist · letzte .* · Funk · Meldung Nr\. 7$/),
@@ -866,7 +866,7 @@ describe('KraefteuebersichtPage — Raster', () => {
       expect(z).toHaveAttribute('data-zustand', 'ueberfaellig');
       return z!;
     });
-    expect(c.textContent).toMatch(/\d{2}:\d{2}$/);
+    expect(c.textContent).toMatch(/\d{4}$/);
     expect(c.getAttribute('aria-label')).toMatch(/^Rückmeldung überfällig · /);
     expect(zeile(container, 'eh-20')).toHaveClass('meldebild-problemzeile');
   });
@@ -1273,7 +1273,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
           abschnitte: [
             expect.objectContaining({
               text: expect.stringMatching(
-                /## Entlassen\n\n- Pers\. Bert Weg \(Sanitäter\) — \d{6}OKT2026\n/,
+                /## Entlassen\n\n- Pers\. Bert Weg \(Sanitäter\) — \d{6}okt26\n/,
               ),
             }),
           ],
@@ -1317,7 +1317,7 @@ describe('KraefteuebersichtPage — Werkzeugzeile', () => {
           abschnitte: [
             expect.objectContaining({
               text: expect.stringMatching(
-                /## Entlassen\n\n- Fzg\. Florian 2 \(RTW\) — \d{6}OKT2026\n\n## Aus dem Einsatz genommen\n\n- Mtl\. Trage ×2 — \d{6}OKT2026\n/,
+                /## Entlassen\n\n- Fzg\. Florian 2 \(RTW\) — \d{6}okt26\n\n## Aus dem Einsatz genommen\n\n- Mtl\. Trage ×2 — \d{6}okt26\n/,
               ),
             }),
           ],
@@ -1420,7 +1420,7 @@ describe('KraefteuebersichtPage — Druck', () => {
     // Der Stand ist der ÄLTESTE erfolgreiche Listenabruf, nicht die Druckzeit.
     expect(within(kopf).getByText('Stand')).toBeInTheDocument();
     const stand = within(kopf).getByText('Stand').nextElementSibling as HTMLElement;
-    expect(stand.textContent).toMatch(/^\d{6}[A-ZÄÖÜ]{3}\d{4}$/);
+    expect(stand.textContent).toMatch(/^\d{6}[a-z]{3}\d{2}$/);
     expect(within(kopf).getByText('Gedruckt von')).toBeInTheDocument();
     expect(await within(kopf).findByText(/Einheit · Stärke/)).toBeInTheDocument();
     // Kein eigener Meldeblatt-Kopf — sonst stünde der Einsatz doppelt auf dem Blatt.
@@ -1650,7 +1650,7 @@ describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH
     vi.useRealTimers();
   });
 
-  it('10:00 UTC steht als „Stand 141200JUL2026“ (Berlin) im Lagebericht', async () => {
+  it('10:00 UTC steht als „Stand 141200jul26“ (Berlin) im Lagebericht', async () => {
     vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-07-14T10:00:00Z'));
     vi.mocked(legeLageberichtAn).mockClear();
@@ -1665,7 +1665,7 @@ describe('KraefteuebersichtPage — Stand der Übernahme in der Anzeigezone (LFH
     fireEvent.click(await screen.findByRole('button', { name: /In Lagebericht übernehmen/i }));
     await waitFor(() => expect(vi.mocked(legeLageberichtAn)).toHaveBeenCalled());
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte?.[0]?.text;
-    expect(text).toContain('**Stand:** 141200JUL2026');
+    expect(text).toContain('**Stand:** 141200jul26');
   });
 });
 

@@ -654,7 +654,7 @@ describe('PersonenDetailPage — Sichten, Verbleib und Notiz im Patientenkopf (L
     await screen.findByRole('heading', { name: /Person R-001/ });
     // Der Chronologie-Zeitstempel erscheint als taktische DTG (dt. Monatskürzel), nicht roh.
     expect(
-      await screen.findByText(/^\d{6}(JAN|FEB|MÄR|APR|MAI|JUN|JUL|AUG|SEP|OKT|NOV|DEZ)2026$/),
+      await screen.findByText(/^\d{6}(jan|feb|mrz|apr|mai|jun|jul|aug|sep|okt|nov|dez)26$/),
     ).toBeInTheDocument();
     expect(screen.queryByText('2026-05-27 10:00:00')).not.toBeInTheDocument();
   });
