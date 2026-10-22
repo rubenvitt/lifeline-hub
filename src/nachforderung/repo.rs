@@ -5,7 +5,7 @@ use super::{adressat_kategorie_gueltig, prioritaet_gueltig, NachforderungAnzeige
 use crate::kommunikation::AdressatKategorie;
 
 /// Kurzname einer Nachforderung im ETB: „2× RTW“, ohne Anzahl nur die Art.
-fn kurzname(anzahl: Option<i64>, art: &str) -> String {
+pub(crate) fn kurzname(anzahl: Option<i64>, art: &str) -> String {
     match anzahl {
         Some(a) => format!("{a}× {art}"),
         None => art.to_string(),
@@ -63,8 +63,8 @@ async fn stufe_protokollieren_tx(
 
 /// Ein Systemeintrag zur Nachforderung `id` mit Verweis auf sie, in der laufenden Transaktion
 /// (LLH-1104 D6; Zusage und Bearbeiten, LLH-1097 D5/D9, nutzen denselben Weg). Liefert die
-/// Kennung des Eintrags.
-async fn protokollieren_tx(
+/// Kennung des Eintrags. Die Übernahme als Einheit (LLH-1383 D6) schreibt ihren Satz ebenso.
+pub(crate) async fn protokollieren_tx(
     conn: &mut sqlx::SqliteConnection,
     id: i64,
     erfasser_id: i64,
@@ -208,7 +208,9 @@ const ANZEIGE_SELECT: &str =
             n.betreuungsstelle_id, n.ziel_br_id, n.ziel_abschnitt_id, n.ziel_text, \
             n.benoetigt_bis, COALESCE(n.zusage_rufnamen, '[]') AS zusage_rufnamen, \
             n.eintreffen_erwartet_at, n.anzahl_angefordert, n.teilung_aus_id, \
-            n.zurueckgezogen_at, n.zurueckgezogen_grund \
+            n.zurueckgezogen_at, n.zurueckgezogen_grund, \
+            (SELECT json_group_array(ee.id ORDER BY ee.id) FROM einsatz_einheit ee \
+             WHERE ee.nachforderung_id = n.id) AS einheit_ids \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
@@ -436,6 +438,21 @@ pub async fn has_material<'e, E: sqlx::SqliteExecutor<'e>>(
     .map_err(Into::into)
 }
 
+/// Trägt die Nachforderung mindestens eine übernommene Einheit (LLH-1383, design.md D8)? Auch
+/// eine aufgelöste zählt (sie war da); eine stornierte ist gelöscht und zählt nicht mehr.
+pub async fn has_einheiten<'e, E: sqlx::SqliteExecutor<'e>>(
+    exec: E,
+    id: i64,
+) -> Result<bool, AppError> {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM einsatz_einheit ee WHERE ee.nachforderung_id = ?)",
+    )
+    .bind(id)
+    .fetch_one(exec)
+    .await
+    .map_err(Into::into)
+}
+
 /// Prüft in der Transaktion einer Übernahme (LLH-1226, design.md D2/D3), ob aus der
 /// Nachforderung Material übernommen werden darf, und liefert ihre Bezeichnung für den
 /// ETB-Text. `NotFound`, wenn sie nicht zum Einsatz gehört; `UnprocessableEntity`, wenn sie nicht
@@ -522,9 +539,12 @@ pub async fn update_status(
         (n, _, Some(spalte)) if n + 1 == alt_stufe => (format!("{spalte} = NULL"), false),
         _ => return Err(ungueltig()),
     };
+    // Ebenso ohne übernommene Einheit (LLH-1383, design.md D8).
     let ohne_posten = if erwartet == super::STATUS_EINGETROFFEN {
         " AND NOT EXISTS (SELECT 1 FROM einsatz_material em \
-           WHERE em.nachforderung_id = nachforderung.id AND em.beendet_als IS NOT 'storniert')"
+           WHERE em.nachforderung_id = nachforderung.id AND em.beendet_als IS NOT 'storniert') \
+          AND NOT EXISTS (SELECT 1 FROM einsatz_einheit ee \
+           WHERE ee.nachforderung_id = nachforderung.id)"
     } else {
         ""
     };

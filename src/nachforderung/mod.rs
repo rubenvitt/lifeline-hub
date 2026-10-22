@@ -26,6 +26,10 @@ pub const ZUSAGE_RUFNAME_MAX: usize = 100;
 pub const ZUSAGE_RUFNAMEN_MAX: usize = 20;
 /// Höchstlänge des Grunds beim Zurückziehen (D8); landet im ETB-Inhalt.
 pub const ZURUECKZIEHEN_GRUND_MAX: usize = 200;
+/// Höchstzahl der Einheiten einer Übernahme aus einer Nachforderung, gezählt vor dem Entdoppeln
+/// (LLH-1383 design.md D2; so viele wie Rufnamen einer Zusage). Spiegel:
+/// `frontend/src/api/eingabegrenzen.ts`.
+pub const UEBERNAHME_EINHEITEN_MAX: usize = ZUSAGE_RUFNAMEN_MAX;
 
 /// Priorität (TEXT in der DB, im Code validiert).
 pub const PRIO_SOFORT: &str = Prioritaet::Sofort.as_str();
@@ -189,6 +193,12 @@ pub struct NachforderungAnzeige {
     pub zurueckgezogen_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zurueckgezogen_grund: Option<String>,
+    /// Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen Einheiten, aufsteigend, auch
+    /// aufgelöste; leer ohne Übernahme (LLH-1383, design.md D7). Nur Kennungen: Namen liest die
+    /// Oberfläche aus dem Modul Einheiten.
+    #[sqlx(try_from = "String")]
+    #[schema(value_type = Vec<i64>)]
+    pub einheit_ids: MaterialIds,
 }
 
 /// Rufnamen einer Zusage, gelesen aus dem JSON-Array der Spalte `zusage_rufnamen` (NULL → `[]` im
@@ -205,8 +215,8 @@ impl TryFrom<String> for ZusageRufnamen {
     }
 }
 
-/// Kennungen übernommener Materialposten, gelesen aus dem JSON-Array der Unterabfrage in
-/// `repo::ANZEIGE_SELECT`; auf dem Draht ein Array von Zahlen.
+/// Kennungen übernommener Materialposten bzw. Einheiten (LLH-1383), gelesen aus dem JSON-Array
+/// einer Unterabfrage in `repo::ANZEIGE_SELECT`; auf dem Draht ein Array von Zahlen.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct MaterialIds(pub Vec<i64>);

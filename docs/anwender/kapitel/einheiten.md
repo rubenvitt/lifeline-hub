@@ -88,6 +88,11 @@ Für Einsatzleitung und Führungspersonal:
 6. Im Paneel „Funk und Kommunikation“ ebenso „Sprechgruppen“, „Kommunikationsmittel“ und
    „Erreichbarkeit / Nummer“ ändern. Die Erreichbarkeit darf höchstens 200 Zeichen lang sein.
 
+Eine Einheit, die aus einer Nachforderung übernommen ist, trägt in den Kopfdaten das Feld
+„Herkunft“ mit „aus Nachforderung #4 ↗“; es führt ins Board der
+[Nachforderungen](nachforderung.md) und hebt die Karte hervor. Ändern lässt sich die Herkunft
+nicht. Ohne Freigabe des Moduls Nachforderungen steht sie ohne Sprung.
+
 ### Das taktische Zeichen setzen
 
 Für Einsatzleitung und Führungspersonal:
@@ -333,6 +338,18 @@ Ohne Freigabe des Moduls Fahrzeuge oder Personal fehlen dessen Zeilen; über dem
 freigegeben ist. Ohne Freigabe des Meldebilds öffnet die App nach dem Bilden die Seite der neuen
 Einheit. Ins Einsatztagebuch schreibt die App einen Eintrag für die ganze Bildung, mit Untereinheiten,
 Fahrzeugen, Kräften und wer woher umgehängt wurde.
+
+### Aus einer Nachforderung
+
+Eingetroffene Kräfte einer Nachforderung lassen sich an deren Karte als Einheiten übernehmen
+(Kapitel [Nachforderungen](nachforderung.md)). Jede neue Einheit heißt wie der Rufname der Zusage,
+trägt ihn auch als Funkrufname und den gewählten Typ; alles Weitere wird wie bei einer gebildeten
+Einheit nachgetragen. Eine schon geführte Einheit mit demselben Namen bekommt nur den Verweis. Das
+Einsatztagebuch hält die Übernahme in einem Eintrag der Nachforderung fest, nicht als „gebildet“
+je Einheit. Solange eine Einheit auf die Nachforderung verweist, lässt sich deren Stufe
+„Eingetroffen“ nicht zurücknehmen. Eine versehentlich übernommene Einheit ohne Spur im Einsatz,
+etwa ohne Eintrag in einem Bereitstellungsraum, verschwindet beim Auflösen ganz und gibt die
+Rücknahme wieder frei.
 
 ### Rechte und ohne Netz
 

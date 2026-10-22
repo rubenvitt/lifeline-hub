@@ -541,6 +541,13 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         begruendung: "Geänderte Rufnamen im `inhalt` der Änderung (LLH-1097 D9)",
     },
     Ausnahme {
+        datei: "src/einheit/aus_nachforderung.rs",
+        funktion: "uebernehmen_tx",
+        spalte: "nachforderung.art",
+        gruppe: Gruppe::Fuehrungsmodul,
+        begruendung: "Kurzname der Nachforderung im `inhalt` der Übernahme als Einheit (LLH-1383 D6)",
+    },
+    Ausnahme {
         datei: "src/routes/einsatz_material.rs",
         funktion: "disponieren",
         spalte: "nachforderung.bezeichnung",

@@ -1899,6 +1899,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id}",
             get(routes::einsatz_einheit::aus_vorlage_vorschau),
         )
+        // LLH-1383: eingetroffene Nachforderung als Einheit übernehmen.
+        .route(
+            "/api/einsaetze/{id}/einheiten/aus-nachforderung",
+            post(routes::einsatz_einheit::aus_nachforderung),
+        )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}",
             patch(routes::einsatz_einheit::update),

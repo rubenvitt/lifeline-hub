@@ -99,6 +99,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_von_name: 'Leit',
   ist_offen: true,
   material_ids: [],
+  einheit_ids: [],
   zusage_rufnamen: [],
   ...over,
 });
@@ -437,7 +438,7 @@ describe('NachforderungenPage', () => {
     expect(screen.getByText('Bedarf drei')).toBeInTheDocument();
   });
 
-  it('eingetroffene Nachforderung zeigt nur noch die Übernahme als Material (LLH-1226)', async () => {
+  it('eingetroffene Nachforderung zeigt nur noch die Übernahme als Einheit oder Material (LLH-1226, LLH-1383)', async () => {
     listeNachforderungen.mockResolvedValue([
       nf({ status: 'eingetroffen', ist_offen: false, eingetroffen_at: '2026-06-12 10:00:00' }),
     ]);
@@ -449,7 +450,7 @@ describe('NachforderungenPage', () => {
       within(karte as HTMLElement)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Als Material übernehmen']);
+    ).toEqual(['Als Einheit übernehmen', 'Als Material übernehmen']);
     expect(stufeVon('2 RTW zur Verstärkung')).toBe('eingetroffen');
   });
 
@@ -1236,6 +1237,137 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     expect(await within(hinweis).findByRole('alert')).toHaveTextContent(
       'Aus der Nachforderung ist Material übernommen',
     );
+  });
+});
+
+describe('NachforderungenPage — Als Einheit übernehmen (LLH-1383)', () => {
+  const rtw = (over: Partial<Nachforderung> = {}) =>
+    nf({
+      id: 4,
+      art: 'RTW',
+      bezeichnung: '2 RTW zur Verstärkung',
+      anzahl: 2,
+      status: 'eingetroffen',
+      ist_offen: false,
+      eingetroffen_at: '2026-06-12 10:00:00',
+      zusage_rufnamen: ['83-1', '83-2'],
+      ziel_br_id: 3,
+      ...over,
+    });
+  const einheit = (id: number, name: string, over: Record<string, unknown> = {}) => ({
+    id,
+    einsatz_id: 1,
+    name,
+    funkrufname: null,
+    nachforderung_id: null,
+    aufgeloest_at: null,
+    ...over,
+  });
+
+  /** Einheiten, Typen und Räume über MSW; liefert die gesendeten POST-Körper. */
+  function einheitServer(einheiten: () => unknown[]) {
+    const koerper: unknown[] = [];
+    server.use(
+      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten())),
+      http.get('/api/einheit-typen', () =>
+        HttpResponse.json([
+          { id: 1, label: 'KTW', sortier: 1 },
+          { id: 2, label: 'RTW', sortier: 2 },
+        ]),
+      ),
+      http.get('/api/einsaetze/1/bereitstellungsraeume', () =>
+        HttpResponse.json([{ id: 3, einsatz_id: 1, bezeichnung: 'Nord' }]),
+      ),
+      http.post('/api/einsaetze/1/einheiten/aus-nachforderung', async ({ request }) => {
+        koerper.push(await request.json());
+        return HttpResponse.json(rtw({ einheit_ids: [11, 12] }), { status: 201 });
+      }),
+    );
+    return { koerper };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ladeModulFreigaben.mockResolvedValue(freigabenFixture());
+  });
+
+  it('übernimmt mit Ziel BR Nord: Rufnamen und Typ vorbelegt, Haken gesetzt, ein POST', async () => {
+    listeNachforderungen.mockResolvedValue([rtw()]);
+    const { koerper } = einheitServer(() => []);
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Als Einheit übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('„RTW“ als Einheit übernehmen');
+    expect(within(dialog).getByText('83-1')).toBeInTheDocument();
+    expect(within(dialog).getByText('83-2')).toBeInTheDocument();
+    await within(dialog).findByText('RTW');
+    const haken = await within(dialog).findByRole('checkbox', { name: 'In BR Nord eintragen' });
+    expect(haken).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() =>
+      expect(koerper).toEqual([
+        {
+          nachforderung_id: 4,
+          einheiten: [{ name: '83-1' }, { name: '83-2' }],
+          typ_id: 2,
+          in_bereitstellungsraum: true,
+        },
+      ]),
+    );
+    expect(await screen.findByText('Einheiten übernommen')).toBeInTheDocument();
+  });
+
+  it('eine Einheit im Einsatz wird verknüpft, nicht neu angelegt', async () => {
+    listeNachforderungen.mockResolvedValue([rtw({ zusage_rufnamen: ['83-1'] })]);
+    const { koerper } = einheitServer(() => [einheit(5, 'Rettung', { funkrufname: '83-1' })]);
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Als Einheit übernehmen' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText('Schon im Einsatz, wird verknüpft: 83-1'),
+    ).toBeInTheDocument();
+    await within(dialog).findByText('RTW');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await waitFor(() =>
+      expect(koerper).toEqual([
+        {
+          nachforderung_id: 4,
+          einheiten: [{ einheit_id: 5 }],
+          typ_id: 2,
+          in_bereitstellungsraum: true,
+        },
+      ]),
+    );
+  });
+
+  it('übernommene Einheiten stehen mit Sprung an der Karte; Material wird nicht mehr angeboten', async () => {
+    listeNachforderungen.mockResolvedValue([rtw({ anzahl: 3, einheit_ids: [11, 12] })]);
+    einheitServer(() => [
+      einheit(11, 'Rettung 1', { funkrufname: '83-1', nachforderung_id: 4 }),
+      einheit(12, '83-2', { nachforderung_id: 4 }),
+    ]);
+    renderPage();
+    const link = await screen.findByRole('link', { name: '83-1' });
+    expect(link).toHaveAttribute('href', '/einsaetze/1/einheiten/11');
+    expect(screen.getByRole('link', { name: '83-2' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/einheiten/12',
+    );
+    expect(screen.getByRole('button', { name: 'Weitere Einheit übernehmen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Als Material übernehmen' })).toBeNull();
+  });
+
+  it('ohne Freigabe Einheiten steht der Knopf gesperrt und die Karte nennt nur die Zahl', async () => {
+    ladeModulFreigaben.mockResolvedValue(
+      freigabenFixture({ einheiten: { sichtbar: false, zugriff: false } }),
+    );
+    listeNachforderungen.mockResolvedValue([rtw({ anzahl: 3, einheit_ids: [11] })]);
+    einheitServer(() => []);
+    renderPage();
+    expect(
+      await screen.findByRole('button', { name: 'Weitere Einheit übernehmen' }),
+    ).toBeDisabled();
+    expect(screen.getByText('1 Einheit übernommen')).toBeInTheDocument();
   });
 });
 

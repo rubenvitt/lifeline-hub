@@ -29,6 +29,7 @@ import type { ZeilenGrund } from '../components/useZeilenFehler';
 import NachforderungKarte, {
   type KartenFormular,
   type StellenVerweis,
+  type UebernahmeEinheit,
   type UebernahmePosten,
 } from './NachforderungKarte';
 import type { ZielAbschnitt, ZielNamen, ZielRaum } from './zielVorschlaege';
@@ -116,6 +117,11 @@ export interface BoardKartenProps {
   materialJeId?: ReadonlyMap<number, UebernahmePosten> | null;
   materialGesperrt?: boolean;
   onMaterialUebernehmen?: (id: number) => void;
+  einheitenJeId?: ReadonlyMap<number, UebernahmeEinheit> | null;
+  einheitGesperrt?: boolean;
+  onEinheitUebernehmen?: (id: number) => void;
+  /** Vorschläge für „Wer“; nur die Karte mit offenem Formular bekommt sie. */
+  werVorschlaege?: readonly string[];
   hervorgehobenId?: number | null;
   /** Die Karte, deren Fortschaltung gerade läuft (Knopf im Ladezustand). */
   laeuftId?: number | null;
@@ -266,6 +272,10 @@ export default function NachforderungBoard({
             materialJeId={karten.materialJeId}
             materialGesperrt={karten.materialGesperrt}
             onMaterialUebernehmen={karten.onMaterialUebernehmen}
+            einheitenJeId={karten.einheitenJeId}
+            einheitGesperrt={karten.einheitGesperrt}
+            onEinheitUebernehmen={karten.onEinheitUebernehmen}
+            werVorschlaege={formular ? karten.werVorschlaege : undefined}
             hervorgehoben={n.id === karten.hervorgehobenId}
             laeuft={n.id === karten.laeuftId}
             stellenJeId={karten.stellenJeId}

@@ -701,6 +701,11 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/einheiten"),
             ("GET", "/api/einsaetze/{id}/personen"),
             ("GET", "/api/einsaetze/{id}/uhs"),
+            // Nachforderungen bleiben der Führung, auch mit Ziel = eigener Raum (LLH-1383
+            // design.md D11): weder lesen noch „Eintreffen melden“ noch als Einheit übernehmen.
+            ("GET", "/api/einsaetze/{id}/nachforderungen"),
+            ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
+            ("POST", "/api/einsaetze/{id}/einheiten/aus-nachforderung"),
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
         }

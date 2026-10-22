@@ -26,6 +26,7 @@ const nf = (over: Partial<Nachforderung> = {}): Nachforderung => ({
   erstellt_at: '2026-06-12 09:00:00',
   ist_offen: true,
   material_ids: [],
+  einheit_ids: [],
   zusage_rufnamen: [],
   ...over,
 });

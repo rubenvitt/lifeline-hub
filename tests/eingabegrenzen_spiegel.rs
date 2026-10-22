@@ -74,6 +74,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX",
             nachforderung::ZURUECKZIEHEN_GRUND_MAX,
         ),
+        (
+            "NACHFORDERUNG_UEBERNAHME_EINHEITEN_MAX",
+            nachforderung::UEBERNAHME_EINHEITEN_MAX,
+        ),
         ("INFOTELEFON_NOTIZ_MAX", infotelefon::NOTIZ_MAX),
         ("INFOTELEFON_KURZ_MAX", infotelefon::KURZ_MAX),
         ("PRESSE_KURZ_MAX", presse::KURZ_MAX),

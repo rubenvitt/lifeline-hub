@@ -1796,6 +1796,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             material_mitglieder: components["schemas"]["EinheitMitgliedMaterial"][];
+            /**
+             * Format: int64
+             * @description Herkunft: aus dieser Nachforderung übernommen (LLH-1383, design.md D7). Nur die Kennung:
+             *     den Kurznamen liest die Oberfläche aus dem Modul Nachforderungen. Fehlt ohne Herkunft.
+             */
+            nachforderung_id?: number | null;
             name: string;
             /**
              * @description Kennzeichen „nicht übernommen“ (LLH-1075, D3): seit der Erfassung als unangemeldete Kraft,
@@ -4331,6 +4337,12 @@ export interface components {
             /** @description Details/Zweck; fehlt ohne Angabe (LLH-1089 design.md D10). */
             bezeichnung?: string | null;
             eingetroffen_at?: string | null;
+            /**
+             * @description Abgeleitet: Kennungen der aus dieser Nachforderung übernommenen Einheiten, aufsteigend, auch
+             *     aufgelöste; leer ohne Übernahme (LLH-1383, design.md D7). Nur Kennungen: Namen liest die
+             *     Oberfläche aus dem Modul Einheiten.
+             */
+            einheit_ids: number[];
             /** Format: int64 */
             einsatz_id: number;
             /** @description Voraussichtliches Eintreffen laut Zusage (UTC, D3); fehlt ohne Angabe. */

@@ -5,11 +5,14 @@ use crate::app::AppState;
 use crate::benachrichtigung::{BenachrichtigungBezugTyp, Bezug};
 use crate::einheit::repo::{self as einheit_repo, EinheitDaten, EinheitPatch};
 use crate::einheit::{
-    aus_vorlage, mitglied_repo, EinheitAnzeige, BEMERKUNG_MAX, ERREICHBARKEIT_MAX, FUNKRUFNAME_MAX,
+    aus_nachforderung, aus_vorlage, mitglied_repo, EinheitAnzeige, BEMERKUNG_MAX,
+    ERREICHBARKEIT_MAX, FUNKRUFNAME_MAX,
 };
 use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
-use crate::einsatz::modul::{Einheiten, Fahrzeuge, Personal};
+use crate::einsatz::modul::{
+    Bereitstellungsraeume, Einheiten, Fahrzeuge, Nachforderungen, Personal,
+};
 use crate::error::AppError;
 use crate::extract::JsonBody;
 use crate::extract::PfadParam;
@@ -231,6 +234,73 @@ pub async fn bilden(
     }
     let anzeige = einheit_repo::laden(&state.pool, einsatz_id, id).await?;
     Ok((StatusCode::CREATED, Json(anzeige)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AusNachforderungBody {
+    pub nachforderung_id: i64,
+    /// Je Zeile eine neue Einheit (`name`) oder eine bestehende (`einheit_id`), LLH-1383 D3.
+    #[serde(default)]
+    pub einheiten: Vec<aus_nachforderung::ZeileEingabe>,
+    /// Einheitstyp der neuen Einheiten.
+    #[serde(default)]
+    pub typ_id: Option<i64>,
+    /// In den Bereitstellungsraum des Ziels buchen (D5); fehlt = nein.
+    #[serde(default)]
+    pub in_bereitstellungsraum: bool,
+}
+
+/// POST /api/einsaetze/{id}/einheiten/aus-nachforderung — eine eingetroffene Nachforderung als
+/// Einheit übernehmen (LLH-1383, design.md D2–D6, Spec `nachforderung-einheit`): neue Einheiten
+/// anlegen oder bestehende verknüpfen, auf Wunsch in den Bereitstellungsraum des Ziels buchen, ein
+/// ETB-Eintrag. Reihenfolge: Gate Einheiten → 400 (Zeilen) → 403 (Freigabe Nachforderungen, bei
+/// Buchung Bereitstellungsräume) vor jedem Lesen → in der Transaktion 404/422/409. Antwort 201 mit
+/// der Nachforderung.
+pub async fn aus_nachforderung(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    JsonBody(body): JsonBody<AusNachforderungBody>,
+) -> Result<(StatusCode, Json<crate::nachforderung::NachforderungAnzeige>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let zeilen = aus_nachforderung::check_zeilen(&body.einheiten)?;
+    // Der Bezug liest die Nachforderung: erst die Freigabe ihres Moduls, sonst verriete 404 gegen
+    // 201 ihre Existenz (Muster `routes/einsatz_material.rs::disponieren`).
+    ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+        .await?;
+    if body.in_bereitstellungsraum {
+        ctx.fordere_zielmodul::<Bereitstellungsraeume>(&state.pool)
+            .await?;
+    }
+    let jetzt = crate::zeit::jetzt();
+    let rahmen = aus_nachforderung::Rahmen {
+        einsatz_id,
+        org_id: ctx.einsatz.org_id,
+        benutzer_id: ctx.benutzer.id,
+        nachforderung_id: body.nachforderung_id,
+        typ_id: body.typ_id,
+        in_bereitstellungsraum: body.in_bereitstellungsraum,
+        jetzt: &jetzt,
+        etb_startwert: etb_startwert(&state.pool, einsatz_id).await?,
+    };
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        aus_nachforderung::uebernehmen_tx(conn, &rahmen, &zeilen).await
+    })?;
+    // Live nach dem Commit (D12).
+    state.live.publiziere(einsatz_id, ergebnis.etb_id);
+    super::nachforderung::sse(&state, einsatz_id);
+    for id in &ergebnis.einheit_ids {
+        sse_einheit(&state, einsatz_id, *id);
+    }
+    if let Some(br_id) = ergebnis.br_id {
+        super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+    }
+    for ep_id in &ergebnis.personen {
+        sse_personal(&state, einsatz_id, *ep_id);
+    }
+    super::abloesung::publish_kopplung(&state, einsatz_id, &ergebnis.abloesung, &ergebnis.hinweise)
+        .await;
+    let n = crate::nachforderung::repo::load(&state.pool, body.nachforderung_id).await?;
+    Ok((StatusCode::CREATED, Json(n)))
 }
 
 /// Ein gesperrtes Zielmodul ist für die Vorschau kein Fehler, sondern ein leerer Teil (D8).

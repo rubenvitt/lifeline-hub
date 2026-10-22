@@ -1,6 +1,7 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import { memo, useId, type ReactNode } from 'react';
 import type {
+  Einheit,
   EinsatzMaterial,
   Nachforderung,
   NachforderungStatus,
@@ -26,7 +27,12 @@ import { KennungsLink } from '../components/kennungsLink';
 import { KEINE_BERECHTIGUNG } from '../einsatz/modulRegistry';
 import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
-import { materialPfad } from '../routing/deeplinks';
+import { einheitDetailPfad, materialPfad } from '../routing/deeplinks';
+import {
+  isWeitereEinheit,
+  kannEinheitUebernehmen,
+  uebernommeneEinheiten,
+} from './einheitUebernahme';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
 import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
 import { nachforderungName } from './nachforderungName';
@@ -65,6 +71,9 @@ export type UebernahmePosten = Pick<
   | 'br_id'
   | 'beendet_at'
 >;
+
+/** Eine übernommene Einheit, wie die Karte sie aus der Einheiten-Query liest (LLH-1383 D9). */
+export type UebernahmeEinheit = Pick<Einheit, 'id' | 'name' | 'funkrufname'>;
 
 /** Eine Betreuungsstelle, wie die Karte ihren Bezug zeigt (LLH-1082): Name und Sprung dorthin. */
 export interface StellenVerweis {
@@ -121,6 +130,58 @@ function UebernommenePosten({
   );
 }
 
+/**
+ * Die übernommenen Einheiten (LLH-1383 D9): „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“, je Einheit
+ * der Sprung in ihr Detail. Kennt die Seite keine davon (Modul nicht freigegeben, Liste noch nicht
+ * da), steht nur die Zahl; eine unbekannte (aufgelöste) zählt als „weitere“.
+ */
+function UebernommeneEinheiten({
+  nachforderung: n,
+  einheitenJeId,
+}: {
+  nachforderung: Pick<Nachforderung, 'einsatz_id' | 'einheit_ids'>;
+  einheitenJeId: ReadonlyMap<number, UebernahmeEinheit> | null | undefined;
+}) {
+  const bekannt = einheitenJeId ? uebernommeneEinheiten(n, einheitenJeId) : [];
+  if (bekannt.length === 0) {
+    return (
+      <Text type="secondary" style={{ fontSize: 13 }} data-lfh="nachforderung-einheiten">
+        {n.einheit_ids.length === 1 ? '1 Einheit' : `${n.einheit_ids.length} Einheiten`} übernommen
+      </Text>
+    );
+  }
+  return (
+    <Text style={{ display: 'block', fontSize: 13 }} data-lfh="nachforderung-einheiten">
+      Als Einheit übernommen:{' '}
+      {bekannt.map((e, i) => (
+        <span key={e.id}>
+          {i > 0 && ', '}
+          <KennungsLink to={einheitDetailPfad(n.einsatz_id, e.id)}>
+            {e.funkrufname?.trim() || e.name} <span aria-hidden="true">↗</span>
+          </KennungsLink>
+        </span>
+      ))}
+      {/* Eine aufgelöste Einheit kennt die Liste der aktiven nicht: sie zählt mit. */}
+      {bekannt.length < n.einheit_ids.length &&
+        `, ${n.einheit_ids.length - bekannt.length} weitere`}
+    </Text>
+  );
+}
+
+/** Ein gesperrter Übernahme-Knopf mit dem Grund sichtbar daneben (M16, LFH-1078). */
+function GesperrterKnopf({ etikett, grundId }: { etikett: string; grundId: string }) {
+  return (
+    <Space size={8} wrap>
+      <Button disabled title={KEINE_BERECHTIGUNG} aria-describedby={grundId}>
+        {etikett}
+      </Button>
+      <Text type="secondary" id={grundId}>
+        {KEINE_BERECHTIGUNG}
+      </Text>
+    </Space>
+  );
+}
+
 interface NachforderungKarteProps {
   nachforderung: Nachforderung;
   /**
@@ -163,6 +224,17 @@ interface NachforderungKarteProps {
   materialGesperrt?: boolean;
   /** Öffnet den Dialog „Als Material übernehmen“ (an eingetroffenen Karten). */
   onMaterialUebernehmen?: (id: number) => void;
+  /**
+   * Bekannte Einheiten je Kennung (LLH-1383 D9), stabil über den Datenstand der Seite.
+   * `null`/fehlend: Modul Einheiten nicht freigegeben oder Liste nicht da — dann nur die Zahl.
+   */
+  einheitenJeId?: ReadonlyMap<number, UebernahmeEinheit> | null;
+  /** Modul Einheiten nicht bedienbar: „Als Einheit übernehmen“ steht gesperrt. */
+  einheitGesperrt?: boolean;
+  /** Öffnet den Dialog „Als Einheit übernehmen“ (an eingetroffenen Karten). */
+  onEinheitUebernehmen?: (id: number) => void;
+  /** Vorschläge für „Wer“ an Zusage und Bearbeiten (D10), stabil über den Datenstand. */
+  werVorschlaege?: readonly string[];
   /** Deeplink-Hervorhebung `?nachforderung=` (LLH-1226 D10, Spec `deeplink-hervorhebung`). */
   hervorgehoben?: boolean;
   /** Die Fortschaltung dieser Karte läuft: der Knopf zeigt es sofort (Kriterium 3). */
@@ -229,6 +301,10 @@ function NachforderungKarte({
   materialJeId,
   materialGesperrt = false,
   onMaterialUebernehmen,
+  einheitenJeId,
+  einheitGesperrt = false,
+  onEinheitUebernehmen,
+  werVorschlaege,
   hervorgehoben = false,
   laeuft = false,
   stellenJeId,
@@ -237,6 +313,7 @@ function NachforderungKarte({
   const { formatZeit } = useAnzeigeKonventionen();
   const { token, rollen } = useRollen();
   const sperrgrundId = useId();
+  const einheitSperrgrundId = useId();
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
   const abgelehnt = n.status === 'abgelehnt';
@@ -307,28 +384,37 @@ function NachforderungKarte({
         ].filter(Boolean)
       : [];
   /*
-   * Übernahme an der eingetroffenen Karte (D10): der Knopf nennt die Handlung, „Weiteren Posten
-   * übernehmen“, sobald schon einer verknüpft ist (LFH-959). Ohne Freigabe für Material steht er
-   * gesperrt mit dem Grund sichtbar daneben, nicht nur im Tooltip (M16, LFH-1078).
+   * Übernahme an der eingetroffenen Karte (LLH-1226 D10, LLH-1383 D9): der Knopf nennt die
+   * Handlung, „Weiteren Posten übernehmen“ bzw. „Weitere Einheit übernehmen“, sobald schon etwas
+   * verknüpft ist (LFH-959). Material und Einheit schließen sich aus: wer eines übernommen hat,
+   * sieht den anderen Knopf nicht mehr. Ohne Freigabe steht der Knopf gesperrt mit dem Grund
+   * sichtbar daneben, nicht nur im Tooltip (M16, LFH-1078).
    */
-  if (darfSchreiben && n.status === 'eingetroffen' && onMaterialUebernehmen) {
-    const etikett = isErgaenzen(n) ? 'Weiteren Posten übernehmen' : 'Als Material übernehmen';
-    aktionen.push(
-      materialGesperrt ? (
-        <Space key="material" size={8} wrap>
-          <Button disabled title={KEINE_BERECHTIGUNG} aria-describedby={sperrgrundId}>
+  if (darfSchreiben && n.status === 'eingetroffen') {
+    if (onEinheitUebernehmen && kannEinheitUebernehmen(n)) {
+      const etikett = isWeitereEinheit(n) ? 'Weitere Einheit übernehmen' : 'Als Einheit übernehmen';
+      aktionen.push(
+        einheitGesperrt ? (
+          <GesperrterKnopf key="einheit" etikett={etikett} grundId={einheitSperrgrundId} />
+        ) : (
+          <Button key="einheit" onClick={() => onEinheitUebernehmen(n.id)}>
             {etikett}
           </Button>
-          <Text type="secondary" id={sperrgrundId}>
-            {KEINE_BERECHTIGUNG}
-          </Text>
-        </Space>
-      ) : (
-        <Button key="material" onClick={() => onMaterialUebernehmen(n.id)}>
-          {etikett}
-        </Button>
-      ),
-    );
+        ),
+      );
+    }
+    if (onMaterialUebernehmen && n.einheit_ids.length === 0) {
+      const etikett = isErgaenzen(n) ? 'Weiteren Posten übernehmen' : 'Als Material übernehmen';
+      aktionen.push(
+        materialGesperrt ? (
+          <GesperrterKnopf key="material" etikett={etikett} grundId={sperrgrundId} />
+        ) : (
+          <Button key="material" onClick={() => onMaterialUebernehmen(n.id)}>
+            {etikett}
+          </Button>
+        ),
+      );
+    }
   }
   const posten = materialJeId ? uebernommenePosten(n, [...materialJeId.values()]) : [];
 
@@ -413,6 +499,9 @@ function NachforderungKarte({
             </Text>
           )
         )}
+        {n.einheit_ids.length > 0 && (
+          <UebernommeneEinheiten nachforderung={n} einheitenJeId={einheitenJeId} />
+        )}
         {abgelehnt && (
           <Text type="danger">
             Abgelehnt{n.abgelehnt_at ? ` (${formatZeit(n.abgelehnt_at)})` : ''}
@@ -431,6 +520,7 @@ function NachforderungKarte({
         <div style={{ marginTop: 8 }}>
           <ZusageFormular
             nachforderung={n}
+            werVorschlaege={werVorschlaege}
             onSenden={(z) => onZusage(n.id, z)}
             onSchliessen={() => onFormular(n.id, null)}
             speicherung={formularSpeicherung}
@@ -444,6 +534,7 @@ function NachforderungKarte({
             zielNamen={zielNamen}
             raeume={raeume}
             abschnitte={abschnitte}
+            werVorschlaege={werVorschlaege}
             onSpeichern={(a) => onBearbeiten(n.id, a)}
             onSchliessen={() => onFormular(n.id, null)}
             speicherung={formularSpeicherung}

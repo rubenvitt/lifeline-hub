@@ -250,6 +250,17 @@ Ob ein Funkrufname schon im Einsatz steht, vergleicht die App ohne Groß- und Kl
 ohne doppelte Leerzeichen, mit Namen und Funkrufnamen der Einheiten und den Funkrufnamen der
 Fahrzeuge. Kräfte aus den Stammdaten bietet der Dialog nicht an.
 
+### Kräfte aus einer Nachforderung
+
+Hat eine Nachforderung den Raum als Ziel, trägt „Als Einheit übernehmen“ an ihrer Karte die
+eingetroffenen Kräfte mit dem Haken „In BR … eintragen“ ein (Kapitel
+[Nachforderungen](nachforderung.md)). Die Belegung zeigt sie wie jede eingetroffene Einheit, mit
+dem Zeitpunkt von „Eintreffen melden“; die Zeitachse jeder Einheit nennt das Eintreffen im Raum.
+Das Einsatztagebuch bekommt keinen Eintrag je Einheit, sondern einen für die ganze Übernahme, etwa
+„Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen“. Am
+gekoppelten Gerät des Raums stehen Nachforderungen nicht; dort bucht „Eintreffen buchen“, was
+ankommt.
+
 ### Was ein Abruf schreibt
 
 Ein Abruf ist eine Entscheidung der Führung: die Kraft verlässt den Raum erst, wenn ihr Ausrücken

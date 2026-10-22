@@ -1,4 +1,5 @@
 import { Form } from 'antd';
+import { useMemo } from 'react';
 import type { Rule } from 'antd/es/form';
 import type { Nachforderung, NachforderungZusageEingabe } from '../api/types';
 import {
@@ -35,18 +36,25 @@ export function werRegeln(anzahlFeld: string): Rule[] {
   ];
 }
 
-/** Das Feld „Wer“: Rufnamen oder freie Angaben, mit Komma oder Enter getrennt. */
+/**
+ * Das Feld „Wer“: Rufnamen oder freie Angaben, mit Komma oder Enter getrennt; mit Vorschlägen aus
+ * den Einheiten des Einsatzes, sobald die Seite sie kennt (LLH-1383 D10).
+ */
 export function WerFeld({
   value,
   onChange,
   id,
   'aria-label': ariaLabel,
+  vorschlaege = KEINE,
 }: {
   value?: string[];
   onChange?: (wer: string[]) => void;
   id?: string;
   'aria-label': string;
+  /** Rufnamen der Einheiten im Einsatz (LLH-1383 D10); ohne bleibt das Feld reiner Freitext. */
+  vorschlaege?: readonly string[];
 }) {
+  const optionen = useMemo(() => vorschlaege.map((v) => ({ value: v, label: v })), [vorschlaege]);
   return (
     <Select<string[]>
       id={id}
@@ -56,8 +64,9 @@ export function WerFeld({
       onChange={(w) => onChange?.(w)}
       tokenSeparators={[',']}
       maxCount={NACHFORDERUNG_ZUSAGE_RUFNAMEN_MAX}
+      options={optionen}
       // Freitext ohne Vorschläge: eine leere Liste darunter wäre nur Rauschen.
-      open={false}
+      open={optionen.length > 0 ? undefined : false}
       suffixIcon={null}
       style={{ width: '100%' }}
     />
@@ -72,11 +81,14 @@ export function WerFeld({
  */
 export default function ZusageFormular({
   nachforderung: n,
+  werVorschlaege,
   onSenden,
   onSchliessen,
   speicherung,
 }: {
   nachforderung: Nachforderung;
+  /** Vorschläge für „Wer“ aus den Einheiten des Einsatzes (LLH-1383 D10). */
+  werVorschlaege?: readonly string[];
   /** **Muss bei Ablehnung ablehnen** (`mutateAsync`): dann bleibt die Eingabe stehen. */
   onSenden: (zusage: NachforderungZusageEingabe) => Promise<unknown>;
   onSchliessen: () => void;
@@ -112,7 +124,7 @@ export default function ZusageFormular({
           <MengenFeld beschriftung="Zugesagt" style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item name="wer" label="Wer" dependencies={['anzahl']} rules={werRegeln('anzahl')}>
-          <WerFeld aria-label="Wer" />
+          <WerFeld aria-label="Wer" vorschlaege={werVorschlaege} />
         </Form.Item>
         <Form.Item name="eintreffen" label="Eintreffen erwartet">
           <ZeitpunktEingabe

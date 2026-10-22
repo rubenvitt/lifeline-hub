@@ -81,12 +81,14 @@ function renderKopf(
     orgDefault = null,
     onPatch = vi.fn<EinheitPatchHandler>().mockResolvedValue(undefined),
     onSetHandStatus = vi.fn<HandStatusHandler>().mockResolvedValue(undefined),
+    nachforderungPfad = null,
   }: {
     einheiten?: Einheit[];
     canEdit?: boolean;
     orgDefault?: string | null;
     onPatch?: ReturnType<typeof vi.fn<EinheitPatchHandler>>;
     onSetHandStatus?: ReturnType<typeof vi.fn<HandStatusHandler>>;
+    nachforderungPfad?: string | null;
   } = {},
 ) {
   server.use(
@@ -113,6 +115,7 @@ function renderKopf(
       orgDefault={orgDefault}
       onPatch={onPatch}
       onSetHandStatus={onSetHandStatus}
+      nachforderungPfad={nachforderungPfad}
     />,
   );
   return { ansicht, onPatch, onSetHandStatus };
@@ -479,5 +482,27 @@ describe('EinheitKopf · Kennzeichen „nicht übernommen“ (LLH-1075, design.m
   it('eine übernommene Einheit trägt es nicht', () => {
     renderKopf(einheit({ unangemeldet: true, nicht_uebernommen_seit: null }));
     expect(screen.queryByText('nicht übernommen')).toBeNull();
+  });
+});
+
+describe('EinheitKopf · Herkunft aus einer Nachforderung (LLH-1383, design.md D9)', () => {
+  it('nennt die Nachforderung mit Sprung', () => {
+    renderKopf(einheit({ nachforderung_id: 4 }), {
+      nachforderungPfad: '/einsaetze/1/nachforderungen?nachforderung=4',
+    });
+    const kopf = screen.getByRole('region', { name: 'Kopfdaten' });
+    expect(within(kopf).getByRole('link', { name: 'aus Nachforderung #4' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen?nachforderung=4',
+    );
+  });
+
+  it('ohne Freigabe ohne Sprung, ohne Herkunft kein Feld', () => {
+    const { ansicht } = renderKopf(einheit({ nachforderung_id: 4 }));
+    expect(screen.getByText('aus Nachforderung #4')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Nachforderung/ })).toBeNull();
+    ansicht.unmount();
+    renderKopf(einheit());
+    expect(screen.queryByText('Herkunft')).toBeNull();
   });
 });

@@ -328,6 +328,16 @@ mod tests {
         .execute(pool)
         .await
         .unwrap();
+        // Ebenso eine aus ihr übernommene Einheit (LLH-1383).
+        sqlx::query(
+            "INSERT INTO einsatz_einheit (einsatz_id, name, nachforderung_id) \
+             VALUES (?, 'Pumpengruppe', ?)",
+        )
+        .bind(e)
+        .bind(nachforderung)
+        .execute(pool)
+        .await
+        .unwrap();
         e
     }
 

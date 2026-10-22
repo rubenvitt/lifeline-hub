@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql]
 ---
 
 ## Überblick
@@ -85,6 +85,8 @@ Für Einsatzleitung und Führungspersonal:
 2. Unter „Zugesagt“ die zugesagte Menge prüfen. Vorbelegt ist die angeforderte Anzahl.
 3. Unter „Wer“ bei Bedarf die Rufnamen oder eine freie Angabe eintragen, etwa „83-1“; Enter oder
    ein Komma schließt einen Eintrag ab. Es passen höchstens so viele Einträge, wie zugesagt sind.
+   Ist das Modul Einheiten freigegeben, schlägt die Liste die Einheiten des Einsatzes vor, die noch
+   aus keiner Nachforderung stammen.
 4. Unter „Eintreffen erwartet“ bei Bedarf den Zeitpunkt eintragen, den die Stelle nennt.
    ![Karte „500× Sandsäcke“ mit dem Formular darunter: Zugesagt 300, Wer „THW OV Musterstadt“, Eintreffen erwartet leer, und den Knöpfen „Zusage erfassen“ und „Abbrechen“](../bilder/nachforderung/nachforderung-zusage.png)
 
@@ -143,6 +145,26 @@ nächste Fuhre Sandsäcke:
 2. Art, Menge und Ort wie beim ersten Posten setzen. Die Menge ist mit dem Rest der Anzahl
    vorbelegt.
 3. „Weiteren Posten übernehmen“ wählen.
+
+### Eingetroffene Kräfte als Einheit übernehmen
+
+Für Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben ist, etwa für zwei
+eingetroffene RTW:
+
+1. In der Spalte „Eingetroffen“ an der Karte der Nachforderung „Als Einheit übernehmen“ wählen.
+2. Der Dialog nennt im Titel die Art, etwa „„RTW“ als Einheit übernehmen“. Unter „Einheiten“ steht
+   je Rufname der Zusage ein Eintrag, etwa „83-1“ und „83-2“. Fehlende Rufnamen eintragen, Enter
+   oder ein Komma schließt einen Eintrag ab. Je Eintrag entsteht eine Einheit.
+3. Unter „Typ“ den Einheitstyp prüfen. Vorbelegt ist der Typ, der wie die Art heißt.
+4. Hat die Nachforderung einen Bereitstellungsraum als Ziel, steht der Haken „In BR Nord
+   eintragen“. Ohne Haken stehen die Einheiten nur im Einsatz, nicht im Raum.
+5. „Übernehmen“ wählen.
+
+Steht ein Eintrag schon als Einheit im Einsatz, nennt der Dialog ihn unter „Schon im Einsatz, wird
+verknüpft“; diese Einheit bekommt den Verweis, eine zweite entsteht nicht. Die Karte zeigt danach
+„Als Einheit übernommen: 83-1 ↗, 83-2 ↗“; jeder Rufname führt in die Ansicht der
+[Einheit](einheiten.md). Sind noch nicht alle angeforderten Kräfte da, bietet die Karte später
+„Weitere Einheit übernehmen“ an.
 
 ### Eine Nachforderung bearbeiten
 
@@ -214,7 +236,8 @@ Auch jede weitere Stufe steht als Systemeintrag im ETB, etwa „Nachforderung 2�
 mehr benötigt)“. Eine Zusage nennt ihre Angaben, etwa „Nachforderung 2× RTW: zugesagt (83-1,
 83-2), Eintreffen erwartet 22.10. 15:30“, eine Teilzusage auch den Rest: „…: 1 zugesagt (83-1);
 1× RTW weiter angefordert“. Eine Änderung schreibt „Nachforderung 2× RTW geändert: Anzahl 3;
-Priorität sofort“. Ein „Rückgängig“ löscht
+Priorität sofort“. Eine Übernahme als Einheit schreibt einen Eintrag wie „Nachforderung 2× RTW:
+als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen“. Ein „Rückgängig“ löscht
 nichts, sondern schreibt einen weiteren Eintrag, etwa „Nachforderung 2× RTW: zurückgesetzt auf
 angefordert“. Alle diese Einträge entstehen immer, unabhängig von „Automatische ETB-Einträge“
 (siehe [Einsatztagebuch](einsatztagebuch.md)). Jeder trägt den Verweis „Nachforderung ↗“; er
@@ -281,9 +304,11 @@ die Zusage zurück auf „Angefordert“. Der Zeitpunkt der zurückgenommenen St
 erneut meldet, setzt einen neuen.
 Ablehnen und Zurückziehen gehen aus jeder Stufe vor „Eingetroffen“; was eingetroffen ist, wird
 weder abgelehnt noch zurückgezogen. Eine zurückgenommene Zusage leert Wer und Eintreffen; eine
-Teilung bleibt dabei bestehen, der Rest bleibt eine eigene Karte. Ist aus einer Nachforderung Material übernommen, lässt sich „Eingetroffen“ nicht mehr
-zurücknehmen; die App nennt den Grund an der Karte. Wer versehentlich übernommen hat, storniert
-zuerst den Posten in der [Materialliste](material.md) und nimmt dann zurück.
+Teilung bleibt dabei bestehen, der Rest bleibt eine eigene Karte. Ist aus einer Nachforderung
+Material oder eine Einheit übernommen, lässt sich „Eingetroffen“ nicht mehr zurücknehmen; die App
+nennt den Grund an der Karte. Wer versehentlich Material übernommen hat, storniert zuerst den
+Posten in der [Materialliste](material.md) und nimmt dann zurück; zu Einheiten siehe unten
+„Übernommene Einheiten“.
 
 ### Übernommenes Material
 
@@ -314,3 +339,26 @@ Jede Übernahme schreibt einen Eintrag ins Einsatztagebuch, etwa „Material «T
 disponiert, Ort Einheit «Rettungsstaffel», aus Nachforderung «3 Tauchpumpen für Keller
 Hauptstraße»“, ohne Ort ohne den Ort-Teil. Die Nachforderung schreibt dafür keinen eigenen
 Eintrag.
+
+### Übernommene Einheiten
+
+Jeder Eintrag unter „Einheiten“ legt eine Einheit an, deren Name und Funkrufname der Eintrag ist,
+mit dem gewählten Typ und damit dessen Soll-Stärke; Abschnitt, Unterstellung und Besatzung
+bleiben leer und lassen sich in der Ansicht der Einheit nachtragen. Ein Eintrag, der einer
+Einheit im Einsatz gleicht (Name oder Funkrufname, ohne Groß/Klein), verknüpft sie stattdessen.
+Heißt schon ein Fahrzeug im Einsatz so, lehnt die App ab und nennt den Namen. Insgesamt trägt
+eine Nachforderung höchstens so viele Einheiten, wie sie anfordert.
+
+Mit dem Haken „In BR … eintragen“ stehen die neuen Einheiten in der Belegung des
+[Bereitstellungsraums](bereitstellungsraeume.md), als eingetroffen zum Zeitpunkt von „Eintreffen
+melden“. Eine verknüpfte Einheit, die schon in einem Raum steht, bleibt dort. Material und
+Einheit schließen sich an einer Karte aus: Ist eines übernommen, bietet die Karte das andere
+nicht mehr an.
+
+Übernehmen dürfen Einsatzleitung und Führungspersonal, wenn das Modul Einheiten freigegeben ist,
+für den Haken zusätzlich das Modul Bereitstellungsräume. Ist Einheiten gesperrt, steht der Knopf
+gesperrt mit „Keine Berechtigung“, und die Karte zeigt nur die Zahl, etwa „2 Einheiten
+übernommen“. Eine aufgelöste Einheit zählt weiter als übernommen, außer sie wird beim Auflösen
+ganz gelöscht, weil sie im Einsatz keine Spur hinterlassen hat (siehe „Auflösen“ unter
+[Einheiten](einheiten.md)); ein Eintrag im Bereitstellungsraum ist eine Spur. Erst wenn keine
+Einheit mehr auf die Nachforderung verweist, lässt sich „Eingetroffen“ wieder zurücknehmen.

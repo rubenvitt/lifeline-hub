@@ -1096,6 +1096,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("aktueller_br_id", G_FK),
             retain("status_id", G_FK),
             retain("status_seit", G_ZEIT),
+            // Herkunft aus einer Nachforderung (LLH-1383, design.md D7).
+            retain("nachforderung_id", G_FK),
         ],
     },
     TabellenRegel {

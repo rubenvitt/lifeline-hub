@@ -16,6 +16,7 @@ import { formatUhrzeitMitTag } from '../../anzeige/format';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import StaerkeEingabe from '../../anzeige/StaerkeEingabe';
 import { InlineAngabe } from '../../components/InlineAngabe';
+import { KennungsLink } from '../../components/kennungsLink';
 import {
   Datenfeld,
   Datenraster,
@@ -67,6 +68,11 @@ interface EinheitKopfProps {
   orgDefault: string | null;
   onPatch: EinheitPatchHandler;
   onSetHandStatus: HandStatusHandler;
+  /**
+   * Sprung zur Nachforderung, aus der die Einheit stammt (LLH-1383 D9); `null` ohne Freigabe
+   * Nachforderungen — dann steht die Herkunft ohne Sprung.
+   */
+  nachforderungPfad?: string | null;
 }
 
 /** Leer ist ein Text, der nach dem Trimmen nichts übrig lässt — wie `leerZuNull` beim Senden. */
@@ -97,6 +103,7 @@ export default function EinheitKopf({
   orgDefault,
   onPatch,
   onSetHandStatus,
+  nachforderungPfad,
 }: EinheitKopfProps) {
   const { token } = useRollen();
   // Grenzen wie der Server (Spec `eingabegrenzen`, LLH-1242): der kurze Funkrufname über
@@ -286,6 +293,20 @@ export default function EinheitKopf({
                 )}
               />
             </Datenfeld>
+            {/* Herkunft (LLH-1383 D9): fest, nicht änderbar; ein Sprung ist keine Handlung. */}
+            {e.nachforderung_id != null && (
+              <Datenfeld label="Herkunft">
+                <span data-lfh="einheit-herkunft">
+                  {nachforderungPfad ? (
+                    <KennungsLink to={nachforderungPfad}>
+                      aus Nachforderung #{e.nachforderung_id} <span aria-hidden="true">↗</span>
+                    </KennungsLink>
+                  ) : (
+                    <>aus Nachforderung #{e.nachforderung_id}</>
+                  )}
+                </span>
+              </Datenfeld>
+            )}
             {/* Eine Person der Einheit; der Server schreibt den Wechsel ins Tagebuch. Die leere
                 Zeile „Einheitsführer eintragen“ zeigt die Lücke (D9). */}
             <Datenfeld label="Einheitsführer">
