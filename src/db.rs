@@ -10088,7 +10088,7 @@ mod tests {
     /// wie `EINSATZ_VORLAGE_STARTLISTE` (Bezeichnung, Einsatzart, Sortierung, ausgeblendete
     /// Module); bestehende Stichworte bleiben ohne Kopplung.
     #[tokio::test]
-    async fn migration_0234_seedet_die_startliste() {
+    async fn migration_0236_seedet_die_startliste() {
         use crate::einsatz_vorlage::EINSATZ_VORLAGE_STARTLISTE;
         use std::collections::BTreeSet;
 
@@ -10101,7 +10101,7 @@ mod tests {
             .execute(&pool)
             .await
             .unwrap();
-        migriere_bis(&pool, 234).await;
+        migriere_bis(&pool, 236).await;
 
         for org_id in [1_i64, 2] {
             let koepfe: Vec<(i64, String, Option<String>, i64)> = sqlx::query_as(
