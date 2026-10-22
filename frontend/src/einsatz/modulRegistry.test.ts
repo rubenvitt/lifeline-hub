@@ -196,8 +196,19 @@ describe('modulRegistry', () => {
       'chat',
       'erinnerungen',
       'meldungen',
-      'nachforderungen',
       'fernmeldewesen',
+    ]);
+    // LLH-1078: die Nachforderungen stehen bei Kräfte & Mittel, Schlüssel und Route bleiben.
+    const nf = kraefte.find((m) => m.key === 'nachforderungen');
+    expect(nf).toMatchObject({
+      label: 'Nachforderungen',
+      route: 'nachforderungen',
+      zaehlerQuelle: 'nachforderungen',
+    });
+    expect(kraefte.map((m) => m.key).slice(-3)).toEqual([
+      'bereitstellungsraeume',
+      'nachforderungen',
+      'abloesung',
     ]);
   });
 

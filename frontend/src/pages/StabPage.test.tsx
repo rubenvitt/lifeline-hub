@@ -254,22 +254,25 @@ describe('StabPage', () => {
       }),
     });
     const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
-    expect(await within(s4).findByRole('link', { name: label('nachforderungen') })).toHaveAttribute(
-      'href',
-      '/einsaetze/1/nachforderungen',
-    );
+    expect(
+      await within(s4).findByRole('link', { name: new RegExp(`^${label('nachforderungen')}`) }),
+    ).toHaveAttribute('href', '/einsaetze/1/nachforderungen');
     expect(within(s4).queryByText(new RegExp(label('verpflegung')))).toBeNull();
     expect(
       within(s4).getByRole('button', { name: `${label('material')} (Keine Berechtigung)` }),
     ).toBeDisabled();
   });
 
-  it('Nachforderungen stehen bei S1 und S4, ohne Zahl', async () => {
-    rendere();
+  it('Nachforderungen stehen bei S1 und S4 mit den offenen aus dem Modulzähler (LLH-1078)', async () => {
+    rendere({
+      zaehler: { nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2 } },
+    });
     for (const k of ['S1', 'S4']) {
       const g = await screen.findByRole('group', { name: `Werkzeuge ${k}` });
       expect(
-        await within(g).findByRole('link', { name: label('nachforderungen') }),
+        await within(g).findByRole('link', {
+          name: `${label('nachforderungen')}, 5, 2 unterwegs`,
+        }),
       ).toHaveAttribute('href', '/einsaetze/1/nachforderungen');
     }
   });
@@ -322,7 +325,7 @@ describe('StabPage', () => {
     });
     // Anker: die Freigaben sind angekommen, sobald eine andere Kachel ihr Werkzeug zeigt.
     const s4 = await screen.findByRole('group', { name: 'Werkzeuge S4' });
-    await within(s4).findByRole('link', { name: label('nachforderungen') });
+    await within(s4).findByRole('link', { name: new RegExp(`^${label('nachforderungen')}`) });
     expect(screen.queryByRole('group', { name: 'Werkzeuge S6' })).toBeNull();
     expect(screen.queryByRole('link', { name: /^Funkplan/ })).toBeNull();
   });

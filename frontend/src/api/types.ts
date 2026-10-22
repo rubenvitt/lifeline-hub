@@ -1234,10 +1234,24 @@ export interface NeueMeldung {
   /** Strukturierter Absender: Einheit ODER Abschnitt dieses Einsatzes, nie beide. */
   einheit_id?: number;
   abschnitt_id?: number;
+  /** Verortung, nur bei der Art Lagemeldung (sonst 422); lat und lon nur gemeinsam. */
+  lat?: number;
+  lon?: number;
 }
 
 export type LageMeldung = S['LageMeldungAnzeige'];
+/** Die Felder, die LLH-1031 an die Lagemeldung gebracht hat. */
+type LageMeldungSeit1031 =
+  'meldungsart' | 'prioritaet' | 'meldung_status' | 'richtung' | 'is_von_geraet';
+/** Eine Lagemeldung, wie ein eingefrorener Lage-Stand sie trägt: Stände von vor LLH-1031 haben
+ *  die Felder ab `meldungsart` nicht, und ihr `id` ist die Kennung des früheren Lageobjekts. */
+export type LageMeldungStand = Omit<LageMeldung, LageMeldungSeit1031> &
+  Partial<Pick<LageMeldung, LageMeldungSeit1031>>;
 export type LageGesehen = S['LageGesehenAnzeige'];
+/** Kein Backend-Schema: Eingabe-Body von `POST …/lage/gesehen`, FE-lokal. */
+export interface LageGesehenBody {
+  meldung_ids: number[];
+}
 /** Letzte Rückmeldung je Einheit bzw. direkt gebundenem Abschnitt. */
 export type Rueckmeldungen = S['RueckmeldungenAnzeige'];
 export type LetzteRueckmeldung = S['LetzteRueckmeldung'];

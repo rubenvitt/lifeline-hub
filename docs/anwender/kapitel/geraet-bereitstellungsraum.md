@@ -106,7 +106,8 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
 ### Meldung an die Einsatzleitung
 
 1. Unten „Melden“ wählen.
-2. Den „Inhalt“ eingeben und die „Priorität“ (normal, dringend, sofort) wählen.
+2. Den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die „Priorität“ (normal,
+   dringend, sofort) wählen. Eine Lagemeldung steht bei der Führung gleich in den Lagemeldungen.
 
    ![Seite „Melden“ mit einer dringenden Meldung zur Zufahrt und der leeren Liste „Eigene Meldungen“](../bilder/geraet-bereitstellungsraum/melden.png)
 

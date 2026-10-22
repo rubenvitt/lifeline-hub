@@ -1135,6 +1135,7 @@ impl Ablauf<'_> {
                         bestaetigung_frist_at: frist_at.as_deref(),
                         einheit_id,
                         abschnitt_id: None,
+                        geo: None,
                     },
                 )
                 .await?;

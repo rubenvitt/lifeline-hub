@@ -12,7 +12,7 @@ import type {
   LageZone,
   FreiesZeichen,
   Gefahrengebiet,
-  LageMeldung,
+  LageMeldungStand,
   KartenAnsicht,
 } from '../../api/types';
 import type { Hintergrundbild } from '../../api/kartenbilder';
@@ -46,7 +46,8 @@ export interface SnapshotDaten {
   zonen: LageZone[];
   freie_zeichen: FreiesZeichen[];
   gefahrengebiete: Gefahrengebiet[];
-  lagemeldungen: LageMeldung[];
+  /** Ältere Stände tragen die Form von vor LLH-1031 (siehe `LageMeldungStand`). */
+  lagemeldungen: LageMeldungStand[];
   bilder: Hintergrundbild[];
   /**
    * Betreuungsstellen. Optional: ältere Snapshots tragen das Feld nicht, und der Server lässt es

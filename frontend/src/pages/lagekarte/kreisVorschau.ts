@@ -123,36 +123,75 @@ export function griffLage(mitte: GeoPunkt, radiusM: number | null): GeoPunkt {
   return radiusM != null && radiusM > 0 ? radiusPunkt(mitte, radiusM) : mitte;
 }
 
+/**
+ * Steht der Mittengriff (LLH-1344, design.md D3)? Nur mit Mitte UND Radius: ohne Radius sitzt der
+ * Randgriff auf der Mitte, zwei Griffe übereinander teilten sich einen Tipp.
+ */
+export function mittenGriffSteht(mitte: GeoPunkt | null, radiusM: number | null): boolean {
+  return mitte != null && radiusM != null && radiusM > 0;
+}
+
 export interface KreisGriff {
   /** Lage nachführen (Mitte/Radius geändert); ohne Mitte hängt der Griff nicht an der Karte. */
   setze(mitte: GeoPunkt | null, radiusM: number | null): void;
   zerstoeren(): void;
 }
 
+/** Ein Griff-Element (Ziel ≥ 44 px, sichtbarer Kern); ein Tipp darauf ist kein Tipp auf die Karte. */
+function griffElement(art: 'kante' | 'mitte', kontext: GriffKontext, kennung: string): HTMLElement {
+  const { container, kern } = griffStil(art, kontext);
+  const el = document.createElement('div');
+  el.style.cssText = container;
+  el.dataset.lfh = kennung;
+  el.setAttribute('aria-hidden', 'true');
+  const innen = document.createElement('div');
+  innen.style.cssText = kern;
+  el.appendChild(innen);
+  // Ein Tipp auf den Griff ist kein Tipp auf die Karte: er versetzte sonst die Mitte.
+  el.addEventListener('click', (e) => e.stopPropagation());
+  return el;
+}
+
 /**
  * Der Radius-Griff (D6): ein ziehbarer `maplibregl.Marker` wie die Bild-Griffe (`bildHandles.ts`),
  * Ziel mindestens 44 px. Ziehen meldet den Radius laufend (`fertig = false`) und am Ende einmal mit
  * `fertig = true`. Die Karte bleibt außerhalb des Griffs verschiebbar.
+ *
+ * Mit `onMitte` steht zusätzlich ein Mittengriff (LLH-1344, design.md D3), sobald ein Radius
+ * steht ({@link mittenGriffSteht}): Ziehen versetzt die Mitte laufend, der Radius bleibt.
  */
 export function erzeugeKreisGriff(
   map: MapLibreMap,
   kontext: GriffKontext,
   onRadius: (radiusM: number, fertig: boolean) => void,
+  onMitte?: (mitte: GeoPunkt, fertig: boolean) => void,
 ): KreisGriff {
-  const { container, kern } = griffStil('kante', kontext);
-  const el = document.createElement('div');
-  el.style.cssText = container;
-  el.dataset.lfh = 'kreisgriff';
-  el.setAttribute('aria-hidden', 'true');
-  const innen = document.createElement('div');
-  innen.style.cssText = kern;
-  el.appendChild(innen);
-  // Ein Tipp auf den Griff ist kein Tipp auf die Karte: er versetzte sonst die Mitte an den Rand.
-  el.addEventListener('click', (e) => e.stopPropagation());
-  const marker = new maplibregl.Marker({ element: el, draggable: true });
+  const marker = new maplibregl.Marker({
+    element: griffElement('kante', kontext, 'kreisgriff'),
+    draggable: true,
+  });
+  const mittenMarker = new maplibregl.Marker({
+    element: griffElement('mitte', kontext, 'kreisgriff-mitte'),
+    draggable: true,
+  });
   let mitte: GeoPunkt | null = null;
+  let radius: number | null = null;
   let dran = false;
+  let mitteDran = false;
   let ziehend = false;
+  let mitteZiehend = false;
+  const mitteJetzt = (): GeoPunkt => {
+    const ll = mittenMarker.getLngLat();
+    return { lat: ll.lat, lon: ll.lng };
+  };
+  mittenMarker.on('dragstart', () => {
+    mitteZiehend = true;
+  });
+  mittenMarker.on('drag', () => onMitte?.(mitteJetzt(), false));
+  mittenMarker.on('dragend', () => {
+    mitteZiehend = false;
+    onMitte?.(mitteJetzt(), true);
+  });
 
   const radiusJetzt = () => {
     const ll = marker.getLngLat();
@@ -171,9 +210,25 @@ export function erzeugeKreisGriff(
     if (r != null) onRadius(r, true);
   });
 
+  const setzeMitte = () => {
+    const steht = onMitte != null && mittenGriffSteht(mitte, radius);
+    if (!steht || !mitte) {
+      if (mitteDran) mittenMarker.remove();
+      mitteDran = false;
+      return;
+    }
+    if (!mitteZiehend) mittenMarker.setLngLat([mitte.lon, mitte.lat]);
+    if (!mitteDran) {
+      mittenMarker.addTo(map);
+      mitteDran = true;
+    }
+  };
+
   return {
     setze(m, radiusM) {
       mitte = m;
+      radius = radiusM;
+      setzeMitte();
       if (!m) {
         if (dran) marker.remove();
         dran = false;
@@ -191,7 +246,9 @@ export function erzeugeKreisGriff(
     },
     zerstoeren() {
       marker.remove();
+      mittenMarker.remove();
       dran = false;
+      mitteDran = false;
     },
   };
 }

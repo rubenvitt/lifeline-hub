@@ -6,12 +6,14 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
  *
  * Gezeigte Ansichten — wer sie umbaut, erzeugt die Bilder neu
  * (`pnpm doku:bilder --grep lagemeldungen`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
- *   an-lage-uebergeben.png  frontend/src/meldungen/LagerelevantModal.tsx
- *   lagemeldungen.png       frontend/src/pages/LagemeldungenPage.tsx
+ *   an-lage-uebergeben.png     frontend/src/meldungen/LagerelevantModal.tsx
+ *   lagemeldungen.png          frontend/src/pages/LagemeldungenPage.tsx
+ *   lagemeldung-erfassen.png   frontend/src/pages/LagemeldungenPage.tsx (Paneel „Lagemeldung
+ *                              erfassen“, frontend/src/meldungen/MeldungFormular.tsx)
  *
- * Die Demo enthält Meldungen, aber keine an die Lage übergebene; der Dialog-Test übergibt eine
- * verortete über die Oberfläche, der Zeitleisten-Test drei weitere über
- * `POST …/meldungen/{mid}/lagerelevant`, eine davon verortet. Bei der verorteten blendet der Lauf
+ * Die Demo enthält zwei Meldungen der Art Lagemeldung; sie stehen ab der Anlage in der Lage. Der
+ * Dialog-Test übergibt eine weitere, verortete über die Oberfläche, der Zeitleisten-Test drei
+ * weitere über `POST …/meldungen/{mid}/lagerelevant`, eine davon verortet. Bei der verorteten blendet der Lauf
  * den Ortsnamen aus (externer Geocoder, nicht deterministisch); die Peilung bleibt.
  */
 
@@ -49,13 +51,11 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await uhrAnhalten(page);
+    // Eine noch nicht übergebene: die Lagemeldungen der Demo stehen schon in der Lage.
+    const [ziel] = await offeneMeldungen(page, demo.id);
     await page.goto(`/einsaetze/${demo.id}/meldungen`);
-    // Die oberste Meldung: ganz unten läge der Knopf der Entwicklerwerkzeuge über ihrem Menü. Ab
-    // drei Aktionen bündelt die Karte sie in einem Menü; eine neue Meldung hat mehr als drei.
-    await page
-      .getByRole('button', { name: /^Aktionen zu Meldung \d+$/ })
-      .first()
-      .click();
+    // Ab drei Aktionen bündelt die Karte sie in einem Menü; eine neue Meldung hat mehr als drei.
+    await page.getByRole('button', { name: `Aktionen zu Meldung ${ziel.lfd_nr}` }).click();
     await page.getByRole('menuitem', { name: 'An Lage übergeben' }).click();
     const dialog = page.getByRole('dialog', { name: 'An die Lage übergeben' });
     // Vorbelegt mit dem Inhalt der Meldung.
@@ -97,10 +97,11 @@ test.describe(KAPITEL, () => {
     await uhrAnhalten(page);
     const ortVorschau = page.waitForResponse((r) => r.url().includes('/ort-vorschau'));
     await page.goto(`/einsaetze/${demo.id}/lagemeldungen`);
-    // Dazu kommt die Übergabe aus dem Dialog-Test davor (dieselbe Datenbank).
+    // Dazu kommen die Übergabe aus dem Dialog-Test davor (dieselbe Datenbank) und die beiden
+    // Lagemeldungen der Demo.
     const eintraege = page.getByRole('region', { name: 'Lagemeldungen' }).getByRole('listitem');
-    await expect(eintraege).toHaveCount(4);
-    await expect(page.getByText('4 übergeben')).toBeVisible();
+    await expect(eintraege).toHaveCount(6);
+    await expect(page.getByText('6 Lagemeldungen')).toBeVisible();
     await ortVorschau;
     await expect(page.getByText('Ort wird ermittelt …')).toHaveCount(0);
     await fotografiere(page, KAPITEL, 'lagemeldungen');
@@ -109,15 +110,39 @@ test.describe(KAPITEL, () => {
     await suche.fill('Kellerabgang');
     await expect(eintraege).toHaveCount(1);
     await suche.fill('');
-    await page.getByRole('radio', { name: 'Heute' }).click();
-    await expect(eintraege).toHaveCount(4);
     await page.getByRole('radio', { name: 'Mit Koordinaten' }).click();
     await expect(eintraege).toHaveCount(2);
-    await expect(page.getByText('2 von 4 übergeben')).toBeVisible();
+    await expect(page.getByText('2 von 6 Lagemeldungen')).toBeVisible();
+    await page.getByRole('radio', { name: 'Alle Orte' }).click();
+    await page.getByRole('radio', { name: 'Übernommen' }).click();
+    await expect(eintraege).toHaveCount(4);
     await eintraege
       .first()
-      .getByRole('link', { name: /^Meldung #\d+$/ })
+      .getByRole('link', { name: /^Meldung #\d+/ })
       .click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/meldungen`));
+  });
+
+  test('Lagemeldung erfassen', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await uhrAnhalten(page);
+    await page.goto(`/einsaetze/${demo.id}/lagemeldungen`);
+    await page.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
+    const paneel = page.getByRole('region', { name: 'Lagemeldung erfassen' });
+    await paneel
+      .getByRole('textbox', { name: 'Inhalt / Wortlaut' })
+      .fill('Pegel Mühlbach 2,40 m, steigt weiter. Deich an der Unterstadt hält.');
+    await paneel.getByRole('textbox', { name: 'Absender' }).fill('EA Unterstadt');
+    await paneel.getByRole('textbox', { name: 'Absender' }).blur();
+    await fotografiere(paneel, KAPITEL, 'lagemeldung-erfassen');
+    // Ablauf weiter: erfassen; die neue steht in der Zeitachse.
+    await paneel.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
+    await expect(paneel).toBeHidden();
+    await expect(
+      page
+        .getByRole('region', { name: 'Lagemeldungen' })
+        .getByText('Pegel Mühlbach 2,40 m', { exact: false }),
+    ).toBeVisible();
   });
 });

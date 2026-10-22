@@ -179,11 +179,74 @@ const volleDaten = {
    * Modulzähler des Servers (LFH-550): die Kennzahl „Offene Aufträge" liest ihn, nicht die Liste.
    * Passend zur Liste darüber — zwei offen (21, 22), davon einer überfällig.
    */
-  zaehler: { auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 } } as object,
+  zaehler: {
+    auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
+    nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1 },
+  } as object,
+  /** Nachforderungen (LLH-1078): drei offene und eine eingetroffene, passend zum Zähler. */
+  nachforderungen: [
+    nachforderung({
+      id: 31,
+      art: 'RTW',
+      bezeichnung: 'RTW für Turnhalle',
+      angefordert_at: vor(25),
+    }),
+    nachforderung({
+      id: 32,
+      art: 'Sandsäcke',
+      anzahl: 2000,
+      bezeichnung: 'Deich Nord',
+      status: 'unterwegs',
+      angefordert_at: vor(95),
+    }),
+    nachforderung({
+      id: 33,
+      art: 'SEG',
+      bezeichnung: 'Betreuung',
+      status: 'zugesagt',
+      angefordert_at: vor(50),
+    }),
+    nachforderung({
+      id: 34,
+      art: 'GW-L',
+      bezeichnung: 'schon da',
+      status: 'eingetroffen',
+      angefordert_at: vor(200),
+    }),
+  ] as object[],
 };
 
+/** Eine Nachforderung im Drahtformat; nur, was das Paneel liest, ist je Fall gesetzt. */
+function nachforderung(over: Record<string, unknown>) {
+  return {
+    einsatz_id: 1,
+    anzahl: null,
+    adressat_kategorie: 'leitstelle',
+    adressat_bezeichnung: null,
+    begruendung: null,
+    prioritaet: 'normal',
+    status: 'angefordert',
+    zugesagt_at: null,
+    unterwegs_at: null,
+    eingetroffen_at: null,
+    abgelehnt_at: null,
+    abgelehnt_grund: null,
+    etb_nachforderung_id: null,
+    erstellt_von_id: 1,
+    erstellt_at: vor(200),
+    erstellt_von_name: null,
+    ist_offen: over.status !== 'eingetroffen' && over.status !== 'abgelehnt',
+    material_ids: [],
+    ...over,
+  };
+}
+
 /** Rückmeldungen und Zähler sind optional: ohne Angabe liefert der Server eine leere Menge. */
-type Daten = Omit<typeof volleDaten, 'zaehler'> & { rueckmeldungen?: object; zaehler?: object };
+type Daten = Omit<typeof volleDaten, 'zaehler' | 'nachforderungen'> & {
+  rueckmeldungen?: object;
+  zaehler?: object;
+  nachforderungen?: object[];
+};
 const KEINE_RUECKMELDUNGEN = { frist_min: 60, einheiten: [], abschnitte: [] };
 
 /** Ein Leitpegel mit frischer Messung (relativ zur echten Uhr, wie die Seite rechnet). */
@@ -211,8 +274,14 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
     http.get(
       '/api/einsaetze/1/modul-zaehler',
-      json(d.zaehler ?? { auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 } }),
+      json(
+        d.zaehler ?? {
+          auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
+          nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 },
+        },
+      ),
     ),
+    http.get('/api/einsaetze/1/nachforderungen', json(d.nachforderungen ?? [])),
     http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
     http.get(
       '/api/einsaetze/1/meldungen/rueckmeldungen',
@@ -521,6 +590,28 @@ describe('UeberblickPage', () => {
     expect(zeilen[1]).not.toHaveTextContent('an ohne');
   });
 
+  // LLH-1078: Zahlen aus dem Modulzähler, die Liste nennt nur die am längsten wartenden.
+  it('Nachforderungen: offen je Stufe aus dem Zähler, die zwei ältesten offenen mit Alter, Deeplink', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    const p = await waitFor(() => paneel('Nachforderungen'));
+    expect(await within(p).findByText('3 offen · 1 unterwegs')).toBeInTheDocument();
+    const stufen = p.querySelector('[data-lfh="nachforderung-stufen"]') as HTMLElement;
+    expect(stufen).toHaveTextContent('Angefordert1Zugesagt1Unterwegs1');
+    const zeilen = await within(p).findAllByRole('link', { name: /vor/ });
+    expect(zeilen.map((z) => z.getAttribute('href'))).toEqual([
+      '/einsaetze/1/nachforderungen?nachforderung=32',
+      '/einsaetze/1/nachforderungen?nachforderung=33',
+    ]);
+    expect(zeilen[0]).toHaveTextContent('vor 1 h 35 min');
+    expect(zeilen[0]).toHaveTextContent('2000× Sandsäcke · Deich Nord');
+    expect(zeilen[0]).toHaveTextContent('Unterwegs');
+    expect(within(p).getByRole('link', { name: 'Nachforderungen öffnen' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/nachforderungen',
+    );
+  });
+
   it('Entscheidungen: Zeitachseneintrag mit Typwort, Folgeaufträge gezählt, ETB-Link mit Filter', async () => {
     stelleBereit(volleDaten);
     rendern();
@@ -762,6 +853,7 @@ describe('UeberblickPage', () => {
     );
     rendern();
     expect(await screen.findByText('Keine offenen Aufträge.')).toBeInTheDocument();
+    expect(await screen.findByText('Keine offenen Nachforderungen.')).toBeInTheDocument();
     expect(
       await screen.findByText('Noch keine Entscheidung im Einsatztagebuch.'),
     ).toBeInTheDocument();
@@ -1050,6 +1142,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     '/api/einsaetze/1/abschnitte',
     '/api/einsaetze/1/gefahrengebiete',
     '/api/einsaetze/1/auftraege',
+    '/api/einsaetze/1/nachforderungen',
     '/api/einsaetze/1/erinnerungen',
     '/api/einsaetze/1/etb',
     '/api/einsaetze/1/meldungen/rueckmeldungen',
@@ -1092,6 +1185,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       auftraege: { zugriff: false },
       etb: { zugriff: false },
       meldungen: { sichtbar: false, zugriff: false },
+      nachforderungen: { zugriff: false },
     });
     rendern();
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
@@ -1099,6 +1193,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
     expect(aufrufe['/api/einsaetze/1/personen']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/nachforderungen']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/etb']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/meldungen/rueckmeldungen']).toBeUndefined();
 
@@ -1117,6 +1212,9 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     const entscheidungen = paneel(/Entscheidungen/);
     expect(within(entscheidungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
     expect(within(entscheidungen).queryByText(/Noch keine Entscheidung/)).toBeNull();
+    const nachforderungen = paneel('Nachforderungen');
+    expect(within(nachforderungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
+    expect(within(nachforderungen).queryByRole('link')).toBeNull();
     // Kein Sprung ins gesperrte ETB.
     expect(within(entscheidungen).queryByRole('link', { name: /Einsatztagebuch/ })).toBeNull();
 

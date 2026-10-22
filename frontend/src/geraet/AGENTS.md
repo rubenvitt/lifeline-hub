@@ -121,6 +121,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   steht an Desktop und Gerät im Aktionsmenü der Zeile. Meldungen an
   die Einsatzleitung baut nur `geraet/GeraetMeldungen.tsx` (UHS-Laptop, Abschnitt, Bereitstellungsraum,
   Verpflegung); das Navigationsziel heißt bei Abschnitt, Bereitstellungsraum und Verpflegung „Melden“.
+  Neben der Priorität wählt die `Segmentleiste` „Art“ zwischen Meldung und Lagemeldung (LLH-1031):
+  Lagemeldung sendet `meldungsart = 'lagemeldung'` auch mit Priorität sofort, Meldung wie bisher
+  (`sofortmeldung` bei sofort, sonst `sonstige`); nach dem Senden steht wieder „Meldung“. Der
+  Server macht die Lagemeldung lagerelevant; das Gerät bekommt dafür keine neue Route, keine Liste
+  der Lagemeldungen, keine Kenntnisnahme und keinen Zähler (Nachweis `tests/geraet_kopplung.rs`).
 - **Verpflegung** (LFH-1044): einsatzweit oder an einer Verpflegungsstelle (LLH-1048, s. u.),
   Startseite ist die geteilte
   `VerpflegungPage` unter `/geraet/:id/verpflegung`; ohne `verpflegung-planen` kein Anlegen,
@@ -165,19 +170,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   Einsatzweite Zähler für Meldungen und Personen bekommt kein Gerät, auch ohne Stelle
   (`modul_zaehler.rs`).
 
-**Meldungsmodell (LLH-1027, Entscheidung 21.10.2026) — Zielbild, gilt ab LLH-1031 bzw. LLH-1066;
-bis dahin gilt das Bestehende**
+**Meldungsmodell (LLH-1027, Entscheidung 21.10.2026) — Zielbild, gilt ab LLH-1066; bis dahin gilt
+das Bestehende**
 
 Begriffe und Datenfluss: `docs/design/2026-10-21-meldungsmodell/README.md`. Das Ticket, das einen
 Punkt baut, schreibt die Regeln oben fort und streicht ihn hier.
 
-- **Lagemeldung vom Gerät (LLH-1031):** `geraet/GeraetMeldungen.tsx` bleibt der einzige Weg;
-  neben der Priorität steht eine `Segmentleiste` „Meldung · Lagemeldung“, Lagemeldung setzt
-  `meldungsart = 'lagemeldung'` (Sofort bleibt `sofortmeldung`). Der Server macht sie
-  lagerelevant wie jede Lagemeldung; das Gerät bekommt dafür keine neue Route, keine Liste der
-  Lagemeldungen, keine Kenntnisnahme und keinen Zähler. Server-Test in
-  `tests/geraet_kopplung.rs`: Gerätelagemeldung ist lagerelevant und in der Liste der Führung als
-  Meldung eines Geräts erkennbar. Der Rest des Geräteflusses (Eigene Meldungen mit
-  Bearbeitungsstand, vormerken ohne Netz) bleibt.
 - **Keine Korrektur am Gerät (LLH-1066):** der PATCH einer Meldung steht in keiner Routenliste;
   Art, Priorität, Bezug und Lage-Angaben korrigiert nur die Führung.

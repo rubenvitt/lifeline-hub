@@ -24,6 +24,7 @@ import type {
   FreiesZeichen,
   Fuehrungsstelle,
   LageMeldung,
+  LageMeldungStand,
   Schaden,
   Uhs,
 } from '../../api/types';
@@ -185,7 +186,8 @@ describe('baueMarker', () => {
   });
 });
 
-function lageMeldung(partial: Partial<LageMeldung>): LageMeldung {
+/** Drahtform eines Lage-Stands von vor LLH-1031: ohne Art, Priorität, Status, Richtung, Gerät. */
+function lageMeldung(partial: Partial<LageMeldungStand>): LageMeldungStand {
   return {
     id: 1,
     einsatz_id: 1,
@@ -272,6 +274,19 @@ describe('baueLageMeldungMarker', () => {
       absender: 'Florian Nord 1',
       inhalt: 'Brücke gesperrt',
     });
+  });
+
+  it('zeichnet eine Lagemeldung der heutigen Form wie die eines alten Lage-Stands', () => {
+    const heute: LageMeldung = {
+      ...lageMeldung({ id: 3, lat: 50.3, lon: 8.7 }),
+      meldungsart: 'lagemeldung',
+      prioritaet: 'normal',
+      meldung_status: 'neu',
+      richtung: 'extern',
+      is_von_geraet: false,
+    };
+    const alt = lageMeldung({ id: 3, lat: 50.3, lon: 8.7 });
+    expect(baueLageMeldungMarker([heute], token)).toEqual(baueLageMeldungMarker([alt], token));
   });
 
   it('setzt kein taktisches Zeichen (Lagemeldung bleibt Kreis)', () => {

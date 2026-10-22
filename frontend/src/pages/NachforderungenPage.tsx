@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ladeBetreuung } from '../api/betreuung';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulZaehler } from '../api/modulZaehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
 import { istKonflikt } from '../api/client';
@@ -25,9 +26,14 @@ import type {
   NachforderungStatus,
   NeueNachforderung,
 } from '../api/types';
-import { NACHFORDERUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
+import { NACHFORDERUNG_STATUS } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
-import NachforderungListe from '../nachforderungen/NachforderungListe';
+import NachforderungBoard, {
+  sichtbareKarten,
+  useBoardStand,
+  type BoardAnsicht,
+} from '../nachforderungen/NachforderungBoard';
+import { boardGruppe, offenText, vorgabeStufe } from '../nachforderungen/nachforderungStufen';
 import NachforderungFormular, {
   type NachforderungBezug,
 } from '../nachforderungen/NachforderungFormular';
@@ -43,6 +49,9 @@ import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenHinweise, SpeicherFehler } from '../components/SpeicherHinweis';
 import { useZeilenFehler } from '../components/useZeilenFehler';
+import { useZuflussSteuerung } from '../components/useZuflussSchleuse';
+import { useMinutenTakt } from '../components/useMinutenTakt';
+import { useViewport } from '../components/useViewport';
 import {
   NACHFORDERUNG_BEZUG_PARAM,
   NACHFORDERUNG_VORBELEGUNG_PARAMS,
@@ -52,13 +61,8 @@ import {
   parseNachforderungVorbelegung,
   type NachforderungVorbelegung,
 } from '../routing/deeplinks';
-import { Filterhinweis, Paneel, Segmentleiste, useRollen } from '../components/instrument';
+import { Filterhinweis, Paneel, useRollen } from '../components/instrument';
 import { Select } from '../components/Select';
-
-/** Schlüssel-Zeitstempel der Abgeschlossen-Ansicht: Eintreffen ODER Ablehnung. */
-function abschlussZeit(n: Nachforderung): string {
-  return n.eingetroffen_at ?? n.abgelehnt_at ?? n.angefordert_at;
-}
 
 export default function NachforderungenPage() {
   const { id } = useParams();
@@ -67,7 +71,19 @@ export default function NachforderungenPage() {
   const qc = useQueryClient();
   const { token } = useRollen();
 
-  const [ansicht, setAnsicht] = useState<'offen' | 'abgeschlossen'>('offen');
+  const jetzt = useMinutenTakt();
+  const schmal = !useViewport().abBreite('md');
+  /*
+   * Das Board (LLH-1078, Spec `nachforderungen-board`). Die Stufe zählt nur am Handy (Segment);
+   * ohne Wahl steht dort die erste offene Stufe mit Karten. Abgelehnt und ältere Eingetroffene
+   * sind eingeklappt, bis jemand sie aufklappt.
+   */
+  const [gewaehlteStufe, setGewaehlteStufe] = useState<NachforderungStatus | null>(null);
+  const [abgelehntOffen, setAbgelehntOffen] = useState(false);
+  const [aeltereOffen, setAeltereOffen] = useState(false);
+  const zufluss = useZuflussSteuerung<Nachforderung>();
+  // Nach der eigenen Fortschaltung bekommt die gewanderte Karte den Fokus (der Knopf ist weg).
+  const [fokusZiel, setFokusZiel] = useState<number | null>(null);
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
   // Vorbelegung aus `?neu=1&art=…`. Lebt nur, solange die Erfassung offen ist: wer schließt und neu
@@ -101,10 +117,16 @@ export default function NachforderungenPage() {
     queryKey: einsatzKeys.einsatz(einsatzId),
     queryFn: () => ladeEinsatz(einsatzId),
   });
-  // Offen/Abgeschlossen-Trennung clientseitig → alle Nachforderungen laden.
+  // Die Stufen trennt das Board clientseitig → alle Nachforderungen laden.
   const nfQuery = useQuery({
     queryKey: einsatzKeys.nachforderungen(einsatzId),
     queryFn: () => listeNachforderungen(einsatzId, {}),
+  });
+  // Die Kopfzahl zählt der Server (LFH-550, Modulzähler `nachforderungen`): derselbe Cache wie
+  // Modulpanel, Überblick und Vorbereitung.
+  const zaehlerQuery = useQuery({
+    queryKey: einsatzKeys.modulZaehler(einsatzId),
+    queryFn: () => ladeModulZaehler(einsatzId),
   });
 
   /*
@@ -199,7 +221,20 @@ export default function NachforderungenPage() {
   );
 
   const invalidiere = () =>
-    qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) });
+    Promise.all([
+      qc.invalidateQueries({ queryKey: einsatzKeys.nachforderungen(einsatzId) }),
+      qc.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(einsatzId) }),
+    ]);
+  /*
+   * Die eigene Handlung ordnet das Board neu (Spec `datensicht-zufluss`): erst wenn der neue Stand
+   * da ist, gibt die Schleuse ihn frei, dann wandert der Fokus mit der Karte. Ohne das hielte der
+   * Fokus auf dem Knopf die Karte in der alten Spalte fest.
+   */
+  const zeigeEigeneHandlung = async (nfId: number) => {
+    await invalidiere();
+    zufluss.nachBenutzeraktion();
+    setFokusZiel(nfId);
+  };
   /*
    * Jede Handlung meldet ihre Ablehnung an ihrem Ort, kein Toast (LFH-1077, `frontend/AGENTS.md`,
    * „Rückwege und Fehler“): Anlegen am Formular, Fortschalten an der Karte, Rückgängig im
@@ -230,7 +265,7 @@ export default function NachforderungenPage() {
     mutationFn: ({ nfId, status }: { nfId: number; status: NachforderungStatus }) =>
       setzeNachforderungStatus(einsatzId, nfId, status),
     onMutate: () => setSeitenFehler(null),
-    onSuccess: invalidiere,
+    onSuccess: (_daten, { nfId }) => zeigeEigeneHandlung(nfId),
     onError: (e) => {
       setSeitenFehler(e);
       invalidiere();
@@ -248,11 +283,12 @@ export default function NachforderungenPage() {
     // Eine neue Fortschaltung an der Karte räumt deren alten Grund.
     onMutate: ({ nfId }) => kartenFehler.beginne(nfId),
     onSuccess: (_daten, { nfId, status, vorher }) => {
-      invalidiere();
-      if (!vorher) return;
-      zeigeRueckgaengig(message, `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`, () =>
-        ruecknahmeMutation.mutate({ nfId, status: vorher }),
-      );
+      if (vorher) {
+        zeigeRueckgaengig(message, `Status: ${NACHFORDERUNG_STATUS[status]?.label ?? status}`, () =>
+          ruecknahmeMutation.mutate({ nfId, status: vorher }),
+        );
+      }
+      return zeigeEigeneHandlung(nfId);
     },
     onError: (e, { nfId }) => {
       kartenFehler.melde(nfId, e, 'Statuswechsel fehlgeschlagen');
@@ -264,11 +300,11 @@ export default function NachforderungenPage() {
       lehneNachforderungAb(einsatzId, nfId, grund),
     // Der Dialog schließt erst hier (design.md D3): bis zur Antwort bleibt der getippte Grund
     // stehen, eine Ablehnung steht im Dialog. Solange sie läuft, sind seine Auswege gesperrt.
-    onSuccess: () => {
-      invalidiere();
+    onSuccess: (_daten, { nfId }) => {
       message.success('Nachforderung abgelehnt');
       setAblehnenId(null);
       setAblehnenGrund('');
+      return zeigeEigeneHandlung(nfId);
     },
     onError: invalidiere,
   });
@@ -349,49 +385,38 @@ export default function NachforderungenPage() {
    * `memo`, und je Render neue Listen oder Pfeile machten jede Karte neu. Steht vor den frühen
    * Rücksprüngen, wie jeder Hook.
    */
-  const {
-    offene,
-    abgeschlossene,
-    offeneGefiltert,
-    abgeschlosseneGefiltert,
-    offeneSortiert,
-    abgeschlosseneSortiert,
-    stellenMitBezug,
-  } = useMemo(() => {
+  const { gefiltert, stellenMitBezug } = useMemo(() => {
     const alle = nfQuery.data ?? [];
-    // Offen/Abgeschlossen clientseitig über die gemeinsame Phasen-Semantik (eingetroffen und
-    // abgelehnt zählen als „abgeschlossen").
-    const istAbg = (n: Nachforderung) =>
-      istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen');
-    const offene = alle.filter((n) => !istAbg(n));
-    const abgeschlossene = alle.filter(istAbg);
-    // Filter „für Stelle“ (LLH-1082): Liste und Ansichtszähler, nicht der Seitenkopf.
-    const imFilter = (n: Nachforderung) =>
-      stelleFilter == null || n.betreuungsstelle_id === stelleFilter;
-    const offeneGefiltert = offene.filter(imFilter);
-    const abgeschlosseneGefiltert = abgeschlossene.filter(imFilter);
+    // Filter „für Stelle“ (LLH-1082): Board und Spaltenzahlen, nicht der Seitenkopf.
+    const gefiltert =
+      stelleFilter == null ? alle : alle.filter((n) => n.betreuungsstelle_id === stelleFilter);
     return {
-      offene,
-      abgeschlossene,
-      offeneGefiltert,
-      abgeschlosseneGefiltert,
+      gefiltert,
       // Stellen, für die es Nachforderungen gibt — die Wahl des Filters.
       stellenMitBezug: [
         ...new Set(
           alle.flatMap((n) => (n.betreuungsstelle_id != null ? [n.betreuungsstelle_id] : [])),
         ),
       ],
-      // Offen-Ansicht: nach Priorität (sofort→dringend→normal), dann angefordert_at absteigend.
-      offeneSortiert: [...offeneGefiltert].sort((a, b) => {
-        const rang = prioRang(a.prioritaet) - prioRang(b.prioritaet);
-        return rang !== 0 ? rang : b.angefordert_at.localeCompare(a.angefordert_at);
-      }),
-      // Abgeschlossen-Ansicht: flach, neueste zuerst (nach Abschluss-Zeit).
-      abgeschlosseneSortiert: [...abgeschlosseneGefiltert].sort((a, b) =>
-        abschlussZeit(b).localeCompare(abschlussZeit(a)),
-      ),
     };
   }, [nfQuery.data, stelleFilter]);
+  const board = useBoardStand(gefiltert, jetzt, zufluss);
+  // Die Vorgabe gilt einmal, beim ersten Datenstand: danach bleibt die Stufe, auch wenn ihre
+  // letzte Karte weiterwandert (sonst spränge das Segment am Handy mit).
+  const vorgabe = vorgabeStufe(board.spalten);
+  useEffect(() => {
+    if (gewaehlteStufe == null && nfQuery.isSuccess) setGewaehlteStufe(vorgabe);
+  }, [gewaehlteStufe, nfQuery.isSuccess, vorgabe]);
+  const ansicht: BoardAnsicht = {
+    stufe: gewaehlteStufe ?? vorgabe,
+    abgelehntOffen,
+    aeltereOffen,
+  };
+  const setzeAnsicht = useCallback((a: BoardAnsicht) => {
+    setGewaehlteStufe(a.stufe);
+    setAbgelehntOffen(a.abgelehntOffen);
+    setAeltereOffen(a.aeltereOffen);
+  }, []);
   const stand = useRef({ alle: nfQuery.data, statusMutation });
   useLayoutEffect(() => {
     stand.current = { alle: nfQuery.data, statusMutation };
@@ -412,9 +437,9 @@ export default function NachforderungenPage() {
   }, []);
 
   /*
-   * `?nachforderung=<id>` (D10, Sprung aus der Materialzeile): die Ansicht, in der sie steht, die
-   * Karte hervorgehoben und einmal ins Bild gerollt; der Parameter wird geräumt
-   * (`useQueryParamSelektion`). Eine unbekannte Kennung ändert nichts.
+   * `?nachforderung=<id>` (D10, Sprung aus der Materialzeile): ihre Stufe gewählt und aufgeklappt
+   * (Abgelehnt, ältere Eingetroffene), die Karte hervorgehoben und einmal ins Bild gerollt; der
+   * Parameter wird geräumt (`useQueryParamSelektion`). Eine unbekannte Kennung ändert nichts.
    */
   const [hervorgehobenId, setHervorgehobenId] = useState<number | null>(null);
   const [scrollZiel, setScrollZiel] = useState<number | null>(null);
@@ -423,11 +448,10 @@ export default function NachforderungenPage() {
   useQueryParamSelektion('nachforderung', nfQuery.isSuccess && einsatzQuery.isSuccess, (nfId) => {
     const n = nfQuery.data?.find((x) => x.id === nfId);
     if (!n) return;
-    setAnsicht(
-      istAbgeschlossen(NACHFORDERUNG_STATUS[n.status]?.phase ?? 'offen')
-        ? 'abgeschlossen'
-        : 'offen',
-    );
+    const gruppe = boardGruppe(n, jetzt);
+    setGewaehlteStufe(gruppe === 'eingetroffen-aelter' ? 'eingetroffen' : gruppe);
+    if (gruppe === 'abgelehnt') setAbgelehntOffen(true);
+    if (gruppe === 'eingetroffen-aelter') setAeltereOffen(true);
     setHervorgehobenId(nfId);
     setScrollZiel(nfId);
   });
@@ -437,7 +461,17 @@ export default function NachforderungenPage() {
     if (!karte) return;
     karte.scrollIntoView?.({ block: 'center' });
     setScrollZiel(null);
-  }, [scrollZiel, ansicht, nfQuery.data]);
+  }, [scrollZiel, gewaehlteStufe, abgelehntOffen, aeltereOffen, board.spalten]);
+  useEffect(() => {
+    if (fokusZiel == null) return;
+    setFokusZiel(null);
+    // Steht die Karte nicht mehr im Bild (am Handy in einer anderen Stufe), bleibt der Fokus im
+    // Board, damit er nicht auf die Seite zurückfällt.
+    const ziel =
+      document.querySelector<HTMLElement>(`[data-nachforderung-id="${fokusZiel}"]`) ??
+      document.querySelector<HTMLElement>('[data-lfh="nachforderung-board"]');
+    ziel?.focus({ preventScroll: false });
+  }, [fokusZiel]);
   // Öffnen und Abbrechen räumen den Grund einer früheren Ablehnung; eine laufende Mutation bleibt
   // unberührt, `reset()` hängte ihr Ergebnis ab.
   const ablehnenRef = useRef(ablehnenMutation);
@@ -474,7 +508,7 @@ export default function NachforderungenPage() {
   }
   const einsatz = einsatzQuery.data;
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
-  const listenProps = {
+  const kartenProps = {
     darfSchreiben,
     onStatus,
     onAblehnen,
@@ -483,6 +517,7 @@ export default function NachforderungenPage() {
     materialGesperrt,
     onMaterialUebernehmen: freigabenBekannt ? onMaterialUebernehmen : undefined,
     hervorgehobenId,
+    laeuftId: statusMutation.isPending ? statusMutation.variables?.nfId : null,
     stellenJeId,
   };
   // Filterwahl nur mit Namen (Freigabe Betreuung) und sobald es Bezüge gibt (design.md D7).
@@ -500,10 +535,11 @@ export default function NachforderungenPage() {
     : null;
   /*
    * Nach einer Ablehnung lädt `onError` neu; die Karte kann dabei in die andere Ansicht wandern
-   * (ein anderer Arbeitsplatz hat schon fortgeschaltet). Ihr Grund hätte dann keinen Ort mehr und
-   * steht im Seitenhinweis, solange sie in der gezeigten Liste fehlt. Die Rücknahme geht vor.
+   * (ein anderer Arbeitsplatz hat schon fortgeschaltet) oder in einer Stufe stehen, die gerade
+   * nicht zu sehen ist. Ihr Grund hätte dann keinen Ort mehr und steht im Seitenhinweis, solange
+   * sie im gezeigten Board fehlt. Die Rücknahme geht vor.
    */
-  const gezeigt = ansicht === 'offen' ? offeneSortiert : abgeschlosseneSortiert;
+  const gezeigt = sichtbareKarten(board.spalten, ansicht, schmal);
   const gewandertId = kartenFehler.gemeldet().find((nfId) => !gezeigt.some((n) => n.id === nfId));
   const gewandert = gewandertId != null ? kartenFehler.grund(gewandertId) : null;
   const gewandertName = nfQuery.data?.find((n) => n.id === gewandertId)?.bezeichnung;
@@ -527,8 +563,12 @@ export default function NachforderungenPage() {
   return (
     <EinsatzSeite
       titel={modulName('nachforderungen')}
-
-      meta={`${offene.length} offen · ${abgeschlossene.length} abgeschlossen`}
+      // Ohne Server-Zahl keine Zahl: „0 offen“ wäre falsch (Fehlt ≠ 0).
+      meta={
+        zaehlerQuery.data?.nachforderungen
+          ? offenText(zaehlerQuery.data.nachforderungen)
+          : undefined
+      }
       dataUpdatedAt={nfQuery.dataUpdatedAt}
       // Nur mit Inhalt gesetzt: ein leerer Slot rendert in `EinsatzSeite` trotzdem seinen Rahmen.
       hinweis={
@@ -601,28 +641,8 @@ export default function NachforderungenPage() {
           title="Nachforderungen konnten nicht geladen werden"
         />
       )}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: token.marginSM,
-          marginBottom: token.margin,
-          alignItems: 'center',
-        }}
-      >
-        <Segmentleiste
-          beschriftung="Ansicht"
-          wert={ansicht}
-          onWechsel={setAnsicht}
-          optionen={[
-            { wert: 'offen', label: `Offen (${offeneGefiltert.length})` },
-            {
-              wert: 'abgeschlossen',
-              label: `Abgeschlossen (${abgeschlosseneGefiltert.length})`,
-            },
-          ]}
-        />
-        {stellenOptionen.length > 0 && (
+      {stellenOptionen.length > 0 && (
+        <div style={{ marginBottom: token.margin }}>
           <Select<number>
             aria-label="Für Stelle"
             allowClear
@@ -632,8 +652,8 @@ export default function NachforderungenPage() {
             options={stellenOptionen}
             onChange={(id) => setzeStelleFilter(id ?? null)}
           />
-        )}
-      </div>
+        </div>
+      )}
       {stelleFilter != null && (
         <div style={{ marginBottom: token.marginSM }}>
           <Filterhinweis
@@ -642,13 +662,16 @@ export default function NachforderungenPage() {
           />
         </div>
       )}
-      {ansicht === 'offen' ? (
-        <NachforderungListe nachforderungen={offeneSortiert} ansicht="offen" {...listenProps} />
-      ) : (
-        <NachforderungListe
-          nachforderungen={abgeschlosseneSortiert}
-          ansicht="abgeschlossen"
-          {...listenProps}
+      {nfQuery.isSuccess && (
+        <NachforderungBoard
+          stand={board}
+          jetzt={jetzt}
+          zufluss={zufluss}
+          // Ein Dialog der Seite liegt im Portal: Fokus und Zeiger zählen dort nicht.
+          halten={ablehnenId != null || uebernahme != null}
+          ansicht={ansicht}
+          onAnsicht={setzeAnsicht}
+          karten={kartenProps}
         />
       )}
       {/* Außerhalb der Karten-`map` (LFH-683): ein Dialog für alle Karten. */}

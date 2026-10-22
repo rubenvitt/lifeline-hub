@@ -14,7 +14,11 @@ import { Paneel, PaneelZeile, monoStil, useRollen } from '../components/instrume
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
-import { auftragsStand, meldungsStand } from '../pages/lage-dashboard/fuehrungsZahlen';
+import {
+  auftragsStand,
+  meldungsStand,
+  nachforderungsStand,
+} from '../pages/lage-dashboard/fuehrungsZahlen';
 import { baueLagebild, kennzahlReihe } from '../pages/lage-dashboard/lagebild';
 import { kraefteZustand, useLagebild } from '../pages/lage-dashboard/useLagebild';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
@@ -92,6 +96,7 @@ export default function VorbereitungPaneel({
       },
       auftraege: auftragsStand(q.zaehler),
       meldungen: meldungsStand(q.zaehler),
+      nachforderungen: nachforderungsStand(q.zaehler),
       besprechung,
     },
     konv,

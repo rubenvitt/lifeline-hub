@@ -3553,14 +3553,16 @@ export interface components {
             objekt_id: number;
             objekt_typ: string;
         };
-        /** @description Antwort von `POST …/lage/meldungen/gesehen`: wie viele dabei gesehen wurden. */
+        /** @description Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden. */
         LageGesehenAnzeige: {
             /** Format: int64 */
             gesehen: number;
         };
         /**
-         * @description Lageobjekt aus lagerelevanter Meldung (LFH-95). Herkunfts-Felder (meldung_*)
-         *     per JOIN — am Lageobjekt bleibt die Quell-Meldung nachvollziehbar.
+         * @description Eine Lagemeldung: eine lagerelevante Meldung in der Sicht der Lage (LFH-95; seit LLH-1031 ohne
+         *     eigenes Lageobjekt, LLH-1027 D1/D6). Die Drahtform bleibt die, die alte Lage-Stände
+         *     (`lage_snapshot.daten`) tragen: dort ist `id` noch die Kennung des früheren Lageobjekts, heute
+         *     gilt `id == meldung_id`. Die Felder ab `meldungsart` fehlen in alten Ständen.
          */
         LageMeldungAnzeige: {
             /** Format: int64 */
@@ -3572,10 +3574,13 @@ export interface components {
             ereigniszeit: string;
             /**
              * @description Zeitpunkt der Übergabe an die Lage (UTC) — wann S2 sie aufgenommen hat, nicht wann es
-             *     geschah.
+             *     geschah. Bei einer Lagemeldung ihr Eingang.
              */
             erstellt_at: string;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Wer sie in die Lage übernommen hat; bei einer Lagemeldung ihr Erfasser.
+             */
             erstellt_von_id: number;
             /** @description Zeitpunkt der ersten Kenntnisnahme (UTC); fehlt, solange neu. */
             gesehen_at?: string | null;
@@ -3586,13 +3591,18 @@ export interface components {
             gesehen_von_id?: number | null;
             /** @description Abgeleitet: Anzeigename zu `gesehen_von_id` (JOIN benutzer). */
             gesehen_von_name?: string | null;
-            /** Format: int64 */
+            /**
+             * Format: int64
+             * @description Kennung der Lagemeldung = Kennung der Meldung (`lagemeldung:<id>` im Client).
+             */
             id: number;
             /**
              * @description Abgeleitet: noch niemand hat die Lagemeldung als gesehen gekennzeichnet (LLH-1206). Gilt
              *     für alle Benutzer gleich; Liste und Modulzähler lesen dasselbe Prädikat (`is_neu_sql`).
              */
             is_neu: boolean;
+            /** @description Abgeleitet: erfasst von einem gekoppelten Gerät (Erfasser ist ein Gerätekonto). */
+            is_von_geraet: boolean;
             /** Format: double */
             lat?: number | null;
             /** Format: double */
@@ -3602,6 +3612,15 @@ export interface components {
             meldung_id: number;
             /** Format: int64 */
             meldung_lfd_nr: number;
+            /** @description Bearbeitungsstand der Meldung im Meldungseingang — nicht die Kenntnisnahme (`is_neu`). */
+            meldung_status: components["schemas"]["MeldungStatus"];
+            /** @description Meldungsart (LLH-1031): `lagemeldung` oder die Art einer übernommenen Meldung. */
+            meldungsart: components["schemas"]["Meldungsart"];
+            /** @description Priorität der Meldung, gleicher Name wie an der Meldung. */
+            prioritaet: components["schemas"]["Prioritaet"];
+            /** @description Richtung intern/extern (eine Lagemeldung an die übergeordnete Stelle ist `extern`). */
+            richtung: components["schemas"]["Richtung"];
+            /** @description Eigener Lage-Text der Übernahme, sonst der Wortlaut der Meldung. */
             text: string;
         };
         /**
@@ -4098,8 +4117,8 @@ export interface components {
          */
         MeldeWeg: "funk" | "telefon" | "persoenlich" | "sonstige";
         /**
-         * @description Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN,
-         *     `lage_meldung_id` als Herkunfts-Rückverweis, `ist_offen` für Posteingang-Filter).
+         * @description Anzeige einer Meldung inkl. abgeleiteter Felder (Bearbeitername per JOIN, `ist_offen` für
+         *     Posteingang-Filter). Ob sie in der Lage steht, sagt `lagerelevant` (LLH-1031).
          */
         MeldungAnzeige: {
             /**
@@ -4165,11 +4184,6 @@ export interface components {
             ist_offen: boolean;
             /** @description Abgeleitet: pflichtig, unbestätigt und Frist <= jetzt. */
             ist_ueberfaellig: boolean;
-            /**
-             * Format: int64
-             * @description Abgeleitet: id des erzeugten Lageobjekts (LFH-95), falls übergeben.
-             */
-            lage_meldung_id?: number | null;
             lagerelevant: boolean;
             /** Format: int64 */
             lfd_nr: number;
@@ -4296,6 +4310,7 @@ export interface components {
             etb?: components["schemas"]["MengenZaehler"] | null;
             lagemeldungen?: components["schemas"]["LagemeldungsZaehler"] | null;
             meldungen?: components["schemas"]["MeldungsZaehler"] | null;
+            nachforderungen?: components["schemas"]["NachforderungsZaehler"] | null;
             personen?: components["schemas"]["MengenZaehler"] | null;
         };
         /**
@@ -4351,6 +4366,30 @@ export interface components {
          * @enum {string}
          */
         NachforderungStatus: "angefordert" | "zugesagt" | "unterwegs" | "eingetroffen" | "abgelehnt";
+        /**
+         * @description Nachforderungen (LLH-1078): offen (angefordert, zugesagt, unterwegs) und davon je Stufe.
+         *     Eingetroffen und abgelehnt zählt der Zähler nicht: „eingetroffen in den letzten 12 h“ hinge an
+         *     der Uhr, und dieser Abruf läuft nur bei Live-Ereignissen.
+         */
+        NachforderungsZaehler: {
+            /**
+             * Format: int64
+             * @description Davon im Status „angefordert“ (noch keine Zusage).
+             */
+            angefordert: number;
+            /** Format: int64 */
+            offen: number;
+            /**
+             * Format: int64
+             * @description Davon „unterwegs“.
+             */
+            unterwegs: number;
+            /**
+             * Format: int64
+             * @description Davon „zugesagt“.
+             */
+            zugesagt: number;
+        };
         /** @description Eine medizinische Verlaufsnotiz (1:1 zu `person_verlaufsnotiz`). */
         NotizAnzeige: {
             /**

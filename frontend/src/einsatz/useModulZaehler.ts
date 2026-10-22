@@ -82,6 +82,10 @@ const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWe
     wert: neu,
     beschreibung: anzahl(neu, 'neue Lagemeldung', 'neue Lagemeldungen'),
   }),
+  nachforderungen: ({ offen, unterwegs }) => ({
+    wert: offen,
+    beschreibung: `${anzahl(offen, 'offene Nachforderung', 'offene Nachforderungen')}, davon ${unterwegs} unterwegs`,
+  }),
 };
 
 /** Alle Quellen, die der Server zählt — die Schlüssel der Abbildung, nicht eine zweite Liste. */
@@ -103,6 +107,7 @@ export const ZAEHLER_LISTEN_KEYS: Record<ServerZaehlerQuelle, EinsatzKey> = {
   chat: EINSATZ_KEYS.chatKanaele,
   dokumente: EINSATZ_KEYS.dokumente,
   lagemeldungen: EINSATZ_KEYS.lagemeldungen,
+  nachforderungen: EINSATZ_KEYS.nachforderungen,
 };
 
 /** Bildet die Serverantwort auf die Anzeige ab. Ein fehlendes Feld (Modul nicht erlaubt)

@@ -34,7 +34,7 @@ for (const modus of ['light', 'dark'] as const) {
 
     const s4 = page.getByRole('group', { name: 'Werkzeuge S4', exact: true });
     // Anker: die Befundzeile steht vollständig, in der Reihenfolge der Prüfliste.
-    await expect(s4.getByRole('link')).toHaveText(['Nachforderung', 'Verpflegung', 'Material']);
+    await expect(s4.getByRole('link')).toHaveText([/^Nachforderungen/, 'Verpflegung', 'Material']);
     // Gemessen wird der Name in der Werkzeugzelle (LLH-1124): er trägt das Bedien-Blau, die Zahl
     // daneben steht in der Textrolle wie jede Kennzahl.
     const links = page

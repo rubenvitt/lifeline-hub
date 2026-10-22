@@ -80,19 +80,31 @@ export function imZeitfenster(
 /** Ortsfilter der Zeitachse: alle, nur verortete, nur unverortete Einträge. */
 export type Ortsfilter = 'alle' | 'mit' | 'ohne';
 
+/**
+ * Herkunftsfilter (LLH-1031): alle, nur von einem gekoppelten Gerät erfasste, nur aus dem
+ * Meldungseingang übernommene (Art ≠ Lagemeldung).
+ */
+export type Herkunftsfilter = 'alle' | 'geraet' | 'uebernommen';
+
 /** Filterstand der Zeitachse — `'alle'` heißt „kein Filter auf dieser Achse". */
 export interface LageFilter {
   fenster: Zeitfenster | 'alle';
   ort: Ortsfilter;
+  herkunft: Herkunftsfilter;
   /** Freitext über Meldungstext, Absender und Meldungsnummer; leer = kein Filter. */
   suche: string;
 }
 
-export const LEERER_FILTER: LageFilter = { fenster: 'alle', ort: 'alle', suche: '' };
+export const LEERER_FILTER: LageFilter = {
+  fenster: 'alle',
+  ort: 'alle',
+  herkunft: 'alle',
+  suche: '',
+};
 
 /** Ist irgendein Filter gesetzt? Trennt „leer" von „weggefiltert" im Leerzustand. */
 export function filterAktiv(f: LageFilter): boolean {
-  return f.fenster !== 'alle' || f.ort !== 'alle' || f.suche.trim() !== '';
+  return f.fenster !== 'alle' || f.ort !== 'alle' || f.herkunft !== 'alle' || f.suche.trim() !== '';
 }
 
 /** Die Felder, die ein Lageobjekt für Filter und Gruppen braucht (Teil von `LageMeldung`). */
@@ -104,6 +116,22 @@ interface LageEintragKern {
   lon?: number | null;
   meldung_lfd_nr: number;
   meldung_absender: string;
+  /** Art der Meldung; fehlt in Lage-Ständen von vor LLH-1031. */
+  meldungsart?: string;
+  /** Erfasst von einem gekoppelten Gerät; fehlt in Lage-Ständen von vor LLH-1031. */
+  is_von_geraet?: boolean;
+}
+
+/** Trifft die Herkunft? Ein Eintrag ohne Art (alter Lage-Stand) ist nur unter „alle“. */
+function herkunftPasst(l: LageEintragKern, herkunft: Herkunftsfilter): boolean {
+  switch (herkunft) {
+    case 'alle':
+      return true;
+    case 'geraet':
+      return l.is_von_geraet === true;
+    case 'uebernommen':
+      return l.meldungsart != null && l.meldungsart !== 'lagemeldung';
+  }
 }
 
 /** Filtert die Menge — rein, Reihenfolge bleibt. */
@@ -119,6 +147,7 @@ export function filtereLagemeldungen<T extends LageEintragKern>(
       return false;
     }
     if (f.ort !== 'alle' && (l.lat != null && l.lon != null) !== (f.ort === 'mit')) return false;
+    if (!herkunftPasst(l, f.herkunft)) return false;
     if (nadel !== '') {
       const heuhaufen = `${l.text} ${l.meldung_absender} ${l.meldung_lfd_nr}`.toLowerCase();
       if (!heuhaufen.includes(nadel)) return false;

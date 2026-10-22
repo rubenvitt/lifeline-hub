@@ -25,6 +25,9 @@ pub struct MeldungDaten<'a> {
     /// vom Handler geprüft.
     pub einheit_id: Option<i64>,
     pub abschnitt_id: Option<i64>,
+    /// Verortung (Breite, Länge), vom Handler geprüft; nur eine Lagemeldung trägt sie beim Anlegen
+    /// (LLH-1031), andere Arten bekommen sie mit der Übernahme in die Lage.
+    pub geo: Option<(f64, f64)>,
 }
 
 /// Offen: Status ungleich „erledigt" (Posteingang = offene Meldungen). Liste und Modulzähler
@@ -50,11 +53,19 @@ macro_rules! ist_ueberfaellig_sql {
     };
 }
 
-/// Neu: noch niemand hat die Lagemeldung (Alias `lm`) als gesehen gekennzeichnet (LLH-1206).
+/// In der Lage: die Meldung (Alias `m`) ist lagerelevant (LLH-1031, LLH-1027 D1). Liste,
+/// Kenntnisnahme und Modulzähler der Lagemeldungen beziehen das Prädikat von hier.
+macro_rules! lage_sicht_sql {
+    () => {
+        "(m.lagerelevant = 1)"
+    };
+}
+
+/// Neu: noch niemand hat die Lagemeldung (Alias `m`) als gesehen gekennzeichnet (LLH-1206).
 /// Liste der Lagemeldungen und Modulzähler beziehen das Prädikat von hier, es gibt kein zweites.
 macro_rules! is_neu_sql {
     () => {
-        "(lm.gesehen_at IS NULL)"
+        "(m.lage_gesehen_at IS NULL)"
     };
 }
 
@@ -65,8 +76,7 @@ macro_rules! quittung_join_sql {
     };
 }
 
-/// SELECT-Projektion inkl. Bearbeitername (LEFT JOIN benutzer), Herkunfts-Rückverweis
-/// (Subquery lage_meldung), Bestätigungs-Achse (LEFT JOIN kommunikation_status, objekt_typ
+/// SELECT-Projektion inkl. Bearbeitername (LEFT JOIN benutzer), Bestätigungs-Achse (LEFT JOIN kommunikation_status, objekt_typ
 /// ='meldung') und abgeleiteten Feldern. Reihenfolge der Spalten = Struct (FromRow positional).
 ///
 /// `ist_ueberfaellig` ist eine computed column mit `jetzt`-Vergleich → ihr `?` steht textuell
@@ -78,8 +88,7 @@ const ANZEIGE_SELECT: &str = concat!(
             m.lagerelevant, m.ereigniszeit, m.eingang_at, m.etb_meldung_id, m.auftrag_id, \
             EXISTS (SELECT 1 FROM auftrag a WHERE a.id = m.auftrag_id AND a.aufgehoben_at IS NOT NULL) \
               AS is_auftrag_aufgehoben, \
-            m.erfasst_von_id, m.erstellt_at, \
-            (SELECT lm.id FROM lage_meldung lm WHERE lm.meldung_id = m.id) AS lage_meldung_id, ",
+            m.erfasst_von_id, m.erstellt_at, ",
     ist_offen_sql!(),
     " AS ist_offen, \
             m.erledigt_at, \
@@ -113,7 +122,7 @@ struct MerkmalGruppe {
 /// Modulzähler der Meldungen (LFH-935): EINE Abfrage, gruppiert nach den Merkmalen, die die
 /// Zählregel braucht ([`crate::einsatz::zaehler::zaehle_meldungen_gewichtet`]). Die Prädikate
 /// sind dieselben Fragmente wie in [`ANZEIGE_SELECT`]; ohne `inhalt`, ohne Benutzer-Joins,
-/// ohne `lage_meldung`. Die Ergebnismenge hängt an den Merkmalskombinationen, nicht am Bestand.
+/// ohne Lage-Spalten. Die Ergebnismenge hängt an den Merkmalskombinationen, nicht am Bestand.
 /// Bind-Reihenfolge: `jetzt` (Fragment im SELECT), dann `einsatz_id`.
 pub async fn zaehlen(
     pool: &SqlitePool,
@@ -367,8 +376,8 @@ async fn anlegen_mit_client_id_tx(
         "INSERT INTO meldung \
            (einsatz_id, lfd_nr, absender, empfaenger, empfaenger_funktion, meldeweg, inhalt, \
             meldungsart, prioritaet, richtung, ereigniszeit, eingang_at, bestaetigung_pflicht, \
-            bestaetigung_frist_at, erfasst_von_id, client_id, einheit_id, abschnitt_id) \
-         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
+            bestaetigung_frist_at, erfasst_von_id, client_id, einheit_id, abschnitt_id, lat, lon) \
+         SELECT ?, COALESCE(MAX(lfd_nr) + 1, ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? \
          FROM meldung WHERE einsatz_id = ? \
          RETURNING id",
     )
@@ -390,22 +399,31 @@ async fn anlegen_mit_client_id_tx(
     .bind(client_id)
     .bind(daten.einheit_id)
     .bind(daten.abschnitt_id)
+    .bind(daten.geo.map(|(lat, _)| lat))
+    .bind(daten.geo.map(|(_, lon)| lon))
     .bind(einsatz_id)
     .fetch_one(&mut *conn)
     .await?;
+    apply_lage_invariante_tx(&mut *conn, meldung_id).await?;
 
     // ETB-Meldung (Pattern B) im selben Commit. Nachrichtenvordruck-Felder mappen
     // direkt: von=absender, an=empfaenger, meldeweg, inhalt, ereigniszeit.
     // Auto-ETB-Schalter (LFH-133): bei abgeschaltetem Dual-Publish entsteht kein
-    // ETB-Folgeeintrag; etb_meldung_id bleibt NULL.
+    // ETB-Folgeeintrag; etb_meldung_id bleibt NULL. Eine Lagemeldung protokolliert als Lage
+    // (LLH-1031, LLH-1027 D3), jede andere Art als Meldung.
     if crate::einsatz::effektiv::effektiv_auto_etb_aktiv(&einst, &org_einst) {
+        let typ = if daten.meldungsart == super::ART_LAGEMELDUNG {
+            crate::etb::TYP_LAGE
+        } else {
+            crate::etb::TYP_MELDUNG
+        };
         let etb_id = crate::etb::repo::anlegen_tx(
             &mut *conn,
             einsatz_id,
             erfasser_id,
             etb_startwert,
             crate::etb::repo::EintragDaten {
-                typ: crate::etb::TYP_MELDUNG,
+                typ,
                 inhalt: daten.inhalt,
                 von: Some(daten.absender),
                 an: daten.empfaenger,
@@ -430,6 +448,28 @@ async fn anlegen_mit_client_id_tx(
     }
 
     Ok(meldung_id)
+}
+
+/// Invariante „Art Lagemeldung ⇒ lagerelevant“ (LLH-1031, LLH-1027 D3): eine Meldung der Art
+/// „Lagemeldung“ steht ab ihrer Anlage in der Lage, übernommen am Eingang durch ihren Erfasser.
+/// Jeder Schreibweg, der eine Meldung anlegt oder ihre Art setzt, ruft diese Funktion; kein
+/// Handler setzt das Flag selbst (`src/AGENTS.md`, „Meldungsmodell“). Eine schon bestehende
+/// Übernahme bleibt mit Zeitpunkt und Person; jede andere Art bleibt unberührt.
+pub async fn apply_lage_invariante_tx(
+    conn: &mut SqliteConnection,
+    meldung_id: i64,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE meldung SET lagerelevant = 1, \
+            lage_uebergeben_at = COALESCE(lage_uebergeben_at, eingang_at), \
+            lage_uebergeben_von_id = COALESCE(lage_uebergeben_von_id, erfasst_von_id) \
+         WHERE id = ? AND meldungsart = ?",
+    )
+    .bind(meldung_id)
+    .bind(super::ART_LAGEMELDUNG)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
 }
 
 /// Ordnungszeitpunkt der Abgeschlossen-Ansicht (LFH-940, D2): zuletzt erledigt oben; ohne
@@ -783,23 +823,27 @@ pub async fn setze_eskaliert(
     Ok(rows.rows_affected() > 0)
 }
 
-/// Ergebnis von [`als_lagerelevant`]: das Lageobjekt und, bei der ersten Übergabe einer
-/// Meldung, die keine Lagemeldung ist, der Systemeintrag im ETB (für das Live-Ereignis).
+/// Ergebnis von [`als_lagerelevant`]: die Lagemeldung (seit LLH-1031 die Meldungs-id selbst,
+/// LLH-1027 D6) und, bei der ersten Übergabe einer Meldung, die keine Lagemeldung ist, der
+/// Systemeintrag im ETB (für das Live-Ereignis).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LageUebergabe {
     pub lage_id: i64,
     pub etb_id: Option<i64>,
 }
 
-/// Übergibt eine Meldung an die Lage (LFH-95): setzt `lagerelevant=1` und legt
-/// (idempotent, UNIQUE meldung_id) ein Lageobjekt an. Geo optional (Meldung hat oft
-/// keine Koordinaten). `text` = Lage-Notiz (Default: Meldungsinhalt). Atomar (Tx):
-/// ein Teilfehler rollt Flag, Lageobjekt und ETB-Eintrag gemeinsam zurück.
-/// Eine erneute Übergabe mit geändertem Text macht die Lagemeldung wieder neu (LLH-1206, D3).
+/// Übernimmt eine Meldung in die Lage (LFH-95; seit LLH-1031 Spalten der Meldung, LLH-1027 D5):
+/// setzt `lagerelevant = 1`, beim ersten Mal Zeitpunkt und Person der Übernahme. `text` ist der
+/// Lage-Text (Vorgabe des Handlers: der Wortlaut); gleich dem Wortlaut wird er als NULL
+/// gespeichert, der Wortlaut gilt. Verortet wird nur, solange keine Verortung besteht
+/// („Später nicht änderbar“). Idempotent: eine erneute Übernahme legt nichts Neues an; ändert sie
+/// den Lage-Text, ist die Lagemeldung wieder neu (LLH-1206, D3). Alle Ausdrücke des Updates lesen
+/// den Stand VOR dem Update (SQLite). `NotFound`, wenn die Meldung nicht zum Einsatz gehört.
 ///
 /// Die ERSTE Übergabe schreibt „Meldung #12 an die Lage übergeben“ als Systemeintrag mit
 /// Verweis auf die Meldung (LLH-1104 D8), unabhängig vom Auto-ETB-Schalter; nicht für die Art
-/// „Lagemeldung“, die ihren Lage-Eintrag schon über das Auto-ETB trägt (LLH-1027 D3).
+/// „Lagemeldung“, die ab der Anlage in der Lage steht und ihren Lage-Eintrag über das Auto-ETB
+/// trägt (LLH-1027 D3). Atomar (Tx): ein Teilfehler rollt Übernahme und ETB-Eintrag zurück.
 pub async fn als_lagerelevant(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -808,45 +852,41 @@ pub async fn als_lagerelevant(
     text: &str,
     geo: Option<(f64, f64)>,
 ) -> Result<LageUebergabe, AppError> {
-    let (lat, lon) = match geo {
-        Some((a, o)) => (Some(a), Some(o)),
-        None => (None, None),
-    };
     crate::write_retry!(pool, |conn| {
         let (lfd_nr, meldungsart, schon_in_der_lage): (i64, String, bool) = sqlx::query_as(
-            "SELECT m.lfd_nr, m.meldungsart, \
-                    EXISTS (SELECT 1 FROM lage_meldung lm WHERE lm.meldung_id = m.id) \
-             FROM meldung m WHERE m.id = ?",
+            "SELECT lfd_nr, meldungsart, lagerelevant = 1 FROM meldung \
+             WHERE id = ? AND einsatz_id = ?",
         )
         .bind(meldung_id)
+        .bind(einsatz_id)
         .fetch_optional(&mut *conn)
         .await?
         .ok_or(AppError::NotFound)?;
-        sqlx::query("UPDATE meldung SET lagerelevant = 1 WHERE id = ?")
-            .bind(meldung_id)
-            .execute(&mut *conn)
-            .await?;
-        let lage_id: i64 = sqlx::query_scalar(
-            "INSERT INTO lage_meldung (einsatz_id, meldung_id, text, lat, lon, erstellt_von_id) \
-             VALUES (?, ?, ?, ?, ?, ?) \
-             ON CONFLICT(meldung_id) DO UPDATE SET text = excluded.text, \
-               gesehen_at = CASE WHEN lage_meldung.text = excluded.text \
-                                 THEN lage_meldung.gesehen_at END, \
-               gesehen_von_id = CASE WHEN lage_meldung.text = excluded.text \
-                                     THEN lage_meldung.gesehen_von_id END \
-             RETURNING id",
+        sqlx::query(
+            "UPDATE meldung SET \
+               lage_gesehen_at = CASE WHEN lagerelevant = 1 AND COALESCE(lage_text, inhalt) = ?1 \
+                                      THEN lage_gesehen_at END, \
+               lage_gesehen_von_id = CASE WHEN lagerelevant = 1 \
+                                           AND COALESCE(lage_text, inhalt) = ?1 \
+                                          THEN lage_gesehen_von_id END, \
+               lage_text = NULLIF(?1, inhalt), \
+               lat = CASE WHEN lat IS NULL AND lon IS NULL THEN ?2 ELSE lat END, \
+               lon = CASE WHEN lat IS NULL AND lon IS NULL THEN ?3 ELSE lon END, \
+               lage_uebergeben_at = COALESCE(lage_uebergeben_at, datetime('now')), \
+               lage_uebergeben_von_id = COALESCE(lage_uebergeben_von_id, ?4), \
+               lagerelevant = 1 \
+             WHERE id = ?5",
         )
-        .bind(einsatz_id)
-        .bind(meldung_id)
         .bind(text)
-        .bind(lat)
-        .bind(lon)
+        .bind(geo.map(|(lat, _)| lat))
+        .bind(geo.map(|(_, lon)| lon))
         .bind(von_id)
-        .fetch_one(&mut *conn)
+        .bind(meldung_id)
+        .execute(&mut *conn)
         .await?;
         if schon_in_der_lage || meldungsart == super::ART_LAGEMELDUNG {
             return Ok(LageUebergabe {
-                lage_id,
+                lage_id: meldung_id,
                 etb_id: None,
             });
         }
@@ -862,7 +902,7 @@ pub async fn als_lagerelevant(
             .execute(&mut *conn)
             .await?;
         Ok(LageUebergabe {
-            lage_id,
+            lage_id: meldung_id,
             etb_id: Some(etb_id),
         })
     })
@@ -930,33 +970,43 @@ pub async fn erteile_auftrag_tx(
     Ok(auftrag_id)
 }
 
-/// SELECT-Projektion einer Lagemeldung inkl. Herkunft (Quell-Meldung) und Kenntnisnahme.
-/// Reihenfolge der Spalten = Struct [`LageMeldungAnzeige`]. Ein Makro, damit die Abfragen
-/// Literale bleiben (`concat!`).
+/// SELECT-Projektion einer Lagemeldung: eine lagerelevante Meldung (LLH-1031, LLH-1027 D6) in
+/// der Drahtform, die auch alte Lage-Stände tragen (`id = meldung_id`, `text` = eigener Lage-Text
+/// oder Wortlaut, `erstellt_*` = Übernahme), dazu die Merkmale der Meldung und die
+/// Kenntnisnahme. Reihenfolge der Spalten = Struct [`LageMeldungAnzeige`]. Ein Makro, damit die
+/// Abfragen Literale bleiben (`concat!`).
 macro_rules! lage_anzeige_select {
     () => {
         concat!(
-            "SELECT lm.id, lm.einsatz_id, lm.meldung_id, lm.text, lm.lat, lm.lon, \
-                    lm.erstellt_von_id, lm.erstellt_at, m.ereigniszeit, \
+            "SELECT m.id, m.einsatz_id, m.id AS meldung_id, \
+                    COALESCE(m.lage_text, m.inhalt) AS text, m.lat, m.lon, \
+                    COALESCE(m.lage_uebergeben_von_id, m.erfasst_von_id) AS erstellt_von_id, \
+                    COALESCE(m.lage_uebergeben_at, m.eingang_at) AS erstellt_at, m.ereigniszeit, \
                     m.lfd_nr AS meldung_lfd_nr, m.absender AS meldung_absender, ",
             is_neu_sql!(),
-            " AS is_neu, lm.gesehen_at, lm.gesehen_von_id, g.anzeigename AS gesehen_von_name \
-             FROM lage_meldung lm JOIN meldung m ON m.id = lm.meldung_id \
-             LEFT JOIN benutzer g ON g.id = lm.gesehen_von_id"
+            " AS is_neu, m.lage_gesehen_at AS gesehen_at, m.lage_gesehen_von_id AS gesehen_von_id, \
+             g.anzeigename AS gesehen_von_name, \
+             m.meldungsart, m.prioritaet, m.status AS meldung_status, m.richtung, \
+             EXISTS (SELECT 1 FROM geraet_kopplung gk WHERE gk.benutzer_id = m.erfasst_von_id) \
+               AS is_von_geraet \
+             FROM meldung m \
+             LEFT JOIN benutzer g ON g.id = m.lage_gesehen_von_id"
         )
     };
 }
 
-/// Listet Lageobjekte eines Einsatzes inkl. Herkunft (Quell-Meldung). Jüngste Ereigniszeit der
-/// Meldung zuerst, nicht die jüngste Übergabe (LLH-1039); bei gleicher Ereigniszeit die zuletzt
-/// übergebene.
+/// Listet die Lagemeldungen eines Einsatzes: die lagerelevanten Meldungen (LLH-1031). Jüngste
+/// Ereigniszeit zuerst, nicht die jüngste Übernahme (LLH-1039); bei gleicher Ereigniszeit die
+/// zuletzt übernommene.
 pub async fn liste_lage_meldungen(
     pool: &SqlitePool,
     einsatz_id: i64,
 ) -> Result<Vec<LageMeldungAnzeige>, AppError> {
     sqlx::query_as::<_, LageMeldungAnzeige>(concat!(
         lage_anzeige_select!(),
-        " WHERE lm.einsatz_id = ? ORDER BY m.ereigniszeit DESC, lm.id DESC"
+        " WHERE m.einsatz_id = ? AND ",
+        lage_sicht_sql!(),
+        " ORDER BY m.ereigniszeit DESC, m.lage_uebergeben_at DESC, m.id DESC"
     ))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -964,17 +1014,19 @@ pub async fn liste_lage_meldungen(
     .map_err(Into::into)
 }
 
-/// Eine Lagemeldung des Einsatzes; `None`, wenn es sie dort nicht gibt.
+/// Eine Lagemeldung des Einsatzes, über die Kennung ihrer Meldung; `None`, wenn es sie dort nicht
+/// gibt oder sie nicht lagerelevant ist.
 pub async fn load_lage_meldung(
     pool: &SqlitePool,
     einsatz_id: i64,
-    lage_id: i64,
+    meldung_id: i64,
 ) -> Result<Option<LageMeldungAnzeige>, AppError> {
     sqlx::query_as::<_, LageMeldungAnzeige>(concat!(
         lage_anzeige_select!(),
-        " WHERE lm.id = ? AND lm.einsatz_id = ?"
+        " WHERE m.id = ? AND m.einsatz_id = ? AND ",
+        lage_sicht_sql!()
     ))
-    .bind(lage_id)
+    .bind(meldung_id)
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await
@@ -982,58 +1034,70 @@ pub async fn load_lage_meldung(
 }
 
 /// Kennzeichnet eine Lagemeldung als gesehen (LLH-1206, D2). Die erste Kenntnisnahme gewinnt:
-/// eine schon gesehene bleibt mit Zeitpunkt und Person unverändert. `None`, wenn die Lagemeldung
-/// nicht zum Einsatz gehört.
+/// eine schon gesehene bleibt mit Zeitpunkt und Person unverändert. `None`, wenn die Meldung nicht
+/// zum Einsatz gehört oder nicht lagerelevant ist.
 pub async fn mark_lage_gesehen(
     pool: &SqlitePool,
     einsatz_id: i64,
-    lage_id: i64,
+    meldung_id: i64,
     von_id: i64,
     jetzt: &str,
 ) -> Result<Option<LageMeldungAnzeige>, AppError> {
     sqlx::query(concat!(
-        "UPDATE lage_meldung AS lm SET gesehen_at = ?, gesehen_von_id = ? \
-         WHERE lm.id = ? AND lm.einsatz_id = ? AND ",
+        "UPDATE meldung AS m SET lage_gesehen_at = ?, lage_gesehen_von_id = ? \
+         WHERE m.id = ? AND m.einsatz_id = ? AND ",
+        lage_sicht_sql!(),
+        " AND ",
         is_neu_sql!()
     ))
     .bind(jetzt)
     .bind(von_id)
-    .bind(lage_id)
+    .bind(meldung_id)
     .bind(einsatz_id)
     .execute(pool)
     .await?;
-    load_lage_meldung(pool, einsatz_id, lage_id).await
+    load_lage_meldung(pool, einsatz_id, meldung_id).await
 }
 
-/// Kennzeichnet alle neuen Lagemeldungen des Einsatzes bis einschließlich `bis_id` als gesehen
-/// (LLH-1206, D2): eine jüngere, die während des Klicks eingeht, bleibt neu. Liefert die Zahl
-/// der dabei gesehenen.
-pub async fn mark_lage_alle_gesehen(
+/// Kennzeichnet die angezeigten neuen Lagemeldungen als gesehen (LLH-1031, Spec
+/// `lagemeldung-kenntnisnahme`): genau die genannten Meldungen, sofern sie lagerelevant, neu und
+/// aus diesem Einsatz sind. Eine, die während des Klicks in die Lage kommt, war nicht angezeigt
+/// und bleibt neu — auch wenn sie älter ist. Liefert die Zahl der dabei gesehenen.
+pub async fn mark_lage_angezeigte_gesehen(
     pool: &SqlitePool,
     einsatz_id: i64,
-    bis_id: i64,
+    meldung_ids: &[i64],
     von_id: i64,
     jetzt: &str,
 ) -> Result<u64, AppError> {
+    if meldung_ids.is_empty() {
+        return Ok(0);
+    }
+    let ids = serde_json::to_string(meldung_ids)
+        .map_err(|e| AppError::Internal(format!("meldung_ids: {e}")))?;
     let rows = sqlx::query(concat!(
-        "UPDATE lage_meldung AS lm SET gesehen_at = ?, gesehen_von_id = ? \
-         WHERE lm.einsatz_id = ? AND lm.id <= ? AND ",
+        "UPDATE meldung AS m SET lage_gesehen_at = ?, lage_gesehen_von_id = ? \
+         WHERE m.einsatz_id = ? AND m.id IN (SELECT value FROM json_each(?)) AND ",
+        lage_sicht_sql!(),
+        " AND ",
         is_neu_sql!()
     ))
     .bind(jetzt)
     .bind(von_id)
     .bind(einsatz_id)
-    .bind(bis_id)
+    .bind(ids)
     .execute(pool)
     .await?;
     Ok(rows.rows_affected())
 }
 
-/// Modulzähler der Lagemeldungen (LLH-1206, D4): die neuen, mit demselben Prädikat wie die
+/// Modulzähler der Lagemeldungen (LLH-1206, D4): die neuen, mit denselben Prädikaten wie die
 /// Liste. Eine Abfrage, ohne Texte.
 pub async fn count_lage_neu(pool: &SqlitePool, einsatz_id: i64) -> Result<i64, AppError> {
     sqlx::query_scalar(concat!(
-        "SELECT COUNT(*) FROM lage_meldung lm WHERE lm.einsatz_id = ? AND ",
+        "SELECT COUNT(*) FROM meldung m WHERE m.einsatz_id = ? AND ",
+        lage_sicht_sql!(),
+        " AND ",
         is_neu_sql!()
     ))
     .bind(einsatz_id)
@@ -1155,6 +1219,7 @@ mod tests {
             bestaetigung_frist_at: None,
             einheit_id: None,
             abschnitt_id: None,
+            geo: None,
         }
     }
 
@@ -1183,7 +1248,7 @@ mod tests {
         assert_eq!(m.ereigniszeit, "2026-06-12 09:00:00");
         assert_eq!(m.eingang_at, "2026-06-12 09:05:00");
         assert!(m.etb_meldung_id.is_some(), "ETB-Meldung wird erzeugt");
-        assert!(m.lage_meldung_id.is_none());
+        assert!(liste_lage_meldungen(&pool, e).await.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -1682,8 +1747,138 @@ mod tests {
         );
     }
 
+    /// Daten einer Lagemeldung (Art `lagemeldung`, ohne Pflicht).
+    fn lagemeldung<'a>(inhalt: &'a str, ereignis: &'a str, eingang: &'a str) -> MeldungDaten<'a> {
+        MeldungDaten {
+            meldungsart: crate::meldung::ART_LAGEMELDUNG,
+            ..daten(inhalt, ereignis, eingang)
+        }
+    }
+
+    /// Spec `meldungseingang`, „Art Lagemeldung ist immer lagerelevant“ (LLH-1031): ab Anlage in
+    /// der Lage, übernommen am Eingang durch den Erfasser, neu für die Kenntnisnahme; der Wortlaut
+    /// ist der Lage-Text, die Kennung die der Meldung.
     #[tokio::test]
-    async fn als_lagerelevant_setzt_flag_und_erzeugt_lageobjekt_mit_herkunft() {
+    async fn lagemeldung_steht_ab_anlage_in_der_lage() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            MeldungDaten {
+                geo: Some((51.4, 10.4)),
+                ..lagemeldung("Lage ruhig", "2026-06-12 09:00:00", "2026-06-12 09:02:00")
+            },
+        )
+        .await
+        .unwrap();
+        assert!(m.lagerelevant);
+        let liste = liste_lage_meldungen(&pool, e).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        let l = &liste[0];
+        assert_eq!((l.id, l.meldung_id), (m.id, m.id));
+        assert_eq!(l.text, "Lage ruhig");
+        assert_eq!((l.lat, l.lon), (Some(51.4), Some(10.4)));
+        assert_eq!(l.erstellt_at, "2026-06-12 09:02:00", "Übernahme = Eingang");
+        assert_eq!(l.erstellt_von_id, b);
+        assert_eq!(l.ereigniszeit, "2026-06-12 09:00:00");
+        assert!(l.is_neu);
+        assert_eq!(l.meldungsart, crate::meldung::Meldungsart::Lagemeldung);
+        assert_eq!(l.meldung_status, MeldungStatus::Neu);
+        assert!(!l.is_von_geraet);
+        assert_eq!(count_lage_neu(&pool, e).await.unwrap(), 1);
+        let lage_text: Option<String> =
+            sqlx::query_scalar("SELECT lage_text FROM meldung WHERE id = ?")
+                .bind(m.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(lage_text, None, "kein Doppel des Wortlauts");
+    }
+
+    /// LLH-1027 D3: auch die Lagemeldung an die übergeordnete Stelle steht in der Lage, mit ihrer
+    /// Richtung; eine andere Art ohne Übernahme fehlt.
+    #[tokio::test]
+    async fn lagemeldung_nach_aussen_steht_in_der_lage_andere_art_nicht() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let extern_m = anlegen(
+            &pool,
+            e,
+            b,
+            MeldungDaten {
+                richtung: crate::meldung::RICHTUNG_EXTERN,
+                prioritaet: crate::meldung::PRIO_DRINGEND,
+                ..lagemeldung(
+                    "Lage an Leitstelle",
+                    "2026-06-12 09:00:00",
+                    "2026-06-12 09:00:00",
+                )
+            },
+        )
+        .await
+        .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            MeldungDaten {
+                meldungsart: crate::meldung::ART_RUECKMELDUNG,
+                ..daten(
+                    "Einsatzbereit",
+                    "2026-06-12 09:01:00",
+                    "2026-06-12 09:01:00",
+                )
+            },
+        )
+        .await
+        .unwrap();
+        let liste = liste_lage_meldungen(&pool, e).await.unwrap();
+        assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].id, extern_m.id);
+        assert_eq!(liste[0].richtung, crate::kommunikation::Richtung::Extern);
+        assert_eq!(
+            liste[0].prioritaet,
+            crate::kommunikation::Prioritaet::Dringend
+        );
+    }
+
+    /// Spec `meldungseingang`, „Eine Lagemeldung protokolliert als Lage“: Auto-ETB Typ `lage`
+    /// (analog `anlegen_erzeugt_etb_meldung_mit_backlink_und_feldmapping`).
+    #[tokio::test]
+    async fn anlegen_einer_lagemeldung_erzeugt_etb_lage_mit_backlink() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            lagemeldung("Lage ruhig", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        let (typ, inhalt, von, backlink): (String, String, Option<String>, i64) =
+            sqlx::query_as("SELECT typ, inhalt, von, meldung_id FROM etb_eintrag WHERE id = ?")
+                .bind(m.etb_meldung_id.expect("Auto-ETB an"))
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(typ, "lage");
+        assert_eq!(inhalt, "Lage ruhig");
+        assert_eq!(von.as_deref(), Some("Florian Nord 1"));
+        assert_eq!(backlink, m.id);
+        let anzahl: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM etb_eintrag WHERE einsatz_id = ?")
+                .bind(e)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 1, "genau ein Eintrag");
+    }
+
+    #[tokio::test]
+    async fn als_lagerelevant_setzt_flag_und_uebernimmt_mit_herkunft() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
         let m = anlegen(
@@ -1698,15 +1893,15 @@ mod tests {
         )
         .await
         .unwrap();
-        let lage_id = als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None)
+        let uebergabe = als_lagerelevant(&pool, e, m.id, b, "Brücke gesperrt", None)
             .await
-            .unwrap()
-            .lage_id;
+            .unwrap();
+        assert_eq!(uebergabe.lage_id, m.id);
         let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
         assert!(nach.lagerelevant);
-        assert_eq!(nach.lage_meldung_id, Some(lage_id));
         let liste = liste_lage_meldungen(&pool, e).await.unwrap();
         assert_eq!(liste.len(), 1);
+        assert_eq!(liste[0].id, m.id, "Kennung ist die Meldung");
         assert_eq!(liste[0].meldung_lfd_nr, m.lfd_nr);
         assert_eq!(liste[0].meldung_absender, "Florian Nord 1");
         assert_eq!(liste[0].text, "Brücke gesperrt");
@@ -1784,6 +1979,55 @@ mod tests {
         assert_eq!(ergebnis.etb_id, None);
     }
 
+    /// Spec `meldungseingang`, „Rückmeldung mit Lageinhalt“: eigener Lage-Text und Ort, der
+    /// Wortlaut bleibt; die Verortung ist danach nicht mehr änderbar.
+    #[tokio::test]
+    async fn uebernahme_mit_lage_text_und_ort_laesst_den_wortlaut() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            MeldungDaten {
+                meldungsart: crate::meldung::ART_RUECKMELDUNG,
+                ..daten(
+                    "Wir sind vor Ort",
+                    "2026-06-12 09:00:00",
+                    "2026-06-12 09:00:00",
+                )
+            },
+        )
+        .await
+        .unwrap();
+        als_lagerelevant(
+            &pool,
+            e,
+            m.id,
+            b,
+            "Brand unter Kontrolle",
+            Some((51.4, 10.4)),
+        )
+        .await
+        .unwrap();
+        als_lagerelevant(
+            &pool,
+            e,
+            m.id,
+            b,
+            "Brand unter Kontrolle",
+            Some((52.0, 11.0)),
+        )
+        .await
+        .unwrap();
+        let l = &liste_lage_meldungen(&pool, e).await.unwrap()[0];
+        assert_eq!(l.text, "Brand unter Kontrolle");
+        assert_eq!((l.lat, l.lon), (Some(51.4), Some(10.4)), "Verortung bleibt");
+        assert_eq!(l.meldungsart, crate::meldung::Meldungsart::Rueckmeldung);
+        let nach = laden(&pool, m.id, "2026-06-12 10:00:00").await.unwrap();
+        assert_eq!(nach.inhalt, "Wir sind vor Ort", "Wortlaut unverändert");
+    }
+
     #[tokio::test]
     async fn als_lagerelevant_ist_idempotent() {
         let pool = crate::db::test_pool().await;
@@ -1796,16 +2040,40 @@ mod tests {
         )
         .await
         .unwrap();
-        let id1 = als_lagerelevant(&pool, e, m.id, b, "erste", None)
+        als_lagerelevant(&pool, e, m.id, b, "erste", None)
             .await
-            .unwrap()
-            .lage_id;
-        let id2 = als_lagerelevant(&pool, e, m.id, b, "zweite", None)
+            .unwrap();
+        let erst = liste_lage_meldungen(&pool, e).await.unwrap();
+        let zweite = als_lagerelevant(&pool, e, m.id, b, "zweite", None)
             .await
-            .unwrap()
-            .lage_id;
-        assert_eq!(id1, id2, "UNIQUE meldung_id → ein Lageobjekt");
-        assert_eq!(liste_lage_meldungen(&pool, e).await.unwrap().len(), 1);
+            .unwrap();
+        assert_eq!(zweite.lage_id, m.id, "Kennung ist die Meldung");
+        let zweit = liste_lage_meldungen(&pool, e).await.unwrap();
+        assert_eq!(zweit.len(), 1, "eine Lagemeldung je Meldung");
+        assert_eq!(
+            zweit[0].erstellt_at, erst[0].erstellt_at,
+            "Übernahme bleibt"
+        );
+        assert_eq!(zweit[0].text, "zweite");
+    }
+
+    #[tokio::test]
+    async fn als_lagerelevant_im_fremden_einsatz_ist_not_found() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            als_lagerelevant(&pool, e + 99, m.id, b, "X", None).await,
+            Err(AppError::NotFound)
+        ));
+        assert!(liste_lage_meldungen(&pool, e).await.unwrap().is_empty());
     }
 
     #[tokio::test]
@@ -1832,22 +2100,17 @@ mod tests {
         )
         .await
         .unwrap();
-        // Die frühere Meldung wird ZULETZT übergeben: höhere id, jüngere Übergabe.
-        let lid_spaet = als_lagerelevant(&pool, e, spaet.id, b, "Pegel steigt", None)
-            .await
-            .unwrap()
-            .lage_id;
-        let lid_frueh = als_lagerelevant(&pool, e, frueh.id, b, "Brücke gesperrt", None)
-            .await
-            .unwrap()
-            .lage_id;
-        for (lid, uebergabe) in [
-            (lid_spaet, "2026-06-12 14:50:00"),
-            (lid_frueh, "2026-06-12 15:05:00"),
+        // Die frühere Meldung wird ZULETZT übergeben: jüngere Übergabe.
+        for (mid, text, uebergabe) in [
+            (spaet.id, "Pegel steigt", "2026-06-12 14:50:00"),
+            (frueh.id, "Brücke gesperrt", "2026-06-12 15:05:00"),
         ] {
-            sqlx::query("UPDATE lage_meldung SET erstellt_at = ? WHERE id = ?")
+            als_lagerelevant(&pool, e, mid, b, text, None)
+                .await
+                .unwrap();
+            sqlx::query("UPDATE meldung SET lage_uebergeben_at = ? WHERE id = ?")
                 .bind(uebergabe)
-                .bind(lid)
+                .bind(mid)
                 .execute(&pool)
                 .await
                 .unwrap();
@@ -1873,10 +2136,10 @@ mod tests {
                     "2026-06-12 15:05:00"
                 ),
             ],
-            "jüngste Ereigniszeit zuerst; die Übergabezeit bleibt am Objekt"
+            "jüngste Ereigniszeit zuerst; die Übergabezeit bleibt an der Lagemeldung"
         );
         // Einzeln geladen trägt sie dieselbe Ereigniszeit.
-        let einzeln = load_lage_meldung(&pool, e, lid_frueh)
+        let einzeln = load_lage_meldung(&pool, e, frueh.id)
             .await
             .unwrap()
             .unwrap();
@@ -1889,6 +2152,16 @@ mod tests {
         let (b, e) = setup(&pool).await;
         let erste = uebergeben(&pool, e, b, "erste").await;
         let zweite = uebergeben(&pool, e, b, "zweite").await;
+        sqlx::query("UPDATE meldung SET lage_uebergeben_at = '2026-06-12 09:00:00' WHERE id = ?")
+            .bind(erste)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE meldung SET lage_uebergeben_at = '2026-06-12 09:05:00' WHERE id = ?")
+            .bind(zweite)
+            .execute(&pool)
+            .await
+            .unwrap();
         let ids: Vec<_> = liste_lage_meldungen(&pool, e)
             .await
             .unwrap()
@@ -1898,7 +2171,8 @@ mod tests {
         assert_eq!(ids, [zweite, erste]);
     }
 
-    /// Legt eine Meldung an und übergibt sie mit `text` an die Lage; liefert die Lagemeldung-id.
+    /// Legt eine Meldung an und übergibt sie mit `text` an die Lage; liefert die Kennung der
+    /// Meldung (= der Lagemeldung, LLH-1031).
     async fn uebergeben(pool: &SqlitePool, e: i64, b: i64, text: &str) -> i64 {
         let m = anlegen(
             pool,
@@ -1910,8 +2184,8 @@ mod tests {
         .unwrap();
         als_lagerelevant(pool, e, m.id, b, text, None)
             .await
-            .unwrap()
-            .lage_id
+            .unwrap();
+        m.id
     }
 
     async fn zweiter_benutzer(pool: &SqlitePool) -> i64 {
@@ -1981,28 +2255,78 @@ mod tests {
         assert_eq!(count_lage_neu(&pool, e).await.unwrap(), 1);
     }
 
+    /// Spec `lagemeldung-kenntnisnahme`, „Nicht in der Lage“: eine Meldung ohne Lagerelevanz
+    /// lässt sich nicht als gesehen kennzeichnen.
     #[tokio::test]
-    async fn alle_gesehen_bis_laesst_juengere_neu() {
+    async fn gesehen_einer_meldung_ausserhalb_der_lage_findet_nichts() {
         let pool = crate::db::test_pool().await;
         let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            daten("X", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        assert!(mark_lage_gesehen(&pool, e, m.id, b, "2026-06-12 10:00:00")
+            .await
+            .unwrap()
+            .is_none());
+        let gesehen: Option<String> =
+            sqlx::query_scalar("SELECT lage_gesehen_at FROM meldung WHERE id = ?")
+                .bind(m.id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(gesehen, None);
+    }
+
+    /// Spec `lagemeldung-kenntnisnahme`, „Alle bis zur angezeigten“: nur die angezeigten; eine
+    /// währenddessen übernommene, ältere Meldung bleibt neu, fremde und nicht lagerelevante
+    /// Kennungen bleiben unberührt.
+    #[tokio::test]
+    async fn angezeigte_gesehen_laesst_nicht_angezeigte_neu() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let alt = anlegen(
+            &pool,
+            e,
+            b,
+            daten("alt", "2026-06-12 08:00:00", "2026-06-12 08:00:00"),
+        )
+        .await
+        .unwrap();
         let a = uebergeben(&pool, e, b, "eins").await;
         let c = uebergeben(&pool, e, b, "zwei").await;
         let d = uebergeben(&pool, e, b, "drei").await;
         mark_lage_gesehen(&pool, e, a, b, "2026-06-12 09:30:00")
             .await
             .unwrap();
-
-        let anzahl = mark_lage_alle_gesehen(&pool, e, c, b, "2026-06-12 10:00:00")
+        // Während des Klicks übernommen: kleinere Kennung, aber nicht angezeigt.
+        als_lagerelevant(&pool, e, alt.id, b, "alt", None)
             .await
             .unwrap();
-        assert_eq!(anzahl, 1, "nur die noch neue bis einschließlich `bis_id`");
+
+        let anzahl =
+            mark_lage_angezeigte_gesehen(&pool, e, &[a, c, d, 99_999], b, "2026-06-12 10:00:00")
+                .await
+                .unwrap();
+        assert_eq!(anzahl, 2, "nur die noch neuen der angezeigten");
 
         let liste = liste_lage_meldungen(&pool, e).await.unwrap();
         let von = |id: i64| liste.iter().find(|l| l.id == id).unwrap();
         assert_eq!(von(a).gesehen_at.as_deref(), Some("2026-06-12 09:30:00"));
         assert!(!von(c).is_neu);
-        assert!(von(d).is_neu, "jünger als `bis_id` bleibt neu");
+        assert!(!von(d).is_neu);
+        assert!(von(alt.id).is_neu, "nicht angezeigt bleibt neu");
         assert_eq!(count_lage_neu(&pool, e).await.unwrap(), 1);
+        assert_eq!(
+            mark_lage_angezeigte_gesehen(&pool, e, &[], b, "2026-06-12 10:00:00")
+                .await
+                .unwrap(),
+            0
+        );
     }
 
     #[tokio::test]
@@ -2017,11 +2341,10 @@ mod tests {
         )
         .await
         .unwrap();
-        let lid = als_lagerelevant(&pool, e, m.id, b, "erste", None)
+        als_lagerelevant(&pool, e, m.id, b, "erste", None)
             .await
-            .unwrap()
-            .lage_id;
-        mark_lage_gesehen(&pool, e, lid, b, "2026-06-12 10:00:00")
+            .unwrap();
+        mark_lage_gesehen(&pool, e, m.id, b, "2026-06-12 10:00:00")
             .await
             .unwrap();
 
@@ -2041,6 +2364,35 @@ mod tests {
         assert!(neu.gesehen_von_id.is_none());
     }
 
+    /// Eine gesehene Lagemeldung, deren Lage-Text über die Übernahme gleich bleibt (Wortlaut als
+    /// Vorgabe), bleibt gesehen (Spec R3, Art Lagemeldung).
+    #[tokio::test]
+    async fn uebernahme_einer_lagemeldung_mit_wortlaut_bleibt_gesehen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let m = anlegen(
+            &pool,
+            e,
+            b,
+            lagemeldung("Lage ruhig", "2026-06-12 09:00:00", "2026-06-12 09:00:00"),
+        )
+        .await
+        .unwrap();
+        mark_lage_gesehen(&pool, e, m.id, b, "2026-06-12 10:00:00")
+            .await
+            .unwrap();
+        als_lagerelevant(&pool, e, m.id, b, "Lage ruhig", Some((51.4, 10.4)))
+            .await
+            .unwrap();
+        let l = &liste_lage_meldungen(&pool, e).await.unwrap()[0];
+        assert!(!l.is_neu);
+        assert_eq!(
+            l.erstellt_at, "2026-06-12 09:00:00",
+            "Übernahme bleibt der Eingang"
+        );
+        assert_eq!(l.lat, Some(51.4), "fehlende Verortung kommt dazu");
+    }
+
     /// Hilfsdaten für eine bestätigungspflichtige Sofortmeldung mit absoluter Frist.
     fn daten_pflicht<'a>(inhalt: &'a str, eingang: &'a str, frist: &'a str) -> MeldungDaten<'a> {
         MeldungDaten {
@@ -2048,6 +2400,7 @@ mod tests {
             bestaetigung_frist_at: Some(frist),
             einheit_id: None,
             abschnitt_id: None,
+            geo: None,
             ..daten(inhalt, eingang, eingang)
         }
     }

@@ -522,6 +522,7 @@ mod tests {
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
                 einheit_id: None,
                 abschnitt_id: None,
+                geo: None,
             },
         )
         .await
@@ -584,6 +585,7 @@ mod tests {
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
                 einheit_id: None,
                 abschnitt_id: None,
+                geo: None,
             },
         )
         .await
@@ -639,6 +641,7 @@ mod tests {
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
                 einheit_id: None,
                 abschnitt_id: None,
+                geo: None,
             },
         )
         .await
@@ -936,6 +939,7 @@ mod tests {
                 bestaetigung_frist_at: Some("2026-06-11 10:00:00"),
                 einheit_id: None,
                 abschnitt_id: None,
+                geo: None,
             },
         )
         .await

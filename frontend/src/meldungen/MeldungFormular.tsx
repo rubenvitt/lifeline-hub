@@ -7,8 +7,10 @@ import { ZeitpunktEingabe, useZeitEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { Paneel } from '../components/instrument';
 import { Select } from '../components/Select';
+import KoordinatenFeld from '../anzeige/KoordinatenFeld';
+import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { ErfassungsFormular, type Speicherung } from '../components/Erfassung';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
 import {
@@ -44,6 +46,8 @@ interface MeldungFormWerte {
   inhalt: string;
   bestaetigung_pflicht: boolean;
   frist_min?: number | null;
+  /** Verortung, nur bei der Art Lagemeldung gezeigt und gesendet (LLH-1031). */
+  koord?: KoordinatenWert;
 }
 
 const DEFAULTS: MeldungFormWerte = {
@@ -59,6 +63,7 @@ const DEFAULTS: MeldungFormWerte = {
   inhalt: '',
   bestaetigung_pflicht: false,
   frist_min: null,
+  koord: null,
 };
 
 /**
@@ -113,6 +118,7 @@ const EINGEKLAPPT = new Set<string>([
   'ereigniszeit',
   'bestaetigung_pflicht',
   'frist_min',
+  'koord',
 ]);
 
 /** `einheit:<id>` / `abschnitt:<id>` → Bezugsfelder der Meldung. Unbekanntes → kein Bezug. */
@@ -133,6 +139,10 @@ export default function MeldungFormular({
   abschnitte = [],
   funktionsVorschlaege = KEINE_VORSCHLAEGE,
   speicherung,
+  artVorgabe,
+  serie = true,
+  onFertig,
+  einsatzId,
 }: {
   senden: boolean;
   /**
@@ -152,7 +162,22 @@ export default function MeldungFormular({
    * Ablehnung im Formular und räumt ihn beim Einhängen und Abbrechen.
    */
   speicherung?: Speicherung;
+  /**
+   * Vorbelegte Meldungsart (LLH-1031: „Lagemeldung erfassen“ auf der Lage-Seite). Gilt für die
+   * Startwerte UND das Reset-Ziel; die Vorbelegungsknöpfe entfallen, denn sie wechselten die Art.
+   */
+  artVorgabe?: Meldungsart;
+  /** Serienmodus mit „Speichern und nächste“ (Vorgabe). `false`, wo nach dem Erfassen geschlossen wird. */
+  serie?: boolean;
+  /** Einzel-Erfassen erfolgreich (nur ohne Serie): der Aufrufer schließt. */
+  onFertig?: () => void;
+  /** Einsatz für die Ort-Zeile der Verortung (Peilung). */
+  einsatzId?: number;
 }) {
+  const vorgaben = useMemo<MeldungFormWerte>(
+    () => (artVorgabe ? { ...DEFAULTS, meldungsart: artVorgabe } : DEFAULTS),
+    [artVorgabe],
+  );
   const [form] = Form.useForm<MeldungFormWerte>();
   const meldungsart = Form.useWatch('meldungsart', form);
   const prioritaet = Form.useWatch('prioritaet', form);
@@ -162,6 +187,8 @@ export default function MeldungFormular({
   const richtung = Form.useWatch('richtung', form);
   const ereigniszeit = Form.useWatch('ereigniszeit', form);
   const fristMin = Form.useWatch('frist_min', form);
+  const koord = Form.useWatch('koord', form);
+  const istLagemeldung = meldungsart === 'lagemeldung';
   const { formatiere } = useZeitEingabe();
   const wortlautRef = useRef<TextAreaRef>(null);
   const [weitereOffen, setWeitereOffen] = useState(false);
@@ -190,8 +217,11 @@ export default function MeldungFormular({
 
   // Das `return` ist tragend: die Hülle wartet auf diese Zusage und lässt die Felder bei
   // Ablehnung stehen.
-  const absenden = (w: MeldungFormWerte) =>
-    onAnlegen({
+  const absenden = (w: MeldungFormWerte) => {
+    // Verortet wird beim Erfassen nur eine Lagemeldung (Server 422 sonst); ein Ort aus einer
+    // vorher gewählten Art Lagemeldung geht nicht mit.
+    const ort = w.meldungsart === 'lagemeldung' ? alsLatLon(w.koord) : null;
+    return onAnlegen({
       ...vonZuBezug(w.von),
       absender: w.absender.trim(),
       empfaenger: w.empfaenger?.trim() || undefined,
@@ -207,7 +237,9 @@ export default function MeldungFormular({
       bestaetigung_pflicht: w.bestaetigung_pflicht,
       bestaetigung_frist_min:
         w.bestaetigung_pflicht && w.frist_min != null ? w.frist_min : undefined,
+      ...(ort ? { lat: ort.lat, lon: ort.lon } : {}),
     });
+  };
 
   const vonOptionen = [
     {
@@ -246,13 +278,14 @@ export default function MeldungFormular({
   /** Jeder Wert, der von der Vorgabe abweicht, steht im Kopf — eingeklappt bleibt nichts verborgen. */
   const abweichungen = [
     von ? vonName.get(von) : undefined,
-    meldeweg !== DEFAULTS.meldeweg ? etikett(MELDEWEG_OPTIONEN, meldeweg) : undefined,
-    meldungsart !== DEFAULTS.meldungsart ? etikett(MELDUNGSART_OPTIONEN, meldungsart) : undefined,
+    meldeweg !== vorgaben.meldeweg ? etikett(MELDEWEG_OPTIONEN, meldeweg) : undefined,
+    meldungsart !== vorgaben.meldungsart ? etikett(MELDUNGSART_OPTIONEN, meldungsart) : undefined,
     // `useWatch` liefert im ersten Render `undefined`: ohne den Riegel stünde kurz „Priorität “ da.
-    prioritaet && prioritaet !== DEFAULTS.prioritaet
+    prioritaet && prioritaet !== vorgaben.prioritaet
       ? `Priorität ${etikett(PRIORITAET_OPTIONEN, prioritaet) ?? ''}`
       : undefined,
-    richtung !== DEFAULTS.richtung ? etikett(RICHTUNG_OPTIONEN, richtung) : undefined,
+    richtung !== vorgaben.richtung ? etikett(RICHTUNG_OPTIONEN, richtung) : undefined,
+    istLagemeldung && koord ? 'verortet' : undefined,
     ereigniszeit ? `Ereignis ${formatiere(ereigniszeit, 'DD.MM. HH:mm')}` : undefined,
     bestaetigungPflicht
       ? fristMin != null
@@ -264,34 +297,37 @@ export default function MeldungFormular({
   const formular = (
     <ErfassungsFormular<MeldungFormWerte>
       form={form}
-      initialValues={DEFAULTS}
+      initialValues={vorgaben}
       onErfassen={absenden}
       // Das Inline-Formular schließt nach dem Senden NICHT — Zuklappen ist ausdrückliche
       // Nutzeraktion. Die beiden Knöpfe unterscheiden sich nur in der Übernahme: „Meldung erfassen"
-      // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat.
-      onFertig={() => {}}
+      // (auch Enter) leert alles, „Speichern und nächste" hält Absender/Meldeweg/Adressat. Ohne
+      // Serie schließt der Aufrufer über `onFertig`.
+      onFertig={onFertig ?? (() => {})}
       laeuft={senden}
       speicherung={speicherung}
       speicherFehlerTitel="Meldung nicht erfasst"
       speicherFehlerFallback="Erfassen fehlgeschlagen"
-      erfassenText="Meldung erfassen"
-      serie
+      erfassenText={artVorgabe === 'lagemeldung' ? 'Lagemeldung erfassen' : 'Meldung erfassen'}
+      serie={serie}
       uebernahme={UEBERNAHME}
       onPruefungGescheitert={(felder) => {
         if (felder.some((f) => EINGEKLAPPT.has(f))) setWeitereOffen(true);
       }}
     >
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
-      <Space style={{ marginBottom: 16 }} wrap>
-        {/* Kein `danger` (LFH-962): der Knopf belegt nur Felder vor, und Rot bedient nichts. Die
+      {!artVorgabe && (
+        <Space style={{ marginBottom: 16 }} wrap>
+          {/* Kein `danger` (LFH-962): der Knopf belegt nur Felder vor, und Rot bedient nichts. Die
             Dringlichkeit trägt das Prio-Etikett „Sofort". */}
-        <Button icon={<IconBlitz />} onClick={sofortVorbelegen}>
-          Sofortmeldung
-        </Button>
-        <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>
-          Lagemeldung (extern)
-        </Button>
-      </Space>
+          <Button icon={<IconBlitz />} onClick={sofortVorbelegen}>
+            Sofortmeldung
+          </Button>
+          <Button icon={<IconPapierflieger />} onClick={lagemeldungVorbelegen}>
+            Lagemeldung (extern)
+          </Button>
+        </Space>
+      )}
       <Form.Item
         name="inhalt"
         label="Inhalt / Wortlaut"
@@ -396,6 +432,16 @@ export default function MeldungFormular({
                     </Form.Item>
                   </Col>
                 </Row>
+                {/* Eine Lagemeldung steht mit Ort auf der Lagekarte (LLH-1031); die Folge sichtbar
+                    am Feld wie bei der Übernahme in die Lage. */}
+                {istLagemeldung && (
+                  <KoordinatenFeld
+                    name="koord"
+                    label="Verortung (optional)"
+                    extra="Später nicht änderbar"
+                    einsatzId={einsatzId}
+                  />
+                )}
                 <Form.Item label="Bestätigung erforderlich (Sofortmeldung)">
                   {/* Flex statt `Space`: nur so trägt die Grundbreite des Fristfelds. */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

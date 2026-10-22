@@ -26,6 +26,7 @@ pub const MODUL_KEYS: [&str; 34] = [
     "material",
     "verpflegung",
     "bereitstellungsraeume",
+    "nachforderungen",
     "abloesung",
     // Erfassung
     "etb",
@@ -47,7 +48,6 @@ pub const MODUL_KEYS: [&str; 34] = [
     "chat",
     "erinnerungen",
     "meldungen",
-    "nachforderungen",
     "fernmeldewesen",
     // Einstellungen
     "einsatz-einstellungen",
@@ -151,6 +151,12 @@ modul_marker! {
 /// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.
 pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/lage/meldungen", Some("lagemeldungen")),
+    // LLH-1031: Kenntnisnahme der Lagemeldungen, auch unter der Kennung der Meldung.
+    ("/api/einsaetze/{id}/lage/gesehen", Some("lagemeldungen")),
+    (
+        "/api/einsaetze/{id}/meldungen/{mid}/lage-gesehen",
+        Some("lagemeldungen"),
+    ),
     ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
     ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
     // LLH-1111: Stand und Termin unter `…/lagebesprechung`, Verlauf und Abschluss unter

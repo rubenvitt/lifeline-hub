@@ -110,16 +110,15 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
 
 const MODUL = 'nachforderungen';
 
-/** Der Eintrag „Nachforderung“ im Modul-Panel der Kategorie Kommunikation. */
+/** Der Eintrag „Nachforderungen“ im Modul-Panel der Kategorie Kräfte & Mittel (LLH-1078). */
 function nachforderungImPanel(page: Page) {
-  return page.getByRole('button', { name: /^Nachforderung(,|$)/ });
+  return page.getByRole('button', { name: /^Nachforderungen(,|$)/ });
 }
 
-async function kommunikationOeffnen(page: Page, einsatzId: string) {
-  await page.goto(`/einsaetze/${einsatzId}/meldungen`);
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'Meldungen (eingehend)' }),
-  ).toBeVisible();
+/** Eine Seite der Kategorie Kräfte & Mittel: dort steht das Modul im Panel. */
+async function kraefteOeffnen(page: Page, einsatzId: string) {
+  await page.goto(`/einsaetze/${einsatzId}/einheiten`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Einheiten' })).toBeVisible();
 }
 
 /** Org-Vorgabe nur im Browser; liefert die PUT-Bodies der Verwaltung zur Prüfung. */
@@ -157,7 +156,7 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   return zustand;
 }
 
-test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überstimmt und übernimmt die Vorgabe wieder', async ({
+test('Org blendet „Nachforderungen" für alle Einsätze aus, der Einsatz überstimmt und übernimmt die Vorgabe wieder', async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -170,7 +169,7 @@ test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überst
   const zustand = await orgVorgabeImBrowser(page, einsatzId);
 
   // Vorbedingung: ohne Vorgabe steht das Modul in der Navigation.
-  await kommunikationOeffnen(page, einsatzId);
+  await kraefteOeffnen(page, einsatzId);
   await expect(nachforderungImPanel(page)).toBeVisible();
 
   // Verwaltung: im Paneel „Module für alle Einsätze“ ausblenden.
@@ -180,7 +179,7 @@ test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überst
     paneel.getByText('Wirkt auf alle Einsätze ohne eigene Einstellung, auch auf laufende.'),
   ).toBeVisible();
   await paneel.getByLabel('Modul filtern').fill('Nachforderung');
-  const vorgabe = paneel.getByRole('switch', { name: 'Sichtbar: Nachforderung' });
+  const vorgabe = paneel.getByRole('switch', { name: 'Sichtbar: Nachforderungen' });
   await expect(vorgabe).toBeChecked();
   await vorgabe.click();
   await expect(page.getByText('Modul-Vorgabe gespeichert')).toBeVisible();
@@ -188,17 +187,17 @@ test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überst
   expect(zustand.puts).toEqual([{ benoetigte_rolle: null, sichtbar: false }]);
 
   // Der laufende Einsatz ohne eigenen Wert folgt der Vorgabe.
-  await kommunikationOeffnen(page, einsatzId);
+  await kraefteOeffnen(page, einsatzId);
   await expect(nachforderungImPanel(page)).toHaveCount(0);
 
   // Editor „Module“: geerbt aus, mit Herkunft; Einlegen überstimmt.
   await page.goto(`/einsaetze/${einsatzId}/einstellungen/module`);
   await page.getByLabel('Modul filtern').fill('Nachforderung');
-  const schalter = page.getByRole('switch', { name: 'Sichtbar: Nachforderung' });
+  const schalter = page.getByRole('switch', { name: 'Sichtbar: Nachforderungen' });
   const zeile = page.locator('[data-modul-zeile="nachforderungen"]');
   await expect(schalter).not.toBeChecked();
   await expect(zeile.getByText('Vorgabe der Organisation: ausgeblendet')).toBeVisible();
-  const uebernehmen = page.getByRole('button', { name: 'Vorgabe übernehmen: Nachforderung' });
+  const uebernehmen = page.getByRole('button', { name: 'Vorgabe übernehmen: Nachforderungen' });
   await expect(uebernehmen).toHaveCount(0);
   await schalter.click();
   await expect(schalter).toBeChecked();
@@ -207,7 +206,7 @@ test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überst
   // Einsatz, nicht mehr aus den Freigaben (LLH-1183).
   await expect(zeile.getByText('Vorgabe der Organisation: ausgeblendet')).toBeVisible();
 
-  await kommunikationOeffnen(page, einsatzId);
+  await kraefteOeffnen(page, einsatzId);
   await expect(nachforderungImPanel(page)).toBeVisible();
 
   // „Vorgabe übernehmen“ nimmt den eigenen Wert zurück: wieder ausgeblendet.
@@ -217,6 +216,6 @@ test('Org blendet „Nachforderung" für alle Einsätze aus, der Einsatz überst
   await expect(schalter).not.toBeChecked();
   await expect(uebernehmen).toHaveCount(0);
 
-  await kommunikationOeffnen(page, einsatzId);
+  await kraefteOeffnen(page, einsatzId);
   await expect(nachforderungImPanel(page)).toHaveCount(0);
 });

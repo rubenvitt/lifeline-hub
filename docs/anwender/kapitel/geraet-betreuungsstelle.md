@@ -59,7 +59,8 @@ Eine falsche Meldung lässt sich im Meldeverlauf zurücknehmen.
 ### Meldung an die Einsatzleitung
 
 1. Unten „Stelle“ öffnen und oben „Meldungen“ wählen.
-2. Den „Inhalt“ eingeben und die „Priorität“ (normal, dringend, sofort) wählen.
+2. Den „Inhalt“ eingeben, unter „Art“ „Meldung“ oder „Lagemeldung“ und die „Priorität“ (normal,
+   dringend, sofort) wählen. Eine Lagemeldung steht bei der Führung gleich in den Lagemeldungen.
 3. „Meldung senden“ wählen. Die Bestätigung lautet „Meldung #… gesendet“; darunter stehen die
    „Eigenen Meldungen“.
 

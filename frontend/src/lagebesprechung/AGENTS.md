@@ -24,7 +24,7 @@ die Ankündigung dem alten Termin. Angekündigt wird nur im Erinnerungs-Schedule
 
 **Vorbereitung der Lagebesprechung** (LFH-550, `lagebesprechung/VorbereitungPaneel.tsx`,
 `lagebesprechung/vorbereitung.ts`): Paneel der Seite Lagebesprechung, rechnet keine Zahl selbst
-(Lagebild wie das Dashboard, Aufträge/Meldungen vom Modulzähler), Quelle je Zeile, Rechteweiche je
+(Lagebild wie das Dashboard, Aufträge/Meldungen/Nachforderungen vom Modulzähler), Quelle je Zeile, Rechteweiche je
 Quelle („—“ mit Grund, nie 0). Reihenfolge wie das Dashboard, **kein Vortragsschema** (LFH-46
 §2.3), nichts wird eingefroren; ein fester Stand nur über „In Lagebericht übernehmen“ (EIN Aufruf,
 Freitext).

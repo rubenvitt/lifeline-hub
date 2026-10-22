@@ -1710,6 +1710,7 @@ mod tests {
                 bestaetigung_frist_at: None,
                 einheit_id: None,
                 abschnitt_id: None,
+                geo: None,
             },
         )
         .await

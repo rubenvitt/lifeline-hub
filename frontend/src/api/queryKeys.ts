@@ -291,7 +291,8 @@ export const EINSATZ_STREAM_EVENTS = {
   chat: [EINSATZ_KEYS.chatKanaele, EINSATZ_KEYS.chatNachrichten, EINSATZ_KEYS.modulZaehler],
   erinnerung: [EINSATZ_KEYS.erinnerungen, EINSATZ_KEYS.modulZaehler],
   auftrag: [EINSATZ_KEYS.auftraege, EINSATZ_KEYS.modulZaehler],
-  nachforderung: [EINSATZ_KEYS.nachforderungen],
+  // Der Modulzähler zählt die offenen Nachforderungen je Stufe (LLH-1078).
+  nachforderung: [EINSATZ_KEYS.nachforderungen, EINSATZ_KEYS.modulZaehler],
   meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen, EINSATZ_KEYS.modulZaehler],
   // Liste + Detail + Verlauf (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
   bereitstellungsraum: [EINSATZ_KEYS.br, EINSATZ_KEYS.brDetail, EINSATZ_KEYS.brVerlauf],
