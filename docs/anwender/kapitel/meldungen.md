@@ -173,7 +173,8 @@ der Bestätigung schließt die Erinnerung
 ### Wer den Alarm bekommt
 
 Den Alarm einer neuen Sofortmeldung bekommen alle, die das Modul Meldungen sehen, außer der
-Person, die die Sofortmeldung erfasst hat. „Bestätigung ausstehend“ bekommen alle mit dem Modul,
+Person, die die Sofortmeldung erfasst hat; bei einer nachträglich heraufgestuften Meldung außer
+der Person, die sie korrigiert hat. „Bestätigung ausstehend“ bekommen alle mit dem Modul,
 auch die erfassende Person. Beide kommen mit Ton und lassen sich unter „Benachrichtigungen“ nicht
 abschalten (Kapitel [Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)). Eine gewöhnliche
 Meldung löst keinen Alarm aus.
@@ -251,9 +252,15 @@ aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
 - Wird die Art auf „Lagemeldung“ gesetzt, steht die Meldung ab dann in den Lagemeldungen, mit der
   Marke „Neu“. Wird die Art einer Lagemeldung geändert, bleibt sie in der Lage, bis jemand sie
   herausnimmt.
-- Zur Sofortmeldung wird eine Meldung nur beim Erfassen: „Sofort“ und „Sofortmeldung“ stehen in der
-  Korrektur nur an einer Meldung, die schon eine ist. Eine bestehende Bestätigungspflicht bleibt,
-  auch wenn die Priorität sinkt.
+- Wird eine Meldung über „Priorität“ „Sofort“ oder über „Meldungsart“ „Sofortmeldung“ erst zur
+  Sofortmeldung, steht vor dem Speichern „Speichern löst den Sofortalarm aus, wenn die Meldung noch
+  keinen hatte.“ Nach dem Speichern geht der Alarm wie beim Erfassen an alle mit dem Modul
+  Meldungen außer der Person, die korrigiert hat. Die Meldung verlangt ab dann eine Bestätigung,
+  die Frist läuft ab dem Speichern, und die Erinnerung „Sofortmeldung #… unbestätigt“ entsteht.
+  Der Systemeintrag beginnt mit „zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst“.
+- Jede Meldung alarmiert höchstens einmal: wer eine Sofortmeldung herab- und wieder heraufstuft,
+  löst keinen zweiten Alarm aus; der Systemeintrag nennt dann „Sofortalarm war schon ausgelöst“.
+  Eine bestehende Bestätigungspflicht bleibt, auch wenn die Priorität sinkt.
 - Ein nachgetragenes „Von Einheit / Abschnitt“ zählt als Rückmeldung dieser Einheit oder dieses
   Abschnitts; der Absender bleibt der Name aus dem Eingang.
 - „Aus der Lage nehmen“ verwirft Lage-Text, Ort und Kenntnisnahme. Eine erneute Übernahme beginnt
