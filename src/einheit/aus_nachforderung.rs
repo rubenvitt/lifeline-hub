@@ -8,7 +8,7 @@
 //! Der Storno einer Fehlübernahme ([`stornieren_tx`], LLH-1388, design.md D1–D6) nimmt genau das
 //! zurück, was die Übernahme an einer Einheit getan hat: dafür hält sie fest, ob sie die Einheit
 //! angelegt und welchen Eintritt sie gebucht hat (`nachforderung_angelegt`,
-//! `nachforderung_belegung_id`, Migration 0241).
+//! `nachforderung_belegung_id`, Migration 0242).
 
 use crate::bereitstellungsraum::eintreffen::{self, normalize, Eintritt};
 use crate::error::AppError;

@@ -10895,7 +10895,7 @@ mod tests {
     /// LLH-1388 D2: Bestand ohne Herkunft der Wirkung (0/NULL), der Schalter nimmt nur 0 und 1, die
     /// Belegung ist ein Fremdschlüssel, und das Löschen des Einsatzes nimmt alles mit.
     #[tokio::test]
-    async fn migration_0241_einheit_haelt_die_wirkung_der_uebernahme() {
+    async fn migration_0242_einheit_haelt_die_wirkung_der_uebernahme() {
         let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 239).await;
         let (e, b) = bild_grundlage(&pool).await;
         let alt: i64 = sqlx::query_scalar(
