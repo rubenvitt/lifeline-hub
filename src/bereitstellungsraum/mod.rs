@@ -452,6 +452,9 @@ pub struct UnangemeldetAngabe<'a> {
     pub br_bezeichnung: &'a str,
     /// Abschnitt des Raums.
     pub abschnitt: Option<&'a str>,
+    /// Kurzname der Nachforderung, aus der die Kraft erwartet wurde (LLH-1387 D4): ersetzt
+    /// „unangemeldet“ durch „aus Nachforderung 2× RTW“.
+    pub nachforderung: Option<&'a str>,
 }
 
 fn gesetzt(wert: Option<&str>) -> Option<&str> {
@@ -482,10 +485,16 @@ pub fn meldung_text_unangemeldet(a: &UnangemeldetAngabe<'_>) -> String {
     if !weitere.is_empty() {
         text.push_str(&format!(" mit {}", weitere.join(", ")));
     }
-    text.push_str(&format!(
-        " unangemeldet im BR {} eingetroffen",
-        a.br_bezeichnung
-    ));
+    match gesetzt(a.nachforderung) {
+        Some(n) => text.push_str(&format!(
+            " aus Nachforderung {n} im BR {} eingetroffen",
+            a.br_bezeichnung
+        )),
+        None => text.push_str(&format!(
+            " unangemeldet im BR {} eingetroffen",
+            a.br_bezeichnung
+        )),
+    }
     if let Some(s) = a.staerke {
         text.push_str(&format!(", Stärke {}", s.anzeige()));
     }
@@ -677,11 +686,22 @@ mod etb_text_tests {
             staerke: Some(crate::staerke::Staerke::neu(1, 1, 7)),
             br_bezeichnung: "Sportplatz",
             abschnitt: Some("Nord"),
+            nachforderung: None,
         };
         assert_eq!(
             meldung_text_unangemeldet(&a),
             "FL-MUS 1-44-1 (FF Musterstadt, HLF 20) unangemeldet im BR Sportplatz eingetroffen, \
              Stärke 1/1/7//9. Abschnitt Nord. Übernahme offen."
+        );
+        // LLH-1387 D4: aus einer Nachforderung erwartet.
+        let a = UnangemeldetAngabe {
+            nachforderung: Some("2× HLF"),
+            ..a
+        };
+        assert_eq!(
+            meldung_text_unangemeldet(&a),
+            "FL-MUS 1-44-1 (FF Musterstadt, HLF 20) aus Nachforderung 2× HLF im BR Sportplatz \
+             eingetroffen, Stärke 1/1/7//9. Abschnitt Nord. Übernahme offen."
         );
         assert_eq!(absender_text(&f), "FL-MUS 1-44-1");
     }
@@ -694,6 +714,7 @@ mod etb_text_tests {
             staerke: None,
             br_bezeichnung: "Sportplatz",
             abschnitt: None,
+            nachforderung: None,
         };
         assert_eq!(
             meldung_text_unangemeldet(&a),
@@ -727,6 +748,7 @@ mod etb_text_tests {
             staerke: None,
             br_bezeichnung: "Sportplatz",
             abschnitt: None,
+            nachforderung: None,
         };
         assert_eq!(
             meldung_text_unangemeldet(&a),

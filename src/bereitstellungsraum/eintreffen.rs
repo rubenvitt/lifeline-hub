@@ -36,6 +36,10 @@ pub struct EintreffenEingabe {
     /// Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen).
     #[serde(default)]
     pub client_id: Option<String>,
+    /// Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit
+    /// bekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug.
+    #[serde(default)]
+    pub nachforderung_id: Option<i64>,
 }
 
 /// Bekannte Kraft: `objekt_typ` `einheit` oder `fahrzeug`.
@@ -117,7 +121,8 @@ impl Erfassung {
 }
 
 /// Feldprüfung vor jedem Schreiben (design.md D2): 400 für jedes Feld für sich, danach 422,
-/// wenn `kraft` und `unangemeldet` zugleich kommen. Weder noch → 400.
+/// wenn `kraft` und `unangemeldet` zugleich kommen oder ein Fahrzeug eine Nachforderung nennt
+/// (LLH-1387 D4). Weder noch → 400.
 pub fn check(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
     if eingabe.kraft.is_none() && eingabe.unangemeldet.is_none() {
         return Err(AppError::Validation(
@@ -143,6 +148,19 @@ pub fn check(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
         .as_ref()
         .map(check_unangemeldet)
         .transpose()?;
+    if eingabe.nachforderung_id.is_some()
+        && matches!(
+            bekannt,
+            Some(Erfassung::Bekannt {
+                typ: ObjektTyp::Fahrzeug,
+                ..
+            })
+        )
+    {
+        return Err(AppError::UnprocessableEntity(
+            "Ein Fahrzeug ohne Einheit lässt sich nicht mit einer Nachforderung verknüpfen".into(),
+        ));
+    }
     match (bekannt, unangemeldet) {
         (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
             "Entweder eine bekannte oder eine unangemeldete Kraft buchen, nicht beides".into(),
@@ -268,6 +286,8 @@ pub struct Gebucht {
     /// Hinweise zur ablösenden Einheit (LLH-1131): eine als ablösende geplante Einheit ist am
     /// Raum eingetroffen. Gemeldet nach dem Commit über `routes::abloesung::publish_kopplung`.
     pub hinweise: Vec<crate::benachrichtigung::Anlass>,
+    /// Die Nachforderung, mit der die Einheit verknüpft wurde (LLH-1387), für Live.
+    pub nachforderung_id: Option<i64>,
 }
 
 /// Rahmen einer Buchung: wer, wo, wann.
@@ -290,20 +310,126 @@ pub struct Rahmen<'a> {
 
 /// Bucht das Eintreffen in der Transaktion des Aufrufers (design.md D2): Raum prüfen, bekannte
 /// Kraft prüfen oder unangemeldete anlegen, Eintritt, Eintreffen (nur Einheit), Meldung (nur
-/// unangemeldet) und genau ein ETB-Eintrag. Ein Fehler in jedem Schritt rollt alles zurück.
+/// unangemeldet) und genau ein ETB-Eintrag. Mit `nachforderung_id` bekommt die Einheit den
+/// Verweis auf die Nachforderung, aus der sie erwartet wird (LLH-1387, design.md D4). Ein Fehler
+/// in jedem Schritt rollt alles zurück.
 pub async fn eintreffen_tx(
     conn: &mut SqliteConnection,
     r: &Rahmen<'_>,
     erfassung: &Erfassung,
+    nachforderung_id: Option<i64>,
 ) -> Result<Gebucht, AppError> {
     // 1. Raum in der Transaktion (gegen das Rennen mit „Auflösen“): sonst 404/422.
     let br = belegung_repo::require_belegbar_tx(&mut *conn, r.einsatz_id, r.br_id).await?;
+    let herkunft = match nachforderung_id {
+        Some(id) => Some(check_herkunft_tx(conn, r, id).await?),
+        None => None,
+    };
     match erfassung {
         Erfassung::Bekannt { typ, objekt_id } => {
-            bekannt_tx(conn, r, &br.bezeichnung, *typ, *objekt_id).await
+            bekannt_tx(
+                conn,
+                r,
+                &br.bezeichnung,
+                *typ,
+                *objekt_id,
+                herkunft.as_ref(),
+            )
+            .await
         }
-        Erfassung::Unangemeldet(u) => unangemeldet_tx(conn, r, &br, u).await,
+        Erfassung::Unangemeldet(u) => unangemeldet_tx(conn, r, &br, u, herkunft.as_ref()).await,
     }
+}
+
+/// Die Nachforderung, aus der eine Kraft am Raum erwartet wird (LLH-1387, design.md D4).
+#[derive(Debug, Clone)]
+struct Herkunft {
+    id: i64,
+    anzahl: Option<i64>,
+    /// Kurzname im Wortlaut („2× RTW“).
+    kurz: String,
+}
+
+/// Prüft die Nachforderung in der Transaktion der Buchung: eine des Einsatzes mit Ziel = dieser
+/// Raum, sonst 404 (das Gerät erfährt nichts über fremde); zugesagt, unterwegs oder schon
+/// eingetroffen (Rennen mit „Eintreffen melden“), sonst 422.
+async fn check_herkunft_tx(
+    conn: &mut SqliteConnection,
+    r: &Rahmen<'_>,
+    nachforderung_id: i64,
+) -> Result<Herkunft, AppError> {
+    use crate::nachforderung::{STATUS_EINGETROFFEN, STATUS_UNTERWEGS, STATUS_ZUGESAGT};
+    let (status, art, anzahl, ziel_br_id): (String, String, Option<i64>, Option<i64>) =
+        sqlx::query_as(
+            "SELECT status, art, anzahl, ziel_br_id FROM nachforderung \
+             WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(nachforderung_id)
+        .bind(r.einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    if ziel_br_id != Some(r.br_id) {
+        return Err(AppError::NotFound);
+    }
+    if ![STATUS_ZUGESAGT, STATUS_UNTERWEGS, STATUS_EINGETROFFEN].contains(&status.as_str()) {
+        return Err(AppError::UnprocessableEntity(
+            "Aus dieser Nachforderung wird keine Kraft erwartet".into(),
+        ));
+    }
+    Ok(Herkunft {
+        id: nachforderung_id,
+        anzahl,
+        kurz: crate::nachforderung::repo::kurzname(anzahl, &art),
+    })
+}
+
+/// Setzt den Verweis der Einheit auf die Nachforderung (D4): schon derselbe → nichts zu tun, ein
+/// anderer → 409; mehr Einheiten als die Anzahl → 422.
+async fn verknuepfe_tx(
+    conn: &mut SqliteConnection,
+    r: &Rahmen<'_>,
+    h: &Herkunft,
+    einheit_id: i64,
+) -> Result<(), AppError> {
+    let (name, verweis): (String, Option<i64>) = sqlx::query_as(
+        "SELECT name, nachforderung_id FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(r.einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    match verweis {
+        Some(n) if n == h.id => return Ok(()),
+        Some(_) => {
+            return Err(AppError::Conflict(format!(
+                "«{name}» ist schon aus einer Nachforderung übernommen"
+            )))
+        }
+        None => {}
+    }
+    if let Some(a) = h.anzahl {
+        let verknuepft: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ? AND nachforderung_id = ?",
+        )
+        .bind(r.einsatz_id)
+        .bind(h.id)
+        .fetch_one(&mut *conn)
+        .await?;
+        if verknuepft >= a {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Die Nachforderung umfasst {a}; verknüpft sind schon {verknuepft}"
+            )));
+        }
+    }
+    sqlx::query("UPDATE einsatz_einheit SET nachforderung_id = ? WHERE id = ? AND einsatz_id = ?")
+        .bind(h.id)
+        .bind(einheit_id)
+        .bind(r.einsatz_id)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
 }
 
 fn buchung<'a>(r: &Rahmen<'a>) -> Buchung<'a> {
@@ -423,6 +549,7 @@ async fn bekannt_tx(
     br_bezeichnung: &str,
     typ: ObjektTyp,
     objekt_id: i64,
+    herkunft: Option<&Herkunft>,
 ) -> Result<Gebucht, AppError> {
     // 2./3. Kraft prüfen (fremd 404, beendet 409, Fahrzeug einer Einheit 409, schon in einem
     // Raum 409) und Eintritt: `belege_tx` prüft genau das; bei einer Einheit samt Zeitachse (4.)
@@ -431,6 +558,9 @@ async fn bekannt_tx(
         match typ {
             ObjektTyp::Einheit => {
                 let e = eintritt_einheit_tx(conn, r, objekt_id).await?;
+                if let Some(h) = herkunft {
+                    verknuepfe_tx(conn, r, h, objekt_id).await?;
+                }
                 let name: String = sqlx::query_scalar(
                     "SELECT name FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
                 )
@@ -487,14 +617,28 @@ async fn bekannt_tx(
         EintreffenZeitachse::Geschrieben => super::etb_text_eingetroffen(&name, br_bezeichnung),
         _ => super::etb_text_eintritt(&name, br_bezeichnung),
     };
-    let etb_id = crate::etb::system_audit_tx(
-        &mut *conn,
-        r.einsatz_id,
-        r.benutzer_id,
-        r.etb_startwert,
-        &text,
-    )
-    .await?;
+    // Mit Nachforderung (LLH-1387 D4) der Satz mit ihrem Kurznamen und Verweis auf sie.
+    let etb_id = match herkunft {
+        Some(h) => {
+            crate::nachforderung::repo::protokollieren_tx(
+                conn,
+                h.id,
+                r.benutzer_id,
+                &format!("Nachforderung {}: {text}", h.kurz),
+            )
+            .await?
+        }
+        None => {
+            crate::etb::system_audit_tx(
+                &mut *conn,
+                r.einsatz_id,
+                r.benutzer_id,
+                r.etb_startwert,
+                &text,
+            )
+            .await?
+        }
+    };
     Ok(Gebucht {
         belegung_id,
         objekt_typ: typ,
@@ -507,6 +651,7 @@ async fn bekannt_tx(
         personen,
         abloesung,
         hinweise,
+        nachforderung_id: herkunft.filter(|_| typ == ObjektTyp::Einheit).map(|h| h.id),
     })
 }
 
@@ -562,6 +707,7 @@ async fn unangemeldet_tx(
     r: &Rahmen<'_>,
     br: &super::BrAnzeige,
     u: &Unangemeldet,
+    herkunft: Option<&Herkunft>,
 ) -> Result<Gebucht, AppError> {
     let erstes = u
         .fahrzeuge
@@ -621,6 +767,9 @@ async fn unangemeldet_tx(
         &fahrzeug_ids,
     )
     .await?;
+    if let Some(h) = herkunft {
+        verknuepfe_tx(conn, r, h, einheit_id).await?;
+    }
 
     // 3. Eintritt, 4. Eintreffen (eine neue Einheit hat keine Personen, also keinen Fan-out).
     let belegung_id = belegung_repo::belege_tx(
@@ -661,6 +810,7 @@ async fn unangemeldet_tx(
         staerke: u.staerke,
         br_bezeichnung: &br.bezeichnung,
         abschnitt: abschnitt.as_deref(),
+        nachforderung: herkunft.map(|h| h.kurz.as_str()),
     });
     let absender = super::absender_text(&angaben);
     let einst = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, r.einsatz_id).await?;
@@ -727,6 +877,14 @@ async fn unangemeldet_tx(
             .await?
         }
     };
+    // Der eine Eintrag verweist auf die Nachforderung (LLH-1387 D4).
+    if let Some(h) = herkunft {
+        sqlx::query("UPDATE etb_eintrag SET nachforderung_id = ? WHERE id = ?")
+            .bind(h.id)
+            .bind(etb_id)
+            .execute(&mut *conn)
+            .await?;
+    }
     Ok(Gebucht {
         belegung_id,
         objekt_typ: ObjektTyp::Einheit,
@@ -739,6 +897,7 @@ async fn unangemeldet_tx(
         personen: beruehrt.personen,
         abloesung: beruehrt.abloesung,
         hinweise: beruehrt.hinweise,
+        nachforderung_id: herkunft.map(|h| h.id),
     })
 }
 
@@ -947,7 +1106,7 @@ mod tests {
         erfassung: &Erfassung,
     ) -> Result<Gebucht, AppError> {
         let mut tx = pool.begin().await.unwrap();
-        let g = eintreffen_tx(&mut tx, r, erfassung).await;
+        let g = eintreffen_tx(&mut tx, r, erfassung, None).await;
         if g.is_ok() {
             tx.commit().await.unwrap();
         }

@@ -5,6 +5,7 @@
 //! (vgl. Meldungs-Triage).
 pub mod arten;
 pub mod benachrichtigung;
+pub mod erwartet;
 pub mod repo;
 
 use crate::kommunikation::{AdressatKategorie, Prioritaet};
@@ -122,6 +123,19 @@ pub fn uebergang_erlaubt(von: &str, nach: &str) -> bool {
         // `abgelehnt` und `zurueckgezogen` bleiben terminal.
         _ => false,
     }
+}
+
+/// Nimmt der Übergang eine Stufe des linearen Flusses zurück (angefordert → zugesagt → unterwegs
+/// → eingetroffen)? Mit verknüpfter Einheit ist das gesperrt (LLH-1387 design.md D5).
+pub fn ist_ruecknahme(von: &str, nach: &str) -> bool {
+    const FOLGE: [&str; 4] = [
+        STATUS_ANGEFORDERT,
+        STATUS_ZUGESAGT,
+        STATUS_UNTERWEGS,
+        STATUS_EINGETROFFEN,
+    ];
+    let stufe = |s: &str| FOLGE.iter().position(|x| *x == s);
+    matches!((stufe(von), stufe(nach)), (Some(v), Some(n)) if n < v)
 }
 
 /// Anzeige einer Nachforderung inkl. Ersteller-Name (JOIN) und abgeleitetem `ist_offen`

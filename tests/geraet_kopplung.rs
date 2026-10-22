@@ -4188,6 +4188,126 @@ async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
     );
 }
 
+/// LLH-1387 (design.md D1–D4): das BR-Gerät liest die erwarteten Kräfte aus Nachforderungen mit
+/// Ziel = eigener Raum als schmale Projektion ohne Freitexte (Art und Rufnamen ausgenommen), die
+/// eines fremden Raums nicht (404); die Nachforderungsliste bleibt 403. Bucht es eine erwartete
+/// Kraft mit Verweis, steht der Verweis an Einheit und Nachforderung, der Status bleibt.
+#[tokio::test]
+async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verweis() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let nord = br_anlegen(&app, &admin, einsatz, "BR Nord", true).await;
+    let sued = br_anlegen(&app, &admin, einsatz, "BR Süd", true).await;
+    let (_, geraet) = br_geraet(&app, &admin, einsatz, nord).await;
+    let mut ids = Vec::new();
+    for ziel in [nord, sued] {
+        let (s, n) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+            &admin,
+            Some(
+                &json!({"art": "RTW", "anzahl": 2, "adressat_kategorie": "leitstelle",
+                         "adressat_bezeichnung": "ILS Nord", "begruendung": "Lage",
+                         "bezeichnung": "Transport", "ziel_br_id": ziel}),
+            ),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{n}");
+        let nid = n["id"].as_i64().unwrap();
+        let (s, v) = anfrage_json(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/nachforderungen/{nid}/zusage"),
+            &admin,
+            Some(&json!({"rufnamen": ["83-1", "83-2"]})),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        ids.push(nid);
+    }
+    let pfad = |br: i64| format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/erwartet");
+
+    let (s, v) = anfrage_json(&app, "GET", &pfad(nord), &geraet, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let liste = v.as_array().unwrap();
+    assert_eq!(liste.len(), 1, "nur die des eigenen Raums: {v}");
+    assert_eq!(liste[0]["nachforderung_id"], ids[0]);
+    assert_eq!(liste[0]["rufnamen"], json!(["83-1", "83-2"]));
+    let mut alle = Vec::new();
+    schluessel(&v, &mut alle);
+    for frei in [
+        "bezeichnung",
+        "begruendung",
+        "adressat_bezeichnung",
+        "ziel_text",
+        "abgelehnt_grund",
+        "zurueckgezogen_grund",
+        "erstellt_von_name",
+    ] {
+        assert!(!alle.iter().any(|k| k == frei), "{frei} am Gerät: {v}");
+    }
+    let (s, _) = anfrage_json(&app, "GET", &pfad(sued), &geraet, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "fremder Raum");
+    let (s, _) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &geraet,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "die Liste bleibt der Führung");
+
+    // Buchen mit Verweis: unangemeldet, die Einheit trägt ihn, die Nachforderung nennt sie.
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &geraet,
+        Some(
+            &json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": "83-1"}]},
+                     "nachforderung_id": ids[0]}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let neu = v["einheit_id"].as_i64().unwrap();
+    // Eine Nachforderung eines fremden Raums verrät das Gerät nichts: 404.
+    let (s, _) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{nord}/eintreffen"),
+        &geraet,
+        Some(
+            &json!({"unangemeldet": {"fahrzeuge": [{"funkrufname": "83-2"}]},
+                     "nachforderung_id": ids[1]}),
+        ),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, v) = anfrage_json(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let n = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["id"] == ids[0])
+        .unwrap();
+    assert_eq!(n["einheit_ids"], json!([neu]));
+    assert_eq!(n["status"], "zugesagt", "das Gerät meldet kein Eintreffen");
+    let (_, v) = anfrage_json(&app, "GET", &pfad(nord), &geraet, None).await;
+    assert_eq!(v[0]["rufnamen"], json!(["83-2"]), "{v}");
+}
+
 /// Meldungen an die Einsatzleitung wie am UHS-Laptop: anlegen und nur die eigenen lesen.
 #[tokio::test]
 async fn br_geraet_meldet_und_liest_nur_eigene_meldungen() {
