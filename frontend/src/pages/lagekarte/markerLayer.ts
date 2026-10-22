@@ -120,8 +120,8 @@ function istAnker(m: Pick<KarteMarker, 'typ'>): boolean {
 /**
  * Clusterbare Marker (alle außer den festen Ankern) als FeatureCollection. `plakette` trägt die
  * aufgelösten Rollen des aktiven Modus; ohne Angabe Nacht. `kartenTheme` ist das aufgelöste Thema
- * der Kartengrundlage: nachts tragen die Zeichen die helle Unterlage (`markerIconKey`, LLH-1141);
- * ohne Angabe Tag (ohne Unterlage).
+ * der Kartengrundlage: nachts rastern die Zeichen mit dem Render-Theme `dark` (`markerIconKey`,
+ * LLH-1141); ohne Angabe Tag.
  */
 export function baueMarkerFc(
   markers: KarteMarker[],

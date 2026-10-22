@@ -154,8 +154,9 @@ export interface Farbrollen {
   /** Platte unter einem taktischen Zeichen in Picker- und Inspector-Kacheln (LFH-836): die
    *  Bibliothek zeichnet mit schwarzer Tinte, nachts trüge das dunkle Paneel sie nicht. Am Tag
    *  durchsichtig (die Kachel sieht aus wie zuvor), nachts hell: Tinte ≥ 7 : 1, gegen `paneel`
-   *  und `flaeche3` ≥ 3 : 1 (`tokens.test.ts`). Die Karte trägt keine Platte (LFH-833), sondern
-   *  auf dunkler Grundlage die Unterlage `ZEICHEN_UNTERLAGE` (`zeichen/unterlage.ts`, LLH-1141). */
+   *  und `flaeche3` ≥ 3 : 1 (`tokens.test.ts`). Karte und Inspector-Kachel eines Fachobjekts
+   *  tragen keine Platte (LFH-833): nachts zeichnet sie das Render-Theme `dark` der Bibliothek
+   *  selbst hell (`zeichen/zeichenTheme.ts`, LLH-1141). */
   zeichenPlatte: string;
 }
 

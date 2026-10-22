@@ -6,11 +6,12 @@ import { FUEKW, anmelden, post } from './fuehrungsorganisation-kern';
 
 /**
  * Zeichenkontrast auf der Lagekarte im Nachtbetrieb (LLH-1141, WCAG 1.4.11 ≥ 3 : 1): jedes
- * taktische Zeichen steht auf der hellen Unterlage (`zeichen/unterlage.ts`), sein Umriss hält
- * gegen die Unterlage und die Unterlage gegen den Kartengrund. Muster: „Zeichenkontrast“ der
- * Fernmeldeskizze (`fernmeldeskizze-ausstattung.spec.ts`), hier aus Pixeln der Kartenleinwand,
- * weil WebGL keine berechneten Stile hat (Kern wie `karten-pixel-kern.ts`). Der Einsatz entsteht
- * über die API: der Test prüft den Anlegedialog nicht (`e2e/AGENTS.md`, LFH-1114).
+ * taktische Zeichen rastert mit dem Render-Theme `dark` der Bibliothek (`zeichen/zeichenTheme.ts`),
+ * eine weiße Hinterlegung folgt eng seiner Kontur. Die Kontur hält gegen die Hinterlegung und die
+ * Hinterlegung gegen den Kartengrund. Muster: „Zeichenkontrast“ der Fernmeldeskizze
+ * (`fernmeldeskizze-ausstattung.spec.ts`), hier aus Pixeln der Kartenleinwand, weil WebGL keine
+ * berechneten Stile hat (Kern wie `karten-pixel-kern.ts`). Der Einsatz entsteht über die API: der
+ * Test prüft den Anlegedialog nicht (`e2e/AGENTS.md`, LFH-1114).
  *
  * Grundlage ist der Blindstil im Nachtbetrieb (`kartenConfigBeantworten` ohne Karten): ein
  * einfarbiger Grund `#0f1115`, der dunkelste Ton der eigenen Palette. Gemessen wird bei Zoom 11,
@@ -18,16 +19,16 @@ import { FUEKW, anmelden, post } from './fuehrungsorganisation-kern';
  * 0,1° auseinander (rund 145 px) und bündeln deshalb nicht.
  *
  * Messung je Zeichen in einem 80-px-Ausschnitt um den Kartenpunkt: Grund ist die Ecke oben links
- * (weit außerhalb des 34-px-Zeichens und des Statusrings), Unterlage das hellste und Umriss das
- * dunkelste Pixel im Quadrat des Zeichens. Ohne Unterlage ist das hellste Pixel eines Zeichens
- * ohne Organisation der Kartengrund selbst (der schwarze Umriss steht auf Durchsichtigem), die
- * Paarung Unterlage gegen Grund fällt auf rund 1 : 1, der Test wird rot. Ein Zeichen mit
- * Organisationsfarbe hielte auch ohne Unterlage; deshalb ist ein Zeichen ohne Organisation
+ * (weit außerhalb des 34-px-Zeichens und des Statusrings), Hinterlegung das hellste und Kontur das
+ * dunkelste Pixel im Quadrat des Zeichens. Ohne Theme ist das hellste Pixel eines Zeichens ohne
+ * Organisation der Kartengrund selbst (der schwarze Umriss steht auf Durchsichtigem), die Paarung
+ * Hinterlegung gegen Grund fällt auf rund 1 : 1, der Test wird rot. Ein Zeichen mit
+ * Organisationsfarbe hielte auch ohne Theme; deshalb ist ein Zeichen ohne Organisation
  * (Einsatzort, freies Zeichen „Formation“) Vorbedingung.
  *
- * Mutationsprobe (22.10.2026): ohne `legeAufUnterlage` in `zeichneKartenZeichen` messen Einsatzort
- * und freies Zeichen Unterlage 1,00 und Umriss 1,10, der Test wird rot; mit Unterlage hält jedes
- * Zeichen 18,9 : 1 gegen den Grund und der Umriss 4,0 (Schaden, rot) bis 20 : 1.
+ * Mutationsprobe (Rechteck-Fassung, 22.10.2026): ohne helles Rastern messen Einsatzort und freies
+ * Zeichen 1,00 und 1,10, der Test wird rot. Die Fassung mit dem Theme `dark` ist lokal nicht
+ * gefahren (kein Debug-Backend in der Cloud), die CI fährt sie.
  */
 
 const THEMA_SCHLUESSEL = 'lifeline-hub.theme';
@@ -152,12 +153,12 @@ async function bildAm(page: Page, ll: readonly [number, number]) {
 
 interface ZeichenMessung {
   grund: string;
-  unterlage: string;
-  umriss: string;
-  /** Unterlage gegen Kartengrund. */
-  unterlageGrund: number;
-  /** Umriss gegen Unterlage. */
-  umrissUnterlage: number;
+  hinterlegung: string;
+  kontur: string;
+  /** Hinterlegung gegen Kartengrund. */
+  hinterlegungGrund: number;
+  /** Kontur gegen Hinterlegung. */
+  konturHinterlegung: number;
 }
 
 async function messeZeichen(page: Page, mitte: { x: number; y: number }): Promise<ZeichenMessung> {
@@ -200,10 +201,10 @@ async function messeZeichen(page: Page, mitte: { x: number; y: number }): Promis
       const rgb = (p: number[]) => `rgb(${p.join(', ')})`;
       return {
         grund: rgb(grund),
-        unterlage: rgb(hell),
-        umriss: rgb(dunkel),
-        unterlageGrund: k(hellL, lum(grund)),
-        umrissUnterlage: k(dunkelL, hellL),
+        hinterlegung: rgb(hell),
+        kontur: rgb(dunkel),
+        hinterlegungGrund: k(hellL, lum(grund)),
+        konturHinterlegung: k(dunkelL, hellL),
       };
     },
     [png.toString('base64'), HALB] as const,
@@ -239,21 +240,23 @@ test('Zeichenkontrast: jedes taktische Zeichen hält auf der Lagekarte im Nachtb
   const befunde: string[] = [];
   for (const p of proben) {
     await springe(page, p.ort);
-    // Vorbedingung: das Zeichen ist gezeichnet, und zwar als Bild mit Unterlage.
+    // Vorbedingung: das Zeichen ist gezeichnet, und zwar als Nachtbild (Theme `dark`).
     await expect
       .poll(() => bildAm(page, p.ort), {
         message: `${p.name}: Zeichen gezeichnet`,
         timeout: 20_000,
       })
-      .toMatch(/^ez\|unterlage\|/);
+      .toMatch(/^ez\|dark\|/);
     const m = await messeZeichen(page, await kartenpunktAufSeite(page, p.ort));
     // Vorbedingung: gemessen wird wirklich gegen den dunklen Kartengrund des Blindstils.
     expect(m.grund, `${p.name}: Kartengrund`).toBe('rgb(15, 17, 21)');
     werte.push(
-      `${p.name}: Unterlage ${m.unterlageGrund.toFixed(2)} gegen Grund, Umriss ${m.umrissUnterlage.toFixed(2)} gegen Unterlage (${m.umriss} auf ${m.unterlage} auf ${m.grund})`,
+      `${p.name}: Hinterlegung ${m.hinterlegungGrund.toFixed(2)} gegen Grund, Kontur ${m.konturHinterlegung.toFixed(2)} gegen Hinterlegung (${m.kontur} auf ${m.hinterlegung} auf ${m.grund})`,
     );
-    if (m.unterlageGrund < 3) befunde.push(`${p.name}: Unterlage ${m.unterlageGrund.toFixed(2)}`);
-    if (m.umrissUnterlage < 3) befunde.push(`${p.name}: Umriss ${m.umrissUnterlage.toFixed(2)}`);
+    if (m.hinterlegungGrund < 3)
+      befunde.push(`${p.name}: Hinterlegung ${m.hinterlegungGrund.toFixed(2)}`);
+    if (m.konturHinterlegung < 3)
+      befunde.push(`${p.name}: Kontur ${m.konturHinterlegung.toFixed(2)}`);
   }
   test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
   await page.screenshot({ path: test.info().outputPath('lagekarte-zeichen-nacht.png') });
@@ -263,7 +266,7 @@ test('Zeichenkontrast: jedes taktische Zeichen hält auf der Lagekarte im Nachtb
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
 });
 
-test('Tagbetrieb: die Zeichen der Lagekarte tragen keine Unterlage', async ({ page }) => {
+test('Tagbetrieb: die Zeichen der Lagekarte rastern ohne Theme `dark`', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize(FUEKW);
   await kartenConfigBeantworten(page, {});
@@ -287,6 +290,6 @@ test('Tagbetrieb: die Zeichen der Lagekarte tragen keine Unterlage', async ({ pa
         message: `${p.name}: Zeichen gezeichnet`,
         timeout: 20_000,
       })
-      .toMatch(/^ez\|(?!unterlage\|)/);
+      .toMatch(/^ez\|(?!dark\|)/);
   }
 });

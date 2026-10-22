@@ -220,7 +220,7 @@ export interface KartenflaecheProps {
   startAnsicht?: StartAnsicht | null;
   /**
    * Aufgelöstes Thema der Kartengrundlage (`loeseKartenTheme`). Nachts tragen alle Zeichen die
-   * helle Unterlage (LLH-1141, `markerIconKey`); ohne Angabe Tag.
+   * Hinterlegung des Render-Themes `dark` (LLH-1141, `markerIconKey`); ohne Angabe Tag.
    */
   kartenTheme?: KartenTheme;
   /** Style-Ladefehler (online nicht erreichbar) → Page stuft ab. */
@@ -784,8 +784,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     // Alle Kartenbilder (Plaketten, Fachobjekte, freie Zeichen) über den Resolver, NICHT über
     // `styleimagemissing` (LFH-841, Begründung in kartenbildResolver.ts). Zeichen synchron über
     // Canvas, in Bildschirmschärfe, alle gleich groß (der Statusring in markerLayer.ts ist auf
-    // ZEICHEN_KARTEN_PX abgestimmt); freie Zeichen seit LFH-836 auf demselben Weg. Ob ein Bild auf
-    // der hellen Unterlage steht, sagt sein Schlüssel (LLH-1141, `zeichneKartenZeichen`).
+    // ZEICHEN_KARTEN_PX abgestimmt); freie Zeichen seit LFH-836 auf demselben Weg. Ob ein Bild mit
+    // dem Render-Theme `dark` entsteht, sagt sein Schlüssel (LLH-1141, `zeichneKartenZeichen`).
     map.setMissingStyleImageResolver(
       kartenbildResolver(map, {
         zeichen: () => zeichenRegistryRef.current,

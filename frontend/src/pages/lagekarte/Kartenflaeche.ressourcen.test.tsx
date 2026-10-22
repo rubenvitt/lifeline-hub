@@ -124,7 +124,7 @@ vi.mock('./zeichnen', async (original) => ({
 
 import Kartenflaeche, { type KartenflaecheProps } from './Kartenflaeche';
 import { MARKER_CLUSTER_QUELLE } from './markerLayer';
-import { bildMitUnterlage, markerIconKey } from './markerIcons';
+import { bildKartenTheme, markerIconKey } from './markerIcons';
 
 const STIL: StyleSpecification = { version: 8, sources: {}, layers: [] };
 const polygon = (x: number): GeoJsonPolygon => ({
@@ -238,7 +238,7 @@ describe('Kartenflaeche: Zeichen nach Kartenthema (LLH-1141)', () => {
 
     neu({ markers: [einheit], kartenTheme: 'dark' });
     expect(icons()).toEqual([markerIconKey(einheit, 'dark')]);
-    expect(bildMitUnterlage(icons()![0]!)).toBe(true);
+    expect(bildKartenTheme(icons()![0]!)).toBe('dark');
 
     neu({ markers: [einheit], kartenTheme: 'light' });
     expect(icons()).toEqual(tag);

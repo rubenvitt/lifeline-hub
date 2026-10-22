@@ -1,12 +1,7 @@
-import {
-  createStyleImage,
-  type MapLike,
-  type StyleImageData,
-  type SymbolImageOptions,
-} from '@einsatzzeichen/maplibre';
+import { addSymbolImage, type MapLike, type SymbolImageOptions } from '@einsatzzeichen/maplibre';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { legeAufUnterlage } from '../../zeichen/unterlage';
-import { bildMitUnterlage, ZEICHEN_KARTEN_PX } from './markerIcons';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
+import { bildKartenTheme, ZEICHEN_KARTEN_PX } from './markerIcons';
 
 /**
  * Die Zeichen (Fachobjekte und freie Zeichen) folgen der Pixeldichte des Bildschirms (LFH-842). Der Resolver in
@@ -58,22 +53,29 @@ export interface ZeichenKarte extends MapLike {
 /**
  * Der eine Weg, auf dem die Lagekarte ein Zeichen als Kartenbild anlegt, für den Resolver
  * (`kartenbildResolver.ts`) und {@link rastereZeichenNeu}. Wie `addSymbolImage`
- * (@einsatzzeichen/maplibre), nur legt es ein Bild, dessen Schlüssel die Unterlage trägt
- * (`bildMitUnterlage`, nachts, LLH-1141), vor dem Anlegen auf die helle Unterlage. Eine belegte ID
- * ist ein Fehler wie dort; beide Aufrufer fangen ihn.
+ * (@einsatzzeichen/maplibre), nur rastert es ein Bild, dessen Schlüssel für die dunkle
+ * Kartengrundlage steht (`bildKartenTheme`, LLH-1141), mit dem Render-Theme `dark` der Bibliothek
+ * (`zeichen/zeichenTheme.ts`); am Tag ohne Theme wie bisher. Eine belegte ID ist ein Fehler wie
+ * dort; beide Aufrufer fangen ihn.
  */
 export function zeichneKartenZeichen(
   karte: MapLike,
   id: string,
   drawing: Drawing,
   optionen: SymbolImageOptions,
-  raster: (drawing: Drawing, optionen: SymbolImageOptions) => StyleImageData = createStyleImage,
+  zeichne: (
+    karte: MapLike,
+    id: string,
+    drawing: Drawing,
+    optionen: SymbolImageOptions,
+  ) => unknown = addSymbolImage,
 ): void {
-  if (karte.hasImage(id)) throw new Error(`Die Karte hat bereits ein Bild mit der ID "${id}".`);
-  const roh = raster(drawing, optionen);
-  karte.addImage(id, bildMitUnterlage(id) ? legeAufUnterlage(roh) : roh, {
-    pixelRatio: optionen.pixelRatio ?? 1,
-  });
+  zeichne(
+    karte,
+    id,
+    drawing,
+    bildKartenTheme(id) === 'dark' ? { ...optionen, theme: ZEICHEN_THEME_DUNKEL } : optionen,
+  );
 }
 
 type Zeichne = (

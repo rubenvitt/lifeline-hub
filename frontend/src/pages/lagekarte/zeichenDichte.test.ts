@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { legeAufUnterlage } from '../../zeichen/unterlage';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 import {
   beobachtePixeldichte,
   rastereZeichenNeu,
@@ -145,40 +145,29 @@ describe('rastereZeichenNeu', () => {
   });
 });
 
-// LLH-1141: welches Bild die Unterlage trägt, sagt allein der Schlüssel (`markerIconKey`). Der
-// Resolver und das Neu-Rastern bei Dichtewechsel zeichnen beide über diesen einen Weg.
+// LLH-1141: mit welchem Render-Theme ein Bild entsteht, sagt allein der Schlüssel (`markerIconKey`).
+// Der Resolver und das Neu-Rastern bei Dichtewechsel zeichnen beide über diesen einen Weg.
 describe('zeichneKartenZeichen', () => {
-  const roh = { width: 1, height: 1, data: new Uint8ClampedArray([0, 0, 0, 0]) };
-  const raster = vi.fn(() => roh);
+  const karte = { hasImage: () => false, addImage: () => {} };
 
-  function karte(belegt: string[] = []) {
-    const angelegt: { id: string; bild: unknown; optionen: unknown }[] = [];
-    const k = {
-      hasImage: (id: string) => belegt.includes(id),
-      addImage: (id: string, bild: unknown, optionen: unknown) => {
-        angelegt.push({ id, bild, optionen });
-      },
-    };
-    return { k, angelegt };
-  }
-
-  it('legt ein Bild mit Unterlage-Schlüssel auf die Unterlage', () => {
-    const { k, angelegt } = karte();
-    zeichneKartenZeichen(k, 'ez|unterlage|x', ZEICHNUNG, { size: 34, pixelRatio: 2 }, raster);
-    expect(raster).toHaveBeenCalledWith(ZEICHNUNG, { size: 34, pixelRatio: 2 });
-    expect(angelegt).toEqual([
-      { id: 'ez|unterlage|x', bild: legeAufUnterlage(roh), optionen: { pixelRatio: 2 } },
-    ]);
+  it('rastert ein Nachtbild mit dem Theme `dark` der Bibliothek', () => {
+    const zeichne = vi.fn();
+    zeichneKartenZeichen(karte, 'ez|dark|x', ZEICHNUNG, { size: 34, pixelRatio: 2 }, zeichne);
+    expect(zeichne).toHaveBeenCalledWith(karte, 'ez|dark|x', ZEICHNUNG, {
+      size: 34,
+      pixelRatio: 2,
+      theme: ZEICHEN_THEME_DUNKEL,
+    });
   });
 
-  it('legt ein Bild ohne Unterlage-Schlüssel unverändert an (Tag)', () => {
-    const { k, angelegt } = karte();
-    zeichneKartenZeichen(k, 'ez|x', ZEICHNUNG, { size: 34, pixelRatio: 1 }, raster);
-    expect(angelegt).toEqual([{ id: 'ez|x', bild: roh, optionen: { pixelRatio: 1 } }]);
+  it('rastert ein Tagbild ohne Theme, wie bisher (Referenzpalette)', () => {
+    const zeichne = vi.fn();
+    zeichneKartenZeichen(karte, 'ez|x', ZEICHNUNG, { size: 34, pixelRatio: 1 }, zeichne);
+    expect(zeichne).toHaveBeenCalledWith(karte, 'ez|x', ZEICHNUNG, { size: 34, pixelRatio: 1 });
   });
 
   it('wirft auf eine belegte ID wie addSymbolImage (der Aufrufer fängt)', () => {
-    const { k } = karte(['ez|x']);
-    expect(() => zeichneKartenZeichen(k, 'ez|x', ZEICHNUNG, { size: 34 }, raster)).toThrow();
+    const belegt = { hasImage: (id: string) => id === 'ez|x', addImage: () => {} };
+    expect(() => zeichneKartenZeichen(belegt, 'ez|x', ZEICHNUNG, { size: 34 })).toThrow();
   });
 });

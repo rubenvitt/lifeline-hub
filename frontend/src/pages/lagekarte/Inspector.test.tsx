@@ -12,6 +12,7 @@ import { renderSvg } from '@einsatzzeichen/core';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import Inspector from './Inspector';
 import { KACHEL_SVG_OPTIONEN } from './markerIcons';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 import type { KarteMarker } from './marker';
 import type { AuswahlRoh } from './leistenDaten';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
@@ -765,12 +766,13 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
     expect(svg).toBe(renderSvg(fachobjektZeichen(tz)!.drawing, KACHEL_SVG_OPTIONEN));
   });
 
-  // LLH-1141: wie die Kachel eines freien Zeichens (LFH-836) steht das Zeichen nachts auf der
-  // hellen Zeichenplatte; am Tag ist die Platte durchsichtig, die Kachel bleibt, wie sie war.
-  it('legt das Zeichen nachts auf die Zeichenplatte, am Tag nicht', () => {
+  // LLH-1141: nachts zeichnet die Bibliothek das Zeichen selbst hell (Render-Theme `dark`, wie die
+  // Lagekarte), ohne Platte dahinter; am Tag bleibt die Kachel, wie sie war.
+  it('zeichnet das Zeichen nachts mit dem Theme `dark`, ohne Platte; am Tag wie bisher', () => {
     const tz = { grundzeichen: 'taktische-formation' } as const;
-    const probe = document.createElement('div');
-    probe.style.backgroundColor = farbenDunkel.zeichenPlatte;
+    const drawing = fachobjektZeichen(tz)!.drawing;
+    const svgVon = (img: HTMLImageElement) =>
+      decodeURIComponent(img.src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
     renderMitProviders(
       <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
         <Inspector
@@ -782,12 +784,16 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
         />
       </ConfigProvider>,
     );
-    const nacht = document.querySelector<HTMLElement>('[data-lfh="auswahl-kachel"] img')!;
-    expect(nacht.style.backgroundColor).toBe(probe.style.backgroundColor);
+    const nacht = document.querySelector<HTMLImageElement>('[data-lfh="auswahl-kachel"] img')!;
+    expect(svgVon(nacht)).toBe(
+      renderSvg(drawing, { ...KACHEL_SVG_OPTIONEN, theme: ZEICHEN_THEME_DUNKEL }),
+    );
+    expect(nacht.style.backgroundColor).toBe('');
     cleanup();
 
-    const tag = kachelMit(tz).querySelector<HTMLElement>('img')!;
-    expect(tag.style.backgroundColor).toBe('transparent');
+    const tag = kachelMit(tz).querySelector<HTMLImageElement>('img')!;
+    expect(svgVon(tag)).toBe(renderSvg(drawing, KACHEL_SVG_OPTIONEN));
+    expect(tag.style.backgroundColor).toBe('');
   });
 
   it('zeigt bei nicht darstellbarem Zeichen das Kürzel statt abzustürzen', () => {

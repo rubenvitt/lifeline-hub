@@ -96,7 +96,7 @@ describe('baueMarkerFc', () => {
   });
 });
 
-// LLH-1141: auf dunkler Kartengrundlage trägt das Bild die Unterlage, das Thema steht im Schlüssel.
+// LLH-1141: auf dunkler Kartengrundlage rastert das Bild mit dem Theme `dark`, das Thema steht im Schlüssel.
 describe('baueMarkerFc/baueEinsatzortFc nach Kartenthema (LLH-1141)', () => {
   const marker = [
     mk({ schluessel: 'einsatzort', typ: 'einsatzort', tz: { grundzeichen: 'anlass' } }),
@@ -109,13 +109,13 @@ describe('baueMarkerFc/baueEinsatzortFc nach Kartenthema (LLH-1141)', () => {
   ];
   const plakette = zonenPlakette(farbenDunkel);
 
-  it('nimmt nachts für jedes Zeichen den Schlüssel mit Unterlage, auch am Einsatzort', () => {
+  it('nimmt nachts für jedes Zeichen den Nachtschlüssel, auch am Einsatzort', () => {
     const icons = [
       ...baueMarkerFc(marker, plakette, 'dark').features,
       ...baueEinsatzortFc(marker, plakette, 'dark').features,
     ].map((f) => f.properties.icon);
     expect(icons).toHaveLength(3);
-    for (const icon of icons) expect(icon?.startsWith('ez|unterlage|')).toBe(true);
+    for (const icon of icons) expect(icon?.startsWith('ez|dark|')).toBe(true);
   });
 
   it('bleibt ohne Thema und am Tag bei den bisherigen Schlüsseln', () => {

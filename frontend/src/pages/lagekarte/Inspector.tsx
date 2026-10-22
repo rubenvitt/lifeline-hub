@@ -12,6 +12,7 @@ import { etbPfad } from '../../routing/deeplinks';
 import type { KarteMarker, MarkerTyp } from './marker';
 import { markerToUrl } from './markerToUrl';
 import { KACHEL_SVG_OPTIONEN, markerZeichen } from './markerIcons';
+import { zeichenTheme } from '../../zeichen/zeichenTheme';
 import { geoKennzahlen } from './geo';
 import KartenDetailCard from './KartenDetailCard';
 import KoordinatenAnzeige from '../../anzeige/KoordinatenAnzeige';
@@ -109,13 +110,18 @@ function inspectorExclude(m: KarteMarker, einsatzId: number): string | undefined
  * Das Zeichen eines Markers als Bild-URL für die Symbol-Kachel — aus derselben Quelle wie die
  * Karten-Icons (`markerZeichen`, LFH-835). Freie Zeichen zeigt dieser Inspector nicht, sie haben den
  * `FreiesZeichenInspector` (LFH-836). `null`, wenn es sich nicht bauen lässt; dann trägt die Kachel
- * das Kürzel.
+ * das Kürzel. Auf dunklem Paneel mit dem Render-Theme `dark` wie die Lagekarte (LLH-1141,
+ * `zeichen/zeichenTheme.ts`): das Zeichen selbst ist hell hinterlegt, keine Platte dahinter.
  */
-function markerBildUrl(mk: KarteMarker): string | null {
+function markerBildUrl(mk: KarteMarker, dunkel: boolean): string | null {
   if (mk.typ === 'freies_zeichen') return null;
   const zeichen = markerZeichen(mk);
   if (!zeichen) return null;
-  const svg = renderSvg(zeichen.drawing, KACHEL_SVG_OPTIONEN);
+  const theme = zeichenTheme(dunkel);
+  const svg = renderSvg(
+    zeichen.drawing,
+    theme ? { ...KACHEL_SVG_OPTIONEN, theme } : KACHEL_SVG_OPTIONEN,
+  );
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
@@ -161,7 +167,7 @@ export default function Inspector({
   onAbschnittFokussieren,
   ohneOrt = false,
 }: InspectorProps) {
-  const { token, rollen } = useRollen();
+  const { token, rollen, dunkel } = useRollen();
   const { formatZeitKurz } = useAnzeigeKonventionen();
   // Eigene ids: der Inspector kann neben Feldern derselben Beschriftung stehen.
   const fachaufgabeId = useId();
@@ -175,7 +181,7 @@ export default function Inspector({
   const fachmodulText = marker.typ === 'lagemeldung' ? 'Zur Quell-Meldung' : 'Im Fachmodul öffnen';
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
-  const bild = useMemo(() => markerBildUrl(marker), [marker]);
+  const bild = useMemo(() => markerBildUrl(marker, dunkel), [marker, dunkel]);
   const raster = auswahlRaster(marker, roh, formatZeitKurz);
   const letzte = letzteMeldungBlock(marker, roh, formatZeitKurz);
 
@@ -202,15 +208,7 @@ export default function Inspector({
           <img
             src={bild}
             alt=""
-            // Nachts auf der hellen Zeichenplatte wie die Kachel eines freien Zeichens (LFH-836,
-            // LLH-1141): Zeichen ohne Organisation zeichnet die Bibliothek nur als schwarzen Umriss.
-            // Am Tag ist die Platte durchsichtig.
-            style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
-              backgroundColor: rollen.zeichenPlatte,
-            }}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
           />
         ) : undefined
       }
