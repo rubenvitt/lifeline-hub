@@ -814,8 +814,8 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     assert_eq!(lage[0]["meldung_absender"], "Florian Nord 1");
     assert_eq!(lage[0]["text"], "Brücke gesperrt");
 
-    // LLH-1104 D8: die erste Übergabe steht einmal im ETB, mit Verweis auf die Meldung; der
-    // Auto-ETB-Eintrag der Meldung trägt denselben Verweis samt Nummer.
+    // LLH-1104 D8: die erste Übernahme steht einmal im ETB (Wortlaut LLH-1046), mit Verweis auf
+    // die Meldung; der Auto-ETB-Eintrag der Meldung trägt denselben Verweis samt Nummer.
     let (_, etb) = anfrage(
         &app,
         "GET",
@@ -834,7 +834,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     assert!(mit_verweis.iter().all(|x| x["meldung_lfd_nr"] == 1));
     let uebernahmen: Vec<&&serde_json::Value> = mit_verweis
         .iter()
-        .filter(|x| x["inhalt"] == "Meldung #1 an die Lage übergeben")
+        .filter(|x| x["inhalt"] == "Meldung #1 in die Lage übernommen")
         .collect();
     assert_eq!(uebernahmen.len(), 1);
     assert_eq!(uebernahmen[0]["typ"], "system");

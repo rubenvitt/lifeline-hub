@@ -22,23 +22,23 @@ aus dem Modul, in dem sie erfasst wird.
    Marke, etwa „Markantes Wetter Dauerregen bis 21:00 ↗“. Die Marke öffnet „Wetter & Pegel“.
 2. Das Kennzahlenband lesen. Fest stehen „Betroffene“, „Kräfte“, „Vermisste“ und „Einsatzdauer“;
    die Plätze ganz links und in der Mitte richten sich nach der Lage (siehe Hintergrund).
-3. Die drei Paneele darunter lesen: „Gefahrenmatrix“, „Sichtung“ und „Meldungsstrom“.
+3. Die drei Paneele darunter lesen: „Gefahrenmatrix“, „Sichtung“ und „Jüngste ETB-Einträge“.
 
-   ![Lagebild mit Kennzahlenband, Gefahrenmatrix, Sichtung, Meldungsstrom und Führungsstand](../bilder/lagebild/lagebild.png)
+   ![Lagebild mit Kennzahlenband, Gefahrenmatrix, Sichtung, jüngsten ETB-Einträgen und Führungsstand](../bilder/lagebild/lagebild.png)
 
 4. Am Fuß den Führungsstand lesen: „Aufträge offen“, „Meldungen offen“, der jüngste
    „Lagebericht“ und „UHS aktiv“.
 5. Um ins Modul zu wechseln, den Verweis eines Paneels wählen, etwa „Gefahren ↗“ in der
    Gefahrenmatrix.
 
-### Neue Einträge im Meldungsstrom anzeigen
+### Neue ETB-Einträge im Lagebild anzeigen
 
-1. Im Lagebild bleiben, während neue Einträge eingehen. Der Meldungsstrom schiebt sie nicht
-   zwischen die gelesenen Zeilen, sondern kündigt sie oben an („… neue Einträge“).
+1. Im Lagebild bleiben, während neue Einträge eingehen. Das Paneel „Jüngste ETB-Einträge“ schiebt
+   sie nicht zwischen die gelesenen Zeilen, sondern kündigt sie oben an („… neue Einträge“).
 
-   ![Meldungsstrom mit dem Hinweis „2 neue Einträge“ und dem Knopf „anzeigen“](../bilder/lagebild/meldungsstrom-neu.png)
+   ![Paneel „Jüngste ETB-Einträge“ mit dem Hinweis „2 neue Einträge“ und dem Knopf „anzeigen“](../bilder/lagebild/etb-eintraege-neu.png)
 
-2. „anzeigen“ wählen: Die neuen Einträge stehen oben im Strom, der Hinweis verschwindet.
+2. „anzeigen“ wählen: Die neuen Einträge stehen oben im Paneel, der Hinweis verschwindet.
 
 ## Hintergrund
 
@@ -80,8 +80,9 @@ Kennzahlenband: dessen Plätze folgen nur Festlegungen am Einsatz, nie einem Mes
   (übergeben, entlassen, Notunterkunft, Verbleib des Leichnams). Abgeschlossene zählen in keiner
   Sichtungskategorie; die Kennzahl „Betroffene“ nennt sie hinter den Patienten („3 Patienten · 2
   abgeschlossen“), „Verbleib offen“ nennt, wie viele unterwegs sind.
-- **Meldungsstrom:** die jüngsten Einträge des Einsatztagebuchs. Rechts im Kopf steht der Zustand
-  der Leitung: „live“, „Verbindung wird aufgebaut“ oder „Verbindung unterbrochen“.
+- **Jüngste ETB-Einträge:** die jüngsten Einträge des Einsatztagebuchs aller Typen, nicht nur
+  Meldungen. Rechts im Kopf steht der Zustand der Leitung: „live“, „Verbindung wird aufgebaut“
+  oder „Verbindung unterbrochen“.
 - **Führungsstand:** „Aufträge offen“ und „Meldungen offen“ zählen wie die Module selbst; ein
   überfälliger Auftrag oder eine überfällige Meldung steht hier hervorgehoben.
 

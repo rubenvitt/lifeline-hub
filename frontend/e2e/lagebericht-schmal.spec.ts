@@ -42,7 +42,7 @@ async function lageberichtAnlegen(page: Page, einsatzId: string): Promise<number
   return (await antwort.json()).id as number;
 }
 
-/** Eine Meldung anlegen und an die Lage übergeben — erst dann hat die Liste eine Zeile. */
+/** Eine Meldung anlegen und in die Lage übernehmen — erst dann hat die Liste eine Zeile. */
 async function lagemeldungAnlegen(page: Page, einsatzId: string) {
   const m = await page.request.post(`/api/einsaetze/${einsatzId}/meldungen`, {
     data: {

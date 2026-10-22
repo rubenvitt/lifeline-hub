@@ -1,5 +1,5 @@
 /**
- * Meldungsstrom des Lage-Dashboards — reine Ableitungen. Der Strom zeigt die jüngsten ETB-Einträge
+ * Meldungsstrom des Lage-Dashboards (Paneel „Jüngste ETB-Einträge“) — reine Ableitungen. Der Strom zeigt die jüngsten ETB-Einträge
  * aller Typen; neue werden nicht unter dem Cursor eingeschoben, sondern per Sammelbanner
  * angekündigt. Die Weiche ist eine Wassermarke (`angezeigtBis`, höchste gezeigte lfd. Nr.): die
  * Seite hält sie, diese Datei rechnet, was sichtbar bleibt und was zurückgehalten wird.

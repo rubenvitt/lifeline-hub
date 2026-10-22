@@ -401,7 +401,7 @@ export const modulRegistry: ModulEintrag[] = [
     icon: IconKachelraster,
     route: 'lage-dashboard',
     status: 'fertig',
-    beschreibung: 'Lage in Zahlen, Meldungsstrom',
+    beschreibung: 'Lage in Zahlen, jüngste ETB-Einträge',
   },
   {
     key: 'lagekarte',
@@ -450,7 +450,7 @@ export const modulRegistry: ModulEintrag[] = [
     status: 'fertig',
     // Neue, für alle gleich: noch von niemandem als gesehen gekennzeichnet (LLH-1206).
     zaehlerQuelle: 'lagemeldungen',
-    beschreibung: 'Lage aus dem Meldungseingang',
+    beschreibung: 'Lagerelevante Meldungen',
   },
   // Kommunikation
   {
@@ -476,11 +476,11 @@ export const modulRegistry: ModulEintrag[] = [
   {
     key: 'meldungen',
     kategorie: 'kommunikation',
-    label: 'Meldungen (eingehend)',
+    label: 'Meldungen',
     icon: IconPosteingang,
     route: 'meldungen',
     status: 'fertig',
-    beschreibung: 'Eingang, Bearbeitung',
+    beschreibung: 'Eingang, Ausgang, Bearbeitung',
     zaehlerQuelle: 'meldungen',
   },
   // LLH-1180: S6 als eigenes Modul, unabhängig von der Stab-Freigabe (ELW 1 ohne Stab). Die
