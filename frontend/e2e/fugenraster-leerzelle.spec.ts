@@ -7,8 +7,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * zwischen belegten Zellen bleibt die Fuge 1 px.
  *
  * Vor dem Fix lag `linie` als Grund unter dem ganzen Raster (`kennzahlenbandStil`,
- * `datenrasterStil`). Fünf Kennzahlen in zwei Spalten (Überblick, 390 px) oder vier Kopfangaben in
- * drei Spalten (Einsatzdaten, 820/1180 px) ließen eine Restspur frei, und dort schien der Grund
+ * `datenrasterStil`). Fünf Kennzahlen in zwei Spalten (Überblick, 390 px, bis LLH-1140) oder vier
+ * Kopfangaben in drei Spalten (Einsatzdaten, 820/1180 px) ließen eine Restspur frei, und dort schien der Grund
  * flächig durch. Jetzt ist der Grund `flaeche`, und jede Zelle zeichnet ihre Fuge als Umriss
  * (`components/instrument/fugenraster.ts`, Regel in `theme/sprache.css`).
  *
@@ -19,7 +19,8 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  * rot, die Regel `[data-fugenraster] > *` entfernt macht die Fuge rot.
  *
  * Das Paneel „Termin“ der Seite Lagebesprechung (LLH-1111, vorher der Stand auf der Stab-Seite)
- * hat KEINE Restspur: zwei Kennzahlen in zwei Spalten; dort ist die Spaltenzahl die Aussage.
+ * hat KEINE Restspur: zwei Kennzahlen in zwei Spalten; dort ist die Spaltenzahl die Aussage. Der
+ * Überblick ebenso, seit er sechs Plätze trägt (LLH-1140): dort bleiben Fuge und volle Reihe.
  *
  * ROLLEN (LFH-435, `e2e/AGENTS.md`): jede Seite auch als Beobachter. Die Kopfangaben der
  * Einsatzdaten sind ohne Schreibrecht Text statt Knopf, der Überblick zeigt gesperrte Kennzahlen
@@ -149,7 +150,7 @@ async function vorbereiten(page: Page, rolleName: (typeof ROLLEN)[number]): Prom
 }
 
 for (const rolleName of ROLLEN) {
-  test(`Überblick 390 px (${rolleName}): Restspur im Band „Lage in Zahlen“ ist Fläche`, async ({
+  test(`Überblick 390 px (${rolleName}): sechs Plätze ohne Restspur, Fuge 1 px`, async ({
     page,
   }) => {
     const id = await vorbereiten(page, rolleName);
@@ -158,8 +159,9 @@ for (const rolleName of ROLLEN) {
     const band = page.getByRole('group', { name: 'Lage in Zahlen' });
     await expect(band.getByText('Einsatzabschnitte', { exact: true })).toBeVisible();
     await expect(band.locator('[aria-busy="true"]')).toHaveCount(0);
-    const v = await pruefeRaster(page, band, true);
+    const v = await pruefeRaster(page, band, false);
     expect(v.spalten).toBe(2);
+    expect(v.rest, 'sechs Plätze füllen drei Reihen ganz').toBeNull();
   });
 
   for (const breite of [820, 1180]) {

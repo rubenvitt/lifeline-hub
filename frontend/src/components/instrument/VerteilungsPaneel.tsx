@@ -18,11 +18,12 @@ import { monoStil, useRollen } from './rollenwerte';
  * Gelb auf Hell und Schwarz auf Dunkel wären als Schrift unlesbar), `balkenKontur` eine
  * Innenkontur, wenn die Füllung auf der Spur verschwände (Schwarz auf Nacht).
  *
- * `kennung` bildet die Greifer: `<kennung>-feld`, `<kennung>-wert`, `<kennung>-anteil`.
+ * `kennung` bildet die Greifer: `<kennung>-wort`, `-feld`, `-wert`, `-anteil`.
  * `attribute` (nur `data-*`) landen am `<li>`, etwa `data-sichtung`.
  *
  * `Verteilungsliste` ist die Liste ohne Paneel, mit `dichte="zeile"` klein genug für eine
- * Paneelzeile (Einheiten je Status im Abschnitt).
+ * Paneelzeile (Einheiten je Status im Abschnitt). `dichte="kompakt"` hält einen Paneelkopf über
+ * einer Vergleichstabelle niedrig (Meldebild).
  */
 
 export interface Verteilungszeile {
@@ -47,6 +48,19 @@ export function anteilProzent(anteil: number): string {
   return `${Math.round(sicher * 1000) / 10}%`;
 }
 
+/** Maße je Dichte: Zahl, Wort, Abstand, Balken. */
+const DICHTE = {
+  paneel: { wert: 20, wort: 12, abstand: 14, zeile: 6, balken: 6 },
+  kompakt: { wert: 15, wort: 12, abstand: 8, zeile: 4, balken: 4 },
+  zeile: { wert: 13, wort: 10, abstand: 6, zeile: 3, balken: 4 },
+} as const;
+
+/**
+ * `paneel`: Zahl Mono 20 (Lagebild); `kompakt`: Mono 15 mit knapper Polsterung, für einen Kopf über
+ * einer Vergleichstabelle (Meldebild); `zeile`: Mono 13 ohne Polsterung, in einer Paneelzeile.
+ */
+export type VerteilungsDichte = keyof typeof DICHTE;
+
 export function Verteilungsliste({
   zeilen,
   kennung = 'verteilung',
@@ -55,46 +69,51 @@ export function Verteilungsliste({
 }: {
   zeilen: readonly Verteilungszeile[];
   kennung?: string;
-  /** `paneel`: Zahl Mono 20 mit Polsterung; `zeile`: Mono 13 ohne Polsterung. */
-  dichte?: 'paneel' | 'zeile';
+  dichte?: VerteilungsDichte;
 } & Pick<HTMLAttributes<HTMLUListElement>, 'aria-label'>) {
   const { token, rollen } = useRollen();
-  const dicht = dichte === 'zeile';
+  const mass = DICHTE[dichte];
+  const inZeile = dichte === 'zeile';
   return (
     <ul
       {...rest}
       style={{
         listStyle: 'none',
         margin: 0,
-        padding: dicht ? 0 : token.padding,
+        padding: inZeile
+          ? 0
+          : dichte === 'kompakt'
+            ? `${token.paddingSM}px ${token.padding}px`
+            : token.padding,
         display: 'grid',
-        gap: dicht ? 6 : 14,
-        // In einer Zahlspalte (rechtsbündiger Flex) nimmt die dichte Liste die volle Breite.
-        ...(dicht ? { width: '100%' } : {}),
+        gap: mass.abstand,
+        // In einer Zahlspalte (rechtsbündiger Flex) nimmt die Liste die volle Breite.
+        ...(inZeile ? { width: '100%' } : {}),
       }}
     >
       {zeilen.map((z) => (
         <li
           key={z.schluessel}
           {...z.attribute}
-          style={{ display: 'flex', flexDirection: 'column', gap: dicht ? 3 : 6 }}
+          style={{ display: 'flex', flexDirection: 'column', gap: mass.zeile }}
         >
           <div
             style={{
               display: 'flex',
               alignItems: 'baseline',
               justifyContent: 'space-between',
-              gap: dicht ? token.paddingXS : token.paddingSM,
+              gap: inZeile ? token.paddingXS : token.paddingSM,
             }}
           >
             <span
+              data-lfh={`${kennung}-wort`}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 6,
-                ...monoStil(dicht ? 10 : 12),
+                ...monoStil(mass.wort),
                 letterSpacing: '0.06em',
-                color: dicht ? rollen.gedaempft : rollen.text,
+                color: inZeile ? rollen.gedaempft : rollen.text,
               }}
             >
               {z.farbfeld && (
@@ -116,18 +135,18 @@ export function Verteilungsliste({
             </span>
             <span
               data-lfh={`${kennung}-wert`}
-              style={{ ...monoStil(dicht ? 13 : 20, 500), color: rollen.text }}
+              style={{ ...monoStil(mass.wert, 500), color: rollen.text }}
             >
               {z.wert ?? '—'}
             </span>
           </div>
           {z.wert == null ? (
             // Ausfall: der Platz bleibt, die Spur nicht — sie sähe aus wie 0.
-            <span aria-hidden="true" style={{ height: dicht ? 4 : 6, visibility: 'hidden' }} />
+            <span aria-hidden="true" style={{ height: mass.balken, visibility: 'hidden' }} />
           ) : (
             <span
               aria-hidden="true"
-              style={{ display: 'flex', height: dicht ? 4 : 6, background: rollen.flaeche3 }}
+              style={{ display: 'flex', height: mass.balken, background: rollen.flaeche3 }}
             >
               <span
                 data-lfh={`${kennung}-anteil`}
@@ -148,11 +167,17 @@ export function Verteilungsliste({
 export default function VerteilungsPaneel({
   zeilen,
   kennung,
+  dichte = 'paneel',
   ...basis
-}: DashboardPaneelBasis & { zeilen: readonly Verteilungszeile[]; kennung?: string }) {
+}: DashboardPaneelBasis & {
+  zeilen: readonly Verteilungszeile[];
+  kennung?: string;
+  /** `paneel` oder `kompakt`; `zeile` gehört in eine Paneelzeile, nicht in ein Paneel. */
+  dichte?: Exclude<VerteilungsDichte, 'zeile'>;
+}) {
   return (
     <DashboardPaneel {...basis}>
-      <Verteilungsliste zeilen={zeilen} kennung={kennung} />
+      <Verteilungsliste zeilen={zeilen} kennung={kennung} dichte={dichte} />
     </DashboardPaneel>
   );
 }

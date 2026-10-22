@@ -1,7 +1,8 @@
 import { screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import ListenPaneel from './ListenPaneel';
+import { dichten, farbenDunkel } from '../../theme/tokens';
+import ListenPaneel, { listenZeileStil } from './ListenPaneel';
 
 const EINTRAEGE = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, text: `Auftrag ${i + 1}` }));
 
@@ -56,5 +57,27 @@ describe('ListenPaneel', () => {
     rendere(EINTRAEGE, 'gesperrt');
     expect(screen.getByText('Modul Aufträge nicht freigegeben.')).toBeInTheDocument();
     expect(screen.queryByRole('listitem')).toBeNull();
+  });
+});
+
+const tokenFuer = (stufe: keyof typeof dichten) => ({
+  controlHeight: dichten[stufe].zeilenhoehe,
+  paddingSM: dichten[stufe].abstand.sm,
+  padding: dichten[stufe].abstand.md,
+});
+
+// Früher `zeilenzielStil` im Führungsüberblick, mit dem Baustein gehoben (LLH-1140).
+describe('listenZeileStil — handgebautes Bedienziel (LFH-365: zwei Angaben)', () => {
+  it('trägt den Boden aus controlHeight — 30 / 48 / 72 px (Literale)', () => {
+    expect(listenZeileStil(farbenDunkel, tokenFuer('kompakt')).minHeight).toBe(30);
+    expect(listenZeileStil(farbenDunkel, tokenFuer('komfortabel')).minHeight).toBe(48);
+    expect(listenZeileStil(farbenDunkel, tokenFuer('handschuh')).minHeight).toBe(72);
+  });
+
+  it('die Polsterung zieht über die Stufen mit, statt festzukleben', () => {
+    const k = listenZeileStil(farbenDunkel, tokenFuer('kompakt'));
+    const h = listenZeileStil(farbenDunkel, tokenFuer('handschuh'));
+    expect(k.paddingBlock).toBeLessThan(h.paddingBlock as number);
+    expect(k.paddingInline).toBeLessThan(h.paddingInline as number);
   });
 });

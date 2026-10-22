@@ -78,4 +78,22 @@ describe('VerteilungsPaneel', () => {
     );
     expect(container.querySelectorAll('[data-lfh="abschnitt-status-wert"]')).toHaveLength(3);
   });
+
+  it('kompakt im Paneel: kleinere Zahl, dieselben Greifer', () => {
+    const { container } = renderMitProviders(
+      <VerteilungsPaneel
+        titel="Einheiten nach FMS-Status"
+        kennung="fms"
+        dichte="kompakt"
+        zustand="daten"
+        zeilen={ZEILEN}
+        leerText="Keine Einheiten."
+        gesperrtText="Modul Einheiten nicht freigegeben."
+        onNeuladen={vi.fn()}
+      />,
+    );
+    const werte = container.querySelectorAll<HTMLElement>('[data-lfh="fms-wert"]');
+    expect(werte).toHaveLength(3);
+    expect(werte[0].style.fontSize).toBe('15px');
+  });
 });

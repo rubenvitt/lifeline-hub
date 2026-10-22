@@ -214,8 +214,9 @@ test('1180 px mit offenem Modulmenü: die Stärke steht auf Höhe des Abschnitts
     hasText: 'Abschnitt Nordufer',
   });
   await expect(zeile).toBeVisible();
-  const name = (await zeile.locator('.ueberblick-abschnitt__name').boundingBox())!;
-  const staerke = (await zeile.locator('.ueberblick-abschnitt__staerke').boundingBox())!;
+  // Zeilenform aus dem Baustein `GliederungsPaneel` (LLH-1140): Kopf = Name, Zahl = Stärke.
+  const name = (await zeile.locator('.lfh-gliederung__kopf').boundingBox())!;
+  const staerke = (await zeile.locator('.lfh-gliederung__zahl').boundingBox())!;
   expect(Math.abs(staerke.y - name.y), 'Stärke in der Zeile des Namens').toBeLessThanOrEqual(2);
   expect(staerke.x, 'Stärke rechts vom Namen').toBeGreaterThan(name.x + name.width);
 });

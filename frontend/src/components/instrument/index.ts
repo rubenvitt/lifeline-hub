@@ -52,6 +52,7 @@ export {
   default as VerteilungsPaneel,
   Verteilungsliste,
   anteilProzent,
+  type VerteilungsDichte,
   type Verteilungszeile,
 } from './VerteilungsPaneel';
 export { default as MatrixPaneel, type Matrixzeile } from './MatrixPaneel';

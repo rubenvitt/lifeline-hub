@@ -6,6 +6,7 @@ import {
   vermisstNotiz,
   baueLagebild,
   einsatzdauer,
+  einsatzdauerKennzahl,
   evakuierungDatenzustand,
   evakuierungStand,
   kennzahlReihe,
@@ -49,6 +50,24 @@ const roh = (over: Partial<Rohdaten> = {}): Rohdaten => ({
 
 /** Schmales geschütztes Leerzeichen (Tausendertrenner) — als Literal, nicht zurückgelesen. */
 const T = '\u202f';
+
+describe('einsatzdauerKennzahl (Lagebild und Überblick, LLH-1140)', () => {
+  it('läuft bis jetzt und nennt den Beginn', () => {
+    const k = einsatzdauerKennzahl({ begonnen_at: '2026-06-11 05:19:00' }, JETZT);
+    expect(k.wert).toBe('6:41');
+    expect(k.einheit).toBe('h');
+    expect(k.notiz).toMatch(/^seit /);
+  });
+
+  it('steht nach dem Abschluss und nennt das Ende', () => {
+    const k = einsatzdauerKennzahl(
+      { begonnen_at: '2026-06-11 05:00:00', abgeschlossen_at: '2026-06-11 07:30:00' },
+      JETZT,
+    );
+    expect(k.wert).toBe('2:30');
+    expect(k.notiz).toMatch(/^beendet /);
+  });
+});
 
 describe('einsatzdauer', () => {
   it('rechnet Stunden und Minuten seit Beginn', () => {
