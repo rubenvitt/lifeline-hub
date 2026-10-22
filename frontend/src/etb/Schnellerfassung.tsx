@@ -10,6 +10,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
 import { DOKUMENT_ACCEPT } from '../api/dokumente';
 import { UPLOAD_MAX_GROESSE } from '../api/upload';
@@ -127,6 +128,14 @@ interface Props {
    * Bildschirmtastatur über der Zeitachse.
    */
   startFokus?: boolean;
+  /**
+   * Platz für die Einstellungen „Nur protokollieren“ und „Werte behalten“ ab `md` (LLH-1037
+   * D12): `EtbEntwurfsTabs` reicht ihn im Reiterband, dort stehen sie ohne eigene Zeile. Fehlt
+   * die Angabe, stehen sie rechts in der Chip-Zeile (Berichtigung, Einzelaufrufer); `null` heißt,
+   * der Platz kommt noch (Callback-Ref) — bis dahin stehen sie nirgends statt kurz in der
+   * Chip-Zeile. Unter `md` gilt immer die Hinweiszeile.
+   */
+  einstellungenZiel?: HTMLElement | null;
 }
 
 /** Sendezustand einer Erfassung: läuft ein Versand, wie weit der Upload ist, welcher Grund steht. */
@@ -302,6 +311,7 @@ export default function Schnellerfassung({
   onVersandChange,
   eingeklappt = false,
   startFokus = true,
+  einstellungenZiel,
 }: Props) {
   const navigate = useNavigate();
   const { token, rollen } = useRollen();
@@ -835,8 +845,9 @@ export default function Schnellerfassung({
    * Sendetaste steht als Kappe an „Erfassen“, Typ und Felder zeigen Präfix-Knopf und „Feld“. Sie
    * bleibt für Zeichengrenze und, unter `md`, „Werte behalten“ — und entfällt, wenn beides fehlt.
    */
-  // „Werte behalten": ab `md` rechts in der Chip-Zeile, darunter in der Hinweiszeile — in der
-  // einzeilig rollenden Chip-Zeile läge er sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
+  // „Werte behalten": ab `md` bei den Einstellungen (`einstellungenAbMd`: Reiterband oder rechts in
+  // der Chip-Zeile), darunter in der Hinweiszeile — in der einzeilig rollenden Chip-Zeile läge er
+  // sonst hinter dem Bildlauf. In der Hinweiszeile OHNE den
   // Kästchen-Boden (`antdKaestchen`, LFH-907): im Handschuh-Betrieb höbe er die Zeile von 36 auf
   // 72 px, und die angepinnte Leiste risse auf dem Handschirm den Deckel der halben Fensterhöhe
   // (`e2e/leisten-flaeche.spec.ts`, 451 statt höchstens 422 px). Benannte Ausnahme.
@@ -853,8 +864,8 @@ export default function Schnellerfassung({
     </Checkbox>
   ) : null;
 
-  // „Nur protokollieren“ (LLH-1037, design.md D7/D8): neben „Werte behalten“, ab `md` in der
-  // Chip-Zeile, darunter in der Hinweiszeile ohne Kästchen-Boden (wie oben). Ohne Freigabe der
+  // „Nur protokollieren“ (LLH-1037, design.md D7/D8/D12): neben „Werte behalten“, ab `md` bei den
+  // Einstellungen, darunter in der Hinweiszeile ohne Kästchen-Boden (wie oben). Ohne Freigabe der
   // Meldungen an und gesperrt, der Grund steht daneben (Wort statt Satz, LFH-1078).
   const protokollSchalter = eingangMoeglich ? (
     <span
@@ -945,6 +956,28 @@ export default function Schnellerfassung({
         )}
       </>
     ) : undefined;
+
+  // Ab `md` stehen beide Einstellungen beisammen und abgesetzt von den Aktionen: im Reiterband,
+  // wenn der Aufrufer dort Platz reicht (LLH-1037 D12), sonst rechts in der Chip-Zeile. In der
+  // Chip-Zeile brach die Gruppe im Handschuh-Betrieb auf dem Fükw um (733 px Karte, 507 px Chips,
+  // 331 px Gruppe), die angepinnte Leiste wuchs um eine Kästchenhöhe. Mit Kästchen-Boden: die
+  // Trefffläche ist dort geprüft (`e2e/trefflaeche-pruefflaechen.spec.ts`).
+  const einstellungenAbMd =
+    !istSchmal && (zeigeSchalter || protokollSchalter != null) ? (
+      <div
+        data-lfh="etb-einstellungen"
+        style={{
+          marginInlineStart: 'auto',
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          gap: token.marginSM,
+        }}
+      >
+        {protokollSchalter}
+        {schalter}
+      </div>
+    ) : null;
 
   const einheitenTreffer =
     menuModus === 'at' ? filterAtEintraege(menuFilter, funkrufnamen, typ) : null;
@@ -1139,8 +1172,8 @@ export default function Schnellerfassung({
       </div>
 
       {/* Chip-Leiste: die gesetzten Felder, der Weg zu weiteren — und rechts, abgesetzt, die
-         EINSTELLUNG „Werte behalten". Nicht neben „Erfassen" und nicht zwischen Aktionen: ein
-         Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
+         EINSTELLUNGEN, wenn kein Reiterband sie aufnimmt. Nicht neben „Erfassen" und nicht zwischen
+         Aktionen: ein Umschalter in einer Knopfreihe wirkt wirkungslos (`components/Erfassung.tsx`). */}
       {!eingeklappt && (
         <div ref={chipZeileRef} style={chipZeileStil(istSchmal, token)}>
           {/* `flexShrink: 0` unter `md`: sonst schrumpfte die Gruppe auf die Zeilenbreite, und die Chips
@@ -1215,22 +1248,13 @@ export default function Schnellerfassung({
               </Button>
             )}
           </Space>
-          {!istSchmal && (zeigeSchalter || protokollSchalter != null) && (
-            <div
-              style={{
-                marginInlineStart: 'auto',
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                gap: token.marginSM,
-              }}
-            >
-              {protokollSchalter}
-              {schalter}
-            </div>
-          )}
+          {einstellungenAbMd != null && einstellungenZiel === undefined && einstellungenAbMd}
         </div>
       )}
+      {einstellungenAbMd != null &&
+        einstellungenZiel != null &&
+        !eingeklappt &&
+        createPortal(einstellungenAbMd, einstellungenZiel)}
 
       {dateien.length > 0 && (
         <ul

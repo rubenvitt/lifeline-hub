@@ -52,7 +52,7 @@ Für Einsatzleitung und Führungspersonal:
 
 1. In der Erfassungsleiste am Fuß der Seite den Text in das Feld „Inhalt …“ schreiben.
 
-   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“, Typ „Meldung“ mit Rahmen in der Typfarbe, Text, den Chips „Von: ELW 1“ und „An: ELW 1“, den Häkchen „Nur protokollieren“ und „Werte behalten“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
+   ![Erfassungsleiste mit Entwurfsreiter „Neuer Eintrag“ und rechts daneben den Häkchen „Nur protokollieren“ und „Werte behalten“, Typ „Meldung“ mit Rahmen in der Typfarbe, Text, den Chips „Von: ELW 1“ und „An: ELW 1“ sowie „Vorschau“ und „Erfassen“](../bilder/einsatztagebuch/erfassung.png)
 
 2. Den Typ prüfen: Der Knopf links zeigt ihn als Wort, zum Beispiel „Meldung“, und die Leiste
    trägt seine Farbe als Rahmen, links als Kante wie die Zeitachse (eine Anordnung etwa orange). Ein Klick darauf wechselt den Typ. Schneller
@@ -99,8 +99,8 @@ dafür nicht.
 
 Für eine reine Mitschrift ohne Meldung:
 
-1. Bei Typ „Meldung“ oder „Lage“ das Häkchen „Nur protokollieren“ setzen. Es steht neben „Werte
-   behalten“, auf einem schmalen Bildschirm unter dem Feld.
+1. Bei Typ „Meldung“ oder „Lage“ das Häkchen „Nur protokollieren“ setzen. Es steht mit „Werte
+   behalten“ rechts neben dem Entwurfsreiter, auf einem schmalen Bildschirm unter dem Feld.
 2. Den Eintrag erfassen. Er steht nur im ETB.
 
 „Nur protokollieren“ gilt für einen Eintrag und ist danach wieder aus, auch mit „Werte behalten“;

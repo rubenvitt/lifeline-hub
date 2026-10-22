@@ -120,6 +120,16 @@ und MUST im Entwurf erhalten bleiben, bis dieser gesendet ist. Bei anderen Typen
 - **WHEN** eine Person den Typ „Anordnung“ wählt
 - **THEN** fehlt der Schalter
 
+### Requirement: Einstellungen der Erfassung kosten keine Zeile
+Ab `md` SHALL „Nur protokollieren“ zusammen mit „Werte behalten“ rechts im Reiterband der
+Entwürfe stehen, abgesetzt von den Aktionen; unter `md` SHALL beides in der Hinweiszeile unter dem
+Feld stehen. Die Einstellungen MUST die angepinnte Erfassungsleiste nicht um eine Zeile erhöhen und
+MUST im Handschuh-Betrieb die Trefffläche der Dichtestufe halten.
+
+#### Scenario: Fükw im Handschuh-Betrieb
+- **WHEN** die Erfassung bei 1366 × 768 im Handschuh-Betrieb mit Typ „Meldung“, Von und An steht
+- **THEN** stehen „Nur protokollieren“ und „Werte behalten“ neben dem Entwurfsreiter, und die Leiste ist so hoch wie ohne „Nur protokollieren“
+
 ### Requirement: Nur protokollieren ohne Recht der Meldungen
 Ist das Modul Meldungen für die Person nicht freigegeben, SHALL der Schalter „Nur protokollieren“
 an und gesperrt stehen, den Grund nennen und der Eintrag nur protokolliert werden. Der Schalter MUST die

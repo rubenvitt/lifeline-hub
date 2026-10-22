@@ -167,8 +167,12 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   `etb-schnellerfassung-tastatur`): bei diesen Typen (nicht in der Berichtigung) zeigt
   `Schnellerfassung.tsx` den Schalter „Nur protokollieren“, Vorgabe aus; aus legt der Server
   Eintrag und Meldung an (Typ „Lage“ → Art „Lagemeldung“, Typ „Meldung“ → Art „Sonstige“). Ab `md`
-  steht er in der Chip-Zeile neben „Werte behalten“, darunter in der Hinweiszeile; er bricht
-  weder die Feldbreite (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Er springt nach jedem
+  steht er mit „Werte behalten“ rechts im Reiterband der Entwürfe (`EtbEntwurfsTabs` reicht den
+  Platz als `einstellungenZiel`, die Schnellerfassung hängt die Gruppe per Portal hinein; ohne
+  Platz rechts in der Chip-Zeile), darunter in der Hinweiszeile. In der Chip-Zeile brach die
+  Gruppe im Handschuh-Betrieb auf dem Fükw um und hob die Leiste um eine Kästchenhöhe
+  (`fokus-verdeckung.spec.ts`, „Nach oben“ hinter dem Kopf). Er bricht weder die Feldbreite
+  (≥ 60 % ab `md`) noch die eingeklappte Handy-Leiste. Er springt nach jedem
   Erfassen auf aus zurück, auch mit „Werte behalten“, und lebt im Entwurf (`nur_protokollieren`,
   optional, kein Versionssprung). Ist das Modul Meldungen gesperrt (`useSprungSperre`), steht er
   an und gesperrt mit dem Grund `MODUL_MELDUNGEN_GESPERRT`. Der Client sendet

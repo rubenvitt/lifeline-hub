@@ -3,7 +3,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { setzeViewportBreite, setzeZeigerGrob } from '../test/viewport';
 import { http, HttpResponse } from 'msw';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import type { NeuerEintrag } from '../api/etb';
 import type { EtbBaustein, EtbEintragAnzeige } from '../api/types';
 import { server } from '../test/server';
@@ -1002,6 +1002,43 @@ describe('Schnellerfassung — Chip-Zeile auf dem Handschirm (LFH-373)', () => {
     // Handschirm den Deckel der halben Fensterhöhe (`e2e/leisten-flaeche.spec.ts`).
     const label = schalter.closest<HTMLElement>('label.ant-checkbox-wrapper')!;
     expect(label.style.minHeight).toBe(inHinweiszeile ? '0px' : '');
+  });
+
+  /**
+   * Ab `md` stehen die Einstellungen im Reiterband, wenn der Aufrufer einen Platz reicht
+   * (LLH-1037 D12): in der Chip-Zeile brach die Gruppe im Handschuh-Betrieb um, und die Leiste
+   * wuchs um eine Kästchenhöhe. Solange der Platz fehlt (`null`), stehen sie nirgends, statt kurz
+   * in der Chip-Zeile aufzublitzen; unter `md` bleibt die Hinweiszeile.
+   */
+  it.each([
+    [1366, 'ziel'],
+    [1366, 'noch-nicht'],
+    [390, 'ziel'],
+  ] as const)('bei %i px mit Platz im Reiterband (%s)', (breite, fall) => {
+    setzeViewportBreite(breite);
+    const ziel = document.createElement('div');
+    document.body.append(ziel);
+    onTestFinished(() => ziel.remove());
+    renderMitProviders(
+      <Schnellerfassung
+        {...props({ werteBehalten: false, onWerteBehaltenChange: vi.fn() })}
+        einstellungenZiel={fall === 'ziel' ? ziel : null}
+      />,
+    );
+    for (const name of ['Werte behalten', 'Nur protokollieren']) {
+      const kaestchen = screen.queryByRole('checkbox', { name });
+      if (breite < 768) {
+        // Unter `md` unverändert in der Hinweiszeile, ohne Kästchen-Boden.
+        expect(kaestchen?.closest('[data-lfh="schnellerfassung"]'), name).not.toBeNull();
+        expect(kaestchen != null && ziel.contains(kaestchen), name).toBe(false);
+      } else if (fall === 'ziel') {
+        expect(kaestchen != null && ziel.contains(kaestchen), name).toBe(true);
+        // Der Boden bleibt: dort ist die Trefffläche im Handschuh-Betrieb geprüft.
+        expect(kaestchen!.closest<HTMLElement>('label')!.style.minHeight, name).toBe('');
+      } else {
+        expect(kaestchen, name).toBeNull();
+      }
+    }
   });
 
   it('holt einen Chip hinter dem rechten Rand waagerecht ins Bild, ohne das Dokument zu rollen', () => {

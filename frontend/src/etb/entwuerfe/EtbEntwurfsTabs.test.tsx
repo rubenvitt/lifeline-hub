@@ -207,6 +207,18 @@ describe('EtbEntwurfsTabs', () => {
     await userEvent.click(await screen.findByText('Funk'));
   }
 
+  it('stellt „Nur protokollieren“ und „Werte behalten“ ab md ins Reiterband (LLH-1037 D12)', async () => {
+    renderMitProviders(<EtbEntwurfsTabs {...props()} />);
+    await screen.findByPlaceholderText(/Inhalt/);
+    // Im Band neben den Reitern, nicht in der Chip-Zeile: dort brach die Gruppe im
+    // Handschuh-Betrieb um, und die angepinnte Leiste wuchs um eine Kästchenhöhe.
+    for (const name of ['Nur protokollieren', 'Werte behalten']) {
+      const kaestchen = screen.getByRole('checkbox', { name });
+      expect(kaestchen.closest('.ant-tabs-nav'), name).not.toBeNull();
+      expect(kaestchen.closest('[data-lfh="etb-erfassung"]'), name).toBeNull();
+    }
+  });
+
   it('übernimmt An und Meldeweg in den nächsten Entwurf (Schalter an)', async () => {
     const p = props();
     renderMitProviders(<EtbEntwurfsTabs {...p} />);
