@@ -156,7 +156,7 @@ abgelehnt werden.
 - **THEN** antwortet der Server mit 403 und fragt den Geocoder nicht
 
 #### Scenario: Geocoder fällt aus
-- **WHEN** der Geocoder nicht antwortet
+- **WHEN** der Geocoder nicht antwortet und kein Adressindex der Offline-Karten passt
 - **THEN** antwortet der Server mit 200 und dem Zustand „nicht erreichbar“ ohne Treffer
 
 #### Scenario: Leerer Suchtext
@@ -170,8 +170,43 @@ abgelehnt werden.
 ### Requirement: Datenschutz der Ortssuche
 Eine Koordinatensuche MUST den Punkt nicht an den Server oder den Geocoder senden. Eine Adresssuche
 SHALL nur den Suchtext und, wenn der Einsatzort verortet ist, einen groben Ausschnitt um ihn an den
-Geocoder senden, keine Einsatzdaten darüber hinaus.
+Geocoder senden, keine Einsatzdaten darüber hinaus. Die Suche im Adressindex der Offline-Karten
+MUST auf dem Server bleiben; findet sie genug Treffer, MUST der Server den Geocoder nicht fragen.
 
 #### Scenario: Koordinate bleibt lokal
 - **WHEN** die Person eine Koordinate sucht und anspringt
 - **THEN** geht dafür keine Anfrage an den Server
+
+#### Scenario: Volle lokale Treffer
+- **WHEN** der Adressindex der Offline-Karten zu einem Suchtext fünf Treffer liefert
+- **THEN** geht keine Anfrage an den Geocoder
+
+### Requirement: Adresssuche aus der Offline-Karte
+Liegt im Kartenverzeichnis des Servers ein Adressindex einer Offline-Region, SHALL die Adresssuche
+an jedem Einstieg (Lagekarte, Ortsfeld, Ortsfeld der Karte) zuerst in ihm suchen und erst danach
+den Geocoder fragen. Treffer aus dem Index MUST vor den Geocoder-Treffern stehen, die Quelle
+`offline_karte` tragen und in der Trefferliste den Zusatz „aus Offline-Karte“ zeigen; die Suchnadel
+trägt nur die Adresse. Ein Geocoder-Treffer, der weniger als 30 m von einem Index-Treffer liegt und
+denselben Namen trägt, MUST entfallen. Liefert der Index mindestens einen Treffer, SHALL der Zustand
+der Antwort „ok“ sein, auch wenn der Geocoder nicht antwortet oder ausgelastet ist. Die Reihenfolge
+im Index folgt der Einsatzumgebung wie beim Geocoder. Der Ortsname einer Koordinate (Ort-Vorschau)
+SHALL aus der nächsten Hausadresse des Index in höchstens 75 m kommen, bevor der Geocoder gefragt
+wird.
+
+#### Scenario: Ohne Internet
+- **WHEN** der Geocoder nicht erreichbar ist, der Adressindex der Region „Testgebiet“ installiert
+  ist und die Person „Hauptstraße 12, Musterstadt“ sucht
+- **THEN** antwortet der Server mit dem Zustand „ok“ und dem Treffer „Hauptstraße 12, 12345
+  Musterstadt“ mit der Quelle `offline_karte`, und die Karte fliegt hin
+
+#### Scenario: Doppelter Ort
+- **WHEN** Index und Geocoder denselben Ort liefern
+- **THEN** steht er einmal in der Liste, als Treffer aus der Offline-Karte
+
+#### Scenario: Ohne Adressindex
+- **WHEN** keine installierte Offline-Karte einen Adressindex mitbringt
+- **THEN** verhält sich die Adresssuche wie ohne Offline-Karten
+
+#### Scenario: Ortsname ohne Internet
+- **WHEN** eine Koordinate weniger als 75 m neben einer Hausadresse des Index liegt und der Geocoder nicht erreichbar ist
+- **THEN** zeigt die Ort-Vorschau diese Adresse als Ortsnamen

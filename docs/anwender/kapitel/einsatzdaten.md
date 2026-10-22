@@ -2,7 +2,7 @@
 titel: Einsatzdaten und Führungsstelle
 gruppen: [fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs]
+quellen: [frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/anzeige/KoordinatenEingabe.tsx, frontend/src/stab/rufnameVorschlaege.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, src/routes/einsatz.rs, src/routes/einsatz_fuehrungsstelle.rs, src/einsatz/repo.rs, frontend/src/pages/EinsatzleiterAngabe.tsx, frontend/src/stab/einsatzleiter.ts, src/einsatz/fuehrungsstelle.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, frontend/src/anzeige/Ortsfeld.tsx, frontend/src/anzeige/Kartenausschnitt.tsx, frontend/src/anzeige/KarteWaehlen.tsx, src/routes/ort_suche.rs, src/geocoding/offline.rs, src/routes/ort_vorschau.rs]
 ---
 
 ## Überblick
@@ -176,14 +176,21 @@ Für die Einsatzleitung:
   das Feld „Als Adresse übernehmen“ an; von sich aus überschreibt es den Text nie.
 - Eine Koordinate im Adressfeld erkennt die App beim Tippen, ohne Anfrage an den Server. „Ort
   suchen“ bleibt dann gesperrt.
-- Die Suche fragt den Geocoder der Organisation (ohne Einstellung den öffentlichen Nominatim)
-  und bevorzugt Orte in der Umgebung des bisherigen Einsatzorts. Sie sucht erst auf Enter oder
+- Die Suche fragt zuerst die Adressen der installierten Offline-Karten auf dem Server, dann den
+  Geocoder der Organisation (ohne Einstellung den öffentlichen Nominatim), und bevorzugt Orte in
+  der Umgebung des bisherigen Einsatzorts. Treffer aus einer Offline-Karte stehen vorn und tragen
+  den Zusatz „aus Offline-Karte“; meldet der Geocoder denselben Ort noch einmal, steht er nur
+  einmal da. Hat der Server kein Internet, findet die Suche so weiter die Adressen der Regionen,
+  deren Offline-Karte einen Adressindex mitbringt (siehe [Karten](karten.md)); Orte außerhalb
+  dieser Regionen findet sie dann nicht. Sie sucht erst auf Enter oder
   „Ort suchen“, nie beim Tippen. Für alle Nutzer zusammen geht höchstens eine Anfrage je Sekunde
   hinaus; ist die Suche gerade belegt, steht „Adresssuche ausgelastet“ am Feld, und „Erneut
   suchen“ versucht es wieder. „Adresssuche nicht erreichbar“ heißt, der Geocoder antwortet
   nicht.
 - An den Geocoder gehen nur der Suchtext und ein grober Ausschnitt um den Einsatzort, keine
-  weiteren Einsatzdaten.
+  weiteren Einsatzdaten. Die Suche in den Offline-Karten bleibt auf dem Server.
+- Den Ortsnamen unter der Koordinate nimmt die App aus derselben Offline-Karte, wenn dort eine
+  Hausadresse in höchstens 75 m Entfernung steht, sonst vom Geocoder.
 - Die Suche braucht das Recht, die Einsatzdaten zu ändern, aber kein Recht auf die Lagekarte.
   „Auf Lagekarte zeigen“ steht nur, wenn der Einsatzort eine Koordinate hat und die Lagekarte
   freigegeben ist.
@@ -204,4 +211,5 @@ meldende Stelle darf höchstens 200 Zeichen lang sein.
 
 Die Angaben des Einsatzkopfs bleiben ohne Netz lesbar, die eigene Führungsstelle nicht (siehe
 [Arbeiten ohne Netz](ohne-netz.md)). Die Adresssuche ist ohne Netz gesperrt („Adresssuche ohne
-Netz nicht verfügbar“).
+Netz nicht verfügbar“). Gemeint ist das Gerät ohne Verbindung zum Server; fehlt nur dem Server
+das Internet, sucht die Adresssuche weiter in den Offline-Karten.
