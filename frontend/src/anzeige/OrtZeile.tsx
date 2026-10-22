@@ -4,7 +4,7 @@ import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
 import { useOrtVorschau } from './useOrtVorschau';
 
 /** Sekundäre Ort-Zeile: «ortsname» · «distanz» «richtung» von «bezug». Additiv, degradiert leer.
- *  Nur rendern, wo eine einsatzId vorhanden ist (Hook → QueryClient nötig). */
+ *  Braucht einen QueryClient. Ohne Einsatz (`einsatzId` `null`, LLH-1376) nur der Ortsname. */
 export function OrtZeile({
   einsatzId,
   koord,
@@ -12,7 +12,7 @@ export function OrtZeile({
   debounceMs,
   maxZeilen,
 }: {
-  einsatzId: number;
+  einsatzId: number | null;
   koord: LatLon;
   exclude?: string;
   debounceMs?: number;

@@ -251,6 +251,11 @@ aus überschreiben.
 - **WHEN** die Koordinate aus einem gewählten Treffer stammt
 - **THEN** steht kein „Als Adresse übernehmen“
 
+#### Scenario: Ohne Einsatz
+- **WHEN** die Person im Dialog „Einsatz anlegen“ die Nadel gezogen hat
+- **THEN** fragt das Feld die Ort-Vorschau der Organisation, die nur aufrufen darf, wer Einsätze anlegen darf (sonst 403), mit denselben Grenzen wie die Ort-Vorschau im Einsatz (1 Anfrage je Sekunde, 1,5 s Zeitlimit, derselbe Cache)
+- **THEN** stehen der Ortsname ohne Peilung und „Als Adresse übernehmen“ unter dem Ausschnitt; ist der Geocoder ausgelastet oder nicht erreichbar, antwortet der Server mit 200 ohne Ortsname
+
 ### Requirement: Auf Karte wählen
 „Auf Karte wählen“ SHALL einen Dialog mit einer großen Karte mit Bedienung öffnen, an der
 Koordinate des Felds mit Nadel, sonst an der Umgebung (meist der Einsatzort), sonst über
