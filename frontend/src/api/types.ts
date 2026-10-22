@@ -1270,6 +1270,35 @@ export interface NeueNachforderung {
   benoetigt_bis?: string;
 }
 
+/**
+ * Body von `POST …/nachforderungen/{nid}/zusage` (LLH-1097 D4), FE-lokal. Eine Anzahl unter der
+ * angeforderten teilt den Rest als eigene Position ab (D1).
+ */
+export interface NachforderungZusageEingabe {
+  /** Zugesagte Menge; fehlt = die angeforderte. */
+  anzahl?: number;
+  /** „Wer“: Rufnamen oder freie Angaben. */
+  rufnamen?: string[];
+  /** Voraussichtliches Eintreffen (UTC); fehlt = ohne. */
+  eintreffen_erwartet_at?: string;
+}
+
+/**
+ * Body von `PATCH …/nachforderungen/{nid}` (LLH-1097 D9), FE-lokal: nur Geändertes, `null` leert.
+ * Steht ein Zielfeld im Body, ersetzt der Body das ganze Ziel. Wer und Eintreffen nur in zugesagt
+ * und unterwegs.
+ */
+export interface PatchNachforderung {
+  anzahl?: number;
+  prioritaet?: NachforderungPrioritaet;
+  bezeichnung?: string | null;
+  ziel_br_id?: number | null;
+  ziel_abschnitt_id?: number | null;
+  ziel_text?: string | null;
+  eintreffen_erwartet_at?: string | null;
+  rufnamen?: string[];
+}
+
 // ============================== Zugangsprotokoll (LFH-1097) ==============================
 /** Ereignis der Anmeldespur (`auth_audit`). */
 export type AnmeldeEreignis = S['Ereignis'];

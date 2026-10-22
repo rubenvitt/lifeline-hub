@@ -70,7 +70,8 @@ const MODULE: readonly {
   {
     pfad: 'nachforderungen',
     anker: 'RTW Wortlaut',
-    knoepfe: ['Zusage erfassen', 'Ablehnen'],
+    // „Ablehnen“ steht seit LLH-1097 im ⋮-Menü der Karte.
+    knoepfe: ['Zusage erfassen'],
     huelle: KARTE,
   },
 ];

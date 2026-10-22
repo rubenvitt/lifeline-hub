@@ -95,16 +95,15 @@ const MIT_NACHBARSCHAFT = [
 /**
  * BEWERTET, ABER FÜR DEN SCANNER UNSICHTBAR (LFH-343 · C8).
  *
- * `nachforderungen/NachforderungKarte.tsx` trägt „Ablehnen" (`danger`) neben der
- * Status-Fortschaltung, mit Abstand. Die Karte baut ihre Aktionen als `ReactNode[]` und spreizt
- * sie mit `{aktionen}` in die Reihe; {@link reihenIn} findet dort keine Reihe.
+ * Eine Karte, die ihre Aktionen als `ReactNode[]` baut und sie mit `{aktionen}` in die Reihe
+ * spreizt: {@link reihenIn} findet dort keine Reihe. (`nachforderungen/NachforderungKarte.tsx`
+ * stand hier, bis LLH-1097 „Ablehnen“ und „Zurückziehen“ hinter den Trenner des ⋮-Menüs legte.)
  *
  * Ein Eintrag in `MIT_NACHBARSCHAFT` färbte den Guard rot, einer in {@link OHNE_NACHBARSCHAFT}
  * behauptete das Gegenteil des Wahren. Die Zusicherung steht deshalb als Kommentar in der Karte
  * selbst; der Test unten pinnt beide Hälften.
  */
 const BEWERTET_OHNE_SCANNER_DECKUNG = [
-  'nachforderungen/NachforderungKarte.tsx',
   // LLH-1098: „Auftrag aufheben“ (`danger`) neben „Vollzug melden“ bzw. „Abnehmen“, gespreizt aus
   // `{aktionen}` und `weitere.map` in ein `<Space size="middle">`; ab drei Aktionen steht es rot
   // hinter dem Trenner des Menüs. Die Knöpfe stehen in `AuftragHandlungen`, die Karte der

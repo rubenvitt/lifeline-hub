@@ -237,6 +237,7 @@ function nachforderung(over: Record<string, unknown>) {
     erstellt_von_name: null,
     ist_offen: over.status !== 'eingetroffen' && over.status !== 'abgelehnt',
     material_ids: [],
+    zusage_rufnamen: [],
     ...over,
   };
 }

@@ -1,6 +1,12 @@
 import { Button, Flex, Space, Typography } from 'antd';
 import { memo, useId, type ReactNode } from 'react';
-import type { EinsatzMaterial, Nachforderung, NachforderungStatus } from '../api/types';
+import type {
+  EinsatzMaterial,
+  Nachforderung,
+  NachforderungStatus,
+  NachforderungZusageEingabe,
+  PatchNachforderung,
+} from '../api/types';
 import {
   NACHFORDERUNG_HANDLUNG,
   NACHFORDERUNG_STATUS,
@@ -8,6 +14,9 @@ import {
   StatusBadge,
 } from '../kommunikation';
 import KommKarte from '../kommunikation/KommKarte';
+import { MenueAusloeser, type MenueEintrag } from '../components/MenueAusloeser';
+import { StatusChip } from '../components/instrument';
+import type { Speicherung } from '../components/Erfassung';
 import { formatVor } from '../anzeige/abstand';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { monoStil, useRollen } from '../components/instrument';
@@ -19,8 +28,12 @@ import { useMaterialOrtKontext } from '../kraefte/MaterialOrtAngabe';
 import { mengeText, ortText, ortVon } from '../kraefte/materialPosten';
 import { materialPfad } from '../routing/deeplinks';
 import { isErgaenzen, uebernommenePosten, uebernommeneMenge } from './materialUebernahme';
-import { kartenZeiten } from './nachforderungStufen';
-import { zielZeile, type ZielNamen } from './zielVorschlaege';
+import { istUeberfaellig, kartenZeiten } from './nachforderungStufen';
+import { nachforderungName } from './nachforderungName';
+import { zielZeile, type ZielAbschnitt, type ZielNamen, type ZielRaum } from './zielVorschlaege';
+import { zusageZeilen } from './zusage';
+import ZusageFormular from './ZusageFormular';
+import BearbeitenFormular from './BearbeitenFormular';
 
 const { Text } = Typography;
 
@@ -58,6 +71,12 @@ export interface StellenVerweis {
   name: string;
   pfad: string;
 }
+
+/** Das Formular, das an einer Karte offen ist (LLH-1097 D10): höchstens eines je Seite. */
+export type KartenFormular = 'zusage' | 'bearbeiten';
+
+/** Die Einträge des ⋮-Menüs einer offenen Karte (D10). */
+type MenueAktion = 'bearbeiten' | 'zurueckziehen' | 'ablehnen';
 
 /** Zustand eines aus dem Einsatz genommenen Postens, Wortlaut der Materialliste (LLH-1093). */
 const AUS_DEM_EINSATZ = 'aus dem Einsatz genommen';
@@ -114,6 +133,24 @@ interface NachforderungKarteProps {
   darfSchreiben?: boolean;
   onStatus?: (id: number, status: NachforderungStatus) => void;
   onAblehnen?: (id: number) => void;
+  /** Öffnet den Dialog „Zurückziehen“ der Seite (LLH-1097 D8). */
+  onZurueckziehen?: (id: number) => void;
+  /**
+   * Das an dieser Karte offene Formular (LLH-1097 D10), `null` ohne. Den Zustand hält die Seite:
+   * offen ist höchstens eines, und solange hält das Board still.
+   */
+  formular?: KartenFormular | null;
+  /** Öffnet (`art`) oder schließt (`null`) das Formular dieser Karte. */
+  onFormular?: (id: number, art: KartenFormular | null) => void;
+  /** Zusage senden; **muss bei Ablehnung ablehnen** (`mutateAsync`). */
+  onZusage?: (id: number, zusage: NachforderungZusageEingabe) => Promise<unknown>;
+  /** Änderung senden; **muss bei Ablehnung ablehnen** (`mutateAsync`). */
+  onBearbeiten?: (id: number, aenderung: PatchNachforderung) => Promise<unknown>;
+  /** Die Mutation des offenen Formulars: ihr Fehler steht im Formular. Nur an dessen Karte. */
+  formularSpeicherung?: Speicherung;
+  /** Räume und Abschnitte für „Wohin“ beim Bearbeiten; nur an der Karte mit offenem Formular. */
+  raeume?: readonly ZielRaum[];
+  abschnitte?: readonly ZielAbschnitt[];
   /** Grund der zuletzt abgelehnten Fortschaltung, aus `components/useZeilenFehler.ts`. */
   fehlerGrund?: ZeilenGrund | null;
   /**
@@ -164,9 +201,11 @@ function StellenBezug({ verweis }: { verweis: StellenVerweis | undefined }) {
 
 /**
  * Karte einer Nachforderung im Board (LLH-1078, Spec `nachforderungen-board`): kompakt —
- * Priorität und Alter seit der Anforderung, „Menge × Art“, Adressat, Bedarf, Zeitzeilen
- * (`kartenZeiten`, Einhängepunkt für das erwartete Eintreffen aus LLH-1097), übernommenes
- * Material, Grund einer Ablehnung. Genau eine Primäraktion: die Fortschaltung um eine Stufe.
+ * Priorität und Alter seit der Anforderung, „Menge × Art“, Adressat, Bedarf, Zusage (Wer,
+ * Teilung, LLH-1097 D11), Zeitzeilen (`kartenZeiten`, mit dem erwarteten Eintreffen),
+ * übernommenes Material, Grund einer Ablehnung oder des Zurückziehens. Genau eine Primäraktion:
+ * die Fortschaltung um eine Stufe; „Zusage erfassen“ öffnet dafür das Formular an der Karte.
+ * Bearbeiten, Zurückziehen und Ablehnen stehen im ⋮-Menü (D10).
  */
 export default memo(NachforderungKarte);
 
@@ -178,6 +217,14 @@ function NachforderungKarte({
   darfSchreiben,
   onStatus,
   onAblehnen,
+  onZurueckziehen,
+  formular = null,
+  onFormular,
+  onZusage,
+  onBearbeiten,
+  formularSpeicherung,
+  raeume,
+  abschnitte,
   fehlerGrund,
   materialJeId,
   materialGesperrt = false,
@@ -193,31 +240,69 @@ function NachforderungKarte({
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
   const abgelehnt = n.status === 'abgelehnt';
+  const zurueckgezogen = n.status === 'zurueckgezogen';
+  const ueberfaellig = jetzt != null && istUeberfaellig(n, jetzt);
+  const name = nachforderungName(n);
   const menge = n.anzahl != null ? `${n.anzahl}× ` : '';
   const adressat = `${ADRESSAT_LABEL[n.adressat_kategorie] ?? n.adressat_kategorie}${n.adressat_bezeichnung ? ` (${n.adressat_bezeichnung})` : ''}`;
   // Im Board nennt die Stufe der Spaltenkopf bzw. das gewählte Segment; eine gehaltene Karte, die
   // inzwischen weiter ist, trägt ihre neue Stufe selbst. Ohne Spalte steht sie immer.
   const statusZeigen = spaltenStufe !== n.status;
-  const zeiten = kartenZeiten(n, formatZeit);
+  const zeiten = kartenZeiten(n, formatZeit, jetzt);
   const ziel = zielZeile(n, zielNamen);
+  const zusage = zusageZeilen(n);
+  // Die Zusage geht über das Formular an der Karte, sobald die Seite es führt (LLH-1097 D10).
+  const zusageAlsFormular = next === 'zugesagt' && onFormular != null && onZusage != null;
+  const offenesFormular = darfSchreiben && n.ist_offen ? formular : null;
 
-  const aktionen: ReactNode[] =
+  /*
+   * Bearbeiten, Zurückziehen und Ablehnen gebündelt (D10, ab drei Aktionen): beide Abschlüsse sind
+   * unumkehrbar und stehen rot hinter dem Trenner; jeder fragt im Dialog der Seite mit Grund.
+   */
+  const menue: MenueEintrag<MenueAktion>[] =
     darfSchreiben && n.ist_offen
+      ? [
+          ...(onFormular && onBearbeiten
+            ? [{ key: 'bearbeiten' as const, label: 'Bearbeiten' }]
+            : []),
+          ...(onZurueckziehen
+            ? [{ key: 'zurueckziehen' as const, label: 'Zurückziehen', gefahr: true as const }]
+            : []),
+          ...(onAblehnen
+            ? [{ key: 'ablehnen' as const, label: 'Ablehnen', gefahr: true as const }]
+            : []),
+        ]
+      : [];
+  const waehle = (key: MenueAktion) => {
+    if (key === 'bearbeiten') onFormular?.(n.id, 'bearbeiten');
+    else if (key === 'zurueckziehen') onZurueckziehen?.(n.id);
+    else onAblehnen?.(n.id);
+  };
+
+  // Solange ein Formular an der Karte offen ist, stehen seine Knöpfe allein: der Öffner ist weg.
+  const aktionen: ReactNode[] =
+    darfSchreiben && n.ist_offen && offenesFormular == null
       ? [
           // Fortschaltung mit EINEM Klick; der Rückweg steht im Rückgängig-Toast, und
           // `uebergang_erlaubt` nimmt die Rücknahme um genau eine Stufe an. Der Knopf nennt die
           // Handlung („Zusage erfassen"), nicht den Zielstatus (LFH-959). Umrandet, nicht gefüllt:
           // gefüllt ist nur die Primäraktion im Seitenkopf, sonst stünde das Board voller Blau.
-          next && onStatus ? (
+          zusageAlsFormular ? (
+            <Button key="next" loading={laeuft} onClick={() => onFormular(n.id, 'zusage')}>
+              {NACHFORDERUNG_HANDLUNG.zugesagt}
+            </Button>
+          ) : next && onStatus ? (
             <Button key="next" loading={laeuft} onClick={() => onStatus(n.id, next)}>
               {NACHFORDERUNG_HANDLUNG[next]}
             </Button>
           ) : null,
-          // „Ablehnen" öffnet das Modal (= eigene Bestätigung mit Grund) → keine Rückfrage.
-          onAblehnen ? (
-            <Button key="ab" danger onClick={() => onAblehnen(n.id)}>
-              Ablehnen
-            </Button>
+          menue.length > 0 ? (
+            <MenueAusloeser<MenueAktion>
+              key="menue"
+              eintraege={menue}
+              zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
+              onWahl={waehle}
+            />
           ) : null,
         ].filter(Boolean)
       : [];
@@ -260,7 +345,11 @@ function NachforderungKarte({
       <Flex justify="space-between" align="center" style={{ marginBottom: 4 }} gap={8} wrap>
         <Space size={6} wrap>
           <PrioBadge prio={n.prioritaet} />
-          {statusZeigen && <StatusBadge phase={status.phase} label={status.label} />}
+          {statusZeigen && (
+            <StatusBadge phase={status.phase} label={status.label} ton={status.ton} />
+          )}
+          {/* Das Wort ist der zweite Kanal neben dem Ton (LLH-1097 D7); kein Alarm. */}
+          {ueberfaellig && <StatusChip ton="achtung" wort="überfällig" />}
         </Space>
         {jetzt != null && (
           <span
@@ -294,6 +383,15 @@ function NachforderungKarte({
           <StellenBezug verweis={stellenJeId?.get(n.betreuungsstelle_id)} />
         )}
         {n.begruendung && <Text type="secondary">{n.begruendung}</Text>}
+        {zusage.length > 0 && (
+          <Space orientation="vertical" size={0} data-lfh="nachforderung-zusage-angaben">
+            {zusage.map((z) => (
+              <Text key={z} style={{ fontSize: 13, overflowWrap: 'anywhere' }}>
+                {z}
+              </Text>
+            ))}
+          </Space>
+        )}
         <Space orientation="vertical" size={0} data-lfh="nachforderung-zeiten">
           {zeiten.map((z) => (
             <Text
@@ -321,7 +419,37 @@ function NachforderungKarte({
             {n.abgelehnt_grund ? `: ${n.abgelehnt_grund}` : ''}
           </Text>
         )}
+        {zurueckgezogen && (
+          <Text type="secondary" style={{ overflowWrap: 'anywhere' }}>
+            Zurückgezogen{n.zurueckgezogen_at ? ` (${formatZeit(n.zurueckgezogen_at)})` : ''}
+            {n.zurueckgezogen_grund ? `: ${n.zurueckgezogen_grund}` : ''}
+          </Text>
+        )}
       </Space>
+
+      {offenesFormular === 'zusage' && onFormular && onZusage && (
+        <div style={{ marginTop: 8 }}>
+          <ZusageFormular
+            nachforderung={n}
+            onSenden={(z) => onZusage(n.id, z)}
+            onSchliessen={() => onFormular(n.id, null)}
+            speicherung={formularSpeicherung}
+          />
+        </div>
+      )}
+      {offenesFormular === 'bearbeiten' && onFormular && onBearbeiten && (
+        <div style={{ marginTop: 8 }}>
+          <BearbeitenFormular
+            nachforderung={n}
+            zielNamen={zielNamen}
+            raeume={raeume}
+            abschnitte={abschnitte}
+            onSpeichern={(a) => onBearbeiten(n.id, a)}
+            onSchliessen={() => onFormular(n.id, null)}
+            speicherung={formularSpeicherung}
+          />
+        </div>
+      )}
 
       {/* Grund einer abgelehnten Fortschaltung über den Knöpfen, bis zur nächsten an dieser Karte
          (LFH-1077). */}
@@ -330,8 +458,8 @@ function NachforderungKarte({
           <ZeilenFehler fehler={fehlerGrund.fehler} fallback={fehlerGrund.fallback} />
         </div>
       )}
-      {/* `<Space size="middle">`: „Ablehnen" ist `danger` und braucht Abstand zur Fortschaltung
-         (gepinnt in `components/aktionsabstand.guard.test.ts`). */}
+      {/* Fortschaltung und ⋮-Menü; „Zurückziehen“ und „Ablehnen“ stehen rot hinter dem Trenner des
+         Menüs (LLH-1097 D10), nicht in der Reihe. */}
       {aktionen.length > 0 && (
         <Space size="middle" wrap style={{ marginTop: 8, width: '100%' }}>
           {aktionen}

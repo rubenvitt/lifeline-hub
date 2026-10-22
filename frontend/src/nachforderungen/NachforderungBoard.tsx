@@ -8,26 +8,42 @@ import {
   type Key,
   type ReactNode,
 } from 'react';
-import type { Nachforderung, NachforderungStatus } from '../api/types';
+import type {
+  Nachforderung,
+  NachforderungStatus,
+  NachforderungZusageEingabe,
+  PatchNachforderung,
+} from '../api/types';
+import type { Speicherung } from '../components/Erfassung';
 import { SeitenLeer } from '../components/SeitenZustand';
-import { Sammelbanner, Segmentleiste, monoStil, useRollen } from '../components/instrument';
+import {
+  Sammelbanner,
+  Segmentleiste,
+  StatusChip,
+  monoStil,
+  useRollen,
+} from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { useZuflussSchleuse, type ZuflussSteuerung } from '../components/useZuflussSchleuse';
 import type { ZeilenGrund } from '../components/useZeilenFehler';
 import NachforderungKarte, {
+  type KartenFormular,
   type StellenVerweis,
   type UebernahmePosten,
 } from './NachforderungKarte';
-import type { ZielNamen } from './zielVorschlaege';
+import type { ZielAbschnitt, ZielNamen, ZielRaum } from './zielVorschlaege';
 import {
+  EINGEKLAPPTE_STUFEN,
   EINGETROFFEN_STUNDEN,
   STUFEN,
   boardGruppe,
   boardSpalten,
   stufeWort,
   vergleicheImBoard,
+  zaehleUeberfaellig,
   type BoardGruppe,
   type BoardSpalte,
+  type EingeklappteStufe,
 } from './nachforderungStufen';
 
 /**
@@ -36,8 +52,11 @@ import {
  * Karte“), keine zweite Form derselben Liste.
  *
  * - Ab `md` Spalten Angefordert · Zugesagt · Unterwegs · Eingetroffen (letzte 12 h); „Abgelehnt“
- *   steht als schmale eingeklappte Spalte daneben und klappt auf. Unter `md` eine Segmentleiste der
- *   fünf Stufen mit Zahl, darunter die Karten der gewählten Stufe.
+ *   und „Zurückgezogen“ (LLH-1097 D8) stehen eingeklappt untereinander in einer schmalen Spalte
+ *   daneben und klappen auf. Unter `md` eine Segmentleiste der sechs Stufen mit Zahl, darunter die Karten der gewählten
+ *   Stufe.
+ * - Über den Spalten „n überfällig“ (LLH-1097 D7), sobald eine Zusage ihr Eintreffen verpasst hat;
+ *   gezählt über die gezeigten Karten, ohne Ton und ohne Alarm.
  * - Fortgeschaltet wird per Knopf an der Karte, nie per Ziehen (Handschuh, Tastatur).
  * - Die Zuflussschleuse hält Menge, Spalte und Folge, solange Zeiger oder Fokus im Board sind oder
  *   ein Dialog der Seite offen ist (`halten`); Fremdes nennt der Sammelbanner. Die eigene
@@ -48,18 +67,51 @@ import {
 
 const schluessel = (n: Nachforderung): Key => n.id;
 
-/** Was die Seite am Board umschaltet: Segment am Handy, Abgelehnt und ältere Eingetroffene. */
+/**
+ * Was die Seite am Board umschaltet: Segment am Handy, die eingeklappten Spalten (Abgelehnt,
+ * Zurückgezogen) und ältere Eingetroffene.
+ */
 export interface BoardAnsicht {
   stufe: NachforderungStatus;
   abgelehntOffen: boolean;
+  zurueckgezogenOffen: boolean;
   aeltereOffen: boolean;
 }
+
+/** Ist die eingeklappte Spalte dieser Stufe aufgeklappt? */
+function eingeklapptOffen(ansicht: BoardAnsicht, stufe: EingeklappteStufe): boolean {
+  return stufe === 'abgelehnt' ? ansicht.abgelehntOffen : ansicht.zurueckgezogenOffen;
+}
+
+function setzeEingeklappt(
+  ansicht: BoardAnsicht,
+  stufe: EingeklappteStufe,
+  offen: boolean,
+): BoardAnsicht {
+  return stufe === 'abgelehnt'
+    ? { ...ansicht, abgelehntOffen: offen }
+    : { ...ansicht, zurueckgezogenOffen: offen };
+}
+
+const istEingeklappt = (stufe: NachforderungStatus): stufe is EingeklappteStufe =>
+  (EINGEKLAPPTE_STUFEN as readonly string[]).includes(stufe);
 
 /** Was jede Karte unverändert bekommt; stabil halten (die Karten sind `memo`). */
 export interface BoardKartenProps {
   darfSchreiben?: boolean;
   onStatus?: (id: number, status: NachforderungStatus) => void;
   onAblehnen?: (id: number) => void;
+  onZurueckziehen?: (id: number) => void;
+  /** Das offene Formular der Seite (LLH-1097 D10): höchstens eines, an genau einer Karte. */
+  offenesFormular?: { id: number; art: KartenFormular } | null;
+  onFormular?: (id: number, art: KartenFormular | null) => void;
+  onZusage?: (id: number, zusage: NachforderungZusageEingabe) => Promise<unknown>;
+  onBearbeiten?: (id: number, aenderung: PatchNachforderung) => Promise<unknown>;
+  /** Mutation des offenen Formulars; nur dessen Karte bekommt sie (die Karten sind `memo`). */
+  formularSpeicherung?: Speicherung;
+  /** Für „Wohin“ beim Bearbeiten; nur die Karte mit offenem Formular bekommt sie. */
+  raeume?: readonly ZielRaum[];
+  abschnitte?: readonly ZielAbschnitt[];
   kartenFehler?: (id: number) => ZeilenGrund | null;
   materialJeId?: ReadonlyMap<number, UebernahmePosten> | null;
   materialGesperrt?: boolean;
@@ -92,7 +144,7 @@ export function sichtbareKarten(
 ): Nachforderung[] {
   return spalten.flatMap((sp) => {
     if (schmal && sp.stufe !== ansicht.stufe) return [];
-    if (!schmal && sp.stufe === 'abgelehnt' && !ansicht.abgelehntOffen) return [];
+    if (!schmal && istEingeklappt(sp.stufe) && !eingeklapptOffen(ansicht, sp.stufe)) return [];
     return [...sp.karten, ...(ansicht.aeltereOffen ? sp.aeltere : [])];
   });
 }
@@ -190,25 +242,37 @@ export default function NachforderungBoard({
 
   const kartenListe = (sp: BoardSpalte, liste: readonly Nachforderung[]) => (
     <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-      {liste.map((n) => (
-        <NachforderungKarte
-          key={n.id}
-          nachforderung={n}
-          spaltenStufe={sp.stufe}
-          jetzt={jetzt}
-          darfSchreiben={karten.darfSchreiben}
-          onStatus={karten.onStatus}
-          onAblehnen={karten.onAblehnen}
-          fehlerGrund={karten.kartenFehler?.(n.id) ?? null}
-          materialJeId={karten.materialJeId}
-          materialGesperrt={karten.materialGesperrt}
-          onMaterialUebernehmen={karten.onMaterialUebernehmen}
-          hervorgehoben={n.id === karten.hervorgehobenId}
-          laeuft={n.id === karten.laeuftId}
-          stellenJeId={karten.stellenJeId}
-          zielNamen={karten.zielNamen}
-        />
-      ))}
+      {liste.map((n) => {
+        // Nur die Karte mit offenem Formular bekommt dessen Mutation und die Ziellisten.
+        const formular = karten.offenesFormular?.id === n.id ? karten.offenesFormular.art : null;
+        return (
+          <NachforderungKarte
+            key={n.id}
+            nachforderung={n}
+            spaltenStufe={sp.stufe}
+            jetzt={jetzt}
+            darfSchreiben={karten.darfSchreiben}
+            onStatus={karten.onStatus}
+            onAblehnen={karten.onAblehnen}
+            onZurueckziehen={karten.onZurueckziehen}
+            formular={formular}
+            onFormular={karten.onFormular}
+            onZusage={karten.onZusage}
+            onBearbeiten={karten.onBearbeiten}
+            formularSpeicherung={formular ? karten.formularSpeicherung : undefined}
+            raeume={formular === 'bearbeiten' ? karten.raeume : undefined}
+            abschnitte={formular === 'bearbeiten' ? karten.abschnitte : undefined}
+            fehlerGrund={karten.kartenFehler?.(n.id) ?? null}
+            materialJeId={karten.materialJeId}
+            materialGesperrt={karten.materialGesperrt}
+            onMaterialUebernehmen={karten.onMaterialUebernehmen}
+            hervorgehoben={n.id === karten.hervorgehobenId}
+            laeuft={n.id === karten.laeuftId}
+            stellenJeId={karten.stellenJeId}
+            zielNamen={karten.zielNamen}
+          />
+        );
+      })}
     </div>
   );
 
@@ -275,7 +339,56 @@ export default function NachforderungBoard({
   );
 
   const leer = stand.sortiert.length === 0 && stand.geordnet.length === 0;
-  const abgelehnt = spalten.find((sp) => sp.stufe === 'abgelehnt')!;
+  const ueberfaellig = zaehleUeberfaellig(stand.geordnet, jetzt);
+
+  /** Eine eingeklappte Spalte (Abgelehnt, Zurückgezogen): schmal mit Wort und Zahl, klappt auf. */
+  const eingeklappteSpalte = (stufe: EingeklappteStufe) => {
+    const sp = spalten.find((x) => x.stufe === stufe)!;
+    const offen = eingeklapptOffen(ansicht, stufe);
+    return (
+      <section
+        key={stufe}
+        data-lfh="board-spalte"
+        data-stufe={stufe}
+        aria-label={`${stufeWort(stufe)}, ${sp.karten.length}`}
+        style={{ minWidth: 0 }}
+      >
+        {offen ? (
+          <>
+            <h2 style={{ ...kopfStil, padding: 0 }}>
+              <Button
+                type="text"
+                block
+                aria-expanded
+                onClick={() => onAnsicht(setzeEingeklappt(ansicht, stufe, false))}
+                style={{ justifyContent: 'space-between', fontWeight: 600 }}
+              >
+                <span>{stufeWort(stufe)}</span>
+                <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+                  {sp.karten.length}
+                </span>
+              </Button>
+            </h2>
+            {inhalt(sp)}
+          </>
+        ) : (
+          // Eingeklappt: eine schmale Spalte, die nur Wort und Zahl trägt und aufklappt.
+          <h2 style={{ margin: 0 }}>
+            <Button
+              aria-expanded={false}
+              onClick={() => onAnsicht(setzeEingeklappt(ansicht, stufe, true))}
+              style={{ fontWeight: 600 }}
+            >
+              {stufeWort(stufe)}{' '}
+              <span data-lfh="board-zahl" style={monoStil(14, 500)}>
+                {sp.karten.length}
+              </span>
+            </Button>
+          </h2>
+        )}
+      </section>
+    );
+  };
 
   return (
     <>
@@ -286,6 +399,11 @@ export default function NachforderungBoard({
         >
           {banner}
         </Sammelbanner>
+      )}
+      {ueberfaellig > 0 && (
+        <div data-lfh="board-ueberfaellig" style={{ marginBottom: token.marginXS }}>
+          <StatusChip ton="achtung" code={ueberfaellig} wort="überfällig" />
+        </div>
       )}
       {leer && <SeitenLeer titel="Keine Nachforderungen" />}
       {schmal && !leer && (
@@ -316,8 +434,12 @@ export default function NachforderungBoard({
               ? { display: 'block' }
               : {
                   display: 'grid',
+                  // Abgelehnt und Zurückgezogen teilen sich eine Spalte, untereinander: eingeklappt
+                  // nur so breit wie ihr Wort, damit die vier Stufen ihre Breite behalten.
                   gridTemplateColumns: `repeat(4, minmax(0, 1fr)) ${
-                    ansicht.abgelehntOffen ? 'minmax(0, 1fr)' : 'auto'
+                    EINGEKLAPPTE_STUFEN.some((stufe) => eingeklapptOffen(ansicht, stufe))
+                      ? 'minmax(0, 1fr)'
+                      : 'auto'
                   }`,
                   gap: token.marginXS,
                   alignItems: 'start',
@@ -340,7 +462,7 @@ export default function NachforderungBoard({
                   {inhalt(sp)}
                 </section>
               ))
-          : STUFEN.filter((s) => s !== 'abgelehnt').map((stufe) => {
+          : STUFEN.filter((s) => !istEingeklappt(s)).map((stufe) => {
               const sp = spalten.find((x) => x.stufe === stufe)!;
               return (
                 <section
@@ -356,46 +478,12 @@ export default function NachforderungBoard({
               );
             })}
         {!schmal && (
-          <section
-            data-lfh="board-spalte"
-            data-stufe="abgelehnt"
-            aria-label={`${stufeWort('abgelehnt')}, ${abgelehnt.karten.length}`}
-            style={{ minWidth: 0 }}
+          <div
+            data-lfh="board-eingeklappt"
+            style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS, minWidth: 0 }}
           >
-            {ansicht.abgelehntOffen ? (
-              <>
-                <h2 style={{ ...kopfStil, padding: 0 }}>
-                  <Button
-                    type="text"
-                    block
-                    aria-expanded
-                    onClick={() => onAnsicht({ ...ansicht, abgelehntOffen: false })}
-                    style={{ justifyContent: 'space-between', fontWeight: 600 }}
-                  >
-                    <span>{stufeWort('abgelehnt')}</span>
-                    <span data-lfh="board-zahl" style={monoStil(14, 500)}>
-                      {abgelehnt.karten.length}
-                    </span>
-                  </Button>
-                </h2>
-                {inhalt(abgelehnt)}
-              </>
-            ) : (
-              // Eingeklappt: eine schmale Spalte, die nur Wort und Zahl trägt und aufklappt.
-              <h2 style={{ margin: 0 }}>
-                <Button
-                  aria-expanded={false}
-                  onClick={() => onAnsicht({ ...ansicht, abgelehntOffen: true })}
-                  style={{ fontWeight: 600 }}
-                >
-                  {stufeWort('abgelehnt')}{' '}
-                  <span data-lfh="board-zahl" style={monoStil(14, 500)}>
-                    {abgelehnt.karten.length}
-                  </span>
-                </Button>
-              </h2>
-            )}
-          </section>
+            {EINGEKLAPPTE_STUFEN.map(eingeklappteSpalte)}
+          </div>
         )}
       </div>
     </>

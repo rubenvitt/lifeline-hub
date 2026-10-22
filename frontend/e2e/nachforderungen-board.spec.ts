@@ -62,9 +62,11 @@ test('drei offene in drei Spalten; Zusage erfassen trägt die Karte weiter, Rüc
     spalte(page, 'abgelehnt').getByRole('button', { name: /Abgelehnt/ }),
   ).toHaveAttribute('aria-expanded', 'false');
 
-  // Die übrigen Karten stehen nach dem Klick, wo sie standen.
+  // Die übrigen Karten stehen nach dem Absenden, wo sie standen. „Zusage erfassen“ öffnet das
+  // Formular an der Karte (LLH-1097 D10); Enter im Mengenfeld sagt die ganze Anzahl zu.
   const vorher = await karte(pumpen).boundingBox();
   await karte(rtw).getByRole('button', { name: 'Zusage erfassen' }).click();
+  await karte(rtw).getByRole('spinbutton', { name: 'Zugesagt' }).press('Enter');
   await expect(spalte(page, 'zugesagt').locator(`[data-nachforderung-id="${rtw}"]`)).toBeVisible();
   await expect(karte(rtw)).toBeFocused();
   expect(await karte(pumpen).boundingBox()).toEqual(vorher);
@@ -95,4 +97,47 @@ test('am Handy eine Segmentleiste der Stufen mit Zahl, ohne waagrechten Überlau
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(ueberhang).toBeLessThanOrEqual(1);
+});
+
+test('Teilzusage teilt in zwei Karten; Zurückziehen über das Menü (LLH-1097)', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  const { id } = await post(page, '/api/einsaetze', {
+    bezeichnung: `E2E Nachforderung Zusage ${Date.now()}`,
+  });
+  const nf = await post(page, `/api/einsaetze/${id}/nachforderungen`, {
+    art: 'RTW',
+    anzahl: 2,
+    bezeichnung: 'RTW Teilzusage',
+    adressat_kategorie: 'leitstelle',
+  });
+  await page.goto(`/einsaetze/${id}/nachforderungen`);
+  const karte = page.locator(`[data-nachforderung-id="${nf.id}"]`);
+  await karte.getByRole('button', { name: 'Zusage erfassen' }).click();
+  const menge = karte.getByRole('spinbutton', { name: 'Zugesagt' });
+  await expect(menge).toHaveValue('2');
+  await menge.fill('1');
+  const wer = karte.getByRole('combobox', { name: 'Wer' });
+  await wer.fill('83-1');
+  await wer.press('Enter');
+  await karte.getByRole('button', { name: 'Zusage erfassen' }).click();
+
+  const zugesagt = spalte(page, 'zugesagt').locator(`[data-nachforderung-id="${nf.id}"]`);
+  await expect(zugesagt).toContainText('1 von 2 zugesagt');
+  await expect(zugesagt).toContainText('Wer: 83-1');
+  const rest = spalte(page, 'angefordert').locator('[data-nachforderung-id]', {
+    hasText: 'Rest einer Teilzusage',
+  });
+  await expect(rest).toContainText('1× RTW');
+
+  await rest.getByRole('button', { name: /^Aktionen zu Nachforderung / }).click();
+  await page.getByRole('menuitem', { name: 'Zurückziehen' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nachforderung zurückziehen' });
+  await dialog.getByRole('textbox').fill('nicht mehr benötigt');
+  await dialog.getByRole('button', { name: 'Zurückziehen' }).click();
+  await expect(spalte(page, 'angefordert')).toContainText('keine');
+  await spalte(page, 'zurueckgezogen')
+    .getByRole('button', { name: /^Zurückgezogen/ })
+    .click();
+  await expect(spalte(page, 'zurueckgezogen')).toContainText('Zurückgezogen');
+  await expect(spalte(page, 'zurueckgezogen')).toContainText('nicht mehr benötigt');
 });

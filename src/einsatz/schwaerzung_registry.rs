@@ -2391,6 +2391,15 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("ziel_abschnitt_id", G_FK),
             scrub("ziel_text", Strategie::NullSetzen, Z_EINSATZ),
             retain("benoetigt_bis", G_ZEIT),
+            // Zusage (LLH-1097 D12): „Wer“ ist Freitext (Rufnamen fremder Einheiten, aber auch
+            // „DRK Musterstadt“) und geht wie der Adressat; Zeit, Menge und der Verweis der
+            // Restposition bleiben. Der Grund des Zurückziehens ist Freitext.
+            scrub("zusage_rufnamen", Strategie::NullSetzen, Z_EINSATZ),
+            retain("eintreffen_erwartet_at", G_ZEIT),
+            retain("anzahl_angefordert", G_ZAEHLER),
+            retain("teilung_aus_id", G_FK),
+            retain("zurueckgezogen_at", G_ZEIT),
+            scrub("zurueckgezogen_grund", Strategie::NullSetzen, Z_EINSATZ),
         ],
     },
     // ---------- Chat / Erinnerungen (Freitexte gescrubbt) ----------

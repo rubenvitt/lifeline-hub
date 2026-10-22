@@ -34,6 +34,14 @@ fn stufen_text(kurz: &str, neu: &str, rueckwaerts: bool, grund: Option<&str>) ->
     }
 }
 
+/// Das Wort einer Stufe im ETB-Wortlaut: der Drahtwert, „zurückgezogen“ mit Umlaut.
+fn stufe_wort(status: &str) -> &str {
+    match status {
+        super::STATUS_ZURUECKGEZOGEN => "zurückgezogen",
+        s => s,
+    }
+}
+
 /// Schreibt den Systemeintrag einer vollzogenen Stufe in der laufenden Transaktion und setzt
 /// seinen Verweis auf die Nachforderung (LLH-1104 D6). Liefert die Kennung des Eintrags.
 async fn stufe_protokollieren_tx(
@@ -44,18 +52,33 @@ async fn stufe_protokollieren_tx(
     rueckwaerts: bool,
     grund: Option<&str>,
 ) -> Result<i64, AppError> {
-    let (einsatz_id, art, anzahl): (i64, String, Option<i64>) =
-        sqlx::query_as("SELECT einsatz_id, art, anzahl FROM nachforderung WHERE id = ?")
+    let (art, anzahl): (String, Option<i64>) =
+        sqlx::query_as("SELECT art, anzahl FROM nachforderung WHERE id = ?")
             .bind(id)
             .fetch_one(&mut *conn)
             .await?;
+    let inhalt = stufen_text(&kurzname(anzahl, &art), stufe_wort(neu), rueckwaerts, grund);
+    protokollieren_tx(conn, id, erfasser_id, &inhalt).await
+}
+
+/// Ein Systemeintrag zur Nachforderung `id` mit Verweis auf sie, in der laufenden Transaktion
+/// (LLH-1104 D6; Zusage und Bearbeiten, LLH-1097 D5/D9, nutzen denselben Weg). Liefert die
+/// Kennung des Eintrags.
+async fn protokollieren_tx(
+    conn: &mut sqlx::SqliteConnection,
+    id: i64,
+    erfasser_id: i64,
+    inhalt: &str,
+) -> Result<i64, AppError> {
+    let einsatz_id: i64 = sqlx::query_scalar("SELECT einsatz_id FROM nachforderung WHERE id = ?")
+        .bind(id)
+        .fetch_one(&mut *conn)
+        .await?;
     let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
         .await?
         .etb_startwert();
-    let inhalt = stufen_text(&kurzname(anzahl, &art), neu, rueckwaerts, grund);
     let etb_id =
-        crate::etb::system_audit_tx(&mut *conn, einsatz_id, erfasser_id, startwert, &inhalt)
-            .await?;
+        crate::etb::system_audit_tx(&mut *conn, einsatz_id, erfasser_id, startwert, inhalt).await?;
     sqlx::query("UPDATE etb_eintrag SET nachforderung_id = ? WHERE id = ?")
         .bind(id)
         .bind(etb_id)
@@ -111,15 +134,23 @@ pub fn anlage_text(
     text
 }
 
+/// Ziel einer Nachforderung: höchstens eines von Raum, Abschnitt und Freitext (LLH-1089 D5).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Ziel<'a> {
+    pub br_id: Option<i64>,
+    pub abschnitt_id: Option<i64>,
+    pub text: Option<&'a str>,
+}
+
 /// Name des Ziels für den ETB-Wortlaut, in der Transaktion der Anlage aus der Zeile gelesen
 /// (Raum: Bezeichnung, Abschnitt: Name, sonst der Freitext). `NotFound`, wenn der Bezug nicht zum
 /// Einsatz gehört — die Route hat das geprüft, die Transaktion sieht es ein zweites Mal.
 async fn ziel_name_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
-    daten: &NachforderungDaten<'_>,
+    ziel: Ziel<'_>,
 ) -> Result<Option<String>, AppError> {
-    let (sql, id) = match (daten.ziel_br_id, daten.ziel_abschnitt_id) {
+    let (sql, id) = match (ziel.br_id, ziel.abschnitt_id) {
         (Some(id), _) => (
             "SELECT bezeichnung FROM bereitstellungsraum WHERE id = ? AND einsatz_id = ?",
             id,
@@ -128,7 +159,7 @@ async fn ziel_name_tx(
             "SELECT name FROM einsatzabschnitt WHERE id = ? AND einsatz_id = ?",
             id,
         ),
-        (None, None) => return Ok(daten.ziel_text.map(str::to_string)),
+        (None, None) => return Ok(ziel.text.map(str::to_string)),
     };
     sqlx::query_scalar::<_, String>(sql)
         .bind(id)
@@ -170,12 +201,14 @@ const ANZEIGE_SELECT: &str =
             n.zugesagt_at, n.unterwegs_at, n.eingetroffen_at, n.abgelehnt_at, n.abgelehnt_grund, \
             n.angefordert_at, n.etb_nachforderung_id, n.erstellt_von_id, n.erstellt_at, \
             b.anzeigename AS erstellt_von_name, \
-            (n.status NOT IN ('eingetroffen', 'abgelehnt')) AS ist_offen, \
+            (n.status NOT IN ('eingetroffen', 'abgelehnt', 'zurueckgezogen')) AS ist_offen, \
             (SELECT json_group_array(em.id ORDER BY em.id) FROM einsatz_material em \
              WHERE em.nachforderung_id = n.id AND em.beendet_als IS NOT 'storniert') \
               AS material_ids, \
             n.betreuungsstelle_id, n.ziel_br_id, n.ziel_abschnitt_id, n.ziel_text, \
-            n.benoetigt_bis \
+            n.benoetigt_bis, COALESCE(n.zusage_rufnamen, '[]') AS zusage_rufnamen, \
+            n.eintreffen_erwartet_at, n.anzahl_angefordert, n.teilung_aus_id, \
+            n.zurueckgezogen_at, n.zurueckgezogen_grund \
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
@@ -230,7 +263,16 @@ pub async fn create_tx(
     // ETB-Meldung (Pattern B): die Anforderung erscheint regulär im ETB, immer — unabhängig von
     // „Automatische ETB-Einträge“ (LLH-1104 D4: Führungsvorgang mit Außenwirkung). Von ist die
     // eigene Führungsstelle, An der Adressat (D5).
-    let ziel = ziel_name_tx(&mut *tx, einsatz_id, daten).await?;
+    let ziel = ziel_name_tx(
+        &mut *tx,
+        einsatz_id,
+        Ziel {
+            br_id: daten.ziel_br_id,
+            abschnitt_id: daten.ziel_abschnitt_id,
+            text: daten.ziel_text,
+        },
+    )
+    .await?;
     let bis = match daten.benoetigt_bis {
         Some(b) => Some(crate::zeitachse::repo::zeit_text(
             b,
@@ -469,6 +511,14 @@ pub async fn update_status(
         (n, Some(spalte), _) if n == alt_stufe + 1 => {
             (format!("{spalte} = COALESCE({spalte}, ?)"), true)
         }
+        // Die Rücknahme der Zusage leert auch deren Angaben (LLH-1097 D6); eine Teilung bleibt.
+        (n, _, Some(spalte)) if n + 1 == alt_stufe && erwartet == super::STATUS_ZUGESAGT => (
+            format!(
+                "{spalte} = NULL, zusage_rufnamen = NULL, eintreffen_erwartet_at = NULL, \
+                 anzahl_angefordert = NULL"
+            ),
+            false,
+        ),
         (n, _, Some(spalte)) if n + 1 == alt_stufe => (format!("{spalte} = NULL"), false),
         _ => return Err(ungueltig()),
     };
@@ -522,6 +572,395 @@ pub async fn lehne_ab(
             return Ok(None);
         }
         stufe_protokollieren_tx(conn, id, erfasser_id, super::STATUS_ABGELEHNT, false, grund)
+            .await
+            .map(Some)
+    })
+}
+
+/// Angaben einer Zusage (LLH-1097 design.md D1–D4), vom Handler getrimmt, entdoppelt und auf
+/// ihre Grenzen geprüft. `eintreffen_erwartet_at` ist normalisiert (UTC).
+#[derive(Debug, Default)]
+pub struct ZusageDaten<'a> {
+    /// Zugesagte Menge; fehlt = die angeforderte Anzahl.
+    pub anzahl: Option<i64>,
+    pub rufnamen: &'a [String],
+    pub eintreffen_erwartet_at: Option<&'a str>,
+}
+
+/// Was eine Zusage geschrieben hat: den ETB-Eintrag und bei einer Teilzusage die Restposition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ZusageErgebnis {
+    pub etb_id: i64,
+    pub rest_id: Option<i64>,
+}
+
+/// Rufnamen als Spaltenwert: JSON-Array, ohne Einträge NULL.
+fn rufnamen_json(rufnamen: &[String]) -> Result<Option<String>, AppError> {
+    if rufnamen.is_empty() {
+        return Ok(None);
+    }
+    serde_json::to_string(rufnamen)
+        .map(Some)
+        .map_err(|e| AppError::Internal(format!("Rufnamen nicht kodierbar: {e}")))
+}
+
+/// Inhalt des Systemeintrags einer Zusage (D5): „Nachforderung 2× RTW: zugesagt (83-1, 83-2),
+/// Eintreffen erwartet 22.10. 15:30“; bei einer Teilzusage „…: 1 zugesagt (83-1) …; 1× RTW weiter
+/// angefordert“. `eta` ist schon in der Anzeigezone formatiert.
+pub fn zusage_text(
+    kurz: &str,
+    teilung: Option<(i64, i64, &str)>,
+    rufnamen: &[String],
+    eta: Option<&str>,
+) -> String {
+    let mut text = match teilung {
+        Some((zugesagt, _, _)) => format!("Nachforderung {kurz}: {zugesagt} zugesagt"),
+        None => format!("Nachforderung {kurz}: zugesagt"),
+    };
+    if !rufnamen.is_empty() {
+        text.push_str(&format!(" ({})", rufnamen.join(", ")));
+    }
+    if let Some(e) = eta {
+        text.push_str(&format!(", Eintreffen erwartet {e}"));
+    }
+    if let Some((_, rest, art)) = teilung {
+        text.push_str(&format!("; {rest}× {art} weiter angefordert"));
+    }
+    text
+}
+
+/// Erfasst die Zusage einer angeforderten Nachforderung (D1–D5) in EINER Transaktion: prüft den
+/// Zusammenhang an der Zeile (422: nicht angefordert, mehr zugesagt als angefordert, mehr
+/// Rufnamen als zugesagt, Eintreffen vor der Anforderung; 404: fremd oder unbekannt), schaltet
+/// auf `zugesagt` mit Menge, Rufnamen und Eintreffen, teilt bei einer Teilzusage den Rest als
+/// eigene angeforderte Position ab und schreibt genau einen Systemeintrag ins ETB.
+pub async fn sage_zu(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    erfasser_id: i64,
+    daten: &ZusageDaten<'_>,
+    jetzt: &str,
+) -> Result<ZusageErgebnis, AppError> {
+    let rufnamen = rufnamen_json(daten.rufnamen)?;
+    crate::write_retry!(pool, |conn| {
+        let (status, anzahl, art, angefordert_at): (String, Option<i64>, String, String) =
+            sqlx::query_as(
+                "SELECT status, anzahl, art, angefordert_at FROM nachforderung \
+                 WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(id)
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        if status != super::STATUS_ANGEFORDERT {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Übergang {status} → zugesagt nicht erlaubt"
+            )));
+        }
+        let zugesagt = daten.anzahl.or(anzahl);
+        let rest = match (zugesagt, anzahl) {
+            (Some(z), Some(a)) if z > a => {
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Zugesagt ist mehr als angefordert ({z} von {a})"
+                )));
+            }
+            (Some(z), Some(a)) if z < a => Some(a - z),
+            _ => None,
+        };
+        pruefe_rufnamen_zahl(daten.rufnamen, zugesagt)?;
+        pruefe_eintreffen(daten.eintreffen_erwartet_at, &angefordert_at)?;
+
+        let r = sqlx::query(
+            "UPDATE nachforderung SET status = ?, zugesagt_at = COALESCE(zugesagt_at, ?), \
+             anzahl = ?, anzahl_angefordert = ?, zusage_rufnamen = ?, eintreffen_erwartet_at = ? \
+             WHERE id = ? AND status = ?",
+        )
+        .bind(super::STATUS_ZUGESAGT)
+        .bind(jetzt)
+        .bind(zugesagt)
+        .bind(rest.and(anzahl))
+        .bind(rufnamen.as_deref())
+        .bind(daten.eintreffen_erwartet_at)
+        .bind(id)
+        .bind(super::STATUS_ANGEFORDERT)
+        .execute(&mut *conn)
+        .await?;
+        if r.rows_affected() == 0 {
+            // Unter BEGIN IMMEDIATE nicht erreichbar; bleibt als Sperre gegen einen Umbau.
+            return Err(AppError::UnprocessableEntity(
+                "Status wurde zwischenzeitlich geändert".into(),
+            ));
+        }
+        // Der Rest ist Teil derselben Anforderung (D1): gleiche Angaben, gleiche Wartezeit,
+        // gleicher ETB-Eintrag der Anforderung.
+        let rest_id = match rest {
+            Some(r) => Some(
+                sqlx::query_scalar::<_, i64>(
+                    "INSERT INTO nachforderung \
+                       (einsatz_id, art, bezeichnung, anzahl, adressat_kategorie, \
+                        adressat_bezeichnung, begruendung, prioritaet, angefordert_at, \
+                        etb_nachforderung_id, erstellt_von_id, betreuungsstelle_id, ziel_br_id, \
+                        ziel_abschnitt_id, ziel_text, benoetigt_bis, teilung_aus_id) \
+                     SELECT einsatz_id, art, bezeichnung, ?, adressat_kategorie, \
+                        adressat_bezeichnung, begruendung, prioritaet, angefordert_at, \
+                        etb_nachforderung_id, erstellt_von_id, betreuungsstelle_id, ziel_br_id, \
+                        ziel_abschnitt_id, ziel_text, benoetigt_bis, id \
+                     FROM nachforderung WHERE id = ? RETURNING id",
+                )
+                .bind(r)
+                .bind(id)
+                .fetch_one(&mut *conn)
+                .await?,
+            ),
+            None => None,
+        };
+        let eta = match daten.eintreffen_erwartet_at {
+            Some(e) => Some(crate::zeitachse::repo::zeit_text(
+                e,
+                anzeigezone_tx(&mut *conn, einsatz_id).await?,
+            )),
+            None => None,
+        };
+        let inhalt = zusage_text(
+            &kurzname(anzahl, &art),
+            match (zugesagt, rest) {
+                (Some(z), Some(r)) => Some((z, r, art.as_str())),
+                _ => None,
+            },
+            daten.rufnamen,
+            eta.as_deref(),
+        );
+        let etb_id = protokollieren_tx(conn, id, erfasser_id, &inhalt).await?;
+        Ok(ZusageErgebnis { etb_id, rest_id })
+    })
+}
+
+/// Mehr Rufnamen als zugesagte Einheiten sind ein Widerspruch (D2): Teil (b) legt je Rufname eine
+/// Einheit an. Ohne bekannte Menge gilt keine Grenze.
+fn pruefe_rufnamen_zahl(rufnamen: &[String], anzahl: Option<i64>) -> Result<(), AppError> {
+    match anzahl {
+        Some(a) if i64::try_from(rufnamen.len()).unwrap_or(i64::MAX) > a => {
+            Err(AppError::UnprocessableEntity(format!(
+                "Mehr Rufnamen als zugesagt ({} für {a})",
+                rufnamen.len()
+            )))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Das erwartete Eintreffen liegt nicht vor der Anforderung (D3). Beide Zeiten sind normalisiert
+/// ('YYYY-MM-DD HH:MM:SS', UTC): der Textvergleich ordnet sie.
+fn pruefe_eintreffen(eta: Option<&str>, angefordert_at: &str) -> Result<(), AppError> {
+    if eta.is_some_and(|e| e < angefordert_at) {
+        return Err(AppError::UnprocessableEntity(
+            "Das erwartete Eintreffen liegt vor der Anforderung".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Zieht eine offene Nachforderung durch die eigene Führung zurück (D8): setzt
+/// `status = 'zurueckgezogen'`, Zeitpunkt und Grund — nur wenn der Bestandsstatus `erwartet`
+/// unverändert ist (optimistische Sperre wie [`lehne_ab`]). Schreibt in derselben Transaktion den
+/// Systemeintrag „Nachforderung 2× RTW: zurückgezogen (Grund)“ und liefert dessen Kennung;
+/// `None` = nichts geändert.
+pub async fn ziehe_zurueck(
+    pool: &SqlitePool,
+    id: i64,
+    erfasser_id: i64,
+    grund: Option<&str>,
+    erwartet: &str,
+    jetzt: &str,
+) -> Result<Option<i64>, AppError> {
+    crate::write_retry!(pool, |conn| {
+        let r = sqlx::query(
+            "UPDATE nachforderung SET status = ?, \
+             zurueckgezogen_at = COALESCE(zurueckgezogen_at, ?), zurueckgezogen_grund = ? \
+             WHERE id = ? AND status = ?",
+        )
+        .bind(super::STATUS_ZURUECKGEZOGEN)
+        .bind(jetzt)
+        .bind(grund)
+        .bind(id)
+        .bind(erwartet)
+        .execute(&mut *conn)
+        .await?;
+        if r.rows_affected() == 0 {
+            return Ok(None);
+        }
+        stufe_protokollieren_tx(
+            conn,
+            id,
+            erfasser_id,
+            super::STATUS_ZURUECKGEZOGEN,
+            false,
+            grund,
+        )
+        .await
+        .map(Some)
+    })
+}
+
+/// Änderungen an einer offenen Nachforderung (D9), vom Handler geprüft (400er). Jedes Feld:
+/// `None` = unverändert. `ziel` ersetzt das ganze Ziel. `eintreffen_erwartet_at` und `rufnamen`
+/// gehören zur Zusage und gelten nur in zugesagt/unterwegs.
+#[derive(Debug, Default)]
+pub struct Aenderung<'a> {
+    pub anzahl: Option<i64>,
+    pub prioritaet: Option<&'a str>,
+    pub bezeichnung: Option<Option<&'a str>>,
+    pub ziel: Option<Ziel<'a>>,
+    pub eintreffen_erwartet_at: Option<Option<&'a str>>,
+    pub rufnamen: Option<&'a [String]>,
+}
+
+/// Bestand einer Nachforderung, wie das Bearbeiten ihn vergleicht.
+#[derive(sqlx::FromRow)]
+struct Bestand {
+    status: String,
+    art: String,
+    anzahl: Option<i64>,
+    angefordert_at: String,
+    prioritaet: String,
+    bezeichnung: Option<String>,
+    ziel_br_id: Option<i64>,
+    ziel_abschnitt_id: Option<i64>,
+    ziel_text: Option<String>,
+    eintreffen_erwartet_at: Option<String>,
+    zusage_rufnamen: String,
+}
+
+/// Bearbeitet eine offene Nachforderung (D9) in EINER Transaktion: 404 fremd oder unbekannt, 422
+/// abgeschlossen, Zusage-Angaben vor der Zusage, mehr Rufnamen als Anzahl, Eintreffen vor der
+/// Anforderung. Schreibt nur, was sich wirklich ändert, und dann genau einen Systemeintrag
+/// „Nachforderung 2× RTW geändert: Anzahl 3; → BR Nord“ (alter Kurzname). Liefert dessen Kennung;
+/// `None` = nichts geändert, nichts geschrieben.
+pub async fn aktualisiere(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    erfasser_id: i64,
+    aenderung: &Aenderung<'_>,
+) -> Result<Option<i64>, AppError> {
+    crate::write_retry!(pool, |conn| {
+        let alt: Bestand = sqlx::query_as(
+            "SELECT status, art, anzahl, angefordert_at, prioritaet, bezeichnung, ziel_br_id, \
+                ziel_abschnitt_id, ziel_text, eintreffen_erwartet_at, \
+                COALESCE(zusage_rufnamen, '[]') AS zusage_rufnamen \
+             FROM nachforderung WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(id)
+        .bind(einsatz_id)
+        .fetch_optional(&mut *conn)
+        .await?
+        .ok_or(AppError::NotFound)?;
+        let offen = super::NachforderungStatus::parse(&alt.status).is_some_and(|s| s.ist_offen());
+        if !offen {
+            return Err(AppError::UnprocessableEntity(
+                "Eine abgeschlossene Nachforderung lässt sich nicht bearbeiten".into(),
+            ));
+        }
+        let zusage_feld =
+            aenderung.eintreffen_erwartet_at.is_some() || aenderung.rufnamen.is_some();
+        if zusage_feld && alt.status == super::STATUS_ANGEFORDERT {
+            return Err(AppError::UnprocessableEntity(
+                "Wer und Eintreffen gehören zur Zusage".into(),
+            ));
+        }
+        let alte_rufnamen: Vec<String> = serde_json::from_str(&alt.zusage_rufnamen)
+            .map_err(|e| AppError::Internal(format!("Rufnamen unlesbar: {e}")))?;
+
+        let anzahl = aenderung.anzahl.or(alt.anzahl);
+        let prioritaet = aenderung.prioritaet.unwrap_or(&alt.prioritaet);
+        let bezeichnung = match aenderung.bezeichnung {
+            Some(b) => b,
+            None => alt.bezeichnung.as_deref(),
+        };
+        let ziel_alt = Ziel {
+            br_id: alt.ziel_br_id,
+            abschnitt_id: alt.ziel_abschnitt_id,
+            text: alt.ziel_text.as_deref(),
+        };
+        let ziel = aenderung.ziel.unwrap_or(ziel_alt);
+        let eta = match aenderung.eintreffen_erwartet_at {
+            Some(e) => e,
+            None => alt.eintreffen_erwartet_at.as_deref(),
+        };
+        let rufnamen: &[String] = aenderung.rufnamen.unwrap_or(&alte_rufnamen);
+        pruefe_rufnamen_zahl(rufnamen, anzahl)?;
+        pruefe_eintreffen(eta, &alt.angefordert_at)?;
+
+        // Was sich ändert, in der Folge der Karte; daraus Wortlaut und „nichts zu tun“.
+        let mut teile: Vec<String> = Vec::new();
+        if anzahl != alt.anzahl {
+            if let Some(a) = anzahl {
+                teile.push(format!("Anzahl {a}"));
+            }
+        }
+        if ziel != ziel_alt {
+            teile.push(match ziel_name_tx(&mut *conn, einsatz_id, ziel).await? {
+                Some(name) => format!("→ {name}"),
+                None => "ohne Ziel".into(),
+            });
+        }
+        if prioritaet != alt.prioritaet {
+            teile.push(format!("Priorität {prioritaet}"));
+        }
+        if bezeichnung != alt.bezeichnung.as_deref() {
+            teile.push(match bezeichnung {
+                Some(b) => format!("Details: {b}"),
+                None => "ohne Details".into(),
+            });
+        }
+        if eta != alt.eintreffen_erwartet_at.as_deref() {
+            teile.push(match eta {
+                Some(e) => format!(
+                    "Eintreffen erwartet {}",
+                    crate::zeitachse::repo::zeit_text(
+                        e,
+                        anzeigezone_tx(&mut *conn, einsatz_id).await?
+                    )
+                ),
+                None => "ohne erwartetes Eintreffen".into(),
+            });
+        }
+        if rufnamen != alte_rufnamen.as_slice() {
+            teile.push(if rufnamen.is_empty() {
+                "ohne Rufnamen".into()
+            } else {
+                format!("Wer: {}", rufnamen.join(", "))
+            });
+        }
+        if teile.is_empty() {
+            return Ok(None);
+        }
+
+        sqlx::query(
+            "UPDATE nachforderung SET anzahl = ?, prioritaet = ?, bezeichnung = ?, \
+                ziel_br_id = ?, ziel_abschnitt_id = ?, ziel_text = ?, \
+                eintreffen_erwartet_at = ?, zusage_rufnamen = ? \
+             WHERE id = ?",
+        )
+        .bind(anzahl)
+        .bind(prioritaet)
+        .bind(bezeichnung)
+        .bind(ziel.br_id)
+        .bind(ziel.abschnitt_id)
+        .bind(ziel.text)
+        .bind(eta)
+        .bind(rufnamen_json(rufnamen)?)
+        .bind(id)
+        .execute(&mut *conn)
+        .await?;
+        let inhalt = format!(
+            "Nachforderung {} geändert: {}",
+            kurzname(alt.anzahl, &alt.art),
+            teile.join("; ")
+        );
+        protokollieren_tx(conn, id, erfasser_id, &inhalt)
             .await
             .map(Some)
     })
@@ -1390,5 +1829,531 @@ mod tests {
         .await
         .unwrap()
         .is_some());
+    }
+
+    // --- LLH-1097: Zusage, Teilzusage, Zurückziehen, Bearbeiten ---
+
+    fn namen(liste: &[&str]) -> Vec<String> {
+        liste.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// D1–D5: Zusage mit Rufnamen und Eintreffen ohne Teilung — eine Position, ein ETB-Eintrag
+    /// mit Wer und Zeit in der Anzeigezone (Juni: +2 h).
+    #[tokio::test]
+    async fn zusage_mit_rufnamen_und_eintreffen() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        let wer = namen(&["Florian Musterstadt 83-1", "Florian Musterstadt 83-2"]);
+        let r = sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                anzahl: None,
+                rufnamen: &wer,
+                eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        assert_eq!(r.rest_id, None);
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.status, NachforderungStatus::Zugesagt);
+        assert_eq!(nach.anzahl, Some(2));
+        assert_eq!(nach.anzahl_angefordert, None);
+        assert_eq!(nach.zusage_rufnamen.0, wer);
+        assert_eq!(
+            nach.eintreffen_erwartet_at.as_deref(),
+            Some("2026-06-12 13:30:00")
+        );
+        assert_eq!(nach.zugesagt_at.as_deref(), Some("2026-06-12 09:05:00"));
+        let etb = etb_der_nachforderung(&pool, n.id).await;
+        assert_eq!(etb.len(), 2, "Anlage und Zusage");
+        assert_eq!(
+            etb[1],
+            (
+                "system".to_string(),
+                "Nachforderung 2× RTW: zugesagt (Florian Musterstadt 83-1, \
+                 Florian Musterstadt 83-2), Eintreffen erwartet 12.06. 15:30"
+                    .to_string()
+            )
+        );
+        let (_, _, _, _, verweis) = etb_zeile(&pool, r.etb_id).await;
+        assert_eq!(verweis, Some(n.id));
+    }
+
+    /// Akzeptanz: Zusage 1 von 2 → eine Position „zugesagt 1× RTW“, eine „angefordert 1× RTW“ mit
+    /// denselben Angaben und derselben Wartezeit; genau ein ETB-Eintrag nennt beides.
+    #[tokio::test]
+    async fn teilzusage_teilt_den_rest_als_offene_position_ab() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let (br, _) = raum_und_abschnitt(&pool, e, b).await;
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                ziel_br_id: Some(br),
+                prioritaet: crate::nachforderung::PRIO_SOFORT,
+                ..daten("RTW", "Transport")
+            },
+        )
+        .await
+        .unwrap();
+        let wer = namen(&["83-1"]);
+        let r = sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                anzahl: Some(1),
+                rufnamen: &wer,
+                eintreffen_erwartet_at: None,
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        let rest_id = r.rest_id.expect("Restposition");
+
+        let zugesagt = load(&pool, n.id).await.unwrap();
+        assert_eq!(zugesagt.status, NachforderungStatus::Zugesagt);
+        assert_eq!(zugesagt.anzahl, Some(1));
+        assert_eq!(zugesagt.anzahl_angefordert, Some(2));
+        assert_eq!(zugesagt.teilung_aus_id, None);
+
+        let rest = load(&pool, rest_id).await.unwrap();
+        assert_eq!(rest.status, NachforderungStatus::Angefordert);
+        assert_eq!(rest.anzahl, Some(1));
+        assert_eq!(rest.teilung_aus_id, Some(n.id));
+        assert_eq!(rest.art, "RTW");
+        assert_eq!(rest.bezeichnung.as_deref(), Some("Transport"));
+        assert_eq!(rest.ziel_br_id, Some(br));
+        assert_eq!(rest.prioritaet, crate::kommunikation::Prioritaet::Sofort);
+        assert_eq!(rest.angefordert_at, n.angefordert_at);
+        assert_eq!(rest.etb_nachforderung_id, n.etb_nachforderung_id);
+        assert_eq!(rest.erstellt_von_id, b);
+        assert!(rest.zusage_rufnamen.0.is_empty());
+        assert_eq!(rest.zugesagt_at, None);
+
+        assert_eq!(list(&pool, e, None).await.unwrap().len(), 2);
+        let etb = etb_der_nachforderung(&pool, n.id).await;
+        assert_eq!(
+            etb.last().unwrap().1,
+            "Nachforderung 2× RTW: 1 zugesagt (83-1); 1× RTW weiter angefordert"
+        );
+        assert!(etb_der_nachforderung(&pool, rest_id).await.is_empty());
+    }
+
+    /// D1/D2/D3/D4: der Zusammenhang wird an der Zeile geprüft; abgewiesen bleibt alles, wie es war.
+    #[tokio::test]
+    async fn zusage_prueft_den_zusammenhang_und_schreibt_dann_nichts() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        let zusage = |anzahl: Option<i64>, wer: Vec<String>, eta: Option<&'static str>| {
+            let pool = pool.clone();
+            async move {
+                sage_zu(
+                    &pool,
+                    e,
+                    n.id,
+                    b,
+                    &ZusageDaten {
+                        anzahl,
+                        rufnamen: &wer,
+                        eintreffen_erwartet_at: eta,
+                    },
+                    "2026-06-12 09:05:00",
+                )
+                .await
+            }
+        };
+        let fehler = [
+            zusage(Some(3), vec![], None).await,
+            zusage(Some(1), namen(&["83-1", "83-2"]), None).await,
+            zusage(None, namen(&["83-1", "83-2", "83-3"]), None).await,
+            zusage(None, vec![], Some("2026-06-12 08:00:00")).await,
+        ];
+        for f in fehler {
+            assert!(matches!(f, Err(AppError::UnprocessableEntity(_))), "{f:?}");
+        }
+        assert!(matches!(
+            sage_zu(
+                &pool,
+                e + 1,
+                n.id,
+                b,
+                &ZusageDaten::default(),
+                "2026-06-12 09:05:00"
+            )
+            .await,
+            Err(AppError::NotFound)
+        ));
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.status, NachforderungStatus::Angefordert);
+        assert_eq!(nach.anzahl, Some(2));
+        assert_eq!(etb_der_nachforderung(&pool, n.id).await.len(), 1);
+        assert_eq!(list(&pool, e, None).await.unwrap().len(), 1);
+
+        // Schon zugesagt: keine zweite Zusage.
+        zusage(None, vec![], None).await.unwrap();
+        assert!(matches!(
+            zusage(None, vec![], None).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+    }
+
+    /// Ohne angeforderte Anzahl setzt die Zusage die Menge, ohne Teilung.
+    #[tokio::test]
+    async fn zusage_ohne_anzahl_setzt_die_menge() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(
+            &pool,
+            e,
+            b,
+            NachforderungDaten {
+                anzahl: None,
+                ..daten("Sandsäcke", "")
+            },
+        )
+        .await
+        .unwrap();
+        let r = sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                anzahl: Some(500),
+                ..Default::default()
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        assert_eq!(r.rest_id, None);
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.anzahl, Some(500));
+        assert_eq!(nach.anzahl_angefordert, None);
+        assert_eq!(
+            etb_der_nachforderung(&pool, n.id).await[1].1,
+            "Nachforderung Sandsäcke: zugesagt"
+        );
+    }
+
+    /// D6: Rückgängig nach der Zusage leert Wer, Eintreffen und die Teilungsmenge; der Rest bleibt
+    /// eigene Position.
+    #[tokio::test]
+    async fn ruecknahme_der_zusage_leert_ihre_angaben_und_laesst_den_rest() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        let wer = namen(&["83-1"]);
+        let r = sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                anzahl: Some(1),
+                rufnamen: &wer,
+                eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_ANGEFORDERT,
+            STATUS_ZUGESAGT,
+            "2026-06-12 09:06:00",
+        )
+        .await
+        .unwrap()
+        .expect("Rücknahme vollzogen");
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.status, NachforderungStatus::Angefordert);
+        assert_eq!(nach.anzahl, Some(1));
+        assert!(nach.zusage_rufnamen.0.is_empty());
+        assert_eq!(nach.eintreffen_erwartet_at, None);
+        assert_eq!(nach.anzahl_angefordert, None);
+        assert_eq!(nach.zugesagt_at, None);
+        let rest = load(&pool, r.rest_id.unwrap()).await.unwrap();
+        assert_eq!(rest.status, NachforderungStatus::Angefordert);
+    }
+
+    /// Die Rücknahme unterwegs → zugesagt lässt die Zusage-Angaben stehen.
+    #[tokio::test]
+    async fn ruecknahme_aus_unterwegs_behaelt_die_zusage() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        let wer = namen(&["83-1"]);
+        sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                anzahl: None,
+                rufnamen: &wer,
+                eintreffen_erwartet_at: Some("2026-06-12 13:30:00"),
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_UNTERWEGS,
+            STATUS_ZUGESAGT,
+            "2026-06-12 09:10:00",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        update_status(
+            &pool,
+            n.id,
+            b,
+            STATUS_ZUGESAGT,
+            STATUS_UNTERWEGS,
+            "2026-06-12 09:11:00",
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.zusage_rufnamen.0, wer);
+        assert!(nach.eintreffen_erwartet_at.is_some());
+    }
+
+    /// D8: Zurückziehen ist terminal, trägt Zeit und Grund, schreibt einen Eintrag und greift nur
+    /// beim erwarteten Bestand.
+    #[tokio::test]
+    async fn zurueckziehen_ist_terminal_mit_grund_und_etb() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        assert_eq!(
+            ziehe_zurueck(&pool, n.id, b, None, STATUS_ZUGESAGT, "2026-06-12 09:30:00")
+                .await
+                .unwrap(),
+            None,
+            "anderer Bestand: nichts geändert"
+        );
+        let etb_id = ziehe_zurueck(
+            &pool,
+            n.id,
+            b,
+            Some("nicht mehr benötigt"),
+            STATUS_ANGEFORDERT,
+            "2026-06-12 09:30:00",
+        )
+        .await
+        .unwrap()
+        .expect("vollzogen");
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.status, NachforderungStatus::Zurueckgezogen);
+        assert!(!nach.ist_offen);
+        assert_eq!(
+            nach.zurueckgezogen_at.as_deref(),
+            Some("2026-06-12 09:30:00")
+        );
+        assert_eq!(
+            nach.zurueckgezogen_grund.as_deref(),
+            Some("nicht mehr benötigt")
+        );
+        let (typ, inhalt, _, _, verweis) = etb_zeile(&pool, etb_id).await;
+        assert_eq!(typ, "system");
+        assert_eq!(
+            inhalt,
+            "Nachforderung 2× RTW: zurückgezogen (nicht mehr benötigt)"
+        );
+        assert_eq!(verweis, Some(n.id));
+        let z = zaehlen(&pool, e).await.unwrap();
+        assert_eq!(z.offen, 0);
+    }
+
+    /// D9: geändert wird nur, was sich ändert; ein Eintrag mit dem alten Kurznamen nennt es.
+    #[tokio::test]
+    async fn bearbeiten_schreibt_die_aenderungen_und_einen_eintrag() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let (br, _) = raum_und_abschnitt(&pool, e, b).await;
+        let n = create(&pool, e, b, daten("RTW", "Transport"))
+            .await
+            .unwrap();
+        let etb_id = aktualisiere(
+            &pool,
+            e,
+            n.id,
+            b,
+            &Aenderung {
+                anzahl: Some(3),
+                prioritaet: Some(crate::nachforderung::PRIO_SOFORT),
+                ziel: Some(Ziel {
+                    br_id: Some(br),
+                    ..Default::default()
+                }),
+                bezeichnung: Some(None),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .expect("geändert");
+        let nach = load(&pool, n.id).await.unwrap();
+        assert_eq!(nach.anzahl, Some(3));
+        assert_eq!(nach.prioritaet, crate::kommunikation::Prioritaet::Sofort);
+        assert_eq!(nach.ziel_br_id, Some(br));
+        assert_eq!(nach.bezeichnung, None);
+        assert_eq!(nach.art, "RTW");
+        let (typ, inhalt, _, _, verweis) = etb_zeile(&pool, etb_id).await;
+        assert_eq!(typ, "system");
+        assert_eq!(
+            inhalt,
+            "Nachforderung 2× RTW geändert: Anzahl 3; → BR Nord; Priorität sofort; ohne Details"
+        );
+        assert_eq!(verweis, Some(n.id));
+
+        // Dieselben Werte noch einmal: nichts zu tun, kein Eintrag.
+        let vorher = etb_der_nachforderung(&pool, n.id).await.len();
+        assert_eq!(
+            aktualisiere(
+                &pool,
+                e,
+                n.id,
+                b,
+                &Aenderung {
+                    anzahl: Some(3),
+                    prioritaet: Some(crate::nachforderung::PRIO_SOFORT),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(etb_der_nachforderung(&pool, n.id).await.len(), vorher);
+    }
+
+    /// D9: Wer und Eintreffen nur nach der Zusage; abgeschlossen ist zu; Rufnamen und Anzahl passen.
+    #[tokio::test]
+    async fn bearbeiten_prueft_stufe_und_zusammenhang() {
+        let pool = crate::db::test_pool().await;
+        let (b, e) = setup(&pool).await;
+        let n = create(&pool, e, b, daten("RTW", "")).await.unwrap();
+        let eta = Aenderung {
+            eintreffen_erwartet_at: Some(Some("2026-06-12 14:00:00")),
+            ..Default::default()
+        };
+        assert!(matches!(
+            aktualisiere(&pool, e, n.id, b, &eta).await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        let wer = namen(&["83-1", "83-2"]);
+        sage_zu(
+            &pool,
+            e,
+            n.id,
+            b,
+            &ZusageDaten {
+                rufnamen: &wer,
+                ..Default::default()
+            },
+            "2026-06-12 09:05:00",
+        )
+        .await
+        .unwrap();
+        let etb_id = aktualisiere(&pool, e, n.id, b, &eta)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            etb_zeile(&pool, etb_id).await.1,
+            "Nachforderung 2× RTW geändert: Eintreffen erwartet 12.06. 16:00"
+        );
+        assert!(matches!(
+            aktualisiere(
+                &pool,
+                e,
+                n.id,
+                b,
+                &Aenderung {
+                    anzahl: Some(1),
+                    ..Default::default()
+                }
+            )
+            .await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        let neu = namen(&["83-3"]);
+        let etb_id = aktualisiere(
+            &pool,
+            e,
+            n.id,
+            b,
+            &Aenderung {
+                anzahl: Some(1),
+                rufnamen: Some(&neu),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            etb_zeile(&pool, etb_id).await.1,
+            "Nachforderung 2× RTW geändert: Anzahl 1; Wer: 83-3"
+        );
+        assert!(matches!(
+            aktualisiere(
+                &pool,
+                e,
+                n.id,
+                b,
+                &Aenderung {
+                    eintreffen_erwartet_at: Some(Some("2026-06-12 08:00:00")),
+                    ..Default::default()
+                }
+            )
+            .await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        ziehe_zurueck(&pool, n.id, b, None, STATUS_ZUGESAGT, "2026-06-12 10:00:00")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            aktualisiere(
+                &pool,
+                e,
+                n.id,
+                b,
+                &Aenderung {
+                    anzahl: Some(2),
+                    ..Default::default()
+                }
+            )
+            .await,
+            Err(AppError::UnprocessableEntity(_))
+        ));
+        assert!(matches!(
+            aktualisiere(&pool, e + 1, n.id, b, &Aenderung::default()).await,
+            Err(AppError::NotFound)
+        ));
     }
 }
