@@ -474,7 +474,7 @@ function nachforderung(teil: Partial<Nachforderung>): Nachforderung {
 }
 
 describe('KraefteuebersichtPage — Zulauf aus Nachforderungen (LLH-1384)', () => {
-  /** Eintreffen in 90 Minuten: nicht überfällig, Uhrzeit heute oder mit Tag. */
+  /** Eintreffen in 90 Minuten: nicht überfällig, taktisch heute `hhmm`, sonst `ddhhmm` (LLH-1053). */
   const eintreffen = () => wire(dayjs().add(90, 'minute'));
 
   it('2× RTW zugesagt mit Eintreffen → „+2 RTW, Eintreffen …“, nicht in der Stärke', async () => {
@@ -488,7 +488,7 @@ describe('KraefteuebersichtPage — Zulauf aus Nachforderungen (LLH-1384)', () =
     const gruppe = await screen.findByRole('region', { name: 'Zulauf aus Nachforderungen' });
     const k = gruppe.querySelector('[data-lfh="kennzahl"]') as HTMLElement;
     expect(k.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^2$/);
-    expect(k).toHaveTextContent(/\+2 RTW, Eintreffen (\d{2}\. )?\d{2}:\d{2}$/);
+    expect(k).toHaveTextContent(/\+2 RTW, Eintreffen (\d{2})?\d{4}$/);
     // Eingetroffenes zählt nicht zum Zulauf.
     expect(k).not.toHaveTextContent('KTW');
     // Der Zulauf führt aufs Board.
