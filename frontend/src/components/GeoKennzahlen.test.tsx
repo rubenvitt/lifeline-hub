@@ -15,7 +15,7 @@ describe('GeoKennzahlen', () => {
     expect(screen.getByText('Länge')).toBeInTheDocument();
     expect(screen.queryByText('Fläche')).not.toBeInTheDocument();
     // Der Wert kommt aus `pages/lagekarte/geo.ts` (`formatLaenge`, Intl de-DE, eine
-    // Nachkommastelle) — NICHT aus `anzeige/format.ts` (`formatDistanz` → '1.50 km').
+    // Nachkommastelle) — NICHT aus `anzeige/format.ts` (`formatDistanz` → '1,50 km').
     // Dieses Literal ist der maschinelle Wächter gegen die verbotene Vereinheitlichung
     // der beiden Distanzformatierer (Plan §Global Constraints, Spec §3.2).
     expect(screen.getByText('1,5 km')).toBeInTheDocument();

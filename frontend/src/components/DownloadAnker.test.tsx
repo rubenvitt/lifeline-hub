@@ -38,16 +38,16 @@ describe('DownloadAnker', () => {
         dateiname="dach.jpg"
         groesse={2 * 1024 * 1024}
         zusatz="Leitung · 12:30"
-        zugaenglicherName="dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen"
+        zugaenglicherName="dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen"
       />,
     );
     const a = screen.getByRole('link', {
-      name: 'dach.jpg, 2.0 MB, Datei von Schaden S-003 herunterladen',
+      name: 'dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen',
     });
     expect(a).toHaveAttribute('href', '/api/x/datei');
     expect(a).toHaveAttribute('download', 'dach.jpg');
     expect(a).toHaveTextContent('dach.jpg');
-    expect(a).toHaveTextContent('2.0 MB');
+    expect(a).toHaveTextContent('2,0 MB');
     expect(a).toHaveTextContent('Leitung · 12:30');
     // Das aria-label ersetzt den Inhalt im Namen — die Zusatzzeile bleibt als Beschreibung
     // erreichbar.

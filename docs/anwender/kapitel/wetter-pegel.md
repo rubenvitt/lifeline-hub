@@ -68,7 +68,8 @@ Eine neue Unwetterwarnung meldet die App von selbst.
 
    ![Dialog „Prognose — MUSTERSTADT“ mit übernommener PEGELONLINE-Vorhersage, Höchststand und Zeitpunkt](../bilder/wetter-pegel/pegel-prognose.png)
 
-3. „Erwarteter Höchststand (m)“ und „Zeitpunkt“ prüfen oder selbst eintragen.
+3. „Erwarteter Höchststand (m)“ und „Zeitpunkt“ prüfen oder selbst eintragen. Den Höchststand
+   mit Komma oder Punkt eingeben, beides gilt: „7,10“ und „7.10“ sind 7,10 m.
 4. „Speichern“ wählen. Die App meldet „Prognose gespeichert“; die Zeile nennt die Prognose.
 
 ## Hintergrund

@@ -27,7 +27,7 @@ describe('EtbDokumente (LFH-743)', () => {
     expect(links).toHaveLength(2);
     expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/dokumente/3/datei');
     expect(links[0]).toHaveAttribute('download', 'plan.pdf');
-    expect(links[0]).toHaveTextContent('Dokument „Lageplan Nord“ · 2.0 KB');
+    expect(links[0]).toHaveTextContent('Dokument „Lageplan Nord“ · 2,0 KB');
     expect(links[1]).toHaveAttribute('href', '/api/einsaetze/5/dokumente/4/datei');
   });
 
@@ -35,7 +35,7 @@ describe('EtbDokumente (LFH-743)', () => {
     render(<EtbDokumente einsatzId={5} lfdNr={42} dokumente={[dokument()]} />);
     expect(
       screen.getByRole('link', {
-        name: 'Dokument „Lageplan Nord“, 2.0 KB, zu Nr. 42 herunterladen',
+        name: 'Dokument „Lageplan Nord“, 2,0 KB, zu Nr. 42 herunterladen',
       }),
     ).toBeInTheDocument();
   });
