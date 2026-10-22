@@ -1174,6 +1174,9 @@ export interface NeuerAuftrag {
   absicht?: string;
   lage?: string;
   ort?: string;
+  /** Koordinate des Ziels (LLH-1114), nur als Paar und nur neben `ort`. */
+  ort_lat?: number;
+  ort_lon?: number;
   zeit?: string;
   mittel?: string;
   verbindung?: string;
@@ -1203,6 +1206,9 @@ export type AuftragPatch = {
   prioritaet?: AuftragPrioritaet;
   /** 'YYYY-MM-DD HH:MM' (UTC); `null` entfernt die Frist. */
   frist_at?: string | null;
+  /** Koordinate des Ziels (LLH-1114): nur als Paar; `null` entfernt sie, ein leeres Ziel auch. */
+  ort_lat?: number | null;
+  ort_lon?: number | null;
 } & Partial<Record<AuftragSchemafeld, string | null>>;
 
 /** Kein Backend-Schema: Body von `POST …/auftraege/{aid}/aufheben` (LLH-1098), FE-lokal. */
