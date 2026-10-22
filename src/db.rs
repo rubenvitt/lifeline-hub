@@ -10733,6 +10733,47 @@ mod tests {
         assert_eq!(uebrig, 0);
     }
 
+    /// LLH-1114, design.md D2: `ort_lat`/`ort_lon` am Auftrag. Ein Auftrag von vorher behält jeden
+    /// Wert und bleibt unverortet; beide Spalten sind `REAL`, nullable, ohne CHECK (das Paar und die
+    /// Bindung an `ort` sichert die App). Die Nummer liegt über 0241 (PR #936, Sofortalarm).
+    #[tokio::test]
+    async fn migration_0242_auftrag_ziel_koordinate() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 241).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        sqlx::query(
+            "INSERT INTO auftrag (id, einsatz_id, auftrag_text, ort, erteilt_at, erstellt_von_id) \
+             VALUES (5, ?, 'Sandsäcke', 'Deich Nord', '2026-10-22 10:00:00', ?)",
+        )
+        .bind(e)
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        migriere_bis(&pool, 242).await;
+
+        let zeile: (String, Option<f64>, Option<f64>) =
+            sqlx::query_as("SELECT ort, ort_lat, ort_lon FROM auftrag WHERE id = 5")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(zeile, ("Deich Nord".to_string(), None, None));
+        let spalten: Vec<(String, String, i64)> = sqlx::query_as(
+            "SELECT name, type, \"notnull\" FROM pragma_table_info('auftrag') \
+             WHERE name IN ('ort_lat', 'ort_lon') ORDER BY name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            spalten,
+            [
+                ("ort_lat".to_string(), "REAL".to_string(), 0),
+                ("ort_lon".to_string(), "REAL".to_string(), 0)
+            ]
+        );
+    }
+
     /// LLH-1383 D7: die Einheit trägt ihre Nachforderung als Fremdschlüssel; der Bestand bleibt
     /// ohne Verweis, das Löschen der Nachforderung leert ihn, und das Löschen des Einsatzes nimmt
     /// beides mit.

@@ -305,3 +305,30 @@ getippte Koordinate erfassbar bleiben.
 #### Scenario: Betreuungsstelle mit Standort anlegen
 - **WHEN** die Person beim Anlegen einer Betreuungsstelle unter „Weitere Angaben“ einen Standort-Treffer wählt
 - **THEN** trägt die Stelle Standort und Koordinate und erscheint als Marker auf der Lagekarte
+
+### Requirement: Orte an UHS, Bereitstellungsraum, Tier und Auftrag
+Der Standort einer UHS und eines Bereitstellungsraums beim Anlegen, der Standort eines
+Bereitstellungsraums beim Bearbeiten, der Fundort eines Tiers beim Erfassen und Bearbeiten und das
+Ziel eines Auftrags beim Erteilen und Berichtigen SHALL das Ortsfeld mit Kartenvorschau und
+Ortssuche im Einsatz nehmen. Es gelten dieselben Regeln wie für die Orte in Schäden und Betreuung:
+Text und Koordinate gemeinsam aus Treffer, getippter Koordinate oder Kartenpunkt, sonst nur Text;
+ein geleerter Text leert die Koordinate; beim Bearbeiten steht eine gespeicherte Koordinate als
+Punkt im Feld, und sie geht nur bei einer Änderung hinaus. Das getrennte Koordinatenfeld am
+Fundort eines Tiers MUST entfallen. Enter im Ziel eines Auftrags MUST suchen und den Auftrag nicht
+erteilen.
+
+#### Scenario: UHS mit Standort anlegen
+- **WHEN** die Person beim Anlegen einer UHS als Standort nach „Turnhalle“ sucht und den Treffer „Turnhalle Nord“ wählt
+- **THEN** trägt die neue UHS diesen Standort und die Koordinate des Treffers
+
+#### Scenario: Tier ohne Auswahl
+- **WHEN** die Person als Fundort eines Tiers „am Deich“ einträgt, ohne einen Treffer zu wählen
+- **THEN** trägt das Tier den Fundort „am Deich“ und ist nicht verortet
+
+#### Scenario: Auftrag mit Ziel erteilen
+- **WHEN** die Person unter „Ausführung“ im Ziel nach „Deich“ sucht, mit Enter die Treffer holt und „Deich km 3“ wählt
+- **THEN** ist der Auftrag noch nicht erteilt, und nach „Auftrag erteilen“ trägt er Ziel und Koordinate des Treffers
+
+#### Scenario: Ziel eines Auftrags berichtigen
+- **WHEN** am Ziel „Deich km 3“ eines verorteten Auftrags nur der Text auf „Deich km 3,5“ berichtigt wird
+- **THEN** geht nur der Text hinaus, und der Auftrag behält seine Koordinate

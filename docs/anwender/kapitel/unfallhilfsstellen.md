@@ -22,7 +22,9 @@ Die Patienten selbst sind Betroffene; ihre Sichtung und ihren Verbleib führt da
 
 1. In der Liste der Unfallhilfsstellen „Neu“ wählen, oder im Titel einer Unfallhilfsstelle den
    Namen öffnen und „+ Neue UHS“ wählen.
-2. „Bezeichnung“ und „Typ“ angeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“.
+2. „Bezeichnung“ und „Typ“ angeben, bei Bedarf „Standort (optional)“ und „Notiz (optional)“. Den
+   Standort mit Enter oder „Ort suchen“ suchen und einen Treffer wählen, dann ist die Stelle gleich
+   verortet; ohne Treffer bleibt er freier Text.
 
    ![Seitenleiste „Unfallhilfsstelle anlegen“ mit Bezeichnung, Typ Patientenablage und Standort](../bilder/unfallhilfsstellen/anlegen.png)
 

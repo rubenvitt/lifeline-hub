@@ -1,3 +1,4 @@
+import { ortFelder, ortsfeldAusGespeichert } from '../anzeige/ortsfeldFormular';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import type { Auftrag, AuftragPatch, AuftragSchemafeld } from '../api/types';
 import { toEmpfaengerTags } from '../fuehrung/empfaengerKern';
@@ -11,10 +12,10 @@ import { alleEmpfaenger, type FormWerte } from './auftragFormularKern';
  * Server (`berichtigbar`); hier wird es nicht nachgerechnet.
  */
 
-const SCHEMAFELDER: readonly AuftragSchemafeld[] = [
+/** Die Textfelder des Schemas; das Ziel ist ein Ortsfeld und steht für sich (LLH-1114). */
+const SCHEMAFELDER: readonly Exclude<AuftragSchemafeld, 'ort'>[] = [
   'absicht',
   'lage',
-  'ort',
   'zeit',
   'mittel',
   'verbindung',
@@ -64,6 +65,7 @@ export function vorbelegungAus(a: Auftrag): { werte: FormWerte; empfaengerAender
       externBezeichnung: extern?.bezeichnung ?? '',
       text: a.auftrag_text,
       ...schema,
+      ort: ortsfeldAusGespeichert(a.ort, a.ort_lat, a.ort_lon),
       prioritaet: a.prioritaet,
       richtung: a.richtung,
       frist: alsZeitpunkt(a.frist_at) ?? null,
@@ -106,6 +108,18 @@ export function berichtigungAus(
   for (const feld of SCHEMAFELDER) {
     const neu = (nachher[feld] ?? '').trim();
     if (neu !== (vorher[feld] ?? '').trim()) patch[feld] = neu === '' ? null : neu;
+  }
+  // Ziel: der Text wie ein Schemafeld; die Koordinate nur bei Änderung, als Paar. Ein geleertes
+  // Ziel leert den Punkt beim Server mit (`auftrag/repo.rs`, `berichtigen_tx`).
+  const ortVorher = ortFelder(vorher.ort);
+  const ortNachher = ortFelder(nachher.ort);
+  if (ortNachher.text !== ortVorher.text) patch.ort = ortNachher.text;
+  if (
+    ortNachher.text != null &&
+    (ortNachher.lat !== ortVorher.lat || ortNachher.lon !== ortVorher.lon)
+  ) {
+    patch.ort_lat = ortNachher.lat;
+    patch.ort_lon = ortNachher.lon;
   }
   return patch;
 }

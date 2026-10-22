@@ -578,6 +578,8 @@ pub async fn abruf(
                 absicht: None,
                 lage: None,
                 ort: abschnitt.as_ref().map(|(_, name)| name.clone()),
+                ort_lat: None,
+                ort_lon: None,
                 zeit: None,
                 mittel: None,
                 verbindung: None,

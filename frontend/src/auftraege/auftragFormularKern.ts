@@ -1,5 +1,6 @@
 import type dayjs from 'dayjs';
 import type { AdressatKategorie, AuftragPrioritaet, NeuerEmpfaenger, Richtung } from '../api/types';
+import type { OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { buildEmpfaenger } from '../fuehrung/empfaengerKern';
 import type { FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 
@@ -24,7 +25,8 @@ export interface FormWerte {
   text: string;
   absicht: string;
   lage: string;
-  ort: string;
+  /** Ziel als Ortsfeld: Text und, wenn verortet, Koordinate (LLH-1114). */
+  ort: OrtsfeldWert;
   zeit: string;
   mittel: string;
   verbindung: string;

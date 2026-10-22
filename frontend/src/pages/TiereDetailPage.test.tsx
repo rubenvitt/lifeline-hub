@@ -1048,7 +1048,7 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
     expect(body!.antreff_lon).toBe(8.25);
   });
 
-  it('Bearbeiten: eine geleerte Koordinate geht als null/null', async () => {
+  it('Bearbeiten: ein geleerter Fundort leert auch die Koordinate (LLH-1114)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, verortet, [
       ortVorschau,
@@ -1058,25 +1058,35 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.clear(await screen.findByLabelText('Verortung'));
+    await userEvent.clear(await screen.findByRole('textbox', { name: 'Fundort' }));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.antreff_ort).toBeNull();
     expect(body!.antreff_lat).toBeNull();
     expect(body!.antreff_lon).toBeNull();
   });
 
-  it('Bearbeiten: eine unlesbare Koordinate sperrt das Speichern mit Meldung am Feld', async () => {
-    let gesendet = false;
+  it('Bearbeiten: der Fundort ist ein Ortsfeld, eine getippte Koordinate verortet (LLH-1114)', async () => {
+    let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', () => {
-        gesendet = true;
+      ortVorschau,
+      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(tierBasis);
       }),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
-    await userEvent.type(await screen.findByLabelText('Verortung'), 'irgendwo');
+    expect(screen.queryByLabelText('Verortung')).toBeNull();
+    const fundort = await screen.findByRole('textbox', { name: 'Fundort' });
+    await userEvent.clear(fundort);
+    await userEvent.type(fundort, '51.50000, 8.25000');
+    expect(screen.getByRole('button', { name: 'Ort suchen' })).toBeDisabled();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByLabelText('Verortung')).toHaveAttribute('aria-invalid', 'true');
-    expect(gesendet).toBe(false);
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toMatchObject({
+      antreff_ort: '51.50000, 8.25000',
+      antreff_lat: 51.5,
+      antreff_lon: 8.25,
+    });
   });
 });

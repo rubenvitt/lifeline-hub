@@ -109,3 +109,27 @@ Leere Felder MUST wegfallen. „Erteilt am“ steht immer, weil jeder Auftrag ei
 #### Scenario: Teilweise gefüllter Auftrag
 - **WHEN** ein Auftrag mit Mittel, Weg und Absicht angezeigt und seine Details aufgeklappt werden
 - **THEN** stehen genau „Mittel“, „Weg“, „Absicht“ und „Erteilt am“ in dieser Reihenfolge
+
+### Requirement: Das Ziel trägt eine Koordinate
+„Ziel / Ort“ SHALL neben dem Text eine Koordinate tragen können (LLH-1114). Der Server MUST sie
+nur als Paar im gültigen Bereich und nur neben einem Text „Ziel / Ort“ annehmen, sonst mit 422
+antworten. Wird der Text geleert, MUST die Koordinate mit wegfallen. Ändert eine Berichtigung nur
+den Punkt, MUST sie „Ziel/Ort“ als geänderte Angabe ins ETB schreiben, unter denselben Bedingungen
+wie jede Berichtigung; ändern sich Text und Punkt, steht „Ziel/Ort“ einmal. Die Schwärzung MUST die
+Koordinate mit dem Text leeren.
+
+#### Scenario: Ziel mit Treffer erteilt
+- **WHEN** ein Auftrag mit Ziel „Deich Nord, km 3“ und der Koordinate des gewählten Treffers erteilt wird
+- **THEN** trägt der Auftrag Text und Koordinate
+
+#### Scenario: Koordinate ohne Text
+- **WHEN** ein Auftrag mit Koordinate, aber ohne „Ziel / Ort“ erteilt wird
+- **THEN** antwortet der Server mit 422 und legt nichts an
+
+#### Scenario: Nadel berichtigt
+- **WHEN** an einem offenen, unquittierten Auftrag nur die Koordinate des Ziels geändert wird
+- **THEN** steht im ETB „Auftrag #N geändert: Ziel/Ort.“, und der Text bleibt
+
+#### Scenario: Ziel geleert
+- **WHEN** der Text „Ziel / Ort“ eines verorteten Auftrags geleert wird
+- **THEN** trägt der Auftrag danach weder Text noch Koordinate

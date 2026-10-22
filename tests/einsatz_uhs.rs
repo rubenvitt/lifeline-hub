@@ -97,6 +97,43 @@ async fn anlegen_liefert_geplant_und_keinen_etb() {
     );
 }
 
+/// LLH-1114, design.md D6: das Ortsfeld im Anlege-Drawer speichert Standort und Koordinate in
+/// einem Schritt. Das Paar und der Bereich gelten wie beim PATCH (422).
+#[tokio::test]
+async fn anlegen_mit_standort_und_koordinate_halbes_paar_ist_422() {
+    let (app, _) = setup_mit_pool().await;
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &cookie).await;
+    let pfad = format!("/api/einsaetze/{einsatz}/uhs");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &pfad,
+        &cookie,
+        Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 51",
+                     "standort": "Turnhalle Nord", "lat": 53.08, "lon": 8.81})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["standort"], "Turnhalle Nord");
+    assert_eq!(
+        (v["lat"].as_f64(), v["lon"].as_f64()),
+        (Some(53.08), Some(8.81))
+    );
+
+    for (bez, extra) in [
+        ("BHP 52", json!({"lat": 53.08})),
+        ("BHP 53", json!({"lat": 53.08, "lon": 190.0})),
+    ] {
+        let mut body = json!({"typ": "behandlungsplatz", "bezeichnung": bez});
+        body.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let (s, v) = anfrage_json(&app, "POST", &pfad, &cookie, Some(&body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{bez}: {v}");
+    }
+}
+
 #[tokio::test]
 async fn status_aktiv_schreibt_etb_in_betrieb_genommen() {
     let (app, _) = setup_mit_pool().await;

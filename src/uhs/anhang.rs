@@ -213,6 +213,8 @@ mod tests {
             st.einsatz,
             st.benutzer,
             NeueDaten {
+                lat: None,
+                lon: None,
                 typ: "behandlungsplatz",
                 bezeichnung,
                 abschnitt_id: None,

@@ -2130,6 +2130,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("absicht", Strategie::NullSetzen, Z_EINSATZ),
             scrub("lage", Strategie::NullSetzen, Z_EINSATZ),
             scrub("ort", Strategie::NullSetzen, Z_EINSATZ),
+            // Koordinate des Ziels (LLH-1114) geht mit dem Text: das Ziel kann eine Privatadresse
+            // sein, anders als Betreuungs- oder Sammelstelle (dort Geo-Skelett).
+            scrub("ort_lat", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("ort_lon", Strategie::NullSetzen, Z_EINSATZ),
             scrub("zeit", Strategie::NullSetzen, Z_EINSATZ),
             scrub("mittel", Strategie::NullSetzen, Z_EINSATZ),
             scrub("verbindung", Strategie::NullSetzen, Z_EINSATZ),

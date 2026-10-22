@@ -92,6 +92,11 @@ pub struct AnlegenBody {
     pub abschnitt_id: Option<i64>,
     pub standort: Option<String>,
     pub notiz: Option<String>,
+    /// Koordinate aus dem Ortsfeld (LLH-1114): nur als Paar im Bereich, sonst 422 wie beim PATCH.
+    #[serde(default)]
+    pub lat: Option<f64>,
+    #[serde(default)]
+    pub lon: Option<f64>,
 }
 
 /// POST /api/einsaetze/{id}/uhs — Anlegen (Status `geplant`). KEIN ETB-Eintrag
@@ -106,6 +111,7 @@ pub async fn anlegen(
     let bezeichnung = pflicht(&body.bezeichnung, "Bezeichnung")?;
     let standort = trimme(body.standort);
     let notiz = trimme(body.notiz);
+    pruefe_koordinate(body.lat, body.lon, "lat", "lon")?;
 
     let uhs = uhs_repo::anlegen(
         &state.pool,
@@ -117,6 +123,8 @@ pub async fn anlegen(
             abschnitt_id: body.abschnitt_id,
             standort: standort.as_deref(),
             notiz: notiz.as_deref(),
+            lat: body.lat,
+            lon: body.lon,
         },
     )
     .await?;

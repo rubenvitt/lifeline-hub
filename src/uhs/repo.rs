@@ -30,6 +30,9 @@ pub struct NeueDaten<'a> {
     pub abschnitt_id: Option<i64>,
     pub standort: Option<&'a str>,
     pub notiz: Option<&'a str>,
+    /// Koordinate (LLH-1114), Paar vom Handler geprüft (`routes::support::pruefe_koordinate`).
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
 }
 
 /// Patch-Daten (COALESCE-Semantik: `None` = unverändert). `typ` und `status`
@@ -117,9 +120,9 @@ pub async fn anlegen_tx(
     }
     let ergebnis = sqlx::query_scalar::<_, i64>(
         "INSERT INTO uhs \
-            (einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, \
+            (einsatz_id, abschnitt_id, typ, bezeichnung, standort, notiz, lat, lon, \
              erfasst_von, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(einsatz_id)
     .bind(daten.abschnitt_id)
@@ -127,6 +130,8 @@ pub async fn anlegen_tx(
     .bind(daten.bezeichnung)
     .bind(daten.standort)
     .bind(daten.notiz)
+    .bind(daten.lat)
+    .bind(daten.lon)
     .bind(erfasser_id)
     .bind(erfasser_id)
     .fetch_one(&mut *conn)
@@ -401,6 +406,8 @@ mod tests {
 
     fn daten<'a>(typ: &'a str, bez: &'a str) -> NeueDaten<'a> {
         NeueDaten {
+            lat: None,
+            lon: None,
             typ,
             bezeichnung: bez,
             abschnitt_id: None,

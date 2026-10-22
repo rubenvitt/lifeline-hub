@@ -214,6 +214,11 @@ pub struct AuftragAnzeige {
     pub absicht: Option<String>,
     pub lage: Option<String>,
     pub ort: Option<String>,
+    /// Koordinate des Ziels (LLH-1114), nur neben `ort`; beide fehlen ohne Punkt (LFH-265).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ort_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ort_lon: Option<f64>,
     pub zeit: Option<String>,
     pub mittel: Option<String>,
     pub verbindung: Option<String>,
