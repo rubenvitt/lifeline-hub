@@ -347,9 +347,11 @@ trägt ihn auch als Funkrufname und den gewählten Typ; alles Weitere wird wie b
 Einheit nachgetragen. Eine schon geführte Einheit mit demselben Namen bekommt nur den Verweis. Das
 Einsatztagebuch hält die Übernahme in einem Eintrag der Nachforderung fest, nicht als „gebildet“
 je Einheit. Solange eine Einheit auf die Nachforderung verweist, lässt sich deren Stufe
-„Eingetroffen“ nicht zurücknehmen. Eine versehentlich übernommene Einheit ohne Spur im Einsatz,
-etwa ohne Eintrag in einem Bereitstellungsraum, verschwindet beim Auflösen ganz und gibt die
-Rücknahme wieder frei.
+„Eingetroffen“ nicht zurücknehmen. Eine versehentlich übernommene Einheit nimmt der Abschnitt
+„Übernahme stornieren“ in ihrer Ansicht zurück, auch wenn sie schon in einem Bereitstellungsraum
+steht: der Verweis entfällt, eine bei der Übernahme angelegte Einheit verlässt den Raum und wird
+aufgelöst, eine verknüpfte bleibt. Danach lässt sich die Rücknahme wieder wählen (Kapitel
+[Nachforderungen](nachforderung.md)).
 
 ### Rechte und ohne Netz
 

@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, migrations/0241_einheit_nachforderung_herkunft.sql, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx]
 ---
 
 ## Überblick
@@ -186,6 +186,20 @@ ist, etwa der dritte von drei KTW:
 
 Sind so viele Einheiten übernommen, wie angefordert, bietet die Karte keine weitere an.
 
+### Eine versehentlich übernommene Einheit stornieren
+
+Für Einsatzleitung und Führungspersonal, wenn die Module Einheiten und Nachforderungen freigegeben
+sind, etwa wenn „83-1“ der falschen Nachforderung zugeordnet wurde:
+
+1. An der Karte unter „Als Einheit übernommen“ den Rufnamen wählen; die Ansicht der Einheit öffnet
+   sich.
+2. Im Abschnitt „Übernahme stornieren“ den Knopf „Übernahme stornieren“ wählen.
+3. Die Rückfrage mit „Übernahme stornieren“ bestätigen.
+
+Die App springt zurück ins Board und hebt die Karte hervor. Steht dort keine übernommene Einheit
+mehr, lässt sich „Eingetroffen“ zurücknehmen. Bei mehreren übernommenen Einheiten wird jede
+einzeln storniert.
+
 ### Eine Nachforderung bearbeiten
 
 Für Einsatzleitung und Führungspersonal, solange die Nachforderung offen ist:
@@ -333,8 +347,8 @@ weder abgelehnt noch zurückgezogen. Eine zurückgenommene Zusage leert Wer und 
 Teilung bleibt dabei bestehen, der Rest bleibt eine eigene Karte. Ist aus einer Nachforderung
 Material oder eine Einheit übernommen, lässt sich „Eingetroffen“ nicht mehr zurücknehmen; die App
 nennt den Grund an der Karte. Wer versehentlich Material übernommen hat, storniert zuerst den
-Posten in der [Materialliste](material.md) und nimmt dann zurück; zu Einheiten siehe unten
-„Übernommene Einheiten“.
+Posten in der [Materialliste](material.md) und nimmt dann zurück; eine versehentlich übernommene
+Einheit wird in ihrer Ansicht mit „Übernahme stornieren“ zurückgenommen (Ablauf oben).
 
 ### Übernommenes Material
 
@@ -388,3 +402,15 @@ gesperrt mit „Keine Berechtigung“, und die Karte zeigt nur die Zahl, etwa �
 ganz gelöscht, weil sie im Einsatz keine Spur hinterlassen hat (siehe „Auflösen“ unter
 [Einheiten](einheiten.md)); ein Eintrag im Bereitstellungsraum ist eine Spur. Erst wenn keine
 Einheit mehr auf die Nachforderung verweist, lässt sich „Eingetroffen“ wieder zurücknehmen.
+
+„Übernahme stornieren“ nimmt zurück, was die Übernahme an dieser einen Einheit getan hat, auch
+mit Eintrag im Raum. Der Verweis auf die Nachforderung entfällt. Eine Einheit, die erst bei der
+Übernahme entstanden ist, verlässt ihren Raum und wird aufgelöst; ohne jede Spur verschwindet
+sie ganz. Eine verknüpfte Einheit, die schon vorher im Einsatz stand, bleibt; sie verlässt nur den
+Raum, in den die Übernahme sie eingetragen hat, und auch den nur, solange sie seitdem nicht
+gewechselt hat oder abgerufen wurde. Die Zeitachse der Einheit behält ihr Eintreffen. Das
+Einsatztagebuch hält den Storno in einem Eintrag der Nachforderung fest, etwa „Nachforderung 2×
+RTW: Übernahme von 83-1 storniert, aus BR Nord ausgetreten, Einheit aufgelöst“, bei einer
+verknüpften Einheit mit „Verknüpfung gelöst“ am Ende. Stornieren dürfen Einsatzleitung und
+Führungspersonal, wenn die Module Einheiten und Nachforderungen freigegeben sind; eine Frist gibt
+es nicht.

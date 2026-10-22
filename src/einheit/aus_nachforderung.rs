@@ -4,6 +4,11 @@
 //! ETB-Eintrag mit Verweis auf die Nachforderung. Alles in der Transaktion des Aufrufers
 //! (`routes::einsatz_einheit::aus_nachforderung`, `write_retry!`); Live meldet die Route nach dem
 //! Commit.
+//!
+//! Der Storno einer Fehlübernahme ([`stornieren_tx`], LLH-1388, design.md D1–D6) nimmt genau das
+//! zurück, was die Übernahme an einer Einheit getan hat: dafür hält sie fest, ob sie die Einheit
+//! angelegt und welchen Eintritt sie gebucht hat (`nachforderung_angelegt`,
+//! `nachforderung_belegung_id`, Migration 0241).
 
 use crate::bereitstellungsraum::eintreffen::{self, normalize, Eintritt};
 use crate::error::AppError;
@@ -201,6 +206,7 @@ pub async fn uebernehmen_tx(
     // 5. Anlegen bzw. verknüpfen, in Zeilenfolge.
     let mut einheiten: Vec<(i64, String, Option<i64>)> = Vec::with_capacity(zeilen.len());
     for zeile in zeilen {
+        let angelegt = matches!(zeile, Zeile::Neu(_));
         let (id, name, aktueller_br) = match zeile {
             Zeile::Neu(name) => {
                 let id = super::repo::anlegen_tx(
@@ -247,10 +253,13 @@ pub async fn uebernehmen_tx(
                 (*id, name, aktueller_br)
             }
         };
+        // Mit der Herkunft ihrer Wirkung (LLH-1388 D2): angelegt oder verknüpft.
         sqlx::query(
-            "UPDATE einsatz_einheit SET nachforderung_id = ? WHERE id = ? AND einsatz_id = ?",
+            "UPDATE einsatz_einheit SET nachforderung_id = ?, nachforderung_angelegt = ? \
+             WHERE id = ? AND einsatz_id = ?",
         )
         .bind(r.nachforderung_id)
+        .bind(angelegt)
         .bind(id)
         .bind(r.einsatz_id)
         .execute(&mut *conn)
@@ -282,11 +291,22 @@ pub async fn uebernehmen_tx(
                 continue;
             }
             let Eintritt {
+                belegung_id,
                 personen,
                 abloesung,
                 hinweise,
                 ..
             } = eintreffen::eintritt_einheit_tx(&mut *conn, &rahmen, *id).await?;
+            // Der Storno bucht genau diesen Eintritt wieder aus (LLH-1388 D3).
+            sqlx::query(
+                "UPDATE einsatz_einheit SET nachforderung_belegung_id = ? \
+                 WHERE id = ? AND einsatz_id = ?",
+            )
+            .bind(belegung_id)
+            .bind(*id)
+            .bind(r.einsatz_id)
+            .execute(&mut *conn)
+            .await?;
             ergebnis.personen.extend(personen);
             ergebnis.abloesung.extend(abloesung);
             ergebnis.hinweise.extend(hinweise);
@@ -306,6 +326,161 @@ pub async fn uebernehmen_tx(
         nachforderung_repo::protokollieren_tx(conn, r.nachforderung_id, r.benutzer_id, &text)
             .await?;
     Ok(ergebnis)
+}
+
+/// ETB-Wortlaut des Stornos (LLH-1388 D3): „Nachforderung 2× RTW: Übernahme von 83-1 storniert,
+/// aus BR Nord ausgetreten, Einheit aufgelöst“; ohne Austritt ohne den Mittelteil, bei einer
+/// verknüpften Einheit „Verknüpfung gelöst“ statt „Einheit aufgelöst“.
+pub fn etb_text_storniert(kurz: &str, name: &str, raum: Option<&str>, aufgeloest: bool) -> String {
+    let mut text = format!("Nachforderung {kurz}: Übernahme von {name} storniert");
+    if let Some(bezeichnung) = raum {
+        text.push_str(&format!(", aus BR {bezeichnung} ausgetreten"));
+    }
+    text.push_str(if aufgeloest {
+        ", Einheit aufgelöst"
+    } else {
+        ", Verknüpfung gelöst"
+    });
+    text
+}
+
+/// Was der Storno geschrieben hat, für Antwort und Live nach dem Commit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Storniert {
+    pub nachforderung_id: i64,
+    pub etb_id: i64,
+    /// Der Raum, aus dem die Einheit ausgetreten ist.
+    pub br_id: Option<i64>,
+    /// Die angelegte Einheit wurde aufgelöst (bzw. ohne Spur gelöscht); `None` bei einer
+    /// verknüpften, die aktiv bleibt.
+    pub aufgeloest: Option<super::repo::Aufgeloest>,
+}
+
+/// Storno einer Fehlübernahme in der Transaktion des Aufrufers (LLH-1388, design.md D3): fremd
+/// 404, aufgelöst 409, ohne Herkunft 422, gleichzeitig storniert 409. Verweis und Herkunft weg;
+/// eine angelegte Einheit wird aufgelöst wie im Normalweg (Austritt, Mitglieder frei, ohne Spur
+/// gelöscht), eine verknüpfte verlässt nur den Raum, den die Übernahme gebucht hat, und nur, wenn
+/// dieser Eintritt noch ihr jüngstes Belegungsereignis ist. Genau ein ETB-Eintrag mit Verweis auf
+/// die Nachforderung.
+pub async fn stornieren_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Storniert, AppError> {
+    super::repo::require_aktiv_tx(&mut *conn, einsatz_id, einheit_id).await?;
+    let (name, nachforderung_id, angelegt, belegung_id): (String, Option<i64>, bool, Option<i64>) =
+        sqlx::query_as(
+            "SELECT name, nachforderung_id, nachforderung_angelegt, nachforderung_belegung_id \
+             FROM einsatz_einheit WHERE id = ? AND einsatz_id = ?",
+        )
+        .bind(einheit_id)
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    let Some(nachforderung_id) = nachforderung_id else {
+        return Err(AppError::UnprocessableEntity(
+            "Die Einheit stammt aus keiner Nachforderung".into(),
+        ));
+    };
+    let (art, anzahl): (String, Option<i64>) =
+        sqlx::query_as("SELECT art, anzahl FROM nachforderung WHERE id = ? AND einsatz_id = ?")
+            .bind(nachforderung_id)
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+    let geloest = sqlx::query(
+        "UPDATE einsatz_einheit SET nachforderung_id = NULL, nachforderung_angelegt = 0, \
+             nachforderung_belegung_id = NULL \
+         WHERE id = ? AND einsatz_id = ? AND nachforderung_id = ?",
+    )
+    .bind(einheit_id)
+    .bind(einsatz_id)
+    .bind(nachforderung_id)
+    .execute(&mut *conn)
+    .await?;
+    if geloest.rows_affected() == 0 {
+        return Err(AppError::Conflict(
+            "Die Übernahme ist schon storniert".into(),
+        ));
+    }
+
+    let (br_id, aufgeloest) = if angelegt {
+        let a = super::repo::aufloesen_tx(
+            &mut *conn,
+            einsatz_id,
+            einheit_id,
+            benutzer_id,
+            jetzt,
+            super::repo::Aufloesung::Aufloesen,
+        )
+        .await?;
+        (a.br, Some(a))
+    } else {
+        (
+            austritt_gebucht_tx(&mut *conn, einsatz_id, einheit_id, benutzer_id, belegung_id)
+                .await?,
+            None,
+        )
+    };
+    let raum: Option<String> = match br_id {
+        Some(br) => Some(
+            sqlx::query_scalar("SELECT bezeichnung FROM bereitstellungsraum WHERE id = ?")
+                .bind(br)
+                .fetch_one(&mut *conn)
+                .await?,
+        ),
+        None => None,
+    };
+    let text = etb_text_storniert(
+        &nachforderung_repo::kurzname(anzahl, &art),
+        &name,
+        raum.as_deref(),
+        angelegt,
+    );
+    let etb_id =
+        nachforderung_repo::protokollieren_tx(conn, nachforderung_id, benutzer_id, &text).await?;
+    Ok(Storniert {
+        nachforderung_id,
+        etb_id,
+        br_id,
+        aufgeloest,
+    })
+}
+
+/// Bucht eine verknüpfte Einheit aus dem Raum aus, in den die Übernahme sie gebucht hat — nur,
+/// wenn dieser Eintritt noch ihr jüngstes Belegungsereignis ist (seitdem gewechselt, abgerufen
+/// oder ausgetreten: ihr Ort bleibt, design.md D3 Schritt 4).
+async fn austritt_gebucht_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    einheit_id: i64,
+    benutzer_id: i64,
+    belegung_id: Option<i64>,
+) -> Result<Option<i64>, AppError> {
+    let Some(belegung_id) = belegung_id else {
+        return Ok(None);
+    };
+    let juengstes: Option<i64> = sqlx::query_scalar(
+        "SELECT MAX(id) FROM br_belegung \
+         WHERE einsatz_id = ? AND objekt_typ = 'einheit' AND objekt_id = ?",
+    )
+    .bind(einsatz_id)
+    .bind(einheit_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if juengstes != Some(belegung_id) {
+        return Ok(None);
+    }
+    crate::bereitstellungsraum::belegung_repo::austritt_einheit_tx(
+        conn,
+        einsatz_id,
+        einheit_id,
+        benutzer_id,
+        "Übernahme storniert",
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -387,6 +562,23 @@ mod tests {
         assert_eq!(
             etb_text("RTW", &namen[..1], Some(("Nord", &[]))),
             "Nachforderung RTW: als Einheit übernommen (83-1)"
+        );
+    }
+
+    #[test]
+    fn etb_text_des_stornos_nennt_raum_und_folge() {
+        assert_eq!(
+            etb_text_storniert("2× RTW", "83-1", Some("Nord"), true),
+            "Nachforderung 2× RTW: Übernahme von 83-1 storniert, aus BR Nord ausgetreten, \
+             Einheit aufgelöst"
+        );
+        assert_eq!(
+            etb_text_storniert("2× RTW", "83-1", None, true),
+            "Nachforderung 2× RTW: Übernahme von 83-1 storniert, Einheit aufgelöst"
+        );
+        assert_eq!(
+            etb_text_storniert("RTW", "83-2", None, false),
+            "Nachforderung RTW: Übernahme von 83-2 storniert, Verknüpfung gelöst"
         );
     }
 }

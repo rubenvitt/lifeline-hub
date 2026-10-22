@@ -10891,4 +10891,87 @@ mod tests {
         .await
         .expect("ein Paar lässt sich speichern");
     }
+
+    /// LLH-1388 D2: Bestand ohne Herkunft der Wirkung (0/NULL), der Schalter nimmt nur 0 und 1, die
+    /// Belegung ist ein Fremdschlüssel, und das Löschen des Einsatzes nimmt alles mit.
+    #[tokio::test]
+    async fn migration_0241_einheit_haelt_die_wirkung_der_uebernahme() {
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 239).await;
+        let (e, b) = bild_grundlage(&pool).await;
+        let alt: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, '83-1') RETURNING id",
+        )
+        .bind(e)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        migriere_bis(&pool, 241).await;
+
+        let (angelegt, belegung): (i64, Option<i64>) = sqlx::query_as(
+            "SELECT nachforderung_angelegt, nachforderung_belegung_id FROM einsatz_einheit \
+             WHERE id = ?",
+        )
+        .bind(alt)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            (angelegt, belegung),
+            (0, None),
+            "Bestand: verknüpft, ohne Buchung"
+        );
+
+        sqlx::query("UPDATE einsatz_einheit SET nachforderung_angelegt = 2 WHERE id = ?")
+            .bind(alt)
+            .execute(&pool)
+            .await
+            .expect_err("nur 0 oder 1");
+        sqlx::query("UPDATE einsatz_einheit SET nachforderung_belegung_id = 999999 WHERE id = ?")
+            .bind(alt)
+            .execute(&pool)
+            .await
+            .expect_err("nachforderung_belegung_id ist ein Fremdschlüssel");
+
+        let br: i64 = sqlx::query_scalar(
+            "INSERT INTO bereitstellungsraum (einsatz_id, bezeichnung, erfasst_von, geaendert_von) \
+             VALUES (?, 'Nord', ?, ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(b)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let eintritt: i64 = sqlx::query_scalar(
+            "INSERT INTO br_belegung (einsatz_id, br_id, objekt_typ, objekt_id, art, erfasst_von) \
+             VALUES (?, ?, 'einheit', ?, 'eintritt', ?) RETURNING id",
+        )
+        .bind(e)
+        .bind(br)
+        .bind(alt)
+        .bind(b)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "UPDATE einsatz_einheit SET nachforderung_angelegt = 1, nachforderung_belegung_id = ? \
+             WHERE id = ?",
+        )
+        .bind(eintritt)
+        .bind(alt)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let verletzt: Vec<(String,)> = sqlx::query_as("PRAGMA foreign_key_check(einsatz_einheit)")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert!(verletzt.is_empty());
+
+        sqlx::query("DELETE FROM einsatz WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .expect("das Löschen des Einsatzes nimmt Einheit und Belegung mit");
+    }
 }
