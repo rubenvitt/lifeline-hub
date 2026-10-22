@@ -27,29 +27,62 @@ Teil-Vorbelegung aus einem Sprung (z. B. Fehlmenge Material) MUST die Anzahl lee
 ### Requirement: Schnellwahl
 
 Über den Feldern SHALL eine Schnellwahl mit sechs Arten stehen: die häufigsten Arten der
-Nachforderungen dieses Einsatzes, aufgefüllt aus der festen Liste gängiger Kräfte und Mittel in
-deren Folge. Ein Klick MUST „Was“ setzen und den Fokus mit markiertem Inhalt auf „Anzahl“ legen,
+Nachforderungen dieses Einsatzes, danach die üblichen Arten der Organisation (Requirement
+„Übliche Arten der Organisation“, LLH-1379), aufgefüllt aus der festen Liste gängiger Kräfte und
+Mittel in deren Folge; jede Art höchstens einmal, ohne Rücksicht auf Groß- und Kleinschreibung. Ein Klick MUST „Was“ setzen und den Fokus mit markiertem Inhalt auf „Anzahl“ legen,
 sodass eine Ziffer die Vorgabe ersetzt und Enter absetzt.
 
 #### Scenario: 2× RTW mit drei Tasten
 - **WHEN** jemand in einem neuen Einsatz „RTW“ in der Schnellwahl klickt, „2“ tippt und Enter drückt
 - **THEN** wird „2× RTW“ an den einzigen aktiven Bereitstellungsraum abgesetzt
 
-#### Scenario: Neuer Einsatz
-- **WHEN** der Einsatz noch keine Nachforderung hat
+#### Scenario: Neuer Einsatz ohne Vorgeschichte
+- **WHEN** der Einsatz noch keine Nachforderung hat und der Benutzer keinen anderen Einsatz der Organisation mit Nachforderungen lesen darf
 - **THEN** zeigt die Schnellwahl RTW, KTW, NEF, LF 10, HLF 20 und DLK 23-12
+
+#### Scenario: Neuer Einsatz in einer Organisation mit Vorgeschichte
+- **WHEN** der Einsatz noch keine Nachforderung hat und in lesbaren Einsätzen der Organisation Sandsäcke und Tauchpumpen angefordert wurden
+- **THEN** beginnt die Schnellwahl mit Sandsäcke und Tauchpumpe, aufgefüllt mit RTW, KTW, NEF und LF 10
 
 ### Requirement: Vorschläge für „Was“
 
-„Was“ SHALL Freitext annehmen und Vorschläge in drei Gruppen zeigen: „In diesem Einsatz“ (frühere
-Arten nach Häufigkeit), „Einheitstypen“ (aktive Typen der Organisation) und „Kräfte und Mittel“
-(feste Liste). Gleiche Arten MUST ohne Rücksicht auf Groß- und Kleinschreibung einmal stehen, in
-der ersten Gruppe. Die Häufigkeit MUST nur aus dem Einsatz kommen, nicht aus anderen Einsätzen
-der Organisation.
+„Was“ SHALL Freitext annehmen und Vorschläge in vier Gruppen zeigen: „In diesem Einsatz“ (frühere
+Arten nach Häufigkeit), „In der Organisation“ (übliche Arten der Organisation), „Einheitstypen“
+(aktive Typen der Organisation) und „Kräfte und Mittel“ (feste Liste). Gleiche Arten MUST ohne
+Rücksicht auf Groß- und Kleinschreibung einmal stehen, in der ersten Gruppe; leere Gruppen MUST
+wegfallen.
 
 #### Scenario: Einheitstyp der Organisation
 - **WHEN** die Organisation den Einheitstyp „Wasserrettungszug“ führt
 - **THEN** steht er unter „Einheitstypen“ zur Auswahl
+
+### Requirement: Übliche Arten der Organisation
+
+Der Server SHALL unter `GET /api/einsaetze/{id}/nachforderungen/arten` die Arten der
+Nachforderungen aus den anderen Einsätzen der Organisation des Einsatzes liefern, höchstens 20,
+als Wortlaut mit der Zahl der Einsätze, in denen sie vorkamen (LLH-1379). Die Route MUST dieselbe
+Tür haben wie die Liste der Nachforderungen. Gezählt MUST nur über Einsätze werden, deren
+Nachforderungen der Benutzer selbst lesen darf: Leserecht am Einsatz mit Nachlauf- und
+Aufbewahrungsfrist und Zugriff auf das Modul Nachforderungen in diesem Einsatz. Der laufende
+Einsatz, Einsätze anderer Organisationen, gelöschte und geschwärzte Einsätze und Arten mit dem
+Schwärzungs-Platzhalter MUST nichts beitragen. Die Rangfolge MUST die Zahl der Einsätze sein,
+dann die Zahl der Nachforderungen, dann die jüngste Anforderung; gleich ist, was sich nur in
+Groß-/Kleinschreibung und Leerraum am Rand unterscheidet, in der Schreibweise der jüngsten
+Anforderung. Die Antwort MUST keine Einsatz-Kennung, Zeit oder Person tragen. Gekoppelte Geräte
+MUST die Route nicht erreichen. Die Oberfläche MUST die Antwort nicht im Lagebild ohne Netz
+speichern; ohne Antwort gilt die feste Liste.
+
+#### Scenario: Art aus einem Einsatz ohne Leserecht
+- **WHEN** „Dolmetscher Ukrainisch“ nur in einem Einsatz angefordert wurde, in dem die Führungskraft kein Mitglied ist, und sie keine org-weite Rolle hat
+- **THEN** fehlt die Art in ihrer Antwort, während ein System-Admin sie erhält
+
+#### Scenario: Abgeschlossener Einsatz nach der Nachlauffrist
+- **WHEN** ein Einsatz seit drei Tagen abgeschlossen ist
+- **THEN** zählen seine Arten für dessen Einsatzleitung, nicht für dessen Führungspersonal
+
+#### Scenario: Üblich heißt in vielen Einsätzen
+- **WHEN** in einem Einsatz dreimal Sandsäcke und in zwei anderen je einmal RTW angefordert wurden
+- **THEN** steht RTW mit zwei Einsätzen vor Sandsäcke mit einem
 
 ### Requirement: Ziel (Meldeort)
 

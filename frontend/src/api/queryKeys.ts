@@ -56,6 +56,10 @@ export const EINSATZ_KEYS = {
   erinnerungen: 'einsatz-erinnerungen',
   auftraege: 'einsatz-auftraege',
   nachforderungen: 'einsatz-nachforderungen',
+  // Übliche Arten der Organisation (LLH-1379): eigener Prefix, nicht live (zählt andere
+  // Einsätze; ein Sub-Key unter `nachforderungen` holte sie bei jedem Ereignis neu) und nicht im
+  // Lagebild offline (Wortlaut anderer Einsätze gehört nicht auf die Platte).
+  nachforderungArten: 'einsatz-nachforderung-arten',
   meldungen: 'einsatz-meldungen',
   lagemeldungen: 'einsatz-lagemeldungen',
   br: 'einsatz-br',
@@ -518,6 +522,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.uhsPlanBild,
   EINSATZ_KEYS.personenListenzugriffe,
   EINSATZ_KEYS.personenBestaetiger,
+  EINSATZ_KEYS.nachforderungArten,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -883,6 +888,7 @@ export const einsatzKeys = {
   auftragEinzeln: (einsatzId: number, auftragId: number) =>
     [EINSATZ_KEYS.auftraege, einsatzId, 'einzeln', auftragId] as const,
   nachforderungen: (einsatzId: number) => [EINSATZ_KEYS.nachforderungen, einsatzId] as const,
+  nachforderungArten: (einsatzId: number) => [EINSATZ_KEYS.nachforderungArten, einsatzId] as const,
 
   // ETB
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,

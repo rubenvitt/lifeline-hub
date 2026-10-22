@@ -60,6 +60,24 @@ pub async fn liste(
     Ok(Json(repo::list(&state.pool, einsatz_id, status).await?))
 }
 
+/// GET /api/einsaetze/{id}/nachforderungen/arten — übliche Arten der Organisation für
+/// Schnellwahl und Vorschläge (LLH-1379, design.md D1–D6). Dieselbe Tür wie die Liste; gezählt
+/// wird nur über andere Einsätze der Einsatz-Org, deren Nachforderungen der Benutzer selbst lesen
+/// darf. Keine Geräteroute (D3).
+pub async fn arten(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Nachforderungen>,
+) -> Result<Json<Vec<crate::nachforderung::arten::NachforderungArtUeblich>>, AppError> {
+    if ctx.geraet.is_some() {
+        // Netz unter der Routenschranke: ein Gerät hat in anderen Einsätzen keine Rolle.
+        return Err(AppError::Forbidden);
+    }
+    Ok(Json(
+        crate::nachforderung::arten::uebliche_arten(&state.pool, &ctx.benutzer, &ctx.einsatz)
+            .await?,
+    ))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct NeueNachforderung {
     pub art: String,

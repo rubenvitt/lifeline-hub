@@ -23,6 +23,7 @@ import {
   legeNachforderungAn,
   lehneNachforderungAb,
   listeNachforderungen,
+  listeUeblicheArten,
   patcheNachforderung,
   setzeNachforderungStatus,
   zieheNachforderungZurueck,
@@ -455,6 +456,18 @@ export default function NachforderungenPage() {
     onError: invalidiere,
   });
   const darfSchreibenRoh = darfImEinsatzSchreiben(einsatzQuery.data);
+  // Übliche Arten der Organisation (LLH-1379): nur, solange das Formular offen ist und angelegt
+  // werden darf. Ein Fehler lässt die Schnellwahl still auf der festen Liste.
+  const orgArtenQuery = useQuery({
+    queryKey: einsatzKeys.nachforderungArten(einsatzId),
+    queryFn: () => listeUeblicheArten(einsatzId),
+    enabled: formOffen && darfSchreibenRoh,
+    staleTime: 5 * 60_000,
+  });
+  const orgArten = useMemo(
+    () => (orgArtenQuery.data ?? []).map((a) => a.art),
+    [orgArtenQuery.data],
+  );
 
   /*
    * Übernehmen (D1): ein Material-POST mit Bezug. Ablehnungen stehen im Dialog (`speicherung`).
@@ -875,6 +888,7 @@ export default function NachforderungenPage() {
             vorbelegung={vorbelegung}
             bezug={bezug}
             fruehereArten={arten}
+            orgArten={orgArten}
             raeume={raeume}
             abschnitte={abschnitte}
             senden={anlegenMutation.isPending}

@@ -69,12 +69,16 @@ export function fruehereArten(
     .map((e) => e.art);
 }
 
-/** Die Schnellwahl: die häufigsten Arten des Einsatzes, aufgefüllt aus {@link GAENGIGE_ARTEN}. */
+/**
+ * Die Schnellwahl: die häufigsten Arten des Einsatzes, dann die üblichen Arten der Organisation
+ * (`GET …/nachforderungen/arten`, LLH-1379), aufgefüllt aus {@link GAENGIGE_ARTEN}.
+ */
 export function schnellwahlArten(
   frueher: readonly string[],
+  orgArten: readonly string[] = [],
   anzahl: number = SCHNELLWAHL_ANZAHL,
 ): string[] {
-  return entdoppelt([...frueher, ...GAENGIGE_ARTEN]).slice(0, anzahl);
+  return entdoppelt([...frueher, ...orgArten, ...GAENGIGE_ARTEN]).slice(0, anzahl);
 }
 
 export interface ArtOption {
@@ -88,13 +92,15 @@ export interface ArtGruppe {
 }
 
 /**
- * Gruppierte Optionen für „Was“: „In diesem Einsatz“, „Einheitstypen“ (Folge des Katalogs),
+ * Gruppierte Optionen für „Was“: „In diesem Einsatz“, „In der Organisation“ (übliche Arten aus
+ * Einsätzen, die der Benutzer lesen darf, LLH-1379), „Einheitstypen“ (Folge des Katalogs),
  * „Kräfte und Mittel“. Entdoppelt ohne Groß-/Kleinschreibung, die erste Gruppe gewinnt; leere
  * Gruppen fallen weg.
  */
 export function artOptionen(
   frueher: readonly string[],
   einheitTypen: ReadonlyArray<Pick<EinheitTyp, 'label' | 'sortier'>>,
+  orgArten: readonly string[] = [],
 ): ArtGruppe[] {
   const gesehen = new Set<string>();
   const gruppe = (label: string, arten: readonly string[]): ArtGruppe => ({
@@ -110,6 +116,7 @@ export function artOptionen(
   const typen = [...einheitTypen].sort((a, b) => a.sortier - b.sortier).map((t) => t.label);
   return [
     gruppe('In diesem Einsatz', frueher),
+    gruppe('In der Organisation', orgArten),
     gruppe('Einheitstypen', typen),
     gruppe('Kräfte und Mittel', GAENGIGE_ARTEN),
   ].filter((g) => g.options.length > 0);

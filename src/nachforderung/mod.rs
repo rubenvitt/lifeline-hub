@@ -3,6 +3,7 @@
 //! nach dem Auftrags-Template (LFH-52); ETB-Kopplung Pattern B. Bewusst KEIN
 //! `kommunikation_status` — der lineare Bedarfsfluss passt nicht auf dessen zwei Achsen
 //! (vgl. Meldungs-Triage).
+pub mod arten;
 pub mod benachrichtigung;
 pub mod repo;
 
