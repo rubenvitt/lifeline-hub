@@ -171,6 +171,14 @@ pub struct MeldungAnzeige {
     /// Strukturierter Absender (LFH-610): der Einsatzabschnitt, von dem die Meldung kam.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub abschnitt_id: Option<i64>,
+    /// Abgeleitet (LLH-1382): die jüngste ETB-Berichtigung des Eintrags `etb_meldung_id`, für die
+    /// Marke „berichtigt“ und den Sprung ins ETB. Der Wortlaut `inhalt` bleibt, wie er einging.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_id: Option<i64>,
+    /// Abgeleitet: laufende Nummer dieser Berichtigung im ETB, gesetzt genau mit
+    /// `etb_berichtigung_id`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_lfd_nr: Option<i64>,
 }
 
 impl MeldungAnzeige {
@@ -262,6 +270,13 @@ pub struct LageMeldungAnzeige {
     pub richtung: Richtung,
     /// Abgeleitet: erfasst von einem gekoppelten Gerät (Erfasser ist ein Gerätekonto).
     pub is_von_geraet: bool,
+    /// Abgeleitet (LLH-1382): jüngste ETB-Berichtigung des Eintrags der Meldung, wie an der
+    /// Meldung. `text` bleibt Lage-Text oder Wortlaut (design.md D1). Fehlt in alten Ständen.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_id: Option<i64>,
+    /// Abgeleitet: laufende Nummer dieser Berichtigung im ETB.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub etb_berichtigung_lfd_nr: Option<i64>,
 }
 
 // ── Nach dem Commit: Live-Bündel, Benachrichtigung, Auto-Frist (aus `routes/meldung.rs`

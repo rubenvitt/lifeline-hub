@@ -38,6 +38,7 @@ import { useSprungSperre } from '../einsatz/useSprungSperre';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { MELDUNG_STATUS } from '../kommunikation';
 import PrioBadge from '../kommunikation/PrioBadge';
+import BerichtigtMarke from '../meldungen/BerichtigtMarke';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
 import { MELDUNGSART_LABEL } from '../meldungen/meldungKennzahlen';
@@ -291,6 +292,13 @@ export default function LagemeldungenPage() {
           {l.richtung === 'extern' && (
             <StatusChip ton="neutral" wort="Extern" style={{ marginInlineEnd: 8 }} />
           )}
+          {/* Der Text bleibt Lage-Text oder Wortlaut, die Berichtigung steht im ETB (LLH-1382, D1). */}
+          <BerichtigtMarke
+            einsatzId={l.einsatz_id}
+            berichtigungId={l.etb_berichtigung_id}
+            berichtigungLfdNr={l.etb_berichtigung_lfd_nr}
+            style={{ marginInlineEnd: 8 }}
+          />
           <KennungsLink to={meldungenPfad(l.einsatz_id, { meldung: l.meldung_id })}>
             {`Meldung #${l.meldung_lfd_nr}`}
             {l.meldung_status !== 'neu' &&

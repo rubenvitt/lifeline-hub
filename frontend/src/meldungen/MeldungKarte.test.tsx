@@ -125,6 +125,30 @@ describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
   });
 });
 
+// LLH-1382: Der Wortlaut bleibt, eine ETB-Berichtigung seines Eintrags steht als Marke daneben.
+describe('MeldungKarte — berichtigter ETB-Eintrag (LLH-1382)', () => {
+  it('zeigt die Marke „berichtigt“ mit Sprung zur Berichtigung und behält den Wortlaut', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({ etb_berichtigung_id: 41, etb_berichtigung_lfd_nr: 9 })}
+        einsatzId={7}
+      />,
+    );
+    expect(screen.getByText('berichtigt')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Berichtigung im ETB, Nr. 9' })).toHaveAttribute(
+      'href',
+      '/einsaetze/7/etb?eintrag=41',
+    );
+    expect(screen.getByText('Deich instabil')).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Berichtigung keine Marke', () => {
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} />);
+    expect(screen.queryByText('berichtigt')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Berichtigung/ })).toBeNull();
+  });
+});
+
 describe('MeldungKarte — Aktionsbündelung (LFH-372/B5k)', () => {
   it('zeigt im Worst-Case höchstens zwei Aktionen im Kartenkörper, den Rest hinter einem Trigger', async () => {
     const cb = alleCallbacks();
