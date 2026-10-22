@@ -2112,6 +2112,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             // Kenntnisnahme (LLH-1206): Zeitpunkt und Benutzer-FK, kein Freitext.
             retain("lage_gesehen_at", G_ZEIT),
             retain("lage_gesehen_von_id", G_FK),
+            // Merker „Sofortalarm ausgelöst“ (LLH-1380), ein Zeitpunkt.
+            retain("sofortalarm_at", G_ZEIT),
         ],
     },
     TabellenRegel {

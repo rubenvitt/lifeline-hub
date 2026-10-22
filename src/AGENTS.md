@@ -414,7 +414,10 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   `apply_lage_invariante_tx`; weg von Lagemeldung bleibt die Lagerelevanz. `lagerelevant: false`
   ist bei Art Lagemeldung 422, sonst leert die Rücknahme Lage-Text, Ort, Übernahme und
   Kenntnisnahme. Versetzen und Entfernen des Orts gehen nur hier, nicht über `als_lagerelevant`.
-  Heraufstufen zu sofort 422 (kein Alarm, keine Frist). Ein Systemeintrag je wirksamer Korrektur
+  Heraufstufen zu sofort (LLH-1380) alarmiert nach dem Commit über `meldung::sofortalarm_melden`,
+  höchstens einmal je Meldung: Merker `meldung.sofortalarm_at`, gesetzt in der Korrektur-Tx,
+  sobald die Meldung vorher oder nachher sofort ist (Invariante: jetzt sofort oder Merker ⇒ hat
+  alarmiert); nicht pflichtig → Pflicht und Frist ab jetzt. Ein Systemeintrag je wirksamer Korrektur
   mit Verweis auf die Meldung; Empfänger und Lage-Text stehen darin ohne Wert (Scrub). Geräte
   erreichen die Route nicht (keine Routenliste).
 

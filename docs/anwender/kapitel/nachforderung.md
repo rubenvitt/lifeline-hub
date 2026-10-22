@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/NachforderungenPaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts]
 ---
 
 ## Überblick
@@ -27,9 +27,12 @@ Für Einsatzleitung und Führungspersonal:
 
 1. Im Einsatz „Nachforderungen“ öffnen und „Nachforderung anlegen“ wählen.
 2. Unter „Was“ angeben, was gebraucht wird. Die Knöpfe der Schnellwahl darüber setzen die
-   häufigsten Arten dieses Einsatzes mit einem Klick, in einem neuen Einsatz RTW, KTW, NEF, LF 10,
-   HLF 20 und DLK 23-12. Beim Tippen schlägt die App frühere Arten dieses Einsatzes, die
-   Einheitstypen der Organisation und gängige Kräfte und Mittel vor.
+   häufigsten Arten dieses Einsatzes mit einem Klick, danach die in der Organisation üblichen
+   Arten, aufgefüllt mit RTW, KTW, NEF, LF 10, HLF 20 und DLK 23-12. Beim
+   Tippen schlägt die App frühere Arten dieses Einsatzes, die in der Organisation üblichen Arten,
+   die Einheitstypen der Organisation und gängige Kräfte und Mittel vor. Üblich ist, was in
+   vielen Einsätzen angefordert wurde; es zählen nur Einsätze, deren Nachforderungen man selbst
+   lesen darf.
 3. Unter „Anzahl“ angeben, wie viel (vorbelegt 1). Nach einem Klick in der Schnellwahl steht der
    Cursor dort, die Ziffer ersetzt die 1.
 4. Unter „Wohin“ den Meldeort angeben: einen Bereitstellungsraum, einen Einsatzabschnitt oder einen
