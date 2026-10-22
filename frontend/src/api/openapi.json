@@ -11147,6 +11147,23 @@
           }
         }
       },
+      "NachforderungArtUeblich": {
+        "type": "object",
+        "description": "Eine übliche Art der Organisation: Wortlaut der jüngsten Anforderung und die Zahl der\nEinsätze, in denen sie vorkam. Bewusst ohne Einsatz-Kennung, Zeit oder Namen (D4).",
+        "required": [
+          "art",
+          "einsaetze"
+        ],
+        "properties": {
+          "art": {
+            "type": "string"
+          },
+          "einsaetze": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "NachforderungStatus": {
         "type": "string",
         "description": "Bedarfs-Status einer Nachforderung (Schema-Anker für die OpenAPI-Union, LFH-120).\nWire == `status`.",

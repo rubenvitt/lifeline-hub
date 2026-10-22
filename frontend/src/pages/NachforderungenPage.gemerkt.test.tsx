@@ -40,11 +40,14 @@ vi.mock('../api/einsaetze', () => ({
 }));
 
 const listeNachforderungen = vi.fn();
+const listeUeblicheArten = vi.fn();
 const legeNachforderungAn = vi.fn();
 const setzeNachforderungStatus = vi.fn();
 const lehneNachforderungAb = vi.fn();
 vi.mock('../api/nachforderungen', () => ({
   listeNachforderungen: (...a: unknown[]) => listeNachforderungen(...a),
+  // Übliche Arten der Organisation (LLH-1379): ohne eigene Vorgabe leer.
+  listeUeblicheArten: (...a: unknown[]) => listeUeblicheArten(...a) ?? Promise.resolve([]),
   legeNachforderungAn: (...a: unknown[]) => legeNachforderungAn(...a),
   setzeNachforderungStatus: (...a: unknown[]) => setzeNachforderungStatus(...a),
   lehneNachforderungAb: (...a: unknown[]) => lehneNachforderungAb(...a),

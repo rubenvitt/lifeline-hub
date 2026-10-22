@@ -1288,6 +1288,8 @@ export type NachforderungPrioritaet = S['Prioritaet'];
 export type NachforderungStatus = S['NachforderungStatus'];
 export type AdressatKategorie = S['AdressatKategorie'];
 export type Nachforderung = S['NachforderungAnzeige'];
+/** Übliche Art der Organisation für Schnellwahl und Vorschläge (LLH-1379). */
+export type NachforderungArtUeblich = S['NachforderungArtUeblich'];
 
 /** Kein Backend-Schema: Eingabe-Body, FE-lokal. */
 export interface NeueNachforderung {
