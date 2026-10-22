@@ -13,6 +13,7 @@ import { merkeServerzeit, serveruhrVergessenFuerTests } from '../offline/serveru
 import { einsatzKeys } from '../api/queryKeys';
 import type { Zeitachse } from '../api/types';
 import KraftZeitachse, { ZEITACHSE_RECHTE_TEXT } from './KraftZeitachse';
+import { tippeZeit } from '../test/zeitEingabe';
 
 const PFAD = '/api/einsaetze/1/personal/7/zeitachse';
 
@@ -354,6 +355,36 @@ describe('KraftZeitachse — Nachtrag in der Anzeigezone (LFH-692)', () => {
     await waitFor(() => expect(zelle('01.10.2026')).not.toBeNull());
     expect(zelle('01.10.2026')).not.toHaveClass('ant-picker-cell-disabled');
     expect(zelle('02.10.2026')).toHaveClass('ant-picker-cell-disabled');
+  });
+
+  it('LLH-1077: „1430“ + Enter kurz nach Mitternacht trägt gestern 14:30 Berliner Zeit nach', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 01.10. 01:30 Berliner Zeit: 14:30 steht heute noch bevor, das Ereignis war gestern.
+    vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
+    let rumpf: Record<string, unknown> | null = null;
+    server.use(
+      http.get(PFAD, () => HttpResponse.json(ZEITACHSE)),
+      http.post(PFAD, async ({ request }) => {
+        rumpf = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(ZEITACHSE, { status: 201 });
+      }),
+    );
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+        <KraftZeitachse einsatzId={1} art="person" id={7} kennung="Anna" darfSchreiben />
+      </AnzeigeKonventionenProvider>,
+    );
+    await waitFor(() => expect(eintraege()).toHaveLength(3));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Nachtragen' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    await waehle('Ereignis', 'Eintreffen');
+    await tippeZeit(
+      userEvent.setup(),
+      within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }),
+      '1430',
+    );
+    await waitFor(() => expect(rumpf).not.toBeNull());
+    expect(rumpf).toMatchObject({ art: 'eintreffen', zeitpunkt_at: '2026-09-30 12:30:00' });
   });
 });
 

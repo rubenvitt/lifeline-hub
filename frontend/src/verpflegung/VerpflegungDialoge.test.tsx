@@ -29,6 +29,7 @@ import {
 } from '../test/verpflegungDaten';
 import type { Bedarfsvorschlag, BedarfsvorschlagArgs } from './useBedarfsvorschlag';
 import { uhrzeitenText } from './verpflegungText';
+import { tippeZeit } from '../test/zeitEingabe';
 
 dayjs.extend(utc);
 
@@ -905,14 +906,46 @@ describe('Zeitzone: Dialog in der Anzeigezone, Browser in UTC (LFH-692)', () => 
     );
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Menge (EP)'), '120');
-    const feld = within(dialog).getByPlaceholderText('jetzt');
-    await userEvent.click(feld);
-    await userEvent.type(feld, '2026-09-24 12:15');
-    await userEvent.keyboard('{Enter}');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Nachtragen' }));
+    // Taktisch getippt (LLH-1077); Enter übernimmt und sendet ab.
+    await tippeZeit(userEvent.setup(), within(dialog).getByPlaceholderText('jetzt'), '241215sep26');
     await waitFor(() =>
       expect(onErfassen).toHaveBeenCalledWith({ menge: 120, zeitpunkt_at: '2026-09-24 10:15:00' }),
     );
+  });
+
+  it('LLH-1077: Ende „1430“ + Enter liegt am Tag des Beginns und legt das Fenster an', async () => {
+    const onErfassen = vi.fn().mockResolvedValue(undefined);
+    renderMitProviders(
+      <AnzeigeKonventionenProvider konventionen={BERLIN}>
+        <ZeitfensterDialog
+          modus={{ art: 'anlegen', onErfassen }}
+          einsatzId={1}
+          freigaben={FREIGABEN}
+          jetzt={JETZT}
+          laeuft={false}
+          fehler={null}
+          onSchliessen={vi.fn()}
+        />
+      </AnzeigeKonventionenProvider>,
+    );
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Bezeichnung'), 'Mittag');
+    await userEvent.type(within(dialog).getByLabelText('Einsatzkräfte (EP)'), '1');
+    await userEvent.type(within(dialog).getByLabelText('Betreute (EP)'), '0');
+    const start = within(dialog).getByRole('textbox', { name: 'Beginn' });
+    await userEvent.clear(start);
+    await userEvent.type(start, '241300sep26');
+    await userEvent.tab();
+    await tippeZeit(
+      userEvent.setup(),
+      within(dialog).getByRole('textbox', { name: 'Ende' }),
+      '1430',
+    );
+    await waitFor(() => expect(onErfassen).toHaveBeenCalled());
+    expect(onErfassen.mock.calls[0][0]).toMatchObject({
+      von_at: '2026-09-24 11:00:00',
+      bis_at: '2026-09-24 12:30:00',
+    });
   });
 });
 
