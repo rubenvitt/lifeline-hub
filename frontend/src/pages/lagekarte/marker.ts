@@ -353,8 +353,8 @@ export function buildBrMarker(
 const LAGEMELDUNG_FARBE = '#d48806';
 
 /**
- * Marker für verortete Lagemeldungen. Unverortete bleiben außen vor — verortet wird beim Übergeben,
- * nicht auf der Karte.
+ * Marker für verortete Lagemeldungen. Unverortete bleiben außen vor — verortet wird beim
+ * Übernehmen in die Lage oder über die Lage-Angaben (LLH-1066), nicht per Ziehen auf der Karte.
  */
 export function baueLageMeldungMarker(
   lagemeldungen: LageMeldungStand[],

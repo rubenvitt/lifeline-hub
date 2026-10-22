@@ -94,7 +94,10 @@ test('eingetroffene Tauchpumpen als Material übernehmen, ergänzen und über de
   // In die Materialliste und über den Verweis zurück auf die hervorgehobene Karte.
   await karte.getByRole('link', { name: 'Material' }).click();
   const liste = page.getByRole('region', { name: 'Material im Einsatz', exact: true });
-  const verweis = liste.getByRole('link', { name: `aus Nachforderung: ${BEDARF}` });
+  // Der Verweis nennt die Nachforderung mit Kurzname und Details (LLH-1089).
+  const verweis = liste.getByRole('link', {
+    name: `aus Nachforderung: 3× Tauchpumpe — ${BEDARF}`,
+  });
   await expect(verweis).toHaveCount(2);
   await verweis.first().click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/nachforderungen$`));

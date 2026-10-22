@@ -13,6 +13,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben } from '../api/types';
 import { istKeyFreigegeben } from '../einsatz/modulRegistry';
 import type { NachforderungOption } from './VerpflegungDialoge';
+import { nachforderungName } from '../nachforderungen/nachforderungName';
 
 export interface NachforderungWahl {
   /** Modul Nachforderungen für die Person bedienbar. */
@@ -39,9 +40,9 @@ export function useNachforderungWahl(
     () => (frei && !query.isError ? (query.data ?? []) : []),
     [frei, query.isError, query.data],
   );
-  const namen = useMemo(() => new Map(liste.map((n) => [n.id, n.bezeichnung])), [liste]);
+  const namen = useMemo(() => new Map(liste.map((n) => [n.id, nachforderungName(n)])), [liste]);
   const optionen = useMemo(
-    () => (frei ? liste.map((n) => ({ value: n.id, label: n.bezeichnung })) : null),
+    () => (frei ? liste.map((n) => ({ value: n.id, label: nachforderungName(n) })) : null),
     [frei, liste],
   );
   return { frei, namen, optionen };

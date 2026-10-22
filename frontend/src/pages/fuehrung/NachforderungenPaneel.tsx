@@ -12,6 +12,7 @@ import {
 import { nachforderungenPfad } from '../../routing/deeplinks';
 import { zeilenzielStil } from './ueberblickStil';
 import Zustandsfeld from './Zustandsfeld';
+import { nachforderungName } from '../../nachforderungen/nachforderungName';
 
 /** Wie viele der am längsten wartenden offenen das Paneel nennt. */
 export const NACHFORDERUNGEN_AELTESTE = 2;
@@ -151,8 +152,7 @@ export default function NachforderungenPaneel({
                     overflowWrap: 'anywhere',
                   }}
                 >
-                  {n.anzahl != null ? `${n.anzahl}× ` : ''}
-                  {n.art} · {n.bezeichnung}
+                  {nachforderungName(n)}
                 </span>
                 <span
                   style={{

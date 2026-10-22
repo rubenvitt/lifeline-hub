@@ -1891,14 +1891,14 @@ mod tests {
             benutzer,
             crate::nachforderung::repo::NachforderungDaten {
                 art: "RTW",
-                bezeichnung: "2 RTW",
+                bezeichnung: Some("2 RTW"),
                 anzahl: Some(2),
                 adressat_kategorie: crate::nachforderung::ADRESSAT_LEITSTELLE,
                 adressat_bezeichnung: None,
                 begruendung: None,
                 prioritaet: crate::nachforderung::PRIO_NORMAL,
                 angefordert_at: "2026-05-23 10:05:00",
-                betreuungsstelle_id: None,
+                ..Default::default()
             },
         )
         .await

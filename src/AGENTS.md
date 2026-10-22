@@ -406,11 +406,17 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.
 - **Schwärzung:** die Lage-Spalten sind Teil der Regel `meldung` (`lage_text` NullSetzen,
   `lat`/`lon` behalten, Zeiten und Benutzer-FKs behalten).
-
-**Zielbild (Entscheidung 21.10.2026), gilt ab dem jeweiligen Folgeticket; bis dahin gilt das
-Bestehende.** Wer einen Punkt baut, schreibt die Regel oben fort und streicht ihn hier.
-- **Weitere Schreibwege rufen die Invariante:** die Korrektur (LLH-1066) geht über dieselbe
-  Repo-Funktion. Zurücknehmen bei Art Lagemeldung ist 422.
+- **Korrektur (LLH-1066):** `PATCH …/meldungen/{mid}` (`routes/meldung_korrektur.rs`, Schreiben
+  in `meldung/korrektur.rs`, eine Transaktion) ändert Art, Priorität, Richtung, Von-Bezug (als
+  Paar; eine id außerhalb des Einsatzes 422, anders als beim Erfassen), Empfänger und die
+  Lage-Angaben. Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang → 422, ein unbekanntes Feld
+  400. Art → Lagemeldung übernimmt jetzt durch den Ändernden (neu für die Kenntnisnahme), danach
+  `apply_lage_invariante_tx`; weg von Lagemeldung bleibt die Lagerelevanz. `lagerelevant: false`
+  ist bei Art Lagemeldung 422, sonst leert die Rücknahme Lage-Text, Ort, Übernahme und
+  Kenntnisnahme. Versetzen und Entfernen des Orts gehen nur hier, nicht über `als_lagerelevant`.
+  Heraufstufen zu sofort 422 (kein Alarm, keine Frist). Ein Systemeintrag je wirksamer Korrektur
+  mit Verweis auf die Meldung; Empfänger und Lage-Text stehen darin ohne Wert (Scrub). Geräte
+  erreichen die Route nicht (keine Routenliste).
 
 ## Backend — Bereitstellungsraum (LLH-1085, LLH-1107)
 

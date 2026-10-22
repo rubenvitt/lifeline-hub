@@ -85,14 +85,19 @@ ihre neue Stufe an sich tragen.
 
 ### Requirement: Zeitpunkte an der Karte
 Die Karte SHALL die Zeitpunkte ihrer Stufen zeigen, die vorhanden sind: angefordert mit Person,
-zugesagt, unterwegs, eingetroffen, dazu das Alter seit der Anforderung. Fehlt ein Zeitpunkt, MUST
-die Zeile fehlen, nicht erfunden werden.
+benötigt bis (Bedarfszeit, Spec `nachforderung-erfassung`), zugesagt, unterwegs, eingetroffen,
+dazu das Alter seit der Anforderung. Fehlt ein Zeitpunkt, MUST die Zeile fehlen, nicht erfunden
+werden.
 
 #### Scenario: Unterwegs
 - **WHEN** eine Nachforderung um 09:00 angefordert, um 09:10 zugesagt und um 09:20 als unterwegs
   gemeldet wurde
 - **THEN** trägt die Karte „Angefordert: …“, „Zugesagt: …“ und „Unterwegs: …“, aber keine Zeile
   „Eingetroffen“
+
+#### Scenario: Mit Bedarfszeit
+- **WHEN** eine Nachforderung um 09:00 angefordert wurde und bis 13:30 benötigt wird
+- **THEN** steht nach „Angefordert: …“ die Zeile „Benötigt bis: …“
 
 ### Requirement: Zahlen aus dem Modulzähler
 Der Seitenkopf SHALL „n offen · m unterwegs“ aus dem Modulzähler `nachforderungen` zeigen. Fehlt

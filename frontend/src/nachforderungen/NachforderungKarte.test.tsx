@@ -261,3 +261,48 @@ describe('NachforderungKarte — im Board (LLH-1078)', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 });
+
+/** LLH-1089 (design.md D10): Ziel und Bedarfszeit an der Karte, Details optional. */
+describe('NachforderungKarte — Ziel und Bedarfszeit (LLH-1089)', () => {
+  const namen = {
+    raeume: new Map([[4, 'BR Nord']]),
+    abschnitte: new Map([[7, 'EA Deich']]),
+  };
+  const ziel = () => document.querySelector('[data-lfh="nachforderung-ziel"]');
+
+  it('nennt den Raum mit Namen, ohne Namen „→ Bereitstellungsraum“', () => {
+    const { unmount } = renderMitProviders(
+      <NachforderungKarte nachforderung={nf({ ziel_br_id: 4 })} zielNamen={namen} />,
+    );
+    expect(ziel()).toHaveTextContent('→ BR Nord');
+    unmount();
+    renderMitProviders(<NachforderungKarte nachforderung={nf({ ziel_br_id: 4 })} />);
+    expect(ziel()).toHaveTextContent('→ Bereitstellungsraum');
+  });
+
+  it('Abschnitt und Freitext; ohne Ziel keine Zeile', () => {
+    const { unmount } = renderMitProviders(
+      <NachforderungKarte nachforderung={nf({ ziel_abschnitt_id: 7 })} zielNamen={namen} />,
+    );
+    expect(ziel()).toHaveTextContent('→ EA Deich');
+    unmount();
+    const zwei = renderMitProviders(
+      <NachforderungKarte nachforderung={nf({ ziel_text: 'Lotsenpunkt Feuerwache' })} />,
+    );
+    expect(ziel()).toHaveTextContent('→ Lotsenpunkt Feuerwache');
+    zwei.unmount();
+    renderMitProviders(<NachforderungKarte nachforderung={nf()} zielNamen={namen} />);
+    expect(ziel()).toBeNull();
+  });
+
+  it('ohne Details steht nur „2× RTW“, mit Bedarfszeit die Zeile „Benötigt bis“', () => {
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({ bezeichnung: undefined, benoetigt_bis: '2026-06-12 13:30:00' })}
+      />,
+    );
+    expect(screen.getByText('2× RTW')).toBeInTheDocument();
+    expect(screen.queryByText('2 RTW zur Verstärkung')).toBeNull();
+    expect(screen.getByText(/^Benötigt bis: /)).toBeInTheDocument();
+  });
+});

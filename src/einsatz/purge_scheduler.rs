@@ -1443,7 +1443,7 @@ mod tests {
             1,
             &crate::nachforderung::repo::NachforderungDaten {
                 art: "Dolmetscher",
-                bezeichnung: "Dolmetscher Ukrainisch für Familie Kowalenko",
+                bezeichnung: Some("Dolmetscher Ukrainisch für Familie Kowalenko"),
                 anzahl: Some(2),
                 adressat_kategorie: crate::nachforderung::ADRESSAT_LEITSTELLE,
                 adressat_bezeichnung: Some("Leitstelle Nord"),
@@ -1451,6 +1451,7 @@ mod tests {
                 prioritaet: crate::nachforderung::PRIO_NORMAL,
                 angefordert_at: "2026-01-01 09:00:00",
                 betreuungsstelle_id: Some(stelle),
+                ..Default::default()
             },
         )
         .await
@@ -1472,7 +1473,10 @@ mod tests {
         );
         assert_eq!(nachher.begruendung, None);
         assert_eq!(nachher.adressat_bezeichnung, None);
-        assert!(!nachher.bezeichnung.contains("Kowalenko"));
+        assert!(!nachher
+            .bezeichnung
+            .unwrap_or_default()
+            .contains("Kowalenko"));
         let stellenname: String =
             sqlx::query_scalar("SELECT bezeichnung FROM betreuungsstelle WHERE id = ?")
                 .bind(stelle)

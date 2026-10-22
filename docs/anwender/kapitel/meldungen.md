@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs]
 ---
 
 ## Überblick
@@ -91,7 +91,8 @@ Für Einsatzleitung und Führungspersonal:
    ihrem Menü.
 2. Im Dialog „In die Lage übernehmen“ den „Lage-Text“ prüfen; leer bleibt der Wortlaut der
    Meldung.
-3. Bei Bedarf unter „Verortung (optional)“ einen Ort setzen. Er ist später nicht änderbar.
+3. Bei Bedarf unter „Verortung (optional)“ einen Ort setzen. Ändern lässt er sich danach in den
+   Lagemeldungen (Kapitel [Lagemeldungen](lagemeldungen.md)).
 4. „Übernehmen“ wählen. Die App meldet „In die Lage übernommen“.
 
 Die Meldung trägt danach „In der Lage ✓“ und erscheint in den Lagemeldungen (Kapitel
@@ -112,6 +113,31 @@ der Punkt gesperrt als „Auftrag erteilen (keine Berechtigung)“ da.
 Wird der Auftrag später aufgehoben, steht an der Karte „Auftrag aufgehoben“ statt des Verweises,
 und „Auftrag erteilen“ ist wieder da. Ein neu erteilter Auftrag tritt an die Stelle des alten; der
 aufgehobene bleibt in den Aufträgen unter „Abgeschlossen“ und im Einsatztagebuch nachlesbar.
+
+### Eine Meldung korrigieren
+
+Für Einsatzleitung und Führungspersonal:
+
+1. An der Karte „Bearbeiten“ wählen, bei vielen Aktionen im Menü der Karte. Die Karte zeigt an
+   Ort und Stelle „Meldungsart“, „Priorität“, „Richtung“, „Von Einheit / Abschnitt“ und
+   „Empfänger / Adressat“.
+2. Die falsche Angabe berichtigen.
+3. „Speichern“ wählen. Die App meldet „Meldung #… korrigiert“. „Abbrechen“ oder Escape lässt alles,
+   wie es war.
+
+Wortlaut, Absender, Meldeweg und Ereigniszeit stehen nicht im Formular: sie bleiben, wie die
+Meldung einging. Lehnt der Server ab, steht der Grund an der Karte, und das Formular bleibt offen.
+
+### Eine Meldung aus der Lage nehmen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. An einer Karte mit „In der Lage ✓“ „Aus der Lage nehmen“ wählen, bei vielen Aktionen im Menü
+   der Karte.
+2. Die Rückfrage „Meldung #… aus der Lage nehmen?“ mit „Aus der Lage nehmen“ beantworten.
+
+Die App meldet „Aus der Lage genommen“. Die Meldung fehlt danach in den Lagemeldungen und auf der
+Lagekarte; ihr Wortlaut bleibt. Eine Meldung der Art „Lagemeldung“ bietet den Punkt nicht an.
 
 ### Eine unangemeldet eingetroffene Einheit übernehmen
 
@@ -214,6 +240,26 @@ Sie steht im Meldungseingang wie jede erfasste Meldung und bekommt keinen zweite
 Die erste Übernahme in die Lage schreibt immer den Systemeintrag „Meldung #12 in die Lage
 übernommen“; eine erneute Übernahme schreibt keinen, eine Lagemeldung ebenfalls nicht. Einträge
 aus der Zeit vor dieser Wortwahl lauten „… an die Lage übergeben“.
+
+### Was eine Korrektur bewirkt
+
+- Jede gespeicherte Korrektur schreibt einen Systemeintrag ins Einsatztagebuch mit Verweis auf die
+  Meldung, etwa „Meldung #12: Art Sonstige → Lagemeldung; in die Lage übernommen“ oder „Meldung
+  #12: Priorität Normal → Dringend; Empfänger geändert“. Der Empfänger und der Lage-Text stehen
+  darin ohne ihren Wert. Ein Speichern ohne Änderung schreibt nichts. Der ETB-Eintrag der Meldung
+  selbst bleibt, wie er war.
+- Wird die Art auf „Lagemeldung“ gesetzt, steht die Meldung ab dann in den Lagemeldungen, mit der
+  Marke „Neu“. Wird die Art einer Lagemeldung geändert, bleibt sie in der Lage, bis jemand sie
+  herausnimmt.
+- Zur Sofortmeldung wird eine Meldung nur beim Erfassen: „Sofort“ und „Sofortmeldung“ stehen in der
+  Korrektur nur an einer Meldung, die schon eine ist. Eine bestehende Bestätigungspflicht bleibt,
+  auch wenn die Priorität sinkt.
+- Ein nachgetragenes „Von Einheit / Abschnitt“ zählt als Rückmeldung dieser Einheit oder dieses
+  Abschnitts; der Absender bleibt der Name aus dem Eingang.
+- „Aus der Lage nehmen“ verwirft Lage-Text, Ort und Kenntnisnahme. Eine erneute Übernahme beginnt
+  ohne sie.
+- Speichern zwei Personen zugleich, gilt die zuletzt gespeicherte Korrektur; beide stehen im
+  Einsatztagebuch.
 
 ### Ohne Netz
 

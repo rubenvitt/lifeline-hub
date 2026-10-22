@@ -43,6 +43,7 @@ async function nachforderungenFuellen(api: APIRequestContext) {
     art: 'Sandsäcke',
     anzahl: 500,
     bezeichnung: 'Sandsäcke gefüllt für Unterführung Lindenstraße',
+    ziel_text: 'Unterführung Lindenstraße',
     adressat_kategorie: 'leitstelle',
     adressat_bezeichnung: 'Leitstelle Musterstadt',
     begruendung: 'Wasser steigt, Keller Lindenstraße 4 bis 8 gefährdet.',
@@ -142,14 +143,11 @@ test.describe(KAPITEL, () => {
     await nachforderungenOeffnen(page);
     await page.getByRole('button', { name: 'Nachforderung anlegen' }).click();
     const paneel = page.getByRole('region', { name: 'Neue Nachforderung' });
-    await paneel.getByLabel('Art', { exact: true }).fill('Tauchpumpe');
+    // Schnellwahl und drei Felder (LLH-1089); „Weitere Angaben“ bleibt eingeklappt.
+    await expect(paneel.getByRole('group', { name: 'Schnellwahl' })).toBeVisible();
+    await paneel.getByRole('combobox', { name: 'Was' }).fill('Tauchpumpe');
     await paneel.getByLabel('Anzahl').fill('3');
-    await paneel
-      .getByLabel('Bezeichnung', { exact: true })
-      .fill('Tauchpumpen mit Schläuchen für Keller');
-    await paneel
-      .getByLabel('Begründung / Lagebezug')
-      .fill('Eigene Pumpen im Einsatz, weitere Keller laufen voll.');
+    await paneel.getByRole('combobox', { name: 'Wohin' }).fill('Keller Hauptstraße 12');
     await fokusWeg(page);
     await fotografiere(paneel, KAPITEL, 'nachforderung-absetzen');
   });
