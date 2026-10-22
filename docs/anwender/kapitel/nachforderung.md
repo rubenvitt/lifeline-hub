@@ -155,6 +155,9 @@ eingetroffene RTW:
 2. Der Dialog nennt im Titel die Art, etwa „„RTW“ als Einheit übernehmen“. Unter „Einheiten“ steht
    je Rufname der Zusage ein Eintrag, etwa „83-1“ und „83-2“. Fehlende Rufnamen eintragen, Enter
    oder ein Komma schließt einen Eintrag ab. Je Eintrag entsteht eine Einheit.
+
+   ![Dialog „„RTW“ als Einheit übernehmen“ mit dem Bedarf, unter „Einheiten“ „Nachbarstadt 83-1“ und „Nachbarstadt 83-2“, Typ „RTW“ und dem gesetzten Haken „In BR Parkplatz Stadion Nord eintragen“](../bilder/nachforderung/nachforderung-einheit-uebernehmen.png)
+
 3. Unter „Typ“ den Einheitstyp prüfen. Vorbelegt ist der Typ, der wie die Art heißt.
 4. Hat die Nachforderung einen Bereitstellungsraum als Ziel, steht der Haken „In BR Nord
    eintragen“. Ohne Haken stehen die Einheiten nur im Einsatz, nicht im Raum.
@@ -163,8 +166,22 @@ eingetroffene RTW:
 Steht ein Eintrag schon als Einheit im Einsatz, nennt der Dialog ihn unter „Schon im Einsatz, wird
 verknüpft“; diese Einheit bekommt den Verweis, eine zweite entsteht nicht. Die Karte zeigt danach
 „Als Einheit übernommen: 83-1 ↗, 83-2 ↗“; jeder Rufname führt in die Ansicht der
-[Einheit](einheiten.md). Sind noch nicht alle angeforderten Kräfte da, bietet die Karte später
-„Weitere Einheit übernehmen“ an.
+[Einheit](einheiten.md).
+
+### Weitere Einheit übernehmen
+
+Für Einsatzleitung und Führungspersonal, wenn erst ein Teil der angeforderten Kräfte übernommen
+ist, etwa der dritte von drei KTW:
+
+1. An der Karte „Weitere Einheit übernehmen“ wählen.
+
+   ![Karte einer eingetroffenen Nachforderung „KTW“ mit „Als Einheit übernommen: Nachbarstadt 85-1 ↗, Nachbarstadt 85-2 ↗“ und dem Knopf „Weitere Einheit übernehmen“](../bilder/nachforderung/nachforderung-einheit-weitere.png)
+
+2. Unter „Einheiten“ die fehlenden Rufnamen prüfen. Vorbelegt sind die Rufnamen der Zusage, die
+   noch keine Einheit tragen; es passen höchstens so viele Einträge, wie noch fehlen.
+3. „Übernehmen“ wählen.
+
+Sind so viele Einheiten übernommen, wie angefordert, bietet die Karte keine weitere an.
 
 ### Eine Nachforderung bearbeiten
 
