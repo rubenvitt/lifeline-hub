@@ -98,25 +98,34 @@ function eintragVon(
   };
 }
 
-/** Gehört die Benachrichtigung in den Eingangshinweis (LLH-1062)? Die Art `meldung`. */
-function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'bezug_typ'>): boolean {
-  return e.art === 'meldung' && (e.bezug_typ === 'meldung' || e.bezug_typ === 'lage_uebernahme');
+/**
+ * Gehört die Benachrichtigung in den Eingangshinweis? Jeder Eingang des Einsatzes (Stufe
+ * `hinweis`, LLH-1143 D7; bis dahin nur die Art `meldung`, LLH-1062). Org-Arten betreffen keinen
+ * offenen Einsatz und bleiben Toasts.
+ */
+function istEingang(e: Pick<BenachrichtigungEreignis, 'art' | 'stufe'>): boolean {
+  return e.stufe === 'hinweis' && !istOrgArt(e.art);
 }
 
-/** Der Eintrag im Eingangshinweis: Absender und Wortlaut aus der Meldung, sonst der Server. */
+/**
+ * Der Eintrag im Eingangshinweis: bei einer Meldung Absender und Wortlaut aus der Meldung, sonst
+ * Titel und Detailzeile des Servers.
+ */
 function eingangVon(
   a: BenachrichtigungAnzeige,
   opts: { uhrzeit: string | null; inhalt: MeldungInhalt | null },
 ): EingangEintrag {
   const inhalt = opts.inhalt;
+  const meldung = a.art === 'meldung';
   return {
     benachrichtigungId: a.id,
     einsatzId: a.einsatz_id,
-    bezug: a.bezug_typ === 'lage_uebernahme' ? 'lage_uebernahme' : 'meldung',
-    meldungId: a.bezug_id,
+    bezug: a.bezug_typ,
+    bezugId: a.bezug_id,
+    ziel: zielVon(a),
     titel: inhalt?.titel ?? a.titel,
-    zeile: inhalt?.absender ?? a.detail ?? a.titel,
-    anfang: inhalt?.anfang ?? undefined,
+    zeile: meldung ? (inhalt?.absender ?? a.detail ?? a.titel) : a.titel,
+    anfang: inhalt?.anfang ?? (meldung ? undefined : (a.detail ?? undefined)),
     wortlaut: inhalt?.wortlaut ?? undefined,
     uhrzeit: opts.uhrzeit ?? undefined,
     pfad: a.pfad,
@@ -137,8 +146,10 @@ function eingangVon(
  *
  * `einsatzId` `null` ist die Org-Zentrale: nur Org-Arten.
  *
- * Benachrichtigungen der Art `meldung` gehen in den Eingangshinweis (`eingang`, LLH-1062), nicht
- * ins Toast-Budget; ihr Ton ist gedrosselt. Ohne `eingang` (Org-Zentrale) gibt es sie nicht.
+ * Eingänge des Einsatzes (Stufe `hinweis`) gehen ins Eingangsband (`eingang`, LLH-1062,
+ * LLH-1143 D7), nicht ins Toast-Budget; ihr Ton ist gedrosselt. Die Toasts tragen Alarme und
+ * Org-Arten. Ohne `eingang` (Org-Zentrale) gibt es keine Einsatz-Eingänge. Die Stufe `still`
+ * steht nur im Verlauf.
  */
 export function useBenachrichtigungen(
   einsatzId: number | null,
@@ -173,6 +184,8 @@ export function useBenachrichtigungen(
         quittiert.add(id);
         toasts.entferneBenachrichtigung(id);
         eingang?.entferneBenachrichtigung(id);
+        // „Alle gelesen“ (LLH-1143 D4): ein Ereignis für alle Eingänge bis dahin, nie für Alarme.
+        if (e.gelesen_bis != null) eingang?.entferneBis(e.gelesen_bis);
         return;
       }
       if (!unbekannt(id)) return;

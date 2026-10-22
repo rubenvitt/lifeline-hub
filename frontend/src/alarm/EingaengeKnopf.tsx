@@ -7,35 +7,13 @@ import { einsatzKeys } from '../api/queryKeys';
 import type { BenachrichtigungAnzeige } from '../api/types';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { Augenbraue } from '../components/instrument';
-import { WortPlatz } from '../components/Kopfleiste';
-import { useViewport } from '../components/useViewport';
 import { IconPosteingang } from '../icons';
 import { rahmenFarben, schrift } from '../theme/tokens';
 import { BENACHRICHTIGUNG_ARTEN } from './benachrichtigungKatalog';
+import { EINGAENGE_OEFFNEN_EVENT, eingaengeName, useKopfBuendelt } from './eingaenge';
+import EingaengeZahl from './EingaengeZahl';
 import { quittiereNachNutzer } from './useBenachrichtigungen';
 import { useBenachrichtigungVerlauf, useVerlaufAbgleich } from './useBenachrichtigungVerlauf';
-
-/**
- * window-Ereignis, mit dem das Eingangsband den Verlauf öffnet (`detail.einsatzId`). Ein Ereignis
- * statt eines geteilten Zustands: Band und Knopf hängen an verschiedenen Stellen des Rahmens.
- */
-export const EINGAENGE_OEFFNEN_EVENT = 'lfh:eingaenge-oeffnen';
-
-/** Bittet den Knopf „Eingänge“ dieses Einsatzes, seinen Verlauf zu öffnen. */
-export function oeffneEingaenge(einsatzId: number): void {
-  window.dispatchEvent(new CustomEvent(EINGAENGE_OEFFNEN_EVENT, { detail: { einsatzId } }));
-}
-
-/** Die sichtbare Zahl: leer bei 0, ab 100 „99+“. Rein und exportiert. */
-export function zahlText(zahl: number): string {
-  if (zahl <= 0) return '';
-  return zahl > 99 ? '99+' : String(zahl);
-}
-
-/** Der zugängliche Name: Zahl und Wort, nie die Zahl allein (Vorleser, WCAG 1.1.1). */
-export function knopfName(zahl: number): string {
-  return zahl > 0 ? `Eingänge, ${zahl} ungelesen` : 'Eingänge, keine ungelesen';
-}
 
 /** Ungelesen: unquittiert und nicht still. Ein offener Alarm steht unter „Neu“, zählt aber nicht. */
 function istNeu(a: BenachrichtigungAnzeige): boolean {
@@ -188,17 +166,20 @@ function VerlaufPaneel({ einsatzId, schliessen }: { einsatzId: number; schliesse
 
 /**
  * Knopf „Eingänge“ in der Kommandoleiste (LLH-1143, design.md D6): das Zeichen des Posteingangs
- * (die Glocke trägt schon Ton und Erinnerungen) und die Zahl der ungelesenen Eingänge, Mono. Die
- * Zahl hält die Breite von „99+“ ({@link WortPlatz}): eine eintreffende Meldung darf den Kopf nicht
- * umbrechen lassen (LLH-1158). Farben aus `rahmenFarben` (Rahmen dauerdunkel, ≥ 7 : 1, LFH-434),
- * Trefffläche aus der Dichte-Staffel. Ab `md` Klappfläche, darunter ein Blatt von unten.
+ * (die Glocke trägt schon Ton und Erinnerungen) mit der Zahl der ungelesenen Eingänge als
+ * Plakette ({@link EingaengeZahl}, nimmt keine Breite). Ab `md` öffnet er eine Klappfläche.
+ *
+ * Bündelt der Kopf die Alarmzentrale ({@link useKopfBuendelt}: Handschirm, Tablet mit Finger),
+ * steht kein eigener Knopf: Zahl und Eintrag „Eingänge“ trägt dann die gebündelte Alarmzentrale,
+ * und der Verlauf öffnet sich hier als Blatt von unten ({@link EINGAENGE_OEFFNEN_EVENT}). Ein
+ * eigener Knopf brach den Kopf bei 820 px in zwei Zeilen.
  *
  * Gleicht den Verlauf für den ganzen Rahmen ab ({@link useVerlaufAbgleich}); Tab-Titel und
  * App-Badge lesen denselben Key.
  */
 export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
   const { token } = theme.useToken();
-  const { istSchmal } = useViewport();
+  const buendelt = useKopfBuendelt();
   const [offen, setOffen] = useState(false);
   useVerlaufAbgleich(einsatzId);
   const ungelesen = useBenachrichtigungVerlauf(einsatzId).data?.ungelesen ?? 0;
@@ -215,47 +196,20 @@ export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
 
   const schliessen = () => setOffen(false);
   const paneel = <VerlaufPaneel einsatzId={einsatzId} schliessen={schliessen} />;
-  const knopf = (
-    <Button
-      type="text"
-      data-lfh="kopf-eingaenge"
-      aria-label={knopfName(ungelesen)}
-      aria-expanded={offen}
-      aria-haspopup="dialog"
-      icon={<IconPosteingang />}
-      onClick={istSchmal ? () => setOffen(true) : undefined}
-      style={{
-        color: ungelesen > 0 ? rahmenFarben.text : rahmenFarben.gedaempft,
-        minWidth: token.controlHeight,
-        fontSize: 12,
-        flexShrink: 0,
-      }}
-    >
-      <WortPlatz
-        platz="99+"
-        style={{ fontFamily: schrift.zahl, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}
-      >
-        {zahlText(ungelesen)}
-      </WortPlatz>
-    </Button>
-  );
 
-  if (istSchmal) {
+  if (buendelt) {
     return (
-      <>
-        {knopf}
-        <Drawer
-          open={offen}
-          onClose={schliessen}
-          placement="bottom"
-          size="auto"
-          title={null}
-          closable
-          styles={{ body: { paddingBlock: token.paddingSM } }}
-        >
-          {paneel}
-        </Drawer>
-      </>
+      <Drawer
+        open={offen}
+        onClose={schliessen}
+        placement="bottom"
+        size="auto"
+        title={null}
+        closable
+        styles={{ body: { paddingBlock: token.paddingSM } }}
+      >
+        {paneel}
+      </Drawer>
     );
   }
   return (
@@ -267,7 +221,23 @@ export default function EingaengeKnopf({ einsatzId }: { einsatzId: number }) {
       content={paneel}
       arrow={false}
     >
-      {knopf}
+      <Button
+        type="text"
+        data-lfh="kopf-eingaenge"
+        aria-label={eingaengeName(ungelesen)}
+        aria-expanded={offen}
+        aria-haspopup="dialog"
+        icon={
+          <EingaengeZahl zahl={ungelesen}>
+            <IconPosteingang />
+          </EingaengeZahl>
+        }
+        style={{
+          color: ungelesen > 0 ? rahmenFarben.text : rahmenFarben.gedaempft,
+          minWidth: token.controlHeight,
+          flexShrink: 0,
+        }}
+      />
     </Popover>
   );
 }

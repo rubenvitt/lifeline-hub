@@ -482,7 +482,11 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
             {/* Eingänge neben der Alarmzentrale (LLH-1143): beide ZEIGEN einen Zustand. */}
             <EingaengeKnopf einsatzId={einsatzId} />
             <EinsatzAnzeigeProvider einsatzId={einsatzId}>
-              <AlarmZentrale einsatzId={einsatzId} darfSichten={darfImEinsatzSchreiben(einsatz)} />
+              <AlarmZentrale
+                einsatzId={einsatzId}
+                darfSichten={darfImEinsatzSchreiben(einsatz)}
+                eingaengeUngelesen={ungelesen}
+              />
             </EinsatzAnzeigeProvider>
           </div>
           <SyncAnzeige

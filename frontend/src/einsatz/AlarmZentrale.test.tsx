@@ -17,6 +17,7 @@ import type {
   BenachrichtigungBezugTyp,
 } from '../api/types';
 import { BENACHRICHTIGUNG_ARTEN } from '../alarm/benachrichtigungKatalog';
+import { EINGAENGE_OEFFNEN_EVENT } from '../alarm/eingaenge';
 import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener';
 import { server } from '../test/server';
 
@@ -134,7 +135,13 @@ function abloesung(schicht: number, art: 'abloesung_vorwarnung' | 'abloesung_fae
   );
 }
 
-function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
+function AlarmTestRoute({
+  mitSteuerung,
+  eingaengeUngelesen,
+}: {
+  mitSteuerung: boolean;
+  eingaengeUngelesen?: number;
+}) {
   const { notification } = AntApp.useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -166,7 +173,7 @@ function AlarmTestRoute({ mitSteuerung }: { mitSteuerung: boolean }) {
           </button>
         </>
       )}
-      {sichtbar && <AlarmZentrale einsatzId={einsatzId} />}
+      {sichtbar && <AlarmZentrale einsatzId={einsatzId} eingaengeUngelesen={eingaengeUngelesen} />}
       <output data-testid="route">
         {location.pathname}
         {location.search}
@@ -179,16 +186,23 @@ function renderAlarm({
   initialEntry = '/einsaetze/1/meldungen',
   mitSteuerung = false,
   strictMode = false,
+  eingaengeUngelesen,
 }: {
   initialEntry?: string;
   mitSteuerung?: boolean;
   strictMode?: boolean;
+  eingaengeUngelesen?: number;
 } = {}) {
   const inhalt = (
     <AntApp>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/einsaetze/:id/*" element={<AlarmTestRoute mitSteuerung={mitSteuerung} />} />
+          <Route
+            path="/einsaetze/:id/*"
+            element={
+              <AlarmTestRoute mitSteuerung={mitSteuerung} eingaengeUngelesen={eingaengeUngelesen} />
+            }
+          />
         </Routes>
       </MemoryRouter>
     </AntApp>
@@ -311,16 +325,20 @@ describe('AlarmZentrale', () => {
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/meldungen?meldung=3');
   });
 
-  it('zeigt eine fällige Erinnerung ohne Detailzeile', async () => {
+  it('zeigt eine fällige Erinnerung im Eingangsband, ohne Detailzeile (LLH-1143)', async () => {
     renderAlarm();
     erinnerungFaellig(5);
     await waitFor(() => expect(screen.getByText('Erinnerung fällig')).toBeInTheDocument());
-    // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
-    const toast = screen
+    // Ein Eingang, kein Alarm: das Band, kein Toast.
+    const band = screen
       .getByText('Erinnerung fällig')
-      .closest<HTMLElement>('.ant-notification-notice')!;
-    expect(toast.querySelector('.ant-notification-notice-description')).toBeNull();
-    expect(within(toast).getByRole('button', { name: 'Öffnen' })).toBeInTheDocument();
+      .closest<HTMLElement>('[data-lfh="eingangsband"]')!;
+    expect(band).not.toBeNull();
+    expect(document.querySelector('.ant-notification-notice')).toBeNull();
+    // LFH-1078: der Titel sagt alles, kein Bittsatz darunter.
+    expect(screen.getAllByText('Erinnerung fällig')).toHaveLength(1);
+    await userEvent.click(within(band).getByRole('button', { name: 'Öffnen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
   });
 
   it('zeigt einen überfälligen Auftrag und springt zum Auftrag', async () => {
@@ -447,13 +465,13 @@ describe('AlarmZentrale', () => {
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/auftraege');
   });
 
-  it('bündelt vier Erinnerungen mit dem korrekten Erinnerungs-Ziel', async () => {
+  it('bündelt vier Erinnerungen im Eingangsband mit dem Erinnerungs-Ziel (LLH-1143)', async () => {
     renderAlarm({ initialEntry: '/einsaetze/1/start' });
     for (let id = 1; id <= 4; id += 1) erinnerungFaellig(id);
 
-    expect(await screen.findByText('3 weitere fällige Erinnerungen')).toBeInTheDocument();
+    expect(await screen.findByText('4 neue Eingänge')).toBeInTheDocument();
+    expect(document.querySelector('.ant-notification-notice')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Zu Meldungen' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Zu Aufträgen' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
     expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
   });
@@ -492,15 +510,16 @@ describe('AlarmZentrale', () => {
     await screen.findByText('Meldung #1');
     auftragUeberfaellig(2);
     await screen.findByText('Auftrag #2');
-    erinnerungFaellig(3);
-    await screen.findByText('Erinnerung fällig');
+    abloesung(3, 'abloesung_faellig');
+    await screen.findByText('Ablösung fällig');
     sofortmeldung(4);
 
     expect(await screen.findByText('3 weitere Alarme')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zu Meldungen' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zu Aufträgen' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Zu Erinnerungen' }));
-    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/erinnerungen');
+    expect(screen.queryByRole('button', { name: 'Zu Erinnerungen' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Zu Ablösungen' }));
+    expect(screen.getByTestId('route')).toHaveTextContent('/einsaetze/1/abloesung');
   });
 });
 
@@ -937,6 +956,36 @@ describe('AlarmZentrale auf dem Tablet mit Finger (LFH-950)', () => {
     },
   );
 
+  it('gebündelt trägt das Ziel auch die Eingänge: Zahl, Name und Eintrag öffnen den Verlauf (LLH-1143)', async () => {
+    setzeViewportBreite(820);
+    setzeZeigerGrob(true);
+    stubAudioReady();
+    stubNotification('default');
+    const geoeffnet: number[] = [];
+    const merken = (ev: Event) =>
+      geoeffnet.push((ev as CustomEvent<{ einsatzId: number }>).detail.einsatzId);
+    window.addEventListener(EINGAENGE_OEFFNEN_EVENT, merken);
+    try {
+      renderAlarm({ eingaengeUngelesen: 3 });
+      const ziel = await screen.findByRole('button', {
+        name: 'Alarmzentrale: Ton bereit, 3 Eingänge ungelesen',
+      });
+      expect(ziel).toHaveTextContent('3');
+      await userEvent.click(ziel);
+      const menue = document.querySelector(
+        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+      ) as HTMLElement;
+      const eintraege = within(menue).getAllByRole('menuitem');
+      expect(eintraege).toHaveLength(3);
+      expect(eintraege[2]).toHaveTextContent('Eingänge, 3 ungelesen');
+      await userEvent.click(eintraege[2]);
+      expect(geoeffnet).toEqual([1]);
+      expect(istAlarmGemutet()).toBe(false);
+    } finally {
+      window.removeEventListener(EINGAENGE_OEFFNEN_EVENT, merken);
+    }
+  });
+
   it('mit Maus bleiben es bei 1024 px zwei Knöpfe', async () => {
     setzeViewportBreite(1024);
     setzeZeigerGrob(false);
@@ -1104,31 +1153,36 @@ describe('AlarmZentrale: Desktop-Meldungen schließen (LFH-951)', () => {
     const { meldungen } = stubMeldungen();
     setzeHidden(true);
     renderAlarm();
-    erinnerungFaellig(5);
+    sofortmeldung(5);
     await waitFor(() => expect(meldungen).toHaveLength(1));
     auftragUeberfaellig(12);
     await waitFor(() => expect(meldungen).toHaveLength(2));
-    abloesung(9, 'abloesung_vorwarnung');
+    abloesung(9, 'abloesung_faellig');
     await waitFor(() => expect(meldungen).toHaveLength(3));
     act(() => {
       window.dispatchEvent(
         new CustomEvent('lfh:unwetter-alarm', { detail: { schluessel: 'sturm-2' } }),
       );
     });
+    // Ein Eingang (LLH-1143): das Band trägt EINE OS-Meldung unter dem tag des Einsatzes.
+    erinnerungFaellig(5);
+    await waitFor(() => expect(meldungen).toHaveLength(5));
     // Benachrichtigungen unter ihrer Kennung, der Unwetterhinweis unter seinem Paar.
     expect(meldungen.map((m) => m.tag)).toEqual([
-      '1-b-205',
+      '1-b-5',
       '1-b-112',
-      '1-b-318',
+      '1-b-319',
       '1-unwetter-sturm-2',
+      '1-eingang',
     ]);
 
     // LFH-1078: die OS-Meldung nennt Gegenstand und Zustand, keine Bitte.
     expect(meldungen.map((m) => [m.titel, m.body])).toEqual([
-      ['Erinnerung fällig', undefined],
+      ['Sofortmeldung eingegangen', 'Meldung #5'],
       ['Auftrag überfällig', 'Auftrag #12'],
-      ['Ablösung steht an', 'Florian 9, 15:30'],
+      ['Ablösung fällig', 'Florian 9, 15:30'],
       ['Unwetterwarnung', 'Unwetterwarnung für den Einsatzort'],
+      ['Erinnerung fällig', undefined],
     ]);
   });
 

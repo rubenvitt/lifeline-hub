@@ -1,5 +1,6 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, request, test, type Locator, type Page } from '@playwright/test';
 import { anmelden, einsatzAnlegen, post } from './fuehrungsorganisation-kern';
+import { benutzerAnlegen, mitgliedEintragen } from './rollen-kern';
 
 /**
  * Stehende Alarme verdecken keine Bedienkante (LFH-1112, Spec `einsatztauglichkeit-layout`).
@@ -18,11 +19,17 @@ import { anmelden, einsatzAnlegen, post } from './fuehrungsorganisation-kern';
  * Mutationsproben (beide gefahren): die Regel `--notification-top` in `src/index.css` entfernen
  * → beide Tests rot („Alarm beginnt bei 18, Bedienkante 97“); dazu die Lageprüfung aussetzen →
  * rot an der Treffer-Prüfung (Ton- und Benachrichtigungsknopf der Kommandoleiste verdeckt).
+ *
+ * Dazu das Eingangsband (LLH-1143, design.md D7): ein Eingang neben drei stehenden Alarmen
+ * verdrängt keinen (antds `maxCount` 3 zählte eine Notification mit) und liegt nicht über ihnen.
+ * Mutationsprobe (gefahren): der Eingangshinweis als `notification.info` (Stand vor LLH-1143) →
+ * rot; dort standen nach dem Eingang nur noch zwei der drei Alarme neben ihm.
  */
 
 const KOPF = '[data-lfh="rahmen-kopf"]';
 const SEITENKOPF = '[data-lfh="seitenkopf"]';
 const ALARM = '.ant-notification-notice:not(.ant-notification-fade-leave)';
+const BAND = '[data-lfh="eingangsband"]';
 /** Abstand der Alarme zur Bedienkante (`ALARM_ABSTAND` in `components/alarmOben.ts`). */
 const ABSTAND = 8;
 
@@ -154,5 +161,65 @@ test.describe('Stehende Alarme unter der Bedienkante', () => {
     await erster.getByRole('button', { name: 'Öffnen', exact: true }).click();
     await expect(page.locator(ALARM)).toHaveCount(2);
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/abloesung`));
+  });
+
+  test('Desktop 1366: drei Alarme und ein Eingang — das Band verdrängt und verdeckt keinen Alarm', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1366, height: 900 });
+    await anmelden(page);
+    const einsatzId = await seede(page, 3);
+    // Eigene Aktionen melden nichts: der Eingang kommt von einem zweiten Konto.
+    const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Eingang Verdeckung');
+    await mitgliedEintragen(page, einsatzId, konto.id, 'fuehrungspersonal');
+    await page.goto(`/einsaetze/${einsatzId}/abloesung`);
+    await expect(page.getByRole('article', { name: 'Schicht Florian Alarm 3' })).toBeVisible();
+    await expect(page.locator(ALARM)).toHaveCount(3, { timeout: 75_000 });
+
+    const zweiter = await request.newContext({ baseURL: test.info().project.use.baseURL });
+    try {
+      const login = await zweiter.post('/api/auth/login', {
+        data: { benutzername: konto.benutzername, passwort: konto.passwort },
+      });
+      expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
+      const meldung = await zweiter.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+        data: {
+          absender: 'Abschnitt Nord',
+          meldeweg: 'funk',
+          inhalt: 'Lage ruhig, keine Veränderung.',
+          meldungsart: 'lagemeldung',
+          ereigniszeit: '2026-10-01 09:30:00',
+        },
+      });
+      expect(meldung.ok(), `Meldung: ${meldung.status()} ${await meldung.text()}`).toBe(true);
+    } finally {
+      await zweiter.dispose();
+    }
+
+    const band = page.locator(BAND);
+    await expect(band).toBeVisible({ timeout: 20_000 });
+    // Kein Alarm verdrängt, keiner gebündelt.
+    await expect(page.locator(ALARM)).toHaveCount(3);
+    const bandBox = (await band.boundingBox())!;
+    for (const alarm of await page.locator(ALARM).all()) {
+      const a = (await alarm.boundingBox())!;
+      const ueberlappt =
+        a.x < bandBox.x + bandBox.width &&
+        bandBox.x < a.x + a.width &&
+        a.y < bandBox.y + bandBox.height &&
+        bandBox.y < a.y + a.height;
+      expect(ueberlappt, 'Eingangsband liegt über einem Alarm').toBe(false);
+    }
+    // Die Alarme bleiben unter der Bedienkante, die Kommandoleiste bedienbar.
+    const kante = Math.max(
+      await unterkante(page.locator(KOPF)),
+      await unterkante(page.locator(SEITENKOPF)),
+    );
+    await alarmeUnter(page, kante);
+    await kommandoleisteKlickbar(page);
+    // Das Band unten im Bild, mit Abstand zum Rand.
+    const hoehe = page.viewportSize()!.height;
+    expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(hoehe);
+    expect(bandBox.y + bandBox.height).toBeGreaterThan(hoehe - 80);
   });
 });

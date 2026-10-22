@@ -9,7 +9,8 @@ import { BENACHRICHTIGUNG_WINDOW_EVENT } from '../live/benachrichtigungListener'
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite, VIEWPORT_STANDARD } from '../test/viewport';
-import EingaengeKnopf, { EINGAENGE_OEFFNEN_EVENT, zahlText } from './EingaengeKnopf';
+import EingaengeKnopf from './EingaengeKnopf';
+import { EINGAENGE_OEFFNEN_EVENT, eingaengeZahlText } from './eingaenge';
 
 /**
  * Knopf „Eingänge“ mit Verlauf (LLH-1143, design.md D6): Zahl der ungelesenen Eingänge, Gruppen
@@ -93,10 +94,10 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
   });
 
   it('kürzt große Zahlen auf „99+“', () => {
-    expect(zahlText(0)).toBe('');
-    expect(zahlText(7)).toBe('7');
-    expect(zahlText(99)).toBe('99');
-    expect(zahlText(120)).toBe('99+');
+    expect(eingaengeZahlText(0)).toBe('');
+    expect(eingaengeZahlText(7)).toBe('7');
+    expect(eingaengeZahlText(99)).toBe('99');
+    expect(eingaengeZahlText(120)).toBe('99+');
   });
 
   it('Paneel: Gruppen „Neu“ und „Früher“, Stilles und Gelesenes unter „Früher“', async () => {
@@ -183,11 +184,16 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     expect(await screen.findByRole('region', { name: 'Eingänge' })).toBeInTheDocument();
   });
 
-  it('unter md als Blatt von unten', async () => {
+  it('bündelt der Kopf (Handschirm): kein eigener Knopf, der Verlauf als Blatt von unten', async () => {
     setzeViewportBreite(390);
-    serverMit({ eintraege: [eintrag(1)], ungelesen: 1 });
+    const zaehler = serverMit({ eintraege: [eintrag(1)], ungelesen: 1 });
     rendern();
-    await userEvent.click(await screen.findByRole('button', { name: 'Eingänge, 1 ungelesen' }));
+    await waitFor(() => expect(zaehler.abrufe).toBeGreaterThan(0));
+    // Zahl und Eintrag trägt die gebündelte Alarmzentrale (`AlarmZentrale.test.tsx`).
+    expect(screen.queryByRole('button', { name: /^Eingänge, / })).not.toBeInTheDocument();
+    act(() => {
+      window.dispatchEvent(new CustomEvent(EINGAENGE_OEFFNEN_EVENT, { detail: { einsatzId: 1 } }));
+    });
     const blatt = await screen.findByRole('dialog');
     expect(within(blatt).getByRole('region', { name: 'Eingänge' })).toBeInTheDocument();
   });
