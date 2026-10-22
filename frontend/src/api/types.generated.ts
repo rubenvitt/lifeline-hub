@@ -2328,6 +2328,19 @@ export interface components {
             funkrufname: string;
         };
         /**
+         * @description Eine Einsatz-Vorlage der Organisation. `ausgeblendet` sind die Modulschlüssel, die ein mit ihr
+         *     angelegter Einsatz als eigenen Wert ausblendet, in der Reihenfolge von `MODUL_KEYS`.
+         */
+        EinsatzVorlage: {
+            ausgeblendet: string[];
+            bezeichnung: string;
+            einsatzart?: components["schemas"]["Einsatzart"] | null;
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            sortier: number;
+        };
+        /**
          * @description Aufgelöste Abschnitts-Anzeige (flach; der Baum wird im FE über
          *     `ueber_abschnitt_id` gebaut), inkl. aufgelöstem Leiter-Namen.
          */
@@ -5771,6 +5784,13 @@ export interface components {
             /** Format: int64 */
             id: number;
             text: string;
+            /**
+             * Format: int64
+             * @description Gekoppelte Einsatz-Vorlage derselben Organisation (LLH-1375): wählt der Anlegedialog
+             *     dieses Stichwort, stellt sich die Vorlage ein, solange niemand sie von Hand gewählt hat.
+             *     Fehlt ohne Kopplung.
+             */
+            vorlage_id?: number | null;
         };
         /**
          * @description System-Rolle (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `system_rolle`.

@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import StichworteTab from '../stammdaten/StichworteTab';
+import EinsatzVorlagenTab from '../stammdaten/EinsatzVorlagenTab';
 import ExterneStellenTab from '../stammdaten/ExterneStellenTab';
 import FahrzeugeTab from '../stammdaten/FahrzeugeTab';
 import MaterialTab from '../stammdaten/MaterialTab';
@@ -50,6 +51,8 @@ export const adminGruppen: AdminGruppe[] = [
        * `titel` in der Sektion); `adminNav.test.tsx` fängt Drift für die Stammdaten-Sektionen.
        */
       { key: 'stichworte', label: 'Einsatz-Stichworte', element: <StichworteTab /> },
+      // LLH-1375: Modulsätze, aus denen der Anlegedialog wählt; ein Stichwort kann auf eine zeigen.
+      { key: 'einsatz-vorlagen', label: 'Einsatz-Vorlagen', element: <EinsatzVorlagenTab /> },
       { key: 'externe-stellen', label: 'Externe Stellen', element: <ExterneStellenTab /> },
       { key: 'fahrzeuge', label: 'Fahrzeuge', element: <FahrzeugeTab /> },
       { key: 'material', label: 'Material', element: <MaterialTab /> },

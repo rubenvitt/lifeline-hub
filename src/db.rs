@@ -10084,6 +10084,103 @@ mod tests {
         assert_eq!(geo, poly, "Geometrie bleibt");
     }
 
+    /// LLH-1375: jede bestehende Organisation bekommt die Startliste der Einsatz-Vorlagen genau
+    /// wie `EINSATZ_VORLAGE_STARTLISTE` (Bezeichnung, Einsatzart, Sortierung, ausgeblendete
+    /// Module); bestehende Stichworte bleiben ohne Kopplung.
+    #[tokio::test]
+    async fn migration_0238_seedet_die_startliste() {
+        use crate::einsatz_vorlage::EINSATZ_VORLAGE_STARTLISTE;
+        use std::collections::BTreeSet;
+
+        let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 232).await;
+        sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Orga'), (2, 'Zweite')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO einsatz_stichwort_vorschlag (org_id, text) VALUES (1, 'MANV15')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        migriere_bis(&pool, 238).await;
+
+        for org_id in [1_i64, 2] {
+            let koepfe: Vec<(i64, String, Option<String>, i64)> = sqlx::query_as(
+                "SELECT id, bezeichnung, einsatzart, sortier FROM einsatz_vorlage \
+                 WHERE org_id = ? ORDER BY sortier",
+            )
+            .bind(org_id)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(
+                koepfe.len(),
+                EINSATZ_VORLAGE_STARTLISTE.len(),
+                "Org {org_id}"
+            );
+            for ((id, bezeichnung, einsatzart, sortier), start) in
+                koepfe.into_iter().zip(EINSATZ_VORLAGE_STARTLISTE)
+            {
+                assert_eq!(bezeichnung, start.bezeichnung);
+                assert_eq!(einsatzart.as_deref(), Some(start.einsatzart.as_str()));
+                assert_eq!(sortier, start.sortier);
+                let aus: BTreeSet<String> = sqlx::query_scalar(
+                    "SELECT modul_key FROM einsatz_vorlage_modul_aus WHERE vorlage_id = ?",
+                )
+                .bind(id)
+                .fetch_all(&pool)
+                .await
+                .unwrap()
+                .into_iter()
+                .collect();
+                let erwartet: BTreeSet<String> = start
+                    .ausgeblendet()
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect();
+                assert_eq!(aus, erwartet, "{}", start.bezeichnung);
+            }
+        }
+        let gekoppelt: Option<i64> =
+            sqlx::query_scalar("SELECT vorlage_id FROM einsatz_stichwort_vorschlag")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(gekoppelt, None, "keine mitgelieferte Kopplung");
+
+        // Löschen einer Vorlage lässt den gekoppelten Vorschlag stehen (SET NULL) und nimmt die
+        // Modulmenge mit (CASCADE).
+        let manv: i64 = sqlx::query_scalar(
+            "SELECT id FROM einsatz_vorlage WHERE org_id = 1 AND bezeichnung = 'MANV'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query("UPDATE einsatz_stichwort_vorschlag SET vorlage_id = ?")
+            .bind(manv)
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("DELETE FROM einsatz_vorlage WHERE id = ?")
+            .bind(manv)
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (n, kopplung): (i64, Option<i64>) =
+            sqlx::query_as("SELECT COUNT(*), MAX(vorlage_id) FROM einsatz_stichwort_vorschlag")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!((n, kopplung), (1, None));
+        let rest: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM einsatz_vorlage_modul_aus WHERE vorlage_id = ?",
+        )
+        .bind(manv)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(rest, 0);
+    }
+
     // --- LLH-1031: Lagemeldungen werden Spalten der Meldung (0233) ---
 
     /// Je Meldung der Stand der Lage-Sicht nach 0233: (id, lagerelevant, lage_text, lat, lon,

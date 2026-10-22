@@ -644,6 +644,12 @@ function gate1Routen(einsatzId: string): Gate1Route[] {
       umleitungOhneAdmin: true,
     },
     {
+      // LLH-1375: die Startliste bringt jede Organisation mit, „MANV“ ist ein Datenanker.
+      pfad: '/admin/stammdaten/einsatz-vorlagen',
+      anker: (p: Page) => p.getByRole('cell', { name: 'MANV', exact: true }),
+      umleitungOhneAdmin: true,
+    },
+    {
       // LLH-1122: Vorgabe des Einsatzes; der Beobachter sieht sie mit dem Rechtehinweis.
       pfad: `/einsaetze/${einsatzId}/einstellungen/abloesung`,
       anker: (p: Page) => p.getByRole('region', { name: 'Schichtmodell des Einsatzes' }),
@@ -1005,6 +1011,20 @@ function gate1VerwaltungRouten(): Gate1Route[] {
           await rechteHinweis(p, NUR_SYSTEM_ADMIN);
           await expect(
             p.getByRole('button', { name: 'Schichtmodell anlegen' }),
+            'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
+          ).toBeDisabled();
+        },
+      },
+    },
+    {
+      // LLH-1375: Einsatz-Vorlagen, gelesen ohne Admin-Recht.
+      pfad: '/admin/stammdaten/einsatz-vorlagen',
+      anker: (p: Page) => p.getByRole('cell', { name: 'MANV', exact: true }),
+      lesend: {
+        vorbedingung: async (p: Page) => {
+          await rechteHinweis(p, NUR_SYSTEM_ADMIN);
+          await expect(
+            p.getByRole('button', { name: 'Einsatz-Vorlage anlegen' }),
             'Vorbedingung: die Primäraktion steht gesperrt, nicht versteckt',
           ).toBeDisabled();
         },

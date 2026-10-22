@@ -751,6 +751,20 @@ export type AbloesungArt = S['AbloesungArt'];
 export type AbloesungBesatzung = S['AbloesungBesatzung'];
 export type BesatzungRolle = S['BesatzungRolle'];
 
+// ============================== LLH-1375 Einsatz-Vorlagen ==============================
+/** Modulsatz der Organisation mit optionaler Einsatzart; `ausgeblendet` sind Modulschlüssel. */
+export type EinsatzVorlage = S['EinsatzVorlage'];
+
+/**
+ * Kein Backend-Schema: `POST /api/einsatz-vorlagen`, `PUT /api/einsatz-vorlagen/{id}`
+ * (Vollersatz, alle Felder Pflicht). Gespeichert werden die ausgeblendeten Module.
+ */
+export interface EinsatzVorlageEingabe {
+  bezeichnung: string;
+  einsatzart: Einsatzart | null;
+  ausgeblendet: string[];
+}
+
 // ============================== LLH-1122 Schichtmodelle ==============================
 export type Schichtmodell = S['Schichtmodell'];
 export type SchichtmodellTyp = S['SchichtmodellTyp'];

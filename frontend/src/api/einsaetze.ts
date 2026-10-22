@@ -39,6 +39,8 @@ interface NeuerEinsatz {
   einsatzort?: string;
   einsatzort_lat?: number;
   einsatzort_lon?: number;
+  /** Einsatz-Vorlage (LLH-1375): ihre ausgeblendeten Module werden eigene Einsatzwerte. */
+  vorlage_id?: number;
 }
 
 export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {

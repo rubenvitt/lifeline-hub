@@ -28,6 +28,7 @@ pub mod einsatz_schaden;
 pub mod einsatz_tier;
 pub mod einsatz_uhs;
 pub mod einsatz_uhs_kraefte;
+pub mod einsatz_vorlage;
 pub mod einsatzabschnitt;
 pub mod erinnerung;
 pub mod etb;

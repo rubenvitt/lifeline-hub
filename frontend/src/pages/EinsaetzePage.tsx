@@ -1,7 +1,7 @@
 import { IconOrtsmarke, IconPlus } from '../icons';
 import { Alert, AutoComplete, Button, Form, Input, Tag, theme } from 'antd';
 import type { Dayjs } from 'dayjs';
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
@@ -11,6 +11,14 @@ import { Kartenausschnitt } from '../anzeige/Kartenausschnitt';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { fetchSchichtmodelle } from '../api/schichtmodelle';
+import { listeEinsatzVorlagen } from '../api/einsatzVorlagen';
+import {
+  OHNE_VORLAGE,
+  einsatzartDerVorlage,
+  wahlNachStichwort,
+  type VorlageWahl,
+} from './einsatzVorlageWahlKern';
+import { auswahlWert, vorlageAusWert, vorlagenOptionen } from '../stammdaten/einsatzVorlageModule';
 import { mitVorgabe } from '../components/vorgabeText';
 import { OrgAnzeigeProvider, useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
@@ -57,6 +65,9 @@ interface AnlegeWerte {
   /** Einsatzort aus dem Ortsfeld (LFH-1175); die Koordinate nur nach Wahl eines Treffers. */
   einsatzort?: OrtsfeldWert;
 }
+
+/** Einsatzart, mit der der Anlegedialog öffnet; auch die Vorbelegung ohne Vorlage. */
+const START_EINSATZART: Einsatzart = 'realeinsatz';
 
 /** Höhe des Kartenausschnitts im Anlegedialog: klein, er bestätigt nur die Wahl. */
 const AUSSCHNITT_ANLEGEN_PX = 120;
@@ -180,6 +191,12 @@ function EinsaetzeInhalt() {
   const qc = useQueryClient();
   const [dialogOffen, setDialogOffen] = useState(false);
   const [form] = Form.useForm<AnlegeWerte>();
+  // Vorlage und Handänderung der Einsatzart (LLH-1375) leben neben dem Formular, nicht als Feld
+  // (Feldbudget, siehe Dialog unten). Deshalb setzt sie `dialogSchliessen` selbst zurück: der
+  // Reset der Erfassungs-Hülle erreicht nur die Felder.
+  const [vorlageWahl, setVorlageWahl] = useState<VorlageWahl>(OHNE_VORLAGE);
+  const einsatzartVonHand = useRef(false);
+  const vorlageFeldId = useId();
 
   const darfAnlegen = darfVerwaltung(benutzer);
 
@@ -247,9 +264,34 @@ function EinsaetzeInhalt() {
     enabled: dialogOffen,
   });
   const orgSchichtmodell = schichtmodelle?.find((m) => m.ist_vorgabe);
+  // Einsatz-Vorlagen der Organisation (LLH-1375, Spec `einsatz-vorlagen`). Ohne Vorlage keine
+  // Auswahl: „Alle Module“ allein wäre keine Wahl.
+  const { data: vorlagen = [] } = useQuery({
+    queryKey: globalKeys.einsatzVorlagen(),
+    queryFn: listeEinsatzVorlagen,
+    enabled: dialogOffen,
+  });
+
+  /** Neue Vorlage; die Einsatzart folgt ihr, solange niemand sie von Hand geändert hat. */
+  function setzeVorlage(wahl: VorlageWahl) {
+    if (wahl === vorlageWahl) return;
+    setVorlageWahl(wahl);
+    if (!einsatzartVonHand.current) {
+      form.setFieldValue(
+        'einsatzart',
+        einsatzartDerVorlage(wahl.vorlageId, vorlagen, START_EINSATZART),
+      );
+    }
+  }
+
+  function dialogSchliessen() {
+    setDialogOffen(false);
+    setVorlageWahl(OHNE_VORLAGE);
+    einsatzartVonHand.current = false;
+  }
 
   const anlegen = useMutation({
-    mutationFn: (werte: AnlegeWerte) =>
+    mutationFn: ({ werte, vorlageId }: { werte: AnlegeWerte; vorlageId: number | null }) =>
       legeEinsatzAn({
         bezeichnung: werte.bezeichnung,
         stichwort: werte.stichwort,
@@ -258,6 +300,8 @@ function EinsaetzeInhalt() {
         // mit `dayjs.utc`); `alsBackendZeit` rechnet den Zeitpunkt nach UTC um.
         begonnen_at: werte.begonnen_at ? alsBackendZeit(werte.begonnen_at) : undefined,
         ...einsatzortFelder(werte.einsatzort),
+        // Ohne Vorlage fehlt das Feld: das Anlegen schreibt dann keine Modulwerte.
+        ...(vorlageId != null ? { vorlage_id: vorlageId } : {}),
       }),
     onSuccess: (neuerEinsatz) => {
       qc.invalidateQueries({ queryKey: globalKeys.einsaetze() });
@@ -581,22 +625,24 @@ function EinsaetzeInhalt() {
       {/* Fünf Felder: Einsatzart und Alarmzeit gleich beim Anlegen, damit die Nachpflege in den
           Kopfdaten im Regelfall entfällt. Vier war die Obergrenze einer Schnellerfassung; das
           optionale fünfte, der Einsatzort, ist die wichtigste Erstangabe und erspart den Gang in
-          die Kopfdaten (LFH-1175, Entscheidung 11.10.2026). Ein sechstes gehört in die Kopfdaten. */}
+          die Kopfdaten (LFH-1175, Entscheidung 11.10.2026). Ein sechstes gehört in die Kopfdaten.
+          Die Einsatz-Vorlage ist kein Feld, sondern eine Zeile unter den Feldern (LLH-1375): sie
+          muss im Dialog stehen, weil das Stichwort sie einstellt. */}
       <ErfassungsModal<AnlegeWerte>
         offen={dialogOffen}
         titel="Neuen Einsatz anlegen"
         form={form}
         erfassenText="Anlegen"
         laeuft={anlegen.isPending}
-        initialValues={{ einsatzart: 'realeinsatz' as Einsatzart, begonnen_at: serverJetzt() }}
+        initialValues={{ einsatzart: START_EINSATZART, begonnen_at: serverJetzt() }}
         onErfassen={async (w) => {
-          await anlegen.mutateAsync(w);
+          await anlegen.mutateAsync({ werte: w, vorlageId: vorlageWahl.vorlageId });
         }}
-        onFertig={() => setDialogOffen(false)}
+        onFertig={dialogSchliessen}
         onAbbrechen={() => {
           // Der nächste Dialog öffnet ohne den Grund des vorigen Versuchs.
           anlegen.reset();
-          setDialogOffen(false);
+          dialogSchliessen();
         }}
       >
         <Form.Item
@@ -607,10 +653,23 @@ function EinsaetzeInhalt() {
           <Input />
         </Form.Item>
         <Form.Item label="Stichwort" name="stichwort">
-          <AutoComplete options={stichwortOptionen} allowClear placeholder="z. B. H1, MANV …" />
+          <AutoComplete
+            options={stichwortOptionen}
+            allowClear
+            placeholder="z. B. H1, MANV …"
+            // Form.Item ruft dieses `onChange` neben seinem eigenen (Tippen, Wahl, Leeren).
+            onChange={(text?: string) =>
+              setzeVorlage(wahlNachStichwort(vorlageWahl, text, stichwortVorschlaege, vorlagen))
+            }
+          />
         </Form.Item>
         <Form.Item label="Einsatzart" name="einsatzart" rules={[{ required: true }]}>
-          <Select options={EINSATZART_OPTIONEN} />
+          <Select
+            options={EINSATZART_OPTIONEN}
+            onChange={() => {
+              einsatzartVonHand.current = true;
+            }}
+          />
         </Form.Item>
         <Form.Item label="Alarmzeit" name="begonnen_at" rules={[{ required: true }]}>
           <ZeitpunktEingabe art="ereignis" style={{ width: '100%' }} />
@@ -619,13 +678,46 @@ function EinsaetzeInhalt() {
           <Ortsfeld suchen={sucheOrtInOrg} suchSchluessel={globalKeys.orgOrtSuche} />
         </Form.Item>
         <GewaehlterOrt />
-        {orgSchichtmodell && (
-          <p
-            data-lfh="anlage-schichtmodell"
-            style={{ margin: 0, marginBlockEnd: token.margin, color: rollen.gedaempft }}
+        {/* Gedämpfte Zeile unter den Feldern (design.md D3): Vorlage als kompakte Auswahl ohne
+            Rahmen, daneben, was der Einsatz von der Organisation bekommt (LLH-1122). */}
+        {(vorlagen.length > 0 || orgSchichtmodell) && (
+          <div
+            data-lfh="anlage-vorgaben"
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              columnGap: token.marginSM,
+              marginBlockEnd: token.margin,
+              color: rollen.gedaempft,
+            }}
           >
-            {`Schichtmodell: ${mitVorgabe(orgSchichtmodell.bezeichnung)}`}
-          </p>
+            {vorlagen.length > 0 && (
+              <span
+                data-lfh="anlage-vorlage"
+                style={{ display: 'inline-flex', alignItems: 'center' }}
+              >
+                <label htmlFor={vorlageFeldId}>Module:</label>
+                <Select<number>
+                  id={vorlageFeldId}
+                  aria-label="Module"
+                  variant="borderless"
+                  popupMatchSelectWidth={false}
+                  value={auswahlWert(vorlageWahl.vorlageId)}
+                  options={vorlagenOptionen(vorlagen, 'Alle Module')}
+                  onChange={(wert) =>
+                    setzeVorlage({ vorlageId: vorlageAusWert(wert), vonHand: true })
+                  }
+                />
+              </span>
+            )}
+            {vorlagen.length > 0 && orgSchichtmodell && <span aria-hidden>·</span>}
+            {orgSchichtmodell && (
+              <span data-lfh="anlage-schichtmodell">
+                {`Schichtmodell: ${mitVorgabe(orgSchichtmodell.bezeichnung)}`}
+              </span>
+            )}
+          </div>
         )}
         <SpeicherFehler
           fehler={anlegen.error}

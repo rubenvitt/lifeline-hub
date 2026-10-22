@@ -1722,6 +1722,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/stichwort-vorschlaege/{id}",
             delete(routes::stichwort::loeschen),
         )
+        // LLH-1375: Kopplung eines Stichworts an eine Einsatz-Vorlage.
+        .route(
+            "/api/stichwort-vorschlaege/{id}/vorlage",
+            put(routes::stichwort::set_vorlage),
+        )
+        // Einsatz-Vorlagen (LLH-1375): Lesen für alle der Org, Schreiben Admin.
+        .route(
+            "/api/einsatz-vorlagen",
+            get(routes::einsatz_vorlage::list).post(routes::einsatz_vorlage::create),
+        )
+        .route(
+            "/api/einsatz-vorlagen/{id}",
+            put(routes::einsatz_vorlage::update).delete(routes::einsatz_vorlage::delete),
+        )
         .route("/api/fahrzeuge", get(routes::fahrzeug::liste))
         .route("/api/fahrzeuge", post(routes::fahrzeug::anlegen))
         .route(

@@ -1,8 +1,10 @@
-import { Button, Popconfirm, type TableColumnsType } from 'antd';
+import { Button, Popconfirm } from 'antd';
 import AdminPage from '../components/AdminPage';
 import SchnellAnlegen from '../components/SchnellAnlegen';
-import { SeitenHinweise } from '../components/SpeicherHinweis';
-import KatalogTabelle from '../components/KatalogTabelle';
+import { SeitenHinweise, ZeilenFehler } from '../components/SpeicherHinweis';
+import KatalogTabelle, { type KatalogSpalte } from '../components/KatalogTabelle';
+import { Select } from '../components/Select';
+import { useZeilenFehler } from '../components/useZeilenFehler';
 import { SeitenFehler } from '../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
@@ -10,10 +12,13 @@ import {
   legeStichwortVorschlagAn,
   listeStichwortVorschlaege,
   loescheStichwortVorschlag,
+  setzeStichwortVorlage,
 } from '../api/stichwortVorschlaege';
+import { listeEinsatzVorlagen } from '../api/einsatzVorlagen';
 import type { StichwortVorschlag } from '../api/types';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
+import { auswahlWert, vorlageAusWert, vorlagenOptionen } from './einsatzVorlageModule';
 
 export default function StichworteTab() {
   const { benutzer } = useAuth();
@@ -23,6 +28,42 @@ export default function StichworteTab() {
   const vorschlaegeQuery = useQuery({
     queryKey: globalKeys.stichwortVorschlaege(),
     queryFn: listeStichwortVorschlaege,
+  });
+
+  // Die Vorlagen für die Auswahl je Zeile (LLH-1375); lesen darf sie jede angemeldete Person.
+  const vorlagenQuery = useQuery({
+    queryKey: globalKeys.einsatzVorlagen(),
+    queryFn: listeEinsatzVorlagen,
+  });
+  const vorlagen = vorlagenQuery.data ?? [];
+  const vorlagenNamen = new Map(vorlagen.map((v) => [v.id, v.bezeichnung]));
+  const vorlagenAuswahl = vorlagenOptionen(vorlagen, 'keine');
+
+  /**
+   * Kopplung an eine Einsatz-Vorlage, sofort gespeichert (LLH-1375). Die Wahl steht gleich in der
+   * Zeile (Cache vorab gesetzt); eine Ablehnung nennt ihren Grund an der Zeile
+   * (`useZeilenFehler`, LFH-1077), und der Serverstand kommt per Abgleich zurück. Die Callbacks
+   * laufen je Aufruf, `mutation.error` kennte nur den letzten.
+   */
+  const zeilen = useZeilenFehler<number>();
+  const vorlageMutation = useMutation({
+    mutationFn: ({ id, vorlageId }: { id: number; vorlageId: number | null }) =>
+      setzeStichwortVorlage(id, vorlageId),
+    onMutate: ({ id, vorlageId }) => {
+      zeilen.beginne(id);
+      qc.setQueryData<StichwortVorschlag[]>(globalKeys.stichwortVorschlaege(), (alt) =>
+        alt?.map((v) => (v.id === id ? { ...v, vorlage_id: vorlageId } : v)),
+      );
+    },
+    onError: (fehler, { id }) => {
+      zeilen.melde(id, fehler, 'Vorlage nicht gespeichert');
+      void qc.invalidateQueries({ queryKey: globalKeys.stichwortVorschlaege() });
+    },
+    onSuccess: (neu) => {
+      qc.setQueryData<StichwortVorschlag[]>(globalKeys.stichwortVorschlaege(), (alt) =>
+        alt?.map((v) => (v.id === neu.id ? neu : v)),
+      );
+    },
   });
 
   const anlegenMutation = useMutation({
@@ -60,7 +101,7 @@ export default function StichworteTab() {
 
   const vorschlaege = vorschlaegeQuery.data ?? [];
 
-  const spalten: TableColumnsType<StichwortVorschlag> = [
+  const spalten: KatalogSpalte<StichwortVorschlag>[] = [
     {
       title: 'Stichwort',
       dataIndex: 'text',
@@ -77,6 +118,38 @@ export default function StichworteTab() {
        * das Frontend sie nicht wiederherstellen; nur der dritte Kopfklick holt sie zurück.
        */
       sorter: (a, b) => a.text.localeCompare(b.text, 'de', { numeric: true }),
+    },
+    {
+      title: 'Vorlage',
+      key: 'vorlage',
+      /**
+       * Gekoppelte Einsatz-Vorlage (LLH-1375): wählt der Anlegedialog dieses Stichwort, stellt sie
+       * sich ein. Leer = keine. Bedienen nur der Admin; die übrigen lesen den Namen.
+       */
+      suchText: (v) => (v.vorlage_id != null ? vorlagenNamen.get(v.vorlage_id) : undefined),
+      render: (_, v: StichwortVorschlag) => {
+        const name = v.vorlage_id != null ? vorlagenNamen.get(v.vorlage_id) : undefined;
+        if (!istAdmin) return name ?? '—';
+        const grund = zeilen.grund(v.id);
+        return (
+          <>
+            {/* „keine“ ist ein Eintrag, kein Leeren: so bleibt die Auswahl immer kontrolliert
+               (antd liest `value={undefined}` als unkontrolliert), und ein abgelehnter Wechsel
+               springt mit dem Serverstand zurück. */}
+            <Select<number>
+              aria-label={`Vorlage zu ${v.text}`}
+              value={auswahlWert(v.vorlage_id)}
+              options={vorlagenAuswahl}
+              loading={vorlagenQuery.isLoading}
+              style={{ width: '100%', minWidth: 180 }}
+              onChange={(wert) =>
+                vorlageMutation.mutate({ id: v.id, vorlageId: vorlageAusWert(wert) })
+              }
+            />
+            {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
+          </>
+        );
+      },
     },
     ...(istAdmin
       ? ([
@@ -111,7 +184,7 @@ export default function StichworteTab() {
               </Popconfirm>
             ),
           },
-        ] as TableColumnsType<StichwortVorschlag>)
+        ] as KatalogSpalte<StichwortVorschlag>[])
       : []),
   ];
 
@@ -146,10 +219,9 @@ export default function StichworteTab() {
           dataSource={vorschlaege}
           columns={spalten}
           locale={{ emptyText: 'Noch keine Stichworte' }}
-          // Nur `text` hat einen Datenbezug — die Aktionsspalte ist render-only und trägt
-          // zur Suche nichts bei (dokumentierte Grenze im Kopf von `KatalogTabelle`).
-          // Der Platzhalter benennt deshalb genau dieses eine Feld.
-          suche={{ platzhalter: 'Stichwort' }}
+          // `text` und der Name der Vorlage (über `suchText`) tragen die Suche; die Aktionsspalte
+          // ist render-only (dokumentierte Grenze im Kopf von `KatalogTabelle`).
+          suche={{ platzhalter: 'Stichwort oder Vorlage' }}
         />
       )}
 

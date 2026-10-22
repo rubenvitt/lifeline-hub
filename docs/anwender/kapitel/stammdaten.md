@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs]
 ---
 
 ## Überblick
@@ -10,7 +10,8 @@ quellen: [frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/MaterialFormM
 Stammdaten sind das, was eine Organisation über jeden Einsatz hinweg vorhält: Fahrzeuge,
 Material und Personal, dazu die Kataloge, aus denen Einsätze schöpfen (Einsatz-Stichworte,
 externe Stellen, Qualifikationen, Status, ETB-Schnellbausteine, Einheitstypen, Sprechgruppen,
-Führungsfunktionen, Schichtmodelle), sowie Name, Logo und Zeichen der Organisation. Einheiten-Vorlagen
+Führungsfunktionen, Schichtmodelle), sowie Name, Logo und Zeichen der Organisation.
+Einsatz-Vorlagen legen fest, welche Module ein neuer Einsatz zeigt. Einheiten-Vorlagen
 beschreiben stehende Einheiten wie einen Sanitätszug mit seinen Untereinheiten, Fahrzeugen und
 seiner Stammbesetzung. Der Verpflegungsplan nennt die Mahlzeiten eines Einsatztags. Im Einsatz
 werden aus den Stammdaten Kräfte disponiert und Einträge vorbelegt.
@@ -78,6 +79,32 @@ Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
 
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
 deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
+
+### Eine Einsatz-Vorlage anlegen
+
+Eine Einsatz-Vorlage ist ein Satz sichtbarer Module, etwa für einen MANV oder einen
+Sanitätsdienst. Wer einen Einsatz anlegt, wählt sie im Dialog „Neuen Einsatz anlegen“ (Kapitel
+[Einsatz auswählen und Oberfläche](einsatz-oberflaeche.md)).
+
+1. Unter „Stammdaten“ „Einsatz-Vorlagen“ öffnen. Je Vorlage stehen Bezeichnung, Einsatzart und
+   wie viele Module sie zeigt, etwa „27 von 34 Modulen“.
+2. „Einsatz-Vorlage anlegen“ wählen.
+3. „Bezeichnung“ eintragen und nach Bedarf die „Einsatzart“ wählen.
+4. Unter „Sichtbare Module“ die Häkchen der Module entfernen, die der Einsatz nicht zeigen soll.
+   Die Module stehen nach den Kategorien der Navigation.
+
+   ![Dialog „Einsatz-Vorlage anlegen“ mit Bezeichnung „Großbrand“, Einsatzart „Realeinsatz“ und den sichtbaren Modulen nach Kategorien, „Stab“ und „Tiere“ ohne Häkchen](../bilder/stammdaten/einsatz-vorlage-anlegen.png)
+
+5. „Speichern“ wählen.
+
+Zum Ändern in der Zeile „Bearbeiten“ wählen. „Löschen“ fragt mit „… löschen?“ nach und wird mit
+„Vorlage löschen“ bestätigt.
+
+### Ein Stichwort mit einer Einsatz-Vorlage koppeln
+
+1. Unter „Stammdaten“ „Einsatz-Stichworte“ öffnen.
+2. In der Zeile des Stichworts unter „Vorlage“ die Einsatz-Vorlage wählen. Die Wahl gilt sofort.
+3. Um die Kopplung zu lösen, „keine“ wählen.
 
 ### Eine Einheiten-Vorlage anlegen
 
@@ -202,6 +229,27 @@ spätere Änderung am Stamm gilt nur für neue Dispositionen.
   bisherigen die Markierung ab; Deaktivieren nimmt sie ebenfalls. Die zuständige Leitstelle steht
   in den Vorschlägen vorn und ist die Vorgabe für den Adressaten einer
   [Nachforderung](nachforderung.md).
+
+### Einsatz-Vorlagen
+
+- Jede Organisation bringt sechs Vorlagen mit: „Kleinlage“ (14 sichtbare Module),
+  „Sanitätsdienst“ (22), „MANV“ (27), „Personensuche“ (25), „Evakuierung und Betreuung“ (30) und
+  „Unwetter“ (28). „Sanitätsdienst“ belegt die Einsatzart „Sanitätsdienst“ vor, die übrigen
+  „Realeinsatz“. „Stab“ zeigt keine von ihnen. Die Liste lässt sich ändern und löschen.
+- Eine Vorlage merkt sich die Module ohne Häkchen. Ein Modul, das mit einer neuen Version
+  hinzukommt, ist deshalb in jeder Vorlage sichtbar. „Einsatzdaten“ und „Einstellungen“ sind
+  „immer sichtbar“ und lassen sich nicht abwählen.
+- Beim Anlegen blendet die Vorlage ihre abgewählten Module in diesem Einsatz aus, als eigene
+  Werte des Einsatzes; im Reiter „Module“ der Einstellungen lassen sie sich wieder einschalten
+  (Kapitel [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)). Eine Vorlage
+  blendet nur aus, nie ein: was die Organisation für alle Einsätze ausblendet, bleibt ausgeblendet.
+- Ein Einsatz merkt sich seine Vorlage nicht. Eine spätere Änderung der Vorlage wirkt nur auf neue
+  Einsätze.
+- Ein Stichwort zeigt auf höchstens eine Vorlage. Wird im Dialog „Neuen Einsatz anlegen“ ein
+  gekoppeltes Stichwort gewählt, stellt sich seine Vorlage ein, solange niemand die Vorlage von
+  Hand gewählt hat. Mitgeliefert wird keine Kopplung. Wird eine Vorlage gelöscht, verlieren ihre
+  Stichworte die Kopplung; die Stichworte bleiben.
+- Jede Bezeichnung gibt es in der Organisation nur einmal, höchstens 100 Zeichen lang.
 
 ### Einheiten-Vorlagen
 

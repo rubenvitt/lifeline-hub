@@ -23,6 +23,7 @@ pub mod dokument;
 pub mod einheit;
 pub mod einheit_vorlage;
 pub mod einsatz;
+pub mod einsatz_vorlage;
 pub mod einsatzabschnitt;
 pub mod entlassung;
 pub mod erinnerung;

@@ -81,6 +81,17 @@ Navigation.
 - **WHEN** in der Datenbank eine Vorgabe der Organisation steht, die `einsatzdaten` ausblendet
 - **THEN** lautet der Eintrag `einsatzdaten` `sichtbar: true, zugriff: true`
 
+### Requirement: Eine Einsatz-Vorlage schreibt eigene Einsatzwerte
+Wird ein Einsatz mit einer Einsatz-Vorlage angelegt (Spec `einsatz-vorlagen`), MUST das System für
+jedes Modul, das die Vorlage ausblendet, beim Anlegen einen eigenen Einsatzwert `sichtbar: false`
+ohne benötigte Rolle speichern, so als hätte die Einsatzleitung den Schalter selbst umgelegt.
+Module, die die Vorlage nicht ausblendet, MUST ohne eigenen Wert bleiben und der Vorgabe der
+Organisation folgen; eine Vorlage blendet nie ein.
+
+#### Scenario: Vorlage beim Anlegen
+- **WHEN** ein Einsatz mit einer Vorlage angelegt wird, die `stab` ausblendet
+- **THEN** liefert `GET /api/einsaetze/{id}/modul-overrides` für `stab` `sichtbar: false`, und der Eintrag `stab` der Freigaben lautet `sichtbar: false`
+
 ### Requirement: Die Navigation folgt den Freigaben des Servers
 Die Navigation des Einsatzes MUST ein Modul mit `sichtbar: false` nicht zeigen. Ein Modul mit
 `sichtbar: true, zugriff: false` MUST sie gesperrt zeigen, mit dem Grund „Keine Berechtigung“ und

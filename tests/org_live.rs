@@ -615,6 +615,11 @@ const KATALOG_SCHREIBEN: &[(&str, &str, &str)] = &[
     ("POST", "/api/stichwort-vorschlaege", r#"{"text":"Sturm"}"#),
     (
         "POST",
+        "/api/einsatz-vorlagen",
+        r#"{"bezeichnung":"Großbrand","ausgeblendet":["tiere"]}"#,
+    ),
+    (
+        "POST",
         "/api/externe-stellen",
         r#"{"bezeichnung":"ILS Musterkreis","art":"leitstelle"}"#,
     ),

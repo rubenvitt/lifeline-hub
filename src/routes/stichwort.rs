@@ -45,3 +45,31 @@ pub async fn loeschen(
     stichwort::loeschen(&state.pool, benutzer.org_id, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[derive(Debug, Deserialize)]
+pub struct VorlageKopplung {
+    /// Einsatz-Vorlage derselben Organisation; `null` löst die Kopplung. Pflichtfeld, damit ein
+    /// leerer Body nicht still entkoppelt.
+    #[serde(
+        default,
+        deserialize_with = "crate::routes::support::deserialize_optional_field"
+    )]
+    pub vorlage_id: Option<Option<i64>>,
+}
+
+/// PUT /api/stichwort-vorschlaege/{id}/vorlage — Vorschlag an eine Einsatz-Vorlage koppeln
+/// (LLH-1375). Admin-only. Fremder oder unbekannter Vorschlag 404, Vorlage einer anderen
+/// Organisation oder unbekannt 400, Feld fehlt 400.
+pub async fn set_vorlage(
+    State(state): State<AppState>,
+    AdminUser(benutzer): AdminUser,
+    PfadParam(id): PfadParam<i64>,
+    JsonBody(req): JsonBody<VorlageKopplung>,
+) -> Result<Json<StichwortVorschlag>, AppError> {
+    let vorlage_id = req
+        .vorlage_id
+        .ok_or_else(|| AppError::Validation("vorlage_id fehlt".into()))?;
+    Ok(Json(
+        stichwort::set_vorlage(&state.pool, benutzer.org_id, id, vorlage_id).await?,
+    ))
+}

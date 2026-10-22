@@ -1,3 +1,4 @@
+import { waehleIn } from '../auswahl-kern';
 import { anmelden, apiAlsAdmin, expect, fotografiere, fuelle, test, uhrAnhalten } from './kern';
 
 /**
@@ -19,6 +20,9 @@ import { anmelden, apiAlsAdmin, expect, fotografiere, fuelle, test, uhrAnhalten 
  *   schichtmodell-anlegen.png
  *                         frontend/src/abloesung/SchichtmodellModal.tsx
  *   verpflegungsplan.png  frontend/src/stammdaten/VerpflegungsplanTab.tsx
+ *   einsatz-vorlage-anlegen.png
+ *                         frontend/src/stammdaten/EinsatzVorlageFormModal.tsx,
+ *                         frontend/src/einsatz/modulRegistry.ts (Kategorien und Module)
  *
  * Gespeichert werden nur der Verpflegungsplan (LLH-1058), den die Demo-Daten nicht mitbringen: vier
  * aktive Mahlzeiten und eine deaktivierte, und das Schichtmodell „Sanitätsdienst“ als Vorgabe der
@@ -145,5 +149,23 @@ test.describe(KAPITEL, () => {
     await page.mouse.move(0, 0);
     await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
     await fotografiere(dialog, KAPITEL, 'schichtmodell-anlegen');
+  });
+
+  test('Dialog „Einsatz-Vorlage anlegen“', async ({ page }) => {
+    await anmelden(page);
+    await uhrAnhalten(page);
+    await page.goto('/admin/stammdaten/einsatz-vorlagen');
+    await expect(page.getByRole('cell', { name: 'MANV', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Einsatz-Vorlage anlegen' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Einsatz-Vorlage anlegen' });
+    await dialog.getByRole('textbox', { name: 'Bezeichnung' }).fill('Großbrand');
+    await waehleIn(dialog.getByRole('combobox', { name: 'Einsatzart' }), 'Realeinsatz');
+    // Nicht gespeichert: das Bild zeigt den Dialog, die Stammdaten bleiben unverändert.
+    await dialog.getByRole('checkbox', { name: 'Stab', exact: true }).uncheck();
+    await dialog.getByRole('checkbox', { name: 'Tiere', exact: true }).uncheck();
+    await page.mouse.move(0, 0);
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await expect.poll(async () => (await dialog.boundingBox())?.width ?? 0).toBeGreaterThan(400);
+    await fotografiere(dialog, KAPITEL, 'einsatz-vorlage-anlegen');
   });
 });
