@@ -559,15 +559,25 @@ describe('MeldungKarte — nachträglich korrigieren (LLH-1066)', () => {
     expect(onKorrigieren).not.toHaveBeenCalled();
   });
 
-  it('bietet „Sofort“ nur einer Meldung an, die schon sofort ist', async () => {
+  it('bietet „Sofort“ an und nennt vor dem Speichern den Sofortalarm (LLH-1380)', async () => {
+    const onKorrigieren = vi.fn().mockResolvedValue(undefined);
     renderKarte(
-      <MeldungKarte meldung={korrigierbar()} einsatzId={7} darfSchreiben onKorrigieren={vi.fn()} />,
+      <MeldungKarte
+        meldung={korrigierbar()}
+        einsatzId={7}
+        darfSchreiben
+        onKorrigieren={onKorrigieren}
+      />,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
-    await oeffne('Priorität');
-    expect(optionenVon('Priorität')).toEqual(['Dringend', 'Normal']);
     await oeffne('Meldungsart');
-    expect(optionenVon('Meldungsart')).not.toContain('Sofortmeldung');
+    expect(optionenVon('Meldungsart')).toContain('Sofortmeldung');
+    const form = screen.getByRole('form', { name: 'Meldung #1 korrigieren' });
+    expect(form).not.toHaveTextContent('Sofortalarm');
+    await waehle('Priorität', 'Sofort');
+    expect(form).toHaveTextContent('Speichern löst den Sofortalarm aus');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(onKorrigieren).toHaveBeenCalledWith(1, { prioritaet: 'sofort' });
   });
 
   it('nimmt eine übernommene Meldung erst nach der Rückfrage aus der Lage', async () => {

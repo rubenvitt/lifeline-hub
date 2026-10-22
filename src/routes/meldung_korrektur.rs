@@ -62,7 +62,7 @@ pub struct MeldungAenderung {
 
 impl MeldungAenderung {
     /// Die Felder für sich (400), dann der Eingang (422). Der Zusammenhang mit dem Stand der
-    /// Meldung (Lage, Sofort, Bezug im Einsatz) folgt in der Transaktion.
+    /// Meldung (Lage, Bezug im Einsatz) folgt in der Transaktion.
     fn pruefen(self) -> Result<Aenderung, AppError> {
         let meldungsart = self
             .meldungsart
@@ -159,6 +159,10 @@ pub async fn korrigieren(
     if let Some(etb_id) = ergebnis.etb_id {
         state.live.publiziere(einsatz_id, etb_id);
         crate::meldung::sse(&state, einsatz_id);
+    }
+    // Erst jetzt zur Sofortmeldung: Sofortalarm wie beim Erfassen, einmal je Meldung (LLH-1380).
+    if ergebnis.sofortalarm {
+        crate::meldung::sofortalarm_nach_heraufstufung(&state, &m, ctx.benutzer.id).await?;
     }
     // Kommt die Meldung neu in die Lage, meldet das S2 und der Einsatzleitung wie die Übergabe
     // (LLH-1062); verlässt sie die Lage, ist ihr Übernahme-Hinweis erledigt.

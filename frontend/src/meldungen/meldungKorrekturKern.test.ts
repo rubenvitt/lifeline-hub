@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Meldung } from '../api/types';
 import {
-  angeboteneWerte,
   istLeer,
   korrekturAenderung,
   korrekturStartwerte,
   lageAenderung,
   vonWert,
+  wirdHeraufgestuft,
 } from './meldungKorrekturKern';
 
 const meldung = (over: Partial<Meldung> = {}): Meldung =>
@@ -55,17 +55,18 @@ describe('meldungKorrekturKern', () => {
     expect(korrekturAenderung(meldung({ empfaenger: null }), { ...w, empfaenger: '' })).toEqual({});
   });
 
-  it('bietet „sofort“ nur einer Meldung an, die schon sofort ist', () => {
-    const optionen = [
-      { value: 'sofort', label: 'Sofort' },
-      { value: 'normal', label: 'Normal' },
-    ];
-    expect(angeboteneWerte(optionen, 'sofort', meldung()).map((o) => o.value)).toEqual(['normal']);
+  it('erkennt das Heraufstufen zur Sofortmeldung, über Priorität oder Art (LLH-1380)', () => {
+    const m = meldung();
+    const w = korrekturStartwerte(m);
+    expect(wirdHeraufgestuft(m, w)).toBe(false);
+    expect(wirdHeraufgestuft(m, { ...w, prioritaet: 'sofort' })).toBe(true);
+    expect(wirdHeraufgestuft(m, { ...w, meldungsart: 'sofortmeldung' })).toBe(true);
+    expect(wirdHeraufgestuft(m, { ...w, prioritaet: 'dringend' })).toBe(false);
+    // Schon sofort: die Art dazu ist kein Heraufstufen.
+    const sofort = meldung({ prioritaet: 'sofort' });
     expect(
-      angeboteneWerte(optionen, 'sofort', meldung({ meldungsart: 'sofortmeldung' })).map(
-        (o) => o.value,
-      ),
-    ).toEqual(['sofort', 'normal']);
+      wirdHeraufgestuft(sofort, { ...korrekturStartwerte(sofort), meldungsart: 'sofortmeldung' }),
+    ).toBe(false);
   });
 
   it('Lage-Angaben: nur Geändertes, leerer Text und entfernter Ort', () => {

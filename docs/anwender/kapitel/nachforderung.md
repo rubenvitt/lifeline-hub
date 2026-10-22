@@ -184,7 +184,8 @@ Für Einsatzleitung und Führungspersonal, wenn der Bedarf entfällt:
 
 1. An der Karte das Menü ⋮ öffnen und „Zurückziehen“ wählen.
 2. Im Dialog „Nachforderung zurückziehen“ bei Bedarf den Grund eintragen, etwa „nicht mehr
-   benötigt“.
+   benötigt“. Der Grund hat höchstens 200 Zeichen; ein längerer bleibt stehen, „Zurückziehen“
+   ist dann gesperrt, bis er gekürzt ist.
 3. „Zurückziehen“ wählen.
 
 Zurückziehen geht, solange die Nachforderung angefordert, zugesagt oder unterwegs ist. Eine
@@ -197,7 +198,8 @@ angeforderte Stelle sagt ab.
 Für Einsatzleitung und Führungspersonal:
 
 1. An der Karte das Menü ⋮ öffnen und „Ablehnen“ wählen.
-2. Im Dialog „Nachforderung ablehnen“ bei Bedarf den Grund eintragen.
+2. Im Dialog „Nachforderung ablehnen“ bei Bedarf den Grund eintragen. Auch hier hat der Grund
+   höchstens 200 Zeichen.
 
    ![Dialog „Nachforderung ablehnen“ mit einem Ablehnungsgrund und den Knöpfen „Abbrechen“ und „Ablehnen“](../bilder/nachforderung/nachforderung-ablehnen.png)
 

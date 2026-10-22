@@ -2990,8 +2990,8 @@ mod tests {
         // LFH-701, Linie A: Die Führungsdokumentation ist das ETB. Die Freitexte der
         // Führungsmodule (Meldung, Auftrag samt Empfänger, Nachforderung, Lagebericht, Befehl,
         // Pressemitteilung, Lagebesprechung) werden geschwärzt, auch die, die nie ins ETB
-        // gelangt sind (Fünf-Punkte-Felder, Ablehnungsgrund, Entwürfe). Struktur bleibt, der
-        // ETB-Wortlaut auch.
+        // gelangt sind (Fünf-Punkte-Felder, Entwürfe), samt Ablehnungsgrund und Ziel als Freitext
+        // (LLH-1385). Struktur bleibt, der ETB-Wortlaut auch.
         let pool = crate::db::test_pool().await;
         let (eid, leit) = schwaerzbarer_einsatz(&pool).await;
         let etb_id: i64 = sqlx::query_scalar(
@@ -3046,10 +3046,11 @@ mod tests {
         let nachforderung_id: i64 = sqlx::query_scalar(
             "INSERT INTO nachforderung (einsatz_id, art, bezeichnung, adressat_kategorie, \
                 adressat_bezeichnung, begruendung, status, abgelehnt_at, abgelehnt_grund, \
-                angefordert_at, erstellt_von_id) \
+                angefordert_at, erstellt_von_id, ziel_text) \
              VALUES (?, 'Dolmetscher', 'Dolmetscher für Fam. Yilmaz', 'leitstelle', \
                 'Leitstelle Nord, Herr Kurz', 'Frau Yilmaz spricht kein Deutsch', 'abgelehnt', \
-                '2026-01-01 11:00:00', 'Herr Kurz nicht erreichbar', '2026-01-01 10:30:00', ?) \
+                '2026-01-01 11:00:00', 'Herr Kurz nicht erreichbar', '2026-01-01 10:30:00', ?, \
+                'Wohnung Fam. Yilmaz, Hauptstr. 5') \
              RETURNING id",
         )
         .bind(eid)
@@ -3192,9 +3193,10 @@ mod tests {
             Option<String>,
             String,
             Option<String>,
+            Option<String>,
         ) = sqlx::query_as(
             "SELECT art, bezeichnung, adressat_bezeichnung, begruendung, status, \
-                abgelehnt_grund FROM nachforderung WHERE id = ?",
+                abgelehnt_grund, ziel_text FROM nachforderung WHERE id = ?",
         )
         .bind(nachforderung_id)
         .fetch_one(&pool)
@@ -3202,8 +3204,8 @@ mod tests {
         .unwrap();
         assert_eq!(
             nachforderung,
-            (p(), p(), None, None, "abgelehnt".into(), None),
-            "Nachforderung: Freitexte weg (auch der nie ins ETB gelangte Ablehnungsgrund)"
+            (p(), p(), None, None, "abgelehnt".into(), None, None),
+            "Nachforderung: Freitexte weg, auch Ablehnungsgrund und Ziel als Freitext"
         );
 
         for (tabelle, id) in &dokumente {

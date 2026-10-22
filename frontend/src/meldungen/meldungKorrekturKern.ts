@@ -82,16 +82,15 @@ export function istSofort(m: Pick<Meldung, 'meldungsart' | 'prioritaet'>): boole
 }
 
 /**
- * Zur Sofortmeldung wird eine Meldung beim Erfassen (design.md D8): die Karte bietet „Sofort“ und
- * „Sofortmeldung“ nur einer Meldung an, die schon sofort ist. Der Server lehnt das Heraufstufen
- * ohnehin ab (422).
+ * Ob die Korrektur eine Meldung erst zur Sofortmeldung macht (LLH-1380). Dann löst das Speichern
+ * den Sofortalarm aus, einmal je Meldung (`src/meldung/korrektur.rs`, `Heraufstufung`); die Karte
+ * sagt das vor dem Speichern.
  */
-export function angeboteneWerte<V extends string>(
-  optionen: { value: V; label: string }[],
-  sofortWert: V,
+export function wirdHeraufgestuft(
   m: Pick<Meldung, 'meldungsart' | 'prioritaet'>,
-): { value: V; label: string }[] {
-  return istSofort(m) ? optionen : optionen.filter((o) => o.value !== sofortWert);
+  w: Pick<KorrekturWerte, 'meldungsart' | 'prioritaet'>,
+): boolean {
+  return !istSofort(m) && istSofort(w);
 }
 
 /** Werte der Lage-Angaben einer Meldung in der Lage (Lage-Text, Verortung). */

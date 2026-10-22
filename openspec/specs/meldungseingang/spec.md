@@ -63,8 +63,12 @@ Priorität, Richtung, Empfänger und der Bezug auf Einheit oder Abschnitt änder
 Transaktion einen Systemeintrag im ETB mit Verweis auf die Meldung schreiben, der die Änderung
 nennt; eine Korrektur ohne wirksame Änderung MUST nichts schreiben. Ohne Schreibrecht MUST das
 System mit HTTP 403 antworten, für eine Meldung eines anderen Einsatzes mit HTTP 404. Gekoppelte
-Geräte MUST NOT korrigieren. Eine Korrektur, die eine Meldung erst zur Sofortmeldung macht, MUST
-mit HTTP 422 abgelehnt werden.
+Geräte MUST NOT korrigieren. Eine Korrektur, die eine Meldung erst zur Sofortmeldung macht
+(LLH-1380), SHALL gelingen und MUST nach dem Commit den Sofortalarm auslösen wie das Erfassen
+(Spec `benachrichtigungen`, „Sofortmeldung alarmiert“; Auslöser ist der Korrigierende), höchstens
+einmal je Meldung: eine Meldung, die als Sofortmeldung erfasst wurde oder schon einmal
+heraufgestuft wurde, MUST NOT erneut alarmieren. War sie nicht bestätigungspflichtig, MUST sie es
+mit der Frist ab der Korrektur werden. Der Systemeintrag MUST das Heraufstufen nennen.
 
 #### Scenario: Priorität berichtigt
 - **WHEN** eine Person die Priorität von Meldung #3 von „normal“ auf „dringend“ ändert
@@ -83,8 +87,12 @@ mit HTTP 422 abgelehnt werden.
 - **THEN** antwortet das System mit HTTP 403
 
 #### Scenario: Zur Sofortmeldung heraufstufen
-- **WHEN** eine Person eine Meldung der Priorität „normal“ auf „sofort“ setzen will
-- **THEN** antwortet das System mit HTTP 422, und die Meldung bleibt unverändert
+- **WHEN** eine Person Meldung #3 der Priorität „normal“ auf „sofort“ setzt
+- **THEN** antwortet das System mit HTTP 200, alle mit dem Modul Meldungen außer ihr erhalten den Sofortalarm, die Meldung ist bestätigungspflichtig, und das ETB enthält „Meldung #3: zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst; Priorität Normal → Sofort“
+
+#### Scenario: Erneut heraufstufen
+- **WHEN** eine Person eine Sofortmeldung herab- und danach wieder heraufstuft
+- **THEN** antwortet das System mit HTTP 200, es entsteht kein zweiter Sofortalarm, und der Systemeintrag nennt „Sofortalarm war schon ausgelöst“
 
 ### Requirement: Der Eingang bleibt unverändert
 Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang einer Meldung SHALL unveränderlich bleiben;

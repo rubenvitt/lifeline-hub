@@ -3,7 +3,8 @@
 //! Ereigniszeit und Eingang bleiben, wie die Meldung einging (das prüft der Handler,
 //! `routes::meldung_korrektur`). Jede wirksame Korrektur schreibt in derselben Transaktion EINEN
 //! Systemeintrag mit Verweis auf die Meldung ins ETB; der ETB-Eintrag der Meldung behält seinen
-//! Typ. Herleitung: `llh-1021/llh-1066/design.md` (Projektablage), D2–D8.
+//! Typ. Herleitung: `llh-1021/llh-1066/design.md` (Projektablage), D2–D8; das Heraufstufen zur
+//! Sofortmeldung samt Sofortalarm `llh-1021/llh-1380/design.md`, D1–D4.
 use crate::error::AppError;
 use crate::fuehrung::Fuehrungsfunktion;
 use crate::kommunikation::{Prioritaet, Richtung};
@@ -37,6 +38,9 @@ pub struct Aenderung {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Ergebnis {
     pub etb_id: Option<i64>,
+    /// Die Korrektur hat die Meldung erst zur Sofortmeldung gemacht, und sie hatte noch keinen
+    /// Sofortalarm: der Aufrufer löst ihn nach dem Commit aus (LLH-1380).
+    pub sofortalarm: bool,
 }
 
 impl Ergebnis {
@@ -65,6 +69,10 @@ struct Stand {
     lage_text: Option<String>,
     lat: Option<f64>,
     lon: Option<f64>,
+    eingang_at: String,
+    bestaetigung_pflicht: bool,
+    /// Merker „Sofortalarm ausgelöst“ (Migration 0241); s. [`sofortalarm_merker`].
+    sofortalarm_at: Option<String>,
 }
 
 impl Stand {
@@ -142,14 +150,6 @@ struct Ziel {
 fn ziel(alt: &Stand, a: &Aenderung) -> Result<Ziel, AppError> {
     let meldungsart = a.meldungsart.unwrap_or(alt.meldungsart);
     let prioritaet = a.prioritaet.unwrap_or(alt.prioritaet);
-    let wird_sofort = meldungsart == Meldungsart::Sofortmeldung || prioritaet == Prioritaet::Sofort;
-    if wird_sofort && !alt.ist_sofort() {
-        return Err(AppError::UnprocessableEntity(
-            "Zur Sofortmeldung wird eine Meldung beim Erfassen; nachträglich gäbe es weder Alarm \
-             noch Frist"
-                .into(),
-        ));
-    }
     let lagerelevant = if meldungsart == Meldungsart::Lagemeldung {
         if a.lagerelevant == Some(false) {
             return Err(AppError::UnprocessableEntity(
@@ -202,6 +202,81 @@ fn ziel(alt: &Stand, a: &Aenderung) -> Result<Ziel, AppError> {
         lage_text,
         geo,
     })
+}
+
+impl Ziel {
+    fn ist_sofort(&self) -> bool {
+        self.meldungsart == Meldungsart::Sofortmeldung || self.prioritaet == Prioritaet::Sofort
+    }
+}
+
+/// Was eine Korrektur am Sofortalarm bewirkt (LLH-1380, design.md D1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Heraufstufung {
+    /// Die Meldung wird nicht erst jetzt sofort.
+    Keine,
+    /// Erst jetzt sofort und noch ohne Sofortalarm: er wird ausgelöst.
+    MitAlarm,
+    /// Erst jetzt wieder sofort, ihr Sofortalarm lief schon (beim Erfassen oder Heraufstufen).
+    SchonAlarmiert,
+}
+
+fn heraufstufung(alt: &Stand, neu: &Ziel) -> Heraufstufung {
+    if !neu.ist_sofort() || alt.ist_sofort() {
+        Heraufstufung::Keine
+    } else if alt.sofortalarm_at.is_some() {
+        Heraufstufung::SchonAlarmiert
+    } else {
+        Heraufstufung::MitAlarm
+    }
+}
+
+/// Der Merker nach der Korrektur. Invariante: eine Meldung, die jetzt sofort ist oder den Merker
+/// trägt, hat ihren Alarm gehabt. Darum setzt ihn jede Korrektur, die eine Meldung vorher (dann
+/// alarmierte sie beim Erfassen: `eingang_at`) oder nachher (`jetzt`) sofort sieht.
+fn sofortalarm_merker(alt: &Stand, neu: &Ziel, jetzt: &str) -> Option<String> {
+    if alt.sofortalarm_at.is_some() {
+        alt.sofortalarm_at.clone()
+    } else if alt.ist_sofort() {
+        Some(alt.eingang_at.clone())
+    } else if neu.ist_sofort() {
+        Some(jetzt.to_string())
+    } else {
+        None
+    }
+}
+
+/// Der vorderste Teil des Systemeintrags beim Heraufstufen (D4).
+fn heraufstufung_teil(h: Heraufstufung) -> Option<&'static str> {
+    match h {
+        Heraufstufung::Keine => None,
+        Heraufstufung::MitAlarm => Some("zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst"),
+        Heraufstufung::SchonAlarmiert => {
+            Some("zur Sofortmeldung heraufgestuft, Sofortalarm war schon ausgelöst")
+        }
+    }
+}
+
+/// Bestätigungsfrist einer heraufgestuften Meldung ab `jetzt` (D3): wie beim Erfassen
+/// Einsatz ?? Org ?? [`super::BESTAETIGUNG_FRIST_DEFAULT_MIN`].
+async fn frist_ab(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    jetzt: &str,
+) -> Result<Option<String>, AppError> {
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    let e = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id).await?;
+    let o = crate::org::einstellungen::laden_oder_default(&mut *conn, org_id).await?;
+    let minuten = super::meldung_bestaetigung_frist_min_ableiten(
+        &e,
+        &o,
+        None,
+        super::BESTAETIGUNG_FRIST_DEFAULT_MIN,
+    );
+    Ok(crate::zeit::plus_minuten(jetzt, minuten))
 }
 
 /// Name eines Von-Bezugs für den ETB-Text; Einheit und Abschnitt sind Lagestruktur (Retain).
@@ -343,7 +418,8 @@ pub async fn korrigieren(
         let alt: Stand = sqlx::query_as(
             "SELECT lfd_nr, meldungsart, prioritaet, richtung, einheit_id, abschnitt_id, \
                     empfaenger_funktion, \
-                    empfaenger, inhalt, lagerelevant = 1 AS lagerelevant, lage_text, lat, lon \
+                    empfaenger, inhalt, lagerelevant = 1 AS lagerelevant, lage_text, lat, lon, \
+                    eingang_at, bestaetigung_pflicht = 1 AS bestaetigung_pflicht, sofortalarm_at \
              FROM meldung WHERE id = ? AND einsatz_id = ?",
         )
         .bind(meldung_id)
@@ -376,10 +452,24 @@ pub async fn korrigieren(
         } else {
             (String::new(), String::new())
         };
-        let teile = etb_teile(&alt, &neu, &von_alt, &von_neu);
+        let mut teile = etb_teile(&alt, &neu, &von_alt, &von_neu);
         if teile.is_empty() {
-            return Ok(Ergebnis { etb_id: None });
+            return Ok(Ergebnis {
+                etb_id: None,
+                sofortalarm: false,
+            });
         }
+        let heraufstufung = heraufstufung(&alt, &neu);
+        if let Some(teil) = heraufstufung_teil(heraufstufung) {
+            teile.insert(0, teil.to_string());
+        }
+        let sofortalarm = heraufstufung == Heraufstufung::MitAlarm;
+        // Wie beim Erfassen macht „sofort“ bestätigungspflichtig, die Frist läuft ab jetzt (D3).
+        let neue_frist = if sofortalarm && !alt.bestaetigung_pflicht {
+            frist_ab(&mut *conn, einsatz_id, jetzt).await?
+        } else {
+            None
+        };
 
         // Übernahme: bleibt, beginnt jetzt oder endet. Die Kenntnisnahme beginnt neu, wenn die
         // Meldung neu in die Lage kommt oder ihr Lage-Text sich ändert (Spec
@@ -398,7 +488,10 @@ pub async fn korrigieren(
                lage_uebergeben_von_id = CASE WHEN ?7 = 0 THEN NULL \
                                              WHEN ?11 = 1 THEN ?13 ELSE lage_uebergeben_von_id END, \
                lage_gesehen_at = CASE WHEN ?14 = 1 THEN lage_gesehen_at END, \
-               lage_gesehen_von_id = CASE WHEN ?14 = 1 THEN lage_gesehen_von_id END \
+               lage_gesehen_von_id = CASE WHEN ?14 = 1 THEN lage_gesehen_von_id END, \
+               sofortalarm_at = ?16, \
+               bestaetigung_pflicht = CASE WHEN ?17 IS NULL THEN bestaetigung_pflicht ELSE 1 END, \
+               bestaetigung_frist_at = COALESCE(?17, bestaetigung_frist_at) \
              WHERE id = ?15",
         )
         .bind(neu.meldungsart.as_str())
@@ -416,6 +509,8 @@ pub async fn korrigieren(
         .bind(von_id)
         .bind(gesehen_bleibt)
         .bind(meldung_id)
+        .bind(sofortalarm_merker(&alt, &neu, jetzt))
+        .bind(neue_frist.as_deref())
         .execute(&mut *conn)
         .await?;
         // Eigene Anweisung, damit die Platzhalter oben stehen bleiben (LLH-1381).
@@ -441,6 +536,7 @@ pub async fn korrigieren(
             .await?;
         Ok(Ergebnis {
             etb_id: Some(etb_id),
+            sofortalarm,
         })
     })
 }
@@ -464,8 +560,14 @@ mod tests {
             lage_text: None,
             lat: None,
             lon: None,
+            eingang_at: EINGANG.into(),
+            bestaetigung_pflicht: false,
+            sofortalarm_at: None,
         }
     }
+
+    const EINGANG: &str = "2026-10-21 09:00:00";
+    const JETZT: &str = "2026-10-21 10:00:00";
 
     fn in_der_lage() -> Stand {
         Stand {
@@ -604,33 +706,67 @@ mod tests {
     }
 
     #[test]
-    fn heraufstufen_zu_sofort_ist_422_herabstufen_geht() {
+    fn heraufstufen_zu_sofort_alarmiert_einmal_herabstufen_geht() {
         let prio = |p| Aenderung {
             prioritaet: Some(p),
             ..Default::default()
         };
-        assert!(ist_422(ziel(&stand(), &prio(Prioritaet::Sofort))));
-        assert!(ist_422(ziel(
-            &stand(),
-            &Aenderung {
-                meldungsart: Some(Meldungsart::Sofortmeldung),
-                ..Default::default()
-            }
-        )));
+        let art = Aenderung {
+            meldungsart: Some(Meldungsart::Sofortmeldung),
+            ..Default::default()
+        };
+        // Erstes Heraufstufen, über Priorität oder Art: Alarm, Merker jetzt.
+        for a in [prio(Prioritaet::Sofort), art.clone()] {
+            let z = ziel(&stand(), &a).unwrap();
+            assert_eq!(heraufstufung(&stand(), &z), Heraufstufung::MitAlarm);
+            assert_eq!(
+                sofortalarm_merker(&stand(), &z, JETZT).as_deref(),
+                Some(JETZT)
+            );
+        }
+        // Schon einmal alarmiert: kein zweiter Alarm, der Merker bleibt.
+        let alarmiert = Stand {
+            sofortalarm_at: Some("2026-10-21 09:30:00".into()),
+            ..stand()
+        };
+        let z = ziel(&alarmiert, &prio(Prioritaet::Sofort)).unwrap();
+        assert_eq!(heraufstufung(&alarmiert, &z), Heraufstufung::SchonAlarmiert);
+        assert_eq!(
+            sofortalarm_merker(&alarmiert, &z, JETZT).as_deref(),
+            Some("2026-10-21 09:30:00")
+        );
+        // Eine Sofortmeldung alarmierte beim Erfassen: herabstufen geht, der Merker nimmt den
+        // Eingang.
         let sofort = Stand {
             prioritaet: Prioritaet::Sofort,
             ..stand()
         };
-        assert!(ziel(&sofort, &prio(Prioritaet::Normal)).is_ok());
+        let z = ziel(&sofort, &prio(Prioritaet::Normal)).unwrap();
+        assert_eq!(heraufstufung(&sofort, &z), Heraufstufung::Keine);
+        assert_eq!(
+            sofortalarm_merker(&sofort, &z, JETZT).as_deref(),
+            Some(EINGANG)
+        );
         // Schon sofort: die Art „Sofortmeldung“ dazu ist kein Heraufstufen.
-        assert!(ziel(
-            &sofort,
-            &Aenderung {
-                meldungsart: Some(Meldungsart::Sofortmeldung),
-                ..Default::default()
-            }
-        )
-        .is_ok());
+        let z = ziel(&sofort, &art).unwrap();
+        assert_eq!(heraufstufung(&sofort, &z), Heraufstufung::Keine);
+        // Weder vorher noch nachher sofort: kein Merker.
+        let z = ziel(&stand(), &prio(Prioritaet::Dringend)).unwrap();
+        assert_eq!(heraufstufung(&stand(), &z), Heraufstufung::Keine);
+        assert_eq!(sofortalarm_merker(&stand(), &z, JETZT), None);
+    }
+
+    #[test]
+    fn heraufstufung_nennt_den_alarm() {
+        assert_eq!(heraufstufung_teil(Heraufstufung::Keine), None);
+        assert_eq!(
+            heraufstufung_teil(Heraufstufung::MitAlarm),
+            Some("zur Sofortmeldung heraufgestuft, Sofortalarm ausgelöst")
+        );
+        assert_eq!(
+            heraufstufung_teil(Heraufstufung::SchonAlarmiert),
+            Some("zur Sofortmeldung heraufgestuft, Sofortalarm war schon ausgelöst")
+        );
     }
 
     #[test]

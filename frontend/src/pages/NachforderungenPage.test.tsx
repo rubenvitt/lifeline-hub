@@ -16,6 +16,10 @@ import { server } from '../test/server';
 import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite } from '../test/viewport';
 import { waehleMenueEintrag } from '../test/menue';
+import {
+  NACHFORDERUNG_ABLEHNEN_GRUND_MAX,
+  NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
+} from '../api/eingabegrenzen';
 
 /*
  * Die Uhr steht auf dem Einsatztag (nur `Date`): „Eingetroffen“ zeigt die letzten 12 h, die
@@ -294,6 +298,44 @@ describe('NachforderungenPage', () => {
     );
     expect(await screen.findByText('Nachforderung zurückgezogen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Rückgängig' })).toBeNull();
+  });
+
+  /**
+   * LLH-1385: beide Gründe tragen die Grenze des Servers als Zähler (`zeichenGrenze`), ohne zu
+   * kürzen; über der Grenze sperrt der Knopf, und nichts geht an den Server.
+   */
+  it.each([
+    {
+      eintrag: 'Ablehnen',
+      titel: 'Nachforderung ablehnen',
+      feld: 'Ablehnungsgrund',
+      max: NACHFORDERUNG_ABLEHNEN_GRUND_MAX,
+      aufruf: () => lehneNachforderungAb,
+    },
+    {
+      eintrag: 'Zurückziehen',
+      titel: 'Nachforderung zurückziehen',
+      feld: 'Grund des Zurückziehens',
+      max: NACHFORDERUNG_ZURUECKZIEHEN_GRUND_MAX,
+      aufruf: () => zieheNachforderungZurueck,
+    },
+  ])('$eintrag: ein zu langer Grund bleibt stehen und sperrt das Senden', async (fall) => {
+    renderPage();
+    await screen.findByText('2 RTW zur Verstärkung');
+    await waehleImMenue(fall.eintrag);
+    const dialog = await screen.findByRole('dialog', { name: fall.titel });
+    const grund = within(dialog).getByLabelText(fall.feld);
+    await userEvent.click(grund);
+    await userEvent.paste('x'.repeat(fall.max + 1));
+    expect(grund).toHaveValue('x'.repeat(fall.max + 1));
+    expect(within(dialog).getByText(/zu lang/)).toBeInTheDocument();
+    const knopf = within(dialog).getByRole('button', { name: fall.eintrag });
+    expect(knopf).toBeDisabled();
+    await userEvent.click(knopf);
+    expect(fall.aufruf()).not.toHaveBeenCalled();
+
+    await userEvent.type(grund, '{Backspace}');
+    expect(knopf).toBeEnabled();
   });
 
   /** LLH-1097 D9: Bearbeiten im ⋮-Menü sendet nur Geändertes. */

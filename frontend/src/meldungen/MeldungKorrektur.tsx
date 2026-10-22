@@ -1,4 +1,4 @@
-import { Button, Col, Form, Input, Row, Space } from 'antd';
+import { Alert, Button, Col, Form, Input, Row, Space } from 'antd';
 import { useState } from 'react';
 import { ETB_PARTEI_MAX } from '../api/eingabegrenzen';
 import type {
@@ -14,11 +14,11 @@ import type {
 import { Select } from '../components/Select';
 import { MELDUNGSART_OPTIONEN, PRIORITAET_OPTIONEN, RICHTUNG_OPTIONEN } from './MeldungFormular';
 import {
-  angeboteneWerte,
   istLeer,
   korrekturAenderung,
   korrekturStartwerte,
   type KorrekturWerte,
+  wirdHeraufgestuft,
 } from './meldungKorrekturKern';
 
 /** Auswahl des Von-Bezugs, gruppiert wie im Erfassen: `einheit:<id>` / `abschnitt:<id>`. */
@@ -81,6 +81,9 @@ export default function MeldungKorrektur({
 }: Props) {
   const [form] = Form.useForm<KorrekturWerte>();
   const [sendet, setSendet] = useState(false);
+  const meldungsart = Form.useWatch('meldungsart', form) ?? meldung.meldungsart;
+  const prioritaet = Form.useWatch('prioritaet', form) ?? meldung.prioritaet;
+  const heraufgestuft = wirdHeraufgestuft(meldung, { meldungsart, prioritaet });
 
   const absenden = (w: KorrekturWerte) => {
     const aenderung = korrekturAenderung(meldung, w);
@@ -122,18 +125,12 @@ export default function MeldungKorrektur({
       <Row gutter={16}>
         <Col xs={24} sm={12}>
           <Form.Item name="meldungsart" label="Meldungsart">
-            <Select<Meldungsart>
-              aria-label="Meldungsart"
-              options={angeboteneWerte(MELDUNGSART_OPTIONEN, 'sofortmeldung', meldung)}
-            />
+            <Select<Meldungsart> aria-label="Meldungsart" options={MELDUNGSART_OPTIONEN} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
           <Form.Item name="prioritaet" label="Priorität">
-            <Select<MeldungPrioritaet>
-              aria-label="Priorität"
-              options={angeboteneWerte(PRIORITAET_OPTIONEN, 'sofort', meldung)}
-            />
+            <Select<MeldungPrioritaet> aria-label="Priorität" options={PRIORITAET_OPTIONEN} />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12}>
@@ -174,6 +171,15 @@ export default function MeldungKorrektur({
           </Form.Item>
         </Col>
       </Row>
+      {heraufgestuft && (
+        // Ein Satz zur Folge vor dem Speichern (LLH-1380): der Alarm geht an alle im Modul.
+        <Alert
+          type="warning"
+          showIcon
+          title="Speichern löst den Sofortalarm aus, wenn die Meldung noch keinen hatte."
+          style={{ marginBottom: 12 }}
+        />
+      )}
       <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
         <Button onClick={abbrechen} disabled={sendet}>
           Abbrechen
