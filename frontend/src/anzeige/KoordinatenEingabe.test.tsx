@@ -211,7 +211,7 @@ describe('KoordinatenEingabe', () => {
       <KoordinatenEingabe value={{ lat: 51.5, lon: 10.25 }} onChange={() => {}} einsatzId={1} />,
     );
     expect(
-      await screen.findByText(/Hauptstr\. 5, Musterstadt · 1[.,]20 km NO von Einsatzort/),
+      await screen.findByText(/Hauptstr\. 5, Musterstadt · 1,20 km NO von Einsatzort/),
     ).toBeInTheDocument();
   });
 
