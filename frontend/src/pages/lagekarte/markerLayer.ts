@@ -7,6 +7,7 @@ import type {
 } from 'maplibre-gl';
 import { FREIES_ZEICHEN_ERSATZLABEL, type KarteMarker, type MarkerTyp } from './marker';
 import { markerIconKey } from './markerIcons';
+import type { KartenTheme } from './basemapStil';
 import { SK_DRINGLICHKEIT, clusterTypProperties, skFarbe } from './clusterDonut';
 import { SK_KURZZEICHEN } from '../../personen/personenKarte';
 import { farbenDunkel } from '../../theme/tokens';
@@ -83,9 +84,9 @@ function beschriftungVon(mk: KarteMarker): string | undefined {
   return mk.beschriftungZusatz ? `${text} · ${mk.beschriftungZusatz}` : text;
 }
 
-function toFeature(mk: KarteMarker, plakette: Plakette): MarkerFeature {
+function toFeature(mk: KarteMarker, plakette: Plakette, kartenTheme: KartenTheme): MarkerFeature {
   const properties: MarkerProps = { schluessel: mk.schluessel, typ: mk.typ, farbe: mk.farbe };
-  const icon = markerIconKey(mk);
+  const icon = markerIconKey(mk, kartenTheme);
   if (icon) properties.icon = icon;
   if (mk.statusFarbe) properties.statusFarbe = mk.statusFarbe;
   if (mk.kurzzeichen) properties.kurzzeichen = mk.kurzzeichen;
@@ -118,15 +119,18 @@ function istAnker(m: Pick<KarteMarker, 'typ'>): boolean {
 
 /**
  * Clusterbare Marker (alle außer den festen Ankern) als FeatureCollection. `plakette` trägt die
- * aufgelösten Rollen des aktiven Modus; ohne Angabe Nacht.
+ * aufgelösten Rollen des aktiven Modus; ohne Angabe Nacht. `kartenTheme` ist das aufgelöste Thema
+ * der Kartengrundlage: nachts rastern die Zeichen mit dem Render-Theme `dark` (`markerIconKey`,
+ * LLH-1141); ohne Angabe Tag.
  */
 export function baueMarkerFc(
   markers: KarteMarker[],
   plakette: Plakette = zonenPlakette(farbenDunkel),
+  kartenTheme: KartenTheme = 'light',
 ): MarkerFeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: markers.filter((m) => !istAnker(m)).map((m) => toFeature(m, plakette)),
+    features: markers.filter((m) => !istAnker(m)).map((m) => toFeature(m, plakette, kartenTheme)),
   };
 }
 
@@ -134,10 +138,11 @@ export function baueMarkerFc(
 export function baueEinsatzortFc(
   markers: KarteMarker[],
   plakette: Plakette = zonenPlakette(farbenDunkel),
+  kartenTheme: KartenTheme = 'light',
 ): MarkerFeatureCollection {
   return {
     type: 'FeatureCollection',
-    features: markers.filter(istAnker).map((m) => toFeature(m, plakette)),
+    features: markers.filter(istAnker).map((m) => toFeature(m, plakette, kartenTheme)),
   };
 }
 

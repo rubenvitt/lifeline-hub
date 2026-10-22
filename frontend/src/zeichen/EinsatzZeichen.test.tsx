@@ -1,7 +1,8 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { farbenHell } from '../theme/tokens';
-import EinsatzZeichen, { ZEICHEN_UNTERLAGE } from './EinsatzZeichen';
+import EinsatzZeichen from './EinsatzZeichen';
+import { ZEICHEN_UNTERLAGE } from './unterlage';
 
 describe('EinsatzZeichen', () => {
   it('rendert für ein darstellbares Fachobjekt genau ein svg in der verlangten Größe', () => {

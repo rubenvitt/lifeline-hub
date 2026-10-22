@@ -1,5 +1,7 @@
 import type { ReactElement } from 'react';
-import { screen, waitFor, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, within } from '@testing-library/react';
+import { ConfigProvider, theme } from 'antd';
+import { antdToken, farbenDunkel } from '../../theme/tokens';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
@@ -10,6 +12,7 @@ import { renderSvg } from '@einsatzzeichen/core';
 import { fachobjektZeichen } from '../../zeichen/fachobjektZeichen';
 import Inspector from './Inspector';
 import { KACHEL_SVG_OPTIONEN } from './markerIcons';
+import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 import type { KarteMarker } from './marker';
 import type { AuswahlRoh } from './leistenDaten';
 import { EinsatzAnzeigeProvider } from '../../anzeige/AnzeigeKonventionenContext';
@@ -761,6 +764,36 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
     expect(bild).not.toBeNull();
     const svg = decodeURIComponent(bild!.src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
     expect(svg).toBe(renderSvg(fachobjektZeichen(tz)!.drawing, KACHEL_SVG_OPTIONEN));
+  });
+
+  // LLH-1141: nachts zeichnet die Bibliothek das Zeichen selbst hell (Render-Theme `dark`, wie die
+  // Lagekarte), ohne Platte dahinter; am Tag bleibt die Kachel, wie sie war.
+  it('zeichnet das Zeichen nachts mit dem Theme `dark`, ohne Platte; am Tag wie bisher', () => {
+    const tz = { grundzeichen: 'taktische-formation' } as const;
+    const drawing = fachobjektZeichen(tz)!.drawing;
+    const svgVon = (img: HTMLImageElement) =>
+      decodeURIComponent(img.src.replace(/^data:image\/svg\+xml;charset=utf-8,/, ''));
+    renderMitProviders(
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm, token: antdToken(farbenDunkel) }}>
+        <Inspector
+          einsatzId={1}
+          marker={{ ...marker, schluessel: 'einheit-7', typ: 'einheit', id: 7, tz }}
+          darfSchreiben={false}
+          onSchliessen={() => {}}
+          onVerortungLoeschen={() => {}}
+        />
+      </ConfigProvider>,
+    );
+    const nacht = document.querySelector<HTMLImageElement>('[data-lfh="auswahl-kachel"] img')!;
+    expect(svgVon(nacht)).toBe(
+      renderSvg(drawing, { ...KACHEL_SVG_OPTIONEN, theme: ZEICHEN_THEME_DUNKEL }),
+    );
+    expect(nacht.style.backgroundColor).toBe('');
+    cleanup();
+
+    const tag = kachelMit(tz).querySelector<HTMLImageElement>('img')!;
+    expect(svgVon(tag)).toBe(renderSvg(drawing, KACHEL_SVG_OPTIONEN));
+    expect(tag.style.backgroundColor).toBe('');
   });
 
   it('zeigt bei nicht darstellbarem Zeichen das Kürzel statt abzustürzen', () => {
