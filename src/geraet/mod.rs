@@ -199,12 +199,14 @@ impl Funktionsansicht {
                 "gefahrenzonen",
                 "einsatzabschnitte",
             ],
-            // LFH-1042: der eigene Raum, die Kräfte des Einsatzes und die eigenen Meldungen.
+            // LFH-1042: der eigene Raum, die Kräfte des Einsatzes und die eigenen Meldungen;
+            // LLH-1252: das Material des eigenen Raums (die Liste schneidet der Handler zu).
             Funktionsansicht::Bereitstellungsraum => &[
                 "bereitstellungsraeume",
                 "einheiten",
                 "fahrzeuge",
                 "meldungen",
+                "material",
             ],
             Funktionsansicht::Einsatzabschnitt => &[
                 "einsatzabschnitte",
@@ -405,6 +407,10 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/fahrzeuge"),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
+    // Material des eigenen Raums nur lesen (LLH-1252, Entscheidung 22.10.2026): der Handler
+    // schneidet auf `br_id` = eigener Raum. Zuordnen, Lösen, Status, Aufteilen und Erfassen
+    // bleiben der Führungsstelle; ein Schreibweg käme als eigener Eintrag mit Stellenprüfung.
+    ("GET", "/api/einsaetze/{id}/material"),
 ];
 
 /// Zusätzliche Einsatzrouten der Betreuungsstelle (LFH-1041): die eigene Stelle in der

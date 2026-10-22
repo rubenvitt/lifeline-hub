@@ -228,7 +228,23 @@ das Ausrücken als Austritt, ruft aber selbst nicht ab.
 | `einheiten`: Zeitachsen-Übersicht der Einheiten (Perioden je Einheit) | L |
 | `einheiten`, `fahrzeuge`: Detail, Position, Ändern, Abschnitt oder Auftrag zuweisen, Übernehmen, Abweisen | — |
 | `meldungen`: Meldung an die Einsatzleitung anlegen, eigene Meldungen lesen | L/S |
+| `material`: Material des eigenen BR (Materialliste, auf den eigenen BR geschnitten) | L |
+| `material`: zuordnen, lösen, Status setzen, ausgeben, aufteilen, erfassen | — |
 | alle übrigen Module, Einstellungen, Verwaltung | — |
+
+#### Scenario: Material des eigenen BR
+
+- **WHEN** am BR Sportplatz ein Lichtmast liegt, am BR Schule eine Trage und ein Stromerzeuger ohne
+  Ort ist
+- **AND** das Gerät des BR Sportplatz die Materialliste abruft
+- **THEN** enthält sie nur den Lichtmast
+
+#### Scenario: Material am Gerät nicht zuordnen
+
+- **WHEN** das Gerät des BR Sportplatz einen Posten dem BR Sportplatz zuordnen oder vom BR
+  Sportplatz lösen will
+- **THEN** antwortet der Server mit 403
+- **AND** bleibt der Ort des Postens unverändert
 
 #### Scenario: Fremder BR
 

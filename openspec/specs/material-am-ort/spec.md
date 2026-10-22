@@ -153,7 +153,11 @@ Einheiten und Fahrzeuge dort noch nicht belegt werden können.
 ### Requirement: Material am Ort auf Geräten
 
 Ein UHS-Laptop SHALL das Material seiner UHS nur lesen: ohne Auswahl, ohne Lösen, ohne Ausgeben. Ein
-Gerät des Bereitstellungsraums MUST keinen Material-Block zeigen und kein Material abfragen.
+Gerät des Bereitstellungsraums SHALL mit Freigabe Material die Sektion „Material“ seines Raums
+ebenso nur lesend zeigen (LLH-1252, Entscheidung 22.10.2026): die Posten des eigenen Raums mit
+Menge und Status, ohne Auswahl, Lösen, Ausgeben, Erfassen und Statuswahl. Der Server MUST ihm aus
+der Materialliste nur die Posten seines Raums liefern. Ohne Freigabe Material MUST die Sektion
+fehlen und kein Material abgefragt werden.
 
 #### Scenario: UHS-Laptop
 - **WHEN** der UHS-Laptop den Bereich „Material“ seiner UHS zeigt
@@ -161,6 +165,14 @@ Gerät des Bereitstellungsraums MUST keinen Material-Block zeigen und kein Mater
 
 #### Scenario: Gerät im Bereitstellungsraum
 - **WHEN** das Gerät des Bereitstellungsraums „BR Nord“ seinen Raum zeigt
+- **AND** am „BR Nord“ der „Lichtmast“ liegt, am „BR Süd“ die „Trage“
+- **THEN** steht in der Sektion „Material“ der „Lichtmast“ mit Menge und Status, ohne
+  Bedienelemente
+- **AND** fehlt die „Trage“
+
+#### Scenario: Gerät im Bereitstellungsraum ohne Freigabe Material
+- **WHEN** das Modul Material im Einsatz nicht freigegeben ist
+- **AND** das Gerät des Bereitstellungsraums „BR Nord“ seinen Raum zeigt
 - **THEN** fehlt die Sektion „Material“
 
 ### Requirement: Status am Ort setzen

@@ -111,6 +111,11 @@ relativ zu `frontend/src/` bzw. zur Wurzel. Specs: `geraete-kopplung`, `funktion
   des eigenen Raums liest das Gerät mit (`…/bereitstellungsraeume/{bid}/verlauf`, Spec
   `funktionsansichten`, LLH-1095), erst beim Aufklappen (`pages/bereitstellungsraum/BrVerlauf.tsx`);
   ein Wechsel nennt den anderen Raum mit Bezeichnung, dessen Detail und Verlauf bleiben 404.
+  Material des eigenen Raums liest es nur (LLH-1252, Entscheidung 22.10.2026, `br-material`):
+  `GET …/material` steht in der Routenliste, der Handler schneidet für jedes Gerät auf `br_id` =
+  eigener Raum (`stelle::sicht`), die Sektion „Material“ steht ohne Bedienung. Zuordnen, Lösen,
+  Status, Ausgeben und Erfassen bleiben der Führungsstelle; ein Schreibweg käme als eigener
+  Listeneintrag mit Stellenprüfung auf Quelle und Ziel.
   `br-eintreffen` (LLH-1075, design.md D14, nur Ansicht `bereitstellungsraum`) öffnet
   „Eintreffen buchen“ (`pages/bereitstellungsraum/EintreffenDialog.tsx`, am Gerät vollflächig) und
   ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“);
