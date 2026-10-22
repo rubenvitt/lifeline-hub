@@ -3,9 +3,9 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 import { STAFFEL, haeltStufe, stelleDichte } from './trefflaeche-kern';
 
 /**
- * LFH-900 — der Sammelbanner im Paneel „Meldungsstrom“ des Lage-Dashboards kostet keine Höhe
- * (Prüfliste Kriterium 12, „kein Sprung unter dem Cursor“; Bedien-Leitlinie: der Banner soll einen
- * Sprung verhindern, nicht selbst einen auslösen).
+ * LFH-900 — der Sammelbanner im Paneel „Jüngste ETB-Einträge“ (im Code „Meldungsstrom“) des
+ * Lage-Dashboards kostet keine Höhe (Prüfliste Kriterium 12, „kein Sprung unter dem Cursor“;
+ * Bedien-Leitlinie: der Banner soll einen Sprung verhindern, nicht selbst einen auslösen).
  *
  * Vor dem Fix stand der Banner im Fluss über der Liste: trifft ein ETB-Eintrag live ein, wurde das
  * Paneel um die Bannerhöhe höher (gemessen 38 / 60 / 88 px je Dichte), die Paneelreihe wuchs mit, und das Band
@@ -59,7 +59,7 @@ const oben = (l: Locator) => l.evaluate((el) => el.getBoundingClientRect().top +
 const unten = (l: Locator) =>
   l.evaluate((el) => el.getBoundingClientRect().bottom + window.scrollY);
 
-const strom = (page: Page) => page.getByRole('region', { name: 'Meldungsstrom' });
+const strom = (page: Page) => page.getByRole('region', { name: 'Jüngste ETB-Einträge' });
 
 for (const { viewport, dichte, soll, vorher: anzahl } of FAELLE) {
   test(`Lage-Dashboard ${viewport.width} px, ${dichte}, ${anzahl} ${anzahl === 1 ? 'Eintrag' : 'Einträge'}: der Sammelbanner verschiebt nichts`, async ({

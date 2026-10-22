@@ -142,7 +142,7 @@ describe('LagemeldungenPage', () => {
     const hhmm = (s: string) => alsOrtszeit(s)!.format('HH:mm');
     const zeile = within(sicht).getByText('Nachgereicht').closest('li') as HTMLElement;
     expect(within(zeile).getByText(hhmm('2026-06-12 11:14:00'))).toBeInTheDocument();
-    expect(zeile).toHaveTextContent(`übergeben ${hhmm('2026-06-12 13:05:00')}`);
+    expect(zeile).toHaveTextContent(`übernommen ${hhmm('2026-06-12 13:05:00')}`);
     // Später geschehen steht oben, auch wenn früher übergeben.
     const text = sicht.textContent ?? '';
     expect(text.indexOf('Pegel steigt')).toBeLessThan(text.indexOf('Nachgereicht'));

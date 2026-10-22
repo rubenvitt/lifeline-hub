@@ -4,7 +4,7 @@
 Das Einsatztagebuch ist der Nachweis der Führung (FwDV 100). Ein Eintrag, den eine Meldung oder
 eine Nachforderung auslöst, verweist auf seinen Vorgang, und der Verlauf einer Nachforderung
 steht vollständig im ETB: Anforderung, Zusage, Anmarsch, Eintreffen, Ablehnung und jede
-Rücknahme. Die Übergabe einer Meldung an die Lage ist eine Handlung der Führung und steht
+Rücknahme. Die Übernahme einer Meldung in die Lage ist eine Handlung der Führung und steht
 ebenfalls dort.
 
 ## Requirements
@@ -106,20 +106,21 @@ Nachforderung“ (Spec `benachrichtigungen`).
 - **WHEN** eine Nachforderung auf zugesagt wechselt
 - **THEN** erhalten Ersteller und S4 je genau einen Hinweis „Nachforderung zugesagt“
 
-### Requirement: Übergabe an die Lage steht im ETB
-Die erste Übergabe einer Meldung an die Lage SHALL im selben Commit einen Systemeintrag
-„Meldung #<lfd_nr> an die Lage übergeben“ mit Verweis auf die Meldung schreiben. Eine erneute
-Übergabe derselben Meldung MUST NOT einen weiteren Eintrag schreiben. Eine Meldung der Art
+### Requirement: Übernahme in die Lage steht im ETB
+Die erste Übernahme einer Meldung in die Lage SHALL im selben Commit einen Systemeintrag
+„Meldung #<lfd_nr> in die Lage übernommen“ mit Verweis auf die Meldung schreiben. Eine erneute
+Übernahme derselben Meldung MUST NOT einen weiteren Eintrag schreiben. Eine Meldung der Art
 „Lagemeldung“ MUST NOT einen solchen Eintrag erzeugen, weil sie ihren Lage-Eintrag schon trägt.
+Vorher geschriebene Einträge („… an die Lage übergeben“) bleiben unverändert.
 
-#### Scenario: Erste Übergabe
-- **WHEN** die Meldung 12 der Art „Sonstige“ an die Lage übergeben wird
-- **THEN** steht „Meldung #12 an die Lage übergeben“ als Systemeintrag mit Verweis „Meldung #12“ im ETB
+#### Scenario: Erste Übernahme
+- **WHEN** die Meldung 12 der Art „Sonstige“ in die Lage übernommen wird
+- **THEN** steht „Meldung #12 in die Lage übernommen“ als Systemeintrag mit Verweis „Meldung #12“ im ETB
 
-#### Scenario: Erneute Übergabe
-- **WHEN** dieselbe Meldung mit geändertem Lage-Text erneut übergeben wird
+#### Scenario: Erneute Übernahme
+- **WHEN** dieselbe Meldung mit geändertem Lage-Text erneut übernommen wird
 - **THEN** entsteht kein weiterer ETB-Eintrag
 
 #### Scenario: Lagemeldung
-- **WHEN** eine Meldung der Art „Lagemeldung“ an die Lage übergeben wird
-- **THEN** entsteht kein Systemeintrag zur Übergabe
+- **WHEN** eine Meldung der Art „Lagemeldung“ in die Lage übernommen wird
+- **THEN** entsteht kein Systemeintrag zur Übernahme

@@ -220,9 +220,11 @@ function MeldungKarte({
         ...(onKorrigieren
           ? [{ key: 'bk', label: 'Bearbeiten', onClick: () => setBearbeiten(true) }]
           : []),
-        // Lage-Übergabe und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung selbst.
+        // Übernahme in die Lage und Auftrag öffnen je ein Formular-Modal und tragen ihre Bestätigung
+        // selbst. Ein Wort für den Vorgang: „In die Lage übernehmen“, Etikett „In der Lage ✓“
+        // (LLH-1046, `frontend/AGENTS.md`, Begriffe).
         ...(!m.lagerelevant && onLagerelevant
-          ? [{ key: 'lr', label: 'An Lage übergeben', onClick: () => onLagerelevant(m.id) }]
+          ? [{ key: 'lr', label: 'In die Lage übernehmen', onClick: () => onLagerelevant(m.id) }]
           : []),
         // Eine Lagemeldung steht immer in der Lage (LLH-1031); jede andere Art lässt sich wieder
         // herausnehmen.
@@ -272,7 +274,7 @@ function MeldungKarte({
             unbearbeitet={!!status.unbearbeitet}
           />
           {m.richtung === 'extern' && <StatusChip ton="neutral" wort="Extern" />}
-          {m.lagerelevant && <StatusChip ton="bedien" wort="Lagerelevant ✓" />}
+          {m.lagerelevant && <StatusChip ton="bedien" wort="In der Lage ✓" />}
           {m.auftrag_id != null &&
             darf('fremde-module') &&
             (m.is_auftrag_aufgehoben ? (

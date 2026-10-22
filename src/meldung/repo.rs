@@ -840,10 +840,10 @@ pub struct LageUebergabe {
 /// legt nichts Neues an; ändert sie den Lage-Text, ist die Lagemeldung wieder neu (LLH-1206, D3). Alle Ausdrücke des Updates lesen
 /// den Stand VOR dem Update (SQLite). `NotFound`, wenn die Meldung nicht zum Einsatz gehört.
 ///
-/// Die ERSTE Übergabe schreibt „Meldung #12 an die Lage übergeben“ als Systemeintrag mit
-/// Verweis auf die Meldung (LLH-1104 D8), unabhängig vom Auto-ETB-Schalter; nicht für die Art
-/// „Lagemeldung“, die ab der Anlage in der Lage steht und ihren Lage-Eintrag über das Auto-ETB
-/// trägt (LLH-1027 D3). Atomar (Tx): ein Teilfehler rollt Übernahme und ETB-Eintrag zurück.
+/// Die ERSTE Übernahme schreibt „Meldung #12 in die Lage übernommen“ als Systemeintrag mit
+/// Verweis auf die Meldung (LLH-1104 D8; Wortlaut wie Knopf und Hinweis, LLH-1046), unabhängig
+/// vom Auto-ETB-Schalter; nicht für die Art „Lagemeldung“, die ab der Anlage in der Lage steht und
+/// ihren Lage-Eintrag über das Auto-ETB trägt (LLH-1027 D3). Atomar (Tx): ein Teilfehler rollt Übernahme und ETB-Eintrag zurück.
 pub async fn als_lagerelevant(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -893,7 +893,7 @@ pub async fn als_lagerelevant(
         let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, einsatz_id)
             .await?
             .etb_startwert();
-        let inhalt = format!("Meldung #{lfd_nr} an die Lage übergeben");
+        let inhalt = format!("Meldung #{lfd_nr} in die Lage übernommen");
         let etb_id =
             crate::etb::system_audit_tx(&mut *conn, einsatz_id, von_id, startwert, &inhalt).await?;
         sqlx::query("UPDATE etb_eintrag SET meldung_id = ? WHERE id = ?")
@@ -1938,7 +1938,7 @@ mod tests {
         assert_eq!(typ, "system");
         assert_eq!(
             inhalt,
-            format!("Meldung #{} an die Lage übergeben", m.lfd_nr)
+            format!("Meldung #{} in die Lage übernommen", m.lfd_nr)
         );
         assert_eq!(verweis, Some(m.id));
 

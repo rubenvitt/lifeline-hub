@@ -1267,7 +1267,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       ],
     });
     render();
-    const box = paneel('Meldungsstrom');
+    const box = paneel('Jüngste ETB-Einträge');
     await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(7));
     const nummern = Array.from(box.querySelectorAll<HTMLElement>('li[data-lfd-nr]')).map((z) =>
       Number(z.dataset.lfdNr),
@@ -1284,7 +1284,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     const daten: Daten = { etb: [etb(1), etb(2)] };
     mockEndpunkte(daten);
     const { client } = render();
-    const box = paneel('Meldungsstrom');
+    const box = paneel('Jüngste ETB-Einträge');
     await waitFor(() => expect(box.querySelectorAll('li[data-lfd-nr]')).toHaveLength(2));
 
     daten.etb = [etb(1), etb(2), etb(3, { inhalt: 'Deichbruch km 4' })];
@@ -1330,7 +1330,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       </>,
       { route: '/einsaetze/1/lage-dashboard' },
     );
-    const box = () => paneel('Meldungsstrom');
+    const box = () => paneel('Jüngste ETB-Einträge');
     await waitFor(() => expect(box().querySelectorAll('li[data-lfd-nr]')).toHaveLength(5));
 
     await userEvent.click(screen.getByRole('button', { name: 'wechseln' }));
@@ -1401,7 +1401,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     const daten: Daten = { etb: [] };
     mockEndpunkte(daten);
     const { client } = render();
-    const box = paneel('Meldungsstrom');
+    const box = paneel('Jüngste ETB-Einträge');
     expect(
       await within(box).findByText('Noch keine Einträge im Einsatztagebuch.'),
     ).toBeInTheDocument();
@@ -1416,7 +1416,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     setzeLiveStatusFuerTest('open');
     mockEndpunkte({ etb: [etb(1)] });
     const erster = render();
-    const live = () => paneel('Meldungsstrom').querySelector('[data-lfh="strom-live"]');
+    const live = () => paneel('Jüngste ETB-Einträge').querySelector('[data-lfh="strom-live"]');
     await waitFor(() => expect(live()?.textContent).toBe('live'));
     erster.unmount();
 
@@ -1429,7 +1429,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   it('ein gescheiterter ETB-Abruf ist ein Fehler, kein leerer Strom', async () => {
     mockEndpunkte({ etbStatus: 500 });
     render();
-    const box = paneel('Meldungsstrom');
+    const box = paneel('Jüngste ETB-Einträge');
     expect(await within(box).findByText('Daten nicht abrufbar')).toBeInTheDocument();
     expect(within(box).queryByText('Noch keine Einträge im Einsatztagebuch.')).toBeNull();
   });
@@ -1437,7 +1437,9 @@ describe('LageDashboardPage — Meldungsstrom', () => {
   it('„ETB" im Kopf führt ins Einsatztagebuch', async () => {
     mockEndpunkte({ etb: [etb(1)] });
     render();
-    await userEvent.click(within(paneel('Meldungsstrom')).getByRole('button', { name: 'ETB' }));
+    await userEvent.click(
+      within(paneel('Jüngste ETB-Einträge')).getByRole('button', { name: 'ETB' }),
+    );
     expect(await screen.findByText('ETB-MODUL')).toBeInTheDocument();
   });
 });
@@ -1681,7 +1683,7 @@ describe('LageDashboardPage — Modulgrenze des Lagebilds (LFH-669)', () => {
     });
     render();
     await waitFor(() => expect(freigabenGeliefert.n).toBeGreaterThan(0));
-    const box = paneel('Meldungsstrom');
+    const box = paneel('Jüngste ETB-Einträge');
     expect(await within(box).findByText('Modul ETB nicht freigegeben.')).toBeInTheDocument();
     await kurzWarten();
     // Vorbedingung: die freien Quellen liefen.
