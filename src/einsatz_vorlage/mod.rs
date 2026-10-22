@@ -80,7 +80,7 @@ impl StartVorlage {
 }
 
 /// Mitgelieferte Vorlagen je Organisation (design.md D4). Neue Organisationen bekommen sie in
-/// `bootstrap_admin`, bestehende per `migrations/0236_einsatz_vorlage.sql` — beide synchron
+/// `bootstrap_admin`, bestehende per `migrations/0238_einsatz_vorlage.sql` — beide synchron
 /// halten (Netz: `db::tests::migration_0236_seedet_die_startliste`).
 pub const EINSATZ_VORLAGE_STARTLISTE: [StartVorlage; 6] = [
     StartVorlage {
