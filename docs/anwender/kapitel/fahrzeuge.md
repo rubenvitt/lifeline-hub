@@ -127,7 +127,7 @@ In der Liste setzt die Spalte „Status“ den Status auf dieselbe Weise.
 
 Für Einsatzleitung und Führungspersonal:
 
-1. In der Liste beim Fahrzeug „Besatzung“ aufklappen.
+1. In der Liste beim Fahrzeug „Details“ aufklappen.
 2. Unter „Kraft zur Besatzung …“ eine Person wählen. Sie steht sofort in der Besatzung.
 
    ![Aufgeklappte Besatzung des RTW 83-1 mit „Soll erfüllt“, drei Personen, davon eine mit der Marke „andere Einheit“, und dem Auswahlfeld „Kraft zur Besatzung …“](../bilder/fahrzeuge/besatzung.png)
@@ -139,7 +139,7 @@ Für Einsatzleitung und Führungspersonal:
 
 Für Einsatzleitung und Führungspersonal, wenn das Fahrzeug einer Einheit angehört:
 
-1. In der Liste beim Fahrzeug „Besatzung“ aufklappen und „Personal der Einheit übernehmen“ wählen.
+1. In der Liste beim Fahrzeug „Details“ aufklappen und „Personal der Einheit übernehmen“ wählen.
    Ist der Knopf gesperrt, steht daneben „keine freien Kräfte der Einheit“: alle Kräfte der
    Einheit sitzen schon auf einem Fahrzeug.
 2. Die Liste nennt die Kräfte der Einheit, die auf keinem Fahrzeug sitzen, je mit Position und
@@ -158,7 +158,7 @@ Für Einsatzleitung und Führungspersonal, wenn das Fahrzeug einer Einheit angeh
 
 Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben ist:
 
-1. In der Liste beim Fahrzeug „Besatzung“ aufklappen. Unter der Besatzung steht „Beladung“ mit der
+1. In der Liste beim Fahrzeug „Details“ aufklappen. Unter der Besatzung steht „Beladung“ mit der
    Zahl der Posten und, falls vorhanden, dem Ausfall, je Posten Menge und Status.
 
    ![Block „Beladung 2 Posten · 1 Ausfall“ unter der Besatzung: Rettungsdecken mit „6 von 10 übrig“, „Ausgeben“ und „Vom Fahrzeug lösen“, eine defekte Absaugpumpe und die Auswahl „Material zuordnen …“](../bilder/fahrzeuge/beladung.png)

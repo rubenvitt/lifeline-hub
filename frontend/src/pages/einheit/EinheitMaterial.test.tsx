@@ -122,6 +122,12 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
     expect(zeile('Wolldecke')).toHaveTextContent('15 von 20 übrig');
   });
 
+  it('ohne Material: nur „Kein Material“, keine Meta „0 Posten“ (LLH-1255)', () => {
+    zeige({ material: { ...einheit, material_mitglieder: [] } as Einheit });
+    expect(within(paneel()).getByText('Kein Material')).toBeInTheDocument();
+    expect(paneel()).not.toHaveTextContent('0 Posten');
+  });
+
   /** Das Einheit-DTO trägt keine Kategorie: sie kommt aus der Materialliste, wenn sie da ist. */
   it('Kategorie aus der Materialliste steht gedämpft an der Zeile', () => {
     zeige();

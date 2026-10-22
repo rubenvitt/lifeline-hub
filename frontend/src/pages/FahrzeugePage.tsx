@@ -1014,17 +1014,19 @@ export default function FahrzeugePage() {
                 unterEbene: 1,
               }}
               zeilenKlasse={(r) => (r.id === highlightId ? 'zeile-hervorgehoben' : undefined)}
-              // Besatzung je Fahrzeug eingeklappt, über den beschrifteten Auslöser in Tabelle UND
-              // Karte aufklappbar (LFH-697); die Ist/Soll-Stärke steht dauerhaft in der
-              // Besatzungs-Spalte bzw. im Sekundärfeld.
+              // Besatzung und Beladung je Fahrzeug eingeklappt, über den beschrifteten Auslöser in
+              // Tabelle UND Karte aufklappbar (LFH-697); die Ist/Soll-Stärke steht dauerhaft in der
+              // Besatzungs-Spalte bzw. im Sekundärfeld. Das Etikett „Details“ deckt beide Blöcke
+              // und ist kürzer als „Besatzung“: ein längeres riss die Zeile bei 1440 px
+              // (LLH-1255, `e2e/gate1-ueberlauf.spec.ts`, Fükw-Desktop).
               //
               // Gemerkte Karten und Zellen zeichnen den Bereich nur neu, wenn `aufklappen` ein neues
               // Objekt ist (es steht in der Garnitur). Die Besatzungsfehler kommen wie `personal`
               // allein über diesen Abschluss: wer das Objekt einmal merkt, nimmt die Gründe in die
               // Abhängigkeiten, sonst blieben ein neuer und ein geräumter Grund unsichtbar.
               aufklappen={{
-                etikett: 'Besatzung',
-                zugaenglicherName: (ef) => `Besatzung zu ${ef.funkrufname}`,
+                etikett: 'Details',
+                zugaenglicherName: (ef) => `Details zu ${ef.funkrufname}`,
                 inhalt: (ef) => (
                   <>
                     <BesatzungsBlock

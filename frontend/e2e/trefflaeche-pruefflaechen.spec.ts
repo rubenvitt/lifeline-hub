@@ -1332,9 +1332,9 @@ function materialAmOrtFlaechen(
     },
     {
       pfad: `${R}/fahrzeuge`,
-      anker: knopf('Besatzung zu Florian 15'),
+      anker: knopf('Details zu Florian 15'),
       vorbereiten: async (page) => {
-        await knopf('Besatzung zu Florian 15')(page).click();
+        await knopf('Details zu Florian 15')(page).click();
         await expect(knopf('Decken Fahrzeug ausgeben')(page)).toBeVisible();
       },
       ziele: ziele('Fahrzeug', /^(Decken|Trage) Fahrzeug vom Fahrzeug lösen$/),

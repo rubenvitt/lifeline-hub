@@ -252,7 +252,7 @@ describe('MaterialTab · Sperrgrund „Material zuordnen …“ (LFH-970)', () =
   it('nennt den Grund und springt ins Modul Material, wenn nichts anzubieten ist', async () => {
     render({ liste: [verortet] });
     await waitFor(() => expect(auswahl()).toBeDisabled());
-    expect(auswahl()).toHaveAccessibleDescription(/Kein Material ohne Ort/);
+    expect(auswahl()).toHaveAccessibleDescription(/Kein anderes Material/);
     expect(screen.getByRole('link', { name: /^Material/ })).toHaveAttribute(
       'href',
       '/einsaetze/1/material',

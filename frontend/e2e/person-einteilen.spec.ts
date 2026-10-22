@@ -95,7 +95,7 @@ test('Einheit und Fahrzeug in der Zeile setzen, Ansicht, Fahrzeugseite und Melde
   await page.goto(`/einsaetze/${s.einsatzId}/fahrzeuge`);
   const fahrzeuge = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
   const fzZeile = fahrzeuge.locator('tr.ant-table-row').filter({ hasText: FAHRZEUG });
-  await fzZeile.getByRole('button', { name: /Besatzung/ }).click();
+  await fzZeile.getByRole('button', { name: /^Details zu / }).click();
   await expect(fahrzeuge.getByText(NAME)).toBeVisible();
 
   // ── Das Meldebild zeigt die Person unter dem Fahrzeug (Stufe „mit Fahrzeugen“) ──

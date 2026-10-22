@@ -318,7 +318,8 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     zeige({ angebot: { data: POSTEN, isError: false } });
     const feld = screen.getByRole('combobox', { name: 'Material zuordnen' });
     await waitFor(() => expect(feld).toBeDisabled());
-    expect(feld).toHaveAccessibleDescription(/Kein Material ohne Ort/);
+    // Alles Material liegt schon hier: „ohne Ort“ wäre falsch, die Auswahl bietet auch andere Orte.
+    expect(feld).toHaveAccessibleDescription(/^Kein anderes Material/);
     // Erfasst wird am Ort (LLH-1133): der Sprung führt nur noch ins Modul, nicht zum Erfassen.
     expect(screen.getByRole('link', { name: /Material/ })).toHaveAttribute(
       'href',
@@ -417,10 +418,33 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     expect(zeile('Wolldecke')).toHaveTextContent('30 von 50 übrig');
   });
 
-  it('ohne Posten steht der Leertext', () => {
-    zeige({ posten: [], leerText: 'Keine Beladung' });
+  it('ohne Posten steht nur der Leertext, keine Kopfzahl „0 Posten“ daneben (LLH-1255)', () => {
+    zeige({ posten: [], leerText: 'Keine Beladung', titel: 'Beladung' });
     expect(screen.getByText('Keine Beladung')).toBeInTheDocument();
-    expect(screen.getByTestId('material-am-ort-kopf')).toHaveTextContent('0 Posten');
+    expect(screen.getByText('Beladung')).toBeInTheDocument();
+    expect(screen.queryByTestId('material-am-ort-kopf')).toBeNull();
+    expect(screen.queryByText(/0 Posten/)).toBeNull();
+  });
+
+  it('kein Material im Einsatz: die Auswahl nennt das, nicht „ohne Ort“ (LLH-1255)', async () => {
+    zeige({ posten: [], angebot: { data: [], isError: false } });
+    const feld = screen.getByRole('combobox', { name: 'Material zuordnen' });
+    await waitFor(() => expect(feld).toBeDisabled());
+    expect(feld).toHaveAccessibleDescription(/^Kein Material im Einsatz/);
+    expect(screen.queryByText(/ohne Ort/)).toBeNull();
+  });
+
+  it('nur beendetes Material anderswo zählt nicht als Angebot (LLH-1255)', async () => {
+    zeige({
+      posten: [],
+      angebot: {
+        data: [em({ id: 20, bezeichnung: 'Stromerzeuger', beendet_at: '2026-10-20 10:00:00' })],
+        isError: false,
+      },
+    });
+    const feld = screen.getByRole('combobox', { name: 'Material zuordnen' });
+    await waitFor(() => expect(feld).toBeDisabled());
+    expect(feld).toHaveAccessibleDescription(/^Kein Material im Einsatz/);
   });
 });
 

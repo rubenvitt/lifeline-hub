@@ -1433,6 +1433,14 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
     expect(belegung.contains(sektion())).toBe(false);
   });
 
+  it('leerer Raum: nur „Kein Material“, keine Kopfzahl „0 Posten“ (LLH-1255)', async () => {
+    seite(brDetail(), { material: [posten({ id: 61, bezeichnung: 'Stromerzeuger' })] });
+    expect(
+      await within(await screen.findByTestId('br-material')).findByText('Kein Material'),
+    ).toBeInTheDocument();
+    expect(sektion()).not.toHaveTextContent('0 Posten');
+  });
+
   it('im geplanten Raum: Lösen und Zuordnen schicken den PATCH an die Disposition', async () => {
     const { gesendet } = seite(brDetail({ status: 'geplant' }));
     await userEvent.click(
