@@ -1,6 +1,13 @@
 import { useQuery, type QueryKey } from '@tanstack/react-query';
 import { Button, Input, Space, type InputProps, type InputRef } from 'antd';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type Ref,
+} from 'react';
 import type { OrtSucheAntwort, OrtTreffer } from '../api/karteOrtSuche';
 import { useRollen } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
@@ -67,6 +74,11 @@ export interface OrtsfeldKarte {
 const VORSCHAU_HOEHE = 160;
 
 interface OrtsfeldGemeinsam {
+  /**
+   * Das Eingabefeld (React 19: `ref` als Prop). `Form.Item` reicht ihn herein; antds
+   * `scrollToFirstError={{ focus: true }}` fokussiert darüber (LLH-1121).
+   */
+  ref?: Ref<InputRef>;
   id?: string;
   'aria-label'?: string;
   /** Prüffehler am Feld, wie `InlineAngabe` sie hineinreicht. */
@@ -137,6 +149,7 @@ const TREFFER_FRISCH_MS = 10 * 60_000;
 export function Ortsfeld(props: OrtsfeldProps) {
   if (props.ohneSuche !== undefined) {
     const {
+      ref,
       id,
       'aria-label': ariaLabel,
       'aria-invalid': ariaInvalid,
@@ -149,6 +162,7 @@ export function Ortsfeld(props: OrtsfeldProps) {
     // Nur Text: kein Knopf, Enter wie in jedem Feld, keine Erkennung, keine Karte.
     return (
       <Input
+        ref={ref}
         id={id}
         aria-label={ariaLabel}
         aria-invalid={ariaInvalid}
@@ -164,6 +178,7 @@ export function Ortsfeld(props: OrtsfeldProps) {
 }
 
 function OrtsfeldMitSuche({
+  ref,
   id,
   'aria-label': ariaLabel,
   'aria-invalid': ariaInvalid,
@@ -182,6 +197,8 @@ function OrtsfeldMitSuche({
   const [anfrage, setAnfrage] = useState<Anfrage | null>(null);
   const nrRef = useRef(0);
   const feldRef = useRef<InputRef>(null);
+  // Der eigene `ref` bleibt für die Fokusrückgabe; der hereingereichte zeigt auf dasselbe Feld.
+  useImperativeHandle(ref, () => feldRef.current as InputRef, []);
   const begriff = adressBegriff(value.text);
   const listeOffen = online && anfrage !== null;
 
