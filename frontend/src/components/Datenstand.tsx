@@ -98,6 +98,8 @@ export default function Datenstand({
     <Typography.Text
       type="secondary"
       title={`Letzte Aktualisierung: ${zeitpunkt(dayjs(dataUpdatedAt), geraetezeit(konventionen))}`}
+      // Millisekundengenauer Anker für e2e: der Titel trägt seit LLH-1061 nur noch Minuten.
+      data-stand={dataUpdatedAt}
       aria-label={offline ? `Datenstand ${uhrzeit}, offline` : `Datenstand ${uhrzeit}`}
       style={STIL}
     >

@@ -16,6 +16,8 @@ describe('Datenstand', () => {
     expect(formatiereDatenstand(zeit)).toBe('1407');
     renderMitProviders(<Datenstand dataUpdatedAt={zeit} />);
     expect(screen.getByText('Stand 1407')).toHaveAccessibleName('Datenstand 1407');
+    // Der Titel trägt nur Minuten; `data-stand` ist der ms-genaue Anker für e2e.
+    expect(screen.getByText('Stand 1407')).toHaveAttribute('data-stand', String(zeit));
   });
 
   it('nennt an einem anderen Tag den Tag und folgt „Datum und Uhrzeit“', () => {

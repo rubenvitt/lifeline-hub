@@ -318,13 +318,13 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
   // Erst jetzt zurücksetzen: was ab hier gemeldet wird, gehört zum Refetch.
   await setzeShiftsZurueck(page);
 
-  // Der `Datenstand`-Titel trägt Sekunden und ist nach dem Warten garantiert ein anderer,
-  // sobald die Antwort gerendert ist — der Anker, der dem Zähler fehlt. Nur das
-  // `title`-Attribut ändert sich, der Anker verschiebt also selbst nichts.
+  // `data-stand` am Datenstand trägt `dataUpdatedAt` in ms und ist nach dem Warten garantiert ein
+  // anderer, sobald die Antwort gerendert ist — der Anker, der dem Zähler fehlt (der Titel trägt
+  // seit LLH-1061 nur Minuten). Nur das Attribut ändert sich, der Anker verschiebt also nichts.
   const datenstand = page.locator('[aria-label^="Datenstand "]');
   await expect(datenstand).toHaveCount(1);
-  const standVorher = await datenstand.getAttribute('title');
-  expect(standVorher, 'der Datenstand muss vor dem Refetch einen Titel tragen').not.toBeNull();
+  const standVorher = await datenstand.getAttribute('data-stand');
+  expect(standVorher, 'der Datenstand muss vor dem Refetch einen Stand tragen').not.toBeNull();
 
   // RELATIV gezählt und der Stand erst HIER genommen: ein Abruf im Wartefenster hätte den
   // Zähler sonst schon auf den Zielwert gehoben.
@@ -349,9 +349,9 @@ test('Einsatzauswahl: ein Fensterfokus-Refetch mit unveränderten Daten verschie
       message: 'der Fensterfokus muss einen zusätzlichen Abruf auslösen',
     })
     .toBeGreaterThanOrEqual(abrufeVorher + 1);
-  // Erst mit dem neuen Titel ist die Antwort im DOM — sonst endete die Ruhemessung womöglich
+  // Erst mit dem neuen Stand ist die Antwort im DOM — sonst endete die Ruhemessung womöglich
   // vor dem Re-Render, bei Sollwert 0 ein stiller Falsch-Grün.
-  await expect(datenstand).not.toHaveAttribute('title', standVorher!);
+  await expect(datenstand).not.toHaveAttribute('data-stand', standVorher!);
 
   const nachRefetch = await ruheShifts(page);
   // Ein Refetch tauscht Daten, kein Dokument. Lud die Seite neu, mäße der frische
