@@ -194,10 +194,10 @@ pub async fn zeitfenster_anlegen(
         stelle_ids,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
+    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, tz, &eingabe).await
+        repo::create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, stil, &eingabe).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok((
@@ -281,7 +281,7 @@ pub async fn zeitfenster_aus_vorlage(
         })
         .collect::<Result<Vec<_>, _>>()?;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
+    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::zeitfenster_aus_vorlage_tx(
@@ -289,7 +289,7 @@ pub async fn zeitfenster_aus_vorlage(
             einsatz_id,
             benutzer_id,
             startwert,
-            tz,
+            stil,
             &tag_von_at,
             &tag_bis_at,
             &fenster,
@@ -382,7 +382,7 @@ pub async fn zeitfenster_aendern(
         stelle_ids,
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
+    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
         repo::update_zeitfenster_tx(
@@ -391,7 +391,7 @@ pub async fn zeitfenster_aendern(
             zid,
             benutzer_id,
             startwert,
-            tz,
+            stil,
             &aenderung,
         )
         .await
@@ -414,10 +414,10 @@ pub async fn zeitfenster_loeschen(
 ) -> Result<StatusCode, AppError> {
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
-    let tz = repo::zeitzone(&state.pool, einsatz_id).await?;
+    let stil = repo::zeitstil(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
     let g = crate::write_retry!(&state.pool, |conn| {
-        repo::delete_zeitfenster_tx(conn, einsatz_id, zid, benutzer_id, startwert, tz).await
+        repo::delete_zeitfenster_tx(conn, einsatz_id, zid, benutzer_id, startwert, stil).await
     })?;
     publiziere(&state, einsatz_id, &g.etb_ids);
     Ok(StatusCode::NO_CONTENT)

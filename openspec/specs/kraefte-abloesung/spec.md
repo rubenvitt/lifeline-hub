@@ -508,7 +508,7 @@ nicht zu holen war; der Sammeltoast springt zur Seite.
 
 #### Scenario: Fälligkeit erreicht
 - **WHEN** die Schicht von „Florian 1“ um 15:30 fällig wird
-- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 15:30“ und Sprung zu ihrer Schicht auf der Seite Ablösung
+- **THEN** erscheint der Alarm „Ablösung fällig“ mit „Florian 1, 1530“ (Darstellung taktisch, Spec `zeitdarstellung`) und Sprung zu ihrer Schicht auf der Seite Ablösung
 
 #### Scenario: Kein Doppelalarm
 - **WHEN** zur selben Fälligkeit auch eine Erinnerung mit Bezug Ablösung fällig wird
@@ -674,7 +674,7 @@ es bleibt bei `planmaessig`, `vorwarnung` und `ueberfaellig`.
 
 #### Scenario: Zwei Stunden vorher
 - **WHEN** eine Schicht ohne Schichtmodell um 15:30 fällig ist und keine ablösende Einheit geplant ist
-- **THEN** erhalten alle mit dem Modul Ablösung um 13:30 genau einmal den Hinweis „Keine ablösende Einheit geplant“ mit „Florian 1, 15:30“
+- **THEN** erhalten alle mit dem Modul Ablösung um 13:30 genau einmal den Hinweis „Keine ablösende Einheit geplant“ mit „Florian 1, 1530“
 
 #### Scenario: Geplant
 - **WHEN** vor 13:30 eine ablösende Einheit geplant wird

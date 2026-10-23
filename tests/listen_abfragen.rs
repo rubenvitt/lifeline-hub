@@ -383,6 +383,8 @@ async fn einsatzliste_laedt_labelkarten_nur_fuer_sichtbare_orgs() {
 #[tokio::test]
 async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
     use lifeline_hub::einsatz::nummer::ZEITZONE_VORGABE;
+    use lifeline_hub::zeitdarstellung::{Zeitdarstellung, Zeitstil};
+    let stil = Zeitstil::new(ZEITZONE_VORGABE, Zeitdarstellung::Taktisch);
     use lifeline_hub::verpflegung::repo::{
         self as v, StelleEingabe, ZeitfensterAenderung, ZeitfensterEingabe,
     };
@@ -430,7 +432,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         e,
         b,
         1,
-        ZEITZONE_VORGABE,
+        stil,
         &fenster(vec![stellen[0]]),
     ))
     .await;
@@ -439,7 +441,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         e,
         b,
         1,
-        ZEITZONE_VORGABE,
+        stil,
         &fenster(stellen.clone()),
     ))
     .await;
@@ -461,7 +463,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         eins,
         b,
         1,
-        ZEITZONE_VORGABE,
+        stil,
         &aendern(stellen.clone()),
     ))
     .await;
@@ -471,7 +473,7 @@ async fn zuordnung_der_stellen_braucht_feste_zahl_an_statements() {
         zwanzig,
         b,
         1,
-        ZEITZONE_VORGABE,
+        stil,
         &aendern(vec![stellen[19]]),
     ))
     .await;

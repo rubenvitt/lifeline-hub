@@ -1585,7 +1585,10 @@ mod tests {
             e,
             nutzer,
             1,
-            crate::einsatz::nummer::ZEITZONE_VORGABE,
+            crate::zeitdarstellung::Zeitstil::new(
+                crate::einsatz::nummer::ZEITZONE_VORGABE,
+                crate::zeitdarstellung::Zeitdarstellung::Taktisch,
+            ),
             &v::ZeitfensterEingabe {
                 bezeichnung: "Mittag".into(),
                 von_at: "2026-01-01 10:00:00".into(),

@@ -1,4 +1,5 @@
 use crate::error::AppError;
+use crate::zeitdarstellung::Zeitstil;
 use sqlx::SqlitePool;
 
 use super::{adressat_kategorie_gueltig, prioritaet_gueltig, NachforderungAnzeige};
@@ -113,7 +114,7 @@ pub struct NachforderungDaten<'a> {
 }
 
 /// Inhalt des ETB-Eintrags der Anlage (LLH-1089 design.md D9): „Nachforderung: 2× RTW → BR Nord,
-/// benötigt bis 21.10. 15:30 — Transport aus der UHS“. Ziel, Bedarfszeit und Details stehen nur,
+/// benötigt bis 211530okt26 — Transport aus der UHS“. Ziel, Bedarfszeit und Details stehen nur,
 /// wenn gesetzt. `bis` ist schon in der Anzeigezone formatiert.
 pub fn anlage_text(
     kurz: &str,
@@ -170,12 +171,13 @@ async fn ziel_name_tx(
         .ok_or(AppError::NotFound)
 }
 
-/// Anzeigezone des Einsatzes für ETB-Texte: Einsatz, sonst Organisation, sonst
-/// `einsatz::nummer::ZEITZONE_VORGABE` (dieselbe Folge wie `benachrichtigung::text`).
-async fn anzeigezone_tx(
+/// Zone und Darstellung des Einsatzes für ETB-Texte: Anzeigezone Einsatz, sonst Organisation,
+/// sonst `einsatz::nummer::ZEITZONE_VORGABE` (dieselbe Folge wie `benachrichtigung::text`);
+/// Zeitdarstellung Einsatz vor Organisation vor Vorgabe (LLH-1061).
+async fn zeitstil_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
-) -> Result<chrono_tz::Tz, AppError> {
+) -> Result<Zeitstil, AppError> {
     let zone: Option<Option<String>> = sqlx::query_scalar(
         "SELECT COALESCE(NULLIF(TRIM(es.zeitzone), ''), oe.zeitzone) \
          FROM einsatz e \
@@ -186,9 +188,9 @@ async fn anzeigezone_tx(
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
     .await?;
-    Ok(crate::einsatz::nummer::zone_oder_vorgabe(
-        zone.flatten().as_deref(),
-    ))
+    let zone = crate::einsatz::nummer::zone_oder_vorgabe(zone.flatten().as_deref());
+    let darstellung = crate::zeitdarstellung::darstellung_laden(&mut *conn, einsatz_id).await?;
+    Ok(Zeitstil::new(zone, darstellung))
 }
 
 /// SELECT-Projektion inkl. Ersteller-Name (LEFT JOIN benutzer), abgeleitetem `ist_offen` und den
@@ -276,10 +278,7 @@ pub async fn create_tx(
     )
     .await?;
     let bis = match daten.benoetigt_bis {
-        Some(b) => Some(crate::zeitachse::repo::zeit_text(
-            b,
-            anzeigezone_tx(&mut *tx, einsatz_id).await?,
-        )),
+        Some(b) => Some(zeitstil_tx(&mut *tx, einsatz_id).await?.zeitpunkt_text(b)),
         None => None,
     };
     let inhalt = anlage_text(
@@ -625,7 +624,7 @@ fn rufnamen_json(rufnamen: &[String]) -> Result<Option<String>, AppError> {
 }
 
 /// Inhalt des Systemeintrags einer Zusage (D5): „Nachforderung 2× RTW: zugesagt (83-1, 83-2),
-/// Eintreffen erwartet 22.10. 15:30“; bei einer Teilzusage „…: 1 zugesagt (83-1) …; 1× RTW weiter
+/// Eintreffen erwartet 221530okt26“; bei einer Teilzusage „…: 1 zugesagt (83-1) …; 1× RTW weiter
 /// angefordert“. `eta` ist schon in der Anzeigezone formatiert.
 pub fn zusage_text(
     kurz: &str,
@@ -737,10 +736,7 @@ pub async fn sage_zu(
             None => None,
         };
         let eta = match daten.eintreffen_erwartet_at {
-            Some(e) => Some(crate::zeitachse::repo::zeit_text(
-                e,
-                anzeigezone_tx(&mut *conn, einsatz_id).await?,
-            )),
+            Some(e) => Some(zeitstil_tx(&mut *conn, einsatz_id).await?.zeitpunkt_text(e)),
             None => None,
         };
         let inhalt = zusage_text(
@@ -939,10 +935,7 @@ pub async fn aktualisiere(
             teile.push(match eta {
                 Some(e) => format!(
                     "Eintreffen erwartet {}",
-                    crate::zeitachse::repo::zeit_text(
-                        e,
-                        anzeigezone_tx(&mut *conn, einsatz_id).await?
-                    )
+                    zeitstil_tx(&mut *conn, einsatz_id).await?.zeitpunkt_text(e)
                 ),
                 None => "ohne erwartetes Eintreffen".into(),
             });
@@ -1143,7 +1136,7 @@ mod tests {
         assert_eq!(n.benoetigt_bis.as_deref(), Some("2026-06-12 13:30:00"));
         assert_eq!(
             etb_der_nachforderung(&pool, n.id).await[0].1,
-            "Nachforderung: 2× RTW → BR Nord, benötigt bis 12.06. 15:30 — \
+            "Nachforderung: 2× RTW → BR Nord, benötigt bis 121530jun26 — \
              Transport aus UHS Turnhalle"
         );
 
@@ -1211,7 +1204,7 @@ mod tests {
         };
         assert_eq!(
             bis(pool.clone()).await,
-            "Nachforderung: 2× RTW, benötigt bis 12.06. 13:30"
+            "Nachforderung: 2× RTW, benötigt bis 121330jun26"
         );
         sqlx::query(
             "INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'Europe/Berlin')",
@@ -1222,7 +1215,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             bis(pool.clone()).await,
-            "Nachforderung: 2× RTW, benötigt bis 12.06. 15:30"
+            "Nachforderung: 2× RTW, benötigt bis 121530jun26"
         );
     }
 
@@ -1897,7 +1890,7 @@ mod tests {
             (
                 "system".to_string(),
                 "Nachforderung 2× RTW: zugesagt (Florian Musterstadt 83-1, \
-                 Florian Musterstadt 83-2), Eintreffen erwartet 12.06. 15:30"
+                 Florian Musterstadt 83-2), Eintreffen erwartet 121530jun26"
                     .to_string()
             )
         );
@@ -2304,7 +2297,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             etb_zeile(&pool, etb_id).await.1,
-            "Nachforderung 2× RTW geändert: Eintreffen erwartet 12.06. 16:00"
+            "Nachforderung 2× RTW geändert: Eintreffen erwartet 121600jun26"
         );
         assert!(matches!(
             aktualisiere(

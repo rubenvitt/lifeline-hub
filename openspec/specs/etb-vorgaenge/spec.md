@@ -82,7 +82,7 @@ Nachforderung SHALL in derselben Transaktion genau einen Systemeintrag mit Verwe
 Nachforderung schreiben, unabhängig von „Automatische ETB-Einträge“. Der Inhalt MUST Anzahl, Art
 und Stufe nennen („Nachforderung 2× RTW: zugesagt“), eine Ablehnung und ein Zurückziehen MUST
 ihren Grund in Klammern tragen, eine Rücknahme MUST „zurückgesetzt auf <Stufe>“ lauten. Eine
-Zusage MUST ihre Angaben nennen („zugesagt (83-1, 83-2), Eintreffen erwartet 22.10. 15:30“), eine
+Zusage MUST ihre Angaben nennen („zugesagt (83-1, 83-2), Eintreffen erwartet 221530okt26“), eine
 Teilzusage dazu den Rest („1 zugesagt (83-1); 1× RTW weiter angefordert“); eine Änderung MUST
 „geändert: …“ mit den neuen Werten lauten. Eine Änderung ohne neuen Wert MUST NOT einen Eintrag
 schreiben. Eine

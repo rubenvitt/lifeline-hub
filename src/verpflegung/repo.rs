@@ -27,7 +27,7 @@
 
 use std::collections::HashMap;
 
-use chrono_tz::Tz;
+use crate::zeitdarstellung::Zeitstil;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use super::stelle::{
@@ -542,10 +542,11 @@ pub async fn zeitfenster_laden(
     Ok(zeile.anzeige(ausgaben, stelle_ids))
 }
 
-/// Die Zeitzone der Organisation des Einsatzes für die ETB-Texte (design.md D5). Fehlt die
-/// Einstellung oder ist sie ungültig, gilt `einsatz::nummer::ZEITZONE_VORGABE`. Vor der
-/// Transaktion zu laden, wie der ETB-`startwert`.
-pub async fn zeitzone(pool: &SqlitePool, einsatz_id: i64) -> Result<Tz, AppError> {
+/// Zone und Darstellung der ETB-Texte eines Einsatzes: die Zeitzone der Organisation (design.md
+/// D5; fehlt sie oder ist sie ungültig, gilt `einsatz::nummer::ZEITZONE_VORGABE`) und die
+/// Zeitdarstellung von Einsatz vor Organisation vor Vorgabe (LLH-1061). Vor der Transaktion zu
+/// laden, wie der ETB-`startwert`.
+pub async fn zeitstil(pool: &SqlitePool, einsatz_id: i64) -> Result<Zeitstil, AppError> {
     let name: Option<Option<String>> = sqlx::query_scalar(
         "SELECT oe.zeitzone FROM einsatz e \
          LEFT JOIN org_einstellungen oe ON oe.org_id = e.org_id WHERE e.id = ?",
@@ -553,9 +554,9 @@ pub async fn zeitzone(pool: &SqlitePool, einsatz_id: i64) -> Result<Tz, AppError
     .bind(einsatz_id)
     .fetch_optional(pool)
     .await?;
-    Ok(crate::einsatz::nummer::zone_oder_vorgabe(
-        name.flatten().as_deref(),
-    ))
+    let zone = crate::einsatz::nummer::zone_oder_vorgabe(name.flatten().as_deref());
+    let darstellung = crate::zeitdarstellung::darstellung_laden(pool, einsatz_id).await?;
+    Ok(Zeitstil::new(zone, darstellung))
 }
 
 // ── Feldprüfungen (400) ─────────────────────────────────────────────────────────────────────
@@ -623,13 +624,13 @@ async fn zeitfenster_roh_tx(
     .ok_or(AppError::NotFound)
 }
 
-/// Zeitraum eines Zeitfensters als ETB-Text in der Org-Zone. Die Zeitpunkte liegen geprüft im
-/// Drahtformat vor.
-fn zeitraum(von: &str, bis: &str, tz: Tz) -> Result<String, AppError> {
+/// Zeitraum eines Zeitfensters als ETB-Text (Org-Zone, Darstellung des Einsatzes). Die
+/// Zeitpunkte liegen geprüft im Drahtformat vor.
+fn zeitraum(von: &str, bis: &str, stil: Zeitstil) -> Result<String, AppError> {
     Ok(zeitraum_text(
         draht_lesen("von_at", von)?,
         draht_lesen("bis_at", bis)?,
-        tz,
+        stil,
     ))
 }
 
@@ -821,7 +822,7 @@ pub async fn create_zeitfenster_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     startwert: i64,
-    tz: Tz,
+    stil: Zeitstil,
     eingabe: &ZeitfensterEingabe,
 ) -> Result<Geschrieben, AppError> {
     // 400 — jedes Feld für sich, vor jeder Abfrage
@@ -865,7 +866,7 @@ pub async fn create_zeitfenster_tx(
     }
     let inhalt = etb_text::angelegt(
         &bezeichnung,
-        &zeitraum(&eingabe.von_at, &eingabe.bis_at, tz)?,
+        &zeitraum(&eingabe.von_at, &eingabe.bis_at, stil)?,
         &b,
         eingabe.verpflegungsart,
         &namen_von(&stellen, &stelle_ids),
@@ -929,7 +930,7 @@ pub async fn zeitfenster_aus_vorlage_tx(
     einsatz_id: i64,
     benutzer_id: i64,
     startwert: i64,
-    tz: Tz,
+    stil: Zeitstil,
     tag_von_at: &str,
     tag_bis_at: &str,
     fenster: &[ZeitfensterEingabe],
@@ -1007,7 +1008,7 @@ pub async fn zeitfenster_aus_vorlage_tx(
             g.uebersprungen.push(f.bezeichnung.clone());
             continue;
         }
-        let neu = create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, tz, e)
+        let neu = create_zeitfenster_tx(conn, einsatz_id, benutzer_id, startwert, stil, e)
             .await
             .map_err(|m| label_error(i, &e.bezeichnung, m))?;
         g.angelegt.push(neu.id);
@@ -1026,7 +1027,7 @@ pub async fn update_zeitfenster_tx(
     id: i64,
     benutzer_id: i64,
     startwert: i64,
-    tz: Tz,
+    stil: Zeitstil,
     a: &ZeitfensterAenderung,
 ) -> Result<Geschrieben, AppError> {
     // 400 vor jeder Abfrage: die Stellenliste (D5), gezählt vor dem Entdoppeln.
@@ -1072,8 +1073,8 @@ pub async fn update_zeitfenster_tx(
     let art_alt = roh.art();
     let art_neu = a.verpflegungsart.unwrap_or(art_alt);
 
-    let zeitraum_neu = zeitraum(&von_at, &bis_at, tz)?;
-    let zeitraum_alt = zeitraum(&roh.von_at, &roh.bis_at, tz)?;
+    let zeitraum_neu = zeitraum(&von_at, &bis_at, stil)?;
+    let zeitraum_alt = zeitraum(&roh.von_at, &roh.bis_at, stil)?;
     let zeitraum_geaendert = von_at != roh.von_at || bis_at != roh.bis_at;
     let aenderungen = etb_text::Aenderungen {
         bezeichnung_vorher: (bezeichnung != roh.bezeichnung).then_some(roh.bezeichnung.as_str()),
@@ -1156,7 +1157,7 @@ pub async fn delete_zeitfenster_tx(
     id: i64,
     benutzer_id: i64,
     startwert: i64,
-    tz: Tz,
+    stil: Zeitstil,
 ) -> Result<Geschrieben, AppError> {
     let roh = zeitfenster_roh_tx(conn, einsatz_id, id).await?;
     let gueltig: i64 = sqlx::query_scalar(
@@ -1174,7 +1175,7 @@ pub async fn delete_zeitfenster_tx(
     }
     let inhalt = etb_text::geloescht(
         &roh.bezeichnung,
-        &zeitraum(&roh.von_at, &roh.bis_at, tz)?,
+        &zeitraum(&roh.von_at, &roh.bis_at, stil)?,
         &roh.bedarf(),
     );
     sqlx::query("DELETE FROM verpflegung_zeitfenster WHERE id = ? AND einsatz_id = ?")

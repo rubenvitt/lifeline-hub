@@ -25,7 +25,7 @@ pub enum Aenderung {
     Empfaenger { neu: String, vorher: String },
     /// Priorität nachher und vorher (Drahtwert, wie ihn die Anordnung sonst nennt).
     Prioritaet { neu: String, vorher: String },
-    /// Frist nachher und vorher, schon in der Zone des Einsatzes formatiert; `None` = keine.
+    /// Frist nachher und vorher, schon in Zone und Darstellung des Einsatzes formatiert; `None` = keine.
     Frist {
         neu: Option<String>,
         vorher: Option<String>,
@@ -38,8 +38,8 @@ fn oder_keine(w: &Option<String>) -> &str {
     w.as_deref().unwrap_or("keine")
 }
 
-/// „Auftrag #4 geändert: Priorität sofort (vorher normal), Frist 12.10. 16:00 (vorher 12.10.
-/// 15:00).“ Leere Liste gibt es nicht: ohne Änderung entsteht kein Eintrag.
+/// „Auftrag #4 geändert: Priorität sofort (vorher normal), Frist 121600okt26 (vorher
+/// 121500okt26).“ Leere Liste gibt es nicht: ohne Änderung entsteht kein Eintrag.
 pub fn geaendert(lfd_nr: Option<i64>, aenderungen: &[Aenderung]) -> String {
     let teile: Vec<String> = aenderungen
         .iter()
@@ -79,14 +79,14 @@ mod tests {
                     vorher: "normal".into(),
                 },
                 Aenderung::Frist {
-                    neu: Some("12.10. 16:00".into()),
-                    vorher: Some("12.10. 15:00".into()),
+                    neu: Some("121600okt26".into()),
+                    vorher: Some("121500okt26".into()),
                 },
             ],
         );
         assert_eq!(
             text,
-            "Auftrag #4 geändert: Priorität sofort (vorher normal), Frist 12.10. 16:00 (vorher 12.10. 15:00)."
+            "Auftrag #4 geändert: Priorität sofort (vorher normal), Frist 121600okt26 (vorher 121500okt26)."
         );
     }
 
@@ -101,10 +101,10 @@ mod tests {
                 None,
                 &[Aenderung::Frist {
                     neu: None,
-                    vorher: Some("12.10. 15:00".into())
+                    vorher: Some("121500okt26".into())
                 }]
             ),
-            "Auftrag geändert: Frist keine (vorher 12.10. 15:00)."
+            "Auftrag geändert: Frist keine (vorher 121500okt26)."
         );
     }
 

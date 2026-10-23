@@ -530,16 +530,28 @@ async fn detail_der_abloesung_nennt_einheit_und_uhrzeit_in_der_anzeigezone() {
                 .unwrap()
         }
     };
-    // Ohne Einstellung gilt die Vorgabe Europe/Berlin; die Vorwarnung nennt die Fälligkeit.
+    // Ohne Einstellung gilt die Vorgabe Europe/Berlin, taktisch (LLH-1061); die Vorwarnung
+    // nennt die Fälligkeit.
     assert_eq!(
         detail(BenachrichtigungArt::AbloesungVorwarnung).await,
-        "Florian 1, 15:30"
+        "Florian 1, 1530"
     );
     sqlx::query("INSERT INTO einsatz_einstellungen (einsatz_id, zeitzone) VALUES (?, 'UTC')")
         .bind(e)
         .execute(&pool)
         .await
         .unwrap();
+    assert_eq!(
+        detail(BenachrichtigungArt::AbloesungFaellig).await,
+        "Florian 1, 1330"
+    );
+    // Die Organisation wählt „Datum und Uhrzeit“, der Einsatz lässt die Vorgabe.
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, zeitdarstellung) VALUES (1, 'datum_uhrzeit')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         detail(BenachrichtigungArt::AbloesungFaellig).await,
         "Florian 1, 13:30"
@@ -644,7 +656,7 @@ async fn hinweis_zur_abloesenden_einheit_nennt_titel_aus_dem_bezug_und_beide_ein
     .await
     .unwrap();
     assert_eq!(t.titel, "Keine ablösende Einheit geplant");
-    assert_eq!(t.detail.as_deref(), Some("Rettungsstaffel, 15:30"));
+    assert_eq!(t.detail.as_deref(), Some("Rettungsstaffel, 1530"));
     for a in [
         BenachrichtigungArt::AbloesungPlanung,
         BenachrichtigungArt::AbloesungAbloeser,

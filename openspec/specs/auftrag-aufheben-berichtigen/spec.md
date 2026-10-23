@@ -136,7 +136,8 @@ vom Typ „Anordnung“ erzeugen, unabhängig vom Schalter „Automatische ETB-E
 lautet „Auftrag #<Nummer> geändert: <Änderungen>.“.
 
 Die Änderungen MUST je geändertem Feld den neuen und den vorherigen Wert nennen, etwa
-„Frist 12.10. 16:00 (vorher 12.10. 15:00)“. Zeiten MUST dabei in der Zeitzone des Einsatzes stehen.
+„Frist 121600okt26 (vorher 121500okt26)“. Zeiten MUST dabei in der Zeitzone des Einsatzes und in
+der Darstellung von Einsatz bzw. Organisation stehen (Spec `zeitdarstellung`, „Servertexte“).
 Ein geänderter Auftragstext MUST wörtlich mit dem neuen Wortlaut erscheinen. Das ist nötig, weil
 der Eintrag die Anordnung im ETB fortschreibt. Die Felder des Befehlsschemas MUST nur mit ihrem
 Namen erscheinen, nicht mit ihrem Inhalt.
@@ -147,7 +148,7 @@ MUST keinen Folgeauftrag tragen. Bestehende ETB-Einträge des Auftrags MUST unve
 #### Scenario: Zwei Felder geändert
 - **WHEN** an Auftrag #4 Frist und Priorität berichtigt werden
 - **THEN** steht im ETB genau eine Anordnung „Auftrag #4 geändert: Priorität sofort (vorher
-  normal), Frist 12.10. 16:00 (vorher 12.10. 15:00).“
+  normal), Frist 121600okt26 (vorher 121500okt26).“
 
 #### Scenario: Schemafeld geändert
 - **WHEN** nur das Schemafeld „Mittel“ berichtigt wird

@@ -161,7 +161,7 @@ Fällig ist eine Schicht bei Beginn plus Rhythmus. Der Rhythmus liegt zwischen e
 und 168 Stunden und erscheint als Dauer, etwa „8 h“ oder „7:30 h“. Vor der Fälligkeit erscheint der Hinweis „Ablösung steht an“, 30 Minuten vorher,
 wenn das Schichtmodell des Einsatzes nichts anderes vorgibt, bei
 Fälligkeit der Alarm „Ablösung fällig“, jeweils mit Einheit und Uhrzeit der Fälligkeit, etwa
-„Florian 1, 15:30“, und „Öffnen“ zu dieser Schicht auf der Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
+„Florian 1, 1530“ (bei „Datum und Uhrzeit“ „Florian 1, 15:30“), und „Öffnen“ zu dieser Schicht auf der Seite Ablösung. Die Zahl am Modul in der Seitenleiste zählt
 die Schichten, die bald fällig oder überfällig sind; der Überblick führt die Fälligkeiten als
 Marken.
 
