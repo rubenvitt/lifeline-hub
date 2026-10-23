@@ -1494,10 +1494,10 @@ test.describe('Gate 1 · Kräfte-Listen (LFH-975)', () => {
         ).toHaveCount(0);
 
         // Was weicht, steht im Zähler des Spaltenschalters: Träger, Ruhe und die Bemerkung
-        // (Voreinstellung), unter `xl` (1200) auch die Funktion.
+        // (Voreinstellung), unter `xxl` der Abschnitt (LLH-1096), unter `xl` (1200) die Funktion.
         await expect(
           region.getByRole('button', {
-            name: `Spalten · ${breite >= 1200 ? 3 : 4} ausgeblendet`,
+            name: `Spalten · ${breite >= 1200 ? 4 : 5} ausgeblendet`,
           }),
         ).toBeVisible();
         const ueber = await tabellenUeberlauf(region);

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -67,8 +67,21 @@ function Sicht(props: {
 
 const ids = () => new Set(gezeichnet.mock.calls.map(([id]) => id));
 
+/*
+ * Die Uhr steht mitten in einer Viertelstunde: deren Wechsel zeichnet absichtlich alles neu
+ * (`viertelstunde()` in der Garnitur). Mit echter Uhr fiel er unter Last zwischen Render und
+ * Rerender, und „nur die geänderte Zeile“ sah alle zwanzig.
+ */
+const MITTEN_IN_DER_VIERTELSTUNDE = new Date('2026-10-22T10:07:30Z');
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(MITTEN_IN_DER_VIERTELSTUNDE);
   gezeichnet.mockClear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe.each(['tabelle', 'karte'] as const)('Datensicht rendert gemerkt (%s, LFH-949)', (form) => {
@@ -103,6 +116,14 @@ describe.each(['tabelle', 'karte'] as const)('Datensicht rendert gemerkt (%s, LF
         karte={{ ...karte }}
       />,
     );
+    expect(ids().size).toBe(20);
+  });
+
+  it('der Wechsel der Viertelstunde rendert alle Zeilen', () => {
+    const { rerender } = renderMitProviders(<Sicht daten={zwanzig} form={form} />);
+    gezeichnet.mockClear();
+    vi.setSystemTime(new Date('2026-10-22T10:15:00Z'));
+    rerender(<Sicht daten={[...zwanzig]} form={form} />);
     expect(ids().size).toBe(20);
   });
 });

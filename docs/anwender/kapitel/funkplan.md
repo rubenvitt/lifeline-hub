@@ -2,7 +2,7 @@
 titel: Fernmeldewesen mit Funkplan, Fernmeldeskizze und Kommunikationsplan
 gruppen: [fuehrung]
 reihenfolge: 440
-quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/stab/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts]
+quellen: [frontend/src/pages/FunkplanPage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stab/funkplan.ts, frontend/src/stab/luecken.ts, frontend/src/stab/sprechgruppenplan.ts, frontend/src/stab/FernmeldeskizzeBild.tsx, frontend/src/stab/skizze/, frontend/src/stab/fernmeldeskizze.ts, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/stab/KommunikationsplanDialoge.tsx, frontend/src/stab/kommunikationsplan.ts, frontend/src/stab/fuehrungsstelle.ts, frontend/src/stab/einsatzleiter.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/components/SprechgruppenPicker.tsx, frontend/src/api/queryKeys.ts, src/routes/stab.rs, src/stab/kommunikation.rs, src/stab/fernmeldeskizze.rs, frontend/src/einsatz/sprungmarken.ts, frontend/src/command-palette/, frontend/src/einsatz/modulRegistry.ts, frontend/src/fernmeldewesen/FernmeldewesenReiter.tsx, frontend/src/einsatz/AltpfadWeiterleitung.tsx, frontend/src/stab/useNetzQuellen.ts, migrations/0186_fernmeldewesen_modul.sql, frontend/src/stammdaten/externeStellenVorschlaege.ts]
 ---
 
 ## Überblick
@@ -29,8 +29,10 @@ Einsatzleitung und Führungspersonal.
 
 3. Einen Namen in den Lücken oder im Plan wählen. Er führt zum Datensatz, an dem die Angabe
    fehlt: Abschnitt, Einheit oder, bei der eigenen Führungsstelle, „auf Einsatzdaten erfassen“.
-4. Dort Sprechgruppen, Kommunikationsmittel und Erreichbarkeit eintragen. Der Funkplan zeigt die
-   Änderung sofort.
+4. Dort Rufname und Sprechgruppen (Funk) sowie Telefon und weitere Verbindungen eintragen. Der
+   Funkplan zeigt die Änderung sofort.
+5. Beim Abschnitt steht in der Spalte „Rufname/OPTA“ sein „Rufname“; fehlt er, die
+   „Kurzbezeichnung“. Die Spalte „Telefon“ zeigt die Festnetz- und Mobilnummern des Datensatzes.
 
 ### Den Funkplan weitergeben
 
@@ -38,6 +40,19 @@ Einsatzleitung und Führungspersonal.
 2. „In Lagebericht übernehmen“ legt einen Lagebericht „Funkplan …“ mit dem heutigen Stand an.
 3. „In Befehl übernehmen“ legt einen Befehl an, in dem der Funkplan unter „Führung und
    Kommunikation“ steht.
+
+### Sprechgruppen vergleichen
+
+1. Im Fernmeldewesen den Reiter „Sprechgruppen“ wählen. Je Sprechgruppe stehen „Bedingung“,
+   „Hinweis“, „Herkunft“ und die „Teilnehmer“ mit ihren Rufnamen.
+2. Im Kopf der Spalte „Bedingung“ nach „TMO“ oder „DMO“ filtern, im Kopf von „Herkunft“ nach
+   „Katalog“ oder „einsatzlokal“: das Trichterzeichen öffnet die Werte zum Ankreuzen, „OK“
+   übernimmt sie. Ein Klick auf einen Spaltenkopf sortiert nach dieser Spalte, „Teilnehmer“ nach
+   ihrer Zahl; ohne Sortierung stehen TMO vor DMO.
+3. Ist die Liste eingeschränkt, steht darüber „Gefiltert“ mit der Zahl der Treffer und je Wert ein
+   Knopf, etwa „Bedingung: DMO“, der genau diesen Filter entfernt; „Filter zurücksetzen“ leert die
+   Filter. Filter und Sortierung stehen in der Adresse der Seite.
+4. Einen Teilnehmer wählen. Er führt zu seinem Datensatz, dort wird die Sprechgruppe zugeordnet.
 
 ### Die Fernmeldeskizze bearbeiten
 
@@ -118,13 +133,22 @@ Trägt die eigene Führungsstelle eine Bezeichnung, etwa „ELW 2 Musterstadt“
 neben „Führungsstelle“ und in der Skizze als eigene Zeile unter „Einsatzleitung“.
 
 Auch im Kommunikationsplan stehen Abschnitte, Einheiten und die eigene Führungsstelle nur
-abgeleitet; ihre Angaben pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
+abgeleitet, mit allen ihren Verbindungen unter „Telefon und weitere Verbindungen“; ihre Angaben
+pflegt man an ihrem Datensatz, die der Führungsstelle in „Einsatzdaten“
 (siehe [Einsatzdaten und Führungsstelle](einsatzdaten.md)). Die Führungsstelle steht dort als
 erste Zeile unter „Einsatzleitung und Stab“, sobald sie erfasst ist, mit ihrem Rufnamen und dem
 Einsatzleiter, etwa „Florian Kreis 10-1 · Einsatzleiter Anna Schulz“; ist keiner festgelegt, steht
 „Einsatzleiter nicht erfasst“. Gepflegt werden im
 Kommunikationsplan nur Stellen ohne eigenen Datensatz. Jede Führungsfunktion kommt je Einsatz
 einmal vor.
+
+### Sortieren und Filtern
+
+Nur die Liste „Sprechgruppen“ lässt sich sortieren und filtern. Der Funkplan steht in der Ordnung
+der Führungsorganisation, von der Führungsstelle über die Abschnitte bis zu Einheiten und
+Fahrzeugen, und der Kommunikationsplan in seinen vier Gruppen; diese Folge ist die Aussage. Statt
+zu filtern, klappt man Zweige und Gruppen zu. Welche Stellen ohne Sprechgruppe sind, nennen die
+„Lücken“.
 
 ### Stellen aus den Stammdaten
 
@@ -140,20 +164,21 @@ trotzdem im Plan, und über dem Plan steht „Rufnummer nicht übernommen“ mit
 ### Lücken
 
 Das Paneel „Lücken“ nennt Abschnitte und Einheiten ohne Sprechgruppe, Einheiten ohne
-Erreichbarkeit, Verbindungen ohne gemeinsame Sprechgruppe, einsatzlokale Sprechgruppen ohne
+Funkrufname, Einheiten ohne Telefon, Verbindungen ohne gemeinsame Sprechgruppe, einsatzlokale Sprechgruppen ohne
 Zuordnung, Sprechgruppen mit nur einem Teilnehmer, eine fehlende Verbindung zur Leitstelle und
 eine nicht erfasste eigene Führungsstelle. Fehlt eine Quelle, steht „—“ mit Grund statt einer 0.
 Der Kopf des Paneels zählt alle Lücken zusammen, etwa „6 Lücken“; eine Einheit ohne Sprechgruppe
-und ohne Erreichbarkeit zählt dabei zweimal, die fehlende eigene Führungsstelle nicht. Fehlt eine
+und ohne Telefon zählt dabei zweimal, die fehlende eigene Führungsstelle nicht. Fehlt eine
 Quelle, steht dort keine Zahl. Dieselbe Zahl steht auf der Seite „Stab“ am Werkzeug „Funkplan“.
 
 ### Was nicht vorkommt
 
-- Die „Erreichbarkeit“ zeigt die Tabelle am Bildschirm erst bei großer Fensterbreite, im Druck
+- Die Spalte „Telefon“ zeigt die Tabelle am Bildschirm erst bei großer Fensterbreite, im Druck
   immer, im Lagebericht nie.
 - Kontaktangaben des Personals stehen nie im Kommunikationsplan; die Besetzung einer Funktion
   steht dort nur als Nebentext.
-- Die Skizze zeigt keine Rufnummern und keine Personennamen.
+- Die Skizze zeigt keine Rufnummern und keine Personennamen; im Eigenschaftspaneel einer Stelle
+  steht nur der Rufname, Telefon und weitere Verbindungen pflegt man am Datensatz.
 - Weder Funkplan noch Skizze noch Kommunikationsplan schreiben ins Einsatztagebuch. Der
   Kommunikationsplan geht nicht in den Lagebericht; er wird gedruckt.
 

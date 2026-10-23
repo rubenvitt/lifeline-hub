@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Input } from 'antd';
 import { ApiError } from '../../api/client';
 import type { AbschnittPatch } from '../../api/einsatzabschnitte';
+import { ABSCHNITT_RUFNAME_MAX } from '../../api/eingabegrenzen';
 import { leerZuNull } from '../../api/patchTriState';
 import type { AbschnittLagezustand, Einsatzabschnitt } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
@@ -14,15 +15,11 @@ import {
   useRollen,
   type SegmentOption,
 } from '../../components/instrument';
-import {
-  KOMMUNIKATIONSMITTEL_OPTIONEN,
-  kommunikationsmittelLabel,
-  mitBetriebsart,
-  teileSprechgruppen,
-} from '../../components/kommunikationsmittel';
+import { mitBetriebsart, teileSprechgruppen } from '../../components/kommunikationsmittel';
 import { Select } from '../../components/Select';
 import { ZeilenFehler } from '../../components/SpeicherHinweis';
 import SprechgruppenPicker from '../../components/SprechgruppenPicker';
+import { VerbindungenAngabe } from '../../components/VerbindungenFeld';
 import StatusTag from '../../components/StatusTag';
 import { abschnittLagezustand, rollenFarbe } from '../../theme/statusFarben';
 import type { AbschnittStaerken } from './abschnittStaerke';
@@ -68,6 +65,11 @@ function isSameIds(a: readonly number[], b: readonly number[]): boolean {
  * Bewusst ein eigenes Bauteil neben `AbschnittDaten` (design.md D1): Vorschau und
  * Funktionsansicht lesen nur und sollen weder Personal noch Mutationen kennen.
  *
+ * Funk und Telefon stehen getrennt (LLH-1134): „Rufname“ (Funkrufname der Abschnittsleitung, vor
+ * der Kurzbezeichnung im Funkplan) und „Sprechgruppen“ sind Funk; „Telefon und weitere
+ * Verbindungen“ ist die typisierte Liste, als Ganzes ersetzt (`verbindungen`). Der Rufname ist
+ * vorerst ein Freitext; das Vorschlagsfeld „aus Stammdaten oder frei“ hängt LLH-1144 hier ein.
+ *
  * Den Über-Abschnitt ändert keine Zeile, sondern das Umhängen in der Gliederung (Ziehen oder
  * „Verschieben unter …“, LFH-1212); die Gliederung zeigt ihn.
  *
@@ -86,14 +88,19 @@ export default function AbschnittDetail({
 }: AbschnittDetailProps) {
   const textRow = (
     etikett: string,
-    feld: 'abschnittsauftrag' | 'erreichbarkeit' | 'bemerkung',
+    feld: 'abschnittsauftrag' | 'rufname' | 'bemerkung',
     mehrzeilig: boolean,
     placeholder?: string,
+    maxLength?: number,
   ) => (
     <InlineAngabe<string>
       etikett={etikett}
       wert={a[feld] ?? ''}
-      anzeige={<span style={{ whiteSpace: 'pre-wrap' }}>{a[feld]}</span>}
+      anzeige={
+        <span style={feld === 'rufname' ? monoStil(13) : { whiteSpace: 'pre-wrap' }}>
+          {a[feld]}
+        </span>
+      }
       leer={isEmptyText}
       gleich={isSameText}
       darfSchreiben={darfSchreiben}
@@ -111,6 +118,7 @@ export default function AbschnittDetail({
           <Input
             {...f}
             placeholder={placeholder}
+            maxLength={maxLength}
             value={value}
             onChange={(e) => onChange(e.target.value)}
           />
@@ -203,6 +211,15 @@ export default function AbschnittDetail({
       <Datenfeld label="Abschnittsauftrag" breit>
         {textRow('Abschnittsauftrag', 'abschnittsauftrag', true)}
       </Datenfeld>
+      <Datenfeld label="Rufname" mono>
+        {textRow(
+          'Rufname',
+          'rufname',
+          false,
+          'z. B. Rotkreuz Musterstadt 1/10-1',
+          ABSCHNITT_RUFNAME_MAX,
+        )}
+      </Datenfeld>
       <Datenfeld label="Sprechgruppen">
         <InlineAngabe<number[]>
           etikett="Sprechgruppen"
@@ -222,29 +239,15 @@ export default function AbschnittDetail({
           )}
         />
       </Datenfeld>
-      <Datenfeld label="Kommunikationsmittel">
-        <InlineAngabe<string | null>
-          etikett="Kommunikationsmittel"
-          wert={a.kommunikationsmittel ?? null}
-          anzeige={kommunikationsmittelLabel(a.kommunikationsmittel)}
-          leer={(w) => w == null}
+      <Datenfeld label="Telefon und weitere Verbindungen" breit>
+        <VerbindungenAngabe
+          etikett="Telefon und weitere Verbindungen"
+          verbindungen={a.verbindungen}
           darfSchreiben={darfSchreiben}
-          onSpeichern={(w) => onPatch('Kommunikationsmittel', { kommunikationsmittel: w })}
-          eingabe={({ feld, popup, value, onChange }) => (
-            <Select<string>
-              {...feld}
-              {...popup}
-              allowClear
-              placeholder="Digitalfunk / Mobil / Festnetz"
-              options={KOMMUNIKATIONSMITTEL_OPTIONEN}
-              value={value ?? undefined}
-              onChange={(w) => onChange(w ?? null)}
-            />
-          )}
+          onSpeichern={(liste) =>
+            onPatch('Telefon und weitere Verbindungen', { verbindungen: liste })
+          }
         />
-      </Datenfeld>
-      <Datenfeld label="Erreichbarkeit / Nummer">
-        {textRow('Erreichbarkeit / Nummer', 'erreichbarkeit', false, 'z. B. 0151 23456')}
       </Datenfeld>
       <Datenfeld label="Bemerkung">{textRow('Bemerkung', 'bemerkung', true)}</Datenfeld>
       <Datenfeld label="Stärke (F/UF/M//Σ)" mono>

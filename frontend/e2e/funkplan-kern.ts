@@ -18,7 +18,8 @@ export const ABSCHNITT = 'Deichverteidigung Nordwest II';
 export const KURZ = 'EA-NORD-2';
 export const EINHEIT = 'Fachgruppe Wasserschaden Musterstadt-Nordwest';
 export const EINHEIT_RUF = 'Florian Musterstadt 1/10';
-export const ERREICHBAR = '+49 171 1234567';
+/** Mobilnummer der Einheit (LLH-1134: typisierte Verbindung statt Freitext-Erreichbarkeit). */
+export const TELEFON = '+49 171 1234567';
 export const FAHRZEUG = 'Florian Musterstadt-Nordwest 1/42-1';
 const FUEHRER = 'Kirchgassner-Wohlfahrt, Maximiliane';
 export const LOKAL = 'DMO 999 Reserve';
@@ -34,7 +35,7 @@ export async function anmelden(page: Page) {
 export { einsatzAnlegen } from './einsatz-kern';
 
 /**
- * Ein Abschnitt mit Sprechgruppen, eine Einheit darunter mit Erreichbarkeit und ohne
+ * Ein Abschnitt mit Sprechgruppen, eine Einheit darunter mit Telefon (LLH-1134) und ohne
  * Sprechgruppe, ein Fahrzeug mit Führer in der Einheit, ein Fahrzeug ohne Einheit (Sammelknoten)
  * und eine nicht zugeordnete einsatzlokale Sprechgruppe: jede Lücke hat einen Treffer.
  */
@@ -54,14 +55,13 @@ export async function seede(page: Page, einsatzId: string) {
   const abschnitt = await post('abschnitte', {
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,
-    kommunikationsmittel: 'digitalfunk',
     sprechgruppe_ids: [tmo, dmo],
   });
   const einheit = await post('einheiten', {
     name: EINHEIT,
     funkrufname: EINHEIT_RUF,
     abschnitt_id: abschnitt,
-    erreichbarkeit: ERREICHBAR,
+    verbindungen: [{ mittel: 'mobil', wert: TELEFON }],
   });
   const fahrzeug = await post('fahrzeuge', {
     adhoc: { funkrufname: FAHRZEUG, fahrzeugtyp: 'HLF 20' },

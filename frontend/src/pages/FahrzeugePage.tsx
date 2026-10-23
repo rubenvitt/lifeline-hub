@@ -49,6 +49,7 @@ import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
 import Datensicht, { scrolleZurZeile, spaltenFuer } from '../components/Datensicht';
+import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import { ErfassungsModal } from '../components/Erfassung';
 import {
   nichtGefundenInhalt,
@@ -265,6 +266,40 @@ const ADHOC_WEITERE: readonly AdhocFeld[] = ['opta'];
 /** Einträge des Zeilenmenüs (design.md D6; „Als eigene Einheit führen“ D9). */
 type ZeilenAktion = 'entlassen' | 'angaben' | 'stamm' | 'einheit' | 'stornieren';
 
+type FahrzeugSpalteKey =
+  | 'funkrufname'
+  | 'typ'
+  | 'einheit'
+  | 'abschnitt'
+  | 'status'
+  | 'seit'
+  | 'besatzung'
+  | 'kennzeichen'
+  | 'traeger'
+  | 'bemerkung'
+  | 'aktionen';
+
+/**
+ * Was das Listengedächtnis beim Aufbau der Seite prüft (LLH-1096, `components/listenGedaechtnis.ts`):
+ * die Adresse wird beim ersten Rendern gelesen, die Spalten stehen erst mit Einsatz, Freigaben und
+ * Zeilen fest. Fest sind die Sortierachsen und der Status mit seinen Kategorien; Typ, Einheit,
+ * Abschnitt und Träger nehmen ihre Werte aus den Zeilen bzw. stehen hinter der Freigabe der
+ * Einheiten (`ausDaten`). Muss zu `spalten` passen: ein fehlender Schlüssel fiele aus der Adresse.
+ */
+const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
+  { key: 'funkrufname', sortWert: true },
+  { key: 'status', sortWert: true, filter: { werte: KATEGORIE_WERTE } },
+  { key: 'seit', sortWert: true },
+  { key: 'besatzung', sortWert: true },
+  { key: 'kennzeichen', sortWert: true },
+];
+const GEDAECHTNIS_AUS_DATEN: readonly FahrzeugSpalteKey[] = [
+  'typ',
+  'einheit',
+  'abschnitt',
+  'traeger',
+];
+
 export default function FahrzeugePage() {
   const { id } = useParams();
   const einsatzId = Number(id);
@@ -312,6 +347,16 @@ export default function FahrzeugePage() {
   // direkt (stabil, `setzeAnsicht` ist je Render neu). Geklont statt in-place gelöscht:
   // `?fahrzeug=` räumt `useQueryParamSelektion` getrennt und später.
   const [searchParams, setSearchParams] = useSearchParams();
+  /**
+   * Sortierung, Kopffilter und Suche der Liste stehen in der Adresse (LLH-1096, Muster der
+   * Schadenliste): Zurück, Neuladen und ein geteilter Link zeigen dieselbe Liste. Der Hook gehört
+   * der Seite und steht vor jedem frühen Ausstieg.
+   */
+  const gedaechtnis = useListenGedaechtnis<FahrzeugSpalteKey>('fahrzeuge', GEDAECHTNIS_SPALTEN, {
+    vorgabe: { spalte: 'funkrufname', richtung: 'auf' },
+    einsatzId,
+    ausDaten: GEDAECHTNIS_AUS_DATEN,
+  });
   useEffect(() => {
     if (!searchParams.has('ansicht')) return;
     const vorgabe = parseFahrzeugeAnsicht(searchParams);
@@ -753,6 +798,7 @@ export default function FahrzeugePage() {
       abBreite: 'xxl',
       sortWert: (ef) => ef.fahrzeugtyp,
       suchText: (ef) => ef.fahrzeugtyp,
+      filter: filterAus((ef) => ef.fahrzeugtyp ?? null),
       render: (t) => t ?? '—',
     },
     ...(einheitenFrei
@@ -801,6 +847,12 @@ export default function FahrzeugePage() {
         werte: KATEGORIE_WERTE,
         trifft: (ef, w) => kategorieVon(ef.status_kategorie) === w,
       },
+      // Nach der FMS-Ziffer des Katalogs, ohne Ziffer nach dem Wort (Ziffern vor Wörtern); die
+      // Kategorie bleibt die führende Achse (Gruppen).
+      sortWert: (ef) => {
+        const anker = ef.status_id != null ? ankerJeStatus.get(ef.status_id) : null;
+        return anker ?? ef.status_label ?? null;
+      },
       // Der Auslöser ist das Etikett, das Menü liegt im Portal — kein `Select`, dessen
       // Mindestbreite die 390-px-Karte sprengte. Der Deskriptor wird ganz gespreizt: würden
       // `optionen` und `onWaehlen` hier eigens gesetzt, könnten Tabelle und Karte unbemerkt
@@ -827,6 +879,8 @@ export default function FahrzeugePage() {
       title: 'Besatzung',
       key: 'besatzung',
       width: 320,
+      // Nach der Ist-Stärke, wie das Abzeichen sie zählt.
+      sortWert: (ef) => personal.filter((p) => p.fahrzeug_id === ef.id).length,
       render: (_, ef) => (
         <BesatzungsStaerkeBadge
           crew={personal.filter((p) => p.fahrzeug_id === ef.id)}
@@ -840,6 +894,7 @@ export default function FahrzeugePage() {
       key: 'kennzeichen',
       width: 120,
       abBreite: 'xxl',
+      sortWert: (ef) => ef.kennzeichen,
       suchText: (ef) => ef.kennzeichen,
       render: (t) => t ?? '—',
     },
@@ -849,10 +904,13 @@ export default function FahrzeugePage() {
       key: 'traeger',
       width: 160,
       abBreite: 'xxl',
+      sortWert: (ef) => ef.traegerorganisation,
       filter: traegerFilter,
       render: (t) => t ?? '—',
     },
     {
+      // Weder Sortierung noch Filter (LLH-1096): eine Notiz in Freitext ist kein Vergleichswert;
+      // gefunden wird sie über die Zeile, nicht über ihren Anfangsbuchstaben.
       title: 'Bemerkung',
       key: 'bemerkung',
       width: 200,
@@ -1003,7 +1061,8 @@ export default function FahrzeugePage() {
               ladend={efQuery.isLoading}
               leerText="Noch keine Fahrzeuge disponiert"
               suche={{ platzhalter: 'Funkrufname, Typ, Kennzeichen' }}
-              standardSortierung={{ spalte: 'funkrufname', richtung: 'auf' }}
+              mehrzahl="Fahrzeugen"
+              gedaechtnis={gedaechtnis}
               spaltenAusVoreinstellung={['bemerkung']}
               zeilenFehler={(f) => zeilen.grund(f.id)}
               gruppen={{

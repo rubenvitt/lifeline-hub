@@ -864,6 +864,7 @@ describe('Bereitstellungsraum — eigener Raum und Melden (LFH-1042)', () => {
     personal_mitglieder: [],
     material_mitglieder: [],
     sprechgruppen: [],
+    verbindungen: [],
     aktueller_br_id: br,
   });
 

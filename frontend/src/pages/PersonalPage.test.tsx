@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { Route, Routes } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { setzeViewportBreite } from '../test/viewport';
@@ -71,6 +71,7 @@ function render(
   personalDaten: unknown[] = disponiert,
   entlasseneDaten: unknown[] = [],
   einheitenDaten: unknown[] = einheiten,
+  route = '/einsaetze/7/personal',
 ) {
   server.use(
     meHandler(admin),
@@ -95,11 +96,22 @@ function render(
     ),
   );
   return renderMitProviders(
-    <Routes>
-      <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
-    </Routes>,
-    { route: '/einsaetze/7/personal' },
+    <>
+      <Ortsfuehler />
+      <Routes>
+        <Route path="/einsaetze/:id/personal" element={<PersonalPage />} />
+      </Routes>
+    </>,
+    { route },
   );
+}
+
+/** Die aktuelle Adresse, wie der Router sie hält (LLH-1096). */
+const ort = { aktuell: '' };
+function Ortsfuehler() {
+  const l = useLocation();
+  ort.aktuell = `${l.pathname}${l.search}`;
+  return null;
 }
 
 /**
@@ -681,7 +693,7 @@ describe('PersonalPage', () => {
     expect(screen.getByRole('button', { name: /Spalten · 2 ausgeblendet/ })).toBeInTheDocument();
   });
 
-  it('der Spaltenschalter meldet Träger, Ruhe und Bemerkung als ausgeblendet, als TEXT', async () => {
+  it('der Spaltenschalter meldet Träger, Ruhe, Bemerkung und (unter xxl) Abschnitt als ausgeblendet, als TEXT', async () => {
     /**
      * Kein Zähl-Abzeichen: ein antd-`Badge` mit `count` und ohne `color` rendert auf
      * `token.colorError` — Rot für einen Spaltenzähler bricht „Rot bedient nichts". Der Zähler
@@ -690,16 +702,18 @@ describe('PersonalPage', () => {
     setzeViewportBreite(1440);
     render(einsatz());
     await bereit();
-    expect(screen.getByRole('button', { name: /Spalten · 3 ausgeblendet/ })).toBeInTheDocument();
-    for (const kopf of ['Träger', 'Ruhe', 'Bemerkung']) {
+    // Abschnitt weicht unter `xxl` wie auf der Fahrzeugseite (LLH-1096).
+    expect(screen.getByRole('button', { name: /Spalten · 4 ausgeblendet/ })).toBeInTheDocument();
+    for (const kopf of ['Träger', 'Ruhe', 'Bemerkung', 'Abschnitt']) {
       expect(screen.queryByRole('columnheader', { name: kopf })).toBeNull();
     }
   });
 
   it.each([
-    [1024, 4],
-    [1366, 3],
-    [1440, 3],
+    // Je ein Platz mehr seit der Abschnitt-Spalte ab `xxl` (LLH-1096).
+    [1024, 5],
+    [1366, 4],
+    [1440, 4],
   ])(
     'bei %i px stehen Einheit, Fahrzeug und Position ohne Schalter im Bild (%i ausgeblendet, LLH-1060 D7)',
     async (breite, anzahl) => {
@@ -1259,5 +1273,62 @@ describe('PersonalPage · Disponieren im Dialog (LFH-983)', () => {
     expect(dialog.querySelector('.ant-modal-footer')).toBeNull();
     await userEvent.click(knopf);
     expect(await within(dialog).findByText('Mindestens eine Person wählen')).toBeInTheDocument();
+  });
+});
+
+/**
+ * Sortieren und Filtern im Spaltenkopf (LLH-1096, Rollout des Musters aus LLH-1086): Status,
+ * Abschnitt, Träger und Position filtern, jede vergleichbare Spalte sortiert, der Stand steht in der
+ * Adresse.
+ */
+describe('PersonalPage · Sortieren und Filtern (LLH-1096)', () => {
+  const einheitenMitAbschnitt = [
+    { ...einheiten[0], abschnitt_id: 20, abschnitt_name: 'EA Süd' },
+    { ...einheiten[0], id: 4, name: 'Staffel', abschnitt_id: 10, abschnitt_name: 'EA Nord' },
+  ];
+  const zweite = {
+    ...disponiert[0],
+    id: 11,
+    personal_id: 6,
+    name: 'Anna Berg',
+    traegerorganisation: 'ASB',
+    staerke_position: 'mannschaft',
+    einheit_id: 4,
+    fahrzeug_id: null,
+  };
+  const folge = () =>
+    [...document.querySelectorAll('tbody tr[data-row-key]')].map((z) =>
+      z.getAttribute('data-row-key'),
+    );
+
+  it('Sortieren und Filtern ändern die Menge und die Adresse', async () => {
+    setzeViewportBreite(1600);
+    render(einsatz(), [disponiert[0], zweite], [], einheitenMitAbschnitt);
+    await bereit('Anna Berg');
+
+    await kopfFilterWaehlen('Abschnitt', ['EA Nord (1)']);
+    await waitFor(() => expect(folge()).toEqual(['11']));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/personal?f.abschnitt=EA%2520Nord'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() => expect(folge()).toHaveLength(2));
+    await userEvent.click(screen.getByRole('columnheader', { name: /^Position/ }));
+    await waitFor(() => expect(ort.aktuell).toBe('/einsaetze/7/personal?sort=position%3Aauf'));
+  });
+
+  it('eine Adresse mit Filter zeigt dieselbe Liste', async () => {
+    setzeViewportBreite(1600);
+    render(
+      einsatz(),
+      [disponiert[0], zweite],
+      [],
+      einheitenMitAbschnitt,
+      '/einsaetze/7/personal?f.position=mannschaft',
+    );
+    await screen.findByText('Anna Berg');
+    expect(screen.queryByText('Thomas Müller')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Filter Position: Mannschaft entfernen' }),
+    ).toBeInTheDocument();
   });
 });

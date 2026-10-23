@@ -88,7 +88,6 @@ function aktionenAttrappe() {
     entferneBereich: vi.fn(async () => {}),
     setzeSchriftfeld: vi.fn(),
     setzeRufname: vi.fn(async () => {}),
-    setzeKommunikationsmittel: vi.fn(async () => {}),
   } satisfies SkizzenAktionen;
 }
 

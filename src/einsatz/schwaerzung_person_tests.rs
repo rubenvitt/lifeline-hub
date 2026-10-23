@@ -68,6 +68,23 @@ fn befund_bezuege(kanten: &[Kante], bezuege: &[PersonenBezug]) -> Vec<String> {
         }
     }
     for b in bezuege {
+        if let Bezug::Ueber { spalte, eltern, fk } = b.bezug {
+            let zum_eltern = kanten
+                .iter()
+                .any(|(t, sp, p)| t == b.tabelle && sp == spalte && p == eltern);
+            let zur_person = kanten
+                .iter()
+                .any(|(t, sp, p)| t == eltern && sp == fk && p == b.art.wurzel());
+            if !zum_eltern || !zur_person {
+                befund.push(format!(
+                    "{}.{spalte} → {eltern}.{fk} ist als Bezug von {} deklariert, ist aber keine \
+                     FK-Kette auf {}",
+                    b.tabelle,
+                    b.art.as_str(),
+                    b.art.wurzel()
+                ));
+            }
+        }
         if let Bezug::Spalte(s) = b.bezug {
             let echt = kanten
                 .iter()
@@ -244,6 +261,45 @@ async fn guard_bezuege_erkennt_sonde_entfernten_und_toten_bezug() {
     assert!(befund_bezuege(&k, &tot)
         .iter()
         .any(|v| v.contains("halter_id_tippfehler")));
+
+    // LLH-1134: eine Kette über einen Datensatz, deren zweite Kante nicht auf die Wurzel zeigt.
+    let mut kette = PERSONENBEZUEGE.to_vec();
+    kette.push(PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "einsatz_verbindung",
+        bezug: Bezug::Ueber {
+            spalte: "abschnitt_id",
+            eltern: "einsatzabschnitt",
+            fk: "ueber_abschnitt_id",
+        },
+        spalten: &[],
+    });
+    assert!(befund_bezuege(&k, &kette)
+        .iter()
+        .any(|v| v.contains("einsatzabschnitt.ueber_abschnitt_id")));
+}
+
+/// Akzeptanzkriterium LLH-1134: der Vollzug für eine externe Kraft nimmt die Verbindungen der
+/// Abschnitte, die sie leitet, und der Einheiten, die sie führt, samt Hinweis; Mittel und
+/// Reihenfolge bleiben, die Verbindung einer anderen Leitung bleibt ganz.
+#[tokio::test]
+async fn scrub_externe_kraft_nimmt_verbindungen_ihrer_abschnitte_und_einheiten() {
+    let pool = crate::db::test_pool().await;
+    let b = testdaten::anlegen(&pool).await;
+    scrub(&pool, b.e1, PersonenArt::ExterneKraft, b.k1).await;
+    let zeilen: Vec<(String, String, Option<String>)> =
+        sqlx::query_as("SELECT mittel, wert, hinweis FROM einsatz_verbindung ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        zeilen,
+        [
+            ("mobil".into(), SCHWAERZUNG_PLATZHALTER.into(), None),
+            ("festnetz".into(), SCHWAERZUNG_PLATZHALTER.into(), None),
+            ("mobil".into(), "Grete Mobil 0175".into(), None),
+        ]
+    );
 }
 
 /// Selbsttest GUARD 2+3: unmarkierte Scrub-Spalte, markierte Retain-Spalte und `Ohne` an der

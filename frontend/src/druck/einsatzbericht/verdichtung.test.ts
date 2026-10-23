@@ -147,7 +147,7 @@ describe('3.1 Stammdaten, Zeiten, Führung', () => {
       rohBericht({
         fuehrungsstelle: {
           zustand: 'daten',
-          daten: { art: 'mobil', sprechgruppen: [], fahrzeug_ids: [] },
+          daten: { art: 'mobil', sprechgruppen: [], verbindungen: [], fahrzeug_ids: [] },
         },
       }),
       konv,

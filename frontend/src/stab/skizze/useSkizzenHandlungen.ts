@@ -598,17 +598,6 @@ export function useSkizzenHandlungen(
     [tue, name, pflicht],
   );
 
-  const setzeKommunikationsmittel = useCallback(
-    (stelle: string, neu: string | null, alt: string | null) =>
-      tue({
-        beschreibung: `Kommunikationsmittel von ${name(stelle)}`,
-        element: stelle,
-        ausfuehren: () => pflicht().setzeKommunikationsmittel(stelle, neu),
-        zuruecknehmen: () => pflicht().setzeKommunikationsmittel(stelle, alt),
-      }),
-    [tue, name, pflicht],
-  );
-
   // ── Rückgängig ────────────────────────────────────────────────────────────────────────────
   const schritt = useCallback(
     async (richtung: 'rueckgaengig' | 'wiederholen') => {
@@ -691,7 +680,6 @@ export function useSkizzenHandlungen(
     entferneBereich,
     setzeSchriftfeld,
     setzeRufname,
-    setzeKommunikationsmittel,
     rueckgaengig: () => schritt('rueckgaengig'),
     wiederholen: () => schritt('wiederholen'),
   };

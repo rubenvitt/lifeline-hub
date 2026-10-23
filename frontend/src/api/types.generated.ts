@@ -1780,8 +1780,6 @@ export interface components {
             bemerkung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
-            /** @description Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz). */
-            erreichbarkeit?: string | null;
             fahrzeug_mitglieder: components["schemas"]["EinheitMitgliedFahrzeug"][];
             /** Format: int64 */
             fuehrer_id?: number | null;
@@ -1796,8 +1794,6 @@ export interface components {
             id: number;
             ist: components["schemas"]["Staerke"];
             ist_kumuliert: components["schemas"]["Staerke"];
-            /** @description Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz). */
-            kommunikationsmittel?: string | null;
             /** Format: double */
             lat?: number | null;
             /** Format: double */
@@ -1831,6 +1827,11 @@ export interface components {
             ueber_einheit_id?: number | null;
             /** @description Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3). */
             unangemeldet: boolean;
+            /**
+             * @description Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
+             *     Personenbezogen: geschwärzt, nie im Lagebericht.
+             */
+            verbindungen: components["schemas"]["KommunikationsVerbindung"][];
         };
         /** @description Fahrzeug-Mitglied einer Einheit (leichtgewichtig). */
         EinheitMitgliedFahrzeug: {
@@ -2366,11 +2367,9 @@ export interface components {
             bemerkung?: string | null;
             /** Format: int64 */
             einsatz_id: number;
-            erreichbarkeit?: string | null;
             flaeche_geojson?: string | null;
             /** Format: int64 */
             id: number;
-            kommunikationsmittel?: string | null;
             /** @description Kurzbezeichnung/Rufname im Einsatz, z. B. „EA-N" (LFH-608); je Einsatz eindeutig. */
             kurzbezeichnung?: string | null;
             lagezustand?: components["schemas"]["AbschnittLagezustand"] | null;
@@ -2379,6 +2378,11 @@ export interface components {
             /** @description Name der disponierten Leiter-Person (aufgelöst), falls gesetzt. */
             leiter_name?: string | null;
             name: string;
+            /**
+             * @description Funkrufname der Abschnittsleitung (LLH-1134), z. B. „Florian Musterstadt 1/10-1“; der
+             *     Funkplan nimmt ihn vor der Kurzbezeichnung.
+             */
+            rufname?: string | null;
             /** Format: int64 */
             sortier: number;
             /** @description Historischer Freitext-Wert (eingefroren; nicht mehr schreibbar). */
@@ -2391,6 +2395,11 @@ export interface components {
             tz_organisation?: string | null;
             /** Format: int64 */
             ueber_abschnitt_id?: number | null;
+            /**
+             * @description Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
+             *     Personenbezogen: geschwärzt, nie im Lagebericht.
+             */
+            verbindungen: components["schemas"]["KommunikationsVerbindung"][];
         };
         /**
          * @description Einsatzart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `einsatzart`.
@@ -3115,16 +3124,12 @@ export interface components {
             /** @description Name der Stelle, z. B. „ELW 2 Musterstadt“ oder „TEL Rathaus“. */
             bezeichnung?: string | null;
             einsatzleiter?: components["schemas"]["EinsatzleiterAnzeige"] | null;
-            /** @description Personenbezogen: wird geschwärzt und steht nie im Lagebericht. */
-            erreichbarkeit?: string | null;
             /**
              * @description Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.
              *     Nur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul
              *     Fahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“).
              */
             fahrzeug_ids: number[];
-            /** @description Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`). */
-            kommunikationsmittel?: string | null;
             /** @description Funkrufname der Führungsstelle, z. B. „Florian Musterstadt 10/1“. */
             rufname?: string | null;
             /**
@@ -3144,6 +3149,11 @@ export interface components {
              * @description Länge zur Breite `standort_lat`, nur als Paar gesetzt.
              */
             standort_lon?: number | null;
+            /**
+             * @description Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.
+             *     Personenbezogen: wird geschwärzt und steht nie im Lagebericht.
+             */
+            verbindungen: components["schemas"]["KommunikationsVerbindung"][];
         };
         /**
          * @description Art der Führungsstelle (FwDV 100): `mobil` (ELW, Führungsfahrzeug) oder `ortsfest`
@@ -6168,9 +6178,9 @@ export interface components {
         /**
          * @description Mittel einer Verbindung. Wire == `as_str()`.
          *
-         *     Bewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine
-         *     Erreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder
-         *     Einzelrufnummer ist `sonstiges` mit Hinweis.
+         *     Seit LLH-1134 auch die Verbindungen an Abschnitt, Einheit und Führungsstelle
+         *     (`einsatz::verbindungen`). Funk steht im Funkplan; eine ISSI oder Einzelrufnummer ist
+         *     `sonstiges` mit Hinweis.
          * @enum {string}
          */
         Verbindungsmittel: "festnetz" | "mobil" | "fax" | "email" | "messenger" | "melder" | "sonstiges";

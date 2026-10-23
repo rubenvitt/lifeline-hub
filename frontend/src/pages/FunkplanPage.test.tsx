@@ -20,6 +20,7 @@ import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';
 import { ladeStab } from '../api/stab';
 import { ApiError } from '../api/client';
 import { freigabenFixture } from '../test/fixtures';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 import type {
   Einheit,
   EinsatzAnzeige,
@@ -108,12 +109,11 @@ const ABSCHNITTE: Einsatzabschnitt[] = [
     name: 'Abschnitt Nord',
     kurzbezeichnung: 'EA-N',
     leiter_name: 'Anna Leiter',
-    kommunikationsmittel: 'digitalfunk',
-    erreichbarkeit: '0171 111',
+    verbindungen: [{ id: 1, mittel: 'mobil', wert: '0171 111', hinweis: null }],
     sortier: 1,
     sprechgruppen: [sg(1, 'TMO', 'TMO 311'), sg(2, 'DMO', 'DMO 505')],
   },
-  { id: 2, einsatz_id: 1, name: 'Abschnitt Süd', sortier: 2, sprechgruppen: [] },
+  { id: 2, einsatz_id: 1, name: 'Abschnitt Süd', sortier: 2, sprechgruppen: [], verbindungen: [] },
 ];
 
 const EINHEITEN = [
@@ -124,7 +124,7 @@ const EINHEITEN = [
     funkrufname: 'Florian 1/10',
     fuehrer_name: 'Bernd Führer',
     abschnitt_id: 1,
-    erreichbarkeit: '0160 GEHEIM',
+    verbindungen: [{ id: 2, mittel: 'mobil', wert: '0160 GEHEIM', hinweis: null }],
     sortier: 1,
     unangemeldet: false,
     sprechgruppen: [],
@@ -192,6 +192,7 @@ beforeEach(() => {
   vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
     art: 'mobil',
     sprechgruppen: [],
+    verbindungen: [],
     fahrzeug_ids: [],
   });
   vi.mocked(ladeKommunikationsplan).mockResolvedValue([]);
@@ -251,20 +252,15 @@ describe('FunkplanPage — Tabelle', () => {
     ).toBeInTheDocument();
     await screen.findByText('Florian 1/42-1');
     const kopf = [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
-    expect(kopf.slice(0, 6)).toEqual([
-      'Stelle',
-      'Rufname/OPTA',
-      'Leiter/Führer',
-      'TMO',
-      'DMO',
-      'Kommunikationsmittel',
-    ]);
+    // LLH-1134: keine Spalte „Kommunikationsmittel“ mehr; „Telefon“ erst ab `xl` (hier schmal).
+    expect(kopf.slice(0, 5)).toEqual(['Stelle', 'Rufname/OPTA', 'Leiter/Führer', 'TMO', 'DMO']);
+    expect(kopf).not.toContain('Kommunikationsmittel');
+    expect(kopf).not.toContain('Telefon');
     const nord = container.querySelector('tr[data-row-key="ab-1"]') as HTMLElement;
     expect(within(nord).getByText('EA-N')).toBeInTheDocument();
     expect(within(nord).getByText('Anna Leiter')).toBeInTheDocument();
     expect(within(nord).getByText('TMO 311')).toBeInTheDocument();
     expect(within(nord).getByText('DMO 505')).toBeInTheDocument();
-    expect(within(nord).getByText('Digitalfunk')).toBeInTheDocument();
     const fz = container.querySelector('tr[data-row-key="fz-100"]') as HTMLElement;
     expect(within(fz).getByText('FW-1-42-1')).toBeInTheDocument();
     expect(within(fz).getByText('Clara Führerin')).toBeInTheDocument();
@@ -319,9 +315,10 @@ describe('FunkplanPage — Lücken und Rechteweiche', () => {
       'href',
       '/einsaetze/1/einheiten/10',
     );
-    expect(
-      within(lueckenZeile('Einheiten ohne Erreichbarkeit')).getByText('0'),
-    ).toBeInTheDocument();
+    // LLH-1134: Funk und Telefon getrennt — zwei Lücken statt „ohne Erreichbarkeit“.
+    expect(within(lueckenZeile('Einheiten ohne Funkrufname')).getByText('0')).toBeInTheDocument();
+    expect(within(lueckenZeile('Einheiten ohne Telefon')).getByText('0')).toBeInTheDocument();
+    expect(within(luecken()).queryByText(/Erreichbarkeit/)).toBeNull();
     const lokal = lueckenZeile('Einsatzlokale Sprechgruppen ohne Zuordnung');
     expect(within(lokal).getByText('1')).toBeInTheDocument();
     expect(within(lokal).getByText('DMO 999')).toBeInTheDocument();
@@ -357,7 +354,8 @@ describe('FunkplanPage — Lücken und Rechteweiche', () => {
     await screen.findByText('Florian ELW 1');
     for (const titel of [
       'Einheiten ohne Sprechgruppe',
-      'Einheiten ohne Erreichbarkeit',
+      'Einheiten ohne Funkrufname',
+      'Einheiten ohne Telefon',
       'Einsatzlokale Sprechgruppen ohne Zuordnung',
     ]) {
       const zeile = lueckenZeile(titel);
@@ -383,7 +381,7 @@ describe('FunkplanPage — Lücken und Rechteweiche', () => {
 });
 
 describe('FunkplanPage — Übernahme in den Lagebericht', () => {
-  it('legt EINEN Freitext-Bericht mit dem Funkplan an, ohne Erreichbarkeit, und öffnet ihn', async () => {
+  it('legt EINEN Freitext-Bericht mit dem Funkplan an, ohne Telefon, und öffnet ihn', async () => {
     setup();
     await screen.findByText('Florian 1/42-1');
     fireEvent.click(screen.getByRole('button', { name: /In Lagebericht übernehmen/ }));
@@ -804,8 +802,11 @@ describe('FunkplanPage — Darstellung Skizze (LFH-625)', () => {
     ) as HTMLElement;
     expect(anlage).not.toBeNull();
     expect(within(anlage).getByText('Anlage: Funkplan')).toBeInTheDocument();
-    // Ganz offen: das Fahrzeug unter der Einheit steht da, samt Erreichbarkeit (Druck).
+    // Ganz offen: das Fahrzeug unter der Einheit steht da, samt Spalte „Telefon“ (Druck, LLH-1134).
     expect(anlage.querySelector('tr[data-row-key="fz-100"]')).not.toBeNull();
+    expect([...anlage.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent)).toContain(
+      'Telefon',
+    );
     expect(within(anlage).getByText('0160 GEHEIM')).toBeInTheDocument();
     // Das Blatt trägt das Papierformat der Skizze (A3 quer als Vorgabe), die Anlage nicht.
     const blatt = container.querySelector('.lfh-skizze-druck-a3') as HTMLElement;
@@ -1092,6 +1093,34 @@ describe('FunkplanPage — Darstellung Sprechgruppen (LFH-848)', () => {
     expect(await screen.findByText(/Modul Fernmeldewesen nicht freigegeben/)).toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Sprechgruppen' })).toBeNull();
   });
+
+  /**
+   * Sortieren und Filtern im Spaltenkopf (LLH-1096): die flache Kanalbelegung ist eine
+   * Vergleichstabelle („wer funkt auf 311?“) und folgt dem Muster der Schadenliste. Die
+   * Funkplan-Tabelle selbst ist ein Baum und bleibt ohne (Kommentar an der Sicht).
+   */
+  it('Sortieren und Filtern ändern die Menge und die Adresse (LLH-1096)', async () => {
+    rendereMit('/einsaetze/1/fernmeldewesen?ansicht=sprechgruppen');
+    const folge = () =>
+      [...plan().querySelectorAll('tr[data-row-key^="sg-"]')].map((z) =>
+        z.getAttribute('data-row-key'),
+      );
+    await waitFor(() => expect(folge()).toEqual(['sg-1', 'sg-2', 'sg-9']));
+    expect(screen.getByRole('button', { name: /^Herkunft filtern/ })).toBeInTheDocument();
+
+    await kopfFilterWaehlen('Bedingung', ['DMO (2)']);
+    await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9']));
+    await waitFor(() => expect(screen.getByTestId('suche')).toHaveTextContent('?f.bedingung=DMO'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    await waitFor(() => expect(folge()).toHaveLength(3));
+
+    await userEvent.click(within(plan()).getByRole('columnheader', { name: /^Sprechgruppe/ }));
+    await waitFor(() => expect(folge()).toEqual(['sg-2', 'sg-9', 'sg-1']));
+    await waitFor(() =>
+      expect(screen.getByTestId('suche')).toHaveTextContent('?sort=sprechgruppe%3Aauf'),
+    );
+  });
 });
 
 describe('FunkplanPage — Lücke „Verbindungen ohne gemeinsame Sprechgruppe“ (LFH-625)', () => {
@@ -1125,8 +1154,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     art: 'mobil' as const,
     rufname: 'Florian Stadt 10/1',
     sprechgruppen: [sg(1, 'TMO', 'TMO 311')],
-    kommunikationsmittel: 'digitalfunk',
-    erreichbarkeit: '0171 ELW',
+    verbindungen: [{ id: 5, mittel: 'festnetz' as const, wert: '0171 ELW', hinweis: null }],
     fahrzeug_ids: [],
   };
 
@@ -1146,7 +1174,6 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
       '/einsaetze/1/einsatzdaten',
     );
     expect(within(fs).getByText('TMO 311')).toBeInTheDocument();
-    expect(within(fs).getByText('Digitalfunk')).toBeInTheDocument();
     expect(within(luecken()).queryByText(/Eigene Gegenstelle/)).toBeNull();
   });
 
@@ -1186,6 +1213,7 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue({
       art: 'mobil',
       sprechgruppen: [sg(7, 'TMO', 'TMO 700')],
+      verbindungen: [],
       fahrzeug_ids: [],
     });
     setup();
@@ -1198,16 +1226,14 @@ describe('FunkplanPage — eigene Führungsstelle (LFH-849)', () => {
     );
   });
 
-  it('übernimmt die Führungsstelle ohne ihre Erreichbarkeit in den Lagebericht', async () => {
+  it('übernimmt die Führungsstelle ohne ihr Telefon in den Lagebericht', async () => {
     vi.mocked(ladeFuehrungsstelle).mockResolvedValue(FS);
     setup();
     await screen.findByText('Florian Stadt 10/1');
     await userEvent.click(screen.getByRole('button', { name: /In Lagebericht übernehmen/ }));
     await waitFor(() => expect(legeLageberichtAn).toHaveBeenCalledTimes(1));
     const text = vi.mocked(legeLageberichtAn).mock.calls[0][1].abschnitte![0].text as string;
-    expect(text).toContain(
-      '- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO 311 · Digitalfunk',
-    );
+    expect(text).toContain('- **Führungsstelle** · Rufname Florian Stadt 10/1 · TMO 311\n');
     expect(text).not.toContain('0171 ELW');
   });
 });

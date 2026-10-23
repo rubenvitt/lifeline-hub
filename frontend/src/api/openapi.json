@@ -4410,6 +4410,7 @@
           "fahrzeug_mitglieder",
           "material_mitglieder",
           "sprechgruppen",
+          "verbindungen",
           "status",
           "unangemeldet"
         ],
@@ -4459,13 +4460,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "erreichbarkeit": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Funk/Kommunikation (LFH-108): Rufnummer/Freitext (PII → schwaerze_einsatz)."
-          },
           "fahrzeug_mitglieder": {
             "type": "array",
             "items": {
@@ -4501,13 +4495,6 @@
           },
           "ist_kumuliert": {
             "$ref": "#/components/schemas/Staerke"
-          },
-          "kommunikationsmittel": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Funk/Kommunikation (LFH-108): Freitext-Schlüssel (digitalfunk/mobil/festnetz)."
           },
           "lat": {
             "type": [
@@ -4612,6 +4599,13 @@
           "unangemeldet": {
             "type": "boolean",
             "description": "Herkunft: unangemeldet am Bereitstellungsraum erfasst, dauerhaft (D3)."
+          },
+          "verbindungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KommunikationsVerbindung"
+            },
+            "description": "Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.\nPersonenbezogen: geschwärzt, nie im Lagebericht."
           }
         }
       },
@@ -5954,7 +5948,8 @@
           "einsatz_id",
           "name",
           "sortier",
-          "sprechgruppen"
+          "sprechgruppen",
+          "verbindungen"
         ],
         "properties": {
           "abschnittsauftrag": {
@@ -5974,12 +5969,6 @@
             "type": "integer",
             "format": "int64"
           },
-          "erreichbarkeit": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "flaeche_geojson": {
             "type": [
               "string",
@@ -5989,12 +5978,6 @@
           "id": {
             "type": "integer",
             "format": "int64"
-          },
-          "kommunikationsmittel": {
-            "type": [
-              "string",
-              "null"
-            ]
           },
           "kurzbezeichnung": {
             "type": [
@@ -6030,6 +6013,13 @@
           },
           "name": {
             "type": "string"
+          },
+          "rufname": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Funkrufname der Abschnittsleitung (LLH-1134), z. B. „Florian Musterstadt 1/10-1“; der\nFunkplan nimmt ihn vor der Kurzbezeichnung."
           },
           "sortier": {
             "type": "integer",
@@ -6074,6 +6064,13 @@
               "null"
             ],
             "format": "int64"
+          },
+          "verbindungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KommunikationsVerbindung"
+            },
+            "description": "Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.\nPersonenbezogen: geschwärzt, nie im Lagebericht."
           }
         }
       },
@@ -7837,6 +7834,7 @@
         "required": [
           "art",
           "sprechgruppen",
+          "verbindungen",
           "fahrzeug_ids"
         ],
         "properties": {
@@ -7862,13 +7860,6 @@
               }
             ]
           },
-          "erreichbarkeit": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Personenbezogen: wird geschwärzt und steht nie im Lagebericht."
-          },
           "fahrzeug_ids": {
             "type": "array",
             "items": {
@@ -7876,13 +7867,6 @@
               "format": "int64"
             },
             "description": "Dispositionszeilen (`einsatz_fahrzeug.id`), die die Führungsstelle tragen, aufsteigend.\nNur IDs: die Führungsstelle liest jeder mit dem Einsatz, Fahrzeugdaten nur das Modul\nFahrzeuge (LFH-1106; Spec `einsatz-fuehrungsstelle`, „Fahrzeuge der Führungsstelle“)."
-          },
-          "kommunikationsmittel": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Kommunikationsart-Schlüssel (`routes::support::KOMMUNIKATIONSMITTEL`)."
           },
           "rufname": {
             "type": [
@@ -7920,6 +7904,13 @@
             ],
             "format": "double",
             "description": "Länge zur Breite `standort_lat`, nur als Paar gesetzt."
+          },
+          "verbindungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KommunikationsVerbindung"
+            },
+            "description": "Telefon und weitere Verbindungen außerhalb des Funks (LLH-1134), in Eingabefolge.\nPersonenbezogen: wird geschwärzt und steht nie im Lagebericht."
           }
         }
       },
@@ -15637,7 +15628,7 @@
       },
       "Verbindungsmittel": {
         "type": "string",
-        "description": "Mittel einer Verbindung. Wire == `as_str()`.\n\nBewusst getrennt von `KOMMUNIKATIONSMITTEL` an Abschnitt und Einheit (drei Schlüssel, eine\nErreichbarkeit je Datensatz, design.md D2). Funk steht im Funkplan; eine ISSI oder\nEinzelrufnummer ist `sonstiges` mit Hinweis.",
+        "description": "Mittel einer Verbindung. Wire == `as_str()`.\n\nSeit LLH-1134 auch die Verbindungen an Abschnitt, Einheit und Führungsstelle\n(`einsatz::verbindungen`). Funk steht im Funkplan; eine ISSI oder Einzelrufnummer ist\n`sonstiges` mit Hinweis.",
         "enum": [
           "festnetz",
           "mobil",

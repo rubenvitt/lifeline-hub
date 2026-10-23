@@ -457,7 +457,9 @@ test('Einheit: Zeilenauslöser und Zuordnungszeilen halten 30 / 48 / 72 px und d
         exact: true,
       }),
     });
-    expect(ziele).toHaveLength(21);
+    // 12 Angaben (LLH-1134: „Telefon und weitere Verbindungen“ statt Kommunikationsmittel und
+    // Erreichbarkeit), 7 Zuordnungsziele, „Einheit auflösen“.
+    expect(ziele).toHaveLength(20);
     let minimum = Infinity;
     const miss = async (name: string, ziel: Locator) => {
       const hoehe = await haeltStufe(ziel, soll, `${name} (${dichte})`);
@@ -1709,7 +1711,10 @@ test('Presse S5 (Beobachter): Titel-Link und „Vermisste ↗“ folgen der Staf
 
 /** Abschnitt, Einheit und Fahrzeug: drei Titel-Links in der Tabelle. */
 const FUNKPLAN_TITEL_LINKS = 3;
-/** Abschnitt ohne Sprechgruppe, Einheit ohne Sprechgruppe, Einheit ohne Erreichbarkeit. */
+/**
+ * Mindestens: Abschnitt ohne Sprechgruppe, Einheit ohne Sprechgruppe, Einheit ohne Telefon (seit
+ * LLH-1134 zusätzlich Einheit ohne Funkrufname).
+ */
 const FUNKPLAN_LUECKEN_LINKS = 3;
 
 async function funkplanSaeen(page: Page, einsatzId: string) {
@@ -1928,7 +1933,7 @@ async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
   );
   expect(verbindung.ok(), `Seeding Verbindung: ${await verbindung.text()}`).toBeTruthy();
   const abschnitt = await page.request.post(`${basis}/abschnitte`, {
-    data: { name: 'Abschnitt Nord', kommunikationsmittel: 'mobil', erreichbarkeit: '0170 1' },
+    data: { name: 'Abschnitt Nord', verbindungen: [{ mittel: 'mobil', wert: '0170 1' }] },
   });
   expect(abschnitt.ok(), `Seeding Abschnitt: ${await abschnitt.text()}`).toBeTruthy();
 }

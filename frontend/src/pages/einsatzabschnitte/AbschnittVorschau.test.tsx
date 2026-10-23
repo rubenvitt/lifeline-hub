@@ -73,7 +73,9 @@ describe('AbschnittVorschau (LFH-664)', () => {
     expect(screen.getByText('Deich an der Mühle halten')).toBeInTheDocument();
     // Einen Fortschritt trägt der Abschnitt nicht (LFH-1208, LLH-1170).
     expect(screen.queryByText('Fortschritt')).not.toBeInTheDocument();
-    expect(screen.getByText('keine Funk-Angaben')).toBeInTheDocument();
+    // Funk und Telefon getrennt (LLH-1134); ohne Angabe je „—“.
+    expect(feldwert('Funk')).toHaveTextContent('—');
+    expect(feldwert('Telefon')).toHaveTextContent('—');
     expect(screen.getByText('Zufahrt nur über Norden')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });

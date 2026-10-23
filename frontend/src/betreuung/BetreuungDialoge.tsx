@@ -621,8 +621,8 @@ export function StelleAnlegenDialog({
           </Form.Item>
           <Form.Item
             name="erreichbarkeit"
-            label="Erreichbarkeit"
-            rules={[zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Erreichbarkeit')]}
+            label="Kontakt"
+            rules={[zeichenRegel(BETREUUNG_ERREICHBARKEIT_MAX, 'Kontakt')]}
           >
             <Input count={zeichenGrenze(BETREUUNG_ERREICHBARKEIT_MAX)} />
           </Form.Item>

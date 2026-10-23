@@ -32,9 +32,8 @@ const ab = (id: number, ueber: number | null = null, name = `A${id}`): Einsatzab
   tz_organisation: null,
   sprechgruppe_tmo: null,
   sprechgruppe_dmo: null,
-  kommunikationsmittel: null,
-  erreichbarkeit: null,
   sprechgruppen: [],
+  verbindungen: [],
 });
 const eh = (
   id: number,
@@ -65,6 +64,7 @@ const eh = (
   tz_organisation: null,
   aktueller_br_id: null,
   sprechgruppen: [],
+  verbindungen: [],
   status: { quelle: 'ohne', verteilung: [] },
   unangemeldet: false,
 });

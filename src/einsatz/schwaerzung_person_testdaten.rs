@@ -31,6 +31,10 @@ pub const ZIEL_KLARTEXTE: &[&str] = &[
     "Pegelstand Deichstraße",
     "Pegel sinkt seit Mittag",
     "EL Brandt",
+    // LLH-1134: Verbindungen an Abschnitt und Einheit der Zielperson.
+    "Hans Mobil 0173",
+    "Hans nur tagsüber",
+    "Hans Festnetz 0174",
 ];
 
 /// Klartexte der Nachbarn — müssen nach einem Personen-Vollzug stehen bleiben.
@@ -46,6 +50,7 @@ pub const NACHBAR_KLARTEXTE: &[&str] = &[
     "Anderer Einsatz Meier",
     "Mustermann-Ausweis.pdf",
     "Meier-Foto-E2.jpg",
+    "Grete Mobil 0175",
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -292,11 +297,48 @@ pub async fn anlegen_mit_status(pool: &SqlitePool, status_e1: &str) -> Bestand {
         &[e1, k1, leitung],
     )
     .await;
-    exec(
+    let ea_nord = id(
         pool,
         "INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id, erreichbarkeit, bemerkung) \
-         VALUES (?, 'EA Nord', ?, 'Hans Funk 0172', 'Deich halten')",
+         VALUES (?, 'EA Nord', ?, 'Hans Funk 0172', 'Deich halten') RETURNING id",
         &[e1, k1],
+    )
+    .await;
+    // LLH-1134: Verbindungen an Abschnitt und Einheit hängen an der führenden Person, wie früher
+    // die Erreichbarkeit; die des Abschnitts einer anderen Leitung bleiben.
+    let zug_hans = id(
+        pool,
+        "INSERT INTO einsatz_einheit (einsatz_id, name, fuehrer_id) \
+         VALUES (?, 'Zug Hans', ?) RETURNING id",
+        &[e1, k1],
+    )
+    .await;
+    let ea_sued = id(
+        pool,
+        "INSERT INTO einsatzabschnitt (einsatz_id, name, leiter_id) \
+         VALUES (?, 'EA Süd', ?) RETURNING id",
+        &[e1, k2],
+    )
+    .await;
+    exec(
+        pool,
+        "INSERT INTO einsatz_verbindung (einsatz_id, bezug, abschnitt_id, mittel, wert, hinweis, \
+            sortier) VALUES (?, 'abschnitt', ?, 'mobil', 'Hans Mobil 0173', 'Hans nur tagsüber', 1)",
+        &[e1, ea_nord],
+    )
+    .await;
+    exec(
+        pool,
+        "INSERT INTO einsatz_verbindung (einsatz_id, bezug, einheit_id, mittel, wert, sortier) \
+         VALUES (?, 'einheit', ?, 'festnetz', 'Hans Festnetz 0174', 1)",
+        &[e1, zug_hans],
+    )
+    .await;
+    exec(
+        pool,
+        "INSERT INTO einsatz_verbindung (einsatz_id, bezug, abschnitt_id, mittel, wert, sortier) \
+         VALUES (?, 'abschnitt', ?, 'mobil', 'Grete Mobil 0175', 1)",
+        &[e1, ea_sued],
     )
     .await;
 

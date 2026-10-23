@@ -598,6 +598,7 @@ describe('baueFuehrungsstelleMarker (LFH-1181)', () => {
   const fs = (p: Partial<Fuehrungsstelle> = {}): Fuehrungsstelle => ({
     art: 'mobil',
     sprechgruppen: [],
+    verbindungen: [],
     fahrzeug_ids: [],
     ...p,
   });

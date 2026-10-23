@@ -5,7 +5,6 @@ import {
   EINHEIT,
   EINHEIT_RUF,
   EINHEIT_ZWEI,
-  ERREICHBAR,
   FAHRZEUG,
   FUEKW,
   KURZ,
@@ -15,6 +14,7 @@ import {
   SG_SICHERHEIT,
   SG_LANG,
   SUBPIXEL,
+  TELEFON,
   anmelden,
   einsatzAnlegen,
   oeffne,
@@ -109,8 +109,10 @@ test('Fükw mit offenem Panel: Messwerte, kein Überhang, Lücken im ersten Bild
   }
 
   // Die Spaltenbreiten (Σ 1020 px) passen in die Contentbreite: kein waagerechter Bildlauf,
-  // auch mit der Erreichbarkeit (1366 ≥ xl).
-  await expect(tabelle(page).getByRole('columnheader', { name: 'Erreichbarkeit' })).toBeVisible();
+  // auch mit dem Telefon (1366 ≥ xl; LLH-1134 statt Kommunikationsmittel und Erreichbarkeit).
+  await expect(
+    tabelle(page).getByRole('columnheader', { name: 'Telefon', exact: true }),
+  ).toBeVisible();
   const ueberhang = await page
     .locator('.ant-table-body')
     .evaluate((el) => el.scrollWidth - el.clientWidth);
@@ -198,7 +200,7 @@ for (const rolle of ['admin', 'beobachter'] as const) {
     });
     await page.getByRole('button', { name: /Drucken/ }).click();
     await page.emulateMedia({ media: 'print' });
-    await expect(tabelle(page).getByText(ERREICHBAR)).toHaveCount(1);
+    await expect(tabelle(page).getByText(TELEFON)).toHaveCount(1);
     const druck = await baumLage(page, '.funkplan-print-root');
     pruefeUmbruch(druck, `Druck A4 (${rolle})`);
     pruefeHaengendenEinzug(druck, `Druck A4 (${rolle})`);
@@ -223,7 +225,7 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
   expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/lageberichte`]);
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
-  await expect(page.getByText(ERREICHBAR)).toHaveCount(0);
+  await expect(page.getByText(TELEFON)).toHaveCount(0);
 });
 
 test('Übernahme in den Befehl (LFH-1027): genau ein POST, danach der LADEF-Befehl', async ({
@@ -246,7 +248,7 @@ test('Übernahme in den Befehl (LFH-1027): genau ein POST, danach der LADEF-Befe
   expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/befehle`]);
   await expect(page.getByText('Führung und Kommunikation').first()).toBeVisible();
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
-  await expect(page.getByText(ERREICHBAR)).toHaveCount(0);
+  await expect(page.getByText(TELEFON)).toHaveCount(0);
 });
 
 test('die Kennung einer Einheit führt auf ihre Detailseite', async ({ page }) => {
@@ -262,12 +264,12 @@ test('die Kennung einer Einheit führt auf ihre Detailseite', async ({ page }) =
 // ── Eigene Führungsstelle (LFH-849) ─────────────────────────────────────────────────────────────
 //
 // Erfasst wird sie auf den Einsatzdaten (Zeilenbearbeitung), der Funkplan zeigt sie als erste
-// Zeile. Der Druckpfad (A4, `beforeprint`) trägt ihre Erreichbarkeit, die Übernahme nie.
+// Zeile. Der Druckpfad (A4, `beforeprint`) trägt ihr Telefon (LLH-1134), die Übernahme nie.
 
 const FS_RUF = 'Florian Musterstadt 10/1';
-const FS_ERREICHBAR = '+49 171 7654321';
+const FS_TELEFON = '+49 171 7654321';
 
-test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck mit Erreichbarkeit, im Bericht ohne', async ({
+test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck mit Telefon, im Bericht ohne', async ({
   page,
 }) => {
   await anmelden(page);
@@ -282,12 +284,15 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
   await ruf.fill(FS_RUF);
   await ruf.press('Enter');
   await expect(paneel.getByRole('button', { name: 'Rufname bearbeiten' })).toContainText(FS_RUF);
-  await paneel.getByRole('button', { name: 'Erreichbarkeit eintragen', exact: true }).click();
-  const erreichbar = paneel.getByRole('textbox', { name: 'Erreichbarkeit', exact: true });
-  await erreichbar.fill(FS_ERREICHBAR);
-  await erreichbar.press('Enter');
-  await expect(paneel.getByRole('button', { name: 'Erreichbarkeit bearbeiten' })).toContainText(
-    FS_ERREICHBAR,
+  // Telefon als typisierte Verbindung (LLH-1134): Liste öffnen, eine Zeile (Mobil) anlegen.
+  const verbindungen = 'Telefon und weitere Verbindungen';
+  await paneel.getByRole('button', { name: `${verbindungen} eintragen`, exact: true }).click();
+  await paneel.getByRole('button', { name: 'Verbindung hinzufügen' }).click();
+  const nummer = paneel.getByRole('textbox', { name: 'Nummer oder Adresse 1', exact: true });
+  await nummer.fill(FS_TELEFON);
+  await nummer.press('Enter');
+  await expect(paneel.getByRole('button', { name: `${verbindungen} bearbeiten` })).toContainText(
+    FS_TELEFON,
   );
 
   await oeffne(page, einsatzId);
@@ -298,9 +303,9 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
     page.getByRole('region', { name: 'Lücken' }).getByText('Eigene Gegenstelle (Führungsstelle)'),
   ).toHaveCount(0);
 
-  // Druckpfad bei A4-Breite: die Erreichbarkeit der Führungsstelle steht da.
+  // Druckpfad bei A4-Breite: das Telefon der Führungsstelle steht da.
   await page.setViewportSize({ width: A4_DRUCKBREITE, height: 900 });
-  await expect(ersteZeile).not.toContainText(FS_ERREICHBAR);
+  await expect(ersteZeile).not.toContainText(FS_TELEFON);
   await page.evaluate(() => {
     window.print = () => {
       window.dispatchEvent(new Event('beforeprint'));
@@ -308,17 +313,17 @@ test('Führungsstelle: auf Einsatzdaten erfasst, erste Zeile im Plan, im Druck m
   });
   await page.getByRole('button', { name: /Drucken/ }).click();
   await page.emulateMedia({ media: 'print' });
-  await expect(tabelle(page).locator('tr[data-row-key="fs"]')).toContainText(FS_ERREICHBAR);
+  await expect(tabelle(page).locator('tr[data-row-key="fs"]')).toContainText(FS_TELEFON);
   await page.emulateMedia({ media: null });
 
-  // Übernahme: die Führungsstelle steht im Bericht, ihre Erreichbarkeit nie.
+  // Übernahme: die Führungsstelle steht im Bericht, ihr Telefon nie.
   await page.reload();
   await page.setViewportSize(FUEKW);
   await expect(tabelle(page).getByText(FAHRZEUG)).toBeVisible();
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
   await expect(page.getByText(FS_RUF).first()).toBeVisible();
-  await expect(page.getByText(FS_ERREICHBAR)).toHaveCount(0);
+  await expect(page.getByText(FS_TELEFON)).toHaveCount(0);
 });
 
 // ── Darstellung „Skizze“ ────────────────────────────────────────────────────────────────────────
@@ -390,8 +395,8 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
 // Gemessen wird die Zeile UNTER der Einfügestelle, relativ zur Tabelle: das Fahrzeug ohne Einheit
 // steht im Sammelknoten am Ende, eine neue Einheit im Abschnitt schöbe es ohne Schleuse sofort nach
 // unten. Relativ, weil das Lücken-Paneel ÜBER der Tabelle mit seinem Inhalt wächst (eine neue Lücke
-// ist eine Zeile mehr); das ist nicht die Datensicht. Die neue Einheit bekommt deshalb eine
-// Erreichbarkeit.
+// ist eine Zeile mehr); das ist nicht die Datensicht. Die neue Einheit bekommt deshalb einen
+// Funkrufnamen und ein Telefon (LLH-1134: je eine eigene Lücke).
 // Mutationsproben: das Gerippe der Schleuse nicht mehr halten (`gerippe: null` in `standJetzt`)
 // → beide Fälle rot (die Zeile rückt, kein Banner); die Zeigerhandler am `<section>` entfernt →
 // der Zeigerfall rot.
@@ -418,7 +423,12 @@ for (const art of ['Fokus', 'Zeiger'] as const) {
     const vorher = await lage();
 
     const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
-      data: { name: NEUE_EINHEIT, abschnitt_id: abschnitt, erreichbarkeit: '+49 171 7777777' },
+      data: {
+        name: NEUE_EINHEIT,
+        funkrufname: 'Florian Musterstadt 3/10',
+        abschnitt_id: abschnitt,
+        verbindungen: [{ mittel: 'mobil', wert: '+49 171 7777777' }],
+      },
     });
     expect(antwort.ok(), `Einheit: ${await antwort.text()}`).toBeTruthy();
 

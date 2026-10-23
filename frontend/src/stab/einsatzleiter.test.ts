@@ -33,6 +33,7 @@ function fs(einsatzleiter?: Einsatzleiter): Fuehrungsstelle {
   return {
     art: 'mobil',
     sprechgruppen: [],
+    verbindungen: [],
     fahrzeug_ids: [],
     ...(einsatzleiter ? { einsatzleiter } : {}),
   };

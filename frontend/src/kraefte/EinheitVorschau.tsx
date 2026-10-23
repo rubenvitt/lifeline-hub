@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { Einheit, Staerke } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
-import FunkErreichbarkeit from '../components/FunkErreichbarkeit';
+import FunkUndTelefon from '../components/FunkUndTelefon';
 import StatusTag from '../components/StatusTag';
 import { Datenfeld, Datenraster, monoStil, useRollen } from '../components/instrument';
 import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
@@ -43,8 +43,6 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
     <VorschauZustand abfrage={abfrage} sorte="Die Einheit">
       {(e) => {
         const status = einheitStatusAnzeige(e.status);
-        const hatFunk =
-          (e.sprechgruppen?.length ?? 0) > 0 || !!e.kommunikationsmittel || !!e.erreichbarkeit;
         return (
           <Datenraster spalten={2} beschriftung={`Einheit ${e.name}`}>
             <Datenfeld label="Name">{e.name}</Datenfeld>
@@ -90,15 +88,13 @@ export default function EinheitVorschau({ einsatzId, id }: { einsatzId: number; 
             <Datenfeld label="Zugeordnet" mono>
               {mittelText(e)}
             </Datenfeld>
-            {hatFunk && (
-              <Datenfeld label="Funk / Erreichbarkeit" breit>
-                <FunkErreichbarkeit
-                  sprechgruppen={e.sprechgruppen}
-                  kommunikationsmittel={e.kommunikationsmittel}
-                  erreichbarkeit={e.erreichbarkeit}
-                />
-              </Datenfeld>
-            )}
+            {/* Funk und Telefon getrennt (LLH-1134); leere Zeilen entfallen in der Vorschau, der
+                Funkrufname steht oben schon als eigene Zeile. */}
+            <FunkUndTelefon
+              sprechgruppen={e.sprechgruppen}
+              verbindungen={e.verbindungen}
+              nurGefuellt
+            />
             {e.bemerkung && (
               <Datenfeld label="Bemerkung" breit>
                 {e.bemerkung}

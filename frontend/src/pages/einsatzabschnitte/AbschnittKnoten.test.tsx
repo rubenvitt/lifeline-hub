@@ -14,8 +14,7 @@ const nord = {
   bemerkung: null,
   sortier: 0,
   sprechgruppen: [],
-  kommunikationsmittel: null,
-  erreichbarkeit: '0151 1',
+  verbindungen: [{ id: 1, mittel: 'mobil', wert: '0151 1', hinweis: null }],
 } as unknown as Einsatzabschnitt;
 
 /** Liest die Tokens desselben Providers, in dem der Knoten steht — der Vergleich prüft den

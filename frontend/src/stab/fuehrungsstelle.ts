@@ -16,8 +16,8 @@ export interface FuehrungsstelleQuelle {
 export const FUEHRUNGSSTELLE_STELLE = 'Führungsstelle';
 
 /**
- * Die eine Erfasst-Regel: eine der Angaben ist nicht leer, oder ihr ist mindestens eine
- * Sprechgruppe oder ein Fahrzeug zugeordnet (LFH-1106), oder ein Einsatzleiter ist erfasst
+ * Die eine Erfasst-Regel: eine der Angaben ist nicht leer, sie hat eine Verbindung (LLH-1134),
+ * ihr ist eine Sprechgruppe oder ein Fahrzeug zugeordnet (LFH-1106), oder ein Einsatzleiter ist erfasst
  * (LFH-1199). Bezeichnung und Standort zählen mit, die Art nicht: sie hat immer einen Wert
  * (LFH-1181, design.md D1). Tabelle, Lücken-Hinweis, Bericht, Skizze, Organigramm und Lagekarte
  * fragen nur hier.
@@ -29,8 +29,7 @@ export function fuehrungsstelleErfasst(fs: Fuehrungsstelle | null): boolean {
     !!fs.standort_adresse?.trim() ||
     fs.standort_lat != null ||
     !!fs.rufname?.trim() ||
-    !!fs.kommunikationsmittel?.trim() ||
-    !!fs.erreichbarkeit?.trim() ||
+    fs.verbindungen.length > 0 ||
     fs.sprechgruppen.length > 0 ||
     fs.fahrzeug_ids.length > 0 ||
     fs.einsatzleiter != null

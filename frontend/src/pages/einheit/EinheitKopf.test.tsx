@@ -52,6 +52,7 @@ function einheit(o: Partial<Einheit> = {}): Einheit {
     sprechgruppen: [],
     tz_fachaufgabe: null,
     tz_organisation: null,
+    verbindungen: [],
     ...o,
   } as unknown as Einheit;
 }

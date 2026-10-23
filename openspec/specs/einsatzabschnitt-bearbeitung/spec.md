@@ -11,7 +11,9 @@ Angaben geändert und aufgelöst wird, ohne dass eine Änderung die eines andere
 ### Requirement: Jede Angabe an ihrem Wert bearbeiten
 Das Detailpaneel der Seite Einsatzabschnitte SHALL jede Angabe des gewählten Abschnitts an ihrem
 Wert bearbeitbar machen: Name, Kurzbezeichnung, Abschnittsleiter, Lagezustand, Abschnittsauftrag,
-Sprechgruppen, Kommunikationsmittel, Erreichbarkeit / Nummer und Bemerkung. Den Über-Abschnitt
+Rufname, Sprechgruppen, „Telefon und weitere Verbindungen“ und Bemerkung. Funk (Rufname,
+Sprechgruppen) und Telefon stehen getrennt; die Verbindungen werden als ganze Liste gespeichert
+(`verbindungen`). Den Über-Abschnitt
 ändert das Umhängen in der Gliederung (Ziehen oder „Verschieben unter …“). Einen Knopf
 „Bearbeiten“ und ein Formular mit allen Angaben MUST es im Detail nicht geben.
 

@@ -5,11 +5,13 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
 import type { Einheit } from '../../api/types';
-import { EINHEIT_ERREICHBARKEIT_MAX } from '../../api/eingabegrenzen';
 import type { EinheitPatchHandler } from './EinheitKopf';
 import EinheitFunk from './EinheitFunk';
 
-/** Paneel „Funk und Kommunikation“ (LLH-1036, design.md D2): je Zeile genau ein Feld. */
+/**
+ * Paneele „Funk“ und „Telefon und weitere Verbindungen“ (LLH-1036 D2, LLH-1134): Funk und
+ * Telefon getrennt, je Zeile genau ein Feld.
+ */
 
 const sprechgruppe = (id: number, bezeichnung: string, betriebsart: 'TMO' | 'DMO') => ({
   id,
@@ -29,8 +31,7 @@ function einheit(o: Partial<Einheit> = {}): Einheit {
     id: 10,
     name: '1. Zug',
     sprechgruppen: [tmo, dmo],
-    kommunikationsmittel: null,
-    erreichbarkeit: '0151 23456',
+    verbindungen: [{ id: 1, mittel: 'mobil', wert: '0151 23456', hinweis: null }],
     ...o,
   } as unknown as Einheit;
 }
@@ -42,7 +43,9 @@ function renderFunk(e: Einheit = einheit(), canEdit = true) {
   return { onPatch };
 }
 
-const paneel = () => screen.getByRole('region', { name: 'Funk und Kommunikation' });
+const paneel = () => screen.getByRole('region', { name: 'Funk' });
+const telefonPaneel = () =>
+  screen.getByRole('region', { name: 'Telefon und weitere Verbindungen' });
 
 describe('EinheitFunk', () => {
   it('zeigt die Sprechgruppen je Betriebsart, ohne Eingabefeld', () => {
@@ -77,44 +80,60 @@ describe('EinheitFunk', () => {
     expect(onPatch).not.toHaveBeenCalled();
   });
 
-  it('Kommunikationsmittel: genau `kommunikationsmittel`', async () => {
+  it('Funk und Telefon stehen getrennt: die Nummer nur unter „Telefon und weitere Verbindungen“', () => {
+    renderFunk();
+    expect(paneel()).not.toHaveTextContent('0151 23456');
+    expect(within(telefonPaneel()).getByRole('link', { name: '0151 23456' })).toHaveAttribute(
+      'href',
+      'tel:015123456',
+    );
+    expect(document.body.textContent).not.toMatch(/erreichbar|kommunikationsmittel/i);
+  });
+
+  it('Verbindungen: genau `verbindungen` als Ersatzliste', async () => {
     const user = userEvent.setup();
     const { onPatch } = renderFunk();
-    await user.click(screen.getByRole('button', { name: 'Kommunikationsmittel eintragen' }));
-    await user.click(screen.getByRole('combobox', { name: 'Kommunikationsmittel' }));
-    await user.click(await screen.findByTitle('Digitalfunk'));
-    await user.click(screen.getByRole('button', { name: 'Kommunikationsmittel speichern' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Telefon und weitere Verbindungen bearbeiten' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Verbindung hinzufügen' }));
+    await user.type(screen.getByRole('textbox', { name: 'Nummer oder Adresse 2' }), 'zug1@drk.de');
+    await user.click(screen.getByRole('combobox', { name: 'Mittel 2' }));
+    await user.click(await screen.findByTitle('E-Mail'));
+    await user.click(
+      screen.getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
+    );
     await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Kommunikationsmittel', {
-        kommunikationsmittel: 'digitalfunk',
+      expect(onPatch).toHaveBeenCalledWith('Telefon und weitere Verbindungen', {
+        verbindungen: [
+          { mittel: 'mobil', wert: '0151 23456' },
+          { mittel: 'email', wert: 'zug1@drk.de' },
+        ],
       }),
     );
   });
 
-  it('Erreichbarkeit: genau `erreichbarkeit`; geleert geht `null`', async () => {
+  it('alle Verbindungen entfernt: `verbindungen: []`', async () => {
     const user = userEvent.setup();
     const { onPatch } = renderFunk();
-    await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }));
-    await user.clear(screen.getByRole('textbox', { name: 'Erreichbarkeit / Nummer' }));
-    await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer speichern' }));
-    await waitFor(() =>
-      expect(onPatch).toHaveBeenCalledWith('Erreichbarkeit / Nummer', { erreichbarkeit: null }),
+    await user.click(
+      screen.getByRole('button', { name: 'Telefon und weitere Verbindungen bearbeiten' }),
     );
-  });
-
-  it('Erreichbarkeit nimmt nicht mehr Zeichen an als der Server (Spec eingabegrenzen)', async () => {
-    const user = userEvent.setup();
-    renderFunk();
-    await user.click(screen.getByRole('button', { name: 'Erreichbarkeit / Nummer bearbeiten' }));
-    expect(screen.getByRole('textbox', { name: 'Erreichbarkeit / Nummer' })).toHaveAttribute(
-      'maxLength',
-      String(EINHEIT_ERREICHBARKEIT_MAX),
+    await user.click(screen.getByRole('button', { name: 'Verbindung 1 entfernen' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Telefon und weitere Verbindungen speichern' }),
+    );
+    await waitFor(() =>
+      expect(onPatch).toHaveBeenCalledWith('Telefon und weitere Verbindungen', {
+        verbindungen: [],
+      }),
     );
   });
 
   it('ohne Recht: nur die Werte, kein Stift', () => {
     renderFunk(einheit(), false);
     expect(within(paneel()).queryAllByRole('button')).toHaveLength(0);
-    expect(paneel()).toHaveTextContent('0151 23456');
+    expect(within(telefonPaneel()).queryAllByRole('button')).toHaveLength(0);
+    expect(telefonPaneel()).toHaveTextContent('0151 23456');
   });
 });

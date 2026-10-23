@@ -87,12 +87,8 @@ import {
 } from '../stab/rufnameVorschlaege';
 import PaneelZustand from '../components/instrument/PaneelZustand';
 import SprechgruppenPicker from '../components/SprechgruppenPicker';
-import {
-  KOMMUNIKATIONSMITTEL_OPTIONEN,
-  kommunikationsmittelLabel,
-  mitBetriebsart,
-  teileSprechgruppen,
-} from '../components/kommunikationsmittel';
+import { mitBetriebsart, teileSprechgruppen } from '../components/kommunikationsmittel';
+import { VerbindungenAngabe } from '../components/VerbindungenFeld';
 import EinsatzleiterAngabe from './EinsatzleiterAngabe';
 import { einsatzleiterDarstellung, einsatzleiterKurz } from '../stab/einsatzleiter';
 import { leerZuNull } from '../api/patchTriState';
@@ -622,7 +618,7 @@ function FuehrungsstellePaneel({
   const text = (
     etikett: string,
     wert: string | null | undefined,
-    schluessel: 'bezeichnung' | 'erreichbarkeit',
+    schluessel: 'bezeichnung',
     maxLength?: number,
   ) => (
     <InlineAngabe<string>
@@ -733,33 +729,18 @@ function FuehrungsstellePaneel({
                 ),
               },
               {
-                etikett: 'Kommunikationsmittel',
+                // Funk (Rufname, Sprechgruppen) und Telefon getrennt (LLH-1134).
+                etikett: 'Telefon und weitere Verbindungen',
                 wert: (
-                  <InlineAngabe<string | null>
-                    etikett="Kommunikationsmittel"
-                    wert={fs.kommunikationsmittel ?? null}
-                    anzeige={kommunikationsmittelLabel(fs.kommunikationsmittel)}
-                    leer={(w) => w === null}
+                  <VerbindungenAngabe
+                    etikett="Telefon und weitere Verbindungen"
+                    verbindungen={fs.verbindungen}
                     darfSchreiben={darfSchreiben}
-                    onSpeichern={(w) =>
-                      speichern('Kommunikationsmittel', { kommunikationsmittel: w })
+                    onSpeichern={(liste) =>
+                      speichern('Telefon und weitere Verbindungen', { verbindungen: liste })
                     }
-                    eingabe={({ feld, popup, value, onChange }) => (
-                      <Select<string>
-                        {...feld}
-                        {...popup}
-                        allowClear
-                        options={KOMMUNIKATIONSMITTEL_OPTIONEN}
-                        value={value ?? undefined}
-                        onChange={(w) => onChange(w ?? null)}
-                      />
-                    )}
                   />
                 ),
-              },
-              {
-                etikett: 'Erreichbarkeit',
-                wert: text('Erreichbarkeit', fs.erreichbarkeit, 'erreichbarkeit'),
               },
               {
                 etikett: 'Führungsfahrzeuge',

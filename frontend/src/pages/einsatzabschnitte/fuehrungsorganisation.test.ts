@@ -14,7 +14,15 @@ import {
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 
 function abschnitt(id: number, p: Partial<Einsatzabschnitt> = {}): Einsatzabschnitt {
-  return { id, einsatz_id: 1, name: `Abschnitt ${id}`, sortier: id, sprechgruppen: [], ...p };
+  return {
+    id,
+    einsatz_id: 1,
+    name: `Abschnitt ${id}`,
+    sortier: id,
+    sprechgruppen: [],
+    verbindungen: [],
+    ...p,
+  };
 }
 
 function einheit(
@@ -35,6 +43,7 @@ function einheit(
     ist: s,
     ist_kumuliert: s,
     status: { quelle: 'ohne', verteilung: [] },
+    verbindungen: [],
     ...p,
   } as Einheit;
 }
@@ -163,6 +172,19 @@ describe('baueFuehrungsorganisation — Knoteninhalt', () => {
     expect(e11).toMatchObject({ name: 'Einheit 11', rufname: null, leitung: null });
   });
 
+  // LLH-1134: wie der Funkplan — der Rufname der Abschnittsleitung vor der Kurzbezeichnung.
+  it('nimmt beim Abschnitt den Rufnamen vor der Kurzbezeichnung', () => {
+    const org = baueFuehrungsorganisation(
+      [
+        abschnitt(1, { kurzbezeichnung: 'EA-N', rufname: 'Rotkreuz Musterstadt 1/10-1' }),
+        abschnitt(2, { kurzbezeichnung: 'EA-S', rufname: '  ' }),
+      ],
+      [],
+    );
+    expect(finde(org.wurzeln, 'ab-1')).toMatchObject({ rufname: 'Rotkreuz Musterstadt 1/10-1' });
+    expect(finde(org.wurzeln, 'ab-2')).toMatchObject({ rufname: 'EA-S' });
+  });
+
   it('leitet die Zeichen wie die Lagekarte ab', () => {
     const org = baueFuehrungsorganisation(
       [abschnitt(1, { tz_organisation: 'thw' })],
@@ -277,7 +299,7 @@ describe('rendereFuehrungsorganisationMarkdown', () => {
         abschnitt_id: 2,
         funkrufname: 'Florian 1/10',
         fuehrer_name: 'Bernd Führer',
-        erreichbarkeit: '0160 GEHEIM',
+        verbindungen: [{ id: 1, mittel: 'mobil', wert: '0160 GEHEIM', hinweis: null }],
       },
       [1, 2, 6],
     ),

@@ -80,7 +80,7 @@ import './kommunikationsplanPrint.css';
  *   gepflegt wird dort (D4, D7). Die Besetzung ist nur Nebentext, Kontaktangaben des Personals
  *   kommen nie vor.
  * - **Form:** `form="tabelle"` in jeder Breite (Vergleichsfläche „welche Nummer hat …?“), die vier
- *   Gruppen als Baumknoten. Die Erreichbarkeit ist hier der Inhalt und immer sichtbar (D5).
+ *   Gruppen als Baumknoten. Die Verbindungen sind hier der Inhalt und immer sichtbar (D5).
  * - **Kein Lagebericht** (D6): ein Bericht wird verteilt und fortgeschrieben, Rufnummern gehören
  *   nicht hinein. Druck ja.
  * - **Ohne Netz** lesbar (Unter-Key in `LAGEBILD_OFFLINE`), die Bedienung ist gesperrt (D9).
@@ -693,6 +693,14 @@ export default function KommunikationsplanPage() {
           </div>
         )}
 
+        {/*
+          Weder Sortierung noch Kopffilter (LLH-1096, Ausnahme wie Meldebild und Funkplan): der Plan
+          ist ein Baum aus vier Gruppen, und im Baummodus verbietet `Datensicht` beides. Die Gruppen
+          SIND die Achse Stellenart (Einsatzleitung und Stab, externe Stellen, Abschnitte,
+          Einheiten), eine leere Gruppe nennt ihren Grund; zugeklappt wird statt gefiltert. Ein
+          Filter nach Verbindungsmittel risse Stellen aus ihrer Gruppe, und den Grund einer leeren
+          Gruppe sähe man nicht mehr.
+        */}
         <Datensicht
           bezeichnung="Kommunikationsplan"
           form="tabelle"

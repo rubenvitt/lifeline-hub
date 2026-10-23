@@ -147,6 +147,7 @@ function einheit(over: Partial<Einheit> = {}): Einheit {
     sprechgruppen: [],
     status: { quelle: 'ohne', verteilung: [] },
     unangemeldet: false,
+    verbindungen: [],
     ...over,
   };
 }

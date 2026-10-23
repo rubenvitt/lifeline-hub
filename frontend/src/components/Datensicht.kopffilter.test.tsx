@@ -257,6 +257,16 @@ describe('Datensicht · Gedächtnis (LLH-1086)', () => {
     }
   });
 
+  it('ohne gemerkte Spaltenwahl gilt die Voreinstellung der Seite (LLH-1096)', () => {
+    setzeViewportBreite(1366);
+    rendere({
+      gedaechtnis: gedaechtnis({ spaltenStart: null }),
+      spaltenAusVoreinstellung: ['typ'],
+    });
+    expect(screen.queryByRole('button', { name: /^Typ filtern/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Spalten · 1 ausgeblendet/ })).toBeInTheDocument();
+  });
+
   it('meldet die Spaltenwahl ans Gerät', async () => {
     setzeViewportBreite(1366);
     const g = gedaechtnis();

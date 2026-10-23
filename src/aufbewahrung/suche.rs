@@ -8,6 +8,9 @@
 //! eines Antrags. Sie schreibt nichts und loggt den Suchtext nicht.
 //!
 //! Betroffene werden nur über den Namen gefunden; `melder_kontakt` gehört der meldenden Person.
+//! Eine externe Kraft trifft auch über die Verbindungen der Abschnitte, die sie leitet, und der
+//! Einheiten, die sie führt (LLH-1134): dieselbe Zuordnung wie der Personen-Scrub
+//! (`schwaerzung_person`, `Bezug::Ueber`).
 //! Kein Treffer heißt nicht „keine Daten“: Namens-Schnappschüsse entfernter Dispositionen
 //! (`auftrag_empfaenger.snap_anzeige`, `einsatz_stabsfunktion.snap_name` mit verwaistem Verweis)
 //! findet die Suche nicht — dafür ist der Einsatz-Antrag da.
@@ -160,8 +163,31 @@ pub async fn personensuche(
     .bind(einsatz_id)
     .fetch_all(pool)
     .await?;
+    // Telefon und weitere Verbindungen je führender externer Kraft (LLH-1134).
+    let verbindungen: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT a.leiter_id, v.wert FROM einsatz_verbindung v \
+           JOIN einsatzabschnitt a ON a.id = v.abschnitt_id \
+         WHERE v.einsatz_id = ? AND a.leiter_id IS NOT NULL \
+         UNION ALL \
+         SELECT e.fuehrer_id, v.wert FROM einsatz_verbindung v \
+           JOIN einsatz_einheit e ON e.id = v.einheit_id \
+         WHERE v.einsatz_id = ? AND e.fuehrer_id IS NOT NULL",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?;
+    let mut kontakte_je_kraft: std::collections::HashMap<i64, Vec<String>> =
+        std::collections::HashMap::new();
+    for (kraft, wert) in verbindungen {
+        kontakte_je_kraft.entry(kraft).or_default().push(wert);
+    }
     for (id, name, disponiert_at) in kraefte {
-        if trifft(suchtext, &[Some(&name)], &[]) {
+        let kontakte: Vec<Option<&str>> = kontakte_je_kraft
+            .get(&id)
+            .map(|k| k.iter().map(|w| Some(w.as_str())).collect())
+            .unwrap_or_default();
+        if trifft(suchtext, &[Some(&name)], &kontakte) {
             let art = PersonenArt::ExterneKraft;
             treffer.push(PersonTrefferAnzeige {
                 art,
@@ -267,6 +293,18 @@ mod tests {
         );
         let t = personensuche(&pool, b.e1, "Externer Hans").await.unwrap();
         assert_eq!(t[0].kennung, format!("EK-{}", b.k1));
+        // LLH-1134: die Nummer an der Einheit, die die externe Kraft führt, findet sie auch.
+        sqlx::query(
+            "UPDATE einsatz_verbindung SET wert = '0173 555 66 77' WHERE bezug = 'einheit'",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        let t = personensuche(&pool, b.e1, "01735556677").await.unwrap();
+        assert_eq!(
+            t.iter().map(|x| x.kennung.clone()).collect::<Vec<_>>(),
+            vec![format!("EK-{}", b.k1)]
+        );
         let t = personensuche(&pool, b.e1, "Maria Beispiel").await.unwrap();
         assert_eq!(t[0].art, PersonenArt::Medienkontakt);
         // Stammkräfte und andere Einsätze werden nicht gefunden.

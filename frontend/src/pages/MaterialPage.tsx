@@ -5,6 +5,7 @@ import { BemerkungZelle } from '../components/BemerkungZelle';
 import { ErfassungsModal } from '../components/Erfassung';
 import { MengenFeld } from '../components/MengenFeld';
 import Datensicht, { spaltenFuer, useSpalteAusgeblendet } from '../components/Datensicht';
+import { useListenGedaechtnis, type GedaechtnisSpalte } from '../components/listenGedaechtnis';
 import {
   nichtGefundenInhalt,
   SeitenFehler,
@@ -164,6 +165,21 @@ const STATUS_FILTER_WERTE = GRUPPEN_REIHENFOLGE.map((s) => ({
   text: gruppenEtikett(s),
 }));
 
+type MaterialSpalteKey =
+  'bezeichnung' | 'kategorie' | 'ort' | 'menge' | 'status' | 'traeger' | 'bemerkung' | 'aktionen';
+
+/**
+ * Was das Listengedächtnis beim Aufbau der Seite prüft (LLH-1096, Herleitung in `FahrzeugePage.tsx`):
+ * feste Achsen mit ihren Werten; Kategorie, Ort und Träger nehmen ihre Werte aus den Zeilen und den
+ * Namen der Orte (`ausDaten`). Muss zu `spalten` passen.
+ */
+const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
+  { key: 'bezeichnung', sortWert: true },
+  { key: 'menge', sortWert: true },
+  { key: 'status', sortWert: true, filter: { werte: STATUS_FILTER_WERTE } },
+];
+const GEDAECHTNIS_AUS_DATEN: readonly MaterialSpalteKey[] = ['kategorie', 'ort', 'traeger'];
+
 /** Werte des Disponier-Dialogs für Stamm-Material. Der Ort steht außerhalb der Werte (D7). */
 interface StammDisposition {
   material_id: number;
@@ -180,6 +196,15 @@ const GRUPPIERUNG_OPTIONEN = [
 export default function MaterialPage() {
   const { id } = useParams();
   const einsatzId = Number(id);
+  /**
+   * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
+   * Hook gehört der Seite und steht vor jedem frühen Ausstieg.
+   */
+  const gedaechtnis = useListenGedaechtnis<MaterialSpalteKey>('material', GEDAECHTNIS_SPALTEN, {
+    vorgabe: { spalte: 'bezeichnung', richtung: 'auf' },
+    einsatzId,
+    ausDaten: GEDAECHTNIS_AUS_DATEN,
+  });
   const qc = useQueryClient();
   const { message } = App.useApp();
   const [adhocOffen, setAdhocOffen] = useState(false);
@@ -650,6 +675,19 @@ export default function MaterialPage() {
     kategorieWerte.length > 0
       ? { werte: kategorieWerte, trifft: (m: EinsatzMaterial, w: string) => m.kategorie === w }
       : undefined;
+  // Trägerfilter nach demselben Muster (LLH-1096): ohne gepflegten Träger kein Filterfeld.
+  const traegerWerte = [
+    ...new Set(ems.map((m) => m.traegerorganisation).filter((t): t is string => !!t)),
+  ]
+    .sort((a, b) => a.localeCompare(b, 'de', { numeric: true }))
+    .map((t) => ({ text: t, value: t }));
+  const traegerFilter =
+    traegerWerte.length > 0
+      ? {
+          werte: traegerWerte,
+          trifft: (m: EinsatzMaterial, w: string) => m.traegerorganisation === w,
+        }
+      : undefined;
 
   /**
    * Spaltenregister der Materialseite. `EinsatzMaterialAnzeige` hat kein `status_kategorie`;
@@ -684,6 +722,7 @@ export default function MaterialPage() {
       // Lesend, darf weichen: unter `xxl` als zweite Zeile der Bezeichnung (`BezeichnungZelle`),
       // über den Spaltenschalter, im Zähler und in der Suche.
       abBreite: 'xxl',
+      sortWert: (m) => m.kategorie,
       filter: kategorieFilter,
       suchText: (m) => m.kategorie,
       render: (t) => t ?? '—',
@@ -691,7 +730,9 @@ export default function MaterialPage() {
     {
       // Der EINE Ort (LLH-1225 D3): eine Angabe mit ausdrücklichem Speichern über den einen
       // Schreibweg (D2); Filter „ohne Ort“, je Einheit, je Fahrzeug, je UHS, je
-      // Bereitstellungsraum (Spec `material-liste`).
+      // Bereitstellungsraum (Spec `material-liste`). Kein eigener Abschnittsfilter (LLH-1096): ein
+      // Abschnitt hieße nur an Einheit und Fahrzeug etwas, nicht an UHS, Bereitstellungsraum oder
+      // „ohne Ort“; die Ortsachse ist die Frage dieser Liste („was ist wo“).
       title: 'Ort',
       key: 'ort',
       mindestBreite: 170,
@@ -747,6 +788,8 @@ export default function MaterialPage() {
       key: 'status',
       width: 120,
       filter: { werte: STATUS_FILTER_WERTE, trifft: (m, w) => statusGruppe(m) === w },
+      // In der Folge der Gruppen (Status, dann „aufgebraucht“), nicht nach dem Wort.
+      sortWert: (m) => GRUPPEN_REIHENFOLGE.indexOf(statusGruppe(m)),
       // Kein `Select` mit Mindestbreite (die 390-px-Karte scheiterte daran). Deskriptor ganz
       // gespreizt — Herleitung in `FahrzeugePage.tsx`.
       render: (_, em) => (
@@ -758,6 +801,19 @@ export default function MaterialPage() {
       ),
     },
     {
+      // Lesend und erst ab `xxl` wie die Kategorie (LLH-1096): am Fükw bliebe dem Ort sonst kein
+      // Platz. Über den Spaltenschalter zurückzuholen, dann mit Filter.
+      title: 'Träger',
+      dataIndex: 'traegerorganisation',
+      key: 'traeger',
+      width: 140,
+      abBreite: 'xxl',
+      sortWert: (m) => m.traegerorganisation,
+      filter: traegerFilter,
+      render: (t) => t ?? '—',
+    },
+    {
+      // Weder Sortierung noch Filter (LLH-1096): eine Notiz in Freitext ist kein Vergleichswert.
       title: 'Bemerkung',
       key: 'bemerkung',
       width: 160,
@@ -901,7 +957,8 @@ export default function MaterialPage() {
             ladend={emQuery.isLoading}
             leerText="Noch kein Material disponiert"
             suche={{ platzhalter: 'Bezeichnung, Kategorie, Ort' }}
-            standardSortierung={{ spalte: 'bezeichnung', richtung: 'auf' }}
+            mehrzahl="Posten"
+            gedaechtnis={gedaechtnis}
             zeilenFehler={(em) => zeilen.grund(em.id)}
             gruppen={{
               ...(gruppierung === 'ort'

@@ -4,6 +4,7 @@ import { StatusChip, monoStil } from '../../components/instrument';
 import type { Einsatzabschnitt, Staerke } from '../../api/types';
 import StaerkeAnzeige from '../../anzeige/StaerkeAnzeige';
 import StatusTag from '../../components/StatusTag';
+import { telefonVerbindungen } from '../../components/verbindungen';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 
 interface Props {
@@ -52,10 +53,10 @@ export default function AbschnittKnoten({ abschnitt, staerke, anzahlEinheiten }:
           {abschnitt.leiter_name}
         </span>
       )}
-      {abschnitt.erreichbarkeit && (
+      {telefonVerbindungen(abschnitt.verbindungen).length > 0 && (
         <span
           aria-hidden="true"
-          title="Erreichbarkeit hinterlegt"
+          title="Telefon hinterlegt"
           style={{ color: token.colorTextSecondary }}
         >
           <IconTelefon />

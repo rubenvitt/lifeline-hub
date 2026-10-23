@@ -53,8 +53,8 @@ import type { SkizzenAktionen } from './skizzenAktionen';
  *   Servers (`abschnitt`, `einheit`, `einsatz`, `fernmeldewesen`) erreicht dieselben Keys in jedem
  *   anderen Tab; die Skizzendaten hängen unter dem Prefix des Fernmeldewesens (LLH-1180).
  * - **Zuordnung am Datensatz** (D5): `ab-`, `eh-`, `fs`, `ks-`, `ko-` am Pfad des Datensatzes;
- *   Rufname und Kommunikationsmittel über dessen PATCH (Abschnitt `kurzbezeichnung`, Einheit
- *   `funkrufname`, Führungsstelle `rufname`), je nur das eine Feld.
+ *   der Rufname über dessen PATCH (Abschnitt `rufname`, LLH-1134; Einheit `funkrufname`,
+ *   Führungsstelle `rufname`), je nur das eine Feld.
  * - **409** (abweichende Version): der Hook holt den Stand des Servers und reicht den Fehler
  *   weiter; die Fläche meldet ihn am Element (`befehlsGrund`).
  * - **Ohne Schreibrecht im Einsatz** gibt es keine Aktionen (`null`, D8): die Fläche ist dann
@@ -150,40 +150,25 @@ export function useSkizzenAktionen(
           return holeSkizze();
       }
     };
-    const feldDesDatensatzes = async (
-      stelle: string,
-      feld: 'rufname' | 'kommunikationsmittel',
-      wert: string | null,
-    ) => {
+    const rufnameDesDatensatzes = async (stelle: string, wert: string | null) => {
       const ziel = zielAus(stelle);
       switch (ziel.art) {
         case 'abschnitt':
-          await patcheAbschnitt(
-            einsatzId,
-            ziel.id,
-            feld === 'rufname' ? { kurzbezeichnung: wert } : { kommunikationsmittel: wert },
-          );
+          await patcheAbschnitt(einsatzId, ziel.id, { rufname: wert });
           await holeDatensatz(ziel);
           return;
         case 'einheit':
-          await patcheEinheit(
-            einsatzId,
-            ziel.id,
-            feld === 'rufname' ? { funkrufname: wert } : { kommunikationsmittel: wert },
-          );
+          await patcheEinheit(einsatzId, ziel.id, { funkrufname: wert });
           await holeDatensatz(ziel);
           return;
         case 'fuehrungsstelle': {
-          const fs = await patcheFuehrungsstelle(
-            einsatzId,
-            feld === 'rufname' ? { rufname: wert } : { kommunikationsmittel: wert },
-          );
+          const fs = await patcheFuehrungsstelle(einsatzId, { rufname: wert });
           qc.setQueryData(einsatzKeys.fuehrungsstelle(einsatzId), fs);
           return;
         }
         default:
-          // Externe Stellen und Komponenten tragen weder Rufname noch Kommunikationsmittel.
-          throw new Error(`„${stelle}“ trägt kein Feld ${feld}`);
+          // Externe Stellen und Komponenten tragen keinen Rufname.
+          throw new Error(`„${stelle}“ trägt kein Feld rufname`);
       }
     };
 
@@ -319,9 +304,7 @@ export function useSkizzenAktionen(
         return schriftfeld;
       },
 
-      setzeRufname: (stelle, rufname) => feldDesDatensatzes(stelle, 'rufname', rufname),
-      setzeKommunikationsmittel: (stelle, mittel) =>
-        feldDesDatensatzes(stelle, 'kommunikationsmittel', mittel),
+      setzeRufname: (stelle, rufname) => rufnameDesDatensatzes(stelle, rufname),
     };
   }, [qc, einsatzId]);
   return darfSchreiben ? aktionen : null;
