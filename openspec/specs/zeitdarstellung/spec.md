@@ -52,6 +52,10 @@ erscheinen: „Zeitpunkt“, „kurz“ (heute nur die Uhrzeit, sonst Tag und Uh
 - **WHEN** die Zeitpunkte 29.03.2026 00:30 UTC und 01:30 UTC in der Anzeigezone Europe/Berlin gezeigt werden
 - **THEN** zeigt die Rolle „Zeitpunkt“ `290130mrz26` und `290330mrz26`
 
+#### Scenario: Kalendertag ohne Uhrzeit
+- **WHEN** nur der Tag eines Zeitpunkts gebraucht wird (Tageskopf, Platzhalter `{datum}` im ETB-Baustein) und der Zeitpunkt der 10.10.2026 ist
+- **THEN** steht taktisch der Tagesteil der DTG `10okt26`, bei „Datum und Uhrzeit“ `10.10.26`
+
 #### Scenario: Anzeigezone weicht von der Browserzone ab
 - **WHEN** der Browser auf UTC steht, die Anzeigezone Europe/Berlin ist, es 10.10.2026 22:30 UTC ist und der Zeitpunkt 10.10.2026 21:00 UTC gezeigt wird
 - **THEN** zeigt die Rolle „kurz“ `102300`, denn in der Anzeigezone ist schon der 11.10.
@@ -87,8 +91,10 @@ den Druck eingehen.
 ### Requirement: Eine Formatstelle
 Zeitangaben für Menschen SHALL nur der Formatkern in `frontend/src/anzeige/` bilden. Ein Wächter
 MUST jede neue Formatierung mit Datums- oder Uhrzeit-Token außerhalb davon ablehnen; Maschinen-
-formate in ISO-Reihenfolge und die Uhr im Kopf sind ausgenommen. Der Bestand vom 22.10.2026 steht
-als Schuldmenge im Wächter und darf nur schrumpfen.
+formate in ISO-Reihenfolge und die Uhr im Kopf sind ausgenommen. Der Bestand vom 22.10.2026 ist
+abgebaut (LLH-1061); die Schuldmenge im Wächter MUST leer bleiben. Die Uhr des Lagemonitors nimmt
+dieselbe Formatierung wie die Uhr im Kopf. Der Datenstand rechnet bewusst in der Gerätezeit, folgt
+aber der Darstellung.
 
 #### Scenario: Neue eigene Formatierung
 - **WHEN** eine Seite unter `pages/` `dayjs().format('HH:mm')` einführt

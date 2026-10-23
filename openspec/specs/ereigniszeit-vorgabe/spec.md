@@ -58,4 +58,4 @@ Ereigniszeit desselben Eintrags übereinstimmen.
 
 #### Scenario: Uhrzeit im Baustein eines vorgehenden Geräts
 - **WHEN** die Uhr eines Geräts 5 min vorgeht, das Gerät eine Antwort des Servers erhalten hat und um 10:00 Serverzeit ein Baustein mit „Stand {uhrzeit}“ eingesetzt wird
-- **THEN** steht im Text „Stand 10:00“
+- **THEN** steht im Text „Stand 1000“ (taktische Darstellung; bei „Datum und Uhrzeit“ „Stand 10:00“)

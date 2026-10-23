@@ -79,7 +79,7 @@ Sitzung MUST in Zeitzone und Zeitformat der Organisation erscheinen, wie die Spa
 
 - **WHEN** ein Admin eine Sitzung beendet, die um 12:13:34 UTC auf einem iPad entstand, und die
   Organisation die Zone Europe/Berlin hat
-- **THEN** zeigt das Detail „iPad, angemeldet 101413OKT2026“ (taktische DTG in Ortszeit), ohne
+- **THEN** zeigt das Detail „iPad, angemeldet 101413okt26“ (taktische DTG in Ortszeit), ohne
   UTC-Zeitstempel
 
 #### Scenario: Eintrag von vor dem Update
