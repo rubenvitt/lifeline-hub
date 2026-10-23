@@ -102,7 +102,17 @@ const GEDAECHTNIS_SPALTEN: readonly GedaechtnisSpalte[] = [
   { key: 'stand', sortWert: true, filter: { werte: STAND_WERTE } },
   { key: 'flaeche', sortWert: true },
 ];
-type GedaechtnisKey = 'bezeichnung' | 'raeumung' | 'evakuiert' | 'stand' | 'flaeche' | 'abschnitt';
+// Alle Spaltenschlüssel, auch die ohne Sortierung und Filter: Die Datensicht typisiert das Gedächtnis
+// über die Schlüssel ihrer Spalten.
+type GedaechtnisKey =
+  | 'bezeichnung'
+  | 'raeumung'
+  | 'evakuiert'
+  | 'stand'
+  | 'sammelstelle'
+  | 'flaeche'
+  | 'abschnitt'
+  | 'aktionen';
 const GEDAECHTNIS_AUS_DATEN: readonly GedaechtnisKey[] = ['abschnitt'];
 
 /** Breite, in der ein langer Bezirksname unter `md` umbricht (wie bei den Stellen). */
