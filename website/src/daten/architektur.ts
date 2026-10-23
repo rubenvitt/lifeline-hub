@@ -132,7 +132,8 @@ function codeBloecke(html: string, bloecke: string[]): string {
     /<pre class="astro-code[^"]*"([^>]*)>([\s\S]*?)<\/pre>/g,
     (_m, attribute: string, inhalt: string) => {
       const sprache = /data-language="([^"]*)"/.exec(attribute)?.[1];
-      const text = entschluesselt(inhalt.replace(/<[^>]+>/g, '')).replace(/\n$/, '');
+      // Shikis Spans weg, nur der Text bleibt; `maske` setzt ihn danach vollständig maskiert ein.
+      const text = entschluesselt(inhalt.split(/<[^>]*>/).join('')).replace(/\n$/, '');
       const block =
         sprache === 'mermaid'
           ? `<figure class="arch-diagramm" data-mermaid><pre class="arch-diagramm__quelle">${maske(text)}</pre></figure>`
