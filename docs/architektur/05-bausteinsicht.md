@@ -227,6 +227,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | `src/main.rs` | Start: Konfiguration, DB, Migrationen, Scheduler, TLS, Server, Herunterfahren | Binary `lifeline-hub` |
 | `src/lib.rs` | Modulbaum des Crates | — |
 | `src/config.rs` | CLI- und ENV-Konfiguration (`clap`), maskierte Geheimnisse, Subkommandos | `LIFELINE_*`-Variablen |
+| `src/lizenz.rs` | Lizenztext aus `LICENSE`, eingebettet; Hinweis bei `--help` und jedem Start, Volltext beim ersten Start | Subkommando `lifeline-hub lizenz` |
 | `src/app.rs` | `AppState`, Router mit allen Routen und Layern, statischer Fallback | `build_router`, `build_router_mit` |
 | `src/routes` | HTTP-Handler je Ressource, gemeinsame Helfer in `support.rs` | alle `/api`-Routen |
 | `src/extract.rs` | Extractors mit `{error}`-Vertrag (`JsonBody`, `PfadParam`) und Quell-IP hinter vertrauten Proxys | von allen Handlern genutzt |
@@ -245,6 +246,7 @@ Regeln: [frontend/src/auth/AGENTS.md](../../frontend/src/auth/AGENTS.md) (Client
 | `src/http_begrenzt.rs` | Begrenztes Einlesen fremder HTTP-Antworten | Geocoder, Fachebenen, OIDC |
 | `src/log_drossel.rs` | Sammelzeilen für fremdausgelöste Logereignisse | Lastabwurf, Pool, 503 |
 | `src/zeit.rs` | Ein Zeitformat für DB und Wire: UTC, sekundengenau | überall |
+| `src/zeitdarstellung.rs` | Zeitpunkte in fertigen Servertexten (ETB-Sätze, Hinweise) in der Darstellung von Einsatz bzw. Organisation, Vorgabe taktisch | Gegenstück `frontend/src/anzeige/zeitDarstellung.ts` |
 | `src/uhrzeit.rs` | Wanduhrzeit `HH:MM` ohne Datum und Zone | Verpflegungsplan |
 | `src/wire_enum.rs` | Makro `wire_enum!`: Enum, Serde, Schema und `as_str()` aus einer Liste | Live-Ereignisse, Domänen-Enums |
 | `src/datentraeger` | Prüfung der Datenträgerverschlüsselung beim Start und stündlich | `GET /api/system/datentraeger` |
