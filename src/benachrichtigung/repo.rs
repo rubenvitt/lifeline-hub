@@ -17,6 +17,10 @@ pub const NACHREICHEN_STUNDEN: i64 = 12;
 /// Wie lange eine quittierte Zeile bleibt, ehe der Scheduler sie abräumt (design.md D1).
 pub const QUITTIERT_AUFBEWAHRUNG_STUNDEN: i64 = 24;
 
+/// Wie lange eine unquittierte Zeile im Verlauf bleibt (LLH-1143, design.md D3): eine Schicht und
+/// mehr. Nachgereicht wird sie nur [`NACHREICHEN_STUNDEN`].
+pub const VERLAUF_STUNDEN: i64 = 24;
+
 /// Höchstzahl der Zeilen einer Listenantwort, jüngste zuerst. Zwölf Stunden einer Großlage
 /// bleiben weit darunter; die Grenze schützt den Server, nicht die Fachlichkeit.
 pub const LISTE_MAX: i64 = 200;
@@ -66,32 +70,36 @@ fn aus_roh(r: RohZeile) -> Option<Zeile> {
     })
 }
 
-/// Schreibt je Empfänger eine Zeile, alle in einer Transaktion. Liefert `(benutzer_id, id)`.
+/// Schreibt je Empfänger eine Zeile mit seiner Stufe, alle in einer Transaktion. Eine stille
+/// Zeile ist schon gelesen (`quittiert_at = erstellt_at`, LLH-1143 design.md D2): sie steht im
+/// Verlauf, zählt nie und wird nie nachgereicht. Liefert `(benutzer_id, stufe, id)`.
 pub async fn anlegen(
     pool: &SqlitePool,
     anlass: &Anlass,
-    empfaenger: &[i64],
-) -> Result<Vec<(i64, i64)>, AppError> {
+    empfaenger: &[(i64, BenachrichtigungStufe)],
+) -> Result<Vec<(i64, BenachrichtigungStufe, i64)>, AppError> {
     let jetzt = crate::zeit::jetzt();
     let mut tx = pool.begin().await?;
     let mut zeilen = Vec::with_capacity(empfaenger.len());
-    for &benutzer_id in empfaenger {
+    for &(benutzer_id, stufe) in empfaenger {
+        let quittiert = (stufe == BenachrichtigungStufe::Still).then_some(&jetzt);
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO benachrichtigung (einsatz_id, benutzer_id, art, stufe, bezug_typ, \
-                 bezug_id, ausloeser_id, erstellt_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                 bezug_id, ausloeser_id, erstellt_at, quittiert_at) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(anlass.einsatz_id)
         .bind(benutzer_id)
         .bind(anlass.art.as_str())
-        .bind(anlass.art.stufe().as_str())
+        .bind(stufe.as_str())
         .bind(anlass.bezug.typ.as_str())
         .bind(anlass.bezug.id)
         .bind(anlass.ausloeser)
         .bind(&jetzt)
+        .bind(quittiert)
         .fetch_one(&mut *tx)
         .await?;
-        zeilen.push((benutzer_id, id));
+        zeilen.push((benutzer_id, stufe, id));
     }
     tx.commit().await?;
     Ok(zeilen)
@@ -136,6 +144,50 @@ pub async fn liste(
         .bind(einsatz_id)
         .bind(einsatz_id)
         .bind(LISTE_MAX)
+        .fetch_all(pool)
+        .await?;
+    Ok(roh.into_iter().filter_map(aus_roh).collect())
+}
+
+/// Der Verlauf von `benutzer_id` im Einsatz (LLH-1143, design.md D3): seine Zeilen, jüngste
+/// zuerst, höchstens [`LISTE_MAX`], ohne Zeitfenster (das Aufräumen begrenzt den Bestand).
+pub async fn verlauf(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    einsatz_id: i64,
+) -> Result<Vec<Zeile>, AppError> {
+    let sql = format!(
+        "SELECT {SPALTEN} FROM benachrichtigung WHERE benutzer_id = ? AND einsatz_id = ? \
+         ORDER BY erstellt_at DESC, id DESC LIMIT ?"
+    );
+    let roh = sqlx::query_as::<_, RohZeile>(sqlx::AssertSqlSafe(sql))
+        .bind(benutzer_id)
+        .bind(einsatz_id)
+        .bind(LISTE_MAX)
+        .fetch_all(pool)
+        .await?;
+    Ok(roh.into_iter().filter_map(aus_roh).collect())
+}
+
+/// „Alle gelesen“ (LLH-1143, design.md D4): quittiert die offenen eigenen Zeilen im Einsatz bis
+/// einschließlich `bis_id`, außer Alarmen. Liefert die jetzt quittierten Zeilen.
+pub async fn gelesen_bis(
+    pool: &SqlitePool,
+    benutzer_id: i64,
+    einsatz_id: i64,
+    bis_id: i64,
+) -> Result<Vec<Zeile>, AppError> {
+    let sql = format!(
+        "UPDATE benachrichtigung SET quittiert_at = ? \
+         WHERE benutzer_id = ? AND einsatz_id = ? AND id <= ? AND quittiert_at IS NULL \
+           AND stufe <> 'alarm' \
+         RETURNING {SPALTEN}"
+    );
+    let roh = sqlx::query_as::<_, RohZeile>(sqlx::AssertSqlSafe(sql))
+        .bind(crate::zeit::jetzt())
+        .bind(benutzer_id)
+        .bind(einsatz_id)
+        .bind(bis_id)
         .fetch_all(pool)
         .await?;
     Ok(roh.into_iter().filter_map(aus_roh).collect())
@@ -256,12 +308,12 @@ pub async fn quittieren_fuer_bezug_ausser(
 }
 
 /// Räumt ab (Scheduler, design.md D1): quittierte Zeilen, deren Quittung älter als
-/// [`QUITTIERT_AUFBEWAHRUNG_STUNDEN`] ist, und unquittierte, älter als [`NACHREICHEN_STUNDEN`].
-/// Liefert die Zahl der gelöschten Zeilen.
+/// [`QUITTIERT_AUFBEWAHRUNG_STUNDEN`] ist, und unquittierte, älter als [`VERLAUF_STUNDEN`]
+/// (LLH-1143). Liefert die Zahl der gelöschten Zeilen.
 pub async fn aufraeumen(pool: &SqlitePool, jetzt: DateTime<Utc>) -> Result<u64, AppError> {
     let quittiert_vor =
         crate::zeit::formatiere_utc(jetzt - Duration::hours(QUITTIERT_AUFBEWAHRUNG_STUNDEN));
-    let erstellt_vor = crate::zeit::formatiere_utc(jetzt - Duration::hours(NACHREICHEN_STUNDEN));
+    let erstellt_vor = crate::zeit::formatiere_utc(jetzt - Duration::hours(VERLAUF_STUNDEN));
     Ok(sqlx::query(
         "DELETE FROM benachrichtigung \
          WHERE (quittiert_at IS NOT NULL AND quittiert_at < ?) \

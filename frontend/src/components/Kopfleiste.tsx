@@ -85,13 +85,14 @@ export function kopfZelleStil(
  *
  * Der Einsatzname ist die Identität der Seite, das Suchfeld nur ein Auslöser. Ab `lg` startet
  * die Namensgruppe mit 340 px (fester Teil aus Marke, Wortmarke, Nummer ≈ 270 px plus Name) und
- * wächst dreimal so stark wie die Suche; die Suche startet bei 180 px und SCHRUMPFT zuerst. Ihre
+ * wächst dreimal so stark wie die Suche; die Suche startet bei 136 px und SCHRUMPFT zuerst. Ihre
  * Obergrenze hält `CommandPaletteTrigger` (`SUCHFELD_MAX_BREITE`).
  *
  * Die BASEN entscheiden zugleich den Umbruch (`flexWrap` am Kopf): die rechte Zellgruppe wandert
  * in eine zweite Zeile, sobald Namensbasis + Suchbasis + rechte Gruppe die Breite übersteigen.
- * Die Summe 340 + 180 = 520 px hält den Umbruchpunkt (≈ 1100 px in `kompakt`); kleiner würde der
- * Name bei mittleren Breiten auf 0 px gedrückt.
+ * Die Summe 340 + 136 = 476 px plus der Knopf „Eingänge“ (44 px samt Abstand, rechte Gruppe,
+ * LLH-1143) hält den Umbruchpunkt von vorher (520 px, ≈ 1100 px in `kompakt`); kleiner würde der
+ * Name bei mittleren Breiten auf 0 px gedrückt. Die Suche gibt die 44 px her, der Name nicht.
  *
  * UNTER `lg` gilt {@link KOPF_NAME_FLEX_SCHMAL}: dort gibt es keine Suchzelle. Ein Flex-Kind
  * mit Text braucht einen Boden, sonst kürzt es nicht, sondern läuft über (Gate 1): die
@@ -101,8 +102,8 @@ export function kopfZelleStil(
  * die Suche laufen.
  */
 export const KOPF_NAME_FLEX = '3 1 340px';
-export const KOPF_NAME_FLEX_SCHMAL = '1 1 240px';
-export const KOPF_SUCHE_FLEX = '1 1 180px';
+export const KOPF_NAME_FLEX_SCHMAL = '1 1 196px';
+export const KOPF_SUCHE_FLEX = '1 1 136px';
 
 /**
  * Markenzelle: Bildmarke „Lebenslinie“ (LFH-837) in der Textfarbe des Rahmens, in Rail-Breite.

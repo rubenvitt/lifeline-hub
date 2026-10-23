@@ -132,17 +132,18 @@ describe('Kopfgruppen — der Einsatzname vor dem Suchfeld (22.09.2026)', () => 
   it('gibt der Namensgruppe eine Basis über ihrem festen Teil (≈ 270 px in kompakt)', () => {
     // LITERALE: mit 240 px deckte die Basis nicht einmal Marke, Wortmarke und Nummer.
     expect(teile(KOPF_NAME_FLEX).basis).toBe(340);
-    expect(teile(KOPF_SUCHE_FLEX).basis).toBe(180);
+    expect(teile(KOPF_SUCHE_FLEX).basis).toBe(136);
   });
 
-  it('bricht nicht früher um als vorher — die Summe der Basen bleibt 520 px', () => {
+  it('bricht nicht früher um als vorher — Basen plus Knopf „Eingänge“ bleiben 520 px', () => {
     // Eine größere Summe kostete das Führungs-Tablet (1024–1280 px) eine zweite Kopfzeile; eine
-    // kleinere hielte bei 992 px alles einzeilig und drückte den Namen auf 0 px.
-    expect(teile(KOPF_NAME_FLEX).basis + teile(KOPF_SUCHE_FLEX).basis).toBe(520);
+    // kleinere hielte bei 992 px alles einzeilig und drückte den Namen auf 0 px. Seit LLH-1143
+    // steht rechts der Knopf „Eingänge“ (44 px samt Abstand); die Suche gibt ihn her.
+    expect(teile(KOPF_NAME_FLEX).basis + teile(KOPF_SUCHE_FLEX).basis + 44).toBe(520);
   });
 
-  it('lässt die Verdichtung unter lg unverändert', () => {
-    expect(KOPF_NAME_FLEX_SCHMAL).toBe('1 1 240px');
+  it('gibt unter lg dem Knopf „Eingänge“ die 44 px aus der Namensbasis (vorher 240 px)', () => {
+    expect(KOPF_NAME_FLEX_SCHMAL).toBe('1 1 196px');
   });
 });
 
