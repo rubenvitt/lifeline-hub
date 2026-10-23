@@ -30,7 +30,7 @@ describe('lesemarkeText', () => {
         marke({ neue_anzahl: 14, gesichtet_at: '2026-09-22 11:04:00', gesichtet_lfd_nr: 6 }),
         BERLIN,
       ),
-    ).toBe('14 neue Einträge seit Ihrer letzten Sichtung um 13:04');
+    ).toBe('14 neue Einträge seit Ihrer letzten Sichtung um 1304');
   });
 
   it('nennt den Tag, wenn die Sichtung nicht von heute ist', () => {
@@ -41,7 +41,7 @@ describe('lesemarkeText', () => {
         marke({ neue_anzahl: 1, gesichtet_at: '2026-09-21 20:30:00', gesichtet_lfd_nr: 6 }),
         BERLIN,
       ),
-    ).toBe('1 neuer Eintrag seit Ihrer letzten Sichtung am 21.09. um 22:30');
+    ).toBe('1 neuer Eintrag seit Ihrer letzten Sichtung 212230');
   });
 
   it('behauptet ohne Marke keine Sichtung, die es nie gab', () => {

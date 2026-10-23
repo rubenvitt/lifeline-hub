@@ -40,7 +40,7 @@ export type TeilStandArt = 'aktuell' | 'veraltet' | 'unbekannt' | 'kein_ort';
 
 export interface TeilStand {
   art: TeilStandArt;
-  /** „Stand 14:25" · „Messung 14:20" (`messStand`) · „Stand unbekannt" · `null` ohne Einsatzort. */
+  /** „Stand 1425" · „Messung 1420" (`messStand`) · „Stand unbekannt" · `null` ohne Einsatzort. */
   stand: string | null;
 }
 

@@ -371,7 +371,7 @@ describe('EtbPage', () => {
     expect(pfad).toHaveTextContent('Einsätze');
     expect(pfad).not.toHaveTextContent('Hochwasser Nord');
     expect(await screen.findByText('Erste Meldung')).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Datenstand \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Datenstand \d{4}$/)).toBeInTheDocument();
     // Kein Filter: der Kopf nennt die Gesamtzahl der Serverzählung.
     const kopf = document.querySelector('[data-lfh="seitenkopf"]')!;
     await waitFor(() => expect(kopf).toHaveTextContent('1 Eintrag'));

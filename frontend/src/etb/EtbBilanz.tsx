@@ -11,7 +11,7 @@ import {
   useRollen,
 } from '../components/instrument';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeit } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 import { etbPfad } from '../routing/deeplinks';
 import { etbTypFarbe, etbTypMehrzahl } from '../theme/statusFarben';
 import {
@@ -169,7 +169,7 @@ export default function EtbBilanz({
                       Nr. {b.lfd_nr} berichtigt
                       {grund?.lfd_nr != null
                         ? ` Nr. ${grund.lfd_nr}`
-                        : ' einen älteren Eintrag'} um {formatUhrzeit(b.ereigniszeit, konventionen)}
+                        : ' einen älteren Eintrag'} um {zeitKurz(b.ereigniszeit, konventionen)}
                       <span aria-hidden="true"> ↗</span>
                     </Link>
                   </li>

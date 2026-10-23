@@ -86,13 +86,29 @@ describe('Auto-Platzhalter Datum und Uhrzeit in der Anzeigezone (LFH-692)', () =
     vi.useRealTimers();
   });
 
-  it('Browser UTC, Anzeigezone Berlin: 30.09. 23:30 UTC wird „01.10.2026 01:30“', () => {
+  it('Browser UTC, Anzeigezone Berlin: 30.09. 23:30 UTC wird „01okt26 0130“', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
     const b = baustein({ inhalt: 'Stand {datum} {uhrzeit}' });
-    expect(setzeBausteinEin(b, einsatz, {}, 'Europe/Berlin').inhalt).toBe('Stand 01.10.2026 01:30');
+    expect(setzeBausteinEin(b, einsatz, {}, { zeitzone: 'Europe/Berlin' }).inhalt).toBe(
+      'Stand 01okt26 0130',
+    );
     // Ohne Anzeigezone bleibt es die Browserzone.
-    expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30.09.2026 23:30');
+    expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30sep26 2330');
+  });
+
+  it('folgt der Darstellung „Datum und Uhrzeit“ (LLH-1061)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-30T23:30:00Z'));
+    const b = baustein({ inhalt: 'Stand {datum} {uhrzeit}' });
+    expect(
+      setzeBausteinEin(
+        b,
+        einsatz,
+        {},
+        { zeitzone: 'Europe/Berlin', zeitdarstellung: 'datum_uhrzeit' },
+      ).inhalt,
+    ).toBe('Stand 01.10.26 01:30');
   });
 });
 
@@ -111,6 +127,6 @@ describe('Auto-Platzhalter nach der Serveruhr (LFH-895)', () => {
     serveruhrVergessenFuerTests();
     merkeServerzeit(new Response(null, { headers: { Date: new Date(server).toUTCString() } }));
     const b = baustein({ inhalt: 'Stand {datum} {uhrzeit}' });
-    expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30.09.2026 10:00');
+    expect(setzeBausteinEin(b, einsatz, {}).inhalt).toBe('Stand 30sep26 1000');
   });
 });

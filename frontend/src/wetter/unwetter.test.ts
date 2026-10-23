@@ -180,10 +180,10 @@ describe('Texte', () => {
     const w = warnung('schwer', 'SCHWERES GEWITTER', 2.5 * STUNDE, 5.5 * STUNDE);
     expect(unwetterHinweisText(w, 0, JETZT, BERLIN)).toEqual({
       titel: 'Unwetterwarnung',
-      beschreibung: 'Schweres Gewitter, ab 17:00 · bis 20:00',
+      beschreibung: 'Schweres Gewitter, ab 1700 · bis 2000',
     });
     expect(unwetterHinweisText(w, 1, JETZT, BERLIN).beschreibung).toBe(
-      'Schweres Gewitter, ab 17:00 · bis 20:00 (+ 1 weitere)',
+      'Schweres Gewitter, ab 1700 · bis 2000 (+ 1 weitere)',
     );
     expect(unwetterHinweisText(warnung('extrem', 'ORKANBÖEN'), 0, JETZT, BERLIN).titel).toBe(
       'Extremes Unwetter',

@@ -172,7 +172,9 @@ export default function Zeitachseneintrag({
           gap: 2,
         }}
       >
-        <span style={{ ...monoStil(13, 500), color: rollen.text }}>{zeit}</span>
+        <span data-lfh="zeitachse-zeit" style={{ ...monoStil(13, 500), color: rollen.text }}>
+          {zeit}
+        </span>
         {nr != null && <span style={{ ...monoStil(10), color: rollen.schwach }}>{nr}</span>}
       </div>
       <span

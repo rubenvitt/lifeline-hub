@@ -61,7 +61,7 @@ describe('AktuellPaneel (LFH-864)', () => {
   it('zeigt die Messung mit Station, Messzeit und Quellenvermerk', () => {
     zeige(ok(messung()));
     expect(screen.getByText('Aktuelle Bedingungen')).toBeInTheDocument();
-    expect(paneel()).toHaveTextContent('Station Ottenstein, 9,0 km · Messung 08:00');
+    expect(paneel()).toHaveTextContent('Station Ottenstein, 9,0 km · Messung 0800');
     expect(paneel()).toHaveTextContent('Datenbasis: Deutscher Wetterdienst');
     expect(paneel()).toHaveTextContent('SYNOP');
 
@@ -141,7 +141,7 @@ describe('AktuellPaneel (LFH-864)', () => {
     const hinweis = paneel().querySelector('[data-lfh="wetter-veraltet"]');
     // Der Abruf gelang; alt ist die Messung der Station, nicht die Verbindung.
     expect(hinweis).toHaveTextContent(
-      'Messung 06:10 · veraltet — die Station hat seitdem keine neue Messung geliefert',
+      'Messung 0610 · veraltet — die Station hat seitdem keine neue Messung geliefert',
     );
     expect(hinweis).not.toHaveTextContent('Aktualisierung');
     expect(kennzahl('Temperatur')).toHaveTextContent('14,8');

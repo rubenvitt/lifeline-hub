@@ -149,14 +149,14 @@ describe('<Verlaufslinie>', () => {
       toJSON: () => ({}),
     } as DOMRect);
     const ablesung = () => document.querySelector('[data-lfh="verlauf-ablesung"]')!.textContent;
-    // Ohne Zeiger: die Zeit des jüngsten Punkts (1405, taktisch).
-    expect(ablesung()).toBe('1405');
+    // Ohne Zeiger: die Zeit des jüngsten Punkts (221405: taktisch, Rolle „kurz“, nicht von heute).
+    expect(ablesung()).toBe('221405');
     // Knapp rechts der Mitte (Pixel 250 von 480 ≈ viewBox 125): der mittlere Punkt,
     // −12 h = 0205, 6,00 m.
     fireEvent.pointerMove(svg, { clientX: 250 });
-    expect(ablesung()).toBe('0205 · 6,00 m');
+    expect(ablesung()).toBe('220205 · 6,00 m');
     fireEvent.pointerLeave(svg);
-    expect(ablesung()).toBe('1405');
+    expect(ablesung()).toBe('221405');
   });
 
   it('ohne Punkte rendert sie nichts', () => {

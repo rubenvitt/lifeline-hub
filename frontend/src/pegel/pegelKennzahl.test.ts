@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PegelAnzeige } from '../api/types';
-import { formatUhrzeit } from '../anzeige/format';
+import { uhrzeit } from '../anzeige/zeitDarstellung';
 import {
   messEpoche,
   pegelKennzahl,
@@ -36,24 +36,22 @@ const pegel = (over: Partial<PegelAnzeige> = {}): PegelAnzeige => ({
 });
 
 describe('Zeit mit Versatz (die Falle der Wirestring-Formatierer)', () => {
-  it('formatUhrzeit liest den Versatz und rechnet in die Anzeigezone', () => {
-    expect(formatUhrzeit('2026-09-22T14:05:00+02:00', BERLIN)).toBe('1405');
+  it('uhrzeit liest den Versatz und rechnet in die Anzeigezone', () => {
+    expect(uhrzeit('2026-09-22T14:05:00+02:00', BERLIN)).toBe('1405');
     // Derselbe Zeitpunkt in UTC geschrieben ergibt dieselbe Ortszeit.
-    expect(formatUhrzeit('2026-09-22T12:05:00Z', BERLIN)).toBe('1405');
+    expect(uhrzeit('2026-09-22T12:05:00Z', BERLIN)).toBe('1405');
     // Anders gezont: New York liegt sechs Stunden hinter Berlin.
-    expect(formatUhrzeit('2026-09-22T14:05:00+02:00', { zeitzone: 'America/New_York' })).toBe(
-      '0805',
-    );
+    expect(uhrzeit('2026-09-22T14:05:00+02:00', { zeitzone: 'America/New_York' })).toBe('0805');
   });
 
   it('hält beide Sommerzeit-Grenzen: der Versatz der Quelle wechselt mit', () => {
     // Letzte Messung vor dem Rückstellen (25.10.2026, 03:00 MESZ → 02:00 MEZ) …
-    expect(formatUhrzeit('2026-10-25T02:45:00+02:00', BERLIN)).toBe('0245');
+    expect(uhrzeit('2026-10-25T02:45:00+02:00', BERLIN)).toBe('0245');
     // … und eine danach, jetzt mit +01:00 (01:15 UTC = 02:15 MEZ).
-    expect(formatUhrzeit('2026-10-25T02:15:00+01:00', BERLIN)).toBe('0215');
+    expect(uhrzeit('2026-10-25T02:15:00+01:00', BERLIN)).toBe('0215');
     // Vorstellen (29.03.2026, 02:00 MEZ → 03:00 MESZ).
-    expect(formatUhrzeit('2026-03-29T01:45:00+01:00', BERLIN)).toBe('0145');
-    expect(formatUhrzeit('2026-03-29T03:15:00+02:00', BERLIN)).toBe('0315');
+    expect(uhrzeit('2026-03-29T01:45:00+01:00', BERLIN)).toBe('0145');
+    expect(uhrzeit('2026-03-29T03:15:00+02:00', BERLIN)).toBe('0315');
   });
 
   it('das Alter kommt aus Date.parse und ist absolut, nicht ortszeitlich', () => {
@@ -64,19 +62,19 @@ describe('Zeit mit Versatz (die Falle der Wirestring-Formatierer)', () => {
 
 describe('standZeit', () => {
   it('am selben Tag wie „jetzt“ nur die Uhrzeit, gegen jetzt statt gegen die Maschinenuhr', () => {
-    expect(standZeit('2026-09-22T14:05:00+02:00', JETZT, BERLIN)).toBe('14:05');
+    expect(standZeit('2026-09-22T14:05:00+02:00', JETZT, BERLIN)).toBe('1405');
   });
 
   it('ein Stand vom Vortag trägt das Tag-Präfix', () => {
-    expect(standZeit('2026-09-21T23:50:00+02:00', JETZT, BERLIN)).toBe('21. 23:50');
+    expect(standZeit('2026-09-21T23:50:00+02:00', JETZT, BERLIN)).toBe('212350');
   });
 
   it('die Tagesgrenze liegt in der Anzeigezone, nicht in UTC', () => {
     // 22.09. 00:10 Berlin ist 21.09. 22:10 UTC — in Berlin derselbe Tag wie JETZT.
-    expect(standZeit('2026-09-21T22:10:00Z', JETZT, BERLIN)).toBe('00:10');
+    expect(standZeit('2026-09-21T22:10:00Z', JETZT, BERLIN)).toBe('0010');
     // In New York ist JETZT (12:30 UTC) der 22., der Stand (18:10 am 21.) der Vortag.
     expect(standZeit('2026-09-21T22:10:00Z', JETZT, { zeitzone: 'America/New_York' })).toBe(
-      '21. 18:10',
+      '211810',
     );
   });
 });
@@ -120,7 +118,7 @@ describe('Trend', () => {
 
 /**
  * Die Tabelle IST die Festlegung: jeder Fall mit Wert, Einheit, Notiz und Ton.
- * `formatUhrzeitMitTag` setzt den Tag voran, wenn der Messtag nicht „heute" auf der echten
+ * `zeitKurz` setzt den Tag voran, wenn der Messtag nicht „heute" auf der echten
  * Uhr ist — deshalb die Erwartung mit optionalem Tag.
  */
 describe('pegelKennzahl', () => {
@@ -128,7 +126,7 @@ describe('pegelKennzahl', () => {
     const k = pegelKennzahl([pegel()], JETZT, BERLIN);
     expect(k).toMatchObject({ fall: 'messung', wert: '6,84', einheit: 'm', ton: 'neutral' });
     expect(k.veraltet).toBe(false);
-    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 14:05');
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 1405');
   });
 
   it('ohne Gewässer steht der Stationsname', () => {
@@ -155,7 +153,7 @@ describe('pegelKennzahl', () => {
     });
     const k = pegelKennzahl([pegel()], grenze + 1000, BERLIN);
     expect(k).toMatchObject({ fall: 'messung', wert: '6,84', ton: 'achtung', veraltet: true });
-    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 14:05 · veraltet');
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 1405 · veraltet');
   });
 
   it('ein Stand vom Vortag nennt den Tag in der Notiz', () => {
@@ -164,7 +162,7 @@ describe('pegelKennzahl', () => {
       JETZT,
       BERLIN,
     );
-    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 21. 23:50 · veraltet');
+    expect(k.notiz).toBe('WESER · steigend +9 cm/h · Stand 212350 · veraltet');
   });
 
   it('Ausfall: festgelegt, keine Messung → „—", „Stand unbekannt", achtung', () => {
@@ -251,13 +249,13 @@ describe('Prognose am Leitpegel (LFH-628)', () => {
       BERLIN,
     );
     expect(k.notiz).toBe(
-      'WESER · steigend +9 cm/h · Stand 14:05 · Prognose 7,10 m bis 18:00 · +1 weitere',
+      'WESER · steigend +9 cm/h · Stand 1405 · Prognose 7,10 m bis 1800 · +1 weitere',
     );
   });
 
   it('ohne Prognose und mit abgelaufener ist die Notiz byte-gleich zur Fassung ohne', () => {
     const ohne = pegelKennzahl([pegel()], JETZT, BERLIN);
-    expect(ohne.notiz).toBe('WESER · steigend +9 cm/h · Stand 14:05');
+    expect(ohne.notiz).toBe('WESER · steigend +9 cm/h · Stand 1405');
     // 12:00 UTC liegt vor JETZT (12:30 UTC): vorbei.
     expect(
       pegelKennzahl([pegel({ prognose: prognose('2026-09-22 12:00:00') })], JETZT, BERLIN),
@@ -271,7 +269,7 @@ describe('Prognose am Leitpegel (LFH-628)', () => {
   it('auch bei Ausfall der Messung steht die Prognose', () => {
     const k = pegelKennzahl([pegel({ messung: undefined, prognose: prognose() })], JETZT, BERLIN);
     expect(k.fall).toBe('ausfall');
-    expect(k.notiz).toBe('WESER · Stand unbekannt · Prognose 7,10 m bis 18:00');
+    expect(k.notiz).toBe('WESER · Stand unbekannt · Prognose 7,10 m bis 1800');
   });
 
   it('nur der Leitpegel zählt — die Prognose eines weiteren Pegels steht nicht in der Kennzahl', () => {
@@ -285,7 +283,7 @@ describe('Prognose am Leitpegel (LFH-628)', () => {
 
   it('am anderen Tag mit Tag davor; unlesbarer Zeitpunkt gilt als abgelaufen', () => {
     expect(prognoseText(prognose('2026-09-23 04:00:00'), JETZT, BERLIN)).toBe(
-      'Prognose 7,10 m bis 23. 06:00',
+      'Prognose 7,10 m bis 230600',
     );
     expect(prognoseOffen(prognose('kaputt'), JETZT)).toBe(false);
     expect(prognoseOffen(prognose(), JETZT)).toBe(true);
@@ -303,7 +301,7 @@ describe('pegelZeile (eine Station, Modulseite LFH-633)', () => {
       einheit: 'm',
       trend: 'steigend +9 cm/h',
       richtung: 'steigend',
-      stand: 'Stand 14:05',
+      stand: 'Stand 1405',
       veraltet: false,
       ton: 'neutral',
       prognose: null,
@@ -320,7 +318,7 @@ describe('pegelZeile (eine Station, Modulseite LFH-633)', () => {
     );
     expect(z.fall).toBe('messung');
     expect(z.wert).toBe('6,84');
-    expect(z.stand).toBe('Stand 13:29');
+    expect(z.stand).toBe('Stand 1329');
     expect(z.veraltet).toBe(true);
     expect(z.ton).toBe('achtung');
   });
@@ -346,7 +344,7 @@ describe('pegelZeile (eine Station, Modulseite LFH-633)', () => {
       richtung: null,
       ton: 'achtung',
       veraltet: false,
-      prognose: 'Prognose 7,10 m bis 18:00',
+      prognose: 'Prognose 7,10 m bis 1800',
     });
     expect(z.einheit).toBeUndefined();
   });

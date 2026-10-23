@@ -22,15 +22,15 @@ export default function BausteinPlatzhalterModal({
   onAbbrechenAll,
 }: Props) {
   const [form] = Form.useForm<Record<string, string>>();
-  // `{datum}`/`{uhrzeit}` in der Anzeigezone (LFH-692).
-  const zone = useAnzeigeKonventionen().konventionen.zeitzone ?? null;
-  const offenePlatzhalter = baustein ? ermittlePlatzhalter(baustein, einsatz, zone) : [];
+  // `{datum}`/`{uhrzeit}` in der Anzeigezone (LFH-692) und der wirksamen Darstellung (LLH-1061).
+  const { konventionen } = useAnzeigeKonventionen();
+  const offenePlatzhalter = baustein ? ermittlePlatzhalter(baustein, einsatz, konventionen) : [];
 
   // Bausteine ohne manuelle Platzhalter sofort einsetzen (kein Dialog nötig).
   useEffect(() => {
     if (!baustein) return;
     if (offenePlatzhalter.length === 0) {
-      onEinsetzen(setzeBausteinEin(baustein, einsatz, {}, zone));
+      onEinsetzen(setzeBausteinEin(baustein, einsatz, {}, konventionen));
       return;
     }
     // Zurückgesetzt wird nur, wenn der Dialog aufgeht: antds `Modal` rendert sein
@@ -42,7 +42,7 @@ export default function BausteinPlatzhalterModal({
 
   function anwenden(werte: Record<string, string>) {
     if (!baustein) return;
-    onEinsetzen(setzeBausteinEin(baustein, einsatz, werte, zone));
+    onEinsetzen(setzeBausteinEin(baustein, einsatz, werte, konventionen));
     form.resetFields();
   }
 

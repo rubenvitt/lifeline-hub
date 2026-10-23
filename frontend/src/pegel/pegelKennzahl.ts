@@ -10,7 +10,8 @@
  *    vergleichbar.
  *  - **Trend auf ganze cm/h**, Richtung als WORT (WCAG 1.4.1): „steigend +9 cm/h",
  *    „fallend −3 cm/h" (U+2212), „gleichbleibend" bei |Trend| < 1, „Trend unbekannt".
- *  - **Datenstand** „Stand HH:MM" in der Anzeigezone, an anderem Tag mit Tag davor.
+ *  - **Datenstand** „Stand 1405" in der Anzeigezone, an anderem Tag mit Tag davor („212350“):
+ *    die Rolle „kurz“ des Formatkerns gegen `jetzt` (LLH-1061).
  *    `zeitpunkt` ist RFC 3339 MIT Versatz: das Alter rechnet `Date.parse`, NICHT
  *    `wireAlsEpoche` (die hängt ein `Z` an und liefert `NaN`).
  *  - **Älter als 60 min → „veraltet"** plus Ton `achtung`: die Quelle misst im 15-min-Raster,
@@ -19,11 +20,12 @@
  *  - **Keiner festgelegt**: „—", „kein Pegel festgelegt", Ton `neutral` (offene Einrichtung).
  *  - **Mehrere**: Zusatz „+n weitere".
  *  - **Prognose**: ein noch offener erwarteter Höchststand steht als „Prognose 7,10 m bis
- *    18:00" hinter dem Datenstand, auch bei Ausfall. Eine abgelaufene fällt weg (vorbei ist
+ *    1800" hinter dem Datenstand, auch bei Ausfall. Eine abgelaufene fällt weg (vorbei ist
  *    nicht „überfällig"). Ohne Prognose ist die Notiz byte-gleich zur Fassung ohne sie.
  */
 import type { PegelAnzeige, PegelPrognose } from '../api/types';
-import { DEFAULT_KONVENTIONEN, inZone, type AnzeigeKonventionen } from '../anzeige/format';
+import { DEFAULT_KONVENTIONEN, type AnzeigeKonventionen } from '../anzeige/format';
+import { zeitKurz } from '../anzeige/zeitDarstellung';
 
 /** Ab diesem Alter ist eine Messung „veraltet". */
 const PEGEL_VERALTET_MS = 60 * 60_000;
@@ -69,17 +71,16 @@ export function trendText(t: number | null | undefined): string {
 }
 
 /**
- * Uhrzeit des Datenstands: `HH:mm` am selben Tag wie `jetzt`, sonst `DD. HH:mm`. Gegen
- * `jetzt` statt gegen die Maschinenuhr, damit die reine Funktion pinnbar bleibt. Rein.
+ * Zeit des Datenstands in der Rolle „kurz“: am selben Tag wie `jetzt` die Uhrzeit (`1405`), sonst
+ * mit Tag (`212350`). Gegen `jetzt` statt gegen die Maschinenuhr, damit die reine Funktion
+ * pinnbar bleibt. Rein.
  */
 export function standZeit(
   zeitpunkt: string,
   jetzt: number,
   konv: AnzeigeKonventionen = DEFAULT_KONVENTIONEN,
 ): string {
-  const d = inZone(zeitpunkt, konv);
-  const heute = inZone(new Date(jetzt).toISOString(), konv);
-  return d.isSame(heute, 'day') ? d.format('HH:mm') : d.format('DD. HH:mm');
+  return zeitKurz(zeitpunkt, konv, jetzt);
 }
 
 /** Messzeitpunkt (RFC 3339 mit Versatz) als Epoche; `NaN` bei Unlesbarem. Rein. */

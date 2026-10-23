@@ -73,21 +73,21 @@ describe('Messwerte — ein fehlender Wert ist ein Strich, nie 0', () => {
 describe('warnZeitraum', () => {
   it('geltende Warnung: „seit … · bis …"', () => {
     expect(warnZeitraum('2026-09-22T11:00:00Z', '2026-09-22T14:00:00Z', JETZT, BERLIN)).toBe(
-      'seit 13:00 · bis 16:00',
+      'seit 1300 · bis 1600',
     );
   });
 
   it('angekündigte Warnung: „ab … · bis …", am anderen Tag mit Tag davor', () => {
     expect(warnZeitraum('2026-09-22T15:00:00Z', '2026-09-23T06:00:00Z', JETZT, BERLIN)).toBe(
-      'ab 17:00 · bis 23. 08:00',
+      'ab 1700 · bis 230800',
     );
   });
 
   it('ohne Ende „bis auf Weiteres", ohne Beginn nur das Ende', () => {
     expect(warnZeitraum('2026-09-22T11:00:00Z', null, JETZT, BERLIN)).toBe(
-      'seit 13:00 · bis auf Weiteres',
+      'seit 1300 · bis auf Weiteres',
     );
-    expect(warnZeitraum(null, '2026-09-22T14:00:00Z', JETZT, BERLIN)).toBe('bis 16:00');
+    expect(warnZeitraum(null, '2026-09-22T14:00:00Z', JETZT, BERLIN)).toBe('bis 1600');
   });
 });
 

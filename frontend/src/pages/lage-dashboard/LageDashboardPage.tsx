@@ -74,7 +74,6 @@ import { kopfWarnung } from '../../wetter/kopfWarnung';
 import WetterKopfMarke from '../../wetter/WetterKopfMarke';
 import { listeEtb } from '../../api/etb';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { formatUhrzeitMitTag } from '../../anzeige/format';
 import { kraefteText } from '../../anzeige/staerke';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
@@ -122,6 +121,7 @@ import {
   type Zaehlstand,
 } from './fuehrungsZahlen';
 import { kraefteZustand, useLagebild } from './useLagebild';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
 
 /**
  * Verdichtet mehrere Queries auf einen Zustand. Fehler schlägt Laden: ein halb geladener Block mit
@@ -597,7 +597,7 @@ export default function LageDashboardPage() {
                 lageberichteGesperrt
                   ? '—'
                   : fuehrung?.bericht
-                    ? formatUhrzeitMitTag(fuehrung.bericht.stand, konv)
+                    ? zeitKurz(fuehrung.bericht.stand, konv)
                     : 'keiner'
               }
               notiz={

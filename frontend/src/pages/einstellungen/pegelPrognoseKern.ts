@@ -56,7 +56,7 @@ export function wiederherstellBody(p: PegelPrognose): PrognoseEingabe {
 }
 
 /**
- * „PEGELONLINE-Vorhersage, gerechnet 07:00: höchster Wert 7,10 m um 18:00" — ein Wert aus dem
+ * „PEGELONLINE-Vorhersage, gerechnet 0700: höchster Wert 7,10 m um 1800" — ein Wert aus dem
  * Abschätzungs-Teil der Reihe bekommt einen Zusatz. Rein.
  */
 export function vorhersageSatz(

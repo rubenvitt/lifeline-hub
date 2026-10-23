@@ -97,6 +97,7 @@ describe('stromQuelle', () => {
 
 describe('stromZeit', () => {
   it('zeigt die Ereigniszeit in der Anzeigezone', () => {
-    expect(stromZeit(e(1), { zeitzone: 'Europe/Berlin' })).toBe('1100');
+    expect(stromZeit(e(1), { zeitzone: 'Europe/Berlin' }, Date.UTC(2026, 5, 11, 18))).toBe('1100');
+    expect(stromZeit(e(1), { zeitzone: 'Europe/Berlin' }, Date.UTC(2026, 5, 12, 8))).toBe('111100');
   });
 });

@@ -17,7 +17,7 @@ import {
   nachtragText,
   letzteBerichtigungen,
   pufferZustand,
-  stundenEtikett,
+  stundenKopf,
   teileZufluss,
   typBilanz,
   typSegmente,
@@ -51,6 +51,11 @@ const puffer: AusstehenderEintrag = {
 };
 const abgelehnt: AbgelehnterEintrag = { ...puffer, grund: 'g', abgelehnt_at: '2026-05-23 10:06' };
 
+/** Zone UTC, „jetzt“ am 23.05.2026 abends: Köpfe vom 23.05. stehen ohne Tag. */
+const UTC = { zeitzone: 'UTC' };
+const JETZT_23 = Date.UTC(2026, 4, 23, 20, 0, 0);
+const kopf = (utc: string) => stundenKopf(utc, UTC, JETZT_23);
+
 describe('gruppiereNachStunde', () => {
   // Identität als Zone: die Stunde steckt in den ersten 13 Zeichen des Wire-Strings.
   const stunde = (utc: string) => utc.slice(0, 13);
@@ -64,8 +69,8 @@ describe('gruppiereNachStunde', () => {
       ausstehend: [],
       abgelehnt: [],
     });
-    const gruppen = gruppiereNachStunde(zeilen, stunde);
-    expect(gruppen.map((g) => g.etikett)).toEqual(['24.05. · 14 Uhr', '23.05. · 14 Uhr']);
+    const gruppen = gruppiereNachStunde(zeilen, stunde, kopf);
+    expect(gruppen.map((g) => g.etikett)).toEqual(['241400', '1400']);
   });
 
   it('springt nicht in eine frühere Gruppe zurück — die Serverordnung gewinnt', () => {
@@ -78,16 +83,28 @@ describe('gruppiereNachStunde', () => {
       ausstehend: [],
       abgelehnt: [],
     });
-    expect(gruppiereNachStunde(zeilen, stunde).map((g) => g.zeilen.length)).toEqual([1, 1, 1]);
+    expect(gruppiereNachStunde(zeilen, stunde, kopf).map((g) => g.zeilen.length)).toEqual([
+      1, 1, 1,
+    ]);
   });
 
   it('ordnet gepufferte Zeilen nach ihrer lokalen Erfassungszeit ein', () => {
     const zeilen = baueZeilen({ eintraege: [], ausstehend: [puffer], abgelehnt: [] });
-    expect(gruppiereNachStunde(zeilen, stunde)[0].schluessel).toBe('2026-05-23 10');
+    expect(gruppiereNachStunde(zeilen, stunde, kopf)[0].schluessel).toBe('2026-05-23 10');
   });
 
-  it('beschriftet die Stunde mit Tag', () => {
-    expect(stundenEtikett('2026-09-21 07')).toBe('21.09. · 07 Uhr');
+  it('beschriftet die Stunde in der Rolle „kurz“: heute ohne, sonst mit Tag (LLH-1061)', () => {
+    expect(stundenKopf('2026-05-23 07:42:00', UTC, JETZT_23)).toBe('0700');
+    expect(stundenKopf('2026-05-21 07:42:00', UTC, JETZT_23)).toBe('210700');
+    expect(
+      stundenKopf('2026-05-21 07:42:00', { ...UTC, zeitdarstellung: 'datum_uhrzeit' }, JETZT_23),
+    ).toBe('21.05. 07:00');
+  });
+
+  it('rechnet den Kopf in der Anzeigezone: 23:30 UTC ist in Berlin schon der nächste Tag', () => {
+    expect(stundenKopf('2026-05-23 23:30:00', { zeitzone: 'Europe/Berlin' }, JETZT_23)).toBe(
+      '240100',
+    );
   });
 });
 
@@ -129,8 +146,8 @@ describe('funkprotokollFolge (LLH-1149)', () => {
       ausstehend: [],
       abgelehnt: [],
     });
-    const gruppen = gruppiereNachStunde(funkprotokollFolge(zeilen), stunde);
-    expect(gruppen.map((g) => g.etikett)).toEqual(['23.05. · 13 Uhr', '23.05. · 14 Uhr']);
+    const gruppen = gruppiereNachStunde(funkprotokollFolge(zeilen), stunde, kopf);
+    expect(gruppen.map((g) => g.etikett)).toEqual(['1300', '1400']);
     expect(gruppen[1].zeilen.map((z) => (z.art === 'eintrag' ? z.eintrag.lfd_nr : null))).toEqual([
       2, 3,
     ]);
@@ -507,6 +524,16 @@ describe('nachtragText (LLH-1088)', () => {
     // In UTC derselbe Tag (21:50 / 23:10), in Berlin schon der 11.
     expect(nachtragText('2026-10-10 21:50:00', '2026-10-10 23:10:00', berlin)).toBe(
       'nachgetragen 110110',
+    );
+  });
+
+  it('folgt der Darstellung „Datum und Uhrzeit“ (LLH-1061)', () => {
+    const datum = { ...berlin, zeitdarstellung: 'datum_uhrzeit' as const };
+    expect(nachtragText('2026-10-10 21:50:00', '2026-10-10 22:20:00', datum)).toBe(
+      'nachgetragen 11.10. 00:20',
+    );
+    expect(nachtragText('2026-10-10 10:00:00', '2026-10-10 12:21:00', datum)).toBe(
+      'nachgetragen um 14:21',
     );
   });
 });

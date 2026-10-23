@@ -23,10 +23,10 @@ describe('messStand — aktuelle Bedingungen (LFH-864): der Stand ist die Messze
     daten: { gemessen_at: vor(gemessenVor) },
   });
 
-  it('„Messung HH:MM" aus `gemessen_at`, nicht aus dem Abruf', () => {
+  it('„Messung HHMM" aus `gemessen_at`, nicht aus dem Abruf', () => {
     expect(messStand(aktuell(10 * MIN), JETZT, BERLIN)).toEqual({
       art: 'aktuell',
-      stand: 'Messung 14:20',
+      stand: 'Messung 1420',
     });
   });
 
@@ -35,7 +35,7 @@ describe('messStand — aktuelle Bedingungen (LFH-864): der Stand ist die Messze
     expect(messStand(aktuell(89 * MIN), JETZT, BERLIN).art).toBe('aktuell');
     expect(messStand(aktuell(91 * MIN), JETZT, BERLIN)).toEqual({
       art: 'veraltet',
-      stand: 'Messung 12:59',
+      stand: 'Messung 1259',
     });
   });
 
@@ -63,10 +63,10 @@ describe('messStand — aktuelle Bedingungen (LFH-864): der Stand ist die Messze
 });
 
 describe('teilStand', () => {
-  it('ok und jung: aktuell mit „Stand HH:MM"', () => {
+  it('ok und jung: aktuell mit „Stand HHMM"', () => {
     expect(
       teilStand({ zustand: 'ok', abgerufen_at: vor(5 * MIN) }, 'warnungen', JETZT, BERLIN),
-    ).toEqual({ art: 'aktuell', stand: 'Stand 14:25' });
+    ).toEqual({ art: 'aktuell', stand: 'Stand 1425' });
   });
 
   it('Warnungen: genau 30 min ist noch aktuell, 30 min + 1 s ist veraltet', () => {
@@ -76,7 +76,7 @@ describe('teilStand', () => {
     ).toBe('aktuell');
     expect(
       teilStand({ zustand: 'ok', abgerufen_at: vor(30 * MIN + 1000) }, 'warnungen', JETZT, BERLIN),
-    ).toEqual({ art: 'veraltet', stand: 'Stand 13:59' });
+    ).toEqual({ art: 'veraltet', stand: 'Stand 1359' });
   });
 
   it('Vorhersage: die Schwelle liegt bei 3 h', () => {
