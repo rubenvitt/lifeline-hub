@@ -3,6 +3,7 @@ import {
   IconGlockeAus,
   IconHakenKreis,
   IconMonitor,
+  IconPosteingang,
   IconVerbotsschild,
 } from '../icons';
 import { Button, Dropdown, Tooltip, theme } from 'antd';
@@ -26,6 +27,8 @@ import {
 import { useAlarmToasts } from '../alarm/useAlarmToasts';
 import { quittiereNachNutzer, useBenachrichtigungen } from '../alarm/useBenachrichtigungen';
 import { useEingangshinweis } from '../alarm/useEingangshinweis';
+import { eingaengeName, oeffneEingaenge, useKopfBuendelt } from '../alarm/eingaenge';
+import EingaengeZahl from '../alarm/EingaengeZahl';
 import { wetterPegelPfad } from '../routing/deeplinks';
 import { WortPlatz } from '../components/Kopfleiste';
 import { useViewport } from '../components/useViewport';
@@ -122,23 +125,34 @@ const DOPPELKLICK_MS = 500;
  * wirkt also seitenunabhängig; die Einsatz-ID reicht der Rahmen schon geprüft herein (LFH-438).
  * Toasts über `App.useApp().notification` (kein statischer Import, sonst Kontext-Leak in Tests).
  *
- * Neben dem Budget steht der Eingangshinweis (`alarm/useEingangshinweis.tsx`, LLH-1062): neue
- * Meldungen und Übernahmen in die Lage gebündelt an einem eigenen Platz. `darfSichten` ist das
- * Schreibrecht im Einsatz; ohne es fehlt dort „Sichten“.
+ * Neben dem Budget steht der Eingangshinweis (`alarm/useEingangshinweis.tsx`, LLH-1062): alle
+ * Eingänge des Einsatzes gebündelt im Eingangsband unten (LLH-1143 D7), die Toasts tragen nur
+ * Alarme. `darfSichten` ist das Schreibrecht im Einsatz; ohne es fehlt dort „Sichten“.
  */
 export default function AlarmZentrale({
   einsatzId,
   darfSichten = false,
+  eingaengeUngelesen,
 }: {
   einsatzId: number;
   darfSichten?: boolean;
+  /**
+   * Ungelesene Eingänge (LLH-1143). Gesetzt, trägt die gebündelte Bauform auch die Eingänge:
+   * Zahl am Ziel und ein Eintrag, der den Verlauf öffnet (der Rahmen hat dann keinen eigenen
+   * Knopf, `alarm/EingaengeKnopf.tsx`). Ohne Angabe keine Eingänge (Tests, Org).
+   */
+  eingaengeUngelesen?: number;
 }) {
   const [gemutet, setGemutet] = useState(istAlarmGemutet());
   const [permission, setPermission] = useState(desktopPermission());
   const [tonStatus, setTonStatus] = useState<TonZustand>(alarmTonStatus() ?? 'prueft');
   // Das gemeinsame Budget (`alarm/useAlarmToasts.tsx`): Benachrichtigungen und Unwetter teilen es.
   const toasts = useAlarmToasts(einsatzId, quittiereNachNutzer);
-  const eingang = useEingangshinweis(einsatzId, quittiereNachNutzer, darfSichten);
+  const { hinweis: eingang, band: eingangsband } = useEingangshinweis(
+    einsatzId,
+    quittiereNachNutzer,
+    darfSichten,
+  );
   useBenachrichtigungen(einsatzId, toasts, eingang);
   // Jede Unwetter-Auslösung bekommt einen eigenen Schlüssel.
   const zaehlerRef = useRef(0);
@@ -279,11 +293,12 @@ export default function AlarmZentrale({
   // Mit grobem Zeiger zwischen `md` und `xl` gilt die Bauform des Handschirms (LFH-950): ein
   // Tooltip erscheint auf Touch erst NACH dem Tipp, und der Tipp auf die Glocke schaltete den Ton
   // sofort und für jeden Einsatz stumm. Das Menü nennt Handlung und Zustand, bevor etwas schaltet.
-  const { istSchmal, abBreite, istBeruehrung } = useViewport();
+  const { istSchmal, abBreite } = useViewport();
   const { token } = theme.useToken();
   const knapp = !abBreite('xl');
   const { dichte } = useDichte();
-  const buendeln = istSchmal || (knapp && istBeruehrung);
+  // Dieselbe Bedingung wie der Knopf „Eingänge“ (`alarm/eingaenge.ts`).
+  const buendeln = useKopfBuendelt();
 
   const desktopAktivieren = () => {
     fordereDesktopPermission((p) => setPermission(p));
@@ -369,45 +384,65 @@ export default function AlarmZentrale({
     const sammelAuffaellig = zeigtTon ? tonAuffaellig : desktopAuffaellig;
 
     return (
-      <Dropdown
-        trigger={['click']}
-        menu={{
-          autoFocus: true,
-          // Die Einträge tragen Handlung UND Zustand in einem Satz: „Ton bereit" als Eintrag, der
-          // stummschaltet, läse sich als Gegenteil — und ohne Zeiger gibt es keinen Tooltip.
-          items: [
-            {
-              key: 'desktop',
-              icon: desktopIcon,
-              label: desktopHinweis,
-              // Wie am breiten Knopf: nur `aus` ist vom Browser aus änderbar.
-              disabled: desktop !== 'aus',
+      <>
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            autoFocus: true,
+            // Die Einträge tragen Handlung UND Zustand in einem Satz: „Ton bereit" als Eintrag, der
+            // stummschaltet, läse sich als Gegenteil — und ohne Zeiger gibt es keinen Tooltip.
+            items: [
+              {
+                key: 'desktop',
+                icon: desktopIcon,
+                label: desktopHinweis,
+                // Wie am breiten Knopf: nur `aus` ist vom Browser aus änderbar.
+                disabled: desktop !== 'aus',
+              },
+              { key: 'ton', icon: tonIcon, label: tonSatz },
+              // Die Eingänge zuletzt (LLH-1143): die beiden Steuerungen behalten ihren Platz.
+              ...(eingaengeUngelesen == null
+                ? []
+                : [
+                    {
+                      key: 'eingaenge',
+                      icon: <IconPosteingang />,
+                      label: eingaengeName(eingaengeUngelesen),
+                    },
+                  ]),
+            ],
+            // Die Zuordnung hängt am MENÜ, nicht je Eintrag — ein Ort für einen etwaigen Riegel.
+            onClick: ({ key }) => {
+              if (key === 'eingaenge') oeffneEingaenge(einsatzId);
+              else if (key === 'desktop') desktopAktivieren();
+              else void tonUmschalten();
             },
-            { key: 'ton', icon: tonIcon, label: tonSatz },
-          ],
-          // Die Zuordnung hängt am MENÜ, nicht je Eintrag — ein Ort für einen etwaigen Riegel.
-          onClick: ({ key }) => {
-            if (key === 'desktop') desktopAktivieren();
-            else void tonUmschalten();
-          },
-        }}
-      >
-        <Button
-          type="text"
-          // Der zugängliche Name trägt Gruppe UND Zustand.
-          aria-label={`Alarmzentrale: ${sammelText}`}
-          icon={zeigtTon ? tonIcon : desktopIcon}
-          style={{
-            color: alarmKnopfFarbe(sammelAuffaellig),
-            fontSize: 12,
-            flexShrink: 0,
           }}
         >
-          {istSchmal || sammelAuffaellig ? (
-            <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
-          ) : null}
-        </Button>
-      </Dropdown>
+          <Button
+            type="text"
+            // Der zugängliche Name trägt Gruppe UND Zustand, dazu die ungelesenen Eingänge.
+            aria-label={`Alarmzentrale: ${sammelText}${
+              eingaengeUngelesen ? `, ${eingaengeUngelesen} Eingänge ungelesen` : ''
+            }`}
+            icon={
+              <EingaengeZahl zahl={eingaengeUngelesen ?? 0}>
+                {zeigtTon ? tonIcon : desktopIcon}
+              </EingaengeZahl>
+            }
+            style={{
+              color: alarmKnopfFarbe(sammelAuffaellig),
+              fontSize: 12,
+              flexShrink: 0,
+            }}
+          >
+            {istSchmal || sammelAuffaellig ? (
+              <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
+            ) : null}
+          </Button>
+        </Dropdown>
+        {eingangsband}
+      </>
     );
   }
 
@@ -453,6 +488,7 @@ export default function AlarmZentrale({
           ) : null}
         </Button>
       </Tooltip>
+      {eingangsband}
     </>
   );
 }

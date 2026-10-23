@@ -9,8 +9,8 @@
 //! 3. `ModulLeser` → Mitglieder mit Leserecht am Modul; `ModulSchreiber` → nur die mit
 //!    Schreibrecht im Einsatz (Einsatzleitung, Führungspersonal), ebenso mit Zugriff aufs Modul.
 //! 4. Danach entfallen: der Auslöser, Gerätekonten, inaktive Konten, wer den Einsatz nicht lesen
-//!    darf, wer das Modul des Bezugs nicht lesen darf und, bei Stufe Hinweis, wer die Art
-//!    abgeschaltet hat (D6).
+//!    darf und wer das Modul des Bezugs nicht lesen darf. Wer bei Stufe Hinweis die Art
+//!    abgeschaltet hat (D6), bekommt sie still: nur im Verlauf (LLH-1143, design.md D2).
 //!
 //! Dieselbe Rechteprüfung ([`Leserecht`]) gilt erneut beim Lesen einer Benachrichtigung.
 
@@ -26,12 +26,14 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-/// Ergebnis der Auflösung: die Organisation des Einsatzes (für den Org-Kanal) und die
-/// Empfänger, aufsteigend.
+/// Ergebnis der Auflösung: die Organisation des Einsatzes (für den Org-Kanal), die Empfänger,
+/// die benachrichtigt werden, und die, für die die Benachrichtigung still ist (Art abgeschaltet;
+/// LLH-1143, design.md D2), je aufsteigend und disjunkt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Aufgeloest {
     pub org_id: i64,
     pub benutzer_ids: Vec<i64>,
+    pub still_ids: Vec<i64>,
 }
 
 /// Die Leserechte eines Einsatzes, einmal geladen: Einsatz, Modulregeln, Rollen der Mitglieder.
@@ -145,6 +147,7 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
         return Ok(Aufgeloest {
             org_id: recht.einsatz.org_id,
             benutzer_ids: Vec::new(),
+            still_ids: Vec::new(),
         });
     }
 
@@ -156,19 +159,19 @@ pub async fn empfaenger(pool: &SqlitePool, anlass: &Anlass) -> Result<Aufgeloest
         BTreeSet::new()
     };
     let bezug_modul = anlass.bezug.typ.modul();
-    let benutzer_ids = benutzer
+    let (still_ids, benutzer_ids): (Vec<i64>, Vec<i64>) = benutzer
         .iter()
-        .filter(|b| !abgeschaltet.contains(&b.id))
         .filter(|b| recht.darf(b, bezug_modul))
         .filter(|b| {
             wege.get(&b.id)
                 .is_some_and(|w| w.iter().any(|m| m.is_none_or(|m| recht.darf(b, Some(m)))))
         })
         .map(|b| b.id)
-        .collect();
+        .partition(|id| abgeschaltet.contains(id));
     Ok(Aufgeloest {
         org_id: recht.einsatz.org_id,
         benutzer_ids,
+        still_ids,
     })
 }
 

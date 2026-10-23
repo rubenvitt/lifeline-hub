@@ -192,6 +192,13 @@ for (const modus of ['light', 'dark'] as const) {
       }
       await page.mouse.move(0, 0);
     });
+    // Vorwarnung und Planung sind Eingänge (LLH-1143): sie stehen im Eingangsband unten rechts,
+    // über den Karten. Auch das Band schließt der Test wie ein Mensch.
+    await page.addLocatorHandler(page.locator('[data-lfh="eingangsband"]'), async (band) => {
+      await band.getByRole('button', { name: 'Schließen', exact: true }).click();
+      await expect(band).toHaveCount(0);
+      await page.mouse.move(0, 0);
+    });
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await page.goto(`/einsaetze/${einsatzId}/abloesung`);

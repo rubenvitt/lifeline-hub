@@ -335,14 +335,20 @@ async fn erfasser_in_der_funktion_bekommt_nichts() {
     assert!(w.lesen(&anna).await.is_empty());
 }
 
-/// Ohne Empfängerfunktion bleibt die Meldung still, auch wenn der Freitext „S2“ lautet: es gibt
-/// keinen Rückschluss vom Freitext auf eine Funktion (`frontend/src/fuehrung/AGENTS.md`).
+/// Ohne Empfängerfunktion ist eine normale Meldung ein Eingang für alle Schreiber (LLH-1143 D5),
+/// auch wenn der Freitext „S2“ lautet: es gibt keinen Rückschluss vom Freitext auf eine Funktion
+/// (`frontend/src/fuehrung/AGENTS.md`), S2 bekommt sie wie jeder andere Schreiber.
 #[tokio::test]
-async fn meldung_ohne_empfaengerfunktion_bleibt_still() {
+async fn meldung_ohne_empfaengerfunktion_geht_an_alle_schreiber() {
     let w = welt().await;
-    w.erfassen(&w.admin, json!({ "empfaenger": "S2" })).await;
-    w.erfassen(&w.admin, json!({})).await;
-    assert!(w.zeilen().await.is_empty());
+    for zusatz in [json!({ "empfaenger": "S2" }), json!({})] {
+        let m = w.erfassen(&w.admin, zusatz.clone()).await;
+        assert_eq!(
+            w.empfaenger("meldung", m["id"].as_i64().unwrap()).await,
+            vec![w.anna, w.bert, w.carla],
+            "{zusatz}"
+        );
+    }
 }
 
 /// Eine Wiederholung mit derselben `client_id` (Offline-Queue, Timeout-Replay) liefert dieselbe
@@ -370,7 +376,7 @@ async fn wiederholung_mit_client_id_meldet_nicht_doppelt() {
 // Spec `benachrichtigungen`, „Eingang einer Meldung“: eine dringende Meldung, jede Lagemeldung und
 // jede Meldung von einem gekoppelten Gerät gehen als Hinweis „Neue Meldung“ an alle mit
 // Schreibrecht im Modul Meldungen, mit Empfängerfunktion an deren Nutzer und die
-// Einsatzleitung. Eine normale Meldung von Hand bleibt still.
+// Einsatzleitung. Seit LLH-1143 (D5) gilt das auch für eine normale Meldung von Hand.
 
 impl Welt {
     /// Nimmt „doris“ als Beobachterin in den Einsatz auf.
@@ -522,14 +528,23 @@ async fn dringende_meldung_und_lagemeldung_erreichen_alle_schreiber_ausser_erfas
     assert_eq!(gelesen[0]["stufe"], "hinweis");
 }
 
-/// Spec-Szenario „Normale Meldung von Hand“: still, auch mit Beobachterin im Einsatz.
+/// Spec-Szenario „Normale Meldung von Hand“ (LLH-1143 D5): ein Eingang für alle Schreiber außer
+/// dem Erfasser, nie für eine Beobachterin.
 #[tokio::test]
-async fn normale_meldung_von_hand_bleibt_still() {
+async fn normale_meldung_von_hand_ist_ein_eingang_fuer_die_schreiber() {
     let w = welt().await;
-    w.beobachterin().await;
-    w.erfassen(&w.cookie("annika").await, json!({ "prioritaet": "normal" }))
+    let doris = w.beobachterin().await;
+    let admin = w.admin_id().await;
+    let m = w
+        .erfassen(&w.cookie("annika").await, json!({ "prioritaet": "normal" }))
         .await;
-    assert!(w.zeilen().await.is_empty());
+    let an = w.empfaenger("meldung", m["id"].as_i64().unwrap()).await;
+    let mut erwartet = vec![admin, w.bert, w.carla];
+    erwartet.sort_unstable();
+    assert_eq!(an, erwartet);
+    assert!(!an.contains(&doris));
+    let gelesen = w.lesen(&w.cookie("bertram").await).await;
+    assert_eq!(gelesen[0]["stufe"], "hinweis");
 }
 
 /// Spec-Szenario „Eingang mit Empfängerfunktion“: die Nutzer der Funktion und die Einsatzleitung
@@ -675,7 +690,13 @@ async fn uebernahme_in_die_lage_erreicht_s2_und_einsatzleitung() {
         w.empfaenger("lage_uebernahme", id).await,
         vec![w.anna, w.carla]
     );
-    let gelesen = w.lesen(&w.cookie("annika").await).await;
+    // Der Eingang der Meldung selbst (LLH-1143 D5) steht daneben; hier zählt die Übernahme.
+    let gelesen: Vec<Value> = w
+        .lesen(&w.cookie("annika").await)
+        .await
+        .into_iter()
+        .filter(|b| b["bezug_typ"] == "lage_uebernahme")
+        .collect();
     assert_eq!(gelesen.len(), 1, "{gelesen:?}");
     assert_eq!(gelesen[0]["titel"], "In die Lage übernommen");
     assert_eq!(gelesen[0]["bezug_typ"], "lage_uebernahme");
@@ -876,7 +897,6 @@ async fn meldung_an_mich_folgt_der_korrektur_nicht_an_den_korrigierenden() {
     .await;
     assert!(w.offen_an(id).await.is_empty());
 
-    // Funktion geleert: eine normale Meldung von Hand ohne Funktion bleibt still.
     w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": "s3" }))
         .await;
     assert_eq!(
@@ -884,9 +904,11 @@ async fn meldung_an_mich_folgt_der_korrektur_nicht_an_den_korrigierenden() {
         Vec::<i64>::new(),
         "Bert hatte ihn schon"
     );
+    // Funktion geleert: eine normale Meldung von Hand ohne Funktion geht an alle mit Schreibrecht
+    // im Modul (LLH-1143, design.md D5); Bert hatte seinen Hinweis schon, der Admin löst aus.
     w.korrigieren(&w.admin, id, json!({ "empfaenger_funktion": null }))
         .await;
-    assert!(w.offen_an(id).await.is_empty());
+    assert_eq!(w.offen_an(id).await, vec![w.anna, w.carla]);
 }
 
 /// Akzeptanzkriterium LLH-1381: eine schon gesichtete Meldung löst mit der Korrektur keinen
