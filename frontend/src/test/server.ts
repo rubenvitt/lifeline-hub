@@ -218,6 +218,14 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
   /**
+   * Erwartete Kräfte eines Raums aus Nachforderungen (LLH-1387) — keine als Default. Der Dialog
+   * „Eintreffen buchen“ fragt sie beim Öffnen ab; Tests mit Nachforderungen überschreiben per
+   * `server.use()`.
+   */
+  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume/:brId/erwartet', () =>
+    HttpResponse.json([]),
+  ),
+  /**
    * Tiere — leer als Default. Die Lagekarte fragt sie mit Freigabe `tiere` ab (Ebene „Tiere",
    * LLH-1123); Tests mit Tieren überschreiben per `server.use()`.
    */

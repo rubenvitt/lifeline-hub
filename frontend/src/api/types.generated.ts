@@ -2539,6 +2539,12 @@ export interface components {
             /** @description Idempotenzschlüssel der Offline-Warteschlange (≤ 64 Zeichen). */
             client_id?: string | null;
             kraft?: components["schemas"]["KraftAngabe"] | null;
+            /**
+             * Format: int64
+             * @description Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit
+             *     bekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug.
+             */
+            nachforderung_id?: number | null;
             unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;
             /**
              * @description Erfassungszeitpunkt nach Serveruhr des Clients (Offline-Warteschlange); höchstens 60 s in
@@ -2697,6 +2703,29 @@ export interface components {
         ErinnerungsZaehler: {
             /** Format: int64 */
             faellig: number;
+        };
+        /** @description Eine Nachforderung mit Ziel = Raum, deren Kräfte noch erwartet werden. */
+        ErwarteteKraft: {
+            /** Format: int64 */
+            anzahl?: number | null;
+            /** @description Art der Nachforderung („RTW“, „SEG“). */
+            art: string;
+            /** @description Voraussichtliches Eintreffen laut Zusage (UTC ohne Zone); fehlt ohne Angabe. */
+            eintreffen_erwartet_at?: string | null;
+            /** Format: int64 */
+            nachforderung_id: number;
+            /**
+             * Format: int64
+             * @description Noch erwartete Anzahl: die Anzahl abzüglich der verknüpften Einheiten; fehlt ohne Anzahl.
+             */
+            offen?: number | null;
+            /**
+             * @description Rufnamen der Zusage, die noch keine verknüpfte Einheit gleichen Namens oder Funkrufnamens
+             *     tragen, in Eingabefolge.
+             */
+            rufnamen: string[];
+            /** @description `zugesagt` oder `unterwegs`. */
+            status: components["schemas"]["NachforderungStatus"];
         };
         /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`). */
         EtbAnzahlAnzeige: {

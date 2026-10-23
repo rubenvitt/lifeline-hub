@@ -199,6 +199,7 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.br,
       EINSATZ_KEYS.brDetail,
       EINSATZ_KEYS.brVerlauf,
+      EINSATZ_KEYS.brErwartet,
     ]);
   });
 
@@ -337,6 +338,7 @@ describe('einsatzKeys (Factory-Output)', () => {
     expect(einsatzKeys.tier(1, 2)).toEqual(['einsatz-tier', 1, 2]);
     expect(einsatzKeys.brDetail(1, 2)).toEqual(['einsatz-br-detail', 1, 2]);
     expect(einsatzKeys.brVerlauf(1, 2)).toEqual(['einsatz-br-verlauf', 1, 2]);
+    expect(einsatzKeys.brErwartet(1, 2)).toEqual(['einsatz-br-erwartet', 1, 2]);
     expect(einsatzKeys.befehl(1, 2)).toEqual(['einsatz-befehl', 1, 2]);
     expect(einsatzKeys.lagebericht(1, 2)).toEqual(['einsatz-lagebericht', 1, 2]);
   });

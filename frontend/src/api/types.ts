@@ -442,6 +442,8 @@ export type BrVerlaufArt = S['BrVerlaufArt'];
 export type BrVerlaufEintrag = S['BrVerlaufEintrag'];
 // LLH-1075: Eintreffen buchen (bekannt oder unangemeldet), Übernehmen einer unangemeldeten Einheit.
 export type EintreffenEingabe = S['EintreffenEingabe'];
+/** Erwartete Kraft aus einer Nachforderung mit Ziel = Raum (LLH-1387). */
+export type ErwarteteKraft = S['ErwarteteKraft'];
 export type EintreffenErgebnis = S['EintreffenErgebnis'];
 export type EintreffenZeitachse = S['EintreffenZeitachse'];
 export type UebernahmeBody = S['UebernahmeBody'];

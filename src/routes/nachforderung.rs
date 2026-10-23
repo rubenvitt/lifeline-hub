@@ -319,8 +319,9 @@ pub async fn status(
             "Aus der Nachforderung ist Material übernommen".into(),
         ));
     }
-    // Ebenso mit übernommenen Einheiten (LLH-1383, design.md D8).
-    if aktuell.status.as_str() == STATUS_EINGETROFFEN
+    // Ebenso mit übernommenen Einheiten (LLH-1383, design.md D8), seit LLH-1387 (D5) für jede
+    // Rücknahme: am Raum gebuchte Einheiten tragen den Verweis schon vor dem Eintreffen.
+    if crate::nachforderung::ist_ruecknahme(aktuell.status.as_str(), neu)
         && repo::has_einheiten(&state.pool, nachforderung_id).await?
     {
         return Err(AppError::UnprocessableEntity(
@@ -383,6 +384,12 @@ pub async fn ablehnen(
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), STATUS_ABGELEHNT) {
         return Err(AppError::UnprocessableEntity(
             "Nachforderung kann in diesem Zustand nicht abgelehnt werden".into(),
+        ));
+    }
+    // Was am Raum eingetroffen ist, wird nicht abgelehnt (LLH-1387 D5).
+    if repo::has_einheiten(&state.pool, nachforderung_id).await? {
+        return Err(AppError::UnprocessableEntity(
+            "Aus der Nachforderung sind Einheiten übernommen".into(),
         ));
     }
     let Some(etb_id) = repo::lehne_ab(
@@ -518,6 +525,12 @@ pub async fn zurueckziehen(
     if !crate::nachforderung::uebergang_erlaubt(aktuell.status.as_str(), STATUS_ZURUECKGEZOGEN) {
         return Err(AppError::UnprocessableEntity(
             "Nachforderung kann in diesem Zustand nicht zurückgezogen werden".into(),
+        ));
+    }
+    // Ebenso nicht zurückgezogen (LLH-1387 D5).
+    if repo::has_einheiten(&state.pool, nachforderung_id).await? {
+        return Err(AppError::UnprocessableEntity(
+            "Aus der Nachforderung sind Einheiten übernommen".into(),
         ));
     }
     let Some(etb_id) = repo::ziehe_zurueck(
