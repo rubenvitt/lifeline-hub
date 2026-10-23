@@ -1,3 +1,113 @@
+## [1.0.0-alpha.151](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.150...v1.0.0-alpha.151) (2026-10-23)
+
+### Wichtige Änderungen
+
+- **Erster Start nur mit Lizenzannahme:** Auf einer leeren Datenbank startet der Server nur mit `--lizenz-akzeptiert` oder `LIFELINE_LIZENZ_AKZEPTIERT=true`. Fehlt der Schalter, gibt der Server den Lizenztext aus und bricht ab, bevor Organisation oder Admin angelegt werden. Bestehende Installationen starten ohne Änderung.
+- **Zeitformat wird zur Zeitdarstellung:** Die bisherige Einstellung „Zeitformat“ (24h/12h) an Organisation und Einsatz heißt jetzt „Zeitdarstellung“. Sie hat die Werte „taktisch“ und „Datum und Uhrzeit“. Bisher gespeicherte Werte werden zurückgesetzt. Damit gilt die Vorgabe: taktische Zeit als DTG, z. B. `101430okt26`.
+- **Funk und Telefon statt „Erreichbarkeit“:** Abschnitt, Einheit und eigene Führungsstelle haben jetzt typisierte Verbindungen (Mittel, Wert, Hinweis). Die Felder „Kommunikationsmittel“ und „Erreichbarkeit“ entfallen. Bestehende Angaben werden ohne Verlust übernommen. Wer über die Schnittstelle schreibt: Anfragen mit den alten Feldern lehnt der Server jetzt mit einem Fehler ab.
+- **Stamm-Gerät nur einmal je Einsatz:** Ein Gerät mit Bestandsnummer lässt sich in einem Einsatz nicht mehr zweimal aktiv disponieren. Gerät ohne Bestandsnummer und Verbrauchsgut sind nicht betroffen.
+- **Eingabegrenzen am Material-Stamm:** Freitexte haben höchstens 200 Zeichen, die Bemerkung höchstens 2 000. Längere Eingaben werden abgewiesen.
+- **Datenbankmigrationen:** Neu in der Datenbank sind:
+  - Stufe „still“ für Benachrichtigungen
+  - Verbindungen am Einsatz
+  - Zeitdarstellung
+  - Koordinaten für das Ziel eines Auftrags und die Sammelstelle
+  - Herkunft einer Übernahme aus einer Nachforderung
+  - Merker für den Sofortalarm
+  - Wahl der Lagekennzahlen
+
+### Zeitdarstellung
+
+- Alle Anzeigen zeigen Zeiten einheitlich, in der Vorgabe taktisch: in Listen und Zeitachsen heute „1446“, an einem anderen Tag „091446“, in Details der volle Zeitpunkt „091446okt26“. Das gilt für ETB, Meldungen, Lagebild, Kräfte, Ablösung, Aufträge, Betreuung, Verpflegung, Lagekarte, Chat, Alarme und mehr.
+- Im Profil („Darstellung auf diesem Gerät“) und in der Sprungpalette lässt sich je Gerät „Datum und Uhrzeit“ wählen. Die Wahl am Gerät geht vor der des Einsatzes, diese vor der der Organisation.
+- Ausdrucke tragen die volle DTG und folgen immer der Einstellung von Einsatz oder Organisation, nie der Gerätewahl.
+- Texte, die der Server ins ETB schreibt, nennen Zeiten in der Darstellung des Einsatzes. Beispiele: Nachträge, Verpflegungszeiträume, Eintreffen einer Nachforderung, Fristen und Ablösungshinweise. Bereits geschriebene Einträge behalten ihren Wortlaut.
+- Auch der Datenstand („Stand 1405“) folgt der gewählten Darstellung.
+- Zeitfelder nehmen überall eine Kurzeingabe wie „1430“ und übernehmen sie mit Enter. Der Filter „von“/„bis“ im Zugangsprotokoll ist jetzt ein zusammenhängender Zeitraum. „gez. DTG“ in der Fernmeldeskizze fällt nie in die Zukunft.
+- Dezimalzahlen stehen mit Komma: „1,20 km“, „1,5 MB“. Dezimalfelder nehmen Komma und Punkt.
+
+### Einsatztagebuch
+
+- Zeitspalte und Stundenköpfe zeigen taktische Zeit. Bausteine setzen `{uhrzeit}` als „1430“ und `{datum}` als „10okt26“ ein.
+- Der ETB-Druck, Modullisten und der Einsatzbericht zeigen die volle DTG.
+
+### Listen und Tabellen
+
+- Tabellen sortieren und filtern direkt im Spaltenkopf. Ein Filterhinweis zeigt die Trefferzahl, Chips zeigen die aktiven Filter, und „Filter zurücksetzen“ hebt alle auf.
+- Sortierung, Filter und Suche stehen in der Adresse. Ein Link zeigt damit dieselbe Sicht, und ohne Parameter gilt der zuletzt genutzte Stand der Sitzung.
+- Verfügbar für:
+  - Fahrzeuge, Personal, Material und Sprechgruppen
+  - Betroffene, Tiere und Evakuierung
+  - Unfallhilfsstellen samt UHS-Kräften und Bereitstellungsräume
+  - Mitglieder, Aufbewahrung, alle Stammdaten und Kataloge
+  - Presse-Log (Filter nach Art)
+- Bei Betroffenen wird der Suchbegriff wegen der Personendaten nicht in die Adresse übernommen.
+
+### Kräfte und Mittel
+
+- **Nachforderungen und Bereitstellungsraum:**
+  - Der Dialog „Eintreffen buchen“ zeigt die erwarteten Kräfte aus zugesagten oder unterwegs befindlichen Nachforderungen, auch am gekoppelten Gerät des Raums. Die gebuchte Einheit wird mit der Nachforderung verknüpft.
+  - Trifft ein Fahrzeug ohne Einheit aus einer Nachforderung ein, wird es automatisch zur Einheit, am Raum gebucht und verknüpft.
+  - „Diese buchen“ bei der Warnung vor einer Doppelbuchung behält jetzt den Verweis auf die Nachforderung.
+  - Sind bereits Einheiten verknüpft, bietet die Karte nur noch Schritte nach vorn an. Zurückziehen, Ablehnen und Rücknahme sind dann mit Grund gesperrt.
+  - Eine fälschlich übernommene Einheit lässt sich mit „Übernahme stornieren“ zurücknehmen, auch wenn sie schon am Raum gebucht ist.
+  - Schnellwahl und Vorschläge bei der Erfassung berücksichtigen die häufigen Arten aus anderen Einsätzen der Organisation.
+  - Übernommene Einheiten stehen in der Kartenzeile kompakt hintereinander statt jede in einer eigenen Zeile.
+  - Der Ablehnungsgrund hat höchstens 200 Zeichen.
+- **Material:**
+  - Ein von Hand erfasster Posten lässt sich nachträglich einer eingetroffenen Nachforderung zuordnen.
+  - Das Gerät am Bereitstellungsraum zeigt das Material seines Raums, nur zum Lesen.
+  - Statuswechsel nennen im ETB und im Kräftebild das Wort der Oberfläche statt eines internen Werts.
+  - Der Aufklapper der Fahrzeugliste heißt „Details“. Leerzustände sind klarer („Kein anderes Material“, „Kein Material im Einsatz“).
+- **Meldebild:** Das Statusband zeigt den „Zulauf“ aus Nachforderungen je Art mit erwartetem Eintreffen und markiert überfälliges Eintreffen.
+- **Verpflegung:** Den Bedarf eines Zeitfensters bearbeitet man direkt in der Karte statt in einem Dialog.
+
+### Führung
+
+- Der „Überblick“ zeigt sechs Kennzahlen wie das Lagebild. Die Warnstufe steht als Hinweis im Seitenkopf. Jedes Paneel hat einen Sprung ins jeweilige Modul.
+- Das Statusband des Meldebilds besteht aus Paneelen: Einheiten nach FMS-Status, Personal nach Status und „keine Rückmeldung“.
+- „Nachforderungen offen“ lässt sich am Einsatz als Lagekennzahl wählen.
+
+### Kommunikation und Meldungen
+
+- **Funk und Telefon:**
+  - Unter „Telefon und weitere Verbindungen“ werden Telefon und weitere Verbindungen erfasst. Ein Abschnitt hat einen eigenen Rufnamen.
+  - Der Funkplan hat eine Spalte „Telefon“ und zeigt Lücken „ohne Funkrufname“ und „ohne Telefon“.
+  - Der Kommunikationsplan zeigt alle Verbindungen.
+- **Benachrichtigungen:**
+  - Neuer Knopf „Eingänge“ mit einem Verlauf, unterteilt in „Neu“ und „Früher“, und der Aktion „Alle gelesen“. „Alle gelesen“ wirkt auf allen Geräten der Person.
+  - Tab-Titel und App-Symbol zeigen die Zahl der ungelesenen Eingänge.
+  - Eingänge erscheinen gebündelt in einem Band unten. Die Toasts oben zeigen nur noch Alarme. Dadurch verdrängt ein Eingang keinen stehenden Alarm mehr.
+  - Abgeschaltete Benachrichtigungsarten kommen still in den Verlauf, ohne Toast und Ton.
+  - Ungelesene Einträge bleiben 24 statt 12 Stunden erhalten.
+  - Eine von Hand erfasste normale Meldung ohne Empfängerfunktion geht als Eingang an alle mit Schreibrecht im Modul Meldungen.
+- **Meldungen:**
+  - Die Empfängerfunktion lässt sich nachträglich korrigieren. Die Hinweise gehen dann an die richtigen Personen.
+  - Eine Meldung lässt sich nachträglich zur Sofortmeldung heraufstufen. Das löst den Sofortalarm einmalig aus.
+  - Eine ETB-Berichtigung erscheint an Meldungskarte, Lagemeldung und Vorschau der Sprungpalette als Marke „berichtigt“ mit Sprung zum ETB-Eintrag.
+
+### Orte und Lagekarte
+
+- Ortssuche mit Kartenvorschau gibt es jetzt auch für:
+  - Schadensort
+  - Standort einer Betreuungsstelle und Sammelstelle eines Evakuierungsbezirks
+  - Standort von UHS und Bereitstellungsraum
+  - Fundort eines Tiers
+  - Ziel eines Auftrags
+- Ein gewählter Treffer, eine getippte Koordinate oder ein Punkt auf der Karte speichert die Koordinate mit.
+- Beim Anlegen eines Einsatzes schlägt das Ortsfeld nach Kartenwahl oder Koordinate den Ortsnamen vor.
+- Taktische Zeichen auf dunkler Kartengrundlage haben eine eng anliegende helle Kontur und bleiben im Nachtbetrieb gut lesbar.
+
+### Betrieb und Installation
+
+- Der Server zeigt die Lizenz an:
+  - beim ersten Start vollständig
+  - bei jedem Start und bei `--help` als Kurzzeile
+  - über den neuen Unterbefehl `lifeline-hub lizenz`
+- Das Container-Abbild enthält die Lizenzdatei, und jedes Release enthält eine eigene Lizenzdatei.
+- Sicherheitsupdate einer kryptografischen Abhängigkeit nach einer Meldung über nicht zeitkonstante Vergleiche.
+- Die Architekturdokumentation (arc42 mit Architekturentscheidungen) ist auf der Website unter „Architektur“ zu finden.
+
 ## [1.0.0-alpha.150](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.149...v1.0.0-alpha.150) (2026-10-22)
 
 ### Wichtige Änderungen
