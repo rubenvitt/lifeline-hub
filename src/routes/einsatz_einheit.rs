@@ -303,6 +303,41 @@ pub async fn aus_nachforderung(
     Ok((StatusCode::CREATED, Json(n)))
 }
 
+/// POST /api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren — eine Fehlübernahme aus einer
+/// Nachforderung rückgängig machen (LLH-1388, design.md D1–D5, Spec `nachforderung-einheit`): den
+/// Verweis lösen, eine angelegte Einheit auflösen (samt Austritt aus dem Raum), eine verknüpfte
+/// aus dem gebuchten Raum austreten lassen, ein ETB-Eintrag. Reihenfolge: Gate Einheiten → 403
+/// ohne Freigabe Nachforderungen vor jedem Lesen → in der Transaktion 404/409/422. Antwort 200 mit
+/// der Nachforderung.
+pub async fn uebernahme_stornieren(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Einheiten>,
+    PfadParam((_eid, eid)): PfadParam<(i64, i64)>,
+) -> Result<Json<crate::nachforderung::NachforderungAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    // Die Herkunft ist eine Nachforderung: erst die Freigabe ihres Moduls (D5).
+    ctx.fordere_zielmodul::<Nachforderungen>(&state.pool)
+        .await?;
+    let jetzt = crate::zeit::jetzt();
+    let benutzer_id = ctx.benutzer.id;
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        aus_nachforderung::stornieren_tx(conn, einsatz_id, eid, benutzer_id, &jetzt).await
+    })?;
+    state.live.publiziere(einsatz_id, ergebnis.etb_id);
+    super::nachforderung::sse(&state, einsatz_id);
+    match &ergebnis.aufgeloest {
+        Some(aufgeloest) => notify_aufgeloest(&state, einsatz_id, eid, aufgeloest).await,
+        None => {
+            sse_einheit(&state, einsatz_id, eid);
+            if let Some(br_id) = ergebnis.br_id {
+                super::einsatz_bereitstellungsraum::sse_br(&state, einsatz_id, br_id);
+            }
+        }
+    }
+    let n = crate::nachforderung::repo::load(&state.pool, ergebnis.nachforderung_id).await?;
+    Ok(Json(n))
+}
+
 /// Ein gesperrtes Zielmodul ist für die Vorschau kein Fehler, sondern ein leerer Teil (D8).
 fn is_gesperrt(pruefung: Result<(), AppError>) -> Result<bool, AppError> {
     match pruefung {

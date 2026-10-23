@@ -1968,6 +1968,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
             post(routes::einsatz_einheit::stornieren),
         )
+        // LLH-1388: Fehlübernahme aus einer Nachforderung stornieren.
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren",
+            post(routes::einsatz_einheit::uebernahme_stornieren),
+        )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",
             post(routes::einsatz_einheit::uebernehmen),

@@ -1098,6 +1098,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status_seit", G_ZEIT),
             // Herkunft aus einer Nachforderung (LLH-1383, design.md D7).
             retain("nachforderung_id", G_FK),
+            // Wirkung der Übernahme für den Storno (LLH-1388): Kennzeichen „angelegt“ und Belegungs-FK.
+            retain("nachforderung_angelegt", G_ENUM),
+            retain("nachforderung_belegung_id", G_FK),
         ],
     },
     TabellenRegel {
