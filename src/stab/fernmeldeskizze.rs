@@ -1378,7 +1378,12 @@ mod tests {
             if pfad.is_dir() {
                 sammle(&pfad, funde);
             } else if pfad.extension().is_some_and(|e| e == "rs")
-                && pfad.file_name().is_some_and(|n| n != "tests.rs")
+                // Testdateien, auch die per `#[path]` eingebundenen `*_tests.rs`, haben keinen
+                // `#[cfg(test)]`-Trenner in sich.
+                && pfad.file_name().is_some_and(|n| {
+                    let n = n.to_string_lossy();
+                    n != "tests.rs" && !n.ends_with("_tests.rs")
+                })
             {
                 let text = std::fs::read_to_string(&pfad).unwrap();
                 funde.push((pfad.to_string_lossy().replace('\\', "/"), text));
