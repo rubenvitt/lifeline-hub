@@ -181,7 +181,9 @@ describe('BearbeitbaresPaneel · Speichern', () => {
     await user.clear(await screen.findByRole('textbox', { name: 'Rufname' }));
     await user.click(screen.getByRole('button', { name: 'Speichern' }));
     const meldung = await screen.findByText('Bitte einen Rufnamen angeben');
-    expect(meldung).toBeVisible();
+    // antd blendet die Meldung über eine Einblend-Animation ein (Höhe und Deckkraft 0 im ersten
+    // Bild); unter Last kommt `findByText` davor an. Sichtbar heißt: nach der Animation.
+    await waitFor(() => expect(meldung).toBeVisible());
     expect(meldung.closest('[data-lfh="datenfeld"]')).toBe(
       screen.getByText('Rufname').closest('[data-lfh="datenfeld"]'),
     );
