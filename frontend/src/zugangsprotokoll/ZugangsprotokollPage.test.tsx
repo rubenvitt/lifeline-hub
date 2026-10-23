@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import dayjs from 'dayjs';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import type { AnmeldeEintrag, BenutzerAnzeige, Zugangsaenderung } from '../api/types';
@@ -9,6 +10,7 @@ import { meHandler, server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import { adminFixture, benutzerFixture } from '../test/fixtures';
 import ZugangsprotokollPage, { parseZugangsprotokollFilter } from './ZugangsprotokollPage';
+import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
 
 /** Zugangsprotokoll der Verwaltung (LFH-1097). */
 
@@ -180,6 +182,22 @@ describe('ZugangsprotokollPage', () => {
     // `ereignis` gehört zur anderen Spur.
     expect(p.has('ereignis')).toBe(false);
     expect(p.get('limit')).toBe(String(ZUGANGSPROTOKOLL_SEITE));
+  });
+
+  it('LLH-1077: „von“ und „bis“ sind ein Zeitraum — „bis“ ohne Tag liegt am Tag von „von“', async () => {
+    const gesehen = zeige();
+    await within(await tabelle()).findByText('Rolle geändert');
+    const user = userEvent.setup();
+    await tippeZeit(user, zeitFeld('von'), '011200okt26');
+    await tippeZeit(user, zeitFeld('bis'), '1500');
+    await waitFor(() =>
+      expect(gesehen.aenderungen.some((p) => p.has('von') && p.has('bis'))).toBe(true),
+    );
+    const p = [...gesehen.aenderungen].reverse().find((q) => q.has('von') && q.has('bis'))!;
+    const von = dayjs.utc(p.get('von')!);
+    const bis = dayjs.utc(p.get('bis')!);
+    expect(bis.diff(von, 'minute')).toBe(180);
+    expect(screen.getByLabelText('Ort')).toHaveTextContent('bis=');
   });
 
   it('entprellt das Kontofeld und lädt dann mit dem Konto', async () => {

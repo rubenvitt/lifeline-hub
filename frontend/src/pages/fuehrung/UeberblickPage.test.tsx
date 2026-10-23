@@ -11,6 +11,7 @@ import { renderMitProviders } from '../../test/utils';
 import { benutzerFixture, freigabenFixture } from '../../test/fixtures';
 import type { ModulFreigabe } from '../../api/types';
 import { leseZuletztModule } from '../../einsatz/zuletztModule';
+import { GLIEDERUNG_KLASSE } from '../../components/instrument';
 import UeberblickPage from './UeberblickPage';
 
 dayjs.extend(utc);
@@ -181,6 +182,7 @@ const volleDaten = {
    */
   zaehler: {
     auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
+    meldungen: { offen: 4, ungesehen: 2, bestaetigung_ueberfaellig: 0 },
     nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1 },
   } as object,
   /** Nachforderungen (LLH-1078): drei offene und eine eingetroffene, passend zum Zähler. */
@@ -278,6 +280,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
       json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
+          meldungen: { offen: 0, ungesehen: 0, bestaetigung_ueberfaellig: 0 },
           nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 },
         },
       ),
@@ -321,6 +324,8 @@ const band = () => screen.getByRole('group', { name: 'Lage in Zahlen' });
 /** Das Band erst nach dem Einsatz-Abruf — der Körper wartet auf ihn (LFH-629). */
 const bandDa = () => screen.findByRole('group', { name: 'Lage in Zahlen' });
 const paneel = (name: string | RegExp) => screen.getByRole('region', { name });
+/** Die Warnstufe steht im Seitenkopf wie im Lagebild (LLH-1140), nicht mehr im Band. */
+const kopfLage = () => document.querySelector<HTMLElement>('[data-lfh="ueberblick-lage-kopf"]');
 
 describe('UeberblickPage', () => {
   it('Seitenkopf: Ortspfad mit Einsatzname, Titel und genau eine Primäraktion', async () => {
@@ -349,30 +354,72 @@ describe('UeberblickPage', () => {
     expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/lageberichte');
   });
 
-  it('Kennzahlenband: fünf Zahlen mit Notiz, jede ein Link ins Fachmodul', async () => {
+  it('Kennzahlenband: sechs Plätze mit Notiz, jede ein Link ins Fachmodul (LLH-1140)', async () => {
     stelleBereit(volleDaten);
     rendern();
     await waitFor(() => expect(within(band()).getByText('+1 in 60 min')).toBeInTheDocument());
+    await waitFor(() => expect(within(band()).getByText('2 neu')).toBeInTheDocument());
     const links = within(band()).getAllByRole('link');
+    // Belegung E1 (LLH-1140): Betroffene, Kräfte, Aufträge, Meldungen, Abschnitte, Dauer — die
+    // Warnstufe ist keine Kennzahl mehr.
     expect(links.map((l) => l.getAttribute('href'))).toEqual([
       '/einsaetze/1/personen',
       '/einsaetze/1/kraefteuebersicht',
-      '/einsaetze/1/gefahren',
       '/einsaetze/1/auftraege',
+      '/einsaetze/1/meldungen',
       '/einsaetze/1/einsatzabschnitte',
+      '/einsaetze/1/einsatzdaten',
     ]);
     const b = within(band());
     expect(links[0]).toHaveTextContent('3');
     expect(b.getByText('F/UF/M//Σ 1/0/1//2')).toBeInTheDocument();
-    // Warnstufe: das Wort ist der zweite Kanal. Ohne festgelegten Pegel keine Pegel-Notiz.
-    expect(links[2]).toHaveTextContent('hoch');
-    expect(links[2]).toHaveTextContent('1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt');
-    expect(links[2]).not.toHaveTextContent(/Pegel/);
     expect(b.getByText('davon 1 ü.')).toBeInTheDocument();
+    // „Meldungen offen“ aus dem Modulzähler (LFH-550), wie im Lagebild.
+    expect(links[3]).toHaveTextContent('4');
     expect(b.getByText('Abschnitt Nord')).toBeInTheDocument();
+    // Einsatzdauer: fünf Stunden seit Beginn.
+    expect(links[5]).toHaveTextContent('5');
+    expect(b.queryByText('Warnstufe')).toBeNull();
   });
 
-  it('Warnstufe mit festgelegtem Pegel: Notiz „Pegel 6,84 m steigend" (LFH-606)', async () => {
+  it('Meldungen offen: überfällige Bestätigung färbt die Kennzahl alarm', async () => {
+    stelleBereit({
+      ...volleDaten,
+      zaehler: {
+        auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
+        meldungen: { offen: 3, ungesehen: 1, bestaetigung_ueberfaellig: 1 },
+        nachforderungen: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 },
+      },
+    });
+    rendern();
+    const meldungen = await within(await bandDa()).findByRole('link', { name: /Meldungen offen/ });
+    await waitFor(() => expect(meldungen).toHaveAttribute('data-ton', 'alarm'));
+    expect(meldungen).toHaveTextContent('1 neu · 1 Bestätigung überfällig');
+  });
+
+  it('Warnstufe im Seitenkopf: Wort und Ton, die offenen Gebiete daneben (LLH-1140)', async () => {
+    stelleBereit(volleDaten);
+    rendern();
+    await waitFor(() => expect(kopfLage()).not.toBeNull());
+    const hinweis = kopfLage()!.querySelector('[data-lfh="warnstufe-hinweis"]')!;
+    expect(hinweis).toHaveTextContent('Warnstufe hoch');
+    // „hoch“ ist Alarm (`warnstufeKennzahl`), wie im Lagebild.
+    expect(hinweis).toHaveAttribute('data-ton', 'alarm');
+    expect(kopfLage()!.querySelector('[data-lfh="warnstufe-offen"]')).toHaveTextContent(
+      '1 nicht beurteilt',
+    );
+    // Ohne festgelegten Pegel keine Pegel-Angabe.
+    expect(kopfLage()).not.toHaveTextContent(/Pegel/);
+  });
+
+  it('ohne Gefahrengebiet kein Warnstufen-Hinweis im Kopf', async () => {
+    stelleBereit({ ...volleDaten, gefahren: [] });
+    rendern();
+    await waitFor(() => expect(within(band()).getByText('+1 in 60 min')).toBeInTheDocument());
+    expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
+  });
+
+  it('Pegel im Seitenkopf: „Pegel 6,84 m steigend" (LFH-606)', async () => {
     stelleBereit({
       ...volleDaten,
       pegel: [
@@ -384,30 +431,35 @@ describe('UeberblickPage', () => {
       ],
     });
     rendern();
-    await waitFor(() => expect(within(band()).getByText(/Pegel 6,84 m/)).toBeInTheDocument());
-    const warnstufe = within(band()).getAllByRole('link')[2];
-    expect(warnstufe).toHaveTextContent('hoch');
-    // Das Gebiet der Testdaten ist nicht beurteilt (LLH-1090): das steht vor dem Pegel.
-    expect(warnstufe).toHaveTextContent(
-      '1 Gefahrengebiet mit Warnstufe · 1 nicht beurteilt · Pegel 6,84 m steigend',
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kopf-pegel"]')).toHaveTextContent(
+        'Pegel 6,84 m steigend',
+      ),
     );
-    // Die Kennzahl gehört weiter der Warnstufe: Ziel bleibt die Gefahrenseite.
-    expect(warnstufe).toHaveAttribute('href', '/einsaetze/1/gefahren');
+    await waitFor(() => expect(kopfLage()).toHaveTextContent('Warnstufe hoch'));
   });
 
-  it('Warnstufe bei Pegel-Ausfall und bei gescheitertem Pegel-Abruf: „Pegel: Stand unbekannt"', async () => {
+  it('Pegel-Ausfall und gescheiterter Pegel-Abruf: „Pegel: Stand unbekannt" im Kopf', async () => {
     stelleBereit({ ...volleDaten, pegel: [leitpegel(null)] });
     const erster = rendern();
-    expect(await within(await bandDa()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kopf-pegel"]')).toHaveTextContent(
+        'Pegel: Stand unbekannt',
+      ),
+    );
     erster.unmount();
 
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/pegel', () => new HttpResponse(null, { status: 500 })),
     ]);
     rendern();
-    expect(await within(await bandDa()).findByText(/Pegel: Stand unbekannt/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector('[data-lfh="kopf-pegel"]')).toHaveTextContent(
+        'Pegel: Stand unbekannt',
+      ),
+    );
     // Der tote Pegel-Abruf macht die Warnstufe nicht unlesbar.
-    expect(within(band()).getAllByRole('link')[2]).toHaveTextContent('hoch');
+    await waitFor(() => expect(kopfLage()).toHaveTextContent('Warnstufe hoch'));
   });
 
   it('Abschnittszeile: Leiter, Stärke, Einheiten nach Status ehrlich beschriftet, Auftrag, Deeplink', async () => {
@@ -420,25 +472,17 @@ describe('UeberblickPage', () => {
     expect(zeile).toHaveTextContent('1 Einheit');
     expect(zeile).toHaveTextContent('1/0/1//2');
     expect(zeile).toHaveTextContent('Trupps verlegen');
-    // Der zweite Kanal der Zellen muss im Linknamen ankommen. Gezählt wird die Einheit nach ihrem
+    // Einheiten je Status als Verteilung (LLH-1140): das Wort steht an der Zahl, eine Legende
+    // braucht es nicht mehr. Der Linkname trägt Wort und Zahl. Gezählt wird die Einheit nach ihrem
     // Status, nicht ihre Mittel (die ergäben 1/1/1).
-    expect(zeile).toHaveAccessibleName(/0\s*bereit/);
-    expect(zeile).toHaveAccessibleName(/0\s*gebunden/);
-    expect(zeile).toHaveAccessibleName(/1\s*Ausfall/);
-    const zellen = zeile.querySelectorAll('[data-lfh="status-zelle"]');
-    expect(Array.from(zellen).map((z) => z.getAttribute('title'))).toEqual([
-      'bereit',
-      'gebunden',
-      'Ausfall',
-    ]);
-    expect(Array.from(zellen).map((z) => z.getAttribute('data-ton'))).toEqual([
-      'normal',
-      'bedien',
-      'alarm',
-    ]);
-    // Die Legende steht über den Zeilen, nicht am Fuß (LFH-962): sie geht dem ersten Raster voraus.
-    const legende = within(p).getByText(/Einheiten nach Status: bereit · gebunden · Ausfall/);
-    expect(legende.compareDocumentPosition(zeile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(zeile).toHaveAccessibleName(/bereit\s*0/);
+    expect(zeile).toHaveAccessibleName(/gebunden\s*0/);
+    expect(zeile).toHaveAccessibleName(/Ausfall\s*1/);
+    const werte = zeile.querySelectorAll('[data-lfh="abschnitt-status-wert"]');
+    expect(Array.from(werte).map((z) => z.textContent)).toEqual(['0', '0', '1']);
+    const balken = zeile.querySelectorAll<HTMLElement>('[data-lfh="abschnitt-status-anteil"]');
+    expect(Array.from(balken).map((z) => z.style.width)).toEqual(['0%', '0%', '100%']);
+    expect(within(p).queryByText(/Einheiten nach Status:/)).toBeNull();
     expect(within(p).getByText('1 Abschnitt · 1 Einheit')).toBeInTheDocument();
   });
 
@@ -522,7 +566,7 @@ describe('UeberblickPage', () => {
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
     const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
     // Die Farbe trägt die Kante, das Wort trägt die Aussage (WCAG 1.4.1).
-    const kante = zeile.querySelector<HTMLElement>('[data-lfh="abschnitt-lagekante"]')!;
+    const kante = zeile.querySelector<HTMLElement>('[data-lfh="ueberblick-abschnitt-kante"]')!;
     expect(kante).toHaveAttribute('data-rolle', 'alarm');
     expect(zeile).toHaveAccessibleName(/kritisch/);
     expect(zeile).toHaveTextContent('EA-N · Vitt');
@@ -554,7 +598,7 @@ describe('UeberblickPage', () => {
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
     const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
     expect(
-      zeile.querySelector('[data-lfh="abschnitt-lagekante"]')!.getAttribute('data-rolle'),
+      zeile.querySelector('[data-lfh="ueberblick-abschnitt-kante"]')!.getAttribute('data-rolle'),
     ).toBe('normal');
     expect(within(zeile).getByText('UA kritisch')).toBeInTheDocument();
   });
@@ -565,7 +609,7 @@ describe('UeberblickPage', () => {
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
     const zeile = await within(p).findByRole('link', { name: /Abschnitt Nord/ });
     expect(
-      zeile.querySelector('[data-lfh="abschnitt-lagekante"]')!.getAttribute('data-rolle'),
+      zeile.querySelector('[data-lfh="ueberblick-abschnitt-kante"]')!.getAttribute('data-rolle'),
     ).toBeNull();
     expect(zeile.querySelector('[data-lfh="abschnitt-fortschritt"]')).toBeNull();
     expect(zeile).not.toHaveTextContent('%');
@@ -607,10 +651,9 @@ describe('UeberblickPage', () => {
     expect(zeilen[0]).toHaveTextContent('vor 1 h 35 min');
     expect(zeilen[0]).toHaveTextContent('2000× Sandsäcke — Deich Nord');
     expect(zeilen[0]).toHaveTextContent('Unterwegs');
-    expect(within(p).getByRole('link', { name: 'Nachforderungen öffnen' })).toHaveAttribute(
-      'href',
-      '/einsaetze/1/nachforderungen',
-    );
+    // Sprung „Nachforderungen ↗“ im Paneelkopf (Dashboard-Baukasten, LLH-1140).
+    await userEvent.click(within(p).getByRole('button', { name: 'Nachforderungen' }));
+    expect(screen.getByTestId('ort')).toHaveTextContent(/^\/einsaetze\/1\/nachforderungen$/);
   });
 
   it('Entscheidungen: Zeitachseneintrag mit Typwort, Folgeaufträge gezählt, ETB-Link mit Filter', async () => {
@@ -623,9 +666,8 @@ describe('UeberblickPage', () => {
     expect(within(li).getByText('Entscheidung')).toBeInTheDocument();
     expect(within(li).getByText('Nr. 411')).toBeInTheDocument();
     expect(within(li).getByText('2 Aufträge')).toBeInTheDocument();
-    expect(
-      within(p).getByRole('link', { name: 'Entscheidungen im Einsatztagebuch öffnen' }),
-    ).toHaveAttribute('href', '/einsaetze/1/etb?typ=entscheidung');
+    await userEvent.click(within(p).getByRole('button', { name: 'ETB' }));
+    expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/etb?typ=entscheidung');
   });
 
   it('Entscheidungen: ohne Eintrag der letzten Stunde ehrlich als „Letzte Entscheidungen"', async () => {
@@ -862,8 +904,9 @@ describe('UeberblickPage', () => {
     expect(
       await screen.findByText('Noch keine Abschnitte und keine Kräfte erfasst.'),
     ).toBeInTheDocument();
-    expect(within(band()).getByText('keine')).toBeInTheDocument();
     expect(within(band()).getByText('noch keine angelegt')).toBeInTheDocument();
+    // Ohne Gefahrengebiet kein Warnstufen-Hinweis im Kopf.
+    expect(document.querySelector('[data-lfh="warnstufe-hinweis"]')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Eintrag erfassen' }));
     expect(screen.getByTestId('ort')).toHaveTextContent('/einsaetze/1/etb?neu=1');
   });
@@ -917,8 +960,10 @@ describe('UeberblickPage', () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Eintrag erfassen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Abschnitt anlegen' })).toBeNull();
-    // Reine Navigation bleibt: sie schreibt nichts.
-    expect(screen.getByRole('button', { name: 'Zu den Aufträgen' })).toBeInTheDocument();
+    // Reine Navigation bleibt: sie schreibt nichts (Sprung im Paneelkopf, LLH-1140).
+    expect(
+      within(paneel('Offene Aufträge')).getByRole('button', { name: 'Aufträge/Befehle' }),
+    ).toBeInTheDocument();
   });
 
   it('abgeschlossener Einsatz: der Grund nennt den Abschluss, nicht die Rolle', async () => {
@@ -957,7 +1002,7 @@ describe('UeberblickPage', () => {
     expect(screen.queryByText(/Folgeaufträge werden nicht gezählt/)).toBeNull();
   });
 
-  it('Abschnitte: fehlen die Aufträge, sagt es der Fuß, die Legende bleibt oben (LFH-962)', async () => {
+  it('Abschnitte: fehlen die Aufträge, sagt es der Fuß, die Stärke bleibt (LFH-962)', async () => {
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/auftraege', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
@@ -968,7 +1013,7 @@ describe('UeberblickPage', () => {
     expect(
       await within(p).findByText('Aufträge nicht abrufbar, Auftragstexte fehlen'),
     ).toBeInTheDocument();
-    expect(within(p).getByText(/Einheiten nach Status: bereit/)).toBeInTheDocument();
+    expect(within(p).getByRole('link', { name: /Abschnitt Nord/ })).toHaveTextContent('1/0/1//2');
   });
 
   it('Ladezustand: Kennzahlen und Paneele zeigen „wird abgerufen", keine Null', async () => {
@@ -988,7 +1033,9 @@ describe('UeberblickPage', () => {
     expect(within(p).getByText('wird abgerufen').closest('[aria-busy="true"]')).not.toBeNull();
     // Eine unabhängige Quelle lädt trotzdem durch.
     await waitFor(() =>
-      expect(within(band()).getByRole('link', { name: /Warnstufe/ })).toHaveTextContent('hoch'),
+      expect(within(band()).getByRole('link', { name: /Einsatzabschnitte/ })).toHaveTextContent(
+        'Abschnitt Nord',
+      ),
     );
   });
 
@@ -1002,18 +1049,23 @@ describe('UeberblickPage', () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
-    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/auftraege', haengt)]);
+    stelleBereit(leereDaten, [
+      http.get('/api/einsaetze/1/nachforderungen', haengt),
+      http.get('/api/einsaetze/1/auftraege', haengt),
+    ]);
     rendern();
     await bandDa();
-    // „Offene Aufträge" trägt leer „Zu den Aufträgen" — im Laden steht ihr Platz, kein Knopf.
-    const auftraege = paneel('Offene Aufträge');
-    const laden = within(auftraege).getByText('wird abgerufen').closest('[aria-busy="true"]')!;
+    // „Nachforderungen" trägt leer „Nachforderung anlegen" — im Laden steht ihr Platz, kein Knopf.
+    const nachforderungen = paneel('Nachforderungen');
+    const laden = within(nachforderungen)
+      .getByText('wird abgerufen')
+      .closest('[aria-busy="true"]')!;
     expect(laden.querySelectorAll('.ant-skeleton-button')).toHaveLength(1);
-    expect(within(auftraege).queryByRole('button')).toBeNull();
-    // „Nächste Marken" hängt ebenfalls an den Aufträgen, trägt leer aber keine Aktion.
-    const marken = paneel('Nächste Marken');
-    expect(within(marken).getByText('wird abgerufen')).toBeInTheDocument();
-    expect(marken.querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
+    expect(within(nachforderungen).queryByRole('button', { name: /anlegen/ })).toBeNull();
+    // „Offene Aufträge" trägt leer keine Aktion (der Sprung steht im Kopf), also kein Platz.
+    const auftraege = paneel('Offene Aufträge');
+    expect(within(auftraege).getByText('wird abgerufen')).toBeInTheDocument();
+    expect(auftraege.querySelectorAll('.ant-skeleton-button')).toHaveLength(0);
   });
 
   it('Körper erst mit dem Einsatz: davor weder Band noch Paneele noch Rechtehinweis (LFH-629)', async () => {
@@ -1041,7 +1093,8 @@ describe('UeberblickPage', () => {
 
   /**
    * LFH-952 (D6): die Abschnittszeile ist ein Raster mit Containerabfrage am Paneel
-   * (`ueberblick.css`). jsdom rechnet weder Raster noch Abfrage; hier stehen die Klassen und die
+   * (`components/instrument/gliederungsPaneel.css`, seit LLH-1140 der Baustein
+   * `GliederungsPaneel`). jsdom rechnet weder Raster noch Abfrage; hier stehen die Klassen und die
    * DOM-Reihenfolge (der Linkname hängt an ihr), die Lage misst `e2e/rahmen-stehen-bleiben.spec.ts`.
    */
   it('die Abschnittszeile trägt die Rasterbereiche in fester Reihenfolge (LFH-952)', async () => {
@@ -1051,14 +1104,14 @@ describe('UeberblickPage', () => {
       selector: '[data-lfh="ueberblick-abschnitt"] *',
     });
     const zeile = name.closest<HTMLElement>('[data-lfh="ueberblick-abschnitt"]')!;
-    expect(zeile).toHaveClass('ueberblick-abschnitt');
+    expect(zeile).toHaveClass(GLIEDERUNG_KLASSE.zeile);
     expect(zeile.style.display).toBe('grid');
-    expect(zeile.closest('ul')).toHaveClass('ueberblick-abschnitte');
+    expect(zeile.closest('ul')).toHaveClass(GLIEDERUNG_KLASSE.liste);
     expect(Array.from(zeile.children).map((k) => k.className)).toEqual([
-      'ueberblick-abschnitt__kante',
-      'ueberblick-abschnitt__name',
-      'ueberblick-abschnitt__auftrag',
-      'ueberblick-abschnitt__staerke',
+      GLIEDERUNG_KLASSE.kante,
+      GLIEDERUNG_KLASSE.kopf,
+      GLIEDERUNG_KLASSE.inhalt,
+      GLIEDERUNG_KLASSE.zahl,
     ]);
   });
 
@@ -1190,7 +1243,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     });
     rendern();
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
-    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
     await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
     expect(aufrufe['/api/einsaetze/1/personen']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
@@ -1216,8 +1269,9 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     const nachforderungen = paneel('Nachforderungen');
     expect(within(nachforderungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
     expect(within(nachforderungen).queryByRole('link')).toBeNull();
-    // Kein Sprung ins gesperrte ETB.
-    expect(within(entscheidungen).queryByRole('link', { name: /Einsatztagebuch/ })).toBeNull();
+    // Kein Sprung ins gesperrte ETB, keiner in die gesperrten Nachforderungen.
+    expect(within(entscheidungen).queryByRole('button', { name: 'ETB' })).toBeNull();
+    expect(within(nachforderungen).queryByRole('button', { name: 'Nachforderungen' })).toBeNull();
 
     // Abschnittszeile ohne Rückmeldung und ohne Aufträge, aber ohne Ausfall.
     const zeile = await within(paneel('Einsatzabschnitte')).findByRole('link', {
@@ -1232,6 +1286,23 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     expect(screen.queryByText(/Stand unbekannt/)).toBeNull();
   });
 
+  it('Meldungen fehlen im Modulzähler (gesperrt): „—“ mit Grund und ohne Link, nie 0', async () => {
+    stelleBereit({
+      ...volleDaten,
+      zaehler: {
+        auftraege: { offen: 2, in_arbeit: 0, ueberfaellig: 1 },
+        nachforderungen: { offen: 3, angefordert: 1, zugesagt: 1, unterwegs: 1 },
+      },
+    });
+    rendern();
+    await waitFor(() => expect(zelle('Offene Aufträge')).toHaveTextContent('2'));
+    const meldungen = zelle('Meldungen offen');
+    expect(meldungen).toHaveTextContent('—');
+    expect(meldungen).toHaveTextContent('nicht freigegeben');
+    expect(meldungen).not.toHaveTextContent('0');
+    expect(meldungen.closest('a')).toBeNull();
+  });
+
   it('gesperrtes Modul mit Altstand im Cache: keine Daten aus dem Cache', async () => {
     mitFreigaben({ personen: { zugriff: false } });
     // Eigener Client ohne `gcTime: 0`: der Altstand muss den ersten await überleben. Literaler Key.
@@ -1243,7 +1314,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       </Routes>,
       { route: '/einsaetze/1/ueberblick', client },
     );
-    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
     const betroffene = zelle('Betroffene');
     expect(betroffene).toHaveTextContent('nicht freigegeben');
     expect(betroffene).not.toHaveTextContent('3');
@@ -1421,7 +1492,7 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
     rendern();
     await bandDa();
     const lagebericht = screen.getByRole('button', { name: /Lagebericht/ });
-    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
     expect(lagebericht).toBeEnabled();
     expect(lagebericht).not.toHaveAttribute('title');
     expect(screen.getByRole('button', { name: /Eintrag/ })).toBeEnabled();
@@ -1439,12 +1510,12 @@ describe('UeberblickPage Sprungziele (LFH-888)', () => {
     mitFreigaben({ kraefteuebersicht: { zugriff: false } });
     rendern();
     await bandDa();
-    await waitFor(() => expect(zelle('Warnstufe')).toHaveTextContent('hoch'));
+    await waitFor(() => expect(zelle('Einsatzabschnitte')).toHaveTextContent('Abschnitt Nord'));
     await waitFor(() =>
       expect(within(band()).getByText('Kräfte im Einsatz').closest('a')).toBeNull(),
     );
     // Gegenprobe: eine freie Nachbarzelle trägt ihren Link — sonst wäre „kein Link" trivial.
-    expect(within(band()).getByText('Warnstufe').closest('a')).not.toBeNull();
+    expect(within(band()).getByText('Einsatzabschnitte').closest('a')).not.toBeNull();
     expect(zelle('Kräfte im Einsatz')).not.toHaveTextContent('—');
   });
 

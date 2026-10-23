@@ -102,8 +102,8 @@ describe('AnrufErfassung — Uhrzeit in der Anzeigezone (LFH-692)', () => {
     await waehleAnliegen('Auskunft zur Lage');
     await userEvent.click(screen.getByText('Anrufer und Uhrzeit'));
     const uhrzeit = screen.getByRole('textbox', { name: 'Uhrzeit' });
-    // Enter übernimmt die getippte Uhrzeit und sendet ab.
-    await tippeZeit(userEvent.setup(), uhrzeit, '30.09.2026 13:00');
+    // Taktisch getippt (LLH-1077); Enter übernimmt die Uhrzeit und sendet ab.
+    await tippeZeit(userEvent.setup(), uhrzeit, '301300sep26');
     await waitFor(() =>
       expect(erfassen).toHaveBeenCalledWith(
         expect.objectContaining({ eingang_at: '2026-09-30 11:00:00' }),

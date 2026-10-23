@@ -9,6 +9,7 @@ import { mitProzessZone } from '../test/prozessZone';
 import { mitVorgehenderGeraeteuhr } from '../test/vorgehendeUhr';
 import type { NeuerAuftrag } from '../api/types';
 import AuftragFormular from './AuftragFormular';
+import { tippeZeit, zeitFeld } from '../test/zeitEingabe';
 
 // Katalog und Besetzung stehen fest, statt über das Netz zu kommen (LFH-549).
 vi.mock('../fuehrung/useFunktionsVorschlaege', async () => ({
@@ -238,6 +239,45 @@ describe('AuftragFormular — Frist und Erteilung in der Anzeigezone (LFH-692)',
           frist_at: '2026-09-24 11:00:00',
           erteilt_at: '2026-09-24 08:00:00',
         }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('LLH-1077: „1430“ + Enter in der Frist, „0945“ in „erteilt am“ (Berliner Zeit)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    // 10:00 Berliner Zeit: die Frist 14:30 liegt heute vor uns, die Erteilung 09:45 dahinter.
+    vi.setSystemTime(new Date('2026-09-24T08:00:00Z'));
+    try {
+      const onAnlegen = vi.fn();
+      renderMitProviders(
+        <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
+          <AuftragFormular
+            card={false}
+            senden={false}
+            abschnitte={[{ id: 1, name: 'Abschnitt Nord' }]}
+            einheiten={[{ id: 2, name: 'LZ 1' }]}
+            onAnlegen={onAnlegen}
+          />
+        </AnzeigeKonventionenProvider>,
+      );
+      const user = userEvent.setup();
+      await openWeitere();
+      await user.type(screen.getByLabelText('Empfänger'), 'S3{Enter}');
+      await user.type(screen.getByLabelText('Auftrag / Was'), 'Erkunden');
+      const erteilt = await screen.findByRole('textbox', { name: 'Erteilt am (optional)' });
+      // Getippt und verlassen (Enter sendete schon hier ab, Erfassungs-Norm); Enter in der Frist.
+      await user.clear(erteilt);
+      await user.type(erteilt, '0945');
+      await tippeZeit(user, zeitFeld('Frist (Quittung/Vollzug)'), '1430');
+      await waitFor(() =>
+        expect(onAnlegen).toHaveBeenCalledWith(
+          expect.objectContaining({
+            frist_at: '2026-09-24 12:30:00',
+            erteilt_at: '2026-09-24 07:45:00',
+          }),
+        ),
       );
     } finally {
       vi.useRealTimers();

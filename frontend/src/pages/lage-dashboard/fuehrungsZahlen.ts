@@ -15,7 +15,7 @@ import type { ModulZaehler } from '../../api/types';
 
 type AuftragsZaehler = NonNullable<ModulZaehler['auftraege']>;
 type MeldungsZaehler = NonNullable<ModulZaehler['meldungen']>;
-type NachforderungsZaehler = NonNullable<ModulZaehler['nachforderungen']>;
+export type NachforderungsZaehler = NonNullable<ModulZaehler['nachforderungen']>;
 
 /** Was an der Zähler-Abfrage gelesen wird (Teilmenge von `UseQueryResult`). */
 export interface ZaehlerAbfrage {
@@ -57,6 +57,14 @@ export const NICHT_FREIGEGEBEN = 'nicht freigegeben';
 /** „1 überfällig" · „keiner überfällig" — die überfälligen UNTER den offenen. */
 export function auftraegeNotiz(z: AuftragsZaehler): string {
   return z.ueberfaellig > 0 ? `${z.ueberfaellig} überfällig` : 'keiner überfällig';
+}
+
+/**
+ * „2 unterwegs" — die unterwegs UNTER den offenen Nachforderungen. Eine Formulierung für die
+ * Werkzeugkachel (`stab/werkzeugZahlen.ts`) und die Lagekennzahl im Band (LLH-1371).
+ */
+export function nachforderungenNotiz(z: NachforderungsZaehler): string {
+  return `${z.unterwegs} unterwegs`;
 }
 
 /** „2 neu" · „2 neu · 1 Bestätigung überfällig". */

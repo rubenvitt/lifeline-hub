@@ -8,6 +8,7 @@ import { renderMitProviders as renderMitBasisProviders } from '../test/utils';
 import { offeneRueckfrage } from '../test/rueckfrage';
 import { setzeViewportBreite } from '../test/viewport';
 import { dichten } from '../theme/tokens';
+import { kopfFilterWaehlen } from '../test/kopfFilter';
 import Datensicht, {
   MAX_SEKUNDAER,
   TIEFE_DECKEL,
@@ -713,6 +714,17 @@ function rendere(props: Partial<Parameters<typeof Datensicht<Fahrzeug, FahrzeugK
 }
 
 const tabellen = (c: HTMLElement) => c.querySelectorAll('.ant-table');
+/**
+ * Das offene Menü des Spaltenschalters. Das Filtermenü im Spaltenkopf (LLH-1086) ist ebenfalls ein
+ * Dropdown mit `role="menu"` und bleibt in jsdom nach dem Schließen offen markiert (kein
+ * `transitionend`); ein freier Griff träfe es.
+ */
+const spaltenMenue = () =>
+  [
+    ...document.querySelectorAll<HTMLElement>(
+      '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
+    ),
+  ].find((m) => !m.closest('.ant-table-filter-dropdown')) ?? null;
 const karten = (c: HTMLElement) => c.querySelectorAll('[data-lfh="datensicht-karte"]');
 
 describe('Datensicht · Formachse', () => {
@@ -1118,25 +1130,23 @@ describe('Datensicht · Filteretikett und Leerzustand (LFH-967)', () => {
    * Ein Mehrfach-Select zeigt nach der Wahl nur noch den Wert („Feuerwehr ×“); der Platzhalter,
    * bisher die einzige Beschriftung, verschwindet. Das Etikett steht deshalb als Präfix im Feld.
    */
-  it.each([390, 1366])(
-    'das Filteretikett bleibt nach der Wahl sichtbar — %i px',
-    async (breite) => {
-      setzeViewportBreite(breite);
-      rendere({ suche: { platzhalter: 'Funkrufname' } });
-      const feld = screen.getByRole('combobox', { name: 'Träger' });
-      const huelle = feld.closest('.ant-select') as HTMLElement;
-      expect(huelle).toHaveTextContent('Träger');
+  // Nur im Kartenzweig: im Tabellenzweig sitzt der Filter seit LLH-1086 im Spaltenkopf.
+  it.each([390])('das Filteretikett bleibt nach der Wahl sichtbar — %i px', async (breite) => {
+    setzeViewportBreite(breite);
+    rendere({ suche: { platzhalter: 'Funkrufname' } });
+    const feld = screen.getByRole('combobox', { name: 'Träger' });
+    const huelle = feld.closest('.ant-select') as HTMLElement;
+    expect(huelle).toHaveTextContent('Träger');
 
-      await userEvent.click(feld);
-      await userEvent.click(await screen.findByTitle('Feuerwehr'));
-      // Auf die Wirkung warten: „Rotkreuz 2“ (HiOrg) fällt aus der Sicht.
-      await waitFor(() => expect(screen.queryByText('Rotkreuz 2')).toBeNull());
-      // Der Wert selbst steht in jsdom nicht als Text da (`maxTagCount="responsive"` misst 0 px);
-      // getragen wird die Aussage vom Präfix, der Platzhalter ist jetzt verschwunden.
-      expect(huelle.querySelector('.ant-select-placeholder')).toBeNull();
-      expect(huelle, 'die Achse steht neben dem gewählten Wert').toHaveTextContent('Träger');
-    },
-  );
+    await userEvent.click(feld);
+    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    // Auf die Wirkung warten: „Rotkreuz 2“ (HiOrg) fällt aus der Sicht.
+    await waitFor(() => expect(screen.queryByText('Rotkreuz 2')).toBeNull());
+    // Der Wert selbst steht in jsdom nicht als Text da (`maxTagCount="responsive"` misst 0 px);
+    // getragen wird die Aussage vom Präfix, der Platzhalter ist jetzt verschwunden.
+    expect(huelle.querySelector('.ant-select-placeholder')).toBeNull();
+    expect(huelle, 'die Achse steht neben dem gewählten Wert').toHaveTextContent('Träger');
+  });
 
   it.each([390, 1366])(
     'aktive Suche ohne Treffer nennt die Einschränkung und setzt sie zurück — %i px',
@@ -1162,8 +1172,7 @@ describe('Datensicht · Filteretikett und Leerzustand (LFH-967)', () => {
   it('aktiver Spaltenfilter ohne Treffer nennt die Einschränkung', async () => {
     setzeViewportBreite(1366);
     rendere({ daten: [F(2, 'Rotkreuz 2', { traeger: 'HiOrg' })], leerText: 'Leer' });
-    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
-    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    await kopfFilterWaehlen('Träger', [/^Feuerwehr/]);
     expect(await screen.findByText('Keine Treffer für die gewählten Filter')).toBeInTheDocument();
     expect(screen.queryByText('Leer')).toBeNull();
     expect(screen.getByRole('button', { name: 'Filter zurücksetzen' })).toBeInTheDocument();
@@ -1529,14 +1538,14 @@ describe('Datensicht · Tabellenzweig', () => {
     ).toEqual(['Florian 1', 'Florian 3', 'Rotkreuz 2']);
   });
 
-  it('Spaltenfilter stehen in der Werkzeugzeile und wirken auf die Zeilenmenge', async () => {
+  it('Spaltenfilter stehen im Spaltenkopf und wirken auf die Zeilenmenge (LLH-1086)', async () => {
     // `filters`/`onFilter` sind am Spaltentyp gesperrt, weil antd deren Zustand intern hält und der
-    // Kartenzweig ihn nicht lesen könnte. Der Filter steht in der Werkzeugzeile.
+    // Kartenzweig ihn nicht lesen könnte. Das Primitiv reicht den Filter KONTROLLIERT in den Kopf.
     const { container } = rendere();
-    expect(container.querySelector('.ant-table-filter-trigger')).toBeNull();
+    expect(container.querySelector('thead .ant-table-filter-trigger')).not.toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Träger' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
-    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    await kopfFilterWaehlen('Träger', [/^Feuerwehr/]);
     expect(
       [...container.querySelectorAll('tr.ant-table-row td:first-child')].map((z) => z.textContent),
     ).toEqual(['Florian 1', 'Florian 3']);
@@ -1549,8 +1558,7 @@ describe('Datensicht · Tabellenzweig', () => {
     const suche = screen.getByRole('searchbox', { name: 'Suche in Fahrzeuge im Einsatz' });
 
     await userEvent.type(suche, 'Florian');
-    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
-    await userEvent.click(await screen.findByTitle('Hilfsorganisation'));
+    await kopfFilterWaehlen('Träger', [/^Hilfsorganisation/]);
     await waitFor(() => expect(namen()).toEqual([]));
 
     suche.focus();
@@ -1565,7 +1573,7 @@ describe('Datensicht · Tabellenzweig', () => {
     expect(ereignis.defaultPrevented).toBe(true);
     expect(suche).toHaveValue('');
     await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Rotkreuz 2', 'Florian 3']));
-    expect(screen.getByRole('combobox', { name: 'Träger' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Träger filtern' })).toBeInTheDocument();
   });
 
   it('übernimmt native Wortlöschung nicht, wenn der Fokus im Ergebnisbereich steht', async () => {
@@ -1611,9 +1619,7 @@ describe('Datensicht · Tabellenzweig', () => {
       const knopf = screen.getByRole('button', { name: /Spalten/ });
       for (let i = 0; i < 3; i += 1) {
         await userEvent.click(knopf);
-        const offen = document.querySelector<HTMLElement>(
-          '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-        );
+        const offen = spaltenMenue();
         if (offen) return offen;
       }
       throw new Error('Der Spaltenschalter ließ sich in drei Klicks nicht öffnen');
@@ -1630,8 +1636,7 @@ describe('Datensicht · Tabellenzweig', () => {
       );
     };
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
-    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    await kopfFilterWaehlen('Träger', [/^Feuerwehr/]);
     await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Florian 3']));
 
     /*
@@ -1645,8 +1650,9 @@ describe('Datensicht · Tabellenzweig', () => {
       'Rotkreuz 2',
       'Florian 3',
     ]);
-    // Das Bedienelement ist mit der Spalte verschwunden.
-    expect(screen.queryByRole('combobox', { name: 'Träger' })).toBeNull();
+    // Das Bedienelement ist mit der Spalte verschwunden, und mit ihm der Chip (LLH-1086).
+    expect(screen.queryByRole('button', { name: /^Träger filtern/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Filter Träger: / })).toBeNull();
 
     // Erneut öffnen: das Menü schließt nach jedem Umschalten.
     await schalteSpalte('Träger', 'da');
@@ -1847,8 +1853,7 @@ describe('Datensicht · Zeilenschleuse', () => {
     const koepfe = () =>
       [...container.querySelectorAll('th.ant-table-cell')].map((z) => z.textContent);
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Träger' }));
-    await userEvent.click(await screen.findByTitle('Feuerwehr'));
+    await kopfFilterWaehlen('Träger', [/^Feuerwehr/]);
     await waitFor(() => expect(namen()).toEqual(['Florian 1', 'Florian 3']));
 
     // Menü öffnen, BEVOR eingefroren wird: der Öffnungsklick verschiebt den Fokus ohnehin.
@@ -1856,9 +1861,7 @@ describe('Datensicht · Zeilenschleuse', () => {
     let menue: HTMLElement | null = null;
     for (let i = 0; i < 3 && !menue; i += 1) {
       await userEvent.click(knopf);
-      menue = document.querySelector<HTMLElement>(
-        '.ant-dropdown:not(.ant-dropdown-hidden) [role="menu"]',
-      );
+      menue = spaltenMenue();
     }
     expect(menue, 'der Spaltenschalter ließ sich in drei Klicks nicht öffnen').not.toBeNull();
 

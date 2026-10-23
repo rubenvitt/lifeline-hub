@@ -117,13 +117,19 @@ filtern, nur auf- und zuklappen.
 
 ### Requirement: Statusband ohne Füllkacheln
 
-Das Statusband SHALL die Einheiten je FMS-Status und das Personal je Zustand als Zahl mit
-Aufgliederung zeigen und MUST NOT leere Kacheln zum Auffüllen zeigen. „Keine Rückmeldung“ MUST nur
-erscheinen, wenn es sie gibt.
+Das Statusband SHALL die Einheiten je FMS-Status und das Personal je Zustand als Paneele des
+Dashboard-Baukastens zeigen („Einheiten nach FMS-Status“, „Personal nach Status“): je Status eine
+Zeile mit Wort, Zahl und Anteilsbalken, die Summe im Paneelkopf (LLH-1140). Es MUST NOT leere
+Kacheln zum Auffüllen zeigen, und ein unbekannter Stand MUST NOT als 0 erscheinen. „Keine
+Rückmeldung“ MUST nur erscheinen, wenn es sie gibt, als eigene Kennzahl mit Sprung in die Meldungen.
 
 #### Scenario: Wenige Status
 - **WHEN** alle zwölf Personen gebunden sind
-- **THEN** zeigt das Band „Personal 12“ mit einem Segment „gebunden“ und keine leere Kachel
+- **THEN** zeigt das Paneel „Personal nach Status“ im Kopf „12 Kräfte“ und eine Zeile „gebunden 12“ mit vollem Balken, und keine leere Kachel
+
+#### Scenario: Ausfall
+- **WHEN** die Listen der Kräfte nicht abrufbar sind
+- **THEN** zeigen beide Paneele „Stand unbekannt“ mit „Erneut abrufen“ und keine Zahl
 
 ### Requirement: Zulauf aus Nachforderungen
 

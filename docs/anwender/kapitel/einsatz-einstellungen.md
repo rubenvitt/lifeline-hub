@@ -2,7 +2,7 @@
 titel: Einstellungen des Einsatzes und Module
 gruppen: [fuehrung]
 reihenfolge: 600
-quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
+quellen: [frontend/src/pages/EinsatzEinstellungenPage.tsx, frontend/src/pages/einstellungen/EinsatzAllgemein.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, frontend/src/pages/einstellungen/EinsatzModule.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/EinsatzZugriff.tsx, frontend/src/pages/einstellungen/EinsatzAbloesung.tsx, frontend/src/pages/einstellungen/EinsatzKennzahlen.tsx, src/routes/lagekennzahl_wahl.rs, frontend/src/abloesung/SchichtmodellModal.tsx, src/routes/abloesung.rs, frontend/src/pages/einstellungen/optionen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/aufbewahrung/fristModell.ts, src/einsatz/berechtigung.rs, src/einsatz/kontext.rs, src/einsatz/effektiv.rs, src/einsatz/modul_override.rs, src/einsatz/repo.rs, src/routes/einsatz.rs, src/meldung/repo.rs, src/auftrag/repo.rs]
 ---
 
 ## Überblick
@@ -15,7 +15,8 @@ fehlt auch die, die Vorgabe des Systems.
 
 Bedient wird das Modul von der Einsatzleitung und dem Führungspersonal, die Reiter „Module“ und
 „Zugriff“ nur von der Einsatzleitung. Der Reiter „Ablösung“ legt das Schichtmodell fest, nach dem
-die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)). Den Reiter „Aufbewahrung“ beschreibt das Kapitel
+die Ablösung des Einsatzes rechnet (Kapitel [Ablösung](abloesung.md)). Der Reiter „Kennzahlen“
+wählt, was Platz 3 der Kennzahlen im Lagebild zeigt. Den Reiter „Aufbewahrung“ beschreibt das Kapitel
 [Aufbewahrung](aufbewahrung.md), die Reiter „Pegel“ und „Geräte“ die Kapitel zu Wetter und
 Pegeln und zu gekoppelten Geräten, den Reiter „Zugriff“ (wer im Einsatz mit welcher Rolle
 arbeitet) das Kapitel [Rechte im Einsatz](rechte-im-einsatz.md).
@@ -69,6 +70,17 @@ Für Einsatzleitung und Führungspersonal:
 
 Jede Änderung gilt sofort, ohne Speichern-Leiste. Die App meldet „Vorgabe des Einsatzes
 gespeichert“.
+
+### Nachforderungen im Lagebild zeigen
+
+Für Einsatzleitung und Führungspersonal:
+
+1. Den Reiter „Kennzahlen“ öffnen.
+2. „Nachforderungen offen auf Platz 3“ einschalten. Platz 3 der Kennzahlen im Lagebild zeigt dann
+   „Nachforderungen offen“ statt „Schäden offen“.
+3. Zum Zurücknehmen den Schalter ausschalten.
+
+Jede Änderung gilt sofort, ohne „Speichern“.
 
 ### Module ausblenden oder auf eine Rolle beschränken
 
@@ -124,6 +136,17 @@ Steht die Einstellung auf „An“, schreibt jede neue Meldung einen ETB-Eintrag
 und jeder neue Auftrag einen vom Typ „Anordnung“. Auf „Aus“ entstehen diese Einträge nicht;
 was ins Einsatztagebuch gehört, trägt dann jemand selbst ein.
 
+### Kennzahlen im Lagebild
+
+Das Lagebild zeigt immer sechs Kennzahlen; zwei Plätze wechseln mit Entscheidungen am Einsatz
+(Kapitel [Lagebild](lagebild.md)). „Nachforderungen offen“ ist eine solche Entscheidung: gewählt
+bleibt gewählt, auch wenn gerade keine Nachforderung offen ist (dann steht dort 0). Eine
+angeordnete Evakuierung geht vor: Solange sie besteht, zeigt Platz 3 „Evakuiert“, und der Reiter
+nennt das unter dem Schalter. Die Wahl bleibt gespeichert und wirkt wieder, sobald die Evakuierung
+aufgehoben ist. Wer das Modul Nachforderungen nicht sehen darf, sieht auf Platz 3 „Nachforderungen
+offen“ mit „—“ und „nicht freigegeben“, nie eine Zahl. Lagebilder, die gerade offen sind, bieten
+den neuen Zuschnitt über den Hinweis „Kennzahlreihe geändert: …“ an.
+
 ### Was „Sichtbar“ und „Benötigte Rolle“ bewirken
 
 - **Ausgeblendet** fehlt ein Modul in der Navigation aller Personen und ist für sie gesperrt.
@@ -164,6 +187,8 @@ die Organisation selbst ausblendet, bleibt auch mit Vorlage ausgeblendet.
   mit dieser Rolle.
 - „Ablösung“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
   die Rhythmus-Vorgabe eines Abschnitts; ein System-Admin ohne Rolle im Einsatz sieht sie nur.
+- „Kennzahlen“ ändern die Einsatzleitung und das Führungspersonal eines laufenden Einsatzes, wie
+  die Pegel; ein System-Admin ohne Rolle im Einsatz sieht den Schalter nur.
 - Alle anderen sehen die Einstellungen als „Nur Ansicht“.
 
 Nach dem Abschluss ist der Einsatz eingefroren; nur die Aufbewahrungsfrist lässt sich noch

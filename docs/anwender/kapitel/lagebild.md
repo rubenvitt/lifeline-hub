@@ -2,7 +2,7 @@
 titel: Lagebild
 gruppen: [alle, fuehrung]
 reihenfolge: 210
-quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/lage-dashboard/LageDashboardPage.tsx, frontend/src/pages/lage-dashboard/LagePaneele.tsx, frontend/src/pages/lage-dashboard/lagebild.ts, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/pages/gefahren/erlaeuterungen.ts, frontend/src/pages/gefahren/ErlaeuterungsMarke.tsx, frontend/src/pages/lage-dashboard/meldungsstrom.ts, frontend/src/pages/lage-dashboard/useLagebild.ts, frontend/src/pages/lage-dashboard/fuehrungsZahlen.ts, src/einsatz/lagekennzahl.rs, frontend/src/wetter/kopfWarnung.ts, frontend/src/wetter/WetterKopfMarke.tsx, frontend/src/api/queryKeys.ts]
 ---
 
 ## Überblick
@@ -46,8 +46,12 @@ aus dem Modul, in dem sie erfasst wird.
 
 - **Ganz links** steht der Leitpegel, sobald ein maßgeblicher Pegel festgelegt ist (Kapitel
   [Wetter und Pegel](wetter-pegel.md)); sonst „Verbleib offen“.
-- **In der Mitte** steht „Evakuiert“, sobald eine Evakuierung angeordnet ist; sonst „Schäden
-  offen“.
+- **In der Mitte** steht „Evakuiert“, sobald eine Evakuierung angeordnet ist. Ist in den
+  Einstellungen des Einsatzes unter „Kennzahlen“ „Nachforderungen offen auf Platz 3“ gewählt,
+  steht dort ohne Evakuierung „Nachforderungen offen“ (Kapitel
+  [Einstellungen des Einsatzes und Module](einsatz-einstellungen.md)); sonst „Schäden offen“.
+  „Nachforderungen offen“ zählt wie das Modulmenü und die Seite „Nachforderungen“: angefordert,
+  zugesagt und unterwegs, darunter, wie viele unterwegs sind.
 
 Wer die Plätze belegt, steht am Einsatz. Ändert sich das, während das Lagebild offen ist, tauscht
 die Reihe nicht unter dem Blick: Ein Hinweis „Kennzahlreihe geändert: …“ bietet den neuen

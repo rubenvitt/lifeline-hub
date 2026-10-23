@@ -1098,6 +1098,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("status_seit", G_ZEIT),
             // Herkunft aus einer Nachforderung (LLH-1383, design.md D7).
             retain("nachforderung_id", G_FK),
+            // Wirkung der Übernahme für den Storno (LLH-1388): Kennzeichen „angelegt“ und Belegungs-FK.
+            retain("nachforderung_angelegt", G_ENUM),
+            retain("nachforderung_belegung_id", G_FK),
         ],
     },
     TabellenRegel {
@@ -1749,6 +1752,19 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("prognose_zeit", G_ZEIT),
             retain("prognose_gesetzt_von_id", G_FK),
             retain("prognose_gesetzt_at", G_ZEIT),
+        ],
+    },
+    // Gewählte Lagekennzahlen (LLH-1371): eine Darstellungsentscheidung, kein Personenbezug.
+    TabellenRegel {
+        tabelle: "einsatz_lagekennzahl_wahl",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("einsatz_id", G_SCOPE),
+            retain("kennzahl", G_ENUM),
+            retain("gewaehlt_von_id", G_FK),
+            retain("gewaehlt_at", G_ZEIT),
         ],
     },
     TabellenRegel {

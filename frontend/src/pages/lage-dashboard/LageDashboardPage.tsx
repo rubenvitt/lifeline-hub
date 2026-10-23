@@ -2,6 +2,9 @@
  * Lage-Dashboard — die ganze Lage auf einem Schirm (Neuentwurf S3,
  * `docs/design/2026-09-21-neuentwurf/neuentwurf.dc.html`).
  *
+ * Vorbild des Dashboard-Baukastens (`frontend/AGENTS.md`, LLH-1140): Fläche, Paneelreihe, Paneele
+ * und Warnstufen-Hinweis kommen aus `components/instrument`.
+ *
  * Aufbau: Seitenkopf mit „Lagebild <TT.MM. HH:MM>", rechts Alter des Datenstands und — nur wenn die
  * höchste Warnstufe ein Alarmbeitrag ist — der Warnstufen-Hinweis. Darunter im Fugenraster:
  * 1. Kennzahlenband, sechs Plätze (vier Kern-, zwei Lageplätze, siehe unten).
@@ -24,7 +27,8 @@
  * `docs/superpowers/specs/2026-09-23-lfh-640-lagebezogene-kennzahlreihe-design.md`): Kern auf
  * 2/4/5/6 (Betroffene, Kräfte, Vermisste, Einsatzdauer), Lageplätze 1 und 3. Platz 1 zeigt den
  * Pegel, wenn einer festgelegt ist, sonst „Verbleib offen"; Platz 3 „Evakuiert", wenn eine
- * Evakuierung angeordnet ist, sonst „Schäden offen". Wer die Plätze belegt, steht am Einsatz
+ * Evakuierung angeordnet ist, sonst „Nachforderungen offen", wenn am Einsatz gewählt (LLH-1371,
+ * Zahl aus dem Modulzähler wie Modulmenü und Board), sonst „Schäden offen". Wer die Plätze belegt, steht am Einsatz
  * (`lagekennzahlen`), nicht an den Fachabfragen — sonst stünde beim Laden kurz eine andere Kennzahl
  * da. Kommt während der Betrachtung ein neuer Zuschnitt, bietet ein Sammelbanner ihn an, statt die
  * Reihe zu tauschen.
@@ -40,7 +44,6 @@
  * freigegebenes Modul (LFH-669, `useLagebild`) wird nicht angefragt und steht als „—" bzw. Satz mit
  * Grund da, nie als Ausfall und nie als 0.
  */
-import { IconWarndreieck } from '../../icons';
 import { useMemo, useState, useSyncExternalStore, useEffect } from 'react';
 import { Link, useParams } from 'react-router';
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query';
@@ -77,9 +80,12 @@ import EinsatzSeite from '../../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 import { useViewport } from '../../components/useViewport';
 import {
+  DashboardFlaeche,
   Kennzahl,
   Kennzahlenband,
+  PaneelReihe,
   Sammelbanner,
+  WarnstufenHinweis,
   monoStil,
   useRollen,
   type KennzahlZustand,
@@ -112,6 +118,7 @@ import {
   auftragsStand,
   meldungenNotiz,
   meldungsStand,
+  nachforderungsStand,
   type Zaehlstand,
 } from './fuehrungsZahlen';
 import { kraefteZustand, useLagebild } from './useLagebild';
@@ -223,6 +230,20 @@ export default function LageDashboardPage() {
     wetterFrei && wetterQuery.isSuccess ? wetterQuery.data.warnungen : undefined;
 
   const einsatz = einsatzQuery.data;
+  // „Nachforderungen offen" (LLH-1371) aus dem Modulzähler — dieselbe Zahl wie Modulmenü und Board
+  // (LFH-550). Fehlt das Feld (Modul nicht frei), ist der Stand `gesperrt`: die Zelle bleibt auf
+  // Platz 3 und nennt den Grund, wie jede gesperrte Kennzahl.
+  const { data: zData, error: zError, isError: zIsError, isPending: zIsPending } = zaehlerQuery;
+  const nachforderungen = useMemo(
+    () =>
+      nachforderungsStand({
+        data: zData,
+        error: zError,
+        isError: zIsError,
+        isPending: zIsPending,
+      }),
+    [zData, zError, zIsError, zIsPending],
+  );
 
   // ── Kennzahlreihe: gehaltener Zuschnitt ── Die Reihe des Einsatzes laut Server, als
   // Schlüssel-String, damit ein Refetch mit gleichem Inhalt keine neue Identität erzeugt.
@@ -259,8 +280,13 @@ export default function LageDashboardPage() {
 
   const lagebild = useMemo(() => {
     if (!basis || !reihe) return null;
-    return baueLagebild({ ...basis, pegelZiel, evakuierung, evakuierungZiel }, jetzt, konv, reihe);
-  }, [basis, reihe, jetzt, konv, pegelZiel, evakuierung, evakuierungZiel]);
+    return baueLagebild(
+      { ...basis, pegelZiel, evakuierung, evakuierungZiel, nachforderungen },
+      jetzt,
+      konv,
+      reihe,
+    );
+  }, [basis, reihe, jetzt, konv, pegelZiel, evakuierung, evakuierungZiel, nachforderungen]);
 
   // ── Meldungsstrom: Wassermarke statt Einschieben ──
   const [angezeigtBis, setAngezeigtBis] = useState<number | null>(null);
@@ -315,6 +341,7 @@ export default function LageDashboardPage() {
     Kräfte: zKraefte,
     Vermisste: zBetroffene,
     Evakuiert: evakuierungDatenzustand(evakuierung),
+    'Nachforderungen offen': nachforderungen.zustand,
     'Schäden offen': quellZustand.schaeden,
     Einsatzdauer: zustandVon(einsatzQuery),
   };
@@ -337,7 +364,6 @@ export default function LageDashboardPage() {
   const warnTon =
     zGefahren === 'daten' && lagebild ? warnstufeTon(lagebild.hoechsteWarnstufe) : 'neutral';
   const dwdWarnung = kopfWarnung(wetterWarnungen, jetzt, konv);
-  const breit = abBreite('lg');
   const bandSpalten = abBreite('xl') ? 6 : abBreite('md') ? 3 : 2;
   const fuehrung = lagebild?.fuehrung;
   const zFuehrung = (z: Quellzustand): KennzahlZustand =>
@@ -385,20 +411,9 @@ export default function LageDashboardPage() {
           >
             <span data-lfh="datenstand">{standText(datenstand, jetzt, konv)}</span>
             {warnTon !== 'neutral' && lagebild && (
-              <span
-                data-lfh="warnstufe-hinweis"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  color: warnTon === 'alarm' ? rollen.alarmText : rollen.achtungText,
-                }}
-              >
-                <span aria-hidden="true" style={{ display: 'inline-flex' }}>
-                  <IconWarndreieck size={14} />
-                </span>
+              <WarnstufenHinweis ton={warnTon === 'alarm' ? 'alarm' : 'achtung'}>
                 Warnstufe {warnstufeKennzahl[lagebild.hoechsteWarnstufe].label}
-              </span>
+              </WarnstufenHinweis>
             )}
             {dwdWarnung && (
               <WetterKopfMarke warnung={dwdWarnung} ziel={wetterPegelPfad(einsatzId)} />
@@ -406,16 +421,7 @@ export default function LageDashboardPage() {
           </span>
         }
       >
-        <div
-          data-lfh="lagebild"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 1,
-            background: rollen.linie,
-            border: `1px solid ${rollen.linie}`,
-          }}
-        >
+        <DashboardFlaeche kennung="lagebild">
           {wechsel && (
             <Sammelbanner
               aktion={{
@@ -479,16 +485,7 @@ export default function LageDashboardPage() {
                 })}
           </Kennzahlenband>
 
-          <div
-            data-lfh="lagebild-paneele"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: breit
-                ? 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr)'
-                : 'minmax(0, 1fr)',
-              gap: 1,
-            }}
-          >
+          <PaneelReihe kennung="lagebild-paneele">
             <GefahrenmatrixPaneel
               zustand={zMatrix}
               zeilen={matrix.zeilen}
@@ -529,7 +526,7 @@ export default function LageDashboardPage() {
               onEtb={() => waehle(etbPfad(einsatzId))}
               onErfassen={() => waehle(etbPfad(einsatzId, { neu: true }))}
             />
-          </div>
+          </PaneelReihe>
 
           {/* Führungsstand (siehe Dateikopf). Die Überfällig-Zahlen sind Alarmbeiträge und
             behalten ihren Ton. */}
@@ -632,7 +629,7 @@ export default function LageDashboardPage() {
               ziel={uhsGesperrt ? undefined : unfallhilfsstellenListePfad(einsatzId)}
             />
           </Kennzahlenband>
-        </div>
+        </DashboardFlaeche>
       </EinsatzSeite>
     </div>
   );

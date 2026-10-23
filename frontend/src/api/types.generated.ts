@@ -2026,7 +2026,7 @@ export interface components {
             /**
              * @description Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
              *     Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,
-             *     Evakuierung angeordnet), nie durch Messwerte.
+             *     Evakuierung angeordnet, gewählt per `lagekennzahl::waehlen`), nie durch Messwerte.
              *
              *     **Leer ist `[]`, nie `absent`** — wie `meine_sachgebiete` an zwei Stellen gebaut, deshalb
              *     `#[schema(required)]` und kein `skip_serializing_if`.
@@ -3863,7 +3863,11 @@ export interface components {
          *     Reihenfolge der Ausgabe von [`ableiten`].
          * @enum {string}
          */
-        Lagekennzahl: "pegel" | "evakuiert";
+        Lagekennzahl: "pegel" | "evakuiert" | "nachforderungen";
+        /** @description Antwort der Wahl: die gespeicherten gewählten Lagekennzahlen. */
+        LagekennzahlWahl: {
+            gewaehlt: components["schemas"]["Lagekennzahl"][];
+        };
         /**
          * @description Lagemeldungen: noch von niemandem als gesehen gekennzeichnet (LLH-1206). Für alle Benutzer
          *     gleich, anders als der Chat.

@@ -25,14 +25,14 @@ setzen Status, tragen nach und streichen.
 
 1. Unter „Kräfte & Mittel“ das „Meldebild“ öffnen. Der Kopf nennt die Zahl der Einheiten und die
    Stärke (Führer/Unterführer/Mannschaft//Gesamt).
-2. Im Statusband die Zahl unter „Einheiten“ ablesen; der Balken darunter gliedert sie nach
-   FMS-Status, die Legende nennt Code und Zahl, etwa „S3 2 · S4 1“. Daneben steht „Personal“ mit
-   der Gliederung nach Kategorie. „Rückmeldung“ mit dem Wort „keine Rückmeldung“ erscheint nur,
-   wenn sich eine Einheit noch nie zurückgemeldet hat, und zählt diese Einheiten. „Zulauf“
-   erscheint, solange eine Nachforderung angefordert, zugesagt oder unterwegs ist: die Zahl nennt,
-   was zugesagt oder unterwegs ist, darunter steht je Art, wann es eintreffen soll, etwa „+2 RTW,
-   Eintreffen 15:30 · +1 GW-San unterwegs, Eintreffen 16:10 · 1 NEF angefordert“. Ein Klick darauf
-   öffnet die Nachforderungen.
+2. Im Statusband unter „Einheiten nach FMS-Status“ je Status Code, Wort und Zahl lesen, etwa
+   „S3 Anfahrt 2“; der Balken darunter zeigt den Anteil, die Summe steht oben rechts. Daneben
+   gliedert „Personal nach Status“ das Personal nach Kategorie. „Rückmeldung“ mit dem Wort „keine
+   Rückmeldung“ erscheint nur, wenn sich eine Einheit noch nie zurückgemeldet hat, zählt diese
+   Einheiten und führt in die Meldungen. „Zulauf“ erscheint, solange eine Nachforderung
+   angefordert, zugesagt oder unterwegs ist: die Zahl nennt, was zugesagt oder unterwegs ist,
+   darunter steht je Art, wann es eintreffen soll, etwa „+2 RTW, Eintreffen 15:30 · +1 GW-San
+   unterwegs, Eintreffen 16:10 · 1 NEF angefordert“. Ein Klick darauf öffnet die Nachforderungen.
 3. Im Raster je Einheit „Status“, „Rückmeldung“ (Uhrzeit der letzten), „Auftrag“ (der jüngste
    offene, als Verweis), „Stärke“, „Abschnitt“, „Seit“ und „Im Einsatz“ lesen. Eine getönte Zeile
    nennt ihren Grund als Wort, etwa „1 Ausfall“, „1 Ausfall Material“ oder „Rückm. überfällig“.

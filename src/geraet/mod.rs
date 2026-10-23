@@ -712,6 +712,11 @@ mod tests {
             ("GET", "/api/einsaetze/{id}/nachforderungen"),
             ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
             ("POST", "/api/einsaetze/{id}/einheiten/aus-nachforderung"),
+            // Ebenso der Storno einer Fehlübernahme (LLH-1388 D5).
+            (
+                "POST",
+                "/api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren",
+            ),
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
         }

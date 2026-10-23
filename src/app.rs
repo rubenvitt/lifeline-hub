@@ -516,6 +516,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/auftraege/{aid}/aufheben",
             post(routes::auftrag::aufheben),
         )
+        // Gewählte Lagekennzahlen (LLH-1371): Lageplatz B des Kennzahlenbands, Gate `OhneModul`.
+        .route(
+            "/api/einsaetze/{id}/lagekennzahl-wahl",
+            put(routes::lagekennzahl_wahl::setzen),
+        )
         // Maßgebliche Pegel: Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
         .route(
             "/api/einsaetze/{id}/pegel",
@@ -1962,6 +1967,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
             post(routes::einsatz_einheit::stornieren),
+        )
+        // LLH-1388: Fehlübernahme aus einer Nachforderung stornieren.
+        .route(
+            "/api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren",
+            post(routes::einsatz_einheit::uebernahme_stornieren),
         )
         .route(
             "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",

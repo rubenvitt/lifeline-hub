@@ -6,6 +6,7 @@ import {
   vermisstNotiz,
   baueLagebild,
   einsatzdauer,
+  einsatzdauerKennzahl,
   evakuierungDatenzustand,
   evakuierungStand,
   kennzahlReihe,
@@ -49,6 +50,24 @@ const roh = (over: Partial<Rohdaten> = {}): Rohdaten => ({
 
 /** Schmales geschütztes Leerzeichen (Tausendertrenner) — als Literal, nicht zurückgelesen. */
 const T = '\u202f';
+
+describe('einsatzdauerKennzahl (Lagebild und Überblick, LLH-1140)', () => {
+  it('läuft bis jetzt und nennt den Beginn', () => {
+    const k = einsatzdauerKennzahl({ begonnen_at: '2026-06-11 05:19:00' }, JETZT);
+    expect(k.wert).toBe('6:41');
+    expect(k.einheit).toBe('h');
+    expect(k.notiz).toMatch(/^seit /);
+  });
+
+  it('steht nach dem Abschluss und nennt das Ende', () => {
+    const k = einsatzdauerKennzahl(
+      { begonnen_at: '2026-06-11 05:00:00', abgeschlossen_at: '2026-06-11 07:30:00' },
+      JETZT,
+    );
+    expect(k.wert).toBe('2:30');
+    expect(k.notiz).toMatch(/^beendet /);
+  });
+});
 
 describe('einsatzdauer', () => {
   it('rechnet Stunden und Minuten seit Beginn', () => {
@@ -172,6 +191,51 @@ describe('kennzahlReihe (LFH-640)', () => {
 
   it('die Reihenfolge der Auslöser am Einsatz ändert nichts', () => {
     expect(kennzahlReihe(['pegel', 'pegel'])).toEqual(kennzahlReihe(['pegel']));
+    expect(kennzahlReihe(['nachforderungen', 'evakuiert'])).toEqual(
+      kennzahlReihe(['evakuiert', 'nachforderungen']),
+    );
+  });
+
+  // LLH-1371: „Nachforderungen offen“ ist gewählt, Heimat Platz 3 hinter „Evakuiert“.
+  it('Nachforderungen gewählt: „Nachforderungen offen" verdrängt „Schäden offen" auf Platz 3', () => {
+    expect(kennzahlReihe(['nachforderungen'])).toEqual([
+      'Verbleib offen',
+      'Betroffene',
+      'Nachforderungen offen',
+      'Kräfte',
+      'Vermisste',
+      'Einsatzdauer',
+    ]);
+    expect(kennzahlReihe(['pegel', 'nachforderungen'])).toEqual([
+      'Pegel',
+      'Betroffene',
+      'Nachforderungen offen',
+      'Kräfte',
+      'Vermisste',
+      'Einsatzdauer',
+    ]);
+  });
+
+  it('eine angeordnete Evakuierung geht der Wahl vor (Rang), die Wahl bleibt unsichtbar stehen', () => {
+    expect(kennzahlReihe(['evakuiert', 'nachforderungen'])).toEqual(kennzahlReihe(['evakuiert']));
+  });
+
+  it('Heimatplatz: die Wahl ändert in JEDER Ausgangslage höchstens Platz 3 (Kriterium 9)', () => {
+    for (const ohne of [[], ['pegel'], ['evakuiert'], ['pegel', 'evakuiert']] as const) {
+      const vorher = kennzahlReihe(ohne);
+      const nachher = kennzahlReihe([...ohne, 'nachforderungen']);
+      const geaendert = vorher.flatMap((e, i) => (e === nachher[i] ? [] : [i]));
+      const erwartet = ohne.some((k) => k === 'evakuiert') ? [] : [2];
+      expect(geaendert, `ausgehend von [${ohne.join(', ')}]`).toEqual(erwartet);
+      expect(nachher).toHaveLength(6);
+    }
+  });
+
+  it('„evakuiert" ändert auch bei gewählten Nachforderungen genau Platz 3', () => {
+    const vorher = kennzahlReihe(['nachforderungen']);
+    const nachher = kennzahlReihe(['nachforderungen', 'evakuiert']);
+    expect(vorher.flatMap((e, i) => (e === nachher[i] ? [] : [i]))).toEqual([2]);
+    expect(reihenWechsel(vorher, nachher)).toBe('Evakuiert statt Nachforderungen offen');
   });
 });
 
@@ -467,5 +531,43 @@ describe('Kennzahl „Evakuiert" (LFH-607)', () => {
     expect(evakuierungDatenzustand({ zustand: 'fehler' })).toBe('fehler');
     expect(evakuierungDatenzustand({ zustand: 'kein-zugriff' })).toBe('daten');
     expect(evakuierungDatenzustand({ zustand: 'daten', kennzahl: null })).toBe('daten');
+  });
+});
+
+describe('Kennzahl „Nachforderungen offen" (LLH-1371)', () => {
+  const gewaehlt = { ...roh().einsatz, lagekennzahlen: ['nachforderungen'] } as EinsatzAnzeige;
+  const zelle = (nachforderungen: Rohdaten['nachforderungen']) =>
+    baueLagebild(roh({ einsatz: gewaehlt, nachforderungen }), JETZT, BERLIN).kennzahlen[2];
+
+  it('Wert und Notiz aus dem Modulzähler: offen, „n unterwegs", kein Ton, Ziel Modulseite', () => {
+    const k = zelle({
+      zustand: 'daten',
+      zahl: { offen: 5, angefordert: 2, zugesagt: 1, unterwegs: 2 },
+    });
+    expect(k).toMatchObject({
+      etikett: 'Nachforderungen offen',
+      wert: '5',
+      notiz: '2 unterwegs',
+      ton: 'neutral',
+      route: 'nachforderungen',
+    });
+    expect(k.ohneZiel).toBeFalsy();
+  });
+
+  it('gewählt bei null offenen: Wert „0", die Zelle bleibt stehen', () => {
+    expect(
+      zelle({ zustand: 'daten', zahl: { offen: 0, angefordert: 0, zugesagt: 0, unterwegs: 0 } }),
+    ).toMatchObject({ etikett: 'Nachforderungen offen', wert: '0', notiz: '0 unterwegs' });
+  });
+
+  it('ohne Zählerstand (laden, Fehler, gesperrt, keine Angabe) keine Zahl', () => {
+    for (const stand of [
+      { zustand: 'laden' },
+      { zustand: 'fehler' },
+      { zustand: 'gesperrt' },
+      undefined,
+    ] as const) {
+      expect(zelle(stand)).toMatchObject({ etikett: 'Nachforderungen offen', wert: '' });
+    }
   });
 });

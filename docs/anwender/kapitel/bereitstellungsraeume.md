@@ -262,7 +262,9 @@ dem Zeitpunkt von „Eintreffen melden“; die Zeitachse jeder Einheit nennt das
 Das Einsatztagebuch bekommt keinen Eintrag je Einheit, sondern einen für die ganze Übernahme, etwa
 „Nachforderung 2× RTW: als Einheiten übernommen (83-1, 83-2), im BR Nord eingetroffen“. Am
 gekoppelten Gerät des Raums stehen Nachforderungen nicht; dort bucht „Eintreffen buchen“, was
-ankommt.
+ankommt. Wird die Übernahme einer Einheit storniert, bucht die App ihren Austritt; der Verlauf
+des Raums zeigt Eintritt und Austritt, bei einer angelegten Einheit mit der Notiz „Einheit
+aufgelöst“, bei einer verknüpften mit „Übernahme storniert“.
 
 ### Was ein Abruf schreibt
 

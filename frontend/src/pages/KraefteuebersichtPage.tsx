@@ -13,6 +13,7 @@ import {
   auftraegePfad,
   einheitenPfad,
   lageberichtDetailPfad,
+  meldungenPfad,
   nachforderungenPfad,
 } from '../routing/deeplinks';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
@@ -99,8 +100,8 @@ import { funktionText } from '../kraefte/einsatzfunktionKern';
 /**
  * Meldebild: Statusraster über alle Einheiten, als Kräftebaum (LLH-1025, Spec `kraeftebaum`).
  *
- * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Kennzahl
- * Einheiten und Personal mit Aufgliederung, „keine Rückmeldung") → Werkzeugzeile außerhalb des
+ * Aufbau: Seitenkopf (Titel · Mono-Meta · Abschnitt-Filter · „Einheit") → Statusband (Paneele
+ * Einheiten nach FMS-Status und Personal nach Status, „keine Rückmeldung"; LLH-1140) → Werkzeugzeile außerhalb des
  * Primitivs, einzeilig (Auswahlzeile, Suche, „Filter (n)“, Stufe, Lagebericht, Druck) → Raster als
  * Baum: Einheit → Untereinheiten, darunter ihre Fahrzeuge mit Besatzung, „Ohne Fahrzeug“ und das
  * Material als Gruppe. Die Elternzeile zeigt die kumulierte Stärke, Verteilung und Tönung bleiben
@@ -644,6 +645,7 @@ export default function KraefteuebersichtPage() {
   const sprungGesperrt = useSprungSperre(einsatzId);
   const einheitenGesperrt = sprungGesperrt('einheiten');
   const lageberichtGesperrt = sprungGesperrt('lageberichte');
+  const meldungenGesperrt = sprungGesperrt('meldungen');
   // Zulauf aus Nachforderungen (LLH-1384, design.md D7): nur mit Freigabe des Moduls, sonst weder
   // Abruf noch Kennzahl. Dieselben Freigaben aus dem Rahmen-Cache wie die Sprungsperre.
   const nachforderungenFrei = istKeyFreigegeben('nachforderungen', useModulFreigaben(einsatzId));
@@ -1189,7 +1191,14 @@ export default function KraefteuebersichtPage() {
             // Lagebericht): gefiltert entfällt er.
             zulauf={gefiltert ? null : zulauf}
             zulaufZiel={nachforderungenPfad(einsatzId)}
+            // Die Rückmeldungen stehen im Modul Meldungen; gesperrt: Kennzahl ohne Sprung.
+            rueckmeldungZiel={meldungenGesperrt ? undefined : meldungenPfad(einsatzId)}
             zustand={listenFehler ? 'fehler' : listenLaden ? 'laden' : 'daten'}
+            onNeuladen={() => {
+              void personalQuery.refetch();
+              void fahrzeugeQuery.refetch();
+              void einheitenQuery.refetch();
+            }}
           />
         </div>
 

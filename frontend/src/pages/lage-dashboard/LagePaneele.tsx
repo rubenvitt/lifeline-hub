@@ -3,15 +3,17 @@
  * „Meldungsstrom“). Rein darstellend
  * — Abfragen, Zustände und Wassermarke hält `LageDashboardPage.tsx`, die Ableitungen liegen in
  * `lageVerdichtung.ts` und `meldungsstrom.ts`.
+ *
+ * Form aus dem Dashboard-Baukasten (`frontend/AGENTS.md`, LLH-1140): `MatrixPaneel`,
+ * `VerteilungsPaneel`, `StromPaneel`. Hier steht nur, was das Lagebild hineinlegt — Wortlaut,
+ * Farben aus dem Vertrag, Fuß und Meta.
  */
-import { useRef, type CSSProperties } from 'react';
 import type { EtbEintragAnzeige, Sichtungskategorie } from '../../api/types';
 import type { AnzeigeKonventionen } from '../../anzeige/format';
 import {
-  Paneel,
-  PaneelLink,
-  PaneelZustand,
-  Sammelbanner,
+  MatrixPaneel,
+  StromPaneel,
+  VerteilungsPaneel,
   Zeitachseneintrag,
   monoStil,
   useRollen,
@@ -22,14 +24,9 @@ import { sichtungsfarben } from '../../theme/tokens';
 import { WARNSTUFE_RANG, type GefahrenZeile, type SichtungsZeile } from './lageVerdichtung';
 import { warnstufeTon, type Quellzustand } from './lagebild';
 import { bannerText, stromQuelle, stromZeit } from './meldungsstrom';
-import { MATRIX_KLASSE } from './matrixGeometrie';
-import './gefahrenmatrix.css';
 import { modulName } from '../../einsatz/modulRegistry';
 import { MIT_ERLAEUTERUNG } from '../gefahren/erlaeuterungen';
 import { ErlaeuterungsZeichen } from '../gefahren/ErlaeuterungsMarke';
-
-/** Im Fugenraster trägt das Raster die Linien — ein eigener Paneelrahmen verdoppelte sie. */
-const IM_RASTER: CSSProperties = { border: 'none', minHeight: 0 };
 
 const LEGENDE = ['niedrig', 'mittel', 'hoch', 'akut'] as const;
 
@@ -55,16 +52,15 @@ export function GefahrenmatrixPaneel({
 }) {
   const { token, rollen } = useRollen();
   const gesperrt = zustand === 'gesperrt';
-  const leerText = gesperrt
-    ? 'Modul Gefahren nicht freigegeben.'
-    : gebiete === 0
-      ? 'Noch keine Gefahrengebiete angelegt.'
-      : 'Keine Gefahr über Stufe „keine“.';
+  const leerText =
+    gebiete === 0 ? 'Noch keine Gefahrengebiete angelegt.' : 'Keine Gefahr über Stufe „keine“.';
   return (
-    <Paneel
+    <MatrixPaneel
       titel="Gefahrenmatrix"
+      kennung="gefahren"
+      zustand={zustand}
       meta={zustand === 'daten' ? `${gebiete} ${gebiete === 1 ? 'Gebiet' : 'Gebiete'}` : undefined}
-      aktion={gesperrt ? undefined : <PaneelLink label="Gefahren" onKlick={onGefahren} />}
+      sprung={{ label: 'Gefahren', onKlick: onGefahren }}
       fuss={
         (zustand === 'daten' || zustand === 'leer') && !gesperrt && beurteilung ? (
           <span data-lfh="gefahren-beurteilung" style={{ fontSize: 11, color: rollen.achtungText }}>
@@ -72,128 +68,38 @@ export function GefahrenmatrixPaneel({
           </span>
         ) : undefined
       }
-      style={IM_RASTER}
-    >
-      <PaneelZustand
-        zustand={gesperrt ? 'leer' : zustand}
-        titel="Gefahrenmatrix"
-        leerText={leerText}
-        leerAktion={gesperrt ? undefined : 'Gefahren bewerten'}
-        onLeerAktion={onGefahren}
-        onNeuladen={onNeuladen}
-      >
-        <div
-          className={MATRIX_KLASSE.wurzel}
-          style={{ padding: token.padding, display: 'flex', flexDirection: 'column', gap: 10 }}
-        >
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-            {zeilen.map((z) => {
-              const farbe = warnstufeBalkenFarbe(z.stufe, token);
-              const rang = WARNSTUFE_RANG[z.stufe];
-              const ton = warnstufeTon(z.stufe);
-              return (
-                <li
-                  key={z.typ}
-                  data-lfh="gefahrenzeile"
-                  data-stufe={z.stufe}
-                  // Name wie die Zelle des Palettenauszugs; mit Erläuterung endet er auf
-                  // „· mit Erläuterung“ (LLH-1365), das Zeichen ist für Hilfstechnik verborgen.
-                  aria-label={`${z.label}: ${z.stufe}${z.mitErlaeuterung ? MIT_ERLAEUTERUNG : ''}`}
-                  className={MATRIX_KLASSE.zeile}
-                  style={{ gap: token.paddingSM }}
-                >
-                  {/* Silbentrennung statt Bruch an beliebiger Stelle (`lang="de"` steht in
-                      index.html). Das Zeichen „mit Erläuterung“ steht am Namen: die Spalte des
-                      Stufenworts trägt „niedrig“ knapp, dort deckte es das Wort. */}
-                  <span
-                    style={{
-                      fontSize: 12,
-                      color: rollen.text2,
-                      hyphens: 'auto',
-                      overflowWrap: 'break-word',
-                    }}
-                  >
-                    {z.label}
-                    {z.mitErlaeuterung && (
-                      <>
-                        {' '}
-                        <ErlaeuterungsZeichen lfh="gefahrenzeile-erlaeuterung" />
-                      </>
-                    )}
-                  </span>
-                  {/* Dekoration neben dem Wort — der zweite Kanal ist das Stufenwort rechts. */}
-                  <span
-                    aria-hidden="true"
-                    data-lfh="gefahrenbalken"
-                    className={MATRIX_KLASSE.stufen}
-                    style={{ height: 14 }}
-                  >
-                    {LEGENDE.map((_, i) => (
-                      <span
-                        key={i}
-                        data-voll={i < rang ? 'ja' : 'nein'}
-                        style={{ background: i < rang && farbe ? farbe : rollen.flaeche3 }}
-                      />
-                    ))}
-                  </span>
-                  <span
-                    style={{
-                      ...monoStil(11),
-                      textAlign: 'end',
-                      color:
-                        ton === 'alarm'
-                          ? rollen.alarmText
-                          : ton === 'achtung'
-                            ? rollen.achtungText
-                            : rollen.gedaempft,
-                    }}
-                  >
-                    {z.stufe}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          {/* Legende in derselben Geometrie wie die Balken (`matrixGeometrie.ts`). */}
+      leerText={leerText}
+      gesperrtText="Modul Gefahren nicht freigegeben."
+      leerAktion={{ label: 'Gefahren bewerten', onKlick: onGefahren }}
+      onNeuladen={onNeuladen}
+      stufen={LEGENDE}
+      zeilen={zeilen.map((z) => ({
+        schluessel: z.typ,
+        name: z.label,
+        // Name wie die Zelle des Palettenauszugs; mit Erläuterung endet er auf
+        // „· mit Erläuterung“ (LLH-1365), das Zeichen ist für Hilfstechnik verborgen.
+        beschriftung: `${z.label}: ${z.stufe}${z.mitErlaeuterung ? MIT_ERLAEUTERUNG : ''}`,
+        zusatz: z.mitErlaeuterung ? (
+          <ErlaeuterungsZeichen lfh="gefahrenzeile-erlaeuterung" />
+        ) : undefined,
+        rang: WARNSTUFE_RANG[z.stufe],
+        farbe: warnstufeBalkenFarbe(z.stufe, token),
+        stufenwort: z.stufe,
+        ton: warnstufeTon(z.stufe),
+      }))}
+      unterLegende={
+        // Das Zeichen der Matrix mit seinem Wort (LLH-1365), nur wenn eine Zeile es trägt.
+        zeilen.some((z) => z.mitErlaeuterung) && (
           <div
             aria-hidden="true"
-            data-lfh="gefahrenlegende"
-            className={`${MATRIX_KLASSE.zeile} ${MATRIX_KLASSE.legende}`}
-            style={{
-              gap: token.paddingSM,
-              paddingTop: 6,
-              borderTop: `1px solid ${rollen.linie}`,
-            }}
+            data-lfh="gefahrenlegende-erlaeuterung"
+            style={{ ...monoStil(10), color: rollen.schwach }}
           >
-            <span className={MATRIX_KLASSE.fueller} />
-            <span
-              className={MATRIX_KLASSE.stufen}
-              style={{ ...monoStil(10), color: rollen.schwach }}
-            >
-              {LEGENDE.map((l) => (
-                <span
-                  key={l}
-                  style={{ textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }}
-                >
-                  {l}
-                </span>
-              ))}
-            </span>
-            <span className={MATRIX_KLASSE.fueller} />
+            <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
           </div>
-          {/* Das Zeichen der Matrix mit seinem Wort (LLH-1365), nur wenn eine Zeile es trägt. */}
-          {zeilen.some((z) => z.mitErlaeuterung) && (
-            <div
-              aria-hidden="true"
-              data-lfh="gefahrenlegende-erlaeuterung"
-              style={{ ...monoStil(10), color: rollen.schwach }}
-            >
-              <ErlaeuterungsZeichen lfh="legende-erlaeuterung" /> mit Erläuterung
-            </div>
-          )}
-        </div>
-      </PaneelZustand>
-    </Paneel>
+        )
+      }
+    />
   );
 }
 
@@ -229,14 +135,13 @@ export function SichtungsPaneel({
   onAufnehmen: () => void;
 }) {
   const { token, rollen } = useRollen();
-  const gesperrt = zustand === 'gesperrt';
   return (
-    <Paneel
+    <VerteilungsPaneel
       titel="Sichtung"
+      kennung="sichtung"
+      zustand={zustand}
       meta={zustand === 'daten' ? `${erfasst} erfasst` : undefined}
-      aktion={
-        gesperrt ? undefined : <PaneelLink label={modulName('personen')} onKlick={onPersonen} />
-      }
+      sprung={{ label: modulName('personen'), onKlick: onPersonen }}
       // Fuß: „Ohne Sichtung" und „Unterwegs / offen / abgeschlossen“ (`versorgungsBilanz`, der
       // Versorgungszustand des Servers). „Ohne Sichtung" steht immer, auch mit 0 — sonst
       // schob die live kommende und gehende Zeile das Paneel.
@@ -264,101 +169,29 @@ export function SichtungsPaneel({
           </span>
         ) : undefined
       }
-      style={IM_RASTER}
-    >
-      <PaneelZustand
-        zustand={gesperrt ? 'leer' : zustand}
-        titel="Sichtung"
-        leerText={gesperrt ? 'Modul Personen nicht freigegeben.' : 'Noch keine Personen erfasst.'}
-        leerAktion={gesperrt ? undefined : 'Person aufnehmen'}
-        onLeerAktion={onAufnehmen}
-        onNeuladen={onNeuladen}
-      >
-        <ul
-          style={{
-            listStyle: 'none',
-            margin: 0,
-            padding: token.padding,
-            display: 'grid',
-            gap: 14,
-          }}
-        >
-          {zeilen.map((z) => {
-            const darstellung = sichtung[z.kategorie];
-            const farbe = darstellung.farbe ? sichtungsfarben[darstellung.farbe] : null;
-            return (
-              <li
-                key={z.kategorie}
-                data-sichtung={z.kategorie}
-                style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    justifyContent: 'space-between',
-                    gap: token.paddingSM,
-                  }}
-                >
-                  {/* Kürzel in Textfarbe, die BBK-Farbe im umrandeten Farbfeld davor: Gelb auf
-                      Hell und Schwarz auf Dunkel wären als Schrift unlesbar. */}
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      ...monoStil(12),
-                      letterSpacing: '0.06em',
-                      color: rollen.text,
-                    }}
-                  >
-                    {farbe && (
-                      <span
-                        aria-hidden="true"
-                        data-lfh="sichtungsfeld"
-                        style={{
-                          width: 9,
-                          height: 9,
-                          background: farbe,
-                          border: `1px solid ${token.colorText}`,
-                        }}
-                      />
-                    )}
-                    {darstellung.label}
-                  </span>
-                  <span style={{ flex: '1 1 auto', fontSize: 11, color: rollen.schwach }}>
-                    {SICHTUNG_BESCHREIBUNG[z.kategorie]}
-                  </span>
-                  <span
-                    data-lfh="sichtung-wert"
-                    style={{ ...monoStil(20, 500), color: rollen.text }}
-                  >
-                    {z.wert}
-                  </span>
-                </div>
-                <span
-                  aria-hidden="true"
-                  style={{ display: 'flex', height: 6, background: rollen.flaeche3 }}
-                >
-                  <span
-                    data-lfh="sichtung-anteil"
-                    style={{
-                      width: `${Math.round(z.anteil * 1000) / 10}%`,
-                      background: farbe ?? rollen.gedaempft,
-                      // Schwarz auf der dunklen Spur verschwände — die Kontur hält ihn sichtbar.
-                      boxShadow:
-                        darstellung.farbe === 'schwarz'
-                          ? `inset 0 0 0 1px ${rollen.gedaempft}`
-                          : undefined,
-                    }}
-                  />
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </PaneelZustand>
-    </Paneel>
+      leerText="Noch keine Personen erfasst."
+      gesperrtText="Modul Personen nicht freigegeben."
+      leerAktion={{ label: 'Person aufnehmen', onKlick: onAufnehmen }}
+      onNeuladen={onNeuladen}
+      zeilen={zeilen.map((z) => {
+        const darstellung = sichtung[z.kategorie];
+        const farbe = darstellung.farbe ? sichtungsfarben[darstellung.farbe] : null;
+        return {
+          schluessel: z.kategorie,
+          attribute: { 'data-sichtung': z.kategorie },
+          // Kürzel in Textfarbe, die BBK-Farbe im umrandeten Farbfeld davor: Gelb auf Hell und
+          // Schwarz auf Dunkel wären als Schrift unlesbar.
+          wort: darstellung.label,
+          farbfeld: farbe ? { farbe, umrandung: token.colorText } : undefined,
+          beschreibung: SICHTUNG_BESCHREIBUNG[z.kategorie],
+          wert: z.wert,
+          anteil: z.anteil,
+          balkenFarbe: farbe ?? rollen.gedaempft,
+          // Schwarz auf der dunklen Spur verschwände — die Kontur hält ihn sichtbar.
+          balkenKontur: darstellung.farbe === 'schwarz' ? rollen.gedaempft : undefined,
+        };
+      })}
+    />
   );
 }
 
@@ -411,9 +244,7 @@ export function MeldungsstromPaneel({
   onEtb: () => void;
   onErfassen: () => void;
 }) {
-  const { token, rollen } = useRollen();
-  const listeRef = useRef<HTMLOListElement>(null);
-  const gesperrt = zustand === 'gesperrt';
+  const { rollen } = useRollen();
   // „live" nur bei offener Leitung — bei totem Stream liefert der Cache weiter alte Daten.
   const metaFarbe =
     liveStatus === 'open'
@@ -422,8 +253,9 @@ export function MeldungsstromPaneel({
         ? rollen.alarmText
         : rollen.schwach;
   return (
-    <Paneel
+    <StromPaneel
       titel={STROM_TITEL}
+      zustand={zustand}
       meta={
         <span
           data-lfh="strom-live"
@@ -437,83 +269,42 @@ export function MeldungsstromPaneel({
           {VERBINDUNG[liveStatus]}
         </span>
       }
-      aktion={gesperrt ? undefined : <PaneelLink label="ETB" onKlick={onEtb} />}
-      style={IM_RASTER}
+      sprung={{ label: 'ETB', onKlick: onEtb }}
+      leerText="Noch keine Einträge im Einsatztagebuch."
+      gesperrtText="Modul ETB nicht freigegeben."
+      leerAktion={{ label: 'Eintrag erfassen', onKlick: onErfassen }}
+      onNeuladen={onNeuladen}
+      listeName="Jüngste Einträge"
+      neu={neu}
+      bannerText={bannerText(neu, neuMindestens)}
+      onAnzeigen={onAnzeigen}
     >
-      <PaneelZustand
-        zustand={gesperrt ? 'leer' : zustand}
-        titel={STROM_TITEL}
-        leerText={
-          gesperrt ? 'Modul ETB nicht freigegeben.' : 'Noch keine Einträge im Einsatztagebuch.'
-        }
-        leerAktion={gesperrt ? undefined : 'Eintrag erfassen'}
-        onLeerAktion={onErfassen}
-        onNeuladen={onNeuladen}
-      >
-        {/* Der Banner liegt als Überlagerung über dem Listenkopf (LFH-900, Muster
-          `InfotelefonPage`): im Fluss machte er das Paneel höher, die Paneelreihe wuchs mit, und
-          das Band „Führungsstand“ rutschte nach unten. `absolute` statt `sticky`: das Paneel ist
-          kein Scrollbereich. Er verdeckt den Kopf der jüngsten gezeigten Zeile, bis „anzeigen“
-          sie mit dem Neuen freigibt. Die Mindesthöhe ist die des Banners (Knopf `controlHeight` +
-          Innenabstand + Rand, wie `HaengenderBaum`): steht nur eine Zeile da, ragte er sonst
-          über das Paneel und in Handschuh über das Band darunter. */}
-        <div
-          style={{
-            position: 'relative',
-            minHeight: token.controlHeight + 2 * token.paddingXS + 2,
-          }}
+      {sichtbar.map((e) => (
+        <Zeitachseneintrag
+          key={e.id}
+          als="li"
+          data-lfd-nr={e.lfd_nr}
+          zeit={stromZeit(e, konv)}
+          nr={`Nr. ${e.lfd_nr}`}
+          typ={e.typ}
+          typwort={etbTyp[e.typ].label}
+          meta={stromQuelle(e)}
         >
-          {neu > 0 && (
-            <Sammelbanner
-              aktion={{
-                label: 'anzeigen',
-                // Der Knopf verschwindet mit dem Banner; der Fokus geht auf die Liste, statt auf
-                // `body` zu fallen (WCAG 2.4.3, wie `HaengenderBaum`).
-                onKlick: () => {
-                  listeRef.current?.focus({ preventScroll: true });
-                  onAnzeigen();
-                },
-              }}
-              style={{ position: 'absolute', insetInline: 0, top: 0, zIndex: 1 }}
-            >
-              {bannerText(neu, neuMindestens)}
-            </Sammelbanner>
-          )}
-          <ol
-            ref={listeRef}
-            tabIndex={-1}
-            aria-label="Jüngste Einträge"
-            style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          <span
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              fontSize: 12,
+              lineHeight: 1.4,
+            }}
+            title={e.inhalt}
           >
-            {sichtbar.map((e) => (
-              <Zeitachseneintrag
-                key={e.id}
-                als="li"
-                data-lfd-nr={e.lfd_nr}
-                zeit={stromZeit(e, konv)}
-                nr={`Nr. ${e.lfd_nr}`}
-                typ={e.typ}
-                typwort={etbTyp[e.typ].label}
-                meta={stromQuelle(e)}
-              >
-                <span
-                  style={{
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
-                    fontSize: 12,
-                    lineHeight: 1.4,
-                  }}
-                  title={e.inhalt}
-                >
-                  {e.inhalt}
-                </span>
-              </Zeitachseneintrag>
-            ))}
-          </ol>
-        </div>
-      </PaneelZustand>
-    </Paneel>
+            {e.inhalt}
+          </span>
+        </Zeitachseneintrag>
+      ))}
+    </StromPaneel>
   );
 }

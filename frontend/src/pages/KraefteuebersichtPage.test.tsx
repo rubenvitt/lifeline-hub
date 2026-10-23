@@ -367,23 +367,19 @@ describe('meldebildMeta', () => {
 });
 
 describe('KraefteuebersichtPage — Statusband', () => {
-  it('zählt Einheiten als Zahl, aufgegliedert je FMS-Status mit Code (LFH-609, LLH-1025)', async () => {
+  it('zählt Einheiten je FMS-Status mit Code, Zahl und Balken (LFH-609, LLH-1025, LLH-1140)', async () => {
     mitEinheit();
     const { container } = setup();
-    const zelle = await waitFor(() => {
-      const z = container.querySelector(
-        '[aria-label="Einheiten je Status"] [data-lfh="kennzahl"]',
-      ) as HTMLElement;
-      expect(z).not.toBeNull();
-      return z;
-    });
-    expect(zelle.querySelector('[data-lfh="kennzahl-wert"]')).toHaveTextContent(/^1$/);
-    // Die Aufgliederung als Bild mit Wortlaut, die Legende fürs Auge (Farbe aus dem Ton:
+    const p = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    await waitFor(() => expect(within(p).getByText('1 Einheit')).toBeInTheDocument());
+    // Je Status eine Zeile: Code, Wort, Zahl; der Balken ergänzt (Farbe aus dem Ton:
     // `statusbandStil.test.ts`).
-    expect(
-      within(zelle).getByRole('img', { name: 'Einheiten nach Status: S4 1' }),
-    ).toBeInTheDocument();
-    expect(zelle).toHaveTextContent('S4 1');
+    const zeilen = within(p).getAllByRole('listitem');
+    expect(zeilen).toHaveLength(1);
+    expect(zeilen[0]).toHaveTextContent(/^S4.*1$/);
+    expect(p.querySelector('[data-lfh="statusband-einheit-anteil"]')).toHaveStyle({
+      width: '100%',
+    });
     // Keine Füllkachel mehr (Spec `kraeftebaum`, „Statusband ohne Füllkacheln“).
     expect(container.querySelector('[data-lfh="meldebild-bandluecke"]')).toBeNull();
   });
@@ -398,18 +394,16 @@ describe('KraefteuebersichtPage — Statusband', () => {
     // Eine Marke statt eines Satzes (LFH-1078): das Einheitenband ignoriert diese Filter.
     await waitFor(() => expect(hinweis()).toHaveTextContent(/^ungefiltert$/));
     // Das Band zählt weiter die Einheit — wie die Einheitenzeile darunter.
-    expect(
-      container.querySelector('[aria-label="Einheiten je Status"] [data-lfh="kennzahl"]'),
-    ).toHaveTextContent('1');
+    expect(container.querySelector('[data-lfh="statusband-einheit-wert"]')).toHaveTextContent(
+      /^1$/,
+    );
   });
 
-  it('führt die Personalverteilung als eigene Zellen', async () => {
+  it('führt die Personalverteilung als eigenes Paneel', async () => {
     vi.mocked(listeEinsatzPersonal).mockResolvedValue([PERSON_P1]);
     setup();
-    const gruppe = await screen.findByRole('region', { name: 'Personal je Status' });
-    expect(
-      within(gruppe).getByRole('img', { name: 'Personal nach Status: gebunden 1' }),
-    ).toBeInTheDocument();
+    const p = await screen.findByRole('region', { name: 'Personal nach Status' });
+    await waitFor(() => expect(within(p).getByRole('listitem')).toHaveTextContent(/^gebunden.*1$/));
   });
 
   // Die positiven Aussagen zur Rückmeldung — und ihre Gegenproben.
@@ -439,7 +433,10 @@ describe('KraefteuebersichtPage — Statusband', () => {
   it('meldet einen gescheiterten Abruf als „Stand unbekannt", nicht als Null', async () => {
     vi.mocked(listeEinsatzFahrzeuge).mockRejectedValue(new Error('kaputt'));
     setup();
-    expect((await screen.findAllByText('Stand unbekannt')).length).toBeGreaterThan(0);
+    // Jedes Paneel des Bands im Fehlerzustand (`PaneelZustand`), keine Zahl.
+    const p = await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
+    expect(await within(p).findByRole('alert')).toHaveTextContent(/Stand unbekannt/);
+    expect(p.querySelector('[data-lfh="statusband-einheit-wert"]')).toBeNull();
   });
 });
 
@@ -511,7 +508,7 @@ describe('KraefteuebersichtPage — Zulauf aus Nachforderungen (LLH-1384)', () =
       nachforderung({ eintreffen_erwartet_at: eintreffen() }),
     ]);
     setup();
-    await screen.findByRole('region', { name: 'Einheiten je Status' });
+    await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
     await waitFor(() => expect(ladeModulFreigaben).toHaveBeenCalled());
     expect(listeNachforderungen).not.toHaveBeenCalled();
     expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull();
@@ -534,7 +531,7 @@ describe('KraefteuebersichtPage — Zulauf aus Nachforderungen (LLH-1384)', () =
     mitEinheit();
     vi.mocked(listeNachforderungen).mockRejectedValue(new ApiError(403, 'verboten'));
     setup();
-    await screen.findByRole('region', { name: 'Einheiten je Status' });
+    await screen.findByRole('region', { name: 'Einheiten nach FMS-Status' });
     await waitFor(() => expect(listeNachforderungen).toHaveBeenCalled());
     expect(screen.queryByRole('region', { name: 'Zulauf aus Nachforderungen' })).toBeNull();
   });

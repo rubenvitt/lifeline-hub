@@ -124,7 +124,9 @@ in dieser Spur, und eine Anmeldung, die nur abläuft, endet still.
 
 ### Suchen und Filtern
 
-- „von“ und „bis“ schließen die genannten Zeitpunkte ein.
+- „von“ und „bis“ schließen die genannten Zeitpunkte ein. Beide lassen sich taktisch tippen
+  („1400“, „011400okt26“); ein „bis“ ohne Tag liegt am Tag von „von“, oder am Folgetag, wenn es
+  sonst davor läge.
 - „Konto“ trifft jeden Benutzernamen, der den eingetragenen Text enthält; „rub“ findet „ruben“
   und „rubina“. Groß- und Kleinschreibung zählen nicht. Die Liste folgt schon beim Tippen. In
   „Zugangsänderungen“ trifft das Konto sowohl den handelnden Admin als auch das Zielkonto, nie

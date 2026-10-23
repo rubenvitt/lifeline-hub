@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnzeigeKonventionenProvider } from '../anzeige/AnzeigeKonventionenContext';
 import type { Abloesung } from '../api/types';
 import { mitProzessZone } from '../test/prozessZone';
@@ -15,13 +15,21 @@ import {
 
 /**
  * LFH-692 (Spec `zeiteingabe`): Browser auf UTC, Organisation auf Europe/Berlin. Beide Zeitfelder
- * der Ablösung lesen die eingegebene Uhrzeit in der Anzeigezone.
+ * der Ablösung lesen die eingegebene Uhrzeit in der Anzeigezone. Getippt wird taktisch und mit
+ * Enter übernommen (LLH-1077); es ist 14:00 Berliner Zeit.
  */
 describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
   mitProzessZone('UTC');
   const BERLIN = { zeitzone: 'Europe/Berlin' };
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-24T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it('Vollzug: 13:00 Berliner Zeit geht als 11:00 UTC hinaus', async () => {
+  it('Vollzug: „1300“ + Enter (Berliner Zeit) geht als 11:00 UTC hinaus', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={BERLIN}>
@@ -39,7 +47,7 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
     await tippeZeit(
       userEvent.setup(),
       within(dialog).getByRole('textbox', { name: 'Zeitpunkt' }),
-      '2026-09-24 13:00',
+      '1300',
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Vollziehen' }));
     await waitFor(() =>
@@ -49,7 +57,7 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
     );
   });
 
-  it('Schicht beginnen: „im Einsatz seit“ 06:30 Berliner Zeit geht als 04:30 UTC hinaus', async () => {
+  it('Schicht beginnen: „0630“ + Enter in „im Einsatz seit“ geht als 04:30 UTC hinaus', async () => {
     const onErfassen = vi.fn().mockResolvedValue(undefined);
     renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={BERLIN}>
@@ -77,7 +85,7 @@ describe('Ablösung — Zeiten in der Anzeigezone (LFH-692)', () => {
     await tippeZeit(
       userEvent.setup(),
       within(dialog).getByRole('textbox', { name: 'Im Einsatz seit' }),
-      '2026-09-24 06:30',
+      '0630',
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Schicht beginnen' }));
     await waitFor(() =>

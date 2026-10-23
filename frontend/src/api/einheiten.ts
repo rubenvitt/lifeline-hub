@@ -188,6 +188,18 @@ export function listAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> 
   return apiGet<Einheit[]>(`/api/einsaetze/${einsatzId}/einheiten?aufgeloeste=1`);
 }
 
+/**
+ * Fehlübernahme aus einer Nachforderung stornieren (LLH-1388, design.md D3): der Verweis entfällt,
+ * eine dabei angelegte Einheit wird aufgelöst (samt Austritt aus dem Raum), eine verknüpfte
+ * verlässt nur den Raum, den die Übernahme gebucht hat. Antwort ist die Nachforderung.
+ */
+export function storniereUebernahme(einsatzId: number, eid: number): Promise<Nachforderung> {
+  return apiSend<Nachforderung>(
+    `/api/einsaetze/${einsatzId}/einheiten/${eid}/uebernahme-stornieren`,
+    'POST',
+  );
+}
+
 /** Fehlanlage stornieren (LLH-1079): nur eine Einheit ohne jede Spur, sie wird gelöscht. */
 export function storniereEinheit(einsatzId: number, eid: number): Promise<void> {
   return apiSend<void>(`/api/einsaetze/${einsatzId}/einheiten/${eid}/stornieren`, 'POST');

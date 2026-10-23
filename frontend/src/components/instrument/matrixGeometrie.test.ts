@@ -8,10 +8,7 @@ import { MATRIX_KLASSE } from './matrixGeometrie';
  * Die Geometrie steht als CSS (Container-Abfrage auf die Paneelbreite); geprüft wird die Quelle,
  * weil jsdom weder Layout noch `@container` rechnet.
  */
-const css = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), 'gefahrenmatrix.css'),
-  'utf8',
-);
+const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'matrixPaneel.css'), 'utf8');
 
 /** Regelkörper des ersten Vorkommens eines Selektors ab `ab`. */
 function regel(selektor: string, ab = 0): string {
@@ -22,7 +19,7 @@ function regel(selektor: string, ab = 0): string {
 
 const px = (s: string) => Number(s.replace('px', ''));
 
-describe('gefahrenmatrix.css', () => {
+describe('matrixPaneel.css', () => {
   it('die Matrix ist der Container, gegen den gemessen wird', () => {
     expect(regel(`.${MATRIX_KLASSE.wurzel}`)).toContain('container-type: inline-size');
   });

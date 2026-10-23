@@ -20,7 +20,12 @@ test.describe(KAPITEL, () => {
     await expect(page.locator('[data-lfh="ueberblick-marke"]').first()).toBeVisible();
     await fotografiere(page, KAPITEL, 'ueberblick');
     // Ablauf weiter: aus dem Paneel der Entscheidungen ins Einsatztagebuch.
-    await page.getByRole('link', { name: 'Entscheidungen im Einsatztagebuch öffnen' }).click();
+    // Der Sprung „ETB ↗“ im Paneelkopf (Dashboard-Baukasten, LLH-1140).
+    await page
+      .locator('section[data-lfh="paneel"]')
+      .filter({ has: page.getByRole('heading', { name: /Entscheidungen/ }) })
+      .getByRole('button', { name: 'ETB' })
+      .click();
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${demo.id}/etb\\?.*typ=entscheidung`));
   });
 
