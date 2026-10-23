@@ -59,7 +59,9 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
    Einsatzleitung sie übernimmt oder abweist.
 5. Steht „Schon im Einsatz: …“, kennt der Einsatz den Funkrufnamen schon. „Diese buchen“ bucht die
    vorhandene Kraft; „Trotzdem neu anlegen“ nur, wenn es wirklich eine andere Kraft ist. Steht die
-   vorhandene Kraft schon in einem Raum, fehlt „Diese buchen“.
+   vorhandene Kraft schon in einem Raum, fehlt „Diese buchen“. Kommt die Erfassung aus „Aus
+   Nachforderungen“, verknüpft auch „Diese buchen“ die Einheit mit der Nachforderung; ein Fahrzeug
+   ohne Einheit lässt sich nicht verknüpfen, das sagt der Hinweis neben dem Knopf.
 
 ### Ohne Netz buchen
 

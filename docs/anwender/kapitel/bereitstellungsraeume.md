@@ -105,7 +105,9 @@ Für Einsatzleitung und Führungspersonal, solange der Raum aktiv ist. Im Zustan
 6. Gibt es im Einsatz schon eine Kraft mit diesem Funkrufnamen, steht „Schon im Einsatz: …“ und
    „Unangemeldet buchen“ ist gesperrt. „Diese buchen“ bucht die vorhandene Kraft, „Trotzdem neu
    anlegen“ legt die neue trotzdem an. Steht die vorhandene Kraft schon in einem Raum, fehlt
-   „Diese buchen“.
+   „Diese buchen“. Kommt die Erfassung aus „Aus Nachforderungen“, verknüpfen beide Knöpfe die
+   Einheit mit der Nachforderung; ein Fahrzeug ohne Einheit lässt sich nicht verknüpfen, das sagt
+   der Hinweis neben dem Knopf.
 7. Ohne Netz lautet die Bestätigung „Offline vorgemerkt: Eintreffen …“. Die Kraft steht unter
    „Vorgemerkt“, bis sie beim Server gebucht ist; eine vorgemerkte Kraft bietet die Suche nicht
    noch einmal an.

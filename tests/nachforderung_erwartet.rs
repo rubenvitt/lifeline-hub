@@ -471,6 +471,63 @@ async fn eintreffen_mit_nachforderung_setzt_den_verweis_beidseitig() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
 }
 
+/// LLH-1396: der Warnweg der Doppelbuchung (D9) verliert den Verweis nicht. Die erste Buchung
+/// scheitert mit 422 und verknüpft nichts; „Diese buchen“ (bekannte Kraft) und „Trotzdem neu
+/// anlegen“ (`trotzdem_anlegen`) tragen beide `nachforderung_id` an die Einheit.
+#[tokio::test]
+async fn doppelbuchungs_warnweg_behaelt_den_verweis() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        "RTW",
+        json!({ "ziel_br_id": nord }),
+        Some(json!({ "rufnamen": ["83-1", "83-2"] })),
+        "unterwegs",
+    )
+    .await;
+    let bekannt = einheit_bilden(&app, &admin, e, "83-1").await;
+    let unangemeldet = |trotzdem: bool| {
+        json!({ "unangemeldet": { "fahrzeuge": [{ "funkrufname": "83-1", "fahrzeugtyp": "RTW" }],
+                                  "trotzdem_anlegen": trotzdem },
+                "nachforderung_id": n })
+    };
+
+    // Warnung: gleichnamige Kraft im Einsatz, nichts gebucht, nichts verknüpft.
+    let (s, j) = eintreffen(&app, &admin, e, nord, unangemeldet(false)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{j:?}");
+    assert_eq!(lade(&app, &admin, e, n).await["einheit_ids"], json!([]));
+
+    // „Diese buchen“: die bekannte Kraft mit Verweis.
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": bekannt },
+                "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let x = einheit(&app, &admin, e, bekannt).await;
+    assert_eq!(x["nachforderung_id"], n, "{x:?}");
+    assert_eq!(x["aktueller_br_id"], nord);
+
+    // „Trotzdem neu anlegen“: die neue Einheit trägt den Verweis ebenso.
+    let (s, j) = eintreffen(&app, &admin, e, nord, unangemeldet(true)).await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let neu = j["einheit_id"].as_i64().unwrap();
+    assert_eq!(einheit(&app, &admin, e, neu).await["nachforderung_id"], n);
+    assert_eq!(
+        lade(&app, &admin, e, n).await["einheit_ids"],
+        json!([bekannt, neu])
+    );
+}
+
 /// D4 Prüfkette: Fahrzeug 422 vor allem; fremder Raum und fremder Einsatz 404; angefordert 422;
 /// Einheit schon aus einer anderen Nachforderung 409. Nichts wird gebucht.
 #[tokio::test]
