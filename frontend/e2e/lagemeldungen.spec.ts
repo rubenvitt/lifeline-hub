@@ -45,7 +45,7 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
   await paneel
     .getByRole('textbox', { name: 'Inhalt / Wortlaut' })
     .fill('Pegel Mühlbach steigt, Deich hält');
-  await paneel.getByRole('textbox', { name: 'Absender' }).fill('EA Unterstadt');
+  await paneel.getByRole('combobox', { name: 'Absender' }).fill('EA Unterstadt');
   await paneel.getByRole('button', { name: 'Lagemeldung erfassen' }).click();
   await expect(paneel).toBeHidden();
 

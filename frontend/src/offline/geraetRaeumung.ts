@@ -13,6 +13,7 @@ import { ortCacheRaeumen } from '../anzeige/ortCache';
 import { erfassungsSitzungRaeumen } from '../components/erfassungsSitzung';
 import { listenGedaechtnisRaeumen } from '../components/listenGedaechtnis';
 import { entwuerfeAufraeumen, entwuerfeRaeumen } from '../etb/entwuerfe/entwurfStore';
+import { zuletztRaeumen } from '../stammdaten/zuletztVerwendet';
 import { gemerkteStellenRaeumen } from '../verpflegung/stellenGedaechtnis';
 import { personErfassungsQuittungenAufraeumen, personErfassungsQuittungenRaeumen } from './queue';
 
@@ -105,6 +106,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
     entscheidung: 'jeder-ausgang',
     grund:
       'Nur die Kennung der Verpflegungsstelle, an der am Desktop gezählt wird (LLH-1040); der Server liefert die Stellen wieder, eine nächste Person soll nicht an fremder Stelle buchen.',
+  },
+  {
+    ort: 'localStorage lfh:stammdatenfeld:zuletzt:<kontext>',
+    datei: 'stammdaten/zuletztVerwendet.ts',
+    entscheidung: 'jeder-ausgang',
+    grund:
+      'Zuletzt übernommene Werte des Vorschlagsfelds (LLH-1144), etwa Absender und Empfänger; Freitext kann einen Personennamen tragen, und die Kataloge liefert der Server wieder.',
   },
   {
     ort: 'localStorage lfh:offline-quittung-signal',
@@ -238,6 +246,7 @@ export async function geraetRaeumen(anlass: AusgangsAnlass): Promise<void> {
     erfassungsSitzung: erfassungsSitzungRaeumen,
     listenGedaechtnis: listenGedaechtnisRaeumen,
     verpflegungsstelle: gemerkteStellenRaeumen,
+    stammdatenfeldZuletzt: zuletztRaeumen,
     ...(anlass === 'abmelden' ? { etbEntwuerfe: entwuerfeRaeumen } : {}),
   });
 }

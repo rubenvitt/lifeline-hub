@@ -299,7 +299,7 @@ describe('LagemeldungenPage', () => {
         within(paneel).getByRole('textbox', { name: 'Inhalt / Wortlaut' }),
         'Pegel steigt',
       );
-      await userEvent.type(within(paneel).getByRole('textbox', { name: 'Absender' }), 'Pegel Süd');
+      await userEvent.type(within(paneel).getByRole('combobox', { name: 'Absender' }), 'Pegel Süd');
       // Die Vorbelegungsknöpfe wechselten die Art: hier entfallen sie.
       expect(within(paneel).queryByRole('button', { name: /Sofortmeldung/ })).toBeNull();
       await userEvent.click(within(paneel).getByRole('button', { name: 'Lagemeldung erfassen' }));

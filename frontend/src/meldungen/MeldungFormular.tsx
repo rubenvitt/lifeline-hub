@@ -7,6 +7,8 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { Paneel } from '../components/instrument';
+import StammdatenFeld, { type Vorschlagsquelle } from '../components/StammdatenFeld';
+import { KONTEXT_FUNKRUFNAME, merkeZuletzt } from '../stammdaten/zuletztVerwendet';
 import { Select } from '../components/Select';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
 import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
@@ -31,6 +33,8 @@ import type {
 } from '../api/types';
 
 const { TextArea } = Input;
+
+const KEINE_QUELLEN: readonly Vorschlagsquelle[] = [];
 
 interface MeldungFormWerte {
   /** Strukturierter Absender: `einheit:<id>` bzw. `abschnitt:<id>`, leer = frei. */
@@ -144,6 +148,7 @@ export default function MeldungFormular({
   serie = true,
   onFertig,
   einsatzId,
+  vorschlagsquellen = KEINE_QUELLEN,
 }: {
   senden: boolean;
   /**
@@ -174,6 +179,11 @@ export default function MeldungFormular({
   onFertig?: () => void;
   /** Einsatz für die Ort-Zeile der Verortung (Peilung). */
   einsatzId?: number;
+  /**
+   * Vorschläge für Absender und Empfänger (LLH-1144, `stammdaten/vorschlagsquellen.ts`): dieselben
+   * Quellen wie ETB Von/An, mit „In Stammdaten übernehmen“. Leer: reiner Freitext ohne Marke.
+   */
+  vorschlagsquellen?: readonly Vorschlagsquelle[];
 }) {
   const vorgaben = useMemo<MeldungFormWerte>(
     () => (artVorgabe ? { ...DEFAULTS, meldungsart: artVorgabe } : DEFAULTS),
@@ -222,10 +232,12 @@ export default function MeldungFormular({
     // Verortet wird beim Erfassen nur eine Lagemeldung (Server 422 sonst); ein Ort aus einer
     // vorher gewählten Art Lagemeldung geht nicht mit.
     const ort = w.meldungsart === 'lagemeldung' ? alsLatLon(w.koord) : null;
-    return onAnlegen({
+    const absender = w.absender.trim();
+    const empfaenger = w.empfaenger?.trim() || undefined;
+    const anlegen = onAnlegen({
       ...vonZuBezug(w.von),
-      absender: w.absender.trim(),
-      empfaenger: w.empfaenger?.trim() || undefined,
+      absender,
+      empfaenger,
       empfaenger_funktion: w.empfaenger_funktion,
       meldeweg: w.meldeweg,
       inhalt: w.inhalt.trim(),
@@ -239,6 +251,11 @@ export default function MeldungFormular({
       bestaetigung_frist_min:
         w.bestaetigung_pflicht && w.frist_min != null ? w.frist_min : undefined,
       ...(ort ? { lat: ort.lat, lon: ort.lon } : {}),
+    });
+    // Erst die angekommene Meldung füllt „Zuletzt verwendet“ (design.md D5).
+    return anlegen.then((ergebnis) => {
+      merkeZuletzt(KONTEXT_FUNKRUFNAME, absender, empfaenger);
+      return ergebnis;
     });
   };
 
@@ -359,7 +376,12 @@ export default function MeldungFormular({
             label="Absender (Funkrufname/Stelle)"
             rules={[{ required: true, whitespace: true, message: 'Absender ist erforderlich' }]}
           >
-            <Input aria-label="Absender" maxLength={ETB_PARTEI_MAX} />
+            <StammdatenFeld
+              nurText
+              aria-label="Absender"
+              maxLength={ETB_PARTEI_MAX}
+              quellen={vorschlagsquellen}
+            />
           </Form.Item>
         </Col>
         {funktionsOptionen.length > 0 && (
@@ -377,7 +399,12 @@ export default function MeldungFormular({
         )}
         <Col xs={24} sm={12} lg={funktionsOptionen.length > 0 ? 8 : 12}>
           <Form.Item name="empfaenger" label="Empfänger / Adressat">
-            <Input placeholder="z. B. ELW 1, S3" maxLength={ETB_PARTEI_MAX} />
+            <StammdatenFeld
+              nurText
+              placeholder="z. B. ELW 1, S3"
+              maxLength={ETB_PARTEI_MAX}
+              quellen={vorschlagsquellen}
+            />
           </Form.Item>
         </Col>
       </Row>

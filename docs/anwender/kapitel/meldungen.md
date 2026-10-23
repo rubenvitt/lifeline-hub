@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 110
-quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx]
+quellen: [frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts]
 ---
 
 ## Überblick
@@ -48,10 +48,12 @@ Für Einsatzleitung und Führungspersonal:
 
    ![Formular „Neue Meldung erfassen“ als Sofortmeldung mit Wortlaut, Absender, Empfängerfunktion, Empfänger und aufgeklappten weiteren Angaben samt Bestätigungsschalter](../bilder/meldungen/meldung-erfassen.png)
 
-3. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ ausfüllen. Ist die Meldung an eine
-   Funktion im Stab gerichtet, unter „Empfängerfunktion“ die Einsatzleitung oder das Sachgebiet
-   wählen; ein leeres „Empfänger / Adressat“ füllt sich dabei mit dem Kürzel, etwa „S2“. Bei
-   Bedarf „Empfänger / Adressat“ frei eintragen oder ändern.
+3. „Inhalt / Wortlaut“ und „Absender (Funkrufname/Stelle)“ ausfüllen. Beim Tippen schlägt das
+   Feld Funkrufnamen und Stellen vor, in den Gruppen „Im Einsatz“, „Stammdaten“ und „Zuletzt
+   verwendet“; ein Vorschlag wird per Klick oder mit Pfeiltaste und Enter übernommen. Ist die
+   Meldung an eine Funktion im Stab gerichtet, unter „Empfängerfunktion“ die Einsatzleitung oder
+   das Sachgebiet wählen; ein leeres „Empfänger / Adressat“ füllt sich dabei mit dem Kürzel, etwa
+   „S2“. Bei Bedarf „Empfänger / Adressat“ frei eintragen oder ändern.
 4. Unter „Weitere Angaben“ bei Bedarf „Von Einheit / Abschnitt“ (belegt den Absender vor),
    „Meldeweg“, „Meldungsart“, „Priorität“, „Richtung“, „Zeitpunkt des Ereignisses“ und die Frist
    der Bestätigung setzen.
@@ -60,6 +62,14 @@ Für Einsatzleitung und Führungspersonal:
 Eine Meldung der Art „Lagemeldung“ steht ab dem Erfassen in den Lagemeldungen, auch nach außen; bei
 dieser Art steht unter „Weitere Angaben“ zusätzlich „Verortung (optional)“ (Kapitel
 [Lagemeldungen](lagemeldungen.md)).
+
+Absender und Empfänger dürfen frei getippt sein, etwa für eine fremde Einheit oder die Polizei vor
+Ort. Neben dem Feld steht dann „frei“, bei einem übernommenen Vorschlag seine Herkunft („Im
+Einsatz“ oder „Stammdaten“). Neben einem freien Wert legt „In Stammdaten übernehmen“ ihn als
+externe Stelle der Art „Sonstige“ an, damit er beim nächsten Mal vorgeschlagen wird; das dürfen
+nur System-Admins, alle anderen sehen den Knopf gesperrt mit „nur System-Admin“. Die Art lässt
+sich unter Verwaltung › Stammdaten › Externe Stellen ändern. Enter bei offener Vorschlagsliste
+übernimmt nur den Wert und schließt die Liste; erst das nächste Enter erfasst die Meldung.
 
 Für mehrere Meldungen hintereinander speichert „Speichern und nächste“ (Strg+Enter, am Mac
 ⌘+Enter) und leert das Formular. Mit dem Häkchen „Werte behalten“ bleiben dabei „Von Einheit /

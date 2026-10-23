@@ -10,6 +10,12 @@ import { renderMitProviders } from '../test/utils';
 import { tippeZeit } from '../test/zeitEingabe';
 import { zuWerte, type EtbEntwurf } from './entwuerfe/entwurfModell';
 import MetaChip from './MetaChip';
+import type { Vorschlagsquelle } from '../components/StammdatenFeld';
+
+/** Vorschläge als eine Quelle „Im Einsatz“ (`components/StammdatenFeld.tsx`, LLH-1144). */
+const quellenAus = (werte: readonly string[]): Vorschlagsquelle[] => [
+  { id: 'test', gruppe: 'einsatz', eintraege: werte.map((w) => ({ label: w, wert: w })) },
+];
 
 dayjs.extend(utc);
 
@@ -192,14 +198,14 @@ describe('MetaChip', () => {
     expect(onCancel).toHaveBeenCalledWith('von');
   });
 
-  it('Text-Feld mit Optionen: AutoComplete, Freitext bleibt per Enter möglich', async () => {
+  it('Text-Feld mit Vorschlägen: StammdatenFeld, Freitext bleibt per Enter möglich', async () => {
     const onCommit = vi.fn();
     renderMitProviders(
       <MetaChip
         feld="von"
         editing
         wert={undefined}
-        optionen={['Florian 1', 'RTW 1']}
+        quellen={quellenAus(['Florian 1', 'RTW 1'])}
         onCommit={onCommit}
         onCancel={vi.fn()}
         onRemove={vi.fn()}
@@ -211,14 +217,14 @@ describe('MetaChip', () => {
     expect(onCommit).toHaveBeenCalledWith('von', 'Eigener Text');
   });
 
-  it('Text-Feld mit Optionen: Klick auf Vorschlag committet sofort (onSelect)', async () => {
+  it('Text-Feld mit Vorschlägen: Klick auf Vorschlag committet sofort (onWahl)', async () => {
     const onCommit = vi.fn();
     renderMitProviders(
       <MetaChip
         feld="von"
         editing
         wert={undefined}
-        optionen={['Florian 1', 'RTW 1']}
+        quellen={quellenAus(['Florian 1', 'RTW 1'])}
         onCommit={onCommit}
         onCancel={vi.fn()}
         onRemove={vi.fn()}
@@ -257,7 +263,7 @@ describe('MetaChip', () => {
         feld={feld}
         editing
         wert={undefined}
-        optionen={optionen ? [...optionen] : undefined}
+        quellen={optionen ? quellenAus(optionen) : undefined}
         onCommit={vi.fn()}
         onCancel={vi.fn()}
         onRemove={vi.fn()}
@@ -300,7 +306,7 @@ describe('MetaChip', () => {
           editing
           gesperrt
           wert={undefined}
-          optionen={optionen ? [...optionen] : undefined}
+          quellen={optionen ? quellenAus(optionen) : undefined}
           onCommit={onCommit}
           onCancel={vi.fn()}
           onRemove={vi.fn()}
@@ -514,7 +520,7 @@ describe('MetaChip — Vorschlag eines vorgehenden Geräts (LFH-895)', () => {
         feld="von"
         editing
         wert={undefined}
-        optionen={['Florian 1']}
+        quellen={quellenAus(['Florian 1'])}
         onCommit={vi.fn()}
         onCancel={vi.fn()}
         onRemove={vi.fn()}

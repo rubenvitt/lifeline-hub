@@ -64,6 +64,7 @@ import { OffeneBearbeitungProvider } from '../../src/components/offeneBearbeitun
 import { useSpeicherLeiste } from '../../src/components/speicherLeiste';
 import DokumentEntwurf from '../../src/entwurf/DokumentEntwurf';
 import { VORLAGEN } from '../../src/befehle/vorlagen';
+import StammdatenFeld, { type Vorschlagsquelle } from '../../src/components/StammdatenFeld';
 
 /** Die Vorschauen zeigen die Stufe des Fükw, des primären Kontexts. */
 const DICHTE: Dichte = 'kompakt';
@@ -311,6 +312,44 @@ function DashboardBeispiel() {
         }))}
       />
     </DashboardFlaeche>
+  );
+}
+
+/** Eine Quelle „Im Einsatz“ und ein Katalog mit Anlage, ohne Recht (LLH-1144). */
+const STAMMDATEN_QUELLEN: readonly Vorschlagsquelle[] = [
+  {
+    id: 'funkrufnamenEinsatz',
+    gruppe: 'einsatz',
+    eintraege: [{ label: 'Florian Musterstadt 1/10-1', wert: 'Florian Musterstadt 1/10-1' }],
+  },
+  {
+    id: 'externeStellen',
+    gruppe: 'stammdaten',
+    eintraege: [],
+    uebernahme: {
+      ziel: 'Externe Stellen',
+      anlegen: async () => ({ id: 0 }),
+      gesperrt: 'nur System-Admin',
+    },
+  },
+];
+
+/** Eigener Formularname je Instanz: die Feld-IDs stehen sonst viermal im Dokument. */
+function StammdatenFeldBeispiel() {
+  const name = useId();
+  return (
+    <Form
+      name={name}
+      layout="vertical"
+      initialValues={{ absender: 'Florian Musterstadt 1/10-1', empfaenger: 'Polizei vor Ort' }}
+    >
+      <Form.Item label="Absender (Funkrufname/Stelle)" name="absender">
+        <StammdatenFeld nurText quellen={STAMMDATEN_QUELLEN} />
+      </Form.Item>
+      <Form.Item label="Empfänger / Adressat" name="empfaenger">
+        <StammdatenFeld nurText quellen={STAMMDATEN_QUELLEN} />
+      </Form.Item>
+    </Form>
   );
 }
 
@@ -570,6 +609,15 @@ export const PREVIEWS: readonly PreviewSpec[] = [
     source: 'components/speicherLeiste.ts',
     docAnchor: 'export function speicherLeisteStil',
     content: () => <SpeicherleisteBeispiel />,
+  },
+  {
+    name: 'StammdatenFeld',
+    title: 'StammdatenFeld (aus Stammdaten oder frei)',
+    group: 'Formular',
+    height: 420,
+    source: 'components/StammdatenFeld.tsx',
+    docAnchor: 'export default function StammdatenFeld',
+    content: () => <StammdatenFeldBeispiel />,
   },
   {
     name: 'DokumentEntwurf',

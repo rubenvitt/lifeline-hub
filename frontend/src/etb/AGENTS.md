@@ -163,6 +163,11 @@ einsatz)`. Abmelden und die Anmeldung eines anderen löschen sie, ein Sitzungsen
   Absenden ein. `@`, `/von`, `/an` überschreiben ihn für den einen Eintrag. Ohne Standard fragt
   die Erfassung inline (`etb/RufnameAbfrage.tsx`, kein Modal), erst wenn das Fach gelesen ist;
   in der Berichtigung wird nicht gefragt.
+- **Von/An schlagen über `components/StammdatenFeld.tsx` vor** (LLH-1144, Spec `stammdaten-feld`):
+  Chip-Editor und Rufname-Abfrage im Modus `nurText` mit `useFunkrufnamenQuellen` (Einsatz,
+  Stammdaten, „Zuletzt verwendet“), **ohne** „In Stammdaten übernehmen“ (Höhenbudget der Leiste,
+  LFH-955). Enter nimmt den mit ↓/↑ markierten Vorschlag, sonst den Text; Escape schließt erst die
+  Liste, dann den Chip. Das `@`-Menü liest weiter `etb/funkrufnamen.ts` (dieselbe Abbildung).
 - **Meldung und Lage gehen in den Meldungseingang** (LLH-1037, Specs `meldungseingang`,
   `etb-schnellerfassung-tastatur`): bei diesen Typen (nicht in der Berichtigung) zeigt
   `Schnellerfassung.tsx` den Schalter „Nur protokollieren“, Vorgabe aus; aus legt der Server

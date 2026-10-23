@@ -83,6 +83,14 @@ export const server = setupServer(
    */
   http.get('/api/einsaetze/:einsatzId/modul-zaehler', () => HttpResponse.json({})),
   /**
+   * Stammdaten-Quellen des Vorschlagsfelds (LLH-1144, `stammdaten/vorschlagsquellen.ts`) —
+   * leere Kataloge als Default. Die ETB-Erfassung und die Meldungsseiten fragen Fahrzeuge im
+   * Dienst und externe Stellen für Von/An bzw. Absender/Empfänger ab; Tests mit Vorschlägen
+   * überschreiben per `server.use()`.
+   */
+  http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+  http.get('/api/externe-stellen', () => HttpResponse.json([])),
+  /**
    * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
    * Org-Vorgabe als Default (echter Zustand eines aktiven Einsatzes ohne Vorgaben). Das
    * Frist-Paneel fragt sie ab; Tests der Kategorien überschreiben per `server.use()`.

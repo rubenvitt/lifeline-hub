@@ -63,6 +63,7 @@ import { useViewport } from '../components/useViewport';
 import { MeldungKennzahlZeile, RichtungFilterKnopf } from '../meldungen/MeldungenSchmal';
 import { modulName } from '../einsatz/modulRegistry';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
+import { useFunkrufnamenQuellen } from '../stammdaten/vorschlagsquellen';
 
 /**
  * Sortierung der Meldungen: Prio (sofort→dringend→normal), dann eskaliert zuerst (Alarm oben), dann
@@ -138,6 +139,13 @@ export default function MeldungenPage() {
   const lageMeldung = lageAuswahl?.einsatzId === einsatzId ? lageAuswahl.meldung : null;
   // Inline-Erfassen-Formular: per Kopf-Knopf auf-/zugeklappt, kein Drawer.
   const [formOffen, setFormOffen] = useState(false);
+  // Absender/Empfänger aus Einsatz und Stammdaten (LLH-1144); abgerufen nur bei offenem Formular.
+  const vorschlagsquellen = useFunkrufnamenQuellen({
+    einsatzId,
+    funktionen: funktionsVorschlaege,
+    uebernahme: true,
+    aktiv: formOffen,
+  });
 
   // Offene und abgeschlossene Meldungen getrennt vom Server (LFH-940, design.md D1/D6): die offenen
   // ungeblättert in der Triage-Ordnung, die abgeschlossenen seitenweise und erst in ihrer Ansicht.
@@ -756,6 +764,7 @@ export default function MeldungenPage() {
             einheiten={einheitenQuery.data}
             abschnitte={abschnitteQuery.data}
             funktionsVorschlaege={funktionsVorschlaege}
+            vorschlagsquellen={vorschlagsquellen}
           />
         </Paneel>
       )}

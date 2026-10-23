@@ -29,11 +29,12 @@ export const EXTERNE_STELLE_ART_LABEL: Record<ExterneStelleArt, string> = {
   sonstige: 'Sonstige',
 };
 
-/** Die aktiven Stellen der Organisation; live über `stammdaten`. */
-export function useExterneStellen() {
+/** Die aktiven Stellen der Organisation; live über `stammdaten`. `aktiv` aus: kein Abruf. */
+export function useExterneStellen(aktiv = true) {
   return useQuery({
     queryKey: globalKeys.externeStellenListe('aktiv'),
     queryFn: () => fetchExterneStellen('aktiv'),
+    enabled: aktiv,
   });
 }
 
