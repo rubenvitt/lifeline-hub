@@ -949,9 +949,18 @@ describe('Druckpfade der Modul-Listen (LFH-727)', () => {
 
   it('Tiere: Sicht und Spezies hin und zurück, „alle“ entfällt', () => {
     expect(tiereDruckPfad(7, { sicht: 'alle' })).toBe('/einsaetze/7/tiere/druck');
-    const pfad = tiereDruckPfad(7, { sicht: 'vermisst', spezies: 'hund' });
+    const pfad = tiereDruckPfad(7, { sicht: 'vermisst', spezies: ['hund'] });
     expect(pfad).toBe('/einsaetze/7/tiere/druck?sicht=vermisst&spezies=hund');
-    expect(parseTiereDruckAuswahl(rundlauf(pfad))).toEqual({ sicht: 'vermisst', spezies: 'hund' });
+    expect(parseTiereDruckAuswahl(rundlauf(pfad))).toEqual({
+      sicht: 'vermisst',
+      spezies: ['hund'],
+    });
+    // Mehrere Spezies aus dem Kopffilter der Liste (LLH-1096).
+    const mehrere = tiereDruckPfad(7, { sicht: 'alle', spezies: ['hund', 'katze'] });
+    expect(parseTiereDruckAuswahl(rundlauf(mehrere))).toEqual({
+      sicht: 'alle',
+      spezies: ['hund', 'katze'],
+    });
     // Die Vorgabe der Liste (`aktiv`) reist ausdrücklich mit.
     expect(parseTiereDruckAuswahl(rundlauf(tiereDruckPfad(7, { sicht: 'aktiv' })))).toEqual({
       sicht: 'aktiv',
@@ -963,9 +972,9 @@ describe('Druckpfade der Modul-Listen (LFH-727)', () => {
     expect(parseTiereDruckAuswahl(new URLSearchParams('sicht=weg&spezies=drache'))).toEqual({
       sicht: 'alle',
     });
-    expect(parseTiereDruckAuswahl(new URLSearchParams('sicht=weg&spezies=katze'))).toEqual({
+    expect(parseTiereDruckAuswahl(new URLSearchParams('sicht=weg&spezies=katze,drache'))).toEqual({
       sicht: 'alle',
-      spezies: 'katze',
+      spezies: ['katze'],
     });
   });
 

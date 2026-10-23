@@ -1,5 +1,5 @@
 import { Breadcrumb, Button, Collapse, Form, Input, Space, Tag, Typography } from 'antd';
-import { Augenbraue, Segmentleiste, StatusChip } from '../components/instrument';
+import { Segmentleiste, StatusChip } from '../components/instrument';
 import { Select } from '../components/Select';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,7 +29,8 @@ import {
 } from '../components/erfassungsSitzung';
 import { SeitenFehler, SeitenSkeleton, SeitenStandVeraltet } from '../components/SeitenZustand';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
-import { tiereDetailPfad, tiereDruckPfad } from '../routing/deeplinks';
+import { parseListenZustand, tiereDetailPfad, tiereDruckPfad } from '../routing/deeplinks';
+import { useListenGedaechtnis } from '../components/listenGedaechtnis';
 import {
   SPEZIES_META,
   TIERE_SICHTEN,
@@ -39,7 +40,7 @@ import {
   verbleibText,
   type TiereSicht,
 } from './tiere/tierHelfer';
-import type { Spezies, Tier } from '../api/types';
+import type { Spezies, Tier, TierStatus } from '../api/types';
 import { useFrischAngelegt } from '../components/useFrischAngelegt';
 import { useCsvExport } from '../components/useCsvExport';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
@@ -72,6 +73,12 @@ function gemerkterFundort(einsatzId: number): OrtsfeldWert | undefined {
 const STATUS_META = TIER_STATUS;
 
 const SPEZIES_KEYS = Object.keys(SPEZIES_META) as Spezies[];
+const SPEZIES_WERTE = SPEZIES_KEYS.map((k) => ({ text: SPEZIES_META[k], value: k as string }));
+const STATUS_FOLGE = Object.keys(STATUS_META) as TierStatus[];
+const STATUS_WERTE = STATUS_FOLGE.map((s) => ({
+  text: STATUS_META[s].label.charAt(0).toUpperCase() + STATUS_META[s].label.slice(1),
+  value: s as string,
+}));
 
 /** Status-Sichten: 'alle' = kein Filter; sonst Status-Filter. */
 type Sicht = TiereSicht;
@@ -94,6 +101,12 @@ function halterAnzeige(t: Tier): React.ReactNode {
  * Das eine Spaltenregister der Tierliste. Modulkonstante, weil kein `render` Komponentenzustand
  * liest; durch `spaltenFuer<Tier>()` geführt, nie annotiert — eine Annotation weitete die
  * Schlüsselliterale auf `string`.
+ *
+ * Sortieren und Filtern (LLH-1096, Muster der Schadenliste): Status und Spezies filtern im
+ * Spaltenkopf, jede Spalte mit vergleichbarem Wert sortiert; Halter (Verweis oder Freitext) und
+ * Fundort (Freitext) bleiben ohne. Die Spezies ersetzt das frühere Auswahlfeld neben den Reitern:
+ * im Kartenzweig steht sie als Auswahlfeld über der Liste, an seiner Stelle. Der Status hat dort
+ * keins (`ohneKartenfeld`): die Reiter darüber führen ihn schon.
  */
 const tierSpalten = spaltenFuer<Tier>()([
   {
@@ -113,6 +126,8 @@ const tierSpalten = spaltenFuer<Tier>()([
     title: 'Status',
     key: 'status',
     width: 130,
+    sortWert: (t) => STATUS_FOLGE.indexOf(t.status),
+    filter: { werte: STATUS_WERTE, trifft: (t, w) => t.status === w, ohneKartenfeld: true },
     render: (_, t) => (
       <StatusChip ton={STATUS_META[t.status].ton} wort={STATUS_META[t.status].label} />
     ),
@@ -121,13 +136,22 @@ const tierSpalten = spaltenFuer<Tier>()([
     // LLH-1092: wohin das Tier gegangen ist, ohne Klick — „—“, solange es nicht abgeschlossen ist.
     title: 'Verbleib',
     key: 'verbleib',
+    sortWert: (t) => verbleibText(t),
     suchText: (t) => verbleibText(t),
     render: (_, t) => verbleibText(t) ?? <Typography.Text type="secondary">—</Typography.Text>,
   },
-  { title: 'Spezies', key: 'spezies', width: 120, render: (_, t) => SPEZIES_META[t.spezies] },
+  {
+    title: 'Spezies',
+    key: 'spezies',
+    width: 120,
+    sortWert: (t) => SPEZIES_META[t.spezies],
+    filter: { werte: SPEZIES_WERTE, trifft: (t, w) => t.spezies === w },
+    render: (_, t) => SPEZIES_META[t.spezies],
+  },
   {
     title: 'Rufname',
     key: 'rufname',
+    sortWert: (t) => t.rufname,
     suchText: (t) => t.rufname,
     render: (_, t) => t.rufname ?? <Typography.Text type="secondary">—</Typography.Text>,
   },
@@ -136,6 +160,7 @@ const tierSpalten = spaltenFuer<Tier>()([
     dataIndex: 'rasse_beschreibung',
     key: 'rasse',
     abBreite: 'lg',
+    sortWert: (t) => t.rasse_beschreibung,
     suchText: (t) => t.rasse_beschreibung,
     render: (r) => r ?? '—',
   },
@@ -189,18 +214,29 @@ export default function TierePage() {
   const einsatzId = Number(id);
   const navigate = useNavigate();
   const [sichtNachEinsatz, setSichtNachEinsatz] = useState<Record<number, Sicht>>({});
-  const [speziesNachEinsatz, setSpeziesNachEinsatz] = useState<Record<number, Spezies | undefined>>(
-    {},
-  );
   const [highlight, setHighlight] = useState<{ einsatzId: number; tierId: number } | null>(null);
   const sicht = sichtNachEinsatz[einsatzId] ?? 'aktiv';
-  const speziesFilter = speziesNachEinsatz[einsatzId];
+  /**
+   * Sortierung, Kopffilter und Suche stehen in der Adresse (LLH-1096, Muster der Schadenliste); der
+   * Hook gehört der Seite und steht vor jedem frühen Ausstieg. Alle Achsen hängen an keinen Daten.
+   */
+  const gedaechtnis = useListenGedaechtnis<TierSpaltenKey>('tiere', tierSpalten, {
+    vorgabe: { spalte: 'reg', richtung: 'ab' },
+    einsatzId,
+  });
+  /** Zählt Neuaufbauten der Sicht, wenn ein neues Tier sonst unter einem Kopffilter fehlte. */
+  const [neuaufbau, setNeuaufbau] = useState(0);
 
   const setSichtFuer = (zielEinsatzId: number, neueSicht: Sicht) => {
     setSichtNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: neueSicht }));
   };
-  const setSpeziesFuer = (zielEinsatzId: number, spezies: Spezies | undefined) => {
-    setSpeziesNachEinsatz((alt) => ({ ...alt, [zielEinsatzId]: spezies }));
+  /**
+   * Ein Reiterwechsel: der Suchbegriff gehört zur Menge des Reiters und fällt weg, Sortierung und
+   * Kopffilter gehen mit (die Sicht beginnt beim gemeldeten Stand des Gedächtnisses).
+   */
+  const wechsleReiter = (neueSicht: Sicht) => {
+    gedaechtnis.melde({ ...gedaechtnis.start, suche: '' });
+    setSichtFuer(einsatzId, neueSicht);
   };
 
   // Die Tier-Liste hält der Einsatz-Live-Stream im EinsatzLayout aktuell (`tier` →
@@ -282,7 +318,22 @@ export default function TierePage() {
       frischAngelegt.merke(variablen.einsatzId, [tier]);
       setHighlight({ einsatzId: variablen.einsatzId, tierId: tier.id });
       setSichtFuer(variablen.einsatzId, tier.status);
-      setSpeziesFuer(variablen.einsatzId, undefined);
+      // Das neue Tier steht in der Sicht: ein Kopffilter auf Spezies oder Status, der es
+      // verbärge, fällt (wie früher das Spezies-Feld), die übrigen bleiben.
+      if (variablen.einsatzId === einsatzId) {
+        const start = gedaechtnis.start;
+        const filter = { ...start.filter };
+        for (const [spalte, wert] of [
+          ['spezies', tier.spezies],
+          ['status', tier.status],
+        ] as const) {
+          if (filter[spalte]?.length && !filter[spalte].includes(wert)) delete filter[spalte];
+        }
+        if (Object.keys(filter).length !== Object.keys(start.filter).length) {
+          gedaechtnis.melde({ ...start, filter });
+          setNeuaufbau((n) => n + 1);
+        }
+      }
       qc.invalidateQueries({ queryKey: einsatzKeys.tiere(variablen.einsatzId) });
       qc.invalidateQueries({ queryKey: einsatzKeys.etb(variablen.einsatzId) });
     },
@@ -319,7 +370,11 @@ export default function TierePage() {
   const nurAnsicht = !darfSchreiben && einsatz.status !== 'aktiv';
 
   const alle = frischAngelegt.alle;
-  const tiere = filterTiere(alle, { sicht, spezies: speziesFilter });
+  const tiere = filterTiere(alle, { sicht });
+  // Der Druck nimmt die Spezies aus dem Kopffilter, wie er in der Adresse steht (LLH-1096).
+  const speziesFilter = (parseListenZustand(searchParams).filter.spezies ?? []).filter(
+    (s): s is Spezies => SPEZIES_KEYS.includes(s as Spezies),
+  );
 
   /**
    * Listenzustand — an der Stelle der Liste entschieden, nie als Frühausstieg.
@@ -399,26 +454,15 @@ export default function TierePage() {
         )
       }
     >
-      {/* Sicht und Spezies als eine Filterzeile. Eine Wahl, die die Liste darunter filtert —
-          `radiogroup`, nicht `tablist`: es gibt kein eigenes Feld je Segment. */}
+      {/* Die Statussicht als Reiter. Eine Wahl, die die Liste darunter filtert — `radiogroup`, nicht
+          `tablist`: es gibt kein eigenes Feld je Segment. Die Spezies filtert im Spaltenkopf
+          (LLH-1096), im Kartenzweig als Auswahlfeld der Sicht. */}
       <Space wrap size="middle" align="center" style={{ marginBottom: 12 }}>
         <Segmentleiste
           beschriftung="Tiere nach Status filtern"
           wert={sicht}
-          onWechsel={(k) => setSichtFuer(einsatzId, k)}
+          onWechsel={wechsleReiter}
           optionen={TIERE_SICHTEN.map((s) => ({ wert: s.key, label: s.label }))}
-        />
-        <Augenbraue>Spezies</Augenbraue>
-        {/* `aria-label`, weil die `Typography.Text` daneben kein `<label>` ist: ohne ihn hätte
-            das Feld keinen zugänglichen Namen. */}
-        <Select<Spezies | undefined>
-          aria-label="Spezies"
-          allowClear
-          placeholder="alle"
-          style={{ width: 180 }}
-          value={speziesFilter}
-          onChange={(v) => setSpeziesFuer(einsatzId, v)}
-          options={SPEZIES_KEYS.map((k) => ({ value: k, label: SPEZIES_META[k] }))}
         />
       </Space>
 
@@ -440,19 +484,18 @@ export default function TierePage() {
              * gesucht, auf „Alle" gewechselt, und dort fehlen still Zeilen. Dieselbe Falle ist an
              * `PersonenPage` behoben.
              *
-             * Der Remount trifft allen Zustand des Primitivs (`suchbegriff`, `eigeneSortierung`,
-             * `eigeneSpaltenAus`, `schleuse`); getrennt abschaltbar ist nichts. Hier ist der Preis
-             * klein: `tierSpalten` ist eine Modulkonstante, und keine Spalte trägt ein `filter`.
+             * Seit dem Gedächtnis (LLH-1096) beginnt die neue Instanz beim gemeldeten Stand:
+             * Sortierung, Kopffilter und Spaltenwahl gehen mit, den Suchbegriff räumt
+             * `wechsleReiter` vorher. `neuaufbau` baut die Sicht neu, wenn ein frisch angelegtes
+             * Tier sonst unter einem Kopffilter fehlte.
              *
-             * Spezies bewusst nicht im Schlüssel: sie ist die innere, häufig getastete Achse
-             * (`filterTiere` bildet die Schnittmenge aus Status und Spezies), Suche und Spezies
-             * werden zusammen gestellt. Ein Remount daran löschte den eben getippten Begriff. Der
-             * Reiter wechselt das Arbeitsfach, die Spezies engt darin ein.
+             * Die Spezies filtert im Kopf, innerhalb der Instanz: der Reiter wechselt das
+             * Arbeitsfach, die Spezies engt darin ein.
              *
              * Der Guard (`components/datensicht.guard.test.ts`) prüft nur, ob der Schlüssel die
              * Schalterachse `sicht` nennt; die Spezies-Frage entscheidet er nicht.
              */
-            key={sicht}
+            key={`${sicht}-${neuaufbau}`}
             bezeichnung="Tiere im Einsatz"
             spalten={tierSpalten}
             daten={tiere}
@@ -460,9 +503,10 @@ export default function TierePage() {
             ladend={tiereQuery.isLoading}
             leerText="Keine Tiere in dieser Sicht"
             suche={{ platzhalter: 'T-Nr., Rufname, Rasse' }}
-            // Spiegelt die Backend-Ordnung (`ORDER BY t.registrier_nr DESC`): das jüngste Tier
-            // oben. Die Sortierung liegt im Client, der Sortierpfeil dreht sie ohne Nachladen um.
-            standardSortierung={{ spalte: 'reg', richtung: 'ab' }}
+            // Vorgabe im Gedächtnis: `reg` absteigend spiegelt die Backend-Ordnung
+            // (`ORDER BY t.registrier_nr DESC`), das jüngste Tier oben.
+            mehrzahl="Tieren"
+            gedaechtnis={gedaechtnis}
             onZeileKlick={(t) => navigate(tiereDetailPfad(einsatzId, t.id))}
             karte={tierKarte(einsatzId)}
             zeilenKlasse={(t) =>

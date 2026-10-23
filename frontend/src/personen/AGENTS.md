@@ -106,6 +106,12 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Schäden (`BezugHinzufuegenDialog`, XOR-Leerung im selben PATCH), „Bezug lösen“ mit Grund an der
   Zeile; lädt erst aufgeklappt. Der Aufenthalt in einer UHS ist kein Bezug, er steht im Kopf
   („In UHS aufnehmen“, „Verlegen“, „Austragen“; nicht am Gerät).
+- **Sortieren und Filtern der Betroffenenliste** (LLH-1096, Spec `tabellen-sortieren-filtern`):
+  Sichtung, Status, Verbleib (nach `verbleibKlasse`) und Abschnitt (der der aktuellen UHS, nur mit
+  freien Einsatzabschnitten) filtern im Spaltenkopf, im Kartenzweig ohne Auswahlfeld
+  (`ohneKartenfeld`). Der Suchbegriff steht NIE in der Adresse (`sucheInAdresse: false`): er trägt
+  Namen, die Adresse landet in Verlauf, Lesezeichen und Links. Die Gerätestartseiten
+  (`geraet/GeraetPatientenPage.tsx`, `GeraetBetroffenePage.tsx`) streichen die Filter des Registers.
 - **Zeilenaktionen der Betroffenenliste** (LLH-1130, Spec `betroffene-lagedaten`): die
   Sichtungszelle ist der Auslöser (`personen/ZeilenSichtung.tsx`, Popover mit `SichtungsWahl` und
   „Übernehmen“, Grund an der Zeile), die leere Verbleib-Zelle bietet „Verbleib erfassen“, das

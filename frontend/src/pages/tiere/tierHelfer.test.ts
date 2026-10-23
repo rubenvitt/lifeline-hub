@@ -56,16 +56,25 @@ describe('filterTiere', () => {
   });
 
   it('filtert allein nach Spezies', () => {
-    expect(nummern(filterTiere(alle, { sicht: 'alle', spezies: 'katze' }))).toEqual([2, 3]);
+    expect(nummern(filterTiere(alle, { sicht: 'alle', spezies: ['katze'] }))).toEqual([2, 3]);
+  });
+
+  it('mehrere Spezies verbinden sich als Vereinigung (Kopffilter, LLH-1096)', () => {
+    expect(nummern(filterTiere(alle, { sicht: 'alle', spezies: ['katze', 'hund'] }))).toEqual([
+      1, 2, 3, 4,
+    ]);
+    expect(nummern(filterTiere(alle, { sicht: 'alle', spezies: ['katze', 'wildtier'] }))).toEqual([
+      2, 3,
+    ]);
   });
 
   it('verbindet Status und Spezies als Schnittmenge, nicht als Vereinigung', () => {
     // Bei `||` statt `&&` ergäbe sich die Vereinigung [2, 3, 4] statt der Schnittmenge [3].
-    expect(nummern(filterTiere(alle, { sicht: 'vermisst', spezies: 'katze' }))).toEqual([3]);
+    expect(nummern(filterTiere(alle, { sicht: 'vermisst', spezies: ['katze'] }))).toEqual([3]);
   });
 
   it('liefert eine leere Menge, wenn die Schnittmenge leer ist', () => {
-    expect(filterTiere(alle, { sicht: 'abgeschlossen', spezies: 'katze' })).toEqual([]);
+    expect(filterTiere(alle, { sicht: 'abgeschlossen', spezies: ['katze'] })).toEqual([]);
   });
 });
 

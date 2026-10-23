@@ -202,3 +202,65 @@ describe('useListenGedaechtnis · neuer Aufbau der Sicht (LLH-1086)', () => {
     expect(hook.result.current.spaltenStart).toEqual({ aus: ['typ'], an: [] });
   });
 });
+
+/**
+ * Personenbezogene Suche bleibt aus der Adresse (LLH-1096, Betroffene): ein Name stünde sonst im
+ * Verlauf des Browsers, in Lesezeichen und in jedem geteilten Link. Sortierung und Filter tragen
+ * keine Personendaten und stehen weiter dort.
+ */
+describe('useListenGedaechtnis · Suche nur in der Sitzung (LLH-1096)', () => {
+  function aufbauenOhneSuche(start: string) {
+    const ort = { aktuell: '' };
+    function Ortsfuehler() {
+      const l = useLocation();
+      ort.aktuell = `${l.pathname}${l.search}`;
+      return null;
+    }
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={[start]}>
+        <Ortsfuehler />
+        {children}
+      </MemoryRouter>
+    );
+    const hook = renderHook(
+      () =>
+        useListenGedaechtnis('personen', SPALTEN, {
+          vorgabe: VORGABE,
+          einsatzId: 7,
+          sucheInAdresse: false,
+        }),
+      { wrapper },
+    );
+    return { hook, ort };
+  }
+
+  it('meldet Filter in die Adresse, die Suche nur in die Sitzung', () => {
+    const { hook, ort } = aufbauenOhneSuche('/p');
+    act(() =>
+      hook.result.current.melde({
+        sortierung: VORGABE,
+        filter: { typ: ['sturm'] },
+        suche: 'Meier',
+      }),
+    );
+    expect(ort.aktuell).toBe('/p?f.typ=sturm');
+    expect(sessionStorage.getItem('lfh:liste:personen:7')).toBe('f.typ=sturm&q=Meier');
+  });
+
+  it('liest keine Suche aus der Adresse und räumt sie dort weg', () => {
+    const { hook, ort } = aufbauenOhneSuche('/p?q=Meier&neu=1');
+    expect(hook.result.current.start.suche).toBe('');
+    expect(ort.aktuell).toBe('/p?neu=1');
+  });
+
+  it('der Rückweg ohne Parameter bringt die Suche aus der Sitzung, die Adresse nur den Filter', () => {
+    sessionStorage.setItem('lfh:liste:personen:7', 'f.typ=sturm&q=Meier');
+    const { hook, ort } = aufbauenOhneSuche('/p');
+    expect(hook.result.current.start).toEqual({
+      sortierung: VORGABE,
+      filter: { typ: ['sturm'] },
+      suche: 'Meier',
+    });
+    expect(ort.aktuell).toBe('/p?f.typ=sturm');
+  });
+});

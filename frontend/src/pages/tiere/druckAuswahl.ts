@@ -9,6 +9,8 @@ export function tiereDruckAuswahl(auswahl: TiereDruckAuswahl): string {
       `Sicht: ${TIERE_SICHTEN.find((s) => s.key === auswahl.sicht)?.label ?? auswahl.sicht}`,
     );
   }
-  if (auswahl.spezies) teile.push(`Spezies: ${SPEZIES_META[auswahl.spezies]}`);
+  if (auswahl.spezies?.length) {
+    teile.push(`Spezies: ${auswahl.spezies.map((s) => SPEZIES_META[s]).join(', ')}`);
+  }
   return teile.length > 0 ? teile.join(' · ') : 'alle Tiere';
 }
