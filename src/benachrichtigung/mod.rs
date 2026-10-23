@@ -36,14 +36,19 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 wire_enum! {
-    /// Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“). Die dritte Stufe, *still*, erzeugt
-    /// keine Benachrichtigung und hat deshalb keinen Wert.
+    /// Wie laut eine Benachrichtigung ist (Spec „Drei Stufen“; LLH-1143, Entscheidung zu LLH-1142
+    /// E1: Alarm, Eingang, Still). Die Stufe einer Art ist fest ([`BenachrichtigungArt::stufe`]);
+    /// *still* entsteht erst beim Empfänger, wenn er die Art abgeschaltet hat oder die Vorgabe
+    /// seiner Rolle sie still stellt ([`aufloesung`]).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, ToSchema)]
     pub enum BenachrichtigungStufe {
         /// Lauter Ton, Toast, OS-Meldung bei verdecktem Tab; nicht abschaltbar.
         Alarm => "alarm",
-        /// Dezenter Ton, Toast, OS-Meldung bei verdecktem Tab; je Art abschaltbar.
+        /// Die Stufe *Eingang* (Wire-Wert bleibt `hinweis`): Eingangsband, dezenter Ton, Zähler im
+        /// Knopf „Eingänge“, im Tab-Titel und am App-Symbol; je Art abschaltbar.
         Hinweis => "hinweis",
+        /// Nur im Verlauf: schon gelesen geschrieben, zählt nie, kein Ton, kein Band, kein Push.
+        Still => "still",
     }
     try_from = |s| format!("Ungültige BenachrichtigungStufe: {s}");
 }
@@ -317,6 +322,24 @@ pub struct BenachrichtigungEreignis {
     /// `true`: der Empfänger hat sie quittiert, ihre Toasts auf seinen anderen Verbindungen
     /// verschwinden (Spec „Quittieren gilt für alle Verbindungen des Nutzers“).
     pub quittiert: bool,
+    /// „Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes
+    /// bis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von
+    /// `POST …/benachrichtigungen/gelesen`; die übrigen Felder nennen die jüngste davon, ein
+    /// älterer Client liest es als deren Einzelquittung.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gelesen_bis: Option<i64>,
+}
+
+/// Der Verlauf eines Einsatzes für den Knopf „Eingänge“ (LLH-1143, design.md D3): die jüngsten
+/// eigenen Benachrichtigungen samt Text und die Zahl der ungelesenen Eingänge darunter.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BenachrichtigungVerlauf {
+    /// Jüngste zuerst, höchstens [`repo::LISTE_MAX`]; ohne die, deren Modul der Nutzer nicht
+    /// (mehr) lesen darf.
+    pub eintraege: Vec<BenachrichtigungAnzeige>,
+    /// Ungelesene Eingänge (Stufe `hinweis`, unquittiert) unter `eintraege`; Alarme und Stilles
+    /// zählen nie.
+    pub ungelesen: i64,
 }
 
 /// Eine Benachrichtigung mit ihrem Text, wie der Empfänger sie liest.
@@ -373,43 +396,55 @@ async fn melden_mit_fehler(
         return Ok(Vec::new());
     }
     let aufgeloest = aufloesung::empfaenger(pool, anlass).await?;
-    ausliefern(
-        pool,
-        live,
-        anlass,
-        aufgeloest.org_id,
-        &aufgeloest.benutzer_ids,
-    )
-    .await?;
+    let mit_stufe = mit_stufe(anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids);
+    ausliefern(pool, live, anlass, aufgeloest.org_id, &mit_stufe).await?;
     Ok(aufgeloest.benutzer_ids)
 }
 
-/// Schreibt je aufgelöstem Empfänger eine Zeile und stellt sie zu (Live, Web Push). Nur für
-/// Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert hat.
+/// Je Empfänger seine Stufe: die der Art, für die Stillen `still` (LLH-1143, design.md D2).
+fn mit_stufe(
+    anlass: &Anlass,
+    benutzer_ids: &[i64],
+    still_ids: &[i64],
+) -> Vec<(i64, BenachrichtigungStufe)> {
+    benutzer_ids
+        .iter()
+        .map(|&id| (id, anlass.art.stufe()))
+        .chain(
+            still_ids
+                .iter()
+                .map(|&id| (id, BenachrichtigungStufe::Still)),
+        )
+        .collect()
+}
+
+/// Schreibt je aufgelöstem Empfänger eine Zeile mit seiner Stufe und stellt sie zu (Live, Web
+/// Push). Nur für Empfänger, die [`aufloesung::empfaenger`] für diesen Anlass geliefert hat.
 async fn ausliefern(
     pool: &SqlitePool,
     live: &LiveHub,
     anlass: &Anlass,
     org_id: i64,
-    benutzer_ids: &[i64],
+    mit_stufe: &[(i64, BenachrichtigungStufe)],
 ) -> Result<(), crate::error::AppError> {
-    if benutzer_ids.is_empty() {
+    if mit_stufe.is_empty() {
         return Ok(());
     }
-    let zeilen = repo::anlegen(pool, anlass, benutzer_ids).await?;
+    let zeilen = repo::anlegen(pool, anlass, mit_stufe).await?;
     let ereignisse: Vec<(i64, BenachrichtigungEreignis)> = zeilen
         .into_iter()
-        .map(|(benutzer_id, id)| {
+        .map(|(benutzer_id, stufe, id)| {
             (
                 benutzer_id,
                 BenachrichtigungEreignis {
                     einsatz_id: anlass.einsatz_id,
                     benachrichtigung_id: id,
                     art: anlass.art,
-                    stufe: anlass.art.stufe(),
+                    stufe,
                     bezug_typ: anlass.bezug.typ,
                     bezug_id: anlass.bezug.id,
                     quittiert: false,
+                    gelesen_bis: None,
                 },
             )
         })
@@ -422,6 +457,8 @@ async fn ausliefern(
             pool,
             ereignisse
                 .iter()
+                // Stilles erreicht kein Gerät (design.md D2): es ist schon gelesen.
+                .filter(|(_, e)| e.stufe != BenachrichtigungStufe::Still)
                 .map(|(benutzer_id, e)| crate::web_push::Sendung {
                     benutzer_id: *benutzer_id,
                     nutzlast: serde_json::to_string(e).expect("Nutzlast serialisierbar"),
@@ -491,6 +528,7 @@ async fn quittiert_zustellen(
                         bezug_typ: z.bezug_typ,
                         bezug_id: z.bezug_id,
                         quittiert: true,
+                        gelesen_bis: None,
                     },
                 )
             })
@@ -535,22 +573,54 @@ async fn umadressieren_mit_fehler(
         Some(anlass) => Some(aufloesung::empfaenger(pool, anlass).await?),
         None => None,
     };
-    let gemeint: &[i64] = aufgeloest.as_ref().map_or(&[], |a| &a.benutzer_ids);
+    // Gemeint sind auch die Stillen (LLH-1143): ihre Zeile bleibt, sie ist nur schon gelesen.
+    let gemeint: Vec<i64> = aufgeloest.as_ref().map_or_else(Vec::new, |a| {
+        a.benutzer_ids.iter().chain(&a.still_ids).copied().collect()
+    });
     let erledigt =
-        repo::quittieren_fuer_bezug_ausser(pool, einsatz_id, art, bezug.typ, bezug.id, gemeint)
+        repo::quittieren_fuer_bezug_ausser(pool, einsatz_id, art, bezug.typ, bezug.id, &gemeint)
             .await?;
     quittiert_zustellen(pool, live, einsatz_id, art, &erledigt).await;
     let (Some(anlass), Some(aufgeloest)) = (neu, aufgeloest) else {
         return Ok(());
     };
     let hatten = repo::empfaenger_des_bezugs(pool, einsatz_id, art, bezug.typ, bezug.id).await?;
-    let dazu: Vec<i64> = aufgeloest
-        .benutzer_ids
-        .iter()
-        .copied()
-        .filter(|id| !hatten.contains(id))
-        .collect();
+    let dazu: Vec<(i64, BenachrichtigungStufe)> =
+        mit_stufe(&anlass, &aufgeloest.benutzer_ids, &aufgeloest.still_ids)
+            .into_iter()
+            .filter(|(id, _)| !hatten.contains(id))
+            .collect();
     ausliefern(pool, live, &anlass, aufgeloest.org_id, &dazu).await
+}
+
+/// „Alle gelesen“ (LLH-1143, design.md D4): quittiert die eigenen Zeilen von `benutzer_id` im
+/// Einsatz bis einschließlich `bis_id`, außer Alarmen (die quittiert jeder einzeln, Spec), und
+/// meldet es seinen Verbindungen mit EINEM Quittier-Ereignis samt `gelesen_bis` — nie eines je
+/// Zeile, das drängte bei vielen Eingängen die anderen Clients in `lagged`. Liefert die Zahl der
+/// jetzt gelesenen Zeilen.
+pub async fn gelesen_bis(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    org_id: i64,
+    einsatz_id: i64,
+    benutzer_id: i64,
+    bis_id: i64,
+) -> Result<usize, crate::error::AppError> {
+    let zeilen = repo::gelesen_bis(pool, benutzer_id, einsatz_id, bis_id).await?;
+    if let Some(j) = zeilen.iter().max_by_key(|z| z.id) {
+        let ereignis = BenachrichtigungEreignis {
+            einsatz_id,
+            benachrichtigung_id: j.id,
+            art: j.art,
+            stufe: j.stufe,
+            bezug_typ: j.bezug_typ,
+            bezug_id: j.bezug_id,
+            quittiert: true,
+            gelesen_bis: Some(bis_id),
+        };
+        zustellen(live, org_id, einsatz_id, j.art, &[(benutzer_id, ereignis)]);
+    }
+    Ok(zeilen.len())
 }
 
 /// Stellt die Ereignisse einer Art und eines Einsatzes zu, je `(benutzer_id, Ereignis)` genau

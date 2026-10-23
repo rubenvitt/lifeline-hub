@@ -334,13 +334,14 @@ async fn ids(pool: &SqlitePool) -> Vec<i64> {
         .unwrap()
 }
 
-/// design.md D1: quittierte Zeilen nach 24 h, unquittierte nach 12 h.
+/// design.md D1, LLH-1143 D3: quittierte Zeilen 24 h nach der Quittung, unquittierte 24 h nach
+/// dem Entstehen (der Verlauf reicht über eine Schicht; nachgereicht wird nur 12 h).
 #[tokio::test]
-async fn aufraeumen_loescht_quittierte_nach_24_und_offene_nach_12_stunden() {
+async fn aufraeumen_loescht_quittierte_und_offene_nach_24_stunden() {
     let pool = crate::db::test_pool().await;
     let (b, e) = setup(&pool).await;
-    let offen_frisch = zeile(&pool, e, b, "2026-06-11 00:00:01", None).await;
-    let _offen_alt = zeile(&pool, e, b, "2026-06-10 23:59:59", None).await;
+    let offen_frisch = zeile(&pool, e, b, "2026-06-10 12:00:01", None).await;
+    let _offen_alt = zeile(&pool, e, b, "2026-06-10 11:59:59", None).await;
     let quittiert_frisch = zeile(
         &pool,
         e,

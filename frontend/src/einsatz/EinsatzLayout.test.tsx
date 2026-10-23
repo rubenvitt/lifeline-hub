@@ -21,10 +21,8 @@ import { adminFixture, benutzerFixture, freigabenFixture } from '../test/fixture
 import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';
 
-const unbearbeitet = vi.hoisted(() => ({ zahl: 0 }));
 vi.mock('./useModulZaehler', () => ({
   useModulZaehler: () => ({}),
-  useUnbearbeiteteMeldungen: () => unbearbeitet.zahl,
 }));
 // Der Unwetter-Wächter hängt am Modulzähler-Modul und hat eigene Tests (`wetter/`, LFH-663).
 vi.mock('../wetter/UnwetterHinweis', () => ({ default: () => null }));
@@ -373,15 +371,15 @@ describe('EinsatzLayout', () => {
    */
 
   /**
-   * Die Kopfzeile trägt 5 Knöpfe und die Wortmarke. Die Aufschlüsselung steht daneben, weil eine
+   * Die Kopfzeile trägt 6 Knöpfe (seit LLH-1143 mit „Eingänge“) und die Wortmarke. Die Aufschlüsselung steht daneben, weil eine
    * nackte Zahl beim Fehlschlag nicht sagt, welche Sorte Ziel dazukam (`test/kopfzeile.ts`).
    */
-  it('AK1 — die Kopfzeile trägt 5 Knöpfe und die Wortmarke (vorher 11 Ziele)', async () => {
+  it('AK1 — die Kopfzeile trägt 6 Knöpfe und die Wortmarke (vorher 11 Ziele)', async () => {
     // Die Wortmarke ist ab `lg` ein Link zur Einsatzliste — ein Bedienziel, kein Umschalter.
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
-    expect(bedienzieleNachRolle()).toEqual({ button: 5, radio: 0, link: 1 });
-    expect(zaehleBedienziele()).toBe(6);
+    expect(bedienzieleNachRolle()).toEqual({ button: 6, radio: 0, link: 1 });
+    expect(zaehleBedienziele()).toBe(7);
     expect(
       within(screen.getByRole('banner')).getByRole('link', { name: 'lifeline-hub' }),
     ).toHaveAttribute('href', '/einsaetze');
@@ -417,6 +415,8 @@ describe('EinsatzLayout', () => {
     const zelle = kopf.querySelector<HTMLElement>('[data-lfh="kopf-alarm"]')!;
     expect(zelle).not.toBeNull();
     expect(zelle).toContainElement(within(kopf).getByRole('button', { name: /^Ton / }));
+    // Die Eingänge stehen in derselben Zelle: auch sie ZEIGEN einen Zustand (LLH-1143).
+    expect(zelle).toContainElement(within(kopf).getByRole('button', { name: /^Eingänge, / }));
     expect(zelle).not.toContainElement(within(kopf).getByRole('button', { name: 'Suchen' }));
     expect(zelle).not.toContainElement(within(kopf).getByRole('button', { name: 'Benutzermenü' }));
     // Kein Trenner-Element mehr — die Zelle trägt die Linie.
@@ -1183,16 +1183,19 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
     await waitFor(() => expect(document.title).toBe('Lagekarte · Hochwasser Nord · lifeline-hub'));
   });
 
-  it('stellt die Zahl der unbearbeiteten Meldungen voran (LLH-1062)', async () => {
-    unbearbeitet.zahl = 3;
-    try {
-      setup(freigabenFixture(), {}, admin, '/einsaetze/7/lagekarte');
-      await waitFor(() =>
-        expect(document.title).toBe('(3) Lagekarte · Hochwasser Nord · lifeline-hub'),
-      );
-    } finally {
-      unbearbeitet.zahl = 0;
-    }
+  it('stellt die Zahl der ungelesenen Eingänge voran, dieselbe wie am Knopf (LLH-1143)', async () => {
+    server.use(
+      http.get('/api/einsaetze/:id/benachrichtigungen', () =>
+        HttpResponse.json({ eintraege: [], ungelesen: 3 }),
+      ),
+    );
+    setup(freigabenFixture(), {}, admin, '/einsaetze/7/lagekarte');
+    await waitFor(() =>
+      expect(document.title).toBe('(3) Lagekarte · Hochwasser Nord · lifeline-hub'),
+    );
+    expect(
+      await screen.findByRole('button', { name: 'Eingänge, 3 ungelesen' }),
+    ).toBeInTheDocument();
   });
 
   it('merkt den offenen Pfad als letzten Ort der Person, ohne die Suche', async () => {

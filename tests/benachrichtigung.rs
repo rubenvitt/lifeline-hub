@@ -907,3 +907,246 @@ async fn pfad_id_und_filter_sind_validiert() {
     let (s, _) = anfrage(&w.app, "GET", "/api/benachrichtigungen", "", None).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
+
+// ───────────────────────── Benachrichtigungszentrale (LLH-1143) ─────────────────────────
+
+impl Welt {
+    async fn verlauf(&self, cookie: &str) -> (StatusCode, Value) {
+        anfrage(
+            &self.app,
+            "GET",
+            &format!("/api/einsaetze/{}/benachrichtigungen", self.einsatz),
+            cookie,
+            None,
+        )
+        .await
+    }
+
+    async fn gelesen(&self, cookie: &str, body: &str) -> (StatusCode, Value) {
+        anfrage(
+            &self.app,
+            "POST",
+            &format!("/api/einsaetze/{}/benachrichtigungen/gelesen", self.einsatz),
+            cookie,
+            Some(body),
+        )
+        .await
+    }
+
+    /// `(stufe, quittiert)` der Zeilen eines Nutzers, nach id.
+    async fn zeilen_von(&self, benutzer_id: i64) -> Vec<(String, bool)> {
+        sqlx::query_as::<_, (String, bool)>(
+            "SELECT stufe, quittiert_at IS NOT NULL FROM benachrichtigung \
+             WHERE benutzer_id = ? ORDER BY id",
+        )
+        .bind(benutzer_id)
+        .fetch_all(&self.pool)
+        .await
+        .unwrap()
+    }
+}
+
+/// design.md D2: eine abgeschaltete Art erzeugt eine Zeile der Stufe still, schon gelesen. Sie
+/// steht im Verlauf, zählt nicht, kommt nicht ins Nachreichen; `melden` nennt nur die Lauten.
+#[tokio::test]
+async fn abgeschaltete_art_steht_still_im_verlauf_und_zaehlt_nicht() {
+    let w = welt().await;
+    let anna = w.cookie("annika").await;
+    let (s, v) = anfrage(
+        &w.app,
+        "PUT",
+        "/api/benutzer-einstellungen/benachrichtigungen_aus",
+        &anna,
+        Some(r#"{"wert":"[\"auftrag_erteilt\"]"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let anna_live = oeffnen(&w.app, &feed, &anna, None).await;
+    let (auftrag, _) = w.auftrag().await;
+
+    let an = w
+        .melden(
+            w.anlass(Art::AuftragErteilt, Typ::Auftrag, auftrag)
+                .an(Adressat::Nutzer(w.anna))
+                .an(Adressat::Nutzer(w.bert)),
+        )
+        .await;
+    assert_eq!(an, vec![w.bert], "benachrichtigt ist nur Bert");
+    assert_eq!(w.zeilen_von(w.anna).await, vec![("still".into(), true)]);
+    assert_eq!(w.zeilen_von(w.bert).await, vec![("hinweis".into(), false)]);
+
+    let (s, v) = w.verlauf(&anna).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ungelesen"], 0, "{v}");
+    let eintraege = v["eintraege"].as_array().unwrap();
+    assert_eq!(eintraege.len(), 1, "{v}");
+    assert_eq!(eintraege[0]["stufe"], "still");
+    assert_eq!(eintraege[0]["titel"], "Neuer Auftrag");
+    assert!(eintraege[0]["quittiert_at"].is_string());
+
+    let (_, v) = anfrage(
+        &w.app,
+        "GET",
+        "/api/benachrichtigungen?offen=true",
+        &anna,
+        None,
+    )
+    .await;
+    assert_eq!(v, json!([]), "still wird nicht nachgereicht");
+
+    // Live geht sie hinaus, damit ein offener Verlauf mitläuft — als still.
+    let e = ereignisse(&lesen(anna_live).await);
+    let still: Vec<Value> = e
+        .iter()
+        .filter(|(n, _)| n == "benachrichtigung")
+        .map(|(_, d)| serde_json::from_str(d).unwrap())
+        .collect();
+    assert_eq!(still.len(), 1, "{e:?}");
+    assert_eq!(still[0]["stufe"], "still");
+}
+
+/// design.md D3: der Verlauf nennt die eigenen Benachrichtigungen des Einsatzes, jüngste zuerst,
+/// und zählt die ungelesenen Eingänge — keine Alarme, keine gelesenen, nichts Fremdes.
+#[tokio::test]
+async fn verlauf_zaehlt_ungelesene_eingaenge_ohne_alarme() {
+    let w = welt().await;
+    let anna = w.cookie("annika").await;
+    let bert = w.cookie("bertram").await;
+    let (a1, _) = w.auftrag().await;
+    let (a2, _) = w.auftrag().await;
+    for anlass in [
+        w.anlass(Art::AuftragErteilt, Typ::Auftrag, a1),
+        w.anlass(Art::AuftragErteilt, Typ::Auftrag, a2),
+        w.anlass(Art::AuftragUeberfaellig, Typ::Auftrag, a1),
+    ] {
+        w.melden(anlass.an(Adressat::Nutzer(w.anna))).await;
+    }
+    let (s, v) = w.verlauf(&anna).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["ungelesen"], 2,
+        "zwei Eingänge, der Alarm zählt nicht: {v}"
+    );
+    let stufen: Vec<&str> = v["eintraege"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["stufe"].as_str().unwrap())
+        .collect();
+    assert_eq!(stufen, ["alarm", "hinweis", "hinweis"], "jüngste zuerst");
+
+    let (s, v) = w.verlauf(&bert).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v, json!({ "eintraege": [], "ungelesen": 0 }));
+
+    // Nur wer den Einsatz lesen darf: die Tür des Einsatzes (`EinsatzLesezugriff`) wie jede
+    // Einsatzroute, für ein Org-Mitglied ohne Mitgliedschaft 403.
+    benutzer_anlegen(&w.app, &w.admin, "fremdling", "keine").await;
+    let fremd = w.cookie("fremdling").await;
+    let (s, _) = w.verlauf(&fremd).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+/// Das Modulrecht am Bezug gilt auch im Verlauf: ohne Recht weder Eintrag noch Zählung.
+#[tokio::test]
+async fn verlauf_prueft_das_modulrecht_am_bezug() {
+    let w = welt().await;
+    let anna = w.cookie("annika").await;
+    w.melden(
+        w.anlass(Art::AuftragErteilt, Typ::Auftrag, 1)
+            .an(Adressat::Nutzer(w.anna)),
+    )
+    .await;
+    w.modul_nur_fuer_admins("auftraege").await;
+    let (s, v) = w.verlauf(&anna).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v, json!({ "eintraege": [], "ungelesen": 0 }));
+}
+
+/// design.md D4: „alle gelesen“ quittiert die eigenen Eingänge bis zur Kennung, nie einen Alarm,
+/// nie eine fremde Zeile, und meldet es den anderen Tabs mit EINEM Ereignis samt `gelesen_bis`.
+#[tokio::test]
+async fn alle_gelesen_quittiert_eingaenge_nicht_alarme_und_meldet_einmal() {
+    let w = welt().await;
+    let anna = w.cookie("annika").await;
+    for anlass in [
+        w.anlass(Art::AuftragErteilt, Typ::Auftrag, 1),
+        w.anlass(Art::Sofortmeldung, Typ::Meldung, 2),
+        w.anlass(Art::Befehl, Typ::Befehl, 3),
+    ] {
+        w.melden(
+            anlass
+                .an(Adressat::Nutzer(w.anna))
+                .an(Adressat::Nutzer(w.bert)),
+        )
+        .await;
+    }
+    let bis: i64 = sqlx::query_scalar("SELECT MAX(id) FROM benachrichtigung WHERE benutzer_id = ?")
+        .bind(w.anna)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+    // Nach `bis` kommt noch einer: er bleibt ungelesen.
+    w.melden(
+        w.anlass(Art::Gefahr, Typ::Gefahrengebiet, 4)
+            .an(Adressat::Nutzer(w.anna)),
+    )
+    .await;
+
+    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let zweiter_tab = oeffnen(&w.app, &feed, &anna, None).await;
+    let (s, v) = w
+        .gelesen(&anna, &json!({ "bis_id": bis }).to_string())
+        .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    assert_eq!(
+        w.zeilen_von(w.anna).await,
+        vec![
+            ("hinweis".into(), true),
+            ("alarm".into(), false),
+            ("hinweis".into(), true),
+            ("hinweis".into(), false),
+        ]
+    );
+    assert!(
+        w.zeilen_von(w.bert).await.iter().all(|(_, q)| !q),
+        "Berts Zeilen bleiben ungelesen"
+    );
+    let e = ereignisse(&lesen(zweiter_tab).await);
+    let gelesen: Vec<Value> = e
+        .iter()
+        .filter(|(n, _)| n == "benachrichtigung")
+        .map(|(_, d)| serde_json::from_str(d).unwrap())
+        .collect();
+    assert_eq!(gelesen.len(), 1, "ein Ereignis für alle: {e:?}");
+    assert_eq!(gelesen[0]["quittiert"], true);
+    assert_eq!(gelesen[0]["gelesen_bis"], bis);
+
+    let (_, v) = w.verlauf(&anna).await;
+    assert_eq!(v["ungelesen"], 1, "{v}");
+
+    // Noch einmal: nichts mehr zu quittieren, kein Fehler.
+    let (s, _) = w
+        .gelesen(&anna, &json!({ "bis_id": bis }).to_string())
+        .await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+}
+
+#[tokio::test]
+async fn alle_gelesen_validiert_den_body_und_das_recht() {
+    let w = welt().await;
+    let anna = w.cookie("annika").await;
+    for body in ["{}", r#"{"bis_id":"x"}"#, "kein json"] {
+        let (s, v) = w.gelesen(&anna, body).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST, "{body}: {v}");
+    }
+    benutzer_anlegen(&w.app, &w.admin, "fremdling", "keine").await;
+    let fremd = w.cookie("fremdling").await;
+    let (s, _) = w.gelesen(&fremd, r#"{"bis_id":1}"#).await;
+    assert_eq!(
+        s,
+        StatusCode::FORBIDDEN,
+        "Tür des Einsatzes wie beim Verlauf"
+    );
+}

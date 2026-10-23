@@ -165,7 +165,10 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await userEvent.clear(vegan);
     await userEvent.type(vegan, '400');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Sonderkost übersteigt den Gesamtbedarf')).toBeVisible();
+    // Der Fehltext blendet per antd-Motion ein (erst Höhe 0, Deckkraft 0): auf das Ende warten.
+    await waitFor(() =>
+      expect(screen.getByText('Sonderkost übersteigt den Gesamtbedarf')).toBeVisible(),
+    );
     expect(screen.getByLabelText('davon vegan')).toHaveValue('400');
     expect(onBedarfSpeichern).toHaveBeenCalledWith(expect.anything(), {
       sonderkost: { vegan: 400 },
@@ -177,7 +180,10 @@ describe('Zeitfensterkarte · Bedarf bearbeiten in der Ansicht', () => {
     await oeffneBearbeiten();
     await userEvent.clear(await screen.findByLabelText('Einsatzkräfte (EP)'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(await screen.findByText('Bitte eine Anzahl angeben — 0, wenn niemand')).toBeVisible();
+    // Der Fehltext blendet per antd-Motion ein (erst Höhe 0, Deckkraft 0): auf das Ende warten.
+    await waitFor(() =>
+      expect(screen.getByText('Bitte eine Anzahl angeben — 0, wenn niemand')).toBeVisible(),
+    );
     expect(onBedarfSpeichern).not.toHaveBeenCalled();
   });
 
