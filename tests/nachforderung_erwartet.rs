@@ -528,8 +528,9 @@ async fn doppelbuchungs_warnweg_behaelt_den_verweis() {
     );
 }
 
-/// D4 Prüfkette: Fahrzeug 422 vor allem; fremder Raum und fremder Einsatz 404; angefordert 422;
-/// Einheit schon aus einer anderen Nachforderung 409. Nichts wird gebucht.
+/// D4 Prüfkette: fremder Raum und fremder Einsatz 404; angefordert 422; Einheit schon aus einer
+/// anderen Nachforderung 409. Nichts wird gebucht. (Ein Fahrzeug ohne Einheit ist seit LLH-1444
+/// kein 422 mehr, siehe `fahrzeug_ohne_einheit_wird_mit_verweis_zur_einheit`.)
 #[tokio::test]
 async fn pruefkette_des_verweises() {
     let app = setup().await;
@@ -555,15 +556,6 @@ async fn pruefkette_des_verweises() {
     let lf = einheit_bilden(&app, &admin, e, "LF 1").await;
     let kraft = |nid: i64| json!({ "kraft": { "objekt_typ": "einheit", "objekt_id": lf }, "nachforderung_id": nid });
 
-    let (s, j) = eintreffen(
-        &app,
-        &admin,
-        e,
-        nord,
-        json!({ "kraft": { "objekt_typ": "fahrzeug", "objekt_id": 1 }, "nachforderung_id": n }),
-    )
-    .await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "Fahrzeug: {j:?}");
     let (s, _) = eintreffen(&app, &admin, e, sued, kraft(n)).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "Ziel ist ein anderer Raum");
     let (s, _) = eintreffen(&app, &admin, e, nord, kraft(fremd)).await;
@@ -594,6 +586,170 @@ async fn pruefkette_des_verweises() {
     let (s, j) = eintreffen(&app, &admin, e, nord, kraft(n)).await;
     assert_eq!(s, StatusCode::CREATED, "{j:?}");
     assert_eq!(lade(&app, &admin, e, n).await["einheit_ids"], json!([lf]));
+}
+
+async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufname: &str) -> i64 {
+    let (s, j) = anfrage(
+        app,
+        "POST",
+        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        cookie,
+        Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "Fahrzeug: {j:?}");
+    j["id"].as_i64().unwrap()
+}
+
+async fn einheit_von(pool: &sqlx::SqlitePool, tabelle: &str, id: i64) -> Option<i64> {
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT einheit_id FROM {tabelle} WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+async fn einheiten_anzahl(pool: &sqlx::SqlitePool, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_einheit WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+/// LLH-1444 (Entscheidung 23.10.2026): ein Fahrzeug ohne Einheit mit Verweis auf eine
+/// Nachforderung wird in derselben Transaktion zur Einheit (Name = Funkrufname, Besatzung ohne
+/// Einheit kommt mit), die Einheit tritt in den Raum ein, verweist auf die Nachforderung und steht
+/// unter ihren Einheiten; genau ein ETB-Eintrag mit Verweis. Eine Wiederholung derselben
+/// `client_id` legt nichts zweites an. Ohne Verweis bleibt es der Eintritt des Fahrzeugs; ein
+/// Fahrzeug, das schon in einem Raum steht, ist 409 und legt keine Einheit an.
+#[tokio::test]
+async fn fahrzeug_ohne_einheit_wird_mit_verweis_zur_einheit() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let nord = raum(&app, &admin, e, "Nord").await;
+    let n = nachforderung(
+        &app,
+        &admin,
+        e,
+        "RTW",
+        json!({ "ziel_br_id": nord }),
+        Some(json!({ "rufnamen": ["RTW 2", "RTW 3"] })),
+        "unterwegs",
+    )
+    .await;
+    let ef = adhoc_fahrzeug(&app, &admin, e, "RTW 2").await;
+    let anna = stammpersonal_disponieren(&app, &admin, e, "Anna").await;
+    let (s, j) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{e}/fahrzeuge/{ef}/besatzung/{anna}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "Besatzung: {j:?}");
+    let vorher = etb(&app, &admin, e).await.len();
+    let einheiten_vorher = einheiten_anzahl(&pool, e).await;
+    let body = json!({ "kraft": { "objekt_typ": "fahrzeug", "objekt_id": ef },
+                       "nachforderung_id": n, "client_id": "llh-1444-a" });
+
+    let (s, j) = eintreffen(&app, &admin, e, nord, body.clone()).await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    let neu = j["einheit_id"].as_i64().expect("Einheit angelegt");
+    assert_eq!(j["belegung"]["objekt_typ"], "einheit", "{j:?}");
+    assert_eq!(j["belegung"]["objekt_id"], neu);
+    assert_eq!(j["fahrzeug_ids"], json!([ef]));
+    assert_eq!(j["zeitachse"], "geschrieben");
+    assert_eq!(j["unangemeldet"], false);
+    assert_eq!(einheiten_anzahl(&pool, e).await, einheiten_vorher + 1);
+
+    let x = einheit(&app, &admin, e, neu).await;
+    assert_eq!(x["name"], "RTW 2");
+    assert_eq!(x["funkrufname"], "RTW 2");
+    assert_eq!(x["nachforderung_id"], n);
+    assert_eq!(x["aktueller_br_id"], nord);
+    assert!(
+        x["nicht_uebernommen_seit"].is_null(),
+        "bekannte Kraft, keine offene Übernahme: {x:?}"
+    );
+    assert_eq!(einheit_von(&pool, "einsatz_fahrzeug", ef).await, Some(neu));
+    assert_eq!(
+        einheit_von(&pool, "einsatz_personal", anna).await,
+        Some(neu)
+    );
+    let fahrzeug_br: Option<i64> =
+        sqlx::query_scalar("SELECT aktueller_br_id FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        fahrzeug_br, None,
+        "im Raum steht die Einheit, nicht das Fahrzeug"
+    );
+
+    let nf = lade(&app, &admin, e, n).await;
+    assert_eq!(
+        nf["einheit_ids"],
+        json!([neu]),
+        "die Nachforderung zählt die Kraft"
+    );
+    assert_eq!(
+        nf["status"], "unterwegs",
+        "Eintreffen melden bleibt der Führung"
+    );
+    let nach = etb(&app, &admin, e).await;
+    assert_eq!(nach.len(), vorher + 1, "genau ein ETB-Eintrag: {nach:#?}");
+    let eintrag = nach
+        .iter()
+        .find(|x| {
+            x["inhalt"]
+                == "Nachforderung 2× RTW: Fahrzeug RTW 2 als Einheit übernommen, im BR Nord \
+                    eingetroffen, Besatzung: Anna"
+        })
+        .unwrap_or_else(|| panic!("ETB-Eintrag mit Nachforderung: {nach:#?}"));
+    assert_eq!(eintrag["nachforderung_id"], n);
+
+    // Wiederholung aus der Warteschlange: dasselbe Ergebnis, nichts Zweites.
+    let (s, w) = eintreffen(&app, &admin, e, nord, body).await;
+    assert_eq!(s, StatusCode::CREATED, "{w:?}");
+    assert_eq!(w["einheit_id"], neu);
+    assert_eq!(einheiten_anzahl(&pool, e).await, einheiten_vorher + 1);
+    assert_eq!(etb(&app, &admin, e).await.len(), vorher + 1);
+
+    // Ohne Verweis wie bisher: das Fahrzeug selbst tritt ein, keine Einheit.
+    let drei = adhoc_fahrzeug(&app, &admin, e, "RTW 3").await;
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "fahrzeug", "objekt_id": drei } }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{j:?}");
+    assert!(j.get("einheit_id").is_none(), "{j:?}");
+    assert_eq!(j["belegung"]["objekt_typ"], "fahrzeug");
+    assert_eq!(einheit_von(&pool, "einsatz_fahrzeug", drei).await, None);
+    assert_eq!(einheiten_anzahl(&pool, e).await, einheiten_vorher + 1);
+
+    // Schon in einem Raum: 409 wie beim Eintritt, keine Einheit, kein Verweis.
+    let (s, j) = eintreffen(
+        &app,
+        &admin,
+        e,
+        nord,
+        json!({ "kraft": { "objekt_typ": "fahrzeug", "objekt_id": drei }, "nachforderung_id": n }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{j:?}");
+    assert_eq!(einheit_von(&pool, "einsatz_fahrzeug", drei).await, None);
+    assert_eq!(einheiten_anzahl(&pool, e).await, einheiten_vorher + 1);
+    assert_eq!(lade(&app, &admin, e, n).await["einheit_ids"], json!([neu]));
 }
 
 /// D5: mit verknüpfter Einheit vor dem Eintreffen gehen Rücknahme, Ablehnen und Zurückziehen

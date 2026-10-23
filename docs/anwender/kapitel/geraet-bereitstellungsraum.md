@@ -61,7 +61,7 @@ Im Zustand „geplant“ nimmt der Raum noch keine Kräfte an: die Knöpfe zum Z
    vorhandene Kraft; „Trotzdem neu anlegen“ nur, wenn es wirklich eine andere Kraft ist. Steht die
    vorhandene Kraft schon in einem Raum, fehlt „Diese buchen“. Kommt die Erfassung aus „Aus
    Nachforderungen“, verknüpft auch „Diese buchen“ die Einheit mit der Nachforderung; ein Fahrzeug
-   ohne Einheit lässt sich nicht verknüpfen, das sagt der Hinweis neben dem Knopf.
+   ohne Einheit wird dabei zur Einheit mit seinem Funkrufnamen.
 
 ### Ohne Netz buchen
 
@@ -137,7 +137,8 @@ Das Tablet führt nur seinen eigenen Raum. Es legt keinen Raum an, wechselt nich
 ändert weder Stammdaten noch Bezeichnung, Standort und Notiz des Raums, löst den Raum nicht auf und
 storniert ihn nicht; das bleibt der Einsatzleitung. Auch an den Einheiten und Fahrzeugen selbst ändert es nichts,
 mit einer Ausnahme: „Unangemeldet buchen“ und „Eintreffen buchen“ aus einer Nachforderung legen eine
-neue Einheit mit ihren Fahrzeugen an. Ob sie bleibt, entscheidet die Einsatzleitung; Übernehmen und
+neue Einheit mit ihren Fahrzeugen an, und „Diese buchen“ aus einer Nachforderung macht ein Fahrzeug
+ohne Einheit zur Einheit. Ob sie bleibt, entscheidet die Einsatzleitung; Übernehmen und
 Abweisen gibt es am Tablet nicht (Kapitel [Einheiten](einheiten.md)). Die Suche findet nur Kräfte
 des Einsatzes, keine aus den Stammdaten.
 

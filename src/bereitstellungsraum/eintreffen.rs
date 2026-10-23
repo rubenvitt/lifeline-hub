@@ -37,7 +37,8 @@ pub struct EintreffenEingabe {
     #[serde(default)]
     pub client_id: Option<String>,
     /// Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit
-    /// bekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug.
+    /// bekommt den Verweis. Nur mit Ziel = dieser Raum. Ein einheitenloses Fahrzeug wird dabei
+    /// zur Einheit (LLH-1444).
     #[serde(default)]
     pub nachforderung_id: Option<i64>,
 }
@@ -121,8 +122,8 @@ impl Erfassung {
 }
 
 /// Feldprüfung vor jedem Schreiben (design.md D2): 400 für jedes Feld für sich, danach 422,
-/// wenn `kraft` und `unangemeldet` zugleich kommen oder ein Fahrzeug eine Nachforderung nennt
-/// (LLH-1387 D4). Weder noch → 400.
+/// wenn `kraft` und `unangemeldet` zugleich kommen. Weder noch → 400. Ein Fahrzeug mit
+/// Nachforderung ist seit LLH-1444 kein 422 mehr: es wird beim Buchen zur Einheit.
 pub fn check(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
     if eingabe.kraft.is_none() && eingabe.unangemeldet.is_none() {
         return Err(AppError::Validation(
@@ -148,19 +149,6 @@ pub fn check(eingabe: &EintreffenEingabe) -> Result<Erfassung, AppError> {
         .as_ref()
         .map(check_unangemeldet)
         .transpose()?;
-    if eingabe.nachforderung_id.is_some()
-        && matches!(
-            bekannt,
-            Some(Erfassung::Bekannt {
-                typ: ObjektTyp::Fahrzeug,
-                ..
-            })
-        )
-    {
-        return Err(AppError::UnprocessableEntity(
-            "Ein Fahrzeug ohne Einheit lässt sich nicht mit einer Nachforderung verknüpfen".into(),
-        ));
-    }
     match (bekannt, unangemeldet) {
         (Some(_), Some(_)) => Err(AppError::UnprocessableEntity(
             "Entweder eine bekannte oder eine unangemeldete Kraft buchen, nicht beides".into(),
@@ -288,6 +276,8 @@ pub struct Gebucht {
     pub hinweise: Vec<crate::benachrichtigung::Anlass>,
     /// Die Nachforderung, mit der die Einheit verknüpft wurde (LLH-1387), für Live.
     pub nachforderung_id: Option<i64>,
+    /// Das gebuchte Fahrzeug ist dabei zur Einheit geworden (LLH-1444): Live meldet es mit.
+    pub als_einheit: bool,
 }
 
 /// Rahmen einer Buchung: wer, wo, wann.
@@ -325,19 +315,19 @@ pub async fn eintreffen_tx(
         Some(id) => Some(check_herkunft_tx(conn, r, id).await?),
         None => None,
     };
-    match erfassung {
-        Erfassung::Bekannt { typ, objekt_id } => {
-            bekannt_tx(
-                conn,
-                r,
-                &br.bezeichnung,
-                *typ,
-                *objekt_id,
-                herkunft.as_ref(),
-            )
-            .await
+    match (erfassung, herkunft.as_ref()) {
+        // Ein einheitenloses Fahrzeug aus einer Nachforderung wird zur Einheit (LLH-1444).
+        (
+            Erfassung::Bekannt {
+                typ: ObjektTyp::Fahrzeug,
+                objekt_id,
+            },
+            Some(h),
+        ) => fahrzeug_als_einheit_tx(conn, r, &br.bezeichnung, *objekt_id, h).await,
+        (Erfassung::Bekannt { typ, objekt_id }, h) => {
+            bekannt_tx(conn, r, &br.bezeichnung, *typ, *objekt_id, h).await
         }
-        Erfassung::Unangemeldet(u) => unangemeldet_tx(conn, r, &br, u, herkunft.as_ref()).await,
+        (Erfassung::Unangemeldet(u), h) => unangemeldet_tx(conn, r, &br, u, h).await,
     }
 }
 
@@ -652,6 +642,117 @@ async fn bekannt_tx(
         abloesung,
         hinweise,
         nachforderung_id: herkunft.filter(|_| typ == ObjektTyp::Einheit).map(|h| h.id),
+        als_einheit: false,
+    })
+}
+
+/// ETB-Wortlaut der Übernahme eines Fahrzeugs beim Eintreffen (LLH-1444): „Nachforderung 2× RTW:
+/// Fahrzeug RTW 2 als Einheit übernommen, im BR Nord eingetroffen“, mit mitgekommener Besatzung
+/// „…, Besatzung: Anna, Berta“.
+pub fn etb_text_fahrzeug_als_einheit(
+    kurz: &str,
+    name: &str,
+    br_bezeichnung: &str,
+    besatzung: &[String],
+) -> String {
+    let mut text = format!(
+        "Nachforderung {kurz}: Fahrzeug {name} als Einheit übernommen, im BR {br_bezeichnung} \
+         eingetroffen"
+    );
+    if !besatzung.is_empty() {
+        text.push_str(&format!(", Besatzung: {}", besatzung.join(", ")));
+    }
+    text
+}
+
+/// Ein einheitenloses Fahrzeug trifft mit Verweis auf eine Nachforderung ein (LLH-1444,
+/// Entscheidung 23.10.2026): es wird in der Transaktion der Buchung zur Einheit wie bei „Als eigene
+/// Einheit führen“ (LLH-1073 D9/D10: Name und Funkrufname = Funkrufname des Fahrzeugs, das Soll
+/// des Fahrzeugs, die Besatzung ohne Einheit kommt mit), die Einheit tritt in den Raum ein
+/// ([`eintritt_einheit_tx`]) und bekommt den Verweis ([`verknuepfe_tx`]). Fehlerfolge vor jedem
+/// Schreiben wie beim Eintritt des Fahrzeugs (fremd 404, beendet 409, einer Einheit zugehörig
+/// 409, schon in einem Raum 409); die Anzahl der Nachforderung erreicht → 422. Genau ein
+/// ETB-Eintrag mit Verweis auf die Nachforderung (D5).
+async fn fahrzeug_als_einheit_tx(
+    conn: &mut SqliteConnection,
+    r: &Rahmen<'_>,
+    br_bezeichnung: &str,
+    ef_id: i64,
+    h: &Herkunft,
+) -> Result<Gebucht, AppError> {
+    use crate::einheit::{mitglied_repo, repo as einheit_repo};
+    let aktuell =
+        belegung_repo::einheitenloses_fahrzeug_br_tx(&mut *conn, r.einsatz_id, ef_id).await?;
+    belegung_repo::check_art_vorbedingung(&BrBelegungsArt::Eintritt, aktuell, r.br_id)?;
+    let (name, soll_fuehrer, soll_unterfuehrer, soll_mannschaft): (
+        String,
+        Option<i64>,
+        Option<i64>,
+        Option<i64>,
+    ) = sqlx::query_as(
+        "SELECT coalesce(f.funkrufname, ef.snap_funkrufname), \
+                f.staerke_fuehrer, f.staerke_unterfuehrer, f.staerke_mannschaft \
+         FROM einsatz_fahrzeug ef LEFT JOIN fahrzeug f ON f.id = ef.fahrzeug_id \
+         WHERE ef.id = ? AND ef.einsatz_id = ?",
+    )
+    .bind(ef_id)
+    .bind(r.einsatz_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    let einheit_id = einheit_repo::anlegen_tx(
+        &mut *conn,
+        r.einsatz_id,
+        r.org_id,
+        &einheit_repo::EinheitDaten {
+            name: &name,
+            abschnitt_id: None,
+            ueber_einheit_id: None,
+            typ_id: None,
+            soll_fuehrer,
+            soll_unterfuehrer,
+            soll_mannschaft,
+            bemerkung: None,
+            funkrufname: Some(&name),
+            sortier: 0,
+            tz_fachaufgabe: None,
+            tz_organisation: None,
+        },
+        r.benutzer_id,
+    )
+    .await?;
+    mitglied_repo::zuordnen_fahrzeug_menge_tx(&mut *conn, r.einsatz_id, einheit_id, &[ef_id])
+        .await?;
+    let besatzung =
+        mitglied_repo::mitnehmen_besatzung_tx(&mut *conn, r.einsatz_id, einheit_id, &[ef_id])
+            .await?;
+    verknuepfe_tx(conn, r, h, einheit_id).await?;
+    let e = eintritt_einheit_tx(conn, r, einheit_id).await?;
+    let namen: Vec<String> = besatzung.iter().map(|(_, n)| n.clone()).collect();
+    let etb_id = crate::nachforderung::repo::protokollieren_tx(
+        conn,
+        h.id,
+        r.benutzer_id,
+        &etb_text_fahrzeug_als_einheit(&h.kurz, &name, br_bezeichnung, &namen),
+    )
+    .await?;
+    let mut personen = e.personen;
+    personen.extend(besatzung.iter().map(|(id, _)| *id));
+    personen.sort_unstable();
+    personen.dedup();
+    Ok(Gebucht {
+        belegung_id: e.belegung_id,
+        objekt_typ: ObjektTyp::Einheit,
+        objekt_id: einheit_id,
+        einheit_id: Some(einheit_id),
+        fahrzeug_ids: vec![ef_id],
+        zeitachse: e.zeitachse,
+        meldung_id: None,
+        etb_id,
+        personen,
+        abloesung: e.abloesung,
+        hinweise: e.hinweise,
+        nachforderung_id: Some(h.id),
+        als_einheit: true,
     })
 }
 
@@ -896,6 +997,7 @@ async fn unangemeldet_tx(
         abloesung: beruehrt.abloesung,
         hinweise: beruehrt.hinweise,
         nachforderung_id: herkunft.map(|h| h.id),
+        als_einheit: false,
     })
 }
 
@@ -1263,6 +1365,37 @@ mod tests {
             unreachable!()
         };
         assert_eq!(u.fahrzeuge.len(), 2);
+    }
+
+    #[test]
+    fn etb_text_fahrzeug_als_einheit_nennt_raum_und_besatzung() {
+        assert_eq!(
+            etb_text_fahrzeug_als_einheit("2× RTW", "RTW 2", "Nord", &[]),
+            "Nachforderung 2× RTW: Fahrzeug RTW 2 als Einheit übernommen, im BR Nord eingetroffen"
+        );
+        assert_eq!(
+            etb_text_fahrzeug_als_einheit(
+                "RTW",
+                "RTW 2",
+                "Nord",
+                &["Anna".to_string(), "Berta".to_string()]
+            ),
+            "Nachforderung RTW: Fahrzeug RTW 2 als Einheit übernommen, im BR Nord eingetroffen, \
+             Besatzung: Anna, Berta"
+        );
+    }
+
+    #[test]
+    fn fahrzeug_mit_nachforderung_besteht_die_pruefung() {
+        let r = check(&EintreffenEingabe {
+            kraft: Some(KraftAngabe {
+                objekt_typ: "fahrzeug".into(),
+                objekt_id: 6,
+            }),
+            nachforderung_id: Some(4),
+            ..Default::default()
+        });
+        assert_eq!(r.unwrap(), bekannt(ObjektTyp::Fahrzeug, 6));
     }
 
     #[test]

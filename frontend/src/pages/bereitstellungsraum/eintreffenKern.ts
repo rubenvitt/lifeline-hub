@@ -321,8 +321,9 @@ export function nachgefordertHinweise(
 /**
  * Was „Eintreffen“ an einer Zeile tut: eine gleichnamige buchbare Einheit buchen (mit Verweis),
  * nichts, solange eine Buchung desselben Namens ohne Netz vorgemerkt ist, sonst die Neuanlage
- * mit dem Rufnamen. Ein einheitenloses Fahrzeug lässt sich nicht verknüpfen: Neuanlage, deren
- * Doppelbuchungs-Hinweis es nennt.
+ * mit dem Rufnamen. Ein gleichnamiges Fahrzeug ohne Einheit geht über den Doppelbuchungs-Hinweis:
+ * „Diese buchen“ macht es mit Verweis zur Einheit (LLH-1444), ein sichtbarer Schritt, weil die
+ * Buchung den Bestand umbaut.
  */
 export function nachgefordertZiel(
   z: NachgefordertZeile,

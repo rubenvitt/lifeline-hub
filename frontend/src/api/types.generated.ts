@@ -2542,7 +2542,8 @@ export interface components {
             /**
              * Format: int64
              * @description Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit
-             *     bekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug.
+             *     bekommt den Verweis. Nur mit Ziel = dieser Raum. Ein einheitenloses Fahrzeug wird dabei
+             *     zur Einheit (LLH-1444).
              */
             nachforderung_id?: number | null;
             unangemeldet?: components["schemas"]["UnangemeldetEingabe"] | null;

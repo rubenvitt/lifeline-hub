@@ -329,11 +329,9 @@ export default function EintreffenDialog({
       ? findDoppelbuchung(funkrufname, { einheiten, fahrzeuge, kandidaten: alle, vorgemerkt })
       : null;
   const serverDoppel = schritt === 'neu' && isDoppelbuchung(buchung.error);
-  // Aus einer Nachforderung trägt „Diese buchen“ den Verweis mit (LLH-1396); ein Fahrzeug ohne
-  // Einheit lässt sich nicht verknüpfen (Server 422), es geht sichtbar ohne Verweis.
-  const doppelVerweis =
-    herkunft != null && doppel?.treffer?.art === 'einheit' ? herkunft.nachforderungId : undefined;
-  const doppelOhneVerweis = herkunft != null && doppel?.treffer?.art === 'fahrzeug';
+  // Aus einer Nachforderung trägt „Diese buchen“ den Verweis mit (LLH-1396), auch bei einem
+  // Fahrzeug ohne Einheit: der Server macht es dabei zur Einheit (LLH-1444).
+  const doppelVerweis = herkunft != null && doppel?.treffer ? herkunft.nachforderungId : undefined;
   const bemerkung = Form.useWatch('bemerkung', form) as string | undefined;
   const weitere = (Form.useWatch('weitere', form) ?? []) as UnangemeldetFormular['weitere'];
   const weitereNamen = (weitere ?? []).map((w) => w?.funkrufname?.trim()).filter(Boolean);
@@ -652,11 +650,6 @@ export default function EintreffenDialog({
             // Unter dem Titel statt daneben: bei 390 px drückte die Knopfreihe den Titel auf null.
             description={
               <Space size="middle" wrap>
-                {doppelOhneVerweis && (
-                  <Typography.Text type="secondary">
-                    Fahrzeug ohne Einheit: ohne Verweis auf die Nachforderung
-                  </Typography.Text>
-                )}
                 {doppel?.treffer && (
                   <Button
                     onClick={() =>

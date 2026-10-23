@@ -6432,7 +6432,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit\nbekommt den Verweis. Nur mit Ziel = dieser Raum, nicht für ein einheitenloses Fahrzeug."
+            "description": "Nachforderung, aus der die Kraft erwartet wird (LLH-1387, design.md D4): die Einheit\nbekommt den Verweis. Nur mit Ziel = dieser Raum. Ein einheitenloses Fahrzeug wird dabei\nzur Einheit (LLH-1444)."
           },
           "unangemeldet": {
             "oneOf": [
